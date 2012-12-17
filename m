@@ -1,150 +1,70 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Mon, 17 Dec 2012 12:25:26 +0100
-Subject: [PATCH 3/4 v2] spi: sh-msiof: Add device tree parsing to driver
-In-Reply-To: <CABMQnV+CSEKwq=4kQYUDXOuARLA_WgvnkJEME_VeYmAv3PLXBg@mail.gmail.com>
-References: <1355313289-29769-1-git-send-email-hechtb+renesas@gmail.com>
- <1355313289-29769-3-git-send-email-hechtb+renesas@gmail.com>
- <CABMQnV+CSEKwq=4kQYUDXOuARLA_WgvnkJEME_VeYmAv3PLXBg@mail.gmail.com>
-Message-ID: <CABYn4sybRf4vxxGccCDSCEMcza4DZdaZgTD6kZ7+v9CDspzCBg@mail.gmail.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Mon, 17 Dec 2012 12:27:56 +0100
+Subject: devicetree support for efikasb
+In-Reply-To: <20121217075907.GQ24458@pengutronix.de> (Sascha Hauer's message
+ of "Mon, 17 Dec 2012 08:59:07 +0100")
+References: <20121217075907.GQ24458@pengutronix.de>
+Message-ID: <87licwdikj.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nobuhiro,
+Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-2012/12/17 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>:
-> Hi, Bastian.
->
-> On Wed, Dec 12, 2012 at 8:54 PM, Bastian Hecht <hechtb@gmail.com> wrote:
->> From: Bastian Hecht <hechtb@gmail.com>
->>
->> This adds the capability to retrieve setup data from the device tree
->> node. The usage of platform data is still available.
->>
->> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
->> ---
->> v2:
->>         - renamed property "chip_select" to "num-cs"
->>         - renamed property "tx_fifo_size" to "renesas,tx-fifo-size"
->>         - renamed property "rx_fifo_size" to "renesas,rx-fifo-size"
->>
->>  drivers/spi/spi-sh-msiof.c |   56 +++++++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 55 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/spi/spi-sh-msiof.c b/drivers/spi/spi-sh-msiof.c
->> index 96358d0..8b40d08 100644
->> --- a/drivers/spi/spi-sh-msiof.c
->> +++ b/drivers/spi/spi-sh-msiof.c
->> @@ -20,6 +20,7 @@
->>  #include <linux/io.h>
->>  #include <linux/kernel.h>
->>  #include <linux/module.h>
->> +#include <linux/of.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/pm_runtime.h>
->>
->> @@ -592,6 +593,37 @@ static u32 sh_msiof_spi_txrx_word(struct spi_device *spi, unsigned nsecs,
->>         return 0;
->>  }
->>
->> +#ifdef CONFIG_OF
->> +static struct sh_msiof_spi_info *sh_msiof_spi_parse_dt(struct device *dev)
->> +{
->> +       struct sh_msiof_spi_info *info;
->> +       struct device_node *np = dev->of_node;
->> +       u32 num_cs = 0;
->> +
->> +       info = devm_kzalloc(dev, sizeof(struct sh_msiof_spi_info), GFP_KERNEL);
->> +       if (!info) {
->> +               dev_err(dev, "failed to allocate setup data\n");
->> +               return NULL;
->> +       }
->> +
->> +       /* Parse the MSIOF properties */
->> +       of_property_read_u32(np, "num-cs", &num_cs);
->> +       of_property_read_u32(np, "renesas,tx-fifo-size",
->> +                                       &info->tx_fifo_override);
->> +       of_property_read_u32(np, "renesas,rx-fifo-size",
->> +                                       &info->rx_fifo_override);
->> +
->> +       info->num_chipselect = num_cs;
->> +
->> +       return info;
->> +}
->> +#else
->> +static struct sh_msiof_spi_info *sh_msiof_spi_parse_dt(struct device *dev)
->> +{
->> +       return NULL;
->> +}
->> +#endif
->> +
->>  static int sh_msiof_spi_probe(struct platform_device *pdev)
->>  {
->>         struct resource *r;
->> @@ -610,7 +642,17 @@ static int sh_msiof_spi_probe(struct platform_device *pdev)
->>         p = spi_master_get_devdata(master);
->>
->>         platform_set_drvdata(pdev, p);
->> -       p->info = pdev->dev.platform_data;
->> +       if (pdev->dev.of_node)
->> +               p->info = sh_msiof_spi_parse_dt(&pdev->dev);
->> +       else
->> +               p->info = pdev->dev.platform_data;
->> +
->> +       if (!p->info) {
->> +               dev_err(&pdev->dev, "failed to obtain device info\n");
->> +               ret = -ENXIO;
->> +               goto err1;
->> +       }
->> +
->>         init_completion(&p->done);
->>
->>         p->clk = clk_get(&pdev->dev, NULL);
->> @@ -715,6 +757,17 @@ static int sh_msiof_spi_runtime_nop(struct device *dev)
->>         return 0;
->>  }
->>
->> +#ifdef CONFIG_OF
->> +static const struct of_device_id sh_msiof_match[] = {
->> +       { .compatible = "renesas,sh-msiof", },
->> +       { .compatible = "renesas,sh-mobile-msiof", },
->> +       {},
->> +};
->> +MODULE_DEVICE_TABLE(of, sh_msiof_match);
->> +#else
->> +#define sh_msiof_match NULL
->> +#endif
->
-> You can remove ifdef if you use of_match_ptr().
->
->> +
->>  static struct dev_pm_ops sh_msiof_spi_dev_pm_ops = {
->>         .runtime_suspend = sh_msiof_spi_runtime_nop,
->>         .runtime_resume = sh_msiof_spi_runtime_nop,
->> @@ -727,6 +780,7 @@ static struct platform_driver sh_msiof_spi_drv = {
->>                 .name           = "spi_sh_msiof",
->>                 .owner          = THIS_MODULE,
->>                 .pm             = &sh_msiof_spi_dev_pm_ops,
->> +               .of_match_table = sh_msiof_match,
->
-> You can use of_match_ptr(sh_msiof_match).
->
+> Hi all,
 
-Ok very nice, will do so.
+Hi,
 
-Thanks,
-
- Bastian
-
->>         },
->>  };
->>  module_platform_driver(sh_msiof_spi_drv);
->> --
->> 1.7.9.5
 >
-> Best regards,
->   Nobuhiro
+> I recently put some work into my Efika MX smartbook. Here are patches
+> to make it work with a current kernel. It turned out that most of the
+> stuff is quite straight forward. Unfortunately there is a lot missing
+> in the USB area. Without USB support the Smartbook is pretty much
+> useless, so most of the patches are for adding USB support.
 >
-> --
-> Nobuhiro Iwamatsu
->    iwamatsu at {nigauri.org / debian.org}
->    GPG ID: 40AD1FA6
+> What currently works is:
+>
+> - USB
+
+Is it working or not ? Or you meant that it's working only if you merge
+the usbmisc-related for imx5* patches ?
+
+> - Display
+
+Given that you wrote something for the mlt017, do you happen to have a
+sii9022 driver too ? :)
+
+> - Battery
+
+I've not noticed something for the ac power supply in the dts. Did I miss something?
+
+> - keyboard/touchpad
+
+Did you try using the white led for 'caps lock' ?
+
+> - Sound (used to work, currently broken)
+> - Wifi
+
+How did you enable it ? Did you configure the gpios to always enable it ?
+
+> - LEDs
+
+You're not mentionning pata. Is it working or not ?
+
+>
+> I'm not posting the patches here since I do not consider them ready, but
+> for everyone interested you can pull the following git tree. I have no
+> idea if the patches work together with the preinstalled U-Boot, I use
+> barebox on the Smartbook.
+
+I've (very quickly) tested it yesterday and it didn't even boot. I've
+yet to look at the serial port output to check if it's a problem on my
+side or a bug in the kernel.
+
+>
+> Since it's a spare time project I have no schedule when to continue. If
+> you want to push this forward, please let me know, I may have soemthing
+> newer then.
+
+I'm still interested in getting mainline working on efika devices.
+
+Arnaud
