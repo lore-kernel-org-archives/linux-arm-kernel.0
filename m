@@ -1,52 +1,49 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 17 Dec 2012 17:00:04 +0000
-Subject: [PATCH v2 6/7] ARM: mackerel: support booting with or without DT
-In-Reply-To: <Pine.LNX.4.64.1212171332520.24007@axis700.grange>
-References: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
- <1355503531-7276-7-git-send-email-g.liakhovetski@gmx.de>
- <Pine.LNX.4.64.1212171332520.24007@axis700.grange>
-Message-ID: <20121217170004.7F6C23E0BDD@localhost>
+Date: Mon, 17 Dec 2012 17:15:13 +0000
+Subject: [PATCH 1/1] spi/atmel: add DT support
+In-Reply-To: <20121217101351.GI23971@game.jcrosoft.org>
+References: <20121121151713.1F8873E0A47@localhost>
+ <1353674679-13158-1-git-send-email-plagnioj@jcrosoft.com>
+ <50AF7C19.8000306@atmel.com> <20121212151308.GK4398@game.jcrosoft.org>
+ <20121215010317.C9C933E0BEC@localhost>
+ <20121217101351.GI23971@game.jcrosoft.org>
+Message-ID: <20121217171513.9B0ED3E0BEC@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Dec 2012 13:40:45 +0100 (CET), Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> This patch adds dynamic switching to booting either with or without DT.
-> So far only a part of the board initialisation can be done via DT. Devices,
-> that still need platform data are kept that way. Devices, that can be
-> initialised from DT will not be supplied from the platform data, if a DT
-> image is detected.
+On Mon, 17 Dec 2012 11:13:51 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> On 01:03 Sat 15 Dec     , Grant Likely wrote:
+> > On Wed, 12 Dec 2012 16:13:08 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> > > On 14:37 Fri 23 Nov     , Nicolas Ferre wrote:
+> > > > On 11/23/2012 01:44 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> > > > > the atmel_spi use only gpio for chip select
+> > > > > 
+> > > > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > > 
+> > > > Seems simple and nice:
+> > > > 
+> > > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > grant is ok to have this for 3.8?
+> > 
+> > Not sure how I missed this one. It's pretty straight forward and not
+> > risky, so no problem. However;
+> > 
+> > > > > the atmel_spi use only gpio for chip select
+> > 
+> > I know you know how to write a proper commit message. I'll need
+> > something better than the above before I commit it. I won't make you
+> > resubmit the patch, but do send me a better description.
+> > 
+> ok replace with this please
 > 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
->  
->  static const char *mackerel_boards_compat_dt[] __initdata = {
-> @@ -1659,10 +1715,20 @@ static const char *mackerel_boards_compat_dt[] __initdata = {
->  DT_MACHINE_START(MACKEREL_DT, "mackerel")
->  	.map_io		= sh7372_map_io,
->  	.init_early	= sh7372_add_early_devices,
-> +	.init_irq	= sh7372_init_irq_of,
-> +	.handle_irq	= shmobile_handle_irq_intc,
-> +	.init_machine	= mackerel_init,
-> +	.init_late	= sh7372_pm_init_late,
-> +	.timer		= &shmobile_timer,
-> +	.dt_compat	= mackerel_boards_compat_dt,
-> +MACHINE_END
-> +
-> +MACHINE_START(MACKEREL, "mackerel")
-> +	.map_io		= sh7372_map_io,
-> +	.init_early	= sh7372_add_early_devices,
->  	.init_irq	= sh7372_init_irq,
->  	.handle_irq	= shmobile_handle_irq_intc,
->  	.init_machine	= mackerel_init,
->  	.init_late	= sh7372_pm_init_late,
->  	.timer		= &shmobile_timer,
-> -	.dt_compat  = mackerel_boards_compat_dt,
->  MACHINE_END
+> spi/atmel: add DT support
+> 
+> Use the newly introduce cs-gpios dt support on atmel.
+> We do not use the hardware cs as it's wired and have buges and limitations.
+> As the the controller's belief that only active-low devices/systems exists.
+> 
+> As done on non-dt system.
 
-MACHINE_START() handle's the DT case just fine. You shouldn't need
-separate MACHINE_START() and DT_MACHINE_START() stanzas. Please merge. I
-see that there was some discussion around sh7372_init_irq_of(), but I
-it is better to have the single function handle the OF/non-OF case
-gracefully rather than duplicating MACHINE definitions.
+Done, thanks.
 
 g.
