@@ -1,49 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Dec 2012 15:34:03 +0100
-Subject: [PATCH 18/18] arm: mvebu: enable btmrvl driver in mvebu_defconfig
-In-Reply-To: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1355841243-3254-19-git-send-email-thomas.petazzoni@free-electrons.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 17 Dec 2012 17:04:41 -0500 (EST)
+Subject: [PATCH 1/2] arm: tegra: Add new DT property to USB node.
+In-Reply-To: <50CF89AF.3000308@wwwdotorg.org>
+Message-ID: <Pine.LNX.4.44L0.1212171704060.1409-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Globalscale Mirabox platform, based on the Armada 370 from
-Marvell, has a SD8787 Wireless/Bluetooth chip connected on the SDIO
-interface. Now that the mvsdio has a Device Tree binding, and the
-necessary Device Tree informations have been added at the SoC and
-board level, let's enable the btmrvl driver for the Bluetooth part of
-the SD8787 chip.
+On Mon, 17 Dec 2012, Stephen Warren wrote:
 
-For now, the driver gets probed correctly, detects the device but
-apparently fails to push the firmware to the device:
+> On 12/13/2012 11:59 PM, Venu Byravarasu wrote:
+> > As Tegra USB host driver is using instance number for resetting
+> > PORT0 twice, adding a new DT property for handling this.
+> 
+> Alan, Greg, Felip,e
+> 
+> This series looks fine to me.
+> 
+> I'd like to take all the Tegra-related USB patches through the Tegra
+> tree for 3.9 if possible (so I'm looking for your acks here). I believe
+> Venu plans to significantly clean up the EHCI/PHY driver split for
+> Tegra, rework the drivers, and add support for Tegra30 in addition to
+> Tegra20. Some of this requires changes to some Tegra board files and
+> device trees to maintain "git bisect" I don't know for sure yet, but I
+> believe that rework may also end up conflicting with other clock-related
+> rework that will show up for Tegra in 3.9. Are you OK with this? I'll
+> certainly look for your review/acks on the patches before picking them
+> up though.
 
-Bluetooth: vendor=0x2df, device=0x911a, class=255, fn=2
-Bluetooth: FW failed to be active in time!
-Bluetooth: Downloading firmware failed!
-Bluetooth: vendor=0x2df, device=0x911b, class=255, fn=3
-Bluetooth: FW failed to be active in time!
-Bluetooth: Downloading firmware failed!
+Regarding the changes to drivers/usb/host/ehci-tegra.c:
 
-This will have to be investigated separately.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 19f0c3d..f849ac3 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -24,6 +24,9 @@ CONFIG_ARM_APPENDED_DTB=y
- CONFIG_VFP=y
- CONFIG_NET=y
- CONFIG_INET=y
-+CONFIG_BT=y
-+CONFIG_BT_MRVL=y
-+CONFIG_BT_MRVL_SDIO=y
- CONFIG_CFG80211=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_SD=y
--- 
-1.7.9.5
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
