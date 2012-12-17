@@ -1,54 +1,59 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 17 Dec 2012 11:37:44 +0100
-Subject: [GIT PULL] i.MX fixes for -rc
-Message-ID: <20121217103744.GL26326@pengutronix.de>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 17 Dec 2012 11:48:11 +0100
+Subject: [PATCH 2/2] ARM: OMAP2+: Drop plat/cpu.h for omap2plus
+In-Reply-To: <20121216200317.24238.63954.stgit@muffinssi.local>
+References: <20121216200236.24238.38151.stgit@muffinssi.local>
+ <20121216200317.24238.63954.stgit@muffinssi.local>
+Message-ID: <CAORVsuXOmzz1cSSrKOy+nCLGJkby+LycqOXXNddJJ4cbnjVGtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Tony,
 
-Please pull the following i.MX fixes for -rc.
+On Sun, Dec 16, 2012 at 9:03 PM, Tony Lindgren <tony@atomide.com> wrote:
+> The cpu_is_omap macros are now local to arch/arm/mach-omap2
+> in soc.h and plat/cpu.h can finally be dropped for omap2+.
+> Thanks everybody for help with fixing the drivers.
+Great!
 
-Thanks
- Sascha
+> Note that we can now also remove the unused plat/cpu.h from
+> smartreflex.c and isp.c as they will cause compile errors
+> with ARCH_MULTIPLATFORM enabled.
+>
+> Cc: Jean Pihet <jean.pihet@newoldbits.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/drm.c             |    1 -
+>  arch/arm/mach-omap2/dss-common.c      |    3 +--
+>  arch/arm/mach-omap2/prm2xxx.c         |    3 +--
+>  arch/arm/mach-omap2/prm3xxx.c         |    3 +--
+>  arch/arm/plat-omap/include/plat/cpu.h |    4 ----
+>  drivers/media/platform/omap3isp/isp.c |    2 --
+>  drivers/power/avs/smartreflex.c       |    2 --
+>  7 files changed, 3 insertions(+), 15 deletions(-)
 
+For the smartreflex driver:
+Acked-by: Jean Pihet <j-pihet@ti.com>
 
-The following changes since commit a4f1de176614f634c367e5994a7bcc428c940df0:
+Regards,
+Jean
 
-  mm: fix kernel BUG at huge_memory.c:1474! (2012-12-16 19:02:38 -0800)
+...
 
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes-rc
-
-for you to fetch changes up to 027c0a6af42efa4f2f6034421349bd26a3ca4923:
-
-  ARM: imx: Move platform-mx2-emma to arch/arm/mach-imx/devices (2012-12-17 10:58:52 +0100)
-
-----------------------------------------------------------------
-ARM i.MX fixes for v3.8-rc
-
-This fixes a compile failure on imx_v4_v5_defconfig and a regression
-introduced with enabling the MIPI clocks on i.MX51. Also one rather
-cosmetic fix for the i.MX27 dts file.
-
-----------------------------------------------------------------
-Fabio Estevam (2):
-      ARM: dts: mx27: Fix the AIPI bus for FEC
-      ARM: imx: Move platform-mx2-emma to arch/arm/mach-imx/devices
-
-Sascha Hauer (1):
-      ARM i.MX51 clock: Fix regression since enabling MIPI/HSP clocks
-
- arch/arm/boot/dts/imx27-3ds.dts                        |    8 ++++----
- arch/arm/boot/dts/imx27-phytec-phycore.dts             |   13 +++++++------
- arch/arm/boot/dts/imx27.dtsi                           |   11 ++++++++++-
- arch/arm/mach-imx/clk-imx51-imx53.c                    |   16 ++++++++++++++++
- .../{plat-mxc => mach-imx}/devices/platform-mx2-emma.c |    4 ++--
- 5 files changed, 39 insertions(+), 13 deletions(-)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mx2-emma.c (94%)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
+> index a17d084..6b2238b 100644
+> --- a/drivers/power/avs/smartreflex.c
+> +++ b/drivers/power/avs/smartreflex.c
+> @@ -27,8 +27,6 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/power/smartreflex.h>
+>
+> -#include <plat/cpu.h>
+> -
+>  #define SMARTREFLEX_NAME_LEN   16
+>  #define NVALUE_NAME_LEN                40
+>  #define SR_DISABLE_TIMEOUT     200
+>
