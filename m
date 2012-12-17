@@ -1,74 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Dec 2012 14:43:11 +0100
-Subject: Do I need to skb_put() Ethernet frames to a minimum of 60 bytes?
-In-Reply-To: <5033C6B0.4060508@xdin.com>
-References: <502A9EC4.4040208@xdin.com>
- <1344976557.2690.43.camel@bwh-desktop.uk.solarflarecom.com>
- <5033C6B0.4060508@xdin.com>
-Message-ID: <50CF216F.2010107@atmel.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 17 Dec 2012 14:51:58 +0100
+Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <50CF1EF1.2070601@antcom.de>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
+ <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
+ <50CF1EF1.2070601@antcom.de>
+Message-ID: <50CF237E.5020409@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2012 07:34 PM, Arvid Brodin :
-> On 2012-08-14 22:35, Ben Hutchings wrote:
->> On Tue, 2012-08-14 at 18:53 +0000, Arvid Brodin wrote:
->>> Hi,
->>>
->>> If I create an sk_buff with a payload of less than 28 bytes (ethheader + data),
->>> and send it using the cadence/macb (Ethernet) driver, I get
->>>
->>> eth0: TX underrun, resetting buffers
->>>
->>> Now I know the minimum Ethernet frame size is 64 bytes (including the 4-byte
->>> FCS), but whose responsibility is it to pad the frame to this size if necessary?
->>> Mine or the driver's - i.e. should I just skb_put() to the minimum size or
->>> should I report the underrun as a driver bug?
->>
->> If the hardware doesn't pad frames automatically then it's the driver's
->> reponsibility to do so.
->>
-> 
-> Nicolas, can you take a look at this? At the moment I'm using the following change
-> in macb.c to avoid TX underruns on short packages:
-> 
-> --- a/drivers/net/ethernet/cadence/macb.c	2012-05-04 19:14:41.927719667 +0200
-> +++ b/drivers/net/ethernet/cadence/macb.c	2012-08-21 19:22:40.063739049 +0200
-> @@ -618,6 +618,7 @@ static void macb_poll_controller(struct
->  }
->  #endif
-> 
-> +#define MIN_ETHFRAME_LEN	60
->  static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
->  {
->  	struct macb *bp = netdev_priv(dev);
-> @@ -635,6 +636,12 @@ static int macb_start_xmit(struct sk_buf
->  	printk("\n");
->  #endif
-> 
-> +	if (skb->len < MIN_ETHFRAME_LEN) {
-> +		/* Pad skb to minium Ethernet frame size */
-> +		if (skb_tailroom(skb) >= MIN_ETHFRAME_LEN - skb->len)
-> +			memset(skb_put(skb, MIN_ETHFRAME_LEN - skb->len), 0,
-> +						MIN_ETHFRAME_LEN - skb->len);
-> +	}
->  	len = skb->len;
->  	spin_lock_irqsave(&bp->lock, flags);
-> 
-> 
-> ... but as you can see this is limited to linear skbs which has been allocated with
-> enough tailroom. Perhaps there are better ways to fix the problem? (Maybe the hardware
-> is actually doing the padding already and the problem has to do with the way the DMA
-> transfer is set up?)
+Hi Wolfgang,
 
-I come back to this issue. It seems to me that the macb Cadence IP is
-padding automatically a too little packet. It is the usual behavior
-unless you specify otherwise in the CTRL register embedded in the tx
-descriptor. I also verified this with wireshark on both ICMP and UDP
-packets.
+On 12/17/2012 02:32 PM, Roland Stigge wrote:
+> And I guess Russell is right: If possible, we should write outputs
+> simultaneously via ODSR (plus OWER/OWDR/OWSR) instead of separate set/clear.
+> 
+> I wonder if we need to save/restore the state of OWSR at every write
+> operation or if we need/can cache it. Assuming that block GPIO are the
+> only code in the kernel that manipulates ODSR.
 
-The error that you are experiencing is on at91sam9260 or at91sam9263
-SoCs, am I right?
+Can you please test the following:
 
-Best regards,
--- 
-Nicolas Ferre
++static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
++{
++       struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++       void __iomem *pio = at91_gpio->regbase;
++
++       __raw_writel(~mask, pio + PIO_OWDR);
++       __raw_writel(mask, pio + PIO_OWER);
++       __raw_writel(val, pio + PIO_ODSR);
++}
+
+Would caching OWSR be a significant speedup here?
+
+Thanks in advance,
+
+Roland
