@@ -1,52 +1,45 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Dec 2012 12:09:35 +0100
-Subject: [PATCH] ASoC: atmel-ssc: change disable to disable in dts node
-In-Reply-To: <20121215145145.GE22033@opensource.wolfsonmicro.com>
-References: <1355364307-31584-1-git-send-email-voice.shen@atmel.com>
- <20121215145145.GE22033@opensource.wolfsonmicro.com>
-Message-ID: <50CEFD6F.3070703@atmel.com>
+Date: Mon, 17 Dec 2012 12:23:23 +0100
+Subject: [PATCH 0/3] at91/ssc: fixes on ASoC tree for 3.8
+Message-ID: <cover.1355742707.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-On 12/15/2012 03:51 PM, Mark Brown :
-> On Thu, Dec 13, 2012 at 10:05:07AM +0800, Bo Shen wrote:
->> Change the value of status to disabled to keep the consistent
->> 
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> 
-> Applied, thanks.
-
 Hi Mark,
 
-While rebasing this patch (for the other open question that we have
-about ssc pinctrl), I discovered that the subject of this patch is
-nonsense (same with the message, BTW).
+This series goes on top of current Linus' git tree and fixes an error that
+we have while compiling DTBs for AT91:
+ERROR (phandle_references): Reference to non-existent node or label
+"pinctrl_ssc0_tx"
 
-So I rewrote the subject and comment and will submit a new patch
-series soon with this content included. So it will be good if you can
-replace this patch with the one in the series that I have just prepared.
+ERROR: Input tree has errors, aborting (use -f to force output)
+make[3]: *** [arch/arm/boot/dts/at91sam9g20ek.dtb] Error 2
 
-As said in the other message, the new series is based on top of
-current Linus' git tree. In fact, the pinctrl related material is
-better merged now that the pinctrl tree for 3.8 is included in mainline.
+I have included pending material that is dealing with SSC and pinctrl. The
+pinctrl part can be merged more easily now that the big pinctrl update for AT91
+has been merged upstream.
+I have also included a typo patch that you have already taken as 315656b (ASoC:
+atmel-ssc: change disable to disable in dts node) in your topic/atmel branch
+but that was not described properly.
 
-I hope that it makes sense for you ;-)
+If you find it easier, I can provide you a git tree for this material: just
+tell me...
 
-Thanks for your patience Mark, bye,
-- -- 
-Nicolas Ferre
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-Comment: Using GnuPG with undefined - http://www.enigmail.net/
+Thanks for your help, best regards,
 
-iQEbBAEBAgAGBQJQzv1oAAoJEAf03oE53VmQEV0H+PDv7MmVEBy3oFoouQ+yowtv
-m6wzh4smEk2BRGWOBV2cXf56CZTakG5ntJmrPLwyXoJ4bt2mC73RAN1DWMuN24Uk
-Vu3gyPQJDOAT2G4jq8b6fjstrjzXa7FbauWX0lNXFc0IUEp4/aX2z82ioK6JKwhW
-JMG77G3yX4jX9GLNES5+ZI8nztXPZ8xAANynXYhadhHCx0TNo81SK/ohut9Xg5gB
-4jYoybhuIymsG8ZYVz9edULLd48VngN25+f27n6Y3uTqvGGZg8ndYEkwMFkqwxKS
-v4RLq1dptq1Z2HNJJCr36hkPdvKT93QcxNm/8Vr82nJUHoqJMXqtef8rkPNgSA==
-=cE8U
------END PGP SIGNATURE-----
+
+Bo Shen (3):
+  ARM: at91/dts: fix typo in SSC status property
+  ARM: at91/dts: add pinctrl support for SSC peripheral
+  ASoC: atmel-ssc: add pinctrl selection to driver
+
+ arch/arm/boot/dts/at91sam9260.dtsi | 18 +++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi | 40 ++++++++++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/at91sam9g45.dtsi | 40 ++++++++++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/at91sam9n12.dtsi | 26 +++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 32 +++++++++++++++++++++++-------
+ drivers/misc/atmel-ssc.c           |  8 ++++++++
+ 6 files changed, 153 insertions(+), 11 deletions(-)
+
+-- 
+1.8.0
