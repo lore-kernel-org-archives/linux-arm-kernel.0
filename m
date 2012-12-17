@@ -1,120 +1,28 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 17 Dec 2012 09:16:19 +0100
-Subject: [PATCH 2/2] ARM: dts: OMAP2+: Add PMU nodes
-In-Reply-To: <1355519930-3851-3-git-send-email-jon-hunter@ti.com>
-References: <1355519930-3851-1-git-send-email-jon-hunter@ti.com>
- <1355519930-3851-3-git-send-email-jon-hunter@ti.com>
-Message-ID: <50CED4D3.9080106@ti.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Mon, 17 Dec 2012 09:21:15 +0100
+Subject: devicetree support for efikasb
+In-Reply-To: <20121217075907.GQ24458@pengutronix.de> (Sascha Hauer's message
+ of "Mon, 17 Dec 2012 08:59:07 +0100")
+References: <20121217075907.GQ24458@pengutronix.de>
+Message-ID: <87ip819jic.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+>>>>> "Sascha" == Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-On 12/14/2012 10:18 PM, Jon Hunter wrote:
-> Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
-> 
-> Please note that the node for OMAP4460 has been placed in a separate
-> header file for OMAP4460, because the node is not compatible with
-> OMAP4430.
+Hi,
 
-But where is the omap4430 node then?
+ Sascha> I'm not posting the patches here since I do not consider them
+ Sascha> ready, but for everyone interested you can pull the following
+ Sascha> git tree.
 
-Regards,
-Benoit
+Thanks, I'll give it a try.
 
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
->  arch/arm/boot/dts/omap2.dtsi         |    5 +++++
->  arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
->  arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
->  arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
->  arch/arm/mach-omap2/pmu.c            |    2 ++
->  5 files changed, 33 insertions(+)
->  create mode 100644 arch/arm/boot/dts/omap4460.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-> index 761c4b6..27f5ea1 100644
-> --- a/arch/arm/boot/dts/omap2.dtsi
-> +++ b/arch/arm/boot/dts/omap2.dtsi
-> @@ -26,6 +26,11 @@
->  		};
->  	};
->  
-> +	pmu {
-> +		compatible = "arm,arm1136-pmu";
-> +		interrupts = <3>;
-> +	};
-> +
->  	soc {
->  		compatible = "ti,omap-infra";
->  		mpu {
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 1acc261..6c63118 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -26,6 +26,12 @@
->  		};
->  	};
->  
-> +	pmu {
-> +		compatible = "arm,cortex-a8-pmu";
-> +		interrupts = <3>;
-> +		ti,hwmods = "debugss";
-> +	};
-> +
->  	/*
->  	 * The soc node represents the soc top level view. It is uses for IPs
->  	 * that are not memory mapped in the MPU view or for the MPU itself.
-> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-> index 73bc1a6..2a6e344 100644
-> --- a/arch/arm/boot/dts/omap4-panda-es.dts
-> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
-> @@ -5,7 +5,9 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> +
->  /include/ "omap4-panda.dts"
-> +/include/ "omap4460.dtsi"
->  
->  /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
->  &sound {
-> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-> new file mode 100644
-> index 0000000..1270890
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap4460.dtsi
-> @@ -0,0 +1,18 @@
-> +/*
-> + * Device Tree Source for OMAP4460 SoC
-> + *
-> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/ {
-> +	pmu {
-> +		compatible = "arm,cortex-a9-pmu";
-> +		interrupts = <0 54 0x4
-> +			      0 55 0x4>;
-> +		ti,hwmods = "debugss";
-> +	};
-> +};
-> diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
-> index 6e620eb..1a0799c 100644
-> --- a/arch/arm/mach-omap2/pmu.c
-> +++ b/arch/arm/mach-omap2/pmu.c
-> @@ -11,6 +11,8 @@
->   * the Free Software Foundation; either version 2 of the License, or
->   * (at your option) any later version.
->   */
-> +#include <linux/of.h>
-> +
->  #include <asm/pmu.h>
->  
->  #include "soc.h"
-> 
+ Sascha> Since it's a spare time project I have no schedule when to
+ Sascha> continue. If you want to push this forward, please let me know,
+ Sascha> I may have soemthing newer then.
+
+I for one would certainly be interested in this getting mainlined.
+
+-- 
+Bye, Peter Korsgaard
