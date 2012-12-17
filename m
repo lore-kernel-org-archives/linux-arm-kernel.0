@@ -1,121 +1,108 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Dec 2012 16:38:58 +0000
-Subject: [RESEND PATCH 2/2] ARM: dts: OMAP2+: Add PMU nodes
-In-Reply-To: <1355520397-5759-3-git-send-email-jon-hunter@ti.com>
-References: <1355520397-5759-1-git-send-email-jon-hunter@ti.com>
- <1355520397-5759-3-git-send-email-jon-hunter@ti.com>
-Message-ID: <20121217163858.GF16561@e106331-lin.cambridge.arm.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 17 Dec 2012 17:50:13 +0100 (CET)
+Subject: [PATCH 6/7] ARM: mackerel: support booting with or without DT
+In-Reply-To: <20121217163852.C57FD3E0BDD@localhost>
+References: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
+ <1355503531-7276-7-git-send-email-g.liakhovetski@gmx.de>
+ <20121216204636.ACD283E0AE3@localhost>
+ <Pine.LNX.4.64.1212162224380.20059@axis700.grange>
+ <20121217163852.C57FD3E0BDD@localhost>
+Message-ID: <Pine.LNX.4.64.1212171743380.24007@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 09:26:37PM +0000, Jon Hunter wrote:
-> Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
+Hi Grant
+
+On Mon, 17 Dec 2012, Grant Likely wrote:
+
+> On Sun, 16 Dec 2012 22:36:56 +0100 (CET), Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > Hi Grant
+> > 
+> > On Sun, 16 Dec 2012, Grant Likely wrote:
+> > 
+> > > On Fri, 14 Dec 2012 17:45:30 +0100, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > > > This patch adds dynamic switching to booting either with or without DT.
+> > > > So far only a part of the board initialisation can be done via DT. Devices,
+> > > > that still need platform data are kept that way. Devices, that can be
+> > > > initialised from DT will not be supplied from the platform data, if a DT
+> > > > image is detected.
+> > > > 
+> > > > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > > > ---
+> > > >  
+> > > > +static int mackerel_i2c_bus_notify(struct notifier_block *nb,
+> > > > +				   unsigned long action, void *data)
+> > > > +{
+> > > > +	struct device *dev = data;
+> > > > +
+> > > > +	if (action != BUS_NOTIFY_ADD_DEVICE ||
+> > > > +	    strcmp(dev_name(dev->parent), "fff20000.i2c"))
+> > > > +		return NOTIFY_DONE;
+> > > > +
+> > > > +	i2c_new_device(to_i2c_adapter(dev), &i2c0_devices[1]);
+> > > > +
+> > > > +	return NOTIFY_OK;
+> > > > +}
+> > > > +
+> > > > +static struct notifier_block mackerel_i2c_notifier = {
+> > > > +	.notifier_call = mackerel_i2c_bus_notify,
+> > > > +};
+> > > 
+> > > This looks dodgy. It appears that the purpose of this hook is to create
+> > > the tca6408-keys device because it has some platform data. However,
+> > > this hook will try to create the device every time BUS_NOTIFY_ADD_DEVICE
+> > > happens on the fff20000.i2c bus *including* when the tca6408-keys device
+> > > gets added.
+> > 
+> > I think, this is only called once, when the i2c adapter device is added in 
+> > i2c_register_adapter(). I2C client devices have these adapter devices as 
+> > their parents, and those devices have "i2c-%d" as their names. Since all 
+> > client devices get destroyed when the adapter is unbound, the above should 
+> > be safe.
 > 
-> Please note that the node for OMAP4460 has been placed in a separate
-> header file for OMAP4460, because the node is not compatible with
-> OMAP4430.
+> Take another look. The way the bus notifiers work is they get called 
+> once for every device registered with the given bus type. That means 
+> i2c_client objects, not i3c
+
+I did, and I also tested. Both I2C clients and I2C adapters are placed on 
+the i2c_bus_type. So, yes, you're right, the above notifier will be called 
+upon registration of each adapter and client. But, the string comparison 
+in the "if" above will only match for the I2C adapter, so, no recursion.
+
+Thanks
+Guennadi
+
+> > > The correct approach when you need to add specific platform data is to
+> > > still put the device into the device tree and make the notifier look for
+> > > that specific device. Then the platform data pointer can be attached at
+> > > BUS_NOTIFY_ADD_DEVICE time.
+> > > 
+> > > However, it doesn't look like you need a notifier at all. From what I
+> > > can see the tca6408-keys device does have platform data, but it is all
+> > > simple (no callback pointers). You should instead encode the platform
+> > > data into device tree properties and extract them from the driver.
+> > 
+> > Yes, this is the ultimate goal. But the purpose of this patch series is to 
+> > move whatever devices are possible right _now_ to DT. Ultimately all of 
+> > them should be migrated. So, yes, we could try to begin with tca6408, 
+> > because the above hack is certainly the ugliest one in this series, but in 
+> > principle this is just one of several devices, that we have to keep in 
+> > platform data for now and aim at removing these temporary hacks as soon as 
+> > respective drivers implement sufficient DT support.
+> > 
+> > Thanks
+> > Guennadi
+> > ---
+> > Guennadi Liakhovetski, Ph.D.
+> > Freelance Open-Source Software Developer
+> > http://www.open-technology.de/
 > 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
->  arch/arm/boot/dts/omap2.dtsi         |    5 +++++
->  arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
->  arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
->  arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
->  4 files changed, 31 insertions(+)
->  create mode 100644 arch/arm/boot/dts/omap4460.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-> index 761c4b6..27f5ea1 100644
-> --- a/arch/arm/boot/dts/omap2.dtsi
-> +++ b/arch/arm/boot/dts/omap2.dtsi
-> @@ -26,6 +26,11 @@
->  		};
->  	};
->  
-> +	pmu {
-> +		compatible = "arm,arm1136-pmu";
-> +		interrupts = <3>;
-> +	};
-> +
->  	soc {
->  		compatible = "ti,omap-infra";
->  		mpu {
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 1acc261..6c63118 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -26,6 +26,12 @@
->  		};
->  	};
->  
-> +	pmu {
-> +		compatible = "arm,cortex-a8-pmu";
-> +		interrupts = <3>;
-> +		ti,hwmods = "debugss";
-> +	};
-> +
->  	/*
->  	 * The soc node represents the soc top level view. It is uses for IPs
->  	 * that are not memory mapped in the MPU view or for the MPU itself.
-> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-> index 73bc1a6..2a6e344 100644
-> --- a/arch/arm/boot/dts/omap4-panda-es.dts
-> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
-> @@ -5,7 +5,9 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> +
->  /include/ "omap4-panda.dts"
-> +/include/ "omap4460.dtsi"
->  
->  /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
->  &sound {
-> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-> new file mode 100644
-> index 0000000..1270890
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap4460.dtsi
-> @@ -0,0 +1,18 @@
-> +/*
-> + * Device Tree Source for OMAP4460 SoC
-> + *
-> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/ {
-> +	pmu {
-> +		compatible = "arm,cortex-a9-pmu";
-> +		interrupts = <0 54 0x4
-> +			      0 55 0x4>;
-
-In other places I've seen interrupts properties written as:
-
-interrupts = < irq1... >,
-             < irq2... >,
-	     < irqN... >;
-
-Where each individual interrupt is surrounded by angle brackets. This produces
-the exact same dtb, but may appear easier to read.
-
-This might not be the right time and place to raise it, but it'd be nice if we
-used one style consistently.
-
-> +		ti,hwmods = "debugss";
-> +	};
-> +};
 > -- 
-> 1.7.10.4
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> Grant Likely, B.Sc, P.Eng.
+> Secret Lab Technologies, Ltd.
 > 
 
-Thanks,
-Mark.
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
