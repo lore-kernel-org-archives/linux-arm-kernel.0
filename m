@@ -1,124 +1,57 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 17 Dec 2012 18:35:10 +0100
-Subject: [RESEND PATCH 2/2] ARM: dts: OMAP2+: Add PMU nodes
-In-Reply-To: <50CF4F38.3040500@ti.com>
-References: <1355520397-5759-1-git-send-email-jon-hunter@ti.com>
- <1355520397-5759-3-git-send-email-jon-hunter@ti.com>
- <20121217163858.GF16561@e106331-lin.cambridge.arm.com>
- <50CF4F38.3040500@ti.com>
-Message-ID: <50CF57CE.2080907@ti.com>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Mon, 17 Dec 2012 18:37:18 +0100
+Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <50CF5327.6070205@antcom.de>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
+ <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
+ <50CF1EF1.2070601@antcom.de> <50CF237E.5020409@antcom.de>
+ <50CF4838.9000401@grandegger.com> <50CF5327.6070205@antcom.de>
+Message-ID: <50CF584E.1040601@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 05:58 PM, Jon Hunter wrote:
-> 
-> On 12/17/2012 10:38 AM, Mark Rutland wrote:
->> On Fri, Dec 14, 2012 at 09:26:37PM +0000, Jon Hunter wrote:
->>> Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
+On 12/17/2012 06:15 PM, Roland Stigge wrote:
+> On 12/17/2012 05:28 PM, Wolfgang Grandegger wrote:
+>> On 12/17/2012 02:51 PM, Roland Stigge wrote:
+>>> Hi Wolfgang,
+>>>> And I guess Russell is right: If possible, we should write outputs
+>>>> simultaneously via ODSR (plus OWER/OWDR/OWSR) instead of separate set/clear.
+>>>>
+>>>> I wonder if we need to save/restore the state of OWSR at every write
+>>>> operation or if we need/can cache it. Assuming that block GPIO are the
+>>>> only code in the kernel that manipulates ODSR.
 >>>
->>> Please note that the node for OMAP4460 has been placed in a separate
->>> header file for OMAP4460, because the node is not compatible with
->>> OMAP4430.
+>>> Can you please test the following:
 >>>
->>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->>> ---
->>>  arch/arm/boot/dts/omap2.dtsi         |    5 +++++
->>>  arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
->>>  arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
->>>  arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
->>>  4 files changed, 31 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/omap4460.dtsi
->>>
->>> diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
->>> index 761c4b6..27f5ea1 100644
->>> --- a/arch/arm/boot/dts/omap2.dtsi
->>> +++ b/arch/arm/boot/dts/omap2.dtsi
->>> @@ -26,6 +26,11 @@
->>>  		};
->>>  	};
->>>  
->>> +	pmu {
->>> +		compatible = "arm,arm1136-pmu";
->>> +		interrupts = <3>;
->>> +	};
+>>> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
+>>> +{
+>>> +       struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+>>> +       void __iomem *pio = at91_gpio->regbase;
 >>> +
->>>  	soc {
->>>  		compatible = "ti,omap-infra";
->>>  		mpu {
->>> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
->>> index 1acc261..6c63118 100644
->>> --- a/arch/arm/boot/dts/omap3.dtsi
->>> +++ b/arch/arm/boot/dts/omap3.dtsi
->>> @@ -26,6 +26,12 @@
->>>  		};
->>>  	};
->>>  
->>> +	pmu {
->>> +		compatible = "arm,cortex-a8-pmu";
->>> +		interrupts = <3>;
->>> +		ti,hwmods = "debugss";
->>> +	};
->>> +
->>>  	/*
->>>  	 * The soc node represents the soc top level view. It is uses for IPs
->>>  	 * that are not memory mapped in the MPU view or for the MPU itself.
->>> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
->>> index 73bc1a6..2a6e344 100644
->>> --- a/arch/arm/boot/dts/omap4-panda-es.dts
->>> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
->>> @@ -5,7 +5,9 @@
->>>   * it under the terms of the GNU General Public License version 2 as
->>>   * published by the Free Software Foundation.
->>>   */
->>> +
->>>  /include/ "omap4-panda.dts"
->>> +/include/ "omap4460.dtsi"
->>>  
->>>  /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
->>>  &sound {
->>> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
->>> new file mode 100644
->>> index 0000000..1270890
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/omap4460.dtsi
->>> @@ -0,0 +1,18 @@
->>> +/*
->>> + * Device Tree Source for OMAP4460 SoC
->>> + *
->>> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
->>> + *
->>> + * This file is licensed under the terms of the GNU General Public License
->>> + * version 2.  This program is licensed "as is" without any warranty of any
->>> + * kind, whether express or implied.
->>> + */
->>> +
->>> +/ {
->>> +	pmu {
->>> +		compatible = "arm,cortex-a9-pmu";
->>> +		interrupts = <0 54 0x4
->>> +			      0 55 0x4>;
+>>> +       __raw_writel(~mask, pio + PIO_OWDR);
 >>
->> In other places I've seen interrupts properties written as:
->>
->> interrupts = < irq1... >,
->>              < irq2... >,
->> 	     < irqN... >;
->>
->> Where each individual interrupt is surrounded by angle brackets. This produces
->> the exact same dtb, but may appear easier to read.
->>
->> This might not be the right time and place to raise it, but it'd be nice if we
->> used one style consistently.
+>> This would also disable normal GPIOs configured for output! From the
+>> manual I understand that if the pin is configured for output, we could
+>> either use PIO_SODR/PIO_CODR to set/clear the bits individually or
+>> PIO_ODSR for synchronous data output. But than we need to care about the
+>> non-block GPIO outputs as well... requiring a read-modify-write cycle :(.
 > 
-> I see that we do define interrupts like that for other OMAP devices and
-> so I can update this to be consistent.
+>>From the manual, I read about OWER: "Enables writing PIO_ODSR for the
+> I/O line" (analogous for OWDR). Would interpret this as affecting ODSR
+> (for block GPIO) but not SODR/CODR (as currently with single GPIOs).
 > 
-> Benoit, let me know if you want me to resend or if you want to update
-> locally.
+> Have you tried? ;-)
 
-Yep, I agree with Mark, I don't like this style either.
+Grrr, I mixed OER with OWER, sorry for the noise. Back to your approach,
+which works.
 
-If you don't mind, I'd prefer you resend the series...
+	/* Do synchronous data output with a single write access */
+	__raw_writel(~mask, pio + PIO_OWDR);
+	__raw_writel(mask, pio + PIO_OWER);
+	__raw_writel(val, pio + PIO_ODSR);
 
-Thanks,
-Benoit
+For caching we would need a storage. Not sure if it's worth compared to
+a context switch into the kernel.
+
+Wolfgang.
