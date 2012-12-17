@@ -1,65 +1,154 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Dec 2012 16:35:35 +0000
-Subject: [PATCH v2 0/6] Add support for a fake, para-virtualised machine
-Message-ID: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 17 Dec 2012 16:35:41 +0000
+Subject: [PATCH v2 6/6] ARM: mach-virt: add SMP support using PSCI
+In-Reply-To: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
+References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1355762141-29616-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+This patch adds support for SMP to mach-virt using the PSCI
+infrastructure.
 
-This is version two of the patches originally posted here:
-
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/135870.html
-
-Given the lively discussion sparked in that thread, there have been a
-fair number of changes since the RFC:
-
-	* A client-side implementation of PSCI and proposed DT binding
-	* Use of PSCI for SMP boot
-	* Removal of the SMP pen code
-	* Dropped the RFC tag
-
-Marc hacked up the KVM side separately and this has been tested
-successfully with his code using a magic build of kvmtool.
-
-As usual, all feedback welcome.
-
-Cheers,
-
-Will
-
-
-Marc Zyngier (1):
-  ARM: Dummy Virtual Machine platform support
-
-Will Deacon (5):
-  ARM: opcodes: add missing include of linux/linkage.h
-  ARM: opcodes: add opcodes definitions for ARM security extensions
-  ARM: psci: add devicetree binding for describing PSCI firmware
-  ARM: psci: add support for PSCI invocations from the kernel
-  ARM: mach-virt: add SMP support using PSCI
-
- Documentation/devicetree/bindings/arm/psci.txt |  58 +++++++
- arch/arm/Kconfig                               |  12 ++
- arch/arm/Makefile                              |   1 +
- arch/arm/include/asm/opcodes-sec.h             |  24 +++
- arch/arm/include/asm/opcodes.h                 |   1 +
- arch/arm/include/asm/psci.h                    |  36 +++++
- arch/arm/kernel/Makefile                       |   1 +
- arch/arm/kernel/psci.c                         | 214 +++++++++++++++++++++++++
- arch/arm/mach-virt/Kconfig                     |  10 ++
- arch/arm/mach-virt/Makefile                    |   6 +
- arch/arm/mach-virt/platsmp.c                   |  76 +++++++++
- arch/arm/mach-virt/virt.c                      |  71 ++++++++
- 12 files changed, 510 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/psci.txt
- create mode 100644 arch/arm/include/asm/opcodes-sec.h
- create mode 100644 arch/arm/include/asm/psci.h
- create mode 100644 arch/arm/kernel/psci.c
- create mode 100644 arch/arm/mach-virt/Kconfig
- create mode 100644 arch/arm/mach-virt/Makefile
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mach-virt/Kconfig   |  1 +
+ arch/arm/mach-virt/Makefile  |  1 +
+ arch/arm/mach-virt/platsmp.c | 76 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-virt/virt.c    |  6 ++++
+ 4 files changed, 84 insertions(+)
  create mode 100644 arch/arm/mach-virt/platsmp.c
- create mode 100644 arch/arm/mach-virt/virt.c
 
+diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
+index a568a2a..8958f0d 100644
+--- a/arch/arm/mach-virt/Kconfig
++++ b/arch/arm/mach-virt/Kconfig
+@@ -3,6 +3,7 @@ config ARCH_VIRT
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select ARM_ARCH_TIMER
++	select ARM_PSCI
+ 	select HAVE_SMP
+ 	select CPU_V7
+ 	select SPARSE_IRQ
+diff --git a/arch/arm/mach-virt/Makefile b/arch/arm/mach-virt/Makefile
+index 7ddbfa6..042afc1 100644
+--- a/arch/arm/mach-virt/Makefile
++++ b/arch/arm/mach-virt/Makefile
+@@ -3,3 +3,4 @@
+ #
+ 
+ obj-y					:= virt.o
++obj-$(CONFIG_SMP)			+= platsmp.o
+diff --git a/arch/arm/mach-virt/platsmp.c b/arch/arm/mach-virt/platsmp.c
+new file mode 100644
+index 0000000..930362b
+--- /dev/null
++++ b/arch/arm/mach-virt/platsmp.c
+@@ -0,0 +1,76 @@
++/*
++ * Dummy Virtual Machine - does what it says on the tin.
++ *
++ * Copyright (C) 2012 ARM Ltd
++ * Author: Will Deacon <will.deacon@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/of.h>
++
++#include <asm/psci.h>
++#include <asm/smp_plat.h>
++#include <asm/hardware/gic.h>
++
++extern void secondary_startup(void);
++
++/*
++ * Enumerate the possible CPU set from the device tree.
++ */
++static void __init virt_smp_init_cpus(void)
++{
++	struct device_node *dn = NULL;
++	int cpu = 0;
++
++	while ((dn = of_find_node_by_type(dn, "cpu"))) {
++		if (cpu < NR_CPUS)
++			set_cpu_possible(cpu, true);
++		cpu++;
++	}
++
++	/* sanity check */
++	if (cpu > NR_CPUS)
++		pr_warning("no. of cores (%d) greater than configured maximum "
++			   "of %d - clipping\n",
++			   cpu, NR_CPUS);
++
++	set_smp_cross_call(gic_raise_softirq);
++}
++
++static void __init virt_smp_prepare_cpus(unsigned int max_cpus)
++{
++}
++
++static int __cpuinit virt_boot_secondary(unsigned int cpu,
++					 struct task_struct *idle)
++{
++	if (psci_ops.cpu_on)
++		return psci_ops.cpu_on(cpu_logical_map(cpu),
++				       __pa(secondary_startup));
++	return -ENODEV;
++}
++
++static void __cpuinit virt_secondary_init(unsigned int cpu)
++{
++	gic_secondary_init(0);
++}
++
++struct smp_operations __initdata virt_smp_ops = {
++	.smp_init_cpus		= virt_smp_init_cpus,
++	.smp_prepare_cpus	= virt_smp_prepare_cpus,
++	.smp_secondary_init	= virt_secondary_init,
++	.smp_boot_secondary	= virt_boot_secondary,
++};
+diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
+index 174b9da..d764835 100644
+--- a/arch/arm/mach-virt/virt.c
++++ b/arch/arm/mach-virt/virt.c
+@@ -20,6 +20,7 @@
+ 
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/smp.h>
+ 
+ #include <asm/arch_timer.h>
+ #include <asm/hardware/gic.h>
+@@ -56,10 +57,15 @@ static struct sys_timer virt_timer = {
+ 	.init = virt_timer_init,
+ };
+ 
++#ifdef CONFIG_SMP
++extern struct smp_operations virt_smp_ops;
++#endif
++
+ DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
+ 	.init_irq	= gic_init_irq,
+ 	.handle_irq     = gic_handle_irq,
+ 	.timer		= &virt_timer,
+ 	.init_machine	= virt_init,
++	.smp		= smp_ops(virt_smp_ops),
+ 	.dt_compat	= virt_dt_match,
+ MACHINE_END
 -- 
 1.8.0
