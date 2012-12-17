@@ -1,62 +1,56 @@
-From: nareshgbhat@gmail.com (Naresh Bhat)
-Date: Mon, 17 Dec 2012 18:41:38 +0530
-Subject: KEXEC on ARM cortex-a15
-In-Reply-To: <20121121102244.GA11990@mudshark.cambridge.arm.com>
-References: <CAJXQGfKpFfUwMeLGFAuTgQn5Yd2D9O271JM1VJ87Nio80tbwXw@mail.gmail.com>
- <20121119144417.GH3290@n2100.arm.linux.org.uk>
- <20121119151327.GG3205@mudshark.cambridge.arm.com>
- <CAJXQGf+BQ18GhR3emhK-ejTivqx_o=gtaO3-FjTiE3BMGydgsw@mail.gmail.com>
- <CAJXQGf+wfXGZ=PWN585dJDMX1nH+sRexf6UZujyjKM6rJeDiXQ@mail.gmail.com>
- <20121120160219.GF26475@mudshark.cambridge.arm.com>
- <CAJXQGfL4PRW9=MQO1XbogA40sHUzXorbFMe1WkiJ751Ej-h7=g@mail.gmail.com>
- <20121121102244.GA11990@mudshark.cambridge.arm.com>
-Message-ID: <CAJXQGfJ0QWB3=wnJLgH2bNxa91TKa_Knok1Sdb0TOzZO40VLuw@mail.gmail.com>
+From: burkegu777@gmail.com (burkegu777)
+Date: Mon, 17 Dec 2012 21:20:32 +0800
+Subject: Looking for a Job - Sourcing Engineer for you in China/Asia
+Message-ID: <201212172101131285574@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will Deacon,
-
-Can you please point me to a GIT repository from where I can pull the
-"MMU disabling code and kexec fixes"  ?
-
-I appreciate your help.
-
-Thanks and Regards
--Naresh Bhat
-
-On Wed, Nov 21, 2012 at 3:52 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Nov 21, 2012 at 08:21:21AM +0000, Naresh Bhat wrote:
->> Hi Will,
->>
->> I have disabled the SMP on host kernel.  But still I am facing the
->> issue as below
->>
->> bash-4.2# ls
->> uImage  vexpress.dtb
->> bash-4.2#
->> bash-4.2# kexec -f uImage --dtb=vexpress.dtb --command-line="console=ttyS0"
->
-> Can you try using a zImage instead and also specifying the console as
-> ttyAMA0, as it looks like you're using a vexpress?
->
->> Starting new kernel
->> Bye!
->> Uncompressing Linux...
->
-> This isn't really very helpful -- some more debugging on your part would be
-> appreciated to get an insight as to what's going wrong. You could either use
-> JTAG or put some early prints in the decompressor to work out where it goes
-> awry.
->
-> Useful things to know would be: the state of the CPU when the new kernel
-> image is entered (if you have JTAG, you could also look at the dtb in memory
-> to see that it looks sane) and also at which point in the decompressor it
-> goes wrong / takes an abort (usually it's when we enable the MMU).
->
-> Will
+Hi,
 
 
 
--- 
-"For things to change, we must change"
--Naresh Bhat
+Sincerely, I am looking for a sourcing job here, full time or part time are all okay with me.
+
+
+If you do need somebody to do some sourcing/purchasing jobs in Asia/China, I would like to get this chance.
+
+
+I have a couple of years experience on sourcing, mainly about electrical,lighting, hardware & some other categories. I can do sourcing & project management & quality inspection, just like a sourcing tunnel for you in China. I would try all my best to find the quality goods/suppliers for you.
+
+
+Please find below my RESUME & attached resume. My Chinese name is Gu Hai, ??.
+
+My resume:
+Male, 28 years old, 1.8m, 68KG, 4 years bachelor degree major in Electric Information Technology,Graduated from Shanghai Institute of technology. CET 6?not bad English ability. living in Shanghai, Married and have an little angel. I Like playing video games, traveling, reading, taking photographs... in my spare time,Oh and movies.I've been in the LED lighting industry for about 4 years. 
+
+
+2008-6 ---- Now, LED Lighting Project Manager-Deal overseas LED lighting sales projects,Managing communications with foreign customers
+-leads project planning, scheduling, monitoring, and reporting activities for lighting projects.
+-In charge of daily operation of LED Lighting department.
+-Manage cost reports, consolidating accounting information...
+
+
+2006-7 --- 2008-5, Shanghai Rhythm International Trading Co., Ltd, International Purchaser, Translator, Project Management, Sourcing Engineer 
+
+-The company is EONE(www.eone.com)'s exclusive agency in mainly of China.
+
+-Purchase all the parts of the generator monitor. And meet the requirements of company's Senior Mechanical Engineers. -Visit most of the China power plants with EONE Engineers, solve the issues and maintain the equipment normal operation. -Deal International Trading ...
+
+
+I believe I can also do some other jobs which you can think out. Also I am not only limited on LED lighting, some other areas are also okay with me. IHope I can get such a chance from you and start a long term cooperation with you. 
+
+
+Best Regards
+
+Burke
+@ Shanghai, China
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/4104eec2/attachment-0001.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: Burke - Resume.docx
+Type: application/octet-stream
+Size: 16195 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/4104eec2/attachment-0001.obj>
