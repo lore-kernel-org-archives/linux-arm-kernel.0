@@ -1,108 +1,39 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 17 Dec 2012 09:07:35 +0100 (CET)
-Subject: [PATCH 5/7] ARM: sh7372: allow boards supporting booting with
- or without DT
-In-Reply-To: <20121215080542.GF9073@verge.net.au>
-References: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
- <1355503531-7276-6-git-send-email-g.liakhovetski@gmx.de>
- <20121215080542.GF9073@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1212170902540.24007@axis700.grange>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 17 Dec 2012 09:13:06 +0100
+Subject: [PATCH v4 16/23] ARM: OMAP2+: clock data: Merge utmi_px_gfclk
+ into usb_host_hs_utmi_px_clk
+In-Reply-To: <alpine.DEB.2.00.1212141838130.5915@utopia.booyaka.com>
+References: <1355134833-5199-1-git-send-email-rogerq@ti.com>
+ <1355134833-5199-17-git-send-email-rogerq@ti.com>
+ <20121214182855.GB4989@atomide.com>
+ <alpine.DEB.2.00.1212141838130.5915@utopia.booyaka.com>
+Message-ID: <50CED412.7060407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon
+Hi,
 
-On Sat, 15 Dec 2012, Simon Horman wrote:
-
-> On Fri, Dec 14, 2012 at 05:45:29PM +0100, Guennadi Liakhovetski wrote:
-> > For boards booting without DT no changes should be caused by this patch.
-> > When booting with DT, devices, whose drivers support DT probing, will not
-> > be registered.
+On 12/14/2012 07:44 PM, Paul Walmsley wrote:
+> Hi
 > 
-> This relates in part to my comment on "ARM: sh7372: support mixed DT and
-> board code interrupt controller init".
+> On Fri, 14 Dec 2012, Tony Lindgren wrote:
 > 
-> It is my understanding that sh7372_add_standard_devices_dt() already
-> exists in setup-sh7372.c and that it is appropriate to use for bring
-> up boards with DT.
+>> Paul, what about this patch? Looks like you've acked the other clock 
+>> patches in this series but not this one?
+> 
+> I commented on it briefly here:
+> 
+> https://patchwork.kernel.org/patch/1838111/
+> 
+> Maybe Beno?t could comment here, but it looks to me (based on a 
+> superficial look at the hardware clock tree data) that these clock nodes 
+> should exist.  In an ideal world, we'd be able to get back to the 
+> autogeneration of this clock data.
 
-I think, we partially clarified this already in the discussion of patch 
-6/7. This patch makes it possible to use standard functions, e.g. 
-sh7372_add_standard_devices() from both DT and non-DT boots. Whereas when 
-booting with DT, devices, for which sufficient DT support already exists, 
-have to be initialised from DT.
+I'm not sure to understand either the rational for that patch. What the
+point of merging the two nodes?
+I mean, we can do it, but AFAIR, we have always decided to use atomic
+node instead of big nodes that handle everything.
 
-Thanks
-Guennadi
-
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > ---
-> >  arch/arm/mach-shmobile/setup-sh7372.c |   17 ++++++++++++++---
-> >  1 files changed, 14 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
-> > index bbe6e2a..3e6bf3d 100644
-> > --- a/arch/arm/mach-shmobile/setup-sh7372.c
-> > +++ b/arch/arm/mach-shmobile/setup-sh7372.c
-> > @@ -981,9 +981,12 @@ static struct platform_device *sh7372_early_devices[] __initdata = {
-> >  	&tmu01_device,
-> >  };
-> >  
-> > -static struct platform_device *sh7372_late_devices[] __initdata = {
-> > +static struct platform_device *sh7372_late_devices_dt[] __initdata = {
-> >  	&iic0_device,
-> >  	&iic1_device,
-> > +};
-> > +
-> > +static struct platform_device *sh7372_late_devices[] __initdata = {
-> >  	&dma0_device,
-> >  	&dma1_device,
-> >  	&dma2_device,
-> > @@ -1012,13 +1015,11 @@ void __init sh7372_add_standard_devices(void)
-> >  		{ "A3SP", &scif4_device, },
-> >  		{ "A3SP", &scif5_device, },
-> >  		{ "A3SP", &scif6_device, },
-> > -		{ "A3SP", &iic1_device, },
-> >  		{ "A3SP", &dma0_device, },
-> >  		{ "A3SP", &dma1_device, },
-> >  		{ "A3SP", &dma2_device, },
-> >  		{ "A3SP", &usb_dma0_device, },
-> >  		{ "A3SP", &usb_dma1_device, },
-> > -		{ "A4R", &iic0_device, },
-> >  		{ "A4R", &veu0_device, },
-> >  		{ "A4R", &veu1_device, },
-> >  		{ "A4R", &veu2_device, },
-> > @@ -1027,6 +1028,10 @@ void __init sh7372_add_standard_devices(void)
-> >  		{ "A4R", &tmu00_device, },
-> >  		{ "A4R", &tmu01_device, },
-> >  	};
-> > +	struct pm_domain_device domain_devices_dt[] = {
-> > +		{ "A3SP", &iic1_device, },
-> > +		{ "A4R", &iic0_device, },
-> > +	};
-> >  
-> >  	sh7372_init_pm_domains();
-> >  
-> > @@ -1035,9 +1040,15 @@ void __init sh7372_add_standard_devices(void)
-> >  
-> >  	platform_add_devices(sh7372_late_devices,
-> >  			    ARRAY_SIZE(sh7372_late_devices));
-> > +	if (!of_have_populated_dt())
-> > +		platform_add_devices(sh7372_late_devices_dt,
-> > +				     ARRAY_SIZE(sh7372_late_devices_dt));
-> >  
-> >  	rmobile_add_devices_to_domains(domain_devices,
-> >  				       ARRAY_SIZE(domain_devices));
-> > +	if (!of_have_populated_dt())
-> > +		rmobile_add_devices_to_domains(domain_devices_dt,
-> > +					       ARRAY_SIZE(domain_devices_dt));
-> >  }
-> >  
-> >  static void __init sh7372_earlytimer_init(void)
-> > -- 
-> > 1.7.2.5
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Regards,
+Benoit
