@@ -1,48 +1,38 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 16 Dec 2012 21:42:40 -0800
-Subject: [PATCH 2/3] CLK: uninline clk_prepare_enable() and
- clk_disable_unprepare()
-In-Reply-To: <CAKohpom37Liqhz38YthaL9q+iFh4=iYHoUmrTOMq2=Ut-D0Dhg@mail.gmail.com>
-References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
- <1353403339-11679-3-git-send-email-dmitry.torokhov@gmail.com>
- <CAKohpomA=vSGuKfD-_zwiSnXGkqAQjtiVqxT2Po=D-LDA_FESg@mail.gmail.com>
- <20121216115756.GO14363@n2100.arm.linux.org.uk>
- <CAKohpok7Lh_ozuBFZdObpPRj0u_B-MNqgWjmaaSik3v4SmgJcw@mail.gmail.com>
- <20121216124013.GP14363@n2100.arm.linux.org.uk>
- <CAKohpom37Liqhz38YthaL9q+iFh4=iYHoUmrTOMq2=Ut-D0Dhg@mail.gmail.com>
-Message-ID: <20121217054240.GA13300@core.coreip.homeip.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 17 Dec 2012 08:18:01 +0200
+Subject: [PATCH 1/4] ARM: dt: Add doc for ARM Snoop Control Unit(SCU)
+Message-ID: <1355725087-11363-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Add scu.txt under arm for ARM Snoop Control Unit(SCU)
 
-On Sun, Dec 16, 2012 at 06:35:24PM +0530, Viresh Kumar wrote:
-> On 16 December 2012 18:10, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Well, there's my comment against patch 2 which never got a reply:
-> >
-> > "Again, what about stuff not using drivers/clk/clk.c ?"
-> >
-> > Has this been addressed?
-> 
-> Hmm.. I misread it and thought it is same as breaking other platforms
-> because there are
-> no dummy routines. But i was wrong :(
-> 
-> So, the problem is, platform not using common-clock framework uses
-> this routine, and they
-> don't want it to be dummy but call prepare & enable..
-> 
-> Because Dmirty requires this one to be non-inline, either he can move
-> these routines to
-> drivers/clk/clk-devres.c (which would be wrong) or can add wrappers
-> over them in clk-devres
-> file.
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ Documentation/devicetree/bindings/arm/scu.txt |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/scu.txt
 
-They do not _have_ to be non-inline, I think we should simply drop the
-first 2 patches and I will refresh and ressend the 3rd one.
-
-Thanks.
-
+diff --git a/Documentation/devicetree/bindings/arm/scu.txt b/Documentation/devicetree/bindings/arm/scu.txt
+new file mode 100644
+index 0000000..96264cf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/scu.txt
+@@ -0,0 +1,15 @@
++* ARM Snoop Control Unit(SCU)
++
++ARM cores often have a configurable SCU to the memory system through
++the AXI interfaces.
++
++Required properties:
++
++- compatible : "arm,cortex-a9-scu"
++- reg : Specifies base physical address and size of the SCU registers.
++
++Example:
++	scu {
++		compatible = "arm,cortex-a9-scu";
++		reg = <0x50040000 0x58>;
++	};
 -- 
-Dmitry
+1.7.9.5
