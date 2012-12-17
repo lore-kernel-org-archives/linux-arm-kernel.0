@@ -1,86 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Dec 2012 11:10:47 -0800
-Subject: [GIT PULL 2/2] omap cleanup for v3.8 merge window
-In-Reply-To: <pull-1355771447-111279>
-Message-ID: <mailman.15.1355771460.1035.linux-arm-kernel@lists.infradead.org>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Mon, 17 Dec 2012 21:40:59 +0200
+Subject: [PATCH] ARM: OMAP4: PRM: Correct PRM_RSTST and PRM_RSTTIME registers
+ shifts
+Message-ID: <1355773259-10952-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2b8318881ddbcb67c5e8d2178b42284749442222:
+According to TRMs the assigned shifts are wrong, so correct them.
+---
+ arch/arm/mach-omap2/prm44xx.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-  Merge tag 'fbdev-for-3.8' of git://gitorious.org/linux-omap-dss2/linux (2012-12-15 13:03:48 -0800)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-for-merge-window-signed
-
-for you to fetch changes up to f64d204b5cf21b282445ba2fa357d970028c9f52:
-
-  arch/arm/mach-omap2/dpll3xxx.c: drop if around WARN_ON (2012-12-17 10:50:41 -0800)
-
-----------------------------------------------------------------
-Here are few more patches to finish the omap changes for
-multiplatform conversion that are not strictly fixes, but
-were too complex to do with the dependencies during the
-merge window. Those are to move of serial-omap.h to
-platform_data, and the removal of remaining cpu_is_omap
-macro usage outside mach-omap2.
-
-Then there are several trivial fixes for typos and few
-minimal omap2plus_defconfig updates.
-
-----------------------------------------------------------------
-AnilKumar Chimata (1):
-      ARM: OMAP2+: omap2plus_defconfig: Add tps65217 support
-
-Javier Martinez Canillas (2):
-      ARM: OMAP2+: enable devtmpfs and devtmpfs automount
-      ARM: OMAP2+: omap2plus_defconfig: enable twl4030 SoC audio
-
-Jon Hunter (1):
-      ARM: OMAP2+: PMU: Remove unused header
-
-Julia Lawall (1):
-      arch/arm/mach-omap2/dpll3xxx.c: drop if around WARN_ON
-
-Peter Ujfalusi (1):
-      ARM: OMAP2+: omap_twl: Change TWL4030_MODULE_PM_RECEIVER to TWL_MODULE_PM_RECEIVER
-
-Srinivas Kandagatla (1):
-      ARM/omap: use module_platform_driver macro
-
-Tony Lindgren (3):
-      MAINTAINERS: Add an entry for omap related .dts files
-      ARM: OMAP: Split fb.c to remove last remaining cpu_is_omap usage
-      ARM: OMAP2+: Drop plat/cpu.h for omap2plus
-
-Wei Yongjun (1):
-      ARM: OMAP4: remove duplicated include from omap_hwmod_44xx_data.c
-
-YOSHIFUJI Hideaki (1):
-      OMAP2: Fix a typo - replace regist with register.
-
- MAINTAINERS                                |  9 ++++
- arch/arm/configs/omap2plus_defconfig       |  5 ++
- arch/arm/mach-omap1/Makefile               |  2 +-
- arch/arm/mach-omap1/fb.c                   | 80 ++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/Makefile               |  2 +-
- arch/arm/mach-omap2/control.h              |  2 +-
- arch/arm/mach-omap2/dpll3xxx.c             |  3 +-
- arch/arm/mach-omap2/drm.c                  |  1 -
- arch/arm/mach-omap2/dss-common.c           |  3 +-
- arch/arm/{plat-omap => mach-omap2}/fb.c    | 50 +------------------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  1 -
- arch/arm/mach-omap2/omap_twl.c             |  8 +--
- arch/arm/mach-omap2/pmu.c                  |  2 -
- arch/arm/mach-omap2/prm2xxx.c              |  3 +-
- arch/arm/mach-omap2/prm3xxx.c              |  3 +-
- arch/arm/plat-omap/Makefile                |  2 +-
- arch/arm/plat-omap/dmtimer.c               | 13 +----
- arch/arm/plat-omap/include/plat/cpu.h      |  4 --
- drivers/media/platform/omap3isp/isp.c      |  2 -
- drivers/power/avs/smartreflex.c            |  2 -
- 20 files changed, 109 insertions(+), 88 deletions(-)
- create mode 100644 arch/arm/mach-omap1/fb.c
- rename arch/arm/{plat-omap => mach-omap2}/fb.c (76%)
+diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+index 22b0979..8ee1fbd 100644
+--- a/arch/arm/mach-omap2/prm44xx.h
++++ b/arch/arm/mach-omap2/prm44xx.h
+@@ -62,8 +62,8 @@
+ 
+ /* OMAP4 specific register offsets */
+ #define OMAP4_RM_RSTCTRL				0x0000
+-#define OMAP4_RM_RSTTIME				0x0004
+-#define OMAP4_RM_RSTST					0x0008
++#define OMAP4_RM_RSTST					0x0004
++#define OMAP4_RM_RSTTIME				0x0008
+ #define OMAP4_PM_PWSTCTRL				0x0000
+ #define OMAP4_PM_PWSTST					0x0004
+ 
+-- 
+1.7.9.5
