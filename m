@@ -1,140 +1,123 @@
-From: alex.shi@intel.com (Alex Shi)
-Date: Mon, 17 Dec 2012 11:13:31 +0800
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <1355460356.5777.12.camel@marge.simpson.net>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
- <50C9E552.1010600@intel.com> <1355460356.5777.12.camel@marge.simpson.net>
-Message-ID: <50CE8DDB.5080506@intel.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Mon, 17 Dec 2012 09:48:46 +0530
+Subject: [PATCH] ARM: EXYNOS: Fix compile error in dev-audio.c
+In-Reply-To: <CAOesGMhgvsM7Fk-YpihjYM6h+xqK-ejBzPKEDypfdKEmHp6ZJg@mail.gmail.com>
+References: <000701cdd9d3$3b6a6e10$b23f4a30$%choi@samsung.com>
+ <CAOesGMhgvsM7Fk-YpihjYM6h+xqK-ejBzPKEDypfdKEmHp6ZJg@mail.gmail.com>
+Message-ID: <CAAgF-BdPMYSzewSoZz6AXjdLktWyiyGV_NZ=T+vDgQSF_XdKiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> 
-> CPU is a bug that slipped into domain degeneration.  You should have
-> SIBLING/MC/NUMA (chasing that down is on todo).
+On Mon, Dec 17, 2012 at 6:12 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Fri, Dec 14, 2012 at 12:15 AM, Jonghwan Choi <jhbird.choi@samsung.com> wrote:
+>> arch/arm/mach-exynos/dev-audio.c:58:4: error: unknown field 'src_clk'
+>> specified in initializer
+>> arch/arm/mach-exynos/dev-audio.c:58:4: warning: initialization makes integer
+>> from pointer without a cast [enabled by default]
+>> arch/arm/mach-exynos/dev-audio.c:58:4: warning: (near initialization for
+>> 'i2sv5_pdata.type.i2s.idma_addr') [enabled by default]
+>> arch/arm/mach-exynos/dev-audio.c:91:4: error: unknown field 'src_clk'
+>> specified in initializer
+>> arch/arm/mach-exynos/dev-audio.c:91:4: warning: initialization makes integer
+>> from pointer without a cast [enabled by default]
+>> arch/arm/mach-exynos/dev-audio.c:91:4: warning: (near initialization for
+>> 'i2sv3_pdata.type.i2s.idma_addr') [enabled by default]
+>>
+>> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+>
+> This only fixes one of many build errors caused by the i2s change:
+>
+>       1 arch/arm/mach-s3c64xx/dev-audio.c:113:4: warning:
+> initialization makes integer from pointer without a cast [enabled by
+> default]
+>       1 arch/arm/mach-s3c64xx/dev-audio.c:113:4: warning: (near
+> initialization for 'i2sv4_pdata.type.i2s.idma_addr') [enabled by
+> default]
+>       1 arch/arm/mach-s3c64xx/dev-audio.c:69:4: warning:
+> initialization makes integer from pointer without a cast [enabled by
+> default]
+>       1 arch/arm/mach-s3c64xx/dev-audio.c:69:4: warning: (near
+> initialization for 'i2sv3_pdata.type.i2s.quirks') [enabled by default]
+>       1 arch/arm/mach-s5p64x0/dev-audio.c:115:4: warning:
+> initialization makes integer from pointer without a cast [enabled by
+> default]
+>       1 arch/arm/mach-s5p64x0/dev-audio.c:115:4: warning: (near
+> initialization for 's5p6450_i2s_pdata.type.i2s.quirks') [enabled by
+> default]
+>       1 arch/arm/mach-s5p64x0/dev-audio.c:48:4: warning:
+> initialization makes integer from pointer without a cast [enabled by
+> default]
+>       1 arch/arm/mach-s5p64x0/dev-audio.c:48:4: warning: (near
+> initialization for 's5p6440_i2s_pdata.type.i2s.idma_addr') [enabled by
+> default]
+>       1 arch/arm/mach-s5p64x0/dev-audio.c:96:4: warning:
+> initialization makes integer from pointer without a cast [enabled by
+> default]
+>       1 arch/arm/mach-s5p64x0/dev-audio.c:96:4: warning: (near
+> initialization for 's5p6450_i2s0_pdata.type.i2s.idma_addr') [enabled
+> by default]
+>       1 arch/arm/mach-s5pc100/dev-audio.c:53:4: warning:
+> initialization makes integer from pointer without a cast [enabled by
+> default]
+>       1 arch/arm/mach-s5pc100/dev-audio.c:53:4: warning: (near
+> initialization for 'i2sv5_pdata.type.i2s.idma_addr') [enabled by
+> default]
+>       1 arch/arm/mach-s5pc100/dev-audio.c:84:4: warning:
+> initialization makes integer from pointer without a cast [enabled by
+> default]
+>       1 arch/arm/mach-s5pc100/dev-audio.c:84:4: warning: (near
+> initialization for 'i2sv3_pdata.type.i2s.quirks') [enabled by default]
+>       1 arch/arm/mach-s5pv210/dev-audio.c:55:4: warning:
+> initialization makes integer from pointer without a cast [enabled by
+> default]
+>       1 arch/arm/mach-s5pv210/dev-audio.c:55:4: warning: (near
+> initialization for 'i2sv5_pdata.type.i2s.idma_addr') [enabled by
+> default]
+>       1 arch/arm/mach-s5pv210/dev-audio.c:87:4: warning:
+> initialization makes integer from pointer without a cast [enabled by
+> default]
+>       1 arch/arm/mach-s5pv210/dev-audio.c:87:4: warning: (near
+> initialization for 'i2sv3_pdata.type.i2s.quirks') [enabled by default]
+>
+>
+> Looks like the breakage was caused by the following commit:
+>
+> commit 1974a042dd15f1f007a3a1a2dd7a23ca0e42c01d
+> Author:     Padmavathi Venna <padma.v@samsung.com>
+> AuthorDate: Wed Nov 28 16:17:48 2012 +0530
+> Commit:     Mark Brown <broonie@opensource.wolfsonmicro.com>
+> CommitDate: Wed Nov 28 19:18:00 2012 +0000
+>
+>     ASoC: Samsung: Get I2S src_clk from clock alias id.
+>
+> Padmavathi, you can't send out code that breaks all Samsung platforms
+> like this, even if there are patches out there that fixes it. Changes
+> have to be bisectable, which means that you can't break and unbreak
+> the build, least of all if you merge through different maintainers.
+> And you need to tell the other maintainer that there are dependent
+> patches, you just sent the above patch to Mark without any such
+> information.
 
-Uh, the SD_PREFER_SIBLING on cpu domain is recovered by myself for a share
- memory benchmark regression. But consider all the situations, I think the
- flag is better to be removed.
+In V3, as I posted all the patches together I didn't mention about the
+dependency. But I could have mentioned about it in V4. I apologize for
+the build break.
 
-============
->From 96bee9a03b2048f2686fbd7de0e2aee458dbd917 Mon Sep 17 00:00:00 2001
-From: Alex Shi <alex.shi@intel.com>
-Date: Mon, 17 Dec 2012 09:42:57 +0800
-Subject: [PATCH 01/18] sched: remove SD_PERFER_SIBLING flag
+>
+> Kukjin, I see that Padmavathi has posted a V3 series of patches to
+> remove all this from the dev-audio files on November 23. Are you ok
+> with us picking them up and sending ASAP?
 
-The flag was introduced in commit b5d978e0c7e79a. Its purpose seems
-trying to fullfill one node first in NUMA machine via pulling tasks
-from other nodes when the node has capacity.
+Kukjin, Could you please give your conformation for the above patches?
 
-Its advantage is when few tasks share memories among them, pulling
-together is helpful on locality, so has performance gain. The shortage
-is it will keep unnecessary task migrations thrashing among different
-nodes, that reduces the performance gain, and just hurt performance if
-tasks has no memory cross.
+>
+>
+> -Olof
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Thinking about the sched numa balancing patch is coming. The small
-advantage are meaningless to us, So better to remove this flag.
-
-Reported-by: Mike Galbraith <efault@gmx.de>
-Signed-off-by: Alex Shi <alex.shi@intel.com>
----
- include/linux/sched.h    |  1 -
- include/linux/topology.h |  2 --
- kernel/sched/core.c      |  1 -
- kernel/sched/fair.c      | 19 +------------------
- 4 files changed, 1 insertion(+), 22 deletions(-)
-
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 5dafac3..6dca96c 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -836,7 +836,6 @@ enum cpu_idle_type {
- #define SD_SHARE_PKG_RESOURCES	0x0200	/* Domain members share cpu pkg resources */
- #define SD_SERIALIZE		0x0400	/* Only a single load balancing instance */
- #define SD_ASYM_PACKING		0x0800  /* Place busy groups earlier in the domain */
--#define SD_PREFER_SIBLING	0x1000	/* Prefer to place tasks in a sibling domain */
- #define SD_OVERLAP		0x2000	/* sched_domains of this level overlap */
- 
- extern int __weak arch_sd_sibiling_asym_packing(void);
-diff --git a/include/linux/topology.h b/include/linux/topology.h
-index d3cf0d6..15864d1 100644
---- a/include/linux/topology.h
-+++ b/include/linux/topology.h
-@@ -100,7 +100,6 @@ int arch_update_cpu_topology(void);
- 				| 1*SD_SHARE_CPUPOWER			\
- 				| 1*SD_SHARE_PKG_RESOURCES		\
- 				| 0*SD_SERIALIZE			\
--				| 0*SD_PREFER_SIBLING			\
- 				| arch_sd_sibling_asym_packing()	\
- 				,					\
- 	.last_balance		= jiffies,				\
-@@ -162,7 +161,6 @@ int arch_update_cpu_topology(void);
- 				| 0*SD_SHARE_CPUPOWER			\
- 				| 0*SD_SHARE_PKG_RESOURCES		\
- 				| 0*SD_SERIALIZE			\
--				| 1*SD_PREFER_SIBLING			\
- 				,					\
- 	.last_balance		= jiffies,				\
- 	.balance_interval	= 1,					\
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 5dae0d2..8ed2784 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -6014,7 +6014,6 @@ sd_numa_init(struct sched_domain_topology_level *tl, int cpu)
- 					| 0*SD_SHARE_CPUPOWER
- 					| 0*SD_SHARE_PKG_RESOURCES
- 					| 1*SD_SERIALIZE
--					| 0*SD_PREFER_SIBLING
- 					| sd_local_flags(level)
- 					,
- 		.last_balance		= jiffies,
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 59e072b..5d175f2 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -4339,13 +4339,9 @@ static bool update_sd_pick_busiest(struct lb_env *env,
- static inline void update_sd_lb_stats(struct lb_env *env,
- 					int *balance, struct sd_lb_stats *sds)
- {
--	struct sched_domain *child = env->sd->child;
- 	struct sched_group *sg = env->sd->groups;
- 	struct sg_lb_stats sgs;
--	int load_idx, prefer_sibling = 0;
--
--	if (child && child->flags & SD_PREFER_SIBLING)
--		prefer_sibling = 1;
-+	int load_idx;
- 
- 	load_idx = get_sd_load_idx(env->sd, env->idle);
- 
-@@ -4362,19 +4358,6 @@ static inline void update_sd_lb_stats(struct lb_env *env,
- 		sds->total_load += sgs.group_load;
- 		sds->total_pwr += sg->sgp->power;
- 
--		/*
--		 * In case the child domain prefers tasks go to siblings
--		 * first, lower the sg capacity to one so that we'll try
--		 * and move all the excess tasks away. We lower the capacity
--		 * of a group only if the local group has the capacity to fit
--		 * these excess tasks, i.e. nr_running < group_capacity. The
--		 * extra check prevents the case where you always pull from the
--		 * heaviest group when it is already under-utilized (possible
--		 * with a large weight task outweighs the tasks on the system).
--		 */
--		if (prefer_sibling && !local_group && sds->this_has_capacity)
--			sgs.group_capacity = min(sgs.group_capacity, 1UL);
--
- 		if (local_group) {
- 			sds->this_load = sgs.avg_load;
- 			sds->this = sg;
--- 
-1.7.12
-
-
-> 
-> -Mike
-> 
+Thanks
+Padma
