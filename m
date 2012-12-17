@@ -1,80 +1,52 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 17 Dec 2012 08:18:04 +0200
-Subject: [PATCH 4/4] ARM: tegra: Set SCU base address dynamically from DT
-In-Reply-To: <1355725087-11363-1-git-send-email-hdoyu@nvidia.com>
-References: <1355725087-11363-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1355725087-11363-4-git-send-email-hdoyu@nvidia.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sun, 16 Dec 2012 23:11:45 -0800
+Subject: [PATCH] input:stmpe-ts: Add support to report BTN_TOUCH event
+In-Reply-To: <20121213091004.GF27617@gmail.com>
+References: <7c50ed5f531db8ab992ebeaf1a48853a6274faf2.1355376050.git.vipulkumar.samar@st.com>
+ <20121213091004.GF27617@gmail.com>
+Message-ID: <20121217071144.GA10898@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set Snoop Control Unit(SCU) register base address dynamically from DT.
+On Thu, Dec 13, 2012 at 09:10:04AM +0000, Lee Jones wrote:
+> On Thu, 13 Dec 2012, Vipul Kumar Samar wrote:
+> 
+> > stmpe touchscreen supports BTN_TOUCH event but doesn't report it. Add
+> > BTN_TOUCH reporting capability to the stmpe touchscreen driver.
+> > 
+> > Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
+> > ---
+> >  drivers/input/touchscreen/stmpe-ts.c |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/input/touchscreen/stmpe-ts.c b/drivers/input/touchscreen/stmpe-ts.c
+> > index 076442a..c3399a1 100644
+> > --- a/drivers/input/touchscreen/stmpe-ts.c
+> > +++ b/drivers/input/touchscreen/stmpe-ts.c
+> > @@ -121,6 +121,7 @@ static void stmpe_work(struct work_struct *work)
+> >  	__stmpe_reset_fifo(ts->stmpe);
+> >  
+> >  	input_report_abs(ts->idev, ABS_PRESSURE, 0);
+> > +	input_report_key(ts->idev, BTN_TOUCH, 0);
+> >  	input_sync(ts->idev);
+> >  }
+> >  
+> > @@ -154,6 +155,7 @@ static irqreturn_t stmpe_ts_handler(int irq, void *data)
+> >  	input_report_abs(ts->idev, ABS_X, x);
+> >  	input_report_abs(ts->idev, ABS_Y, y);
+> >  	input_report_abs(ts->idev, ABS_PRESSURE, z);
+> > +	input_report_key(ts->idev, BTN_TOUCH, 1);
+> >  	input_sync(ts->idev);
+> >  
+> >         /* flush the FIFO after we have read out our values. */
+> > -- 
+> > 1.7.2.2
+> 
+> So long as it's tested/working, the code looks fine so:
+> 
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/mach-tegra/platsmp.c |   23 ++++++++++++++++++++---
- 1 file changed, 20 insertions(+), 3 deletions(-)
+Applied, thank you.
 
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 1b926df..45c0b79 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -18,6 +18,8 @@
- #include <linux/jiffies.h>
- #include <linux/smp.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/gic.h>
-@@ -36,7 +38,7 @@
- 
- extern void tegra_secondary_startup(void);
- 
--static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
-+static void __iomem *scu_base;
- 
- #define EVP_CPU_RESET_VECTOR \
- 	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
-@@ -143,14 +145,28 @@ done:
- 	return status;
- }
- 
-+static const struct of_device_id cortex_a9_scu_match[] __initconst = {
-+	{ .compatible = "arm,cortex-a9-scu", },
-+	{}
-+};
-+
- /*
-  * Initialise the CPU possible map early - this describes the CPUs
-  * which may be present or become present in the system.
-  */
- static void __init tegra_smp_init_cpus(void)
- {
--	unsigned int i, ncores = scu_get_core_count(scu_base);
-+	struct device_node *np;
-+	unsigned int i, ncores = 1;
-+
-+	np = of_find_matching_node(NULL, cortex_a9_scu_match);
-+	if (!np)
-+		return;
-+	scu_base = of_iomap(np, 0);
-+	if (!scu_base)
-+		return;
- 
-+	ncores = scu_get_core_count(scu_base);
- 	if (ncores > nr_cpu_ids) {
- 		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
- 			ncores, nr_cpu_ids);
-@@ -166,7 +182,8 @@ static void __init tegra_smp_init_cpus(void)
- static void __init tegra_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	tegra_cpu_reset_handler_init();
--	scu_enable(scu_base);
-+	if (scu_base)
-+		scu_enable(scu_base);
- }
- 
- struct smp_operations tegra_smp_ops __initdata = {
 -- 
-1.7.9.5
+Dmitry
