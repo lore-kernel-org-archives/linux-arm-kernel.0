@@ -1,40 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Dec 2012 16:10:42 +0000
-Subject: [PATCH] ARM: cache: flush to LoUU instead of LoUIS on uniprocessor
- CPUs
-Message-ID: <1355760642-28559-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 17 Dec 2012 16:11:08 +0000
+Subject: [PATCH] ARM: realview: fix private peripheral memory base for EB rev.
+ B boards
+Message-ID: <1355760668-28606-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-flush_cache_louis flushes the D-side caches to the point of unification
-inner-shareable. On uniprocessor CPUs, this is defined as zero and
-therefore no flushing will take place. Rather than invent a new interface
-for UP systems, instead use our SMP_ON_UP patching code to read the
-LoUU from the CLIDR instead.
+Commit 34ae6c96a6a7 ("ARM: 7298/1: realview: fix mapping of MPCore
+private memory region") accidentally broke the definition for the base
+address of the private peripheral region on revision B Realview-EB
+boards.
 
-Cc: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+This patch uses the correct address for REALVIEW_EB11MP_PRIV_MEM_BASE.
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Florian Fainelli <florian@openwrt.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/cache-v7.S | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-realview/include/mach/board-eb.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index cd95664..7539ec2 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -44,8 +44,10 @@ ENDPROC(v7_flush_icache_all)
- ENTRY(v7_flush_dcache_louis)
- 	dmb					@ ensure ordering with previous memory accesses
- 	mrc	p15, 1, r0, c0, c0, 1		@ read clidr, r0 = clidr
--	ands	r3, r0, #0xe00000		@ extract LoUIS from clidr
--	mov	r3, r3, lsr #20			@ r3 = LoUIS * 2
-+	ALT_SMP(ands	r3, r0, #(7 << 21))	@ extract LoUIS from clidr
-+	ALT_UP(ands	r3, r0, #(7 << 27))	@ extract LoUU from clidr
-+	ALT_SMP(mov	r3, r3, lsr #20)	@ r3 = LoUIS * 2
-+	ALT_UP(mov	r3, r3, lsr #26)	@ r3 = LoUU * 2
- 	moveq	pc, lr				@ return if level == 0
- 	mov	r10, #0				@ r10 (starting level) = 0
- 	b	flush_levels			@ start flushing cache levels
+diff --git a/arch/arm/mach-realview/include/mach/board-eb.h b/arch/arm/mach-realview/include/mach/board-eb.h
+index 124bce6..a301e61 100644
+--- a/arch/arm/mach-realview/include/mach/board-eb.h
++++ b/arch/arm/mach-realview/include/mach/board-eb.h
+@@ -47,7 +47,7 @@
+ #define REALVIEW_EB_USB_BASE		0x4F000000	/* USB */
+ 
+ #ifdef CONFIG_REALVIEW_EB_ARM11MP_REVB
+-#define REALVIEW_EB11MP_PRIV_MEM_BASE	0x1F000000
++#define REALVIEW_EB11MP_PRIV_MEM_BASE	0x10100000
+ #define REALVIEW_EB11MP_L220_BASE	0x10102000	/* L220 registers */
+ #define REALVIEW_EB11MP_SYS_PLD_CTRL1	0xD8		/* Register offset for MPCore sysctl */
+ #else
 -- 
 1.8.0
