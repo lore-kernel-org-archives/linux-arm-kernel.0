@@ -1,86 +1,111 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 17 Dec 2012 20:41:47 +0100
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20121217182911.GA10448@obsidianresearch.com>
-References: <50C9056D.2050309@wwwdotorg.org>
- <20121213070332.GA9946@avionic-0098.adnet.avionic-design.de>
- <20121213080415.GA21178@obsidianresearch.com>
- <20121213082323.GA13620@avionic-0098.adnet.avionic-design.de>
- <50CA1A8D.9070504@wwwdotorg.org>
- <20121213204229.GC18597@avionic-0098.adnet.avionic-design.de>
- <20121214151045.GA22304@avionic-0098.adnet.avionic-design.de>
- <20121214172729.GA7671@obsidianresearch.com>
- <20121216123340.GB31780@avionic-0098.adnet.avionic-design.de>
- <20121217182911.GA10448@obsidianresearch.com>
-Message-ID: <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Mon, 17 Dec 2012 20:47:31 +0100
+Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <50CF5E45.5030104@antcom.de>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
+ <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
+ <50CF1EF1.2070601@antcom.de> <50CF237E.5020409@antcom.de>
+ <50CF4838.9000401@grandegger.com> <50CF5327.6070205@antcom.de>
+ <50CF584E.1040601@grandegger.com> <50CF5E45.5030104@antcom.de>
+Message-ID: <50CF76D3.9030708@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 17, 2012 at 11:29:11AM -0700, Jason Gunthorpe wrote:
+On 12/17/2012 07:02 PM, Roland Stigge wrote:
+> On 12/17/2012 06:37 PM, Wolfgang Grandegger wrote:
+>> 	/* Do synchronous data output with a single write access */
+>> 	__raw_writel(~mask, pio + PIO_OWDR);
+>> 	__raw_writel(mask, pio + PIO_OWER);
+>> 	__raw_writel(val, pio + PIO_ODSR);
+>>
+>> For caching we would need a storage. Not sure if it's worth compared to
+>> a context switch into the kernel.
 > 
-> > > Ie route access for 00:1N.0 to the configuration space on bridge port N
-> > 
-> > Is there any particular reason why you choose 0x10 as the base slot
-> > for bridge ports? With the latest DT support patches, mapping this
-> > should be even simpler as we associate a port index with each port
-> > and the port array is gone.
-> 
-> No specific reason, it similar to what intel did and clearly shows the
-> port number in a octet of the device id. It just can't be 0.
+> Block GPIO is not only for you in userspace. ;-) You can also implement
+> efficient n-bit bus I/O in kernel drivers, n-bit-banging. :-) So not
+> always context switches involved.
 
-So I tried and implemented something along the lines of what you
-suggested, and guess what? It does work indeed. For some reason even the
-"imprecise external abort" goes away. Basically what I did is fake the
-configuration space accesses to 0000:0.0 so that they return semi-valid
-data. Nothing special yet, just basically returning vendor and product
-ID, header type, class and other static data.
+OK, what do you think about the following untested patch:
 
-Initially the implementation was read-only and that still caused the
-external abort, but adding nop'ed write functions apparently solved
-that.
+>From b44cad16cbbca84715dffd4cb5268497216add25 Mon Sep 17 00:00:00 2001
+From: Wolfgang Grandegger <wg@grandegger.com>
+Date: Mon, 3 Dec 2012 08:31:55 +0100
+Subject: [PATCH 1/2] gpio: add GPIO block callback functions for AT91
 
-What I'll do next is add some caching of written values, so that reading
-them back actually yields something correct. After that I'll post what I
-have so that others can look at it or even reuse it.
+Signed-off-by: Wolfgang Grandegger <wg@grandegger.com>
+---
+ arch/arm/mach-at91/gpio.c |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-The problem of matching DT nodes to the root ports still isn't solved,
-but I'll take another look at that tomorrow.
-
-> > > Then you are a bit closer. You should see both root port bridges
-> > > appear in your lspci.. IIRC the host bridge device is not essential to
-> > > discovery working on Linux.
-> > 
-> > The second port will probably still not appear, at least not in the
-> > latest patches for DT support since it won't be registered unless
-> > enabled. Even if enabled it will not be registered unless a link is
-> > available, which it isn't in any of the setups that I currently have.
-> > I'll need to check with our hardware engineers whether we can hook
-> > something up to the second port.
-> 
-> You can probably bodge around and just register it anyhow, the
-> internal bridge will still show up in linux, even though there is no
-> device behind it.
-> 
-> I'm not sure if PCI-E ports should be ignored if the link is down. The
-> kernel has the ability to re-scan them at runtime, and if the
-> controller has a link up interrupt then it can happen automatically.
-> 
-> I sent through a patch for kirkwood that did this, we hot plug the
-> PCIe device because userspace intializes it.
-
-I don't think the root ports on Tegra support this. Or at least there's
-no code to support it yet. I'll see if I can at least modify the code to
-still show the root port on the bus if it is enabled but the link is not
-available. The DT binding allows each port to be enabled so that if a
-board configuration doesn't provide a physical connection the software
-doesn't have to bother initializing it.
-available.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/207850de/attachment-0001.sig>
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index be42cf0..cf6bd45 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -42,13 +42,16 @@ struct at91_gpio_chip {
+ 	void __iomem		*regbase;	/* PIO bank virtual address */
+ 	struct clk		*clock;		/* associated clock */
+ 	struct irq_domain	*domain;	/* associated irq domain */
++	unsigned long		mask_shadow;	/* synchronous data output */
+ };
+ 
+ #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
+ 
+ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
+ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
++static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val);
+ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
++static unsigned long at91_gpiolib_get_block(struct gpio_chip *chip, unsigned long mask);
+ static int at91_gpiolib_direction_output(struct gpio_chip *chip,
+ 					 unsigned offset, int val);
+ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+@@ -62,7 +65,9 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 			.direction_input  = at91_gpiolib_direction_input, \
+ 			.direction_output = at91_gpiolib_direction_output, \
+ 			.get		  = at91_gpiolib_get,		\
++			.get_block	  = at91_gpiolib_get_block,	\
+ 			.set		  = at91_gpiolib_set,		\
++			.set_block	  = at91_gpiolib_set_block,	\
+ 			.dbg_show	  = at91_gpiolib_dbg_show,	\
+ 			.to_irq		  = at91_gpiolib_to_irq,	\
+ 			.ngpio		  = nr_gpio,			\
+@@ -896,6 +901,16 @@ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset)
+ 	return (pdsr & mask) != 0;
+ }
+ 
++static unsigned long at91_gpiolib_get_block(struct gpio_chip *chip, unsigned long mask)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	u32 pdsr;
++
++	pdsr = __raw_readl(pio + PIO_PDSR);
++	return pdsr & mask;
++}
++
+ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
+ {
+ 	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+@@ -905,6 +920,20 @@ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
+ 	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
+ }
+ 
++static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++
++	/* Do synchronous data output with a single write access */
++	if (mask != at91_gpio->mask_shadow) {
++		at91_gpio->mask_shadow = mask;
++		__raw_writel(~mask, pio + PIO_OWDR);
++		__raw_writel(mask, pio + PIO_OWER);
++	}
++	__raw_writel(val, pio + PIO_ODSR);
++}
++
+ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ {
+ 	int i;
+-- 
+1.7.9.5
