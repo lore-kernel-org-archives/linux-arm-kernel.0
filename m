@@ -1,157 +1,81 @@
-From: peter@turczak.de (Peter Turczak)
-Date: Mon, 17 Dec 2012 15:26:02 +0100
-Subject: [PATCH/RFC] mxs: mach-mxs: Setup mac address prefix from dt
-Message-ID: <C97C836E-18D1-41C5-8DC3-E82BC2019018@turczak.de>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 17 Dec 2012 08:39:52 -0600
+Subject: [RFC] drm/lcdc: add TI LCD Controller DRM driver
+In-Reply-To: <50CF248B.4010401@ti.com>
+References: <1355443446-8723-1-git-send-email-robdclark@gmail.com>
+ <50CF248B.4010401@ti.com>
+Message-ID: <CAF6AEGvm2TmFh7xiYzjt9yGT4kuBFA=_219NkwQAjbBVZ+Z6rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables setting the the fec ethernet mac address either completely
-from dt, take only the prefix from dt and use the remaining device unique bytes 
-from the OTP or use OTP uniq bytes and the hardcoded values as before when no
-mac address is specified in the dt. So compatibility should be maintained to
-devices already shipped.
+On Mon, Dec 17, 2012 at 7:56 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> On 2012-12-14 02:04, Rob Clark wrote:
+>> A simple DRM/KMS driver for the TI LCD Controller found in various
+>> smaller TI parts (AM33xx, OMAPL138, etc).  This driver uses the
+>> CMA helpers.  Currently only the TFP410 DVI encoder is supported
+>> (tested with beaglebone + DVI cape).  There are also various LCD
+>> displays, for which support can be added (as I get hw to test on),
+>> and an external i2c HDMI encoder found on some boards.
+>>
+>> The display controller supports a single CRTC.  And the encoder+
+>> connector are split out into sub-devices.  Depending on which LCD
+>> or external encoder is actually present, the appropriate output
+>> module(s) will be loaded.
+>>
+>> Signed-off-by: Rob Clark <robdclark@gmail.com>
+>> ---
+>>  drivers/gpu/drm/Kconfig            |   2 +
+>>  drivers/gpu/drm/Makefile           |   1 +
+>>  drivers/gpu/drm/lcdc/Kconfig       |  11 +
+>>  drivers/gpu/drm/lcdc/Makefile      |   8 +
+>>  drivers/gpu/drm/lcdc/lcdc_crtc.c   | 544 +++++++++++++++++++++++++++++++++
+>>  drivers/gpu/drm/lcdc/lcdc_drv.c    | 604 +++++++++++++++++++++++++++++++++++++
+>>  drivers/gpu/drm/lcdc/lcdc_drv.h    | 162 ++++++++++
+>>  drivers/gpu/drm/lcdc/lcdc_regs.h   | 154 ++++++++++
+>>  drivers/gpu/drm/lcdc/lcdc_tfp410.c | 424 ++++++++++++++++++++++++++
+>>  drivers/gpu/drm/lcdc/lcdc_tfp410.h |  26 ++
+>>  10 files changed, 1936 insertions(+)
+>>  create mode 100644 drivers/gpu/drm/lcdc/Kconfig
+>>  create mode 100644 drivers/gpu/drm/lcdc/Makefile
+>>  create mode 100644 drivers/gpu/drm/lcdc/lcdc_crtc.c
+>>  create mode 100644 drivers/gpu/drm/lcdc/lcdc_drv.c
+>>  create mode 100644 drivers/gpu/drm/lcdc/lcdc_drv.h
+>>  create mode 100644 drivers/gpu/drm/lcdc/lcdc_regs.h
+>>  create mode 100644 drivers/gpu/drm/lcdc/lcdc_tfp410.c
+>>  create mode 100644 drivers/gpu/drm/lcdc/lcdc_tfp410.h
+>
+> "lcdc" is quite a common term. The directory should perhaps be something
+> like ti-lcdc?
 
-Currently only Denx or Freescale manufacturer prefixes are guessed from the
-selected hardware platform. The suggested patch provides a more elegant
-solution because other vendors to just need to adapt their device tree 
-description file.
+yeah.. but not one else was using it (other than internally to the
+driver).. I guess we could call it tilcdc or ti-lcdc
 
-Example:
-mac0: ethernet at 800f0000 {
-             phy-mode = "rmii";
-             pinctrl-names = "default";
-             pinctrl-0 = <&mac0_pins_a>;
-             phy-supply = <&reg_fec_3v3>;
-             phy-reset-gpios = <&gpio2 5 3>;
-             phy-reset-duration = <100>;
-             local-mac-address = [00 04 1E 5E 1B B9];
-             status = "okay";
-         };
-or
-mac0: ethernet at 800f0000 {
-             phy-mode = "rmii";
-             pinctrl-names = "default";
-             pinctrl-0 = <&mac0_pins_a>;
-             phy-supply = <&reg_fec_3v3>;
-             phy-reset-gpios = <&gpio2 5 3>;
-             phy-reset-duration = <100>;
-             local-mac-address = [00 04 1E];
-             status = "okay";
-         };
+> Probably not relevant, but I wonder if the same LCDC was used in
+> omap1... It'd be nice to get rid of the omap1 fb driver.
 
-Signed-off-by: Peter Turczak <peter@turczak.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/mach-mxs.c |   83 +++++++++++++++++++++++++-----------------
- 1 files changed, 49 insertions(+), 34 deletions(-)
+would be interesting if you have any idea where to find hw to test
+with (museum?)
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 4748ec5..d7b349a 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -164,54 +164,69 @@ enum mac_oui {
- 
- static void __init update_fec_mac_prop(enum mac_oui oui)
- {
--	struct device_node *np, *from = NULL;
--	struct property *newmac;
-+	struct device_node *from = NULL;
- 	const u32 *ocotp = mxs_get_ocotp();
- 	u8 *macaddr;
-+	const u8 *maddr = NULL;
-+	int len = 0;
- 	u32 val;
--	int i;
--
--	for (i = 0; i < 2; i++) {
--		np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
--		if (!np)
--			return;
--		from = np;
--
--		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
--		if (!newmac)
--			return;
--		newmac->value = newmac + 1;
--		newmac->length = 6;
--
--		newmac->name = kstrdup("local-mac-address", GFP_KERNEL);
--		if (!newmac->name) {
--			kfree(newmac);
-+	int i = 0;
-+	int tt = 0;
-+
-+	for_each_compatible_node(from, NULL, "fsl,imx28-fec") {
-+		macaddr = kzalloc(6, GFP_KERNEL);
-+		if (!macaddr) {
-+			pr_err("%s: failed to allocate mem for macaddr\n",
-+				__func__);
- 			return;
- 		}
- 
-+		/*retrieve MAC from DT*/
-+		maddr = of_get_property(from, "local-mac-address", &len);
-+		val = ocotp[i];
-+		i++;
-+
-+		if (maddr && (len == 6)) {
-+			/*6 bytes MAC defined*/
-+			for (tt = 0; tt < 6; tt++)
-+				macaddr[tt] = maddr[tt];
-+
-+			/*overwrite with DT MAC*/
-+			val = (macaddr[3] << 16) | (macaddr[4] << 8) |
-+			      (macaddr[5] << 0);
-+
-+			pr_debug("MACH-MXS: %i MAC taken from DT\n", i);
-+		} else if (maddr && (len == 3)) {
-+			/*only vendor OUI defined in DT*/
-+			macaddr[0] = maddr[0];
-+			macaddr[1] = maddr[1];
-+			macaddr[2] = maddr[2];
-+
-+			pr_debug("MACH-MXS: %i MAC OUI taken from DT\n", i);
-+		} else {
- 		/*
- 		 * OCOTP only stores the last 4 octets for each mac address,
- 		 * so hard-code OUI here.
- 		 */
--		macaddr = newmac->value;
--		switch (oui) {
--		case OUI_FSL:
--			macaddr[0] = 0x00;
--			macaddr[1] = 0x04;
--			macaddr[2] = 0x9f;
--			break;
--		case OUI_DENX:
--			macaddr[0] = 0xc0;
--			macaddr[1] = 0xe5;
--			macaddr[2] = 0x4e;
--			break;
-+			switch (oui) {
-+			case OUI_FSL:
-+				macaddr[0] = 0x00;
-+				macaddr[1] = 0x04;
-+				macaddr[2] = 0x9f;
-+				break;
-+			case OUI_DENX:
-+				macaddr[0] = 0xc0;
-+				macaddr[1] = 0xe5;
-+				macaddr[2] = 0x4e;
-+				break;
-+			}
-+
-+			pr_debug("MACH-MXS: %i hard-coded MAC taken\n", i);
- 		}
--		val = ocotp[i];
-+
- 		macaddr[3] = (val >> 16) & 0xff;
- 		macaddr[4] = (val >> 8) & 0xff;
- 		macaddr[5] = (val >> 0) & 0xff;
--
--		prom_update_property(np, newmac);
- 	}
- }
- 
--- 
-1.7.0.4
+> I'm not very enthusiastic about adding ti-lcdc specific panel/chip
+> drivers. It's not really a big deal if it's only kernel code, but you
+> add device-tree bindings also, which is an external API that you need to
+> support after adding it.
+>
+> I'd rather see the energy put to common display framework, and get this
+> whole panel/chip driver issue solved in a generic manner.
+
+yeah, I was expecting to migrate to CDF once it exists, but needed
+something for now.  I'm using the exercise to get my thoughts straight
+on how CDF should fit into KMS.  (One thing I plan to add support for
+is an i2c connected hdmi encoder.. which looks like it would fit well
+in drivers/gpu/drm/i2c.. so the drm encoder-slave stuff might be the
+way.)
+
+If you have any suggestions on the DT bindings, I'd like to hear 'em.
+
+BR,
+-R
+
+>  Tomi
+>
+>
