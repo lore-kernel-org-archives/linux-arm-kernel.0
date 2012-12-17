@@ -1,41 +1,179 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Dec 2012 15:46:02 +0000
-Subject: [QUESTION] mmc: mmci: Howto merge patches
-In-Reply-To: <CAPDyKFpXyVCzFWkyL3+92Zb9hoyKaEV4hpaUYO9O5o71nNmk8w@mail.gmail.com>
-References: <CAPDyKFpXyVCzFWkyL3+92Zb9hoyKaEV4hpaUYO9O5o71nNmk8w@mail.gmail.com>
-Message-ID: <20121217154602.GT14363@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 17 Dec 2012 15:51:53 +0000
+Subject: [PATCH RESEND 5/6 v10] gpio: Add device tree support to block
+ GPIO API
+In-Reply-To: <1355495185-24220-6-git-send-email-stigge@antcom.de>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <1355495185-24220-6-git-send-email-stigge@antcom.de>
+Message-ID: <20121217155153.GD16561@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 17, 2012 at 04:29:51PM +0100, Ulf Hansson wrote:
-> Hi Russell and Chris,
+Hi,
+
+I have a few comments on the parsing code.
+
+On Fri, Dec 14, 2012 at 02:26:24PM +0000, Roland Stigge wrote:
+> This patch adds device tree support to the block GPIO API.
 > 
-> I would like to propose a change of how we handle mmci patches to be
-> merged. Instead of going through Russell's arm tree, I would like
-> Chris to handle the merge through his mmc tree.
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 > 
-> The reason is simply that patches can have dependencies to the
-> protocol layer and in seems a bit unnecessary to wait for another
-> merge window to occur to handle these patches.
-
-You're going to have to wait another merge window _anyway_ because no
-kernel developer should be stuffing their tree full of patches during
-any merge window that have not already been in linux-next well _before_
-the merge window.
-
-So like it or not, this merge window already closed to new submissions
-maybe two weeks ago.
-
-> Moreover, if most of the mmci patches goes through Chris mmc tree, I
-> believe we would minimize the number of possible conflicts. Russell
-> will then only need to NACK patches to prevent them from being merged.
+> ---
+>  Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 +++++++
+>  drivers/gpio/Makefile                                 |    1 
+>  drivers/gpio/gpioblock-of.c                           |   84 ++++++++++++++++++
+>  3 files changed, 121 insertions(+)
 > 
-> Do you think this could be and acceptable setup for both of you?
+> --- /dev/null
+> +++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio-block.txt
+> @@ -0,0 +1,36 @@
+> +Block GPIO definition
+> +=====================
+> +
+> +This binding specifies arbitrary blocks of gpios, combining gpios from one or
+> +more GPIO controllers together, to form a word for r/w access.
+> +
+> +Required property:
+> +- compatible: must be "linux,gpio-block"
+> +
+> +Required subnodes:
+> +- the name will be the registered name of the block
+> +- property "gpios" is a list of gpios for the respective block
+> +
+> +Example:
+> +
+> +        blockgpio {
+> +                compatible = "linux,gpio-block";
+> +
+> +                block0 {
+> +                        gpios = <&gpio 3 0 0>,
+> +                                <&gpio 3 1 0>;
+> +                };
+> +                block1 {
+> +                        gpios = <&gpio 4 1 0>,
+> +                                <&gpio 4 3 0>,
+> +                                <&gpio 4 2 0>,
+> +                                <&gpio 4 4 0>,
+> +                                <&gpio 4 5 0>,
+> +                                <&gpio 4 6 0>,
+> +                                <&gpio 4 7 0>,
+> +                                <&gpio 4 8 0>,
+> +                                <&gpio 4 9 0>,
+> +                                <&gpio 4 10 0>,
+> +                                <&gpio 4 19 0>;
+> +                };
+> +        };
+> --- linux-2.6.orig/drivers/gpio/Makefile
+> +++ linux-2.6/drivers/gpio/Makefile
+> @@ -4,6 +4,7 @@ ccflags-$(CONFIG_DEBUG_GPIO)	+= -DDEBUG
+>  
+>  obj-$(CONFIG_GPIOLIB)		+= gpiolib.o devres.o
+>  obj-$(CONFIG_OF_GPIO)		+= gpiolib-of.o
+> +obj-$(CONFIG_OF_GPIO)		+= gpioblock-of.o
+>  
+>  # Device drivers. Generally keep list sorted alphabetically
+>  obj-$(CONFIG_GPIO_GENERIC)	+= gpio-generic.o
+> --- /dev/null
+> +++ linux-2.6/drivers/gpio/gpioblock-of.c
+> @@ -0,0 +1,84 @@
+> +/*
+> + * OF implementation for Block GPIO
+> + *
+> + * Copyright (C) 2012 Roland Stigge <stigge@antcom.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/gpio.h>
+> +#include <linux/of.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/module.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
+> +
+> +static int __devinit gpioblock_of_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *block;
+> +	unsigned *gpios;
+> +	int ngpio;
+> +	int ret;
+> +	struct gpio_block *gb;
+> +
+> +	for_each_available_child_of_node(pdev->dev.of_node, block) {
+> +		int i;
+> +
+> +		ngpio = of_gpio_count(block);
+> +		gpios = kzalloc(ngpio * sizeof(*gpios), GFP_KERNEL);
 
-The reason that you want to do this is because you're realising that it's
-taking a long time for you to get your patches into mainline.  The reason
-that I'm being slow with your patches is that you haven't built up the
-trust on my side that I can simply say "yes that's fine, I trust your
-patches."
+What if the block node is malformed? ngpio might be -ENOENT or -EINVAL.
 
-That alone is good enough reason for me to say no way to this.
+> +		if (!gpios)
+> +			return -ENOMEM;
+> +		for (i = 0; i < ngpio; i++) {
+> +			ret = of_get_gpio(block, i);
+> +			if (ret < 0)
+> +				return ret; /* expect -EPROBE_DEFER */
+> +			gpios[i] = ret;
+> +		}
+> +		gb = gpio_block_create(gpios, ngpio, block->name);
+> +		if (IS_ERR(gb)) {
+> +			dev_err(&pdev->dev,
+> +				"Error creating GPIO block from device tree\n");
+> +			return PTR_ERR(gb);
+
+Won't this leak the memory for the gpios object we kzalloc'd earlier?
+
+> +		}
+> +		ret = gpio_block_register(gb);
+> +		if (ret < 0) {
+> +			gpio_block_free(gb);
+> +			return ret;
+
+Same here.
+
+> +		}
+> +		kfree(gpios);
+> +		dev_info(&pdev->dev, "Registered gpio block %s: %d gpios\n",
+> +			 block->name, ngpio);
+
+Any of the returns in this block will leave the block node's refcount
+incremented.
+
+> +	}
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +static struct of_device_id gpioblock_of_match[] __devinitdata = {
+> +	{ .compatible = "linux,gpio-block", },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, gpioblock_of_match);
+> +#endif
+> +
+> +static struct platform_driver gpioblock_of_driver = {
+> +	.driver	= {
+> +		.name = "gpio-block",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = of_match_ptr(gpioblock_of_match),
+> +
+> +	},
+> +	.probe	= gpioblock_of_probe,
+> +};
+> +
+> +module_platform_driver(gpioblock_of_driver);
+> +
+> +MODULE_DESCRIPTION("GPIO Block driver");
+> +MODULE_AUTHOR("Roland Stigge <stigge@antcom.de>");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:gpioblock-of");
+> 
+
+Thanks,
+Mark.
