@@ -1,33 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Dec 2012 10:31:03 -0800
-Subject: [GIT PULL] omap fixes and cleanups for v3.8 merge window
-In-Reply-To: <20121217180852.GA24440@arwen.pp.htv.fi>
-References: <20121217180200.GU4989@atomide.com>
- <20121217180852.GA24440@arwen.pp.htv.fi>
-Message-ID: <20121217183103.GW4989@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Dec 2012 19:38:50 +0100
+Subject: [PATCH 0/2] clocksource: nomadik-mtu: support timer-based delay
+In-Reply-To: <20121217113611.GA31470@balto.lan>
+References: <1354615845-2758-1-git-send-email-fabio.baltieri@linaro.org>
+ <20121217113611.GA31470@balto.lan>
+Message-ID: <CACRpkdYRJvFEUvB++fKgVWEXZrTQ7aob0MPMwW4TBs_VRNuzsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [121217 10:18]:
-> Hi,
-> 
-> On Mon, Dec 17, 2012 at 10:02:01AM -0800, Tony Lindgren wrote:
-> >  drivers/mfd/omap-usb-host.c                        |  3 +-
-> >  drivers/tty/serial/omap-serial.c                   |  3 +-
-> >  drivers/usb/phy/Kconfig                            |  1 +
-> 
-> I did mention I was against adding OMAP dependencies do drivers.
-> Interesting to see to commit going upstream without a reply to my
-> comment :-s
-> 
-> http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=commitdiff;h=3e194c88f8b71700822828749187e65853ed8166
+On Mon, Dec 17, 2012 at 12:36 PM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
+> On Tue, Dec 04, 2012 at 11:10:43AM +0100, Fabio Baltieri wrote:
+>> this implements timer-based delay support for nomadik and ux500
+>> platforms, using the MTU as time source, and marks the u8500 cpufreq
+>> driver as CPUFREQ_CONST_LOOPS accordingly.
+>>
+>> The patches are based on Arnd's arm-soc/ux500/mtu-clk branch, as that
+>> contains latest MTU driver developments, including a driver move/rename,
+>> but I can rebase if necessary.
+>
+> The patches applies cleanly on current mainline now, as all dependencies
+> has already been merged, can this be considered for for merging too?
 
-Looks like Linus already applied it. Anyways, I like Dmitry's idea
-of adding an extra COMPILE_COVERAGE flag to enable the build of
-arch specific drivers for driver subsystem maintainers, I'll
-do a patch for that so you can test build all the arch specific
-USB drivers on x86 also.
+If no clocksource maintainer steps up in a week then notify me and
+I'll simply stick these into the ux500 tree.
 
-Regards,
-
-Tony
+Yours,
+Linus Walleij
