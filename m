@@ -1,85 +1,154 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Dec 2012 16:35:38 +0000
-Subject: [PATCH v2 3/6] ARM: psci: add devicetree binding for describing PSCI
- firmware
+Date: Mon, 17 Dec 2012 16:35:40 +0000
+Subject: [PATCH v2 5/6] ARM: Dummy Virtual Machine platform support
 In-Reply-To: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
 References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1355762141-29616-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1355762141-29616-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new devicetree binding for describing PSCI firmware
-to Linux.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
+Add support for the smallest, dumbest possible platform, to be
+used as a guest for KVM or other hypervisors.
+
+It only mandates a GIC and architected timers. Fits nicely with
+a multiplatform zImage. Uses very little silicon area.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- Documentation/devicetree/bindings/arm/psci.txt | 58 ++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/psci.txt
+ arch/arm/Kconfig            |  2 ++
+ arch/arm/Makefile           |  1 +
+ arch/arm/mach-virt/Kconfig  |  9 +++++++
+ arch/arm/mach-virt/Makefile |  5 ++++
+ arch/arm/mach-virt/virt.c   | 65 +++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 82 insertions(+)
+ create mode 100644 arch/arm/mach-virt/Kconfig
+ create mode 100644 arch/arm/mach-virt/Makefile
+ create mode 100644 arch/arm/mach-virt/virt.c
 
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2a04375..552d72e0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1127,6 +1127,8 @@ source "arch/arm/mach-versatile/Kconfig"
+ source "arch/arm/mach-vexpress/Kconfig"
+ source "arch/arm/plat-versatile/Kconfig"
+ 
++source "arch/arm/mach-virt/Kconfig"
++
+ source "arch/arm/mach-w90x900/Kconfig"
+ 
+ # Definitions to make life easier
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 5f914fc..e8232ad 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -192,6 +192,7 @@ machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
+ machine-$(CONFIG_ARCH_SPEAR13XX)	+= spear13xx
+ machine-$(CONFIG_ARCH_SPEAR3XX)		+= spear3xx
+ machine-$(CONFIG_MACH_SPEAR600)		+= spear6xx
++machine-$(CONFIG_ARCH_VIRT)		+= virt
+ machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
+ 
+ # Platform directory name.  This list is sorted alphanumerically
+diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
 new file mode 100644
-index 0000000..904d0d3
+index 0000000..a568a2a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -0,0 +1,58 @@
-+* Power State Coordination Interface (PSCI)
++++ b/arch/arm/mach-virt/Kconfig
+@@ -0,0 +1,9 @@
++config ARCH_VIRT
++	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
++	select ARCH_WANT_OPTIONAL_GPIOLIB
++	select ARM_GIC
++	select ARM_ARCH_TIMER
++	select HAVE_SMP
++	select CPU_V7
++	select SPARSE_IRQ
++	select USE_OF
+diff --git a/arch/arm/mach-virt/Makefile b/arch/arm/mach-virt/Makefile
+new file mode 100644
+index 0000000..7ddbfa6
+--- /dev/null
++++ b/arch/arm/mach-virt/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for the linux kernel.
++#
 +
-+Firmware implementing the PSCI functions described in ARM document number
-+ARM DEN 0022A ("Power State Coordination Interface System Software on ARM
-+processors") can be used by Linux to initiate various CPU-centric power
-+operations.
++obj-y					:= virt.o
+diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
+new file mode 100644
+index 0000000..174b9da
+--- /dev/null
++++ b/arch/arm/mach-virt/virt.c
+@@ -0,0 +1,65 @@
++/*
++ * Dummy Virtual Machine - does what it says on the tin.
++ *
++ * Copyright (C) 2012 ARM Ltd
++ * Authors: Will Deacon <will.deacon@arm.com>,
++ *          Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+Issue A of the specification describes functions for CPU suspend, hotplug
-+and migration of secure software.
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
 +
-+Functions are invoked by trapping to the privilege level of the PSCI
-+firmware (specified as part of the binding below) and passing arguments
-+in a manner similar to that specified by AAPCS:
++#include <asm/arch_timer.h>
++#include <asm/hardware/gic.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
 +
-+	 r0		=> 32-bit Function ID / return value
-+	{r1 - r3}	=> Parameters
++const static struct of_device_id irq_match[] = {
++	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
++	{}
++};
 +
-+Note that the immediate field of the trapping instruction must be set
-+to #0.
++static void __init gic_init_irq(void)
++{
++	of_irq_init(irq_match);
++}
 +
++static void __init virt_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
 +
-+Main node required properties:
++static void __init virt_timer_init(void)
++{
++	WARN_ON(arch_timer_of_register() != 0);
++	WARN_ON(arch_timer_sched_clock_init() != 0);
++}
 +
-+ - compatible    : Must be "arm,psci"
++static const char *virt_dt_match[] = {
++	"linux,dummy-virt",
++	NULL
++};
 +
-+ - method        : The method of calling the PSCI firmware. Permitted
-+                   values are:
++static struct sys_timer virt_timer = {
++	.init = virt_timer_init,
++};
 +
-+                   "smc" : SMC #0, with the register assignments specified
-+		           in this binding.
-+
-+                   "hvc" : HVC #0, with the register assignments specified
-+		           in this binding.
-+
-+ - function-base : The base ID from which the functions are offset.
-+
-+Main node optional properties:
-+
-+ - cpu_suspend   : Offset of CPU_SUSPEND ID from function-base
-+
-+ - cpu_off       : Offset of CPU_OFF ID from function-base
-+
-+ - cpu_on        : Offset of CPU_ON ID from function-base
-+
-+ - migrate       : Offset of MIGRATE ID from function-base
-+
-+
-+Example:
-+
-+	psci {
-+		compatible	= "arm,psci";
-+		method		= "smc";
-+		function-base	= <0x95c1ba5e>;
-+		cpu_suspend	= <0>;
-+		cpu_off		= <1>;
-+		cpu_on		= <2>;
-+		migrate		= <3>;
-+	};
++DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
++	.init_irq	= gic_init_irq,
++	.handle_irq     = gic_handle_irq,
++	.timer		= &virt_timer,
++	.init_machine	= virt_init,
++	.dt_compat	= virt_dt_match,
++MACHINE_END
 -- 
 1.8.0
