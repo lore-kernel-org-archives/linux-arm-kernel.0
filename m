@@ -1,56 +1,36 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 17 Dec 2012 22:40:35 +0100
-Subject: [PATCH 4/4] ODROID-X: dts: Add mshc node for ODROID-X board
-In-Reply-To: <1355774107-364-5-git-send-email-tobetter@gmail.com>
-References: <1355774107-364-1-git-send-email-tobetter@gmail.com>
- <1355774107-364-5-git-send-email-tobetter@gmail.com>
-Message-ID: <2216925.ElgEB0zitR@flatron>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 17 Dec 2012 14:43:19 -0700
+Subject: [PATCH 1/4] ARM: tegra30: Add support for Uart clock source
+ divider as 15.1
+In-Reply-To: <1355746101-15291-2-git-send-email-ldewangan@nvidia.com>
+References: <1355746101-15291-1-git-send-email-ldewangan@nvidia.com>
+ <1355746101-15291-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <50CF91F7.5010402@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjin,
+On 12/17/2012 05:08 AM, Laxman Dewangan wrote:
+> Tegra20 uart clock source have the 15.1 clock divider in place of
 
-On Tuesday 18 of December 2012 04:55:07 Dongjin Kim wrote:
-> Adding the device node to support eMMC storage on SDCARD4 ports,
-> controlled by Mobile Storage Host Controller.
-> 
-> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
-> ---
->  arch/arm/boot/dts/exynos4412-odroidx.dts |   21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts
-> b/arch/arm/boot/dts/exynos4412-odroidx.dts index 3943011..fbd0b51
-> 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
-> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> @@ -73,4 +73,25 @@
->  			linux,default-trigger = "mmc0";
->  		};
->  	};
-> +
-> +	mshc at 12550000 {
-> +		num-slots = <1>;
-> +		supports-highspeed;
-> +		broken-cd;
-> +		fifo-depth = <0x80>;
-> +		card-detect-delay = <200>;
-> +		samsung,dw-mshc-ciu-div = <3>;
-> +		samsung,dw-mshc-sdr-timing = <2 3 3>;
-> +		samsung,dw-mshc-ddr-timing = <1 2 3>;
-> +
-> +		slot at 0 {
-> +			reg = <0>;
-> +			bus-width = <8>;
-> +			gpios = <&gpk0 0 3>, <&gpk0 1 3>,
-> +				<&gpk0 3 3>, <&gpk0 4 3>,
-> +				<&gpk0 5 3>, <&gpk0 6 3>,
-> +				<&gpk1 3 4>, <&gpk1 4 4>,
-> +				<&gpk1 5 4>, <&gpk1 6 4>;
+That says Tegra20, but ...
 
-What is the gpios property for in this node? Pin configuration using 
-legacy GPIO bindings is not supported anymore on Exynos4. Pin control 
-bindings must be used.
+> 7.1. Add support for 15.1 clock divider and change the uart clock divider
+> flag to DIV_U151.
 
-Best regards,
-Tomasz Figa
+>  arch/arm/mach-tegra/clock.h               |    3 +-
+>  arch/arm/mach-tegra/tegra30_clocks.c      |   70 ++++++++++++++++++++++------
+>  arch/arm/mach-tegra/tegra30_clocks_data.c |   10 ++--
+
+... the patch only modifies Tegra30. Do both Tegra20 and Tegra30 have
+this feature; should both clock drivers be updated?
+
+BTW, Prashant is reworking the Tegra clock support to be modular, rather
+than having a single monolithic "Tegra clock" type, and also moving the
+code to drivers/clk. This patch will conflict signifcantly with that.
+Please work with him to integrate this patch into his rework series,
+either before or after his changes, and have him include the patch when
+he posts his series. You'll also need to think about whether/how your
+and his series depend on each-other.
+
+... but: Is this a pure bug-fix? If so, I guess this patch should be
+applied before Prashant's patches, and this patch also Cc: stable?
