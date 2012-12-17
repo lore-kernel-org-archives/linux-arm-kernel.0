@@ -1,61 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 17 Dec 2012 09:59:52 +0100
-Subject: [PATCH] clk: export __clk_get_name for re-use in imx-ipu-v3 and
- others
-In-Reply-To: <1355400745-7320-1-git-send-email-ndevos@redhat.com>
-References: <1355400745-7320-1-git-send-email-ndevos@redhat.com>
-Message-ID: <20121217085952.GH26326@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Dec 2012 10:04:32 +0100
+Subject: [PATCH 2/2] ARM: OMAP2+: Drop plat/cpu.h for omap2plus
+In-Reply-To: <20121216200317.24238.63954.stgit@muffinssi.local>
+References: <20121216200236.24238.38151.stgit@muffinssi.local>
+ <20121216200317.24238.63954.stgit@muffinssi.local>
+Message-ID: <1555457.YNrhJNmIOs@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 01:12:25PM +0100, Niels de Vos wrote:
-> This fixes the following error when building for arm-imx:
-> > ERROR: "__clk_get_name" [drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.ko] undefined!
-> > make[1]: *** [__modpost] Error 1
-> > make: *** [modules] Error 2
+Hi Tony,
+
+Thanks for the patch.
+
+On Sunday 16 December 2012 12:03:17 Tony Lindgren wrote:
+> The cpu_is_omap macros are now local to arch/arm/mach-omap2
+> in soc.h and plat/cpu.h can finally be dropped for omap2+.
+> Thanks everybody for help with fixing the drivers.
 > 
-> There are valid usecases to get the name of a clock, be it for debugging
-> purposes or to register a children of a clock like done in this IPU driver.
-> Therefore exporting __clk_get_name() and make it available for others makes
-> sense.
-
-Gnerally I think the name of a clock shouldn't be a secret, so:
-
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
+> Note that we can now also remove the unused plat/cpu.h from
+> smartreflex.c and isp.c as they will cause compile errors
+> with ARCH_MULTIPLATFORM enabled.
 > 
-> Reported-by: Peter Robinson <pbrobinson@gmail.com>
-> CC: Sascha Hauer <s.hauer@pengutronix.de>
-> CC: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Niels de Vos <ndevos@redhat.com>
+> Cc: Jean Pihet <jean.pihet@newoldbits.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+For the OMAP3 ISP part,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
 > ---
->  drivers/clk/clk.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 251e45d..fbe0f3a 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -259,10 +259,11 @@ late_initcall(clk_disable_unused);
->  
->  /***    helper functions   ***/
->  
-> -inline const char *__clk_get_name(struct clk *clk)
-> +const char *__clk_get_name(struct clk *clk)
->  {
->  	return !clk ? NULL : clk->name;
->  }
-> +EXPORT_SYMBOL_GPL(__clk_get_name);
->  
->  inline struct clk_hw *__clk_get_hw(struct clk *clk)
->  {
-> -- 
-> 1.7.11.7
-> 
-> 
+>  arch/arm/mach-omap2/drm.c             |    1 -
+>  arch/arm/mach-omap2/dss-common.c      |    3 +--
+>  arch/arm/mach-omap2/prm2xxx.c         |    3 +--
+>  arch/arm/mach-omap2/prm3xxx.c         |    3 +--
+>  arch/arm/plat-omap/include/plat/cpu.h |    4 ----
+>  drivers/media/platform/omap3isp/isp.c |    2 --
+>  drivers/power/avs/smartreflex.c       |    2 --
+>  7 files changed, 3 insertions(+), 15 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+
+Laurent Pinchart
