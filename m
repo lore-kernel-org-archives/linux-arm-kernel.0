@@ -1,47 +1,41 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 17 Dec 2012 21:01:36 +0100
-Subject: [PATCH] ARM: mach-imx6q: Do not run error code path in success
- case
-In-Reply-To: <1355756147-24856-1-git-send-email-fabio.estevam@freescale.com>
-References: <1355756147-24856-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20121217200136.GR26326@pengutronix.de>
+Date: Mon, 17 Dec 2012 21:02:32 +0100
+Subject: [PATCH 4/4] FEC: Add time stamping code and a PTP hardware clock
+In-Reply-To: <20121217151445.GA17907@S2101-09.ap.freescale.net>
+References: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
+ <20121217091345.GA753@pengutronix.de>
+ <CAHrpEqTVuSR_-Tpdzb98=VJbg7grSFvSQ9xA6mPsHpGb7RvNCg@mail.gmail.com>
+ <20121217151445.GA17907@S2101-09.ap.freescale.net>
+Message-ID: <20121217200232.GS26326@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 17, 2012 at 12:55:47PM -0200, Fabio Estevam wrote:
-> The 'put_clk' path should only run in the case of failure, so provide a 'return'
-> to avoid it running in the success case.
+On Mon, Dec 17, 2012 at 11:14:46PM +0800, Shawn Guo wrote:
+> Hi Sascha,
+> 
+> On Mon, Dec 17, 2012 at 10:48:31PM +0800, Frank Li wrote:
+> > > I don't know how to continue from here. Since the whole patch doesn't
+> > > seem to reviewed very much I tend to say we should revert it for now and
+> > > let Frank redo it for the next merge window.
+> > >
+> > > Other opinions?
+> > 
+> > Can we just disable CONFIG_FEC_PTP defaut instead of revert whole patch?
+> > 
+> To be clear, the following is what Frank meant.  Since Frank is out of
+> office for some time, I will send this immediate fix to David, if you
+> are fine with it.
 
-Are you sure? It looks to me like it was intentional. The purpose of
-this function is to set the parent/rate correctly. The references to
-the clock are not needed later.
+This leaves an option in the tree which can be used to break FEC on
+i.MX3/5.
+
+	depends on !SOC_IMX31 && !SOC_IMX35 && !SOC_IMX5
+
+might be an option, but given that this patch seems to have bypassed any
+review I feel more like reverting it.
 
 Sascha
 
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/mach-imx6q.c |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index 4eb1b3a..61f50aa 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -134,6 +134,8 @@ static void __init imx6q_sabrelite_cko1_setup(void)
->  	clk_set_parent(cko1_sel, ahb);
->  	rate = clk_round_rate(cko1, 16000000);
->  	clk_set_rate(cko1, rate);
-> +
-> +	return;
->  put_clk:
->  	if (!IS_ERR(cko1_sel))
->  		clk_put(cko1_sel);
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
