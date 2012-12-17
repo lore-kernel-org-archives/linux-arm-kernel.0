@@ -1,118 +1,52 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 17 Dec 2012 10:58:32 -0600
-Subject: [RESEND PATCH 2/2] ARM: dts: OMAP2+: Add PMU nodes
-In-Reply-To: <20121217163858.GF16561@e106331-lin.cambridge.arm.com>
-References: <1355520397-5759-1-git-send-email-jon-hunter@ti.com>
- <1355520397-5759-3-git-send-email-jon-hunter@ti.com>
- <20121217163858.GF16561@e106331-lin.cambridge.arm.com>
-Message-ID: <50CF4F38.3040500@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 17 Dec 2012 17:00:04 +0000
+Subject: [PATCH v2 6/7] ARM: mackerel: support booting with or without DT
+In-Reply-To: <Pine.LNX.4.64.1212171332520.24007@axis700.grange>
+References: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
+ <1355503531-7276-7-git-send-email-g.liakhovetski@gmx.de>
+ <Pine.LNX.4.64.1212171332520.24007@axis700.grange>
+Message-ID: <20121217170004.7F6C23E0BDD@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 12/17/2012 10:38 AM, Mark Rutland wrote:
-> On Fri, Dec 14, 2012 at 09:26:37PM +0000, Jon Hunter wrote:
->> Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
->>
->> Please note that the node for OMAP4460 has been placed in a separate
->> header file for OMAP4460, because the node is not compatible with
->> OMAP4430.
->>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> ---
->>  arch/arm/boot/dts/omap2.dtsi         |    5 +++++
->>  arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
->>  arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
->>  arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
->>  4 files changed, 31 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/omap4460.dtsi
->>
->> diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
->> index 761c4b6..27f5ea1 100644
->> --- a/arch/arm/boot/dts/omap2.dtsi
->> +++ b/arch/arm/boot/dts/omap2.dtsi
->> @@ -26,6 +26,11 @@
->>  		};
->>  	};
->>  
->> +	pmu {
->> +		compatible = "arm,arm1136-pmu";
->> +		interrupts = <3>;
->> +	};
->> +
->>  	soc {
->>  		compatible = "ti,omap-infra";
->>  		mpu {
->> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
->> index 1acc261..6c63118 100644
->> --- a/arch/arm/boot/dts/omap3.dtsi
->> +++ b/arch/arm/boot/dts/omap3.dtsi
->> @@ -26,6 +26,12 @@
->>  		};
->>  	};
->>  
->> +	pmu {
->> +		compatible = "arm,cortex-a8-pmu";
->> +		interrupts = <3>;
->> +		ti,hwmods = "debugss";
->> +	};
->> +
->>  	/*
->>  	 * The soc node represents the soc top level view. It is uses for IPs
->>  	 * that are not memory mapped in the MPU view or for the MPU itself.
->> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
->> index 73bc1a6..2a6e344 100644
->> --- a/arch/arm/boot/dts/omap4-panda-es.dts
->> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
->> @@ -5,7 +5,9 @@
->>   * it under the terms of the GNU General Public License version 2 as
->>   * published by the Free Software Foundation.
->>   */
->> +
->>  /include/ "omap4-panda.dts"
->> +/include/ "omap4460.dtsi"
->>  
->>  /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
->>  &sound {
->> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
->> new file mode 100644
->> index 0000000..1270890
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap4460.dtsi
->> @@ -0,0 +1,18 @@
->> +/*
->> + * Device Tree Source for OMAP4460 SoC
->> + *
->> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
->> + *
->> + * This file is licensed under the terms of the GNU General Public License
->> + * version 2.  This program is licensed "as is" without any warranty of any
->> + * kind, whether express or implied.
->> + */
->> +
->> +/ {
->> +	pmu {
->> +		compatible = "arm,cortex-a9-pmu";
->> +		interrupts = <0 54 0x4
->> +			      0 55 0x4>;
+On Mon, 17 Dec 2012 13:40:45 +0100 (CET), Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> This patch adds dynamic switching to booting either with or without DT.
+> So far only a part of the board initialisation can be done via DT. Devices,
+> that still need platform data are kept that way. Devices, that can be
+> initialised from DT will not be supplied from the platform data, if a DT
+> image is detected.
 > 
-> In other places I've seen interrupts properties written as:
-> 
-> interrupts = < irq1... >,
->              < irq2... >,
-> 	     < irqN... >;
-> 
-> Where each individual interrupt is surrounded by angle brackets. This produces
-> the exact same dtb, but may appear easier to read.
-> 
-> This might not be the right time and place to raise it, but it'd be nice if we
-> used one style consistently.
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+>  
+>  static const char *mackerel_boards_compat_dt[] __initdata = {
+> @@ -1659,10 +1715,20 @@ static const char *mackerel_boards_compat_dt[] __initdata = {
+>  DT_MACHINE_START(MACKEREL_DT, "mackerel")
+>  	.map_io		= sh7372_map_io,
+>  	.init_early	= sh7372_add_early_devices,
+> +	.init_irq	= sh7372_init_irq_of,
+> +	.handle_irq	= shmobile_handle_irq_intc,
+> +	.init_machine	= mackerel_init,
+> +	.init_late	= sh7372_pm_init_late,
+> +	.timer		= &shmobile_timer,
+> +	.dt_compat	= mackerel_boards_compat_dt,
+> +MACHINE_END
+> +
+> +MACHINE_START(MACKEREL, "mackerel")
+> +	.map_io		= sh7372_map_io,
+> +	.init_early	= sh7372_add_early_devices,
+>  	.init_irq	= sh7372_init_irq,
+>  	.handle_irq	= shmobile_handle_irq_intc,
+>  	.init_machine	= mackerel_init,
+>  	.init_late	= sh7372_pm_init_late,
+>  	.timer		= &shmobile_timer,
+> -	.dt_compat  = mackerel_boards_compat_dt,
+>  MACHINE_END
 
-I see that we do define interrupts like that for other OMAP devices and
-so I can update this to be consistent.
+MACHINE_START() handle's the DT case just fine. You shouldn't need
+separate MACHINE_START() and DT_MACHINE_START() stanzas. Please merge. I
+see that there was some discussion around sh7372_init_irq_of(), but I
+it is better to have the single function handle the OF/non-OF case
+gracefully rather than duplicating MACHINE definitions.
 
-Benoit, let me know if you want me to resend or if you want to update
-locally.
-
-Cheers
-Jon
+g.
