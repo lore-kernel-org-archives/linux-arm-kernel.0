@@ -1,40 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 16 Dec 2012 16:29:56 -0800
-Subject: Warnings from u9500 device trees
-Message-ID: <CAOesGMhwht8oRMAT=9Kh2hLmOZEZ=n_QVoNVB=Q4qZFj1HyU2Q@mail.gmail.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Sun, 16 Dec 2012 19:32:27 -0500
+Subject: [PATCH v6] ARM: Factor out cpuid implementor and part number
+In-Reply-To: <1354407686-38366-1-git-send-email-c.dall@virtualopensystems.com>
+References: <1354407686-38366-1-git-send-email-c.dall@virtualopensystems.com>
+Message-ID: <CANM98qKfFXmKwn24O1=5+f538qWKmRUCHHsXMyYi6hK5JKmvoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Known issue? I haven't seen a patch for it on the lists yet.
+On Sat, Dec 1, 2012 at 7:21 PM, Christoffer Dall
+<c.dall@virtualopensystems.com> wrote:
+> Decoding the implementor and part number of the CPU id in the CPU ID
+> register is needed by KVM, so we factor it out to share the code.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+> ---
+> Changes since v5:
+>  - (OK, this is getting ridiculous, this time I forgot a git add):
+>    incorrect function declaration
+> Changes since v4:
+>  - Properly decode XScale cpu architecture versions
+> Changes since v3:
+>  - Only call read_cpuid_part_number once and squash warning
+> Changes since v2:
+>  - Take implementor as argument to read_cpuid_part_number
+> Changes since v1:
+>  - Accidentally pointed to an old file, this one has more consistent
+>    naming of the cpu implementor and part number defines.
+>
+>  arch/arm/include/asm/cputype.h   |   33 +++++++++++++++++++++++++++++++++
+>  arch/arm/kernel/perf_event_cpu.c |   34 ++++++++++++++++------------------
+>  2 files changed, 49 insertions(+), 18 deletions(-)
 
-Warning (reg_format): "reg" property in
-/soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes)
-(#address-cells == 1, #size-cells == 1)
-Warning (reg_format): "reg" property in
-/soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes)
-(#address-cells == 1, #size-cells == 1)
-Warning (reg_format): "reg" property in
-/soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes)
-(#address-cells == 1, #size-cells == 1)
-Warning (reg_format): "reg" property in
-/soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes)
-(#address-cells == 1, #size-cells == 1)
+any news on this one?
 
-
-prcmu has #address-cells of 1, and #size-cells of 1, but the reg is
-just a single cell on that entry (<5>). Something's weird with either
-the binding you've implemented, or how you specified the device tree.
-
-The changes are old too, since March. No one else has noticed this
-since then? Are there no users of this platform? :(
-
-commit 7e0ce270b2ef3d0d00c3f0725f48aa3127d73edf
-Author:     Lee Jones <lee.jones@linaro.org>
-AuthorDate: Thu Mar 15 16:46:17 2012 +0000
-Commit:     Arnd Bergmann <arnd@arndb.de>
-CommitDate: Fri Mar 16 19:46:13 2012 +0000
-
-    ARM: ux500: db8500: list most devices in the snowball device tree
-
-
--Olof
+-Christoffer
