@@ -1,63 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 17 Dec 2012 08:31:35 +0000
-Subject: Warnings from u9500 device trees
-In-Reply-To: <CAOesGMhwht8oRMAT=9Kh2hLmOZEZ=n_QVoNVB=Q4qZFj1HyU2Q@mail.gmail.com>
-References: <CAOesGMhwht8oRMAT=9Kh2hLmOZEZ=n_QVoNVB=Q4qZFj1HyU2Q@mail.gmail.com>
-Message-ID: <20121217083135.GU27617@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Dec 2012 09:45:03 +0100
+Subject: [PATCH/WIP/RFC 02/14] shmobile-iommu: Move IPMMU driver to
+ drivers/iommu
+In-Reply-To: <50CE8D24.3010604@igel.co.jp>
+References: <1350290093-998-1-git-send-email-hdk@igel.co.jp>
+ <1355678760-27357-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <50CE8D24.3010604@igel.co.jp>
+Message-ID: <1626129.3KmpqDAOtk@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Damian,
 
-> Known issue? I haven't seen a patch for it on the lists yet.
-> 
-> Warning (reg_format): "reg" property in
-> /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes)
-> (#address-cells == 1, #size-cells == 1)
-> Warning (reg_format): "reg" property in
-> /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes)
-> (#address-cells == 1, #size-cells == 1)
-> Warning (reg_format): "reg" property in
-> /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes)
-> (#address-cells == 1, #size-cells == 1)
-> Warning (reg_format): "reg" property in
-> /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes)
-> (#address-cells == 1, #size-cells == 1)
-> 
-> 
-> prcmu has #address-cells of 1, and #size-cells of 1, but the reg is
-> just a single cell on that entry (<5>). Something's weird with either
-> the binding you've implemented, or how you specified the device tree.
-> 
-> The changes are old too, since March. No one else has noticed this
-> since then? Are there no users of this platform? :(
+(CC'ing iommu at lists.linux-foundation.org)
 
-Neither. We've known about it since March (including Arnd), but it's
-not important. The issue is that #size-cells can't be 0, but the 
-AB8500 uses mailboxes not registers, so there is no size per-say. I
-have requested that we remove the 'reg' property entirely, as the
-Mailbox number is hard-coded, but Arnd wasn't a fan, so we just left
-it as-is.
+On Monday 17 December 2012 12:10:28 Damian Hobson-Garcia wrote:
+> On 2012/12/17 2:25, Laurent Pinchart wrote:
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  arch/arm/mach-shmobile/Kconfig                     |    6 ------
+> >  arch/arm/mach-shmobile/Makefile                    |    3 ---
+> >  drivers/iommu/Kconfig                              |    6 ++++++
+> >  drivers/iommu/Makefile                             |    1 +
+> >  .../ipmmu.c => drivers/iommu/shmobile-ipmmu.c      |    0
+> >  5 files changed, 7 insertions(+), 9 deletions(-)
+> >  rename arch/arm/mach-shmobile/ipmmu.c => drivers/iommu/shmobile-ipmmu.c
+> >  (100%)
+>
+> I agree that arch/arm is not a good place, but I'm not completely sure that
+> ipmmu.c belongs in drivers/iommu.  The reason is because of the PMB
+> functionality provided by the IPMMU.  The PMB provides a fixed address
+> remapping capability that is completely unrelated to the IOMMU
+> functionality.  Since this remapping is done by writing the IPMMU registers
+> directly, instead of via a page table it doesn't really fit in well with the
+> IOMMU API (it also supports things like tiled/linear address translation,
+> which require some other method to set up).  Since the PMB and the IOMMU
+> functions of the IPPMU share the same register address space, we would like
+> to have one driver to handle the register accesses of both of these
+> functions.  That driver is ipmmu.c.  So if ipmmu.c is in drivers/iommu, the
+> entire IOMMU subsystem must be enabled in order to use the PMB
+> functionality. So maybe it might be better to treat the IPMMU like a
+> multifuction device, with a core driver (ipmmu.c) in one location and the
+> function implementations in their own respective directories. Does
+> drivers/mfd sound like a good place for it?
 
-Out of interest, why are you getting 4 errors? Are you building all
-of the DTS:es at once?
+I've thought about this as well. The IPMMU indeed provides two different 
+functions, so drivers/mfd/ could be a candidate. This being said, both the 
+IOMMU function and the PMB function are related to virtual memory space 
+management, so they're not totally unrelated. I agree that the PMB function 
+isn't really an IOMMU in the sense that it will likely not be exposed through 
+the existing IOMMU API.
 
-Kind regards,
-Lee
-
-> commit 7e0ce270b2ef3d0d00c3f0725f48aa3127d73edf
-> Author:     Lee Jones <lee.jones@linaro.org>
-> AuthorDate: Thu Mar 15 16:46:17 2012 +0000
-> Commit:     Arnd Bergmann <arnd@arndb.de>
-> CommitDate: Fri Mar 16 19:46:13 2012 +0000
-> 
->     ARM: ux500: db8500: list most devices in the snowball device tree
-> 
-> 
-> -Olof
+However, drivers/iommu/ seems to me like a more natural place to store the 
+IPMMU driver compared to drivers/mfd/. Enabling IOMMU support 
+(CONFIG_IOMMU_SUPPORT) doesn't mean the IOMMU core (CONFIG_IOMMU_API) will be 
+compiled in. There would thus be no extra code compiled in if the IOMMU 
+function of the IPMMU is disabled.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+
+Laurent Pinchart
