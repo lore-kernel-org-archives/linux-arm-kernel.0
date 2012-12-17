@@ -1,123 +1,41 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Mon, 17 Dec 2012 09:48:46 +0530
-Subject: [PATCH] ARM: EXYNOS: Fix compile error in dev-audio.c
-In-Reply-To: <CAOesGMhgvsM7Fk-YpihjYM6h+xqK-ejBzPKEDypfdKEmHp6ZJg@mail.gmail.com>
-References: <000701cdd9d3$3b6a6e10$b23f4a30$%choi@samsung.com>
- <CAOesGMhgvsM7Fk-YpihjYM6h+xqK-ejBzPKEDypfdKEmHp6ZJg@mail.gmail.com>
-Message-ID: <CAAgF-BdPMYSzewSoZz6AXjdLktWyiyGV_NZ=T+vDgQSF_XdKiw@mail.gmail.com>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Mon, 17 Dec 2012 04:26:47 +0000
+Subject: [PATCH 0/2]  ARM: davinci: da850: add pinctrl support
+In-Reply-To: <1354876051-25938-1-git-send-email-anilkumar.v@ti.com>
+References: <1354876051-25938-1-git-send-email-anilkumar.v@ti.com>
+Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412A40C5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi All,
 
-On Mon, Dec 17, 2012 at 6:12 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Fri, Dec 14, 2012 at 12:15 AM, Jonghwan Choi <jhbird.choi@samsung.com> wrote:
->> arch/arm/mach-exynos/dev-audio.c:58:4: error: unknown field 'src_clk'
->> specified in initializer
->> arch/arm/mach-exynos/dev-audio.c:58:4: warning: initialization makes integer
->> from pointer without a cast [enabled by default]
->> arch/arm/mach-exynos/dev-audio.c:58:4: warning: (near initialization for
->> 'i2sv5_pdata.type.i2s.idma_addr') [enabled by default]
->> arch/arm/mach-exynos/dev-audio.c:91:4: error: unknown field 'src_clk'
->> specified in initializer
->> arch/arm/mach-exynos/dev-audio.c:91:4: warning: initialization makes integer
->> from pointer without a cast [enabled by default]
->> arch/arm/mach-exynos/dev-audio.c:91:4: warning: (near initialization for
->> 'i2sv3_pdata.type.i2s.idma_addr') [enabled by default]
->>
->> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
->
-> This only fixes one of many build errors caused by the i2s change:
->
->       1 arch/arm/mach-s3c64xx/dev-audio.c:113:4: warning:
-> initialization makes integer from pointer without a cast [enabled by
-> default]
->       1 arch/arm/mach-s3c64xx/dev-audio.c:113:4: warning: (near
-> initialization for 'i2sv4_pdata.type.i2s.idma_addr') [enabled by
-> default]
->       1 arch/arm/mach-s3c64xx/dev-audio.c:69:4: warning:
-> initialization makes integer from pointer without a cast [enabled by
-> default]
->       1 arch/arm/mach-s3c64xx/dev-audio.c:69:4: warning: (near
-> initialization for 'i2sv3_pdata.type.i2s.quirks') [enabled by default]
->       1 arch/arm/mach-s5p64x0/dev-audio.c:115:4: warning:
-> initialization makes integer from pointer without a cast [enabled by
-> default]
->       1 arch/arm/mach-s5p64x0/dev-audio.c:115:4: warning: (near
-> initialization for 's5p6450_i2s_pdata.type.i2s.quirks') [enabled by
-> default]
->       1 arch/arm/mach-s5p64x0/dev-audio.c:48:4: warning:
-> initialization makes integer from pointer without a cast [enabled by
-> default]
->       1 arch/arm/mach-s5p64x0/dev-audio.c:48:4: warning: (near
-> initialization for 's5p6440_i2s_pdata.type.i2s.idma_addr') [enabled by
-> default]
->       1 arch/arm/mach-s5p64x0/dev-audio.c:96:4: warning:
-> initialization makes integer from pointer without a cast [enabled by
-> default]
->       1 arch/arm/mach-s5p64x0/dev-audio.c:96:4: warning: (near
-> initialization for 's5p6450_i2s0_pdata.type.i2s.idma_addr') [enabled
-> by default]
->       1 arch/arm/mach-s5pc100/dev-audio.c:53:4: warning:
-> initialization makes integer from pointer without a cast [enabled by
-> default]
->       1 arch/arm/mach-s5pc100/dev-audio.c:53:4: warning: (near
-> initialization for 'i2sv5_pdata.type.i2s.idma_addr') [enabled by
-> default]
->       1 arch/arm/mach-s5pc100/dev-audio.c:84:4: warning:
-> initialization makes integer from pointer without a cast [enabled by
-> default]
->       1 arch/arm/mach-s5pc100/dev-audio.c:84:4: warning: (near
-> initialization for 'i2sv3_pdata.type.i2s.quirks') [enabled by default]
->       1 arch/arm/mach-s5pv210/dev-audio.c:55:4: warning:
-> initialization makes integer from pointer without a cast [enabled by
-> default]
->       1 arch/arm/mach-s5pv210/dev-audio.c:55:4: warning: (near
-> initialization for 'i2sv5_pdata.type.i2s.idma_addr') [enabled by
-> default]
->       1 arch/arm/mach-s5pv210/dev-audio.c:87:4: warning:
-> initialization makes integer from pointer without a cast [enabled by
-> default]
->       1 arch/arm/mach-s5pv210/dev-audio.c:87:4: warning: (near
-> initialization for 'i2sv3_pdata.type.i2s.quirks') [enabled by default]
->
->
-> Looks like the breakage was caused by the following commit:
->
-> commit 1974a042dd15f1f007a3a1a2dd7a23ca0e42c01d
-> Author:     Padmavathi Venna <padma.v@samsung.com>
-> AuthorDate: Wed Nov 28 16:17:48 2012 +0530
-> Commit:     Mark Brown <broonie@opensource.wolfsonmicro.com>
-> CommitDate: Wed Nov 28 19:18:00 2012 +0000
->
->     ASoC: Samsung: Get I2S src_clk from clock alias id.
->
-> Padmavathi, you can't send out code that breaks all Samsung platforms
-> like this, even if there are patches out there that fixes it. Changes
-> have to be bisectable, which means that you can't break and unbreak
-> the build, least of all if you merge through different maintainers.
-> And you need to tell the other maintainer that there are dependent
-> patches, you just sent the above patch to Mark without any such
-> information.
+As pinctrl-single is required for handling Pad configuration of various 
+DaVinci module(for e.g mcasp, i2c etc) with DT. Hence for this patch if
+there are no review comments, could you pull this patch ?
 
-In V3, as I posted all the patches together I didn't mention about the
-dependency. But I could have mentioned about it in V4. I apologize for
-the build break.
+Thanks,
+Anil     
 
->
-> Kukjin, I see that Padmavathi has posted a V3 series of patches to
-> remove all this from the dev-audio files on November 23. Are you ok
-> with us picking them up and sending ASAP?
-
-Kukjin, Could you please give your conformation for the above patches?
-
->
->
-> -Olof
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Thanks
-Padma
+On Fri, Dec 07, 2012 at 15:57:29, Kumar, Anil wrote:
+> This set of patches adds:
+> 
+> * Add pinctrl-single for handling Padconf registers.
+> * Add NAND node to export NAND functionality on da850 EVM.
+> * Add NAND pinctrl node to do pin mux according to pinctrl-single driver.
+> 
+> Kumar, Anil (2):
+>   ARM: davinci: da850: add pinctrl driver entries
+>   ARM: davinci: da850: add NAND driver entries
+> 
+>  .../devicetree/bindings/arm/davinci/pinctrl.txt    |   29 ++++++++++++++++++++
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/boot/dts/da850-evm.dts                    |   22 +++++++++++++++
+>  arch/arm/boot/dts/da850.dtsi                       |   23 +++++++++++++++
+>  arch/arm/configs/da8xx_omapl_defconfig             |    1 +
+>  5 files changed, 76 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/pinctrl.txt
+> 
+> -- 
+> 1.7.4.1
+> 
+> 
