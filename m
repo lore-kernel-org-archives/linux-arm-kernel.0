@@ -1,209 +1,119 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 17 Dec 2012 14:30:53 -0700
-Subject: [PATCH v3] NTP: Add a CONFIG_RTC_SYSTOHC configuration
-In-Reply-To: <50CBB917.7090502@linaro.org>
-References: <20121214231933.GA15796@obsidianresearch.com>
- <50CBB917.7090502@linaro.org>
-Message-ID: <20121217213053.GA27497@obsidianresearch.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 17 Dec 2012 22:33:29 +0100
+Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <50CF76D3.9030708@grandegger.com>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
+ <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
+ <50CF1EF1.2070601@antcom.de> <50CF237E.5020409@antcom.de>
+ <50CF4838.9000401@grandegger.com> <50CF5327.6070205@antcom.de>
+ <50CF584E.1040601@grandegger.com> <50CF5E45.5030104@antcom.de>
+ <50CF76D3.9030708@grandegger.com>
+Message-ID: <50CF8FA9.8050609@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The purpose of this option is to allow ARM/etc systems that rely on the
-class RTC subsystem to have the same kind of automatic NTP based
-synchronization that we have on PC platforms. Today ARM does not
-implement update_persistent_clock and makes extensive use of the class
-RTC system.
+On 17/12/12 20:47, Wolfgang Grandegger wrote:
+> On 12/17/2012 07:02 PM, Roland Stigge wrote:
+>> On 12/17/2012 06:37 PM, Wolfgang Grandegger wrote:
+>>> 	/* Do synchronous data output with a single write access */
+>>> 	__raw_writel(~mask, pio + PIO_OWDR);
+>>> 	__raw_writel(mask, pio + PIO_OWER);
+>>> 	__raw_writel(val, pio + PIO_ODSR);
+>>>
+>>> For caching we would need a storage. Not sure if it's worth compared to
+>>> a context switch into the kernel.
+>>
+>> Block GPIO is not only for you in userspace. ;-) You can also implement
+>> efficient n-bit bus I/O in kernel drivers, n-bit-banging. :-) So not
+>> always context switches involved.
+> 
+> OK, what do you think about the following untested patch:
 
-When enabled CONFIG_RTC_SYSTOHC will provide a generic
-rtc_update_persistent_clock that stores the current time in the RTC and
-is intended complement the existing CONFIG_RTC_HCTOSYS option that loads
-the RTC at boot.
+Looks good!
 
-Like with RTC_HCTOSYS the platform's update_persistent_clock is used
-first, if it works. Platforms with mixed class RTC and non-RTC drivers
-need to return ENODEV when class RTC should be used. Such an update for
-PPC is included in this patch.
+Why "untested"? ;-)
 
-Long term, implementations of update_persistent_clock should migrate to
-proper class RTC drivers and use CONFIG_RTC_SYSTOHC instead.
+Thanks,
 
-Tested on ARM kirkwood and PPC405
+Roland
 
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- arch/powerpc/kernel/time.c |    2 +-
- drivers/rtc/Kconfig        |   10 +++++++++-
- drivers/rtc/Makefile       |    1 +
- drivers/rtc/systohc.c      |   44 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/rtc.h        |    1 +
- kernel/time/ntp.c          |   16 ++++++++++++----
- 6 files changed, 68 insertions(+), 6 deletions(-)
- create mode 100644 drivers/rtc/systohc.c
-
-v3 changes:
-- Test menuconfig, reorder options to look better, fix kconfig
-  RTC_HCTOSYS_DEVICE to be 'or' not 'and'
-- Change the function name to rtc_set_ntp_time to avoid confusing
-  this api with the distinct *_persistant_clock stuff
-- Fix typo in the ENODEV test to be || not &&
-- Fully retest on ARM+PPC
-
-diff --git a/arch/powerpc/kernel/time.c b/arch/powerpc/kernel/time.c
-index ce4cb77..bc844a8 100644
---- a/arch/powerpc/kernel/time.c
-+++ b/arch/powerpc/kernel/time.c
-@@ -667,7 +667,7 @@ int update_persistent_clock(struct timespec now)
- 	struct rtc_time tm;
- 
- 	if (!ppc_md.set_rtc_time)
--		return 0;
-+		return -ENODEV;
- 
- 	to_tm(now.tv_sec + 1 + timezone_offset, &tm);
- 	tm.tm_year -= 1900;
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 19c03ab..b377e96 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -25,9 +25,17 @@ config RTC_HCTOSYS
- 	  the value read from a specified RTC device. This is useful to avoid
- 	  unnecessary fsck runs at boot time, and to network better.
- 
-+config RTC_SYSTOHC
-+	bool "Set the RTC time based on NTP synchronization"
-+	default y
-+	help
-+	  If you say yes here, the system time (wall clock) will be stored
-+	  in the RTC specified by RTC_HCTOSYS_DEVICE approximately every 11
-+	  minutes if userspace reports synchronized NTP status.
-+
- config RTC_HCTOSYS_DEVICE
- 	string "RTC used to set the system time"
--	depends on RTC_HCTOSYS = y
-+	depends on RTC_HCTOSYS = y || RTC_SYSTOHC = y
- 	default "rtc0"
- 	help
- 	  The RTC device that will be used to (re)initialize the system
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 56297f0..69d11f1 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -6,6 +6,7 @@ ccflags-$(CONFIG_RTC_DEBUG)	:= -DDEBUG
- 
- obj-$(CONFIG_RTC_LIB)		+= rtc-lib.o
- obj-$(CONFIG_RTC_HCTOSYS)	+= hctosys.o
-+obj-$(CONFIG_RTC_SYSTOHC)	+= systohc.o
- obj-$(CONFIG_RTC_CLASS)		+= rtc-core.o
- rtc-core-y			:= class.o interface.o
- 
-diff --git a/drivers/rtc/systohc.c b/drivers/rtc/systohc.c
-new file mode 100644
-index 0000000..bf3e242
---- /dev/null
-+++ b/drivers/rtc/systohc.c
-@@ -0,0 +1,44 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ */
-+#include <linux/rtc.h>
-+#include <linux/time.h>
-+
-+/**
-+ * rtc_set_ntp_time - Save NTP synchronized time to the RTC
-+ * @now: Current time of day
-+ *
-+ * Replacement for the NTP platform function update_persistent_clock
-+ * that stores time for later retrieval by rtc_hctosys.
-+ *
-+ * Returns 0 on successful RTC update, -ENODEV if a RTC update is not
-+ * possible at all, and various other -errno for specific temporary failure
-+ * cases.
-+ *
-+ * If temporary failure is indicated the caller should try again 'soon'
-+ */
-+int rtc_set_ntp_time(struct timespec now)
-+{
-+	struct rtc_device *rtc;
-+	struct rtc_time tm;
-+	int err = -ENODEV;
-+
-+	if (now.tv_nsec < (NSEC_PER_SEC >> 1))
-+		rtc_time_to_tm(now.tv_sec, &tm);
-+	else
-+		rtc_time_to_tm(now.tv_sec + 1, &tm);
-+
-+	rtc = rtc_class_open(CONFIG_RTC_HCTOSYS_DEVICE);
-+	if (rtc) {
-+		/* rtc_hctosys exclusively uses UTC, so we call set_time here,
-+		 * not set_mmss. */
-+		if (rtc->ops && (rtc->ops->set_time || rtc->ops->set_mmss))
-+			err = rtc_set_time(rtc, &tm);
-+		rtc_class_close(rtc);
-+	}
-+
-+	return err;
-+}
-diff --git a/include/linux/rtc.h b/include/linux/rtc.h
-index 9531845..11d05f9 100644
---- a/include/linux/rtc.h
-+++ b/include/linux/rtc.h
-@@ -138,6 +138,7 @@ extern void rtc_device_unregister(struct rtc_device *rtc);
- extern int rtc_read_time(struct rtc_device *rtc, struct rtc_time *tm);
- extern int rtc_set_time(struct rtc_device *rtc, struct rtc_time *tm);
- extern int rtc_set_mmss(struct rtc_device *rtc, unsigned long secs);
-+extern int rtc_set_ntp_time(struct timespec now);
- int __rtc_read_alarm(struct rtc_device *rtc, struct rtc_wkalrm *alarm);
- extern int rtc_read_alarm(struct rtc_device *rtc,
- 			struct rtc_wkalrm *alrm);
-diff --git a/kernel/time/ntp.c b/kernel/time/ntp.c
-index 24174b4..313b161 100644
---- a/kernel/time/ntp.c
-+++ b/kernel/time/ntp.c
-@@ -15,6 +15,7 @@
- #include <linux/time.h>
- #include <linux/mm.h>
- #include <linux/module.h>
-+#include <linux/rtc.h>
- 
- #include "tick-internal.h"
- 
-@@ -483,8 +484,7 @@ out:
- 	return leap;
- }
- 
--#ifdef CONFIG_GENERIC_CMOS_UPDATE
--
-+#if defined(CONFIG_GENERIC_CMOS_UPDATE) || defined(CONFIG_RTC_SYSTOHC)
- static void sync_cmos_clock(struct work_struct *work);
- 
- static DECLARE_DELAYED_WORK(sync_cmos_work, sync_cmos_clock);
-@@ -510,14 +510,22 @@ static void sync_cmos_clock(struct work_struct *work)
- 	}
- 
- 	getnstimeofday(&now);
--	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2)
-+	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2) {
-+		fail = -ENODEV;
-+#ifdef CONFIG_GENERIC_CMOS_UPDATE
- 		fail = update_persistent_clock(now);
-+#endif
-+#ifdef CONFIG_RTC_SYSTOHC
-+		if (fail == -ENODEV)
-+			fail = rtc_set_ntp_time(now);
-+#endif
-+	}
- 
- 	next.tv_nsec = (NSEC_PER_SEC / 2) - now.tv_nsec - (TICK_NSEC / 2);
- 	if (next.tv_nsec <= 0)
- 		next.tv_nsec += NSEC_PER_SEC;
- 
--	if (!fail)
-+	if (!fail || fail == -ENODEV)
- 		next.tv_sec = 659;
- 	else
- 		next.tv_sec = 0;
--- 
-1.7.5.4
+>>From b44cad16cbbca84715dffd4cb5268497216add25 Mon Sep 17 00:00:00 2001
+> From: Wolfgang Grandegger <wg@grandegger.com>
+> Date: Mon, 3 Dec 2012 08:31:55 +0100
+> Subject: [PATCH 1/2] gpio: add GPIO block callback functions for AT91
+> 
+> Signed-off-by: Wolfgang Grandegger <wg@grandegger.com>
+> ---
+>  arch/arm/mach-at91/gpio.c |   29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+> 
+> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+> index be42cf0..cf6bd45 100644
+> --- a/arch/arm/mach-at91/gpio.c
+> +++ b/arch/arm/mach-at91/gpio.c
+> @@ -42,13 +42,16 @@ struct at91_gpio_chip {
+>  	void __iomem		*regbase;	/* PIO bank virtual address */
+>  	struct clk		*clock;		/* associated clock */
+>  	struct irq_domain	*domain;	/* associated irq domain */
+> +	unsigned long		mask_shadow;	/* synchronous data output */
+>  };
+>  
+>  #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
+>  
+>  static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
+>  static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
+> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val);
+>  static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
+> +static unsigned long at91_gpiolib_get_block(struct gpio_chip *chip, unsigned long mask);
+>  static int at91_gpiolib_direction_output(struct gpio_chip *chip,
+>  					 unsigned offset, int val);
+>  static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+> @@ -62,7 +65,9 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+>  			.direction_input  = at91_gpiolib_direction_input, \
+>  			.direction_output = at91_gpiolib_direction_output, \
+>  			.get		  = at91_gpiolib_get,		\
+> +			.get_block	  = at91_gpiolib_get_block,	\
+>  			.set		  = at91_gpiolib_set,		\
+> +			.set_block	  = at91_gpiolib_set_block,	\
+>  			.dbg_show	  = at91_gpiolib_dbg_show,	\
+>  			.to_irq		  = at91_gpiolib_to_irq,	\
+>  			.ngpio		  = nr_gpio,			\
+> @@ -896,6 +901,16 @@ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset)
+>  	return (pdsr & mask) != 0;
+>  }
+>  
+> +static unsigned long at91_gpiolib_get_block(struct gpio_chip *chip, unsigned long mask)
+> +{
+> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+> +	void __iomem *pio = at91_gpio->regbase;
+> +	u32 pdsr;
+> +
+> +	pdsr = __raw_readl(pio + PIO_PDSR);
+> +	return pdsr & mask;
+> +}
+> +
+>  static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
+>  {
+>  	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+> @@ -905,6 +920,20 @@ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
+>  	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
+>  }
+>  
+> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
+> +{
+> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+> +	void __iomem *pio = at91_gpio->regbase;
+> +
+> +	/* Do synchronous data output with a single write access */
+> +	if (mask != at91_gpio->mask_shadow) {
+> +		at91_gpio->mask_shadow = mask;
+> +		__raw_writel(~mask, pio + PIO_OWDR);
+> +		__raw_writel(mask, pio + PIO_OWER);
+> +	}
+> +	__raw_writel(val, pio + PIO_ODSR);
+> +}
+> +
+>  static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+>  {
+>  	int i;
