@@ -1,56 +1,46 @@
-From: burkegu777@gmail.com (burkegu777)
-Date: Mon, 17 Dec 2012 21:20:32 +0800
-Subject: Looking for a Job - Sourcing Engineer for you in China/Asia
-Message-ID: <201212172101131285574@gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 17 Dec 2012 14:32:33 +0100
+Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <50CF0744.7040404@grandegger.com>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
+ <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
+Message-ID: <50CF1EF1.2070601@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 12/17/2012 12:51 PM, Wolfgang Grandegger wrote:
+>>> Without having an AT91 available right now, I guess the hardware
+>>> interface of this GPIO chip is different from the GPIO block API. While
+>>> the hardware has clear and set registers, the val parameter of
+>>> at91_gpiolib_set_block() should be interpreted as the actual output
+>>> values. See lpc32xx_gpo_set_block() for an example for handling set and
+>>> clear registers like this: First, set_bits and clear_bits words are
+>>> calculated from mask and val parameters, and finally written to the
+>>> respective hardware registers.
+>>>
+>>> Note that one .set_block() can result in writing both the set and clear
+>>> registers of the hardware when val contains both 0s and 1s in
+>>> respectively masked positions.
+>>
+>> Oops, I obviously did not test GPIO block write. The patch below does
+>> work now. Feel free to add it to the next version of your series.
+> 
+> The patch lacks an important fix, sorry. Please consider the updated
+> patch below.
 
+Thanks!
 
+And I guess Russell is right: If possible, we should write outputs
+simultaneously via ODSR (plus OWER/OWDR/OWSR) instead of separate set/clear.
 
-Sincerely, I am looking for a sourcing job here, full time or part time are all okay with me.
+I wonder if we need to save/restore the state of OWSR at every write
+operation or if we need/can cache it. Assuming that block GPIO are the
+only code in the kernel that manipulates ODSR.
 
+Further: Can we include this patch for arch/arm/mach-at91 via the gpio
+subsystem or does it need to go separately via arm-soc.git?
 
-If you do need somebody to do some sourcing/purchasing jobs in Asia/China, I would like to get this chance.
+Thanks,
 
-
-I have a couple of years experience on sourcing, mainly about electrical,lighting, hardware & some other categories. I can do sourcing & project management & quality inspection, just like a sourcing tunnel for you in China. I would try all my best to find the quality goods/suppliers for you.
-
-
-Please find below my RESUME & attached resume. My Chinese name is Gu Hai, ??.
-
-My resume:
-Male, 28 years old, 1.8m, 68KG, 4 years bachelor degree major in Electric Information Technology,Graduated from Shanghai Institute of technology. CET 6?not bad English ability. living in Shanghai, Married and have an little angel. I Like playing video games, traveling, reading, taking photographs... in my spare time,Oh and movies.I've been in the LED lighting industry for about 4 years. 
-
-
-2008-6 ---- Now, LED Lighting Project Manager-Deal overseas LED lighting sales projects,Managing communications with foreign customers
--leads project planning, scheduling, monitoring, and reporting activities for lighting projects.
--In charge of daily operation of LED Lighting department.
--Manage cost reports, consolidating accounting information...
-
-
-2006-7 --- 2008-5, Shanghai Rhythm International Trading Co., Ltd, International Purchaser, Translator, Project Management, Sourcing Engineer 
-
--The company is EONE(www.eone.com)'s exclusive agency in mainly of China.
-
--Purchase all the parts of the generator monitor. And meet the requirements of company's Senior Mechanical Engineers. -Visit most of the China power plants with EONE Engineers, solve the issues and maintain the equipment normal operation. -Deal International Trading ...
-
-
-I believe I can also do some other jobs which you can think out. Also I am not only limited on LED lighting, some other areas are also okay with me. IHope I can get such a chance from you and start a long term cooperation with you. 
-
-
-Best Regards
-
-Burke
-@ Shanghai, China
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/4104eec2/attachment-0001.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: Burke - Resume.docx
-Type: application/octet-stream
-Size: 16195 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/4104eec2/attachment-0001.obj>
+Roland
