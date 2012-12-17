@@ -1,37 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Dec 2012 16:11:08 +0000
-Subject: [PATCH] ARM: realview: fix private peripheral memory base for EB rev.
- B boards
-Message-ID: <1355760668-28606-1-git-send-email-will.deacon@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 17 Dec 2012 18:13:19 +0200
+Subject: [PATCH v4 16/23] ARM: OMAP2+: clock data: Merge utmi_px_gfclk
+ into usb_host_hs_utmi_px_clk
+In-Reply-To: <50CED412.7060407@ti.com>
+References: <1355134833-5199-1-git-send-email-rogerq@ti.com>
+ <1355134833-5199-17-git-send-email-rogerq@ti.com>
+ <20121214182855.GB4989@atomide.com>
+ <alpine.DEB.2.00.1212141838130.5915@utopia.booyaka.com>
+ <50CED412.7060407@ti.com>
+Message-ID: <50CF449F.7090708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 34ae6c96a6a7 ("ARM: 7298/1: realview: fix mapping of MPCore
-private memory region") accidentally broke the definition for the base
-address of the private peripheral region on revision B Realview-EB
-boards.
+On 12/17/2012 10:13 AM, Benoit Cousson wrote:
+> Hi,
+> 
+> On 12/14/2012 07:44 PM, Paul Walmsley wrote:
+>> Hi
+>>
+>> On Fri, 14 Dec 2012, Tony Lindgren wrote:
+>>
+>>> Paul, what about this patch? Looks like you've acked the other clock 
+>>> patches in this series but not this one?
+>>
+>> I commented on it briefly here:
+>>
+>> https://patchwork.kernel.org/patch/1838111/
+>>
+>> Maybe Beno?t could comment here, but it looks to me (based on a 
+>> superficial look at the hardware clock tree data) that these clock nodes 
+>> should exist.  In an ideal world, we'd be able to get back to the 
+>> autogeneration of this clock data.
+> 
+> I'm not sure to understand either the rational for that patch. What the
+> point of merging the two nodes?
+> I mean, we can do it, but AFAIR, we have always decided to use atomic
+> node instead of big nodes that handle everything.
+>
 
-This patch uses the correct address for REALVIEW_EB11MP_PRIV_MEM_BASE.
+I can see a similar thing done for mcbsp clocks (e.g. /* Merged
+func_mcbsp1_gfclk into mcbsp1 */), mmc clocks, timer clocks, mcasp
+clock, and sgx clock. i.e. The clock sel (mux) is combined with clock
+gate. I don't see why USB host has to be done differently.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Florian Fainelli <florian@openwrt.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mach-realview/include/mach/board-eb.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Were exceptions made for the above clocks in the auto generation code?
 
-diff --git a/arch/arm/mach-realview/include/mach/board-eb.h b/arch/arm/mach-realview/include/mach/board-eb.h
-index 124bce6..a301e61 100644
---- a/arch/arm/mach-realview/include/mach/board-eb.h
-+++ b/arch/arm/mach-realview/include/mach/board-eb.h
-@@ -47,7 +47,7 @@
- #define REALVIEW_EB_USB_BASE		0x4F000000	/* USB */
- 
- #ifdef CONFIG_REALVIEW_EB_ARM11MP_REVB
--#define REALVIEW_EB11MP_PRIV_MEM_BASE	0x1F000000
-+#define REALVIEW_EB11MP_PRIV_MEM_BASE	0x10100000
- #define REALVIEW_EB11MP_L220_BASE	0x10102000	/* L220 registers */
- #define REALVIEW_EB11MP_SYS_PLD_CTRL1	0xD8		/* Register offset for MPCore sysctl */
- #else
--- 
-1.8.0
+The problem from driver point of view is that it has to manage an
+additional clock per port. Not a big deal, but I thought it could be
+avoided.
+
+regards,
+-roger
