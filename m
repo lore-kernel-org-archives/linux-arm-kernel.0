@@ -1,104 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 17 Dec 2012 10:13:45 +0100
-Subject: [PATCH 4/4] FEC: Add time stamping code and a PTP hardware clock
-In-Reply-To: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
-References: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20121217091345.GA753@pengutronix.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 17 Dec 2012 11:31:08 +0200
+Subject: [PATCH 1/2] ARM: OMAP: Split vrfb.c to remove last remaining
+ cpu_is_omap usage
+In-Reply-To: <20121216200314.24238.9481.stgit@muffinssi.local>
+References: <20121216200236.24238.38151.stgit@muffinssi.local>
+ <20121216200314.24238.9481.stgit@muffinssi.local>
+Message-ID: <50CEE65C.20009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 12:25:31PM +0800, Frank Li wrote:
-> This patch adds a driver for the FEC(MX6) that offers time
-> stamping and a PTP haderware clock. Because FEC\ENET(MX6)
-> hardware frequency adjustment is complex, we have implemented
-> this in software by changing the multiplication factor of the
-> timecounter.
+On 2012-12-16 22:03, Tony Lindgren wrote:
+> Looks like we missed plat-omap/fb.c for cpu_is_omap usage
+> mach-omap2. This is the last user of cpu_is_omap, so let's
+> quickly fix it up so we can finally remove plat/cpu.h for
+> omap2lus.
 > 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> We want to limit cpu_is_omap macro usage to mach-omap2 only so
+> we can make plat/cpu.h private. After this we can finally drop
+> plat/cpu.h for omap2+.
+> 
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  drivers/net/ethernet/freescale/Kconfig   |    9 +
->  drivers/net/ethernet/freescale/Makefile  |    1 +
->  drivers/net/ethernet/freescale/fec.c     |   88 +++++++-
->  drivers/net/ethernet/freescale/fec.h     |   38 +++
->  drivers/net/ethernet/freescale/fec_ptp.c |  386 ++++++++++++++++++++++++++++++
->  5 files changed, 521 insertions(+), 1 deletions(-)
->  create mode 100644 drivers/net/ethernet/freescale/fec_ptp.c
-> 
-> diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
-> index feff516..ff3be53 100644
-> --- a/drivers/net/ethernet/freescale/Kconfig
-> +++ b/drivers/net/ethernet/freescale/Kconfig
-> @@ -92,4 +92,13 @@ config GIANFAR
->  	  This driver supports the Gigabit TSEC on the MPC83xx, MPC85xx,
->  	  and MPC86xx family of chips, and the FEC on the 8540.
->  
-> +config FEC_PTP
-> +	bool "PTP Hardware Clock (PHC)"
-> +	depends on FEC
-> +	select PPS
-> +	select PTP_1588_CLOCK
-> +	--help---
-> +	  Say Y here if you want to use PTP Hardware Clock (PHC) in the
-> +	  driver.  Only the basic clock operations have been implemented.
-> +
->  endif # NET_VENDOR_FREESCALE
-> diff --git a/drivers/net/ethernet/freescale/Makefile b/drivers/net/ethernet/freescale/Makefile
-> index 3d1839a..d4d19b3 100644
-> --- a/drivers/net/ethernet/freescale/Makefile
-> +++ b/drivers/net/ethernet/freescale/Makefile
-> @@ -3,6 +3,7 @@
->  #
->  
->  obj-$(CONFIG_FEC) += fec.o
-> +obj-$(CONFIG_FEC_PTP) += fec_ptp.o
->  obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx.o
->  ifeq ($(CONFIG_FEC_MPC52xx_MDIO),y)
->  	obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx_phy.o
-> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> index d0e1b33..2665162 100644
-> --- a/drivers/net/ethernet/freescale/fec.c
-> +++ b/drivers/net/ethernet/freescale/fec.c
-> @@ -280,6 +280,17 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->  			| BD_ENET_TX_LAST | BD_ENET_TX_TC);
->  	bdp->cbd_sc = status;
->  
-> +#ifdef CONFIG_FEC_PTP
+>  arch/arm/mach-omap1/Makefile |    2 +
+>  arch/arm/mach-omap1/fb.c     |   80 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/Makefile |    2 +
+>  arch/arm/mach-omap2/fb.c     |   50 +-------------------------
+>  arch/arm/plat-omap/Makefile  |    2 +
+>  5 files changed, 85 insertions(+), 51 deletions(-)
+>  create mode 100644 arch/arm/mach-omap1/fb.c
+>  rename arch/arm/{plat-omap/fb.c => mach-omap2/fb.c} (76%)
 
-This ifdef desert in the fec driver currently breaks all SoCs except
-i.MX6 in the imx_v6_v7_defconfig.
+Ok, I didn't realize that plat-omap cannot refer to cpu_is_omap either.
+The patch looks fine, except the subject should say "split fb.c", not
+"split vrfb.c".
 
-Most of these could be fixed with something like if (fec_use_ptp(fep)),
+ Tomi
 
 
->  #if defined(CONFIG_M523x) || defined(CONFIG_M527x) || defined(CONFIG_M528x) || \
->      defined(CONFIG_M520x) || defined(CONFIG_M532x) || \
->      defined(CONFIG_ARCH_MXC) || defined(CONFIG_SOC_IMX28)
-> @@ -88,6 +94,13 @@ struct bufdesc {
->  	unsigned short cbd_datlen;	/* Data length */
->  	unsigned short cbd_sc;	/* Control and status info */
->  	unsigned long cbd_bufaddr;	/* Buffer address */
-> +#ifdef CONFIG_FEC_PTP
-> +	unsigned long cbd_esc;
-> +	unsigned long cbd_prot;
-> +	unsigned long cbd_bdu;
-> +	unsigned long ts;
-> +	unsigned short res0[4];
-> +#endif
->  };
-
-This one changes the layout of the hardware buffer description which is
-not so easy to fix.
-
-I don't know how to continue from here. Since the whole patch doesn't
-seem to reviewed very much I tend to say we should revert it for now and
-let Frank redo it for the next merge window.
-
-Other opinions?
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/f46adcb7/attachment.sig>
