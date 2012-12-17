@@ -1,68 +1,85 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 17 Dec 2012 10:36:10 -0600
-Subject: [RFC] drm/lcdc: add TI LCD Controller DRM driver
-In-Reply-To: <CAKG51UAunsckFj9g7EMrX6=uFakEidQv2AJJMXPVzeY77eU+JA@mail.gmail.com>
-References: <1355443446-8723-1-git-send-email-robdclark@gmail.com>
- <50CF248B.4010401@ti.com>
- <CAF6AEGvm2TmFh7xiYzjt9yGT4kuBFA=_219NkwQAjbBVZ+Z6rg@mail.gmail.com>
- <CAF6AEGtfeXycZjashi=PenX86m7HLBTZ=U04Q4kLSyqJXwQ1fQ@mail.gmail.com>
- <CAKG51UAunsckFj9g7EMrX6=uFakEidQv2AJJMXPVzeY77eU+JA@mail.gmail.com>
-Message-ID: <CAF6AEGt2hvmjRQoAjeGko_Fxq=B5DcYCRQUsM7POPxqOwja5Lg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Dec 2012 16:35:38 +0000
+Subject: [PATCH v2 3/6] ARM: psci: add devicetree binding for describing PSCI
+ firmware
+In-Reply-To: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
+References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1355762141-29616-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 17, 2012 at 9:26 AM, Sekhar Nori <nori.sekhar@gmail.com> wrote:
-> Hi Rob,
->
->
-> On Monday, December 17, 2012, Rob Clark wrote:
->>
->> On Mon, Dec 17, 2012 at 8:39 AM, Rob Clark <robdclark@gmail.com> wrote:
->> >> I'm not very enthusiastic about adding ti-lcdc specific panel/chip
->> >> drivers. It's not really a big deal if it's only kernel code, but you
->> >> add device-tree bindings also, which is an external API that you need
->> >> to
->> >> support after adding it.
->> >>
->> >> I'd rather see the energy put to common display framework, and get this
->> >> whole panel/chip driver issue solved in a generic manner.
->> >
->> > yeah, I was expecting to migrate to CDF once it exists, but needed
->> > something for now.  I'm using the exercise to get my thoughts straight
->> > on how CDF should fit into KMS.  (One thing I plan to add support for
->> > is an i2c connected hdmi encoder.. which looks like it would fit well
->> > in drivers/gpu/drm/i2c.. so the drm encoder-slave stuff might be the
->> > way.)
->> >
->> > If you have any suggestions on the DT bindings, I'd like to hear 'em.
->>
->> btw, a little bit of-topic, but speaking of DT...
->>
->> Anybody have any clue about how backlight devices are supposed to work
->> in this brave new DT world?
->
->
-> See Runtime interpreted power sequences here:
->  http://lkml.indiana.edu/hypermail/linux/kernel/1208.2/00029.html
->
-> It is an attempt to address this need.
+This patch adds a new devicetree binding for describing PSCI firmware
+to Linux.
 
-hmm, I'm not really sure that is what is needed..  or rather, it might
-perhaps make sense to have a generic backlight driver implementation
-that could be used where appropriate, but I'm a bit suspicious about
-that trying to cover absolutely everything.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 58 ++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/psci.txt
 
->From the drm/display driver we don't even want to care how the
-backlight is implemented.  You could have (just making something up
-hypothetically) a backlight controlled via a uart or some sort of
-other crazy magic.. and eventually the generic interpreter gets out of
-hand.
-
-Really I think we just want a way to retrieve a 'struct
-backlight_device *' that is created somewhere else.  We don't care how
-that backlight driver is implemented.  I don't think we want an
-interpreter.. we want a way to lookup backlight device by name or
-phandle or something like that.
-
-BR,
--R
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+new file mode 100644
+index 0000000..904d0d3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -0,0 +1,58 @@
++* Power State Coordination Interface (PSCI)
++
++Firmware implementing the PSCI functions described in ARM document number
++ARM DEN 0022A ("Power State Coordination Interface System Software on ARM
++processors") can be used by Linux to initiate various CPU-centric power
++operations.
++
++Issue A of the specification describes functions for CPU suspend, hotplug
++and migration of secure software.
++
++Functions are invoked by trapping to the privilege level of the PSCI
++firmware (specified as part of the binding below) and passing arguments
++in a manner similar to that specified by AAPCS:
++
++	 r0		=> 32-bit Function ID / return value
++	{r1 - r3}	=> Parameters
++
++Note that the immediate field of the trapping instruction must be set
++to #0.
++
++
++Main node required properties:
++
++ - compatible    : Must be "arm,psci"
++
++ - method        : The method of calling the PSCI firmware. Permitted
++                   values are:
++
++                   "smc" : SMC #0, with the register assignments specified
++		           in this binding.
++
++                   "hvc" : HVC #0, with the register assignments specified
++		           in this binding.
++
++ - function-base : The base ID from which the functions are offset.
++
++Main node optional properties:
++
++ - cpu_suspend   : Offset of CPU_SUSPEND ID from function-base
++
++ - cpu_off       : Offset of CPU_OFF ID from function-base
++
++ - cpu_on        : Offset of CPU_ON ID from function-base
++
++ - migrate       : Offset of MIGRATE ID from function-base
++
++
++Example:
++
++	psci {
++		compatible	= "arm,psci";
++		method		= "smc";
++		function-base	= <0x95c1ba5e>;
++		cpu_suspend	= <0>;
++		cpu_off		= <1>;
++		cpu_on		= <2>;
++		migrate		= <3>;
++	};
+-- 
+1.8.0
