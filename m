@@ -1,45 +1,80 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Dec 2012 12:23:23 +0100
-Subject: [PATCH 0/3] at91/ssc: fixes on ASoC tree for 3.8
-Message-ID: <cover.1355742707.git.nicolas.ferre@atmel.com>
+Date: Mon, 17 Dec 2012 12:23:24 +0100
+Subject: [PATCH 1/3] ARM: at91/dts: fix typo in SSC status property
+In-Reply-To: <cover.1355742707.git.nicolas.ferre@atmel.com>
+References: <cover.1355742707.git.nicolas.ferre@atmel.com>
+Message-ID: <10c033465336fc6cc82b6006153b0c456021589e.1355742707.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+From: Bo Shen <voice.shen@atmel.com>
 
-This series goes on top of current Linus' git tree and fixes an error that
-we have while compiling DTBs for AT91:
-ERROR (phandle_references): Reference to non-existent node or label
-"pinctrl_ssc0_tx"
+Change the value of status to "disabled" to conform with
+property requirement.
 
-ERROR: Input tree has errors, aborting (use -f to force output)
-make[3]: *** [arch/arm/boot/dts/at91sam9g20ek.dtb] Error 2
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+[nicolas.ferre at atmel.com: commit subject line and typos]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9263.dtsi | 4 ++--
+ arch/arm/boot/dts/at91sam9g45.dtsi | 4 ++--
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-I have included pending material that is dealing with SSC and pinctrl. The
-pinctrl part can be merged more easily now that the big pinctrl update for AT91
-has been merged upstream.
-I have also included a typo patch that you have already taken as 315656b (ASoC:
-atmel-ssc: change disable to disable in dts node) in your topic/atmel branch
-but that was not described properly.
-
-If you find it easier, I can provide you a git tree for this material: just
-tell me...
-
-Thanks for your help, best regards,
-
-
-Bo Shen (3):
-  ARM: at91/dts: fix typo in SSC status property
-  ARM: at91/dts: add pinctrl support for SSC peripheral
-  ASoC: atmel-ssc: add pinctrl selection to driver
-
- arch/arm/boot/dts/at91sam9260.dtsi | 18 +++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi | 40 ++++++++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/at91sam9g45.dtsi | 40 ++++++++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/at91sam9n12.dtsi | 26 +++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  | 32 +++++++++++++++++++++++-------
- drivers/misc/atmel-ssc.c           |  8 ++++++++
- 6 files changed, 153 insertions(+), 11 deletions(-)
-
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 8e6251f..32ec62c 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -368,14 +368,14 @@
+ 				compatible = "atmel,at91rm9200-ssc";
+ 				reg = <0xfff98000 0x4000>;
+ 				interrupts = <16 4 5>;
+-				status = "disable";
++				status = "disabled";
+ 			};
+ 
+ 			ssc1: ssc at fff9c000 {
+ 				compatible = "atmel,at91rm9200-ssc";
+ 				reg = <0xfff9c000 0x4000>;
+ 				interrupts = <17 4 5>;
+-				status = "disable";
++				status = "disabled";
+ 			};
+ 
+ 			macb0: ethernet at fffbc000 {
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index fa1ae0c..231858f 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -425,14 +425,14 @@
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xfff9c000 0x4000>;
+ 				interrupts = <16 4 5>;
+-				status = "disable";
++				status = "disabled";
+ 			};
+ 
+ 			ssc1: ssc at fffa0000 {
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xfffa0000 0x4000>;
+ 				interrupts = <17 4 5>;
+-				status = "disable";
++				status = "disabled";
+ 			};
+ 
+ 			adc0: adc at fffb0000 {
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 617ede5..40ac3a4 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -92,7 +92,7 @@
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xf0010000 0x4000>;
+ 				interrupts = <28 4 5>;
+-				status = "disable";
++				status = "disabled";
+ 			};
+ 
+ 			tcb0: timer at f8008000 {
 -- 
 1.8.0
