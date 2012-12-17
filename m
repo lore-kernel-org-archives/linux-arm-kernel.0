@@ -1,56 +1,119 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Dec 2012 15:13:48 +0000
-Subject: ARM realview breakages w/ 3.7 under qemu
-In-Reply-To: <50CF26D2.1040008@openwrt.org>
-References: <50CA0FC1.5090009@openwrt.org>
- <20121213174817.GB12946@mudshark.cambridge.arm.com>
- <20121214094012.GG14363@n2100.arm.linux.org.uk>
- <50CB0150.1000901@openwrt.org>
- <20121217134246.GE11558@mudshark.cambridge.arm.com>
- <50CF26D2.1040008@openwrt.org>
-Message-ID: <20121217151348.GC22633@mudshark.cambridge.arm.com>
+From: arvid.brodin@xdin.com (Arvid Brodin)
+Date: Mon, 17 Dec 2012 16:15:19 +0100
+Subject: Do I need to skb_put() Ethernet frames to a minimum of 60 bytes?
+In-Reply-To: <50CF216F.2010107@atmel.com>
+References: <502A9EC4.4040208@xdin.com>
+ <1344976557.2690.43.camel@bwh-desktop.uk.solarflarecom.com>
+ <5033C6B0.4060508@xdin.com> <50CF216F.2010107@atmel.com>
+Message-ID: <50CF3707.9060502@xdin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 17, 2012 at 02:06:10PM +0000, Florian Fainelli wrote:
-> Le 12/17/12 14:42, Will Deacon a ?crit :
-> > On Fri, Dec 14, 2012 at 10:37:04AM +0000, Florian Fainelli wrote:
-> >> Le 12/14/12 10:40, Russell King - ARM Linux a ?crit :
-> >>> On Thu, Dec 13, 2012 at 05:48:17PM +0000, Will Deacon wrote:
-> >>>> On Thu, Dec 13, 2012 at 05:26:25PM +0000, Florian Fainelli wrote:
-> >>>>> - PBX A9: booting with less than 1024MBytes of RAM causes this:
-> >>>>> [    0.000000] Truncating RAM at 20000000-3fffffff to -3f7fffff (vmalloc
-> >>>>> region overlap).
-> >>>>> [    0.000000] Ignoring RAM at 80000000-8fffffff (vmalloc region overlap).
-> >>>>>
-> >>>>> Do these issues sounds familiar to any of you? The kernel config is
-> >>>>> attached in case that helps.
-> >>> I don't have the original email to reply to (so I don't have the .config
-> >>> either) but my guess for the above would be that HIGHMEM is disabled.
-> >> The original mail containing the .config file was actually rejected by
-> >> the mailing-list manager. I have uploaded it here:
-> >> http://alphacore.org/~florian/openwrt/realview-eb-config
-> >>
-> >> You are right, HIGHMEM is disabled. Even though enabling HIGHMEM does
-> >> not allow me booting either without at least 1Gbyte of RAM:
-> >>
-> >> [    0.000000] Memory policy: ECC disabled, Data cache writealloc
-> >> and we are stuck.
-> > I just dusted off my pbx and it boots fine with your .config and a 3.7
-> > kernel when passing mem=128M on the command line.
-> Ok, there must be something specific to qemu, can you also try with it?
-
-Works too, but I had to add mem=128M to the command line (I guess the ATAGs
-are wrong).
-
-> >
-> > For EB, can you try the following diff please?
+On 2012-12-17 14:43, Nicolas Ferre wrote:
+> On 08/21/2012 07:34 PM, Arvid Brodin :
+>> On 2012-08-14 22:35, Ben Hutchings wrote:
+>>> On Tue, 2012-08-14 at 18:53 +0000, Arvid Brodin wrote:
+>>>> Hi,
+>>>>
+>>>> If I create an sk_buff with a payload of less than 28 bytes (ethheader + data),
+>>>> and send it using the cadence/macb (Ethernet) driver, I get
+>>>>
+>>>> eth0: TX underrun, resetting buffers
+>>>>
+>>>> Now I know the minimum Ethernet frame size is 64 bytes (including the 4-byte
+>>>> FCS), but whose responsibility is it to pad the frame to this size if necessary?
+>>>> Mine or the driver's - i.e. should I just skb_put() to the minimum size or
+>>>> should I report the underrun as a driver bug?
+>>>
+>>> If the hardware doesn't pad frames automatically then it's the driver's
+>>> reponsibility to do so.
+>>>
+>>
+>> Nicolas, can you take a look at this? At the moment I'm using the following change
+>> in macb.c to avoid TX underruns on short packages:
+>>
+>> --- a/drivers/net/ethernet/cadence/macb.c	2012-05-04 19:14:41.927719667 +0200
+>> +++ b/drivers/net/ethernet/cadence/macb.c	2012-08-21 19:22:40.063739049 +0200
+>> @@ -618,6 +618,7 @@ static void macb_poll_controller(struct
+>>  }
+>>  #endif
+>>
+>> +#define MIN_ETHFRAME_LEN	60
+>>  static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
+>>  {
+>>  	struct macb *bp = netdev_priv(dev);
+>> @@ -635,6 +636,12 @@ static int macb_start_xmit(struct sk_buf
+>>  	printk("\n");
+>>  #endif
+>>
+>> +	if (skb->len < MIN_ETHFRAME_LEN) {
+>> +		/* Pad skb to minium Ethernet frame size */
+>> +		if (skb_tailroom(skb) >= MIN_ETHFRAME_LEN - skb->len)
+>> +			memset(skb_put(skb, MIN_ETHFRAME_LEN - skb->len), 0,
+>> +						MIN_ETHFRAME_LEN - skb->len);
+>> +	}
+>>  	len = skb->len;
+>>  	spin_lock_irqsave(&bp->lock, flags);
+>>
+>>
+>> ... but as you can see this is limited to linear skbs which has been allocated with
+>> enough tailroom. Perhaps there are better ways to fix the problem? (Maybe the hardware
+>> is actually doing the padding already and the problem has to do with the way the DMA
+>> transfer is set up?)
 > 
-> Works for me, thank you! I realized that I had this patch for 3.3 
-> already, but not in 3.7. This means that Realview EB has been broken 
-> since 3.3-rc and specifically commit 34ae6c96 (ARM: 7298/1: realview: 
-> fix mapping of MPCore private memory region).
+> I come back to this issue. It seems to me that the macb Cadence IP is
+> padding automatically a too little packet. It is the usual behavior
+> unless you specify otherwise in the CTRL register embedded in the tx
+> descriptor. I also verified this with wireshark on both ICMP and UDP
+> packets.
+> 
+> The error that you are experiencing is on at91sam9260 or at91sam9263
+> SoCs, am I right?
 
-Cool, can I re-post with your tested-by please?
+No, this was on an AVR32 AP7000 board.
 
-Will
+I believe this is what I did to solve the issue (patch for linux-2.6.37):
+
+diff -Nurp linux-2.6.37-001-bsa400/drivers/net//macb.c
+linux-2.6.37-macb-hsr/drivers/net//macb.c
+--- linux-2.6.37-orig/drivers/net//macb.c	2012-09-16 22:41:02.746754672 +0200
++++ linux-2.6.37-macb/drivers/net//macb.c	2012-09-17 00:34:35.161389720 +0200
+@@ -376,8 +379,9 @@ static void macb_tx(struct macb *bp)
+
+ 			rmb();
+
+-			dma_unmap_single(&bp->pdev->dev, rp->mapping, skb->len,
+-							 DMA_TO_DEVICE);
++			dma_unmap_single(&bp->pdev->dev, rp->mapping,
++					 max(skb->len, (unsigned int) ETH_ZLEN),
++					 DMA_TO_DEVICE);
+ 			rp->skb = NULL;
+ 			dev_kfree_skb_irq(skb);
+ 		}
+@@ -413,7 +417,8 @@ static void macb_tx(struct macb *bp)
+
+ 		dev_dbg(&bp->pdev->dev, "skb %u (data %p) TX complete\n",
+ 			tail, skb->data);
+-		dma_unmap_single(&bp->pdev->dev, rp->mapping, skb->len,
++		dma_unmap_single(&bp->pdev->dev, rp->mapping,
++				 max(skb->len, (unsigned int) ETH_ZLEN),
+ 				 DMA_TO_DEVICE);
+ 		bp->stats.tx_packets++;
+ 		bp->stats.tx_bytes += skb->len;
+@@ -675,7 +680,10 @@ static int macb_start_xmit(struct sk_buf
+ 	printk("\n");
+ #endif
+
+-	len = skb->len;
++	if (skb_padto(skb, ETH_ZLEN) != 0)
++		return NETDEV_TX_OK; /* There is no NETDEV_TX_FAIL... */
++
++	len = max(skb->len, (unsigned int) ETH_ZLEN);
+ 	spin_lock_irqsave(&bp->lock, flags);
+
+ 	/* This is a hard error, log it. */
+
+
+-- 
+Arvid Brodin | Consultant (Linux)
+XDIN AB | Knarrarn?sgatan 7 | SE-164 40 Kista | Sweden | xdin.com
