@@ -1,55 +1,120 @@
-From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Tue, 18 Dec 2012 18:26:18 +0530
-Subject: [PATCH v2] ARM: OMAP2: hwmod: Fix "register offset NULL check" bug
-Message-ID: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
+From: nori.sekhar@gmail.com (Sekhar Nori)
+Date: Mon, 17 Dec 2012 20:56:05 +0530
+Subject: [RFC] drm/lcdc: add TI LCD Controller DRM driver
+In-Reply-To: <CAF6AEGtfeXycZjashi=PenX86m7HLBTZ=U04Q4kLSyqJXwQ1fQ@mail.gmail.com>
+References: <1355443446-8723-1-git-send-email-robdclark@gmail.com>
+ <50CF248B.4010401@ti.com>
+ <CAF6AEGvm2TmFh7xiYzjt9yGT4kuBFA=_219NkwQAjbBVZ+Z6rg@mail.gmail.com>
+ <CAF6AEGtfeXycZjashi=PenX86m7HLBTZ=U04Q4kLSyqJXwQ1fQ@mail.gmail.com>
+Message-ID: <CAKG51UAunsckFj9g7EMrX6=uFakEidQv2AJJMXPVzeY77eU+JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Hebbar, Gururaja" <gururaja.hebbar@ti.com>
+Hi Rob,
 
-omap4_cminst_wait_module_ready() checks if register offset is NULL.
+On Monday, December 17, 2012, Rob Clark wrote:
 
-int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
-				   u16 clkctrl_offs)
-{
-	int i = 0;
+> On Mon, Dec 17, 2012 at 8:39 AM, Rob Clark <robdclark@gmail.com<javascript:;>>
+> wrote:
+> >> I'm not very enthusiastic about adding ti-lcdc specific panel/chip
+> >> drivers. It's not really a big deal if it's only kernel code, but you
+> >> add device-tree bindings also, which is an external API that you need to
+> >> support after adding it.
+> >>
+> >> I'd rather see the energy put to common display framework, and get this
+> >> whole panel/chip driver issue solved in a generic manner.
+> >
+> > yeah, I was expecting to migrate to CDF once it exists, but needed
+> > something for now.  I'm using the exercise to get my thoughts straight
+> > on how CDF should fit into KMS.  (One thing I plan to add support for
+> > is an i2c connected hdmi encoder.. which looks like it would fit well
+> > in drivers/gpu/drm/i2c.. so the drm encoder-slave stuff might be the
+> > way.)
+> >
+> > If you have any suggestions on the DT bindings, I'd like to hear 'em.
+>
+> btw, a little bit of-topic, but speaking of DT...
+>
+> Anybody have any clue about how backlight devices are supposed to work
+> in this brave new DT world?
 
-	if (!clkctrl_offs)
-		return 0;
 
-In case of AM33xx, CLKCTRL register offset for different clock domains
-are not uniformly placed. An example of this would be the RTC clock
-domain with CLKCTRL offset at 0x00.
-In such cases the module ready check is skipped which leads to a data
-abort during boot-up when RTC registers is accessed.
+See Runtime interpreted power sequences here:
+ http://lkml.indiana.edu/hypermail/linux/kernel/1208.2/00029.html
 
-Since the actual base address is verified in
-omap4_cminst_read_inst_reg(), this check here is not required at all
-and hence can be removed.
+It is an attempt to address this need.
 
-Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
----
-Changes in v2:
-	- update commit message to reflect the actual cause. Previous
-	message conveyed a wrong/opposite message.
+Thanks,
+Sekhar
 
-:100644 100644 7f9a464... 40545ff... M	arch/arm/mach-omap2/cminst44xx.c
- arch/arm/mach-omap2/cminst44xx.c |    3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-index 7f9a464..40545ff 100644
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -271,9 +271,6 @@ int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
- {
- 	int i = 0;
- 
--	if (!clkctrl_offs)
--		return 0;
--
- 	omap_test_timeout(_is_module_ready(part, inst, cdoffs, clkctrl_offs),
- 			  MAX_MODULE_READY_TIME, i);
- 
--- 
-1.7.9.5
+ In the old days, the board file would
+> stuff a fxn ptr to control backlight in pdata for the driver.  But we
+> don't have this any more.  I think I need some way to retrieve the
+> 'struct backlight_device' ptr associated with the panel driver, so
+> that the appropriate dpms fxn ptrs can enable/disable the backlight.
+>
+> I'm thinking the dt file should have something that looks roughly like:
+>
+>                 /* Settings for CDTech_S035Q01 / LCD3 cape: */
+>                 panel {
+>                         compatible = "lcdc,panel";
+>                         pinctrl-names = "default";
+>                         pinctrl-0 = <&bone_lcd3_cape_lcd_pins>;
+>                         panel-info {
+>                                 ac-bias           = <255>;
+>                                 ac-bias-intrpt    = <0>;
+>                                 dma-burst-sz      = <16>;
+>                                 bpp               = <16>;
+>                                 fdd               = <0x80>;
+>                                 tft-alt-mode      = <0>;
+>                                 stn-565-mode      = <0>;
+>                                 mono-8bit-mode    = <0>;
+>                                 invert-line-clock = <1>;
+>                                 invert-frm-clock  = <1>;
+>                                 sync-edge         = <0>;
+>                                 sync-ctrl         = <1>;
+>                                 raster-order      = <0>;
+>                                 fifo-th           = <0>;
+>                         };
+>                         display-timings {
+>                                 native-mode = <&timing0>;
+>                                 timing0: 320x240 {
+>                                         hactive         = <320>;
+>                                         vactive         = <240>;
+>                                         hback-porch     = <21>;
+>                                         hfront-porch    = <58>;
+>                                         hsync-len       = <47>;
+>                                         vback-porch     = <11>;
+>                                         vfront-porch    = <23>;
+>                                         vsync-len       = <2>;
+>                                         clock-frequency = <8000000>;
+>                                 };
+>                         };
+>
+>                         backlight {
+>                                 compatible = "tps65217-backlight";
+>                                 isel = <1>;
+>                                 fdim = <200>;
+>
+>                                 tps = <&tps>;   /* link to the tps */
+>                                 brightness = <100>;
+>                         };
+>                 };
+>
+> display-timings is based on the of-videomode helpers patch..
+> panel-info probably needs to be made to be something more generic, but
+> we need something to know how to configure the crtc properly..
+>
+> but I'm not quite sure what to do with the backlight..
+>
+> BR,
+> -R
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org <javascript:;>
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/4154d6df/attachment-0001.html>
