@@ -1,56 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 17 Dec 2012 11:22:23 +0100
-Subject: [PATCH] ARM: imx: Move platform-mx2-emma to
- arch/arm/mach-imx/devices
-In-Reply-To: <1353946282-12439-1-git-send-email-fabio.estevam@freescale.com>
-References: <1353946282-12439-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20121217102223.GJ26326@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 17 Dec 2012 11:23:20 +0100
+Subject: [Resend PATCH v6 1/4] pinctrl: atmel-ssc: add pinctrl support
+In-Reply-To: <20121217093947.GG23971@game.jcrosoft.org>
+References: <1353464229-20846-1-git-send-email-voice.shen@atmel.com>
+ <20121121022441.GJ4673@opensource.wolfsonmicro.com>
+ <20121217093947.GG23971@game.jcrosoft.org>
+Message-ID: <50CEF298.3070508@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 02:11:22PM -0200, Fabio Estevam wrote:
-> Move platform-mx2-emma to arch/arm/mach-imx/devices and fix the following build
-> error:
+On 12/17/2012 10:39 AM, Jean-Christophe PLAGNIOL-VILLARD :
+> On 11:24 Wed 21 Nov     , Mark Brown wrote:
+>> On Wed, Nov 21, 2012 at 10:17:09AM +0800, Bo Shen wrote:
+>>> Add pinctrl support for atmel ssc peripheral
+>>>
+>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>>
+>> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > 
-> make[2]: *** No rule to make target `arch/arm/mach-imx/devices/platform-mx2-emma.o', needed by `arch/arm/mach-imx/devices/built-in.o'.  Stop.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> you handle this one with scc
 
-Applied, thanks
+Hold on Jean-Christophe, I made a little experiment this morning, and
+this patch is not applying correctly on:
+- linus' tree
+- linux-next
+- neither Mark's for-next branch
 
-Sascha
+So, *I* will manage this patch and try to make sure that Mark is able to
+seamlessly include it in his tree on top of a known source for a future
+ASoC "fixes" pull-request.
 
-> ---
->  .../devices/platform-mx2-emma.c                    |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->  rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mx2-emma.c (94%)
-> 
-> diff --git a/arch/arm/plat-mxc/devices/platform-mx2-emma.c b/arch/arm/mach-imx/devices/platform-mx2-emma.c
-> similarity index 94%
-> rename from arch/arm/plat-mxc/devices/platform-mx2-emma.c
-> rename to arch/arm/mach-imx/devices/platform-mx2-emma.c
-> index 508404d..11bd01d 100644
-> --- a/arch/arm/plat-mxc/devices/platform-mx2-emma.c
-> +++ b/arch/arm/mach-imx/devices/platform-mx2-emma.c
-> @@ -6,8 +6,8 @@
->   * the terms of the GNU General Public License version 2 as published by the
->   * Free Software Foundation.
->   */
-> -#include <mach/hardware.h>
-> -#include <mach/devices-common.h>
-> +#include "../hardware.h"
-> +#include "devices-common.h"
->  
->  #define imx_mx2_emmaprp_data_entry_single(soc)				\
->  	{								\
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
+Mark, what about rebasing this one on top of current Linus' tree
+(toguether with the one that you have just applied on the topic/atmel
+branch: (ASoC: atmel-ssc: change disable to disable in dts node)?
 
+I hope that once reworked, they will be able to reach Linus' tree soon
+because the lack of this patch is causing DTB compilation errors on all
+AT91...
+
+
+Best regards,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas Ferre
