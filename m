@@ -1,29 +1,61 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 17 Dec 2012 09:44:10 +0100 (CET)
-Subject: [PATCH 05/10] ARM: shmobile: Add DT table of INTC for sh7372
-In-Reply-To: <1355562224-29448-6-git-send-email-horms+renesas@verge.net.au>
-References: <1355562224-29448-1-git-send-email-horms+renesas@verge.net.au>
- <1355562224-29448-6-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1212170941400.24007@axis700.grange>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 17 Dec 2012 09:59:52 +0100
+Subject: [PATCH] clk: export __clk_get_name for re-use in imx-ipu-v3 and
+ others
+In-Reply-To: <1355400745-7320-1-git-send-email-ndevos@redhat.com>
+References: <1355400745-7320-1-git-send-email-ndevos@redhat.com>
+Message-ID: <20121217085952.GH26326@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon
-
-On Sat, 15 Dec 2012, Simon Horman wrote:
-
-> From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+On Thu, Dec 13, 2012 at 01:12:25PM +0100, Niels de Vos wrote:
+> This fixes the following error when building for arm-imx:
+> > ERROR: "__clk_get_name" [drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.ko] undefined!
+> > make[1]: *** [__modpost] Error 1
+> > make: *** [modules] Error 2
 > 
-> Cc: Magnus Damm <damm@opensource.se>
-> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> There are valid usecases to get the name of a clock, be it for debugging
+> purposes or to register a children of a clock like done in this IPU driver.
+> Therefore exporting __clk_get_name() and make it available for others makes
+> sense.
 
-What happened to intcs support? Why has it been dropped? Without it many 
-important devices cannot be set up from DT, e.g. I2C #0.
+Gnerally I think the name of a clock shouldn't be a secret, so:
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+> 
+> Reported-by: Peter Robinson <pbrobinson@gmail.com>
+> CC: Sascha Hauer <s.hauer@pengutronix.de>
+> CC: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Niels de Vos <ndevos@redhat.com>
+> ---
+>  drivers/clk/clk.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 251e45d..fbe0f3a 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -259,10 +259,11 @@ late_initcall(clk_disable_unused);
+>  
+>  /***    helper functions   ***/
+>  
+> -inline const char *__clk_get_name(struct clk *clk)
+> +const char *__clk_get_name(struct clk *clk)
+>  {
+>  	return !clk ? NULL : clk->name;
+>  }
+> +EXPORT_SYMBOL_GPL(__clk_get_name);
+>  
+>  inline struct clk_hw *__clk_get_hw(struct clk *clk)
+>  {
+> -- 
+> 1.7.11.7
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
