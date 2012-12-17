@@ -1,44 +1,54 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Dec 2012 11:23:20 +0100
-Subject: [Resend PATCH v6 1/4] pinctrl: atmel-ssc: add pinctrl support
-In-Reply-To: <20121217093947.GG23971@game.jcrosoft.org>
-References: <1353464229-20846-1-git-send-email-voice.shen@atmel.com>
- <20121121022441.GJ4673@opensource.wolfsonmicro.com>
- <20121217093947.GG23971@game.jcrosoft.org>
-Message-ID: <50CEF298.3070508@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 17 Dec 2012 11:37:44 +0100
+Subject: [GIT PULL] i.MX fixes for -rc
+Message-ID: <20121217103744.GL26326@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 10:39 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 11:24 Wed 21 Nov     , Mark Brown wrote:
->> On Wed, Nov 21, 2012 at 10:17:09AM +0800, Bo Shen wrote:
->>> Add pinctrl support for atmel ssc peripheral
->>>
->>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->>
->> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> 
-> you handle this one with scc
+Hi Arnd, Olof,
 
-Hold on Jean-Christophe, I made a little experiment this morning, and
-this patch is not applying correctly on:
-- linus' tree
-- linux-next
-- neither Mark's for-next branch
+Please pull the following i.MX fixes for -rc.
 
-So, *I* will manage this patch and try to make sure that Mark is able to
-seamlessly include it in his tree on top of a known source for a future
-ASoC "fixes" pull-request.
-
-Mark, what about rebasing this one on top of current Linus' tree
-(toguether with the one that you have just applied on the topic/atmel
-branch: (ASoC: atmel-ssc: change disable to disable in dts node)?
-
-I hope that once reworked, they will be able to reach Linus' tree soon
-because the lack of this patch is causing DTB compilation errors on all
-AT91...
+Thanks
+ Sascha
 
 
-Best regards,
+The following changes since commit a4f1de176614f634c367e5994a7bcc428c940df0:
+
+  mm: fix kernel BUG at huge_memory.c:1474! (2012-12-16 19:02:38 -0800)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes-rc
+
+for you to fetch changes up to 027c0a6af42efa4f2f6034421349bd26a3ca4923:
+
+  ARM: imx: Move platform-mx2-emma to arch/arm/mach-imx/devices (2012-12-17 10:58:52 +0100)
+
+----------------------------------------------------------------
+ARM i.MX fixes for v3.8-rc
+
+This fixes a compile failure on imx_v4_v5_defconfig and a regression
+introduced with enabling the MIPI clocks on i.MX51. Also one rather
+cosmetic fix for the i.MX27 dts file.
+
+----------------------------------------------------------------
+Fabio Estevam (2):
+      ARM: dts: mx27: Fix the AIPI bus for FEC
+      ARM: imx: Move platform-mx2-emma to arch/arm/mach-imx/devices
+
+Sascha Hauer (1):
+      ARM i.MX51 clock: Fix regression since enabling MIPI/HSP clocks
+
+ arch/arm/boot/dts/imx27-3ds.dts                        |    8 ++++----
+ arch/arm/boot/dts/imx27-phytec-phycore.dts             |   13 +++++++------
+ arch/arm/boot/dts/imx27.dtsi                           |   11 ++++++++++-
+ arch/arm/mach-imx/clk-imx51-imx53.c                    |   16 ++++++++++++++++
+ .../{plat-mxc => mach-imx}/devices/platform-mx2-emma.c |    4 ++--
+ 5 files changed, 39 insertions(+), 13 deletions(-)
+ rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mx2-emma.c (94%)
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
