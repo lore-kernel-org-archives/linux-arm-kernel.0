@@ -1,31 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Dec 2012 20:00:11 +0000
-Subject: [PATCH v2 3/6] ARM: psci: add devicetree binding for describing
- PSCI firmware
-In-Reply-To: <1355762141-29616-4-git-send-email-will.deacon@arm.com>
-References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
- <1355762141-29616-4-git-send-email-will.deacon@arm.com>
-Message-ID: <201212172000.11850.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 17 Dec 2012 21:01:36 +0100
+Subject: [PATCH] ARM: mach-imx6q: Do not run error code path in success
+ case
+In-Reply-To: <1355756147-24856-1-git-send-email-fabio.estevam@freescale.com>
+References: <1355756147-24856-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20121217200136.GR26326@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 December 2012, Will Deacon wrote:
-> +
-> + - function-base : The base ID from which the functions are offset.
-> +
-> +Main node optional properties:
-> +
-> + - cpu_suspend   : Offset of CPU_SUSPEND ID from function-base
-> +
-> + - cpu_off       : Offset of CPU_OFF ID from function-base
-> +
-> + - cpu_on        : Offset of CPU_ON ID from function-base
-> +
-> + - migrate       : Offset of MIGRATE ID from function-base
+On Mon, Dec 17, 2012 at 12:55:47PM -0200, Fabio Estevam wrote:
+> The 'put_clk' path should only run in the case of failure, so provide a 'return'
+> to avoid it running in the success case.
 
-What is the benefit of the "function-base" property over just having
-32 bit IDs for each function. For all I can tell, the interface does
-not rely on the numbers to be consecutive, so removing the function-base
-attribute would make the binding simpler as well as more flexible.
+Are you sure? It looks to me like it was intentional. The purpose of
+this function is to set the parent/rate correctly. The references to
+the clock are not needed later.
 
-	Arnd
+Sascha
+
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 4eb1b3a..61f50aa 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -134,6 +134,8 @@ static void __init imx6q_sabrelite_cko1_setup(void)
+>  	clk_set_parent(cko1_sel, ahb);
+>  	rate = clk_round_rate(cko1, 16000000);
+>  	clk_set_rate(cko1, rate);
+> +
+> +	return;
+>  put_clk:
+>  	if (!IS_ERR(cko1_sel))
+>  		clk_put(cko1_sel);
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
