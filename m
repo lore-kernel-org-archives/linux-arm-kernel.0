@@ -1,111 +1,125 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 17 Dec 2012 12:50:16 +0100
-Subject: devicetree support for efikasb
-In-Reply-To: <87licwdikj.fsf@lebrac.rtp-net.org>
-References: <20121217075907.GQ24458@pengutronix.de>
- <87licwdikj.fsf@lebrac.rtp-net.org>
-Message-ID: <20121217115016.GN26326@pengutronix.de>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Mon, 17 Dec 2012 12:51:32 +0100
+Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <50CF03FB.2030100@grandegger.com>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
+ <50CF03FB.2030100@grandegger.com>
+Message-ID: <50CF0744.7040404@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 17, 2012 at 12:27:56PM +0100, Arnaud Patard wrote:
-> Sascha Hauer <s.hauer@pengutronix.de> writes:
+On 12/17/2012 12:37 PM, Wolfgang Grandegger wrote:
+> Hi Roland,
 > 
-> > Hi all,
+> On 12/15/2012 12:49 AM, Roland Stigge wrote:
+>> Hi Wolfgang,
+>>
+>> thank you for the patch!
+>>
+>> On 14/12/12 18:58, Wolfgang Grandegger wrote:
+>>> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
+>>> +{
+>>> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+>>> +	void __iomem *pio = at91_gpio->regbase;
+>>> +
+>>> +	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
+>>> +}
+>>> +
+>>
+>> Without having an AT91 available right now, I guess the hardware
+>> interface of this GPIO chip is different from the GPIO block API. While
+>> the hardware has clear and set registers, the val parameter of
+>> at91_gpiolib_set_block() should be interpreted as the actual output
+>> values. See lpc32xx_gpo_set_block() for an example for handling set and
+>> clear registers like this: First, set_bits and clear_bits words are
+>> calculated from mask and val parameters, and finally written to the
+>> respective hardware registers.
+>>
+>> Note that one .set_block() can result in writing both the set and clear
+>> registers of the hardware when val contains both 0s and 1s in
+>> respectively masked positions.
 > 
-> Hi,
-> 
-> >
-> > I recently put some work into my Efika MX smartbook. Here are patches
-> > to make it work with a current kernel. It turned out that most of the
-> > stuff is quite straight forward. Unfortunately there is a lot missing
-> > in the USB area. Without USB support the Smartbook is pretty much
-> > useless, so most of the patches are for adding USB support.
-> >
-> > What currently works is:
-> >
-> > - USB
-> 
-> Is it working or not ? Or you meant that it's working only if you merge
-> the usbmisc-related for imx5* patches ?
+> Oops, I obviously did not test GPIO block write. The patch below does
+> work now. Feel free to add it to the next version of your series.
 
-It's working with the patches in the git branch. It requires usbmisc
-patches and also ULPI support for the chipidea driver. I only bashed
-the chipidea driver until it worked. The last time I looked at the
-chipidea driver patches on the mailing list they were so much in flux
-that it didn't make sense to me to post even more patches. I hope
-this settles soon.
+The patch lacks an important fix, sorry. Please consider the updated
+patch below.
 
-> 
-> > - Display
-> 
-> Given that you wrote something for the mlt017, do you happen to have a
-> sii9022 driver too ? :)
-
-Only a very old one which won't work with the current code.
-
-> 
-> > - Battery
-> 
-> I've not noticed something for the ac power supply in the dts. Did I miss something?
-
-I only added the following for the battery which is enough to detect it:
-
-	battery: battery at 0b {
-		compatible = "sbs,sbs-battery";
-		reg = <0x0b>;
-		sbs,battery-detect-gpios = <&gpio3 6 1>;
-	};
-
-I haven't done anything with the ac power supply yet. I suppose it's
-detectable via a gpio, right?
-
-> 
-> > - keyboard/touchpad
-> 
-> Did you try using the white led for 'caps lock' ?
-
-No, I only registered it as LED, I haven't tried to wire it up the caps
-lock functionality. For me capslock is the most useless feature on a
-keyboard, I usually reconfigure this to a addition modifier key anyway
-;)
-
-> 
-> > - Sound (used to work, currently broken)
-> > - Wifi
-> 
-> How did you enable it ? Did you configure the gpios to always enable it ?
-
-I configured the corresponding gpio as input, so it seems to get
-overwritten by the wifi switch. I don't know the schematics, but I'm
-able to turn Wifi off and on with the switch.
+Wolfgang.
 
 
-> 
-> > - LEDs
-> 
-> You're not mentionning pata. Is it working or not ?
+>From a1f93ddea9c6c9c6a80d7a02d3c8d9902823fe47 Mon Sep 17 00:00:00 2001
+From: Wolfgang Grandegger <wg@grandegger.com>
+Date: Mon, 3 Dec 2012 08:31:55 +0100
+Subject: [PATCH 1/2] gpio: add GPIO block callback functions for AT91
 
-Ah, missed that. PATA is working aswell. Only PIO though.
+Signed-off-by: Wolfgang Grandegger <wg@grandegger.com>
+---
+ arch/arm/mach-at91/gpio.c |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-> 
-> >
-> > I'm not posting the patches here since I do not consider them ready, but
-> > for everyone interested you can pull the following git tree. I have no
-> > idea if the patches work together with the preinstalled U-Boot, I use
-> > barebox on the Smartbook.
-> 
-> I've (very quickly) tested it yesterday and it didn't even boot. I've
-> yet to look at the serial port output to check if it's a problem on my
-> side or a bug in the kernel.
-
-Do you mean barebox doesn't boot or the kernel doesn't boot?
-
-Sascha
-
-
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index be42cf0..77c6f91 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -48,7 +48,9 @@ struct at91_gpio_chip {
+ 
+ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
+ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
++static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val);
+ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
++static unsigned long at91_gpiolib_get_block(struct gpio_chip *chip, unsigned long mask);
+ static int at91_gpiolib_direction_output(struct gpio_chip *chip,
+ 					 unsigned offset, int val);
+ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+@@ -62,7 +64,9 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 			.direction_input  = at91_gpiolib_direction_input, \
+ 			.direction_output = at91_gpiolib_direction_output, \
+ 			.get		  = at91_gpiolib_get,		\
++			.get_block	  = at91_gpiolib_get_block,	\
+ 			.set		  = at91_gpiolib_set,		\
++			.set_block	  = at91_gpiolib_set_block,	\
+ 			.dbg_show	  = at91_gpiolib_dbg_show,	\
+ 			.to_irq		  = at91_gpiolib_to_irq,	\
+ 			.ngpio		  = nr_gpio,			\
+@@ -896,6 +900,16 @@ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset)
+ 	return (pdsr & mask) != 0;
+ }
+ 
++static unsigned long at91_gpiolib_get_block(struct gpio_chip *chip, unsigned long mask)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	u32 pdsr;
++
++	pdsr = __raw_readl(pio + PIO_PDSR);
++	return pdsr & mask;
++}
++
+ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
+ {
+ 	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+@@ -905,6 +919,20 @@ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
+ 	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
+ }
+ 
++static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	u32 set_bits = val & mask;
++	u32 clr_bits = ~val & mask;
++
++	/* GPIO outputs can only be set at once or cleared at once */
++	if (set_bits)
++		__raw_writel(set_bits, pio + PIO_SODR);
++	if (clr_bits)
++		__raw_writel(clr_bits, pio + PIO_CODR);
++}
++
+ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ {
+ 	int i;
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
