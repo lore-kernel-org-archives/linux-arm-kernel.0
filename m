@@ -1,49 +1,47 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 17 Dec 2012 17:15:13 +0000
-Subject: [PATCH 1/1] spi/atmel: add DT support
-In-Reply-To: <20121217101351.GI23971@game.jcrosoft.org>
-References: <20121121151713.1F8873E0A47@localhost>
- <1353674679-13158-1-git-send-email-plagnioj@jcrosoft.com>
- <50AF7C19.8000306@atmel.com> <20121212151308.GK4398@game.jcrosoft.org>
- <20121215010317.C9C933E0BEC@localhost>
- <20121217101351.GI23971@game.jcrosoft.org>
-Message-ID: <20121217171513.9B0ED3E0BEC@localhost>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 17 Dec 2012 18:15:19 +0100
+Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <50CF4838.9000401@grandegger.com>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
+ <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
+ <50CF1EF1.2070601@antcom.de> <50CF237E.5020409@antcom.de>
+ <50CF4838.9000401@grandegger.com>
+Message-ID: <50CF5327.6070205@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Dec 2012 11:13:51 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> On 01:03 Sat 15 Dec     , Grant Likely wrote:
-> > On Wed, 12 Dec 2012 16:13:08 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> > > On 14:37 Fri 23 Nov     , Nicolas Ferre wrote:
-> > > > On 11/23/2012 01:44 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> > > > > the atmel_spi use only gpio for chip select
-> > > > > 
-> > > > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > > 
-> > > > Seems simple and nice:
-> > > > 
-> > > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > grant is ok to have this for 3.8?
-> > 
-> > Not sure how I missed this one. It's pretty straight forward and not
-> > risky, so no problem. However;
-> > 
-> > > > > the atmel_spi use only gpio for chip select
-> > 
-> > I know you know how to write a proper commit message. I'll need
-> > something better than the above before I commit it. I won't make you
-> > resubmit the patch, but do send me a better description.
-> > 
-> ok replace with this please
+On 12/17/2012 05:28 PM, Wolfgang Grandegger wrote:
+> On 12/17/2012 02:51 PM, Roland Stigge wrote:
+>> Hi Wolfgang,
+>>> And I guess Russell is right: If possible, we should write outputs
+>>> simultaneously via ODSR (plus OWER/OWDR/OWSR) instead of separate set/clear.
+>>>
+>>> I wonder if we need to save/restore the state of OWSR at every write
+>>> operation or if we need/can cache it. Assuming that block GPIO are the
+>>> only code in the kernel that manipulates ODSR.
+>>
+>> Can you please test the following:
+>>
+>> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
+>> +{
+>> +       struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+>> +       void __iomem *pio = at91_gpio->regbase;
+>> +
+>> +       __raw_writel(~mask, pio + PIO_OWDR);
 > 
-> spi/atmel: add DT support
-> 
-> Use the newly introduce cs-gpios dt support on atmel.
-> We do not use the hardware cs as it's wired and have buges and limitations.
-> As the the controller's belief that only active-low devices/systems exists.
-> 
-> As done on non-dt system.
+> This would also disable normal GPIOs configured for output! From the
+> manual I understand that if the pin is configured for output, we could
+> either use PIO_SODR/PIO_CODR to set/clear the bits individually or
+> PIO_ODSR for synchronous data output. But than we need to care about the
+> non-block GPIO outputs as well... requiring a read-modify-write cycle :(.
 
-Done, thanks.
+>From the manual, I read about OWER: "Enables writing PIO_ODSR for the
+I/O line" (analogous for OWDR). Would interpret this as affecting ODSR
+(for block GPIO) but not SODR/CODR (as currently with single GPIOs).
 
-g.
+Have you tried? ;-)
+
+Thanks in advance,
+
+Roland
