@@ -1,28 +1,25 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Mon, 17 Dec 2012 21:53:29 +0200
-Subject: [PATCH] ARM: OMAP4: PRM: Correct wrong instance usage for reading
- reset sources
-Message-ID: <1355774009-30208-1-git-send-email-ivan.khoronzhuk@ti.com>
+From: tobetter@gmail.com (Dongjin Kim)
+Date: Tue, 18 Dec 2012 04:55:03 +0900
+Subject: [PATCH 0/4] ODROID-X: Adding dt-based ODROID-X support
+Message-ID: <1355774107-364-1-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To read reset sources registers we have to use PRM_DEVICE_INST
----
- arch/arm/mach-omap2/prm44xx.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This patch set adds DT-based board file for Hardkernel's ODROID-X which is
+based on Samsung's Exynos4412 SoC. In the current version had been tested
+supporting SDCARD, eMMC and LED blinking.
 
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 7498bc7..0b61b8d 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -333,7 +333,7 @@ static u32 omap44xx_prm_read_reset_sources(void)
- 	u32 r = 0;
- 	u32 v;
- 
--	v = omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
-+	v = omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
- 				    OMAP4_RM_RSTST);
- 
- 	p = omap44xx_prm_reset_src_map;
+
+Dongjin Kim (4):
+  ODROID-X: dts: Add board dts file for ODROID-X
+  ODROID-X: dts: Add fixed-regulator for peripherals.
+  ODROID-X: dts: Add nodes for leds based on GPIO.
+  ODROID-X: dts: Add mshc node for ODROID-X board
+
+ arch/arm/boot/dts/Makefile               |    1 +
+ arch/arm/boot/dts/exynos4412-odroidx.dts |   97 ++++++++++++++++++++++++++++++
+ 2 files changed, 98 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos4412-odroidx.dts
+
 -- 
 1.7.9.5
