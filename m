@@ -1,29 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 17 Dec 2012 21:03:39 +0000 (UTC)
-Subject: [PATCH v4 16/23] ARM: OMAP2+: clock data: Merge utmi_px_gfclk
- into usb_host_hs_utmi_px_clk
-In-Reply-To: <50CF47FF.2010002@ti.com>
-References: <1355134833-5199-1-git-send-email-rogerq@ti.com>
- <1355134833-5199-17-git-send-email-rogerq@ti.com>
- <20121214182855.GB4989@atomide.com>
- <alpine.DEB.2.00.1212141838130.5915@utopia.booyaka.com>
- <50CED412.7060407@ti.com> <50CF449F.7090708@ti.com>
- <50CF47FF.2010002@ti.com>
-Message-ID: <alpine.DEB.2.00.1212172102010.29833@utopia.booyaka.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 17 Dec 2012 14:07:59 -0700
+Subject: [PATCH 1/2] arm: tegra: Add new DT property to USB node.
+In-Reply-To: <1355468348-8821-2-git-send-email-vbyravarasu@nvidia.com>
+References: <1355468348-8821-1-git-send-email-vbyravarasu@nvidia.com>
+ <1355468348-8821-2-git-send-email-vbyravarasu@nvidia.com>
+Message-ID: <50CF89AF.3000308@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Dec 2012, Benoit Cousson wrote:
+On 12/13/2012 11:59 PM, Venu Byravarasu wrote:
+> As Tegra USB host driver is using instance number for resetting
+> PORT0 twice, adding a new DT property for handling this.
 
-> It was done for legacy reason but should disappear once the modulemode
-> will be be removed from the clock nodes.
+Alan, Greg, Felip,e
 
-Here's a start at taking care of the low-hanging fruit:
+This series looks fine to me.
 
-http://marc.info/?l=linux-omap&m=135577685007813&w=2
+I'd like to take all the Tegra-related USB patches through the Tegra
+tree for 3.9 if possible (so I'm looking for your acks here). I believe
+Venu plans to significantly clean up the EHCI/PHY driver split for
+Tegra, rework the drivers, and add support for Tegra30 in addition to
+Tegra20. Some of this requires changes to some Tegra board files and
+device trees to maintain "git bisect" I don't know for sure yet, but I
+believe that rework may also end up conflicting with other clock-related
+rework that will show up for Tegra in 3.9. Are you OK with this? I'll
+certainly look for your review/acks on the patches before picking them
+up though.
 
-Only lightly tested, so tests with Kconfigs with lots of OMAP drivers 
-enabled would be appreciated.
-
-
-- Paul
+Thanks.
