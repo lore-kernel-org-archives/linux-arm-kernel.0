@@ -1,39 +1,93 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Mon, 17 Dec 2012 17:28:40 +0100
-Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <50CF237E.5020409@antcom.de>
-References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
- <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
- <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
- <50CF1EF1.2070601@antcom.de> <50CF237E.5020409@antcom.de>
-Message-ID: <50CF4838.9000401@grandegger.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 17 Dec 2012 10:30:01 -0600
+Subject: [RFC 2/5] ARM: dts: Add Cross Trigger Interface binding
+In-Reply-To: <20121217162055.GE16561@e106331-lin.cambridge.arm.com>
+References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
+ <1355348588-22318-3-git-send-email-jon-hunter@ti.com>
+ <20121213174139.GA12946@mudshark.cambridge.arm.com> <50CA2ABA.1050600@ti.com>
+ <20121217162055.GE16561@e106331-lin.cambridge.arm.com>
+Message-ID: <50CF4889.5000408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 02:51 PM, Roland Stigge wrote:
-> Hi Wolfgang,
-> 
-> On 12/17/2012 02:32 PM, Roland Stigge wrote:
->> And I guess Russell is right: If possible, we should write outputs
->> simultaneously via ODSR (plus OWER/OWDR/OWSR) instead of separate set/clear.
+
+On 12/17/2012 10:20 AM, Mark Rutland wrote:
+> On Thu, Dec 13, 2012 at 07:21:30PM +0000, Jon Hunter wrote:
 >>
->> I wonder if we need to save/restore the state of OWSR at every write
->> operation or if we need/can cache it. Assuming that block GPIO are the
->> only code in the kernel that manipulates ODSR.
+>> On 12/13/2012 11:41 AM, Will Deacon wrote:
+>>> On Wed, Dec 12, 2012 at 09:43:05PM +0000, Jon Hunter wrote:
+>>>> Adds a device-tree binding for the ARM Cross Trigger Interface (CTI).
+>>>> The ARM Cross Trigger Interface provides a way to route events between
+>>>> processor modules. For example, on OMAP4430 we use the CTI module to
+>>>> route PMU events to the GIC interrupt module.
+>>>>
+>>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/arm/cti.txt |   32 +++++++++++++++++++++++++
+>>>>  1 file changed, 32 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/arm/cti.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/cti.txt b/Documentation/devicetree/bindings/arm/cti.txt
+>>>> new file mode 100644
+>>>> index 0000000..4a0e2d3
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/arm/cti.txt
+>>>> @@ -0,0 +1,32 @@
+>>>> +* ARM Cross Trigger Interface (CTI)
+>>>> +
+>>>> +The ARM Cross Trigger Interface provides a way to route events between
+>>>> +processor modules. For example, debug events from one processor can be
+>>>> +broadcasted to other processors. The events that can be routed between
+>>>> +processors are specific to the device.
+>>>> +
+>>>> +Required properties:
+>>>> +
+>>>> +- compatible:			Should be "arm,primecell".
+>>>> +- interrupts:			Interrupt associated with CTI module.
+>>>> +- reg:				Contains timer register address range (base
+>>>> +				address and length).
+>>>> +- arm,cti-name:			A unique name for the CTI module, that will be
+>>>> +				used when requesting the CTI module instance.
+>>>> +
+>>>> +
+>>>> +Optional properties:
+>>>> +
+>>>> +- arm-primecell-periphid:	Primecell peripheral ID associated with CTI
+>>>> +				module.
+>>>
+>>> For multi-cluster systems, I wouldn't be surprised to see multiple CTI
+>>> instances, each with different CPU affinities. Can we include an affinity
+>>> property following Mark's proposed binding?
+>>>
+>>>   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137290.html
+>>
+>> Yes I can take a look. Would something like that be applicable to pmu as
+>> well or is that unlikely to have different affinities? I am just
+>> wondering if there is something that we should implement in general for
+>> the various primecell components.
 > 
-> Can you please test the following:
-> 
-> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
-> +{
-> +       struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> +       void __iomem *pio = at91_gpio->regbase;
-> +
-> +       __raw_writel(~mask, pio + PIO_OWDR);
+> Do you mean for describing the PMU's affinity to the perf subsystem or its
+> wiring to the CTI?
 
-This would also disable normal GPIOs configured for output! From the
-manual I understand that if the pin is configured for output, we could
-either use PIO_SODR/PIO_CODR to set/clear the bits individually or
-PIO_ODSR for synchronous data output. But than we need to care about the
-non-block GPIO outputs as well... requiring a read-modify-write cycle :(.
+Yes the PMU's affinity in general, ignoring CTI for now.
 
-Wolfgang.
+> It's certainly applicable for the former; I've been working on a series to
+> enable support for the PMUs in both clusters in a A15x2 A7x3 coretile using the
+> binding, and I intend to post a series shortly. I'm not sure about the latter,
+> as I don't have much of an understanding about the CTI.
+
+Ok great. I think that this use-case of PMU+CTI is a special case for
+OMAP. CTI could be used for many things and for some reason TI hooked up
+the PMU interrupt via the CTI on OMAP4430 (which has been giving me
+grief ;-)
+
+So if there is a general way to describe the affinity of a module, such
+as PMU, I could re-use this and add to the CTI binding as Will suggested.
+
+> I'm not sure how many other components have affinity concerns, but the
+> intention is for the binding to be reusable.
+
+Great.
+
+Thanks
+Jon
