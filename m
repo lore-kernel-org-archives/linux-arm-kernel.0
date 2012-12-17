@@ -1,82 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Dec 2012 14:01:59 +0100
-Subject: [PATCH 3/3 v2] net/macb: Try to optimize struct macb layout
-In-Reply-To: <cover.1355748676.git.nicolas.ferre@atmel.com>
-References: <cover.1355748676.git.nicolas.ferre@atmel.com>
-Message-ID: <cd54582850d50ec7ae391aae423b8982875a123a.1355748676.git.nicolas.ferre@atmel.com>
+From: nareshgbhat@gmail.com (Naresh Bhat)
+Date: Mon, 17 Dec 2012 18:41:38 +0530
+Subject: KEXEC on ARM cortex-a15
+In-Reply-To: <20121121102244.GA11990@mudshark.cambridge.arm.com>
+References: <CAJXQGfKpFfUwMeLGFAuTgQn5Yd2D9O271JM1VJ87Nio80tbwXw@mail.gmail.com>
+ <20121119144417.GH3290@n2100.arm.linux.org.uk>
+ <20121119151327.GG3205@mudshark.cambridge.arm.com>
+ <CAJXQGf+BQ18GhR3emhK-ejTivqx_o=gtaO3-FjTiE3BMGydgsw@mail.gmail.com>
+ <CAJXQGf+wfXGZ=PWN585dJDMX1nH+sRexf6UZujyjKM6rJeDiXQ@mail.gmail.com>
+ <20121120160219.GF26475@mudshark.cambridge.arm.com>
+ <CAJXQGfL4PRW9=MQO1XbogA40sHUzXorbFMe1WkiJ751Ej-h7=g@mail.gmail.com>
+ <20121121102244.GA11990@mudshark.cambridge.arm.com>
+Message-ID: <CAJXQGfJ0QWB3=wnJLgH2bNxa91TKa_Knok1Sdb0TOzZO40VLuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Havard Skinnemoen <havard@skinnemoen.net>
+Hi Will Deacon,
 
-Move TX-related fields to the top of the struct so that they end up on
-the same cache line. Move the NAPI struct below that since it is used
-from the interrupt handler. RX-related fields go below those.
+Can you please point me to a GIT repository from where I can pull the
+"MMU disabling code and kexec fixes"  ?
 
-Move the spinlock before regs since they are usually used together.
+I appreciate your help.
 
-Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
-[nicolas.ferre at atmel.com: adapt to newer kernel]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/net/ethernet/cadence/macb.h | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+Thanks and Regards
+-Naresh Bhat
 
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index cef146f..aeeb729 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -548,38 +548,39 @@ struct macb_or_gem_ops {
- };
- 
- struct macb {
-+	spinlock_t		lock;
- 	void __iomem		*regs;
- 
-+	unsigned int		tx_head;
-+	unsigned int		tx_tail;
-+	struct macb_dma_desc	*tx_ring;
-+	struct macb_tx_skb	*tx_skb;
-+	dma_addr_t		tx_ring_dma;
-+	struct work_struct	tx_error_task;
-+
-+	struct napi_struct	napi;
-+
- 	unsigned int		rx_tail;
- 	unsigned int		rx_prepared_head;
- 	struct macb_dma_desc	*rx_ring;
- 	struct sk_buff		**rx_skbuff;
- 	void			*rx_buffers;
- 	size_t			rx_buffer_size;
-+	dma_addr_t		rx_ring_dma;
-+	dma_addr_t		rx_buffers_dma;
- 
--	unsigned int		tx_head, tx_tail;
--	struct macb_dma_desc	*tx_ring;
--	struct macb_tx_skb	*tx_skb;
-+	struct macb_or_gem_ops	macbgem_ops;
- 
--	spinlock_t		lock;
- 	struct platform_device	*pdev;
- 	struct clk		*pclk;
- 	struct clk		*hclk;
- 	struct net_device	*dev;
--	struct napi_struct	napi;
--	struct work_struct	tx_error_task;
- 	struct net_device_stats	stats;
- 	union {
- 		struct macb_stats	macb;
- 		struct gem_stats	gem;
- 	}			hw_stats;
- 
--	dma_addr_t		rx_ring_dma;
--	dma_addr_t		tx_ring_dma;
--	dma_addr_t		rx_buffers_dma;
--
--	struct macb_or_gem_ops	macbgem_ops;
--
- 	struct mii_bus		*mii_bus;
- 	struct phy_device	*phy_dev;
- 	unsigned int 		link;
+On Wed, Nov 21, 2012 at 3:52 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Nov 21, 2012 at 08:21:21AM +0000, Naresh Bhat wrote:
+>> Hi Will,
+>>
+>> I have disabled the SMP on host kernel.  But still I am facing the
+>> issue as below
+>>
+>> bash-4.2# ls
+>> uImage  vexpress.dtb
+>> bash-4.2#
+>> bash-4.2# kexec -f uImage --dtb=vexpress.dtb --command-line="console=ttyS0"
+>
+> Can you try using a zImage instead and also specifying the console as
+> ttyAMA0, as it looks like you're using a vexpress?
+>
+>> Starting new kernel
+>> Bye!
+>> Uncompressing Linux...
+>
+> This isn't really very helpful -- some more debugging on your part would be
+> appreciated to get an insight as to what's going wrong. You could either use
+> JTAG or put some early prints in the decompressor to work out where it goes
+> awry.
+>
+> Useful things to know would be: the state of the CPU when the new kernel
+> image is entered (if you have JTAG, you could also look at the dtb in memory
+> to see that it looks sane) and also at which point in the decompressor it
+> goes wrong / takes an abort (usually it's when we enable the MMU).
+>
+> Will
+
+
+
 -- 
-1.8.0
+"For things to change, we must change"
+-Naresh Bhat
