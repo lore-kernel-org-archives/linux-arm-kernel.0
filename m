@@ -1,49 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Dec 2012 12:23:26 +0100
-Subject: [PATCH 3/3] ASoC: atmel-ssc: add pinctrl selection to driver
-In-Reply-To: <cover.1355742707.git.nicolas.ferre@atmel.com>
-References: <cover.1355742707.git.nicolas.ferre@atmel.com>
-Message-ID: <3c04845ebfda106a5e980f15a8a038f47d114b9f.1355742707.git.nicolas.ferre@atmel.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 17 Dec 2012 20:24:29 +0900
+Subject: [Resend PATCH v6 1/4] pinctrl: atmel-ssc: add pinctrl support
+In-Reply-To: <50CEF298.3070508@atmel.com>
+References: <1353464229-20846-1-git-send-email-voice.shen@atmel.com>
+ <20121121022441.GJ4673@opensource.wolfsonmicro.com>
+ <20121217093947.GG23971@game.jcrosoft.org>
+ <50CEF298.3070508@atmel.com>
+Message-ID: <20121217112428.GA4985@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bo Shen <voice.shen@atmel.com>
+On Mon, Dec 17, 2012 at 11:23:20AM +0100, Nicolas Ferre wrote:
 
-Add default pinctrl selection to atmel-ssc driver. The pinctrl
-is mandatory.
+> Mark, what about rebasing this one on top of current Linus' tree
+> (toguether with the one that you have just applied on the topic/atmel
+> branch: (ASoC: atmel-ssc: change disable to disable in dts node)?
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-[nicolas.ferre at atmel.com: split dtsi and driver changes]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/misc/atmel-ssc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> I hope that once reworked, they will be able to reach Linus' tree soon
+> because the lack of this patch is causing DTB compilation errors on all
+> AT91...
 
-diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-index 158da5a..3c09cbb 100644
---- a/drivers/misc/atmel-ssc.c
-+++ b/drivers/misc/atmel-ssc.c
-@@ -19,6 +19,7 @@
- #include <linux/module.h>
- 
- #include <linux/of.h>
-+#include <linux/pinctrl/consumer.h>
- 
- /* Serialize access to ssc_list and user count */
- static DEFINE_SPINLOCK(user_lock);
-@@ -131,6 +132,13 @@ static int ssc_probe(struct platform_device *pdev)
- 	struct resource *regs;
- 	struct ssc_device *ssc;
- 	const struct atmel_ssc_platform_data *plat_dat;
-+	struct pinctrl *pinctrl;
-+
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl)) {
-+		dev_err(&pdev->dev, "Failed to request pinctrl\n");
-+		return PTR_ERR(pinctrl);
-+	}
- 
- 	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
- 	if (!ssc) {
--- 
-1.8.0
+I'm going to send a pull request for the last one today.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/f9dd011b/attachment-0001.sig>
