@@ -1,130 +1,121 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Mon, 17 Dec 2012 13:04:50 +0100
-Subject: devicetree support for efikasb
-In-Reply-To: <20121217115016.GN26326@pengutronix.de> (Sascha Hauer's message
- of "Mon, 17 Dec 2012 12:50:16 +0100")
-References: <20121217075907.GQ24458@pengutronix.de>
- <87licwdikj.fsf@lebrac.rtp-net.org>
- <20121217115016.GN26326@pengutronix.de>
-Message-ID: <878v8wdgv1.fsf@lebrac.rtp-net.org>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Mon, 17 Dec 2012 17:38:21 +0530
+Subject: [PATCH 4/4] ARM: tegra: dts: add dma requestor and port numbers for
+ serial controller
+In-Reply-To: <1355746101-15291-1-git-send-email-ldewangan@nvidia.com>
+References: <1355746101-15291-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1355746101-15291-5-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+Add parameters for:
+- port-number to enable the port index in device interface.
+- dma requestor id to make trigger for apb dma burst transfer
+  from controller.
 
-> On Mon, Dec 17, 2012 at 12:27:56PM +0100, Arnaud Patard wrote:
->> Sascha Hauer <s.hauer@pengutronix.de> writes:
->> 
->> > Hi all,
->> 
->> Hi,
->> 
->> >
->> > I recently put some work into my Efika MX smartbook. Here are patches
->> > to make it work with a current kernel. It turned out that most of the
->> > stuff is quite straight forward. Unfortunately there is a lot missing
->> > in the USB area. Without USB support the Smartbook is pretty much
->> > useless, so most of the patches are for adding USB support.
->> >
->> > What currently works is:
->> >
->> > - USB
->> 
->> Is it working or not ? Or you meant that it's working only if you merge
->> the usbmisc-related for imx5* patches ?
->
-> It's working with the patches in the git branch. It requires usbmisc
-> patches and also ULPI support for the chipidea driver. I only bashed
-> the chipidea driver until it worked. The last time I looked at the
-> chipidea driver patches on the mailing list they were so much in flux
-> that it didn't make sense to me to post even more patches. I hope
-> this settles soon.
->
->> 
->> > - Display
->> 
->> Given that you wrote something for the mlt017, do you happen to have a
->> sii9022 driver too ? :)
->
-> Only a very old one which won't work with the current code.
->
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20.dtsi |   10 ++++++++++
+ arch/arm/boot/dts/tegra30.dtsi |   10 ++++++++++
+ 2 files changed, 20 insertions(+), 0 deletions(-)
 
-ok. so it's near to no driver for current kernels.
-
->> 
->> > - Battery
->> 
->> I've not noticed something for the ac power supply in the dts. Did I miss something?
->
-> I only added the following for the battery which is enough to detect it:
->
-> 	battery: battery at 0b {
-> 		compatible = "sbs,sbs-battery";
-> 		reg = <0x0b>;
-> 		sbs,battery-detect-gpios = <&gpio3 6 1>;
-> 	};
->
-> I haven't done anything with the ac power supply yet. I suppose it's
-> detectable via a gpio, right?
-
-it's gpio 3 3. Was wondering if it was not in the dts due to missing
-information or due to not working.
-
->
->> 
->> > - keyboard/touchpad
->> 
->> Did you try using the white led for 'caps lock' ?
->
-> No, I only registered it as LED, I haven't tried to wire it up the caps
-> lock functionality. For me capslock is the most useless feature on a
-> keyboard, I usually reconfigure this to a addition modifier key anyway
-> ;)
->
->> 
->> > - Sound (used to work, currently broken)
->> > - Wifi
->> 
->> How did you enable it ? Did you configure the gpios to always enable it ?
->
-> I configured the corresponding gpio as input, so it seems to get
-> overwritten by the wifi switch. I don't know the schematics, but I'm
-> able to turn Wifi off and on with the switch.
-
-afaik, the wifi switch is killing bluetooth and wifi (and overrides the
-gpios). With the gpios, you can get either bluetooth or wifi enabled
-See http://git.rtp-net.org/?p=efika.git;a=blob;f=rfkill.patch for
-instance.
-
-
->
->
->> 
->> > - LEDs
->> 
->> You're not mentionning pata. Is it working or not ?
->
-> Ah, missed that. PATA is working aswell. Only PIO though.
-
-it was pio before so that's fine. I had some stuff to try to get pata on
-DT before but I got stuck at the 'usb not working' stage. So, it's nice
-to see that there's already a known-to-be-working one.
-
->
->> 
->> >
->> > I'm not posting the patches here since I do not consider them ready, but
->> > for everyone interested you can pull the following git tree. I have no
->> > idea if the patches work together with the preinstalled U-Boot, I use
->> > barebox on the Smartbook.
->> 
->> I've (very quickly) tested it yesterday and it didn't even boot. I've
->> yet to look at the serial port output to check if it's a problem on my
->> side or a bug in the kernel.
->
-> Do you mean barebox doesn't boot or the kernel doesn't boot?
-
-No idea. All I get is a black screen, so I need to look at the serial
-output. Oh, it's uboot not barebox btw. Sorry for the confusion.
-
-Arnaud
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index b8effa1..ca3a2a3 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -199,6 +199,8 @@
+ 		reg = <0x70006000 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 36 0x04>;
++		port-number = <0>;
++		nvidia,dma-request-selector = <&apbdma 8>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -207,6 +209,8 @@
+ 		reg = <0x70006040 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 37 0x04>;
++		port-number = <1>;
++		nvidia,dma-request-selector = <&apbdma 9>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -215,6 +219,8 @@
+ 		reg = <0x70006200 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 46 0x04>;
++		port-number = <2>;
++		nvidia,dma-request-selector = <&apbdma 10>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -223,6 +229,8 @@
+ 		reg = <0x70006300 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 90 0x04>;
++		port-number = <3>;
++		nvidia,dma-request-selector = <&apbdma 19>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -231,6 +239,8 @@
+ 		reg = <0x70006400 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 91 0x04>;
++		port-number = <4>;
++		nvidia,dma-request-selector = <&apbdma 20>;
+ 		status = "disabled";
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 529fdb8..dcb9caa 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -195,6 +195,8 @@
+ 		reg = <0x70006000 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 36 0x04>;
++		port-number = <0>;
++		nvidia,dma-request-selector = <&apbdma 8>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -203,6 +205,8 @@
+ 		reg = <0x70006040 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 37 0x04>;
++		port-number = <1>;
++		nvidia,dma-request-selector = <&apbdma 9>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -211,6 +215,8 @@
+ 		reg = <0x70006200 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 46 0x04>;
++		port-number = <2>;
++		nvidia,dma-request-selector = <&apbdma 10>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -219,6 +225,8 @@
+ 		reg = <0x70006300 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 90 0x04>;
++		port-number = <3>;
++		nvidia,dma-request-selector = <&apbdma 19>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -227,6 +235,8 @@
+ 		reg = <0x70006400 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 91 0x04>;
++		port-number = <4>;
++		nvidia,dma-request-selector = <&apbdma 20>;
+ 		status = "disabled";
+ 	};
+ 
+-- 
+1.7.1.1
