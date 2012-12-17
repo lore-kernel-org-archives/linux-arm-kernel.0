@@ -1,108 +1,101 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 17 Dec 2012 17:50:13 +0100 (CET)
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 17 Dec 2012 16:54:00 +0000
 Subject: [PATCH 6/7] ARM: mackerel: support booting with or without DT
-In-Reply-To: <20121217163852.C57FD3E0BDD@localhost>
+In-Reply-To: <Pine.LNX.4.64.1212162224380.20059@axis700.grange>
 References: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
  <1355503531-7276-7-git-send-email-g.liakhovetski@gmx.de>
  <20121216204636.ACD283E0AE3@localhost>
  <Pine.LNX.4.64.1212162224380.20059@axis700.grange>
- <20121217163852.C57FD3E0BDD@localhost>
-Message-ID: <Pine.LNX.4.64.1212171743380.24007@axis700.grange>
+Message-ID: <20121217165400.6D05B3E0BDD@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant
-
-On Mon, 17 Dec 2012, Grant Likely wrote:
-
-> On Sun, 16 Dec 2012 22:36:56 +0100 (CET), Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > Hi Grant
-> > 
-> > On Sun, 16 Dec 2012, Grant Likely wrote:
-> > 
-> > > On Fri, 14 Dec 2012 17:45:30 +0100, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > > > This patch adds dynamic switching to booting either with or without DT.
-> > > > So far only a part of the board initialisation can be done via DT. Devices,
-> > > > that still need platform data are kept that way. Devices, that can be
-> > > > initialised from DT will not be supplied from the platform data, if a DT
-> > > > image is detected.
-> > > > 
-> > > > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > > > ---
-> > > >  
-> > > > +static int mackerel_i2c_bus_notify(struct notifier_block *nb,
-> > > > +				   unsigned long action, void *data)
-> > > > +{
-> > > > +	struct device *dev = data;
-> > > > +
-> > > > +	if (action != BUS_NOTIFY_ADD_DEVICE ||
-> > > > +	    strcmp(dev_name(dev->parent), "fff20000.i2c"))
-> > > > +		return NOTIFY_DONE;
-> > > > +
-> > > > +	i2c_new_device(to_i2c_adapter(dev), &i2c0_devices[1]);
-> > > > +
-> > > > +	return NOTIFY_OK;
-> > > > +}
-> > > > +
-> > > > +static struct notifier_block mackerel_i2c_notifier = {
-> > > > +	.notifier_call = mackerel_i2c_bus_notify,
-> > > > +};
+On Sun, 16 Dec 2012 22:36:56 +0100 (CET), Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> Hi Grant
+> 
+> On Sun, 16 Dec 2012, Grant Likely wrote:
+> 
+> > On Fri, 14 Dec 2012 17:45:30 +0100, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > > This patch adds dynamic switching to booting either with or without DT.
+> > > So far only a part of the board initialisation can be done via DT. Devices,
+> > > that still need platform data are kept that way. Devices, that can be
+> > > initialised from DT will not be supplied from the platform data, if a DT
+> > > image is detected.
 > > > 
-> > > This looks dodgy. It appears that the purpose of this hook is to create
-> > > the tca6408-keys device because it has some platform data. However,
-> > > this hook will try to create the device every time BUS_NOTIFY_ADD_DEVICE
-> > > happens on the fff20000.i2c bus *including* when the tca6408-keys device
-> > > gets added.
+> > > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > > ---
+> > >  
+> > > +static int mackerel_i2c_bus_notify(struct notifier_block *nb,
+> > > +				   unsigned long action, void *data)
+> > > +{
+> > > +	struct device *dev = data;
+> > > +
+> > > +	if (action != BUS_NOTIFY_ADD_DEVICE ||
+> > > +	    strcmp(dev_name(dev->parent), "fff20000.i2c"))
+> > > +		return NOTIFY_DONE;
+> > > +
+> > > +	i2c_new_device(to_i2c_adapter(dev), &i2c0_devices[1]);
+> > > +
+> > > +	return NOTIFY_OK;
+> > > +}
+> > > +
+> > > +static struct notifier_block mackerel_i2c_notifier = {
+> > > +	.notifier_call = mackerel_i2c_bus_notify,
+> > > +};
 > > 
-> > I think, this is only called once, when the i2c adapter device is added in 
-> > i2c_register_adapter(). I2C client devices have these adapter devices as 
-> > their parents, and those devices have "i2c-%d" as their names. Since all 
-> > client devices get destroyed when the adapter is unbound, the above should 
-> > be safe.
+> > This looks dodgy. It appears that the purpose of this hook is to create
+> > the tca6408-keys device because it has some platform data. However,
+> > this hook will try to create the device every time BUS_NOTIFY_ADD_DEVICE
+> > happens on the fff20000.i2c bus *including* when the tca6408-keys device
+> > gets added.
 > 
-> Take another look. The way the bus notifiers work is they get called 
-> once for every device registered with the given bus type. That means 
-> i2c_client objects, not i3c
+> I think, this is only called once, when the i2c adapter device is added in 
+> i2c_register_adapter(). I2C client devices have these adapter devices as 
+> their parents, and those devices have "i2c-%d" as their names. Since all 
+> client devices get destroyed when the adapter is unbound, the above should 
+> be safe.
 
-I did, and I also tested. Both I2C clients and I2C adapters are placed on 
-the i2c_bus_type. So, yes, you're right, the above notifier will be called 
-upon registration of each adapter and client. But, the string comparison 
-in the "if" above will only match for the I2C adapter, so, no recursion.
+Take another look. The way the bus notifiers work is they get called
+once for every device registered that has the given bus type. In this
+case, that means i2c_bus_type, which also means every i2c_client object
+registration. Also, the point of i2c_new_device() is that it creates a
+new i2c_client object and registers it.... trigger a new call to this
+notifier... which calls i2c_new_device again!
 
-Thanks
-Guennadi
-
-> > > The correct approach when you need to add specific platform data is to
-> > > still put the device into the device tree and make the notifier look for
-> > > that specific device. Then the platform data pointer can be attached at
-> > > BUS_NOTIFY_ADD_DEVICE time.
-> > > 
-> > > However, it doesn't look like you need a notifier at all. From what I
-> > > can see the tca6408-keys device does have platform data, but it is all
-> > > simple (no callback pointers). You should instead encode the platform
-> > > data into device tree properties and extract them from the driver.
+> 
+> > The correct approach when you need to add specific platform data is to
+> > still put the device into the device tree and make the notifier look for
+> > that specific device. Then the platform data pointer can be attached at
+> > BUS_NOTIFY_ADD_DEVICE time.
 > > 
-> > Yes, this is the ultimate goal. But the purpose of this patch series is to 
-> > move whatever devices are possible right _now_ to DT. Ultimately all of 
-> > them should be migrated. So, yes, we could try to begin with tca6408, 
-> > because the above hack is certainly the ugliest one in this series, but in 
-> > principle this is just one of several devices, that we have to keep in 
-> > platform data for now and aim at removing these temporary hacks as soon as 
-> > respective drivers implement sufficient DT support.
-> > 
-> > Thanks
-> > Guennadi
-> > ---
-> > Guennadi Liakhovetski, Ph.D.
-> > Freelance Open-Source Software Developer
-> > http://www.open-technology.de/
+> > However, it doesn't look like you need a notifier at all. From what I
+> > can see the tca6408-keys device does have platform data, but it is all
+> > simple (no callback pointers). You should instead encode the platform
+> > data into device tree properties and extract them from the driver.
 > 
-> -- 
-> Grant Likely, B.Sc, P.Eng.
-> Secret Lab Technologies, Ltd.
-> 
+> Yes, this is the ultimate goal. But the purpose of this patch series is to 
+> move whatever devices are possible right _now_ to DT. Ultimately all of 
+> them should be migrated. So, yes, we could try to begin with tca6408, 
+> because the above hack is certainly the ugliest one in this series, but in 
+> principle this is just one of several devices, that we have to keep in 
+> platform data for now and aim at removing these temporary hacks as soon as 
+> respective drivers implement sufficient DT support.
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Understood. However I think you're going about it the long way around.
+Instead of cherry picking some devices to put into the device tree, you
+should put all of them into the DT, even if the driver doesn't have
+bindings for them yet. If you really prefer the temporary hack approach
+then you should do two things:
+
+1) for platform devices, use AUXDATA to hook up platform_data pointers
+when the devices are instantiated from the device tree.
+2) for everything else, use 1 notifier per bus_type to hook up
+platform_data on the BUS_NOTIFY_ADD_DEVICE event, but instead of the
+dodgy code used above, use the dev->of_node->full_name property to
+figure out which device has gotten registered.
+
+It would be convenient to have AUXDATA for non-platform device
+registrations, but nobody has hooked that up just yet, and it is really
+a temporary measure until clock bindings are fully in place.
+
+g.
