@@ -1,28 +1,31 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 17 Dec 2012 19:02:45 +0100
-Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <50CF584E.1040601@grandegger.com>
-References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
- <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
- <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
- <50CF1EF1.2070601@antcom.de> <50CF237E.5020409@antcom.de>
- <50CF4838.9000401@grandegger.com> <50CF5327.6070205@antcom.de>
- <50CF584E.1040601@grandegger.com>
-Message-ID: <50CF5E45.5030104@antcom.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 17 Dec 2012 20:08:52 +0200
+Subject: [GIT PULL] omap fixes and cleanups for v3.8 merge window
+In-Reply-To: <20121217180200.GU4989@atomide.com>
+References: <20121217180200.GU4989@atomide.com>
+Message-ID: <20121217180852.GA24440@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 06:37 PM, Wolfgang Grandegger wrote:
-> 	/* Do synchronous data output with a single write access */
-> 	__raw_writel(~mask, pio + PIO_OWDR);
-> 	__raw_writel(mask, pio + PIO_OWER);
-> 	__raw_writel(val, pio + PIO_ODSR);
-> 
-> For caching we would need a storage. Not sure if it's worth compared to
-> a context switch into the kernel.
+Hi,
 
-Block GPIO is not only for you in userspace. ;-) You can also implement
-efficient n-bit bus I/O in kernel drivers, n-bit-banging. :-) So not
-always context switches involved.
+On Mon, Dec 17, 2012 at 10:02:01AM -0800, Tony Lindgren wrote:
+>  drivers/mfd/omap-usb-host.c                        |  3 +-
+>  drivers/tty/serial/omap-serial.c                   |  3 +-
+>  drivers/usb/phy/Kconfig                            |  1 +
 
-Roland
+I did mention I was against adding OMAP dependencies do drivers.
+Interesting to see to commit going upstream without a reply to my
+comment :-s
+
+http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=commitdiff;h=3e194c88f8b71700822828749187e65853ed8166
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/9724bddc/attachment.sig>
