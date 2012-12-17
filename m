@@ -1,24 +1,34 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 17 Dec 2012 14:25:50 +0000
-Subject: [PATCH 1/3] ARM: at91/dts: fix typo in SSC status property
-In-Reply-To: <10c033465336fc6cc82b6006153b0c456021589e.1355742707.git.nicolas.ferre@atmel.com>
-References: <cover.1355742707.git.nicolas.ferre@atmel.com>
- <10c033465336fc6cc82b6006153b0c456021589e.1355742707.git.nicolas.ferre@atmel.com>
-Message-ID: <20121217142550.GH4985@opensource.wolfsonmicro.com>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Mon, 17 Dec 2012 15:30:45 +0100
+Subject: devicetree support for efikasb
+In-Reply-To: <87bods92pc.fsf@dell.be.48ers.dk>
+References: <20121217075907.GQ24458@pengutronix.de>
+ <87licwdikj.fsf@lebrac.rtp-net.org>
+ <87licw97nn.fsf@dell.be.48ers.dk>
+ <871ueodb75.fsf@lebrac.rtp-net.org>
+ <87bods92pc.fsf@dell.be.48ers.dk>
+Message-ID: <20121217143045.GA3219@type.bordeaux.inria.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 17, 2012 at 12:23:24PM +0100, Nicolas Ferre wrote:
-> From: Bo Shen <voice.shen@atmel.com>
-> 
-> Change the value of status to "disabled" to conform with
-> property requirement.
+Peter Korsgaard, le Mon 17 Dec 2012 15:24:15 +0100, a ?crit :
+> Samuel, what happened to the ledtriggers-for-keyboard-leds stuff?
 
-This has already gone towards Linus.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/ca8a398d/attachment.sig>
+AIUI, it's still in the TODO list of Dmitry Torokhov (latest version
+was sent on Date: Mon, 14 Nov 2011 05:06:13 +0100). There was a Kconfig
+issue that might be what is blocking it:
+
+?
+> --- a/drivers/char/Kconfig
+> +++ b/drivers/char/Kconfig
+> @@ -8,6 +8,7 @@ config VT
+>       bool "Virtual terminal" if EMBEDDED
+>       depends on !S390
+>       select INPUT
+> +     select LEDS_INPUT
+
+This will not work as LEDS_INPUT is itself depends and selects other
+symbols and "select" statement does not propagate dependencies.
+?
+
+Samuel
