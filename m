@@ -1,38 +1,34 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 17 Dec 2012 08:18:01 +0200
-Subject: [PATCH 1/4] ARM: dt: Add doc for ARM Snoop Control Unit(SCU)
-Message-ID: <1355725087-11363-1-git-send-email-hdoyu@nvidia.com>
+Date: Mon, 17 Dec 2012 08:18:02 +0200
+Subject: [PATCH 2/4] ARM: dt: tegra20.dtsi: Add SCU node
+In-Reply-To: <1355725087-11363-1-git-send-email-hdoyu@nvidia.com>
+References: <1355725087-11363-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1355725087-11363-2-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add scu.txt under arm for ARM Snoop Control Unit(SCU)
+Add Snoop Control Unit(SCU) node for Cortex A9 MP.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- Documentation/devicetree/bindings/arm/scu.txt |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/scu.txt
+ arch/arm/boot/dts/tegra20.dtsip |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/scu.txt b/Documentation/devicetree/bindings/arm/scu.txt
-new file mode 100644
-index 0000000..96264cf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/scu.txt
-@@ -0,0 +1,15 @@
-+* ARM Snoop Control Unit(SCU)
-+
-+ARM cores often have a configurable SCU to the memory system through
-+the AXI interfaces.
-+
-+Required properties:
-+
-+- compatible : "arm,cortex-a9-scu"
-+- reg : Specifies base physical address and size of the SCU registers.
-+
-+Example:
+diff --git a/arch/arm/boot/dts/tegra20.dtsip b/arch/arm/boot/dts/tegra20.dtsip
+index 3e046b1..d325aed 100644
+--- a/arch/arm/boot/dts/tegra20.dtsip
++++ b/arch/arm/boot/dts/tegra20.dtsip
+@@ -91,6 +91,11 @@
+ 		};
+ 	};
+ 
 +	scu {
 +		compatible = "arm,cortex-a9-scu";
 +		reg = <0x50040000 0x58>;
 +	};
++
+ 	timer at 50004600 {
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0x50040600 0x20>;
 -- 
 1.7.9.5
