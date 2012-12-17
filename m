@@ -1,39 +1,56 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 17 Dec 2012 14:51:58 +0100
-Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <50CF1EF1.2070601@antcom.de>
-References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
- <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
- <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
- <50CF1EF1.2070601@antcom.de>
-Message-ID: <50CF237E.5020409@antcom.de>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Mon, 17 Dec 2012 13:52:25 +0000
+Subject: [PATCH 3/3 v2] net/macb: Try to optimize struct macb layout
+In-Reply-To: <cd54582850d50ec7ae391aae423b8982875a123a.1355748676.git.nicolas.ferre@atmel.com>
+References: <cover.1355748676.git.nicolas.ferre@atmel.com>
+ <cd54582850d50ec7ae391aae423b8982875a123a.1355748676.git.nicolas.ferre@atmel.com>
+Message-ID: <1355752345.2676.2.camel@bwh-desktop.uk.solarflarecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfgang,
-
-On 12/17/2012 02:32 PM, Roland Stigge wrote:
-> And I guess Russell is right: If possible, we should write outputs
-> simultaneously via ODSR (plus OWER/OWDR/OWSR) instead of separate set/clear.
+On Mon, 2012-12-17 at 14:01 +0100, Nicolas Ferre wrote:
+> From: Havard Skinnemoen <havard@skinnemoen.net>
 > 
-> I wonder if we need to save/restore the state of OWSR at every write
-> operation or if we need/can cache it. Assuming that block GPIO are the
-> only code in the kernel that manipulates ODSR.
+> Move TX-related fields to the top of the struct so that they end up on
+> the same cache line. Move the NAPI struct below that since it is used
+> from the interrupt handler. RX-related fields go below those.
 
-Can you please test the following:
+> Move the spinlock before regs since they are usually used together.
+>
+> Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
+> [nicolas.ferre at atmel.com: adapt to newer kernel]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/net/ethernet/cadence/macb.h | 25 +++++++++++++------------
+>  1 file changed, 13 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+> index cef146f..aeeb729 100644
+> --- a/drivers/net/ethernet/cadence/macb.h
+> +++ b/drivers/net/ethernet/cadence/macb.h
+> @@ -548,38 +548,39 @@ struct macb_or_gem_ops {
+>  };
+>  
+>  struct macb {
+> +	spinlock_t		lock;
+>  	void __iomem		*regs;
+>  
+> +	unsigned int		tx_head;
+> +	unsigned int		tx_tail;
+> +	struct macb_dma_desc	*tx_ring;
+> +	struct macb_tx_skb	*tx_skb;
+> +	dma_addr_t		tx_ring_dma;
+> +	struct work_struct	tx_error_task;
+> +
+> +	struct napi_struct	napi;
+[...]
 
-+static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
-+{
-+       struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-+       void __iomem *pio = at91_gpio->regbase;
-+
-+       __raw_writel(~mask, pio + PIO_OWDR);
-+       __raw_writel(mask, pio + PIO_OWER);
-+       __raw_writel(val, pio + PIO_ODSR);
-+}
+If this driver may be used on SMP systems them 'napi' should be declared
+with the suffix ___cacheline_aligned_in_smp.
 
-Would caching OWSR be a significant speedup here?
+Ben.
 
-Thanks in advance,
-
-Roland
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
