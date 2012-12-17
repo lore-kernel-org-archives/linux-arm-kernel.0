@@ -1,44 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Dec 2012 11:30:42 +0000
-Subject: [PATCH v6] ARM: Factor out cpuid implementor and part number
-In-Reply-To: <CANM98qKfFXmKwn24O1=5+f538qWKmRUCHHsXMyYi6hK5JKmvoA@mail.gmail.com>
-References: <1354407686-38366-1-git-send-email-c.dall@virtualopensystems.com>
- <CANM98qKfFXmKwn24O1=5+f538qWKmRUCHHsXMyYi6hK5JKmvoA@mail.gmail.com>
-Message-ID: <20121217113042.GB10094@mudshark.cambridge.arm.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Mon, 17 Dec 2012 12:36:11 +0100
+Subject: [PATCH 0/2] clocksource: nomadik-mtu: support timer-based delay
+In-Reply-To: <1354615845-2758-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1354615845-2758-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <20121217113611.GA31470@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 17, 2012 at 12:32:27AM +0000, Christoffer Dall wrote:
-> On Sat, Dec 1, 2012 at 7:21 PM, Christoffer Dall
-> <c.dall@virtualopensystems.com> wrote:
-> > Decoding the implementor and part number of the CPU id in the CPU ID
-> > register is needed by KVM, so we factor it out to share the code.
-> >
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> > ---
-> > Changes since v5:
-> >  - (OK, this is getting ridiculous, this time I forgot a git add):
-> >    incorrect function declaration
-> > Changes since v4:
-> >  - Properly decode XScale cpu architecture versions
-> > Changes since v3:
-> >  - Only call read_cpuid_part_number once and squash warning
-> > Changes since v2:
-> >  - Take implementor as argument to read_cpuid_part_number
-> > Changes since v1:
-> >  - Accidentally pointed to an old file, this one has more consistent
-> >    naming of the cpu implementor and part number defines.
-> >
-> >  arch/arm/include/asm/cputype.h   |   33 +++++++++++++++++++++++++++++++++
-> >  arch/arm/kernel/perf_event_cpu.c |   34 ++++++++++++++++------------------
-> >  2 files changed, 49 insertions(+), 18 deletions(-)
+Hi all,
+
+On Tue, Dec 04, 2012 at 11:10:43AM +0100, Fabio Baltieri wrote:
+> this implements timer-based delay support for nomadik and ux500
+> platforms, using the MTU as time source, and marks the u8500 cpufreq
+> driver as CPUFREQ_CONST_LOOPS accordingly.
 > 
-> any news on this one?
+> The patches are based on Arnd's arm-soc/ux500/mtu-clk branch, as that
+> contains latest MTU driver developments, including a driver move/rename,
+> but I can rebase if necessary.
 
-If you resend as two patches (cputype.h first, then perf) and fix the
-whitespace problem in the first (missing space after '&') then I'll put
-them in my perf tree which will ultimately go via Russell.
+The patches applies cleanly on current mainline now, as all dependencies
+has already been merged, can this be considered for for merging too?
 
-Will
+Also, the nomadik-mtu driver has been moved into drivers/clocksource so
+do anybody knows if this this should end up into arm-soc or in the
+clocksource tree?
+
+Thanks,
+Fabio
+
+> Fabio Baltieri (2):
+>   clocksource: nomadik-mtu: support timer-based delay
+>   cpufreq: db8500: set CPUFREQ_CONST_LOOPS
+> 
+>  drivers/clocksource/nomadik-mtu.c | 11 +++++++++++
+>  drivers/cpufreq/db8500-cpufreq.c  |  2 +-
+>  2 files changed, 12 insertions(+), 1 deletion(-)
+
+-- 
+Fabio Baltieri
