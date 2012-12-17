@@ -1,57 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Dec 2012 13:42:46 +0000
-Subject: ARM realview breakages w/ 3.7 under qemu
-In-Reply-To: <50CB0150.1000901@openwrt.org>
-References: <50CA0FC1.5090009@openwrt.org>
- <20121213174817.GB12946@mudshark.cambridge.arm.com>
- <20121214094012.GG14363@n2100.arm.linux.org.uk>
- <50CB0150.1000901@openwrt.org>
-Message-ID: <20121217134246.GE11558@mudshark.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 17 Dec 2012 14:43:11 +0100
+Subject: Do I need to skb_put() Ethernet frames to a minimum of 60 bytes?
+In-Reply-To: <5033C6B0.4060508@xdin.com>
+References: <502A9EC4.4040208@xdin.com>
+ <1344976557.2690.43.camel@bwh-desktop.uk.solarflarecom.com>
+ <5033C6B0.4060508@xdin.com>
+Message-ID: <50CF216F.2010107@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 10:37:04AM +0000, Florian Fainelli wrote:
-> Le 12/14/12 10:40, Russell King - ARM Linux a ?crit :
-> > On Thu, Dec 13, 2012 at 05:48:17PM +0000, Will Deacon wrote:
-> >> On Thu, Dec 13, 2012 at 05:26:25PM +0000, Florian Fainelli wrote:
-> >>> - PBX A9: booting with less than 1024MBytes of RAM causes this:
-> >>> [    0.000000] Truncating RAM at 20000000-3fffffff to -3f7fffff (vmalloc
-> >>> region overlap).
-> >>> [    0.000000] Ignoring RAM at 80000000-8fffffff (vmalloc region overlap).
-> >>>
-> >>> Do these issues sounds familiar to any of you? The kernel config is
-> >>> attached in case that helps.
-> > I don't have the original email to reply to (so I don't have the .config
-> > either) but my guess for the above would be that HIGHMEM is disabled.
-> The original mail containing the .config file was actually rejected by 
-> the mailing-list manager. I have uploaded it here: 
-> http://alphacore.org/~florian/openwrt/realview-eb-config
+On 08/21/2012 07:34 PM, Arvid Brodin :
+> On 2012-08-14 22:35, Ben Hutchings wrote:
+>> On Tue, 2012-08-14 at 18:53 +0000, Arvid Brodin wrote:
+>>> Hi,
+>>>
+>>> If I create an sk_buff with a payload of less than 28 bytes (ethheader + data),
+>>> and send it using the cadence/macb (Ethernet) driver, I get
+>>>
+>>> eth0: TX underrun, resetting buffers
+>>>
+>>> Now I know the minimum Ethernet frame size is 64 bytes (including the 4-byte
+>>> FCS), but whose responsibility is it to pad the frame to this size if necessary?
+>>> Mine or the driver's - i.e. should I just skb_put() to the minimum size or
+>>> should I report the underrun as a driver bug?
+>>
+>> If the hardware doesn't pad frames automatically then it's the driver's
+>> reponsibility to do so.
+>>
 > 
-> You are right, HIGHMEM is disabled. Even though enabling HIGHMEM does 
-> not allow me booting either without at least 1Gbyte of RAM:
+> Nicolas, can you take a look at this? At the moment I'm using the following change
+> in macb.c to avoid TX underruns on short packages:
 > 
-> [    0.000000] Memory policy: ECC disabled, Data cache writealloc
-> and we are stuck.
+> --- a/drivers/net/ethernet/cadence/macb.c	2012-05-04 19:14:41.927719667 +0200
+> +++ b/drivers/net/ethernet/cadence/macb.c	2012-08-21 19:22:40.063739049 +0200
+> @@ -618,6 +618,7 @@ static void macb_poll_controller(struct
+>  }
+>  #endif
+> 
+> +#define MIN_ETHFRAME_LEN	60
+>  static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
+>  {
+>  	struct macb *bp = netdev_priv(dev);
+> @@ -635,6 +636,12 @@ static int macb_start_xmit(struct sk_buf
+>  	printk("\n");
+>  #endif
+> 
+> +	if (skb->len < MIN_ETHFRAME_LEN) {
+> +		/* Pad skb to minium Ethernet frame size */
+> +		if (skb_tailroom(skb) >= MIN_ETHFRAME_LEN - skb->len)
+> +			memset(skb_put(skb, MIN_ETHFRAME_LEN - skb->len), 0,
+> +						MIN_ETHFRAME_LEN - skb->len);
+> +	}
+>  	len = skb->len;
+>  	spin_lock_irqsave(&bp->lock, flags);
+> 
+> 
+> ... but as you can see this is limited to linear skbs which has been allocated with
+> enough tailroom. Perhaps there are better ways to fix the problem? (Maybe the hardware
+> is actually doing the padding already and the problem has to do with the way the DMA
+> transfer is set up?)
 
-I just dusted off my pbx and it boots fine with your .config and a 3.7
-kernel when passing mem=128M on the command line.
+I come back to this issue. It seems to me that the macb Cadence IP is
+padding automatically a too little packet. It is the usual behavior
+unless you specify otherwise in the CTRL register embedded in the tx
+descriptor. I also verified this with wireshark on both ICMP and UDP
+packets.
 
-For EB, can you try the following diff please?
+The error that you are experiencing is on at91sam9260 or at91sam9263
+SoCs, am I right?
 
-Will
-
---->8
-
-diff --git a/arch/arm/mach-realview/include/mach/board-eb.h b/arch/arm/mach-realview/include/mach/board-eb.h
-index 124bce6..a301e61 100644
---- a/arch/arm/mach-realview/include/mach/board-eb.h
-+++ b/arch/arm/mach-realview/include/mach/board-eb.h
-@@ -47,7 +47,7 @@
- #define REALVIEW_EB_USB_BASE           0x4F000000      /* USB */
- 
- #ifdef CONFIG_REALVIEW_EB_ARM11MP_REVB
--#define REALVIEW_EB11MP_PRIV_MEM_BASE  0x1F000000
-+#define REALVIEW_EB11MP_PRIV_MEM_BASE  0x10100000
- #define REALVIEW_EB11MP_L220_BASE      0x10102000      /* L220 registers */
- #define REALVIEW_EB11MP_SYS_PLD_CTRL1  0xD8            /* Register offset for MPCore sysctl */
- #else
+Best regards,
+-- 
+Nicolas Ferre
