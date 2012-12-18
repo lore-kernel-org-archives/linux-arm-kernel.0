@@ -1,75 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 18 Dec 2012 17:31:37 +0100
-Subject: [PATCH 13/18] arm: kirkwood: mplcec4: use Device Tree to probe
- SDIO
-In-Reply-To: <1355841243-3254-14-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1355841243-3254-14-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121218163137.GK3392@lunn.ch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Dec 2012 16:35:02 +0000
+Subject: [PATCH RESEND 5/6 v10] gpio: Add device tree support to block
+ GPIO API
+In-Reply-To: <50D07DFF.2040102@antcom.de>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <1355495185-24220-6-git-send-email-stigge@antcom.de>
+ <20121217155153.GD16561@e106331-lin.cambridge.arm.com>
+ <50D07DFF.2040102@antcom.de>
+Message-ID: <20121218163502.GB32484@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 03:33:58PM +0100, Thomas Petazzoni wrote:
-> Now that the mvsdio driver has a Device Tree binding, and the SDIO
-> controller is declared in kirkwood.dtsi, migrate the mplcec4 board to
-> use the Device Tree to probe the SDIO controller.
+On Tue, Dec 18, 2012 at 02:30:23PM +0000, Roland Stigge wrote:
+> Hi Mark,
 > 
-> This patch has not been tested, it remains to be tested by a person
-> having access to the hardware.
+> On 12/17/2012 04:51 PM, Mark Rutland wrote:
+> >> +static int __devinit gpioblock_of_probe(struct platform_device *pdev)
+> >> +{
+> >> +	struct device_node *block;
+> >> +	unsigned *gpios;
+> >> +	int ngpio;
+> >> +	int ret;
+> >> +	struct gpio_block *gb;
+> >> +
+> >> +	for_each_available_child_of_node(pdev->dev.of_node, block) {
+> >> +		int i;
+> >> +
+> >> +		ngpio = of_gpio_count(block);
+> >> +		gpios = kzalloc(ngpio * sizeof(*gpios), GFP_KERNEL);
+> > 
+> > What if the block node is malformed? ngpio might be -ENOENT or -EINVAL.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Stefan Peter <s.peter@mpl.ch>
-> ---
->  arch/arm/boot/dts/kirkwood-mplcec4.dts |    6 ++++++
->  arch/arm/mach-kirkwood/board-mplcec4.c |    6 ------
->  2 files changed, 6 insertions(+), 6 deletions(-)
+> AFAICS, of_gpio_count() always returns at least 0. Both if
+> CONFIG_OF_GPIO is y, m or n. And called of_gpio_named_count() also
+> currently doesn't return error values. Further, other drivers using
+> of_gpio_count() don't expect or catch <0.
+
+Whoops. I'd managed to misread the logic in of_gpio_named_count, sorry.
+
+> However, it's reasonable to guard against of_gpio_count() < 1 since
+> probing without provided blocks should be void.
 > 
-> diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-> index 262c654..ed10977 100644
-> --- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
-> +++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-> @@ -133,6 +133,12 @@
->  			status = "okay";
->  
->  		};
-> +
-> +		mvsdio at 90000 {
-> +			status = "okay";
-> +			cd-gpios = <&gpio1 15 0>;
-> +			/* No WP GPIO */
-> +		};
->  	};
+> Will change this for the next patch update together with your leakage
+> findings.
+> 
+> Thanks for reporting!
+> 
+> Roland
 
-Hi Thomas
+Sounds good!
 
-kirkwood-mplcec4.dts contains:
-
-                pinctrl: pinctrl at 10000 {
-
-                        pinctrl-0 = < &pmx_nand &pmx_uart0
-                                      &pmx_led_health &pmx_sdio
-                                      &pmx_sata0 &pmx_sata1
-                                      &pmx_led_user1o
-                                      &pmx_led_user1g &pmx_led_user0o
-                                      &pmx_led_user0g &pmx_led_misc
-                                      &pmx_sdio_cd
-                                    >;
-                        pinctrl-names = "default";
-
-Should &pmx_sdio and &pmx_sdio_cd be moved out of here and into the
-mvsdio at 90000 node?
-
->  
->  	gpio-leds {
-> diff --git a/arch/arm/mach-kirkwood/board-mplcec4.c b/arch/arm/mach-kirkwood/board-mplcec4.c
-> index 56bfe5a..183ff8a 100644
-> --- a/arch/arm/mach-kirkwood/board-mplcec4.c
-> +++ b/arch/arm/mach-kirkwood/board-mplcec4.c
-> @@ -24,11 +24,6 @@ static struct mv643xx_eth_platform_data mplcec4_ge01_data = {
->  	.phy_addr	= MV643XX_ETH_PHY_ADDR(2),
->  };
-
-There is another header file which can be removed.
-
-Thanks
-	Andrew
+Thanks,
+Mark.
