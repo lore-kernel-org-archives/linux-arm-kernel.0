@@ -1,109 +1,210 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 18 Dec 2012 07:46:36 -0600
-Subject: [PATCH 4/4] ARM: tegra: Set SCU base address dynamically from DT
-In-Reply-To: <20121218.112129.1344593225772728837.hdoyu@nvidia.com>
-References: <1355725087-11363-1-git-send-email-hdoyu@nvidia.com><1355725087-11363-4-git-send-email-hdoyu@nvidia.com><50CF258E.2080207@gmail.com>
- <20121218.112129.1344593225772728837.hdoyu@nvidia.com>
-Message-ID: <50D073BC.3040607@gmail.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Tue, 18 Dec 2012 19:26:06 +0530
+Subject: [PATCH v2] usb: phy: samsung: Add support to set pmu isolation
+In-Reply-To: <1355810167-18425-2-git-send-email-gautam.vivek@samsung.com>
+References: <1355810167-18425-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1355838966-11269-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2012 03:21 AM, Hiroshi Doyu wrote:
-> Hi Rob,
-> 
-> Rob Herring <robherring2@gmail.com> wrote @ Mon, 17 Dec 2012 15:00:46 +0100:
-> 
->> On 12/17/2012 12:18 AM, Hiroshi Doyu wrote:
->>> Set Snoop Control Unit(SCU) register base address dynamically from DT.
->>>
->>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->>> ---
->>>  arch/arm/mach-tegra/platsmp.c |   23 ++++++++++++++++++++---
->>>  1 file changed, 20 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
->>> index 1b926df..45c0b79 100644
->>> --- a/arch/arm/mach-tegra/platsmp.c
->>> +++ b/arch/arm/mach-tegra/platsmp.c
->>> @@ -18,6 +18,8 @@
->>>  #include <linux/jiffies.h>
->>>  #include <linux/smp.h>
->>>  #include <linux/io.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_address.h>
->>>  
->>>  #include <asm/cacheflush.h>
->>>  #include <asm/hardware/gic.h>
->>> @@ -36,7 +38,7 @@
->>>  
->>>  extern void tegra_secondary_startup(void);
->>>  
->>> -static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
->>> +static void __iomem *scu_base;
->>>  
->>>  #define EVP_CPU_RESET_VECTOR \
->>>  	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
->>> @@ -143,14 +145,28 @@ done:
->>>  	return status;
->>>  }
->>>  
->>> +static const struct of_device_id cortex_a9_scu_match[] __initconst = {
->>> +	{ .compatible = "arm,cortex-a9-scu", },
->>> +	{}
->>> +};
->>> +
->>>  /*
->>>   * Initialise the CPU possible map early - this describes the CPUs
->>>   * which may be present or become present in the system.
->>>   */
->>>  static void __init tegra_smp_init_cpus(void)
->>>  {
->>> -	unsigned int i, ncores = scu_get_core_count(scu_base);
->>> +	struct device_node *np;
->>> +	unsigned int i, ncores = 1;
->>> +
->>> +	np = of_find_matching_node(NULL, cortex_a9_scu_match);
->>> +	if (!np)
->>> +		return;
->>> +	scu_base = of_iomap(np, 0);
->>
->> Did you actually test this? Unless something changed, ioremap does not
->> work this early. The only reason to have it mapped this early is to get
->> the core count, but that doesn't work on A15 or A7. So we really need to
->> get core count/mask in a standard way. At least some work to get core
->> count from DT went into 3.8.
->>
->> BTW, you can get the scu address on the A9 by reading cp15 register:
->>
->> 	/* Get SCU base */
->> 	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
->>
->> It's still probably good to have the DT node, but the reg property can
->> be optional in this case.
-> 
-> I'm simply wondering, if the above cp15 works with Cortex-A9, do we
-> still need SCU DT node? At least from Cortex-A15 TRM, it seems that
-> SCU is tighly integrated into CPU core and it doesn't have any user
-> control. So Cortex-A15 doesn't seem to need to configure SCU. For
-> Cortex-A7, I haven't yet found S/W configurable register definitions
-> in TRM. So if neither of A15/A7 need SCU base, would the above cp15
-> intructions be enough?
+Adding support to parse device node data in order to get
+required properties to set pmu isolation for usb-phy.
 
-The A15/A7 still have the register for the other peripherals like the
-GIC, but there are no SCU registers or other way to get a core count
-from the h/w.
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+---
 
-The DT node could be used to determine if you have an SCU or not. I just
-used the cpu node compatible value to determine that.
+Changes from v1:
+ - Changed the name of property for phy handler from'samsung,usb-phyctrl'
+   to 'samsung,usb-phyhandle' to make it look more generic.
+ - Similarly 'samsung,phyctrl-reg' is changed to 'samsung,phyhandle-reg'
+ - Added a check for 'samsung,usb-phyhandle' before getting node from
+   phandle.
+ - Putting the node using 'of_node_put()' which had been missed.
+ - Adding necessary check for the pointer in 'samsung_usbphy_set_isolation()'
+   to avoid any NULL pointer dereferencing.
+ - Unmapping the register ioremapped in 'samsung_usbphy_parse_dt_param()'.
 
->> We need to move away from having the DT matching code within the
->> platforms. This should all be moved to the scu code in a scu_of_init
->> function that could be called from common code.
-> 
-> True if SCU DT node is still necessary.
 
-Well, reading the cp15 register and mapping the registers could be
-common code independent of DT. I'm not sure if there are non-A9
-implementations of the SCU which don't have the cp15 register.
+ .../devicetree/bindings/usb/samsung-usbphy.txt     |   12 +++
+ drivers/usb/phy/samsung-usbphy.c                   |   94 ++++++++++++++++++--
+ 2 files changed, 98 insertions(+), 8 deletions(-)
 
-Rob
+diff --git a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+index 7b26e2d..a7b28b2 100644
+--- a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
++++ b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+@@ -9,3 +9,15 @@ Required properties:
+ - compatible : should be "samsung,exynos4210-usbphy"
+ - reg : base physical address of the phy registers and length of memory mapped
+ 	region.
++
++Optional properties:
++- samsung,usb-phyhandle : should point to usb-phyhandle sub-node which provides
++			binding data to enable/disable device PHY handled by
++			PMU register.
++
++			Required properties:
++			- compatible : should be "samsung,usbdev-phyctrl" for
++					DEVICE type phy.
++			- samsung,phyhandle-reg: base physical address of
++						PHY_CONTROL register in PMU.
++- samsung,enable-mask : should be '1'
+diff --git a/drivers/usb/phy/samsung-usbphy.c b/drivers/usb/phy/samsung-usbphy.c
+index 5c5e1bb5..4ceabe3 100644
+--- a/drivers/usb/phy/samsung-usbphy.c
++++ b/drivers/usb/phy/samsung-usbphy.c
+@@ -72,6 +72,8 @@ enum samsung_cpu_type {
+  * @dev: The parent device supplied to the probe function
+  * @clk: usb phy clock
+  * @regs: usb phy register memory base
++ * @devctrl_reg: usb device phy-control pmu register memory base
++ * @en_mask: enable mask
+  * @ref_clk_freq: reference clock frequency selection
+  * @cpu_type: machine identifier
+  */
+@@ -81,12 +83,73 @@ struct samsung_usbphy {
+ 	struct device	*dev;
+ 	struct clk	*clk;
+ 	void __iomem	*regs;
++	void __iomem	*devctrl_reg;
++	u32		en_mask;
+ 	int		ref_clk_freq;
+ 	int		cpu_type;
+ };
+ 
+ #define phy_to_sphy(x)		container_of((x), struct samsung_usbphy, phy)
+ 
++static int samsung_usbphy_parse_dt_param(struct samsung_usbphy *sphy)
++{
++	struct device_node *usb_phyctrl;
++	u32 reg;
++	int lenp;
++
++	if (!sphy->dev->of_node) {
++		sphy->devctrl_reg = NULL;
++		return -ENODEV;
++	}
++
++	if (of_get_property(sphy->dev->of_node, "samsung,usb-phyhandle", &lenp)) {
++		usb_phyctrl = of_parse_phandle(sphy->dev->of_node,
++						"samsung,usb-phyhandle", 0);
++		if (!usb_phyctrl) {
++			dev_warn(sphy->dev, "Can't get usb-phy handle\n");
++			sphy->devctrl_reg = NULL;
++		}
++
++		of_property_read_u32(usb_phyctrl, "samsung,phyhandle-reg", &reg);
++
++		sphy->devctrl_reg = ioremap(reg, SZ_4);
++
++		of_property_read_u32(sphy->dev->of_node, "samsung,enable-mask",
++							&sphy->en_mask);
++		of_node_put(usb_phyctrl);
++	} else {
++		dev_warn(sphy->dev, "Can't get usb-phy handle\n");
++		sphy->devctrl_reg = NULL;
++	}
++
++	return 0;
++}
++
++/*
++ * Set isolation here for phy.
++ * SOCs control this by controlling corresponding PMU registers
++ */
++static void samsung_usbphy_set_isolation(struct samsung_usbphy *sphy, int on)
++{
++	void __iomem *usb_phyctrl_reg;
++	u32 en_mask = sphy->en_mask;
++	u32 reg;
++
++	usb_phyctrl_reg = sphy->devctrl_reg;
++
++	if (!usb_phyctrl_reg) {
++		dev_warn(sphy->dev, "Can't set pmu isolation\n");
++		return;
++	}
++
++	reg = readl(usb_phyctrl_reg);
++
++	if (on)
++		writel(reg & ~en_mask, usb_phyctrl_reg);
++	else
++		writel(reg | en_mask, usb_phyctrl_reg);
++}
++
+ /*
+  * Returns reference clock frequency selection value
+  */
+@@ -199,6 +262,8 @@ static int samsung_usbphy_init(struct usb_phy *phy)
+ 	/* Disable phy isolation */
+ 	if (sphy->plat && sphy->plat->pmu_isolation)
+ 		sphy->plat->pmu_isolation(false);
++	else
++		samsung_usbphy_set_isolation(sphy, false);
+ 
+ 	/* Initialize usb phy registers */
+ 	samsung_usbphy_enable(sphy);
+@@ -228,6 +293,8 @@ static void samsung_usbphy_shutdown(struct usb_phy *phy)
+ 	/* Enable phy isolation */
+ 	if (sphy->plat && sphy->plat->pmu_isolation)
+ 		sphy->plat->pmu_isolation(true);
++	else
++		samsung_usbphy_set_isolation(sphy, true);
+ 
+ 	clk_disable_unprepare(sphy->clk);
+ }
+@@ -249,17 +316,12 @@ static inline int samsung_usbphy_get_driver_data(struct platform_device *pdev)
+ static int __devinit samsung_usbphy_probe(struct platform_device *pdev)
+ {
+ 	struct samsung_usbphy *sphy;
+-	struct samsung_usbphy_data *pdata;
++	struct samsung_usbphy_data *pdata = pdev->dev.platform_data;
+ 	struct device *dev = &pdev->dev;
+ 	struct resource *phy_mem;
+ 	void __iomem	*phy_base;
+ 	struct clk *clk;
+-
+-	pdata = pdev->dev.platform_data;
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "%s: no platform data defined\n", __func__);
+-		return -EINVAL;
+-	}
++	int ret;
+ 
+ 	phy_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!phy_mem) {
+@@ -283,7 +345,20 @@ static int __devinit samsung_usbphy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(clk);
+ 	}
+ 
+-	sphy->dev		= &pdev->dev;
++	sphy->dev = &pdev->dev;
++
++	ret = samsung_usbphy_parse_dt_param(sphy);
++	if (ret) {
++		/* fallback to pdata */
++		if (!pdata) {
++			dev_err(&pdev->dev,
++				"%s: no device data found\n", __func__);
++			return -ENODEV;
++		} else {
++			sphy->plat = pdata;
++		}
++	}
++
+ 	sphy->plat		= pdata;
+ 	sphy->regs		= phy_base;
+ 	sphy->clk		= clk;
+@@ -305,6 +380,9 @@ static int __exit samsung_usbphy_remove(struct platform_device *pdev)
+ 
+ 	usb_remove_phy(&sphy->phy);
+ 
++	if (sphy->devctrl_reg)
++		iounmap(sphy->devctrl_reg);
++
+ 	return 0;
+ }
+ 
+-- 
+1.7.6.5
