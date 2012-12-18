@@ -1,66 +1,50 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 19 Dec 2012 11:05:53 +0530
-Subject: [PATCH 5/5] ARM: EXYNOS: Avoid passing the clks through platform data
-In-Reply-To: <1355895353-10316-1-git-send-email-padma.v@samsung.com>
-References: <1355895353-10316-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1355895353-10316-6-git-send-email-padma.v@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 18 Dec 2012 09:08:59 -0800
+Subject: [PATCH] ARM: dts: add pinctrl nodes for Exynos5250 SoC
+In-Reply-To: <CACRpkdZgSpkHW3mW_2ZhvUWVTX7Qppb5G8d+MdD3zUDOYCY-pw@mail.gmail.com>
+References: <1355403978-388-1-git-send-email-thomas.abraham@linaro.org>
+ <CACRpkdZgSpkHW3mW_2ZhvUWVTX7Qppb5G8d+MdD3zUDOYCY-pw@mail.gmail.com>
+Message-ID: <50D0A32B.9050400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I2S controller has an internal mux for RCLK source clks. The list
-of source clk names were passed through platform data in non-dt case.
-The variable holding the list of RCLK source clk names is not
-required, as the list of clks need to be registered with clkdev
-using generic connection id. This is required as part of adding DT
-support for I2S controller driver.
+On 12/14/12 12:34, Linus Walleij wrote:
+> On Thu, Dec 13, 2012 at 2:06 PM, Thomas Abraham
+> <thomas.abraham@linaro.org>  wrote:
+>
+>> Add pinctrl device nodes for Exynos5250 SoC.
+>>
+>> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+>
+> Acked-by: Linus Walleij<linus.walleij@linaro.org>
+>
+>> - The individual device nodes which are using the old style Samsung gpio
+>>    bindings have not been converted over to pinctrl bindings yet. It might
+>>    also be important to know if Linus's pinctrl grab in device core patch
+>>    (http://comments.gmane.org/gmane.linux.kernel/1409263) gets accepted.
+>
+> Greg seems happy with it and the plan is to have it merged for kernel
+> v3.9.
+>
+> I intend to push Greg for an ACK and queue it for linux-next right after the
+> merge window.
+>
+Same here ;-)
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-Acked-by: Sangbeom Kim <sbkim73@samsung.com>
----
- arch/arm/mach-exynos/dev-audio.c |   12 ------------
- 1 files changed, 0 insertions(+), 12 deletions(-)
+>> - This patch should not be merged for now which otherwise would break existing
+>>    platforms which are using the old samsung gpio driver bindings. This patch
+>>    is intended to get started with the migration to pinctrl framework.
+>>    It is probably better to first prepare all the migration patches and
+>>    merge them as a bunch.
+>
+> Sure. I guess it'll be taken through the Samsung tree anyway, right?
+>
+I'm OK on this, if Greg is OK, then let me pick this up in Samsung tree.
 
-diff --git a/arch/arm/mach-exynos/dev-audio.c b/arch/arm/mach-exynos/dev-audio.c
-index a1cb42c..9d1a609 100644
---- a/arch/arm/mach-exynos/dev-audio.c
-+++ b/arch/arm/mach-exynos/dev-audio.c
-@@ -23,11 +23,6 @@
- #include <mach/irqs.h>
- #include <mach/regs-audss.h>
- 
--static const char *rclksrc[] = {
--	[0] = "busclk",
--	[1] = "i2sclk",
--};
--
- static int exynos4_cfg_i2s(struct platform_device *pdev)
- {
- 	/* configure GPIO for i2s port */
-@@ -55,7 +50,6 @@ static struct s3c_audio_pdata i2sv5_pdata = {
- 		.i2s = {
- 			.quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI
- 					 | QUIRK_NEED_RSTCLR,
--			.src_clk = rclksrc,
- 			.idma_addr = EXYNOS4_AUDSS_INT_MEM,
- 		},
- 	},
-@@ -78,17 +72,11 @@ struct platform_device exynos4_device_i2s0 = {
- 	},
- };
- 
--static const char *rclksrc_v3[] = {
--	[0] = "sclk_i2s",
--	[1] = "no_such_clock",
--};
--
- static struct s3c_audio_pdata i2sv3_pdata = {
- 	.cfg_gpio = exynos4_cfg_i2s,
- 	.type = {
- 		.i2s = {
- 			.quirks = QUIRK_NO_MUXPSR,
--			.src_clk = rclksrc_v3,
- 		},
- 	},
- };
--- 
-1.7.4.4
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
