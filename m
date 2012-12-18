@@ -1,136 +1,62 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 18 Dec 2012 22:57:13 +0530
-Subject: [PATCH v5 1/2] ARM: davinci: dm365: add support for v4l2 video
- display
-In-Reply-To: <50BDF72C.2000906@ti.com>
-References: <1354522904-22501-1-git-send-email-prabhakar.lad@ti.com>
- <1354522904-22501-2-git-send-email-prabhakar.lad@ti.com>
- <50BDF72C.2000906@ti.com>
-Message-ID: <CA+V-a8s73CR1QYiENQ6D2k=YcwdMjG3H3vy4YDjdyMpDQtg7ag@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 19 Dec 2012 06:34:05 +1300
+Subject: [PATCH RESEND 3/6] clk: exynos: Fix incorrect usage of IS_ERR_OR_NULL
+In-Reply-To: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
+References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1355852048-23188-4-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar,
+Resend to include mailing lists.
 
-Thanks for the review.
+Replace IS_ERR_OR_NULL with IS_ERR on clk_get results.
 
-On Tue, Dec 4, 2012 at 6:44 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 12/3/2012 1:51 PM, Prabhakar Lad wrote:
->> From: Manjunath Hadli <manjunath.hadli@ti.com>
->>
->> Create platform devices for various video modules like venc,osd,
->> vpbe and v4l2 driver for dm365.
->>
->> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
->> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
->> ---
->>  arch/arm/mach-davinci/board-dm365-evm.c |    4 +-
->>  arch/arm/mach-davinci/davinci.h         |    2 +-
->>  arch/arm/mach-davinci/dm365.c           |  203 +++++++++++++++++++++++++++++--
->>  3 files changed, 195 insertions(+), 14 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
->> index 1b4a8ad..0c3dae6 100644
->> --- a/arch/arm/mach-davinci/board-dm365-evm.c
->> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
->> @@ -564,8 +564,6 @@ static struct davinci_uart_config uart_config __initdata = {
->>
->>  static void __init dm365_evm_map_io(void)
->>  {
->> -     /* setup input configuration for VPFE input devices */
->> -     dm365_set_vpfe_config(&vpfe_cfg);
->>       dm365_init();
->>  }
->>
->> @@ -597,6 +595,8 @@ static __init void dm365_evm_init(void)
->>
->>       davinci_setup_mmc(0, &dm365evm_mmc_config);
->>
->> +     dm365_init_video(&vpfe_cfg, NULL);
->> +
->>       /* maybe setup mmc1/etc ... _after_ mmc0 */
->>       evm_init_cpld();
->>
->> diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
->> index 12d544b..1c2670f 100644
->> --- a/arch/arm/mach-davinci/davinci.h
->> +++ b/arch/arm/mach-davinci/davinci.h
->> @@ -84,7 +84,7 @@ void __init dm365_init_ks(struct davinci_ks_platform_data *pdata);
->>  void __init dm365_init_rtc(void);
->>  void dm365_init_spi0(unsigned chipselect_mask,
->>                       const struct spi_board_info *info, unsigned len);
->> -void dm365_set_vpfe_config(struct vpfe_config *cfg);
->> +int __init dm365_init_video(struct vpfe_config *, struct vpbe_config *);
->>
->>  /* DM644x function declarations */
->>  void __init dm644x_init(void);
->> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
->> index b680c83..cada153 100644
->> --- a/arch/arm/mach-davinci/dm365.c
->> +++ b/arch/arm/mach-davinci/dm365.c
->> @@ -40,10 +40,16 @@
->>
->>  #define DM365_REF_FREQ               24000000        /* 24 MHz on the DM365 EVM */
->>
->> +#define DM3XX_VDAC_CONFIG            0x01c4002c
->> +
->> +#define DM365_RTC_BASE                       0x01c69000
->> +
->>  /* Base of key scan register bank */
->>  #define DM365_KEYSCAN_BASE           0x01c69400
->>
->> -#define DM365_RTC_BASE                       0x01c69000
->> +#define DM365_OSD_REG_BASE           0x01c71c00
->
-> Nit: Can you call it DM365_OSD_BASE. If we were to include REG in the
-> name, then it should be done consistently. So we would instead have
-> DM365_KEYSCAN_REG_BASE.
->
-Ok.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+CC: Inki Dae <inki.dae@samsung.com>
+CC: Joonyoung Shim <jy0922.shim@samsung.com>
+CC: Seung-Woo Kim <sw0312.kim@samsung.com>
+CC: Kyungmin Park <kyungmin.park@samsung.com>
+CC: dri-devel at lists.freedesktop.org
+---
+ drivers/gpu/drm/exynos/exynos_hdmi.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
->> +
->> +#define DM365_VENC_REG_BASE          0x01c71e00
->>
->>  #define DAVINCI_DM365_VC_BASE                0x01d0c000
->>  #define DAVINCI_DMA_VC_TX            2
->> @@ -56,6 +62,11 @@
->>  #define DM365_EMAC_CNTRL_RAM_OFFSET  0x1000
->>  #define DM365_EMAC_CNTRL_RAM_SIZE    0x2000
->>
->> +#define DM365_VPSS_CLK_CTRL_ADDR             0x44
->> +#define DM365_VPSS_VENCCLKEN_ENABLE          BIT(3)
->> +#define DM365_VPSS_DACCLKEN_ENABLE           BIT(4)
->> +#define DM365_VPSS_PLLC2SYSCLK5_ENABLE               (BIT(5) & ~BIT(6))
->
-> This expression does not make much sense. It is same as BIT(5). You
-> needed a mask and an enable?
->
-Agreed its equivalent to BIT(5), but pll2c2sysclk5 depends on two bits
-bit 5 and bit bit 6, so to keep consistent I used them. Do you want me to remove
-it and just keep BIT(5) ?
-
->> +
->>  static struct pll_data pll1_data = {
->>       .num            = 1,
->>       .phys_base      = DAVINCI_PLL1_BASE,
->> @@ -1232,6 +1243,186 @@ static struct platform_device dm365_isif_dev = {
->>       },
->>  };
->>
->> +static struct resource dm365_osd_resources[] = {
->> +     {
->> +             .start = DM365_OSD_REG_BASE,
->> +             .end   = DM365_OSD_REG_BASE + 0x100,
->
->         .end   = DM365_OSD_REG_BASE + 0xff,
->
-> A similar fix is needed multiple places below. Sorry, I did not notice
-> this last time around.
->
-Ok I'll fix it.
-
-Thanks and Regards,
---Prabhakar Lad
-
-> Thanks,
-> Sekhar
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index 2c115f8..557ef2f 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -2167,27 +2167,27 @@ static int __devinit hdmi_resources_init(struct hdmi_context *hdata)
+ 
+ 	/* get clocks, power */
+ 	res->hdmi = clk_get(dev, "hdmi");
+-	if (IS_ERR_OR_NULL(res->hdmi)) {
++	if (IS_ERR(res->hdmi)) {
+ 		DRM_ERROR("failed to get clock 'hdmi'\n");
+ 		goto fail;
+ 	}
+ 	res->sclk_hdmi = clk_get(dev, "sclk_hdmi");
+-	if (IS_ERR_OR_NULL(res->sclk_hdmi)) {
++	if (IS_ERR(res->sclk_hdmi)) {
+ 		DRM_ERROR("failed to get clock 'sclk_hdmi'\n");
+ 		goto fail;
+ 	}
+ 	res->sclk_pixel = clk_get(dev, "sclk_pixel");
+-	if (IS_ERR_OR_NULL(res->sclk_pixel)) {
++	if (IS_ERR(res->sclk_pixel)) {
+ 		DRM_ERROR("failed to get clock 'sclk_pixel'\n");
+ 		goto fail;
+ 	}
+ 	res->sclk_hdmiphy = clk_get(dev, "sclk_hdmiphy");
+-	if (IS_ERR_OR_NULL(res->sclk_hdmiphy)) {
++	if (IS_ERR(res->sclk_hdmiphy)) {
+ 		DRM_ERROR("failed to get clock 'sclk_hdmiphy'\n");
+ 		goto fail;
+ 	}
+ 	res->hdmiphy = clk_get(dev, "hdmiphy");
+-	if (IS_ERR_OR_NULL(res->hdmiphy)) {
++	if (IS_ERR(res->hdmiphy)) {
+ 		DRM_ERROR("failed to get clock 'hdmiphy'\n");
+ 		goto fail;
+ 	}
+-- 
+1.7.9.5
