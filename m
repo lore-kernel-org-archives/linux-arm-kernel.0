@@ -1,330 +1,287 @@
 From: loic.pallardy-ext@stericsson.com (Loic Pallardy)
-Date: Tue, 18 Dec 2012 14:10:07 +0100
-Subject: [PATCH 4/9] mailbox: create opened message type
+Date: Tue, 18 Dec 2012 14:10:09 +0100
+Subject: [PATCH 6/9] mailbox: add shared memory mailbox type
 In-Reply-To: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
 References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
-Message-ID: <1355836212-17956-5-git-send-email-loic.pallardy-ext@stericsson.com>
+Message-ID: <1355836212-17956-7-git-send-email-loic.pallardy-ext@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current message type is a u32 to fit HW fifo format.
-This should be extended to support any message exchanges
-and type of mailbox.
-Propose structure owns the original u32 and an optional
-pointer on additional data.
+Some mailboxes are made up of cross interrupts
+and associated shared memory.
+Shared memory mapping is fixed and cross interrupt/shared
+memory relation make impossible the use of virtio.
+Mailbox framework must be enough opened to support
+any kind of mailbox.
 
 Signed-off-by: Loic Pallardy <loic.pallardy@st.com>
 ---
- drivers/mailbox/Kconfig         |  9 ++++++
- drivers/mailbox/mailbox-omap1.c | 18 ++++++------
- drivers/mailbox/mailbox-omap2.c | 10 ++++---
- drivers/mailbox/mailbox.c       | 64 +++++++++++++++++++++++++++++------------
- drivers/mailbox/mailbox.h       |  6 ++--
- include/linux/mailbox.h         | 17 ++++++++++-
- 6 files changed, 89 insertions(+), 35 deletions(-)
+ drivers/mailbox/mailbox-omap1.c | 40 +++++++++++++++++++++++++++++++---------
+ drivers/mailbox/mailbox-omap2.c | 16 ++++++++++++----
+ drivers/mailbox/mailbox.c       | 38 +++++++++++---------------------------
+ drivers/mailbox/mailbox.h       | 14 ++++++++------
+ 4 files changed, 62 insertions(+), 46 deletions(-)
 
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index d1e7d74..efb766f 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -33,4 +33,13 @@ config MBOX_KFIFO_SIZE
-          This can also be changed at runtime (via the mbox_kfifo_size
-          module parameter).
- 
-+config MBOX_DATA_SIZE
-+	int "Mailbox associated data max size (bytes)"
-+	default 64
-+	help
-+	  Specify the default size of mailbox's associated data buffer
-+	  (bytes)
-+          This can also be changed at runtime (via the mbox_kfifo_size
-+          module parameter).
-+
- endif
 diff --git a/drivers/mailbox/mailbox-omap1.c b/drivers/mailbox/mailbox-omap1.c
-index 31cb70a..94e90af 100644
+index 94e90af..0097342 100644
 --- a/drivers/mailbox/mailbox-omap1.c
 +++ b/drivers/mailbox/mailbox-omap1.c
-@@ -50,26 +50,26 @@ static inline void mbox_write_reg(u32 val, size_t ofs)
- }
+@@ -37,6 +37,7 @@ struct omap_mbox1_fifo {
+ struct omap_mbox1_priv {
+ 	struct omap_mbox1_fifo tx_fifo;
+ 	struct omap_mbox1_fifo rx_fifo;
++	bool empty_flag;
+ };
  
+ static inline int mbox_read_reg(size_t ofs)
+@@ -52,12 +53,12 @@ static inline void mbox_write_reg(u32 val, size_t ofs)
  /* msg */
--static mbox_msg_t omap1_mbox_fifo_read(struct mailbox *mbox)
-+static int omap1_mbox_fifo_read(struct mailbox *mbox, struct mailbox_msg *msg)
+ static int omap1_mbox_fifo_read(struct mailbox *mbox, struct mailbox_msg *msg)
  {
- 	struct omap_mbox1_fifo *fifo =
- 		&((struct omap_mbox1_priv *)mbox->priv)->rx_fifo;
--	mbox_msg_t msg;
+-	struct omap_mbox1_fifo *fifo =
+-		&((struct omap_mbox1_priv *)mbox->priv)->rx_fifo;
++	struct omap_mbox1_priv *priv = (struct omap_mbox1_priv *)mbox->priv;
++	struct omap_mbox1_fifo *fifo = &priv->rx_fifo;
  
--	msg = mbox_read_reg(fifo->data);
--	msg |= ((mbox_msg_t) mbox_read_reg(fifo->cmd)) << 16;
-+	msg->header = mbox_read_reg(fifo->data);
-+	msg->header |= ((mbox_msg_t) mbox_read_reg(fifo->cmd)) << 16;
- 
--	return msg;
-+	return 0;
+ 	msg->header = mbox_read_reg(fifo->data);
+ 	msg->header |= ((mbox_msg_t) mbox_read_reg(fifo->cmd)) << 16;
+-
++	priv->empty_flag = false;
+ 	return 0;
  }
  
--static void
--omap1_mbox_fifo_write(struct mailbox *mbox, mbox_msg_t msg)
-+static int
-+omap1_mbox_fifo_write(struct mailbox *mbox, struct mailbox_msg *msg)
- {
- 	struct omap_mbox1_fifo *fifo =
- 		&((struct omap_mbox1_priv *)mbox->priv)->tx_fifo;
+@@ -69,12 +70,16 @@ omap1_mbox_fifo_write(struct mailbox *mbox, struct mailbox_msg *msg)
  
--	mbox_write_reg(msg & 0xffff, fifo->data);
--	mbox_write_reg(msg >> 16, fifo->cmd);
-+	mbox_write_reg(msg->header & 0xffff, fifo->data);
-+	mbox_write_reg(msg->header >> 16, fifo->cmd);
-+	return 0
+ 	mbox_write_reg(msg->header & 0xffff, fifo->data);
+ 	mbox_write_reg(msg->header >> 16, fifo->cmd);
+-	return 0
++	return 0;
  }
  
  static int omap1_mbox_fifo_empty(struct mailbox *mbox)
+ {
+-	return 0;
++	struct omap_mbox1_priv *priv = (struct omap_mbox1_priv *)mbox->priv;
++	if (priv->empty_flag)
++		return 0;
++	else
++		return 1;
+ }
+ 
+ static int omap1_mbox_fifo_full(struct mailbox *mbox)
+@@ -85,6 +90,18 @@ static int omap1_mbox_fifo_full(struct mailbox *mbox)
+ 	return mbox_read_reg(fifo->flag);
+ }
+ 
++static int ompa1_mbox_poll_for_space(struct mailbox *mbox)
++{
++	int ret = 0, i = 1000;
++
++	while (omap1_mbox_fifo_full(mbox)) {
++		if (--i == 0)
++			return -1;
++		udelay(1);
++	}
++	return ret;
++}
++
+ /* irq */
+ static void
+ omap1_mbox_enable_irq(struct mailbox *mbox, mailbox_type_t irq)
+@@ -103,17 +120,22 @@ omap1_mbox_disable_irq(struct mailbox *mbox, mailbox_type_t irq)
+ static int
+ omap1_mbox_is_irq(struct mailbox *mbox, mailbox_type_t irq)
+ {
++	struct omap_mbox1_priv *priv = (struct omap_mbox1_priv *)mbox->priv;
++
+ 	if (irq == IRQ_TX)
+ 		return 0;
++	if (irq == IRQ_RX)
++		priv->empty_flag = true;
++
+ 	return 1;
+ }
+ 
+ static struct mailbox_ops omap1_mbox_ops = {
+ 	.type           = MBOX_HW_FIFO1_TYPE,
+-	.fifo_read      = omap1_mbox_fifo_read,
+-	.fifo_write     = omap1_mbox_fifo_write,
+-	.fifo_empty     = omap1_mbox_fifo_empty,
+-	.fifo_full      = omap1_mbox_fifo_full,
++	.read           = omap1_mbox_fifo_read,
++	.write          = omap1_mbox_fifo_write,
++	.empty     = omap1_mbox_fifo_empty,
++	.poll_for_space = ompa1_mbox_poll_for_space,
+ 	.enable_irq     = omap1_mbox_enable_irq,
+ 	.disable_irq    = omap1_mbox_disable_irq,
+ 	.is_irq         = omap1_mbox_is_irq,
 diff --git a/drivers/mailbox/mailbox-omap2.c b/drivers/mailbox/mailbox-omap2.c
-index 230d9d3..2299674 100644
+index 2299674..7c26bed 100644
 --- a/drivers/mailbox/mailbox-omap2.c
 +++ b/drivers/mailbox/mailbox-omap2.c
-@@ -95,18 +95,20 @@ static void omap2_mbox_shutdown(struct mailbox *mbox)
+@@ -125,6 +125,14 @@ static int omap2_mbox_fifo_full(struct mailbox *mbox)
+ 	return mbox_read_reg(fifo->fifo_stat);
  }
  
- /* Mailbox FIFO handle functions */
--static mbox_msg_t omap2_mbox_fifo_read(struct mailbox *mbox)
-+static int omap2_mbox_fifo_read(struct mailbox *mbox, struct mailbox_msg *msg)
- {
- 	struct omap_mbox2_fifo *fifo =
- 		&((struct omap_mbox2_priv *)mbox->priv)->rx_fifo;
--	return (mbox_msg_t) mbox_read_reg(fifo->msg);
-+	msg->header = mbox_read_reg(fifo->msg);
++static int ompa2_mbox_poll_for_space(struct mailbox *mbox)
++{
++	if (omap2_mbox_fifo_full(mbox))
++		return -1;
++
 +	return 0;
- }
- 
--static void omap2_mbox_fifo_write(struct mailbox *mbox, mbox_msg_t msg)
-+static int omap2_mbox_fifo_write(struct mailbox *mbox, struct mailbox_msg *msg)
- {
- 	struct omap_mbox2_fifo *fifo =
- 		&((struct omap_mbox2_priv *)mbox->priv)->tx_fifo;
--	mbox_write_reg(msg, fifo->msg);
-+	mbox_write_reg(msg->header, fifo->msg);
-+	return 0;
- }
- 
- static int omap2_mbox_fifo_empty(struct mailbox *mbox)
++}
++
+ /* Mailbox IRQ handle functions */
+ static void omap2_mbox_enable_irq(struct mailbox *mbox,
+ 		mailbox_type_t irq)
+@@ -210,10 +218,10 @@ static struct mailbox_ops omap2_mbox_ops = {
+ 	.type           = MBOX_HW_FIFO2_TYPE,
+ 	.startup        = omap2_mbox_startup,
+ 	.shutdown       = omap2_mbox_shutdown,
+-	.fifo_read      = omap2_mbox_fifo_read,
+-	.fifo_write     = omap2_mbox_fifo_write,
+-	.fifo_empty     = omap2_mbox_fifo_empty,
+-	.fifo_full      = omap2_mbox_fifo_full,
++	.read           = omap2_mbox_fifo_read,
++	.write          = omap2_mbox_fifo_write,
++	.empty          = omap2_mbox_fifo_empty,
++	.poll_for_space = ompa2_mbox_poll_for_space,
+ 	.enable_irq     = omap2_mbox_enable_irq,
+ 	.disable_irq    = omap2_mbox_disable_irq,
+ 	.ack_irq        = omap2_mbox_ack_irq,
 diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index b9389c6..727e67e 100644
+index 8b7d7bd..c0a8e49 100644
 --- a/drivers/mailbox/mailbox.c
 +++ b/drivers/mailbox/mailbox.c
-@@ -43,12 +43,13 @@ static unsigned int mbox_kfifo_size = CONFIG_MBOX_KFIFO_SIZE;
- module_param(mbox_kfifo_size, uint, S_IRUGO);
- MODULE_PARM_DESC(mbox_kfifo_size, "Size of mailbox kfifo (bytes)");
+@@ -45,21 +45,17 @@ MODULE_PARM_DESC(mbox_kfifo_size, "Size of mailbox kfifo (bytes)");
  
-+
+ 
  /* Mailbox FIFO handle functions */
--static inline mbox_msg_t mbox_fifo_read(struct mailbox *mbox)
-+static inline mbox_msg_t mbox_fifo_read(struct mailbox *mbox, struct mailbox_msg *msg)
+-static inline mbox_msg_t mbox_fifo_read(struct mailbox *mbox, struct mailbox_msg *msg)
++static inline mbox_msg_t mbox_read(struct mailbox *mbox, struct mailbox_msg *msg)
  {
--	return mbox->ops->fifo_read(mbox);
-+	return mbox->ops->fifo_read(mbox, msg);
+-	return mbox->ops->fifo_read(mbox, msg);
++	return mbox->ops->read(mbox, msg);
  }
--static inline void mbox_fifo_write(struct mailbox *mbox, mbox_msg_t msg)
-+static inline void mbox_fifo_write(struct mailbox *mbox, struct mailbox_msg *msg)
+-static inline void mbox_fifo_write(struct mailbox *mbox, struct mailbox_msg *msg)
++static inline void mbox_write(struct mailbox *mbox, struct mailbox_msg *msg)
  {
- 	mbox->ops->fifo_write(mbox, msg);
+-	mbox->ops->fifo_write(mbox, msg);
++	mbox->ops->write(mbox, msg);
  }
-@@ -89,14 +90,14 @@ static int __mbox_poll_for_space(struct mailbox *mbox)
- 	return ret;
- }
- 
--int mailbox_msg_send(struct mailbox *mbox, mbox_msg_t msg)
-+int mailbox_msg_send(struct mailbox *mbox, struct mailbox_msg *msg)
+-static inline int mbox_fifo_empty(struct mailbox *mbox)
++static inline int mbox_empty(struct mailbox *mbox)
  {
- 	struct mailbox_queue *mq = mbox->txq;
- 	int ret = 0, len;
- 
- 	spin_lock_bh(&mq->lock);
- 
--	if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
-+	if (kfifo_avail(&mq->fifo) < (sizeof(msg) + msg->size)) {
- 		ret = -ENOMEM;
- 		goto out;
- 	}
-@@ -106,9 +107,14 @@ int mailbox_msg_send(struct mailbox *mbox, mbox_msg_t msg)
- 		goto out;
- 	}
- 
--	len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
-+	len = kfifo_in(&mq->fifo, (unsigned char *)msg, sizeof(msg));
- 	WARN_ON(len != sizeof(msg));
- 
-+	if (msg->size && msg->pdata) {
-+		len = kfifo_in(&mq->fifo, (unsigned char *)msg->pdata, msg->size);
-+		WARN_ON(len != msg->size);
-+	}
-+
- 	tasklet_schedule(&mbox->txq->tasklet);
- 
- out:
-@@ -151,11 +157,13 @@ void mailbox_disable_irq(struct mailbox *mbox, mailbox_irq_t irq)
- }
- EXPORT_SYMBOL(mailbox_disable_irq);
- 
-+static unsigned char tx_data_buf[CONFIG_MBOX_DATA_SIZE];
-+
- static void mbox_tx_tasklet(unsigned long tx_data)
- {
- 	struct mailbox *mbox = (struct mailbox *)tx_data;
- 	struct mailbox_queue *mq = mbox->txq;
--	mbox_msg_t msg;
-+	struct mailbox_msg msg;
- 	int ret;
- 
- 	while (kfifo_len(&mq->fifo)) {
-@@ -168,30 +176,44 @@ static void mbox_tx_tasklet(unsigned long tx_data)
- 				sizeof(msg));
- 		WARN_ON(ret != sizeof(msg));
- 
--		mbox_fifo_write(mbox, msg);
-+		if (msg.size) {
-+			ret = kfifo_out(&mq->fifo, tx_data_buf,	sizeof(msg.size));
-+			WARN_ON(ret != msg.size);
-+			msg.pdata = tx_data_buf;
-+		}
-+
-+		mbox_fifo_write(mbox, &msg);
- 	}
+-	return mbox->ops->fifo_empty(mbox);
+-}
+-static inline int mbox_fifo_full(struct mailbox *mbox)
+-{
+-	return mbox->ops->fifo_full(mbox);
++	return mbox->ops->empty(mbox);
  }
  
- /*
-  * Message receiver(workqueue)
+ /* Mailbox IRQ handle functions */
+@@ -78,16 +74,7 @@ static inline int is_mbox_irq(struct mailbox *mbox, mailbox_irq_t irq)
   */
-+static unsigned char rx_work_data[CONFIG_MBOX_DATA_SIZE];
-+
- static void mbox_rx_work(struct work_struct *work)
+ static int __mbox_poll_for_space(struct mailbox *mbox)
  {
- 	struct mailbox_queue *mq =
- 		container_of(work, struct mailbox_queue, work);
--	mbox_msg_t msg;
- 	int len;
-+	struct mailbox *mbox = mq->mbox;
-+	struct mailbox_msg msg;
+-	int ret = 0, i = 1000;
+-
+-	while (mbox_fifo_full(mbox)) {
+-		if (mbox->ops->type == MBOX_HW_FIFO2_TYPE)
+-			return -1;
+-		if (--i == 0)
+-			return -1;
+-		udelay(1);
+-	}
+-	return ret;
++	return mbox->ops->poll_for_space(mbox);
+ }
  
- 	while (kfifo_len(&mq->fifo) >= sizeof(msg)) {
- 		len = kfifo_out(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
- 		WARN_ON(len != sizeof(msg));
- 
--		blocking_notifier_call_chain(&mq->mbox->notifier, len,
--				(void *)msg);
-+		if (msg.size) {
-+			len = kfifo_out(&mq->fifo, rx_work_data, msg.size);
-+			WARN_ON(len != msg.size);
-+			msg.pdata = rx_work_data;
-+		}
-+
-+		blocking_notifier_call_chain(&mbox->notifier, len, (void *)&msg);
- 		spin_lock_irq(&mq->lock);
- 		if (mq->full) {
- 			mq->full = false;
--			mailbox_enable_irq(mq->mbox, IRQ_RX);
-+			mailbox_enable_irq(mbox, IRQ_RX);
- 		}
- 		spin_unlock_irq(&mq->lock);
+ int mailbox_msg_send(struct mailbox *mbox, struct mailbox_msg *msg)
+@@ -103,7 +90,7 @@ int mailbox_msg_send(struct mailbox *mbox, struct mailbox_msg *msg)
  	}
-@@ -210,21 +232,28 @@ static void __mbox_tx_interrupt(struct mailbox *mbox)
- static void __mbox_rx_interrupt(struct mailbox *mbox)
- {
- 	struct mailbox_queue *mq = mbox->rxq;
--	mbox_msg_t msg;
-+	struct mailbox_msg msg;
+ 
+ 	if (kfifo_is_empty(&mq->fifo) && !__mbox_poll_for_space(mbox)) {
+-		mbox_fifo_write(mbox, msg);
++		mbox_write(mbox, msg);
+ 		goto out;
+ 	}
+ 
+@@ -182,7 +169,7 @@ static void mbox_tx_tasklet(unsigned long tx_data)
+ 			msg.pdata = tx_data_buf;
+ 		}
+ 
+-		mbox_fifo_write(mbox, &msg);
++		mbox_write(mbox, &msg);
+ 	}
+ }
+ 
+@@ -236,7 +223,7 @@ static void __mbox_rx_interrupt(struct mailbox *mbox)
+ 	struct mailbox_msg msg;
  	int len;
  
- 	while (!mbox_fifo_empty(mbox)) {
--		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
-+		if (unlikely(kfifo_avail(&mq->fifo) <
-+				(sizeof(msg) + CONFIG_MBOX_DATA_SIZE))) {
+-	while (!mbox_fifo_empty(mbox)) {
++	while (!mbox_empty(mbox)) {
+ 		if (unlikely(kfifo_avail(&mq->fifo) <
+ 				(sizeof(msg) + CONFIG_MBOX_DATA_SIZE))) {
  			mailbox_disable_irq(mbox, IRQ_RX);
- 			mq->full = true;
+@@ -244,7 +231,7 @@ static void __mbox_rx_interrupt(struct mailbox *mbox)
  			goto nomem;
  		}
  
--		msg = mbox_fifo_read(mbox);
-+		mbox_fifo_read(mbox, &msg);
+-		mbox_fifo_read(mbox, &msg);
++		mbox_read(mbox, &msg);
  
  		len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
  		WARN_ON(len != sizeof(msg));
- 
-+		if (msg.pdata && msg.size) {
-+			len = kfifo_in(&mq->fifo, (unsigned char *)msg.pdata,
-+					msg.size);
-+			WARN_ON(len != msg.size);
-+		}
-+
- 		if (mbox->ops->type == MBOX_HW_FIFO1_TYPE)
- 			break;
- 	}
-@@ -450,10 +479,9 @@ static int __init mailbox_init(void)
- 		return err;
- 
- 	/* kfifo size sanity check: alignment and minimal size */
--	mbox_kfifo_size = ALIGN(mbox_kfifo_size, sizeof(mbox_msg_t));
-+	mbox_kfifo_size = ALIGN(mbox_kfifo_size, sizeof(struct mailbox_msg));
- 	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size,
--			sizeof(mbox_msg_t));
+@@ -254,9 +241,6 @@ static void __mbox_rx_interrupt(struct mailbox *mbox)
+ 					msg.size);
+ 			WARN_ON(len != msg.size);
+ 		}
 -
-+			sizeof(struct mailbox_msg) + CONFIG_MBOX_DATA_SIZE);
- 	return 0;
- }
- subsys_initcall(mailbox_init);
+-		if (mbox->ops->type == MBOX_HW_FIFO1_TYPE)
+-			break;
+ 	}
+ 
+ 	/* no more messages in the fifo. clear IRQ source. */
 diff --git a/drivers/mailbox/mailbox.h b/drivers/mailbox/mailbox.h
-index 530f191..23ac551 100644
+index 0a31c99..f103194 100644
 --- a/drivers/mailbox/mailbox.h
 +++ b/drivers/mailbox/mailbox.h
-@@ -19,8 +19,8 @@ struct mailbox_ops {
+@@ -11,18 +11,19 @@
+ #include <linux/mailbox.h>
+ 
+ typedef int __bitwise mailbox_type_t;
+-#define MBOX_HW_FIFO1_TYPE ((__force mailbox_type_t) 1)
+-#define MBOX_HW_FIFO2_TYPE ((__force mailbox_type_t) 2)
++#define MBOX_HW_FIFO1_TYPE	((__force mailbox_type_t) 1)
++#define MBOX_HW_FIFO2_TYPE	((__force mailbox_type_t) 2)
++#define MBOX_SHARED_MEM_TYPE	((__force mailbox_type_t) 3)
+ 
+ struct mailbox_ops {
+ 	mailbox_type_t        type;
  	int             (*startup)(struct mailbox *mbox);
  	void            (*shutdown)(struct mailbox *mbox);
  	/* fifo */
--	mbox_msg_t      (*fifo_read)(struct mailbox *mbox);
--	void            (*fifo_write)(struct mailbox *mbox, mbox_msg_t msg);
-+	mbox_msg_t      (*fifo_read)(struct mailbox *mbox, struct mailbox_msg *msg);
-+	int             (*fifo_write)(struct mailbox *mbox, struct mailbox_msg *msg);
- 	int             (*fifo_empty)(struct mailbox *mbox);
- 	int             (*fifo_full)(struct mailbox *mbox);
+-	mbox_msg_t      (*fifo_read)(struct mailbox *mbox, struct mailbox_msg *msg);
+-	int             (*fifo_write)(struct mailbox *mbox, struct mailbox_msg *msg);
+-	int             (*fifo_empty)(struct mailbox *mbox);
+-	int             (*fifo_full)(struct mailbox *mbox);
++	int             (*read)(struct mailbox *mbox, struct mailbox_msg *msg);
++	int             (*write)(struct mailbox *mbox, struct mailbox_msg *msg);
++	int             (*empty)(struct mailbox *mbox);
++	int             (*poll_for_space)(struct mailbox *mbox);
  	/* irq */
-@@ -40,7 +40,7 @@ struct mailbox_queue {
- 	struct kfifo            fifo;
- 	struct work_struct      work;
- 	struct tasklet_struct   tasklet;
--	struct mailbox        *mbox;
-+	struct mailbox          *mbox;
- 	bool full;
- };
+ 	void            (*enable_irq)(struct mailbox *mbox,
+ 			mailbox_irq_t irq);
+@@ -47,6 +48,7 @@ struct mailbox_queue {
  
-diff --git a/include/linux/mailbox.h b/include/linux/mailbox.h
-index 18c9502..d256e1a 100644
---- a/include/linux/mailbox.h
-+++ b/include/linux/mailbox.h
-@@ -7,7 +7,22 @@ typedef int __bitwise mailbox_irq_t;
- #define IRQ_TX ((__force mailbox_irq_t) 1)
- #define IRQ_RX ((__force mailbox_irq_t) 2)
- 
--int mailbox_msg_send(struct mailbox *, mbox_msg_t msg);
-+struct mailbox_msg {
-+	int		size;
-+	u32		header;
-+	void		*pdata;
-+};
-+
-+#define MAILBOX_FILL_MSG(_msg, _header, _pdata, _size) { \
-+	_msg.header = _header; \
-+	_msg.pdata = (void *)_pdata; \
-+	_msg.size = _size; \
-+}
-+
-+#define MAILBOX_FILL_HEADER_MSG(_msg, _header) \
-+	MAILBOX_FILL_MSG(_msg, _header, NULL, 0);
-+
-+int mailbox_msg_send(struct mailbox *, struct mailbox_msg *msg);
- 
- struct mailbox *mailbox_get(const char *, struct notifier_block *nb);
- void mailbox_put(struct mailbox *mbox, struct notifier_block *nb);
+ struct mailbox {
+ 	char                    *name;
++	unsigned int            id;
+ 	unsigned int            irq;
+ 	struct mailbox_queue  *txq, *rxq;
+ 	struct mailbox_ops    *ops;
 -- 
 1.7.11.1
