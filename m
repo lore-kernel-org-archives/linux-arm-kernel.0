@@ -1,46 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Dec 2012 10:14:43 +0000
-Subject: [PATCH] ARM: realview: fix private peripheral memory base for
- EB rev. B boards
-In-Reply-To: <1355760668-28606-1-git-send-email-will.deacon@arm.com>
-References: <1355760668-28606-1-git-send-email-will.deacon@arm.com>
-Message-ID: <50D04213.3050605@arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 18 Dec 2012 12:15:48 +0200
+Subject: [PATCH V3 1/5] ARM: tegra: add pending SGI checking API
+In-Reply-To: <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <1355797861-12759-2-git-send-email-josephl@nvidia.com>
+ <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
+Message-ID: <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/12 16:11, Will Deacon wrote:
-> Commit 34ae6c96a6a7 ("ARM: 7298/1: realview: fix mapping of MPCore
-> private memory region") accidentally broke the definition for the base
-> address of the private peripheral region on revision B Realview-EB
-> boards.
+On Tue, Dec 18, 2012 at 03:42:24AM +0100, Colin Cross wrote:
+> On Mon, Dec 17, 2012 at 6:30 PM, Joseph Lo <josephl@nvidia.com> wrote:
+> > The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
+> > include the power of GIC. That caused the SGI (Software Generated
+> > Interrupt) been lost. Because the SGI can't wake up the CPU that in
+> > the "powered-down" CPU idle mode. We need to check if there is any
+> > pending SGI when go into "powered-down" CPU idle mode. This is important
+> > especially when applying the coupled cpuidle framework into "power-down"
+> > cpuidle dirver. Because the coupled cpuidle framework may have the
+> > chance that misses IPI_SINGLE_FUNC handling sometimes.
 > 
-> This patch uses the correct address for REALVIEW_EB11MP_PRIV_MEM_BASE.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Tested-by: Florian Fainelli <florian@openwrt.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> This problem exists for any GIC-based SoC, and needs to be fixed in
+> gic_cpu_save or gic_dist_save, whichever one loses the interrupt.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Not necessarily. It depends on the SoC design. On Tegra20, the entire CPU
+cluster is railgated, including the GIC. This causes a pending IPI to be lost.
+But for example on OMAP4, only the actual CPU cores are powergated. The GIC
+stays alive until also the core domain hits idle. By that time a potential
+pending IPI has long woken up the target CPU again, so no additional
+checks are needed for functional correct behavior.
 
-> ---
->  arch/arm/mach-realview/include/mach/board-eb.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-realview/include/mach/board-eb.h b/arch/arm/mach-realview/include/mach/board-eb.h
-> index 124bce6..a301e61 100644
-> --- a/arch/arm/mach-realview/include/mach/board-eb.h
-> +++ b/arch/arm/mach-realview/include/mach/board-eb.h
-> @@ -47,7 +47,7 @@
->  #define REALVIEW_EB_USB_BASE		0x4F000000	/* USB */
->  
->  #ifdef CONFIG_REALVIEW_EB_ARM11MP_REVB
-> -#define REALVIEW_EB11MP_PRIV_MEM_BASE	0x1F000000
-> +#define REALVIEW_EB11MP_PRIV_MEM_BASE	0x10100000
->  #define REALVIEW_EB11MP_L220_BASE	0x10102000	/* L220 registers */
->  #define REALVIEW_EB11MP_SYS_PLD_CTRL1	0xD8		/* Register offset for MPCore sysctl */
->  #else
-> 
+Cheers,
 
-
--- 
-Jazz is not dead. It just smells funny...
+Peter.
