@@ -1,41 +1,42 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 18 Dec 2012 11:36:05 -0800
-Subject: [PATCH V3 1/5] ARM: tegra: add pending SGI checking API
-In-Reply-To: <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <1355797861-12759-2-git-send-email-josephl@nvidia.com>
- <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
- <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
-Message-ID: <CAMbhsRSDwSoHoEs93NZhDchCS28-vQCuW2p+kqfNKeqLygL2sQ@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 19 Dec 2012 08:39:15 +1300
+Subject: [PATCH RESEND 3/6] clk: exynos: Fix incorrect usage of
+ IS_ERR_OR_NULL
+In-Reply-To: <1355857917.24188.3.camel@gitbox>
+References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
+ <1355852048-23188-4-git-send-email-linux@prisktech.co.nz>
+ <20121218183944.GH5032@mwanda> <1355856767.23479.3.camel@gitbox>
+ <20121218190334.GK5032@mwanda> <1355857917.24188.3.camel@gitbox>
+Message-ID: <1355859555.24188.6.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 2:15 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> On Tue, Dec 18, 2012 at 03:42:24AM +0100, Colin Cross wrote:
->> On Mon, Dec 17, 2012 at 6:30 PM, Joseph Lo <josephl@nvidia.com> wrote:
->> > The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
->> > include the power of GIC. That caused the SGI (Software Generated
->> > Interrupt) been lost. Because the SGI can't wake up the CPU that in
->> > the "powered-down" CPU idle mode. We need to check if there is any
->> > pending SGI when go into "powered-down" CPU idle mode. This is important
->> > especially when applying the coupled cpuidle framework into "power-down"
->> > cpuidle dirver. Because the coupled cpuidle framework may have the
->> > chance that misses IPI_SINGLE_FUNC handling sometimes.
->>
->> This problem exists for any GIC-based SoC, and needs to be fixed in
->> gic_cpu_save or gic_dist_save, whichever one loses the interrupt.
->
-> Not necessarily. It depends on the SoC design. On Tegra20, the entire CPU
-> cluster is railgated, including the GIC. This causes a pending IPI to be lost.
-> But for example on OMAP4, only the actual CPU cores are powergated. The GIC
-> stays alive until also the core domain hits idle. By that time a potential
-> pending IPI has long woken up the target CPU again, so no additional
-> checks are needed for functional correct behavior.
+On Wed, 2012-12-19 at 08:11 +1300, Tony Prisk wrote:
+> On Tue, 2012-12-18 at 22:03 +0300, Dan Carpenter wrote:
+> > I don't care either way, but being different from the documentation
+> > is less bad than crashing which is what your patch does.  Please
+> > be more careful in the future.
+> > 
+> > regards,
+> > dan carpenter
+> 
+> Critism accepted.
+> 
+> Given that the driver depends on (PLAT_SAMSUNG || ARCH_MULTIPLATFORM),
+> and multiplatform select COMMON_CLK and PLAT_SAMSUNG is selected only by
+> ARCH_S3C64XX which has HAVE_CLK I didn't see a problem here.
+> 
+> Your point is still valid and I will sort it out with Mike first.
+> 
+> Regards
+> Tony P
 
-I'm not sure that is correct for OMAP4.  C2 and C3 will put the power
-rail for the GIC in retention, and I don't think an IPI will wake it
-up.  I believe the same problem also exists for Exynos5.  In any case,
-checking for an IPI early during idle and aborting won't hurt those
-platforms, so I still think it should be in the GIC driver and not by
-mapping the GIC registers into a separate driver.
+Actually, I was wrong here - PLAT_SAMSUNG is selectable via
+
+PLAT_S3C24XX || ARCH_S3C64XX || PLAT_S5P
+
+but all these options (or the options that select them) seem to select a
+clock system as well, hence still no reason for a crash.
+
+Regards
+Tony P
