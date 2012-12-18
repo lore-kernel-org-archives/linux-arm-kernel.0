@@ -1,278 +1,120 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Wed, 19 Dec 2012 00:19:06 +0100
-Subject: [PATCH v2] usb: phy: samsung: Add support to set pmu isolation
-In-Reply-To: <1355838966-11269-1-git-send-email-gautam.vivek@samsung.com>
-References: <1355810167-18425-2-git-send-email-gautam.vivek@samsung.com>
- <1355838966-11269-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <50D0F9EA.9090002@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 18 Dec 2012 23:34:35 +0000
+Subject: [PATCH] ARM: VIC: use irq_domain_add_simple()
+In-Reply-To: <507D61E7.2080704@gmail.com>
+References: <1350392786-29191-1-git-send-email-linus.walleij@stericsson.com>
+ <507D61E7.2080704@gmail.com>
+Message-ID: <CACxGe6tBLfj3CDDZAfGmznj3B-h4OfJsrRc+85w9fnxFH6Cd_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+Russell,
 
-On 12/18/2012 02:56 PM, Vivek Gautam wrote:
-> Adding support to parse device node data in order to get
-> required properties to set pmu isolation for usb-phy.
+It looks to me like the below patch breaks versatile because it makes
+it try to register a linear irq_domain instead of the legacy one that
+it needs. Here are the relevant commits:
+
+07c9249f1: "ARM: 7554/1: VIC: use irq_domain_add_simple()"
+946c59a08: "ARM: vic: fix build warning caused by previous commit"
+
+I'm working on getting it properly sorted out (and more importantly
+*simplified*), but in the mean time I think the above two commits need
+to be reverted. Reverting them on my tree fixes booting for me.
+
+g.
+
+On Tue, Oct 16, 2012 at 2:32 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On 10/16/2012 08:06 AM, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Instead of allocating descriptors on-the-fly for the device tree
+>> initialization case, use irq_domain_add_simple() which will take
+>> care of this if you pass negative as the first_irq.
+>>
+>> Alter the signature of __vic_init() to pass the first_irq as
+>> signed so this works as expected.
+>>
+>> Switching the VIC to use irq_domain_add_simple() also has the
+>> upside of displaying the same WARNING when you boot with
+>> pre-allocated descriptors on systems using SPARSE_IRQ but
+>> yet not using device tree.
+>>
+>> Cc: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> Signed-off-by: Vivek Gautam<gautam.vivek@samsung.com>
-> ---
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 >
-> Changes from v1:
->   - Changed the name of property for phy handler from'samsung,usb-phyctrl'
->     to 'samsung,usb-phyhandle' to make it look more generic.
->   - Similarly 'samsung,phyctrl-reg' is changed to 'samsung,phyhandle-reg'
->   - Added a check for 'samsung,usb-phyhandle' before getting node from
->     phandle.
->   - Putting the node using 'of_node_put()' which had been missed.
->   - Adding necessary check for the pointer in 'samsung_usbphy_set_isolation()'
->     to avoid any NULL pointer dereferencing.
->   - Unmapping the register ioremapped in 'samsung_usbphy_parse_dt_param()'.
+> Rob
 >
+>> ---
+>>  arch/arm/common/vic.c               | 18 ++++++------------
+>>  arch/arm/include/asm/hardware/vic.h |  2 +-
+>>  2 files changed, 7 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+>> index e0d5388..4fd5d98 100644
+>> --- a/arch/arm/common/vic.c
+>> +++ b/arch/arm/common/vic.c
+>> @@ -218,7 +218,7 @@ static void __init vic_register(void __iomem *base, unsigned int irq,
+>>       v->resume_sources = resume_sources;
+>>       v->irq = irq;
+>>       vic_id++;
+>> -     v->domain = irq_domain_add_legacy(node, fls(valid_sources), irq, 0,
+>> +     v->domain = irq_domain_add_simple(node, fls(valid_sources), irq,
+>>                                         &vic_irqdomain_ops, v);
+>>  }
+>>
+>> @@ -350,7 +350,7 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
+>>       vic_register(base, irq_start, vic_sources, 0, node);
+>>  }
+>>
+>> -void __init __vic_init(void __iomem *base, unsigned int irq_start,
+>> +void __init __vic_init(void __iomem *base, int irq_start,
+>>                             u32 vic_sources, u32 resume_sources,
+>>                             struct device_node *node)
+>>  {
+>> @@ -416,18 +416,12 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+>>       if (WARN_ON(!regs))
+>>               return -EIO;
+>>
+>> -     irq_base = irq_alloc_descs(-1, 0, 32, numa_node_id());
+>> -     if (WARN_ON(irq_base < 0))
+>> -             goto out_unmap;
+>> -
+>> -     __vic_init(regs, irq_base, ~0, ~0, node);
+>> +     /*
+>> +      * Passing -1 as first IRQ makes the simple domain allocate descriptors
+>> +      */
+>> +     __vic_init(regs, -1, ~0, ~0, node);
+>>
+>>       return 0;
+>> -
+>> - out_unmap:
+>> -     iounmap(regs);
+>> -
+>> -     return -EIO;
+>>  }
+>>  #endif /* CONFIG OF */
+>>
+>> diff --git a/arch/arm/include/asm/hardware/vic.h b/arch/arm/include/asm/hardware/vic.h
+>> index e14af1a..2bebad3 100644
+>> --- a/arch/arm/include/asm/hardware/vic.h
+>> +++ b/arch/arm/include/asm/hardware/vic.h
+>> @@ -47,7 +47,7 @@
+>>  struct device_node;
+>>  struct pt_regs;
+>>
+>> -void __vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources,
+>> +void __vic_init(void __iomem *base, int irq_start, u32 vic_sources,
+>>               u32 resume_sources, struct device_node *node);
+>>  void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
+>>  int vic_of_init(struct device_node *node, struct device_node *parent);
+>>
 >
->   .../devicetree/bindings/usb/samsung-usbphy.txt     |   12 +++
->   drivers/usb/phy/samsung-usbphy.c                   |   94 ++++++++++++++++++--
->   2 files changed, 98 insertions(+), 8 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
-> index 7b26e2d..a7b28b2 100644
-> --- a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
-> +++ b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
-> @@ -9,3 +9,15 @@ Required properties:
->   - compatible : should be "samsung,exynos4210-usbphy"
->   - reg : base physical address of the phy registers and length of memory mapped
->   	region.
-> +
-> +Optional properties:
-> +- samsung,usb-phyhandle : should point to usb-phyhandle sub-node which provides
-> +			binding data to enable/disable device PHY handled by
-> +			PMU register.
-> +
-> +			Required properties:
-> +			- compatible : should be "samsung,usbdev-phyctrl" for
-> +					DEVICE type phy.
-> +			- samsung,phyhandle-reg: base physical address of
-> +						PHY_CONTROL register in PMU.
-> +- samsung,enable-mask : should be '1'
 
-This should only be 1 for Exynos4210+ SoCs, right ?
-S5PV210 uses bit 0 for OTG and bit1 for USB host, doesn't it ? And for 
-s3c64xx
-it seems to be bit 16.
 
-How about deriving this information from 'compatible' property instead ?
-
-Maybe you could just encode the USB PMU registers (I assume those aren't
-touched by anything but the usb drivers) in a regular 'reg' property in
-an usbphy subnode. Then the driver could interpret it also with help
-of 'compatible' property. And you could just use of_iomap(). E.g.
-
-  usbphy at 12130000 {
-  	compatible = "samsung,exynos5250-usbphy";
-	reg = <0x12130000 0x100>, <0x12100000 0x100>;
-	usbphy-pmu {
-		/* USB device and host PHY_CONTROL registers */
-		reg = <0x10040704 8>;
-	};
-  };
-
-Your "samsung,usb-phyhandle" approach seems over-engineered to me.
-I might be missing something though.
-
-> diff --git a/drivers/usb/phy/samsung-usbphy.c b/drivers/usb/phy/samsung-usbphy.c
-> index 5c5e1bb5..4ceabe3 100644
-> --- a/drivers/usb/phy/samsung-usbphy.c
-> +++ b/drivers/usb/phy/samsung-usbphy.c
-> @@ -72,6 +72,8 @@ enum samsung_cpu_type {
->    * @dev: The parent device supplied to the probe function
->    * @clk: usb phy clock
->    * @regs: usb phy register memory base
-> + * @devctrl_reg: usb device phy-control pmu register memory base
-
-hum, this name is not really helpful in understanding what's going
-on here.
-
-Looking at arch/arm/mach-s5pv210/setup-usb-phy.c, there is only one
-PHY_CONTROL (Power Management Unit) register for both OTG and USB host
-PHYs. So are you really taking care of that case as well ?
-
-> + * @en_mask: enable mask
->    * @ref_clk_freq: reference clock frequency selection
->    * @cpu_type: machine identifier
->    */
-> @@ -81,12 +83,73 @@ struct samsung_usbphy {
->   	struct device	*dev;
->   	struct clk	*clk;
->   	void __iomem	*regs;
-> +	void __iomem	*devctrl_reg;
-> +	u32		en_mask;
->   	int		ref_clk_freq;
->   	int		cpu_type;
->   };
->
->   #define phy_to_sphy(x)		container_of((x), struct samsung_usbphy, phy)
->
-> +static int samsung_usbphy_parse_dt_param(struct samsung_usbphy *sphy)
-> +{
-> +	struct device_node *usb_phyctrl;
-> +	u32 reg;
-> +	int lenp;
-> +
-> +	if (!sphy->dev->of_node) {
-> +		sphy->devctrl_reg = NULL;
-> +		return -ENODEV;
-> +	}
-> +
-> +	if (of_get_property(sphy->dev->of_node, "samsung,usb-phyhandle",&lenp)) {
-> +		usb_phyctrl = of_parse_phandle(sphy->dev->of_node,
-> +						"samsung,usb-phyhandle", 0);
-> +		if (!usb_phyctrl) {
-> +			dev_warn(sphy->dev, "Can't get usb-phy handle\n");
-> +			sphy->devctrl_reg = NULL;
-> +		}
-> +
-> +		of_property_read_u32(usb_phyctrl, "samsung,phyhandle-reg",&reg);
-> +
-> +		sphy->devctrl_reg = ioremap(reg, SZ_4);
-
-What happens if invalid address value is assigned to 
-'samsung,phyhandle-reg' ?
-
-> +		of_property_read_u32(sphy->dev->of_node, "samsung,enable-mask",
-> +							&sphy->en_mask);
-> +		of_node_put(usb_phyctrl);
-> +	} else {
-> +		dev_warn(sphy->dev, "Can't get usb-phy handle\n");
-> +		sphy->devctrl_reg = NULL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Set isolation here for phy.
-> + * SOCs control this by controlling corresponding PMU registers
-> + */
-> +static void samsung_usbphy_set_isolation(struct samsung_usbphy *sphy, int on)
-> +{
-> +	void __iomem *usb_phyctrl_reg;
-> +	u32 en_mask = sphy->en_mask;
-> +	u32 reg;
-> +
-> +	usb_phyctrl_reg = sphy->devctrl_reg;
-> +
-> +	if (!usb_phyctrl_reg) {
-> +		dev_warn(sphy->dev, "Can't set pmu isolation\n");
-> +		return;
-> +	}
-> +
-> +	reg = readl(usb_phyctrl_reg);
-> +
-> +	if (on)
-> +		writel(reg&  ~en_mask, usb_phyctrl_reg);
-> +	else
-> +		writel(reg | en_mask, usb_phyctrl_reg);
-> +}
-> +
->   /*
->    * Returns reference clock frequency selection value
->    */
-> @@ -199,6 +262,8 @@ static int samsung_usbphy_init(struct usb_phy *phy)
->   	/* Disable phy isolation */
->   	if (sphy->plat&&  sphy->plat->pmu_isolation)
->   		sphy->plat->pmu_isolation(false);
-> +	else
-> +		samsung_usbphy_set_isolation(sphy, false);
->
->   	/* Initialize usb phy registers */
->   	samsung_usbphy_enable(sphy);
-> @@ -228,6 +293,8 @@ static void samsung_usbphy_shutdown(struct usb_phy *phy)
->   	/* Enable phy isolation */
->   	if (sphy->plat&&  sphy->plat->pmu_isolation)
->   		sphy->plat->pmu_isolation(true);
-> +	else
-> +		samsung_usbphy_set_isolation(sphy, true);
->
->   	clk_disable_unprepare(sphy->clk);
->   }
-> @@ -249,17 +316,12 @@ static inline int samsung_usbphy_get_driver_data(struct platform_device *pdev)
->   static int __devinit samsung_usbphy_probe(struct platform_device *pdev)
->   {
->   	struct samsung_usbphy *sphy;
-> -	struct samsung_usbphy_data *pdata;
-> +	struct samsung_usbphy_data *pdata = pdev->dev.platform_data;
->   	struct device *dev =&pdev->dev;
->   	struct resource *phy_mem;
->   	void __iomem	*phy_base;
->   	struct clk *clk;
-> -
-> -	pdata = pdev->dev.platform_data;
-> -	if (!pdata) {
-> -		dev_err(&pdev->dev, "%s: no platform data defined\n", __func__);
-> -		return -EINVAL;
-> -	}
-> +	int ret;
->
->   	phy_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->   	if (!phy_mem) {
-> @@ -283,7 +345,20 @@ static int __devinit samsung_usbphy_probe(struct platform_device *pdev)
->   		return PTR_ERR(clk);
->   	}
->
-> -	sphy->dev		=&pdev->dev;
-> +	sphy->dev =&pdev->dev;
-
-	sphy->dev = dev;
-
-> +
-> +	ret = samsung_usbphy_parse_dt_param(sphy);
-> +	if (ret) {
-> +		/* fallback to pdata */
-> +		if (!pdata) {
-> +			dev_err(&pdev->dev,
-> +				"%s: no device data found\n", __func__);
-
-I find term "device data" a bit confusing here.
-
-> +			return -ENODEV;
-
-In the original code -EINVAL was returned when platform_data was not set.
-
-> +		} else {
-> +			sphy->plat = pdata;
-> +		}
-> +	}
-> +
-
-How about rewriting this to:
-
-	if (dev->of_node) {
-		ret = samsung_usbphy_parse_dt_param(sphy);
-		if (ret < 0)
-			return ret;
-	} else {
-		if (!pdata) {
-			dev_err(dev, "no platform data specified\n");
-			return -EINVAL;
-		}
-	}	
-
-This way we won't be obfuscating any error code returned from the
-OF parsing function.
-
->   	sphy->plat		= pdata;
->   	sphy->regs		= phy_base;
->   	sphy->clk		= clk;
-> @@ -305,6 +380,9 @@ static int __exit samsung_usbphy_remove(struct platform_device *pdev)
->
->   	usb_remove_phy(&sphy->phy);
->
-> +	if (sphy->devctrl_reg)
-> +		iounmap(sphy->devctrl_reg);
-> +
->   	return 0;
->   }
 
 --
-
-Regards,
-Sylwester
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
