@@ -1,48 +1,39 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Dec 2012 15:33:51 +0100
-Subject: [PATCH 06/18] arm: mvebu: add pin muxing options for the SDIO
- interface on Armada 370
+Date: Tue, 18 Dec 2012 15:33:53 +0100
+Subject: [PATCH 08/18] arm: mvebu: enable the SD card slot on Armada XP DB
+ board
 In-Reply-To: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1355841243-3254-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1355841243-3254-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDIO interface is available either on pins MPP9/11/12/13/14/15 or
-MPP47/48/49/50/51/52 on the Armada 370. Even though all combinations
-are potentially possible, those two muxing options are the most
-probable ones, so we provide those at the SoC level .dtsi file.
-
-In practice, in turns out the Armada 370 DB board uses the former,
-while the Armada 370 Mirabox uses the latter.
+The Armada XP DB evaluation board has one SD card slot, directly
+connected to the SDIO IP of the SoC, so we enable this
+IP. Unfortunately, there are no GPIOs for card-detect and
+write-protect.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370.dtsi |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/armada-xp-db.dts |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 636cf7d..88f9bab 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -47,6 +47,18 @@
- 		pinctrl {
- 			compatible = "marvell,mv88f6710-pinctrl";
- 			reg = <0xd0018000 0x38>;
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index 8e53b25..c7035c5 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -90,5 +90,12 @@
+ 			phy = <&phy3>;
+ 			phy-mode = "sgmii";
+ 		};
 +
-+			sdio_pins1: sdio-pins1 {
-+			      marvell,pins = "mpp9",  "mpp11", "mpp12",
-+					     "mpp13", "mpp14", "mpp15";
-+			      marvell,function = "sd0";
-+			};
-+
-+			sdio_pins2: sdio-pins2 {
-+			      marvell,pins = "mpp47", "mpp48", "mpp49",
-+					     "mpp50", "mpp51", "mpp52";
-+			      marvell,function = "sd0";
-+			};
- 	        };
- 
- 		gpio0: gpio at d0018100 {
++		mvsdio at d00d4000 {
++			pinctrl-0 = <&sdio_pins>;
++			pinctrl-names = "default";
++			status = "okay";
++			/* No CD or WP GPIOs */
++		};
+ 	};
+ };
 -- 
 1.7.9.5
