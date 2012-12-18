@@ -1,44 +1,156 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 18 Dec 2012 21:12:01 +0800
-Subject: [PATCH] net: fec: forbid FEC_PTP on SoCs that do not support
-In-Reply-To: <1355836004-22067-1-git-send-email-shawn.guo@linaro.org>
-References: <1355836004-22067-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20121218131159.GA16251@S2101-09.ap.freescale.net>
+From: loic.pallardy-ext@stericsson.com (Loic Pallardy)
+Date: Tue, 18 Dec 2012 14:10:05 +0100
+Subject: [PATCH 2/9] mailbox: split internal header from API header
+In-Reply-To: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
+References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
+Message-ID: <1355836212-17956-3-git-send-email-loic.pallardy-ext@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Misspelled Frank's email address.  Copy him.  Sorry.
+Now internal structures can remain hidden to the user and just API
+related functions and defines are made available.
 
-On Tue, Dec 18, 2012 at 09:06:44PM +0800, Shawn Guo wrote:
-> Beside imx6q, the kernel built from imx_v6_v7_defconfig is also
-> supposed to be running on other IMX SoCs that do not have the PTP
-> block.  Before fec driver gets fixed to run-time detect target hardware
-> rather than conditional compiling with #ifdef CONFIG_FEC_PTP, let's
-> give it a quick fix in Kconfig to forbid FEC_PTP on those IMX SoCs that
-> do not support PTP.
-> 
-> Reported-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/net/ethernet/freescale/Kconfig |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
-> index 5ba6e1c..ec490d7 100644
-> --- a/drivers/net/ethernet/freescale/Kconfig
-> +++ b/drivers/net/ethernet/freescale/Kconfig
-> @@ -94,9 +94,8 @@ config GIANFAR
->  
->  config FEC_PTP
->  	bool "PTP Hardware Clock (PHC)"
-> -	depends on FEC && ARCH_MXC
-> +	depends on FEC && ARCH_MXC && !SOC_IMX25 && !SOC_IMX27 && !SOC_IMX35 && !SOC_IMX5
->  	select PTP_1588_CLOCK
-> -	default y if SOC_IMX6Q
->  	--help---
->  	  Say Y here if you want to use PTP Hardware Clock (PHC) in the
->  	  driver.  Only the basic clock operations have been implemented.
-> -- 
-> 1.7.9.5
-> 
-> 
+Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+---
+ drivers/mailbox/mailbox.c | 34 ++++++++++++++++++++++++++++++++++
+ drivers/mailbox/mailbox.h | 44 +-------------------------------------------
+ include/linux/mailbox.h   | 18 ++++++++++++++++++
+ 3 files changed, 53 insertions(+), 43 deletions(-)
+ create mode 100644 include/linux/mailbox.h
+
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index aec291d0..8cb3b15 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -116,6 +116,40 @@ out:
+ }
+ EXPORT_SYMBOL(omap_mbox_msg_send);
+ 
++void omap_mbox_save_ctx(struct omap_mbox *mbox)
++{
++	if (!mbox->ops->save_ctx) {
++		dev_err(mbox->dev, "%s:\tno save\n", __func__);
++		return;
++	}
++
++	mbox->ops->save_ctx(mbox);
++}
++EXPORT_SYMBOL(omap_mbox_save_ctx);
++
++void omap_mbox_restore_ctx(struct omap_mbox *mbox)
++{
++	if (!mbox->ops->restore_ctx) {
++		dev_err(mbox->dev, "%s:\tno restore\n", __func__);
++		return;
++	}
++
++	mbox->ops->restore_ctx(mbox);
++}
++EXPORT_SYMBOL(omap_mbox_restore_ctx);
++
++void omap_mbox_enable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
++{
++	mbox->ops->enable_irq(mbox, irq);
++}
++EXPORT_SYMBOL(omap_mbox_enable_irq);
++
++void omap_mbox_disable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
++{
++	mbox->ops->disable_irq(mbox, irq);
++}
++EXPORT_SYMBOL(omap_mbox_disable_irq);
++
+ static void mbox_tx_tasklet(unsigned long tx_data)
+ {
+ 	struct omap_mbox *mbox = (struct omap_mbox *)tx_data;
+diff --git a/drivers/mailbox/mailbox.h b/drivers/mailbox/mailbox.h
+index 88a9f6a..bf3c1b4 100644
+--- a/drivers/mailbox/mailbox.h
++++ b/drivers/mailbox/mailbox.h
+@@ -8,13 +8,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/device.h>
+ #include <linux/kfifo.h>
+-
+-typedef u32 mbox_msg_t;
+-struct omap_mbox;
+-
+-typedef int __bitwise omap_mbox_irq_t;
+-#define IRQ_TX ((__force omap_mbox_irq_t) 1)
+-#define IRQ_RX ((__force omap_mbox_irq_t) 2)
++#include <linux/mailbox.h>
+ 
+ typedef int __bitwise omap_mbox_type_t;
+ #define OMAP_MBOX_TYPE1 ((__force omap_mbox_type_t) 1)
+@@ -61,45 +55,9 @@ struct omap_mbox {
+ 	struct blocking_notifier_head   notifier;
+ };
+ 
+-int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
+ void omap_mbox_init_seq(struct omap_mbox *);
+ 
+-struct omap_mbox *omap_mbox_get(const char *, struct notifier_block *nb);
+-void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb);
+-
+ int omap_mbox_register(struct device *parent, struct omap_mbox **);
+ int omap_mbox_unregister(void);
+ 
+-static inline void omap_mbox_save_ctx(struct omap_mbox *mbox)
+-{
+-	if (!mbox->ops->save_ctx) {
+-		dev_err(mbox->dev, "%s:\tno save\n", __func__);
+-		return;
+-	}
+-
+-	mbox->ops->save_ctx(mbox);
+-}
+-
+-static inline void omap_mbox_restore_ctx(struct omap_mbox *mbox)
+-{
+-	if (!mbox->ops->restore_ctx) {
+-		dev_err(mbox->dev, "%s:\tno restore\n", __func__);
+-		return;
+-	}
+-
+-	mbox->ops->restore_ctx(mbox);
+-}
+-
+-static inline void omap_mbox_enable_irq(struct omap_mbox *mbox,
+-		omap_mbox_irq_t irq)
+-{
+-	mbox->ops->enable_irq(mbox, irq);
+-}
+-
+-static inline void omap_mbox_disable_irq(struct omap_mbox *mbox,
+-		omap_mbox_irq_t irq)
+-{
+-	mbox->ops->disable_irq(mbox, irq);
+-}
+-
+ #endif /* MAILBOX_H */
+diff --git a/include/linux/mailbox.h b/include/linux/mailbox.h
+new file mode 100644
+index 0000000..78ef848
+--- /dev/null
++++ b/include/linux/mailbox.h
+@@ -0,0 +1,18 @@
++/* mailbox.h */
++
++typedef u32 mbox_msg_t;
++struct omap_mbox;
++
++typedef int __bitwise omap_mbox_irq_t;
++#define IRQ_TX ((__force omap_mbox_irq_t) 1)
++#define IRQ_RX ((__force omap_mbox_irq_t) 2)
++
++int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
++
++struct omap_mbox *omap_mbox_get(const char *, struct notifier_block *nb);
++void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb);
++
++void omap_mbox_save_ctx(struct omap_mbox *mbox);
++void omap_mbox_restore_ctx(struct omap_mbox *mbox);
++void omap_mbox_enable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq);
++void omap_mbox_disable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq);
+-- 
+1.7.11.1
