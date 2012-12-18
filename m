@@ -1,28 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 18 Dec 2012 17:35:28 +0100
-Subject: [PATCH 17/18] arm: mvebu: enable mwifiex driver in mvebu_defconfig
-In-Reply-To: <1355841243-3254-18-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1355841243-3254-18-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121218163528.GL3392@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 18 Dec 2012 09:55:17 -0700
+Subject: [PATCH 2/4] ARM: tegra: add connection name for uart clock table
+In-Reply-To: <50D015B5.8050805@nvidia.com>
+References: <1355746101-15291-1-git-send-email-ldewangan@nvidia.com>
+ <1355746101-15291-3-git-send-email-ldewangan@nvidia.com>
+ <50CF9233.3010506@wwwdotorg.org> <50D015B5.8050805@nvidia.com>
+Message-ID: <50D09FF5.7050901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 03:34:02PM +0100, Thomas Petazzoni wrote:
-> The Globalscale Mirabox platform, based on the Armada 370 from
-> Marvell, has a SD8787 Wireless chip connected on the SDIO
-> interface. Now that the mvsdio has a Device Tree binding, and the
-> necessary Device Tree informations have been added at the SoC and
-> board level, let's enable the mwifiex driver for the Wireless part of
-> the SD8787 chip.
+On 12/18/2012 12:05 AM, Laxman Dewangan wrote:
+> On Tuesday 18 December 2012 03:14 AM, Stephen Warren wrote:
+>> On 12/17/2012 05:08 AM, Laxman Dewangan wrote:
+>>> Add connection name "uart-clk" for the uart clock information.
+>>
+>> Does the UART receive more than one clock, so that it actually cares
+>> what the clock connection name is? If not, can we just drop this patch?
 > 
-> For now, the driver gets probed correctly, detects a device and shows
-> the network interfaces. However, scanning Wifi networks doesn't work
-> for now, with a 'CMD_RESP: cmd 0x6 error, result=0x1' message. This
-> will have to be investigated separately.
+> I like to have this patch because:
+> - In future, I want to also get the name of the clock source and set
+> parent of uart clock properly.
 
-Hi Thomas
+I don't understand that; drivers should not care about the names of
+clocks; the names will be entirely irrelevant once we get clocks from DT.
 
-Sounds similar to what i see on topkick with the mwifiex driver.
+> - I want to switch the parent clock source dynamically between CLKM and
+> PLLP to achieve more power optimization i.e. use CLKM wherever possible..
 
-       Andrew
+I'd prefer to defer that until after we get clocks from DT. Otherwise,
+we're just adding more churn to the old clock driver first. It'd be
+better to just switch to the new clock driver, put all the clocks in DT,
+and then build on that.
