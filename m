@@ -1,57 +1,48 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Dec 2012 15:33:49 +0100
-Subject: [PATCH 04/18] mmc: mvsdio: add pinctrl integration
+Date: Tue, 18 Dec 2012 15:33:51 +0100
+Subject: [PATCH 06/18] arm: mvebu: add pin muxing options for the SDIO
+ interface on Armada 370
 In-Reply-To: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1355841243-3254-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1355841243-3254-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On many Marvell SoCs, the pins used for the SDIO interface are part of
-the MPP pins, that are muxable pins. In order to get the muxing of
-those pins correct, this commit integrates the mvsdio driver with the
-pinctrl infrastructure by calling devm_pinctrl_get_select_default()
-during ->probe().
+The SDIO interface is available either on pins MPP9/11/12/13/14/15 or
+MPP47/48/49/50/51/52 on the Armada 370. Even though all combinations
+are potentially possible, those two muxing options are the most
+probable ones, so we provide those at the SoC level .dtsi file.
 
-Note that we permit this function to fail because not all Marvell
-platforms have yet been fully converted to using the pinctrl
-infrastructure.
+In practice, in turns out the Armada 370 DB board uses the former,
+while the Armada 370 Mirabox uses the latter.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/mmc/host/mvsdio.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/armada-370.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index 56954bc..feb16bd 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -25,6 +25,7 @@
- #include <linux/of_irq.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/slot-gpio.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #include <asm/sizes.h>
- #include <asm/unaligned.h>
-@@ -692,6 +693,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	struct resource *r;
- 	int ret, irq;
- 	int gpio_card_detect, gpio_write_protect;
-+	struct pinctrl *pinctrl;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(pdev, 0);
-@@ -713,6 +715,10 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	host->dev = &pdev->dev;
- 	host->res = r;
- 
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl))
-+		dev_warn(&pdev->dev, "no pins associated\n");
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 636cf7d..88f9bab 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -47,6 +47,18 @@
+ 		pinctrl {
+ 			compatible = "marvell,mv88f6710-pinctrl";
+ 			reg = <0xd0018000 0x38>;
 +
- 	/* Some non-DT platforms do not pass a clock, and the clock
- 	   frequency is passed through platform_data. On DT platforms,
- 	   a clock must always be passed, even if there is no gatable
++			sdio_pins1: sdio-pins1 {
++			      marvell,pins = "mpp9",  "mpp11", "mpp12",
++					     "mpp13", "mpp14", "mpp15";
++			      marvell,function = "sd0";
++			};
++
++			sdio_pins2: sdio-pins2 {
++			      marvell,pins = "mpp47", "mpp48", "mpp49",
++					     "mpp50", "mpp51", "mpp52";
++			      marvell,function = "sd0";
++			};
+ 	        };
+ 
+ 		gpio0: gpio at d0018100 {
 -- 
 1.7.9.5
