@@ -1,82 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Dec 2012 17:53:13 +0000
-Subject: [PATCH v3 3/6] ARM: psci: add devicetree binding for describing PSCI
- firmware
+Date: Tue, 18 Dec 2012 17:53:12 +0000
+Subject: [PATCH v3 2/6] ARM: opcodes: add opcodes definitions for ARM security
+ extensions
 In-Reply-To: <1355853196-23676-1-git-send-email-will.deacon@arm.com>
 References: <1355853196-23676-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1355853196-23676-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1355853196-23676-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new devicetree binding for describing PSCI firmware
-to Linux.
+The ARM security extensions introduced the smc instruction, which is not
+supported by all versions of GAS.
 
+This patch introduces opcodes-sec.h, so that smc is made available in a
+similar manner to hvc.
+
+Acked-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- Documentation/devicetree/bindings/arm/psci.txt | 55 ++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/psci.txt
+ arch/arm/include/asm/opcodes-sec.h | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 arch/arm/include/asm/opcodes-sec.h
 
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+diff --git a/arch/arm/include/asm/opcodes-sec.h b/arch/arm/include/asm/opcodes-sec.h
 new file mode 100644
-index 0000000..433afe9
+index 0000000..bc3a917
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -0,0 +1,55 @@
-+* Power State Coordination Interface (PSCI)
++++ b/arch/arm/include/asm/opcodes-sec.h
+@@ -0,0 +1,24 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2012 ARM Limited
++ */
 +
-+Firmware implementing the PSCI functions described in ARM document number
-+ARM DEN 0022A ("Power State Coordination Interface System Software on ARM
-+processors") can be used by Linux to initiate various CPU-centric power
-+operations.
++#ifndef __ASM_ARM_OPCODES_SEC_H
++#define __ASM_ARM_OPCODES_SEC_H
 +
-+Issue A of the specification describes functions for CPU suspend, hotplug
-+and migration of secure software.
++#include <asm/opcodes.h>
 +
-+Functions are invoked by trapping to the privilege level of the PSCI
-+firmware (specified as part of the binding below) and passing arguments
-+in a manner similar to that specified by AAPCS:
++#define __SMC(imm4) __inst_arm_thumb32(					\
++	0xE1600070 | (((imm4) & 0xF) << 0),				\
++	0xF7F08000 | (((imm4) & 0xF) << 16)				\
++)
 +
-+	 r0		=> 32-bit Function ID / return value
-+	{r1 - r3}	=> Parameters
-+
-+Note that the immediate field of the trapping instruction must be set
-+to #0.
-+
-+
-+Main node required properties:
-+
-+ - compatible    : Must be "arm,psci"
-+
-+ - method        : The method of calling the PSCI firmware. Permitted
-+                   values are:
-+
-+                   "smc" : SMC #0, with the register assignments specified
-+		           in this binding.
-+
-+                   "hvc" : HVC #0, with the register assignments specified
-+		           in this binding.
-+
-+Main node optional properties:
-+
-+ - cpu_suspend   : Function ID for CPU_SUSPEND operation
-+
-+ - cpu_off       : Function ID for CPU_OFF operation
-+
-+ - cpu_on        : Function ID for CPU_ON operation
-+
-+ - migrate       : Function ID for MIGRATE operation
-+
-+
-+Example:
-+
-+	psci {
-+		compatible	= "arm,psci";
-+		method		= "smc";
-+		cpu_suspend	= <0x95c10000>;
-+		cpu_off		= <0x95c10001>;
-+		cpu_on		= <0x95c10002>;
-+		migrate		= <0x95c10003>;
-+	};
++#endif /* __ASM_ARM_OPCODES_SEC_H */
 -- 
 1.8.0
