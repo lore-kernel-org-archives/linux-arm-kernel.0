@@ -1,29 +1,100 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 18 Dec 2012 09:39:24 +0900
-Subject: [PATCH 09/10] ARM: shmobile: sh7372: Do not initialise TMU when
- using DT
-In-Reply-To: <Pine.LNX.4.64.1212171056150.24007@axis700.grange>
-References: <1355562224-29448-1-git-send-email-horms+renesas@verge.net.au>
- <1355562224-29448-10-git-send-email-horms+renesas@verge.net.au>
- <Pine.LNX.4.64.1212171056150.24007@axis700.grange>
-Message-ID: <20121218003924.GJ7146@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Dec 2012 16:39:47 -0800
+Subject: [GIT PULL 1/2] omap fixes for v3.8 merge window
+In-Reply-To: <pull-1355771447-111279>
+References: <pull-1355771447-111279>
+Message-ID: <20121218003946.GA4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 17, 2012 at 10:58:39AM +0100, Guennadi Liakhovetski wrote:
-> Hi Simon
+* Tony Lindgren <tony@atomide.com> [121217 11:13]:
+> The following changes since commit 2b8318881ddbcb67c5e8d2178b42284749442222:
 > 
-> On Sat, 15 Dec 2012, Simon Horman wrote:
+>   Merge tag 'fbdev-for-3.8' of git://gitorious.org/linux-omap-dss2/linux (2012-12-15 13:03:48 -0800)
 > 
-> > This is in preparation for initialising INTC using DT.
-> > The proposed INTC configuration is not complete and does
-> > not allow the TMU to be initialised, to exclude it when using DT.
+> are available in the git repository at:
 > 
-> Not sure why you decide to not include incs, as I said, it is quite 
-> important on sh7372. If we do find a way to include it back, then this 
-> patch becomes unnecessary too.
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/fixes-for-merge-window-v4-signed
+> 
+> for you to fetch changes up to 2cb85a7bd2ca6db3ab3d632d0a1b6ca3770ddcf4:
+> 
+>   Merge branch 'omap-for-v3.8/fixes-for-merge-window' into omap-for-v3.8/fixes-for-merge-window-v2 (2012-12-16 11:28:10 -0800)
+> 
+> ----------------------------------------------------------------
+> 
+> These patches fixes a build error caused by a merge
+> conflict with the fb code, few timer warnings, and longer
+> term regressions for tfp410 and omap h4 ethernet. Also
+> included is a GPIO mode fix for the legacy mux code.
 
-Yes, I agree this should not be necessary once INTC has more complete
-DT support. But in the meantime it seems to be needed.
+Also please pick up Paul Walmsley's series "[GIT PULL] ARM: OMAP:
+clock/cpuidle: fixes for the v3.8 merge window" if you have
+a chance.
 
-Its the baby-steps approach to changing everything.
+Thanks,
+
+Tony
+ 
+> ----------------------------------------------------------------
+> Javier Martinez Canillas (1):
+>       ARM: OMAP2+: common: remove use of vram
+> 
+> Jon Hunter (6):
+>       ARM: OMAP2+: Fix realtime_counter_init warning in timer.c
+>       ARM: AM335x: Fix warning in timer.c
+>       ARM: OMAP2420: Fix ethernet support for OMAP2420 H4
+>       ARM: OMAP: Remove debug-devices.c
+>       ARM: dts: OMAP2420: Correct H4 board memory size
+>       ARM: dts: Add build target for omap4-panda-a4
+> 
+> Oleg Matcovschi (1):
+>       OMAP2+: mux: Fixed gpio mux mode analysis
+> 
+> Roger Quadros (1):
+>       mfd: omap-usb-host: get rid of cpu_is_omap..() macros
+> 
+> Tomi Valkeinen (1):
+>       OMAP: board-files: fix i2c_bus for tfp410
+> 
+> Tony Lindgren (3):
+>       Merge branch 'fixes-timer-build' of git://github.com/jonhunter/linux into omap-for-v3.8/fixes-for-merge-window
+>       ARM: OMAP: Move plat/omap-serial.h to include/linux/platform_data/serial-omap.h
+>       Merge branch 'omap-for-v3.8/fixes-for-merge-window' into omap-for-v3.8/fixes-for-merge-window-v2
+> 
+> Vaibhav Hiremath (1):
+>       ARM: OMAP2+: Fix sparse warnings in timer.c
+> 
+>  arch/arm/boot/dts/Makefile                         |  1 +
+>  arch/arm/boot/dts/omap2420-h4.dts                  |  2 +-
+>  arch/arm/mach-omap2/Kconfig                        |  3 +-
+>  arch/arm/mach-omap2/board-3430sdp.c                |  1 +
+>  arch/arm/mach-omap2/board-am3517evm.c              |  1 +
+>  arch/arm/mach-omap2/board-cm-t35.c                 |  1 +
+>  arch/arm/mach-omap2/board-devkit8000.c             |  1 +
+>  arch/arm/mach-omap2/board-h4.c                     | 83 +++++--------------
+>  arch/arm/mach-omap2/board-omap3evm.c               |  1 +
+>  arch/arm/mach-omap2/board-omap3stalker.c           |  1 +
+>  arch/arm/mach-omap2/common.c                       |  3 -
+>  arch/arm/mach-omap2/mux.c                          | 10 +--
+>  arch/arm/mach-omap2/mux.h                          | 20 +++--
+>  arch/arm/mach-omap2/mux34xx.c                      |  2 +-
+>  arch/arm/mach-omap2/serial.c                       |  3 +-
+>  arch/arm/mach-omap2/timer.c                        |  6 +-
+>  arch/arm/mach-omap2/usb-host.c                     |  4 +
+>  arch/arm/plat-omap/Makefile                        |  1 -
+>  arch/arm/plat-omap/debug-devices.c                 | 92 ----------------------
+>  arch/arm/plat-omap/include/plat/debug-devices.h    |  2 -
+>  drivers/mfd/omap-usb-host.c                        |  3 +-
+>  drivers/tty/serial/omap-serial.c                   |  3 +-
+>  .../linux/platform_data/serial-omap.h              |  0
+>  include/linux/platform_data/usb-omap.h             |  3 +
+>  include/video/omap-panel-tfp410.h                  |  2 +-
+>  25 files changed, 64 insertions(+), 185 deletions(-)
+>  delete mode 100644 arch/arm/plat-omap/debug-devices.c
+>  delete mode 100644 arch/arm/plat-omap/include/plat/debug-devices.h
+>  rename arch/arm/plat-omap/include/plat/omap-serial.h => include/linux/platform_data/serial-omap.h (100%)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
