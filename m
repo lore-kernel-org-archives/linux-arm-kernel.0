@@ -1,85 +1,180 @@
-From: loic.pallardy-ext@stericsson.com (Loic Pallardy)
-Date: Tue, 18 Dec 2012 14:10:08 +0100
-Subject: [PATCH 5/9] mailbox: change protection mechanisms
-In-Reply-To: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
-References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
-Message-ID: <1355836212-17956-6-git-send-email-loic.pallardy-ext@stericsson.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 18 Dec 2012 13:12:36 +0000
+Subject: [Xen-devel] [PATCH v2 6/6] ARM: mach-virt: add SMP support using
+ PSCI
+In-Reply-To: <alpine.DEB.2.02.1212181204450.17523@kaball.uk.xensource.com>
+References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
+ <1355762141-29616-7-git-send-email-will.deacon@arm.com>
+ <alpine.DEB.2.02.1212181204450.17523@kaball.uk.xensource.com>
+Message-ID: <50D06BC4.3090208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TX: replace spin by mutex
-RX: replace spin_lock_irq by spin_lock_irqsave
+On 18/12/12 12:19, Stefano Stabellini wrote:
+> On Mon, 17 Dec 2012, Will Deacon wrote:
+>> This patch adds support for SMP to mach-virt using the PSCI
+>> infrastructure.
+>>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>
+>>  arch/arm/mach-virt/Kconfig   |  1 +
+>>  arch/arm/mach-virt/Makefile  |  1 +
+>>  arch/arm/mach-virt/platsmp.c | 76 ++++++++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/mach-virt/virt.c    |  6 ++++
+>>  4 files changed, 84 insertions(+)
+>>  create mode 100644 arch/arm/mach-virt/platsmp.c
+>>
+>> diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
+>> index a568a2a..8958f0d 100644
+>> --- a/arch/arm/mach-virt/Kconfig
+>> +++ b/arch/arm/mach-virt/Kconfig
+>> @@ -3,6 +3,7 @@ config ARCH_VIRT
+>>  	select ARCH_WANT_OPTIONAL_GPIOLIB
+>>  	select ARM_GIC
+>>  	select ARM_ARCH_TIMER
+>> +	select ARM_PSCI
+>>  	select HAVE_SMP
+>>  	select CPU_V7
+>>  	select SPARSE_IRQ
+> 
+> Considering that PSCI is actually needed only to boot secondary cpus,
+> maybe we want to select it if CONFIG_SMP is enabled?
 
-Signed-off-by: Loic Pallardy <loic.pallardy@st.com>
----
- drivers/mailbox/mailbox.c | 10 ++++++----
- drivers/mailbox/mailbox.h |  1 +
- 2 files changed, 7 insertions(+), 4 deletions(-)
+Well, I was considering using it to "power-off" the VM when the last CPU
+powers itself off, and this would apply to UP as well.
 
-diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index 727e67e..8b7d7bd 100644
---- a/drivers/mailbox/mailbox.c
-+++ b/drivers/mailbox/mailbox.c
-@@ -95,7 +95,7 @@ int mailbox_msg_send(struct mailbox *mbox, struct mailbox_msg *msg)
- 	struct mailbox_queue *mq = mbox->txq;
- 	int ret = 0, len;
- 
--	spin_lock_bh(&mq->lock);
-+	mutex_lock(&mq->mlock);
- 
- 	if (kfifo_avail(&mq->fifo) < (sizeof(msg) + msg->size)) {
- 		ret = -ENOMEM;
-@@ -118,7 +118,7 @@ int mailbox_msg_send(struct mailbox *mbox, struct mailbox_msg *msg)
- 	tasklet_schedule(&mbox->txq->tasklet);
- 
- out:
--	spin_unlock_bh(&mq->lock);
-+	mutex_unlock(&mq->mlock);
- 	return ret;
- }
- EXPORT_SYMBOL(mailbox_msg_send);
-@@ -198,6 +198,7 @@ static void mbox_rx_work(struct work_struct *work)
- 	int len;
- 	struct mailbox *mbox = mq->mbox;
- 	struct mailbox_msg msg;
-+	unsigned long flags;
- 
- 	while (kfifo_len(&mq->fifo) >= sizeof(msg)) {
- 		len = kfifo_out(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
-@@ -210,12 +211,12 @@ static void mbox_rx_work(struct work_struct *work)
- 		}
- 
- 		blocking_notifier_call_chain(&mbox->notifier, len, (void *)&msg);
--		spin_lock_irq(&mq->lock);
-+		spin_lock_irqsave(&mq->lock, flags);
- 		if (mq->full) {
- 			mq->full = false;
- 			mailbox_enable_irq(mbox, IRQ_RX);
- 		}
--		spin_unlock_irq(&mq->lock);
-+		spin_unlock_irqrestore(&mq->lock, flags);
- 	}
- }
- 
-@@ -288,6 +289,7 @@ static struct mailbox_queue *mbox_queue_alloc(struct mailbox *mbox,
- 		return NULL;
- 
- 	spin_lock_init(&mq->lock);
-+	mutex_init(&mq->mlock);
- 
- 	if (kfifo_alloc(&mq->fifo, mbox_kfifo_size, GFP_KERNEL))
- 		goto error;
-diff --git a/drivers/mailbox/mailbox.h b/drivers/mailbox/mailbox.h
-index 23ac551..0a31c99 100644
---- a/drivers/mailbox/mailbox.h
-+++ b/drivers/mailbox/mailbox.h
-@@ -37,6 +37,7 @@ struct mailbox_ops {
- 
- struct mailbox_queue {
- 	spinlock_t              lock;
-+	struct mutex		mlock;
- 	struct kfifo            fifo;
- 	struct work_struct      work;
- 	struct tasklet_struct   tasklet;
+>> diff --git a/arch/arm/mach-virt/Makefile b/arch/arm/mach-virt/Makefile
+>> index 7ddbfa6..042afc1 100644
+>> --- a/arch/arm/mach-virt/Makefile
+>> +++ b/arch/arm/mach-virt/Makefile
+>> @@ -3,3 +3,4 @@
+>>  #
+>>  
+>>  obj-y					:= virt.o
+>> +obj-$(CONFIG_SMP)			+= platsmp.o
+>> diff --git a/arch/arm/mach-virt/platsmp.c b/arch/arm/mach-virt/platsmp.c
+>> new file mode 100644
+>> index 0000000..930362b
+>> --- /dev/null
+>> +++ b/arch/arm/mach-virt/platsmp.c
+>> @@ -0,0 +1,76 @@
+>> +/*
+>> + * Dummy Virtual Machine - does what it says on the tin.
+>> + *
+>> + * Copyright (C) 2012 ARM Ltd
+>> + * Author: Will Deacon <will.deacon@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/init.h>
+>> +#include <linux/smp.h>
+>> +#include <linux/of.h>
+>> +
+>> +#include <asm/psci.h>
+>> +#include <asm/smp_plat.h>
+>> +#include <asm/hardware/gic.h>
+>> +
+>> +extern void secondary_startup(void);
+>> +
+>> +/*
+>> + * Enumerate the possible CPU set from the device tree.
+>> + */
+>> +static void __init virt_smp_init_cpus(void)
+>> +{
+>> +	struct device_node *dn = NULL;
+>> +	int cpu = 0;
+>> +
+>> +	while ((dn = of_find_node_by_type(dn, "cpu"))) {
+>> +		if (cpu < NR_CPUS)
+>> +			set_cpu_possible(cpu, true);
+>> +		cpu++;
+>> +	}
+>> +
+>> +	/* sanity check */
+>> +	if (cpu > NR_CPUS)
+>> +		pr_warning("no. of cores (%d) greater than configured maximum "
+>> +			   "of %d - clipping\n",
+>> +			   cpu, NR_CPUS);
+>> +
+>> +	set_smp_cross_call(gic_raise_softirq);
+>> +}
+>> +
+>> +static void __init virt_smp_prepare_cpus(unsigned int max_cpus)
+>> +{
+>> +}
+>> +
+>> +static int __cpuinit virt_boot_secondary(unsigned int cpu,
+>> +					 struct task_struct *idle)
+>> +{
+>> +	if (psci_ops.cpu_on)
+>> +		return psci_ops.cpu_on(cpu_logical_map(cpu),
+>> +				       __pa(secondary_startup));
+>> +	return -ENODEV;
+>> +}
+> 
+> Isn't there a better way to check whether PSCI is actually "enabled", as
+> in present in the device tree and initialized correctly?
+
+All methods are optional, so I'm afraid you have to check for their
+validity each time you want to access one.
+
+> Maybe we need a pcsi_enabled() static inline of some sort?
+> 
+> 
+>> +static void __cpuinit virt_secondary_init(unsigned int cpu)
+>> +{
+>> +	gic_secondary_init(0);
+>> +}
+>> +
+>> +struct smp_operations __initdata virt_smp_ops = {
+>> +	.smp_init_cpus		= virt_smp_init_cpus,
+>> +	.smp_prepare_cpus	= virt_smp_prepare_cpus,
+>> +	.smp_secondary_init	= virt_secondary_init,
+>> +	.smp_boot_secondary	= virt_boot_secondary,
+>> +};
+>> diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
+>> index 174b9da..d764835 100644
+>> --- a/arch/arm/mach-virt/virt.c
+>> +++ b/arch/arm/mach-virt/virt.c
+>> @@ -20,6 +20,7 @@
+>>  
+>>  #include <linux/of_irq.h>
+>>  #include <linux/of_platform.h>
+>> +#include <linux/smp.h>
+>>  
+>>  #include <asm/arch_timer.h>
+>>  #include <asm/hardware/gic.h>
+>> @@ -56,10 +57,15 @@ static struct sys_timer virt_timer = {
+>>  	.init = virt_timer_init,
+>>  };
+>>  
+>> +#ifdef CONFIG_SMP
+>> +extern struct smp_operations virt_smp_ops;
+>> +#endif
+>> +
+>>  DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
+>>  	.init_irq	= gic_init_irq,
+>>  	.handle_irq     = gic_handle_irq,
+>>  	.timer		= &virt_timer,
+>>  	.init_machine	= virt_init,
+>> +	.smp		= smp_ops(virt_smp_ops),
+>>  	.dt_compat	= virt_dt_match,
+>>  MACHINE_END
+>> -- 
+>> 1.8.0
+> 
+
+
 -- 
-1.7.11.1
+Jazz is not dead. It just smells funny...
