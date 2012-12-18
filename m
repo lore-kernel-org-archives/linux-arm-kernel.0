@@ -1,41 +1,88 @@
 From: pratikp@codeaurora.org (pratikp at codeaurora.org)
-Date: Tue, 18 Dec 2012 11:19:21 -0800
-Subject: [RFC 4/8] coresight: add CoreSight ETB driver
+Date: Tue, 18 Dec 2012 11:19:19 -0800
+Subject: [RFC 2/8] coresight: add CoreSight TMC driver
 In-Reply-To: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
 References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
-Message-ID: <1355858365-11849-5-git-send-email-pratikp@codeaurora.org>
+Message-ID: <1355858365-11849-3-git-send-email-pratikp@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratik Patel <pratikp@codeaurora.org>
 
-This driver manages CoreSight ETB (Embedded Trace Buffer) which
-acts as a circular buffer sink collecting generated trace data.
+This driver manages CoreSight TMC (Trace Memory Controller) which
+can act as a link or a sink depending upon its configuration. It
+can present itself as an ETF (Embedded Trace FIFO) or ETR
+(Embedded Trace Router).
+
+ETF when configured in circular buffer mode acts as a trace
+collection sink. When configured in HW fifo mode it acts as link.
+ETR always acts as a sink and can be used to route data to memory
+allocated in RAM.
 
 Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
 ---
- drivers/coresight/Makefile        |    2 +-
- drivers/coresight/coresight-etb.c |  467 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 468 insertions(+), 1 deletions(-)
- create mode 100644 drivers/coresight/coresight-etb.c
+ .../devicetree/bindings/arm/coresight.txt          |    2 +
+ drivers/coresight/Kconfig                          |   11 +
+ drivers/coresight/Makefile                         |    1 +
+ drivers/coresight/coresight-tmc.c                  |  794 ++++++++++++++++++++
+ 4 files changed, 808 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/coresight/coresight-tmc.c
 
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index c584073..031f760 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -31,6 +31,7 @@ Optional properties:
+ 			 component
+ - coresight-child-ports : list of input port numbers of the children
+ - coresight-default-sink : represents the default compile time CoreSight sink
++- arm,buffer-size : size of contiguous buffer space for TMC ETR
+ 
+ Examples:
+ 
+@@ -43,6 +44,7 @@ Examples:
+ 		coresight-name = "coresight-tmc-etr";
+ 		coresight-nr-inports = <1>;
+ 		coresight-default-sink;
++		arm,buffer-size = <0x100000>;
+ 	};
+ 
+ 	tpiu: tpiu at fc318000 {
+diff --git a/drivers/coresight/Kconfig b/drivers/coresight/Kconfig
+index 65279c4..6905ef2 100644
+--- a/drivers/coresight/Kconfig
++++ b/drivers/coresight/Kconfig
+@@ -7,3 +7,14 @@ menuconfig CORESIGHT
+ 	  the right series of components on user input via sysfs. It also
+ 	  provides status information to user space applications through
+ 	  sysfs interface.
++
++if CORESIGHT
++
++config CORESIGHT_LINKS_AND_SINKS
++	bool "CoreSight Link and Sink drivers"
++	help
++	  This enables support for CoreSight link and sink drivers that are
++	  responsible for transporting and collecting the trace data
++	  respectively.
++
++endif
 diff --git a/drivers/coresight/Makefile b/drivers/coresight/Makefile
-index 540df99..3c1debc 100644
+index 218e3b5..16e26c5 100644
 --- a/drivers/coresight/Makefile
 +++ b/drivers/coresight/Makefile
-@@ -3,4 +3,4 @@
+@@ -3,3 +3,4 @@
  #
  obj-$(CONFIG_CORESIGHT) += coresight.o
  obj-$(CONFIG_OF) += of_coresight.o
--obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o
-+obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o coresight-etb.o
-diff --git a/drivers/coresight/coresight-etb.c b/drivers/coresight/coresight-etb.c
++obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o
+diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
 new file mode 100644
-index 0000000..d52ab28
+index 0000000..c1b7d31
 --- /dev/null
-+++ b/drivers/coresight/coresight-etb.c
-@@ -0,0 +1,467 @@
-+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
++++ b/drivers/coresight/coresight-tmc.c
+@@ -0,0 +1,794 @@
++/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 and
@@ -59,87 +106,196 @@ index 0000000..d52ab28
 +#include <linux/miscdevice.h>
 +#include <linux/uaccess.h>
 +#include <linux/slab.h>
++#include <linux/dma-mapping.h>
 +#include <linux/delay.h>
 +#include <linux/spinlock.h>
 +#include <linux/clk.h>
++#include <linux/of.h>
 +#include <linux/of_coresight.h>
 +#include <linux/coresight.h>
 +
 +#include "coresight-priv.h"
 +
-+#define etb_writel(drvdata, val, off)	__raw_writel((val), drvdata->base + off)
-+#define etb_readl(drvdata, off)		__raw_readl(drvdata->base + off)
++#define tmc_writel(drvdata, val, off)	__raw_writel((val), drvdata->base + off)
++#define tmc_readl(drvdata, off)		__raw_readl(drvdata->base + off)
 +
-+#define ETB_LOCK(drvdata)						\
++#define TMC_LOCK(drvdata)						\
 +do {									\
 +	mb();								\
-+	etb_writel(drvdata, 0x0, CORESIGHT_LAR);			\
++	tmc_writel(drvdata, 0x0, CORESIGHT_LAR);			\
 +} while (0)
-+#define ETB_UNLOCK(drvdata)						\
++#define TMC_UNLOCK(drvdata)						\
 +do {									\
-+	etb_writel(drvdata, CORESIGHT_UNLOCK, CORESIGHT_LAR);		\
++	tmc_writel(drvdata, CORESIGHT_UNLOCK, CORESIGHT_LAR);		\
 +	mb();								\
 +} while (0)
 +
-+#define ETB_RAM_DEPTH_REG	(0x004)
-+#define ETB_STATUS_REG		(0x00C)
-+#define ETB_RAM_READ_DATA_REG	(0x010)
-+#define ETB_RAM_READ_POINTER	(0x014)
-+#define ETB_RAM_WRITE_POINTER	(0x018)
-+#define ETB_TRG			(0x01C)
-+#define ETB_CTL_REG		(0x020)
-+#define ETB_RWD_REG		(0x024)
-+#define ETB_FFSR		(0x300)
-+#define ETB_FFCR		(0x304)
-+#define ETB_ITMISCOP0		(0xEE0)
-+#define ETB_ITTRFLINACK		(0xEE4)
-+#define ETB_ITTRFLIN		(0xEE8)
-+#define ETB_ITATBDATA0		(0xEEC)
-+#define ETB_ITATBCTR2		(0xEF0)
-+#define ETB_ITATBCTR1		(0xEF4)
-+#define ETB_ITATBCTR0		(0xEF8)
++#define TMC_RSZ			(0x004)
++#define TMC_STS			(0x00C)
++#define TMC_RRD			(0x010)
++#define TMC_RRP			(0x014)
++#define TMC_RWP			(0x018)
++#define TMC_TRG			(0x01C)
++#define TMC_CTL			(0x020)
++#define TMC_RWD			(0x024)
++#define TMC_MODE		(0x028)
++#define TMC_LBUFLEVEL		(0x02C)
++#define TMC_CBUFLEVEL		(0x030)
++#define TMC_BUFWM		(0x034)
++#define TMC_RRPHI		(0x038)
++#define TMC_RWPHI		(0x03C)
++#define TMC_AXICTL		(0x110)
++#define TMC_DBALO		(0x118)
++#define TMC_DBAHI		(0x11C)
++#define TMC_FFSR		(0x300)
++#define TMC_FFCR		(0x304)
++#define TMC_PSCR		(0x308)
++#define TMC_ITMISCOP0		(0xEE0)
++#define TMC_ITTRFLIN		(0xEE8)
++#define TMC_ITATBDATA0		(0xEEC)
++#define TMC_ITATBCTR2		(0xEF0)
++#define TMC_ITATBCTR1		(0xEF4)
++#define TMC_ITATBCTR0		(0xEF8)
 +
 +#define BYTES_PER_WORD		4
-+#define ETB_SIZE_WORDS		4096
-+#define FRAME_SIZE_WORDS	4
 +
-+struct etb_drvdata {
++enum tmc_config_type {
++	TMC_CONFIG_TYPE_ETB,
++	TMC_CONFIG_TYPE_ETR,
++	TMC_CONFIG_TYPE_ETF,
++};
++
++enum tmc_mode {
++	TMC_MODE_CIRCULAR_BUFFER,
++	TMC_MODE_SOFTWARE_FIFO,
++	TMC_MODE_HARDWARE_FIFO,
++};
++
++enum tmc_mem_intf_width {
++	TMC_MEM_INTF_WIDTH_32BITS	= 0x2,
++	TMC_MEM_INTF_WIDTH_64BITS	= 0x3,
++	TMC_MEM_INTF_WIDTH_128BITS	= 0x4,
++	TMC_MEM_INTF_WIDTH_256BITS	= 0x5,
++};
++
++struct tmc_drvdata {
 +	void __iomem		*base;
 +	struct device		*dev;
 +	struct coresight_device	*csdev;
 +	struct miscdevice	miscdev;
 +	struct clk		*clk;
 +	spinlock_t		spinlock;
++	int			read_count;
 +	bool			reading;
-+	atomic_t		in_use;
-+	uint8_t			*buf;
++	char			*buf;
++	dma_addr_t		paddr;
++	void __iomem		*vaddr;
++	uint32_t		size;
 +	bool			enable;
++	enum tmc_config_type	config_type;
 +	uint32_t		trigger_cntr;
 +};
 +
-+static void __etb_enable(struct etb_drvdata *drvdata)
++static void tmc_wait_for_ready(struct tmc_drvdata *drvdata)
 +{
-+	int i;
++	int count;
 +
-+	ETB_UNLOCK(drvdata);
-+
-+	etb_writel(drvdata, 0x0, ETB_RAM_WRITE_POINTER);
-+	for (i = 0; i < ETB_SIZE_WORDS; i++)
-+		etb_writel(drvdata, 0x0, ETB_RWD_REG);
-+
-+	etb_writel(drvdata, 0x0, ETB_RAM_WRITE_POINTER);
-+	etb_writel(drvdata, 0x0, ETB_RAM_READ_POINTER);
-+
-+	etb_writel(drvdata, drvdata->trigger_cntr, ETB_TRG);
-+	etb_writel(drvdata, BIT(13) | BIT(0), ETB_FFCR);
-+	etb_writel(drvdata, BIT(0), ETB_CTL_REG);
-+
-+	ETB_LOCK(drvdata);
++	/* Ensure formatter, unformatter and hardware fifo are empty */
++	for (count = TIMEOUT_US; BVAL(tmc_readl(drvdata, TMC_STS), 2) != 1
++				&& count > 0; count--)
++		udelay(1);
++	WARN(count == 0, "timeout while waiting for TMC ready, TMC_STS: %#x\n",
++	     tmc_readl(drvdata, TMC_STS));
 +}
 +
-+static int etb_enable(struct coresight_device *csdev)
++static void tmc_flush_and_stop(struct tmc_drvdata *drvdata)
 +{
-+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	int count;
++	uint32_t ffcr;
++
++	ffcr = tmc_readl(drvdata, TMC_FFCR);
++	ffcr |= BIT(12);
++	tmc_writel(drvdata, ffcr, TMC_FFCR);
++	ffcr |= BIT(6);
++	tmc_writel(drvdata, ffcr, TMC_FFCR);
++	/* Ensure flush completes */
++	for (count = TIMEOUT_US; BVAL(tmc_readl(drvdata, TMC_FFCR), 6) != 0
++				&& count > 0; count--)
++		udelay(1);
++	WARN(count == 0, "timeout while flushing TMC, TMC_FFCR: %#x\n",
++	     tmc_readl(drvdata, TMC_FFCR));
++
++	tmc_wait_for_ready(drvdata);
++}
++
++static void __tmc_enable(struct tmc_drvdata *drvdata)
++{
++	tmc_writel(drvdata, 0x1, TMC_CTL);
++}
++
++static void __tmc_disable(struct tmc_drvdata *drvdata)
++{
++	tmc_writel(drvdata, 0x0, TMC_CTL);
++}
++
++static void __tmc_etb_enable(struct tmc_drvdata *drvdata)
++{
++	/* Zero out the memory to help with debug */
++	memset(drvdata->buf, 0, drvdata->size);
++
++	TMC_UNLOCK(drvdata);
++
++	tmc_writel(drvdata, TMC_MODE_CIRCULAR_BUFFER, TMC_MODE);
++	tmc_writel(drvdata, 0x133, TMC_FFCR);
++	tmc_writel(drvdata, drvdata->trigger_cntr, TMC_TRG);
++	__tmc_enable(drvdata);
++
++	TMC_LOCK(drvdata);
++}
++
++static void __tmc_etr_enable(struct tmc_drvdata *drvdata)
++{
++	uint32_t axictl;
++
++	/* Zero out the memory to help with debug */
++	memset(drvdata->vaddr, 0, drvdata->size);
++
++	TMC_UNLOCK(drvdata);
++
++	tmc_writel(drvdata, drvdata->size / BYTES_PER_WORD, TMC_RSZ);
++	tmc_writel(drvdata, TMC_MODE_CIRCULAR_BUFFER, TMC_MODE);
++
++	axictl = tmc_readl(drvdata, TMC_AXICTL);
++	axictl |= (0xF << 8);
++	tmc_writel(drvdata, axictl, TMC_AXICTL);
++	axictl &= ~(0x1 << 7);
++	tmc_writel(drvdata, axictl, TMC_AXICTL);
++	axictl = (axictl & ~0x3) | 0x2;
++	tmc_writel(drvdata, axictl, TMC_AXICTL);
++
++	tmc_writel(drvdata, drvdata->paddr, TMC_DBALO);
++	tmc_writel(drvdata, 0x0, TMC_DBAHI);
++	tmc_writel(drvdata, 0x133, TMC_FFCR);
++	tmc_writel(drvdata, drvdata->trigger_cntr, TMC_TRG);
++	__tmc_enable(drvdata);
++
++	TMC_LOCK(drvdata);
++}
++
++static void __tmc_etf_enable(struct tmc_drvdata *drvdata)
++{
++	TMC_UNLOCK(drvdata);
++
++	tmc_writel(drvdata, TMC_MODE_HARDWARE_FIFO, TMC_MODE);
++	tmc_writel(drvdata, 0x3, TMC_FFCR);
++	tmc_writel(drvdata, 0x0, TMC_BUFWM);
++	__tmc_enable(drvdata);
++
++	TMC_LOCK(drvdata);
++}
++
++static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
++{
 +	int ret;
 +	unsigned long flags;
 +
@@ -148,178 +304,314 @@ index 0000000..d52ab28
 +		return ret;
 +
 +	spin_lock_irqsave(&drvdata->spinlock, flags);
-+	__etb_enable(drvdata);
++	if (drvdata->reading) {
++		spin_unlock_irqrestore(&drvdata->spinlock, flags);
++		clk_disable_unprepare(drvdata->clk);
++		return -EBUSY;
++	}
++
++	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
++		__tmc_etb_enable(drvdata);
++	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		__tmc_etr_enable(drvdata);
++	} else {
++		if (mode == TMC_MODE_CIRCULAR_BUFFER)
++			__tmc_etb_enable(drvdata);
++		else
++			__tmc_etf_enable(drvdata);
++	}
 +	drvdata->enable = true;
 +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 +
-+	dev_info(drvdata->dev, "ETB enabled\n");
++	dev_info(drvdata->dev, "TMC enabled\n");
 +	return 0;
 +}
 +
-+static void __etb_disable(struct etb_drvdata *drvdata)
++static int tmc_enable_sink(struct coresight_device *csdev)
 +{
-+	int count;
-+	uint32_t ffcr;
++	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +
-+	ETB_UNLOCK(drvdata);
-+
-+	ffcr = etb_readl(drvdata, ETB_FFCR);
-+	ffcr |= BIT(12);
-+	etb_writel(drvdata, ffcr, ETB_FFCR);
-+	ffcr |= BIT(6);
-+	etb_writel(drvdata, ffcr, ETB_FFCR);
-+	for (count = TIMEOUT_US; BVAL(etb_readl(drvdata, ETB_FFCR), 6) != 0
-+				&& count > 0; count--)
-+		udelay(1);
-+	WARN(count == 0, "timeout while flushing DRVDATA, ETB_FFCR: %#x\n",
-+	     etb_readl(drvdata, ETB_FFCR));
-+
-+	etb_writel(drvdata, 0x0, ETB_CTL_REG);
-+	for (count = TIMEOUT_US; BVAL(etb_readl(drvdata, ETB_FFSR), 1) != 1
-+				&& count > 0; count--)
-+		udelay(1);
-+	WARN(count == 0, "timeout while disabling DRVDATA, ETB_FFSR: %#x\n",
-+	     etb_readl(drvdata, ETB_FFSR));
-+
-+	ETB_LOCK(drvdata);
++	return tmc_enable(drvdata, TMC_MODE_CIRCULAR_BUFFER);
 +}
 +
-+static void __etb_dump(struct etb_drvdata *drvdata)
++static int tmc_enable_link(struct coresight_device *csdev, int inport,
++			   int outport)
 +{
-+	int i;
-+	uint8_t *buf_ptr;
++	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	return tmc_enable(drvdata, TMC_MODE_HARDWARE_FIFO);
++}
++
++static void __tmc_etb_dump(struct tmc_drvdata *drvdata)
++{
++	enum tmc_mem_intf_width memwidth;
++	uint8_t memwords;
++	char *bufp;
 +	uint32_t read_data;
-+	uint32_t read_ptr;
-+	uint32_t write_ptr;
-+	uint32_t frame_off;
-+	uint32_t frame_endoff;
++	int i;
 +
-+	ETB_UNLOCK(drvdata);
-+
-+	read_ptr = etb_readl(drvdata, ETB_RAM_READ_POINTER);
-+	write_ptr = etb_readl(drvdata, ETB_RAM_WRITE_POINTER);
-+
-+	frame_off = write_ptr % FRAME_SIZE_WORDS;
-+	frame_endoff = FRAME_SIZE_WORDS - frame_off;
-+	if (frame_off) {
-+		dev_err(drvdata->dev, "write_ptr: %lu not aligned to formatter "
-+				"frame size\n", (unsigned long)write_ptr);
-+		dev_err(drvdata->dev, "frameoff: %lu, frame_endoff: %lu\n",
-+			(unsigned long)frame_off, (unsigned long)frame_endoff);
-+		write_ptr += frame_endoff;
-+	}
-+
-+	if ((etb_readl(drvdata, ETB_STATUS_REG) & BIT(0)) == 0)
-+		etb_writel(drvdata, 0x0, ETB_RAM_READ_POINTER);
++	memwidth = BMVAL(tmc_readl(drvdata, CORESIGHT_DEVID), 8, 10);
++	if (memwidth == TMC_MEM_INTF_WIDTH_32BITS)
++		memwords = 1;
++	else if (memwidth == TMC_MEM_INTF_WIDTH_64BITS)
++		memwords = 2;
++	else if (memwidth == TMC_MEM_INTF_WIDTH_128BITS)
++		memwords = 4;
 +	else
-+		etb_writel(drvdata, write_ptr, ETB_RAM_READ_POINTER);
++		memwords = 8;
 +
-+	buf_ptr = drvdata->buf;
-+	for (i = 0; i < ETB_SIZE_WORDS; i++) {
-+		read_data = etb_readl(drvdata, ETB_RAM_READ_DATA_REG);
-+		*buf_ptr++ = read_data >> 0;
-+		*buf_ptr++ = read_data >> 8;
-+		*buf_ptr++ = read_data >> 16;
-+		*buf_ptr++ = read_data >> 24;
-+	}
-+
-+	if (frame_off) {
-+		buf_ptr -= (frame_endoff * BYTES_PER_WORD);
-+		for (i = 0; i < frame_endoff; i++) {
-+			*buf_ptr++ = 0x0;
-+			*buf_ptr++ = 0x0;
-+			*buf_ptr++ = 0x0;
-+			*buf_ptr++ = 0x0;
++	bufp = drvdata->buf;
++	while (1) {
++		for (i = 0; i < memwords; i++) {
++			read_data = tmc_readl(drvdata, TMC_RRD);
++			if (read_data == 0xFFFFFFFF)
++				return;
++			memcpy(bufp, &read_data, BYTES_PER_WORD);
++			bufp += BYTES_PER_WORD;
 +		}
 +	}
-+
-+	etb_writel(drvdata, read_ptr, ETB_RAM_READ_POINTER);
-+
-+	ETB_LOCK(drvdata);
 +}
 +
-+static void etb_disable(struct coresight_device *csdev)
++static void __tmc_etb_disable(struct tmc_drvdata *drvdata)
 +{
-+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	TMC_UNLOCK(drvdata);
++
++	tmc_flush_and_stop(drvdata);
++	__tmc_etb_dump(drvdata);
++	__tmc_disable(drvdata);
++
++	TMC_LOCK(drvdata);
++}
++
++static void __tmc_etr_dump(struct tmc_drvdata *drvdata)
++{
++	uint32_t rwp, rwphi;
++
++	rwp = tmc_readl(drvdata, TMC_RWP);
++	rwphi = tmc_readl(drvdata, TMC_RWPHI);
++
++	if (BVAL(tmc_readl(drvdata, TMC_STS), 0))
++		drvdata->buf = drvdata->vaddr + rwp - drvdata->paddr;
++	else
++		drvdata->buf = drvdata->vaddr;
++}
++
++static void __tmc_etr_disable(struct tmc_drvdata *drvdata)
++{
++	TMC_UNLOCK(drvdata);
++
++	tmc_flush_and_stop(drvdata);
++	__tmc_etr_dump(drvdata);
++	__tmc_disable(drvdata);
++
++	TMC_LOCK(drvdata);
++}
++
++static void __tmc_etf_disable(struct tmc_drvdata *drvdata)
++{
++	TMC_UNLOCK(drvdata);
++
++	tmc_flush_and_stop(drvdata);
++	__tmc_disable(drvdata);
++
++	TMC_LOCK(drvdata);
++}
++
++static void tmc_disable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
++{
 +	unsigned long flags;
 +
 +	spin_lock_irqsave(&drvdata->spinlock, flags);
-+	__etb_disable(drvdata);
-+	__etb_dump(drvdata);
++	if (drvdata->reading)
++		goto out;
++
++	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
++		__tmc_etb_disable(drvdata);
++	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		__tmc_etr_disable(drvdata);
++	} else {
++		if (mode == TMC_MODE_CIRCULAR_BUFFER)
++			__tmc_etb_disable(drvdata);
++		else
++			__tmc_etf_disable(drvdata);
++	}
++out:
 +	drvdata->enable = false;
 +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 +
 +	clk_disable_unprepare(drvdata->clk);
 +
-+	dev_info(drvdata->dev, "ETB disabled\n");
++	dev_info(drvdata->dev, "TMC disabled\n");
 +}
 +
-+static void etb_abort(struct coresight_device *csdev)
++static void tmc_disable_sink(struct coresight_device *csdev)
 +{
-+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	tmc_disable(drvdata, TMC_MODE_CIRCULAR_BUFFER);
++}
++
++static void tmc_disable_link(struct coresight_device *csdev, int inport,
++			     int outport)
++{
++	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	tmc_disable(drvdata, TMC_MODE_HARDWARE_FIFO);
++}
++
++static void tmc_abort(struct coresight_device *csdev)
++{
++	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +	unsigned long flags;
++	enum tmc_mode mode;
 +
 +	spin_lock_irqsave(&drvdata->spinlock, flags);
-+	__etb_disable(drvdata);
-+	__etb_dump(drvdata);
++	if (drvdata->reading)
++		goto out0;
++
++	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
++		__tmc_etb_disable(drvdata);
++	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		__tmc_etr_disable(drvdata);
++	} else {
++		mode = tmc_readl(drvdata, TMC_MODE);
++		if (mode == TMC_MODE_CIRCULAR_BUFFER)
++			__tmc_etb_disable(drvdata);
++		else
++			goto out1;
++	}
++out0:
 +	drvdata->enable = false;
 +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 +
-+	dev_info(drvdata->dev, "ETB aborted\n");
++	dev_info(drvdata->dev, "TMC aborted\n");
++	return;
++out1:
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 +}
 +
-+static const struct coresight_ops_sink etb_sink_ops = {
-+	.enable		= etb_enable,
-+	.disable	= etb_disable,
-+	.abort		= etb_abort,
++static const struct coresight_ops_sink tmc_sink_ops = {
++	.enable		= tmc_enable_sink,
++	.disable	= tmc_disable_sink,
++	.abort		= tmc_abort,
 +};
 +
-+static const struct coresight_ops etb_cs_ops = {
-+	.sink_ops	= &etb_sink_ops,
++static const struct coresight_ops_link tmc_link_ops = {
++	.enable		= tmc_enable_link,
++	.disable	= tmc_disable_link,
 +};
 +
-+static void etb_dump(struct etb_drvdata *drvdata)
++static const struct coresight_ops tmc_etb_cs_ops = {
++	.sink_ops	= &tmc_sink_ops,
++};
++
++static const struct coresight_ops tmc_etr_cs_ops = {
++	.sink_ops	= &tmc_sink_ops,
++};
++
++static const struct coresight_ops tmc_etf_cs_ops = {
++	.sink_ops	= &tmc_sink_ops,
++	.link_ops	= &tmc_link_ops,
++};
++
++static int tmc_read_prepare(struct tmc_drvdata *drvdata)
 +{
++	int ret;
 +	unsigned long flags;
++	enum tmc_mode mode;
 +
 +	spin_lock_irqsave(&drvdata->spinlock, flags);
-+	if (drvdata->enable) {
-+		__etb_disable(drvdata);
-+		__etb_dump(drvdata);
-+		__etb_enable(drvdata);
++	if (!drvdata->enable)
++		goto out;
++
++	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
++		__tmc_etb_disable(drvdata);
++	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		__tmc_etr_disable(drvdata);
++	} else {
++		mode = tmc_readl(drvdata, TMC_MODE);
++		if (mode == TMC_MODE_CIRCULAR_BUFFER) {
++			__tmc_etb_disable(drvdata);
++		} else {
++			ret = -ENODEV;
++			goto err;
++		}
 +	}
++out:
++	drvdata->reading = true;
 +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 +
-+	dev_info(drvdata->dev, "ETB dumped\n");
++	dev_info(drvdata->dev, "TMC read start\n");
++	return 0;
++err:
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++	return ret;
 +}
 +
-+static int etb_open(struct inode *inode, struct file *file)
++static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
 +{
-+	struct etb_drvdata *drvdata = container_of(file->private_data,
-+						   struct etb_drvdata, miscdev);
++	unsigned long flags;
++	enum tmc_mode mode;
 +
-+	if (atomic_cmpxchg(&drvdata->in_use, 0, 1))
-+		return -EBUSY;
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++	if (!drvdata->enable)
++		goto out;
++
++	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
++		__tmc_etb_enable(drvdata);
++	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		__tmc_etr_enable(drvdata);
++	} else {
++		mode = tmc_readl(drvdata, TMC_MODE);
++		if (mode == TMC_MODE_CIRCULAR_BUFFER)
++			__tmc_etb_enable(drvdata);
++	}
++out:
++	drvdata->reading = false;
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
++	dev_info(drvdata->dev, "TMC read end\n");
++}
++
++static int tmc_open(struct inode *inode, struct file *file)
++{
++	struct tmc_drvdata *drvdata = container_of(file->private_data,
++						   struct tmc_drvdata, miscdev);
++	int ret = 0;
++
++	if (drvdata->read_count++)
++		goto out;
++
++	ret = tmc_read_prepare(drvdata);
++	if (ret)
++		return ret;
++out:
++	nonseekable_open(inode, file);
 +
 +	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
 +	return 0;
 +}
 +
-+static ssize_t etb_read(struct file *file, char __user *data,
-+				size_t len, loff_t *ppos)
++static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
++			loff_t *ppos)
 +{
-+	struct etb_drvdata *drvdata = container_of(file->private_data,
-+						   struct etb_drvdata, miscdev);
++	struct tmc_drvdata *drvdata = container_of(file->private_data,
++						   struct tmc_drvdata, miscdev);
++	char *bufp = drvdata->buf + *ppos;
 +
-+	if (drvdata->reading == false) {
-+		etb_dump(drvdata);
-+		drvdata->reading = true;
++	if (*ppos + len > drvdata->size)
++		len = drvdata->size - *ppos;
++
++	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		if (bufp == (char *)(drvdata->vaddr + drvdata->size))
++			bufp = drvdata->vaddr;
++		else if (bufp > (char *)(drvdata->vaddr + drvdata->size))
++			bufp -= drvdata->size;
++		if ((bufp + len) > (char *)(drvdata->vaddr + drvdata->size))
++			len = (char *)(drvdata->vaddr + drvdata->size) - bufp;
 +	}
 +
-+	if (*ppos + len > ETB_SIZE_WORDS * BYTES_PER_WORD)
-+		len = ETB_SIZE_WORDS * BYTES_PER_WORD - *ppos;
-+
-+	if (copy_to_user(data, drvdata->buf + *ppos, len)) {
++	if (copy_to_user(data, bufp, len)) {
 +		dev_dbg(drvdata->dev, "%s: copy_to_user failed\n", __func__);
 +		return -EFAULT;
 +	}
@@ -327,44 +619,51 @@ index 0000000..d52ab28
 +	*ppos += len;
 +
 +	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
-+		__func__, len, (int) (ETB_SIZE_WORDS * BYTES_PER_WORD - *ppos));
++		__func__, len, (int) (drvdata->size - *ppos));
 +	return len;
 +}
 +
-+static int etb_release(struct inode *inode, struct file *file)
++static int tmc_release(struct inode *inode, struct file *file)
 +{
-+	struct etb_drvdata *drvdata = container_of(file->private_data,
-+						   struct etb_drvdata, miscdev);
++	struct tmc_drvdata *drvdata = container_of(file->private_data,
++						   struct tmc_drvdata, miscdev);
 +
-+	drvdata->reading = false;
-+	atomic_set(&drvdata->in_use, 0);
++	if (--drvdata->read_count) {
++		if (drvdata->read_count < 0) {
++			WARN_ONCE(1, "mismatched close\n");
++			drvdata->read_count = 0;
++		}
++		goto out;
++	}
 +
++	tmc_read_unprepare(drvdata);
++out:
 +	dev_dbg(drvdata->dev, "%s: released\n", __func__);
 +	return 0;
 +}
 +
-+static const struct file_operations etb_fops = {
++static const struct file_operations tmc_fops = {
 +	.owner		= THIS_MODULE,
-+	.open		= etb_open,
-+	.read		= etb_read,
-+	.release	= etb_release,
++	.open		= tmc_open,
++	.read		= tmc_read,
++	.release	= tmc_release,
 +	.llseek		= no_llseek,
 +};
 +
-+static ssize_t etb_show_trigger_cntr(struct device *dev,
++static ssize_t tmc_show_trigger_cntr(struct device *dev,
 +				     struct device_attribute *attr, char *buf)
 +{
-+	struct etb_drvdata *drvdata = dev_get_drvdata(dev->parent);
++	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
 +	unsigned long val = drvdata->trigger_cntr;
 +
 +	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
 +}
 +
-+static ssize_t etb_store_trigger_cntr(struct device *dev,
++static ssize_t tmc_store_trigger_cntr(struct device *dev,
 +				      struct device_attribute *attr,
 +				      const char *buf, size_t size)
 +{
-+	struct etb_drvdata *drvdata = dev_get_drvdata(dev->parent);
++	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
 +	unsigned long val;
 +
 +	if (sscanf(buf, "%lx", &val) != 1)
@@ -373,29 +672,40 @@ index 0000000..d52ab28
 +	drvdata->trigger_cntr = val;
 +	return size;
 +}
-+static DEVICE_ATTR(trigger_cntr, S_IRUGO | S_IWUSR, etb_show_trigger_cntr,
-+		   etb_store_trigger_cntr);
++static DEVICE_ATTR(trigger_cntr, S_IRUGO | S_IWUSR, tmc_show_trigger_cntr,
++		   tmc_store_trigger_cntr);
 +
-+static struct attribute *etb_attrs[] = {
++static struct attribute *tmc_attrs[] = {
 +	&dev_attr_trigger_cntr.attr,
 +	NULL,
 +};
 +
-+static struct attribute_group etb_attr_grp = {
-+	.attrs = etb_attrs,
++static struct attribute_group tmc_attr_grp = {
++	.attrs = tmc_attrs,
 +};
 +
-+static const struct attribute_group *etb_attr_grps[] = {
-+	&etb_attr_grp,
++static const struct attribute_group *tmc_etb_attr_grps[] = {
++	&tmc_attr_grp,
 +	NULL,
 +};
 +
-+static int __devinit etb_probe(struct platform_device *pdev)
++static const struct attribute_group *tmc_etr_attr_grps[] = {
++	&tmc_attr_grp,
++	NULL,
++};
++
++static const struct attribute_group *tmc_etf_attr_grps[] = {
++	&tmc_attr_grp,
++	NULL,
++};
++
++static int __devinit tmc_probe(struct platform_device *pdev)
 +{
-+	int ret;
++	int ret = 0;
++	uint32_t devid;
 +	struct device *dev = &pdev->dev;
 +	struct coresight_platform_data *pdata;
-+	struct etb_drvdata *drvdata;
++	struct tmc_drvdata *drvdata;
 +	struct resource *res;
 +	struct coresight_desc *desc;
 +
@@ -430,78 +740,142 @@ index 0000000..d52ab28
 +	if (ret)
 +		return ret;
 +
-+	drvdata->buf = devm_kzalloc(dev, ETB_SIZE_WORDS * BYTES_PER_WORD,
-+				    GFP_KERNEL);
-+	if (!drvdata->buf)
-+		return -ENOMEM;
++	ret = clk_prepare_enable(drvdata->clk);
++	if (ret)
++		return ret;
++
++	devid = tmc_readl(drvdata, CORESIGHT_DEVID);
++	drvdata->config_type = BMVAL(devid, 6, 7);
++
++	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		if (pdev->dev.of_node)
++			ret = of_property_read_u32(pdev->dev.of_node,
++				"arm,buffer-size", &drvdata->size);
++		if (ret)
++			drvdata->size = SZ_1M;
++	} else {
++		drvdata->size = tmc_readl(drvdata, TMC_RSZ) * BYTES_PER_WORD;
++	}
++
++	clk_disable_unprepare(drvdata->clk);
++
++	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		drvdata->vaddr = dma_alloc_coherent(dev, drvdata->size,
++						&drvdata->paddr, GFP_KERNEL);
++		if (!drvdata->vaddr)
++			return -ENOMEM;
++		memset(drvdata->vaddr, 0, drvdata->size);
++		drvdata->buf = drvdata->vaddr;
++	} else {
++		drvdata->buf = devm_kzalloc(dev, drvdata->size, GFP_KERNEL);
++		if (!drvdata->buf)
++			return -ENOMEM;
++	}
 +
 +	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
-+	if (!desc)
-+		return -ENOMEM;
-+	desc->type = CORESIGHT_DEV_TYPE_SINK;
-+	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
-+	desc->ops = &etb_cs_ops;
-+	desc->pdata = pdev->dev.platform_data;
-+	desc->dev = &pdev->dev;
-+	desc->groups = etb_attr_grps;
-+	desc->owner = THIS_MODULE;
-+	drvdata->csdev = coresight_register(desc);
-+	if (IS_ERR(drvdata->csdev))
-+		return PTR_ERR(drvdata->csdev);
++	if (!desc) {
++		ret = -ENOMEM;
++		goto err0;
++	}
++	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
++		desc->type = CORESIGHT_DEV_TYPE_SINK;
++		desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
++		desc->ops = &tmc_etb_cs_ops;
++		desc->pdata = pdev->dev.platform_data;
++		desc->dev = &pdev->dev;
++		desc->groups = tmc_etb_attr_grps;
++		desc->owner = THIS_MODULE;
++		drvdata->csdev = coresight_register(desc);
++		if (IS_ERR(drvdata->csdev)) {
++			ret = PTR_ERR(drvdata->csdev);
++			goto err0;
++		}
++	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		desc->type = CORESIGHT_DEV_TYPE_SINK;
++		desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
++		desc->ops = &tmc_etr_cs_ops;
++		desc->pdata = pdev->dev.platform_data;
++		desc->dev = &pdev->dev;
++		desc->groups = tmc_etr_attr_grps;
++		desc->owner = THIS_MODULE;
++		drvdata->csdev = coresight_register(desc);
++		if (IS_ERR(drvdata->csdev)) {
++			ret = PTR_ERR(drvdata->csdev);
++			goto err0;
++		}
++	} else {
++		desc->type = CORESIGHT_DEV_TYPE_LINKSINK;
++		desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
++		desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
++		desc->ops = &tmc_etf_cs_ops;
++		desc->pdata = pdev->dev.platform_data;
++		desc->dev = &pdev->dev;
++		desc->groups = tmc_etf_attr_grps;
++		desc->owner = THIS_MODULE;
++		drvdata->csdev = coresight_register(desc);
++		if (IS_ERR(drvdata->csdev)) {
++			ret = PTR_ERR(drvdata->csdev);
++			goto err0;
++		}
++	}
 +
 +	drvdata->miscdev.name = ((struct coresight_platform_data *)
 +				 (pdev->dev.platform_data))->name;
 +	drvdata->miscdev.minor = MISC_DYNAMIC_MINOR;
-+	drvdata->miscdev.fops = &etb_fops;
++	drvdata->miscdev.fops = &tmc_fops;
 +	ret = misc_register(&drvdata->miscdev);
 +	if (ret)
-+		goto err;
++		goto err1;
 +
-+	dev_info(dev, "ETB initialized\n");
++	dev_info(dev, "TMC initialized\n");
 +	return 0;
-+err:
++err1:
 +	coresight_unregister(drvdata->csdev);
++err0:
++	dma_free_coherent(dev, drvdata->size, &drvdata->paddr, GFP_KERNEL);
 +	return ret;
 +}
 +
-+static int __devexit etb_remove(struct platform_device *pdev)
++static int __devexit tmc_remove(struct platform_device *pdev)
 +{
-+	struct etb_drvdata *drvdata = platform_get_drvdata(pdev);
++	struct tmc_drvdata *drvdata = platform_get_drvdata(pdev);
 +
 +	misc_deregister(&drvdata->miscdev);
 +	coresight_unregister(drvdata->csdev);
++	dma_free_coherent(drvdata->dev, drvdata->size, &drvdata->paddr,
++			  GFP_KERNEL);
 +	return 0;
 +}
 +
-+static struct of_device_id etb_match[] = {
-+	{.compatible = "arm,coresight-etb"},
++static struct of_device_id tmc_match[] = {
++	{.compatible = "arm,coresight-tmc"},
 +	{}
 +};
 +
-+static struct platform_driver etb_driver = {
-+	.probe          = etb_probe,
-+	.remove         = __devexit_p(etb_remove),
++static struct platform_driver tmc_driver = {
++	.probe          = tmc_probe,
++	.remove         = __devexit_p(tmc_remove),
 +	.driver         = {
-+		.name   = "coresight-etb",
++		.name   = "coresight-tmc",
 +		.owner	= THIS_MODULE,
-+		.of_match_table = etb_match,
++		.of_match_table = tmc_match,
 +	},
 +};
 +
-+static int __init etb_init(void)
++static int __init tmc_init(void)
 +{
-+	return platform_driver_register(&etb_driver);
++	return platform_driver_register(&tmc_driver);
 +}
-+module_init(etb_init);
++module_init(tmc_init);
 +
-+static void __exit etb_exit(void)
++static void __exit tmc_exit(void)
 +{
-+	platform_driver_unregister(&etb_driver);
++	platform_driver_unregister(&tmc_driver);
 +}
-+module_exit(etb_exit);
++module_exit(tmc_exit);
 +
 +MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("CoreSight Embedded Trace Buffer driver");
++MODULE_DESCRIPTION("CoreSight Trace Memory Controller driver");
 -- 
 Employee of Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
