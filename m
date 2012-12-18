@@ -1,79 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Dec 2012 15:33:52 +0100
-Subject: [PATCH 07/18] arm: mvebu: add pin muxing options for the SDIO
- interface on Armada XP
+Date: Tue, 18 Dec 2012 15:33:50 +0100
+Subject: [PATCH 05/18] arm: mvebu: add DT information for the SDIO interface
+ of Armada 370/XP
 In-Reply-To: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1355841243-3254-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1355841243-3254-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDIO interface is only available on pins MPP30/31/32/33/34/35 on
-the various Armada XP variants, so we provide a pin muxing option for
-this in the Armada XP .dtsi files.
-
-Even though those muxing options are the same for MV78230, MV78260 and
-MV78460, we keep them in each .dtsi file, because the number of pins,
-and therefore the declaration of the pinctrl node, is different for
-each SoC variant.
+Now that the mvsdio MMC driver has a Device Tree binding, we add the
+Device Tree informations to describe the SDIO interface available in
+the Armada 370/XP SoCs.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-mv78230.dtsi |    6 ++++++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi |    6 ++++++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |    6 ++++++
- 3 files changed, 18 insertions(+)
+ arch/arm/boot/dts/armada-370-xp.dtsi |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index c45c7b4..3fa9c84 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -40,6 +40,12 @@
- 		pinctrl {
- 			compatible = "marvell,mv78230-pinctrl";
- 			reg = <0xd0018000 0x38>;
-+
-+			sdio_pins: sdio-pins {
-+				marvell,pins = "mpp30", "mpp31", "mpp32",
-+					       "mpp33", "mpp34", "mpp35";
-+				marvell,function = "sd0";
-+			};
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index cf6c48a..41a5b11 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -129,6 +129,14 @@
+ 			clocks = <&coreclk 0>;
+ 			status = "disabled";
  		};
- 
- 		gpio0: gpio at d0018100 {
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index a2aee57..5a907b3 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -48,6 +48,12 @@
- 		pinctrl {
- 			compatible = "marvell,mv78260-pinctrl";
- 			reg = <0xd0018000 0x38>;
 +
-+			sdio_pins: sdio-pins {
-+				marvell,pins = "mpp30", "mpp31", "mpp32",
-+					       "mpp33", "mpp34", "mpp35";
-+				marvell,function = "sd0";
-+			};
- 		};
++		mvsdio at d00d4000 {
++			compatible = "marvell,orion-sdio";
++			reg = <0xd00d4000 0x200>;
++			interrupts = <54>;
++			clocks = <&gateclk 17>;
++			status = "disabled";
++		};
+ 	};
+ };
  
- 		gpio0: gpio at d0018100 {
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index da03a12..6dcdc50d 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -63,6 +63,12 @@
- 		pinctrl {
- 			compatible = "marvell,mv78460-pinctrl";
- 			reg = <0xd0018000 0x38>;
-+
-+			sdio_pins: sdio-pins {
-+				marvell,pins = "mpp30", "mpp31", "mpp32",
-+					       "mpp33", "mpp34", "mpp35";
-+				marvell,function = "sd0";
-+			};
- 		};
- 
- 		gpio0: gpio at d0018100 {
 -- 
 1.7.9.5
