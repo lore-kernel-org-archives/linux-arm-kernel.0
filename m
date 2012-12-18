@@ -1,109 +1,54 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 18 Dec 2012 11:06:45 +0800
-Subject: [PATCH V3 2/5] ARM: tegra20: cpuidle: add powered-down state
- for secondary CPU
-In-Reply-To: <CAMbhsRTLo6jS_7hqVVtgaa8_ZweAwicrgghaaFWfnzHpc6f1Pg@mail.gmail.com>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <1355797861-12759-3-git-send-email-josephl@nvidia.com>
- <CAMbhsRTLo6jS_7hqVVtgaa8_ZweAwicrgghaaFWfnzHpc6f1Pg@mail.gmail.com>
-Message-ID: <1355800005.16185.14.camel@jlo-ubuntu-64.nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 18 Dec 2012 12:51:44 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Fix PFC - MOD_SEL2 missed an entry
+In-Reply-To: <20121218023610.GV28065@verge.net.au>
+References: <1353601737-21641-1-git-send-email-phil.edworthy@renesas.com>
+ <20121218023610.GV28065@verge.net.au>
+Message-ID: <20121218035144.GC13353@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-12-18 at 10:46 +0800, Colin Cross wrote:
-> On Mon, Dec 17, 2012 at 6:30 PM, Joseph Lo <josephl@nvidia.com> wrote:
-> > The powered-down state of Tegra20 requires power gating both CPU cores.
-> > When the secondary CPU requests to enter powered-down state, it saves
-> > its own contexts and then enters WFI. The Tegra20 had a limition to
-> > power down both CPU cores. The secondary CPU must waits for CPU0 in
-> > powered-down state too. If the secondary CPU be woken up before CPU0
-> > entering powered-down state, then it needs to restore its CPU states
-> > and waits for next chance.
-> >
-> > Be aware of that, you may see the legacy power state "LP2" in the code
-> > which is exactly the same meaning of "CPU power down".
-> >
-> > Based on the work by:
-> > Colin Cross <ccross@android.com>
-> > Gary King <gking@nvidia.com>
-> >
-> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+On Tue, Dec 18, 2012 at 11:36:10AM +0900, Simon Horman wrote:
+> On Thu, Nov 22, 2012 at 04:28:57PM +0000, Phil Edworthy wrote:
+> > The list of functions selected by the MOD_SEL2 register was missing
+> > an entry. This caused all entries after this to modify the MOD_SEL2
+> > register incorrectly.
+> 
+> Laurent, can you handle this in your series?
+> I believe it removes this file.
+
+Sorry, I missed the fact that this is for stable.
+Laurent, can you handle upstream and I'll handle stable?
+
+> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 > > ---
-> > V3:
-> > * dynamic checking of the number of the state counts
-> > * fix the code sequence for aborting cpu_suspend in
-> >   tegra20_sleep_cpu_secondary_finish
-> > V2:
-> > * no change
-> > ---
-> >  arch/arm/mach-tegra/cpuidle-tegra20.c |   94 ++++++++++++++++++++-
-> >  arch/arm/mach-tegra/pm.c              |    2 +
-> >  arch/arm/mach-tegra/sleep-tegra20.S   |  147 +++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-tegra/sleep.h           |   23 +++++
-> >  4 files changed, 261 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> > index d32e8b0..716aef3 100644
-> > --- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-> > +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> > +static int __cpuinit tegra20_idle_lp2(struct cpuidle_device *dev,
-> > +                                     struct cpuidle_driver *drv,
-> > +                                     int index)
-> > +{
-> > +       u32 cpu = is_smp() ? cpu_logical_map(dev->cpu) : dev->cpu;
-> > +       bool entered_lp2 = false;
-> > +
-> > +       local_fiq_disable();
-> > +
-> > +       tegra_set_cpu_in_lp2(cpu);
-> > +       cpu_pm_enter();
+> >  arch/arm/mach-shmobile/pfc-r8a7779.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c b/arch/arm/mach-shmobile/pfc-r8a7779.c
+> > index 9fac32e4..15f6a48 100644
+> > --- a/arch/arm/mach-shmobile/pfc-r8a7779.c
+> > +++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
+> > @@ -2525,7 +2525,7 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
+> >  	    /* SEL_SCIF [2] */
+> >  	    FN_SEL_SCIF_0, FN_SEL_SCIF_1, FN_SEL_SCIF_2, FN_SEL_SCIF_3,
+> >  	    /* SEL_CANCLK [2] */
+> > -	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2,
+> > +	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2, 0,
+> >  	    /* SEL_CAN0 [1] */
+> >  	    FN_SEL_CAN0_0, FN_SEL_CAN0_1,
+> >  	    /* SEL_HSCIF1 [1] */
+> > -- 
+> > 1.7.5.4
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> You must check the return value from cpu_pm_enter and synchronize and
-> abort both cpus.
-> 
-Please check the sequence in last patch. Although it used the API that
-be provided by patch 1 to check the pending sgi. 
-
-> > +
-> > +       if (cpu == 0)
-> > +               cpu_do_idle();
-> > +       else
-> > +               entered_lp2 = tegra20_idle_enter_lp2_cpu_1(dev, drv, index);
-> > +
-> > +       cpu_pm_exit();
-> > +       tegra_clear_cpu_in_lp2(cpu);
-> > +
-> > +       local_fiq_enable();
-> > +
-> > +       smp_rmb();
-> > +
-> > +       return entered_lp2 ? index : 0;
-> > +}
-> > +#endif
-> > +
-> >  int __init tegra20_cpuidle_init(void)
-> >  {
-> > -       int ret;
-> > +       int ret, i;
-> >         unsigned int cpu;
-> >         struct cpuidle_device *dev;
-> >         struct cpuidle_driver *drv = &tegra_idle_driver;
-> >
-> > +       drv->state_count = sizeof(tegra_idle_states) /
-> > +                          sizeof(struct cpuidle_state);
-> > +       for (i = 0; i < drv->state_count; i++)
-> > +               memcpy(&drv->states[i], &tegra_idle_states[i],
-> > +                      sizeof(struct cpuidle_state));
-> > +
-> >         ret = cpuidle_register_driver(&tegra_idle_driver);
-> >         if (ret) {
-> >                 pr_err("CPUidle driver registration failed\n");
-> 
-> Is there a call to cpu_cluster_pm_enter/exit somewhere else?
-
-Yes, there is. Please check the fuction "tegra_idle_lp2_last" in "pm.c",
-because it's a common code of "powered-down" idle state for CPU0 on
-Tegra20 & Tegra30.
-
-Thanks,
-Joseph
