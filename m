@@ -1,36 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Dec 2012 15:29:11 +0100
-Subject: [PATCH] sunxi: Change the machine compatible string.
-Message-ID: <1355840951-32533-1-git-send-email-maxime.ripard@free-electrons.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 18 Dec 2012 15:30:23 +0100
+Subject: [PATCH RESEND 5/6 v10] gpio: Add device tree support to block
+ GPIO API
+In-Reply-To: <20121217155153.GD16561@e106331-lin.cambridge.arm.com>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <1355495185-24220-6-git-send-email-stigge@antcom.de>
+ <20121217155153.GD16561@e106331-lin.cambridge.arm.com>
+Message-ID: <50D07DFF.2040102@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68136b10 ("ARM: sunxi: Change device tree naming scheme for
-sunxi") changed the naming scheme and the compatible strings used in the
-device trees related to the sunXi platform, but forgot to change the
-compatible string in the DT machine definition.
+Hi Mark,
 
-This prevents the kernel from booting on these boards.
+On 12/17/2012 04:51 PM, Mark Rutland wrote:
+>> +static int __devinit gpioblock_of_probe(struct platform_device *pdev)
+>> +{
+>> +	struct device_node *block;
+>> +	unsigned *gpios;
+>> +	int ngpio;
+>> +	int ret;
+>> +	struct gpio_block *gb;
+>> +
+>> +	for_each_available_child_of_node(pdev->dev.of_node, block) {
+>> +		int i;
+>> +
+>> +		ngpio = of_gpio_count(block);
+>> +		gpios = kzalloc(ngpio * sizeof(*gpios), GFP_KERNEL);
+> 
+> What if the block node is malformed? ngpio might be -ENOENT or -EINVAL.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/mach-sunxi/sunxi.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+AFAICS, of_gpio_count() always returns at least 0. Both if
+CONFIG_OF_GPIO is y, m or n. And called of_gpio_named_count() also
+currently doesn't return error values. Further, other drivers using
+of_gpio_count() don't expect or catch <0.
 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index dc634ae..d09e408 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -79,8 +79,8 @@ static void __init sunxi_dt_init(void)
- }
- 
- static const char * const sunxi_board_dt_compat[] = {
--	"allwinner,sun4i",
--	"allwinner,sun5i",
-+	"allwinner,sun4i-a10",
-+	"allwinner,sun5i-a13",
- 	NULL,
- };
- 
--- 
-1.7.9.5
+However, it's reasonable to guard against of_gpio_count() < 1 since
+probing without provided blocks should be void.
+
+Will change this for the next patch update together with your leakage
+findings.
+
+Thanks for reporting!
+
+Roland
