@@ -1,64 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Dec 2012 16:29:44 +0000
-Subject: [PATCH 5/7] arm64: ARMv8 RTSM model (SoC) support
-In-Reply-To: <20121211163932.GC16071@arm.com>
-References: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
- <1354914392-9634-6-git-send-email-catalin.marinas@arm.com>
- <201212111541.16479.arnd@arndb.de> <20121211163932.GC16071@arm.com>
-Message-ID: <20121218162944.GA594@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 18 Dec 2012 17:31:37 +0100
+Subject: [PATCH 13/18] arm: kirkwood: mplcec4: use Device Tree to probe
+ SDIO
+In-Reply-To: <1355841243-3254-14-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1355841243-3254-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121218163137.GK3392@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 11, 2012 at 04:39:32PM +0000, Catalin Marinas wrote:
-> On Tue, Dec 11, 2012 at 03:41:15PM +0000, Arnd Bergmann wrote:
-> > On Friday 07 December 2012, Catalin Marinas wrote:
-> > > diff --git a/arch/arm6
-> > > +static const char *vexpress_dt_match[] __initdata = {
-> > > +       "arm,vexpress",
-> > > +       NULL,
-> > > +};
-> > > +
-> > > +static int __init vexpress_init(void)
-> > > +{
-> > > +       if (!of_flat_dt_match(of_get_flat_dt_root(), vexpress_dt_match))
-> > > +               return 0;
-> > > +
-> > > +       vexpress_sysreg_of_early_init();
-> > > +       vexpress_clk_of_init();
-> > > +
-> > > +       return 0;
-> > > +}
-> > > +arch_initcall(vexpress_init);
-> > 
-> > I think it would be more appropriate for these two to check the presence of
-> > the individual devices, and move the caller into the actual device driver,
-> > rather than checking for the root node of the device tree.
-> > 
-> > There may be cases where we want to check the root node, but both the clock
-> > setup and the sysreg should both be detectable.
+On Tue, Dec 18, 2012 at 03:33:58PM +0100, Thomas Petazzoni wrote:
+> Now that the mvsdio driver has a Device Tree binding, and the SDIO
+> controller is declared in kirkwood.dtsi, migrate the mplcec4 board to
+> use the Device Tree to probe the SDIO controller.
 > 
-> I cc'ed Pawel as well since it's touching his code. We've been through
-> several versions internally and didn't find a clear winner. Currently,
-> vexpress_clk_of_init() requires vexpress_sysreg_of_early_init() to be
-> called first. Pawel has a patch to allow sysreg self-initialisation when
-> called from vexpress_clk_of_init().
+> This patch has not been tested, it remains to be tested by a person
+> having access to the hardware.
 > 
-> This leaves us with a way to call vexpress_clk_of_init() directly from
-> clk-vexpress.c. There are two ways:
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Stefan Peter <s.peter@mpl.ch>
+> ---
+>  arch/arm/boot/dts/kirkwood-mplcec4.dts |    6 ++++++
+>  arch/arm/mach-kirkwood/board-mplcec4.c |    6 ------
+>  2 files changed, 6 insertions(+), 6 deletions(-)
 > 
-> 1. arch_initcall() in clk-vexpress.c, checking for the DT match.
-> 2. driver registration (arch_initcall) and later probing when
->    of_platform_populate() is called from the arch/arm64 code.
+> diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+> index 262c654..ed10977 100644
+> --- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
+> +++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+> @@ -133,6 +133,12 @@
+>  			status = "okay";
+>  
+>  		};
+> +
+> +		mvsdio at 90000 {
+> +			status = "okay";
+> +			cd-gpios = <&gpio1 15 0>;
+> +			/* No WP GPIO */
+> +		};
+>  	};
 
-After some more thinking, none of these would work for arch/arm since
-vexpress_clk_of_init() is called very early via the time_init() ...
-v2m_dt_timer_init(). On arm64 we rely on the architected timers to be
-always present but this assumption is not valid on arm where clocks
-would need to be initialised early.
+Hi Thomas
 
-While I'd really like to get rid of the SoC code in arch/arm64, the best
-place I see for the vexpress_clk_of_init() call is still the arch code
-(unless we add #ifdefs in the clk-vexpress.c code).
+kirkwood-mplcec4.dts contains:
 
--- 
-Catalin
+                pinctrl: pinctrl at 10000 {
+
+                        pinctrl-0 = < &pmx_nand &pmx_uart0
+                                      &pmx_led_health &pmx_sdio
+                                      &pmx_sata0 &pmx_sata1
+                                      &pmx_led_user1o
+                                      &pmx_led_user1g &pmx_led_user0o
+                                      &pmx_led_user0g &pmx_led_misc
+                                      &pmx_sdio_cd
+                                    >;
+                        pinctrl-names = "default";
+
+Should &pmx_sdio and &pmx_sdio_cd be moved out of here and into the
+mvsdio at 90000 node?
+
+>  
+>  	gpio-leds {
+> diff --git a/arch/arm/mach-kirkwood/board-mplcec4.c b/arch/arm/mach-kirkwood/board-mplcec4.c
+> index 56bfe5a..183ff8a 100644
+> --- a/arch/arm/mach-kirkwood/board-mplcec4.c
+> +++ b/arch/arm/mach-kirkwood/board-mplcec4.c
+> @@ -24,11 +24,6 @@ static struct mv643xx_eth_platform_data mplcec4_ge01_data = {
+>  	.phy_addr	= MV643XX_ETH_PHY_ADDR(2),
+>  };
+
+There is another header file which can be removed.
+
+Thanks
+	Andrew
