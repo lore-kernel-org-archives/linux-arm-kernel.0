@@ -1,44 +1,42 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Dec 2012 12:06:53 +0000
-Subject: [RFC PATCH 0/5] clockevents: decouple broadcast mechanism from drivers
-Message-ID: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
+Date: Tue, 18 Dec 2012 12:06:54 +0000
+Subject: [RFC PATCH 1/5] ARM: remove useless guard in smp.c
+In-Reply-To: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
+References: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1355832418-31692-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some SMP systems, cpu-local timers may stop delivering interrupts
-when in low power states, or not all CPUs may have local timers. To
-support these systems we have a mechanism for broadcasting timer ticks
-to other CPUs. This mechanism relies on the struct
-clock_event_device::broadcast function pointer, which is a
-driver-specific mechanism for broadcasting ticks to other CPUs.
+Currently we only provide an implementation of smp_timer_broadcast in
+smp.c if GENERIC_CLOCKEVENTS_BROADCAST is selected. As
+smp_timer_broadcast is only used in smp.c, smp.c depends on SMP, and
+GENERIC_CLOCKEVENTS_BROADCAST is selected by SMP, this is unnecessary.
 
-As the broadcast mechanism is architecture-specific, placing the
-broadcast function on struct clock_event_device ties each driver to a
-single architecture. Additionally the driver or architecture backend
-must handle the routing of broadcast ticks to the correct
-clock_event_device, leading to duplication of the list of active
-clock_event_devices.
+This patch removes the redundant guard.
 
-These patches introduce a generic mechanism for handling the receipt of
-timer broadcasts, and an optional architecture-specific broadcast
-function which allows drivers to be decoupled from a particular
-architecture will retaining support for timer tick broadcasts. These
-mechanisms are wired up for the arm port, and have been boot-tested on a
-pandaboard.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm/kernel/smp.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-Thanks,
-Mark.
-
-Mark Rutland (5):
-  ARM: remove useless guard in smp.c
-  clockevents: Add generic timer broadcast receiver
-  ARM: Use generic timer broadcast receive
-  clockevents: Add generic timer broadcast function
-  ARM: Add generic timer broadcast support
-
- arch/arm/Kconfig             |    1 +
- arch/arm/kernel/smp.c        |   15 ++-------------
- include/linux/clockchips.h   |    9 +++++++++
- kernel/time/Kconfig          |    4 ++++
- kernel/time/tick-broadcast.c |   30 ++++++++++++++++++++++++++++++
- 5 files changed, 46 insertions(+), 13 deletions(-)
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index fbc8b26..21954bc 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -473,14 +473,10 @@ static void ipi_timer(void)
+ 	evt->event_handler(evt);
+ }
+ 
+-#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+ static void smp_timer_broadcast(const struct cpumask *mask)
+ {
+ 	smp_cross_call(mask, IPI_TIMER);
+ }
+-#else
+-#define smp_timer_broadcast	NULL
+-#endif
+ 
+ static void broadcast_timer_set_mode(enum clock_event_mode mode,
+ 	struct clock_event_device *evt)
+-- 
+1.7.0.4
