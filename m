@@ -1,10 +1,10 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Dec 2012 10:19:10 +0000
+Date: Tue, 18 Dec 2012 10:25:52 +0000
 Subject: [PATCH] ARM: realview: fix private peripheral memory base for
  EB rev. B boards
 In-Reply-To: <1355760668-28606-1-git-send-email-will.deacon@arm.com>
 References: <1355760668-28606-1-git-send-email-will.deacon@arm.com>
-Message-ID: <50D0431E.8080300@arm.com>
+Message-ID: <50D044B0.1000208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
