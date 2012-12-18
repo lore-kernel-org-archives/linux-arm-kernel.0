@@ -1,41 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Dec 2012 15:33:55 +0100
-Subject: [PATCH 10/18] arm: mvebu: enable the SDIO interface on the
- Globalscale Mirabox
-In-Reply-To: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1355841243-3254-11-git-send-email-thomas.petazzoni@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Dec 2012 16:01:27 +0100
+Subject: [GIT PULL] ARM: arm-soc fixes for 3.8
+In-Reply-To: <20121218065502.GA12865@quad.lixom.net>
+References: <20121218065502.GA12865@quad.lixom.net>
+Message-ID: <50D08547.8040405@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Globalscale Mirabox uses the SDIO interface of the Armada 370 to
-connect to a Wifi/Bluetooth SD8787 chip, so we enable the SDIO
-interface of this board in its Device Tree file.
+Hi Olof,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-mirabox.dts |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+Le 18/12/2012 07:55, Olof Johansson a ?crit :
+> Maxime Ripard (1):
+>       ARM: sunxi: Change device tree naming scheme for sunxi
 
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index 3b40713..1864820 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -52,5 +52,15 @@
- 			phy = <&phy1>;
- 			phy-mode = "rgmii-id";
- 		};
-+
-+		mvsdio at d00d4000 {
-+			pinctrl-0 = <&sdio_pins2>;
-+			pinctrl-names = "default";
-+			status = "okay";
-+			/*
-+			 * No CD or WP GPIOs: SDIO interface used for
-+			 * Wifi/Bluetooth chip
-+			 */
-+		};
- 	};
- };
+There's something odd about this one (commit 68136b10). The patch that
+you seem to have applied differs from the one I sent. The DTs files
+appears to have not been renamed, while in the patch I sent
+(http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137105.html),
+it's the case.
+
+Do you know what happened here? What can we do to fix that?
+
+Maxime
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
