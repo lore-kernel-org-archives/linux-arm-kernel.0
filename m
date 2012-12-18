@@ -1,33 +1,52 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Dec 2012 15:33:01 +0100
-Subject: [PATCH] arm: kirkwood: register DT devices earlier
-In-Reply-To: <20121218141902.GI3392@lunn.ch>
-References: <1355839667-1487-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121218141902.GI3392@lunn.ch>
-Message-ID: <20121218153301.6ffced12@skate>
+Date: Tue, 18 Dec 2012 15:33:45 +0100
+Subject: Device Tree binding for the mvsdio driver and related changes
+Message-ID: <1355841243-3254-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Hello,
 
-On Tue, 18 Dec 2012 15:19:02 +0100, Andrew Lunn wrote:
+This series of patches adds a Device Tree binding to the mvsdio driver
+(the driver for the SDIO interface found in many Marvell SoCs), and
+uses this binding to enable the SDIO interface on Armada 370 and
+Armada XP platforms, as well as converting the Kirkwood platforms to
+using the Device Tree to probe the SDIO interface.
 
-> I have a different fix for this.
-> 
-> The gpio is being used to supply power to SATA. So i turn it into a
-> fixed-regulator, using DT.
-> 
-> I will send the patch tonight.
+This series is obviously 3.9 material.
 
-Indeed sounds a much better fix than mine. My patch posting was mainly
-to raise the issue, and ensure we get some fix for it, I was quite sure
-there was a better way of fixing this.
+Here is a short description of the patches:
 
-Thanks,
+ * Patches 1 and 2 cleanup the mvsdio driver initialization by using
+   the slot-gpio helpers for the card-detect and write-protect GPIOs
+
+ * Patch 3 adds the Device Tree binding itself to the mvsdio driver
+
+ * Patch 4 adds pinctrl integration to the mvsdio driver
+
+ * Patch 5 adds Device Tree information to describe the SDIO interface
+   on the Armada 370 and Armada XP SoCs.
+
+ * Patches 6 and 7 add pin muxing options for the SDIO interface on
+   Armada 370 and Armada XP SoCs.
+
+ * Patches 8, 9, 10 enable the SDIO interface on the Armada XP DB,
+   Armada 370 DB and Globalscale Mirabox platforms.
+
+ * Patch 11 adds Device Tree information to describe the SDIO
+   interface on the Kirkwood SoCs.
+
+ * Patches 12, 13, 14 convert the Kirkwood platforms that have been
+   migrated to the Device Tree, to actually use the Device Tree to
+   probe the SDIO interface.
+
+ * Patch 15 removes a useless header inclusion related to the SDIO
+   interface to the Kirkwood Dockstar platform.
+
+ * Patches 16, 17 and 18 update the mvebu_defconfig to enable the
+   mvsdio driver, as well as Wifi/Bluetooth drivers needed for the
+   SD8787 chip connected over SDIO on the Globalscale Mirabox.
+
+Best regards,
 
 Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
