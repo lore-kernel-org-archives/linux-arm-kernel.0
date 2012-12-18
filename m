@@ -1,57 +1,48 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Tue, 18 Dec 2012 10:19:21 +0800
-Subject: common clock framwork: clk_set_rate issue
-In-Reply-To: <20121217201945.GA19651@pengutronix.de>
-References: <CADApbej+f9P1sgLMR8_McoCCSLDjJt_qitWdNd8X1v6PwZqsnQ@mail.gmail.com>
- <20121217201945.GA19651@pengutronix.de>
-Message-ID: <CADApbej17udzpStNeY+tsSkeOy_Fv2+o+zKs4zBLV8+ST4DWTg@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 18 Dec 2012 10:30:56 +0800
+Subject: [PATCH V3 0/5] ARM: tegra20: cpuidle: add power-down state
+Message-ID: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 4:19 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Thu, Dec 06, 2012 at 10:52:03AM +0800, Chao Xie wrote:
->> hi
->> When develop the clk drivers for SOCs based on common clock framework.
->> I met a issue.
->> For example there is a uart device, it's function clock comes from a
->> divider, and the divider's parent is a mux. It means
->>
->> MUX --> DIV --> UART
->>
->> As we know that UART can work at low baudrate for a terminal, while it
->> can also connect to GPS module which needs a high rate. So the MUX
->> will provide two clock source, a low clock rate and high clock rate.
->>
->> The MUX clk driver clk-mux.c does not implement a ->round_rate callbacks.
->> It means that when uart driver is used for a GPS and it want to change
->> it clock, the driver will call clk_set_rate(); clk_set_rate will loop
->> upward to DIV, and DIV will try to set its divider, and it need loop
->> upward to MUX.
->> In fact the current clk drivers have some issue.
->> MUX clk driver should provide the round_rate callback, it then can
->> provide a new_rate. It means that in clk_calc_subtree MUX can switch
->> the clock source.
->
-> It's not that simple. The input clocks to a mux may not only differ in
-> their rate but can also have other different properties, like for
-> example one input may be always present whereas another input only runs
-> when the CPU is in run mode.
->
-> It may be a possibility to add a flag to the mux to explicitely
-> allow reparenting on a rate change.
->
-> Sascha
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-555
+This adds a "powered-down" state in cpuidle for Tegra20. It requires power
+gating both CPU cores. When the CPU1 requests to enter "powered-down"
+state, it saves its own state and then enters WFI. When the CPU0 requests
+the same state, it attempts to put the CPU1 into reset to prevent it from
+waking up. Then power down both CPUs together and turn off the CPU rail.
 
-There is already a flag to do it.
-CLK_SET_RATE_PARENT
-if the mux does not want to changes the input for clk_set_rate called
-by its child, it can clear this flag.
-The question is whether we need add the round_rate/recalc_rate for MUX
-type of clock? Is there any special issue about it that why current
-MUX implementation does not have these callbacks?
+If the CPU1 be woken up before CPU0 entering powered-down state, then it
+needs to restore it's CPU state and waits for next chance.
+
+V3:
+* sqash the last 2 patches in previors version to support coupled cpuidle
+  directly
+
+V2:
+* add a new patch for checking if there is any pending SGI
+* if there is a SGI pending for the CPU, then we will abort the
+  "powered-down" idle for the both CPUs that already in coupled state
+
+Verified on Seaboard(Tegra20) and Cardhu(Tegra30).
+
+Joseph Lo (5):
+  ARM: tegra: add pending SGI checking API
+  ARM: tegra20: cpuidle: add powered-down state for secondary CPU
+  ARM: tegra20: clocks: add CPU low-power function into
+    tegra_cpu_car_ops
+  ARM: tegra20: flowctrl: add support for cpu_suspend_enter/exit
+  ARM: tegra20: cpuidle: apply coupled cpuidle for powered-down mode
+
+ arch/arm/mach-tegra/Kconfig           |    1 +
+ arch/arm/mach-tegra/cpuidle-tegra20.c |  201 ++++++++++++++++++++++++++++++++-
+ arch/arm/mach-tegra/flowctrl.c        |   38 ++++++-
+ arch/arm/mach-tegra/flowctrl.h        |    4 +
+ arch/arm/mach-tegra/irq.c             |   15 +++
+ arch/arm/mach-tegra/irq.h             |   22 ++++
+ arch/arm/mach-tegra/pm.c              |    2 +
+ arch/arm/mach-tegra/sleep-tegra20.S   |  200 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/sleep.S           |   19 +++
+ arch/arm/mach-tegra/sleep.h           |   26 +++++
+ arch/arm/mach-tegra/tegra20_clocks.c  |   99 ++++++++++++++++
+ 11 files changed, 617 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/irq.h
