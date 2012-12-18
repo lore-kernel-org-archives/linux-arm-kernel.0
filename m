@@ -1,50 +1,98 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Dec 2012 12:06:56 +0000
-Subject: [RFC PATCH 3/5] ARM: Use generic timer broadcast receive
+Date: Tue, 18 Dec 2012 12:06:57 +0000
+Subject: [RFC PATCH 4/5] clockevents: Add generic timer broadcast function
 In-Reply-To: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
 References: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1355832418-31692-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1355832418-31692-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the ARM backend must maintain a redundant list of timers for
-the purpose of centralising timer broadcast functionality. This prevents
-sharing timer drivers across architectures.
+Currently, the timer broadcast mechanism is defined by a function
+pointer on struct clock_event_device. As the fundamental mechanism for
+broadcast is architecture-specific, this means that clock_event_device
+drivers cannot be shared across multiple architectures.
 
-This patch moves the pain of dealing with timer broadcasts to the core
-clockevents tick broadcast code, which already maintains its own list
-of timers.
+This patch adds an (optional) architecture-specific function for timer
+tick broadcast, allowing drivers which may require broadcast
+functionality to be shared across multiple architectures.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm/kernel/smp.c |    8 +-------
- 1 files changed, 1 insertions(+), 7 deletions(-)
+ include/linux/clockchips.h   |    5 +++++
+ kernel/time/Kconfig          |    4 ++++
+ kernel/time/tick-broadcast.c |   15 +++++++++++++++
+ 3 files changed, 24 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 21954bc..59bf6d5 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -467,12 +467,6 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
-  */
- static DEFINE_PER_CPU(struct clock_event_device, percpu_clockevent);
+diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+index e1089aa..6634652 100644
+--- a/include/linux/clockchips.h
++++ b/include/linux/clockchips.h
+@@ -162,6 +162,11 @@ extern void clockevents_suspend(void);
+ extern void clockevents_resume(void);
  
--static void ipi_timer(void)
--{
--	struct clock_event_device *evt = &__get_cpu_var(percpu_clockevent);
--	evt->event_handler(evt);
--}
--
- static void smp_timer_broadcast(const struct cpumask *mask)
- {
- 	smp_cross_call(mask, IPI_TIMER);
-@@ -586,7 +580,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
++#ifdef CONFIG_ARCH_HAS_TICK_BROADCAST
++extern void tick_broadcast(const struct cpumask *mask);
++#else
++#define tick_broadcast	NULL
++#endif
+ extern int tick_receive_broadcast(void);
+ #endif
  
- 	case IPI_TIMER:
- 		irq_enter();
--		ipi_timer();
-+		tick_receive_broadcast();
- 		irq_exit();
- 		break;
+diff --git a/kernel/time/Kconfig b/kernel/time/Kconfig
+index 8601f0d..b696922 100644
+--- a/kernel/time/Kconfig
++++ b/kernel/time/Kconfig
+@@ -38,6 +38,10 @@ config GENERIC_CLOCKEVENTS_BUILD
+ 	default y
+ 	depends on GENERIC_CLOCKEVENTS
  
++# Architecture can handle broadcast in a driver-agnostic way
++config ARCH_HAS_TICK_BROADCAST
++	bool
++
+ # Clockevents broadcasting infrastructure
+ config GENERIC_CLOCKEVENTS_BROADCAST
+ 	bool
+diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+index c2dd022..ec22a80 100644
+--- a/kernel/time/tick-broadcast.c
++++ b/kernel/time/tick-broadcast.c
+@@ -18,6 +18,7 @@
+ #include <linux/percpu.h>
+ #include <linux/profile.h>
+ #include <linux/sched.h>
++#include <linux/smp.h>
+ 
+ #include "tick-internal.h"
+ 
+@@ -86,6 +87,12 @@ int tick_is_broadcast_device(struct clock_event_device *dev)
+ 	return (dev && tick_broadcast_device.evtdev == dev);
+ }
+ 
++static void err_broadcast(const struct cpumask *mask)
++{
++	pr_crit_once("Attempted to broadcast tick, but no broadcast mechanism "
++		     "present. Some CPUs may be unresponsive.");
++}
++
+ /*
+  * Check, if the device is disfunctional and a place holder, which
+  * needs to be handled by the broadcast device.
+@@ -105,6 +112,14 @@ int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu)
+ 	 */
+ 	if (!tick_device_is_functional(dev)) {
+ 		dev->event_handler = tick_handle_periodic;
++		if (!dev->broadcast)
++			dev->broadcast = tick_broadcast;
++		if (!dev->broadcast) {
++			pr_warn_once("%s depends on broadcast, but no "
++				     "broadcast function available\n",
++				     dev->name);
++			dev->broadcast = err_broadcast;
++		}
+ 		cpumask_set_cpu(cpu, tick_get_broadcast_mask());
+ 		tick_broadcast_start_periodic(tick_broadcast_device.evtdev);
+ 		ret = 1;
 -- 
 1.7.0.4
