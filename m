@@ -1,43 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Dec 2012 12:20:16 +0000
-Subject: [PATCH 06/10] arm: arch_timer: divorce from local_timer api
-In-Reply-To: <20121210110754.GA18328@e106331-lin.cambridge.arm.com>
-References: <1354297568-26366-1-git-send-email-mark.rutland@arm.com>
- <1354297568-26366-7-git-send-email-mark.rutland@arm.com>
- <50C26ACA.4050509@codeaurora.org>
- <20121210110754.GA18328@e106331-lin.cambridge.arm.com>
-Message-ID: <20121218122002.GA29998@e106331-lin.cambridge.arm.com>
+From: gururaja.hebbar@ti.com (Hebbar Gururaja)
+Date: Tue, 18 Dec 2012 18:02:09 +0530
+Subject: [PATCH] ARM: OMAP2: hwmod: Fix "register offset NULL check" bug
+Message-ID: <1355833929-25387-1-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
+From: "Hebbar, Gururaja" <gururaja.hebbar@ti.com>
 
-On Mon, Dec 10, 2012 at 11:09:41AM +0000, Mark Rutland wrote:
-> On Fri, Dec 07, 2012 at 10:16:42PM +0000, Stephen Boyd wrote:
-> > On 11/30/12 09:46, Mark Rutland wrote:
-> > > Currently, the arch_timer driver is tied to the arm port, as it relies
-> > > on code in arch/arm/smp.c to setup and teardown timers as cores are
-> > > hotplugged on and off. The timer is registered through an arm-specific
-> > > registration mechanism, preventing sharing the driver with the arm64
-> > > port.
-> > >
-> > > This patch moves the driver to using a cpu notifier instead, making it
-> > > easier to port.
-> > 
-> > How does ipi_timer() work after this change? Don't we need it because of
-> > FEAT_C3_STOP?
-> 
-> The unfortunate answer is it doesn't, and we'll need broadcast for any systems
-> where the timers turn off in low power states.
-> 
-> I'll take a look at decoupling the broadcast mechanism from the drivers, it's
-> not really a property of the clock hardware and it would be nice to split it.
+omap4_cminst_wait_module_ready() checks if register offset is NULL.
 
-I've had a go at splitting the broadcast mechanism in another series:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137929.html
+int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
+				   u16 clkctrl_offs)
+{
+	int i = 0;
 
-I'm evidently not proficient with git send-email -- I'd intended for you to be
-on Cc.
+	if (!clkctrl_offs)
+		return 0;
 
-Thanks,
-Mark
+In case of AM33xx, not all clock domains have CLKSTCTRL at 0x00. An
+example of this would be the RTC clock domain. In such cases the
+module ready check is skipped which leads to a data abort during bootup
+when RTC registers is accessed.
+
+Since the actual base address is verified in
+omap4_cminst_read_inst_reg(), this check here is not required at all
+and hence can be removed.
+
+Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+---
+:100644 100644 7f9a464... 40545ff... M	arch/arm/mach-omap2/cminst44xx.c
+ arch/arm/mach-omap2/cminst44xx.c |    3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 7f9a464..40545ff 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -271,9 +271,6 @@ int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
+ {
+ 	int i = 0;
+ 
+-	if (!clkctrl_offs)
+-		return 0;
+-
+ 	omap_test_timeout(_is_module_ready(part, inst, cdoffs, clkctrl_offs),
+ 			  MAX_MODULE_READY_TIME, i);
+ 
+-- 
+1.7.9.5
