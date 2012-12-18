@@ -1,118 +1,87 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 18 Dec 2012 06:55:25 +0100
-Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <50CF76D3.9030708@grandegger.com>
-References: <50CBBB25.20002@antcom.de> <50CF03FB.2030100@grandegger.com>
- <50CF0744.7040404@grandegger.com> <50CF1EF1.2070601@antcom.de>
- <50CF237E.5020409@antcom.de> <50CF4838.9000401@grandegger.com>
- <50CF5327.6070205@antcom.de> <50CF584E.1040601@grandegger.com>
- <50CF5E45.5030104@antcom.de> <50CF76D3.9030708@grandegger.com>
-Message-ID: <20121218055525.GJ23971@game.jcrosoft.org>
+Date: Tue, 18 Dec 2012 07:00:09 +0100
+Subject: [PATCH 1/4] ODROID-X: dts: Add board dts file for ODROID-X
+In-Reply-To: <CAOesGMgZWNiCmTFGvr--zKf+vS51hX5jPnD+NZq8OvGFLS9rJA@mail.gmail.com>
+References: <1355774107-364-1-git-send-email-tobetter@gmail.com>
+ <1355774107-364-2-git-send-email-tobetter@gmail.com>
+ <CAOesGMgZWNiCmTFGvr--zKf+vS51hX5jPnD+NZq8OvGFLS9rJA@mail.gmail.com>
+Message-ID: <20121218060009.GK23971@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20:47 Mon 17 Dec     , Wolfgang Grandegger wrote:
-> On 12/17/2012 07:02 PM, Roland Stigge wrote:
-> > On 12/17/2012 06:37 PM, Wolfgang Grandegger wrote:
-> >> 	/* Do synchronous data output with a single write access */
-> >> 	__raw_writel(~mask, pio + PIO_OWDR);
-> >> 	__raw_writel(mask, pio + PIO_OWER);
-> >> 	__raw_writel(val, pio + PIO_ODSR);
-> >>
-> >> For caching we would need a storage. Not sure if it's worth compared to
-> >> a context switch into the kernel.
-> > 
-> > Block GPIO is not only for you in userspace. ;-) You can also implement
-> > efficient n-bit bus I/O in kernel drivers, n-bit-banging. :-) So not
-> > always context switches involved.
+On 17:56 Mon 17 Dec     , Olof Johansson wrote:
+> On Mon, Dec 17, 2012 at 11:55 AM, Dongjin Kim <tobetter@gmail.com> wrote:
+> > Add initial dtb file for Hardkernel's ODROID-X board based on EXYNOS4412 SoC.
+> >
+> > Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/Makefile               |    1 +
+> >  arch/arm/boot/dts/exynos4412-odroidx.dts |   52 ++++++++++++++++++++++++++++++
+> >  2 files changed, 53 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/exynos4412-odroidx.dts
+> >
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index ca6fb8e..3355af9 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -45,6 +45,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+> >         exynos5250-smdk5250.dtb \
+> >         exynos5440-ssdk5440.dtb \
+> >         exynos4412-smdk4412.dtb \
+> > +       exynos4412-odroidx.dtb \
 > 
-> OK, what do you think about the following untested patch:
+> Please add them alphabetically, so before smdk.
+we need to drop the \ \ stuff it will end with merge conflict
+as if you add 2 dtb at the end you will end with 2 patch that touch the same
+previous line
 > 
-> From b44cad16cbbca84715dffd4cb5268497216add25 Mon Sep 17 00:00:00 2001
-> From: Wolfgang Grandegger <wg@grandegger.com>
-> Date: Mon, 3 Dec 2012 08:31:55 +0100
-> Subject: [PATCH 1/2] gpio: add GPIO block callback functions for AT91
+> > diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> > new file mode 100644
+> > index 0000000..786ddd7
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> > @@ -0,0 +1,52 @@
+> > +/*
+> > + * Hardkernel's Exynos4412 based ODROID-X board device tree source
+> > + *
+> > + * Copyright (c) 2012-2013 Dongjin Kim <tobetter@gmail.com>
 > 
-> Signed-off-by: Wolfgang Grandegger <wg@grandegger.com>
-> ---
->  arch/arm/mach-at91/gpio.c |   29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
+> Are you from the future?
 > 
-> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-> index be42cf0..cf6bd45 100644
-> --- a/arch/arm/mach-at91/gpio.c
-> +++ b/arch/arm/mach-at91/gpio.c
-> @@ -42,13 +42,16 @@ struct at91_gpio_chip {
->  	void __iomem		*regbase;	/* PIO bank virtual address */
->  	struct clk		*clock;		/* associated clock */
->  	struct irq_domain	*domain;	/* associated irq domain */
-> +	unsigned long		mask_shadow;	/* synchronous data output */
->  };
->  
->  #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
->  
->  static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
->  static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
-> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val);
->  static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
-> +static unsigned long at91_gpiolib_get_block(struct gpio_chip *chip, unsigned long mask);
->  static int at91_gpiolib_direction_output(struct gpio_chip *chip,
->  					 unsigned offset, int val);
->  static int at91_gpiolib_direction_input(struct gpio_chip *chip,
-> @@ -62,7 +65,9 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
->  			.direction_input  = at91_gpiolib_direction_input, \
->  			.direction_output = at91_gpiolib_direction_output, \
->  			.get		  = at91_gpiolib_get,		\
-> +			.get_block	  = at91_gpiolib_get_block,	\
->  			.set		  = at91_gpiolib_set,		\
-> +			.set_block	  = at91_gpiolib_set_block,	\
->  			.dbg_show	  = at91_gpiolib_dbg_show,	\
->  			.to_irq		  = at91_gpiolib_to_irq,	\
->  			.ngpio		  = nr_gpio,			\
-> @@ -896,6 +901,16 @@ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset)
->  	return (pdsr & mask) != 0;
->  }
->  
-> +static unsigned long at91_gpiolib_get_block(struct gpio_chip *chip, unsigned long mask)
-> +{
-> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> +	void __iomem *pio = at91_gpio->regbase;
-> +	u32 pdsr;
-> +
-> +	pdsr = __raw_readl(pio + PIO_PDSR);
-> +	return pdsr & mask;
-> +}
-> +
->  static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
->  {
->  	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> @@ -905,6 +920,20 @@ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
->  	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
->  }
->  
-> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
-> +{
-> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> +	void __iomem *pio = at91_gpio->regbase;
-> +
-> +	/* Do synchronous data output with a single write access */
-> +	if (mask != at91_gpio->mask_shadow) {
-> +		at91_gpio->mask_shadow = mask;
-> +		__raw_writel(~mask, pio + PIO_OWDR);
-> +		__raw_writel(mask, pio + PIO_OWER);
-> +	}
-> +	__raw_writel(val, pio + PIO_ODSR);
-> +}
-this driver is only for old at91 platfrom if you touch at91 you need to update
-the pinctrl too
+> > + *
+> > + * Device tree source file for Hardkernel's ODROID-X board which is based on
+> > + * Samsung's Exynos4412 SoC.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > +*/
+> > +
+> > +/dts-v1/;
+> > +/include/ "exynos4412.dtsi"
+> > +
+> > +/ {
+> > +       model = "Hardkernel ODROID-X board based on Exynos4412";
+> > +       compatible = "samsung,exynos4412";
+> 
+> It should have a more specific compatible value first, i.e.
+> "hardkernel,odroid-x" or similar.
+> 
+> 
+> > +       memory {
+> > +               reg = <0x40000000 0x40000000>;
+> > +       };
+> > +
+> > +       chosen {
+> > +               bootargs ="root=/dev/mmcblk0p3 rw console=ttySAC1,115200 init=/sbin/init delay=2";
+> 
+> Bootargs should be passed in from u-boot, don't specify them in the
+> static device tree.
+
+why not we can choose to have a default cmdline and even usit as a complement
+of the bootloader one
+
+it's up to the dts maintainer to choose
 
 Best Regards,
 J.
-> +
->  static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
->  {
->  	int i;
-> -- 
-> 1.7.9.5
-> 
-> 
