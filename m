@@ -1,59 +1,54 @@
-From: vbyravarasu@nvidia.com (Venu Byravarasu)
-Date: Tue, 18 Dec 2012 10:01:01 +0530
-Subject: [PATCH] arm: tegra: remove USB address related macros from iomap.h
-Message-ID: <1355805061-22789-1-git-send-email-vbyravarasu@nvidia.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 17 Dec 2012 20:50:48 -0800
+Subject: [RFC] gate clock binding and descriptiveness of bindings
+Message-ID: <50CFF628.4010208@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB register base address and sizes defined in iomap.h
-are not used in any files other than board-dt-tegra20.c.
-Hence removed those defines from header file and using
-the absolute values in board files.
+Hi,
 
-Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
----
- arch/arm/mach-tegra/board-dt-tegra20.c |    6 +++---
- arch/arm/mach-tegra/iomap.h            |    9 ---------
- 2 files changed, 3 insertions(+), 12 deletions(-)
+I'd like to propose a binding for gate clocks so that we can discuss how
+descriptive devicetree clock bindings should be.
 
-diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-index 734d9cc..aae399b 100644
---- a/arch/arm/mach-tegra/board-dt-tegra20.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-@@ -81,11 +81,11 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra20-i2s.0", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S2_BASE, "tegra20-i2s.1", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-das", TEGRA_APB_MISC_DAS_BASE, "tegra20-das", NULL),
--	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB_BASE, "tegra-ehci.0",
-+	OF_DEV_AUXDATA("nvidia,tegra20-ehci", 0xC5000000, "tegra-ehci.0",
- 		       &tegra_ehci1_pdata),
--	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB2_BASE, "tegra-ehci.1",
-+	OF_DEV_AUXDATA("nvidia,tegra20-ehci", 0xC5004000, "tegra-ehci.1",
- 		       &tegra_ehci2_pdata),
--	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB3_BASE, "tegra-ehci.2",
-+	OF_DEV_AUXDATA("nvidia,tegra20-ehci", 0xC5008000, "tegra-ehci.2",
- 		       &tegra_ehci3_pdata),
- 	OF_DEV_AUXDATA("nvidia,tegra20-apbdma", TEGRA_APB_DMA_BASE, "tegra-apbdma", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-pwm", TEGRA_PWFM_BASE, "tegra-pwm", NULL),
-diff --git a/arch/arm/mach-tegra/iomap.h b/arch/arm/mach-tegra/iomap.h
-index db8be51..399fbca 100644
---- a/arch/arm/mach-tegra/iomap.h
-+++ b/arch/arm/mach-tegra/iomap.h
-@@ -240,15 +240,6 @@
- #define TEGRA_CSITE_BASE		0x70040000
- #define TEGRA_CSITE_SIZE		SZ_256K
- 
--#define TEGRA_USB_BASE			0xC5000000
--#define TEGRA_USB_SIZE			SZ_16K
--
--#define TEGRA_USB2_BASE			0xC5004000
--#define TEGRA_USB2_SIZE			SZ_16K
--
--#define TEGRA_USB3_BASE			0xC5008000
--#define TEGRA_USB3_SIZE			SZ_16K
--
- #define TEGRA_SDMMC1_BASE		0xC8000000
- #define TEGRA_SDMMC1_SIZE		SZ_512
- 
+Binding for simple gate clocks.
+
+This binding uses the common clock binding[1].
+
+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+
+Required properties:
+- compatible : shall be "gate-clock"
+- #clock-cells : from common clock binding; shall be set to 0
+- reg : shall be register containing bit to toggle to gate/ungate the clock
+- enable-bit : shall be bit in register to set/clear to toggle the gate
+
+Optional properties:
+- clock-output-names : from common clock binding
+- clocks : shall be the input parent clock which is gated by this clock.
+- set-to-disable: if present, indicates bit must be set to disable the clock
+
+Example:
+        gate {
+                compatible = "gate-clock";
+                #clock-cells = <0>;
+                reg = <0x45 0x4>;
+                enable-bit = <1>;
+                clocks = <&osc>
+        };
+
+This seems to capture what the gate clock needs, minus the spinlock
+which can't come from DT.
+
+Some starter questions:
+
+1) Should we have two compatible strings, one for the "set-to-disable"
+clocks and one for the "set-to-enable" clocks instead of having a
+property "set-to-disable"?
+
+2) Should we specify the enable bit as a property or should that be
+handled by software? I.e. is it too descriptive to specify the bits
+within a register that do something?
+
 -- 
-1.7.0.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
