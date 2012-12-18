@@ -1,9 +1,9 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 19 Dec 2012 06:34:05 +1300
-Subject: [PATCH RESEND 3/6] clk: exynos: Fix incorrect usage of IS_ERR_OR_NULL
+Date: Wed, 19 Dec 2012 06:34:03 +1300
+Subject: [PATCH RESEND 1/6] clk: omap: Fix incorrect usage of IS_ERR_OR_NULL
 In-Reply-To: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
 References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1355852048-23188-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1355852048-23188-2-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,51 +12,41 @@ Resend to include mailing lists.
 Replace IS_ERR_OR_NULL with IS_ERR on clk_get results.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-CC: Inki Dae <inki.dae@samsung.com>
-CC: Joonyoung Shim <jy0922.shim@samsung.com>
-CC: Seung-Woo Kim <sw0312.kim@samsung.com>
-CC: Kyungmin Park <kyungmin.park@samsung.com>
-CC: dri-devel at lists.freedesktop.org
+Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/gpu/drm/exynos/exynos_hdmi.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/plat-omap/dmtimer.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 2c115f8..557ef2f 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -2167,27 +2167,27 @@ static int __devinit hdmi_resources_init(struct hdmi_context *hdata)
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index 938b50a..e5e150d 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -143,7 +143,7 @@ int omap_dm_timer_prepare(struct omap_dm_timer *timer)
+ 	 */
+ 	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
+ 		timer->fclk = clk_get(&timer->pdev->dev, "fck");
+-		if (WARN_ON_ONCE(IS_ERR_OR_NULL(timer->fclk))) {
++		if (WARN_ON_ONCE(IS_ERR(timer->fclk))) {
+ 			timer->fclk = NULL;
+ 			dev_err(&timer->pdev->dev, ": No fclk handle.\n");
+ 			return -EINVAL;
+@@ -418,7 +418,7 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+ 		return pdata->set_timer_src(timer->pdev, source);
  
- 	/* get clocks, power */
- 	res->hdmi = clk_get(dev, "hdmi");
--	if (IS_ERR_OR_NULL(res->hdmi)) {
-+	if (IS_ERR(res->hdmi)) {
- 		DRM_ERROR("failed to get clock 'hdmi'\n");
- 		goto fail;
+ 	fclk = clk_get(&timer->pdev->dev, "fck");
+-	if (IS_ERR_OR_NULL(fclk)) {
++	if (IS_ERR(fclk)) {
+ 		pr_err("%s: fck not found\n", __func__);
+ 		return -EINVAL;
  	}
- 	res->sclk_hdmi = clk_get(dev, "sclk_hdmi");
--	if (IS_ERR_OR_NULL(res->sclk_hdmi)) {
-+	if (IS_ERR(res->sclk_hdmi)) {
- 		DRM_ERROR("failed to get clock 'sclk_hdmi'\n");
- 		goto fail;
+@@ -438,7 +438,7 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
  	}
- 	res->sclk_pixel = clk_get(dev, "sclk_pixel");
--	if (IS_ERR_OR_NULL(res->sclk_pixel)) {
-+	if (IS_ERR(res->sclk_pixel)) {
- 		DRM_ERROR("failed to get clock 'sclk_pixel'\n");
- 		goto fail;
- 	}
- 	res->sclk_hdmiphy = clk_get(dev, "sclk_hdmiphy");
--	if (IS_ERR_OR_NULL(res->sclk_hdmiphy)) {
-+	if (IS_ERR(res->sclk_hdmiphy)) {
- 		DRM_ERROR("failed to get clock 'sclk_hdmiphy'\n");
- 		goto fail;
- 	}
- 	res->hdmiphy = clk_get(dev, "hdmiphy");
--	if (IS_ERR_OR_NULL(res->hdmiphy)) {
-+	if (IS_ERR(res->hdmiphy)) {
- 		DRM_ERROR("failed to get clock 'hdmiphy'\n");
- 		goto fail;
- 	}
+ 
+ 	parent = clk_get(&timer->pdev->dev, parent_name);
+-	if (IS_ERR_OR_NULL(parent)) {
++	if (IS_ERR(parent)) {
+ 		pr_err("%s: %s not found\n", __func__, parent_name);
+ 		ret = -EINVAL;
+ 		goto out;
 -- 
 1.7.9.5
