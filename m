@@ -1,39 +1,45 @@
 From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 18 Dec 2012 11:44:56 +0530
-Subject: [PATCH 1/4] ARM: tegra30: Add support for Uart clock source
- divider as 15.1
-In-Reply-To: <50CF91F7.5010402@wwwdotorg.org>
+Date: Tue, 18 Dec 2012 11:48:33 +0530
+Subject: [PATCH 3/4] ARM: tegra: Add OF_DEV_AUXDATA for uart driver in
+ board dt
+In-Reply-To: <50CF92D5.6090805@wwwdotorg.org>
 References: <1355746101-15291-1-git-send-email-ldewangan@nvidia.com>
- <1355746101-15291-2-git-send-email-ldewangan@nvidia.com>
- <50CF91F7.5010402@wwwdotorg.org>
-Message-ID: <50D009E0.3050409@nvidia.com>
+ <1355746101-15291-4-git-send-email-ldewangan@nvidia.com>
+ <50CF92D5.6090805@wwwdotorg.org>
+Message-ID: <50D00AB9.8090800@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 December 2012 03:13 AM, Stephen Warren wrote:
+On Tuesday 18 December 2012 03:17 AM, Stephen Warren wrote:
 > On 12/17/2012 05:08 AM, Laxman Dewangan wrote:
->> Tegra20 uart clock source have the 15.1 clock divider in place of
-> That says Tegra20, but ...
->
->> 7.1. Add support for 15.1 clock divider and change the uart clock divider
->> flag to DIV_U151.
->>   arch/arm/mach-tegra/clock.h               |    3 +-
->>   arch/arm/mach-tegra/tegra30_clocks.c      |   70 ++++++++++++++++++++++------
->>   arch/arm/mach-tegra/tegra30_clocks_data.c |   10 ++--
-> ... the patch only modifies Tegra30. Do both Tegra20 and Tegra30 have
-> this feature; should both clock drivers be updated?
->
-> BTW, Prashant is reworking the Tegra clock support to be modular, rather
-> than having a single monolithic "Tegra clock" type, and also moving the
-> code to drivers/clk. This patch will conflict signifcantly with that.
-> Please work with him to integrate this patch into his rework series,
-> either before or after his changes, and have him include the patch when
-> he posts his series. You'll also need to think about whether/how your
-> and his series depend on each-other.
->
-> ... but: Is this a pure bug-fix? If so, I guess this patch should be
-> applied before Prashant's patches, and this patch also Cc: stable?
+>> Add OF_DEV_AUXDATA for high speed uart controller driver for
+>> Tegra20/Tegra30 board dt files.
+>> Set the parent clock of uart controller to PLLP.
+>> diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+>> @@ -94,6 +94,11 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+>> +	OF_DEV_AUXDATA("nvidia,tegra20-hsuart", 0x70006000, "tegra-uart.0", NULL),
+>> +	OF_DEV_AUXDATA("nvidia,tegra20-hsuart", 0x70006040, "tegra-uart.1", NULL),
+>> +	OF_DEV_AUXDATA("nvidia,tegra20-hsuart", 0x70006200, "tegra-uart.2", NULL),
+>> +	OF_DEV_AUXDATA("nvidia,tegra20-hsuart", 0x70006300, "tegra-uart.3", NULL),
+>> +	OF_DEV_AUXDATA("nvidia,tegra20-hsuart", 0x70006400, "tegra-uart.4", NULL),
+> Instead, can we simply get the clocks from device tree? Prashant, how
+> much effort will that be once your clock patches are checked in, or is
+> it already part of those patches?
 
-My clock driver rework includes this fix. Divider supports both DIVU71 
-and DIVU151.
-UART divider is set to DIVU151.
+It is not part of rework patches, but I will send a patch for it 
+immediately after those patches are accepted upstream.
+
+>> @@ -106,7 +111,10 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+>>   static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
+>>   	/* name		parent		rate		enabled */
+>>   	{ "uarta",	"pll_p",	216000000,	true },
+>> +	{ "uartb",	"pll_p",	216000000,	false },
+>> +	{ "uartc",	"pll_p",	216000000,	false },
+>>   	{ "uartd",	"pll_p",	216000000,	true },
+>> +	{ "uarte",	"pll_p",	216000000,	false },
+> Prashant's clock patches remove this table. Please work with him to work
+> out how to deal with that.
+
+Laxman,
+
+If you want I can include these entries in current tables.
