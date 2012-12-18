@@ -1,63 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 18 Dec 2012 10:03:38 -0700
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20121218025113.GA27029@obsidianresearch.com>
-References: <20121213080415.GA21178@obsidianresearch.com>
- <20121213082323.GA13620@avionic-0098.adnet.avionic-design.de>
- <50CA1A8D.9070504@wwwdotorg.org>
- <20121213204229.GC18597@avionic-0098.adnet.avionic-design.de>
- <20121214151045.GA22304@avionic-0098.adnet.avionic-design.de>
- <20121214172729.GA7671@obsidianresearch.com>
- <20121216123340.GB31780@avionic-0098.adnet.avionic-design.de>
- <20121217182911.GA10448@obsidianresearch.com>
- <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
- <50CFD0B3.6030208@wwwdotorg.org>
- <20121218025113.GA27029@obsidianresearch.com>
-Message-ID: <50D0A1EA.9090009@wwwdotorg.org>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Tue, 18 Dec 2012 18:22:37 +0100
+Subject: [PATCH 0/2] Armadillo DT Reference Implementation
+Message-ID: <1355851359-8871-1-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 07:51 PM, Jason Gunthorpe wrote:
-> [trimmed the cc list]
-> 
-> On Mon, Dec 17, 2012 at 07:10:59PM -0700, Stephen Warren wrote:
-> 
->>> What I'll do next is add some caching of written values, so that
->>> reading them back actually yields something correct. After that
->>> I'll post what I have so that others can look at it or even reuse
->>> it.
->>
->> Some internal discussion implies this shouldn't be required; here's
->> what they said:
-> 
-> Looking at the driver, it says:
-> 
-> + * 0x80000000 - 0x80003fff - PCI controller registers
-> + * 0x80004000 - 0x80103fff - PCI configuration space
-> + * 0x80104000 - 0x80203fff - PCI extended configuration space
-> 
-> And the bridge config regions are at:
-> 
-> +#define RP0_OFFSET     0x0000
-> +#define RP1_OFFSET     0x1000
-> 
-> And from the first checkin, config space accesses have been split into
-> three designations:
->  bridge #0 - 0x80000000 + 0
->  bridge #1 - 0x80000000 + 0x1000
->  Every other bus - 0x80104000 + [equation]
-> 
-> And based on Thierry's results it looks like once the bridge
-> subordinate bus numbers are setup (via their lower mappings) then the
-> 'every other bus' mapping starts working as expected.
-> 
-> So.. is there a register to be set that lets the bridge configuration
-> be accessed through the [0x80004000 - 0x80103fff] region as bus 0?
-> Presumably a non-PCI device number register?
+This is the design approch of Simon Horman's kzm9g implementation transferred
+to the Armadillo board.
 
-It looks like some PCI host controller registers do need to be set up
-(so far the information is related to "type 0" vs. "type 1"
-configuration accesses, although I'm not familiar with what that means).
+It is based on the branch next of 
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
+and was tested on the branch devel/of of
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
 
-Jay will continue to drive this with our HW folks and try and get this
-working.
+For the ethernet controller to work the series assumes the patch
+net: sh_eth: Add support of device tree probe
+http://patchwork.ozlabs.org/patch/191713/ to be applied.
+
+Bastian Hecht (2):
+  ARM: r8a7740: Add interim sh-eth device name to clocks list
+  ARM: shmobile: armadillo800eva: Reference DT implementation
+
+ arch/arm/boot/dts/Makefile                         |    1 +
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts |   33 ++++
+ arch/arm/mach-shmobile/Kconfig                     |   10 ++
+ arch/arm/mach-shmobile/Makefile                    |    1 +
+ .../board-armadillo800eva-reference.c              |  172 ++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-r8a7740.c             |    1 +
+ arch/arm/mach-shmobile/include/mach/common.h       |    2 +
+ 7 files changed, 220 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+ create mode 100644 arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+
+-- 
+1.7.9.5
