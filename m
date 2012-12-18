@@ -1,107 +1,62 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 18 Dec 2012 07:47:23 +0100
-Subject: [PATCH 1/4] ODROID-X: dts: Add board dts file for ODROID-X
-In-Reply-To: <CAOesGMj05zX=h+79t=-GPO3YCL1R-ognrPEn7EEyw0CTdCvkHg@mail.gmail.com>
-References: <1355774107-364-1-git-send-email-tobetter@gmail.com>
- <1355774107-364-2-git-send-email-tobetter@gmail.com>
- <CAOesGMgZWNiCmTFGvr--zKf+vS51hX5jPnD+NZq8OvGFLS9rJA@mail.gmail.com>
- <20121218060009.GK23971@game.jcrosoft.org>
- <CAOesGMj05zX=h+79t=-GPO3YCL1R-ognrPEn7EEyw0CTdCvkHg@mail.gmail.com>
-Message-ID: <20121218064723.GN23971@game.jcrosoft.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 18 Dec 2012 07:50:44 +0100
+Subject: [PATCH] ARM: shmobile: r8a7779: Fix PFC - MOD_SEL2 missed an entry
+In-Reply-To: <20121218042854.GH29354@verge.net.au>
+References: <1353601737-21641-1-git-send-email-phil.edworthy@renesas.com>
+ <20121218035144.GC13353@verge.net.au> <20121218042854.GH29354@verge.net.au>
+Message-ID: <1990499.FnQH3SnHiY@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:14 Mon 17 Dec     , Olof Johansson wrote:
-> On Mon, Dec 17, 2012 at 10:00 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 17:56 Mon 17 Dec     , Olof Johansson wrote:
-> >> On Mon, Dec 17, 2012 at 11:55 AM, Dongjin Kim <tobetter@gmail.com> wrote:
-> >> > Add initial dtb file for Hardkernel's ODROID-X board based on EXYNOS4412 SoC.
-> >> >
-> >> > Signed-off-by: Dongjin Kim <tobetter@gmail.com>
-> >> > ---
-> >> >  arch/arm/boot/dts/Makefile               |    1 +
-> >> >  arch/arm/boot/dts/exynos4412-odroidx.dts |   52 ++++++++++++++++++++++++++++++
-> >> >  2 files changed, 53 insertions(+)
-> >> >  create mode 100644 arch/arm/boot/dts/exynos4412-odroidx.dts
-> >> >
-> >> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> > index ca6fb8e..3355af9 100644
-> >> > --- a/arch/arm/boot/dts/Makefile
-> >> > +++ b/arch/arm/boot/dts/Makefile
-> >> > @@ -45,6 +45,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
-> >> >         exynos5250-smdk5250.dtb \
-> >> >         exynos5440-ssdk5440.dtb \
-> >> >         exynos4412-smdk4412.dtb \
-> >> > +       exynos4412-odroidx.dtb \
-> >>
-> >> Please add them alphabetically, so before smdk.
-> > we need to drop the \ \ stuff it will end with merge conflict
-> > as if you add 2 dtb at the end you will end with 2 patch that touch the same
-> > previous line
+Hi Simon,
+
+On Tuesday 18 December 2012 13:28:54 Simon Horman wrote:
+> On Tue, Dec 18, 2012 at 12:51:44PM +0900, Simon Horman wrote:
+> > On Tue, Dec 18, 2012 at 11:36:10AM +0900, Simon Horman wrote:
+> > > On Thu, Nov 22, 2012 at 04:28:57PM +0000, Phil Edworthy wrote:
+> > > > The list of functions selected by the MOD_SEL2 register was missing
+> > > > an entry. This caused all entries after this to modify the MOD_SEL2
+> > > > register incorrectly.
+> > > 
+> > > Laurent, can you handle this in your series?
+> > > I believe it removes this file.
+> > 
+> > Sorry, I missed the fact that this is for stable.
+> > Laurent, can you handle upstream and I'll handle stable?
+
+Sure. I've added the patch to my tree.
+
+> Sorry, yet another thing.
 > 
-> ..which is why the dts files should be added alphabetically instead of
-> just appended to the list.
-we need to drop this \
-
-and use this syntax and keep ordered
-dtb-$() +=
-
+> Phil, could you explain what problems manifest at for users without this
+> change? To be included in stable it is important that it solves a problem
+> that actually manifests.
 > 
-> >> > diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> >> > new file mode 100644
-> >> > index 0000000..786ddd7
-> >> > --- /dev/null
-> >> > +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> >> > @@ -0,0 +1,52 @@
-> >> > +/*
-> >> > + * Hardkernel's Exynos4412 based ODROID-X board device tree source
-> >> > + *
-> >> > + * Copyright (c) 2012-2013 Dongjin Kim <tobetter@gmail.com>
-> >>
-> >> Are you from the future?
-> >>
-> >> > + *
-> >> > + * Device tree source file for Hardkernel's ODROID-X board which is based on
-> >> > + * Samsung's Exynos4412 SoC.
-> >> > + *
-> >> > + * This program is free software; you can redistribute it and/or modify
-> >> > + * it under the terms of the GNU General Public License version 2 as
-> >> > + * published by the Free Software Foundation.
-> >> > +*/
-> >> > +
-> >> > +/dts-v1/;
-> >> > +/include/ "exynos4412.dtsi"
-> >> > +
-> >> > +/ {
-> >> > +       model = "Hardkernel ODROID-X board based on Exynos4412";
-> >> > +       compatible = "samsung,exynos4412";
-> >>
-> >> It should have a more specific compatible value first, i.e.
-> >> "hardkernel,odroid-x" or similar.
-> >>
-> >>
-> >> > +       memory {
-> >> > +               reg = <0x40000000 0x40000000>;
-> >> > +       };
-> >> > +
-> >> > +       chosen {
-> >> > +               bootargs ="root=/dev/mmcblk0p3 rw console=ttySAC1,115200 init=/sbin/init delay=2";
-> >>
-> >> Bootargs should be passed in from u-boot, don't specify them in the
-> >> static device tree.
-> >
-> > why not we can choose to have a default cmdline and even usit as a complement
-> > of the bootloader one
-> >
-> > it's up to the dts maintainer to choose
-> 
-> The chance of having a valid generic command line that will work for
-> everyone with that hardware is fairly small, especially on more
-> generic systems that might have a regular distro installed on them.
+> > > > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > > > ---
+> > > > 
+> > > >  arch/arm/mach-shmobile/pfc-r8a7779.c |    2 +-
+> > > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c
+> > > > b/arch/arm/mach-shmobile/pfc-r8a7779.c index 9fac32e4..15f6a48 100644
+> > > > --- a/arch/arm/mach-shmobile/pfc-r8a7779.c
+> > > > +++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
+> > > > @@ -2525,7 +2525,7 @@ static struct pinmux_cfg_reg
+> > > > pinmux_config_regs[] = {
+> > > > 
+> > > >  	    /* SEL_SCIF [2] */
+> > > >  	    FN_SEL_SCIF_0, FN_SEL_SCIF_1, FN_SEL_SCIF_2, FN_SEL_SCIF_3,
+> > > >  	    /* SEL_CANCLK [2] */
+> > > > 
+> > > > -	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2,
+> > > > +	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2, 0,
+> > > > 
+> > > >  	    /* SEL_CAN0 [1] */
+> > > >  	    FN_SEL_CAN0_0, FN_SEL_CAN0_1,
+> > > >  	    /* SEL_HSCIF1 [1] */
 
-this does not hurt anyone 99% of the people will overwrite you can just see as
-a cmdline example
+-- 
+Regards,
 
-Best Regards,
-J.
+Laurent Pinchart
