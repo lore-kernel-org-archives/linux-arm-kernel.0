@@ -1,76 +1,57 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 17 Dec 2012 19:10:59 -0700
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
-References: <50C9056D.2050309@wwwdotorg.org>
- <20121213070332.GA9946@avionic-0098.adnet.avionic-design.de>
- <20121213080415.GA21178@obsidianresearch.com>
- <20121213082323.GA13620@avionic-0098.adnet.avionic-design.de>
- <50CA1A8D.9070504@wwwdotorg.org>
- <20121213204229.GC18597@avionic-0098.adnet.avionic-design.de>
- <20121214151045.GA22304@avionic-0098.adnet.avionic-design.de>
- <20121214172729.GA7671@obsidianresearch.com>
- <20121216123340.GB31780@avionic-0098.adnet.avionic-design.de>
- <20121217182911.GA10448@obsidianresearch.com>
- <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
-Message-ID: <50CFD0B3.6030208@wwwdotorg.org>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Tue, 18 Dec 2012 10:19:21 +0800
+Subject: common clock framwork: clk_set_rate issue
+In-Reply-To: <20121217201945.GA19651@pengutronix.de>
+References: <CADApbej+f9P1sgLMR8_McoCCSLDjJt_qitWdNd8X1v6PwZqsnQ@mail.gmail.com>
+ <20121217201945.GA19651@pengutronix.de>
+Message-ID: <CADApbej17udzpStNeY+tsSkeOy_Fv2+o+zKs4zBLV8+ST4DWTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 12:41 PM, Thierry Reding wrote:
-> On Mon, Dec 17, 2012 at 11:29:11AM -0700, Jason Gunthorpe wrote:
->> 
->>>> Ie route access for 00:1N.0 to the configuration space on
->>>> bridge port N
->>> 
->>> Is there any particular reason why you choose 0x10 as the base
->>> slot for bridge ports? With the latest DT support patches,
->>> mapping this should be even simpler as we associate a port
->>> index with each port and the port array is gone.
->> 
->> No specific reason, it similar to what intel did and clearly
->> shows the port number in a octet of the device id. It just can't
->> be 0.
-> 
-> So I tried and implemented something along the lines of what you 
-> suggested, and guess what? It does work indeed. For some reason
-> even the "imprecise external abort" goes away. Basically what I did
-> is fake the configuration space accesses to 0000:0.0 so that they
-> return semi-valid data. Nothing special yet, just basically
-> returning vendor and product ID, header type, class and other
-> static data.
-> 
-> Initially the implementation was read-only and that still caused
-> the external abort, but adding nop'ed write functions apparently
-> solved that.
-> 
-> What I'll do next is add some caching of written values, so that
-> reading them back actually yields something correct. After that
-> I'll post what I have so that others can look at it or even reuse
-> it.
+On Tue, Dec 18, 2012 at 4:19 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Thu, Dec 06, 2012 at 10:52:03AM +0800, Chao Xie wrote:
+>> hi
+>> When develop the clk drivers for SOCs based on common clock framework.
+>> I met a issue.
+>> For example there is a uart device, it's function clock comes from a
+>> divider, and the divider's parent is a mux. It means
+>>
+>> MUX --> DIV --> UART
+>>
+>> As we know that UART can work at low baudrate for a terminal, while it
+>> can also connect to GPS module which needs a high rate. So the MUX
+>> will provide two clock source, a low clock rate and high clock rate.
+>>
+>> The MUX clk driver clk-mux.c does not implement a ->round_rate callbacks.
+>> It means that when uart driver is used for a GPS and it want to change
+>> it clock, the driver will call clk_set_rate(); clk_set_rate will loop
+>> upward to DIV, and DIV will try to set its divider, and it need loop
+>> upward to MUX.
+>> In fact the current clk drivers have some issue.
+>> MUX clk driver should provide the round_rate callback, it then can
+>> provide a new_rate. It means that in clk_calc_subtree MUX can switch
+>> the clock source.
+>
+> It's not that simple. The input clocks to a mux may not only differ in
+> their rate but can also have other different properties, like for
+> example one input may be always present whereas another input only runs
+> when the CPU is in run mode.
+>
+> It may be a possibility to add a flag to the mux to explicitely
+> allow reparenting on a rate change.
+>
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-555
 
-Some internal discussion implies this shouldn't be required; here's
-what they said:
-
------Original Message----- (from Chung-Hung Lai)
-
-All PCIE root port registers are in configuration space. To access
-them, as well as configuration registers of PCIE devices below the
-bridge, you will need to program the AXI to FPCI BAR mappings defined
-in AFI. After programmed those, the configuration register space of
-PCIE fabric are mapped to Tegra's MMIO register space. I take it back
-that T30 and [elided] have differences - that was for other units, not
-PCIE.
-
-As Mark said, all AFI's own registers are in MMIO space and can be
-accessed directly.
-
-Thanks,
-Luke
-
------Original Message----- (from Mark Van Nostrand)
-
-There are pci bridge registers but also registers to configure the
-PCIE wrapper.  AFAIK all Tegra devices (T20/T30/[elided]) have
-compliant bridge registers but also need AFI (PCIE wrapper)
-configuration updates as well.
+There is already a flag to do it.
+CLK_SET_RATE_PARENT
+if the mux does not want to changes the input for clk_set_rate called
+by its child, it can clear this flag.
+The question is whether we need add the round_rate/recalc_rate for MUX
+type of clock? Is there any special issue about it that why current
+MUX implementation does not have these callbacks?
