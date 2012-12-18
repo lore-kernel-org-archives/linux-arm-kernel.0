@@ -1,53 +1,126 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 18 Dec 2012 12:37:43 +0530
-Subject: [PATCH 1/4] ARM: tegra30: Add support for Uart clock source
- divider as 15.1
-In-Reply-To: <50D00C1D.9090100@nvidia.com>
-References: <1355746101-15291-1-git-send-email-ldewangan@nvidia.com>
- <1355746101-15291-2-git-send-email-ldewangan@nvidia.com>
- <50CF91F7.5010402@wwwdotorg.org> <50D009E0.3050409@nvidia.com>
- <50D00C1D.9090100@nvidia.com>
-Message-ID: <50D0163F.3030806@nvidia.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 18 Dec 2012 08:32:50 +0100
+Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
+In-Reply-To: <50CFD0B3.6030208@wwwdotorg.org>
+References: <20121213080415.GA21178@obsidianresearch.com>
+ <20121213082323.GA13620@avionic-0098.adnet.avionic-design.de>
+ <50CA1A8D.9070504@wwwdotorg.org>
+ <20121213204229.GC18597@avionic-0098.adnet.avionic-design.de>
+ <20121214151045.GA22304@avionic-0098.adnet.avionic-design.de>
+ <20121214172729.GA7671@obsidianresearch.com>
+ <20121216123340.GB31780@avionic-0098.adnet.avionic-design.de>
+ <20121217182911.GA10448@obsidianresearch.com>
+ <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
+ <50CFD0B3.6030208@wwwdotorg.org>
+Message-ID: <20121218073250.GA32572@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 December 2012 11:54 AM, Laxman Dewangan wrote:
-> On Tuesday 18 December 2012 11:44 AM, Prashant Gaikwad wrote:
->> On Tuesday 18 December 2012 03:13 AM, Stephen Warren wrote:
->>> On 12/17/2012 05:08 AM, Laxman Dewangan wrote:
->>>> Tegra20 uart clock source have the 15.1 clock divider in place of
->>> That says Tegra20, but ...
->>>
->>>> 7.1. Add support for 15.1 clock divider and change the uart clock divider
->>>> flag to DIV_U151.
->>>>     arch/arm/mach-tegra/clock.h               |    3 +-
->>>>     arch/arm/mach-tegra/tegra30_clocks.c      |   70 ++++++++++++++++++++++------
->>>>     arch/arm/mach-tegra/tegra30_clocks_data.c |   10 ++--
->>> ... the patch only modifies Tegra30. Do both Tegra20 and Tegra30 have
->>> this feature; should both clock drivers be updated?
->>>
->>> BTW, Prashant is reworking the Tegra clock support to be modular, rather
->>> than having a single monolithic "Tegra clock" type, and also moving the
->>> code to drivers/clk. This patch will conflict signifcantly with that.
->>> Please work with him to integrate this patch into his rework series,
->>> either before or after his changes, and have him include the patch when
->>> he posts his series. You'll also need to think about whether/how your
->>> and his series depend on each-other.
->>>
->>> ... but: Is this a pure bug-fix? If so, I guess this patch should be
->>> applied before Prashant's patches, and this patch also Cc: stable?
->> My clock driver rework includes this fix. Divider supports both DIVU71
->> and DIVU151.
->> UART divider is set to DIVU151.
-> Prashant,
-> I like to go this patch as first patch towards bug fixes rather than
-> after moving the clock. The reason is that we will pull this change in
-> our downstream and will be available in our K3.7 code.
+On Mon, Dec 17, 2012 at 07:10:59PM -0700, Stephen Warren wrote:
+> On 12/17/2012 12:41 PM, Thierry Reding wrote:
+> > On Mon, Dec 17, 2012 at 11:29:11AM -0700, Jason Gunthorpe wrote:
+> >> 
+> >>>> Ie route access for 00:1N.0 to the configuration space on
+> >>>> bridge port N
+> >>> 
+> >>> Is there any particular reason why you choose 0x10 as the base
+> >>> slot for bridge ports? With the latest DT support patches,
+> >>> mapping this should be even simpler as we associate a port
+> >>> index with each port and the port array is gone.
+> >> 
+> >> No specific reason, it similar to what intel did and clearly
+> >> shows the port number in a octet of the device id. It just can't
+> >> be 0.
+> > 
+> > So I tried and implemented something along the lines of what you 
+> > suggested, and guess what? It does work indeed. For some reason
+> > even the "imprecise external abort" goes away. Basically what I did
+> > is fake the configuration space accesses to 0000:0.0 so that they
+> > return semi-valid data. Nothing special yet, just basically
+> > returning vendor and product ID, header type, class and other
+> > static data.
+> > 
+> > Initially the implementation was read-only and that still caused
+> > the external abort, but adding nop'ed write functions apparently
+> > solved that.
+> > 
+> > What I'll do next is add some caching of written values, so that
+> > reading them back actually yields something correct. After that
+> > I'll post what I have so that others can look at it or even reuse
+> > it.
+> 
+> Some internal discussion implies this shouldn't be required; here's
+> what they said:
+> 
+> -----Original Message----- (from Chung-Hung Lai)
+> 
+> All PCIE root port registers are in configuration space. To access
+> them, as well as configuration registers of PCIE devices below the
+> bridge, you will need to program the AXI to FPCI BAR mappings defined
+> in AFI. After programmed those, the configuration register space of
+> PCIE fabric are mapped to Tegra's MMIO register space. I take it back
+> that T30 and [elided] have differences - that was for other units, not
+> PCIE.
+> 
+> As Mark said, all AFI's own registers are in MMIO space and can be
+> accessed directly.
+> 
+> Thanks,
+> Luke
+> 
+> -----Original Message----- (from Mark Van Nostrand)
+> 
+> There are pci bridge registers but also registers to configure the
+> PCIE wrapper.  AFAIK all Tegra devices (T20/T30/[elided]) have
+> compliant bridge registers but also need AFI (PCIE wrapper)
+> configuration updates as well.
 
-Laxman,
+But none of the above matches the (sparse) documentation. The TRM
+clearly states that each root port has a 4 KiB window that should be
+used to access the root port's configuration space. The driver supports
+that information.
 
-We are not going to use ccf in our downstream kernel port to K3.7. How 
-does that help pushing in upstream?
+I can also easily refute it by modifying the configuration space
+accessor to look like this:
 
->
->
+	static int tegra_pcie_read_conf(struct pci_bus *bus, unsigned int devfn,
+					int where, int size, u32 *value)
+	{
+		struct tegra_pcie *pcie = sys_to_pcie(bus->sysdata);
+		void __iomem *addr = NULL;
+
+		if (where >= 0x100)
+			return PCIBIOS_BAD_REGISTER_NUMBER;
+
+		addr = pcie->cs + PCIE_CONF_BUS(bus->number) +
+				  PCIE_CONF_DEV(PCI_SLOT(devfn)) +
+				  PCIE_CONF_FUNC(PCI_FUNC(devfn)) +
+				  PCIE_CONF_REG(where);
+
+		*value = readl(addr);
+
+		if (size == 1)
+			*value = (*value >> (8 * (where & 3))) & 0xff;
+		else if (size == 2)
+			*value = (*value >> (8 * (where & 3))) & 0xffff;
+
+		return PCIBIOS_SUCCESSFUL;
+	}
+
+and booting with that modification, which yields:
+
+[    3.097784] pci 0000:00:00.0: [1556:4711] type 01 class 0x060400
+
+Which is the PLDA bridge within the FPGA, *not* the Tegra host bridge.
+
+So either we're doing something really wrong when setting up the FPCI
+BAR mappings or you guys need to get your information right.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121218/b78f1872/attachment.sig>
