@@ -1,42 +1,61 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 19 Dec 2012 08:39:15 +1300
-Subject: [PATCH RESEND 3/6] clk: exynos: Fix incorrect usage of
- IS_ERR_OR_NULL
-In-Reply-To: <1355857917.24188.3.camel@gitbox>
-References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
- <1355852048-23188-4-git-send-email-linux@prisktech.co.nz>
- <20121218183944.GH5032@mwanda> <1355856767.23479.3.camel@gitbox>
- <20121218190334.GK5032@mwanda> <1355857917.24188.3.camel@gitbox>
-Message-ID: <1355859555.24188.6.camel@gitbox>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 18 Dec 2012 16:59:45 -0500 (EST)
+Subject: [PATCH v2 4/6] ARM: psci: add support for PSCI invocations from
+ the kernel
+In-Reply-To: <20121218101125.GC9072@mudshark.cambridge.arm.com>
+References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
+ <1355762141-29616-5-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.02.1212171537230.1263@xanadu.home>
+ <20121218101125.GC9072@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1212181657020.1263@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-12-19 at 08:11 +1300, Tony Prisk wrote:
-> On Tue, 2012-12-18 at 22:03 +0300, Dan Carpenter wrote:
-> > I don't care either way, but being different from the documentation
-> > is less bad than crashing which is what your patch does.  Please
-> > be more careful in the future.
+On Tue, 18 Dec 2012, Will Deacon wrote:
+> On Mon, Dec 17, 2012 at 08:51:27PM +0000, Nicolas Pitre wrote:
+> > On Mon, 17 Dec 2012, Will Deacon wrote:
+> > > +static int psci_cpu_suspend(struct psci_power_state state,
+> > > +			    unsigned long entry_point)
+> > > +{
+> > > +	int err;
+> > > +	u32 fn, power_state;
+> > > +
+> > > +	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
+> > > +	power_state = psci_power_state_pack(state);
+> > > +	err = invoke_psci_fn(fn, power_state, (u32)entry_point, 0);
 > > 
-> > regards,
-> > dan carpenter
+> > Why do you need the u32 cast here?
 > 
-> Critism accepted.
+> That's a hangover from when entry_point was a void *. I'll fix that, thanks.
+
+Hopefully you didn't pass virtual pointers to the PSCI call, did you?  :-)
+
+> > > +static int __init psci_init(void)
+> > > +{
+> > > +	struct device_node *np;
+> > > +	const char *method;
+> > > +	u32 base, id;
+> > > +
+> > > +	np = of_find_matching_node(NULL, psci_of_match);
+> > > +	if (!np)
+> > > +		return 0;
+> > > +
+> > > +	pr_info("probing function IDs from device-tree\n");
+> > 
+> > Having "probing function IDs from device-tree" in the middle of a kernel 
+> > log isn't very informative.  Better make this more useful or remove it.
+> > 
+> > > +
+> > > +	if (of_property_read_u32(np, "function-base", &base)) {
+> > > +		pr_warning("missing \"function-base\" property\n");
+> > 
+> > Same thing here: this lacks context in a kernel log.
+> > And so on for the other occurrences.
 > 
-> Given that the driver depends on (PLAT_SAMSUNG || ARCH_MULTIPLATFORM),
-> and multiplatform select COMMON_CLK and PLAT_SAMSUNG is selected only by
-> ARCH_S3C64XX which has HAVE_CLK I didn't see a problem here.
-> 
-> Your point is still valid and I will sort it out with Mike first.
-> 
-> Regards
-> Tony P
+> Actually, these are all prefixed with "psci: " thanks to the pr_fmt
+> definition at the top of the file.
 
-Actually, I was wrong here - PLAT_SAMSUNG is selectable via
+Ah, goodie!  No more issue then.
 
-PLAT_S3C24XX || ARCH_S3C64XX || PLAT_S5P
 
-but all these options (or the options that select them) seem to select a
-clock system as well, hence still no reason for a crash.
-
-Regards
-Tony P
+Nicolas
