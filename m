@@ -1,59 +1,50 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 17 Dec 2012 19:51:13 -0700
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <50CFD0B3.6030208@wwwdotorg.org>
-References: <20121213080415.GA21178@obsidianresearch.com>
- <20121213082323.GA13620@avionic-0098.adnet.avionic-design.de>
- <50CA1A8D.9070504@wwwdotorg.org>
- <20121213204229.GC18597@avionic-0098.adnet.avionic-design.de>
- <20121214151045.GA22304@avionic-0098.adnet.avionic-design.de>
- <20121214172729.GA7671@obsidianresearch.com>
- <20121216123340.GB31780@avionic-0098.adnet.avionic-design.de>
- <20121217182911.GA10448@obsidianresearch.com>
- <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
- <50CFD0B3.6030208@wwwdotorg.org>
-Message-ID: <20121218025113.GA27029@obsidianresearch.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 18 Dec 2012 10:57:34 +0800
+Subject: [PATCH V3 1/5] ARM: tegra: add pending SGI checking API
+In-Reply-To: <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <1355797861-12759-2-git-send-email-josephl@nvidia.com>
+ <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
+Message-ID: <1355799454.16185.5.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[trimmed the cc list]
-
-On Mon, Dec 17, 2012 at 07:10:59PM -0700, Stephen Warren wrote:
-
-> > What I'll do next is add some caching of written values, so that
-> > reading them back actually yields something correct. After that
-> > I'll post what I have so that others can look at it or even reuse
-> > it.
+On Tue, 2012-12-18 at 10:42 +0800, Colin Cross wrote:
+> On Mon, Dec 17, 2012 at 6:30 PM, Joseph Lo <josephl@nvidia.com> wrote:
+> > The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
+> > include the power of GIC. That caused the SGI (Software Generated
+> > Interrupt) been lost. Because the SGI can't wake up the CPU that in
+> > the "powered-down" CPU idle mode. We need to check if there is any
+> > pending SGI when go into "powered-down" CPU idle mode. This is important
+> > especially when applying the coupled cpuidle framework into "power-down"
+> > cpuidle dirver. Because the coupled cpuidle framework may have the
+> > chance that misses IPI_SINGLE_FUNC handling sometimes.
 > 
-> Some internal discussion implies this shouldn't be required; here's
-> what they said:
+> This problem exists for any GIC-based SoC, and needs to be fixed in
+> gic_cpu_save or gic_dist_save, whichever one loses the interrupt.
+> 
+Indeed, but may not need to be taken care for every SoC. It's depend on
+HW design. Different SoC had different design about it. For ex, some SoC
+only put CPU core to power saving mode not include GIC, or there is
+another irq controller can handle the case when CPU go into power saving
+mode. Differenc SoC had different usage here (some need to check all
+pending irq, some need to check SGI only and some even no need to
+consider this). So putting this into to common code may not a good
+choice.
 
-Looking at the driver, it says:
+Thanks,
+Joseph
 
-+ * 0x80000000 - 0x80003fff - PCI controller registers
-+ * 0x80004000 - 0x80103fff - PCI configuration space
-+ * 0x80104000 - 0x80203fff - PCI extended configuration space
-
-And the bridge config regions are at:
-
-+#define RP0_OFFSET     0x0000
-+#define RP1_OFFSET     0x1000
-
-And from the first checkin, config space accesses have been split into
-three designations:
- bridge #0 - 0x80000000 + 0
- bridge #1 - 0x80000000 + 0x1000
- Every other bus - 0x80104000 + [equation]
-
-And based on Thierry's results it looks like once the bridge
-subordinate bus numbers are setup (via their lower mappings) then the
-'every other bus' mapping starts working as expected.
-
-So.. is there a register to be set that lets the bridge configuration
-be accessed through the [0x80004000 - 0x80103fff] region as bus 0?
-Presumably a non-PCI device number register?
-
-Is there some provision for providing a host bridge configuration
-space?
-
-Jason
+> > For the PPI or SPI, something like the legacy peripheral interrupt. It
+> > still can be maintained by Tegra legacy interrupt controller. If there
+> > is any pending PPI or SPI when CPU in "powered-down" CPU idle mode. The
+> > CPU can be woken up immediately. So we don't need to take care the same
+> > situation for PPI or SPI.
+> >
+> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > ---
+> > V3:
+> > * move the static mapping of GIC addr into tegra_pending_sgi
+> > V2:
+> > * new in V2
+> > ---
