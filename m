@@ -1,45 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 18 Dec 2012 11:36:10 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Fix PFC - MOD_SEL2 missed an entry
-In-Reply-To: <1353601737-21641-1-git-send-email-phil.edworthy@renesas.com>
-References: <1353601737-21641-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <20121218023610.GV28065@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 17 Dec 2012 18:39:25 -0800
+Subject: [GIT PULL] ARM: OMAP: clock/cpuidle: fixes for the v3.8 merge
+ window
+In-Reply-To: <20121218003855.GZ4989@atomide.com>
+References: <alpine.DEB.2.00.1212171908460.29833@utopia.booyaka.com>
+ <20121218003855.GZ4989@atomide.com>
+Message-ID: <20121218023925.GA16947@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 04:28:57PM +0000, Phil Edworthy wrote:
-> The list of functions selected by the MOD_SEL2 register was missing
-> an entry. This caused all entries after this to modify the MOD_SEL2
-> register incorrectly.
+On Mon, Dec 17, 2012 at 04:38:55PM -0800, Tony Lindgren wrote:
+> Olof,
+> 
+> * Paul Walmsley <paul@pwsan.com> [121217 11:12]:
+> > Hi Tony
+> > 
+> > The following changes since commit 7a280cf512053137a37da2801eac73a8842fa50d:
+> > 
+> >   Merge tag 'disintegrate-x86-20121214' of git://git.infradead.org/users/dhowells/linux-headers (2012-12-14 15:48:52 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-a-for-v3.8-window
+> > 
+> > for you to fetch changes up to 9db316b6bf0234d9391f87dd0d28b23f5a44facb:
+> > 
+> >   ARM: OMAP3/4: cpuidle: fix sparse and checkpatch warnings (2012-12-15 01:41:24 -0700)
+> > 
+> > ----------------------------------------------------------------
+> > Fix some OMAP4 clock problems, and deal with some sparse warnings from
+> > the OMAP CPUIdle code.
+> 
+> Can you please pick up this one too?
 
-Laurent, can you handle this in your series?
-I believe it removes this file.
+Done, pulled.
 
-> 
-> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> ---
->  arch/arm/mach-shmobile/pfc-r8a7779.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c b/arch/arm/mach-shmobile/pfc-r8a7779.c
-> index 9fac32e4..15f6a48 100644
-> --- a/arch/arm/mach-shmobile/pfc-r8a7779.c
-> +++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
-> @@ -2525,7 +2525,7 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
->  	    /* SEL_SCIF [2] */
->  	    FN_SEL_SCIF_0, FN_SEL_SCIF_1, FN_SEL_SCIF_2, FN_SEL_SCIF_3,
->  	    /* SEL_CANCLK [2] */
-> -	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2,
-> +	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2, 0,
->  	    /* SEL_CAN0 [1] */
->  	    FN_SEL_CAN0_0, FN_SEL_CAN0_1,
->  	    /* SEL_HSCIF1 [1] */
-> -- 
-> 1.7.5.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+
+-Olof
