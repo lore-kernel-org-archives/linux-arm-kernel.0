@@ -1,168 +1,43 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 18 Dec 2012 12:19:40 +0000
-Subject: [Xen-devel] [PATCH v2 6/6] ARM: mach-virt: add SMP support using
- PSCI
-In-Reply-To: <1355762141-29616-7-git-send-email-will.deacon@arm.com>
-References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
- <1355762141-29616-7-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.DEB.2.02.1212181204450.17523@kaball.uk.xensource.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Dec 2012 12:20:16 +0000
+Subject: [PATCH 06/10] arm: arch_timer: divorce from local_timer api
+In-Reply-To: <20121210110754.GA18328@e106331-lin.cambridge.arm.com>
+References: <1354297568-26366-1-git-send-email-mark.rutland@arm.com>
+ <1354297568-26366-7-git-send-email-mark.rutland@arm.com>
+ <50C26ACA.4050509@codeaurora.org>
+ <20121210110754.GA18328@e106331-lin.cambridge.arm.com>
+Message-ID: <20121218122002.GA29998@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Dec 2012, Will Deacon wrote:
-> This patch adds support for SMP to mach-virt using the PSCI
-> infrastructure.
+Stephen,
+
+On Mon, Dec 10, 2012 at 11:09:41AM +0000, Mark Rutland wrote:
+> On Fri, Dec 07, 2012 at 10:16:42PM +0000, Stephen Boyd wrote:
+> > On 11/30/12 09:46, Mark Rutland wrote:
+> > > Currently, the arch_timer driver is tied to the arm port, as it relies
+> > > on code in arch/arm/smp.c to setup and teardown timers as cores are
+> > > hotplugged on and off. The timer is registered through an arm-specific
+> > > registration mechanism, preventing sharing the driver with the arm64
+> > > port.
+> > >
+> > > This patch moves the driver to using a cpu notifier instead, making it
+> > > easier to port.
+> > 
+> > How does ipi_timer() work after this change? Don't we need it because of
+> > FEAT_C3_STOP?
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
->
->  arch/arm/mach-virt/Kconfig   |  1 +
->  arch/arm/mach-virt/Makefile  |  1 +
->  arch/arm/mach-virt/platsmp.c | 76 ++++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-virt/virt.c    |  6 ++++
->  4 files changed, 84 insertions(+)
->  create mode 100644 arch/arm/mach-virt/platsmp.c
+> The unfortunate answer is it doesn't, and we'll need broadcast for any systems
+> where the timers turn off in low power states.
 > 
-> diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
-> index a568a2a..8958f0d 100644
-> --- a/arch/arm/mach-virt/Kconfig
-> +++ b/arch/arm/mach-virt/Kconfig
-> @@ -3,6 +3,7 @@ config ARCH_VIRT
->  	select ARCH_WANT_OPTIONAL_GPIOLIB
->  	select ARM_GIC
->  	select ARM_ARCH_TIMER
-> +	select ARM_PSCI
->  	select HAVE_SMP
->  	select CPU_V7
->  	select SPARSE_IRQ
+> I'll take a look at decoupling the broadcast mechanism from the drivers, it's
+> not really a property of the clock hardware and it would be nice to split it.
 
-Considering that PSCI is actually needed only to boot secondary cpus,
-maybe we want to select it if CONFIG_SMP is enabled?
+I've had a go at splitting the broadcast mechanism in another series:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137929.html
 
+I'm evidently not proficient with git send-email -- I'd intended for you to be
+on Cc.
 
-> diff --git a/arch/arm/mach-virt/Makefile b/arch/arm/mach-virt/Makefile
-> index 7ddbfa6..042afc1 100644
-> --- a/arch/arm/mach-virt/Makefile
-> +++ b/arch/arm/mach-virt/Makefile
-> @@ -3,3 +3,4 @@
->  #
->  
->  obj-y					:= virt.o
-> +obj-$(CONFIG_SMP)			+= platsmp.o
-> diff --git a/arch/arm/mach-virt/platsmp.c b/arch/arm/mach-virt/platsmp.c
-> new file mode 100644
-> index 0000000..930362b
-> --- /dev/null
-> +++ b/arch/arm/mach-virt/platsmp.c
-> @@ -0,0 +1,76 @@
-> +/*
-> + * Dummy Virtual Machine - does what it says on the tin.
-> + *
-> + * Copyright (C) 2012 ARM Ltd
-> + * Author: Will Deacon <will.deacon@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/smp.h>
-> +#include <linux/of.h>
-> +
-> +#include <asm/psci.h>
-> +#include <asm/smp_plat.h>
-> +#include <asm/hardware/gic.h>
-> +
-> +extern void secondary_startup(void);
-> +
-> +/*
-> + * Enumerate the possible CPU set from the device tree.
-> + */
-> +static void __init virt_smp_init_cpus(void)
-> +{
-> +	struct device_node *dn = NULL;
-> +	int cpu = 0;
-> +
-> +	while ((dn = of_find_node_by_type(dn, "cpu"))) {
-> +		if (cpu < NR_CPUS)
-> +			set_cpu_possible(cpu, true);
-> +		cpu++;
-> +	}
-> +
-> +	/* sanity check */
-> +	if (cpu > NR_CPUS)
-> +		pr_warning("no. of cores (%d) greater than configured maximum "
-> +			   "of %d - clipping\n",
-> +			   cpu, NR_CPUS);
-> +
-> +	set_smp_cross_call(gic_raise_softirq);
-> +}
-> +
-> +static void __init virt_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +}
-> +
-> +static int __cpuinit virt_boot_secondary(unsigned int cpu,
-> +					 struct task_struct *idle)
-> +{
-> +	if (psci_ops.cpu_on)
-> +		return psci_ops.cpu_on(cpu_logical_map(cpu),
-> +				       __pa(secondary_startup));
-> +	return -ENODEV;
-> +}
-
-Isn't there a better way to check whether PSCI is actually "enabled", as
-in present in the device tree and initialized correctly?
-
-Maybe we need a pcsi_enabled() static inline of some sort?
-
-
-> +static void __cpuinit virt_secondary_init(unsigned int cpu)
-> +{
-> +	gic_secondary_init(0);
-> +}
-> +
-> +struct smp_operations __initdata virt_smp_ops = {
-> +	.smp_init_cpus		= virt_smp_init_cpus,
-> +	.smp_prepare_cpus	= virt_smp_prepare_cpus,
-> +	.smp_secondary_init	= virt_secondary_init,
-> +	.smp_boot_secondary	= virt_boot_secondary,
-> +};
-> diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
-> index 174b9da..d764835 100644
-> --- a/arch/arm/mach-virt/virt.c
-> +++ b/arch/arm/mach-virt/virt.c
-> @@ -20,6 +20,7 @@
->  
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
-> +#include <linux/smp.h>
->  
->  #include <asm/arch_timer.h>
->  #include <asm/hardware/gic.h>
-> @@ -56,10 +57,15 @@ static struct sys_timer virt_timer = {
->  	.init = virt_timer_init,
->  };
->  
-> +#ifdef CONFIG_SMP
-> +extern struct smp_operations virt_smp_ops;
-> +#endif
-> +
->  DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
->  	.init_irq	= gic_init_irq,
->  	.handle_irq     = gic_handle_irq,
->  	.timer		= &virt_timer,
->  	.init_machine	= virt_init,
-> +	.smp		= smp_ops(virt_smp_ops),
->  	.dt_compat	= virt_dt_match,
->  MACHINE_END
-> -- 
-> 1.8.0
+Thanks,
+Mark
