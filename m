@@ -1,61 +1,33 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 18 Dec 2012 16:59:45 -0500 (EST)
-Subject: [PATCH v2 4/6] ARM: psci: add support for PSCI invocations from
- the kernel
-In-Reply-To: <20121218101125.GC9072@mudshark.cambridge.arm.com>
-References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
- <1355762141-29616-5-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1212171537230.1263@xanadu.home>
- <20121218101125.GC9072@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1212181657020.1263@xanadu.home>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 18 Dec 2012 23:13:56 +0100
+Subject: [PATCH 0/2] Fixes for 3.8-rc1
+Message-ID: <1355868838-16124-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Dec 2012, Will Deacon wrote:
-> On Mon, Dec 17, 2012 at 08:51:27PM +0000, Nicolas Pitre wrote:
-> > On Mon, 17 Dec 2012, Will Deacon wrote:
-> > > +static int psci_cpu_suspend(struct psci_power_state state,
-> > > +			    unsigned long entry_point)
-> > > +{
-> > > +	int err;
-> > > +	u32 fn, power_state;
-> > > +
-> > > +	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
-> > > +	power_state = psci_power_state_pack(state);
-> > > +	err = invoke_psci_fn(fn, power_state, (u32)entry_point, 0);
-> > 
-> > Why do you need the u32 cast here?
-> 
-> That's a hangover from when entry_point was a void *. I'll fix that, thanks.
+These two patches are fixes needed for Linux 3.8.
 
-Hopefully you didn't pass virtual pointers to the PSCI call, did you?  :-)
+The first patch fixes a lockup due to the missing SDIO clock. Since
+the clkdev alias is missing, the sdio driver fails to
+clk_prepare_enable() the clock. The lateinit call in the clk framework
+then disables the clock since nobody owns it. The next access to the
+SDIO register space causes the SoC to lockup.
 
-> > > +static int __init psci_init(void)
-> > > +{
-> > > +	struct device_node *np;
-> > > +	const char *method;
-> > > +	u32 base, id;
-> > > +
-> > > +	np = of_find_matching_node(NULL, psci_of_match);
-> > > +	if (!np)
-> > > +		return 0;
-> > > +
-> > > +	pr_info("probing function IDs from device-tree\n");
-> > 
-> > Having "probing function IDs from device-tree" in the middle of a kernel 
-> > log isn't very informative.  Better make this more useful or remove it.
-> > 
-> > > +
-> > > +	if (of_property_read_u32(np, "function-base", &base)) {
-> > > +		pr_warning("missing \"function-base\" property\n");
-> > 
-> > Same thing here: this lacks context in a kernel log.
-> > And so on for the other occurrences.
-> 
-> Actually, these are all prefixed with "psci: " thanks to the pr_fmt
-> definition at the top of the file.
+The second patch fixes a null-pointer dereference. The conversion of
+Kirkwood to pinctrl/gpio resulted in that using GPIO calls inside the
+board-*.c file causes an exception, since the gpio driver has not yet
+been loaded. Topkick is using the GPIO to control power to the SATA0
+device. So convert the gpio to a fixed regulator, in DT, which gets
+loaded after the gpio driver is available.
 
-Ah, goodie!  No more issue then.
+Andrew Lunn (2):
+  ARM: Kirkwood: Fix missing sdio clock
+  ARM: Kirkwood: Use fixed-regulator instead of board gpio call
 
+ arch/arm/boot/dts/kirkwood-topkick.dts     |   17 +++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c          |    4 ++++
+ arch/arm/mach-kirkwood/board-usi_topkick.c |    4 ----
+ 3 files changed, 21 insertions(+), 4 deletions(-)
 
-Nicolas
+-- 
+1.7.10.4
