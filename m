@@ -1,76 +1,37 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Dec 2012 14:55:32 +0200
-Subject: [PATCH v2] ARM: OMAP2: hwmod: Fix "register offset NULL check" bug
-In-Reply-To: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20121218125338.GA31383@arwen.pp.htv.fi>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 18 Dec 2012 18:35:37 +0530
+Subject: [PATCH 1/4] ARM: tegra30: Add support for Uart clock source
+ divider as 15.1
+In-Reply-To: <50D0163F.3030806@nvidia.com>
+References: <1355746101-15291-1-git-send-email-ldewangan@nvidia.com>
+ <1355746101-15291-2-git-send-email-ldewangan@nvidia.com>
+ <50CF91F7.5010402@wwwdotorg.org> <50D009E0.3050409@nvidia.com>
+ <50D00C1D.9090100@nvidia.com> <50D0163F.3030806@nvidia.com>
+Message-ID: <50D06A21.2000102@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 06:26:18PM +0530, Hebbar Gururaja wrote:
-> From: "Hebbar, Gururaja" <gururaja.hebbar@ti.com>
-> 
-> omap4_cminst_wait_module_ready() checks if register offset is NULL.
-> 
-> int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
-> 				   u16 clkctrl_offs)
-> {
-> 	int i = 0;
-> 
-> 	if (!clkctrl_offs)
-> 		return 0;
-> 
-> In case of AM33xx, CLKCTRL register offset for different clock domains
-> are not uniformly placed. An example of this would be the RTC clock
-> domain with CLKCTRL offset at 0x00.
-> In such cases the module ready check is skipped which leads to a data
-> abort during boot-up when RTC registers is accessed.
-> 
-> Since the actual base address is verified in
-> omap4_cminst_read_inst_reg(), this check here is not required at all
-> and hence can be removed.
-> 
-> Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+On Tuesday 18 December 2012 12:37 PM, Prashant Gaikwad wrote:
+> On Tuesday 18 December 2012 11:54 AM, Laxman Dewangan wrote:
+>> On Tuesday 18 December 2012 11:44 AM, Prashant Gaikwad wrote:
+>>>
+>>> My clock driver rework includes this fix. Divider supports both DIVU71
+>>> and DIVU151.
+>>> UART divider is set to DIVU151.
+>> Prashant,
+>> I like to go this patch as first patch towards bug fixes rather than
+>> after moving the clock. The reason is that we will pull this change in
+>> our downstream and will be available in our K3.7 code.
+> Laxman,
+>
+> We are not going to use ccf in our downstream kernel port to K3.7. How
+> does that help pushing in upstream?
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+Ok, as per our internal discussion, I am going to drop first three 
+patches. I will relookinto these patches once your series get applied 
+and will work if there is any missing items.
 
-> ---
-> Changes in v2:
-> 	- update commit message to reflect the actual cause. Previous
-> 	message conveyed a wrong/opposite message.
-> 
-> :100644 100644 7f9a464... 40545ff... M	arch/arm/mach-omap2/cminst44xx.c
->  arch/arm/mach-omap2/cminst44xx.c |    3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-> index 7f9a464..40545ff 100644
-> --- a/arch/arm/mach-omap2/cminst44xx.c
-> +++ b/arch/arm/mach-omap2/cminst44xx.c
-> @@ -271,9 +271,6 @@ int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
->  {
->  	int i = 0;
->  
-> -	if (!clkctrl_offs)
-> -		return 0;
-> -
->  	omap_test_timeout(_is_module_ready(part, inst, cdoffs, clkctrl_offs),
->  			  MAX_MODULE_READY_TIME, i);
->  
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121218/415e2a5c/attachment.sig>
+Stephen,
+I will respin the 4th patch based on how the discussion on serial driver 
+goes. I will send the new patch for 4th change.
