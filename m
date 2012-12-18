@@ -1,35 +1,38 @@
-From: Claudio.Fontana@huawei.com (Claudio Fontana)
-Date: Tue, 18 Dec 2012 09:42:49 +0100
-Subject: [PATCH RESEND 4] ARM: plat-versatile: move secondary CPU startup into
- cpuinit
-In-Reply-To: <50B47C31.2040709@huawei.com>
-References: <50B47C31.2040709@huawei.com>
-Message-ID: <50D02C89.9030307@huawei.com>
+From: lznuaa@gmail.com (Frank Li)
+Date: Tue, 18 Dec 2012 16:51:35 +0800
+Subject: [PATCH 4/4] FEC: Add time stamping code and a PTP hardware clock
+In-Reply-To: <20121218070420.GA2946@netboy.at.omicron.at>
+References: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
+ <20121217091345.GA753@pengutronix.de>
+ <CAHrpEqTVuSR_-Tpdzb98=VJbg7grSFvSQ9xA6mPsHpGb7RvNCg@mail.gmail.com>
+ <20121217151445.GA17907@S2101-09.ap.freescale.net>
+ <20121217200232.GS26326@pengutronix.de>
+ <20121218070420.GA2946@netboy.at.omicron.at>
+Message-ID: <CAHrpEqRxJrZRjfmcN3a2Xd1QCF9oM=hoXhddSv6u4SPPoJha6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>>
+>> might be an option, but given that this patch seems to have bypassed any
+>> review I feel more like reverting it.
+>
+> Instead of reverting, I suggest finding a solution (Frank) to let the
+> code work when it can work and to prevent it when it cannot. This
+> could be kconfig, DT, or run time probing of silicon revisions, but I
+> don't have access to this hardware, and so I can't really say how to
+> fix it.
 
-Using __CPUINIT instead of __INIT puts the secondary CPU startup code
-into the "right" section: it will not be freed in hotplug configurations,
-allowing hot-add of cpus, while still getting freed in non-hotplug configs.
+I am traveling in this week. I will try to find out the solution after
+come back office
+in next week. But quick solution is shawn's patch, which resolve mx3
+and mx5 problem at least in short term.
 
-Tested successfully on Fast-Models and on Arndale for VCPU hotplug. 
-
-Signed-off-by: Claudio Fontana <claudio.fontana@huawei.com>
-Tested-by: Claudio Fontana <claudio.fontana@huawei.com>
-
-diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-index dd703ef..19fe180 100644
---- a/arch/arm/plat-versatile/headsmp.S
-+++ b/arch/arm/plat-versatile/headsmp.S
-@@ -11,7 +11,7 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- 
--	__INIT
-+	__CPUINIT
- 
- /*
-  * Realview/Versatile Express specific entry point for secondary CPUs.
--- 
-1.7.12.1
+>
+> Just for the record, I did in fact review this patch, and I commented
+> on exactly this point. Frank said we would address this point, and he
+> did so. Not knowing the imx family very well, I took his word for it.
+> After all, Frank has a Freescale address, and I would expect a
+> Freescale employee to know how to provide the right fix.
+>
+> Thanks,
+> Richard
