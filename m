@@ -1,92 +1,67 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 17 Dec 2012 23:06:38 -0500
-Subject: [PATCH 2/2] ARM: Use implementor and part defines from cputype.h
-In-Reply-To: <1355803598-58471-1-git-send-email-c.dall@virtualopensystems.com>
-References: <1355803598-58471-1-git-send-email-c.dall@virtualopensystems.com>
-Message-ID: <1355803598-58471-2-git-send-email-c.dall@virtualopensystems.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 18 Dec 2012 13:28:54 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Fix PFC - MOD_SEL2 missed an entry
+In-Reply-To: <20121218035144.GC13353@verge.net.au>
+References: <1353601737-21641-1-git-send-email-phil.edworthy@renesas.com>
+ <20121218023610.GV28065@verge.net.au>
+ <20121218035144.GC13353@verge.net.au>
+Message-ID: <20121218042854.GH29354@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of decoding implementor numbers, part numbers and Xscale
-architecture masks inline in the pmu probing function, use defines
-and accessor functions from cputype.h, which can also be shared by
-other subsystems, such as KVM.
+On Tue, Dec 18, 2012 at 12:51:44PM +0900, Simon Horman wrote:
+> On Tue, Dec 18, 2012 at 11:36:10AM +0900, Simon Horman wrote:
+> > On Thu, Nov 22, 2012 at 04:28:57PM +0000, Phil Edworthy wrote:
+> > > The list of functions selected by the MOD_SEL2 register was missing
+> > > an entry. This caused all entries after this to modify the MOD_SEL2
+> > > register incorrectly.
+> > 
+> > Laurent, can you handle this in your series?
+> > I believe it removes this file.
+> 
+> Sorry, I missed the fact that this is for stable.
+> Laurent, can you handle upstream and I'll handle stable?
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
----
- arch/arm/kernel/perf_event_cpu.c |   34 ++++++++++++++++------------------
- 1 file changed, 16 insertions(+), 18 deletions(-)
+Sorry, yet another thing.
 
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 9a4f630..5c59e19 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -201,48 +201,46 @@ static struct platform_device_id __devinitdata cpu_pmu_plat_device_ids[] = {
- static int __devinit probe_current_pmu(struct arm_pmu *pmu)
- {
- 	int cpu = get_cpu();
--	unsigned long cpuid = read_cpuid_id();
--	unsigned long implementor = (cpuid & 0xFF000000) >> 24;
--	unsigned long part_number = (cpuid & 0xFFF0);
-+	unsigned long implementor = read_cpuid_implementor();
-+	unsigned long part_number = read_cpuid_part_number();
- 	int ret = -ENODEV;
- 
- 	pr_info("probing PMU on CPU %d\n", cpu);
- 
- 	/* ARM Ltd CPUs. */
--	if (0x41 == implementor) {
-+	if (implementor == ARM_CPU_IMP_ARM) {
- 		switch (part_number) {
--		case 0xB360:	/* ARM1136 */
--		case 0xB560:	/* ARM1156 */
--		case 0xB760:	/* ARM1176 */
-+		case ARM_CPU_PART_ARM1136:
-+		case ARM_CPU_PART_ARM1156:
-+		case ARM_CPU_PART_ARM1176:
- 			ret = armv6pmu_init(pmu);
- 			break;
--		case 0xB020:	/* ARM11mpcore */
-+		case ARM_CPU_PART_ARM11MPCORE:
- 			ret = armv6mpcore_pmu_init(pmu);
- 			break;
--		case 0xC080:	/* Cortex-A8 */
-+		case ARM_CPU_PART_CORTEX_A8:
- 			ret = armv7_a8_pmu_init(pmu);
- 			break;
--		case 0xC090:	/* Cortex-A9 */
-+		case ARM_CPU_PART_CORTEX_A9:
- 			ret = armv7_a9_pmu_init(pmu);
- 			break;
--		case 0xC050:	/* Cortex-A5 */
-+		case ARM_CPU_PART_CORTEX_A5:
- 			ret = armv7_a5_pmu_init(pmu);
- 			break;
--		case 0xC0F0:	/* Cortex-A15 */
-+		case ARM_CPU_PART_CORTEX_A15:
- 			ret = armv7_a15_pmu_init(pmu);
- 			break;
--		case 0xC070:	/* Cortex-A7 */
-+		case ARM_CPU_PART_CORTEX_A7:
- 			ret = armv7_a7_pmu_init(pmu);
- 			break;
- 		}
- 	/* Intel CPUs [xscale]. */
--	} else if (0x69 == implementor) {
--		part_number = (cpuid >> 13) & 0x7;
--		switch (part_number) {
--		case 1:
-+	} else if (implementor == ARM_CPU_IMP_INTEL) {
-+		switch (xscale_cpu_arch_version()) {
-+		case ARM_CPU_XSCALE_ARCH_V1:
- 			ret = xscale1pmu_init(pmu);
- 			break;
--		case 2:
-+		case ARM_CPU_XSCALE_ARCH_V2:
- 			ret = xscale2pmu_init(pmu);
- 			break;
- 		}
--- 
-1.7.9.5
+Phil, could you explain what problems manifest at for users without this
+change? To be included in stable it is important that it solves a problem
+that actually manifests.
+
+> > > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > > ---
+> > >  arch/arm/mach-shmobile/pfc-r8a7779.c |    2 +-
+> > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c b/arch/arm/mach-shmobile/pfc-r8a7779.c
+> > > index 9fac32e4..15f6a48 100644
+> > > --- a/arch/arm/mach-shmobile/pfc-r8a7779.c
+> > > +++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
+> > > @@ -2525,7 +2525,7 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
+> > >  	    /* SEL_SCIF [2] */
+> > >  	    FN_SEL_SCIF_0, FN_SEL_SCIF_1, FN_SEL_SCIF_2, FN_SEL_SCIF_3,
+> > >  	    /* SEL_CANCLK [2] */
+> > > -	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2,
+> > > +	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2, 0,
+> > >  	    /* SEL_CAN0 [1] */
+> > >  	    FN_SEL_CAN0_0, FN_SEL_CAN0_1,
+> > >  	    /* SEL_HSCIF1 [1] */
+> > > -- 
+> > > 1.7.5.4
+> > > 
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
