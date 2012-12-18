@@ -1,83 +1,41 @@
-From: pratikp@codeaurora.org (pratikp at codeaurora.org)
-Date: Tue, 18 Dec 2012 11:19:17 -0800
-Subject: CoreSight framework and drivers
-Message-ID: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
+From: ccross@android.com (Colin Cross)
+Date: Tue, 18 Dec 2012 11:36:05 -0800
+Subject: [PATCH V3 1/5] ARM: tegra: add pending SGI checking API
+In-Reply-To: <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <1355797861-12759-2-git-send-email-josephl@nvidia.com>
+ <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
+ <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
+Message-ID: <CAMbhsRSDwSoHoEs93NZhDchCS28-vQCuW2p+kqfNKeqLygL2sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This RFC is aimed at introducing CoreSight framework as well as
-individual CoreSight trace component drivers adhering to ARM
-CoreSight specification. Some prior discussion on this can be
-referred at [1].
+On Tue, Dec 18, 2012 at 2:15 AM, Peter De Schrijver
+<pdeschrijver@nvidia.com> wrote:
+> On Tue, Dec 18, 2012 at 03:42:24AM +0100, Colin Cross wrote:
+>> On Mon, Dec 17, 2012 at 6:30 PM, Joseph Lo <josephl@nvidia.com> wrote:
+>> > The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
+>> > include the power of GIC. That caused the SGI (Software Generated
+>> > Interrupt) been lost. Because the SGI can't wake up the CPU that in
+>> > the "powered-down" CPU idle mode. We need to check if there is any
+>> > pending SGI when go into "powered-down" CPU idle mode. This is important
+>> > especially when applying the coupled cpuidle framework into "power-down"
+>> > cpuidle dirver. Because the coupled cpuidle framework may have the
+>> > chance that misses IPI_SINGLE_FUNC handling sometimes.
+>>
+>> This problem exists for any GIC-based SoC, and needs to be fixed in
+>> gic_cpu_save or gic_dist_save, whichever one loses the interrupt.
+>
+> Not necessarily. It depends on the SoC design. On Tegra20, the entire CPU
+> cluster is railgated, including the GIC. This causes a pending IPI to be lost.
+> But for example on OMAP4, only the actual CPU cores are powergated. The GIC
+> stays alive until also the core domain hits idle. By that time a potential
+> pending IPI has long woken up the target CPU again, so no additional
+> checks are needed for functional correct behavior.
 
-There are 3 kinds of CoreSight trace components:
-
-* Sources: Responsible for producing trace data to provide
-  visibility for the associated entity.
-
-* Links: Transport components that carry trace data.
-
-* Sinks: Collectors for storing trace data or acting as conduits
-  for off-chip trace data collection.
-
-These components can be connected in various topologies to suite
-a particular SoCs tracing needs.
-
-Framework is responsible for gathering and using the information
-about the registered CoreSight components and their connections
-to allow it to dynamically deduce the sequence of components
-representing a connection from a CoreSight source to the
-currently selected CoreSight sink. This helps the framework to
-program the correct set of components to satisfy user request.
-
-[1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/204591
-
-Pratik Patel (8):
-  coresight: add CoreSight core layer framework
-  coresight: add CoreSight TMC driver
-  coresight: add CoreSight TPIU driver
-  coresight: add CoreSight ETB driver
-  coresight: add CoreSight Funnel driver
-  coresight: add CoreSight Replicator driver
-  coresight: add CoreSight STM driver
-  coresight: add CoreSight ETM driver
-
- Documentation/devicetree/bindings/arm/coresight.txt |  110 ++
- arch/arm/include/asm/hardware/cp14.h                |  540 ++++++
- drivers/Kconfig                                     |    2 +
- drivers/Makefile                                    |    1 +
- drivers/coresight/Kconfig                           |   60 +
- drivers/coresight/Makefile                          |    8 +
- drivers/coresight/coresight-etb.c                   |  467 +++++
- drivers/coresight/coresight-etm-cp14.c              |  510 ++++++
- drivers/coresight/coresight-etm.c                   | 1752 +++++++++++++++++++
- drivers/coresight/coresight-funnel.c                |  260 +++
- drivers/coresight/coresight-priv.h                  |   48 +
- drivers/coresight/coresight-replicator.c            |  211 +++
- drivers/coresight/coresight-stm.c                   |  819 +++++++++
- drivers/coresight/coresight-tmc.c                   |  794 +++++++++
- drivers/coresight/coresight-tpiu.c                  |  232 +++
- drivers/coresight/coresight.c                       |  681 +++++++
- drivers/coresight/of_coresight.c                    |   99 ++
- include/linux/coresight-stm.h                       |   51 +
- include/linux/coresight.h                           |  167 ++
- include/linux/of_coresight.h                        |   27 +
- 20 files changed, 6839 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
- create mode 100644 arch/arm/include/asm/hardware/cp14.h
- create mode 100644 drivers/coresight/Kconfig
- create mode 100644 drivers/coresight/Makefile
- create mode 100644 drivers/coresight/coresight-etb.c
- create mode 100644 drivers/coresight/coresight-etm-cp14.c
- create mode 100644 drivers/coresight/coresight-etm.c
- create mode 100644 drivers/coresight/coresight-funnel.c
- create mode 100644 drivers/coresight/coresight-priv.h
- create mode 100644 drivers/coresight/coresight-replicator.c
- create mode 100644 drivers/coresight/coresight-stm.c
- create mode 100644 drivers/coresight/coresight-tmc.c
- create mode 100644 drivers/coresight/coresight-tpiu.c
- create mode 100644 drivers/coresight/coresight.c
- create mode 100644 drivers/coresight/of_coresight.c
- create mode 100644 include/linux/coresight-stm.h
- create mode 100644 include/linux/coresight.h
- create mode 100644 include/linux/of_coresight.h
+I'm not sure that is correct for OMAP4.  C2 and C3 will put the power
+rail for the GIC in retention, and I don't think an IPI will wake it
+up.  I believe the same problem also exists for Exynos5.  In any case,
+checking for an IPI early during idle and aborting won't hurt those
+platforms, so I still think it should be in the GIC driver and not by
+mapping the GIC registers into a separate driver.
