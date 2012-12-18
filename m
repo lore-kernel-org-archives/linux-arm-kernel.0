@@ -1,19 +1,31 @@
-From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Tue, 18 Dec 2012 15:15:07 +0100
-Subject: 3.7 kernel hangs when doing scp
-In-Reply-To: <CAOMZO5Bc5stXXviuf3OL9vAHw+ER=GzzV1q=5Yr5q=AnfoGiGw@mail.gmail.com>
-References: <CAOMZO5Bc5stXXviuf3OL9vAHw+ER=GzzV1q=5Yr5q=AnfoGiGw@mail.gmail.com>
-Message-ID: <20121218141507.GC4939@breakpoint.cc>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 18 Dec 2012 15:19:02 +0100
+Subject: [PATCH] arm: kirkwood: register DT devices earlier
+In-Reply-To: <1355839667-1487-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1355839667-1487-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121218141902.GI3392@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 12:01:35AM -0200, Fabio Estevam wrote:
-> Booting a 3.7 kernel on a mx6qsabrelite board via NFS and using an
-> asix USB/Ethernet adapter and then I try to transfer a 10MB file from
-> the target to the host:
+On Tue, Dec 18, 2012 at 03:07:47PM +0100, Thomas Petazzoni wrote:
+> The board-dt.c initialization functions calls the per-board legacy
+> init functions (to probe devices that have not yet been converted to
+> the Device Tree) before probing the devices declared in the Device
+> Tree.
+> 
+> This unfortunately causes a boot crash on Topkick, because the
+> board-specific initialization function sets a GPIO to some
+> value. Unfortunately, since the devices declared in the Device Tree
+> haven't been probed, the GPIO controllers haven't been probed, and the
+> gpio_set_value() call causes the following crash:
 
-That backtrace shows only that nothing is going on. Can you attach that asix
-thingy to another USB-host and test?
-Is your host working well with other devices say usb-storage?
+Hi Thomas
 
-Sebastian
+I have a different fix for this.
+
+The gpio is being used to supply power to SATA. So i turn it into a
+fixed-regulator, using DT.
+
+I will send the patch tonight.
+
+  Andrew
