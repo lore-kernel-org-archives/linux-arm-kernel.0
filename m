@@ -1,44 +1,46 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 18 Dec 2012 12:18:19 +0200
-Subject: [PATCH V3 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle
- for powered-down mode
-In-Reply-To: <1355797861-12759-6-git-send-email-josephl@nvidia.com>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <1355797861-12759-6-git-send-email-josephl@nvidia.com>
-Message-ID: <20121218101819.GP19258@tbergstrom-lnx.Nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 18 Dec 2012 10:17:07 +0000
+Subject: [PATCH] ARM: realview: fix private peripheral memory base for
+ EB rev. B boards
+In-Reply-To: <1355760668-28606-1-git-send-email-will.deacon@arm.com>
+References: <1355760668-28606-1-git-send-email-will.deacon@arm.com>
+Message-ID: <50D042A3.2020009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 03:31:01AM +0100, Joseph Lo wrote:
-> The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
-> core to go into this mode before other core. The coupled cpuidle framework
-> can help to sync the MPCore to coupled state then go into "powered-down"
-> idle mode together. The driver can just assume the MPCore come into
-> "powered-down" mode at the same time. No need to take care if the CPU_0
-> goes into this mode along and only can put it into safe idle mode (WFI).
+On 17/12/12 16:11, Will Deacon wrote:
+> Commit 34ae6c96a6a7 ("ARM: 7298/1: realview: fix mapping of MPCore
+> private memory region") accidentally broke the definition for the base
+> address of the private peripheral region on revision B Realview-EB
+> boards.
 > 
-> The powered-down state of Tegra20 requires power gating both CPU cores.
-> When the secondary CPU requests to enter powered-down state, it saves
-> its own contexts and then enters WFI for waiting CPU0 in the same state.
-> When the CPU0 requests powered-down state, it attempts to put the secondary
-> CPU into reset to prevent it from waking up. Then power down both CPUs
-> together and power off the cpu rail.
+> This patch uses the correct address for REALVIEW_EB11MP_PRIV_MEM_BASE.
 > 
-> Be aware of that, you may see the legacy power state "LP2" in the code
-> which is exactly the same meaning of "CPU power down".
-> 
-> Based on the work by:
-> Colin Cross <ccross@android.com>
-> Gary King <gking@nvidia.com>
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Tested-by: Florian Fainelli <florian@openwrt.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
 > ---
-> V3:
-> * sqash last two patch in previous version to support coupled cpuidle
->   directly
+>  arch/arm/mach-realview/include/mach/board-eb.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-realview/include/mach/board-eb.h b/arch/arm/mach-realview/include/mach/board-eb.h
+> index 124bce6..a301e61 100644
+> --- a/arch/arm/mach-realview/include/mach/board-eb.h
+> +++ b/arch/arm/mach-realview/include/mach/board-eb.h
+> @@ -47,7 +47,7 @@
+>  #define REALVIEW_EB_USB_BASE		0x4F000000	/* USB */
+>  
+>  #ifdef CONFIG_REALVIEW_EB_ARM11MP_REVB
+> -#define REALVIEW_EB11MP_PRIV_MEM_BASE	0x1F000000
+> +#define REALVIEW_EB11MP_PRIV_MEM_BASE	0x10100000
+>  #define REALVIEW_EB11MP_L220_BASE	0x10102000	/* L220 registers */
+>  #define REALVIEW_EB11MP_SYS_PLD_CTRL1	0xD8		/* Register offset for MPCore sysctl */
+>  #else
+> 
 
-nitpick - it should be 'squash'.
 
-Cheers,
-
-Peter.
+-- 
+Jazz is not dead. It just smells funny...
