@@ -1,43 +1,42 @@
 From: pratikp@codeaurora.org (pratikp at codeaurora.org)
-Date: Tue, 18 Dec 2012 11:19:22 -0800
-Subject: [RFC 5/8] coresight: add CoreSight Funnel driver
+Date: Tue, 18 Dec 2012 11:19:23 -0800
+Subject: [RFC 6/8] coresight: add CoreSight Replicator driver
 In-Reply-To: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
 References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
-Message-ID: <1355858365-11849-6-git-send-email-pratikp@codeaurora.org>
+Message-ID: <1355858365-11849-7-git-send-email-pratikp@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratik Patel <pratikp@codeaurora.org>
 
-This driver manages CoreSight Funnel which acts as a link.
-Funnels have multiple input ports (typically 8) each of which
-represents an input trace data stream. These multiple input trace
-data streams are interleaved into a single output stream coming
-out of the Funnel.
+This driver manages CoreSight Replicator that takes single input
+trace data stream and replicates it to produce two identical
+trace data output streams. Replicators are typically used to
+route single interleaved trace data stream to two or more sinks.
 
 Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
 ---
- drivers/coresight/Makefile           |    2 +-
- drivers/coresight/coresight-funnel.c |  260 ++++++++++++++++++++++++++++++++++
- 2 files changed, 261 insertions(+), 1 deletions(-)
- create mode 100644 drivers/coresight/coresight-funnel.c
+ drivers/coresight/Makefile               |    2 +-
+ drivers/coresight/coresight-replicator.c |  211 ++++++++++++++++++++++++++++++
+ 2 files changed, 212 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/coresight/coresight-replicator.c
 
 diff --git a/drivers/coresight/Makefile b/drivers/coresight/Makefile
-index 3c1debc..9f84ad0 100644
+index 9f84ad0..b385e81 100644
 --- a/drivers/coresight/Makefile
 +++ b/drivers/coresight/Makefile
 @@ -3,4 +3,4 @@
  #
  obj-$(CONFIG_CORESIGHT) += coresight.o
  obj-$(CONFIG_OF) += of_coresight.o
--obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o coresight-etb.o
-+obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o coresight-etb.o coresight-funnel.o
-diff --git a/drivers/coresight/coresight-funnel.c b/drivers/coresight/coresight-funnel.c
+-obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o coresight-etb.o coresight-funnel.o
++obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o coresight-etb.o coresight-funnel.o coresight-replicator.o
+diff --git a/drivers/coresight/coresight-replicator.c b/drivers/coresight/coresight-replicator.c
 new file mode 100644
-index 0000000..7f39a3e
+index 0000000..fe37e5e
 --- /dev/null
-+++ b/drivers/coresight/coresight-funnel.c
-@@ -0,0 +1,260 @@
++++ b/drivers/coresight/coresight-replicator.c
+@@ -0,0 +1,211 @@
 +/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -53,7 +52,6 @@ index 0000000..7f39a3e
 +#include <linux/kernel.h>
 +#include <linux/module.h>
 +#include <linux/init.h>
-+#include <linux/types.h>
 +#include <linux/device.h>
 +#include <linux/platform_device.h>
 +#include <linux/io.h>
@@ -65,152 +63,105 @@ index 0000000..7f39a3e
 +
 +#include "coresight-priv.h"
 +
-+#define funnel_writel(drvdata, val, off)	\
-+			__raw_writel((val), drvdata->base + off)
-+#define funnel_readl(drvdata, off)		\
-+			__raw_readl(drvdata->base + off)
++#define replicator_writel(drvdata, val, off)	\
++				__raw_writel((val), drvdata->base + off)
++#define replicator_readl(drvdata, off)		\
++				__raw_readl(drvdata->base + off)
 +
-+#define FUNNEL_LOCK(drvdata)						\
++#define REPLICATOR_LOCK(drvdata)					\
 +do {									\
 +	mb();								\
-+	funnel_writel(drvdata, 0x0, CORESIGHT_LAR);			\
++	replicator_writel(drvdata, 0x0, CORESIGHT_LAR);			\
 +} while (0)
-+#define FUNNEL_UNLOCK(drvdata)						\
++#define REPLICATOR_UNLOCK(drvdata)					\
 +do {									\
-+	funnel_writel(drvdata, CORESIGHT_UNLOCK, CORESIGHT_LAR);	\
++	replicator_writel(drvdata, CORESIGHT_UNLOCK, CORESIGHT_LAR);	\
 +	mb();								\
 +} while (0)
 +
-+#define FUNNEL_FUNCTL		(0x000)
-+#define FUNNEL_PRICTL		(0x004)
-+#define FUNNEL_ITATBDATA0	(0xEEC)
-+#define FUNNEL_ITATBCTR2	(0xEF0)
-+#define FUNNEL_ITATBCTR1	(0xEF4)
-+#define FUNNEL_ITATBCTR0	(0xEF8)
++#define REPLICATOR_IDFILTER0		(0x000)
++#define REPLICATOR_IDFILTER1		(0x004)
++#define REPLICATOR_ITATBCTR0		(0xEFC)
++#define REPLICATOR_ITATBCTR1		(0xEF8)
 +
-+#define FUNNEL_HOLDTIME_MASK	(0xF00)
-+#define FUNNEL_HOLDTIME_SHFT	(0x8)
-+#define FUNNEL_HOLDTIME		(0x7 << FUNNEL_HOLDTIME_SHFT)
-+
-+struct funnel_drvdata {
++struct replicator_drvdata {
 +	void __iomem		*base;
 +	struct device		*dev;
 +	struct coresight_device	*csdev;
 +	struct clk		*clk;
-+	uint32_t		priority;
 +};
 +
-+static void __funnel_enable(struct funnel_drvdata *drvdata, int port)
++static void __replicator_enable(struct replicator_drvdata *drvdata, int outport)
 +{
-+	uint32_t functl;
++	REPLICATOR_UNLOCK(drvdata);
 +
-+	FUNNEL_UNLOCK(drvdata);
++	if (outport == 0) {
++		replicator_writel(drvdata, 0x0, REPLICATOR_IDFILTER0);
++		replicator_writel(drvdata, 0xFF, REPLICATOR_IDFILTER1);
++	} else {
++		replicator_writel(drvdata, 0x0, REPLICATOR_IDFILTER1);
++		replicator_writel(drvdata, 0xFF, REPLICATOR_IDFILTER0);
++	}
 +
-+	functl = funnel_readl(drvdata, FUNNEL_FUNCTL);
-+	functl &= ~FUNNEL_HOLDTIME_MASK;
-+	functl |= FUNNEL_HOLDTIME;
-+	functl |= (1 << port);
-+	funnel_writel(drvdata, functl, FUNNEL_FUNCTL);
-+	funnel_writel(drvdata, drvdata->priority, FUNNEL_PRICTL);
-+
-+	FUNNEL_LOCK(drvdata);
++	REPLICATOR_LOCK(drvdata);
 +}
 +
-+static int funnel_enable(struct coresight_device *csdev, int inport,
-+			 int outport)
++static int replicator_enable(struct coresight_device *csdev, int inport,
++			     int outport)
 +{
-+	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +	int ret;
 +
 +	ret = clk_prepare_enable(drvdata->clk);
 +	if (ret)
 +		return ret;
 +
-+	__funnel_enable(drvdata, inport);
++	__replicator_enable(drvdata, outport);
 +
-+	dev_info(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
++	dev_info(drvdata->dev, "REPLICATOR enabled\n");
 +	return 0;
 +}
 +
-+static void __funnel_disable(struct funnel_drvdata *drvdata, int inport)
++static void __replicator_disable(struct replicator_drvdata *drvdata,
++				 int outport)
 +{
-+	uint32_t functl;
++	REPLICATOR_UNLOCK(drvdata);
 +
-+	FUNNEL_UNLOCK(drvdata);
++	if (outport == 0)
++		replicator_writel(drvdata, 0xFF, REPLICATOR_IDFILTER0);
++	else
++		replicator_writel(drvdata, 0xFF, REPLICATOR_IDFILTER1);
 +
-+	functl = funnel_readl(drvdata, FUNNEL_FUNCTL);
-+	functl &= ~(1 << inport);
-+	funnel_writel(drvdata, functl, FUNNEL_FUNCTL);
-+
-+	FUNNEL_LOCK(drvdata);
++	REPLICATOR_LOCK(drvdata);
 +}
 +
-+static void funnel_disable(struct coresight_device *csdev, int inport,
-+			   int outport)
++static void replicator_disable(struct coresight_device *csdev, int inport,
++			       int outport)
 +{
-+	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +
-+	__funnel_disable(drvdata, inport);
++	__replicator_disable(drvdata, outport);
 +
 +	clk_disable_unprepare(drvdata->clk);
 +
-+	dev_info(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
++	dev_info(drvdata->dev, "REPLICATOR disabled\n");
 +}
 +
-+static const struct coresight_ops_link funnel_link_ops = {
-+	.enable		= funnel_enable,
-+	.disable	= funnel_disable,
++static const struct coresight_ops_link replicator_link_ops = {
++	.enable		= replicator_enable,
++	.disable	= replicator_disable,
 +};
 +
-+static const struct coresight_ops funnel_cs_ops = {
-+	.link_ops	= &funnel_link_ops,
++static const struct coresight_ops replicator_cs_ops = {
++	.link_ops	= &replicator_link_ops,
 +};
 +
-+static ssize_t funnel_show_priority(struct device *dev,
-+				    struct device_attribute *attr, char *buf)
-+{
-+	struct funnel_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+	unsigned long val = drvdata->priority;
-+
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
-+}
-+
-+static ssize_t funnel_store_priority(struct device *dev,
-+				     struct device_attribute *attr,
-+				     const char *buf, size_t size)
-+{
-+	struct funnel_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+	unsigned long val;
-+
-+	if (sscanf(buf, "%lx", &val) != 1)
-+		return -EINVAL;
-+
-+	drvdata->priority = val;
-+	return size;
-+}
-+static DEVICE_ATTR(priority, S_IRUGO | S_IWUSR, funnel_show_priority,
-+		   funnel_store_priority);
-+
-+static struct attribute *funnel_attrs[] = {
-+	&dev_attr_priority.attr,
-+	NULL,
-+};
-+
-+static struct attribute_group funnel_attr_grp = {
-+	.attrs = funnel_attrs,
-+};
-+
-+static const struct attribute_group *funnel_attr_grps[] = {
-+	&funnel_attr_grp,
-+	NULL,
-+};
-+
-+static int __devinit funnel_probe(struct platform_device *pdev)
++static int __devinit replicator_probe(struct platform_device *pdev)
 +{
 +	int ret;
 +	struct device *dev = &pdev->dev;
 +	struct coresight_platform_data *pdata;
-+	struct funnel_drvdata *drvdata;
++	struct replicator_drvdata *drvdata;
 +	struct resource *res;
 +	struct coresight_desc *desc;
 +
@@ -247,57 +198,56 @@ index 0000000..7f39a3e
 +	if (!desc)
 +		return -ENOMEM;
 +	desc->type = CORESIGHT_DEV_TYPE_LINK;
-+	desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_MERG;
-+	desc->ops = &funnel_cs_ops;
++	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
++	desc->ops = &replicator_cs_ops;
 +	desc->pdata = pdev->dev.platform_data;
 +	desc->dev = &pdev->dev;
-+	desc->groups = funnel_attr_grps;
 +	desc->owner = THIS_MODULE;
 +	drvdata->csdev = coresight_register(desc);
 +	if (IS_ERR(drvdata->csdev))
 +		return PTR_ERR(drvdata->csdev);
 +
-+	dev_info(dev, "FUNNEL initialized\n");
++	dev_info(dev, "REPLICATOR initialized\n");
 +	return 0;
 +}
 +
-+static int __devexit funnel_remove(struct platform_device *pdev)
++static int __devexit replicator_remove(struct platform_device *pdev)
 +{
-+	struct funnel_drvdata *drvdata = platform_get_drvdata(pdev);
++	struct replicator_drvdata *drvdata = platform_get_drvdata(pdev);
 +
 +	coresight_unregister(drvdata->csdev);
 +	return 0;
 +}
 +
-+static struct of_device_id funnel_match[] = {
-+	{.compatible = "arm,coresight-funnel"},
++static struct of_device_id replicator_match[] = {
++	{.compatible = "qcom,coresight-replicator"},
 +	{}
 +};
 +
-+static struct platform_driver funnel_driver = {
-+	.probe          = funnel_probe,
-+	.remove         = __devexit_p(funnel_remove),
++static struct platform_driver replicator_driver = {
++	.probe          = replicator_probe,
++	.remove         = __devexit_p(replicator_remove),
 +	.driver         = {
-+		.name   = "coresight-funnel",
++		.name   = "coresight-replicator",
 +		.owner	= THIS_MODULE,
-+		.of_match_table = funnel_match,
++		.of_match_table = replicator_match,
 +	},
 +};
 +
-+static int __init funnel_init(void)
++static int __init replicator_init(void)
 +{
-+	return platform_driver_register(&funnel_driver);
++	return platform_driver_register(&replicator_driver);
 +}
-+module_init(funnel_init);
++module_init(replicator_init);
 +
-+static void __exit funnel_exit(void)
++static void __exit replicator_exit(void)
 +{
-+	platform_driver_unregister(&funnel_driver);
++	platform_driver_unregister(&replicator_driver);
 +}
-+module_exit(funnel_exit);
++module_exit(replicator_exit);
 +
 +MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("CoreSight Funnel driver");
++MODULE_DESCRIPTION("CoreSight Replicator driver");
 -- 
 Employee of Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
