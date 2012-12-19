@@ -1,36 +1,72 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 19 Dec 2012 10:18:37 -0800
-Subject: [PATCH v2 2/7] arm: zynq: timer: Remove unnecessary register write
-In-Reply-To: <ab760e55-61c2-46b0-b899-1935c213536e@CO1EHSMHS026.ehs.local>
-References: <ab760e55-61c2-46b0-b899-1935c213536e@CO1EHSMHS026.ehs.local>
-Message-ID: <9a66d197-21b2-478d-9439-6f6b121a0d9e@VA3EHSMHS024.ehs.local>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 19 Dec 2012 10:20:30 -0800
+Subject: [PATCH 4/4] clk: zynq: Use of_init_clk_data()
+In-Reply-To: <20121219172619.GB1005@beefymiracle.amer.corp.natinst.com>
+References: <1355778135-32458-1-git-send-email-sboyd@codeaurora.org>
+ <1355778135-32458-5-git-send-email-sboyd@codeaurora.org>
+ <20121219172619.GB1005@beefymiracle.amer.corp.natinst.com>
+Message-ID: <50D2056E.9000507@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acknowedging an interrupt requires to read the interrupt register
-only. The write was only required to work around a bug in
-the QEMU implementation of the TTC, which is fixed.
+On 12/19/12 09:26, Josh Cartwright wrote:
+> On Mon, Dec 17, 2012 at 01:02:15PM -0800, Stephen Boyd wrote:
+>> Reduce lines of code and simplify this driver by using the
+>> generic clock binding parsing function. This also fixes a bug
+>> where the 'flags' member of the init struct is not initialized.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Josh Cartwright <josh.cartwright@ni.com>
+>> Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>> ---
+>>  drivers/clk/clk-zynq.c | 28 +++++++++-------------------
+>>  1 file changed, 9 insertions(+), 19 deletions(-)
+> Stephen-
+>
+> Is there a particular tree I should be testing this against?  Booting this set
+> on top of linus/master gives me:
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
-Reviewed-by: Josh Cartwright <josh.cartwright@ni.com>
----
- arch/arm/mach-zynq/timer.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+I based the patches off of linux-next-20121217 although it seems like it
+applied fine for you on linus/master.
 
-diff --git a/arch/arm/mach-zynq/timer.c b/arch/arm/mach-zynq/timer.c
-index 570491d..f1d224b 100644
---- a/arch/arm/mach-zynq/timer.c
-+++ b/arch/arm/mach-zynq/timer.c
-@@ -121,8 +121,7 @@ static irqreturn_t xttcps_clock_event_interrupt(int irq, void *dev_id)
- 	struct xttcps_timer *timer = &xttce->xttc;
- 
- 	/* Acknowledge the interrupt and call event handler */
--	__raw_writel(__raw_readl(timer->base_addr + XTTCPS_ISR_OFFSET),
--			timer->base_addr + XTTCPS_ISR_OFFSET);
-+	__raw_readl(timer->base_addr + XTTCPS_ISR_OFFSET);
- 
- 	xttce->ce.event_handler(&xttce->ce);
- 
+>    ------------[ cut here ]------------
+>    WARNING: at drivers/clk/clk-zynq.c:159 zynq_periph_clk_setup+0x190/0x248()
+>    [<c000d814>] (unwind_backtrace+0x0/0xf8) from [<c0016808>] (warn_slowpath_common+0x50/0x60)
+>    [<c0016808>] (warn_slowpath_common+0x50/0x60) from [<c00168e0>] (warn_slowpath_null+0x1c/0x24)
+>    [<c00168e0>] (warn_slowpath_null+0x1c/0x24) from [<c0193520>] (zynq_periph_clk_setup+0x190/0x248)
+>    [<c0193520>] (zynq_periph_clk_setup+0x190/0x248) from [<c0192944>] (of_clk_init+0x30/0x58)
+>    [<c0192944>] (of_clk_init+0x30/0x58) from [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48)
+>    [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48) from [<c0185d54>] (time_init+0x28/0x30)
+>    [<c0185d54>] (time_init+0x28/0x30) from [<c0183650>] (start_kernel+0x1a8/0x2c0)
+>    [<c0183650>] (start_kernel+0x1a8/0x2c0) from [<00008074>] (0x8074)
+>    ---[ end trace 1b75b31a2719ed1c ]---
+>    ------------[ cut here ]------------
+>    WARNING: at drivers/clk/clk-zynq.c:296 zynq_cpu_clk_setup+0x1e0/0x26c()
+>    [<c000d814>] (unwind_backtrace+0x0/0xf8) from [<c0016808>] (warn_slowpath_common+0x50/0x60)
+>    [<c0016808>] (warn_slowpath_common+0x50/0x60) from [<c00168e0>] (warn_slowpath_null+0x1c/0x24)
+>    [<c00168e0>] (warn_slowpath_null+0x1c/0x24) from [<c0193304>] (zynq_cpu_clk_setup+0x1e0/0x26c)
+>    [<c0193304>] (zynq_cpu_clk_setup+0x1e0/0x26c) from [<c0192944>] (of_clk_init+0x30/0x58)
+>    [<c0192944>] (of_clk_init+0x30/0x58) from [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48)
+>    [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48) from [<c0185d54>] (time_init+0x28/0x30)
+>    [<c0185d54>] (time_init+0x28/0x30) from [<c0183650>] (start_kernel+0x1a8/0x2c0)
+>    [<c0183650>] (start_kernel+0x1a8/0x2c0) from [<00008074>] (0x8074)
+>    ---[ end trace 1b75b31a2719ed1d ]---
+>    ------------[ cut here ]------------
+>    WARNING: at drivers/clk/clk-zynq.c:347 zynq_cpu_clk_setup+0x210/0x26c()
+>    [<c000d814>] (unwind_backtrace+0x0/0xf8) from [<c0016808>] (warn_slowpath_common+0x50/0x60)
+>    [<c0016808>] (warn_slowpath_common+0x50/0x60) from [<c00168e0>] (warn_slowpath_null+0x1c/0x24)
+>    [<c00168e0>] (warn_slowpath_null+0x1c/0x24) from [<c0193334>] (zynq_cpu_clk_setup+0x210/0x26c)
+>    [<c0193334>] (zynq_cpu_clk_setup+0x210/0x26c) from [<c0192944>] (of_clk_init+0x30/0x58)
+>    [<c0192944>] (of_clk_init+0x30/0x58) from [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48)
+>    [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48) from [<c0185d54>] (time_init+0x28/0x30)
+>    [<c0185d54>] (time_init+0x28/0x30) from [<c0183650>] (start_kernel+0x1a8/0x2c0)
+>    [<c0183650>] (start_kernel+0x1a8/0x2c0) from [<00008074>] (0x8074)
+>    ---[ end trace 1b75b31a2719ed1e ]---
+
+Can you show the code at those line numbers? There are quite a few
+WARN_ONs in that code and it's possible the WARN_ON is the one
+introduced in this patch.
+
 -- 
-1.8.0.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
