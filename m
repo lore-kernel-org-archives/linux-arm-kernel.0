@@ -1,33 +1,32 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 19 Dec 2012 10:18:38 -0800
-Subject: [PATCH v2 3/7] arm: zynq: timer: Remove unused #defines
+Date: Wed, 19 Dec 2012 10:18:42 -0800
+Subject: [PATCH v2 7/7] arm: zynq: timer: Set clock_event cpumask
 In-Reply-To: <ab760e55-61c2-46b0-b899-1935c213536e@CO1EHSMHS026.ehs.local>
 References: <ab760e55-61c2-46b0-b899-1935c213536e@CO1EHSMHS026.ehs.local>
-Message-ID: <31c26534-3353-47aa-acd5-f320b04e76c6@VA3EHSMHS016.ehs.local>
+Message-ID: <2a6829e8-3578-4fcf-b6d2-406576187abb@VA3EHSMHS004.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The timers are common to both A9 cores, so let's set the clock
+event struct's cpumask accordingly, to all possible CPUs.
+
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-Acked-by: Michal Simek <michal.simek@xilinx.com>
-Acked-by: John Linn <john.linn@xilinx.com>
 Reviewed-by: Josh Cartwright <josh.cartwright@ni.com>
 ---
- arch/arm/mach-zynq/timer.c | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/mach-zynq/timer.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/mach-zynq/timer.c b/arch/arm/mach-zynq/timer.c
-index f1d224b..80bf474 100644
+index 7b2e047..f9fbc9c 100644
 --- a/arch/arm/mach-zynq/timer.c
 +++ b/arch/arm/mach-zynq/timer.c
-@@ -39,9 +39,6 @@
- #define XTTCPS_CNT_CNTRL_OFFSET	0x0C /* Counter Control Reg, RW */
- #define XTTCPS_COUNT_VAL_OFFSET	0x18 /* Counter Value Reg, RO */
- #define XTTCPS_INTR_VAL_OFFSET		0x24 /* Interval Count Reg, RW */
--#define XTTCPS_MATCH_1_OFFSET		0x30 /* Match 1 Value Reg, RW */
--#define XTTCPS_MATCH_2_OFFSET		0x3C /* Match 2 Value Reg, RW */
--#define XTTCPS_MATCH_3_OFFSET		0x48 /* Match 3 Value Reg, RW */
- #define XTTCPS_ISR_OFFSET		0x54 /* Interrupt Status Reg, RO */
- #define XTTCPS_IER_OFFSET		0x60 /* Interrupt Enable Reg, RW */
+@@ -267,6 +267,7 @@ static void __init zynq_ttc_setup_clockevent(struct device_node *np,
+ 	ttcce->ce.set_mode = xttcps_set_mode;
+ 	ttcce->ce.rating = 200;
+ 	ttcce->ce.irq = irq;
++	ttcce->ce.cpumask = cpu_possible_mask;
  
+ 	__raw_writel(0x23, ttcce->xttc.base_addr + XTTCPS_CNT_CNTRL_OFFSET);
+ 	__raw_writel(CLK_CNTRL_PRESCALE | CLK_CNTRL_PRESCALE_EN,
 -- 
 1.8.0.2
