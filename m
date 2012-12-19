@@ -1,80 +1,69 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Wed, 19 Dec 2012 13:53:08 +0100
-Subject: [PATCH 1/1] ARM: dts: omap3-igep: remove VSIM regulator
-In-Reply-To: <50D1B4C1.4060502@ti.com>
-References: <1355532740-5956-1-git-send-email-javier.martinez@collabora.co.uk>
- <CAAwP0s2oJCcvCgQ6UrcnLJpt7K7AdHhVWGOthhgc4v9AgmaHEQ@mail.gmail.com>
- <50D1B4C1.4060502@ti.com>
-Message-ID: <CAAwP0s1Jc6ixQPKLnm5FTWkysK3i0-u3kE-=Xpz=0WF5Y4N5cg@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 19 Dec 2012 13:11:51 +0000
+Subject: [PATCH 1/2] gpiolib: add gpio_export_with_name
+In-Reply-To: <20121218060415.GM23971@game.jcrosoft.org>
+References: <20121121101259.GQ4398@game.jcrosoft.org>
+ <1353492849-29397-1-git-send-email-plagnioj@jcrosoft.com>
+ <20121126135911.2F1D33E187C@localhost>
+ <20121128201907.GF4398@game.jcrosoft.org>
+ <20121218060415.GM23971@game.jcrosoft.org>
+Message-ID: <20121219131151.789043E0AD7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 1:36 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-> Hi Javier,
->
-> On 12/19/2012 10:31 AM, Javier Martinez Canillas wrote:
->> On Sat, Dec 15, 2012 at 1:52 AM, Javier Martinez Canillas
->> <javier.martinez@collabora.co.uk> wrote:
->>> commit 5a8095e9 ARM: dts: Add omap3-beagle.dts
->>>
->>> moved the VSIM regulator definition to the twl4030.dtsi to avoid
->>> duplication. A definition for the VSIM regulator was also present
->>> on omap3-igep.dtsi which leads to the following build error:
->>>
->>> DTC     arch/arm/boot/dts/omap3-igep0020.dtb
->>> DTC     arch/arm/boot/dts/omap3-igep0030.dtb
->>> ERROR (duplicate_label): Duplicate label 'vsim' on /ocp/i2c at 48070000/twl at 48/regulator-vsim and /ocp/i2c at 48070000/twl at 48/regulator at 10
->>> ERROR: Input tree has errors, aborting (use -f to force output)
->>> ERROR (duplicate_label): Duplicate label 'vsim' on /ocp/i2c at 48070000/twl at 48/regulator-vsim and /ocp/i2c at 48070000/twl at 48/regulator at 10
->>> ERROR: Input tree has errors, aborting (use -f to force output)
->>> make[1]: *** [arch/arm/boot/dts/omap3-igep0020.dtb] Error 2
->>> make[1]: *** Waiting for unfinished jobs....
->>> make[1]: *** [arch/arm/boot/dts/omap3-igep0030.dtb] Error 2
->>> make: *** [dtbs] Error 2
->>>
->>> Since IGEP devices uses the same PMIC as Beagle boards, the VSIM
->>> definition from twl4030.dtsi can be used.
->>>
->>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>> ---
->>>  arch/arm/boot/dts/omap3-igep.dtsi |    6 ------
->>>  1 files changed, 0 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
->>> index 125fe00..de708ca 100644
->>> --- a/arch/arm/boot/dts/omap3-igep.dtsi
->>> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
->>> @@ -43,12 +43,6 @@
->>>                 interrupts = <7>; /* SYS_NIRQ cascaded to intc */
->>>                 interrupt-parent = <&intc>;
->>>
->>> -               vsim: regulator at 10 {
->>> -                       compatible = "ti,twl4030-vsim";
->>> -                       regulator-min-microvolt = <1800000>;
->>> -                       regulator-max-microvolt = <3000000>;
->>> -               };
->>> -
->>>                 twl_audio: audio {
->>>                         compatible = "ti,twl4030-audio";
->>>                         codec {
->>
->> Hi Benoit,
->>
->> It is ok for you that I send delta patches for the IGEP DT initial
->> support [1] such as this patch and the MMC device node mux pins setup
->> [2] or should I merge these changes and resend a new patch-set?
->
-> It is always better to re-send a clean patch set instead of fixing a
-> previously broken one. It will be bisect friendly.
->
-> Regards,
-> Benoit
->
+On Tue, 18 Dec 2012 07:04:15 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> On 21:19 Wed 28 Nov     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 13:59 Mon 26 Nov     , Grant Likely wrote:
+> > > On Wed, 21 Nov 2012 11:14:08 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> > > > allow to specify a name to an exported gpio
+> > > > 
+> > > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > 
+> > > The gpio sysfs ABI is already horrible, racy, and unsafe. Really, we
+> > > need a proper chrdev interface for controlling gpios. Sysfs is fine for
+> > > poking around and experimenting, but we cannot provide any fine grained
+> > > access control, locking or faster IO with the one-file-per-gpio sysfs
+> > > model.
+> > I do agree on this and mention it on the ML multiple times but this an ABI
+> > and we can not change it anymore we need to support it
+> > > So, no, I don't think this is a good idea to extend gpiolib in
+> > > this way.
+> > > 
+> > > However, I would be okay with making gpiochips first-class kobjects or
+> > > struct devices that appear as a child of the gpio controller device so
+> > > that userspace could interrogate the device tree node associated with
+> > > the device.
+> > the problem here is that I do not want the user space to become smart
+> > 
+> > I want the user space to known which gpio use for a specific feature
+> > as example you just want to read lack restistor to detect a hw features
+> > 
+> > you known the encoding it does not change cross hw but the pin to read do
+> > 
+> > So the idea is just to tell the user space use this pin to get your
+> > information
+> > 
+> > how to do you want to solve this?
+> > 
+> > This apply to other case:
+> >  - chip poweron/off
+> >  - reset
+> >  etc... all control by userspace
+> 
+> ping
 
-ok, it wasn't broken when I sent it but the recent change on
-twl4030.dtsi broke it...
+I've already stated in other thread that I want to see a significantly
+better GPIO interface created. Something based on a char dev and can
+handle 'bursts' of gpio manipulations/reads. I'm not going to accept
+extensions to the sysfs interface.
 
-I'll send a v4 of the patch-set with this fix + the MMC mux pins setup
+Within that context I would consider named subsets of the same interface
+that pre-packages a set of related gpio pins.
 
-Thanks a lot and best regards,
-Javier
+That said, I'm not convinced that direct gpio access is the abstraction
+that you want. If it is an interface for, say, reading feature bits,
+then it probably does want to be an actual driver that reads the
+gpios/registers/adc/etc and returns the parsed status in a file. That's
+the only way to reliably get the abstraction from your example above.
+
+g.
