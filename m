@@ -1,38 +1,34 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Wed, 19 Dec 2012 12:06:28 +0200
-Subject: [PATCH] ARM: OMAP4: PRM: fix RSTTIME and RSTST offsets
-In-Reply-To: <1355911588-21977-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1355911588-21977-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1355911588-21977-3-git-send-email-ivan.khoronzhuk@ti.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Wed, 19 Dec 2012 10:16:15 +0000
+Subject: [PATCH] ARM: OMAP2+: Fix compillation error in mach-omap2/timer.c
+In-Reply-To: <1355910609-31336-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1355910609-31336-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC9A56D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+Hi Peter, Tony
 
-RSTTIME is offset 0x8 and RSTST is offset 0x04 for OMAP4430 and
-OMAP4460.
+On Wed, Dec 19, 2012 at 15:20:09, Ujfalusi, Peter wrote:
+> prom_add_property() has been renamed to of_add_property()
+> This patch fixes the following comilation error:
+> 
+> arch/arm/mach-omap2/timer.c: In function ?omap_get_timer_dt?:
+> arch/arm/mach-omap2/timer.c:178:3: error: implicit declaration of function ?prom_add_property? [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+> make[1]: *** [arch/arm/mach-omap2/timer.o] Error 1
+> make[1]: *** Waiting for unfinished jobs....
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+> Hi Tony,
+> 
+> today's mainline does not compile due to this API rename in of core.
+> Not sure if we alreasy have fix for this pending.
+> 
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-[ivan.khoronzhuk at ti.com: ported from k3.4]
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- arch/arm/mach-omap2/prm44xx.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+There following patches for needed to get omap2plus_defconfig build working
 
-diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
-index 22b0979..8ee1fbd 100644
---- a/arch/arm/mach-omap2/prm44xx.h
-+++ b/arch/arm/mach-omap2/prm44xx.h
-@@ -62,8 +62,8 @@
- 
- /* OMAP4 specific register offsets */
- #define OMAP4_RM_RSTCTRL				0x0000
--#define OMAP4_RM_RSTTIME				0x0004
--#define OMAP4_RM_RSTST					0x0008
-+#define OMAP4_RM_RSTST					0x0004
-+#define OMAP4_RM_RSTTIME				0x0008
- #define OMAP4_PM_PWSTCTRL				0x0000
- #define OMAP4_PM_PWSTST					0x0004
- 
--- 
-1.7.9.5
+https://patchwork.kernel.org/patch/1810481/ - address the build breakage due to header file cleanup
+https://patchwork.kernel.org/patch/1810441/ - address the prom_add_property() issue
+http://marc.info/?l=linux-arm-kernel&m=135589966017628&w=2 - this crept in during a merge commit.
