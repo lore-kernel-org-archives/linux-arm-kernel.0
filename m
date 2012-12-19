@@ -1,41 +1,40 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Wed, 19 Dec 2012 13:04:12 -0600
-Subject: [PATCH v2 0/7] Updates for Zynq's timer driver
-In-Reply-To: <ab760e55-61c2-46b0-b899-1935c213536e@CO1EHSMHS026.ehs.local>
-References: <ab760e55-61c2-46b0-b899-1935c213536e@CO1EHSMHS026.ehs.local>
-Message-ID: <20121219190412.GD1005@beefymiracle.amer.corp.natinst.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Dec 2012 19:08:24 +0000
+Subject: Inconsistency in clk framework
+In-Reply-To: <1355943649.2451.1.camel@gitbox>
+References: <1355890233.25599.4.camel@gitbox>
+ <20121219092636.GW14363@n2100.arm.linux.org.uk>
+ <1355938492.27893.8.camel@gitbox> <1355943649.2451.1.camel@gitbox>
+Message-ID: <20121219190824.GX14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 10:16:25AM -0800, Soren Brinkmann wrote:
-> I started to put some effort on syncing the Xilinx Linux tree with mainline and
-> the timer driver is my first victim.
-> Most commits are fixing style issues or clean up. Functionality is touched only
-> in patches #2 and #7.
+On Thu, Dec 20, 2012 at 08:00:49AM +1300, Tony Prisk wrote:
+> On Thu, 2012-12-20 at 06:34 +1300, Tony Prisk wrote:
+> > On Wed, 2012-12-19 at 09:26 +0000, Russell King - ARM Linux wrote:
+> > > On Wed, Dec 19, 2012 at 05:10:33PM +1300, Tony Prisk wrote:
+> > > > Hi Mike,
+> > > > 
+> > > > In attempting to remove some IS_ERR_OR_NULL references, it was pointed
+> > > > out that clk_get() can return NULL if CONFIG_HAVE_CLK is not defined.
+> > > 
+> > > That is correct - but why is that a problem?  As far as users are
+> > > concerned, NULL is a valid clock.  If HAVE_CLK is undefined, do you
+> > > want all your drivers to suddenly stop working?
+> > 
+> > That will be where the misunderstanding has occurred - I didn't consider
+> > NULL to be a valid clock.
+> > 
+> > Given that NULL is a valid clock, I guess all tests against get_clk and
+> > of_get_clk results should be IS_ERR_OR_NULL. Correct?
+> > 
+> For the sake of clarity, I should rephrase:
 > 
-> Some patches are present in almost identically in the Xilinx Linux tree and I
-> took over 'Acked-by' lines from those commits.
-> 
-> To repost the patch with the arm-kernel list included I made this a v2 to avoid
-> confusion about which series is the current one, though the patches are the same
-> as the ones posted before on lkml only.
-> I added Josh's 'Reviewed-by' line though.
+> If the driver can't operate with a NULL clk, it should use a
+> IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
 
-I had a chance this morning to get this set up and running on one of our
-Zynq boards this morning in between testing Stephen's clk-zynq changes.
-Looks good.
-
-Whoever is going to pick this up (probably Michal), feel free to add my:
-
-Tested-by: Josh Cartwright <josh.cartwright@ni.com>
-
-Thanks,
-
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121219/6642571f/attachment.sig>
+Why should a _consumer_ of a clock care?  It is _very_ important that
+people get this idea - to a consumer, the struct clk is just an opaque
+cookie.  The fact that it appears to be a pointer does _not_ mean that
+the driver can do any kind of dereferencing on that pointer - it should
+never do so.
