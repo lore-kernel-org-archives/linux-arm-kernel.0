@@ -1,108 +1,96 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Dec 2012 17:19:47 +0000
-Subject: [PATCH 4/4] net/smsc911x: Provide common clock functionality
-In-Reply-To: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
-References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Wed, 19 Dec 2012 11:26:19 -0600
+Subject: [PATCH 4/4] clk: zynq: Use of_init_clk_data()
+In-Reply-To: <1355778135-32458-5-git-send-email-sboyd@codeaurora.org>
+References: <1355778135-32458-1-git-send-email-sboyd@codeaurora.org>
+ <1355778135-32458-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20121219172619.GB1005@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms provide clocks which require enabling before the
-SMSC911x chip will power on. This patch uses the new common clk
-framework to do just that. If no clock is provided, it will just
-be ignored and the driver will continue to assume that no clock
-is required for the chip to run successfully.
+On Mon, Dec 17, 2012 at 01:02:15PM -0800, Stephen Boyd wrote:
+> Reduce lines of code and simplify this driver by using the
+> generic clock binding parsing function. This also fixes a bug
+> where the 'flags' member of the init struct is not initialized.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Josh Cartwright <josh.cartwright@ni.com>
+> Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  drivers/clk/clk-zynq.c | 28 +++++++++-------------------
+>  1 file changed, 9 insertions(+), 19 deletions(-)
 
-Cc: Steve Glendinning <steve.glendinning@shawell.net>
-Cc: netdev at vger.kernel.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/net/ethernet/smsc/smsc911x.c |   31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+Stephen-
 
-diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
-index 4616bf2..f6196cd 100644
---- a/drivers/net/ethernet/smsc/smsc911x.c
-+++ b/drivers/net/ethernet/smsc/smsc911x.c
-@@ -33,6 +33,7 @@
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
- #include <linux/crc32.h>
-+#include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/errno.h>
- #include <linux/etherdevice.h>
-@@ -144,6 +145,9 @@ struct smsc911x_data {
- 
- 	/* regulators */
- 	struct regulator_bulk_data supplies[SMSC911X_NUM_SUPPLIES];
-+
-+	/* clock */
-+	struct clk *clk;
- };
- 
- /* Easy access to information */
-@@ -369,7 +373,7 @@ out:
- }
- 
- /*
-- * enable resources, currently just regulators.
-+ * enable regulator and clock resources.
-  */
- static int smsc911x_enable_resources(struct platform_device *pdev)
- {
-@@ -382,6 +386,13 @@ static int smsc911x_enable_resources(struct platform_device *pdev)
- 	if (ret)
- 		netdev_err(ndev, "failed to enable regulators %d\n",
- 				ret);
-+
-+	if (pdata->clk) {
-+		ret = clk_prepare_enable(pdata->clk);
-+		if (ret < 0)
-+			netdev_err(ndev, "failed to enable clock %d\n", ret);
-+	}
-+
- 	return ret;
- }
- 
-@@ -396,6 +407,10 @@ static int smsc911x_disable_resources(struct platform_device *pdev)
- 
- 	ret = regulator_bulk_disable(ARRAY_SIZE(pdata->supplies),
- 			pdata->supplies);
-+
-+	if (pdata->clk)
-+		clk_disable_unprepare(pdata->clk);
-+
- 	return ret;
- }
- 
-@@ -421,6 +436,14 @@ static int smsc911x_request_resources(struct platform_device *pdev)
- 	if (ret)
- 		netdev_err(ndev, "couldn't get regulators %d\n",
- 				ret);
-+
-+	/* Request clock */
-+	pdata->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(pdata->clk)) {
-+		netdev_warn(ndev, "couldn't get clock %d\n", PTR_ERR(pdata->clk));
-+		pdata->clk = NULL;
-+	}
-+
- 	return ret;
- }
- 
-@@ -436,6 +459,12 @@ static void smsc911x_free_resources(struct platform_device *pdev)
- 	/* Free regulators */
- 	regulator_bulk_free(ARRAY_SIZE(pdata->supplies),
- 			pdata->supplies);
-+
-+	/* Free clock */
-+	if (pdata->clk) {
-+		clk_put(pdata->clk);
-+		pdata->clk = NULL;
-+	}
- }
- 
- /* waits for MAC not busy, with timeout.  Only called by smsc911x_mac_read
--- 
-1.7.9.5
+Is there a particular tree I should be testing this against?  Booting this set
+on top of linus/master gives me:
+
+   Linux version 3.7.0-10837-g3bb3ebf (joshc at beefymiracle) (gcc version 4.6.3 (Sourcery CodeBench Lite 2012.03-57) ) #3 Wed Dec 19 11:19:20 CST 2012
+   CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=18c53c7d
+   CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+   Machine: Xilinx Zynq Platform, model: NI Zynq Prototype Board
+   Memory policy: ECC disabled, Data cache writeback
+   Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 130048
+   Kernel command line: console=ttyPS1,115200
+   PID hash table entries: 2048 (order: 1, 8192 bytes)
+   Dentry cache hash table entries: 65536 (order: 6, 262144 bytes)
+   Inode-cache hash table entries: 32768 (order: 5, 131072 bytes)
+   __ex_table already sorted, skipping sort
+   Memory: 512MB = 512MB total
+   Memory: 514304k/514304k available, 9984k reserved, 0K highmem
+   Virtual kernel memory layout:
+       vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+       fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+       vmalloc : 0xe0800000 - 0xff000000   ( 488 MB)
+       lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
+         .text : 0xc0008000 - 0xc0182e58   (1516 kB)
+         .init : 0xc0183000 - 0xc01992cc   (  89 kB)
+         .data : 0xc019a000 - 0xc01ac040   (  73 kB)
+          .bss : 0xc01ac064 - 0xc01d30fc   ( 157 kB)
+   SLUB: Genslabs=11, HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+   NR_IRQS:16 nr_irqs:16 16
+   ------------[ cut here ]------------
+   WARNING: at drivers/clk/clk-zynq.c:159 zynq_periph_clk_setup+0x190/0x248()
+   [<c000d814>] (unwind_backtrace+0x0/0xf8) from [<c0016808>] (warn_slowpath_common+0x50/0x60)
+   [<c0016808>] (warn_slowpath_common+0x50/0x60) from [<c00168e0>] (warn_slowpath_null+0x1c/0x24)
+   [<c00168e0>] (warn_slowpath_null+0x1c/0x24) from [<c0193520>] (zynq_periph_clk_setup+0x190/0x248)
+   [<c0193520>] (zynq_periph_clk_setup+0x190/0x248) from [<c0192944>] (of_clk_init+0x30/0x58)
+   [<c0192944>] (of_clk_init+0x30/0x58) from [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48)
+   [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48) from [<c0185d54>] (time_init+0x28/0x30)
+   [<c0185d54>] (time_init+0x28/0x30) from [<c0183650>] (start_kernel+0x1a8/0x2c0)
+   [<c0183650>] (start_kernel+0x1a8/0x2c0) from [<00008074>] (0x8074)
+   ---[ end trace 1b75b31a2719ed1c ]---
+   ------------[ cut here ]------------
+   WARNING: at drivers/clk/clk-zynq.c:296 zynq_cpu_clk_setup+0x1e0/0x26c()
+   [<c000d814>] (unwind_backtrace+0x0/0xf8) from [<c0016808>] (warn_slowpath_common+0x50/0x60)
+   [<c0016808>] (warn_slowpath_common+0x50/0x60) from [<c00168e0>] (warn_slowpath_null+0x1c/0x24)
+   [<c00168e0>] (warn_slowpath_null+0x1c/0x24) from [<c0193304>] (zynq_cpu_clk_setup+0x1e0/0x26c)
+   [<c0193304>] (zynq_cpu_clk_setup+0x1e0/0x26c) from [<c0192944>] (of_clk_init+0x30/0x58)
+   [<c0192944>] (of_clk_init+0x30/0x58) from [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48)
+   [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48) from [<c0185d54>] (time_init+0x28/0x30)
+   [<c0185d54>] (time_init+0x28/0x30) from [<c0183650>] (start_kernel+0x1a8/0x2c0)
+   [<c0183650>] (start_kernel+0x1a8/0x2c0) from [<00008074>] (0x8074)
+   ---[ end trace 1b75b31a2719ed1d ]---
+   ------------[ cut here ]------------
+   WARNING: at drivers/clk/clk-zynq.c:347 zynq_cpu_clk_setup+0x210/0x26c()
+   [<c000d814>] (unwind_backtrace+0x0/0xf8) from [<c0016808>] (warn_slowpath_common+0x50/0x60)
+   [<c0016808>] (warn_slowpath_common+0x50/0x60) from [<c00168e0>] (warn_slowpath_null+0x1c/0x24)
+   [<c00168e0>] (warn_slowpath_null+0x1c/0x24) from [<c0193334>] (zynq_cpu_clk_setup+0x210/0x26c)
+   [<c0193334>] (zynq_cpu_clk_setup+0x210/0x26c) from [<c0192944>] (of_clk_init+0x30/0x58)
+   [<c0192944>] (of_clk_init+0x30/0x58) from [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48)
+   [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48) from [<c0185d54>] (time_init+0x28/0x30)
+   [<c0185d54>] (time_init+0x28/0x30) from [<c0183650>] (start_kernel+0x1a8/0x2c0)
+   [<c0183650>] (start_kernel+0x1a8/0x2c0) from [<00008074>] (0x8074)
+   ---[ end trace 1b75b31a2719ed1e ]---
+   sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 4294967286ms
+   Calibrating delay loop... 3991.96 BogoMIPS (lpj=19959808)
+   pid_max: default: 32768 minimum: 301
+   Mount-cache hash table entries: 512
+   CPU: Testing write buffer coherency: ok
+   Setting up static identity map for 0x139e00 - 0x139e58
+   devtmpfs: initialized
+   DMA: preallocated 256 KiB pool for atomic coherent allocations
+   L310 cache controller enabled
+   l2x0: 8 ways, CACHE_ID 0x000000c0, AUX_CTRL 0x02060000, Cache size: 524288 B
+
+Josh
