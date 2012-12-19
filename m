@@ -1,35 +1,146 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 19 Dec 2012 18:33:02 +0100
-Subject: [PATCH 4/8] arm: mxs: Enable JFFS2
+Date: Wed, 19 Dec 2012 18:32:59 +0100
+Subject: [PATCH 1/8] arm: mxs: Regenerate mxs_defconfig to match recent kernel
 In-Reply-To: <1355938386-14582-1-git-send-email-marex@denx.de>
 References: <1355938386-14582-1-git-send-email-marex@denx.de>
-Message-ID: <1355938386-14582-5-git-send-email-marex@denx.de>
+Message-ID: <1355938386-14582-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The JFFS2 is very commonly used on NOR flashes. Enable it.
+This patch is a result of:
+make mxs_defconfig
+make savedefconfig
+cp defconfig arch/arm/configs/mxs_defconfig
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/configs/mxs_defconfig |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/configs/mxs_defconfig |   42 +++++++++++-----------------------------
+ 1 file changed, 11 insertions(+), 31 deletions(-)
 
 diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 69efd38..41b5a74 100644
+index 048aaca..fdb92e1 100644
 --- a/arch/arm/configs/mxs_defconfig
 +++ b/arch/arm/configs/mxs_defconfig
-@@ -139,6 +139,10 @@ CONFIG_FSCACHE_STATS=y
- CONFIG_CACHEFILES=m
- CONFIG_TMPFS=y
+@@ -1,5 +1,7 @@
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_TASKSTATS=y
+ CONFIG_TASK_DELAY_ACCT=y
+ CONFIG_TASK_XACCT=y
+@@ -8,7 +10,6 @@ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+ # CONFIG_UTS_NS is not set
+ # CONFIG_IPC_NS is not set
+-# CONFIG_USER_NS is not set
+ # CONFIG_PID_NS is not set
+ # CONFIG_NET_NS is not set
+ CONFIG_PERF_EVENTS=y
+@@ -24,8 +25,6 @@ CONFIG_BLK_DEV_INTEGRITY=y
+ CONFIG_ARCH_MXS=y
+ CONFIG_MACH_MXS_DT=y
+ # CONFIG_ARM_THUMB is not set
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_AEABI=y
+ CONFIG_AUTO_ZRELADDR=y
+@@ -46,23 +45,21 @@ CONFIG_SYN_COOKIES=y
+ CONFIG_CAN=m
+ CONFIG_CAN_RAW=m
+ CONFIG_CAN_BCM=m
+-CONFIG_CAN_DEV=m
+ CONFIG_CAN_FLEXCAN=m
+ # CONFIG_WIRELESS is not set
+ CONFIG_DEVTMPFS=y
+ # CONFIG_FIRMWARE_IN_KERNEL is not set
+-# CONFIG_BLK_DEV is not set
+ CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_DATAFLASH=y
+-CONFIG_MTD_M25P80
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_GPMI_NAND=y
++# CONFIG_BLK_DEV is not set
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_ENC28J60=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+ # CONFIG_WLAN is not set
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_INPUT_EVDEV=m
+@@ -89,21 +86,6 @@ CONFIG_SPI_MXS=y
+ CONFIG_DEBUG_GPIO=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+-# CONFIG_MFD_SUPPORT is not set
+-CONFIG_DISPLAY_SUPPORT=m
+-# CONFIG_HID_SUPPORT is not set
+-CONFIG_SOUND=y
+-CONFIG_SND=y
+-CONFIG_SND_TIMER=y
+-CONFIG_SND_PCM=y
+-CONFIG_SND_JACK=y
+-CONFIG_SND_DRIVERS=y
+-CONFIG_SND_ARM=y
+-CONFIG_SND_SOC=y
+-CONFIG_SND_MXS_SOC=y
+-CONFIG_SND_SOC_MXS_SGTL5000=y
+-CONFIG_SND_SOC_I2C_AND_SPI=y
+-CONFIG_SND_SOC_SGTL5000=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_FB=y
+@@ -115,13 +97,16 @@ CONFIG_BACKLIGHT_PWM=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FONTS=y
+ CONFIG_LOGO=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_MXS_SOC=y
++CONFIG_SND_SOC_MXS_SGTL5000=y
+ CONFIG_USB=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_MXS_PHY=y
+-CONFIG_SCSI=y
+-CONFIG_BLK_DEV_SD=y
+ CONFIG_MMC=y
+ CONFIG_MMC_MXS=y
+ CONFIG_NEW_LEDS=y
+@@ -154,7 +139,6 @@ CONFIG_TMPFS=y
  CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_JFFS2_COMPRESSION_OPTIONS=y
-+CONFIG_JFFS2_LZO=y
-+CONFIG_JFFS2_RUBIN=y
- CONFIG_UBIFS_FS=y
- CONFIG_UBIFS_FS_ADVANCED_COMPR=y
+ # CONFIG_MISC_FILESYSTEMS is not set
  CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_NFS_V3_ACL=y
+ CONFIG_NFS_V4=y
+ CONFIG_ROOT_NFS=y
+@@ -164,16 +148,12 @@ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_UNUSED_SYMBOLS=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_LOCKUP_DETECTOR=y
+-CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_TIMER_STATS=y
+ CONFIG_PROVE_LOCKING=y
+-CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
+-CONFIG_SYSCTL_SYSCALL_CHECK=y
+ CONFIG_BLK_DEV_IO_TRACE=y
+ CONFIG_STRICT_DEVMEM=y
+ CONFIG_DEBUG_USER=y
+-CONFIG_CRYPTO=y
+ CONFIG_CRYPTO_CRC32C=m
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
+ # CONFIG_CRYPTO_HW is not set
 -- 
 1.7.10.4
