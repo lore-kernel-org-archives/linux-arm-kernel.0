@@ -1,31 +1,21 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 19 Dec 2012 20:27:12 +0530
-Subject: [PATCH] ARM: tegra30: tegra30 gpio is not compatible with tegra20 gpio
-Message-ID: <1355929032-26549-1-git-send-email-ldewangan@nvidia.com>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Wed, 19 Dec 2012 15:58:27 +0100
+Subject: [PATCH 3/3] kcmp: enable the kcmp syscall when C/R is enabled
+In-Reply-To: <1355923677-18249-4-git-send-email-alekskartashov@parallels.com>
+References: <1355923677-18249-1-git-send-email-alekskartashov@parallels.com>
+ <1355923677-18249-4-git-send-email-alekskartashov@parallels.com>
+Message-ID: <20689.54803.684081.31731@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tegra30 gpio controller is not compatible with the tegra20 due to
-their bank stride i.e. Tegra20 bank stride is 0x80 where Tegra30
-bank stride is 0x100.
+Alexander Kartashov writes:
+ > --- a/arch/arm/kernel/calls.S
+ > +++ b/arch/arm/kernel/calls.S
+ > @@ -387,7 +387,7 @@
+ >  /* 375 */	CALL(sys_setns)
+ >  		CALL(sys_process_vm_readv)
+ >  		CALL(sys_process_vm_writev)
+ > -		CALL(sys_ni_syscall)	/* reserved for sys_kcmp */
+ > +		CALL(sys_kcmp)	/* reserved for sys_kcmp */
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
- arch/arm/boot/dts/tegra30.dtsi |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 80a0edf..dfa9f57 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -176,7 +176,7 @@
- 	};
- 
- 	gpio: gpio {
--		compatible = "nvidia,tegra30-gpio", "nvidia,tegra20-gpio";
-+		compatible = "nvidia,tegra30-gpio"
- 		reg = <0x6000d000 0x1000>;
- 		interrupts = <0 32 0x04
- 			      0 33 0x04
--- 
-1.7.1.1
+The /* reserved for sys_kcmp */ comment is now obsolete and should be removed.
