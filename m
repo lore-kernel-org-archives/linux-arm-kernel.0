@@ -1,35 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 19 Dec 2012 02:13:50 +0000 (UTC)
-Subject: [PATCH v2] ARM: OMAP2: hwmod: Fix "register offset NULL check" bug
-In-Reply-To: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <alpine.DEB.2.00.1212190210021.2446@utopia.booyaka.com>
+From: fengguang.wu@intel.com (Fengguang Wu)
+Date: Wed, 19 Dec 2012 10:22:47 +0800
+Subject: arch/arm/mach-omap2/i2c.c:130:2: error: implicit declaration of
+ function 'omap_pm_set_max_mpu_wakeup_lat'
+In-Reply-To: <20121219021102.GA9472@localhost>
+References: <20121219021102.GA9472@localhost>
+Message-ID: <20121219022247.GA11170@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Dec 2012, Hebbar Gururaja wrote:
+[add more CC]
 
-> From: "Hebbar, Gururaja" <gururaja.hebbar@ti.com>
+On Wed, Dec 19, 2012 at 10:11:02AM +0800, Fengguang Wu wrote:
+> Hi Linus, Wolfram,
 > 
-> omap4_cminst_wait_module_ready() checks if register offset is NULL.
+> FYI, kernel build failed on
 > 
-> int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
-> 				   u16 clkctrl_offs)
-> {
-> 	int i = 0;
+> tree:   git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux master
+> head:   752451f01c4567b506bf4343082682dbb8fb30dd
+> commit: 752451f01c4567b506bf4343082682dbb8fb30dd Merge branch 'i2c-embedded/for-next' of git://git.pengutronix.de/git/wsa/linux
+> date:   56 minutes ago
+> config: make ARCH=arm omap2plus_defconfig
 > 
-> 	if (!clkctrl_offs)
-> 		return 0;
+> All error/warnings:
 > 
-> In case of AM33xx, CLKCTRL register offset for different clock domains
-> are not uniformly placed. An example of this would be the RTC clock
-> domain with CLKCTRL offset at 0x00.
-> In such cases the module ready check is skipped which leads to a data
-> abort during boot-up when RTC registers is accessed.
-
-We've got a few hwmods on OMAP44xx that don't have clkctrl_offs registers 
-listed in the hwmod data, and which are not marked with HWMOD_NO_IDLEST.  
-What's going to happen in those cases?
-
-
-- Paul
+> arch/arm/mach-omap2/i2c.c: In function 'omap_pm_set_max_mpu_wakeup_lat_compat':
+> arch/arm/mach-omap2/i2c.c:130:2: error: implicit declaration of function 'omap_pm_set_max_mpu_wakeup_lat' [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+> 
+> The root cause is, i2c.c (which is always compiled in arch/arm/mach-omap2/Makefile)
+> uses omap_pm_set_max_mpu_wakeup_lat() which is defined in omap-pm-noop.c (which
+> is compiled only on CONFIG_OMAP_PM_NOOP).
+> 
+> 
+> vim +/omap_pm_set_max_mpu_wakeup_lat +130 arch/arm/mach-omap2/i2c.c
+> 
+> 752451f0 Linus Torvalds 2012-12-18  124   * XXX This function is a temporary compatibility wrapper - only
+> 752451f0 Linus Torvalds 2012-12-18  125   * needed until the I2C driver can be converted to call
+> 752451f0 Linus Torvalds 2012-12-18  126   * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
+> 752451f0 Linus Torvalds 2012-12-18  127   */
+> 752451f0 Linus Torvalds 2012-12-18  128  static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
+> 752451f0 Linus Torvalds 2012-12-18  129  {
+> 752451f0 Linus Torvalds 2012-12-18 @130  	omap_pm_set_max_mpu_wakeup_lat(dev, t);
+> 752451f0 Linus Torvalds 2012-12-18  131  }
+> 752451f0 Linus Torvalds 2012-12-18  132  
+> 3a8761c0 Tony Lindgren  2012-10-08  133  static const char name[] = "omap_i2c";
+> 
+> ---
+> 0-DAY kernel build testing backend         Open Source Technology Center
+> Fengguang Wu, Yuanhan Liu                              Intel Corporation
