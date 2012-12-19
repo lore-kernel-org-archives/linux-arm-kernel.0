@@ -1,42 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Dec 2012 09:18:28 -0800
-Subject: [GIT PULL] two trivial omap build error fixes for v3.8 merge window
-Message-ID: <20121219171828.GP4989@atomide.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Dec 2012 17:19:45 +0000
+Subject: [PATCH 2/4] clk: ux500: Ensure the FMSC clock is obtainable
+In-Reply-To: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
+References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1355937587-31730-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+The FMSC clock is traditionally used for NAND flash devices when
+used on the ux500 series platforms. This patch makes it searchable
+during a clock-name search.
 
-Here's few more trivial build fixes caused by the merge
-conflicts.
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/clk/ux500/u8500_clk.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Tony
-
-
-The following changes since commit 5031a2a7c12b837a0913c4139ebeb6bbff5e1aa5:
-
-  Merge tag 'for-v3.8-part2' of git://git.infradead.org/battery-2.6 (2012-12-19 08:14:08 -0800)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/fixes-for-merge-window-part2-signed
-
-for you to fetch changes up to a702e279da5154d09a894bf9eac594845da3f390:
-
-  ARM: OMAP: Fix build breakage due to missing include in i2c.c (2012-12-19 08:37:30 -0800)
-
-----------------------------------------------------------------
-Looks like few more trivial merge errors caused by the
-multiplatform related header clean-up popped up.
-
-----------------------------------------------------------------
-Peter Ujfalusi (1):
-      ARM: OMAP2+: Fix compillation error in mach-omap2/timer.c
-
-Vaibhav Bedia (1):
-      ARM: OMAP: Fix build breakage due to missing include in i2c.c
-
- arch/arm/mach-omap2/i2c.c   | 1 +
- arch/arm/mach-omap2/timer.c | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+index 6b889a0..a601802 100644
+--- a/drivers/clk/ux500/u8500_clk.c
++++ b/drivers/clk/ux500/u8500_clk.c
+@@ -324,7 +324,7 @@ void u8500_clk_init(void)
+ 
+ 	clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", U8500_CLKRST3_BASE,
+ 				BIT(0), 0);
+-	clk_register_clkdev(clk, NULL, "fsmc");
++	clk_register_clkdev(clk, "fsmc", NULL);
+ 
+ 	clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", U8500_CLKRST3_BASE,
+ 				BIT(1), 0);
+-- 
+1.7.9.5
