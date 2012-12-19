@@ -1,48 +1,94 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Dec 2012 17:54:43 +0000
-Subject: [PATCH v2 4/7] arm64: Populate the platform devices
+Date: Wed, 19 Dec 2012 17:54:41 +0000
+Subject: [PATCH v2 2/7] vexpress: Match the "arm,
+ sp810" DT entry for clock initialisation
 In-Reply-To: <1355939686-23728-1-git-send-email-catalin.marinas@arm.com>
 References: <1355939686-23728-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1355939686-23728-5-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1355939686-23728-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add a device_initcall() to populate the platform devices
-(of_default_bus_match_table). This allows SoC implementations that do
-not require earlier initcalls to avoid any platform-specific code under
-arch/arm64.
+Currently the clk-vexpress.c implementation relies on the vexpress code
+to call the vexpress_clk_of_init() function which performs the SP810
+initialisation. This patch adds "arm,sp810" to the clock DT match array
+allowing of_clk_init() to call the vexpress_sp810_of_setup() function.
+In case of CONFIG_ARM64, make vexpress_clk_of_init() an arch_initcall().
 
-GIC and generic timer initialisation is done via FDT and CPU notifiers
-independently of the SoC code.
+Note that SP810 requires the fixed clocks to be already registered.
+Since the clock subsystem does not handle DT dependencies, the
+corresponding DT entries must be in the correct order.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm64/kernel/setup.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 7665a9b..894c1e5 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -39,6 +39,7 @@
- #include <linux/proc_fs.h>
- #include <linux/memblock.h>
- #include <linux/of_fdt.h>
-+#include <linux/of_platform.h>
- 
- #include <asm/cputype.h>
- #include <asm/elf.h>
-@@ -289,6 +290,13 @@ static int __init topology_init(void)
+The "Note" above worries me a bit. There is another way like calling
+of_clk_init() twice, with two match arrays - the original one and
+another just for sp810. Suggestions welcome.
+
+Not tested on AArch32 code yet.
+
+ drivers/clk/versatile/clk-vexpress.c | 28 +++++++++++++++++-----------
+ include/linux/vexpress.h             |  2 +-
+ 2 files changed, 18 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
+index 4f83ff9..a3754e7 100644
+--- a/drivers/clk/versatile/clk-vexpress.c
++++ b/drivers/clk/versatile/clk-vexpress.c
+@@ -98,21 +98,11 @@ struct clk *vexpress_sp810_of_get(struct of_phandle_args *clkspec, void *data)
+ 	return vexpress_sp810_timerclken[clkspec->args[0]];
  }
- subsys_initcall(topology_init);
  
-+static int __init arm64_device_probe(void)
+-static const __initconst struct of_device_id vexpress_fixed_clk_match[] = {
+-	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+-	{ .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
+-	{}
+-};
+-
+-void __init vexpress_clk_of_init(void)
++static void __init vexpress_sp810_of_setup(struct device_node *node)
+ {
+-	struct device_node *node;
+ 	struct clk *clk;
+ 	struct clk *refclk, *timclk;
+ 
+-	of_clk_init(vexpress_fixed_clk_match);
+-
+-	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
+ 	vexpress_sp810_init(of_iomap(node, 0));
+ 	of_clk_add_provider(node, vexpress_sp810_of_get, NULL);
+ 
+@@ -138,4 +128,20 @@ void __init vexpress_clk_of_init(void)
+ 				"v2m-timer1", "sp804"));
+ }
+ 
++static const __initconst struct of_device_id vexpress_clk_match[] = {
++	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
++	{ .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
++	{ .compatible = "arm,sp810", .data = vexpress_sp810_of_setup, },
++	{}
++};
++
++int __init vexpress_clk_of_init(void)
 +{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	of_clk_init(vexpress_clk_match);
 +	return 0;
 +}
-+device_initcall(arm64_device_probe);
++#ifdef CONFIG_ARM64
++arch_initcall(vexpress_clk_of_init);
++#endif
 +
- static const char *hwcap_str[] = {
- 	"fp",
- 	"asimd",
+ #endif
+diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
+index c52215f..b55ae6a 100644
+--- a/include/linux/vexpress.h
++++ b/include/linux/vexpress.h
+@@ -116,6 +116,6 @@ struct clk *vexpress_osc_setup(struct device *dev);
+ void vexpress_osc_of_setup(struct device_node *node);
+ 
+ void vexpress_clk_init(void __iomem *sp810_base);
+-void vexpress_clk_of_init(void);
++int vexpress_clk_of_init(void);
+ 
+ #endif
