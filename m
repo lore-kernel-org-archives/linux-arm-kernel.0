@@ -1,49 +1,27 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 19 Dec 2012 14:56:27 +0100
-Subject: [PATCH 2/2] arm: cache-l2x0: aurora: Use writel_relaxed instead of
- writel
-In-Reply-To: <1355925387-9564-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1355925387-9564-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1355925387-9564-3-git-send-email-gregory.clement@free-electrons.com>
+Date: Wed, 19 Dec 2012 14:56:25 +0100
+Subject: [PATCH 0/2] arm: cache-l2x0: aurora: Various bug fixes
+Message-ID: <1355925387-9564-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The use of writel instead of writel_relaxed lead to deadlock in some
-situation (SMP on Armada 370 for instance). The use of writel_relaxed
-as it was done in the rest of this driver fixes this bug.
+Hi,
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mm/cache-l2x0.c |    9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+Now that we have more devices and more boards supported, bugs shows
+up. Here are a couple of fixes that have been tested on Aramda XP
+based boards such as DB-78460-BP and DB-MV784MP-GP, and on Armada 370
+based boards such as DB-88F6710-BP-DDR3 and Mirabox. They are 3.8
+materials.
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 7ffe943..96a1ae4 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -459,8 +459,8 @@ static void aurora_pa_range(unsigned long start, unsigned long end,
- 	unsigned long flags;
- 
- 	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	writel(start, l2x0_base + AURORA_RANGE_BASE_ADDR_REG);
--	writel(end, l2x0_base + offset);
-+	writel_relaxed(start, l2x0_base + AURORA_RANGE_BASE_ADDR_REG);
-+	writel_relaxed(end, l2x0_base + offset);
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
- 
- 	cache_sync();
-@@ -674,8 +674,9 @@ static void pl310_resume(void)
- static void aurora_resume(void)
- {
- 	if (!(readl(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
--		writel(l2x0_saved_regs.aux_ctrl, l2x0_base + L2X0_AUX_CTRL);
--		writel(l2x0_saved_regs.ctrl, l2x0_base + L2X0_CTRL);
-+		writel_relaxed(l2x0_saved_regs.aux_ctrl,
-+				l2x0_base + L2X0_AUX_CTRL);
-+		writel_relaxed(l2x0_saved_regs.ctrl, l2x0_base + L2X0_CTRL);
- 	}
- }
- 
+Thanks,
+
+Gregory CLEMENT (2):
+  arm: cache-l2x0: aurora: Invalidate during clean operation with WT
+    enable
+  arm: cache-l2x0: aurora: Use writel_relaxed instead of writel
+
+ arch/arm/mm/cache-l2x0.c |   31 +++++++++++++++++++------------
+ 1 file changed, 19 insertions(+), 12 deletions(-)
+
 -- 
 1.7.9.5
