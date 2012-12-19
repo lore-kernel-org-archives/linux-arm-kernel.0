@@ -1,48 +1,44 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 19 Dec 2012 06:53:10 +0000
-Subject: arch/arm/mach-omap2/i2c.c:130:2: error: implicit declaration of
- function 'omap_pm_set_max_mpu_wakeup_lat'
-In-Reply-To: <20121219022247.GA11170@localhost>
-References: <20121219021102.GA9472@localhost>
- <20121219022247.GA11170@localhost>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC9A322@DBDE01.ent.ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Dec 2012 09:46:00 +0100
+Subject: [GIT PULL] Fixes for sunxi for 3.8 merge window
+Message-ID: <1355906760-23041-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 07:52:47, Fengguang Wu wrote:
-> [add more CC]
-> 
-> On Wed, Dec 19, 2012 at 10:11:02AM +0800, Fengguang Wu wrote:
-> > Hi Linus, Wolfram,
-> > 
-> > FYI, kernel build failed on
-> > 
-> > tree:   git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux master
-> > head:   752451f01c4567b506bf4343082682dbb8fb30dd
-> > commit: 752451f01c4567b506bf4343082682dbb8fb30dd Merge branch 'i2c-embedded/for-next' of git://git.pengutronix.de/git/wsa/linux
-> > date:   56 minutes ago
-> > config: make ARCH=arm omap2plus_defconfig
-> > 
-> > All error/warnings:
-> > 
-> > arch/arm/mach-omap2/i2c.c: In function 'omap_pm_set_max_mpu_wakeup_lat_compat':
-> > arch/arm/mach-omap2/i2c.c:130:2: error: implicit declaration of function 'omap_pm_set_max_mpu_wakeup_lat' [-Werror=implicit-function-declaration]
-> > cc1: some warnings being treated as errors
-> > 
-> > The root cause is, i2c.c (which is always compiled in arch/arm/mach-omap2/Makefile)
-> > uses omap_pm_set_max_mpu_wakeup_lat() which is defined in omap-pm-noop.c (which
-> > is compiled only on CONFIG_OMAP_PM_NOOP).
+Arnd, Olof,
 
-CONFIG_OMAP_PM_NOOP is defined. The build breakage is due to a missing header inclusion.
-I just sent a patch for this [1]
+Please consider pulling these two (late) patches for the sunxi support.
 
-There are still a couple of patches missing before omap2plus_defconfig compiles
-https://patchwork.kernel.org/patch/1810481/
-https://patchwork.kernel.org/patch/1810441/
+The first one add the support for the sunxi architecture in the multiplatform
+kernel, allowing to easily build a kernel that boots on the sun4i/sun5i
+supported boards.
 
-I guess they are on the way from some other tree.
+The second one fixes some compatible strings that were left behind in the
+previous compatible renaming patch, preventing the kernel from booting.
 
-Regards,
-Vaibhav
+Thanks,
+Maxime 
 
-[1] http://marc.info/?l=linux-arm-kernel&m=135589966017628&w=2
+The following changes since commit 7445d6b5a7a40c40cda3935ba3827896305cfc21:
+
+  ARM: sunxi: Change device tree naming scheme for sunxi (2012-12-18 15:11:16 +0100)
+
+are available in the git repository at:
+
+  git://github.com/mripard/linux.git tags/sunxi-fixes-for-3.8-rc1
+
+for you to fetch changes up to 91e4f61216c6e15f7ff99f2d18407a08cfe601b0:
+
+  sunxi: Change the machine compatible string. (2012-12-19 09:23:42 +0100)
+
+----------------------------------------------------------------
+Fixes for the sunxi core to be merged in 3.8-rc1
+
+----------------------------------------------------------------
+Maxime Ripard (2):
+      ARM: multi_v7_defconfig: Add ARCH_SUNXI
+      sunxi: Change the machine compatible string.
+
+ arch/arm/configs/multi_v7_defconfig |    1 +
+ arch/arm/mach-sunxi/sunxi.c         |    4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
