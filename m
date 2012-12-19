@@ -1,40 +1,47 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Wed, 19 Dec 2012 15:53:20 +0000
-Subject: [PATCH 4/4] FEC: Add time stamping code and a PTP hardware clock
-In-Reply-To: <20121218070420.GA2946@netboy.at.omicron.at>
-References: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
- <20121217091345.GA753@pengutronix.de>
- <CAHrpEqTVuSR_-Tpdzb98=VJbg7grSFvSQ9xA6mPsHpGb7RvNCg@mail.gmail.com>
- <20121217151445.GA17907@S2101-09.ap.freescale.net>
- <20121217200232.GS26326@pengutronix.de>
- <20121218070420.GA2946@netboy.at.omicron.at>
-Message-ID: <20121219155319.GP13292@decadent.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 19 Dec 2012 08:38:14 -0800
+Subject: [PATCH 1/1] ARM: OMAP: Fix build breakage due to missing
+ include in i2c.c
+In-Reply-To: <1355899610-11548-1-git-send-email-vaibhav.bedia@ti.com>
+References: <1355899610-11548-1-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <20121219163814.GM4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 08:04:20AM +0100, Richard Cochran wrote:
-> On Mon, Dec 17, 2012 at 09:02:32PM +0100, Sascha Hauer wrote:
-> > This leaves an option in the tree which can be used to break FEC on
-> > i.MX3/5.
-> > 
-> > 	depends on !SOC_IMX31 && !SOC_IMX35 && !SOC_IMX5
-> > 
-> > might be an option, but given that this patch seems to have bypassed any
-> > review I feel more like reverting it.
+* Vaibhav Bedia <vaibhav.bedia@ti.com> [121218 22:49]:
+> Merge commit 752451f (Merge branch 'i2c-embedded/for-next' of git://git.pengutronix.de/git/wsa/linux)
+> resulted in a build breakage for OMAP
 > 
-> Instead of reverting, I suggest finding a solution (Frank) to let the
-> code work when it can work and to prevent it when it cannot. This
-> could be kconfig, DT, or run time probing of silicon revisions, but I
-> don't have access to this hardware, and so I can't really say how to
-> fix it.
-[...]
+> ...
+> arch/arm/mach-omap2/i2c.c: In function 'omap_pm_set_max_mpu_wakeup_lat_compat':
+> arch/arm/mach-omap2/i2c.c:130:2: error: implicit declaration of function 'omap_pm_set_max_mpu_wakeup_lat'
+> make[1]: *** [arch/arm/mach-omap2/i2c.o] Error 1
+> ...
+> 
+> Fix this by including the appropriate header file with the function prototype
 
-Please implement run-time probing.  A different configuration for
-each SoC is just not sustainable for distributions.
+Thanks applying.
 
-Ben.
-
--- 
-Ben Hutchings
-We get into the habit of living before acquiring the habit of thinking.
-                                                              - Albert Camus
+Tony
+ 
+> Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> ---
+>  arch/arm/mach-omap2/i2c.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
+> index df6d6ac..b9074dd 100644
+> --- a/arch/arm/mach-omap2/i2c.c
+> +++ b/arch/arm/mach-omap2/i2c.c
+> @@ -22,6 +22,7 @@
+>  #include "soc.h"
+>  #include "omap_hwmod.h"
+>  #include "omap_device.h"
+> +#include "omap-pm.h"
+>  
+>  #include "prm.h"
+>  #include "common.h"
+> -- 
+> 1.7.0.4
+> 
