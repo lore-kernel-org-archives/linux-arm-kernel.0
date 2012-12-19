@@ -1,91 +1,132 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 19 Dec 2012 14:33:10 +0100
-Subject: [PATCH v4 3/3] ARM/dts: omap3: Add support for IGEP COM Module
-In-Reply-To: <1355923990-21240-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1355923990-21240-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1355923990-21240-4-git-send-email-javier.martinez@collabora.co.uk>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Wed, 19 Dec 2012 19:20:40 +0530
+Subject: [PATCH v3 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
+In-Reply-To: <20121215072312.EBCAA3E0C06@localhost>
+References: <1355416562-25539-1-git-send-email-gautam.vivek@samsung.com>
+ <1355416562-25539-2-git-send-email-gautam.vivek@samsung.com>
+ <20121215072312.EBCAA3E0C06@localhost>
+Message-ID: <CAFp+6iHoS4XJWHNrsyVsQS4bYZs1PUNEGsRr=EqAS7kpm2XGMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ISEE IGEP COM Module is an TI OMAP3 SoC computer on module.
+CC: Doug Anderson
 
-This patch adds an initial device tree support to boot an
-IGEP COM Module from the MMC/SD.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Tested-by: Enric Balletbo i Serra <eballetbo@gmail.com>
----
+On Sat, Dec 15, 2012 at 12:53 PM, Grant Likely
+<grant.likely@secretlab.ca> wrote:
+> On Thu, 13 Dec 2012 22:06:01 +0530, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+>> Adding EHCI device tree node for Exynos5250 along with
+>> the device base adress and gpio line for vbus.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> Acked-by: Jingoo Han <jg1.han@samsung.com>
+>> ---
+>>  .../devicetree/bindings/usb/exynos-usb.txt         |   25 ++++++++++++++++++++
+>>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 +++
+>>  arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++
+>>  arch/arm/mach-exynos/include/mach/map.h            |    1 +
+>>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +
+>>  5 files changed, 38 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/usb/exynos-usb.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+>> new file mode 100644
+>> index 0000000..e8bbb47
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+>> @@ -0,0 +1,25 @@
+>> +Samsung Exynos SoC USB controller
+>> +
+>> +The USB devices interface with USB controllers on Exynos SOCs.
+>> +The device node has following properties.
+>> +
+>> +EHCI
+>> +Required properties:
+>> + - compatible: should be "samsung,exynos4210-ehci" for USB 2.0
+>> +   EHCI controller in host mode.
+>> + - reg: physical base address of the controller and length of memory mapped
+>> +   region.
+>> + - interrupts: interrupt number to the cpu.
+>> +
+>> +Optional properties:
+>> + - samsung,vbus-gpio:  if present, specifies the GPIO that
+>> +   needs to be pulled up for the bus to be powered.
+>> +
+>> +Example:
+>> +
+>> +     usb at 12110000 {
+>> +             compatible = "samsung,exynos4210-ehci";
+>> +             reg = <0x12110000 0x100>;
+>> +             interrupts = <0 71 0>;
+>> +             samsung,vbus-gpio = <&gpx2 6 1 3 3>;
+>> +     };
+>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> index 711b55f..f990086 100644
+>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> @@ -218,4 +218,8 @@
+>>       i2s_2: i2s at 12D70000 {
+>>               status = "disabled";
+>>       };
+>> +
+>> +     usb at 12110000 {
+>> +             samsung,vbus-gpio = <&gpx2 6 1 3 3>;
+>> +     };
+>>  };
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>> index 581e57a..584bb9a 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -299,6 +299,12 @@
+>>               rx-dma-channel = <&pdma0 11>; /* preliminary */
+>>       };
+>>
+>> +     usb at 12110000 {
+>> +             compatible = "samsung,exynos4210-ehci";
+>> +             reg = <0x12110000 0x100>;
+>> +             interrupts = <0 71 0>;
+>> +     };
+>> +
+>>       amba {
+>>               #address-cells = <1>;
+>>               #size-cells = <1>;
+>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+>> index cbb2852..b2c662f 100644
+>> --- a/arch/arm/mach-exynos/include/mach/map.h
+>> +++ b/arch/arm/mach-exynos/include/mach/map.h
+>> @@ -201,6 +201,7 @@
+>>  #define EXYNOS4_PA_EHCI                      0x12580000
+>>  #define EXYNOS4_PA_OHCI                      0x12590000
+>>  #define EXYNOS4_PA_HSPHY             0x125B0000
+>> +#define EXYNOS5_PA_EHCI                      0x12110000
+>>  #define EXYNOS4_PA_MFC                       0x13400000
+>>
+>>  #define EXYNOS4_PA_UART                      0x13800000
+>> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> index 462e5ac..b3b9af1 100644
+>> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> @@ -110,6 +110,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+>>                               "samsung-i2s.1", NULL),
+>>       OF_DEV_AUXDATA("samsung,samsung-i2s", 0x12D70000,
+>>                               "samsung-i2s.2", NULL),
+>> +     OF_DEV_AUXDATA("samsung,exynos4210-ehci", EXYNOS5_PA_EHCI,
+>> +                             "s5p-ehci", NULL),
+>
+> I'm assuming the above change is temporary. What is left to be done to
+> drop the auxdata in theses two patches?
+>
+> Otherwise the patch looks fine.
+>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Changes since v1:
-    - Use default-state = "on" instead default-trigger = "default-on" for LED
-    - Update GPIO mapping according to latest IGEP COM Module rev.E instead D
 
- arch/arm/boot/dts/Makefile           |    1 +
- arch/arm/boot/dts/omap3-igep0030.dts |   44 ++++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-igep0030.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 24b28ba..8880c55 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -107,6 +107,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-evm.dtb \
- 	omap3-tobi.dtb \
- 	omap3-igep0020.dtb \
-+	omap3-igep0030.dtb \
- 	omap4-panda.dtb \
- 	omap4-panda-es.dtb \
- 	omap4-var-som.dtb \
-diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-new file mode 100644
-index 0000000..9dc48d2
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-igep0030.dts
-@@ -0,0 +1,44 @@
-+/*
-+ * Device Tree Source for IGEP COM Module
-+ *
-+ * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
-+ * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/include/ "omap3-igep.dtsi"
-+
-+/ {
-+	model = "IGEP COM Module";
-+	compatible = "isee,omap3-igep0030", "ti,omap3";
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		boot {
-+			 label = "omap3:green:boot";
-+			 gpios = <&twl_gpio 13 1>;
-+			 default-state = "on";
-+		};
-+
-+		user0 {
-+			 label = "omap3:red:user0";
-+			 gpios = <&twl_gpio 18 1>; /* LEDA */
-+			 default-state = "off";
-+		};
-+
-+		user1 {
-+			 label = "omap3:green:user1";
-+			 gpios = <&twl_gpio 19 1>; /* LEDB */
-+			 default-state = "off";
-+		};
-+
-+		user2 {
-+			 label = "omap3:red:user1";
-+			 gpios = <&gpio1 16 1>;
-+			 default-state = "off";
-+		};
-+	};
-+};
 -- 
-1.7.7.6
+Thanks & Regards
+Vivek
