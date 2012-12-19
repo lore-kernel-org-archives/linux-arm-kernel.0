@@ -1,40 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 19 Dec 2012 12:56:12 -0200
-Subject: 3.7 kernel hangs when doing scp
-In-Reply-To: <20121218024353.GA17118@kroah.com>
-References: <CAOMZO5Bc5stXXviuf3OL9vAHw+ER=GzzV1q=5Yr5q=AnfoGiGw@mail.gmail.com>
- <20121218024353.GA17118@kroah.com>
-Message-ID: <CAOMZO5DTB79e3W1_i2NLin7RWXVzraoysEGVLxv9_aoRS39D4Q@mail.gmail.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 19 Dec 2012 20:27:12 +0530
+Subject: [PATCH] ARM: tegra30: tegra30 gpio is not compatible with tegra20 gpio
+Message-ID: <1355929032-26549-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+tegra30 gpio controller is not compatible with the tegra20 due to
+their bank stride i.e. Tegra20 bank stride is 0x80 where Tegra30
+bank stride is 0x100.
 
-On Tue, Dec 18, 2012 at 12:43 AM, Greg KH <greg@kroah.com> wrote:
-> On Tue, Dec 18, 2012 at 12:01:35AM -0200, Fabio Estevam wrote:
->> Hi,
->>
->> Booting a 3.7 kernel on a mx6qsabrelite board via NFS and using an
->> asix USB/Ethernet adapter and then I try to transfer a 10MB file from
->> the target to the host:
->
-> Has this ever worked before on any older kernel?
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ arch/arm/boot/dts/tegra30.dtsi |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-We did more experiments on this and we noticed that:
-
-- mx51 running kernel 3.7 does not show this problem (tested a non-dt
-mx51 kernel, which uses drivers/usb/host/ehci-mxc.c instead of the
-chipidea driver.)
-- x86 running 3.2 kernel does not show this problem
-- usb support on mx6 has appeared on 3.6, but running an out-of-tree
-3.0.35 kernel also shows the same issue.
-- Doing long file transfers via mass storage on mx6 running 3.7 works fine.
-
-Shawn/Sascha/Peter,
-
-Any suggestions as to how debug this? By looking at the kernel dumps
-it seems to point to 'gic_handle_irq' area.
-
-Thanks,
-
-Fabio Estevam
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 80a0edf..dfa9f57 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -176,7 +176,7 @@
+ 	};
+ 
+ 	gpio: gpio {
+-		compatible = "nvidia,tegra30-gpio", "nvidia,tegra20-gpio";
++		compatible = "nvidia,tegra30-gpio"
+ 		reg = <0x6000d000 0x1000>;
+ 		interrupts = <0 32 0x04
+ 			      0 33 0x04
+-- 
+1.7.1.1
