@@ -1,9 +1,9 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 19 Dec 2012 11:05:52 +0530
-Subject: [PATCH 4/5] ARM: S5PV210: Avoid passing the clks through platform data
+Date: Wed, 19 Dec 2012 11:05:53 +0530
+Subject: [PATCH 5/5] ARM: EXYNOS: Avoid passing the clks through platform data
 In-Reply-To: <1355895353-10316-1-git-send-email-padma.v@samsung.com>
 References: <1355895353-10316-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1355895353-10316-5-git-send-email-padma.v@samsung.com>
+Message-ID: <1355895353-10316-6-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,14 +17,14 @@ support for I2S controller driver.
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 Acked-by: Sangbeom Kim <sbkim73@samsung.com>
 ---
- arch/arm/mach-s5pv210/dev-audio.c |   16 ----------------
- 1 files changed, 0 insertions(+), 16 deletions(-)
+ arch/arm/mach-exynos/dev-audio.c |   12 ------------
+ 1 files changed, 0 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/dev-audio.c b/arch/arm/mach-s5pv210/dev-audio.c
-index 0a5480b..addfb16 100644
---- a/arch/arm/mach-s5pv210/dev-audio.c
-+++ b/arch/arm/mach-s5pv210/dev-audio.c
-@@ -20,11 +20,6 @@
+diff --git a/arch/arm/mach-exynos/dev-audio.c b/arch/arm/mach-exynos/dev-audio.c
+index a1cb42c..9d1a609 100644
+--- a/arch/arm/mach-exynos/dev-audio.c
++++ b/arch/arm/mach-exynos/dev-audio.c
+@@ -23,11 +23,6 @@
  #include <mach/irqs.h>
  #include <mach/regs-audss.h>
  
@@ -33,35 +33,34 @@ index 0a5480b..addfb16 100644
 -	[1] = "i2sclk",
 -};
 -
- static int s5pv210_cfg_i2s(struct platform_device *pdev)
+ static int exynos4_cfg_i2s(struct platform_device *pdev)
  {
  	/* configure GPIO for i2s port */
-@@ -52,7 +47,6 @@ static struct s3c_audio_pdata i2sv5_pdata = {
+@@ -55,7 +50,6 @@ static struct s3c_audio_pdata i2sv5_pdata = {
  		.i2s = {
  			.quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI
  					 | QUIRK_NEED_RSTCLR,
 -			.src_clk = rclksrc,
- 			.idma_addr = S5PV210_AUDSS_INT_MEM,
+ 			.idma_addr = EXYNOS4_AUDSS_INT_MEM,
  		},
  	},
-@@ -75,18 +69,8 @@ struct platform_device s5pv210_device_iis0 = {
+@@ -78,17 +72,11 @@ struct platform_device exynos4_device_i2s0 = {
  	},
  };
  
 -static const char *rclksrc_v3[] = {
--	[0] = "iis",
--	[1] = "audio-bus",
+-	[0] = "sclk_i2s",
+-	[1] = "no_such_clock",
 -};
 -
  static struct s3c_audio_pdata i2sv3_pdata = {
- 	.cfg_gpio = s5pv210_cfg_i2s,
--	.type = {
--		.i2s = {
+ 	.cfg_gpio = exynos4_cfg_i2s,
+ 	.type = {
+ 		.i2s = {
+ 			.quirks = QUIRK_NO_MUXPSR,
 -			.src_clk = rclksrc_v3,
--		},
--	},
+ 		},
+ 	},
  };
- 
- static struct resource s5pv210_iis1_resource[] = {
 -- 
 1.7.4.4
