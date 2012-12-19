@@ -1,32 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Dec 2012 09:40:19 +0000
-Subject: [RFC PATCH 1/5] ARM: remove useless guard in smp.c
-In-Reply-To: <50D0BA2D.2020600@codeaurora.org>
-References: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
- <1355832418-31692-2-git-send-email-mark.rutland@arm.com>
- <50D0BA2D.2020600@codeaurora.org>
-Message-ID: <20121219094019.GC32484@e106331-lin.cambridge.arm.com>
+From: eballetbo@gmail.com (Enric Balletbo i Serra)
+Date: Wed, 19 Dec 2012 10:48:46 +0100
+Subject: [PATCH] staging: tidspbridge: Fix build breakage due to splitting CM
+ functions.
+Message-ID: <1355910526-29691-1-git-send-email-eballetbo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 06:47:09PM +0000, Stephen Boyd wrote:
-> On 12/18/12 04:06, Mark Rutland wrote:
-> > Currently we only provide an implementation of smp_timer_broadcast in
-> > smp.c if GENERIC_CLOCKEVENTS_BROADCAST is selected. As
-> > smp_timer_broadcast is only used in smp.c, smp.c depends on SMP, and
-> > GENERIC_CLOCKEVENTS_BROADCAST is selected by SMP, this is unnecessary.
-> 
-> You might want to add that GENERIC_CLOCKEVENTS_BROADCAST depends on
-> GENERIC_CLOCKEVENTS and SMP depends on GENERIC_CLOCKEVENTS too.
+From: Enric Balletbo i Serra <eballetbo@iseebcn.com>
 
-Will do.
+Commit ff4ae5d (ARM: OMAP2+: CM/hwmod: split CM functions into OMAP2, OMAP3-specific files)
+resulted in a build breakage for tidspbridge driver.
 
-> > This patch removes the redundant guard.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+   ...
+   CC [M]  drivers/staging/tidspbridge/core/tiomap3430.o
+   staging/tidspbridge/core/tiomap3430.c: In function ?bridge_brd_start?:
+   staging/tidspbridge/core/tiomap3430.c:550:24: error: ?OMAP3430_CM_AUTOIDLE_PLL?
+     undeclared (first use in this function)
+   make[3]: *** [drivers/staging/tidspbridge/core/tiomap3430.o] Error 1
+   ...
 
-Thanks!
+Fix this by including the appropriate header file.
 
-Mark.
+Signed-off-by: Enric Balletbo i Serra <eballetbo@iseebcn.com>
+---
+ drivers/staging/tidspbridge/core/_tiomap.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/tidspbridge/core/_tiomap.h b/drivers/staging/tidspbridge/core/_tiomap.h
+index 543a127..b783bfa 100644
+--- a/drivers/staging/tidspbridge/core/_tiomap.h
++++ b/drivers/staging/tidspbridge/core/_tiomap.h
+@@ -31,7 +31,7 @@
+  * driver should read or write to PRM/CM registers directly; they
+  * should rely on OMAP core code to do this.
+  */
+-#include <mach-omap2/cm2xxx_3xxx.h>
++#include <mach-omap2/cm3xxx.h>
+ #include <mach-omap2/prm-regbits-34xx.h>
+ #include <mach-omap2/cm-regbits-34xx.h>
+ #include <dspbridge/devdefs.h>
+-- 
+1.7.10.4
