@@ -1,62 +1,104 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 18 Dec 2012 23:16:06 -0500 (EST)
-Subject: [PATCH v3 4/6] ARM: psci: add support for PSCI invocations from
- the kernel
-In-Reply-To: <1355853196-23676-5-git-send-email-will.deacon@arm.com>
+Date: Tue, 18 Dec 2012 23:17:34 -0500 (EST)
+Subject: [PATCH v3 5/6] ARM: Dummy Virtual Machine platform support
+In-Reply-To: <1355853196-23676-6-git-send-email-will.deacon@arm.com>
 References: <1355853196-23676-1-git-send-email-will.deacon@arm.com>
- <1355853196-23676-5-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.02.1212182315440.1263@xanadu.home>
+ <1355853196-23676-6-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1212182316500.1263@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 18 Dec 2012, Will Deacon wrote:
 
-> This patch adds support for the Power State Coordination Interface
-> defined by ARM, allowing Linux to request CPU-centric power-management
-> operations from firmware implementing the PSCI protocol.
+> From: Marc Zyngier <marc.zyngier@arm.com>
 > 
+> Add support for the smallest, dumbest possible platform, to be
+> used as a guest for KVM or other hypervisors.
+> 
+> It only mandates a GIC and architected timers. Fits nicely with
+> a multiplatform zImage. Uses very little silicon area.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 
 Acked-by: Nicolas Pitre <nico@linaro.org>
 
 
 > ---
->  arch/arm/Kconfig            |  10 +++
->  arch/arm/include/asm/psci.h |  36 ++++++++
->  arch/arm/kernel/Makefile    |   1 +
->  arch/arm/kernel/psci.c      | 211 ++++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 258 insertions(+)
->  create mode 100644 arch/arm/include/asm/psci.h
->  create mode 100644 arch/arm/kernel/psci.c
+>  arch/arm/Kconfig            |  2 ++
+>  arch/arm/Makefile           |  1 +
+>  arch/arm/mach-virt/Kconfig  |  9 +++++++
+>  arch/arm/mach-virt/Makefile |  5 ++++
+>  arch/arm/mach-virt/virt.c   | 65 +++++++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 82 insertions(+)
+>  create mode 100644 arch/arm/mach-virt/Kconfig
+>  create mode 100644 arch/arm/mach-virt/Makefile
+>  create mode 100644 arch/arm/mach-virt/virt.c
 > 
 > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 8c83d98..80d54b8 100644
+> index 80d54b8..3443d89 100644
 > --- a/arch/arm/Kconfig
 > +++ b/arch/arm/Kconfig
-> @@ -1617,6 +1617,16 @@ config HOTPLUG_CPU
->  	  Say Y here to experiment with turning CPUs off and on.  CPUs
->  	  can be controlled through /sys/devices/system/cpu.
+> @@ -1130,6 +1130,8 @@ source "arch/arm/mach-versatile/Kconfig"
+>  source "arch/arm/mach-vexpress/Kconfig"
+>  source "arch/arm/plat-versatile/Kconfig"
 >  
-> +config ARM_PSCI
-> +	bool "Support for the ARM Power State Coordination Interface (PSCI)"
-> +	depends on CPU_V7
-> +	help
-> +	  Say Y here if you want Linux to communicate with system firmware
-> +	  implementing the PSCI specification for CPU-centric power
-> +	  management operations described in ARM document number ARM DEN
-> +	  0022A ("Power State Coordination Interface System Software on
-> +	  ARM processors").
+> +source "arch/arm/mach-virt/Kconfig"
 > +
->  config LOCAL_TIMERS
->  	bool "Use local timer interrupts"
->  	depends on SMP
-> diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+>  source "arch/arm/mach-vt8500/Kconfig"
+>  
+>  source "arch/arm/mach-w90x900/Kconfig"
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 30c443c..ea4f481 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -194,6 +194,7 @@ machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
+>  machine-$(CONFIG_ARCH_SPEAR13XX)	+= spear13xx
+>  machine-$(CONFIG_ARCH_SPEAR3XX)		+= spear3xx
+>  machine-$(CONFIG_MACH_SPEAR600)		+= spear6xx
+> +machine-$(CONFIG_ARCH_VIRT)		+= virt
+>  machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
+>  machine-$(CONFIG_ARCH_SUNXI)		+= sunxi
+>  
+> diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
 > new file mode 100644
-> index 0000000..ce0dbe7
+> index 0000000..a568a2a
 > --- /dev/null
-> +++ b/arch/arm/include/asm/psci.h
-> @@ -0,0 +1,36 @@
+> +++ b/arch/arm/mach-virt/Kconfig
+> @@ -0,0 +1,9 @@
+> +config ARCH_VIRT
+> +	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
+> +	select ARCH_WANT_OPTIONAL_GPIOLIB
+> +	select ARM_GIC
+> +	select ARM_ARCH_TIMER
+> +	select HAVE_SMP
+> +	select CPU_V7
+> +	select SPARSE_IRQ
+> +	select USE_OF
+> diff --git a/arch/arm/mach-virt/Makefile b/arch/arm/mach-virt/Makefile
+> new file mode 100644
+> index 0000000..7ddbfa6
+> --- /dev/null
+> +++ b/arch/arm/mach-virt/Makefile
+> @@ -0,0 +1,5 @@
+> +#
+> +# Makefile for the linux kernel.
+> +#
+> +
+> +obj-y					:= virt.o
+> diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
+> new file mode 100644
+> index 0000000..174b9da
+> --- /dev/null
+> +++ b/arch/arm/mach-virt/virt.c
+> @@ -0,0 +1,65 @@
 > +/*
+> + * Dummy Virtual Machine - does what it says on the tin.
+> + *
+> + * Copyright (C) 2012 ARM Ltd
+> + * Authors: Will Deacon <will.deacon@arm.com>,
+> + *          Marc Zyngier <marc.zyngier@arm.com>
+> + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
 > + * published by the Free Software Foundation.
@@ -66,260 +108,55 @@ Acked-by: Nicolas Pitre <nico@linaro.org>
 > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 > + * GNU General Public License for more details.
 > + *
-> + * Copyright (C) 2012 ARM Limited
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 > + */
 > +
-> +#ifndef __ASM_ARM_PSCI_H
-> +#define __ASM_ARM_PSCI_H
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
 > +
-> +#define PSCI_POWER_STATE_TYPE_STANDBY		0
-> +#define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
+> +#include <asm/arch_timer.h>
+> +#include <asm/hardware/gic.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
 > +
-> +struct psci_power_state {
-> +	u16	id;
-> +	u8	type;
-> +	u8	affinity_level;
+> +const static struct of_device_id irq_match[] = {
+> +	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
+> +	{}
 > +};
 > +
-> +struct psci_operations {
-> +	int (*cpu_suspend)(struct psci_power_state state,
-> +			   unsigned long entry_point);
-> +	int (*cpu_off)(struct psci_power_state state);
-> +	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
-> +	int (*migrate)(unsigned long cpuid);
+> +static void __init gic_init_irq(void)
+> +{
+> +	of_irq_init(irq_match);
+> +}
+> +
+> +static void __init virt_init(void)
+> +{
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
+> +
+> +static void __init virt_timer_init(void)
+> +{
+> +	WARN_ON(arch_timer_of_register() != 0);
+> +	WARN_ON(arch_timer_sched_clock_init() != 0);
+> +}
+> +
+> +static const char *virt_dt_match[] = {
+> +	"linux,dummy-virt",
+> +	NULL
 > +};
 > +
-> +extern struct psci_operations psci_ops;
-> +
-> +#endif /* __ASM_ARM_PSCI_H */
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 5bbec7b..5f3338e 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -82,5 +82,6 @@ obj-$(CONFIG_DEBUG_LL)	+= debug.o
->  obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
->  
->  obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
-> +obj-$(CONFIG_ARM_PSCI)		+= psci.o
->  
->  extra-y := $(head-y) vmlinux.lds
-> diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-> new file mode 100644
-> index 0000000..3653164
-> --- /dev/null
-> +++ b/arch/arm/kernel/psci.c
-> @@ -0,0 +1,211 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * Copyright (C) 2012 ARM Limited
-> + *
-> + * Author: Will Deacon <will.deacon@arm.com>
-> + */
-> +
-> +#define pr_fmt(fmt) "psci: " fmt
-> +
-> +#include <linux/init.h>
-> +#include <linux/of.h>
-> +
-> +#include <asm/compiler.h>
-> +#include <asm/errno.h>
-> +#include <asm/opcodes-sec.h>
-> +#include <asm/opcodes-virt.h>
-> +#include <asm/psci.h>
-> +
-> +struct psci_operations psci_ops;
-> +
-> +static int (*invoke_psci_fn)(u32, u32, u32, u32);
-> +
-> +enum psci_function {
-> +	PSCI_FN_CPU_SUSPEND,
-> +	PSCI_FN_CPU_ON,
-> +	PSCI_FN_CPU_OFF,
-> +	PSCI_FN_MIGRATE,
-> +	PSCI_FN_MAX,
+> +static struct sys_timer virt_timer = {
+> +	.init = virt_timer_init,
 > +};
 > +
-> +static u32 psci_function_id[PSCI_FN_MAX];
-> +
-> +#define PSCI_RET_SUCCESS		0
-> +#define PSCI_RET_EOPNOTSUPP		-1
-> +#define PSCI_RET_EINVAL			-2
-> +#define PSCI_RET_EPERM			-3
-> +
-> +static int psci_to_linux_errno(int errno)
-> +{
-> +	switch (errno) {
-> +	case PSCI_RET_SUCCESS:
-> +		return 0;
-> +	case PSCI_RET_EOPNOTSUPP:
-> +		return -EOPNOTSUPP;
-> +	case PSCI_RET_EINVAL:
-> +		return -EINVAL;
-> +	case PSCI_RET_EPERM:
-> +		return -EPERM;
-> +	};
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +#define PSCI_POWER_STATE_ID_MASK	0xffff
-> +#define PSCI_POWER_STATE_ID_SHIFT	0
-> +#define PSCI_POWER_STATE_TYPE_MASK	0x1
-> +#define PSCI_POWER_STATE_TYPE_SHIFT	16
-> +#define PSCI_POWER_STATE_AFFL_MASK	0x3
-> +#define PSCI_POWER_STATE_AFFL_SHIFT	24
-> +
-> +static u32 psci_power_state_pack(struct psci_power_state state)
-> +{
-> +	return	((state.id & PSCI_POWER_STATE_ID_MASK)
-> +			<< PSCI_POWER_STATE_ID_SHIFT)	|
-> +		((state.type & PSCI_POWER_STATE_TYPE_MASK)
-> +			<< PSCI_POWER_STATE_TYPE_SHIFT)	|
-> +		((state.affinity_level & PSCI_POWER_STATE_AFFL_MASK)
-> +			<< PSCI_POWER_STATE_AFFL_SHIFT);
-> +}
-> +
-> +/*
-> + * The following two functions are invoked via the invoke_psci_fn pointer
-> + * and will not be inlined, allowing us to piggyback on the AAPCS.
-> + */
-> +static noinline int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1,
-> +					 u32 arg2)
-> +{
-> +	asm volatile(
-> +			__asmeq("%0", "r0")
-> +			__asmeq("%1", "r1")
-> +			__asmeq("%2", "r2")
-> +			__asmeq("%3", "r3")
-> +			__HVC(0)
-> +		: "+r" (function_id)
-> +		: "r" (arg0), "r" (arg1), "r" (arg2));
-> +
-> +	return function_id;
-> +}
-> +
-> +static noinline int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1,
-> +					 u32 arg2)
-> +{
-> +	asm volatile(
-> +			__asmeq("%0", "r0")
-> +			__asmeq("%1", "r1")
-> +			__asmeq("%2", "r2")
-> +			__asmeq("%3", "r3")
-> +			__SMC(0)
-> +		: "+r" (function_id)
-> +		: "r" (arg0), "r" (arg1), "r" (arg2));
-> +
-> +	return function_id;
-> +}
-> +
-> +static int psci_cpu_suspend(struct psci_power_state state,
-> +			    unsigned long entry_point)
-> +{
-> +	int err;
-> +	u32 fn, power_state;
-> +
-> +	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
-> +	power_state = psci_power_state_pack(state);
-> +	err = invoke_psci_fn(fn, power_state, entry_point, 0);
-> +	return psci_to_linux_errno(err);
-> +}
-> +
-> +static int psci_cpu_off(struct psci_power_state state)
-> +{
-> +	int err;
-> +	u32 fn, power_state;
-> +
-> +	fn = psci_function_id[PSCI_FN_CPU_OFF];
-> +	power_state = psci_power_state_pack(state);
-> +	err = invoke_psci_fn(fn, power_state, 0, 0);
-> +	return psci_to_linux_errno(err);
-> +}
-> +
-> +static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
-> +{
-> +	int err;
-> +	u32 fn;
-> +
-> +	fn = psci_function_id[PSCI_FN_CPU_ON];
-> +	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
-> +	return psci_to_linux_errno(err);
-> +}
-> +
-> +static int psci_migrate(unsigned long cpuid)
-> +{
-> +	int err;
-> +	u32 fn;
-> +
-> +	fn = psci_function_id[PSCI_FN_MIGRATE];
-> +	err = invoke_psci_fn(fn, cpuid, 0, 0);
-> +	return psci_to_linux_errno(err);
-> +}
-> +
-> +static const struct of_device_id psci_of_match[] __initconst = {
-> +	{ .compatible = "arm,psci",	},
-> +	{},
-> +};
-> +
-> +static int __init psci_init(void)
-> +{
-> +	struct device_node *np;
-> +	const char *method;
-> +	u32 id;
-> +
-> +	np = of_find_matching_node(NULL, psci_of_match);
-> +	if (!np)
-> +		return 0;
-> +
-> +	pr_info("probing function IDs from device-tree\n");
-> +
-> +	if (of_property_read_string(np, "method", &method)) {
-> +		pr_warning("missing \"method\" property\n");
-> +		goto out_put_node;
-> +	}
-> +
-> +	if (!strcmp("hvc", method)) {
-> +		invoke_psci_fn = __invoke_psci_fn_hvc;
-> +	} else if (!strcmp("smc", method)) {
-> +		invoke_psci_fn = __invoke_psci_fn_smc;
-> +	} else {
-> +		pr_warning("invalid \"method\" property: %s\n", method);
-> +		goto out_put_node;
-> +	}
-> +
-> +	if (!of_property_read_u32(np, "cpu_suspend", &id)) {
-> +		psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
-> +		psci_ops.cpu_suspend = psci_cpu_suspend;
-> +	}
-> +
-> +	if (!of_property_read_u32(np, "cpu_off", &id)) {
-> +		psci_function_id[PSCI_FN_CPU_OFF] = id;
-> +		psci_ops.cpu_off = psci_cpu_off;
-> +	}
-> +
-> +	if (!of_property_read_u32(np, "cpu_on", &id)) {
-> +		psci_function_id[PSCI_FN_CPU_ON] = id;
-> +		psci_ops.cpu_on = psci_cpu_on;
-> +	}
-> +
-> +	if (!of_property_read_u32(np, "migrate", &id)) {
-> +		psci_function_id[PSCI_FN_MIGRATE] = id;
-> +		psci_ops.migrate = psci_migrate;
-> +	}
-> +
-> +out_put_node:
-> +	of_node_put(np);
-> +	return 0;
-> +}
-> +early_initcall(psci_init);
+> +DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
+> +	.init_irq	= gic_init_irq,
+> +	.handle_irq     = gic_handle_irq,
+> +	.timer		= &virt_timer,
+> +	.init_machine	= virt_init,
+> +	.dt_compat	= virt_dt_match,
+> +MACHINE_END
 > -- 
 > 1.8.0
 > 
