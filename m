@@ -1,42 +1,32 @@
-From: alekskartashov@parallels.com (Alexander Kartashov)
-Date: Wed, 19 Dec 2012 17:27:55 +0400
-Subject: [PATCH 1/3] kcmp: Include linux/ptrace.h
-In-Reply-To: <1355923677-18249-1-git-send-email-alekskartashov@parallels.com>
-References: <1355923677-18249-1-git-send-email-alekskartashov@parallels.com>
-Message-ID: <1355923677-18249-2-git-send-email-alekskartashov@parallels.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 19 Dec 2012 14:33:07 +0100
+Subject: [PATCH v4 0/3] ARM/dts: omap3: Add DT support for IGEP devices
+Message-ID: <1355923990-21240-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyrill Gorcunov <gorcunov@openvz.org>
+IGEP technology devices are TI OMAP3 SoC based industrial embedded
+and computer-on-module boards. This patch-set adds initial device
+tree support for these devices.
 
-This makes it compile on s390. After all the ptrace_may_access
-(which we use this file) is declared exactly in linux/ptrace.h.
+The device trees allows to boot from an MMC and are working all the
+components that already have device tree support on OMAP3 SoCs:
 
-This is preparatory work to wire this syscall up on all archs.
+- MMC/SD
+- UARTs
+- GPIO LEDs
+- TWL4030 codec audio
+- pinmux/pinconf pinctrl
 
-Original-by: Heiko Carstens <heiko.carstens@de.ibm.com>
-Signed-off-by: Cyrill Gorcunov <gorcunov@openvz.org>
-CC: Andrew Morton <akpm@linux-foundation.org>
-CC: "H. Peter Anvin" <hpa@zytor.com>
-CC: Eric W. Biederman <ebiederm@xmission.com>
-CC: Pavel Emelyanov <xemul@parallels.com>
-CC: Alexander Kartashov <alekskartashov@parallels.com>
-Signed-off-by: Alexander Kartashov <alekskartashov@parallels.com>
----
- kernel/kcmp.c |    1 +
- 1 file changed, 1 insertion(+)
+Some peripheral are still not working such as Flash storage and
+Ethernet but support for these will also be included once the
+OMAP GPMC device tree binding patches land on mainline.
 
-diff --git a/kernel/kcmp.c b/kernel/kcmp.c
-index 30b7b22..e30ac0f 100644
---- a/kernel/kcmp.c
-+++ b/kernel/kcmp.c
-@@ -4,6 +4,7 @@
- #include <linux/string.h>
- #include <linux/random.h>
- #include <linux/module.h>
-+#include <linux/ptrace.h>
- #include <linux/init.h>
- #include <linux/errno.h>
- #include <linux/cache.h>
--- 
-1.7.9.5
+This is a v4 of the patch-set that adds MMC mux pins setup and
+fixes a build issue due recent changes on twl4030.dtsi.
+
+The patch-set is composed of the following patches:
+
+[PATCH v4 1/3] ARM/dts: omap3: Add generic DT support for IGEP devices
+[PATCH v4 2/3] ARM/dts: omap3: Add support for IGEPv2 board
+[PATCH v4 3/3] ARM/dts: omap3: Add support for IGEP COM Module
