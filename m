@@ -1,60 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Dec 2012 10:19:34 +0000
-Subject: [RFC PATCH 2/5] clockevents: Add generic timer broadcast receiver
-In-Reply-To: <50D0EB67.2060802@codeaurora.org>
-References: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
- <1355832418-31692-3-git-send-email-mark.rutland@arm.com>
- <50D0EB67.2060802@codeaurora.org>
-Message-ID: <20121219101934.GD32484@e106331-lin.cambridge.arm.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 19 Dec 2012 18:27:17 +0800
+Subject: [PATCH 0/3] at91: PMECC: enable PMECC in dt for at91sam9x5ek,
+ at91sam9n12ek
+Message-ID: <1355912840-29501-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 10:17:11PM +0000, Stephen Boyd wrote:
-> On 12/18/12 04:06, Mark Rutland wrote:
-> > diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-> > index f113755..c2dd022 100644
-> > --- a/kernel/time/tick-broadcast.c
-> > +++ b/kernel/time/tick-broadcast.c
-> > @@ -125,6 +125,21 @@ int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu)
-> >  	return ret;
-> >  }
-> >  
-> > +int tick_receive_broadcast(void)
-> > +{
-> > +	struct tick_device *td = this_cpu_ptr(&tick_cpu_device);
-> > +	struct clock_event_device *evt = td->evtdev;
-> > +
-> > +	if (!evt)
-> > +		return -ENODEV;
-> > +
-> > +	if (!evt->event_handler)
-> > +		return -EINVAL;
-> > +
-> 
-> Does this actually happen? It's not obvious to me how it does.
+Those patches will enable PMECC in dt parameters for at91sam9x5ek, at91sam9n12ek.
 
-Taking a look at it, I don't think it does. Any tick_device's
-clock_event_device should have an event_handler. I'll drop this check.
+Josh Wu (3):
+  MTD: at91: atmel_nand: for PMECC, add code to choose the ecc bits and
+    sector size according to the ONFI parameter ECC requirement.
+  at91: 9x5: add DT parameters to enable PMECC
+  at91: at91sam9n12: add DT parameters to enable PMECC
 
-A tick device might not have a clock_event_device registered in some cases --
-the x86 lapic timer has to deal with interrupts pending across a kexec, where
-interrupts are enabled before local timers are registered. I'm not sure how
-common this problem might be though, and whether it should be dealt with here
-or elsewhere.
+ arch/arm/boot/dts/at91sam9n12.dtsi  |    1 +
+ arch/arm/boot/dts/at91sam9n12ek.dts |    5 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi   |    4 ++
+ arch/arm/boot/dts/at91sam9x5cm.dtsi |    5 +-
+ drivers/mtd/nand/atmel_nand.c       |   89 +++++++++++++++++++++++++++++++++++
+ 5 files changed, 102 insertions(+), 2 deletions(-)
 
-> > +	evt->event_handler(evt);
-> > +	return 0;
-> > +}
-> > +
-> >  /*
-> >   * Broadcast the event to the cpus, which are set in the mask (mangled).
-> >   */
-> 
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-
-Thanks,
-Mark.
+-- 
+1.7.9.5
