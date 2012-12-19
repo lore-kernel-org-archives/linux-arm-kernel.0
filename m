@@ -1,162 +1,120 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 18 Dec 2012 23:17:34 -0500 (EST)
-Subject: [PATCH v3 5/6] ARM: Dummy Virtual Machine platform support
-In-Reply-To: <1355853196-23676-6-git-send-email-will.deacon@arm.com>
-References: <1355853196-23676-1-git-send-email-will.deacon@arm.com>
- <1355853196-23676-6-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.02.1212182316500.1263@xanadu.home>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Tue, 18 Dec 2012 20:21:29 -0800
+Subject: [PATCH 1/7] arm: zynq: timer: Replace PSS through PS
+In-Reply-To: <20121219023120.GE27963@beefymiracle.amer.corp.natinst.com>
+References: <1355876199-23788-1-git-send-email-soren.brinkmann@xilinx.com>
+ <ee701193-af05-4e73-9376-42a4c6ac3c01@CO9EHSMHS032.ehs.local>
+ <20121219023120.GE27963@beefymiracle.amer.corp.natinst.com>
+Message-ID: <fa221d49-1a55-4c24-820c-8f7b6995027c@AM1EHSMHS017.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Dec 2012, Will Deacon wrote:
+Hi Josh,
 
-> From: Marc Zyngier <marc.zyngier@arm.com>
+On Tue, Dec 18, 2012 at 08:31:20PM -0600, Josh Cartwright wrote:
+> On Tue, Dec 18, 2012 at 04:16:33PM -0800, Soren Brinkmann wrote:
+> > The acronym PSS is deprecated by Xilinx. The correct term, which is
+> > also used in Xilinx documentation is PS (processing system).
+> > This is just a search and replace:
+> >  - s/PSS/PS/g
+> >  - s/pss/ps/g
+> > 
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> [..]
+> > --- a/arch/arm/mach-zynq/timer.c
+> > +++ b/arch/arm/mach-zynq/timer.c
+> > @@ -35,17 +35,17 @@
+> >   * Timer Register Offset Definitions of Timer 1, Increment base address by 4
+> >   * and use same offsets for Timer 2
+> >   */
+> > -#define XTTCPSS_CLK_CNTRL_OFFSET	0x00 /* Clock Control Reg, RW */
+> > -#define XTTCPSS_CNT_CNTRL_OFFSET	0x0C /* Counter Control Reg, RW */
+> > -#define XTTCPSS_COUNT_VAL_OFFSET	0x18 /* Counter Value Reg, RO */
+> > -#define XTTCPSS_INTR_VAL_OFFSET		0x24 /* Interval Count Reg, RW */
+> > -#define XTTCPSS_MATCH_1_OFFSET		0x30 /* Match 1 Value Reg, RW */
+> > -#define XTTCPSS_MATCH_2_OFFSET		0x3C /* Match 2 Value Reg, RW */
+> > -#define XTTCPSS_MATCH_3_OFFSET		0x48 /* Match 3 Value Reg, RW */
+> > -#define XTTCPSS_ISR_OFFSET		0x54 /* Interrupt Status Reg, RO */
+> > -#define XTTCPSS_IER_OFFSET		0x60 /* Interrupt Enable Reg, RW */
+> > -
+> > -#define XTTCPSS_CNT_CNTRL_DISABLE_MASK	0x1
+> > +#define XTTCPS_CLK_CNTRL_OFFSET	0x00 /* Clock Control Reg, RW */
+> > +#define XTTCPS_CNT_CNTRL_OFFSET	0x0C /* Counter Control Reg, RW */
+> > +#define XTTCPS_COUNT_VAL_OFFSET	0x18 /* Counter Value Reg, RO */
+> > +#define XTTCPS_INTR_VAL_OFFSET		0x24 /* Interval Count Reg, RW */
+> > +#define XTTCPS_MATCH_1_OFFSET		0x30 /* Match 1 Value Reg, RW */
+> > +#define XTTCPS_MATCH_2_OFFSET		0x3C /* Match 2 Value Reg, RW */
+> > +#define XTTCPS_MATCH_3_OFFSET		0x48 /* Match 3 Value Reg, RW */
+> > +#define XTTCPS_ISR_OFFSET		0x54 /* Interrupt Status Reg, RO */
+> > +#define XTTCPS_IER_OFFSET		0x60 /* Interrupt Enable Reg, RW */
+> > +
+> > +#define XTTCPS_CNT_CNTRL_DISABLE_MASK	0x1
+> >  
+> >  /* Setup the timers to use pre-scaling, using a fixed value for now that will
+> >   * work across most input frequency, but it may need to be more dynamic
+> > @@ -57,72 +57,72 @@
+> >  #define CNT_CNTRL_RESET		(1<<4)
+> >  
+> >  /**
+> > - * struct xttcpss_timer - This definition defines local timer structure
+> > + * struct xttcps_timer - This definition defines local timer structure
+> >   *
+> >   * @base_addr:	Base address of timer
+> >   **/
+> > -struct xttcpss_timer {
+> > +struct xttcps_timer {
+> >  	void __iomem	*base_addr;
+> >  };
+> >  
+> > -struct xttcpss_timer_clocksource {
+> > -	struct xttcpss_timer	xttc;
+> > +struct xttcps_timer_clocksource {
+> > +	struct xttcps_timer	xttc;
+> >  	struct clocksource	cs;
+> >  };
+> >  
+> > -#define to_xttcpss_timer_clksrc(x) \
+> > -		container_of(x, struct xttcpss_timer_clocksource, cs)
+> > +#define to_xttcps_timer_clksrc(x) \
+> > +		container_of(x, struct xttcps_timer_clocksource, cs)
+> >  
+> > -struct xttcpss_timer_clockevent {
+> > -	struct xttcpss_timer		xttc;
+> > +struct xttcps_timer_clockevent {
+> > +	struct xttcps_timer		xttc;
+> >  	struct clock_event_device	ce;
+> >  	struct clk			*clk;
+> >  };
+> >  
+> > -#define to_xttcpss_timer_clkevent(x) \
+> > -		container_of(x, struct xttcpss_timer_clockevent, ce)
+> > +#define to_xttcps_timer_clkevent(x) \
+> > +		container_of(x, struct xttcps_timer_clockevent, ce)
+> >  
+> >  /**
+> > - * xttcpss_set_interval - Set the timer interval value
+> > + * xttcps_set_interval - Set the timer interval value
+> >   *
+> >   * @timer:	Pointer to the timer instance
+> >   * @cycles:	Timer interval ticks
+> >   **/
+> > -static void xttcpss_set_interval(struct xttcpss_timer *timer,
+> > +static void xttcps_set_interval(struct xttcps_timer *timer,
+> >  					unsigned long cycles)
 > 
-> Add support for the smallest, dumbest possible platform, to be
-> used as a guest for KVM or other hypervisors.
+> Stylistic nit, but if we're going to be making cosmetic changes of this
+> sort, I'd personally like to see the arguments lined up properly:
 > 
-> It only mandates a GIC and architected timers. Fits nicely with
-> a multiplatform zImage. Uses very little silicon area.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> static void xttcps_set_interval(struct xttcps_timer *timer,
+> 				unsigned long cycles)
+I actually don't like that because it's rather high maintenance to align
+arguments like this - and keeping them that way. I usually rely on vim with
+smartindent set to produce reasonable indent levels.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+And reviewing the coding guideline, I'd even say it's not encouraged:
+	"Descendants are always substantially shorter than the parent and
+	are placed substantially to the right. The same applies to function
+	headers with a long argument list."
 
-
-> ---
->  arch/arm/Kconfig            |  2 ++
->  arch/arm/Makefile           |  1 +
->  arch/arm/mach-virt/Kconfig  |  9 +++++++
->  arch/arm/mach-virt/Makefile |  5 ++++
->  arch/arm/mach-virt/virt.c   | 65 +++++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 82 insertions(+)
->  create mode 100644 arch/arm/mach-virt/Kconfig
->  create mode 100644 arch/arm/mach-virt/Makefile
->  create mode 100644 arch/arm/mach-virt/virt.c
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 80d54b8..3443d89 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1130,6 +1130,8 @@ source "arch/arm/mach-versatile/Kconfig"
->  source "arch/arm/mach-vexpress/Kconfig"
->  source "arch/arm/plat-versatile/Kconfig"
->  
-> +source "arch/arm/mach-virt/Kconfig"
-> +
->  source "arch/arm/mach-vt8500/Kconfig"
->  
->  source "arch/arm/mach-w90x900/Kconfig"
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 30c443c..ea4f481 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -194,6 +194,7 @@ machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
->  machine-$(CONFIG_ARCH_SPEAR13XX)	+= spear13xx
->  machine-$(CONFIG_ARCH_SPEAR3XX)		+= spear3xx
->  machine-$(CONFIG_MACH_SPEAR600)		+= spear6xx
-> +machine-$(CONFIG_ARCH_VIRT)		+= virt
->  machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
->  machine-$(CONFIG_ARCH_SUNXI)		+= sunxi
->  
-> diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
-> new file mode 100644
-> index 0000000..a568a2a
-> --- /dev/null
-> +++ b/arch/arm/mach-virt/Kconfig
-> @@ -0,0 +1,9 @@
-> +config ARCH_VIRT
-> +	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
-> +	select ARCH_WANT_OPTIONAL_GPIOLIB
-> +	select ARM_GIC
-> +	select ARM_ARCH_TIMER
-> +	select HAVE_SMP
-> +	select CPU_V7
-> +	select SPARSE_IRQ
-> +	select USE_OF
-> diff --git a/arch/arm/mach-virt/Makefile b/arch/arm/mach-virt/Makefile
-> new file mode 100644
-> index 0000000..7ddbfa6
-> --- /dev/null
-> +++ b/arch/arm/mach-virt/Makefile
-> @@ -0,0 +1,5 @@
-> +#
-> +# Makefile for the linux kernel.
-> +#
-> +
-> +obj-y					:= virt.o
-> diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
-> new file mode 100644
-> index 0000000..174b9da
-> --- /dev/null
-> +++ b/arch/arm/mach-virt/virt.c
-> @@ -0,0 +1,65 @@
-> +/*
-> + * Dummy Virtual Machine - does what it says on the tin.
-> + *
-> + * Copyright (C) 2012 ARM Ltd
-> + * Authors: Will Deacon <will.deacon@arm.com>,
-> + *          Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +
-> +#include <asm/arch_timer.h>
-> +#include <asm/hardware/gic.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/time.h>
-> +
-> +const static struct of_device_id irq_match[] = {
-> +	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
-> +	{}
-> +};
-> +
-> +static void __init gic_init_irq(void)
-> +{
-> +	of_irq_init(irq_match);
-> +}
-> +
-> +static void __init virt_init(void)
-> +{
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +}
-> +
-> +static void __init virt_timer_init(void)
-> +{
-> +	WARN_ON(arch_timer_of_register() != 0);
-> +	WARN_ON(arch_timer_sched_clock_init() != 0);
-> +}
-> +
-> +static const char *virt_dt_match[] = {
-> +	"linux,dummy-virt",
-> +	NULL
-> +};
-> +
-> +static struct sys_timer virt_timer = {
-> +	.init = virt_timer_init,
-> +};
-> +
-> +DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
-> +	.init_irq	= gic_init_irq,
-> +	.handle_irq     = gic_handle_irq,
-> +	.timer		= &virt_timer,
-> +	.init_machine	= virt_init,
-> +	.dt_compat	= virt_dt_match,
-> +MACHINE_END
-> -- 
-> 1.8.0
-> 
+	Thanks,
+	Soren
