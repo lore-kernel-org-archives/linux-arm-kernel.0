@@ -1,57 +1,92 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Dec 2012 11:12:17 -0800
-Subject: [PATCH 4/4] clk: zynq: Use of_init_clk_data()
-In-Reply-To: <20121219183617.GC1005@beefymiracle.amer.corp.natinst.com>
-References: <1355778135-32458-1-git-send-email-sboyd@codeaurora.org>
- <1355778135-32458-5-git-send-email-sboyd@codeaurora.org>
- <20121219172619.GB1005@beefymiracle.amer.corp.natinst.com>
- <50D2056E.9000507@codeaurora.org>
- <20121219183617.GC1005@beefymiracle.amer.corp.natinst.com>
-Message-ID: <50D21191.3000501@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 19 Dec 2012 11:26:11 -0800
+Subject: [PATCH 0/8] Flip on multiplatform support for omap2plus for v3.9
+Message-ID: <20121219192354.22098.33408.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/12 10:36, Josh Cartwright wrote:
-> On Wed, Dec 19, 2012 at 10:20:30AM -0800, Stephen Boyd wrote:
->> On 12/19/12 09:26, Josh Cartwright wrote:
->>> On Mon, Dec 17, 2012 at 01:02:15PM -0800, Stephen Boyd wrote:
-> [..]
->> Can you show the code at those line numbers? There are quite a few
->> WARN_ONs in that code and it's possible the WARN_ON is the one
->> introduced in this patch.
-> It looks like we're not hitting the WARN_ON() you added, but several of
-> the other ones.
+Hi all,
 
-Ah it seems that zynq is doing different things with the clock names.
-The periph clock is this
+These patches enable multiplatform support for omap2plus.
 
-                                uart_clk: uart_clk {
-                                        #clock-cells = <1>;
-                                        compatible =
-"xlnx,zynq-periph-clock";
-                                        clocks = <&iopll &armpll &ddrpll>;
-                                        reg = <0x154>;
-                                        clock-output-names =
-"uart0_ref_clk",
-                                                            
-"uart1_ref_clk";
+To build and boot it against the current mainline kernel
+you need the following:
 
-and so zynq_periph_clk_setup() wants to register clocks named uart_clk,
-uart0_ref_clk, and uart1_ref_clk. But my change causes uart0_ref_clk to
-be registered twice because of the way of_init_clk_data() detects the
-init.name property from the binding (we use clock-output-names[0] and
-only use np->name if there is no clock-output-names).
+[PATCH 1/2] ARM: l2x0: Only set .set_debug on PL310 r3p0 and earlier
+[PATCH 2/2] ARM: disable errata work-arounds which access secure registers
+[GIT PULL 1/2] omap fixes for v3.8 merge window
+[GIT PULL 2/2] omap cleanup for v3.8 merge window
+[GIT PULL] two trivial omap build error fixes for v3.8 merge window
+cpts: Fix build error caused by include of plat/clock.h
 
-Perhaps we need to make of_init_clk_data() take an integer argument
-indicating which name to use? So of_init_clk_data(np, &init, 0) would
-mean use the np->name as the init.name, and of_init_clk_data(np, &init,
-1) would mean use the clock-output-names[0] property,
-of_init_clk_data(np, &init, 2) would mean use the clock-output-names[1]
-property.
+Regards,
 
-Or perhaps we should think of some way to generate unique names from the
-bindings that the clock APIs can use internally.
+Tony
+
+---
+
+Tony Lindgren (8):
+      ARM: OMAP2+: Limi omap initcalls to omap only on multiplatform kernels
+      ARM: OMAP2+: Use omap initcalls
+      ARM: OMAP: Fix i2c cmdline initcall for multiplatform
+      ARM: OMAP: Fix dmaengine init for multiplatform
+      ARM: OMAP2+: Add multiplatform debug_ll support
+      ARM: OMAP2+: Disable code that currently does not work with multiplaform
+      ARM: OMAP2+: Enable ARCH_MULTIPLATFORM support
+      ARM: OMAP2+: Add minimal support for booting vexpress
+
+
+ arch/arm/Kconfig                         |   13 ++
+ arch/arm/Kconfig.debug                   |   56 +++++++++
+ arch/arm/configs/omap2plus_defconfig     |    6 +
+ arch/arm/include/debug/omap2plus.S       |  190 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap1/dma.c                |   18 +++
+ arch/arm/mach-omap1/i2c.c                |    6 +
+ arch/arm/mach-omap2/Kconfig              |   25 ++++
+ arch/arm/mach-omap2/Makefile             |    3 
+ arch/arm/mach-omap2/board-omap3beagle.c  |    2 
+ arch/arm/mach-omap2/board-rx51-video.c   |    3 
+ arch/arm/mach-omap2/clock2xxx.c          |    2 
+ arch/arm/mach-omap2/clock3xxx.c          |    2 
+ arch/arm/mach-omap2/devices.c            |    6 -
+ arch/arm/mach-omap2/dma.c                |   23 +++-
+ arch/arm/mach-omap2/drm.c                |    2 
+ arch/arm/mach-omap2/emu.c                |    2 
+ arch/arm/mach-omap2/fb.c                 |    4 -
+ arch/arm/mach-omap2/gpio.c               |    5 -
+ arch/arm/mach-omap2/gpmc.c               |    4 -
+ arch/arm/mach-omap2/hdq1w.c              |    3 
+ arch/arm/mach-omap2/hwspinlock.c         |    2 
+ arch/arm/mach-omap2/i2c.c                |    5 +
+ arch/arm/mach-omap2/mcbsp.c              |    3 
+ arch/arm/mach-omap2/omap-iommu.c         |    2 
+ arch/arm/mach-omap2/omap2-restart.c      |    3 
+ arch/arm/mach-omap2/omap4-common.c       |    4 -
+ arch/arm/mach-omap2/omap_device.c        |    5 -
+ arch/arm/mach-omap2/omap_hwmod.c         |    2 
+ arch/arm/mach-omap2/omap_phy_internal.c  |    2 
+ arch/arm/mach-omap2/opp3xxx_data.c       |    2 
+ arch/arm/mach-omap2/opp4xxx_data.c       |    2 
+ arch/arm/mach-omap2/pm-debug.c           |    2 
+ arch/arm/mach-omap2/pm.c                 |    2 
+ arch/arm/mach-omap2/pmu.c                |    2 
+ arch/arm/mach-omap2/prm3xxx.c            |    2 
+ arch/arm/mach-omap2/prm44xx.c            |    2 
+ arch/arm/mach-omap2/serial.c             |    2 
+ arch/arm/mach-omap2/smartreflex-class3.c |    2 
+ arch/arm/mach-omap2/soc.h                |   29 +++++
+ arch/arm/mach-omap2/timer.c              |    2 
+ arch/arm/mach-omap2/wd_timer.c           |    2 
+ arch/arm/plat-omap/Kconfig               |   30 -----
+ arch/arm/plat-omap/Makefile              |    2 
+ arch/arm/plat-omap/i2c.c                 |    3 
+ arch/arm/plat-omap/include/plat/i2c.h    |    6 +
+ drivers/crypto/omap-sham.c               |    3 
+ drivers/dma/omap-dma.c                   |   20 ---
+ drivers/media/rc/Kconfig                 |    2 
+ drivers/staging/tidspbridge/Kconfig      |    2 
+ 49 files changed, 422 insertions(+), 100 deletions(-)
+ create mode 100644 arch/arm/include/debug/omap2plus.S
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Signature
