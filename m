@@ -1,55 +1,220 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Wed, 19 Dec 2012 19:29:36 +0100
-Subject: [PATCH 1/2] mx27: add a clock gate to activate SPLL clock
-Message-ID: <1355941777-99352-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 19 Dec 2012 19:37:10 +0100
+Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
+In-Reply-To: <20121219183236.GP23971@game.jcrosoft.org>
+References: <20121219183236.GP23971@game.jcrosoft.org>
+Message-ID: <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A clock gate is mandatory to activate SPLL clock needed, at least, for usb.
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+at91 adc offers the choice between two resolutions: low and high.
+The low and high resolution values depends on adc IP version, as many IP
+properties have been exposed through device tree, these settings have also
+been added to the dt bindings.
+
+Update at the same time the dtsi.
+
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+[plagnioj at jcrosoft.com: udpate current adc dt support]
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: linux-iio at vger.kernel.org
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-imx/clk-imx27.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/arm/atmel-adc.txt          |   11 +++
+ arch/arm/boot/dts/at91sam9260.dtsi                 |    3 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |    3 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |    3 +
+ drivers/iio/adc/at91_adc.c                         |   74 ++++++++++++++++++--
+ 5 files changed, 90 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 4c1d1e4..4f066d13 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -62,7 +62,7 @@ static const char *clko_sel_clks[] = {
- 	"32k", "usb_div", "dptc",
+diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+index c63097d..fd2d69e 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+@@ -14,9 +14,17 @@ Required properties:
+   - atmel,adc-status-register: Offset of the Interrupt Status Register
+   - atmel,adc-trigger-register: Offset of the Trigger Register
+   - atmel,adc-vref: Reference voltage in millivolts for the conversions
++  - atmel,adc-res: List of resolution in bits supported by the ADC. List size
++		   must be two at least.
++  - atmel,adc-res-names: Contains one identifier string for each resolution
++			 in atmel,adc-res property. "lowres" and "highres"
++			 identifiers are required.
+ 
+ Optional properties:
+   - atmel,adc-use-external: Boolean to enable of external triggers
++  - atmel,adc-use-res: String corresponding to an identifier from
++		       atmel,adc-res-names property. If not specified, the highest
++		       resolution will be used.
+  
+ Optional trigger Nodes:
+   - Required properties:
+@@ -40,6 +48,9 @@ adc0: adc at fffb0000 {
+ 	atmel,adc-trigger-register = <0x08>;
+ 	atmel,adc-use-external;
+ 	atmel,adc-vref = <3300>;
++	atmel,adc-res = <8 10>;
++	atmel,adc-res-names = "lowres", "highres";
++	atmel,adc-use-res = "lowres";
+ 
+ 	trigger at 0 {
+ 		trigger-name = "external-rising";
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index cca34bc..7c605d2 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -506,6 +506,9 @@
+ 				atmel,adc-drdy-mask = <0x10000>;
+ 				atmel,adc-status-register = <0x1c>;
+ 				atmel,adc-trigger-register = <0x04>;
++				atmel,adc-res = <8 10>;
++				atmel,adc-res-names = "lowres", "highres";
++				atmel,adc-use-res = "highres";
+ 
+ 				trigger at 0 {
+ 					trigger-name = "timer-counter-0";
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 253afed..70c776e 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -488,6 +488,9 @@
+ 				atmel,adc-drdy-mask = <0x10000>;
+ 				atmel,adc-status-register = <0x1c>;
+ 				atmel,adc-trigger-register = <0x08>;
++				atmel,adc-res = <8 10>;
++				atmel,adc-res-names = "lowres", "highres";
++				atmel,adc-use-res = "highres";
+ 
+ 				trigger at 0 {
+ 					trigger-name = "external-rising";
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 70c1f5d..e52862d 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -469,6 +469,9 @@
+ 				atmel,adc-drdy-mask = <0x1000000>;
+ 				atmel,adc-status-register = <0x30>;
+ 				atmel,adc-trigger-register = <0xc0>;
++				atmel,adc-res = <8 10>;
++				atmel,adc-res-names = "lowres", "highres";
++				atmel,adc-use-res = "highres";
+ 
+ 				trigger at 0 {
+ 					trigger-name = "external-rising";
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index 315bed1..f175a86 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -57,6 +57,8 @@ struct at91_adc_state {
+ 	u32			trigger_number;
+ 	bool			use_external;
+ 	u32			vref_mv;
++	u32			res;		/* resolution used for convertions */
++	bool			low_res;	/* the resolution corresponds to the lowest one */
+ 	wait_queue_head_t	wq_data_avail;
  };
  
--static const char *ssi_sel_clks[] = { "spll", "mpll", };
-+static const char *ssi_sel_clks[] = { "spll_gate", "mpll", };
+@@ -138,7 +140,7 @@ static int at91_adc_channel_init(struct iio_dev *idev)
+ 		chan->channel = bit;
+ 		chan->scan_index = idx;
+ 		chan->scan_type.sign = 'u';
+-		chan->scan_type.realbits = 10;
++		chan->scan_type.realbits = st->res;
+ 		chan->scan_type.storagebits = 16;
+ 		chan->info_mask = IIO_CHAN_INFO_SCALE_SHARED_BIT |
+ 			IIO_CHAN_INFO_RAW_SEPARATE_BIT;
+@@ -372,6 +374,59 @@ static int at91_adc_read_raw(struct iio_dev *idev,
+ 	return -EINVAL;
+ }
  
- enum mx27_clks {
- 	dummy, ckih, ckil, mpll, spll, mpll_main2, ahb, ipg, nfc_div, per1_div,
-@@ -82,7 +82,7 @@ enum mx27_clks {
- 	csi_ahb_gate, brom_ahb_gate, ata_ahb_gate, wdog_ipg_gate, usb_ipg_gate,
- 	uart6_ipg_gate, uart5_ipg_gate, uart4_ipg_gate, uart3_ipg_gate,
- 	uart2_ipg_gate, uart1_ipg_gate, ckih_div1p5, fpm, mpll_osc_sel,
--	mpll_sel, clk_max
-+	mpll_sel, spll_gate, clk_max
- };
++static int at91_adc_of_get_resolution(struct at91_adc_state *st,
++				      struct platform_device *pdev)
++{
++	struct iio_dev *idev = iio_priv_to_dev(st);
++	struct device_node *np = pdev->dev.of_node;
++	int count, i, ret = 0;
++	char *res_name, *s;
++	u32 *resolutions;
++
++	count = of_property_count_strings(np, "atmel,adc-res-names");
++	if (count < 2) {
++		dev_err(&idev->dev, "You must specified at least two resolution names for "
++				    "adc-res-names property in the DT\n");
++		return count;
++	}
++
++	resolutions = kmalloc(count * sizeof(*resolutions), GFP_KERNEL);
++	if (!resolutions)
++		return -ENOMEM;
++
++	if (of_property_read_u32_array(np, "atmel,adc-res", resolutions, count)) {
++		dev_err(&idev->dev, "Missing adc-res property in the DT.\n");
++		ret = -ENODEV;
++		goto ret;
++	}
++
++	if (of_property_read_string(np, "atmel,adc-use-res", (const char **)&res_name))
++		res_name = "highres";
++
++	for (i = 0; i < count; i++) {
++		if (of_property_read_string_index(np, "atmel,adc-res-names", i, (const char **)&s))
++			continue;
++
++		if (strcmp(res_name, s))
++			continue;
++
++		st->res = resolutions[i];
++		if (!strcmp(res_name, "lowres"))
++			st->low_res = true;
++		else
++			st->low_res = false;
++
++		dev_info(&idev->dev, "Resolution used: %u bits\n", st->res);
++		goto ret;
++	}
++
++	dev_err(&idev->dev, "There is no resolution for %s\n", res_name);
++
++ret:
++	kfree(resolutions);
++	return ret;
++}
++
+ static int at91_adc_probe_dt(struct at91_adc_state *st,
+ 			     struct platform_device *pdev)
+ {
+@@ -415,6 +470,10 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+ 	}
+ 	st->vref_mv = prop;
  
- static struct clk *clk[clk_max];
-@@ -104,6 +104,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 			ARRAY_SIZE(mpll_sel_clks));
- 	clk[mpll] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
- 	clk[spll] = imx_clk_pllv1("spll", "ckih", CCM_SPCTL0);
-+	clk[spll_gate] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
- 	clk[mpll_main2] = imx_clk_fixed_factor("mpll_main2", "mpll", 2, 3);
++	ret = at91_adc_of_get_resolution(st, pdev);
++	if (ret)
++		goto error_ret;
++
+ 	st->registers = devm_kzalloc(&idev->dev,
+ 				     sizeof(struct at91_adc_reg_desc),
+ 				     GFP_KERNEL);
+@@ -628,9 +687,16 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+ 	 */
+ 	ticks = round_up((st->startup_time * adc_clk /
+ 			  1000000) - 1, 8) / 8;
+-	at91_adc_writel(st, AT91_ADC_MR,
+-			(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
+-			(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
++
++	if (st->low_res)
++		at91_adc_writel(st, AT91_ADC_MR,
++				AT91_ADC_LOWRES |
++				(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
++				(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
++	else
++		at91_adc_writel(st, AT91_ADC_MR,
++				(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
++				(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
  
- 	if (mx27_revision() >= IMX_CHIP_REVISION_2_0) {
-@@ -121,7 +122,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk[per4_div] = imx_clk_divider("per4_div", "mpll_main2", CCM_PCDR1, 24, 6);
- 	clk[vpu_sel] = imx_clk_mux("vpu_sel", CCM_CSCR, 21, 1, vpu_sel_clks, ARRAY_SIZE(vpu_sel_clks));
- 	clk[vpu_div] = imx_clk_divider("vpu_div", "vpu_sel", CCM_PCDR0, 10, 6);
--	clk[usb_div] = imx_clk_divider("usb_div", "spll", CCM_CSCR, 28, 3);
-+	clk[usb_div] = imx_clk_divider("usb_div", "spll_gate", CCM_CSCR, 28, 3);
- 	clk[cpu_sel] = imx_clk_mux("cpu_sel", CCM_CSCR, 15, 1, cpu_sel_clks, ARRAY_SIZE(cpu_sel_clks));
- 	clk[clko_sel] = imx_clk_mux("clko_sel", CCM_CCSR, 0, 5, clko_sel_clks, ARRAY_SIZE(clko_sel_clks));
- 	if (mx27_revision() >= IMX_CHIP_REVISION_2_0)
+ 	/* Setup the ADC channels available on the board */
+ 	ret = at91_adc_channel_init(idev);
 -- 
-1.7.8.6
+1.7.10.4
