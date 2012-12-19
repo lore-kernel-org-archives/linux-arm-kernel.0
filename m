@@ -1,44 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Dec 2012 08:38:56 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix compillation error in mach-omap2/timer.c
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC9A56D@DBDE01.ent.ti.com>
-References: <1355910609-31336-1-git-send-email-peter.ujfalusi@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC9A56D@DBDE01.ent.ti.com>
-Message-ID: <20121219163856.GN4989@atomide.com>
+From: alekskartashov@parallels.com (Alexander Kartashov)
+Date: Wed, 19 Dec 2012 20:44:29 +0400
+Subject: [PATCH 2/3] kcmp: Drop x86 dependancy
+In-Reply-To: <1355935470-21001-1-git-send-email-alekskartashov@parallels.com>
+References: <20689.54803.684081.31731@pilspetsen.it.uu.se>
+ <1355935470-21001-1-git-send-email-alekskartashov@parallels.com>
+Message-ID: <1355935470-21001-3-git-send-email-alekskartashov@parallels.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Bedia, Vaibhav <vaibhav.bedia@ti.com> [121219 02:18]:
-> Hi Peter, Tony
-> 
-> On Wed, Dec 19, 2012 at 15:20:09, Ujfalusi, Peter wrote:
-> > prom_add_property() has been renamed to of_add_property()
-> > This patch fixes the following comilation error:
-> > 
-> > arch/arm/mach-omap2/timer.c: In function ?omap_get_timer_dt?:
-> > arch/arm/mach-omap2/timer.c:178:3: error: implicit declaration of function ?prom_add_property? [-Werror=implicit-function-declaration]
-> > cc1: some warnings being treated as errors
-> > make[1]: *** [arch/arm/mach-omap2/timer.o] Error 1
-> > make[1]: *** Waiting for unfinished jobs....
-> > 
-> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > ---
-> > Hi Tony,
-> > 
-> > today's mainline does not compile due to this API rename in of core.
-> > Not sure if we alreasy have fix for this pending.
-> > 
+From: Cyrill Gorcunov <gorcunov@openvz.org>
 
-Thanks applying.
+Signed-off-by: Cyrill Gorcunov <gorcunov@openvz.org>
+Signed-off-by: Alexander Kartashov <alekskartashov@parallels.com>
+---
+ kernel/Makefile |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 86e3285..9f7a139 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -25,9 +25,7 @@ endif
+ obj-y += sched/
+ obj-y += power/
  
-> There following patches for needed to get omap2plus_defconfig build working
-> 
-> https://patchwork.kernel.org/patch/1810481/ - address the build breakage due to header file cleanup
-> https://patchwork.kernel.org/patch/1810441/ - address the prom_add_property() issue
-> http://marc.info/?l=linux-arm-kernel&m=135589966017628&w=2 - this crept in during a merge commit.
-
-Thanks all these should be queued up somewhere now.
-
-Regards,
-
-Tony 
+-ifeq ($(CONFIG_CHECKPOINT_RESTORE),y)
+-obj-$(CONFIG_X86) += kcmp.o
+-endif
++obj-$(CONFIG_CHECKPOINT_RESTORE) += kcmp.o
+ obj-$(CONFIG_FREEZER) += freezer.o
+ obj-$(CONFIG_PROFILING) += profile.o
+ obj-$(CONFIG_STACKTRACE) += stacktrace.o
+-- 
+1.7.9.5
