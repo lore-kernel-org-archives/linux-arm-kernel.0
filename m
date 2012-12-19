@@ -1,35 +1,29 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 19 Dec 2012 18:33:05 +0100
-Subject: [PATCH 7/8] arm: mxs: Enable support for most SPI flashes
-In-Reply-To: <1355938386-14582-1-git-send-email-marex@denx.de>
-References: <1355938386-14582-1-git-send-email-marex@denx.de>
-Message-ID: <1355938386-14582-8-git-send-email-marex@denx.de>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 20 Dec 2012 06:34:52 +1300
+Subject: Inconsistency in clk framework
+In-Reply-To: <20121219092636.GW14363@n2100.arm.linux.org.uk>
+References: <1355890233.25599.4.camel@gitbox>
+ <20121219092636.GW14363@n2100.arm.linux.org.uk>
+Message-ID: <1355938492.27893.8.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable support for most SPI flashes, usually M25P80. They're used
-on MX28 designs a lot.
+On Wed, 2012-12-19 at 09:26 +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 19, 2012 at 05:10:33PM +1300, Tony Prisk wrote:
+> > Hi Mike,
+> > 
+> > In attempting to remove some IS_ERR_OR_NULL references, it was pointed
+> > out that clk_get() can return NULL if CONFIG_HAVE_CLK is not defined.
+> 
+> That is correct - but why is that a problem?  As far as users are
+> concerned, NULL is a valid clock.  If HAVE_CLK is undefined, do you
+> want all your drivers to suddenly stop working?
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/configs/mxs_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+That will be where the misunderstanding has occurred - I didn't consider
+NULL to be a valid clock.
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 0b7e466..2948fec 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -54,6 +54,9 @@ CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_DATAFLASH=y
-+CONFIG_MTD_M25P80=y
-+# CONFIG_M25PXX_USE_FAST_READ is not set
-+CONFIG_MTD_SST25L=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_GPMI_NAND=y
- CONFIG_MTD_UBI=y
--- 
-1.7.10.4
+Given that NULL is a valid clock, I guess all tests against get_clk and
+of_get_clk results should be IS_ERR_OR_NULL. Correct?
+
+Regards
+Tony P
