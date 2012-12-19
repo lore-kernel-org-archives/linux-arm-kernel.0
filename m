@@ -1,50 +1,185 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 Dec 2012 09:08:59 -0800
-Subject: [PATCH] ARM: dts: add pinctrl nodes for Exynos5250 SoC
-In-Reply-To: <CACRpkdZgSpkHW3mW_2ZhvUWVTX7Qppb5G8d+MdD3zUDOYCY-pw@mail.gmail.com>
-References: <1355403978-388-1-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdZgSpkHW3mW_2ZhvUWVTX7Qppb5G8d+MdD3zUDOYCY-pw@mail.gmail.com>
-Message-ID: <50D0A32B.9050400@samsung.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 19 Dec 2012 12:01:11 +0530
+Subject: [PATCH] ARM: tegra: dts: add aliases and DMA requestor for serial
+ controller
+Message-ID: <1355898671-3960-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/12 12:34, Linus Walleij wrote:
-> On Thu, Dec 13, 2012 at 2:06 PM, Thomas Abraham
-> <thomas.abraham@linaro.org>  wrote:
->
->> Add pinctrl device nodes for Exynos5250 SoC.
->>
->> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
->
-> Acked-by: Linus Walleij<linus.walleij@linaro.org>
->
->> - The individual device nodes which are using the old style Samsung gpio
->>    bindings have not been converted over to pinctrl bindings yet. It might
->>    also be important to know if Linus's pinctrl grab in device core patch
->>    (http://comments.gmane.org/gmane.linux.kernel/1409263) gets accepted.
->
-> Greg seems happy with it and the plan is to have it merged for kernel
-> v3.9.
->
-> I intend to push Greg for an ACK and queue it for linux-next right after the
-> merge window.
->
-Same here ;-)
+Add APB DMA requestor and serial aliases for serial controller.
+There will be two serial driver i.e. 8250 based simple serial driver
+and APB DMA based serial driver for higher baudrate and performace.
 
->> - This patch should not be merged for now which otherwise would break existing
->>    platforms which are using the old samsung gpio driver bindings. This patch
->>    is intended to get started with the migration to pinctrl framework.
->>    It is probably better to first prepare all the migration patches and
->>    merge them as a bunch.
->
-> Sure. I guess it'll be taken through the Samsung tree anyway, right?
->
-I'm OK on this, if Greg is OK, then let me pick this up in Samsung tree.
+The simple serial driver get enabled with compatible nvidia,tegra20-uart
+and APB DMA based driver will get enabled with compatible
+nvidia,tegra20-hsuart.
 
-Thanks.
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20.dtsi |   30 +++++++++++++++++++++++++-----
+ arch/arm/boot/dts/tegra30.dtsi |   31 ++++++++++++++++++++++++++-----
+ 2 files changed, 51 insertions(+), 10 deletions(-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index b8effa1..fe35c72 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -4,6 +4,14 @@
+ 	compatible = "nvidia,tegra20";
+ 	interrupt-parent = <&intc>;
+ 
++	aliases {
++		serial0 = &uarta;
++		serial1 = &uartb;
++		serial2 = &uartc;
++		serial3 = &uartd;
++		serial4 = &uarte;
++	};
++
+ 	host1x {
+ 		compatible = "nvidia,tegra20-host1x", "simple-bus";
+ 		reg = <0x50000000 0x00024000>;
+@@ -194,43 +202,55 @@
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 70006000 {
++	/*
++	 * There are two serial driver i.e. 8250 based simple serial
++	 * driver and APB DMA based serial driver for higher baudrate
++	 * and performace. To enable the 8250 based driver, the compatible
++	 * is "nvidia,tegra20-uart" and to enable the APB DMA based serial
++	 * driver, the comptible is "nvidia,tegra20-hsuart".
++	 */
++	uarta: serial at 70006000 {
+ 		compatible = "nvidia,tegra20-uart";
+ 		reg = <0x70006000 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 36 0x04>;
++		nvidia,dma-request-selector = <&apbdma 8>;
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 70006040 {
++	uartb: serial at 70006040 {
+ 		compatible = "nvidia,tegra20-uart";
+ 		reg = <0x70006040 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 37 0x04>;
++		nvidia,dma-request-selector = <&apbdma 9>;
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 70006200 {
++	uartc: serial at 70006200 {
+ 		compatible = "nvidia,tegra20-uart";
+ 		reg = <0x70006200 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 46 0x04>;
++		nvidia,dma-request-selector = <&apbdma 10>;
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 70006300 {
++	uartd: serial at 70006300 {
+ 		compatible = "nvidia,tegra20-uart";
+ 		reg = <0x70006300 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 90 0x04>;
++		nvidia,dma-request-selector = <&apbdma 19>;
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 70006400 {
++	uarte: serial at 70006400 {
+ 		compatible = "nvidia,tegra20-uart";
+ 		reg = <0x70006400 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 91 0x04>;
++		nvidia,dma-request-selector = <&apbdma 20>;
+ 		status = "disabled";
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 529fdb8..80a0edf 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -4,6 +4,14 @@
+ 	compatible = "nvidia,tegra30";
+ 	interrupt-parent = <&intc>;
+ 
++	aliases {
++		serial0 = &uarta;
++		serial1 = &uartb;
++		serial2 = &uartc;
++		serial3 = &uartd;
++		serial4 = &uarte;
++	};
++
+ 	host1x {
+ 		compatible = "nvidia,tegra30-host1x", "simple-bus";
+ 		reg = <0x50000000 0x00024000>;
+@@ -190,43 +198,56 @@
+ 		       0x70003000 0x3e4>; /* Mux registers */
+ 	};
+ 
+-	serial at 70006000 {
++	/*
++	 * There are two serial driver i.e. 8250 based simple serial
++	 * driver and APB DMA based serial driver for higher baudrate
++	 * and performace. To enable the 8250 based driver, the compatible
++	 * is "nvidia,tegra30-uart", "nvidia,tegra20-uart" and to enable
++	 * the APB DMA based serial driver, the comptible is
++	 * "nvidia,tegra30-hsuart", "nvidia,tegra20-hsuart".
++	 */
++	uarta: serial at 70006000 {
+ 		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+ 		reg = <0x70006000 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 36 0x04>;
++		nvidia,dma-request-selector = <&apbdma 8>;
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 70006040 {
++	uartb: serial at 70006040 {
+ 		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+ 		reg = <0x70006040 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 37 0x04>;
++		nvidia,dma-request-selector = <&apbdma 9>;
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 70006200 {
++	uartc: serial at 70006200 {
+ 		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+ 		reg = <0x70006200 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 46 0x04>;
++		nvidia,dma-request-selector = <&apbdma 10>;
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 70006300 {
++	uartd: serial at 70006300 {
+ 		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+ 		reg = <0x70006300 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 90 0x04>;
++		nvidia,dma-request-selector = <&apbdma 19>;
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 70006400 {
++	uarte: serial at 70006400 {
+ 		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+ 		reg = <0x70006400 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 91 0x04>;
++		nvidia,dma-request-selector = <&apbdma 20>;
+ 		status = "disabled";
+ 	};
+ 
+-- 
+1.7.1.1
