@@ -1,110 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Dec 2012 11:26:27 -0800
-Subject: [PATCH 6/8] ARM: OMAP2+: Disable code that currently does not work
- with multiplaform
-In-Reply-To: <20121219192354.22098.33408.stgit@muffinssi.local>
-References: <20121219192354.22098.33408.stgit@muffinssi.local>
-Message-ID: <20121219192627.22098.10760.stgit@muffinssi.local>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Wed, 19 Dec 2012 11:22:13 -0800
+Subject: [PATCH 4/4] clk: zynq: Use of_init_clk_data()
+In-Reply-To: <1355778135-32458-5-git-send-email-sboyd@codeaurora.org>
+References: <1355778135-32458-1-git-send-email-sboyd@codeaurora.org>
+ <1355778135-32458-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <b11edd0b-27ff-48b3-9f2a-1e7ab293cc34@CO9EHSMHS019.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We still need to fix up few places for multiplatform support,
-but that can proceed separately. Fix the issue by making the
-problem drivers depends !ARCH_MULTIPLATFORM for now.
+Hi Stephen,
 
-The remaining pieces that are not multiplatform compatible
-for omap2+ SoCs are:
+I guess Josh is the better person to talk about this, since he created the
+patches regarding common clock for mainline, but I tried running your series
+and ran into this:
 
-1. Some drivers are using custom omap_dm_timer calls
+Unable to handle kernel NULL pointer dereference at virtual address 0000002a
+pgd = c0004000
+[0000002a] *pgd=00000000
+Internal error: Oops: 5 [#1] PREEMPT ARM
+Modules linked in:
+CPU: 0    Tainted: G        W     (3.7.0-rc3-00025-gc11ffdd-dirty #246)
+PC is at __clk_prepare+0x20/0x80
+LR is at clk_prepare+0x2c/0x44
+pc : [<c031659c>]    lr : [<c0316628>]    psr: a0000153
+sp : ee02fdd0  ip : ee02fde8  fp : ee02fde4
+r10: 00000000  r9 : 00000000  r8 : c0587884
+r7 : 00000000  r6 : c05aab98  r5 : fffffffe  r4 : fffffffe
+r3 : 00000000  r2 : 00000000  r1 : 00000000  r0 : fffffffe
+Flags: NzCv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+Control: 18c5387d  Table: 00004059  DAC: 00000015
+Process swapper (pid: 1, stack limit = 0xee02e230)
+Stack: (0xee02fdd0 to 0xee030000)
+fdc0:                                     c05b6a18 fffffffe ee02fdfc ee02fde8
+fde0: c0316628 c0316588 ee085400 fffffffe ee02fe24 ee02fe00 c03c1358 c0316608
+fe00: c03c1328 ee085410 c05aab98 c05aab98 00000000 c0587884 ee02fe34 ee02fe28
+fe20: c026a5c0 c03c1334 ee02fe5c ee02fe38 c0268f50 c026a5a8 c026a7b8 c0313ac0
+fe40: ee085410 ee085410 ee085444 c05aab98 ee02fe7c ee02fe60 c02691c0 c0268e18
+fe60: c0269150 c05aab98 c0269150 00000000 ee02fea4 ee02fe80 c0267320 c026915c
+fe80: ee00948c ee096df0 c021e02c c05aab98 ed9a0bc0 c05ab3a8 ee02feb4 ee02fea8
+fea0: c0268a28 c02672d0 ee02fee4 ee02feb8 c0268408 c0268a0c c04b56d1 00000000
+fec0: ee02fee4 c05aab98 c0565e60 00000000 0000006f c0587884 ee02ff14 ee02fee8
+fee0: c0269990 c0268340 00000000 00000000 c0565e60 00000000 0000006f c0587884
+ff00: 00000000 00000000 ee02ff24 ee02ff18 c026a9cc c02698f0 ee02ff3c ee02ff28
+ff20: c0565e84 c026a984 ee02e000 ee02ff40 ee02ff74 ee02ff40 c00086f8 c0565e6c
+ff40: c04f72e4 00000000 ee02ff74 00000006 00000006 c0571dac c0571d8c 0000006f
+ff60: c0587884 00000000 ee02ffac ee02ff78 c03bf9c4 c0008664 00000006 00000006
+ff80: c05511a8 00000000 ee02ffac 00000000 c03bf8cc 00000000 00000000 00000000
+ffa0: 00000000 ee02ffb0 c000ea98 c03bf8d8 00000000 00000000 00000000 00000000
+ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 0158ec21 0eced1ff
+[<c031659c>] (__clk_prepare+0x20/0x80) from [<c0316628>] (clk_prepare+0x2c/0x44)
+[<c0316628>] (clk_prepare+0x2c/0x44) from [<c03c1358>] (xuartps_probe+0x30/0x1ac
+)
+[<c03c1358>] (xuartps_probe+0x30/0x1ac) from [<c026a5c0>] (platform_drv_probe+0x
+24/0x28)
+[<c026a5c0>] (platform_drv_probe+0x24/0x28) from [<c0268f50>] (driver_probe_devi
+ce+0x144/0x344)
+[<c0268f50>] (driver_probe_device+0x144/0x344) from [<c02691c0>] (__driver_attac
+h+0x70/0x94)
+[<c02691c0>] (__driver_attach+0x70/0x94) from [<c0267320>] (bus_for_each_dev+0x5
+c/0x8c)
+[<c0267320>] (bus_for_each_dev+0x5c/0x8c) from [<c0268a28>] (driver_attach+0x28/
+0x30)
+[<c0268a28>] (driver_attach+0x28/0x30) from [<c0268408>] (bus_add_driver+0xd4/0x
+254)
+[<c0268408>] (bus_add_driver+0xd4/0x254) from [<c0269990>] (driver_register+0xac
+/0x14c)
+[<c0269990>] (driver_register+0xac/0x14c) from [<c026a9cc>] (platform_driver_reg
+ister+0x54/0x68)
+[<c026a9cc>] (platform_driver_register+0x54/0x68) from [<c0565e84>] (xuartps_ini
+t+0x24/0x44)
+[<c0565e84>] (xuartps_init+0x24/0x44) from [<c00086f8>] (do_one_initcall+0xa0/0x
+170)
+[<c00086f8>] (do_one_initcall+0xa0/0x170) from [<c03bf9c4>] (kernel_init+0xf8/0x
+2ac)
+[<c03bf9c4>] (kernel_init+0xf8/0x2ac) from [<c000ea98>] (ret_from_fork+0x14/0x20
+)
+Code: e8bd4000 e2504000 01a05004 0a000015 (e594302c) 
+---[ end trace 1b75b31a2719ed1d ]---
+Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 
-There are two drivers that are directly usign omap hardware
-timers for PWM and DSP clocking: drivers/media/rc/ir-rx51.c and
-drivers/staging/tidspbridge/core/dsp-clock.c. These can be
-fixed for multiplatform by allowing a minimal set of hardware
-timers to be accessed, and for some functionality by using the
-hrtimer framework.
 
-2. Hardware OMAP4_ERRATA_I688 needs to be fixed up
+A probably unique thing I do is, I set the status of uart0 to disabled. This way
+I can reuse my rootfs which does not run getty on ttyPS1. And this worked fine
+before.
 
-This can't be enabled for multiplatform configurations in
-it's current form. It may be possible to fix it up to do
-instruction replacement early on during init. Luckily it
-looks like this errata does not seem to get hit with
-mainline kernel code alone at least currently.
-
-3. Legacy header needed for omap-sham.c
-
-Looks like it still needs mach/irqs.h for omap1 that
-does not exist for multiplatform systems. Just ifdef
-it for now.
-
-Cc: Timo Kokkonen <timo.t.kokkonen@iki.fi>
-Cc: Sean Young <sean@mess.org>
-Cc: "V?ctor Manuel J?quez Leal" <vjaquez@igalia.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: Omar Ramirez Luna <omar.ramirez@ti.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/Kconfig         |    2 +-
- drivers/crypto/omap-sham.c          |    3 +++
- drivers/media/rc/Kconfig            |    2 +-
- drivers/staging/tidspbridge/Kconfig |    2 +-
- 4 files changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 41b581f..492d764 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -397,7 +397,7 @@ config OMAP3_SDRC_AC_TIMING
- 
- config OMAP4_ERRATA_I688
- 	bool "OMAP4 errata: Async Bridge Corruption"
--	depends on ARCH_OMAP4
-+	depends on ARCH_OMAP4 && !ARCH_MULTIPLATFORM
- 	select ARCH_HAS_BARRIERS
- 	help
- 	  If a data is stalled inside asynchronous bridge because of back
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index 1d75e6f..d65f22c 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -38,7 +38,10 @@
- #include <crypto/internal/hash.h>
- 
- #include <linux/omap-dma.h>
-+
-+#ifdef CONFIG_ARCH_OMAP1
- #include <mach/irqs.h>
-+#endif
- 
- #define SHA_REG_DIGEST(x)		(0x00 + ((x) * 0x04))
- #define SHA_REG_DIN(x)			(0x1C + ((x) * 0x04))
-diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
-index 79ba242..19f3563 100644
---- a/drivers/media/rc/Kconfig
-+++ b/drivers/media/rc/Kconfig
-@@ -291,7 +291,7 @@ config IR_TTUSBIR
- 
- config IR_RX51
- 	tristate "Nokia N900 IR transmitter diode"
--	depends on OMAP_DM_TIMER && LIRC
-+	depends on OMAP_DM_TIMER && LIRC && !ARCH_MULTIPLATFORM
- 	---help---
- 	   Say Y or M here if you want to enable support for the IR
- 	   transmitter diode built in the Nokia N900 (RX51) device.
-diff --git a/drivers/staging/tidspbridge/Kconfig b/drivers/staging/tidspbridge/Kconfig
-index 0dd479f..60848f1 100644
---- a/drivers/staging/tidspbridge/Kconfig
-+++ b/drivers/staging/tidspbridge/Kconfig
-@@ -4,7 +4,7 @@
- 
- menuconfig TIDSPBRIDGE
- 	tristate "DSP Bridge driver"
--	depends on ARCH_OMAP3
-+	depends on ARCH_OMAP3 && !ARCH_MULTIPLATFORM
- 	select OMAP_MBOX_FWK
- 	help
- 	  DSP/BIOS Bridge is designed for platforms that contain a GPP and
+	Soren
