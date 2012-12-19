@@ -1,61 +1,69 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 19 Dec 2012 12:34:14 +0000
-Subject: [PATCH 2/2] MAINTAINERS: Add an entry for omap related .dts files
-In-Reply-To: <20121214194452.9874.40037.stgit@muffinssi.local>
-References: <20121214194325.9874.95898.stgit@muffinssi.local>
- <20121214194452.9874.40037.stgit@muffinssi.local>
-Message-ID: <20121219123414.32B5E3E0AD7@localhost>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 19 Dec 2012 13:36:17 +0100
+Subject: [PATCH 1/1] ARM: dts: omap3-igep: remove VSIM regulator
+In-Reply-To: <CAAwP0s2oJCcvCgQ6UrcnLJpt7K7AdHhVWGOthhgc4v9AgmaHEQ@mail.gmail.com>
+References: <1355532740-5956-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CAAwP0s2oJCcvCgQ6UrcnLJpt7K7AdHhVWGOthhgc4v9AgmaHEQ@mail.gmail.com>
+Message-ID: <50D1B4C1.4060502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Dec 2012 11:44:52 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> All your omap .dts files are belong to us.
-> 
-> Beno??t has been doing a good job picking up most of the
-> omap .dts files so far. Let's make sure we both get
-> cc:ed for the related patches.
-> 
-> The .dts patches need to be queued by us as separate
-> patches from drivers and other code changes to avoid
-> pointless merge conflists like we saw with v3.8
-> networking changes.
-> 
-> Cc: Beno??t Cousson <b-cousson@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Hi Javier,
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+On 12/19/2012 10:31 AM, Javier Martinez Canillas wrote:
+> On Sat, Dec 15, 2012 at 1:52 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> commit 5a8095e9 ARM: dts: Add omap3-beagle.dts
+>>
+>> moved the VSIM regulator definition to the twl4030.dtsi to avoid
+>> duplication. A definition for the VSIM regulator was also present
+>> on omap3-igep.dtsi which leads to the following build error:
+>>
+>> DTC     arch/arm/boot/dts/omap3-igep0020.dtb
+>> DTC     arch/arm/boot/dts/omap3-igep0030.dtb
+>> ERROR (duplicate_label): Duplicate label 'vsim' on /ocp/i2c at 48070000/twl at 48/regulator-vsim and /ocp/i2c at 48070000/twl at 48/regulator at 10
+>> ERROR: Input tree has errors, aborting (use -f to force output)
+>> ERROR (duplicate_label): Duplicate label 'vsim' on /ocp/i2c at 48070000/twl at 48/regulator-vsim and /ocp/i2c at 48070000/twl at 48/regulator at 10
+>> ERROR: Input tree has errors, aborting (use -f to force output)
+>> make[1]: *** [arch/arm/boot/dts/omap3-igep0020.dtb] Error 2
+>> make[1]: *** Waiting for unfinished jobs....
+>> make[1]: *** [arch/arm/boot/dts/omap3-igep0030.dtb] Error 2
+>> make: *** [dtbs] Error 2
+>>
+>> Since IGEP devices uses the same PMIC as Beagle boards, the VSIM
+>> definition from twl4030.dtsi can be used.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>  arch/arm/boot/dts/omap3-igep.dtsi |    6 ------
+>>  1 files changed, 0 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+>> index 125fe00..de708ca 100644
+>> --- a/arch/arm/boot/dts/omap3-igep.dtsi
+>> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
+>> @@ -43,12 +43,6 @@
+>>                 interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+>>                 interrupt-parent = <&intc>;
+>>
+>> -               vsim: regulator at 10 {
+>> -                       compatible = "ti,twl4030-vsim";
+>> -                       regulator-min-microvolt = <1800000>;
+>> -                       regulator-max-microvolt = <3000000>;
+>> -               };
+>> -
+>>                 twl_audio: audio {
+>>                         compatible = "ti,twl4030-audio";
+>>                         codec {
+> 
+> Hi Benoit,
+> 
+> It is ok for you that I send delta patches for the IGEP DT initial
+> support [1] such as this patch and the MMC device node mux pins setup
+> [2] or should I merge these changes and resend a new patch-set?
 
-> ---
->  MAINTAINERS |    9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 0bc485c..4927e80 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -5253,6 +5253,15 @@ F:	arch/arm/*omap*/
->  F:	drivers/i2c/busses/i2c-omap.c
->  F:	include/linux/i2c-omap.h
->  
-> +OMAP DEVICE TREE SUPPORT
-> +M:	Beno??t Cousson <b-cousson@ti.com>
-> +M:	Tony Lindgren <tony@atomide.com>
-> +L:	linux-omap at vger.kernel.org
-> +L:	devicetree-discuss at lists.ozlabs.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	arch/arm/boot/dts/*omap*
-> +F:	arch/arm/boot/dts/*am3*
-> +
->  OMAP CLOCK FRAMEWORK SUPPORT
->  M:	Paul Walmsley <paul@pwsan.com>
->  L:	linux-omap at vger.kernel.org
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+It is always better to re-send a clean patch set instead of fixing a
+previously broken one. It will be bisect friendly.
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+Regards,
+Benoit
