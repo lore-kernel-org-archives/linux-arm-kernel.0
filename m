@@ -1,53 +1,45 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 19 Dec 2012 09:06:12 +0800
-Subject: [PATCH V3 1/5] ARM: tegra: add pending SGI checking API
-In-Reply-To: <CAMbhsRSDwSoHoEs93NZhDchCS28-vQCuW2p+kqfNKeqLygL2sQ@mail.gmail.com>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <1355797861-12759-2-git-send-email-josephl@nvidia.com>
- <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
- <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
- <CAMbhsRSDwSoHoEs93NZhDchCS28-vQCuW2p+kqfNKeqLygL2sQ@mail.gmail.com>
-Message-ID: <1355879172.4449.10.camel@jlo-ubuntu-64.nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 19 Dec 2012 10:49:33 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Fix PFC - MOD_SEL2 missed an entry
+In-Reply-To: <OFBEDBF9C1.A0917823-ON80257AD8.0034C56B-80257AD8.0036CE31@eu.necel.com>
+References: <1353601737-21641-1-git-send-email-phil.edworthy@renesas.com>
+ <20121218023610.GV28065@verge.net.au>
+ <20121218035144.GC13353@verge.net.au>
+ <20121218042854.GH29354@verge.net.au>
+ <OFBEDBF9C1.A0917823-ON80257AD8.0034C56B-80257AD8.0036CE31@eu.necel.com>
+Message-ID: <20121219014933.GB11055@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-12-19 at 03:36 +0800, Colin Cross wrote:
-> On Tue, Dec 18, 2012 at 2:15 AM, Peter De Schrijver
-> <pdeschrijver@nvidia.com> wrote:
-> > On Tue, Dec 18, 2012 at 03:42:24AM +0100, Colin Cross wrote:
-> >> On Mon, Dec 17, 2012 at 6:30 PM, Joseph Lo <josephl@nvidia.com> wrote:
-> >> > The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
-> >> > include the power of GIC. That caused the SGI (Software Generated
-> >> > Interrupt) been lost. Because the SGI can't wake up the CPU that in
-> >> > the "powered-down" CPU idle mode. We need to check if there is any
-> >> > pending SGI when go into "powered-down" CPU idle mode. This is important
-> >> > especially when applying the coupled cpuidle framework into "power-down"
-> >> > cpuidle dirver. Because the coupled cpuidle framework may have the
-> >> > chance that misses IPI_SINGLE_FUNC handling sometimes.
-> >>
-> >> This problem exists for any GIC-based SoC, and needs to be fixed in
-> >> gic_cpu_save or gic_dist_save, whichever one loses the interrupt.
-> >
-> > Not necessarily. It depends on the SoC design. On Tegra20, the entire CPU
-> > cluster is railgated, including the GIC. This causes a pending IPI to be lost.
-> > But for example on OMAP4, only the actual CPU cores are powergated. The GIC
-> > stays alive until also the core domain hits idle. By that time a potential
-> > pending IPI has long woken up the target CPU again, so no additional
-> > checks are needed for functional correct behavior.
+On Tue, Dec 18, 2012 at 09:58:35AM +0000, phil.edworthy at renesas.com wrote:
+> Hi Simon,
 > 
-> I'm not sure that is correct for OMAP4.  C2 and C3 will put the power
-> rail for the GIC in retention, and I don't think an IPI will wake it
-> up.  I believe the same problem also exists for Exynos5.  In any case,
-> checking for an IPI early during idle and aborting won't hurt those
-> platforms, so I still think it should be in the GIC driver and not by
-> mapping the GIC registers into a separate driver.
+> > On Tue, Dec 18, 2012 at 12:51:44PM +0900, Simon Horman wrote:
+> > > On Tue, Dec 18, 2012 at 11:36:10AM +0900, Simon Horman wrote:
+> > > > On Thu, Nov 22, 2012 at 04:28:57PM +0000, Phil Edworthy wrote:
+> > > > > The list of functions selected by the MOD_SEL2 register was 
+> missing
+> > > > > an entry. This caused all entries after this to modify the 
+> MOD_SEL2
+> > > > > register incorrectly.
+> > > > 
+> > > > Laurent, can you handle this in your series?
+> > > > I believe it removes this file.
+> > > 
+> > > Sorry, I missed the fact that this is for stable.
+> > > Laurent, can you handle upstream and I'll handle stable?
+> > 
+> > Sorry, yet another thing.
+> > 
+> > Phil, could you explain what problems manifest at for users without this
+> > change? To be included in stable it is important that it solves a 
+> problem
+> > that actually manifests.
+> 
+> If the user requests certain pin functionality (e.g. any HSPI2_B pins such 
+> as GPIO_FN_HSPI_CLK2_B), the MOD_SEL2 register won't be set up correctly, 
+> so it won't work. I am not sure if that warrants going onto stable or not 
+> - your call!
 
-Hi Colin,
-
-If I move this code into common GIC driver, should I just take care
-pending SGI also?
-
-I will try to create a RFC patch for this.
-
-Thanks,
-Joseph
+Thanks. At this stage I think that it isn't stable material.
+Regardless, I will see about getting the fix included in 3.8.
