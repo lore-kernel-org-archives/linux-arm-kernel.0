@@ -1,34 +1,60 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 19 Dec 2012 10:16:15 +0000
-Subject: [PATCH] ARM: OMAP2+: Fix compillation error in mach-omap2/timer.c
-In-Reply-To: <1355910609-31336-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1355910609-31336-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC9A56D@DBDE01.ent.ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 19 Dec 2012 10:19:34 +0000
+Subject: [RFC PATCH 2/5] clockevents: Add generic timer broadcast receiver
+In-Reply-To: <50D0EB67.2060802@codeaurora.org>
+References: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
+ <1355832418-31692-3-git-send-email-mark.rutland@arm.com>
+ <50D0EB67.2060802@codeaurora.org>
+Message-ID: <20121219101934.GD32484@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter, Tony
+On Tue, Dec 18, 2012 at 10:17:11PM +0000, Stephen Boyd wrote:
+> On 12/18/12 04:06, Mark Rutland wrote:
+> > diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+> > index f113755..c2dd022 100644
+> > --- a/kernel/time/tick-broadcast.c
+> > +++ b/kernel/time/tick-broadcast.c
+> > @@ -125,6 +125,21 @@ int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu)
+> >  	return ret;
+> >  }
+> >  
+> > +int tick_receive_broadcast(void)
+> > +{
+> > +	struct tick_device *td = this_cpu_ptr(&tick_cpu_device);
+> > +	struct clock_event_device *evt = td->evtdev;
+> > +
+> > +	if (!evt)
+> > +		return -ENODEV;
+> > +
+> > +	if (!evt->event_handler)
+> > +		return -EINVAL;
+> > +
+> 
+> Does this actually happen? It's not obvious to me how it does.
 
-On Wed, Dec 19, 2012 at 15:20:09, Ujfalusi, Peter wrote:
-> prom_add_property() has been renamed to of_add_property()
-> This patch fixes the following comilation error:
+Taking a look at it, I don't think it does. Any tick_device's
+clock_event_device should have an event_handler. I'll drop this check.
+
+A tick device might not have a clock_event_device registered in some cases --
+the x86 lapic timer has to deal with interrupts pending across a kexec, where
+interrupts are enabled before local timers are registered. I'm not sure how
+common this problem might be though, and whether it should be dealt with here
+or elsewhere.
+
+> > +	evt->event_handler(evt);
+> > +	return 0;
+> > +}
+> > +
+> >  /*
+> >   * Broadcast the event to the cpus, which are set in the mask (mangled).
+> >   */
 > 
-> arch/arm/mach-omap2/timer.c: In function ?omap_get_timer_dt?:
-> arch/arm/mach-omap2/timer.c:178:3: error: implicit declaration of function ?prom_add_property? [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
-> make[1]: *** [arch/arm/mach-omap2/timer.o] Error 1
-> make[1]: *** Waiting for unfinished jobs....
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
-> Hi Tony,
-> 
-> today's mainline does not compile due to this API rename in of core.
-> Not sure if we alreasy have fix for this pending.
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
 
-There following patches for needed to get omap2plus_defconfig build working
-
-https://patchwork.kernel.org/patch/1810481/ - address the build breakage due to header file cleanup
-https://patchwork.kernel.org/patch/1810441/ - address the prom_add_property() issue
-http://marc.info/?l=linux-arm-kernel&m=135589966017628&w=2 - this crept in during a merge commit.
+Thanks,
+Mark.
