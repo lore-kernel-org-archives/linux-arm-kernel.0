@@ -1,94 +1,58 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Dec 2012 17:54:41 +0000
-Subject: [PATCH v2 2/7] vexpress: Match the "arm,
- sp810" DT entry for clock initialisation
-In-Reply-To: <1355939686-23728-1-git-send-email-catalin.marinas@arm.com>
-References: <1355939686-23728-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1355939686-23728-3-git-send-email-catalin.marinas@arm.com>
+Date: Wed, 19 Dec 2012 17:54:39 +0000
+Subject: [PATCH v2 0/7] arm64: ARMv8 RTSM model SoC support
+Message-ID: <1355939686-23728-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the clk-vexpress.c implementation relies on the vexpress code
-to call the vexpress_clk_of_init() function which performs the SP810
-initialisation. This patch adds "arm,sp810" to the clock DT match array
-allowing of_clk_init() to call the vexpress_sp810_of_setup() function.
-In case of CONFIG_ARM64, make vexpress_clk_of_init() an arch_initcall().
+Hi,
 
-Note that SP810 requires the fixed clocks to be already registered.
-Since the clock subsystem does not handle DT dependencies, the
-corresponding DT entries must be in the correct order.
+Following feedback from Arnd, I moved the vexpress clocks initialisation
+in clk-vexpress.c and removed the arch/arm64/platorms directory
+entirely. We still have an ARCH_VEXPRESS Kconfig entry since the related
+code under drivers/ requires it but otherwise the SoC support is much
+simplified.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
----
+The 2nd patch is trickier as it relies on the clocks order in the DT
+(more comments in the patch log)
 
-The "Note" above worries me a bit. There is another way like calling
-of_clk_init() twice, with two match arrays - the original one and
-another just for sp810. Suggestions welcome.
 
-Not tested on AArch32 code yet.
+Catalin Marinas (6):
+  arm: Move sp810.h to include/linux/amba/
+  vexpress: Match the "arm,sp810" DT entry for clock initialisation
+  arm64: Always select ARM_AMBA and GENERIC_GPIO
+  arm64: Populate the platform devices
+  arm64: Enable ARMv8 RTSM model (SoC) support
+  arm64: Add simple earlyprintk support
 
- drivers/clk/versatile/clk-vexpress.c | 28 +++++++++++++++++-----------
- include/linux/vexpress.h             |  2 +-
- 2 files changed, 18 insertions(+), 12 deletions(-)
+Pawel Moll (1):
+  arm64: Add dts files for the ARMv8 RTSM model
 
-diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
-index 4f83ff9..a3754e7 100644
---- a/drivers/clk/versatile/clk-vexpress.c
-+++ b/drivers/clk/versatile/clk-vexpress.c
-@@ -98,21 +98,11 @@ struct clk *vexpress_sp810_of_get(struct of_phandle_args *clkspec, void *data)
- 	return vexpress_sp810_timerclken[clkspec->args[0]];
- }
- 
--static const __initconst struct of_device_id vexpress_fixed_clk_match[] = {
--	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
--	{ .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
--	{}
--};
--
--void __init vexpress_clk_of_init(void)
-+static void __init vexpress_sp810_of_setup(struct device_node *node)
- {
--	struct device_node *node;
- 	struct clk *clk;
- 	struct clk *refclk, *timclk;
- 
--	of_clk_init(vexpress_fixed_clk_match);
--
--	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
- 	vexpress_sp810_init(of_iomap(node, 0));
- 	of_clk_add_provider(node, vexpress_sp810_of_get, NULL);
- 
-@@ -138,4 +128,20 @@ void __init vexpress_clk_of_init(void)
- 				"v2m-timer1", "sp804"));
- }
- 
-+static const __initconst struct of_device_id vexpress_clk_match[] = {
-+	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
-+	{ .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
-+	{ .compatible = "arm,sp810", .data = vexpress_sp810_of_setup, },
-+	{}
-+};
-+
-+int __init vexpress_clk_of_init(void)
-+{
-+	of_clk_init(vexpress_clk_match);
-+	return 0;
-+}
-+#ifdef CONFIG_ARM64
-+arch_initcall(vexpress_clk_of_init);
-+#endif
-+
- #endif
-diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
-index c52215f..b55ae6a 100644
---- a/include/linux/vexpress.h
-+++ b/include/linux/vexpress.h
-@@ -116,6 +116,6 @@ struct clk *vexpress_osc_setup(struct device *dev);
- void vexpress_osc_of_setup(struct device_node *node);
- 
- void vexpress_clk_init(void __iomem *sp810_base);
--void vexpress_clk_of_init(void);
-+int vexpress_clk_of_init(void);
- 
- #endif
+ Documentation/arm64/memory.txt                     |   2 +
+ arch/arm/plat-spear/restart.c                      |   2 +-
+ arch/arm64/Kconfig                                 |  16 +-
+ arch/arm64/Kconfig.debug                           |   9 +
+ arch/arm64/boot/dts/Makefile                       |   2 +
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts             | 154 ++++++++++++++
+ arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi       | 234 +++++++++++++++++++++
+ arch/arm64/boot/dts/skeleton.dtsi                  |  13 ++
+ arch/arm64/configs/vexpress_defconfig              |  90 ++++++++
+ arch/arm64/include/asm/io.h                        |   3 +
+ arch/arm64/include/asm/memory.h                    |   1 +
+ arch/arm64/include/asm/mmu.h                       |   1 +
+ arch/arm64/kernel/Makefile                         |   1 +
+ arch/arm64/kernel/early_printk.c                   | 118 +++++++++++
+ arch/arm64/kernel/head.S                           |  12 +-
+ arch/arm64/kernel/setup.c                          |   8 +
+ arch/arm64/mm/mmu.c                                |  42 ++++
+ drivers/clk/versatile/clk-vexpress.c               |  31 +--
+ drivers/net/ethernet/smsc/Kconfig                  |   4 +-
+ .../asm/hardware => include/linux/amba}/sp810.h    |   0
+ include/linux/vexpress.h                           |   2 +-
+ 21 files changed, 725 insertions(+), 20 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+ create mode 100644 arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+ create mode 100644 arch/arm64/boot/dts/skeleton.dtsi
+ create mode 100644 arch/arm64/configs/vexpress_defconfig
+ create mode 100644 arch/arm64/kernel/early_printk.c
+ rename {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h (100%)
