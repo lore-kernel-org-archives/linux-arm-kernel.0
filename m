@@ -1,19 +1,34 @@
 From: alekskartashov@parallels.com (Alexander Kartashov)
-Date: Wed, 19 Dec 2012 17:27:54 +0400
-Subject: Enable the syscall kcmp in ARM Linux port
-Message-ID: <1355923677-18249-1-git-send-email-alekskartashov@parallels.com>
+Date: Wed, 19 Dec 2012 17:27:56 +0400
+Subject: [PATCH 2/3] kcmp: Drop x86 dependancy
+In-Reply-To: <1355923677-18249-1-git-send-email-alekskartashov@parallels.com>
+References: <1355923677-18249-1-git-send-email-alekskartashov@parallels.com>
+Message-ID: <1355923677-18249-3-git-send-email-alekskartashov@parallels.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear colleagues,
+From: Cyrill Gorcunov <gorcunov@openvz.org>
 
-I'm developing an ARM port of the CRIU suite
-so I need the syscall kcmp that is currently
-available only in the x86 port of the kernel.
+Signed-off-by: Cyrill Gorcunov <gorcunov@openvz.org>
+Signed-off-by: Alexander Kartashov <alekskartashov@parallels.com>
+---
+ kernel/Makefile |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-This patchset enables the syscall kcmp
-in the ARM port of the Linux kernel.
-
---
-Sincerely yours,
-Alexander Kartashov
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 86e3285..9f7a139 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -25,9 +25,7 @@ endif
+ obj-y += sched/
+ obj-y += power/
+ 
+-ifeq ($(CONFIG_CHECKPOINT_RESTORE),y)
+-obj-$(CONFIG_X86) += kcmp.o
+-endif
++obj-$(CONFIG_CHECKPOINT_RESTORE) += kcmp.o
+ obj-$(CONFIG_FREEZER) += freezer.o
+ obj-$(CONFIG_PROFILING) += profile.o
+ obj-$(CONFIG_STACKTRACE) += stacktrace.o
+-- 
+1.7.9.5
