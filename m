@@ -1,69 +1,57 @@
-From: pratikp@codeaurora.org (Pratik Patel)
-Date: Wed, 19 Dec 2012 13:06:54 -0800
-Subject: CoreSight framework and drivers
-In-Reply-To: <20121219112314.GA26329@mudshark.cambridge.arm.com>
-References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
- <20121219112314.GA26329@mudshark.cambridge.arm.com>
-Message-ID: <20121219210654.GA524@pratikp-linux.qualcomm.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 19 Dec 2012 15:09:31 -0600
+Subject: [PATCH 09/12] ARM: OMAP2+: powerdomain: skip register reads for
+ powerdomains known to be on
+In-Reply-To: <20121209200327.3196.27686.stgit@dusk.lan>
+References: <20121209200108.3196.12452.stgit@dusk.lan>
+ <20121209200327.3196.27686.stgit@dusk.lan>
+Message-ID: <50D22D0B.3050502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 11:23:14AM +0000, Will Deacon wrote:
-> Hi Pratik,
+Hi Paul,
+
+On 12/09/2012 02:03 PM, Paul Walmsley wrote:
+> There's no need to determine the current power state for powerdomains
+> that must be on while the kernel is running.  We mark these
+> powerdomains with a new flag, PWRDM_ACTIVE_WITH_KERNEL.  Any
+> powerdomain marked with that flag is reported as being in the ON power
+> state while the kernel is running.
 > 
-> On Tue, Dec 18, 2012 at 07:19:17PM +0000, pratikp at codeaurora.org wrote:
-> > This RFC is aimed at introducing CoreSight framework as well as
-> > individual CoreSight trace component drivers adhering to ARM
-> > CoreSight specification. Some prior discussion on this can be
-> > referred at [1].
-> > 
-> > There are 3 kinds of CoreSight trace components:
-> > 
-> > * Sources: Responsible for producing trace data to provide
-> >   visibility for the associated entity.
-> > 
-> > * Links: Transport components that carry trace data.
-> > 
-> > * Sinks: Collectors for storing trace data or acting as conduits
-> >   for off-chip trace data collection.
-> > 
-> > These components can be connected in various topologies to suite
-> > a particular SoCs tracing needs.
-> > 
-> > Framework is responsible for gathering and using the information
-> > about the registered CoreSight components and their connections
-> > to allow it to dynamically deduce the sequence of components
-> > representing a connection from a CoreSight source to the
-> > currently selected CoreSight sink. This helps the framework to
-> > program the correct set of components to satisfy user request.
-> 
-> From a million miles up, this looks like a sensible sort of design but I
-> really think you need to talk to Jon Hunter (he's at least on CC) about
-> this, especially where bindings are concerned. If we can get something that
-> you both agree on, then we can include the CTI with the other coresight
-> components and do a more in-depth review at that point.
-> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Beno?t Cousson <b-cousson@ti.com>
+> ---
+>  arch/arm/mach-omap2/powerdomain.c           |    9 ++++++---
+>  arch/arm/mach-omap2/powerdomain.h           |    4 ++++
+>  arch/arm/mach-omap2/powerdomains2xxx_data.c |    2 ++
+>  arch/arm/mach-omap2/powerdomains33xx_data.c |    3 ++-
+>  arch/arm/mach-omap2/powerdomains3xxx_data.c |    9 ++++++---
+>  arch/arm/mach-omap2/powerdomains44xx_data.c |    5 ++++-
+>  6 files changed, 24 insertions(+), 8 deletions(-)
 
-Thanks for the feedback.
+[snip]
 
-> Finally, how do you plan on exposing this data to the user? I think the only
-> sane way is to have per-device file descriptors which act as pipes to the raw
-> data but this means we need some readily available, open-source tooling (or
-> at least public specifications of the trace formats).
-> 
+> diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
+> index 704664c..b64213c 100644
+> --- a/arch/arm/mach-omap2/powerdomains44xx_data.c
+> +++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
+> @@ -53,7 +53,8 @@ static struct powerdomain core_44xx_pwrdm = {
+>  		[3] = PWRSTS_ON,	/* ducati_l2ram */
+>  		[4] = PWRSTS_ON,	/* ducati_unicache */
+>  	},
+> -	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+> +	.flags		  = (PWRDM_HAS_LOWPOWERSTATECHANGE |
+> +			     PWRDM_ACTIVE_WITH_KERNEL),
+>  };
 
-The sink drivers (ETB, TMC), expose a device node per device that
-is used to collect the raw data.
+My understanding is that for OMAP4 devices, the core power domain may
+not be active the same time as the MPU power domain. The Cortex-A9 has
+the ability to access some peripherals (such as timer, McBSP) via a
+private bus that does not require the core domain to be active. This is
+a difference from OMAP3 devices, where the core would always be on with
+the MPU power domain.
 
-Eg:, we have:
-/dev/coresight-etb
-/dev/coresight-tmc-etf
-/dev/coresight-tmc-etr
+Hopefully, Benoit will chime in if I have gotten this wrong ;-)
 
-where reading /dev/coresight-tmc-etf only works when the ETF is
-in circular buffer mode.
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Cheers
+Jon
