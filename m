@@ -1,72 +1,72 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Dec 2012 10:20:30 -0800
-Subject: [PATCH 4/4] clk: zynq: Use of_init_clk_data()
-In-Reply-To: <20121219172619.GB1005@beefymiracle.amer.corp.natinst.com>
-References: <1355778135-32458-1-git-send-email-sboyd@codeaurora.org>
- <1355778135-32458-5-git-send-email-sboyd@codeaurora.org>
- <20121219172619.GB1005@beefymiracle.amer.corp.natinst.com>
-Message-ID: <50D2056E.9000507@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 19 Dec 2012 10:27:20 -0800
+Subject: [GIT PULL 1/2] Samsung fixes-1 for v3.8-rc1
+Message-ID: <008401cdde16$7cfe2690$76fa73b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/12 09:26, Josh Cartwright wrote:
-> On Mon, Dec 17, 2012 at 01:02:15PM -0800, Stephen Boyd wrote:
->> Reduce lines of code and simplify this driver by using the
->> generic clock binding parsing function. This also fixes a bug
->> where the 'flags' member of the init struct is not initialized.
->>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: Josh Cartwright <josh.cartwright@ni.com>
->> Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>
->> ---
->>  drivers/clk/clk-zynq.c | 28 +++++++++-------------------
->>  1 file changed, 9 insertions(+), 19 deletions(-)
-> Stephen-
->
-> Is there a particular tree I should be testing this against?  Booting this set
-> on top of linus/master gives me:
+Hi Arnd, Olof
 
-I based the patches off of linux-next-20121217 although it seems like it
-applied fine for you on linus/master.
+Here is Samsung fixes-1 for v3.8-rc1.
+Most of them are trivial fixes which are for NULL pointer dereference, MSHC
+clocks instance names and exynos5440 stuff.
 
->    ------------[ cut here ]------------
->    WARNING: at drivers/clk/clk-zynq.c:159 zynq_periph_clk_setup+0x190/0x248()
->    [<c000d814>] (unwind_backtrace+0x0/0xf8) from [<c0016808>] (warn_slowpath_common+0x50/0x60)
->    [<c0016808>] (warn_slowpath_common+0x50/0x60) from [<c00168e0>] (warn_slowpath_null+0x1c/0x24)
->    [<c00168e0>] (warn_slowpath_null+0x1c/0x24) from [<c0193520>] (zynq_periph_clk_setup+0x190/0x248)
->    [<c0193520>] (zynq_periph_clk_setup+0x190/0x248) from [<c0192944>] (of_clk_init+0x30/0x58)
->    [<c0192944>] (of_clk_init+0x30/0x58) from [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48)
->    [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48) from [<c0185d54>] (time_init+0x28/0x30)
->    [<c0185d54>] (time_init+0x28/0x30) from [<c0183650>] (start_kernel+0x1a8/0x2c0)
->    [<c0183650>] (start_kernel+0x1a8/0x2c0) from [<00008074>] (0x8074)
->    ---[ end trace 1b75b31a2719ed1c ]---
->    ------------[ cut here ]------------
->    WARNING: at drivers/clk/clk-zynq.c:296 zynq_cpu_clk_setup+0x1e0/0x26c()
->    [<c000d814>] (unwind_backtrace+0x0/0xf8) from [<c0016808>] (warn_slowpath_common+0x50/0x60)
->    [<c0016808>] (warn_slowpath_common+0x50/0x60) from [<c00168e0>] (warn_slowpath_null+0x1c/0x24)
->    [<c00168e0>] (warn_slowpath_null+0x1c/0x24) from [<c0193304>] (zynq_cpu_clk_setup+0x1e0/0x26c)
->    [<c0193304>] (zynq_cpu_clk_setup+0x1e0/0x26c) from [<c0192944>] (of_clk_init+0x30/0x58)
->    [<c0192944>] (of_clk_init+0x30/0x58) from [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48)
->    [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48) from [<c0185d54>] (time_init+0x28/0x30)
->    [<c0185d54>] (time_init+0x28/0x30) from [<c0183650>] (start_kernel+0x1a8/0x2c0)
->    [<c0183650>] (start_kernel+0x1a8/0x2c0) from [<00008074>] (0x8074)
->    ---[ end trace 1b75b31a2719ed1d ]---
->    ------------[ cut here ]------------
->    WARNING: at drivers/clk/clk-zynq.c:347 zynq_cpu_clk_setup+0x210/0x26c()
->    [<c000d814>] (unwind_backtrace+0x0/0xf8) from [<c0016808>] (warn_slowpath_common+0x50/0x60)
->    [<c0016808>] (warn_slowpath_common+0x50/0x60) from [<c00168e0>] (warn_slowpath_null+0x1c/0x24)
->    [<c00168e0>] (warn_slowpath_null+0x1c/0x24) from [<c0193334>] (zynq_cpu_clk_setup+0x210/0x26c)
->    [<c0193334>] (zynq_cpu_clk_setup+0x210/0x26c) from [<c0192944>] (of_clk_init+0x30/0x58)
->    [<c0192944>] (of_clk_init+0x30/0x58) from [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48)
->    [<c0189708>] (xilinx_zynq_timer_init+0x40/0x48) from [<c0185d54>] (time_init+0x28/0x30)
->    [<c0185d54>] (time_init+0x28/0x30) from [<c0183650>] (start_kernel+0x1a8/0x2c0)
->    [<c0183650>] (start_kernel+0x1a8/0x2c0) from [<00008074>] (0x8074)
->    ---[ end trace 1b75b31a2719ed1e ]---
+Please pull from:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.8-samsung-fixes-1
 
-Can you show the code at those line numbers? There are quite a few
-WARN_ONs in that code and it's possible the WARN_ON is the one
-introduced in this patch.
+If any problems, please kindly let me know.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks.
+
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 752451f01c4567b506bf4343082682dbb8fb30dd:
+
+  Merge branch 'i2c-embedded/for-next' of
+git://git.pengutronix.de/git/wsa/linux (2012-12-18 16:51:10 -0800)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.8-samsung-fixes-1
+
+for you to fetch changes up to 454696fdc864aacaab978755d44d73d418c59788:
+
+  ARM: EXYNOS: Fix MSHC clocks instance names (2012-12-19 09:25:27 -0800)
+
+----------------------------------------------------------------
+Axel Lin (1):
+      pinctrl: exynos5440/samsung: Staticize pcfgs
+
+Dongjin Kim (1):
+      ARM: EXYNOS: Fix MSHC clocks instance names
+
+Kukjin Kim (3):
+      ARM: EXYNOS: fix build error when MFC is not selected
+      ARM: EXYNOS: fix GIC using for EXYNOS5440
+      ARM: EXYNOS: fix skip scu_enable() for EXYNOS5440
+
+Michael Spang (1):
+      ARM: SAMSUNG: Add missing include guard to gpio-core.h
+
+Sachin Kamat (4):
+      pinctrl: samsung: Fix a typo in pinctrl-samsung.h
+      ARM: EXYNOS: Fix NULL pointer dereference bug in Origen
+      ARM: EXYNOS: Fix NULL pointer dereference bug in SMDK4X12
+      ARM: EXYNOS: Fix NULL pointer dereference bug in SMDKV310
+
+ arch/arm/mach-exynos/clock-exynos4.c           |    4 ++--
+ arch/arm/mach-exynos/common.c                  |    3 ++-
+ arch/arm/mach-exynos/mach-exynos5-dt.c         |    2 ++
+ arch/arm/mach-exynos/mach-origen.c             |    4 ++--
+ arch/arm/mach-exynos/mach-smdk4x12.c           |    4 ++--
+ arch/arm/mach-exynos/mach-smdkv310.c           |    4 ++--
+ arch/arm/mach-exynos/platsmp.c                 |    2 +-
+ arch/arm/plat-samsung/include/plat/gpio-core.h |    5 +++++
+ drivers/pinctrl/pinctrl-exynos5440.c           |    2 +-
+ drivers/pinctrl/pinctrl-samsung.c              |    2 +-
+ drivers/pinctrl/pinctrl-samsung.h              |    2 +-
+ 11 files changed, 21 insertions(+), 13 deletions(-)
