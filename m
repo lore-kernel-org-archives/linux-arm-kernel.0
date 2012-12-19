@@ -1,76 +1,96 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Dec 2012 11:26:14 -0800
-Subject: [PATCH 1/8] ARM: OMAP2+: Limi omap initcalls to omap only on
- multiplatform kernels
+Date: Wed, 19 Dec 2012 11:26:20 -0800
+Subject: [PATCH 3/8] ARM: OMAP: Fix i2c cmdline initcall for multiplatform
 In-Reply-To: <20121219192354.22098.33408.stgit@muffinssi.local>
 References: <20121219192354.22098.33408.stgit@muffinssi.local>
-Message-ID: <20121219192614.22098.89676.stgit@muffinssi.local>
+Message-ID: <20121219192620.22098.41783.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to make sure that multiplatform kernels don't
-run omap initcalls when booted on other SoCs.
+We only want this initcall to run when the kernel is
+booted on omap SoCs. Fix the issue by initializing the
+the initcall from separately for omap1 and omap2+.
 
-Do this by adding wrapper macros for the initcalls that
-return early if soc_is_omap() test fails. This allows
-us to easily change the defines later if we have SoC
-specific init sections available.
+This fixes the issue for omap2+ multiplatform configs
+as we are using omap_subsys_initcall there.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/soc.h |   29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/mach-omap1/i2c.c             |    6 ++++++
+ arch/arm/mach-omap2/i2c.c             |    5 +++++
+ arch/arm/plat-omap/i2c.c              |    3 +--
+ arch/arm/plat-omap/include/plat/i2c.h |    6 ++++++
+ 4 files changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-index f31d907..092aedd 100644
---- a/arch/arm/mach-omap2/soc.h
-+++ b/arch/arm/mach-omap2/soc.h
-@@ -42,6 +42,9 @@
- #undef MULTI_OMAP2
- #undef OMAP_NAME
+diff --git a/arch/arm/mach-omap1/i2c.c b/arch/arm/mach-omap1/i2c.c
+index faca808..7f5761c 100644
+--- a/arch/arm/mach-omap1/i2c.c
++++ b/arch/arm/mach-omap1/i2c.c
+@@ -91,3 +91,9 @@ int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *pdata,
  
-+#ifdef CONFIG_ARCH_MULTIPLATFORM
-+#define MULTI_OMAP2
-+#endif
- #ifdef CONFIG_SOC_OMAP2420
- # ifdef OMAP_NAME
- #  undef  MULTI_OMAP2
-@@ -112,6 +115,11 @@ int omap_type(void);
-  */
- unsigned int omap_rev(void);
- 
-+static inline int soc_is_omap(void)
+ 	return platform_device_register(pdev);
+ }
++
++static  int __init omap_i2c_cmdline(void)
 +{
-+	return omap_rev() != 0;
++	return omap_register_i2c_bus_cmdline();
 +}
-+
- /*
-  * Get the CPU revision for OMAP devices
++subsys_initcall(omap_i2c_cmdline);
+diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
+index fbb9b15..9eb146f 100644
+--- a/arch/arm/mach-omap2/i2c.c
++++ b/arch/arm/mach-omap2/i2c.c
+@@ -165,3 +165,8 @@ int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *i2c_pdata,
+ 	return PTR_RET(pdev);
+ }
+ 
++static  int __init omap_i2c_cmdline(void)
++{
++	return omap_register_i2c_bus_cmdline();
++}
++omap_subsys_initcall(omap_i2c_cmdline);
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+index f9df624..58213d9 100644
+--- a/arch/arm/plat-omap/i2c.c
++++ b/arch/arm/plat-omap/i2c.c
+@@ -68,7 +68,7 @@ __setup("i2c_bus=", omap_i2c_bus_setup);
+  * Register busses defined in command line but that are not registered with
+  * omap_register_i2c_bus from board initialization code.
   */
-@@ -465,5 +473,26 @@ static inline unsigned int omap4_has_ ##feat(void)	\
+-static int __init omap_register_i2c_bus_cmdline(void)
++int __init omap_register_i2c_bus_cmdline(void)
+ {
+ 	int i, err = 0;
  
- OMAP4_HAS_FEATURE(perf_silicon, PERF_SILICON)
+@@ -83,7 +83,6 @@ static int __init omap_register_i2c_bus_cmdline(void)
+ out:
+ 	return err;
+ }
+-subsys_initcall(omap_register_i2c_bus_cmdline);
  
-+/*
-+ * We need to make sure omap initcalls don't run when
-+ * multiplatform kernels are booted on other SoCs.
-+ */
-+#define omap_initcall(level, fn)		\
-+static int __init __used __##fn(void)		\
-+{						\
-+	if (!soc_is_omap())			\
-+		return 0;			\
-+	return fn();				\
-+}						\
-+level(__##fn);
+ /**
+  * omap_register_i2c_bus - register I2C bus with device descriptors
+diff --git a/arch/arm/plat-omap/include/plat/i2c.h b/arch/arm/plat-omap/include/plat/i2c.h
+index 7a9028c..810629d 100644
+--- a/arch/arm/plat-omap/include/plat/i2c.h
++++ b/arch/arm/plat-omap/include/plat/i2c.h
+@@ -32,6 +32,7 @@ int omap_i2c_add_bus(struct omap_i2c_bus_platform_data *i2c_pdata,
+ extern int omap_register_i2c_bus(int bus_id, u32 clkrate,
+ 				 struct i2c_board_info const *info,
+ 				 unsigned len);
++extern int omap_register_i2c_bus_cmdline(void);
+ #else
+ static inline int omap_register_i2c_bus(int bus_id, u32 clkrate,
+ 				 struct i2c_board_info const *info,
+@@ -39,6 +40,11 @@ static inline int omap_register_i2c_bus(int bus_id, u32 clkrate,
+ {
+ 	return 0;
+ }
 +
-+#define omap_early_initcall(fn)		omap_initcall(early_initcall, fn)
-+#define omap_core_initcall(fn)		omap_initcall(core_initcall, fn)
-+#define omap_postcore_initcall(fn)	omap_initcall(postcore_initcall, fn)
-+#define omap_arch_initcall(fn)		omap_initcall(arch_initcall, fn)
-+#define omap_subsys_initcall(fn)	omap_initcall(subsys_initcall, fn)
-+#define omap_device_initcall(fn)	omap_initcall(device_initcall, fn)
-+#define omap_late_initcall(fn)		omap_initcall(late_initcall, fn)
-+
- #endif	/* __ASSEMBLY__ */
++static inline int omap_register_i2c_bus_cmdline(void)
++{
++	return 0;
++}
+ #endif
  
+ struct omap_hwmod;
