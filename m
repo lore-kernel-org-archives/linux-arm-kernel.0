@@ -1,43 +1,40 @@
-From: alekskartashov@parallels.com (Alexander Kartashov)
-Date: Wed, 19 Dec 2012 20:44:28 +0400
-Subject: [PATCH 1/3] kcmp: Include linux/ptrace.h
-In-Reply-To: <1355935470-21001-1-git-send-email-alekskartashov@parallels.com>
-References: <20689.54803.684081.31731@pilspetsen.it.uu.se>
- <1355935470-21001-1-git-send-email-alekskartashov@parallels.com>
-Message-ID: <1355935470-21001-2-git-send-email-alekskartashov@parallels.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 19 Dec 2012 16:53:21 +0000 (UTC)
+Subject: BUG: spinlock bad magic on CPU#0 on BeagleBone
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC9A69C@DBDE01.ent.ti.com>
+References: <B5906170F1614E41A8A28DE3B8D121433EC9A69C@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1212191650430.16873@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyrill Gorcunov <gorcunov@openvz.org>
+On Wed, 19 Dec 2012, Bedia, Vaibhav wrote:
 
-This makes it compile on s390. After all the ptrace_may_access
-(which we use this file) is declared exactly in linux/ptrace.h.
+> Current mainline on Beaglebone using the omap2plus_defconfig + 3 build fixes
+> is triggering a BUG()
 
-This is preparatory work to wire this syscall up on all archs.
+...
 
-Original-by: Heiko Carstens <heiko.carstens@de.ibm.com>
-Signed-off-by: Cyrill Gorcunov <gorcunov@openvz.org>
-CC: Andrew Morton <akpm@linux-foundation.org>
-CC: "H. Peter Anvin" <hpa@zytor.com>
-CC: Eric W. Biederman <ebiederm@xmission.com>
-CC: Pavel Emelyanov <xemul@parallels.com>
-CC: Alexander Kartashov <alekskartashov@parallels.com>
-Signed-off-by: Alexander Kartashov <alekskartashov@parallels.com>
----
- kernel/kcmp.c |    1 +
- 1 file changed, 1 insertion(+)
+> [    0.109688] Security Framework initialized
+> [    0.109889] Mount-cache hash table entries: 512
+> [    0.112674] BUG: spinlock bad magic on CPU#0, swapper/0/0
+> [    0.112724]  lock: atomic64_lock+0x240/0x400, .magic: 00000000, .owner: <none>/-1, .owner_cpu: 0
+> [    0.112782] [<c001af64>] (unwind_backtrace+0x0/0xf0) from [<c02c2010>] (do_raw_spin_lock+0x158/0x198)
+> [    0.112813] [<c02c2010>] (do_raw_spin_lock+0x158/0x198) from [<c04d89ec>] (_raw_spin_lock_irqsave+0x4c/0x58)
+> [    0.112844] [<c04d89ec>] (_raw_spin_lock_irqsave+0x4c/0x58) from [<c02cabf0>] (atomic64_add_return+0x30/0x5c)
+> [    0.112886] [<c02cabf0>] (atomic64_add_return+0x30/0x5c) from [<c0124564>] (alloc_mnt_ns.clone.14+0x44/0xac)
+> [    0.112914] [<c0124564>] (alloc_mnt_ns.clone.14+0x44/0xac) from [<c0124f4c>] (create_mnt_ns+0xc/0x54)
+> [    0.112951] [<c0124f4c>] (create_mnt_ns+0xc/0x54) from [<c06f31a4>] (mnt_init+0x120/0x1d4)
+> [    0.112978] [<c06f31a4>] (mnt_init+0x120/0x1d4) from [<c06f2d50>] (vfs_caches_init+0xe0/0x10c)
+> [    0.113005] [<c06f2d50>] (vfs_caches_init+0xe0/0x10c) from [<c06d4798>] (start_kernel+0x29c/0x300)
+> [    0.113029] [<c06d4798>] (start_kernel+0x29c/0x300) from [<80008078>] (0x80008078)
+> [    0.118290] CPU: Testing write buffer coherency: ok
+> [    0.118968] CPU0: thread -1, cpu 0, socket -1, mpidr 0
+> [    0.119053] Setting up static identity map for 0x804de2c8 - 0x804de338
+> [    0.120698] Brought up 1 CPUs
 
-diff --git a/kernel/kcmp.c b/kernel/kcmp.c
-index 30b7b22..e30ac0f 100644
---- a/kernel/kcmp.c
-+++ b/kernel/kcmp.c
-@@ -4,6 +4,7 @@
- #include <linux/string.h>
- #include <linux/random.h>
- #include <linux/module.h>
-+#include <linux/ptrace.h>
- #include <linux/init.h>
- #include <linux/errno.h>
- #include <linux/cache.h>
--- 
-1.7.9.5
+This is probably a memory corruption bug, there's probably some code 
+executing early that's writing outside its own data and trashing some 
+previously-allocated memory.
+
+
+- Paul
