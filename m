@@ -1,43 +1,45 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 19 Dec 2012 10:16:25 -0800
-Subject: [PATCH v2 0/7] Updates for Zynq's timer driver
-Message-ID: <ab760e55-61c2-46b0-b899-1935c213536e@CO1EHSMHS026.ehs.local>
+Date: Wed, 19 Dec 2012 10:18:40 -0800
+Subject: [PATCH v2 5/7] arm: zynq: timer: Remove redundant #includes
+In-Reply-To: <ab760e55-61c2-46b0-b899-1935c213536e@CO1EHSMHS026.ehs.local>
+References: <ab760e55-61c2-46b0-b899-1935c213536e@CO1EHSMHS026.ehs.local>
+Message-ID: <21207fff-dd51-4099-88f8-eea754e3d19c@CO1EHSMHS021.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I started to put some effort on syncing the Xilinx Linux tree with mainline and
-the timer driver is my first victim.
-Most commits are fixing style issues or clean up. Functionality is touched only
-in patches #2 and #7.
+Some #includes are implicitly included through others, some are
+just not needed.
 
-Some patches are present in almost identically in the Xilinx Linux tree and I
-took over 'Acked-by' lines from those commits.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Reviewed-by: Josh Cartwright <josh.cartwright@ni.com>
+---
+ arch/arm/mach-zynq/timer.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-To repost the patch with the arm-kernel list included I made this a v2 to avoid
-confusion about which series is the current one, though the patches are the same
-as the ones posted before on lkml only.
-I added Josh's 'Reviewed-by' line though.
-
-v2:
- - extend receipient list
- - adding reviewed by lines to commit messages
-
-	Soren
-
-
-Soren Brinkmann (7):
-  arm: zynq: timer: Replace PSS through PS
-  arm: zynq: timer: Remove unnecessary register write
-  arm: zynq: timer: Remove unused #defines
-  arm: zynq: timer: Align columns
-  arm: zynq: timer: Remove redundant #includes
-  arm: zynq: timer: Fix comment style
-  arm: zynq: timer: Set clock_event cpumask
-
- arch/arm/mach-zynq/common.c |   6 +-
- arch/arm/mach-zynq/common.h |   2 +-
- arch/arm/mach-zynq/timer.c  | 150 +++++++++++++++++++++-----------------------
- 3 files changed, 75 insertions(+), 83 deletions(-)
-
+diff --git a/arch/arm/mach-zynq/timer.c b/arch/arm/mach-zynq/timer.c
+index 4b81ae1..2b23d0f 100644
+--- a/arch/arm/mach-zynq/timer.c
++++ b/arch/arm/mach-zynq/timer.c
+@@ -15,20 +15,12 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+ #include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/types.h>
+-#include <linux/clocksource.h>
+ #include <linux/clockchips.h>
+-#include <linux/io.h>
+-#include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/slab.h>
+ #include <linux/clk-provider.h>
+-
+ #include "common.h"
+ 
+ /*
 -- 
 1.8.0.2
