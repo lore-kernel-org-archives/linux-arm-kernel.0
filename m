@@ -1,44 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Dec 2012 09:37:28 -0800
-Subject: [PATCH V5 2/2] ASoC: SAMSUNG: Add DT support for i2s
-References: <1355395373-22058-1-git-send-email-padma.v@samsung.com>
- <1355395373-22058-3-git-send-email-padma.v@samsung.com>
- <20121219132414.2CF653E0AD7@localhost>
- <20121219170937.GV4985@opensource.wolfsonmicro.com>
-Message-ID: <007401cdde0f$86096210$921c2630$@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 19 Dec 2012 17:54:43 +0000
+Subject: [PATCH v2 4/7] arm64: Populate the platform devices
+In-Reply-To: <1355939686-23728-1-git-send-email-catalin.marinas@arm.com>
+References: <1355939686-23728-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1355939686-23728-5-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Mark Brown wrote:
-> >
-> > On Wed, Dec 19, 2012 at 01:24:14PM +0000, Grant Likely wrote:
-> > > On Thu, 13 Dec 2012 16:12:53 +0530, Padmavathi Venna
-> > <padma.v@samsung.com> wrote:
-> >
-> > > > +- compatible : "samsung,samsung-i2s"
-> >
-> > > Isn't that kind of redundant?  :-)
-> >
-> > > The format of the compatible strings should be "<vendor>,<part-
-> number>-
-> > i2s".
-> > > Please be specific about the part number that you're doing the binding
-> > > for. For example; use "samsung,exynos4210-i2s" instead of
-> > "samsung,exynos-i2s".
-> >
-> > There are actually versioned IPs here (where the versions are used
-> > publically in a few places) but it's not clearly documented which is
-> > which.  It would be reasonable to use the IP versions here I think.
-> 
-Oops, I'm resending due to problem of my e-mail client.
+This patch add a device_initcall() to populate the platform devices
+(of_default_bus_match_table). This allows SoC implementations that do
+not require earlier initcalls to avoid any platform-specific code under
+arch/arm64.
 
-> I agree with Mark Brown. That makes sense, for example, see mfc.
-> 	compatible = "samsung,mfc-v6"
-> Same versioned IPs can be used on different SoCs, so in my opinion, in
-this
-> case, to use version is more clear.
-> 
+GIC and generic timer initialisation is done via FDT and CPU notifiers
+independently of the SoC code.
 
-- Kukjin
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/kernel/setup.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 7665a9b..894c1e5 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -39,6 +39,7 @@
+ #include <linux/proc_fs.h>
+ #include <linux/memblock.h>
+ #include <linux/of_fdt.h>
++#include <linux/of_platform.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/elf.h>
+@@ -289,6 +290,13 @@ static int __init topology_init(void)
+ }
+ subsys_initcall(topology_init);
+ 
++static int __init arm64_device_probe(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	return 0;
++}
++device_initcall(arm64_device_probe);
++
+ static const char *hwcap_str[] = {
+ 	"fp",
+ 	"asimd",
