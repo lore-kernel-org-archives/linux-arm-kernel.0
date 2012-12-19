@@ -1,40 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Dec 2012 11:27:28 +0000
-Subject: [PATCH v2 4/6] ARM: psci: add support for PSCI invocations from
- the kernel
-In-Reply-To: <alpine.LFD.2.02.1212181657020.1263@xanadu.home>
-References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
- <1355762141-29616-5-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1212171537230.1263@xanadu.home>
- <20121218101125.GC9072@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1212181657020.1263@xanadu.home>
-Message-ID: <20121219112728.GB26329@mudshark.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 19 Dec 2012 12:31:11 +0100
+Subject: [PATCH] gpio: mvebu-gpio: Make mvebu-gpio depend on OF_CONFIG
+Message-ID: <1355916672-26626-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 09:59:45PM +0000, Nicolas Pitre wrote:
-> On Tue, 18 Dec 2012, Will Deacon wrote:
-> > On Mon, Dec 17, 2012 at 08:51:27PM +0000, Nicolas Pitre wrote:
-> > > On Mon, 17 Dec 2012, Will Deacon wrote:
-> > > > +static int psci_cpu_suspend(struct psci_power_state state,
-> > > > +			    unsigned long entry_point)
-> > > > +{
-> > > > +	int err;
-> > > > +	u32 fn, power_state;
-> > > > +
-> > > > +	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
-> > > > +	power_state = psci_power_state_pack(state);
-> > > > +	err = invoke_psci_fn(fn, power_state, (u32)entry_point, 0);
-> > > 
-> > > Why do you need the u32 cast here?
-> > 
-> > That's a hangover from when entry_point was a void *. I'll fix that, thanks.
-> 
-> Hopefully you didn't pass virtual pointers to the PSCI call, did you?  :-)
+When building without device tree support (for the mv78x00 SoCs for
+example), the build failed because of_irq_count is undeclared. However
+mvebu-gpio is not designed to build without device tree support. So
+make it depends on OF_CONFIG, remove the #ifdef OF_CONFIG line and the
+platform_device_id.
 
-...and I'd have gotten away with it if it wasn't for those meddling kids!
+Tested on RD-78x00-mASA, DB-78460-BP, DB-88F6710-BP-DDR3,
+DB-MV784MP-GP, Mirabox and OpenBlocks AX3.
 
-It was also made worse by Marc's code working first time too (after I blamed
-the firmware like any sane kernel hacker would do :)
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/gpio/Kconfig      |    1 +
+ drivers/gpio/gpio-mvebu.c |   17 -----------------
+ 2 files changed, 1 insertion(+), 17 deletions(-)
 
-Will
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 8ae1f5b..682de75 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -172,6 +172,7 @@ config GPIO_MSM_V2
+ config GPIO_MVEBU
+ 	def_bool y
+ 	depends on PLAT_ORION
++	depends on OF
+ 	select GPIO_GENERIC
+ 	select GENERIC_IRQ_CHIP
+ 
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index 6dd51d8..0961f2c 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -41,7 +41,6 @@
+ #include <linux/io.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_device.h>
+-#include <linux/platform_device.h>
+ #include <linux/pinctrl/consumer.h>
+ 
+ /*
+@@ -469,19 +468,6 @@ static void mvebu_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	}
+ }
+ 
+-static struct platform_device_id mvebu_gpio_ids[] = {
+-	{
+-		.name = "orion-gpio",
+-	}, {
+-		.name = "mv78200-gpio",
+-	}, {
+-		.name = "armadaxp-gpio",
+-	}, {
+-		/* sentinel */
+-	},
+-};
+-MODULE_DEVICE_TABLE(platform, mvebu_gpio_ids);
+-
+ static struct of_device_id mvebu_gpio_of_match[] = {
+ 	{
+ 		.compatible = "marvell,orion-gpio",
+@@ -555,9 +541,7 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
+ 	mvchip->chip.base = id * MVEBU_MAX_GPIO_PER_BANK;
+ 	mvchip->chip.ngpio = ngpios;
+ 	mvchip->chip.can_sleep = 0;
+-#ifdef CONFIG_OF
+ 	mvchip->chip.of_node = np;
+-#endif
+ 
+ 	spin_lock_init(&mvchip->lock);
+ 	mvchip->membase = devm_request_and_ioremap(&pdev->dev, res);
+@@ -698,7 +682,6 @@ static struct platform_driver mvebu_gpio_driver = {
+ 		.of_match_table = mvebu_gpio_of_match,
+ 	},
+ 	.probe		= mvebu_gpio_probe,
+-	.id_table	= mvebu_gpio_ids,
+ };
+ 
+ static int __init mvebu_gpio_init(void)
+-- 
+1.7.9.5
