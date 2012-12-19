@@ -1,92 +1,99 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed, 19 Dec 2012 23:41:01 +0200
-Subject: [PATCH] ARM: OMAP1: nokia770: enable CBUS/Retu
-Message-ID: <1355953262-4352-1-git-send-email-aaro.koskinen@iki.fi>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 19 Dec 2012 22:15:22 +0000
+Subject: [PATCH] gpio: mvebu-gpio: Make mvebu-gpio depend on OF_CONFIG
+In-Reply-To: <1355916672-26626-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1355916672-26626-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121219221522.4A3343E0AD6@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add needed platform data so that it's possible to use Retu and e.g. feed
-Retu watchdog.
+On Wed, 19 Dec 2012 12:31:11 +0100, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+> When building without device tree support (for the mv78x00 SoCs for
+> example), the build failed because of_irq_count is undeclared. However
+> mvebu-gpio is not designed to build without device tree support. So
+> make it depends on OF_CONFIG, remove the #ifdef OF_CONFIG line and the
+> platform_device_id.
+> 
+> Tested on RD-78x00-mASA, DB-78460-BP, DB-88F6710-BP-DDR3,
+> DB-MV784MP-GP, Mirabox and OpenBlocks AX3.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- arch/arm/mach-omap1/board-nokia770.c |   43 ++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+Applied, thanks.
 
-diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
-index 24d2f2d..ecd3f2a 100644
---- a/arch/arm/mach-omap1/board-nokia770.c
-+++ b/arch/arm/mach-omap1/board-nokia770.c
-@@ -7,6 +7,7 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/irq.h>
- #include <linux/gpio.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-@@ -23,6 +24,8 @@
- 
- #include <linux/platform_data/keypad-omap.h>
- #include <linux/platform_data/lcd-mipid.h>
-+#include <linux/platform_data/gpio-omap.h>
-+#include <linux/platform_data/i2c-cbus-gpio.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -212,6 +215,45 @@ static inline void nokia770_mmc_init(void)
- }
- #endif
- 
-+#if defined(CONFIG_I2C_CBUS_GPIO) || defined(CONFIG_I2C_CBUS_GPIO_MODULE)
-+static struct i2c_cbus_platform_data nokia770_cbus_data = {
-+	.clk_gpio = OMAP_MPUIO(9),
-+	.dat_gpio = OMAP_MPUIO(10),
-+	.sel_gpio = OMAP_MPUIO(11),
-+};
-+
-+static struct platform_device nokia770_cbus_device = {
-+	.name   = "i2c-cbus-gpio",
-+	.id     = 2,
-+	.dev    = {
-+		.platform_data = &nokia770_cbus_data,
-+	},
-+};
-+
-+static struct i2c_board_info nokia770_i2c_board_info_2[] __initdata = {
-+	{
-+		I2C_BOARD_INFO("retu-mfd", 0x01),
-+	},
-+};
-+
-+static void __init nokia770_cbus_init(void)
-+{
-+	const int retu_irq_gpio = 62;
-+
-+	if (gpio_request_one(retu_irq_gpio, GPIOF_IN, "Retu IRQ"))
-+		return;
-+	irq_set_irq_type(gpio_to_irq(retu_irq_gpio), IRQ_TYPE_EDGE_RISING);
-+	nokia770_i2c_board_info_2[0].irq = gpio_to_irq(retu_irq_gpio);
-+	i2c_register_board_info(2, nokia770_i2c_board_info_2,
-+				ARRAY_SIZE(nokia770_i2c_board_info_2));
-+	platform_device_register(&nokia770_cbus_device);
-+}
-+#else /* CONFIG_I2C_CBUS_GPIO */
-+static void __init nokia770_cbus_init(void)
-+{
-+}
-+#endif /* CONFIG_I2C_CBUS_GPIO */
-+
- static void __init omap_nokia770_init(void)
- {
- 	/* On Nokia 770, the SleepX signal is masked with an
-@@ -233,6 +275,7 @@ static void __init omap_nokia770_init(void)
- 	mipid_dev_init();
- 	omap1_usb_init(&nokia770_usb_config);
- 	nokia770_mmc_init();
-+	nokia770_cbus_init();
- }
- 
- MACHINE_START(NOKIA770, "Nokia 770")
+g.
+
+> ---
+>  drivers/gpio/Kconfig      |    1 +
+>  drivers/gpio/gpio-mvebu.c |   17 -----------------
+>  2 files changed, 1 insertion(+), 17 deletions(-)
+> 
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index 8ae1f5b..682de75 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -172,6 +172,7 @@ config GPIO_MSM_V2
+>  config GPIO_MVEBU
+>  	def_bool y
+>  	depends on PLAT_ORION
+> +	depends on OF
+>  	select GPIO_GENERIC
+>  	select GENERIC_IRQ_CHIP
+>  
+> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+> index 6dd51d8..0961f2c 100644
+> --- a/drivers/gpio/gpio-mvebu.c
+> +++ b/drivers/gpio/gpio-mvebu.c
+> @@ -41,7 +41,6 @@
+>  #include <linux/io.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_device.h>
+> -#include <linux/platform_device.h>
+>  #include <linux/pinctrl/consumer.h>
+>  
+>  /*
+> @@ -469,19 +468,6 @@ static void mvebu_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  	}
+>  }
+>  
+> -static struct platform_device_id mvebu_gpio_ids[] = {
+> -	{
+> -		.name = "orion-gpio",
+> -	}, {
+> -		.name = "mv78200-gpio",
+> -	}, {
+> -		.name = "armadaxp-gpio",
+> -	}, {
+> -		/* sentinel */
+> -	},
+> -};
+> -MODULE_DEVICE_TABLE(platform, mvebu_gpio_ids);
+> -
+>  static struct of_device_id mvebu_gpio_of_match[] = {
+>  	{
+>  		.compatible = "marvell,orion-gpio",
+> @@ -555,9 +541,7 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
+>  	mvchip->chip.base = id * MVEBU_MAX_GPIO_PER_BANK;
+>  	mvchip->chip.ngpio = ngpios;
+>  	mvchip->chip.can_sleep = 0;
+> -#ifdef CONFIG_OF
+>  	mvchip->chip.of_node = np;
+> -#endif
+>  
+>  	spin_lock_init(&mvchip->lock);
+>  	mvchip->membase = devm_request_and_ioremap(&pdev->dev, res);
+> @@ -698,7 +682,6 @@ static struct platform_driver mvebu_gpio_driver = {
+>  		.of_match_table = mvebu_gpio_of_match,
+>  	},
+>  	.probe		= mvebu_gpio_probe,
+> -	.id_table	= mvebu_gpio_ids,
+>  };
+>  
+>  static int __init mvebu_gpio_init(void)
+> -- 
+> 1.7.9.5
+> 
+
 -- 
-1.7.10.4
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
