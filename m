@@ -1,69 +1,89 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 19 Dec 2012 13:11:51 +0000
-Subject: [PATCH 1/2] gpiolib: add gpio_export_with_name
-In-Reply-To: <20121218060415.GM23971@game.jcrosoft.org>
-References: <20121121101259.GQ4398@game.jcrosoft.org>
- <1353492849-29397-1-git-send-email-plagnioj@jcrosoft.com>
- <20121126135911.2F1D33E187C@localhost>
- <20121128201907.GF4398@game.jcrosoft.org>
- <20121218060415.GM23971@game.jcrosoft.org>
-Message-ID: <20121219131151.789043E0AD7@localhost>
+Date: Wed, 19 Dec 2012 13:24:14 +0000
+Subject: [PATCH V5 2/2] ASoC: SAMSUNG: Add DT support for i2s
+In-Reply-To: <1355395373-22058-3-git-send-email-padma.v@samsung.com>
+References: <1355395373-22058-1-git-send-email-padma.v@samsung.com>
+ <1355395373-22058-3-git-send-email-padma.v@samsung.com>
+Message-ID: <20121219132414.2CF653E0AD7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Dec 2012 07:04:15 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> On 21:19 Wed 28 Nov     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 13:59 Mon 26 Nov     , Grant Likely wrote:
-> > > On Wed, 21 Nov 2012 11:14:08 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> > > > allow to specify a name to an exported gpio
-> > > > 
-> > > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > 
-> > > The gpio sysfs ABI is already horrible, racy, and unsafe. Really, we
-> > > need a proper chrdev interface for controlling gpios. Sysfs is fine for
-> > > poking around and experimenting, but we cannot provide any fine grained
-> > > access control, locking or faster IO with the one-file-per-gpio sysfs
-> > > model.
-> > I do agree on this and mention it on the ML multiple times but this an ABI
-> > and we can not change it anymore we need to support it
-> > > So, no, I don't think this is a good idea to extend gpiolib in
-> > > this way.
-> > > 
-> > > However, I would be okay with making gpiochips first-class kobjects or
-> > > struct devices that appear as a child of the gpio controller device so
-> > > that userspace could interrogate the device tree node associated with
-> > > the device.
-> > the problem here is that I do not want the user space to become smart
-> > 
-> > I want the user space to known which gpio use for a specific feature
-> > as example you just want to read lack restistor to detect a hw features
-> > 
-> > you known the encoding it does not change cross hw but the pin to read do
-> > 
-> > So the idea is just to tell the user space use this pin to get your
-> > information
-> > 
-> > how to do you want to solve this?
-> > 
-> > This apply to other case:
-> >  - chip poweron/off
-> >  - reset
-> >  etc... all control by userspace
+On Thu, 13 Dec 2012 16:12:53 +0530, Padmavathi Venna <padma.v@samsung.com> wrote:
+> Add support for device based discovery.
 > 
-> ping
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  .../devicetree/bindings/sound/samsung-i2s.txt      |   75 +++++++
+>  sound/soc/samsung/dma.c                            |    1 +
+>  sound/soc/samsung/dma.h                            |    1 +
+>  sound/soc/samsung/i2s.c                            |  233 ++++++++++++++++----
+>  4 files changed, 269 insertions(+), 41 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/sound/samsung-i2s.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+> new file mode 100644
+> index 0000000..bff47b4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+> @@ -0,0 +1,75 @@
+> +* Samsung I2S controller
+> +
+> +Required SoC Specific Properties:
+> +
+> +- compatible : "samsung,samsung-i2s"
 
-I've already stated in other thread that I want to see a significantly
-better GPIO interface created. Something based on a char dev and can
-handle 'bursts' of gpio manipulations/reads. I'm not going to accept
-extensions to the sysfs interface.
+Isn't that kind of redundant?  :-)
 
-Within that context I would consider named subsets of the same interface
-that pre-packages a set of related gpio pins.
+The format of the compatible strings should be "<vendor>,<part-number>-i2s". 
+Please be specific about the part number that you're doing the binding
+for. For example; use "samsung,exynos4210-i2s" instead of "samsung,exynos-i2s".
 
-That said, I'm not convinced that direct gpio access is the abstraction
-that you want. If it is an interface for, say, reading feature bits,
-then it probably does want to be an actual driver that reads the
-gpios/registers/adc/etc and returns the parsed status in a file. That's
-the only way to reliably get the abstraction from your example above.
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +[PRELIMINARY: the dma channel allocation will change once there are
+> +official DMA bindings]
+> +
+> +- tx-dma-channel-secondary: The dma channel specifier for secondary tx
+> +  operations. The format of the dma specifier depends on the dma
+> +  controller.
+> +- tx-dma-channel: The dma channel specifier for tx operations. The format of
+> +  the dma specifier depends on the dma controller.
+> +- rx-dma-channel: The dma channel specifier for rx operations. The format of
+> +  the dma specifier depends on the dma controller.
+> +
+> +Optional SoC Specific Properties:
+> +
+> +- samsung,supports-6ch: If the I2S Primary sound source has 5.1 Channel
+> +  support, this flag is enabled.
+> +- samsung,supports-rstclr: This flag should be set if I2S software reset bit
+> +  control is required. When this flag is set I2S software reset bit will be
+> +  enabled or disabled based on need.
+> +- samsung,supports-secdai:If I2S block has a secondary FIFO and internal DMA,
+> +  then this flag is enabled.
+> +- samsung,idma-addr: Internal DMA register base address of the audio
+> +  sub system(used in secondary sound source).
+> +
+> +Required Board Specific Properties:
+> +
+> +- gpios: The gpio specifier for data out,data in, LRCLK, CDCLK and SCLK
+> +  interface lines. The format of the gpio specifier depends on the gpio
+> +  controller.
+> +  The syntax of samsung gpio specifier is
+> +	<[phandle of the gpio controller node]
+> +	 [pin number within the gpio controller]
+> +	 [mux function]
+> +	 [flags and pull up/down]
+> +	 [drive strength]>
+> +
+> +Aliases:
+> +
+> +- All the I2S controller nodes are represented in the aliases node using
+> +  the following format 'i2s{n}' where n is a unique number for the alias.
+
+Are the aliases actually being used now? If not, then drop this section.
+I don't see any references in this patch.
+
+Otherwise the binding looks good to me.
 
 g.
