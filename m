@@ -1,56 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Dec 2012 10:30:15 -0800
-Subject: [PATCH] ARM: EXYNOS: Fix compile error in dev-audio.c
-References: <000701cdd9d3$3b6a6e10$b23f4a30$%choi@samsung.com>
- <CAOesGMhgvsM7Fk-YpihjYM6h+xqK-ejBzPKEDypfdKEmHp6ZJg@mail.gmail.com>
-Message-ID: <008701cdde16$e58b2280$b0a16780$@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 19 Dec 2012 19:32:36 +0100
+Subject: [PATCH 0/3] IIO: AT91: add lowres, sleep and sample&hold time
+ missing support
+Message-ID: <20121219183236.GP23971@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Olof Johansson wrote:
-> 
-> [...]
-> 
-> > Looks like the breakage was caused by the following commit:
-> >
-> > commit 1974a042dd15f1f007a3a1a2dd7a23ca0e42c01d
-> > Author:     Padmavathi Venna <padma.v@samsung.com>
-> > AuthorDate: Wed Nov 28 16:17:48 2012 +0530
-> > Commit:     Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > CommitDate: Wed Nov 28 19:18:00 2012 +0000
-> >
-> >     ASoC: Samsung: Get I2S src_clk from clock alias id.
-> >
-> > Padmavathi, you can't send out code that breaks all Samsung platforms
-> > like this, even if there are patches out there that fixes it. Changes
-> > have to be bisectable, which means that you can't break and unbreak
-> > the build, least of all if you merge through different maintainers.
-> > And you need to tell the other maintainer that there are dependent
-> > patches, you just sent the above patch to Mark without any such
-> > information.
-> >
-> Oops, I thought the 'src_clk'  should be restored with my drop the commit
-> 48a2050d ("ARM: SAMSUNG: Delete the unnecessary variable"), however,
-> seems other patch has same changes...What's happening?
-> 
-> See below,
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-
-> November/134979.html
-> 
-> > Kukjin, I see that Padmavathi has posted a V3 series of patches to
-> > remove all this from the dev-audio files on November 23. Are you ok
-> > with us picking them up and sending ASAP?
-> >
-> Hmm, just Mark's following can fix it but I didn't look at it yet.
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-
-> November/134911.html
-> 
-Olof, I sent 'git pull request' for fix the problems just now, please check
-it.
+Hi,
 
-Thanks.
+	The current adc driver is missing some key feature support
+	 - select high/low resolution support
+	 - sleep mode
+	 - Sample and Hold Time
 
-- Kukjin
+	 This patch seris fix it
+	 Without it the current driver is not usable in most of the case
+
+Jean-Christophe PLAGNIOL-VILLARD (2):
+      ARM: AT91: IIO: add sleep mode support
+      ARM: AT91: IIO: fix missing Sample and Hold time
+
+Ludovic Desroches (1):
+      ARM: AT91: IIO: add low and high res support for adc
+
+ Documentation/devicetree/bindings/arm/atmel-adc.txt |   13 ++++++++++++
+ arch/arm/boot/dts/at91sam9260.dtsi                  |    3 +++
+ arch/arm/boot/dts/at91sam9g45.dtsi                  |    3 +++
+ arch/arm/boot/dts/at91sam9x5.dtsi                   |    3 +++
+ drivers/iio/adc/at91_adc.c                          |   90 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
+ 5 files changed, 107 insertions(+), 5 deletions(-)
+
+Best Regards,
+J.
