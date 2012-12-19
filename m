@@ -1,72 +1,56 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Dec 2012 10:27:58 -0800
-Subject: [PATCH V3 0/5 RESEND] Avoid passing clks through platform data
-In-Reply-To: <1355895353-10316-1-git-send-email-padma.v@samsung.com>
-References: <1355895353-10316-1-git-send-email-padma.v@samsung.com>
-Message-ID: <008601cdde16$937d94a0$ba78bde0$@samsung.com>
+Date: Wed, 19 Dec 2012 10:30:15 -0800
+Subject: [PATCH] ARM: EXYNOS: Fix compile error in dev-audio.c
+References: <000701cdd9d3$3b6a6e10$b23f4a30$%choi@samsung.com>
+ <CAOesGMhgvsM7Fk-YpihjYM6h+xqK-ejBzPKEDypfdKEmHp6ZJg@mail.gmail.com>
+Message-ID: <008701cdde16$e58b2280$b0a16780$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Padmavathi Venna wrote:
+Kukjin Kim wrote:
 > 
-> These are the set of patches required to fix the following build error
-> in dev-audio.c on all samsung platforms.
+> Olof Johansson wrote:
 > 
-> arch/arm/mach-exynos/dev-audio.c:58:4: error: unknown field 'src_clk'
-> specified in initializer
-> arch/arm/mach-exynos/dev-audio.c:58:4: warning: initialization makes
-> integer
-> from pointer without a cast [enabled by default]
-> arch/arm/mach-exynos/dev-audio.c:58:4: warning: (near initialization for
-> 'i2sv5_pdata.type.i2s.idma_addr') [enabled by default]
-> arch/arm/mach-exynos/dev-audio.c:91:4: error: unknown field 'src_clk'
-> specified in initializer
-> arch/arm/mach-exynos/dev-audio.c:91:4: warning: initialization makes
-> integer
-> from pointer without a cast [enabled by default]
-> arch/arm/mach-exynos/dev-audio.c:91:4: warning: (near initialization for
-> 'i2sv3_pdata.type.i2s.idma_addr') [enabled by default]
+> [...]
 > 
-> Changes since v2:
->         - Rebased on 3.7-rc3
+> > Looks like the breakage was caused by the following commit:
+> >
+> > commit 1974a042dd15f1f007a3a1a2dd7a23ca0e42c01d
+> > Author:     Padmavathi Venna <padma.v@samsung.com>
+> > AuthorDate: Wed Nov 28 16:17:48 2012 +0530
+> > Commit:     Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > CommitDate: Wed Nov 28 19:18:00 2012 +0000
+> >
+> >     ASoC: Samsung: Get I2S src_clk from clock alias id.
+> >
+> > Padmavathi, you can't send out code that breaks all Samsung platforms
+> > like this, even if there are patches out there that fixes it. Changes
+> > have to be bisectable, which means that you can't break and unbreak
+> > the build, least of all if you merge through different maintainers.
+> > And you need to tell the other maintainer that there are dependent
+> > patches, you just sent the above patch to Mark without any such
+> > information.
+> >
+> Oops, I thought the 'src_clk'  should be restored with my drop the commit
+> 48a2050d ("ARM: SAMSUNG: Delete the unnecessary variable"), however,
+> seems other patch has same changes...What's happening?
 > 
-> I2S controller has an internal mux for RCLK source clks. The list
-> of source clk names were passed through platform data in non-dt case.
-> The variable holding the list of RCLK source clk names is not
-> required, as the list of clks need to be registered with clkdev
-> using generic connection id. This is required as part of adding DT
-> support for I2S controller driver.
+> See below,
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-
+> November/134979.html
 > 
-> In the below series of patches, registered the existed clks with
-> clkdev using generic connection id and removed the variable which
-> holds those clk names. This is done for s3c64xx,s5pc100,s5p64x0,
-> s5pv210 and exynos4 series. But tested the sound card detection
-> only on smdk6410 board. On remaining all platforms it was just
-> build tested.
+> > Kukjin, I see that Padmavathi has posted a V3 series of patches to
+> > remove all this from the dev-audio files on November 23. Are you ok
+> > with us picking them up and sending ASAP?
+> >
+> Hmm, just Mark's following can fix it but I didn't look at it yet.
 > 
-> Padmavathi Venna (5):
->   ARM: S3C64XX: Add I2S clkdev support
->   ARM: S5PC100: Add I2S clkdev support
->   ARM: S5P64X0: Add I2S clkdev support
->   ARM: S5PV210: Avoid passing the clks through platform data
->   ARM: EXYNOS: Avoid passing the clks through platform data
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-
+> November/134911.html
 > 
->  arch/arm/mach-exynos/dev-audio.c      |   12 ---
->  arch/arm/mach-s3c64xx/clock.c         |  126
-++++++++++++++++++++----------
-> ---
->  arch/arm/mach-s3c64xx/dev-audio.c     |   11 ---
->  arch/arm/mach-s5p64x0/clock-s5p6440.c |   49 +++++++++----
->  arch/arm/mach-s5p64x0/clock-s5p6450.c |   61 +++++++++++-----
->  arch/arm/mach-s5p64x0/dev-audio.c     |   12 ---
->  arch/arm/mach-s5pc100/clock.c         |   48 ++++++++-----
->  arch/arm/mach-s5pc100/dev-audio.c     |   16 ----
->  arch/arm/mach-s5pv210/dev-audio.c     |   16 ----
->  9 files changed, 182 insertions(+), 169 deletions(-)
-> 
-> --
-> 1.7.4.4
+Olof, I sent 'git pull request' for fix the problems just now, please check
+it.
 
-Applied, thanks.
+Thanks.
 
 - Kukjin
