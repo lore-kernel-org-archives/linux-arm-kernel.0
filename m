@@ -1,56 +1,60 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Wed, 19 Dec 2012 10:40:53 +0530
-Subject: [PATCH] ARM: cache-l2x0.c: Apply the workaround to r3p0 only
-In-Reply-To: <20121030100227.GA8260@bnru04>
-References: <20121030100227.GA8260@bnru04>
-Message-ID: <20121219051052.GA15163@bnru10>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Wed, 19 Dec 2012 11:05:48 +0530
+Subject: [PATCH V3 0/5 RESEND] Avoid passing clks through platform data
+Message-ID: <1355895353-10316-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Will,
+These are the set of patches required to fix the following build error
+in dev-audio.c on all samsung platforms.
 
-On Tue, Oct 30, 2012 at 11:02:32 +0100, srinidhi kasagar wrote:
-> The PL310 bug 753970 should be applied only to r3p0
-> 
-> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> ---
->  arch/arm/mm/cache-l2x0.c |    9 +++++++--
->  1 files changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 2a8e380..7925734 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -311,6 +311,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
->  	u32 aux;
->  	u32 cache_id;
->  	u32 way_size = 0;
-> +	u32 l2x0_revision;
->  	int ways;
->  	const char *type;
->  
-> @@ -331,8 +332,12 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
->  			ways = 8;
->  		type = "L310";
->  #ifdef CONFIG_PL310_ERRATA_753970
-> -		/* Unmapped register. */
-> -		sync_reg_offset = L2X0_DUMMY_REG;
-> +		 /* FIXME: make sense to have dt support for L2 Erratas? */
-> +		l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
-> +				L2X0_CACHE_ID_RTL_MASK;
-> +		if (l2x0_revision == L2X0_CACHE_ID_RTL_R3P0)
-> +			/* Unmapped register. */
-> +			sync_reg_offset = L2X0_DUMMY_REG;
->  #endif
->  		outer_cache.set_debug = pl310_set_debug;
->  		break;
+arch/arm/mach-exynos/dev-audio.c:58:4: error: unknown field 'src_clk'
+specified in initializer
+arch/arm/mach-exynos/dev-audio.c:58:4: warning: initialization makes integer
+from pointer without a cast [enabled by default]
+arch/arm/mach-exynos/dev-audio.c:58:4: warning: (near initialization for
+'i2sv5_pdata.type.i2s.idma_addr') [enabled by default]
+arch/arm/mach-exynos/dev-audio.c:91:4: error: unknown field 'src_clk'
+specified in initializer
+arch/arm/mach-exynos/dev-audio.c:91:4: warning: initialization makes integer
+from pointer without a cast [enabled by default]
+arch/arm/mach-exynos/dev-audio.c:91:4: warning: (near initialization for
+'i2sv3_pdata.type.i2s.idma_addr') [enabled by default]
 
-What is your thought on this? The platforms like x540 shares mostly the same code as 
-of 8500 but Cortex and PL310 revisions are upgraded, and consequently since we manage the
-the single defconfig for both these platforms, the compile time options for enabling
-ARM/PL310 ERRATAs are not really working out.
+Changes since v2:
+        - Rebased on 3.7-rc3
 
-This is the first cut, and I see the same issue even with the ERRATA PL310_ERRATA_769419
-or the commit 11ed0ba1754841316d4095478944300acf19acc3
+I2S controller has an internal mux for RCLK source clks. The list
+of source clk names were passed through platform data in non-dt case.
+The variable holding the list of RCLK source clk names is not
+required, as the list of clks need to be registered with clkdev
+using generic connection id. This is required as part of adding DT
+support for I2S controller driver.
 
-regards/srinidhi
+In the below series of patches, registered the existed clks with
+clkdev using generic connection id and removed the variable which
+holds those clk names. This is done for s3c64xx,s5pc100,s5p64x0,
+s5pv210 and exynos4 series. But tested the sound card detection
+only on smdk6410 board. On remaining all platforms it was just
+build tested.
+
+Padmavathi Venna (5):
+  ARM: S3C64XX: Add I2S clkdev support
+  ARM: S5PC100: Add I2S clkdev support
+  ARM: S5P64X0: Add I2S clkdev support
+  ARM: S5PV210: Avoid passing the clks through platform data
+  ARM: EXYNOS: Avoid passing the clks through platform data
+
+ arch/arm/mach-exynos/dev-audio.c      |   12 ---
+ arch/arm/mach-s3c64xx/clock.c         |  126 ++++++++++++++++++++-------------
+ arch/arm/mach-s3c64xx/dev-audio.c     |   11 ---
+ arch/arm/mach-s5p64x0/clock-s5p6440.c |   49 +++++++++----
+ arch/arm/mach-s5p64x0/clock-s5p6450.c |   61 +++++++++++-----
+ arch/arm/mach-s5p64x0/dev-audio.c     |   12 ---
+ arch/arm/mach-s5pc100/clock.c         |   48 ++++++++-----
+ arch/arm/mach-s5pc100/dev-audio.c     |   16 ----
+ arch/arm/mach-s5pv210/dev-audio.c     |   16 ----
+ 9 files changed, 182 insertions(+), 169 deletions(-)
+
+-- 
+1.7.4.4
