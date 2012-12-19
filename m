@@ -1,62 +1,55 @@
 From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Wed, 19 Dec 2012 19:29:37 +0100
-Subject: [PATCH 2/2] mxc: enable EHCI PER clock
-In-Reply-To: <1355941777-99352-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1355941777-99352-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <1355941777-99352-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Date: Wed, 19 Dec 2012 19:29:36 +0100
+Subject: [PATCH 1/2] mx27: add a clock gate to activate SPLL clock
+Message-ID: <1355941777-99352-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EHCI PER clock (aka usb_div) must be enabled to have EHCI driver working.
+A clock gate is mandatory to activate SPLL clock needed, at least, for usb.
 
 Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 ---
- drivers/usb/host/ehci-mxc.c |   12 +++++++++++-
- 1 files changed, 11 insertions(+), 1 deletions(-)
+ arch/arm/mach-imx/clk-imx27.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-index ec7f5d2..8050631 100644
---- a/drivers/usb/host/ehci-mxc.c
-+++ b/drivers/usb/host/ehci-mxc.c
-@@ -31,7 +31,7 @@
- #define ULPI_VIEWPORT_OFFSET	0x170
- 
- struct ehci_mxc_priv {
--	struct clk *usbclk, *ahbclk, *phyclk;
-+	struct clk *usbclk, *ahbclk, *perclk, *phyclk;
- 	struct usb_hcd *hcd;
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 4c1d1e4..4f066d13 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -62,7 +62,7 @@ static const char *clko_sel_clks[] = {
+ 	"32k", "usb_div", "dptc",
  };
  
-@@ -150,6 +150,13 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 	}
- 	clk_prepare_enable(priv->ahbclk);
+-static const char *ssi_sel_clks[] = { "spll", "mpll", };
++static const char *ssi_sel_clks[] = { "spll_gate", "mpll", };
  
-+	priv->perclk = devm_clk_get(&pdev->dev, "per");
-+	if (IS_ERR(priv->perclk)) {
-+		ret = PTR_ERR(priv->perclk);
-+		goto err_clk_per;
-+	}
-+	clk_prepare_enable(priv->perclk);
-+
- 	/* "dr" device has its own clock on i.MX51 */
- 	priv->phyclk = devm_clk_get(&pdev->dev, "phy");
- 	if (IS_ERR(priv->phyclk))
-@@ -233,6 +240,8 @@ err_init:
- 	if (priv->phyclk)
- 		clk_disable_unprepare(priv->phyclk);
+ enum mx27_clks {
+ 	dummy, ckih, ckil, mpll, spll, mpll_main2, ahb, ipg, nfc_div, per1_div,
+@@ -82,7 +82,7 @@ enum mx27_clks {
+ 	csi_ahb_gate, brom_ahb_gate, ata_ahb_gate, wdog_ipg_gate, usb_ipg_gate,
+ 	uart6_ipg_gate, uart5_ipg_gate, uart4_ipg_gate, uart3_ipg_gate,
+ 	uart2_ipg_gate, uart1_ipg_gate, ckih_div1p5, fpm, mpll_osc_sel,
+-	mpll_sel, clk_max
++	mpll_sel, spll_gate, clk_max
+ };
  
-+	clk_disable_unprepare(priv->perclk);
-+err_clk_per:
- 	clk_disable_unprepare(priv->ahbclk);
- err_clk_ahb:
- 	clk_disable_unprepare(priv->usbclk);
-@@ -259,6 +268,7 @@ static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
+ static struct clk *clk[clk_max];
+@@ -104,6 +104,7 @@ int __init mx27_clocks_init(unsigned long fref)
+ 			ARRAY_SIZE(mpll_sel_clks));
+ 	clk[mpll] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
+ 	clk[spll] = imx_clk_pllv1("spll", "ckih", CCM_SPCTL0);
++	clk[spll_gate] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
+ 	clk[mpll_main2] = imx_clk_fixed_factor("mpll_main2", "mpll", 2, 3);
  
- 	clk_disable_unprepare(priv->usbclk);
- 	clk_disable_unprepare(priv->ahbclk);
-+	clk_disable_unprepare(priv->perclk);
- 
- 	if (priv->phyclk)
- 		clk_disable_unprepare(priv->phyclk);
+ 	if (mx27_revision() >= IMX_CHIP_REVISION_2_0) {
+@@ -121,7 +122,7 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk[per4_div] = imx_clk_divider("per4_div", "mpll_main2", CCM_PCDR1, 24, 6);
+ 	clk[vpu_sel] = imx_clk_mux("vpu_sel", CCM_CSCR, 21, 1, vpu_sel_clks, ARRAY_SIZE(vpu_sel_clks));
+ 	clk[vpu_div] = imx_clk_divider("vpu_div", "vpu_sel", CCM_PCDR0, 10, 6);
+-	clk[usb_div] = imx_clk_divider("usb_div", "spll", CCM_CSCR, 28, 3);
++	clk[usb_div] = imx_clk_divider("usb_div", "spll_gate", CCM_CSCR, 28, 3);
+ 	clk[cpu_sel] = imx_clk_mux("cpu_sel", CCM_CSCR, 15, 1, cpu_sel_clks, ARRAY_SIZE(cpu_sel_clks));
+ 	clk[clko_sel] = imx_clk_mux("clko_sel", CCM_CCSR, 0, 5, clko_sel_clks, ARRAY_SIZE(clko_sel_clks));
+ 	if (mx27_revision() >= IMX_CHIP_REVISION_2_0)
 -- 
 1.7.8.6
