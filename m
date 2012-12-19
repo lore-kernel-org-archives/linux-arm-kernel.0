@@ -1,36 +1,22 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 20 Dec 2012 08:00:49 +1300
-Subject: Inconsistency in clk framework
-In-Reply-To: <1355938492.27893.8.camel@gitbox>
-References: <1355890233.25599.4.camel@gitbox>
- <20121219092636.GW14363@n2100.arm.linux.org.uk>
- <1355938492.27893.8.camel@gitbox>
-Message-ID: <1355943649.2451.1.camel@gitbox>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 19 Dec 2012 17:04:08 -0200
+Subject: [PATCH 2/2] mxc: enable EHCI PER clock
+In-Reply-To: <1355941777-99352-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1355941777-99352-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1355941777-99352-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <CAOMZO5DzoCsVZY-2Zzoxd0ACGKaryzoMtg8qPm+ttriNQvR9Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-12-20 at 06:34 +1300, Tony Prisk wrote:
-> On Wed, 2012-12-19 at 09:26 +0000, Russell King - ARM Linux wrote:
-> > On Wed, Dec 19, 2012 at 05:10:33PM +1300, Tony Prisk wrote:
-> > > Hi Mike,
-> > > 
-> > > In attempting to remove some IS_ERR_OR_NULL references, it was pointed
-> > > out that clk_get() can return NULL if CONFIG_HAVE_CLK is not defined.
-> > 
-> > That is correct - but why is that a problem?  As far as users are
-> > concerned, NULL is a valid clock.  If HAVE_CLK is undefined, do you
-> > want all your drivers to suddenly stop working?
-> 
-> That will be where the misunderstanding has occurred - I didn't consider
-> NULL to be a valid clock.
-> 
-> Given that NULL is a valid clock, I guess all tests against get_clk and
-> of_get_clk results should be IS_ERR_OR_NULL. Correct?
-> 
-For the sake of clarity, I should rephrase:
+On Wed, Dec 19, 2012 at 4:29 PM, Gwenhael Goavec-Merou
+<gwenhael.goavec-merou@armadeus.com> wrote:
+> EHCI PER clock (aka usb_div) must be enabled to have EHCI driver working.
+>
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 
-If the driver can't operate with a NULL clk, it should use a
-IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
+Have you considered to use the chipidea usb driver in mx27 instead?
+mx28/mx6 are already converted to the chipidea usb driver.
 
-Regards
-Tony P
+Regards,
+
+Fabio Estevm
