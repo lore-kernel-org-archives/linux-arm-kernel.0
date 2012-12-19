@@ -1,34 +1,61 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 19 Dec 2012 13:33:40 +0100
-Subject: [PATCH 2/2] ARM: OMAP2+: omap2plus_defconfig: enable CMA allocator
-In-Reply-To: <1355920420-20852-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1355920420-20852-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1355920420-20852-2-git-send-email-javier.martinez@collabora.co.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 19 Dec 2012 12:34:14 +0000
+Subject: [PATCH 2/2] MAINTAINERS: Add an entry for omap related .dts files
+In-Reply-To: <20121214194452.9874.40037.stgit@muffinssi.local>
+References: <20121214194325.9874.95898.stgit@muffinssi.local>
+ <20121214194452.9874.40037.stgit@muffinssi.local>
+Message-ID: <20121219123414.32B5E3E0AD7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP framebuffer driver now uses the standard dma allocator
-instead of the (now removed) omap specific vram allocator.
+On Fri, 14 Dec 2012 11:44:52 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> All your omap .dts files are belong to us.
+> 
+> Beno??t has been doing a good job picking up most of the
+> omap .dts files so far. Let's make sure we both get
+> cc:ed for the related patches.
+> 
+> The .dts patches need to be queued by us as separate
+> patches from drivers and other code changes to avoid
+> pointless merge conflists like we saw with v3.8
+> networking changes.
+> 
+> Cc: Beno??t Cousson <b-cousson@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Enable the Contiguous Memory Allocator by default to allow large
-dma memory buffers allocation.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/configs/omap2plus_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> ---
+>  MAINTAINERS |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 0bc485c..4927e80 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -5253,6 +5253,15 @@ F:	arch/arm/*omap*/
+>  F:	drivers/i2c/busses/i2c-omap.c
+>  F:	include/linux/i2c-omap.h
+>  
+> +OMAP DEVICE TREE SUPPORT
+> +M:	Beno??t Cousson <b-cousson@ti.com>
+> +M:	Tony Lindgren <tony@atomide.com>
+> +L:	linux-omap at vger.kernel.org
+> +L:	devicetree-discuss at lists.ozlabs.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	arch/arm/boot/dts/*omap*
+> +F:	arch/arm/boot/dts/*am3*
+> +
+>  OMAP CLOCK FRAMEWORK SUPPORT
+>  M:	Paul Walmsley <paul@pwsan.com>
+>  L:	linux-omap at vger.kernel.org
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index da530a0..dc4789e 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -64,6 +64,7 @@ CONFIG_MAC80211=m
- CONFIG_MAC80211_RC_PID=y
- CONFIG_MAC80211_RC_DEFAULT_PID=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_CMA=y
- CONFIG_CONNECTOR=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
 -- 
-1.7.7.6
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
