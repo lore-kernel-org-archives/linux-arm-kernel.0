@@ -1,47 +1,52 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 Dec 2012 19:29:02 -0800
-Subject: [PATCH] ARM: exynos: Fix warning due to missing 'inline' in stub
-In-Reply-To: <1355642780-26929-1-git-send-email-olof@lixom.net>
-References: <1355642780-26929-1-git-send-email-olof@lixom.net>
-Message-ID: <001601cddd98$feade870$fc09b950$@samsung.com>
+Date: Tue, 18 Dec 2012 19:38:20 -0800
+Subject: [PATCH] ARM: EXYNOS: Fix MSHC clocks instance names
+In-Reply-To: <CAJuYYwS-+x9=V5z+POGYCHL8TkUDjrRB663Mys6ppCBXRASxFQ@mail.gmail.com>
+References: <1355501608-2955-1-git-send-email-tobetter@gmail.com>
+ <CAJuYYwS-+x9=V5z+POGYCHL8TkUDjrRB663Mys6ppCBXRASxFQ@mail.gmail.com>
+Message-ID: <002101cddd9a$4bd206d0$e3761470$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+Thomas Abraham wrote:
 > 
-> In file included from arch/arm/mach-exynos/clock-exynos5.c:29:0:
-> arch/arm/mach-exynos/common.h:28:12: warning: 'exynos_pm_late_initcall'
-> defined but not used [-Wunused-function]
+> On 14 December 2012 21:43, Dongjin Kim <tobetter@gmail.com> wrote:
+> > Replace clock instance name of MSHC controller for BIC and CIU of
+> Exynos4412.
+> >
+> > Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+> > ---
+> >  arch/arm/mach-exynos/clock-exynos4.c |    4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-
+> exynos/clock-exynos4.c
+> > index efead60..bbcb3de 100644
+> > --- a/arch/arm/mach-exynos/clock-exynos4.c
+> > +++ b/arch/arm/mach-exynos/clock-exynos4.c
+> > @@ -529,7 +529,7 @@ static struct clk exynos4_init_clocks_off[] = {
+> >                 .enable         = exynos4_clk_ip_fsys_ctrl,
+> >                 .ctrlbit        = (1 << 8),
+> >         }, {
+> > -               .name           = "dwmmc",
+> > +               .name           = "biu",
+> >                 .parent         = &exynos4_clk_aclk_133.clk,
+> >                 .enable         = exynos4_clk_ip_fsys_ctrl,
+> >                 .ctrlbit        = (1 << 9),
+> > @@ -1134,7 +1134,7 @@ static struct clksrc_clk exynos4_clksrcs[] = {
+> >                 .reg_div = { .reg = EXYNOS4_CLKDIV_MFC, .shift = 0,
+.size = 4 },
+> >         }, {
+> >                 .clk    = {
+> > -                       .name           = "sclk_dwmmc",
+> > +                       .name           = "ciu",
+> >                         .parent         = &exynos4_clk_dout_mmc4.clk,
+> >                         .enable         = exynos4_clksrc_mask_fsys_ctrl,
+> >                         .ctrlbit        = (1 << 16),
+> > --
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
+> Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
 > 
-> I've added this to the fixes branch on arm-soc. I've also noticed that
-> every single non-EXYNOS5 board/config fails to build. Kukjin?
-> 
-
-I'm OK on this. Thanks for your fix.
+Thanks, applied.
 
 - Kukjin
-
->  arch/arm/mach-exynos/common.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-
-> exynos/common.h
-> index dac146d..04744f9 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -25,7 +25,7 @@ void exynos_init_late(void);
->  #ifdef CONFIG_PM_GENERIC_DOMAINS
->  int exynos_pm_late_initcall(void);
->  #else
-> -static int exynos_pm_late_initcall(void) { return 0; }
-> +static inline int exynos_pm_late_initcall(void) { return 0; }
->  #endif
-> 
->  #ifdef CONFIG_ARCH_EXYNOS4
-> --
-> 1.7.10.1.488.g05fbf7a
