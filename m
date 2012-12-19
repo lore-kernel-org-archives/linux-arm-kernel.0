@@ -1,106 +1,92 @@
-From: pratikp@codeaurora.org (Pratik Patel)
-Date: Wed, 19 Dec 2012 13:24:31 -0800
-Subject: CoreSight framework and drivers
-In-Reply-To: <50D1F37E.6000804@ti.com>
-References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
- <20121219112314.GA26329@mudshark.cambridge.arm.com>
- <50D1F37E.6000804@ti.com>
-Message-ID: <20121219212431.GC23594@pratikp-linux.qualcomm.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 19 Dec 2012 23:41:01 +0200
+Subject: [PATCH] ARM: OMAP1: nokia770: enable CBUS/Retu
+Message-ID: <1355953262-4352-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 11:03:58AM -0600, Jon Hunter wrote:
-> 
-> On 12/19/2012 05:23 AM, Will Deacon wrote:
-> > Hi Pratik,
-> > 
-> > On Tue, Dec 18, 2012 at 07:19:17PM +0000, pratikp at codeaurora.org wrote:
-> >> This RFC is aimed at introducing CoreSight framework as well as
-> >> individual CoreSight trace component drivers adhering to ARM
-> >> CoreSight specification. Some prior discussion on this can be
-> >> referred at [1].
-> >>
-> >> There are 3 kinds of CoreSight trace components:
-> >>
-> >> * Sources: Responsible for producing trace data to provide
-> >>   visibility for the associated entity.
-> >>
-> >> * Links: Transport components that carry trace data.
-> >>
-> >> * Sinks: Collectors for storing trace data or acting as conduits
-> >>   for off-chip trace data collection.
-> >>
-> >> These components can be connected in various topologies to suite
-> >> a particular SoCs tracing needs.
-> >>
-> >> Framework is responsible for gathering and using the information
-> >> about the registered CoreSight components and their connections
-> >> to allow it to dynamically deduce the sequence of components
-> >> representing a connection from a CoreSight source to the
-> >> currently selected CoreSight sink. This helps the framework to
-> >> program the correct set of components to satisfy user request.
-> > 
-> > From a million miles up, this looks like a sensible sort of design but I
-> > really think you need to talk to Jon Hunter (he's at least on CC) about
-> > this, especially where bindings are concerned. If we can get something that
-> > you both agree on, then we can include the CTI with the other coresight
-> > components and do a more in-depth review at that point.
-> 
-> I need to look at these in closer detail, but there are a couple
-> high-level items that need to be aligned on which are ...
-> 
-> 1. Why not use the AMBA bus framework?
-> 
-> You mentioned before that "AMBA bus is for PrimeCell devices (class 0xF)
-> as opposed to CoreSight devices (class 0x9)". I will not claim to be
-> that familiar with primecell and coresight devices and there
-> differences, but this statement does not help me understand why a new
-> bus type is needed. Furthermore, the existing ETM and ETB driver in
-> arch/arm/kernel/etm.c uses the AMBA bus today and so at least those
-> coresight devices are able to use the AMBA bus type.
-> 
+Add needed platform data so that it's possible to use Retu and e.g. feed
+Retu watchdog.
 
-Currently we use the CoreSight virtual bus to conveniently list
-sysfs configuration attributes for all the registered CoreSight
-devices.
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ arch/arm/mach-omap1/board-nokia770.c |   43 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-For eg:
-/sys/bus/coresight/devices/coresight-etm0/<attribute>
-/sys/bus/coresight/devices/coresight-etm1/<attribute>
-/sys/bus/coresight/devices/coresight-stm/<attribute>
-/sys/bus/coresight/devices/coresight-tmc-etf/<attribute>
-...
-...
-
-Some of the attributes are based on device type (i.e. source,
-link or sink) so they will exist for all devices of that type
-while some are device specific.
-
-Maybe I am misunderstanding the question but are you suggesting
-to register CoreSight devices to the AMBA bus instead of the
-CoreSight core layer code?
-
-Will Deacon mentioned earlier that AMBA framework can be changed
-to accomodate devices with a different class but I am more
-concerned with losing some of the stuff that the core layer code
-does (eg. coresight_register, coresight_enable, coresight_disable
-in coresight.c) if we register CoreSight drivers to the AMBA bus
-without letting the core layer know about the device connections.
-
-BTW, sorry the patches didn't get posted to the list since they
-are apparently awaiting moderator approval.
-
-> 2. What about the existing ETM/ETB drivers?
-> 
-> We have existing drivers for ETM and ETB in arch/arm/kernel/etm.c. We
-> should either move those drivers to the drivers directory or replace
-> them with the new one. However, no point in having two drivers for the
-> same coresight device.
-> 
-
-Agree we should ensure we don't lose any existing functionality.
-
+diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
+index 24d2f2d..ecd3f2a 100644
+--- a/arch/arm/mach-omap1/board-nokia770.c
++++ b/arch/arm/mach-omap1/board-nokia770.c
+@@ -7,6 +7,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++#include <linux/irq.h>
+ #include <linux/gpio.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -23,6 +24,8 @@
+ 
+ #include <linux/platform_data/keypad-omap.h>
+ #include <linux/platform_data/lcd-mipid.h>
++#include <linux/platform_data/gpio-omap.h>
++#include <linux/platform_data/i2c-cbus-gpio.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -212,6 +215,45 @@ static inline void nokia770_mmc_init(void)
+ }
+ #endif
+ 
++#if defined(CONFIG_I2C_CBUS_GPIO) || defined(CONFIG_I2C_CBUS_GPIO_MODULE)
++static struct i2c_cbus_platform_data nokia770_cbus_data = {
++	.clk_gpio = OMAP_MPUIO(9),
++	.dat_gpio = OMAP_MPUIO(10),
++	.sel_gpio = OMAP_MPUIO(11),
++};
++
++static struct platform_device nokia770_cbus_device = {
++	.name   = "i2c-cbus-gpio",
++	.id     = 2,
++	.dev    = {
++		.platform_data = &nokia770_cbus_data,
++	},
++};
++
++static struct i2c_board_info nokia770_i2c_board_info_2[] __initdata = {
++	{
++		I2C_BOARD_INFO("retu-mfd", 0x01),
++	},
++};
++
++static void __init nokia770_cbus_init(void)
++{
++	const int retu_irq_gpio = 62;
++
++	if (gpio_request_one(retu_irq_gpio, GPIOF_IN, "Retu IRQ"))
++		return;
++	irq_set_irq_type(gpio_to_irq(retu_irq_gpio), IRQ_TYPE_EDGE_RISING);
++	nokia770_i2c_board_info_2[0].irq = gpio_to_irq(retu_irq_gpio);
++	i2c_register_board_info(2, nokia770_i2c_board_info_2,
++				ARRAY_SIZE(nokia770_i2c_board_info_2));
++	platform_device_register(&nokia770_cbus_device);
++}
++#else /* CONFIG_I2C_CBUS_GPIO */
++static void __init nokia770_cbus_init(void)
++{
++}
++#endif /* CONFIG_I2C_CBUS_GPIO */
++
+ static void __init omap_nokia770_init(void)
+ {
+ 	/* On Nokia 770, the SleepX signal is masked with an
+@@ -233,6 +275,7 @@ static void __init omap_nokia770_init(void)
+ 	mipid_dev_init();
+ 	omap1_usb_init(&nokia770_usb_config);
+ 	nokia770_mmc_init();
++	nokia770_cbus_init();
+ }
+ 
+ MACHINE_START(NOKIA770, "Nokia 770")
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.10.4
