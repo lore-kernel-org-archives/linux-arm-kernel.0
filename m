@@ -1,32 +1,108 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Dec 2012 17:19:44 +0000
-Subject: [PATCH 1/4] ARM: ux500: Provide a means to obtain the SMSC9115 clock
- when DT is enabled
-Message-ID: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
+Date: Wed, 19 Dec 2012 17:19:47 +0000
+Subject: [PATCH 4/4] net/smsc911x: Provide common clock functionality
+In-Reply-To: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
+References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device Tree names devices differently to how some frameworks expect
-them. Until we can move a platform over to the new way of obtaining
-resources, we have to use the OF_DEV_AUXDATA() macros to craft a
-device name which can be used in searches during allocation time.
+Some platforms provide clocks which require enabling before the
+SMSC911x chip will power on. This patch uses the new common clk
+framework to do just that. If no clock is provided, it will just
+be ignored and the driver will continue to assume that no clock
+is required for the chip to run successfully.
 
+Cc: Steve Glendinning <steve.glendinning@shawell.net>
+Cc: netdev at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/ethernet/smsc/smsc911x.c |   31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index db0bb75..dfb68ce 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -284,6 +284,7 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80128000, "nmk-i2c.2", NULL),
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80110000, "nmk-i2c.3", NULL),
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x8012a000, "nmk-i2c.4", NULL),
-+	OF_DEV_AUXDATA("smsc,lan9115", 0x50000000, "smsc911x", NULL),
- 	/* Requires device name bindings. */
- 	OF_DEV_AUXDATA("stericsson,nmk_pinctrl", 0, "pinctrl-db8500", NULL),
- 	/* Requires clock name and DMA bindings. */
+diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
+index 4616bf2..f6196cd 100644
+--- a/drivers/net/ethernet/smsc/smsc911x.c
++++ b/drivers/net/ethernet/smsc/smsc911x.c
+@@ -33,6 +33,7 @@
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/crc32.h>
++#include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/errno.h>
+ #include <linux/etherdevice.h>
+@@ -144,6 +145,9 @@ struct smsc911x_data {
+ 
+ 	/* regulators */
+ 	struct regulator_bulk_data supplies[SMSC911X_NUM_SUPPLIES];
++
++	/* clock */
++	struct clk *clk;
+ };
+ 
+ /* Easy access to information */
+@@ -369,7 +373,7 @@ out:
+ }
+ 
+ /*
+- * enable resources, currently just regulators.
++ * enable regulator and clock resources.
+  */
+ static int smsc911x_enable_resources(struct platform_device *pdev)
+ {
+@@ -382,6 +386,13 @@ static int smsc911x_enable_resources(struct platform_device *pdev)
+ 	if (ret)
+ 		netdev_err(ndev, "failed to enable regulators %d\n",
+ 				ret);
++
++	if (pdata->clk) {
++		ret = clk_prepare_enable(pdata->clk);
++		if (ret < 0)
++			netdev_err(ndev, "failed to enable clock %d\n", ret);
++	}
++
+ 	return ret;
+ }
+ 
+@@ -396,6 +407,10 @@ static int smsc911x_disable_resources(struct platform_device *pdev)
+ 
+ 	ret = regulator_bulk_disable(ARRAY_SIZE(pdata->supplies),
+ 			pdata->supplies);
++
++	if (pdata->clk)
++		clk_disable_unprepare(pdata->clk);
++
+ 	return ret;
+ }
+ 
+@@ -421,6 +436,14 @@ static int smsc911x_request_resources(struct platform_device *pdev)
+ 	if (ret)
+ 		netdev_err(ndev, "couldn't get regulators %d\n",
+ 				ret);
++
++	/* Request clock */
++	pdata->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(pdata->clk)) {
++		netdev_warn(ndev, "couldn't get clock %d\n", PTR_ERR(pdata->clk));
++		pdata->clk = NULL;
++	}
++
+ 	return ret;
+ }
+ 
+@@ -436,6 +459,12 @@ static void smsc911x_free_resources(struct platform_device *pdev)
+ 	/* Free regulators */
+ 	regulator_bulk_free(ARRAY_SIZE(pdata->supplies),
+ 			pdata->supplies);
++
++	/* Free clock */
++	if (pdata->clk) {
++		clk_put(pdata->clk);
++		pdata->clk = NULL;
++	}
+ }
+ 
+ /* waits for MAC not busy, with timeout.  Only called by smsc911x_mac_read
 -- 
 1.7.9.5
