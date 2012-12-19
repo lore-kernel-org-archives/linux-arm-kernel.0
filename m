@@ -1,218 +1,85 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 19 Dec 2012 19:37:10 +0100
-Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
-In-Reply-To: <20121219183236.GP23971@game.jcrosoft.org>
+Date: Wed, 19 Dec 2012 19:37:11 +0100
+Subject: [PATCH 2/3] ARM: AT91: IIO: add sleep mode support
+In-Reply-To: <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20121219183236.GP23971@game.jcrosoft.org>
-Message-ID: <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
+ <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1355942232-26251-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+The sleep mode will allow to put the add in sleep between conversion.
 
-at91 adc offers the choice between two resolutions: low and high.
-The low and high resolution values depends on adc IP version, as many IP
-properties have been exposed through device tree, these settings have also
-been added to the dt bindings.
-
-Update at the same time the dtsi.
-
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-[plagnioj at jcrosoft.com: udpate current adc dt support]
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: linux-iio at vger.kernel.org
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- .../devicetree/bindings/arm/atmel-adc.txt          |   11 +++
- arch/arm/boot/dts/at91sam9260.dtsi                 |    3 +
- arch/arm/boot/dts/at91sam9g45.dtsi                 |    3 +
- arch/arm/boot/dts/at91sam9x5.dtsi                  |    3 +
- drivers/iio/adc/at91_adc.c                         |   74 ++++++++++++++++++--
- 5 files changed, 90 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/arm/atmel-adc.txt |    1 +
+ drivers/iio/adc/at91_adc.c                          |   19 ++++++++++---------
+ 2 files changed, 11 insertions(+), 9 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-index c63097d..fd2d69e 100644
+index fd2d69e..efb6f02 100644
 --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
 +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-@@ -14,9 +14,17 @@ Required properties:
-   - atmel,adc-status-register: Offset of the Interrupt Status Register
-   - atmel,adc-trigger-register: Offset of the Trigger Register
-   - atmel,adc-vref: Reference voltage in millivolts for the conversions
-+  - atmel,adc-res: List of resolution in bits supported by the ADC. List size
-+		   must be two at least.
-+  - atmel,adc-res-names: Contains one identifier string for each resolution
-+			 in atmel,adc-res property. "lowres" and "highres"
-+			 identifiers are required.
- 
- Optional properties:
-   - atmel,adc-use-external: Boolean to enable of external triggers
-+  - atmel,adc-use-res: String corresponding to an identifier from
-+		       atmel,adc-res-names property. If not specified, the highest
-+		       resolution will be used.
+@@ -25,6 +25,7 @@ Optional properties:
+   - atmel,adc-use-res: String corresponding to an identifier from
+ 		       atmel,adc-res-names property. If not specified, the highest
+ 		       resolution will be used.
++  - atmel,atmel,adc-sleep-mode: Boolean to enable of sleep mode when no conversion
   
  Optional trigger Nodes:
    - Required properties:
-@@ -40,6 +48,9 @@ adc0: adc at fffb0000 {
- 	atmel,adc-trigger-register = <0x08>;
- 	atmel,adc-use-external;
- 	atmel,adc-vref = <3300>;
-+	atmel,adc-res = <8 10>;
-+	atmel,adc-res-names = "lowres", "highres";
-+	atmel,adc-use-res = "lowres";
- 
- 	trigger at 0 {
- 		trigger-name = "external-rising";
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index cca34bc..7c605d2 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -506,6 +506,9 @@
- 				atmel,adc-drdy-mask = <0x10000>;
- 				atmel,adc-status-register = <0x1c>;
- 				atmel,adc-trigger-register = <0x04>;
-+				atmel,adc-res = <8 10>;
-+				atmel,adc-res-names = "lowres", "highres";
-+				atmel,adc-use-res = "highres";
- 
- 				trigger at 0 {
- 					trigger-name = "timer-counter-0";
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 253afed..70c776e 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -488,6 +488,9 @@
- 				atmel,adc-drdy-mask = <0x10000>;
- 				atmel,adc-status-register = <0x1c>;
- 				atmel,adc-trigger-register = <0x08>;
-+				atmel,adc-res = <8 10>;
-+				atmel,adc-res-names = "lowres", "highres";
-+				atmel,adc-use-res = "highres";
- 
- 				trigger at 0 {
- 					trigger-name = "external-rising";
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 70c1f5d..e52862d 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -469,6 +469,9 @@
- 				atmel,adc-drdy-mask = <0x1000000>;
- 				atmel,adc-status-register = <0x30>;
- 				atmel,adc-trigger-register = <0xc0>;
-+				atmel,adc-res = <8 10>;
-+				atmel,adc-res-names = "lowres", "highres";
-+				atmel,adc-use-res = "highres";
- 
- 				trigger at 0 {
- 					trigger-name = "external-rising";
 diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index 315bed1..f175a86 100644
+index f175a86..c563488 100644
 --- a/drivers/iio/adc/at91_adc.c
 +++ b/drivers/iio/adc/at91_adc.c
-@@ -57,6 +57,8 @@ struct at91_adc_state {
+@@ -52,6 +52,7 @@ struct at91_adc_state {
+ 	void __iomem		*reg_base;
+ 	struct at91_adc_reg_desc *registers;
+ 	u8			startup_time;
++	bool			sleep_mode;
+ 	struct iio_trigger	**trig;
+ 	struct at91_adc_trigger	*trigger_list;
  	u32			trigger_number;
- 	bool			use_external;
- 	u32			vref_mv;
-+	u32			res;		/* resolution used for convertions */
-+	bool			low_res;	/* the resolution corresponds to the lowest one */
- 	wait_queue_head_t	wq_data_avail;
- };
- 
-@@ -138,7 +140,7 @@ static int at91_adc_channel_init(struct iio_dev *idev)
- 		chan->channel = bit;
- 		chan->scan_index = idx;
- 		chan->scan_type.sign = 'u';
--		chan->scan_type.realbits = 10;
-+		chan->scan_type.realbits = st->res;
- 		chan->scan_type.storagebits = 16;
- 		chan->info_mask = IIO_CHAN_INFO_SCALE_SHARED_BIT |
- 			IIO_CHAN_INFO_RAW_SEPARATE_BIT;
-@@ -372,6 +374,59 @@ static int at91_adc_read_raw(struct iio_dev *idev,
- 	return -EINVAL;
- }
- 
-+static int at91_adc_of_get_resolution(struct at91_adc_state *st,
-+				      struct platform_device *pdev)
-+{
-+	struct iio_dev *idev = iio_priv_to_dev(st);
-+	struct device_node *np = pdev->dev.of_node;
-+	int count, i, ret = 0;
-+	char *res_name, *s;
-+	u32 *resolutions;
-+
-+	count = of_property_count_strings(np, "atmel,adc-res-names");
-+	if (count < 2) {
-+		dev_err(&idev->dev, "You must specified at least two resolution names for "
-+				    "adc-res-names property in the DT\n");
-+		return count;
-+	}
-+
-+	resolutions = kmalloc(count * sizeof(*resolutions), GFP_KERNEL);
-+	if (!resolutions)
-+		return -ENOMEM;
-+
-+	if (of_property_read_u32_array(np, "atmel,adc-res", resolutions, count)) {
-+		dev_err(&idev->dev, "Missing adc-res property in the DT.\n");
-+		ret = -ENODEV;
-+		goto ret;
-+	}
-+
-+	if (of_property_read_string(np, "atmel,adc-use-res", (const char **)&res_name))
-+		res_name = "highres";
-+
-+	for (i = 0; i < count; i++) {
-+		if (of_property_read_string_index(np, "atmel,adc-res-names", i, (const char **)&s))
-+			continue;
-+
-+		if (strcmp(res_name, s))
-+			continue;
-+
-+		st->res = resolutions[i];
-+		if (!strcmp(res_name, "lowres"))
-+			st->low_res = true;
-+		else
-+			st->low_res = false;
-+
-+		dev_info(&idev->dev, "Resolution used: %u bits\n", st->res);
-+		goto ret;
-+	}
-+
-+	dev_err(&idev->dev, "There is no resolution for %s\n", res_name);
-+
-+ret:
-+	kfree(resolutions);
-+	return ret;
-+}
-+
- static int at91_adc_probe_dt(struct at91_adc_state *st,
- 			     struct platform_device *pdev)
- {
-@@ -415,6 +470,10 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+@@ -455,6 +456,8 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
  	}
- 	st->vref_mv = prop;
+ 	st->num_channels = prop;
  
-+	ret = at91_adc_of_get_resolution(st, pdev);
-+	if (ret)
-+		goto error_ret;
++	st->sleep_mode = of_property_read_bool(node, "atmel,adc-sleep-mode");
 +
- 	st->registers = devm_kzalloc(&idev->dev,
- 				     sizeof(struct at91_adc_reg_desc),
- 				     GFP_KERNEL);
-@@ -628,9 +687,16 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+ 	if (of_property_read_u32(node, "atmel,adc-startup-time", &prop)) {
+ 		dev_err(&idev->dev, "Missing adc-startup-time property in the DT.\n");
+ 		ret = -EINVAL;
+@@ -580,6 +583,7 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+ 	struct iio_dev *idev;
+ 	struct at91_adc_state *st;
+ 	struct resource *res;
++	u32 reg;
+ 
+ 	idev = iio_device_alloc(sizeof(struct at91_adc_state));
+ 	if (idev == NULL) {
+@@ -687,16 +691,13 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
  	 */
  	ticks = round_up((st->startup_time * adc_clk /
  			  1000000) - 1, 8) / 8;
--	at91_adc_writel(st, AT91_ADC_MR,
--			(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
--			(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
-+
-+	if (st->low_res)
-+		at91_adc_writel(st, AT91_ADC_MR,
-+				AT91_ADC_LOWRES |
-+				(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
-+				(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
-+	else
-+		at91_adc_writel(st, AT91_ADC_MR,
-+				(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
-+				(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
+-
++	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
++	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
+ 	if (st->low_res)
+-		at91_adc_writel(st, AT91_ADC_MR,
+-				AT91_ADC_LOWRES |
+-				(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
+-				(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
+-	else
+-		at91_adc_writel(st, AT91_ADC_MR,
+-				(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
+-				(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
++		reg |= AT91_ADC_LOWRES;
++	if (st->sleep_mode)
++		reg |= AT91_ADC_SLEEP;
++	at91_adc_writel(st, AT91_ADC_MR, reg);
  
  	/* Setup the ADC channels available on the board */
  	ret = at91_adc_channel_init(idev);
