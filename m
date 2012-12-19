@@ -1,42 +1,47 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 Dec 2012 19:26:07 -0800
-Subject: [PATCH] ARM: EXYNOS: fix GIC using for EXYNOS5440
-In-Reply-To: <50C545E8.8050301@samsung.com>
-References: <030c01cdd672$cb1b6b40$615241c0$%kim@samsung.com>
- <50C545E8.8050301@samsung.com>
-Message-ID: <001501cddd98$9698dba0$c3ca92e0$@samsung.com>
+Date: Tue, 18 Dec 2012 19:29:02 -0800
+Subject: [PATCH] ARM: exynos: Fix warning due to missing 'inline' in stub
+In-Reply-To: <1355642780-26929-1-git-send-email-olof@lixom.net>
+References: <1355642780-26929-1-git-send-email-olof@lixom.net>
+Message-ID: <001601cddd98$feade870$fc09b950$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
+Olof Johansson wrote:
 > 
-> Hi,
+> In file included from arch/arm/mach-exynos/clock-exynos5.c:29:0:
+> arch/arm/mach-exynos/common.h:28:12: warning: 'exynos_pm_late_initcall'
+> defined but not used [-Wunused-function]
 > 
-> On 12/10/2012 10:07 AM, Kukjin Kim wrote:
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >   arch/arm/mach-exynos/common.c |    3 ++-
-> >   1 files changed, 2 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-
-> exynos/common.c
-> > index 0eb3b9a..9ecda37 100644
-> > --- a/arch/arm/mach-exynos/common.c
-> > +++ b/arch/arm/mach-exynos/common.c
-> > @@ -684,7 +684,8 @@ void __init exynos5_init_irq(void)
-> >   	 * Theses parameters should be NULL and 0 because EXYNOS4
-> >   	 * uses GIC instead of VIC.
-> >   	 */
-> > -	s5p_init_irq(NULL, 0);
-> > +	if (!of_machine_is_compatible("samsung,exynos5440"))
-> > +		s5p_init_irq(NULL, 0);
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> ---
 > 
-> How about remove to call s5p_init_irq() here because All exynos SoCs use
-> GIC instead of VIC?
+> I've added this to the fixes branch on arm-soc. I've also noticed that
+> every single non-EXYNOS5 board/config fails to build. Kukjin?
 > 
 
-NO, the current s5p_init_irq() is not only for VIC but also Timer which is
-used on EXYNOS SoCs, I know the name is strange...
+I'm OK on this. Thanks for your fix.
 
-> >   	gic_arch_extn.irq_set_wake = s3c_irq_wake;
-> >   }
+- Kukjin
+
+>  arch/arm/mach-exynos/common.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-
+> exynos/common.h
+> index dac146d..04744f9 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -25,7 +25,7 @@ void exynos_init_late(void);
+>  #ifdef CONFIG_PM_GENERIC_DOMAINS
+>  int exynos_pm_late_initcall(void);
+>  #else
+> -static int exynos_pm_late_initcall(void) { return 0; }
+> +static inline int exynos_pm_late_initcall(void) { return 0; }
+>  #endif
+> 
+>  #ifdef CONFIG_ARCH_EXYNOS4
+> --
+> 1.7.10.1.488.g05fbf7a
