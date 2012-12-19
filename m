@@ -1,51 +1,59 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 19 Dec 2012 16:24:33 +0000
-Subject: [PATCH V2] spi: remove check for bits_per_word on transfer from
- low level driver
-In-Reply-To: <1355820943-25228-1-git-send-email-ldewangan@nvidia.com>
-References: <1355820943-25228-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20121219162433.1E1E43E0BCF@localhost>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 19 Dec 2012 21:39:36 +0100
+Subject: [PATCH] Add apf51 basic support
+In-Reply-To: <1355694591-7084-1-git-send-email-laurent.cans@gmail.com>
+References: <1355694591-7084-1-git-send-email-laurent.cans@gmail.com>
+Message-ID: <20121219203936.GG26326@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Dec 2012 14:25:43 +0530, Laxman Dewangan <ldewangan@nvidia.com> wrote:
-> The spi core make sure that each transfer structure have the proper
-> setting for bits_per_word before calling low level transfer APIs.
-> 
-> Hence it is no more require to check again in low level driver for
-> this field whether this is set correct or not. Removing such code
-> from low level driver.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-[...]
-> diff --git a/drivers/spi/spi-txx9.c b/drivers/spi/spi-txx9.c
-> index d5a3cbb..550b5f4 100644
-> --- a/drivers/spi/spi-txx9.c
-> +++ b/drivers/spi/spi-txx9.c
-> @@ -189,9 +189,8 @@ static void txx9spi_work_one(struct txx9spi *c, struct spi_message *m)
->  		unsigned int len = t->len;
->  		unsigned int wsize;
->  		u32 speed_hz = t->speed_hz ? : spi->max_speed_hz;
-> -		u8 bits_per_word = t->bits_per_word ? : spi->bits_per_word;
-> +		u8 bits_per_word = t->bits_per_word;
->  
-> -		bits_per_word = bits_per_word ? : 8;
->  		wsize = bits_per_word >> 3; /* in bytes */
->  
->  		if (prev_speed_hz != speed_hz
-> @@ -316,9 +315,8 @@ static int txx9spi_transfer(struct spi_device *spi, struct spi_message *m)
->  	/* check each transfer's parameters */
->  	list_for_each_entry (t, &m->transfers, transfer_list) {
->  		u32 speed_hz = t->speed_hz ? : spi->max_speed_hz;
-> -		u8 bits_per_word = t->bits_per_word ? : spi->bits_per_word;
-> +		u8 bits_per_word = t->bits_per_word;
->  
-> -		bits_per_word = bits_per_word ? : 8;
+On Sun, Dec 16, 2012 at 10:49:51PM +0100, Laurent Cans wrote:
+> Signed-off-by: Laurent Cans <laurent.cans@gmail.com>
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> ---
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		ckih1 {
+> +			compatible = "fsl,imx-ckih1", "fixed-clock";
+> +			clock-frequency = <0>;
+> +		};
+> +
+> +		osc {
+> +			compatible = "fsl,imx-osc", "fixed-clock";
+> +			clock-frequency = <33554432>;
+> +		};
 
-Have you verified here that bits_per_word can never be '0' here? What is
-the path that ensures spi->bits_per_word (and hence t->bits_per_word) is
-set to 8 here?
+These compatible properties shouldn't be necessary, right?
 
-Otherwise the patch looks good. Thanks for doing this work.
+> +	};
+> +	soc {
+> +		aips at 70000000 { /* aips-1 */
+> +			spba at 70000000 {
+> +				uart3: serial at 7000c000 {
+> +					pinctrl-names = "default";
+> +					pinctrl-0 = <&pinctrl_uart3_2>;
+> +					status = "okay";
+> +				};
+> +			};
+> +		};
 
-g.
+This (and the other nodes) can more eaasily be written as:
+
+&uart3 {
+	...
+};
+
+see arch/arm/boot/dts/omap5-evm.dts for a good example.
+
+This has the advantage that you don't have to resemble the SoC layout
+in your board file.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
