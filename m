@@ -1,19 +1,31 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Dec 2012 10:27:20 -0800
-Subject: [GIT PULL 1/2] Samsung fixes-1 for v3.8-rc1
-Message-ID: <008401cdde16$7cfe2690$76fa73b0$@samsung.com>
+Date: Wed, 19 Dec 2012 10:27:26 -0800
+Subject: [GIT PULL 2/2] Samsung fixes-audio part for v3.8-rc1
+Message-ID: <008501cdde16$8081a800$8184f800$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
+Arnd, Olof
 
-Here is Samsung fixes-1 for v3.8-rc1.
-Most of them are trivial fixes which are for NULL pointer dereference, MSHC
-clocks instance names and exynos5440 stuff.
+This is for fix the following build error in dev-audio.c on current Samsung
+platforms :-(
 
-Please pull from:
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-v3.8-samsung-fixes-1
+arch/arm/mach-exynos/dev-audio.c:58:4: error: unknown field 'src_clk'
+specified in initializer
+arch/arm/mach-exynos/dev-audio.c:58:4: warning: initialization makes integer
+from pointer without a cast [enabled by default]
+arch/arm/mach-exynos/dev-audio.c:58:4: warning: (near initialization for
+'i2sv5_pdata.type.i2s.idma_addr') [enabled by default]
+arch/arm/mach-exynos/dev-audio.c:91:4: error: unknown field 'src_clk'
+specified in initializer
+arch/arm/mach-exynos/dev-audio.c:91:4: warning: initialization makes integer
+from pointer without a cast [enabled by default]
+arch/arm/mach-exynos/dev-audio.c:91:4: warning: (near initialization for
+'i2sv3_pdata.type.i2s.idma_addr') [enabled by default]
+
+Actually, Pdma's patches were in my tree before release v3.7 but I was
+holding on because I needed to check about regarding audio driver part.
+Anyway, this is required to fix the problem.
 
 If any problems, please kindly let me know.
 
@@ -22,51 +34,42 @@ Thanks.
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-The following changes since commit 752451f01c4567b506bf4343082682dbb8fb30dd:
+The following changes since commit 74779e22261172ea728b989310f6ecc991b57d62:
 
-  Merge branch 'i2c-embedded/for-next' of
-git://git.pengutronix.de/git/wsa/linux (2012-12-18 16:51:10 -0800)
+  Merge tag 'for-3.8-rc1' of git://gitorious.org/linux-pwm/linux-pwm
+(2012-12-19 08:19:07 -0800)
 
 are available in the git repository at:
 
 
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-v3.8-samsung-fixes-1
+v3.8-samsung-fixes-audio
 
-for you to fetch changes up to 454696fdc864aacaab978755d44d73d418c59788:
+for you to fetch changes up to fb0a20594787f8a1f10389eec46a2cd51fa6a533:
 
-  ARM: EXYNOS: Fix MSHC clocks instance names (2012-12-19 09:25:27 -0800)
+  ARM: EXYNOS: Avoid passing the clks through platform data (2012-12-19
+09:49:29 -0800)
 
 ----------------------------------------------------------------
-Axel Lin (1):
-      pinctrl: exynos5440/samsung: Staticize pcfgs
+Padmavathi Venna (5):
+      ARM: S3C64XX: Add I2S clkdev support
+      ARM: S5PC100: Add I2S clkdev support
+      ARM: S5P64X0: Add I2S clkdev support
+      ARM: S5PV210: Avoid passing the clks through platform data
+      ARM: EXYNOS: Avoid passing the clks through platform data
 
-Dongjin Kim (1):
-      ARM: EXYNOS: Fix MSHC clocks instance names
-
-Kukjin Kim (3):
-      ARM: EXYNOS: fix build error when MFC is not selected
-      ARM: EXYNOS: fix GIC using for EXYNOS5440
-      ARM: EXYNOS: fix skip scu_enable() for EXYNOS5440
-
-Michael Spang (1):
-      ARM: SAMSUNG: Add missing include guard to gpio-core.h
-
-Sachin Kamat (4):
-      pinctrl: samsung: Fix a typo in pinctrl-samsung.h
-      ARM: EXYNOS: Fix NULL pointer dereference bug in Origen
-      ARM: EXYNOS: Fix NULL pointer dereference bug in SMDK4X12
-      ARM: EXYNOS: Fix NULL pointer dereference bug in SMDKV310
-
- arch/arm/mach-exynos/clock-exynos4.c           |    4 ++--
- arch/arm/mach-exynos/common.c                  |    3 ++-
- arch/arm/mach-exynos/mach-exynos5-dt.c         |    2 ++
- arch/arm/mach-exynos/mach-origen.c             |    4 ++--
- arch/arm/mach-exynos/mach-smdk4x12.c           |    4 ++--
- arch/arm/mach-exynos/mach-smdkv310.c           |    4 ++--
- arch/arm/mach-exynos/platsmp.c                 |    2 +-
- arch/arm/plat-samsung/include/plat/gpio-core.h |    5 +++++
- drivers/pinctrl/pinctrl-exynos5440.c           |    2 +-
- drivers/pinctrl/pinctrl-samsung.c              |    2 +-
- drivers/pinctrl/pinctrl-samsung.h              |    2 +-
- 11 files changed, 21 insertions(+), 13 deletions(-)
+ arch/arm/mach-exynos/dev-audio.c      |   12 --------
+ arch/arm/mach-s3c64xx/clock.c         |  126
+++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------
+------
+ arch/arm/mach-s3c64xx/dev-audio.c     |   11 --------
+ arch/arm/mach-s5p64x0/clock-s5p6440.c |   49
++++++++++++++++++++++-----------
+ arch/arm/mach-s5p64x0/clock-s5p6450.c |   61
++++++++++++++++++++++++++++-------------
+ arch/arm/mach-s5p64x0/dev-audio.c     |   12 --------
+ arch/arm/mach-s5pc100/clock.c         |   48
++++++++++++++++++++------------
+ arch/arm/mach-s5pc100/dev-audio.c     |   16 -----------
+ arch/arm/mach-s5pv210/dev-audio.c     |   16 -----------
+ 9 files changed, 182 insertions(+), 169 deletions(-)
