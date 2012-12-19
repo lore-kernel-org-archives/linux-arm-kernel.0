@@ -1,44 +1,56 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 18 Dec 2012 20:23:32 -0800
-Subject: [PATCH 0/7] Updates for Zynq's timer driver
-In-Reply-To: <20121219025945.GF27963@beefymiracle.amer.corp.natinst.com>
-References: <bfaf054c-2b45-458e-a67f-f9d1c982ec51@TX2EHSMHS017.ehs.local>
- <20121219025945.GF27963@beefymiracle.amer.corp.natinst.com>
-Message-ID: <32732a9b-d3a7-498f-a3d0-9f0c4f0bf8b2@CO9EHSMHS032.ehs.local>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Wed, 19 Dec 2012 10:40:53 +0530
+Subject: [PATCH] ARM: cache-l2x0.c: Apply the workaround to r3p0 only
+In-Reply-To: <20121030100227.GA8260@bnru04>
+References: <20121030100227.GA8260@bnru04>
+Message-ID: <20121219051052.GA15163@bnru10>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Hello Will,
 
-On Tue, Dec 18, 2012 at 08:59:45PM -0600, Josh Cartwright wrote:
-> On Tue, Dec 18, 2012 at 04:16:32PM -0800, Soren Brinkmann wrote:
-> > I started to put some effort on syncing the Xilinx Linux tree with mainline and
-> > the timer driver is my first victim.
-> > Most commits are fixing style issues or clean up. Functionality is touched only
-> > in patches #2 and #7.
-> > 
-> > Some patches are present in almost identically in the Xilinx Linux tree and I
-> > took over 'Ackec-by' lines from those commits.
-> > 
-> > 	Soren
-> > 
-> > Soren Brinkmann (7):
-> >   arm: zynq: timer: Replace PSS through PS
-> >   arm: zynq: timer: Remove unnecessary register write
-> >   arm: zynq: timer: Remove unused #defines
-> >   arm: zynq: timer: Align columns
-> >   arm: zynq: timer: Remove redundant #includes
-> >   arm: zynq: timer: Fix comment style
-> >   arm: zynq: timer: Set clock_event cpumask
+On Tue, Oct 30, 2012 at 11:02:32 +0100, srinidhi kasagar wrote:
+> The PL310 bug 753970 should be applied only to r3p0
 > 
-> Hey Soren-
+> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> ---
+>  arch/arm/mm/cache-l2x0.c |    9 +++++++--
+>  1 files changed, 7 insertions(+), 2 deletions(-)
 > 
-> I had a look through this patchset and besides the stylistic nit in
-> patch 1, everything looks good to me.  Feel free to add my Reviewed-by.
-> 
-> Also, you seem to have neglected linux-arm-kernel from CC, you'll likely
-> want to repost there.
-Thanks, for reviewing and the heads up. I'll add the reviewed-by lines and
-repost including linux-arm-kernel.
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 2a8e380..7925734 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -311,6 +311,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+>  	u32 aux;
+>  	u32 cache_id;
+>  	u32 way_size = 0;
+> +	u32 l2x0_revision;
+>  	int ways;
+>  	const char *type;
+>  
+> @@ -331,8 +332,12 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+>  			ways = 8;
+>  		type = "L310";
+>  #ifdef CONFIG_PL310_ERRATA_753970
+> -		/* Unmapped register. */
+> -		sync_reg_offset = L2X0_DUMMY_REG;
+> +		 /* FIXME: make sense to have dt support for L2 Erratas? */
+> +		l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
+> +				L2X0_CACHE_ID_RTL_MASK;
+> +		if (l2x0_revision == L2X0_CACHE_ID_RTL_R3P0)
+> +			/* Unmapped register. */
+> +			sync_reg_offset = L2X0_DUMMY_REG;
+>  #endif
+>  		outer_cache.set_debug = pl310_set_debug;
+>  		break;
 
-	Soren
+What is your thought on this? The platforms like x540 shares mostly the same code as 
+of 8500 but Cortex and PL310 revisions are upgraded, and consequently since we manage the
+the single defconfig for both these platforms, the compile time options for enabling
+ARM/PL310 ERRATAs are not really working out.
+
+This is the first cut, and I see the same issue even with the ERRATA PL310_ERRATA_769419
+or the commit 11ed0ba1754841316d4095478944300acf19acc3
+
+regards/srinidhi
