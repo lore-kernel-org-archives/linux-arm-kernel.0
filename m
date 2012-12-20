@@ -1,35 +1,34 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 20 Dec 2012 12:41:58 -0300
-Subject: [PATCH] arm: omap3: igep0020: Add console default kernel arguments
-Message-ID: <1356018118-29852-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Dec 2012 16:51:43 +0100
+Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
+In-Reply-To: <50D2EDE6.3090706@atmel.com>
+References: <20121219183236.GP23971@game.jcrosoft.org>
+ <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
+ <50D2EBA1.4050305@free-electrons.com> <50D2EDE6.3090706@atmel.com>
+Message-ID: <50D3340F.3090209@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IGEP v2 boards has console as ttyO2,115200n8.
-It's better so simply set this as the default kernel argument
-directly in the device tree board file.
+Hi Ludovic,
 
-Cc: Enric Balletbo i Serra <eballetbo@gmail.com>
-Cc: Javier Martinez Canillas <javier@dowhile0.org>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/boot/dts/omap3-igep0020.dts |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Le 20/12/2012 11:52, ludovic.desroches a ?crit :
+>> I'm wondering, why are you using such a complex dt parsing code, and
+>> bindings, when you only requires a boolean to switch between 8 and 10
+>> bits mode (which seem to be the only thing you support)?
+> 
+> We will have a 10 and 12 bits mode on future ADCs and I would like to
+> have something which could manage more than two resolutions if it
+> happens one day.
 
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-index e2b9849..45ffe21 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
-@@ -15,6 +15,10 @@
- 	model = "IGEPv2";
- 	compatible = "isee,omap3-igep0020", "ti,omap3";
- 
-+	chosen {
-+		bootargs = "console=ttyO2,115200n8 earlyprintk";
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		boot {
+I see your point. I'm not fond at all of the existing bindings for the
+driver (putting things like registers offset in the dt is a non-sense to
+me, but hey...), so I'd like to still keep it as simple and non-bloated
+as possible, but it's true that in the current situation, we probably
+have no other choice.
+
+Maxime
 -- 
-1.7.8.6
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
