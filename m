@@ -1,71 +1,46 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 20 Dec 2012 17:13:37 +1300
-Subject: Inconsistency in clk framework
-In-Reply-To: <20121219190824.GX14363@n2100.arm.linux.org.uk>
-References: <1355890233.25599.4.camel@gitbox>
- <20121219092636.GW14363@n2100.arm.linux.org.uk>
- <1355938492.27893.8.camel@gitbox> <1355943649.2451.1.camel@gitbox>
- <20121219190824.GX14363@n2100.arm.linux.org.uk>
-Message-ID: <1355976817.2968.12.camel@gitbox>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 20 Dec 2012 04:20:04 +0000
+Subject: [PATCH v2] ARM: OMAP2: hwmod: Fix "register offset NULL check" bug
+In-Reply-To: <alpine.DEB.2.00.1212190210021.2446@utopia.booyaka.com>
+References: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
+ <alpine.DEB.2.00.1212190210021.2446@utopia.booyaka.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB0C4FB@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-12-19 at 19:08 +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 20, 2012 at 08:00:49AM +1300, Tony Prisk wrote:
-> > On Thu, 2012-12-20 at 06:34 +1300, Tony Prisk wrote:
-> > > On Wed, 2012-12-19 at 09:26 +0000, Russell King - ARM Linux wrote:
-> > > > On Wed, Dec 19, 2012 at 05:10:33PM +1300, Tony Prisk wrote:
-> > > > > Hi Mike,
-> > > > > 
-> > > > > In attempting to remove some IS_ERR_OR_NULL references, it was pointed
-> > > > > out that clk_get() can return NULL if CONFIG_HAVE_CLK is not defined.
-> > > > 
-> > > > That is correct - but why is that a problem?  As far as users are
-> > > > concerned, NULL is a valid clock.  If HAVE_CLK is undefined, do you
-> > > > want all your drivers to suddenly stop working?
-> > > 
-> > > That will be where the misunderstanding has occurred - I didn't consider
-> > > NULL to be a valid clock.
-> > > 
-> > > Given that NULL is a valid clock, I guess all tests against get_clk and
-> > > of_get_clk results should be IS_ERR_OR_NULL. Correct?
-> > > 
-> > For the sake of clarity, I should rephrase:
-> > 
-> > If the driver can't operate with a NULL clk, it should use a
-> > IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
+On Wed, Dec 19, 2012 at 07:43:50, Paul Walmsley wrote:
+> On Tue, 18 Dec 2012, Hebbar Gururaja wrote:
 > 
-> Why should a _consumer_ of a clock care?  It is _very_ important that
-> people get this idea - to a consumer, the struct clk is just an opaque
-> cookie.  The fact that it appears to be a pointer does _not_ mean that
-> the driver can do any kind of dereferencing on that pointer - it should
-> never do so.
+> > From: "Hebbar, Gururaja" <gururaja.hebbar@ti.com>
+> > 
+> > omap4_cminst_wait_module_ready() checks if register offset is NULL.
+> > 
+> > int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
+> > 				   u16 clkctrl_offs)
+> > {
+> > 	int i = 0;
+> > 
+> > 	if (!clkctrl_offs)
+> > 		return 0;
+> > 
+> > In case of AM33xx, CLKCTRL register offset for different clock domains
+> > are not uniformly placed. An example of this would be the RTC clock
+> > domain with CLKCTRL offset at 0x00.
+> > In such cases the module ready check is skipped which leads to a data
+> > abort during boot-up when RTC registers is accessed.
+> 
+> We've got a few hwmods on OMAP44xx that don't have clkctrl_offs registers 
+> listed in the hwmod data, and which are not marked with HWMOD_NO_IDLEST.  
+> What's going to happen in those cases?
 
-As a simple example:
-We have a PWM module that requires a clock source to be enabled before
-registers can be read/written.
+Hmm. This is a special case to me. Let me go back and do some review.
+Will be back with some more details.
 
-*pseudo code*
-x = clk_get("pwm_clock")
-if IS_ERR(x) then fail
-err = clk_enable(x)
-if (err != 0) then fail
-start writing to module registers
+> 
+> 
+> - Paul
+> 
 
 
-Assuming HAVE_CLK is undefined:
-
-x = clk_get("pwm_clock") (= NULL)
-if IS_ERR(x) then fail (not an error)
-err = clk_enable(x) (= 0)
-if (err) then fail (not an error)
-start writing to module registers
-(register writes lock the bus because the clock wasn't really enabled,
-but no errors occurred enabling the clock)
-
-
-I apologise if it seems like I am not getting it, but I would like to
-understand this properly to avoid further problems later.
-
-Regards
-Tony P
+Regards, 
+Gururaja
