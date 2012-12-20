@@ -1,35 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 20 Dec 2012 17:36:35 +0530
-Subject: [PATCH V3 1/5] ARM: tegra: add pending SGI checking API
-In-Reply-To: <20121220111409.GH19258@tbergstrom-lnx.Nvidia.com>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <1355797861-12759-2-git-send-email-josephl@nvidia.com>
- <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
- <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
- <CAMbhsRSDwSoHoEs93NZhDchCS28-vQCuW2p+kqfNKeqLygL2sQ@mail.gmail.com>
- <50D2BB51.9000109@ti.com> <20121220093412.GE19258@tbergstrom-lnx.Nvidia.com>
- <50D2DF45.1000305@ti.com> <20121220095951.GG19258@tbergstrom-lnx.Nvidia.com>
- <50D2E76C.7050309@ti.com> <20121220111409.GH19258@tbergstrom-lnx.Nvidia.com>
-Message-ID: <50D2FF4B.5010401@ti.com>
+From: prasanna.ps@samsung.com (Prasanna Kumar)
+Date: Thu, 20 Dec 2012 17:56:17 +0530
+Subject: [PATCH v2 2/3] arm: exynos5: Enable PM generic domain support in
+ Kconfig
+In-Reply-To: <CAPmaG0uqkRcoUBR8Gjv_+BSJ3hwxUCz0G-YKNQX=qvx83i6QOQ@mail.gmail.com>
+References: <CAPmaG0uqkRcoUBR8Gjv_+BSJ3hwxUCz0G-YKNQX=qvx83i6QOQ@mail.gmail.com>
+Message-ID: <1356006378-17441-3-git-send-email-prasanna.ps@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 December 2012 04:44 PM, Peter De Schrijver wrote:
->>>
->>> So why does OMAP4 have working coupled idle without the SGI check then?
->>>
->> Because whenever the OMAP4 CPUs enter into any power states apart from
->> ON, clock-domain force wakeup method us being used to wakeup
->> secondary CPUs. And secondly CPU RET is not supported on purpose because
->> of some known IP block issues.
->>
->
-> Aha. That explains indeed why you don't need the check.
->
-Just for the information on OMAP5 SOC, CPU RET is supported and the
-couple idle works on it without IPI. As I mentioned, we do use
-clock-domain force wakeup method for wakeup. Code is out of the
-tree hence i didn't mention that in first place.
+This patch adds support to enable PM generic domains
+under Exynos5 family
 
-Regards
-Santosh
+Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+---
+ This patch is same as v1
+ arch/arm/mach-exynos/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 91d5b6f..1c77f17 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -63,6 +63,7 @@ config SOC_EXYNOS5250
+ 	depends on ARCH_EXYNOS5
+ 	select S5P_PM if PM
+ 	select S5P_SLEEP if PM
++	select PM_GENERIC_DOMAINS if PM
+ 	select S5P_DEV_MFC
+ 	select SAMSUNG_DMADEV
+ 	help
+-- 
+1.7.0.4
