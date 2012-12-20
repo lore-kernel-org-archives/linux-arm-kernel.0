@@ -1,55 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Dec 2012 08:09:21 -0800
-Subject: [GIT PULL 2/2] Samsung fixes-audio part for v3.8-rc1
-In-Reply-To: <008501cdde16$8081a800$8184f800$@samsung.com>
-References: <008501cdde16$8081a800$8184f800$@samsung.com>
-Message-ID: <20121220160921.GE1034@quad.lixom.net>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Thu, 20 Dec 2012 17:13:52 +0100
+Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
+In-Reply-To: <50D3340F.3090209@free-electrons.com>
+References: <20121219183236.GP23971@game.jcrosoft.org>
+ <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
+ <50D2EBA1.4050305@free-electrons.com> <50D2EDE6.3090706@atmel.com>
+ <50D3340F.3090209@free-electrons.com>
+Message-ID: <50D33940.4000607@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 10:27:26AM -0800, Kukjin Kim wrote:
-> Arnd, Olof
-> 
-> This is for fix the following build error in dev-audio.c on current Samsung
-> platforms :-(
-> 
-> arch/arm/mach-exynos/dev-audio.c:58:4: error: unknown field 'src_clk'
-> specified in initializer
-> arch/arm/mach-exynos/dev-audio.c:58:4: warning: initialization makes integer
-> from pointer without a cast [enabled by default]
-> arch/arm/mach-exynos/dev-audio.c:58:4: warning: (near initialization for
-> 'i2sv5_pdata.type.i2s.idma_addr') [enabled by default]
-> arch/arm/mach-exynos/dev-audio.c:91:4: error: unknown field 'src_clk'
-> specified in initializer
-> arch/arm/mach-exynos/dev-audio.c:91:4: warning: initialization makes integer
-> from pointer without a cast [enabled by default]
-> arch/arm/mach-exynos/dev-audio.c:91:4: warning: (near initialization for
-> 'i2sv3_pdata.type.i2s.idma_addr') [enabled by default]
-> 
-> Actually, Pdma's patches were in my tree before release v3.7 but I was
-> holding on because I needed to check about regarding audio driver part.
-> Anyway, this is required to fix the problem.
-> 
-> If any problems, please kindly let me know.
-> 
-> Thanks.
-> 
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
-> 
-> The following changes since commit 74779e22261172ea728b989310f6ecc991b57d62:
-> 
->   Merge tag 'for-3.8-rc1' of git://gitorious.org/linux-pwm/linux-pwm
-> (2012-12-19 08:19:07 -0800)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> v3.8-samsung-fixes-audio
+On 12/20/2012 04:51 PM, Maxime Ripard wrote:
+> Hi Ludovic,
+>
+> Le 20/12/2012 11:52, ludovic.desroches a ?crit :
+>>> I'm wondering, why are you using such a complex dt parsing code, and
+>>> bindings, when you only requires a boolean to switch between 8 and 10
+>>> bits mode (which seem to be the only thing you support)?
+>>
+>> We will have a 10 and 12 bits mode on future ADCs and I would like to
+>> have something which could manage more than two resolutions if it
+>> happens one day.
+>
+> I see your point. I'm not fond at all of the existing bindings for the
+> driver (putting things like registers offset in the dt is a non-sense to
+> me, but hey...), so I'd like to still keep it as simple and non-bloated
+> as possible, but it's true that in the current situation, we probably
+> have no other choice.
+>
 
+I have the same feeling than you about ADC bindings, I think that there 
+are too many parameters exhibited. Moreover, most of them are chip relative.
 
-Pulled.
+I have not found other ways to deal with it properly. I would like to 
+have them hidden into the driver (depending on the compatible string) 
+but it will be a mess if we split parameters into dt and driver.
 
+So the idea was to have a binding which could allow us to manage several 
+cases about resolution modes in the future.
 
--Olof
+Ludovic
+
+> Maxime
+>
