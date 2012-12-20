@@ -1,67 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Dec 2012 11:42:41 +0100
-Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
-In-Reply-To: <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121219183236.GP23971@game.jcrosoft.org>
- <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <50D2EBA1.4050305@free-electrons.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 20 Dec 2012 11:43:08 +0100
+Subject: LPC32xx and MMCI driver
+In-Reply-To: <50D2E317.6000005@precidata.com>
+References: <50D2E156.20707@precidata.com> <50D2E317.6000005@precidata.com>
+Message-ID: <50D2EBBC.2070803@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Le 19/12/2012 19:37, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 12/20/2012 11:06 AM, Gabriele Mondada wrote:
+> Hi,
+> Currently, LPC32xx plateform do not enable DMA on the mmci driver. This
+> makes the driver useless because getting out data from a 64 bytes FIFO
+> by interrupt is not fast enough (at standard SD-card data rate).
 > 
-> at91 adc offers the choice between two resolutions: low and high.
-> The low and high resolution values depends on adc IP version, as many IP
-> properties have been exposed through device tree, these settings have also
-> been added to the dt bindings.
+> DMA is not enabled because LPC32xx has a bug that prevent DMA to work
+> properly with the MMC controller (silicon bug, I guess). NXP did a patch
+> to workaround this, but it has not been commited on the main branch. The
+> patch is for linux 2.6.39.2 and does not use dmaengine.
 > 
-> Update at the same time the dtsi.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> [plagnioj at jcrosoft.com: udpate current adc dt support]
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: linux-iio at vger.kernel.org
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  .../devicetree/bindings/arm/atmel-adc.txt          |   11 +++
->  arch/arm/boot/dts/at91sam9260.dtsi                 |    3 +
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |    3 +
->  arch/arm/boot/dts/at91sam9x5.dtsi                  |    3 +
->  drivers/iio/adc/at91_adc.c                         |   74 ++++++++++++++++++--
->  5 files changed, 90 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> index c63097d..fd2d69e 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> @@ -14,9 +14,17 @@ Required properties:
->    - atmel,adc-status-register: Offset of the Interrupt Status Register
->    - atmel,adc-trigger-register: Offset of the Trigger Register
->    - atmel,adc-vref: Reference voltage in millivolts for the conversions
-> +  - atmel,adc-res: List of resolution in bits supported by the ADC. List size
-> +		   must be two at least.
-> +  - atmel,adc-res-names: Contains one identifier string for each resolution
-> +			 in atmel,adc-res property. "lowres" and "highres"
-> +			 identifiers are required.
->  
->  Optional properties:
->    - atmel,adc-use-external: Boolean to enable of external triggers
-> +  - atmel,adc-use-res: String corresponding to an identifier from
-> +		       atmel,adc-res-names property. If not specified, the highest
-> +		       resolution will be used.
+> So, I reworked this patch to make it compatible with the last kernel
+> (3.7). Here it is. Have I any chance to see this patch be commited on
+> the main branch?
 
+First, thank you for the patch!
 
-I'm wondering, why are you using such a complex dt parsing code, and
-bindings, when you only requires a boolean to switch between 8 and 10
-bits mode (which seem to be the only thing you support)?
+Unfortunately, it doesn't apply to v3.7 in the form it arrived in my
+INBOX (mainly formatting issues, maybe MUA related?). Can you please
+check and resend? I'd like to test it.
 
-Maxime
+Further, there seem to be many #ifdefs in two subsystems (mmc and dma)
+at once. First, maybe the LPC32XX specific pl08x_force_dma_burst() could
+be moved to mmci.c since it is only used there and this would minimize
+the patch to only the mmc subsystem.
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+And maybe at least some of the ifdefs could be removed.
+
+The less ifdefs, the higher the chances of mainlining. ;-)
+
+Thanks in advance,
+
+Roland
