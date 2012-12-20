@@ -1,89 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Dec 2012 11:32:54 +0000
-Subject: [PATCH 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
- HAVE_ARM_SCU
-In-Reply-To: <20121220.132633.1909466776701611516.hdoyu@nvidia.com>
-References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com><1355996654-6579-4-git-send-email-hdoyu@nvidia.com><50D2F3B4.3040302@arm.com>
- <20121220.132633.1909466776701611516.hdoyu@nvidia.com>
-Message-ID: <50D2F766.2000709@arm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 20 Dec 2012 12:57:58 +0100
+Subject: [PATCH 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
+In-Reply-To: <50D2EFFB.8030702@arm.com>
+References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com><1355996654-6579-6-git-send-email-hdoyu@nvidia.com><50D2EFFB.8030702@arm.com>
+Message-ID: <20121220.135758.1347753620353343245.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/12/12 11:26, Hiroshi Doyu wrote:
-> Marc Zyngier <marc.zyngier@arm.com> wrote @ Thu, 20 Dec 2012 12:17:08 +0100:
-> 
->> On 20/12/12 09:44, Hiroshi Doyu wrote:
->>> The method to detect the number of CPU cores on Cortex-A9 MPCore and
->>> Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
->>> information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
->>> have to read it from the system coprocessor(CP15), because the SCU on
->>> Cortex-A15 MPCore does not have software readable registers. This
->>> patch selects the correct method at runtime based on the CPU ID.
->>>
->>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->>> ---
->>>  arch/arm/mach-tegra/platsmp.c |   31 ++++++++++++++++++++++++++++---
->>>  1 file changed, 28 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
->>> index 1b926df..68e76ef 100644
->>> --- a/arch/arm/mach-tegra/platsmp.c
->>> +++ b/arch/arm/mach-tegra/platsmp.c
->>> @@ -23,6 +23,7 @@
->>>  #include <asm/hardware/gic.h>
->>>  #include <asm/mach-types.h>
->>>  #include <asm/smp_scu.h>
->>> +#include <asm/cputype.h>
->>>  
->>>  #include <mach/powergate.h>
->>>  
->>> @@ -34,9 +35,13 @@
->>>  #include "common.h"
->>>  #include "iomap.h"
->>>  
->>> +#define CPU_MASK		0xff0ffff0
->>> +#define CPU_CORTEX_A9		0x410fc090
->>> +#define CPU_CORTEX_A15		0x410fc0f0
->>> +
->>>  extern void tegra_secondary_startup(void);
->>>  
->>> -static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
->>> +static void __iomem *scu_base;
->>>  
->>>  #define EVP_CPU_RESET_VECTOR \
->>>  	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
->>> @@ -149,7 +154,26 @@ done:
->>>   */
->>>  static void __init tegra_smp_init_cpus(void)
->>>  {
->>> -	unsigned int i, ncores = scu_get_core_count(scu_base);
->>> +	unsigned int i, cpu_id, ncores;
->>> +	u32 l2ctlr;
->>> +	phys_addr_t pa;
->>> +
->>> +	cpu_id = read_cpuid(CPUID_ID) & CPU_MASK;
->>> +	switch (cpu_id) {
->>> +	case CPU_CORTEX_A15:
->>> +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
->>> +		ncores = ((l2ctlr >> 24) & 3) + 1;
->>
->> Please, do not do that. It doesn't scale to multiple clusters. Instead,
->> you can now rely on arm_dt_init_cpu_maps() to do the right thing as long
->> as your device tree exposes all the cpu nodes.
-> 
-> Ok, this could be the answer why DT for cpu is necessary even when
-> it's got from CP15?
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137989.html
-> 
+Marc Zyngier <marc.zyngier@arm.com> wrote @ Thu, 20 Dec 2012 12:01:15 +0100:
 
-Indeed, there is no unified way to find out how many CPUs are present in
-a system. The A15 trick is neat (we used it in the past), but doesn't
-scale to multiple clusters, not to mention heterogeneous clusters.
+> On 20/12/12 09:44, Hiroshi Doyu wrote:
+> > Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
+> > timer than TMR0. If it's available, it will be used for clock source
+> > and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
+> > necessary for clock event.
+> > 
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> >  .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 ++++
+> >  drivers/clocksource/tegra20_timer.c                |   64 +++++++++++++++++++-
+> >  2 files changed, 74 insertions(+), 1 deletion(-)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> > new file mode 100644
+> > index 0000000..9de936a
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> > @@ -0,0 +1,11 @@
+> > +NVIDIA Tegra Timer Stamp Counter(TSC)
+> > +
+> > +Required properties:
+> > +- compatible : "nvidia,tegra114-tsc
+> > +- reg : Should contain 1 register ranges(address and length)
+> > +
+> > +Example:
+> > +	tsc {
+> > +		compatible = "nvidia,tegra114-tsc";
+> > +		reg = <0x700f0000 0x20000>;
+> > +	};
+> > diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+> > index 1d25de8..285a6f1 100644
+> > --- a/drivers/clocksource/tegra20_timer.c
+> > +++ b/drivers/clocksource/tegra20_timer.c
+> > @@ -30,6 +30,7 @@
+> >  #include <asm/mach/time.h>
+> >  #include <asm/smp_twd.h>
+> >  #include <asm/sched_clock.h>
+> > +#include <asm/arch_timer.h>
+> >  
+> >  #define RTC_SECONDS            0x08
+> >  #define RTC_SHADOW_SECONDS     0x0c
+> > @@ -271,10 +272,71 @@ static void __init tegra20_init_tmr(void)
+> >  	clockevents_register_device(&tegra_clockevent);
+> >  }
+> >  
+> > +#define TSC_CNTCR		0		/* TSC control registers */
+> > +#define TSC_CNTCR_ENABLE	(1 << 0)	/* Enable */
+> > +#define TSC_CNTCR_HDBG		(1 << 1)	/* Halt on debug */
+> > +
+> > +#define TSC_CNTCV0		0x8		/* TSC counter (LSW) */
+> > +#define TSC_CNTCV1		0xc		/* TSC counter (MSW) */
+> > +#define TSC_CNTFID0		0x20		/* TSC freq id 0 */
+> > +
+> > +static const struct of_device_id tegra_tsc_match[] __initconst = {
+> > +	{ .compatible = "nvidia,tegra114-tsc" },
+> > +	{}
+> > +};
+> > +
+> > +static int tegra_arch_timer_init(void)
+> > +{
+> > +	int err;
+> > +	struct device_node *np;
+> > +	struct clk *clk;
+> > +	void __iomem *tsc_base;
+> > +	u32 freq, val;
+> > +
+> > +	np = of_find_matching_node(NULL, tegra_tsc_match);
+> > +	if (!np)
+> > +		return -ENODEV;
+> > +
+> > +	tsc_base = of_iomap(np, 0);
+> > +	if (!tsc_base)
+> > +		return -ENODEV;
+> > +
+> > +	clk = clk_get_sys("clk_m", NULL);
+> > +	if (IS_ERR(clk)) {
+> > +		freq = 12000000;
+> > +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
+> > +	} else {
+> > +		freq = clk_get_rate(clk);
+> > +		clk_put(clk);
+> > +	}
+> > +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
+> > +
+> > +	/* CNTFRQ */
+> > +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
+> > +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
+> > +	BUG_ON(val != freq);
+> 
+> This is scary. CNTFRQ is only writable from secure mode, and will
+> explode in any other situation.
+> 
+> Also, writing to CNTFRQ doesn't change the timer frequency! This is just
+> a way for secure mode to tell the rest of the world the frequency the
+> timer is ticking at. Unless you've wired the input clock to be able to
+> change the frequency?
 
-Hence the DT bindings for cpus, which neatly solves this problem and is
-future proof.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+ATM, our upstream kernel is expected in secure mode. This situation
+may be changed later, though....
