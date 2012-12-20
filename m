@@ -1,54 +1,75 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 20 Dec 2012 08:20:45 -0200
-Subject: 3.7 kernel hangs when doing scp
-In-Reply-To: <20121220043943.GA992@nchen-desktop>
-References: <CAOMZO5Bc5stXXviuf3OL9vAHw+ER=GzzV1q=5Yr5q=AnfoGiGw@mail.gmail.com>
- <20121218024353.GA17118@kroah.com>
- <CAOMZO5DTB79e3W1_i2NLin7RWXVzraoysEGVLxv9_aoRS39D4Q@mail.gmail.com>
- <20121220043943.GA992@nchen-desktop>
-Message-ID: <CAOMZO5B1DyktHa0Vfb4+-H9bdxaoacas6ZCHEH0bDLuKiCB6hA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 20 Dec 2012 15:54:44 +0530
+Subject: [PATCH V3 1/5] ARM: tegra: add pending SGI checking API
+In-Reply-To: <20121220095951.GG19258@tbergstrom-lnx.Nvidia.com>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <1355797861-12759-2-git-send-email-josephl@nvidia.com>
+ <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
+ <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
+ <CAMbhsRSDwSoHoEs93NZhDchCS28-vQCuW2p+kqfNKeqLygL2sQ@mail.gmail.com>
+ <50D2BB51.9000109@ti.com> <20121220093412.GE19258@tbergstrom-lnx.Nvidia.com>
+ <50D2DF45.1000305@ti.com> <20121220095951.GG19258@tbergstrom-lnx.Nvidia.com>
+Message-ID: <50D2E76C.7050309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On Thu, Dec 20, 2012 at 2:39 AM, Peter Chen <peter.chen@freescale.com> wrote:
-
-> Please to see if the Stream mode disable (bit4, usbmode) is set or not?
-> If it is not, please try below patch
+On Thursday 20 December 2012 03:29 PM, Peter De Schrijver wrote:
+> On Thu, Dec 20, 2012 at 10:49:57AM +0100, Santosh Shilimkar wrote:
+>> On Thursday 20 December 2012 03:04 PM, Peter De Schrijver wrote:
+>>> On Thu, Dec 20, 2012 at 08:16:33AM +0100, Santosh Shilimkar wrote:
+>>>> On Wednesday 19 December 2012 01:06 AM, Colin Cross wrote:
+>>>>> On Tue, Dec 18, 2012 at 2:15 AM, Peter De Schrijver
+>>>>> <pdeschrijver@nvidia.com> wrote:
+>>>>>> On Tue, Dec 18, 2012 at 03:42:24AM +0100, Colin Cross wrote:
+>>>>>>> On Mon, Dec 17, 2012 at 6:30 PM, Joseph Lo <josephl@nvidia.com> wrote:
+>>>>>>>> The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
+>>>>>>>> include the power of GIC. That caused the SGI (Software Generated
+>>>>>>>> Interrupt) been lost. Because the SGI can't wake up the CPU that in
+>>>>>>>> the "powered-down" CPU idle mode. We need to check if there is any
+>>>>>>>> pending SGI when go into "powered-down" CPU idle mode. This is important
+>>>>>>>> especially when applying the coupled cpuidle framework into "power-down"
+>>>>>>>> cpuidle dirver. Because the coupled cpuidle framework may have the
+>>>>>>>> chance that misses IPI_SINGLE_FUNC handling sometimes.
+>>>>>>>
+>>>>>>> This problem exists for any GIC-based SoC, and needs to be fixed in
+>>>>>>> gic_cpu_save or gic_dist_save, whichever one loses the interrupt.
+>>>>>>
+>>>>>> Not necessarily. It depends on the SoC design. On Tegra20, the entire CPU
+>>>>>> cluster is railgated, including the GIC. This causes a pending IPI to be lost.
+>>>>>> But for example on OMAP4, only the actual CPU cores are powergated. The GIC
+>>>>>> stays alive until also the core domain hits idle. By that time a potential
+>>>>>> pending IPI has long woken up the target CPU again, so no additional
+>>>>>> checks are needed for functional correct behavior.
+>>>>>
+>>>>> I'm not sure that is correct for OMAP4.  C2 and C3 will put the power
+>>>>> rail for the GIC in retention, and I don't think an IPI will wake it
+>>>>> up.  I believe the same problem also exists for Exynos5.  In any case,
+>>>>> checking for an IPI early during idle and aborting won't hurt those
+>>>>> platforms, so I still think it should be in the GIC driver and not by
+>>>>> mapping the GIC registers into a separate driver.
+>>>>>
+>>>> I second Colin on the GIC power states on OMAP.
+>>>
+>>> But even then PRCM will only trigger the transition to retention voltage after
+>>> both CPUs hit off mode. I guess a pending IPI will wakeup the core before the
+>>> PRCM starts the transition.
+>>>
+>> No it won't. You are talking about the voltage domain retention while
+>> the point is SGI becomes useless once CPU power domain transition to
+>> low power state. And btw, voltage transition also can not happen just
+>> with two CPU's in retention. It does have dependency like cluster power
+>> state to hit retention.
+>>
+>> CPUs have their own power domain state and once they enter into any low
+>> power state apart from ON power state, SGI doesn't work. hope this is
+>> clear.
 >
-> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-> index c97503b..258bc02 100644
-> --- a/drivers/usb/host/ehci-hcd.c
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -227,6 +227,7 @@ static void tdi_reset (struct ehci_hcd *ehci)
+> So why does OMAP4 have working coupled idle without the SGI check then?
 >
->         tmp = ehci_readl(ehci, &ehci->regs->usbmode);
->         tmp |= USBMODE_CM_HC;
-> +       tmp |= (1 << 4); /* disable stream mode */
->         /* The default byte access to MMR space is LE after
->          * controller reset. Set the required endian mode
->          * for transfer buffers to match the host microprocessor
+Because whenever the OMAP4 CPUs enter into any power states apart from
+ON, clock-domain force wakeup method us being used to wakeup
+secondary CPUs. And secondly CPU RET is not supported on purpose because
+of some known IP block issues.
 
-Excellent! Your suggestion made scp work with mx6 on 3.7.
-
-I assume that this "fix" or workaround would need a better place, right?
-
-Should this fix go into the chipidea host driver instead?
-
-Also, I wonder on how "standard" this USBMODE register is. i.e. there
-is a deviation from the FSL EHCI USBMODE register.
-I found it in include/linux/usb/ehci_def.h:
-
-#define USBMODE_SDIS            (1<<3)          /* Stream disable */
-
-, which is at a different bit position from the i.MX6 Reference Manual:
-
-4 SDIS Stream Disable Mode. (0 - Inactive [default]; 1 - Active)
-
-Also interested to know more details@to why disabling stream mode
-make things work.
-
-Thanks a lot!
-
-Fabio Estevam
+Regards
+Santosh
