@@ -1,29 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Dec 2012 20:17:20 +0100
-Subject: [PATCH 0/3] clk: Provide option to unprepare unused clocks at
- late init
-In-Reply-To: <1355872583-20928-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1355872583-20928-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdbCuDxszPZ-VYxhbNUSvyGM=rGw4h5Uy8LfqDcY0V-Dyg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 20 Dec 2012 11:19:22 -0800
+Subject: [PATCH 0/9] drivers: mailbox: framework creation
+In-Reply-To: <20121220182835.GB21056@atomide.com>
+References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
+ <CACRpkdaqO7AAeYeR8SZt4Tbv1grrMq85TNYMc-FSbUSrnZBm=Q@mail.gmail.com>
+ <20121220182835.GB21056@atomide.com>
+Message-ID: <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 12:16 AM, Ulf Hansson
-<ulf.hansson@stericsson.com> wrote:
-
-> The disable_unused sequence executed at late init, is already handling the
-> fast unused ungated clocks to be gated. This patchset extends this sequence to
-> include the slow unused prepared clocks to be unprepared.
+On Thu, Dec 20, 2012 at 10:28 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Linus Walleij <linus.walleij@linaro.org> [121220 10:19]:
+>> On Tue, Dec 18, 2012 at 2:10 PM, Loic Pallardy
+>> <loic.pallardy-ext@stericsson.com> wrote:
+>>
+>> > OMAP and ST-Ericsson platforms are both using mailbox to communicate
+>> > with some coprocessors.
+>> > Based on OMAP existing mailbox framework, this series proposes a
+>> > generic framework, living under drivers/mailbox.
+>>
+>> I like this patch series so you have my Acked-by.
+>>
+>> Since it's a new subsystem and affects a few ARM architectures can
+>> we merge this into the ARM SoC tree once we have consensus,
+>> so we get some rotation in linux-next that way?
 >
-> The default behavior will not change in this patchset. To unprepare unused
-> clocks during the disable_unused sequence, the clk_hw needs to implement
-> the new optional callback, is_prepared.
+> Yes good idea.
 >
-> The motivation for this patchset is to save power. Clocks that is from
-> bootloaders prepared|enabled, but not used should be unprepared|disabled.
+>> Olof/Arnd?
+>
+> I suggest we set up an immutable branch against
+> v3.8-rc1 when it's out with only these patches in it.
+> Then we can all merge it in as needed. Maybe Arnd or
+> Olof can set up the branch?
 
-This has a nice symmetrical touch to it and looks allright to me, so
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I haven't reviewed the patches yet, but this flow sounds reasonable to me.
 
-Yours,
-Linus Walleij
+> FYI, looks like I need to merge in this branch too to
+> avoid build errors with remoteproc enabled once I flip
+> on the multiplatform support for omap2+.
+
+While we can make the branch stable, would it make sense to make
+remoteproc for omap depend on !multiplatform during the transition, to
+reduce dependencies a little? Either way works, but it'd be nice to
+keep them independent if we can.
+
+
+-Olof
