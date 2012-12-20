@@ -1,41 +1,53 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 21 Dec 2012 00:13:48 +0200
-Subject: [PATCH 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
-In-Reply-To: <50D34630.9020708@arm.com>
-References: <50D305A6.2080904@arm.com>
- <20121220125507.GB6819@tbergstrom-lnx.Nvidia.com>
- <50D31365.9000009@arm.com>
- <20121220.164230.292625215885249791.hdoyu@nvidia.com>
- <50D34630.9020708@arm.com>
-Message-ID: <20121220221348.GB19766@tbergstrom-lnx.Nvidia.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Thu, 20 Dec 2012 14:19:48 -0800
+Subject: [PATCH] ARM: dts: fix split memory bank for SSDK5440
+In-Reply-To: <1464138.NEt7mMkYJc@flatron>
+References: <1356030217-5472-1-git-send-email-kgene.kim@samsung.com>
+ <CAOesGMg03Yn=fDr1XqmbBUs=eZO0_8=iti1LUiJ6CX5n1Bm45g@mail.gmail.com>
+ <1464138.NEt7mMkYJc@flatron>
+Message-ID: <50D38F04.8020307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > 
-> > "tegra114.dtsi" has the folloiwng "tsc" entry. So can we consider that
-> > if dts has this entry, CNTFRQ is not set, which implies it's in secure
-> > mode. kernel should set it up by itself? Otherwise, skip this setup
-> > and use it. For example:
-> > 
-> >  	tsc {
-> >  		compatible = "nvidia,tegra114-tsc";
-> >  		reg = <0x700f0000 0x20000>;
-> > +		setup-cntfrq;
-> >  	};
-> > 
-> > Is this what you explained in the above?
-> > At least, kernel can survive without bootloader/firmware support, ATM.
-> 
-> No. The DT should only describe the hardware, and not something that is
-> Linux specific.
-> 
-> Just use the "clock-frequency" attribute in the timer arch-timer node,
-> and get rid of this CNTFRQ setting. The driver already knows how to deal
-> with this situation if this attribute is set.
+I would like to ask a question here. Do we need to have sparse even if 
+the physical memory is contiguous? All the recent exynos machines come 
+with physical banks without any holes, and I am thinking why not drop it 
+and use flat mem instead. With LPAE these sections sizes wont be useful, 
+and I dont like to keep different section sizes for different 
+configurations. Any suggestions/opinions are very much helpful to me.
 
-The frequency is probed at boottime by the kernel though. It will not
-necessarily be the same for every board.
+Regards,
+Subash
 
-Cheers,
-
-Peter.
+On Thursday 20 December 2012 01:14 PM, Tomasz Figa wrote:
+> Hi Olof,
+>
+> On Thursday 20 of December 2012 11:56:59 Olof Johansson wrote:
+>> Hi,
+>>
+>> On Thu, Dec 20, 2012 at 11:03 AM, Kukjin Kim <kgene.kim@samsung.com>
+> wrote:
+>>> The size of memory bank should be under 256MB, because current
+>>> section size is 256MB on EXYNOS SoCs. This patch fixes it.
+>>
+>> This makes no sense. You don't have to split up memory ranges, the
+>> code should be made to handle it instead.
+>
+> It's not Exynos code which causes the problem. Sparsemem initialization
+> relies on the fact that initial amount of structures to described memory
+> equals to maximum section size which is defined per arch (e.g.
+> ARCH_EXYNOS).
+>
+>> What's the actual bug caused by this? The description is vague.
+>
+> The kernel panics early on NULL pointer dereference in memory
+> initialization.
+>
+> Best regards,
+> Tomasz Figa
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
