@@ -1,81 +1,68 @@
-From: prasanna.ps@samsung.com (Prasanna Kumar)
-Date: Thu, 20 Dec 2012 17:56:18 +0530
-Subject: [PATCH v2 3/3] ARM: EXYNOS5: save CLK_TOP_SRC3 register before
- powergating
-In-Reply-To: <CAPmaG0uqkRcoUBR8Gjv_+BSJ3hwxUCz0G-YKNQX=qvx83i6QOQ@mail.gmail.com>
-References: <CAPmaG0uqkRcoUBR8Gjv_+BSJ3hwxUCz0G-YKNQX=qvx83i6QOQ@mail.gmail.com>
-Message-ID: <1356006378-17441-4-git-send-email-prasanna.ps@samsung.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Thu, 20 Dec 2012 20:13:50 +0800
+Subject: [PATCH 0/9] ARM: PRIMA2: bringup new CSR SiRFmarco SMP SoC
+Message-ID: <1356005639-23466-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a software workaround to the hardware
-problem found in exynos5 while powergating.
+this patch series enables the new CSR SiRFmarco SMP SoC.
 
-It is observed that CLK_TOP_SRC3 register gets modified if
-the G-Scaler/MFC devices are power gated. The clock for G-Scaler gets
-set to XXTI which results in the device running very slow .
-A big drop in performance is noticed whilerunning the video.
-This issue also occurs while powergating MFC.
+change list:
+1. Marco has different OS timer hardware with Prima2, so add a new timer-marco
+2. add platsmp.c, headsmp.S and hotplug.c for MPcore support
+3. some hardwares have changed, like rstc, so use of_compatible to branch Prima2
+   and Marco
+4. add initial .dtsi for Marco SoC and initial .dts for the EVB
+5. use GIC for Marco instead of Prima2's IRQ controller
+6. add DEBUG_LL uart ports for Prima2 and Marco debug ports
 
-The value of clock source register is restored once the powergating
-operation is completed.
+Barry Song (9):
+  ARM: PRIMA2: add CSR SiRFmarco device tree .dts
+  ARM: PRIMA2: enable AUTO_ZRELADDR for SIRF in Kconfig
+  ARM: PRIMA2: initialize l2x0 according to mach from DT
+  ARM: PRIMA2: mv timer to timer-prima2 as we will add timer-marco
+  ARM: PRIMA2: rstc: enable the support for Marco
+  ARM: PRIMA2: rtciobg: it is also compatible with marco
+  ARM: PRIMA2: irq: make prima2 irq can work even we enable GIC for
+    Marco
+  ARM: PRIMA2: add new SiRFmarco SMP SoC infrastructures
+  ARM: PRIMA2: provide two DEBUG_LL ports for prima2 and marco
 
-Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
----
- arch/arm/mach-exynos/pm_domains.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig                                 |    1 +
+ arch/arm/Kconfig.debug                           |   14 +
+ arch/arm/boot/dts/Makefile                       |    1 +
+ arch/arm/boot/dts/marco-evb.dts                  |   51 ++
+ arch/arm/boot/dts/marco.dtsi                     |  749 ++++++++++++++++++++++
+ arch/arm/configs/prima2_defconfig                |    3 +
+ arch/arm/mach-prima2/Kconfig                     |   10 +
+ arch/arm/mach-prima2/Makefile                    |    5 +-
+ arch/arm/mach-prima2/common.c                    |   46 ++-
+ arch/arm/mach-prima2/common.h                    |   14 +-
+ arch/arm/mach-prima2/headsmp.S                   |   79 +++
+ arch/arm/mach-prima2/hotplug.c                   |   41 ++
+ arch/arm/mach-prima2/include/mach/irqs.h         |    4 +-
+ arch/arm/mach-prima2/include/mach/uart.h         |    6 +
+ arch/arm/mach-prima2/include/mach/uncompress.h   |    3 +
+ arch/arm/mach-prima2/irq.c                       |   16 +-
+ arch/arm/mach-prima2/l2x0.c                      |   14 +
+ arch/arm/mach-prima2/platsmp.c                   |  170 +++++
+ arch/arm/mach-prima2/rstc.c                      |   45 +-
+ arch/arm/mach-prima2/rtciobrg.c                  |    1 +
+ arch/arm/mach-prima2/timer-marco.c               |  359 +++++++++++
+ arch/arm/mach-prima2/{timer.c => timer-prima2.c} |    4 +-
+ 22 files changed, 1609 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm/boot/dts/marco-evb.dts
+ create mode 100644 arch/arm/boot/dts/marco.dtsi
+ create mode 100644 arch/arm/mach-prima2/headsmp.S
+ create mode 100644 arch/arm/mach-prima2/hotplug.c
+ create mode 100644 arch/arm/mach-prima2/platsmp.c
+ create mode 100644 arch/arm/mach-prima2/timer-marco.c
+ rename arch/arm/mach-prima2/{timer.c => timer-prima2.c} (98%)
 
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 9f1351d..bd8a41e 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -24,6 +24,8 @@
- 
- #include <mach/regs-pmu.h>
- #include <plat/devs.h>
-+#include <mach/regs-clock.h>
-+#include <plat/cpu.h>
- 
- /*
-  * Exynos specific wrapper around the generic power domain
-@@ -41,6 +43,24 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
- 	void __iomem *base;
- 	u32 timeout, pwr;
- 	char *op;
-+	u32 tmp = 0;
-+
-+	/*
-+	 *It is found that the CLK SRC register in exynos5
-+	 *gets modified when power domain of gsc/mfc/isp/disp1
-+	 *is powered off.This happens only after the system is
-+	 *suspended and resumed and not before that.
-+	 *The following fix adresses this hardware issue.
-+	 *It saves the value of clock source register and
-+	 *resores it later
-+	 */
-+
-+	if (of_machine_is_compatible("samsung,exynos5250")) {
-+		if (!power_on) {
-+			/* save clock source register */
-+			tmp = __raw_readl(EXYNOS5_CLKSRC_TOP3);
-+		}
-+	}
- 
- 	pd = container_of(domain, struct exynos_pm_domain, pd);
- 	base = pd->base;
-@@ -61,6 +81,13 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
- 		cpu_relax();
- 		usleep_range(80, 100);
- 	}
-+
-+	if (of_machine_is_compatible("samsung,exynos5250")) {
-+		if (!power_on) {
-+			/* restore clock source register */
-+			__raw_writel(tmp, EXYNOS5_CLKSRC_TOP3);
-+		}
-+	}
- 	return 0;
- }
- 
 -- 
-1.7.0.4
+1.7.5.4
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
