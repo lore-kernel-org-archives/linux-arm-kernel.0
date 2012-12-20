@@ -1,42 +1,41 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Dec 2012 10:01:27 -0700
-Subject: [PATCH 2/2] ARM: tegra: moving the clock gating procedure to
- tegra_cpu_kill
-In-Reply-To: <1355970519-28200-2-git-send-email-josephl@nvidia.com>
-References: <1355970519-28200-1-git-send-email-josephl@nvidia.com>
- <1355970519-28200-2-git-send-email-josephl@nvidia.com>
-Message-ID: <50D34467.9000006@wwwdotorg.org>
+Date: Thu, 20 Dec 2012 10:03:37 -0700
+Subject: [PATCH] ARM: tegra: dts: add aliases and DMA requestor for serial
+ controller
+In-Reply-To: <50D2AD02.6060101@nvidia.com>
+References: <1355898671-3960-1-git-send-email-ldewangan@nvidia.com>
+ <50D1F2CB.3090206@wwwdotorg.org> <50D2AD02.6060101@nvidia.com>
+Message-ID: <50D344E9.70305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2012 07:28 PM, Joseph Lo wrote:
-> The tegra_cpu_die was be executed by the CPU itslf. So the clock gating
-> procedure won't be executed after the CPU hardware shutdown code. Moving
-> the clock gating procedure to tegra_cpu_kill that will be run by another
-> CPU after the CPU died.
+On 12/19/2012 11:15 PM, Laxman Dewangan wrote:
+> On Wednesday 19 December 2012 10:30 PM, Stephen Warren wrote:
+>> On 12/18/2012 11:31 PM, Laxman Dewangan wrote:
+>>> Add APB DMA requestor and serial aliases for serial controller.
+>>> There will be two serial driver i.e. 8250 based simple serial driver
+>>> and APB DMA based serial driver for higher baudrate and performace.
+>>>
+>>> The simple serial driver get enabled with compatible nvidia,tegra20-uart
+>>> and APB DMA based driver will get enabled with compatible
+>>> nvidia,tegra20-hsuart.
+>> This patch seems to do two things:
+>>
+>> 1) Add a comment describing how to select the basic or DMA-based driver.
+>> I can see why this is useful.
+>>
+>> 2) Add aliases for the serial ports. I have no idea why this is useful.
+> 
+> Serial aliases are added because we want to get the port number like
+> /dev/ttyTHS0,  /d/ttyTHS2 etc. The uarta should be /dev/ttyTHS0 and
+> uartc should be /dev/ttyTHS2. The port number can be found using aliases
+> and of_alias_get_id() in driver file:
+> 
+> port_number = of_alias_get_id(np, "serial");
 
-Hmmm. I wonder if this is enough to make kexec-on-Tegra-with-SMP-enabled
-work without explicitly hot-unplugging all the CPUs first... An
-implementation of cpu_kill() was a major part of what was missing. I
-thought an implementation of cpu_kill() would require a bunch of code
-from cpu_die() too. Does this patch assume cpu_die() has executed first,
-and only then cpu_kill() will work, or can cpu_kill() be used on its own?
+Oh, I see. I guess the aliases make sense then.
 
-> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-
-> @@ -34,10 +45,6 @@ void __ref tegra_cpu_die(unsigned int cpu)
->  	/* Shut down the current CPU. */
->  	tegra_hotplug_shutdown();
->  
-> -	/* Clock gate the CPU */
-> -	tegra_wait_cpu_in_reset(cpu);
-> -	tegra_disable_cpu_clock(cpu);
-
-I believe that's the last use of the calculation performed right at the
-start of this function:
-
-        cpu = cpu_logical_map(cpu);
-
-Can you remove that?
-
-Also, Peter, can you review these 2 patches as well?
+But, wouldn't you only add aliases for the specific UARTs that are in
+use on a particular board (so put them in tegraNN-board.dts) rather than
+all UARTs on Tegra (i.e. the current patch which puts them into
+tegraNN.dtsi)?
