@@ -1,48 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 20 Dec 2012 12:46:33 +0530
-Subject: [PATCH V3 1/5] ARM: tegra: add pending SGI checking API
-In-Reply-To: <CAMbhsRSDwSoHoEs93NZhDchCS28-vQCuW2p+kqfNKeqLygL2sQ@mail.gmail.com>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <1355797861-12759-2-git-send-email-josephl@nvidia.com>
- <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
- <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
- <CAMbhsRSDwSoHoEs93NZhDchCS28-vQCuW2p+kqfNKeqLygL2sQ@mail.gmail.com>
-Message-ID: <50D2BB51.9000109@ti.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Thu, 20 Dec 2012 08:15:47 +0100
+Subject: [PATCH] missing ->mmap_sem around find_vma() in swp_emulate.c
+In-Reply-To: <20121216002557.GY4939@ZenIV.linux.org.uk>
+References: <20121216002557.GY4939@ZenIV.linux.org.uk>
+Message-ID: <50D2BB23.5070105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 December 2012 01:06 AM, Colin Cross wrote:
-> On Tue, Dec 18, 2012 at 2:15 AM, Peter De Schrijver
-> <pdeschrijver@nvidia.com> wrote:
->> On Tue, Dec 18, 2012 at 03:42:24AM +0100, Colin Cross wrote:
->>> On Mon, Dec 17, 2012 at 6:30 PM, Joseph Lo <josephl@nvidia.com> wrote:
->>>> The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
->>>> include the power of GIC. That caused the SGI (Software Generated
->>>> Interrupt) been lost. Because the SGI can't wake up the CPU that in
->>>> the "powered-down" CPU idle mode. We need to check if there is any
->>>> pending SGI when go into "powered-down" CPU idle mode. This is important
->>>> especially when applying the coupled cpuidle framework into "power-down"
->>>> cpuidle dirver. Because the coupled cpuidle framework may have the
->>>> chance that misses IPI_SINGLE_FUNC handling sometimes.
->>>
->>> This problem exists for any GIC-based SoC, and needs to be fixed in
->>> gic_cpu_save or gic_dist_save, whichever one loses the interrupt.
->>
->> Not necessarily. It depends on the SoC design. On Tegra20, the entire CPU
->> cluster is railgated, including the GIC. This causes a pending IPI to be lost.
->> But for example on OMAP4, only the actual CPU cores are powergated. The GIC
->> stays alive until also the core domain hits idle. By that time a potential
->> pending IPI has long woken up the target CPU again, so no additional
->> checks are needed for functional correct behavior.
+Am 16.12.2012 01:25, schrieb Al Viro:
+> find_vma() is *not* safe when somebody else is removing vmas.  Not just
+> the return value might get bogus just as you are getting it (this instance
+> doesn't try to dereference the resulting vma), the search itself can get
+> buggered in rather spectacular ways.  IOW, ->mmap_sem really, really is
+> not optional here.
 >
-> I'm not sure that is correct for OMAP4.  C2 and C3 will put the power
-> rail for the GIC in retention, and I don't think an IPI will wake it
-> up.  I believe the same problem also exists for Exynos5.  In any case,
-> checking for an IPI early during idle and aborting won't hurt those
-> platforms, so I still think it should be in the GIC driver and not by
-> mapping the GIC registers into a separate driver.
+> Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+> ---
+> diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
+> index df74518..ab1017b 100644
+> --- a/arch/arm/kernel/swp_emulate.c
+> +++ b/arch/arm/kernel/swp_emulate.c
+> @@ -109,10 +109,12 @@ static void set_segfault(struct pt_regs *regs, unsigned long addr)
+>   {
+>   	siginfo_t info;
 >
-I second Colin on the GIC power states on OMAP.
+> +	down_read(&current->mm->mmap_sem);
+>   	if (find_vma(current->mm, addr) == NULL)
+>   		info.si_code = SEGV_MAPERR;
+>   	else
+>   		info.si_code = SEGV_ACCERR;
+> +	up_read(&current->mm->mmap_sem);
+>
+>   	info.si_signo = SIGSEGV;
+>   	info.si_errno = 0;
 
-Regards
-Santosh
+Any comment on this?
+
+Thanks
+
+Dirk
