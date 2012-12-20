@@ -1,50 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Dec 2012 09:35:49 -0800
-Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
-In-Reply-To: <CAOesGMiZTF4gogCkU7eSaOydkX82wfWywkKBgCJo_-ZW0Ox4kw@mail.gmail.com>
-References: <20121220163814.GA29557@quad.lixom.net>
- <CA+55aFxL47wxTyTzLdnoFV=trnrMAz=_7rhsQFjb+K_mvTCa9w@mail.gmail.com>
- <CAOesGMiZTF4gogCkU7eSaOydkX82wfWywkKBgCJo_-ZW0Ox4kw@mail.gmail.com>
-Message-ID: <20121220173548.GB4989@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Dec 2012 17:36:11 +0000
+Subject: [PATCH] kexec: disable non-boot CPUs
+In-Reply-To: <50D34934.9070106@wwwdotorg.org>
+References: <1355960681-32015-1-git-send-email-swarren@wwwdotorg.org>
+ <20121220104945.GC16887@mudshark.cambridge.arm.com>
+ <50D34934.9070106@wwwdotorg.org>
+Message-ID: <20121220173611.GC5387@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [121220 09:30]:
-> [proper reply-to-all this time]
+On Thu, Dec 20, 2012 at 05:21:56PM +0000, Stephen Warren wrote:
+> On 12/20/2012 03:49 AM, Will Deacon wrote:
+> > If you do manage to get this merged, please can you follow up with a patch
+> > to remove the smp_kill_cpus bits from arch/arm/kernel/smp.c please? It only
+> > exists as a hook to do exactly this and currently nobody is using it afaict.
 > 
-> On Thu, Dec 20, 2012 at 8:49 AM, Linus Torvalds
-> <torvalds@linux-foundation.org> wrote:
-> > On Thu, Dec 20, 2012 at 8:38 AM, Olof Johansson <olof@lixom.net> wrote:
-> >>
-> >> One of the sunxi patches from the last pull request was misapplied (I
-> >> realized what happened -- git am -s didn't apply cleanly so I had done it
-> >> through regular patch, thus not catching the renames properly). Here's
-> >> a fresh version of the pull request with a couple more OMAP and Samsung
-> >> patches included.
-> >
-> > Argh!
-> >
-> > I pulled your earlier branch due to Tony's ack, and now you're
-> > re-created that branch with new pulls (effectively rebasing it).
-> >
-> > Don't do things like this to me.
+> I originally implemented this in
+> arch/arm/kernel/process.c:machine_shutdown(), which currently is:
 > 
-> Yeah, sorry about that -- I wanted to replace the broken patch, and
-> Tony's branch was based on a newer version of your tree so I brought
-> everything forward as I had to rebase anyway.
+> void machine_shutdown(void)
+> {
+> #ifdef CONFIG_SMP
+> 	smp_send_stop();
+> #endif
+> }
 > 
-> I'll rebuild on top of what you've pulled, and send a fresh request of
-> just the delta. Sorry about the race condition here.
+> and I changed it to something like:
+> 
+> void machine_shutdown(void)
+> {
+> #ifdef CONFIG_HOTPLUG_CPU
+>  	disable_nonboot_cpus();
+> #elifdef CONFIG_SMP
+> 	smp_send_stop();
+> #endif
+> }
+> 
+> ... but then figured that moving it up into the core kexec code would be
+> better, so that everything always worked the same way.
 
-Sorry for me adding to the confusion too.
+Hmmm, isn't this racy: requiring the secondaries to hit idle and notice
+they're offline and call cpu_die before the primary has replace the kernel
+image?
 
-Looks like Linus already applied "ARM: OMAP: Fix build breakage due
-to missing include in i2c.c" that I had queued earlier.
+> Anyway, the change above addresses Eric's concern about isolating the
+> change to ARM. Does that seem like a reasonable thing for the ARM code
+> to do?
 
-Olof, I suggest you just merge my pull request up to the other commit
-c16acf12 (ARM: OMAP2+: Fix compillation error in mach-omap2/timer.c).
-Or just pick it whichever works better for you.
+I think you're better off using what we currently have and hanging your code
+off platform_cpu_kill.
 
-Regards,
-
-Tony
+Will
