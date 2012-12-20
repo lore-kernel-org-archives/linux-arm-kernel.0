@@ -1,24 +1,38 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 20 Dec 2012 17:22:44 +0000 (UTC)
-Subject: [PATCH 09/12] ARM: OMAP2+: powerdomain: skip register reads for
- powerdomains known to be on
-In-Reply-To: <50D22D0B.3050502@ti.com>
-References: <20121209200108.3196.12452.stgit@dusk.lan>
- <20121209200327.3196.27686.stgit@dusk.lan> <50D22D0B.3050502@ti.com>
-Message-ID: <alpine.DEB.2.00.1212201722190.3498@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 20 Dec 2012 09:28:19 -0800
+Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
+In-Reply-To: <CA+55aFxL47wxTyTzLdnoFV=trnrMAz=_7rhsQFjb+K_mvTCa9w@mail.gmail.com>
+References: <20121220163814.GA29557@quad.lixom.net>
+ <CA+55aFxL47wxTyTzLdnoFV=trnrMAz=_7rhsQFjb+K_mvTCa9w@mail.gmail.com>
+Message-ID: <CAOesGMiZTF4gogCkU7eSaOydkX82wfWywkKBgCJo_-ZW0Ox4kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Dec 2012, Jon Hunter wrote:
+[proper reply-to-all this time]
 
-> My understanding is that for OMAP4 devices, the core power domain may
-> not be active the same time as the MPU power domain. The Cortex-A9 has
-> the ability to access some peripherals (such as timer, McBSP) via a
-> private bus that does not require the core domain to be active. This is
-> a difference from OMAP3 devices, where the core would always be on with
-> the MPU power domain.
+On Thu, Dec 20, 2012 at 8:49 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Thu, Dec 20, 2012 at 8:38 AM, Olof Johansson <olof@lixom.net> wrote:
+>>
+>> One of the sunxi patches from the last pull request was misapplied (I
+>> realized what happened -- git am -s didn't apply cleanly so I had done it
+>> through regular patch, thus not catching the renames properly). Here's
+>> a fresh version of the pull request with a couple more OMAP and Samsung
+>> patches included.
+>
+> Argh!
+>
+> I pulled your earlier branch due to Tony's ack, and now you're
+> re-created that branch with new pulls (effectively rebasing it).
+>
+> Don't do things like this to me.
 
-You are absolutely right and I will drop that part from this patch.
+Yeah, sorry about that -- I wanted to replace the broken patch, and
+Tony's branch was based on a newer version of your tree so I brought
+everything forward as I had to rebase anyway.
+
+I'll rebuild on top of what you've pulled, and send a fresh request of
+just the delta. Sorry about the race condition here.
 
 
-- Paul
+-Olof
