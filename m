@@ -1,53 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Dec 2012 17:36:11 +0000
-Subject: [PATCH] kexec: disable non-boot CPUs
-In-Reply-To: <50D34934.9070106@wwwdotorg.org>
-References: <1355960681-32015-1-git-send-email-swarren@wwwdotorg.org>
- <20121220104945.GC16887@mudshark.cambridge.arm.com>
- <50D34934.9070106@wwwdotorg.org>
-Message-ID: <20121220173611.GC5387@mudshark.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 20 Dec 2012 10:43:04 -0700
+Subject: [PATCH V3 2/5] ARM: tegra20: cpuidle: add powered-down state
+ for secondary CPU
+In-Reply-To: <1355797861-12759-3-git-send-email-josephl@nvidia.com>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <1355797861-12759-3-git-send-email-josephl@nvidia.com>
+Message-ID: <50D34E28.5000208@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 05:21:56PM +0000, Stephen Warren wrote:
-> On 12/20/2012 03:49 AM, Will Deacon wrote:
-> > If you do manage to get this merged, please can you follow up with a patch
-> > to remove the smp_kill_cpus bits from arch/arm/kernel/smp.c please? It only
-> > exists as a hook to do exactly this and currently nobody is using it afaict.
+On 12/17/2012 07:30 PM, Joseph Lo wrote:
+> The powered-down state of Tegra20 requires power gating both CPU cores.
+> When the secondary CPU requests to enter powered-down state, it saves
+> its own contexts and then enters WFI. The Tegra20 had a limition to
+> power down both CPU cores. The secondary CPU must waits for CPU0 in
+> powered-down state too. If the secondary CPU be woken up before CPU0
+> entering powered-down state, then it needs to restore its CPU states
+> and waits for next chance.
 > 
-> I originally implemented this in
-> arch/arm/kernel/process.c:machine_shutdown(), which currently is:
-> 
-> void machine_shutdown(void)
-> {
-> #ifdef CONFIG_SMP
-> 	smp_send_stop();
-> #endif
-> }
-> 
-> and I changed it to something like:
-> 
-> void machine_shutdown(void)
-> {
-> #ifdef CONFIG_HOTPLUG_CPU
->  	disable_nonboot_cpus();
-> #elifdef CONFIG_SMP
-> 	smp_send_stop();
-> #endif
-> }
-> 
-> ... but then figured that moving it up into the core kexec code would be
-> better, so that everything always worked the same way.
+> Be aware of that, you may see the legacy power state "LP2" in the code
+> which is exactly the same meaning of "CPU power down".
 
-Hmmm, isn't this racy: requiring the secondaries to hit idle and notice
-they're offline and call cpu_die before the primary has replace the kernel
-image?
+> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
 
-> Anyway, the change above addresses Eric's concern about isolating the
-> change to ARM. Does that seem like a reasonable thing for the ARM code
-> to do?
+>  int __init tegra20_cpuidle_init(void)
 
-I think you're better off using what we currently have and hanging your code
-off platform_cpu_kill.
+> +	drv->state_count = sizeof(tegra_idle_states) /
+> +			   sizeof(struct cpuidle_state);
 
-Will
+Use ARRAY_SIZE() there?
+
+
+> +	for (i = 0; i < drv->state_count; i++)
+> +		memcpy(&drv->states[i], &tegra_idle_states[i],
+> +		       sizeof(struct cpuidle_state));
+
+Can't you call memcpy() once:
+
+memcpy(drv->states, tegra_idle_states,
+		drv->state_count * sizeof(drv->states[0]));
+
+... although I personally much preferred when all this was just static
+initialization directly in tegra_idle_driver, rather than all this messy
+copying. Really, struct cpuidle_driver should point at the array, rather
+than including it.
+
+> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+
+> @@ -173,6 +173,8 @@ bool __cpuinit tegra_set_cpu_in_lp2(int phy_cpu_id)
+>  
+>  	if ((phy_cpu_id == 0) && cpumask_equal(cpu_lp2_mask, cpu_online_mask))
+>  		last_cpu = true;
+> +	else if (phy_cpu_id == 1)
+> +		tegra20_cpu_set_resettable_soon();
+>  
+>  	spin_unlock(&tegra_lp2_lock);
+>  	return last_cpu;
+
+Shouldn't the code in that else branch have a run-time check for whether
+it's running on Tegra20? When compiled without Tegra20 support,
+tegra20_cpu_set_resettable_soon() is a dummy static inline, but when
+both Tegra20 and Tegra30 are compiled in, isn't that code going to run
+when it shouldn't; pm.c being a common file.
+
+(Peter again, can you please review/ack this series. Thanks)
