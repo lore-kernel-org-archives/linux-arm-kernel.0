@@ -1,55 +1,70 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 20 Dec 2012 11:34:12 +0200
-Subject: [PATCH V3 1/5] ARM: tegra: add pending SGI checking API
-In-Reply-To: <50D2BB51.9000109@ti.com>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <1355797861-12759-2-git-send-email-josephl@nvidia.com>
- <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
- <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
- <CAMbhsRSDwSoHoEs93NZhDchCS28-vQCuW2p+kqfNKeqLygL2sQ@mail.gmail.com>
- <50D2BB51.9000109@ti.com>
-Message-ID: <20121220093412.GE19258@tbergstrom-lnx.Nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Dec 2012 09:40:10 +0000
+Subject: Inconsistency in clk framework
+In-Reply-To: <1355976817.2968.12.camel@gitbox>
+References: <1355890233.25599.4.camel@gitbox>
+ <20121219092636.GW14363@n2100.arm.linux.org.uk>
+ <1355938492.27893.8.camel@gitbox> <1355943649.2451.1.camel@gitbox>
+ <20121219190824.GX14363@n2100.arm.linux.org.uk>
+ <1355976817.2968.12.camel@gitbox>
+Message-ID: <20121220094010.GY14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 08:16:33AM +0100, Santosh Shilimkar wrote:
-> On Wednesday 19 December 2012 01:06 AM, Colin Cross wrote:
-> > On Tue, Dec 18, 2012 at 2:15 AM, Peter De Schrijver
-> > <pdeschrijver@nvidia.com> wrote:
-> >> On Tue, Dec 18, 2012 at 03:42:24AM +0100, Colin Cross wrote:
-> >>> On Mon, Dec 17, 2012 at 6:30 PM, Joseph Lo <josephl@nvidia.com> wrote:
-> >>>> The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
-> >>>> include the power of GIC. That caused the SGI (Software Generated
-> >>>> Interrupt) been lost. Because the SGI can't wake up the CPU that in
-> >>>> the "powered-down" CPU idle mode. We need to check if there is any
-> >>>> pending SGI when go into "powered-down" CPU idle mode. This is important
-> >>>> especially when applying the coupled cpuidle framework into "power-down"
-> >>>> cpuidle dirver. Because the coupled cpuidle framework may have the
-> >>>> chance that misses IPI_SINGLE_FUNC handling sometimes.
-> >>>
-> >>> This problem exists for any GIC-based SoC, and needs to be fixed in
-> >>> gic_cpu_save or gic_dist_save, whichever one loses the interrupt.
-> >>
-> >> Not necessarily. It depends on the SoC design. On Tegra20, the entire CPU
-> >> cluster is railgated, including the GIC. This causes a pending IPI to be lost.
-> >> But for example on OMAP4, only the actual CPU cores are powergated. The GIC
-> >> stays alive until also the core domain hits idle. By that time a potential
-> >> pending IPI has long woken up the target CPU again, so no additional
-> >> checks are needed for functional correct behavior.
-> >
-> > I'm not sure that is correct for OMAP4.  C2 and C3 will put the power
-> > rail for the GIC in retention, and I don't think an IPI will wake it
-> > up.  I believe the same problem also exists for Exynos5.  In any case,
-> > checking for an IPI early during idle and aborting won't hurt those
-> > platforms, so I still think it should be in the GIC driver and not by
-> > mapping the GIC registers into a separate driver.
-> >
-> I second Colin on the GIC power states on OMAP.
+On Thu, Dec 20, 2012 at 05:13:37PM +1300, Tony Prisk wrote:
+> On Wed, 2012-12-19 at 19:08 +0000, Russell King - ARM Linux wrote:
+> > On Thu, Dec 20, 2012 at 08:00:49AM +1300, Tony Prisk wrote:
+> > > On Thu, 2012-12-20 at 06:34 +1300, Tony Prisk wrote:
+> > > > On Wed, 2012-12-19 at 09:26 +0000, Russell King - ARM Linux wrote:
+> > > > > On Wed, Dec 19, 2012 at 05:10:33PM +1300, Tony Prisk wrote:
+> > > > > > Hi Mike,
+> > > > > > 
+> > > > > > In attempting to remove some IS_ERR_OR_NULL references, it was pointed
+> > > > > > out that clk_get() can return NULL if CONFIG_HAVE_CLK is not defined.
+> > > > > 
+> > > > > That is correct - but why is that a problem?  As far as users are
+> > > > > concerned, NULL is a valid clock.  If HAVE_CLK is undefined, do you
+> > > > > want all your drivers to suddenly stop working?
+> > > > 
+> > > > That will be where the misunderstanding has occurred - I didn't consider
+> > > > NULL to be a valid clock.
+> > > > 
+> > > > Given that NULL is a valid clock, I guess all tests against get_clk and
+> > > > of_get_clk results should be IS_ERR_OR_NULL. Correct?
+> > > > 
+> > > For the sake of clarity, I should rephrase:
+> > > 
+> > > If the driver can't operate with a NULL clk, it should use a
+> > > IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
+> > 
+> > Why should a _consumer_ of a clock care?  It is _very_ important that
+> > people get this idea - to a consumer, the struct clk is just an opaque
+> > cookie.  The fact that it appears to be a pointer does _not_ mean that
+> > the driver can do any kind of dereferencing on that pointer - it should
+> > never do so.
+> 
+> As a simple example:
+> We have a PWM module that requires a clock source to be enabled before
+> registers can be read/written.
+> 
+> *pseudo code*
+> x = clk_get("pwm_clock")
+> if IS_ERR(x) then fail
+> err = clk_enable(x)
+> if (err != 0) then fail
+> start writing to module registers
+> 
+> 
+> Assuming HAVE_CLK is undefined:
+> 
+> x = clk_get("pwm_clock") (= NULL)
+> if IS_ERR(x) then fail (not an error)
+> err = clk_enable(x) (= 0)
+> if (err) then fail (not an error)
+> start writing to module registers
+> (register writes lock the bus because the clock wasn't really enabled,
+> but no errors occurred enabling the clock)
 
-But even then PRCM will only trigger the transition to retention voltage after
-both CPUs hit off mode. I guess a pending IPI will wakeup the core before the
-PRCM starts the transition.
-
-Cheers,
-
-Peter.
+Which is really silly if you have a platform which requires clock control
+and HAVE_CLK is not selected.  The clk API is not designed to cope with
+that situation.
