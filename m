@@ -1,84 +1,62 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 20 Dec 2012 11:49:03 -0600
-Subject: [RFC 4/8] coresight: add CoreSight ETB driver
-In-Reply-To: <1355858365-11849-5-git-send-email-pratikp@codeaurora.org>
-References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
- <1355858365-11849-5-git-send-email-pratikp@codeaurora.org>
-Message-ID: <50D34F8F.5050304@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 20 Dec 2012 18:51:15 +0100
+Subject: at91sam9260 MACB problem with IP fragmentation
+In-Reply-To: <50D2D7BD.3030801@erwinrol.com>
+References: <50C08233.9030905@erwinrol.com> <50C09D2E.8050608@atmel.com>
+ <50D2D7BD.3030801@erwinrol.com>
+Message-ID: <50D35013.9020106@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 12/18/2012 01:19 PM, pratikp at codeaurora.org wrote:
-> From: Pratik Patel <pratikp@codeaurora.org>
+On 12/20/2012 10:17 AM, Erwin Rol :
+> Hallo Nicolas,
 > 
-> This driver manages CoreSight ETB (Embedded Trace Buffer) which
-> acts as a circular buffer sink collecting generated trace data.
+> On 6-12-2012 14:27, Nicolas Ferre wrote:
+>> Erwin,
+>>
+>> On 12/06/2012 12:32 PM, Erwin Rol :
+>>> Hello Nicolas, Havard, all,
+>>>
+>>> I have a very obscure problem with a at91sam9260 board (almost 1 to 1
+>>> copy of the Atmel EK).
+>>>
+>>> The MACB seems to stall when I use large (>2 * MTU) UDP datagrams. The
+>>> test case is that a udp echo client (PC) sends datagrams with increasing
+>>> length to the AT91 until the max length of the UDP datagram is reached.
+>>> When there is no IP fragmentation everything is fine, but when the
+>>> datagrams are starting to get fragmented the AT91 will not reply
+>>> anymore. But as soon as some network traffic happens it goes on again,
+>>> and non of the data is lost.
 > 
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> ---
->  drivers/coresight/Makefile        |    2 +-
->  drivers/coresight/coresight-etb.c |  467 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 468 insertions(+), 1 deletions(-)
+> <snip>
+> 
+>>> I tried several kernels including the test version from Nicolas that he
+>>> posted on LKML in October. They all show the same effect.
+>>
+>> [..]
+>>
+>> It seems that Matteo has the same behavior: check here:
+>> http://www.spinics.net/lists/netdev/msg218951.html
+> 
+> I tried Matteo's patch and it seems to work. But I don't know if the
+> patch is really the right solution. I checked again with wireshark and
+> it really seems the sending that stalls not the receiving. But as soon
+> as a ethernet frame is received the sending "un-stalls". So maybe the
+> patch just causes an MACB IRQ at certain moments that causes the sending
+> to continue?
 
-[snip]
+Any digging is interesting for me.
 
-> +static int __devinit etb_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +	struct device *dev = &pdev->dev;
-> +	struct coresight_platform_data *pdata;
-> +	struct etb_drvdata *drvdata;
-> +	struct resource *res;
-> +	struct coresight_desc *desc;
-> +
-> +	if (pdev->dev.of_node) {
-> +		pdata = of_get_coresight_platform_data(dev, pdev->dev.of_node);
-> +		if (IS_ERR(pdata))
-> +			return PTR_ERR(pdata);
-> +		pdev->dev.platform_data = pdata;
-> +	}
-> +
-> +	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
-> +	if (!drvdata)
-> +		return -ENOMEM;
-> +	drvdata->dev = &pdev->dev;
-> +	platform_set_drvdata(pdev, drvdata);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -ENODEV;
-> +
-> +	drvdata->base = devm_ioremap(dev, res->start, resource_size(res));
-> +	if (!drvdata->base)
-> +		return -ENOMEM;
-> +
-> +	spin_lock_init(&drvdata->spinlock);
-> +
-> +	drvdata->clk = devm_clk_get(dev, "core_clk");
-> +	if (IS_ERR(drvdata->clk))
-> +		return PTR_ERR(drvdata->clk);
-> +
-> +	ret = clk_set_rate(drvdata->clk, CORESIGHT_CLK_RATE_TRACE);
-> +	if (ret)
-> +		return ret;
-> +
-> +	drvdata->buf = devm_kzalloc(dev, ETB_SIZE_WORDS * BYTES_PER_WORD,
-> +				    GFP_KERNEL);
-> +	if (!drvdata->buf)
-> +		return -ENOMEM;
-> +
-> +	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
-> +	if (!desc)
-> +		return -ENOMEM;
-> +	desc->type = CORESIGHT_DEV_TYPE_SINK;
-> +	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
 
-Can a source be directly connected to a sink or do you need to have a
-link in between?
+>> I am working on the macb driver right now, so I will try to reproduce
+>> and track this issue on my side.
+> 
+> Any luck reproducing it ?
 
-The reason, I ask is because on some Cortex-A8 devices we have ETM
-directly connected to ETB and there is no link per-se to configure.
+Yes, I see unexpected things happening but as I am connected to a whole
+company network so maybe some broadcast packets are unlocking the
+interface...
+Anyway, I am continuing to investigate.
 
-Cheers
-Jon
+Best regards,--
+Nicolas Ferre
