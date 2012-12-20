@@ -1,62 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Dec 2012 18:51:15 +0100
-Subject: at91sam9260 MACB problem with IP fragmentation
-In-Reply-To: <50D2D7BD.3030801@erwinrol.com>
-References: <50C08233.9030905@erwinrol.com> <50C09D2E.8050608@atmel.com>
- <50D2D7BD.3030801@erwinrol.com>
-Message-ID: <50D35013.9020106@atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 20 Dec 2012 10:54:09 -0700
+Subject: [PATCH V3 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle for
+ powered-down mode
+In-Reply-To: <1355797861-12759-6-git-send-email-josephl@nvidia.com>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <1355797861-12759-6-git-send-email-josephl@nvidia.com>
+Message-ID: <50D350C1.6070400@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2012 10:17 AM, Erwin Rol :
-> Hallo Nicolas,
+On 12/17/2012 07:31 PM, Joseph Lo wrote:
+> The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
+> core to go into this mode before other core. The coupled cpuidle framework
+> can help to sync the MPCore to coupled state then go into "powered-down"
+> idle mode together. The driver can just assume the MPCore come into
+> "powered-down" mode at the same time. No need to take care if the CPU_0
+> goes into this mode along and only can put it into safe idle mode (WFI).
 > 
-> On 6-12-2012 14:27, Nicolas Ferre wrote:
->> Erwin,
->>
->> On 12/06/2012 12:32 PM, Erwin Rol :
->>> Hello Nicolas, Havard, all,
->>>
->>> I have a very obscure problem with a at91sam9260 board (almost 1 to 1
->>> copy of the Atmel EK).
->>>
->>> The MACB seems to stall when I use large (>2 * MTU) UDP datagrams. The
->>> test case is that a udp echo client (PC) sends datagrams with increasing
->>> length to the AT91 until the max length of the UDP datagram is reached.
->>> When there is no IP fragmentation everything is fine, but when the
->>> datagrams are starting to get fragmented the AT91 will not reply
->>> anymore. But as soon as some network traffic happens it goes on again,
->>> and non of the data is lost.
+> The powered-down state of Tegra20 requires power gating both CPU cores.
+> When the secondary CPU requests to enter powered-down state, it saves
+> its own contexts and then enters WFI for waiting CPU0 in the same state.
+> When the CPU0 requests powered-down state, it attempts to put the secondary
+> CPU into reset to prevent it from waking up. Then power down both CPUs
+> together and power off the cpu rail.
 > 
-> <snip>
-> 
->>> I tried several kernels including the test version from Nicolas that he
->>> posted on LKML in October. They all show the same effect.
->>
->> [..]
->>
->> It seems that Matteo has the same behavior: check here:
->> http://www.spinics.net/lists/netdev/msg218951.html
-> 
-> I tried Matteo's patch and it seems to work. But I don't know if the
-> patch is really the right solution. I checked again with wireshark and
-> it really seems the sending that stalls not the receiving. But as soon
-> as a ethernet frame is received the sending "un-stalls". So maybe the
-> patch just causes an MACB IRQ at certain moments that causes the sending
-> to continue?
+> Be aware of that, you may see the legacy power state "LP2" in the code
+> which is exactly the same meaning of "CPU power down".
 
-Any digging is interesting for me.
+> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
 
+> +static void tegra20_wake_reset_cpu_1(void)
 
->> I am working on the macb driver right now, so I will try to reproduce
->> and track this issue on my side.
-> 
-> Any luck reproducing it ?
+Nit/bikeshe: I think tegra20_wake_from_reset_cpu_1() might be a slightly
+more descriptive name? I assume the function works on CPU1, which is
+assumed to be in reset, and removes reset from the CPU so it boots.
 
-Yes, I see unexpected things happening but as I am connected to a whole
-company network so maybe some broadcast packets are unlocking the
-interface...
-Anyway, I am continuing to investigate.
+> @@ -137,6 +241,9 @@ int __init tegra20_cpuidle_init(void)
+>  	for_each_possible_cpu(cpu) {
+>  		dev = &per_cpu(tegra_idle_device, cpu);
+>  		dev->cpu = cpu;
+> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+> +		dev->coupled_cpus = *cpu_online_mask;
+> +#endif
 
-Best regards,--
-Nicolas Ferre
+That CONFIG option is selected by ARCH_TEGRA_2x_SOC, which must be
+enabled for this file to be compiled. So, you can drop the ifdef, and
+make the code uncondtional.
