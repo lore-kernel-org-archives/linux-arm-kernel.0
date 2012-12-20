@@ -1,48 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Dec 2012 10:54:09 -0700
-Subject: [PATCH V3 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle for
- powered-down mode
-In-Reply-To: <1355797861-12759-6-git-send-email-josephl@nvidia.com>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <1355797861-12759-6-git-send-email-josephl@nvidia.com>
-Message-ID: <50D350C1.6070400@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Dec 2012 17:56:39 +0000
+Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
+In-Reply-To: <20121220163814.GA29557@quad.lixom.net>
+References: <20121220163814.GA29557@quad.lixom.net>
+Message-ID: <20121220175639.GA14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 07:31 PM, Joseph Lo wrote:
-> The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
-> core to go into this mode before other core. The coupled cpuidle framework
-> can help to sync the MPCore to coupled state then go into "powered-down"
-> idle mode together. The driver can just assume the MPCore come into
-> "powered-down" mode at the same time. No need to take care if the CPU_0
-> goes into this mode along and only can put it into safe idle mode (WFI).
+On Thu, Dec 20, 2012 at 08:38:14AM -0800, Olof Johansson wrote:
+> One of the sunxi patches from the last pull request was misapplied (I
+> realized what happened -- git am -s didn't apply cleanly so I had done it
+> through regular patch, thus not catching the renames properly). Here's
+> a fresh version of the pull request with a couple more OMAP and Samsung
+> patches included.
 > 
-> The powered-down state of Tegra20 requires power gating both CPU cores.
-> When the secondary CPU requests to enter powered-down state, it saves
-> its own contexts and then enters WFI for waiting CPU0 in the same state.
-> When the CPU0 requests powered-down state, it attempts to put the secondary
-> CPU into reset to prevent it from waking up. Then power down both CPUs
-> together and power off the cpu rail.
-> 
-> Be aware of that, you may see the legacy power state "LP2" in the code
-> which is exactly the same meaning of "CPU power down".
+> There's a chance that a couple of the OMAP patches will also go in through
+> Russell, since my connectivity has been crap so far this trip and it
+> causes build breaks for the platform. It's a branch pull from Tony,
+> it should be a no-op either way.
 
-> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+Olof,
 
-> +static void tegra20_wake_reset_cpu_1(void)
+Not sure what's going on, but my recent pull from arm-soc for-next still
+hasn't solved the OMAP build failures in my kbuild - I'm still getting:
 
-Nit/bikeshe: I think tegra20_wake_from_reset_cpu_1() might be a slightly
-more descriptive name? I assume the function works on CPU1, which is
-assumed to be in reset, and removes reset from the CPU so it boots.
+arch/arm/mach-omap2/timer.c: In function 'omap_get_timer_dt':
+arch/arm/mach-omap2/timer.c:178:3: error: implicit declaration of function 'prom_add_property'
+arch/arm/mach-omap2/i2c.c: In function 'omap_pm_set_max_mpu_wakeup_lat_compat':
+arch/arm/mach-omap2/i2c.c:130:2: error: implicit declaration of function 'omap_pm_set_max_mpu_wakeup_lat'
 
-> @@ -137,6 +241,9 @@ int __init tegra20_cpuidle_init(void)
->  	for_each_possible_cpu(cpu) {
->  		dev = &per_cpu(tegra_idle_device, cpu);
->  		dev->cpu = cpu;
-> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-> +		dev->coupled_cpus = *cpu_online_mask;
-> +#endif
+This is the top commit I have from you:
 
-That CONFIG option is selected by ARCH_TEGRA_2x_SOC, which must be
-enabled for this file to be compiled. So, you can drop the ifdef, and
-make the code uncondtional.
+commit aad05c3602ba5c42ff8d0e572b2f614f25779ede
+Merge: eccf4b3 f64d204
+Author: Olof Johansson <olof@lixom.net>
+Date:   Mon Dec 17 18:44:26 2012 -0800
+
+    Merge branch 'late/omap-cleanup' into for-next
+    
+    By Tony Lindgren (3) and others
+    via Tony Lindgren
+    * late/omap-cleanup:
+      arch/arm/mach-omap2/dpll3xxx.c: drop if around WARN_ON
+      OMAP2: Fix a typo - replace regist with register.
+      ARM/omap: use module_platform_driver macro
+      ARM: OMAP2+: PMU: Remove unused header
+      ARM: OMAP4: remove duplicated include from omap_hwmod_44xx_data.c
+      ARM: OMAP2+: omap2plus_defconfig: enable twl4030 SoC audio
+      ARM: OMAP2+: omap2plus_defconfig: Add tps65217 support
+      ARM: OMAP2+: enable devtmpfs and devtmpfs automount
+      ARM: OMAP2+: omap_twl: Change TWL4030_MODULE_PM_RECEIVER to TWL_MODULE_PM_RECEIVER
+      ARM: OMAP2+: Drop plat/cpu.h for omap2plus
+      ARM: OMAP: Split fb.c to remove last remaining cpu_is_omap usage
+      MAINTAINERS: Add an entry for omap related .dts files
