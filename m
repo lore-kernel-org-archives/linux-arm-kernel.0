@@ -1,43 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Dec 2012 10:08:42 -0800
-Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
-In-Reply-To: <20121220175639.GA14363@n2100.arm.linux.org.uk>
-References: <20121220163814.GA29557@quad.lixom.net>
- <20121220175639.GA14363@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMgxXmXUW2RP_5AxJ6Z5sRBhFJ2CQz4S12MwXAb3=ibYOA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Dec 2012 19:16:54 +0100
+Subject: [PATCH 0/9] drivers: mailbox: framework creation
+In-Reply-To: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
+References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
+Message-ID: <CACRpkdaqO7AAeYeR8SZt4Tbv1grrMq85TNYMc-FSbUSrnZBm=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 9:56 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Dec 20, 2012 at 08:38:14AM -0800, Olof Johansson wrote:
->> One of the sunxi patches from the last pull request was misapplied (I
->> realized what happened -- git am -s didn't apply cleanly so I had done it
->> through regular patch, thus not catching the renames properly). Here's
->> a fresh version of the pull request with a couple more OMAP and Samsung
->> patches included.
->>
->> There's a chance that a couple of the OMAP patches will also go in through
->> Russell, since my connectivity has been crap so far this trip and it
->> causes build breaks for the platform. It's a branch pull from Tony,
->> it should be a no-op either way.
->
-> Olof,
->
-> Not sure what's going on, but my recent pull from arm-soc for-next still
-> hasn't solved the OMAP build failures in my kbuild - I'm still getting:
->
-> arch/arm/mach-omap2/timer.c: In function 'omap_get_timer_dt':
-> arch/arm/mach-omap2/timer.c:178:3: error: implicit declaration of function 'prom_add_property'
-> arch/arm/mach-omap2/i2c.c: In function 'omap_pm_set_max_mpu_wakeup_lat_compat':
-> arch/arm/mach-omap2/i2c.c:130:2: error: implicit declaration of function 'omap_pm_set_max_mpu_wakeup_lat'
+On Tue, Dec 18, 2012 at 2:10 PM, Loic Pallardy
+<loic.pallardy-ext@stericsson.com> wrote:
 
-Yep, I forgot to bring the fixes branch into our for-next. Try again
-once it mirrors out, I just pushed out a rebuild of it. New top commit
-should be e691d77e8825054376b31e79a9b5f9fa79fe764d.
+> OMAP and ST-Ericsson platforms are both using mailbox to communicate
+> with some coprocessors.
+> Based on OMAP existing mailbox framework, this series proposes a
+> generic framework, living under drivers/mailbox.
 
-I'm doing a "build all defconfigs" run before sending the incremental
-pull request of fixes to Linus.
+I like this patch series so you have my Acked-by.
 
+Since it's a new subsystem and affects a few ARM architectures can
+we merge this into the ARM SoC tree once we have consensus,
+so we get some rotation in linux-next that way?
 
--Olof
+Olof/Arnd?
+
+Yours,
+Linus Walleij
