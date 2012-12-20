@@ -1,37 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Dec 2012 13:51:39 +0800
-Subject: [PATCH 0/8] arm: mxs: Various mxs_defconfig adjustments
-In-Reply-To: <1355938386-14582-1-git-send-email-marex@denx.de>
-References: <1355938386-14582-1-git-send-email-marex@denx.de>
-Message-ID: <20121220055136.GA24134@S2101-09.ap.freescale.net>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Thu, 20 Dec 2012 11:23:30 +0530
+Subject: [PATCH] clk: debug clock tree
+In-Reply-To: <50CA17FB.9060606@wwwdotorg.org>
+References: <1355370586-6600-1-git-send-email-pgaikwad@nvidia.com>
+ <CAPtuhThBigSQMkNDf16Fo1tddTKo=rPEydHmzep0DqtgLrB+HA@mail.gmail.com>
+ <50CA17FB.9060606@wwwdotorg.org>
+Message-ID: <50D2A7DA.5050907@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 06:32:58PM +0100, Marek Vasut wrote:
-> This patchset enables various config options, mostly needed to
-> get MX28EVK and M28EVK decently working.
-> 
-> Marek Vasut (8):
->   arm: mxs: Regenerate mxs_defconfig to match recent kernel
->   arm: mxs: Enable MTD block access
->   arm: mxs: Enable UBI and UBIFS
->   arm: mxs: Enable JFFS2
->   arm: mxs: Enable EXT2 and EXT4
->   arm: mxs: Enable AT24 EEPROM support
->   arm: mxs: Enable support for most SPI flashes
->   arm: mxs: Enable most commonly used PHYs
+On Thursday 13 December 2012 11:31 PM, Stephen Warren wrote:
+> On 12/13/2012 09:27 AM, Mike Turquette wrote:
+>> On Wed, Dec 12, 2012 at 7:49 PM, Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
+>>> Adds debug file "clock_tree" in /sys/kernel/debug/clk dir.
+>>> It helps to view all the clock registered in tree format.
+>>>
+>> Prashant,
+>>
+>> Thanks for submitting this.  We've been talking about having a single
+>> file for representing the tree for some time.
+>>
+>> Regarding the output format had you considered using a well known
+>> format which can be parsed using well known parsing libs?  This avoids
+>> needing a custom parser just for this one file.  JSON springs to mind
+>> as something lightweight and well-understood.
+> One advantage of the format below is that it's very easily
+> human-readable, and it's not too hard to parse (although I guess you'd
+> have to parse the indent level to get parent/child relation, which would
+> suck a bit). Is there room to provide both? Otherwise, I guess the
+> kernel could include a script to convert from JSON/whatever into the
+> format below.
+>
+>>> For example:
+>>>     clock                        enable_cnt  prepare_cnt  rate
+>>> ---------------------------------------------------------------------
+>>>   i2s0_sync                      0           0            24000000
+>>>   spdif_in_sync                  0           0            24000000
+>>>      spdif_mux                   0           0            24000000
+>>>         spdif                    0           0            24000000
+>>>            spdif_doubler         0           0            48000000
+>>>               spdif_div          0           0            48000000
+>>>                  spdif_2x        0           0            48000000
+>
 
-It does not need to be so verbose.  It can just be one patch.
-
-Shawn
-
-> 
->  arch/arm/configs/mxs_defconfig |   63 +++++++++++++++++++---------------------
->  1 file changed, 30 insertions(+), 33 deletions(-)
-> 
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> 
-> -- 
-> 1.7.10.4
-> 
+Even I think that output must be easily human-readable. How about adding 
+sysfs to switch between human-readable and machine-readable format?
+I will try come up with a implementation.
