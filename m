@@ -1,62 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Dec 2012 10:59:48 -0700
-Subject: [PATCH] kexec: disable non-boot CPUs
-In-Reply-To: <20121220173611.GC5387@mudshark.cambridge.arm.com>
-References: <1355960681-32015-1-git-send-email-swarren@wwwdotorg.org>
- <20121220104945.GC16887@mudshark.cambridge.arm.com>
- <50D34934.9070106@wwwdotorg.org>
- <20121220173611.GC5387@mudshark.cambridge.arm.com>
-Message-ID: <50D35214.4090008@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 20 Dec 2012 10:08:42 -0800
+Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
+In-Reply-To: <20121220175639.GA14363@n2100.arm.linux.org.uk>
+References: <20121220163814.GA29557@quad.lixom.net>
+ <20121220175639.GA14363@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMgxXmXUW2RP_5AxJ6Z5sRBhFJ2CQz4S12MwXAb3=ibYOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2012 10:36 AM, Will Deacon wrote:
-> On Thu, Dec 20, 2012 at 05:21:56PM +0000, Stephen Warren wrote:
->> On 12/20/2012 03:49 AM, Will Deacon wrote:
->>> If you do manage to get this merged, please can you follow up with a patch
->>> to remove the smp_kill_cpus bits from arch/arm/kernel/smp.c please? It only
->>> exists as a hook to do exactly this and currently nobody is using it afaict.
+On Thu, Dec 20, 2012 at 9:56 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Dec 20, 2012 at 08:38:14AM -0800, Olof Johansson wrote:
+>> One of the sunxi patches from the last pull request was misapplied (I
+>> realized what happened -- git am -s didn't apply cleanly so I had done it
+>> through regular patch, thus not catching the renames properly). Here's
+>> a fresh version of the pull request with a couple more OMAP and Samsung
+>> patches included.
 >>
->> I originally implemented this in
->> arch/arm/kernel/process.c:machine_shutdown(), which currently is:
->>
->> void machine_shutdown(void)
->> {
->> #ifdef CONFIG_SMP
->> 	smp_send_stop();
->> #endif
->> }
->>
->> and I changed it to something like:
->>
->> void machine_shutdown(void)
->> {
->> #ifdef CONFIG_HOTPLUG_CPU
->>  	disable_nonboot_cpus();
->> #elifdef CONFIG_SMP
->> 	smp_send_stop();
->> #endif
->> }
->>
->> ... but then figured that moving it up into the core kexec code would be
->> better, so that everything always worked the same way.
-> 
-> Hmmm, isn't this racy: requiring the secondaries to hit idle and notice
-> they're offline and call cpu_die before the primary has replace the kernel
-> image?
+>> There's a chance that a couple of the OMAP patches will also go in through
+>> Russell, since my connectivity has been crap so far this trip and it
+>> causes build breaks for the platform. It's a branch pull from Tony,
+>> it should be a no-op either way.
+>
+> Olof,
+>
+> Not sure what's going on, but my recent pull from arm-soc for-next still
+> hasn't solved the OMAP build failures in my kbuild - I'm still getting:
+>
+> arch/arm/mach-omap2/timer.c: In function 'omap_get_timer_dt':
+> arch/arm/mach-omap2/timer.c:178:3: error: implicit declaration of function 'prom_add_property'
+> arch/arm/mach-omap2/i2c.c: In function 'omap_pm_set_max_mpu_wakeup_lat_compat':
+> arch/arm/mach-omap2/i2c.c:130:2: error: implicit declaration of function 'omap_pm_set_max_mpu_wakeup_lat'
 
-Isn't disable_nonboot_cpus() synchronous? If not, I imagine my original
-patch wasn't any better in this respect, except that the hotunplug
-happened earlier, and hence reduced the likelihood of actually seeing
-any such issues.
+Yep, I forgot to bring the fixes branch into our for-next. Try again
+once it mirrors out, I just pushed out a rebuild of it. New top commit
+should be e691d77e8825054376b31e79a9b5f9fa79fe764d.
 
->> Anyway, the change above addresses Eric's concern about isolating the
->> change to ARM. Does that seem like a reasonable thing for the ARM code
->> to do?
-> 
-> I think you're better off using what we currently have and hanging your code
-> off platform_cpu_kill.
+I'm doing a "build all defconfigs" run before sending the incremental
+pull request of fixes to Linus.
 
-OK, I'll look into that. Joseph Lo just posted patches to implement
-cpu_kill() on Tegra, which was needed to fix some issues in our hotplug
-code anyway. Perhaps that will remove the need for any other changes...
+
+-Olof
