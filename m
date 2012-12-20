@@ -1,46 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Dec 2012 20:51:13 +0000
-Subject: [PATCH 4/4] net/smsc911x: Provide common clock functionality
-In-Reply-To: <20121220203514.GN2691@gmail.com>
-References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
- <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
- <CACRpkda79O_b3Z8g7Sy7vMtW9neZU4x-Z=iEQgjqu4X5tFKyhw@mail.gmail.com>
- <20121220192441.GC14363@n2100.arm.linux.org.uk>
- <20121220203514.GN2691@gmail.com>
-Message-ID: <20121220205113.GD14363@n2100.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (tomasz.figa at gmail.com)
+Date: Thu, 20 Dec 2012 22:06:27 +0100
+Subject: [PATCH v2 3/3] ARM: EXYNOS5: save CLK_TOP_SRC3 register before
+ powergating
+In-Reply-To: <1356006378-17441-4-git-send-email-prasanna.ps@samsung.com>
+References: <CAPmaG0uqkRcoUBR8Gjv_+BSJ3hwxUCz0G-YKNQX=qvx83i6QOQ@mail.gmail.com>
+ <1356006378-17441-4-git-send-email-prasanna.ps@samsung.com>
+Message-ID: <21192551.mmsSZImfn7@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 08:35:14PM +0000, Lee Jones wrote:
-> On Thu, 20 Dec 2012, Russell King - ARM Linux wrote:
-> 
-> > On Thu, Dec 20, 2012 at 08:12:08PM +0100, Linus Walleij wrote:
-> > > On Wed, Dec 19, 2012 at 6:19 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > > 
-> > > > Some platforms provide clocks which require enabling before the
-> > > > SMSC911x chip will power on. This patch uses the new common clk
-> > > > framework to do just that. If no clock is provided, it will just
-> > > > be ignored and the driver will continue to assume that no clock
-> > > > is required for the chip to run successfully.
-> > > >
-> > > > Cc: Steve Glendinning <steve.glendinning@shawell.net>
-> > > > Cc: netdev at vger.kernel.org
-> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > 
-> > > Seems to me like it'll do the trick.
-> > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > This looks fairly dangerous.  What about those platforms which use this
-> > driver, but don't provide a clock for it?
-> > 
-> > It looks like this will result in those platforms losing their ethernet
-> > support.  There's at least a bunch of the ARM evaluation boards which
-> > make use of this driver...
-> 
-> Right, but nothing should regress. If no clock is provided the driver
-> moves on during the request and will refuse to prepare, enable and
-> disable there after. 
-> 
-> Unless I've made a mistake somewhere? If so, I'd be happy to fixup.
+Hi Prasanna,
 
-No, but... don't use NULL for that.  Use IS_ERR(pdata->clk) instead.
+On Thursday 20 of December 2012 17:56:18 Prasanna Kumar wrote:
+> This patch adds a software workaround to the hardware
+> problem found in exynos5 while powergating.
+> 
+> It is observed that CLK_TOP_SRC3 register gets modified if
+> the G-Scaler/MFC devices are power gated. The clock for G-Scaler gets
+> set to XXTI which results in the device running very slow .
+> A big drop in performance is noticed whilerunning the video.
+> This issue also occurs while powergating MFC.
+> 
+> The value of clock source register is restored once the powergating
+> operation is completed.
+
+Is the problem really related to power gating at all? From what you 
+described in comment in the code, it seems like it's a problem with 
+suspend/resume, not power gating, so it should be rather saved on suspend 
+and restored on resume. Please recheck clock save/restore part of power 
+management code.
+
+Altering clock configuration registers from power domain code looks really 
+ugly...
+
+Best regards,
+Tomasz Figa
