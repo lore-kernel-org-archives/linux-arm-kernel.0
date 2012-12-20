@@ -1,47 +1,33 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 20 Dec 2012 11:33:47 +0530
-Subject: [PATCH V2] spi: remove check for bits_per_word on transfer from
- low level driver
-In-Reply-To: <20121219162433.1E1E43E0BCF@localhost>
-References: <1355820943-25228-1-git-send-email-ldewangan@nvidia.com>
- <20121219162433.1E1E43E0BCF@localhost>
-Message-ID: <50D2AA43.8050106@nvidia.com>
+Date: Thu, 20 Dec 2012 11:45:30 +0530
+Subject: [PATCH] ARM: tegra: dts: add aliases and DMA requestor for serial
+ controller
+In-Reply-To: <50D1F2CB.3090206@wwwdotorg.org>
+References: <1355898671-3960-1-git-send-email-ldewangan@nvidia.com>
+ <50D1F2CB.3090206@wwwdotorg.org>
+Message-ID: <50D2AD02.6060101@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 December 2012 09:54 PM, Grant Likely wrote:
-> On Tue, 18 Dec 2012 14:25:43 +0530, Laxman Dewangan<ldewangan@nvidia.com>  wrote:
->> The spi core make sure that each transfer structure have the proper
->> setting for bits_per_word before calling low level transfer APIs.
+On Wednesday 19 December 2012 10:30 PM, Stephen Warren wrote:
+> On 12/18/2012 11:31 PM, Laxman Dewangan wrote:
+>> Add APB DMA requestor and serial aliases for serial controller.
+>> There will be two serial driver i.e. 8250 based simple serial driver
+>> and APB DMA based serial driver for higher baudrate and performace.
 >>
->> Hence it is no more require to check again in low level driver for
->> this field whether this is set correct or not. Removing such code
->> from low level driver.
->>
->> Signed-off-by: Laxman Dewangan<ldewangan@nvidia.com>
-> [...]
->> */
->>
->>   		if (prev_speed_hz != speed_hz
->> @@ -316,9 +315,8 @@ static int txx9spi_transfer(struct spi_device *spi, struct spi_message *m)
->>   	/* check each transfer's parameters */
->>   	list_for_each_entry (t,&m->transfers, transfer_list) {
->>   		u32 speed_hz = t->speed_hz ? : spi->max_speed_hz;
->> -		u8 bits_per_word = t->bits_per_word ? : spi->bits_per_word;
->> +		u8 bits_per_word = t->bits_per_word;
->>
->> -		bits_per_word = bits_per_word ? : 8;
-> Have you verified here that bits_per_word can never be '0' here? What is
-> the path that ensures spi->bits_per_word (and hence t->bits_per_word) is
-> set to 8 here?
+>> The simple serial driver get enabled with compatible nvidia,tegra20-uart
+>> and APB DMA based driver will get enabled with compatible
+>> nvidia,tegra20-hsuart.
+> This patch seems to do two things:
 >
-> Otherwise the patch looks good. Thanks for doing this work.
+> 1) Add a comment describing how to select the basic or DMA-based driver.
+> I can see why this is useful.
+>
+> 2) Add aliases for the serial ports. I have no idea why this is useful.
 
+Serial aliases are added because we want to get the port number like 
+/dev/ttyTHS0,  /d/ttyTHS2 etc. The uarta should be /dev/ttyTHS0 and 
+uartc should be /dev/ttyTHS2. The port number can be found using aliases 
+and of_alias_get_id() in driver file:
 
-When we do the spi_add_device(), the spi_setup() get called.
-In spi_setup, it make  sure that spi->bits_per_word is not zero.
-
-in spi_setup(spi.c)
-
-if (!spi->bits_per_word)
-                 spi->bits_per_word = 8;
+port_number = of_alias_get_id(np, "serial");
