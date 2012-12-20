@@ -1,23 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Dec 2012 15:01:05 +0000
-Subject: [GIT PULL] two trivial omap build error fixes for v3.8 merge
- window
-In-Reply-To: <20121219171828.GP4989@atomide.com>
-References: <20121219171828.GP4989@atomide.com>
-Message-ID: <20121220150105.GA28275@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Dec 2012 07:10:59 -0800
+Subject: [GIT PULL] ARM: arm-soc fixes for 3.8
+In-Reply-To: <50D08547.8040405@free-electrons.com>
+References: <20121218065502.GA12865@quad.lixom.net>
+ <50D08547.8040405@free-electrons.com>
+Message-ID: <20121220151059.GU4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 09:18:28AM -0800, Tony Lindgren wrote:
-> Here's few more trivial build fixes caused by the merge
-> conflicts.
+* Maxime Ripard <maxime.ripard@free-electrons.com> [121218 07:08]:
+> Hi Olof,
+> 
+> Le 18/12/2012 07:55, Olof Johansson a ?crit :
+> > Maxime Ripard (1):
+> >       ARM: sunxi: Change device tree naming scheme for sunxi
+> 
+> There's something odd about this one (commit 68136b10). The patch that
+> you seem to have applied differs from the one I sent. The DTs files
+> appears to have not been renamed, while in the patch I sent
+> (http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137105.html),
+> it's the case.
+> 
+> Do you know what happened here? What can we do to fix that?
 
-If Olof isn't able to pull this stuff in tonight, I'll pull it into my
-tree and send it up with my stuff.  I'll also see about picking up
-on the previous one with the common.c vram.h fix too.
+Looks like that's trivial to fix as needed, no need to rebuild
+the branch to fix that AFAIK.
 
-I'm not sure what Olof's plans are, but I know Arnd isn't around at
-the moment, and Olof was travelling a couple of days ago and hasn't
-reappeared since.  I don't think we can leave these fixes any longer
-as OMAP has been broken in mainline for at least the last four days
-and we're nearing the end of the merge window.
+The fix can be done once Olof is available online again.
+
+Linus, I suggest that you go ahead and pull this if there are
+no other issues with this branch.
+
+Regards,
+
+Tony
