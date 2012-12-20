@@ -1,75 +1,97 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Thu, 20 Dec 2012 11:52:22 +0100
-Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
-In-Reply-To: <50D2EBA1.4050305@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Dec 2012 11:55:28 +0100
+Subject: [PATCH 3/3] ARM: AT91: IIO: fix missing Sample and Hold time
+In-Reply-To: <1355942232-26251-3-git-send-email-plagnioj@jcrosoft.com>
 References: <20121219183236.GP23971@game.jcrosoft.org>
  <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
- <50D2EBA1.4050305@free-electrons.com>
-Message-ID: <50D2EDE6.3090706@atmel.com>
+ <1355942232-26251-3-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <50D2EEA0.8040807@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-On 12/20/2012 11:42 AM, Maxime Ripard wrote:
-> Hi,
->
-> Le 19/12/2012 19:37, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
->> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>
->> at91 adc offers the choice between two resolutions: low and high.
->> The low and high resolution values depends on adc IP version, as many IP
->> properties have been exposed through device tree, these settings have also
->> been added to the dt bindings.
->>
->> Update at the same time the dtsi.
->>
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->> [plagnioj at jcrosoft.com: udpate current adc dt support]
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: linux-iio at vger.kernel.org
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>   .../devicetree/bindings/arm/atmel-adc.txt          |   11 +++
->>   arch/arm/boot/dts/at91sam9260.dtsi                 |    3 +
->>   arch/arm/boot/dts/at91sam9g45.dtsi                 |    3 +
->>   arch/arm/boot/dts/at91sam9x5.dtsi                  |    3 +
->>   drivers/iio/adc/at91_adc.c                         |   74 ++++++++++++++++++--
->>   5 files changed, 90 insertions(+), 4 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
->> index c63097d..fd2d69e 100644
->> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
->> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
->> @@ -14,9 +14,17 @@ Required properties:
->>     - atmel,adc-status-register: Offset of the Interrupt Status Register
->>     - atmel,adc-trigger-register: Offset of the Trigger Register
->>     - atmel,adc-vref: Reference voltage in millivolts for the conversions
->> +  - atmel,adc-res: List of resolution in bits supported by the ADC. List size
->> +		   must be two at least.
->> +  - atmel,adc-res-names: Contains one identifier string for each resolution
->> +			 in atmel,adc-res property. "lowres" and "highres"
->> +			 identifiers are required.
->>
->>   Optional properties:
->>     - atmel,adc-use-external: Boolean to enable of external triggers
->> +  - atmel,adc-use-res: String corresponding to an identifier from
->> +		       atmel,adc-res-names property. If not specified, the highest
->> +		       resolution will be used.
->
->
-> I'm wondering, why are you using such a complex dt parsing code, and
-> bindings, when you only requires a boolean to switch between 8 and 10
-> bits mode (which seem to be the only thing you support)?
+Le 19/12/2012 19:37, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+> On the at91_adc a minimal Sample and Hold Time is necessary for the ADC to
+> guarantee the best converted final value between two channels selection.
+> This time has to be programmed through the bitfield SHTIM in the
+> Mode Register ADC_MR.
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: linux-iio at vger.kernel.org
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>  Documentation/devicetree/bindings/arm/atmel-adc.txt |    1 +
+>  drivers/iio/adc/at91_adc.c                          |   15 ++++++++++++++-
+>  2 files changed, 15 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+> index efb6f02..dd2ca90 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+> @@ -26,6 +26,7 @@ Optional properties:
+>  		       atmel,adc-res-names property. If not specified, the highest
+>  		       resolution will be used.
+>    - atmel,atmel,adc-sleep-mode: Boolean to enable of sleep mode when no conversion
+> +  - atmel,adc-sample-hold-time: Sample and Hold Time
 
-We will have a 10 and 12 bits mode on future ADCs and I would like to 
-have something which could manage more than two resolutions if it 
-happens one day.
+In which unit? nanoseconds? number of clock ticks?
 
-Regards
+>   
+>  Optional trigger Nodes:
+>    - Required properties:
+> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+> index c563488..9481375 100644
+> --- a/drivers/iio/adc/at91_adc.c
+> +++ b/drivers/iio/adc/at91_adc.c
+> @@ -52,6 +52,7 @@ struct at91_adc_state {
+>  	void __iomem		*reg_base;
+>  	struct at91_adc_reg_desc *registers;
+>  	u8			startup_time;
+> +	u8			sample_hold_time;
+>  	bool			sleep_mode;
+>  	struct iio_trigger	**trig;
+>  	struct at91_adc_trigger	*trigger_list;
+> @@ -465,6 +466,9 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+>  	}
+>  	st->startup_time = prop;
+>  
+> +	prop = 0;
+> +	of_property_read_u32(node, "atmel,adc-sample-hold-time", &prop);
+> +	st->sample_hold_time = prop;
+>  
+>  	if (of_property_read_u32(node, "atmel,adc-vref", &prop)) {
+>  		dev_err(&idev->dev, "Missing adc-vref property in the DT.\n");
+> @@ -578,7 +582,7 @@ static const struct iio_info at91_adc_info = {
+>  
+>  static int __devinit at91_adc_probe(struct platform_device *pdev)
+>  {
+> -	unsigned int prsc, mstrclk, ticks, adc_clk;
+> +	unsigned int prsc, mstrclk, ticks, adc_clk, shtim;
+>  	int ret;
+>  	struct iio_dev *idev;
+>  	struct at91_adc_state *st;
+> @@ -691,12 +695,21 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+>  	 */
+>  	ticks = round_up((st->startup_time * adc_clk /
+>  			  1000000) - 1, 8) / 8;
+> +	/*
+> +	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
+> +	 * the best converted final value between two channels selection
+> +	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
+> +	 */
+> +	shtim = round_up((st->sample_hold_time * adc_clk /
+> +			  1000000) - 1, 1);
+> +
 
-Ludovic
+Since, from all the datasheet I have (G20, G45 and X5), the minimum time
+is always 500ns, do we really need to add a dt property for that?
 
->
-> Maxime
->
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
