@@ -1,22 +1,74 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 20 Dec 2012 09:44:51 -0800
-Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
-In-Reply-To: <20121220173548.GB4989@atomide.com>
-References: <20121220163814.GA29557@quad.lixom.net>
- <CA+55aFxL47wxTyTzLdnoFV=trnrMAz=_7rhsQFjb+K_mvTCa9w@mail.gmail.com>
- <CAOesGMiZTF4gogCkU7eSaOydkX82wfWywkKBgCJo_-ZW0Ox4kw@mail.gmail.com>
- <20121220173548.GB4989@atomide.com>
-Message-ID: <CA+55aFyhsXpB9-cS3-wbVojaTaiDq9jFe3bhbQrbzFpKHvMbJQ@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 20 Dec 2012 11:46:13 -0600
+Subject: CoreSight framework and drivers
+In-Reply-To: <20121219212431.GC23594@pratikp-linux.qualcomm.com>
+References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
+ <20121219112314.GA26329@mudshark.cambridge.arm.com> <50D1F37E.6000804@ti.com>
+ <20121219212431.GC23594@pratikp-linux.qualcomm.com>
+Message-ID: <50D34EE5.8090407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 9:35 AM, Tony Lindgren <tony@atomide.com> wrote:
->
-> Looks like Linus already applied "ARM: OMAP: Fix build breakage due
-> to missing include in i2c.c" that I had queued earlier.
 
-Yeah, since it was my mis-merge, and I realized that I had entirely
-missed the header file fixup, I felt like I had to correct it since I
-had the report and the pointer to the fix..
+On 12/19/2012 03:24 PM, Pratik Patel wrote:
 
-            Linus
+[snip]
+
+> Currently we use the CoreSight virtual bus to conveniently list
+> sysfs configuration attributes for all the registered CoreSight
+> devices.
+> 
+> For eg:
+> /sys/bus/coresight/devices/coresight-etm0/<attribute>
+> /sys/bus/coresight/devices/coresight-etm1/<attribute>
+> /sys/bus/coresight/devices/coresight-stm/<attribute>
+> /sys/bus/coresight/devices/coresight-tmc-etf/<attribute>
+> ...
+> ...
+> 
+> Some of the attributes are based on device type (i.e. source,
+> link or sink) so they will exist for all devices of that type
+> while some are device specific.
+> 
+> Maybe I am misunderstanding the question but are you suggesting
+> to register CoreSight devices to the AMBA bus instead of the
+> CoreSight core layer code?
+
+Yes exactly.
+
+> Will Deacon mentioned earlier that AMBA framework can be changed
+> to accomodate devices with a different class but I am more
+> concerned with losing some of the stuff that the core layer code
+> does (eg. coresight_register, coresight_enable, coresight_disable
+> in coresight.c) if we register CoreSight drivers to the AMBA bus
+> without letting the core layer know about the device connections.
+
+I may be missing something, but couldn't you keep all the
+register/enable/disable stuff but just register the device with the amba
+bus? Obviously some changes would need to be made.
+
+Personally, I don't have strong feeling either way, but we have ETM/ETB
+drivers using AMBA today and so I am hoping we can come to agreement on
+this going forward.
+
+Russell, Will, what are your thoughts?
+
+Otherwise, looking at the code, I like what you have implemented. I
+still need to look closer, but I am struggling to figure out how a
+coresight device such as the cross-trigger-interface fits with this
+model. This model appears to be geared towards coresight devices used
+for traces purposes and are either source, links or sinks. The
+cross-trigger-interface is not a source or a sink. However, although you
+it could be considered as a link (routing events), it is not really, as
+it may not link to other coresight sinks/source.
+
+In my case, I have PMU-IRQ --> CTI --> GIC. So a non-coresight source
+and sink. In away the CTI looks more like a 2nd-level interrupt
+controller than anything else. Hence, another type of coresight device
+may be needed in addition to source, links and sinks. Or link is
+extended in some way to connect to non-coresight sources/sinks.
+
+Let me know if you have any thoughts.
+
+Cheers
+Jon
