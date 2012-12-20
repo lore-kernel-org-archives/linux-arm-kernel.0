@@ -1,41 +1,40 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 20 Dec 2012 13:44:27 +0100
-Subject: [PATCH 0/8] arm: mxs: Various mxs_defconfig adjustments
-In-Reply-To: <20121220055136.GA24134@S2101-09.ap.freescale.net>
-References: <1355938386-14582-1-git-send-email-marex@denx.de>
- <20121220055136.GA24134@S2101-09.ap.freescale.net>
-Message-ID: <201212201344.27626.marex@denx.de>
+From: ajaynumb@gmail.com (Ajay kumar)
+Date: Thu, 20 Dec 2012 18:19:43 +0530
+Subject: [PATCH 1/3] ARM: dts: Add device tree node for G2D controller on
+ Exynos5
+In-Reply-To: <1354112989-3161-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1354112989-3161-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <CAEC9eQPV9U73+O6uW9=fkzWcr-4djriL5aTk-kF9smvcqvRKCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+ping.
 
-> On Wed, Dec 19, 2012 at 06:32:58PM +0100, Marek Vasut wrote:
-> > This patchset enables various config options, mostly needed to
-> > get MX28EVK and M28EVK decently working.
-> > 
-> > Marek Vasut (8):
-> >   arm: mxs: Regenerate mxs_defconfig to match recent kernel
-> >   arm: mxs: Enable MTD block access
-> >   arm: mxs: Enable UBI and UBIFS
-> >   arm: mxs: Enable JFFS2
-> >   arm: mxs: Enable EXT2 and EXT4
-> >   arm: mxs: Enable AT24 EEPROM support
-> >   arm: mxs: Enable support for most SPI flashes
-> >   arm: mxs: Enable most commonly used PHYs
-> 
-> It does not need to be so verbose.  It can just be one patch.
-
-Do you prefer one gigantic patch then?
-
-> Shawn
-> 
-> >  arch/arm/configs/mxs_defconfig |   63
-> >  +++++++++++++++++++--------------------- 1 file changed, 30
-> >  insertions(+), 33 deletions(-)
-> > 
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-
-Best regards,
-Marek Vasut
+On Wed, Nov 28, 2012 at 7:59 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
+> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 581e57a..6d50c15 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -613,4 +613,10 @@
+>                 reg = <0x14450000 0x10000>;
+>                 interrupts = <0 94 0>;
+>         };
+> +
+> +       g2d: g2d {
+> +               compatible = "samsung,exynos-g2d-41";
+> +               reg = <0x10850000 0x1000>;
+> +               interrupts = <0 91 0>;
+> +       };
+>  };
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
