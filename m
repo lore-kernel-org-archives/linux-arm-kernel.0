@@ -1,33 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Dec 2012 11:40:04 +0100
-Subject: [PATCH 0/3] IIO: AT91: add lowres, sleep and sample&hold time
- missing support
-In-Reply-To: <20121219183236.GP23971@game.jcrosoft.org>
-References: <20121219183236.GP23971@game.jcrosoft.org>
-Message-ID: <50D2EB04.9080804@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 20 Dec 2012 08:40:41 -0200
+Subject: 3.7 kernel hangs when doing scp
+In-Reply-To: <CAOMZO5B1DyktHa0Vfb4+-H9bdxaoacas6ZCHEH0bDLuKiCB6hA@mail.gmail.com>
+References: <CAOMZO5Bc5stXXviuf3OL9vAHw+ER=GzzV1q=5Yr5q=AnfoGiGw@mail.gmail.com>
+ <20121218024353.GA17118@kroah.com>
+ <CAOMZO5DTB79e3W1_i2NLin7RWXVzraoysEGVLxv9_aoRS39D4Q@mail.gmail.com>
+ <20121220043943.GA992@nchen-desktop>
+ <CAOMZO5B1DyktHa0Vfb4+-H9bdxaoacas6ZCHEH0bDLuKiCB6hA@mail.gmail.com>
+Message-ID: <CAOMZO5DtiknWX7io6bgVew=gS5BX+yka1F=AizF7sjaK06rjXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 20, 2012 at 8:20 AM, Fabio Estevam <festevam@gmail.com> wrote:
 
-Le 19/12/2012 19:32, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> Hi,
-> 
-> 	The current adc driver is missing some key feature support
-> 	 - select high/low resolution support
-> 	 - sleep mode
-> 	 - Sample and Hold Time
-> 
-> 	 This patch seris fix it
-> 	 Without it the current driver is not usable in most of the case
+> Excellent! Your suggestion made scp work with mx6 on 3.7.
+>
+> I assume that this "fix" or workaround would need a better place, right?
+>
+> Should this fix go into the chipidea host driver instead?
 
-Could you put me in Cc for the next iterations please?
+Also, we are already passing the CI13XXX_DISABLE_STREAMING flag:
 
-Thanks,
-Maxime
+static struct ci13xxx_platform_data ci13xxx_imx_platdata  = {
+	.name			= "ci13xxx_imx",
+	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
+				  CI13XXX_PULLUP_ON_VBUS |
+				  CI13XXX_DISABLE_STREAMING,
+	.capoffset		= DEF_CAPOFFSET,
+};
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+
+Fabio Estevam
