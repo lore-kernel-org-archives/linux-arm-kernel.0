@@ -1,82 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Dec 2012 23:39:48 -0800
-Subject: [PATCH] lib: atomic64: Initialize locks statically to fix early users
-In-Reply-To: <50D2B94D.10309@codeaurora.org>
-Message-ID: <1355989188-17665-1-git-send-email-sboyd@codeaurora.org>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Thu, 20 Dec 2012 09:07:13 +0100
+Subject: [PATCH 6/6 v11] gpio: Add block gpio to several gpio drivers
+In-Reply-To: <20121220070805.GQ23971@game.jcrosoft.org>
+References: <1355952138-20459-1-git-send-email-stigge@antcom.de>
+ <1355952138-20459-7-git-send-email-stigge@antcom.de>
+ <20121220070805.GQ23971@game.jcrosoft.org>
+Message-ID: <50D2C731.1080009@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atomic64 library uses a handful of static spin locks to
-implement atomic 64-bit operations on architectures without
-support for atomic 64-bit instructions. Unfortunately, the
-spinlocks are initialized in a pure initcall and that is too late
-for the vfs namespace code which wants to use atomic64 operations
-before the initcall is run (introduced by 8823c07 "vfs: Add setns
-support for the mount namespace").
+On 12/20/2012 08:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 22:22 Wed 19 Dec     , Roland Stigge wrote:
+>> This patch adds block GPIO support to several gpio drivers.
+>>
+>> This implements block GPIO only for some selected drivers since block GPIO is
+>> an optional feature which may not be suitable for every GPIO hardware. (With
+>> automatic fallback to the single GPIO functions if not available in a driver.)
+>>
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>>
+>> ---
+>>  arch/arm/mach-at91/gpio.c         |   33 +++++++++++++++
+> as said on the previous version the mach-at91 is deprecated for this platform
+> and boards
+> 
+> you MUST updatethe drivers/pinctrl/pinctrl-at91
+> 
+> nack on at91 untill this is done
 
-This leads to BUG messages such as:
+I suggest to drop the hunk for the AT91 for the moment and wait until
+the block gpio interface is accepted. Then we can add the block gpio
+enhancement to the GPIO drivers in arch/... not only for the AT91...
+also because they have to go through different sub-systems maintainers.
 
-BUG: spinlock bad magic on CPU#0, swapper/0/0
- lock: atomic64_lock+0x240/0x400, .magic: 00000000, .owner: <none>/-1, .owner_cpu: 0
-[<c001af64>] (unwind_backtrace+0x0/0xf0) from [<c02c2010>] (do_raw_spin_lock+0x158/0x198)
-[<c02c2010>] (do_raw_spin_lock+0x158/0x198) from [<c04d89ec>] (_raw_spin_lock_irqsave+0x4c/0x58)
-[<c04d89ec>] (_raw_spin_lock_irqsave+0x4c/0x58) from [<c02cabf0>] (atomic64_add_return+0x30/0x5c)
-[<c02cabf0>] (atomic64_add_return+0x30/0x5c) from [<c0124564>] (alloc_mnt_ns.clone.14+0x44/0xac)
-[<c0124564>] (alloc_mnt_ns.clone.14+0x44/0xac) from [<c0124f4c>] (create_mnt_ns+0xc/0x54)
-[<c0124f4c>] (create_mnt_ns+0xc/0x54) from [<c06f31a4>] (mnt_init+0x120/0x1d4)
-[<c06f31a4>] (mnt_init+0x120/0x1d4) from [<c06f2d50>] (vfs_caches_init+0xe0/0x10c)
-[<c06f2d50>] (vfs_caches_init+0xe0/0x10c) from [<c06d4798>] (start_kernel+0x29c/0x300)
-[<c06d4798>] (start_kernel+0x29c/0x300) from [<80008078>] (0x80008078)
-
-coming out early on during boot when spinlock debugging is enabled.
-
-Fix this problem by initializing the spinlocks statically at
-compile time.
-
-Reported-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Cc: Eric W. Biederman <ebiederm@xmission.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
-
-Sorry Andrew, I couldn't find a maintainer of this file so I
-am picking on you.
-
- lib/atomic64.c | 17 +++++------------
- 1 file changed, 5 insertions(+), 12 deletions(-)
-
-diff --git a/lib/atomic64.c b/lib/atomic64.c
-index 9785378..08a4f06 100644
---- a/lib/atomic64.c
-+++ b/lib/atomic64.c
-@@ -31,7 +31,11 @@
- static union {
- 	raw_spinlock_t lock;
- 	char pad[L1_CACHE_BYTES];
--} atomic64_lock[NR_LOCKS] __cacheline_aligned_in_smp;
-+} atomic64_lock[NR_LOCKS] __cacheline_aligned_in_smp = {
-+	[0 ... (NR_LOCKS - 1)] = {
-+		.lock =  __RAW_SPIN_LOCK_UNLOCKED(atomic64_lock.lock),
-+	},
-+};
- 
- static inline raw_spinlock_t *lock_addr(const atomic64_t *v)
- {
-@@ -173,14 +177,3 @@ int atomic64_add_unless(atomic64_t *v, long long a, long long u)
- 	return ret;
- }
- EXPORT_SYMBOL(atomic64_add_unless);
--
--static int init_atomic64_lock(void)
--{
--	int i;
--
--	for (i = 0; i < NR_LOCKS; ++i)
--		raw_spin_lock_init(&atomic64_lock[i].lock);
--	return 0;
--}
--
--pure_initcall(init_atomic64_lock);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Wolfgang.
