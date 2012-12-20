@@ -1,25 +1,26 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 20 Dec 2012 11:46:57 +0530
-Subject: [PATCH] ARM: tegra30: tegra30 gpio is not compatible with tegra20
- gpio
-In-Reply-To: <50D1F385.7000506@wwwdotorg.org>
-References: <1355929032-26549-1-git-send-email-ldewangan@nvidia.com>
- <50D1F385.7000506@wwwdotorg.org>
-Message-ID: <50D2AD59.8070901@nvidia.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 19 Dec 2012 22:25:24 -0800
+Subject: BUG: spinlock bad magic on CPU#0 on BeagleBone
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC9B6FE@DBDE01.ent.ti.com>
+References: <B5906170F1614E41A8A28DE3B8D121433EC9A69C@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1212191650430.16873@utopia.booyaka.com>
+ <50D2224E.4060300@codeaurora.org>
+ <B5906170F1614E41A8A28DE3B8D121433EC9B6FE@DBDE01.ent.ti.com>
+Message-ID: <50D2AF54.7050402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 December 2012 10:34 PM, Stephen Warren wrote:
-> On 12/19/2012 07:57 AM, Laxman Dewangan wrote:
->> tegra30 gpio controller is not compatible with the tegra20 due to
->> their bank stride i.e. Tegra20 bank stride is 0x80 where Tegra30
->> bank stride is 0x100.
-> Thanks, I've been meaning to clean this up for a while, but never got
-> around to it. I can apply after the merge window is closed; I don't
-> think it's important enough to warrant going into 3.8 or earlier, since
-> it doesn't cause any active problems.
+On 12/19/2012 8:48 PM, Bedia, Vaibhav wrote:
+> I tried out 3 variants of AM335x boards - 2 of these (BeagleBone and EVM) have DDR2
+> and 1 has DDR3 (EVM-SK). The BUG is triggered on all of these at the same point.
 >
-> Have you checked all the other devices to make sure they're all correct to?
+> With Stephen's change I don't see this on any of the board variants :)
+> New bootlog below.
 
-Not yet, I  am going one by one for finding if anything we are missing 
-on IO drivers or not and then came across this.
+Great! Can I have your Tested-by then? I'll wrap it up into a patch. Is
+this is a new regression? From a glance at the code it looks to have
+existed for quite a while now.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
