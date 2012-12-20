@@ -1,37 +1,121 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Dec 2012 13:25:00 +0000
-Subject: [Xen-devel] [PATCH v2 5/6] ARM: Dummy Virtual Machine platform
- support
-In-Reply-To: <alpine.DEB.2.02.1212201310080.17523@kaball.uk.xensource.com>
-References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
- <1355762141-29616-6-git-send-email-will.deacon@arm.com>
- <alpine.DEB.2.02.1212181202310.17523@kaball.uk.xensource.com>
- <20121218131401.GB22139@mudshark.cambridge.arm.com>
- <50D0AF5C.1070605@codeaurora.org> <50D0B384.40605@arm.com>
- <50D1DC6F.3010304@codeaurora.org>
- <alpine.DEB.2.02.1212201310080.17523@kaball.uk.xensource.com>
-Message-ID: <50D311AC.6060309@arm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 20 Dec 2012 14:25:44 +0100
+Subject: [PATCH 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
+In-Reply-To: <50D2FF19.4060600@arm.com>
+References: <50D2EFFB.8030702@arm.com><20121220.135758.1347753620353343245.hdoyu@nvidia.com><50D2FF19.4060600@arm.com>
+Message-ID: <20121220.152544.2281355586046026239.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/12/12 13:12, Stefano Stabellini wrote:
-> On Wed, 19 Dec 2012, Christopher Covington wrote:
->>> What would be the point of using DCC?
->>
->> It seemed like ARM-Ltd.-architected peripherals were picked for the timer and
->> interrupt controller, so I wondered why not for the console as well. As best
->> I'm aware, unless one ventures into the PrimeCell line with the PL011, DCC is
->> the closest match for an officially architected console mechanism.
+Marc Zyngier <marc.zyngier@arm.com> wrote @ Thu, 20 Dec 2012 13:05:45 +0100:
+
+> On 20/12/12 11:57, Hiroshi Doyu wrote:
+> > Marc Zyngier <marc.zyngier@arm.com> wrote @ Thu, 20 Dec 2012 12:01:15 +0100:
+> > 
+> >> On 20/12/12 09:44, Hiroshi Doyu wrote:
+> >>> Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
+> >>> timer than TMR0. If it's available, it will be used for clock source
+> >>> and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
+> >>> necessary for clock event.
+> >>>
+> >>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> >>> ---
+> >>>  .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 ++++
+> >>>  drivers/clocksource/tegra20_timer.c                |   64 +++++++++++++++++++-
+> >>>  2 files changed, 74 insertions(+), 1 deletion(-)
+> >>>  create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> >>> new file mode 100644
+> >>> index 0000000..9de936a
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> >>> @@ -0,0 +1,11 @@
+> >>> +NVIDIA Tegra Timer Stamp Counter(TSC)
+> >>> +
+> >>> +Required properties:
+> >>> +- compatible : "nvidia,tegra114-tsc
+> >>> +- reg : Should contain 1 register ranges(address and length)
+> >>> +
+> >>> +Example:
+> >>> +	tsc {
+> >>> +		compatible = "nvidia,tegra114-tsc";
+> >>> +		reg = <0x700f0000 0x20000>;
+> >>> +	};
+> >>> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+> >>> index 1d25de8..285a6f1 100644
+> >>> --- a/drivers/clocksource/tegra20_timer.c
+> >>> +++ b/drivers/clocksource/tegra20_timer.c
+> >>> @@ -30,6 +30,7 @@
+> >>>  #include <asm/mach/time.h>
+> >>>  #include <asm/smp_twd.h>
+> >>>  #include <asm/sched_clock.h>
+> >>> +#include <asm/arch_timer.h>
+> >>>  
+> >>>  #define RTC_SECONDS            0x08
+> >>>  #define RTC_SHADOW_SECONDS     0x0c
+> >>> @@ -271,10 +272,71 @@ static void __init tegra20_init_tmr(void)
+> >>>  	clockevents_register_device(&tegra_clockevent);
+> >>>  }
+> >>>  
+> >>> +#define TSC_CNTCR		0		/* TSC control registers */
+> >>> +#define TSC_CNTCR_ENABLE	(1 << 0)	/* Enable */
+> >>> +#define TSC_CNTCR_HDBG		(1 << 1)	/* Halt on debug */
+> >>> +
+> >>> +#define TSC_CNTCV0		0x8		/* TSC counter (LSW) */
+> >>> +#define TSC_CNTCV1		0xc		/* TSC counter (MSW) */
+> >>> +#define TSC_CNTFID0		0x20		/* TSC freq id 0 */
+> >>> +
+> >>> +static const struct of_device_id tegra_tsc_match[] __initconst = {
+> >>> +	{ .compatible = "nvidia,tegra114-tsc" },
+> >>> +	{}
+> >>> +};
+> >>> +
+> >>> +static int tegra_arch_timer_init(void)
+> >>> +{
+> >>> +	int err;
+> >>> +	struct device_node *np;
+> >>> +	struct clk *clk;
+> >>> +	void __iomem *tsc_base;
+> >>> +	u32 freq, val;
+> >>> +
+> >>> +	np = of_find_matching_node(NULL, tegra_tsc_match);
+> >>> +	if (!np)
+> >>> +		return -ENODEV;
+> >>> +
+> >>> +	tsc_base = of_iomap(np, 0);
+> >>> +	if (!tsc_base)
+> >>> +		return -ENODEV;
+> >>> +
+> >>> +	clk = clk_get_sys("clk_m", NULL);
+> >>> +	if (IS_ERR(clk)) {
+> >>> +		freq = 12000000;
+> >>> +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
+> >>> +	} else {
+> >>> +		freq = clk_get_rate(clk);
+> >>> +		clk_put(clk);
+> >>> +	}
+> >>> +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
+> >>> +
+> >>> +	/* CNTFRQ */
+> >>> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
+> >>> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
+> >>> +	BUG_ON(val != freq);
+> >>
+> >> This is scary. CNTFRQ is only writable from secure mode, and will
+> >> explode in any other situation.
+> >>
+> >> Also, writing to CNTFRQ doesn't change the timer frequency! This is just
+> >> a way for secure mode to tell the rest of the world the frequency the
+> >> timer is ticking at. Unless you've wired the input clock to be able to
+> >> change the frequency?
+> > 
+> > ATM, our upstream kernel is expected in secure mode. This situation
+> > may be changed later, though....
 > 
-> I certainly wouldn't want to mandate the presence of any devices that
-> require emulation in the DT for a virtual machine, including DCC, as
-> simple as it might be.
+> I appreciate this. But I expect this kernel to be also used on the
+> non-secure side if someone tried to run KVM with it. And this would go
+> bang right away.
 
-Indeed. GIC and timers have explicit support for virtualization in
-hardware. Emulating random IPs is up to the implementor, and given that
-virtio already exists (and performs rather well), I don't feel the urge
-to reinvent the wheel.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+What is the common way to make the above code selective at run
+time(secure or non-secure path)?
