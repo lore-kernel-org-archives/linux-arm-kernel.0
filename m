@@ -1,111 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Dec 2012 11:01:15 +0000
-Subject: [PATCH 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
-In-Reply-To: <1355996654-6579-6-git-send-email-hdoyu@nvidia.com>
-References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
- <1355996654-6579-6-git-send-email-hdoyu@nvidia.com>
-Message-ID: <50D2EFFB.8030702@arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 20 Dec 2012 13:14:09 +0200
+Subject: [PATCH V3 1/5] ARM: tegra: add pending SGI checking API
+In-Reply-To: <50D2E76C.7050309@ti.com>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <1355797861-12759-2-git-send-email-josephl@nvidia.com>
+ <CAMbhsRSorDf-BebFn+t39zOK4VX4N0Fu0iPrM7XpKZcssTgX9A@mail.gmail.com>
+ <20121218101548.GO19258@tbergstrom-lnx.Nvidia.com>
+ <CAMbhsRSDwSoHoEs93NZhDchCS28-vQCuW2p+kqfNKeqLygL2sQ@mail.gmail.com>
+ <50D2BB51.9000109@ti.com>
+ <20121220093412.GE19258@tbergstrom-lnx.Nvidia.com>
+ <50D2DF45.1000305@ti.com>
+ <20121220095951.GG19258@tbergstrom-lnx.Nvidia.com>
+ <50D2E76C.7050309@ti.com>
+Message-ID: <20121220111409.GH19258@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/12/12 09:44, Hiroshi Doyu wrote:
-> Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
-> timer than TMR0. If it's available, it will be used for clock source
-> and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
-> necessary for clock event.
+> >
+> > So why does OMAP4 have working coupled idle without the SGI check then?
+> >
+> Because whenever the OMAP4 CPUs enter into any power states apart from
+> ON, clock-domain force wakeup method us being used to wakeup
+> secondary CPUs. And secondly CPU RET is not supported on purpose because
+> of some known IP block issues.
 > 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 ++++
->  drivers/clocksource/tegra20_timer.c                |   64 +++++++++++++++++++-
->  2 files changed, 74 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
-> new file mode 100644
-> index 0000000..9de936a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
-> @@ -0,0 +1,11 @@
-> +NVIDIA Tegra Timer Stamp Counter(TSC)
-> +
-> +Required properties:
-> +- compatible : "nvidia,tegra114-tsc
-> +- reg : Should contain 1 register ranges(address and length)
-> +
-> +Example:
-> +	tsc {
-> +		compatible = "nvidia,tegra114-tsc";
-> +		reg = <0x700f0000 0x20000>;
-> +	};
-> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-> index 1d25de8..285a6f1 100644
-> --- a/drivers/clocksource/tegra20_timer.c
-> +++ b/drivers/clocksource/tegra20_timer.c
-> @@ -30,6 +30,7 @@
->  #include <asm/mach/time.h>
->  #include <asm/smp_twd.h>
->  #include <asm/sched_clock.h>
-> +#include <asm/arch_timer.h>
->  
->  #define RTC_SECONDS            0x08
->  #define RTC_SHADOW_SECONDS     0x0c
-> @@ -271,10 +272,71 @@ static void __init tegra20_init_tmr(void)
->  	clockevents_register_device(&tegra_clockevent);
->  }
->  
-> +#define TSC_CNTCR		0		/* TSC control registers */
-> +#define TSC_CNTCR_ENABLE	(1 << 0)	/* Enable */
-> +#define TSC_CNTCR_HDBG		(1 << 1)	/* Halt on debug */
-> +
-> +#define TSC_CNTCV0		0x8		/* TSC counter (LSW) */
-> +#define TSC_CNTCV1		0xc		/* TSC counter (MSW) */
-> +#define TSC_CNTFID0		0x20		/* TSC freq id 0 */
-> +
-> +static const struct of_device_id tegra_tsc_match[] __initconst = {
-> +	{ .compatible = "nvidia,tegra114-tsc" },
-> +	{}
-> +};
-> +
-> +static int tegra_arch_timer_init(void)
-> +{
-> +	int err;
-> +	struct device_node *np;
-> +	struct clk *clk;
-> +	void __iomem *tsc_base;
-> +	u32 freq, val;
-> +
-> +	np = of_find_matching_node(NULL, tegra_tsc_match);
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	tsc_base = of_iomap(np, 0);
-> +	if (!tsc_base)
-> +		return -ENODEV;
-> +
-> +	clk = clk_get_sys("clk_m", NULL);
-> +	if (IS_ERR(clk)) {
-> +		freq = 12000000;
-> +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
-> +	} else {
-> +		freq = clk_get_rate(clk);
-> +		clk_put(clk);
-> +	}
-> +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
-> +
-> +	/* CNTFRQ */
-> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
-> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
-> +	BUG_ON(val != freq);
 
-This is scary. CNTFRQ is only writable from secure mode, and will
-explode in any other situation.
+Aha. That explains indeed why you don't need the check.
 
-Also, writing to CNTFRQ doesn't change the timer frequency! This is just
-a way for secure mode to tell the rest of the world the frequency the
-timer is ticking at. Unless you've wired the input clock to be able to
-change the frequency?
+Cheers,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Peter.
