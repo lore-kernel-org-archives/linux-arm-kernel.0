@@ -1,48 +1,47 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 20 Dec 2012 11:23:30 +0530
-Subject: [PATCH] clk: debug clock tree
-In-Reply-To: <50CA17FB.9060606@wwwdotorg.org>
-References: <1355370586-6600-1-git-send-email-pgaikwad@nvidia.com>
- <CAPtuhThBigSQMkNDf16Fo1tddTKo=rPEydHmzep0DqtgLrB+HA@mail.gmail.com>
- <50CA17FB.9060606@wwwdotorg.org>
-Message-ID: <50D2A7DA.5050907@nvidia.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 20 Dec 2012 11:33:47 +0530
+Subject: [PATCH V2] spi: remove check for bits_per_word on transfer from
+ low level driver
+In-Reply-To: <20121219162433.1E1E43E0BCF@localhost>
+References: <1355820943-25228-1-git-send-email-ldewangan@nvidia.com>
+ <20121219162433.1E1E43E0BCF@localhost>
+Message-ID: <50D2AA43.8050106@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 December 2012 11:31 PM, Stephen Warren wrote:
-> On 12/13/2012 09:27 AM, Mike Turquette wrote:
->> On Wed, Dec 12, 2012 at 7:49 PM, Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
->>> Adds debug file "clock_tree" in /sys/kernel/debug/clk dir.
->>> It helps to view all the clock registered in tree format.
->>>
->> Prashant,
+On Wednesday 19 December 2012 09:54 PM, Grant Likely wrote:
+> On Tue, 18 Dec 2012 14:25:43 +0530, Laxman Dewangan<ldewangan@nvidia.com>  wrote:
+>> The spi core make sure that each transfer structure have the proper
+>> setting for bits_per_word before calling low level transfer APIs.
 >>
->> Thanks for submitting this.  We've been talking about having a single
->> file for representing the tree for some time.
+>> Hence it is no more require to check again in low level driver for
+>> this field whether this is set correct or not. Removing such code
+>> from low level driver.
 >>
->> Regarding the output format had you considered using a well known
->> format which can be parsed using well known parsing libs?  This avoids
->> needing a custom parser just for this one file.  JSON springs to mind
->> as something lightweight and well-understood.
-> One advantage of the format below is that it's very easily
-> human-readable, and it's not too hard to parse (although I guess you'd
-> have to parse the indent level to get parent/child relation, which would
-> suck a bit). Is there room to provide both? Otherwise, I guess the
-> kernel could include a script to convert from JSON/whatever into the
-> format below.
+>> Signed-off-by: Laxman Dewangan<ldewangan@nvidia.com>
+> [...]
+>> */
+>>
+>>   		if (prev_speed_hz != speed_hz
+>> @@ -316,9 +315,8 @@ static int txx9spi_transfer(struct spi_device *spi, struct spi_message *m)
+>>   	/* check each transfer's parameters */
+>>   	list_for_each_entry (t,&m->transfers, transfer_list) {
+>>   		u32 speed_hz = t->speed_hz ? : spi->max_speed_hz;
+>> -		u8 bits_per_word = t->bits_per_word ? : spi->bits_per_word;
+>> +		u8 bits_per_word = t->bits_per_word;
+>>
+>> -		bits_per_word = bits_per_word ? : 8;
+> Have you verified here that bits_per_word can never be '0' here? What is
+> the path that ensures spi->bits_per_word (and hence t->bits_per_word) is
+> set to 8 here?
 >
->>> For example:
->>>     clock                        enable_cnt  prepare_cnt  rate
->>> ---------------------------------------------------------------------
->>>   i2s0_sync                      0           0            24000000
->>>   spdif_in_sync                  0           0            24000000
->>>      spdif_mux                   0           0            24000000
->>>         spdif                    0           0            24000000
->>>            spdif_doubler         0           0            48000000
->>>               spdif_div          0           0            48000000
->>>                  spdif_2x        0           0            48000000
->
+> Otherwise the patch looks good. Thanks for doing this work.
 
-Even I think that output must be easily human-readable. How about adding 
-sysfs to switch between human-readable and machine-readable format?
-I will try come up with a implementation.
+
+When we do the spi_add_device(), the spi_setup() get called.
+In spi_setup, it make  sure that spi->bits_per_word is not zero.
+
+in spi_setup(spi.c)
+
+if (!spi->bits_per_word)
+                 spi->bits_per_word = 8;
