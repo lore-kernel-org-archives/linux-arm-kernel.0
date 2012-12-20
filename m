@@ -1,74 +1,25 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 20 Dec 2012 11:46:13 -0600
-Subject: CoreSight framework and drivers
-In-Reply-To: <20121219212431.GC23594@pratikp-linux.qualcomm.com>
-References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
- <20121219112314.GA26329@mudshark.cambridge.arm.com> <50D1F37E.6000804@ti.com>
- <20121219212431.GC23594@pratikp-linux.qualcomm.com>
-Message-ID: <50D34EE5.8090407@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 20 Dec 2012 10:46:58 -0700
+Subject: [PATCH V3 3/5] ARM: tegra20: clocks: add CPU low-power function
+ into tegra_cpu_car_ops
+In-Reply-To: <1355797861-12759-4-git-send-email-josephl@nvidia.com>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <1355797861-12759-4-git-send-email-josephl@nvidia.com>
+Message-ID: <50D34F12.9080801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/17/2012 07:30 PM, Joseph Lo wrote:
+> Add suspend, resume and rail_off_ready API into tegra_cpu_car_ops. These
+> functions were used for CPU powered-down state maintenance.
 
-On 12/19/2012 03:24 PM, Pratik Patel wrote:
+I think this isn't adding those functions into tegra_cpu_car_ops, but
+rather implementing the already existing function pointers for Tegra20,
+right?
 
-[snip]
-
-> Currently we use the CoreSight virtual bus to conveniently list
-> sysfs configuration attributes for all the registered CoreSight
-> devices.
-> 
-> For eg:
-> /sys/bus/coresight/devices/coresight-etm0/<attribute>
-> /sys/bus/coresight/devices/coresight-etm1/<attribute>
-> /sys/bus/coresight/devices/coresight-stm/<attribute>
-> /sys/bus/coresight/devices/coresight-tmc-etf/<attribute>
-> ...
-> ...
-> 
-> Some of the attributes are based on device type (i.e. source,
-> link or sink) so they will exist for all devices of that type
-> while some are device specific.
-> 
-> Maybe I am misunderstanding the question but are you suggesting
-> to register CoreSight devices to the AMBA bus instead of the
-> CoreSight core layer code?
-
-Yes exactly.
-
-> Will Deacon mentioned earlier that AMBA framework can be changed
-> to accomodate devices with a different class but I am more
-> concerned with losing some of the stuff that the core layer code
-> does (eg. coresight_register, coresight_enable, coresight_disable
-> in coresight.c) if we register CoreSight drivers to the AMBA bus
-> without letting the core layer know about the device connections.
-
-I may be missing something, but couldn't you keep all the
-register/enable/disable stuff but just register the device with the amba
-bus? Obviously some changes would need to be made.
-
-Personally, I don't have strong feeling either way, but we have ETM/ETB
-drivers using AMBA today and so I am hoping we can come to agreement on
-this going forward.
-
-Russell, Will, what are your thoughts?
-
-Otherwise, looking at the code, I like what you have implemented. I
-still need to look closer, but I am struggling to figure out how a
-coresight device such as the cross-trigger-interface fits with this
-model. This model appears to be geared towards coresight devices used
-for traces purposes and are either source, links or sinks. The
-cross-trigger-interface is not a source or a sink. However, although you
-it could be considered as a link (routing events), it is not really, as
-it may not link to other coresight sinks/source.
-
-In my case, I have PMU-IRQ --> CTI --> GIC. So a non-coresight source
-and sink. In away the CTI looks more like a 2nd-level interrupt
-controller than anything else. Hence, another type of coresight device
-may be needed in addition to source, links and sinks. Or link is
-extended in some way to connect to non-coresight sources/sinks.
-
-Let me know if you have any thoughts.
-
-Cheers
-Jon
+This patch touches the clock driver and Prashant will soon be posting
+patches that significantly rework the clock driver. Those will conflict.
+How have you worked with Prashant to resolve the conflicts? Will
+Prashant's patches be based on top of this series? Please explicitly
+describe the dependencies and resolution of conflicts when you post the
+next version. (below the ---, along with the changelog)
