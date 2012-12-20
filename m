@@ -1,45 +1,40 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Thu, 20 Dec 2012 17:13:52 +0100
-Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
-In-Reply-To: <50D3340F.3090209@free-electrons.com>
-References: <20121219183236.GP23971@game.jcrosoft.org>
- <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
- <50D2EBA1.4050305@free-electrons.com> <50D2EDE6.3090706@atmel.com>
- <50D3340F.3090209@free-electrons.com>
-Message-ID: <50D33940.4000607@atmel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 20 Dec 2012 08:29:38 -0800
+Subject: [GIT PULL] ARM: arm-soc fixes for 3.8
+In-Reply-To: <20121220151059.GU4989@atomide.com>
+References: <20121218065502.GA12865@quad.lixom.net>
+ <50D08547.8040405@free-electrons.com>
+ <20121220151059.GU4989@atomide.com>
+Message-ID: <20121220162938.GA29578@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2012 04:51 PM, Maxime Ripard wrote:
-> Hi Ludovic,
->
-> Le 20/12/2012 11:52, ludovic.desroches a ?crit :
->>> I'm wondering, why are you using such a complex dt parsing code, and
->>> bindings, when you only requires a boolean to switch between 8 and 10
->>> bits mode (which seem to be the only thing you support)?
->>
->> We will have a 10 and 12 bits mode on future ADCs and I would like to
->> have something which could manage more than two resolutions if it
->> happens one day.
->
-> I see your point. I'm not fond at all of the existing bindings for the
-> driver (putting things like registers offset in the dt is a non-sense to
-> me, but hey...), so I'd like to still keep it as simple and non-bloated
-> as possible, but it's true that in the current situation, we probably
-> have no other choice.
->
+On Thu, Dec 20, 2012 at 07:10:59AM -0800, Tony Lindgren wrote:
+> * Maxime Ripard <maxime.ripard@free-electrons.com> [121218 07:08]:
+> > Hi Olof,
+> > 
+> > Le 18/12/2012 07:55, Olof Johansson a ?crit :
+> > > Maxime Ripard (1):
+> > >       ARM: sunxi: Change device tree naming scheme for sunxi
+> > 
+> > There's something odd about this one (commit 68136b10). The patch that
+> > you seem to have applied differs from the one I sent. The DTs files
+> > appears to have not been renamed, while in the patch I sent
+> > (http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137105.html),
+> > it's the case.
+> > 
+> > Do you know what happened here? What can we do to fix that?
+> 
+> Looks like that's trivial to fix as needed, no need to rebuild
+> the branch to fix that AFAIK.
+> 
+> The fix can be done once Olof is available online again.
+> 
+> Linus, I suggest that you go ahead and pull this if there are
+> no other issues with this branch.
 
-I have the same feeling than you about ADC bindings, I think that there 
-are too many parameters exhibited. Moreover, most of them are chip relative.
+Sorry for being offline a bit longer than expected. Fresh pull request
+coming in a minute.
 
-I have not found other ways to deal with it properly. I would like to 
-have them hidden into the driver (depending on the compatible string) 
-but it will be a mess if we split parameters into dt and driver.
 
-So the idea was to have a binding which could allow us to manage several 
-cases about resolution modes in the future.
-
-Ludovic
-
-> Maxime
->
+-Olof
