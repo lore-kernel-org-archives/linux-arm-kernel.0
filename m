@@ -1,97 +1,111 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Dec 2012 11:55:28 +0100
-Subject: [PATCH 3/3] ARM: AT91: IIO: fix missing Sample and Hold time
-In-Reply-To: <1355942232-26251-3-git-send-email-plagnioj@jcrosoft.com>
-References: <20121219183236.GP23971@game.jcrosoft.org>
- <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
- <1355942232-26251-3-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <50D2EEA0.8040807@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Dec 2012 11:01:15 +0000
+Subject: [PATCH 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
+In-Reply-To: <1355996654-6579-6-git-send-email-hdoyu@nvidia.com>
+References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
+ <1355996654-6579-6-git-send-email-hdoyu@nvidia.com>
+Message-ID: <50D2EFFB.8030702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Le 19/12/2012 19:37, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> On the at91_adc a minimal Sample and Hold Time is necessary for the ADC to
-> guarantee the best converted final value between two channels selection.
-> This time has to be programmed through the bitfield SHTIM in the
-> Mode Register ADC_MR.
+On 20/12/12 09:44, Hiroshi Doyu wrote:
+> Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
+> timer than TMR0. If it's available, it will be used for clock source
+> and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
+> necessary for clock event.
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: linux-iio at vger.kernel.org
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 > ---
->  Documentation/devicetree/bindings/arm/atmel-adc.txt |    1 +
->  drivers/iio/adc/at91_adc.c                          |   15 ++++++++++++++-
->  2 files changed, 15 insertions(+), 1 deletion(-)
+>  .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 ++++
+>  drivers/clocksource/tegra20_timer.c                |   64 +++++++++++++++++++-
+>  2 files changed, 74 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> index efb6f02..dd2ca90 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> @@ -26,6 +26,7 @@ Optional properties:
->  		       atmel,adc-res-names property. If not specified, the highest
->  		       resolution will be used.
->    - atmel,atmel,adc-sleep-mode: Boolean to enable of sleep mode when no conversion
-> +  - atmel,adc-sample-hold-time: Sample and Hold Time
-
-In which unit? nanoseconds? number of clock ticks?
-
->   
->  Optional trigger Nodes:
->    - Required properties:
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index c563488..9481375 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -52,6 +52,7 @@ struct at91_adc_state {
->  	void __iomem		*reg_base;
->  	struct at91_adc_reg_desc *registers;
->  	u8			startup_time;
-> +	u8			sample_hold_time;
->  	bool			sleep_mode;
->  	struct iio_trigger	**trig;
->  	struct at91_adc_trigger	*trigger_list;
-> @@ -465,6 +466,9 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
->  	}
->  	st->startup_time = prop;
->  
-> +	prop = 0;
-> +	of_property_read_u32(node, "atmel,adc-sample-hold-time", &prop);
-> +	st->sample_hold_time = prop;
->  
->  	if (of_property_read_u32(node, "atmel,adc-vref", &prop)) {
->  		dev_err(&idev->dev, "Missing adc-vref property in the DT.\n");
-> @@ -578,7 +582,7 @@ static const struct iio_info at91_adc_info = {
->  
->  static int __devinit at91_adc_probe(struct platform_device *pdev)
->  {
-> -	unsigned int prsc, mstrclk, ticks, adc_clk;
-> +	unsigned int prsc, mstrclk, ticks, adc_clk, shtim;
->  	int ret;
->  	struct iio_dev *idev;
->  	struct at91_adc_state *st;
-> @@ -691,12 +695,21 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
->  	 */
->  	ticks = round_up((st->startup_time * adc_clk /
->  			  1000000) - 1, 8) / 8;
-> +	/*
-> +	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
-> +	 * the best converted final value between two channels selection
-> +	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
-> +	 */
-> +	shtim = round_up((st->sample_hold_time * adc_clk /
-> +			  1000000) - 1, 1);
+> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> new file mode 100644
+> index 0000000..9de936a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> @@ -0,0 +1,11 @@
+> +NVIDIA Tegra Timer Stamp Counter(TSC)
 > +
+> +Required properties:
+> +- compatible : "nvidia,tegra114-tsc
+> +- reg : Should contain 1 register ranges(address and length)
+> +
+> +Example:
+> +	tsc {
+> +		compatible = "nvidia,tegra114-tsc";
+> +		reg = <0x700f0000 0x20000>;
+> +	};
+> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+> index 1d25de8..285a6f1 100644
+> --- a/drivers/clocksource/tegra20_timer.c
+> +++ b/drivers/clocksource/tegra20_timer.c
+> @@ -30,6 +30,7 @@
+>  #include <asm/mach/time.h>
+>  #include <asm/smp_twd.h>
+>  #include <asm/sched_clock.h>
+> +#include <asm/arch_timer.h>
+>  
+>  #define RTC_SECONDS            0x08
+>  #define RTC_SHADOW_SECONDS     0x0c
+> @@ -271,10 +272,71 @@ static void __init tegra20_init_tmr(void)
+>  	clockevents_register_device(&tegra_clockevent);
+>  }
+>  
+> +#define TSC_CNTCR		0		/* TSC control registers */
+> +#define TSC_CNTCR_ENABLE	(1 << 0)	/* Enable */
+> +#define TSC_CNTCR_HDBG		(1 << 1)	/* Halt on debug */
+> +
+> +#define TSC_CNTCV0		0x8		/* TSC counter (LSW) */
+> +#define TSC_CNTCV1		0xc		/* TSC counter (MSW) */
+> +#define TSC_CNTFID0		0x20		/* TSC freq id 0 */
+> +
+> +static const struct of_device_id tegra_tsc_match[] __initconst = {
+> +	{ .compatible = "nvidia,tegra114-tsc" },
+> +	{}
+> +};
+> +
+> +static int tegra_arch_timer_init(void)
+> +{
+> +	int err;
+> +	struct device_node *np;
+> +	struct clk *clk;
+> +	void __iomem *tsc_base;
+> +	u32 freq, val;
+> +
+> +	np = of_find_matching_node(NULL, tegra_tsc_match);
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	tsc_base = of_iomap(np, 0);
+> +	if (!tsc_base)
+> +		return -ENODEV;
+> +
+> +	clk = clk_get_sys("clk_m", NULL);
+> +	if (IS_ERR(clk)) {
+> +		freq = 12000000;
+> +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
+> +	} else {
+> +		freq = clk_get_rate(clk);
+> +		clk_put(clk);
+> +	}
+> +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
+> +
+> +	/* CNTFRQ */
+> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
+> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
+> +	BUG_ON(val != freq);
 
-Since, from all the datasheet I have (G20, G45 and X5), the minimum time
-is always 500ns, do we really need to add a dt property for that?
+This is scary. CNTFRQ is only writable from secure mode, and will
+explode in any other situation.
 
-Maxime
+Also, writing to CNTFRQ doesn't change the timer frequency! This is just
+a way for secure mode to tell the rest of the world the frequency the
+timer is ticking at. Unless you've wired the input clock to be able to
+change the frequency?
 
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
