@@ -1,57 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Dec 2012 11:33:25 -0800
-Subject: [PATCH 0/9] drivers: mailbox: framework creation
-In-Reply-To: <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
-References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
- <CACRpkdaqO7AAeYeR8SZt4Tbv1grrMq85TNYMc-FSbUSrnZBm=Q@mail.gmail.com>
- <20121220182835.GB21056@atomide.com>
- <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
-Message-ID: <20121220193325.GH21056@atomide.com>
+From: pengw@nvidia.com (Bryan Wu)
+Date: Thu, 20 Dec 2012 11:41:29 -0800
+Subject: [PATCH 2/2] ARM: DT: tegra: Unify the description of Tegra20 boards
+In-Reply-To: <1356032489-27619-1-git-send-email-pengw@nvidia.com>
+References: <1356032489-27619-1-git-send-email-pengw@nvidia.com>
+Message-ID: <1356032489-27619-2-git-send-email-pengw@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [121220 11:22]:
-> On Thu, Dec 20, 2012 at 10:28 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Linus Walleij <linus.walleij@linaro.org> [121220 10:19]:
-> >> On Tue, Dec 18, 2012 at 2:10 PM, Loic Pallardy
-> >> <loic.pallardy-ext@stericsson.com> wrote:
-> >>
-> >> > OMAP and ST-Ericsson platforms are both using mailbox to communicate
-> >> > with some coprocessors.
-> >> > Based on OMAP existing mailbox framework, this series proposes a
-> >> > generic framework, living under drivers/mailbox.
-> >>
-> >> I like this patch series so you have my Acked-by.
-> >>
-> >> Since it's a new subsystem and affects a few ARM architectures can
-> >> we merge this into the ARM SoC tree once we have consensus,
-> >> so we get some rotation in linux-next that way?
-> >
-> > Yes good idea.
-> >
-> >> Olof/Arnd?
-> >
-> > I suggest we set up an immutable branch against
-> > v3.8-rc1 when it's out with only these patches in it.
-> > Then we can all merge it in as needed. Maybe Arnd or
-> > Olof can set up the branch?
-> 
-> I haven't reviewed the patches yet, but this flow sounds reasonable to me.
+Use engineering name 'Tegra20' instead of 'Tegra2'
 
-OK cool.
+Signed-off-by: Bryan Wu <pengw@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20-harmony.dts  |    2 +-
+ arch/arm/boot/dts/tegra20-ventana.dts  |    2 +-
+ arch/arm/boot/dts/tegra20-whistler.dts |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index 43eb72a..b506de9 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -3,7 +3,7 @@
+ /include/ "tegra20.dtsi"
  
-> > FYI, looks like I need to merge in this branch too to
-> > avoid build errors with remoteproc enabled once I flip
-> > on the multiplatform support for omap2+.
-> 
-> While we can make the branch stable, would it make sense to make
-> remoteproc for omap depend on !multiplatform during the transition, to
-> reduce dependencies a little? Either way works, but it'd be nice to
-> keep them independent if we can.
-
-Yes I'll update the omap multiplat fixups patch I posted yesterday.
-I noticed it only after running make randconfig for a while.
-
-Regards,
-
-Tony
+ / {
+-	model = "NVIDIA Tegra2 Harmony evaluation board";
++	model = "NVIDIA Tegra20 Harmony evaluation board";
+ 	compatible = "nvidia,harmony", "nvidia,tegra20";
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
+index adc4754..0392dea 100644
+--- a/arch/arm/boot/dts/tegra20-ventana.dts
++++ b/arch/arm/boot/dts/tegra20-ventana.dts
+@@ -3,7 +3,7 @@
+ /include/ "tegra20.dtsi"
+ 
+ / {
+-	model = "NVIDIA Tegra2 Ventana evaluation board";
++	model = "NVIDIA Tegra20 Ventana evaluation board";
+ 	compatible = "nvidia,ventana", "nvidia,tegra20";
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
+index 20d576e..5836ad6 100644
+--- a/arch/arm/boot/dts/tegra20-whistler.dts
++++ b/arch/arm/boot/dts/tegra20-whistler.dts
+@@ -3,7 +3,7 @@
+ /include/ "tegra20.dtsi"
+ 
+ / {
+-	model = "NVIDIA Tegra2 Whistler evaluation board";
++	model = "NVIDIA Tegra20 Whistler evaluation board";
+ 	compatible = "nvidia,whistler", "nvidia,tegra20";
+ 
+ 	memory {
+-- 
+1.7.10.4
