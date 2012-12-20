@@ -1,52 +1,42 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Dec 2012 09:55:38 -0700
-Subject: [PATCH] ARM: tegra30: fix power up sequence for boot_secondary
-In-Reply-To: <1355970603-28531-1-git-send-email-josephl@nvidia.com>
-References: <1355970603-28531-1-git-send-email-josephl@nvidia.com>
-Message-ID: <50D3430A.4020901@wwwdotorg.org>
+Date: Thu, 20 Dec 2012 10:01:27 -0700
+Subject: [PATCH 2/2] ARM: tegra: moving the clock gating procedure to
+ tegra_cpu_kill
+In-Reply-To: <1355970519-28200-2-git-send-email-josephl@nvidia.com>
+References: <1355970519-28200-1-git-send-email-josephl@nvidia.com>
+ <1355970519-28200-2-git-send-email-josephl@nvidia.com>
+Message-ID: <50D34467.9000006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2012 07:30 PM, Joseph Lo wrote:
-> The power up sequence is different on the cold boot CPU and the CPU
-> that resumed from the hotplug. For the cold boot CPU, it was been power
-> gated as default. To power up the cold boot CPU, the power should be
-> un-gated by un toggling the power gate register manually.
-> 
-> For the CPU that resumed from the hotplug, after un-halted the CPU. The
-> flow controller will un-gate the power of the CPU. No need to manually
-> control, just wait the power be resumed and continue the power up
-> sequence after the CPU power is ready.
+On 12/19/2012 07:28 PM, Joseph Lo wrote:
+> The tegra_cpu_die was be executed by the CPU itslf. So the clock gating
+> procedure won't be executed after the CPU hardware shutdown code. Moving
+> the clock gating procedure to tegra_cpu_kill that will be run by another
+> CPU after the CPU died.
 
-I'd like Peter to review this too (CC'd). I guess it looks OK...
+Hmmm. I wonder if this is enough to make kexec-on-Tegra-with-SMP-enabled
+work without explicitly hot-unplugging all the CPUs first... An
+implementation of cpu_kill() was a major part of what was missing. I
+thought an implementation of cpu_kill() would require a bunch of code
+from cpu_die() too. Does this patch assume cpu_die() has executed first,
+and only then cpu_kill() will work, or can cpu_kill() be used on its own?
 
-> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
 
-> @@ -72,7 +75,27 @@ static int tegra30_power_up_cpu(unsigned int cpu)
->  	if (pwrgateid < 0)
->  		return pwrgateid;
+> @@ -34,10 +45,6 @@ void __ref tegra_cpu_die(unsigned int cpu)
+>  	/* Shut down the current CPU. */
+>  	tegra_hotplug_shutdown();
 >  
-> -	/* If this is the first boot, toggle powergates directly. */
-> +	/*
-> +	 * If the CPU had booted and went through here after CPU
-> +	 * had been already un-gated by flow controller. Wait
-> +	 * for confirmation that the CPU is powered then remove
-> +	 * the IO clamps. On the cold boot entry, do not wait.
-> +	 */
+> -	/* Clock gate the CPU */
+> -	tegra_wait_cpu_in_reset(cpu);
+> -	tegra_disable_cpu_clock(cpu);
 
-That comment is quite unclear. In particular the first sentence says "if
-something" rather than "if something then something". Can you please
-re-write it?
+I believe that's the last use of the calculation performed right at the
+start of this function:
 
-Also, it'd be good to explain (or at least briefly reference) the boot
-path for a cold-boot CPU and a warm boot CPU; I assume that somehow a
-cold boot CPU doesn't execute tegra_secondary_init(), but a warm boot
-CPU does?
+        cpu = cpu_logical_map(cpu);
 
-> +	if (cpumask_test_cpu(cpu, &tegra_cpu_init_mask)) {
-> +		timeout = jiffies + 5;
+Can you remove that?
 
-Are the units/frequency of the jiffies variable always constant? Should
-"5" be not a constant, but instead a calculation involving HZ or
-msecs_to_jiffies()? Certainly, the few other uses of time_before() I
-looked at use HZ or msecs_to_jiffies().
+Also, Peter, can you review these 2 patches as well?
