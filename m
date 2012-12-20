@@ -1,53 +1,33 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 20 Dec 2012 19:53:41 +0100
-Subject: [PATCH 1/2] ARM: versatile: bump IRQ numbers
-Message-ID: <1356029621-30203-1-git-send-email-linus.walleij@stericsson.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 20 Dec 2012 11:00:11 -0800
+Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
+In-Reply-To: <20121220184525.GC21056@atomide.com>
+References: <20121220163814.GA29557@quad.lixom.net>
+ <20121220175639.GA14363@n2100.arm.linux.org.uk>
+ <CAOesGMgxXmXUW2RP_5AxJ6Z5sRBhFJ2CQz4S12MwXAb3=ibYOA@mail.gmail.com>
+ <20121220184525.GC21056@atomide.com>
+Message-ID: <CA+55aFyiRPk0Qta35PBqMFqn+GkKaugqKJM3WHCT0JEJ1YohWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Dec 20, 2012 at 10:45 AM, Tony Lindgren <tony@atomide.com> wrote:
+>
+> I'm seeing the "BUG: spinlock bad magic on CPU#0" issue
+> reported and fixed here:
+>
+> http://marc.info/?l=linux-arm-kernel&m=135594868503683&w=2
+>
+> But that's probably been already posted as a proper patch
+> somewhere?
 
-The Versatile starts to register Linux IRQ numbers from offset 0
-which is illegal, since this is NO_IRQ. Bump all hard-coded IRQs
-by 32 to get rid of the problem.
+Hmm. The patch there looks better than any alternative I can think of.
+It uses the same spinlock name for the whole array, but I think it's
+only used for lockdep printouts, so that should be fine.
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-versatile/include/mach/irqs.h | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Send me the patch with signed-off and tested-by, and perhaps have a
+few more people test it. The powerpc and sparc people both use it in
+their 32-bit versions and have responsible maintainers, so it might be
+worth it double-checking with BenH and DaveM about it, just in case.
+Added to the Cc.
 
-diff --git a/arch/arm/mach-versatile/include/mach/irqs.h b/arch/arm/mach-versatile/include/mach/irqs.h
-index bf44c61..0fd771c 100644
---- a/arch/arm/mach-versatile/include/mach/irqs.h
-+++ b/arch/arm/mach-versatile/include/mach/irqs.h
-@@ -25,7 +25,7 @@
-  *  IRQ interrupts definitions are the same as the INT definitions
-  *  held within platform.h
-  */
--#define IRQ_VIC_START		0
-+#define IRQ_VIC_START		32
- #define IRQ_WDOGINT		(IRQ_VIC_START + INT_WDOGINT)
- #define IRQ_SOFTINT		(IRQ_VIC_START + INT_SOFTINT)
- #define IRQ_COMMRx		(IRQ_VIC_START + INT_COMMRx)
-@@ -100,7 +100,7 @@
- /*
-  * Secondary interrupt controller
-  */
--#define IRQ_SIC_START		32
-+#define IRQ_SIC_START		64
- #define IRQ_SIC_MMCI0B 		(IRQ_SIC_START + SIC_INT_MMCI0B)
- #define IRQ_SIC_MMCI1B 		(IRQ_SIC_START + SIC_INT_MMCI1B)
- #define IRQ_SIC_KMI0		(IRQ_SIC_START + SIC_INT_KMI0)
-@@ -120,7 +120,7 @@
- #define IRQ_SIC_PCI1		(IRQ_SIC_START + SIC_INT_PCI1)
- #define IRQ_SIC_PCI2		(IRQ_SIC_START + SIC_INT_PCI2)
- #define IRQ_SIC_PCI3		(IRQ_SIC_START + SIC_INT_PCI3)
--#define IRQ_SIC_END		63
-+#define IRQ_SIC_END		95
- 
- #define IRQ_GPIO0_START		(IRQ_SIC_END + 1)
- #define IRQ_GPIO0_END		(IRQ_GPIO0_START + 31)
--- 
-1.7.11.3
+                Linus
