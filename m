@@ -1,131 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Dec 2012 13:33:38 +0000
-Subject: [PATCH 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
-In-Reply-To: <20121220.152544.2281355586046026239.hdoyu@nvidia.com>
-References: <50D2EFFB.8030702@arm.com><20121220.135758.1347753620353343245.hdoyu@nvidia.com><50D2FF19.4060600@arm.com>
- <20121220.152544.2281355586046026239.hdoyu@nvidia.com>
-Message-ID: <50D313B2.8050805@arm.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 20 Dec 2012 15:05:19 +0100
+Subject: [PATCH 1/1] ARM: OMAP3: igep0020: simplify GPIO LEDs dependencies
+In-Reply-To: <1355505428-24302-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1355505428-24302-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CABxcv=k6wypYO+JOV1rWyuGtR-seNQ2PFqym7QsAdkC+mC7P8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/12/12 13:25, Hiroshi Doyu wrote:
-> Marc Zyngier <marc.zyngier@arm.com> wrote @ Thu, 20 Dec 2012 13:05:45 +0100:
-> 
->> On 20/12/12 11:57, Hiroshi Doyu wrote:
->>> Marc Zyngier <marc.zyngier@arm.com> wrote @ Thu, 20 Dec 2012 12:01:15 +0100:
->>>
->>>> On 20/12/12 09:44, Hiroshi Doyu wrote:
->>>>> Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
->>>>> timer than TMR0. If it's available, it will be used for clock source
->>>>> and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
->>>>> necessary for clock event.
->>>>>
->>>>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->>>>> ---
->>>>>  .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 ++++
->>>>>  drivers/clocksource/tegra20_timer.c                |   64 +++++++++++++++++++-
->>>>>  2 files changed, 74 insertions(+), 1 deletion(-)
->>>>>  create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
->>>>> new file mode 100644
->>>>> index 0000000..9de936a
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
->>>>> @@ -0,0 +1,11 @@
->>>>> +NVIDIA Tegra Timer Stamp Counter(TSC)
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible : "nvidia,tegra114-tsc
->>>>> +- reg : Should contain 1 register ranges(address and length)
->>>>> +
->>>>> +Example:
->>>>> +	tsc {
->>>>> +		compatible = "nvidia,tegra114-tsc";
->>>>> +		reg = <0x700f0000 0x20000>;
->>>>> +	};
->>>>> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
->>>>> index 1d25de8..285a6f1 100644
->>>>> --- a/drivers/clocksource/tegra20_timer.c
->>>>> +++ b/drivers/clocksource/tegra20_timer.c
->>>>> @@ -30,6 +30,7 @@
->>>>>  #include <asm/mach/time.h>
->>>>>  #include <asm/smp_twd.h>
->>>>>  #include <asm/sched_clock.h>
->>>>> +#include <asm/arch_timer.h>
->>>>>  
->>>>>  #define RTC_SECONDS            0x08
->>>>>  #define RTC_SHADOW_SECONDS     0x0c
->>>>> @@ -271,10 +272,71 @@ static void __init tegra20_init_tmr(void)
->>>>>  	clockevents_register_device(&tegra_clockevent);
->>>>>  }
->>>>>  
->>>>> +#define TSC_CNTCR		0		/* TSC control registers */
->>>>> +#define TSC_CNTCR_ENABLE	(1 << 0)	/* Enable */
->>>>> +#define TSC_CNTCR_HDBG		(1 << 1)	/* Halt on debug */
->>>>> +
->>>>> +#define TSC_CNTCV0		0x8		/* TSC counter (LSW) */
->>>>> +#define TSC_CNTCV1		0xc		/* TSC counter (MSW) */
->>>>> +#define TSC_CNTFID0		0x20		/* TSC freq id 0 */
->>>>> +
->>>>> +static const struct of_device_id tegra_tsc_match[] __initconst = {
->>>>> +	{ .compatible = "nvidia,tegra114-tsc" },
->>>>> +	{}
->>>>> +};
->>>>> +
->>>>> +static int tegra_arch_timer_init(void)
->>>>> +{
->>>>> +	int err;
->>>>> +	struct device_node *np;
->>>>> +	struct clk *clk;
->>>>> +	void __iomem *tsc_base;
->>>>> +	u32 freq, val;
->>>>> +
->>>>> +	np = of_find_matching_node(NULL, tegra_tsc_match);
->>>>> +	if (!np)
->>>>> +		return -ENODEV;
->>>>> +
->>>>> +	tsc_base = of_iomap(np, 0);
->>>>> +	if (!tsc_base)
->>>>> +		return -ENODEV;
->>>>> +
->>>>> +	clk = clk_get_sys("clk_m", NULL);
->>>>> +	if (IS_ERR(clk)) {
->>>>> +		freq = 12000000;
->>>>> +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
->>>>> +	} else {
->>>>> +		freq = clk_get_rate(clk);
->>>>> +		clk_put(clk);
->>>>> +	}
->>>>> +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
->>>>> +
->>>>> +	/* CNTFRQ */
->>>>> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
->>>>> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
->>>>> +	BUG_ON(val != freq);
->>>>
->>>> This is scary. CNTFRQ is only writable from secure mode, and will
->>>> explode in any other situation.
->>>>
->>>> Also, writing to CNTFRQ doesn't change the timer frequency! This is just
->>>> a way for secure mode to tell the rest of the world the frequency the
->>>> timer is ticking at. Unless you've wired the input clock to be able to
->>>> change the frequency?
->>>
->>> ATM, our upstream kernel is expected in secure mode. This situation
->>> may be changed later, though....
->>
->> I appreciate this. But I expect this kernel to be also used on the
->> non-secure side if someone tried to run KVM with it. And this would go
->> bang right away.
-> 
-> What is the common way to make the above code selective at run
-> time(secure or non-secure path)?
+On Fri, Dec 14, 2012 at 6:17 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> The IGEPv2 board has two user GPIO LEDs and one of them is
+> default to "on" to tell the user that the board booted correctly.
+>
+> But to use these LEDs the config options CONFIG_LEDS_GPIO,
+> CONFIG_LEDS_TRIGGERS and CONFIG_LEDS_TRIGGER_DEFAULT_ON have to
+> be enabled.
+>
+> Since only the default-on and default-off triggers were used
+> anyway, it is better to just use .default_state instead of
+> .default_trigger and not depend on CONFIG_LEDS_TRIGGER_*
+>
+> Also, this is consistent with IGEPv2 Device Tree that uses
+> default-state instead of linux,default-trigger for the leds
+> device nodes. The LED names also have been updated to use the
+> same names used on omap3-igep0020.dtb.
+>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  arch/arm/mach-omap2/board-igep0020.c |   16 ++++++++--------
+>  1 files changed, 8 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+> index 0f24cb8..1921541 100644
+> --- a/arch/arm/mach-omap2/board-igep0020.c
+> +++ b/arch/arm/mach-omap2/board-igep0020.c
+> @@ -300,20 +300,20 @@ static struct omap2_hsmmc_info mmc[] = {
+>
+>  static struct gpio_led igep_gpio_leds[] = {
+>         [0] = {
+> -               .name                   = "gpio-led:red:d0",
+> -               .default_trigger        = "default-off"
+> +               .name                   = "omap3:red:user0",
+> +               .default_state          = 0,
+>         },
+>         [1] = {
+> -               .name                   = "gpio-led:green:d0",
+> -               .default_trigger        = "default-off",
+> +               .name                   = "omap3:green:boot",
+> +               .default_state          = 1,
+>         },
+>         [2] = {
+> -               .name                   = "gpio-led:red:d1",
+> -               .default_trigger        = "default-off",
+> +               .name                   = "omap3:red:user1",
+> +               .default_state          = 0,
+>         },
+>         [3] = {
+> -               .name                   = "gpio-led:green:d1",
+> -               .default_trigger        = "heartbeat",
+> +               .name                   = "omap3:green:user1",
+> +               .default_state          = 0,
+>                 .gpio                   = -EINVAL, /* gets replaced */
+>                 .active_low             = 1,
+>         },
+> --
 
-All platforms are currently doing it in their firmware/bootloader, which
-runs on the secure side. The kernel itself should be able to run on both
-sides.
+Hi Tony,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Any comments on this patch?
+
+I wonder if I should keep sending fixes/improvements for board-igep0020.c
+
+I already sent an initial Device Tree support for IGEP boards [1] and
+Benoit told me he is going to queue for 3.9. But still doesn't support
+many peripherals found on these boards because they still don't proper
+DT support, for instance NAND and Ethernet need the GPMC bindings
+patches that haven't hit mainline yet.
+
+So, it seems I will have to keep working on the board file until it
+can be completely deprecated.
+
+Thanks a lot and best regards,
+Javier
+
+[1]: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82383.html
