@@ -1,85 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Dec 2012 17:09:04 +0000
-Subject: [PATCH 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
-In-Reply-To: <20121220.164230.292625215885249791.hdoyu@nvidia.com>
-References: <50D305A6.2080904@arm.com><20121220125507.GB6819@tbergstrom-lnx.Nvidia.com><50D31365.9000009@arm.com>
- <20121220.164230.292625215885249791.hdoyu@nvidia.com>
-Message-ID: <50D34630.9020708@arm.com>
+From: joshc@eso.teric.us (Josh Cartwright)
+Date: Thu, 20 Dec 2012 11:23:01 -0600
+Subject: OT:zynx on zedboard.org hr timer problem with dts
+In-Reply-To: <201212201744.43678.tim01@vlsi.informatik.tu-darmstadt.de>
+References: <201212201744.43678.tim01@vlsi.informatik.tu-darmstadt.de>
+Message-ID: <20121220172301.GC27361@kryptos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/12/12 14:42, Hiroshi Doyu wrote:
-> Marc Zyngier <marc.zyngier@arm.com> wrote @ Thu, 20 Dec 2012 14:32:21 +0100:
+On Thu, Dec 20, 2012 at 05:44:42PM +0100, Tim Sander wrote:
+> Hi
 > 
->> On 20/12/12 12:55, Peter De Schrijver wrote:
->>> On Thu, Dec 20, 2012 at 01:33:42PM +0100, Marc Zyngier wrote:
->>>> On 20/12/12 12:22, Peter De Schrijver wrote:
->>>>>>>>> +
->>>>>>>>> +	/* CNTFRQ */
->>>>>>>>> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
->>>>>>>>> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
->>>>>>>>> +	BUG_ON(val != freq);
->>>>>>>>
->>>>>>>> This is scary. CNTFRQ is only writable from secure mode, and will
->>>>>>>> explode in any other situation.
->>>>>>>>
->>>>>>>> Also, writing to CNTFRQ doesn't change the timer frequency! This is just
->>>>>>>> a way for secure mode to tell the rest of the world the frequency the
->>>>>>>> timer is ticking at. Unless you've wired the input clock to be able to
->>>>>>>> change the frequency?
->>>>>>>
->>>>>>> ATM, our upstream kernel is expected in secure mode. This situation
->>>>>>> may be changed later, though....
->>>>>>
->>>>>> I appreciate this. But I expect this kernel to be also used on the
->>>>>> non-secure side if someone tried to run KVM with it. And this would go
->>>>>> bang right away.
->>>>>>
->>>>>
->>>>> But the guest wouldn't necessarily have this peripheral, or any other Tegra114
->>>>> peripheral for that matter?
->>>>
->>>> The problem is not so much the guest but the host. The host has to be
->>>> booted in non-secure, so just saying "we do not support non-secure" is
->>>> not a very convincing argument.
->>>>
->>>> Unless of course you've already decided that you don't want to support
->>>> KVM on this SoC...
->>>>
->>>
->>> I guess that means we can't support KVM yet. Tegra does not have a secure
->>> monitor by default. It all depends on what that system integrator does.
->>
->> VExpress doesn't have a secure monitor either, and yet we run KVM on it
->> (by switching to non-secure before loading the kernel). Same for Exynos5.
->>
->> What I'm trying to say is that this code is rather pointless (this
->> should be done by the firmware/bootloader, not the kernel, or the
->> information should be provided in DT if CNTFRQ is not set).
-> 
-> "tegra114.dtsi" has the folloiwng "tsc" entry. So can we consider that
-> if dts has this entry, CNTFRQ is not set, which implies it's in secure
-> mode. kernel should set it up by itself? Otherwise, skip this setup
-> and use it. For example:
-> 
->  	tsc {
->  		compatible = "nvidia,tegra114-tsc";
->  		reg = <0x700f0000 0x20000>;
-> +		setup-cntfrq;
->  	};
-> 
-> Is this what you explained in the above?
-> At least, kernel can survive without bootloader/firmware support, ATM.
+> This is probably not the right list but in lack of knowing a better place:
+> I am using the xilinx git repository (git://git.xilinx.com/linux-xlnx.git) 
+> with the attached dts file. Most stuff works fine but there is a error message 
+> on startup:
+> Zynq clock init
+> xlnx,ps7-ttc-1.00.a #0 at 0xe0800000, irq=43
+> ------------[ cut here ]------------
+> WARNING: at arch/arm/kernel/smp_twd.c:389 time_init+0x20/0x30()
+> twd_local_timer_of_register failed (-22)
+> Modules linked in:
+> [<c001417c>] (unwind_backtrace+0x0/0x11c) from [<c0020aac>] (warn_slowpath_common+0x4c/0x64)
+> [<c0020aac>] (warn_slowpath_common+0x4c/0x64) from [<c0020b44>] (warn_slowpath_fmt+0x2c/0x3c)
+> [<c0020b44>] (warn_slowpath_fmt+0x2c/0x3c) from [<c0486080>] (time_init+0x20/0x30)
+> [<c0486080>] (time_init+0x20/0x30) from [<c04826c0>] (start_kernel+0x1b4/0x2f0)
+> [<c04826c0>] (start_kernel+0x1b4/0x2f0) from [<00008044>] (0x8044)
+> ---[ end trace 0000000000000001 ]---
+> and hrtimers are not working although they are enabled in the .config.
 
-No. The DT should only describe the hardware, and not something that is
-Linux specific.
+Hey Tim-
 
-Just use the "clock-frequency" attribute in the timer arch-timer node,
-and get rid of this CNTFRQ setting. The driver already knows how to deal
-with this situation if this attribute is set.
+A better place to ask questions about the Xilinx tree will likely be on
+their Embedded Linux forum [1].
 
-Thanks,
+> I am sure this is an error in the attached dts but i am to knew to this device tree 
+> stuff to find the error. So any hint would be apreciated.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+On first glance, it looks like you've specified a node for the twd, but
+neglected to specify interrupts.  See Documentation/devicetree/bindings/arm/twd.txt. 
+ 
+> 		swdt at f8005000 {
+> 			device_type = "watchdog";
+> 			compatible = "arm,cortex-a9-twd-timer";
+> 			reg = <0xf8005000 0x100>;
+> 			clock-frequency = <111111111>;
+> 		};
+
+Good luck,
+     Josh
+
+[1]: http://forums.xilinx.com/t5/Embedded-Linux/bd-p/ELINUX
