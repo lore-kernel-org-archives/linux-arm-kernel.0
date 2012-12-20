@@ -1,41 +1,28 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Thu, 20 Dec 2012 08:15:47 +0100
-Subject: [PATCH] missing ->mmap_sem around find_vma() in swp_emulate.c
-In-Reply-To: <20121216002557.GY4939@ZenIV.linux.org.uk>
-References: <20121216002557.GY4939@ZenIV.linux.org.uk>
-Message-ID: <50D2BB23.5070105@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 20 Dec 2012 07:35:27 +0000 (UTC)
+Subject: [PATCH v2] ARM: OMAP2: hwmod: Fix "register offset NULL check" bug
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EB0C4FB@DBDE01.ent.ti.com>
+References: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
+ <alpine.DEB.2.00.1212190210021.2446@utopia.booyaka.com>
+ <1BAFE6F6C881BF42822005164F1491C33EB0C4FB@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1212200734160.7362@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 16.12.2012 01:25, schrieb Al Viro:
-> find_vma() is *not* safe when somebody else is removing vmas.  Not just
-> the return value might get bogus just as you are getting it (this instance
-> doesn't try to dereference the resulting vma), the search itself can get
-> buggered in rather spectacular ways.  IOW, ->mmap_sem really, really is
-> not optional here.
->
-> Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
-> ---
-> diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
-> index df74518..ab1017b 100644
-> --- a/arch/arm/kernel/swp_emulate.c
-> +++ b/arch/arm/kernel/swp_emulate.c
-> @@ -109,10 +109,12 @@ static void set_segfault(struct pt_regs *regs, unsigned long addr)
->   {
->   	siginfo_t info;
->
-> +	down_read(&current->mm->mmap_sem);
->   	if (find_vma(current->mm, addr) == NULL)
->   		info.si_code = SEGV_MAPERR;
->   	else
->   		info.si_code = SEGV_ACCERR;
-> +	up_read(&current->mm->mmap_sem);
->
->   	info.si_signo = SIGSEGV;
->   	info.si_errno = 0;
+On Thu, 20 Dec 2012, Hebbar, Gururaja wrote:
 
-Any comment on this?
+> On Wed, Dec 19, 2012 at 07:43:50, Paul Walmsley wrote:
+> 
+> > We've got a few hwmods on OMAP44xx that don't have clkctrl_offs registers 
+> > listed in the hwmod data, and which are not marked with HWMOD_NO_IDLEST.  
+> > What's going to happen in those cases?
+> 
+> Hmm. This is a special case to me. Let me go back and do some review.
+> Will be back with some more details.
 
-Thanks
+Probably what needs to happen is that those hwmods need to be marked with 
+HWMOD_NO_IDLEST, in a separate patch before yours.  As far as I can tell, 
+that's how they should have been marked initially.  Then your patch should 
+be fine.
 
-Dirk
+- Paul
