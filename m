@@ -1,114 +1,112 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Dec 2012 13:15:30 -0700
-Subject: [PATCH] kexec: disable non-boot CPUs
-In-Reply-To: <50D35214.4090008@wwwdotorg.org>
-References: <1355960681-32015-1-git-send-email-swarren@wwwdotorg.org>
- <20121220104945.GC16887@mudshark.cambridge.arm.com>
- <50D34934.9070106@wwwdotorg.org>
- <20121220173611.GC5387@mudshark.cambridge.arm.com>
- <50D35214.4090008@wwwdotorg.org>
-Message-ID: <50D371E2.1030807@wwwdotorg.org>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 20 Dec 2012 21:16:15 +0100
+Subject: CoreSight framework and drivers
+In-Reply-To: <20121220195127.GA14877@pratikp-linux.qualcomm.com>
+References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
+ <20121219112314.GA26329@mudshark.cambridge.arm.com>
+ <50D1F37E.6000804@ti.com>
+ <20121219212431.GC23594@pratikp-linux.qualcomm.com>
+ <50D34EE5.8090407@ti.com>
+ <20121220195127.GA14877@pratikp-linux.qualcomm.com>
+Message-ID: <CAORVsuXB8kS69=UWA_FE42HabgaAA5gB4K52uJ_CFMv8-_hNiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2012 10:59 AM, Stephen Warren wrote:
-> On 12/20/2012 10:36 AM, Will Deacon wrote:
->> On Thu, Dec 20, 2012 at 05:21:56PM +0000, Stephen Warren wrote:
->>> On 12/20/2012 03:49 AM, Will Deacon wrote:
->>>> If you do manage to get this merged, please can you follow up with a patch
->>>> to remove the smp_kill_cpus bits from arch/arm/kernel/smp.c please? It only
->>>> exists as a hook to do exactly this and currently nobody is using it afaict.
->>>
->>> I originally implemented this in
->>> arch/arm/kernel/process.c:machine_shutdown(), which currently is:
->>>
->>> void machine_shutdown(void)
->>> {
->>> #ifdef CONFIG_SMP
->>> 	smp_send_stop();
->>> #endif
->>> }
->>>
->>> and I changed it to something like:
->>>
->>> void machine_shutdown(void)
->>> {
->>> #ifdef CONFIG_HOTPLUG_CPU
->>>  	disable_nonboot_cpus();
->>> #elifdef CONFIG_SMP
->>> 	smp_send_stop();
->>> #endif
->>> }
->>>
->>> ... but then figured that moving it up into the core kexec code would be
->>> better, so that everything always worked the same way.
+Hi Pratik,
+
+On Thu, Dec 20, 2012 at 8:51 PM, Pratik Patel <pratikp@codeaurora.org> wrote:
+> On Thu, Dec 20, 2012 at 11:46:13AM -0600, Jon Hunter wrote:
 >>
->> Hmmm, isn't this racy: requiring the secondaries to hit idle and notice
->> they're offline and call cpu_die before the primary has replace the kernel
->> image?
-> 
-> Isn't disable_nonboot_cpus() synchronous? If not, I imagine my original
-> patch wasn't any better in this respect, except that the hotunplug
-> happened earlier, and hence reduced the likelihood of actually seeing
-> any such issues.
-> 
->>> Anyway, the change above addresses Eric's concern about isolating the
->>> change to ARM. Does that seem like a reasonable thing for the ARM code
->>> to do?
+>> On 12/19/2012 03:24 PM, Pratik Patel wrote:
 >>
->> I think you're better off using what we currently have and hanging your code
->> off platform_cpu_kill.
-> 
-> OK, I'll look into that. Joseph Lo just posted patches to implement
-> cpu_kill() on Tegra, which was needed to fix some issues in our hotplug
-> code anyway. Perhaps that will remove the need for any other changes...
+>> [snip]
+>>
+>> > Currently we use the CoreSight virtual bus to conveniently list
+>> > sysfs configuration attributes for all the registered CoreSight
+>> > devices.
+>> >
+>> > For eg:
+>> > /sys/bus/coresight/devices/coresight-etm0/<attribute>
+>> > /sys/bus/coresight/devices/coresight-etm1/<attribute>
+>> > /sys/bus/coresight/devices/coresight-stm/<attribute>
+>> > /sys/bus/coresight/devices/coresight-tmc-etf/<attribute>
+>> > ...
+>> > ...
+>> >
+>> > Some of the attributes are based on device type (i.e. source,
+>> > link or sink) so they will exist for all devices of that type
+>> > while some are device specific.
+>> >
+>> > Maybe I am misunderstanding the question but are you suggesting
+>> > to register CoreSight devices to the AMBA bus instead of the
+>> > CoreSight core layer code?
+>>
+>> Yes exactly.
+>>
+>> > Will Deacon mentioned earlier that AMBA framework can be changed
+>> > to accomodate devices with a different class but I am more
+>> > concerned with losing some of the stuff that the core layer code
+>> > does (eg. coresight_register, coresight_enable, coresight_disable
+>> > in coresight.c) if we register CoreSight drivers to the AMBA bus
+>> > without letting the core layer know about the device connections.
+>>
+>> I may be missing something, but couldn't you keep all the
+>> register/enable/disable stuff but just register the device with the amba
+>> bus? Obviously some changes would need to be made.
+>>
+>
+> Ok, so are you referring to making CoreSight devices register
+> with AMBA bus instead of platform bus keeping everything else
+> intact?
+>
+>> Personally, I don't have strong feeling either way, but we have ETM/ETB
+>> drivers using AMBA today and so I am hoping we can come to agreement on
+>> this going forward.
+>>
+>> Russell, Will, what are your thoughts?
+>>
+>> Otherwise, looking at the code, I like what you have implemented. I
+>> still need to look closer, but I am struggling to figure out how a
+>> coresight device such as the cross-trigger-interface fits with this
+>> model. This model appears to be geared towards coresight devices used
+>> for traces purposes and are either source, links or sinks. The
+>> cross-trigger-interface is not a source or a sink. However, although you
+>> it could be considered as a link (routing events), it is not really, as
+>> it may not link to other coresight sinks/source.
+>>
+>> In my case, I have PMU-IRQ --> CTI --> GIC. So a non-coresight source
+>> and sink. In away the CTI looks more like a 2nd-level interrupt
+>> controller than anything else. Hence, another type of coresight device
+>> may be needed in addition to source, links and sinks. Or link is
+>> extended in some way to connect to non-coresight sources/sinks.
+>>
+>> Let me know if you have any thoughts.
+>>
+>
+> I had left the "None" type for miscellaneous stuff but I agree it
+> should be a separate type - maybe "debug".
+>
+> Having said that I like the CTI driver you have uploaded. Need to
+> look at it in more detail. Since CTI connections can vary between
+> chip to chip, we need a generic way to deal with it.
+I am also interested to look at such a framework in order to have a
+clean implementation of the ETM, PMI/CMI (HW tracing IP on OMAP4+).
+I am currently busy on a driver for PMI/CMI which requires some
+configuration of the Coresight, ETM, ETB, ATB etc. IP blocks.
 
-Will,
+Could you send your patches to linux-arm and linux-omap mailing lists?
+I will be pleased to review them.
 
-I just remembered one other advantage of disable_nonboot_cpus(); it
-always makes the kexec happen on the boot CPU. Without this, I believe
-it's random whether CPU0 or CPU1 performs the kexec. I suspect it's most
-likely to work if we can always kexec on the boot CPU rather than a
-random CPU?
+Regards,
+Jean
 
-Joseph, Peter,
-
-As you know, I've been looking into kexec[2] on Tegra. Here's a summary
-of a few tests I did:
-
-linux-next plus nothing in particular, SMP enabled:
-* Hangs/crashes during kexec
-
-linux-next + SMP disabled: kexec works
-
-linux-next + hotunplug CPUs other than CPU0 before kexec: kexec works
-
-Will Deacon suggested this was due to a missing implementation of struct
-smp_operations .cpu_kill on Tegra, which means that when CPUn are
-present, they're simply spinning executing code, and kexec will
-eventually overwrite that code, causing all manner of problems. So,
-since I noticed that Joseph posted an implementation of .cpu_kill for
-Tegra, I tried that out[1]. It certainly doesn't solve the problem, and
-in fact actually causes the kernel performing the kexec (rather than the
-kexec'd kernel) to hang:
-
-> [   26.291903] Starting new kernel
-> [   47.309571] INFO: rcu_preempt detected stalls on CPUs/tasks: { 1} (detected by 0, t=2102 jiffies, g=211, c=210, q=37)
-> [   47.323410] Task dump for CPU 1:
-> [   47.329763] dd              R running      0   401      1 0x00000000
-> [   47.339343] [<c0521690>] (__schedule+0x360/0x600) from [<c002d9b0>] (do_syslog+0x2b4/0x478)
-> [   47.350952] [<c002d9b0>] (do_syslog+0x2b4/0x478) from [<ed86bb08>] (0xed86bb08)
-
-Manually hotunplugging the CPUs first still works OK with those patches
-applied though.
-
-I /think/ kexec calls .cpu_kill() without having caused the CPU itself
-to call .cpu_die() first? Did you allow for that possibility inside the
-implementation you posted?
-
-[1]
-http://patchwork.ozlabs.org/patch/207601/
-http://patchwork.ozlabs.org/patch/207602/
-
-[2]
-http://en.wikipedia.org/wiki/Kexec
+>
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
