@@ -1,38 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Dec 2012 09:28:19 -0800
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Dec 2012 09:35:49 -0800
 Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
-In-Reply-To: <CA+55aFxL47wxTyTzLdnoFV=trnrMAz=_7rhsQFjb+K_mvTCa9w@mail.gmail.com>
+In-Reply-To: <CAOesGMiZTF4gogCkU7eSaOydkX82wfWywkKBgCJo_-ZW0Ox4kw@mail.gmail.com>
 References: <20121220163814.GA29557@quad.lixom.net>
  <CA+55aFxL47wxTyTzLdnoFV=trnrMAz=_7rhsQFjb+K_mvTCa9w@mail.gmail.com>
-Message-ID: <CAOesGMiZTF4gogCkU7eSaOydkX82wfWywkKBgCJo_-ZW0Ox4kw@mail.gmail.com>
+ <CAOesGMiZTF4gogCkU7eSaOydkX82wfWywkKBgCJo_-ZW0Ox4kw@mail.gmail.com>
+Message-ID: <20121220173548.GB4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[proper reply-to-all this time]
+* Olof Johansson <olof@lixom.net> [121220 09:30]:
+> [proper reply-to-all this time]
+> 
+> On Thu, Dec 20, 2012 at 8:49 AM, Linus Torvalds
+> <torvalds@linux-foundation.org> wrote:
+> > On Thu, Dec 20, 2012 at 8:38 AM, Olof Johansson <olof@lixom.net> wrote:
+> >>
+> >> One of the sunxi patches from the last pull request was misapplied (I
+> >> realized what happened -- git am -s didn't apply cleanly so I had done it
+> >> through regular patch, thus not catching the renames properly). Here's
+> >> a fresh version of the pull request with a couple more OMAP and Samsung
+> >> patches included.
+> >
+> > Argh!
+> >
+> > I pulled your earlier branch due to Tony's ack, and now you're
+> > re-created that branch with new pulls (effectively rebasing it).
+> >
+> > Don't do things like this to me.
+> 
+> Yeah, sorry about that -- I wanted to replace the broken patch, and
+> Tony's branch was based on a newer version of your tree so I brought
+> everything forward as I had to rebase anyway.
+> 
+> I'll rebuild on top of what you've pulled, and send a fresh request of
+> just the delta. Sorry about the race condition here.
 
-On Thu, Dec 20, 2012 at 8:49 AM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Thu, Dec 20, 2012 at 8:38 AM, Olof Johansson <olof@lixom.net> wrote:
->>
->> One of the sunxi patches from the last pull request was misapplied (I
->> realized what happened -- git am -s didn't apply cleanly so I had done it
->> through regular patch, thus not catching the renames properly). Here's
->> a fresh version of the pull request with a couple more OMAP and Samsung
->> patches included.
->
-> Argh!
->
-> I pulled your earlier branch due to Tony's ack, and now you're
-> re-created that branch with new pulls (effectively rebasing it).
->
-> Don't do things like this to me.
+Sorry for me adding to the confusion too.
 
-Yeah, sorry about that -- I wanted to replace the broken patch, and
-Tony's branch was based on a newer version of your tree so I brought
-everything forward as I had to rebase anyway.
+Looks like Linus already applied "ARM: OMAP: Fix build breakage due
+to missing include in i2c.c" that I had queued earlier.
 
-I'll rebuild on top of what you've pulled, and send a fresh request of
-just the delta. Sorry about the race condition here.
+Olof, I suggest you just merge my pull request up to the other commit
+c16acf12 (ARM: OMAP2+: Fix compillation error in mach-omap2/timer.c).
+Or just pick it whichever works better for you.
 
+Regards,
 
--Olof
+Tony
