@@ -1,49 +1,52 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 20 Dec 2012 10:12:01 +0100
-Subject: [PATCH 6/6 v11] gpio: Add block gpio to several gpio drivers
-In-Reply-To: <50D2C731.1080009@grandegger.com>
-References: <1355952138-20459-1-git-send-email-stigge@antcom.de>
- <1355952138-20459-7-git-send-email-stigge@antcom.de>
- <20121220070805.GQ23971@game.jcrosoft.org> <50D2C731.1080009@grandegger.com>
-Message-ID: <50D2D661.9090707@antcom.de>
+From: mailinglists@erwinrol.com (Erwin Rol)
+Date: Thu, 20 Dec 2012 10:17:49 +0100
+Subject: at91sam9260 MACB problem with IP fragmentation
+In-Reply-To: <50C09D2E.8050608@atmel.com>
+References: <50C08233.9030905@erwinrol.com> <50C09D2E.8050608@atmel.com>
+Message-ID: <50D2D7BD.3030801@erwinrol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2012 09:07 AM, Wolfgang Grandegger wrote:
-> On 12/20/2012 08:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 22:22 Wed 19 Dec     , Roland Stigge wrote:
->>> This patch adds block GPIO support to several gpio drivers.
->>>
->>> This implements block GPIO only for some selected drivers since block GPIO is
->>> an optional feature which may not be suitable for every GPIO hardware. (With
->>> automatic fallback to the single GPIO functions if not available in a driver.)
->>>
->>> Signed-off-by: Roland Stigge <stigge@antcom.de>
->>>
->>> ---
->>>  arch/arm/mach-at91/gpio.c         |   33 +++++++++++++++
->> as said on the previous version the mach-at91 is deprecated for this platform
->> and boards
->>
->> you MUST updatethe drivers/pinctrl/pinctrl-at91
->>
->> nack on at91 untill this is done
+Hallo Nicolas,
+
+On 6-12-2012 14:27, Nicolas Ferre wrote:
+> Erwin,
 > 
-> I suggest to drop the hunk for the AT91 for the moment and wait until
-> the block gpio interface is accepted. Then we can add the block gpio
-> enhancement to the GPIO drivers in arch/... not only for the AT91...
-> also because they have to go through different sub-systems maintainers.
+> On 12/06/2012 12:32 PM, Erwin Rol :
+>> Hello Nicolas, Havard, all,
+>>
+>> I have a very obscure problem with a at91sam9260 board (almost 1 to 1
+>> copy of the Atmel EK).
+>>
+>> The MACB seems to stall when I use large (>2 * MTU) UDP datagrams. The
+>> test case is that a udp echo client (PC) sends datagrams with increasing
+>> length to the AT91 until the max length of the UDP datagram is reached.
+>> When there is no IP fragmentation everything is fine, but when the
+>> datagrams are starting to get fragmented the AT91 will not reply
+>> anymore. But as soon as some network traffic happens it goes on again,
+>> and non of the data is lost.
 
-OK, thank you two! Will remove the at91 patch from the current series.
-Block GPIO support for at91 can be added later.
+<snip>
 
-I just noticed that the patch set needs another patch not yet in
-mainline, but in linux-next, linux-gpio and gpio/next.
+>> I tried several kernels including the test version from Nicolas that he
+>> posted on LKML in October. They all show the same effect.
+> 
+> [..]
+> 
+> It seems that Matteo has the same behavior: check here:
+> http://www.spinics.net/lists/netdev/msg218951.html
 
-I'm providing a branch to easily pull from for testing, building on v3.7:
+I tried Matteo's patch and it seems to work. But I don't know if the
+patch is really the right solution. I checked again with wireshark and
+it really seems the sending that stalls not the receiving. But as soon
+as a ethernet frame is received the sending "un-stalls". So maybe the
+patch just causes an MACB IRQ at certain moments that causes the sending
+to continue?
 
-git://git.antcom.de/linux-2.6.git blockgpio
+> I am working on the macb driver right now, so I will try to reproduce
+> and track this issue on my side.
 
-Feedback welcome - thanks!
+Any luck reproducing it ?
 
-Roland
+
+- Erwin
