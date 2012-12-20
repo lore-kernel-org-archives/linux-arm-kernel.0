@@ -1,43 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Dec 2012 11:08:48 -0800
-Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
-In-Reply-To: <CA+55aFyiRPk0Qta35PBqMFqn+GkKaugqKJM3WHCT0JEJ1YohWw@mail.gmail.com>
-References: <20121220163814.GA29557@quad.lixom.net>
- <20121220175639.GA14363@n2100.arm.linux.org.uk>
- <CAOesGMgxXmXUW2RP_5AxJ6Z5sRBhFJ2CQz4S12MwXAb3=ibYOA@mail.gmail.com>
- <20121220184525.GC21056@atomide.com>
- <CA+55aFyiRPk0Qta35PBqMFqn+GkKaugqKJM3WHCT0JEJ1YohWw@mail.gmail.com>
-Message-ID: <20121220190847.GF21056@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Dec 2012 20:09:29 +0100
+Subject: [PATCH 1/4] ARM: ux500: Provide a means to obtain the SMSC9115
+ clock when DT is enabled
+In-Reply-To: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
+References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZpe_=qRHG9paz0Rv9wNY2zfuG+xChdq+HVWJ4jvdgSfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Torvalds <torvalds@linux-foundation.org> [121220 11:03]:
-> On Thu, Dec 20, 2012 at 10:45 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > I'm seeing the "BUG: spinlock bad magic on CPU#0" issue
-> > reported and fixed here:
-> >
-> > http://marc.info/?l=linux-arm-kernel&m=135594868503683&w=2
-> >
-> > But that's probably been already posted as a proper patch
-> > somewhere?
-> 
-> Hmm. The patch there looks better than any alternative I can think of.
-> It uses the same spinlock name for the whole array, but I think it's
-> only used for lockdep printouts, so that should be fine.
-> 
-> Send me the patch with signed-off and tested-by, and perhaps have a
-> few more people test it. The powerpc and sparc people both use it in
-> their 32-bit versions and have responsible maintainers, so it might be
-> worth it double-checking with BenH and DaveM about it, just in case.
-> Added to the Cc.
+On Wed, Dec 19, 2012 at 6:19 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Looks like it's been posted to LKML as:
+> Device Tree names devices differently to how some frameworks expect
+> them. Until we can move a platform over to the new way of obtaining
+> resources, we have to use the OF_DEV_AUXDATA() macros to craft a
+> device name which can be used in searches during allocation time.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-[PATCH] lib: atomic64: Initialize locks statically to fix early users
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Replied to it with my tested-by if you want to pick it up.
+I think that the best way to fix this regression is to gather
+ACKs from the involved subsystems and push it throug
+ARM SoC directly.
 
-Regards,
+I thing Cc: stable at kernel.org needs to be added to all patches
+in this set as well.
 
-Tony
+Yours,
+Linus Walleij
