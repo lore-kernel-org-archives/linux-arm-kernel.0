@@ -1,88 +1,66 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 20 Dec 2012 11:44:01 +0200
-Subject: [PATCH 3/9] ARM: tegra: # of CPU cores detection w/ & w/o HAVE_ARM_SCU
-In-Reply-To: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
-References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1355996654-6579-4-git-send-email-hdoyu@nvidia.com>
+Date: Thu, 20 Dec 2012 11:43:58 +0200
+Subject: [PATCH 0/9] ARM: Initial support for Tegra 114 SoC.
+Message-ID: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The method to detect the number of CPU cores on Cortex-A9 MPCore and
-Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
-information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
-have to read it from the system coprocessor(CP15), because the SCU on
-Cortex-A15 MPCore does not have software readable registers. This
-patch selects the correct method at runtime based on the CPU ID.
+Hi,
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/mach-tegra/platsmp.c |   31 ++++++++++++++++++++++++++++---
- 1 file changed, 28 insertions(+), 3 deletions(-)
+This patchset adds initial support for the NVIDIA's new Tegra 114
+SoC (T114) based on the ARM Cortex-A15 MP. It has the minimal support
+to allow the kernel to boot up into shell console. This can be used as
+a basis for adding other device drivers for this SoC. Currently there
+are 2 evaluation boards available, "Dalmore" and "Pluto".
 
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 1b926df..68e76ef 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -23,6 +23,7 @@
- #include <asm/hardware/gic.h>
- #include <asm/mach-types.h>
- #include <asm/smp_scu.h>
-+#include <asm/cputype.h>
- 
- #include <mach/powergate.h>
- 
-@@ -34,9 +35,13 @@
- #include "common.h"
- #include "iomap.h"
- 
-+#define CPU_MASK		0xff0ffff0
-+#define CPU_CORTEX_A9		0x410fc090
-+#define CPU_CORTEX_A15		0x410fc0f0
-+
- extern void tegra_secondary_startup(void);
- 
--static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
-+static void __iomem *scu_base;
- 
- #define EVP_CPU_RESET_VECTOR \
- 	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
-@@ -149,7 +154,26 @@ done:
-  */
- static void __init tegra_smp_init_cpus(void)
- {
--	unsigned int i, ncores = scu_get_core_count(scu_base);
-+	unsigned int i, cpu_id, ncores;
-+	u32 l2ctlr;
-+	phys_addr_t pa;
-+
-+	cpu_id = read_cpuid(CPUID_ID) & CPU_MASK;
-+	switch (cpu_id) {
-+	case CPU_CORTEX_A15:
-+		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
-+		ncores = ((l2ctlr >> 24) & 3) + 1;
-+		break;
-+	case CPU_CORTEX_A9:
-+		/* Get SCU physical base */
-+		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
-+		scu_base = IO_ADDRESS(pa);
-+		ncores = scu_get_core_count(scu_base);
-+		break;
-+	default:
-+		BUG();
-+		break;
-+	}
- 
- 	if (ncores > nr_cpu_ids) {
- 		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
-@@ -166,7 +190,8 @@ static void __init tegra_smp_init_cpus(void)
- static void __init tegra_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	tegra_cpu_reset_handler_init();
--	scu_enable(scu_base);
-+	if (scu_base)
-+		scu_enable(scu_base);
- }
- 
- struct smp_operations tegra_smp_ops __initdata = {
+This patchset is against Stephen Warren's linux-next_common branch:
+
+  git://nv-tegra.nvidia.com/user/swarren/linux-2.6 linux-next_common
+
+For those who want to try:
+
+  $ make ARCH=arm tegra_defconfig
+  $ scripts/config -e ARCH_TEGRA_114_SOC -d DRM -d SUSPEND \
+    	-d PM_RUNTIME -d CPU_FREQ -d CPU_IDLE
+  $ make ARCH=arm menuconfig # if needed to configure more
+  $ make ARCH=arm all -j9
+
+Verified that this single image booted up with "Dalmore(T114)",
+"Pluto(T114)" and "Cardhu(T30)". For "Cardhu(T30)" with this single
+image, SPI driver doesn't seem to afford the above configuration , it
+hangs at boot-up. With SPI disabled, it's ok.
+
+
+Hiroshi Doyu (9):
+  ARM: tegra: fuse: Add chipid TEGRA114 0x35
+  HACK: ARM: tegra: Use CLK_IGNORE_UNUSED for Tegra 114 SoC
+  ARM: tegra: # of CPU cores detection w/ & w/o HAVE_ARM_SCU
+  clocksource: tegra: Reorganize funcs by clock functionarities
+  clocksource: tegra: Enable ARM arch_timer with TSC
+  ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
+  ARM: dt: tegra114: Add new board, Dalmore
+  ARM: dt: tegra114: Add new board, Pluto
+  ARM: tegra: Add initial support for Tegra 114 SoC.
+
+ .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 +
+ arch/arm/boot/dts/Makefile                         |    4 +-
+ arch/arm/boot/dts/tegra114-dalmore.dts             |   21 ++
+ arch/arm/boot/dts/tegra114-pluto.dts               |   21 ++
+ arch/arm/boot/dts/tegra114.dtsi                    |   89 ++++++++
+ arch/arm/mach-tegra/Kconfig                        |   10 +
+ arch/arm/mach-tegra/Makefile                       |    1 +
+ arch/arm/mach-tegra/board-dt-tegra114.c            |   48 +++++
+ arch/arm/mach-tegra/common.c                       |    1 +
+ arch/arm/mach-tegra/fuse.h                         |    1 +
+ arch/arm/mach-tegra/platsmp.c                      |   31 ++-
+ arch/arm/mach-tegra/tegra30_clocks_data.c          |    2 +
+ drivers/clocksource/tegra20_timer.c                |  222 +++++++++++++-------
+ 13 files changed, 384 insertions(+), 78 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+ create mode 100644 arch/arm/boot/dts/tegra114-dalmore.dts
+ create mode 100644 arch/arm/boot/dts/tegra114-pluto.dts
+ create mode 100644 arch/arm/boot/dts/tegra114.dtsi
+ create mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
+
 -- 
 1.7.9.5
