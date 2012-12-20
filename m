@@ -1,33 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Dec 2012 19:24:42 +0000
-Subject: [PATCH 4/4] net/smsc911x: Provide common clock functionality
-In-Reply-To: <CACRpkda79O_b3Z8g7Sy7vMtW9neZU4x-Z=iEQgjqu4X5tFKyhw@mail.gmail.com>
-References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
- <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
- <CACRpkda79O_b3Z8g7Sy7vMtW9neZU4x-Z=iEQgjqu4X5tFKyhw@mail.gmail.com>
-Message-ID: <20121220192441.GC14363@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Dec 2012 11:33:25 -0800
+Subject: [PATCH 0/9] drivers: mailbox: framework creation
+In-Reply-To: <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
+References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
+ <CACRpkdaqO7AAeYeR8SZt4Tbv1grrMq85TNYMc-FSbUSrnZBm=Q@mail.gmail.com>
+ <20121220182835.GB21056@atomide.com>
+ <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
+Message-ID: <20121220193325.GH21056@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 08:12:08PM +0100, Linus Walleij wrote:
-> On Wed, Dec 19, 2012 at 6:19 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > Some platforms provide clocks which require enabling before the
-> > SMSC911x chip will power on. This patch uses the new common clk
-> > framework to do just that. If no clock is provided, it will just
-> > be ignored and the driver will continue to assume that no clock
-> > is required for the chip to run successfully.
+* Olof Johansson <olof@lixom.net> [121220 11:22]:
+> On Thu, Dec 20, 2012 at 10:28 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Linus Walleij <linus.walleij@linaro.org> [121220 10:19]:
+> >> On Tue, Dec 18, 2012 at 2:10 PM, Loic Pallardy
+> >> <loic.pallardy-ext@stericsson.com> wrote:
+> >>
+> >> > OMAP and ST-Ericsson platforms are both using mailbox to communicate
+> >> > with some coprocessors.
+> >> > Based on OMAP existing mailbox framework, this series proposes a
+> >> > generic framework, living under drivers/mailbox.
+> >>
+> >> I like this patch series so you have my Acked-by.
+> >>
+> >> Since it's a new subsystem and affects a few ARM architectures can
+> >> we merge this into the ARM SoC tree once we have consensus,
+> >> so we get some rotation in linux-next that way?
 > >
-> > Cc: Steve Glendinning <steve.glendinning@shawell.net>
-> > Cc: netdev at vger.kernel.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > Yes good idea.
+> >
+> >> Olof/Arnd?
+> >
+> > I suggest we set up an immutable branch against
+> > v3.8-rc1 when it's out with only these patches in it.
+> > Then we can all merge it in as needed. Maybe Arnd or
+> > Olof can set up the branch?
 > 
-> Seems to me like it'll do the trick.
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> I haven't reviewed the patches yet, but this flow sounds reasonable to me.
 
-This looks fairly dangerous.  What about those platforms which use this
-driver, but don't provide a clock for it?
+OK cool.
+ 
+> > FYI, looks like I need to merge in this branch too to
+> > avoid build errors with remoteproc enabled once I flip
+> > on the multiplatform support for omap2+.
+> 
+> While we can make the branch stable, would it make sense to make
+> remoteproc for omap depend on !multiplatform during the transition, to
+> reduce dependencies a little? Either way works, but it'd be nice to
+> keep them independent if we can.
 
-It looks like this will result in those platforms losing their ethernet
-support.  There's at least a bunch of the ARM evaluation boards which
-make use of this driver...
+Yes I'll update the omap multiplat fixups patch I posted yesterday.
+I noticed it only after running make randconfig for a while.
+
+Regards,
+
+Tony
