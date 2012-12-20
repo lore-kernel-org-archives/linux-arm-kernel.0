@@ -1,46 +1,66 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Thu, 20 Dec 2012 04:20:04 +0000
-Subject: [PATCH v2] ARM: OMAP2: hwmod: Fix "register offset NULL check" bug
-In-Reply-To: <alpine.DEB.2.00.1212190210021.2446@utopia.booyaka.com>
-References: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
- <alpine.DEB.2.00.1212190210021.2446@utopia.booyaka.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB0C4FB@DBDE01.ent.ti.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 20 Dec 2012 12:39:44 +0800
+Subject: 3.7 kernel hangs when doing scp
+In-Reply-To: <CAOMZO5DTB79e3W1_i2NLin7RWXVzraoysEGVLxv9_aoRS39D4Q@mail.gmail.com>
+References: <CAOMZO5Bc5stXXviuf3OL9vAHw+ER=GzzV1q=5Yr5q=AnfoGiGw@mail.gmail.com>
+ <20121218024353.GA17118@kroah.com>
+ <CAOMZO5DTB79e3W1_i2NLin7RWXVzraoysEGVLxv9_aoRS39D4Q@mail.gmail.com>
+Message-ID: <20121220043943.GA992@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 07:43:50, Paul Walmsley wrote:
-> On Tue, 18 Dec 2012, Hebbar Gururaja wrote:
+On Wed, Dec 19, 2012 at 12:56:12PM -0200, Fabio Estevam wrote:
+> Hi Greg,
 > 
-> > From: "Hebbar, Gururaja" <gururaja.hebbar@ti.com>
-> > 
-> > omap4_cminst_wait_module_ready() checks if register offset is NULL.
-> > 
-> > int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
-> > 				   u16 clkctrl_offs)
-> > {
-> > 	int i = 0;
-> > 
-> > 	if (!clkctrl_offs)
-> > 		return 0;
-> > 
-> > In case of AM33xx, CLKCTRL register offset for different clock domains
-> > are not uniformly placed. An example of this would be the RTC clock
-> > domain with CLKCTRL offset at 0x00.
-> > In such cases the module ready check is skipped which leads to a data
-> > abort during boot-up when RTC registers is accessed.
+> On Tue, Dec 18, 2012 at 12:43 AM, Greg KH <greg@kroah.com> wrote:
+> > On Tue, Dec 18, 2012 at 12:01:35AM -0200, Fabio Estevam wrote:
+> >> Hi,
+> >>
+> >> Booting a 3.7 kernel on a mx6qsabrelite board via NFS and using an
+> >> asix USB/Ethernet adapter and then I try to transfer a 10MB file from
+> >> the target to the host:
+> >
+> > Has this ever worked before on any older kernel?
 > 
-> We've got a few hwmods on OMAP44xx that don't have clkctrl_offs registers 
-> listed in the hwmod data, and which are not marked with HWMOD_NO_IDLEST.  
-> What's going to happen in those cases?
+> We did more experiments on this and we noticed that:
+> 
+> - mx51 running kernel 3.7 does not show this problem (tested a non-dt
+> mx51 kernel, which uses drivers/usb/host/ehci-mxc.c instead of the
+> chipidea driver.)
+> - x86 running 3.2 kernel does not show this problem
+> - usb support on mx6 has appeared on 3.6, but running an out-of-tree
+> 3.0.35 kernel also shows the same issue.
+> - Doing long file transfers via mass storage on mx6 running 3.7 works fine.
+> 
+> Shawn/Sascha/Peter,
+> 
+> Any suggestions as to how debug this? By looking at the kernel dumps
+> it seems to point to 'gic_handle_irq' area.
+Hi Fabio,
 
-Hmm. This is a special case to me. Let me go back and do some review.
-Will be back with some more details.
+Please to see if the Stream mode disable (bit4, usbmode) is set or not?
+If it is not, please try below patch
+
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index c97503b..258bc02 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -227,6 +227,7 @@ static void tdi_reset (struct ehci_hcd *ehci)
+ 
+ 	tmp = ehci_readl(ehci, &ehci->regs->usbmode);
+ 	tmp |= USBMODE_CM_HC;
++	tmp |= (1 << 4); /* disable stream mode */
+ 	/* The default byte access to MMR space is LE after
+ 	 * controller reset. Set the required endian mode
+ 	 * for transfer buffers to match the host microprocessor
 
 > 
+> Thanks,
 > 
-> - Paul
+> Fabio Estevam
 > 
 
+-- 
 
-Regards, 
-Gururaja
+Best Regards,
+Peter Chen
