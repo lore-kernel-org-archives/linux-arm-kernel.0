@@ -1,48 +1,71 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Dec 2012 10:30:40 +0800
-Subject: [PATCH/RFC] mxs: mach-mxs: Setup mac address prefix from dt
-In-Reply-To: <C97C836E-18D1-41C5-8DC3-E82BC2019018@turczak.de>
-References: <C97C836E-18D1-41C5-8DC3-E82BC2019018@turczak.de>
-Message-ID: <20121220023037.GA24069@S2101-09.ap.freescale.net>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 20 Dec 2012 17:13:37 +1300
+Subject: Inconsistency in clk framework
+In-Reply-To: <20121219190824.GX14363@n2100.arm.linux.org.uk>
+References: <1355890233.25599.4.camel@gitbox>
+ <20121219092636.GW14363@n2100.arm.linux.org.uk>
+ <1355938492.27893.8.camel@gitbox> <1355943649.2451.1.camel@gitbox>
+ <20121219190824.GX14363@n2100.arm.linux.org.uk>
+Message-ID: <1355976817.2968.12.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 17, 2012 at 03:26:02PM +0100, Peter Turczak wrote:
-> This patch enables setting the the fec ethernet mac address either completely
-> from dt, take only the prefix from dt and use the remaining device unique bytes 
-> from the OTP or use OTP uniq bytes and the hardcoded values as before when no
-> mac address is specified in the dt. So compatibility should be maintained to
-> devices already shipped.
+On Wed, 2012-12-19 at 19:08 +0000, Russell King - ARM Linux wrote:
+> On Thu, Dec 20, 2012 at 08:00:49AM +1300, Tony Prisk wrote:
+> > On Thu, 2012-12-20 at 06:34 +1300, Tony Prisk wrote:
+> > > On Wed, 2012-12-19 at 09:26 +0000, Russell King - ARM Linux wrote:
+> > > > On Wed, Dec 19, 2012 at 05:10:33PM +1300, Tony Prisk wrote:
+> > > > > Hi Mike,
+> > > > > 
+> > > > > In attempting to remove some IS_ERR_OR_NULL references, it was pointed
+> > > > > out that clk_get() can return NULL if CONFIG_HAVE_CLK is not defined.
+> > > > 
+> > > > That is correct - but why is that a problem?  As far as users are
+> > > > concerned, NULL is a valid clock.  If HAVE_CLK is undefined, do you
+> > > > want all your drivers to suddenly stop working?
+> > > 
+> > > That will be where the misunderstanding has occurred - I didn't consider
+> > > NULL to be a valid clock.
+> > > 
+> > > Given that NULL is a valid clock, I guess all tests against get_clk and
+> > > of_get_clk results should be IS_ERR_OR_NULL. Correct?
+> > > 
+> > For the sake of clarity, I should rephrase:
+> > 
+> > If the driver can't operate with a NULL clk, it should use a
+> > IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
 > 
-> Currently only Denx or Freescale manufacturer prefixes are guessed from the
-> selected hardware platform. The suggested patch provides a more elegant
-> solution because other vendors to just need to adapt their device tree 
-> description file.
-> 
-> Example:
-> mac0: ethernet at 800f0000 {
->              phy-mode = "rmii";
->              pinctrl-names = "default";
->              pinctrl-0 = <&mac0_pins_a>;
->              phy-supply = <&reg_fec_3v3>;
->              phy-reset-gpios = <&gpio2 5 3>;
->              phy-reset-duration = <100>;
->              local-mac-address = [00 04 1E 5E 1B B9];
->              status = "okay";
->          };
-> or
-> mac0: ethernet at 800f0000 {
->              phy-mode = "rmii";
->              pinctrl-names = "default";
->              pinctrl-0 = <&mac0_pins_a>;
->              phy-supply = <&reg_fec_3v3>;
->              phy-reset-gpios = <&gpio2 5 3>;
->              phy-reset-duration = <100>;
->              local-mac-address = [00 04 1E];
->              status = "okay";
->          };
+> Why should a _consumer_ of a clock care?  It is _very_ important that
+> people get this idea - to a consumer, the struct clk is just an opaque
+> cookie.  The fact that it appears to be a pointer does _not_ mean that
+> the driver can do any kind of dereferencing on that pointer - it should
+> never do so.
 
-Property "local-mac-address" is defined by a common bindings, we do not
-want to get a different meaning on mach-mxs.
+As a simple example:
+We have a PWM module that requires a clock source to be enabled before
+registers can be read/written.
 
-Shawn
+*pseudo code*
+x = clk_get("pwm_clock")
+if IS_ERR(x) then fail
+err = clk_enable(x)
+if (err != 0) then fail
+start writing to module registers
+
+
+Assuming HAVE_CLK is undefined:
+
+x = clk_get("pwm_clock") (= NULL)
+if IS_ERR(x) then fail (not an error)
+err = clk_enable(x) (= 0)
+if (err) then fail (not an error)
+start writing to module registers
+(register writes lock the bus because the clock wasn't really enabled,
+but no errors occurred enabling the clock)
+
+
+I apologise if it seems like I am not getting it, but I would like to
+understand this properly to avoid further problems later.
+
+Regards
+Tony P
