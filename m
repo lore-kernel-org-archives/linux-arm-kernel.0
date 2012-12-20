@@ -1,70 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Dec 2012 09:40:10 +0000
-Subject: Inconsistency in clk framework
-In-Reply-To: <1355976817.2968.12.camel@gitbox>
-References: <1355890233.25599.4.camel@gitbox>
- <20121219092636.GW14363@n2100.arm.linux.org.uk>
- <1355938492.27893.8.camel@gitbox> <1355943649.2451.1.camel@gitbox>
- <20121219190824.GX14363@n2100.arm.linux.org.uk>
- <1355976817.2968.12.camel@gitbox>
-Message-ID: <20121220094010.GY14363@n2100.arm.linux.org.uk>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 20 Dec 2012 11:44:01 +0200
+Subject: [PATCH 3/9] ARM: tegra: # of CPU cores detection w/ & w/o HAVE_ARM_SCU
+In-Reply-To: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
+References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1355996654-6579-4-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 05:13:37PM +1300, Tony Prisk wrote:
-> On Wed, 2012-12-19 at 19:08 +0000, Russell King - ARM Linux wrote:
-> > On Thu, Dec 20, 2012 at 08:00:49AM +1300, Tony Prisk wrote:
-> > > On Thu, 2012-12-20 at 06:34 +1300, Tony Prisk wrote:
-> > > > On Wed, 2012-12-19 at 09:26 +0000, Russell King - ARM Linux wrote:
-> > > > > On Wed, Dec 19, 2012 at 05:10:33PM +1300, Tony Prisk wrote:
-> > > > > > Hi Mike,
-> > > > > > 
-> > > > > > In attempting to remove some IS_ERR_OR_NULL references, it was pointed
-> > > > > > out that clk_get() can return NULL if CONFIG_HAVE_CLK is not defined.
-> > > > > 
-> > > > > That is correct - but why is that a problem?  As far as users are
-> > > > > concerned, NULL is a valid clock.  If HAVE_CLK is undefined, do you
-> > > > > want all your drivers to suddenly stop working?
-> > > > 
-> > > > That will be where the misunderstanding has occurred - I didn't consider
-> > > > NULL to be a valid clock.
-> > > > 
-> > > > Given that NULL is a valid clock, I guess all tests against get_clk and
-> > > > of_get_clk results should be IS_ERR_OR_NULL. Correct?
-> > > > 
-> > > For the sake of clarity, I should rephrase:
-> > > 
-> > > If the driver can't operate with a NULL clk, it should use a
-> > > IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
-> > 
-> > Why should a _consumer_ of a clock care?  It is _very_ important that
-> > people get this idea - to a consumer, the struct clk is just an opaque
-> > cookie.  The fact that it appears to be a pointer does _not_ mean that
-> > the driver can do any kind of dereferencing on that pointer - it should
-> > never do so.
-> 
-> As a simple example:
-> We have a PWM module that requires a clock source to be enabled before
-> registers can be read/written.
-> 
-> *pseudo code*
-> x = clk_get("pwm_clock")
-> if IS_ERR(x) then fail
-> err = clk_enable(x)
-> if (err != 0) then fail
-> start writing to module registers
-> 
-> 
-> Assuming HAVE_CLK is undefined:
-> 
-> x = clk_get("pwm_clock") (= NULL)
-> if IS_ERR(x) then fail (not an error)
-> err = clk_enable(x) (= 0)
-> if (err) then fail (not an error)
-> start writing to module registers
-> (register writes lock the bus because the clock wasn't really enabled,
-> but no errors occurred enabling the clock)
+The method to detect the number of CPU cores on Cortex-A9 MPCore and
+Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
+information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
+have to read it from the system coprocessor(CP15), because the SCU on
+Cortex-A15 MPCore does not have software readable registers. This
+patch selects the correct method at runtime based on the CPU ID.
 
-Which is really silly if you have a platform which requires clock control
-and HAVE_CLK is not selected.  The clk API is not designed to cope with
-that situation.
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/mach-tegra/platsmp.c |   31 ++++++++++++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 1b926df..68e76ef 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -23,6 +23,7 @@
+ #include <asm/hardware/gic.h>
+ #include <asm/mach-types.h>
+ #include <asm/smp_scu.h>
++#include <asm/cputype.h>
+ 
+ #include <mach/powergate.h>
+ 
+@@ -34,9 +35,13 @@
+ #include "common.h"
+ #include "iomap.h"
+ 
++#define CPU_MASK		0xff0ffff0
++#define CPU_CORTEX_A9		0x410fc090
++#define CPU_CORTEX_A15		0x410fc0f0
++
+ extern void tegra_secondary_startup(void);
+ 
+-static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
++static void __iomem *scu_base;
+ 
+ #define EVP_CPU_RESET_VECTOR \
+ 	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
+@@ -149,7 +154,26 @@ done:
+  */
+ static void __init tegra_smp_init_cpus(void)
+ {
+-	unsigned int i, ncores = scu_get_core_count(scu_base);
++	unsigned int i, cpu_id, ncores;
++	u32 l2ctlr;
++	phys_addr_t pa;
++
++	cpu_id = read_cpuid(CPUID_ID) & CPU_MASK;
++	switch (cpu_id) {
++	case CPU_CORTEX_A15:
++		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
++		ncores = ((l2ctlr >> 24) & 3) + 1;
++		break;
++	case CPU_CORTEX_A9:
++		/* Get SCU physical base */
++		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
++		scu_base = IO_ADDRESS(pa);
++		ncores = scu_get_core_count(scu_base);
++		break;
++	default:
++		BUG();
++		break;
++	}
+ 
+ 	if (ncores > nr_cpu_ids) {
+ 		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
+@@ -166,7 +190,8 @@ static void __init tegra_smp_init_cpus(void)
+ static void __init tegra_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	tegra_cpu_reset_handler_init();
+-	scu_enable(scu_base);
++	if (scu_base)
++		scu_enable(scu_base);
+ }
+ 
+ struct smp_operations tegra_smp_ops __initdata = {
+-- 
+1.7.9.5
