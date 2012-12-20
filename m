@@ -1,34 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Dec 2012 16:51:43 +0100
-Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
-In-Reply-To: <50D2EDE6.3090706@atmel.com>
-References: <20121219183236.GP23971@game.jcrosoft.org>
- <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
- <50D2EBA1.4050305@free-electrons.com> <50D2EDE6.3090706@atmel.com>
-Message-ID: <50D3340F.3090209@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Dec 2012 07:55:18 -0800
+Subject: [PATCH 0/8] Flip on multiplatform support for omap2plus for v3.9
+In-Reply-To: <20121219192354.22098.33408.stgit@muffinssi.local>
+References: <20121219192354.22098.33408.stgit@muffinssi.local>
+Message-ID: <20121220155518.GX4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
-
-Le 20/12/2012 11:52, ludovic.desroches a ?crit :
->> I'm wondering, why are you using such a complex dt parsing code, and
->> bindings, when you only requires a boolean to switch between 8 and 10
->> bits mode (which seem to be the only thing you support)?
+* Tony Lindgren <tony@atomide.com> [121219 11:28]:
+> Hi all,
 > 
-> We will have a 10 and 12 bits mode on future ADCs and I would like to
-> have something which could manage more than two resolutions if it
-> happens one day.
+> These patches enable multiplatform support for omap2plus.
+> 
+> To build and boot it against the current mainline kernel
+> you need the following:
+> 
+> [PATCH 1/2] ARM: l2x0: Only set .set_debug on PL310 r3p0 and earlier
+> [PATCH 2/2] ARM: disable errata work-arounds which access secure registers
+> [GIT PULL 1/2] omap fixes for v3.8 merge window
+> [GIT PULL 2/2] omap cleanup for v3.8 merge window
+> [GIT PULL] two trivial omap build error fixes for v3.8 merge window
+> cpts: Fix build error caused by include of plat/clock.h
 
-I see your point. I'm not fond at all of the existing bindings for the
-driver (putting things like registers offset in the dt is a non-sense to
-me, but hey...), so I'd like to still keep it as simple and non-bloated
-as possible, but it's true that in the current situation, we probably
-have no other choice.
+Few notes on booting this as at least Lokesh already hit the mkimage
+issue like I did earlier.
 
-Maxime
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+To boot this you also need to run mkimage manually on the zImage:
+
+$ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
+	-n "Linux" -d zImage-omap2plus uImage-omap2plus
+
+And to boot the vexpress on qemu something like this should do:
+
+$ qemu-system-arm -machine vexpress-a9 -m 1024 -net nic -net user -serial stdio \
+	-append "console=ttyAMA0,115200n8 rw root=/dev/mmcblk0p2 rootwait" \
+	-kernel zImage-omap2plus -initrd initrd.img -sd rootfs.img
+
+I had to build the Linaro qemu to get it to boot, for some reason the
+version of qemu in debian unstable did not boot vexpress for me.
+
+Regards,
+
+Tony
