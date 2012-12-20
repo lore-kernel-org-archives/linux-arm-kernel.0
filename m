@@ -1,73 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Dec 2012 11:17:08 +0000
-Subject: [PATCH 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
- HAVE_ARM_SCU
-In-Reply-To: <1355996654-6579-4-git-send-email-hdoyu@nvidia.com>
-References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
- <1355996654-6579-4-git-send-email-hdoyu@nvidia.com>
-Message-ID: <50D2F3B4.3040302@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 20 Dec 2012 09:18:43 -0200
+Subject: 3.7 kernel hangs when doing scp
+In-Reply-To: <CAOMZO5B5hv+oG+8fQYyFxRb=VLOiPmC8+0LhAFLOOzBY4z6PZA@mail.gmail.com>
+References: <CAOMZO5Bc5stXXviuf3OL9vAHw+ER=GzzV1q=5Yr5q=AnfoGiGw@mail.gmail.com>
+ <20121218024353.GA17118@kroah.com>
+ <CAOMZO5DTB79e3W1_i2NLin7RWXVzraoysEGVLxv9_aoRS39D4Q@mail.gmail.com>
+ <20121220043943.GA992@nchen-desktop>
+ <CAOMZO5B1DyktHa0Vfb4+-H9bdxaoacas6ZCHEH0bDLuKiCB6hA@mail.gmail.com>
+ <CAOMZO5B5hv+oG+8fQYyFxRb=VLOiPmC8+0LhAFLOOzBY4z6PZA@mail.gmail.com>
+Message-ID: <CAOMZO5Dhasq11fyJj73_UcyVdoz-N0MAHBu0=PQUxRn42VOdkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/12/12 09:44, Hiroshi Doyu wrote:
-> The method to detect the number of CPU cores on Cortex-A9 MPCore and
-> Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
-> information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
-> have to read it from the system coprocessor(CP15), because the SCU on
-> Cortex-A15 MPCore does not have software readable registers. This
-> patch selects the correct method at runtime based on the CPU ID.
-> 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  arch/arm/mach-tegra/platsmp.c |   31 ++++++++++++++++++++++++++++---
->  1 file changed, 28 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-> index 1b926df..68e76ef 100644
-> --- a/arch/arm/mach-tegra/platsmp.c
-> +++ b/arch/arm/mach-tegra/platsmp.c
-> @@ -23,6 +23,7 @@
->  #include <asm/hardware/gic.h>
->  #include <asm/mach-types.h>
->  #include <asm/smp_scu.h>
-> +#include <asm/cputype.h>
->  
->  #include <mach/powergate.h>
->  
-> @@ -34,9 +35,13 @@
->  #include "common.h"
->  #include "iomap.h"
->  
-> +#define CPU_MASK		0xff0ffff0
-> +#define CPU_CORTEX_A9		0x410fc090
-> +#define CPU_CORTEX_A15		0x410fc0f0
-> +
->  extern void tegra_secondary_startup(void);
->  
-> -static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
-> +static void __iomem *scu_base;
->  
->  #define EVP_CPU_RESET_VECTOR \
->  	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
-> @@ -149,7 +154,26 @@ done:
->   */
->  static void __init tegra_smp_init_cpus(void)
->  {
-> -	unsigned int i, ncores = scu_get_core_count(scu_base);
-> +	unsigned int i, cpu_id, ncores;
-> +	u32 l2ctlr;
-> +	phys_addr_t pa;
-> +
-> +	cpu_id = read_cpuid(CPUID_ID) & CPU_MASK;
-> +	switch (cpu_id) {
-> +	case CPU_CORTEX_A15:
-> +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
-> +		ncores = ((l2ctlr >> 24) & 3) + 1;
+On Thu, Dec 20, 2012 at 8:45 AM, Fabio Estevam <festevam@gmail.com> wrote:
 
-Please, do not do that. It doesn't scale to multiple clusters. Instead,
-you can now rely on arm_dt_init_cpu_maps() to do the right thing as long
-as your device tree exposes all the cpu nodes.
+> Would this be the correct fix?
+>
+> --- a/include/linux/usb/chipidea.h
+> +++ b/include/linux/usb/chipidea.h
+> @@ -18,7 +18,7 @@ struct ci13xxx_platform_data {
+>  #define CI13XXX_REGS_SHARED            BIT(0)
+>  #define CI13XXX_REQUIRE_TRANSCEIVER    BIT(1)
+>  #define CI13XXX_PULLUP_ON_VBUS         BIT(2)
+> -#define CI13XXX_DISABLE_STREAMING      BIT(3)
+> +#define CI13XXX_DISABLE_STREAMING      BIT(4)
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Ops, these are just the platform data flags.
+
+I will take a look on why the chipidea driver is not properly
+disabling stream mode.
+
+Regards,
+
+Fabio Estevam
