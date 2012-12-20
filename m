@@ -1,33 +1,37 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 20 Dec 2012 11:00:11 -0800
-Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
-In-Reply-To: <20121220184525.GC21056@atomide.com>
-References: <20121220163814.GA29557@quad.lixom.net>
- <20121220175639.GA14363@n2100.arm.linux.org.uk>
- <CAOesGMgxXmXUW2RP_5AxJ6Z5sRBhFJ2CQz4S12MwXAb3=ibYOA@mail.gmail.com>
- <20121220184525.GC21056@atomide.com>
-Message-ID: <CA+55aFyiRPk0Qta35PBqMFqn+GkKaugqKJM3WHCT0JEJ1YohWw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Dec 2012 11:03:37 -0800
+Subject: [PATCH] ARM: dts: fix split memory bank for SSDK5440
+Message-ID: <1356030217-5472-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 10:45 AM, Tony Lindgren <tony@atomide.com> wrote:
->
-> I'm seeing the "BUG: spinlock bad magic on CPU#0" issue
-> reported and fixed here:
->
-> http://marc.info/?l=linux-arm-kernel&m=135594868503683&w=2
->
-> But that's probably been already posted as a proper patch
-> somewhere?
+The size of memory bank should be under 256MB, because current
+section size is 256MB on EXYNOS SoCs. This patch fixes it.
 
-Hmm. The patch there looks better than any alternative I can think of.
-It uses the same spinlock name for the whole array, but I think it's
-only used for lockdep printouts, so that should be fine.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Send me the patch with signed-off and tested-by, and perhaps have a
-few more people test it. The powerpc and sparc people both use it in
-their 32-bit versions and have responsible maintainers, so it might be
-worth it double-checking with BenH and DaveM about it, just in case.
-Added to the Cc.
-
-                Linus
+diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+index 44d4d24..79d02cc 100644
+--- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
++++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+@@ -17,7 +17,14 @@
+ 	compatible = "samsung,ssdk5440", "samsung,exynos5440";
+ 
+ 	memory {
+-		reg = <0x80000000 0x80000000>;
++		reg = <0x80000000 0x10000000
++		       0x90000000 0x10000000
++		       0xA0000000 0x10000000
++		       0xB0000000 0x10000000
++		       0xC0000000 0x10000000
++		       0xD0000000 0x10000000
++		       0xE0000000 0x10000000
++		       0xF0000000 0x10000000>;
+ 	};
+ 
+ 	chosen {
+-- 
+1.7.10.4
