@@ -1,60 +1,99 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 20 Dec 2012 08:45:05 -0200
-Subject: 3.7 kernel hangs when doing scp
-In-Reply-To: <CAOMZO5B1DyktHa0Vfb4+-H9bdxaoacas6ZCHEH0bDLuKiCB6hA@mail.gmail.com>
-References: <CAOMZO5Bc5stXXviuf3OL9vAHw+ER=GzzV1q=5Yr5q=AnfoGiGw@mail.gmail.com>
- <20121218024353.GA17118@kroah.com>
- <CAOMZO5DTB79e3W1_i2NLin7RWXVzraoysEGVLxv9_aoRS39D4Q@mail.gmail.com>
- <20121220043943.GA992@nchen-desktop>
- <CAOMZO5B1DyktHa0Vfb4+-H9bdxaoacas6ZCHEH0bDLuKiCB6hA@mail.gmail.com>
-Message-ID: <CAOMZO5B5hv+oG+8fQYyFxRb=VLOiPmC8+0LhAFLOOzBY4z6PZA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Dec 2012 11:46:14 +0100
+Subject: [PATCH 2/3] ARM: AT91: IIO: add sleep mode support
+In-Reply-To: <1355942232-26251-2-git-send-email-plagnioj@jcrosoft.com>
+References: <20121219183236.GP23971@game.jcrosoft.org>
+ <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
+ <1355942232-26251-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <50D2EC76.5010508@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 8:20 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Peter,
->
-> On Thu, Dec 20, 2012 at 2:39 AM, Peter Chen <peter.chen@freescale.com> wrote:
->
->> Please to see if the Stream mode disable (bit4, usbmode) is set or not?
->> If it is not, please try below patch
->>
->> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
->> index c97503b..258bc02 100644
->> --- a/drivers/usb/host/ehci-hcd.c
->> +++ b/drivers/usb/host/ehci-hcd.c
->> @@ -227,6 +227,7 @@ static void tdi_reset (struct ehci_hcd *ehci)
->>
->>         tmp = ehci_readl(ehci, &ehci->regs->usbmode);
->>         tmp |= USBMODE_CM_HC;
->> +       tmp |= (1 << 4); /* disable stream mode */
->>         /* The default byte access to MMR space is LE after
->>          * controller reset. Set the required endian mode
->>          * for transfer buffers to match the host microprocessor
->
-> Excellent! Your suggestion made scp work with mx6 on 3.7.
->
-> I assume that this "fix" or workaround would need a better place, right?
->
-> Should this fix go into the chipidea host driver instead?
->
-> Also, I wonder on how "standard" this USBMODE register is. i.e. there
-> is a deviation from the FSL EHCI USBMODE register.
-> I found it in include/linux/usb/ehci_def.h:
->
-> #define USBMODE_SDIS            (1<<3)          /* Stream disable */
->
-> , which is at a different bit position from the i.MX6 Reference Manual:
->
-> 4 SDIS Stream Disable Mode. (0 - Inactive [default]; 1 - Active)
+Hi,
 
-Would this be the correct fix?
+Le 19/12/2012 19:37, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+> The sleep mode will allow to put the add in sleep between conversion.
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: linux-iio at vger.kernel.org
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>  Documentation/devicetree/bindings/arm/atmel-adc.txt |    1 +
+>  drivers/iio/adc/at91_adc.c                          |   19 ++++++++++---------
+>  2 files changed, 11 insertions(+), 9 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+> index fd2d69e..efb6f02 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+> @@ -25,6 +25,7 @@ Optional properties:
+>    - atmel,adc-use-res: String corresponding to an identifier from
+>  		       atmel,adc-res-names property. If not specified, the highest
+>  		       resolution will be used.
+> +  - atmel,atmel,adc-sleep-mode: Boolean to enable of sleep mode when no conversion
+>   
+>  Optional trigger Nodes:
+>    - Required properties:
+> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+> index f175a86..c563488 100644
+> --- a/drivers/iio/adc/at91_adc.c
+> +++ b/drivers/iio/adc/at91_adc.c
+> @@ -52,6 +52,7 @@ struct at91_adc_state {
+>  	void __iomem		*reg_base;
+>  	struct at91_adc_reg_desc *registers;
+>  	u8			startup_time;
+> +	bool			sleep_mode;
+>  	struct iio_trigger	**trig;
+>  	struct at91_adc_trigger	*trigger_list;
+>  	u32			trigger_number;
+> @@ -455,6 +456,8 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+>  	}
+>  	st->num_channels = prop;
+>  
+> +	st->sleep_mode = of_property_read_bool(node, "atmel,adc-sleep-mode");
+> +
+>  	if (of_property_read_u32(node, "atmel,adc-startup-time", &prop)) {
+>  		dev_err(&idev->dev, "Missing adc-startup-time property in the DT.\n");
+>  		ret = -EINVAL;
+> @@ -580,6 +583,7 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+>  	struct iio_dev *idev;
+>  	struct at91_adc_state *st;
+>  	struct resource *res;
+> +	u32 reg;
+>  
+>  	idev = iio_device_alloc(sizeof(struct at91_adc_state));
+>  	if (idev == NULL) {
+> @@ -687,16 +691,13 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+>  	 */
+>  	ticks = round_up((st->startup_time * adc_clk /
+>  			  1000000) - 1, 8) / 8;
+> -
+> +	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
+> +	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
+>  	if (st->low_res)
+> -		at91_adc_writel(st, AT91_ADC_MR,
+> -				AT91_ADC_LOWRES |
+> -				(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
+> -				(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
+> -	else
+> -		at91_adc_writel(st, AT91_ADC_MR,
+> -				(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
+> -				(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
+> +		reg |= AT91_ADC_LOWRES;
+> +	if (st->sleep_mode)
+> +		reg |= AT91_ADC_SLEEP;
+> +	at91_adc_writel(st, AT91_ADC_MR, reg);
 
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -18,7 +18,7 @@ struct ci13xxx_platform_data {
- #define CI13XXX_REGS_SHARED            BIT(0)
- #define CI13XXX_REQUIRE_TRANSCEIVER    BIT(1)
- #define CI13XXX_PULLUP_ON_VBUS         BIT(2)
--#define CI13XXX_DISABLE_STREAMING      BIT(3)
-+#define CI13XXX_DISABLE_STREAMING      BIT(4)
+I'm fine with the code in itself, but since this also refactors what has
+been added in the previous patch, maybe you can add it in the first patch.
+
+Apart from that, you can add my Acked-by.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
