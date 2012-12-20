@@ -1,41 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Dec 2012 18:47:14 +0000
-Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
-In-Reply-To: <CAOesGMgxXmXUW2RP_5AxJ6Z5sRBhFJ2CQz4S12MwXAb3=ibYOA@mail.gmail.com>
-References: <20121220163814.GA29557@quad.lixom.net>
- <20121220175639.GA14363@n2100.arm.linux.org.uk>
- <CAOesGMgxXmXUW2RP_5AxJ6Z5sRBhFJ2CQz4S12MwXAb3=ibYOA@mail.gmail.com>
-Message-ID: <20121220184714.GB14363@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 20 Dec 2012 19:53:53 +0100
+Subject: [PATCH 2/2] ARM: VIC: fix bug in VIC irqdomain code
+Message-ID: <1356029633-30239-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 10:08:42AM -0800, Olof Johansson wrote:
-> On Thu, Dec 20, 2012 at 9:56 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Dec 20, 2012 at 08:38:14AM -0800, Olof Johansson wrote:
-> >> One of the sunxi patches from the last pull request was misapplied (I
-> >> realized what happened -- git am -s didn't apply cleanly so I had done it
-> >> through regular patch, thus not catching the renames properly). Here's
-> >> a fresh version of the pull request with a couple more OMAP and Samsung
-> >> patches included.
-> >>
-> >> There's a chance that a couple of the OMAP patches will also go in through
-> >> Russell, since my connectivity has been crap so far this trip and it
-> >> causes build breaks for the platform. It's a branch pull from Tony,
-> >> it should be a no-op either way.
-> >
-> > Olof,
-> >
-> > Not sure what's going on, but my recent pull from arm-soc for-next still
-> > hasn't solved the OMAP build failures in my kbuild - I'm still getting:
-> >
-> > arch/arm/mach-omap2/timer.c: In function 'omap_get_timer_dt':
-> > arch/arm/mach-omap2/timer.c:178:3: error: implicit declaration of function 'prom_add_property'
-> > arch/arm/mach-omap2/i2c.c: In function 'omap_pm_set_max_mpu_wakeup_lat_compat':
-> > arch/arm/mach-omap2/i2c.c:130:2: error: implicit declaration of function 'omap_pm_set_max_mpu_wakeup_lat'
-> 
-> Yep, I forgot to bring the fixes branch into our for-next. Try again
-> once it mirrors out, I just pushed out a rebuild of it. New top commit
-> should be e691d77e8825054376b31e79a9b5f9fa79fe764d.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Yes, this looks much better, thanks.
+The VIC irqdomain code added in commit
+07c9249f1fa90cc8189bed44c0bcece664596a72
+"ARM: 7554/1: VIC: use irq_domain_add_simple()"
+
+Had two bugs:
+
+1) It didn't call irq_create_mapping() once on each
+   valid irq source in the slowpath when registering
+   the controller.
+
+2) It passed a -1 as IRQ offset for the DT case, whereas
+   0 should be passed as invalid IRQ instead.
+
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/common/vic.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+index e4df17c..8f324b9 100644
+--- a/arch/arm/common/vic.c
++++ b/arch/arm/common/vic.c
+@@ -206,6 +206,7 @@ static void __init vic_register(void __iomem *base, unsigned int irq,
+ 				struct device_node *node)
+ {
+ 	struct vic_device *v;
++	int i;
+ 
+ 	if (vic_id >= ARRAY_SIZE(vic_devices)) {
+ 		printk(KERN_ERR "%s: too few VICs, increase CONFIG_ARM_VIC_NR\n", __func__);
+@@ -220,6 +221,10 @@ static void __init vic_register(void __iomem *base, unsigned int irq,
+ 	vic_id++;
+ 	v->domain = irq_domain_add_simple(node, fls(valid_sources), irq,
+ 					  &vic_irqdomain_ops, v);
++	/* create an IRQ mapping for each valid IRQ */
++	for (i = 0; i < fls(valid_sources); i++)
++		if (valid_sources & (1 << i))
++			irq_create_mapping(v->domain, i);
+ }
+ 
+ static void vic_ack_irq(struct irq_data *d)
+@@ -416,9 +421,9 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ 		return -EIO;
+ 
+ 	/*
+-	 * Passing -1 as first IRQ makes the simple domain allocate descriptors
++	 * Passing 0 as first IRQ makes the simple domain allocate descriptors
+ 	 */
+-	__vic_init(regs, -1, ~0, ~0, node);
++	__vic_init(regs, 0, ~0, ~0, node);
+ 
+ 	return 0;
+ }
+-- 
+1.7.11.3
