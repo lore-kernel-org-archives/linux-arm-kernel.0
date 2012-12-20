@@ -1,57 +1,43 @@
 From: zhanzhenbo@gmail.com (steve.zhan)
-Date: Thu, 20 Dec 2012 20:44:28 +0800
-Subject: [PATCH] hwspinlock/core: Kernel panic when enable DEBUG_SPINLOCK_SLEEP
- config.
-Message-ID: <CAKvkGKcLU4ehteAqozw6+dCodSoQvJRSkpnu85um0C62c7RzSg@mail.gmail.com>
+Date: Thu, 20 Dec 2012 22:02:04 +0800
+Subject: [PATCH] hwspinlock/core: Kernel panic when enable
+ DEBUG_SPINLOCK_SLEEP config.
+In-Reply-To: <CAK=WgbbWNEJB79iPURdYM52HtoyvsFeoEUvfodwWg5qvtMhQyQ@mail.gmail.com>
+References: <CAKvkGKcLU4ehteAqozw6+dCodSoQvJRSkpnu85um0C62c7RzSg@mail.gmail.com>
+ <CAK=WgbbWNEJB79iPURdYM52HtoyvsFeoEUvfodwWg5qvtMhQyQ@mail.gmail.com>
+Message-ID: <CAKvkGKd8YSm0BDmaOTRh8P5O4tvQ7+D-9d=MoGf0CrG_noBcsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ohad,
-
-                When enable this config to check kernel, kernel will
-complain panic at slab.c(kmem_cache_alloc function): "BUG: sleeping
-function called from invalid context".
-                 The Backtrace is: hwspin_lock_register ->
-radix_tree_insert -> kmem_cache_alloc -> __might_sleep -> BUG
-
-                 Hwspinlock has been inited in postcore_initcall phase, but
-kernel sleep check has enable in early_initcall
-phase(__might_sleep_init_called ==1 in sched.c)
-
-                 I think the the same problem is in __hwspin_lock_request
-function, this function use pm_runtime_get _sync interface, so might seep
-that flag don't have RPM_ASYNC value.
-
-Do you hae some good suggestions Or comments about this?
+Hi, Ohad,
+             Thank you. The kernel version is
+3.4.-rc6(android-3.4-compat  kernel version). I have
+checkout 93b465c2e186d96fb90012ba0f9372eb9952e732 and that is  good
+solution using mutex protect these interface.
 
 
-diff --git a/drivers/hwspinlock/hwspinlock_core.c
-b/drivers/hwspinlock/hwspinlock_core.c
-index db713c0..49ff54a 100644
---- a/drivers/hwspinlock/hwspinlock_core.c
-+++ b/drivers/hwspinlock/hwspinlock_core.c
-@@ -50,7 +50,7 @@
-  * tree, looking for an unused hwspinlock instance, is now reduced to a
-  * single radix tree API call.
-  */
--static RADIX_TREE(hwspinlock_tree, GFP_KERNEL);
-+static RADIX_TREE(hwspinlock_tree, GFP_ATOMIC);
+steve.
 
- /*
-  * Synchronization of access to the tree is achieved using this mutex,
-@@ -413,7 +413,7 @@ static int __hwspin_lock_request(struct hwspinlock
-*hwlock)
-        }
 
-        /* notify PM core that power is now needed */
--       ret = pm_runtime_get_sync(dev);
-+       ret = pm_runtime_get(dev);
-        if (ret < 0) {
-                dev_err(dev, "%s: can't power on device\n", __func__);
-                return ret;
+2012/12/20 Ohad Ben-Cohen <ohad@wizery.com>
 
--- 
-Steve Zhan
+> Hello Steve,
+>
+> On Thu, Dec 20, 2012 at 2:44 PM, steve.zhan <zhanzhenbo@gmail.com> wrote:
+> >                 When enable this config to check kernel, kernel will
+> > complain panic at slab.c(kmem_cache_alloc function): "BUG: sleeping
+> function
+> > called from invalid context".
+>
+> Which kernel version are you using ?
+>
+> Specifically, do you have commit
+> 93b465c2e186d96fb90012ba0f9372eb9952e732 "hwspinlock/core: use a mutex
+> to protect the radix tree" ?
+>
+> Thanks,
+> Ohad.
+>
 
 
 
@@ -59,4 +45,4 @@ Steve Zhan
 Steve Zhan
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121220/8449dcfc/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121220/a42d65e5/attachment-0001.html>
