@@ -1,45 +1,113 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 20 Dec 2012 11:04:03 +0900
-Subject: [PATCH] ARM: EXYNOS: fix GIC using for EXYNOS5440
-In-Reply-To: <001501cddd98$9698dba0$c3ca92e0$@samsung.com>
-References: <030c01cdd672$cb1b6b40$615241c0$%kim@samsung.com>
- <50C545E8.8050301@samsung.com> <001501cddd98$9698dba0$c3ca92e0$@samsung.com>
-Message-ID: <50D27213.9050403@samsung.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 20 Dec 2012 10:28:38 +0800
+Subject: [PATCH 1/2] ARM: tegra: update the cache maintenance order for CPU
+ shutdown
+Message-ID: <1355970519-28200-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2012 12:26 PM, Kukjin Kim wrote:
-> Joonyoung Shim wrote:
->> Hi,
->>
->> On 12/10/2012 10:07 AM, Kukjin Kim wrote:
->>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->>> ---
->>>    arch/arm/mach-exynos/common.c |    3 ++-
->>>    1 files changed, 2 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-
->> exynos/common.c
->>> index 0eb3b9a..9ecda37 100644
->>> --- a/arch/arm/mach-exynos/common.c
->>> +++ b/arch/arm/mach-exynos/common.c
->>> @@ -684,7 +684,8 @@ void __init exynos5_init_irq(void)
->>>    	 * Theses parameters should be NULL and 0 because EXYNOS4
->>>    	 * uses GIC instead of VIC.
->>>    	 */
->>> -	s5p_init_irq(NULL, 0);
->>> +	if (!of_machine_is_compatible("samsung,exynos5440"))
->>> +		s5p_init_irq(NULL, 0);
->> How about remove to call s5p_init_irq() here because All exynos SoCs use
->> GIC instead of VIC?
->>
-> NO, the current s5p_init_irq() is not only for VIC but also Timer which is
-> used on EXYNOS SoCs, I know the name is strange...
+Updating the cache maintenance order before CPU shutdown when doing CPU
+hotplug.
+The old order:
+* clean L1 by flush_cache_all
+* exit SMP
+* CPU shutdown
+Adapt to:
+* disable L1 data cache by clear C bit
+* clean L1 by v7_flush_dcache_louis
+* exit SMP
+* CPU shutdown
 
-I think timer can be selective by MCT on Exynos SoCs.
+For CPU hotplug case, it's no need to do "flush_cache_all". And we should
+disable L1 data cache before clean L1 data cache. Then leaving the SMP
+coherency.
 
-The patch(ARM: EXYNOS: remove static mapping of PWM memory) is for it.
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/hotplug.c       |    4 ++--
+ arch/arm/mach-tegra/sleep-tegra20.S |    3 ---
+ arch/arm/mach-tegra/sleep-tegra30.S |    3 ---
+ arch/arm/mach-tegra/sleep.S         |    4 +++-
+ arch/arm/mach-tegra/sleep.h         |    1 +
+ 5 files changed, 6 insertions(+), 9 deletions(-)
 
->>>    	gic_arch_extn.irq_set_wake = s3c_irq_wake;
->>>    }
->
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+index dca5141..d8c683b 100644
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -28,8 +28,8 @@ void __ref tegra_cpu_die(unsigned int cpu)
+ {
+ 	cpu = cpu_logical_map(cpu);
+ 
+-	/* Flush the L1 data cache. */
+-	flush_cache_all();
++	/* Clean L1 data cache */
++	tegra_disable_clean_inv_dcache();
+ 
+ 	/* Shut down the current CPU. */
+ 	tegra_hotplug_shutdown();
+diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+index 72ce709..ad2ca07 100644
+--- a/arch/arm/mach-tegra/sleep-tegra20.S
++++ b/arch/arm/mach-tegra/sleep-tegra20.S
+@@ -33,9 +33,6 @@
+  * should never return
+  */
+ ENTRY(tegra20_hotplug_shutdown)
+-	/* Turn off SMP coherency */
+-	exit_smp r4, r5
+-
+ 	/* Put this CPU down */
+ 	cpu_id	r0
+ 	bl	tegra20_cpu_shutdown
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index 562a8e7..63a15bd 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -32,9 +32,6 @@
+  * Should never return.
+  */
+ ENTRY(tegra30_hotplug_shutdown)
+-	/* Turn off SMP coherency */
+-	exit_smp r4, r5
+-
+ 	/* Powergate this CPU */
+ 	mov	r0, #TEGRA30_POWER_HOTPLUG_SHUTDOWN
+ 	bl	tegra30_cpu_shutdown
+diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
+index 26afa7c..addae35 100644
+--- a/arch/arm/mach-tegra/sleep.S
++++ b/arch/arm/mach-tegra/sleep.S
+@@ -34,7 +34,7 @@
+ #include "flowctrl.h"
+ #include "sleep.h"
+ 
+-#ifdef CONFIG_PM_SLEEP
++#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_PM_SLEEP)
+ /*
+  * tegra_disable_clean_inv_dcache
+  *
+@@ -60,7 +60,9 @@ ENTRY(tegra_disable_clean_inv_dcache)
+ 
+ 	ldmfd	sp!, {r0, r4-r5, r7, r9-r11, pc}
+ ENDPROC(tegra_disable_clean_inv_dcache)
++#endif
+ 
++#ifdef CONFIG_PM_SLEEP
+ /*
+  * tegra_sleep_cpu_finish(unsigned long v2p)
+  *
+diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+index 9821ee7..56505c3 100644
+--- a/arch/arm/mach-tegra/sleep.h
++++ b/arch/arm/mach-tegra/sleep.h
+@@ -106,6 +106,7 @@ exit_l2_resume:
+ #else
+ void tegra_resume(void);
+ int tegra_sleep_cpu_finish(unsigned long);
++void tegra_disable_clean_inv_dcache(void);
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+ void tegra20_hotplug_init(void);
+-- 
+1.7.0.4
