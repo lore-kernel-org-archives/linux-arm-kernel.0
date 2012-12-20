@@ -1,53 +1,53 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Dec 2012 07:56:14 -0800
-Subject: [GIT PULL] two trivial omap build error fixes for v3.8 merge
- window
-In-Reply-To: <20121220152508.GW4989@atomide.com>
-References: <20121219171828.GP4989@atomide.com>
- <20121220150105.GA28275@n2100.arm.linux.org.uk>
- <20121220152508.GW4989@atomide.com>
-Message-ID: <20121220155614.GA1034@quad.lixom.net>
+Date: Thu, 20 Dec 2012 08:01:32 -0800
+Subject: [GIT PULL] Fixes for sunxi for 3.8 merge window
+In-Reply-To: <1355906760-23041-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1355906760-23041-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20121220160132.GB1034@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 07:25:08AM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [121220 07:03]:
-> > On Wed, Dec 19, 2012 at 09:18:28AM -0800, Tony Lindgren wrote:
-> > > Here's few more trivial build fixes caused by the merge
-> > > conflicts.
-> > 
-> > If Olof isn't able to pull this stuff in tonight, I'll pull it into my
-> > tree and send it up with my stuff.  I'll also see about picking up
-> > on the previous one with the common.c vram.h fix too.
+On Wed, Dec 19, 2012 at 09:46:00AM +0100, Maxime Ripard wrote:
+> Arnd, Olof,
 > 
-> I just replied to the "[GIT PULL] ARM: arm-soc fixes for 3.8" thread
-> suggesting Linus pull it. It seems that the issue with that one
-> .dts file can easily be fixed later on and there's no need to go
-> tinker with that branch.
+> Please consider pulling these two (late) patches for the sunxi support.
 > 
-> Please go ahead and pull in the $Subject: branch though, these two
-> are not yet in Olof's branch.
+> The first one add the support for the sunxi architecture in the multiplatform
+> kernel, allowing to easily build a kernel that boots on the sun4i/sun5i
+> supported boards.
 > 
-> > I'm not sure what Olof's plans are, but I know Arnd isn't around at
-> > the moment, and Olof was travelling a couple of days ago and hasn't
-> > reappeared since.  I don't think we can leave these fixes any longer
-> > as OMAP has been broken in mainline for at least the last four days
-> > and we're nearing the end of the merge window.
+> The second one fixes some compatible strings that were left behind in the
+> previous compatible renaming patch, preventing the kernel from booting.
 > 
-> Yes, Olof mentioned that he should be back online within few days.
-> He's probably enjoying the bastu :)
+> Thanks,
+> Maxime 
+> 
+> The following changes since commit 7445d6b5a7a40c40cda3935ba3827896305cfc21:
+> 
+>   ARM: sunxi: Change device tree naming scheme for sunxi (2012-12-18 15:11:16 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/mripard/linux.git tags/sunxi-fixes-for-3.8-rc1
+> 
+> for you to fetch changes up to 91e4f61216c6e15f7ff99f2d18407a08cfe601b0:
+> 
+>   sunxi: Change the machine compatible string. (2012-12-19 09:23:42 +0100)
+> 
+> ----------------------------------------------------------------
+> Fixes for the sunxi core to be merged in 3.8-rc1
+> 
+> ----------------------------------------------------------------
+> Maxime Ripard (2):
+>       ARM: multi_v7_defconfig: Add ARCH_SUNXI
+>       sunxi: Change the machine compatible string.
 
-More like dealing with sick and jetlagged kids, and having issues with
-a decent 3G connection where I'm staying (almost literally in the middle
-of nowhere). It's the first time my current workflow of ssh:ing to my main
-workstation has not worked well, unfortunately.
+Hi,
 
-I've redone the sunxi pieces of the fixes branch now, and will apply the other
-recent pull requests and will include those. Since Tony's patches are on
-a branch, if Russell overtakes me and gets his pull request in, there won't be
-any problems caused by it.
-
-I'll have a fresh pull request for Linus in an hour or so.
+I get more than those patches when I pull that tag, and it seems like some of
+them are now invalid. Like "ARM: sunxi: Add missing sun4i.dtsi file", which 
+will add a fresh sun4i.dtsi, when it's already been added and renamed
+sun4i-a10.dtsi.
 
 
 -Olof
