@@ -1,86 +1,70 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 20 Dec 2012 15:05:19 +0100
-Subject: [PATCH 1/1] ARM: OMAP3: igep0020: simplify GPIO LEDs dependencies
-In-Reply-To: <1355505428-24302-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1355505428-24302-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CABxcv=k6wypYO+JOV1rWyuGtR-seNQ2PFqym7QsAdkC+mC7P8g@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 20 Dec 2012 15:42:30 +0100
+Subject: [PATCH 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
+In-Reply-To: <50D31365.9000009@arm.com>
+References: <50D305A6.2080904@arm.com><20121220125507.GB6819@tbergstrom-lnx.Nvidia.com><50D31365.9000009@arm.com>
+Message-ID: <20121220.164230.292625215885249791.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 6:17 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> The IGEPv2 board has two user GPIO LEDs and one of them is
-> default to "on" to tell the user that the board booted correctly.
->
-> But to use these LEDs the config options CONFIG_LEDS_GPIO,
-> CONFIG_LEDS_TRIGGERS and CONFIG_LEDS_TRIGGER_DEFAULT_ON have to
-> be enabled.
->
-> Since only the default-on and default-off triggers were used
-> anyway, it is better to just use .default_state instead of
-> .default_trigger and not depend on CONFIG_LEDS_TRIGGER_*
->
-> Also, this is consistent with IGEPv2 Device Tree that uses
-> default-state instead of linux,default-trigger for the leds
-> device nodes. The LED names also have been updated to use the
-> same names used on omap3-igep0020.dtb.
->
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  arch/arm/mach-omap2/board-igep0020.c |   16 ++++++++--------
->  1 files changed, 8 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-> index 0f24cb8..1921541 100644
-> --- a/arch/arm/mach-omap2/board-igep0020.c
-> +++ b/arch/arm/mach-omap2/board-igep0020.c
-> @@ -300,20 +300,20 @@ static struct omap2_hsmmc_info mmc[] = {
->
->  static struct gpio_led igep_gpio_leds[] = {
->         [0] = {
-> -               .name                   = "gpio-led:red:d0",
-> -               .default_trigger        = "default-off"
-> +               .name                   = "omap3:red:user0",
-> +               .default_state          = 0,
->         },
->         [1] = {
-> -               .name                   = "gpio-led:green:d0",
-> -               .default_trigger        = "default-off",
-> +               .name                   = "omap3:green:boot",
-> +               .default_state          = 1,
->         },
->         [2] = {
-> -               .name                   = "gpio-led:red:d1",
-> -               .default_trigger        = "default-off",
-> +               .name                   = "omap3:red:user1",
-> +               .default_state          = 0,
->         },
->         [3] = {
-> -               .name                   = "gpio-led:green:d1",
-> -               .default_trigger        = "heartbeat",
-> +               .name                   = "omap3:green:user1",
-> +               .default_state          = 0,
->                 .gpio                   = -EINVAL, /* gets replaced */
->                 .active_low             = 1,
->         },
-> --
+Marc Zyngier <marc.zyngier@arm.com> wrote @ Thu, 20 Dec 2012 14:32:21 +0100:
 
-Hi Tony,
+> On 20/12/12 12:55, Peter De Schrijver wrote:
+> > On Thu, Dec 20, 2012 at 01:33:42PM +0100, Marc Zyngier wrote:
+> >> On 20/12/12 12:22, Peter De Schrijver wrote:
+> >>>>>>> +
+> >>>>>>> +	/* CNTFRQ */
+> >>>>>>> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
+> >>>>>>> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
+> >>>>>>> +	BUG_ON(val != freq);
+> >>>>>>
+> >>>>>> This is scary. CNTFRQ is only writable from secure mode, and will
+> >>>>>> explode in any other situation.
+> >>>>>>
+> >>>>>> Also, writing to CNTFRQ doesn't change the timer frequency! This is just
+> >>>>>> a way for secure mode to tell the rest of the world the frequency the
+> >>>>>> timer is ticking at. Unless you've wired the input clock to be able to
+> >>>>>> change the frequency?
+> >>>>>
+> >>>>> ATM, our upstream kernel is expected in secure mode. This situation
+> >>>>> may be changed later, though....
+> >>>>
+> >>>> I appreciate this. But I expect this kernel to be also used on the
+> >>>> non-secure side if someone tried to run KVM with it. And this would go
+> >>>> bang right away.
+> >>>>
+> >>>
+> >>> But the guest wouldn't necessarily have this peripheral, or any other Tegra114
+> >>> peripheral for that matter?
+> >>
+> >> The problem is not so much the guest but the host. The host has to be
+> >> booted in non-secure, so just saying "we do not support non-secure" is
+> >> not a very convincing argument.
+> >>
+> >> Unless of course you've already decided that you don't want to support
+> >> KVM on this SoC...
+> >>
+> > 
+> > I guess that means we can't support KVM yet. Tegra does not have a secure
+> > monitor by default. It all depends on what that system integrator does.
+> 
+> VExpress doesn't have a secure monitor either, and yet we run KVM on it
+> (by switching to non-secure before loading the kernel). Same for Exynos5.
+> 
+> What I'm trying to say is that this code is rather pointless (this
+> should be done by the firmware/bootloader, not the kernel, or the
+> information should be provided in DT if CNTFRQ is not set).
 
-Any comments on this patch?
+"tegra114.dtsi" has the folloiwng "tsc" entry. So can we consider that
+if dts has this entry, CNTFRQ is not set, which implies it's in secure
+mode. kernel should set it up by itself? Otherwise, skip this setup
+and use it. For example:
 
-I wonder if I should keep sending fixes/improvements for board-igep0020.c
+ 	tsc {
+ 		compatible = "nvidia,tegra114-tsc";
+ 		reg = <0x700f0000 0x20000>;
++		setup-cntfrq;
+ 	};
 
-I already sent an initial Device Tree support for IGEP boards [1] and
-Benoit told me he is going to queue for 3.9. But still doesn't support
-many peripherals found on these boards because they still don't proper
-DT support, for instance NAND and Ethernet need the GPMC bindings
-patches that haven't hit mainline yet.
-
-So, it seems I will have to keep working on the board file until it
-can be completely deprecated.
-
-Thanks a lot and best regards,
-Javier
-
-[1]: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82383.html
+Is this what you explained in the above?
+At least, kernel can survive without bootloader/firmware support, ATM.
