@@ -1,36 +1,52 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Dec 2012 15:49:07 +0100
-Subject: [PATCH v2 08/20] arm: mvebu: enable the SD card slot on Armada XP DB
+Date: Fri, 21 Dec 2012 15:49:08 +0100
+Subject: [PATCH v2 09/20] arm: mvebu: enable the SD card slot on Armada 370 DB
  board
 In-Reply-To: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1356101359-6054-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1356101359-6054-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The Armada XP DB evaluation board has one SD card slot, directly
-connected to the SDIO IP of the SoC, so we enable this
-IP. Unfortunately, there are no GPIOs for card-detect and
-write-protect.
+connected to the SDIO IP of the SoC, so we add a device tree
+description for it.
+
+However, in the default configuration of the board, the SD card slot
+is not usable: the connector plugged into CON40 must be changed
+against a different one, provided with the board by the
+manufacturer. Since such a manual modification of the hardware is
+needed, we did not enable the SDIO interface by default, and left it
+to the board user to modify the Device Tree if needed. Since this
+board is really only an evaluation board for developers and not a
+final product, it is not too bad.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-db.dts |    7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/armada-370-db.dts |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 8e53b25..c7035c5 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -90,5 +90,12 @@
- 			phy = <&phy3>;
- 			phy-mode = "sgmii";
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index 0004402..43ff156 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -59,5 +59,20 @@
+ 			phy = <&phy1>;
+ 			phy-mode = "rgmii-id";
  		};
 +
 +		mvsdio at d00d4000 {
-+			pinctrl-0 = <&sdio_pins>;
++			pinctrl-0 = <&sdio_pins1>;
 +			pinctrl-names = "default";
-+			status = "okay";
++			/*
++			 * This device is disabled by default, because
++			 * using the SD card connector requires
++			 * changing the default CON40 connector
++			 * "DB-88F6710_MPP_2xRGMII_DEVICE_Jumper" to a
++			 * different connector
++			 * "DB-88F6710_MPP_RGMII_SD_Jumper".
++			 */
++			status = "disabled";
 +			/* No CD or WP GPIOs */
 +		};
  	};
