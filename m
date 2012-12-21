@@ -1,111 +1,114 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Dec 2012 15:49:00 +0100
-Subject: [PATCH v2 01/20] mmc: mvsdio: use slot-gpio infrastructure for write
- protect gpio
+Date: Fri, 21 Dec 2012 15:49:01 +0100
+Subject: [PATCH v2 02/20] mmc: mvsdio: use slot-gpio for card detect gpio
 In-Reply-To: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1356101359-6054-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1356101359-6054-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The MMC core subsystem provides in drivers/mmc/core/slot-gpio.c a nice
-set of helper functions to simplify the management of the write
-protect GPIO in MMC host drivers. This patch migrates the mvsdio
-driver to using those helpers, which will make the ->probe() code
-simpler, and therefore ease the process of adding a Device Tree
-binding for this driver.
+set of helper functions to simplify the management of the card detect
+GPIO in MMC host drivers. This patch migrates the mvsdio driver to
+using those helpers, which will make the ->probe() code simpler, and
+therefore ease the process of adding a Device Tree binding for this
+driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/mmc/host/mvsdio.c |   34 +++++-----------------------------
- 1 file changed, 5 insertions(+), 29 deletions(-)
+ drivers/mmc/host/mvsdio.c |   44 +++++++++-----------------------------------
+ 1 file changed, 9 insertions(+), 35 deletions(-)
 
 diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index de4c20b..a24a22f 100644
+index a24a22f..baf19fc 100644
 --- a/drivers/mmc/host/mvsdio.c
 +++ b/drivers/mmc/host/mvsdio.c
-@@ -22,6 +22,7 @@
- #include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/mmc/host.h>
-+#include <linux/mmc/slot-gpio.h>
- 
- #include <asm/sizes.h>
- #include <asm/unaligned.h>
-@@ -54,7 +55,6 @@ struct mvsd_host {
+@@ -54,7 +54,6 @@ struct mvsd_host {
+ 	struct resource *res;
  	int irq;
  	struct clk *clk;
- 	int gpio_card_detect;
--	int gpio_write_protect;
+-	int gpio_card_detect;
  };
  
  #define mvsd_write(offs, val)	writel(val, iobase + (offs))
-@@ -566,20 +566,6 @@ static void mvsd_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 	spin_unlock_irqrestore(&host->lock, flags);
+@@ -540,13 +539,6 @@ static void mvsd_timeout_timer(unsigned long data)
+ 		mmc_request_done(host->mmc, mrq);
  }
  
--static int mvsd_get_ro(struct mmc_host *mmc)
+-static irqreturn_t mvsd_card_detect_irq(int irq, void *dev)
 -{
--	struct mvsd_host *host = mmc_priv(mmc);
--
--	if (host->gpio_write_protect)
--		return gpio_get_value(host->gpio_write_protect);
--
--	/*
--	 * Board doesn't support read only detection; let the mmc core
--	 * decide what to do.
--	 */
--	return -ENOSYS;
+-	struct mvsd_host *host = dev;
+-	mmc_detect_change(host->mmc, msecs_to_jiffies(100));
+-	return IRQ_HANDLED;
 -}
 -
- static void mvsd_power_up(struct mvsd_host *host)
+ static void mvsd_enable_sdio_irq(struct mmc_host *mmc, int enable)
  {
- 	void __iomem *iobase = host->base;
-@@ -676,7 +662,7 @@ static void mvsd_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	struct mvsd_host *host = mmc_priv(mmc);
+@@ -765,23 +757,11 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 		clk_prepare_enable(host->clk);
+ 	}
  
- static const struct mmc_host_ops mvsd_ops = {
- 	.request		= mvsd_request,
--	.get_ro			= mvsd_get_ro,
-+	.get_ro			= mmc_gpio_get_ro,
- 	.set_ios		= mvsd_set_ios,
- 	.enable_sdio_irq	= mvsd_enable_sdio_irq,
- };
-@@ -798,15 +784,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	if (!host->gpio_card_detect)
- 		mmc->caps |= MMC_CAP_NEEDS_POLL;
- 
--	if (mvsd_data->gpio_write_protect) {
--		ret = gpio_request(mvsd_data->gpio_write_protect,
--				   DRIVER_NAME " wp");
+-	if (mvsd_data->gpio_card_detect) {
+-		ret = gpio_request(mvsd_data->gpio_card_detect,
+-				   DRIVER_NAME " cd");
 -		if (ret == 0) {
--			gpio_direction_input(mvsd_data->gpio_write_protect);
--			host->gpio_write_protect =
--				mvsd_data->gpio_write_protect;
+-			gpio_direction_input(mvsd_data->gpio_card_detect);
+-			irq = gpio_to_irq(mvsd_data->gpio_card_detect);
+-			ret = request_irq(irq, mvsd_card_detect_irq,
+-					  IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING,
+-					  DRIVER_NAME " cd", host);
+-			if (ret == 0)
+-				host->gpio_card_detect =
+-					mvsd_data->gpio_card_detect;
+-			else
+-				gpio_free(mvsd_data->gpio_card_detect);
 -		}
 -	}
-+	mmc_gpio_request_ro(mmc, mvsd_data->gpio_write_protect);
+-	if (!host->gpio_card_detect)
++	if (gpio_is_valid(mvsd_data->gpio_card_detect)) {
++		ret = mmc_gpio_request_cd(mmc, mvsd_data->gpio_card_detect);
++		if (ret)
++			goto out;
++	} else
+ 		mmc->caps |= MMC_CAP_NEEDS_POLL;
  
- 	setup_timer(&host->timer, mvsd_timeout_timer, (unsigned long)host);
- 	platform_set_drvdata(pdev, mmc);
-@@ -831,8 +809,7 @@ out:
- 			free_irq(gpio_to_irq(host->gpio_card_detect), host);
- 			gpio_free(host->gpio_card_detect);
- 		}
--		if (host->gpio_write_protect)
--			gpio_free(host->gpio_write_protect);
-+		mmc_gpio_free_ro(mmc);
+ 	mmc_gpio_request_ro(mmc, mvsd_data->gpio_write_protect);
+@@ -794,9 +774,9 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 
+ 	pr_notice("%s: %s driver initialized, ",
+ 			   mmc_hostname(mmc), DRIVER_NAME);
+-	if (host->gpio_card_detect)
++	if (!(mmc->caps & MMC_CAP_NEEDS_POLL))
+ 		printk("using GPIO %d for card detection\n",
+-		       host->gpio_card_detect);
++		       mvsd_data->gpio_card_detect);
+ 	else
+ 		printk("lacking card detect (fall back to polling)\n");
+ 	return 0;
+@@ -805,10 +785,7 @@ out:
+ 	if (host) {
+ 		if (host->irq)
+ 			free_irq(host->irq, host);
+-		if (host->gpio_card_detect) {
+-			free_irq(gpio_to_irq(host->gpio_card_detect), host);
+-			gpio_free(host->gpio_card_detect);
+-		}
++		mmc_gpio_free_cd(mmc);
+ 		mmc_gpio_free_ro(mmc);
  		if (host->base)
  			iounmap(host->base);
- 	}
-@@ -861,8 +838,7 @@ static int __exit mvsd_remove(struct platform_device *pdev)
- 		}
+@@ -832,10 +809,7 @@ static int __exit mvsd_remove(struct platform_device *pdev)
+ 	if (mmc) {
+ 		struct mvsd_host *host = mmc_priv(mmc);
+ 
+-		if (host->gpio_card_detect) {
+-			free_irq(gpio_to_irq(host->gpio_card_detect), host);
+-			gpio_free(host->gpio_card_detect);
+-		}
++		mmc_gpio_free_cd(mmc);
  		mmc_remove_host(mmc);
  		free_irq(host->irq, host);
--		if (host->gpio_write_protect)
--			gpio_free(host->gpio_write_protect);
-+		mmc_gpio_free_ro(mmc);
- 		del_timer_sync(&host->timer);
- 		mvsd_power_down(host);
- 		iounmap(host->base);
+ 		mmc_gpio_free_ro(mmc);
 -- 
 1.7.9.5
