@@ -1,60 +1,46 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Dec 2012 08:41:17 -0800
-Subject: [PATCH] ARM: OMAP2+: omap_twl: Change
- TWL4030_MODULE_PM_RECEIVER to TWL_MODULE_PM_RECEIVER
-In-Reply-To: <50D45B72.2050300@ti.com>
-References: <1352799152-20980-1-git-send-email-peter.ujfalusi@ti.com>
- <50A4A376.3020703@ti.com> <20121121215234.GB5279@atomide.com>
- <50ADFDD3.1080508@ti.com> <20121214171800.GO4989@atomide.com>
- <50D45B72.2050300@ti.com>
-Message-ID: <20121221164116.GK21056@atomide.com>
+Date: Fri, 21 Dec 2012 08:48:49 -0800
+Subject: [PATCH 0/8] Flip on multiplatform support for omap2plus for v3.9
+In-Reply-To: <CALF0-+Xy+w=4Bs+97WJj76-tAnb56v=hS+zLyr9ue_zBKSQoVg@mail.gmail.com>
+References: <20121219192354.22098.33408.stgit@muffinssi.local>
+ <20121220155518.GX4989@atomide.com>
+ <CALF0-+XspOix_RiNkWN7d1L9uxBZi7Zf5SDaKcx0P7P_Z3anqA@mail.gmail.com>
+ <20121221010518.GJ21056@atomide.com>
+ <CALF0-+Xy+w=4Bs+97WJj76-tAnb56v=hS+zLyr9ue_zBKSQoVg@mail.gmail.com>
+Message-ID: <20121221164849.GL21056@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [121221 04:54]:
+* Ezequiel Garcia <elezegarcia@gmail.com> [121221 04:50]:
 > Hi Tony,
 > 
-> On 12/14/2012 06:18 PM, Tony Lindgren wrote:
-> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [121122 02:28]:
-> >> Hi Tony,
-> >>
-> >> On 11/21/2012 10:52 PM, Tony Lindgren wrote:
-> >>> * Peter Ujfalusi <peter.ujfalusi@ti.com> [121115 00:12]:
-> >>>> Hi Tony,
-> >>>>
-> >>>> On 11/13/2012 10:32 AM, Peter Ujfalusi wrote:
-> >>>>> To facilitate upcoming cleanup in twl stack.
-> >>>>> No functional change.
-> >>>>
-> >>>> Would you please consider this patch for 3.8? It would shorten the time I'll
-> >>>> need to progress on the cleanup regarding to twl-core greatly.
-> >>>
-> >>> Please go ahead and merge this with your other patches:
-> >>>
-> >>> Acked-by: Tony Lindgren <tony@atomide.com>
-> >>>
-> >>> Or let me know if I still need to queue it.
-> >>
-> >> This patch has no dependencies on other patches. It is better to go via
-> >> linux-omap.
-> > 
-> > Applying into omap-for-v3.8/fixes-for-merge-window.
+> On Thu, Dec 20, 2012 at 10:05 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > Maybe use Olof's lates pull request for fixes from LAKML +
+> > ARM: l2x0: Only set .set_debug on PL310 r3p0 and earlier +
+> > ARM: disable errata work-arounds which access secure registers
+> > and these patches?
+> >
 > 
-> Today I looked at:
-> omap-for-v3.8/fixes-for-merge-window-part2
-> omap-for-v3.8/fixes-for-merge-window-v4
-> omap-for-v3.8/fixes-non-critical-v2
+> FYI, I've successfully booted my IGEPv2 board using:
+> * arm-soc/for-next
+
+Ah right, sorry this series also needs the omap branch
+omap-for-v3.8/cleanup-for-merge-window that's now in
+arm-soc/for-next. Specifically it's the "ARM: OMAP: Split
+fb.c to remove last remaining cpu_is_omap usage" patch.
+
+> * igep DT patches
+> * this multiplatform series
+> * the two patches mentioned above
 > 
-> branches as well linux-next, mainline, but I can not find this patch. I want
-> to send the second part of the twl-core cleanup series which needs this patch
-> to be in first.
-> Can you make sure this is going for 3.8?
+> With this series CONFIG_MACH_IGEP0020 is not needed,
+> just CONFIG_MACH_OMAP_GENERIC is selected.
+> 
+> So I guess this means, for igep v2,
+> 
+> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-It should be in omap-for-v3.8/cleanup-for-merge-window
-that Olof wanted separated from fixes so hopefully it
-will get queued once the merge window related issues are
-out of the way.
-
-Regards,
+Thanks,
 
 Tony
