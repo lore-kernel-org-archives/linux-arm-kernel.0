@@ -1,78 +1,47 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Dec 2012 15:49:06 +0100
-Subject: [PATCH v2 07/20] arm: mvebu: add pin muxing options for the SDIO
- interface on Armada XP
+Date: Fri, 21 Dec 2012 15:49:05 +0100
+Subject: [PATCH v2 06/20] arm: mvebu: add pin muxing options for the SDIO
+ interface on Armada 370
 In-Reply-To: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1356101359-6054-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1356101359-6054-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDIO interface is only available on pins MPP30/31/32/33/34/35 on
-the various Armada XP variants, so we provide a pin muxing option for
-this in the Armada XP .dtsi files.
+The SDIO interface is available either on pins MPP9/11/12/13/14/15 or
+MPP47/48/49/50/51/52 on the Armada 370. Even though all combinations
+are potentially possible, those two muxing options are the most
+probable ones, so we provide those at the SoC level .dtsi file.
 
-Even though those muxing options are the same for MV78230, MV78260 and
-MV78460, we keep them in each .dtsi file, because the number of pins,
-and therefore the declaration of the pinctrl node, is different for
-each SoC variant.
+In practice, in turns out the Armada 370 DB board uses the former,
+while the Armada 370 Mirabox uses the latter.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-mv78230.dtsi |    6 ++++++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi |    6 ++++++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |    6 ++++++
- 3 files changed, 18 insertions(+)
+ arch/arm/boot/dts/armada-370.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index c45c7b4..3fa9c84 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -40,6 +40,12 @@
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 636cf7d..88f9bab 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -47,6 +47,18 @@
  		pinctrl {
- 			compatible = "marvell,mv78230-pinctrl";
+ 			compatible = "marvell,mv88f6710-pinctrl";
  			reg = <0xd0018000 0x38>;
 +
-+			sdio_pins: sdio-pins {
-+				marvell,pins = "mpp30", "mpp31", "mpp32",
-+					       "mpp33", "mpp34", "mpp35";
-+				marvell,function = "sd0";
++			sdio_pins1: sdio-pins1 {
++			      marvell,pins = "mpp9",  "mpp11", "mpp12",
++					     "mpp13", "mpp14", "mpp15";
++			      marvell,function = "sd0";
 +			};
- 		};
- 
- 		gpio0: gpio at d0018100 {
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index a2aee57..5a907b3 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -48,6 +48,12 @@
- 		pinctrl {
- 			compatible = "marvell,mv78260-pinctrl";
- 			reg = <0xd0018000 0x38>;
 +
-+			sdio_pins: sdio-pins {
-+				marvell,pins = "mpp30", "mpp31", "mpp32",
-+					       "mpp33", "mpp34", "mpp35";
-+				marvell,function = "sd0";
++			sdio_pins2: sdio-pins2 {
++			      marvell,pins = "mpp47", "mpp48", "mpp49",
++					     "mpp50", "mpp51", "mpp52";
++			      marvell,function = "sd0";
 +			};
- 		};
- 
- 		gpio0: gpio at d0018100 {
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index da03a12..6dcdc50d 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -63,6 +63,12 @@
- 		pinctrl {
- 			compatible = "marvell,mv78460-pinctrl";
- 			reg = <0xd0018000 0x38>;
-+
-+			sdio_pins: sdio-pins {
-+				marvell,pins = "mpp30", "mpp31", "mpp32",
-+					       "mpp33", "mpp34", "mpp35";
-+				marvell,function = "sd0";
-+			};
- 		};
+ 	        };
  
  		gpio0: gpio at d0018100 {
 -- 
