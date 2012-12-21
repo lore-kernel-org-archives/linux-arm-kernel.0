@@ -1,240 +1,319 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 21 Dec 2012 10:04:06 -0700
-Subject: [PATCH 6/9] crypto: omap-sham - Add Device Tree Support
+Date: Fri, 21 Dec 2012 10:04:09 -0700
+Subject: [PATCH 9/9] crypto: omap-sham - Add SHA224 and SHA256 Support
 In-Reply-To: <1356109449-11624-1-git-send-email-mgreer@animalcreek.com>
 References: <1356109449-11624-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1356109449-11624-7-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1356109449-11624-10-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Add Device Tree suport to the omap-sham crypto
-driver.  Currently, only support for OMAP2 and
-OMAP3 is being added but support for OMAP4 will
-be added in a subsequent patch.
+The OMAP4/AM33xx version of the SHAM crypto module
+supports SHA224 and SHA256 in addition to MD5 and
+SHA1 that the OMAP2 version of the module supports.
 
+To add this support, use the platform_data introduced
+in an ealier commit to hold the list of algorithms
+supported by the current module.  The probe routine
+will use that list to register the correct algorithms.
+
+Note: The code being integrated is from the TI AM33xx SDK
+and was written by Greg Turner <gkmturner@gmail.com> and
+Herman Schuurman (current email unknown) while at TI.
+
+CC: Greg Turner <gkmturner@gmail.com>
 CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- drivers/crypto/omap-sham.c | 139 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 106 insertions(+), 33 deletions(-)
+ drivers/crypto/omap-sham.c | 183 ++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 173 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index f6b270e..860cad8 100644
+index fab0af4..edff981 100644
 --- a/drivers/crypto/omap-sham.c
 +++ b/drivers/crypto/omap-sham.c
-@@ -30,6 +30,10 @@
- #include <linux/dmaengine.h>
- #include <linux/omap-dma.h>
- #include <linux/pm_runtime.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- #include <linux/delay.h>
- #include <linux/crypto.h>
- #include <linux/cryptohash.h>
-@@ -145,6 +149,7 @@ struct omap_sham_dev {
- 	int			irq;
- 	spinlock_t		lock;
- 	int			err;
-+	unsigned int		dma;
- 	struct dma_chan		*dma_lch;
- 	struct tasklet_struct	done_task;
+@@ -83,6 +83,8 @@
+ #define SHA_REG_MODE_ALGO_MASK		(3 << 1)
+ #define		SHA_REG_MODE_ALGO_MD5_128	(0 << 1)
+ #define		SHA_REG_MODE_ALGO_SHA1_160	(1 << 1)
++#define		SHA_REG_MODE_ALGO_SHA2_224	(2 << 1)
++#define		SHA_REG_MODE_ALGO_SHA2_256	(3 << 1)
  
-@@ -1155,13 +1160,99 @@ static irqreturn_t omap_sham_irq(int irq, void *dev_id)
- 	return IRQ_HANDLED;
+ #define SHA_REG_LENGTH			0x48
+ 
+@@ -121,6 +123,10 @@
+ 						<< (FLAGS_MODE_SHIFT - 1))
+ #define		FLAGS_MODE_SHA1		(SHA_REG_MODE_ALGO_SHA1_160	\
+ 						<< (FLAGS_MODE_SHIFT - 1))
++#define		FLAGS_MODE_SHA224	(SHA_REG_MODE_ALGO_SHA2_224	\
++						<< (FLAGS_MODE_SHIFT - 1))
++#define		FLAGS_MODE_SHA256	(SHA_REG_MODE_ALGO_SHA2_256	\
++						<< (FLAGS_MODE_SHIFT - 1))
+ #define FLAGS_HMAC		20
+ #define FLAGS_ERROR		21
+ 
+@@ -173,7 +179,15 @@ struct omap_sham_ctx {
+ 
+ #define OMAP_SHAM_QUEUE_LENGTH	1
+ 
++struct omap_sham_algs_info {
++	struct ahash_alg	*algs_list;
++	unsigned int		size;
++	unsigned int		registered;
++};
++
+ struct omap_sham_pdata {
++	struct omap_sham_algs_info	*algs_info;
++	unsigned int	algs_info_size;
+ 	unsigned long	flags;
+ 	int		digest_size;
+ 
+@@ -322,6 +336,12 @@ static void omap_sham_copy_ready_hash(struct ahash_request *req)
+ 			big_endian = 1;
+ 		d = SHA1_DIGEST_SIZE / sizeof(u32);
+ 		break;
++	case FLAGS_MODE_SHA224:
++		d = SHA224_DIGEST_SIZE / sizeof(u32);
++		break;
++	case FLAGS_MODE_SHA256:
++		d = SHA256_DIGEST_SIZE / sizeof(u32);
++		break;
+ 	default:
+ 		d = 0;
+ 	}
+@@ -780,6 +800,12 @@ static int omap_sham_init(struct ahash_request *req)
+ 	case SHA1_DIGEST_SIZE:
+ 		ctx->flags |= FLAGS_MODE_SHA1;
+ 		break;
++	case SHA224_DIGEST_SIZE:
++		ctx->flags |= FLAGS_MODE_SHA224;
++		break;
++	case SHA256_DIGEST_SIZE:
++		ctx->flags |= FLAGS_MODE_SHA256;
++		break;
+ 	}
+ 
+ 	ctx->bufcnt = 0;
+@@ -1173,6 +1199,16 @@ static int omap_sham_cra_sha1_init(struct crypto_tfm *tfm)
+ 	return omap_sham_cra_init_alg(tfm, "sha1");
  }
  
-+#ifdef CONFIG_OF
-+static const struct of_device_id omap_sham_of_match[] = {
-+	{
-+		.compatible	= "ti,omap2-sham",
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, omap_sham_of_match);
-+
-+static int omap_sham_get_res_of(struct omap_sham_dev *dd,
-+		struct device *dev, struct resource *res)
++static int omap_sham_cra_sha224_init(struct crypto_tfm *tfm)
 +{
-+	struct device_node *node = dev->of_node;
-+	const struct of_device_id *match;
-+	int err = 0;
-+
-+	match = of_match_device(of_match_ptr(omap_sham_of_match), dev);
-+	if (!match) {
-+		dev_err(dev, "no compatible OF match\n");
-+		err = -EINVAL;
-+		goto err;
-+	}
-+
-+	err = of_address_to_resource(node, 0, res);
-+	if (err < 0) {
-+		dev_err(dev, "can't translate OF node address\n");
-+		err = -EINVAL;
-+		goto err;
-+	}
-+
-+	dd->irq = of_irq_to_resource(node, 0, NULL);
-+	if (!dd->irq) {
-+		dev_err(dev, "can't translate OF irq value\n");
-+		err = -EINVAL;
-+		goto err;
-+	}
-+
-+	dd->dma = -1; /* Dummy value that's unused */
-+
-+err:
-+	return err;
-+}
-+#else
-+static int omap_sham_get_res_dev(struct omap_sham_dev *dd,
-+		struct device *dev, struct resource *res)
-+{
-+	return -EINVAL;
-+}
-+#endif
-+
-+static int omap_sham_get_res_pdev(struct omap_sham_dev *dd,
-+		struct platform_device *pdev, struct resource *res)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct resource *r;
-+	int err = 0;
-+
-+	/* Get the base address */
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!r) {
-+		dev_err(dev, "no MEM resource info\n");
-+		err = -ENODEV;
-+		goto err;
-+	}
-+	memcpy(res, r, sizeof(*res));
-+
-+	/* Get the IRQ */
-+	dd->irq = platform_get_irq(pdev, 0);
-+	if (dd->irq < 0) {
-+		dev_err(dev, "no IRQ resource info\n");
-+		err = dd->irq;
-+		goto err;
-+	}
-+
-+	/* Get the DMA */
-+	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-+	if (!r) {
-+		dev_err(dev, "no DMA resource info\n");
-+		err = -ENODEV;
-+		goto err;
-+	}
-+	dd->dma = r->start;
-+
-+err:
-+	return err;
++	return omap_sham_cra_init_alg(tfm, "sha224");
 +}
 +
- static int __devinit omap_sham_probe(struct platform_device *pdev)
++static int omap_sham_cra_sha256_init(struct crypto_tfm *tfm)
++{
++	return omap_sham_cra_init_alg(tfm, "sha256");
++}
++
+ static int omap_sham_cra_md5_init(struct crypto_tfm *tfm)
  {
- 	struct omap_sham_dev *dd;
- 	struct device *dev = &pdev->dev;
--	struct resource *res;
-+	struct resource res;
- 	dma_cap_mask_t mask;
--	unsigned dma_chan;
- 	int err, i, j;
- 
- 	dd = kzalloc(sizeof(struct omap_sham_dev), GFP_KERNEL);
-@@ -1178,33 +1269,18 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
- 	tasklet_init(&dd->done_task, omap_sham_done_task, (unsigned long)dd);
- 	crypto_init_queue(&dd->queue, OMAP_SHAM_QUEUE_LENGTH);
- 
--	dd->irq = -1;
--
--	/* Get the base address */
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		dev_err(dev, "no MEM resource info\n");
--		err = -ENODEV;
--		goto res_err;
--	}
--	dd->phys_base = res->start;
--
--	/* Get the DMA */
--	res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
--	if (!res) {
--		dev_err(dev, "no DMA resource info\n");
--		err = -ENODEV;
-+	err = (dev->of_node) ? omap_sham_get_res_of(dd, dev, &res) :
-+			       omap_sham_get_res_pdev(dd, pdev, &res);
-+	if (err)
- 		goto res_err;
--	}
--	dma_chan = res->start;
- 
--	/* Get the IRQ */
--	dd->irq = platform_get_irq(pdev,  0);
--	if (dd->irq < 0) {
--		dev_err(dev, "no IRQ resource info\n");
--		err = dd->irq;
-+	dd->io_base = devm_request_and_ioremap(dev, &res);
-+	if (!dd->io_base) {
-+		dev_err(dev, "can't ioremap\n");
-+		err = -ENOMEM;
- 		goto res_err;
+ 	return omap_sham_cra_init_alg(tfm, "md5");
+@@ -1191,7 +1227,7 @@ static void omap_sham_cra_exit(struct crypto_tfm *tfm)
  	}
-+	dd->phys_base = res.start;
+ }
  
- 	err = request_irq(dd->irq, omap_sham_irq,
- 			IRQF_TRIGGER_LOW, dev_name(dev), dd);
-@@ -1216,10 +1292,10 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 
--	dd->dma_lch = dma_request_channel(mask, omap_dma_filter_fn, &dma_chan);
-+	dd->dma_lch = dma_request_channel(mask, omap_dma_filter_fn, &dd->dma);
- 	if (!dd->dma_lch) {
- 		dev_err(dev, "unable to obtain RX DMA engine channel %u\n",
--			dma_chan);
-+			dd->dma);
- 		err = -ENXIO;
- 		goto dma_err;
- 	}
-@@ -1255,13 +1331,11 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
- err_algs:
- 	for (j = 0; j < i; j++)
- 		crypto_unregister_ahash(&algs[j]);
--	iounmap(dd->io_base);
- 	pm_runtime_disable(dev);
- io_err:
- 	dma_release_channel(dd->dma_lch);
- dma_err:
--	if (dd->irq >= 0)
--		free_irq(dd->irq, dd);
-+	free_irq(dd->irq, dd);
- res_err:
- 	kfree(dd);
- 	dd = NULL;
-@@ -1285,11 +1359,9 @@ static int __devexit omap_sham_remove(struct platform_device *pdev)
- 	for (i = 0; i < ARRAY_SIZE(algs); i++)
- 		crypto_unregister_ahash(&algs[i]);
- 	tasklet_kill(&dd->done_task);
--	iounmap(dd->io_base);
- 	pm_runtime_disable(&pdev->dev);
- 	dma_release_channel(dd->dma_lch);
--	if (dd->irq >= 0)
--		free_irq(dd->irq, dd);
-+	free_irq(dd->irq, dd);
- 	kfree(dd);
- 	dd = NULL;
- 
-@@ -1321,6 +1393,7 @@ static struct platform_driver omap_sham_driver = {
- 		.name	= "omap-sham",
- 		.owner	= THIS_MODULE,
- 		.pm	= &omap_sham_pm_ops,
-+		.of_match_table	= omap_sham_of_match,
- 	},
+-static struct ahash_alg algs[] = {
++static struct ahash_alg algs_sha1_md5[] = {
+ {
+ 	.init		= omap_sham_init,
+ 	.update		= omap_sham_update,
+@@ -1290,6 +1326,102 @@ static struct ahash_alg algs[] = {
+ }
  };
  
++/* OMAP4 has some algs in addition to what OMAP2 has */
++static struct ahash_alg algs_sha224_sha256[] = {
++{
++	.init		= omap_sham_init,
++	.update		= omap_sham_update,
++	.final		= omap_sham_final,
++	.finup		= omap_sham_finup,
++	.digest		= omap_sham_digest,
++	.halg.digestsize	= SHA224_DIGEST_SIZE,
++	.halg.base	= {
++		.cra_name		= "sha224",
++		.cra_driver_name	= "omap-sha224",
++		.cra_priority		= 100,
++		.cra_flags		= CRYPTO_ALG_TYPE_AHASH |
++						CRYPTO_ALG_ASYNC |
++						CRYPTO_ALG_NEED_FALLBACK,
++		.cra_blocksize		= SHA224_BLOCK_SIZE,
++		.cra_ctxsize		= sizeof(struct omap_sham_ctx),
++		.cra_alignmask		= 0,
++		.cra_module		= THIS_MODULE,
++		.cra_init		= omap_sham_cra_init,
++		.cra_exit		= omap_sham_cra_exit,
++	}
++},
++{
++	.init		= omap_sham_init,
++	.update		= omap_sham_update,
++	.final		= omap_sham_final,
++	.finup		= omap_sham_finup,
++	.digest		= omap_sham_digest,
++	.halg.digestsize	= SHA256_DIGEST_SIZE,
++	.halg.base	= {
++		.cra_name		= "sha256",
++		.cra_driver_name	= "omap-sha256",
++		.cra_priority		= 100,
++		.cra_flags		= CRYPTO_ALG_TYPE_AHASH |
++						CRYPTO_ALG_ASYNC |
++						CRYPTO_ALG_NEED_FALLBACK,
++		.cra_blocksize		= SHA256_BLOCK_SIZE,
++		.cra_ctxsize		= sizeof(struct omap_sham_ctx),
++		.cra_alignmask		= 0,
++		.cra_module		= THIS_MODULE,
++		.cra_init		= omap_sham_cra_init,
++		.cra_exit		= omap_sham_cra_exit,
++	}
++},
++{
++	.init		= omap_sham_init,
++	.update		= omap_sham_update,
++	.final		= omap_sham_final,
++	.finup		= omap_sham_finup,
++	.digest		= omap_sham_digest,
++	.setkey		= omap_sham_setkey,
++	.halg.digestsize	= SHA224_DIGEST_SIZE,
++	.halg.base	= {
++		.cra_name		= "hmac(sha224)",
++		.cra_driver_name	= "omap-hmac-sha224",
++		.cra_priority		= 100,
++		.cra_flags		= CRYPTO_ALG_TYPE_AHASH |
++						CRYPTO_ALG_ASYNC |
++						CRYPTO_ALG_NEED_FALLBACK,
++		.cra_blocksize		= SHA224_BLOCK_SIZE,
++		.cra_ctxsize		= sizeof(struct omap_sham_ctx) +
++					sizeof(struct omap_sham_hmac_ctx),
++		.cra_alignmask		= OMAP_ALIGN_MASK,
++		.cra_module		= THIS_MODULE,
++		.cra_init		= omap_sham_cra_sha224_init,
++		.cra_exit		= omap_sham_cra_exit,
++	}
++},
++{
++	.init		= omap_sham_init,
++	.update		= omap_sham_update,
++	.final		= omap_sham_final,
++	.finup		= omap_sham_finup,
++	.digest		= omap_sham_digest,
++	.setkey		= omap_sham_setkey,
++	.halg.digestsize	= SHA256_DIGEST_SIZE,
++	.halg.base	= {
++		.cra_name		= "hmac(sha256)",
++		.cra_driver_name	= "omap-hmac-sha256",
++		.cra_priority		= 100,
++		.cra_flags		= CRYPTO_ALG_TYPE_AHASH |
++						CRYPTO_ALG_ASYNC |
++						CRYPTO_ALG_NEED_FALLBACK,
++		.cra_blocksize		= SHA256_BLOCK_SIZE,
++		.cra_ctxsize		= sizeof(struct omap_sham_ctx) +
++					sizeof(struct omap_sham_hmac_ctx),
++		.cra_alignmask		= OMAP_ALIGN_MASK,
++		.cra_module		= THIS_MODULE,
++		.cra_init		= omap_sham_cra_sha256_init,
++		.cra_exit		= omap_sham_cra_exit,
++	}
++},
++};
++
+ static void omap_sham_done_task(unsigned long data)
+ {
+ 	struct omap_sham_dev *dd = (struct omap_sham_dev *)data;
+@@ -1364,7 +1496,16 @@ static irqreturn_t omap_sham_irq_omap4(int irq, void *dev_id)
+ 	return omap_sham_irq_common(dd);
+ }
+ 
++static struct omap_sham_algs_info omap_sham_algs_info_omap2[] = {
++	{
++		.algs_list	= algs_sha1_md5,
++		.size		= ARRAY_SIZE(algs_sha1_md5),
++	},
++};
++
+ static const struct omap_sham_pdata omap_sham_pdata_omap2 = {
++	.algs_info	= omap_sham_algs_info_omap2,
++	.algs_info_size	= ARRAY_SIZE(omap_sham_algs_info_omap2),
+ 	.flags		= BIT(FLAGS_BE32_SHA1),
+ 	.digest_size	= SHA1_DIGEST_SIZE,
+ 	.copy_hash	= omap_sham_copy_hash_omap2,
+@@ -1385,7 +1526,20 @@ static const struct omap_sham_pdata omap_sham_pdata_omap2 = {
+ };
+ 
+ #ifdef CONFIG_OF
++static struct omap_sham_algs_info omap_sham_algs_info_omap4[] = {
++	{
++		.algs_list	= algs_sha1_md5,
++		.size		= ARRAY_SIZE(algs_sha1_md5),
++	},
++	{
++		.algs_list	= algs_sha224_sha256,
++		.size		= ARRAY_SIZE(algs_sha224_sha256),
++	},
++};
++
+ static const struct omap_sham_pdata omap_sham_pdata_omap4 = {
++	.algs_info	= omap_sham_algs_info_omap4,
++	.algs_info_size	= ARRAY_SIZE(omap_sham_algs_info_omap4),
+ 	.flags		= BIT(FLAGS_AUTO_XOR),
+ 	.digest_size	= SHA256_DIGEST_SIZE,
+ 	.copy_hash	= omap_sham_copy_hash_omap4,
+@@ -1570,17 +1724,24 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
+ 	list_add_tail(&dd->list, &sham.dev_list);
+ 	spin_unlock(&sham.lock);
+ 
+-	for (i = 0; i < ARRAY_SIZE(algs); i++) {
+-		err = crypto_register_ahash(&algs[i]);
+-		if (err)
+-			goto err_algs;
++	for (i = 0; i < dd->pdata->algs_info_size; i++) {
++		for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
++			err = crypto_register_ahash(
++					&dd->pdata->algs_info[i].algs_list[j]);
++			if (err)
++				goto err_algs;
++
++			dd->pdata->algs_info[i].registered++;
++		}
+ 	}
+ 
+ 	return 0;
+ 
+ err_algs:
+-	for (j = 0; j < i; j++)
+-		crypto_unregister_ahash(&algs[j]);
++	for (i = dd->pdata->algs_info_size - 1; i >= 0; i--)
++		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
++			crypto_unregister_ahash(
++					&dd->pdata->algs_info[i].algs_list[j]);
+ 	pm_runtime_disable(dev);
+ 	dma_release_channel(dd->dma_lch);
+ dma_err:
+@@ -1597,7 +1758,7 @@ data_err:
+ static int __devexit omap_sham_remove(struct platform_device *pdev)
+ {
+ 	static struct omap_sham_dev *dd;
+-	int i;
++	int i, j;
+ 
+ 	dd = platform_get_drvdata(pdev);
+ 	if (!dd)
+@@ -1605,8 +1766,10 @@ static int __devexit omap_sham_remove(struct platform_device *pdev)
+ 	spin_lock(&sham.lock);
+ 	list_del(&dd->list);
+ 	spin_unlock(&sham.lock);
+-	for (i = 0; i < ARRAY_SIZE(algs); i++)
+-		crypto_unregister_ahash(&algs[i]);
++	for (i = dd->pdata->algs_info_size - 1; i >= 0; i--)
++		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
++			crypto_unregister_ahash(
++					&dd->pdata->algs_info[i].algs_list[j]);
+ 	tasklet_kill(&dd->done_task);
+ 	pm_runtime_disable(&pdev->dev);
+ 	dma_release_channel(dd->dma_lch);
 -- 
 1.7.12
