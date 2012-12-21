@@ -1,36 +1,38 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 21 Dec 2012 12:57:40 +0100
-Subject: 3.7 kernel hangs when doing scp
-In-Reply-To: <CAOMZO5CdNsFJgYW-DAeS7jEh4r+4RwyvasvJGgfzaeXM3X02bg@mail.gmail.com>
-References: <20121218024353.GA17118@kroah.com>
- <CAOMZO5DTB79e3W1_i2NLin7RWXVzraoysEGVLxv9_aoRS39D4Q@mail.gmail.com>
- <20121220043943.GA992@nchen-desktop>
- <CAOMZO5B1DyktHa0Vfb4+-H9bdxaoacas6ZCHEH0bDLuKiCB6hA@mail.gmail.com>
- <CAOMZO5B5hv+oG+8fQYyFxRb=VLOiPmC8+0LhAFLOOzBY4z6PZA@mail.gmail.com>
- <CAOMZO5Dhasq11fyJj73_UcyVdoz-N0MAHBu0=PQUxRn42VOdkw@mail.gmail.com>
- <20121221022249.GA16251@nchen-desktop>
- <CAOMZO5B3EXOB4ijh0LOhvU4g67kdz8KSXw8dvS2dOD1anu_8Bw@mail.gmail.com>
- <20121221114953.GA2678@pengutronix.de>
- <CAOMZO5CdNsFJgYW-DAeS7jEh4r+4RwyvasvJGgfzaeXM3X02bg@mail.gmail.com>
-Message-ID: <20121221115740.GB2678@pengutronix.de>
+From: elezegarcia@gmail.com (Ezequiel Garcia)
+Date: Fri, 21 Dec 2012 09:48:05 -0300
+Subject: [PATCH 0/8] Flip on multiplatform support for omap2plus for v3.9
+In-Reply-To: <20121221010518.GJ21056@atomide.com>
+References: <20121219192354.22098.33408.stgit@muffinssi.local>
+ <20121220155518.GX4989@atomide.com>
+ <CALF0-+XspOix_RiNkWN7d1L9uxBZi7Zf5SDaKcx0P7P_Z3anqA@mail.gmail.com>
+ <20121221010518.GJ21056@atomide.com>
+Message-ID: <CALF0-+Xy+w=4Bs+97WJj76-tAnb56v=hS+zLyr9ue_zBKSQoVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tony,
 
-> Only to make the compiler happy. hw_write() is now used by
-> ci_role_start(), so I re-ordered so that  hw_write comes first in the
-> code and compiler does not complain.
+On Thu, Dec 20, 2012 at 10:05 PM, Tony Lindgren <tony@atomide.com> wrote:
+>
+> Maybe use Olof's lates pull request for fixes from LAKML +
+> ARM: l2x0: Only set .set_debug on PL310 r3p0 and earlier +
+> ARM: disable errata work-arounds which access secure registers
+> and these patches?
+>
 
-Yup, spotted this on second glance. If you submit the patch, might be
-helpful to mention this.
+FYI, I've successfully booted my IGEPv2 board using:
+* arm-soc/for-next
+* igep DT patches
+* this multiplatform series
+* the two patches mentioned above
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121221/2a121596/attachment.sig>
+With this series CONFIG_MACH_IGEP0020 is not needed,
+just CONFIG_MACH_OMAP_GENERIC is selected.
+
+So I guess this means, for igep v2,
+
+Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+
+Nice job,
+
+    Ezequiel
