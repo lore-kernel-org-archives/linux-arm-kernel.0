@@ -1,45 +1,33 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 21 Dec 2012 17:58:17 +0800
-Subject: [PATCH 2/2] ARM: tegra: moving the clock gating procedure to
- tegra_cpu_kill
-In-Reply-To: <50D34467.9000006@wwwdotorg.org>
-References: <1355970519-28200-1-git-send-email-josephl@nvidia.com>
- <1355970519-28200-2-git-send-email-josephl@nvidia.com>
- <50D34467.9000006@wwwdotorg.org>
-Message-ID: <1356083897.26029.187.camel@jlo-ubuntu-64.nvidia.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 21 Dec 2012 15:32:01 +0530
+Subject: [RFC PATCH 1/5] ARM: remove useless guard in smp.c
+In-Reply-To: <1355832418-31692-2-git-send-email-mark.rutland@arm.com>
+References: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
+ <1355832418-31692-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <50D43399.7010705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-12-21 at 01:01 +0800, Stephen Warren wrote:
-> On 12/19/2012 07:28 PM, Joseph Lo wrote:
-> > The tegra_cpu_die was be executed by the CPU itslf. So the clock gating
-> > procedure won't be executed after the CPU hardware shutdown code. Moving
-> > the clock gating procedure to tegra_cpu_kill that will be run by another
-> > CPU after the CPU died.
-> 
-> Hmmm. I wonder if this is enough to make kexec-on-Tegra-with-SMP-enabled
-> work without explicitly hot-unplugging all the CPUs first... An
-> implementation of cpu_kill() was a major part of what was missing. I
-> thought an implementation of cpu_kill() would require a bunch of code
-> from cpu_die() too. Does this patch assume cpu_die() has executed first,
-> and only then cpu_kill() will work, or can cpu_kill() be used on its own?
-> 
-Yes, the tegra_cpu_die must be run first then tegra_cpu_kill. Because
-the tegra_cpu_die shutdown the CPU by itself, then we can clock gate the
-CPU in tegra_cpu_kill. If the tegra_cpu_kill be run itself, the system
-will be hung in wait_for_reset(CPU).
+On Tuesday 18 December 2012 05:36 PM, Mark Rutland wrote:
+> Currently we only provide an implementation of smp_timer_broadcast in
+> smp.c if GENERIC_CLOCKEVENTS_BROADCAST is selected. As
+> smp_timer_broadcast is only used in smp.c, smp.c depends on SMP, and
+> GENERIC_CLOCKEVENTS_BROADCAST is selected by SMP, this is unnecessary.
+>
+> This patch removes the redundant guard.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+CONFIG_GENERIC_CLOCKEVENTS_BROADCAST isn't mandatory to
+have SMP kernel working so the below select in ARM arch
+kconfig not seems to entirely accurate. SMP kernel will
+still boot with !GENERIC_CLOCKEVENTS_BROADCAST.
 
-About the kexec issue, it's complicate. Your solution should be the
-right solution. And we should implement the hardware shutdown code in
-cpu_die not cpu_kill. I suspect this issue can be reproduced on all ARM
-platform. Because the smp_send_stop can't really shutdown the secondary
-CPU core if just call machine_shutdown without disable_nonboot_cpu. And
-in platform_shutdown and platform_reboot case, the secondary CPU already
-been offlined and killed before this function be called. Does any other
-ARM SMP platform can run kexec without any issue?
+select GENERIC_CLOCKEVENTS_BROADCAST if SMP
 
-(I will check if we can do some HW shutdown in tegra_cpu_kill. For ex,
-just clock gate the CPU without wait_for_reset.)
+The issue comes only for deeper CPU power C-states.
+Anyway, you patch is correct from the current code point of
+view.
 
-Thanks,
-Joseph
+Regards
+Santosh
