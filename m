@@ -1,61 +1,42 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 21 Dec 2012 15:32:18 +0530
-Subject: [RFC PATCH 2/5] clockevents: Add generic timer broadcast receiver
-In-Reply-To: <1355832418-31692-3-git-send-email-mark.rutland@arm.com>
+Date: Fri, 21 Dec 2012 15:38:02 +0530
+Subject: [RFC PATCH 0/5] clockevents: decouple broadcast mechanism from
+ drivers
+In-Reply-To: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
 References: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
- <1355832418-31692-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <50D433AA.6070606@ti.com>
+Message-ID: <50D43502.1070402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Mark,
+
 On Tuesday 18 December 2012 05:36 PM, Mark Rutland wrote:
-> Currently the broadcast mechanism used for timers is abstracted by a
-> function pointer on struct clock_event_device. As the fundamental
-> mechanism for broadcast is architecture-specific, this ties each
-> clock_event_device driver to a single architecture, even where the
-> driver is otherwise generic.
+> In some SMP systems, cpu-local timers may stop delivering interrupts
+> when in low power states, or not all CPUs may have local timers. To
+> support these systems we have a mechanism for broadcasting timer ticks
+> to other CPUs. This mechanism relies on the struct
+> clock_event_device::broadcast function pointer, which is a
+> driver-specific mechanism for broadcasting ticks to other CPUs.
 >
-> This patch adds a standard path for the receipt of timer broadcasts, so
-> drivers and/or architecture backends need not manage redundant lists of
-> timers for the purpose of routing broadcast timer ticks.
+> As the broadcast mechanism is architecture-specific, placing the
+> broadcast function on struct clock_event_device ties each driver to a
+> single architecture. Additionally the driver or architecture backend
+> must handle the routing of broadcast ticks to the correct
+> clock_event_device, leading to duplication of the list of active
+> clock_event_devices.
 >
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->   include/linux/clockchips.h   |    4 ++++
->   kernel/time/tick-broadcast.c |   15 +++++++++++++++
->   2 files changed, 19 insertions(+), 0 deletions(-)
+> These patches introduce a generic mechanism for handling the receipt of
+> timer broadcasts, and an optional architecture-specific broadcast
+> function which allows drivers to be decoupled from a particular
+> architecture will retaining support for timer tick broadcasts. These
+> mechanisms are wired up for the arm port, and have been boot-tested on a
+> pandaboard.
 >
-> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
-> index 8a7096f..e1089aa 100644
-> --- a/include/linux/clockchips.h
-> +++ b/include/linux/clockchips.h
-> @@ -161,6 +161,10 @@ clockevents_calc_mult_shift(struct clock_event_device *ce, u32 freq, u32 minsec)
->   extern void clockevents_suspend(void);
->   extern void clockevents_resume(void);
->
-> +#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-> +extern int tick_receive_broadcast(void);
-> +#endif
-> +
-As mentioned in earlier patch, CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-isn't must for SMP kernel and hence when build with
-!GENERIC_CLOCKEVENTS_BROADCAST, $subject patch will break the build.
+Apart from the relevant comments given against couple of patches and
+Stephen's printk string comment, the series looks pretty good to me.
 
-Below is the fix for the same. Feel free to fold it if you agree.
+I have tested the series with CPUIdle where the broadcast is actually
+used actively.
 
-diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
-index 6634652..921568b 100644
---- a/include/linux/clockchips.h
-+++ b/include/linux/clockchips.h
-@@ -168,6 +168,11 @@ extern void tick_broadcast(const struct cpumask *mask);
-  #define tick_broadcast	NULL
-  #endif
-  extern int tick_receive_broadcast(void);
-+#else
-+static inline int tick_receive_broadcast(void)
-+{
-+	return 0;
-+}
-  #endif
-
-  #ifdef CONFIG_GENERIC_CLOCKEVENTS
+So feel free to add,
+Reviewed-tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
