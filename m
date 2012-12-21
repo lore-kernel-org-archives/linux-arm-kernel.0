@@ -1,52 +1,57 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 21 Dec 2012 10:04:00 -0700
-Subject: [PATCH 0/9] crypto: omap-sham - Updates & New Functionality
-Message-ID: <1356109449-11624-1-git-send-email-mgreer@animalcreek.com>
+Date: Fri, 21 Dec 2012 10:04:03 -0700
+Subject: [PATCH 3/9] crypto: omap-sham - Add suspend/resume support
+In-Reply-To: <1356109449-11624-1-git-send-email-mgreer@animalcreek.com>
+References: <1356109449-11624-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1356109449-11624-4-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-[This supersedes the omap-sham driver patches sent in the
- "crypto: omap-sham updates" series sent a few weeks ago.]
+Add suspend/resume support to the OMAP SHAM driver.
 
-This patch series does several things to the omap-sham crypto
-driver including:
- - converting to use pm_runtime
- - adding suspend/resume support
- - converting to use dmaengine API
- - adding device tree support
- - adding OMAP4/AM33XX support
- - adding SHA224 and SHA256 support
- - some minor cleanups
+CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ drivers/crypto/omap-sham.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-The patches are based on the current k.o. kernel, plus:
- - the ARM hwmod, etc patches from
-   "[PATCH 00/15] OMAP SHAM & AES Crypto Updates"
-   (http://marc.info/?l=linux-omap&m=135610732120447&w=2)
- - the EDMA dmaengine patches submitted by Matt Porter
-   "[RFC PATCH v3 00/16] DMA Engine support for AM33XX]"
-   (https://lkml.org/lkml/2012/10/18/256)
- - some misc patches required by the EDMA patches
- - a hack to fix the compilation error that the current k.o. kernel has
-
-A working examle is here:
-
-	git at github.com:mgreeraz/linux-mag.git submitted/crypto/sham
-
-Mark A. Greer (9):
-  crypto: omap-sham - Remove unnecessary pr_info noise
-  crypto: omap-sham - Convert to use pm_runtime API
-  crypto: omap-sham - Add suspend/resume support
-  crypto: omap-sham - Add code to use dmaengine API
-  crypto: omap-sham - Remove usage of private DMA API
-  crypto: omap-sham - Add Device Tree Support
-  crypto: omap-sham - Convert to dma_request_slave_channel_compat()
-  crypto: omap-sham - Add OMAP4/AM33XX SHAM Support
-  crypto: omap-sham - Add SHA224 and SHA256 Support
-
- drivers/crypto/omap-sham.c | 913 +++++++++++++++++++++++++++++++++++----------
- 1 file changed, 718 insertions(+), 195 deletions(-)
-
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index 777eb9f..9c3b096 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -1269,12 +1269,31 @@ static int __devexit omap_sham_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int omap_sham_suspend(struct device *dev)
++{
++	pm_runtime_put_sync(dev);
++	return 0;
++}
++
++static int omap_sham_resume(struct device *dev)
++{
++	pm_runtime_get_sync(dev);
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops omap_sham_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(omap_sham_suspend, omap_sham_resume)
++};
++
+ static struct platform_driver omap_sham_driver = {
+ 	.probe	= omap_sham_probe,
+ 	.remove	= omap_sham_remove,
+ 	.driver	= {
+ 		.name	= "omap-sham",
+ 		.owner	= THIS_MODULE,
++		.pm	= &omap_sham_pm_ops,
+ 	},
+ };
+ 
 -- 
 1.7.12
