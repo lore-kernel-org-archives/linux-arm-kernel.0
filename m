@@ -1,39 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Dec 2012 16:21:32 +0000
-Subject: [PATCH] mmc: mmci: Gate the clock when freq is 0
-In-Reply-To: <1355327421-20187-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1355327421-20187-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20121221162132.GI14363@n2100.arm.linux.org.uk>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Fri, 21 Dec 2012 09:28:02 -0700
+Subject: [PATCH 02/15] ARM: OMAP2xxx: hwmod: Add DMA support for SHAM module
+In-Reply-To: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
+References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1356107295-11121-3-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 04:50:21PM +0100, Ulf Hansson wrote:
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index edc3e9b..bf07823 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -1147,6 +1147,15 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  		}
->  	}
->  
-> +	/*
-> +	 * If clock = 0 and the block needs a certain value in the clreg
-> +	 * to function, we need to gate the clock by removing MCI_PWR_ON.
-> +	 * This is a special case for ST Micro variants, since the power
-> +	 * register in the ARM legacy case is used for powering the cards.
+From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-I wish you'd stop using "legacy" when talking about the ARM primecell.
-How can it be legacy when ARMs current development boards still use this
-primecell?
+The current OMAP2 SHAM support doesn't enable DMA
+so add that support so it can use DMA just like OMAP3.
 
-> +	 */
-> +	if (!ios->clock && variant->clkreg)
-> +		pwr &= ~MCI_PWR_ON;
+CC: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c | 2 +-
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 6 ++++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-This is horrid.  You're overloading the clkreg default value with another
-meaning here - "if we have any bits set in the default value for the
-MCICLOCK register, the MCIPOWER register has special meanings for the
-power control bits".
-
-When you think about it as I've described it above, do you think this is
-an acceptable solution to this problem?
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
+index 8a9b67a..510f584 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
+@@ -405,5 +405,5 @@ struct omap_hwmod_ocp_if omap2xxx_l4_core__sham = {
+ 	.slave		= &omap2xxx_sham_hwmod,
+ 	.clk		= "sha_ick",
+ 	.addr		= omap2xxx_sham_addrs,
+-	.user		= OCP_USER_MPU,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+index e72132d..ab3305b 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+@@ -886,9 +886,15 @@ struct omap_hwmod_irq_info omap2_sham_mpu_irqs[] = {
+ 	{ .irq = -1 }
+ };
+ 
++struct omap_hwmod_dma_info omap2_sham_sdma_chs[] = {
++	{ .name = "rx", .dma_req = 13 },
++	{ .dma_req = -1 }
++};
++
+ struct omap_hwmod omap2xxx_sham_hwmod = {
+ 	.name		= "sham",
+ 	.mpu_irqs	= omap2_sham_mpu_irqs,
++	.sdma_reqs	= omap2_sham_sdma_chs,
+ 	.main_clk	= "l4_ck",
+ 	.prcm		= {
+ 		.omap2 = {
+-- 
+1.7.12
