@@ -1,68 +1,111 @@
-From: dianders@chromium.org (Doug Anderson)
+From: kgene.kim@samsung.com (Kukjin Kim)
 Date: Fri, 21 Dec 2012 10:13:50 -0800
-Subject: [PATCH v3 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
-In-Reply-To: <CAFp+6iFSZjfVJp23j2dEz0hRap07RMo68GJpsQM7YqOMBCbqsQ@mail.gmail.com>
-References: <1355416562-25539-1-git-send-email-gautam.vivek@samsung.com>
- <1355416562-25539-2-git-send-email-gautam.vivek@samsung.com>
- <20121215072312.EBCAA3E0C06@localhost>
- <CAFp+6iHoS4XJWHNrsyVsQS4bYZs1PUNEGsRr=EqAS7kpm2XGMQ@mail.gmail.com>
- <CAFp+6iFSZjfVJp23j2dEz0hRap07RMo68GJpsQM7YqOMBCbqsQ@mail.gmail.com>
-Message-ID: <CAD=FV=X=GRz0ZuFSqEHPy6i2ULtHk==M2_gaCvdmd=81YMNmMg@mail.gmail.com>
+Subject: [PATCH v2 1/4] ODROID-X: dts: Add board dts file for ODROID-X
+In-Reply-To: <1356111423-3454-2-git-send-email-tobetter@gmail.com>
+References: <1356111423-3454-1-git-send-email-tobetter@gmail.com>
+ <1356111423-3454-2-git-send-email-tobetter@gmail.com>
+Message-ID: <007b01cddfa6$f158b460$d40a1d20$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vivek,
+Dongjin Kim wrote:
+> 
+> Add initial dtb file for Hardkernel's ODROID-X board based on EXYNOS4412
+> SoC.
+> 
+> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile               |    1 +
+>  arch/arm/boot/dts/exynos4412-odroidx.dts |   47
+> ++++++++++++++++++++++++++++++
+>  2 files changed, 48 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/exynos4412-odroidx.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index d077ef8..364d67b 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -44,6 +44,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-
+> origen.dtb \
+>  	exynos4210-trats.dtb \
+>  	exynos5250-smdk5250.dtb \
+>  	exynos5440-ssdk5440.dtb \
+> +	exynos4412-odroidx.dtb \
+>  	exynos4412-smdk4412.dtb \
+>  	exynos5250-smdk5250.dtb \
+>  	exynos5250-snow.dtb
 
+Just now, I sorted out the ordering alphabetically and submitted.
 
-On Fri, Dec 21, 2012 at 12:16 AM, Vivek Gautam
-<gautamvivek1987@gmail.com> wrote:
-> Hi all,
->
->
-> On Wed, Dec 19, 2012 at 7:20 PM, Vivek Gautam <gautamvivek1987@gmail.com> wrote:
->> CC: Doug Anderson
->>
->>
->> On Sat, Dec 15, 2012 at 12:53 PM, Grant Likely
->> <grant.likely@secretlab.ca> wrote:
->>> On Thu, 13 Dec 2012 22:06:01 +0530, Vivek Gautam <gautam.vivek@samsung.com> wrote:
->>>> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
->>>> index 462e5ac..b3b9af1 100644
->>>> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
->>>> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
->>>> @@ -110,6 +110,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
->>>>                               "samsung-i2s.1", NULL),
->>>>       OF_DEV_AUXDATA("samsung,samsung-i2s", 0x12D70000,
->>>>                               "samsung-i2s.2", NULL),
->>>> +     OF_DEV_AUXDATA("samsung,exynos4210-ehci", EXYNOS5_PA_EHCI,
->>>> +                             "s5p-ehci", NULL),
->>>
->>> I'm assuming the above change is temporary. What is left to be done to
->>> drop the auxdata in theses two patches?
->>>
->>> Otherwise the patch looks fine.
->>>
->>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
->
-> Any more thought about this patch?
-> Or does this change seems fine?
+> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts
+> b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> new file mode 100644
+> index 0000000..323ed177
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> @@ -0,0 +1,47 @@
+> +/*
+> + * Hardkernel's Exynos4412 based ODROID-X board device tree source
+> + *
+> + * Copyright (c) 2012 Dongjin Kim <tobetter@gmail.com>
+> + *
+> + * Device tree source file for Hardkernel's ODROID-X board which is based
+> on
+> + * Samsung's Exynos4412 SoC.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +/dts-v1/;
+> +/include/ "exynos4412.dtsi"
+> +
+> +/ {
+> +	model = "Hardkernel ODROID-X board based on Exynos4412";
+> +	compatible = "hardkernel,exynos4412", "samsung,exynos4412";
 
-I'm fairly certain we can just drop the OF_DEV_AUXDATA entry here.  I
-haven't been following this as closely as I should, but I know that
-the comment for this table says that the whole purpose is to override
-device names and that it should be temporary.  We don't need to do any
-overriding of device names here, do we?
+Probably, 
 
-When I drop this (and the ohci and phy) entries from my table I can
-still boot and still can use USB.  The big difference is what shows up
-in dmesg
++	compatible = "hardkernel,odroid-x", "samsung,exynos4412";
 
-[    1.605000] s5p-ehci s5p-ehci: S5P EHCI Host Controller
+> +
+> +	memory {
+> +		reg = <0x40000000 0x40000000>;
 
-Becomes:
+If you can't see any error message in kernel boot, boot-loader should inform
+the memory size and bank information to the kernel. So should be separated
+with bank size, 256MiB. But I need to think again as Olof said in other
+thread.
 
-[    1.550000] s5p-ehci 12110000.usb: S5P EHCI Host Controller
+> +	};
+> +
+> +	serial at 13800000 {
+> +		status = "okay";
+> +	};
+> +
+> +	serial at 13810000 {
+> +		status = "okay";
+> +	};
+> +
+> +	serial at 13820000 {
+> +		status = "okay";
+> +	};
+> +
+> +	serial at 13830000 {
+> +		status = "okay";
+> +	};
+> +
+> +	sdhci at 12530000 {
+> +		bus-width = <4>;
+> +		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+> +		pinctrl-names = "default";
+> +		status = "okay";
+> +	};
+> +};
+> --
+> 1.7.9.5
 
-...and some sysfs paths change.
+BTW, you don't need any bootargs as default?
 
--Doug
+- Kukjin
