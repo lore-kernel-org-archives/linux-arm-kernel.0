@@ -1,73 +1,85 @@
-From: torbenh@linutronix.de (Torben Hohn)
-Date: Fri, 21 Dec 2012 15:06:15 +0100
-Subject: [PATCH 1/2] mxs timer: use ahbx bus clock to drive the timers on
- timrotv2
-In-Reply-To: <1356098776-10498-1-git-send-email-torbenh@linutronix.de>
-References: <1356098776-10498-1-git-send-email-torbenh@linutronix.de>
-Message-ID: <1356098776-10498-2-git-send-email-torbenh@linutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Dec 2012 15:48:59 +0100
+Subject: [PATCH v2] Device Tree binding for the mvsdio driver and related
+ changes
+Message-ID: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-timer resolution of ~32us is pretty low.
-v2 has 32bits resolution, so we have quite some headroom, and
-can use the 24MHz clock.
-v1 has only 16bits, so we only increase v2.
+Hello,
 
-So we just exchange the timrot clock in imx28.
-On imx23 we have timrotv1 and everything stays the same.
+This series of patches adds a Device Tree binding to the mvsdio driver
+(the driver for the SDIO interface found in many Marvell SoCs), and
+uses this binding to enable the SDIO interface on Armada 370 and
+Armada XP platforms, as well as converting the Kirkwood platforms to
+using the Device Tree to probe the SDIO interface.
 
-Signed-off-by: Torben Hohn <torbenh@linutronix.de>
----
- arch/arm/mach-mxs/timer.c   |    9 +++++----
- drivers/clk/mxs/clk-imx28.c |    2 +-
- 2 files changed, 6 insertions(+), 5 deletions(-)
+The series has been tested on Kirkwood Topkick, Armada 370 Mirabox,
+Armada XP OpenBlocks, Armada 370 DB and Armada XP DB. The changes on
+the Dreamplug and MPLCEC4 boards should be tested by their respective
+maintainers if possible.
 
-diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
-index 856f4c7..689a2b5 100644
---- a/arch/arm/mach-mxs/timer.c
-+++ b/arch/arm/mach-mxs/timer.c
-@@ -72,8 +72,9 @@
- #define BM_TIMROT_TIMCTRLn_IRQ_EN	(1 << 14)
- #define BM_TIMROT_TIMCTRLn_IRQ		(1 << 15)
- #define BP_TIMROT_TIMCTRLn_SELECT	0
--#define BV_TIMROTv1_TIMCTRLn_SELECT__32KHZ_XTAL	0x8
--#define BV_TIMROTv2_TIMCTRLn_SELECT__32KHZ_XTAL	0xb
-+#define BV_TIMROTv1_TIMCTRLn_SELECT__32KHZ_XTAL		0x8
-+#define BV_TIMROTv2_TIMCTRLn_SELECT__32KHZ_XTAL		0xb
-+#define BV_TIMROTv2_TIMCTRLn_SELECT__TICK_ALWAYS	0xf
- 
- static struct clock_event_device mxs_clockevent_device;
- static enum clock_event_mode mxs_clockevent_mode = CLOCK_EVT_MODE_UNUSED;
-@@ -288,7 +289,7 @@ void __init mxs_timer_init(void)
- 	/* one for clock_event */
- 	__raw_writel((timrot_is_v1() ?
- 			BV_TIMROTv1_TIMCTRLn_SELECT__32KHZ_XTAL :
--			BV_TIMROTv2_TIMCTRLn_SELECT__32KHZ_XTAL) |
-+			BV_TIMROTv2_TIMCTRLn_SELECT__TICK_ALWAYS) |
- 			BM_TIMROT_TIMCTRLn_UPDATE |
- 			BM_TIMROT_TIMCTRLn_IRQ_EN,
- 			mxs_timrot_base + HW_TIMROT_TIMCTRLn(0));
-@@ -296,7 +297,7 @@ void __init mxs_timer_init(void)
- 	/* another for clocksource */
- 	__raw_writel((timrot_is_v1() ?
- 			BV_TIMROTv1_TIMCTRLn_SELECT__32KHZ_XTAL :
--			BV_TIMROTv2_TIMCTRLn_SELECT__32KHZ_XTAL) |
-+			BV_TIMROTv2_TIMCTRLn_SELECT__TICK_ALWAYS) |
- 			BM_TIMROT_TIMCTRLn_RELOAD,
- 			mxs_timrot_base + HW_TIMROT_TIMCTRLn(1));
- 
-diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-index db3af08..0174270 100644
---- a/drivers/clk/mxs/clk-imx28.c
-+++ b/drivers/clk/mxs/clk-imx28.c
-@@ -238,7 +238,7 @@ int __init mx28_clocks_init(void)
- 		of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
- 	}
- 
--	clk_register_clkdev(clks[clk32k], NULL, "timrot");
-+	clk_register_clkdev(clks[xbus], NULL, "timrot");
- 	clk_register_clkdev(clks[enet_out], NULL, "enet_out");
- 
- 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
--- 
-1.7.10.4
+This series is obviously 3.9 material.
+
+Here is a short description of the patches:
+
+ * Patches 1 and 2 cleanup the mvsdio driver initialization by using
+   the slot-gpio helpers for the card-detect and write-protect GPIOs
+
+ * Patch 3 adds the Device Tree binding itself to the mvsdio driver
+
+ * Patch 4 adds pinctrl integration to the mvsdio driver
+
+ * Patch 5 adds Device Tree information to describe the SDIO interface
+   on the Armada 370 and Armada XP SoCs.
+
+ * Patches 6 and 7 add pin muxing options for the SDIO interface on
+   Armada 370 and Armada XP SoCs.
+
+ * Patches 8, 9, 10 enable the SDIO interface on the Armada XP DB,
+   Armada 370 DB and Globalscale Mirabox platforms.
+
+ * Patch 11 adds Device Tree information to describe the SDIO
+   interface on the Kirkwood SoCs.
+
+ * Patches 12 and 13 convert the Dreamplug and mplcec4 Kirkwood
+   platforms to use the Device Tree to probe their SDIO interface and
+   mux the corresponding pins.
+
+ * Patch 14 adds a pin mux option for the SDIO interface on the
+   88F6282 SoC, which is used in the Topkick platform.
+
+ * Patch 15 makes the Topkick DTS file inherit the kirkwood-8262.dtsi,
+   so that it gets the pinctrl definition.
+
+ * Patch 16 converts the Kirkwood Topkick platform to use the Device
+   Tree to probe its SDIO interface and mux the corresponding pins.
+
+ * Patch 17 removes a useless header inclusion related to the SDIO
+   interface to the Kirkwood Dockstar platform.
+
+ * Patches 18, 19 and 20 update the mvebu_defconfig to enable the
+   mvsdio driver, as well as Wifi/Bluetooth drivers needed for the
+   SD8787 chip connected over SDIO on the Globalscale Mirabox.
+
+Changes since v1:
+
+ * On Kirkwood Dreamplug, use the Device Tree to mux the SDIO pins,
+   and remove a header inclusion that has become useless in the board
+   C file. Requested by Andrew Lunn.
+
+ * On Kirkwood MPLCEC4, use the Device Tree to mux the SDIO pins, and
+   remove a header inclusion that has become useless in the board C
+   file. Requested by Andrew Lunn.
+
+ * Add a pin mux option for the SDIO interface in the 88F6282 SoC.
+
+ * Make the Kirkwood Topkick DTS file inherit the 88F6282 DTSI file.
+
+ * On Kirkwood Topkick, use the Device Tree to mux the SDIO pins, and
+   remove a header inclusion that has become useless in the board C
+   file. Requested by Andrew Lunn.
+
+Best regards,
+
+Thomas
