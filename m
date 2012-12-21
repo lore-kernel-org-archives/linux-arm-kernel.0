@@ -1,26 +1,83 @@
-From: grossman@bbn.com (Martin Grossman)
-Date: Fri, 21 Dec 2012 09:50:38 -0500
-Subject: Looking for a V3.X kernel am3517_evm_defconfig file (3.5.7 preferred)
-Message-ID: <50D4773E.80802@bbn.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Dec 2012 15:49:15 +0100
+Subject: [PATCH v2 16/20] arm: kirkwood: topkick: use Device Tree to probe SDIO
+In-Reply-To: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1356101359-6054-17-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Does anyone know where I can find this file?
+Now that the mvsdio driver has a Device Tree binding, and the SDIO
+controller is declared in kirkwood.dtsi, migrate the topkick board to
+use the Device Tree to probe the SDIO controller and mux the pins of
+the SDIO interface properly.
 
-I have tried bringing a 2.6.32 version into a 3.5.7 without any changes
-from kernel.org
-and the uncompress (piggy) code works but then it hangs.
+The patch has been tested on the Topkick hardware. However, due to an
+apparently unrelated problem, it is unable to detect the Wifi chip
+connected on the SDIO bus.
 
-Are there any patches I need?
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+---
+Changes since v1:
+ * Remove the useless header inclusion from board-usi_topkick.c, now
+   that the SDIO interface is probed from the Device Tree.
+ * Reference the pmx_sdio muxing option from the DT node describing
+   the SDIO interface, in order to get proper muxing of this
+   interface.
+---
+ arch/arm/boot/dts/kirkwood-topkick.dts     |    9 +++++++++
+ arch/arm/mach-kirkwood/board-usi_topkick.c |    6 ------
+ 2 files changed, 9 insertions(+), 6 deletions(-)
 
-PS I've already fixed the command line /dev/ttyS2 to /dev/tty02 changes
-but still no output.
-     So I have no idea if its not running (something else wrong in the
-config),
-     or its running OK but just not seeing any console output.
-
-PPS This is on a AM3505/3517 Zoom eval board with a AM3517 chip and it
-currently boots kernel (uImage)
-Linux version 2.6.32 (schuyler_2 at neo) (gcc version 4.3.3 (Sourcery G++
-Lite 2009q1-203) ) #1 Tue Jan 25 16:18:32 CST 2011
-from either the SD card or via tftp (with rootfs always on SD).
+diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
+index 8f4a5b8..82329b5 100644
+--- a/arch/arm/boot/dts/kirkwood-topkick.dts
++++ b/arch/arm/boot/dts/kirkwood-topkick.dts
+@@ -55,6 +55,15 @@
+ 			status = "okay";
+ 			nr-ports = <1>;
+ 		};
++
++
++		mvsdio at 90000 {
++			pinctrl-0 = <&pmx_sdio>;
++			pinctrl-names = "default";
++			status = "okay";
++			/* No CD or WP GPIOs */
++		};
++
+ 	};
+ 
+ 	gpio-leds {
+diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
+index 15e69fc..6c83416 100644
+--- a/arch/arm/mach-kirkwood/board-usi_topkick.c
++++ b/arch/arm/mach-kirkwood/board-usi_topkick.c
+@@ -14,7 +14,6 @@
+ #include <linux/init.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+-#include <linux/platform_data/mmc-mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+@@ -22,10 +21,6 @@ static struct mv643xx_eth_platform_data topkick_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+ };
+ 
+-static struct mvsdio_platform_data topkick_mvsdio_data = {
+-	/* unfortunately the CD signal has not been connected */
+-};
+-
+ /*
+  * GPIO LED layout
+  *
+@@ -77,5 +72,4 @@ void __init usi_topkick_init(void)
+ 	gpio_set_value(TOPKICK_SATA0_PWR_ENABLE, 1);
+ 
+ 	kirkwood_ge00_init(&topkick_ge00_data);
+-	kirkwood_sdio_init(&topkick_mvsdio_data);
+ }
+-- 
+1.7.9.5
