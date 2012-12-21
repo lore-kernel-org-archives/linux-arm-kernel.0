@@ -1,128 +1,96 @@
 From: pratikp@codeaurora.org (Pratik Patel)
-Date: Fri, 21 Dec 2012 14:18:28 -0800
-Subject: CoreSight framework and drivers
-In-Reply-To: <50D3972E.4030607@ti.com>
-References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
- <20121219112314.GA26329@mudshark.cambridge.arm.com>
- <50D1F37E.6000804@ti.com>
- <20121219212431.GC23594@pratikp-linux.qualcomm.com>
- <50D34EE5.8090407@ti.com>
- <20121220195127.GA14877@pratikp-linux.qualcomm.com>
- <50D3972E.4030607@ti.com>
-Message-ID: <20121221221828.GA2658@pratikp-linux.qualcomm.com>
+Date: Fri, 21 Dec 2012 14:27:03 -0800
+Subject: [RFC 3/5] ARM: CTI: Convert CTI helpers to AMBA bus driver
+In-Reply-To: <1355348588-22318-4-git-send-email-jon-hunter@ti.com>
+References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
+ <1355348588-22318-4-git-send-email-jon-hunter@ti.com>
+Message-ID: <20121221222703.GB2658@pratikp-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 04:54:38PM -0600, Jon Hunter wrote:
-> 
-> On 12/20/2012 01:51 PM, Pratik Patel wrote:
-> > On Thu, Dec 20, 2012 at 11:46:13AM -0600, Jon Hunter wrote:
-> >>
-> >> On 12/19/2012 03:24 PM, Pratik Patel wrote:
-> >>
-> >> [snip]
-> >>
-> >>> Currently we use the CoreSight virtual bus to conveniently list
-> >>> sysfs configuration attributes for all the registered CoreSight
-> >>> devices.
-> >>>
-> >>> For eg:
-> >>> /sys/bus/coresight/devices/coresight-etm0/<attribute>
-> >>> /sys/bus/coresight/devices/coresight-etm1/<attribute>
-> >>> /sys/bus/coresight/devices/coresight-stm/<attribute>
-> >>> /sys/bus/coresight/devices/coresight-tmc-etf/<attribute>
-> >>> ...
-> >>> ...
-> >>>
-> >>> Some of the attributes are based on device type (i.e. source,
-> >>> link or sink) so they will exist for all devices of that type
-> >>> while some are device specific.
-> >>>
-> >>> Maybe I am misunderstanding the question but are you suggesting
-> >>> to register CoreSight devices to the AMBA bus instead of the
-> >>> CoreSight core layer code?
-> >>
-> >> Yes exactly.
-> >>
-> >>> Will Deacon mentioned earlier that AMBA framework can be changed
-> >>> to accomodate devices with a different class but I am more
-> >>> concerned with losing some of the stuff that the core layer code
-> >>> does (eg. coresight_register, coresight_enable, coresight_disable
-> >>> in coresight.c) if we register CoreSight drivers to the AMBA bus
-> >>> without letting the core layer know about the device connections.
-> >>
-> >> I may be missing something, but couldn't you keep all the
-> >> register/enable/disable stuff but just register the device with the amba
-> >> bus? Obviously some changes would need to be made.
-> >>
-> > 
-> > Ok, so are you referring to making CoreSight devices register
-> > with AMBA bus instead of platform bus keeping everything else
-> > intact?
-> 
-> Yes exactly. However, please note I am not saying that we should do
-> this, and I asking what direction does the community want us to take
-> here? Platform bus or AMBA bus?
-> 
-> >> Personally, I don't have strong feeling either way, but we have ETM/ETB
-> >> drivers using AMBA today and so I am hoping we can come to agreement on
-> >> this going forward.
-> >>
-> >> Russell, Will, what are your thoughts?
-> >>
-> >> Otherwise, looking at the code, I like what you have implemented. I
-> >> still need to look closer, but I am struggling to figure out how a
-> >> coresight device such as the cross-trigger-interface fits with this
-> >> model. This model appears to be geared towards coresight devices used
-> >> for traces purposes and are either source, links or sinks. The
-> >> cross-trigger-interface is not a source or a sink. However, although you
-> >> it could be considered as a link (routing events), it is not really, as
-> >> it may not link to other coresight sinks/source.
-> >>
-> >> In my case, I have PMU-IRQ --> CTI --> GIC. So a non-coresight source
-> >> and sink. In away the CTI looks more like a 2nd-level interrupt
-> >> controller than anything else. Hence, another type of coresight device
-> >> may be needed in addition to source, links and sinks. Or link is
-> >> extended in some way to connect to non-coresight sources/sinks.
-> >>
-> >> Let me know if you have any thoughts.
-> >>
-> > 
-> > I had left the "None" type for miscellaneous stuff but I agree it
-> > should be a separate type - maybe "debug".
-> > 
-> > Having said that I like the CTI driver you have uploaded. Need to
-> > look at it in more detail. Since CTI connections can vary between
-> > chip to chip, we need a generic way to deal with it.
-> 
-> Yes if you have any ideas let me know. As Will had mentioned it would be
-> good to have a common function table all these devices could use too. I
-> will take a closer look at what you have.
-> 
+On Wed, Dec 12, 2012 at 03:43:06PM -0600, Jon Hunter wrote:
+> +
+> +/**
+> + * cti_irq_ack - acknowledges the CTI trigger output
+> + * @cti: CTI instance
+> + *
+> + * Acknowledges the CTI trigger output by writting to the appropriate
+> + * bit in the CTI interrupt acknowledge register.
+> + */
+> +int cti_irq_ack(struct cti *cti)
+> +{
+> +	u32 v;
+> +
+> +	if (!cti || !cti->enabled)
+> +		return -EINVAL;
+> +
+> +	v = cti_readl(cti, CTIINTACK);
 
-I had started on a CTI driver much in line with your current
-implementation but your approach looks good to me.
+Just curious if CTIINTACK is a read-write register? This is a
+read-only for us.
 
-Looking at the code though, I couldn't find a way to perform a
-mapping between two different CTIs. Reason I ask is because we
-have use cases where we need to map one CTIs input to another
-CTIs output on the same channel.
+> +	v |= BIT(cti->trig_out);
+> +	cti_writel(v, cti, CTIINTACK);
+> +
+> +	return 0;
+> +}
+> +
+> +
+> +static int cti_probe(struct amba_device *dev, const struct amba_id *id)
+> +{
+> +	struct cti *cti;
+> +	struct device_node *np = dev->dev.of_node;
+> +	int rc;
+> +
+> +	if (!np) {
+> +		dev_err(&dev->dev, "device-tree not found!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	cti = devm_kzalloc(&dev->dev, sizeof(struct cti), GFP_KERNEL);
+> +	if (!cti) {
+> +		dev_err(&dev->dev, "memory allocation failed!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	rc = of_property_read_string_index(np, "arm,cti-name", 0, &cti->name);
+> +	if (rc) {
+> +		dev_err(&dev->dev, "no name found for CTI!\n");
+> +		return rc;
+> +	}
 
-Do you intend to support different entities within kernel to map
-different trig_in or trig_out on the same CTI? If so, it might
-probably require reference counting for the enable/disable.
+Shouldn't the CTI driver have some kind of clock management that
+it does for itself?
 
-What user interface do you plan to provide for the CTI? Maybe
-something consistent with other CoreSight components in sysfs to
-allow users to enable, disable, map and unmap ???
-
-Please let me know your thoughts.
-
-CTIs can easily be made part of the CoreSight core layer using a
-different type but apart from being part of the CoreSight list
-containing all the trace and CTI components, not sure if there is
-anything that is useful to do in the core layer. Need to think
-about this.
+> +
+> +	if (!dev->irq[0]) {
+> +		dev_err(&dev->dev, "no CTI interrupt found!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	cti->irq = dev->irq[0];
+> +	cti->base = of_iomap(np, 0);
+> +	if (!cti->base) {
+> +		dev_err(&dev->dev, "unable to map CTI registers!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	cti->dev = &dev->dev;
+> +	amba_set_drvdata(dev, cti);
+> +	list_add_tail(&cti->node, &cti_list);
+> +
+> +	/*
+> +	 * AMBA bus driver has already enabled RPM and incremented
+> +	 * use-count, so now we can safely decrement the use-count
+> +	 * and allow the CTI driver to manage RPM for the device.
+> +	 */
+> +	pm_runtime_put(&dev->dev);
+> +
+> +	dev_info(&dev->dev, "ARM CTI driver");
+> +
+> +	return 0;
+> +}
+> +
 
 -- 
 Employee of Qualcomm Innovation Center, Inc.
