@@ -1,37 +1,41 @@
 From: tobetter@gmail.com (Dongjin Kim)
-Date: Sat, 22 Dec 2012 02:37:01 +0900
-Subject: [PATCH v2 2/4] ODROID-X: dts: Add fixed-regulator for peripherals.
+Date: Sat, 22 Dec 2012 02:37:02 +0900
+Subject: [PATCH v2 3/4] ODROID-X: dts: Add nodes for leds based on GPIO.
 In-Reply-To: <1356111423-3454-1-git-send-email-tobetter@gmail.com>
 References: <1356111423-3454-1-git-send-email-tobetter@gmail.com>
-Message-ID: <1356111423-3454-3-git-send-email-tobetter@gmail.com>
+Message-ID: <1356111423-3454-4-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the node to support fixed voltage for peripherals like LED,
-ethernet controller.
+This patch adds GPIO connected LEDS on ODROID-X board, and describe its
+properties.
 
 Signed-off-by: Dongjin Kim <tobetter@gmail.com>
 ---
- arch/arm/boot/dts/exynos4412-odroidx.dts |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/exynos4412-odroidx.dts |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-index 323ed177..3d53663 100644
+index 3d53663..e5c57c1 100644
 --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
 +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-@@ -44,4 +44,14 @@
- 		pinctrl-names = "default";
- 		status = "okay";
+@@ -54,4 +54,18 @@
+ 		enable-active-high;
+ 		regulator-boot-on;
  	};
 +
-+	regulator_p3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "p3v3_en";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpa1 1 0>;
-+		enable-active-high;
-+		regulator-boot-on;
++	leds {
++		compatible = "gpio-leds";
++		led1 {
++			label = "led1:heart";
++			gpios = <&gpc1 0 0>;
++			linux,default-trigger = "heartbeat";
++		};
++		led2 {
++			label = "led2:mmc0";
++			gpios = <&gpc1 2 0>;
++			linux,default-trigger = "mmc0";
++		};
 +	};
  };
 -- 
