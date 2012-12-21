@@ -1,53 +1,50 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Fri, 21 Dec 2012 09:48:40 +0530
-Subject: [PATCH] ARM: tegra: dts: add aliases and DMA requestor for serial
- controller
-In-Reply-To: <50D344E9.70305@wwwdotorg.org>
-References: <1355898671-3960-1-git-send-email-ldewangan@nvidia.com>
- <50D1F2CB.3090206@wwwdotorg.org> <50D2AD02.6060101@nvidia.com>
- <50D344E9.70305@wwwdotorg.org>
-Message-ID: <50D3E320.2090804@nvidia.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 21 Dec 2012 13:02:11 +0800
+Subject: [PATCH V3 3/5] ARM: tegra20: clocks: add CPU low-power
+ function into tegra_cpu_car_ops
+In-Reply-To: <50D34F12.9080801@wwwdotorg.org>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <1355797861-12759-4-git-send-email-josephl@nvidia.com>
+ <50D34F12.9080801@wwwdotorg.org>
+Message-ID: <1356066131.26029.26.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 December 2012 10:33 PM, Stephen Warren wrote:
-> On 12/19/2012 11:15 PM, Laxman Dewangan wrote:
->> On Wednesday 19 December 2012 10:30 PM, Stephen Warren wrote:
->>> On 12/18/2012 11:31 PM, Laxman Dewangan wrote:
->>>> Add APB DMA requestor and serial aliases for serial controller.
->>>> There will be two serial driver i.e. 8250 based simple serial driver
->>>> and APB DMA based serial driver for higher baudrate and performace.
->>>>
->>>> The simple serial driver get enabled with compatible nvidia,tegra20-uart
->>>> and APB DMA based driver will get enabled with compatible
->>>> nvidia,tegra20-hsuart.
->>> This patch seems to do two things:
->>>
->>> 1) Add a comment describing how to select the basic or DMA-based driver.
->>> I can see why this is useful.
->>>
->>> 2) Add aliases for the serial ports. I have no idea why this is useful.
->> Serial aliases are added because we want to get the port number like
->> /dev/ttyTHS0,  /d/ttyTHS2 etc. The uarta should be /dev/ttyTHS0 and
->> uartc should be /dev/ttyTHS2. The port number can be found using aliases
->> and of_alias_get_id() in driver file:
->>
->> port_number = of_alias_get_id(np, "serial");
-> Oh, I see. I guess the aliases make sense then.
->
-> But, wouldn't you only add aliases for the specific UARTs that are in
-> use on a particular board (so put them in tegraNN-board.dts) rather than
-> all UARTs on Tegra (i.e. the current patch which puts them into
-> tegraNN.dtsi)?
+On Fri, 2012-12-21 at 01:46 +0800, Stephen Warren wrote:
+> On 12/17/2012 07:30 PM, Joseph Lo wrote:
+> > Add suspend, resume and rail_off_ready API into tegra_cpu_car_ops. These
+> > functions were used for CPU powered-down state maintenance.
+> 
+> I think this isn't adding those functions into tegra_cpu_car_ops, but
+> rather implementing the already existing function pointers for Tegra20,
+> right?
+> 
+Yes, exactly.
 
-I like to have this in tegraN N.dtsi file becasue:
-- This policy is not going to change the board to board. For high speed 
-driver the uarta will be ttyTHS0 and uartb ttyTHS1.
-- In board file I will only enable driver and make compatible, not worry 
-about the making aliases.
+> This patch touches the clock driver and Prashant will soon be posting
+> patches that significantly rework the clock driver. Those will conflict.
+> How have you worked with Prashant to resolve the conflicts? Will
+> Prashant's patches be based on top of this series? Please explicitly
+> describe the dependencies and resolution of conflicts when you post the
+> next version. (below the ---, along with the changelog)
+> 
+Yes, there are many patch series may have dependency each other
+recently. We also want to know what the sequence you expect to merge the
+patch series to your tree. Evan my own patch series had dependency too.
+For ex, hotplug enhancement, cpuidle, SMP works on UP and
+suspend/resume. Currently, I think we are all work the the top of
+linux-next tree. If we can't expect the sequence of the patch series to
+be merged, we will always have some conflicts with each other.
 
-This approach will simplify the instantiation. This will also avoid 
-confusion like the aliases get added or not when we create board dts file.
-This will be on same line we have with board files where pdev->id is 
-fixed for all board in common place i.e. device.c which decide the 
-port-number.
+Depend on the timing, I think it should be better to know which patch
+series should be going first or recently and which should go later and
+depend on which series. Then we can rearrange our patches on top of it.
+And reducing the job to fix conflict on your side.
+
+What do you think, Prashant? If your rework of clock driver will show up
+soon and Stephen also expect that will be merged first, I am fine to
+re-base on it and re-send my next version after new clock driver be
+done.
+
+Thanks,
+Joseph
