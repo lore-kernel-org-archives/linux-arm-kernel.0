@@ -1,67 +1,32 @@
-From: namhyung@kernel.org (Namhyung Kim)
-Date: Fri, 21 Dec 2012 14:47:12 +0900
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
-Message-ID: <20121221054712.GA2933@danjae>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 21 Dec 2012 12:03:33 +0530
+Subject: [PATCH 09/12] ARM: OMAP2+: powerdomain: skip register reads for
+ powerdomains known to be on
+In-Reply-To: <alpine.DEB.2.00.1212201722190.3498@utopia.booyaka.com>
+References: <20121209200108.3196.12452.stgit@dusk.lan>
+ <20121209200327.3196.27686.stgit@dusk.lan> <50D22D0B.3050502@ti.com>
+ <alpine.DEB.2.00.1212201722190.3498@utopia.booyaka.com>
+Message-ID: <50D402BD.3020402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
-
-On Thu, Dec 13, 2012 at 11:11:11AM +0100, Vincent Guittot wrote:
-> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
-> > On 12/12/2012 09:31 PM, Vincent Guittot wrote:
-> >> +static bool is_buddy_busy(int cpu)
-> >> +{
-> >> +     struct rq *rq = cpu_rq(cpu);
-> >> +
-> >> +     /*
-> >> +      * A busy buddy is a CPU with a high load or a small load with a lot of
-> >> +      * running tasks.
-> >> +      */
-> >> +     return ((rq->avg.runnable_avg_sum << rq->nr_running) >
-> >
-> > If nr_running a bit big, rq->avg.runnable_avg_sum << rq->nr_running is
-> > zero. you will get the wrong decision.
-> 
-> yes, I'm going to do that like below instead:
-> return (rq->avg.runnable_avg_sum > (rq->avg.runnable_avg_period >>
-> rq->nr_running));
-
-Doesn't it consider nr_running too much?  It seems current is_buddy_busy
-returns false on a cpu that has 1 task runs 40% cputime, but returns true
-on a cpu that has 3 tasks runs 10% cputime each or for 2 tasks of 15%
-cputime each, right?
-
-I don't know what is correct, but just guessing that in a cpu's point
-of view it'd be busier if it has a higher runnable_avg_sum than a
-higher nr_running IMHO.
+On Thursday 20 December 2012 10:52 PM, Paul Walmsley wrote:
+> On Wed, 19 Dec 2012, Jon Hunter wrote:
+>
+>> My understanding is that for OMAP4 devices, the core power domain may
+>> not be active the same time as the MPU power domain. The Cortex-A9 has
+>> the ability to access some peripherals (such as timer, McBSP) via a
+>> private bus that does not require the core domain to be active. This is
+>> a difference from OMAP3 devices, where the core would always be on with
+>> the MPU power domain.
+>
+> You are absolutely right and I will drop that part from this patch.
+>
+Just to be clear, MPU has direct path to ABE domain peripherals on
+OMAP4. As Jon pointed out MCBSP and few timers are put under this
+domain can be directly accessed by MPU without L3. ABE also can
+be accessed via L3 by MPU. ABE has a dual map with MPU.
 
 
-> 
-> >
-> >> +                     rq->avg.runnable_avg_period);
-> >> +}
-> >> +
-> >> +static bool is_light_task(struct task_struct *p)
-> >> +{
-> >> +     /* A light task runs less than 25% in average */
-> >> +     return ((p->se.avg.runnable_avg_sum << 1) <
-> >> +                     p->se.avg.runnable_avg_period);
-> >
-> > 25% may not suitable for big machine.
-> 
-> Threshold is always an issue, which threshold should be suitable for
-> big machine ?
-> 
-> I'm wondering if i should use the imbalance_pct value for computing
-> the threshold
-
-Anyway, I wonder how 'sum << 1' computes 25%.  Shouldn't it be << 2 ?
-
-Thanks,
-Namhyung
+Regards
+Santosh
