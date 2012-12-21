@@ -1,119 +1,45 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 21 Dec 2012 09:28:07 -0700
-Subject: [PATCH 07/15] ARM: AM33XX: hwmod: Update and uncomment SHA0 module
- data
+Date: Fri, 21 Dec 2012 09:28:06 -0700
+Subject: [PATCH 06/15] ARM: AM33XX: Add sha0 crypto clock data
 In-Reply-To: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
 References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1356107295-11121-8-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1356107295-11121-7-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Update the SHA0 HIB2 module's hwmod data for the am33xx SoC.
-Also, remove it from the '#if 0' block that its currently
-inside so the data is actually available for use.
+Add clock data for for the SHA0 crypto module
+on the am33xx SoC.
 
 CC: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 43 +++++++++++++++++++++++++-----
- 1 file changed, 37 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/cclock33xx_data.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 081c71e..9f7aadd 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -417,7 +417,6 @@ static struct omap_hwmod am33xx_adc_tsc_hwmod = {
-  *    - ocmc ram
-  *    - ocp watch point
-  *    - aes0
-- *    - sha0
-  */
- #if 0
+diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
+index ea64ad6..56d6755 100644
+--- a/arch/arm/mach-omap2/cclock33xx_data.c
++++ b/arch/arm/mach-omap2/cclock33xx_data.c
+@@ -412,6 +412,10 @@ static struct clk smartreflex1_fck;
+ DEFINE_STRUCT_CLK_HW_OMAP(smartreflex1_fck, NULL);
+ DEFINE_STRUCT_CLK(smartreflex1_fck, dpll_core_ck_parents, clk_ops_null);
+ 
++static struct clk sha0_fck;
++DEFINE_STRUCT_CLK_HW_OMAP(sha0_fck, NULL);
++DEFINE_STRUCT_CLK(sha0_fck, dpll_core_ck_parents, clk_ops_null);
++
  /*
-@@ -543,22 +542,37 @@ static struct omap_hwmod am33xx_aes0_hwmod = {
- 		},
- 	},
- };
-+#endif
-+
-+/* sha0 HIB2 (the 'P' (public) device) */
-+static struct omap_hwmod_class_sysconfig am33xx_sha0_sysc = {
-+	.rev_offs	= 0x100,
-+	.sysc_offs	= 0x110,
-+	.syss_offs	= 0x114,
-+	.sysc_flags	= SYSS_HAS_RESET_STATUS,
-+};
- 
--/* sha0 */
- static struct omap_hwmod_class am33xx_sha0_hwmod_class = {
- 	.name		= "sha0",
-+	.sysc		= &am33xx_sha0_sysc,
- };
- 
- static struct omap_hwmod_irq_info am33xx_sha0_irqs[] = {
--	{ .irq = 108 + OMAP_INTC_START, },
-+	{ .irq = 109 + OMAP_INTC_START, },
- 	{ .irq = -1 },
- };
- 
-+struct omap_hwmod_dma_info am33xx_sha0_edma_reqs[] = {
-+	{ .name = "rx", .dma_req = 36, },
-+	{ .dma_req = -1 }
-+};
-+
- static struct omap_hwmod am33xx_sha0_hwmod = {
--	.name		= "sha0",
-+	.name		= "sham",
- 	.class		= &am33xx_sha0_hwmod_class,
- 	.clkdm_name	= "l3_clkdm",
- 	.mpu_irqs	= am33xx_sha0_irqs,
-+	.sdma_reqs	= am33xx_sha0_edma_reqs,
- 	.main_clk	= "l3_gclk",
- 	.prcm		= {
- 		.omap4	= {
-@@ -568,8 +582,6 @@ static struct omap_hwmod am33xx_sha0_hwmod = {
- 	},
- };
- 
--#endif
--
- /* 'smartreflex' class */
- static struct omap_hwmod_class am33xx_smartreflex_hwmod_class = {
- 	.name		= "smartreflex",
-@@ -3328,6 +3340,24 @@ static struct omap_hwmod_ocp_if am33xx_l3_s__usbss = {
- 	.flags		= OCPIF_SWSUP_IDLE,
- };
- 
-+/* l3 main -> sha0 HIB2 */
-+static struct omap_hwmod_addr_space am33xx_sha0_addrs[] = {
-+	{
-+		.pa_start	= 0x53100000,
-+		.pa_end		= 0x53100000 + SZ_512 - 1,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+	{ }
-+};
-+
-+static struct omap_hwmod_ocp_if am33xx_l3_main__sha0 = {
-+	.master		= &am33xx_l3_main_hwmod,
-+	.slave		= &am33xx_sha0_hwmod,
-+	.clk		= "sha0_fck",
-+	.addr		= am33xx_sha0_addrs,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_l4_fw__emif_fw,
- 	&am33xx_l3_main__emif,
-@@ -3401,6 +3431,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_l3_s__usbss,
- 	&am33xx_l4_hs__cpgmac0,
- 	&am33xx_cpgmac0__mdio,
-+	&am33xx_l3_main__sha0,
- 	NULL,
- };
- 
+  * Modules clock nodes
+  *
+@@ -876,6 +880,7 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"mmu_fck",		&mmu_fck,	CK_AM33XX),
+ 	CLK(NULL,	"smartreflex0_fck",	&smartreflex0_fck,	CK_AM33XX),
+ 	CLK(NULL,	"smartreflex1_fck",	&smartreflex1_fck,	CK_AM33XX),
++	CLK(NULL,	"sha0_fck",		&sha0_fck,	CK_AM33XX),
+ 	CLK(NULL,	"timer1_fck",		&timer1_fck,	CK_AM33XX),
+ 	CLK(NULL,	"timer2_fck",		&timer2_fck,	CK_AM33XX),
+ 	CLK(NULL,	"timer3_fck",		&timer3_fck,	CK_AM33XX),
 -- 
 1.7.12
