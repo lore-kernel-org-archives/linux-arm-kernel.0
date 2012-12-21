@@ -1,42 +1,90 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 21 Dec 2012 15:38:02 +0530
-Subject: [RFC PATCH 0/5] clockevents: decouple broadcast mechanism from
- drivers
-In-Reply-To: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
-References: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <50D43502.1070402@ti.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Fri, 21 Dec 2012 10:09:55 +0000
+Subject: [PATCH] ARM: tegra: cpufreq: move clk_get/put out of function
+ tegra_cpu_init/exit
+Message-ID: <1356084595-17800-1-git-send-email-linuxzsc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+tegra_cpu_init/exit will be called every time one cpu core is online or
+offline. And all cpu cores share same clocks, redundant clk_get/put
+wast time,  so I move them out.
 
-On Tuesday 18 December 2012 05:36 PM, Mark Rutland wrote:
-> In some SMP systems, cpu-local timers may stop delivering interrupts
-> when in low power states, or not all CPUs may have local timers. To
-> support these systems we have a mechanism for broadcasting timer ticks
-> to other CPUs. This mechanism relies on the struct
-> clock_event_device::broadcast function pointer, which is a
-> driver-specific mechanism for broadcasting ticks to other CPUs.
->
-> As the broadcast mechanism is architecture-specific, placing the
-> broadcast function on struct clock_event_device ties each driver to a
-> single architecture. Additionally the driver or architecture backend
-> must handle the routing of broadcast ticks to the correct
-> clock_event_device, leading to duplication of the list of active
-> clock_event_devices.
->
-> These patches introduce a generic mechanism for handling the receipt of
-> timer broadcasts, and an optional architecture-specific broadcast
-> function which allows drivers to be decoupled from a particular
-> architecture will retaining support for timer tick broadcasts. These
-> mechanisms are wired up for the arm port, and have been boot-tested on a
-> pandaboard.
->
-Apart from the relevant comments given against couple of patches and
-Stephen's printk string comment, the series looks pretty good to me.
+Signed-off-by: Richard Zhao <linuxzsc@gmail.com>
+---
+ arch/arm/mach-tegra/cpu-tegra.c |   40 +++++++++++++++++++--------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
-I have tested the series with CPUIdle where the broadcast is actually
-used actively.
-
-So feel free to add,
-Reviewed-tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
+index 627bf0f..4faa3c6 100644
+--- a/arch/arm/mach-tegra/cpu-tegra.c
++++ b/arch/arm/mach-tegra/cpu-tegra.c
+@@ -217,24 +217,6 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
+ 	if (policy->cpu >= NUM_CPUS)
+ 		return -EINVAL;
+ 
+-	cpu_clk = clk_get_sys(NULL, "cpu");
+-	if (IS_ERR(cpu_clk))
+-		return PTR_ERR(cpu_clk);
+-
+-	pll_x_clk = clk_get_sys(NULL, "pll_x");
+-	if (IS_ERR(pll_x_clk))
+-		return PTR_ERR(pll_x_clk);
+-
+-	pll_p_clk = clk_get_sys(NULL, "pll_p");
+-	if (IS_ERR(pll_p_clk))
+-		return PTR_ERR(pll_p_clk);
+-
+-	emc_clk = clk_get_sys("cpu", "emc");
+-	if (IS_ERR(emc_clk)) {
+-		clk_put(cpu_clk);
+-		return PTR_ERR(emc_clk);
+-	}
+-
+ 	clk_prepare_enable(emc_clk);
+ 	clk_prepare_enable(cpu_clk);
+ 
+@@ -259,8 +241,6 @@ static int tegra_cpu_exit(struct cpufreq_policy *policy)
+ {
+ 	cpufreq_frequency_table_cpuinfo(policy, freq_table);
+ 	clk_disable_unprepare(emc_clk);
+-	clk_put(emc_clk);
+-	clk_put(cpu_clk);
+ 	return 0;
+ }
+ 
+@@ -281,12 +261,32 @@ static struct cpufreq_driver tegra_cpufreq_driver = {
+ 
+ static int __init tegra_cpufreq_init(void)
+ {
++	cpu_clk = clk_get_sys(NULL, "cpu");
++	if (IS_ERR(cpu_clk))
++		return PTR_ERR(cpu_clk);
++
++	pll_x_clk = clk_get_sys(NULL, "pll_x");
++	if (IS_ERR(pll_x_clk))
++		return PTR_ERR(pll_x_clk);
++
++	pll_p_clk = clk_get_sys(NULL, "pll_p");
++	if (IS_ERR(pll_p_clk))
++		return PTR_ERR(pll_p_clk);
++
++	emc_clk = clk_get_sys("cpu", "emc");
++	if (IS_ERR(emc_clk)) {
++		clk_put(cpu_clk);
++		return PTR_ERR(emc_clk);
++	}
++
+ 	return cpufreq_register_driver(&tegra_cpufreq_driver);
+ }
+ 
+ static void __exit tegra_cpufreq_exit(void)
+ {
+         cpufreq_unregister_driver(&tegra_cpufreq_driver);
++	clk_put(emc_clk);
++	clk_put(cpu_clk);
+ }
+ 
+ 
+-- 
+1.7.9.5
