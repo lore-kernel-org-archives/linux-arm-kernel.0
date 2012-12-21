@@ -1,67 +1,85 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 21 Dec 2012 11:18:28 -0600
-Subject: [RESEND PATCH 0/5] cpufreq: db8500: Rename driver and update some
- parts
-In-Reply-To: <CAPDyKFpN_MM+3N6U07UFu71rEPFkjwExCsnTwMkXbt0ei9ryfg@mail.gmail.com>
-References: <1355153142-9534-1-git-send-email-ulf.hansson@stericsson.com>
- <CAPtuhTgcmdxtG9B6L5NMyLCrhQh2o0DFkq47e_YCMoBzVhaF=g@mail.gmail.com>
- <CAPDyKFpN_MM+3N6U07UFu71rEPFkjwExCsnTwMkXbt0ei9ryfg@mail.gmail.com>
-Message-ID: <CAPtuhTgJysTATpAjG5fJv_RUgL-60fwpDYcoF2KUQ8U7+W=Yjg@mail.gmail.com>
+From: tobetter@gmail.com (Dongjin Kim)
+Date: Sat, 22 Dec 2012 02:37:00 +0900
+Subject: [PATCH v2 1/4] ODROID-X: dts: Add board dts file for ODROID-X
+In-Reply-To: <1356111423-3454-1-git-send-email-tobetter@gmail.com>
+References: <1356111423-3454-1-git-send-email-tobetter@gmail.com>
+Message-ID: <1356111423-3454-2-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 3:20 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 12 December 2012 21:56, Mike Turquette <mturquette@linaro.org> wrote:
->> On Mon, Dec 10, 2012 at 7:25 AM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
->>> From: Ulf Hansson <ulf.hansson@linaro.org>
->>>
->>> This patchset starts by renaming the db8500 cpufreq driver to a more generic
->>> name. There are new variants which rely on it too, so instead we give it a
->>> family name of dbx500.
->>>
->>> On top of that a fixup patch for initialization of the driver and some minor
->>> cleanup patches are included as well.
->>>
->>> These patches can be material for 3.8.
->>>
->>> Since some patches for the db8500 cpufreq driver has recently been merged
->>> through Mike Turquette's clk tree, I decided to base these patches on top
->>> of the clk-next branch. So I hope Mike is fine by merging these patches
->>> through his tree.
->>>
->>> So I will try to collect ACKs from Rafael for the cpufreq patches. The
->>> mfd patch has already been ACKED by Samuel.
->>>
->>
->> Ulf,
->>
->> Just FYI clk-next has been pulled by Linus for 3.8.  I can still take
->> this branch once Rafael ACKs the CPUfreq bits if you want, but I think
->> you have more options now that clk-next is merged in.  It's up to you.
->
-> I think the easiest way forward (at least for me :-) ) would be if we
-> could send them as for 3.8 rcs. Is that possible for you Mike?
->
+Add initial dtb file for Hardkernel's ODROID-X board based on EXYNOS4412 SoC.
 
-Hi Ulf,
+Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+---
+ arch/arm/boot/dts/Makefile               |    1 +
+ arch/arm/boot/dts/exynos4412-odroidx.dts |   47 ++++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos4412-odroidx.dts
 
-I did not want to leave you hanging on this point.  I decided at the
-last minute to not bring a development platform or a nice laptop on my
-vacation so I will not be sending any more pull requests to Linus for
-3.8-rc unless some patches come in which are just obvious fixes.  Even
-then I will wait until I return in January to properly test any fixes
-before I send the request out.
-
-Sorry that these patches did not make it in for 3.8 but I will queue
-them up into clk-next in January.
-
-Thanks,
-Mike
-
->>
->> Regards,
->> Mike
->
-> Thanks!
->
-> Ulf Hansson
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d077ef8..364d67b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -44,6 +44,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+ 	exynos4210-trats.dtb \
+ 	exynos5250-smdk5250.dtb \
+ 	exynos5440-ssdk5440.dtb \
++	exynos4412-odroidx.dtb \
+ 	exynos4412-smdk4412.dtb \
+ 	exynos5250-smdk5250.dtb \
+ 	exynos5250-snow.dtb
+diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+new file mode 100644
+index 0000000..323ed177
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+@@ -0,0 +1,47 @@
++/*
++ * Hardkernel's Exynos4412 based ODROID-X board device tree source
++ *
++ * Copyright (c) 2012 Dongjin Kim <tobetter@gmail.com>
++ *
++ * Device tree source file for Hardkernel's ODROID-X board which is based on
++ * Samsung's Exynos4412 SoC.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/dts-v1/;
++/include/ "exynos4412.dtsi"
++
++/ {
++	model = "Hardkernel ODROID-X board based on Exynos4412";
++	compatible = "hardkernel,exynos4412", "samsung,exynos4412";
++
++	memory {
++		reg = <0x40000000 0x40000000>;
++	};
++
++	serial at 13800000 {
++		status = "okay";
++	};
++
++	serial at 13810000 {
++		status = "okay";
++	};
++
++	serial at 13820000 {
++		status = "okay";
++	};
++
++	serial at 13830000 {
++		status = "okay";
++	};
++
++	sdhci at 12530000 {
++		bus-width = <4>;
++		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
++		pinctrl-names = "default";
++		status = "okay";
++	};
++};
+-- 
+1.7.9.5
