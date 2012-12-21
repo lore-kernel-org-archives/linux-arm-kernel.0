@@ -1,57 +1,53 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 21 Dec 2012 09:31:16 +0530
-Subject: [PATCH 0/8] Flip on multiplatform support for omap2plus for v3.9
-In-Reply-To: <CALF0-+XspOix_RiNkWN7d1L9uxBZi7Zf5SDaKcx0P7P_Z3anqA@mail.gmail.com>
-References: <20121219192354.22098.33408.stgit@muffinssi.local>
- <20121220155518.GX4989@atomide.com>
- <CALF0-+XspOix_RiNkWN7d1L9uxBZi7Zf5SDaKcx0P7P_Z3anqA@mail.gmail.com>
-Message-ID: <50D3DF0C.1050606@ti.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Fri, 21 Dec 2012 09:48:40 +0530
+Subject: [PATCH] ARM: tegra: dts: add aliases and DMA requestor for serial
+ controller
+In-Reply-To: <50D344E9.70305@wwwdotorg.org>
+References: <1355898671-3960-1-git-send-email-ldewangan@nvidia.com>
+ <50D1F2CB.3090206@wwwdotorg.org> <50D2AD02.6060101@nvidia.com>
+ <50D344E9.70305@wwwdotorg.org>
+Message-ID: <50D3E320.2090804@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Garcia,
-
-On Friday 21 December 2012 05:41 AM, Ezequiel Garcia wrote:
-> Hello Tony,
->
-> On Thu, Dec 20, 2012 at 12:55 PM, Tony Lindgren <tony@atomide.com> wrote:
->> * Tony Lindgren <tony@atomide.com> [121219 11:28]:
->>> Hi all,
+On Thursday 20 December 2012 10:33 PM, Stephen Warren wrote:
+> On 12/19/2012 11:15 PM, Laxman Dewangan wrote:
+>> On Wednesday 19 December 2012 10:30 PM, Stephen Warren wrote:
+>>> On 12/18/2012 11:31 PM, Laxman Dewangan wrote:
+>>>> Add APB DMA requestor and serial aliases for serial controller.
+>>>> There will be two serial driver i.e. 8250 based simple serial driver
+>>>> and APB DMA based serial driver for higher baudrate and performace.
+>>>>
+>>>> The simple serial driver get enabled with compatible nvidia,tegra20-uart
+>>>> and APB DMA based driver will get enabled with compatible
+>>>> nvidia,tegra20-hsuart.
+>>> This patch seems to do two things:
 >>>
->>> These patches enable multiplatform support for omap2plus.
+>>> 1) Add a comment describing how to select the basic or DMA-based driver.
+>>> I can see why this is useful.
 >>>
->>> To build and boot it against the current mainline kernel
->>> you need the following:
->>>
->>> [PATCH 1/2] ARM: l2x0: Only set .set_debug on PL310 r3p0 and earlier
->>> [PATCH 2/2] ARM: disable errata work-arounds which access secure registers
->>> [GIT PULL 1/2] omap fixes for v3.8 merge window
->>> [GIT PULL 2/2] omap cleanup for v3.8 merge window
->>> [GIT PULL] two trivial omap build error fixes for v3.8 merge window
->>> cpts: Fix build error caused by include of plat/clock.h
+>>> 2) Add aliases for the serial ports. I have no idea why this is useful.
+>> Serial aliases are added because we want to get the port number like
+>> /dev/ttyTHS0,  /d/ttyTHS2 etc. The uarta should be /dev/ttyTHS0 and
+>> uartc should be /dev/ttyTHS2. The port number can be found using aliases
+>> and of_alias_get_id() in driver file:
 >>
+>> port_number = of_alias_get_id(np, "serial");
+> Oh, I see. I guess the aliases make sense then.
 >
-> I'm trying this on my IGEP v2 board (using Javier's patches for DT).
->
-> I've applied these series on top of your branch
-> "omap-for-v3.8/fixes-for-merge-window-part2".
->
-> However, I'm finding some conflicts (fb.c appears in plat-omap,
-> some missing headers, etc.)
->
-> Could you suggest a better branch to base the series?
-Can you try it on current mainline.
-It applies without any conflicts..
+> But, wouldn't you only add aliases for the specific UARTs that are in
+> use on a particular board (so put them in tegraNN-board.dts) rather than
+> all UARTs on Tegra (i.e. the current patch which puts them into
+> tegraNN.dtsi)?
 
-Thanks
-Lokesh
->
-> Thanks!
->
->      Ezequiel
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+I like to have this in tegraN N.dtsi file becasue:
+- This policy is not going to change the board to board. For high speed 
+driver the uarta will be ttyTHS0 and uartb ttyTHS1.
+- In board file I will only enable driver and make compatible, not worry 
+about the making aliases.
+
+This approach will simplify the instantiation. This will also avoid 
+confusion like the aliases get added or not when we create board dts file.
+This will be on same line we have with board files where pdev->id is 
+fixed for all board in common place i.e. device.c which decide the 
+port-number.
