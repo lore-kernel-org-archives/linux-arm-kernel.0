@@ -1,51 +1,51 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 21 Dec 2012 09:56:57 +0900
-Subject: [PATCH] ARM: dts: fix split memory bank for SSDK5440
-In-Reply-To: <CAOesGMhVxidvs6Ywxzb=aK0GB0=bJMVfC7BWhXUQiPgeCpndbA@mail.gmail.com>
-References: <1356030217-5472-1-git-send-email-kgene.kim@samsung.com>
- <CAOesGMg03Yn=fDr1XqmbBUs=eZO0_8=iti1LUiJ6CX5n1Bm45g@mail.gmail.com>
- <1464138.NEt7mMkYJc@flatron> <20121220234146.GF14363@n2100.arm.linux.org.uk>
- <01f801cddf12$9f95c350$dec149f0$@samsung.com>
- <CAOesGMhVxidvs6Ywxzb=aK0GB0=bJMVfC7BWhXUQiPgeCpndbA@mail.gmail.com>
-Message-ID: <000a01cddf16$13a027b0$3ae07710$%cho@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Dec 2012 17:05:18 -0800
+Subject: [PATCH 0/8] Flip on multiplatform support for omap2plus for v3.9
+In-Reply-To: <CALF0-+XspOix_RiNkWN7d1L9uxBZi7Zf5SDaKcx0P7P_Z3anqA@mail.gmail.com>
+References: <20121219192354.22098.33408.stgit@muffinssi.local>
+ <20121220155518.GX4989@atomide.com>
+ <CALF0-+XspOix_RiNkWN7d1L9uxBZi7Zf5SDaKcx0P7P_Z3anqA@mail.gmail.com>
+Message-ID: <20121221010518.GJ21056@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Olof Johansson [mailto:olof at lixom.net]
-> Sent: Friday, December 21, 2012 9:36 AM
+* Ezequiel Garcia <elezegarcia@gmail.com> [121220 16:13]:
+> Hello Tony,
 > 
-> On Thu, Dec 20, 2012 at 4:32 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Russell King - ARM Linux wrote:
+> On Thu, Dec 20, 2012 at 12:55 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Tony Lindgren <tony@atomide.com> [121219 11:28]:
+> >> Hi all,
 > >>
-> >
-> > [...]
-> >
-> >> >
-> >> > > What's the actual bug caused by this? The description is vague.
-> >> >
-> >> > The kernel panics early on NULL pointer dereference in memory
-> >> > initialization.
+> >> These patches enable multiplatform support for omap2plus.
 > >>
+> >> To build and boot it against the current mainline kernel
+> >> you need the following:
+> >>
+> >> [PATCH 1/2] ARM: l2x0: Only set .set_debug on PL310 r3p0 and earlier
+> >> [PATCH 2/2] ARM: disable errata work-arounds which access secure registers
+> >> [GIT PULL 1/2] omap fixes for v3.8 merge window
+> >> [GIT PULL 2/2] omap cleanup for v3.8 merge window
+> >> [GIT PULL] two trivial omap build error fixes for v3.8 merge window
+> >> cpts: Fix build error caused by include of plat/clock.h
 > >
-> > (Cc'ed KyongHo Cho)
-> >
-> > Yeah, correct. The size of memory bank should be under section size and
-> > current section size is 256MiB on EXYNOS. So if we don't change the section
-> > size, each memory bank should be under 256MiB. If not, as Tomasz said,
-> > kernel panic happens in mem_init().
 > 
-> That's a bug somewhere, the device tree should describe the hardware,
-> and not necessarily the massaged format that the kernel wants it in to
-> not trigger a bug.
+> I'm trying this on my IGEP v2 board (using Javier's patches for DT).
 > 
-> So I don't want to see this patch merged, I want to see a proper fix
-> instead, please.
+> I've applied these series on top of your branch
+> "omap-for-v3.8/fixes-for-merge-window-part2".
 > 
-> There are also already other exynos platforms and device trees with
-> more than 256MB in the memory node. Changing all of them this way
-> seems unreasonable.
+> However, I'm finding some conflicts (fb.c appears in plat-omap,
+> some missing headers, etc.)
 > 
-As Kukjin said earlier, the kernel panic may happen while gathering
-memory statistics in mem_init()(arch/arm/mm/init.c). Russell King does not
-agreed to modify mem_init() instead he told that a memory bank must not cross
-section boundaries.
+> Could you suggest a better branch to base the series?
+
+Maybe use Olof's lates pull request for fixes from LAKML +
+ARM: l2x0: Only set .set_debug on PL310 r3p0 and earlier +
+ARM: disable errata work-arounds which access secure registers
+and these patches?
+
+Or just wait for -rc1 and then I'll push out a branch.
+
+Regards,
+
+Tony
