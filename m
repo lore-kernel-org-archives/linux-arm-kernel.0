@@ -1,30 +1,36 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 21 Dec 2012 13:43:25 +1100
-Subject: [GIT PULL v2] ARM: arm-soc fixes for 3.8
-In-Reply-To: <CA+55aFyiRPk0Qta35PBqMFqn+GkKaugqKJM3WHCT0JEJ1YohWw@mail.gmail.com>
-References: <20121220163814.GA29557@quad.lixom.net>
- <20121220175639.GA14363@n2100.arm.linux.org.uk>
- <CAOesGMgxXmXUW2RP_5AxJ6Z5sRBhFJ2CQz4S12MwXAb3=ibYOA@mail.gmail.com>
- <20121220184525.GC21056@atomide.com>
- <CA+55aFyiRPk0Qta35PBqMFqn+GkKaugqKJM3WHCT0JEJ1YohWw@mail.gmail.com>
-Message-ID: <1356057805.5397.58.camel@pasglop>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Dec 2012 19:38:53 -0800
+Subject: linux-next: manual merge of the arm-soc tree with the pinctrl tree
+In-Reply-To: <20121221132014.0bf8772fb3e48c51cec1548a@canb.auug.org.au>
+References: <20121221132014.0bf8772fb3e48c51cec1548a@canb.auug.org.au>
+Message-ID: <027101cddf2c$b4f2f9b0$1ed8ed10$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-12-20 at 11:00 -0800, Linus Torvalds wrote:
-> Hmm. The patch there looks better than any alternative I can think of.
-> It uses the same spinlock name for the whole array, but I think it's
-> only used for lockdep printouts, so that should be fine.
+Stephen Rothwell wrote:
 > 
-> Send me the patch with signed-off and tested-by, and perhaps have a
-> few more people test it. The powerpc and sparc people both use it in
-> their 32-bit versions and have responsible maintainers, so it might be
-> worth it double-checking with BenH and DaveM about it, just in case.
-> Added to the Cc.
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got conflicts in
+> drivers/pinctrl/pinctrl-exynos5440.c and
+> drivers/pinctrl/pinctrl-samsung.c between commit e5b4c9d4ab55 ("pinctrl:
+> exynos5440: Fix compile error in pinctrl-exynos5440/samsung.c") from the
+> pinctrl tree and commit d5fd5da290ce ("pinctrl: exynos5440/samsung:
+> Staticize pcfgs") from the arm-soc tree.
+> 
+Oops, the commit d5fd5da290ce already sent to Linus Torvalds via arm-soc
+tree today. In addition, I applied with Linus Walleij's ack ;-)
 
-The patch looks fine. I won't personally be able to test it until after
-I'm back from vacation though. I'll see if I can get somebody else to
-but don't wait for me.
+Linus Walleij, please drop the patch in your tree. Sorry I didn't notify
+about that when I got the patch from Choi.
 
-Cheers,
-Ben.
+Thanks.
+
+- Kukjin
+
+> The former is a superset of the latter, so I used that (no action
+> is required).
+> 
+> --
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
