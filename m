@@ -1,50 +1,67 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 21 Dec 2012 13:02:11 +0800
-Subject: [PATCH V3 3/5] ARM: tegra20: clocks: add CPU low-power
- function into tegra_cpu_car_ops
-In-Reply-To: <50D34F12.9080801@wwwdotorg.org>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <1355797861-12759-4-git-send-email-josephl@nvidia.com>
- <50D34F12.9080801@wwwdotorg.org>
-Message-ID: <1356066131.26029.26.camel@jlo-ubuntu-64.nvidia.com>
+From: namhyung@kernel.org (Namhyung Kim)
+Date: Fri, 21 Dec 2012 14:47:12 +0900
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+Message-ID: <20121221054712.GA2933@danjae>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-12-21 at 01:46 +0800, Stephen Warren wrote:
-> On 12/17/2012 07:30 PM, Joseph Lo wrote:
-> > Add suspend, resume and rail_off_ready API into tegra_cpu_car_ops. These
-> > functions were used for CPU powered-down state maintenance.
-> 
-> I think this isn't adding those functions into tegra_cpu_car_ops, but
-> rather implementing the already existing function pointers for Tegra20,
-> right?
-> 
-Yes, exactly.
+Hi Vincent,
 
-> This patch touches the clock driver and Prashant will soon be posting
-> patches that significantly rework the clock driver. Those will conflict.
-> How have you worked with Prashant to resolve the conflicts? Will
-> Prashant's patches be based on top of this series? Please explicitly
-> describe the dependencies and resolution of conflicts when you post the
-> next version. (below the ---, along with the changelog)
+On Thu, Dec 13, 2012 at 11:11:11AM +0100, Vincent Guittot wrote:
+> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
+> > On 12/12/2012 09:31 PM, Vincent Guittot wrote:
+> >> +static bool is_buddy_busy(int cpu)
+> >> +{
+> >> +     struct rq *rq = cpu_rq(cpu);
+> >> +
+> >> +     /*
+> >> +      * A busy buddy is a CPU with a high load or a small load with a lot of
+> >> +      * running tasks.
+> >> +      */
+> >> +     return ((rq->avg.runnable_avg_sum << rq->nr_running) >
+> >
+> > If nr_running a bit big, rq->avg.runnable_avg_sum << rq->nr_running is
+> > zero. you will get the wrong decision.
 > 
-Yes, there are many patch series may have dependency each other
-recently. We also want to know what the sequence you expect to merge the
-patch series to your tree. Evan my own patch series had dependency too.
-For ex, hotplug enhancement, cpuidle, SMP works on UP and
-suspend/resume. Currently, I think we are all work the the top of
-linux-next tree. If we can't expect the sequence of the patch series to
-be merged, we will always have some conflicts with each other.
+> yes, I'm going to do that like below instead:
+> return (rq->avg.runnable_avg_sum > (rq->avg.runnable_avg_period >>
+> rq->nr_running));
 
-Depend on the timing, I think it should be better to know which patch
-series should be going first or recently and which should go later and
-depend on which series. Then we can rearrange our patches on top of it.
-And reducing the job to fix conflict on your side.
+Doesn't it consider nr_running too much?  It seems current is_buddy_busy
+returns false on a cpu that has 1 task runs 40% cputime, but returns true
+on a cpu that has 3 tasks runs 10% cputime each or for 2 tasks of 15%
+cputime each, right?
 
-What do you think, Prashant? If your rework of clock driver will show up
-soon and Stephen also expect that will be merged first, I am fine to
-re-base on it and re-send my next version after new clock driver be
-done.
+I don't know what is correct, but just guessing that in a cpu's point
+of view it'd be busier if it has a higher runnable_avg_sum than a
+higher nr_running IMHO.
+
+
+> 
+> >
+> >> +                     rq->avg.runnable_avg_period);
+> >> +}
+> >> +
+> >> +static bool is_light_task(struct task_struct *p)
+> >> +{
+> >> +     /* A light task runs less than 25% in average */
+> >> +     return ((p->se.avg.runnable_avg_sum << 1) <
+> >> +                     p->se.avg.runnable_avg_period);
+> >
+> > 25% may not suitable for big machine.
+> 
+> Threshold is always an issue, which threshold should be suitable for
+> big machine ?
+> 
+> I'm wondering if i should use the imbalance_pct value for computing
+> the threshold
+
+Anyway, I wonder how 'sum << 1' computes 25%.  Shouldn't it be << 2 ?
 
 Thanks,
-Joseph
+Namhyung
