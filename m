@@ -1,51 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Dec 2012 17:05:18 -0800
-Subject: [PATCH 0/8] Flip on multiplatform support for omap2plus for v3.9
-In-Reply-To: <CALF0-+XspOix_RiNkWN7d1L9uxBZi7Zf5SDaKcx0P7P_Z3anqA@mail.gmail.com>
-References: <20121219192354.22098.33408.stgit@muffinssi.local>
- <20121220155518.GX4989@atomide.com>
- <CALF0-+XspOix_RiNkWN7d1L9uxBZi7Zf5SDaKcx0P7P_Z3anqA@mail.gmail.com>
-Message-ID: <20121221010518.GJ21056@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 21 Dec 2012 09:58:12 +0800
+Subject: [PATCH 0/8] arm: mxs: Various mxs_defconfig adjustments
+In-Reply-To: <201212201344.27626.marex@denx.de>
+References: <1355938386-14582-1-git-send-email-marex@denx.de>
+ <20121220055136.GA24134@S2101-09.ap.freescale.net>
+ <201212201344.27626.marex@denx.de>
+Message-ID: <CAAQ0ZWSxdfWzaHfr2eVazRHp-eGBdHFyVb-P_ib_6xmoGWXQdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ezequiel Garcia <elezegarcia@gmail.com> [121220 16:13]:
-> Hello Tony,
-> 
-> On Thu, Dec 20, 2012 at 12:55 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Tony Lindgren <tony@atomide.com> [121219 11:28]:
-> >> Hi all,
-> >>
-> >> These patches enable multiplatform support for omap2plus.
-> >>
-> >> To build and boot it against the current mainline kernel
-> >> you need the following:
-> >>
-> >> [PATCH 1/2] ARM: l2x0: Only set .set_debug on PL310 r3p0 and earlier
-> >> [PATCH 2/2] ARM: disable errata work-arounds which access secure registers
-> >> [GIT PULL 1/2] omap fixes for v3.8 merge window
-> >> [GIT PULL 2/2] omap cleanup for v3.8 merge window
-> >> [GIT PULL] two trivial omap build error fixes for v3.8 merge window
-> >> cpts: Fix build error caused by include of plat/clock.h
+On Thu, Dec 20, 2012 at 01:44:27PM +0100, Marek Vasut wrote:
+> Dear Shawn Guo,
+>
+> > On Wed, Dec 19, 2012 at 06:32:58PM +0100, Marek Vasut wrote:
+> > > This patchset enables various config options, mostly needed to
+> > > get MX28EVK and M28EVK decently working.
+> > >
+> > > Marek Vasut (8):
+> > >   arm: mxs: Regenerate mxs_defconfig to match recent kernel
+> > >   arm: mxs: Enable MTD block access
+> > >   arm: mxs: Enable UBI and UBIFS
+> > >   arm: mxs: Enable JFFS2
+> > >   arm: mxs: Enable EXT2 and EXT4
+> > >   arm: mxs: Enable AT24 EEPROM support
+> > >   arm: mxs: Enable support for most SPI flashes
+> > >   arm: mxs: Enable most commonly used PHYs
 > >
-> 
-> I'm trying this on my IGEP v2 board (using Javier's patches for DT).
-> 
-> I've applied these series on top of your branch
-> "omap-for-v3.8/fixes-for-merge-window-part2".
-> 
-> However, I'm finding some conflicts (fb.c appears in plat-omap,
-> some missing headers, etc.)
-> 
-> Could you suggest a better branch to base the series?
+> > It does not need to be so verbose.  It can just be one patch.
+>
+> Do you prefer one gigantic patch then?
+>
+I do not take "1 file changed, 30 insertions(+), 33 deletions(-)" as
+a gigantic change set, especially when it's on defconfig.  Just remember
+to run savedefconfig before you submit the changes.
 
-Maybe use Olof's lates pull request for fixes from LAKML +
-ARM: l2x0: Only set .set_debug on PL310 r3p0 and earlier +
-ARM: disable errata work-arounds which access secure registers
-and these patches?
+Shawn
 
-Or just wait for -rc1 and then I'll push out a branch.
-
-Regards,
-
-Tony
+> > >  arch/arm/configs/mxs_defconfig |   63
+> > >  +++++++++++++++++++--------------------- 1 file changed, 30
+> > >  insertions(+), 33 deletions(-)
