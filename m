@@ -1,69 +1,32 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 21 Dec 2012 15:10:28 +0800
-Subject: [PATCH V3 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle
- for powered-down mode
-In-Reply-To: <50D350C1.6070400@wwwdotorg.org>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <1355797861-12759-6-git-send-email-josephl@nvidia.com>
- <50D350C1.6070400@wwwdotorg.org>
-Message-ID: <1356073828.26029.49.camel@jlo-ubuntu-64.nvidia.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 21 Dec 2012 09:31:57 +0200
+Subject: [PATCH 0/9] drivers: mailbox: framework creation
+In-Reply-To: <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
+References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
+ <CACRpkdaqO7AAeYeR8SZt4Tbv1grrMq85TNYMc-FSbUSrnZBm=Q@mail.gmail.com>
+ <20121220182835.GB21056@atomide.com>
+ <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
+Message-ID: <CAK=Wgba=jLiig+TBcAcp7STz=Y6RM8noR_0S2HZjNQXLZV8JBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-12-21 at 01:54 +0800, Stephen Warren wrote:
-> On 12/17/2012 07:31 PM, Joseph Lo wrote:
-> > The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
-> > core to go into this mode before other core. The coupled cpuidle framework
-> > can help to sync the MPCore to coupled state then go into "powered-down"
-> > idle mode together. The driver can just assume the MPCore come into
-> > "powered-down" mode at the same time. No need to take care if the CPU_0
-> > goes into this mode along and only can put it into safe idle mode (WFI).
-> > 
-> > The powered-down state of Tegra20 requires power gating both CPU cores.
-> > When the secondary CPU requests to enter powered-down state, it saves
-> > its own contexts and then enters WFI for waiting CPU0 in the same state.
-> > When the CPU0 requests powered-down state, it attempts to put the secondary
-> > CPU into reset to prevent it from waking up. Then power down both CPUs
-> > together and power off the cpu rail.
-> > 
-> > Be aware of that, you may see the legacy power state "LP2" in the code
-> > which is exactly the same meaning of "CPU power down".
-> 
-> > diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> 
-> > +static void tegra20_wake_reset_cpu_1(void)
-> 
-> Nit/bikeshe: I think tegra20_wake_from_reset_cpu_1() might be a slightly
-> more descriptive name? I assume the function works on CPU1, which is
-> assumed to be in reset, and removes reset from the CPU so it boots.
-> 
-Yes.
-Do you mean this function running on CPU1? It runs on CPU0 to wake up
-CPU1. About the function name, it looks more appropriate.
+On Thu, Dec 20, 2012 at 9:19 PM, Olof Johansson <olof@lixom.net> wrote:
+> While we can make the branch stable, would it make sense to make
+> remoteproc for omap depend on !multiplatform during the transition, to
+> reduce dependencies a little? Either way works, but it'd be nice to
+> keep them independent if we can.
 
-> > @@ -137,6 +241,9 @@ int __init tegra20_cpuidle_init(void)
-> >  	for_each_possible_cpu(cpu) {
-> >  		dev = &per_cpu(tegra_idle_device, cpu);
-> >  		dev->cpu = cpu;
-> > +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-> > +		dev->coupled_cpus = *cpu_online_mask;
-> > +#endif
-> 
-> That CONFIG option is selected by ARCH_TEGRA_2x_SOC, which must be
-> enabled for this file to be compiled. So, you can drop the ifdef, and
-> make the code uncondtional.
+I'm not sure multiplatform is the culprit; OMAP's remoteproc driver
+heavily depends on this mailbox code, and obviously breaks with this
+patch-set if only for the the naming changes. We'll need this patch
+set to update omap's remoteproc as well so at least we don't break
+bisectibility, though running a sanity test before merging would be
+even nicer (Loic I can help if you don't have a panda board).
 
-No, I found I need this if I want to make the device works on UP case.
-Then I need to do something like below, when we disable SMP.
-
->	config ARCH_TEGRA_2x_SOC 
->	bool "Enable support for Tegra20 family" 
->+	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP 
->	select ARCH_REQUIRE_GPIOLIB 
->	select ARM_ERRATA_720789 
->	select ARM_ERRATA_742230 
-
-This will be updated in next version as well.
+BTW - grep shows that tidspbridge is using the mailbox code too, but
+it's in staging and I'm not sure it gets much love. Nevertheless, as
+long as it's there we should at least update it with the new API as
+well.
 
 Thanks,
-Joseph
+Ohad.
