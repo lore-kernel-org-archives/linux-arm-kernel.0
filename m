@@ -1,117 +1,199 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 21 Dec 2012 10:04:53 -0700
-Subject: [PATCH 03/10] crypto: omap-aes - Convert to use pm_runtime API
+Date: Fri, 21 Dec 2012 10:04:57 -0700
+Subject: [PATCH 07/10] crypto: omap-aes - Add Device Tree Support
 In-Reply-To: <1356109500-11719-1-git-send-email-mgreer@animalcreek.com>
 References: <1356109500-11719-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1356109500-11719-4-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1356109500-11719-8-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Convert the omap-aes crypto driver to use the
-pm_runtime API instead of the clk API.
+Add Device Tree suport to the omap-aes crypto
+driver.  Currently, only support for OMAP2 and
+OMAP3 is being added but support for OMAP4 will
+be added in a subsequent patch.
 
-CC: Kevin Hilman <khilman@deeprootsystems.com>
 CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- drivers/crypto/omap-aes.c | 29 +++++++++++------------------
- 1 file changed, 11 insertions(+), 18 deletions(-)
+ drivers/crypto/omap-aes.c | 119 ++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 93 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 33cd783..c229852 100644
+index faf522f..68bf22d 100644
 --- a/drivers/crypto/omap-aes.c
 +++ b/drivers/crypto/omap-aes.c
-@@ -19,10 +19,10 @@
- #include <linux/init.h>
- #include <linux/errno.h>
- #include <linux/kernel.h>
--#include <linux/clk.h>
- #include <linux/platform_device.h>
- #include <linux/scatterlist.h>
- #include <linux/dma-mapping.h>
-+#include <linux/pm_runtime.h>
+@@ -25,6 +25,9 @@
+ #include <linux/dmaengine.h>
+ #include <linux/omap-dma.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_address.h>
  #include <linux/io.h>
  #include <linux/crypto.h>
  #include <linux/interrupt.h>
-@@ -96,7 +96,6 @@ struct omap_aes_dev {
- 	struct list_head	list;
- 	unsigned long		phys_base;
- 	void __iomem		*io_base;
--	struct clk		*iclk;
- 	struct omap_aes_ctx	*ctx;
- 	struct device		*dev;
- 	unsigned long		flags;
-@@ -167,7 +166,7 @@ static int omap_aes_hw_init(struct omap_aes_dev *dd)
- 	 * It may be long delays between requests.
- 	 * Device might go to off mode to save power.
- 	 */
--	clk_enable(dd->iclk);
-+	pm_runtime_get_sync(dd->dev);
+@@ -819,11 +822,93 @@ static struct crypto_alg algs[] = {
+ }
+ };
  
- 	if (!(dd->flags & FLAGS_INIT)) {
- 		dd->flags |= FLAGS_INIT;
-@@ -518,7 +517,7 @@ static void omap_aes_finish_req(struct omap_aes_dev *dd, int err)
++#ifdef CONFIG_OF
++static const struct of_device_id omap_aes_of_match[] = {
++	{
++		.compatible	= "ti,omap2-aes",
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(of, omap_aes_of_match);
++
++static int omap_aes_get_res_of(struct omap_aes_dev *dd,
++		struct device *dev, struct resource *res)
++{
++	struct device_node *node = dev->of_node;
++	const struct of_device_id *match;
++	int err = 0;
++
++	match = of_match_device(of_match_ptr(omap_aes_of_match), dev);
++	if (!match) {
++		dev_err(dev, "no compatible OF match\n");
++		err = -EINVAL;
++		goto err;
++	}
++
++	err = of_address_to_resource(node, 0, res);
++	if (err < 0) {
++		dev_err(dev, "can't translate OF node address\n");
++		err = -EINVAL;
++		goto err;
++	}
++
++	dd->dma_out = -1; /* Dummy value that's unused */
++	dd->dma_in = -1; /* Dummy value that's unused */
++
++err:
++	return err;
++}
++#else
++static int omap_aes_get_res_dev(struct omap_aes_dev *dd,
++		struct device *dev, struct resource *res)
++{
++	return -EINVAL;
++}
++#endif
++
++static int omap_aes_get_res_pdev(struct omap_aes_dev *dd,
++		struct platform_device *pdev, struct resource *res)
++{
++	struct device *dev = &pdev->dev;
++	struct resource *r;
++	int err = 0;
++
++	/* Get the base address */
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!r) {
++		dev_err(dev, "no MEM resource info\n");
++		err = -ENODEV;
++		goto err;
++	}
++	memcpy(res, r, sizeof(*res));
++
++	/* Get the DMA out channel */
++	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++	if (!r) {
++		dev_err(dev, "no DMA out resource info\n");
++		err = -ENODEV;
++		goto err;
++	}
++	dd->dma_out = r->start;
++
++	/* Get the DMA in channel */
++	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
++	if (!r) {
++		dev_err(dev, "no DMA in resource info\n");
++		err = -ENODEV;
++		goto err;
++	}
++	dd->dma_in = r->start;
++
++err:
++	return err;
++}
++
+ static int omap_aes_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct omap_aes_dev *dd;
+-	struct resource *res;
++	struct resource res;
+ 	int err = -ENOMEM, i, j;
+ 	u32 reg;
  
- 	pr_debug("err: %d\n", err);
+@@ -838,35 +923,18 @@ static int omap_aes_probe(struct platform_device *pdev)
+ 	spin_lock_init(&dd->lock);
+ 	crypto_init_queue(&dd->queue, OMAP_AES_QUEUE_LENGTH);
  
--	clk_disable(dd->iclk);
-+	pm_runtime_put_sync(dd->dev);
- 	dd->flags &= ~FLAGS_BUSY;
- 
- 	req->base.complete(&req->base, err);
-@@ -813,26 +812,21 @@ static int omap_aes_probe(struct platform_device *pdev)
- 	else
- 		dd->dma_in = res->start;
- 
--	/* Initializing the clock */
--	dd->iclk = clk_get(dev, "ick");
--	if (IS_ERR(dd->iclk)) {
--		dev_err(dev, "clock intialization failed.\n");
--		err = PTR_ERR(dd->iclk);
--		goto err_res;
+-	/* Get the base address */
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		dev_err(dev, "invalid resource type\n");
+-		err = -ENODEV;
++	err = (dev->of_node) ? omap_aes_get_res_of(dd, dev, &res) :
++			       omap_aes_get_res_pdev(dd, pdev, &res);
++	if (err)
+ 		goto err_res;
 -	}
+-	dd->phys_base = res->start;
 -
- 	dd->io_base = ioremap(dd->phys_base, SZ_4K);
+-	/* Get the DMA */
+-	res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+-	if (!res)
+-		dev_info(dev, "no DMA info\n");
+-	else
+-		dd->dma_out = res->start;
+-
+-	/* Get the DMA */
+-	res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+-	if (!res)
+-		dev_info(dev, "no DMA info\n");
+-	else
+-		dd->dma_in = res->start;
+-
+-	dd->io_base = ioremap(dd->phys_base, SZ_4K);
++
++	dd->io_base = devm_request_and_ioremap(dev, &res);
  	if (!dd->io_base) {
  		dev_err(dev, "can't ioremap\n");
  		err = -ENOMEM;
--		goto err_io;
-+		goto err_res;
+ 		goto err_res;
  	}
++	dd->phys_base = res.start;
  
--	clk_enable(dd->iclk);
-+	pm_runtime_enable(dev);
-+	pm_runtime_get_sync(dev);
-+
- 	reg = omap_aes_read(dd, AES_REG_REV);
- 	dev_info(dev, "OMAP AES hw accel rev: %u.%u\n",
- 		 (reg & AES_REG_REV_MAJOR) >> 4, reg & AES_REG_REV_MINOR);
--	clk_disable(dd->iclk);
-+
-+	pm_runtime_put_sync(dev);
- 
- 	tasklet_init(&dd->done_task, omap_aes_done_task, (unsigned long)dd);
- 	tasklet_init(&dd->queue_task, omap_aes_queue_task, (unsigned long)dd);
-@@ -862,8 +856,7 @@ err_dma:
+ 	pm_runtime_enable(dev);
+ 	pm_runtime_get_sync(dev);
+@@ -904,7 +972,6 @@ err_algs:
+ err_dma:
  	tasklet_kill(&dd->done_task);
  	tasklet_kill(&dd->queue_task);
- 	iounmap(dd->io_base);
--err_io:
--	clk_put(dd->iclk);
-+	pm_runtime_disable(dev);
+-	iounmap(dd->io_base);
+ 	pm_runtime_disable(dev);
  err_res:
  	kfree(dd);
- 	dd = NULL;
-@@ -891,7 +884,7 @@ static int omap_aes_remove(struct platform_device *pdev)
+@@ -932,7 +999,6 @@ static int omap_aes_remove(struct platform_device *pdev)
+ 	tasklet_kill(&dd->done_task);
  	tasklet_kill(&dd->queue_task);
  	omap_aes_dma_cleanup(dd);
- 	iounmap(dd->io_base);
--	clk_put(dd->iclk);
-+	pm_runtime_disable(dd->dev);
+-	iounmap(dd->io_base);
+ 	pm_runtime_disable(dd->dev);
  	kfree(dd);
  	dd = NULL;
+@@ -965,6 +1031,7 @@ static struct platform_driver omap_aes_driver = {
+ 		.name	= "omap-aes",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= &omap_aes_pm_ops,
++		.of_match_table	= omap_aes_of_match,
+ 	},
+ };
  
 -- 
 1.7.12
