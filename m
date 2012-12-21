@@ -1,243 +1,76 @@
-From: tim01@vlsi.informatik.tu-darmstadt.de (Tim Sander)
-Date: Fri, 21 Dec 2012 15:52:48 +0100
-Subject: OT:zynx on zedboard.org hr timer problem with dts
-In-Reply-To: <20121220172301.GC27361@kryptos>
-References: <201212201744.43678.tim01@vlsi.informatik.tu-darmstadt.de>
- <20121220172301.GC27361@kryptos>
-Message-ID: <201212211552.51689.tim01@vlsi.informatik.tu-darmstadt.de>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 21 Dec 2012 16:07:44 +0100
+Subject: [RESEND PATCH] leds: leds-gpio: set devm_gpio_request_one() flags
+ correctly
+Message-ID: <1356102464-22234-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh
+commit a99d76f leds: leds-gpio: use gpio_request_one
 
-Thanks for your answer.
-> A better place to ask questions about the Xilinx tree will likely be on
-> their Embedded Linux forum [1].
-Probably but as i am running a mixtrue out of xilinx stable and preempt rt
-i was in kind of inbetween...
-> > I am sure this is an error in the attached dts but i am to knew to this
-> > device tree stuff to find the error. So any hint would be apreciated.
-> 
-> On first glance, it looks like you've specified a node for the twd, but
-> neglected to specify interrupts.  See
-> Documentation/devicetree/bindings/arm/twd.txt.
-> 
-> > 		swdt at f8005000 {
-> > 		
-> > 			device_type = "watchdog";
-> > 			compatible = "arm,cortex-a9-twd-timer";
-> > 			reg = <0xf8005000 0x100>;
-> > 			clock-frequency = <111111111>;
-> > 		
-> > 		};
-The missing interrupt was a good find but it was not the crucial part.
-To make everyone happy using a search engine, i am appending a version wich
-works on 3.6.9-rt22 merged with the xilinx tree.
+changed the leds-gpio driver to use gpio_request_one() instead
+of gpio_request() + gpio_direction_output()
 
-Best regards
-Tim
--------------- next part --------------
-/dts-v1/;
+Unfortunately, it also made a semantic change that breaks the
+leds-gpio driver.
 
-/ {
-	model = "Xilinx Zedboard";
-	compatible = "xlnx,zynq-zc702";
-	#address-cells = <0x1>;
-	#size-cells = <0x1>;
-	interrupt-parent = <0x1>;
+The gpio_request_one() flags parameter was set to:
 
-	memory {
-		device_type = "memory";
-		reg = <0x00000000 0x20000000>; 
-	};
-	chosen {
-		bootargs = "console=ttyPS0,115200 init=/usr/sbin/init root=/dev/mmcblk0p2 rw ip=192.168.3.4:192.168.3.3:192.168.3.1:255.255.255.0::eth0:none earlyprintk"; 
-		linux,stdout-path = "/amba at 0/uart at E0001000";
-	};
+GPIOF_DIR_OUT | (led_dat->active_low ^ state)
 
-	soc {
-		compatible = "xlnx,zynq";
-		clock-frequency = <33333333>;
-	};
+Since GPIOF_DIR_OUT is 0, the final flags value will just be the
+XOR'ed value of led_dat->active_low and state.
 
+This value were used to distinguish between HIGH/LOW output initial
+level and call gpio_direction_output() accordingly.
 
-	amba at 0 {
-		compatible = "simple-bus";
-		#address-cells = <0x1>;
-		#size-cells = <0x1>;
-		ranges;
+With this new semantic gpio_request_one() will take the flags value
+of 1 as a configuration of input direction (GPIOF_DIR_IN) and will
+call gpio_direction_input() instead of gpio_direction_output().
 
-		gic: intc at f8f01000 {
-			interrupt-controller;
-			compatible = "arm,cortex-a9-gic";
-			#interrupt-cells = <3>;
-			reg = < 0xf8f01000 0x1000 >,
-			      < 0xf8f00100 0x0100 >;
-		};
+int gpio_request_one(unsigned gpio, unsigned long flags, const char *label)
+{
+..
+	if (flags & GPIOF_DIR_IN)
+		err = gpio_direction_input(gpio);
+	else
+		err = gpio_direction_output(gpio,
+				(flags & GPIOF_INIT_HIGH) ? 1 : 0);
+..
+}
 
-		pl310 at f8f02000 {
-			compatible = "arm,pl310-cache";
-			cache-unified;
-			cache-level = <2>;
-			reg = <0xf8f02000 0x1000>;
-			arm,data-latency = <3 2 2>;
-			arm,tag-latency = <2 2 2>;
-			interrupts = <0 34 4>;
-		};
+The right semantic is to evaluate led_dat->active_low ^ state and
+set the output initial level explicitly.
 
-		uart at e0001000 {
-			compatible = "xlnx,ps7-uart-1.00.a";
-			reg = <0xe0001000 0x1000>;
-			interrupts = < 0 50 4 >;
-			interrupt-parent = <&gic>;
-			clock = <50000000>;
-		};
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
 
-		timer at 0xf8001000 {
-			compatible = "xlnx,ps7-ttc-1.00.a";
-			reg = <0xf8001000 0x1000>;
-			interrupts = <0 10 4>,<0 11 4>,<0 12 4>;
-			interrupt-parent = <&gic>;
-			clock-frequency-timer0 = <111111111>;
-			clock-frequency-timer1 = <111111111>;
-			clock-frequency-timer2 = <111111111>;
-		};
+This makes LEDs to work again on my IGEPv2 board (TI OMAP3 based SoC).
 
-		timer at f8f00600 {
-			compatible = "arm,cortex-a9-twd-timer";
-			reg = <0xf8f00600 0x20>;
-			interrupts = <1 13 0x301>;
-			interrupt-parent = <&gic>;
-		};
+I sent this patch before but then realized that I only cc'ed to linux-leds.
+So, I'm resending the patch cc'ing linux-omap,linux-arm-kernel and LKML to
+reach a broader audience and have more people review/test the patch.
 
+Sorry for the noise if someone got it twice.
 
-		swdt at f8005000 {
-			device_type = "watchdog";
-			compatible = "xlnx,ps7-wdt-1.00.a";
-			reg = <0xf8005000 0x100>;
-			clock-frequency = <111111111>;
-		};
+ drivers/leds/leds-gpio.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-		scuwdt at f8f00620 {
-			device_type = "watchdog";
-			compatible = "arm,mpcore_wdt";
-			reg = <0xf8f00620 0x20>;
-			clock-frequency = <333333333>;
-			reset = <1>;
-	    };
-
-		eth at e000b000 {
-		  compatible = "xlnx,ps7-ethernet-1.00.a";
-		  reg = <0xe000b000 0x1000>;
-		  interrupts = <0 22 4>;
-		  interrupt-parent = <&gic>;
-		  phy-handle = <&phy0>;
-		  xlnx,ptp-enet-clock = <111111111>;
-		  xlnx,slcr-div0-1000Mbps = <8>;
-		  xlnx,slcr-div0-100Mbps = <8>;
-		  xlnx,slcr-div0-10Mbps = <8>;
-		  xlnx,slcr-div1-1000Mbps = <1>;
-		  xlnx,slcr-div1-100Mbps = <5>;
-		  xlnx,slcr-div1-10Mbps = <50>;
-		  #address-cells = <0x1>;
-		  #size-cells = <0x0>;
-
-		  mdio {
-			#address-cells = <0x1>;
-			#size-cells = <0x0>;
-			phy0: phy at 0 {
-			  compatible = "marvell,88e1510";
-			  device_type = "ethernet-phy";
-			  reg = <0x0>;
-			  marvell,reg-init = <0x3 0x10 0xff00 0x1e 0x3 0x11 0xfff0 0xa>;
-			};
-		  };
-		};
-
-		sdhci at e0100000 {
-			compatible = "xlnx,ps7-sdhci-1.00.a";
-			reg = <0xe0100000 0x1000>;
-			xlnx,has-cd = <0x1>;
-			interrupts = <0 24 4>;
-			interrupt-parent = <&gic>;
-			clock-frequency = <33333000>;
-		};
-
-		usb at e0002000 {
-			compatible = "xlnx,ps7-usb-1.00.a";
-			reg = <0xe0002000 0x1000>;
-			interrupts = <0 21 4>;
-			interrupt-parent = <&gic>;
-			dr_mode = "host";
-			phy_type = "ulpi";
-		};
-
-		gpio at e000a000 {
-			compatible = "xlnx,ps7-gpio-1.00.a";
-			reg = <0xe000a000 0x1000>;
-			interrupts = <0 20 4>;
-			interrupt-parent = <&gic>;
-		};
-
-		qspi0: spi at e000d000 {
-			compatible = "xlnx,ps7-qspi-1.00.a";
-			reg = <0xE000D000 0x1000>;
-			interrupts = <0 19 4>;
-			interrupt-parent = <&gic>;
-			speed-hz = <200000000>;
-			bus-num = <1>;
-			num-chip-select = <1>;
-			#address-cells = <1>;
-			#size-cells = <0>;
-			is-dual = <0>;
-			flash at 0 {
-			compatible = "n25q128";
-			reg = <0x0>;
-			spi-max-frequency = <50000000>;
-			#address-cells = <1>;
-			#size-cells = <1>;
-			partition at qspi-fsbl {
-				label = "qspi-fsbl";
-				reg = <0x0 0x80000>;
-				};
-			partition at qspi-u-boot {
-				label = "qspi-u-boot";
-				reg = <0x80000 0x80000>;
-				};
-			partition at qspi-linux {
-				label = "qspi-linux";
-				reg = <0x100000 0x500000>;
-				};
-			partition at qspi-device-tree {
-				label = "qspi-device-tree";
-				reg = <0x600000 0x20000>;
-				};
-			partition at qspi-user {
-				label = "qspi-user";
-				reg = <0x620000 0xE0000>;
-				};
-			partition at qspi-scratch {
-				label = "qspi-scratch";
-				reg = <0x700000 0x100000>;
-				};
-			partition at qspi-rootfs {
-				label = "qspi-rootfs";
-				reg = <0x800000 0x800000>;
-				};
-			};
-		};
-
-		devcfg at f8007000 {
-			compatible = "xlnx,ps7-dev-cfg-1.00.a";
-			reg = <0xf8007000 0x100>;
-			interrupts = <0 8 4>;
-			interrupt-parent = <&gic>;
-		};
-		xadc at f8007100 {
-			compatible = "xlnx,ps7-xadc-1.00.a";
-			reg = <0xf8007100 0x20>;
-			interrupts = <0 7 4>;
-			interrupt-parent = <&gic>;
-		};
-	};
-};
+diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
+index 1885a26..a0d931b 100644
+--- a/drivers/leds/leds-gpio.c
++++ b/drivers/leds/leds-gpio.c
+@@ -127,8 +127,9 @@ static int create_gpio_led(const struct gpio_led *template,
+ 		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+ 
+ 	ret = devm_gpio_request_one(parent, template->gpio,
+-			GPIOF_DIR_OUT | (led_dat->active_low ^ state),
+-			template->name);
++				    (led_dat->active_low ^ state) ?
++				    GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
++				    template->name);
+ 	if (ret < 0)
+ 		return ret;
+ 
+-- 
+1.7.7.6
