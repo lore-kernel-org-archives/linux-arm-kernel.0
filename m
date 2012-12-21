@@ -1,64 +1,68 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Fri, 21 Dec 2012 19:10:27 +0100
-Subject: [PATCH] arm: omap3: igep0020: Add console default kernel arguments
-In-Reply-To: <CAFqH_50ELkdXhVwW8atG0VsXU85S3pZqCVf9cytQRGk5SocFXw@mail.gmail.com>
-References: <1356018118-29852-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <CAFqH_50ELkdXhVwW8atG0VsXU85S3pZqCVf9cytQRGk5SocFXw@mail.gmail.com>
-Message-ID: <CAAwP0s1snYU7FR-BVM=GLg0oopT6NkBVLOysffia0dadsxW+BQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 21 Dec 2012 10:13:50 -0800
+Subject: [PATCH v3 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
+In-Reply-To: <CAFp+6iFSZjfVJp23j2dEz0hRap07RMo68GJpsQM7YqOMBCbqsQ@mail.gmail.com>
+References: <1355416562-25539-1-git-send-email-gautam.vivek@samsung.com>
+ <1355416562-25539-2-git-send-email-gautam.vivek@samsung.com>
+ <20121215072312.EBCAA3E0C06@localhost>
+ <CAFp+6iHoS4XJWHNrsyVsQS4bYZs1PUNEGsRr=EqAS7kpm2XGMQ@mail.gmail.com>
+ <CAFp+6iFSZjfVJp23j2dEz0hRap07RMo68GJpsQM7YqOMBCbqsQ@mail.gmail.com>
+Message-ID: <CAD=FV=X=GRz0ZuFSqEHPy6i2ULtHk==M2_gaCvdmd=81YMNmMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Vivek,
 
-Thanks for the patch
 
-On Fri, Dec 21, 2012 at 5:02 PM, Enric Balletbo Serra
-<eballetbo@gmail.com> wrote:
-> Hi Ezequiel,
+On Fri, Dec 21, 2012 at 12:16 AM, Vivek Gautam
+<gautamvivek1987@gmail.com> wrote:
+> Hi all,
 >
-> Thanks  for the patch.
 >
-> 2012/12/20 Ezequiel Garcia <ezequiel.garcia@free-electrons.com>:
->> IGEP v2 boards has console as ttyO2,115200n8.
->> It's better so simply set this as the default kernel argument
->> directly in the device tree board file.
+> On Wed, Dec 19, 2012 at 7:20 PM, Vivek Gautam <gautamvivek1987@gmail.com> wrote:
+>> CC: Doug Anderson
 >>
->> Cc: Enric Balletbo i Serra <eballetbo@gmail.com>
->> Cc: Javier Martinez Canillas <javier@dowhile0.org>
->> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->> ---
->>  arch/arm/boot/dts/omap3-igep0020.dts |    4 ++++
->>  1 files changed, 4 insertions(+), 0 deletions(-)
 >>
->> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
->> index e2b9849..45ffe21 100644
->> --- a/arch/arm/boot/dts/omap3-igep0020.dts
->> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
->> @@ -15,6 +15,10 @@
->>         model = "IGEPv2";
->>         compatible = "isee,omap3-igep0020", "ti,omap3";
->>
->> +       chosen {
->> +               bootargs = "console=ttyO2,115200n8 earlyprintk";
->> +       };
->> +
+>> On Sat, Dec 15, 2012 at 12:53 PM, Grant Likely
+>> <grant.likely@secretlab.ca> wrote:
+>>> On Thu, 13 Dec 2012 22:06:01 +0530, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+>>>> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>>>> index 462e5ac..b3b9af1 100644
+>>>> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+>>>> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>>>> @@ -110,6 +110,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+>>>>                               "samsung-i2s.1", NULL),
+>>>>       OF_DEV_AUXDATA("samsung,samsung-i2s", 0x12D70000,
+>>>>                               "samsung-i2s.2", NULL),
+>>>> +     OF_DEV_AUXDATA("samsung,exynos4210-ehci", EXYNOS5_PA_EHCI,
+>>>> +                             "s5p-ehci", NULL),
+>>>
+>>> I'm assuming the above change is temporary. What is left to be done to
+>>> drop the auxdata in theses two patches?
+>>>
+>>> Otherwise the patch looks fine.
+>>>
+>>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 >
-> The u-boot 'bootargs' env overwrites the one from chosen ?
->
+> Any more thought about this patch?
+> Or does this change seems fine?
 
-I just tested and U-Boot 'bootargs' has precedence over DT bootargs
-but I didn't find a way to append boot parameters from U-Boot. You can
-either overwrite it completely or not.
+I'm fairly certain we can just drop the OF_DEV_AUXDATA entry here.  I
+haven't been following this as closely as I should, but I know that
+the comment for this table says that the whole purpose is to override
+device names and that it should be temporary.  We don't need to do any
+overriding of device names here, do we?
 
-That been said I think that is a good idea to have some default
-bootargs on the DT but since you can't append any boot option from
-U-Boot I would also add root=/dev/mmcblk0p2 rw rootwait so at least it
-will be able to mount the rootfs from the uSD/MMC.
+When I drop this (and the ohci and phy) entries from my table I can
+still boot and still can use USB.  The big difference is what shows up
+in dmesg
 
-Also, many IGEP COM Module base boards also have serial consoles that
-are connected to the OMAP3 UART3 (ttyO2), so maybe is better to add
-this to omap3-igep.dtsi instead of omap3-igep0020.dts to avoid future
-duplication.
+[    1.605000] s5p-ehci s5p-ehci: S5P EHCI Host Controller
 
-Best regards,
-Javier
+Becomes:
+
+[    1.550000] s5p-ehci 12110000.usb: S5P EHCI Host Controller
+
+...and some sysfs paths change.
+
+-Doug
