@@ -1,20 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Dec 2012 09:24:21 +0000
-Subject: [PATCH 4/4] net/smsc911x: Provide common clock functionality
-In-Reply-To: <20121221091306.GO2691@gmail.com>
-References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
- <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
- <CACRpkda79O_b3Z8g7Sy7vMtW9neZU4x-Z=iEQgjqu4X5tFKyhw@mail.gmail.com>
- <20121220192441.GC14363@n2100.arm.linux.org.uk>
- <20121220203514.GN2691@gmail.com>
- <20121220205113.GD14363@n2100.arm.linux.org.uk>
- <20121221091306.GO2691@gmail.com>
-Message-ID: <20121221092421.GG14363@n2100.arm.linux.org.uk>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 21 Dec 2012 17:45:10 +0800
+Subject: [PATCH v6 0/8] pinctrl: support mmp silicon with single driver
+Message-ID: <1356083118-18857-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 21, 2012 at 09:13:06AM +0000, Lee Jones wrote:
-> Are you saying remove "pdata->clk = NULL;" and test for IS_ERR
-> every time?
+Changelog:
+v6:
+1. Two configuration array will be created for each pin group.
+This first array is stored in pcs_function structure. The 32-bit 
+configruation argument is stored in this array. Driver stores 
+data while parsing DTS file, and loads these config array if 
+function selector is indicated.
+The second array is stored in pinctrl_map structure. Driver won't
+use it directly. So we could avoid to append lookup pinctrl map
+method that is introduced in v5.
 
-Exactly.
+v5:
+1. Move the properties of pinconf into pin group. So those mask
+properties could be merged with other pinconf properties.
+2. Append lookup pinctrl map method.
+3. Append input schmitt disable config parameter.
+4. Clean code.
+
+v4:
+1. Define gpio range as sub-node, not label. And remove
+pinctrl-single,gpio-ranges property.
+2. Use new two properties in sub-node, reg &
+pinctrl-single,gpio. GPIO number & GPIO function are listed in
+the pinctrl-single,gpio property.
+3. Reference the names like pinctrl-single,bias.
+4. Add compatible name "pinconf-single". If the compatible name is
+"pinctrl-single", there's no pinconf. If the compatible name is
+"pinconf-single", there's the generic pinconf in pinctrl-single.
+5. Update documents.
+
+v3:
+1. Add more comments in document.
+2. Replace pcs_readl() & pcs_writel() by pcs->read() & pcs->write().
+3. Clean code.
+
+v2:
+1. Remove "pinctrl-single,gpio-mask". Since GPIO function is one of the
+mux function in the pinmux register of both OMAP and PXA/MMP silicons.
+Use "pinctrl-single,function-mask" instead.
+2. Remove "pinctrl-single,gpio-enable" & "pinctrl-single,gpio-disable".
+Use "pinctrl-single,gpio-func" instead. Because GPIO mode is only one
+of the mux functions in the pinmux register. Defining "gpio-enable" &
+"gpio-disable" are redundant.
+3. Define register with __iomem, not u32 type.
+4. Remove "pinctrl-single,input-schmit-shift",
+"pinctrl-single,power-source-shift", "pinctrl-single,bias-shift". All
+these properties could be calculated by mask fields.
+5. Return -EPROBE_DEFER if pinmux could be got in device driver. And
+the device driver would be probed again deferred.
