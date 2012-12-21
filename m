@@ -1,57 +1,52 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 21 Dec 2012 10:04:54 -0700
-Subject: [PATCH 04/10] crypto: omap-aes - Add suspend/resume support
+Date: Fri, 21 Dec 2012 10:04:58 -0700
+Subject: [PATCH 08/10] crypto: omap-aes - Convert to
+ dma_request_slave_channel_compat()
 In-Reply-To: <1356109500-11719-1-git-send-email-mgreer@animalcreek.com>
 References: <1356109500-11719-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1356109500-11719-5-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1356109500-11719-9-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Add suspend/resume support to the OMAP AES driver.
+Use the dma_request_slave_channel_compat() call instead of
+the dma_request_channel() call to request a DMA channel.
+This allows the omap-aes driver use different DMA engines.
 
 CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- drivers/crypto/omap-aes.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/crypto/omap-aes.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index c229852..3262139 100644
+index 68bf22d..e28788e 100644
 --- a/drivers/crypto/omap-aes.c
 +++ b/drivers/crypto/omap-aes.c
-@@ -891,12 +891,31 @@ static int omap_aes_remove(struct platform_device *pdev)
- 	return 0;
- }
+@@ -296,15 +296,19 @@ static int omap_aes_dma_init(struct omap_aes_dev *dd)
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
  
-+#ifdef CONFIG_PM_SLEEP
-+static int omap_aes_suspend(struct device *dev)
-+{
-+	pm_runtime_put_sync(dev);
-+	return 0;
-+}
-+
-+static int omap_aes_resume(struct device *dev)
-+{
-+	pm_runtime_get_sync(dev);
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops omap_aes_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(omap_aes_suspend, omap_aes_resume)
-+};
-+
- static struct platform_driver omap_aes_driver = {
- 	.probe	= omap_aes_probe,
- 	.remove	= omap_aes_remove,
- 	.driver	= {
- 		.name	= "omap-aes",
- 		.owner	= THIS_MODULE,
-+		.pm	= &omap_aes_pm_ops,
- 	},
- };
+-	dd->dma_lch_in = dma_request_channel(mask, omap_dma_filter_fn,
+-					     &dd->dma_in);
++	dd->dma_lch_in = dma_request_slave_channel_compat(mask,
++							  omap_dma_filter_fn,
++							  &dd->dma_in,
++							  dd->dev, "rx");
+ 	if (!dd->dma_lch_in) {
+ 		dev_err(dd->dev, "Unable to request in DMA channel\n");
+ 		goto err_dma_in;
+ 	}
  
+-	dd->dma_lch_out = dma_request_channel(mask, omap_dma_filter_fn,
+-					     &dd->dma_out);
++	dd->dma_lch_out = dma_request_slave_channel_compat(mask,
++							   omap_dma_filter_fn,
++							   &dd->dma_out,
++							   dd->dev, "tx");
+ 	if (!dd->dma_lch_out) {
+ 		dev_err(dd->dev, "Unable to request out DMA channel\n");
+ 		goto err_dma_out;
 -- 
 1.7.12
