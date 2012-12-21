@@ -1,71 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Dec 2012 10:05:35 +0100
-Subject: [GIT PULL] Fixes for sunxi for 3.8 merge window
-In-Reply-To: <20121220160132.GB1034@quad.lixom.net>
-References: <1355906760-23041-1-git-send-email-maxime.ripard@free-electrons.com>
- <20121220160132.GB1034@quad.lixom.net>
-Message-ID: <50D4265F.4080307@free-electrons.com>
+Date: Fri, 21 Dec 2012 10:07:13 +0100
+Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
+In-Reply-To: <50D33940.4000607@atmel.com>
+References: <20121219183236.GP23971@game.jcrosoft.org>
+ <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
+ <50D2EBA1.4050305@free-electrons.com> <50D2EDE6.3090706@atmel.com>
+ <50D3340F.3090209@free-electrons.com> <50D33940.4000607@atmel.com>
+Message-ID: <50D426C1.5050807@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/12/2012 17:01, Olof Johansson a ?crit :
-> On Wed, Dec 19, 2012 at 09:46:00AM +0100, Maxime Ripard wrote:
->> Arnd, Olof,
+Le 20/12/2012 17:13, ludovic.desroches a ?crit :
+> On 12/20/2012 04:51 PM, Maxime Ripard wrote:
+>> Hi Ludovic,
 >>
->> Please consider pulling these two (late) patches for the sunxi support.
+>> Le 20/12/2012 11:52, ludovic.desroches a ?crit :
+>>>> I'm wondering, why are you using such a complex dt parsing code, and
+>>>> bindings, when you only requires a boolean to switch between 8 and 10
+>>>> bits mode (which seem to be the only thing you support)?
+>>>
+>>> We will have a 10 and 12 bits mode on future ADCs and I would like to
+>>> have something which could manage more than two resolutions if it
+>>> happens one day.
 >>
->> The first one add the support for the sunxi architecture in the multiplatform
->> kernel, allowing to easily build a kernel that boots on the sun4i/sun5i
->> supported boards.
+>> I see your point. I'm not fond at all of the existing bindings for the
+>> driver (putting things like registers offset in the dt is a non-sense to
+>> me, but hey...), so I'd like to still keep it as simple and non-bloated
+>> as possible, but it's true that in the current situation, we probably
+>> have no other choice.
 >>
->> The second one fixes some compatible strings that were left behind in the
->> previous compatible renaming patch, preventing the kernel from booting.
->>
->> Thanks,
->> Maxime 
->>
->> The following changes since commit 7445d6b5a7a40c40cda3935ba3827896305cfc21:
->>
->>   ARM: sunxi: Change device tree naming scheme for sunxi (2012-12-18 15:11:16 +0100)
->>
->> are available in the git repository at:
->>
->>   git://github.com/mripard/linux.git tags/sunxi-fixes-for-3.8-rc1
->>
->> for you to fetch changes up to 91e4f61216c6e15f7ff99f2d18407a08cfe601b0:
->>
->>   sunxi: Change the machine compatible string. (2012-12-19 09:23:42 +0100)
->>
->> ----------------------------------------------------------------
->> Fixes for the sunxi core to be merged in 3.8-rc1
->>
->> ----------------------------------------------------------------
->> Maxime Ripard (2):
->>       ARM: multi_v7_defconfig: Add ARCH_SUNXI
->>       sunxi: Change the machine compatible string.
 > 
-> Hi,
+> I have the same feeling than you about ADC bindings, I think that there
+> are too many parameters exhibited. Moreover, most of them are chip
+> relative.
 > 
-> I get more than those patches when I pull that tag, and it seems like some of
-> them are now invalid. Like "ARM: sunxi: Add missing sun4i.dtsi file", which 
-> will add a fresh sun4i.dtsi, when it's already been added and renamed
-> sun4i-a10.dtsi.
+> I have not found other ways to deal with it properly. I would like to
+> have them hidden into the driver (depending on the compatible string)
+> but it will be a mess if we split parameters into dt and driver.
 
-Hi,
+I'm glad we feel the same way :)
 
-This patch has been sent by Stefan Roese and was applied by Arnd I
-believe (Commit 7423d2d8), so I took it in my tree for the next patches
-to apply cleanly as well.
+> So the idea was to have a binding which could allow us to manage several
+> cases about resolution modes in the future.
 
-And then came the patch that was not doing the renaming, and one of that
-renamed files was actually sun4i.dtsi to sun4i-a10.dtsi.
+Yes, I got the idea. Like I said, if we don't want to touch at the
+bindings and do want you suggested, then your patch is the best solution
+we have.
 
-I'm not sure how we should handle those, do you want me to send you
-patches? maybe it'll be easier for you to apply these changes?
-
-Thanks,
 Maxime
-
 -- 
 Maxime Ripard, Free Electrons
 Kernel, drivers, real-time and embedded Linux
