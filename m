@@ -1,52 +1,45 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 21 Dec 2012 17:45:18 +0800
-Subject: [PATCH v6 8/8] i2c: pxa: configure pinmux
-In-Reply-To: <1356083118-18857-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1356083118-18857-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1356083118-18857-9-git-send-email-haojian.zhuang@linaro.org>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 21 Dec 2012 17:58:17 +0800
+Subject: [PATCH 2/2] ARM: tegra: moving the clock gating procedure to
+ tegra_cpu_kill
+In-Reply-To: <50D34467.9000006@wwwdotorg.org>
+References: <1355970519-28200-1-git-send-email-josephl@nvidia.com>
+ <1355970519-28200-2-git-send-email-josephl@nvidia.com>
+ <50D34467.9000006@wwwdotorg.org>
+Message-ID: <1356083897.26029.187.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Haojian Zhuang <haojian.zhuang@gmail.com>
+On Fri, 2012-12-21 at 01:01 +0800, Stephen Warren wrote:
+> On 12/19/2012 07:28 PM, Joseph Lo wrote:
+> > The tegra_cpu_die was be executed by the CPU itslf. So the clock gating
+> > procedure won't be executed after the CPU hardware shutdown code. Moving
+> > the clock gating procedure to tegra_cpu_kill that will be run by another
+> > CPU after the CPU died.
+> 
+> Hmmm. I wonder if this is enough to make kexec-on-Tegra-with-SMP-enabled
+> work without explicitly hot-unplugging all the CPUs first... An
+> implementation of cpu_kill() was a major part of what was missing. I
+> thought an implementation of cpu_kill() would require a bunch of code
+> from cpu_die() too. Does this patch assume cpu_die() has executed first,
+> and only then cpu_kill() will work, or can cpu_kill() be used on its own?
+> 
+Yes, the tegra_cpu_die must be run first then tegra_cpu_kill. Because
+the tegra_cpu_die shutdown the CPU by itself, then we can clock gate the
+CPU in tegra_cpu_kill. If the tegra_cpu_kill be run itself, the system
+will be hung in wait_for_reset(CPU).
 
-Configure pins by pinctrl driver.
+About the kexec issue, it's complicate. Your solution should be the
+right solution. And we should implement the hardware shutdown code in
+cpu_die not cpu_kill. I suspect this issue can be reproduced on all ARM
+platform. Because the smp_send_stop can't really shutdown the secondary
+CPU core if just call machine_shutdown without disable_nonboot_cpu. And
+in platform_shutdown and platform_reboot case, the secondary CPU already
+been offlined and killed before this function be called. Does any other
+ARM SMP platform can run kexec without any issue?
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/i2c/busses/i2c-pxa.c |    5 +++++
- 1 file changed, 5 insertions(+)
+(I will check if we can do some HW shutdown in tegra_cpu_kill. For ex,
+just clock gate the CPU without wait_for_reset.)
 
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index 7c8b5d0..11e4a30 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -32,6 +32,7 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/of_i2c.h>
-+#include <linux/pinctrl/consumer.h>
- #include <linux/platform_device.h>
- #include <linux/err.h>
- #include <linux/clk.h>
-@@ -1051,6 +1052,7 @@ static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
- 			    enum pxa_i2c_types *i2c_types)
- {
- 	struct device_node *np = pdev->dev.of_node;
-+	struct pinctrl *pinctrl;
- 	const struct of_device_id *of_id =
- 			of_match_device(i2c_pxa_dt_ids, &pdev->dev);
- 	int ret;
-@@ -1063,6 +1065,9 @@ static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
- 		return ret;
- 	}
- 	pdev->id = ret;
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl))
-+		return -EPROBE_DEFER;
- 	if (of_get_property(np, "mrvl,i2c-polling", NULL))
- 		i2c->use_pio = 1;
- 	if (of_get_property(np, "mrvl,i2c-fast-mode", NULL))
--- 
-1.7.10.4
+Thanks,
+Joseph
