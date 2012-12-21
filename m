@@ -1,456 +1,316 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 21 Dec 2012 17:45:11 +0800
-Subject: [PATCH v6 1/8] pinctrl: single: support generic pinconf
+Date: Fri, 21 Dec 2012 17:45:12 +0800
+Subject: [PATCH v6 2/8] ARM: dts: support pinctrl single in pxa910
 In-Reply-To: <1356083118-18857-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1356083118-18857-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1356083118-18857-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1356083118-18857-3-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the operation of generic pinconf. The supported config arguments
-are INPUT_SCHMITT, INPUT_SCHMITT_DISABLE, POWER_SOURCE, BIAS_DISABLE,
-BIAS_PULLUP, BIAS_PULLDOWN.
+Add pinctrl-single support with device tree in pxa910 dkb platform.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/pinctrl/Kconfig          |    1 +
- drivers/pinctrl/pinctrl-single.c |  292 +++++++++++++++++++++++++++++++++++++-
- 2 files changed, 287 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/pxa910-dkb.dts |  204 +++++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/pxa910.dtsi    |   68 +++++++++++++
+ 2 files changed, 271 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index c31aeb0..2434c21 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -143,6 +143,7 @@ config PINCTRL_SINGLE
- 	depends on OF
- 	select PINMUX
- 	select PINCONF
-+	select GENERIC_PINCONF
- 	help
- 	  This selects the device tree based generic pinctrl driver.
+diff --git a/arch/arm/boot/dts/pxa910-dkb.dts b/arch/arm/boot/dts/pxa910-dkb.dts
+index 595492a..76e9c8d 100644
+--- a/arch/arm/boot/dts/pxa910-dkb.dts
++++ b/arch/arm/boot/dts/pxa910-dkb.dts
+@@ -24,10 +24,212 @@
  
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index 7964283..7d593b8 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -22,6 +22,7 @@
- 
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/pinctrl/pinmux.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- 
- #include "core.h"
- 
-@@ -60,6 +61,19 @@ struct pcs_func_vals {
- };
- 
- /**
-+ * struct pcs_conf_vals - pinconf parameter, pinconf register offset
-+ * and value/mask pair
-+ * @param:	config parameter
-+ * @val:	register value
-+ * @mask:	mask of register value
-+ */
-+struct pcs_conf_vals {
-+	enum pin_config_param param;
-+	unsigned val;
-+	unsigned mask;
-+};
+ 	soc {
+ 		apb at d4000000 {
+-			uart1: uart at d4017000 {
++			pmx: pinmux at d401e000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&board_pins>;
 +
-+/**
-  * struct pcs_function - pinctrl function
-  * @name:	pinctrl function name
-  * @vals:	register and vals array
-@@ -74,6 +88,8 @@ struct pcs_function {
- 	unsigned nvals;
- 	const char **pgnames;
- 	int npgnames;
-+	struct pcs_conf_vals *conf;
-+	int nconfs;
- 	struct list_head node;
- };
++				board_pins: pinmux_board_pins {
++					/* pins not owned by device driver */
++					/* w1 */
++					pinctrl-single,pins = <
++						0x0cc 0x2	/* CLK_REQ_W1 */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				uart1_pins: pinmux_uart1_pins {
++					pinctrl-single,pins = <
++						0x198 0x6	/* GPIO47_UART1_RXD */
++						0x19c 0x6	/* GPIO48_UART1_TXD */
++					>;
++					/* power source, mask */
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					/* bias, mask, disable, pull down, pull up */
++					pinctrl-single,bias = <0xc000 0xe000 0 0xa000 0xc000>;
++					/* input schmitt, mask, disable */
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				uart2_pins: pinmux_uart2_pins {
++					pinctrl-single,pins = <
++						0x150 0x4	/* GPIO29_UART2_CTS */
++						0x154 0x4	/* GPIO30_UART2_RTS */
++						0x158 0x4	/* GPIO31_UART2_TXD */
++						0x15c 0x4	/* GPIO32_UART2_RXD */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				uart3_pins: pinmux_uart3_pins {
++					pinctrl-single,pins = <
++						0x188 0x7	/* GPIO43_UART3_RXD */
++						0x18c 0x7	/* GPIO44_UART3_TXD */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				twsi1_pins: pinmux_twsi1_pins {
++					pinctrl-single,pins = <
++						0x1b0 0x2	/* GPIO53_TWSI_SCL */
++						0x1b4 0x2	/* GPIO54_TWSI_SDA */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				nand_pins: pinmux_nand_pins {
++					pinctrl-single,pins = <
++						0x040 0x0	/* ND_IO0 */
++						0x03c 0x0	/* ND_IO1 */
++						0x038 0x0	/* ND_IO2 */
++						0x034 0x0	/* ND_IO3 */
++						0x030 0x0	/* ND_IO4 */
++						0x02c 0x0	/* ND_IO5 */
++						0x028 0x0	/* ND_IO6 */
++						0x024 0x0	/* ND_IO7 */
++						0x020 0x0	/* ND_IO8 */
++						0x01c 0x0	/* ND_IO9 */
++						0x018 0x0	/* ND_IO10 */
++						0x014 0x0	/* ND_IO11 */
++						0x010 0x0	/* ND_IO12 */
++						0x00c 0x0	/* ND_IO13 */
++						0x008 0x0	/* ND_IO14 */
++						0x004 0x0	/* ND_IO15 */
++						0x044 0x0	/* ND_nCS0 */
++						0x060 0x1	/* ND_ALE */
++						0x05c 0x0	/* ND_CLE */
++						0x054 0x1	/* ND_nWE */
++						0x058 0x1	/* ND_nRE */
++						0x068 0x0	/* ND_RDY0 */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				mmc1_ldata_pins: pinmux_mmc1_ldata_pins {
++					pinctrl-single,pins = <
++						0x0a0 0x0	/* MMC1_DATA0 */
++						0x09c 0x0	/* MMC1_DATA1 */
++						0x098 0x0	/* MMC1_DATA2 */
++						0x094 0x0	/* MMC1_DATA3 */
++					>;
++					pinctrl-single,power-source = <0x1800 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				mmc1_hdata_pins: pinmux_mmc1_hdata_pins {
++					pinctrl-single,pins = <
++						0x090 0x0	/* MMC1_DATA4 */
++						0x08c 0x0	/* MMC1_DATA5 */
++						0x088 0x0	/* MMC1_DATA6 */
++						0x084 0x0	/* MMC1_DATA7 */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				mmc1_clk_pins: pinmux_mmc1_clk_pins {
++					pinctrl-single,pins = <
++						0x0a4 0x0	/* MMC1_CMD */
++						0x0a8 0x0	/* MMC1_CLK */
++					>;
++					pinctrl-single,power-source = <0x1800 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				mmc1_cd_pins: pinmux_mmc1_cd_pins {
++					pinctrl-single,pins = <
++						0x0ac 0x0	/* MMC1_CD */
++						0x0b0 0x0	/* MMC1_WP */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				mmc2_pins: pinmux_mmc2_pins {
++					pinctrl-single,pins = <
++						0x180 0x1	/* MMC2_CMD */
++						0x184 0x1	/* MMC2_CLK */
++						0x17c 0x1	/* MMC2_DATA0 */
++						0x178 0x1	/* MMC2_DATA1 */
++						0x174 0x1	/* MMC2_DATA2 */
++						0x170 0x1	/* MMC2_DATA3 */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				ssp1_pins: pinmux_ssp1_pins {
++					pinctrl-single,pins = <
++						0x130 0x1	/* GPIO21_SSP1_SCLK */
++						0x134 0x1	/* GPIO22_SSP1_FRM */
++						0x138 0x1	/* GPIO23_SSP1_TXD */
++						0x13c 0x1	/* GPIO24_SSP1_RXD */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				keypad_pins: pinmux_keypad_pins {
++					pinctrl-single,pins = <
++						0x0dc 0x1	/* GPIO0_MKIN0 */
++						0x0e0 0x1	/* GPIO1_MKOUT0 */
++						0x0e4 0x1	/* GPIO2_MKIN1 */
++						0x0e8 0x1	/* GPIO3_MKOUT1 */
++						0x0ec 0x1	/* GPIO4_MKIN2 */
++						0x0f0 0x1	/* GPIO5_MKOUT2 */
++						0x0f4 0x1	/* GPIO6_MKIN3 */
++						0x0f8 0x1	/* GPIO7_MKOUT3 */
++						0x0fc 0x1	/* GPIO8_MKIN4 */
++						0x100 0x1	/* GPIO9_MKOUT4 */
++						0x10c 0x1	/* GPIO12_MKIN6 */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				nfc_pins: pinmux_nfc_pins {
++					pinctrl-single,pins = <
++						0x120 0x0	/* GPIO17 */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++				wlan_pins: pinmux_wlan_pins {
++					pinctrl-single,pins = <
++						0x114 0x0	/* GPIO14 */
++						0x12c 0x0	/* GPIO20 */
++						0x160 0x0	/* GPIO33 */
++						0x164 0x0	/* GPIO34 */
++						0x168 0x0	/* GPIO35 */
++						0x16c 0x0	/* GPIO36 */
++					>;
++					pinctrl-single,power-source = <0x1000 0x1800>;
++					pinctrl-single,bias = <0 0xe000 0 0xa000 0xc000>;
++					pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
++				};
++			};
++			uart1: uart at d4017000 {	/* FFUART */
++				pinctrl-names = "default";
++				pinctrl-0 = <&uart1_pins>;
++				status = "okay";
++			};
++			uart2: uart at d4018000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&uart2_pins>;
++				status = "okay";
++			};
++			uart3: uart at d4036000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&uart3_pins>;
+ 				status = "okay";
+ 			};
+ 			twsi1: i2c at d4011000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&twsi1_pins>;
+ 				status = "okay";
  
-@@ -128,6 +144,7 @@ struct pcs_name {
-  * @fshift:	function register shift
-  * @foff:	value to turn mux off
-  * @fmax:	max number of functions in fmask
-+ * @is_pinconf:	whether supports pinconf
-  * @names:	array of register names for pins
-  * @pins:	physical pins on the SoC
-  * @pgtree:	pingroup index radix tree
-@@ -153,6 +170,7 @@ struct pcs_device {
- 	unsigned foff;
- 	unsigned fmax;
- 	bool bits_per_mux;
-+	bool is_pinconf;
- 	struct pcs_name *names;
- 	struct pcs_data pins;
- 	struct radix_tree_root pgtree;
-@@ -448,25 +466,149 @@ static struct pinmux_ops pcs_pinmux_ops = {
- static int pcs_pinconf_get(struct pinctrl_dev *pctldev,
- 				unsigned pin, unsigned long *config)
- {
-+	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
-+	struct pin_desc *pdesc = pin_desc_get(pctldev, pin);
-+	struct pcs_function *func;
-+	const struct pinctrl_setting_mux *setting;
-+	unsigned fselector, offset = 0, data = 0, i, j;
+ 				pmic: 88pm860x at 34 {
+diff --git a/arch/arm/boot/dts/pxa910.dtsi b/arch/arm/boot/dts/pxa910.dtsi
+index 825aaca..c2f8b21 100644
+--- a/arch/arm/boot/dts/pxa910.dtsi
++++ b/arch/arm/boot/dts/pxa910.dtsi
+@@ -54,6 +54,74 @@
+ 			reg = <0xd4000000 0x00200000>;
+ 			ranges;
+ 
++			pmx: pinmux at d401e000 {
++				compatible = "pinconf-single";
++				reg = <0xd401e000 0x0330>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges;
 +
-+	/* If pin is not described in DTS & enabled, mux_setting is NULL. */
-+	setting = pdesc->mux_setting;
-+	if (!setting)
-+		return -ENOTSUPP;
-+	fselector = setting->func;
-+	func = radix_tree_lookup(&pcs->ftree, fselector);
-+	if (!func) {
-+		dev_err(pcs->dev, "%s could not find function%i\n",
-+			__func__, fselector);
-+		return -ENOTSUPP;
-+	}
++				pinctrl-single,register-width = <32>;
++				pinctrl-single,function-mask = <7>;
 +
-+	for (i = 0; i < func->nconfs; i++) {
-+		if (pinconf_to_config_param(*config) != func->conf[i].param)
-+			continue;
-+		offset = pin * (pcs->width / BITS_PER_BYTE);
-+		data = pcs->read(pcs->base + offset);
-+		data &= func->conf[i].mask;
-+		switch (func->conf[i].param) {
-+		case PIN_CONFIG_BIAS_DISABLE:
-+		case PIN_CONFIG_BIAS_PULL_DOWN:
-+		case PIN_CONFIG_BIAS_PULL_UP:
-+		case PIN_CONFIG_INPUT_SCHMITT_DISABLE:
-+			if (data != func->conf[i].val)
-+				return -ENOTSUPP;
-+			*config = data;
-+			break;
-+		case PIN_CONFIG_INPUT_SCHMITT:
-+			/* either INPUT_SCHMITT or DISABLE */
-+			for (j = 0; j < func->nconfs; j++) {
-+				switch (func->conf[j].param) {
-+				case PIN_CONFIG_INPUT_SCHMITT_DISABLE:
-+					if (data == func->conf[j].val)
-+						return -ENOTSUPP;
-+					break;
-+				default:
-+					break;
-+				}
-+			}
-+			*config = data;
-+			break;
-+		default:
-+			*config = data;
-+			break;
-+		}
-+		return 0;
-+	}
- 	return -ENOTSUPP;
- }
- 
- static int pcs_pinconf_set(struct pinctrl_dev *pctldev,
- 				unsigned pin, unsigned long config)
- {
-+	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
-+	struct pin_desc *pdesc = pin_desc_get(pctldev, pin);
-+	struct pcs_function *func;
-+	const struct pinctrl_setting_mux *setting;
-+	unsigned fselector;
-+	unsigned offset = 0, shift = 0, arg = 0, i, data;
++				range0: range at d401e0dc {
++					/* GPIO0 ~ GPIO54 */
++					reg = <0xd401e0dc 0xdc>;
++					/* gpio base & gpio func */
++					pinctrl-single,gpio = <0 0>;
++				};
++				range1: range at d401e2f0 {
++					/* GPIO55 ~ GPIO59 */
++					reg = <0xd401e2f0 0x14>;
++					pinctrl-single,gpio = <55 1>;
++				};
++				range2: range at d401e304 {
++					/* GPIO60 ~ GPIO66 */
++					reg = <0xd401e304 0x1c>;
++					pinctrl-single,gpio = <60 0>;
++				};
++				range3: range at d401e1b8 {
++					/* GPIO67 ~ GPIO109 */
++					reg = <0xd401e1b8 0xac>;
++					pinctrl-single,gpio = <67 0>;
++				};
++				range4: range at d401e298 {
++					/* GPIO110 ~ GPIO116 */
++					reg = <0xd401e298 0x1c>;
++					pinctrl-single,gpio = <110 0>;
++				};
++				range5: range at d401e0b4 {
++					/* GPIO117 ~ GPIO120 */
++					reg = <0xd401e0b4 0x10>;
++					pinctrl-single,gpio = <117 1>;
++				};
++				range6: range at d401e32c {
++					/* GPIO121 */
++					reg = <0xd401e32c 0x04>;
++					pinctrl-single,gpio = <121 0>;
++				};
++				range7: range at d401e0c8 {
++					/* GPIO122 ~ GPIO123 */
++					reg = <0xd401e0c8 0x08>;
++					pinctrl-single,gpio = <122 1>;
++				};
++				range8: range at d401e0d0 {
++					/* GPIO124 */
++					reg = <0xd401e0d0 0x04>;
++					pinctrl-single,gpio = <124 0>;
++				};
++				range9: range at d401e0d4 {
++					/* GPIO125 */
++					reg = <0xd401e0d4 0x04>;
++					pinctrl-single,gpio = <125 1>;
++				};
++				range10: range at d401e06c {
++					/* GPIO126 ~ GPIO127 */
++					reg = <0xd401e06c 0x08>;
++					pinctrl-single,gpio = <126 0>;
++				};
++			};
 +
-+	/* If pin is not described in DTS & enabled, mux_setting is NULL. */
-+	setting = pdesc->mux_setting;
-+	if (!setting)
-+		return -ENOTSUPP;
-+	fselector = setting->func;
-+	func = radix_tree_lookup(&pcs->ftree, fselector);
-+	if (!func) {
-+		dev_err(pcs->dev, "%s could not find function%i\n",
-+			__func__, fselector);
-+		return -ENOTSUPP;
-+	}
-+
-+	for (i = 0; i < func->nconfs; i++) {
-+		if (pinconf_to_config_param(config) == func->conf[i].param) {
-+			offset = pin * (pcs->width / BITS_PER_BYTE);
-+			data = pcs->read(pcs->base + offset);
-+			switch (func->conf[i].param) {
-+			case PIN_CONFIG_BIAS_DISABLE:
-+			case PIN_CONFIG_BIAS_PULL_DOWN:
-+			case PIN_CONFIG_BIAS_PULL_UP:
-+			case PIN_CONFIG_INPUT_SCHMITT_DISABLE:
-+				data &= ~func->conf[i].mask;
-+				data |= func->conf[i].val;
-+				break;
-+			case PIN_CONFIG_INPUT_SCHMITT:
-+			case PIN_CONFIG_POWER_SOURCE:
-+				shift = ffs(func->conf[i].mask) - 1;
-+				arg = pinconf_to_config_argument(config);
-+				data &= ~func->conf[i].mask;
-+				data |= (arg << shift) & func->conf[i].mask;
-+				break;
-+			default:
-+				return -ENOTSUPP;
-+			}
-+			pcs->write(data, pcs->base + offset);
-+			return 0;
-+		}
-+	}
- 	return -ENOTSUPP;
- }
- 
- static int pcs_pinconf_group_get(struct pinctrl_dev *pctldev,
- 				unsigned group, unsigned long *config)
- {
--	return -ENOTSUPP;
-+	const unsigned *pins;
-+	unsigned npins, old;
-+	int i, ret;
-+
-+	ret = pcs_get_group_pins(pctldev, group, &pins, &npins);
-+	if (ret)
-+		return ret;
-+	for (i = 0; i < npins; i++) {
-+		if (pcs_pinconf_get(pctldev, pins[i], config))
-+			return -ENOTSUPP;
-+		/* configs do not match between two pins */
-+		if (i && (old != *config))
-+			return -ENOTSUPP;
-+		old = *config;
-+	}
-+	return 0;
- }
- 
- static int pcs_pinconf_group_set(struct pinctrl_dev *pctldev,
- 				unsigned group, unsigned long config)
- {
--	return -ENOTSUPP;
-+	const unsigned *pins;
-+	unsigned npins;
-+	int i, ret;
-+
-+	ret = pcs_get_group_pins(pctldev, group, &pins, &npins);
-+	if (ret)
-+		return ret;
-+	for (i = 0; i < npins; i++) {
-+		if (pcs_pinconf_set(pctldev, pins[i], config))
-+			return -ENOTSUPP;
-+	}
-+	return 0;
- }
- 
- static void pcs_pinconf_dbg_show(struct pinctrl_dev *pctldev,
-@@ -676,11 +818,137 @@ static int pcs_get_pin_by_offset(struct pcs_device *pcs, unsigned offset)
- 	return index;
- }
- 
-+static int pcs_config_match(unsigned data, unsigned match)
-+{
-+	int ret = 0;
-+
-+	if (!match) {
-+		if (!data)
-+			ret = 1;
-+	} else {
-+		if ((data & match) == match)
-+			ret = 1;
-+	}
-+	return ret;
-+}
-+
-+static void add_config(struct pcs_conf_vals *conf, enum pin_config_param param,
-+		       unsigned match, unsigned mask)
-+{
-+	conf->param = param;
-+	conf->val = match;
-+	conf->mask = mask;
-+}
-+
-+static void add_setting(unsigned long *setting, enum pin_config_param param,
-+			unsigned arg)
-+{
-+	*setting = pinconf_to_config_packed(param, arg);
-+}
-+
-+static int pcs_parse_pinconf(struct pcs_device *pcs, struct device_node *np,
-+			     struct pcs_function *func,
-+			     struct pinctrl_map **map)
-+
-+{
-+	struct pinctrl_map *m = *map;
-+	int i = 0, c = 0, nconfs = 0, count = 0;
-+	unsigned value[5];
-+	unsigned long *settings;
-+
-+	/* If pinconf isn't supported, don't parse properties in below. */
-+	if (!pcs->is_pinconf)
-+		return 0;
-+
-+	if (of_find_property(np, "pinctrl-single,bias", NULL)) {
-+		/* DISABLE, PULL_DOWN, PULL_UP */
-+		count += 3;
-+		nconfs++;
-+	}
-+	if (of_find_property(np, "pinctrl-single,power-source", NULL)) {
-+		/* POWER_SOURCE */
-+		count++;
-+		nconfs++;
-+	}
-+	if (of_find_property(np, "pinctrl-single,input-schmitt", NULL)) {
-+		/* DISABLE, INPUT_SCHMITT */
-+		count += 2;
-+		nconfs++;
-+	}
-+	if (!nconfs)
-+		return 0;
-+
-+	func->conf = devm_kzalloc(pcs->dev,
-+				  sizeof(struct pcs_conf_vals) * count,
-+				  GFP_KERNEL);
-+	if (!func->conf)
-+		return -ENOMEM;
-+	m++;
-+	settings = devm_kzalloc(pcs->dev, sizeof(unsigned long) * nconfs,
-+				GFP_KERNEL);
-+	if (!settings)
-+		return -ENOMEM;
-+	func->nconfs = count;
-+
-+	if (!of_property_read_u32_array(np, "pinctrl-single,bias", value, 5)) {
-+		value[0] &= value[1];	/* bias value to set */
-+		value[2] &= value[1];	/* bias disable */
-+		value[3] &= value[1];	/* bias pull down */
-+		value[4] &= value[1];	/* bias pull up */
-+		add_config(&func->conf[i++], PIN_CONFIG_BIAS_DISABLE,
-+			   value[2], value[1]);
-+		add_config(&func->conf[i++], PIN_CONFIG_BIAS_PULL_DOWN,
-+			   value[3], value[1]);
-+		add_config(&func->conf[i++], PIN_CONFIG_BIAS_PULL_UP,
-+			   value[4], value[1]);
-+		if (pcs_config_match(value[0], value[2])) {
-+			add_setting(&settings[c++], PIN_CONFIG_BIAS_DISABLE, 1);
-+		} else {
-+			if ((value[0] & value[3]) == value[3])
-+				add_setting(&settings[c++],
-+					    PIN_CONFIG_BIAS_PULL_DOWN, 1);
-+			else if ((value[0] & value[4]) == value[4])
-+				add_setting(&settings[c++],
-+					    PIN_CONFIG_BIAS_PULL_UP, 1);
-+		}
-+	}
-+	if (!of_property_read_u32_array(np, "pinctrl-single,input-schmitt",
-+					value, 3)) {
-+		value[0] &= value[1];	/* input schmitt */
-+		value[2] &= value[1];	/* input schmitt disable */
-+		add_config(&func->conf[i++], PIN_CONFIG_INPUT_SCHMITT_DISABLE,
-+			   value[2], value[1]);
-+		add_config(&func->conf[i++], PIN_CONFIG_INPUT_SCHMITT,
-+			   value[1], value[1]);
-+		if (pcs_config_match(value[0], value[2]))
-+			add_setting(&settings[c++],
-+				    PIN_CONFIG_INPUT_SCHMITT_DISABLE, 1);
-+		else
-+			add_setting(&settings[c++],
-+				    PIN_CONFIG_INPUT_SCHMITT, value[0]);
-+	}
-+	if (!of_property_read_u32_array(np, "pinctrl-single,power-source",
-+					value, 2)) {
-+		value[0] &= value[1];	/* power source */
-+		add_config(&func->conf[i++], PIN_CONFIG_POWER_SOURCE,
-+			   value[1], value[1]);
-+		add_setting(&settings[c++], PIN_CONFIG_POWER_SOURCE, value[0]);
-+	}
-+	m->type = PIN_MAP_TYPE_CONFIGS_GROUP;
-+	m->data.configs.group_or_pin = np->name;
-+	m->data.configs.configs = settings;
-+	m->data.configs.num_configs = nconfs;
-+	return 0;
-+}
-+
-+static void pcs_free_pingroups(struct pcs_device *pcs);
-+
- /**
-  * smux_parse_one_pinctrl_entry() - parses a device tree mux entry
-  * @pcs: pinctrl driver instance
-  * @np: device node of the mux entry
-  * @map: map entry
-+ * @num_maps: number of map
-  * @pgnames: pingroup names
-  *
-  * Note that this binding currently supports only sets of one register + value.
-@@ -697,6 +965,7 @@ static int pcs_get_pin_by_offset(struct pcs_device *pcs, unsigned offset)
- static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
- 						struct device_node *np,
- 						struct pinctrl_map **map,
-+						unsigned *num_maps,
- 						const char **pgnames)
- {
- 	struct pcs_func_vals *vals;
-@@ -769,8 +1038,14 @@ static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
- 	(*map)->data.mux.group = np->name;
- 	(*map)->data.mux.function = np->name;
- 
-+	if (pcs_parse_pinconf(pcs, np, function, map))
-+		goto free_pingroups;
-+	*num_maps = 2;
- 	return 0;
- 
-+free_pingroups:
-+	pcs_free_pingroups(pcs);
-+	*num_maps = 1;
- free_function:
- 	pcs_remove_function(pcs, function);
- 
-@@ -799,7 +1074,8 @@ static int pcs_dt_node_to_map(struct pinctrl_dev *pctldev,
- 
- 	pcs = pinctrl_dev_get_drvdata(pctldev);
- 
--	*map = devm_kzalloc(pcs->dev, sizeof(**map), GFP_KERNEL);
-+	/* create 2 maps. One is for pinmux, and the other is for pinconf. */
-+	*map = devm_kzalloc(pcs->dev, sizeof(**map) * 2, GFP_KERNEL);
- 	if (!*map)
- 		return -ENOMEM;
- 
-@@ -811,13 +1087,13 @@ static int pcs_dt_node_to_map(struct pinctrl_dev *pctldev,
- 		goto free_map;
- 	}
- 
--	ret = pcs_parse_one_pinctrl_entry(pcs, np_config, map, pgnames);
-+	ret = pcs_parse_one_pinctrl_entry(pcs, np_config, map, num_maps,
-+					  pgnames);
- 	if (ret < 0) {
- 		dev_err(pcs->dev, "no pins entries for %s\n",
- 			np_config->name);
- 		goto free_pgnames;
- 	}
--	*num_maps = 1;
- 
- 	return 0;
- 
-@@ -972,6 +1248,7 @@ static int __devinit pcs_probe(struct platform_device *pdev)
- 	mutex_init(&pcs->mutex);
- 	INIT_LIST_HEAD(&pcs->pingroups);
- 	INIT_LIST_HEAD(&pcs->functions);
-+	pcs->is_pinconf = match->data;
- 
- 	PCS_GET_PROP_U32("pinctrl-single,register-width", &pcs->width,
- 			 "register width not specified\n");
-@@ -1035,6 +1312,8 @@ static int __devinit pcs_probe(struct platform_device *pdev)
- 	pcs->desc.pmxops = &pcs_pinmux_ops;
- 	pcs->desc.confops = &pcs_pinconf_ops;
- 	pcs->desc.owner = THIS_MODULE;
-+	if (match->data)
-+		pcs_pinconf_ops.is_generic = true;
- 
- 	ret = pcs_allocate_pin_table(pcs);
- 	if (ret < 0)
-@@ -1075,7 +1354,8 @@ static int pcs_remove(struct platform_device *pdev)
- }
- 
- static struct of_device_id pcs_of_match[] = {
--	{ .compatible = DRIVER_NAME, },
-+	{ .compatible = "pinctrl-single", .data = (void *)false },
-+	{ .compatible = "pinconf-single", .data = (void *)true },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, pcs_of_match);
+ 			timer0: timer at d4014000 {
+ 				compatible = "mrvl,mmp-timer";
+ 				reg = <0xd4014000 0x100>;
 -- 
 1.7.10.4
