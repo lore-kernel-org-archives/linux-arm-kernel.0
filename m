@@ -1,34 +1,48 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 21 Dec 2012 12:22:34 -0700
-Subject: [PATCH 00/15] OMAP SHAM & AES Crypto Updates
-In-Reply-To: <87a9t78boa.fsf@dell.be.48ers.dk>
-References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
- <87a9t78boa.fsf@dell.be.48ers.dk>
-Message-ID: <20121221192234.GA10722@animalcreek.com>
+From: omar.ramirez@copitl.com (Omar Ramirez Luna)
+Date: Fri, 21 Dec 2012 13:33:08 -0600
+Subject: [PATCH 0/9] drivers: mailbox: framework creation
+In-Reply-To: <50D42337.3080204@st.com>
+References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
+ <CACRpkdaqO7AAeYeR8SZt4Tbv1grrMq85TNYMc-FSbUSrnZBm=Q@mail.gmail.com>
+ <20121220182835.GB21056@atomide.com>
+ <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
+ <CAK=Wgba=jLiig+TBcAcp7STz=Y6RM8noR_0S2HZjNQXLZV8JBA@mail.gmail.com>
+ <50D42337.3080204@st.com>
+Message-ID: <CAJ6Av5N+H4eno+9FizLp9gNsZrZ-TQnLnVGjf-UMBtNiDVuNdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 21, 2012 at 08:09:25PM +0100, Peter Korsgaard wrote:
-> >>>>> "Mark" == Mark A Greer <mgreer@animalcreek.com> writes:
-> 
->  Mark> From: "Mark A. Greer" <mgreer@animalcreek.com>
->  Mark> [This series supersedes the hwmod related patches sent in the
->  Mark>  "crypto: omap-sham updates" and "crypto: omap-aes updates"
->  Mark>  series a few weeks ago.]
-> 
->  Mark> This series adds hwmod support for the OMAP SHAM and AES
->  Mark> modules on OMAP2, OMAP3, and OMAP4/AM33XX SoCs.  It also
->  Mark> adds device tree info for those modules.
-> 
-> Huh, does am335x have a sham module? I don't see any mention of that in
-> spruh73g.pdf
+Hi Loic/Ohad,
 
-Yes.  It has sham, aes, and rng modules.
+On Fri, Dec 21, 2012 at 2:52 AM, Loic PALLARDY <loic.pallardy@st.com> wrote:
+>
+>
+> On 12/21/2012 08:31 AM, Ohad Ben-Cohen wrote:
+>> On Thu, Dec 20, 2012 at 9:19 PM, Olof Johansson<olof@lixom.net>  wrote:
+>>> While we can make the branch stable, would it make sense to make
+>>> remoteproc for omap depend on !multiplatform during the transition, to
+>>> reduce dependencies a little? Either way works, but it'd be nice to
+>>> keep them independent if we can.
+>>
+>> I'm not sure multiplatform is the culprit; OMAP's remoteproc driver
+>> heavily depends on this mailbox code, and obviously breaks with this
+>> patch-set if only for the the naming changes. We'll need this patch
+>> set to update omap's remoteproc as well so at least we don't break
+>> bisectibility, though running a sanity test before merging would be
+>> even nicer (Loic I can help if you don't have a panda board).
+>
+> Hi Ohad,
+> Yes tidspbridge and remoteproc must be adapted.
+> This new mailbox fw has been tested on TI environment by Omar, who did
+> adaptation at least for tidspbridge.
+>
+> Omar, do you have patch series ready for TI adaptations to new mailbox
+> framework?
+> Else I can do it, but I won't be able to test it (no panda board)
 
-They are not described in the TRM.  In fact, I had to use the omap4
-description (closely guarded by TI) because AFAIK there isn't a doc
-for the am33xx.  The am33xx modules are identical to the omap4 ones
-except for the register addresses and dma channels so that doc worked.
+Yes, I made the changes, for tidspbridge and remoteproc, I will submit
+both for review, based on this series.
 
-Mark
---
+Cheers,
+
+Omar
