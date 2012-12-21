@@ -1,27 +1,95 @@
-From: loic.pallardy@st.com (Loic PALLARDY)
-Date: Fri, 21 Dec 2012 09:54:26 +0100
-Subject: [PATCH 1/9] mailbox: OMAP: introduce mailbox framework
-In-Reply-To: <20121218165909.GF4989@atomide.com>
-References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
- <1355836212-17956-2-git-send-email-loic.pallardy-ext@stericsson.com>
- <20121218165909.GF4989@atomide.com>
-Message-ID: <50D423C2.3090009@st.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 21 Dec 2012 09:59:55 +0100
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <CAKfTPtBs28LqUL908U7=ae82+mAV7ba1bj1Kt9PnizdLTo3EwA@mail.gmail.com>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+ <20121221054712.GA2933@danjae>
+ <CAKfTPtBs28LqUL908U7=ae82+mAV7ba1bj1Kt9PnizdLTo3EwA@mail.gmail.com>
+Message-ID: <CAKfTPtB9M5=VbmpWH8-0rhJ1XRVm27u+18mjxqk_FgbXjO1R4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/18/2012 05:59 PM, Tony Lindgren wrote:
-> * Loic Pallardy<loic.pallardy-ext@stericsson.com>  [121218 05:15]:
+On 21 December 2012 09:53, Vincent Guittot <vincent.guittot@linaro.org> wrote:
+> On 21 December 2012 06:47, Namhyung Kim <namhyung@kernel.org> wrote:
+>> Hi Vincent,
 >>
->> Signed-off-by: Omar Ramirez Luna<omar.luna@linaro.org>
+>> On Thu, Dec 13, 2012 at 11:11:11AM +0100, Vincent Guittot wrote:
+>>> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
+>>> > On 12/12/2012 09:31 PM, Vincent Guittot wrote:
+>>> >> +static bool is_buddy_busy(int cpu)
+>>> >> +{
+>>> >> +     struct rq *rq = cpu_rq(cpu);
+>>> >> +
+>>> >> +     /*
+>>> >> +      * A busy buddy is a CPU with a high load or a small load with a lot of
+>>> >> +      * running tasks.
+>>> >> +      */
+>>> >> +     return ((rq->avg.runnable_avg_sum << rq->nr_running) >
+>>> >
+>>> > If nr_running a bit big, rq->avg.runnable_avg_sum << rq->nr_running is
+>>> > zero. you will get the wrong decision.
+>>>
+>>> yes, I'm going to do that like below instead:
+>>> return (rq->avg.runnable_avg_sum > (rq->avg.runnable_avg_period >>
+>>> rq->nr_running));
+>>
+>> Doesn't it consider nr_running too much?  It seems current is_buddy_busy
+>> returns false on a cpu that has 1 task runs 40% cputime, but returns true
+>> on a cpu that has 3 tasks runs 10% cputime each or for 2 tasks of 15%
+>> cputime each, right?
 >
-> AFAIK the first two patches should have:
-> From: Omar Ramirez Luna<omar.luna@linaro.org>
-Yes right, my mistake.
-I'll fix that on next version.
-/Loic
+> Yes it's right.
+>>
+>> I don't know what is correct, but just guessing that in a cpu's point
+>> of view it'd be busier if it has a higher runnable_avg_sum than a
+>> higher nr_running IMHO.
 >
-> Once that's fixed, for arch/arm/*omap*/* parts:
+sorry, the mail has been sent before i finish it
+
+> The nr_running is used to point out how many tasks are running
+> simultaneously and the potential scheduling latency of adding
+
+The nr_running is used to point out how many tasks are running
+simultaneously and as a result the potential scheduling latency.
+I have used the shift instruction because it was quite simple and
+efficient but it may give too much weight to nr_running. I could use a
+simple division instead of shifting runnable_avg_sum
+
 >
-> Acked-by: Tony Lindgren<tony@atomide.com>
+>>
+>>
+>>>
+>>> >
+>>> >> +                     rq->avg.runnable_avg_period);
+>>> >> +}
+>>> >> +
+>>> >> +static bool is_light_task(struct task_struct *p)
+>>> >> +{
+>>> >> +     /* A light task runs less than 25% in average */
+>>> >> +     return ((p->se.avg.runnable_avg_sum << 1) <
+>>> >> +                     p->se.avg.runnable_avg_period);
+>>> >
+>>> > 25% may not suitable for big machine.
+>>>
+>>> Threshold is always an issue, which threshold should be suitable for
+>>> big machine ?
+>>>
+>>> I'm wondering if i should use the imbalance_pct value for computing
+>>> the threshold
+>>
+>> Anyway, I wonder how 'sum << 1' computes 25%.  Shouldn't it be << 2 ?
+>
+> The 1st version of the patch was using << 2 but I received a comment
+> saying that it was may be not enough aggressive so I have updated the
+> formula with << 1 but forgot to update the comment. I will align
+> comment and formula in the next version.
+> Thanks for pointing this
+>
+> Vincent
+>
+>>
+>> Thanks,
+>> Namhyung
