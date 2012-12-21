@@ -1,48 +1,49 @@
-From: omar.ramirez@copitl.com (Omar Ramirez Luna)
-Date: Fri, 21 Dec 2012 13:33:08 -0600
-Subject: [PATCH 0/9] drivers: mailbox: framework creation
-In-Reply-To: <50D42337.3080204@st.com>
-References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
- <CACRpkdaqO7AAeYeR8SZt4Tbv1grrMq85TNYMc-FSbUSrnZBm=Q@mail.gmail.com>
- <20121220182835.GB21056@atomide.com>
- <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
- <CAK=Wgba=jLiig+TBcAcp7STz=Y6RM8noR_0S2HZjNQXLZV8JBA@mail.gmail.com>
- <50D42337.3080204@st.com>
-Message-ID: <CAJ6Av5N+H4eno+9FizLp9gNsZrZ-TQnLnVGjf-UMBtNiDVuNdA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Dec 2012 13:50:56 -0700
+Subject: [PATCH] ARM: tegra: dts: add aliases and DMA requestor for serial
+ controller
+In-Reply-To: <50D3E320.2090804@nvidia.com>
+References: <1355898671-3960-1-git-send-email-ldewangan@nvidia.com>
+ <50D1F2CB.3090206@wwwdotorg.org> <50D2AD02.6060101@nvidia.com>
+ <50D344E9.70305@wwwdotorg.org> <50D3E320.2090804@nvidia.com>
+Message-ID: <50D4CBB0.7080603@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Loic/Ohad,
-
-On Fri, Dec 21, 2012 at 2:52 AM, Loic PALLARDY <loic.pallardy@st.com> wrote:
->
->
-> On 12/21/2012 08:31 AM, Ohad Ben-Cohen wrote:
->> On Thu, Dec 20, 2012 at 9:19 PM, Olof Johansson<olof@lixom.net>  wrote:
->>> While we can make the branch stable, would it make sense to make
->>> remoteproc for omap depend on !multiplatform during the transition, to
->>> reduce dependencies a little? Either way works, but it'd be nice to
->>> keep them independent if we can.
+On 12/20/2012 09:18 PM, Laxman Dewangan wrote:
+> On Thursday 20 December 2012 10:33 PM, Stephen Warren wrote:
+>> On 12/19/2012 11:15 PM, Laxman Dewangan wrote:
+>>> On Wednesday 19 December 2012 10:30 PM, Stephen Warren wrote:
+>>>> On 12/18/2012 11:31 PM, Laxman Dewangan wrote:
+>>>>> Add APB DMA requestor and serial aliases for serial controller.
+>>>>> There will be two serial driver i.e. 8250 based simple serial driver
+>>>>> and APB DMA based serial driver for higher baudrate and performace.
+...
+>>>> This patch seems to do two things:
+...
+>>>> 2) Add aliases for the serial ports. I have no idea why this is useful.
+>>> Serial aliases are added because we want to get the port number like
+>>> /dev/ttyTHS0,  /d/ttyTHS2 etc. The uarta should be /dev/ttyTHS0 and
+>>> uartc should be /dev/ttyTHS2. The port number can be found using aliases
+>>> and of_alias_get_id() in driver file:
+>>>
+>>> port_number = of_alias_get_id(np, "serial");
 >>
->> I'm not sure multiplatform is the culprit; OMAP's remoteproc driver
->> heavily depends on this mailbox code, and obviously breaks with this
->> patch-set if only for the the naming changes. We'll need this patch
->> set to update omap's remoteproc as well so at least we don't break
->> bisectibility, though running a sanity test before merging would be
->> even nicer (Loic I can help if you don't have a panda board).
->
-> Hi Ohad,
-> Yes tidspbridge and remoteproc must be adapted.
-> This new mailbox fw has been tested on TI environment by Omar, who did
-> adaptation at least for tidspbridge.
->
-> Omar, do you have patch series ready for TI adaptations to new mailbox
-> framework?
-> Else I can do it, but I won't be able to test it (no panda board)
+>> Oh, I see. I guess the aliases make sense then.
+>>
+>> But, wouldn't you only add aliases for the specific UARTs that are in
+>> use on a particular board (so put them in tegraNN-board.dts) rather than
+>> all UARTs on Tegra (i.e. the current patch which puts them into
+>> tegraNN.dtsi)?
+> 
+> I like to have this in tegraN N.dtsi file becasue:
+> - This policy is not going to change the board to board. For high speed
+> driver the uarta will be ttyTHS0 and uartb ttyTHS1.
 
-Yes, I made the changes, for tidspbridge and remoteproc, I will submit
-both for review, based on this series.
-
-Cheers,
-
-Omar
+Sure it is. Since the board files select which UARTs use the low-speed
+driver vs. the high-speed driver by overriding the compatible value,
+each board will have a different subset of UARTs which use the high
+speed driver and hence which use the aliases. Don't you want to end up
+with /dev/ttyHS0 on each board, rather than ending up with a "random"
+device node name depending on which UART the board designer picked for
+the high speed device?
