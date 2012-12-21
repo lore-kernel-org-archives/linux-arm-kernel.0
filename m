@@ -1,55 +1,71 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 21 Dec 2012 09:28:04 -0700
-Subject: [PATCH 04/15] ARM: OMAP2+: Remove unnecessary message when no SHA IP
- is present
-In-Reply-To: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
-References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1356107295-11121-5-git-send-email-mgreer@animalcreek.com>
+Date: Fri, 21 Dec 2012 09:28:00 -0700
+Subject: [PATCH 00/15] OMAP SHAM & AES Crypto Updates
+Message-ID: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Remove the error message that prints when there is no SHA IP
-present to make it consistent with all the other IPs.
+[This series supersedes the hwmod related patches sent in the
+ "crypto: omap-sham updates" and "crypto: omap-aes updates"
+ series a few weeks ago.]
 
-CC: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
----
- arch/arm/mach-omap2/devices.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
+This series adds hwmod support for the OMAP SHAM and AES
+modules on OMAP2, OMAP3, and OMAP4/AM33XX SoCs.  It also
+adds device tree info for those modules.
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index a217408..598ab1e 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -466,20 +466,15 @@ static void omap_init_rng(void)
- 
- static void __init omap_init_sham(void)
- {
--	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
--		struct omap_hwmod *oh;
--		struct platform_device *pdev;
-+	struct omap_hwmod *oh;
-+	struct platform_device *pdev;
- 
--		oh = omap_hwmod_lookup("sham");
--		if (!oh)
--			return;
-+	oh = omap_hwmod_lookup("sham");
-+	if (!oh)
-+		return;
- 
--		pdev = omap_device_build("omap-sham", -1, oh, NULL, 0, NULL,
--					 0, 0);
--		WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
--	} else {
--		pr_err("%s: platform not supported\n", __func__);
--	}
-+	pdev = omap_device_build("omap-sham", -1, oh, NULL, 0, NULL, 0, 0);
-+	WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
- }
- 
- #if defined(CONFIG_CRYPTO_DEV_OMAP_AES) || defined(CONFIG_CRYPTO_DEV_OMAP_AES_MODULE)
+The patches are based on the latest k.o. kernel, plus:
+ - patches from the EDMA dmaengine series submitted by Matt Porter
+   "[RFC PATCH v3 00/16] DMA Engine support for AM33XX"
+   (https://lkml.org/lkml/2012/10/18/256).
+ - some misc patches required by the EDMA patches
+ - a hack to fix the compilation error that it currently has
+
+The driver changes that will take advantage of these changes will
+be submitted in a different series (and to a different mail list).
+
+A working example is here:
+
+	git at github.com:mgreeraz/linux-mag.git submitted/crypto/hwmod
+
+Mark A. Greer (15):
+  ARM: OMAP2xxx: hwmod: Convert SHAM crypto device data to hwmod
+  ARM: OMAP2xxx: hwmod: Add DMA support for SHAM module
+  ARM: OMAP3xxx: hwmod: Convert SHAM crypto device data to hwmod
+  ARM: OMAP2+: Remove unnecessary message when no SHA IP is present
+  ARM: OMAP2+: Only manually add hwmod data when DT not used.
+  ARM: AM33XX: Add sha0 crypto clock data
+  ARM: AM33XX: hwmod: Update and uncomment SHA0 module data
+  ARM: dts: Add SHAM data and documentation for AM33XX
+  ARM: OMAP2xxx: hwmod: Convert AES crypto devcie data to hwmod
+  ARM: OMAP3xxx: hwmod: Convert AES crypto device data to hwmod
+  ARM: OMAP2+: Remove unnecessary message when no AES IP is present
+  ARM: OMAP2+: Only manually add hwmod data when DT not used.
+  ARM: AM33XX: Add aes0 crypto clock data
+  ARM: AM33XX: hwmod: Update and uncomment AES0 module data
+  ARM: dts: Add AES data and documentation for AM33XX
+
+ .../devicetree/bindings/crypto/omap-aes.txt        |  37 +++++
+ .../devicetree/bindings/crypto/omap-sham.txt       |  35 +++++
+ arch/arm/boot/dts/am335x-bone.dts                  |   8 ++
+ arch/arm/boot/dts/am335x-evm.dts                   |   8 ++
+ arch/arm/boot/dts/am335x-evmsk.dts                 |   8 ++
+ arch/arm/boot/dts/am33xx.dtsi                      |  25 ++++
+ arch/arm/mach-omap2/cclock2430_data.c              |   4 +-
+ arch/arm/mach-omap2/cclock33xx_data.c              |  10 ++
+ arch/arm/mach-omap2/cclock3xxx_data.c              |   4 +-
+ arch/arm/mach-omap2/devices.c                      | 149 +++------------------
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   2 +
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   2 +
+ .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  36 +++++
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  81 +++++++++++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  92 +++++++++++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 128 ++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |   4 +
+ 17 files changed, 488 insertions(+), 145 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/crypto/omap-aes.txt
+ create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
+
 -- 
 1.7.12
