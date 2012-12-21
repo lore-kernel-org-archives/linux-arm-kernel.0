@@ -1,32 +1,54 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 21 Dec 2012 09:31:57 +0200
-Subject: [PATCH 0/9] drivers: mailbox: framework creation
-In-Reply-To: <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
-References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
- <CACRpkdaqO7AAeYeR8SZt4Tbv1grrMq85TNYMc-FSbUSrnZBm=Q@mail.gmail.com>
- <20121220182835.GB21056@atomide.com>
- <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
-Message-ID: <CAK=Wgba=jLiig+TBcAcp7STz=Y6RM8noR_0S2HZjNQXLZV8JBA@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 21 Dec 2012 16:07:51 +0800
+Subject: [PATCH] ARM: tegra30: fix power up sequence for boot_secondary
+In-Reply-To: <50D3430A.4020901@wwwdotorg.org>
+References: <1355970603-28531-1-git-send-email-josephl@nvidia.com>
+ <50D3430A.4020901@wwwdotorg.org>
+Message-ID: <1356077271.26029.81.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 9:19 PM, Olof Johansson <olof@lixom.net> wrote:
-> While we can make the branch stable, would it make sense to make
-> remoteproc for omap depend on !multiplatform during the transition, to
-> reduce dependencies a little? Either way works, but it'd be nice to
-> keep them independent if we can.
-
-I'm not sure multiplatform is the culprit; OMAP's remoteproc driver
-heavily depends on this mailbox code, and obviously breaks with this
-patch-set if only for the the naming changes. We'll need this patch
-set to update omap's remoteproc as well so at least we don't break
-bisectibility, though running a sanity test before merging would be
-even nicer (Loic I can help if you don't have a panda board).
-
-BTW - grep shows that tidspbridge is using the mailbox code too, but
-it's in staging and I'm not sure it gets much love. Nevertheless, as
-long as it's there we should at least update it with the new API as
-well.
+On Fri, 2012-12-21 at 00:55 +0800, Stephen Warren wrote:
+> On 12/19/2012 07:30 PM, Joseph Lo wrote:
+> > The power up sequence is different on the cold boot CPU and the CPU
+> > that resumed from the hotplug. For the cold boot CPU, it was been power
+> > gated as default. To power up the cold boot CPU, the power should be
+> > un-gated by un toggling the power gate register manually.
+> > 
+> > For the CPU that resumed from the hotplug, after un-halted the CPU. The
+> > flow controller will un-gate the power of the CPU. No need to manually
+> > control, just wait the power be resumed and continue the power up
+> > sequence after the CPU power is ready.
+> 
+> I'd like Peter to review this too (CC'd). I guess it looks OK...
+> 
+> > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> 
+> > @@ -72,7 +75,27 @@ static int tegra30_power_up_cpu(unsigned int cpu)
+> >  	if (pwrgateid < 0)
+> >  		return pwrgateid;
+> >  
+> > -	/* If this is the first boot, toggle powergates directly. */
+> > +	/*
+> > +	 * If the CPU had booted and went through here after CPU
+> > +	 * had been already un-gated by flow controller. Wait
+> > +	 * for confirmation that the CPU is powered then remove
+> > +	 * the IO clamps. On the cold boot entry, do not wait.
+> > +	 */
+> 
+> That comment is quite unclear. In particular the first sentence says "if
+> something" rather than "if something then something". Can you please
+> re-write it?
+> 
+OK.
+> Also, it'd be good to explain (or at least briefly reference) the boot
+> path for a cold-boot CPU and a warm boot CPU; I assume that somehow a
+> cold boot CPU doesn't execute tegra_secondary_init(), but a warm boot
+> CPU does?
+> 
+The boot path was the same. Both of the conditions were booted from
+tegra_boot_secondary. Just the power sequence has been different. We add
+the code to recover the power up sequence of warm boot CPU.
 
 Thanks,
-Ohad.
+Joseph
