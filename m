@@ -1,120 +1,68 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 21 Dec 2012 22:56:32 +0200
-Subject: [PATCH] ARM: OMAP1: fix USB configuration use-after-release
-Message-ID: <1356123392-6172-1-git-send-email-aaro.koskinen@iki.fi>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Dec 2012 14:04:29 -0700
+Subject: [PATCH V3 2/5] ARM: tegra20: cpuidle: add powered-down state
+ for secondary CPU
+In-Reply-To: <1356071804.26029.34.camel@jlo-ubuntu-64.nvidia.com>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <1355797861-12759-3-git-send-email-josephl@nvidia.com>
+ <50D34E28.5000208@wwwdotorg.org>
+ <1356071804.26029.34.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <50D4CEDD.3070206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All boards, except Amstrad E3, mark USB config with __initdata.
+On 12/20/2012 11:36 PM, Joseph Lo wrote:
+> On Fri, 2012-12-21 at 01:43 +0800, Stephen Warren wrote:
+>> On 12/17/2012 07:30 PM, Joseph Lo wrote:
+>>> The powered-down state of Tegra20 requires power gating both CPU cores.
+>>> When the secondary CPU requests to enter powered-down state, it saves
+>>> its own contexts and then enters WFI. The Tegra20 had a limition to
+>>> power down both CPU cores. The secondary CPU must waits for CPU0 in
+>>> powered-down state too. If the secondary CPU be woken up before CPU0
+>>> entering powered-down state, then it needs to restore its CPU states
+>>> and waits for next chance.
+>>>
+>>> Be aware of that, you may see the legacy power state "LP2" in the code
+>>> which is exactly the same meaning of "CPU power down".
 
-As a result, when you compile USB into modules, they will try to refer
-already released platform data and the behaviour is undefined. For example
-on Nokia 770, I get the following kernel panic when modprobing ohci-hcd:
+>>> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
 
-[    3.462158] Unable to handle kernel paging request at virtual address e7fddef0
-[    3.477050] pgd = c3434000
-[    3.487365] [e7fddef0] *pgd=00000000
-[    3.498535] Internal error: Oops: 80000005 [#1] ARM
-[    3.510955] Modules linked in: ohci_hcd(+)
-[    3.522705] CPU: 0    Not tainted  (3.7.0-770_tiny+ #5)
-[    3.535552] PC is at 0xe7fddef0
-[    3.546508] LR is at ohci_omap_init+0x5c/0x144 [ohci_hcd]
-[    3.560272] pc : [<e7fddef0>]    lr : [<bf003140>]    psr: a0000013
-[    3.560272] sp : c344bdb0  ip : c344bce0  fp : c344bdcc
-[    3.589782] r10: 00000001  r9 : 00000000  r8 : 00000000
-[    3.604553] r7 : 00000026  r6 : 000000de  r5 : c0227300  r4 : c342d620
-[    3.621032] r3 : e7fddef0  r2 : c048b880  r1 : 00000000  r0 : 0000000a
-[    3.637786] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[    3.655822] Control: 0005317f  Table: 13434000  DAC: 00000015
-[    3.672790] Process modprobe (pid: 425, stack limit = 0xc344a1b8)
-[    3.690643] Stack: (0xc344bdb0 to 0xc344c000)
-[    3.707031] bda0:                                     bf0030e4 c342d620 00000000 c049e62c
-[    3.727905] bdc0: c344be04 c344bdd0 c0150ff0 bf0030f4 bf001b88 00000000 c048a4ac c345b020
-[    3.748870] bde0: c342d620 00000000 c048a468 bf003968 00000001 bf006000 c344be34 c344be08
-[    3.769836] be00: bf001bf0 c0150e48 00000000 c344be18 c00b9bfc c048a478 c048a4ac bf0037f8
-[    3.790985] be20: c012ca04 c000e024 c344be44 c344be38 c012d968 bf001a84 c344be64 c344be48
-[    3.812164] be40: c012c8ac c012d95c 00000000 c048a478 c048a4ac bf0037f8 c344be84 c344be68
-[    3.833740] be60: c012ca74 c012c80c 20000013 00000000 c344be88 bf0037f8 c344beac c344be88
-[    3.855468] be80: c012b038 c012ca14 c38093cc c383ee10 bf0037f8 c35be5a0 c049d5e8 00000000
-[    3.877166] bea0: c344bebc c344beb0 c012c40c c012aff4 c344beec c344bec0 c012bfc0 c012c3fc
-[    3.898834] bec0: bf00378c 00000000 c344beec bf0037f8 00067f39 00000000 00005c44 c000e024
-[    3.920837] bee0: c344bf14 c344bef0 c012cd54 c012befc c04ce080 00067f39 00000000 00005c44
-[    3.943023] bf00: c000e024 bf006000 c344bf24 c344bf18 c012db14 c012ccc0 c344bf3c c344bf28
-[    3.965423] bf20: bf00604c c012dad8 c344a000 bf003834 c344bf7c c344bf40 c00087ac bf006010
-[    3.987976] bf40: 0000000f bf003834 00067f39 00000000 00005c44 bf003834 00067f39 00000000
-[    4.010711] bf60: 00005c44 c000e024 c344a000 00000000 c344bfa4 c344bf80 c004c35c c0008720
-[    4.033569] bf80: c344bfac c344bf90 01422192 01427ea0 00000000 00000080 00000000 c344bfa8
-[    4.056518] bfa0: c000dec0 c004c2f0 01422192 01427ea0 01427ea0 00005c44 00067f39 00000000
-[    4.079406] bfc0: 01422192 01427ea0 00000000 00000080 b6e11008 014221aa be941fcc b6e1e008
-[    4.102569] bfe0: b6ef6300 be941758 0000e93c b6ef6310 60000010 01427ea0 00000000 00000000
-[    4.125946] Backtrace:
-[    4.143463] [<bf0030e4>] (ohci_omap_init+0x0/0x144 [ohci_hcd]) from [<c0150ff0>] (usb_add_hcd+0x1b8/0x61c)
-[    4.183898]  r6:c049e62c r5:00000000 r4:c342d620 r3:bf0030e4
-[    4.205596] [<c0150e38>] (usb_add_hcd+0x0/0x61c) from [<bf001bf0>] (ohci_hcd_omap_drv_probe+0x17c/0x224 [ohci_hcd])
-[    4.248138] [<bf001a74>] (ohci_hcd_omap_drv_probe+0x0/0x224 [ohci_hcd]) from [<c012d968>] (platform_drv_probe+0x1c/0x20)
-[    4.292144]  r8:c000e024 r7:c012ca04 r6:bf0037f8 r5:c048a4ac r4:c048a478
-[    4.316192] [<c012d94c>] (platform_drv_probe+0x0/0x20) from [<c012c8ac>] (driver_probe_device+0xb0/0x208)
-[    4.360168] [<c012c7fc>] (driver_probe_device+0x0/0x208) from [<c012ca74>] (__driver_attach+0x70/0x94)
-[    4.405548]  r6:bf0037f8 r5:c048a4ac r4:c048a478 r3:00000000
-[    4.429809] [<c012ca04>] (__driver_attach+0x0/0x94) from [<c012b038>] (bus_for_each_dev+0x54/0x90)
-[    4.475708]  r6:bf0037f8 r5:c344be88 r4:00000000 r3:20000013
-[    4.500366] [<c012afe4>] (bus_for_each_dev+0x0/0x90) from [<c012c40c>] (driver_attach+0x20/0x28)
-[    4.528442]  r7:00000000 r6:c049d5e8 r5:c35be5a0 r4:bf0037f8
-[    4.553466] [<c012c3ec>] (driver_attach+0x0/0x28) from [<c012bfc0>] (bus_add_driver+0xd4/0x228)
-[    4.581878] [<c012beec>] (bus_add_driver+0x0/0x228) from [<c012cd54>] (driver_register+0xa4/0x134)
-[    4.629730]  r8:c000e024 r7:00005c44 r6:00000000 r5:00067f39 r4:bf0037f8
-[    4.656738] [<c012ccb0>] (driver_register+0x0/0x134) from [<c012db14>] (platform_driver_register+0x4c/0x60)
-[    4.706542] [<c012dac8>] (platform_driver_register+0x0/0x60) from [<bf00604c>] (ohci_hcd_mod_init+0x4c/0x8c [ohci_hcd])
-[    4.757843] [<bf006000>] (ohci_hcd_mod_init+0x0/0x8c [ohci_hcd]) from [<c00087ac>] (do_one_initcall+0x9c/0x174)
-[    4.808990]  r4:bf003834 r3:c344a000
-[    4.832641] [<c0008710>] (do_one_initcall+0x0/0x174) from [<c004c35c>] (sys_init_module+0x7c/0x194)
-[    4.881530] [<c004c2e0>] (sys_init_module+0x0/0x194) from [<c000dec0>] (ret_fast_syscall+0x0/0x2c)
-[    4.930664]  r7:00000080 r6:00000000 r5:01427ea0 r4:01422192
-[    4.956481] Code: bad PC value
-[    4.978729] ---[ end trace 58280240f08342c4 ]---
-[    5.002258] Kernel panic - not syncing: Fatal exception
+[ code to set up the idle state array]
 
-Fix this by taking a copy of the data. Also mark Amstrad E3's data with
-__initdata to save some memory with multi-board kernels.
+>> ... although I personally much preferred when all this was just static
+>> initialization directly in tegra_idle_driver, rather than all this messy
+>> copying. Really, struct cpuidle_driver should point at the array, rather
+>> than including it.
+>>
+> I think so. If you strongly prefer the original style, I can rollback to
+> the previous version here.
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- arch/arm/mach-omap1/board-ams-delta.c |    2 +-
- arch/arm/mach-omap1/usb.c             |    8 +++++++-
- 2 files changed, 8 insertions(+), 2 deletions(-)
+I suppose there's little point changing it back; I know others objected
+to the original code:-(
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index e255164..063b0c0 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -160,7 +160,7 @@ static struct omap_lcd_config ams_delta_lcd_config __initdata = {
- 	.ctrl_name	= "internal",
- };
- 
--static struct omap_usb_config ams_delta_usb_config = {
-+static struct omap_usb_config ams_delta_usb_config __initdata = {
- 	.register_host	= 1,
- 	.hmc_mode	= 16,
- 	.pins[0]	= 2,
-diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
-index 84267ed..4b1e5dd 100644
---- a/arch/arm/mach-omap1/usb.c
-+++ b/arch/arm/mach-omap1/usb.c
-@@ -629,8 +629,14 @@ static void __init omap_1510_usb_init(struct omap_usb_config *config)
- static inline void omap_1510_usb_init(struct omap_usb_config *config) {}
- #endif
- 
--void __init omap1_usb_init(struct omap_usb_config *pdata)
-+void __init omap1_usb_init(struct omap_usb_config *_pdata)
- {
-+	struct omap_usb_config *pdata;
-+
-+	pdata = kmemdup(_pdata, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return;
-+
- 	pdata->usb0_init = omap1_usb0_init;
- 	pdata->usb1_init = omap1_usb1_init;
- 	pdata->usb2_init = omap1_usb2_init;
--- 
-1.7.10.4
+>>> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+>>
+>>> @@ -173,6 +173,8 @@ bool __cpuinit tegra_set_cpu_in_lp2(int phy_cpu_id)
+>>>  
+>>>  	if ((phy_cpu_id == 0) && cpumask_equal(cpu_lp2_mask, cpu_online_mask))
+>>>  		last_cpu = true;
+>>> +	else if (phy_cpu_id == 1)
+>>> +		tegra20_cpu_set_resettable_soon();
+>>>  
+>>>  	spin_unlock(&tegra_lp2_lock);
+>>>  	return last_cpu;
+>>
+>> Shouldn't the code in that else branch have a run-time check for whether
+>> it's running on Tegra20? When compiled without Tegra20 support,
+>> tegra20_cpu_set_resettable_soon() is a dummy static inline, but when
+>> both Tegra20 and Tegra30 are compiled in, isn't that code going to run
+>> when it shouldn't; pm.c being a common file.
+>
+> Because the code didn't hurt Tegra30, so I didn't add a runtime
+> detection there. If you have concern, I can add runtime detection there.
+
+The only issue I see that could happen is that
+tegra20_cpu_set_resettable_soon() writes to some location to maintain
+the CPU resettable state. Since I assume that location isn't used for
+that purpose on Tegra30, could this cause some conflict? It seems best
+to add the check to make sure there's no issue here.
