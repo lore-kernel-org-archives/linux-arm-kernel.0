@@ -1,128 +1,185 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 21 Dec 2012 09:28:08 -0700
-Subject: [PATCH 08/15] ARM: dts: Add SHAM data and documentation for AM33XX
+Date: Fri, 21 Dec 2012 09:28:10 -0700
+Subject: [PATCH 10/15] ARM: OMAP3xxx: hwmod: Convert AES crypto device data to
+ hwmod
 In-Reply-To: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
 References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1356107295-11121-9-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1356107295-11121-11-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Add the generic AM33XX SHAM module's device tree data and
-enable it for the am335x-evm, am335x-evmsk, and am335x-bone
-platforms.  Also add Documentation file describing the data
-for the SHAM module.
+Convert the device data for the OMAP3 AES crypto IP
+from explicit platform_data to hwmod.
 
 CC: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- .../devicetree/bindings/crypto/omap-sham.txt       | 35 ++++++++++++++++++++++
- arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
- arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
- arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +++
- arch/arm/boot/dts/am33xx.dtsi                      | 12 ++++++++
- 5 files changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
+ arch/arm/mach-omap2/cclock3xxx_data.c      |  3 +-
+ arch/arm/mach-omap2/devices.c              | 42 +-------------------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 62 ++++++++++++++++++++++++++++++
+ 3 files changed, 66 insertions(+), 41 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/crypto/omap-sham.txt b/Documentation/devicetree/bindings/crypto/omap-sham.txt
-new file mode 100644
-index 0000000..53839cc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/omap-sham.txt
-@@ -0,0 +1,35 @@
-+OMAP SoC SHA crypto Module
-+
-+Required properties:
-+
-+- compatible : Should contain entries for this and backward compatible
-+  SHAM versions:
-+  - "ti,omap2-sham" for OMAP2 & OMAP3.
-+  - "ti,omap4-sham" for OMAP4 and AM33XX.
-+  Note that these two versions are incompatible.
-+- ti,hwmods: Name of the hwmod associated with the SHAM module
-+- reg : Offset and length of the register set for the module
-+- interrupt-parent : the phandle for the interrupt controller that
-+  services interrupts for this module.
-+- interrupts : the interrupt number for the SHAM module.
-+
-+Optional properties:
-+- dmas: DMA controller phandle and DMA request ordered pair.
-+	Only one rx pair is valid per SHAM module.
-+- dma-names: DMA request name. This string corresponds 1:1 with
-+	the ordered pair in dmas. The string naming is to be
-+	"rx" for RX request.
-+
-+Example:
-+	/* AM335x */
-+	sham: sham at 53100000 {
-+		compatible = "ti,omap4-sham";
-+		ti,hwmods = "sham";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x53100000 0x200>;
-+		interrupt-parent = <&intc>;
-+		interrupts = <109>;
-+		dmas = <&edma 36>;
-+		dma-names = "rx";
-+	};
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 9075198..1c35f83 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -192,3 +192,7 @@
- &edma {
- 	ti,edma-xbar-event-map = <32 12>;
+diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
+index 34c3371..582b055 100644
+--- a/arch/arm/mach-omap2/cclock3xxx_data.c
++++ b/arch/arm/mach-omap2/cclock3xxx_data.c
+@@ -3332,7 +3332,8 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK("omap_hsmmc.2",	"ick",	&mmchs3_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"mmchs3_ick",	&mmchs3_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"icr_ick",	&icr_ick,	CK_34XX | CK_36XX),
+-	CLK("omap-aes",	"ick",	&aes2_ick,	CK_34XX | CK_36XX),
++	CLK("omap-aes",	"ick",		&aes2_ick,	CK_34XX | CK_36XX),
++	CLK(NULL,	"aes2_ick",	&aes2_ick,	CK_34XX | CK_36XX),
+ 	CLK("omap-sham",	"ick",	&sha12_ick,	CK_34XX | CK_36XX),
+ 	CLK(NULL,	"sha12_ick",	&sha12_ick,	CK_34XX | CK_36XX),
+ 	CLK(NULL,	"des2_ick",	&des2_ick,	CK_34XX | CK_36XX),
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 2a4a9f3..f5d5c89 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -477,38 +477,9 @@ static void __init omap_init_sham(void)
+ 	WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
+ }
+ 
+-#if defined(CONFIG_CRYPTO_DEV_OMAP_AES) || defined(CONFIG_CRYPTO_DEV_OMAP_AES_MODULE)
+-
+-#ifdef CONFIG_ARCH_OMAP3
+-static struct resource omap3_aes_resources[] = {
+-	{
+-		.start	= OMAP34XX_SEC_AES_BASE,
+-		.end	= OMAP34XX_SEC_AES_BASE + 0x4C,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= OMAP34XX_DMA_AES2_TX,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	{
+-		.start	= OMAP34XX_DMA_AES2_RX,
+-		.flags	= IORESOURCE_DMA,
+-	}
+-};
+-static int omap3_aes_resources_sz = ARRAY_SIZE(omap3_aes_resources);
+-#else
+-#define omap3_aes_resources		NULL
+-#define omap3_aes_resources_sz		0
+-#endif
+-
+-static struct platform_device aes_device = {
+-	.name		= "omap-aes",
+-	.id		= -1,
+-};
+-
+-static void omap_init_aes(void)
++static void __init omap_init_aes(void)
+ {
+-	if (cpu_is_omap24xx()) {
++	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+ 		struct omap_hwmod *oh;
+ 		struct platform_device *pdev;
+ 
+@@ -519,20 +490,11 @@ static void omap_init_aes(void)
+ 		pdev = omap_device_build("omap-aes", -1, oh, NULL, 0, NULL,
+ 					 0, 0);
+ 		WARN(IS_ERR(pdev), "Can't build omap_device for omap-aes\n");
+-	} else if (cpu_is_omap34xx()) {
+-		aes_device.resource = omap3_aes_resources;
+-		aes_device.num_resources = omap3_aes_resources_sz;
+-		platform_device_register(&aes_device);
+ 	} else {
+ 		pr_err("%s: platform not supported\n", __func__);
+-		return;
+ 	}
+ }
+ 
+-#else
+-static inline void omap_init_aes(void) { }
+-#endif
+-
+ /*-------------------------------------------------------------------------*/
+ 
+ #if defined(CONFIG_VIDEO_OMAP2_VOUT) || \
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 122b4dc..85d1b08 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3605,6 +3605,67 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__sham = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
  };
-+
-+&sham {
-+	status = "okay";
+ 
++/* l4_core -> AES */
++static struct omap_hwmod_sysc_fields omap3xxx_aes_sysc_fields = {
++	.sidle_shift	= 6,
++	.srst_shift	= 1,
++	.autoidle_shift	= 0,
 +};
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 70ac496..57515cd 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -259,3 +259,7 @@
- 		reg = <0>;
- 	};
- };
 +
-+&sham {
-+	status = "okay";
++static struct omap_hwmod_class_sysconfig omap3_aes_sysc = {
++	.rev_offs	= 0x44,
++	.sysc_offs	= 0x48,
++	.syss_offs	= 0x4c,
++	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
++			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
++	.sysc_fields	= &omap3xxx_aes_sysc_fields,
 +};
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index f5a6162..b322919 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -248,3 +248,7 @@
- 		};
- 	};
- };
 +
-+&sham {
-+	status = "okay";
++static struct omap_hwmod_class omap3xxx_aes_class = {
++	.name	= "aes",
++	.sysc	= &omap3_aes_sysc,
 +};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index c02ade7..671135e 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -455,5 +455,17 @@
- 				mac-address = [ 00 00 00 00 00 00 ];
- 			};
- 		};
 +
-+		sham: sham at 53100000 {
-+			compatible = "ti,omap4-sham";
-+			ti,hwmods = "sham";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x53100000 0x200>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <109>;
-+			dmas = <&edma 36>;
-+			dma-names = "rx";
-+		};
- 	};
++struct omap_hwmod_dma_info omap3_aes_sdma_reqs[] = {
++	{ .name = "tx", .dma_req = OMAP34XX_DMA_AES2_TX, },
++	{ .name = "rx", .dma_req = OMAP34XX_DMA_AES2_RX, },
++	{ .dma_req = -1 }
++};
++
++struct omap_hwmod omap3xxx_aes_hwmod = {
++	.name		= "aes",
++	.sdma_reqs	= omap3_aes_sdma_reqs,
++	.main_clk	= "aes2_ick",
++	.prcm		= {
++		.omap2 = {
++			.module_offs = CORE_MOD,
++			.prcm_reg_id = 1,
++			.module_bit = OMAP3430_EN_AES2_SHIFT,
++			.idlest_reg_id = 1,
++			.idlest_idle_bit = OMAP3430_ST_AES2_SHIFT,
++		},
++	},
++	.class		= &omap3xxx_aes_class,
++};
++
++static struct omap_hwmod_addr_space omap3xxx_aes_addrs[] = {
++	{
++		.pa_start	= 0x480c5000,
++		.pa_end		= 0x480c5000 + 0x50 - 1,
++		.flags		= ADDR_TYPE_RT
++	},
++	{ }
++};
++
++static struct omap_hwmod_ocp_if omap3xxx_l4_core__aes = {
++	.master		= &omap3xxx_l4_core_hwmod,
++	.slave		= &omap3xxx_aes_hwmod,
++	.clk		= "aes2_ick",
++	.addr		= omap3xxx_aes_addrs,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap3xxx_l3_main__l4_core,
+ 	&omap3xxx_l3_main__l4_per,
+@@ -3659,6 +3720,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
+ static struct omap_hwmod_ocp_if *omap3xxx_gp_hwmod_ocp_ifs[] __initdata = {
+ 	&omap3xxx_l4_sec__timer12,
+ 	&omap3xxx_l4_core__sham,
++	&omap3xxx_l4_core__aes,
+ 	NULL
  };
+ 
 -- 
 1.7.12
