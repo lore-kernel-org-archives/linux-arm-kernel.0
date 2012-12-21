@@ -1,95 +1,73 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 21 Dec 2012 09:59:55 +0100
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <CAKfTPtBs28LqUL908U7=ae82+mAV7ba1bj1Kt9PnizdLTo3EwA@mail.gmail.com>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
- <20121221054712.GA2933@danjae>
- <CAKfTPtBs28LqUL908U7=ae82+mAV7ba1bj1Kt9PnizdLTo3EwA@mail.gmail.com>
-Message-ID: <CAKfTPtB9M5=VbmpWH8-0rhJ1XRVm27u+18mjxqk_FgbXjO1R4g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Dec 2012 10:05:35 +0100
+Subject: [GIT PULL] Fixes for sunxi for 3.8 merge window
+In-Reply-To: <20121220160132.GB1034@quad.lixom.net>
+References: <1355906760-23041-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20121220160132.GB1034@quad.lixom.net>
+Message-ID: <50D4265F.4080307@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 December 2012 09:53, Vincent Guittot <vincent.guittot@linaro.org> wrote:
-> On 21 December 2012 06:47, Namhyung Kim <namhyung@kernel.org> wrote:
->> Hi Vincent,
+Le 20/12/2012 17:01, Olof Johansson a ?crit :
+> On Wed, Dec 19, 2012 at 09:46:00AM +0100, Maxime Ripard wrote:
+>> Arnd, Olof,
 >>
->> On Thu, Dec 13, 2012 at 11:11:11AM +0100, Vincent Guittot wrote:
->>> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
->>> > On 12/12/2012 09:31 PM, Vincent Guittot wrote:
->>> >> +static bool is_buddy_busy(int cpu)
->>> >> +{
->>> >> +     struct rq *rq = cpu_rq(cpu);
->>> >> +
->>> >> +     /*
->>> >> +      * A busy buddy is a CPU with a high load or a small load with a lot of
->>> >> +      * running tasks.
->>> >> +      */
->>> >> +     return ((rq->avg.runnable_avg_sum << rq->nr_running) >
->>> >
->>> > If nr_running a bit big, rq->avg.runnable_avg_sum << rq->nr_running is
->>> > zero. you will get the wrong decision.
->>>
->>> yes, I'm going to do that like below instead:
->>> return (rq->avg.runnable_avg_sum > (rq->avg.runnable_avg_period >>
->>> rq->nr_running));
+>> Please consider pulling these two (late) patches for the sunxi support.
 >>
->> Doesn't it consider nr_running too much?  It seems current is_buddy_busy
->> returns false on a cpu that has 1 task runs 40% cputime, but returns true
->> on a cpu that has 3 tasks runs 10% cputime each or for 2 tasks of 15%
->> cputime each, right?
->
-> Yes it's right.
+>> The first one add the support for the sunxi architecture in the multiplatform
+>> kernel, allowing to easily build a kernel that boots on the sun4i/sun5i
+>> supported boards.
 >>
->> I don't know what is correct, but just guessing that in a cpu's point
->> of view it'd be busier if it has a higher runnable_avg_sum than a
->> higher nr_running IMHO.
->
-sorry, the mail has been sent before i finish it
-
-> The nr_running is used to point out how many tasks are running
-> simultaneously and the potential scheduling latency of adding
-
-The nr_running is used to point out how many tasks are running
-simultaneously and as a result the potential scheduling latency.
-I have used the shift instruction because it was quite simple and
-efficient but it may give too much weight to nr_running. I could use a
-simple division instead of shifting runnable_avg_sum
-
->
->>
->>
->>>
->>> >
->>> >> +                     rq->avg.runnable_avg_period);
->>> >> +}
->>> >> +
->>> >> +static bool is_light_task(struct task_struct *p)
->>> >> +{
->>> >> +     /* A light task runs less than 25% in average */
->>> >> +     return ((p->se.avg.runnable_avg_sum << 1) <
->>> >> +                     p->se.avg.runnable_avg_period);
->>> >
->>> > 25% may not suitable for big machine.
->>>
->>> Threshold is always an issue, which threshold should be suitable for
->>> big machine ?
->>>
->>> I'm wondering if i should use the imbalance_pct value for computing
->>> the threshold
->>
->> Anyway, I wonder how 'sum << 1' computes 25%.  Shouldn't it be << 2 ?
->
-> The 1st version of the patch was using << 2 but I received a comment
-> saying that it was may be not enough aggressive so I have updated the
-> formula with << 1 but forgot to update the comment. I will align
-> comment and formula in the next version.
-> Thanks for pointing this
->
-> Vincent
->
+>> The second one fixes some compatible strings that were left behind in the
+>> previous compatible renaming patch, preventing the kernel from booting.
 >>
 >> Thanks,
->> Namhyung
+>> Maxime 
+>>
+>> The following changes since commit 7445d6b5a7a40c40cda3935ba3827896305cfc21:
+>>
+>>   ARM: sunxi: Change device tree naming scheme for sunxi (2012-12-18 15:11:16 +0100)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/mripard/linux.git tags/sunxi-fixes-for-3.8-rc1
+>>
+>> for you to fetch changes up to 91e4f61216c6e15f7ff99f2d18407a08cfe601b0:
+>>
+>>   sunxi: Change the machine compatible string. (2012-12-19 09:23:42 +0100)
+>>
+>> ----------------------------------------------------------------
+>> Fixes for the sunxi core to be merged in 3.8-rc1
+>>
+>> ----------------------------------------------------------------
+>> Maxime Ripard (2):
+>>       ARM: multi_v7_defconfig: Add ARCH_SUNXI
+>>       sunxi: Change the machine compatible string.
+> 
+> Hi,
+> 
+> I get more than those patches when I pull that tag, and it seems like some of
+> them are now invalid. Like "ARM: sunxi: Add missing sun4i.dtsi file", which 
+> will add a fresh sun4i.dtsi, when it's already been added and renamed
+> sun4i-a10.dtsi.
+
+Hi,
+
+This patch has been sent by Stefan Roese and was applied by Arnd I
+believe (Commit 7423d2d8), so I took it in my tree for the next patches
+to apply cleanly as well.
+
+And then came the patch that was not doing the renaming, and one of that
+renamed files was actually sun4i.dtsi to sun4i-a10.dtsi.
+
+I'm not sure how we should handle those, do you want me to send you
+patches? maybe it'll be easier for you to apply these changes?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
