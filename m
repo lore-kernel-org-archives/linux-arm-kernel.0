@@ -1,184 +1,118 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 21 Dec 2012 09:28:03 -0700
-Subject: [PATCH 03/15] ARM: OMAP3xxx: hwmod: Convert SHAM crypto device data
- to hwmod
+Date: Fri, 21 Dec 2012 09:28:07 -0700
+Subject: [PATCH 07/15] ARM: AM33XX: hwmod: Update and uncomment SHA0 module
+ data
 In-Reply-To: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
 References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1356107295-11121-4-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1356107295-11121-8-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Convert the device data for the OMAP3 SHAM2 (SHA1/MD5) crypto IP
-from explicit platform_data to hwmod.
+Update the SHA0 HIB2 module's hwmod data for the am33xx SoC.
+Also, remove it from the '#if 0' block that its currently
+inside so the data is actually available for use.
 
 CC: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- arch/arm/mach-omap2/cclock3xxx_data.c      |  1 +
- arch/arm/mach-omap2/devices.c              | 41 +------------------
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 66 ++++++++++++++++++++++++++++++
- 3 files changed, 69 insertions(+), 39 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 43 +++++++++++++++++++++++++-----
+ 1 file changed, 37 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
-index bdf3948..34c3371 100644
---- a/arch/arm/mach-omap2/cclock3xxx_data.c
-+++ b/arch/arm/mach-omap2/cclock3xxx_data.c
-@@ -3334,6 +3334,7 @@ static struct omap_clk omap3xxx_clks[] = {
- 	CLK(NULL,	"icr_ick",	&icr_ick,	CK_34XX | CK_36XX),
- 	CLK("omap-aes",	"ick",	&aes2_ick,	CK_34XX | CK_36XX),
- 	CLK("omap-sham",	"ick",	&sha12_ick,	CK_34XX | CK_36XX),
-+	CLK(NULL,	"sha12_ick",	&sha12_ick,	CK_34XX | CK_36XX),
- 	CLK(NULL,	"des2_ick",	&des2_ick,	CK_34XX | CK_36XX),
- 	CLK("omap_hsmmc.1",	"ick",	&mmchs2_ick,	CK_3XXX),
- 	CLK("omap_hsmmc.0",	"ick",	&mmchs1_ick,	CK_3XXX),
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 9465351..a217408 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -464,38 +464,9 @@ static void omap_init_rng(void)
- 	WARN(IS_ERR(pdev), "Can't build omap_device for omap_rng\n");
- }
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 081c71e..9f7aadd 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -417,7 +417,6 @@ static struct omap_hwmod am33xx_adc_tsc_hwmod = {
+  *    - ocmc ram
+  *    - ocp watch point
+  *    - aes0
+- *    - sha0
+  */
+ #if 0
+ /*
+@@ -543,22 +542,37 @@ static struct omap_hwmod am33xx_aes0_hwmod = {
+ 		},
+ 	},
+ };
++#endif
++
++/* sha0 HIB2 (the 'P' (public) device) */
++static struct omap_hwmod_class_sysconfig am33xx_sha0_sysc = {
++	.rev_offs	= 0x100,
++	.sysc_offs	= 0x110,
++	.syss_offs	= 0x114,
++	.sysc_flags	= SYSS_HAS_RESET_STATUS,
++};
  
--#if defined(CONFIG_CRYPTO_DEV_OMAP_SHAM) || defined(CONFIG_CRYPTO_DEV_OMAP_SHAM_MODULE)
--
--#ifdef CONFIG_ARCH_OMAP3
--static struct resource omap3_sham_resources[] = {
--	{
--		.start	= OMAP34XX_SEC_SHA1MD5_BASE,
--		.end	= OMAP34XX_SEC_SHA1MD5_BASE + 0x64,
--		.flags	= IORESOURCE_MEM,
--	},
--	{
--		.start	= 49 + OMAP_INTC_START,
--		.flags	= IORESOURCE_IRQ,
--	},
--	{
--		.start	= OMAP34XX_DMA_SHA1MD5_RX,
--		.flags	= IORESOURCE_DMA,
--	}
--};
--static int omap3_sham_resources_sz = ARRAY_SIZE(omap3_sham_resources);
--#else
--#define omap3_sham_resources		NULL
--#define omap3_sham_resources_sz		0
--#endif
--
--static struct platform_device sham_device = {
--	.name		= "omap-sham",
--	.id		= -1,
--};
--
--static void omap_init_sham(void)
-+static void __init omap_init_sham(void)
- {
--	if (cpu_is_omap24xx()) {
-+	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
- 		struct omap_hwmod *oh;
- 		struct platform_device *pdev;
- 
-@@ -506,18 +477,10 @@ static void omap_init_sham(void)
- 		pdev = omap_device_build("omap-sham", -1, oh, NULL, 0, NULL,
- 					 0, 0);
- 		WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
--	} else if (cpu_is_omap34xx()) {
--		sham_device.resource = omap3_sham_resources;
--		sham_device.num_resources = omap3_sham_resources_sz;
--		platform_device_register(&sham_device);
- 	} else {
- 		pr_err("%s: platform not supported\n", __func__);
--		return;
- 	}
- }
--#else
--static inline void omap_init_sham(void) { }
--#endif
- 
- #if defined(CONFIG_CRYPTO_DEV_OMAP_AES) || defined(CONFIG_CRYPTO_DEV_OMAP_AES_MODULE)
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 8bb2628..122b4dc 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -3540,6 +3540,71 @@ static struct omap_hwmod_ocp_if omap3xxx_l3_main__gpmc = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+-/* sha0 */
+ static struct omap_hwmod_class am33xx_sha0_hwmod_class = {
+ 	.name		= "sha0",
++	.sysc		= &am33xx_sha0_sysc,
  };
  
-+/* l4_core -> SHAM2 (SHA1/MD5) (similar to omap24xx) */
-+static struct omap_hwmod_sysc_fields omap3_sham_sysc_fields = {
-+	.sidle_shift	= 4,
-+	.srst_shift	= 1,
-+	.autoidle_shift	= 0,
-+};
-+
-+static struct omap_hwmod_class_sysconfig omap3_sham_sysc = {
-+	.rev_offs	= 0x5c,
-+	.sysc_offs	= 0x60,
-+	.syss_offs	= 0x64,
-+	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-+			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
-+	.sysc_fields	= &omap3_sham_sysc_fields,
-+};
-+
-+static struct omap_hwmod_class omap3xxx_sham_class = {
-+	.name	= "sham",
-+	.sysc	= &omap3_sham_sysc,
-+};
-+
-+struct omap_hwmod_irq_info omap3_sham_mpu_irqs[] = {
-+	{ .irq = 49 + OMAP_INTC_START, },
-+	{ .irq = -1 }
-+};
-+
-+struct omap_hwmod_dma_info omap3_sham_sdma_reqs[] = {
-+	{ .name = "rx", .dma_req = OMAP34XX_DMA_SHA1MD5_RX, },
+ static struct omap_hwmod_irq_info am33xx_sha0_irqs[] = {
+-	{ .irq = 108 + OMAP_INTC_START, },
++	{ .irq = 109 + OMAP_INTC_START, },
+ 	{ .irq = -1 },
+ };
+ 
++struct omap_hwmod_dma_info am33xx_sha0_edma_reqs[] = {
++	{ .name = "rx", .dma_req = 36, },
 +	{ .dma_req = -1 }
 +};
 +
-+struct omap_hwmod omap3xxx_sham_hwmod = {
+ static struct omap_hwmod am33xx_sha0_hwmod = {
+-	.name		= "sha0",
 +	.name		= "sham",
-+	.mpu_irqs	= omap3_sham_mpu_irqs,
-+	.sdma_reqs	= omap3_sham_sdma_reqs,
-+	.main_clk	= "sha12_ick",
-+	.prcm		= {
-+		.omap2 = {
-+			.module_offs = CORE_MOD,
-+			.prcm_reg_id = 1,
-+			.module_bit = OMAP3430_EN_SHA12_SHIFT,
-+			.idlest_reg_id = 1,
-+			.idlest_idle_bit = OMAP3430_ST_SHA12_SHIFT,
-+		},
-+	},
-+	.class		= &omap3xxx_sham_class,
-+};
-+
-+static struct omap_hwmod_addr_space omap3xxx_sham_addrs[] = {
+ 	.class		= &am33xx_sha0_hwmod_class,
+ 	.clkdm_name	= "l3_clkdm",
+ 	.mpu_irqs	= am33xx_sha0_irqs,
++	.sdma_reqs	= am33xx_sha0_edma_reqs,
+ 	.main_clk	= "l3_gclk",
+ 	.prcm		= {
+ 		.omap4	= {
+@@ -568,8 +582,6 @@ static struct omap_hwmod am33xx_sha0_hwmod = {
+ 	},
+ };
+ 
+-#endif
+-
+ /* 'smartreflex' class */
+ static struct omap_hwmod_class am33xx_smartreflex_hwmod_class = {
+ 	.name		= "smartreflex",
+@@ -3328,6 +3340,24 @@ static struct omap_hwmod_ocp_if am33xx_l3_s__usbss = {
+ 	.flags		= OCPIF_SWSUP_IDLE,
+ };
+ 
++/* l3 main -> sha0 HIB2 */
++static struct omap_hwmod_addr_space am33xx_sha0_addrs[] = {
 +	{
-+		.pa_start	= 0x480c3000,
-+		.pa_end		= 0x480c3000 + 0x64 - 1,
++		.pa_start	= 0x53100000,
++		.pa_end		= 0x53100000 + SZ_512 - 1,
 +		.flags		= ADDR_TYPE_RT
 +	},
 +	{ }
 +};
 +
-+static struct omap_hwmod_ocp_if omap3xxx_l4_core__sham = {
-+	.master		= &omap3xxx_l4_core_hwmod,
-+	.slave		= &omap3xxx_sham_hwmod,
-+	.clk		= "sha12_ick",
-+	.addr		= omap3xxx_sham_addrs,
++static struct omap_hwmod_ocp_if am33xx_l3_main__sha0 = {
++	.master		= &am33xx_l3_main_hwmod,
++	.slave		= &am33xx_sha0_hwmod,
++	.clk		= "sha0_fck",
++	.addr		= am33xx_sha0_addrs,
 +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 +};
 +
- static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
- 	&omap3xxx_l3_main__l4_core,
- 	&omap3xxx_l3_main__l4_per,
-@@ -3593,6 +3658,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
- /* GP-only hwmod links */
- static struct omap_hwmod_ocp_if *omap3xxx_gp_hwmod_ocp_ifs[] __initdata = {
- 	&omap3xxx_l4_sec__timer12,
-+	&omap3xxx_l4_core__sham,
- 	NULL
+ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l4_fw__emif_fw,
+ 	&am33xx_l3_main__emif,
+@@ -3401,6 +3431,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l3_s__usbss,
+ 	&am33xx_l4_hs__cpgmac0,
+ 	&am33xx_cpgmac0__mdio,
++	&am33xx_l3_main__sha0,
+ 	NULL,
  };
  
 -- 
