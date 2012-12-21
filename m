@@ -1,47 +1,187 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri, 21 Dec 2012 03:03:20 +0100
-Subject: [PATCH 0/8] arm: mxs: Various mxs_defconfig adjustments
-In-Reply-To: <CAAQ0ZWSxdfWzaHfr2eVazRHp-eGBdHFyVb-P_ib_6xmoGWXQdw@mail.gmail.com>
-References: <1355938386-14582-1-git-send-email-marex@denx.de>
- <201212201344.27626.marex@denx.de>
- <CAAQ0ZWSxdfWzaHfr2eVazRHp-eGBdHFyVb-P_ib_6xmoGWXQdw@mail.gmail.com>
-Message-ID: <201212210303.20834.marex@denx.de>
+Date: Fri, 21 Dec 2012 03:07:31 +0100
+Subject: [PATCH] arm: mxs: Update mxs_defconfig
+Message-ID: <1356055651-27145-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Regenerate the mxs_defconfig to match recent kernel using the following
+commands:
 
-> On Thu, Dec 20, 2012 at 01:44:27PM +0100, Marek Vasut wrote:
-> > Dear Shawn Guo,
-> > 
-> > > On Wed, Dec 19, 2012 at 06:32:58PM +0100, Marek Vasut wrote:
-> > > > This patchset enables various config options, mostly needed to
-> > > > get MX28EVK and M28EVK decently working.
-> > > > 
-> > > > Marek Vasut (8):
-> > > >   arm: mxs: Regenerate mxs_defconfig to match recent kernel
-> > > >   arm: mxs: Enable MTD block access
-> > > >   arm: mxs: Enable UBI and UBIFS
-> > > >   arm: mxs: Enable JFFS2
-> > > >   arm: mxs: Enable EXT2 and EXT4
-> > > >   arm: mxs: Enable AT24 EEPROM support
-> > > >   arm: mxs: Enable support for most SPI flashes
-> > > >   arm: mxs: Enable most commonly used PHYs
-> > > 
-> > > It does not need to be so verbose.  It can just be one patch.
-> > 
-> > Do you prefer one gigantic patch then?
-> 
-> I do not take "1 file changed, 30 insertions(+), 33 deletions(-)" as
-> a gigantic change set, especially when it's on defconfig.  Just remember
-> to run savedefconfig before you submit the changes.
+make mxs_defconfig
+make savedefconfig
+cp defconfig arch/arm/configs/mxs_defconfig
 
-Sure, one big nasty patch on it's way to your mailbox then.
+Then enable these features:
+- MTD block access
+- UBI and UBIFS
+- JFFS2
+- EXT2 and EXT4
+- AT24 EEPROM support
+- Support for most of the SPI flashes
+- Support for ethernet PHYs that are usually used on mxs designs
 
-I wanted to keep the changes separate to make them obvious and clear, that was 
-my whole motivation, nothing else.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/configs/mxs_defconfig |   63 +++++++++++++++++++---------------------
+ 1 file changed, 30 insertions(+), 33 deletions(-)
 
-[...]
+NOTE: The SGTL5000 is enabled by default, it's not enabled by hand thus not
+      listed above
 
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index 048aaca..9d30a6b 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -1,5 +1,7 @@
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_TASKSTATS=y
+ CONFIG_TASK_DELAY_ACCT=y
+ CONFIG_TASK_XACCT=y
+@@ -8,7 +10,6 @@ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+ # CONFIG_UTS_NS is not set
+ # CONFIG_IPC_NS is not set
+-# CONFIG_USER_NS is not set
+ # CONFIG_PID_NS is not set
+ # CONFIG_NET_NS is not set
+ CONFIG_PERF_EVENTS=y
+@@ -24,8 +25,6 @@ CONFIG_BLK_DEV_INTEGRITY=y
+ CONFIG_ARCH_MXS=y
+ CONFIG_MACH_MXS_DT=y
+ # CONFIG_ARM_THUMB is not set
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_AEABI=y
+ CONFIG_AUTO_ZRELADDR=y
+@@ -46,23 +45,31 @@ CONFIG_SYN_COOKIES=y
+ CONFIG_CAN=m
+ CONFIG_CAN_RAW=m
+ CONFIG_CAN_BCM=m
+-CONFIG_CAN_DEV=m
+ CONFIG_CAN_FLEXCAN=m
+ # CONFIG_WIRELESS is not set
+ CONFIG_DEVTMPFS=y
+ # CONFIG_FIRMWARE_IN_KERNEL is not set
+-# CONFIG_BLK_DEV is not set
+ CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_DATAFLASH=y
+-CONFIG_MTD_M25P80
++CONFIG_MTD_M25P80=y
++# CONFIG_M25PXX_USE_FAST_READ is not set
++CONFIG_MTD_SST25L=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_GPMI_NAND=y
++CONFIG_MTD_UBI=y
++# CONFIG_BLK_DEV is not set
++CONFIG_EEPROM_AT24=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_ENC28J60=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
++CONFIG_SMSC_PHY=y
++CONFIG_ICPLUS_PHY=y
++CONFIG_REALTEK_PHY=y
++CONFIG_MICREL_PHY=y
+ # CONFIG_WLAN is not set
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_INPUT_EVDEV=m
+@@ -89,21 +96,6 @@ CONFIG_SPI_MXS=y
+ CONFIG_DEBUG_GPIO=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+-# CONFIG_MFD_SUPPORT is not set
+-CONFIG_DISPLAY_SUPPORT=m
+-# CONFIG_HID_SUPPORT is not set
+-CONFIG_SOUND=y
+-CONFIG_SND=y
+-CONFIG_SND_TIMER=y
+-CONFIG_SND_PCM=y
+-CONFIG_SND_JACK=y
+-CONFIG_SND_DRIVERS=y
+-CONFIG_SND_ARM=y
+-CONFIG_SND_SOC=y
+-CONFIG_SND_MXS_SOC=y
+-CONFIG_SND_SOC_MXS_SGTL5000=y
+-CONFIG_SND_SOC_I2C_AND_SPI=y
+-CONFIG_SND_SOC_SGTL5000=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_FB=y
+@@ -115,13 +107,16 @@ CONFIG_BACKLIGHT_PWM=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FONTS=y
+ CONFIG_LOGO=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_MXS_SOC=y
++CONFIG_SND_SOC_MXS_SGTL5000=y
+ CONFIG_USB=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_MXS_PHY=y
+-CONFIG_SCSI=y
+-CONFIG_BLK_DEV_SD=y
+ CONFIG_MMC=y
+ CONFIG_MMC_MXS=y
+ CONFIG_NEW_LEDS=y
+@@ -145,16 +140,23 @@ CONFIG_COMMON_CLK_DEBUG=y
+ CONFIG_IIO=y
+ CONFIG_PWM=y
+ CONFIG_PWM_MXS=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS=y
+ # CONFIG_DNOTIFY is not set
+ CONFIG_FSCACHE=m
+ CONFIG_FSCACHE_STATS=y
+ CONFIG_CACHEFILES=m
+ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+-# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_JFFS2_FS=y
++CONFIG_JFFS2_COMPRESSION_OPTIONS=y
++CONFIG_JFFS2_LZO=y
++CONFIG_JFFS2_RUBIN=y
++CONFIG_UBIFS_FS=y
++CONFIG_UBIFS_FS_ADVANCED_COMPR=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_NFS_V3_ACL=y
+ CONFIG_NFS_V4=y
+ CONFIG_ROOT_NFS=y
+@@ -164,17 +166,12 @@ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_UNUSED_SYMBOLS=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_LOCKUP_DETECTOR=y
+-CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_TIMER_STATS=y
+ CONFIG_PROVE_LOCKING=y
+-CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
+-CONFIG_SYSCTL_SYSCALL_CHECK=y
+ CONFIG_BLK_DEV_IO_TRACE=y
+ CONFIG_STRICT_DEVMEM=y
+ CONFIG_DEBUG_USER=y
+-CONFIG_CRYPTO=y
+-CONFIG_CRYPTO_CRC32C=m
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
+ # CONFIG_CRYPTO_HW is not set
+ CONFIG_CRC_ITU_T=m
+-- 
+1.7.10.4
