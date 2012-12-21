@@ -1,147 +1,84 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Fri, 21 Dec 2012 13:46:28 +0530
-Subject: [PATCH v3 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
-In-Reply-To: <CAFp+6iHoS4XJWHNrsyVsQS4bYZs1PUNEGsRr=EqAS7kpm2XGMQ@mail.gmail.com>
-References: <1355416562-25539-1-git-send-email-gautam.vivek@samsung.com>
- <1355416562-25539-2-git-send-email-gautam.vivek@samsung.com>
- <20121215072312.EBCAA3E0C06@localhost>
- <CAFp+6iHoS4XJWHNrsyVsQS4bYZs1PUNEGsRr=EqAS7kpm2XGMQ@mail.gmail.com>
-Message-ID: <CAFp+6iFSZjfVJp23j2dEz0hRap07RMo68GJpsQM7YqOMBCbqsQ@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 21 Dec 2012 09:53:48 +0100
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <20121221054712.GA2933@danjae>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+ <20121221054712.GA2933@danjae>
+Message-ID: <CAKfTPtBs28LqUL908U7=ae82+mAV7ba1bj1Kt9PnizdLTo3EwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-
-On Wed, Dec 19, 2012 at 7:20 PM, Vivek Gautam <gautamvivek1987@gmail.com> wrote:
-> CC: Doug Anderson
+On 21 December 2012 06:47, Namhyung Kim <namhyung@kernel.org> wrote:
+> Hi Vincent,
 >
->
-> On Sat, Dec 15, 2012 at 12:53 PM, Grant Likely
-> <grant.likely@secretlab.ca> wrote:
->> On Thu, 13 Dec 2012 22:06:01 +0530, Vivek Gautam <gautam.vivek@samsung.com> wrote:
->>> Adding EHCI device tree node for Exynos5250 along with
->>> the device base adress and gpio line for vbus.
->>>
->>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>> Acked-by: Jingoo Han <jg1.han@samsung.com>
->>> ---
->>>  .../devicetree/bindings/usb/exynos-usb.txt         |   25 ++++++++++++++++++++
->>>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 +++
->>>  arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++
->>>  arch/arm/mach-exynos/include/mach/map.h            |    1 +
->>>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +
->>>  5 files changed, 38 insertions(+), 0 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/usb/exynos-usb.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
->>> new file mode 100644
->>> index 0000000..e8bbb47
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
->>> @@ -0,0 +1,25 @@
->>> +Samsung Exynos SoC USB controller
->>> +
->>> +The USB devices interface with USB controllers on Exynos SOCs.
->>> +The device node has following properties.
->>> +
->>> +EHCI
->>> +Required properties:
->>> + - compatible: should be "samsung,exynos4210-ehci" for USB 2.0
->>> +   EHCI controller in host mode.
->>> + - reg: physical base address of the controller and length of memory mapped
->>> +   region.
->>> + - interrupts: interrupt number to the cpu.
->>> +
->>> +Optional properties:
->>> + - samsung,vbus-gpio:  if present, specifies the GPIO that
->>> +   needs to be pulled up for the bus to be powered.
->>> +
->>> +Example:
->>> +
->>> +     usb at 12110000 {
->>> +             compatible = "samsung,exynos4210-ehci";
->>> +             reg = <0x12110000 0x100>;
->>> +             interrupts = <0 71 0>;
->>> +             samsung,vbus-gpio = <&gpx2 6 1 3 3>;
->>> +     };
->>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> index 711b55f..f990086 100644
->>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>> @@ -218,4 +218,8 @@
->>>       i2s_2: i2s at 12D70000 {
->>>               status = "disabled";
->>>       };
->>> +
->>> +     usb at 12110000 {
->>> +             samsung,vbus-gpio = <&gpx2 6 1 3 3>;
->>> +     };
->>>  };
->>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
->>> index 581e57a..584bb9a 100644
->>> --- a/arch/arm/boot/dts/exynos5250.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->>> @@ -299,6 +299,12 @@
->>>               rx-dma-channel = <&pdma0 11>; /* preliminary */
->>>       };
->>>
->>> +     usb at 12110000 {
->>> +             compatible = "samsung,exynos4210-ehci";
->>> +             reg = <0x12110000 0x100>;
->>> +             interrupts = <0 71 0>;
->>> +     };
->>> +
->>>       amba {
->>>               #address-cells = <1>;
->>>               #size-cells = <1>;
->>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
->>> index cbb2852..b2c662f 100644
->>> --- a/arch/arm/mach-exynos/include/mach/map.h
->>> +++ b/arch/arm/mach-exynos/include/mach/map.h
->>> @@ -201,6 +201,7 @@
->>>  #define EXYNOS4_PA_EHCI                      0x12580000
->>>  #define EXYNOS4_PA_OHCI                      0x12590000
->>>  #define EXYNOS4_PA_HSPHY             0x125B0000
->>> +#define EXYNOS5_PA_EHCI                      0x12110000
->>>  #define EXYNOS4_PA_MFC                       0x13400000
->>>
->>>  #define EXYNOS4_PA_UART                      0x13800000
->>> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
->>> index 462e5ac..b3b9af1 100644
->>> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
->>> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
->>> @@ -110,6 +110,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
->>>                               "samsung-i2s.1", NULL),
->>>       OF_DEV_AUXDATA("samsung,samsung-i2s", 0x12D70000,
->>>                               "samsung-i2s.2", NULL),
->>> +     OF_DEV_AUXDATA("samsung,exynos4210-ehci", EXYNOS5_PA_EHCI,
->>> +                             "s5p-ehci", NULL),
+> On Thu, Dec 13, 2012 at 11:11:11AM +0100, Vincent Guittot wrote:
+>> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
+>> > On 12/12/2012 09:31 PM, Vincent Guittot wrote:
+>> >> +static bool is_buddy_busy(int cpu)
+>> >> +{
+>> >> +     struct rq *rq = cpu_rq(cpu);
+>> >> +
+>> >> +     /*
+>> >> +      * A busy buddy is a CPU with a high load or a small load with a lot of
+>> >> +      * running tasks.
+>> >> +      */
+>> >> +     return ((rq->avg.runnable_avg_sum << rq->nr_running) >
+>> >
+>> > If nr_running a bit big, rq->avg.runnable_avg_sum << rq->nr_running is
+>> > zero. you will get the wrong decision.
 >>
->> I'm assuming the above change is temporary. What is left to be done to
->> drop the auxdata in theses two patches?
+>> yes, I'm going to do that like below instead:
+>> return (rq->avg.runnable_avg_sum > (rq->avg.runnable_avg_period >>
+>> rq->nr_running));
+>
+> Doesn't it consider nr_running too much?  It seems current is_buddy_busy
+> returns false on a cpu that has 1 task runs 40% cputime, but returns true
+> on a cpu that has 3 tasks runs 10% cputime each or for 2 tasks of 15%
+> cputime each, right?
+
+Yes it's right.
+>
+> I don't know what is correct, but just guessing that in a cpu's point
+> of view it'd be busier if it has a higher runnable_avg_sum than a
+> higher nr_running IMHO.
+
+The nr_running is used to point out how many tasks are running
+simultaneously and the potential scheduling latency of adding
+
+>
+>
 >>
->> Otherwise the patch looks fine.
+>> >
+>> >> +                     rq->avg.runnable_avg_period);
+>> >> +}
+>> >> +
+>> >> +static bool is_light_task(struct task_struct *p)
+>> >> +{
+>> >> +     /* A light task runs less than 25% in average */
+>> >> +     return ((p->se.avg.runnable_avg_sum << 1) <
+>> >> +                     p->se.avg.runnable_avg_period);
+>> >
+>> > 25% may not suitable for big machine.
 >>
->> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-Any more thought about this patch?
-Or does this change seems fine?
-
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+>> Threshold is always an issue, which threshold should be suitable for
+>> big machine ?
+>>
+>> I'm wondering if i should use the imbalance_pct value for computing
+>> the threshold
 >
+> Anyway, I wonder how 'sum << 1' computes 25%.  Shouldn't it be << 2 ?
+
+The 1st version of the patch was using << 2 but I received a comment
+saying that it was may be not enough aggressive so I have updated the
+formula with << 1 but forgot to update the comment. I will align
+comment and formula in the next version.
+Thanks for pointing this
+
+Vincent
+
 >
->
-> --
-> Thanks & Regards
-> Vivek
-
-
-
--- 
-Thanks & Regards
-Vivek
+> Thanks,
+> Namhyung
