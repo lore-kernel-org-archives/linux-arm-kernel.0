@@ -1,29 +1,20 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Dec 2012 19:45:01 +0100
-Subject: [PATCH] ARM: Kirkwood: Fix missing clk for USB device.
-Message-ID: <1356201902-20448-1-git-send-email-andrew@lunn.ch>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Sat, 22 Dec 2012 11:31:56 -0800
+Subject: [PATCH 0/3] ARM: pxa: palmtreo: a few treo fixes
+Message-ID: <1356204719-3317-1-git-send-email-mikedunn@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without the clock being held by a driver, it ges turned off at a bad
-time causing the SoC to lockup.
+Some miscellaneous fixes to the treo code.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/kirkwood.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+Mike Dunn (3):
+  ARM: pxa: palmtreo: fix lcd initialization on treo680
+  ARM: pxa: palmtreo: fix #ifdefs for leds-gpio device
+  ARM: pxa: palmtreo: add docg4 device initialization
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 7735cee..110d6cb 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -144,6 +144,7 @@
- 			compatible = "marvell,orion-ehci";
- 			reg = <0x50000 0x1000>;
- 			interrupts = <19>;
-+			clocks = <&gate_clk 3>;
- 			status = "okay";
- 		};
- 
+ arch/arm/mach-pxa/include/mach/palmtreo.h |    3 +
+ arch/arm/mach-pxa/palmtreo.c              |  102 ++++++++++++++++++++++++++---
+ 2 files changed, 96 insertions(+), 9 deletions(-)
+
 -- 
-1.7.10.4
+1.7.8.6
