@@ -1,5 +1,5 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Sun, 23 Dec 2012 01:45:21 +0530
+Date: Sun, 23 Dec 2012 01:45:49 +0530
 Subject: [PATCH] ARM: tegra: dts: add aliases and DMA requestor for serial
  controller
 In-Reply-To: <50D4CBB0.7080603@wwwdotorg.org>
@@ -7,7 +7,7 @@ References: <1355898671-3960-1-git-send-email-ldewangan@nvidia.com>
  <50D1F2CB.3090206@wwwdotorg.org> <50D2AD02.6060101@nvidia.com>
  <50D344E9.70305@wwwdotorg.org> <50D3E320.2090804@nvidia.com>
  <50D4CBB0.7080603@wwwdotorg.org>
-Message-ID: <50D614D9.8020106@nvidia.com>
+Message-ID: <50D614F5.9040406@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
