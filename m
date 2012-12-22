@@ -1,73 +1,51 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 22 Dec 2012 18:18:18 +0100
-Subject: at91 gpio irq discrepancy in behavior vs. documentation
-In-Reply-To: <CAG4_upQTZW0_+cRsyqOi031Gm4BTwXPqxYxKS1W-OtZUrVfOjw@mail.gmail.com>
-References: <CAG4_upQTZW0_+cRsyqOi031Gm4BTwXPqxYxKS1W-OtZUrVfOjw@mail.gmail.com>
-Message-ID: <20121222171818.GS23971@game.jcrosoft.org>
+Date: Sat, 22 Dec 2012 18:21:33 +0100
+Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
+In-Reply-To: <50D426C1.5050807@free-electrons.com>
+References: <20121219183236.GP23971@game.jcrosoft.org>
+ <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
+ <50D2EBA1.4050305@free-electrons.com> <50D2EDE6.3090706@atmel.com>
+ <50D3340F.3090209@free-electrons.com> <50D33940.4000607@atmel.com>
+ <50D426C1.5050807@free-electrons.com>
+Message-ID: <20121222172133.GT23971@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:51 Fri 21 Dec     , Chris Verges wrote:
-> Hi all,
+On 10:07 Fri 21 Dec     , Maxime Ripard wrote:
+> Le 20/12/2012 17:13, ludovic.desroches a ?crit :
+> > On 12/20/2012 04:51 PM, Maxime Ripard wrote:
+> >> Hi Ludovic,
+> >>
+> >> Le 20/12/2012 11:52, ludovic.desroches a ?crit :
+> >>>> I'm wondering, why are you using such a complex dt parsing code, and
+> >>>> bindings, when you only requires a boolean to switch between 8 and 10
+> >>>> bits mode (which seem to be the only thing you support)?
+> >>>
+> >>> We will have a 10 and 12 bits mode on future ADCs and I would like to
+> >>> have something which could manage more than two resolutions if it
+> >>> happens one day.
+> >>
+> >> I see your point. I'm not fond at all of the existing bindings for the
+> >> driver (putting things like registers offset in the dt is a non-sense to
+> >> me, but hey...), so I'd like to still keep it as simple and non-bloated
+> >> as possible, but it's true that in the current situation, we probably
+> >> have no other choice.
+> >>
+> > 
+> > I have the same feeling than you about ADC bindings, I think that there
+> > are too many parameters exhibited. Moreover, most of them are chip
+> > relative.
+> > 
+> > I have not found other ways to deal with it properly. I would like to
+> > have them hidden into the driver (depending on the compatible string)
+> > but it will be a mess if we split parameters into dt and driver.
 > 
-> In gpio.c for the mach-at91 family, there is a comment above the
-> gpio_irq_mask() function which indicates that the AT91_PIN_* macros can
-> be used directly as inputs into the request_irq() function.  (See
-> arch/arm/mach-at91/gpio.c Line 489 in a 3.4.10 kernel if you aren't
-> familiar with this comment block.)
-> 
-> Following this comment block, to register an IRQ on the GPIO pin PA0,
-> for example, one could do the following:
-> 
->     err = request_irq(AT91_PIN_PA0, ...);
-this is not true for some release you must use gpio_to_irq now
+> I'm glad we feel the same way :)
+I'm not I fee; exactly this opposte way
 
-we drop this when cleaniing the gpio support and switch to the irq domain
-> 
-> I recently tested this on a board using an at91sam9g20 processor.  The
-> image was running a vanilla 3.4.10 (no patches).  The request_irq() call
-> succeeded, but in looking at /proc/interrupts, it seems like this causes
-> an interrupt to be assign to the Advanced Interrupt Controller (AIC) on
-> the processor:
-> 
->     $ cat /proc/interrupts
->                CPU0
-> >>>   0:          0       AIC  my_irq_handler
->       1:    2478772       AIC  at91_tick, rtc0, ttyS0
->       7:          0       AIC  ttyS2
->       8:        150       AIC
->       9:         26       AIC  mmc0
->      12:        474       AIC
->      20:      62796       AIC  ohci_hcd:usb1
->     Err:          0
-> 
-> Toggling the pin PA0 does not cause an interrupt.
-> 
-> What I found works is wrapping the pin macro with gpio_to_irq():
-> 
->     err = request_irq(gpio_to_irq(AT91_PIN_PA0), ...);
-> 
->     $ cat /proc/interrupts
->                CPU0
->       1:    2478772       AIC  at91_tick, rtc0, ttyS0
->       7:          0       AIC  ttyS2
->       8:        150       AIC
->       9:         26       AIC  mmc0
->      12:        474       AIC
->      20:      62796       AIC  ohci_hcd:usb1
-> >>>  32:          0      GPIO  my_irq_handler
->     Err:          0
-> 
-> Since this behavior is so contrary to the comment block in the gpio.c
-> file, I'm wondering why there is such a discrepancy in behavior.  Is the
-> comment block simply out of date?  I'm more than happy to submit a patch
-> to update the documentation if that's the case.
-this driver is now deprecated anyway as we switch to pinctrl now, that include
-both pintrcl and gpio
+I do want to toucht the kernel code to add new soc
 
-We just keep it for old style platform for dt we do not use it
-
-And any mainline board will now be DT
+so no I like this binding
 
 Best Regards,
 J.
