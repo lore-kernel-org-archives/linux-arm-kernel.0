@@ -1,52 +1,42 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 22 Dec 2012 09:54:04 +0000
-Subject: [PATCH V2] spi: remove check for bits_per_word on transfer from
- low level driver
-In-Reply-To: <50D2AA43.8050106@nvidia.com>
-References: <1355820943-25228-1-git-send-email-ldewangan@nvidia.com>
- <20121219162433.1E1E43E0BCF@localhost> <50D2AA43.8050106@nvidia.com>
-Message-ID: <20121222095404.420FC3E08BE@localhost>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 22 Dec 2012 22:05:32 +0800
+Subject: [PATCH v2 01/20] mmc: mvsdio: use slot-gpio infrastructure for
+ write protect gpio
+In-Reply-To: <1356101359-6054-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1356101359-6054-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121222140529.GA12120@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Dec 2012 11:33:47 +0530, Laxman Dewangan <ldewangan@nvidia.com> wrote:
-> On Wednesday 19 December 2012 09:54 PM, Grant Likely wrote:
-> > On Tue, 18 Dec 2012 14:25:43 +0530, Laxman Dewangan<ldewangan@nvidia.com>  wrote:
-> >> The spi core make sure that each transfer structure have the proper
-> >> setting for bits_per_word before calling low level transfer APIs.
-> >>
-> >> Hence it is no more require to check again in low level driver for
-> >> this field whether this is set correct or not. Removing such code
-> >> from low level driver.
-> >>
-> >> Signed-off-by: Laxman Dewangan<ldewangan@nvidia.com>
-> > [...]
-> >> */
-> >>
-> >>   		if (prev_speed_hz != speed_hz
-> >> @@ -316,9 +315,8 @@ static int txx9spi_transfer(struct spi_device *spi, struct spi_message *m)
-> >>   	/* check each transfer's parameters */
-> >>   	list_for_each_entry (t,&m->transfers, transfer_list) {
-> >>   		u32 speed_hz = t->speed_hz ? : spi->max_speed_hz;
-> >> -		u8 bits_per_word = t->bits_per_word ? : spi->bits_per_word;
-> >> +		u8 bits_per_word = t->bits_per_word;
-> >>
-> >> -		bits_per_word = bits_per_word ? : 8;
-> > Have you verified here that bits_per_word can never be '0' here? What is
-> > the path that ensures spi->bits_per_word (and hence t->bits_per_word) is
-> > set to 8 here?
-> >
-> > Otherwise the patch looks good. Thanks for doing this work.
-> 
-> 
-> When we do the spi_add_device(), the spi_setup() get called.
-> In spi_setup, it make  sure that spi->bits_per_word is not zero.
-> 
-> in spi_setup(spi.c)
-> 
-> if (!spi->bits_per_word)
->                  spi->bits_per_word = 8;
+On Fri, Dec 21, 2012 at 03:49:00PM +0100, Thomas Petazzoni wrote:
+> @@ -831,8 +809,7 @@ out:
+>  			free_irq(gpio_to_irq(host->gpio_card_detect), host);
+>  			gpio_free(host->gpio_card_detect);
+>  		}
+> -		if (host->gpio_write_protect)
+> -			gpio_free(host->gpio_write_protect);
+> +		mmc_gpio_free_ro(mmc);
 
-Applied, thanks.
+I posted a series[1] to save the call from error path and .remove().
 
-g.
+Shawn
+
+PS. What's the merge path for these mmc patches?  I do not even see
+linux-mmc and Chris Ball on the Cc list.
+
+[1] http://thread.gmane.org/gmane.linux.kernel.mmc/18197
+
+>  		if (host->base)
+>  			iounmap(host->base);
+>  	}
+> @@ -861,8 +838,7 @@ static int __exit mvsd_remove(struct platform_device *pdev)
+>  		}
+>  		mmc_remove_host(mmc);
+>  		free_irq(host->irq, host);
+> -		if (host->gpio_write_protect)
+> -			gpio_free(host->gpio_write_protect);
+> +		mmc_gpio_free_ro(mmc);
+>  		del_timer_sync(&host->timer);
+>  		mvsd_power_down(host);
+>  		iounmap(host->base);
