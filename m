@@ -1,61 +1,77 @@
-From: kg4ysn@gmail.com (Chris Verges)
-Date: Fri, 21 Dec 2012 21:51:02 -0800
-Subject: at91 gpio irq discrepancy in behavior vs. documentation
-Message-ID: <CAG4_upQTZW0_+cRsyqOi031Gm4BTwXPqxYxKS1W-OtZUrVfOjw@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Sat, 22 Dec 2012 14:33:18 +0800
+Subject: [PATCH v6 5/8] document: devicetree: bind pinconf with pin single
+In-Reply-To: <20121222012201.GS21056@atomide.com>
+References: <1356083118-18857-1-git-send-email-haojian.zhuang@linaro.org>
+ <1356083118-18857-6-git-send-email-haojian.zhuang@linaro.org>
+ <20121222012201.GS21056@atomide.com>
+Message-ID: <CAD6h2NQNc0gke1FrEDn7h9ZwoEwBSxiqPAZFQw-By3GBW2xbZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 22 December 2012 09:22, Tony Lindgren <tony@atomide.com> wrote:
+> Hi,
+>
+> * Haojian Zhuang <haojian.zhuang@linaro.org> [121221 01:48]:
+>>
+>> +- pinctrl-single,power-source : array of value that are used to configure
+>> +  power source in the pinmux register. They're value of power source field
+>> +  and power source mask.
+>> +
+>> +             /* power source, mask */
+>> +             pinctrl-single,power-source = <0x1000 0x1800>;
+>> +
+>> +- pinctrl-single,bias : array of value that are used to configure the input
+>> +  bias in the pinmux register.  They're value of bias field, bias mask,
+>> +  bias disable value, bias pull down value & bias pull up value.
+>> +
+>> +             /* bias, mask, disable, pull down, pull up */
+>> +             pinctrl-single,bias = <0xc000 0xe000 0 0xa000 0xc000>;
+>> +
+>> +- pinctrl-single,input-schmitt : array of value that are used to configure
+>> +  input schmitt in the pinmux register. They're value of input schmitt field,
+>> +  mask, & disable value.
+>> +
+>> +             /* input schmitt value, mask, disable */
+>> +             pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
+>> +
+>
+> Hmm we might be able to standardize on just few bindings if we
+> break the bias into enable, pullup and pulldown. Then we should
+> have the defval, enable and disable for each of them to allow
+> setting the board specific config, and to enable and disable
+> things using the generic pinconf api.
+>
+> So how about something like this:
+>
+> pinctrl-single,power-source      = <defval regmask enableval disableval>;
 
-In gpio.c for the mach-at91 family, there is a comment above the
-gpio_irq_mask() function which indicates that the AT91_PIN_* macros can
-be used directly as inputs into the request_irq() function.  (See
-arch/arm/mach-at91/gpio.c Line 489 in a 3.4.10 kernel if you aren't
-familiar with this comment block.)
+It seems that there's no requirement on disable power source. Is there
+any silicon that need
+to disable power source? I think that power source means drive strength at here.
 
-Following this comment block, to register an IRQ on the GPIO pin PA0,
-for example, one could do the following:
+> pinctrl-single,bias-enable       = <defval regmask enableval disableval>;
+> pinctrl-single,bias-pullup       = <defval regmask enableval disableval>;
+> pinctrl-single,bias-pulldown     = <defval regmask enableval disableval>;
 
-    err = request_irq(AT91_PIN_PA0, ...);
+If bias-pullup or bias-pulldown, it means that bias-enable also.
+As my understanding, pin could be in any state of bias-disable,
+bias-pullup, bias-pulldown.
+In my v5 patches, pin couldn't switch state among these states. Now
+it's fixed in v6 patches.
 
-I recently tested this on a board using an at91sam9g20 processor.  The
-image was running a vanilla 3.4.10 (no patches).  The request_irq() call
-succeeded, but in looking at /proc/interrupts, it seems like this causes
-an interrupt to be assign to the Advanced Interrupt Controller (AIC) on
-the processor:
+> pinctrl-single,input-schmitt     = <defval regmask enableval disableval>;
+In Marvell silicons, input-schmitt trigger could be configured as
+high-edge, low-edge or both
+detect. So enableval can't cover this usage.
 
-    $ cat /proc/interrupts
-               CPU0
->>>   0:          0       AIC  my_irq_handler
-      1:    2478772       AIC  at91_tick, rtc0, ttyS0
-      7:          0       AIC  ttyS2
-      8:        150       AIC
-      9:         26       AIC  mmc0
-     12:        474       AIC
-     20:      62796       AIC  ohci_hcd:usb1
-    Err:          0
+>
+> And then we can add support for other things like comparators too:
+>
+> pinctrl-single,comparator-enable = <defval regmask enableval disableval>;
+> pinctrl-single,comparator-status = <regmask>;   /* read only status bits */
+>
+I'm OK on appending these properties. I would also add slew rate property later.
 
-Toggling the pin PA0 does not cause an interrupt.
-
-What I found works is wrapping the pin macro with gpio_to_irq():
-
-    err = request_irq(gpio_to_irq(AT91_PIN_PA0), ...);
-
-    $ cat /proc/interrupts
-               CPU0
-      1:    2478772       AIC  at91_tick, rtc0, ttyS0
-      7:          0       AIC  ttyS2
-      8:        150       AIC
-      9:         26       AIC  mmc0
-     12:        474       AIC
-     20:      62796       AIC  ohci_hcd:usb1
->>>  32:          0      GPIO  my_irq_handler
-    Err:          0
-
-Since this behavior is so contrary to the comment block in the gpio.c
-file, I'm wondering why there is such a discrepancy in behavior.  Is the
-comment block simply out of date?  I'm more than happy to submit a patch
-to update the documentation if that's the case.
-
-Thanks,
-Chris
+Regards
+Haojian
