@@ -1,51 +1,22 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 22 Dec 2012 18:21:33 +0100
-Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
-In-Reply-To: <50D426C1.5050807@free-electrons.com>
-References: <20121219183236.GP23971@game.jcrosoft.org>
- <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
- <50D2EBA1.4050305@free-electrons.com> <50D2EDE6.3090706@atmel.com>
- <50D3340F.3090209@free-electrons.com> <50D33940.4000607@atmel.com>
- <50D426C1.5050807@free-electrons.com>
-Message-ID: <20121222172133.GT23971@game.jcrosoft.org>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Sat, 22 Dec 2012 10:27:38 -0800
+Subject: [PATCH 0/2] ARM: pxa: palm27x: device initialization fixes
+Message-ID: <1356200860-3241-1-git-send-email-mikedunn@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:07 Fri 21 Dec     , Maxime Ripard wrote:
-> Le 20/12/2012 17:13, ludovic.desroches a ?crit :
-> > On 12/20/2012 04:51 PM, Maxime Ripard wrote:
-> >> Hi Ludovic,
-> >>
-> >> Le 20/12/2012 11:52, ludovic.desroches a ?crit :
-> >>>> I'm wondering, why are you using such a complex dt parsing code, and
-> >>>> bindings, when you only requires a boolean to switch between 8 and 10
-> >>>> bits mode (which seem to be the only thing you support)?
-> >>>
-> >>> We will have a 10 and 12 bits mode on future ADCs and I would like to
-> >>> have something which could manage more than two resolutions if it
-> >>> happens one day.
-> >>
-> >> I see your point. I'm not fond at all of the existing bindings for the
-> >> driver (putting things like registers offset in the dt is a non-sense to
-> >> me, but hey...), so I'd like to still keep it as simple and non-bloated
-> >> as possible, but it's true that in the current situation, we probably
-> >> have no other choice.
-> >>
-> > 
-> > I have the same feeling than you about ADC bindings, I think that there
-> > are too many parameters exhibited. Moreover, most of them are chip
-> > relative.
-> > 
-> > I have not found other ways to deal with it properly. I would like to
-> > have them hidden into the driver (depending on the compatible string)
-> > but it will be a mess if we split parameters into dt and driver.
-> 
-> I'm glad we feel the same way :)
-I'm not I fee; exactly this opposte way
+Hi,
 
-I do want to toucht the kernel code to add new soc
+I/ve been working on getting the kernel running smoothly on my palm treo 680.
+To start, here are a couple short patches that fix problems with udc and lcd
+device initialization.  Thanks for looking.  Happy holidays!
 
-so no I like this binding
+Mike Dunn (2):
+  ARM: pxa: palm27x: fix udc device initialization
+  ARM: pxa: palm27x: fix lcd device initialization
 
-Best Regards,
-J.
+ arch/arm/mach-pxa/palm27x.c |   26 ++++++++++++++++----------
+ 1 files changed, 16 insertions(+), 10 deletions(-)
+
+-- 
+1.7.8.6
