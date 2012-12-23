@@ -1,46 +1,40 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 23 Dec 2012 04:24:48 +0100
-Subject: [PATCH 2/2] ARM: pxa: palm27x: fix lcd device initialization
-In-Reply-To: <1356200860-3241-3-git-send-email-mikedunn@newsguy.com>
-References: <1356200860-3241-1-git-send-email-mikedunn@newsguy.com>
- <1356200860-3241-3-git-send-email-mikedunn@newsguy.com>
-Message-ID: <201212230424.48655.marex@denx.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 23 Dec 2012 08:40:43 +0000 (UTC)
+Subject: [PATCH 00/15] OMAP SHAM & AES Crypto Updates
+In-Reply-To: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
+References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <alpine.DEB.2.00.1212230836160.16045@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mike Dunn,
+Hi Mark,
 
-> This fixes incorrect tests of the return codes from gpiolib functions in
-> palm27x_lcd_init().  Currently a return code of 0 is incorrectly
-> interpreted as an error.  A call to gpio_free() is also added.
-> 
-> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
-> ---
->  arch/arm/mach-pxa/palm27x.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
-> index 298a8a9..473c9e3 100644
-> --- a/arch/arm/mach-pxa/palm27x.c
-> +++ b/arch/arm/mach-pxa/palm27x.c
-> @@ -145,12 +145,13 @@ void __init palm27x_lcd_init(int power, struct
-> pxafb_mode_info *mode) palm27x_lcd_screen.modes = mode;
-> 
->  	if (gpio_is_valid(power)) {
-> -		if (!gpio_request(power, "LCD power")) {
-> +		if (gpio_request(power, "LCD power") < 0) {
->  			pr_err("Palm27x: failed to claim lcd power gpio!\n");
->  			return;
->  		}
-> -		if (!gpio_direction_output(power, 1)) {
-> +		if (gpio_direction_output(power, 1) < 0) {
->  			pr_err("Palm27x: lcd power configuration failed!\n");
-> +			gpio_free(power);
->  			return;
->  		}
->  		palm27x_lcd_power = power;
+On Fri, 21 Dec 2012, Mark A. Greer wrote:
 
-Acked-by: Marek Vasut <marex@denx.de>
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> 
+> [This series supersedes the hwmod related patches sent in the
+>  "crypto: omap-sham updates" and "crypto: omap-aes updates"
+>  series a few weeks ago.]
+> 
+> This series adds hwmod support for the OMAP SHAM and AES
+> modules on OMAP2, OMAP3, and OMAP4/AM33XX SoCs.  It also
+> adds device tree info for those modules.
 
-Best regards,
-Marek Vasut
+Thanks for working on this, this will get us much closer to being able to 
+convert the hwmod code into an OMAP bus.  I haven't looked closely at 
+these patches yet, but a few comments/questions:
+
+- Looks like the two DTS patches are the ones with direct dependencies on 
+the DMA Engine support patches that you mentioned.  Any objection to me 
+taking the series without those two patches?  Then once the DMA Engine 
+series goes in, maybe those AM33xx DTS patches can go up?
+
+- The patch series causes AM3517/3505 to crash.  I'd guess this is due to 
+the SHAM/AES modules being initialized on those chips, but they probably 
+don't exist there.  Can you change the initialization for those on OMAP3 
+to only take place on OMAP34xx/36xx GP?  I guess you'd need to create new 
+lists for those in the hwmod init.
+
+
+- Paul
