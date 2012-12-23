@@ -1,31 +1,26 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Sun, 23 Dec 2012 07:18:04 -0800
-Subject: [PATCH 3/3] ARM: pxa: palmtreo: add docg4 device initialization
-In-Reply-To: <50D71120.7040704@mvista.com>
-References: <1356204719-3317-1-git-send-email-mikedunn@newsguy.com>
- <1356204719-3317-4-git-send-email-mikedunn@newsguy.com>
- <50D71120.7040704@mvista.com>
-Message-ID: <50D720AC.40504@newsguy.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Sun, 23 Dec 2012 16:47:36 +0100
+Subject: [PATCH 13/15] ARM: AM33XX: Add aes0 crypto clock data
+In-Reply-To: <1356107295-11121-14-git-send-email-mgreer@animalcreek.com> (Mark
+ A. Greer's message of "Fri, 21 Dec 2012 09:28:13 -0700")
+References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
+ <1356107295-11121-14-git-send-email-mgreer@animalcreek.com>
+Message-ID: <87licou5wn.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/23/2012 06:11 AM, Sergei Shtylyov wrote:
+>>>>> "Mark" == Mark A Greer <mgreer@animalcreek.com> writes:
 
->>
->>   /******************************************************************************
->> + * diskonchip docg4 flash
->> + ******************************************************************************/
->> +#if defined(CONFIG_MACH_TREO680)
->> +/* REVISIT: does the centro have this device also? */
->> +#if defined(CONFIG_MTD_NAND_DOCG4) || defined(CONFIG_MTD_NAND_DOCG4_MODULE)
-> 
->    #if IS_ENABLED(CONFIG_MTD_NAND_DOCG4)
-> 
-> WBR, Sergei
-> 
+ Mark> From: "Mark A. Greer" <mgreer@animalcreek.com>
+ Mark> Add clock data for for the SHA0 crypto module
 
+s/SHA/AES/
 
-Thanks Sergei.  I see this in kconfig.h now.  This will be another patch to
-replace all the "if defined" in this file.
+Reviewed-by: Peter Korsgaard <jacmet@sunsite.dk>
+ 
+ Mark> +static struct clk aes0_fck;
+ Mark> +DEFINE_STRUCT_CLK_HW_OMAP(aes0_fck, NULL);
+ Mark> +DEFINE_STRUCT_CLK(aes0_fck, dpll_core_ck_parents, clk_ops_null);
 
-Mike
+-- 
+Bye, Peter Korsgaard
