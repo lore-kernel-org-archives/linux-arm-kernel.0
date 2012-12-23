@@ -1,35 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 23 Dec 2012 16:16:39 +0100
-Subject: [PATCH 2/4] ARM: Kirkwood: Switch TWSI1 of 88f6282 to DT
-Message-ID: <20121223151639.GA12697@lunn.ch>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Sun, 23 Dec 2012 07:18:04 -0800
+Subject: [PATCH 3/3] ARM: pxa: palmtreo: add docg4 device initialization
+In-Reply-To: <50D71120.7040704@mvista.com>
+References: <1356204719-3317-1-git-send-email-mikedunn@newsguy.com>
+ <1356204719-3317-4-git-send-email-mikedunn@newsguy.com>
+ <50D71120.7040704@mvista.com>
+Message-ID: <50D720AC.40504@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Clock Management of kirkwood has moved to DT clock providers.
-> However, TWSI1 has not yet been done.
-> This switches TWSI1 of 88f6282 to DT clock providers.
+On 12/23/2012 06:11 AM, Sergei Shtylyov wrote:
+
+>>
+>>   /******************************************************************************
+>> + * diskonchip docg4 flash
+>> + ******************************************************************************/
+>> +#if defined(CONFIG_MACH_TREO680)
+>> +/* REVISIT: does the centro have this device also? */
+>> +#if defined(CONFIG_MTD_NAND_DOCG4) || defined(CONFIG_MTD_NAND_DOCG4_MODULE)
 > 
-> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> ---
->  arch/arm/boot/dts/kirkwood-6282.dtsi |    1 +
->  1 file changed, 1 insertion(+)
+>    #if IS_ENABLED(CONFIG_MTD_NAND_DOCG4)
 > 
-> diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi
-> +b/arch/arm/boot/dts/kirkwood-6282.dtsi
-> index bc23081..ad63b88 100644
-> --- a/arch/arm/boot/dts/kirkwood-6282.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
-> @@ -45,6 +45,7 @@
->                         #size-cells = <0>;
->                         interrupts = <32>;
->                         clock-frequency = <100000>;
-> +                       clocks = <&gate_clk 7>;
->                         status = "disabled";
->                 };
->         };
+> WBR, Sergei
+> 
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Jason: This patch should be queued up for -rc2.
+Thanks Sergei.  I see this in kconfig.h now.  This will be another patch to
+replace all the "if defined" in this file.
 
-       Andrew
+Mike
