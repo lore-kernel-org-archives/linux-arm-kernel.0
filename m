@@ -1,27 +1,33 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 23 Dec 2012 01:53:13 +0400
-Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
- IS_ERR_OR_NULL
-In-Reply-To: <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
-References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
- <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
-Message-ID: <50D62BC9.9010706@mvista.com>
+From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
+Date: Sun, 23 Dec 2012 11:34:35 +0900
+Subject: [PATCH 2/4] ARM: Kirkwood: Switch TWSI1 of 88f6282 to DT clock
+ providers
+In-Reply-To: <1356230077-15340-1-git-send-email-iwamatsu@nigauri.org>
+References: <1356230077-15340-1-git-send-email-iwamatsu@nigauri.org>
+Message-ID: <1356230077-15340-2-git-send-email-iwamatsu@nigauri.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Clock Management of kirkwood has moved to DT clock providers.
+However, TWSI1 has not yet been done.
+This switches TWSI1 of 88f6282 to DT clock providers.
 
-On 18-12-2012 21:34, Tony Prisk wrote:
+Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+---
+ arch/arm/boot/dts/kirkwood-6282.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-> Resend to include mailing lists.
-
-    Such remarks should be placed under --- tear line, not in the changelog.
-
-> Replace IS_ERR_OR_NULL with IS_ERR on clk_get results.
-
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> CC: Kyungmin Park <kyungmin.park@samsung.com>
-> CC: Tomasz Stanislawski <t.stanislaws@samsung.com>
-> CC: linux-media at vger.kernel.org
-
-WBR, Sergei
+diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
+index bc23081..ad63b88 100644
+--- a/arch/arm/boot/dts/kirkwood-6282.dtsi
++++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
+@@ -45,6 +45,7 @@
+ 			#size-cells = <0>;
+ 			interrupts = <32>;
+ 			clock-frequency = <100000>;
++			clocks = <&gate_clk 7>;
+ 			status = "disabled";
+ 		};
+ 	};
+-- 
+1.7.10.4
