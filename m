@@ -1,36 +1,35 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Sun, 23 Dec 2012 07:10:02 -0800
-Subject: [PATCH 2/3] ARM: pxa: palmtreo: fix #ifdefs for leds-gpio device
-In-Reply-To: <201212230420.55725.marex@denx.de>
-References: <1356204719-3317-1-git-send-email-mikedunn@newsguy.com>
- <1356204719-3317-3-git-send-email-mikedunn@newsguy.com>
- <201212230420.55725.marex@denx.de>
-Message-ID: <50D71ECA.6080005@newsguy.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 23 Dec 2012 16:16:39 +0100
+Subject: [PATCH 2/4] ARM: Kirkwood: Switch TWSI1 of 88f6282 to DT
+Message-ID: <20121223151639.GA12697@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2012 07:20 PM, Marek Vasut wrote:
-> Dear Mike Dunn,
+> Clock Management of kirkwood has moved to DT clock providers.
+> However, TWSI1 has not yet been done.
+> This switches TWSI1 of 88f6282 to DT clock providers.
 > 
->> The #ifdefs around the leds-gpio device platform data are erroneous. 
->> Currently the device is not instantiated on the centro unless
->> CONFIG_MACH_TREO680 is defined.
->>
->> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
->> ---
->>
->> The #ifdefs within palmtreo_leds_init() are a little ugly, but I think the
->> only alternative would be to instantiate the leds-gpio device platform
->> data for both treo680 and centro, which would require some of the #defines
->> in palmtreo.h to be moved outside their containing #ifdef
->> CONFIG_MACH_{TREO680,CENTRO}.
+> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> ---
+>  arch/arm/boot/dts/kirkwood-6282.dtsi |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> Shall we not just kill all those ifdefs and let GCC decide what to optimize out? 
-> I think this kind of simple stuff should just be optimized out anyway.
+> diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi
+> +b/arch/arm/boot/dts/kirkwood-6282.dtsi
+> index bc23081..ad63b88 100644
+> --- a/arch/arm/boot/dts/kirkwood-6282.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
+> @@ -45,6 +45,7 @@
+>                         #size-cells = <0>;
+>                         interrupts = <32>;
+>                         clock-frequency = <100000>;
+> +                       clocks = <&gate_clk 7>;
+>                         status = "disabled";
+>                 };
+>         };
 
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-You're suggesting that all the #ifdef CONFIG_MACH_{TREO680,CENTRO} be removed
-from palmtreo.h?  Yes, this might be better.  I'll look into it.
+Jason: This patch should be queued up for -rc2.
 
-Thanks again,
-Mike
+       Andrew
