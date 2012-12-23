@@ -1,30 +1,30 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 23 Dec 2012 04:24:16 +0100
-Subject: [PATCH 1/2] ARM: pxa: palm27x: fix udc device initialization
-In-Reply-To: <1356200860-3241-2-git-send-email-mikedunn@newsguy.com>
-References: <1356200860-3241-1-git-send-email-mikedunn@newsguy.com>
- <1356200860-3241-2-git-send-email-mikedunn@newsguy.com>
-Message-ID: <201212230424.16848.marex@denx.de>
+Date: Sun, 23 Dec 2012 04:20:55 +0100
+Subject: [PATCH 2/3] ARM: pxa: palmtreo: fix #ifdefs for leds-gpio device
+In-Reply-To: <1356204719-3317-3-git-send-email-mikedunn@newsguy.com>
+References: <1356204719-3317-1-git-send-email-mikedunn@newsguy.com>
+ <1356204719-3317-3-git-send-email-mikedunn@newsguy.com>
+Message-ID: <201212230420.55725.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Mike Dunn,
 
-> This patch fixes some bad behaviour from the usb gadget during machine
-> initialization by changing the management of the D+ pull-up gpio from the
-> gpio-vbus driver to the pxa27x-udc driver.  Also, code that drives the
-> pull-up high is removed.  (The gpio-vbus driver can optionally manage the
-> D+ line pull-up, but the pxa27x-udc driver does this itself.)
+> The #ifdefs around the leds-gpio device platform data are erroneous. 
+> Currently the device is not instantiated on the centro unless
+> CONFIG_MACH_TREO680 is defined.
 > 
-> Without this patch, the host senses the presence of the usb gadget during
-> machine initialization (when palm27x_udc_init() runs), at which point it
-> tries to enumerate the newly detected usb gadget.  But because the
-> pxa27x-udc driver has not been initialized yet, there's no gadget driver
-> to respond to the host, and enumeration fails.  Tested on my Palm Treo680.
-[...]
+> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+> ---
+> 
+> The #ifdefs within palmtreo_leds_init() are a little ugly, but I think the
+> only alternative would be to instantiate the leds-gpio device platform
+> data for both treo680 and centro, which would require some of the #defines
+> in palmtreo.h to be moved outside their containing #ifdef
+> CONFIG_MACH_{TREO680,CENTRO}.
 
-I think it was the whole big idea to let gpio-vbus manage this kind of stuff. 
-But it's been a while, Ccing Haojian to review these.
+Shall we not just kill all those ifdefs and let GCC decide what to optimize out? 
+I think this kind of simple stuff should just be optimized out anyway.
 
 Best regards,
 Marek Vasut
