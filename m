@@ -1,40 +1,25 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Sun, 23 Dec 2012 19:22:19 +0100
-Subject: [PATCH] arm: omap3: igep0020: Add console default kernel arguments
-In-Reply-To: <CALF0-+UWx-cP7tcZ_L3dHaJREgi9R7-hD23z2wjD5N5ftROQpw@mail.gmail.com>
-References: <1356018118-29852-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <CAFqH_50ELkdXhVwW8atG0VsXU85S3pZqCVf9cytQRGk5SocFXw@mail.gmail.com>
- <CAAwP0s1snYU7FR-BVM=GLg0oopT6NkBVLOysffia0dadsxW+BQ@mail.gmail.com>
- <CALF0-+UWx-cP7tcZ_L3dHaJREgi9R7-hD23z2wjD5N5ftROQpw@mail.gmail.com>
-Message-ID: <CAAwP0s1vgrsho12CtejnoBo4biTN-VF_m_oqm+CD95AemhEHyg@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sun, 23 Dec 2012 23:21:21 +0400
+Subject: [PATCH] ARM: at91: rm9200: remake the BGA as default version
+In-Reply-To: <1356286069-8852-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1356286069-8852-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <50D759B1.1010701@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 22, 2012 at 3:17 PM, Ezequiel Garcia <elezegarcia@gmail.com> wrote:
-> Hi Enric and Javier,
->
->>> The u-boot 'bootargs' env overwrites the one from chosen ?
->>>
->>
->> I just tested and U-Boot 'bootargs' has precedence over DT bootargs
->> but I didn't find a way to append boot parameters from U-Boot. You can
->> either overwrite it completely or not.
->>
->
-> Yes. That seems to be the current case.
-> Perhaps we can merge
-> ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER
-> and CMDLINE_EXTEND in one generic config stating
-> the desired bootargs behavior.
->
-> Does this sound sane?
->
+Hello.
 
-Hi Ezequiel,
+On 23-12-2012 22:07, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-You could enable ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER on
-omap2plus_defconfig but just having a sane DTB bootargs default value
-is better IMHO.
+> as we are supposed to just have to specify when we use the PQFP version
 
-Best regards,
-Javier
+> since commit 3e90772f76010c315474bde59eaca7cc4c94d645
+> ARM: at91: fix at91rm9200 soc subtype handling
+
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: stable at kernel.org
+
+    The new address is stable at vger.kernel.org. Don't know if the old one works 
+still...
+
+WBR, Sergei
