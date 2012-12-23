@@ -1,173 +1,63 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Sun, 23 Dec 2012 11:35:49 +0900
-Subject: [PATCH] ARM: Kirkwood: Bundle the common pinctrl of 88f6281 and
- 88f6282
-Message-ID: <1356230149-15437-1-git-send-email-iwamatsu@nigauri.org>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 23 Dec 2012 04:18:49 +0100
+Subject: [PATCH 1/3] ARM: pxa: palmtreo: fix lcd initialization on treo680
+In-Reply-To: <1356204719-3317-2-git-send-email-mikedunn@newsguy.com>
+References: <1356204719-3317-1-git-send-email-mikedunn@newsguy.com>
+ <1356204719-3317-2-git-send-email-mikedunn@newsguy.com>
+Message-ID: <201212230418.51035.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-88f6281 and 88f6282 has common pinctrl.
-This buldles the common pincrtl of these to kirkwood-628x-base.dtsi.
+Dear Mike Dunn,
 
-Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
----
- arch/arm/boot/dts/kirkwood-6281.dtsi      |   38 ++------------------------
- arch/arm/boot/dts/kirkwood-6282.dtsi      |   35 ++----------------------
- arch/arm/boot/dts/kirkwood-628x-base.dtsi |   41 +++++++++++++++++++++++++++++
- 3 files changed, 45 insertions(+), 69 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-628x-base.dtsi
+I think you should Cc Haojian (done)
 
-diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
-index d6c9d65..c8fe885 100644
---- a/arch/arm/boot/dts/kirkwood-6281.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
-@@ -1,44 +1,10 @@
-+/include/ "kirkwood-628x-base.dtsi"
-+
- / {
- 	ocp at f1000000 {
- 		pinctrl: pinctrl at 10000 {
- 			compatible = "marvell,88f6281-pinctrl";
- 			reg = <0x10000 0x20>;
--
--			pmx_nand: pmx-nand {
--				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
--					       "mpp4", "mpp5", "mpp18",
--					       "mpp19";
--				marvell,function = "nand";
--			};
--			pmx_sata0: pmx-sata0 {
--				marvell,pins = "mpp5", "mpp21", "mpp23";
--				marvell,function = "sata0";
--			};
--			pmx_sata1: pmx-sata1 {
--				marvell,pins = "mpp4", "mpp20", "mpp22";
--				marvell,function = "sata1";
--			};
--			pmx_spi: pmx-spi {
--				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
--				marvell,function = "spi";
--			};
--			pmx_twsi0: pmx-twsi0 {
--				marvell,pins = "mpp8", "mpp9";
--				marvell,function = "twsi0";
--			};
--			pmx_uart0: pmx-uart0 {
--				marvell,pins = "mpp10", "mpp11";
--				marvell,function = "uart0";
--			};
--			pmx_uart1: pmx-uart1 {
--				marvell,pins = "mpp13", "mpp14";
--				marvell,function = "uart1";
--			};
--			pmx_sdio: pmx-sdio {
--				marvell,pins = "mpp12", "mpp13", "mpp14",
--					       "mpp15", "mpp16", "mpp17";
--				marvell,function = "sdio";
--			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
-index e0a779c..7ce9614 100644
---- a/arch/arm/boot/dts/kirkwood-6282.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
-@@ -1,3 +1,5 @@
-+/include/ "kirkwood-628x-base.dtsi"
-+
- / {
- 	ocp at f1000000 {
- 
-@@ -5,43 +7,10 @@
- 			compatible = "marvell,88f6282-pinctrl";
- 			reg = <0x10000 0x20>;
- 
--			pmx_nand: pmx-nand {
--				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
--							"mpp4", "mpp5", "mpp18", "mpp19";
--				marvell,function = "nand";
--			};
--
--			pmx_sata0: pmx-sata0 {
--				marvell,pins = "mpp5", "mpp21", "mpp23";
--				marvell,function = "sata0";
--			};
--			pmx_sata1: pmx-sata1 {
--				marvell,pins = "mpp4", "mpp20", "mpp22";
--				marvell,function = "sata1";
--			};
--			pmx_spi: pmx-spi {
--				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
--				marvell,function = "spi";
--			};
--			pmx_twsi0: pmx-twsi0 {
--				marvell,pins = "mpp8", "mpp9";
--				marvell,function = "twsi0";
--			};
--
- 			pmx_twsi1: pmx-twsi1 {
- 				marvell,pins = "mpp36", "mpp37";
- 				marvell,function = "twsi1";
- 			};
--
--			pmx_uart0: pmx-uart0 {
--				marvell,pins = "mpp10", "mpp11";
--				marvell,function = "uart0";
--			};
--
--			pmx_uart1: pmx-uart1 {
--				marvell,pins = "mpp13", "mpp14";
--				marvell,function = "uart1";
--			};
- 		};
- 
- 		i2c at 11100 {
-diff --git a/arch/arm/boot/dts/kirkwood-628x-base.dtsi b/arch/arm/boot/dts/kirkwood-628x-base.dtsi
-new file mode 100644
-index 0000000..c8103b6
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-628x-base.dtsi
-@@ -0,0 +1,41 @@
-+/ {
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			pmx_nand: pmx-nand {
-+				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
-+					       "mpp4", "mpp5", "mpp18",
-+					       "mpp19";
-+				marvell,function = "nand";
-+			};
-+			pmx_sata0: pmx-sata0 {
-+				marvell,pins = "mpp5", "mpp21", "mpp23";
-+				marvell,function = "sata0";
-+			};
-+			pmx_sata1: pmx-sata1 {
-+				marvell,pins = "mpp4", "mpp20", "mpp22";
-+				marvell,function = "sata1";
-+			};
-+			pmx_spi: pmx-spi {
-+				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
-+				marvell,function = "spi";
-+			};
-+			pmx_twsi0: pmx-twsi0 {
-+				marvell,pins = "mpp8", "mpp9";
-+				marvell,function = "twsi0";
-+			};
-+			pmx_uart0: pmx-uart0 {
-+				marvell,pins = "mpp10", "mpp11";
-+				marvell,function = "uart0";
-+			};
-+			pmx_uart1: pmx-uart1 {
-+				marvell,pins = "mpp13", "mpp14";
-+				marvell,function = "uart1";
-+			};
-+			pmx_sdio: pmx-sdio {
-+				marvell,pins = "mpp12", "mpp13", "mpp14",
-+					       "mpp15", "mpp16", "mpp17";
-+				marvell,function = "sdio";
-+			};
-+		};
-+	};
-+};
--- 
-1.7.10.4
+> This patch gets the LCD working on my Palm Treo680.  Changing the Palm
+> Centro code is avoided (I don't have a Centro for testing at the moment),
+> but some initialization is shuffled around a bit.
+
+I think I have a spare device somewhere around. I might get it available to you 
+somehow eventually -- but that'll need some further discussion. Let's postpone 
+it for now.
+
+> This basically adds some code that manages the three gpios that interface
+> to the lcd on the Treo 680.  The precise role of each gpio in the hardware
+> architecture is not entirely clear to me; this patch is the result of
+> trial-and-error and observing how the PalmOS code initializes the lcd.
+
+Yay, good old times ;-)
+
+> The need for this patch is not evident when Linux is loaded from PalmOS,
+> because at that point the lcd-related gpios have already been configured. 
+> But when booting the kernel by other means, this patch is required unless
+> the bootloader has performed the necessary initialializations.
+
+You mean U-Boot ? Makes sense.
+[...]
+
+>  static void __init treo680_init(void)
+>  {
+>  	pxa2xx_mfp_config(ARRAY_AND_SIZE(treo680_pin_config));
+>  	palmphone_common_init();
+> +	treo680_lcd_init();
+
+I think you want to do treo680_gpio_configure() kind of thing and then call 
+palm27x_lcd_init() from here.
+
+Even better of course would be to integrate this kind of GPIO fiddling with the 
+backlight subsystem, so the LCD can be properly powered down when going LPM.
+
+>  	palm27x_mmc_init(GPIO_NR_TREO_SD_DETECT_N, GPIO_NR_TREO680_SD_READONLY,
+>  			GPIO_NR_TREO680_SD_POWER, 0);
+>  }
+> @@ -438,6 +488,7 @@ static void __init centro_init(void)
+>  {
+>  	pxa2xx_mfp_config(ARRAY_AND_SIZE(centro685_pin_config));
+>  	palmphone_common_init();
+> +	palm27x_lcd_init(GPIO_NR_TREO_BL_POWER, &palm_320x320_new_lcd_mode);
+>  	palm27x_mmc_init(GPIO_NR_TREO_SD_DETECT_N, -1,
+>  			GPIO_NR_CENTRO_SD_POWER, 1);
+>  }
+
+Best regards,
+Marek Vasut
