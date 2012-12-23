@@ -1,34 +1,40 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 23 Dec 2012 19:07:49 +0100
-Subject: [PATCH] ARM: at91: rm9200: remake the BGA as default version
-Message-ID: <1356286069-8852-1-git-send-email-plagnioj@jcrosoft.com>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Sun, 23 Dec 2012 19:22:19 +0100
+Subject: [PATCH] arm: omap3: igep0020: Add console default kernel arguments
+In-Reply-To: <CALF0-+UWx-cP7tcZ_L3dHaJREgi9R7-hD23z2wjD5N5ftROQpw@mail.gmail.com>
+References: <1356018118-29852-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <CAFqH_50ELkdXhVwW8atG0VsXU85S3pZqCVf9cytQRGk5SocFXw@mail.gmail.com>
+ <CAAwP0s1snYU7FR-BVM=GLg0oopT6NkBVLOysffia0dadsxW+BQ@mail.gmail.com>
+ <CALF0-+UWx-cP7tcZ_L3dHaJREgi9R7-hD23z2wjD5N5ftROQpw@mail.gmail.com>
+Message-ID: <CAAwP0s1vgrsho12CtejnoBo4biTN-VF_m_oqm+CD95AemhEHyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-as we are supposed to just have to specify when we use the PQFP version
+On Sat, Dec 22, 2012 at 3:17 PM, Ezequiel Garcia <elezegarcia@gmail.com> wrote:
+> Hi Enric and Javier,
+>
+>>> The u-boot 'bootargs' env overwrites the one from chosen ?
+>>>
+>>
+>> I just tested and U-Boot 'bootargs' has precedence over DT bootargs
+>> but I didn't find a way to append boot parameters from U-Boot. You can
+>> either overwrite it completely or not.
+>>
+>
+> Yes. That seems to be the current case.
+> Perhaps we can merge
+> ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER
+> and CMDLINE_EXTEND in one generic config stating
+> the desired bootargs behavior.
+>
+> Does this sound sane?
+>
 
-since commit 3e90772f76010c315474bde59eaca7cc4c94d645
-ARM: at91: fix at91rm9200 soc subtype handling
+Hi Ezequiel,
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: stable at kernel.org
----
+You could enable ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER on
+omap2plus_defconfig but just having a sane DTB bootargs default value
+is better IMHO.
 
- arch/arm/mach-at91/setup.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 19cdd0b..28750c5 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -105,6 +105,8 @@ static void __init soc_detect(u32 dbgu_base)
- 	switch (socid) {
- 	case ARCH_ID_AT91RM9200:
- 		at91_soc_initdata.type = AT91_SOC_RM9200;
-+		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_NONE)
-+			at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
- 		at91_boot_soc = at91rm9200_soc;
- 		break;
- 
--- 
-1.7.10.4
+Best regards,
+Javier
