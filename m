@@ -1,7 +1,7 @@
 From: matt@genesi-usa.com (Matt Sealey)
-Date: Sun, 23 Dec 2012 05:16:02 -0600
+Date: Sun, 23 Dec 2012 05:18:21 -0600
 Subject: [PATCH] ehci-mxc: remove Efika MX-specific CHRGVBUS hack
-Message-ID: <1356261362-8418-1-git-send-email-matt@genesi-usa.com>
+Message-ID: <1356261501-8465-1-git-send-email-matt@genesi-usa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
