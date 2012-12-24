@@ -1,38 +1,30 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 24 Dec 2012 09:07:34 +0800
-Subject: [PATCH v8 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <20121215072738.882313E0C08@localhost>
-References: <1355481404-27695-1-git-send-email-zonque@gmail.com>
- <1355481404-27695-6-git-send-email-zonque@gmail.com>
- <20121215072738.882313E0C08@localhost>
-Message-ID: <50D7AAD6.1090705@gmail.com>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Mon, 24 Dec 2012 02:08:45 +0100
+Subject: [PATCH] ARM: pxa/colibri: fix SD detect pin
+Message-ID: <1356311326-3065-1-git-send-email-marcel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2012 03:27 PM, Grant Likely wrote:
-> On Fri, 14 Dec 2012 11:36:44 +0100, Daniel Mack <zonque@gmail.com> wrote:
->> This patch adds basic DT bindings for OMAP GPMC.
->>
->> The actual peripherals are instantiated from child nodes within the GPMC
->> node, and the only type of device that is currently supported is NAND.
->>
->> Code was added to parse the generic GPMC timing parameters and some
->> documentation with examples on how to use them.
->>
->> Successfully tested on an AM33xx board.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> 
-> For all patches in this series:
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Due to a missing else the Colibri PXA270 erroneously fell through
+getting the PXA320's detect pin assigned.
 
-Thanks Grant!
+Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
+---
+ arch/arm/mach-pxa/colibri-evalboard.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Tony, could you apply these patches somewhere so others can base upon
-them? As I said, I'm now travelling and can't continue my work, so I
-would much like to know these series at a safe place :)
-
-
-Again thanks to everyone,
-Daniel
+diff --git a/arch/arm/mach-pxa/colibri-evalboard.c b/arch/arm/mach-pxa/colibri-evalboard.c
+index 8404b24..9e7a4d3 100644
+--- a/arch/arm/mach-pxa/colibri-evalboard.c
++++ b/arch/arm/mach-pxa/colibri-evalboard.c
+@@ -46,7 +46,7 @@ static void __init colibri_mmc_init(void)
+ 	if (machine_is_colibri())	/* PXA270 Colibri */
+ 		colibri_mci_platform_data.gpio_card_detect =
+ 			GPIO0_COLIBRI_PXA270_SD_DETECT;
+-	if (machine_is_colibri300())	/* PXA300 Colibri */
++	else if (machine_is_colibri300())	/* PXA300 Colibri */
+ 		colibri_mci_platform_data.gpio_card_detect =
+ 			GPIO13_COLIBRI_PXA300_SD_DETECT;
+ 	else				/* PXA320 Colibri */
+-- 
+1.7.9.5
