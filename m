@@ -1,89 +1,55 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 24 Dec 2012 11:37:50 -0600
-Subject: [PATCH] clk: debug clock tree
-In-Reply-To: <50D6DC4E.9020205@nvidia.com>
-References: <1355370586-6600-1-git-send-email-pgaikwad@nvidia.com>
- <CAPtuhThBigSQMkNDf16Fo1tddTKo=rPEydHmzep0DqtgLrB+HA@mail.gmail.com>
- <50CA17FB.9060606@wwwdotorg.org> <50D2A7DA.5050907@nvidia.com>
- <CAPtuhTgytOHGpVQ+vXQMpgFhuUo+y0H-QqpLg5cff2cdC-Rkzg@mail.gmail.com>
- <50D6DC4E.9020205@nvidia.com>
-Message-ID: <CAPtuhTh9h6tJehZAJtyRB6bBESAYaqeN=v+dhmoavQG1euzqdw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 24 Dec 2012 16:01:39 -0200
+Subject: [PATCH] ARM: dts: imx23-olinuxino: Fix IOMUX settings
+Message-ID: <1356372099-16134-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 23, 2012 at 4:26 AM, Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
-> On Saturday 22 December 2012 04:26 AM, Mike Turquette wrote:
->>
->> On Wed, Dec 19, 2012 at 11:53 PM, Prashant Gaikwad <pgaikwad@nvidia.com>
->> wrote:
->>>
->>> On Thursday 13 December 2012 11:31 PM, Stephen Warren wrote:
->>>>
->>>> On 12/13/2012 09:27 AM, Mike Turquette wrote:
->>>>>
->>>>> On Wed, Dec 12, 2012 at 7:49 PM, Prashant Gaikwad <pgaikwad@nvidia.com>
->>>>> wrote:
->>>>>>
->>>>>> Adds debug file "clock_tree" in /sys/kernel/debug/clk dir.
->>>>>> It helps to view all the clock registered in tree format.
->>>>>>
->>>>> Prashant,
->>>>>
->>>>> Thanks for submitting this.  We've been talking about having a single
->>>>> file for representing the tree for some time.
->>>>>
->>>>> Regarding the output format had you considered using a well known
->>>>> format which can be parsed using well known parsing libs?  This avoids
->>>>> needing a custom parser just for this one file.  JSON springs to mind
->>>>> as something lightweight and well-understood.
->>>>
->>>> One advantage of the format below is that it's very easily
->>>> human-readable, and it's not too hard to parse (although I guess you'd
->>>> have to parse the indent level to get parent/child relation, which would
->>>> suck a bit). Is there room to provide both? Otherwise, I guess the
->>>> kernel could include a script to convert from JSON/whatever into the
->>>> format below.
->>>>
->>>>>> For example:
->>>>>>      clock                        enable_cnt  prepare_cnt  rate
->>>>>> ---------------------------------------------------------------------
->>>>>>    i2s0_sync                      0           0            24000000
->>>>>>    spdif_in_sync                  0           0            24000000
->>>>>>       spdif_mux                   0           0            24000000
->>>>>>          spdif                    0           0            24000000
->>>>>>             spdif_doubler         0           0            48000000
->>>>>>                spdif_div          0           0            48000000
->>>>>>                   spdif_2x        0           0            48000000
->>>>
->>>>
->>> Even I think that output must be easily human-readable. How about adding
->>> sysfs to switch between human-readable and machine-readable format?
->>> I will try come up with a implementation.
->>>
->> Do you mean a sysfs file which controls the output format?  How about
->> just two different files?  One can be clk-dump (machine readable) and
->> the other is clk-summary (human readable).
->
->
-> It is also fine. Is this patch ok for human-readable format? or any
-> suggestions?
-> I will change the file name to clk-summary.
->
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Prashant,
+On the imx23-olinuxino board GPIO2_1 is connected to the LED and GPIO0_17
+is the USB PHY reset.
 
-Yes the format seems to be agreeable for human-readable format based
-on the feedback on the list.  Go ahead and keep the column titles and
-the dashed lines that I commented on earlier... my comments are less
-relevant if a separate machine-readable clk-dump file exists.
+So make the IOMUX assignment properly.
 
-Are you going to take a crack at JSON-formatted output for clk-dump?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx23-olinuxino.dts |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Thanks,
-Mike
-
->>
->> Regards,
->> Mike
->
->
+diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
+index 7c43b8e..e7484e4 100644
+--- a/arch/arm/boot/dts/imx23-olinuxino.dts
++++ b/arch/arm/boot/dts/imx23-olinuxino.dts
+@@ -39,17 +39,17 @@
+ 				hog_pins_a: hog at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-						0x2013 /* MX23_PAD_SSP1_DETECT__GPIO_2_1 */
++						0x0113 /* MX23_PAD_GPMI_ALE__GPIO_0_17 */
+ 					>;
+ 					fsl,drive-strength = <0>;
+ 					fsl,voltage = <1>;
+ 					fsl,pull-up = <0>;
+ 				};
+ 
+-				led_pin_gpio0_17: led_gpio0_17 at 0 {
++				led_pin_gpio2_1: led_gpio2_1 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-						0x0113 /* MX23_PAD_GPMI_ALE__GPIO_0_17 */
++						0x2013 /* MX23_PAD_SSP1_DETECT__GPIO_2_1 */
+ 					>;
+ 					fsl,drive-strength = <0>;
+ 					fsl,voltage = <1>;
+@@ -110,7 +110,7 @@
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&led_pin_gpio0_17>;
++		pinctrl-0 = <&led_pin_gpio2_1>;
+ 
+ 		user {
+ 			label = "green";
+-- 
+1.7.9.5
