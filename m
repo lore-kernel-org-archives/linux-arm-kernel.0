@@ -1,72 +1,85 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 23 Dec 2012 18:24:58 -0700
-Subject: [PATCH 1/3] ARM: OMAP: 32k counter: resolve sparse warnings
+Date: Sun, 23 Dec 2012 18:25:01 -0700
+Subject: [PATCH 3/3] ARM: OMAP: SRAM: resolve sparse warnings
 In-Reply-To: <20121224012304.13698.43551.stgit@dusk.lan>
 References: <20121224012304.13698.43551.stgit@dusk.lan>
-Message-ID: <20121224012456.13698.41839.stgit@dusk.lan>
+Message-ID: <20121224012500.13698.73653.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1fe97c8f6a1de67a5f56e029a818903d5bed8017 ("ARM: OMAP: Make OMAP
-clocksource source selection using kernel param") results in a new warning
-from sparse:
+Commit bb77209432873214a796a70a4539e4ebdf3feb54 ("ARM: OMAP: Move
+omap2+ specific parts of sram.c to mach-omap2") adds some new sparse
+warnings:
 
-arch/arm/plat-omap/counter_32k.c:86:12: warning: symbol 'omap_init_clocksource_32k' was not declared. Should it be static?
+arch/arm/plat-omap/sram.c:43:6: warning: symbol 'omap_sram_push_address' was not declared. Should it be static?
+arch/arm/plat-omap/sram.c:65:6: warning: symbol 'omap_sram_reset' was not declared. Should it be static?
+arch/arm/plat-omap/sram.c:73:13: warning: symbol 'omap_map_sram' was not declared. Should it be static?
 
-Fix by adding a temporary header file, needed until the 32k counter
-code is moved to drivers/.
-arch/arm/plat-omap/include/plat/counter-32k.h can't be added due to
-ARM CONFIG_ARCH_MULTIPLATFORM restrictions on the use of the "plat/"
+Fix by creating a temporary header file containing prototypes for
+these SRAM functions - needed until the SRAM code is moved to
+drivers/.  arch/arm/plat-omap/include/plat/sram.h can't be added due
+to ARM CONFIG_ARCH_MULTIPLATFORM restrictions on the use of the "plat/"
 include path shortcut.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/counter_32k.c |    2 ++
- arch/arm/plat-omap/counter_32k.h |   20 ++++++++++++++++++++
- 2 files changed, 22 insertions(+)
- create mode 100644 arch/arm/plat-omap/counter_32k.h
+ arch/arm/plat-omap/sram.c |    2 ++
+ arch/arm/plat-omap/sram.h |   35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
+ create mode 100644 arch/arm/plat-omap/sram.h
 
-diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-index f3771cd..1d129d3 100644
---- a/arch/arm/plat-omap/counter_32k.c
-+++ b/arch/arm/plat-omap/counter_32k.c
-@@ -22,6 +22,8 @@
- #include <asm/mach/time.h>
- #include <asm/sched_clock.h>
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index 743fc28..d15e7b9 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -26,6 +26,8 @@
  
-+#include "counter_32k.h"
+ #include <asm/mach/map.h>
+ 
++#include "sram.h"
 +
- /* OMAP2_32KSYNCNT_CR_OFF: offset of 32ksync counter register */
- #define OMAP2_32KSYNCNT_REV_OFF		0x0
- #define OMAP2_32KSYNCNT_REV_SCHEME	(0x3 << 30)
-diff --git a/arch/arm/plat-omap/counter_32k.h b/arch/arm/plat-omap/counter_32k.h
+ #define ROUND_DOWN(value,boundary)	((value) & (~((boundary)-1)))
+ 
+ static void __iomem *omap_sram_base;
+diff --git a/arch/arm/plat-omap/sram.h b/arch/arm/plat-omap/sram.h
 new file mode 100644
-index 0000000..4366ce5
+index 0000000..7e47de4
 --- /dev/null
-+++ b/arch/arm/plat-omap/counter_32k.h
-@@ -0,0 +1,20 @@
++++ b/arch/arm/plat-omap/sram.h
+@@ -0,0 +1,35 @@
 +/*
-+ * OMAP 32k counter function prototypes
++ * OMAP common SRAM prototypes
 + *
 + * Copyright (C) 2012 Texas Instruments, Inc.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
 + *
-+ * XXX Needed until the OMAP 32k counter code is moved to somewhere under
-+ * drivers/.
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
++ * 02110-1301 USA
++ *
++ *
++ * XXX This file is needed until the SRAM handling is implemented via
++ * some device driver.
 + */
-+#ifndef __ARCH_ARM_PLAT_OMAP_COUNTER_32K_H
-+#define __ARCH_ARM_PLAT_OMAP_COUNTER_32K_H
++
++#ifndef __ARCH_ARM_PLAT_OMAP_SRAM_H
++#define __ARCH_ARM_PLAT_OMAP_SRAM_H
 +
 +#include <linux/kernel.h>
 +
-+extern int omap_init_clocksource_32k(void __iomem *vbase);
++extern void *omap_sram_push_address(unsigned long size);
++extern void omap_sram_reset(void);
++extern void __init omap_map_sram(unsigned long start, unsigned long size,
++				 unsigned long skip, int cached);
 +
 +#endif
