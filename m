@@ -1,91 +1,38 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Sun, 23 Dec 2012 21:50:52 -0300
-Subject: [PATCH 3/3] arm: omap2: gpmc: add DT bindings for OneNAND
-In-Reply-To: <1356307280-8323-3-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1356307280-8323-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1356307280-8323-3-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <CALF0-+VHp+V=d114r_OT8baht_hSi9apmdYrJ3eVQRtEzjDZAw@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 24 Dec 2012 09:07:34 +0800
+Subject: [PATCH v8 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <20121215072738.882313E0C08@localhost>
+References: <1355481404-27695-1-git-send-email-zonque@gmail.com>
+ <1355481404-27695-6-git-send-email-zonque@gmail.com>
+ <20121215072738.882313E0C08@localhost>
+Message-ID: <50D7AAD6.1090705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 23, 2012 at 9:01 PM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> This patch adds device tree bindings for OMAP OneNAND devices.
-> Tested on an OMAP3 3430 IGEPv2 board.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  .../devicetree/bindings/mtd/gpmc-onenand.txt       |   44 ++++++++++++++++++++
->  arch/arm/mach-omap2/gpmc.c                         |   44 ++++++++++++++++++++
->  2 files changed, 88 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
->
-> diff --git a/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt b/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-> new file mode 100644
-> index 0000000..4108f18
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-> @@ -0,0 +1,44 @@
-> +Device tree bindings for GPMC connected OneNANDs
-> +
-> +GPMC connected OneNAND (found on OMAP boards) are represented as child nodes of
-> +the GPMC controller with a name of "onenand".
-> +
-> +All timing relevant properties as well as generic gpmc child properties are
-> +explained in a separate documents - please refer to
-> +Documentation/devicetree/bindings/bus/ti-gpmc.txt
-> +
-> +Required properties:
-> +
-> + - reg:                        The CS line the peripheral is connected to
-> +
-> +Optional properties:
-> +
-> + - dma-channel:                DMA Channel index
-> +
-> +For inline partiton table parsing (optional):
-> +
-> + - #address-cells: should be set to 1
-> + - #size-cells: should be set to 1
-> +
-> +Example for an OMAP3430 board:
-> +
-> +       gpmc: gpmc at 6e000000 {
-> +               compatible = "ti,omap3430-gpmc";
-> +               ti,hwmods = "gpmc";
-> +               reg = <0x6e000000 0x1000000>;
-> +               interrupts = <20>;
-> +               gpmc,num-cs = <8>;
-> +               gpmc,num-waitpins = <4>;
-> +               #address-cells = <2>;
-> +               #size-cells = <1>;
-> +
+On 12/15/2012 03:27 PM, Grant Likely wrote:
+> On Fri, 14 Dec 2012 11:36:44 +0100, Daniel Mack <zonque@gmail.com> wrote:
+>> This patch adds basic DT bindings for OMAP GPMC.
+>>
+>> The actual peripherals are instantiated from child nodes within the GPMC
+>> node, and the only type of device that is currently supported is NAND.
+>>
+>> Code was added to parse the generic GPMC timing parameters and some
+>> documentation with examples on how to use them.
+>>
+>> Successfully tested on an AM33xx board.
+>>
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> 
+> For all patches in this series:
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Before anyone complains, this is wrong:
+Thanks Grant!
 
-> +               onenand at 0 {
-> +                       reg = <0>;
-> +
+Tony, could you apply these patches somewhere so others can base upon
+them? As I said, I'm now travelling and can't continue my work, so I
+would much like to know these series at a safe place :)
 
-It should be "reg = <0 0 0>" of course.
 
-Also, IMHO, I don't like the node to be matched by his name.
-Shouldn't we add a "compatible" tag instead?
-
-That way we could describe the device like
-
-flash at xxx {
-    compatible = "nand";
-}
-
-or
-
-flash at xxx {
-    compatible = "onenand";
-}
-
-Does this make sense?
-
-Regards,
-
-    Ezequiel
+Again thanks to everyone,
+Daniel
