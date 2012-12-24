@@ -1,30 +1,47 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 24 Dec 2012 17:17:30 +0200
-Subject: [PATCH 0/9] drivers: mailbox: framework creation
-In-Reply-To: <CAJ6Av5N+H4eno+9FizLp9gNsZrZ-TQnLnVGjf-UMBtNiDVuNdA@mail.gmail.com>
-References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
- <CACRpkdaqO7AAeYeR8SZt4Tbv1grrMq85TNYMc-FSbUSrnZBm=Q@mail.gmail.com>
- <20121220182835.GB21056@atomide.com>
- <CAOesGMh2uZC_9FzAxDVZqwe06OgqOrKjPgQi6wOJCt-SAmoHwg@mail.gmail.com>
- <CAK=Wgba=jLiig+TBcAcp7STz=Y6RM8noR_0S2HZjNQXLZV8JBA@mail.gmail.com>
- <50D42337.3080204@st.com>
- <CAJ6Av5N+H4eno+9FizLp9gNsZrZ-TQnLnVGjf-UMBtNiDVuNdA@mail.gmail.com>
-Message-ID: <CAK=WgbaJCwF+vg+23mH7wjyUnVMYjFvpK_Wbffk3SEXKTB-1MA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 24 Dec 2012 16:34:28 +0100
+Subject: [PATCH 1/2] ARM: pxa: palm27x: fix udc device initialization
+In-Reply-To: <201212230424.16848.marex@denx.de> (Marek Vasut's message of
+ "Sun, 23 Dec 2012 04:24:16 +0100")
+References: <1356200860-3241-1-git-send-email-mikedunn@newsguy.com>
+ <1356200860-3241-2-git-send-email-mikedunn@newsguy.com>
+ <201212230424.16848.marex@denx.de>
+Message-ID: <87sj6vmpkr.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar,
+Marek Vasut <marex@denx.de> writes:
 
-On Fri, Dec 21, 2012 at 9:33 PM, Omar Ramirez Luna
-<omar.ramirez@copitl.com> wrote:
-> Yes, I made the changes, for tidspbridge and remoteproc, I will submit
-> both for review, based on this series.
+> Dear Mike Dunn,
+>
+>> This patch fixes some bad behaviour from the usb gadget during machine
+>> initialization by changing the management of the D+ pull-up gpio from the
+>> gpio-vbus driver to the pxa27x-udc driver.  Also, code that drives the
+>> pull-up high is removed.  (The gpio-vbus driver can optionally manage the
+>> D+ line pull-up, but the pxa27x-udc driver does this itself.)
+>> 
+>> Without this patch, the host senses the presence of the usb gadget during
+>> machine initialization (when palm27x_udc_init() runs), at which point it
+>> tries to enumerate the newly detected usb gadget.  But because the
+>> pxa27x-udc driver has not been initialized yet, there's no gadget driver
+>> to respond to the host, and enumeration fails.  Tested on my Palm Treo680.
+> [...]
+>
+> I think it was the whole big idea to let gpio-vbus manage this kind of stuff. 
+> But it's been a while, Ccing Haojian to review these.
 
-Great, thanks.
+Actually gpio-vbus was designed to :
+ - detect and handle VBus
+ - and handle following D+ pullup if peripheral controller *can't*
 
-Please note that when we do eventually merge this, we need your
-updates to be squashed into Loic's patches so we don't break
-bisectibility.
+But pxa27x_udc is a peripheral controller which does handle D+ pullup, and
+expects to handle it by himself (ie. is not fully compatible with a D+ pullup
+handling by gpio-vbus, one not working case being Mike's one).
 
-Thanks,
-Ohad.
+So Mike's patch makes sense IMHO. He could have left the VBUS handling to
+gpio-vbus and D+ to pxa27x_udc, or let pxa27x_udc handle both, that's up to you.
+
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+
+-- 
+Robert
