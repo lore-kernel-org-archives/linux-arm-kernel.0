@@ -1,30 +1,35 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Mon, 24 Dec 2012 02:08:45 +0100
-Subject: [PATCH] ARM: pxa/colibri: fix SD detect pin
-Message-ID: <1356311326-3065-1-git-send-email-marcel@ziswiler.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 23 Dec 2012 18:24:56 -0700
+Subject: [PATCH 0/3] ARM: OMAP: resolve sparse warnings with v3.8-rc1
+Message-ID: <20121224012304.13698.43551.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to a missing else the Colibri PXA270 erroneously fell through
-getting the PXA320's detect pin assigned.
+Another minor release, another new set of sparse warnings.  It would
+be good if patch submitters and mainline committers can verify that
+new patches don't add sparse warnings.  Otherwise it makes it harder
+for others to verify that their code is sparse-warning-free.
 
-Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
+- Paul
+
 ---
- arch/arm/mach-pxa/colibri-evalboard.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/colibri-evalboard.c b/arch/arm/mach-pxa/colibri-evalboard.c
-index 8404b24..9e7a4d3 100644
---- a/arch/arm/mach-pxa/colibri-evalboard.c
-+++ b/arch/arm/mach-pxa/colibri-evalboard.c
-@@ -46,7 +46,7 @@ static void __init colibri_mmc_init(void)
- 	if (machine_is_colibri())	/* PXA270 Colibri */
- 		colibri_mci_platform_data.gpio_card_detect =
- 			GPIO0_COLIBRI_PXA270_SD_DETECT;
--	if (machine_is_colibri300())	/* PXA300 Colibri */
-+	else if (machine_is_colibri300())	/* PXA300 Colibri */
- 		colibri_mci_platform_data.gpio_card_detect =
- 			GPIO13_COLIBRI_PXA300_SD_DETECT;
- 	else				/* PXA320 Colibri */
--- 
-1.7.9.5
+sparse_fixes_a_3.8-rc
+   text	   data	    bss	    dec	    hex	filename
+7697036	 722268	5614832	14034136	 d624d8	vmlinux.omap2plus_defconfig.orig
+7697036	 722268	5614832	14034136	 d624d8	vmlinux.omap2plus_defconfig
+
+Paul Walmsley (3):
+      ARM: OMAP: 32k counter: resolve sparse warnings
+      ARM: OMAP AM33xx: hwmod data: resolve sparse warnings
+      ARM: OMAP: SRAM: resolve sparse warnings
+
+
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    4 ++-
+ arch/arm/plat-omap/counter_32k.c           |    2 ++
+ arch/arm/plat-omap/counter_32k.h           |   20 ++++++++++++++++
+ arch/arm/plat-omap/sram.c                  |    2 ++
+ arch/arm/plat-omap/sram.h                  |   35 ++++++++++++++++++++++++++++
+ 5 files changed, 61 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/plat-omap/counter_32k.h
+ create mode 100644 arch/arm/plat-omap/sram.h
