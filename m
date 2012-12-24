@@ -1,194 +1,80 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 24 Dec 2012 17:02:12 +0800
-Subject: [PATCH v3 3/7] usb: chipidea: add otg id switch and vbus
- connect/disconnect detect
-In-Reply-To: <87k3t4mqh9.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1353921068-15673-1-git-send-email-peter.chen@freescale.com>
- <1353921068-15673-4-git-send-email-peter.chen@freescale.com>
- <87k3t4mqh9.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20121224090211.GC21391@nchen-desktop>
+From: nvmarkzhang@gmail.com (Mark Zhang)
+Date: Mon, 24 Dec 2012 17:58:56 +0800
+Subject: [PATCH 0/9] ARM: Initial support for Tegra 114 SoC.
+In-Reply-To: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
+References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <50D82760.6060706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2012 at 04:30:10PM +0200, Alexander Shishkin wrote:
-> Peter Chen <peter.chen@freescale.com> writes:
+On 12/20/2012 05:43 PM, Hiroshi Doyu wrote:
+> Hi,
 > 
-> > +static void ci_otg_work(struct work_struct *work)
-> > +{
-> > +	struct ci13xxx *ci = container_of(work, struct ci13xxx, work);
-> > +
-> > +	if (test_bit(CI_ID, &ci->events)) {
-> > +		clear_bit(CI_ID, &ci->events);
-> > +		ci_handle_id_switch(ci);
-> > +	} else if (test_bit(CI_B_SESS_VALID, &ci->events)) {
-> > +		clear_bit(CI_B_SESS_VALID, &ci->events);
-> > +		ci_handle_vbus_change(ci);
-> > +	} else
-> > +		dev_err(ci->dev, "unexpected event occurs at %s\n", __func__);
-> > +
-> > +	enable_irq(ci->irq);
-> > +}
+> This patchset adds initial support for the NVIDIA's new Tegra 114
+> SoC (T114) based on the ARM Cortex-A15 MP. It has the minimal support
+> to allow the kernel to boot up into shell console. This can be used as
+> a basis for adding other device drivers for this SoC. Currently there
+> are 2 evaluation boards available, "Dalmore" and "Pluto".
 > 
-> if (ci->id) {
-> 	ci->id = false;
-> 	ci_handle_id_switch(ci);
-> } else if (ci->vbus_valid) {
-> 	ci->vbus_valid = false;
-> 	ci_handle_vbus_change(ci);
-> } ...
+> This patchset is against Stephen Warren's linux-next_common branch:
 > 
-> is so much easier on the eyes. We really don't have any reasons to have
-> events in a bitmask.
+>   git://nv-tegra.nvidia.com/user/swarren/linux-2.6 linux-next_common
+> 
+> For those who want to try:
+> 
+>   $ make ARCH=arm tegra_defconfig
+>   $ scripts/config -e ARCH_TEGRA_114_SOC -d DRM -d SUSPEND \
+>     	-d PM_RUNTIME -d CPU_FREQ -d CPU_IDLE
+>   $ make ARCH=arm menuconfig # if needed to configure more
 
-Ok, then I keep several flags (currently, it is two) as otg events.
-> > @@ -321,19 +422,36 @@ static irqreturn_t ci_irq(int irq, void *data)
-> >  	irqreturn_t ret = IRQ_NONE;
-> >  	u32 otgsc = 0;
-> >  
-> > -	if (ci->is_otg)
-> > -		otgsc = hw_read(ci, OP_OTGSC, ~0);
-> > -
-> > -	if (ci->role != CI_ROLE_END)
-> > -		ret = ci_role(ci)->irq(ci);
-> > +	otgsc = hw_read(ci, OP_OTGSC, ~0);
-> >  
-> > -	if (ci->is_otg && (otgsc & OTGSC_IDIS)) {
-> > +	/*
-> > +	 * Handle id change interrupt, it indicates device/host function
-> > +	 * switch.
-> > +	 */
-> > +	if (ci->is_otg && (otgsc & OTGSC_IDIE) && (otgsc & OTGSC_IDIS)) {
-> > +		set_bit(CI_ID, &ci->events);
-> >  		hw_write(ci, OP_OTGSC, OTGSC_IDIS, OTGSC_IDIS);
-> 
-> A thought: we're setting and unsetting IDIS/IDIE and BSVIS/BSVIE that we
-> might use a helper function for it.
-ci_clear_otg_status/ci_enable_otg_interrupt/ci_disable_otg_interrupt?
+I think we also need to enable:
 
-> 
-> >  		disable_irq_nosync(ci->irq);
-> >  		queue_work(ci->wq, &ci->work);
-> > -		ret = IRQ_HANDLED;
-> > +		return IRQ_HANDLED;
-> > +	}
-> > +
-> > +	/*
-> > +	 * Handle vbus change interrupt, it indicates device connection
-> > +	 * and disconnection events.
-> > +	 */
-> > +	if ((otgsc & OTGSC_BSVIE) && (otgsc & OTGSC_BSVIS)) {
-> > +		set_bit(CI_B_SESS_VALID, &ci->events);
-> > +		hw_write(ci, OP_OTGSC, OTGSC_BSVIS, OTGSC_BSVIS);
-> > +		disable_irq_nosync(ci->irq);
-> > +		queue_work(ci->wq, &ci->work);
-> > +		return IRQ_HANDLED;
-> >  	}
-> >  
-> > +	/* Handle device/host interrupt */
-> > +	if (ci->role != CI_ROLE_END)
-> > +		ret = ci_role(ci)->irq(ci);
-> > +
-> >  	return ret;
-> >  }
-> >  
-> > @@ -397,6 +515,7 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
-> >  	struct resource	*res;
-> >  	void __iomem	*base;
-> >  	int		ret;
-> > +	u32		otgsc;
-> >  
-> >  	if (!dev->platform_data) {
-> >  		dev_err(dev, "platform data missing\n");
-> > @@ -421,6 +540,7 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
-> >  		return -ENOMEM;
-> >  	}
-> >  
-> > +	ci->events = 0;
-> 
-> "ci" has just been kzalloc'ed.
-will change.
-> 
-> >  	ci->dev = dev;
-> >  	ci->platdata = dev->platform_data;
-> >  	if (ci->platdata->phy)
-> > @@ -442,12 +562,20 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
-> >  		return -ENODEV;
-> >  	}
-> >  
-> > -	INIT_WORK(&ci->work, ci_role_work);
-> > +	INIT_WORK(&ci->work, ci_otg_work);
-> > +	INIT_DELAYED_WORK(&ci->dwork, ci_delayed_work);
-> >  	ci->wq = create_singlethread_workqueue("ci_otg");
-> >  	if (!ci->wq) {
-> >  		dev_err(dev, "can't create workqueue\n");
-> >  		return -ENODEV;
-> >  	}
-> > +	/* Disable all interrupts bits */
-> > +	hw_write(ci, OP_USBINTR, 0xffffffff, 0);
-> > +	hw_write(ci, OP_OTGSC, OTGSC_INT_EN_BITS, 0);
-> > +
-> > +	/* Clear all interrupts status bits*/
-> > +	hw_write(ci, OP_USBSTS, 0xffffffff, 0xffffffff);
-> > +	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, OTGSC_INT_STATUS_BITS);
-> 
-> How about moving these to hw_device_init()?
+CONFIG_ARM_APPENDED_DTB
+CONFIG_ARM_ATAG_DTB_COMPAT
 
-Good idea
-> 
-> >  
-> >  	/* initialize role(s) before the interrupt is requested */
-> >  	ret = ci_hdrc_host_init(ci);
-> > @@ -465,6 +593,7 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
-> >  	}
-> >  
-> >  	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
-> > +		dev_dbg(dev, "support otg\n");
-> >  		ci->is_otg = true;
-> >  		/* ID pin needs 1ms debouce time, we delay 2ms for safe */
-> >  		mdelay(2);
-> > @@ -475,13 +604,29 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
-> >  			: CI_ROLE_GADGET;
-> >  	}
-> >  
-> > +	if (ci->is_otg)
-> > +		/* if otg is supported, create struct usb_otg */
-> > +		ci_hdrc_otg_init(ci);
-> 
-> Can this just go the same block where is_otg is set?
-Will change
-> 
-> > +
-> >  	ret = ci_role_start(ci, ci->role);
-> >  	if (ret) {
-> > -		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
-> > +		dev_err(dev, "can't start %s role, ret=%d\n",
-> > +				ci_role(ci)->name, ret);
-> 
-> This change is not really related to the rest of the patch.
-It just adds return value output, it can let the user know what kinds of
-error occurs during the ci_role_start, meanwhile, it is a small change,
-and not deserved a patch.
-> 
-> >  		ret = -ENODEV;
-> >  		goto rm_wq;
-> >  	}
-> >  
-> > +	otgsc = hw_read(ci, OP_OTGSC, ~0);
-> > +	/*
-> > +	 * if it is device mode:
-> > +	 * - Enable vbus detect
-> > +	 * - If it has already connected to host, notify udc
-> > +	 */
-> > +	if (ci->role == CI_ROLE_GADGET) {
-> > +		hw_write(ci, OP_OTGSC, OTGSC_BSVIE, OTGSC_BSVIE);
-> > +		ci_handle_vbus_change(ci);
-> > +	}
-> 
-> This looks like something that belongs to gadget role start, doesn't it?
-Yes, will change.
-> 
+because currently we append the dtb to the kernel image(will not do this
+after u-boot supports dalmore and we can load the dtb in u-boot cmd), so
+we need to make kernel being aware of this.
 
--- 
+My experience is after I enabled these 2 configs, kernel starts up normally.
 
-Best Regards,
-Peter Chen
+Mark
+>   $ make ARCH=arm all -j9
+> 
+> Verified that this single image booted up with "Dalmore(T114)",
+> "Pluto(T114)" and "Cardhu(T30)". For "Cardhu(T30)" with this single
+> image, SPI driver doesn't seem to afford the above configuration , it
+> hangs at boot-up. With SPI disabled, it's ok.
+> 
+> 
+> Hiroshi Doyu (9):
+>   ARM: tegra: fuse: Add chipid TEGRA114 0x35
+>   HACK: ARM: tegra: Use CLK_IGNORE_UNUSED for Tegra 114 SoC
+>   ARM: tegra: # of CPU cores detection w/ & w/o HAVE_ARM_SCU
+>   clocksource: tegra: Reorganize funcs by clock functionarities
+>   clocksource: tegra: Enable ARM arch_timer with TSC
+>   ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
+>   ARM: dt: tegra114: Add new board, Dalmore
+>   ARM: dt: tegra114: Add new board, Pluto
+>   ARM: tegra: Add initial support for Tegra 114 SoC.
+> 
+>  .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 +
+>  arch/arm/boot/dts/Makefile                         |    4 +-
+>  arch/arm/boot/dts/tegra114-dalmore.dts             |   21 ++
+>  arch/arm/boot/dts/tegra114-pluto.dts               |   21 ++
+>  arch/arm/boot/dts/tegra114.dtsi                    |   89 ++++++++
+>  arch/arm/mach-tegra/Kconfig                        |   10 +
+>  arch/arm/mach-tegra/Makefile                       |    1 +
+>  arch/arm/mach-tegra/board-dt-tegra114.c            |   48 +++++
+>  arch/arm/mach-tegra/common.c                       |    1 +
+>  arch/arm/mach-tegra/fuse.h                         |    1 +
+>  arch/arm/mach-tegra/platsmp.c                      |   31 ++-
+>  arch/arm/mach-tegra/tegra30_clocks_data.c          |    2 +
+>  drivers/clocksource/tegra20_timer.c                |  222 +++++++++++++-------
+>  13 files changed, 384 insertions(+), 78 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+>  create mode 100644 arch/arm/boot/dts/tegra114-dalmore.dts
+>  create mode 100644 arch/arm/boot/dts/tegra114-pluto.dts
+>  create mode 100644 arch/arm/boot/dts/tegra114.dtsi
+>  create mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
+> 
