@@ -1,40 +1,26 @@
 From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 24 Dec 2012 07:46:59 +0100
-Subject: [PATCH 2/2] cpts: fix a run time warn_on.
-In-Reply-To: <50D7101A.6020506@mvista.com>
-References: <cover.1356204860.git.richardcochran@gmail.com>
- <ad26ca328f0eba6a722d0288ac1c37ad55789447.1356204860.git.richardcochran@gmail.com>
- <50D7101A.6020506@mvista.com>
-Message-ID: <20121224064658.GA2390@netboy.at.omicron.at>
+Date: Mon, 24 Dec 2012 08:19:08 +0100
+Subject: [PATCH v2 0/2] cpts fixes for v3.8-rc2
+Message-ID: <cover.1356331925.git.richardcochran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 23, 2012 at 06:07:22PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 22-12-2012 23:41, Richard Cochran wrote:
-> 
-> >This patch fixes a warning in clk_enable by calling clk_prepare first.
-> 
-> >Signed-off-by: Richard Cochran <richardcochran@gmail.com>
-> >---
-> >  drivers/net/ethernet/ti/cpts.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> >diff --git a/drivers/net/ethernet/ti/cpts.c b/drivers/net/ethernet/ti/cpts.c
-> >index 5ab8fb4..3e32a31 100644
-> >--- a/drivers/net/ethernet/ti/cpts.c
-> >+++ b/drivers/net/ethernet/ti/cpts.c
-> >@@ -247,6 +247,7 @@ static void cpts_clk_init(struct cpts *cpts)
-> >  		cpts->refclk = NULL;
-> >  		return;
-> >  	}
-> >+	clk_prepare(cpts->refclk);
-> >  	clk_enable(cpts->refclk);
-> 
->    Maybe just call clk_prepare_enable() instead?
+Changed in v2:
+Use clk_prepare_enable instead of clk_prepare + clk_enable.
 
-Okay, will fix in v2.
+The new cpts driver has two small issues, but it otherwise seems to be
+working in -rc1.
 
 Thanks,
 Richard
+
+Richard Cochran (2):
+  cpts: fix build error by removing useless code.
+  cpts: fix a run time warn_on.
+
+ drivers/net/ethernet/ti/cpts.c |    3 +--
+ drivers/net/ethernet/ti/cpts.h |    1 -
+ 2 files changed, 1 insertions(+), 3 deletions(-)
+
+-- 
+1.7.2.5
