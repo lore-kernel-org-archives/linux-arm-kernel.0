@@ -1,133 +1,191 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 24 Dec 2012 16:33:59 +0800
-Subject: [PATCH v3 2/7] usb: chipidea: add otg file
-In-Reply-To: <87mwy0ms6h.fsf@ashishki-desk.ger.corp.intel.com>
+Date: Mon, 24 Dec 2012 17:02:12 +0800
+Subject: [PATCH v3 3/7] usb: chipidea: add otg id switch and vbus
+ connect/disconnect detect
+In-Reply-To: <87k3t4mqh9.fsf@ashishki-desk.ger.corp.intel.com>
 References: <1353921068-15673-1-git-send-email-peter.chen@freescale.com>
- <1353921068-15673-3-git-send-email-peter.chen@freescale.com>
- <87mwy0ms6h.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20121224083357.GB21391@nchen-desktop>
+ <1353921068-15673-4-git-send-email-peter.chen@freescale.com>
+ <87k3t4mqh9.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20121224090211.GC21391@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2012 at 03:53:26PM +0200, Alexander Shishkin wrote:
+On Thu, Nov 29, 2012 at 04:30:10PM +0200, Alexander Shishkin wrote:
 > Peter Chen <peter.chen@freescale.com> writes:
 > 
-> > diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-> > index d738603..8702871 100644
-> > --- a/drivers/usb/chipidea/ci.h
-> > +++ b/drivers/usb/chipidea/ci.h
-> > @@ -129,6 +129,7 @@ struct hw_bank {
-> >   * @vbus_active: is VBUS active
-> >   * @transceiver: pointer to USB PHY, if any
-> >   * @hcd: pointer to usb_hcd for ehci host driver
-> > + * @otg: for otg support
-> >   */
-> >  struct ci13xxx {
-> >  	struct device			*dev;
-> > @@ -164,6 +165,7 @@ struct ci13xxx {
-> >  	bool				global_phy;
-> >  	struct usb_phy			*transceiver;
-> >  	struct usb_hcd			*hcd;
-> > +	struct usb_otg      otg;
-> 
-> Can you indent the "otg" so that it's aligned with the rest?
-will change
-> 
-> >  };
-> >  
-> >  static inline struct ci_role_driver *ci_role(struct ci13xxx *ci)
-> > diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-> > new file mode 100644
-> > index 0000000..7dea3b3
-> > --- /dev/null
-> > +++ b/drivers/usb/chipidea/otg.c
-> > @@ -0,0 +1,60 @@
-> > +/*
-> > + * otg.c - ChipIdea USB IP core OTG driver
-> > + *
-> > + * Copyright (C) 2012 Freescale Semiconductor, Inc.
-> > + *
-> > + * Author: Peter Chen
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/platform_device.h>
-> > +#include <linux/module.h>
-> > +#include <linux/io.h>
-> > +#include <linux/irq.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/slab.h>
-> 
-> Most of these look unnecessary.
-> 
-> > +#include <linux/usb/gadget.h>
-> > +#include <linux/usb/otg.h>
-> > +#include <linux/usb/chipidea.h>
-> > +
-> > +#include "ci.h"
-> > +#include "udc.h"
-> > +#include "bits.h"
-> > +#include "host.h"
-> > +#include "debug.h"
-> 
-> And these.
-will change
-> 
-> > +
-> > +static int ci_otg_set_peripheral(struct usb_otg *otg,
-> > +		struct usb_gadget *periph)
+> > +static void ci_otg_work(struct work_struct *work)
 > > +{
-> > +	otg->gadget = periph;
+> > +	struct ci13xxx *ci = container_of(work, struct ci13xxx, work);
 > > +
-> > +	return 0;
+> > +	if (test_bit(CI_ID, &ci->events)) {
+> > +		clear_bit(CI_ID, &ci->events);
+> > +		ci_handle_id_switch(ci);
+> > +	} else if (test_bit(CI_B_SESS_VALID, &ci->events)) {
+> > +		clear_bit(CI_B_SESS_VALID, &ci->events);
+> > +		ci_handle_vbus_change(ci);
+> > +	} else
+> > +		dev_err(ci->dev, "unexpected event occurs at %s\n", __func__);
+> > +
+> > +	enable_irq(ci->irq);
 > > +}
-> > +
-> > +static int ci_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
-> > +{
-> > +	otg->host = host;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +/**
-> > + * ci_hdrc_otg_init - initialize device related bits
-> > + * ci: the controller
-> > + *
-> > + * This function create otg struct, if the device can switch between
-> > + * device and host.
-> > + */
-> > +int ci_hdrc_otg_init(struct ci13xxx *ci)
-> > +{
-> > +	/* Useless at current */
-> > +	ci->otg.set_peripheral = ci_otg_set_peripheral;
-> > +	ci->otg.set_host = ci_otg_set_host;
-> > +	if (!IS_ERR_OR_NULL(ci->transceiver))
-> > +		ci->transceiver->otg = &ci->otg;
-> > +
-> > +	return 0;
-> > +}
-> > diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
-> > new file mode 100644
-> > index 0000000..b4c6b3e
-> > --- /dev/null
-> > +++ b/drivers/usb/chipidea/otg.h
-> > @@ -0,0 +1,6 @@
-> > +#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
-> > +#define __DRIVERS_USB_CHIPIDEA_OTG_H
-> > +
-> > +int ci_hdrc_otg_init(struct ci13xxx *ci);
 > 
-> Can you put it to ci.h instead?
+> if (ci->id) {
+> 	ci->id = false;
+> 	ci_handle_id_switch(ci);
+> } else if (ci->vbus_valid) {
+> 	ci->vbus_valid = false;
+> 	ci_handle_vbus_change(ci);
+> } ...
+> 
+> is so much easier on the eyes. We really don't have any reasons to have
+> events in a bitmask.
 
-I think we may have more complicated operation for otg, so keep one
-otg header is accepted, like host.h, udc.h.
+Ok, then I keep several flags (currently, it is two) as otg events.
+> > @@ -321,19 +422,36 @@ static irqreturn_t ci_irq(int irq, void *data)
+> >  	irqreturn_t ret = IRQ_NONE;
+> >  	u32 otgsc = 0;
+> >  
+> > -	if (ci->is_otg)
+> > -		otgsc = hw_read(ci, OP_OTGSC, ~0);
+> > -
+> > -	if (ci->role != CI_ROLE_END)
+> > -		ret = ci_role(ci)->irq(ci);
+> > +	otgsc = hw_read(ci, OP_OTGSC, ~0);
+> >  
+> > -	if (ci->is_otg && (otgsc & OTGSC_IDIS)) {
+> > +	/*
+> > +	 * Handle id change interrupt, it indicates device/host function
+> > +	 * switch.
+> > +	 */
+> > +	if (ci->is_otg && (otgsc & OTGSC_IDIE) && (otgsc & OTGSC_IDIS)) {
+> > +		set_bit(CI_ID, &ci->events);
+> >  		hw_write(ci, OP_OTGSC, OTGSC_IDIS, OTGSC_IDIS);
 > 
-> Thanks,
-> --
-> Alex
+> A thought: we're setting and unsetting IDIS/IDIE and BSVIS/BSVIE that we
+> might use a helper function for it.
+ci_clear_otg_status/ci_enable_otg_interrupt/ci_disable_otg_interrupt?
+
+> 
+> >  		disable_irq_nosync(ci->irq);
+> >  		queue_work(ci->wq, &ci->work);
+> > -		ret = IRQ_HANDLED;
+> > +		return IRQ_HANDLED;
+> > +	}
+> > +
+> > +	/*
+> > +	 * Handle vbus change interrupt, it indicates device connection
+> > +	 * and disconnection events.
+> > +	 */
+> > +	if ((otgsc & OTGSC_BSVIE) && (otgsc & OTGSC_BSVIS)) {
+> > +		set_bit(CI_B_SESS_VALID, &ci->events);
+> > +		hw_write(ci, OP_OTGSC, OTGSC_BSVIS, OTGSC_BSVIS);
+> > +		disable_irq_nosync(ci->irq);
+> > +		queue_work(ci->wq, &ci->work);
+> > +		return IRQ_HANDLED;
+> >  	}
+> >  
+> > +	/* Handle device/host interrupt */
+> > +	if (ci->role != CI_ROLE_END)
+> > +		ret = ci_role(ci)->irq(ci);
+> > +
+> >  	return ret;
+> >  }
+> >  
+> > @@ -397,6 +515,7 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+> >  	struct resource	*res;
+> >  	void __iomem	*base;
+> >  	int		ret;
+> > +	u32		otgsc;
+> >  
+> >  	if (!dev->platform_data) {
+> >  		dev_err(dev, "platform data missing\n");
+> > @@ -421,6 +540,7 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+> >  		return -ENOMEM;
+> >  	}
+> >  
+> > +	ci->events = 0;
+> 
+> "ci" has just been kzalloc'ed.
+will change.
+> 
+> >  	ci->dev = dev;
+> >  	ci->platdata = dev->platform_data;
+> >  	if (ci->platdata->phy)
+> > @@ -442,12 +562,20 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+> >  		return -ENODEV;
+> >  	}
+> >  
+> > -	INIT_WORK(&ci->work, ci_role_work);
+> > +	INIT_WORK(&ci->work, ci_otg_work);
+> > +	INIT_DELAYED_WORK(&ci->dwork, ci_delayed_work);
+> >  	ci->wq = create_singlethread_workqueue("ci_otg");
+> >  	if (!ci->wq) {
+> >  		dev_err(dev, "can't create workqueue\n");
+> >  		return -ENODEV;
+> >  	}
+> > +	/* Disable all interrupts bits */
+> > +	hw_write(ci, OP_USBINTR, 0xffffffff, 0);
+> > +	hw_write(ci, OP_OTGSC, OTGSC_INT_EN_BITS, 0);
+> > +
+> > +	/* Clear all interrupts status bits*/
+> > +	hw_write(ci, OP_USBSTS, 0xffffffff, 0xffffffff);
+> > +	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, OTGSC_INT_STATUS_BITS);
+> 
+> How about moving these to hw_device_init()?
+
+Good idea
+> 
+> >  
+> >  	/* initialize role(s) before the interrupt is requested */
+> >  	ret = ci_hdrc_host_init(ci);
+> > @@ -465,6 +593,7 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+> >  	}
+> >  
+> >  	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
+> > +		dev_dbg(dev, "support otg\n");
+> >  		ci->is_otg = true;
+> >  		/* ID pin needs 1ms debouce time, we delay 2ms for safe */
+> >  		mdelay(2);
+> > @@ -475,13 +604,29 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+> >  			: CI_ROLE_GADGET;
+> >  	}
+> >  
+> > +	if (ci->is_otg)
+> > +		/* if otg is supported, create struct usb_otg */
+> > +		ci_hdrc_otg_init(ci);
+> 
+> Can this just go the same block where is_otg is set?
+Will change
+> 
+> > +
+> >  	ret = ci_role_start(ci, ci->role);
+> >  	if (ret) {
+> > -		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+> > +		dev_err(dev, "can't start %s role, ret=%d\n",
+> > +				ci_role(ci)->name, ret);
+> 
+> This change is not really related to the rest of the patch.
+It just adds return value output, it can let the user know what kinds of
+error occurs during the ci_role_start, meanwhile, it is a small change,
+and not deserved a patch.
+> 
+> >  		ret = -ENODEV;
+> >  		goto rm_wq;
+> >  	}
+> >  
+> > +	otgsc = hw_read(ci, OP_OTGSC, ~0);
+> > +	/*
+> > +	 * if it is device mode:
+> > +	 * - Enable vbus detect
+> > +	 * - If it has already connected to host, notify udc
+> > +	 */
+> > +	if (ci->role == CI_ROLE_GADGET) {
+> > +		hw_write(ci, OP_OTGSC, OTGSC_BSVIE, OTGSC_BSVIE);
+> > +		ci_handle_vbus_change(ci);
+> > +	}
+> 
+> This looks like something that belongs to gadget role start, doesn't it?
+Yes, will change.
 > 
 
 -- 
