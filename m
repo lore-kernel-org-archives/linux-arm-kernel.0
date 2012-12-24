@@ -1,22 +1,26 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 24 Dec 2012 15:49:22 +0000
-Subject: [PATCH] ASoC: atmel-soc: make it buildable on other architectures
-In-Reply-To: <1354973002-13588-1-git-send-email-manabian@gmail.com>
-References: <1354973002-13588-1-git-send-email-manabian@gmail.com>
-Message-ID: <20121224154922.GI30837@opensource.wolfsonmicro.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 24 Dec 2012 09:40:52 -0700
+Subject: [PATCH V3 00/11] ARM: delete struct sys_timer
+In-Reply-To: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
+References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <50D88594.6060601@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 08, 2012 at 02:23:22PM +0100, Joachim Eastwood wrote:
-> Not very useful on non AT91/AVR32 platforms but it provides
-> more build coverage and prepares for ARM multiplatform.
+On 11/19/2012 11:30 AM, Stephen Warren wrote:
+> Russell, I'm mainly reposting this to see if you have any comments or
+> opinion, in particular on the core ARM changes.
+> 
+> The aim of this series is to remove ARM's struct sys_timer. As a pre-
+> cursor, this requires a little re-arrangement of arch_gettimeoffset and
+> associated changes to other architectures.
+> 
+> The full series can be found in git at:
 
-Applied, thanks.  Would be nice if this had a different subject line to
-the previous commit...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121224/4ef9cdec/attachment-0001.sig>
+(now at):
+git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+arm-timer-rework
+
+I have put this branch into the Tegra tree's for-next branch. Once the
+holidays are over, I'll send a pull request to get this into arm-soc as
+a baseline branch for others to build on.
