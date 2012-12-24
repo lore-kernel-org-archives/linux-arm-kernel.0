@@ -1,35 +1,50 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 23 Dec 2012 18:24:56 -0700
-Subject: [PATCH 0/3] ARM: OMAP: resolve sparse warnings with v3.8-rc1
-Message-ID: <20121224012304.13698.43551.stgit@dusk.lan>
+Date: Sun, 23 Dec 2012 18:25:00 -0700
+Subject: [PATCH 2/3] ARM: OMAP AM33xx: hwmod data: resolve sparse warnings
+In-Reply-To: <20121224012304.13698.43551.stgit@dusk.lan>
+References: <20121224012304.13698.43551.stgit@dusk.lan>
+Message-ID: <20121224012458.13698.43620.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another minor release, another new set of sparse warnings.  It would
-be good if patch submitters and mainline committers can verify that
-new patches don't add sparse warnings.  Otherwise it makes it harder
-for others to verify that their code is sparse-warning-free.
+Commit 70384a6af0914d5dcec034643941e29d3e3e69f7 ("ARM: OMAP3+:
+hwmod: Add AM33XX HWMOD data for davinci_mdio module") adds two
+new sparse warnings:
 
-- Paul
+arch/arm/mach-omap2/omap_hwmod_33xx_data.c:2518:30: warning: symbol 'am33xx_mdio_addr_space' was not declared. Should it be static?
+arch/arm/mach-omap2/omap_hwmod_33xx_data.c:2526:26: warning: symbol 'am33xx_cpgmac0__mdio' was not declared. Should it be static?
 
+Fix by marking the two new records as static.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Mugunthan V N <mugunthanvnm@ti.com>
+Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Peter Korsgaard <jacmet@sunsite.dk>
+Cc: Richard Cochran <richardcochran@gmail.com>
+Cc: David S. Miller <davem@davemloft.net>
 ---
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-sparse_fixes_a_3.8-rc
-   text	   data	    bss	    dec	    hex	filename
-7697036	 722268	5614832	14034136	 d624d8	vmlinux.omap2plus_defconfig.orig
-7697036	 722268	5614832	14034136	 d624d8	vmlinux.omap2plus_defconfig
-
-Paul Walmsley (3):
-      ARM: OMAP: 32k counter: resolve sparse warnings
-      ARM: OMAP AM33xx: hwmod data: resolve sparse warnings
-      ARM: OMAP: SRAM: resolve sparse warnings
-
-
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    4 ++-
- arch/arm/plat-omap/counter_32k.c           |    2 ++
- arch/arm/plat-omap/counter_32k.h           |   20 ++++++++++++++++
- arch/arm/plat-omap/sram.c                  |    2 ++
- arch/arm/plat-omap/sram.h                  |   35 ++++++++++++++++++++++++++++
- 5 files changed, 61 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/plat-omap/counter_32k.h
- create mode 100644 arch/arm/plat-omap/sram.h
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 081c71e..02ca493 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -2515,7 +2515,7 @@ static struct omap_hwmod_ocp_if am33xx_l4_hs__cpgmac0 = {
+ 	.user		= OCP_USER_MPU,
+ };
+ 
+-struct omap_hwmod_addr_space am33xx_mdio_addr_space[] = {
++static struct omap_hwmod_addr_space am33xx_mdio_addr_space[] = {
+ 	{
+ 		.pa_start	= 0x4A101000,
+ 		.pa_end		= 0x4A101000 + SZ_256 - 1,
+@@ -2523,7 +2523,7 @@ struct omap_hwmod_addr_space am33xx_mdio_addr_space[] = {
+ 	{ }
+ };
+ 
+-struct omap_hwmod_ocp_if am33xx_cpgmac0__mdio = {
++static struct omap_hwmod_ocp_if am33xx_cpgmac0__mdio = {
+ 	.master		= &am33xx_cpgmac0_hwmod,
+ 	.slave		= &am33xx_mdio_hwmod,
+ 	.addr		= am33xx_mdio_addr_space,
