@@ -1,27 +1,64 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 25 Dec 2012 15:13:47 +0530
-Subject: [PATCH] ARM: tegra: dts: add aliases and DMA requestor for serial
- controller
-In-Reply-To: <50D93AB6.7040905@wwwdotorg.org>
-References: <1355898671-3960-1-git-send-email-ldewangan@nvidia.com>
- <50D1F2CB.3090206@wwwdotorg.org> <50D2AD02.6060101@nvidia.com>
- <50D344E9.70305@wwwdotorg.org> <50D3E320.2090804@nvidia.com>
- <50D4CBB0.7080603@wwwdotorg.org> <50D614D9.8020106@nvidia.com>
- <50D93AB6.7040905@wwwdotorg.org>
-Message-ID: <50D97553.80001@nvidia.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Tue, 25 Dec 2012 18:26:02 +0800
+Subject: [PATCH] seria: sirf: only use lookup table to set baudrate when
+ ioclk=150MHz
+Message-ID: <1356431162-8372-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 December 2012 11:03 AM, Stephen Warren wrote:
-> On 12/22/2012 01:15 PM, Laxman Dewangan wrote:
->
->> This way it is straight
->> forward for the uart user to directly see the uart instance on board and
->> decide the port number rather than going to what are other uart and
->> their corresponding driver.
-> Still, there is some precedent in the kernel for your approach. So, I
-> guess we can go ahead with using the aliases as-is.
->
+From: Barry Song <Baohua.Song@csr.com>
 
-So can I assume this patch is fine and I need not to re-spin it for 
-removing aliases?
+The fast lookup table to set baudrate is only right when ioclk
+is 150MHz. for most platforms, ioclk is 150MHz, but some boards
+might set ioclk to other frequency.
+
+so re-calc the clk_div_reg when ioclk is not 150MHz.
+
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/tty/serial/sirfsoc_uart.c |   18 +++++++++++++-----
+ 1 files changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
+index 142217c..fe28b1f 100644
+--- a/drivers/tty/serial/sirfsoc_uart.c
++++ b/drivers/tty/serial/sirfsoc_uart.c
+@@ -375,7 +375,12 @@ static void sirfsoc_uart_set_termios(struct uart_port *port,
+ 	int		threshold_div;
+ 	int		temp;
+ 
+-	ioclk_rate = 150000000;
++	struct clk *clk = clk_get_sys("io", NULL);
++	BUG_ON(IS_ERR(clk));
++
++	ioclk_rate = clk_get_rate(clk);
++	clk_put(clk);
++
+ 	switch (termios->c_cflag & CSIZE) {
+ 	default:
+ 	case CS8:
+@@ -431,10 +436,13 @@ static void sirfsoc_uart_set_termios(struct uart_port *port,
+ 			sirfsoc_uart_disable_ms(port);
+ 	}
+ 
+-	/* common rate: fast calculation */
+-	for (ic = 0; ic < SIRF_BAUD_RATE_SUPPORT_NR; ic++)
+-		if (baud_rate == baudrate_to_regv[ic].baud_rate)
+-			clk_div_reg = baudrate_to_regv[ic].reg_val;
++	if (ioclk_rate == 150000000) {
++		/* common rate: fast calculation */
++		for (ic = 0; ic < SIRF_BAUD_RATE_SUPPORT_NR; ic++)
++			if (baud_rate == baudrate_to_regv[ic].baud_rate)
++				clk_div_reg = baudrate_to_regv[ic].reg_val;
++	}
++
+ 	setted_baud = baud_rate;
+ 	/* arbitary rate setting */
+ 	if (unlikely(clk_div_reg == 0))
+-- 
+1.7.5.4
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog@www.csr.com/blog
