@@ -1,41 +1,94 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 25 Dec 2012 10:07:52 -0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select IPUV3 driver
-Message-ID: <1356437272-1679-1-git-send-email-festevam@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 25 Dec 2012 21:00:53 +0800
+Subject: [PATCH 2/3] mmc: esdhc i.MX: Fix version register read
+In-Reply-To: <1348471345-30785-3-git-send-email-s.hauer@pengutronix.de>
+References: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
+ <1348471345-30785-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20121225130050.GD14088@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Sascha,
 
-Let IPUV3 driver be built by default.
+On Mon, Sep 24, 2012 at 09:22:24AM +0200, Sascha Hauer wrote:
+> The i.MX ESDHC controller version register is a mess:
+> 
+> - i.MX25 has a v1 controller which identifies itself as v2
+> - i.MX6Q has a v3 controller which identifies itself as v4
+> - i.MX35,51,53 have v2 controllers which identify themselves correctly
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+When looking at these a second time, I start doubting the statement
+about i.MX25.  Since i.MX25 is actually a newer SoC than i.MX35, it
+sounds unreasonable that i.MX35 runs a v2 controller while i.MX25 runs
+a v1.
+
+The confirmation from designer tells that i.MX25 runs a v2 controller
+too.  This also matches the statement of "SD Host Controller Standard
+Specification Version 2.0" listed in IMX25RM 23.1.1 Features chapter.
+You probably got the impression that i.MX25 has a v1 controller by
+reading the HOSTVER_SVN bit description.  While it says 0x00 - SD Host
+Specification Version 1.0, the register value is actually 0x01. 
+
+So the esdhc host version register indeed encodes the correct value
+for all i.MX SoCs except imx6q.  Thus, I prefer to replace the patch
+with the one below.
+
+Also I'm working on a big series to make esdhc driver more feature
+complete for imx6q, including 8bit support, so I would like to pick
+up your work from here.
+
+Shawn
+
+---8<------
+
+[PATCH] mmc: sdhci-esdhc-imx: fix host version read
+
+When commit 95a2482 (mmc: sdhci-esdhc-imx: add basic imx6q usdhc
+support) works around host version issue on imx6q, it gets the
+register address fixup "reg ^= 2" lost for imx25/35/51/53 esdhc.
+Thus, the controller version on these SoCs is wrongly identified
+as v1 while it's actually v2.
+
+Add the address fixup back and take a different approach to correct
+imx6q host version, so that the host version read gets back to work
+for all SoCs.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: <stable@vger.kernel.org>
 ---
- arch/arm/configs/imx_v6_v7_defconfig |    5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/mmc/host/sdhci-esdhc-imx.c |   19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 6966713..a613eb7 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -159,6 +159,7 @@ CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_SOC_CAMERA=y
- CONFIG_SOC_CAMERA_OV2640=y
-+CONFIG_DRM=y
- CONFIG_VIDEO_MX3=y
- CONFIG_FB=y
- CONFIG_LCD_PLATFORM=y
-@@ -200,6 +201,10 @@ CONFIG_RTC_DRV_MXC=y
- CONFIG_DMADEVICES=y
- CONFIG_IMX_SDMA=y
- CONFIG_MXS_DMA=y
-+CONFIG_STAGING=y
-+CONFIG_DRM_IMX=y
-+CONFIG_DRM_IMX_IPUV3_CORE=y
-+CONFIG_DRM_IMX_IPUV3=y
- CONFIG_COMMON_CLK_DEBUG=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index e07df81..b503113 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -237,15 +237,18 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 
+ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
+ {
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct pltfm_imx_data *imx_data = pltfm_host->priv;
++
+ 	if (unlikely(reg == SDHCI_HOST_VERSION)) {
+-		u16 val = readw(host->ioaddr + (reg ^ 2));
+-		/*
+-		 * uSDHC supports SDHCI v3.0, but it's encoded as value
+-		 * 0x3 in host controller version register, which violates
+-		 * SDHCI_SPEC_300 definition.  Work it around here.
+-		 */
+-		if ((val & SDHCI_SPEC_VER_MASK) == 3)
+-			return --val;
++		reg ^= 2;
++		if (is_imx6q_usdhc(imx_data)) {
++			/*
++			 * The usdhc register returns a wrong host version.
++			 * Correct it here.
++			 */
++			return SDHCI_SPEC_300;
++		}
+ 	}
+ 
+ 	return readw(host->ioaddr + reg);
 -- 
 1.7.9.5
