@@ -1,64 +1,48 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Tue, 25 Dec 2012 18:26:02 +0800
-Subject: [PATCH] seria: sirf: only use lookup table to set baudrate when
- ioclk=150MHz
-Message-ID: <1356431162-8372-1-git-send-email-Barry.Song@csr.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 25 Dec 2012 19:05:44 +0800
+Subject: [PATCH 1/2] ARM: dts: imx27-3ds: Rename it to imx27-pdk
+In-Reply-To: <1356190716-21254-1-git-send-email-festevam@gmail.com>
+References: <1356190716-21254-1-git-send-email-festevam@gmail.com>
+Message-ID: <20121225110541.GA14088@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On Sat, Dec 22, 2012 at 01:38:34PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> imx27-pdk is the name found on Freescale website, so use it instead of 3ds.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/{imx27-3ds.dts => imx27-pdk.dts} |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>  rename arch/arm/boot/dts/{imx27-3ds.dts => imx27-pdk.dts} (85%)
+> 
+> diff --git a/arch/arm/boot/dts/imx27-3ds.dts b/arch/arm/boot/dts/imx27-pdk.dts
+> similarity index 85%
+> rename from arch/arm/boot/dts/imx27-3ds.dts
+> rename to arch/arm/boot/dts/imx27-pdk.dts
+> index fa04c7b..860b6f2 100644
+> --- a/arch/arm/boot/dts/imx27-3ds.dts
+> +++ b/arch/arm/boot/dts/imx27-pdk.dts
+> @@ -13,8 +13,8 @@
+>  /include/ "imx27.dtsi"
+>  
+>  / {
+> -	model = "mx27_3ds";
+> -	compatible = "freescale,imx27-3ds", "fsl,imx27";
+> +	model = "Freescale i.MX27 Product Development Kit";
+> +	compatible = "freescale,imx27-pdk", "fsl,imx27";
 
-The fast lookup table to set baudrate is only right when ioclk
-is 150MHz. for most platforms, ioclk is 150MHz, but some boards
-might set ioclk to other frequency.
+Since you are there, you may want to change it to:
 
-so re-calc the clk_div_reg when ioclk is not 150MHz.
+	compatible = "fsl,imx27-pdk", "fsl,imx27";
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/tty/serial/sirfsoc_uart.c |   18 +++++++++++++-----
- 1 files changed, 13 insertions(+), 5 deletions(-)
+Shawn
 
-diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
-index 142217c..fe28b1f 100644
---- a/drivers/tty/serial/sirfsoc_uart.c
-+++ b/drivers/tty/serial/sirfsoc_uart.c
-@@ -375,7 +375,12 @@ static void sirfsoc_uart_set_termios(struct uart_port *port,
- 	int		threshold_div;
- 	int		temp;
- 
--	ioclk_rate = 150000000;
-+	struct clk *clk = clk_get_sys("io", NULL);
-+	BUG_ON(IS_ERR(clk));
-+
-+	ioclk_rate = clk_get_rate(clk);
-+	clk_put(clk);
-+
- 	switch (termios->c_cflag & CSIZE) {
- 	default:
- 	case CS8:
-@@ -431,10 +436,13 @@ static void sirfsoc_uart_set_termios(struct uart_port *port,
- 			sirfsoc_uart_disable_ms(port);
- 	}
- 
--	/* common rate: fast calculation */
--	for (ic = 0; ic < SIRF_BAUD_RATE_SUPPORT_NR; ic++)
--		if (baud_rate == baudrate_to_regv[ic].baud_rate)
--			clk_div_reg = baudrate_to_regv[ic].reg_val;
-+	if (ioclk_rate == 150000000) {
-+		/* common rate: fast calculation */
-+		for (ic = 0; ic < SIRF_BAUD_RATE_SUPPORT_NR; ic++)
-+			if (baud_rate == baudrate_to_regv[ic].baud_rate)
-+				clk_div_reg = baudrate_to_regv[ic].reg_val;
-+	}
-+
- 	setted_baud = baud_rate;
- 	/* arbitary rate setting */
- 	if (unlikely(clk_div_reg == 0))
--- 
-1.7.5.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog@www.csr.com/blog
+>  
+>  	memory {
+>  		reg = <0x0 0x0>;
+> -- 
+> 1.7.9.5
+> 
