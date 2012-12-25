@@ -1,28 +1,22 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 25 Dec 2012 22:10:23 +0800
-Subject: [PATCH 1/2] mxs timer: use ahbx bus clock to drive the timers on
- timrotv2
-In-Reply-To: <1356098776-10498-2-git-send-email-torbenh@linutronix.de>
-References: <1356098776-10498-1-git-send-email-torbenh@linutronix.de>
- <1356098776-10498-2-git-send-email-torbenh@linutronix.de>
-Message-ID: <20121225141020.GB25478@S2101-09.ap.freescale.net>
+Date: Tue, 25 Dec 2012 22:18:45 +0800
+Subject: [PATCH] ARM: dts: imx23-olinuxino: Fix IOMUX settings
+In-Reply-To: <1356372099-16134-1-git-send-email-festevam@gmail.com>
+References: <1356372099-16134-1-git-send-email-festevam@gmail.com>
+Message-ID: <20121225141843.GC25478@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 21, 2012 at 03:06:15PM +0100, Torben Hohn wrote:
-> timer resolution of ~32us is pretty low.
-> v2 has 32bits resolution, so we have quite some headroom, and
-> can use the 24MHz clock.
-> v1 has only 16bits, so we only increase v2.
+On Mon, Dec 24, 2012 at 04:01:39PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> So we just exchange the timrot clock in imx28.
-> On imx23 we have timrotv1 and everything stays the same.
+> On the imx23-olinuxino board GPIO2_1 is connected to the LED and GPIO0_17
+> is the USB PHY reset.
 > 
-> Signed-off-by: Torben Hohn <torbenh@linutronix.de>
+> So make the IOMUX assignment properly.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-1) s/ahbx/apbx on patch subject.
-2) The patch prefix should look like "ARM: mxs: ..."
-
-Fixed them and applied both patches.  Thanks.
+Applied, thanks.
 
 Shawn
