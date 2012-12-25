@@ -1,94 +1,206 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 25 Dec 2012 21:00:53 +0800
-Subject: [PATCH 2/3] mmc: esdhc i.MX: Fix version register read
-In-Reply-To: <1348471345-30785-3-git-send-email-s.hauer@pengutronix.de>
-References: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
- <1348471345-30785-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20121225130050.GD14088@S2101-09.ap.freescale.net>
+Date: Tue, 25 Dec 2012 21:23:06 +0800
+Subject: [PATCH] arm: mxs: Update mxs_defconfig
+In-Reply-To: <1356055651-27145-1-git-send-email-marex@denx.de>
+References: <1356055651-27145-1-git-send-email-marex@denx.de>
+Message-ID: <20121225132304.GA25478@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On Mon, Sep 24, 2012 at 09:22:24AM +0200, Sascha Hauer wrote:
-> The i.MX ESDHC controller version register is a mess:
+On Fri, Dec 21, 2012 at 03:07:31AM +0100, Marek Vasut wrote:
+> Regenerate the mxs_defconfig to match recent kernel using the following
+> commands:
 > 
-> - i.MX25 has a v1 controller which identifies itself as v2
-> - i.MX6Q has a v3 controller which identifies itself as v4
-> - i.MX35,51,53 have v2 controllers which identify themselves correctly
+> make mxs_defconfig
+> make savedefconfig
+> cp defconfig arch/arm/configs/mxs_defconfig
+> 
+> Then enable these features:
+> - MTD block access
+> - UBI and UBIFS
+> - JFFS2
+> - EXT2 and EXT4
+> - AT24 EEPROM support
+> - Support for most of the SPI flashes
+> - Support for ethernet PHYs that are usually used on mxs designs
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
-When looking at these a second time, I start doubting the statement
-about i.MX25.  Since i.MX25 is actually a newer SoC than i.MX35, it
-sounds unreasonable that i.MX35 runs a v2 controller while i.MX25 runs
-a v1.
+Applied with one comment below to Fabio.
 
-The confirmation from designer tells that i.MX25 runs a v2 controller
-too.  This also matches the statement of "SD Host Controller Standard
-Specification Version 2.0" listed in IMX25RM 23.1.1 Features chapter.
-You probably got the impression that i.MX25 has a v1 controller by
-reading the HOSTVER_SVN bit description.  While it says 0x00 - SD Host
-Specification Version 1.0, the register value is actually 0x01. 
+> ---
+>  arch/arm/configs/mxs_defconfig |   63 +++++++++++++++++++---------------------
+>  1 file changed, 30 insertions(+), 33 deletions(-)
+> 
+> NOTE: The SGTL5000 is enabled by default, it's not enabled by hand thus not
+>       listed above
+> 
+> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+> index 048aaca..9d30a6b 100644
+> --- a/arch/arm/configs/mxs_defconfig
+> +++ b/arch/arm/configs/mxs_defconfig
+> @@ -1,5 +1,7 @@
+>  CONFIG_EXPERIMENTAL=y
+>  CONFIG_SYSVIPC=y
+> +CONFIG_NO_HZ=y
+> +CONFIG_HIGH_RES_TIMERS=y
+>  CONFIG_TASKSTATS=y
+>  CONFIG_TASK_DELAY_ACCT=y
+>  CONFIG_TASK_XACCT=y
+> @@ -8,7 +10,6 @@ CONFIG_IKCONFIG=y
+>  CONFIG_IKCONFIG_PROC=y
+>  # CONFIG_UTS_NS is not set
+>  # CONFIG_IPC_NS is not set
+> -# CONFIG_USER_NS is not set
+>  # CONFIG_PID_NS is not set
+>  # CONFIG_NET_NS is not set
+>  CONFIG_PERF_EVENTS=y
+> @@ -24,8 +25,6 @@ CONFIG_BLK_DEV_INTEGRITY=y
+>  CONFIG_ARCH_MXS=y
+>  CONFIG_MACH_MXS_DT=y
+>  # CONFIG_ARM_THUMB is not set
+> -CONFIG_NO_HZ=y
+> -CONFIG_HIGH_RES_TIMERS=y
+>  CONFIG_PREEMPT_VOLUNTARY=y
+>  CONFIG_AEABI=y
+>  CONFIG_AUTO_ZRELADDR=y
+> @@ -46,23 +45,31 @@ CONFIG_SYN_COOKIES=y
+>  CONFIG_CAN=m
+>  CONFIG_CAN_RAW=m
+>  CONFIG_CAN_BCM=m
+> -CONFIG_CAN_DEV=m
+>  CONFIG_CAN_FLEXCAN=m
+>  # CONFIG_WIRELESS is not set
+>  CONFIG_DEVTMPFS=y
+>  # CONFIG_FIRMWARE_IN_KERNEL is not set
+> -# CONFIG_BLK_DEV is not set
+>  CONFIG_MTD=y
+> +CONFIG_MTD_CMDLINE_PARTS=y
+>  CONFIG_MTD_CHAR=y
+> +CONFIG_MTD_BLOCK=y
+>  CONFIG_MTD_DATAFLASH=y
+> -CONFIG_MTD_M25P80
+> +CONFIG_MTD_M25P80=y
 
-So the esdhc host version register indeed encodes the correct value
-for all i.MX SoCs except imx6q.  Thus, I prefer to replace the patch
-with the one below.
+Fabio,
 
-Also I'm working on a big series to make esdhc driver more feature
-complete for imx6q, including 8bit support, so I would like to pick
-up your work from here.
+I do not think it's reasonable to ask Marek to drop this change from
+his patch, as the change is probably included here because of
+savedefconfig.  So I will have to drop your patch below.  Sorry.
+
+[PATCH] ARM: mxs_defconfig: Fix MTD_M25P80 selection
+http://article.gmane.org/gmane.linux.ports.arm.kernel/203788
 
 Shawn
 
----8<------
-
-[PATCH] mmc: sdhci-esdhc-imx: fix host version read
-
-When commit 95a2482 (mmc: sdhci-esdhc-imx: add basic imx6q usdhc
-support) works around host version issue on imx6q, it gets the
-register address fixup "reg ^= 2" lost for imx25/35/51/53 esdhc.
-Thus, the controller version on these SoCs is wrongly identified
-as v1 while it's actually v2.
-
-Add the address fixup back and take a different approach to correct
-imx6q host version, so that the host version read gets back to work
-for all SoCs.
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: <stable@vger.kernel.org>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index e07df81..b503113 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -237,15 +237,18 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 
- static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
- {
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+
- 	if (unlikely(reg == SDHCI_HOST_VERSION)) {
--		u16 val = readw(host->ioaddr + (reg ^ 2));
--		/*
--		 * uSDHC supports SDHCI v3.0, but it's encoded as value
--		 * 0x3 in host controller version register, which violates
--		 * SDHCI_SPEC_300 definition.  Work it around here.
--		 */
--		if ((val & SDHCI_SPEC_VER_MASK) == 3)
--			return --val;
-+		reg ^= 2;
-+		if (is_imx6q_usdhc(imx_data)) {
-+			/*
-+			 * The usdhc register returns a wrong host version.
-+			 * Correct it here.
-+			 */
-+			return SDHCI_SPEC_300;
-+		}
- 	}
- 
- 	return readw(host->ioaddr + reg);
--- 
-1.7.9.5
+> +# CONFIG_M25PXX_USE_FAST_READ is not set
+> +CONFIG_MTD_SST25L=y
+>  CONFIG_MTD_NAND=y
+>  CONFIG_MTD_NAND_GPMI_NAND=y
+> +CONFIG_MTD_UBI=y
+> +# CONFIG_BLK_DEV is not set
+> +CONFIG_EEPROM_AT24=y
+> +CONFIG_SCSI=y
+> +CONFIG_BLK_DEV_SD=y
+>  CONFIG_NETDEVICES=y
+> -CONFIG_NET_ETHERNET=y
+>  CONFIG_ENC28J60=y
+> -# CONFIG_NETDEV_1000 is not set
+> -# CONFIG_NETDEV_10000 is not set
+> +CONFIG_SMSC_PHY=y
+> +CONFIG_ICPLUS_PHY=y
+> +CONFIG_REALTEK_PHY=y
+> +CONFIG_MICREL_PHY=y
+>  # CONFIG_WLAN is not set
+>  # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+>  CONFIG_INPUT_EVDEV=m
+> @@ -89,21 +96,6 @@ CONFIG_SPI_MXS=y
+>  CONFIG_DEBUG_GPIO=y
+>  CONFIG_GPIO_SYSFS=y
+>  # CONFIG_HWMON is not set
+> -# CONFIG_MFD_SUPPORT is not set
+> -CONFIG_DISPLAY_SUPPORT=m
+> -# CONFIG_HID_SUPPORT is not set
+> -CONFIG_SOUND=y
+> -CONFIG_SND=y
+> -CONFIG_SND_TIMER=y
+> -CONFIG_SND_PCM=y
+> -CONFIG_SND_JACK=y
+> -CONFIG_SND_DRIVERS=y
+> -CONFIG_SND_ARM=y
+> -CONFIG_SND_SOC=y
+> -CONFIG_SND_MXS_SOC=y
+> -CONFIG_SND_SOC_MXS_SGTL5000=y
+> -CONFIG_SND_SOC_I2C_AND_SPI=y
+> -CONFIG_SND_SOC_SGTL5000=y
+>  CONFIG_REGULATOR=y
+>  CONFIG_REGULATOR_FIXED_VOLTAGE=y
+>  CONFIG_FB=y
+> @@ -115,13 +107,16 @@ CONFIG_BACKLIGHT_PWM=y
+>  CONFIG_FRAMEBUFFER_CONSOLE=y
+>  CONFIG_FONTS=y
+>  CONFIG_LOGO=y
+> +CONFIG_SOUND=y
+> +CONFIG_SND=y
+> +CONFIG_SND_SOC=y
+> +CONFIG_SND_MXS_SOC=y
+> +CONFIG_SND_SOC_MXS_SGTL5000=y
+>  CONFIG_USB=y
+>  CONFIG_USB_CHIPIDEA=y
+>  CONFIG_USB_CHIPIDEA_HOST=y
+>  CONFIG_USB_STORAGE=y
+>  CONFIG_USB_MXS_PHY=y
+> -CONFIG_SCSI=y
+> -CONFIG_BLK_DEV_SD=y
+>  CONFIG_MMC=y
+>  CONFIG_MMC_MXS=y
+>  CONFIG_NEW_LEDS=y
+> @@ -145,16 +140,23 @@ CONFIG_COMMON_CLK_DEBUG=y
+>  CONFIG_IIO=y
+>  CONFIG_PWM=y
+>  CONFIG_PWM_MXS=y
+> +CONFIG_EXT2_FS=y
+> +CONFIG_EXT2_FS_XATTR=y
+>  CONFIG_EXT3_FS=y
+> +CONFIG_EXT4_FS=y
+>  # CONFIG_DNOTIFY is not set
+>  CONFIG_FSCACHE=m
+>  CONFIG_FSCACHE_STATS=y
+>  CONFIG_CACHEFILES=m
+>  CONFIG_TMPFS=y
+>  CONFIG_TMPFS_POSIX_ACL=y
+> -# CONFIG_MISC_FILESYSTEMS is not set
+> +CONFIG_JFFS2_FS=y
+> +CONFIG_JFFS2_COMPRESSION_OPTIONS=y
+> +CONFIG_JFFS2_LZO=y
+> +CONFIG_JFFS2_RUBIN=y
+> +CONFIG_UBIFS_FS=y
+> +CONFIG_UBIFS_FS_ADVANCED_COMPR=y
+>  CONFIG_NFS_FS=y
+> -CONFIG_NFS_V3=y
+>  CONFIG_NFS_V3_ACL=y
+>  CONFIG_NFS_V4=y
+>  CONFIG_ROOT_NFS=y
+> @@ -164,17 +166,12 @@ CONFIG_MAGIC_SYSRQ=y
+>  CONFIG_UNUSED_SYMBOLS=y
+>  CONFIG_DEBUG_KERNEL=y
+>  CONFIG_LOCKUP_DETECTOR=y
+> -CONFIG_DETECT_HUNG_TASK=y
+>  CONFIG_TIMER_STATS=y
+>  CONFIG_PROVE_LOCKING=y
+> -CONFIG_DEBUG_SPINLOCK_SLEEP=y
+>  CONFIG_DEBUG_INFO=y
+> -CONFIG_SYSCTL_SYSCALL_CHECK=y
+>  CONFIG_BLK_DEV_IO_TRACE=y
+>  CONFIG_STRICT_DEVMEM=y
+>  CONFIG_DEBUG_USER=y
+> -CONFIG_CRYPTO=y
+> -CONFIG_CRYPTO_CRC32C=m
+>  # CONFIG_CRYPTO_ANSI_CPRNG is not set
+>  # CONFIG_CRYPTO_HW is not set
+>  CONFIG_CRC_ITU_T=m
+> -- 
+> 1.7.10.4
+> 
