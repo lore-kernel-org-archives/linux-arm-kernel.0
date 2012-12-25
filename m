@@ -1,27 +1,51 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 25 Dec 2012 21:52:14 +0530
-Subject: [PATCH 1/3] ARM: OMAP: 32k counter: resolve sparse warnings
-In-Reply-To: <20121224012456.13698.41839.stgit@dusk.lan>
-References: <20121224012304.13698.43551.stgit@dusk.lan>
- <20121224012456.13698.41839.stgit@dusk.lan>
-Message-ID: <50D9D2B6.4060906@ti.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 25 Dec 2012 21:53:32 +0300
+Subject: [PATCH] seria: sirf: only use lookup table to set baudrate when
+ ioclk=150MHz
+In-Reply-To: <1356431162-8372-1-git-send-email-Barry.Song@csr.com>
+References: <1356431162-8372-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <50D9F62C.6010601@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 December 2012 06:54 AM, Paul Walmsley wrote:
-> Commit 1fe97c8f6a1de67a5f56e029a818903d5bed8017 ("ARM: OMAP: Make OMAP
-> clocksource source selection using kernel param") results in a new warning
-> from sparse:
->
-> arch/arm/plat-omap/counter_32k.c:86:12: warning: symbol 'omap_init_clocksource_32k' was not declared. Should it be static?
->
-> Fix by adding a temporary header file, needed until the 32k counter
-> code is moved to drivers/.
-> arch/arm/plat-omap/include/plat/counter-32k.h can't be added due to
-> ARM CONFIG_ARCH_MULTIPLATFORM restrictions on the use of the "plat/"
-> include path shortcut.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Hello.
 
-Looks good to my eyes.
-Acked-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
+On 12/25/2012 01:26 PM, Barry Song wrote:
+
+> From: Barry Song <Baohua.Song@csr.com>
+
+> The fast lookup table to set baudrate is only right when ioclk
+> is 150MHz. for most platforms, ioclk is 150MHz, but some boards
+> might set ioclk to other frequency.
+
+> so re-calc the clk_div_reg when ioclk is not 150MHz.
+
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  drivers/tty/serial/sirfsoc_uart.c |   18 +++++++++++++-----
+>  1 files changed, 13 insertions(+), 5 deletions(-)
+
+> diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
+> index 142217c..fe28b1f 100644
+> --- a/drivers/tty/serial/sirfsoc_uart.c
+> +++ b/drivers/tty/serial/sirfsoc_uart.c
+> @@ -375,7 +375,12 @@ static void sirfsoc_uart_set_termios(struct uart_port *port,
+>  	int		threshold_div;
+>  	int		temp;
+>  
+> -	ioclk_rate = 150000000;
+> +	struct clk *clk = clk_get_sys("io", NULL);
+
+   Please keep the coding style and insert emoty line here; you can also remove
+preceding empty line (not to break the declaration block).
+
+> +	BUG_ON(IS_ERR(clk));
+> +
+> +	ioclk_rate = clk_get_rate(clk);
+> +	clk_put(clk);
+> +
+>  	switch (termios->c_cflag & CSIZE) {
+>  	default:
+>  	case CS8:
+
+WBR, Sergei
