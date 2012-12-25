@@ -1,90 +1,110 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 24 Dec 2012 22:33:42 -0700
-Subject: [PATCH] ARM: tegra: dts: add aliases and DMA requestor for serial
- controller
-In-Reply-To: <50D614D9.8020106@nvidia.com>
-References: <1355898671-3960-1-git-send-email-ldewangan@nvidia.com>
- <50D1F2CB.3090206@wwwdotorg.org> <50D2AD02.6060101@nvidia.com>
- <50D344E9.70305@wwwdotorg.org> <50D3E320.2090804@nvidia.com>
- <50D4CBB0.7080603@wwwdotorg.org> <50D614D9.8020106@nvidia.com>
-Message-ID: <50D93AB6.7040905@wwwdotorg.org>
+From: Barry.Song@csr.com (Barry Song)
+Date: Tue, 25 Dec 2012 17:32:04 +0800
+Subject: [PATCH] serial: sirf: add support for new SiRFmarco SMP SoC
+Message-ID: <1356427924-7785-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2012 01:15 PM, Laxman Dewangan wrote:
-> On Saturday 22 December 2012 02:20 AM, Stephen Warren wrote:
->> On 12/20/2012 09:18 PM, Laxman Dewangan wrote:
->>> On Thursday 20 December 2012 10:33 PM, Stephen Warren wrote:
->>>> On 12/19/2012 11:15 PM, Laxman Dewangan wrote:
->>>>> On Wednesday 19 December 2012 10:30 PM, Stephen Warren wrote:
->>>>>> On 12/18/2012 11:31 PM, Laxman Dewangan wrote:
->>>>>>> Add APB DMA requestor and serial aliases for serial controller.
->>>>>>> There will be two serial driver i.e. 8250 based simple serial driver
->>>>>>> and APB DMA based serial driver for higher baudrate and performace.
->> ...
->>>>>> This patch seems to do two things:
->> ...
->>>>>> 2) Add aliases for the serial ports. I have no idea why this is
->>>>>> useful.
->>>>> Serial aliases are added because we want to get the port number like
->>>>> /dev/ttyTHS0,  /d/ttyTHS2 etc. The uarta should be /dev/ttyTHS0 and
->>>>> uartc should be /dev/ttyTHS2. The port number can be found using
->>>>> aliases
->>>>> and of_alias_get_id() in driver file:
->>>>>
->>>>> port_number = of_alias_get_id(np, "serial");
->>>> Oh, I see. I guess the aliases make sense then.
->>>>
->>>> But, wouldn't you only add aliases for the specific UARTs that are in
->>>> use on a particular board (so put them in tegraNN-board.dts) rather
->>>> than
->>>> all UARTs on Tegra (i.e. the current patch which puts them into
->>>> tegraNN.dtsi)?
->>> I like to have this in tegraN N.dtsi file becasue:
->>> - This policy is not going to change the board to board. For high speed
->>> driver the uarta will be ttyTHS0 and uartb ttyTHS1.
->> Sure it is. Since the board files select which UARTs use the low-speed
->> driver vs. the high-speed driver by overriding the compatible value,
->> each board will have a different subset of UARTs which use the high
->> speed driver and hence which use the aliases. Don't you want to end up
->> with /dev/ttyHS0 on each board, rather than ending up with a "random"
->> device node name depending on which UART the board designer picked for
->> the high speed device?
-> 
-> We had this in past where we started the high speed driver always from 0
-> like in one board uartc become ttyHS0 and another board uarta become
-> ttyHS0 and uartc become ttyHS1.
-> This confused more to other team (BT and modem team) as they need to
-> know all uart instance and their corresponding driver.  So we kept uarta
+From: Barry Song <Baohua.Song@csr.com>
 
-That doesn't really make sense; The BT and MODEM team should only care
-about the specific UARTs they use.
+CSR SiRFmarco's UART IP is same with SiRFprimaII except that
+it has two more uart ports.
+this patch makes the old driver support new SiRFmarco as well:
+1. add .compatible = "sirf,marco-uart" to OF match table
+2. add two ports in the port table
+3. take spin_lock in isr to avoid the conflict of threads opening
+uart on CPU1 and isr running on CPU0.
+For 3, we did see some problems on SiRFmarco as SiRFmarco is a
+SMP SoC but the old SiRFprimaII is UP.
 
-> will be always 0 and uartc will be always 2.
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/tty/serial/sirfsoc_uart.c |   19 +++++++++++++++++++
+ drivers/tty/serial/sirfsoc_uart.h |    2 +-
+ 2 files changed, 20 insertions(+), 1 deletions(-)
 
-That seems a little unlikely; why can't different boards use different
-UARTs for different purposes; after all, UARTA is often a debug UART not
-a BT or MODEM UART.
+diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
+index 5da5cb9..142217c 100644
+--- a/drivers/tty/serial/sirfsoc_uart.c
++++ b/drivers/tty/serial/sirfsoc_uart.c
+@@ -75,6 +75,20 @@ static struct sirfsoc_uart_port sirfsoc_uart_ports[SIRFSOC_UART_NR] = {
+ 			.line		= 2,
+ 		},
+ 	},
++	[3] = {
++		.port = {
++			.iotype		= UPIO_MEM,
++			.flags		= UPF_BOOT_AUTOCONF,
++			.line		= 3,
++		},
++	},
++	[4] = {
++		.port = {
++			.iotype		= UPIO_MEM,
++			.flags		= UPF_BOOT_AUTOCONF,
++			.line		= 4,
++		},
++	},
+ };
+ 
+ static inline struct sirfsoc_uart_port *to_sirfport(struct uart_port *port)
+@@ -245,6 +259,7 @@ static irqreturn_t sirfsoc_uart_isr(int irq, void *dev_id)
+ 	struct uart_port *port = &sirfport->port;
+ 	struct uart_state *state = port->state;
+ 	struct circ_buf *xmit = &port->state->xmit;
++	spin_lock(&port->lock);
+ 	intr_status = rd_regl(port, SIRFUART_INT_STATUS);
+ 	wr_regl(port, SIRFUART_INT_STATUS, intr_status);
+ 	intr_status &= rd_regl(port, SIRFUART_INT_EN);
+@@ -254,6 +269,7 @@ static irqreturn_t sirfsoc_uart_isr(int irq, void *dev_id)
+ 				goto recv_char;
+ 			uart_insert_char(port, intr_status,
+ 					SIRFUART_RX_OFLOW, 0, TTY_BREAK);
++			spin_unlock(&port->lock);
+ 			return IRQ_HANDLED;
+ 		}
+ 		if (intr_status & SIRFUART_RX_OFLOW)
+@@ -286,6 +302,7 @@ recv_char:
+ 		sirfsoc_uart_pio_rx_chars(port, SIRFSOC_UART_IO_RX_MAX_CNT);
+ 	if (intr_status & SIRFUART_TX_INT_EN) {
+ 		if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
++			spin_unlock(&port->lock);
+ 			return IRQ_HANDLED;
+ 		} else {
+ 			sirfsoc_uart_pio_tx_chars(sirfport,
+@@ -296,6 +313,7 @@ recv_char:
+ 				sirfsoc_uart_stop_tx(port);
+ 		}
+ 	}
++	spin_unlock(&port->lock);
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -729,6 +747,7 @@ static int sirfsoc_uart_resume(struct platform_device *pdev)
+ 
+ static struct of_device_id sirfsoc_uart_ids[] = {
+ 	{ .compatible = "sirf,prima2-uart", },
++	{ .compatible = "sirf,marco-uart", },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, sirfsoc_serial_of_match);
+diff --git a/drivers/tty/serial/sirfsoc_uart.h b/drivers/tty/serial/sirfsoc_uart.h
+index 6e207fd..6431640 100644
+--- a/drivers/tty/serial/sirfsoc_uart.h
++++ b/drivers/tty/serial/sirfsoc_uart.h
+@@ -139,7 +139,7 @@
+ #define SIRFSOC_UART_MINOR			0
+ #define SIRFUART_PORT_NAME			"sirfsoc-uart"
+ #define SIRFUART_MAP_SIZE			0x200
+-#define SIRFSOC_UART_NR				3
++#define SIRFSOC_UART_NR				5
+ #define SIRFSOC_PORT_TYPE			0xa5
+ 
+ /* Baud Rate Calculation */
+-- 
+1.7.5.4
 
-> This way it is straight
-> forward for the uart user to directly see the uart instance on board and
-> decide the port number rather than going to what are other uart and
-> their corresponding driver.
 
-Still, there is some precedent in the kernel for your approach. So, I
-guess we can go ahead with using the aliases as-is.
 
-Your approach breaks down in the following scenarios though:
-
-a) Somebody (random customer board designer or SW engineer, who NVIDIA
-can't control) wants the console UART to always have alias serial0;
-there are examples of this in the kernel. On just the boards we support
-upstream, some use UART A for the debug/console and some use UART D. I
-know of others that use UART B.
-
-b) The board contains UARTs (e.g. PCIe) that aren't the Tegra-internal
-UARTs, so the alias IDs can't all map to Tegra UART IDs.
-
-c) Conceptually, the purpose of aliases seems to be to provide useful
-names (numbers) for the relevant ports, and naming/numbering
-non-existent ports doesn't seem particularly useful.
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
