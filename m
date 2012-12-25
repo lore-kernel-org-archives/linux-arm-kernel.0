@@ -1,22 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 25 Dec 2012 22:18:45 +0800
-Subject: [PATCH] ARM: dts: imx23-olinuxino: Fix IOMUX settings
-In-Reply-To: <1356372099-16134-1-git-send-email-festevam@gmail.com>
-References: <1356372099-16134-1-git-send-email-festevam@gmail.com>
-Message-ID: <20121225141843.GC25478@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 25 Dec 2012 21:52:14 +0530
+Subject: [PATCH 1/3] ARM: OMAP: 32k counter: resolve sparse warnings
+In-Reply-To: <20121224012456.13698.41839.stgit@dusk.lan>
+References: <20121224012304.13698.43551.stgit@dusk.lan>
+ <20121224012456.13698.41839.stgit@dusk.lan>
+Message-ID: <50D9D2B6.4060906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 24, 2012 at 04:01:39PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> On the imx23-olinuxino board GPIO2_1 is connected to the LED and GPIO0_17
-> is the USB PHY reset.
-> 
-> So make the IOMUX assignment properly.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Monday 24 December 2012 06:54 AM, Paul Walmsley wrote:
+> Commit 1fe97c8f6a1de67a5f56e029a818903d5bed8017 ("ARM: OMAP: Make OMAP
+> clocksource source selection using kernel param") results in a new warning
+> from sparse:
+>
+> arch/arm/plat-omap/counter_32k.c:86:12: warning: symbol 'omap_init_clocksource_32k' was not declared. Should it be static?
+>
+> Fix by adding a temporary header file, needed until the 32k counter
+> code is moved to drivers/.
+> arch/arm/plat-omap/include/plat/counter-32k.h can't be added due to
+> ARM CONFIG_ARCH_MULTIPLATFORM restrictions on the use of the "plat/"
+> include path shortcut.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
 
-Applied, thanks.
-
-Shawn
+Looks good to my eyes.
+Acked-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
