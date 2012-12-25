@@ -1,22 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 25 Dec 2012 20:05:38 +0800
-Subject: [PATCH v2 1/2] ARM: dts: imx27-3ds: Rename it to imx27-pdk
-In-Reply-To: <1356433852-3028-1-git-send-email-festevam@gmail.com>
-References: <1356433852-3028-1-git-send-email-festevam@gmail.com>
-Message-ID: <20121225120535.GC14088@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 25 Dec 2012 10:07:52 -0200
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select IPUV3 driver
+Message-ID: <1356437272-1679-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 25, 2012 at 09:10:51AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> imx27-pdk is the name found on Freescale website, so use it instead of 3ds.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Use 'fsl' instead of 'freescale' in the compatible field.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I assume Sascha will pick them up, so for both:
+Let IPUV3 driver be built by default.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 6966713..a613eb7 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -159,6 +159,7 @@ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_OV2640=y
++CONFIG_DRM=y
+ CONFIG_VIDEO_MX3=y
+ CONFIG_FB=y
+ CONFIG_LCD_PLATFORM=y
+@@ -200,6 +201,10 @@ CONFIG_RTC_DRV_MXC=y
+ CONFIG_DMADEVICES=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_MXS_DMA=y
++CONFIG_STAGING=y
++CONFIG_DRM_IMX=y
++CONFIG_DRM_IMX_IPUV3_CORE=y
++CONFIG_DRM_IMX_IPUV3=y
+ CONFIG_COMMON_CLK_DEBUG=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_EXT2_FS=y
+-- 
+1.7.9.5
