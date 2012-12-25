@@ -1,29 +1,28 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 25 Dec 2012 11:27:54 -0200
-Subject: [PATCH] arm: mxs: Update mxs_defconfig
-In-Reply-To: <20121225132304.GA25478@S2101-09.ap.freescale.net>
-References: <1356055651-27145-1-git-send-email-marex@denx.de>
- <20121225132304.GA25478@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5BhtUY38WpF5Y3GBCwrYA5aZ5Ds01sqHY3xebDX3D2Tog@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 25 Dec 2012 22:10:23 +0800
+Subject: [PATCH 1/2] mxs timer: use ahbx bus clock to drive the timers on
+ timrotv2
+In-Reply-To: <1356098776-10498-2-git-send-email-torbenh@linutronix.de>
+References: <1356098776-10498-1-git-send-email-torbenh@linutronix.de>
+ <1356098776-10498-2-git-send-email-torbenh@linutronix.de>
+Message-ID: <20121225141020.GB25478@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 25, 2012 at 11:23 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Fri, Dec 21, 2012 at 03:06:15PM +0100, Torben Hohn wrote:
+> timer resolution of ~32us is pretty low.
+> v2 has 32bits resolution, so we have quite some headroom, and
+> can use the 24MHz clock.
+> v1 has only 16bits, so we only increase v2.
+> 
+> So we just exchange the timrot clock in imx28.
+> On imx23 we have timrotv1 and everything stays the same.
+> 
+> Signed-off-by: Torben Hohn <torbenh@linutronix.de>
 
-> Fabio,
->
-> I do not think it's reasonable to ask Marek to drop this change from
-> his patch, as the change is probably included here because of
-> savedefconfig.  So I will have to drop your patch below.  Sorry.
->
-> [PATCH] ARM: mxs_defconfig: Fix MTD_M25P80 selection
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/203788
+1) s/ahbx/apbx on patch subject.
+2) The patch prefix should look like "ARM: mxs: ..."
 
-No problem, Shawn.
+Fixed them and applied both patches.  Thanks.
 
-Marek's patch is complete and fix the issue from my previous patch, so
-it makes sense to use only Marek's patch instead.
-
-Regards,
-
-Fabio Estevam
+Shawn
