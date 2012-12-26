@@ -1,32 +1,36 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Dec 2012 01:34:29 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the pinctrl tree
-In-Reply-To: <027101cddf2c$b4f2f9b0$1ed8ed10$@samsung.com>
-References: <20121221132014.0bf8772fb3e48c51cec1548a@canb.auug.org.au>
- <027101cddf2c$b4f2f9b0$1ed8ed10$@samsung.com>
-Message-ID: <CACRpkdb50D+PMNf9sPTGUs9fsE-QOP0aWB+_aQ6ZpqLuFkvjUg@mail.gmail.com>
+Date: Wed, 26 Dec 2012 01:43:47 +0100
+Subject: [PATCH] ARM: VIC: use irq_domain_add_simple()
+In-Reply-To: <CACRpkdbtn4Pz3uLCxDGOBSVW7vfLECf2UZkT5+X9ip1ZZFb8Lw@mail.gmail.com>
+References: <1350392786-29191-1-git-send-email-linus.walleij@stericsson.com>
+ <507D61E7.2080704@gmail.com>
+ <CACxGe6tBLfj3CDDZAfGmznj3B-h4OfJsrRc+85w9fnxFH6Cd_Q@mail.gmail.com>
+ <CACRpkdbtn4Pz3uLCxDGOBSVW7vfLECf2UZkT5+X9ip1ZZFb8Lw@mail.gmail.com>
+Message-ID: <CACRpkdb=neoRkCmTVyrAoiP4JTU4GqEZG727JAU6J_bot+DSqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 21, 2012 at 4:38 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Stephen Rothwell wrote:
->>
->> Hi all,
->>
->> Today's linux-next merge of the arm-soc tree got conflicts in
->> drivers/pinctrl/pinctrl-exynos5440.c and
->> drivers/pinctrl/pinctrl-samsung.c between commit e5b4c9d4ab55 ("pinctrl:
->> exynos5440: Fix compile error in pinctrl-exynos5440/samsung.c") from the
->> pinctrl tree and commit d5fd5da290ce ("pinctrl: exynos5440/samsung:
->> Staticize pcfgs") from the arm-soc tree.
->>
-> Oops, the commit d5fd5da290ce already sent to Linus Torvalds via arm-soc
-> tree today. In addition, I applied with Linus Walleij's ack ;-)
+On Thu, Dec 20, 2012 at 7:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Dec 19, 2012 at 12:34 AM, Grant Likely
+> <grant.likely@secretlab.ca> wrote:
 >
-> Linus Walleij, please drop the patch in your tree. Sorry I didn't notify
-> about that when I got the patch from Choi.
+>> It looks to me like the below patch breaks versatile because it makes
+>> it try to register a linear irq_domain instead of the legacy one that
+>> it needs. Here are the relevant commits:
+>>
+>> 07c9249f1: "ARM: 7554/1: VIC: use irq_domain_add_simple()"
+>> 946c59a08: "ARM: vic: fix build warning caused by previous commit"
+>>
+>> I'm working on getting it properly sorted out (and more importantly
+>> *simplified*), but in the mean time I think the above two commits need
+>> to be reverted. Reverting them on my tree fixes booting for me.
+>
+> Isn't that a bit violent, can't we just fix the real bug?
+>
+> Does the below patch work for you, it does two things:
 
-OK dropped it, sorry for the delay...
+I've submitted the fixes to Russell's patch tracker now ... would
+appreciate some testing but I'm pretty sure they will fix the issue.
 
 Yours,
 Linus Walleij
