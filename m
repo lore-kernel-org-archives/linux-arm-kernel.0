@@ -1,112 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 26 Dec 2012 22:27:42 +0800
-Subject: [PATCH V7 2/7] ARM: dt: change .dtb build rules to build in dts
- directory
-In-Reply-To: <1354058956-7199-2-git-send-email-swarren@wwwdotorg.org>
-References: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
- <1354058956-7199-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20121226142739.GA28980@S2101-09.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Dec 2012 15:04:33 +0000
+Subject: [PATCH] seria: sirf: only use lookup table to set baudrate
+ when ioclk=150MHz
+In-Reply-To: <1356431162-8372-1-git-send-email-Barry.Song@csr.com>
+References: <1356431162-8372-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <20121226150433.GB24604@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2012 at 04:29:11PM -0700, Stephen Warren wrote:
-> From: Grant Likely <grant.likely@secretlab.ca>
-> 
-> The current rules have the .dtb files build in a different directory
-> from the .dts files. The only reason for this is that it was what
-> PowerPC has done historically. This patch changes ARM to use the generic
-> dtb rule which builds .dtb files in the same directory as the source .dts.
-> 
-It's a pity that after merging the patch, all the enabled dts files
-will be rebuilt anyway no matter whether they are actually changed
-or not.
+On Tue, Dec 25, 2012 at 06:26:02PM +0800, Barry Song wrote:
+> @@ -375,7 +375,12 @@ static void sirfsoc_uart_set_termios(struct uart_port *port,
+>  	int		threshold_div;
+>  	int		temp;
+>  
+> -	ioclk_rate = 150000000;
+> +	struct clk *clk = clk_get_sys("io", NULL);
+> +	BUG_ON(IS_ERR(clk));
 
-Shawn
+No.  Really, no.  Stop using BUG_ON() as some kind of crappy assert().
+BUG_ON() takes the entire kernel out when it fails.  There's absolutely
+no need for this what so ever - especially here.
 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> [swarren: added rm command for old stale .dtb files]
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> v7: New patch.
-> ---
->  arch/arm/Makefile          |    4 ++--
->  arch/arm/boot/Makefile     |   12 ------------
->  arch/arm/boot/dts/Makefile |    8 ++++++++
->  3 files changed, 10 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 1ec5f67..5f92252 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -291,10 +291,10 @@ zinstall uinstall install: vmlinux
->  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
->  
->  %.dtb: scripts
-> -	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-> +	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
->  
->  dtbs: scripts
-> -	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-> +	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) dtbs
->  
->  # We use MRPROPER_FILES and CLEAN_FILES now
->  archclean:
-> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-> index 9137df5..abfce28 100644
-> --- a/arch/arm/boot/Makefile
-> +++ b/arch/arm/boot/Makefile
-> @@ -15,8 +15,6 @@ ifneq ($(MACHINE),)
->  include $(srctree)/$(MACHINE)/Makefile.boot
->  endif
->  
-> -include $(srctree)/arch/arm/boot/dts/Makefile
-> -
->  # Note: the following conditions must always be true:
->  #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
->  #   PARAMS_PHYS must be within 4MB of ZRELADDR
-> @@ -59,16 +57,6 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
->  
->  endif
->  
-> -targets += $(dtb-y)
-> -
-> -# Rule to build device tree blobs
-> -$(obj)/%.dtb: $(src)/dts/%.dts FORCE
-> -	$(call if_changed_dep,dtc)
-> -
-> -$(obj)/dtbs: $(addprefix $(obj)/, $(dtb-y))
-> -
-> -clean-files := *.dtb
-> -
->  ifneq ($(LOADADDR),)
->    UIMAGE_LOADADDR=$(LOADADDR)
->  else
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a17d5ab..cb217f8 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -136,4 +136,12 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
->  	wm8650-mid.dtb
->  dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
->  
-> +targets += dtbs
->  endif
-> +
-> +dtbs: $(addprefix $(obj)/, $(dtb-y))
-> +	# *.dtb used to be generated in the directory above. Clean out the
-> +	# old build results so people don't accidentally use them.
-> +	rm -f $(obj)/../*.dtb
-> +
-> +clean-files := *.dtb
-> -- 
-> 1.7.10.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Get the clock at probe or port initialization time.  Save that pointer.
+Only give it up when the port is torn down.  And treat it as any other
+clock - prepare and enable it, and disable and unprepare it when you're
+done with it.
+
+And there's no need to use this clk_get_sys() crap in drivers.  Add the
+necessary clkdev entries or deal with it in DT.  Absolutely do not use
+clk_get_sys() in drivers; it's there for *PLATFORM* code to use when
+there's no other possibility for them and NOT drivers.
