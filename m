@@ -1,36 +1,52 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Dec 2012 01:43:47 +0100
-Subject: [PATCH] ARM: VIC: use irq_domain_add_simple()
-In-Reply-To: <CACRpkdbtn4Pz3uLCxDGOBSVW7vfLECf2UZkT5+X9ip1ZZFb8Lw@mail.gmail.com>
-References: <1350392786-29191-1-git-send-email-linus.walleij@stericsson.com>
- <507D61E7.2080704@gmail.com>
- <CACxGe6tBLfj3CDDZAfGmznj3B-h4OfJsrRc+85w9fnxFH6Cd_Q@mail.gmail.com>
- <CACRpkdbtn4Pz3uLCxDGOBSVW7vfLECf2UZkT5+X9ip1ZZFb8Lw@mail.gmail.com>
-Message-ID: <CACRpkdb=neoRkCmTVyrAoiP4JTU4GqEZG727JAU6J_bot+DSqQ@mail.gmail.com>
+Date: Wed, 26 Dec 2012 01:51:05 +0100
+Subject: [PATCH 4/4 v2] net/smsc911x: Provide common clock functionality
+In-Reply-To: <20121221114105.GP2691@gmail.com>
+References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
+ <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
+ <CACRpkda79O_b3Z8g7Sy7vMtW9neZU4x-Z=iEQgjqu4X5tFKyhw@mail.gmail.com>
+ <20121220192441.GC14363@n2100.arm.linux.org.uk>
+ <20121220203514.GN2691@gmail.com>
+ <20121220205113.GD14363@n2100.arm.linux.org.uk>
+ <20121221091306.GO2691@gmail.com>
+ <20121221092421.GG14363@n2100.arm.linux.org.uk>
+ <20121221114105.GP2691@gmail.com>
+Message-ID: <CACRpkdZGC=f0X1wLt1QLMB=x+ba6VRDAbRcW6wR_2gvNLuGw1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 7:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Dec 19, 2012 at 12:34 AM, Grant Likely
-> <grant.likely@secretlab.ca> wrote:
->
->> It looks to me like the below patch breaks versatile because it makes
->> it try to register a linear irq_domain instead of the legacy one that
->> it needs. Here are the relevant commits:
->>
->> 07c9249f1: "ARM: 7554/1: VIC: use irq_domain_add_simple()"
->> 946c59a08: "ARM: vic: fix build warning caused by previous commit"
->>
->> I'm working on getting it properly sorted out (and more importantly
->> *simplified*), but in the mean time I think the above two commits need
->> to be reverted. Reverting them on my tree fixes booting for me.
->
-> Isn't that a bit violent, can't we just fix the real bug?
->
-> Does the below patch work for you, it does two things:
+On Fri, Dec 21, 2012 at 12:41 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I've submitted the fixes to Russell's patch tracker now ... would
-appreciate some testing but I'm pretty sure they will fix the issue.
+> +       if (IS_ERR(pdata->clk)) {
+> +               ret = clk_prepare_enable(pdata->clk);
+> +               if (ret < 0)
+> +                       netdev_err(ndev, "failed to enable clock %d\n", ret);
+> +       }
+
+I think you got all of these backwards now, shouldn't it be if
+(!IS_ERR(pdata->clk)) { } ...?
+
+It's late here but enlighten me if I don't get it.
+
+> +       if (IS_ERR(pdata->clk))
+> +               clk_disable_unprepare(pdata->clk);
+
+Dito.
+
+> +       /* Request clock */
+> +       pdata->clk = clk_get(&pdev->dev, NULL);
+> +       if (IS_ERR(pdata->clk))
+> +               netdev_warn(ndev, "couldn't get clock %li\n", PTR_ERR(pdata->clk));
+
+This one seems correct though.
+
+> +       /* Free clock */
+> +       if (IS_ERR(pdata->clk)) {
+> +               clk_put(pdata->clk);
+> +               pdata->clk = NULL;
+> +       }
+
+Should be !IS_ERR()
 
 Yours,
 Linus Walleij
