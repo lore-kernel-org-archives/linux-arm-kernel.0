@@ -1,29 +1,29 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Wed, 26 Dec 2012 09:40:20 +0530
-Subject: [PATCH 2/3] ARM: OMAP AM33xx: hwmod data: resolve sparse warnings
-In-Reply-To: <20121224012458.13698.43620.stgit@dusk.lan>
-References: <20121224012304.13698.43551.stgit@dusk.lan>
- <20121224012458.13698.43620.stgit@dusk.lan>
-Message-ID: <50DA78AC.9090601@ti.com>
+Date: Wed, 26 Dec 2012 09:42:28 +0530
+Subject: [PATCH v2 0/2] cpts fixes for v3.8-rc2
+In-Reply-To: <cover.1356331925.git.richardcochran@gmail.com>
+References: <cover.1356331925.git.richardcochran@gmail.com>
+Message-ID: <50DA792C.1070603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/24/2012 6:55 AM, Paul Walmsley wrote:
-> Commit 70384a6af0914d5dcec034643941e29d3e3e69f7 ("ARM: OMAP3+:
-> hwmod: Add AM33XX HWMOD data for davinci_mdio module") adds two
-> new sparse warnings:
+On 12/24/2012 12:49 PM, Richard Cochran wrote:
+> Changed in v2:
+> Use clk_prepare_enable instead of clk_prepare + clk_enable.
 >
-> arch/arm/mach-omap2/omap_hwmod_33xx_data.c:2518:30: warning: symbol 'am33xx_mdio_addr_space' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_33xx_data.c:2526:26: warning: symbol 'am33xx_cpgmac0__mdio' was not declared. Should it be static?
+> The new cpts driver has two small issues, but it otherwise seems to be
+> working in -rc1.
 >
-> Fix by marking the two new records as static.
+> Thanks,
+> Richard
 >
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Mugunthan V N <mugunthanvnm@ti.com>
-> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Peter Korsgaard <jacmet@sunsite.dk>
-> Cc: Richard Cochran <richardcochran@gmail.com>
-> Cc: David S. Miller <davem@davemloft.net>
+> Richard Cochran (2):
+>    cpts: fix build error by removing useless code.
+>    cpts: fix a run time warn_on.
+>
+>   drivers/net/ethernet/ti/cpts.c |    3 +--
+>   drivers/net/ethernet/ti/cpts.h |    1 -
+>   2 files changed, 1 insertions(+), 3 deletions(-)
 >
 Looks good to me.
 Acked-by : Mugunthan V N <mugunthanvnm@ti.com>
