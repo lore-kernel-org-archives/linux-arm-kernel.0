@@ -1,38 +1,36 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Wed, 26 Dec 2012 10:48:34 +0800
-Subject: [PATCH 2/2] spi: sirf: add support for new SiRFmarco SMP SoC
-In-Reply-To: <1356490114-18022-1-git-send-email-Barry.Song@csr.com>
-References: <1356490114-18022-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1356490114-18022-2-git-send-email-Barry.Song@csr.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 26 Dec 2012 10:56:04 +0800
+Subject: [PATCH 3/3] mmc: esdhc i.MX: Support 8bit mode
+In-Reply-To: <m3fw66legd.fsf@pullcord.laptop.org>
+References: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
+ <1348471345-30785-4-git-send-email-s.hauer@pengutronix.de>
+ <20120925071505.GG27291@S2101-09.ap.freescale.net>
+ <20120925072714.GY1322@pengutronix.de>
+ <20120925073317.GI27291@S2101-09.ap.freescale.net>
+ <20120925073808.GZ1322@pengutronix.de>
+ <m3k3vilety.fsf@pullcord.laptop.org>
+ <20120925075309.GL27291@S2101-09.ap.freescale.net>
+ <m3fw66legd.fsf@pullcord.laptop.org>
+Message-ID: <20121226025601.GF25478@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On Tue, Sep 25, 2012 at 04:00:18AM -0400, Chris Ball wrote:
+> Hi,
+> 
+> On Tue, Sep 25 2012, Shawn Guo wrote:
+> > On Tue, Sep 25, 2012 at 03:52:09AM -0400, Chris Ball wrote:
+> >> We could also break the stalemate by just changing the common spec to
+> >> have bus-width become optional, default 4.  It's not going to break the
+> >> code of anyone who's been treating it as required.  I don't think there
+> >> there was a principled reason behind making it required.
+> >> 
+> > That would be the best :)
+> 
+> Ah, but sdhci-s3c and dw_mmc have been assuming that bus-width defaults
+> 1 when it's not supplied.  That's going to make it complicated.
+> 
+Okay, we will do the same for esdhc driver, and also submit a change to
+the common binding to make it clear.
 
-the driver is also compatible with SiRFmarco except SiRFprimaII,
-so simply add "sirf,marco-spi" to OF match table.
-
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/spi/spi-sirf.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-index 38a191c..09ca0e3 100644
---- a/drivers/spi/spi-sirf.c
-+++ b/drivers/spi/spi-sirf.c
-@@ -659,6 +659,7 @@ static const struct dev_pm_ops spi_sirfsoc_pm_ops = {
- 
- static const struct of_device_id spi_sirfsoc_of_match[] = {
- 	{ .compatible = "sirf,prima2-spi", },
-+	{ .compatible = "sirf,marco-spi", },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, sirfsoc_spi_of_match);
--- 
-1.7.5.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Shawn
