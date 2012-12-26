@@ -1,36 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 26 Dec 2012 10:56:04 +0800
-Subject: [PATCH 3/3] mmc: esdhc i.MX: Support 8bit mode
-In-Reply-To: <m3fw66legd.fsf@pullcord.laptop.org>
-References: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
- <1348471345-30785-4-git-send-email-s.hauer@pengutronix.de>
- <20120925071505.GG27291@S2101-09.ap.freescale.net>
- <20120925072714.GY1322@pengutronix.de>
- <20120925073317.GI27291@S2101-09.ap.freescale.net>
- <20120925073808.GZ1322@pengutronix.de>
- <m3k3vilety.fsf@pullcord.laptop.org>
- <20120925075309.GL27291@S2101-09.ap.freescale.net>
- <m3fw66legd.fsf@pullcord.laptop.org>
-Message-ID: <20121226025601.GF25478@S2101-09.ap.freescale.net>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Wed, 26 Dec 2012 09:40:20 +0530
+Subject: [PATCH 2/3] ARM: OMAP AM33xx: hwmod data: resolve sparse warnings
+In-Reply-To: <20121224012458.13698.43620.stgit@dusk.lan>
+References: <20121224012304.13698.43551.stgit@dusk.lan>
+ <20121224012458.13698.43620.stgit@dusk.lan>
+Message-ID: <50DA78AC.9090601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 04:00:18AM -0400, Chris Ball wrote:
-> Hi,
-> 
-> On Tue, Sep 25 2012, Shawn Guo wrote:
-> > On Tue, Sep 25, 2012 at 03:52:09AM -0400, Chris Ball wrote:
-> >> We could also break the stalemate by just changing the common spec to
-> >> have bus-width become optional, default 4.  It's not going to break the
-> >> code of anyone who's been treating it as required.  I don't think there
-> >> there was a principled reason behind making it required.
-> >> 
-> > That would be the best :)
-> 
-> Ah, but sdhci-s3c and dw_mmc have been assuming that bus-width defaults
-> 1 when it's not supplied.  That's going to make it complicated.
-> 
-Okay, we will do the same for esdhc driver, and also submit a change to
-the common binding to make it clear.
-
-Shawn
+On 12/24/2012 6:55 AM, Paul Walmsley wrote:
+> Commit 70384a6af0914d5dcec034643941e29d3e3e69f7 ("ARM: OMAP3+:
+> hwmod: Add AM33XX HWMOD data for davinci_mdio module") adds two
+> new sparse warnings:
+>
+> arch/arm/mach-omap2/omap_hwmod_33xx_data.c:2518:30: warning: symbol 'am33xx_mdio_addr_space' was not declared. Should it be static?
+> arch/arm/mach-omap2/omap_hwmod_33xx_data.c:2526:26: warning: symbol 'am33xx_cpgmac0__mdio' was not declared. Should it be static?
+>
+> Fix by marking the two new records as static.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Mugunthan V N <mugunthanvnm@ti.com>
+> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+> Cc: Peter Korsgaard <jacmet@sunsite.dk>
+> Cc: Richard Cochran <richardcochran@gmail.com>
+> Cc: David S. Miller <davem@davemloft.net>
+>
+Looks good to me.
+Acked-by : Mugunthan V N <mugunthanvnm@ti.com>
