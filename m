@@ -1,50 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 26 Dec 2012 19:42:03 +0100
-Subject: [GIT PULLv2] Fixes for sunXi for 3.8
-Message-ID: <50DB44FB.30603@free-electrons.com>
+From: tobetter@gmail.com (Dongjin Kim)
+Date: Thu, 27 Dec 2012 03:42:20 +0900
+Subject: [PATCH 1/2] ARM: dts: Add EHCI device tree node for Exynos4
+In-Reply-To: <1356547341-23620-1-git-send-email-tobetter@gmail.com>
+References: <1356547341-23620-1-git-send-email-tobetter@gmail.com>
+Message-ID: <1356547341-23620-2-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+This patch adds EHCI device node on device tree for Exynos4 and defines its
+default platform data, s5p_usb_phy_init and s5p_usb_phy_exit, so that those
+function can be called from the driver.
 
-Here is the two fixes I sent previously rebased on top of 3.8-rc1.
+Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi         |    7 +++++++
+ arch/arm/mach-exynos/mach-exynos4-dt.c |    9 +++++++++
+ 2 files changed, 16 insertions(+)
 
-The first one add the support for the sunxi architecture in the multiplatform
-kernel, allowing to easily build a kernel that boots on the sun4i/sun5i
-supported boards.
-
-The second one fixes some compatible strings that were left behind in the
-previous compatible renaming patch, preventing the kernel from booting.
-
-Thanks,
-Maxime
-
-The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
-
-  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
-
-are available in the git repository at:
-
-  git://github.com/mripard/linux.git tags/sunxi-fixes-for-3.8-rc2
-
-for you to fetch changes up to 43880f709dc59840849e31b01735ac587195ef8a:
-
-  sunxi: Change the machine compatible string. (2012-12-23 18:20:15 +0100)
-
-----------------------------------------------------------------
-Fixes for the sunxi core to be merged in 3.8-rc2
-
-----------------------------------------------------------------
-Maxime Ripard (2):
-      ARM: multi_v7_defconfig: Add ARCH_SUNXI
-      sunxi: Change the machine compatible string.
-
- arch/arm/configs/multi_v7_defconfig |    1 +
- arch/arm/mach-sunxi/sunxi.c         |    4 ++--
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 92bca86..df1a9f0 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -140,6 +140,13 @@
+ 		status = "disabled";
+ 	};
+ 
++	ehci at 12580000 {
++		compatible = "samsung,exynos-ehci";
++		reg = <0x12580000 0x100>;
++		interrupts = <0 70 0>;
++		status = "disabled";
++	};
++
+ 	serial at 13800000 {
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13800000 0x100>;
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index 92757ff..c8a23f0 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/of_platform.h>
+ #include <linux/serial_core.h>
++#include <linux/platform_data/usb-ehci-s5p.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/gic.h>
+@@ -20,9 +21,15 @@
+ 
+ #include <plat/cpu.h>
+ #include <plat/regs-serial.h>
++#include <plat/usb-phy.h>
+ 
+ #include "common.h"
+ 
++static struct s5p_ehci_platdata s5p_ehci_platdata = {
++	.phy_init = s5p_usb_phy_init,
++	.phy_exit = s5p_usb_phy_exit,
++};
++
+ /*
+  * The following lookup table is used to override device names when devices
+  * are registered from device tree. This is temporarily added to enable
+@@ -80,6 +87,8 @@ static const struct of_dev_auxdata exynos4_auxdata_lookup[] __initconst = {
+ 	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_MDMA1, "dma-pl330.2", NULL),
+ 	OF_DEV_AUXDATA("samsung,exynos4210-tmu", EXYNOS4_PA_TMU,
+ 				"exynos-tmu", NULL),
++	OF_DEV_AUXDATA("samsung,exynos-ehci", EXYNOS4_PA_EHCI,
++				"s5p-ehci", &s5p_ehci_platdata),
+ 	{},
+ };
+ 
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
