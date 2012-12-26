@@ -1,40 +1,68 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 26 Dec 2012 06:31:13 +0000
-Subject: [PATCH 09/10] ARM: OMAP2+: clockdomain: convert existing atomic
- usecounts into spinlock-protected shorts/ints
-In-Reply-To: <20121209012342.19716.66436.stgit@dusk.lan>
-References: <20121209011755.19716.25244.stgit@dusk.lan>
- <20121209012342.19716.66436.stgit@dusk.lan>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECA6D3D@DBDE01.ent.ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 26 Dec 2012 16:00:27 +0800
+Subject: [PATCH v4 1/5] ARM: Add interface for registering and calling
+ firmware-specific operations
+In-Reply-To: <1353599478-24617-2-git-send-email-t.figa@samsung.com>
+References: <1353599478-24617-1-git-send-email-t.figa@samsung.com>
+ <1353599478-24617-2-git-send-email-t.figa@samsung.com>
+Message-ID: <CAGsJ_4xhE0dXmesBfZPgajeEUTWkO594rjy8qTKsN3fZ7LZNaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+2012/11/22, Tomasz Figa <t.figa@samsung.com>:
+> Some boards are running with secure firmware running in TrustZone secure
+> world, which changes the way some things have to be initialized.
+>
+> This patch adds an interface for platforms to specify available firmware
+> operations and call them.
+>
+> A wrapper macro, call_firmware_op(), checks if the operation is provided
+> and calls it if so, otherwise returns -ENOSYS to allow fallback to
+> legacy operation..
+>
+> By default no operations are provided.
+>
+> Example of use:
+>
+> In code using firmware ops:
+>
+> 	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+> 		CPU1_BOOT_REG);
+>
+> 	/* Call Exynos specific smc call */
+> 	if (call_firmware_op(cpu_boot, cpu) == -ENOSYS)
+> 		cpu_boot_legacy(...); /* Try legacy way */
+>
+> 	gic_raise_softirq(cpumask_of(cpu), 1);
+>
+> In board-/platform-specific code:
+>
+> 	static int platformX_do_idle(void)
+> 	{
+> 		/* tell platformX firmware to enter idle */
+> 	        return 0;
+> 	}
+>
+> 	static int platformX_cpu_boot(int i)
+> 	{
+> 		/* tell platformX firmware to boot CPU i */
+> 		return 0;
+> 	}
+>
+> 	static const struct firmware_ops platformX_firmware_ops = {
+> 		.do_idle	= exynos_do_idle,
+> 		.cpu_boot	= exynos_cpu_boot,
+> 		/* other operations not available on platformX */
+> 	};
 
-On Sun, Dec 09, 2012 at 06:53:43, Paul Walmsley wrote:
-> The atomic usecounts seem to be confusing, and are no longer needed
-> since the operations that they are attached to really should take
-> place under lock.  Replace the atomic counters with simple integers,
-> protected by the enclosing powerdomain spinlock.
-[...]
->  
-> @@ -1063,7 +1123,8 @@ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
->  	 * should be called for every clock instance or hwmod that is
->  	 * enabled, so the clkdm can be force woken up.
->  	 */
-> -	if ((atomic_inc_return(&clkdm->usecount) > 1) && autodeps) {
-> +	clkdm->usecount++;
-> +	if (clkdm->usecount > 1 && autodeps) {
->  		pwrdm_unlock(clkdm->pwrdm.ptr);
->  		return 0;
->  	}
+i am thinking the firmware_ops should be namespaced, some hardware has
+firmware, firmware_ops should not be using a global namespace here.
 
-This is not directly related to this patch but something I noticed when I enabled
-the various debug prints.
+>
+> 	static void __init board_init_early(void)
+> 	{
+> 	        register_firmware_ops(&platformX_firmware_ops);
+> 	}
+>
 
-if the clkdm->usecount is > 1, there is still a call to arch_clkdm->clkdm_clk_enable().
-Won't the usecount >1 guarantee that the clkdm is in the right state and the PRCM
-access can be skipped?
-
-Regards,
-Vaibhav
+-barry
