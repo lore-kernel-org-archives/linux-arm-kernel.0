@@ -1,27 +1,112 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Wed, 26 Dec 2012 19:26:16 +0530
-Subject: [PATCH v4] usb: phy: samsung: Add support to set pmu isolation
-In-Reply-To: <1356524912-4736-2-git-send-email-gautam.vivek@samsung.com>
-References: <1356524912-4736-1-git-send-email-gautam.vivek@samsung.com>
- <1356524912-4736-2-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <CAFp+6iEoy-d6gHBMAiNi0n+tE8iS7Hk=k92w8EWfT_r3eeN_UA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 26 Dec 2012 22:27:42 +0800
+Subject: [PATCH V7 2/7] ARM: dt: change .dtb build rules to build in dts
+ directory
+In-Reply-To: <1354058956-7199-2-git-send-email-swarren@wwwdotorg.org>
+References: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
+ <1354058956-7199-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20121226142739.GA28980@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Tue, Nov 27, 2012 at 04:29:11PM -0700, Stephen Warren wrote:
+> From: Grant Likely <grant.likely@secretlab.ca>
+> 
+> The current rules have the .dtb files build in a different directory
+> from the .dts files. The only reason for this is that it was what
+> PowerPC has done historically. This patch changes ARM to use the generic
+> dtb rule which builds .dtb files in the same directory as the source .dts.
+> 
+It's a pity that after merging the patch, all the enabled dts files
+will be rebuilt anyway no matter whether they are actually changed
+or not.
 
+Shawn
 
-On Wed, Dec 26, 2012 at 5:58 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> Adding support to parse device node data in order to get
-> required properties to set pmu isolation for usb-phy.
->
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> [swarren: added rm command for old stale .dtb files]
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
-
-Hope these changes align with what architectural changes you had suggested ?
-
-
-
--- 
-Thanks & Regards
-Vivek
+> v7: New patch.
+> ---
+>  arch/arm/Makefile          |    4 ++--
+>  arch/arm/boot/Makefile     |   12 ------------
+>  arch/arm/boot/dts/Makefile |    8 ++++++++
+>  3 files changed, 10 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 1ec5f67..5f92252 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -291,10 +291,10 @@ zinstall uinstall install: vmlinux
+>  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
+>  
+>  %.dtb: scripts
+> -	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+> +	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
+>  
+>  dtbs: scripts
+> -	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+> +	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) dtbs
+>  
+>  # We use MRPROPER_FILES and CLEAN_FILES now
+>  archclean:
+> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+> index 9137df5..abfce28 100644
+> --- a/arch/arm/boot/Makefile
+> +++ b/arch/arm/boot/Makefile
+> @@ -15,8 +15,6 @@ ifneq ($(MACHINE),)
+>  include $(srctree)/$(MACHINE)/Makefile.boot
+>  endif
+>  
+> -include $(srctree)/arch/arm/boot/dts/Makefile
+> -
+>  # Note: the following conditions must always be true:
+>  #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
+>  #   PARAMS_PHYS must be within 4MB of ZRELADDR
+> @@ -59,16 +57,6 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
+>  
+>  endif
+>  
+> -targets += $(dtb-y)
+> -
+> -# Rule to build device tree blobs
+> -$(obj)/%.dtb: $(src)/dts/%.dts FORCE
+> -	$(call if_changed_dep,dtc)
+> -
+> -$(obj)/dtbs: $(addprefix $(obj)/, $(dtb-y))
+> -
+> -clean-files := *.dtb
+> -
+>  ifneq ($(LOADADDR),)
+>    UIMAGE_LOADADDR=$(LOADADDR)
+>  else
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index a17d5ab..cb217f8 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -136,4 +136,12 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+>  	wm8650-mid.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
+>  
+> +targets += dtbs
+>  endif
+> +
+> +dtbs: $(addprefix $(obj)/, $(dtb-y))
+> +	# *.dtb used to be generated in the directory above. Clean out the
+> +	# old build results so people don't accidentally use them.
+> +	rm -f $(obj)/../*.dtb
+> +
+> +clean-files := *.dtb
+> -- 
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
