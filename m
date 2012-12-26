@@ -1,32 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Dec 2012 15:04:33 +0000
-Subject: [PATCH] seria: sirf: only use lookup table to set baudrate
- when ioclk=150MHz
-In-Reply-To: <1356431162-8372-1-git-send-email-Barry.Song@csr.com>
-References: <1356431162-8372-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <20121226150433.GB24604@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 26 Dec 2012 20:09:05 +0300
+Subject: [PATCH 2/2] spi: sirf: add support for new SiRFmarco SMP SoC
+In-Reply-To: <CAGsJ_4wp1KvfotmDHzTCU9bmEP5BKDAU=Z0qjvOXw6FoFYNNKQ@mail.gmail.com>
+References: <1356490114-18022-1-git-send-email-Barry.Song@csr.com>
+ <1356490114-18022-2-git-send-email-Barry.Song@csr.com>
+ <50DAE219.10806@mvista.com>
+ <CAGsJ_4wp1KvfotmDHzTCU9bmEP5BKDAU=Z0qjvOXw6FoFYNNKQ@mail.gmail.com>
+Message-ID: <50DB2F31.1000300@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 25, 2012 at 06:26:02PM +0800, Barry Song wrote:
-> @@ -375,7 +375,12 @@ static void sirfsoc_uart_set_termios(struct uart_port *port,
->  	int		threshold_div;
->  	int		temp;
->  
-> -	ioclk_rate = 150000000;
-> +	struct clk *clk = clk_get_sys("io", NULL);
-> +	BUG_ON(IS_ERR(clk));
+Hello.
 
-No.  Really, no.  Stop using BUG_ON() as some kind of crappy assert().
-BUG_ON() takes the entire kernel out when it fails.  There's absolutely
-no need for this what so ever - especially here.
+On 12/26/2012 03:32 PM, Barry Song wrote:
 
-Get the clock at probe or port initialization time.  Save that pointer.
-Only give it up when the port is torn down.  And treat it as any other
-clock - prepare and enable it, and disable and unprepare it when you're
-done with it.
+>>> From: Barry Song <Baohua.Song@csr.com>
 
-And there's no need to use this clk_get_sys() crap in drivers.  Add the
-necessary clkdev entries or deal with it in DT.  Absolutely do not use
-clk_get_sys() in drivers; it's there for *PLATFORM* code to use when
-there's no other possibility for them and NOT drivers.
+>>> the driver is also compatible with SiRFmarco except SiRFprimaII,
+>>> so simply add "sirf,marco-spi" to OF match table.
+
+>>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+
+>>     You've just posted this patch as a part of another 2-patch series.
+
+> no, this one is spi, the other one is i2c.
+
+   Sorry for the noise -- I was being blind (and goggles didn't help :-).
+
+> -barry
+
+WBR, Sergei
