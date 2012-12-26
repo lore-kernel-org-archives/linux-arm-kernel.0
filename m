@@ -1,32 +1,50 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 26 Dec 2012 20:09:05 +0300
-Subject: [PATCH 2/2] spi: sirf: add support for new SiRFmarco SMP SoC
-In-Reply-To: <CAGsJ_4wp1KvfotmDHzTCU9bmEP5BKDAU=Z0qjvOXw6FoFYNNKQ@mail.gmail.com>
-References: <1356490114-18022-1-git-send-email-Barry.Song@csr.com>
- <1356490114-18022-2-git-send-email-Barry.Song@csr.com>
- <50DAE219.10806@mvista.com>
- <CAGsJ_4wp1KvfotmDHzTCU9bmEP5BKDAU=Z0qjvOXw6FoFYNNKQ@mail.gmail.com>
-Message-ID: <50DB2F31.1000300@mvista.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 26 Dec 2012 19:42:03 +0100
+Subject: [GIT PULLv2] Fixes for sunXi for 3.8
+Message-ID: <50DB44FB.30603@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Arnd, Olof,
 
-On 12/26/2012 03:32 PM, Barry Song wrote:
+Here is the two fixes I sent previously rebased on top of 3.8-rc1.
 
->>> From: Barry Song <Baohua.Song@csr.com>
+The first one add the support for the sunxi architecture in the multiplatform
+kernel, allowing to easily build a kernel that boots on the sun4i/sun5i
+supported boards.
 
->>> the driver is also compatible with SiRFmarco except SiRFprimaII,
->>> so simply add "sirf,marco-spi" to OF match table.
+The second one fixes some compatible strings that were left behind in the
+previous compatible renaming patch, preventing the kernel from booting.
 
->>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Thanks,
+Maxime
 
->>     You've just posted this patch as a part of another 2-patch series.
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 
-> no, this one is spi, the other one is i2c.
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
 
-   Sorry for the noise -- I was being blind (and goggles didn't help :-).
+are available in the git repository at:
 
-> -barry
+  git://github.com/mripard/linux.git tags/sunxi-fixes-for-3.8-rc2
 
-WBR, Sergei
+for you to fetch changes up to 43880f709dc59840849e31b01735ac587195ef8a:
+
+  sunxi: Change the machine compatible string. (2012-12-23 18:20:15 +0100)
+
+----------------------------------------------------------------
+Fixes for the sunxi core to be merged in 3.8-rc2
+
+----------------------------------------------------------------
+Maxime Ripard (2):
+      ARM: multi_v7_defconfig: Add ARCH_SUNXI
+      sunxi: Change the machine compatible string.
+
+ arch/arm/configs/multi_v7_defconfig |    1 +
+ arch/arm/mach-sunxi/sunxi.c         |    4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
