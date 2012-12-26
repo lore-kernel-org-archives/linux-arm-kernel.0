@@ -1,286 +1,55 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Wed, 26 Dec 2012 10:54:31 +0900
-Subject: [PATCH v6 12/12] iommu/exynos: add debugfs entries for System MMU
-Message-ID: <003f01cde30b$f2891d30$d79b5790$%cho@samsung.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Wed, 26 Dec 2012 10:30:16 +0800
+Subject: [PATCH 1/2] i2c: sirf: register i2c_client from dt child-nodes in
+ probe entry
+Message-ID: <1356489017-17737-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds debugfs directory and nodes for inspecting internal
-state of System MMU.
+From: Barry Song <Baohua.Song@csr.com>
 
-Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
+in probe() entry of i2c_driver, set the of node of adapter and
+call of_i2c_register_devices to register all i2c_client from
+dt child-nodes
+
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- drivers/iommu/exynos-iommu.c | 204 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 198 insertions(+), 6 deletions(-)
+ drivers/i2c/busses/i2c-sirf.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 9753e0e..78c0eb7 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -26,12 +26,17 @@
- #include <linux/list.h>
- #include <linux/memblock.h>
- #include <linux/export.h>
-+#include <linux/fs.h>
-+#include <linux/seq_file.h>
-+#include <linux/debugfs.h>
- #include <linux/string.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
+diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
+index 5574a47..181d7c2 100644
+--- a/drivers/i2c/busses/i2c-sirf.c
++++ b/drivers/i2c/busses/i2c-sirf.c
+@@ -12,6 +12,7 @@
+ #include <linux/slab.h>
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
++#include <linux/of_i2c.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+@@ -328,6 +329,7 @@ static int __devinit i2c_sirfsoc_probe(struct platform_device *pdev)
+ 	adap->algo = &i2c_sirfsoc_algo;
+ 	adap->algo_data = siic;
  
- #include <asm/cacheflush.h>
++	adap->dev.of_node = pdev->dev.of_node;
+ 	adap->dev.parent = &pdev->dev;
+ 	adap->nr = pdev->id;
  
-+#define MODULE_NAME "exynos-sysmmu"
-+
- /* We does not consider super section mapping (16MB) */
- #define SECT_ORDER 20
- #define LPAGE_ORDER 16
-@@ -223,6 +228,7 @@ struct sysmmu_drvdata {
- 	struct sysmmu_prefbuf pbufs[MAX_NUM_PBUF];
- 	int num_pbufs;
- 	struct sysmmu_version ver;
-+	struct dentry *debugfs_root;
- 	struct iommu_domain *domain;
- 	unsigned long pgtable;
- 	bool runtime_active;
-@@ -1066,6 +1072,8 @@ static void __init __sysmmu_init_mmuname(struct device *sysmmu,
- 	}
- }
+@@ -371,6 +373,8 @@ static int __devinit i2c_sirfsoc_probe(struct platform_device *pdev)
  
-+static void __create_debugfs_entry(struct sysmmu_drvdata *drvdata);
-+
- static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- {
- 	int i, ret;
-@@ -1134,6 +1142,8 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 	clk_disable(clk);
  
- 		data->runtime_active = !pm_runtime_enabled(dev);
++	of_i2c_register_devices(adap);
++
+ 	dev_info(&pdev->dev, " I2C adapter ready to operate\n");
  
-+		__create_debugfs_entry(data);
-+
- 		platform_set_drvdata(pdev, data);
- 
- 		dev->archdata.iommu = &sysmmu_placeholder;
-@@ -1238,7 +1248,7 @@ static struct platform_driver exynos_sysmmu_driver __refdata = {
- 	.probe		= exynos_sysmmu_probe,
- 	.driver		= {
- 		.owner		= THIS_MODULE,
--		.name		= "exynos-sysmmu",
-+		.name		= MODULE_NAME,
- 		.pm		= &__pm_ops,
- 		.of_match_table = of_match_ptr(sysmmu_of_match),
- 	}
-@@ -1631,6 +1641,8 @@ static struct iommu_ops exynos_iommu_ops = {
- 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
- };
- 
-+static struct dentry *sysmmu_debugfs_root; /* /sys/kernel/debug/sysmmu */
-+
- static int __init exynos_iommu_init(void)
- {
- 	int ret;
-@@ -1642,17 +1654,197 @@ static int __init exynos_iommu_init(void)
- 		return -ENOMEM;
- 	}
- 
--	ret = platform_driver_register(&exynos_sysmmu_driver);
-+	ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-+	if (ret) {
-+		kmem_cache_destroy(lv2table_kmem_cache);
-+		pr_err("%s: Failed to register IOMMU ops\n", __func__);
-+		return -EFAULT;
-+	}
- 
--	if (ret == 0)
--		ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-+	sysmmu_debugfs_root = debugfs_create_dir("sysmmu", NULL);
-+	if (!sysmmu_debugfs_root)
-+		pr_err("%s: Failed to create debugfs entry, 'sysmmu'\n",
-+							__func__);
-+	if (IS_ERR(sysmmu_debugfs_root))
-+		sysmmu_debugfs_root = NULL;
- 
-+	ret = platform_driver_register(&exynos_sysmmu_driver);
- 	if (ret) {
--		pr_err("%s: Failed to register exynos-iommu driver.\n",
--								__func__);
- 		kmem_cache_destroy(lv2table_kmem_cache);
-+		pr_err("%s: Failed to register System MMU driver\n", __func__);
- 	}
- 
- 	return ret;
- }
- subsys_initcall(exynos_iommu_init);
-+
-+static int debug_string_show(struct seq_file *s, void *unused)
-+{
-+	char *str = s->private;
-+
-+	seq_printf(s, "%s\n", str);
-+
-+	return 0;
-+}
-+
-+static int debug_sysmmu_list_show(struct seq_file *s, void *unused)
-+{
-+	struct sysmmu_drvdata *drvdata = s->private;
-+	struct platform_device *pdev = to_platform_device(drvdata->sysmmu);
-+	int idx, maj, min, ret;
-+
-+	seq_printf(s, "SysMMU Name | Ver | SFR Base\n");
-+
-+	if (pm_runtime_enabled(drvdata->sysmmu)) {
-+		ret = pm_runtime_get_sync(drvdata->sysmmu);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	for (idx = 0; idx < drvdata->nsfrs; idx++) {
-+		struct resource *res;
-+
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, idx);
-+		if (!res)
-+			break;
-+
-+		maj = __sysmmu_version(drvdata, idx, &min);
-+
-+		if (drvdata->mmuname) {
-+			if (maj == 0)
-+				seq_printf(s, "%11.s | N/A | 0x%08x\n",
-+					drvdata->mmuname[idx], res->start);
-+			else
-+				seq_printf(s, "%11.s | %d.%d | 0x%08x\n",
-+				drvdata->mmuname[idx], maj, min, res->start);
-+		} else {
-+			if (maj == 0)
-+				seq_printf(s, "N/A | 0x%08x\n", res->start);
-+			else
-+				seq_printf(s, "%d.%d | 0x%08x\n",
-+							maj, min, res->start);
-+		}
-+	}
-+
-+	if (pm_runtime_enabled(drvdata->sysmmu))
-+		pm_runtime_put(drvdata->sysmmu);
-+
-+	return 0;
-+}
-+
-+static int debug_next_sibling_show(struct seq_file *s, void *unused)
-+{
-+	struct device *dev = s->private;
-+
-+	if (dev->parent &&
-+		!strncmp(dev_name(dev->parent),
-+			MODULE_NAME, strlen(MODULE_NAME)))
-+		seq_printf(s, "%s\n", dev_name(dev->parent));
-+	return 0;
-+}
-+
-+static int __show_master(struct device *dev, void *data)
-+{
-+	struct seq_file *s = data;
-+
-+	if (strncmp(dev_name(dev), MODULE_NAME, strlen(MODULE_NAME)))
-+		seq_printf(s, "%s\n", dev_name(dev));
-+	return 0;
-+}
-+
-+static int debug_master_show(struct seq_file *s, void *unused)
-+{
-+	struct device *dev = s->private;
-+
-+	device_for_each_child(dev, s, __show_master);
-+	return 0;
-+}
-+
-+static int debug_string_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, debug_string_show, inode->i_private);
-+}
-+
-+static int debug_sysmmu_list_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, debug_sysmmu_list_show, inode->i_private);
-+}
-+
-+static int debug_next_sibling_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, debug_next_sibling_show, inode->i_private);
-+}
-+
-+static int debug_master_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, debug_master_show, inode->i_private);
-+}
-+
-+static const struct file_operations debug_string_fops = {
-+	.open = debug_string_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+static const struct file_operations debug_sysmmu_list_fops = {
-+	.open = debug_sysmmu_list_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+static const struct file_operations debug_next_sibling_fops = {
-+	.open = debug_next_sibling_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+static const struct file_operations debug_master_fops = {
-+	.open = debug_master_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+static void __init __create_debugfs_entry(struct sysmmu_drvdata *drvdata)
-+{
-+	if (!sysmmu_debugfs_root)
-+		return;
-+
-+	drvdata->debugfs_root = debugfs_create_dir(dev_name(drvdata->sysmmu),
-+							sysmmu_debugfs_root);
-+	if (!drvdata->debugfs_root)
-+		dev_err(drvdata->sysmmu, "Failed to create debugfs dentry\n");
-+	if (IS_ERR(drvdata->debugfs_root))
-+		drvdata->debugfs_root = NULL;
-+
-+	if (!drvdata->debugfs_root)
-+		return;
-+
-+	if (!debugfs_create_u32("enable", 0664, drvdata->debugfs_root,
-+						&drvdata->activations))
-+		dev_err(drvdata->sysmmu,
-+				"Failed to create debugfs file 'enable'\n");
-+
-+	if (!debugfs_create_x32("pagetable", 0664, drvdata->debugfs_root,
-+						(u32 *)&drvdata->pgtable))
-+		dev_err(drvdata->sysmmu,
-+				"Failed to create debugfs file 'pagetable'\n");
-+
-+	if (!debugfs_create_file("sysmmu_list", 0444, drvdata->debugfs_root,
-+					drvdata, &debug_sysmmu_list_fops))
-+		dev_err(drvdata->sysmmu,
-+			"Failed to create debugfs file 'sysmmu_list'\n");
-+
-+	if (!debugfs_create_file("next_sibling", 0x444, drvdata->debugfs_root,
-+				drvdata->sysmmu, &debug_next_sibling_fops))
-+		dev_err(drvdata->sysmmu,
-+			"Failed to create debugfs file 'next_siblings'\n");
-+
-+	if (!debugfs_create_file("master", 0x444, drvdata->debugfs_root,
-+				drvdata->sysmmu, &debug_master_fops))
-+		dev_err(drvdata->sysmmu,
-+			"Failed to create debugfs file 'next_siblings'\n");
-+}
+ 	return 0;
 -- 
-1.8.0
+1.7.5.4
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
