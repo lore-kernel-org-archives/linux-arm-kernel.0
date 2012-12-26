@@ -1,45 +1,32 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue, 25 Dec 2012 12:34:27 -0700
-Subject: [PATCH 00/15] OMAP SHAM & AES Crypto Updates
-In-Reply-To: <20121225192937.GD4846@animalcreek.com>
-References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1212230836160.16045@utopia.booyaka.com>
- <20121225192937.GD4846@animalcreek.com>
-Message-ID: <20121225193427.GE4846@animalcreek.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 26 Dec 2012 01:34:29 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the pinctrl tree
+In-Reply-To: <027101cddf2c$b4f2f9b0$1ed8ed10$@samsung.com>
+References: <20121221132014.0bf8772fb3e48c51cec1548a@canb.auug.org.au>
+ <027101cddf2c$b4f2f9b0$1ed8ed10$@samsung.com>
+Message-ID: <CACRpkdb50D+PMNf9sPTGUs9fsE-QOP0aWB+_aQ6ZpqLuFkvjUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 25, 2012 at 12:29:37PM -0700, Mark A. Greer wrote:
-> On Sun, Dec 23, 2012 at 08:40:43AM +0000, Paul Walmsley wrote:
-> > Hi Mark,
-> > 
-> > On Fri, 21 Dec 2012, Mark A. Greer wrote:
-> > 
-> > > From: "Mark A. Greer" <mgreer@animalcreek.com>
-> > > 
-> > > [This series supersedes the hwmod related patches sent in the
-> > >  "crypto: omap-sham updates" and "crypto: omap-aes updates"
-> > >  series a few weeks ago.]
-> > > 
-> > > This series adds hwmod support for the OMAP SHAM and AES
-> > > modules on OMAP2, OMAP3, and OMAP4/AM33XX SoCs.  It also
-> > > adds device tree info for those modules.
-> > 
-> > Thanks for working on this, this will get us much closer to being able to 
-> > convert the hwmod code into an OMAP bus.  I haven't looked closely at 
-> > these patches yet, but a few comments/questions:
-> > 
-> > - Looks like the two DTS patches are the ones with direct dependencies on 
-> > the DMA Engine support patches that you mentioned.
-> 
-> The patch(es) that convert the drivers to use
-> dma_request_slave_channel_compat() will cause problems too if the
-> patch that adds that call isn't in your branch.  AFAIK, this is the
-> latest version, https://patchwork.kernel.org/patch/1459231/ from
-> Jon Hunter.
+On Fri, Dec 21, 2012 at 4:38 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Stephen Rothwell wrote:
+>>
+>> Hi all,
+>>
+>> Today's linux-next merge of the arm-soc tree got conflicts in
+>> drivers/pinctrl/pinctrl-exynos5440.c and
+>> drivers/pinctrl/pinctrl-samsung.c between commit e5b4c9d4ab55 ("pinctrl:
+>> exynos5440: Fix compile error in pinctrl-exynos5440/samsung.c") from the
+>> pinctrl tree and commit d5fd5da290ce ("pinctrl: exynos5440/samsung:
+>> Staticize pcfgs") from the arm-soc tree.
+>>
+> Oops, the commit d5fd5da290ce already sent to Linus Torvalds via arm-soc
+> tree today. In addition, I applied with Linus Walleij's ack ;-)
+>
+> Linus Walleij, please drop the patch in your tree. Sorry I didn't notify
+> about that when I got the patch from Choi.
 
-Oops, sorry, please disregard this comment.  I had the wrong patchset
-in mind when I wrote it.
+OK dropped it, sorry for the delay...
 
-Mark
---
+Yours,
+Linus Walleij
