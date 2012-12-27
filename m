@@ -1,74 +1,72 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 27 Dec 2012 11:47:58 +0100
-Subject: [PATCH v4 2/7] usb: chipidea: add otg file
-In-Reply-To: <1356591603-23323-3-git-send-email-peter.chen@freescale.com>
-References: <1356591603-23323-1-git-send-email-peter.chen@freescale.com>
- <1356591603-23323-3-git-send-email-peter.chen@freescale.com>
-Message-ID: <20121227104758.GV26326@pengutronix.de>
+Date: Thu, 27 Dec 2012 11:49:29 +0100
+Subject: [PATCH] ehci-mxc: remove Efika MX-specific CHRGVBUS hack
+In-Reply-To: <1356261362-8418-1-git-send-email-matt@genesi-usa.com>
+References: <1356261362-8418-1-git-send-email-matt@genesi-usa.com>
+Message-ID: <20121227104929.GW26326@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 27, 2012 at 02:59:58PM +0800, Peter Chen wrote:
-> Implement struct usb_otg, In that way, calling otg_set_peripheral
-> will not be failed at udc.c.
+On Sun, Dec 23, 2012 at 05:16:02AM -0600, Matt Sealey wrote:
+> Since Efika MX platform support (pre-devicetree) was removed from the tree
+> this code no longer has any possibility of running and clutters up the
+> driver which is being replaced by the chipidea host in the future anyway.
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Signed-off-by: Matt Sealey <matt@genesi-usa.com>
+> Tested-by: Steev Klimazewski <steev@genesi-usa.com>
+> CC: Sascha Hauer <kernel@pengutronix.de>
+> CC: Alan Stern <stern@rowland.harvard.edu>
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+
+> 
 > ---
-> Changes for v4:
-> - Some tiny changes, like delete unused header files
+>  drivers/usb/host/ehci-mxc.c |   20 --------------------
+>  1 file changed, 20 deletions(-)
 > 
->  drivers/usb/chipidea/Makefile |    2 +-
->  drivers/usb/chipidea/ci.h     |    2 +
->  drivers/usb/chipidea/otg.c    |   60 +++++++++++++++++++++++++++++++++++++++++
->  drivers/usb/chipidea/otg.h    |    6 ++++
->  4 files changed, 69 insertions(+), 1 deletions(-)
+> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+> index 8e58a5f..b62c3a8 100644
+> --- a/drivers/usb/host/ehci-mxc.c
+> +++ b/drivers/usb/host/ehci-mxc.c
+> @@ -102,7 +102,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+>  	struct usb_hcd *hcd;
+>  	struct resource *res;
+>  	int irq, ret;
+> -	unsigned int flags;
+>  	struct ehci_mxc_priv *priv;
+>  	struct device *dev = &pdev->dev;
+>  	struct ehci_hcd *ehci;
+> @@ -213,25 +212,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_add;
+>  
+> -	if (pdata->otg) {
+> -		/*
+> -		 * efikamx and efikasb have some hardware bug which is
+> -		 * preventing usb to work unless CHRGVBUS is set.
+> -		 * It's in violation of USB specs
+> -		 */
+> -		if (machine_is_mx51_efikamx() || machine_is_mx51_efikasb()) {
+> -			flags = usb_phy_io_read(pdata->otg,
+> -							ULPI_OTG_CTRL);
+> -			flags |= ULPI_OTG_CTRL_CHRGVBUS;
+> -			ret = usb_phy_io_write(pdata->otg, flags,
+> -							ULPI_OTG_CTRL);
+> -			if (ret) {
+> -				dev_err(dev, "unable to set CHRVBUS\n");
+> -				goto err_add;
+> -			}
+> -		}
+> -	}
+> -
+>  	return 0;
+>  
+>  err_add:
+> -- 
+> 1.7.10.4
 > 
-> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index d92ca32..11f513c 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
->  
->  obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
->  
-> -ci_hdrc-y				:= core.o
-> +ci_hdrc-y				:= core.o otg.o
->  ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
->  ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
->  ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
-> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-> index d738603..8702871 100644
-> --- a/drivers/usb/chipidea/ci.h
-> +++ b/drivers/usb/chipidea/ci.h
-> @@ -129,6 +129,7 @@ struct hw_bank {
->   * @vbus_active: is VBUS active
->   * @transceiver: pointer to USB PHY, if any
->   * @hcd: pointer to usb_hcd for ehci host driver
-> + * @otg: for otg support
->   */
->  struct ci13xxx {
->  	struct device			*dev;
-> @@ -164,6 +165,7 @@ struct ci13xxx {
->  	bool				global_phy;
->  	struct usb_phy			*transceiver;
->  	struct usb_hcd			*hcd;
-> +	struct usb_otg      otg;
-
-I'd really like to know how this is going to proceed.
-
-The ULPI driver currently allocates a struct usb_otg and sets
-otg->set_host and otg->set_vbus. Since now the chipidea driver uses its
-own struct usb_otg, this will not work with ULPI support.
-
-I see some ways out of this:
-
-- Use a pointer above instead of an own struct usb_otg in the ci driver.
-- move the set_host and set_vbus callbacks to struct usb_phy.
-
-I'd like to have this solved before we merge this patch.
-
-Sascha
-
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
