@@ -1,105 +1,37 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 28 Dec 2012 00:59:50 +0200
-Subject: [PATCH 2/2] i2c-exynos5: add debugfs support for registers
-In-Reply-To: <1356434755-13702-2-git-send-email-ch.naveen@samsung.com>
-References: <1354021236-28596-2-git-send-email-ch.naveen@samsung.com>
- <1356434755-13702-1-git-send-email-ch.naveen@samsung.com>
- <1356434755-13702-2-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20121227225950.GC12665@arwen.pp.htv.fi>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 28 Dec 2012 12:20:48 +1300
+Subject: [PATCH 0/4] arm: vt8500: Add new models and remove single-platform.
+Message-ID: <1356650452-16559-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 25, 2012 at 04:55:55PM +0530, Naveen Krishna Chatradhi wrote:
-> This patch replaces the dev_vdbg with debugfs function calls
-> in i2c-exynos5.c driver.
-> 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> ---
-> Changes since v1:
-> The debugfs implementation is a suggestion by Felipe Balbi.
-> Its not tested, Implemented only for review purpose..
-> 
->  drivers/i2c/busses/i2c-exynos5.c |  140 +++++++++++++++++++++++++++++---------
->  1 file changed, 109 insertions(+), 31 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
-> index 7614f60..2d2da22 100644
-> --- a/drivers/i2c/busses/i2c-exynos5.c
-> +++ b/drivers/i2c/busses/i2c-exynos5.c
-> @@ -12,6 +12,7 @@
->  
->  #include <linux/kernel.h>
->  #include <linux/module.h>
-> +#include <linux/debugfs.h>
->  
->  #include <linux/i2c.h>
->  #include <linux/init.h>
-> @@ -55,6 +56,7 @@ struct exynos5_i2c {
->  
->  	int			bus_num;
->  	int			speed_mode;
-> +	struct dentry		*debugfs_root;
->  };
->  
->  static const struct of_device_id exynos5_i2c_match[] = {
-> @@ -63,39 +65,112 @@ static const struct of_device_id exynos5_i2c_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, exynos5_i2c_match);
->  
-> -/* TODO: Should go to debugfs */
-> -static inline void dump_i2c_register(struct exynos5_i2c *i2c)
-> +static int exynos5_i2c_regs_show(struct seq_file *s, void *data)
->  {
-> -	dev_vdbg(i2c->dev, "Register dump(%d) :\n %x\n %x\n %x\n %x\n"
-> -		" %x\n %x\n %x\n %x\n %x\n"
-> -		" %x\n %x\n %x\n %x\n %x\n"
-> -		" %x\n %x\n %x\n %x\n %x\n"
-> -		" %x\n %x\n %x\n %x\n %x\n",
-> -		i2c->suspended,
-> -		readl(i2c->regs + HSI2C_CTL),
-> -		readl(i2c->regs + HSI2C_FIFO_CTL),
-> -		readl(i2c->regs + HSI2C_TRAILIG_CTL),
-> -		readl(i2c->regs + HSI2C_CLK_CTL),
-> -		readl(i2c->regs + HSI2C_CLK_SLOT),
-> -		readl(i2c->regs + HSI2C_INT_ENABLE),
-> -		readl(i2c->regs + HSI2C_INT_STATUS),
-> -		readl(i2c->regs + HSI2C_ERR_STATUS),
-> -		readl(i2c->regs + HSI2C_FIFO_STATUS),
-> -		readl(i2c->regs + HSI2C_TX_DATA),
-> -		readl(i2c->regs + HSI2C_RX_DATA),
-> -		readl(i2c->regs + HSI2C_CONF),
-> -		readl(i2c->regs + HSI2C_AUTO_CONF),
-> -		readl(i2c->regs + HSI2C_TIMEOUT),
-> -		readl(i2c->regs + HSI2C_MANUAL_CMD),
-> -		readl(i2c->regs + HSI2C_TRANS_STATUS),
-> -		readl(i2c->regs + HSI2C_TIMING_HS1),
-> -		readl(i2c->regs + HSI2C_TIMING_HS2),
-> -		readl(i2c->regs + HSI2C_TIMING_HS3),
-> -		readl(i2c->regs + HSI2C_TIMING_FS1),
-> -		readl(i2c->regs + HSI2C_TIMING_FS2),
-> -		readl(i2c->regs + HSI2C_TIMING_FS3),
-> -		readl(i2c->regs + HSI2C_TIMING_SLA),
-> +	struct exynos5_i2c *i2c = (struct exynos5_i2c *)s->private;
-> +
-> +	if (i2c->suspended) {
-> +		seq_printf(s, "i2c suspended, can't read registers\n");
-> +		return 0;
-> +	}
-> +
-> +	pm_runtime_get_sync(i2c->dev);
-> +
-> +	seq_printf(s, "CTL:\t\t0x%08x\n",
-> +		readl(i2c->regs + HSI2C_CTL));
+Hi Arnd/Olaf,
 
-BTW, there is a generic regdump debugfs interface nowadays, please use
-that instead (look for debugfs_create_regset32)
+These patches should be pretty self explanatory.
+
+#1 - Adds support for WM8750 and WM8850.
+#2 - Remove the single-platform Kconfig options.
+#3 - Move the early debug code so it can be used for multiplatform.
+#4 - Cleanup the unused headers in arch/arm/mach-vt8500/include.
+
+Tony Prisk (4):
+  arm: vt8500: Add support for Wondermedia WM8750/WM8850
+  arm: vt8500: Remove single platform Kconfig options
+  arm: vt8500: Convert debug-macro.S to be multiplatform friendly
+  arm: vt8500: Remove remaining mach includes
+
+ Documentation/devicetree/bindings/arm/vt8500.txt |    8 +++++
+ arch/arm/Kconfig                                 |   16 ----------
+ arch/arm/Kconfig.debug                           |    8 +++++
+ arch/arm/mach-vt8500/Kconfig                     |   26 +++++++++++++--
+ arch/arm/mach-vt8500/include/mach/debug-macro.S  |   31 ------------------
+ arch/arm/mach-vt8500/include/mach/timex.h        |   26 ---------------
+ arch/arm/mach-vt8500/include/mach/uncompress.h   |   37 ----------------------
+ arch/arm/mach-vt8500/vt8500.c                    |    2 ++
+ 8 files changed, 41 insertions(+), 113 deletions(-)
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/uncompress.h
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121228/a500c17b/attachment.sig>
+1.7.9.5
