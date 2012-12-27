@@ -1,37 +1,95 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 27 Dec 2012 16:48:18 +0000
-Subject: [PATCH V5 2/2] ASoC: SAMSUNG: Add DT support for i2s
-In-Reply-To: <CAAgF-BdNwk=aB9PdOieb=t-WBmCvB5CWEYic44fc6WwhJUHGmw@mail.gmail.com>
-References: <1355395373-22058-1-git-send-email-padma.v@samsung.com>
- <1355395373-22058-3-git-send-email-padma.v@samsung.com>
- <20121219132414.2CF653E0AD7@localhost>
- <20121219170937.GV4985@opensource.wolfsonmicro.com>
- <CAAgF-Bc3zSyhaMwSOy977PJ-PdtMfDXjFrTvpzETeHJAAQU3vQ@mail.gmail.com>
- <008401cddfad$ae2d19e0$0a874da0$@samsung.com>
- <CAAgF-BckOnct3gGgrxiG2W-D74sFmD=7HfBOqkj9HTc66ZPoiQ@mail.gmail.com>
- <CAAgF-BdNwk=aB9PdOieb=t-WBmCvB5CWEYic44fc6WwhJUHGmw@mail.gmail.com>
-Message-ID: <20121227164818.GD5005@opensource.wolfsonmicro.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 27 Dec 2012 08:58:57 -0800
+Subject: [PATCH 1/3] pinctrl: exynos: add exynos5250 SoC specific data
+In-Reply-To: <CAJuYYwTZkzCXjowhKaJ253Oji07eDdEjMvNssyL1ThWtETswSQ@mail.gmail.com>
+References: <1355399644-29417-1-git-send-email-thomas.abraham@linaro.org>
+ <1355399644-29417-2-git-send-email-thomas.abraham@linaro.org>
+ <CACRpkdaQ10CgoFXtk4EyqL4LWVpsdEAdrmy5R-_Rqm5fJdqS4A@mail.gmail.com>
+ <CAJuYYwTZkzCXjowhKaJ253Oji07eDdEjMvNssyL1ThWtETswSQ@mail.gmail.com>
+Message-ID: <017801cde453$77b03eb0$6710bc10$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 26, 2012 at 04:21:58PM +0530, Padma Venkat wrote:
-> Hi,
+Thomas Abraham wrote:
 > 
-> On Mon, Dec 24, 2012 at 9:33 AM, Padma Venkat <padma.kvr@gmail.com> wrote:
-> > Hi,
+> Hi Linus,
+> 
+> On 14 December 2012 21:21, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Thu, Dec 13, 2012 at 12:54 PM, Thomas Abraham
+> > <thomas.abraham@linaro.org> wrote:
+> >
+> >> Add Samsung Exynos5250 SoC specific data to enable pinctrl support for
+> >> all platforms based on Exynos5250.
+> >>
+> >> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> >
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > For this series, I guess you'll fix it through the Samsung tree?
+> 
+> Thanks for your ack. Since there are patches to be prepared for
+> migrating the rest of Exynos5250 related code to the pinctrl
+> framework, it would be easier if this series goes through the Samsung
+> tree.
+> 
+I applied this series, thanks.
 
-You should always delete irrelevant text from mails, it makes it much
-easier for people to find whatever content you've added.
+And I think, would be clear if the config could be changed like following.
 
-> >> I agree with using version here but we need some consensus about that.
+8<----------------------------------------------------------------------
+From: Kukjin Kim <kgene.kim@samsung.com>
+Subject: [PATCH] pinctrl: exynos: change PINCTRL_EXYNOS option
 
-> Any suggestions on i2s compatible name or "samsung,i2s-v5" is okay?
+Since pinctrl-exynos can support exynos4 and exynos5 so changed
+the option name to PINCTRL_EXYNOS for more clarity.
 
-I think that's fine.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121227/170caedc/attachment.sig>
+Cc: Thomas Abraham <Thomas.abraham@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 91d5b6f..e1f63e7 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -412,7 +412,7 @@ config MACH_EXYNOS4_DT
+ 	select CPU_EXYNOS4210
+ 	select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
+ 	select PINCTRL
+-	select PINCTRL_EXYNOS4
++	select PINCTRL_EXYNOS
+ 	select USE_OF
+ 	help
+ 	  Machine support for Samsung Exynos4 machine with device tree
+enabled.
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index c31aeb0..f59feab 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -185,8 +185,8 @@ config PINCTRL_SAMSUNG
+ 	select PINMUX
+ 	select PINCONF
+ 
+-config PINCTRL_EXYNOS4
+-	bool "Pinctrl driver data for Exynos4 SoC"
++config PINCTRL_EXYNOS
++	bool "Pinctrl driver data for Samsung EXYNOS SoCs"
+ 	depends on OF && GPIOLIB
+ 	select PINCTRL_SAMSUNG
+ 
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index fc4606f..6e87e52 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -36,7 +36,7 @@ obj-$(CONFIG_PINCTRL_TEGRA30)	+= pinctrl-tegra30.o
+ obj-$(CONFIG_PINCTRL_U300)	+= pinctrl-u300.o
+ obj-$(CONFIG_PINCTRL_COH901)	+= pinctrl-coh901.o
+ obj-$(CONFIG_PINCTRL_SAMSUNG)	+= pinctrl-samsung.o
+-obj-$(CONFIG_PINCTRL_EXYNOS4)	+= pinctrl-exynos.o
++obj-$(CONFIG_PINCTRL_EXYNOS)	+= pinctrl-exynos.o
+ obj-$(CONFIG_PINCTRL_EXYNOS5440)	+= pinctrl-exynos5440.o
+ obj-$(CONFIG_PINCTRL_XWAY)	+= pinctrl-xway.o
+ obj-$(CONFIG_PINCTRL_LANTIQ)	+= pinctrl-lantiq.o
+8<----------------------------------------------------------------------
+
+- Kukjin
