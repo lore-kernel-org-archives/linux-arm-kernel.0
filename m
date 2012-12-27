@@ -1,42 +1,55 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 27 Dec 2012 08:21:55 +0100
-Subject: [PATCH v4 3/7] usb: chipidea: add otg id switch and vbus
- connect/disconnect detect
-In-Reply-To: <1356591603-23323-4-git-send-email-peter.chen@freescale.com>
-References: <1356591603-23323-1-git-send-email-peter.chen@freescale.com>
- <1356591603-23323-4-git-send-email-peter.chen@freescale.com>
-Message-ID: <201212270821.55253.marex@denx.de>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Thu, 27 Dec 2012 07:41:55 +0000
+Subject: [imx:work/efikasb 4/29] drivers/usb/chipidea/otg.c:54:4: error:
+ 'struct ci13xxx' has no member named 'otg'
+In-Reply-To: <50ce25f4./78UjnbIRjv7NLWj%fengguang.wu@intel.com>
+References: <50ce25f4./78UjnbIRjv7NLWj%fengguang.wu@intel.com>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803D58A98@039-SN2MPN1-022.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Peter Chen,
+Fixed at my tree: https://github.com/hzpeterchen/linux-usb.git
 
-[...]
-> +
-> +#define CI_VBUS_STABLE_TIMEOUT 500
-
-Shall we not change this to static const int instead ?
-
-[...]
-
-> --- a/drivers/usb/chipidea/udc.c
-> +++ b/drivers/usb/chipidea/udc.c
-> @@ -1371,6 +1371,7 @@ static int ci13xxx_vbus_session(struct usb_gadget
-> *_gadget, int is_active) pm_runtime_get_sync(&_gadget->dev);
->  			hw_device_reset(ci, USBMODE_CM_DC);
->  			hw_device_state(ci, ci->ep0out->qh.dma);
-> +			dev_dbg(ci->dev, "Connected to host\n");
->  		} else {
->  			hw_device_state(ci, 0);
->  			if (ci->platdata->notify_event)
-> @@ -1378,6 +1379,7 @@ static int ci13xxx_vbus_session(struct usb_gadget
-> *_gadget, int is_active) CI13XXX_CONTROLLER_STOPPED_EVENT);
->  			_gadget_stop_activity(&ci->gadget);
->  			pm_runtime_put_sync(&_gadget->dev);
-> +			dev_dbg(ci->dev, "disconnected from host\n");
-
-Keep the capital letters at the begining of the sentence consistent -- either 
-start with capital D here or fix the capital C above.
-
->  		}
->  	}
+ 
+> 
+> tree:   git://git.pengutronix.de/git/imx/linux-2.6.git work/efikasb
+> head:   4de30514cbd7126ba06062e39ba4701f2bca1a37
+> commit: 919553ea44720e0b8ea0275c32254f5e325aba11 [4/29] usb: chipidea:
+> add otg file
+> config: make ARCH=x86_64 allyesconfig
+> 
+> Note: the imx/work/efikasb HEAD 4de3051 builds fine.
+>       It only hurts bisectibility.
+> 
+> All error/warnings:
+> 
+> drivers/usb/chipidea/otg.c: In function 'ci_hdrc_otg_init':
+> drivers/usb/chipidea/otg.c:54:4: error: 'struct ci13xxx' has no member
+> named 'otg'
+> drivers/usb/chipidea/otg.c:55:4: error: 'struct ci13xxx' has no member
+> named 'otg'
+> drivers/usb/chipidea/otg.c:57:29: error: 'struct ci13xxx' has no member
+> named 'otg'
+> 
+> vim +54 drivers/usb/chipidea/otg.c
+> 
+> 919553ea Peter Chen 2012-11-19  48   * This function create otg struct,
+> if the device can switch between
+> 919553ea Peter Chen 2012-11-19  49   * device and host.
+> 919553ea Peter Chen 2012-11-19  50   */
+> 919553ea Peter Chen 2012-11-19  51  int ci_hdrc_otg_init(struct ci13xxx
+> *ci)
+> 919553ea Peter Chen 2012-11-19  52  {
+> 919553ea Peter Chen 2012-11-19  53  	/* Useless at current */
+> 919553ea Peter Chen 2012-11-19 @54  	ci->otg.set_peripheral =
+> ci_otg_set_peripheral;
+> 919553ea Peter Chen 2012-11-19  55  	ci->otg.set_host =
+> ci_otg_set_host;
+> 919553ea Peter Chen 2012-11-19  56  	if (!IS_ERR_OR_NULL(ci-
+> >transceiver))
+> 919553ea Peter Chen 2012-11-19  57  		ci->transceiver->otg =
+> &ci->otg;
+> 
+> ---
+> 0-DAY kernel build testing backend         Open Source Technology Center
+> Fengguang Wu, Yuanhan Liu                              Intel Corporation
