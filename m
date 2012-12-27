@@ -1,113 +1,45 @@
-From: prasannapadubidri@gmail.com (Prasanna Kumar)
-Date: Thu, 27 Dec 2012 10:28:41 +0530
-Subject: [PATCH v2 1/3] ARM: dts: exynos5: Set up power domain for
- MFC,G-scaler,MAU and ISP
-In-Reply-To: <1356006378-17441-2-git-send-email-prasanna.ps@samsung.com>
-References: <CAPmaG0uqkRcoUBR8Gjv_+BSJ3hwxUCz0G-YKNQX=qvx83i6QOQ@mail.gmail.com>
- <1356006378-17441-2-git-send-email-prasanna.ps@samsung.com>
-Message-ID: <CAPmaG0u17hHBdybMRXNZ3friR5yAufvboZzgaOQDG=VuByr_zA@mail.gmail.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Thu, 27 Dec 2012 10:41:50 +0530
+Subject: [PATCH 1/6 v9] arm: use devicetree to get smp_twd clock
+In-Reply-To: <1354833773-22845-2-git-send-email-mark.langsdorf@calxeda.com>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354833773-22845-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354833773-22845-2-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <50DBD896.8040706@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-Any comments on this patch ?
-
-Thanks,
-Prasanna
-
-On Thu, Dec 20, 2012 at 5:56 PM, Prasanna Kumar <prasanna.ps@samsung.com> wrote:
-> This patch adds device tree nodes for MFC,G-scaler,MAU and ISP power domains
-> of exynos5.It binds these power-domain nodes to repsective device tree nodes.
+On Friday 07 December 2012 04:12 AM, Mark Langsdorf wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 >
-> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
 > ---
->  arch/arm/boot/dts/exynos5250.dtsi |   25 +++++++++++++++++++++++++
->  1 files changed, 25 insertions(+), 0 deletions(-)
+> Changes from v4, v5, v6, v7, v8
+>          None.
+> Changes from v3
+>          No longer setting *clk to NULL in twd_get_clock().
+> Changes from v2
+>          Turned the check for the node pointer into an if-then-else statement.
+>          Removed the second, redundant clk_get_rate.
+> Changes from v1
+>          None.
 >
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 581e57a..71a37bd 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -83,6 +83,7 @@
->                 compatible = "samsung,mfc-v6";
->                 reg = <0x11000000 0x10000>;
->                 interrupts = <0 96 0>;
-> +               samsung,power-domain = <&pd_mfc>;
->         };
->
->         rtc {
-> @@ -283,6 +284,7 @@
->                 samsung,supports-rstclr;
->                 samsung,supports-secdai;
->                 samsung,idma-addr = <0x03000000>;
-> +               samsung,power-domain = <&pd_mau>;
->         };
->
->         i2s_1: i2s at 12D60000 {
-> @@ -578,28 +580,51 @@
->                 };
->         };
->
-> +       pd_gsc: gsc-power-domain at 0x10044000 {
-> +               compatible = "samsung,exynos4210-pd";
-> +               reg = <0x10044000 0x20>;
-> +       };
-> +
-> +       pd_isp: isp-power-domain at 0x10044020 {
-> +               compatible = "samsung,exynos4210-pd";
-> +               reg = <0x10044020 0x20>;
-> +               };
-> +
-> +       pd_mfc: mfc-power-domain at 0x10044040 {
-> +               compatible = "samsung,exynos4210-pd";
-> +               reg = <0x10044040 0x20>;
-> +       };
-> +
-> +       pd_mau: mau-power-domain at 0x100440C0 {
-> +               compatible = "samsung,exynos4210-pd";
-> +               reg = <0x100440C0 0x20>;
-> +       };
->         gsc_0:  gsc at 0x13e00000 {
->                 compatible = "samsung,exynos5-gsc";
->                 reg = <0x13e00000 0x1000>;
->                 interrupts = <0 85 0>;
-> +               samsung,power-domain = <&pd_gsc>;
->         };
->
->         gsc_1:  gsc at 0x13e10000 {
->                 compatible = "samsung,exynos5-gsc";
->                 reg = <0x13e10000 0x1000>;
->                 interrupts = <0 86 0>;
-> +               samsung,power-domain = <&pd_gsc>;
->         };
->
->         gsc_2:  gsc at 0x13e20000 {
->                 compatible = "samsung,exynos5-gsc";
->                 reg = <0x13e20000 0x1000>;
->                 interrupts = <0 87 0>;
-> +               samsung,power-domain = <&pd_gsc>;
->         };
->
->         gsc_3:  gsc at 0x13e30000 {
->                 compatible = "samsung,exynos5-gsc";
->                 reg = <0x13e30000 0x1000>;
->                 interrupts = <0 88 0>;
-> +               samsung,power-domain = <&pd_gsc>;
->         };
->
->         hdmi {
-> --
-> 1.7.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   arch/arm/kernel/smp_twd.c | 19 +++++++++++--------
+>   1 file changed, 11 insertions(+), 8 deletions(-)
 
+Hi Mark,
 
+What is the status of this patch?
 
--- 
-Thanks
-Prasanna Kumar
+Regards,
+PrashantG
+
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index b22d700..af46b80 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -237,12 +237,15 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
+>   	return IRQ_NONE;
+>   }
+>
