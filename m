@@ -1,101 +1,37 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 27 Dec 2012 10:27:14 -0800
-Subject: [PATCH] ARM: EXYNOS: fix uncompress.h and debug-macro.S for EXYNOS5440
-Message-ID: <1356632834-8934-1-git-send-email-kgene.kim@samsung.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 27 Dec 2012 20:35:24 +0200
+Subject: [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB
+In-Reply-To: <505A8BAB.2020004@ti.com>
+References: <1348047128-25692-1-git-send-email-kishon@ti.com>
+ <505A8BAB.2020004@ti.com>
+Message-ID: <20121227183524.GB7097@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes uart base address for uncompress and debug-macro
-on EXYNOS5440.
+Hi,
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-exynos/include/mach/debug-macro.S |   25 +++++++++++++++++------
- arch/arm/mach-exynos/include/mach/map.h         |    1 +
- arch/arm/mach-exynos/include/mach/uncompress.h  |   20 +++++++++++-------
- 3 files changed, 33 insertions(+), 13 deletions(-)
+On Thu, Sep 20, 2012 at 05:21:15AM +0200, Benoit Cousson wrote:
+> On 09/19/2012 11:32 AM, Kishon Vijay Abraham I wrote:
+> > This patch series adds dt data to get MUSB working in omap4 and omap3
+> > 
+> > Changes from v2:
+> > * Changes the subject of all the patches to include "ARM: dts:"
+> > * Added reg property and interrupt property for "usb_otg_hs". Previously these
+> >   were obtained from ti,hwmods property.
+> > * Rebased on
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git devel-dt
+> > 
+> > Changes from v1:
+> > Just removed the omap-usb2 dt data and sent that as a separate patch.
+> > 
+> > Kishon Vijay Abraham I (3):
+> >   ARM: dts: Add twl6030-usb data
+> >   ARM: dts: Add twl4030-usb data
+> >   ARM: dts: omap: Add usb_otg and glue data
+> 
+> Thanks for the update. I've just pulled the series for 3.7.
 
-diff --git a/arch/arm/mach-exynos/include/mach/debug-macro.S b/arch/arm/mach-exynos/include/mach/debug-macro.S
-index e0c86ea..69e3e52 100644
---- a/arch/arm/mach-exynos/include/mach/debug-macro.S
-+++ b/arch/arm/mach-exynos/include/mach/debug-macro.S
-@@ -21,12 +21,25 @@
- 	 */
- 
- 	.macro addruart, rp, rv, tmp
--		mrc	p15, 0, \tmp, c0, c0, 0
--		and	\tmp, \tmp, #0xf0
--		teq	\tmp, #0xf0		@@ A15
--		ldreq	\rp, =EXYNOS5_PA_UART
--		movne	\rp, #EXYNOS4_PA_UART	@@ EXYNOS4
--		ldr	\rv, =S3C_VA_UART
-+		mov	\rp, #0x10000000
-+		ldr	\rp, [\rp, #0]
-+		and	\rp, \rp, #0x0ff00000
-+		teq	\rp, #0x03200000	@ EXYNOS4210, EXYNOS4212
-+		beq	4f
-+		teq	\rp, #0x04400000	@ EXYNOS4412
-+		beq	4f
-+		teq	\rp, #0x03500000	@ EXYNOS5250
-+		beq	5f
-+		b	54f
-+
-+4:		mov	\rp, #EXYNOS4_PA_UART
-+		b	99f
-+5:		mov	\rp, #EXYNOS5_PA_UART
-+		b	99f
-+54:		mov	\rp, #EXYNOS5440_PA_UART
-+		b	99f
-+99:		ldr	\rv, =S3C_VA_UART
-+
- #if CONFIG_DEBUG_S3C_UART != 0
- 		add	\rp, \rp, #(0x10000 * CONFIG_DEBUG_S3C_UART)
- 		add	\rv, \rv, #(0x10000 * CONFIG_DEBUG_S3C_UART)
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 1df6abb..cba083e 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -203,6 +203,7 @@
- 
- #define EXYNOS4_PA_UART			0x13800000
- #define EXYNOS5_PA_UART			0x12C00000
-+#define EXYNOS5440_PA_UART		0x000B0000
- 
- #define EXYNOS4_PA_VP			0x12C00000
- #define EXYNOS4_PA_MIXER		0x12C10000
-diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
-index 2979995..ace9be2 100644
---- a/arch/arm/mach-exynos/include/mach/uncompress.h
-+++ b/arch/arm/mach-exynos/include/mach/uncompress.h
-@@ -31,16 +31,22 @@ static void arch_detect_cpu(void)
- 
- 	/*
- 	 * product_id is bits 31:12
--	 *    bits 23:20 describe the exynosX family
--	 *
-+	 *    bits 27:20 describe the exynosX family
- 	 */
- 	chip_id >>= 20;
--	chip_id &= 0xf;
--
--	if (chip_id == 0x5)
--		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
-+	chip_id &= 0xff;
-+
-+	if (chip_id == 0x32 || chip_id == 0x44)
-+		/* EXYNOS4210, EXYNOS4212 and EXYNOS4412 */
-+		uart_base = (volatile u8 *)EXYNOS4_PA_UART;
-+	else if (chip_id == 0x35)
-+		/* EXYNOS5250 */
-+		uart_base = (volatile u8 *)EXYNOS5_PA_UART;
- 	else
--		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
-+		/* EXYNOS5440 */
-+		uart_base = (volatile u8 *)EXYNOS5440_PA_UART;
-+
-+	uart_base += S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT;
- 
- 	/*
- 	 * For preventing FIFO overrun or infinite loop of UART console,
--- 
-1.7.10.4
+I wonder what happened to the patch #3 (Add usb_otg and glue data)
+of this series? Why was it dropped? I cannot see it in 3.7 or 3.8-rc1.
+
+A.
