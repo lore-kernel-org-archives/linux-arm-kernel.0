@@ -1,204 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 27 Dec 2012 20:40:48 +0100
-Subject: [PATCH] ARM: Kirkwood: Bundle the common pinctrl of 88f6281 and
- 88f6282
-In-Reply-To: <20121227170524.GX21694@titan.lakedaemon.net>
-References: <1356230149-15437-1-git-send-email-iwamatsu@nigauri.org>
- <20121227170524.GX21694@titan.lakedaemon.net>
-Message-ID: <20121227194048.GH17242@lunn.ch>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Thu, 27 Dec 2012 20:23:48 +0100
+Subject: [PATCH 2/2] dma: mv_xor: do not sync the DMA buffer after being
+ deallocated
+In-Reply-To: <1356636228-23096-1-git-send-email-lkundrak@v3.sk>
+References: <1356636228-23096-1-git-send-email-lkundrak@v3.sk>
+Message-ID: <1356636228-23096-2-git-send-email-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 27, 2012 at 12:05:24PM -0500, Jason Cooper wrote:
-> On Sun, Dec 23, 2012 at 11:35:49AM +0900, Nobuhiro Iwamatsu wrote:
-> > 88f6281 and 88f6282 has common pinctrl.
-> > This buldles the common pincrtl of these to kirkwood-628x-base.dtsi.
-> > 
-> > Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > ---
-> >  arch/arm/boot/dts/kirkwood-6281.dtsi      |   38 ++------------------------
-> >  arch/arm/boot/dts/kirkwood-6282.dtsi      |   35 ++----------------------
-> >  arch/arm/boot/dts/kirkwood-628x-base.dtsi |   41 +++++++++++++++++++++++++++++
-> 
-> Is there a reason we can't move the contents of the proposed
-> kirkwood-628x-base.dtsi into kirkwood.dtsi ?
+DMA_CHECK was unhappy:
+mv_xor mv_xor.0: DMA-API: device driver tries to sync DMA memory it has not
 
-Hi Jason
+Also, the xor test was causing the mv_xor_slot_cleanup() to incorrectly
+dealocate the destination buffer. This is fixed as well, since the deallocation
+is done in mv_xor_probe() (with correct flags) now:
+mv_xor mv_xor.0: DMA-API: device driver frees DMA memory with different direction [device address=0x000000001dea4000] [size=4096 bytes] [mapped with DMA_FROM_DEVICE] [unmapped with DMA_BIDIRECTIONAL]
 
-It might cause problems for kirkwood-98DX4122. I'm assuming this
-kirkwood embedded inside a Marvell switch will require a different
-pinctrl. I've no idea what pins it actually has, so i cannot really
-say.
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+---
+ drivers/dma/mv_xor.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
-> Also, please don't forget to CC Andrew Lunn and myself for kirkwood
-> patches.  I've added him.
-
-I added Valentin Longchamp to CC: who might be able to tell us if any
-of common pinctrl below is also common to 98DX4122.
-
-   Andrew
-
-
-> >  3 files changed, 45 insertions(+), 69 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-628x-base.dtsi
-> > 
-> > diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
-> > index d6c9d65..c8fe885 100644
-> > --- a/arch/arm/boot/dts/kirkwood-6281.dtsi
-> > +++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
-> > @@ -1,44 +1,10 @@
-> > +/include/ "kirkwood-628x-base.dtsi"
-> > +
-> >  / {
-> >  	ocp at f1000000 {
-> >  		pinctrl: pinctrl at 10000 {
-> >  			compatible = "marvell,88f6281-pinctrl";
-> >  			reg = <0x10000 0x20>;
-> > -
-> > -			pmx_nand: pmx-nand {
-> > -				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
-> > -					       "mpp4", "mpp5", "mpp18",
-> > -					       "mpp19";
-> > -				marvell,function = "nand";
-> > -			};
-> > -			pmx_sata0: pmx-sata0 {
-> > -				marvell,pins = "mpp5", "mpp21", "mpp23";
-> > -				marvell,function = "sata0";
-> > -			};
-> > -			pmx_sata1: pmx-sata1 {
-> > -				marvell,pins = "mpp4", "mpp20", "mpp22";
-> > -				marvell,function = "sata1";
-> > -			};
-> > -			pmx_spi: pmx-spi {
-> > -				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
-> > -				marvell,function = "spi";
-> > -			};
-> > -			pmx_twsi0: pmx-twsi0 {
-> > -				marvell,pins = "mpp8", "mpp9";
-> > -				marvell,function = "twsi0";
-> > -			};
-> > -			pmx_uart0: pmx-uart0 {
-> > -				marvell,pins = "mpp10", "mpp11";
-> > -				marvell,function = "uart0";
-> > -			};
-> > -			pmx_uart1: pmx-uart1 {
-> > -				marvell,pins = "mpp13", "mpp14";
-> > -				marvell,function = "uart1";
-> > -			};
-> > -			pmx_sdio: pmx-sdio {
-> > -				marvell,pins = "mpp12", "mpp13", "mpp14",
-> > -					       "mpp15", "mpp16", "mpp17";
-> > -				marvell,function = "sdio";
-> > -			};
-> >  		};
-> >  	};
-> >  };
-> > diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
-> > index e0a779c..7ce9614 100644
-> > --- a/arch/arm/boot/dts/kirkwood-6282.dtsi
-> > +++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
-> > @@ -1,3 +1,5 @@
-> > +/include/ "kirkwood-628x-base.dtsi"
-> > +
-> >  / {
-> >  	ocp at f1000000 {
-> >  
-> > @@ -5,43 +7,10 @@
-> >  			compatible = "marvell,88f6282-pinctrl";
-> >  			reg = <0x10000 0x20>;
-> >  
-> > -			pmx_nand: pmx-nand {
-> > -				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
-> > -							"mpp4", "mpp5", "mpp18", "mpp19";
-> > -				marvell,function = "nand";
-> > -			};
-> > -
-> > -			pmx_sata0: pmx-sata0 {
-> > -				marvell,pins = "mpp5", "mpp21", "mpp23";
-> > -				marvell,function = "sata0";
-> > -			};
-> > -			pmx_sata1: pmx-sata1 {
-> > -				marvell,pins = "mpp4", "mpp20", "mpp22";
-> > -				marvell,function = "sata1";
-> > -			};
-> > -			pmx_spi: pmx-spi {
-> > -				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
-> > -				marvell,function = "spi";
-> > -			};
-> > -			pmx_twsi0: pmx-twsi0 {
-> > -				marvell,pins = "mpp8", "mpp9";
-> > -				marvell,function = "twsi0";
-> > -			};
-> > -
-> >  			pmx_twsi1: pmx-twsi1 {
-> >  				marvell,pins = "mpp36", "mpp37";
-> >  				marvell,function = "twsi1";
-> >  			};
-> > -
-> > -			pmx_uart0: pmx-uart0 {
-> > -				marvell,pins = "mpp10", "mpp11";
-> > -				marvell,function = "uart0";
-> > -			};
-> > -
-> > -			pmx_uart1: pmx-uart1 {
-> > -				marvell,pins = "mpp13", "mpp14";
-> > -				marvell,function = "uart1";
-> > -			};
-> >  		};
-> >  
-> >  		i2c at 11100 {
-> > diff --git a/arch/arm/boot/dts/kirkwood-628x-base.dtsi b/arch/arm/boot/dts/kirkwood-628x-base.dtsi
-> > new file mode 100644
-> > index 0000000..c8103b6
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/kirkwood-628x-base.dtsi
-> > @@ -0,0 +1,41 @@
-> > +/ {
-> > +	ocp at f1000000 {
-> > +		pinctrl: pinctrl at 10000 {
-> > +			pmx_nand: pmx-nand {
-> > +				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
-> > +					       "mpp4", "mpp5", "mpp18",
-> > +					       "mpp19";
-> > +				marvell,function = "nand";
-> > +			};
-> > +			pmx_sata0: pmx-sata0 {
-> > +				marvell,pins = "mpp5", "mpp21", "mpp23";
-> > +				marvell,function = "sata0";
-> > +			};
-> > +			pmx_sata1: pmx-sata1 {
-> > +				marvell,pins = "mpp4", "mpp20", "mpp22";
-> > +				marvell,function = "sata1";
-> > +			};
-> > +			pmx_spi: pmx-spi {
-> > +				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
-> > +				marvell,function = "spi";
-> > +			};
-> > +			pmx_twsi0: pmx-twsi0 {
-> > +				marvell,pins = "mpp8", "mpp9";
-> > +				marvell,function = "twsi0";
-> > +			};
-> > +			pmx_uart0: pmx-uart0 {
-> > +				marvell,pins = "mpp10", "mpp11";
-> > +				marvell,function = "uart0";
-> > +			};
-> > +			pmx_uart1: pmx-uart1 {
-> > +				marvell,pins = "mpp13", "mpp14";
-> > +				marvell,function = "uart1";
-> > +			};
-> > +			pmx_sdio: pmx-sdio {
-> > +				marvell,pins = "mpp12", "mpp13", "mpp14",
-> > +					       "mpp15", "mpp16", "mpp17";
-> > +				marvell,function = "sdio";
-> > +			};
-> > +		};
-> > +	};
-> > +};
-> > -- 
-> > 1.7.10.4
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index 39387df..f642d8b 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -946,7 +946,7 @@ static int mv_xor_memcpy_self_test(struct mv_xor_chan *mv_chan)
+ 	tx = mv_xor_prep_dma_memcpy(dma_chan, dest_dma, src_dma,
+ 				    MV_XOR_TEST_SIZE,
+ 				    DMA_COMPL_SRC_UNMAP_SINGLE |
+-				    DMA_COMPL_DEST_UNMAP_SINGLE);
++				    DMA_COMPL_SKIP_DEST_UNMAP);
+ 	cookie = mv_xor_tx_submit(tx);
+ 	mv_xor_issue_pending(dma_chan);
+ 	async_tx_ack(tx);
+@@ -962,6 +962,8 @@ static int mv_xor_memcpy_self_test(struct mv_xor_chan *mv_chan)
+ 
+ 	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
+ 				MV_XOR_TEST_SIZE, DMA_FROM_DEVICE);
++	dma_unmap_single(dma_chan->device->dev, dest_dma, MV_XOR_TEST_SIZE,
++			 DMA_FROM_DEVICE);
+ 	if (memcmp(src, dest, MV_XOR_TEST_SIZE)) {
+ 		dev_err(dma_chan->device->dev,
+ 			"Self-test copy failed compare, disabling\n");
+@@ -1039,7 +1041,8 @@ mv_xor_xor_self_test(struct mv_xor_chan *mv_chan)
+ 					   0, PAGE_SIZE, DMA_TO_DEVICE);
+ 
+ 	tx = mv_xor_prep_dma_xor(dma_chan, dest_dma, dma_srcs,
+-				 MV_XOR_NUM_SRC_TEST, PAGE_SIZE, 0);
++				 MV_XOR_NUM_SRC_TEST, PAGE_SIZE,
++				 DMA_COMPL_SKIP_DEST_UNMAP);
+ 
+ 	cookie = mv_xor_tx_submit(tx);
+ 	mv_xor_issue_pending(dma_chan);
+@@ -1056,6 +1059,8 @@ mv_xor_xor_self_test(struct mv_xor_chan *mv_chan)
+ 
+ 	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
+ 				PAGE_SIZE, DMA_FROM_DEVICE);
++	dma_unmap_page(dma_chan->device->dev, dest_dma, PAGE_SIZE,
++		       DMA_FROM_DEVICE);
+ 	for (i = 0; i < (PAGE_SIZE / sizeof(u32)); i++) {
+ 		u32 *ptr = page_address(dest);
+ 		if (ptr[i] != cmp_word) {
+-- 
+1.7.1
