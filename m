@@ -1,37 +1,35 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 27 Dec 2012 20:35:24 +0200
-Subject: [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB
-In-Reply-To: <505A8BAB.2020004@ti.com>
-References: <1348047128-25692-1-git-send-email-kishon@ti.com>
- <505A8BAB.2020004@ti.com>
-Message-ID: <20121227183524.GB7097@blackmetal.musicnaut.iki.fi>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 27 Dec 2012 11:45:44 -0500
+Subject: [PATCH v2 13/20] arm: kirkwood: mplcec4: use Device Tree to
+ probe SDIO
+In-Reply-To: <50DC3FC0.4000308@mpl.ch>
+References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1356101359-6054-14-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50DC3FC0.4000308@mpl.ch>
+Message-ID: <20121227164544.GW21694@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Sep 20, 2012 at 05:21:15AM +0200, Benoit Cousson wrote:
-> On 09/19/2012 11:32 AM, Kishon Vijay Abraham I wrote:
-> > This patch series adds dt data to get MUSB working in omap4 and omap3
+On Thu, Dec 27, 2012 at 01:32:00PM +0100, Stefan Peter wrote:
+> on 21.12.2012 15:49, Thomas Petazzoni wrote:
+> > Now that the mvsdio driver has a Device Tree binding, and the SDIO
+> > controller is declared in kirkwood.dtsi, migrate the mplcec4 board to
+> > use the Device Tree to probe the SDIO controller and to mux the pins
+> > of the SDIO interface correctly.
 > > 
-> > Changes from v2:
-> > * Changes the subject of all the patches to include "ARM: dts:"
-> > * Added reg property and interrupt property for "usb_otg_hs". Previously these
-> >   were obtained from ti,hwmods property.
-> > * Rebased on
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git devel-dt
+> > This patch has not been tested, it remains to be tested by a person
+> > having access to the hardware.
 > > 
-> > Changes from v1:
-> > Just removed the omap-usb2 dt data and sent that as a separate patch.
-> > 
-> > Kishon Vijay Abraham I (3):
-> >   ARM: dts: Add twl6030-usb data
-> >   ARM: dts: Add twl4030-usb data
-> >   ARM: dts: omap: Add usb_otg and glue data
-> 
-> Thanks for the update. I've just pulled the series for 3.7.
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: Stefan Peter <s.peter@mpl.ch>
+...
+> After applying "Fixes for 3.8-rc1" and"ARM: Kirkwood: Fix missing clk
+> for USB device" from Andrew to 3.8-rc1, I was able to test these patches
+> on the MPL CEC4 under 3.8-rc1. The mvsdio was fully functional.
 
-I wonder what happened to the patch #3 (Add usb_otg and glue data)
-of this series? Why was it dropped? I cannot see it in 3.7 or 3.8-rc1.
+If you are comfortable saying so, please add a "Tested-by: ..." We don't
+like to assume ;-)
 
-A.
+thx,
+
+Jason.
