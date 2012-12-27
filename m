@@ -1,79 +1,37 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 27 Dec 2012 16:23:31 +0100
-Subject: [PATCH v2 3/3] ARM: EXYNOS5: save CLK_TOP_SRC3 register before
- powergating
-In-Reply-To: <1356006378-17441-4-git-send-email-prasanna.ps@samsung.com>
-References: <CAPmaG0uqkRcoUBR8Gjv_+BSJ3hwxUCz0G-YKNQX=qvx83i6QOQ@mail.gmail.com>
- <1356006378-17441-4-git-send-email-prasanna.ps@samsung.com>
-Message-ID: <1630653.cgu5QYax72@amdc1227>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 27 Dec 2012 16:48:18 +0000
+Subject: [PATCH V5 2/2] ASoC: SAMSUNG: Add DT support for i2s
+In-Reply-To: <CAAgF-BdNwk=aB9PdOieb=t-WBmCvB5CWEYic44fc6WwhJUHGmw@mail.gmail.com>
+References: <1355395373-22058-1-git-send-email-padma.v@samsung.com>
+ <1355395373-22058-3-git-send-email-padma.v@samsung.com>
+ <20121219132414.2CF653E0AD7@localhost>
+ <20121219170937.GV4985@opensource.wolfsonmicro.com>
+ <CAAgF-Bc3zSyhaMwSOy977PJ-PdtMfDXjFrTvpzETeHJAAQU3vQ@mail.gmail.com>
+ <008401cddfad$ae2d19e0$0a874da0$@samsung.com>
+ <CAAgF-BckOnct3gGgrxiG2W-D74sFmD=7HfBOqkj9HTc66ZPoiQ@mail.gmail.com>
+ <CAAgF-BdNwk=aB9PdOieb=t-WBmCvB5CWEYic44fc6WwhJUHGmw@mail.gmail.com>
+Message-ID: <20121227164818.GD5005@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prasanna,
+On Wed, Dec 26, 2012 at 04:21:58PM +0530, Padma Venkat wrote:
+> Hi,
+> 
+> On Mon, Dec 24, 2012 at 9:33 AM, Padma Venkat <padma.kvr@gmail.com> wrote:
+> > Hi,
 
-On Thursday 20 of December 2012 17:56:18 Prasanna Kumar wrote:
-> This patch adds a software workaround to the hardware
-> problem found in exynos5 while powergating.
-> 
-> It is observed that CLK_TOP_SRC3 register gets modified if
-> the G-Scaler/MFC devices are power gated. The clock for G-Scaler gets
-> set to XXTI which results in the device running very slow .
-> A big drop in performance is noticed whilerunning the video.
-> This issue also occurs while powergating MFC.
-> 
-> The value of clock source register is restored once the powergating
-> operation is completed.
-> 
-> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm_domains.c |   27 +++++++++++++++++++++++++++
->  1 files changed, 27 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/pm_domains.c
-> b/arch/arm/mach-exynos/pm_domains.c index 9f1351d..bd8a41e 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -24,6 +24,8 @@
-> 
->  #include <mach/regs-pmu.h>
->  #include <plat/devs.h>
-> +#include <mach/regs-clock.h>
-> +#include <plat/cpu.h>
-> 
->  /*
->   * Exynos specific wrapper around the generic power domain
-> @@ -41,6 +43,24 @@ static int exynos_pd_power(struct generic_pm_domain
-> *domain, bool power_on) void __iomem *base;
->  	u32 timeout, pwr;
->  	char *op;
-> +	u32 tmp = 0;
-> +
-> +	/*
-> +	 *It is found that the CLK SRC register in exynos5
-> +	 *gets modified when power domain of gsc/mfc/isp/disp1
-> +	 *is powered off.This happens only after the system is
-> +	 *suspended and resumed and not before that.
-> +	 *The following fix adresses this hardware issue.
-> +	 *It saves the value of clock source register and
-> +	 *resores it later
-> +	 */
-> +
-> +	if (of_machine_is_compatible("samsung,exynos5250")) {
-> +		if (!power_on) {
-> +			/* save clock source register */
-> +			tmp = __raw_readl(EXYNOS5_CLKSRC_TOP3);
+You should always delete irrelevant text from mails, it makes it much
+easier for people to find whatever content you've added.
 
-I really think this problem needs more investigation, but if gating
-a power domain can really change a clock source register and save/restore 
-when gating is really required, then the code must be reworked so it does 
-not access clock registers directly.
+> >> I agree with using version here but we need some consensus about that.
 
-At the moment it is not a problem, but we are going to have Exynos support 
-for Common Clock Framework merged in near future and it will remove static 
-mapping of clock registers.
+> Any suggestions on i2s compatible name or "samsung,i2s-v5" is okay?
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+I think that's fine.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121227/170caedc/attachment.sig>
