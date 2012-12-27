@@ -1,41 +1,76 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 27 Dec 2012 13:21:34 +1300
-Subject: [PATCH fix-3.8] rtc: vt8500: Correct handling of CR_24H bitfield
-Message-ID: <1356567694-3657-1-git-send-email-linux@prisktech.co.nz>
+Date: Thu, 27 Dec 2012 13:25:43 +1300
+Subject: [PATCH fix-3.8] video: vt8500: Fix X crash when initializing
+ framebuffer.
+Message-ID: <1356567943-3836-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Control register bitfield for 12H/24H mode is handled incorrectly.
-Setting CR_24H actually enables 12H mode. This patch renames the
-define and changes the initialization code to correctly set
-24H mode.
+This patch adds support for .fb_check_var which is required when
+X attempts to initialize the framebuffer. The only supported
+resolution is the native resolution of the LCD panel, so we test
+against the resolution supplied from the DT panel definition.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- drivers/rtc/rtc-vt8500.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/video/wm8505fb.c |   25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/rtc/rtc-vt8500.c b/drivers/rtc/rtc-vt8500.c
-index 14e2d8c..387edf6 100644
---- a/drivers/rtc/rtc-vt8500.c
-+++ b/drivers/rtc/rtc-vt8500.c
-@@ -70,7 +70,7 @@
- 				| ALARM_SEC_BIT)
+diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+index 77539c1..c84e376 100644
+--- a/drivers/video/wm8505fb.c
++++ b/drivers/video/wm8505fb.c
+@@ -41,10 +41,18 @@
  
- #define VT8500_RTC_CR_ENABLE	(1 << 0)	/* Enable RTC */
--#define VT8500_RTC_CR_24H	(1 << 1)	/* 24h time format */
-+#define VT8500_RTC_CR_12H	(1 << 1)	/* 12h time format */
- #define VT8500_RTC_CR_SM_ENABLE	(1 << 2)	/* Enable periodic irqs */
- #define VT8500_RTC_CR_SM_SEC	(1 << 3)	/* 0: 1Hz/60, 1: 1Hz */
- #define VT8500_RTC_CR_CALIB	(1 << 4)	/* Enable calibration */
-@@ -247,7 +247,7 @@ static int __devinit vt8500_rtc_probe(struct platform_device *pdev)
+ #define to_wm8505fb_info(__info) container_of(__info, \
+ 						struct wm8505fb_info, fb)
++
++struct lcd_params {
++	u32 pixel_width;
++	u32 pixel_height;
++	u32 color_depth;
++};
++
+ struct wm8505fb_info {
+ 	struct fb_info		fb;
+ 	void __iomem		*regbase;
+ 	unsigned int		contrast;
++	struct lcd_params	lcd_params;
+ };
+ 
+ 
+@@ -248,8 +256,21 @@ static int wm8505fb_blank(int blank, struct fb_info *info)
+ 	return 0;
+ }
+ 
++static int wm8505fb_check_var(struct fb_var_screeninfo *var,
++			      struct fb_info *info)
++{
++	struct wm8505fb_info *fbi = to_wm8505fb_info(info);
++        if (!fbi) return -EINVAL;
++
++	if (info->var.bits_per_pixel != fbi->lcd_params.color_depth) return -EINVAL;
++	if (info->var.xres != fbi->lcd_params.pixel_width) return -EINVAL;
++	if (info->var.yres != fbi->lcd_params.pixel_height) return -EINVAL;
++	return 0;
++}
++
+ static struct fb_ops wm8505fb_ops = {
+ 	.owner		= THIS_MODULE,
++	.fb_check_var	= wm8505fb_check_var,
+ 	.fb_set_par	= wm8505fb_set_par,
+ 	.fb_setcolreg	= wm8505fb_setcolreg,
+ 	.fb_fillrect	= wmt_ge_fillrect,
+@@ -354,6 +375,10 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
+ 		goto failed_free_res;
  	}
  
- 	/* Enable RTC and set it to 24-hour mode */
--	writel(VT8500_RTC_CR_ENABLE | VT8500_RTC_CR_24H,
-+	writel(VT8500_RTC_CR_ENABLE,
- 	       vt8500_rtc->regbase + VT8500_RTC_CR);
++	fbi->lcd_params.pixel_width = of_mode.xres;
++	fbi->lcd_params.pixel_height = of_mode.yres;
++	fbi->lcd_params.color_depth = bpp;
++
+ 	of_mode.vmode = FB_VMODE_NONINTERLACED;
+ 	fb_videomode_to_var(&fbi->fb.var, &of_mode);
  
- 	vt8500_rtc->rtc = rtc_device_register("vt8500-rtc", &pdev->dev,
 -- 
 1.7.9.5
