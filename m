@@ -1,275 +1,102 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Thu, 27 Dec 2012 17:31:02 +0530
-Subject: [PATCH v4] usb: phy: samsung: Add support to set pmu isolation
-In-Reply-To: <50DB7A83.3010508@gmail.com>
-References: <1356524912-4736-1-git-send-email-gautam.vivek@samsung.com>
- <1356524912-4736-2-git-send-email-gautam.vivek@samsung.com>
- <50DB7A83.3010508@gmail.com>
-Message-ID: <CAFp+6iEUNjZewY1b3T-eCHeiZrouxYGPXtxHuNvJdi+UEKTNjg@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Thu, 27 Dec 2012 12:09:28 +0000
+Subject: [PATCH 2/3] ARM: AT91: IIO: add sleep mode support
+In-Reply-To: <50D2EC76.5010508@free-electrons.com>
+References: <20121219183236.GP23971@game.jcrosoft.org>
+ <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
+ <1355942232-26251-2-git-send-email-plagnioj@jcrosoft.com>
+ <50D2EC76.5010508@free-electrons.com>
+Message-ID: <50DC3A78.80100@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
-
-
-On Thu, Dec 27, 2012 at 4:00 AM, Sylwester Nawrocki
-<sylvester.nawrocki@gmail.com> wrote:
-> On 12/26/2012 01:28 PM, Vivek Gautam wrote:
+On 12/20/2012 10:46 AM, Maxime Ripard wrote:
+> Hi,
+> 
+> Le 19/12/2012 19:37, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+>> The sleep mode will allow to put the add in sleep between conversion.
 >>
->> Adding support to parse device node data in order to get
->> required properties to set pmu isolation for usb-phy.
->>
->> Signed-off-by: Vivek Gautam<gautam.vivek@samsung.com>
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Cc: linux-iio at vger.kernel.org
+>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
 >> ---
->>   .../devicetree/bindings/usb/samsung-usbphy.txt     |   31 ++++
->>   drivers/usb/phy/samsung-usbphy.c                   |  145
->> +++++++++++++++++---
->>   2 files changed, 155 insertions(+), 21 deletions(-)
+>>  Documentation/devicetree/bindings/arm/atmel-adc.txt |    1 +
+>>  drivers/iio/adc/at91_adc.c                          |   19 ++++++++++---------
+>>  2 files changed, 11 insertions(+), 9 deletions(-)
+I have no particular problem with this, but would like a brief note on what
+one looses when sleep mode is enabled?  How much slower is the conversion if
+we first have to come out of sleep mode?   Basically I want a justification
+of why we don't always enable this.  Is this hardware specific or
+should it simply be controllable from userspace?
+
 >>
->> diff --git a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
->> b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
->> index 7b26e2d..6b873fd 100644
->> --- a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
->> +++ b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
->> @@ -9,3 +9,34 @@ Required properties:
->>   - compatible : should be "samsung,exynos4210-usbphy"
->>   - reg : base physical address of the phy registers and length of memory
->> mapped
->>         region.
+>> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>> index fd2d69e..efb6f02 100644
+>> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>> @@ -25,6 +25,7 @@ Optional properties:
+>>    - atmel,adc-use-res: String corresponding to an identifier from
+>>  		       atmel,adc-res-names property. If not specified, the highest
+>>  		       resolution will be used.
+>> +  - atmel,atmel,adc-sleep-mode: Boolean to enable of sleep mode when no conversion
+>>   
+>>  Optional trigger Nodes:
+>>    - Required properties:
+>> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+>> index f175a86..c563488 100644
+>> --- a/drivers/iio/adc/at91_adc.c
+>> +++ b/drivers/iio/adc/at91_adc.c
+>> @@ -52,6 +52,7 @@ struct at91_adc_state {
+>>  	void __iomem		*reg_base;
+>>  	struct at91_adc_reg_desc *registers;
+>>  	u8			startup_time;
+>> +	bool			sleep_mode;
+>>  	struct iio_trigger	**trig;
+>>  	struct at91_adc_trigger	*trigger_list;
+>>  	u32			trigger_number;
+>> @@ -455,6 +456,8 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+>>  	}
+>>  	st->num_channels = prop;
+>>  
+>> +	st->sleep_mode = of_property_read_bool(node, "atmel,adc-sleep-mode");
 >> +
->> +Optional properties:
->> +- #address-cells: should be '1' when usbphy node has a child node with
->> 'reg'
->> +                 property.
->> +- #size-cells: should be '1' when usbphy node has a child node with 'reg'
->> +              property.
->> +
->> +- The child node 'usbphy-pmu' to the node usbphy should provide the
->> following
->> +  information required by usb-phy controller to enable/disable the phy.
->> +   - reg : base physical address of PHY control register in PMU which
->> +           enables/disables the phy controller.
->> +           The size of this register is the total sum of size of all
->> phy-control
->> +           registers that the SoC has. For example, the size will be
->> +           '0x4' in case we have only one phy-control register (like in
->> S3C64XX) or
->> +           '0x8' in case we have two phy-control registers (like in
->> Exynos4210)
->> +           and so on.
->> +
->> +Example:
->> + - Exysno4210
->
->
-> s/Exysno/Exynos
->
-Sure will amend this.
->
->> +
->> +       usbphy at 125B0000 {
->> +               #address-cells =<1>;
->> +               #size-cells =<1>;
->> +               compatible = "samsung,exynos4210-usbphy";
->> +               reg =<0x125B0000 0x100>;
->> +
->> +               usbphy-pmu {
->> +                       /* USB device and host PHY_CONTROL registers */
->> +                       reg =<0x10020704 0x8>;
->> +               };
->> +       };
->> diff --git a/drivers/usb/phy/samsung-usbphy.c
->> b/drivers/usb/phy/samsung-usbphy.c
->> index 5c5e1bb5..b9f4f42 100644
->> --- a/drivers/usb/phy/samsung-usbphy.c
->> +++ b/drivers/usb/phy/samsung-usbphy.c
->> @@ -60,20 +60,42 @@
->>   #define MHZ (1000*1000)
->>   #endif
->>
->> +#define S3C64XX_USBPHY_ENABLE                  (0x1<<  16)
->> +#define EXYNOS_USBPHY_ENABLE                   (0x1<<  0)
->> +
->>   enum samsung_cpu_type {
->>         TYPE_S3C64XX,
->>         TYPE_EXYNOS4210,
->>   };
->>
->>   /*
->> + * struct samsung_usbphy_drvdata - driver data for various SoC variants
->> + * @cpu_type: machine identifier
->> + * @devphy_en_mask: device phy enable mask for PHY CONTROL register
->> + *
->> + *     Here we have a separate mask for device type phy.
->> + *     Having different masks for host and device type phy helps
->> + *     in setting independent masks in case of SoCs like S5PV210,
->> + *     in which PHY0 and PHY1 enable bits belong to same register
->> + *     placed at [0] and [1] respectively.
->
->
-> "and are placed at positions 0 and 1 respectively" ?
->
-Ok, will change this.
->
->> + *     Although for newer SoCs like exynos these bits belong to
->> + *     different registers altogether placed at [0].
->> + */
->> +struct samsung_usbphy_drvdata {
->> +       int cpu_type;
->> +       int devphy_en_mask;
->> +};
->> +
->> +/*
->>    * struct samsung_usbphy - transceiver driver state
->>    * @phy: transceiver structure
->>    * @plat: platform data
->>    * @dev: The parent device supplied to the probe function
->>    * @clk: usb phy clock
->>    * @regs: usb phy register memory base
->> + * @phyctrl_pmureg: usb device phy-control pmu register memory base
->
->
-> nit: Perhaps we could just call it "pmureg' ?
->
-Sure we can use the name 'pmureg'.
->
->>    * @ref_clk_freq: reference clock frequency selection
->> - * @cpu_type: machine identifier
->> + * @drv_data: driver data available for different cpu types
->
->
-> Actually it's for different SoCs, not CPUs, right ?
->
-Right, will change this.
-
->
->>    */
->>   struct samsung_usbphy {
->>         struct usb_phy  phy;
->> @@ -81,12 +103,67 @@ struct samsung_usbphy {
->>         struct device   *dev;
->>         struct clk      *clk;
->>         void __iomem    *regs;
->> +       void __iomem    *phyctrl_pmureg;
->>         int             ref_clk_freq;
->> -       int             cpu_type;
->> +       const struct samsung_usbphy_drvdata *drv_data;
->>   };
->>
->>   #define phy_to_sphy(x)                container_of((x), struct
->> samsung_usbphy, phy)
->>
->> +static int samsung_usbphy_parse_dt_param(struct samsung_usbphy *sphy)
->
->
-> nit: s/samsung_usbphy_parse_dt_param/samsung_usbphy_parse_dt ?
->
-Ok, will change this.
->
->> +{
->> +       struct device_node *usbphy_pmu;
->> +       u32 reg[2];
->> +       int ret;
->> +
->> +       if (!sphy->dev->of_node) {
->> +               dev_err(sphy->dev, "Can't get usb-phy node\n");
->> +               return -ENODEV;
->
->
-> The function is called only when dev->of_node is not NULL, so this path
-> is never executed, AFAICS. I would just drop this redundant check.
->
-Yes, thanks for pointing out. I missed that. Will remove this check.
-
->
->> +       }
->> +
->> +       usbphy_pmu = of_get_child_by_name(sphy->dev->of_node,
->> "usbphy-pmu");
->> +       if (!usbphy_pmu)
->> +               dev_warn(sphy->dev, "Can't get usb-phy pmu control
->> node\n");
->
->
->> +       ret = of_property_read_u32_array(usbphy_pmu, "reg", reg,
->>
->> +                                               ARRAY_SIZE(reg));
->> +       if (!ret)
->> +               sphy->phyctrl_pmureg = ioremap(reg[0], reg[1]);
->
->
-> I don't think this is correct. reg is not really an array of u32 type,
-> it's an array of address/size tuples. I thought you would use of_iomap()
-> here. Any reason why you didn't do so ? It would also make it easier to
-> handle multiple address/size pairs if required.
->
-True we should in fact be using of_iomap. Will change this accordingly.
-
->
->> +
->> +       of_node_put(usbphy_pmu);
->> +
->> +       if (IS_ERR_OR_NULL(sphy->phyctrl_pmureg)) {
->
->
-> When is sphy->phyctrl_pmureg assigned a ERR_PTR() value ? Wouldn't it
-> be enough to simply check for NULL ?
->
-Yes, true no error returned here, will check this against NULL.
-
->
->> +               dev_err(sphy->dev, "Can't get usb-phy pmu control
->> register\n");
->> +               return -ENODEV;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +/*
->> + * Set isolation here for phy.
->> + * SOCs control this by controlling corresponding PMU registers
->> + */
->> +static void samsung_usbphy_set_isolation(struct samsung_usbphy *sphy, int
->> on)
->> +{
->> +       u32 reg;
->> +       int en_mask;
->> +
->> +       if (!sphy->phyctrl_pmureg) {
->> +               dev_warn(sphy->dev, "Can't set pmu isolation\n");
->> +               return;
->> +       }
->> +
->> +       reg = readl(sphy->phyctrl_pmureg);
->
->
-> To make it more generic maybe it's worth to store an offset to the actual
-> register somewhere, e.g. in the driver_data struct ? This function is
-> supposed to handle both device and host PHYs, isn't it ?
->
-True we can make put an offset for host and device PHYs.
-So we iomap the memory base address of the first register (i.e. device
-PHY in exynos4210),
-and then use an offset for other register (i.e.host PHY). Right?
-
->> +       en_mask = sphy->drv_data->devphy_en_mask;
->> +
->> +       if (on)
->> +               writel(reg&  ~en_mask, sphy->phyctrl_pmureg);
->>
->> +       else
->> +               writel(reg | en_mask, sphy->phyctrl_pmureg);
->
->
-> nit: This could be also written as:
->
->         reg = on ? reg & ~mask : reg | mask;
->         writel(reg, sphy->phyctrl_pmureg);
-
-Sure will amend this.
-
-
--- 
-Thanks & Regards
-Vivek
+>>  	if (of_property_read_u32(node, "atmel,adc-startup-time", &prop)) {
+>>  		dev_err(&idev->dev, "Missing adc-startup-time property in the DT.\n");
+>>  		ret = -EINVAL;
+>> @@ -580,6 +583,7 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+>>  	struct iio_dev *idev;
+>>  	struct at91_adc_state *st;
+>>  	struct resource *res;
+>> +	u32 reg;
+>>  
+>>  	idev = iio_device_alloc(sizeof(struct at91_adc_state));
+>>  	if (idev == NULL) {
+>> @@ -687,16 +691,13 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
+>>  	 */
+>>  	ticks = round_up((st->startup_time * adc_clk /
+>>  			  1000000) - 1, 8) / 8;
+>> -
+>> +	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
+>> +	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
+>>  	if (st->low_res)
+>> -		at91_adc_writel(st, AT91_ADC_MR,
+>> -				AT91_ADC_LOWRES |
+>> -				(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
+>> -				(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
+>> -	else
+>> -		at91_adc_writel(st, AT91_ADC_MR,
+>> -				(AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
+>> -				(AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
+>> +		reg |= AT91_ADC_LOWRES;
+>> +	if (st->sleep_mode)
+>> +		reg |= AT91_ADC_SLEEP;
+>> +	at91_adc_writel(st, AT91_ADC_MR, reg);
+> 
+> I'm fine with the code in itself, but since this also refactors what has
+> been added in the previous patch, maybe you can add it in the first patch.
+> 
+> Apart from that, you can add my Acked-by.
+> 
+> Maxime
+> 
