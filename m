@@ -1,62 +1,204 @@
-From: philip@balister.org (Philip Balister)
-Date: Thu, 27 Dec 2012 13:53:37 -0500
-Subject: OT:zynx on zedboard.org hr timer problem with dts
-In-Reply-To: <20121220172301.GC27361@kryptos>
-References: <201212201744.43678.tim01@vlsi.informatik.tu-darmstadt.de>
- <20121220172301.GC27361@kryptos>
-Message-ID: <50DC9931.5070500@balister.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 27 Dec 2012 20:40:48 +0100
+Subject: [PATCH] ARM: Kirkwood: Bundle the common pinctrl of 88f6281 and
+ 88f6282
+In-Reply-To: <20121227170524.GX21694@titan.lakedaemon.net>
+References: <1356230149-15437-1-git-send-email-iwamatsu@nigauri.org>
+ <20121227170524.GX21694@titan.lakedaemon.net>
+Message-ID: <20121227194048.GH17242@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2012 12:23 PM, Josh Cartwright wrote:
-> On Thu, Dec 20, 2012 at 05:44:42PM +0100, Tim Sander wrote:
->> Hi
->>
->> This is probably not the right list but in lack of knowing a better place:
->> I am using the xilinx git repository (git://git.xilinx.com/linux-xlnx.git)
->> with the attached dts file. Most stuff works fine but there is a error message
->> on startup:
->> Zynq clock init
->> xlnx,ps7-ttc-1.00.a #0 at 0xe0800000, irq=43
->> ------------[ cut here ]------------
->> WARNING: at arch/arm/kernel/smp_twd.c:389 time_init+0x20/0x30()
->> twd_local_timer_of_register failed (-22)
->> Modules linked in:
->> [<c001417c>] (unwind_backtrace+0x0/0x11c) from [<c0020aac>] (warn_slowpath_common+0x4c/0x64)
->> [<c0020aac>] (warn_slowpath_common+0x4c/0x64) from [<c0020b44>] (warn_slowpath_fmt+0x2c/0x3c)
->> [<c0020b44>] (warn_slowpath_fmt+0x2c/0x3c) from [<c0486080>] (time_init+0x20/0x30)
->> [<c0486080>] (time_init+0x20/0x30) from [<c04826c0>] (start_kernel+0x1b4/0x2f0)
->> [<c04826c0>] (start_kernel+0x1b4/0x2f0) from [<00008044>] (0x8044)
->> ---[ end trace 0000000000000001 ]---
->> and hrtimers are not working although they are enabled in the .config.
->
-> Hey Tim-
->
-> A better place to ask questions about the Xilinx tree will likely be on
-> their Embedded Linux forum [1].
->
+On Thu, Dec 27, 2012 at 12:05:24PM -0500, Jason Cooper wrote:
+> On Sun, Dec 23, 2012 at 11:35:49AM +0900, Nobuhiro Iwamatsu wrote:
+> > 88f6281 and 88f6282 has common pinctrl.
+> > This buldles the common pincrtl of these to kirkwood-628x-base.dtsi.
+> > 
+> > Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> > ---
+> >  arch/arm/boot/dts/kirkwood-6281.dtsi      |   38 ++------------------------
+> >  arch/arm/boot/dts/kirkwood-6282.dtsi      |   35 ++----------------------
+> >  arch/arm/boot/dts/kirkwood-628x-base.dtsi |   41 +++++++++++++++++++++++++++++
+> 
+> Is there a reason we can't move the contents of the proposed
+> kirkwood-628x-base.dtsi into kirkwood.dtsi ?
 
-I find the forum to be painful to use and it is very difficult to track 
-multiple conversations. And it looks like there is only one arm kernel 
-guy there on a regular basis.
+Hi Jason
 
-Philip
+It might cause problems for kirkwood-98DX4122. I'm assuming this
+kirkwood embedded inside a Marvell switch will require a different
+pinctrl. I've no idea what pins it actually has, so i cannot really
+say.
 
->> I am sure this is an error in the attached dts but i am to knew to this device tree
->> stuff to find the error. So any hint would be apreciated.
->
-> On first glance, it looks like you've specified a node for the twd, but
-> neglected to specify interrupts.  See Documentation/devicetree/bindings/arm/twd.txt.
->
->> 		swdt at f8005000 {
->> 			device_type = "watchdog";
->> 			compatible = "arm,cortex-a9-twd-timer";
->> 			reg = <0xf8005000 0x100>;
->> 			clock-frequency = <111111111>;
->> 		};
->
-> Good luck,
->       Josh
->
-> [1]: http://forums.xilinx.com/t5/Embedded-Linux/bd-p/ELINUX
->
+> Also, please don't forget to CC Andrew Lunn and myself for kirkwood
+> patches.  I've added him.
+
+I added Valentin Longchamp to CC: who might be able to tell us if any
+of common pinctrl below is also common to 98DX4122.
+
+   Andrew
+
+
+> >  3 files changed, 45 insertions(+), 69 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/kirkwood-628x-base.dtsi
+> > 
+> > diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
+> > index d6c9d65..c8fe885 100644
+> > --- a/arch/arm/boot/dts/kirkwood-6281.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
+> > @@ -1,44 +1,10 @@
+> > +/include/ "kirkwood-628x-base.dtsi"
+> > +
+> >  / {
+> >  	ocp at f1000000 {
+> >  		pinctrl: pinctrl at 10000 {
+> >  			compatible = "marvell,88f6281-pinctrl";
+> >  			reg = <0x10000 0x20>;
+> > -
+> > -			pmx_nand: pmx-nand {
+> > -				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
+> > -					       "mpp4", "mpp5", "mpp18",
+> > -					       "mpp19";
+> > -				marvell,function = "nand";
+> > -			};
+> > -			pmx_sata0: pmx-sata0 {
+> > -				marvell,pins = "mpp5", "mpp21", "mpp23";
+> > -				marvell,function = "sata0";
+> > -			};
+> > -			pmx_sata1: pmx-sata1 {
+> > -				marvell,pins = "mpp4", "mpp20", "mpp22";
+> > -				marvell,function = "sata1";
+> > -			};
+> > -			pmx_spi: pmx-spi {
+> > -				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
+> > -				marvell,function = "spi";
+> > -			};
+> > -			pmx_twsi0: pmx-twsi0 {
+> > -				marvell,pins = "mpp8", "mpp9";
+> > -				marvell,function = "twsi0";
+> > -			};
+> > -			pmx_uart0: pmx-uart0 {
+> > -				marvell,pins = "mpp10", "mpp11";
+> > -				marvell,function = "uart0";
+> > -			};
+> > -			pmx_uart1: pmx-uart1 {
+> > -				marvell,pins = "mpp13", "mpp14";
+> > -				marvell,function = "uart1";
+> > -			};
+> > -			pmx_sdio: pmx-sdio {
+> > -				marvell,pins = "mpp12", "mpp13", "mpp14",
+> > -					       "mpp15", "mpp16", "mpp17";
+> > -				marvell,function = "sdio";
+> > -			};
+> >  		};
+> >  	};
+> >  };
+> > diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
+> > index e0a779c..7ce9614 100644
+> > --- a/arch/arm/boot/dts/kirkwood-6282.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
+> > @@ -1,3 +1,5 @@
+> > +/include/ "kirkwood-628x-base.dtsi"
+> > +
+> >  / {
+> >  	ocp at f1000000 {
+> >  
+> > @@ -5,43 +7,10 @@
+> >  			compatible = "marvell,88f6282-pinctrl";
+> >  			reg = <0x10000 0x20>;
+> >  
+> > -			pmx_nand: pmx-nand {
+> > -				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
+> > -							"mpp4", "mpp5", "mpp18", "mpp19";
+> > -				marvell,function = "nand";
+> > -			};
+> > -
+> > -			pmx_sata0: pmx-sata0 {
+> > -				marvell,pins = "mpp5", "mpp21", "mpp23";
+> > -				marvell,function = "sata0";
+> > -			};
+> > -			pmx_sata1: pmx-sata1 {
+> > -				marvell,pins = "mpp4", "mpp20", "mpp22";
+> > -				marvell,function = "sata1";
+> > -			};
+> > -			pmx_spi: pmx-spi {
+> > -				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
+> > -				marvell,function = "spi";
+> > -			};
+> > -			pmx_twsi0: pmx-twsi0 {
+> > -				marvell,pins = "mpp8", "mpp9";
+> > -				marvell,function = "twsi0";
+> > -			};
+> > -
+> >  			pmx_twsi1: pmx-twsi1 {
+> >  				marvell,pins = "mpp36", "mpp37";
+> >  				marvell,function = "twsi1";
+> >  			};
+> > -
+> > -			pmx_uart0: pmx-uart0 {
+> > -				marvell,pins = "mpp10", "mpp11";
+> > -				marvell,function = "uart0";
+> > -			};
+> > -
+> > -			pmx_uart1: pmx-uart1 {
+> > -				marvell,pins = "mpp13", "mpp14";
+> > -				marvell,function = "uart1";
+> > -			};
+> >  		};
+> >  
+> >  		i2c at 11100 {
+> > diff --git a/arch/arm/boot/dts/kirkwood-628x-base.dtsi b/arch/arm/boot/dts/kirkwood-628x-base.dtsi
+> > new file mode 100644
+> > index 0000000..c8103b6
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/kirkwood-628x-base.dtsi
+> > @@ -0,0 +1,41 @@
+> > +/ {
+> > +	ocp at f1000000 {
+> > +		pinctrl: pinctrl at 10000 {
+> > +			pmx_nand: pmx-nand {
+> > +				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
+> > +					       "mpp4", "mpp5", "mpp18",
+> > +					       "mpp19";
+> > +				marvell,function = "nand";
+> > +			};
+> > +			pmx_sata0: pmx-sata0 {
+> > +				marvell,pins = "mpp5", "mpp21", "mpp23";
+> > +				marvell,function = "sata0";
+> > +			};
+> > +			pmx_sata1: pmx-sata1 {
+> > +				marvell,pins = "mpp4", "mpp20", "mpp22";
+> > +				marvell,function = "sata1";
+> > +			};
+> > +			pmx_spi: pmx-spi {
+> > +				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
+> > +				marvell,function = "spi";
+> > +			};
+> > +			pmx_twsi0: pmx-twsi0 {
+> > +				marvell,pins = "mpp8", "mpp9";
+> > +				marvell,function = "twsi0";
+> > +			};
+> > +			pmx_uart0: pmx-uart0 {
+> > +				marvell,pins = "mpp10", "mpp11";
+> > +				marvell,function = "uart0";
+> > +			};
+> > +			pmx_uart1: pmx-uart1 {
+> > +				marvell,pins = "mpp13", "mpp14";
+> > +				marvell,function = "uart1";
+> > +			};
+> > +			pmx_sdio: pmx-sdio {
+> > +				marvell,pins = "mpp12", "mpp13", "mpp14",
+> > +					       "mpp15", "mpp16", "mpp17";
+> > +				marvell,function = "sdio";
+> > +			};
+> > +		};
+> > +	};
+> > +};
+> > -- 
+> > 1.7.10.4
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
