@@ -1,75 +1,65 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Thu, 27 Dec 2012 07:43:28 +0000
-Subject: [imx:work/efikasb 5/29] drivers/usb/chipidea/core.c:323:4:
- warning: large integer implicitly truncated to unsigned type
-In-Reply-To: <50ce2697.0463bOWc8yxBEQL0%fengguang.wu@intel.com>
-References: <50ce2697.0463bOWc8yxBEQL0%fengguang.wu@intel.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803D58AAD@039-SN2MPN1-022.039d.mgd.msft.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 27 Dec 2012 16:20:08 +0800
+Subject: [PATCH v4 3/7] usb: chipidea: add otg id switch and vbus
+ connect/disconnect detect
+In-Reply-To: <201212270821.55253.marex@denx.de>
+References: <1356591603-23323-1-git-send-email-peter.chen@freescale.com>
+ <1356591603-23323-4-git-send-email-peter.chen@freescale.com>
+ <201212270821.55253.marex@denx.de>
+Message-ID: <20121227082007.GA29123@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 27, 2012 at 08:21:55AM +0100, Marek Vasut wrote:
+> Dear Peter Chen,
+> 
+> [...]
+> > +
+> > +#define CI_VBUS_STABLE_TIMEOUT 500
+> 
+> Shall we not change this to static const int instead ?
+Is it a must?
+I find the similar at drivers/usb/core/hub.c
 
-Fixed at my tree: https://github.com/hzpeterchen/linux-usb.git
+2433 #define PORT_RESET_TRIES        5
+2434 #define SET_ADDRESS_TRIES       2
+2435 #define GET_DESCRIPTOR_TRIES    2
+2436 #define SET_CONFIG_TRIES        (2 * (use_both_schemes + 1))
+2437 #define USE_NEW_SCHEME(i)       ((i) / 2 == (int)old_scheme_first)
+2438         
+2439 #define HUB_ROOT_RESET_TIME     50      /* times are in msec */
+2440 #define HUB_SHORT_RESET_TIME    10
+2441 #define HUB_BH_RESET_TIME       50
+2442 #define HUB_LONG_RESET_TIME     200
+2443 #define HUB_RESET_TIMEOUT       500
+> 
+> [...]
+> 
+> > --- a/drivers/usb/chipidea/udc.c
+> > +++ b/drivers/usb/chipidea/udc.c
+> > @@ -1371,6 +1371,7 @@ static int ci13xxx_vbus_session(struct usb_gadget
+> > *_gadget, int is_active) pm_runtime_get_sync(&_gadget->dev);
+> >  			hw_device_reset(ci, USBMODE_CM_DC);
+> >  			hw_device_state(ci, ci->ep0out->qh.dma);
+> > +			dev_dbg(ci->dev, "Connected to host\n");
+> >  		} else {
+> >  			hw_device_state(ci, 0);
+> >  			if (ci->platdata->notify_event)
+> > @@ -1378,6 +1379,7 @@ static int ci13xxx_vbus_session(struct usb_gadget
+> > *_gadget, int is_active) CI13XXX_CONTROLLER_STOPPED_EVENT);
+> >  			_gadget_stop_activity(&ci->gadget);
+> >  			pm_runtime_put_sync(&_gadget->dev);
+> > +			dev_dbg(ci->dev, "disconnected from host\n");
+> 
+> Keep the capital letters at the begining of the sentence consistent -- either 
+> start with capital D here or fix the capital C above.
+Thanks, I will change "d" to "D".
+> 
+> >  		}
+> >  	}
+> 
 
- 
-> 
-> tree:   git://git.pengutronix.de/git/imx/linux-2.6.git work/efikasb
-> head:   4de30514cbd7126ba06062e39ba4701f2bca1a37
-> commit: 012289b901c5e60b6f0d215cef44697dc71b5d76 [5/29] usb: chipidea:
-> add otg id switch and vbus connect/disconnect detect
-> config: make ARCH=x86_64 allyesconfig
-> 
-> All warnings:
-> 
-> drivers/usb/chipidea/core.c: In function 'ci_handle_id_switch':
-> drivers/usb/chipidea/core.c:323:4: warning: large integer implicitly
-> truncated to unsigned type [-Woverflow]
-> 
-> vim +323 drivers/usb/chipidea/core.c
-> 
-> 012289b9 Peter Chen         2012-11-19  307
-> 012289b9 Peter Chen         2012-11-19  308  	}
-> 012289b9 Peter Chen         2012-11-19  309  }
-> 012289b9 Peter Chen         2012-11-19  310
-> 012289b9 Peter Chen         2012-11-19  311  static void
-> ci_handle_id_switch(struct ci13xxx *ci)
-> 5f36e231 Alexander Shishkin 2012-05-11  312  {
-> 5f36e231 Alexander Shishkin 2012-05-11  313  	enum ci_role role =
-> ci_otg_role(ci);
-> 5f36e231 Alexander Shishkin 2012-05-11  314
-> 5f36e231 Alexander Shishkin 2012-05-11  315  	if (role != ci->role) {
-> 5f36e231 Alexander Shishkin 2012-05-11  316  		dev_dbg(ci->dev,
-> "switching from %s to %s\n",
-> 5f36e231 Alexander Shishkin 2012-05-11  317  			ci_role(ci)-
-> >name, ci->roles[role]->name);
-> 5f36e231 Alexander Shishkin 2012-05-11  318
-> 012289b9 Peter Chen         2012-11-19  319  		/* 1. Finish the
-> current role */
-> 012289b9 Peter Chen         2012-11-19  320  		if (ci->role ==
-> CI_ROLE_GADGET) {
-> 012289b9 Peter Chen         2012-11-19  321
-> 	usb_gadget_vbus_disconnect(&ci->gadget);
-> 012289b9 Peter Chen         2012-11-19  322  			/* host
-> doesn't care B_SESSION_VALID event */
-> 012289b9 Peter Chen         2012-11-19 @323  			hw_write(ci,
-> OP_OTGSC, OTGSC_BSVIE, ~OTGSC_BSVIE);
-> 012289b9 Peter Chen         2012-11-19  324  			hw_write(ci,
-> OP_OTGSC, OTGSC_BSVIS, OTGSC_BSVIS);
-> 012289b9 Peter Chen         2012-11-19  325  			ci->role =
-> CI_ROLE_END;
-> 012289b9 Peter Chen         2012-11-19  326  			/* reset
-> controller */
-> 012289b9 Peter Chen         2012-11-19  327
-> 	hw_device_reset(ci, USBMODE_CM_IDLE);
-> 012289b9 Peter Chen         2012-11-19  328  		} else if (ci->role
-> == CI_ROLE_HOST) {
-> 012289b9 Peter Chen         2012-11-19  329
-> 	ci_role_stop(ci);
-> 012289b9 Peter Chen         2012-11-19  330  			/* reset
-> controller */
-> 012289b9 Peter Chen         2012-11-19  331
-> 	hw_device_reset(ci, USBMODE_CM_IDLE);
-> 
-> ---
-> 0-DAY kernel build testing backend         Open Source Technology Center
-> Fengguang Wu, Yuanhan Liu                              Intel Corporation
+-- 
+
+Best Regards,
+Peter Chen
