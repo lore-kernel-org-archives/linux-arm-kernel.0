@@ -1,42 +1,43 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Thu, 27 Dec 2012 05:16:16 -0800
-Subject: [PATCH 1/2] ARM: pxa: palm27x: fix udc device initialization
-In-Reply-To: <87sj6vmpkr.fsf@free.fr>
-References: <1356200860-3241-1-git-send-email-mikedunn@newsguy.com>
- <1356200860-3241-2-git-send-email-mikedunn@newsguy.com>
- <201212230424.16848.marex@denx.de> <87sj6vmpkr.fsf@free.fr>
-Message-ID: <50DC4A20.3080702@newsguy.com>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Thu, 27 Dec 2012 08:28:22 -0500
+Subject: [PATCH 0/6 v8] cpufreq: add support for Calxeda ECX-1000
+ (highbank)
+In-Reply-To: <2705062.NIaFfcLb3a@vostro.rjw.lan>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354726121-17190-1-git-send-email-mark.langsdorf@calxeda.com>,
+ <2705062.NIaFfcLb3a@vostro.rjw.lan>
+Message-ID: <21672683C5A3814BB4DB938EBE482DE435D97660AB@IAD2MBX09.mex02.mlsrvr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+I thought I had addressed all the issues with the v9 version. The only comments I got on it was Mike's reviewed-by and I didn't think that warranted a resend.
 
-On 12/24/2012 07:34 AM, Robert Jarzmik wrote:
+If you do want me to send it again, do you want it  updated to current top-of-tree? That may take a bit, since there's an unrelated bug that's preventing my test box from booting.
 
-[..]
-
-
- Actually gpio-vbus was designed to :
->  - detect and handle VBus
->  - and handle following D+ pullup if peripheral controller *can't*
-> 
-> But pxa27x_udc is a peripheral controller which does handle D+ pullup, and
-> expects to handle it by himself (ie. is not fully compatible with a D+ pullup
-> handling by gpio-vbus, one not working case being Mike's one).
-> 
-> So Mike's patch makes sense IMHO. He could have left the VBUS handling to
-> gpio-vbus and D+ to pxa27x_udc, or let pxa27x_udc handle both, that's up to you.
+--Mark Langsdorf
+Calxeda, Inc.
 
 
-I didn't realize the pxa27x-udc driver could handle the vbus as well.
+________________________________________
+From: Rafael J. Wysocki [rjw at sisk.pl]
+Sent: Thursday, December 27, 2012 7:12 AM
+To: Mark Langsdorf
+Cc: linux-kernel at vger.kernel.org; cpufreq at vger.kernel.org; linux-pm at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 0/6 v8] cpufreq: add support for Calxeda ECX-1000 (highbank)
+
+On Wednesday, December 05, 2012 10:48:35 AM Mark Langsdorf wrote:
+> This patch series adds cpufreq support for the Calxeda
+> ECX-1000 (highbank) SoCs. The EnergyCore Management Engine (ECME) on
+> the ECX-1000 manages the voltage for the part and communications with
+> Linux through a pl320 mailbox. clk notifications are used to control
+> when to send messages to the ECME.
+
+If you want me to handle this, can you please resend the whole patchset (with
+all of the comments addressed, if possible)?
+
+Rafael
 
 
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
-
-Thanks Robert.  Should have CC'd you, since you're the udc driver author.  Glad
-you saw this.
-
-
-Thanks again,
-MIke
+--
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
