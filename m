@@ -1,120 +1,35 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 27 Dec 2012 22:54:48 +0100
-Subject: [PATCH 2/2] ARM: dts: cfa10049: Change the SPI3 bus to spi-gpio
-In-Reply-To: <1356645288-10110-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1356645288-10110-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1356645288-10110-3-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 27 Dec 2012 23:00:51 +0100
+Subject: [PATCHv2] ARM: dts: cfa10049: Add PCA9555 GPIO expander to the
+ device tree
+In-Reply-To: <20121122112447.GI24693@S2100-06.ap.freescale.net>
+References: <20121120144322.GE4882@S2100-06.ap.freescale.net>
+ <1353422015-4790-1-git-send-email-maxime.ripard@free-electrons.com>
+ <50AE023D.3000406@free-electrons.com>
+ <20121122112447.GI24693@S2100-06.ap.freescale.net>
+Message-ID: <50DCC513.5030004@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DAC found on the last chip select requires a word length of 12 bits,
-which is not supported by the SSP controller of the iMX28. Use
-bitbanging for that bus to support such a length.
+Hi Shawn,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10049.dts |   78 ++++++++++++++++++----------------
- 1 file changed, 42 insertions(+), 36 deletions(-)
+Le 22/11/2012 12:24, Shawn Guo a ?crit :
+> On Thu, Nov 22, 2012 at 11:45:17AM +0100, Maxime Ripard wrote:
+> The patch is ok now.  But I have problem to apply it because its
+> prerequisite has been applied on i2c tree, as I did not plan a second
+> pull request for 3.8 at all.
+> 
+> I hope it's fine to apply the patch on top of v3.8-rc1, or you can
+> try to ask Wolfram to have this patch go via his tree too.
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index 7890acc..dd91244 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -52,48 +52,17 @@
- 				spi3_pins_cfa10049: spi3-cfa10049 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
--						0x0181 /* MX28_PAD_GPMI_RDN__SSP3_SCK */
--						0x01c1 /* MX28_PAD_GPMI_RESETN__SSP3_CMD */
--						0x0111 /* MX28_PAD_GPMI_CE1N__SSP3_D3 */
--						0x01a2 /* MX28_PAD_GPMI_ALE__SSP3_D4 */
--						0x01b2 /* MX28_PAD_GPMI_CLE__SSP3_D5 */
-+						0x0183 /* MX28_PAD_GPMI_RDN__GPIO_0_24 */
-+						0x01c3 /* MX28_PAD_GPMI_RESETN__GPIO_0_28 */
-+						0x0113 /* MX28_PAD_GPMI_CE1N__GPIO_0_17 */
-+						0x01a3 /* MX28_PAD_GPMI_ALE__GPIO_0_26 */
-+						0x01b3 /* MX28_PAD_GPMI_CLE__GPIO_0_27 */
- 					>;
- 					fsl,drive-strength = <1>;
- 					fsl,voltage = <1>;
- 					fsl,pull-up = <1>;
- 				};
- 			};
--
--			ssp3: ssp at 80016000 {
--				compatible = "fsl,imx28-spi";
--				pinctrl-names = "default";
--				pinctrl-0 = <&spi3_pins_cfa10049>;
--				status = "okay";
--
--				gpio5: gpio5 at 0 {
--					compatible = "fairchild,74hc595";
--					gpio-controller;
--					#gpio-cells = <2>;
--					reg = <0>;
--					registers-number = <2>;
--					spi-max-frequency = <100000>;
--				};
--
--				gpio6: gpio6 at 1 {
--					compatible = "fairchild,74hc595";
--					gpio-controller;
--					#gpio-cells = <2>;
--					reg = <1>;
--					registers-number = <4>;
--					spi-max-frequency = <100000>;
--				};
--
--				dac0: dh2228 at 2 {
--					compatible = "rohm,dh2228fv";
--					reg = <2>;
--					spi-max-frequency = <100000>;
--				};
--			};
- 		};
- 
- 		apbx at 80040000 {
-@@ -177,4 +146,41 @@
- 			status = "okay";
- 		};
- 	};
-+
-+	spi3 {
-+		compatible = "spi-gpio";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&spi3_pins_cfa10049>;
-+		status = "okay";
-+		gpio-sck = <&gpio0 24 0>;
-+		gpio-mosi = <&gpio0 28 0>;
-+		cs-gpios = <&gpio0 17 0 &gpio0 26 0 &gpio0 27 0>;
-+		num-chipselects = <3>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		gpio5: gpio5 at 0 {
-+			compatible = "fairchild,74hc595";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <0>;
-+			registers-number = <2>;
-+			spi-max-frequency = <100000>;
-+		};
-+
-+		gpio6: gpio6 at 1 {
-+			compatible = "fairchild,74hc595";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <1>;
-+			registers-number = <4>;
-+			spi-max-frequency = <100000>;
-+		};
-+
-+		dac0: dh2228 at 2 {
-+			compatible = "rohm,dh2228fv";
-+			reg = <2>;
-+			spi-max-frequency = <100000>;
-+		};
-+	};
- };
+Are you still ok to apply it on top of 3.8-rc1 and send it for -rc2? Or
+to queue it up for 3.9?
+
+Thanks,
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
