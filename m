@@ -1,110 +1,71 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 27 Dec 2012 11:35:00 +0100
-Subject: [PATCH 1/1 net-next] NET: FEC: dynamtic check DMA desc buff type
-In-Reply-To: <1356599447-5698-1-git-send-email-Frank.Li@freescale.com>
-References: <1356599447-5698-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20121227103500.GU26326@pengutronix.de>
+Date: Thu, 27 Dec 2012 11:47:58 +0100
+Subject: [PATCH v4 2/7] usb: chipidea: add otg file
+In-Reply-To: <1356591603-23323-3-git-send-email-peter.chen@freescale.com>
+References: <1356591603-23323-1-git-send-email-peter.chen@freescale.com>
+ <1356591603-23323-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <20121227104758.GV26326@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 27, 2012 at 05:10:47PM +0800, Frank Li wrote:
-> MX6 and mx28 support enhanced DMA descript buff to support 1588
-> ptp. But MX25, MX3x, MX5x can't support enhanced DMA descript buff.
-> Check fec type and choose correct DAM descript buff type.
+On Thu, Dec 27, 2012 at 02:59:58PM +0800, Peter Chen wrote:
+> Implement struct usb_otg, In that way, calling otg_set_peripheral
+> will not be failed at udc.c.
 > 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
-
-Please provide a series that gets rid of CONFIG_FEC_PTP. This patch here
-might be a first step to it, but until it's complete and we can have a
-look at the end result: No.
-
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->  drivers/net/ethernet/freescale/Kconfig |    2 +-
->  drivers/net/ethernet/freescale/fec.c   |  155 ++++++++++++++++++++++++--------
->  drivers/net/ethernet/freescale/fec.h   |    8 ++-
->  3 files changed, 126 insertions(+), 39 deletions(-)
+> Changes for v4:
+> - Some tiny changes, like delete unused header files
 > 
-> diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
-> index ec490d7..d1edb2e 100644
-> --- a/drivers/net/ethernet/freescale/Kconfig
-> +++ b/drivers/net/ethernet/freescale/Kconfig
-> @@ -94,7 +94,7 @@ config GIANFAR
+>  drivers/usb/chipidea/Makefile |    2 +-
+>  drivers/usb/chipidea/ci.h     |    2 +
+>  drivers/usb/chipidea/otg.c    |   60 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/usb/chipidea/otg.h    |    6 ++++
+>  4 files changed, 69 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+> index d92ca32..11f513c 100644
+> --- a/drivers/usb/chipidea/Makefile
+> +++ b/drivers/usb/chipidea/Makefile
+> @@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
 >  
->  config FEC_PTP
->  	bool "PTP Hardware Clock (PHC)"
-> -	depends on FEC && ARCH_MXC && !SOC_IMX25 && !SOC_IMX27 && !SOC_IMX35 && !SOC_IMX5
-> +	depends on FEC && ARCH_MXC
->  	select PTP_1588_CLOCK
->  	--help---
->  	  Say Y here if you want to use PTP Hardware Clock (PHC) in the
-> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> index 0704bca..21f385d 100644
-> --- a/drivers/net/ethernet/freescale/fec.c
-> +++ b/drivers/net/ethernet/freescale/fec.c
-> @@ -76,6 +76,8 @@
->  #define FEC_QUIRK_USE_GASKET		(1 << 2)
->  /* Controller has GBIT support */
->  #define FEC_QUIRK_HAS_GBIT		(1 << 3)
-> +/* Controller has extend desc buffer */
-> +#define FEC_QUICK_HAS_BUFDESC_EX	(1 << 4)
-
-It's 'quirk', not 'quick'
-
+>  obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
 >  
->  static struct platform_device_id fec_devtype[] = {
->  	{
-> @@ -93,7 +95,8 @@ static struct platform_device_id fec_devtype[] = {
->  		.driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_SWAP_FRAME,
->  	}, {
->  		.name = "imx6q-fec",
-> -		.driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT,
-> +		.driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT |
-> +				FEC_QUICK_HAS_BUFDESC_EX,
->  	}, {
->  		/* sentinel */
->  	}
-> @@ -117,7 +120,9 @@ static const struct of_device_id fec_dt_ids[] = {
->  MODULE_DEVICE_TABLE(of, fec_dt_ids);
->  
->  static unsigned char macaddr[ETH_ALEN];
-> +static int fec_ptp_enable = 1;
->  module_param_array(macaddr, byte, NULL, 0);
-> +module_param(fec_ptp_enable, int, 1);
->  MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
+> -ci_hdrc-y				:= core.o
+> +ci_hdrc-y				:= core.o otg.o
+>  ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
+>  ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
+>  ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+> index d738603..8702871 100644
+> --- a/drivers/usb/chipidea/ci.h
+> +++ b/drivers/usb/chipidea/ci.h
+> @@ -129,6 +129,7 @@ struct hw_bank {
+>   * @vbus_active: is VBUS active
+>   * @transceiver: pointer to USB PHY, if any
+>   * @hcd: pointer to usb_hcd for ehci host driver
+> + * @otg: for otg support
+>   */
+>  struct ci13xxx {
+>  	struct device			*dev;
+> @@ -164,6 +165,7 @@ struct ci13xxx {
+>  	bool				global_phy;
+>  	struct usb_phy			*transceiver;
+>  	struct usb_hcd			*hcd;
+> +	struct usb_otg      otg;
 
-The 'fec_ptp_enable' shouldn't be weaved into the mac address. Use a
-separate block of code for this.
-Also, this shouldn't be here at all. If you want to make this
-configurable via kernel commandline, then this should be a separate
-patch so that it can be discussed separately. Also you should provide a
-description *why* you think this is necessary.
+I'd really like to know how this is going to proceed.
 
->  
->  #if defined(CONFIG_M5272)
-> @@ -144,6 +149,12 @@ MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
->  #error "FEC: descriptor ring size constants too large"
->  #endif
->  
-> +#ifdef CONFIG_FEC_PTP
-> +#if (((RX_RING_SIZE + TX_RING_SIZE) * 32) > PAGE_SIZE)
-> +#error "FEC: descriptor ring size constants too large"
-> +#endif
-> +#endif
-> +
->  /* Interrupt events/masks. */
->  #define FEC_ENET_HBERR	((uint)0x80000000)	/* Heartbeat error */
->  #define FEC_ENET_BABR	((uint)0x40000000)	/* Babbling receiver */
-> @@ -192,6 +203,36 @@ MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
->  
->  static int mii_cnt;
->  
-> +#ifdef CONFIG_FEC_PTP
-> +static struct bufdesc * get_nextdesc(struct bufdesc * bdp, int is_ex)
+The ULPI driver currently allocates a struct usb_otg and sets
+otg->set_host and otg->set_vbus. Since now the chipidea driver uses its
+own struct usb_otg, this will not work with ULPI support.
 
-driver specific functions should always have a driver specific prefix.
+I see some ways out of this:
 
+- Use a pointer above instead of an own struct usb_otg in the ci driver.
+- move the set_host and set_vbus callbacks to struct usb_phy.
 
-This patch has coding style issues. Please run through checkpatch.
+I'd like to have this solved before we merge this patch.
 
 Sascha
 
