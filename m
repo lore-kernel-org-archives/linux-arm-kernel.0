@@ -1,117 +1,46 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 27 Dec 2012 15:00:02 +0800
-Subject: [PATCH v4 6/7] usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
-In-Reply-To: <1356591603-23323-1-git-send-email-peter.chen@freescale.com>
-References: <1356591603-23323-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1356591603-23323-7-git-send-email-peter.chen@freescale.com>
+From: prathyush.k@samsung.com (Prathyush K)
+Date: Thu, 27 Dec 2012 02:14:18 -0500
+Subject: [PATCH] arm: dma mapping: export arm iommu functions
+Message-ID: <1356592458-11077-1-git-send-email-prathyush.k@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(change CI13XXX to CI13 to avoid junk email check)
-Now, we have handled vbus session in core driver when the
-vbus interrupt occurs, so our pullup operations are all
-according to vbus.
-Of cource, the software can still call .pullup when device connects
-to host if it wants to connect/disconnect with host.
+This patch adds EXPORT_SYMBOL calls to the three arm iommu
+functions - arm_iommu_create_mapping, arm_iommu_free_mapping
+and arm_iommu_attach_device. These functions can now be called
+from dynamic modules.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Signed-off-by: Prathyush K <prathyush.k@samsung.com>
 ---
- drivers/usb/chipidea/ci13xxx_imx.c |    1 -
- drivers/usb/chipidea/ci13xxx_msm.c |    1 -
- drivers/usb/chipidea/udc.c         |   23 ++++++++---------------
- include/linux/usb/chipidea.h       |    1 -
- 4 files changed, 8 insertions(+), 18 deletions(-)
+ arch/arm/mm/dma-mapping.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 8c29122..3b91ff4 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -88,7 +88,6 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
- static struct ci13xxx_platform_data ci13xxx_imx_platdata  = {
- 	.name			= "ci13xxx_imx",
- 	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
--				  CI13XXX_PULLUP_ON_VBUS |
- 				  CI13XXX_DISABLE_STREAMING,
- 	.capoffset		= DEF_CAPOFFSET,
- };
-diff --git a/drivers/usb/chipidea/ci13xxx_msm.c b/drivers/usb/chipidea/ci13xxx_msm.c
-index 7d16681..5755ee8 100644
---- a/drivers/usb/chipidea/ci13xxx_msm.c
-+++ b/drivers/usb/chipidea/ci13xxx_msm.c
-@@ -49,7 +49,6 @@ static struct ci13xxx_platform_data ci13xxx_msm_platdata = {
- 	.name			= "ci13xxx_msm",
- 	.flags			= CI13XXX_REGS_SHARED |
- 				  CI13XXX_REQUIRE_TRANSCEIVER |
--				  CI13XXX_PULLUP_ON_VBUS |
- 				  CI13XXX_DISABLE_STREAMING,
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 6b2fb87..c0f0f43 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1797,6 +1797,7 @@ err2:
+ err:
+ 	return ERR_PTR(err);
+ }
++EXPORT_SYMBOL(arm_iommu_create_mapping);
  
- 	.notify_event		= ci13xxx_msm_notify_event,
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index c983ce2..4a246a6 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1360,9 +1360,6 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
- 	unsigned long flags;
- 	int gadget_ready = 0;
- 
--	if (!(ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS))
--		return -EOPNOTSUPP;
--
- 	spin_lock_irqsave(&ci->lock, flags);
- 	ci->vbus_active = is_active;
- 	if (ci->driver)
-@@ -1426,8 +1423,7 @@ static int ci13xxx_pullup(struct usb_gadget *_gadget, int is_on)
+ static void release_iommu_mapping(struct kref *kref)
  {
- 	struct ci13xxx *ci = container_of(_gadget, struct ci13xxx, gadget);
+@@ -1813,6 +1814,7 @@ void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping)
+ 	if (mapping)
+ 		kref_put(&mapping->kref, release_iommu_mapping);
+ }
++EXPORT_SYMBOL(arm_iommu_release_mapping);
  
--	if ((ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) &&
--			!ci->vbus_active)
-+	if (!ci->vbus_active)
- 		return -ENOTSUPP;
+ /**
+  * arm_iommu_attach_device
+@@ -1841,5 +1843,6 @@ int arm_iommu_attach_device(struct device *dev,
+ 	pr_debug("Attached IOMMU controller to %s device.\n", dev_name(dev));
+ 	return 0;
+ }
++EXPORT_SYMBOL(arm_iommu_attach_device);
  
- 	if (is_on)
-@@ -1551,14 +1547,12 @@ static int ci13xxx_start(struct usb_gadget *gadget,
- 
- 	ci->driver = driver;
- 	pm_runtime_get_sync(&ci->gadget.dev);
--	if (ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) {
--		if (ci->vbus_active) {
--			if (ci->platdata->flags & CI13XXX_REGS_SHARED)
--				hw_device_reset(ci, USBMODE_CM_DC);
--		} else {
--			pm_runtime_put_sync(&ci->gadget.dev);
--			goto done;
--		}
-+	if (ci->vbus_active) {
-+		if (ci->platdata->flags & CI13XXX_REGS_SHARED)
-+			hw_device_reset(ci, USBMODE_CM_DC);
-+	} else {
-+		pm_runtime_put_sync(&ci->gadget.dev);
-+		goto done;
- 	}
- 
- 	retval = hw_device_state(ci, ci->ep0out->qh.dma);
-@@ -1581,8 +1575,7 @@ static int ci13xxx_stop(struct usb_gadget *gadget,
- 
- 	spin_lock_irqsave(&ci->lock, flags);
- 
--	if (!(ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) ||
--			ci->vbus_active) {
-+	if (ci->vbus_active) {
- 		hw_device_state(ci, 0);
- 		if (ci->platdata->notify_event)
- 			ci->platdata->notify_event(ci,
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 544825d..37821b3 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -17,7 +17,6 @@ struct ci13xxx_platform_data {
- 	unsigned long	 flags;
- #define CI13XXX_REGS_SHARED		BIT(0)
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
--#define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
- 
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
+ #endif
 -- 
-1.7.0.4
+1.8.0
