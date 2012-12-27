@@ -1,27 +1,42 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 27 Dec 2012 14:12:58 +0100
-Subject: [PATCH 0/6 v8] cpufreq: add support for Calxeda ECX-1000
- (highbank)
-In-Reply-To: <1354726121-17190-1-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354726121-17190-1-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <2705062.NIaFfcLb3a@vostro.rjw.lan>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Thu, 27 Dec 2012 05:16:16 -0800
+Subject: [PATCH 1/2] ARM: pxa: palm27x: fix udc device initialization
+In-Reply-To: <87sj6vmpkr.fsf@free.fr>
+References: <1356200860-3241-1-git-send-email-mikedunn@newsguy.com>
+ <1356200860-3241-2-git-send-email-mikedunn@newsguy.com>
+ <201212230424.16848.marex@denx.de> <87sj6vmpkr.fsf@free.fr>
+Message-ID: <50DC4A20.3080702@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 05, 2012 10:48:35 AM Mark Langsdorf wrote:
-> This patch series adds cpufreq support for the Calxeda
-> ECX-1000 (highbank) SoCs. The EnergyCore Management Engine (ECME) on
-> the ECX-1000 manages the voltage for the part and communications with
-> Linux through a pl320 mailbox. clk notifications are used to control
-> when to send messages to the ECME.
+Hi Robert,
 
-If you want me to handle this, can you please resend the whole patchset (with
-all of the comments addressed, if possible)?
+On 12/24/2012 07:34 AM, Robert Jarzmik wrote:
 
-Rafael
+[..]
 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+ Actually gpio-vbus was designed to :
+>  - detect and handle VBus
+>  - and handle following D+ pullup if peripheral controller *can't*
+> 
+> But pxa27x_udc is a peripheral controller which does handle D+ pullup, and
+> expects to handle it by himself (ie. is not fully compatible with a D+ pullup
+> handling by gpio-vbus, one not working case being Mike's one).
+> 
+> So Mike's patch makes sense IMHO. He could have left the VBUS handling to
+> gpio-vbus and D+ to pxa27x_udc, or let pxa27x_udc handle both, that's up to you.
+
+
+I didn't realize the pxa27x-udc driver could handle the vbus as well.
+
+
+> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+
+
+Thanks Robert.  Should have CC'd you, since you're the udc driver author.  Glad
+you saw this.
+
+
+Thanks again,
+MIke
