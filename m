@@ -1,50 +1,101 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 27 Dec 2012 19:19:00 +0100
-Subject: [PATCH 2/3 V2] iio: mxs: Implement support for touchscreen
-In-Reply-To: <50DC319B.1050607@kernel.org>
-References: <1355449598-15980-1-git-send-email-marex@denx.de>
- <1355449598-15980-2-git-send-email-marex@denx.de>
- <50DC319B.1050607@kernel.org>
-Message-ID: <201212271919.00794.marex@denx.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 27 Dec 2012 10:27:14 -0800
+Subject: [PATCH] ARM: EXYNOS: fix uncompress.h and debug-macro.S for EXYNOS5440
+Message-ID: <1356632834-8934-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jonathan Cameron,
+This patch fixes uart base address for uncompress and debug-macro
+on EXYNOS5440.
 
-> On 12/14/2012 01:46 AM, Marek Vasut wrote:
-> > This patch implements support for sampling of a touchscreen into
-> > the MXS LRADC driver. The LRADC block allows configuring some of
-> > it's channels into special mode where they either output the drive
-> > voltage or sample it, allowing it to operate a 4-wire or 5-wire
-> > resistive touchscreen.
-> > 
-> > In case the touchscreen mode is enabled, the LRADC slot #7 is
-> > reserved for touchscreen only, therefore it is not possible to
-> > sample 8 LRADC channels at time, but only 7 channels.
-> > 
-> > The touchscreen controller is configured such that the PENDOWN event
-> > disables touchscreen interrupts and triggers execution of worker
-> > thread, which then polls the touchscreen controller for X, Y and
-> > Pressure values. This reduces the overhead of interrupt-driven
-> > operation. Upon the PENUP event, the worker thread re-enables the
-> > PENDOWN detection interrupt and exits.
-> 
-> I still have a few reservations about this patch.  Firstly
-> I would love to see a more generic approach to this as I outlined
-> before.  Still we can't have everything we want sometimes :)
-> Also, this is a lot of input related code in a driver that isn't
-> in the input subsystem.  Really up to Dmitry on whether he is
-> happy with this, or whether he insists on an mfd.
-> 
-> So all in all, with reservations I'll add this to the IIO tree
-> IF Dmitry is happy with it and there are no other issues raised
-> in the meantime.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-exynos/include/mach/debug-macro.S |   25 +++++++++++++++++------
+ arch/arm/mach-exynos/include/mach/map.h         |    1 +
+ arch/arm/mach-exynos/include/mach/uncompress.h  |   20 +++++++++++-------
+ 3 files changed, 33 insertions(+), 13 deletions(-)
 
-Understood, I'll wait for Dmitry.
-
-> Jonathan
-> 
-> p.s. If anyone has time, I'd also like to get this out of staging
-> in the coming cycle.
-
-[...]
+diff --git a/arch/arm/mach-exynos/include/mach/debug-macro.S b/arch/arm/mach-exynos/include/mach/debug-macro.S
+index e0c86ea..69e3e52 100644
+--- a/arch/arm/mach-exynos/include/mach/debug-macro.S
++++ b/arch/arm/mach-exynos/include/mach/debug-macro.S
+@@ -21,12 +21,25 @@
+ 	 */
+ 
+ 	.macro addruart, rp, rv, tmp
+-		mrc	p15, 0, \tmp, c0, c0, 0
+-		and	\tmp, \tmp, #0xf0
+-		teq	\tmp, #0xf0		@@ A15
+-		ldreq	\rp, =EXYNOS5_PA_UART
+-		movne	\rp, #EXYNOS4_PA_UART	@@ EXYNOS4
+-		ldr	\rv, =S3C_VA_UART
++		mov	\rp, #0x10000000
++		ldr	\rp, [\rp, #0]
++		and	\rp, \rp, #0x0ff00000
++		teq	\rp, #0x03200000	@ EXYNOS4210, EXYNOS4212
++		beq	4f
++		teq	\rp, #0x04400000	@ EXYNOS4412
++		beq	4f
++		teq	\rp, #0x03500000	@ EXYNOS5250
++		beq	5f
++		b	54f
++
++4:		mov	\rp, #EXYNOS4_PA_UART
++		b	99f
++5:		mov	\rp, #EXYNOS5_PA_UART
++		b	99f
++54:		mov	\rp, #EXYNOS5440_PA_UART
++		b	99f
++99:		ldr	\rv, =S3C_VA_UART
++
+ #if CONFIG_DEBUG_S3C_UART != 0
+ 		add	\rp, \rp, #(0x10000 * CONFIG_DEBUG_S3C_UART)
+ 		add	\rv, \rv, #(0x10000 * CONFIG_DEBUG_S3C_UART)
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 1df6abb..cba083e 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -203,6 +203,7 @@
+ 
+ #define EXYNOS4_PA_UART			0x13800000
+ #define EXYNOS5_PA_UART			0x12C00000
++#define EXYNOS5440_PA_UART		0x000B0000
+ 
+ #define EXYNOS4_PA_VP			0x12C00000
+ #define EXYNOS4_PA_MIXER		0x12C10000
+diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
+index 2979995..ace9be2 100644
+--- a/arch/arm/mach-exynos/include/mach/uncompress.h
++++ b/arch/arm/mach-exynos/include/mach/uncompress.h
+@@ -31,16 +31,22 @@ static void arch_detect_cpu(void)
+ 
+ 	/*
+ 	 * product_id is bits 31:12
+-	 *    bits 23:20 describe the exynosX family
+-	 *
++	 *    bits 27:20 describe the exynosX family
+ 	 */
+ 	chip_id >>= 20;
+-	chip_id &= 0xf;
+-
+-	if (chip_id == 0x5)
+-		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
++	chip_id &= 0xff;
++
++	if (chip_id == 0x32 || chip_id == 0x44)
++		/* EXYNOS4210, EXYNOS4212 and EXYNOS4412 */
++		uart_base = (volatile u8 *)EXYNOS4_PA_UART;
++	else if (chip_id == 0x35)
++		/* EXYNOS5250 */
++		uart_base = (volatile u8 *)EXYNOS5_PA_UART;
+ 	else
+-		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
++		/* EXYNOS5440 */
++		uart_base = (volatile u8 *)EXYNOS5440_PA_UART;
++
++	uart_base += S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT;
+ 
+ 	/*
+ 	 * For preventing FIFO overrun or infinite loop of UART console,
+-- 
+1.7.10.4
