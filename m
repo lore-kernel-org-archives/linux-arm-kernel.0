@@ -1,75 +1,60 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 27 Dec 2012 11:49:29 +0100
-Subject: [PATCH] ehci-mxc: remove Efika MX-specific CHRGVBUS hack
-In-Reply-To: <1356261362-8418-1-git-send-email-matt@genesi-usa.com>
-References: <1356261362-8418-1-git-send-email-matt@genesi-usa.com>
-Message-ID: <20121227104929.GW26326@pengutronix.de>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Thu, 27 Dec 2012 11:25:14 +0000
+Subject: [PATCH 1/3 V2] iio: mxs: Remove unused struct mxs_lradc_chan
+In-Reply-To: <1355449598-15980-1-git-send-email-marex@denx.de>
+References: <1355449598-15980-1-git-send-email-marex@denx.de>
+Message-ID: <50DC301A.4040103@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 23, 2012 at 05:16:02AM -0600, Matt Sealey wrote:
-> Since Efika MX platform support (pre-devicetree) was removed from the tree
-> this code no longer has any possibility of running and clutters up the
-> driver which is being replaced by the chipidea host in the future anyway.
+On 12/14/2012 01:46 AM, Marek Vasut wrote:
+> This structure definition seems to be some kind of remnant from
+> previous development that accidentally made it mainline. Remove
+> it as it's unused.
 > 
-> Signed-off-by: Matt Sealey <matt@genesi-usa.com>
-> Tested-by: Steev Klimazewski <steev@genesi-usa.com>
-> CC: Sascha Hauer <kernel@pengutronix.de>
-> CC: Alan Stern <stern@rowland.harvard.edu>
-
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-
+> Remove unused "enable" field from struct mxs_lradc as well. This
+> seems to be remnant of early development too.
 > 
+Added to togreg branch of
+
+git://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git
+
+Jonathan
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  drivers/usb/host/ehci-mxc.c |   20 --------------------
->  1 file changed, 20 deletions(-)
+>  drivers/staging/iio/adc/mxs-lradc.c |    7 -------
+>  1 file changed, 7 deletions(-)
 > 
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> index 8e58a5f..b62c3a8 100644
-> --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -102,7 +102,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  	struct usb_hcd *hcd;
->  	struct resource *res;
->  	int irq, ret;
-> -	unsigned int flags;
->  	struct ehci_mxc_priv *priv;
->  	struct device *dev = &pdev->dev;
->  	struct ehci_hcd *ehci;
-> @@ -213,25 +212,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto err_add;
+> V2: The patch is now combination of previously two separate patches:
+> [PATCH 1/4] iio: mxs: Remove unused struct mxs_lradc_chan
+> [PATCH 2/4] iio: mxs: Remove unused fields from mxs_lradc
+> 
+> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
+> index ca7c1fa..6249957 100644
+> --- a/drivers/staging/iio/adc/mxs-lradc.c
+> +++ b/drivers/staging/iio/adc/mxs-lradc.c
+> @@ -75,11 +75,6 @@ static const char * const mxs_lradc_irq_name[] = {
+>  	"mxs-lradc-button1",
+>  };
 >  
-> -	if (pdata->otg) {
-> -		/*
-> -		 * efikamx and efikasb have some hardware bug which is
-> -		 * preventing usb to work unless CHRGVBUS is set.
-> -		 * It's in violation of USB specs
-> -		 */
-> -		if (machine_is_mx51_efikamx() || machine_is_mx51_efikasb()) {
-> -			flags = usb_phy_io_read(pdata->otg,
-> -							ULPI_OTG_CTRL);
-> -			flags |= ULPI_OTG_CTRL_CHRGVBUS;
-> -			ret = usb_phy_io_write(pdata->otg, flags,
-> -							ULPI_OTG_CTRL);
-> -			if (ret) {
-> -				dev_err(dev, "unable to set CHRVBUS\n");
-> -				goto err_add;
-> -			}
-> -		}
-> -	}
+> -struct mxs_lradc_chan {
+> -	uint8_t				slot;
+> -	uint8_t				flags;
+> -};
 > -
->  	return 0;
+>  struct mxs_lradc {
+>  	struct device		*dev;
+>  	void __iomem		*base;
+> @@ -90,8 +85,6 @@ struct mxs_lradc {
 >  
->  err_add:
-> -- 
-> 1.7.10.4
+>  	struct mutex		lock;
+>  
+> -	uint8_t			enable;
+> -
+>  	struct completion	completion;
+>  };
+>  
 > 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
