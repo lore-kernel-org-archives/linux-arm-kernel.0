@@ -1,53 +1,37 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 27 Dec 2012 13:14:31 +1300
-Subject: [PATCH 3/3] clk: vt8500: Fix division-by-0 when requested rate=0
+Date: Thu, 27 Dec 2012 13:14:29 +1300
+Subject: [PATCH 1/3] clk: vt8500: Fix error in PLL calculations on non-exact
+ match.
 In-Reply-To: <1356567272-3420-1-git-send-email-linux@prisktech.co.nz>
 References: <1356567272-3420-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1356567272-3420-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1356567272-3420-2-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A request to vt8500_dclk_(round_rate/set_rate) with rate=0 results
-in a division-by-0 in the kernel.
+When a PLL frequency calculation is performed and a non-exact match
+is found the wrong multiplier and divisors are returned.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- drivers/clk/clk-vt8500.c |   14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ drivers/clk/clk-vt8500.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
-index 3306c2b..db7d41f 100644
+index fe25570..0cb26be 100644
 --- a/drivers/clk/clk-vt8500.c
 +++ b/drivers/clk/clk-vt8500.c
-@@ -121,7 +121,12 @@ static long vt8500_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
- 				unsigned long *prate)
- {
- 	struct clk_device *cdev = to_clk_device(hw);
--	u32 divisor = *prate / rate;
-+	u32 divisor;
-+
-+	if (rate == 0)
-+		return 0;
-+
-+	divisor = *prate / rate;
+@@ -361,9 +361,9 @@ static void wm8650_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 	/* if we got here, it wasn't an exact match */
+ 	pr_warn("%s: requested rate %lu, found rate %lu\n", __func__, rate,
+ 							rate - best_err);
+-	*multiplier = mul;
+-	*divisor1 = div1;
+-	*divisor2 = div2;
++	*multiplier = best_mul;
++	*divisor1 = best_div1;
++	*divisor2 = best_div2;
+ }
  
- 	/* If prate / rate would be decimal, incr the divisor */
- 	if (rate * divisor < *prate)
-@@ -142,9 +147,14 @@ static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
- 				unsigned long parent_rate)
- {
- 	struct clk_device *cdev = to_clk_device(hw);
--	u32 divisor = parent_rate / rate;
-+	u32 divisor;
- 	unsigned long flags = 0;
- 
-+	if (rate == 0)
-+		return 0;
-+
-+	divisor =  parent_rate / rate;
-+
- 	/* If prate / rate would be decimal, incr the divisor */
- 	if (rate * divisor < *prate)
- 		divisor++;
+ static int vtwm_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 -- 
 1.7.9.5
