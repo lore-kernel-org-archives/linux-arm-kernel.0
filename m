@@ -1,59 +1,34 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 27 Dec 2012 15:15:40 +0100
-Subject: [PATCH] arm: dma mapping: export arm iommu functions
-In-Reply-To: <1356592458-11077-1-git-send-email-prathyush.k@samsung.com>
-References: <1356592458-11077-1-git-send-email-prathyush.k@samsung.com>
-Message-ID: <50DC580C.7080507@samsung.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 27 Dec 2012 15:43:42 +0100
+Subject: [PATCH 0/6 v8] cpufreq: add support for Calxeda ECX-1000
+ (highbank)
+In-Reply-To: <21672683C5A3814BB4DB938EBE482DE435D97660AB@IAD2MBX09.mex02.mlsrvr.com>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <2705062.NIaFfcLb3a@vostro.rjw.lan>
+ <21672683C5A3814BB4DB938EBE482DE435D97660AB@IAD2MBX09.mex02.mlsrvr.com>
+Message-ID: <1870891.OAGJzKZTJS@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thursday, December 27, 2012 08:28:22 AM Mark Langsdorf wrote:
+> I thought I had addressed all the issues with the v9 version. The only
+> comments I got on it was Mike's reviewed-by and I didn't think that
+> warranted a resend.
+> 
+> If you do want me to send it again, do you want it  updated to current
+> top-of-tree?
 
-On 12/27/2012 8:14 AM, Prathyush K wrote:
-> This patch adds EXPORT_SYMBOL calls to the three arm iommu
-> functions - arm_iommu_create_mapping, arm_iommu_free_mapping
-> and arm_iommu_attach_device. These functions can now be called
-> from dynamic modules.
+Yes, please.
 
-Could You describe a bit more why those functions might be needed by 
-dynamic modules?
+> That may take a bit, since there's an unrelated bug that's preventing my
+> test box from booting.
 
-> Signed-off-by: Prathyush K <prathyush.k@samsung.com>
-> ---
->   arch/arm/mm/dma-mapping.c | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 6b2fb87..c0f0f43 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1797,6 +1797,7 @@ err2:
->   err:
->   	return ERR_PTR(err);
->   }
-> +EXPORT_SYMBOL(arm_iommu_create_mapping);
+Sure.
 
-EXPORT_SYMOBL_GPL() ?
+Thanks,
+Rafael
 
->   static void release_iommu_mapping(struct kref *kref)
->   {
-> @@ -1813,6 +1814,7 @@ void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping)
->   	if (mapping)
->   		kref_put(&mapping->kref, release_iommu_mapping);
->   }
-> +EXPORT_SYMBOL(arm_iommu_release_mapping);
->   
->   /**
->    * arm_iommu_attach_device
-> @@ -1841,5 +1843,6 @@ int arm_iommu_attach_device(struct device *dev,
->   	pr_debug("Attached IOMMU controller to %s device.\n", dev_name(dev));
->   	return 0;
->   }
-> +EXPORT_SYMBOL(arm_iommu_attach_device);
->   
->   #endif
 
-Best regards
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
