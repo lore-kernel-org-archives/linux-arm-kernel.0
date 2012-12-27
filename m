@@ -1,35 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 27 Dec 2012 23:00:51 +0100
-Subject: [PATCHv2] ARM: dts: cfa10049: Add PCA9555 GPIO expander to the
- device tree
-In-Reply-To: <20121122112447.GI24693@S2100-06.ap.freescale.net>
-References: <20121120144322.GE4882@S2100-06.ap.freescale.net>
- <1353422015-4790-1-git-send-email-maxime.ripard@free-electrons.com>
- <50AE023D.3000406@free-electrons.com>
- <20121122112447.GI24693@S2100-06.ap.freescale.net>
-Message-ID: <50DCC513.5030004@free-electrons.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 27 Dec 2012 23:21:10 +0100
+Subject: [PATCH] ARM: Dove: move CuBox led pinctrl to gpio-leds node
+Message-ID: <1356646870-2903-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+gpio-leds has support for pinctrl allocation, make use of it.
 
-Le 22/11/2012 12:24, Shawn Guo a ?crit :
-> On Thu, Nov 22, 2012 at 11:45:17AM +0100, Maxime Ripard wrote:
-> The patch is ok now.  But I have problem to apply it because its
-> prerequisite has been applied on i2c tree, as I did not plan a second
-> pull request for 3.8 at all.
-> 
-> I hope it's fine to apply the patch on top of v3.8-rc1, or you can
-> try to ask Wolfram to have this patch go via his tree too.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/dove-cubox.dts |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Are you still ok to apply it on top of 3.8-rc1 and send it for -rc2? Or
-to queue it up for 3.9?
-
-Thanks,
-Maxime
-
+diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+index cdee96f..bed5b62 100644
+--- a/arch/arm/boot/dts/dove-cubox.dts
++++ b/arch/arm/boot/dts/dove-cubox.dts
+@@ -17,6 +17,9 @@
+ 
+ 	leds {
+ 		compatible = "gpio-leds";
++		pinctrl-0 = <&pmx_gpio_18>;
++		pinctrl-names = "default";
++
+ 		power {
+ 			label = "Power";
+ 			gpios = <&gpio0 18 1>;
+@@ -47,7 +50,7 @@
+ };
+ 
+ &pinctrl {
+-	pinctrl-0 = <&pmx_gpio_12 &pmx_gpio_18>;
++	pinctrl-0 = <&pmx_gpio_12>;
+ 	pinctrl-names = "default";
+ 
+ 	pmx_gpio_12: pmx-gpio-12 {
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
