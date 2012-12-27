@@ -1,39 +1,37 @@
 From: s.peter@mpl.ch (Stefan Peter)
-Date: Thu, 27 Dec 2012 23:57:59 +0100
-Subject: [PATCH 0/2] Fixes for 3.8-rc1
-In-Reply-To: <1355868838-16124-1-git-send-email-andrew@lunn.ch>
-References: <1355868838-16124-1-git-send-email-andrew@lunn.ch>
-Message-ID: <50DCD277.7040201@mpl.ch>
+Date: Thu, 27 Dec 2012 23:58:06 +0100
+Subject: [PATCH] ARM: Kirkwood: Fix missing clk for USB device.
+In-Reply-To: <1356201902-20448-1-git-send-email-andrew@lunn.ch>
+References: <1356201902-20448-1-git-send-email-andrew@lunn.ch>
+Message-ID: <50DCD27E.8090804@mpl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.12.2012 23:13, Andrew Lunn wrote:
-> These two patches are fixes needed for Linux 3.8.
+On 22.12.2012 19:45, Andrew Lunn wrote:
+> Without the clock being held by a driver, it ges turned off at a bad
+> time causing the SoC to lockup.
 > 
-> The first patch fixes a lockup due to the missing SDIO clock. Since
-> the clkdev alias is missing, the sdio driver fails to
-> clk_prepare_enable() the clock. The lateinit call in the clk framework
-> then disables the clock since nobody owns it. The next access to the
-> SDIO register space causes the SoC to lockup.
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/kirkwood.dtsi |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> The second patch fixes a null-pointer dereference. The conversion of
-> Kirkwood to pinctrl/gpio resulted in that using GPIO calls inside the
-> board-*.c file causes an exception, since the gpio driver has not yet
-> been loaded. Topkick is using the GPIO to control power to the SATA0
-> device. So convert the gpio to a fixed regulator, in DT, which gets
-> loaded after the gpio driver is available.
-> 
-> Andrew Lunn (2):
->   ARM: Kirkwood: Fix missing sdio clock
->   ARM: Kirkwood: Use fixed-regulator instead of board gpio call
-> 
->  arch/arm/boot/dts/kirkwood-topkick.dts     |   17 +++++++++++++++++
->  arch/arm/mach-kirkwood/board-dt.c          |    4 ++++
->  arch/arm/mach-kirkwood/board-usi_topkick.c |    4 ----
->  3 files changed, 21 insertions(+), 4 deletions(-)
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> index 7735cee..110d6cb 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -144,6 +144,7 @@
+>  			compatible = "marvell,orion-ehci";
+>  			reg = <0x50000 0x1000>;
+>  			interrupts = <19>;
+> +			clocks = <&gate_clk 3>;
+>  			status = "okay";
+>  		};
+>  
 > 
 
-Tested-by: Stefan Peter <s.peter@mplch>
+Tested-by: Stefan Peter <s.peter@mpl.ch>
+
 
 
 -- 
