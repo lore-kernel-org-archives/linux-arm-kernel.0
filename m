@@ -1,32 +1,15 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 27 Dec 2012 14:52:22 -0500
-Subject: [PATCH] ARM: Kirkwood: Bundle the common pinctrl of 88f6281
- and 88f6282
-In-Reply-To: <20121227170524.GX21694@titan.lakedaemon.net>
-References: <1356230149-15437-1-git-send-email-iwamatsu@nigauri.org>
- <20121227170524.GX21694@titan.lakedaemon.net>
-Message-ID: <20121227195222.GZ21694@titan.lakedaemon.net>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Thu, 27 Dec 2012 20:56:03 +0100
+Subject: [PATCH] dma: mv_xor: remove minimal offload length threshold
+In-Reply-To: <1356636037-22948-1-git-send-email-lkundrak@v3.sk>
+References: <1356636037-22948-1-git-send-email-lkundrak@v3.sk>
+Message-ID: <1356638163.22102.0.camel@hobbes>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 27, 2012 at 12:05:24PM -0500, Jason Cooper wrote:
-> On Sun, Dec 23, 2012 at 11:35:49AM +0900, Nobuhiro Iwamatsu wrote:
-> > 88f6281 and 88f6282 has common pinctrl.
-> > This buldles the common pincrtl of these to kirkwood-628x-base.dtsi.
-> > 
-> > Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > ---
-> >  arch/arm/boot/dts/kirkwood-6281.dtsi      |   38 ++------------------------
-> >  arch/arm/boot/dts/kirkwood-6282.dtsi      |   35 ++----------------------
-> >  arch/arm/boot/dts/kirkwood-628x-base.dtsi |   41 +++++++++++++++++++++++++++++
-> 
-> Is there a reason we can't move the contents of the proposed
-> kirkwood-628x-base.dtsi into kirkwood.dtsi ?
+On Thu, 2012-12-27 at 20:20 +0100, Lubomir Rintel wrote:
+> This fatally confuses dma_async_memcpy_buf_to_pg which thinks it signals an out
+> of memory condition and retries indefinitelly, causing a soft lockup.
 
-Also, once we figure this out, could you please base your other patch
-series on top of this?  Putting the cleanups before the changes helps us
-avoid merge conflicts as we pull everything together.
-
-thx,
-
-Jason.
+More of these here, it seems:
+https://bugzilla.redhat.com/show_bug.cgi?id=845143
