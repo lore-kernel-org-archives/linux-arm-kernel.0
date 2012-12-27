@@ -1,45 +1,49 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 27 Dec 2012 10:41:50 +0530
-Subject: [PATCH 1/6 v9] arm: use devicetree to get smp_twd clock
-In-Reply-To: <1354833773-22845-2-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354833773-22845-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354833773-22845-2-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <50DBD896.8040706@nvidia.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 27 Dec 2012 14:59:56 +0800
+Subject: [PATCH v4 0/7] Add fully tested id switch and vbus connect detect
+ support for Chipidea
+Message-ID: <1356591603-23323-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 December 2012 04:12 AM, Mark Langsdorf wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
-> ---
-> Changes from v4, v5, v6, v7, v8
->          None.
-> Changes from v3
->          No longer setting *clk to NULL in twd_get_clock().
-> Changes from v2
->          Turned the check for the node pointer into an if-then-else statement.
->          Removed the second, redundant clk_get_rate.
-> Changes from v1
->          None.
->
->   arch/arm/kernel/smp_twd.c | 19 +++++++++++--------
->   1 file changed, 11 insertions(+), 8 deletions(-)
+(Sorry for update slowly due to long time business trip)
 
-Hi Mark,
+Changes for v4 mainly for 2/7, 3/7, 4/7, see individual
+patch commit for detail.
 
-What is the status of this patch?
+This patchset adds fully tested otg id switch function and
+vbus connect/disconnect detection for chipidea driver.
+The mainly design of id/vbus handling follows msm otg driver.
+I hope the msm usb maintainer can have a look of this patchset,
+and give some comments, and move the whole msm usb driver to
+chipidea framework if possible in the future.
 
-Regards,
-PrashantG
+This patchset is fully tested at i.mx6Q saberlite board.
 
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index b22d700..af46b80 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -237,12 +237,15 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
->   	return IRQ_NONE;
->   }
->
+There is github repo for my chipdiea work:
+https://github.com/hzpeterchen/linux-usb.git
+branch: master
+
+Peter Chen (7):
+  Revert "USB: chipidea: add vbus detect for udc"
+  usb: chipidea: add otg file
+  usb: chipidea: add otg id switch and vbus connect/disconnect detect
+  usb: chipidea: consolidate ci_role_driver's API for both roles
+  usb: chipidea: udc: add pullup/pulldown dp at hw_device_state
+  usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
+  usb: chipidea: imx: add internal vbus regulator control
+
+ drivers/usb/chipidea/Makefile      |    2 +-
+ drivers/usb/chipidea/bits.h        |   10 ++
+ drivers/usb/chipidea/ci.h          |   30 ++++++-
+ drivers/usb/chipidea/ci13xxx_imx.c |   81 +++++++++++++----
+ drivers/usb/chipidea/ci13xxx_msm.c |    1 -
+ drivers/usb/chipidea/core.c        |  178 +++++++++++++++++++++++++++++++-----
+ drivers/usb/chipidea/host.c        |    2 +
+ drivers/usb/chipidea/otg.c         |   68 ++++++++++++++
+ drivers/usb/chipidea/otg.h         |    9 ++
+ drivers/usb/chipidea/udc.c         |  101 ++++++++++-----------
+ include/linux/usb/chipidea.h       |    1 -
+ 11 files changed, 382 insertions(+), 101 deletions(-)
+ create mode 100644 drivers/usb/chipidea/otg.c
+ create mode 100644 drivers/usb/chipidea/otg.h
