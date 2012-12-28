@@ -1,37 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 28 Dec 2012 12:25:47 -0200
-Subject: [PATCH] ARM: mach-imx: Kconfig: Do not select Babbage for
- MACH_IMX51_DT
-Message-ID: <1356704747-14845-1-git-send-email-festevam@gmail.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Fri, 28 Dec 2012 15:32:08 +0100
+Subject: [PATCH] cpuidle: kirkwood: Move out of mach directory, add DT.
+In-Reply-To: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
+References: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
+Message-ID: <50DDAD68.4090704@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hello Andrew,
 
-When mx51 dt support was added it was necessary to select MACH_MX51_BABBAGE in
-order to get the mx51 dt built without errors.
+Le 12/28/12 13:47, Andrew Lunn a ?crit :
+> Move the Kirkwood cpuidle driver out of arch/arm/mach-kirkwood and
+> into drivers/cpuidle. Convert the driver into a platform driver and
+> add a device tree binding. Add a DT node to instantiate the driver for
+> boards converted to DT, and a platform data for old style boards.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
 
-At that time, there was no pinctrl support for mx51 yet.
+[snip]
 
-Currently there is no need to select MACH_MX51_BABBAGE anymore.
+>
+> +/*****************************************************************************
+> + * CPU idle
+> + ****************************************************************************/
+> +static struct resource kirkwood_cpuidle_resource[] = {
+> +	{
+> +		.flags	= IORESOURCE_MEM,
+> +		.start	= DDR_OPERATION_BASE,
+> +		.end	= 3,
 
-Reported-by: Matt Sealy <matt@genesi-usa.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/Kconfig |    1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 1ad0d76..ae3bd54 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -756,7 +756,6 @@ comment "i.MX51 machines:"
- 
- config MACH_IMX51_DT
- 	bool "Support i.MX51 platforms from device tree"
--	select MACH_MX51_BABBAGE
- 	select SOC_IMX51
- 	help
- 	  Include support for Freescale i.MX51 based platforms
--- 
-1.7.9.5
+Should not this be DDR_OPERATION_BASE + 3?
+--
+Florian
