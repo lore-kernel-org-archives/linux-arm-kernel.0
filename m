@@ -1,66 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Dec 2012 19:31:24 +0000
-Subject: [PATCH 4/4 v2] net/smsc911x: Provide common clock functionality
-In-Reply-To: <CACRpkdZGC=f0X1wLt1QLMB=x+ba6VRDAbRcW6wR_2gvNLuGw1g@mail.gmail.com>
-References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
- <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
- <CACRpkda79O_b3Z8g7Sy7vMtW9neZU4x-Z=iEQgjqu4X5tFKyhw@mail.gmail.com>
- <20121220192441.GC14363@n2100.arm.linux.org.uk>
- <20121220203514.GN2691@gmail.com>
- <20121220205113.GD14363@n2100.arm.linux.org.uk>
- <20121221091306.GO2691@gmail.com>
- <20121221092421.GG14363@n2100.arm.linux.org.uk>
- <20121221114105.GP2691@gmail.com>
- <CACRpkdZGC=f0X1wLt1QLMB=x+ba6VRDAbRcW6wR_2gvNLuGw1g@mail.gmail.com>
-Message-ID: <CAF2Aj3jjTYRQ6sOHfQwZOtZ-HwLn2Rkt8oCZpT-TiS4gy7-Ojg@mail.gmail.com>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Fri, 28 Dec 2012 10:21:51 +0600
+Subject: [PATCH 3/4] arm: vt8500: Convert debug-macro.S to be
+ multiplatform friendly
+In-Reply-To: <1356650452-16559-4-git-send-email-linux@prisktech.co.nz>
+References: <1356650452-16559-1-git-send-email-linux@prisktech.co.nz>
+ <1356650452-16559-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <CABjd4Yx8CoREmQmJJjT9MO5Fr2Xr_mksGsofL8zBcS9DguAM6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No, you're right, I'm a moron.
+On Dec 28, 2012 3:21 AM, "Tony Prisk" <linux@prisktech.co.nz> wrote:
+>
+> This patch moves debug-macro.S from arm/mach-vt8500/include/mach to
+> arm/include/debug/vt8500.S to provide multiplatform support.
 
-Will fix up and resend when I'm back to work.
+Hi Tony!
 
-Sent from my mobile Linux device.
-On Dec 26, 2012 12:51 AM, "Linus Walleij" <linus.walleij@linaro.org> wrote:
+Looks like you haven't included the new file.
 
-> On Fri, Dec 21, 2012 at 12:41 PM, Lee Jones <lee.jones@linaro.org> wrote:
->
-> > +       if (IS_ERR(pdata->clk)) {
-> > +               ret = clk_prepare_enable(pdata->clk);
-> > +               if (ret < 0)
-> > +                       netdev_err(ndev, "failed to enable clock %d\n",
-> ret);
-> > +       }
->
-> I think you got all of these backwards now, shouldn't it be if
-> (!IS_ERR(pdata->clk)) { } ...?
->
-> It's late here but enlighten me if I don't get it.
->
-> > +       if (IS_ERR(pdata->clk))
-> > +               clk_disable_unprepare(pdata->clk);
->
-> Dito.
->
-> > +       /* Request clock */
-> > +       pdata->clk = clk_get(&pdev->dev, NULL);
-> > +       if (IS_ERR(pdata->clk))
-> > +               netdev_warn(ndev, "couldn't get clock %li\n",
-> PTR_ERR(pdata->clk));
->
-> This one seems correct though.
->
-> > +       /* Free clock */
-> > +       if (IS_ERR(pdata->clk)) {
-> > +               clk_put(pdata->clk);
-> > +               pdata->clk = NULL;
-> > +       }
->
-> Should be !IS_ERR()
->
-> Yours,
-> Linus Walleij
->
+Best,
+Alexey
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121227/73803030/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121228/5390c721/attachment-0001.html>
