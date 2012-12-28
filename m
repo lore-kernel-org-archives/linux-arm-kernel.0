@@ -1,59 +1,65 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Dec 2012 15:08:50 +0100
-Subject: [PATCH 3/3] ARM: Kirkwood: Convert NSA310 I2C to device tree
+Date: Fri, 28 Dec 2012 15:08:48 +0100
+Subject: [PATCH 1/3] ARM: Kirkwood: Convert NSA310 to DT based regulators.
 In-Reply-To: <1356703730-4926-1-git-send-email-andrew@lunn.ch>
 References: <1356703730-4926-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1356703730-4926-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1356703730-4926-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a sub-node into the I2C node to represent the adt7476 device.
-
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-nsa310.dts |    5 +++++
- arch/arm/mach-kirkwood/board-nsa310.c |    6 ------
- 2 files changed, 5 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/kirkwood-nsa310.dts |   17 +++++++++++++++++
+ arch/arm/mach-kirkwood/board-nsa310.c |    4 ----
+ 2 files changed, 17 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
-index 85cce36..dbb3551 100644
+index 5509f96..2dc1d09 100644
 --- a/arch/arm/boot/dts/kirkwood-nsa310.dts
 +++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
-@@ -29,6 +29,11 @@
- 
- 		i2c at 11000 {
- 			status = "okay";
-+
-+			adt7476: adt7476a at 2e {
-+				compatible = "adt7476";
-+				reg = <0x2e>;
-+			};
+@@ -141,4 +141,21 @@
+ 			gpios = <&gpio1 8 0>;
  		};
- 
- 		nand at 3000000 {
+ 	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		usb0_power_off: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "USB Power Off";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 21 0>;
++		};
++	};
+ };
 diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
-index 7a56273..1bd328d 100644
+index f58d2e1..d04184d 100644
 --- a/arch/arm/mach-kirkwood/board-nsa310.c
 +++ b/arch/arm/mach-kirkwood/board-nsa310.c
-@@ -38,10 +38,6 @@ static unsigned int nsa310_mpp_config[] __initdata = {
- 	0
- };
+@@ -19,7 +19,6 @@
+ #include "common.h"
+ #include "mpp.h"
  
--static struct i2c_board_info __initdata nsa310_i2c_info[] = {
--	{ I2C_BOARD_INFO("adt7476", 0x2e) },
--};
--
- void __init nsa310_init(void)
- {
- 	u32 dev, rev;
-@@ -49,8 +45,6 @@ void __init nsa310_init(void)
- 	kirkwood_mpp_conf(nsa310_mpp_config);
+-#define NSA310_GPIO_USB_POWER_OFF	21
+ #define NSA310_GPIO_POWER_OFF		48
  
- 	kirkwood_pcie_id(&dev, &rev);
+ static unsigned int nsa310_mpp_config[] __initdata = {
+@@ -72,9 +71,6 @@ static void __init nsa310_gpio_init(void)
+ 				  "Power Off");
+ 	if (!err)
+ 		pm_power_off = nsa310_power_off;
 -
--	i2c_register_board_info(0, ARRAY_AND_SIZE(nsa310_i2c_info));
+-	nsa310_gpio_request(NSA310_GPIO_USB_POWER_OFF, GPIOF_OUT_INIT_LOW,
+-			    "USB Power Off");
  }
  
- static int __init nsa310_pci_init(void)
+ void __init nsa310_init(void)
 -- 
 1.7.10.4
