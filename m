@@ -1,43 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 28 Dec 2012 19:45:26 +0800
-Subject: [REGRESSION][3.8.-rc1][ INFO: possible circular locking
- dependency detected ]
-In-Reply-To: <1356613404.16896.4.camel@thor.lan>
-References: <201212221628.26640.maciej.rutecki@gmail.com>
- <20121226023435.GE25478@S2101-09.ap.freescale.net>
- <20121227083618.GA9775@S2101-09.ap.freescale.net>
- <1356613404.16896.4.camel@thor.lan>
-Message-ID: <20121228114525.GD19447@S2101-09.ap.freescale.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 28 Dec 2012 13:25:08 +0100
+Subject: [PATCH 0/4] Power off drivers for QNAP and LSXL.
+Message-ID: <1356697512-3950-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 27, 2012 at 08:03:24AM -0500, Peter Hurley wrote:
-> On Thu, 2012-12-27 at 16:36 +0800, Shawn Guo wrote:
-> > On Wed, Dec 26, 2012 at 10:34:39AM +0800, Shawn Guo wrote:
-> > > It seems that I'm running into the same locking issue.  My setup is:
-> > > 
-> > > - i.MX28 (ARM)
-> > > - v3.8-rc1
-> > > - mxs_defconfig
-> >   - The warning is seen when LCD is blanking
-> > > 
-> > 
-> > The warning disappears after reverting patch daee779 (console: implement
-> > lockdep support for console_lock).  Is it suggesting that the mxs
-> > frame buffer driver (drivers/video/mxsfb.c) is doing something bad?
-> > 
-> > Shawn
-> > 
-> > > 
-> > > [  602.229899] ======================================================
-> > > [  602.229905] [ INFO: possible circular locking dependency detected ]
-> > > [  602.229926] 3.8.0-rc1-00003-gde4ae7f #767 Not tainted
-> > > [  602.229933] -------------------------------------------------------
-> > > [  602.229951] kworker/0:1/21 is trying to acquire lock:
-> > > [  602.230037]  ((fb_notifier_list).rwsem){.+.+.+}, at: [<c0041f34>] __blocking_notifier_call_chain+0x2c/0x60
-> 
-> You want this patch https://patchwork.kernel.org/patch/1757061/
-> 
-Thanks for the pointer, Peter.  It does fix the problem for me.
+This patchset contains two power off driver, moving existing code
+out of mach-kirkwood into drivers/power/reset.
 
-Shawn
+QNAP NAS boards have a microcontroller connected to a UART. Sending
+the command to it turns the power off. There are Orion5x QNAP boards
+which can later use this driver, once they are converted to DT.
+
+Kirkwood Buffalo Linkstation LSXL devices power off by restarting and
+letting the boot loader idle until the user hits a switch. There are
+again Orion5x devices which could use this driver in the future, once
+they are converted to DT. It also looks like some PXA devices could
+use it.
+
+Patches #1 and #3 are the drivers, and #2 and #4 make use of the
+driver, removing C code and adding DT nodes.
+
+The QNAP driver has been tested on a QNAP TS119+. The LSXL driver is
+currently untested.
+
+git://github.com/lunn/linux.git v3.8-rc1-qnap-poweroff
+
+Andrew Lunn (4):
+  Power: Reset: Driver to turn QNAP board power off.
+  ARM: Kirkwood: Make use of the QNAP Power off driver.
+  Power: Reset: Power off by restarting
+  ARM: Kirkwood: Convert LSXL to restart-poweroff driver.
+
+ .../bindings/power_supply/qnap-poweroff.txt        |   14 +++
+ .../bindings/power_supply/restart-poweroff.txt     |    9 ++
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi               |    4 +
+ arch/arm/boot/dts/kirkwood-ts219.dtsi              |    5 +
+ arch/arm/mach-kirkwood/Kconfig                     |    2 +
+ arch/arm/mach-kirkwood/board-lsxl.c                |   16 ---
+ arch/arm/mach-kirkwood/board-ts219.c               |    3 -
+ drivers/power/reset/Kconfig                        |   17 +++
+ drivers/power/reset/Makefile                       |    2 +
+ drivers/power/reset/qnap-poweroff.c                |  124 ++++++++++++++++++++
+ drivers/power/reset/restart-poweroff.c             |   67 +++++++++++
+ 11 files changed, 244 insertions(+), 19 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
+ create mode 100644 Documentation/devicetree/bindings/power_supply/restart-poweroff.txt
+ create mode 100644 drivers/power/reset/qnap-poweroff.c
+ create mode 100644 drivers/power/reset/restart-poweroff.c
+
+-- 
+1.7.10.4
