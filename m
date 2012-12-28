@@ -1,29 +1,40 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Dec 2012 18:17:49 +0100
-Subject: Kirkwood issues with 3.8-rc1 - Ooops and hang on reboot
-Message-ID: <20121228171749.GA6152@lunn.ch>
+Date: Fri, 28 Dec 2012 18:28:07 +0100
+Subject: [PATCH] cpuidle: kirkwood: Move out of mach directory, add DT.
+In-Reply-To: <50DDCF47.1030305@ti.com>
+References: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
+ <50DDAA42.2020101@gmail.com> <20121228143517.GA5172@lunn.ch>
+ <50DDB2E3.103@gmail.com> <20121228154927.GC5172@lunn.ch>
+ <50DDC54A.3020509@gmail.com> <50DDCF47.1030305@ti.com>
+Message-ID: <20121228172807.GA7578@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh
+> Putting DDR/SDRAM into self refresh means, you no longer have RAM
+> available to execute and any code CPU needs to execute after that has
+> to be executed either from lock down cache with no cache evictions or
+> from some internal on chip memory with caches disabled to avoid accesses
+> to DDR. Not sure how below code works if the first writel puts DDR into
+> self refresh. Is cpu_do_idle() code copied to some internal memory ?
+> 
+> +	writel(0x7, ddr_operation_base);
+> +	cpu_do_idle();
+> 
+> May be I am missing something but i have worked on such a code for OMAP3
+> kind of devices and seen major issues with DDR self refresh and CPU
+> entering into idle state.
 
-What compiler version are you using to get the opps?
+Quoting the datasheet:
 
-I don't see this problem, when building with:
+  To place the SDRAM into self refresh set the <Cmd> field in the
+  SDRAM Operation Register (Table 174 p. 400) to 0x7. The SDRAM
+  controller waits for 256 cycles and then generates a self refresh
+  command to SDRAM, and clears the SDRAM Operation register.
 
-arm-linux-gnueabi-gcc -v
-Using built-in specs.
-Target: arm-linux-gnueabi
-Configured with: ../src/configure -v --with-pkgversion='Debian 4.4.5-8' --with-bugurl=file:///usr/share/doc/gcc-4.4/README.Bugs --enable-languages=c,c++,fortran,objc,obj-c++ --prefix=/usr --program-suffix=-4.4 --enable-shared --enable-multiarch --enable-linker-build-id --with-system-zlib --libexecdir=/usr/lib --without-included-gettext --enable-threads=posix --with-gxx-include-dir=/usr/arm-linux-gnueabi/include/c++/4.4.5 --libdir=/usr/lib --enable-nls --enable-clocale=gnu --enable-libstdcxx-debug --enable-objc-gc --disable-sjlj-exceptions --enable-checking=release --program-prefix=arm-linux-gnueabi- --includedir=/usr/arm-linux-gnueabi/include --build=i486-linux-gnu --host=i486-linux-gnu --target=arm-linux-gnueabi --with-headers=/usr/arm-linux-gnueabi/include --with-libs=/usr/arm-linux-gnueabi/lib
-Thread model: posix
-gcc version 4.4.5 (Debian 4.4.5-8)
+I assume we always manage to execute the WFI within these 256 cycles.
 
-The disassembly i get looks similar, but not identical.
+There is also some text about handling new pending transactions, so
+even if it does not WFI, e.g. because of an interrupts, it seems to do
+the right thing.
 
-BTW:
-
-make drivers/clk/mvebu/clk-gating-ctrl.lst
-
-is useful in situations like this.
-
-   Andrew
+    Andrew
