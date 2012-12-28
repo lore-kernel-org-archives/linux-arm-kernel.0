@@ -1,40 +1,25 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Dec 2012 18:28:07 +0100
-Subject: [PATCH] cpuidle: kirkwood: Move out of mach directory, add DT.
-In-Reply-To: <50DDCF47.1030305@ti.com>
-References: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
- <50DDAA42.2020101@gmail.com> <20121228143517.GA5172@lunn.ch>
- <50DDB2E3.103@gmail.com> <20121228154927.GC5172@lunn.ch>
- <50DDC54A.3020509@gmail.com> <50DDCF47.1030305@ti.com>
-Message-ID: <20121228172807.GA7578@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Dec 2012 17:38:18 +0000
+Subject: Kirkwood issues with 3.8-rc1 - Ooops and hang on reboot
+In-Reply-To: <20121228171749.GA6152@lunn.ch>
+References: <20121228171749.GA6152@lunn.ch>
+Message-ID: <20121228173818.GD24604@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Putting DDR/SDRAM into self refresh means, you no longer have RAM
-> available to execute and any code CPU needs to execute after that has
-> to be executed either from lock down cache with no cache evictions or
-> from some internal on chip memory with caches disabled to avoid accesses
-> to DDR. Not sure how below code works if the first writel puts DDR into
-> self refresh. Is cpu_do_idle() code copied to some internal memory ?
+On Fri, Dec 28, 2012 at 06:17:49PM +0100, Andrew Lunn wrote:
+> Hi Josh
 > 
-> +	writel(0x7, ddr_operation_base);
-> +	cpu_do_idle();
-> 
-> May be I am missing something but i have worked on such a code for OMAP3
-> kind of devices and seen major issues with DDR self refresh and CPU
-> entering into idle state.
+> What compiler version are you using to get the opps?
 
-Quoting the datasheet:
+It's a section mismatch warning.  Just look at the code line and compare
+it with the disassembly.  Oh, the code line indicates that the code is
+no longer present.  Why would that be?
 
-  To place the SDRAM into self refresh set the <Cmd> field in the
-  SDRAM Operation Register (Table 174 p. 400) to 0x7. The SDRAM
-  controller waits for 256 cycles and then generates a self refresh
-  command to SDRAM, and clears the SDRAM Operation register.
+static struct clk __init *mvebu_clk_gating_get_src(
+                  ^^^^^^
+        struct of_phandle_args *clkspec, void *data)
+{
+        struct mvebu_gating_ctrl *ctrl = (struct mvebu_gating_ctrl *)data;
 
-I assume we always manage to execute the WFI within these 256 cycles.
-
-There is also some text about handling new pending transactions, so
-even if it does not WFI, e.g. because of an interrupts, it seems to do
-the right thing.
-
-    Andrew
+maybe?
