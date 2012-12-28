@@ -1,56 +1,95 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 28 Dec 2012 08:55:31 -0600
-Subject: [PATCH] cpuidle: kirkwood: Move out of mach directory, add DT.
-In-Reply-To: <20121228143517.GA5172@lunn.ch>
-References: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
- <50DDAA42.2020101@gmail.com> <20121228143517.GA5172@lunn.ch>
-Message-ID: <50DDB2E3.103@gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 28 Dec 2012 16:11:51 +0100
+Subject: [PATCH 4/4] clk: zynq: Use of_init_clk_data()
+In-Reply-To: <20121221154832.GM1005@beefymiracle.amer.corp.natinst.com>
+References: <1355778135-32458-1-git-send-email-sboyd@codeaurora.org>
+ <1355778135-32458-5-git-send-email-sboyd@codeaurora.org>
+ <b11edd0b-27ff-48b3-9f2a-1e7ab293cc34@CO9EHSMHS019.ehs.local>
+ <50D223DD.8070208@codeaurora.org>
+ <20121219205330.GE1005@beefymiracle.amer.corp.natinst.com>
+ <296b6ceb-f248-4add-9b4e-bceddcc1613c@CO1EHSMHS028.ehs.local>
+ <20121221154832.GM1005@beefymiracle.amer.corp.natinst.com>
+Message-ID: <CAHTX3dLfmJ+UU68ABnmzjKNB0SRQg_6_uw3VHy7x2StW+Kb3XA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/28/2012 08:35 AM, Andrew Lunn wrote:
-> On Fri, Dec 28, 2012 at 08:18:42AM -0600, Rob Herring wrote:
->> On 12/28/2012 06:47 AM, Andrew Lunn wrote:
->>> Move the Kirkwood cpuidle driver out of arch/arm/mach-kirkwood and
->>> into drivers/cpuidle. Convert the driver into a platform driver and
->>> add a device tree binding. Add a DT node to instantiate the driver for
->>> boards converted to DT, and a platform data for old style boards.
+2012/12/21 Josh Cartwright <josh.cartwright@ni.com>:
+> On Fri, Dec 21, 2012 at 03:28:10PM +0000, Michal Simek wrote:
 >>
->> Is this an old comment? I don't see any platform data.
-> 
-> There is no platform data, since all the driver needs is an address of
-> the DDR control register. The code to create a platform device entry
-> is in common.c hunk.
-
-So you should say "a platform device for old style boards".
-
->>> +		cpuidle at 1418 {
->>> +			compatible = "marvell,kirkwood-cpuidle";
->>> +			reg = <0x1418 0x4>;
->>> +		};
->>> +
 >>
->> This is describing what linux wants, not the hardware. This is a common
->> problem with cpuidle drivers in that they use shared registers. I don't
->> have a good solution, but this doesn't belong in DTS.
-> 
-> Do you have a bad solution?
+>> > -----Original Message-----
+>> > From: Josh Cartwright [mailto:josh.cartwright at ni.com]
+>> > Sent: Wednesday, December 19, 2012 9:54 PM
+>> > To: Stephen Boyd; Michal Simek
+>> > Cc: Soren Brinkmann; Mike Turquette; linux-kernel at vger.kernel.org; linux-arm-
+>> > kernel at lists.infradead.org
+>> > Subject: Re: [PATCH 4/4] clk: zynq: Use of_init_clk_data()
+>> >
+>> > On Wed, Dec 19, 2012 at 12:30:21PM -0800, Stephen Boyd wrote:
+>> > > On 12/19/12 11:22, Soren Brinkmann wrote:
+>> > [..]
+>> > > >
+>> > > > A probably unique thing I do is, I set the status of uart0 to
+>> > > > disabled. This way I can reuse my rootfs which does not run getty on
+>> > > > ttyPS1. And this worked fine before.
+>> > > >
+>> > >
+>> > > Thanks for testing. It seems that clocks are failing to register.
+>> > > Please try this patch.
+>> > >
+>> > > --->8-----
+>> > >
+>> > > diff --git a/drivers/tty/serial/xilinx_uartps.c
+>> > > b/drivers/tty/serial/xilinx_uartps.c
+>> > > index 2be22a2..2734715 100644
+>> > > --- a/drivers/tty/serial/xilinx_uartps.c
+>> > > +++ b/drivers/tty/serial/xilinx_uartps.c
+>> > > @@ -948,9 +948,9 @@ static int xuartps_probe(struct platform_device *pdev)
+>> > >         struct clk *clk;
+>> > >
+>> > >         clk = of_clk_get(pdev->dev.of_node, 0);
+>> > > -       if (!clk) {
+>> > > -               dev_err(&pdev->dev, "no clock specified\n");
+>> > > -               return -ENODEV;
+>> > > +       if (IS_ERR(clk)) {
+>> > > +               dev_err(&pdev->dev, "failed to get clock\n");
+>> > > +               return PTR_ERR(clk);
+>> > >         }
+>> > >
+>> > >         rc = clk_prepare_enable(clk);
+>> >
+>> > Yes, indeed.
+>> >
+>> > As a side note, this is introduced in my patch "serial: xilinx_uartps:
+>> > get clock rate info from dts", which is in xilinx/arm-next (and thus in linux-next),
+>> > but as far as I can tell, didn't ever make it into the arm-soc tree.
+>> >
+>> > Michal, did you have plans for pushing this through arm-soc?
+>>
+>> I have had this patch in my devel branch for a while.
+>> It is in arm-next tree right now and I will provide path to mainline.
+>
+> Will you be rolling in Stephen's suggestions, or should he/I cook up a
+> patch on top with the fix in place?
 
-Ha! :) I should say I don't have a clear, obvious solution.
+Here is the patch I have applied.
 
-Don't do a platform driver and just check the machine compatible
-property which is what I did for highbank. Have the machine code create
-the platform device. Not *all* platform devices have to be created based
-on the DTB. Create an MFD driver for the whole block of registers.
+http://git.xilinx.com/?p=linux-xlnx.git;a=commit;h=a3607ea56f4455c515201ab91d2304a634925f6c
 
-> I could just hard code the address, since its the same for all
-> kirkwood SoCs. Also, the register is not being used by any other
-> code on kirkwood, so its not shared.
+> It probably makes sense to pull the quoted fix above directly into the
+> patch before it hits mainline, and we can change the use of of_clk_get
+> as a patch on top.  Thoughts?
 
-Then describe it based on the reference manual, but you need to do so
-assuming you are using all the other registers. I assume there are other
-registers at say 0x1414 or 0x141c. You have to be careful if you create
-separate nodes for each register or sub-group of registers. It needs to
-work no matter what the OS expectation is.
+Stephen: Can you please tell me how do you want to add these patches
+to mainline?
+Through arm-soc tree? Have you asked for pulling?
 
-Rob
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian
