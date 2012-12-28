@@ -1,90 +1,43 @@
-From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Fri, 28 Dec 2012 17:10:51 +0530
-Subject: [PATCH 2/2] arm: exynos5: Add HS-I2C device tree platform information
-In-Reply-To: <1356694851-1345-1-git-send-email-ch.naveen@samsung.com>
-References: <1356694851-1345-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1356694851-1345-2-git-send-email-ch.naveen@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 28 Dec 2012 19:45:26 +0800
+Subject: [REGRESSION][3.8.-rc1][ INFO: possible circular locking
+ dependency detected ]
+In-Reply-To: <1356613404.16896.4.camel@thor.lan>
+References: <201212221628.26640.maciej.rutecki@gmail.com>
+ <20121226023435.GE25478@S2101-09.ap.freescale.net>
+ <20121227083618.GA9775@S2101-09.ap.freescale.net>
+ <1356613404.16896.4.camel@thor.lan>
+Message-ID: <20121228114525.GD19447@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds HS-I2C device tree platform information in
-exynos5.dtsi and exynos5-smdk5250.
+On Thu, Dec 27, 2012 at 08:03:24AM -0500, Peter Hurley wrote:
+> On Thu, 2012-12-27 at 16:36 +0800, Shawn Guo wrote:
+> > On Wed, Dec 26, 2012 at 10:34:39AM +0800, Shawn Guo wrote:
+> > > It seems that I'm running into the same locking issue.  My setup is:
+> > > 
+> > > - i.MX28 (ARM)
+> > > - v3.8-rc1
+> > > - mxs_defconfig
+> >   - The warning is seen when LCD is blanking
+> > > 
+> > 
+> > The warning disappears after reverting patch daee779 (console: implement
+> > lockdep support for console_lock).  Is it suggesting that the mxs
+> > frame buffer driver (drivers/video/mxsfb.c) is doing something bad?
+> > 
+> > Shawn
+> > 
+> > > 
+> > > [  602.229899] ======================================================
+> > > [  602.229905] [ INFO: possible circular locking dependency detected ]
+> > > [  602.229926] 3.8.0-rc1-00003-gde4ae7f #767 Not tainted
+> > > [  602.229933] -------------------------------------------------------
+> > > [  602.229951] kworker/0:1/21 is trying to acquire lock:
+> > > [  602.230037]  ((fb_notifier_list).rwsem){.+.+.+}, at: [<c0041f34>] __blocking_notifier_call_chain+0x2c/0x60
+> 
+> You want this patch https://patchwork.kernel.org/patch/1757061/
+> 
+Thanks for the pointer, Peter.  It does fix the problem for me.
 
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
----
- arch/arm/boot/dts/exynos5250-smdk5250.dts |   16 +++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi         |   32 +++++++++++++++++++++++++++++
- 2 files changed, 48 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 942d576..b7fba59 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -108,6 +108,22 @@
- 		};
- 	};
- 
-+	hsi2c at 12C50000 {
-+		status = "disabled";
-+	};
-+
-+	hsi2c at 12D00000 {
-+		status = "disabled";
-+	};
-+
-+	hsi2c at 12D50000 {
-+		status = "disabled";
-+	};
-+
-+	hsi2c at 12DE0000 {
-+		status = "disabled";
-+	};
-+
- 	dwmmc0 at 12200000 {
- 		num-slots = <1>;
- 		supports-highspeed;
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 45799e8..a10c089 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -213,6 +213,38 @@
-                 #size-cells = <0>;
- 	};
- 
-+	hsi2c at 12C50000 {
-+		compatible = "samsung,exynos5-hsi2c";
-+		reg = <0x12C50000 0x1000>;
-+		interrupts = <0 56 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	hsi2c at 12D00000 {
-+		compatible = "samsung,exynos5-hsi2c";
-+		reg = <0x12D00000 0x1000>;
-+		interrupts = <0 57 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	hsi2c at 12D50000 {
-+		compatible = "samsung,exynos5-hsi2c";
-+		reg = <0x12D50000 0x1000>;
-+		interrupts = <0 58 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	hsi2c at 12DE0000 {
-+		compatible = "samsung,exynos5-hsi2c";
-+		reg = <0x12DE0000 0x1000>;
-+		interrupts = <0 59 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
- 	spi_0: spi at 12d20000 {
- 		compatible = "samsung,exynos4210-spi";
- 		reg = <0x12d20000 0x100>;
--- 
-1.7.9.5
+Shawn
