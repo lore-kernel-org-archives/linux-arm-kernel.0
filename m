@@ -1,132 +1,32 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 28 Dec 2012 21:08:09 +1300
-Subject: [PATCH 3/4 v2] arm: vt8500: Convert debug-macro.S to be multiplatform
- friendly
-Message-ID: <1356682089-20339-1-git-send-email-linux@prisktech.co.nz>
+Date: Fri, 28 Dec 2012 21:09:50 +1300
+Subject: [PATCH 3/4] arm: vt8500: Convert debug-macro.S to be
+ multiplatform friendly
+In-Reply-To: <CABjd4Yx8CoREmQmJJjT9MO5Fr2Xr_mksGsofL8zBcS9DguAM6A@mail.gmail.com>
+References: <1356650452-16559-1-git-send-email-linux@prisktech.co.nz>
+ <1356650452-16559-4-git-send-email-linux@prisktech.co.nz>
+ <CABjd4Yx8CoREmQmJJjT9MO5Fr2Xr_mksGsofL8zBcS9DguAM6A@mail.gmail.com>
+Message-ID: <1356682190.19865.0.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves debug-macro.S from arm/mach-vt8500/include/mach to
-arm/include/debug/vt8500.S to provide multiplatform support.
+On Fri, 2012-12-28 at 10:21 +0600, Alexey Charkov wrote:
+> 
+> On Dec 28, 2012 3:21 AM, "Tony Prisk" <linux@prisktech.co.nz> wrote:
+> >
+> > This patch moves debug-macro.S from arm/mach-vt8500/include/mach to
+> > arm/include/debug/vt8500.S to provide multiplatform support.
+> 
+> Hi Tony!
+> 
+> Looks like you haven't included the new file.
+> 
+> Best,
+> Alexey
+> 
 
-Minor style changes in code for readability.
+Thanks Alexey,
+Resent as 3/4 v2.
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
-Patch resend due to missing arch/arm/include/debug/vt8500.S
-
- arch/arm/Kconfig.debug                          |    8 +++++
- arch/arm/include/debug/vt8500.S                 |   37 +++++++++++++++++++++++
- arch/arm/mach-vt8500/include/mach/debug-macro.S |   31 -------------------
- 3 files changed, 45 insertions(+), 31 deletions(-)
- create mode 100644 arch/arm/include/debug/vt8500.S
- delete mode 100644 arch/arm/mach-vt8500/include/mach/debug-macro.S
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 661030d..bbb0a67 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -412,6 +412,13 @@ choice
- 		  of the tiles using the RS1 memory map, including all new A-class
- 		  core tiles, FPGA-based SMMs and software models.
- 
-+	config DEBUG_VT8500_UART0
-+		bool "Use UART0 on VIA/Wondermedia SoCs"
-+		depends on ARCH_VT8500
-+		help
-+		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
-+		  devices, including VT8500, WM8505, WM8650 and WM8850.
-+
- 	config DEBUG_LL_UART_NONE
- 		bool "No low-level debugging UART"
- 		depends on !ARCH_MULTIPLATFORM
-@@ -506,6 +513,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
- 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
- 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
-+	default "debug/vt8500.S" if DEBUG_VT8500_UART0
- 	default "debug/tegra.S" if DEBUG_TEGRA_UART
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
- 	default "mach/debug-macro.S"
-diff --git a/arch/arm/include/debug/vt8500.S b/arch/arm/include/debug/vt8500.S
-new file mode 100644
-index 0000000..0e0ca08
---- /dev/null
-+++ b/arch/arm/include/debug/vt8500.S
-@@ -0,0 +1,37 @@
-+/* 
-+ * Debugging macro include header
-+ *
-+ *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-+ *    Moved from arch/arm/mach-vt8500/include/mach/debug-macro.S
-+ *    Minor changes for readability.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define DEBUG_LL_PHYS_BASE		0xD8000000
-+#define DEBUG_LL_VIRT_BASE		0xF8000000
-+#define DEBUG_LL_UART_OFFSET		0x00200000
-+
-+#if defined(CONFIG_DEBUG_VT8500_UART0)
-+	.macro	addruart, rp, rv, tmp
-+	mov	\rp,      #DEBUG_LL_UART_OFFSET
-+	orr	\rv, \rp, #DEBUG_LL_VIRT_BASE
-+	orr	\rp, \rp, #DEBUG_LL_PHYS_BASE
-+	.endm
-+
-+	.macro	senduart,rd,rx
-+	strb	\rd, [\rx, #0]
-+	.endm
-+
-+	.macro	busyuart,rd,rx
-+1001:	ldr	\rd, [\rx, #0x1c]
-+	ands	\rd, \rd, #0x2
-+	bne	1001b
-+	.endm
-+
-+	.macro	waituart,rd,rx
-+	.endm
-+
-+#endif
-diff --git a/arch/arm/mach-vt8500/include/mach/debug-macro.S b/arch/arm/mach-vt8500/include/mach/debug-macro.S
-deleted file mode 100644
-index ca292f2..0000000
---- a/arch/arm/mach-vt8500/include/mach/debug-macro.S
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/*
-- * arch/arm/mach-vt8500/include/mach/debug-macro.S
-- *
-- *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-- *
-- * Debugging macro include header
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
--*/
--
--	.macro	addruart, rp, rv, tmp
--	mov	\rp,      #0x00200000
--	orr	\rv, \rp, #0xf8000000
--	orr	\rp, \rp, #0xd8000000
--	.endm
--
--	.macro	senduart,rd,rx
--	strb	\rd, [\rx, #0]
--	.endm
--
--	.macro	busyuart,rd,rx
--1001:	ldr	\rd, [\rx, #0x1c]
--	ands	\rd, \rd, #0x2
--	bne	1001b
--	.endm
--
--	.macro	waituart,rd,rx
--	.endm
--- 
-1.7.9.5
+Regards
+Tony P
