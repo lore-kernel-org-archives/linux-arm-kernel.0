@@ -1,139 +1,202 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Dec 2012 13:25:11 +0100
-Subject: [PATCH 3/4] Power: Reset: Power off by restarting
+Date: Fri, 28 Dec 2012 13:25:09 +0100
+Subject: [PATCH 1/4] Power: Reset: Driver to turn QNAP board power off.
 In-Reply-To: <1356697512-3950-1-git-send-email-andrew@lunn.ch>
 References: <1356697512-3950-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1356697512-3950-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1356697512-3950-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices, Buffalo Linkstation LS-XHL and LS-CHLv2 for example,
-power-off by restarting to letting u-boot hold the SoC until the user
-presses a key. Add a generic driver to implement this. It binds a
-function to pm_power_off, which calls arm_pm_restart.
+From: Andrew Lunn <andrew.lunn@ruag.com>
+
+The QNAP NAS boxes have a microcontroller attached to the SoCs second
+serial port. By sending it a simple command, it will turn the power
+for the board off. This driver registers a function for pm_power_off
+to send such a command.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- .../bindings/power_supply/restart-poweroff.txt     |    9 +++
- drivers/power/reset/Kconfig                        |    8 +++
+ .../bindings/power_supply/qnap-poweroff.txt        |   14 +++
+ drivers/power/reset/Kconfig                        |    9 ++
  drivers/power/reset/Makefile                       |    1 +
- drivers/power/reset/restart-poweroff.c             |   67 ++++++++++++++++++++
- 4 files changed, 85 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power_supply/restart-poweroff.txt
- create mode 100644 drivers/power/reset/restart-poweroff.c
+ drivers/power/reset/qnap-poweroff.c                |  124 ++++++++++++++++++++
+ 4 files changed, 148 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
+ create mode 100644 drivers/power/reset/qnap-poweroff.c
 
-diff --git a/Documentation/devicetree/bindings/power_supply/restart-poweroff.txt b/Documentation/devicetree/bindings/power_supply/restart-poweroff.txt
+diff --git a/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt b/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
 new file mode 100644
-index 0000000..e4f1660
+index 0000000..0951952
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/power_supply/restart-poweroff.txt
-@@ -0,0 +1,9 @@
-+* Restart Power Off
++++ b/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
+@@ -0,0 +1,14 @@
++* QNAP Power Off
 +
-+Buffalo Linkstation LS-XHL and LS-CHLv2, and other devices power off
-+by restarting and letting u-boot keep hold of the machine until the
-+user presses a button.
++QNAP NAS devices have a microcontroller controlling the main power
++supply. This microcontroller is connected to UART1 of the Kirkwood and
++Orion5x SoCs. Sending the charactor 'A', at 19200 baud, tells the
++microcontroller to turn the power off. This driver adds a handler to
++pm_power_off which is called to turn the power off.
 +
 +Required Properties:
-+- compatible: Should be "restart-poweroff"
++- compatible: Should be "qnap,power-off"
++
++- reg: Address and length of the register set for UART1
++- clocks: tclk clock
 +
 diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 6453aac..1ae65b8 100644
+index 6461b48..6453aac 100644
 --- a/drivers/power/reset/Kconfig
 +++ b/drivers/power/reset/Kconfig
-@@ -22,3 +22,11 @@ config POWER_RESET_QNAP
- 	  commands to the microcontroller which controls the main power.
- 
- 	  Say Y if you have a QNAP NAS.
+@@ -13,3 +13,12 @@ config POWER_RESET_GPIO
+ 	  This driver supports turning off your board via a GPIO line.
+ 	  If your board needs a GPIO high/low to power down, say Y and
+ 	  create a binding in your devicetree.
 +
-+config POWER_RESET_RESTART
-+	bool "Restart power-off driver"
-+	depends on ARM
++config POWER_RESET_QNAP
++	bool "QNAP power-off driver"
++	depends on OF_GPIO && POWER_RESET && PLAT_ORION
 +	help
-+	  Some boards don't actually have the ability to power off.
-+	  Instead they restart, and u-boot holds the SoC until the
-+	  user presses a key. u-boot then boots into Linux.
++	  This driver supports turning off QNAP NAS devices by sending
++	  commands to the microcontroller which controls the main power.
++
++	  Say Y if you have a QNAP NAS.
 diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index c4d3b2d..0f317f5 100644
+index 751488a..c4d3b2d 100644
 --- a/drivers/power/reset/Makefile
 +++ b/drivers/power/reset/Makefile
-@@ -1,2 +1,3 @@
+@@ -1 +1,2 @@
  obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
- obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
-+obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
-\ No newline at end of file
-diff --git a/drivers/power/reset/restart-poweroff.c b/drivers/power/reset/restart-poweroff.c
++obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
 new file mode 100644
-index 0000000..79b1a2e
+index 0000000..ca0b476
 --- /dev/null
-+++ b/drivers/power/reset/restart-poweroff.c
-@@ -0,0 +1,67 @@
++++ b/drivers/power/reset/qnap-poweroff.c
+@@ -0,0 +1,124 @@
 +/*
-+ * Power off by restarting and let u-boot keep hold of the machine
-+ * until the user presses a button for example.
++ * QNAP Turbo NAS Board power off
 + *
-+ * Andrew Lunn <andrew@lunn.ch>
++ * Copyright (C) 2012 Andrew Lunn <andrew@lunn.ch>
 + *
-+ * Copyright (C) 2012 Andrew Lunn
++ * Based on the code from:
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Copyright (C) 2009  Martin Michlmayr <tbm@cyrius.com>
++ * Copyright (C) 2008  Byron Bradley <byron.bbradley@gmail.com>
 + *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
 + */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <asm/system_misc.h>
-+#include <linux/of_platform.h>
-+#include <linux/module.h>
 +
-+static void restart_poweroff_do_poweroff(void)
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/serial_reg.h>
++#include <linux/kallsyms.h>
++#include <linux/of.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++
++#define UART1_REG(x)	(base + ((UART_##x) << 2))
++
++static void __iomem *base;
++static unsigned long tclk;
++
++static void
++qnap_power_off(void)
 +{
-+	arm_pm_restart('h', NULL);
++	/* 19200 baud divisor */
++	const unsigned divisor = ((tclk + (8 * 19200)) / (16 * 19200));
++
++	pr_err("%s: triggering power-off...\n", __func__);
++
++	/* hijack UART1 and reset into sane state (19200,8n1) */
++	writel(0x83, UART1_REG(LCR));
++	writel(divisor & 0xff, UART1_REG(DLL));
++	writel((divisor >> 8) & 0xff, UART1_REG(DLM));
++	writel(0x03, UART1_REG(LCR));
++	writel(0x00, UART1_REG(IER));
++	writel(0x00, UART1_REG(FCR));
++	writel(0x00, UART1_REG(MCR));
++
++	/* send the power-off command 'A' to PIC */
++	writel('A', UART1_REG(TX));
 +}
 +
-+static int __devinit restart_poweroff_probe(struct platform_device *pdev)
++static int
++qnap_power_off_probe(struct platform_device *pdev)
 +{
-+	/* If a pm_power_off function has already been added, leave it alone */
-+	if (pm_power_off != NULL) {
-+		dev_err(&pdev->dev,
-+			"pm_power_off function already registered");
-+		return -EBUSY;
++	struct resource *res;
++	struct clk *clk;
++	char symname[KSYM_NAME_LEN];
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (res == NULL) {
++		dev_err(&pdev->dev, "Missing resource");
++		return -EINVAL;
 +	}
 +
-+	pm_power_off = &restart_poweroff_do_poweroff;
++	base = devm_ioremap(&pdev->dev, res->start,
++			    resource_size(res));
++	if (base == NULL) {
++		dev_err(&pdev->dev, "Unable to map resource");
++		return -EINVAL;
++	}
++
++	/* We need to know tclk in order to calculate the UART
++	   divisor */
++	clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(clk)) {
++		dev_err(&pdev->dev, "Clk missing");
++		return PTR_ERR(clk);
++	}
++
++	tclk = clk_get_rate(clk);
++
++	/* Check that nothing else has already setup a handler */
++	if (pm_power_off != NULL) {
++		lookup_symbol_name(pm_power_off, symname);
++		dev_err(&pdev->dev,
++			"pm_power_off already claimed %p %s",
++			pm_power_off, symname);
++		return -EBUSY;
++	}
++	pm_power_off = qnap_power_off;
++
 +	return 0;
 +}
 +
-+static int __devexit restart_poweroff_remove(struct platform_device *pdev)
++static int
++qnap_power_off_remove(struct platform_device *pdev)
 +{
-+	if (pm_power_off == &restart_poweroff_do_poweroff)
-+		pm_power_off = NULL;
++	pm_power_off = NULL;
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id of_restart_poweroff_match[] = {
-+	{ .compatible = "restart-poweroff", },
-+	{},
++static const struct of_device_id qnap_power_off_of_match_table[] = {
++	{ .compatible = "qnap,power-off", },
++	{}
 +};
 +
-+static struct platform_driver restart_poweroff_driver = {
-+	.probe = restart_poweroff_probe,
-+	.remove = __devexit_p(restart_poweroff_remove),
-+	.driver = {
-+		   .name = "poweroff-restart",
-+		   .owner = THIS_MODULE,
-+		   .of_match_table = of_restart_poweroff_match,
-+		   },
++MODULE_DEVICE_TABLE(of, qnap_power_off_of_match_table);
++
++static struct platform_driver qnap_power_off_driver = {
++	.probe	= qnap_power_off_probe,
++	.remove	= qnap_power_off_remove,
++	.driver	= {
++		.owner	= THIS_MODULE,
++		.name	= "qnap_power_off",
++		.of_match_table = of_match_ptr(qnap_power_off_of_match_table),
++	},
 +};
 +
-+module_platform_driver(restart_poweroff_driver);
++module_platform_driver(qnap_power_off_driver);
 +
-+MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch");
-+MODULE_DESCRIPTION("restart poweroff driver");
-+MODULE_LICENSE("GPLv2");
-+MODULE_ALIAS("platform:poweroff-restart");
++MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
++MODULE_DESCRIPTION("QNAP Power off driver");
++MODULE_LICENSE("GPLv2+");
 -- 
 1.7.10.4
