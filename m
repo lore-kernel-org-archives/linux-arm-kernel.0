@@ -1,65 +1,75 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Dec 2012 15:08:48 +0100
-Subject: [PATCH 1/3] ARM: Kirkwood: Convert NSA310 to DT based regulators.
-In-Reply-To: <1356703730-4926-1-git-send-email-andrew@lunn.ch>
-References: <1356703730-4926-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1356703730-4926-2-git-send-email-andrew@lunn.ch>
+Date: Fri, 28 Dec 2012 15:14:10 +0100
+Subject: [PATCH 1/5] ARM: Kirkwood: Convert NS2 to gpio-poweroff.
+Message-ID: <1356704050-5047-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Remove C code and add a Device Tree node in its place.
+
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-nsa310.dts |   17 +++++++++++++++++
- arch/arm/mach-kirkwood/board-nsa310.c |    4 ----
- 2 files changed, 17 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
-index 5509f96..2dc1d09 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
-@@ -141,4 +141,21 @@
- 			gpios = <&gpio1 8 0>;
+This is untested. I've been known to get the active hi/low the wrong
+way around so that the board powers off as the driver loads at boot
+time. So it would be very good to have a tested-by: sign off.
+
+
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi |    6 ++++++
+ arch/arm/mach-kirkwood/board-ns2.c         |   14 --------------
+ 2 files changed, 6 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+index 9bc6785..58c4103 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+@@ -60,4 +60,10 @@
+ 			gpios = <&gpio0 12 0>;
  		};
  	};
 +
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		usb0_power_off: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB Power Off";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 21 0>;
-+		};
++	gpio_poweroff {
++		compatible = "gpio-poweroff";
++		gpios = <&gpio0 31 0>;
 +	};
++
  };
-diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
-index f58d2e1..d04184d 100644
---- a/arch/arm/mach-kirkwood/board-nsa310.c
-+++ b/arch/arm/mach-kirkwood/board-nsa310.c
-@@ -19,7 +19,6 @@
+diff --git a/arch/arm/mach-kirkwood/board-ns2.c b/arch/arm/mach-kirkwood/board-ns2.c
+index 8821720..f263449 100644
+--- a/arch/arm/mach-kirkwood/board-ns2.c
++++ b/arch/arm/mach-kirkwood/board-ns2.c
+@@ -15,7 +15,6 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/mv643xx_eth.h>
+-#include <linux/gpio.h>
+ #include <linux/of.h>
  #include "common.h"
  #include "mpp.h"
+@@ -59,13 +58,6 @@ static unsigned int ns2_mpp_config[] __initdata = {
+ 	0
+ };
  
--#define NSA310_GPIO_USB_POWER_OFF	21
- #define NSA310_GPIO_POWER_OFF		48
- 
- static unsigned int nsa310_mpp_config[] __initdata = {
-@@ -72,9 +71,6 @@ static void __init nsa310_gpio_init(void)
- 				  "Power Off");
- 	if (!err)
- 		pm_power_off = nsa310_power_off;
+-#define NS2_GPIO_POWER_OFF	31
 -
--	nsa310_gpio_request(NSA310_GPIO_USB_POWER_OFF, GPIOF_OUT_INIT_LOW,
--			    "USB Power Off");
+-static void ns2_power_off(void)
+-{
+-	gpio_set_value(NS2_GPIO_POWER_OFF, 1);
+-}
+-
+ void __init ns2_init(void)
+ {
+ 	/*
+@@ -77,10 +69,4 @@ void __init ns2_init(void)
+ 	    of_machine_is_compatible("lacie,netspace_mini_v2"))
+ 		ns2_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
+ 	kirkwood_ge00_init(&ns2_ge00_data);
+-
+-	if (gpio_request(NS2_GPIO_POWER_OFF, "power-off") == 0 &&
+-	    gpio_direction_output(NS2_GPIO_POWER_OFF, 0) == 0)
+-		pm_power_off = ns2_power_off;
+-	else
+-		pr_err("ns2: failed to configure power-off GPIO\n");
  }
- 
- void __init nsa310_init(void)
 -- 
 1.7.10.4
