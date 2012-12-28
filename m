@@ -1,21 +1,31 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 28 Dec 2012 19:03:01 +0800
-Subject: [PATCHv2] ARM: dts: cfa10049: Add PCA9555 GPIO expander to the
- device tree
-In-Reply-To: <50DCC513.5030004@free-electrons.com>
-References: <20121120144322.GE4882@S2100-06.ap.freescale.net>
- <1353422015-4790-1-git-send-email-maxime.ripard@free-electrons.com>
- <50AE023D.3000406@free-electrons.com>
- <20121122112447.GI24693@S2100-06.ap.freescale.net>
- <50DCC513.5030004@free-electrons.com>
-Message-ID: <20121228110259.GA19447@S2101-09.ap.freescale.net>
+Date: Fri, 28 Dec 2012 19:17:43 +0800
+Subject: [PATCH 0/2] ARM: cfa10036: Switch SPI to gpio bitbanging
+In-Reply-To: <1356645288-10110-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1356645288-10110-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20121228111742.GB19447@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 27, 2012 at 11:00:51PM +0100, Maxime Ripard wrote:
-> Are you still ok to apply it on top of 3.8-rc1 and send it for -rc2? Or
-> to queue it up for 3.9?
+On Thu, Dec 27, 2012 at 10:54:46PM +0100, Maxime Ripard wrote:
+> Hi Shawn,
 > 
-Since it's not really a bug fix, I will have to queue it up for 3.9.
+> Here is a patchset that moves the spi bus we use to bitbanging. This is needed
+> because the DAC found on this bus is actually using a 12 bits wordlength, while
+> the imx28 spi controler can only handle 4, 8 or 16 bits per words.
+> 
+Will try to apply the second patch after the first one gets applied on spi tree.
 
 Shawn
+
+> Maxime Ripard (2):
+>   spi: spi-gpio: Add checks for the dt properties
+>   ARM: dts: cfa10049: Change the SPI3 bus to spi-gpio
+> 
+>  arch/arm/boot/dts/imx28-cfa10049.dts |   78 ++++++++++++++++++----------------
+>  drivers/spi/spi-gpio.c               |   23 ++++++++--
+>  2 files changed, 62 insertions(+), 39 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
