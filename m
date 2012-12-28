@@ -1,90 +1,85 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 28 Dec 2012 22:59:57 +0300
-Subject: [PATCH fix-3.8] video: vt8500: Fix X crash when initializing
- framebuffer.
-In-Reply-To: <1356567943-3836-1-git-send-email-linux@prisktech.co.nz>
-References: <1356567943-3836-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <50DDFA3D.1000506@mvista.com>
+From: michael@walle.cc (Michael Walle)
+Date: Fri, 28 Dec 2012 20:16:59 +0100
+Subject: [PATCH 4/4] ARM: Kirkwood: Convert LSXL to restart-poweroff
+ driver.
+In-Reply-To: <1356697512-3950-5-git-send-email-andrew@lunn.ch>
+References: <1356697512-3950-1-git-send-email-andrew@lunn.ch>
+ <1356697512-3950-5-git-send-email-andrew@lunn.ch>
+Message-ID: <201212282016.59894.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 12/27/2012 03:25 AM, Tony Prisk wrote:
-
-> This patch adds support for .fb_check_var which is required when
-> X attempts to initialize the framebuffer. The only supported
-> resolution is the native resolution of the LCD panel, so we test
-> against the resolution supplied from the DT panel definition.
-
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Am Freitag 28 Dezember 2012, 13:25:12 schrieb Andrew Lunn:
+> Add a device tree node and remove the C code.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  drivers/video/wm8505fb.c |   25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-
-> diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
-> index 77539c1..c84e376 100644
-> --- a/drivers/video/wm8505fb.c
-> +++ b/drivers/video/wm8505fb.c
-[...]
-> @@ -248,8 +256,21 @@ static int wm8505fb_blank(int blank, struct fb_info *info)
->  	return 0;
+>  arch/arm/boot/dts/kirkwood-lsxl.dtsi |    4 ++++
+>  arch/arm/mach-kirkwood/Kconfig       |    1 +
+>  arch/arm/mach-kirkwood/board-lsxl.c  |   16 ----------------
+>  3 files changed, 5 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+> b/arch/arm/boot/dts/kirkwood-lsxl.dtsi index 37d45c4..996c7fe 100644
+> --- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+> @@ -172,6 +172,10 @@
+>  		alarm-gpios = <&gpio1 8 0>;
+>  	};
+> 
+> +	restart_poweroff {
+> +		compatible = "restart-poweroff";
+> +	};
+> +
+>  	regulators {
+>  		compatible = "simple-bus";
+>  		#address-cells = <1>;
+> diff --git a/arch/arm/mach-kirkwood/Kconfig
+> b/arch/arm/mach-kirkwood/Kconfig index bb4de9c..432bee0 100644
+> --- a/arch/arm/mach-kirkwood/Kconfig
+> +++ b/arch/arm/mach-kirkwood/Kconfig
+> @@ -119,6 +119,7 @@ config MACH_GOFLEXNET_DT
+>  config MACH_LSXL_DT
+>  	bool "Buffalo Linkstation LS-XHL, LS-CHLv2 (Flattened Device Tree)"
+>  	select ARCH_KIRKWOOD_DT
+> +	select POWER_RESET_RESTART
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Buffalo Linkstation LS-XHL & LS-CHLv2 devices, using
+> diff --git a/arch/arm/mach-kirkwood/board-lsxl.c
+> b/arch/arm/mach-kirkwood/board-lsxl.c index 4ec8b7a..3483952 100644
+> --- a/arch/arm/mach-kirkwood/board-lsxl.c
+> +++ b/arch/arm/mach-kirkwood/board-lsxl.c
+> @@ -25,19 +25,6 @@ static struct mv643xx_eth_platform_data lsxl_ge01_data =
+> { .phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+>  };
+> 
+> -/*
+> - * On the LS-XHL/LS-CHLv2, the shutdown process is following:
+> - * - Userland monitors key events until the power switch goes to off
+> position - * - The board reboots
+> - * - U-boot starts and goes into an idle mode waiting for the user
+> - *   to move the switch to ON position
+> - *
+> - */
+> -static void lsxl_power_off(void)
+> -{
+> -	kirkwood_restart('h', NULL);
+> -}
+> -
+>  void __init lsxl_init(void)
+>  {
+>  	/*
+> @@ -46,7 +33,4 @@ void __init lsxl_init(void)
+> 
+>  	kirkwood_ge00_init(&lsxl_ge00_data);
+>  	kirkwood_ge01_init(&lsxl_ge01_data);
+> -
+> -	/* register power-off method */
+> -	pm_power_off = lsxl_power_off;
 >  }
->  
-> +static int wm8505fb_check_var(struct fb_var_screeninfo *var,
-> +			      struct fb_info *info)
-> +{
-> +	struct wm8505fb_info *fbi = to_wm8505fb_info(info);
-> +        if (!fbi) return -EINVAL;
-> +
-> +	if (info->var.bits_per_pixel != fbi->lcd_params.color_depth) return -EINVAL;
-> +	if (info->var.xres != fbi->lcd_params.pixel_width) return -EINVAL;
-> +	if (info->var.yres != fbi->lcd_params.pixel_height) return -EINVAL;
-> +	return 0;
-> +}
-> +
 
-[...]
+Tested-by: Michael Walle <michael@walle.cc>
 
-$ scripts/checkpatch.pl
-patches/video-vt8500-Fix-X-crash-when-initializing-framebuffer.patch
-ERROR: code indent should use tabs where possible
-#42: FILE: drivers/video/wm8505fb.c:263:
-+        if (!fbi) return -EINVAL;$
-
-WARNING: please, no spaces at the start of a line
-#42: FILE: drivers/video/wm8505fb.c:263:
-+        if (!fbi) return -EINVAL;$
-
-ERROR: trailing statements should be on next line
-#42: FILE: drivers/video/wm8505fb.c:263:
-+        if (!fbi) return -EINVAL;
-
-WARNING: line over 80 characters
-#44: FILE: drivers/video/wm8505fb.c:265:
-+	if (info->var.bits_per_pixel != fbi->lcd_params.color_depth) return -EINVAL;
-
-ERROR: trailing statements should be on next line
-#44: FILE: drivers/video/wm8505fb.c:265:
-+	if (info->var.bits_per_pixel != fbi->lcd_params.color_depth) return -EINVAL;
-
-ERROR: trailing statements should be on next line
-#45: FILE: drivers/video/wm8505fb.c:266:
-+	if (info->var.xres != fbi->lcd_params.pixel_width) return -EINVAL;
-
-ERROR: trailing statements should be on next line
-#46: FILE: drivers/video/wm8505fb.c:267:
-+	if (info->var.yres != fbi->lcd_params.pixel_height) return -EINVAL;
-
-total: 5 errors, 2 warnings, 49 lines checked
-
-NOTE: whitespace errors detected, you may wish to use scripts/cleanpatch or
-      scripts/cleanfile
-
-patches/video-vt8500-Fix-X-crash-when-initializing-framebuffer.patch has style
-problems, please review.
-
-If any of these errors are false positives, please report
-them to the maintainer, see CHECKPATCH in MAINTAINERS.
-
-WBR, Sergei
+Sort of, device_shutdown() is blocking on my board (seems to be some kind of 
+issue with orion-ehci), but that has nothing to do with this patch :)
