@@ -1,136 +1,54 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 28 Dec 2012 12:20:49 +1300
-Subject: [PATCH 1/4] arm: vt8500: Add support for Wondermedia WM8750/WM8850
-In-Reply-To: <1356650452-16559-1-git-send-email-linux@prisktech.co.nz>
-References: <1356650452-16559-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1356650452-16559-2-git-send-email-linux@prisktech.co.nz>
+From: tcech@suse.cz (Tomas Cech)
+Date: Fri, 28 Dec 2012 01:18:40 +0100
+Subject: [PATCH v2 0/4]  ARM: pxa: palmtreo: a few treo fixes
+In-Reply-To: <1356631340-30328-1-git-send-email-mikedunn@newsguy.com>
+References: <1356631340-30328-1-git-send-email-mikedunn@newsguy.com>
+Message-ID: <20121228001840.GC22054@crashnator.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the WM8750 (ARMv6) and WM8850 (ARMv7).
+Hi,
 
-Common features across all SoCs are split into ARCH_VT8500 and
-unique features are specified by each SoC option.
+On Thu, Dec 27, 2012 at 10:02:16AM -0800, Mike Dunn wrote:
+>Some miscellaneous fixes to the treo code.
+>
+>Change log:
+>v2:
+>  patch 1: gpio initialization separated out from lcd initialization, per
+>  	   Marek's suggestion (lcd still initializes correctly this way).
+>  patch 2: Removed #ifdef CONFIG_MACH_TREO680 from around defines in
+>  	   both palmtreo.h and leds-gpio device data in palmtreo.c, per Marek's
+>	   suggestion, and let compiler optimize out unused data (verified).
+>  patch 3: Use IS_EMABLED macro, per Sergei's suggestion
+>  patch 4: new patch for v2: use IS_ENABLED elsewhere in file
+>
+>Mike Dunn (4):
+>  ARM: palmtreo: fix lcd initilialization on treo680
+>  ARM: palmtreo: fix #ifdefs for leds-gpio device
+>  ARM: palmtreo: add docg4 device initialization
+>  ARM: palmtreo: replace #if defined with IF_ENABLED
+>
+> arch/arm/mach-pxa/include/mach/palmtreo.h |    5 +-
+> arch/arm/mach-pxa/palmtreo.c              |  101 ++++++++++++++++++++++++++---
+> 2 files changed, 94 insertions(+), 12 deletions(-)
+>
+>-- 
+>1.7.8.6
+>
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- Documentation/devicetree/bindings/arm/vt8500.txt |    8 ++++++
- arch/arm/Kconfig                                 |   17 +++++++----
- arch/arm/mach-vt8500/Kconfig                     |   33 ++++++++++++++++++++--
- arch/arm/mach-vt8500/vt8500.c                    |    2 ++
- 4 files changed, 51 insertions(+), 9 deletions(-)
+for all the patches
 
-diff --git a/Documentation/devicetree/bindings/arm/vt8500.txt b/Documentation/devicetree/bindings/arm/vt8500.txt
-index d657832..87dc1dd 100644
---- a/Documentation/devicetree/bindings/arm/vt8500.txt
-+++ b/Documentation/devicetree/bindings/arm/vt8500.txt
-@@ -12,3 +12,11 @@ compatible = "wm,wm8505";
- Boards with the Wondermedia WM8650 SoC shall have the following properties:
- Required root node property:
- compatible = "wm,wm8650";
-+
-+Boards with the Wondermedia WM8750 SoC shall have the following properties:
-+Required root node property:
-+compatible = "wm,wm8750";
-+
-+Boards with the Wondermedia WM8850 SoC shall have the following properties:
-+Required root node property:
-+compatible = "wm,wm8850";
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f95ba14..fbb9492 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -952,20 +952,25 @@ config ARCH_OMAP
- 
- config ARCH_VT8500_SINGLE
- 	bool "VIA/WonderMedia 85xx"
--	select ARCH_HAS_CPUFREQ
--	select ARCH_REQUIRE_GPIOLIB
--	select CLKDEV_LOOKUP
-+	select ARCH_VT8500
- 	select COMMON_CLK
- 	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
--	select HAVE_CLK
- 	select MULTI_IRQ_HANDLER
- 	select SPARSE_IRQ
- 	select USE_OF
- 	help
- 	  Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
- 
-+config ARCH_WM8750_SINGLE
-+	bool "WonderMedia WM8750/WM8850"
-+	select ARCH_VT8500
-+	select COMMON_CLK
-+	select MULTI_IRQ_HANDLER
-+	select SPARSE_IRQ
-+	select USE_OF
-+	help
-+	  Support for WonderMedia WM8750/WM8850 System-on-Chip.
-+
- endchoice
- 
- menu "Multiple platform selection"
-diff --git a/arch/arm/mach-vt8500/Kconfig b/arch/arm/mach-vt8500/Kconfig
-index 2ed0b7d..d67c7fa 100644
---- a/arch/arm/mach-vt8500/Kconfig
-+++ b/arch/arm/mach-vt8500/Kconfig
-@@ -1,12 +1,39 @@
- config ARCH_VT8500
--	bool "VIA/WonderMedia 85xx" if ARCH_MULTI_V5
--	default ARCH_VT8500_SINGLE
-+	bool
- 	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CLKDEV_LOOKUP
--	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_GPIO
- 	select HAVE_CLK
-+
-+config ARCH_WM8505
-+	bool "VIA/WonderMedia 85xx" if !ARCH_VT8500_SINGLE
-+	depends on ARCH_MULTI_V5
-+	default ARCH_VT8500_SINGLE
-+	select ARCH_VT8500
-+	select CPU_ARM926T
- 	help
- 	  Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
-+
-+config ARCH_WM8750
-+	bool "WonderMedia WM8750"
-+	depends on ARCH_MULTI_V6 || ARCH_WM8750_SINGLE
-+	select ARCH_VT8500
-+	select CPU_V6
-+	help
-+	  Support for WonderMedia WM8750 System-on-Chip.
-+
-+config ARCH_WM8850
-+	bool "WonderMedia WM8850"
-+	depends on ARCH_MULTI_V7 || ARCH_WM8750_SINGLE
-+	select ARCH_VT8500
-+	select CPU_V7
-+	help
-+	  Support for WonderMedia WM8850 System-on-Chip.
-+
-+# ensure that ARCH_WM8850 is on if ARCH_WM8750 is off
-+config ARCH_WM8850_AUTO
-+      def_bool y
-+      depends on ARCH_WM8750_SINGLE && !ARCH_WM8750
-+      select ARCH_WM8850
-diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
-index 3c66d48..55162ab 100644
---- a/arch/arm/mach-vt8500/vt8500.c
-+++ b/arch/arm/mach-vt8500/vt8500.c
-@@ -183,6 +183,8 @@ static const char * const vt8500_dt_compat[] = {
- 	"via,vt8500",
- 	"wm,wm8650",
- 	"wm,wm8505",
-+	"wm,wm8750",
-+	"wm,wm8850",
- };
- 
- DT_MACHINE_START(WMT_DT, "VIA/Wondermedia SoC (Device Tree Support)")
--- 
-1.7.9.5
+Acked-by: Tomas Cech <sleep_walker@suse.cz>
+
+Thanks for these fixes!
+
+Best regards,
+
+Tomas Cech
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121228/a4e5fc21/attachment.sig>
