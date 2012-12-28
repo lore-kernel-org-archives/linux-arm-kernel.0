@@ -1,39 +1,56 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Fri, 28 Dec 2012 06:52:29 -0800
-Subject: [PATCH] ARM: pxa27x: fix ac97 controller warm reset code
-Message-ID: <1356706349-3189-1-git-send-email-mikedunn@newsguy.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 28 Dec 2012 08:55:31 -0600
+Subject: [PATCH] cpuidle: kirkwood: Move out of mach directory, add DT.
+In-Reply-To: <20121228143517.GA5172@lunn.ch>
+References: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
+ <50DDAA42.2020101@gmail.com> <20121228143517.GA5172@lunn.ch>
+Message-ID: <50DDB2E3.103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes some code that implements a work-around to a hardware bug in
-the ac97 controller on the pxa27x.  A bug in the controller's warm reset
-functionality requires that the mfp used by the controller as the AC97_RESET_n
-line be temporarily reconfigured as a generic output gpio (AF0) and manually
-held high for the duration of the warm reset cycle.  This is what was done in
-the original code, but it was broken long ago by commit
-fb1bf8cd13bfa7ed0364ab0d82f717fc020d35f6, which changed the mfp to a GPIO input
-instead of a high output.
+On 12/28/2012 08:35 AM, Andrew Lunn wrote:
+> On Fri, Dec 28, 2012 at 08:18:42AM -0600, Rob Herring wrote:
+>> On 12/28/2012 06:47 AM, Andrew Lunn wrote:
+>>> Move the Kirkwood cpuidle driver out of arch/arm/mach-kirkwood and
+>>> into drivers/cpuidle. Convert the driver into a platform driver and
+>>> add a device tree binding. Add a DT node to instantiate the driver for
+>>> boards converted to DT, and a platform data for old style boards.
+>>
+>> Is this an old comment? I don't see any platform data.
+> 
+> There is no platform data, since all the driver needs is an address of
+> the DDR control register. The code to create a platform device entry
+> is in common.c hunk.
 
-Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
----
- arch/arm/mach-pxa/pxa27x.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+So you should say "a platform device for old style boards".
 
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 8047ee0..76221e4 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -47,9 +47,9 @@ void pxa27x_clear_otgph(void)
- EXPORT_SYMBOL(pxa27x_clear_otgph);
+>>> +		cpuidle at 1418 {
+>>> +			compatible = "marvell,kirkwood-cpuidle";
+>>> +			reg = <0x1418 0x4>;
+>>> +		};
+>>> +
+>>
+>> This is describing what linux wants, not the hardware. This is a common
+>> problem with cpuidle drivers in that they use shared registers. I don't
+>> have a good solution, but this doesn't belong in DTS.
+> 
+> Do you have a bad solution?
 
- static unsigned long ac97_reset_config[] = {
--	GPIO113_GPIO,
-+	MFP_CFG_OUT(GPIO113, AF0, DRIVE_HIGH),
- 	GPIO113_AC97_nRESET,
--	GPIO95_GPIO,
-+	MFP_CFG_OUT(GPIO95, AF0, DRIVE_HIGH),
- 	GPIO95_AC97_nRESET,
- };
+Ha! :) I should say I don't have a clear, obvious solution.
 
---
-1.7.8.6
+Don't do a platform driver and just check the machine compatible
+property which is what I did for highbank. Have the machine code create
+the platform device. Not *all* platform devices have to be created based
+on the DTB. Create an MFD driver for the whole block of registers.
+
+> I could just hard code the address, since its the same for all
+> kirkwood SoCs. Also, the register is not being used by any other
+> code on kirkwood, so its not shared.
+
+Then describe it based on the reference manual, but you need to do so
+assuming you are using all the other registers. I assume there are other
+registers at say 0x1414 or 0x141c. You have to be careful if you create
+separate nodes for each register or sub-group of registers. It needs to
+work no matter what the OS expectation is.
+
+Rob
