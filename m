@@ -1,78 +1,39 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Fri, 28 Dec 2012 15:45:32 +0100
-Subject: [PATCH v2 1/1 net-next] NET: FEC: dynamtic check DMA desc buff
- type
-In-Reply-To: <1356676164-10910-1-git-send-email-Frank.Li@freescale.com>
-References: <1356676164-10910-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20701.45196.361432.80622@ipc1.ka-ro>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Fri, 28 Dec 2012 06:52:29 -0800
+Subject: [PATCH] ARM: pxa27x: fix ac97 controller warm reset code
+Message-ID: <1356706349-3189-1-git-send-email-mikedunn@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frank Li writes:
-> MX6 and mx28 support enhanced DMA descript buff to support 1588
-> ptp. But MX25, MX3x, MX5x can't support enhanced DMA descript buff.
-> Check fec type and choose correct DAM descript buff type.
-                                    ^^^
-s/DAM/DMA/
-s/descript/descriptor/g
+This patch fixes some code that implements a work-around to a hardware bug in
+the ac97 controller on the pxa27x.  A bug in the controller's warm reset
+functionality requires that the mfp used by the controller as the AC97_RESET_n
+line be temporarily reconfigured as a generic output gpio (AF0) and manually
+held high for the duration of the warm reset cycle.  This is what was done in
+the original code, but it was broken long ago by commit
+fb1bf8cd13bfa7ed0364ab0d82f717fc020d35f6, which changed the mfp to a GPIO input
+instead of a high output.
 
-[...]
-> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> index 0704bca..290f91c 100644
-> --- a/drivers/net/ethernet/freescale/fec.c
-> +++ b/drivers/net/ethernet/freescale/fec.c
-> @@ -76,6 +76,8 @@
->  #define FEC_QUIRK_USE_GASKET		(1 << 2)
->  /* Controller has GBIT support */
->  #define FEC_QUIRK_HAS_GBIT		(1 << 3)
-> +/* Controller has extend desc buffer */
-> +#define FEC_QUICK_HAS_BUFDESC_EX	(1 << 4)
-               ^^^^^
-As Sascha has already pointed out, this should be 'QUIRK' rather than
-'QUICK' (like in the preceeding lines)!
+Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+---
+ arch/arm/mach-pxa/pxa27x.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
->  static struct platform_device_id fec_devtype[] = {
->  	{
-> @@ -93,7 +95,8 @@ static struct platform_device_id fec_devtype[] = {
->  		.driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_SWAP_FRAME,
->  	}, {
->  		.name = "imx6q-fec",
-> -		.driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT,
-> +		.driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT |
-> +				FEC_QUICK_HAS_BUFDESC_EX,
-                                    ^^^^^
-same as above.
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 8047ee0..76221e4 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -47,9 +47,9 @@ void pxa27x_clear_otgph(void)
+ EXPORT_SYMBOL(pxa27x_clear_otgph);
 
-[...]
-> @@ -1574,6 +1617,8 @@ fec_probe(struct platform_device *pdev)
->  	fep->pdev = pdev;
->  	fep->dev_id = dev_id++;
->  
-> +	fep->bufdesc_ex = 0;
-> +
->  	if (!fep->hwp) {
->  		ret = -ENOMEM;
->  		goto failed_ioremap;
-> @@ -1628,19 +1673,19 @@ fec_probe(struct platform_device *pdev)
->  		goto failed_clk;
->  	}
->  
-> -#ifdef CONFIG_FEC_PTP
->  	fep->clk_ptp = devm_clk_get(&pdev->dev, "ptp");
-> +	fep->bufdesc_ex =
-> +		pdev->id_entry->driver_data & FEC_QUICK_HAS_BUFDESC_EX;
-                                                  ^^^^^
-same as above.
+ static unsigned long ac97_reset_config[] = {
+-	GPIO113_GPIO,
++	MFP_CFG_OUT(GPIO113, AF0, DRIVE_HIGH),
+ 	GPIO113_AC97_nRESET,
+-	GPIO95_GPIO,
++	MFP_CFG_OUT(GPIO95, AF0, DRIVE_HIGH),
+ 	GPIO95_AC97_nRESET,
+ };
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+--
+1.7.8.6
