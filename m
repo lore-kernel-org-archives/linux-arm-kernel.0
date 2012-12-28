@@ -1,44 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 28 Dec 2012 22:16:32 +0100
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20121228210622.GA4519@avionic-0098.adnet.avionic-design.de>
-References: <20121214151045.GA22304@avionic-0098.adnet.avionic-design.de>
- <20121214172729.GA7671@obsidianresearch.com>
- <20121216123340.GB31780@avionic-0098.adnet.avionic-design.de>
- <20121217182911.GA10448@obsidianresearch.com>
- <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
- <50CFD0B3.6030208@wwwdotorg.org>
- <20121218025113.GA27029@obsidianresearch.com>
- <50D0A1EA.9090009@wwwdotorg.org>
- <20121220153231.GA11256@avionic-0098.adnet.avionic-design.de>
- <20121222155040.61829b00@skate>
- <20121228210622.GA4519@avionic-0098.adnet.avionic-design.de>
-Message-ID: <20121228221632.3892e90b@skate>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 29 Dec 2012 06:50:36 +0900
+Subject: [PATCH v2] ARM: sh7372: fix cache clean / invalidate order
+In-Reply-To: <Pine.LNX.4.64.1212281227070.29263@axis700.grange>
+References: <20121211163313.GG16759@mudshark.cambridge.arm.com>
+ <20121211163843.GH16759@mudshark.cambridge.arm.com>
+ <50C7C16B.7050106@codeaurora.org>
+ <20121212103338.GB23022@e102568-lin.cambridge.arm.com>
+ <20121212133650.GJ6195@mudshark.cambridge.arm.com>
+ <Pine.LNX.4.64.1212130909190.18586@axis700.grange>
+ <20121213105109.GB26540@mudshark.cambridge.arm.com>
+ <Pine.LNX.4.64.1212131522430.18586@axis700.grange>
+ <50C9E8BD.1020501@ti.com>
+ <Pine.LNX.4.64.1212281227070.29263@axis700.grange>
+Message-ID: <20121228215035.GH8834@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry Reding,
-
-On Fri, 28 Dec 2012 22:06:22 +0100, Thierry Reding wrote:
-
-> > Thanks for putting your code online. I've started using it already for
-> > the Marvell PCIe support, at least the host-bridge.c helpers you've
-> > written, and also to have a look at the DT binding you've implemented.
+On Fri, Dec 28, 2012 at 12:32:54PM +0100, Guennadi Liakhovetski wrote:
+> According to the Cortex A8 TRM the L2 cache should be first cleaned and 
+> then disabled. Fix the swapped order on sh7372.
 > 
-> That's great. I've been thinking about this some more and one problem
-> we'll be facing is that none of the fake host bridges actually exist and
-> therefore don't have any official PCI IDs. What I did for Tegra was just
-> choose one of the nForce IDs, but that's obviously hackish. One solution
-> would be to convince somebody benevolent to sponsor an ID for this
-> particular purpose. I think Red Hat did so for Virtio.
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Indeed, that's a remaining problem to solve. Would be great to have
-some vendor sponsoring a few IDs for that. At least for a fake PCI Host
-Bridge and a fake PCI-to-PCI bridge.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks, applied to the soc branch of the renesas tree.
