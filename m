@@ -1,110 +1,45 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 29 Dec 2012 12:50:38 -0800
-Subject: [PATCH v3 5/5] ARM: dts: add mct device tree node for all supported
- Exynos SoC's
-In-Reply-To: <1356814238-23895-1-git-send-email-thomas.abraham@linaro.org>
-References: <1356814238-23895-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1356814238-23895-6-git-send-email-thomas.abraham@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 29 Dec 2012 18:04:44 -0300
+Subject: [PATCH] ARM: dts: omap3-igep: Add fixed always-on regulators to
+ common dtsi file
+Message-ID: <1356815084-6943-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MCT device tree node for Exynos4210, Exynos4212, Exynos4412 and Exynos5250.
+These regulators are common to igep0020 and igep0030 boards
+and are needed by smsc911x controller.
 
-Cc: Changhwan Youn <chaos.youn@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Enric Balletbo i Serra <eballetbo@gmail.com>
+Cc: Javier Martinez Canillas <javier@dowhile0.org>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/exynos4210.dtsi |    8 ++++++++
- arch/arm/boot/dts/exynos4212.dtsi |   10 ++++++++++
- arch/arm/boot/dts/exynos4412.dtsi |    8 ++++++++
- arch/arm/boot/dts/exynos5250.dtsi |   21 +++++++++++++++++++++
- 4 files changed, 47 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap3-igep.dtsi |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 89c7dd0..1542d86 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -47,6 +47,14 @@
- 			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
- 	};
- 
-+	mct at 10050000 {
-+		compatible = "samsung,exynos4210-mct";
-+		reg = <0x10050000 0x800>;
-+		interrupts = <0 57 0>, <0 0 0>, <0 0 0>, <0 0 0>,
-+			     <0 42 0>, <0 48 0>;
-+		samsung,mct-nr-local-irqs = <4>;
-+	};
-+
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
- 		interrupt-parent = <&combiner>;
-diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index c6ae200..87c6da4 100644
---- a/arch/arm/boot/dts/exynos4212.dtsi
-+++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -25,4 +25,14 @@
- 	gic:interrupt-controller at 10490000 {
- 		cpu-offset = <0x8000>;
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index dd01c46..91a42ce 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -24,6 +24,18 @@
+ 		ti,mcbsp = <&mcbsp2>;
+ 		ti,codec = <&twl_audio>;
  	};
 +
-+	mct at 10050000 {
-+		compatible = "samsung,exynos4210-mct";
-+		reg = <0x10050000 0x800>;
-+		interrupts = <0 57 0>, <0 0 0>, <0 0 0>, <0 0 0>,
-+			     <1 12 0>, <1 12 0>;
-+		samsung,mct-nr-local-irqs = <2>;
-+	};
++        vddvario: regulator-vddvario {
++                compatible = "regulator-fixed";
++                regulator-name = "vddvario";
++                regulator-always-on;
++        };
 +
-+
++        vdd33a: regulator-vdd33a {
++                compatible = "regulator-fixed";
++                regulator-name = "vdd33a";
++                regulator-always-on;
++        };
  };
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index d7dfe31..ccf020a 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -25,4 +25,12 @@
- 	gic:interrupt-controller at 10490000 {
- 		cpu-offset = <0x4000>;
- 	};
-+
-+	mct at 10050000 {
-+		compatible = "samsung,exynos4210-mct";
-+		reg = <0x10050000 0x800>;
-+		interrupts = <0 57 0>, <0 0 0>, <0 0 0>, <0 0 0>,
-+			     <1 12 0>, <1 12 0>, <1 12 0>, <1 12 0>;
-+		samsung,mct-nr-local-irqs = <4>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 45799e8..7e9600d 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -69,6 +69,27 @@
- 			     <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
- 	};
  
-+	mct at 101C0000 {
-+		compatible = "samsung,exynos4210-mct";
-+		reg = <0x101C0000 0x800>;
-+		interrupt-controller;
-+		#interrups-cells = <2>;
-+		interrupt-parent = <&mct_map>;
-+		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
-+			     <4 0>, <5 0>;
-+		samsung,mct-nr-local-irqs = <2>;
-+
-+		mct_map: mct-map {
-+			compatible = "samsung,mct-map";
-+			#interrupt-cells = <2>;
-+			#address-cells = <0>;
-+			#size-cells = <0>;
-+			interrupt-map = <0x0 0 &combiner 23 3>,
-+					<0x4 0 &gic 0 120 0>,
-+					<0x5 0 &gic 0 121 0>;
-+		};
-+	};
-+
- 	pmu {
- 		compatible = "arm,cortex-a15-pmu";
- 		interrupt-parent = <&combiner>;
+ &omap3_pmx_core {
 -- 
-1.7.5.4
+1.7.8.6
