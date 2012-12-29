@@ -1,111 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 28 Dec 2012 20:38:45 -0800
-Subject: [GIT PULL] ARM: arm-soc OMAP low-prio fixes
-Message-ID: <20121229043845.GB11208@quad.lixom.net>
+Date: Fri, 28 Dec 2012 20:43:43 -0800
+Subject: [PATCH 1/2] ARM: DT: tegra: Add Tegra30 Beaver board support
+In-Reply-To: <50DE3146.6090001@nvidia.com>
+References: <1356032489-27619-1-git-send-email-pengw@nvidia.com>
+ <50DDC743.2080606@gmail.com> <50DE3146.6090001@nvidia.com>
+Message-ID: <CAOesGMgW890K4Wo2-SFE4YFn5f8T950BTZ82rkCQfwpV+bsRyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Dec 28, 2012 at 3:54 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> On 12/28/2012 09:22 AM, Rob Herring wrote:
+>> On 12/20/2012 01:41 PM, Bryan Wu wrote:
+>>> This patch adds support for Tegra30 Beaver board in upstream kernel.
+>
+>>> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
+>
+>>> +/ {
+>>> +    model = "NVIDIA Tegra30 Beaver evaluation board";
+>>> +    compatible = "nvidia,beaver", "nvidia,tegra30";
+>>
+>> nvidia,beaver needs to be documented.
+>
+> Hmmm. I guess we've managed not to document /any/ of the Tegra
+> board-level compatible values. Bryan, could you make a separate patch to
+> add all the existing board compatible values to
+> Documentation/devicetree/bindings/arm/tegra.txt. The Beaver addition to
+> that file can still be part of the Beaver-specific patch though.
 
-I'll leave it up to you to decide if you want to pull this or not --
-it can wait to 3.9 as well.
+Does it need to be documented? Then the "support a new platform only
+through DTS update" is no longer true. :)
 
-This branch came in from Tony at the start of the merge window, and I
-wanted to give it a little time in -next (but it got more than expected
-due to travel).
+In the past, I don't think we've strictly documented all derivative
+platform compatible values, just some of the reference ones?
 
-It's a mix of lowish priority fixes and a couple of cleanups to split
-setup between OMAP1/2+, needed for multiplatform restructuring.
-
-Said multiplatform restructuring is the main reason arm-soc saw so much
-churn this release -- i.MX and OMAP platforms were reshuffled quite a
-bit to make them ready for multiplatform. i.MX finished, OMAP is nearly
-there with just a few more patches needed (for 3.9). It should slow down
-again for next release.
-
-
-Thanks,
 
 -Olof
-
-The following changes since commit 2b8318881ddbcb67c5e8d2178b42284749442222:
-
-  Merge tag 'fbdev-for-3.8' of git://gitorious.org/linux-omap-dss2/linux (2012-12-15 13:03:48 -0800)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/omap-late-cleanups
-
-for you to fetch changes up to f64d204b5cf21b282445ba2fa357d970028c9f52:
-
-  arch/arm/mach-omap2/dpll3xxx.c: drop if around WARN_ON (2012-12-17 10:50:41 -0800)
-
-----------------------------------------------------------------
-ARM: arm-soc: late cleanups for omap
-
->From Tony Lindgren:
-Here are few more patches to finish the omap changes for
-multiplatform conversion that are not strictly fixes, but
-were too complex to do with the dependencies during the
-merge window. Those are to move of serial-omap.h to
-platform_data, and the removal of remaining cpu_is_omap
-macro usage outside mach-omap2.
-
-Then there are several trivial fixes for typos and few
-minimal omap2plus_defconfig updates.
-
-----------------------------------------------------------------
-AnilKumar Chimata (1):
-      ARM: OMAP2+: omap2plus_defconfig: Add tps65217 support
-
-Javier Martinez Canillas (2):
-      ARM: OMAP2+: enable devtmpfs and devtmpfs automount
-      ARM: OMAP2+: omap2plus_defconfig: enable twl4030 SoC audio
-
-Jon Hunter (1):
-      ARM: OMAP2+: PMU: Remove unused header
-
-Julia Lawall (1):
-      arch/arm/mach-omap2/dpll3xxx.c: drop if around WARN_ON
-
-Peter Ujfalusi (1):
-      ARM: OMAP2+: omap_twl: Change TWL4030_MODULE_PM_RECEIVER to TWL_MODULE_PM_RECEIVER
-
-Srinivas Kandagatla (1):
-      ARM/omap: use module_platform_driver macro
-
-Tony Lindgren (3):
-      MAINTAINERS: Add an entry for omap related .dts files
-      ARM: OMAP: Split fb.c to remove last remaining cpu_is_omap usage
-      ARM: OMAP2+: Drop plat/cpu.h for omap2plus
-
-Wei Yongjun (1):
-      ARM: OMAP4: remove duplicated include from omap_hwmod_44xx_data.c
-
-YOSHIFUJI Hideaki (1):
-      OMAP2: Fix a typo - replace regist with register.
-
- MAINTAINERS                                |  9 ++++
- arch/arm/configs/omap2plus_defconfig       |  5 ++
- arch/arm/mach-omap1/Makefile               |  2 +-
- arch/arm/mach-omap1/fb.c                   | 80 ++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/Makefile               |  2 +-
- arch/arm/mach-omap2/control.h              |  2 +-
- arch/arm/mach-omap2/dpll3xxx.c             |  3 +-
- arch/arm/mach-omap2/drm.c                  |  1 -
- arch/arm/mach-omap2/dss-common.c           |  3 +-
- arch/arm/{plat-omap => mach-omap2}/fb.c    | 50 +------------------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  1 -
- arch/arm/mach-omap2/omap_twl.c             |  8 +--
- arch/arm/mach-omap2/pmu.c                  |  2 -
- arch/arm/mach-omap2/prm2xxx.c              |  3 +-
- arch/arm/mach-omap2/prm3xxx.c              |  3 +-
- arch/arm/plat-omap/Makefile                |  2 +-
- arch/arm/plat-omap/dmtimer.c               | 13 +----
- arch/arm/plat-omap/include/plat/cpu.h      |  4 --
- drivers/media/platform/omap3isp/isp.c      |  2 -
- drivers/power/avs/smartreflex.c            |  2 -
- 20 files changed, 109 insertions(+), 88 deletions(-)
- create mode 100644 arch/arm/mach-omap1/fb.c
- rename arch/arm/{plat-omap => mach-omap2}/fb.c (76%)
