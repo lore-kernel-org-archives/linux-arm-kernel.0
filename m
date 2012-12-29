@@ -1,37 +1,112 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 28 Dec 2012 20:43:43 -0800
-Subject: [PATCH 1/2] ARM: DT: tegra: Add Tegra30 Beaver board support
-In-Reply-To: <50DE3146.6090001@nvidia.com>
-References: <1356032489-27619-1-git-send-email-pengw@nvidia.com>
- <50DDC743.2080606@gmail.com> <50DE3146.6090001@nvidia.com>
-Message-ID: <CAOesGMgW890K4Wo2-SFE4YFn5f8T950BTZ82rkCQfwpV+bsRyQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 29 Dec 2012 00:24:27 -0500
+Subject: [PATCH 2/3] ARM: Kirkwood: Convert NSA310 to use gpio-poweroff
+ driver
+In-Reply-To: <1356703730-4926-3-git-send-email-andrew@lunn.ch>
+References: <1356703730-4926-1-git-send-email-andrew@lunn.ch>
+ <1356703730-4926-3-git-send-email-andrew@lunn.ch>
+Message-ID: <20121229052427.GD21694@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 28, 2012 at 3:54 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> On 12/28/2012 09:22 AM, Rob Herring wrote:
->> On 12/20/2012 01:41 PM, Bryan Wu wrote:
->>> This patch adds support for Tegra30 Beaver board in upstream kernel.
->
->>> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
->
->>> +/ {
->>> +    model = "NVIDIA Tegra30 Beaver evaluation board";
->>> +    compatible = "nvidia,beaver", "nvidia,tegra30";
->>
->> nvidia,beaver needs to be documented.
->
-> Hmmm. I guess we've managed not to document /any/ of the Tegra
-> board-level compatible values. Bryan, could you make a separate patch to
-> add all the existing board compatible values to
-> Documentation/devicetree/bindings/arm/tegra.txt. The Beaver addition to
-> that file can still be part of the Beaver-specific patch though.
+Andrew,
 
-Does it need to be documented? Then the "support a new platform only
-through DTS update" is no longer true. :)
+On Fri, Dec 28, 2012 at 03:08:49PM +0100, Andrew Lunn wrote:
+> Remove the C code and add a Device Tree node for gpio-poweroff.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/kirkwood-nsa310.dts |    5 +++++
+>  arch/arm/mach-kirkwood/board-nsa310.c |   33 ---------------------------------
+>  2 files changed, 5 insertions(+), 33 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+> index 2dc1d09..85cce36 100644
+> --- a/arch/arm/boot/dts/kirkwood-nsa310.dts
+> +++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+> @@ -142,6 +142,11 @@
+>  		};
+>  	};
+>  
+> +	gpio_poweroff {
+> +		compatible = "gpio-poweroff";
+> +		gpios = <&gpio1 16 0>;
+> +	};
+> +
+>  	regulators {
+>  		compatible = "simple-bus";
+>  		#address-cells = <1>;
+> diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
+> index d04184d..7a56273 100644
+> --- a/arch/arm/mach-kirkwood/board-nsa310.c
+> +++ b/arch/arm/mach-kirkwood/board-nsa310.c
+> @@ -11,7 +11,6 @@
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/i2c.h>
+> -#include <linux/gpio.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -19,8 +18,6 @@
+>  #include "common.h"
+>  #include "mpp.h"
+>  
+> -#define NSA310_GPIO_POWER_OFF		48
+> -
+>  static unsigned int nsa310_mpp_config[] __initdata = {
+>  	MPP12_GPIO, /* led esata green */
+>  	MPP13_GPIO, /* led esata red */
+> @@ -45,42 +42,12 @@ static struct i2c_board_info __initdata nsa310_i2c_info[] = {
+>  	{ I2C_BOARD_INFO("adt7476", 0x2e) },
+>  };
+>  
+> -static void nsa310_power_off(void)
+> -{
+> -	gpio_set_value(NSA310_GPIO_POWER_OFF, 1);
+> -}
+> -
+> -static int __init nsa310_gpio_request(unsigned int gpio, unsigned long flags,
+> -				       const char *label)
+> -{
+> -	int err;
+> -
+> -	err = gpio_request_one(gpio, flags, label);
+> -	if (err)
+> -		pr_err("NSA-310: can't setup GPIO%u (%s), err=%d\n",
+> -			gpio, label, err);
+> -
+> -	return err;
+> -}
+> -
+> -static void __init nsa310_gpio_init(void)
+> -{
+> -	int err;
+> -
+> -	err = nsa310_gpio_request(NSA310_GPIO_POWER_OFF, GPIOF_OUT_INIT_LOW,
+> -				  "Power Off");
+> -	if (!err)
+> -		pm_power_off = nsa310_power_off;
+> -}
+> -
+>  void __init nsa310_init(void)
+>  {
+>  	u32 dev, rev;
+>  
+>  	kirkwood_mpp_conf(nsa310_mpp_config);
 
-In the past, I don't think we've strictly documented all derivative
-platform compatible values, just some of the reference ones?
+Are you working on this?
 
+thx,
 
--Olof
+Jason.
+
+>  
+> -	nsa310_gpio_init();
+> -
+>  	kirkwood_pcie_id(&dev, &rev);
+>  
+>  	i2c_register_board_info(0, ARRAY_AND_SIZE(nsa310_i2c_info));
+> -- 
+> 1.7.10.4
+> 
