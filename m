@@ -1,49 +1,148 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 29 Dec 2012 09:09:55 +0100
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <50DE2FFB.8040804@wwwdotorg.org>
-References: <20121214151045.GA22304@avionic-0098.adnet.avionic-design.de>
- <20121214172729.GA7671@obsidianresearch.com>
- <20121216123340.GB31780@avionic-0098.adnet.avionic-design.de>
- <20121217182911.GA10448@obsidianresearch.com>
- <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
- <50CFD0B3.6030208@wwwdotorg.org>
- <20121218025113.GA27029@obsidianresearch.com>
- <50D0A1EA.9090009@wwwdotorg.org>
- <20121220153231.GA11256@avionic-0098.adnet.avionic-design.de>
- <20121222155040.61829b00@skate>
- <20121228210622.GA4519@avionic-0098.adnet.avionic-design.de>
- <20121228221632.3892e90b@skate> <50DE2FFB.8040804@wwwdotorg.org>
-Message-ID: <20121229090955.776816b7@skate>
+From: zhanzhenbo@gmail.com (steve.zhan)
+Date: Sat, 29 Dec 2012 17:17:27 +0800
+Subject: No subject
+Message-ID: <CAKvkGKd_VJUYHxtE18mDHkkGBOiHtxOR9uKJEf2d8CofuNeVHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stephen Warren,
+Hi,
 
-On Fri, 28 Dec 2012 16:49:15 -0700, Stephen Warren wrote:
+    It is good idea add this feature.
 
-> >> That's great. I've been thinking about this some more and one problem
-> >> we'll be facing is that none of the fake host bridges actually exist and
-> >> therefore don't have any official PCI IDs. What I did for Tegra was just
-> >> choose one of the nForce IDs, but that's obviously hackish. One solution
-> >> would be to convince somebody benevolent to sponsor an ID for this
-> >> particular purpose. I think Red Hat did so for Virtio.
-> > 
-> > Indeed, that's a remaining problem to solve. Would be great to have
-> > some vendor sponsoring a few IDs for that. At least for a fake PCI Host
-> > Bridge and a fake PCI-to-PCI bridge.
-> 
-> Is it actually necessary for a host/PCI bridge to show up on the PCI bus
-> as device 0?
+1: Can we let the "ret = hwspin_lock_tests(ops, hwlock);" add after
+hwspin_lock_register_single have return
+succeed, that can avoid test duplicated Or error lockid. Of course, If
+this interface is intend to test soc hardware capability only, we can
+put it in the arch module not this core framework. For driver hardware
+sanity check, i would add it after software have register it.
 
-I don't know, PCI experts are much better placed than me to answer this
-question. How is this related to the problem of PCI IDs ?
 
-Best regards,
+2:Is it possible that interface add configs that choose which locks
+will be test? Because the hwspinlock module is init late in
+postcore_initcall phase, Maybe MACH/ARCH code(for example: code in
+early_initcall) need use private other interfaces to lock some
+hwspinlocks and then register hw locks to hwspinlock framework, Maybe
+some hw locks is in lock status but which test failed.
 
-Thomas
+
+
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Steve Zhan
+
+
+> From: Ido Yariv <ido@wizery.com>
+> To: Ohad Ben-Cohen <ohad@wizery.com>, linux-kernel at vger.kernel.org,
+> 	linux-arm-kernel at lists.infradead.org, linux-omap at vger.kernel.org
+> Cc: Ido Yariv <ido@wizery.com>
+> Subject: [PATCH] hwspinlock/core: Add testing capabilities
+> Message-ID: <1355344026-17222-1-git-send-email-ido@wizery.com>
+>
+> Add testing capabilities for verifying correctness of the underlying
+> hwspinlock layers. This can be handy especially during development.
+> These tests are performed only once as part of the hwspinlock
+> registration.
+>
+> Signed-off-by: Ido Yariv <ido@wizery.com>
+> ---
+>  drivers/hwspinlock/Kconfig           |    9 +++++
+>  drivers/hwspinlock/hwspinlock_core.c |   54
+> ++++++++++++++++++++++++++++++++++
+>  2 files changed, 63 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
+> index c7c3128..ad632cd 100644
+> --- a/drivers/hwspinlock/Kconfig
+> +++ b/drivers/hwspinlock/Kconfig
+> @@ -8,6 +8,15 @@ config HWSPINLOCK
+>
+>  menu "Hardware Spinlock drivers"
+>
+> +config HWSPINLOCK_TEST
+> +	bool "Verify underlying hwspinlock implementation"
+> +	depends on HWSPINLOCK
+> +	help
+> +	  Say Y here to perform tests on the underlying hwspinlock
+> +	  implementation. The tests are only performed once per implementation.
+> +
+> +	  Say N, unless you absolutely know what you are doing.
+> +
+>  config HWSPINLOCK_OMAP
+>  	tristate "OMAP Hardware Spinlock device"
+>  	depends on ARCH_OMAP4
+> diff --git a/drivers/hwspinlock/hwspinlock_core.c
+> b/drivers/hwspinlock/hwspinlock_core.c
+> index 085e28e..1874e85 100644
+> --- a/drivers/hwspinlock/hwspinlock_core.c
+> +++ b/drivers/hwspinlock/hwspinlock_core.c
+> @@ -307,6 +307,53 @@ out:
+>  	return hwlock;
+>  }
+>
+> +#ifdef CONFIG_HWSPINLOCK_TEST
+> +#define NUM_OF_TEST_ITERATIONS 100
+> +static int hwspin_lock_tests(const struct hwspinlock_ops *ops,
+> +			     struct hwspinlock *hwlock)
+> +{
+> +	int i;
+> +	int ret;
+> +
+> +	for (i = 0; i < NUM_OF_TEST_ITERATIONS; i++) {
+> +		ret = ops->trylock(hwlock);
+> +		if (!ret) {
+> +			pr_err("%s: Initial lock failed\n", __func__);
+> +			return -EFAULT;
+> +		}
+> +
+> +		/* Verify lock actually works - re-acquiring it should fail */
+> +		ret = ops->trylock(hwlock);
+> +		if (ret) {
+> +			/* Keep locks balanced even in failure cases */
+> +			ops->unlock(hwlock);
+> +			ops->unlock(hwlock);
+> +			pr_err("%s: Recursive lock succeeded unexpectedly\n",
+> +			       __func__);
+> +			return -EFAULT;
+> +		}
+> +
+> +		/* Verify unlock by re-acquiring the lock after releasing it */
+> +		ops->unlock(hwlock);
+> +		ret = ops->trylock(hwlock);
+> +		if (!ret) {
+> +			pr_err("%s: Unlock failed\n", __func__);
+> +			return -EINVAL;
+> +		}
+> +
+> +		ops->unlock(hwlock);
+> +	}
+> +
+> +	return 0;
+> +}
+> +#else /* CONFIG_HWSPINLOCK_TEST*/
+> +static int hwspin_lock_tests(const struct hwspinlock_ops *ops,
+> +			     struct hwspinlock *hwlock)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+>  /**
+>   * hwspin_lock_register() - register a new hw spinlock device
+>   * @bank: the hwspinlock device, which usually provides numerous hw locks
+> @@ -345,6 +392,13 @@ int hwspin_lock_register(struct hwspinlock_device
+> *bank, struct device *dev,
+>  		spin_lock_init(&hwlock->lock);
+>  		hwlock->bank = bank;
+>
+> +		ret = hwspin_lock_tests(ops, hwlock);
+> +		if (ret) {
+> +			pr_err("hwspinlock tests failed on lock %d\n",
+> +			       base_id + i);
+> +			goto reg_failed;
+> +		}
+> +
+>  		ret = hwspin_lock_register_single(hwlock, base_id + i);
+>  		if (ret)
+>  			goto reg_failed;
+> --
+> 1.7.7.6
