@@ -1,27 +1,36 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 28 Dec 2012 16:54:46 -0700
-Subject: [PATCH 1/2] ARM: DT: tegra: Add Tegra30 Beaver board support
-In-Reply-To: <50DDC743.2080606@gmail.com>
-References: <1356032489-27619-1-git-send-email-pengw@nvidia.com>
- <50DDC743.2080606@gmail.com>
-Message-ID: <50DE3146.6090001@nvidia.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 28 Dec 2012 17:42:46 -0700
+Subject: [PATCH 1/2] ARM: dts: prevent *.dtb from always being rebuilt
+Message-ID: <1356741767-29292-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/28/2012 09:22 AM, Rob Herring wrote:
-> On 12/20/2012 01:41 PM, Bryan Wu wrote:
->> This patch adds support for Tegra30 Beaver board in upstream kernel.
+From: Stephen Warren <swarren@nvidia.com>
 
->> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
+if_changed (used by the *.dts->*.dtc rule) rebuilds files if they aren't
+contained in $(targets). (make V=2 indicates this). Add $(dtb-y) to
+$(targets) to prevent *.dtb from always being rebuilt.
 
->> +/ {
->> +	model = "NVIDIA Tegra30 Beaver evaluation board";
->> +	compatible = "nvidia,beaver", "nvidia,tegra30";
-> 
-> nvidia,beaver needs to be documented.
+This fixes a regression introduced by the .dtb rule rework in 499cd82
+"ARM: dt: change .dtb build rules to build in dts directory".
 
-Hmmm. I guess we've managed not to document /any/ of the Tegra
-board-level compatible values. Bryan, could you make a separate patch to
-add all the existing board compatible values to
-Documentation/devicetree/bindings/arm/tegra.txt. The Beaver addition to
-that file can still be part of the Beaver-specific patch though.
+Reported-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/Makefile |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e44da40..5ebb44f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -155,6 +155,7 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+ dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
+ 
+ targets += dtbs
++targets += $(dtb-y)
+ endif
+ 
+ # *.dtb used to be generated in the directory above. Clean out the
+-- 
+1.7.10.4
