@@ -1,73 +1,151 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Sat, 29 Dec 2012 11:11:40 +0100
-Subject: [PATCH 1/5] ARM: Kirkwood: Convert NS2 to gpio-poweroff.
-In-Reply-To: <20121229075547.GG7578@lunn.ch>
-References: <1356704050-5047-1-git-send-email-andrew@lunn.ch>
- <20121229010742.GB1357@kw.sim.vm.gnt>
- <20121229075547.GG7578@lunn.ch>
-Message-ID: <20121229101140.GD1357@kw.sim.vm.gnt>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 29 Dec 2012 11:20:17 +0100
+Subject: [PATCH 0/6 v12] gpio: Add block GPIO
+In-Reply-To: <1356281376-25853-1-git-send-email-stigge@antcom.de>
+References: <1356281376-25853-1-git-send-email-stigge@antcom.de>
+Message-ID: <20121229102017.GA7360@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 29, 2012 at 08:55:47AM +0100, Andrew Lunn wrote:
-> On Sat, Dec 29, 2012 at 02:07:42AM +0100, Simon Guinot wrote:
-> > On Fri, Dec 28, 2012 at 03:14:10PM +0100, Andrew Lunn wrote:
-> > > Remove C code and add a Device Tree node in its place.
-> > > 
-> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > > ---
-> > > 
-> > > This is untested. I've been known to get the active hi/low the wrong
-> > > way around so that the board powers off as the driver loads at boot
-> > > time. So it would be very good to have a tested-by: sign off.
-> > 
-> > Hi Andrew,
-> > 
-> > I think that GPIOs are currently broken for LaCie DT boards, due to
-> > commit f9e75922: "ARM: Kirkwood: Make use of mvebu pincltl and gpio
-> > drivers".
+On 17:49 Sun 23 Dec     , Roland Stigge wrote:
+> This set of patches adds:
 > 
-> Hi Simon
+> * Block GPIO API to gpiolib
+> * Sysfs support for GPIO API, to provide userland access
+> * Device interface for userland access (alternative to sysfs)
+> * Devicetree support to instantiate GPIO blocks via DT
+> * Example implementations in several gpio drivers since they need
+>   special accessor functions for block wise GPIO access (only for some
+>   selected drivers since the feature is optional and not suitable for
+>   all GPIO hardware)
+> * Fix for race condition in gpiolib on device creation
 > 
-> gpio-power-off should work with either the old or the new driver.
-
-gpio_request fails because mvebu-gpio relies on pinctrl which is not
-available on the ns2 DT board. The mpp registration is still done in
-the old fashion way for the ns2 (with kirkwood_mpp_conf()).
-
-Look at the orion_gpio_of_init() call removal in f9e75922.
-
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> Tested by: Wolfgang Grandegger <wg@grandegger.com>
+> --
 > 
-> What might not work with the old code gpio power off code with the new
-> new driver. So it is worth giving it a try.
-
-I have but gpio_request fails. It is the same with all the drivers
-trying to get GPIOs...
-
+> Testing branch available at: git://git.antcom.de/linux-2.6.git blockgpio
 > 
-> > As mvbu_gpio is now used (instead of orion_gpio), pinctrl must also be
-> > used. I think that the pinctrl conversion is a preliminary work to the
-> > gpio_poweroff conversion. I realized this some weeks ago while working
-> > on the exactly same patch. Unfortunately, I failed to find enough time
-> > to fix it.
-> > 
-> > If you can afford a few days delay, let's say until the end of the next
-> > week, I should be able to add the pinctrl conversion patch and then also
-> > to test your patch on the top of that.
+> Changes since v11:
+> * Removed support for at91, since this one is currently in the migration
+>   process to pinctrl implementation
+already done for 3.8
+
+in Linus tree
+
+Best Regards,
+J.
+> * Fixed mask setting via sysfs
+> * Device interface: declare gpio_block_fop_poll() static
 > 
-> No rush. We have maybe another 4 weeks before we need to submit code
-> upstream for the next merge window.
-
-OK fine. I'll do that next week.
-
-Simon
-
+> Changes since v10:
+> * gpioblock-of.c: Catch <1 specified GPIOs
+> * gpioblock-of.c: Fixed memory leak in probe()'s error path
+> * gpioblock-of.c: Fixed block node's refcount via of_node_put()
+> * Added driver support for samsung, mm-lantiq and sa1100
+> * Added driver support for at91 (by Wolfgang Grandegger)
+> * Added pinctrl driver support for pinctl-nomadik
 > 
-> 	 Andrew
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121229/980a929b/attachment-0001.sig>
+> Changed since v9:
+> * Changed IRQ flags for device interface's poll() from IRQF_TRIGGER_FALLING
+>   to IRQF_SHARED
+> * Use block name on gpio_request
+> * Added spinlock for ISR manipulated data (dev interface / poll())
+> 
+> Changed since v8:
+> * Added poll() function to dev interface for IRQ handling
+> * Fixed gpio_block_register() in case of missing CONFIG_GPIO_SYSFS
+> * Fixed mask handling in sysfs interface
+> * Fixed get_user/put_user pointer (cast)
+> 
+> Changes since v7:
+> * Fixed error in API documentation (name arg missing in prototype)
+> * Fixed compile error if sysfs is missing: Moved gpio_block_is_output()
+>   out of sysfs-ifdef
+> * Added error handling to gpio_block_register()
+> * Added mask attribute to sysfs (although dev interface exists now)
+> 
+> Changes since v6:
+> * Changed realloc to list handling
+> * Added mask to kernel API
+> * Added device interface as userspace API
+> * Changed sizeof() to BITS_PER_LONG
+> * Fixed multiline comment style
+> * Documented direction setting by the user
+> * Documented order of handled chips in case of multiple chips in one block
+> 
+> Changes since v5:
+> * Documented sysfs: elaborated on "exported" and "values" attributes
+> * Documented sysfs: gpiochip is a separate class now
+> * Aggregated driver support patches for block gpio into one single patch
+> * Added gpio block driver support for twl6040 and pch
+> 
+> Changes since v4:
+> * Documented word width
+> * Bugfix: export/unexport on register/unregister
+> * Using default dev_attrs for gpio_block_class
+> * Fix gpiolib: race condition on device creation
+> * Added driver support for ucb14500, vt8500, xilinx
+> 
+> Changes since v3:
+> * Added driver support for pca953x, em, pl061, max732x, pcf857x
+> * Coding style improvements
+> * Fixed krealloc memory leak in error case
+> * sysfs: values in hex
+> * Register blocks in a list
+> * Narrowing lock scope
+> * Use S_IWUSR and S_IRUGO instead of direct octal values
+> * Use for_each_set_bit()
+> * Change from unsigned to unsigned long for masks and values
+> 
+> Changes since v2:
+> * Added sysfs support
+> * Added devicetree support
+> * Added support for lpc32xx, generic
+> * Added functions for GPIO block registration
+> * Added more error checking
+> * Bit remapping bugfix
+> 
+> Changes since v1:
+> * API change to 32/64 bit word, bit masks
+> 
+> Thanks to Ryan Mallon, Linus Walleij, Stijn Devriendt, Jean-Christophe
+> Plagniol-Villard, Mark Brown, Greg Kroah-Hartman, Grant Likely, Stefan
+> Roese, Wolfgang Grandegger, Tobias Rutz, Fengguang Wu and Mark Rutland
+> for reviewing and testing!
+> 
+> Roland Stigge (6):
+>  gpio: Add a block GPIO API to gpiolib
+>  gpio: Add sysfs support to block GPIO API
+>  gpio: Add userland device interface to block GPIO
+>  gpiolib: Fix default attributes for class
+>  gpio: Add device tree support to block GPIO API
+>  gpio: Add block gpio to several gpio drivers
+> 
+>  Documentation/ABI/testing/dev-gpioblock               |   34 
+>  Documentation/ABI/testing/sysfs-gpio                  |   31 
+>  Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 
+>  Documentation/gpio.txt                                |   58 +
+>  drivers/gpio/Makefile                                 |    1 
+>  drivers/gpio/gpio-em.c                                |   23 
+>  drivers/gpio/gpio-generic.c                           |   56 +
+>  drivers/gpio/gpio-lpc32xx.c                           |   82 +
+>  drivers/gpio/gpio-max730x.c                           |   61 +
+>  drivers/gpio/gpio-max732x.c                           |   59 +
+>  drivers/gpio/gpio-mm-lantiq.c                         |   22 
+>  drivers/gpio/gpio-pca953x.c                           |   64 +
+>  drivers/gpio/gpio-pcf857x.c                           |   24 
+>  drivers/gpio/gpio-pch.c                               |   27 
+>  drivers/gpio/gpio-pl061.c                             |   17 
+>  drivers/gpio/gpio-sa1100.c                            |   20 
+>  drivers/gpio/gpio-samsung.c                           |   31 
+>  drivers/gpio/gpio-twl6040.c                           |   32 
+>  drivers/gpio/gpio-ucb1400.c                           |   23 
+>  drivers/gpio/gpio-vt8500.c                            |   24 
+>  drivers/gpio/gpio-xilinx.c                            |   44 +
+>  drivers/gpio/gpioblock-of.c                           |  100 ++
+>  drivers/gpio/gpiolib.c                                |  782 ++++++++++++++++--
+>  drivers/pinctrl/pinctrl-nomadik.c                     |   36 
+>  include/asm-generic/gpio.h                            |   28 
+>  include/linux/gpio.h                                  |  125 ++
+>  26 files changed, 1793 insertions(+), 47 deletions(-)
