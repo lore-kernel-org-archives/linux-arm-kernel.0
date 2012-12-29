@@ -1,81 +1,47 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 29 Dec 2012 15:04:52 -0800
-Subject: [PATCH] ARM: dts: add board dts file for EXYNOS4412 based Origen board
-Message-ID: <1356822292-26465-1-git-send-email-thomas.abraham@linaro.org>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Sat, 29 Dec 2012 18:31:37 -0500
+Subject: Kirkwood issues with 3.8-rc1 - Ooops and hang on reboot
+In-Reply-To: <20121228173818.GD24604@n2100.arm.linux.org.uk>
+References: <20121228171749.GA6152@lunn.ch>
+ <20121228173818.GD24604@n2100.arm.linux.org.uk>
+Message-ID: <CAMW5UfaPv=Rq64MVtJNsdt8L4+0bq=cvbw5nqFBEcjY_+3cHZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a minimal board dts file for EXYNOS4412 based Insignal Origen board.
+Bah, didn't send to everyone last time...
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/boot/dts/Makefile              |    1 +
- arch/arm/boot/dts/exynos4412-origen.dts |   45 +++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos4412-origen.dts
+Building with CONFIG_DEBUG_SECTION_MISMATCH enabled, the only warning
+I get is for drivers/w1/masters/w1-gpio.o.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e44da40..c84f9f7 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -43,6 +43,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos4210-smdkv310.dtb \
- 	exynos4210-trats.dtb \
- 	exynos4412-smdk4412.dtb \
-+	exynos4412-origen.dtb \
- 	exynos5250-smdk5250.dtb \
- 	exynos5250-snow.dtb \
- 	exynos5440-ssdk5440.dtb
-diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-new file mode 100644
-index 0000000..df880c4
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos4412-origen.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Insignal's Exynos4412 based Origen board device tree source
-+ *
-+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Device tree source file for Insignal's Origen board which is based on
-+ * Samsung's Exynos4412 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+/include/ "exynos4412.dtsi"
-+
-+/ {
-+	model = "Insignal Origen evaluation board based on Exynos4412";
-+	compatible = "insignal,origen4412", "samsung,exynos4412";
-+
-+	memory {
-+		reg = <0x40000000 0x40000000>;
-+	};
-+
-+	chosen {
-+		bootargs ="console=ttySAC2,115200";
-+	};
-+
-+	serial at 13800000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13810000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13820000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13830000 {
-+		status = "okay";
-+	};
-+};
--- 
-1.7.5.4
+WARNING: drivers/w1/masters/w1-gpio.o(.data+0x0): Section mismatch in
+reference from the variable w1_gpio_driver to the function
+.init.text:w1_gpio_probe()
+The variable w1_gpio_driver references
+the function __init w1_gpio_probe()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+
+Shouldn't I be seeing a warning for
+drivers/clk/mvebu/clk-gating-ctrl.o at this point as well?
+
+Josh C
+
+On Fri, Dec 28, 2012 at 12:38 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Dec 28, 2012 at 06:17:49PM +0100, Andrew Lunn wrote:
+>> Hi Josh
+>>
+>> What compiler version are you using to get the opps?
+>
+> It's a section mismatch warning.  Just look at the code line and compare
+> it with the disassembly.  Oh, the code line indicates that the code is
+> no longer present.  Why would that be?
+>
+> static struct clk __init *mvebu_clk_gating_get_src(
+>                   ^^^^^^
+>         struct of_phandle_args *clkspec, void *data)
+> {
+>         struct mvebu_gating_ctrl *ctrl = (struct mvebu_gating_ctrl *)data;
+>
+> maybe?
