@@ -1,36 +1,27 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 28 Dec 2012 17:42:47 -0700
-Subject: [PATCH 2/2] arm64: dts: prevent *.dtb from always being rebuilt
-In-Reply-To: <1356741767-29292-1-git-send-email-swarren@wwwdotorg.org>
-References: <1356741767-29292-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1356741767-29292-2-git-send-email-swarren@wwwdotorg.org>
+Date: Fri, 28 Dec 2012 17:43:37 -0700
+Subject: [PATCH V7 2/7] ARM: dt: change .dtb build rules to build in dts
+ directory
+In-Reply-To: <20121226142739.GA28980@S2101-09.ap.freescale.net>
+References: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
+ <1354058956-7199-2-git-send-email-swarren@wwwdotorg.org>
+ <20121226142739.GA28980@S2101-09.ap.freescale.net>
+Message-ID: <50DE3CB9.10409@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 12/26/2012 07:27 AM, Shawn Guo wrote:
+> On Tue, Nov 27, 2012 at 04:29:11PM -0700, Stephen Warren wrote:
+>> From: Grant Likely <grant.likely@secretlab.ca>
+>>
+>> The current rules have the .dtb files build in a different directory
+>> from the .dts files. The only reason for this is that it was what
+>> PowerPC has done historically. This patch changes ARM to use the generic
+>> dtb rule which builds .dtb files in the same directory as the source .dts.
+>
+> It's a pity that after merging the patch, all the enabled dts files
+> will be rebuilt anyway no matter whether they are actually changed
+> or not.
 
-if_changed (used by the *.dts->*.dtc rule) rebuilds files if they aren't
-contained in $(targets). (make V=2 indicates this). Add $(dtb-y) to
-$(targets) to prevent *.dtb from always being rebuilt. Note
-
-This fixes a regression introduced by the .dtb rule rework in da4cbc6
-"arm64: use new common dtc rule", although since arm64 doesn't actually
-have any *.dts yet, this isn't a critical issue.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm64/boot/dts/Makefile |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index 801e2d7..32ac0ae 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,4 +1,5 @@
- targets += dtbs
-+targets += $(dtb-y)
- 
- dtbs: $(addprefix $(obj)/, $(dtb-y))
- 
--- 
-1.7.10.4
+Oops. I thought I'd tested that quite extensively, but I somehow missed
+something. I've sent patches to fix this.
