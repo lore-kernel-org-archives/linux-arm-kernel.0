@@ -1,41 +1,41 @@
-From: ahemaily@gmail.com (ahemaily at gmail.com)
-Date: Sat, 29 Dec 2012 22:43:20 +0200
-Subject: [PATCH 1/1] arm :omap :DMA: fix a bug on reserving the omap SDMA
- channels
-Message-ID: <1356813800-4705-1-git-send-email-ahemaily@gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sat, 29 Dec 2012 12:50:33 -0800
+Subject: [PATCH v3 0/5] ARM: Exynos: Enable device tree support for MCT
+ controller
+Message-ID: <1356814238-23895-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ahemaily <ahemaily@gmail.com>
+Changes since v2:
+- Rebased to linux 3.8-rc1
 
-The variable  dma_lch_count  used for comparison  (omap_dma_reserve_channels <= dma_lch_count)
-before it initialized to the value from omap_dma_dev_attr : d->lch_count.
+Changes since v1:
+- Includes changes suggested by Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
 
-I change the place of dma_lch_count initialization to be before the comparison.
+This patch series adds device tree support for Exynos4/5 MCT controller.
+This patch series has been tested on Exynos4210 based Origen board, Exynos4412
+based Origen board and Exynos5250 based SMDK board.
 
-Signed-off-by: Abdelrahman Hemaily <ahemaily@gmail.com>
----
- arch/arm/plat-omap/dma.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thomas Abraham (5):
+  ARM: Exynos: add a register base address variable in mct controller driver
+  ARM: Exynos: prepare an array of MCT interrupt numbers and use it
+  ARM: Exynos: add device tree support for MCT controller driver
+  ARM: Exynos: remove static io-remapping of mct registers for Exynos5
+  ARM: dts: add mct device tree node for all supported Exynos SoC's
 
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index c76ed8b..cb3e321 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -2014,12 +2014,12 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
- 
- 	d			= p->dma_attr;
- 	errata			= p->errata;
--
-+	dma_lch_count           = d->lch_count;
-+
- 	if ((d->dev_caps & RESERVE_CHANNEL) && omap_dma_reserve_channels
- 			&& (omap_dma_reserve_channels <= dma_lch_count))
- 		d->lch_count	= omap_dma_reserve_channels;
- 
--	dma_lch_count		= d->lch_count;
- 	dma_chan_count		= dma_lch_count;
- 	dma_chan		= d->chan;
- 	enable_1510_mode	= d->dev_caps & ENABLE_1510_MODE;
+ .../bindings/timer/samsung,exynos4210-mct.txt      |   69 ++++++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |    8 +
+ arch/arm/boot/dts/exynos4212.dtsi                  |   10 +
+ arch/arm/boot/dts/exynos4412.dtsi                  |    8 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   21 +++
+ arch/arm/mach-exynos/common.c                      |    5 -
+ arch/arm/mach-exynos/include/mach/irqs.h           |    6 -
+ arch/arm/mach-exynos/include/mach/map.h            |    1 -
+ arch/arm/mach-exynos/include/mach/regs-mct.h       |   53 ------
+ arch/arm/mach-exynos/mct.c                         |  175 +++++++++++++-------
+ 10 files changed, 232 insertions(+), 124 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/samsung,exynos4210-mct.txt
+ delete mode 100644 arch/arm/mach-exynos/include/mach/regs-mct.h
+
 -- 
-1.7.9.5
+1.7.5.4
