@@ -1,97 +1,148 @@
-From: prathyush@chromium.org (Prathyush K)
-Date: Fri, 28 Dec 2012 09:53:47 +0530
-Subject: [PATCH] arm: dma mapping: export arm iommu functions
-In-Reply-To: <50DC580C.7080507@samsung.com>
-References: <1356592458-11077-1-git-send-email-prathyush.k@samsung.com>
- <50DC580C.7080507@samsung.com>
-Message-ID: <CAH=HWYP5r18qjQSc_2121vikbTMpYv6DKOfW=hpOpGB7rUyNRA@mail.gmail.com>
+From: zhanzhenbo@gmail.com (steve.zhan)
+Date: Sat, 29 Dec 2012 17:19:08 +0800
+Subject: [PATCH] hwspinlock/core: Add testing capabilities
+Message-ID: <CAKvkGKfc5jw+_ABgB8nrX37B7zHCoA5Ld0Gs5O-EDFD-Gk0OKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 27, 2012 at 7:45 PM, Marek Szyprowski
-<m.szyprowski@samsung.com>wrote:
+Hi,
 
-> Hello,
->
->
-> On 12/27/2012 8:14 AM, Prathyush K wrote:
->
->> This patch adds EXPORT_SYMBOL calls to the three arm iommu
->> functions - arm_iommu_create_mapping, arm_iommu_free_mapping
->> and arm_iommu_attach_device. These functions can now be called
->> from dynamic modules.
->>
->
-> Could You describe a bit more why those functions might be needed by
-> dynamic modules?
->
-> Hi Marek,
+    It is good idea add this feature.
 
-We are adding iommu support to exynos gsc and s5p-mfc.
-And these two drivers need to be built as modules to improve boot time.
+1: Can we let the "ret = hwspin_lock_tests(ops, hwlock);" add after
+hwspin_lock_register_single have return
+succeed, that can avoid test duplicated Or error lockid. Of course, If
+this interface is intend to test soc hardware capability only, we can
+put it in the arch module not this core framework. For driver hardware
+sanity check, i would add it after software have register it.
 
-We're calling these three functions from inside these drivers:
-e.g.
-mapping = arm_iommu_create_mapping(&platform_bus_type, 0x20000000, SZ_256M,
-4);
-arm_iommu_attach_device(mdev, mapping);
+
+2:Is it possible that interface add configs that choose which locks
+will be test? Because the hwspinlock module is init late in
+postcore_initcall phase, Maybe MACH/ARCH code(for example: code in
+early_initcall) need use private other interfaces to lock some
+hwspinlocks and then register hw locks to hwspinlock framework, Maybe
+some hw locks is in lock status but which test failed.
 
 
 
->
->  Signed-off-by: Prathyush K <prathyush.k@samsung.com>
->> ---
->>   arch/arm/mm/dma-mapping.c | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> index 6b2fb87..c0f0f43 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -1797,6 +1797,7 @@ err2:
->>   err:
->>         return ERR_PTR(err);
->>   }
->> +EXPORT_SYMBOL(arm_iommu_**create_mapping);
->>
->
-> EXPORT_SYMOBL_GPL() ?
->
->
-Right, it should be EXPORT_SYMOBL_GPL().
 
-Will update in next patch.
+-- 
+Steve Zhan
 
 
-
+> From: Ido Yariv <ido@wizery.com>
+> To: Ohad Ben-Cohen <ohad@wizery.com>, linux-kernel at vger.kernel.org,
+> 	linux-arm-kernel at lists.infradead.org, linux-omap at vger.kernel.org
+> Cc: Ido Yariv <ido@wizery.com>
+> Subject: [PATCH] hwspinlock/core: Add testing capabilities
+> Message-ID: <1355344026-17222-1-git-send-email-ido@wizery.com>
 >
->    static void release_iommu_mapping(struct kref *kref)
->>   {
->> @@ -1813,6 +1814,7 @@ void arm_iommu_release_mapping(**struct
->> dma_iommu_mapping *mapping)
->>         if (mapping)
->>                 kref_put(&mapping->kref, release_iommu_mapping);
->>   }
->> +EXPORT_SYMBOL(arm_iommu_**release_mapping);
->>     /**
->>    * arm_iommu_attach_device
->> @@ -1841,5 +1843,6 @@ int arm_iommu_attach_device(struct device *dev,
->>         pr_debug("Attached IOMMU controller to %s device.\n",
->> dev_name(dev));
->>         return 0;
->>   }
->> +EXPORT_SYMBOL(arm_iommu_**attach_device);
->>     #endif
->>
+> Add testing capabilities for verifying correctness of the underlying
+> hwspinlock layers. This can be handy especially during development.
+> These tests are performed only once as part of the hwspinlock
+> registration.
 >
-> Best regards
+> Signed-off-by: Ido Yariv <ido@wizery.com>
+> ---
+>  drivers/hwspinlock/Kconfig           |    9 +++++
+>  drivers/hwspinlock/hwspinlock_core.c |   54
+> ++++++++++++++++++++++++++++++++++
+>  2 files changed, 63 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
+> index c7c3128..ad632cd 100644
+> --- a/drivers/hwspinlock/Kconfig
+> +++ b/drivers/hwspinlock/Kconfig
+> @@ -8,6 +8,15 @@ config HWSPINLOCK
+>
+>  menu "Hardware Spinlock drivers"
+>
+> +config HWSPINLOCK_TEST
+> +	bool "Verify underlying hwspinlock implementation"
+> +	depends on HWSPINLOCK
+> +	help
+> +	  Say Y here to perform tests on the underlying hwspinlock
+> +	  implementation. The tests are only performed once per implementation.
+> +
+> +	  Say N, unless you absolutely know what you are doing.
+> +
+>  config HWSPINLOCK_OMAP
+>  	tristate "OMAP Hardware Spinlock device"
+>  	depends on ARCH_OMAP4
+> diff --git a/drivers/hwspinlock/hwspinlock_core.c
+> b/drivers/hwspinlock/hwspinlock_core.c
+> index 085e28e..1874e85 100644
+> --- a/drivers/hwspinlock/hwspinlock_core.c
+> +++ b/drivers/hwspinlock/hwspinlock_core.c
+> @@ -307,6 +307,53 @@ out:
+>  	return hwlock;
+>  }
+>
+> +#ifdef CONFIG_HWSPINLOCK_TEST
+> +#define NUM_OF_TEST_ITERATIONS 100
+> +static int hwspin_lock_tests(const struct hwspinlock_ops *ops,
+> +			     struct hwspinlock *hwlock)
+> +{
+> +	int i;
+> +	int ret;
+> +
+> +	for (i = 0; i < NUM_OF_TEST_ITERATIONS; i++) {
+> +		ret = ops->trylock(hwlock);
+> +		if (!ret) {
+> +			pr_err("%s: Initial lock failed\n", __func__);
+> +			return -EFAULT;
+> +		}
+> +
+> +		/* Verify lock actually works - re-acquiring it should fail */
+> +		ret = ops->trylock(hwlock);
+> +		if (ret) {
+> +			/* Keep locks balanced even in failure cases */
+> +			ops->unlock(hwlock);
+> +			ops->unlock(hwlock);
+> +			pr_err("%s: Recursive lock succeeded unexpectedly\n",
+> +			       __func__);
+> +			return -EFAULT;
+> +		}
+> +
+> +		/* Verify unlock by re-acquiring the lock after releasing it */
+> +		ops->unlock(hwlock);
+> +		ret = ops->trylock(hwlock);
+> +		if (!ret) {
+> +			pr_err("%s: Unlock failed\n", __func__);
+> +			return -EINVAL;
+> +		}
+> +
+> +		ops->unlock(hwlock);
+> +	}
+> +
+> +	return 0;
+> +}
+> +#else /* CONFIG_HWSPINLOCK_TEST*/
+> +static int hwspin_lock_tests(const struct hwspinlock_ops *ops,
+> +			     struct hwspinlock *hwlock)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+>  /**
+>   * hwspin_lock_register() - register a new hw spinlock device
+>   * @bank: the hwspinlock device, which usually provides numerous hw locks
+> @@ -345,6 +392,13 @@ int hwspin_lock_register(struct hwspinlock_device
+> *bank, struct device *dev,
+>  		spin_lock_init(&hwlock->lock);
+>  		hwlock->bank = bank;
+>
+> +		ret = hwspin_lock_tests(ops, hwlock);
+> +		if (ret) {
+> +			pr_err("hwspinlock tests failed on lock %d\n",
+> +			       base_id + i);
+> +			goto reg_failed;
+> +		}
+> +
+>  		ret = hwspin_lock_register_single(hwlock, base_id + i);
+>  		if (ret)
+>  			goto reg_failed;
 > --
-> Marek Szyprowski
-> Samsung Poland R&D Center
->
->
-> Regards,
-Prathyush
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121228/4aee24a0/attachment-0001.html>
+> 1.7.7.6
