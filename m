@@ -1,60 +1,73 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sat, 29 Dec 2012 10:33:59 +0100
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <50DE2FFB.8040804@wwwdotorg.org>
-References: <20121217182911.GA10448@obsidianresearch.com>
- <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
- <50CFD0B3.6030208@wwwdotorg.org>
- <20121218025113.GA27029@obsidianresearch.com>
- <50D0A1EA.9090009@wwwdotorg.org>
- <20121220153231.GA11256@avionic-0098.adnet.avionic-design.de>
- <20121222155040.61829b00@skate>
- <20121228210622.GA4519@avionic-0098.adnet.avionic-design.de>
- <20121228221632.3892e90b@skate> <50DE2FFB.8040804@wwwdotorg.org>
-Message-ID: <20121229093359.GA5877@avionic-0098.adnet.avionic-design.de>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Sat, 29 Dec 2012 11:11:40 +0100
+Subject: [PATCH 1/5] ARM: Kirkwood: Convert NS2 to gpio-poweroff.
+In-Reply-To: <20121229075547.GG7578@lunn.ch>
+References: <1356704050-5047-1-git-send-email-andrew@lunn.ch>
+ <20121229010742.GB1357@kw.sim.vm.gnt>
+ <20121229075547.GG7578@lunn.ch>
+Message-ID: <20121229101140.GD1357@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 28, 2012 at 04:49:15PM -0700, Stephen Warren wrote:
-> On 12/28/2012 02:16 PM, Thomas Petazzoni wrote:
-> > Dear Thierry Reding,
+On Sat, Dec 29, 2012 at 08:55:47AM +0100, Andrew Lunn wrote:
+> On Sat, Dec 29, 2012 at 02:07:42AM +0100, Simon Guinot wrote:
+> > On Fri, Dec 28, 2012 at 03:14:10PM +0100, Andrew Lunn wrote:
+> > > Remove C code and add a Device Tree node in its place.
+> > > 
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > > ---
+> > > 
+> > > This is untested. I've been known to get the active hi/low the wrong
+> > > way around so that the board powers off as the driver loads at boot
+> > > time. So it would be very good to have a tested-by: sign off.
 > > 
-> > On Fri, 28 Dec 2012 22:06:22 +0100, Thierry Reding wrote:
+> > Hi Andrew,
 > > 
-> >>> Thanks for putting your code online. I've started using it already for
-> >>> the Marvell PCIe support, at least the host-bridge.c helpers you've
-> >>> written, and also to have a look at the DT binding you've implemented.
-> >>
-> >> That's great. I've been thinking about this some more and one problem
-> >> we'll be facing is that none of the fake host bridges actually exist and
-> >> therefore don't have any official PCI IDs. What I did for Tegra was just
-> >> choose one of the nForce IDs, but that's obviously hackish. One solution
-> >> would be to convince somebody benevolent to sponsor an ID for this
-> >> particular purpose. I think Red Hat did so for Virtio.
-> > 
-> > Indeed, that's a remaining problem to solve. Would be great to have
-> > some vendor sponsoring a few IDs for that. At least for a fake PCI Host
-> > Bridge and a fake PCI-to-PCI bridge.
+> > I think that GPIOs are currently broken for LaCie DT boards, due to
+> > commit f9e75922: "ARM: Kirkwood: Make use of mvebu pincltl and gpio
+> > drivers".
 > 
-> Is it actually necessary for a host/PCI bridge to show up on the PCI bus
-> as device 0?
+> Hi Simon
+> 
+> gpio-power-off should work with either the old or the new driver.
 
-It isn't actually required to make PCI work, but it enables PCI device
-matching to DT nodes with the generic code. If we leave out the host
-bridge, then the matching becomes rather complicated and we'll most
-likely have to special-case it (in the worst case on a per-mach basis).
-The PCI core allows this by overriding the default implementations (weak
-symbols) but doing so will conflict with the multi-platform work. Making
-it work with multi-platform will probably require the addition of a
-.of_match() to struct pci_ops or similar.
+gpio_request fails because mvebu-gpio relies on pinctrl which is not
+available on the ns2 DT board. The mpp registration is still done in
+the old fashion way for the ns2 (with kirkwood_mpp_conf()).
 
-Faking a host bridge seems like the lesser evil to me.
+Look at the orion_gpio_of_init() call removal in f9e75922.
 
-Thierry
+> 
+> What might not work with the old code gpio power off code with the new
+> new driver. So it is worth giving it a try.
+
+I have but gpio_request fails. It is the same with all the drivers
+trying to get GPIOs...
+
+> 
+> > As mvbu_gpio is now used (instead of orion_gpio), pinctrl must also be
+> > used. I think that the pinctrl conversion is a preliminary work to the
+> > gpio_poweroff conversion. I realized this some weeks ago while working
+> > on the exactly same patch. Unfortunately, I failed to find enough time
+> > to fix it.
+> > 
+> > If you can afford a few days delay, let's say until the end of the next
+> > week, I should be able to add the pinctrl conversion patch and then also
+> > to test your patch on the top of that.
+> 
+> No rush. We have maybe another 4 weeks before we need to submit code
+> upstream for the next merge window.
+
+OK fine. I'll do that next week.
+
+Simon
+
+> 
+> 	 Andrew
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121229/eba49ec7/attachment.sig>
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121229/980a929b/attachment-0001.sig>
