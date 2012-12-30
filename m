@@ -1,63 +1,89 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 31 Dec 2012 10:00:07 +1300
-Subject: [PATCH v2] mtd: vt8500: Add support for Wondermedia Serial Flash
- Controller
-Message-ID: <1356901207-13536-1-git-send-email-linux@prisktech.co.nz>
+Date: Mon, 31 Dec 2012 11:01:02 +1300
+Subject: [PATCH] input: vt8500: Add power button keypad driver
+Message-ID: <1356904862-16417-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the Wondermedia serial flash controller
-found on WM8505, WM8650 and WM8850 SoCs.
+This patch adds support for the Power Button keypad found on
+Wondermedia netbooks/tablets.
+
+A keymap property is exposed to allowing defining the key
+event to be generated when the power button is pressed.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
-v2: Whitespace tidyup
+ .../bindings/input/vt8500-power-keypad.txt         |   17 ++
+ drivers/input/keyboard/Kconfig                     |   10 ++
+ drivers/input/keyboard/Makefile                    |    1 +
+ drivers/input/keyboard/wmt_power_keypad.c          |  174 ++++++++++++++++++++
+ 4 files changed, 202 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/vt8500-power-keypad.txt
+ create mode 100644 drivers/input/keyboard/wmt_power_keypad.c
 
- drivers/mtd/devices/Kconfig      |    7 +
- drivers/mtd/devices/Makefile     |    3 +-
- drivers/mtd/devices/wmt_sflash.c |  614 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 623 insertions(+), 1 deletion(-)
- create mode 100644 drivers/mtd/devices/wmt_sflash.c
-
-diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
-index 27f80cd..6c4bbd4 100644
---- a/drivers/mtd/devices/Kconfig
-+++ b/drivers/mtd/devices/Kconfig
-@@ -128,6 +128,13 @@ config MTD_BCM47XXSFLASH
- 	  registered by bcma as platform devices. This enables driver for
- 	  serial flash memories (only read-only mode is implemented).
- 
-+config MTD_WMT_SFLASH
-+	tristate "WonderMedia Serial Flash Support"
-+	depends on MTD
-+	help
-+	  Enable this option to provide support for the Wondermedia SoC serial
-+	  flash controller.
-+
- config MTD_SLRAM
- 	tristate "Uncached system RAM"
- 	help
-diff --git a/drivers/mtd/devices/Makefile b/drivers/mtd/devices/Makefile
-index 395733a..10b8bec 100644
---- a/drivers/mtd/devices/Makefile
-+++ b/drivers/mtd/devices/Makefile
-@@ -19,6 +19,7 @@ obj-$(CONFIG_MTD_DATAFLASH)	+= mtd_dataflash.o
- obj-$(CONFIG_MTD_M25P80)	+= m25p80.o
- obj-$(CONFIG_MTD_SPEAR_SMI)	+= spear_smi.o
- obj-$(CONFIG_MTD_SST25L)	+= sst25l.o
-+obj-$(CONFIG_MTD_WMT_SFLASH)	+= wmt_sflash.o
- obj-$(CONFIG_MTD_BCM47XXSFLASH)	+= bcm47xxsflash.o
- 
--CFLAGS_docg3.o			+= -I$(src)
-\ No newline at end of file
-+CFLAGS_docg3.o			+= -I$(src)
-diff --git a/drivers/mtd/devices/wmt_sflash.c b/drivers/mtd/devices/wmt_sflash.c
+diff --git a/Documentation/devicetree/bindings/input/vt8500-power-keypad.txt b/Documentation/devicetree/bindings/input/vt8500-power-keypad.txt
 new file mode 100644
-index 0000000..49359ea
+index 0000000..bae6228
 --- /dev/null
-+++ b/drivers/mtd/devices/wmt_sflash.c
-@@ -0,0 +1,614 @@
-+/*
++++ b/Documentation/devicetree/bindings/input/vt8500-power-keypad.txt
+@@ -0,0 +1,17 @@
++* Wondermedia Power Keypad device tree bindings
++
++Wondermedia SoCs have a single irq-driven power button attached to
++the power management controller.
++
++Required SoC Specific Properties:
++- compatible: should be one of the following
++   - "wm,power-keypad": For all Wondermedia 8xxx-series SoCs.
++- interrupts: should be the power management controller wakeup interrupt.
++- keymap: linux keycode to generate when power button pressed.
++
++Example:
++	powerkey: pwrkey at 0 {
++		compatible = "wm,power-keypad";
++		interrupts = <22>;
++		keymap = <116>; /* KEY_POWER */
++	};
+diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+index 5a240c6..c270f27 100644
+--- a/drivers/input/keyboard/Kconfig
++++ b/drivers/input/keyboard/Kconfig
+@@ -595,6 +595,16 @@ config KEYBOARD_TWL4030
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called twl4030_keypad.
+ 
++config KEYBOARD_WMT_POWER_KEYPAD
++	tristate "Wondermedia Power keypad support"
++	depends on ARCH_VT8500
++	help
++	  Say Y here to enable support for the power button keypad
++	  on Wondermedia 8xxx-series SoCs.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called wmt_power_keypad.
++
+ config KEYBOARD_XTKBD
+ 	tristate "XT keyboard"
+ 	select SERIO
+diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
+index 44e7600..eea31af 100644
+--- a/drivers/input/keyboard/Makefile
++++ b/drivers/input/keyboard/Makefile
+@@ -52,5 +52,6 @@ obj-$(CONFIG_KEYBOARD_TC3589X)		+= tc3589x-keypad.o
+ obj-$(CONFIG_KEYBOARD_TEGRA)		+= tegra-kbc.o
+ obj-$(CONFIG_KEYBOARD_TNETV107X)	+= tnetv107x-keypad.o
+ obj-$(CONFIG_KEYBOARD_TWL4030)		+= twl4030_keypad.o
++obj-$(CONFIG_KEYBOARD_WMT_POWER_KEYPAD)	+= wmt_power_keypad.o
+ obj-$(CONFIG_KEYBOARD_XTKBD)		+= xtkbd.o
+ obj-$(CONFIG_KEYBOARD_W90P910)		+= w90p910_keypad.o
+diff --git a/drivers/input/keyboard/wmt_power_keypad.c b/drivers/input/keyboard/wmt_power_keypad.c
+new file mode 100644
+index 0000000..ce8aa9a
+--- /dev/null
++++ b/drivers/input/keyboard/wmt_power_keypad.c
+@@ -0,0 +1,174 @@
++/* Wondermedia Power Keypad
++ *
 + * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
 + *
 + * This software is licensed under the terms of the GNU General Public
@@ -71,605 +97,164 @@ index 0000000..49359ea
 + *
 + */
 +
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+#include <linux/errno.h>
 +#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/input.h>
++#include <linux/interrupt.h>
 +#include <linux/platform_device.h>
-+
++#include <linux/bitops.h>
 +#include <linux/of.h>
-+#include <linux/of_device.h>
 +#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_device.h>
 +
-+#include <linux/mtd/mtd.h>
++static void __iomem *pmc_base;
++static struct input_dev *kpad_power;
++static spinlock_t kpad_power_lock;
++static int power_button_pressed;
++static struct timer_list kpad_power_timer;
++static unsigned int kpad_power_code;
 +
-+/* controller only supports erase size of 64KB */
-+#define WMT_ERASESIZE			0x10000
-+
-+/* Serial Flash controller register offsets */
-+#define SF_CHIP_SEL_0_CFG		0x000
-+#define SF_CHIP_SEL_1_CFG		0x008
-+#define SF_SPI_INTF_CFG			0x040
-+#define SF_SPI_RD_WR_CTR		0x050
-+#define SF_SPI_WR_EN_CTR		0x060
-+#define SF_SPI_ER_CTR			0x070
-+#define SF_SPI_ER_START_ADDR		0x074
-+#define SF_SPI_ERROR_STATUS		0x080
-+#define SF_SPI_MEM_0_SR_ACC		0x100
-+#define SF_SPI_MEM_1_SR_ACC		0x110
-+#define SF_SPI_PDWN_CTR_0		0x180
-+#define SF_SPI_PDWN_CTR_1		0x190
-+#define SF_SPI_PROG_CMD_CTR		0x200
-+#define SF_SPI_USER_CMD_VAL		0x210
-+#define SF_SPI_PROG_CMD_WBF		0x300	/* 64 bytes */
-+#define SF_SPI_PROG_CMD_RBF		0x380	/* 64 bytes */
-+
-+/* SF_SPI_WR_EN_CTR bit fields */
-+#define SF_CS0_WR_EN			BIT(0)
-+#define SF_CS1_WR_EN			BIT(1)
-+
-+/* SF_SPI_ER_CTR bit fields */
-+#define SF_SEC_ER_EN			BIT(31)
-+
-+/* SF_SPI_ERROR_STATUS bit fields */
-+#define SF_ERR_TIMEOUT			BIT(31)
-+#define SF_ERR_WR_PROT_ERR		BIT(5)
-+#define SF_ERR_MEM_REGION_ERR		BIT(4)
-+#define SF_ERR_PWR_DWN_ACC_ERR		BIT(3)
-+#define SF_ERR_PCMD_OP_ERR		BIT(2)
-+#define SF_ERR_PCMD_ACC_ERR		BIT(1)
-+#define SF_ERR_MASLOCK_ERR		BIT(0)
-+
-+/*
-+ * Serial Flash device manufacturers
-+ * Please keep sorted by manufacturers ID
-+ */
-+#define MFR_SPANSION		0x01
-+#define MFR_EON			0x1C
-+#define MFR_ATMEL		0x1F
-+#define MFR_NUMONYX		0x20
-+#define MFR_FUDAN		0xA1
-+#define MFR_SST			0xBF
-+#define MFR_MXIC		0xC2
-+#define MFR_WINBOND		0xEF
-+
-+/*
-+ * SF Device Models
-+ * Please keep in the same order as the manufacturers table
-+ */
-+
-+/* Spansion */
-+#define SPAN_FL016A		0x0214 /* 2 MB */
-+#define SPAN_FL064A		0x0216 /* 8 MB */
-+
-+/* Eon */
-+#define EON_25P16		0x2015 /* 2 MB */
-+#define EON_25P64		0x2017 /* 8 MB */
-+#define EON_25F40		0x3113 /* 512 KB */
-+#define EON_25F16		0x3115 /* 2 MB */
-+
-+/* Atmel */
-+#define AT_25DF041A		0x4401 /* 512KB */
-+
-+/* Numonyx */
-+#define	NX_25P16		0x2015 /* 2 MB */
-+#define	NX_25P64		0x2017 /* 8 MB */
-+
-+/* Fudan Microelectronics Group */
-+#define FM_25F04		0x3113 /* 512 KB */
-+
-+/* SST */
-+#define SST_VF016B		0x2541 /* 2 MB */
-+
-+/* MXIC */
-+#define	MX_L512			0x2010 /* 64 KB , 4KB*/
-+#define MX_L4005A		0x2013 /* 512 KB */
-+#define	MX_L1605D		0x2015 /* 2 MB */
-+#define	MX_L3205D		0x2016 /* 4 MB */
-+#define	MX_L6405D		0x2017 /* 8 MB */
-+#define	MX_L1635D		0x2415 /* 2 MB */
-+#define	MX_L3235D		0x5E16 /* 4 MB */
-+#define	MX_L12805D		0x2018 /* 16 MB */
-+
-+/* WinBond */
-+#define WB_W25X40BV		0x3013	/* 512 KB */
-+#define WB_X16A			0x3015	/* 2 MB */
-+#define WB_X32			0x3016	/* 4 MB */
-+#define WB_X64			0x3017	/* 8 MB */
-+
-+
-+#define SF_ID(mfr, mdl)		((mfr << 16) | mdl)
-+
-+#define FLASH_UNKNOWN		0x00ffffff
-+
-+struct wmt_flash_id {
-+	u32	id;
-+	u32	size;		/* Size in KB */
-+};
-+
-+static struct wmt_flash_id flash_ids[] = {
-+	{ SF_ID(MFR_SPANSION,	SPAN_FL016A),	2048 },
-+	{ SF_ID(MFR_SPANSION,	SPAN_FL064A),	8192 },
-+	{ SF_ID(MFR_EON,	EON_25P16),	2048 },
-+	{ SF_ID(MFR_EON,	EON_25P64),	8192 },
-+	{ SF_ID(MFR_EON,	EON_25F40),	512 },
-+	{ SF_ID(MFR_EON,	EON_25F16),	2048 },
-+	{ SF_ID(MFR_ATMEL,	AT_25DF041A),	512 },
-+	{ SF_ID(MFR_NUMONYX,	NX_25P16),	2048 },
-+	{ SF_ID(MFR_NUMONYX,	NX_25P64),	8192 },
-+	{ SF_ID(MFR_FUDAN,	FM_25F04),	512 },
-+	{ SF_ID(MFR_SST,	SST_VF016B),	2048 },
-+	{ SF_ID(MFR_MXIC,	MX_L512),	64 },
-+	{ SF_ID(MFR_MXIC,	MX_L4005A),	512 },
-+	{ SF_ID(MFR_MXIC,	MX_L1605D),	2048 },
-+	{ SF_ID(MFR_MXIC,	MX_L3205D),	4192 },
-+	{ SF_ID(MFR_MXIC,	MX_L6405D),	8192 },
-+	{ SF_ID(MFR_MXIC,	MX_L1635D),	2048 },
-+	{ SF_ID(MFR_MXIC,	MX_L3235D),	4192 },
-+	{ SF_ID(MFR_MXIC,	MX_L12805D),	16384 },
-+	{ SF_ID(MFR_WINBOND,	WB_W25X40BV),	512 },
-+	{ SF_ID(MFR_WINBOND,	WB_X16A),	2048 },
-+	{ SF_ID(MFR_WINBOND,	WB_X32),	4096 },
-+	{ SF_ID(MFR_WINBOND,	WB_X64),	8192 },
-+	{ 0, 0 },
-+};
-+
-+struct wmt_sf_chip {
-+	u32	id;
-+	u32	size;
-+	u32	addr_phys;
-+	u32	ccr;
-+};
-+
-+struct wmt_sf_data {
-+	struct mtd_info		*sf_mtd;
-+	struct clk		*sf_clk;
-+	struct device		*dev;
-+
-+	struct wmt_sf_chip	chip[2];
-+
-+	void __iomem		*base;		/* register virt base */
-+
-+	void __iomem		*sf_base_virt;	/* mem-mapped sf virt base */
-+	u32			sf_base_phys;	/* mem-mapped sf phys base */
-+	u32			sf_total_size;
-+};
-+
-+static u32 sf_get_chip_size(struct device *dev, u32 id)
++static inline void kpad_power_timeout(unsigned long fcontext)
 +{
-+	int i;
-+	for (i = 0; flash_ids[i].id != 0; i++)
-+		if (flash_ids[i].id == id)
-+			return flash_ids[i].size * 1024;
++	u32 status;
++	unsigned long flags;
 +
-+	dev_err(dev, "Unknown flash id (%08x)\n", id);
-+	return 0;
-+}
++	spin_lock_irqsave(&kpad_power_lock, flags);
 +
-+static void sf_calc_ccr(struct wmt_sf_chip *chip)
-+{
-+	unsigned int cnt = 0, size;
++	status = readl(pmc_base + 0x14);
 +
-+	size = chip->size;
-+	while (size) {
-+		size >>= 1;
-+		cnt++;
++	if (power_button_pressed) {
++		input_report_key(kpad_power, kpad_power_code, 0);
++		input_sync(kpad_power);
++		power_button_pressed = 0;
 +	}
-+	cnt -= 16;
-+	cnt = cnt << 8;
-+	chip->ccr = (chip->addr_phys | cnt);
++
++	spin_unlock_irqrestore(&kpad_power_lock, flags);
 +}
 +
-+static int wmt_sf_init_hw(struct wmt_sf_data *info)
++static irqreturn_t kpad_power_isr(int irq_num, void *data)
 +{
-+	u32 strap;
-+	u32 phys_addr;
++	u32 status;
++	unsigned long flags;
++
++	spin_lock_irqsave(&kpad_power_lock, flags);
++
++	status = readl(pmc_base + 0x14);
++	udelay(100);
++	writel(status, pmc_base + 0x14);
++
++	if (status & BIT(14)) {
++		if (!power_button_pressed) {
++			input_report_key(kpad_power, kpad_power_code, 1);
++			input_sync(kpad_power);
++
++			power_button_pressed = 1;
++
++			mod_timer(&kpad_power_timer,
++				  jiffies + msecs_to_jiffies(500));
++		}
++	}
++
++	spin_unlock_irqrestore(&kpad_power_lock, flags);
++
++	return IRQ_HANDLED;
++}
++
++static int vt8500_pwr_kpad_probe(struct platform_device *pdev)
++{
 +	struct device_node *np;
-+	void __iomem *gpio_base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "wm,wm8650-gpio");
-+	if (!np) {
-+		dev_err(info->dev, "Unable to find GPIO node\n");
-+		return -1;
-+	}
-+
-+	gpio_base = of_iomap(np, 0);
-+	if (!gpio_base) {
-+		dev_err(info->dev, "Failed to map gpio memory\n");
-+		return -1;
-+	}
-+
-+	strap = readl_relaxed(gpio_base + 0x100);
-+	iounmap(gpio_base);
-+
-+	if ((strap & 0x06) == 0) {
-+		phys_addr = 0xFFFFFFFF;
-+		writel(0x00000011, info->base + SF_SPI_RD_WR_CTR);
-+		writel(0xFF800800, info->base + SF_CHIP_SEL_0_CFG);
-+		writel(0x00030000, info->base + SF_SPI_INTF_CFG);
-+	} else {
-+		phys_addr = 0xEFFFFFFF;
-+		writel(0x00000011, info->base + SF_SPI_RD_WR_CTR);
-+		writel(0xEF800800, info->base + SF_CHIP_SEL_0_CFG);
-+		writel(0x00030000, info->base + SF_SPI_INTF_CFG);
-+	}
-+
-+	info->chip[0].id = FLASH_UNKNOWN;
-+	info->chip[1].id = FLASH_UNKNOWN;
-+
-+	/* Read serial flash ID */
-+	writel(0x11, info->base + SF_SPI_RD_WR_CTR);
-+	info->chip[0].id = readl(info->base + SF_SPI_MEM_0_SR_ACC);
-+	writel(0x01, info->base + SF_SPI_RD_WR_CTR);
-+
-+	writel(0x11, info->base + SF_SPI_RD_WR_CTR);
-+	info->chip[1].id = readl(info->base + SF_SPI_MEM_1_SR_ACC);
-+	writel(0x01, info->base + SF_SPI_RD_WR_CTR);
-+
-+	info->chip[0].size = sf_get_chip_size(info->dev, info->chip[0].id);
-+	if (info->chip[0].size == 0)
-+		return -1;
-+
-+	info->chip[0].addr_phys = phys_addr - info->chip[0].size + 1;
-+	if (info->chip[0].addr_phys & 0xffff) {
-+		dev_err(info->dev, "Chip 0 start address must align to 64KB\n");
-+		return -1;
-+	}
-+	info->sf_base_phys = info->chip[0].addr_phys;
-+	info->sf_total_size = info->chip[0].size;
-+	pr_info("SFC: Chip 0 @ %08x (size: %d)\n", info->chip[0].addr_phys,
-+							info->chip[0].size);
-+
-+	sf_calc_ccr(&info->chip[0]);
-+	writel(info->chip[0].ccr, info->base + SF_CHIP_SEL_0_CFG);
-+
-+	if (info->chip[1].id != FLASH_UNKNOWN) {
-+		info->chip[1].size = sf_get_chip_size(info->dev,
-+						      info->chip[1].id);
-+		info->chip[1].addr_phys = info->chip[0].addr_phys -
-+							info->chip[1].size;
-+		if (info->chip[1].addr_phys & 0xffff) {
-+			dev_err(info->dev, "Chip 1 start address must align to 64KB\n");
-+			info->chip[1].id = FLASH_UNKNOWN;
-+			return 0;
-+		}
-+		info->sf_base_phys = info->chip[1].addr_phys;
-+		info->sf_total_size += info->chip[1].size;
-+		pr_info("SFC: Chip 1 @ %08x (size: %d)\n",
-+				info->chip[1].addr_phys, info->chip[1].size);
-+
-+		sf_calc_ccr(&info->chip[1]);
-+		writel(info->chip[1].ccr, info->base + SF_CHIP_SEL_1_CFG);
-+	}
-+
-+	return 0;
-+}
-+
-+static int sf_check_error(struct device *dev, u32 code)
-+{
-+	if (code & SF_ERR_TIMEOUT) {
-+		dev_err(dev, "Serial flash timeout\n");
-+		return -ETIMEDOUT;
-+	}
-+
-+	if (code & SF_ERR_WR_PROT_ERR) {
-+		dev_err(dev, "Serial flash write-protected\n");
-+		return -EIO;
-+	}
-+
-+	if (code & SF_ERR_MEM_REGION_ERR) {
-+		dev_err(dev, "Serial flash memory region error\n");
-+		return -EIO;
-+	}
-+
-+	if (code & SF_ERR_PWR_DWN_ACC_ERR) {
-+		dev_err(dev, "Serial flash power down access error\n");
-+		return -EIO;
-+	}
-+
-+	if (code & SF_ERR_PCMD_OP_ERR)	{
-+		dev_err(dev, "Serial flash program CMD OP error\n");
-+		return -EIO;
-+	}
-+
-+	if (code & SF_ERR_PCMD_ACC_ERR) {
-+		dev_err(dev, "Serial flash program CMD OP access error\n");
-+		return -EIO;
-+	}
-+
-+	if (code & SF_ERR_MASLOCK_ERR) {
-+		dev_err(dev, "Serial flash master lock error\n");
-+		return -EIO;
-+	}
-+
-+	/* no error */
-+	return 0;
-+}
-+
-+static int sf_spi_read_status(struct wmt_sf_data *info, int chip)
-+{
-+	u32 timeout = 0x30000000;
-+	u32 temp;
++	u32 status;
 +	int err;
++	int irq;
 +
-+	do {
-+		if (chip == 0)
-+			temp = readl_relaxed(info->base + SF_SPI_MEM_0_SR_ACC);
-+		else
-+			temp = readl_relaxed(info->base + SF_SPI_MEM_1_SR_ACC);
-+
-+		if ((temp & 0x1) == 0x0)
-+			break;
-+
-+		err = sf_check_error(info->dev,
-+				     readl(info->base + SF_SPI_ERROR_STATUS));
-+		if (err) {
-+			writel(0x3f, info->base + SF_SPI_ERROR_STATUS);
-+			return err;
-+		}
-+		timeout--;
-+	} while (timeout);
-+
-+	if (timeout == 0) {
-+		dev_err(info->dev, "spi request timed-out\n");
-+		return -ETIMEDOUT;
-+	}
-+
-+	return 0;
-+}
-+
-+static int sf_sector_erase(struct wmt_sf_data *info, u32 addr)
-+{
-+	int chip;
-+	u32 val;
-+
-+	if ((info->sf_base_phys + addr) < info->chip[0].addr_phys) {
-+		chip = 0;
-+		writel(SF_CS0_WR_EN, info->base + SF_SPI_WR_EN_CTR);
-+	} else {
-+		chip = 1;
-+		writel(SF_CS1_WR_EN, info->base + SF_SPI_WR_EN_CTR);
-+	}
-+
-+	addr &= ~(info->sf_mtd->erasesize - 1);
-+	writel(addr, info->base + SF_SPI_ER_START_ADDR);
-+
-+	writel(SF_SEC_ER_EN, info->base + SF_SPI_ER_CTR);
-+
-+	val = sf_spi_read_status(info, chip);
-+
-+	writel(0, info->base + SF_SPI_WR_EN_CTR);
-+	return val;
-+}
-+
-+static int sf_erase(struct mtd_info *mtd, struct erase_info *instr)
-+{
-+	struct wmt_sf_data *info = mtd->priv;
-+	int ret;
-+
-+	ret = clk_enable(info->sf_clk);
-+	if (ret)
-+		return ret;
-+
-+	ret = sf_sector_erase(info, (u32)instr->addr);
-+	if (ret) {
-+		clk_disable(info->sf_clk);
-+		return ret;
-+	}
-+
-+	instr->state = MTD_ERASE_DONE;
-+	mtd_erase_callback(instr);
-+
-+	clk_disable(info->sf_clk);
-+	return 0;
-+}
-+
-+static int sf_read(struct mtd_info *mtd, loff_t from, size_t len,
-+			 size_t *retlen, u_char *buf)
-+{
-+	struct wmt_sf_data *info = mtd->priv;
-+	int ret;
-+
-+	ret = clk_enable(info->sf_clk);
-+	if (ret)
-+		return ret;
-+
-+	if (sf_spi_read_status(info, 0))
-+		return -EBUSY;
-+	if (sf_spi_read_status(info, 1))
-+		return -EBUSY;
-+
-+	if (from + len > mtd->size) {
-+		dev_err(info->dev, "Request out of bounds (from=%llu, len=%d)\n",
-+								from, len);
++	np = of_find_compatible_node(NULL, NULL, "via,vt8500-pmc");
++	if (!np) {
++		dev_err(&pdev->dev, "pmc node not found\n");
 +		return -EINVAL;
 +	}
 +
-+	memcpy_fromio(buf, info->sf_base_virt + from, len);
-+	*retlen = len;
-+
-+	clk_disable(info->sf_clk);
-+	return 0;
-+}
-+
-+static int sf_sector_write(struct wmt_sf_data *info, loff_t to, size_t len,
-+			   const u_char *buf)
-+{
-+	int ret;
-+	int data_size;
-+	u32 count;
-+	u32 addr_to = (u32)(info->sf_base_virt) + to;
-+
-+	ret = clk_enable(info->sf_clk);
-+	if (ret)
-+		return ret;
-+
-+	if (sf_spi_read_status(info, 0))
-+		return -EBUSY;
-+	if (sf_spi_read_status(info, 1))
-+		return -EBUSY;
-+
-+	writel(SF_CS0_WR_EN | SF_CS1_WR_EN, info->base + SF_SPI_WR_EN_CTR);
-+
-+	count = 0;
-+	while (len) {
-+		data_size = (len >= 4) ? 4 : 1;
-+		memcpy_toio(((u_char *)(addr_to + count)), buf + count,
-+								data_size);
-+		count += data_size;
-+		len -= data_size;
-+
-+		if (len) {
-+			data_size = (len >= 4) ? 4 : 1;
-+			memcpy_toio(((u_char *)(addr_to + count)), buf + count,
-+								data_size);
-+			count += data_size;
-+			len -= data_size;
-+		}
-+
-+		ret = sf_spi_read_status(info, 0);
-+		if (ret) {
-+			clk_disable(info->sf_clk);
-+			return ret;
-+		}
-+	}
-+
-+	writel(0, info->base + SF_SPI_WR_EN_CTR);
-+
-+	clk_disable(info->sf_clk);
-+
-+	return count;
-+}
-+
-+static int sf_write(struct mtd_info *mtd, loff_t to, size_t len,
-+				size_t *retlen, const u_char *buf)
-+{
-+	struct wmt_sf_data *info = mtd->priv;
-+
-+	*retlen = sf_sector_write(info, to, len, buf);
-+
-+	return 0;
-+}
-+
-+static int mtdsf_init_device(struct device *dev, struct mtd_info *mtd,
-+					unsigned long size, char *name)
-+{
-+	mtd->name = name;
-+	mtd->type = MTD_NORFLASH;
-+	mtd->flags = MTD_CAP_NORFLASH;
-+	mtd->size = size;
-+	mtd->erasesize = WMT_ERASESIZE;
-+	mtd->owner = THIS_MODULE;
-+	mtd->_erase = sf_erase;
-+	mtd->_read = sf_read;
-+	mtd->_write = sf_write;
-+	mtd->writesize = 1;
-+
-+	if (mtd_device_register(mtd, NULL, 0)) {
-+		dev_err(dev, "Erroring adding MTD device\n");
-+		return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+static int wmt_sf_probe(struct platform_device *pdev)
-+{
-+	struct wmt_sf_data	*info;
-+	struct device_node	*np = pdev->dev.of_node;
-+	int err;
-+
-+	if (!np) {
-+		dev_err(&pdev->dev, "Invalid devicetree node\n");
-+		return -EINVAL;
-+	}
-+
-+	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
-+	if (!info) {
-+		dev_err(&pdev->dev, "Failed to get memory for SF info\n");
++	pmc_base = of_iomap(np, 0);
++	if (!pmc_base) {
++		dev_err(&pdev->dev, "unable to map pmc memory\n");
 +		return -ENOMEM;
 +	}
 +
-+	info->dev = &pdev->dev;
-+
-+	info->base = of_iomap(np, 0);
-+	if (!info->base) {
-+		dev_err(&pdev->dev, "Failed to map register memory\n");
-+		return -ENOMEM;
++	np = pdev->dev.of_node;
++	if (!np) {
++		dev_err(&pdev->dev, "devicenode not found\n");
++		return -ENODEV;
 +	}
 +
-+	info->sf_clk = of_clk_get(np, 0);
-+	if (!info->sf_clk) {
-+		dev_err(&pdev->dev, "Failed to get clock from device tree\n");
-+		return -EINVAL;
-+	}
-+
-+	err = clk_prepare_enable(info->sf_clk);
-+	if (err)
-+		return err;
-+
-+	err = wmt_sf_init_hw(info);
-+	clk_disable(info->sf_clk);
++	err = of_property_read_u32(np, "keymap", &kpad_power_code);
 +	if (err) {
-+		dev_err(&pdev->dev, "Failed to initialize SF hardware\n");
-+		return -EIO;
++		dev_warn(&pdev->dev, "defaulting to KEY_POWER\n");
++		kpad_power_code = KEY_POWER;
 +	}
 +
-+	info->sf_base_virt = devm_ioremap(&pdev->dev, info->sf_base_phys,
-+					  info->sf_total_size);
-+	if (!info->sf_base_virt) {
-+		dev_err(&pdev->dev, "Failed to map serial flash memory\n");
++	/* set power button to soft-power */
++	status = readl(pmc_base + 0x54);
++	writel(status | 1, pmc_base + 0x54);
++
++	/* clear any pending interrupts */
++	status = readl(pmc_base + 0x14);
++	writel(status, pmc_base + 0x14);
++
++	kpad_power = input_allocate_device();
++	if (!kpad_power) {
++		dev_err(&pdev->dev, "failed to allocate input device\n");
 +		return -ENOMEM;
 +	}
 +
-+	info->sf_mtd = devm_kzalloc(&pdev->dev, sizeof(struct mtd_info),
-+								GFP_KERNEL);
-+	if (!info->sf_mtd) {
-+		dev_err(&pdev->dev, "Failed to allocate SFMTD memory\n");
-+		return -ENOMEM;
-+	}
++	spin_lock_init(&kpad_power_lock);
++	setup_timer(&kpad_power_timer, kpad_power_timeout,
++				       (unsigned long)kpad_power);
 +
-+	err = mtdsf_init_device(info->dev, info->sf_mtd, info->sf_total_size,
-+						"Wondermedia SF Device");
-+	if (err)
++	irq = irq_of_parse_and_map(np, 0);
++	err = request_irq(irq, &kpad_power_isr, 0, "pwrbtn", NULL);
++	if (err < 0) {
++		dev_err(&pdev->dev, "failed to request irq\n");
 +		return err;
++	}
 +
-+	info->sf_mtd->priv = info;
-+	dev_set_drvdata(&pdev->dev, info);
++	kpad_power->evbit[0] = BIT_MASK(EV_KEY);
++	set_bit(kpad_power_code, kpad_power->keybit);
 +
-+	pr_info("Wondermedia Serial Flash Controller initialized\n");
++	kpad_power->name = "wmt_power_keypad";
++	kpad_power->phys = "wmt_power_keypad";
++	kpad_power->keycode = &kpad_power_code;
++	kpad_power->keycodesize = sizeof(unsigned int);
++	kpad_power->keycodemax = 1;
++
++	err = input_register_device(kpad_power);
++	if (err < 0) {
++		dev_err(&pdev->dev, "failed to register input device\n");
++		return err;
++	}
 +
 +	return 0;
 +}
 +
-+static int wmt_sf_remove(struct platform_device *pdev)
-+{
-+	struct wmt_sf_data *info = dev_get_drvdata(&pdev->dev);
-+
-+	mtd_device_unregister(info->sf_mtd);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id wmt_dt_ids[] = {
-+	{ .compatible = "wm,wm8505-sf", },
-+	{}
++static struct of_device_id vt8500_pwr_kpad_dt_ids[] = {
++	{ .compatible = "wm,power-keypad" },
++	{ /* Sentinel */ },
 +};
 +
-+static struct platform_driver wmt_sf_driver = {
-+	.probe		= wmt_sf_probe,
-+	.remove		= wmt_sf_remove,
++static struct platform_driver vt8500_pwr_kpad_driver = {
++	.probe		= vt8500_pwr_kpad_probe,
 +	.driver		= {
-+		.name	= "wmt-sf",
++		.name	= "wmt-power-keypad",
 +		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(wmt_dt_ids),
++		.of_match_table = vt8500_pwr_kpad_dt_ids,
 +	},
 +};
 +
-+module_platform_driver(wmt_sf_driver);
++module_platform_driver(vt8500_pwr_kpad_driver);
 +
++MODULE_DESCRIPTION("Wondermedia Power Keypad Driver");
 +MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
-+MODULE_DESCRIPTION("Wondermedia SoC Serial Flash driver");
 +MODULE_LICENSE("GPL v2");
++MODULE_DEVICE_TABLE(of, vt8500_pwr_kpad_dt_ids);
 -- 
 1.7.9.5
