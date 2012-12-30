@@ -1,37 +1,35 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 30 Dec 2012 16:07:48 -0600
-Subject: [PATCH] rtc: pl031: add wake-up support
-Message-ID: <1356905268-29587-1-git-send-email-robherring2@gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 31 Dec 2012 11:47:08 +1300
+Subject: [RFC PATCH] Add support for devicetree to i8042 serio driver
+Message-ID: <1356907629-25459-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Since this patch may adversely affect a lot of users, I thought I'd post this
+as an RFC first. I don't think the changes should affect any existing i8042
+implementations, but can never be certain.
 
-Mark the pl031 as wake-up capable so that rtcwake and suspend test can work.
+Limitations:
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: rtc-linux at googlegroups.com
-Cc: linux-kernel at vger.kernel.org
----
- drivers/rtc/rtc-pl031.c |    2 ++
- 1 file changed, 2 insertions(+)
+This patch does not overcome the problem of only being able to select
+a single i8042 platform at compile-time. If compiling for a multiplatform
+kernel, all platforms must use the DT version or only one platform
+can have i8042 support.
 
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 08378e3..9e20958 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -380,6 +380,8 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto out_no_irq;
- 	}
- 
-+	device_init_wakeup(&adev->dev, 1);
-+
- 	return 0;
- 
- out_no_irq:
+The DT version assumes memory-mapped i8042 registers. It can not handle
+IO-mapped modules (eg. x86)
+
+Tony Prisk (1):
+  input: i8042: Add support for devicetree to i8042 serio driver
+
+ .../devicetree/bindings/input/intel-8042.txt       |   29 +++++
+ drivers/input/serio/Kconfig                        |   10 +-
+ drivers/input/serio/i8042-dt.h                     |  127 ++++++++++++++++++++
+ drivers/input/serio/i8042.c                        |   15 ++-
+ drivers/input/serio/i8042.h                        |    4 +-
+ 5 files changed, 181 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/intel-8042.txt
+ create mode 100644 drivers/input/serio/i8042-dt.h
+
 -- 
-1.7.10.4
+1.7.9.5
