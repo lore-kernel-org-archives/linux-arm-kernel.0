@@ -1,73 +1,100 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 30 Dec 2012 10:15:03 -0600
-Subject: [PATCH 2/6] ARM: dts: fix highbank cpu mpidr values
+Date: Sun, 30 Dec 2012 10:15:04 -0600
+Subject: [PATCH 3/6] ARM: highbank: fix typos with hignbank in power request
+ functions
 In-Reply-To: <1356884107-30991-1-git-send-email-robherring2@gmail.com>
 References: <1356884107-30991-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1356884107-30991-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1356884107-30991-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-With the addition of commit a0ae0240 (ARM: kernel: add device tree init
-map function), the cpu reg values must match the cpu mpidr register or we'll
-get warnings. For some reason, the CLUSTERID on highbank is 9, so the reg
-value needs to be 0x90n to quiet the warnings.
+s/hignbank/highbank/
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/boot/dts/highbank.dts |   16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/mach-highbank/highbank.c |    2 +-
+ arch/arm/mach-highbank/pm.c       |    2 +-
+ arch/arm/mach-highbank/sysregs.h  |    8 ++++----
+ arch/arm/mach-highbank/system.c   |    4 ++--
+ 4 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-index 81e0bfa..5927a8d 100644
---- a/arch/arm/boot/dts/highbank.dts
-+++ b/arch/arm/boot/dts/highbank.dts
-@@ -30,37 +30,37 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index dc24816..981dc1e 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -135,7 +135,7 @@ static struct sys_timer highbank_timer = {
  
--		cpu at 0 {
-+		cpu at 900 {
- 			compatible = "arm,cortex-a9";
- 			device_type = "cpu";
--			reg = <0>;
-+			reg = <0x900>;
- 			next-level-cache = <&L2>;
- 			clocks = <&a9pll>;
- 			clock-names = "cpu";
- 		};
+ static void highbank_power_off(void)
+ {
+-	hignbank_set_pwr_shutdown();
++	highbank_set_pwr_shutdown();
  
--		cpu at 1 {
-+		cpu at 901 {
- 			compatible = "arm,cortex-a9";
- 			device_type = "cpu";
--			reg = <1>;
-+			reg = <0x901>;
- 			next-level-cache = <&L2>;
- 			clocks = <&a9pll>;
- 			clock-names = "cpu";
- 		};
+ 	while (1)
+ 		cpu_do_idle();
+diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
+index 74aa135..0f4ffd6 100644
+--- a/arch/arm/mach-highbank/pm.c
++++ b/arch/arm/mach-highbank/pm.c
+@@ -32,7 +32,7 @@ static int highbank_suspend_finish(unsigned long val)
  
--		cpu at 2 {
-+		cpu at 902 {
- 			compatible = "arm,cortex-a9";
- 			device_type = "cpu";
--			reg = <2>;
-+			reg = <0x902>;
- 			next-level-cache = <&L2>;
- 			clocks = <&a9pll>;
- 			clock-names = "cpu";
- 		};
+ static int highbank_pm_enter(suspend_state_t state)
+ {
+-	hignbank_set_pwr_suspend();
++	highbank_set_pwr_suspend();
+ 	highbank_set_cpu_jump(0, cpu_resume);
+ 	cpu_suspend(0, highbank_suspend_finish);
  
--		cpu at 3 {
-+		cpu at 903 {
- 			compatible = "arm,cortex-a9";
- 			device_type = "cpu";
--			reg = <3>;
-+			reg = <0x903>;
- 			next-level-cache = <&L2>;
- 			clocks = <&a9pll>;
- 			clock-names = "cpu";
+diff --git a/arch/arm/mach-highbank/sysregs.h b/arch/arm/mach-highbank/sysregs.h
+index e13e8ea..707cfd3 100644
+--- a/arch/arm/mach-highbank/sysregs.h
++++ b/arch/arm/mach-highbank/sysregs.h
+@@ -44,25 +44,25 @@ static inline void highbank_set_core_pwr(void)
+ 		writel_relaxed(1, sregs_base + SREG_CPU_PWR_CTRL(cpu));
+ }
+ 
+-static inline void hignbank_set_pwr_suspend(void)
++static inline void highbank_set_pwr_suspend(void)
+ {
+ 	writel(HB_PWR_SUSPEND, sregs_base + HB_SREG_A9_PWR_REQ);
+ 	highbank_set_core_pwr();
+ }
+ 
+-static inline void hignbank_set_pwr_shutdown(void)
++static inline void highbank_set_pwr_shutdown(void)
+ {
+ 	writel(HB_PWR_SHUTDOWN, sregs_base + HB_SREG_A9_PWR_REQ);
+ 	highbank_set_core_pwr();
+ }
+ 
+-static inline void hignbank_set_pwr_soft_reset(void)
++static inline void highbank_set_pwr_soft_reset(void)
+ {
+ 	writel(HB_PWR_SOFT_RESET, sregs_base + HB_SREG_A9_PWR_REQ);
+ 	highbank_set_core_pwr();
+ }
+ 
+-static inline void hignbank_set_pwr_hard_reset(void)
++static inline void highbank_set_pwr_hard_reset(void)
+ {
+ 	writel(HB_PWR_HARD_RESET, sregs_base + HB_SREG_A9_PWR_REQ);
+ 	highbank_set_core_pwr();
+diff --git a/arch/arm/mach-highbank/system.c b/arch/arm/mach-highbank/system.c
+index aed96ad..37d8384 100644
+--- a/arch/arm/mach-highbank/system.c
++++ b/arch/arm/mach-highbank/system.c
+@@ -22,9 +22,9 @@
+ void highbank_restart(char mode, const char *cmd)
+ {
+ 	if (mode == 'h')
+-		hignbank_set_pwr_hard_reset();
++		highbank_set_pwr_hard_reset();
+ 	else
+-		hignbank_set_pwr_soft_reset();
++		highbank_set_pwr_soft_reset();
+ 
+ 	while (1)
+ 		cpu_do_idle();
 -- 
 1.7.10.4
