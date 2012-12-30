@@ -1,90 +1,90 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 30 Dec 2012 11:28:29 -0700
-Subject: [PATCH 1/3] ARM: OMAP2xxx: PM: enter WFI via inline asm if CORE
- stays active
+Date: Sun, 30 Dec 2012 11:28:30 -0700
+Subject: [PATCH 2/3] ARM: OMAP2+: hwmod: add support for blocking WFI when a
+ device is active
 In-Reply-To: <20121230182745.30526.47072.stgit@dusk.lan>
 References: <20121230182745.30526.47072.stgit@dusk.lan>
-Message-ID: <20121230182826.30526.27155.stgit@dusk.lan>
+Message-ID: <20121230182829.30526.32914.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There shouldn't be any need to jump to SRAM code if the OMAP CORE
-clockdomain (and consequently the SDRAM controller and CORE PLL) stays
-active during MPU WFI.  The SRAM code should only be needed when the RAM
-enters self-refresh.  So in the case where CORE stays active, just call
-WFI directly from the mach-omap2/pm24xx.c code.  This removes some
-unnecessary SRAM code.
+Apparently, on some OMAPs, the MPU can't be allowed to enter WFI while
+certain peripherals are active.  It's not clear why, and it's likely
+that there is simply some other bug in the driver or integration code.
+But since the likelihood that anyone will have the time to track these
+problems down in the future seems quite small, we'll provide a
+flag, HWMOD_BLOCK_WFI, to mark these issues in the hwmod data.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Richard Woodruff <r-woodruff2@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/pm24xx.c    |    9 +++------
- arch/arm/mach-omap2/sleep24xx.S |   19 -------------------
- 2 files changed, 3 insertions(+), 25 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |    8 ++++++++
+ arch/arm/mach-omap2/omap_hwmod.h |    9 +++++++++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index c333fa6..659a2f5 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -54,7 +54,6 @@
- #include "powerdomain.h"
- #include "clockdomain.h"
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 4653efb..6804d47 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -139,6 +139,8 @@
+ #include <linux/slab.h>
+ #include <linux/bootmem.h>
  
--static void (*omap2_sram_idle)(void);
- static void (*omap2_sram_suspend)(u32 dllctrl, void __iomem *sdrc_dlla_ctrl,
- 				  void __iomem *sdrc_power);
++#include <asm/system_misc.h>
++
+ #include "clock.h"
+ #include "omap_hwmod.h"
  
-@@ -196,7 +195,7 @@ static void omap2_enter_mpu_retention(void)
- 						 OMAP2_PM_PWSTCTRL);
- 	}
+@@ -2134,6 +2136,8 @@ static int _enable(struct omap_hwmod *oh)
+ 	_enable_clocks(oh);
+ 	if (soc_ops.enable_module)
+ 		soc_ops.enable_module(oh);
++	if (oh->flags & HWMOD_BLOCK_WFI)
++		disable_hlt();
  
--	omap2_sram_idle();
-+	asm("wfi" : : : "memory", "cc");
- }
+ 	if (soc_ops.update_context_lost)
+ 		soc_ops.update_context_lost(oh);
+@@ -2195,6 +2199,8 @@ static int _idle(struct omap_hwmod *oh)
+ 		_idle_sysc(oh);
+ 	_del_initiator_dep(oh, mpu_oh);
  
- static int omap2_can_sleep(void)
-@@ -356,11 +355,9 @@ int __init omap2_pm_init(void)
- 	/*
- 	 * We copy the assembler sleep/wakeup routines to SRAM.
- 	 * These routines need to be in SRAM as that's the only
--	 * memory the MPU can see when it wakes up.
-+	 * memory the MPU can see when it wakes up after the entire
-+	 * chip enters idle.
- 	 */
--	omap2_sram_idle = omap_sram_push(omap24xx_idle_loop_suspend,
--					 omap24xx_idle_loop_suspend_sz);
--
- 	omap2_sram_suspend = omap_sram_push(omap24xx_cpu_suspend,
- 					    omap24xx_cpu_suspend_sz);
++	if (oh->flags & HWMOD_BLOCK_WFI)
++		enable_hlt();
+ 	if (soc_ops.disable_module)
+ 		soc_ops.disable_module(oh);
  
-diff --git a/arch/arm/mach-omap2/sleep24xx.S b/arch/arm/mach-omap2/sleep24xx.S
-index ce0ccd2..1d3cb25 100644
---- a/arch/arm/mach-omap2/sleep24xx.S
-+++ b/arch/arm/mach-omap2/sleep24xx.S
-@@ -37,25 +37,6 @@
- 	.text
+@@ -2303,6 +2309,8 @@ static int _shutdown(struct omap_hwmod *oh)
+ 	if (oh->_state == _HWMOD_STATE_ENABLED) {
+ 		_del_initiator_dep(oh, mpu_oh);
+ 		/* XXX what about the other system initiators here? dma, dsp */
++		if (oh->flags & HWMOD_BLOCK_WFI)
++			enable_hlt();
+ 		if (soc_ops.disable_module)
+ 			soc_ops.disable_module(oh);
+ 		_disable_clocks(oh);
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+index 3ae852a..80c00e7 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -451,6 +451,14 @@ struct omap_hwmod_omap4_prcm {
+  *     enabled.  This prevents the hwmod code from being able to
+  *     enable and reset the IP block early.  XXX Eventually it should
+  *     be possible to query the clock framework for this information.
++ * HWMOD_BLOCK_WFI: Some OMAP peripherals apparently don't work
++ *     correctly if the MPU is allowed to go idle while the
++ *     peripherals are active.  This is apparently true for the I2C on
++ *     OMAP2420, and also the EMAC on AM3517/3505.  It's unlikely that
++ *     this is really true -- we're probably not configuring something
++ *     correctly, or this is being abused to deal with some PM latency
++ *     issues -- but we're currently suffering from a shortage of
++ *     folks who are able to track these issues down properly.
+  */
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -462,6 +470,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
+ #define HWMOD_16BIT_REG				(1 << 8)
+ #define HWMOD_EXT_OPT_MAIN_CLK			(1 << 9)
++#define HWMOD_BLOCK_WFI				(1 << 10)
  
  /*
-- * Forces OMAP into idle state
-- *
-- * omap24xx_idle_loop_suspend() - This bit of code just executes the WFI
-- * for normal idles.
-- *
-- * Note: This code get's copied to internal SRAM at boot. When the OMAP
-- *	 wakes up it continues execution at the point it went to sleep.
-- */
--	.align	3
--ENTRY(omap24xx_idle_loop_suspend)
--	stmfd	sp!, {r0, lr}		@ save registers on stack
--	mov	r0, #0			@ clear for mcr setup
--	mcr	p15, 0, r0, c7, c0, 4	@ wait for interrupt
--	ldmfd	sp!, {r0, pc}		@ restore regs and return
--
--ENTRY(omap24xx_idle_loop_suspend_sz)
--	.word	. - omap24xx_idle_loop_suspend
--
--/*
-  * omap24xx_cpu_suspend() - Forces OMAP into deep sleep state by completing
-  * SDRC shutdown then ARM shutdown.  Upon wake MPU is back on so just restore
-  * SDRC.
+  * omap_hwmod._int_flags definitions
