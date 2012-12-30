@@ -1,51 +1,71 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 30 Dec 2012 10:15:06 -0600
-Subject: [PATCH 5/6] ARM: highbank: add a power request clear
+Date: Sun, 30 Dec 2012 10:15:07 -0600
+Subject: [PATCH 6/6] ARM: highbank: save and restore L2 cache and GIC on
+ suspend
 In-Reply-To: <1356884107-30991-1-git-send-email-robherring2@gmail.com>
 References: <1356884107-30991-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1356884107-30991-6-git-send-email-robherring2@gmail.com>
+Message-ID: <1356884107-30991-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-When we fail to power down, we need to clear out the power request.
+This fixes suspend to RAM adding necessary save and restore of L2 and GIC.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-highbank/sysregs.h |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/mach-highbank/pm.c |   19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-highbank/sysregs.h b/arch/arm/mach-highbank/sysregs.h
-index 707cfd3..70af9d1 100644
---- a/arch/arm/mach-highbank/sysregs.h
-+++ b/arch/arm/mach-highbank/sysregs.h
-@@ -44,6 +44,15 @@ static inline void highbank_set_core_pwr(void)
- 		writel_relaxed(1, sregs_base + SREG_CPU_PWR_CTRL(cpu));
- }
+diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
+index 0f4ffd6..04eddb4 100644
+--- a/arch/arm/mach-highbank/pm.c
++++ b/arch/arm/mach-highbank/pm.c
+@@ -14,10 +14,12 @@
+  * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
-+static inline void highbank_clear_core_pwr(void)
-+{
-+	int cpu = cpu_logical_map(smp_processor_id());
-+	if (scu_base_addr)
-+		scu_power_mode(scu_base_addr, SCU_PM_NORMAL);
-+	else
-+		writel_relaxed(0, sregs_base + SREG_CPU_PWR_CTRL(cpu));
-+}
-+
- static inline void highbank_set_pwr_suspend(void)
++#include <linux/cpu_pm.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/suspend.h>
+ 
++#include <asm/cacheflush.h>
+ #include <asm/proc-fns.h>
+ #include <asm/suspend.h>
+ 
+@@ -26,16 +28,31 @@
+ 
+ static int highbank_suspend_finish(unsigned long val)
  {
- 	writel(HB_PWR_SUSPEND, sregs_base + HB_SREG_A9_PWR_REQ);
-@@ -68,4 +77,10 @@ static inline void highbank_set_pwr_hard_reset(void)
- 	highbank_set_core_pwr();
++	outer_flush_all();
++	outer_disable();
++
++	highbank_set_pwr_suspend();
++
+ 	cpu_do_idle();
++
++	highbank_clear_pwr_request();
+ 	return 0;
  }
  
-+static inline void highbank_clear_pwr_request(void)
-+{
-+	writel(~0UL, sregs_base + HB_SREG_A9_PWR_REQ);
-+	highbank_clear_core_pwr();
-+}
+ static int highbank_pm_enter(suspend_state_t state)
+ {
+-	highbank_set_pwr_suspend();
++	cpu_pm_enter();
++	cpu_cluster_pm_enter();
 +
- #endif
+ 	highbank_set_cpu_jump(0, cpu_resume);
+ 	cpu_suspend(0, highbank_suspend_finish);
+ 
++	cpu_cluster_pm_exit();
++	cpu_pm_exit();
++
++	highbank_smc1(0x102, 0x1);
++	if (scu_base_addr)
++		scu_enable(scu_base_addr);
+ 	return 0;
+ }
+ 
 -- 
 1.7.10.4
