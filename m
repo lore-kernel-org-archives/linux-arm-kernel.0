@@ -1,100 +1,77 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 30 Dec 2012 10:15:04 -0600
-Subject: [PATCH 3/6] ARM: highbank: fix typos with hignbank in power request
- functions
+Date: Sun, 30 Dec 2012 10:15:05 -0600
+Subject: [PATCH 4/6] ARM: highbank: fix secondary boot and hotplug
 In-Reply-To: <1356884107-30991-1-git-send-email-robherring2@gmail.com>
 References: <1356884107-30991-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1356884107-30991-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1356884107-30991-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-s/hignbank/highbank/
+With commit 384a290 (ARM: gic: use a private mapping for CPU target
+interfaces), wake-up IPIs now go to all cores as the gic cpu interface
+numbering may not follow core numbering. This broke secondary boot on
+highbank since the boot address was already set for all secondary cores,
+this caused all cores to boot before the kernel was ready.
+
+Fix this by moving the setting of the jump address to
+highbank_boot_secondary instead of highbank_smp_prepare_cpus and
+highbank_cpu_die. Also, clear the address when we boot. This prevents
+cores from booting before they are actually triggered and is also necessary
+to get suspend/resume to work.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-highbank/highbank.c |    2 +-
- arch/arm/mach-highbank/pm.c       |    2 +-
- arch/arm/mach-highbank/sysregs.h  |    8 ++++----
- arch/arm/mach-highbank/system.c   |    4 ++--
- 4 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/mach-highbank/hotplug.c |    2 +-
+ arch/arm/mach-highbank/platsmp.c |   12 +-----------
+ 2 files changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index dc24816..981dc1e 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -135,7 +135,7 @@ static struct sys_timer highbank_timer = {
- 
- static void highbank_power_off(void)
+diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
+index 7b60fac..f30c528 100644
+--- a/arch/arm/mach-highbank/hotplug.c
++++ b/arch/arm/mach-highbank/hotplug.c
+@@ -30,7 +30,7 @@ void __ref highbank_cpu_die(unsigned int cpu)
  {
--	hignbank_set_pwr_shutdown();
-+	highbank_set_pwr_shutdown();
+ 	flush_cache_all();
  
- 	while (1)
- 		cpu_do_idle();
-diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
-index 74aa135..0f4ffd6 100644
---- a/arch/arm/mach-highbank/pm.c
-+++ b/arch/arm/mach-highbank/pm.c
-@@ -32,7 +32,7 @@ static int highbank_suspend_finish(unsigned long val)
+-	highbank_set_cpu_jump(cpu, secondary_startup);
++	highbank_set_cpu_jump(cpu, phys_to_virt(0));
+ 	highbank_set_core_pwr();
  
- static int highbank_pm_enter(suspend_state_t state)
+ 	cpu_do_idle();
+diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
+index 1129957..4ecc864 100644
+--- a/arch/arm/mach-highbank/platsmp.c
++++ b/arch/arm/mach-highbank/platsmp.c
+@@ -32,6 +32,7 @@ static void __cpuinit highbank_secondary_init(unsigned int cpu)
+ 
+ static int __cpuinit highbank_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
--	hignbank_set_pwr_suspend();
-+	highbank_set_pwr_suspend();
- 	highbank_set_cpu_jump(0, cpu_resume);
- 	cpu_suspend(0, highbank_suspend_finish);
++	highbank_set_cpu_jump(cpu, secondary_startup);
+ 	gic_raise_softirq(cpumask_of(cpu), 0);
+ 	return 0;
+ }
+@@ -61,19 +62,8 @@ static void __init highbank_smp_init_cpus(void)
  
-diff --git a/arch/arm/mach-highbank/sysregs.h b/arch/arm/mach-highbank/sysregs.h
-index e13e8ea..707cfd3 100644
---- a/arch/arm/mach-highbank/sysregs.h
-+++ b/arch/arm/mach-highbank/sysregs.h
-@@ -44,25 +44,25 @@ static inline void highbank_set_core_pwr(void)
- 		writel_relaxed(1, sregs_base + SREG_CPU_PWR_CTRL(cpu));
+ static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	int i;
+-
+ 	if (scu_base_addr)
+ 		scu_enable(scu_base_addr);
+-
+-	/*
+-	 * Write the address of secondary startup into the jump table
+-	 * The cores are in wfi and wait until they receive a soft interrupt
+-	 * and a non-zero value to jump to. Then the secondary CPU branches
+-	 * to this address.
+-	 */
+-	for (i = 1; i < max_cpus; i++)
+-		highbank_set_cpu_jump(i, secondary_startup);
  }
  
--static inline void hignbank_set_pwr_suspend(void)
-+static inline void highbank_set_pwr_suspend(void)
- {
- 	writel(HB_PWR_SUSPEND, sregs_base + HB_SREG_A9_PWR_REQ);
- 	highbank_set_core_pwr();
- }
- 
--static inline void hignbank_set_pwr_shutdown(void)
-+static inline void highbank_set_pwr_shutdown(void)
- {
- 	writel(HB_PWR_SHUTDOWN, sregs_base + HB_SREG_A9_PWR_REQ);
- 	highbank_set_core_pwr();
- }
- 
--static inline void hignbank_set_pwr_soft_reset(void)
-+static inline void highbank_set_pwr_soft_reset(void)
- {
- 	writel(HB_PWR_SOFT_RESET, sregs_base + HB_SREG_A9_PWR_REQ);
- 	highbank_set_core_pwr();
- }
- 
--static inline void hignbank_set_pwr_hard_reset(void)
-+static inline void highbank_set_pwr_hard_reset(void)
- {
- 	writel(HB_PWR_HARD_RESET, sregs_base + HB_SREG_A9_PWR_REQ);
- 	highbank_set_core_pwr();
-diff --git a/arch/arm/mach-highbank/system.c b/arch/arm/mach-highbank/system.c
-index aed96ad..37d8384 100644
---- a/arch/arm/mach-highbank/system.c
-+++ b/arch/arm/mach-highbank/system.c
-@@ -22,9 +22,9 @@
- void highbank_restart(char mode, const char *cmd)
- {
- 	if (mode == 'h')
--		hignbank_set_pwr_hard_reset();
-+		highbank_set_pwr_hard_reset();
- 	else
--		hignbank_set_pwr_soft_reset();
-+		highbank_set_pwr_soft_reset();
- 
- 	while (1)
- 		cpu_do_idle();
+ struct smp_operations highbank_smp_ops __initdata = {
 -- 
 1.7.10.4
