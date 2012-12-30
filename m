@@ -1,46 +1,59 @@
-From: ido@wizery.com (Ido Yariv)
-Date: Sun, 30 Dec 2012 13:20:18 +0200
-Subject: [PATCH] hwspinlock/core: Add testing capabilities
-In-Reply-To: <CAKvkGKfc5jw+_ABgB8nrX37B7zHCoA5Ld0Gs5O-EDFD-Gk0OKg@mail.gmail.com>
-References: <CAKvkGKfc5jw+_ABgB8nrX37B7zHCoA5Ld0Gs5O-EDFD-Gk0OKg@mail.gmail.com>
-Message-ID: <20121230112018.GA14042@WorkStation.localnet>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Sun, 30 Dec 2012 21:09:05 +0800
+Subject: [PATCH 2/3] ARM: dts: imx: Add imx51 KPP entry
+In-Reply-To: <1356872946-2810-1-git-send-email-Ying.Liu@freescale.com>
+References: <1356872946-2810-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1356872946-2810-2-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+1) Add KPP device node entry.
+2) Add one KPP pinctrl entry.
 
-On Sat, Dec 29, 2012 at 05:19:08PM +0800, steve.zhan wrote:
-> Hi,
-> 
->     It is good idea add this feature.
-> 
-> 1: Can we let the "ret = hwspin_lock_tests(ops, hwlock);" add after
-> hwspin_lock_register_single have return
-> succeed, that can avoid test duplicated Or error lockid. Of course, If
-> this interface is intend to test soc hardware capability only, we can
-> put it in the arch module not this core framework. For driver hardware
-> sanity check, i would add it after software have register it.
+Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+---
+ arch/arm/boot/dts/imx51.dtsi |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
-I'd rather not test the spinlocks after they are registering as they
-might already be in use by then.
-
-While this feature only verifies the underlying platform implementation,
-I think it's best to avoid code duplication and keep it in one place
-that will always get called.
-
-> 2:Is it possible that interface add configs that choose which locks
-> will be test? Because the hwspinlock module is init late in
-> postcore_initcall phase, Maybe MACH/ARCH code(for example: code in
-> early_initcall) need use private other interfaces to lock some
-> hwspinlocks and then register hw locks to hwspinlock framework, Maybe
-> some hw locks is in lock status but which test failed.
-
-It was assumed that up to the point where the hw spinlocks are
-registered they will not be used, regardless of when this module is
-initialized.
-If this assumption does not hold for your platform, the simplest
-solution would be to set this config option to 'N', as there is no safe
-way of verifying spinlocks that are actively being used.
-
-Thanks for reviewing this,
-Ido.
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 1f5d45e..3150a31 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -221,6 +221,14 @@
+ 				#interrupt-cells = <2>;
+ 			};
+ 
++			kpp: kpp at 73f94000 {
++				compatible = "fsl,imx-kpp";
++				reg = <0x73f94000 0x4000>;
++				interrupts = <60>;
++				clocks = <&clks 0>;
++				status = "disabled";
++			};
++
+ 			wdog1: wdog at 73f98000 {
+ 				compatible = "fsl,imx51-wdt", "fsl,imx21-wdt";
+ 				reg = <0x73f98000 0x4000>;
+@@ -410,6 +418,20 @@
+ 						>;
+ 					};
+ 				};
++				kpp {
++					pinctrl_kpp_1: kppgrp-1 {
++						fsl,pins = <
++							438 0xe0	/* MX51_PAD_KEY_ROW0__KEY_ROW0 */
++							439 0xe0	/* MX51_PAD_KEY_ROW1__KEY_ROW1 */
++							440 0xe0	/* MX51_PAD_KEY_ROW2__KEY_ROW2 */
++							441 0xe0	/* MX51_PAD_KEY_ROW3__KEY_ROW3 */
++							442 0xe8	/* MX51_PAD_KEY_COL0__KEY_COL0 */
++							444 0xe8	/* MX51_PAD_KEY_COL1__KEY_COL1 */
++							446 0xe8	/* MX51_PAD_KEY_COL2__KEY_COL2 */
++							448 0xe8	/* MX51_PAD_KEY_COL3__KEY_COL3 */
++						>;
++					};
++				};
+ 			};
+ 
+ 			pwm1: pwm at 73fb4000 {
+-- 
+1.7.1
