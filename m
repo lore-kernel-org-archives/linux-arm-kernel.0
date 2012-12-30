@@ -1,54 +1,47 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 30 Dec 2012 16:04:46 +1300
-Subject: [PATCH] rtc: vt8500: Fix handling of data passed in struct rtc_time
-Message-ID: <1356836686-26419-1-git-send-email-linux@prisktech.co.nz>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Sat, 29 Dec 2012 23:09:38 -0500
+Subject: [PATCH RESEND 4] ARM: plat-versatile: move secondary CPU startup
+ into cpuinit
+In-Reply-To: <50D02C89.9030307@huawei.com>
+References: <50B47C31.2040709@huawei.com>
+	<50D02C89.9030307@huawei.com>
+Message-ID: <CANM98qK4VighSAw5eZUuR20qCzbynR4rnR0ZTicp1VdUkRRjqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tm_mon is 0..11, whereas vt8500 expects 1..12 for the month field,
-causing invalid date errors for January, and causing the day field
-to roll over incorrectly.
+On Tue, Dec 18, 2012 at 3:42 AM, Claudio Fontana
+<Claudio.Fontana@huawei.com> wrote:
+>
+> Using __CPUINIT instead of __INIT puts the secondary CPU startup code
+> into the "right" section: it will not be freed in hotplug configurations,
+> allowing hot-add of cpus, while still getting freed in non-hotplug configs.
+>
+> Tested successfully on Fast-Models and on Arndale for VCPU hotplug.
 
-The century flag is only handled in vt8500_rtc_read_time, but not
-set in vt8500_rtc_set_time. This patch corrects the behaviour of the
-century flag.
+not quite sure how testing on Arndale verifies this change?
 
-Signed-off-by: Edgar Toernig <froese@gmx.de>
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
+>
+> Signed-off-by: Claudio Fontana <claudio.fontana@huawei.com>
+> Tested-by: Claudio Fontana <claudio.fontana@huawei.com>
+>
+> diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+> index dd703ef..19fe180 100644
+> --- a/arch/arm/plat-versatile/headsmp.S
+> +++ b/arch/arm/plat-versatile/headsmp.S
+> @@ -11,7 +11,7 @@
+>  #include <linux/linkage.h>
+>  #include <linux/init.h>
+>
+> -       __INIT
+> +       __CPUINIT
+>
+>  /*
+>   * Realview/Versatile Express specific entry point for secondary CPUs.
+> --
+> 1.7.12.1
+>
 
-This patch is based on 3.8rc1 with the previous fix applied:
+Otherwise looks ok to me (not guaranteeing that cpu hotplug will
+magically work for KVM using this change though).
 
-Previous patch: 77cdf96a0654cb45b4dd530f3393c6a8f2fa1e0b
-rtc: vt8500: Correct handling of CR_24H bitfield
-
- drivers/rtc/rtc-vt8500.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/rtc/rtc-vt8500.c b/drivers/rtc/rtc-vt8500.c
-index 387edf6..2448f2a 100644
---- a/drivers/rtc/rtc-vt8500.c
-+++ b/drivers/rtc/rtc-vt8500.c
-@@ -119,7 +119,7 @@ static int vt8500_rtc_read_time(struct device *dev, struct rtc_time *tm)
- 	tm->tm_min = bcd2bin((time & TIME_MIN_MASK) >> TIME_MIN_S);
- 	tm->tm_hour = bcd2bin((time & TIME_HOUR_MASK) >> TIME_HOUR_S);
- 	tm->tm_mday = bcd2bin(date & DATE_DAY_MASK);
--	tm->tm_mon = bcd2bin((date & DATE_MONTH_MASK) >> DATE_MONTH_S);
-+	tm->tm_mon = bcd2bin((date & DATE_MONTH_MASK) >> DATE_MONTH_S) - 1;
- 	tm->tm_year = bcd2bin((date & DATE_YEAR_MASK) >> DATE_YEAR_S)
- 			+ ((date >> DATE_CENTURY_S) & 1 ? 200 : 100);
- 	tm->tm_wday = (time & TIME_DOW_MASK) >> TIME_DOW_S;
-@@ -138,8 +138,9 @@ static int vt8500_rtc_set_time(struct device *dev, struct rtc_time *tm)
- 	}
- 
- 	writel((bin2bcd(tm->tm_year - 100) << DATE_YEAR_S)
--		| (bin2bcd(tm->tm_mon) << DATE_MONTH_S)
--		| (bin2bcd(tm->tm_mday)),
-+		| (bin2bcd(tm->tm_mon + 1) << DATE_MONTH_S)
-+		| (bin2bcd(tm->tm_mday))
-+		| ((tm->tm_year >= 200) << DATE_CENTURY_S),
- 		vt8500_rtc->regbase + VT8500_RTC_DS);
- 	writel((bin2bcd(tm->tm_wday) << TIME_DOW_S)
- 		| (bin2bcd(tm->tm_hour) << TIME_HOUR_S)
--- 
-1.7.9.5
+-Christoffer
