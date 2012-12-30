@@ -1,83 +1,54 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Sun, 30 Dec 2012 09:01:31 +0800
-Subject: [PATCH v2 1/1 net-next] NET: FEC: dynamtic check DMA desc buff
- type
-In-Reply-To: <20701.45196.361432.80622@ipc1.ka-ro>
-References: <1356676164-10910-1-git-send-email-Frank.Li@freescale.com>
- <20701.45196.361432.80622@ipc1.ka-ro>
-Message-ID: <CAHrpEqS42MNXF011sROJOxWE7N66Roy_Bb5TC+CM5keFMf6D+A@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sun, 30 Dec 2012 16:04:46 +1300
+Subject: [PATCH] rtc: vt8500: Fix handling of data passed in struct rtc_time
+Message-ID: <1356836686-26419-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/12/28 Lothar Wa?mann <LW@karo-electronics.de>:
-> Frank Li writes:
->> MX6 and mx28 support enhanced DMA descript buff to support 1588
->> ptp. But MX25, MX3x, MX5x can't support enhanced DMA descript buff.
->> Check fec type and choose correct DAM descript buff type.
->                                     ^^^
-> s/DAM/DMA/
-> s/descript/descriptor/g
->
-> [...]
->> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
->> index 0704bca..290f91c 100644
->> --- a/drivers/net/ethernet/freescale/fec.c
->> +++ b/drivers/net/ethernet/freescale/fec.c
->> @@ -76,6 +76,8 @@
->>  #define FEC_QUIRK_USE_GASKET         (1 << 2)
->>  /* Controller has GBIT support */
->>  #define FEC_QUIRK_HAS_GBIT           (1 << 3)
->> +/* Controller has extend desc buffer */
->> +#define FEC_QUICK_HAS_BUFDESC_EX     (1 << 4)
->                ^^^^^
-> As Sascha has already pointed out, this should be 'QUIRK' rather than
-> 'QUICK' (like in the preceeding lines)!
->
->>  static struct platform_device_id fec_devtype[] = {
->>       {
->> @@ -93,7 +95,8 @@ static struct platform_device_id fec_devtype[] = {
->>               .driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_SWAP_FRAME,
->>       }, {
->>               .name = "imx6q-fec",
->> -             .driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT,
->> +             .driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT |
->> +                             FEC_QUICK_HAS_BUFDESC_EX,
->                                     ^^^^^
-> same as above.
->
-> [...]
->> @@ -1574,6 +1617,8 @@ fec_probe(struct platform_device *pdev)
->>       fep->pdev = pdev;
->>       fep->dev_id = dev_id++;
->>
->> +     fep->bufdesc_ex = 0;
->> +
->>       if (!fep->hwp) {
->>               ret = -ENOMEM;
->>               goto failed_ioremap;
->> @@ -1628,19 +1673,19 @@ fec_probe(struct platform_device *pdev)
->>               goto failed_clk;
->>       }
->>
->> -#ifdef CONFIG_FEC_PTP
->>       fep->clk_ptp = devm_clk_get(&pdev->dev, "ptp");
->> +     fep->bufdesc_ex =
->> +             pdev->id_entry->driver_data & FEC_QUICK_HAS_BUFDESC_EX;
->                                                   ^^^^^
-> same as above.
+tm_mon is 0..11, whereas vt8500 expects 1..12 for the month field,
+causing invalid date errors for January, and causing the day field
+to roll over incorrectly.
 
-Okay, I will fix it after new year holiday.
+The century flag is only handled in vt8500_rtc_read_time, but not
+set in vt8500_rtc_set_time. This patch corrects the behaviour of the
+century flag.
 
->
->
-> Lothar Wa?mann
-> --
-> ___________________________________________________________
->
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
->
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
+Signed-off-by: Edgar Toernig <froese@gmx.de>
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+
+This patch is based on 3.8rc1 with the previous fix applied:
+
+Previous patch: 77cdf96a0654cb45b4dd530f3393c6a8f2fa1e0b
+rtc: vt8500: Correct handling of CR_24H bitfield
+
+ drivers/rtc/rtc-vt8500.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/rtc/rtc-vt8500.c b/drivers/rtc/rtc-vt8500.c
+index 387edf6..2448f2a 100644
+--- a/drivers/rtc/rtc-vt8500.c
++++ b/drivers/rtc/rtc-vt8500.c
+@@ -119,7 +119,7 @@ static int vt8500_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ 	tm->tm_min = bcd2bin((time & TIME_MIN_MASK) >> TIME_MIN_S);
+ 	tm->tm_hour = bcd2bin((time & TIME_HOUR_MASK) >> TIME_HOUR_S);
+ 	tm->tm_mday = bcd2bin(date & DATE_DAY_MASK);
+-	tm->tm_mon = bcd2bin((date & DATE_MONTH_MASK) >> DATE_MONTH_S);
++	tm->tm_mon = bcd2bin((date & DATE_MONTH_MASK) >> DATE_MONTH_S) - 1;
+ 	tm->tm_year = bcd2bin((date & DATE_YEAR_MASK) >> DATE_YEAR_S)
+ 			+ ((date >> DATE_CENTURY_S) & 1 ? 200 : 100);
+ 	tm->tm_wday = (time & TIME_DOW_MASK) >> TIME_DOW_S;
+@@ -138,8 +138,9 @@ static int vt8500_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ 	}
+ 
+ 	writel((bin2bcd(tm->tm_year - 100) << DATE_YEAR_S)
+-		| (bin2bcd(tm->tm_mon) << DATE_MONTH_S)
+-		| (bin2bcd(tm->tm_mday)),
++		| (bin2bcd(tm->tm_mon + 1) << DATE_MONTH_S)
++		| (bin2bcd(tm->tm_mday))
++		| ((tm->tm_year >= 200) << DATE_CENTURY_S),
+ 		vt8500_rtc->regbase + VT8500_RTC_DS);
+ 	writel((bin2bcd(tm->tm_wday) << TIME_DOW_S)
+ 		| (bin2bcd(tm->tm_hour) << TIME_HOUR_S)
+-- 
+1.7.9.5
