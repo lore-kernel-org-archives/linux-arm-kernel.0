@@ -1,54 +1,35 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 30 Dec 2012 18:31:38 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP AM3517/05: hwmod data: block WFI when EMAC
- active
-Message-ID: <alpine.DEB.2.00.1212301828590.8175@utopia.booyaka.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 31 Dec 2012 07:56:33 +1300
+Subject: [PATCH] rtc: vt8500: Fix year field in vt8500_rtc_set_time
+Message-ID: <1356893793-29537-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+year field is incorrectly masked when setting the date. If the year
+is beyond 2099, the year field will be incorrectly updated in hardware.
 
-According to Mark Greer, on OMAP AM3517/3505 chips, the EMAC is unable
-to wake the ARM up from WFI:
+This patch masks the year field correctly.
 
-    http://www.spinics.net/lists/arm-kernel/msg174734.html
-
-Further troubleshooting was unable to narrow the problem down.  So we
-don't have much choice other than to block WFI when the EMAC is active
-with the HWMOD_BLOCK_WFI flag.  However, for some reason, we don't
-have an EMAC hwmod -- probably some bug in the data -- so set the flag
-on the MDIO hwmod data instead.
-
-Based on Mark's original patch.  We're removing the omap_device-based
-pm_lats code, so a different approach was needed.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Mark A. Greer <mgreer@animalcreek.com>
+Signed-off-by: Edgar Toernig <froese@gmx.de>
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
+Patch based on 3.8-rc1
 
-Applies after the WFI cleanup series -- intended for a post-cleanup fixes
-pull request or a new feature pull request.
+ drivers/rtc/rtc-vt8500.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 8bb2628..4a68735 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -3439,7 +3439,13 @@ static struct omap_hwmod_class am35xx_mdio_class = {
- static struct omap_hwmod am35xx_mdio_hwmod = {
- 	.name		= "davinci_mdio",
- 	.class		= &am35xx_mdio_class,
--	.flags		= HWMOD_NO_IDLEST,
-+	/*
-+	 * According to Mark Greer, the MPU will not return from WFI
-+	 * when the EMAC signals an interrupt.  We're missing an EMAC
-+	 * hwmod for some reason, so add the flag to the MDIO instead.
-+	 * http://www.spinics.net/lists/arm-kernel/msg174734.html
-+	 */
-+	.flags		= (HWMOD_NO_IDLEST | HWMOD_BLOCK_WFI),
- };
+diff --git a/drivers/rtc/rtc-vt8500.c b/drivers/rtc/rtc-vt8500.c
+index 14e2d8c..37b42a4 100644
+--- a/drivers/rtc/rtc-vt8500.c
++++ b/drivers/rtc/rtc-vt8500.c
+@@ -137,7 +137,7 @@ static int vt8500_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ 		return -EINVAL;
+ 	}
  
- /*
+-	writel((bin2bcd(tm->tm_year - 100) << DATE_YEAR_S)
++	writel((bin2bcd(tm->tm_year % 100) << DATE_YEAR_S)
+ 		| (bin2bcd(tm->tm_mon) << DATE_MONTH_S)
+ 		| (bin2bcd(tm->tm_mday)),
+ 		vt8500_rtc->regbase + VT8500_RTC_DS);
 -- 
-1.7.10.4
+1.7.9.5
