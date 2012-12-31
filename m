@@ -1,31 +1,47 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 31 Dec 2012 09:39:02 -0700
-Subject: [PATCH 1/2] ARM: dts: prevent *.dtb from always being rebuilt
-In-Reply-To: <20121230053204.GC20903@quad.lixom.net>
-References: <1356741767-29292-1-git-send-email-swarren@wwwdotorg.org>
- <20121230053204.GC20903@quad.lixom.net>
-Message-ID: <50E1BFA6.9040102@wwwdotorg.org>
+Date: Mon, 31 Dec 2012 09:40:11 -0700
+Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
+In-Reply-To: <20121229090955.776816b7@skate>
+References: <20121214151045.GA22304@avionic-0098.adnet.avionic-design.de>
+ <20121214172729.GA7671@obsidianresearch.com>
+ <20121216123340.GB31780@avionic-0098.adnet.avionic-design.de>
+ <20121217182911.GA10448@obsidianresearch.com>
+ <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
+ <50CFD0B3.6030208@wwwdotorg.org>
+ <20121218025113.GA27029@obsidianresearch.com>
+ <50D0A1EA.9090009@wwwdotorg.org>
+ <20121220153231.GA11256@avionic-0098.adnet.avionic-design.de>
+ <20121222155040.61829b00@skate>
+ <20121228210622.GA4519@avionic-0098.adnet.avionic-design.de>
+ <20121228221632.3892e90b@skate> <50DE2FFB.8040804@wwwdotorg.org>
+ <20121229090955.776816b7@skate>
+Message-ID: <50E1BFEB.5070300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/29/2012 10:32 PM, Olof Johansson wrote:
-> On Fri, Dec 28, 2012 at 05:42:46PM -0700, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> if_changed (used by the *.dts->*.dtc rule) rebuilds files if they aren't
->> contained in $(targets). (make V=2 indicates this). Add $(dtb-y) to
->> $(targets) to prevent *.dtb from always being rebuilt.
->>
->> This fixes a regression introduced by the .dtb rule rework in 499cd82
->> "ARM: dt: change .dtb build rules to build in dts directory".
->>
->> Reported-by: Shawn Guo <shawn.guo@linaro.org>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+On 12/29/2012 01:09 AM, Thomas Petazzoni wrote:
+> Dear Stephen Warren,
 > 
-> Not sure who you have in mind to apply this, but if it's not through arm-soc:
+> On Fri, 28 Dec 2012 16:49:15 -0700, Stephen Warren wrote:
 > 
-> Acked-by: Olof Johansson <olof@lixom.net>
+>>>> That's great. I've been thinking about this some more and one problem
+>>>> we'll be facing is that none of the fake host bridges actually exist and
+>>>> therefore don't have any official PCI IDs. What I did for Tegra was just
+>>>> choose one of the nForce IDs, but that's obviously hackish. One solution
+>>>> would be to convince somebody benevolent to sponsor an ID for this
+>>>> particular purpose. I think Red Hat did so for Virtio.
+>>>
+>>> Indeed, that's a remaining problem to solve. Would be great to have
+>>> some vendor sponsoring a few IDs for that. At least for a fake PCI Host
+>>> Bridge and a fake PCI-to-PCI bridge.
+>>
+>> Is it actually necessary for a host/PCI bridge to show up on the PCI bus
+>> as device 0?
+> 
+> I don't know, PCI experts are much better placed than me to answer this
+> question. How is this related to the problem of PCI IDs ?
 
-I was assuming through the device tree tree, since that's where the dtc
-rule rework went through, but I think it's mostly just about whoever
-picks it up:-)
+If a real PCI device exists, its configuration registers contain the PCI
+IDs, so you just "use" them. If no real PCI device exists, yet should,
+so you end up implementing a virtual device, the SW needs to decide
+which PCI IDs to masquerade as, so you need to come up with some fake IDs.
