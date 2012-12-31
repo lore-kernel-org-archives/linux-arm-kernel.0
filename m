@@ -1,15 +1,22 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Mon, 31 Dec 2012 18:37:00 +0530
-Subject: [RFC v2 07/18] ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod with
- the right flags
+Date: Mon, 31 Dec 2012 18:37:01 +0530
+Subject: [RFC v2 08/18] ARM: OMAP2+: AM33XX: hwmod: Fixup cpgmac0 hwmod entry
 In-Reply-To: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
 References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1356959231-17335-8-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1356959231-17335-9-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TPTC0 needs to be idled and put to standby under SW control.
-Add the appropriate flags in the TPTC0 hwmod entry.
+The current HWMOD code expects the memory region with
+the IP's SYSCONFIG register to be marked with ADDR_TYPE_RT
+flag.
+
+CPGMAC0 hwmod entry specifies two memory regions and marks
+both with the flag ADDR_TYPE_RT although only the 2nd region
+has the SYSCONFIG register. This leads to the HWMOD code
+accessing the wrong memory address for idle and standby
+operations. Fix this by removing the ADDR_TYPE_RT flag from
+the 1st memory region in CPGMAC0 hwmod entry.
 
 Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
@@ -19,22 +26,24 @@ Cc: Kevin Hilman <khilman@deeprootsystems.com>
 Cc: Vaibhav Hiremath <hvaibhav@ti.com>
 ---
 v1->v2:
-	No change
+	Address review comments from Santosh and
+	Vaibhav Hiremath. Previous discussion on the change
+	is @ http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129512.html
 
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 5e50e68..5c34d4b 100644
+index 5c34d4b..863ce08 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -1823,6 +1823,7 @@ static struct omap_hwmod am33xx_tptc0_hwmod = {
- 	.class		= &am33xx_tptc_hwmod_class,
- 	.clkdm_name	= "l3_clkdm",
- 	.mpu_irqs	= am33xx_tptc0_irqs,
-+	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
- 	.main_clk	= "l3_gclk",
- 	.prcm		= {
- 		.omap4	= {
+@@ -2496,7 +2496,6 @@ static struct omap_hwmod_addr_space am33xx_cpgmac0_addr_space[] = {
+ 	{
+ 		.pa_start	= 0x4a100000,
+ 		.pa_end		= 0x4a100000 + SZ_2K - 1,
+-		.flags		= ADDR_TYPE_RT,
+ 	},
+ 	/* cpsw wr */
+ 	{
 -- 
 1.7.0.4
