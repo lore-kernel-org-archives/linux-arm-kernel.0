@@ -1,37 +1,121 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 31 Dec 2012 11:24:04 -0600
-Subject: [PATCH 1/2] ARM: dts: prevent *.dtb from always being rebuilt
-In-Reply-To: <50E1BFA6.9040102@wwwdotorg.org>
-References: <1356741767-29292-1-git-send-email-swarren@wwwdotorg.org>
- <20121230053204.GC20903@quad.lixom.net> <50E1BFA6.9040102@wwwdotorg.org>
-Message-ID: <50E1CA34.8010305@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 31 Dec 2012 10:18:46 -0800
+Subject: [PATCH v6 00/12] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <003301cde30b$c584c2d0$508e4870$%cho@samsung.com>
+References: <003301cde30b$c584c2d0$508e4870$%cho@samsung.com>
+Message-ID: <032401cde783$485ae1a0$d910a4e0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/31/2012 10:39 AM, Stephen Warren wrote:
-> On 12/29/2012 10:32 PM, Olof Johansson wrote:
->> On Fri, Dec 28, 2012 at 05:42:46PM -0700, Stephen Warren wrote:
->>> From: Stephen Warren <swarren@nvidia.com>
->>>
->>> if_changed (used by the *.dts->*.dtc rule) rebuilds files if they aren't
->>> contained in $(targets). (make V=2 indicates this). Add $(dtb-y) to
->>> $(targets) to prevent *.dtb from always being rebuilt.
->>>
->>> This fixes a regression introduced by the .dtb rule rework in 499cd82
->>> "ARM: dt: change .dtb build rules to build in dts directory".
->>>
->>> Reported-by: Shawn Guo <shawn.guo@linaro.org>
->>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->>
->> Not sure who you have in mind to apply this, but if it's not through arm-soc:
->>
->> Acked-by: Olof Johansson <olof@lixom.net>
+Cho KyongHo wrote:
 > 
-> I was assuming through the device tree tree, since that's where the dtc
-> rule rework went through, but I think it's mostly just about whoever
-> picks it up:-)
+> notice: v6 patch-set is rebased on next/iommu-exynos branch of
+> linux-samsung.git.  This patch-set does not include 2 patches (05 and 06
+> patches in v5 patch-se) because they alread exist already in the branch.
 > 
+> The current exynos-iommu(System MMU) driver does not work
+> autonomously
+> since it is lack of support for power management of peripheral blocks.
+> For example, MFC device driver must ensure that its System MMU is
+> disabled
+> before MFC block is power-down not to invalidate IOTLB in the System MMU
+> when I/O memory mapping is changed. Because A System MMU is resides in
+> the
+> same H/W block, access to control registers of System MMU while the H/W
+> block is turned off must be prohibited.
+> 
+> This set of changes solves the above problem with setting each System
+> MMUs
+> as the parent of the device which owns the System MMU to recieve the
+> information when the device is turned off or turned on.
+> 
+> Another big change to the driver is the support for devicetree.
+> The bindings for System MMU is described in
+> Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
+> 
+> In addition, this patchset also includes several bug fixes and
+enhancements
+> of the current driver.
+> 
+> Change log:
+> v6:
+> - Rebased on the branch, next/iommu-exynos of
+>   git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> 
+> v5:
+> - new bugfix: patch 01
+> - Reordered patches
+>   * patch 01 ~ 05: Bugfix and enhancements of the existing driver
+>   * patch 06 ~ 10: Device Tree support and callbacks for power management
+>   * patch 11     : System MMU 3.2 and 3.3 support
+>   * patch 12 ~ 14: Debugging features
+> - Additional code compaction
+> 
+> v4:
+> - Remove Change-Id from v3 patches
+> - Change the order of the third and the first patch
+>   Thanks to Kukjin Kim.
+> - Fix memory leak when allocating and assigning exynos_iommu_owner to
+> client
+>   device if the client device has multiple System MMUs.
+>   Thanks to Rahul Sharma.
+> 
+> v3:
+> - Fix prefetch buffer flag definition for System MMU 3.3 (patch 10/12)
+> - Fix incorrect setting for SET_RUNTIME_PM_OPS (patch 09/12)
+>   Thanks to Prathyush.
+> 
+> v2:
+> - Split the patch to iommu/exynos into 9 patches
+> - Support for System MMU 3.3
+> - Some code compaction
+> 
+> Patch summary:
+> [PATCH v6 01/12] iommu/exynos: add missing cache flush for removed
+> pagetable entries
+> [PATCH v6 02/12] iommu/exynos: always use iommu fault handler
+> [PATCH v6 03/12] iommu/exynos: allocate lv2 page table from own slab
+> [PATCH v6 04/12] iommu/exynos: change rwlock to spinlock
+> [PATCH v6 05/12] iommu/exynos: support for device tree
+> [PATCH v6 06/12] iommu/exynos: set System MMU as the parent of client
+> device
+> [PATCH v6 07/12] ARM: EXYNOS: remove system mmu initialization from
+> exynos tree
+> [PATCH v6 08/12] iommu/exynos: add support for runtime pm and
+> suspend/resume
+> [PATCH v6 09/12] iommu/exynos: add support for System MMU 3.2 and 3.3
+> [PATCH v6 10/12] iommu/exynos: pass version information from DT
+> [PATCH v6 11/12] iommu/exynos: add literal name of System MMU for
+> debugging
+> [PATCH v6 12/12] iommu/exynos: add debugfs entries for System MMU
+> 
+> Diffstats:
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts  |    2 +-
+>  arch/arm/boot/dts/exynos5250.dtsi          |   27 +-
+>  arch/arm/mach-exynos/Kconfig               |    5 -
+>  arch/arm/mach-exynos/Makefile              |    1 -
+>  arch/arm/mach-exynos/clock-exynos4.c       |   41 +-
+>  arch/arm/mach-exynos/clock-exynos4210.c    |    9 +-
+>  arch/arm/mach-exynos/clock-exynos4212.c    |   23 +-
+>  arch/arm/mach-exynos/clock-exynos5.c       |   87 +-
+>  arch/arm/mach-exynos/dev-sysmmu.c          |  274 ------
+>  arch/arm/mach-exynos/include/mach/sysmmu.h |   66 --
+>  arch/arm/mach-exynos/mach-exynos4-dt.c     |   34 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c     |   30 +
+>  drivers/iommu/Kconfig                      |    2 +-
+>  drivers/iommu/Makefile                     |    2 +-
+>  drivers/iommu/exynos-iommu.c               | 1477 +++++++++++++++++++++--
+> -----
+>  15 files changed, 1284 insertions(+), 796 deletions(-)
 
-I'll pick up both.
+Looks OK to me, and some guys tested this series on board.
 
-Rob
+Joerg, it's time to merge this. If you don't mind, let me pick up this whole
+series into Samsung tree because this touches many Samsung stuff. 
+
+Any problems/comments on this, let me know.
+
+Happy new year, thanks.
+
+- Kukjin
