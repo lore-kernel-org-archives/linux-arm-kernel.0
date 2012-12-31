@@ -1,21 +1,59 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 31 Dec 2012 20:28:47 +0800
-Subject: [PATCH 1/3] Input: imx_keypad - Add device tree support
-In-Reply-To: <CA+8Hj81gf=Z2TGj+s1ypBcuS07MngVFb27v4=sdP4tXk40z9Aw@mail.gmail.com>
-References: <1356872946-2810-1-git-send-email-Ying.Liu@freescale.com>
- <20121230232852.GB13899@core.coreip.homeip.net>
- <20121231005527.GC31816@S2101-09.ap.freescale.net>
- <CA+8Hj81gf=Z2TGj+s1ypBcuS07MngVFb27v4=sdP4tXk40z9Aw@mail.gmail.com>
-Message-ID: <CAAQ0ZWQ3jsW1=boEdasjRg9W7mivaYdshgsguOr7dsSdAJmMDQ@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 31 Dec 2012 13:52:14 +0100
+Subject: [PATCH] ARM: dts: omap3-igep: Add fixed always-on regulators to
+ common dtsi file
+In-Reply-To: <1356815084-6943-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1356815084-6943-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <CABxcv=mpL6=6AvZCwQfcH+sFQXTLEc7mcsXEK_3e8KqDeNhvHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 December 2012 14:45, Liu Ying <liu.y.victor@gmail.com> wrote:
-> Hi, Shawn,
+On Sat, Dec 29, 2012 at 10:04 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> These regulators are common to igep0020 and igep0030 boards
+> and are needed by smsc911x controller.
 >
-> I plan to remove pinctrl code in the coming next version driver patch
-> first. Do you think this is ok or not?
+> Cc: Beno?t Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Enric Balletbo i Serra <eballetbo@gmail.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/omap3-igep.dtsi |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
 >
-Sure.  Just leave the dependency for Dmitry to handle :)
+> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+> index dd01c46..91a42ce 100644
+> --- a/arch/arm/boot/dts/omap3-igep.dtsi
+> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
+> @@ -24,6 +24,18 @@
+>                 ti,mcbsp = <&mcbsp2>;
+>                 ti,codec = <&twl_audio>;
+>         };
+> +
+> +        vddvario: regulator-vddvario {
+> +                compatible = "regulator-fixed";
+> +                regulator-name = "vddvario";
+> +                regulator-always-on;
+> +        };
+> +
+> +        vdd33a: regulator-vdd33a {
+> +                compatible = "regulator-fixed";
+> +                regulator-name = "vdd33a";
+> +                regulator-always-on;
+> +        };
+>  };
+>
+>  &omap3_pmx_core {
 
-Shawn
+Hi Ezequiel,
+
+This shouldn't be defined on the generic omap3-igep.dtsi but on
+omap3-igep0020.dts since the IGEP COM Module doesn't have the LAN
+SMSC9221 chip which is the one using these regulators.
+
+Otherwise, the patch looks good to me and I think it has to be part of
+the series that add SMSC9221 support for IGEPv2.
+
+Thanks a lot and best regards,
+Javier
