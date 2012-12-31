@@ -1,181 +1,74 @@
 From: tobetter@gmail.com (Dongjin Kim)
-Date: Mon, 31 Dec 2012 11:39:45 +0900
-Subject: [PATCH] ARM: dts: max77686: Add DTS file for max77686 PMIC
-Message-ID: <1356921589-12716-1-git-send-email-tobetter@gmail.com>
+Date: Mon, 31 Dec 2012 11:45:14 +0900
+Subject: [PATCH RESEND] ARM: dts: Add EHCI device tree node for Exynos4
+Message-ID: <1356921918-12959-1-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a dedicated DTS file for max77686 PMIC, supposed to be included
-in a board DTS to control the power for certain consumer devices or AP with 9 BUCKs
-and 26 LDOs
+This patch adds EHCI device node on device tree for Exynos4 and defines its
+default platform data, s5p_usb_phy_init and s5p_usb_phy_exit, so that those
+function can be called from the driver.
 
 Signed-off-by: Dongjin Kim <tobetter@gmail.com>
 ---
- arch/arm/boot/dts/max77686.dtsi |  156 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 156 insertions(+)
- create mode 100644 arch/arm/boot/dts/max77686.dtsi
+ arch/arm/boot/dts/exynos4.dtsi         |    7 +++++++
+ arch/arm/mach-exynos/mach-exynos4-dt.c |    9 +++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/max77686.dtsi b/arch/arm/boot/dts/max77686.dtsi
-new file mode 100644
-index 0000000..9484a0d
---- /dev/null
-+++ b/arch/arm/boot/dts/max77686.dtsi
-@@ -0,0 +1,156 @@
-+/*
-+ * Copyright (C) 2012 Dongjin Kim <tobetter@gmail.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ */
-+
-+&max77686 {
-+	compatible = "maxim,max77686";
-+
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+
-+	voltage-regulators {
-+		buck1: buck at 10 {
-+			regulator-compatible = "BUCK1";
-+		};
-+
-+		buck2: buck at 12 {
-+			regulator-compatible = "BUCK2";
-+		};
-+
-+		buck3: buck at 1c {
-+			regulator-compatible = "BUCK3";
-+		};
-+
-+		buck4: buck at 26 {
-+			regulator-compatible = "BUCK4";
-+		};
-+
-+		buck5: buck at 30 {
-+			regulator-compatible = "BUCK5";
-+		};
-+
-+		buck6: buck at 32 {
-+			regulator-compatible = "BUCK6";
-+		};
-+
-+		buck7: buck at 34 {
-+			regulator-compatible = "BUCK7";
-+		};
-+
-+		buck8: buck at 36 {
-+			regulator-compatible = "BUCK8";
-+		};
-+
-+		buck9: buck at 38 {
-+			regulator-compatible = "BUCK9";
-+		};
-+
-+		ldo1: ldo at 40 {
-+			regulator-compatible = "LDO1";
-+		};
-+
-+		ldo2: ldo at 41 {
-+			regulator-compatible = "LDO2";
-+		};
-+
-+		ldo3: ldo at 42 {
-+			regulator-compatible = "LDO3";
-+		};
-+
-+		ldo4: ldo at 43 {
-+			regulator-compatible = "LDO4";
-+		};
-+
-+		ldo5: ldo at 44 {
-+			regulator-compatible = "LDO5";
-+		};
-+
-+		ldo6: ldo at 45 {
-+			regulator-compatible = "LDO6";
-+		};
-+
-+		ldo7: ldo at 46 {
-+			regulator-compatible = "LDO7";
-+		};
-+
-+		ldo8: ldo at 47 {
-+			regulator-compatible = "LDO8";
-+		};
-+
-+		ldo9: ldo at 48 {
-+			regulator-compatible = "LDO9";
-+		};
-+
-+		ldo10: ldo at 49 {
-+			regulator-compatible = "LDO10";
-+		};
-+
-+		ldo11: ldo at 4a {
-+			regulator-compatible = "LDO11";
-+		};
-+
-+		ldo12: ldo at 4b {
-+			regulator-compatible = "LDO12";
-+		};
-+
-+		ldo13: ldo at 4c {
-+			regulator-compatible = "LDO13";
-+		};
-+
-+		ldo14: ldo at 4d {
-+			regulator-compatible = "LDO14";
-+		};
-+
-+		ldo15: ldo at 4e {
-+			regulator-compatible = "LDO15";
-+		};
-+
-+		ldo16: ldo at 4f {
-+			regulator-compatible = "LDO16";
-+		};
-+
-+		ldo17: ldo at 50 {
-+			regulator-compatible = "LDO17";
-+		};
-+
-+		ldo18: ldo at 51 {
-+			regulator-compatible = "LDO18";
-+		};
-+
-+		ldo19: ldo at 52 {
-+			regulator-compatible = "LDO19";
-+		};
-+
-+		ldo20: ldo at 53 {
-+			regulator-compatible = "LDO20";
-+		};
-+
-+		ldo21: ldo at 54 {
-+			regulator-compatible = "LDO21";
-+		};
-+
-+		ldo22: ldo at 55 {
-+			regulator-compatible = "LDO22";
-+		};
-+
-+		ldo23: ldo at 56 {
-+			regulator-compatible = "LDO23";
-+		};
-+
-+		ldo24: ldo at 57 {
-+			regulator-compatible = "LDO24";
-+		};
-+
-+		ldo25: ldo at 58 {
-+			regulator-compatible = "LDO25";
-+		};
-+
-+		ldo26: ldo at 59 {
-+			regulator-compatible = "LDO26";
-+		};
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 92bca86..df1a9f0 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -140,6 +140,13 @@
+ 		status = "disabled";
+ 	};
+ 
++	ehci at 12580000 {
++		compatible = "samsung,exynos-ehci";
++		reg = <0x12580000 0x100>;
++		interrupts = <0 70 0>;
++		status = "disabled";
 +	};
++
+ 	serial at 13800000 {
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13800000 0x100>;
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index 92757ff..c8a23f0 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/of_platform.h>
+ #include <linux/serial_core.h>
++#include <linux/platform_data/usb-ehci-s5p.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/gic.h>
+@@ -20,9 +21,15 @@
+ 
+ #include <plat/cpu.h>
+ #include <plat/regs-serial.h>
++#include <plat/usb-phy.h>
+ 
+ #include "common.h"
+ 
++static struct s5p_ehci_platdata s5p_ehci_platdata = {
++	.phy_init = s5p_usb_phy_init,
++	.phy_exit = s5p_usb_phy_exit,
 +};
++
+ /*
+  * The following lookup table is used to override device names when devices
+  * are registered from device tree. This is temporarily added to enable
+@@ -80,6 +87,8 @@ static const struct of_dev_auxdata exynos4_auxdata_lookup[] __initconst = {
+ 	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_MDMA1, "dma-pl330.2", NULL),
+ 	OF_DEV_AUXDATA("samsung,exynos4210-tmu", EXYNOS4_PA_TMU,
+ 				"exynos-tmu", NULL),
++	OF_DEV_AUXDATA("samsung,exynos-ehci", EXYNOS4_PA_EHCI,
++				"s5p-ehci", &s5p_ehci_platdata),
+ 	{},
+ };
+ 
 -- 
 1.7.10.4
