@@ -1,36 +1,24 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 30 Dec 2012 15:57:59 -0800
-Subject: [PATCH] input: vt8500: Add power button keypad driver
-In-Reply-To: <1356911071.26227.10.camel@gitbox>
-References: <1356904862-16417-1-git-send-email-linux@prisktech.co.nz>
- <20121230232527.GA13899@core.coreip.homeip.net>
- <1356911071.26227.10.camel@gitbox>
-Message-ID: <20121230235759.GA14116@core.coreip.homeip.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 31 Dec 2012 08:28:50 +0800
+Subject: [PATCH] ARM: mach-imx: Kconfig: Do not select Babbage for
+ MACH_IMX51_DT
+In-Reply-To: <1356704747-14845-1-git-send-email-festevam@gmail.com>
+References: <1356704747-14845-1-git-send-email-festevam@gmail.com>
+Message-ID: <20121231002849.GB31816@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 31, 2012 at 12:44:31PM +1300, Tony Prisk wrote:
+On Fri, Dec 28, 2012 at 12:25:47PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> > > +	status = readl(pmc_base + 0x14);
-> > > +	udelay(100);
-> > > +	writel(status, pmc_base + 0x14);
-> > > +
-> > > +	if (status & BIT(14)) {
-> > > +		if (!power_button_pressed) {
-> > 
-> > No need to do this check.
-> > 
-> The hardware generates multiple interrupts when the button is held.
-> Without the !power_button_pressed, it will generate multiple pressed
-> events without releases, because the timer doesn't get to finish.
+> When mx51 dt support was added it was necessary to select MACH_MX51_BABBAGE in
+> order to get the mx51 dt built without errors.
+> 
+> At that time, there was no pinctrl support for mx51 yet.
+> 
+> Currently there is no need to select MACH_MX51_BABBAGE anymore.
+> 
+> Reported-by: Matt Sealy <matt@genesi-usa.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Input core will filter out duplicate events anyway though...
-
-And your current way means that timer is never adjusted, so the key will
-be released and reported as pressed again if I keep holding it, which is
-not correct.
-
-Thanks.
-
--- 
-Dmitry
+Applied, thanks.
