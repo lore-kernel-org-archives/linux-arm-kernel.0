@@ -1,103 +1,34 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 31 Dec 2012 14:08:27 +0100
-Subject: [RESEND PATCH] leds: leds-gpio: set devm_gpio_request_one() flags
- correctly
-In-Reply-To: <CALF0-+XM4EZJHU360AUAUFBPctwO81JQ7kUiH12V2n6x7wCXfA@mail.gmail.com>
-References: <1356102464-22234-1-git-send-email-javier.martinez@collabora.co.uk>
- <CALF0-+XM4EZJHU360AUAUFBPctwO81JQ7kUiH12V2n6x7wCXfA@mail.gmail.com>
-Message-ID: <50E18E4B.7000107@collabora.co.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 31 Dec 2012 18:40:46 +0530
+Subject: [PATCH 2/3] ARM: OMAP2+: hwmod: add support for blocking WFI
+ when a device is active
+In-Reply-To: <alpine.DEB.2.00.1212311254570.27120@utopia.booyaka.com>
+References: <20121230182745.30526.47072.stgit@dusk.lan>
+ <20121230182829.30526.32914.stgit@dusk.lan> <50E14C12.5020105@ti.com>
+ <alpine.DEB.2.00.1212311254570.27120@utopia.booyaka.com>
+Message-ID: <50E18ED6.30802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21/2012 06:06 PM, Ezequiel Garcia wrote:
-> On Fri, Dec 21, 2012 at 12:07 PM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> commit a99d76f leds: leds-gpio: use gpio_request_one
+On Monday 31 December 2012 06:26 PM, Paul Walmsley wrote:
+> Hi
+>
+> On Mon, 31 Dec 2012, Santosh Shilimkar wrote:
+>
+>> This is more of question. If the limitation is w.r.t MPU power
+>> state then shouldn't we just prevent the MPU power state rather
+>> than blocking the WFI completely.
 >>
->> changed the leds-gpio driver to use gpio_request_one() instead
->> of gpio_request() + gpio_direction_output()
->>
->> Unfortunately, it also made a semantic change that breaks the
->> leds-gpio driver.
->>
->> The gpio_request_one() flags parameter was set to:
->>
->> GPIOF_DIR_OUT | (led_dat->active_low ^ state)
->>
->> Since GPIOF_DIR_OUT is 0, the final flags value will just be the
->> XOR'ed value of led_dat->active_low and state.
->>
->> This value were used to distinguish between HIGH/LOW output initial
->> level and call gpio_direction_output() accordingly.
->>
->> With this new semantic gpio_request_one() will take the flags value
->> of 1 as a configuration of input direction (GPIOF_DIR_IN) and will
->> call gpio_direction_input() instead of gpio_direction_output().
->>
->> int gpio_request_one(unsigned gpio, unsigned long flags, const char *label)
->> {
->> ..
->>         if (flags & GPIOF_DIR_IN)
->>                 err = gpio_direction_input(gpio);
->>         else
->>                 err = gpio_direction_output(gpio,
->>                                 (flags & GPIOF_INIT_HIGH) ? 1 : 0);
->> ..
->> }
->>
->> The right semantic is to evaluate led_dat->active_low ^ state and
->> set the output initial level explicitly.
->>
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> ---
->>
->> This makes LEDs to work again on my IGEPv2 board (TI OMAP3 based SoC).
->>
->> I sent this patch before but then realized that I only cc'ed to linux-leds.
->> So, I'm resending the patch cc'ing linux-omap,linux-arm-kernel and LKML to
->> reach a broader audience and have more people review/test the patch.
->>
->> Sorry for the noise if someone got it twice.
->>
->>  drivers/leds/leds-gpio.c |    5 +++--
->>  1 files changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
->> index 1885a26..a0d931b 100644
->> --- a/drivers/leds/leds-gpio.c
->> +++ b/drivers/leds/leds-gpio.c
->> @@ -127,8 +127,9 @@ static int create_gpio_led(const struct gpio_led *template,
->>                 led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
->>
->>         ret = devm_gpio_request_one(parent, template->gpio,
->> -                       GPIOF_DIR_OUT | (led_dat->active_low ^ state),
->> -                       template->name);
->> +                                   (led_dat->active_low ^ state) ?
->> +                                   GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
->> +                                   template->name);
->>         if (ret < 0)
->>                 return ret;
->>
->> --
->> 1.7.7.6
->>
-> 
-> Without this patch my IGEP v2 LEDs were dead,
-> and this patch brings them back.
-> 
-> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> 
-> Thanks,
-> 
->     Ezequiel
-> 
+>> Can you please clarify if retaining MPU power state in ON can achieve
+>> the same results ?
+>
+> In these cases, it's blocking WFI that is apparently needed.  I know it
+> doesn't make much sense.
+>
+Ya. It doesn't make sense but if that is the case then the patch make
+sense :-)
 
-Hello,
+Thanks for clarification !!
 
-Any news on this?
-
-GPIO LEDs support is still not working on latest mainline kernel and other
-people report that this patch solves the issue for them.
-
-Thanks a lot and best regards,
-Javier
+Regards
+Santosh
