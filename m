@@ -1,25 +1,72 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 31 Dec 2012 13:57:28 +0530
-Subject: [PATCH 1/3] ARM: OMAP2xxx: PM: enter WFI via inline asm if CORE
- stays active
-In-Reply-To: <20121230182826.30526.27155.stgit@dusk.lan>
-References: <20121230182745.30526.47072.stgit@dusk.lan>
- <20121230182826.30526.27155.stgit@dusk.lan>
-Message-ID: <50E14C70.2090700@ti.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 31 Dec 2012 11:56:11 +0200
+Subject: [PATCH Resend] ARM: pxa27x: fix ac97 controller warm reset code
+In-Reply-To: <1356728815-14410-1-git-send-email-mikedunn@newsguy.com>
+References: <1356728815-14410-1-git-send-email-mikedunn@newsguy.com>
+Message-ID: <50E1613B.9040403@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 30 December 2012 11:58 PM, Paul Walmsley wrote:
-> There shouldn't be any need to jump to SRAM code if the OMAP CORE
-> clockdomain (and consequently the SDRAM controller and CORE PLL) stays
-> active during MPU WFI.  The SRAM code should only be needed when the RAM
-> enters self-refresh.  So in the case where CORE stays active, just call
-> WFI directly from the mach-omap2/pm24xx.c code.  This removes some
-> unnecessary SRAM code.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Richard Woodruff <r-woodruff2@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+On 12/28/12 23:06, Mike Dunn wrote:
+> This patch fixes some code that implements a work-around to a hardware bug in
+> the ac97 controller on the pxa27x.  A bug in the controller's warm reset
+> functionality requires that the mfp used by the controller as the AC97_RESET_n
+> line be temporarily reconfigured as a generic output gpio (AF0) and manually
+> held high for the duration of the warm reset cycle.  This is what was done in
+> the original code, but it was broken long ago by commit
+> fb1bf8cd13bfa7ed0364ab0d82f717fc020d35f6 
+> ([ARM] pxa: introduce processor specific pxa27x_assert_ac97reset())
+> which changed the mfp to a GPIO input instead of a high output.
+
+Apparently, it is broken only on boards with no external pullups on these lines.
+
+> 
+> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
 > ---
-This sounds correct to me.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>  arch/arm/mach-pxa/pxa27x.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+> index 8047ee0..76221e4 100644
+> --- a/arch/arm/mach-pxa/pxa27x.c
+> +++ b/arch/arm/mach-pxa/pxa27x.c
+> @@ -47,9 +47,9 @@ void pxa27x_clear_otgph(void)
+>  EXPORT_SYMBOL(pxa27x_clear_otgph);
+> 
+>  static unsigned long ac97_reset_config[] = {
+> -	GPIO113_GPIO,
+> +	MFP_CFG_OUT(GPIO113, AF0, DRIVE_HIGH),
+>  	GPIO113_AC97_nRESET,
+> -	GPIO95_GPIO,
+> +	MFP_CFG_OUT(GPIO95, AF0, DRIVE_HIGH),
+
+It was always discouraged to code the above directly.
+How about one of the below:
+1)
+GPIO113_GPIO | MFP_PULL_HIGH,
+GPIO95_GPIO  | MFP_PULL_HIGH,
+
+or
+
+2) introduce something like:
+GPIO113_AC97_nRESET_GPIO_HIGH
+GPIO95_AC97_nRESET_GPIO_HIGH
+in the mfp-pxa27x.h file and use them in the structure above.
+
+
+>  	GPIO95_AC97_nRESET,
+>  };
+> 
+> --
+> 1.7.8.6
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Regards,
+Igor.
