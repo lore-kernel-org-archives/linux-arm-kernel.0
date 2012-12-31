@@ -1,61 +1,33 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 31 Dec 2012 12:03:00 +0100
-Subject: [PATCH 6/6] ARM: OMAP: sdp3430: Audio support via the common
- omap-twl4030 machine driver
-In-Reply-To: <1356951780-5412-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1356951780-5412-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1356951780-5412-7-git-send-email-peter.ujfalusi@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 31 Dec 2012 12:23:50 +0100 (CET)
+Subject: [PATCH 1/2] ARM: shmobile: add function declarations for sh7372 DT
+ helper functions
+Message-ID: <Pine.LNX.4.64.1212311213510.24596@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the common omap-twl4030 ASoC machine driver for audio.
+sh7372_add_early_devices_dt() and sh7372_add_standard_devices_dt() are
+defined as global functions in arch/arm/mach-shmobile/setup-sh7372.c,
+but their declarations are missing. Add them to common.h, where similar
+functions for this and other SoC types are already declared.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 ---
- arch/arm/mach-omap2/board-3430sdp.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/mach-shmobile/include/mach/common.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index 40c22a7..e7ef311 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -25,6 +25,7 @@
- #include <linux/gpio.h>
- #include <linux/mmc/host.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
-+#include <linux/platform_data/omap-twl4030.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -209,6 +210,19 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{}	/* Terminator */
- };
- 
-+static struct omap_tw4030_pdata omap_twl4030_audio_data = {
-+	.voice_connected = true,
-+	.custom_routing	= true,
-+
-+	.has_hs		= OMAP_TWL4030_LEFT | OMAP_TWL4030_RIGHT,
-+	.has_hf		= OMAP_TWL4030_LEFT | OMAP_TWL4030_RIGHT,
-+
-+	.has_mainmic	= true,
-+	.has_submic	= true,
-+	.has_hsmic	= true,
-+	.has_linein	= OMAP_TWL4030_LEFT | OMAP_TWL4030_RIGHT,
-+};
-+
- static int sdp3430_twl_gpio_setup(struct device *dev,
- 		unsigned gpio, unsigned ngpio)
- {
-@@ -225,6 +239,9 @@ static int sdp3430_twl_gpio_setup(struct device *dev,
- 	/* gpio + 15 is "sub_lcd_nRST" (output) */
- 	gpio_request_one(gpio + 15, GPIOF_OUT_INIT_LOW, "sub_lcd_nRST");
- 
-+	omap_twl4030_audio_data.jack_detect = gpio + 2;
-+	omap_twl4030_audio_init("SDP3430", &omap_twl4030_audio_data);
-+
- 	return 0;
- }
- 
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 7e08fa5..abce184 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -23,6 +23,8 @@ extern void sh7372_init_irq(void);
+ extern void sh7372_map_io(void);
+ extern void sh7372_add_early_devices(void);
+ extern void sh7372_add_standard_devices(void);
++extern void sh7372_add_early_devices_dt(void);
++extern void sh7372_add_standard_devices_dt(void);
+ extern void sh7372_clock_init(void);
+ extern void sh7372_pinmux_init(void);
+ extern void sh7372_pm_init(void);
 -- 
-1.8.0.2
+1.7.2.5
