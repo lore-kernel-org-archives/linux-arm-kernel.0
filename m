@@ -1,102 +1,27 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 30 Dec 2012 18:13:47 -0800
-Subject: [PATCH] ARM: dts: add board dts file for EXYNOS4412 based Origen
- board
-References: <1356822292-26465-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <02f901cde6fc$78a63d00$69f2b700$@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 31 Dec 2012 10:38:40 +0800
+Subject: [PATCH v2 1/2] ARM: dts: imx27-3ds: Rename it to imx27-pdk
+In-Reply-To: <20121225120535.GC14088@S2101-09.ap.freescale.net>
+References: <1356433852-3028-1-git-send-email-festevam@gmail.com>
+ <20121225120535.GC14088@S2101-09.ap.freescale.net>
+Message-ID: <20121231023838.GE31816@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Thomas Abraham wrote:
-> >
-> > Add a minimal board dts file for EXYNOS4412 based Insignal Origen board.
-> >
-> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+On Tue, Dec 25, 2012 at 08:05:38PM +0800, Shawn Guo wrote:
+> On Tue, Dec 25, 2012 at 09:10:51AM -0200, Fabio Estevam wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > imx27-pdk is the name found on Freescale website, so use it instead of 3ds.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > > ---
-> >  arch/arm/boot/dts/Makefile              |    1 +
-> >  arch/arm/boot/dts/exynos4412-origen.dts |   45
-> > +++++++++++++++++++++++++++++++
-> >  2 files changed, 46 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/exynos4412-origen.dts
-> >
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index e44da40..c84f9f7 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -43,6 +43,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-
-> > origen.dtb \
-> >  	exynos4210-smdkv310.dtb \
-> >  	exynos4210-trats.dtb \
-> >  	exynos4412-smdk4412.dtb \
-> > +	exynos4412-origen.dtb \
-> >  	exynos5250-smdk5250.dtb \
-> >  	exynos5250-snow.dtb \
-> >  	exynos5440-ssdk5440.dtb
-> > diff --git a/arch/arm/boot/dts/exynos4412-origen.dts
-> > b/arch/arm/boot/dts/exynos4412-origen.dts
-> > new file mode 100644
-> > index 0000000..df880c4
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/exynos4412-origen.dts
-> > @@ -0,0 +1,45 @@
-> > +/*
-> > + * Insignal's Exynos4412 based Origen board device tree source
-> > + *
-> > + * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
-> > + *		http://www.samsung.com
-> > + *
-> > + * Device tree source file for Insignal's Origen board which is based
-on
-> > + * Samsung's Exynos4412 SoC.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > +*/
-> > +
-> > +/dts-v1/;
-> > +/include/ "exynos4412.dtsi"
-> > +
-> > +/ {
-> > +	model = "Insignal Origen evaluation board based on Exynos4412";
-> > +	compatible = "insignal,origen4412", "samsung,exynos4412";
-> > +
-> > +	memory {
-> > +		reg = <0x40000000 0x40000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs ="console=ttySAC2,115200";
-> > +	};
-> > +
-> > +	serial at 13800000 {
-> > +		status = "okay";
-> > +	};
-> > +
-> > +	serial at 13810000 {
-> > +		status = "okay";
-> > +	};
-> > +
-> > +	serial at 13820000 {
-> > +		status = "okay";
-> > +	};
-> > +
-> > +	serial at 13830000 {
-> > +		status = "okay";
-> > +	};
-> > +};
-> > --
-> > 1.7.5.4
+> > Changes since v1:
+> > - Use 'fsl' instead of 'freescale' in the compatible field.
 > 
-> Looks OK to me, applied.
+> I assume Sascha will pick them up, so for both:
 > 
-Ah, one more.
-BTW, I think, need to sort out the memory configuration and bootargs
+I just picked them up to ease the global imx dts cleanup that I'm doing
+right now.
 
-And compatible name? origen4412 is right? Probably, origen-quad?
-
-Thanks.
-
-- Kukjin
+Shawn
