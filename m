@@ -1,107 +1,103 @@
-From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Mon, 31 Dec 2012 18:36:53 +0530
-Subject: [RFC v2 00/18] ARM: OMAP2+: AM33XX: Add suspend-resume support
-Message-ID: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 31 Dec 2012 14:08:27 +0100
+Subject: [RESEND PATCH] leds: leds-gpio: set devm_gpio_request_one() flags
+ correctly
+In-Reply-To: <CALF0-+XM4EZJHU360AUAUFBPctwO81JQ7kUiH12V2n6x7wCXfA@mail.gmail.com>
+References: <1356102464-22234-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CALF0-+XM4EZJHU360AUAUFBPctwO81JQ7kUiH12V2n6x7wCXfA@mail.gmail.com>
+Message-ID: <50E18E4B.7000107@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 12/21/2012 06:06 PM, Ezequiel Garcia wrote:
+> On Fri, Dec 21, 2012 at 12:07 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> commit a99d76f leds: leds-gpio: use gpio_request_one
+>>
+>> changed the leds-gpio driver to use gpio_request_one() instead
+>> of gpio_request() + gpio_direction_output()
+>>
+>> Unfortunately, it also made a semantic change that breaks the
+>> leds-gpio driver.
+>>
+>> The gpio_request_one() flags parameter was set to:
+>>
+>> GPIOF_DIR_OUT | (led_dat->active_low ^ state)
+>>
+>> Since GPIOF_DIR_OUT is 0, the final flags value will just be the
+>> XOR'ed value of led_dat->active_low and state.
+>>
+>> This value were used to distinguish between HIGH/LOW output initial
+>> level and call gpio_direction_output() accordingly.
+>>
+>> With this new semantic gpio_request_one() will take the flags value
+>> of 1 as a configuration of input direction (GPIOF_DIR_IN) and will
+>> call gpio_direction_input() instead of gpio_direction_output().
+>>
+>> int gpio_request_one(unsigned gpio, unsigned long flags, const char *label)
+>> {
+>> ..
+>>         if (flags & GPIOF_DIR_IN)
+>>                 err = gpio_direction_input(gpio);
+>>         else
+>>                 err = gpio_direction_output(gpio,
+>>                                 (flags & GPIOF_INIT_HIGH) ? 1 : 0);
+>> ..
+>> }
+>>
+>> The right semantic is to evaluate led_dat->active_low ^ state and
+>> set the output initial level explicitly.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>
+>> This makes LEDs to work again on my IGEPv2 board (TI OMAP3 based SoC).
+>>
+>> I sent this patch before but then realized that I only cc'ed to linux-leds.
+>> So, I'm resending the patch cc'ing linux-omap,linux-arm-kernel and LKML to
+>> reach a broader audience and have more people review/test the patch.
+>>
+>> Sorry for the noise if someone got it twice.
+>>
+>>  drivers/leds/leds-gpio.c |    5 +++--
+>>  1 files changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
+>> index 1885a26..a0d931b 100644
+>> --- a/drivers/leds/leds-gpio.c
+>> +++ b/drivers/leds/leds-gpio.c
+>> @@ -127,8 +127,9 @@ static int create_gpio_led(const struct gpio_led *template,
+>>                 led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+>>
+>>         ret = devm_gpio_request_one(parent, template->gpio,
+>> -                       GPIOF_DIR_OUT | (led_dat->active_low ^ state),
+>> -                       template->name);
+>> +                                   (led_dat->active_low ^ state) ?
+>> +                                   GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
+>> +                                   template->name);
+>>         if (ret < 0)
+>>                 return ret;
+>>
+>> --
+>> 1.7.7.6
+>>
+> 
+> Without this patch my IGEP v2 LEDs were dead,
+> and this patch brings them back.
+> 
+> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> 
+> Thanks,
+> 
+>     Ezequiel
+> 
 
-This is the second version of the patch series for adding suspend-resume
-support for AM33XX. Based on the feedback received on the previous patch
-series [1] almost all the patches have undergone a bit a rework.
+Hello,
 
-The 1st two patches depend on the changes for mailbox code migration
-from arch/arm/*-omap*/ to drivers/mailbox/ [2].
+Any news on this?
 
-The patch series also depends on recent changes to the OMAP PM framework
-by Paul Walmsley.
+GPIO LEDs support is still not working on latest mainline kernel and other
+people report that this patch solves the issue for them.
 
-I found it easiest to apply the AM33XX suspend-resume patches on top of
-Paul's TEST_pwrdm_post_fpwrst_devel_a_3.9 branch + the patches @ [2].
-
-With these dependencies met, the PM code uses the firmware interface
-and expects the userspace to load the WKUP_M3 binary before the
-suspend-resume functionality is made available. The binary file (and
-the source-code for WKUP_M3) can be obtained from the 'next' branch at
-[3]. The WKUP_M3 binary can either be loaded post bootup via
-the sysfs entry './sys/devices/ocp.2/wkup_m3.4/firmware' or
-it can be included in the kernel image as part of the build process.
-
-DDR3 specific changes have been skipped for now since mainline U-Boot
-exhibited stability issues on all the DDR3 based AM335x boards that i could
-lay my hands on.
-
-I have done basic testing along with power measurments on the different
-power rails on the AM335x EVM. PER domain transition on the BeagleBone fails
-if the CPSW driver is included in the kernel and is yet to be root caused.
-Along with this issue more extensive testing on other OMAP platforms is also
-pending right now.
-
-For more details on the AM335x suspend-resume support please refer to the
-changelog in the different patches.
-
-Regards,
-Vaibhav
-
-[1] http://marc.info/?l=linux-arm-kernel&m=135185970731607&w=4
-[2] http://marc.info/?l=linux-omap&m=135583648827089&w=4
-[3] http://arago-project.org/git/projects/?p=am33x-cm3.git;a=shortlog;h=refs/heads/next
-
-Vaibhav Bedia (18):
-  mailbox: OMAP2+: Add support for AM33XX
-  mailbox: Add an API for flushing the FIFO
-  memory: emif: Move EMIF related header file to include/linux/
-  ARM: OMAP2+: AM33XX: CM: Get rid of unncessary header inclusions
-  ARM: OMAP2+: AM33XX: CM/PRM: Use __ASSEMBLER__ macros in header files
-  ARM: OMAP2+: AM33XX: hwmod: Register OCMC RAM hwmod
-  ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod with the right flags
-  ARM: OMAP2+: AM33XX: hwmod: Fixup cpgmac0 hwmod entry
-  ARM: OMAP2+: AM33XX: Update the hardreset API
-  ARM: OMAP2+: AM33XX: hwmod: Update the WKUP-M3 hwmod with reset
-    status bit
-  ARM: DTS: AM33XX: Add nodes for OCMC RAM and WKUP-M3
-  ARM: OMAP2+: timer: Add suspend-resume callbacks for clockevent
-    device
-  ARM: OMAP2+: AM33XX: timer: Interchance clkevt and clksrc timers
-  ARM: OMAP2+: AM33XX: control: Add some control module registers and
-    APIs
-  ARM: OMAP2+: AM33XX: Add assembly code for PM operations
-  ARM: OMAP2+: AM33XX: Basic suspend resume support
-  ARM: OMAP2+: AM33XX: Select Mailbox when PM is enabled
-  ARM: OMAP2+: AM33XX: Hookup AM33XX PM code into OMAP builds
-
- .../devicetree/bindings/arm/omap/timer.txt         |    2 +
- arch/arm/boot/dts/am33xx.dtsi                      |   12 +
- arch/arm/mach-omap2/Kconfig                        |    4 +-
- arch/arm/mach-omap2/Makefile                       |    2 +
- arch/arm/mach-omap2/board-generic.c                |    1 +
- arch/arm/mach-omap2/cm33xx.h                       |   10 +-
- arch/arm/mach-omap2/common.h                       |   10 +
- arch/arm/mach-omap2/control.c                      |   20 +
- arch/arm/mach-omap2/control.h                      |   41 ++
- arch/arm/mach-omap2/io.c                           |    7 +
- arch/arm/mach-omap2/omap_hwmod.c                   |    5 +-
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |   50 +-
- arch/arm/mach-omap2/pm.h                           |    7 +
- arch/arm/mach-omap2/pm33xx.c                       |  469 ++++++++++++++++
- arch/arm/mach-omap2/pm33xx.h                       |   56 ++
- arch/arm/mach-omap2/prm33xx.c                      |   11 +-
- arch/arm/mach-omap2/prm33xx.h                      |    5 +-
- arch/arm/mach-omap2/sleep33xx.S                    |  584 +++++++++++++++++++
- arch/arm/mach-omap2/sram.c                         |   10 +-
- arch/arm/mach-omap2/sram.h                         |    2 +
- arch/arm/mach-omap2/timer.c                        |   39 ++-
- drivers/mailbox/mailbox-omap2.c                    |   54 ++-
- drivers/mailbox/mailbox.c                          |   36 ++
- drivers/mailbox/mailbox.h                          |    3 +
- drivers/memory/emif.c                              |    2 +-
- drivers/memory/emif.h                              |  589 --------------------
- include/linux/mailbox.h                            |    1 +
- include/linux/ti_emif.h                            |  589 ++++++++++++++++++++
- 28 files changed, 1989 insertions(+), 632 deletions(-)
- create mode 100644 arch/arm/mach-omap2/pm33xx.c
- create mode 100644 arch/arm/mach-omap2/pm33xx.h
- create mode 100644 arch/arm/mach-omap2/sleep33xx.S
- delete mode 100644 drivers/memory/emif.h
- create mode 100644 include/linux/ti_emif.h
+Thanks a lot and best regards,
+Javier
