@@ -1,72 +1,45 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 31 Dec 2012 11:56:11 +0200
-Subject: [PATCH Resend] ARM: pxa27x: fix ac97 controller warm reset code
-In-Reply-To: <1356728815-14410-1-git-send-email-mikedunn@newsguy.com>
-References: <1356728815-14410-1-git-send-email-mikedunn@newsguy.com>
-Message-ID: <50E1613B.9040403@compulab.co.il>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 31 Dec 2012 12:02:54 +0100
+Subject: [PATCH 0/6] ARM: OMAP3: Audio support update for omap-twl4030
+Message-ID: <1356951780-5412-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/28/12 23:06, Mike Dunn wrote:
-> This patch fixes some code that implements a work-around to a hardware bug in
-> the ac97 controller on the pxa27x.  A bug in the controller's warm reset
-> functionality requires that the mfp used by the controller as the AC97_RESET_n
-> line be temporarily reconfigured as a generic output gpio (AF0) and manually
-> held high for the duration of the warm reset cycle.  This is what was done in
-> the original code, but it was broken long ago by commit
-> fb1bf8cd13bfa7ed0364ab0d82f717fc020d35f6 
-> ([ARM] pxa: introduce processor specific pxa27x_assert_ac97reset())
-> which changed the mfp to a GPIO input instead of a high output.
+Hello,
 
-Apparently, it is broken only on boards with no external pullups on these lines.
+omap-twl4030 ASoC machine driver can support more boards with the following
+series:
+http://mailman.alsa-project.org/pipermail/alsa-devel/2012-December/058119.html
 
-> 
-> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
-> ---
->  arch/arm/mach-pxa/pxa27x.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-> index 8047ee0..76221e4 100644
-> --- a/arch/arm/mach-pxa/pxa27x.c
-> +++ b/arch/arm/mach-pxa/pxa27x.c
-> @@ -47,9 +47,9 @@ void pxa27x_clear_otgph(void)
->  EXPORT_SYMBOL(pxa27x_clear_otgph);
-> 
->  static unsigned long ac97_reset_config[] = {
-> -	GPIO113_GPIO,
-> +	MFP_CFG_OUT(GPIO113, AF0, DRIVE_HIGH),
->  	GPIO113_AC97_nRESET,
-> -	GPIO95_GPIO,
-> +	MFP_CFG_OUT(GPIO95, AF0, DRIVE_HIGH),
+Rework the omap-twl4030 audio support code in arch/arm/mach-omap2/ to take
+advantages of this. The same machine driver can support the zoom2 and sdp3430
+boards as well.
 
-It was always discouraged to code the above directly.
-How about one of the below:
-1)
-GPIO113_GPIO | MFP_PULL_HIGH,
-GPIO95_GPIO  | MFP_PULL_HIGH,
+Regards,
+Peter
+---
+Peter Ujfalusi (6):
+  ARM: OMAP: 3430sdp: Enable extmute functionality for audio
+  ARM: OMAP: zoom: Zoom2 does not have extmute functionality
+  ARM: OMAP2+: twl-common: Add default twl4030 audio configuration
+  ARM: OMAP2+: twl-common: Allow boards to customize the twl4030 audio
+    setup
+  ARM: OMAP: zoom: Audio support via the common omap-twl4030 machine
+    driver
+  ARM: OMAP: sdp3430: Audio support via the common omap-twl4030 machine
+    driver
 
-or
-
-2) introduce something like:
-GPIO113_AC97_nRESET_GPIO_HIGH
-GPIO95_AC97_nRESET_GPIO_HIGH
-in the mfp-pxa27x.h file and use them in the structure above.
-
-
->  	GPIO95_AC97_nRESET,
->  };
-> 
-> --
-> 1.7.8.6
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+ arch/arm/mach-omap2/board-3430sdp.c          | 20 +++++++++++++++++++
+ arch/arm/mach-omap2/board-cm-t35.c           |  2 +-
+ arch/arm/mach-omap2/board-devkit8000.c       |  2 +-
+ arch/arm/mach-omap2/board-igep0020.c         |  2 +-
+ arch/arm/mach-omap2/board-omap3beagle.c      |  2 +-
+ arch/arm/mach-omap2/board-omap3evm.c         |  2 +-
+ arch/arm/mach-omap2/board-overo.c            |  2 +-
+ arch/arm/mach-omap2/board-zoom-peripherals.c | 29 ++++++++++++++++++++--------
+ arch/arm/mach-omap2/twl-common.c             | 17 ++++++++++------
+ arch/arm/mach-omap2/twl-common.h             |  3 ++-
+ 10 files changed, 60 insertions(+), 21 deletions(-)
 
 -- 
-Regards,
-Igor.
+1.8.0.2
