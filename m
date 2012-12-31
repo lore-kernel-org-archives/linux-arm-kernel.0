@@ -1,34 +1,32 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 31 Dec 2012 08:12:05 +0100
-Subject: [PATCH 6/9] ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
-In-Reply-To: <20121229063913.GA13620@quad.lixom.net>
-References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com><1355996654-6579-7-git-send-email-hdoyu@nvidia.com><20121229063913.GA13620@quad.lixom.net>
-Message-ID: <20121231.091205.1954307462967637866.hdoyu@nvidia.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 31 Dec 2012 13:55:54 +0530
+Subject: [PATCH 2/3] ARM: OMAP2+: hwmod: add support for blocking WFI
+ when a device is active
+In-Reply-To: <20121230182829.30526.32914.stgit@dusk.lan>
+References: <20121230182745.30526.47072.stgit@dusk.lan>
+ <20121230182829.30526.32914.stgit@dusk.lan>
+Message-ID: <50E14C12.5020105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Paul,
 
-Olof Johansson <olof@lixom.net> wrote @ Sat, 29 Dec 2012 07:39:13 +0100:
+On Sunday 30 December 2012 11:58 PM, Paul Walmsley wrote:
+> Apparently, on some OMAPs, the MPU can't be allowed to enter WFI while
+> certain peripherals are active.  It's not clear why, and it's likely
+> that there is simply some other bug in the driver or integration code.
+> But since the likelihood that anyone will have the time to track these
+> problems down in the future seems quite small, we'll provide a
+> flag, HWMOD_BLOCK_WFI, to mark these issues in the hwmod data.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+This is more of question. If the limitation is w.r.t MPU power
+state then shouldn't we just prevent the MPU power state rather
+than blocking the WFI completely.
 
-> On Thu, Dec 20, 2012 at 11:44:04AM +0200, Hiroshi Doyu wrote:
-> > Initial support for Tegra 114 SoC. This is expected to be included in
-> > the board DTS files, Tegra 114 SoC based evaluation board family.
-> > 
-> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> 
-> Hi,
-> 
-> I think it could be a good idea to start documenting the cpu configuration in
-> the device tree on some of these larger platforms as well, i.e. include a cpus/
-> hierarchy. Would you mind adding those, please?
+Can you please clarify if retaining MPU power state in ON can achieve
+the same results ?
 
-Ok, I'll.
-
-> It would give you the flexibility of switching over to using device
-> tree to probe the number of cpus in case the platform grows yet another
-> way to figure out the number of cores in the future, without having to
-> update the device-trees at that time. :)
-> 
-> 
-> -Olof
+Regards
+Santosh
