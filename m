@@ -1,51 +1,89 @@
-From: zhanzhenbo@gmail.com (steve.zhan)
-Date: Sun, 30 Dec 2012 23:39:43 +0800
-Subject: [PATCH] hwspinlock/core: Add testing capabilities
-In-Reply-To: <20121230151722.GB16890@WorkStation.localnet>
-References: <CAKvkGKfc5jw+_ABgB8nrX37B7zHCoA5Ld0Gs5O-EDFD-Gk0OKg@mail.gmail.com>
- <20121230112018.GA14042@WorkStation.localnet>
- <CAKvkGKep9Fgib=iwCE4RnBWrfsMkJu4CcpNxUDqnkyHpkjohuA@mail.gmail.com>
- <20121230142710.GA16250@WorkStation.localnet>
- <CAKvkGKcHfJZ++B+sq2NUZT=EDW7C+Zd3zxsOjY1MV2YA9ecE7A@mail.gmail.com>
- <20121230151722.GB16890@WorkStation.localnet>
-Message-ID: <CAKvkGKffWP+oqxU3rbzVFuSedtOQ3eC9U+=c402fPWEMLaYWiw@mail.gmail.com>
+From: vaibhav.bedia@ti.com (Vaibhav Bedia)
+Date: Mon, 31 Dec 2012 18:36:54 +0530
+Subject: [RFC v2 01/18] mailbox: OMAP2+: Add support for AM33XX
+In-Reply-To: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
+References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1356959231-17335-2-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Ido,
-          I see.  But this is system init call order error,  something
-driver interface have called before module driver init have ready,  if this
-situation is exsist, we can' t release the bank pointer if only some lock
-have register failed, for example, omap_hwspinlock
-"reg_fail:
-        pm_runtime_disable(&pdev->dev);
-        kfree(bank);
-"
+Mailbox IP on AM33XX is the same as that present in OMAP4.
+The single instance of Mailbox IP on AM33XX contains
+8 sub-modules and facilitates communication between MPU,
+PRUs and WKUP_M3.
 
-So, because this is not problem.
+The first mailbox sub-module is assigned for communication
+between MPU and WKUP-M3.
 
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Cc: Russ Dill <russ.dill@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+v1->v2:
+	Address the comment on operator usage from Russ Dill
 
-Yes, this test function is good patch, i have use it for test ours hardware.
+ drivers/mailbox/mailbox-omap2.c |   35 ++++++++++++++++++++++++++++++++++-
+ 1 files changed, 34 insertions(+), 1 deletions(-)
 
-Steve.
-
-
-2012/12/30 Ido Yariv <ido@wizery.com>
-
-> That's actually not what I was concerned about. If
-> hwspin_lock_register_single returns 0, anyone could potentially request
-> and acquire that lock. If we then call hwspin_lock_tests it could
-> potentially fail since the lock might already be acquired and the first
-> call to trylock will not succeed.
->
-> Since there's no real advantage in testing the locks after registering
-> them, I suggest we keep the current implementation.
->
-
-
-
+diff --git a/drivers/mailbox/mailbox-omap2.c b/drivers/mailbox/mailbox-omap2.c
+index 7c26bed..6d61159 100644
+--- a/drivers/mailbox/mailbox-omap2.c
++++ b/drivers/mailbox/mailbox-omap2.c
+@@ -151,7 +151,7 @@ static void omap2_mbox_disable_irq(struct mailbox *mbox,
+ 	struct omap_mbox2_priv *p = mbox->priv;
+ 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
+ 
+-	if (!cpu_is_omap44xx())
++	if (!cpu_is_omap44xx() && !soc_is_am33xx())
+ 		bit = mbox_read_reg(p->irqdisable) & ~bit;
+ 
+ 	mbox_write_reg(bit, p->irqdisable);
+@@ -352,6 +352,32 @@ struct mailbox mbox_2_info = {
+ struct mailbox *omap4_mboxes[] = { &mbox_1_info, &mbox_2_info, NULL };
+ #endif
+ 
++#if defined(CONFIG_SOC_AM33XX)
++static struct omap_mbox2_priv omap2_mbox_wkup_m3_priv = {
++	.tx_fifo = {
++		.msg		= MAILBOX_MESSAGE(0),
++		.fifo_stat	= MAILBOX_FIFOSTATUS(0),
++		.msg_stat	= MAILBOX_MSGSTATUS(0),
++	},
++	.rx_fifo = {
++		.msg		= MAILBOX_MESSAGE(1),
++		.msg_stat	= MAILBOX_MSGSTATUS(1),
++	},
++	.irqenable	= OMAP4_MAILBOX_IRQENABLE(3),
++	.irqstatus	= OMAP4_MAILBOX_IRQSTATUS(3),
++	.irqdisable	= OMAP4_MAILBOX_IRQENABLE_CLR(3),
++	.notfull_bit	= MAILBOX_IRQ_NOTFULL(0),
++	.newmsg_bit	= MAILBOX_IRQ_NEWMSG(0),
++};
++
++struct mailbox mbox_wkup_m3_info = {
++	.name	= "wkup_m3",
++	.ops	= &omap2_mbox_ops,
++	.priv	= &omap2_mbox_wkup_m3_priv,
++};
++struct mailbox *am33xx_mboxes[] = { &mbox_wkup_m3_info, NULL };
++#endif
++
+ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
+ {
+ 	struct resource *mem;
+@@ -386,6 +412,13 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
+ 		list[0]->irq = list[1]->irq = platform_get_irq(pdev, 0);
+ 	}
+ #endif
++#if defined(CONFIG_SOC_AM33XX)
++	else if (soc_is_am33xx()) {
++		list = am33xx_mboxes;
++
++		list[0]->irq = platform_get_irq(pdev, 0);
++	}
++#endif
+ 	else {
+ 		pr_err("%s: platform not supported\n", __func__);
+ 		return -ENODEV;
 -- 
-Steve Zhan
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121230/b56d6281/attachment-0001.html>
+1.7.0.4
