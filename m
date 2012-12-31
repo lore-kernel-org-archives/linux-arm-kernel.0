@@ -1,101 +1,104 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Mon, 31 Dec 2012 18:37:05 +0530
-Subject: [RFC v2 12/18] ARM: OMAP2+: timer: Add suspend-resume callbacks for
- clockevent device
+Date: Mon, 31 Dec 2012 18:37:06 +0530
+Subject: [RFC v2 13/18] ARM: OMAP2+: AM33XX: timer: Interchance clkevt and
+ clksrc timers
 In-Reply-To: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
 References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1356959231-17335-13-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1356959231-17335-14-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current OMAP timer code registers two timers -
-one as clocksource and one as clockevent.
-AM33XX has only one usable timer in the WKUP domain
-so one of the timers needs suspend-resume support
-to restore the configuration to pre-suspend state.
+AM33XX has two timers (DTIMER0/1) in the WKUP domain.
+On GP devices the source of DMTIMER0 is fixed to an
+inaccurate internal 32k RC oscillator and this makes
+the DMTIMER0 practically either as a clocksource or
+as clockevent.
 
-commit adc78e6 (timekeeping: Add suspend and resume
-of clock event devices) introduced .suspend and .resume
-callbacks for clock event devices. Leverages these
-callbacks to have AM33XX clockevent timer which is
-in not in WKUP domain to behave properly across system
-suspend.
+Currently the timer instance in WKUP domain is used
+as the clockevent and the timer in non-WKUP domain
+as the clocksource. DMTIMER1 in WKUP domain can keep
+running in suspend from a 32K clock fed from external
+OSC and can serve as the persistent clock for the kernel.
+To enable this, interchange the timers used as clocksource
+and clockevent for AM33XX.
+
+For now a new DT property has been added to allow the timer code
+to select the timer with the right property.
+
+It has been pointed out by Santosh Shilimkar and Kevin Hilman
+that such a change will result in soc-idle never being achieved
+on AM33XX. There are other reasons why soc-idle does not look
+feasible on AM33XX so for now we go ahead with the interchange
+of the the timers. If at a later point of time we do come up
+with an approach which makes soc-idle possible on AM33XX, this
+can be revisited.
 
 Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Tony Lingren <tony@atomide.com>
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Vaibhav Hiremath <hvaibhav@ti.com>
 Cc: Jon Hunter <jon-hunter@ti.com>
+
 ---
 v1->v2:
-	Get rid of harcoded timer id.
-	Note: since a platform device is not created for these timer
-	instances and because there's very minimal change needed for
-	restarting the timer a full blown context save and restore
-	has been skipped.
+	Use DT properties for changing the timers
 
- arch/arm/mach-omap2/timer.c |   33 +++++++++++++++++++++++++++++++++
- 1 files changed, 33 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/arm/omap/timer.txt         |    2 ++
+ arch/arm/boot/dts/am33xx.dtsi                      |    1 +
+ arch/arm/mach-omap2/timer.c                        |    6 +++---
+ 3 files changed, 6 insertions(+), 3 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
+index 8732d4d..62d4f2c 100644
+--- a/Documentation/devicetree/bindings/arm/omap/timer.txt
++++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
+@@ -18,6 +18,8 @@ Optional properties:
+ - ti,timer-pwm: 	Indicates the timer can generate a PWM output.
+ - ti,timer-secure: 	Indicates the timer is reserved on a secure OMAP device
+ 			and therefore cannot be used by the kernel.
++- ti,timer-non-wkup	Indicates the timer is in non-wkup power domain and hence
++			will lose register context when the power domain transitions
+ 
+ Example:
+ 
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 4731748..b4e8bf7 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -251,6 +251,7 @@
+ 			reg = <0x48040000 0x400>;
+ 			interrupts = <68>;
+ 			ti,hwmods = "timer2";
++			ti,timer-non-wkup;
+ 		};
+ 
+ 		timer3: timer at 48042000 {
 diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 691aa67..38f9cbc 100644
+index 38f9cbc..cfb3413 100644
 --- a/arch/arm/mach-omap2/timer.c
 +++ b/arch/arm/mach-omap2/timer.c
-@@ -128,6 +128,36 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
- 	}
- }
+@@ -264,7 +264,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	int r = 0;
  
-+static void omap_clkevt_suspend(struct clock_event_device *unused)
-+{
-+	char name[10];
-+	struct omap_hwmod *oh;
-+
-+	sprintf(name, "timer%d", clkev.id);
-+	oh = omap_hwmod_lookup(name);
-+	if (!oh)
-+		return;
-+
-+	__omap_dm_timer_stop(&clkev, 1, clkev.rate);
-+	omap_hwmod_idle(oh);
-+}
-+
-+static void omap_clkevt_resume(struct clock_event_device *unused)
-+{
-+	char name[10];
-+	struct omap_hwmod *oh;
-+
-+	sprintf(name, "timer%d", clkev.id);
-+	oh = omap_hwmod_lookup(name);
-+	if (!oh)
-+		return;
-+
-+	omap_hwmod_enable(oh);
-+	__omap_dm_timer_load_start(&clkev,
-+			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
-+	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
-+}
-+
- static struct clock_event_device clockevent_gpt = {
- 	.name		= "gp_timer",
- 	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-@@ -135,6 +165,8 @@ static struct clock_event_device clockevent_gpt = {
- 	.rating		= 300,
- 	.set_next_event	= omap2_gp_timer_set_next_event,
- 	.set_mode	= omap2_gp_timer_set_mode,
-+	.suspend	= omap_clkevt_suspend,
-+	.resume		= omap_clkevt_resume,
- };
+ 	if (of_have_populated_dt()) {
+-		np = omap_get_timer_dt(omap_timer_match, NULL);
++		np = omap_get_timer_dt(omap_timer_match, property);
+ 		if (!np)
+ 			return -ENODEV;
  
- static struct property device_disabled = {
-@@ -323,6 +355,7 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
- 	int res;
+@@ -633,8 +633,8 @@ OMAP_SYS_TIMER(3_gp, gptimer);
+ #endif /* CONFIG_ARCH_OMAP3 */
  
- 	clkev.errata = omap_dm_timer_get_errata();
-+	clkev.id = gptimer_id;
+ #ifdef CONFIG_SOC_AM33XX
+-OMAP_SYS_GP_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, "ti,timer-alwon",
+-		       2, OMAP4_MPU_SOURCE);
++OMAP_SYS_GP_TIMER_INIT(3_am33xx, 2, OMAP4_MPU_SOURCE, "ti,timer-non-wkup",
++		       1, OMAP4_MPU_SOURCE);
+ OMAP_SYS_TIMER(3_am33xx, gptimer);
+ #endif /* CONFIG_SOC_AM33XX */
  
- 	/*
- 	 * For clock-event timers we never read the timer counter and
 -- 
 1.7.0.4
