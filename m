@@ -1,230 +1,245 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 1 Jan 2013 22:53:19 +0100
-Subject: [PATCH v2 02/11] ARM: S3C24XX: move irq-pm code into main irq file
+Date: Tue, 1 Jan 2013 22:54:48 +0100
+Subject: [PATCH v2 03/11] ARM: S3C24XX: cleanup irq-pm integration
 In-Reply-To: <201301012251.15899.heiko@sntech.de>
 References: <201301012251.15899.heiko@sntech.de>
-Message-ID: <201301012253.20093.heiko@sntech.de>
+Message-ID: <201301012254.49106.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this change, it's possible to make more elements static
-and also reduce the number of .h elements further down the road.
+This patch integrates the irq-pm functions we moved in the previous patch.
+This includes some static attributes and the removal of the irq suspend
+and resume declaratons from the plat-samsung/pm.h header.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/mach-s3c24xx/Makefile |    2 +-
- arch/arm/mach-s3c24xx/irq-pm.c |   95 ----------------------------------------
- arch/arm/plat-s3c24xx/irq.c    |   76 ++++++++++++++++++++++++++++++++
- 3 files changed, 77 insertions(+), 96 deletions(-)
- delete mode 100644 arch/arm/mach-s3c24xx/irq-pm.c
+ arch/arm/mach-s3c24xx/common.h          |    2 ++
+ arch/arm/mach-s3c24xx/s3c2410.c         |    4 +++-
+ arch/arm/mach-s3c24xx/s3c2412.c         |    4 +++-
+ arch/arm/mach-s3c24xx/s3c2416.c         |    4 +++-
+ arch/arm/mach-s3c24xx/s3c2440.c         |    4 +++-
+ arch/arm/mach-s3c24xx/s3c2442.c         |    4 +++-
+ arch/arm/plat-s3c24xx/irq.c             |   22 +++++++++++-----------
+ arch/arm/plat-samsung/include/plat/pm.h |    6 ------
+ 8 files changed, 28 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
-index 0ab6ab1..3e1d12c 100644
---- a/arch/arm/mach-s3c24xx/Makefile
-+++ b/arch/arm/mach-s3c24xx/Makefile
-@@ -37,7 +37,7 @@ obj-$(CONFIG_CPU_S3C2443)	+= s3c2443.o irq-s3c2443.o clock-s3c2443.o
+diff --git a/arch/arm/mach-s3c24xx/common.h b/arch/arm/mach-s3c24xx/common.h
+index c2f596e..ed6276f 100644
+--- a/arch/arm/mach-s3c24xx/common.h
++++ b/arch/arm/mach-s3c24xx/common.h
+@@ -15,4 +15,6 @@
+ void s3c2410_restart(char mode, const char *cmd);
+ void s3c244x_restart(char mode, const char *cmd);
  
- # PM
++extern struct syscore_ops s3c24xx_irq_syscore_ops;
++
+ #endif /* __ARCH_ARM_MACH_S3C24XX_COMMON_H */
+diff --git a/arch/arm/mach-s3c24xx/s3c2410.c b/arch/arm/mach-s3c24xx/s3c2410.c
+index a3c5cb0..9ebef95 100644
+--- a/arch/arm/mach-s3c24xx/s3c2410.c
++++ b/arch/arm/mach-s3c24xx/s3c2410.c
+@@ -49,6 +49,8 @@
+ #include <plat/gpio-cfg.h>
+ #include <plat/gpio-cfg-helpers.h>
  
--obj-$(CONFIG_PM)		+= pm.o irq-pm.o sleep.o
-+obj-$(CONFIG_PM)		+= pm.o sleep.o
++#include "common.h"
++
+ /* Initial IO mappings */
  
- # common code
+ static struct map_desc s3c2410_iodesc[] __initdata = {
+@@ -182,8 +184,8 @@ int __init s3c2410_init(void)
  
-diff --git a/arch/arm/mach-s3c24xx/irq-pm.c b/arch/arm/mach-s3c24xx/irq-pm.c
-deleted file mode 100644
-index 0efb2e2..0000000
---- a/arch/arm/mach-s3c24xx/irq-pm.c
-+++ /dev/null
-@@ -1,95 +0,0 @@
--/* linux/arch/arm/plat-s3c24xx/irq-om.c
-- *
-- * Copyright (c) 2003-2004 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
-- *	http://armlinux.simtec.co.uk/
-- *
-- * S3C24XX - IRQ PM code
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/init.h>
--#include <linux/module.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--
--#include <plat/cpu.h>
--#include <plat/pm.h>
--#include <plat/irq.h>
--
--#include <asm/irq.h>
--
+ #ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
+-#endif
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
++#endif
+ 
+ 	return device_register(&s3c2410_dev);
+ }
+diff --git a/arch/arm/mach-s3c24xx/s3c2412.c b/arch/arm/mach-s3c24xx/s3c2412.c
+index 6c5f403..0ec08bd 100644
+--- a/arch/arm/mach-s3c24xx/s3c2412.c
++++ b/arch/arm/mach-s3c24xx/s3c2412.c
+@@ -51,6 +51,8 @@
+ #include <plat/pll.h>
+ #include <plat/nand-core.h>
+ 
++#include "common.h"
++
+ #ifndef CONFIG_CPU_S3C2412_ONLY
+ void __iomem *s3c24xx_va_gpio2 = S3C24XX_VA_GPIO;
+ 
+@@ -244,8 +246,8 @@ int __init s3c2412_init(void)
+ 
+ #ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2412_pm_syscore_ops);
+-#endif
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
++#endif
+ 
+ 	return device_register(&s3c2412_dev);
+ }
+diff --git a/arch/arm/mach-s3c24xx/s3c2416.c b/arch/arm/mach-s3c24xx/s3c2416.c
+index 77ee0b7..e30476d 100644
+--- a/arch/arm/mach-s3c24xx/s3c2416.c
++++ b/arch/arm/mach-s3c24xx/s3c2416.c
+@@ -63,6 +63,8 @@
+ #include <plat/rtc-core.h>
+ #include <plat/spi-core.h>
+ 
++#include "common.h"
++
+ static struct map_desc s3c2416_iodesc[] __initdata = {
+ 	IODESC_ENT(WATCHDOG),
+ 	IODESC_ENT(CLKPWR),
+@@ -105,9 +107,9 @@ int __init s3c2416_init(void)
+ 
+ #ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2416_pm_syscore_ops);
+-#endif
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ 	register_syscore_ops(&s3c2416_irq_syscore_ops);
++#endif
+ 
+ 	return device_register(&s3c2416_dev);
+ }
+diff --git a/arch/arm/mach-s3c24xx/s3c2440.c b/arch/arm/mach-s3c24xx/s3c2440.c
+index 2b3dddb..559e394 100644
+--- a/arch/arm/mach-s3c24xx/s3c2440.c
++++ b/arch/arm/mach-s3c24xx/s3c2440.c
+@@ -40,6 +40,8 @@
+ #include <plat/gpio-cfg.h>
+ #include <plat/gpio-cfg-helpers.h>
+ 
++#include "common.h"
++
+ static struct device s3c2440_dev = {
+ 	.bus		= &s3c2440_subsys,
+ };
+@@ -57,9 +59,9 @@ int __init s3c2440_init(void)
+ 
+ #ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
++	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ #endif
+ 	register_syscore_ops(&s3c244x_pm_syscore_ops);
+-	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ 
+ 	/* register our system device for everything else */
+ 
+diff --git a/arch/arm/mach-s3c24xx/s3c2442.c b/arch/arm/mach-s3c24xx/s3c2442.c
+index 22cb7c9..f732826 100644
+--- a/arch/arm/mach-s3c24xx/s3c2442.c
++++ b/arch/arm/mach-s3c24xx/s3c2442.c
+@@ -51,6 +51,8 @@
+ #include <plat/gpio-cfg.h>
+ #include <plat/gpio-cfg-helpers.h>
+ 
++#include "common.h"
++
+ /* S3C2442 extended clock support */
+ 
+ static unsigned long s3c2442_camif_upll_round(struct clk *clk,
+@@ -172,9 +174,9 @@ int __init s3c2442_init(void)
+ 
+ #ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
++	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ #endif
+ 	register_syscore_ops(&s3c244x_pm_syscore_ops);
+-	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ 
+ 	return device_register(&s3c2442_dev);
+ }
+diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
+index 9b4404d..d774c3b 100644
+--- a/arch/arm/plat-s3c24xx/irq.c
++++ b/arch/arm/plat-s3c24xx/irq.c
+@@ -134,25 +134,25 @@ static inline void s3c_irq_maskack(struct irq_data *data)
+ }
+ 
+ #ifdef CONFIG_PM
 -/* state for IRQs over sleep */
 -
 -/* default is to allow for EINT0..EINT15, and IRQ_RTC as wakeup sources
-- *
-- * set bit to 1 in allow bitfield to enable the wakeup settings on it
++/* state for IRQs over sleep
+  *
++ * default is to allow for EINT0..EINT15, and IRQ_RTC as wakeup sources
+  * set bit to 1 in allow bitfield to enable the wakeup settings on it
 -*/
--
++ */
+ 
 -unsigned long s3c_irqwake_intallow	= 1L << (IRQ_RTC - IRQ_EINT0) | 0xfL;
--unsigned long s3c_irqwake_eintallow	= 0x0000fff0L;
--
--int s3c_irq_wake(struct irq_data *data, unsigned int state)
--{
++unsigned long s3c_irqwake_intallow	= 1L << 30 | 0xfL;
+ unsigned long s3c_irqwake_eintallow	= 0x0000fff0L;
+ 
++/* FIXME: must not be static until s3c2412 irqs are included */
+ int s3c_irq_wake(struct irq_data *data, unsigned int state)
+ {
 -	unsigned long irqbit = 1 << (data->irq - IRQ_EINT0);
--
--	if (!(s3c_irqwake_intallow & irqbit))
--		return -ENOENT;
--
++	unsigned long irqbit = 1 << data->hwirq;
+ 
+ 	if (!(s3c_irqwake_intallow & irqbit))
+ 		return -ENOENT;
+ 
 -	printk(KERN_INFO "wake %s for irq %d\n",
 -	       state ? "enabled" : "disabled", data->irq);
--
--	if (!state)
--		s3c_irqwake_intmask |= irqbit;
--	else
--		s3c_irqwake_intmask &= ~irqbit;
--
--	return 0;
--}
--
--static struct sleep_save irq_save[] = {
--	SAVE_ITEM(S3C2410_INTMSK),
--	SAVE_ITEM(S3C2410_INTSUBMSK),
--};
--
--/* the extint values move between the s3c2410/s3c2440 and the s3c2412
-- * so we use an array to hold them, and to calculate the address of
-- * the register at run-time
--*/
--
--static unsigned long save_extint[3];
--static unsigned long save_eintflt[4];
--static unsigned long save_eintmask;
--
++	pr_info("wake %s for hwirq %lu\n",
++		state ? "enabled" : "disabled", data->hwirq);
+ 
+ 	if (!state)
+ 		s3c_irqwake_intmask |= irqbit;
+@@ -635,7 +635,7 @@ static unsigned long save_extint[3];
+ static unsigned long save_eintflt[4];
+ static unsigned long save_eintmask;
+ 
 -int s3c24xx_irq_suspend(void)
--{
--	unsigned int i;
--
--	for (i = 0; i < ARRAY_SIZE(save_extint); i++)
--		save_extint[i] = __raw_readl(S3C24XX_EXTINT0 + (i*4));
--
--	for (i = 0; i < ARRAY_SIZE(save_eintflt); i++)
--		save_eintflt[i] = __raw_readl(S3C24XX_EINFLT0 + (i*4));
--
--	s3c_pm_do_save(irq_save, ARRAY_SIZE(irq_save));
--	save_eintmask = __raw_readl(S3C24XX_EINTMASK);
--
--	return 0;
--}
--
++static int s3c24xx_irq_suspend(void)
+ {
+ 	unsigned int i;
+ 
+@@ -651,7 +651,7 @@ int s3c24xx_irq_suspend(void)
+ 	return 0;
+ }
+ 
 -void s3c24xx_irq_resume(void)
--{
--	unsigned int i;
--
--	for (i = 0; i < ARRAY_SIZE(save_extint); i++)
--		__raw_writel(save_extint[i], S3C24XX_EXTINT0 + (i*4));
--
--	for (i = 0; i < ARRAY_SIZE(save_eintflt); i++)
--		__raw_writel(save_eintflt[i], S3C24XX_EINFLT0 + (i*4));
--
--	s3c_pm_do_restore(irq_save, ARRAY_SIZE(irq_save));
--	__raw_writel(save_eintmask, S3C24XX_EINTMASK);
--}
-diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
-index 19ea087..9b4404d 100644
---- a/arch/arm/plat-s3c24xx/irq.c
-+++ b/arch/arm/plat-s3c24xx/irq.c
-@@ -133,6 +133,36 @@ static inline void s3c_irq_maskack(struct irq_data *data)
- 	s3c_irq_ack(data);
- }
++static void s3c24xx_irq_resume(void)
+ {
+ 	unsigned int i;
  
-+#ifdef CONFIG_PM
-+/* state for IRQs over sleep */
-+
-+/* default is to allow for EINT0..EINT15, and IRQ_RTC as wakeup sources
-+ *
-+ * set bit to 1 in allow bitfield to enable the wakeup settings on it
-+*/
-+
-+unsigned long s3c_irqwake_intallow	= 1L << (IRQ_RTC - IRQ_EINT0) | 0xfL;
-+unsigned long s3c_irqwake_eintallow	= 0x0000fff0L;
-+
-+int s3c_irq_wake(struct irq_data *data, unsigned int state)
-+{
-+	unsigned long irqbit = 1 << (data->irq - IRQ_EINT0);
-+
-+	if (!(s3c_irqwake_intallow & irqbit))
-+		return -ENOENT;
-+
-+	printk(KERN_INFO "wake %s for irq %d\n",
-+	       state ? "enabled" : "disabled", data->irq);
-+
-+	if (!state)
-+		s3c_irqwake_intmask |= irqbit;
-+	else
-+		s3c_irqwake_intmask &= ~irqbit;
-+
-+	return 0;
-+}
-+#endif
-+
- struct irq_chip s3c_irq_level_chip = {
- 	.name		= "s3c-level",
- 	.irq_ack	= s3c_irq_maskack,
-@@ -590,6 +620,52 @@ void __init s3c24xx_init_irq(void)
- 					       &s3c24xx_irq_ops, &s3c_intc[2]);
+@@ -664,9 +664,9 @@ void s3c24xx_irq_resume(void)
+ 	s3c_pm_do_restore(irq_save, ARRAY_SIZE(irq_save));
+ 	__raw_writel(save_eintmask, S3C24XX_EINTMASK);
  }
+-#endif
  
-+#ifdef CONFIG_PM
-+static struct sleep_save irq_save[] = {
-+	SAVE_ITEM(S3C2410_INTMSK),
-+	SAVE_ITEM(S3C2410_INTSUBMSK),
-+};
-+
-+/* the extint values move between the s3c2410/s3c2440 and the s3c2412
-+ * so we use an array to hold them, and to calculate the address of
-+ * the register at run-time
-+*/
-+
-+static unsigned long save_extint[3];
-+static unsigned long save_eintflt[4];
-+static unsigned long save_eintmask;
-+
-+int s3c24xx_irq_suspend(void)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(save_extint); i++)
-+		save_extint[i] = __raw_readl(S3C24XX_EXTINT0 + (i*4));
-+
-+	for (i = 0; i < ARRAY_SIZE(save_eintflt); i++)
-+		save_eintflt[i] = __raw_readl(S3C24XX_EINFLT0 + (i*4));
-+
-+	s3c_pm_do_save(irq_save, ARRAY_SIZE(irq_save));
-+	save_eintmask = __raw_readl(S3C24XX_EINTMASK);
-+
-+	return 0;
-+}
-+
-+void s3c24xx_irq_resume(void)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(save_extint); i++)
-+		__raw_writel(save_extint[i], S3C24XX_EXTINT0 + (i*4));
-+
-+	for (i = 0; i < ARRAY_SIZE(save_eintflt); i++)
-+		__raw_writel(save_eintflt[i], S3C24XX_EINFLT0 + (i*4));
-+
-+	s3c_pm_do_restore(irq_save, ARRAY_SIZE(irq_save));
-+	__raw_writel(save_eintmask, S3C24XX_EINTMASK);
-+}
-+#endif
-+
  struct syscore_ops s3c24xx_irq_syscore_ops = {
  	.suspend	= s3c24xx_irq_suspend,
  	.resume		= s3c24xx_irq_resume,
+ };
++#endif
+diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
+index 887a0c9..f6fcade 100644
+--- a/arch/arm/plat-samsung/include/plat/pm.h
++++ b/arch/arm/plat-samsung/include/plat/pm.h
+@@ -109,17 +109,11 @@ extern void s3c_pm_do_restore_core(struct sleep_save *ptr, int count);
+ #ifdef CONFIG_PM
+ extern int s3c_irq_wake(struct irq_data *data, unsigned int state);
+ extern int s3c_irqext_wake(struct irq_data *data, unsigned int state);
+-extern int s3c24xx_irq_suspend(void);
+-extern void s3c24xx_irq_resume(void);
+ #else
+ #define s3c_irq_wake NULL
+ #define s3c_irqext_wake NULL
+-#define s3c24xx_irq_suspend NULL
+-#define s3c24xx_irq_resume  NULL
+ #endif
+ 
+-extern struct syscore_ops s3c24xx_irq_syscore_ops;
+-
+ /* PM debug functions */
+ 
+ #ifdef CONFIG_SAMSUNG_PM_DEBUG
 -- 
 1.7.2.3
