@@ -1,245 +1,708 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 1 Jan 2013 22:54:48 +0100
-Subject: [PATCH v2 03/11] ARM: S3C24XX: cleanup irq-pm integration
+Date: Tue, 1 Jan 2013 22:55:29 +0100
+Subject: [PATCH v2 04/11] ARM: S3C24XX: move s3c2416 irq init to common irq
+ code
 In-Reply-To: <201301012251.15899.heiko@sntech.de>
 References: <201301012251.15899.heiko@sntech.de>
-Message-ID: <201301012254.49106.heiko@sntech.de>
+Message-ID: <201301012255.30189.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch integrates the irq-pm functions we moved in the previous patch.
-This includes some static attributes and the removal of the irq suspend
-and resume declaratons from the plat-samsung/pm.h header.
+This is needed to further clean up the irq init.
+The only change made during the move is the renaming of the
+possibly conflicting irq_save to irq2_save
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/mach-s3c24xx/common.h          |    2 ++
- arch/arm/mach-s3c24xx/s3c2410.c         |    4 +++-
- arch/arm/mach-s3c24xx/s3c2412.c         |    4 +++-
- arch/arm/mach-s3c24xx/s3c2416.c         |    4 +++-
- arch/arm/mach-s3c24xx/s3c2440.c         |    4 +++-
- arch/arm/mach-s3c24xx/s3c2442.c         |    4 +++-
- arch/arm/plat-s3c24xx/irq.c             |   22 +++++++++++-----------
- arch/arm/plat-samsung/include/plat/pm.h |    6 ------
- 8 files changed, 28 insertions(+), 22 deletions(-)
+ arch/arm/mach-s3c24xx/Makefile      |    2 +-
+ arch/arm/mach-s3c24xx/irq-s3c2416.c |  348 -----------------------------------
+ arch/arm/plat-s3c24xx/irq.c         |  309 +++++++++++++++++++++++++++++++
+ 3 files changed, 310 insertions(+), 349 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2416.c
 
-diff --git a/arch/arm/mach-s3c24xx/common.h b/arch/arm/mach-s3c24xx/common.h
-index c2f596e..ed6276f 100644
---- a/arch/arm/mach-s3c24xx/common.h
-+++ b/arch/arm/mach-s3c24xx/common.h
-@@ -15,4 +15,6 @@
- void s3c2410_restart(char mode, const char *cmd);
- void s3c244x_restart(char mode, const char *cmd);
+diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
+index 3e1d12c..30904c9 100644
+--- a/arch/arm/mach-s3c24xx/Makefile
++++ b/arch/arm/mach-s3c24xx/Makefile
+@@ -25,7 +25,7 @@ obj-$(CONFIG_S3C2412_DMA)	+= dma-s3c2412.o
+ obj-$(CONFIG_S3C2412_PM)	+= pm-s3c2412.o
+ obj-$(CONFIG_S3C2412_PM_SLEEP)	+= sleep-s3c2412.o
  
-+extern struct syscore_ops s3c24xx_irq_syscore_ops;
-+
- #endif /* __ARCH_ARM_MACH_S3C24XX_COMMON_H */
-diff --git a/arch/arm/mach-s3c24xx/s3c2410.c b/arch/arm/mach-s3c24xx/s3c2410.c
-index a3c5cb0..9ebef95 100644
---- a/arch/arm/mach-s3c24xx/s3c2410.c
-+++ b/arch/arm/mach-s3c24xx/s3c2410.c
-@@ -49,6 +49,8 @@
- #include <plat/gpio-cfg.h>
- #include <plat/gpio-cfg-helpers.h>
+-obj-$(CONFIG_CPU_S3C2416)	+= s3c2416.o irq-s3c2416.o clock-s3c2416.o
++obj-$(CONFIG_CPU_S3C2416)	+= s3c2416.o clock-s3c2416.o
+ obj-$(CONFIG_S3C2416_PM)	+= pm-s3c2416.o
  
-+#include "common.h"
-+
- /* Initial IO mappings */
- 
- static struct map_desc s3c2410_iodesc[] __initdata = {
-@@ -182,8 +184,8 @@ int __init s3c2410_init(void)
- 
- #ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2410_pm_syscore_ops);
+ obj-$(CONFIG_CPU_S3C2440)	+= s3c2440.o irq-s3c2440.o clock-s3c2440.o
+diff --git a/arch/arm/mach-s3c24xx/irq-s3c2416.c b/arch/arm/mach-s3c24xx/irq-s3c2416.c
+deleted file mode 100644
+index ff141b0..0000000
+--- a/arch/arm/mach-s3c24xx/irq-s3c2416.c
++++ /dev/null
+@@ -1,348 +0,0 @@
+-/* linux/arch/arm/mach-s3c2416/irq.c
+- *
+- * Copyright (c) 2009 Yauhen Kharuzhy <jekhor@gmail.com>,
+- *	as part of OpenInkpot project
+- * Copyright (c) 2009 Promwad Innovation Company
+- *	Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+-*/
+-
+-#include <linux/init.h>
+-#include <linux/module.h>
+-#include <linux/interrupt.h>
+-#include <linux/ioport.h>
+-#include <linux/device.h>
+-#include <linux/io.h>
+-#include <linux/syscore_ops.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/irq.h>
+-
+-#include <asm/mach/irq.h>
+-
+-#include <mach/regs-irq.h>
+-#include <mach/regs-gpio.h>
+-
+-#include <plat/cpu.h>
+-#include <plat/pm.h>
+-#include <plat/irq.h>
+-
+-#define INTMSK(start, end) ((1 << ((end) + 1 - (start))) - 1)
+-
+-static inline void s3c2416_irq_demux(unsigned int irq, unsigned int len)
+-{
+-	unsigned int subsrc, submsk;
+-	unsigned int end;
+-
+-	/* read the current pending interrupts, and the mask
+-	 * for what it is available */
+-
+-	subsrc = __raw_readl(S3C2410_SUBSRCPND);
+-	submsk = __raw_readl(S3C2410_INTSUBMSK);
+-
+-	subsrc  &= ~submsk;
+-	subsrc >>= (irq - S3C2410_IRQSUB(0));
+-	subsrc  &= (1 << len)-1;
+-
+-	end = len + irq;
+-
+-	for (; irq < end && subsrc; irq++) {
+-		if (subsrc & 1)
+-			generic_handle_irq(irq);
+-
+-		subsrc >>= 1;
+-	}
+-}
+-
+-/* WDT/AC97 sub interrupts */
+-
+-static void s3c2416_irq_demux_wdtac97(unsigned int irq, struct irq_desc *desc)
+-{
+-	s3c2416_irq_demux(IRQ_S3C2443_WDT, 4);
+-}
+-
+-#define INTMSK_WDTAC97	(1UL << (IRQ_WDT - IRQ_EINT0))
+-#define SUBMSK_WDTAC97	INTMSK(IRQ_S3C2443_WDT, IRQ_S3C2443_AC97)
+-
+-static void s3c2416_irq_wdtac97_mask(struct irq_data *data)
+-{
+-	s3c_irqsub_mask(data->irq, INTMSK_WDTAC97, SUBMSK_WDTAC97);
+-}
+-
+-static void s3c2416_irq_wdtac97_unmask(struct irq_data *data)
+-{
+-	s3c_irqsub_unmask(data->irq, INTMSK_WDTAC97);
+-}
+-
+-static void s3c2416_irq_wdtac97_ack(struct irq_data *data)
+-{
+-	s3c_irqsub_maskack(data->irq, INTMSK_WDTAC97, SUBMSK_WDTAC97);
+-}
+-
+-static struct irq_chip s3c2416_irq_wdtac97 = {
+-	.irq_mask	= s3c2416_irq_wdtac97_mask,
+-	.irq_unmask	= s3c2416_irq_wdtac97_unmask,
+-	.irq_ack	= s3c2416_irq_wdtac97_ack,
+-};
+-
+-/* LCD sub interrupts */
+-
+-static void s3c2416_irq_demux_lcd(unsigned int irq, struct irq_desc *desc)
+-{
+-	s3c2416_irq_demux(IRQ_S3C2443_LCD1, 4);
+-}
+-
+-#define INTMSK_LCD	(1UL << (IRQ_LCD - IRQ_EINT0))
+-#define SUBMSK_LCD	INTMSK(IRQ_S3C2443_LCD1, IRQ_S3C2443_LCD4)
+-
+-static void s3c2416_irq_lcd_mask(struct irq_data *data)
+-{
+-	s3c_irqsub_mask(data->irq, INTMSK_LCD, SUBMSK_LCD);
+-}
+-
+-static void s3c2416_irq_lcd_unmask(struct irq_data *data)
+-{
+-	s3c_irqsub_unmask(data->irq, INTMSK_LCD);
+-}
+-
+-static void s3c2416_irq_lcd_ack(struct irq_data *data)
+-{
+-	s3c_irqsub_maskack(data->irq, INTMSK_LCD, SUBMSK_LCD);
+-}
+-
+-static struct irq_chip s3c2416_irq_lcd = {
+-	.irq_mask	= s3c2416_irq_lcd_mask,
+-	.irq_unmask	= s3c2416_irq_lcd_unmask,
+-	.irq_ack	= s3c2416_irq_lcd_ack,
+-};
+-
+-/* DMA sub interrupts */
+-
+-static void s3c2416_irq_demux_dma(unsigned int irq, struct irq_desc *desc)
+-{
+-	s3c2416_irq_demux(IRQ_S3C2443_DMA0, 6);
+-}
+-
+-#define INTMSK_DMA	(1UL << (IRQ_S3C2443_DMA - IRQ_EINT0))
+-#define SUBMSK_DMA	INTMSK(IRQ_S3C2443_DMA0, IRQ_S3C2443_DMA5)
+-
+-
+-static void s3c2416_irq_dma_mask(struct irq_data *data)
+-{
+-	s3c_irqsub_mask(data->irq, INTMSK_DMA, SUBMSK_DMA);
+-}
+-
+-static void s3c2416_irq_dma_unmask(struct irq_data *data)
+-{
+-	s3c_irqsub_unmask(data->irq, INTMSK_DMA);
+-}
+-
+-static void s3c2416_irq_dma_ack(struct irq_data *data)
+-{
+-	s3c_irqsub_maskack(data->irq, INTMSK_DMA, SUBMSK_DMA);
+-}
+-
+-static struct irq_chip s3c2416_irq_dma = {
+-	.irq_mask	= s3c2416_irq_dma_mask,
+-	.irq_unmask	= s3c2416_irq_dma_unmask,
+-	.irq_ack	= s3c2416_irq_dma_ack,
+-};
+-
+-/* UART3 sub interrupts */
+-
+-static void s3c2416_irq_demux_uart3(unsigned int irq, struct irq_desc *desc)
+-{
+-	s3c2416_irq_demux(IRQ_S3C2443_RX3, 3);
+-}
+-
+-#define INTMSK_UART3	(1UL << (IRQ_S3C2443_UART3 - IRQ_EINT0))
+-#define SUBMSK_UART3	(0x7 << (IRQ_S3C2443_RX3 - S3C2410_IRQSUB(0)))
+-
+-static void s3c2416_irq_uart3_mask(struct irq_data *data)
+-{
+-	s3c_irqsub_mask(data->irq, INTMSK_UART3, SUBMSK_UART3);
+-}
+-
+-static void s3c2416_irq_uart3_unmask(struct irq_data *data)
+-{
+-	s3c_irqsub_unmask(data->irq, INTMSK_UART3);
+-}
+-
+-static void s3c2416_irq_uart3_ack(struct irq_data *data)
+-{
+-	s3c_irqsub_maskack(data->irq, INTMSK_UART3, SUBMSK_UART3);
+-}
+-
+-static struct irq_chip s3c2416_irq_uart3 = {
+-	.irq_mask	= s3c2416_irq_uart3_mask,
+-	.irq_unmask	= s3c2416_irq_uart3_unmask,
+-	.irq_ack	= s3c2416_irq_uart3_ack,
+-};
+-
+-/* second interrupt register */
+-
+-static inline void s3c2416_irq_ack_second(struct irq_data *data)
+-{
+-	unsigned long bitval = 1UL << (data->irq - IRQ_S3C2416_2D);
+-
+-	__raw_writel(bitval, S3C2416_SRCPND2);
+-	__raw_writel(bitval, S3C2416_INTPND2);
+-}
+-
+-static void s3c2416_irq_mask_second(struct irq_data *data)
+-{
+-	unsigned long bitval = 1UL << (data->irq - IRQ_S3C2416_2D);
+-	unsigned long mask;
+-
+-	mask = __raw_readl(S3C2416_INTMSK2);
+-	mask |= bitval;
+-	__raw_writel(mask, S3C2416_INTMSK2);
+-}
+-
+-static void s3c2416_irq_unmask_second(struct irq_data *data)
+-{
+-	unsigned long bitval = 1UL << (data->irq - IRQ_S3C2416_2D);
+-	unsigned long mask;
+-
+-	mask = __raw_readl(S3C2416_INTMSK2);
+-	mask &= ~bitval;
+-	__raw_writel(mask, S3C2416_INTMSK2);
+-}
+-
+-struct irq_chip s3c2416_irq_second = {
+-	.irq_ack	= s3c2416_irq_ack_second,
+-	.irq_mask	= s3c2416_irq_mask_second,
+-	.irq_unmask	= s3c2416_irq_unmask_second,
+-};
+-
+-
+-/* IRQ initialisation code */
+-
+-static int s3c2416_add_sub(unsigned int base,
+-				   void (*demux)(unsigned int,
+-						 struct irq_desc *),
+-				   struct irq_chip *chip,
+-				   unsigned int start, unsigned int end)
+-{
+-	unsigned int irqno;
+-
+-	irq_set_chip_and_handler(base, &s3c_irq_level_chip, handle_level_irq);
+-	irq_set_chained_handler(base, demux);
+-
+-	for (irqno = start; irqno <= end; irqno++) {
+-		irq_set_chip_and_handler(irqno, chip, handle_level_irq);
+-		set_irq_flags(irqno, IRQF_VALID);
+-	}
+-
+-	return 0;
+-}
+-
+-static void s3c2416_irq_add_second(void)
+-{
+-	unsigned long pend;
+-	unsigned long last;
+-	int irqno;
+-	int i;
+-
+-	/* first, clear all interrupts pending... */
+-	last = 0;
+-	for (i = 0; i < 4; i++) {
+-		pend = __raw_readl(S3C2416_INTPND2);
+-
+-		if (pend == 0 || pend == last)
+-			break;
+-
+-		__raw_writel(pend, S3C2416_SRCPND2);
+-		__raw_writel(pend, S3C2416_INTPND2);
+-		printk(KERN_INFO "irq: clearing pending status %08x\n",
+-		       (int)pend);
+-		last = pend;
+-	}
+-
+-	for (irqno = IRQ_S3C2416_2D; irqno <= IRQ_S3C2416_I2S1; irqno++) {
+-		switch (irqno) {
+-		case IRQ_S3C2416_RESERVED2:
+-		case IRQ_S3C2416_RESERVED3:
+-			/* no IRQ here */
+-			break;
+-		default:
+-			irq_set_chip_and_handler(irqno, &s3c2416_irq_second,
+-						 handle_edge_irq);
+-			set_irq_flags(irqno, IRQF_VALID);
+-		}
+-	}
+-}
+-
+-static int s3c2416_irq_add(struct device *dev,
+-				  struct subsys_interface *sif)
+-{
+-	printk(KERN_INFO "S3C2416: IRQ Support\n");
+-
+-	s3c2416_add_sub(IRQ_LCD, s3c2416_irq_demux_lcd, &s3c2416_irq_lcd,
+-			IRQ_S3C2443_LCD2, IRQ_S3C2443_LCD4);
+-
+-	s3c2416_add_sub(IRQ_S3C2443_DMA, s3c2416_irq_demux_dma,
+-			&s3c2416_irq_dma, IRQ_S3C2443_DMA0, IRQ_S3C2443_DMA5);
+-
+-	s3c2416_add_sub(IRQ_S3C2443_UART3, s3c2416_irq_demux_uart3,
+-			&s3c2416_irq_uart3,
+-			IRQ_S3C2443_RX3, IRQ_S3C2443_ERR3);
+-
+-	s3c2416_add_sub(IRQ_WDT, s3c2416_irq_demux_wdtac97,
+-			&s3c2416_irq_wdtac97,
+-			IRQ_S3C2443_WDT, IRQ_S3C2443_AC97);
+-
+-	s3c2416_irq_add_second();
+-
+-	return 0;
+-}
+-
+-static struct subsys_interface s3c2416_irq_interface = {
+-	.name		= "s3c2416_irq",
+-	.subsys		= &s3c2416_subsys,
+-	.add_dev	= s3c2416_irq_add,
+-};
+-
+-static int __init s3c2416_irq_init(void)
+-{
+-	return subsys_interface_register(&s3c2416_irq_interface);
+-}
+-
+-arch_initcall(s3c2416_irq_init);
+-
+-#ifdef CONFIG_PM
+-static struct sleep_save irq_save[] = {
+-	SAVE_ITEM(S3C2416_INTMSK2),
+-};
+-
+-int s3c2416_irq_suspend(void)
+-{
+-	s3c_pm_do_save(irq_save, ARRAY_SIZE(irq_save));
+-
+-	return 0;
+-}
+-
+-void s3c2416_irq_resume(void)
+-{
+-	s3c_pm_do_restore(irq_save, ARRAY_SIZE(irq_save));
+-}
+-
+-struct syscore_ops s3c2416_irq_syscore_ops = {
+-	.suspend	= s3c2416_irq_suspend,
+-	.resume		= s3c2416_irq_resume,
+-};
 -#endif
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
-+#endif
- 
- 	return device_register(&s3c2410_dev);
- }
-diff --git a/arch/arm/mach-s3c24xx/s3c2412.c b/arch/arm/mach-s3c24xx/s3c2412.c
-index 6c5f403..0ec08bd 100644
---- a/arch/arm/mach-s3c24xx/s3c2412.c
-+++ b/arch/arm/mach-s3c24xx/s3c2412.c
-@@ -51,6 +51,8 @@
- #include <plat/pll.h>
- #include <plat/nand-core.h>
- 
-+#include "common.h"
-+
- #ifndef CONFIG_CPU_S3C2412_ONLY
- void __iomem *s3c24xx_va_gpio2 = S3C24XX_VA_GPIO;
- 
-@@ -244,8 +246,8 @@ int __init s3c2412_init(void)
- 
- #ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2412_pm_syscore_ops);
--#endif
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
-+#endif
- 
- 	return device_register(&s3c2412_dev);
- }
-diff --git a/arch/arm/mach-s3c24xx/s3c2416.c b/arch/arm/mach-s3c24xx/s3c2416.c
-index 77ee0b7..e30476d 100644
---- a/arch/arm/mach-s3c24xx/s3c2416.c
-+++ b/arch/arm/mach-s3c24xx/s3c2416.c
-@@ -63,6 +63,8 @@
- #include <plat/rtc-core.h>
- #include <plat/spi-core.h>
- 
-+#include "common.h"
-+
- static struct map_desc s3c2416_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
- 	IODESC_ENT(CLKPWR),
-@@ -105,9 +107,9 @@ int __init s3c2416_init(void)
- 
- #ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2416_pm_syscore_ops);
--#endif
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
- 	register_syscore_ops(&s3c2416_irq_syscore_ops);
-+#endif
- 
- 	return device_register(&s3c2416_dev);
- }
-diff --git a/arch/arm/mach-s3c24xx/s3c2440.c b/arch/arm/mach-s3c24xx/s3c2440.c
-index 2b3dddb..559e394 100644
---- a/arch/arm/mach-s3c24xx/s3c2440.c
-+++ b/arch/arm/mach-s3c24xx/s3c2440.c
-@@ -40,6 +40,8 @@
- #include <plat/gpio-cfg.h>
- #include <plat/gpio-cfg-helpers.h>
- 
-+#include "common.h"
-+
- static struct device s3c2440_dev = {
- 	.bus		= &s3c2440_subsys,
- };
-@@ -57,9 +59,9 @@ int __init s3c2440_init(void)
- 
- #ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2410_pm_syscore_ops);
-+	register_syscore_ops(&s3c24xx_irq_syscore_ops);
- #endif
- 	register_syscore_ops(&s3c244x_pm_syscore_ops);
--	register_syscore_ops(&s3c24xx_irq_syscore_ops);
- 
- 	/* register our system device for everything else */
- 
-diff --git a/arch/arm/mach-s3c24xx/s3c2442.c b/arch/arm/mach-s3c24xx/s3c2442.c
-index 22cb7c9..f732826 100644
---- a/arch/arm/mach-s3c24xx/s3c2442.c
-+++ b/arch/arm/mach-s3c24xx/s3c2442.c
-@@ -51,6 +51,8 @@
- #include <plat/gpio-cfg.h>
- #include <plat/gpio-cfg-helpers.h>
- 
-+#include "common.h"
-+
- /* S3C2442 extended clock support */
- 
- static unsigned long s3c2442_camif_upll_round(struct clk *clk,
-@@ -172,9 +174,9 @@ int __init s3c2442_init(void)
- 
- #ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2410_pm_syscore_ops);
-+	register_syscore_ops(&s3c24xx_irq_syscore_ops);
- #endif
- 	register_syscore_ops(&s3c244x_pm_syscore_ops);
--	register_syscore_ops(&s3c24xx_irq_syscore_ops);
- 
- 	return device_register(&s3c2442_dev);
- }
 diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
-index 9b4404d..d774c3b 100644
+index d774c3b..450e95b 100644
 --- a/arch/arm/plat-s3c24xx/irq.c
 +++ b/arch/arm/plat-s3c24xx/irq.c
-@@ -134,25 +134,25 @@ static inline void s3c_irq_maskack(struct irq_data *data)
- }
- 
- #ifdef CONFIG_PM
--/* state for IRQs over sleep */
--
--/* default is to allow for EINT0..EINT15, and IRQ_RTC as wakeup sources
-+/* state for IRQs over sleep
-  *
-+ * default is to allow for EINT0..EINT15, and IRQ_RTC as wakeup sources
-  * set bit to 1 in allow bitfield to enable the wakeup settings on it
--*/
-+ */
- 
--unsigned long s3c_irqwake_intallow	= 1L << (IRQ_RTC - IRQ_EINT0) | 0xfL;
-+unsigned long s3c_irqwake_intallow	= 1L << 30 | 0xfL;
- unsigned long s3c_irqwake_eintallow	= 0x0000fff0L;
- 
-+/* FIXME: must not be static until s3c2412 irqs are included */
- int s3c_irq_wake(struct irq_data *data, unsigned int state)
- {
--	unsigned long irqbit = 1 << (data->irq - IRQ_EINT0);
-+	unsigned long irqbit = 1 << data->hwirq;
- 
- 	if (!(s3c_irqwake_intallow & irqbit))
- 		return -ENOENT;
- 
--	printk(KERN_INFO "wake %s for irq %d\n",
--	       state ? "enabled" : "disabled", data->irq);
-+	pr_info("wake %s for hwirq %lu\n",
-+		state ? "enabled" : "disabled", data->hwirq);
- 
- 	if (!state)
- 		s3c_irqwake_intmask |= irqbit;
-@@ -635,7 +635,7 @@ static unsigned long save_extint[3];
- static unsigned long save_eintflt[4];
- static unsigned long save_eintmask;
- 
--int s3c24xx_irq_suspend(void)
-+static int s3c24xx_irq_suspend(void)
- {
- 	unsigned int i;
- 
-@@ -651,7 +651,7 @@ int s3c24xx_irq_suspend(void)
- 	return 0;
- }
- 
--void s3c24xx_irq_resume(void)
-+static void s3c24xx_irq_resume(void)
- {
- 	unsigned int i;
- 
-@@ -664,9 +664,9 @@ void s3c24xx_irq_resume(void)
- 	s3c_pm_do_restore(irq_save, ARRAY_SIZE(irq_save));
- 	__raw_writel(save_eintmask, S3C24XX_EINTMASK);
- }
--#endif
- 
- struct syscore_ops s3c24xx_irq_syscore_ops = {
- 	.suspend	= s3c24xx_irq_suspend,
+@@ -670,3 +670,312 @@ struct syscore_ops s3c24xx_irq_syscore_ops = {
  	.resume		= s3c24xx_irq_resume,
  };
-+#endif
-diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
-index 887a0c9..f6fcade 100644
---- a/arch/arm/plat-samsung/include/plat/pm.h
-+++ b/arch/arm/plat-samsung/include/plat/pm.h
-@@ -109,17 +109,11 @@ extern void s3c_pm_do_restore_core(struct sleep_save *ptr, int count);
- #ifdef CONFIG_PM
- extern int s3c_irq_wake(struct irq_data *data, unsigned int state);
- extern int s3c_irqext_wake(struct irq_data *data, unsigned int state);
--extern int s3c24xx_irq_suspend(void);
--extern void s3c24xx_irq_resume(void);
- #else
- #define s3c_irq_wake NULL
- #define s3c_irqext_wake NULL
--#define s3c24xx_irq_suspend NULL
--#define s3c24xx_irq_resume  NULL
  #endif
- 
--extern struct syscore_ops s3c24xx_irq_syscore_ops;
--
- /* PM debug functions */
- 
- #ifdef CONFIG_SAMSUNG_PM_DEBUG
++
++#ifdef CONFIG_CPU_S3C2416
++#define INTMSK(start, end) ((1 << ((end) + 1 - (start))) - 1)
++
++static inline void s3c2416_irq_demux(unsigned int irq, unsigned int len)
++{
++	unsigned int subsrc, submsk;
++	unsigned int end;
++
++	/* read the current pending interrupts, and the mask
++	 * for what it is available */
++
++	subsrc = __raw_readl(S3C2410_SUBSRCPND);
++	submsk = __raw_readl(S3C2410_INTSUBMSK);
++
++	subsrc  &= ~submsk;
++	subsrc >>= (irq - S3C2410_IRQSUB(0));
++	subsrc  &= (1 << len)-1;
++
++	end = len + irq;
++
++	for (; irq < end && subsrc; irq++) {
++		if (subsrc & 1)
++			generic_handle_irq(irq);
++
++		subsrc >>= 1;
++	}
++}
++
++/* WDT/AC97 sub interrupts */
++
++static void s3c2416_irq_demux_wdtac97(unsigned int irq, struct irq_desc *desc)
++{
++	s3c2416_irq_demux(IRQ_S3C2443_WDT, 4);
++}
++
++#define INTMSK_WDTAC97	(1UL << (IRQ_WDT - IRQ_EINT0))
++#define SUBMSK_WDTAC97	INTMSK(IRQ_S3C2443_WDT, IRQ_S3C2443_AC97)
++
++static void s3c2416_irq_wdtac97_mask(struct irq_data *data)
++{
++	s3c_irqsub_mask(data->irq, INTMSK_WDTAC97, SUBMSK_WDTAC97);
++}
++
++static void s3c2416_irq_wdtac97_unmask(struct irq_data *data)
++{
++	s3c_irqsub_unmask(data->irq, INTMSK_WDTAC97);
++}
++
++static void s3c2416_irq_wdtac97_ack(struct irq_data *data)
++{
++	s3c_irqsub_maskack(data->irq, INTMSK_WDTAC97, SUBMSK_WDTAC97);
++}
++
++static struct irq_chip s3c2416_irq_wdtac97 = {
++	.irq_mask	= s3c2416_irq_wdtac97_mask,
++	.irq_unmask	= s3c2416_irq_wdtac97_unmask,
++	.irq_ack	= s3c2416_irq_wdtac97_ack,
++};
++
++/* LCD sub interrupts */
++
++static void s3c2416_irq_demux_lcd(unsigned int irq, struct irq_desc *desc)
++{
++	s3c2416_irq_demux(IRQ_S3C2443_LCD1, 4);
++}
++
++#define INTMSK_LCD	(1UL << (IRQ_LCD - IRQ_EINT0))
++#define SUBMSK_LCD	INTMSK(IRQ_S3C2443_LCD1, IRQ_S3C2443_LCD4)
++
++static void s3c2416_irq_lcd_mask(struct irq_data *data)
++{
++	s3c_irqsub_mask(data->irq, INTMSK_LCD, SUBMSK_LCD);
++}
++
++static void s3c2416_irq_lcd_unmask(struct irq_data *data)
++{
++	s3c_irqsub_unmask(data->irq, INTMSK_LCD);
++}
++
++static void s3c2416_irq_lcd_ack(struct irq_data *data)
++{
++	s3c_irqsub_maskack(data->irq, INTMSK_LCD, SUBMSK_LCD);
++}
++
++static struct irq_chip s3c2416_irq_lcd = {
++	.irq_mask	= s3c2416_irq_lcd_mask,
++	.irq_unmask	= s3c2416_irq_lcd_unmask,
++	.irq_ack	= s3c2416_irq_lcd_ack,
++};
++
++/* DMA sub interrupts */
++
++static void s3c2416_irq_demux_dma(unsigned int irq, struct irq_desc *desc)
++{
++	s3c2416_irq_demux(IRQ_S3C2443_DMA0, 6);
++}
++
++#define INTMSK_DMA	(1UL << (IRQ_S3C2443_DMA - IRQ_EINT0))
++#define SUBMSK_DMA	INTMSK(IRQ_S3C2443_DMA0, IRQ_S3C2443_DMA5)
++
++
++static void s3c2416_irq_dma_mask(struct irq_data *data)
++{
++	s3c_irqsub_mask(data->irq, INTMSK_DMA, SUBMSK_DMA);
++}
++
++static void s3c2416_irq_dma_unmask(struct irq_data *data)
++{
++	s3c_irqsub_unmask(data->irq, INTMSK_DMA);
++}
++
++static void s3c2416_irq_dma_ack(struct irq_data *data)
++{
++	s3c_irqsub_maskack(data->irq, INTMSK_DMA, SUBMSK_DMA);
++}
++
++static struct irq_chip s3c2416_irq_dma = {
++	.irq_mask	= s3c2416_irq_dma_mask,
++	.irq_unmask	= s3c2416_irq_dma_unmask,
++	.irq_ack	= s3c2416_irq_dma_ack,
++};
++
++/* UART3 sub interrupts */
++
++static void s3c2416_irq_demux_uart3(unsigned int irq, struct irq_desc *desc)
++{
++	s3c2416_irq_demux(IRQ_S3C2443_RX3, 3);
++}
++
++#define INTMSK_UART3	(1UL << (IRQ_S3C2443_UART3 - IRQ_EINT0))
++#define SUBMSK_UART3	(0x7 << (IRQ_S3C2443_RX3 - S3C2410_IRQSUB(0)))
++
++static void s3c2416_irq_uart3_mask(struct irq_data *data)
++{
++	s3c_irqsub_mask(data->irq, INTMSK_UART3, SUBMSK_UART3);
++}
++
++static void s3c2416_irq_uart3_unmask(struct irq_data *data)
++{
++	s3c_irqsub_unmask(data->irq, INTMSK_UART3);
++}
++
++static void s3c2416_irq_uart3_ack(struct irq_data *data)
++{
++	s3c_irqsub_maskack(data->irq, INTMSK_UART3, SUBMSK_UART3);
++}
++
++static struct irq_chip s3c2416_irq_uart3 = {
++	.irq_mask	= s3c2416_irq_uart3_mask,
++	.irq_unmask	= s3c2416_irq_uart3_unmask,
++	.irq_ack	= s3c2416_irq_uart3_ack,
++};
++
++/* second interrupt register */
++
++static inline void s3c2416_irq_ack_second(struct irq_data *data)
++{
++	unsigned long bitval = 1UL << (data->irq - IRQ_S3C2416_2D);
++
++	__raw_writel(bitval, S3C2416_SRCPND2);
++	__raw_writel(bitval, S3C2416_INTPND2);
++}
++
++static void s3c2416_irq_mask_second(struct irq_data *data)
++{
++	unsigned long bitval = 1UL << (data->irq - IRQ_S3C2416_2D);
++	unsigned long mask;
++
++	mask = __raw_readl(S3C2416_INTMSK2);
++	mask |= bitval;
++	__raw_writel(mask, S3C2416_INTMSK2);
++}
++
++static void s3c2416_irq_unmask_second(struct irq_data *data)
++{
++	unsigned long bitval = 1UL << (data->irq - IRQ_S3C2416_2D);
++	unsigned long mask;
++
++	mask = __raw_readl(S3C2416_INTMSK2);
++	mask &= ~bitval;
++	__raw_writel(mask, S3C2416_INTMSK2);
++}
++
++struct irq_chip s3c2416_irq_second = {
++	.irq_ack	= s3c2416_irq_ack_second,
++	.irq_mask	= s3c2416_irq_mask_second,
++	.irq_unmask	= s3c2416_irq_unmask_second,
++};
++
++
++/* IRQ initialisation code */
++
++static int s3c2416_add_sub(unsigned int base,
++				   void (*demux)(unsigned int,
++						 struct irq_desc *),
++				   struct irq_chip *chip,
++				   unsigned int start, unsigned int end)
++{
++	unsigned int irqno;
++
++	irq_set_chip_and_handler(base, &s3c_irq_level_chip, handle_level_irq);
++	irq_set_chained_handler(base, demux);
++
++	for (irqno = start; irqno <= end; irqno++) {
++		irq_set_chip_and_handler(irqno, chip, handle_level_irq);
++		set_irq_flags(irqno, IRQF_VALID);
++	}
++
++	return 0;
++}
++
++static void s3c2416_irq_add_second(void)
++{
++	unsigned long pend;
++	unsigned long last;
++	int irqno;
++	int i;
++
++	/* first, clear all interrupts pending... */
++	last = 0;
++	for (i = 0; i < 4; i++) {
++		pend = __raw_readl(S3C2416_INTPND2);
++
++		if (pend == 0 || pend == last)
++			break;
++
++		__raw_writel(pend, S3C2416_SRCPND2);
++		__raw_writel(pend, S3C2416_INTPND2);
++		printk(KERN_INFO "irq: clearing pending status %08x\n",
++		       (int)pend);
++		last = pend;
++	}
++
++	for (irqno = IRQ_S3C2416_2D; irqno <= IRQ_S3C2416_I2S1; irqno++) {
++		switch (irqno) {
++		case IRQ_S3C2416_RESERVED2:
++		case IRQ_S3C2416_RESERVED3:
++			/* no IRQ here */
++			break;
++		default:
++			irq_set_chip_and_handler(irqno, &s3c2416_irq_second,
++						 handle_edge_irq);
++			set_irq_flags(irqno, IRQF_VALID);
++		}
++	}
++}
++
++static int s3c2416_irq_add(struct device *dev,
++				  struct subsys_interface *sif)
++{
++	printk(KERN_INFO "S3C2416: IRQ Support\n");
++
++	s3c2416_add_sub(IRQ_LCD, s3c2416_irq_demux_lcd, &s3c2416_irq_lcd,
++			IRQ_S3C2443_LCD2, IRQ_S3C2443_LCD4);
++
++	s3c2416_add_sub(IRQ_S3C2443_DMA, s3c2416_irq_demux_dma,
++			&s3c2416_irq_dma, IRQ_S3C2443_DMA0, IRQ_S3C2443_DMA5);
++
++	s3c2416_add_sub(IRQ_S3C2443_UART3, s3c2416_irq_demux_uart3,
++			&s3c2416_irq_uart3,
++			IRQ_S3C2443_RX3, IRQ_S3C2443_ERR3);
++
++	s3c2416_add_sub(IRQ_WDT, s3c2416_irq_demux_wdtac97,
++			&s3c2416_irq_wdtac97,
++			IRQ_S3C2443_WDT, IRQ_S3C2443_AC97);
++
++	s3c2416_irq_add_second();
++
++	return 0;
++}
++
++static struct subsys_interface s3c2416_irq_interface = {
++	.name		= "s3c2416_irq",
++	.subsys		= &s3c2416_subsys,
++	.add_dev	= s3c2416_irq_add,
++};
++
++static int __init s3c2416_irq_init(void)
++{
++	return subsys_interface_register(&s3c2416_irq_interface);
++}
++
++arch_initcall(s3c2416_irq_init);
++
++#ifdef CONFIG_PM
++static struct sleep_save irq2_save[] = {
++	SAVE_ITEM(S3C2416_INTMSK2),
++};
++
++int s3c2416_irq_suspend(void)
++{
++	s3c_pm_do_save(irq2_save, ARRAY_SIZE(irq2_save));
++
++	return 0;
++}
++
++void s3c2416_irq_resume(void)
++{
++	s3c_pm_do_restore(irq2_save, ARRAY_SIZE(irq2_save));
++}
++
++struct syscore_ops s3c2416_irq_syscore_ops = {
++	.suspend	= s3c2416_irq_suspend,
++	.resume		= s3c2416_irq_resume,
++};
++#endif
++
++#endif
 -- 
 1.7.2.3
