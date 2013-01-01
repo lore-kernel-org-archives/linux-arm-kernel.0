@@ -1,50 +1,73 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Mon, 31 Dec 2012 13:04:14 -0800
-Subject: [PATCH Resend] ARM: pxa27x: fix ac97 controller warm reset code
-In-Reply-To: <50E1613B.9040403@compulab.co.il>
-References: <1356728815-14410-1-git-send-email-mikedunn@newsguy.com>
- <50E1613B.9040403@compulab.co.il>
-Message-ID: <50E1FDCE.4010101@newsguy.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Mon, 31 Dec 2012 17:07:46 -0800
+Subject: [PATCH] arm: dma mapping: export arm iommu functions
+In-Reply-To: <20121229065356.GA13760@quad.lixom.net>
+References: <1356592458-11077-1-git-send-email-prathyush.k@samsung.com>
+ <50DC580C.7080507@samsung.com>
+ <CAH=HWYP5r18qjQSc_2121vikbTMpYv6DKOfW=hpOpGB7rUyNRA@mail.gmail.com>
+ <20121229065356.GA13760@quad.lixom.net>
+Message-ID: <50E236E2.9050305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/31/2012 01:56 AM, Igor Grinberg wrote:
-> On 12/28/12 23:06, Mike Dunn wrote:
 
 
-[..]
-
-
+On Friday 28 December 2012 10:53 PM, Olof Johansson wrote:
+> On Fri, Dec 28, 2012 at 09:53:47AM +0530, Prathyush K wrote:
+>> On Thu, Dec 27, 2012 at 7:45 PM, Marek Szyprowski
+>> <m.szyprowski@samsung.com>wrote:
 >>
->>  static unsigned long ac97_reset_config[] = {
->> -	GPIO113_GPIO,
->> +	MFP_CFG_OUT(GPIO113, AF0, DRIVE_HIGH),
->>  	GPIO113_AC97_nRESET,
->> -	GPIO95_GPIO,
->> +	MFP_CFG_OUT(GPIO95, AF0, DRIVE_HIGH),
-> 
-> It was always discouraged to code the above directly.
+>>> Hello,
+>>>
+>>>
+>>> On 12/27/2012 8:14 AM, Prathyush K wrote:
+>>>
+>>>> This patch adds EXPORT_SYMBOL calls to the three arm iommu
+>>>> functions - arm_iommu_create_mapping, arm_iommu_free_mapping
+>>>> and arm_iommu_attach_device. These functions can now be called
+>>>> from dynamic modules.
+>>>>
+>>>
+>>> Could You describe a bit more why those functions might be needed by
+>>> dynamic modules?
+>>>
+>>> Hi Marek,
+>>
+>> We are adding iommu support to exynos gsc and s5p-mfc.
+>> And these two drivers need to be built as modules to improve boot time.
+>>
+>> We're calling these three functions from inside these drivers:
+>> e.g.
+>> mapping = arm_iommu_create_mapping(&platform_bus_type, 0x20000000, SZ_256M,
+>> 4);
+>> arm_iommu_attach_device(mdev, mapping);
+>
+> The driver shouldn't have to call these low-level functions directly,
+> something's wrong if you need that.
+
+These are not truly low-level calls, but arm specific wrappers to the 
+dma-mapping implementations. Drivers need to call former to declare 
+mappings requirement needed for their IOMMU and later to start using it.
+
+>
+> How is the DMA address management different here from other system/io mmus? is
+> that 256M window a hardware restriction?
+
+No, each IOMMU is capable of 4G. But to keep the IOMMU address space to 
+what is required, various sizes were used earlier and later fixed on to 
+256M. This can be increased if the drivers demand more buffers mapped to 
+the device at anytime.
 
 
-Had a funny feeling about that when I coded it...  I should have heeded the
-feeling instead of being hasty.
+Regards,
+Subash
 
-
-> How about one of the below:
-> 1)
-> GPIO113_GPIO | MFP_PULL_HIGH,
-> GPIO95_GPIO  | MFP_PULL_HIGH,
-> 
-> or
-> 
-> 2) introduce something like:
-> GPIO113_AC97_nRESET_GPIO_HIGH
-> GPIO95_AC97_nRESET_GPIO_HIGH
-> in the mfp-pxa27x.h file and use them in the structure above.
-
-
-OK, will implement your suggestion and resubmit.  To me, your first option seems
-clearer to the casual reader.
-
-Thanks Igor,
-Mike
+>
+> -Olof
+>
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+>
