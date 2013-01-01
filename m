@@ -1,47 +1,39 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 31 Jan 2013 23:46:58 -0700
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130201061450.GS29973@lunn.ch>
-References: <51082C4E.5050903@gmail.com> <20130130000341.GA10600@schnuecks.de>
- <51086E86.8040705@gmail.com> <20130130083044.GA25688@schnuecks.de>
- <5108F300.7000705@gmail.com>
- <20130130230100.GV7717@titan.lakedaemon.net>
- <20130131224457.GB17976@schnuecks.de>
- <20130201000109.GK7717@titan.lakedaemon.net>
- <20130201001932.GA13044@obsidianresearch.com>
- <20130201061450.GS29973@lunn.ch>
-Message-ID: <20130201064658.GA17576@obsidianresearch.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue,  1 Jan 2013 21:08:03 +1300
+Subject: [PATCH] mmc: vt8500: Remove __devexit attribute on .remove
+Message-ID: <1357027683-26992-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 07:14:50AM +0100, Andrew Lunn wrote:
-> > My guesses would be the RTC and/or GPIO blocks (the GPIO blinker needs
-> > a clock), based on table 94.
-> 
-> I've used AT91 parts where you can do GPO with the clock disabled, but
-> GPI needed a ticking clock. So, yes, GPIO is a good candidate for
-> ruint clock as well.
-> 
-> Looking through the data sheets, and comparing against the gated
-> clocks, we have the following without their own clock:
-> 
-> RTC, I2C (a.k.a. TWI), UART, NAND, SPI, Watchdog, eFuse,
+With the changes to HOTPLUG merged for 3.8, this attribute is
+no longer required and results in a warning at compile time.
 
-Hmm..
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ drivers/mmc/host/wmt-sdmmc.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-If watchdog is on the runit clock then the bridge registers and thus
-the timer are on the runit clock, so the whole point would be moot.
-
-Any easy test would be to boot a system with a minimal DT, basically
-serial only, and have the kernel disable the runit clock, read a
-register from one of those blocks, enable the clock and print OK. The
-ones that lock up need the runit clock for sure. 7 boots should answer
-the question :)
-
-My guess is that all the peripherals behind mbus unit 0x1 (see table
-94, and table 96) are controlled by that clock gate. The other gates
-seem to be organized by mbus unit, and there is something very tidy
-about that from a hardware perspective :)
-
-Jason
+diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+index 5ba4605..3a7ce57 100644
+--- a/drivers/mmc/host/wmt-sdmmc.c
++++ b/drivers/mmc/host/wmt-sdmmc.c
+@@ -892,7 +892,7 @@ fail1:
+ 	return ret;
+ }
+ 
+-static int __devexit wmt_mci_remove(struct platform_device *pdev)
++static int wmt_mci_remove(struct platform_device *pdev)
+ {
+ 	struct mmc_host *mmc;
+ 	struct wmt_mci_priv *priv;
+@@ -1012,7 +1012,7 @@ static const struct dev_pm_ops wmt_mci_pm = {
+ 
+ static struct platform_driver wmt_mci_driver = {
+ 	.probe = wmt_mci_probe,
+-	.remove = __exit_p(wmt_mci_remove),
++	.remove = wmt_mci_remove,
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+ 		.owner = THIS_MODULE,
+-- 
+1.7.9.5
