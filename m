@@ -1,32 +1,33 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue,  1 Jan 2013 21:16:07 +0800
-Subject: [PATCH] ARM: mm: fix wrong branch from a9 to pj4b
-Message-ID: <1357046167-32495-1-git-send-email-haojian.zhuang@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 1 Jan 2013 10:15:09 -0800
+Subject: [PATCH 3/3] ARM: OMAP: SRAM: resolve sparse warnings
+In-Reply-To: <20121224012500.13698.73653.stgit@dusk.lan>
+References: <20121224012304.13698.43551.stgit@dusk.lan>
+ <20121224012500.13698.73653.stgit@dusk.lan>
+Message-ID: <20130101181508.GB22106@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_ARCH_MULTIPLATFORM & CONFIG_ARCH_MVEBU are both enabled,
-__v7_pj4b_setup is added between __v7_ca9mp_setup and __v7_setup.
+* Paul Walmsley <paul@pwsan.com> [121223 17:30]:
+> Commit bb77209432873214a796a70a4539e4ebdf3feb54 ("ARM: OMAP: Move
+> omap2+ specific parts of sram.c to mach-omap2") adds some new sparse
+> warnings:
+> 
+> arch/arm/plat-omap/sram.c:43:6: warning: symbol 'omap_sram_push_address' was not declared. Should it be static?
+> arch/arm/plat-omap/sram.c:65:6: warning: symbol 'omap_sram_reset' was not declared. Should it be static?
+> arch/arm/plat-omap/sram.c:73:13: warning: symbol 'omap_map_sram' was not declared. Should it be static?
+> 
+> Fix by creating a temporary header file containing prototypes for
+> these SRAM functions - needed until the SRAM code is moved to
+> drivers/.  arch/arm/plat-omap/include/plat/sram.h can't be added due
+> to ARM CONFIG_ARCH_MULTIPLATFORM restrictions on the use of the "plat/"
+> include path shortcut.
 
-But there's no jump instruction added. If the chip is Cortex A5/A9,
-it goes through __v7_pj4b_setup also. It results in system hang.
+Here too we should just include <plat/sram.h>, that's OK for the
+multiplatform builds. Just drivers will not have it available.
+Then eventually the issue disappears as this code becomes a regular
+device driver.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/mm/proc-v7.S |    1 +
- 1 file changed, 1 insertion(+)
+Regards,
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 350f6a7..863de63 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -169,6 +169,7 @@ __v7_ca15mp_setup:
- 	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
- 	mcreq	p15, 0, r0, c1, c0, 1
- #endif
-+	b	__v7_setup
- 
- __v7_pj4b_setup:
- #ifdef CONFIG_CPU_PJ4B
--- 
-1.7.10.4
+Tony
