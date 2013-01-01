@@ -1,29 +1,38 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Tue, 01 Jan 2013 19:33:42 +0100
-Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
- IS_ERR_OR_NULL
-In-Reply-To: <50D62BC9.9010706@mvista.com>
-References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
- <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
- <50D62BC9.9010706@mvista.com>
-Message-ID: <50E32C06.5020104@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 1 Jan 2013 10:13:20 -0800
+Subject: [PATCH 1/3] ARM: OMAP: 32k counter: resolve sparse warnings
+In-Reply-To: <20121224012456.13698.41839.stgit@dusk.lan>
+References: <20121224012304.13698.43551.stgit@dusk.lan>
+ <20121224012456.13698.41839.stgit@dusk.lan>
+Message-ID: <20130101181319.GA22106@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2012 10:53 PM, Sergei Shtylyov wrote:
-> Hello.
->
-> On 18-12-2012 21:34, Tony Prisk wrote:
->
->> Resend to include mailing lists.
->
-> Such remarks should be placed under --- tear line, not in the changelog.
->
->> Replace IS_ERR_OR_NULL with IS_ERR on clk_get results.
->
->> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
->> CC: Kyungmin Park <kyungmin.park@samsung.com>
->> CC: Tomasz Stanislawski <t.stanislaws@samsung.com>
->> CC: linux-media at vger.kernel.org
+Hi,
 
-I've applied first version of this patch to my tree for 3.9, thanks.
+Sorry for the delay, just noticed this looking at your pull request.
+
+* Paul Walmsley <paul@pwsan.com> [121223 17:30]:
+> Commit 1fe97c8f6a1de67a5f56e029a818903d5bed8017 ("ARM: OMAP: Make OMAP
+> clocksource source selection using kernel param") results in a new warning
+> from sparse:
+> 
+> arch/arm/plat-omap/counter_32k.c:86:12: warning: symbol 'omap_init_clocksource_32k' was not declared. Should it be static?
+> 
+> Fix by adding a temporary header file, needed until the 32k counter
+> code is moved to drivers/.
+> arch/arm/plat-omap/include/plat/counter-32k.h can't be added due to
+> ARM CONFIG_ARCH_MULTIPLATFORM restrictions on the use of the "plat/"
+> include path shortcut.
+
+Here it's OK to include <plat/counter-32k.h> for multiplatform builds
+as the path will be included in plat-omap/Makefile.
+
+So include <plat/*.h> will only disappear for drivers. In the long
+run we should just make the remaining code in plat-omap into drivers,
+and then issue will disappear for good. But until these are all drivers,
+we should just include <plat/counter-32k.h>.
+
+Regards,
+
+Tony
