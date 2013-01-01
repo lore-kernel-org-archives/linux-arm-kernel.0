@@ -1,310 +1,167 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 1 Jan 2013 22:56:30 +0100
-Subject: [PATCH v2 06/11] ARM: S3C24XX: assimilate s3c2416 subirqs into new
- structure
+Date: Tue, 1 Jan 2013 22:57:31 +0100
+Subject: [PATCH v2 07/11] ARM: S3C24XX: assimilate second s3c2416 interrupt
+ into new structure
 In-Reply-To: <201301012251.15899.heiko@sntech.de>
 References: <201301012251.15899.heiko@sntech.de>
-Message-ID: <201301012256.30853.heiko@sntech.de>
+Message-ID: <201301012257.31613.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The contents of the base interrupt register is identical for
-s3c2443 and s3c2416/2450, so keep it separate already.
+The interrupt ack,mask and unmask functions for the main interrupt
+register are also able to handle the second one of the s3c2416.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/plat-s3c24xx/irq.c |  257 ++++++++++++-------------------------------
- 1 files changed, 72 insertions(+), 185 deletions(-)
+ arch/arm/plat-s3c24xx/irq.c |  106 ++++++++++++-------------------------------
+ 1 files changed, 30 insertions(+), 76 deletions(-)
 
 diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
-index 55b5e6e..9407845 100644
+index 9407845..646861a 100644
 --- a/arch/arm/plat-s3c24xx/irq.c
 +++ b/arch/arm/plat-s3c24xx/irq.c
-@@ -671,158 +671,44 @@ struct syscore_ops s3c24xx_irq_syscore_ops = {
- };
+@@ -17,6 +17,7 @@
+ */
+ 
+ #include <linux/init.h>
++#include <linux/slab.h>
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
+ #include <linux/ioport.h>
+@@ -409,7 +410,8 @@ static int s3c24xx_irq_map(struct irq_domain *h, unsigned int virq,
+ 						 handle_edge_irq);
+ 		break;
+ 	case S3C_IRQTYPE_EDGE:
+-		if (irq_data->parent_irq)
++		if (irq_data->parent_irq ||
++		    intc->reg_pending == S3C2416_SRCPND2)
+ 			irq_set_chip_and_handler(virq, &s3c_irq_subedge_chip,
+ 						 handle_edge_irq);
+ 		else
+@@ -709,80 +711,6 @@ struct s3c_irq_data init_s3c2443base[32] = {
  #endif
  
--#ifdef CONFIG_CPU_S3C2416
--#define INTMSK(start, end) ((1 << ((end) + 1 - (start))) - 1)
+ #ifdef CONFIG_CPU_S3C2416
 -
--static inline void s3c2416_irq_demux(unsigned int irq, unsigned int len)
+-/* second interrupt register */
+-
+-static inline void s3c2416_irq_ack_second(struct irq_data *data)
 -{
--	unsigned int subsrc, submsk;
--	unsigned int end;
+-	unsigned long bitval = 1UL << (data->irq - IRQ_S3C2416_2D);
 -
--	/* read the current pending interrupts, and the mask
--	 * for what it is available */
+-	__raw_writel(bitval, S3C2416_SRCPND2);
+-	__raw_writel(bitval, S3C2416_INTPND2);
+-}
 -
--	subsrc = __raw_readl(S3C2410_SUBSRCPND);
--	submsk = __raw_readl(S3C2410_INTSUBMSK);
+-static void s3c2416_irq_mask_second(struct irq_data *data)
+-{
+-	unsigned long bitval = 1UL << (data->irq - IRQ_S3C2416_2D);
+-	unsigned long mask;
 -
--	subsrc  &= ~submsk;
--	subsrc >>= (irq - S3C2410_IRQSUB(0));
--	subsrc  &= (1 << len)-1;
+-	mask = __raw_readl(S3C2416_INTMSK2);
+-	mask |= bitval;
+-	__raw_writel(mask, S3C2416_INTMSK2);
+-}
 -
--	end = len + irq;
+-static void s3c2416_irq_unmask_second(struct irq_data *data)
+-{
+-	unsigned long bitval = 1UL << (data->irq - IRQ_S3C2416_2D);
+-	unsigned long mask;
 -
--	for (; irq < end && subsrc; irq++) {
--		if (subsrc & 1)
--			generic_handle_irq(irq);
+-	mask = __raw_readl(S3C2416_INTMSK2);
+-	mask &= ~bitval;
+-	__raw_writel(mask, S3C2416_INTMSK2);
+-}
 -
--		subsrc >>= 1;
+-struct irq_chip s3c2416_irq_second = {
+-	.irq_ack	= s3c2416_irq_ack_second,
+-	.irq_mask	= s3c2416_irq_mask_second,
+-	.irq_unmask	= s3c2416_irq_unmask_second,
+-};
+-
+-
+-static void s3c2416_irq_add_second(void)
+-{
+-	unsigned long pend;
+-	unsigned long last;
+-	int irqno;
+-	int i;
+-
+-	/* first, clear all interrupts pending... */
+-	last = 0;
+-	for (i = 0; i < 4; i++) {
+-		pend = __raw_readl(S3C2416_INTPND2);
+-
+-		if (pend == 0 || pend == last)
+-			break;
+-
+-		__raw_writel(pend, S3C2416_SRCPND2);
+-		__raw_writel(pend, S3C2416_INTPND2);
+-		printk(KERN_INFO "irq: clearing pending status %08x\n",
+-		       (int)pend);
+-		last = pend;
+-	}
+-
+-	for (irqno = IRQ_S3C2416_2D; irqno <= IRQ_S3C2416_I2S1; irqno++) {
+-		switch (irqno) {
+-		case IRQ_S3C2416_RESERVED2:
+-		case IRQ_S3C2416_RESERVED3:
+-			/* no IRQ here */
+-			break;
+-		default:
+-			irq_set_chip_and_handler(irqno, &s3c2416_irq_second,
+-						 handle_edge_irq);
+-			set_irq_flags(irqno, IRQF_VALID);
+-		}
 -	}
 -}
 -
--/* WDT/AC97 sub interrupts */
--
--static void s3c2416_irq_demux_wdtac97(unsigned int irq, struct irq_desc *desc)
--{
--	s3c2416_irq_demux(IRQ_S3C2443_WDT, 4);
--}
--
--#define INTMSK_WDTAC97	(1UL << (IRQ_WDT - IRQ_EINT0))
--#define SUBMSK_WDTAC97	INTMSK(IRQ_S3C2443_WDT, IRQ_S3C2443_AC97)
--
--static void s3c2416_irq_wdtac97_mask(struct irq_data *data)
--{
--	s3c_irqsub_mask(data->irq, INTMSK_WDTAC97, SUBMSK_WDTAC97);
--}
--
--static void s3c2416_irq_wdtac97_unmask(struct irq_data *data)
--{
--	s3c_irqsub_unmask(data->irq, INTMSK_WDTAC97);
--}
--
--static void s3c2416_irq_wdtac97_ack(struct irq_data *data)
--{
--	s3c_irqsub_maskack(data->irq, INTMSK_WDTAC97, SUBMSK_WDTAC97);
--}
--
--static struct irq_chip s3c2416_irq_wdtac97 = {
--	.irq_mask	= s3c2416_irq_wdtac97_mask,
--	.irq_unmask	= s3c2416_irq_wdtac97_unmask,
--	.irq_ack	= s3c2416_irq_wdtac97_ack,
--};
--
--/* LCD sub interrupts */
--
--static void s3c2416_irq_demux_lcd(unsigned int irq, struct irq_desc *desc)
--{
--	s3c2416_irq_demux(IRQ_S3C2443_LCD1, 4);
--}
--
--#define INTMSK_LCD	(1UL << (IRQ_LCD - IRQ_EINT0))
--#define SUBMSK_LCD	INTMSK(IRQ_S3C2443_LCD1, IRQ_S3C2443_LCD4)
--
--static void s3c2416_irq_lcd_mask(struct irq_data *data)
--{
--	s3c_irqsub_mask(data->irq, INTMSK_LCD, SUBMSK_LCD);
--}
--
--static void s3c2416_irq_lcd_unmask(struct irq_data *data)
--{
--	s3c_irqsub_unmask(data->irq, INTMSK_LCD);
--}
--
--static void s3c2416_irq_lcd_ack(struct irq_data *data)
--{
--	s3c_irqsub_maskack(data->irq, INTMSK_LCD, SUBMSK_LCD);
--}
--
--static struct irq_chip s3c2416_irq_lcd = {
--	.irq_mask	= s3c2416_irq_lcd_mask,
--	.irq_unmask	= s3c2416_irq_lcd_unmask,
--	.irq_ack	= s3c2416_irq_lcd_ack,
--};
--
--/* DMA sub interrupts */
--
--static void s3c2416_irq_demux_dma(unsigned int irq, struct irq_desc *desc)
--{
--	s3c2416_irq_demux(IRQ_S3C2443_DMA0, 6);
--}
--
--#define INTMSK_DMA	(1UL << (IRQ_S3C2443_DMA - IRQ_EINT0))
--#define SUBMSK_DMA	INTMSK(IRQ_S3C2443_DMA0, IRQ_S3C2443_DMA5)
--
--
--static void s3c2416_irq_dma_mask(struct irq_data *data)
--{
--	s3c_irqsub_mask(data->irq, INTMSK_DMA, SUBMSK_DMA);
--}
--
--static void s3c2416_irq_dma_unmask(struct irq_data *data)
--{
--	s3c_irqsub_unmask(data->irq, INTMSK_DMA);
--}
--
--static void s3c2416_irq_dma_ack(struct irq_data *data)
--{
--	s3c_irqsub_maskack(data->irq, INTMSK_DMA, SUBMSK_DMA);
--}
--
--static struct irq_chip s3c2416_irq_dma = {
--	.irq_mask	= s3c2416_irq_dma_mask,
--	.irq_unmask	= s3c2416_irq_dma_unmask,
--	.irq_ack	= s3c2416_irq_dma_ack,
-+#if defined CONFIG_CPU_S3C2416 || defined CONFIG_CPU_S3C2443
-+struct s3c_irq_data init_s3c2443base[32] = {
-+	{ .type = S3C_IRQTYPE_EINT, }, /* EINT0 */
-+	{ .type = S3C_IRQTYPE_EINT, }, /* EINT1 */
-+	{ .type = S3C_IRQTYPE_EINT, }, /* EINT2 */
-+	{ .type = S3C_IRQTYPE_EINT, }, /* EINT3 */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* EINT4to7 */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* EINT8to23 */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* CAM on S3C2443/2450 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* nBATT_FLT */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* TICK */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* WDT/AC97 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* TIMER0 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* TIMER1 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* TIMER2 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* TIMER3 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* TIMER4 */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* UART2 */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* LCD */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* DMA */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* UART3 */
-+	{ .type = S3C_IRQTYPE_NONE, }, /* CFON on S3C2443/2450 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* SDI1 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* SDI0 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* SPI0 */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* UART1 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* NAND */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* USBD */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* USBH */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* IIC */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* UART0 */
-+	{ .type = S3C_IRQTYPE_NONE, }, /* SPI1 on S3C243/2450 */
-+	{ .type = S3C_IRQTYPE_EDGE, }, /* RTC */
-+	{ .type = S3C_IRQTYPE_LEVEL, }, /* ADCPARENT */
- };
-+#endif
- 
--/* UART3 sub interrupts */
--
--static void s3c2416_irq_demux_uart3(unsigned int irq, struct irq_desc *desc)
--{
--	s3c2416_irq_demux(IRQ_S3C2443_RX3, 3);
--}
--
--#define INTMSK_UART3	(1UL << (IRQ_S3C2443_UART3 - IRQ_EINT0))
--#define SUBMSK_UART3	(0x7 << (IRQ_S3C2443_RX3 - S3C2410_IRQSUB(0)))
--
--static void s3c2416_irq_uart3_mask(struct irq_data *data)
--{
--	s3c_irqsub_mask(data->irq, INTMSK_UART3, SUBMSK_UART3);
--}
--
--static void s3c2416_irq_uart3_unmask(struct irq_data *data)
--{
--	s3c_irqsub_unmask(data->irq, INTMSK_UART3);
--}
--
--static void s3c2416_irq_uart3_ack(struct irq_data *data)
--{
--	s3c_irqsub_maskack(data->irq, INTMSK_UART3, SUBMSK_UART3);
--}
--
--static struct irq_chip s3c2416_irq_uart3 = {
--	.irq_mask	= s3c2416_irq_uart3_mask,
--	.irq_unmask	= s3c2416_irq_uart3_unmask,
--	.irq_ack	= s3c2416_irq_uart3_ack,
--};
-+#ifdef CONFIG_CPU_S3C2416
- 
- /* second interrupt register */
- 
-@@ -861,27 +747,6 @@ struct irq_chip s3c2416_irq_second = {
+ struct s3c_irq_data init_s3c2416subint[32] = {
+ 	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 28 }, /* UART0-RX */
+ 	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 28 }, /* UART0-TX */
+@@ -815,8 +743,21 @@ struct s3c_irq_data init_s3c2416subint[32] = {
+ 	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 9 }, /* AC97 */
  };
  
- 
--/* IRQ initialisation code */
--
--static int s3c2416_add_sub(unsigned int base,
--				   void (*demux)(unsigned int,
--						 struct irq_desc *),
--				   struct irq_chip *chip,
--				   unsigned int start, unsigned int end)
--{
--	unsigned int irqno;
--
--	irq_set_chip_and_handler(base, &s3c_irq_level_chip, handle_level_irq);
--	irq_set_chained_handler(base, demux);
--
--	for (irqno = start; irqno <= end; irqno++) {
--		irq_set_chip_and_handler(irqno, chip, handle_level_irq);
--		set_irq_flags(irqno, IRQF_VALID);
--	}
--
--	return 0;
--}
--
- static void s3c2416_irq_add_second(void)
- {
- 	unsigned long pend;
-@@ -918,26 +783,48 @@ static void s3c2416_irq_add_second(void)
- 	}
- }
- 
-+struct s3c_irq_data init_s3c2416subint[32] = {
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 28 }, /* UART0-RX */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 28 }, /* UART0-TX */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 28 }, /* UART0-ERR */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 23 }, /* UART1-RX */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 23 }, /* UART1-TX */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 23 }, /* UART1-ERR */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 15 }, /* UART2-RX */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 15 }, /* UART2-TX */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 15 }, /* UART2-ERR */
-+	{ .type = S3C_IRQTYPE_EDGE, .parent_irq = 31 }, /* TC */
-+	{ .type = S3C_IRQTYPE_EDGE, .parent_irq = 31 }, /* ADC */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 6 }, /* CAM_C S3C2450 */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 6 }, /* CAM_P S3C2450 */
++struct s3c_irq_data init_s3c2416_second[32] = {
++	{ .type = S3C_IRQTYPE_EDGE }, /* 2D */
++	{ .type = S3C_IRQTYPE_EDGE }, /* IIC1 */
 +	{ .type = S3C_IRQTYPE_NONE }, /* reserved */
 +	{ .type = S3C_IRQTYPE_NONE }, /* reserved */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 16 }, /* LCD2 */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 16 }, /* LCD3 */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 16 }, /* LCD4 */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 17 }, /* DMA0 */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 17 }, /* DMA1 */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 17 }, /* DMA2 */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 17 }, /* DMA3 */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 17 }, /* DMA4 */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 17 }, /* DMA5 */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 18 }, /* UART3-RX */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 18 }, /* UART3-TX */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 18 }, /* UART3-ERR */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 9 }, /* WDT */
-+	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 9 }, /* AC97 */
++	{ .type = S3C_IRQTYPE_EDGE }, /* PCM0 */
++	{ .type = S3C_IRQTYPE_EDGE }, /* PCM1 */
++	{ .type = S3C_IRQTYPE_EDGE }, /* I2S0 */
++	{ .type = S3C_IRQTYPE_EDGE }, /* I2S1 */
 +};
 +
  void __init s3c2416_init_irq(void)
  {
-+	/* override irq data */
-+	s3c_intc[0].irqs = &init_s3c2443base[0];
-+	s3c_intc[2].irqs = &init_s3c2416subint[0];
++	struct s3c_irq_intc *s3c_intc2;
 +
- 	pr_info("S3C2416: IRQ Support\n");
+ 	/* override irq data */
+ 	s3c_intc[0].irqs = &init_s3c2443base[0];
+ 	s3c_intc[2].irqs = &init_s3c2416subint[0];
+@@ -825,7 +766,20 @@ void __init s3c2416_init_irq(void)
  
  	s3c24xx_init_irq();
  
--	s3c2416_add_sub(IRQ_LCD, s3c2416_irq_demux_lcd, &s3c2416_irq_lcd,
--			IRQ_S3C2443_LCD2, IRQ_S3C2443_LCD4);
--
--	s3c2416_add_sub(IRQ_S3C2443_DMA, s3c2416_irq_demux_dma,
--			&s3c2416_irq_dma, IRQ_S3C2443_DMA0, IRQ_S3C2443_DMA5);
--
--	s3c2416_add_sub(IRQ_S3C2443_UART3, s3c2416_irq_demux_uart3,
--			&s3c2416_irq_uart3,
--			IRQ_S3C2443_RX3, IRQ_S3C2443_ERR3);
--
--	s3c2416_add_sub(IRQ_WDT, s3c2416_irq_demux_wdtac97,
--			&s3c2416_irq_wdtac97,
--			IRQ_S3C2443_WDT, IRQ_S3C2443_AC97);
--
- 	s3c2416_irq_add_second();
+-	s3c2416_irq_add_second();
++	s3c_intc2 = kzalloc(sizeof(struct s3c_irq_intc), GFP_KERNEL);
++	if (!s3c_intc2) {
++		pr_err("irq: failed to allocate memory for second controller\n");
++		return;
++	}
++
++	s3c_intc2->reg_pending = S3C2416_SRCPND2;
++	s3c_intc2->reg_intpnd = S3C2416_INTPND2;
++	s3c_intc2->reg_mask = S3C2416_INTMSK2;
++	s3c_intc2->irqs = &init_s3c2416_second[0];
++
++	s3c24xx_clear_intc(s3c_intc2);
++	s3c_intc2->domain = irq_domain_add_legacy(NULL, 8, IRQ_S3C2416_2D, 0,
++						  &s3c24xx_irq_ops, s3c_intc2);
  }
  
+ #ifdef CONFIG_PM
 -- 
 1.7.2.3
