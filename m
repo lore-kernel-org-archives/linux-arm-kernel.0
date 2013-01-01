@@ -1,66 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 Jan 2013 10:25:06 -0800
-Subject: [RFC v2 01/18] mailbox: OMAP2+: Add support for AM33XX
-In-Reply-To: <1356959231-17335-2-git-send-email-vaibhav.bedia@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-2-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <20130101182506.GD22106@atomide.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Tue, 01 Jan 2013 19:33:42 +0100
+Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
+ IS_ERR_OR_NULL
+In-Reply-To: <50D62BC9.9010706@mvista.com>
+References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
+ <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
+ <50D62BC9.9010706@mvista.com>
+Message-ID: <50E32C06.5020104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Bedia <vaibhav.bedia@ti.com> [121231 05:10]:
-> Mailbox IP on AM33XX is the same as that present in OMAP4.
-> The single instance of Mailbox IP on AM33XX contains
-> 8 sub-modules and facilitates communication between MPU,
-> PRUs and WKUP_M3.
-> 
-> The first mailbox sub-module is assigned for communication
-> between MPU and WKUP-M3.
-> 
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Cc: Russ Dill <russ.dill@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> v1->v2:
-> 	Address the comment on operator usage from Russ Dill
-> 
->  drivers/mailbox/mailbox-omap2.c |   35 ++++++++++++++++++++++++++++++++++-
->  1 files changed, 34 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mailbox/mailbox-omap2.c b/drivers/mailbox/mailbox-omap2.c
-> index 7c26bed..6d61159 100644
-> --- a/drivers/mailbox/mailbox-omap2.c
-> +++ b/drivers/mailbox/mailbox-omap2.c
-> @@ -151,7 +151,7 @@ static void omap2_mbox_disable_irq(struct mailbox *mbox,
->  	struct omap_mbox2_priv *p = mbox->priv;
->  	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
->  
-> -	if (!cpu_is_omap44xx())
-> +	if (!cpu_is_omap44xx() && !soc_is_am33xx())
->  		bit = mbox_read_reg(p->irqdisable) & ~bit;
->  
->  	mbox_write_reg(bit, p->irqdisable);
+On 12/22/2012 10:53 PM, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 18-12-2012 21:34, Tony Prisk wrote:
+>
+>> Resend to include mailing lists.
+>
+> Such remarks should be placed under --- tear line, not in the changelog.
+>
+>> Replace IS_ERR_OR_NULL with IS_ERR on clk_get results.
+>
+>> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+>> CC: Kyungmin Park <kyungmin.park@samsung.com>
+>> CC: Tomasz Stanislawski <t.stanislaws@samsung.com>
+>> CC: linux-media at vger.kernel.org
 
-The cpu_is/soc_is macros are no longer available to drivers
-with 8d91a42e (Merge tag 'omap-late-cleanups'...). So you'll
-have to pass whatever flags the driver needs in platform_data
-or as device tree properties.
-
-> @@ -386,6 +412,13 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
->  		list[0]->irq = list[1]->irq = platform_get_irq(pdev, 0);
->  	}
->  #endif
-> +#if defined(CONFIG_SOC_AM33XX)
-> +	else if (soc_is_am33xx()) {
-> +		list = am33xx_mboxes;
-> +
-> +		list[0]->irq = platform_get_irq(pdev, 0);
-> +	}
-> +#endif
->  	else {
->  		pr_err("%s: platform not supported\n", __func__);
->  		return -ENODEV;
-
-Here too.
-
-Tony
+I've applied first version of this patch to my tree for 3.9, thanks.
