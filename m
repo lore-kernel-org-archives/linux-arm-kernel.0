@@ -1,37 +1,32 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 01 Jan 2013 14:40:50 +0200
-Subject: [PATCH Resend] ARM: pxa27x: fix ac97 controller warm reset code
-In-Reply-To: <50E1FDCE.4010101@newsguy.com>
-References: <1356728815-14410-1-git-send-email-mikedunn@newsguy.com>
- <50E1613B.9040403@compulab.co.il> <50E1FDCE.4010101@newsguy.com>
-Message-ID: <50E2D952.2050201@compulab.co.il>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue,  1 Jan 2013 21:16:07 +0800
+Subject: [PATCH] ARM: mm: fix wrong branch from a9 to pj4b
+Message-ID: <1357046167-32495-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/31/12 23:04, Mike Dunn wrote:
-> On 12/31/2012 01:56 AM, Igor Grinberg wrote:
->> On 12/28/12 23:06, Mike Dunn wrote:
+If CONFIG_ARCH_MULTIPLATFORM & CONFIG_ARCH_MVEBU are both enabled,
+__v7_pj4b_setup is added between __v7_ca9mp_setup and __v7_setup.
 
-[...]
+But there's no jump instruction added. If the chip is Cortex A5/A9,
+it goes through __v7_pj4b_setup also. It results in system hang.
 
->> How about one of the below:
->> 1)
->> GPIO113_GPIO | MFP_PULL_HIGH,
->> GPIO95_GPIO  | MFP_PULL_HIGH,
->>
->> or
->>
->> 2) introduce something like:
->> GPIO113_AC97_nRESET_GPIO_HIGH
->> GPIO95_AC97_nRESET_GPIO_HIGH
->> in the mfp-pxa27x.h file and use them in the structure above.
-> 
-> 
-> OK, will implement your suggestion and resubmit.  To me, your first option seems
-> clearer to the casual reader.
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/mm/proc-v7.S |    1 +
+ 1 file changed, 1 insertion(+)
 
-Actually, the second option is more robust, because you actually drive the pin.
-
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 350f6a7..863de63 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -169,6 +169,7 @@ __v7_ca15mp_setup:
+ 	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
+ 	mcreq	p15, 0, r0, c1, c0, 1
+ #endif
++	b	__v7_setup
+ 
+ __v7_pj4b_setup:
+ #ifdef CONFIG_CPU_PJ4B
 -- 
-Regards,
-Igor.
+1.7.10.4
