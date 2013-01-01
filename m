@@ -1,39 +1,37 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue,  1 Jan 2013 21:08:03 +1300
-Subject: [PATCH] mmc: vt8500: Remove __devexit attribute on .remove
-Message-ID: <1357027683-26992-1-git-send-email-linux@prisktech.co.nz>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 01 Jan 2013 14:40:50 +0200
+Subject: [PATCH Resend] ARM: pxa27x: fix ac97 controller warm reset code
+In-Reply-To: <50E1FDCE.4010101@newsguy.com>
+References: <1356728815-14410-1-git-send-email-mikedunn@newsguy.com>
+ <50E1613B.9040403@compulab.co.il> <50E1FDCE.4010101@newsguy.com>
+Message-ID: <50E2D952.2050201@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the changes to HOTPLUG merged for 3.8, this attribute is
-no longer required and results in a warning at compile time.
+On 12/31/12 23:04, Mike Dunn wrote:
+> On 12/31/2012 01:56 AM, Igor Grinberg wrote:
+>> On 12/28/12 23:06, Mike Dunn wrote:
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- drivers/mmc/host/wmt-sdmmc.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+[...]
 
-diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
-index 5ba4605..3a7ce57 100644
---- a/drivers/mmc/host/wmt-sdmmc.c
-+++ b/drivers/mmc/host/wmt-sdmmc.c
-@@ -892,7 +892,7 @@ fail1:
- 	return ret;
- }
- 
--static int __devexit wmt_mci_remove(struct platform_device *pdev)
-+static int wmt_mci_remove(struct platform_device *pdev)
- {
- 	struct mmc_host *mmc;
- 	struct wmt_mci_priv *priv;
-@@ -1012,7 +1012,7 @@ static const struct dev_pm_ops wmt_mci_pm = {
- 
- static struct platform_driver wmt_mci_driver = {
- 	.probe = wmt_mci_probe,
--	.remove = __exit_p(wmt_mci_remove),
-+	.remove = wmt_mci_remove,
- 	.driver = {
- 		.name = DRIVER_NAME,
- 		.owner = THIS_MODULE,
+>> How about one of the below:
+>> 1)
+>> GPIO113_GPIO | MFP_PULL_HIGH,
+>> GPIO95_GPIO  | MFP_PULL_HIGH,
+>>
+>> or
+>>
+>> 2) introduce something like:
+>> GPIO113_AC97_nRESET_GPIO_HIGH
+>> GPIO95_AC97_nRESET_GPIO_HIGH
+>> in the mfp-pxa27x.h file and use them in the structure above.
+> 
+> 
+> OK, will implement your suggestion and resubmit.  To me, your first option seems
+> clearer to the casual reader.
+
+Actually, the second option is more robust, because you actually drive the pin.
+
 -- 
-1.7.9.5
+Regards,
+Igor.
