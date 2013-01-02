@@ -1,24 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 2 Jan 2013 12:31:27 -0800
-Subject: [PATCH v3 1/4] ODROID-X: dts: Add board dts file for ODROID-X
-In-Reply-To: <1356921314-12595-2-git-send-email-tobetter@gmail.com>
-References: <1356921314-12595-1-git-send-email-tobetter@gmail.com>
- <1356921314-12595-2-git-send-email-tobetter@gmail.com>
-Message-ID: <CAOesGMgoyT2xTwgPBw1CASO-6iakpRLxEh1aad-LL7SxJ1+5Vg@mail.gmail.com>
+Date: Wed, 2 Jan 2013 12:39:32 -0800
+Subject: [PATCH 0/6] highbank fixes for 3.8
+In-Reply-To: <1356884107-30991-1-git-send-email-robherring2@gmail.com>
+References: <1356884107-30991-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20130102203932.GA7293@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 30, 2012 at 6:35 PM, Dongjin Kim <tobetter@gmail.com> wrote:
-> Add initial dtb file for Hardkernel's ODROID-X board based on EXYNOS4412 SoC.
->
-> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+On Sun, Dec 30, 2012 at 10:15:01AM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> This series fixes secondary boot/hotplug, some boot warnings and
+> suspend/resume for highbank. Arguably, suspend fixes are 3.9 material,
+> but I'm including it here as the same fix needed for suspend/resume is
+> needed to fix secondary core boot on 3.8.
+> 
+> Also, the Nico's gic change (ARM: gic: use a private mapping for CPU target
+> interfaces) breaks QEMU which does not initialize the cpu target registers
+> correctly.
+> 
+> Rob
+> 
+> Rob Herring (6):
+>   ARM: dts: add device_type prop to cpu nodes on Calxeda platforms
+>   ARM: dts: fix highbank cpu mpidr values
+>   ARM: highbank: fix typos with hignbank in power request functions
+>   ARM: highbank: fix secondary boot and hotplug
+>   ARM: highbank: add a power request clear
+>   ARM: highbank: save and restore L2 cache and GIC on suspend
 
-Patch 1-4:
-
-Acked-by: Olof Johansson <olof@lixom.net>
-
-... but I think it might make sense to just add the file as one commit
-instead of splitting it across 4 as this series does.
+All applied to arm-soc fixes. Thanks!
 
 
 -Olof
