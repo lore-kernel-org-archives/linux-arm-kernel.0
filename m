@@ -1,19 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 02 Jan 2013 15:00:57 -0700
-Subject: [PATCH v2 05/11] ARM: dt: tegra30: Add device node for APB MISC
-In-Reply-To: <1356619644-18565-6-git-send-email-pgaikwad@nvidia.com>
-References: <1356619644-18565-1-git-send-email-pgaikwad@nvidia.com>
- <1356619644-18565-6-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <50E4AE19.1060503@wwwdotorg.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 2 Jan 2013 20:03:58 -0200
+Subject: [PATCH v2] ARM: Kconfig: Do not force selection of ARCH_VEXPRESS
+ by ARCH_MULTI_V7
+In-Reply-To: <50C1EE36.6000202@calxeda.com>
+References: <1353431918-9326-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5CQZbRub5ZWHzsNfewcRh5T7pPQuKNaTDYaFg-j1HzN0A@mail.gmail.com>
+ <50C1EE36.6000202@calxeda.com>
+Message-ID: <CAOMZO5An=MSHs4Tpzo82tqDx4kyi4x4L69U8A7+opQ0iOf_u7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/27/2012 07:47 AM, Prashant Gaikwad wrote:
-> APB misc contains multiple registers required by different modules
-> such as CAR.
+Russell,
 
-I don't see a DT binding document that describes what
-nvidia,tegra30-apbmisc means. Also, the register range for this new node
-overlaps that for the pinmux node, so they can't both "request" their
-register region. You may need multiple entries in the apbmisc reg
-property to avoid this.
+On Fri, Dec 7, 2012 at 11:25 AM, Rob Herring <rob.herring@calxeda.com> wrote:
+
+>> Does this version look good?
+>
+> Yes.
+>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+Should I submit this one to the patch system?
+
+Regards,
+
+Fabio Estevam
