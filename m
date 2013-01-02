@@ -1,31 +1,30 @@
 From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Wed, 2 Jan 2013 10:13:53 +0000
-Subject: [PATCH 2/3] ARM: dts: AM33XX: Add d_can instances to aliases
-In-Reply-To: <50AB60BE.1080002@pengutronix.de>
+Date: Wed, 2 Jan 2013 10:14:21 +0000
+Subject: [PATCH 3/3] ARM: dts: AM33XX: Add memory resource to d_can node
+In-Reply-To: <50AC8ECA.1020906@pengutronix.de>
 References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
- <1352916505-12343-3-git-send-email-anilkumar@ti.com>
- <50AB60BE.1080002@pengutronix.de>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAD4881@DBDE01.ent.ti.com>
+ <1352916505-12343-4-git-send-email-anilkumar@ti.com>
+ <50AC8ECA.1020906@pengutronix.de>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAD58A2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 16:21:42, Marc Kleine-Budde wrote:
+On Wed, Nov 21, 2012 at 13:50:26, Marc Kleine-Budde wrote:
 > On 11/14/2012 07:08 PM, AnilKumar Ch wrote:
-> > Add d_can instances to aliases node to get the D_CAN instance number
-> > from the driver. To initialize D_CAN message RAM, corresponding instance
-> > number is required.
+> > Add a new address space/memory resource to d_can device tree node. D_CAN
+> > RAM initialization is achieved through RAMINIT register which is part of
+> > AM33XX control module address space. D_CAN RAM init or de-init should be
+> > done by writing instance corresponding value to control module register.
 > > 
-> > To initialize instance 0 message RAM then 0x1 should be written and for
-> > instance 1 message RAM, 0x2 should be written to control module register.
-> > 
-> > With device-tree framework ip instance number is "-1" by default for all
-> > instances. To get device id/instance number then modules should be added
-> > to DT "aliases" node. of_alias_get_id() gives the device id number based
-> > on number of alias nodes present in "aliases node".
+> > Till we have a separate control module driver to write to control module,
+> > d_can driver will handle the register writes to control module by itself.
+> > So a new address space to represent this control module register is added
+> > to d_can driver.
 > > 
 > > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 > 
 > Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> 
 
 Hi Tony/Benoit,
 
