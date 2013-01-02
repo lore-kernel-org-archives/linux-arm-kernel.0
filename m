@@ -1,33 +1,33 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Wed, 2 Jan 2013 15:57:29 +0530
-Subject: [PATCH v3 5/7] ARM: OMAP2+: omap2plus_defconfig: Add tmp275 sensor
- support
+Date: Wed, 2 Jan 2013 15:57:26 +0530
+Subject: [PATCH v3 2/7] ARM: OMAP2+: omap2plus_defconfig: Add lis3lv02d support
 In-Reply-To: <1357122451-7577-1-git-send-email-anilkumar@ti.com>
 References: <1357122451-7577-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1357122451-7577-6-git-send-email-anilkumar@ti.com>
+Message-ID: <1357122451-7577-3-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM335x-evm device have temperature sensor, one has to manually
-enable this support to use of temperature sensor. So this patch
-enables tmp275 driver as module in omap2plus_defconfig.
+AM335X-EVM and AM335X-EVMSK devices have lis331dlh accelerometer, one
+has to manually enable this support to use accelerometer. So this patch
+enables lis3lv02d driver as moudle in omap2plus_defconfig.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/configs/omap2plus_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/omap2plus_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index f3e0e8c..af08c26 100644
+index ee6e060..8fd208a 100644
 --- a/arch/arm/configs/omap2plus_defconfig
 +++ b/arch/arm/configs/omap2plus_defconfig
-@@ -135,6 +135,7 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_TWL4030=y
- CONFIG_W1=y
- CONFIG_POWER_SUPPLY=y
-+CONFIG_SENSORS_LM75=m
- CONFIG_WATCHDOG=y
- CONFIG_OMAP_WATCHDOG=y
- CONFIG_TWL4030_WATCHDOG=y
+@@ -83,6 +83,8 @@ CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_SENSORS_LIS3LV02D=m
++CONFIG_SENSORS_LIS3_I2C=m
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_SCSI_MULTI_LUN=y
 -- 
 1.7.9.5
