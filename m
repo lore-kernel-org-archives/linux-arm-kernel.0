@@ -1,23 +1,52 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 2 Jan 2013 10:32:08 -0200
-Subject: [PATCH 1/2] ARM: mx25pdk: Add device tree support
-In-Reply-To: <1355262464-25401-1-git-send-email-festevam@gmail.com>
-References: <1355262464-25401-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5DST8+e9qLUBR0KCOcVR1EL9o94MieQTGouJwfMJzfaxA@mail.gmail.com>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Wed, 2 Jan 2013 18:54:47 +0530
+Subject: [PATCH 0/7] HWMOD fixes for AM33xx PWM submodules and device tree
+ nodes.
+Message-ID: <1357133094-30806-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+This patch series is being part of [1] and resubmitting on top of 3.8-rc1 to
+make it to 3.9.
 
-On Tue, Dec 11, 2012 at 7:47 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Add basic device tree support for mx25pdk board.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+In AM33xx PWM sub modules like ECAP, EHRPWM & EQEP are  integrated to
+PWM subsystem. All these submodules shares the resources (clock) & has
+a clock gating register in PWM Subsystem. So a parent PWM subsystem
+driver is created. To support PWM subsystem driver, parent child
+relation is created in HWMOD entry in patch #2.
 
-Any comments about this one?
+In addition EHRPWM module requires explicit clock gating from control
+module. Hence add clock node for tbclk handling in patch #4.
 
-Regards,
+Patch #3 to support common clock migration for AM33xx.
 
-Fabio Estevam
+Also Device tree nodes populated to support parent child relation
+between PWMSS, ECAP & EHRPWM submodules (patch #5, 6 & 7).
+
+This patch series based on linux_omap/master [2] and tested for
+backlight with ECAP on AM335x-evm & AM335x-evmsk.
+
+1. https://lkml.org/lkml/2012/11/27/120
+2. http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=commit;h=c4e2e79ff7c9f4fdad7da432c6b449121cc3033e
+
+Philip Avinash (7):
+  ARM: OMAP: AM33xx hwmod: Corrects PWM subsystem HWMOD entries
+  ARM: OMAP: AM33xx hwmod: Add parent-child relationship for PWM
+    subsystem
+  pwm: pwm-tiehrpwm: Update the clock handling of pwm-tiehrpwm driver
+  ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK
+  ARM: dts: AM33XX: Add PWMSS device tree nodes
+  ARM: dts: AM33XX: Add PWM backlight DT data to  am335x-evm
+  ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evmsk
+
+ arch/arm/boot/dts/am335x-evm.dts           |   23 ++
+ arch/arm/boot/dts/am335x-evmsk.dts         |   23 ++
+ arch/arm/boot/dts/am33xx.dtsi              |   84 ++++++
+ arch/arm/mach-omap2/cclock33xx_data.c      |   30 +++
+ arch/arm/mach-omap2/control.h              |    8 +
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |  390 ++++++++++++++++++----------
+ drivers/pwm/pwm-tiehrpwm.c                 |    4 +-
+ 7 files changed, 417 insertions(+), 145 deletions(-)
+
+-- 
+1.7.9.5
