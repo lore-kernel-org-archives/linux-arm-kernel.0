@@ -1,7 +1,9 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  2 Jan 2013 14:53:20 -0700
-Subject: [PATCH V2 1/3] ARM: tegra: seaboard: enable HDMI port
-Message-ID: <1357163602-10777-1-git-send-email-swarren@wwwdotorg.org>
+Date: Wed,  2 Jan 2013 14:53:21 -0700
+Subject: [PATCH V2 2/3] ARM: tegra: ventana: enable HDMI port
+In-Reply-To: <1357163602-10777-1-git-send-email-swarren@wwwdotorg.org>
+References: <1357163602-10777-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1357163602-10777-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,15 +11,15 @@ From: Stephen Warren <swarren@nvidia.com>
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-v2: No change.
+v2: Limit DDC I2C speed to 100KHz.
 ---
- arch/arm/boot/dts/tegra20-seaboard.dts |   18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/tegra20-ventana.dts |   20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index 4204598..f9e3ad4 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
+index adc4754..816eb12 100644
+--- a/arch/arm/boot/dts/tegra20-ventana.dts
++++ b/arch/arm/boot/dts/tegra20-ventana.dts
 @@ -10,6 +10,18 @@
  		reg = <0x00000000 0x40000000>;
  	};
@@ -37,7 +39,16 @@ index 4204598..f9e3ad4 100644
  	pinmux {
  		pinctrl-names = "default";
  		pinctrl-0 = <&state_default>;
-@@ -345,7 +357,7 @@
+@@ -320,7 +332,7 @@
+ 
+ 	i2c at 7000c400 {
+ 		status = "okay";
+-		clock-frequency = <400000>;
++		clock-frequency = <100000>;
+ 	};
+ 
+ 	i2cmux {
+@@ -335,7 +347,7 @@
  		pinctrl-1 = <&state_i2cmux_pta>;
  		pinctrl-2 = <&state_i2cmux_idle>;
  
@@ -46,7 +57,7 @@ index 4204598..f9e3ad4 100644
  			reg = <0>;
  			#address-cells = <1>;
  			#size-cells = <0>;
-@@ -463,13 +475,13 @@
+@@ -446,13 +458,13 @@
  					regulator-max-microvolt = <1800000>;
  				};
  
