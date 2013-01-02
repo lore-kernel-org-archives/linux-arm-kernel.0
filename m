@@ -1,47 +1,31 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  2 Jan 2013 11:46:16 -0700
-Subject: [PATCH 1/2] ARM: tegra: trimslice: add gpio-poweroff node to DT
-Message-ID: <1357152377-5918-1-git-send-email-swarren@wwwdotorg.org>
+Date: Wed,  2 Jan 2013 11:46:17 -0700
+Subject: [PATCH 2/2] ARM: tegra: enable gpio-poweroff driver in defconfig
+In-Reply-To: <1357152377-5918-1-git-send-email-swarren@wwwdotorg.org>
+References: <1357152377-5918-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1357152377-5918-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-... and disable tri-state from the pingroup that contains the poweroff
-GPIO.
-
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra20-trimslice.dts |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/configs/tegra_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-index b70b4cb..4b6c486 100644
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@ -249,6 +249,11 @@
- 					"ld23_22";
- 				nvidia,pull = <1>;
- 			};
-+			conf_spif {
-+				nvidia,pins = "spif";
-+				nvidia,pull = <1>;
-+				nvidia,tristate = <0>;
-+			};
- 		};
- 	};
- 
-@@ -322,6 +327,11 @@
- 		bus-width = <4>;
- 	};
- 
-+	poweroff {
-+		compatible = "gpio-poweroff";
-+		gpios = <&gpio 191 1>; /* gpio PX7, active low */
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index a7827fd..a568c34 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -127,6 +127,8 @@ CONFIG_GPIO_TPS6586X=y
+ CONFIG_GPIO_TPS65910=y
+ CONFIG_POWER_SUPPLY=y
+ CONFIG_BATTERY_SBS=y
++CONFIG_POWER_RESET=y
++CONFIG_POWER_RESET_GPIO=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_MFD_TPS6586X=y
+ CONFIG_MFD_TPS65910=y
 -- 
 1.7.10.4
