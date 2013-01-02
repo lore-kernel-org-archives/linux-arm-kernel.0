@@ -1,122 +1,102 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 02 Jan 2013 14:24:01 -0800
-Subject: [PATCH 24/26] ARM: S3C64XX: make regs-srom.h local
+Date: Wed, 02 Jan 2013 14:23:55 -0800
+Subject: [PATCH 18/26] ARM: S3C2412: cleanup regs-s3c2412.h
 In-Reply-To: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
 References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1357165443-3716-25-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1357165443-3716-19-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The header file can be local in mach-s3c64xx/.
+Move the regs-s3c2412.h into mach-s3c24xx/s3c2412.c file.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c64xx/mach-mini6410.c                |    2 +-
- arch/arm/mach-s3c64xx/mach-real6410.c                |    2 +-
- arch/arm/mach-s3c64xx/mach-smdk6410.c                |    2 +-
- arch/arm/mach-s3c64xx/{include/mach => }/regs-srom.h |   11 +++++------
- 4 files changed, 8 insertions(+), 9 deletions(-)
- rename arch/arm/mach-s3c64xx/{include/mach => }/regs-srom.h (90%)
+ arch/arm/mach-s3c24xx/include/mach/regs-s3c2412.h |   23 -----------------
+ arch/arm/mach-s3c24xx/s3c2412.c                   |   28 ++++++++++-----------
+ 2 files changed, 14 insertions(+), 37 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-s3c2412.h
 
-diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
-index 67881e6d..7cec86c 100644
---- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-@@ -31,7 +31,6 @@
- 
- #include <mach/map.h>
- #include <mach/regs-gpio.h>
--#include <mach/regs-srom.h>
- 
- #include <plat/adc.h>
- #include <plat/cpu.h>
-@@ -46,6 +45,7 @@
- 
- #include "common.h"
- #include "regs-modem.h"
-+#include "regs-srom.h"
- 
- #define UCON S3C2410_UCON_DEFAULT
- #define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
-diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-index f620b89..215693c 100644
---- a/arch/arm/mach-s3c64xx/mach-real6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-@@ -32,7 +32,6 @@
- 
- #include <mach/map.h>
- #include <mach/regs-gpio.h>
--#include <mach/regs-srom.h>
- 
- #include <plat/adc.h>
- #include <plat/cpu.h>
-@@ -47,6 +46,7 @@
- 
- #include "common.h"
- #include "regs-modem.h"
-+#include "regs-srom.h"
- 
- #define UCON S3C2410_UCON_DEFAULT
- #define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index f49ecae..dcf41bd 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -59,7 +59,6 @@
- #include <plat/regs-serial.h>
- #include <mach/regs-gpio.h>
- #include <mach/regs-sys.h>
--#include <mach/regs-srom.h>
- #include <linux/platform_data/ata-samsung_cf.h>
- #include <linux/platform_data/i2c-s3c2410.h>
- #include <plat/fb.h>
-@@ -75,6 +74,7 @@
- 
- #include "common.h"
- #include "regs-modem.h"
-+#include "regs-srom.h"
- 
- #define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
- #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
-diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-srom.h b/arch/arm/mach-s3c64xx/regs-srom.h
-similarity index 90%
-rename from arch/arm/mach-s3c64xx/include/mach/regs-srom.h
-rename to arch/arm/mach-s3c64xx/regs-srom.h
-index 756731b..d56f338 100644
---- a/arch/arm/mach-s3c64xx/include/mach/regs-srom.h
-+++ b/arch/arm/mach-s3c64xx/regs-srom.h
+diff --git a/arch/arm/mach-s3c24xx/include/mach/regs-s3c2412.h b/arch/arm/mach-s3c24xx/include/mach/regs-s3c2412.h
+deleted file mode 100644
+index aa69dc7..0000000
+--- a/arch/arm/mach-s3c24xx/include/mach/regs-s3c2412.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/* arch/arm/mach-s3c2410/include/mach/regs-s3c2412.h
+- *
+- * Copyright 2007 Simtec Electronics
+- *	http://armlinux.simtec.co.uk/
+- *	Ben Dooks <ben@simtec.co.uk>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * S3C2412 specific register definitions
+-*/
+-
+-#ifndef __ASM_ARCH_REGS_S3C2412_H
+-#define __ASM_ARCH_REGS_S3C2412_H "s3c2412"
+-
+-#define S3C2412_SWRST		(S3C24XX_VA_CLKPWR + 0x30)
+-#define S3C2412_SWRST_RESET	(0x533C2412)
+-
+-/* see regs-power.h for the other registers in the power block. */
+-
+-#endif	/* __ASM_ARCH_REGS_S3C2412_H */
+-
+diff --git a/arch/arm/mach-s3c24xx/s3c2412.c b/arch/arm/mach-s3c24xx/s3c2412.c
+index 6c5f403..26ab760 100644
+--- a/arch/arm/mach-s3c24xx/s3c2412.c
++++ b/arch/arm/mach-s3c24xx/s3c2412.c
 @@ -1,5 +1,4 @@
--/* arch/arm/plat-s3c64xx/include/plat/regs-srom.h
+-/* linux/arch/arm/mach-s3c2412/s3c2412.c
 - *
 +/*
-  * Copyright 2009 Andy Green <andy@warmcat.com>
+  * Copyright (c) 2006 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
   *
-  * S3C64XX SROM definitions
-@@ -9,8 +8,8 @@
-  * published by the Free Software Foundation.
- */
+@@ -28,28 +27,29 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
  
--#ifndef __PLAT_REGS_SROM_H
--#define __PLAT_REGS_SROM_H __FILE__
-+#ifndef __MACH_S3C64XX_REGS_SROM_H
-+#define __MACH_S3C64XX_REGS_SROM_H __FILE__
+-#include <mach/hardware.h>
+ #include <asm/proc-fns.h>
+ #include <asm/irq.h>
+ #include <asm/system_misc.h>
  
- #define S3C64XX_SROMREG(x)	(S3C_VA_MEM + (x))
+-#include <plat/cpu-freq.h>
+-
++#include <mach/hardware.h>
+ #include <mach/regs-clock.h>
+-#include <plat/regs-serial.h>
+-#include <mach/regs-power.h>
+-#include <mach/regs-gpio.h>
+ #include <mach/regs-dsc.h>
+-#include <plat/regs-spi.h>
+-#include <mach/regs-s3c2412.h>
++#include <mach/regs-gpio.h>
++#include <mach/regs-power.h>
  
-@@ -29,7 +28,7 @@
- #define S3C64XX_SROM_BW__DATAWIDTH__SHIFT	0
- #define S3C64XX_SROM_BW__WAITENABLE__SHIFT	2
- #define S3C64XX_SROM_BW__BYTEENABLE__SHIFT	3
--#define S3C64XX_SROM_BW__CS_MASK 0xf
-+#define S3C64XX_SROM_BW__CS_MASK		0xf
+-#include <plat/s3c2412.h>
++#include <plat/clock.h>
+ #include <plat/cpu.h>
++#include <plat/cpu-freq.h>
+ #include <plat/devs.h>
+-#include <plat/clock.h>
+-#include <plat/pm.h>
+-#include <plat/pll.h>
+ #include <plat/nand-core.h>
++#include <plat/pll.h>
++#include <plat/pm.h>
++#include <plat/regs-serial.h>
++#include <plat/regs-spi.h>
++#include <plat/s3c2412.h>
++
++#define S3C2412_SWRST			(S3C24XX_VA_CLKPWR + 0x30)
++#define S3C2412_SWRST_RESET		(0x533C2412)
  
- #define S3C64XX_SROM_BW__NCS0__SHIFT	0
- #define S3C64XX_SROM_BW__NCS1__SHIFT	4
-@@ -56,4 +55,4 @@
- #define S3C64XX_SROM_BCX__TACS__SHIFT	28
- #define S3C64XX_SROM_BCX__TACS__MASK	0xf
- 
--#endif /* _PLAT_REGS_SROM_H */
-+#endif /* __MACH_S3C64XX_REGS_SROM_H */
+ #ifndef CONFIG_CPU_S3C2412_ONLY
+ void __iomem *s3c24xx_va_gpio2 = S3C24XX_VA_GPIO;
 -- 
 1.7.10.4
