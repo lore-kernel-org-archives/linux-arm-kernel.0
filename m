@@ -1,111 +1,84 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 2 Jan 2013 17:00:31 +0200
-Subject: [PATCH v5 11/22] mfd: omap-usb-host: Use devm_kzalloc() and
- devm_request_and_ioremap()
+Date: Wed, 2 Jan 2013 17:00:32 +0200
+Subject: [PATCH v5 12/22] mfd: omap-usb-host: know about number of ports from
+ revision register
 In-Reply-To: <1357138842-28964-1-git-send-email-rogerq@ti.com>
 References: <1357138842-28964-1-git-send-email-rogerq@ti.com>
-Message-ID: <1357138842-28964-12-git-send-email-rogerq@ti.com>
+Message-ID: <1357138842-28964-13-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_ variants of kzalloc and ioremap. Also clean up error path.
+The revision register should tell us how many ports are present.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/mfd/omap-usb-host.c |   36 +++++++++---------------------------
- 1 files changed, 9 insertions(+), 27 deletions(-)
+ drivers/mfd/omap-usb-host.c |   32 +++++++++++++++++++++++++++-----
+ 1 files changed, 27 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 85a4a43..b24a3ab 100644
+index b24a3ab..5edb828 100644
 --- a/drivers/mfd/omap-usb-host.c
 +++ b/drivers/mfd/omap-usb-host.c
-@@ -467,17 +467,20 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+@@ -91,6 +91,8 @@
  
- 	if (!pdata) {
- 		dev_err(dev, "Missing platform data\n");
--		ret = -ENOMEM;
--		goto end_probe;
-+		return -ENODEV;
- 	}
  
--	omap = kzalloc(sizeof(*omap), GFP_KERNEL);
-+	omap = devm_kzalloc(dev, sizeof(*omap), GFP_KERNEL);
- 	if (!omap) {
- 		dev_err(dev, "Memory allocation failed\n");
--		ret = -ENOMEM;
--		goto end_probe;
-+		return -ENOMEM;
- 	}
- 
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "uhh");
-+	omap->uhh_base = devm_request_and_ioremap(dev, res);
-+	if (!omap->uhh_base)
-+		return -EADDRNOTAVAIL;
+ struct usbhs_hcd_omap {
++	int				nports;
 +
- 	spin_lock_init(&omap->lock);
+ 	struct clk			*xclk60mhsp1_ck;
+ 	struct clk			*xclk60mhsp2_ck;
+ 	struct clk			*utmi_p1_fck;
+@@ -353,8 +355,6 @@ static void omap_usbhs_init(struct device *dev)
  
- 	omap->pdata = pdata;
-@@ -575,20 +578,6 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+ 	pm_runtime_get_sync(dev);
+ 	spin_lock_irqsave(&omap->lock, flags);
+-	omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
+-	dev_dbg(dev, "OMAP UHH_REVISION 0x%x\n", omap->usbhs_rev);
+ 
+ 	reg = usbhs_read(omap->uhh_base, OMAP_UHH_HOSTCONFIG);
+ 	/* setup ULPI bypass and burst configurations */
+@@ -487,8 +487,32 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+ 
+ 	pm_runtime_enable(dev);
+ 
++	platform_set_drvdata(pdev, omap);
++	pm_runtime_get_sync(dev);
+ 
+-	for (i = 0; i < OMAP3_HS_USB_PORTS; i++)
++	omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
++
++	/* we need to call runtime suspend before we update omap->nports
++	 * to prevent unbalanced clk_disable()
++	 */
++	pm_runtime_put_sync(dev);
++
++	switch (omap->usbhs_rev) {
++	case OMAP_USBHS_REV1:
++		omap->nports = 3;
++		break;
++	case OMAP_USBHS_REV2:
++		omap->nports = 2;
++		break;
++	default:
++		omap->nports = OMAP3_HS_USB_PORTS;
++		dev_dbg(dev,
++		  "USB HOST Rev : 0x%d not recognized, assuming %d ports\n",
++		   omap->usbhs_rev, omap->nports);
++		break;
++	}
++
++	for (i = 0; i < omap->nports; i++)
+ 		if (is_ehci_phy_mode(i) || is_ehci_tll_mode(i) ||
+ 			is_ehci_hsic_mode(i)) {
+ 			omap->ehci_logic_fck = clk_get(dev, "ehci_logic_fck");
+@@ -578,8 +602,6 @@ static int usbhs_omap_probe(struct platform_device *pdev)
  				"failed error:%d\n", ret);
  	}
  
--	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "uhh");
--	if (!res) {
--		dev_err(dev, "UHH EHCI get resource failed\n");
--		ret = -ENODEV;
--		goto err_init_60m_fclk;
--	}
+-	platform_set_drvdata(pdev, omap);
 -
--	omap->uhh_base = ioremap(res->start, resource_size(res));
--	if (!omap->uhh_base) {
--		dev_err(dev, "UHH ioremap failed\n");
--		ret = -ENOMEM;
--		goto err_init_60m_fclk;
--	}
--
- 	platform_set_drvdata(pdev, omap);
- 
  	omap_usbhs_init(dev);
-@@ -598,13 +587,10 @@ static int usbhs_omap_probe(struct platform_device *pdev)
- 		goto err_alloc;
- 	}
- 
--	goto end_probe;
-+	return 0;
- 
- err_alloc:
- 	omap_usbhs_deinit(&pdev->dev);
--	iounmap(omap->uhh_base);
--
--err_init_60m_fclk:
- 	clk_put(omap->init_60m_fclk);
- 
- err_usbhost_p2_fck:
-@@ -628,9 +614,7 @@ err_utmi_p1_fck:
- err_end:
- 	clk_put(omap->ehci_logic_fck);
- 	pm_runtime_disable(dev);
--	kfree(omap);
- 
--end_probe:
- 	return ret;
- }
- 
-@@ -645,7 +629,6 @@ static int usbhs_omap_remove(struct platform_device *pdev)
- 	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
- 
- 	omap_usbhs_deinit(&pdev->dev);
--	iounmap(omap->uhh_base);
- 	clk_put(omap->init_60m_fclk);
- 	clk_put(omap->usbhost_p2_fck);
- 	clk_put(omap->usbhost_p1_fck);
-@@ -655,7 +638,6 @@ static int usbhs_omap_remove(struct platform_device *pdev)
- 	clk_put(omap->utmi_p1_fck);
- 	clk_put(omap->ehci_logic_fck);
- 	pm_runtime_disable(&pdev->dev);
--	kfree(omap);
- 
- 	return 0;
- }
+ 	ret = omap_usbhs_alloc_children(pdev);
+ 	if (ret) {
 -- 
 1.7.4.1
