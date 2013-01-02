@@ -1,25 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 02 Jan 2013 15:09:58 -0700
-Subject: [PATCH v2 00/11] Migrate Tegra to common clock framework
-In-Reply-To: <1356619644-18565-1-git-send-email-pgaikwad@nvidia.com>
-References: <1356619644-18565-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <50E4B036.6080205@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 02 Jan 2013 14:23:38 -0800
+Subject: [PATCH 01/26] gpio: samsung: remove inclusion <mach/regs-clock.h>
+In-Reply-To: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
+References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1357165443-3716-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/27/2012 07:47 AM, Prashant Gaikwad wrote:
-> This patchset does following:
-> 1. Decompose single tegra clock structure into multiple clocks.
-> 2. Try to use standard clock types supported by common clock framework.
-> 3. Use dynamic initialization.
-> 4. Move all clock code to drivers/clk/tegra from mach-tegra.
-> 5. Add device tree support for Tegra20 and Tegra30 clocks.
-> 6. Remove all legacy clock code from mach-tegra.
+The <mach/regs-clock.h> is not needed for gpio-samsung.
 
-Mike,
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/gpio/gpio-samsung.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-Aside from a couple of small issues I just pointed out, this series
-looks reasonable to me. I'd like to take it through the Tegra tree since
-it might open up opportunities for other cleanup, and it has far more
-dependencies-on/conflicts-with other changes there than the drivers/clk
-tree. So, I'm looking for your ack when you can. Thanks.
+diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
+index 01f7fe9..9070f86 100644
+--- a/drivers/gpio/gpio-samsung.c
++++ b/drivers/gpio/gpio-samsung.c
+@@ -32,7 +32,6 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/map.h>
+-#include <mach/regs-clock.h>
+ #include <mach/regs-gpio.h>
+ 
+ #include <plat/cpu.h>
+-- 
+1.7.10.4
