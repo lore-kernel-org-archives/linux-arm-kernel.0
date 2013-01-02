@@ -1,34 +1,40 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 02 Jan 2013 14:27:07 -0800
-Subject: [PATCH v3 1/4] ODROID-X: dts: Add board dts file for ODROID-X
-In-Reply-To: <CAOesGMgoyT2xTwgPBw1CASO-6iakpRLxEh1aad-LL7SxJ1+5Vg@mail.gmail.com>
-References: <1356921314-12595-1-git-send-email-tobetter@gmail.com>
- <1356921314-12595-2-git-send-email-tobetter@gmail.com>
- <CAOesGMgoyT2xTwgPBw1CASO-6iakpRLxEh1aad-LL7SxJ1+5Vg@mail.gmail.com>
-Message-ID: <042501cde938$4e37c2d0$eaa74870$@samsung.com>
+Date: Wed, 02 Jan 2013 14:42:07 -0800
+Subject: [PATCH] ARM: EXYNOS: fix uncompress.h and debug-macro.S for
+ EXYNOS5440
+In-Reply-To: <CAK9yfHycpk6S1e3wW-8hLB7HM2tFykZGOSiz2jaYVwMf2khOUA@mail.gmail.com>
+References: <1356632834-8934-1-git-send-email-kgene.kim@samsung.com>
+ <CAK9yfHycpk6S1e3wW-8hLB7HM2tFykZGOSiz2jaYVwMf2khOUA@mail.gmail.com>
+Message-ID: <042601cde93a$662750c0$3275f240$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+Sachin Kamat wrote:
 > 
-> On Sun, Dec 30, 2012 at 6:35 PM, Dongjin Kim <tobetter@gmail.com> wrote:
-> > Add initial dtb file for Hardkernel's ODROID-X board based on EXYNOS4412
-> SoC.
+> Hi Kukjin,
+> 
+Hi,
+
+> On 27 December 2012 23:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > This patch fixes uart base address for uncompress and debug-macro
+> > on EXYNOS5440.
 > >
-> > Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/include/mach/debug-macro.S |   25
+> +++++++++++++++++------
+> >  arch/arm/mach-exynos/include/mach/map.h         |    1 +
+> >  arch/arm/mach-exynos/include/mach/uncompress.h  |   20
+> +++++++++++-------
+> >  3 files changed, 33 insertions(+), 13 deletions(-)
 > 
-> Patch 1-4:
+> With this patch I found that Origen board does not boot.
+> It stops at "Uncompressing Linux...".
+> Tested using your latest for-next branch.
 > 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> ... but I think it might make sense to just add the file as one commit
-> instead of splitting it across 4 as this series does.
-> 
-I think so.
+Oh, OK. Let me check it again.
+Thanks for your test.
 
-If Dongjin doesn't mind, let me squash them into on commit when I apply into
-Samsung tree.
-
-Thanks.
+Happy New Year!
 
 - Kukjin
