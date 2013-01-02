@@ -1,78 +1,26 @@
-From: pengw@nvidia.com (Bryan Wu)
-Date: Wed, 2 Jan 2013 14:50:24 -0800
-Subject: [PATCH 1/2] ARM: DT: tegra: Add board leaver compatible properties
-Message-ID: <1357167025-6167-1-git-send-email-pengw@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Jan 2013 22:59:21 +0000
+Subject: [PATCH v2] ARM: Kconfig: Do not force selection of
+ ARCH_VEXPRESS by ARCH_MULTI_V7
+In-Reply-To: <1353431918-9326-1-git-send-email-festevam@gmail.com>
+References: <1353431918-9326-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130102225921.GH2631@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bryan Wu <pengw@nvidia.com>
----
- Documentation/devicetree/bindings/arm/tegra.txt |   51 ++++++++++++++++++++---
- 1 file changed, 45 insertions(+), 6 deletions(-)
+On Tue, Nov 20, 2012 at 03:18:38PM -0200, Fabio Estevam wrote:
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> index b9f38e3..aa46be8 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -310,4 +310,6 @@ SECTIONS
+>   * binutils is too old (for other reasons as well)
+>   */
+>  ASSERT((__proc_info_end - __proc_info_begin), "missing CPU support")
+> +#ifndef CONFIG_ARCH_MULTIPLATFORM
+>  ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
+> +#endif
 
-diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
-index 6e69d2e..ff9199a 100644
---- a/Documentation/devicetree/bindings/arm/tegra.txt
-+++ b/Documentation/devicetree/bindings/arm/tegra.txt
-@@ -1,14 +1,53 @@
- NVIDIA Tegra device tree bindings
- -------------------------------------------
- 
--Boards with the tegra20 SoC shall have the following properties:
-+- Boards with the tegra20 SoC shall have the following properties:
-+  Required root node property:
-+  compatible = "nvidia,tegra20";
- 
--Required root node property:
-+- Boards with the tegra30 SoC shall have the following properties:
-+  Required root node property:
-+  compatible = "nvidia,tegra30";
- 
--compatible = "nvidia,tegra20";
-+Boards
-+-------------------------------------------
-+
-+- NVIDIA Tegra20 Harmony evaluation board:
-+  compatible = "nvidia,harmony", "nvidia,tegra20";
-+
-+- Avionic Design Medcom-Wide board:
-+  compatible = "ad,medcom-wide", "ad,tamonten", "nvidia,tegra20";
-+
-+- Toshiba AC100 / Dynabook AZ;
-+  compatible = "compal,paz00", "nvidia,tegra20";
-+
-+- Avionic Design Plutux board:
-+  compatible = "ad,plutux", "ad,tamonten", "nvidia,tegra20";
-+
-+- NVIDIA Seaboard:
-+  compatible = "nvidia,seaboard", "nvidia,tegra20";
-+
-+- Avionic Design Tamonten SOM:
-+  compatible = "ad,tamonten", "nvidia,tegra20";
-+
-+- Avionic Design Tamonten Evaluation Carrier:
-+  compatible = "ad,tec", "ad,tamonten", "nvidia,tegra20";
-+
-+- Compulab TrimSlice board:
-+  compatible = "compulab,trimslice", "nvidia,tegra20";
-+
-+- NVIDIA Tegra20 Ventana evaluation board:
-+  compatible = "nvidia,ventana", "nvidia,tegra20";
-+
-+- NVIDIA Tegra20 Whistler evaluation board:
-+  compatible = "nvidia,whistler", "nvidia,tegra20";
-+
-+- NVIDIA Tegra30 Cardhu evaluation board:
-+  compatible = "nvidia,cardhu", "nvidia,tegra30";
- 
--Boards with the tegra30 SoC shall have the following properties:
-+- NVIDIA Tegra30 Cardhu A02 evaluation board:
-+  compatible = "nvidia,cardhu-a02", "nvidia,cardhu", "nvidia,tegra30";
- 
--Required root node property:
-+- NVIDIA Tegra30 Cardhu A04 (A05, A06, A07) evaluation board:
-+  compatible = "nvidia,cardhu-a04", "nvidia,cardhu", "nvidia,tegra30";
- 
--compatible = "nvidia,tegra30";
--- 
-1.7.10.4
+This is wrong.  So you want a kernel build which produces an unbootable
+kernel (because it contains absolutely no platform support of any kind,
+not even any DT platform support) to succeed?
