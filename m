@@ -1,39 +1,52 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Thu, 03 Jan 2013 00:14:38 +0100
-Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
- IS_ERR_OR_NULL
-In-Reply-To: <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
-References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
- <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
- <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
- <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
-Message-ID: <50E4BF5E.9060108@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Jan 2013 23:15:13 +0000
+Subject: [PATCH v2] ARM: Kconfig: Do not force selection of
+ ARCH_VEXPRESS by ARCH_MULTI_V7
+In-Reply-To: <CAOMZO5CFPh9TsdGKZx=hKqJ-VvUX9sLw1rzR1intMcidEb9nfQ@mail.gmail.com>
+References: <1353431918-9326-1-git-send-email-festevam@gmail.com>
+ <20130102225921.GH2631@n2100.arm.linux.org.uk>
+ <CAOMZO5CFPh9TsdGKZx=hKqJ-VvUX9sLw1rzR1intMcidEb9nfQ@mail.gmail.com>
+Message-ID: <20130102231513.GI2631@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2013 06:10 AM, Dan Carpenter wrote:
-> clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
+On Wed, Jan 02, 2013 at 09:03:52PM -0200, Fabio Estevam wrote:
+> On Wed, Jan 2, 2013 at 8:59 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Nov 20, 2012 at 03:18:38PM -0200, Fabio Estevam wrote:
+> >> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> >> index b9f38e3..aa46be8 100644
+> >> --- a/arch/arm/kernel/vmlinux.lds.S
+> >> +++ b/arch/arm/kernel/vmlinux.lds.S
+> >> @@ -310,4 +310,6 @@ SECTIONS
+> >>   * binutils is too old (for other reasons as well)
+> >>   */
+> >>  ASSERT((__proc_info_end - __proc_info_begin), "missing CPU support")
+> >> +#ifndef CONFIG_ARCH_MULTIPLATFORM
+> >>  ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
+> >> +#endif
+> >
+> > This is wrong.  So you want a kernel build which produces an unbootable
+> > kernel (because it contains absolutely no platform support of any kind,
+> > not even any DT platform support) to succeed?
+> 
+> Ok, what about the first version?
+> https://patchwork.kernel.org/patch/1774521/
 
-It's not a problem for this driver, as it never dereferences what's
-returned from clk_get(). It would have to include <plat/clock.h>, which
-it doesn't and which would have clearly indicated abuse of the clock API.
+That seems to be better because it leaves the desire for an unbootable
+kernel to be a build failure.
 
-Moreover, this driver now depends on architectures that select HAVE_CLK,
-so it couldn't be build when CONFIG_HAVE_CLK is disabled.
+However, it allows the multi-platform case to end up with a configuration
+where such a kernel can be generated, which is something Arnd wants to
+avoid as it messes up allnoconfig and randconfig builds.
 
-> I told Tony about this but everyone has been gone with end of year
-> holidays so it hasn't been addressed.
->
-> Tony, please fix it so people don't apply these patches until
-> clk_get() is updated to not return NULL.  It sucks to have to revert
-> patches.
+What we need to come up with is some kind of "default platform" which is
+always built into the kernel.  Will had some ideas about that for the
+virtualization stuff, but I think there were objections to that over it
+being modelled on Versatile Express.  If that can be sorted, then we
+have a solution to this problem.
 
-As explained by Russell many times, the clock API users should not care
-whether the value returned from clk_get() is NULL or not. It should only
-be tested with IS_ERR(). The patches look fine to me, no need to do
-anything.
-
----
-
-Regards,
-Sylwester
+We _should_ be aiming to get to that state anyway, where the kernel
+doesn't need to know about platform X, Y or Z but just uses the
+description in DT which tells it where devices A, B, and C are and how
+they relate to the rest of the system.
