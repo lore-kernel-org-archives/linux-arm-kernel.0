@@ -1,42 +1,45 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Wed, 2 Jan 2013 15:57:30 +0530
-Subject: [PATCH v3 6/7] ARM: OMAP2+: omap2plus_defconfig: Add leds-gpio support
-In-Reply-To: <1357122451-7577-1-git-send-email-anilkumar@ti.com>
-References: <1357122451-7577-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1357122451-7577-7-git-send-email-anilkumar@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 2 Jan 2013 10:49:39 +0000
+Subject: [PATCH] ASoC: pxa2xx-ac97: fix oops when codec_driver probe runs
+In-Reply-To: <1356704275-3098-1-git-send-email-mikedunn@newsguy.com>
+References: <1356704275-3098-1-git-send-email-mikedunn@newsguy.com>
+Message-ID: <20130102104939.GA4627@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM335X-EVMSK and AM335X-BONE devices have gpio controlled user leds,
-one has to manually enable this support to use user leds. So this
-patch enables gpio-leds driver in omap2plus_defconfig. Also enables
-different TRIGGERS like TRIGGER_TIMER, TRIGGER_HEARTBEAT and etc.
+On Fri, Dec 28, 2012 at 06:17:55AM -0800, Mike Dunn wrote:
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- arch/arm/configs/omap2plus_defconfig |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+> -	/* Punt most of the init to the SoC probe; we may need the machine
+> -	 * driver to do interesting things with the clocking to get us up
+> -	 * and running.
+> -	 */
+> -	return snd_soc_register_dais(&pdev->dev, pxa_ac97_dai_driver,
+> -			ARRAY_SIZE(pxa_ac97_dai_driver));
+> +	ret = snd_soc_register_dais(&pdev->dev, pxa_ac97_dai_driver,
+> +				    ARRAY_SIZE(pxa_ac97_dai_driver));
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "snd_soc_register_dais failed with %d\n",
+> +			ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = pxa2xx_ac97_hw_probe(pdev);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "pxa2xx_ac97_hw_probe failed with %d\n",
+> +			ret);
+> +		snd_soc_unregister_dais(&pdev->dev,
+> +					ARRAY_SIZE(pxa_ac97_dai_driver));
+> +	}
+> +	return ret;
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index af08c26..ea704be 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -203,6 +203,16 @@ CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_SDIO_UART=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_ONESHOT=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=y
-+CONFIG_LEDS_TRIGGER_CPU=y
-+CONFIG_LEDS_TRIGGER_GPIO=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_TWL92330=y
- CONFIG_RTC_DRV_TWL4030=y
--- 
-1.7.9.5
+We should be doing all resource acquisition before registering the DAIs,
+if anything this patch introduces the potential for additional issues
+with the clocks not having been acquired before we try to use them in
+the sound card.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130102/b1c84a0d/attachment-0001.sig>
