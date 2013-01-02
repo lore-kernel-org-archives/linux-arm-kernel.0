@@ -1,86 +1,79 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 2 Jan 2013 15:09:41 +0100
-Subject: [PATCH 2/2] pwm: vt8500: Add support for .set_polarity
-In-Reply-To: <1356899005-8876-2-git-send-email-linux@prisktech.co.nz>
-References: <1356899005-8876-1-git-send-email-linux@prisktech.co.nz>
- <1356899005-8876-2-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130102140941.GC4414@avionic-0098.adnet.avionic-design.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 2 Jan 2013 17:00:20 +0200
+Subject: [PATCH v5 00/22] OMAP USB Host cleanup
+Message-ID: <1357138842-28964-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 31, 2012 at 09:23:25AM +1300, Tony Prisk wrote:
-> Add support to set polarity on pwm devices, allowing for inverted
-> duty cycles.
+Hi,
 
-"PWM devices", please. Maybe the subject could be something less API
-specific, like "pwm: vt8500: Add polarity support".
+This patchset addresses the following
 
->  .../devicetree/bindings/pwm/vt8500-pwm.txt         |    7 ++++---
->  drivers/pwm/pwm-vt8500.c                           |   21 ++++++++++++++++++++
->  2 files changed, 25 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt b/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
-> index bcc6367..f71cc8d 100644
-> --- a/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
-> +++ b/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
-> @@ -3,14 +3,15 @@ VIA/Wondermedia VT8500/WM8xxx series SoC PWM controller
->  Required properties:
->  - compatible: should be "via,vt8500-pwm"
->  - reg: physical base address and length of the controller's registers
-> -- #pwm-cells: should be 2.  The first cell specifies the per-chip index
-> -  of the PWM to use and the second cell is the period in nanoseconds.
-> +- #pwm-cells: should be 3.  The first cell specifies the per-chip index
-> +  of the PWM to use, the second cell is the period in nanoseconds, and the
-> +  third cell is for flags.
+- Avoid addressing clocks one by one by name and use a for loop + bunch
+  of cleanups.
+- Get number of channels/ports dynamically either from revision register
+  or from platform data. Avoids getting clocks that are not present.
+- Add OMAP5 and HSIC mode (Not tested)
 
-This needs to document what flags the third cell encodes and how. Either
-that or refer to the generic PWM binding documentation.
+v5:
+- Rebased on top of todays arm-soc/for-next
+- Removed the clock merging patch from the list.
+- Updated patches 14, 19 and 20 to accomodate the above change.
+- Added patch 22 to fix a build warning.
 
-> diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
-> index 27ed0f4..9abf561 100644
-> --- a/drivers/pwm/pwm-vt8500.c
-> +++ b/drivers/pwm/pwm-vt8500.c
-> @@ -164,10 +164,31 @@ static void vt8500_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  	clk_disable(vt8500->clk);
->  }
->  
-> +static int vt8500_pwm_set_polarity(struct pwm_chip *chip,
-> +				   struct pwm_device *pwm,
-> +				   enum pwm_polarity polarity)
-> +{
-> +	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
-> +	u32 val;
-> +
-> +	val = readl(vt8500->base + REG_CTRL(pwm->hwpwm));
-> +
-> +	if (polarity == PWM_POLARITY_INVERSED)
-> +		val |= CTRL_INVERT;
-> +	else
-> +		val &= ~CTRL_INVERT;
-> +
-> +	writel(val, vt8500->base + REG_CTRL(pwm->hwpwm));
-> +	pwm_busy_wait(vt8500, pwm->hwpwm, STATUS_CTRL_UPDATE);
-> +
-> +	return 0;
-> +}
-> +
->  static struct pwm_ops vt8500_pwm_ops = {
->  	.enable = vt8500_pwm_enable,
->  	.disable = vt8500_pwm_disable,
->  	.config = vt8500_pwm_config,
-> +	.set_polarity = vt8500_pwm_set_polarity,
->  	.owner = THIS_MODULE,
->  };
+v4:
+- Added appropriate maintainers in to/cc
+- minor print message fix in patch 23 to maintain consistency
 
-This patch is missing the corresponding changes to the DT code. You need
-to override the pwm_chip's .of_xlate() and .of_pwm_n_cells fields. You
-can look at the TI EHRPWM driver if you need inspiration.
+v3:
+- Rebased on arm-soc/for-next commit f979306c4d38d213c6977aaf3b1115e8ded71e3a
+- Rearranged patch that get rids of cpu_is_omap..() macros
+- Coding style fixes
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130102/c6bd63da/attachment.sig>
+v2:
+- Clocks are allocated dynamically based on number of ports available
+on the platform
+- Reduced console spam if non critical clocks are not found on the platform.
+- Get rid of cpu_is_.. macros from USB host driver.
+
+cheers,
+-roger
+
+---
+Roger Quadros (22):
+  mfd: omap-usb-tll: Avoid creating copy of platform data
+  mfd: omap-usb-tll: Fix channel count detection
+  mfd: omap-usb-tll: Use devm_kzalloc/ioremap and clean up error path
+  mfd: omap-usb-tll: Clean up clock handling
+  mfd: omap-usb-tll: introduce and use mode_needs_tll()
+  mfd: omap-usb-tll: Check for missing platform data in probe
+  mfd: omap-usb-tll: Fix error message
+  mfd: omap-usb-tll: serialize access to TLL device
+  mfd: omap-usb-tll: Add OMAP5 revision and HSIC support
+  mfd: omap_usb_host: Avoid creating copy of platform_data
+  mfd: omap-usb-host: Use devm_kzalloc() and devm_request_and_ioremap()
+  mfd: omap-usb-host: know about number of ports from revision register
+  mfd: omap-usb-host: override number of ports from platform data
+  mfd: omap-usb-host: cleanup clock management code
+  mfd: omap-usb-host: Manage HSIC clocks for HSIC mode
+  mfd: omap-usb-host: Get rid of unnecessary spinlock
+  mfd: omap-usb-host: clean up omap_usbhs_init()
+  USB: ehci-omap: Don't free gpios that we didn't request
+  ARM: OMAP3: clock data: get rid of unused USB host clock aliases and
+    dummies
+  ARM: OMAP4: clock data: get rid of unused USB host clock aliases
+  mfd: omap-usb-host: Don't spam console on clk_set_parent failure
+  mdf: omap-usb-host: get rid of build warning
+
+ arch/arm/mach-omap2/cclock3xxx_data.c  |   11 -
+ arch/arm/mach-omap2/cclock44xx_data.c  |    7 -
+ arch/arm/mach-omap2/usb-host.c         |    1 +
+ arch/arm/mach-omap2/usb.h              |    1 +
+ drivers/mfd/omap-usb-host.c            |  499 +++++++++++++++++++-------------
+ drivers/mfd/omap-usb-tll.c             |  244 +++++++++-------
+ drivers/usb/host/ehci-omap.c           |    8 -
+ include/linux/platform_data/usb-omap.h |    1 +
+ 8 files changed, 435 insertions(+), 337 deletions(-)
+
+-- 
+1.7.4.1
