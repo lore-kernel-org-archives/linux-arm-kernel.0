@@ -1,134 +1,70 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Wed, 2 Jan 2013 08:29:57 +0100 (CET)
-Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
- IS_ERR_OR_NULL
-In-Reply-To: <1357104713.30504.8.camel@gitbox>
-References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
- <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
- <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
- <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
- <1357104713.30504.8.camel@gitbox>
-Message-ID: <alpine.DEB.2.02.1301020827040.2241@localhost6.localdomain6>
+From: laurent.cans@gmail.com (Laurent CANS)
+Date: Wed, 2 Jan 2013 09:41:12 +0100
+Subject: [PATCH] Add apf51 basic support
+In-Reply-To: <20121219203936.GG26326@pengutronix.de>
+References: <1355694591-7084-1-git-send-email-laurent.cans@gmail.com>
+ <20121219203936.GG26326@pengutronix.de>
+Message-ID: <CAA1eMkEoaJ14WOjciCD-zN4BqPEZ=14M_U7DSqxRoRA0XPLh0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wed, 2 Jan 2013, Tony Prisk wrote:
-
-> On Wed, 2013-01-02 at 08:10 +0300, Dan Carpenter wrote:
->> clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
->>
->> I told Tony about this but everyone has been gone with end of year
->> holidays so it hasn't been addressed.
->>
->> Tony, please fix it so people don't apply these patches until
->> clk_get() is updated to not return NULL.  It sucks to have to revert
->> patches.
->>
->> regards,
->> dan carpenter
+2012/12/19 Sascha Hauer <s.hauer@pengutronix.de>:
+> On Sun, Dec 16, 2012 at 10:49:51PM +0100, Laurent Cans wrote:
+>> Signed-off-by: Laurent Cans <laurent.cans@gmail.com>
+>> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+>> ---
+>> +     clocks {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +
+>> +             ckih1 {
+>> +                     compatible = "fsl,imx-ckih1", "fixed-clock";
+>> +                     clock-frequency = <0>;
+>> +             };
+>> +
+>> +             osc {
+>> +                     compatible = "fsl,imx-osc", "fixed-clock";
+>> +                     clock-frequency = <33554432>;
+>> +             };
 >
-> I posted the query to Mike Turquette, linux-kernel and linux-arm-kernel
-> mailing lists, regarding the return of NULL when HAVE_CLK is undefined.
+> These compatible properties shouldn't be necessary, right?
+
+Yes you are right. I will correct that.
+
 >
-> Short Answer: A return value of NULL is valid and not an error therefore
-> we should be using IS_ERR, not IS_ERR_OR_NULL on clk_get results.
+>> +     };
+>> +     soc {
+>> +             aips at 70000000 { /* aips-1 */
+>> +                     spba at 70000000 {
+>> +                             uart3: serial at 7000c000 {
+>> +                                     pinctrl-names = "default";
+>> +                                     pinctrl-0 = <&pinctrl_uart3_2>;
+>> +                                     status = "okay";
+>> +                             };
+>> +                     };
+>> +             };
 >
-> I see the obvious problem this creates, and asked this question:
+> This (and the other nodes) can more eaasily be written as:
 >
-> If the driver can't operate with a NULL clk, it should use a
-> IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
+> &uart3 {
+>         ...
+> };
 >
+> see arch/arm/boot/dts/omap5-evm.dts for a good example.
 >
-> And Russell's answer:
+> This has the advantage that you don't have to resemble the SoC layout
+> in your board file.
+
+I will send v2 version of the patch during the week written with this
+new layout.
+
+Thanks for the comments
+
 >
-> Why should a _consumer_ of a clock care?  It is _very_ important that
-> people get this idea - to a consumer, the struct clk is just an opaque
-> cookie.  The fact that it appears to be a pointer does _not_ mean that
-> the driver can do any kind of dereferencing on that pointer - it should
-> never do so.
+> Sascha
 >
-> Thread can be viewed here:
-> https://lkml.org/lkml/2012/12/20/105
-
-There are dereferences to the result of clk_get a few times.  I tried the 
-following semantic patch:
-
-@@ expression E; identifier I; @@
-* E = clk_get(...) ... E->I
-
-It gives the results shown below (- marks matched lines, not lines to 
-remove).  I also tried with devm_clk_get instead of clk_get, but got 
-nothing.
-
-julia
-
-diff -u -p /var/linuxes/linux-next/arch/sh/kernel/cpufreq.c /tmp/nothing/arch/sh/kernel/cpufreq.c
---- /var/linuxes/linux-next/arch/sh/kernel/cpufreq.c
-+++ /tmp/nothing/arch/sh/kernel/cpufreq.c
-@@ -117,15 +117,11 @@ static int sh_cpufreq_cpu_init(struct cp
-
-  	dev = get_cpu_device(cpu);
-
--	cpuclk = clk_get(dev, "cpu_clk");
--	if (IS_ERR(cpuclk)) {
-  		dev_err(dev, "couldn't get CPU clk\n");
-  		return PTR_ERR(cpuclk);
-  	}
-
--	policy->cur = policy->min = policy->max = sh_cpufreq_get(cpu);
-
--	freq_table = cpuclk->nr_freqs ? cpuclk->freq_table : NULL;
-  	if (freq_table) {
-  		int result;
-
-diff -u -p /var/linuxes/linux-next/arch/mips/kernel/cpufreq/loongson2_cpufreq.c /tmp/nothing/arch/mips/kernel/cpufreq/loongson2_cpufreq.c
---- /var/linuxes/linux-next/arch/mips/kernel/cpufreq/loongson2_cpufreq.c
-+++ /tmp/nothing/arch/mips/kernel/cpufreq/loongson2_cpufreq.c
-@@ -111,13 +111,10 @@ static int loongson2_cpufreq_cpu_init(st
-  	if (!cpu_online(policy->cpu))
-  		return -ENODEV;
-
--	cpuclk = clk_get(NULL, "cpu_clk");
--	if (IS_ERR(cpuclk)) {
-  		printk(KERN_ERR "cpufreq: couldn't get CPU clk\n");
-  		return PTR_ERR(cpuclk);
-  	}
-
--	cpuclk->rate = cpu_clock_freq / 1000;
-  	if (!cpuclk->rate)
-  		return -EINVAL;
-
-diff -u -p /var/linuxes/linux-next/drivers/net/ethernet/ti/cpts.c /tmp/nothing/drivers/net/ethernet/ti/cpts.c
---- /var/linuxes/linux-next/drivers/net/ethernet/ti/cpts.c
-+++ /tmp/nothing/drivers/net/ethernet/ti/cpts.c
-@@ -241,14 +241,10 @@ static void cpts_overflow_check(struct w
-
-  static void cpts_clk_init(struct cpts *cpts)
-  {
--	cpts->refclk = clk_get(NULL, CPTS_REF_CLOCK_NAME);
--	if (IS_ERR(cpts->refclk)) {
-  		pr_err("Failed to clk_get %s\n", CPTS_REF_CLOCK_NAME);
-  		cpts->refclk = NULL;
-  		return;
-  	}
--	clk_enable(cpts->refclk);
--	cpts->freq = cpts->refclk->recalc(cpts->refclk);
-  }
-
-  static void cpts_clk_release(struct cpts *cpts)
-diff -u -p /var/linuxes/linux-next/drivers/i2c/busses/i2c-sh7760.c /tmp/nothing/drivers/i2c/busses/i2c-sh7760.c
---- /var/linuxes/linux-next/drivers/i2c/busses/i2c-sh7760.c
-+++ /tmp/nothing/drivers/i2c/busses/i2c-sh7760.c
-@@ -397,11 +397,7 @@ static int calc_CCR(unsigned long scl_hz
-  	signed char cdf, cdfm;
-  	int scgd, scgdm, scgds;
-
--	mclk = clk_get(NULL, "peripheral_clk");
--	if (IS_ERR(mclk)) {
-  		return PTR_ERR(mclk);
--	} else {
--		mck = mclk->rate;
-  		clk_put(mclk);
-  	}
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
