@@ -1,136 +1,65 @@
-From: k.debski@samsung.com (Kamil Debski)
-Date: Wed, 02 Jan 2013 11:14:45 +0100
-Subject: [PATCH -next] [media] s5p-mfc: remove unused variable
-In-Reply-To: <CAPgLHd8BLn1_O4-9rCBbREq4ke2ZaJAVWLhOEF2QwACxub=vUQ@mail.gmail.com>
-References: <CAPgLHd8BLn1_O4-9rCBbREq4ke2ZaJAVWLhOEF2QwACxub=vUQ@mail.gmail.com>
-Message-ID: <005001cde8d1$fe712810$fb537830$%debski@samsung.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Wed, 2 Jan 2013 10:15:14 +0000
+Subject: [PATCH v4 0/4] pm: Add power off control
+In-Reply-To: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
+References: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAD58C2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+On Fri, Dec 14, 2012 at 11:33:13, AnilKumar, Chimata wrote:
+> Add PM power_off control to rtc driver and PMIC status is set to
+> STATUS_OFF to shutdown PMIC if PWR_EN is toggled by RTC module.
+> 
+> System power off sequence:-
+> * Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
+> * Enable PMIC_POWER_EN in rtc module
+> * Set rtc ALARM2 time
+> * Enable ALARM2 interrupt
+> 
+> These patches were tested on am335x-bone (BeagleBone). These patchs
+> are based on linux-next.
 
-Thank you for your patch.
+Hi All,
 
-Best wishes,
--- 
-Kamil Debski
-Linux Platform Group
-Samsung Poland R&D Center
+Happy New Year
 
-> -----Original Message-----
-> From: linux-media-owner at vger.kernel.org [mailto:linux-media-
-> owner at vger.kernel.org] On Behalf Of Wei Yongjun
-> Sent: Sunday, December 02, 2012 1:17 PM
-> To: kyungmin.park at samsung.com; k.debski at samsung.com;
-> jtp.park at samsung.com; mchehab at redhat.com
-> Cc: yongjun_wei at trendmicro.com.cn; linux-arm-kernel at lists.infradead.org;
-> linux-media at vger.kernel.org
-> Subject: [PATCH -next] [media] s5p-mfc: remove unused variable
-> 
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> The variable index is initialized but never used otherwise, so remove
-> the unused variable.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Gentle ping to this series
 
-Acked-by: Kamil Debski <k.debski@samsung.com>
-
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc.c        | 5 -----
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 6 ------
->  2 files changed, 11 deletions(-)
+Thanks
+AnilKumar
+ 
+> Changes from v3:
+> 	- TPS65217 mfd driver changes are accepted so dropped
+> 	  from this series.
+> 	- With recent changes in the kernel, reboot_mutex held BUG()
+> 	  is not seen so removed while(1); from rtc_power_off.
+> 	- Removed spinlock before while(1); which is not necessary.
 > 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> index 3afe879..856cf00 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> @@ -273,7 +273,6 @@ static void s5p_mfc_handle_frame_new(struct
-> s5p_mfc_ctx *ctx, unsigned int err)
->  	struct s5p_mfc_buf  *dst_buf;
->  	size_t dspl_y_addr;
->  	unsigned int frame_type;
-> -	unsigned int index;
+> Changes from v2:
+> 	- Incorporated Kevin's comment on v2
+> 	  * Enabled RTC in ompa2plus_defconfig
 > 
->  	dspl_y_addr = s5p_mfc_hw_call(dev->mfc_ops, get_dspl_y_adr, dev);
->  	frame_type = s5p_mfc_hw_call(dev->mfc_ops, get_dec_frame_type,
-> dev); @@ -310,7 +309,6 @@ static void s5p_mfc_handle_frame_new(struct
-> s5p_mfc_ctx *ctx, unsigned int err)
->  			vb2_buffer_done(dst_buf->b,
->  				err ? VB2_BUF_STATE_ERROR :
-VB2_BUF_STATE_DONE);
+> Changes from v1:
+> 	- Incorporated Vaibhav's comments on v1
+> 	  * Changed the time rollover logic with the help of
+> 	    rtc-lib APIs
 > 
-> -			index = dst_buf->b->v4l2_buf.index;
->  			break;
->  		}
->  	}
-> @@ -326,8 +324,6 @@ static void s5p_mfc_handle_frame(struct s5p_mfc_ctx
-> *ctx,
->  	unsigned long flags;
->  	unsigned int res_change;
+> AnilKumar Ch (3):
+>   ARM: dts: AM33XX: Set pmic-shutdown-controller for BeagleBone
+>   ARM: dts: AM33XX: Enable system power off control in am335x-bone
+>   ARM: OMAP2+: omap2plus_defconfig: Enable RTC support
 > 
-> -	unsigned int index;
-> -
->  	dst_frame_status = s5p_mfc_hw_call(dev->mfc_ops, get_dspl_status,
-> dev)
->  				& S5P_FIMV_DEC_STATUS_DECODING_STATUS_MASK;
->  	res_change = (s5p_mfc_hw_call(dev->mfc_ops, get_dspl_status, dev)
-> @@ -387,7 +383,6 @@ static void s5p_mfc_handle_frame(struct s5p_mfc_ctx
-> *ctx,
->  			mfc_debug(2, "Running again the same buffer\n");
->  			ctx->after_packed_pb = 1;
->  		} else {
-> -			index = src_buf->b->v4l2_buf.index;
->  			mfc_debug(2, "MFC needs next buffer\n");
->  			ctx->consumed_stream = 0;
->  			list_del(&src_buf->list);
+> Colin Foe-Parker (1):
+>   rtc: OMAP: Add system pm_power_off to rtc driver
 > 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> index 3a8cfd9..bf4d2f4 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> @@ -1408,7 +1408,6 @@ static inline int s5p_mfc_run_dec_frame(struct
-> s5p_mfc_ctx *ctx)
->  	struct s5p_mfc_buf *temp_vb;
->  	unsigned long flags;
->  	int last_frame = 0;
-> -	unsigned int index;
+>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
+>  arch/arm/boot/dts/am335x-bone.dts                  |    6 ++
+>  arch/arm/configs/omap2plus_defconfig               |    1 +
+>  drivers/rtc/rtc-omap.c                             |   74 +++++++++++++++++++-
+>  4 files changed, 85 insertions(+), 1 deletion(-)
 > 
->  	spin_lock_irqsave(&dev->irqlock, flags);
+> -- 
+> 1.7.9.5
 > 
-> @@ -1427,8 +1426,6 @@ static inline int s5p_mfc_run_dec_frame(struct
-> s5p_mfc_ctx *ctx)
->  			temp_vb->b->v4l2_planes[0].bytesused);
->  	spin_unlock_irqrestore(&dev->irqlock, flags);
 > 
-> -	index = temp_vb->b->v4l2_buf.index;
-> -
->  	dev->curr_ctx = ctx->num;
->  	s5p_mfc_clean_ctx_int_flags(ctx);
->  	if (temp_vb->b->v4l2_planes[0].bytesused == 0) { @@ -1452,7
-> +1449,6 @@ static inline int s5p_mfc_run_enc_frame(struct s5p_mfc_ctx
-> *ctx)
->  	unsigned int src_y_size, src_c_size;
->  	*/
->  	unsigned int dst_size;
-> -	unsigned int index;
-> 
->  	spin_lock_irqsave(&dev->irqlock, flags);
-> 
-> @@ -1487,8 +1483,6 @@ static inline int s5p_mfc_run_enc_frame(struct
-> s5p_mfc_ctx *ctx)
-> 
->  	spin_unlock_irqrestore(&dev->irqlock, flags);
-> 
-> -	index = src_mb->b->v4l2_buf.index;
-> -
->  	dev->curr_ctx = ctx->num;
->  	s5p_mfc_clean_ctx_int_flags(ctx);
->  	s5p_mfc_encode_one_frame_v6(ctx);
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media"
-> in the body of a message to majordomo at vger.kernel.org More majordomo
-> info at  http://vger.kernel.org/majordomo-info.html
