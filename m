@@ -1,52 +1,101 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 02 Jan 2013 18:31:53 +1300
-Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
- IS_ERR_OR_NULL
-In-Reply-To: <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
-References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
- <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
- <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
- <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
-Message-ID: <1357104713.30504.8.camel@gitbox>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 02 Jan 2013 09:16:42 +0200
+Subject: [PATCH v2] ARM: OMAP3: cm-t3517: add MMC support
+In-Reply-To: <1354871155-32528-1-git-send-email-grinberg@compulab.co.il>
+References: <1354795206-12048-1-git-send-email-grinberg@compulab.co.il>
+ <1354871155-32528-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <50E3DEDA.7020807@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-02 at 08:10 +0300, Dan Carpenter wrote:
-> clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
+ping
+
+Hi Tony,
+
+This is a really small addition to improve Paul's tests coverage.
+Can this go into 3.9?
+
+Thanks
+
+On 12/07/12 11:05, Igor Grinberg wrote:
+> cm-t3517 uses two MMC interfaces. Add support for both.
 > 
-> I told Tony about this but everyone has been gone with end of year
-> holidays so it hasn't been addressed.
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> ---
+> v2: Use CONFIG_MMC_OMAP_HS instead of plain CONFIG_MMC, so it will be stubbed
+>     out with the same defines as omap_hsmmc_init() function.
+>     Fix the !CONFIG_MMC_OMAP_HS case.
 > 
-> Tony, please fix it so people don't apply these patches until
-> clk_get() is updated to not return NULL.  It sucks to have to revert
-> patches.
+>  arch/arm/mach-omap2/board-cm-t3517.c |   27 +++++++++++++++++++++++++++
+>  1 files changed, 27 insertions(+), 0 deletions(-)
 > 
-> regards,
-> dan carpenter
+> diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+> index ebbc2ad..792d684 100644
+> --- a/arch/arm/mach-omap2/board-cm-t3517.c
+> +++ b/arch/arm/mach-omap2/board-cm-t3517.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/nand.h>
+>  #include <linux/mtd/partitions.h>
+> +#include <linux/mmc/host.h>
+>  #include <linux/can/platform/ti_hecc.h>
+>  
+>  #include <asm/mach-types.h>
+> @@ -46,6 +47,7 @@
+>  
+>  #include "mux.h"
+>  #include "control.h"
+> +#include "hsmmc.h"
+>  #include "common-board-devices.h"
+>  #include "am35xx-emac.h"
+>  #include "gpmc-nand.h"
+> @@ -121,6 +123,26 @@ static void cm_t3517_init_hecc(void)
+>  static inline void cm_t3517_init_hecc(void) {}
+>  #endif
+>  
+> +#if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
+> +static struct omap2_hsmmc_info cm_t3517_mmc[] = {
+> +	{
+> +		.mmc		= 1,
+> +		.caps		= MMC_CAP_4_BIT_DATA,
+> +		.gpio_cd	= 144,
+> +		.gpio_wp	= 59,
+> +	},
+> +	{
+> +		.mmc		= 2,
+> +		.caps		= MMC_CAP_4_BIT_DATA,
+> +		.gpio_cd	= -EINVAL,
+> +		.gpio_wp	= -EINVAL,
+> +	},
+> +	{}	/* Terminator */
+> +};
+> +#else
+> +#define cm_t3517_mmc NULL
+> +#endif
+> +
+>  #if defined(CONFIG_RTC_DRV_V3020) || defined(CONFIG_RTC_DRV_V3020_MODULE)
+>  #define RTC_IO_GPIO		(153)
+>  #define RTC_WR_GPIO		(154)
+> @@ -271,6 +293,10 @@ static struct omap_board_mux board_mux[] __initdata = {
+>  	/* CM-T3517 USB HUB nRESET */
+>  	OMAP3_MUX(MCBSP4_CLKX, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+>  
+> +	/* CD - GPIO144 and WP - GPIO59 for MMC1 - SB-T35 */
+> +	OMAP3_MUX(UART2_CTS, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
+> +	OMAP3_MUX(GPMC_CLK, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
+> +
+>  	{ .reg_offset = OMAP_MUX_TERMINATOR },
+>  };
+>  #endif
+> @@ -286,6 +312,7 @@ static void __init cm_t3517_init(void)
+>  	cm_t3517_init_usbh();
+>  	cm_t3517_init_hecc();
+>  	am35xx_emac_init(AM35XX_DEFAULT_MDIO_FREQUENCY, 1);
+> +	omap_hsmmc_init(cm_t3517_mmc);
+>  }
+>  
+>  MACHINE_START(CM_T3517, "Compulab CM-T3517")
 
-I posted the query to Mike Turquette, linux-kernel and linux-arm-kernel
-mailing lists, regarding the return of NULL when HAVE_CLK is undefined.
-
-Short Answer: A return value of NULL is valid and not an error therefore
-we should be using IS_ERR, not IS_ERR_OR_NULL on clk_get results.
-
-I see the obvious problem this creates, and asked this question:
-
-If the driver can't operate with a NULL clk, it should use a
-IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
-
-
-And Russell's answer:
-
-Why should a _consumer_ of a clock care?  It is _very_ important that
-people get this idea - to a consumer, the struct clk is just an opaque
-cookie.  The fact that it appears to be a pointer does _not_ mean that
-the driver can do any kind of dereferencing on that pointer - it should
-never do so.
-
-Thread can be viewed here:
-https://lkml.org/lkml/2012/12/20/105
-
-
-Regards
-Tony Prisk
+-- 
+Regards,
+Igor.
