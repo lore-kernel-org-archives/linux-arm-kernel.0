@@ -1,38 +1,42 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Wed, 2 Jan 2013 10:44:32 +0100 (CET)
-Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
- IS_ERR_OR_NULL
-In-Reply-To: <20130102092638.GB2631@n2100.arm.linux.org.uk>
-References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
- <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
- <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
- <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
- <20130102092638.GB2631@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1301021031490.1994@hadrien>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Wed, 2 Jan 2013 10:11:40 +0000
+Subject: [PATCH 0/7] ARM: OMAP2+: AM33XX: Enable few drivers in
+ omap2plus_defconfig
+In-Reply-To: <20121214180905.GX4989@atomide.com>
+References: <1353481163-29462-1-git-send-email-anilkumar@ti.com>
+ <20121214180905.GX4989@atomide.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAD484A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Jan 2013, Russell King - ARM Linux wrote:
+On Fri, Dec 14, 2012 at 23:39:05, Tony Lindgren wrote:
+> * AnilKumar Ch <anilkumar@ti.com> [121120 23:01]:
+> > This patch series enable tps65910, lis3lv02d accelerometer, tsl2550
+> > ambient light sensor, matrix keypad, tmp275 temperature sensor, gpio
+> > leds and D_CAN drivers in omap2plus_defconfig.
+> > 
+> > These are the peripherals present in AM33XX family of devices.
+> > 
+> > AnilKumar Ch (7):
+> >   ARM: OMAP2+: omap2plus_defconfig: Enable tps65910 PMIC
+> >   ARM: OMAP2+: omap2plus_defconfig: Enable lis3lv02d accelerometer
+> >   ARM: OMAP2+: omap2plus_defconfig: Enable tsl2550 ambient light sensor
+> >   ARM: OMAP2+: omap2plus_defconfig: Enable matrix keypad driver
+> >   ARM: OMAP2+: omap2plus_defconfig: Enable tmp275 sensor
+> >   ARM: OMAP2+: omap2plus_defconfig: Enable leds-gpio driver
+> >   ARM: OMAP2+: omap2plus_defconfig: Enable DCAN controller
+> > 
+> >  arch/arm/configs/omap2plus_defconfig |   17 +++++++++++++++++
+> >  1 file changed, 17 insertions(+)
+> 
+> Let's make all these into modules except for the tps65910.
+> 
 
-> On Wed, Jan 02, 2013 at 08:10:36AM +0300, Dan Carpenter wrote:
-> > clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
-> >
-> > I told Tony about this but everyone has been gone with end of year
-> > holidays so it hasn't been addressed.
-> >
-> > Tony, please fix it so people don't apply these patches until
-> > clk_get() is updated to not return NULL.  It sucks to have to revert
-> > patches.
->
-> How about people stop using IS_ERR_OR_NULL for stuff which it shouldn't
-> be used for?
+Happy New Year Tony,
 
-Perhaps the cases where clk_get returns NULL could have a comment
-indicating that NULL does not represent a failure?
+I will send the updated series with the changes. Selecting leds-gpio
+driver as module is not supported, so leds-gpio driver is enabled
+by default and rest of the drivers as modules.
 
-In 3.7.1, it looks like it might have been possible for NULL to be
-returned by clk_get in arch/mips/loongson1/common/clock.c, but that
-definition seems to be gone in a recent linux-next.  The remaining
-definitions look OK.
-
-julia
+Thanks
+AnilKumar
