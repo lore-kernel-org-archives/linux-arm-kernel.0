@@ -1,190 +1,88 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 02 Jan 2013 14:24:00 -0800
-Subject: [PATCH 23/26] ARM: S3C64XX: make regs-modem.h local
+Date: Wed, 02 Jan 2013 14:23:54 -0800
+Subject: [PATCH 17/26] ARM: S3C2416: remove regs-s3c2416-mem.h and
+ regs-s3c2416.h
 In-Reply-To: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
 References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1357165443-3716-24-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1357165443-3716-18-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The header can be local in mach-s3c64xx/.
+The headers no longer used anywhere now.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c64xx/mach-anw6410.c                  |    2 +-
- arch/arm/mach-s3c64xx/mach-crag6410.c                 |    2 +-
- arch/arm/mach-s3c64xx/mach-mini6410.c                 |    2 +-
- arch/arm/mach-s3c64xx/mach-real6410.c                 |    2 +-
- arch/arm/mach-s3c64xx/mach-smartq.c                   |    2 +-
- arch/arm/mach-s3c64xx/mach-smdk6410.c                 |    2 +-
- arch/arm/mach-s3c64xx/pm.c                            |    2 +-
- arch/arm/mach-s3c64xx/{include/mach => }/regs-modem.h |   11 +++++------
- 8 files changed, 12 insertions(+), 13 deletions(-)
- rename arch/arm/mach-s3c64xx/{include/mach => }/regs-modem.h (78%)
+ .../mach-s3c24xx/include/mach/regs-s3c2416-mem.h   |   30 --------------------
+ arch/arm/mach-s3c24xx/include/mach/regs-s3c2416.h  |   24 ----------------
+ 2 files changed, 54 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-s3c2416-mem.h
+ delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-s3c2416.h
 
-diff --git a/arch/arm/mach-s3c64xx/mach-anw6410.c b/arch/arm/mach-s3c64xx/mach-anw6410.c
-index 99e82ac..dac03ab 100644
---- a/arch/arm/mach-s3c64xx/mach-anw6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-anw6410.c
-@@ -50,9 +50,9 @@
- #include <plat/devs.h>
- #include <plat/cpu.h>
- #include <mach/regs-gpio.h>
--#include <mach/regs-modem.h>
- 
- #include "common.h"
-+#include "regs-modem.h"
- 
- /* DM9000 */
- #define ANW6410_PA_DM9000	(0x18000000)
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index e1a0742..d254135 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -52,7 +52,6 @@
- 
- #include <mach/regs-sys.h>
- #include <mach/regs-gpio.h>
--#include <mach/regs-modem.h>
- 
- #include <plat/regs-serial.h>
- #include <plat/fb.h>
-@@ -71,6 +70,7 @@
- #include "common.h"
- #include "crag6410.h"
- #include "regs-gpio-memport.h"
-+#include "regs-modem.h"
- 
- /* serial port setup */
- 
-diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
-index 07c349c..67881e6d 100644
---- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-@@ -31,7 +31,6 @@
- 
- #include <mach/map.h>
- #include <mach/regs-gpio.h>
--#include <mach/regs-modem.h>
- #include <mach/regs-srom.h>
- 
- #include <plat/adc.h>
-@@ -46,6 +45,7 @@
- #include <video/samsung_fimd.h>
- 
- #include "common.h"
-+#include "regs-modem.h"
- 
- #define UCON S3C2410_UCON_DEFAULT
- #define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
-diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-index 7476f7c..f620b89 100644
---- a/arch/arm/mach-s3c64xx/mach-real6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-@@ -32,7 +32,6 @@
- 
- #include <mach/map.h>
- #include <mach/regs-gpio.h>
--#include <mach/regs-modem.h>
- #include <mach/regs-srom.h>
- 
- #include <plat/adc.h>
-@@ -47,6 +46,7 @@
- #include <video/samsung_fimd.h>
- 
- #include "common.h"
-+#include "regs-modem.h"
- 
- #define UCON S3C2410_UCON_DEFAULT
- #define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index c6d7390..fc3e9b3 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -25,7 +25,6 @@
- 
- #include <mach/map.h>
- #include <mach/regs-gpio.h>
--#include <mach/regs-modem.h>
- 
- #include <plat/clock.h>
- #include <plat/cpu.h>
-@@ -41,6 +40,7 @@
- #include <video/platform_lcd.h>
- 
- #include "common.h"
-+#include "regs-modem.h"
- 
- #define UCON S3C2410_UCON_DEFAULT
- #define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE)
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index 574a9ee..f49ecae 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -57,7 +57,6 @@
- #include <asm/mach-types.h>
- 
- #include <plat/regs-serial.h>
--#include <mach/regs-modem.h>
- #include <mach/regs-gpio.h>
- #include <mach/regs-sys.h>
- #include <mach/regs-srom.h>
-@@ -75,6 +74,7 @@
- #include <plat/backlight.h>
- 
- #include "common.h"
-+#include "regs-modem.h"
- 
- #define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
- #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
-diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-index f431987..c6eff9f 100644
---- a/arch/arm/mach-s3c64xx/pm.c
-+++ b/arch/arm/mach-s3c64xx/pm.c
-@@ -30,9 +30,9 @@
- #include <mach/regs-gpio.h>
- #include <mach/regs-clock.h>
- #include <mach/regs-syscon-power.h>
--#include <mach/regs-modem.h>
- 
- #include "regs-gpio-memport.h"
-+#include "regs-modem.h"
- 
- struct s3c64xx_pm_domain {
- 	char *const name;
-diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-modem.h b/arch/arm/mach-s3c64xx/regs-modem.h
-similarity index 78%
-rename from arch/arm/mach-s3c64xx/include/mach/regs-modem.h
-rename to arch/arm/mach-s3c64xx/regs-modem.h
-index 49f7759..073cdd3 100644
---- a/arch/arm/mach-s3c64xx/include/mach/regs-modem.h
-+++ b/arch/arm/mach-s3c64xx/regs-modem.h
-@@ -1,5 +1,4 @@
--/* arch/arm/plat-s3c64xx/include/plat/regs-modem.h
+diff --git a/arch/arm/mach-s3c24xx/include/mach/regs-s3c2416-mem.h b/arch/arm/mach-s3c24xx/include/mach/regs-s3c2416-mem.h
+deleted file mode 100644
+index 2f31b74..0000000
+--- a/arch/arm/mach-s3c24xx/include/mach/regs-s3c2416-mem.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/* arch/arm/mach-s3c2410/include/mach/regs-s3c2416-mem.h
 - *
-+/*
-  * Copyright 2008 Openmoko, Inc.
-  * Copyright 2008 Simtec Electronics
-  *      http://armlinux.simtec.co.uk/
-@@ -12,10 +11,10 @@
-  * published by the Free Software Foundation.
- */
- 
--#ifndef __PLAT_S3C64XX_REGS_MODEM_H
--#define __PLAT_S3C64XX_REGS_MODEM_H __FILE__
-+#ifndef __MACH_S3C64XX_REGS_MODEM_H
-+#define __MACH_S3C64XX_REGS_MODEM_H __FILE__
- 
--#define S3C64XX_MODEMREG(x)	(S3C64XX_VA_MODEM + (x))
-+#define S3C64XX_MODEMREG(x)			(S3C64XX_VA_MODEM + (x))
- 
- #define S3C64XX_MODEM_INT2AP			S3C64XX_MODEMREG(0x0)
- #define S3C64XX_MODEM_INT2MODEM			S3C64XX_MODEMREG(0x4)
-@@ -28,4 +27,4 @@
- #define MIFPCON_INT2M_LEVEL			(1 << 4)
- #define MIFPCON_LCD_BYPASS			(1 << 3)
- 
--#endif /* __PLAT_S3C64XX_REGS_MODEM_H */
-+#endif /* __MACH_S3C64XX_REGS_MODEM_H */
+- * Copyright (c) 2009 Yauhen Kharuzhy <jekhor@gmail.com>,
+- *	as part of OpenInkpot project
+- * Copyright (c) 2009 Promwad Innovation Company
+- *	Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * S3C2416 memory register definitions
+-*/
+-
+-#ifndef __ASM_ARM_REGS_S3C2416_MEM
+-#define __ASM_ARM_REGS_S3C2416_MEM
+-
+-#ifndef S3C2416_MEMREG
+-#define S3C2416_MEMREG(x) (S3C24XX_VA_MEMCTRL + (x))
+-#endif
+-
+-#define S3C2416_BANKCFG			S3C2416_MEMREG(0x00)
+-#define S3C2416_BANKCON1		S3C2416_MEMREG(0x04)
+-#define S3C2416_BANKCON2		S3C2416_MEMREG(0x08)
+-#define S3C2416_BANKCON3		S3C2416_MEMREG(0x0C)
+-
+-#define S3C2416_REFRESH			S3C2416_MEMREG(0x10)
+-#define S3C2416_TIMEOUT			S3C2416_MEMREG(0x14)
+-
+-#endif /*  __ASM_ARM_REGS_S3C2416_MEM */
+diff --git a/arch/arm/mach-s3c24xx/include/mach/regs-s3c2416.h b/arch/arm/mach-s3c24xx/include/mach/regs-s3c2416.h
+deleted file mode 100644
+index e443167..0000000
+--- a/arch/arm/mach-s3c24xx/include/mach/regs-s3c2416.h
++++ /dev/null
+@@ -1,24 +0,0 @@
+-/* arch/arm/mach-s3c2410/include/mach/regs-s3c2416.h
+- *
+- * Copyright (c) 2009 Yauhen Kharuzhy <jekhor@gmail.com>,
+- *	as part of OpenInkpot project
+- * Copyright (c) 2009 Promwad Innovation Company
+- *	Yauhen Kharuzhy <yauhen.kharuzhy@promwad.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * S3C2416 specific register definitions
+-*/
+-
+-#ifndef __ASM_ARCH_REGS_S3C2416_H
+-#define __ASM_ARCH_REGS_S3C2416_H "s3c2416"
+-
+-#define S3C2416_SWRST		(S3C24XX_VA_CLKPWR + 0x44)
+-#define S3C2416_SWRST_RESET	(0x533C2416)
+-
+-/* see regs-power.h for the other registers in the power block. */
+-
+-#endif	/* __ASM_ARCH_REGS_S3C2416_H */
+-
 -- 
 1.7.10.4
