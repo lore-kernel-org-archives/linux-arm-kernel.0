@@ -1,70 +1,25 @@
-From: laurent.cans@gmail.com (Laurent CANS)
-Date: Wed, 2 Jan 2013 09:41:12 +0100
-Subject: [PATCH] Add apf51 basic support
-In-Reply-To: <20121219203936.GG26326@pengutronix.de>
-References: <1355694591-7084-1-git-send-email-laurent.cans@gmail.com>
- <20121219203936.GG26326@pengutronix.de>
-Message-ID: <CAA1eMkEoaJ14WOjciCD-zN4BqPEZ=14M_U7DSqxRoRA0XPLh0g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Jan 2013 09:26:38 +0000
+Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
+ IS_ERR_OR_NULL
+In-Reply-To: <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
+References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
+ <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
+ <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
+ <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
+Message-ID: <20130102092638.GB2631@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/12/19 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Sun, Dec 16, 2012 at 10:49:51PM +0100, Laurent Cans wrote:
->> Signed-off-by: Laurent Cans <laurent.cans@gmail.com>
->> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
->> ---
->> +     clocks {
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +
->> +             ckih1 {
->> +                     compatible = "fsl,imx-ckih1", "fixed-clock";
->> +                     clock-frequency = <0>;
->> +             };
->> +
->> +             osc {
->> +                     compatible = "fsl,imx-osc", "fixed-clock";
->> +                     clock-frequency = <33554432>;
->> +             };
->
-> These compatible properties shouldn't be necessary, right?
+On Wed, Jan 02, 2013 at 08:10:36AM +0300, Dan Carpenter wrote:
+> clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
+> 
+> I told Tony about this but everyone has been gone with end of year
+> holidays so it hasn't been addressed.
+> 
+> Tony, please fix it so people don't apply these patches until
+> clk_get() is updated to not return NULL.  It sucks to have to revert
+> patches.
 
-Yes you are right. I will correct that.
-
->
->> +     };
->> +     soc {
->> +             aips at 70000000 { /* aips-1 */
->> +                     spba at 70000000 {
->> +                             uart3: serial at 7000c000 {
->> +                                     pinctrl-names = "default";
->> +                                     pinctrl-0 = <&pinctrl_uart3_2>;
->> +                                     status = "okay";
->> +                             };
->> +                     };
->> +             };
->
-> This (and the other nodes) can more eaasily be written as:
->
-> &uart3 {
->         ...
-> };
->
-> see arch/arm/boot/dts/omap5-evm.dts for a good example.
->
-> This has the advantage that you don't have to resemble the SoC layout
-> in your board file.
-
-I will send v2 version of the patch during the week written with this
-new layout.
-
-Thanks for the comments
-
->
-> Sascha
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+How about people stop using IS_ERR_OR_NULL for stuff which it shouldn't
+be used for?
