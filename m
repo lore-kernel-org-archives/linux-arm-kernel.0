@@ -1,44 +1,87 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 2 Jan 2013 12:19:57 -0800
-Subject: [PATCH v3 0/7] ARM: OMAP2+: AM33XX: Enable few drivers in
- omap2plus_defconfig
-In-Reply-To: <1357122451-7577-1-git-send-email-anilkumar@ti.com>
-References: <1357122451-7577-1-git-send-email-anilkumar@ti.com>
-Message-ID: <CAOesGMj0yO5JxkDAeN1negip5dvwX9Y3syoU4JPsKnVJ0GucdQ@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu,  3 Jan 2013 09:23:03 +1300
+Subject: [PATCH 3/4] video: vt8500: Remove unused
+ platform_data/video-vt8500lcdfb.h
+In-Reply-To: <1357158184-18213-1-git-send-email-linux@prisktech.co.nz>
+References: <1357158184-18213-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1357158184-18213-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With the conversion to devicetree only for arch-vt8500, this
+header is no longer required. This patch removes the #include
+from the two framebuffer drivers that used it, and the header file.
 
-On Wed, Jan 2, 2013 at 2:27 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
-> This patch series enable tps65910, lis3lv02d accelerometer, tsl2550
-> ambient light sensor, matrix keypad, tmp275 temperature sensor, gpio
-> leds and D_CAN drivers in omap2plus_defconfig.
->
-> These are the peripherals present in AM33XX family of devices.
->
-> Changes from v2:
->         - Incorporated Tony's comments on v2
->           * Enabled as modules instead of kernel built-in drivers.
->         - Dropped 1st patch because it was accepted.
->
-> Changes from v1:
->         - Incorporated martinez javier's comments on v1
->           * Enabled few more triggers in omap2plus_defconfig
->         - Included Igor's patch, which modifies the omap2plus
->           defconfig for AM33XX devices.
->
-> AnilKumar Ch (7):
->   ARM: OMAP2+: omap2plus_defconfig: Add tps65910 support
->   ARM: OMAP2+: omap2plus_defconfig: Add lis3lv02d support
->   ARM: OMAP2+: omap2plus_defconfig: Add tsl2550 support
->   ARM: OMAP2+: omap2plus_defconfig: Add matrix-keypad support
->   ARM: OMAP2+: omap2plus_defconfig: Add tmp275 sensor support
->   ARM: OMAP2+: omap2plus_defconfig: Add leds-gpio support
->   ARM: OMAP2+: omap2plus_defconfig: Add D_CAN support
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ drivers/video/vt8500lcdfb.c                     |    2 --
+ drivers/video/wm8505fb.c                        |    2 --
+ include/linux/platform_data/video-vt8500lcdfb.h |   31 -----------------------
+ 3 files changed, 35 deletions(-)
+ delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
 
-Doing this as 7 separate patches seems excessive to me. Just do it as
-one single patch instead.
-
-
--Olof
+diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+index e8853ac..b1fbe20 100644
+--- a/drivers/video/vt8500lcdfb.c
++++ b/drivers/video/vt8500lcdfb.c
+@@ -30,8 +30,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/wait.h>
+ 
+-#include <linux/platform_data/video-vt8500lcdfb.h>
+-
+ #include "vt8500lcdfb.h"
+ 
+ #ifdef CONFIG_FB_WMT_GE_ROPS
+diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+index a990708..f0185cd 100644
+--- a/drivers/video/wm8505fb.c
++++ b/drivers/video/wm8505fb.c
+@@ -32,8 +32,6 @@
+ #include <linux/of_fdt.h>
+ #include <linux/memblock.h>
+ 
+-#include <linux/platform_data/video-vt8500lcdfb.h>
+-
+ #include "wm8505fb_regs.h"
+ 
+ #ifdef CONFIG_FB_WMT_GE_ROPS
+diff --git a/include/linux/platform_data/video-vt8500lcdfb.h b/include/linux/platform_data/video-vt8500lcdfb.h
+deleted file mode 100644
+index 7f399c3..0000000
+--- a/include/linux/platform_data/video-vt8500lcdfb.h
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/*
+- *  VT8500/WM8505 Frame Buffer platform data definitions
+- *
+- *  Copyright (C) 2010 Ed Spiridonov <edo.rus@gmail.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#ifndef _VT8500FB_H
+-#define _VT8500FB_H
+-
+-#include <linux/fb.h>
+-
+-struct vt8500fb_platform_data {
+-	struct fb_videomode	mode;
+-	u32			xres_virtual;
+-	u32			yres_virtual;
+-	u32			bpp;
+-	unsigned long		video_mem_phys;
+-	void			*video_mem_virt;
+-	unsigned long		video_mem_len;
+-};
+-
+-#endif /* _VT8500FB_H */
+-- 
+1.7.9.5
