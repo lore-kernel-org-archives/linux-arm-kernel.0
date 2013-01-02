@@ -1,143 +1,32 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 2 Jan 2013 14:00:21 -0600
-Subject: CoreSight framework and drivers
-In-Reply-To: <20121221221828.GA2658@pratikp-linux.qualcomm.com>
-References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
- <20121219112314.GA26329@mudshark.cambridge.arm.com> <50D1F37E.6000804@ti.com>
- <20121219212431.GC23594@pratikp-linux.qualcomm.com> <50D34EE5.8090407@ti.com>
- <20121220195127.GA14877@pratikp-linux.qualcomm.com> <50D3972E.4030607@ti.com>
- <20121221221828.GA2658@pratikp-linux.qualcomm.com>
-Message-ID: <50E491D5.3080106@ti.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 2 Jan 2013 13:09:32 -0700
+Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
+In-Reply-To: <20121229093359.GA5877@avionic-0098.adnet.avionic-design.de>
+References: <20121217194147.GA2767@avionic-0098.adnet.avionic-design.de>
+ <50CFD0B3.6030208@wwwdotorg.org>
+ <20121218025113.GA27029@obsidianresearch.com>
+ <50D0A1EA.9090009@wwwdotorg.org>
+ <20121220153231.GA11256@avionic-0098.adnet.avionic-design.de>
+ <20121222155040.61829b00@skate>
+ <20121228210622.GA4519@avionic-0098.adnet.avionic-design.de>
+ <20121228221632.3892e90b@skate> <50DE2FFB.8040804@wwwdotorg.org>
+ <20121229093359.GA5877@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20130102200932.GA2956@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Dec 29, 2012 at 10:33:59AM +0100, Thierry Reding wrote:
 
-On 12/21/2012 04:18 PM, Pratik Patel wrote:
-> On Thu, Dec 20, 2012 at 04:54:38PM -0600, Jon Hunter wrote:
->>
->> On 12/20/2012 01:51 PM, Pratik Patel wrote:
->>> On Thu, Dec 20, 2012 at 11:46:13AM -0600, Jon Hunter wrote:
->>>>
->>>> On 12/19/2012 03:24 PM, Pratik Patel wrote:
->>>>
->>>> [snip]
->>>>
->>>>> Currently we use the CoreSight virtual bus to conveniently list
->>>>> sysfs configuration attributes for all the registered CoreSight
->>>>> devices.
->>>>>
->>>>> For eg:
->>>>> /sys/bus/coresight/devices/coresight-etm0/<attribute>
->>>>> /sys/bus/coresight/devices/coresight-etm1/<attribute>
->>>>> /sys/bus/coresight/devices/coresight-stm/<attribute>
->>>>> /sys/bus/coresight/devices/coresight-tmc-etf/<attribute>
->>>>> ...
->>>>> ...
->>>>>
->>>>> Some of the attributes are based on device type (i.e. source,
->>>>> link or sink) so they will exist for all devices of that type
->>>>> while some are device specific.
->>>>>
->>>>> Maybe I am misunderstanding the question but are you suggesting
->>>>> to register CoreSight devices to the AMBA bus instead of the
->>>>> CoreSight core layer code?
->>>>
->>>> Yes exactly.
->>>>
->>>>> Will Deacon mentioned earlier that AMBA framework can be changed
->>>>> to accomodate devices with a different class but I am more
->>>>> concerned with losing some of the stuff that the core layer code
->>>>> does (eg. coresight_register, coresight_enable, coresight_disable
->>>>> in coresight.c) if we register CoreSight drivers to the AMBA bus
->>>>> without letting the core layer know about the device connections.
->>>>
->>>> I may be missing something, but couldn't you keep all the
->>>> register/enable/disable stuff but just register the device with the amba
->>>> bus? Obviously some changes would need to be made.
->>>>
->>>
->>> Ok, so are you referring to making CoreSight devices register
->>> with AMBA bus instead of platform bus keeping everything else
->>> intact?
->>
->> Yes exactly. However, please note I am not saying that we should do
->> this, and I asking what direction does the community want us to take
->> here? Platform bus or AMBA bus?
->>
->>>> Personally, I don't have strong feeling either way, but we have ETM/ETB
->>>> drivers using AMBA today and so I am hoping we can come to agreement on
->>>> this going forward.
->>>>
->>>> Russell, Will, what are your thoughts?
->>>>
->>>> Otherwise, looking at the code, I like what you have implemented. I
->>>> still need to look closer, but I am struggling to figure out how a
->>>> coresight device such as the cross-trigger-interface fits with this
->>>> model. This model appears to be geared towards coresight devices used
->>>> for traces purposes and are either source, links or sinks. The
->>>> cross-trigger-interface is not a source or a sink. However, although you
->>>> it could be considered as a link (routing events), it is not really, as
->>>> it may not link to other coresight sinks/source.
->>>>
->>>> In my case, I have PMU-IRQ --> CTI --> GIC. So a non-coresight source
->>>> and sink. In away the CTI looks more like a 2nd-level interrupt
->>>> controller than anything else. Hence, another type of coresight device
->>>> may be needed in addition to source, links and sinks. Or link is
->>>> extended in some way to connect to non-coresight sources/sinks.
->>>>
->>>> Let me know if you have any thoughts.
->>>>
->>>
->>> I had left the "None" type for miscellaneous stuff but I agree it
->>> should be a separate type - maybe "debug".
->>>
->>> Having said that I like the CTI driver you have uploaded. Need to
->>> look at it in more detail. Since CTI connections can vary between
->>> chip to chip, we need a generic way to deal with it.
->>
->> Yes if you have any ideas let me know. As Will had mentioned it would be
->> good to have a common function table all these devices could use too. I
->> will take a closer look at what you have.
->>
-> 
-> I had started on a CTI driver much in line with your current
-> implementation but your approach looks good to me.
-> 
-> Looking at the code though, I couldn't find a way to perform a
-> mapping between two different CTIs. Reason I ask is because we
-> have use cases where we need to map one CTIs input to another
-> CTIs output on the same channel.
+> It isn't actually required to make PCI work, but it enables PCI device
+> matching to DT nodes with the generic code. If we leave out the host
+> bridge, then the matching becomes rather complicated and we'll most
 
-The code is largely based upon the existing cti helpers, which just had
-a cti_map_trigger() function. The use-case you described is not
-supported by the current helpers and so also not supported in my initial
-implementation (although we should add this). Hence, it would be
-probably best to split the cti_map_trigger() into two functions say,
-cti_map_triggerin() and cti_map_triggerout(), to map a trigger
-input/output to a channel.
+Can you elaborate on this a bit? What do pci bus location bindings look
+like?
 
-> Do you intend to support different entities within kernel to map
-> different trig_in or trig_out on the same CTI? If so, it might
-> probably require reference counting for the enable/disable.
+BTW, does anyone have working links for the various PDFs (ePAR, PCI
+bindings, etc) for open firmware stuff, they all seem broken these
+days..
 
-I need to think about this some more, as this does make it a little more
-complex. Right now only one entity can use a cti module at a time.
-
-> What user interface do you plan to provide for the CTI? Maybe
-> something consistent with other CoreSight components in sysfs to
-> allow users to enable, disable, map and unmap ???
-
-Yes that's possible.
-
-> Please let me know your thoughts.
-> 
-> CTIs can easily be made part of the CoreSight core layer using a
-> different type but apart from being part of the CoreSight list
-> containing all the trace and CTI components, not sure if there is
-> anything that is useful to do in the core layer. Need to think
-> about this.
-
-Yes it would be good to make this all part of the same coresight framework.
-
-Cheers
-Jon
+Cheers,
+Jason
