@@ -1,144 +1,66 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu,  3 Jan 2013 10:47:20 +1300
-Subject: [PATCH] gpio: vt8500: memory cleanup missing
-Message-ID: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed,  2 Jan 2013 14:53:20 -0700
+Subject: [PATCH V2 1/3] ARM: tegra: seaboard: enable HDMI port
+Message-ID: <1357163602-10777-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is missing a .remove callback, and the fail path on
-probe is incomplete.
+From: Stephen Warren <swarren@nvidia.com>
 
-If an error occurs in vt8500_add_chips, gpio_base is not unmapped.
-The driver is also ignoring the return value from this function so
-if a chip fails to register it completes as successful.
-
-Replaced pr_err with dev_err in vt8500_add_chips since the device is
-available.
-
-There is also no .remove callback defined. To allow removing the
-registered chips, I have moved *vtchip to be a static global.
-
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/gpio/gpio-vt8500.c |   53 ++++++++++++++++++++++++++++++++++----------
- 1 file changed, 41 insertions(+), 12 deletions(-)
+v2: No change.
+---
+ arch/arm/boot/dts/tegra20-seaboard.dts |   18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpio/gpio-vt8500.c b/drivers/gpio/gpio-vt8500.c
-index b53320a..a147b33 100644
---- a/drivers/gpio/gpio-vt8500.c
-+++ b/drivers/gpio/gpio-vt8500.c
-@@ -122,11 +122,13 @@ static struct vt8500_gpio_data wm8650_data = {
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index 4204598..f9e3ad4 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -10,6 +10,18 @@
+ 		reg = <0x00000000 0x40000000>;
+ 	};
  
- struct vt8500_gpio_chip {
- 	struct gpio_chip		chip;
--
- 	const struct vt8500_gpio_bank_regoffsets *regs;
- 	void __iomem	*base;
- };
- 
-+/* Pointer to our array of chips */
-+static struct vt8500_gpio_chip *vtchip;
++	host1x {
++		hdmi {
++			status = "okay";
 +
- 
- #define to_vt8500(__chip) container_of(__chip, struct vt8500_gpio_chip, chip)
- 
-@@ -224,7 +226,6 @@ static int vt8500_of_xlate(struct gpio_chip *gc,
- static int vt8500_add_chips(struct platform_device *pdev, void __iomem *base,
- 				const struct vt8500_gpio_data *data)
- {
--	struct vt8500_gpio_chip *vtchip;
- 	struct gpio_chip *chip;
- 	int i;
- 	int pin_cnt = 0;
-@@ -233,7 +234,7 @@ static int vt8500_add_chips(struct platform_device *pdev, void __iomem *base,
- 			sizeof(struct vt8500_gpio_chip) * data->num_banks,
- 			GFP_KERNEL);
- 	if (!vtchip) {
--		pr_err("%s: failed to allocate chip memory\n", __func__);
-+		dev_err(&pdev->dev, "failed to allocate chip memory\n");
- 		return -ENOMEM;
- 	}
- 
-@@ -261,6 +262,7 @@ static int vt8500_add_chips(struct platform_device *pdev, void __iomem *base,
- 
- 		gpiochip_add(chip);
- 	}
++			vdd-supply = <&hdmi_vdd_reg>;
++			pll-supply = <&hdmi_pll_reg>;
 +
- 	return 0;
- }
- 
-@@ -273,36 +275,63 @@ static struct of_device_id vt8500_gpio_dt_ids[] = {
- 
- static int vt8500_gpio_probe(struct platform_device *pdev)
- {
-+	int ret;
- 	void __iomem *gpio_base;
--	struct device_node *np;
-+	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id =
- 				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
- 
--	if (!of_id) {
--		dev_err(&pdev->dev, "Failed to find gpio controller\n");
-+	if (!np) {
-+		dev_err(&pdev->dev, "GPIO node missing in devicetree\n");
- 		return -ENODEV;
- 	}
- 
--	np = pdev->dev.of_node;
--	if (!np) {
--		dev_err(&pdev->dev, "Missing GPIO description in devicetree\n");
--		return -EFAULT;
-+	if (!of_id) {
-+		dev_err(&pdev->dev, "No matching driver data\n");
-+		return -ENODEV;
- 	}
- 
- 	gpio_base = of_iomap(np, 0);
- 	if (!gpio_base) {
- 		dev_err(&pdev->dev, "Unable to map GPIO registers\n");
--		of_node_put(np);
- 		return -ENOMEM;
- 	}
- 
--	vt8500_add_chips(pdev, gpio_base, of_id->data);
-+	ret = vt8500_add_chips(pdev, gpio_base, of_id->data);
-+	if (ret) {
-+		iounmap(gpio_base);
-+		return ret;
-+	}
++			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
++			nvidia,hpd-gpio = <&gpio 111 0>; /* PN7 */
++		};
++	};
 +
-+	return 0;
-+}
-+
-+static int vt8500_gpio_remove(struct platform_device *pdev)
-+{
-+	int i;
-+	int ret;
-+	const struct vt8500_gpio_data *data;
-+	void __iomem *gpio_base = vtchip[0].base;
-+	const struct of_device_id *of_id =
-+				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
-+
-+	data = of_id->data;
-+
-+	for (i = 0; i < data->num_banks; i++) {
-+		ret = gpiochip_remove(&vtchip[i].chip);
-+		if (ret)
-+			dev_warn(&pdev->dev, "gpiochip_remove returned %d\n",
-+				 ret);
-+	}
-+
-+	iounmap(gpio_base);
+ 	pinmux {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&state_default>;
+@@ -345,7 +357,7 @@
+ 		pinctrl-1 = <&state_i2cmux_pta>;
+ 		pinctrl-2 = <&state_i2cmux_idle>;
  
- 	return 0;
- }
+-		i2c at 0 {
++		hdmi_ddc: i2c at 0 {
+ 			reg = <0>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -463,13 +475,13 @@
+ 					regulator-max-microvolt = <1800000>;
+ 				};
  
- static struct platform_driver vt8500_gpio_driver = {
- 	.probe		= vt8500_gpio_probe,
-+	.remove		= vt8500_gpio_remove,
- 	.driver		= {
- 		.name	= "vt8500-gpio",
- 		.owner	= THIS_MODULE,
+-				ldo7 {
++				hdmi_vdd_reg: ldo7 {
+ 					regulator-name = "vdd_ldo7,avdd_hdmi,vdd_fuse";
+ 					regulator-min-microvolt = <3300000>;
+ 					regulator-max-microvolt = <3300000>;
+ 				};
+ 
+-				ldo8 {
++				hdmi_pll_reg: ldo8 {
+ 					regulator-name = "vdd_ldo8,avdd_hdmi_pll";
+ 					regulator-min-microvolt = <1800000>;
+ 					regulator-max-microvolt = <1800000>;
 -- 
-1.7.9.5
+1.7.10.4
