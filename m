@@ -1,64 +1,66 @@
 From: avinashphilip@ti.com (Philip Avinash)
-Date: Wed, 2 Jan 2013 18:54:53 +0530
-Subject: [PATCH 6/7] ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evm
+Date: Wed, 2 Jan 2013 18:54:54 +0530
+Subject: [PATCH 7/7] ARM: dts: AM33XX: Add PWM backlight DT data to
+ am335x-evmsk
 In-Reply-To: <1357133094-30806-1-git-send-email-avinashphilip@ti.com>
 References: <1357133094-30806-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1357133094-30806-7-git-send-email-avinashphilip@ti.com>
+Message-ID: <1357133094-30806-8-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PWM output from ecap0 uses as backlight source. Also adds low threshold
-value to have a uniform divisions in brightness-levels scales.
+PWM output from ecap2 uses as backlight source. Also adds low threshold
+value to have a uniform divisions in brightness-levels scales with
+inverse polarity.
 
 Signed-off-by: Philip Avinash <avinashphilip@ti.com>
 Reviewed-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
- arch/arm/boot/dts/am335x-evm.dts |   23 +++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-evmsk.dts |   23 +++++++++++++++++++++++
  1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index d649644..fd3b691 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -44,6 +44,12 @@
- 				0x154 0x27	/* spi0_d0.gpio0_3, INPUT | MODE7 */
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index f5a6162..a50f286 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -51,6 +51,12 @@
+ 				0x9c 0x27	/* gpmc_ben0_cle.gpio2_5, INPUT | MODE7 */
  			>;
  		};
 +
-+		ecap0_pins: backlight_pins {
++		ecap2_pins: backlight_pins {
 +			pinctrl-single,pins = <
-+				0x164 0x0	/* eCAP0_in_PWM0_out.eCAP0_in_PWM0_out MODE0 */
++				0x19c 0x4	/* mcasp0_ahclkr.ecap2_in_pwm2_out MODE4 */
 +			>;
 +		};
  	};
  
  	ocp {
-@@ -102,6 +108,16 @@
- 				reg = <0x48>;
+@@ -94,6 +100,16 @@
+ 				st,max-limit-z = <750>;
  			};
  		};
 +
-+		epwmss0: epwmss at 48300000 {
++		epwmss2: epwmss at 48304000 {
 +			status = "okay";
 +
-+			ecap0: ecap at 48300100 {
++			ecap2: ecap at 48304100 {
 +				status = "okay";
 +				pinctrl-names = "default";
-+				pinctrl-0 = <&ecap0_pins>;
++				pinctrl-0 = <&ecap2_pins>;
 +			};
 +		};
  	};
  
  	vbat: fixedregulator at 0 {
-@@ -158,6 +174,13 @@
- 			gpio-key,wakeup;
+@@ -170,6 +186,13 @@
+ 			gpios = <&gpio3 5 0>;
  		};
  	};
 +
 +	backlight {
 +		compatible = "pwm-backlight";
-+		pwms = <&ecap0 0 50000 0>;
-+		brightness-levels = <0 51 53 56 62 75 101 152 255>;
++		pwms = <&ecap2 0 50000 1>;
++		brightness-levels = <0 58 61 66 75 90 125 170 255>;
 +		default-brightness-level = <8>;
 +	};
  };
