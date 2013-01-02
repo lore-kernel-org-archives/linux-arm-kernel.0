@@ -1,95 +1,65 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 02 Jan 2013 14:23:39 -0800
-Subject: [PATCH 02/26] cpufreq: exynos: cleanup exynos-cpufreq header
+Date: Wed, 02 Jan 2013 14:23:43 -0800
+Subject: [PATCH 06/26] ARM: S5PV210: move regs-sys.h into setup-usb-phy.c file
 In-Reply-To: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
 References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1357165443-3716-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1357165443-3716-7-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+The <mach/regs-sys.h> can be moved into mach-s5pv210/setup-usb-phy.c
+file.
+
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/cpufreq/exynos-cpufreq.c                                   |    4 ++--
- .../include/mach/cpufreq.h => drivers/cpufreq/exynos-cpufreq.h     |    3 +--
- drivers/cpufreq/exynos4210-cpufreq.c                               |    3 ++-
- drivers/cpufreq/exynos4x12-cpufreq.c                               |    3 ++-
- drivers/cpufreq/exynos5250-cpufreq.c                               |    3 ++-
- 5 files changed, 9 insertions(+), 7 deletions(-)
- rename arch/arm/mach-exynos/include/mach/cpufreq.h => drivers/cpufreq/exynos-cpufreq.h (94%)
+ arch/arm/mach-s5pv210/include/mach/regs-sys.h |   15 ---------------
+ arch/arm/mach-s5pv210/setup-usb-phy.c         |    7 ++++++-
+ 2 files changed, 6 insertions(+), 16 deletions(-)
+ delete mode 100644 arch/arm/mach-s5pv210/include/mach/regs-sys.h
 
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index 7012ea8..caf638b 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -18,10 +18,10 @@
- #include <linux/cpufreq.h>
- #include <linux/suspend.h>
- 
--#include <mach/cpufreq.h>
--
- #include <plat/cpu.h>
- 
-+#include "exynos-cpufreq.h"
-+
- static struct exynos_dvfs_info *exynos_info;
- 
- static struct regulator *arm_regulator;
-diff --git a/arch/arm/mach-exynos/include/mach/cpufreq.h b/drivers/cpufreq/exynos-cpufreq.h
-similarity index 94%
-rename from arch/arm/mach-exynos/include/mach/cpufreq.h
-rename to drivers/cpufreq/exynos-cpufreq.h
-index 7517c3f..25c748b 100644
---- a/arch/arm/mach-exynos/include/mach/cpufreq.h
-+++ b/drivers/cpufreq/exynos-cpufreq.h
-@@ -1,5 +1,4 @@
--/* linux/arch/arm/mach-exynos/include/mach/cpufreq.h
+diff --git a/arch/arm/mach-s5pv210/include/mach/regs-sys.h b/arch/arm/mach-s5pv210/include/mach/regs-sys.h
+deleted file mode 100644
+index cccb1ed..0000000
+--- a/arch/arm/mach-s5pv210/include/mach/regs-sys.h
++++ /dev/null
+@@ -1,15 +0,0 @@
+-/* arch/arm/mach-s5pv210/include/mach/regs-sys.h
 - *
-+/*
-  * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-  *
-diff --git a/drivers/cpufreq/exynos4210-cpufreq.c b/drivers/cpufreq/exynos4210-cpufreq.c
-index fb148fa..a5d0a81 100644
---- a/drivers/cpufreq/exynos4210-cpufreq.c
-+++ b/drivers/cpufreq/exynos4210-cpufreq.c
-@@ -18,7 +18,8 @@
- #include <linux/cpufreq.h>
- 
- #include <mach/regs-clock.h>
--#include <mach/cpufreq.h>
+- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com/
+- *
+- * S5PV210 - System registers definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#define S5PV210_USB_PHY_CON	(S3C_VA_SYS + 0xE80C)
+-#define S5PV210_USB_PHY0_EN	(1 << 0)
+-#define S5PV210_USB_PHY1_EN	(1 << 1)
+diff --git a/arch/arm/mach-s5pv210/setup-usb-phy.c b/arch/arm/mach-s5pv210/setup-usb-phy.c
+index be39cf4..356a090 100644
+--- a/arch/arm/mach-s5pv210/setup-usb-phy.c
++++ b/arch/arm/mach-s5pv210/setup-usb-phy.c
+@@ -12,12 +12,17 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
 +
-+#include "exynos-cpufreq.h"
- 
- #define CPUFREQ_LEVEL_END	L5
- 
-diff --git a/drivers/cpufreq/exynos4x12-cpufreq.c b/drivers/cpufreq/exynos4x12-cpufreq.c
-index 8c5a7af..63ff74e 100644
---- a/drivers/cpufreq/exynos4x12-cpufreq.c
-+++ b/drivers/cpufreq/exynos4x12-cpufreq.c
-@@ -18,7 +18,8 @@
- #include <linux/cpufreq.h>
- 
- #include <mach/regs-clock.h>
--#include <mach/cpufreq.h>
-+
-+#include "exynos-cpufreq.h"
- 
- #define CPUFREQ_LEVEL_END	(L13 + 1)
- 
-diff --git a/drivers/cpufreq/exynos5250-cpufreq.c b/drivers/cpufreq/exynos5250-cpufreq.c
-index e64c253..407126c 100644
---- a/drivers/cpufreq/exynos5250-cpufreq.c
-+++ b/drivers/cpufreq/exynos5250-cpufreq.c
-@@ -19,7 +19,8 @@
- 
  #include <mach/map.h>
- #include <mach/regs-clock.h>
--#include <mach/cpufreq.h>
+-#include <mach/regs-sys.h>
 +
-+#include "exynos-cpufreq.h"
+ #include <plat/cpu.h>
+ #include <plat/regs-usb-hsotg-phy.h>
+ #include <plat/usb-phy.h>
  
- #define CPUFREQ_LEVEL_END	(L15 + 1)
- 
++#define S5PV210_USB_PHY_CON	(S3C_VA_SYS + 0xE80C)
++#define S5PV210_USB_PHY0_EN	(1 << 0)
++#define S5PV210_USB_PHY1_EN	(1 << 1)
++
+ static int s5pv210_usb_otgphy_init(struct platform_device *pdev)
+ {
+ 	struct clk *xusbxti;
 -- 
 1.7.10.4
