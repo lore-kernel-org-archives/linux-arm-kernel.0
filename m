@@ -1,39 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  2 Jan 2013 14:34:15 -0700
-Subject: [PATCH] ARM: tegra: fix Kconfig warnings when !SMP
-Message-ID: <1357162455-24043-1-git-send-email-swarren@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  2 Jan 2013 22:41:11 +0100
+Subject: [PATCH 1/2] ARM: nomadik: delete dangling include
+Message-ID: <1357162871-6915-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+This reference to the old include header for the FSMC NAND
+MTD driver was somehow left in place, get rid of it.
 
-Fix:
-
-warning: (ARCH_TEGRA_2x_SOC) selects ARM_ERRATA_754327 which has unmet direct dependencies (CPU_V7 && SMP)
-warning: (ARCH_TEGRA_2x_SOC) selects ARM_ERRATA_742230 which has unmet direct dependencies (CPU_V7 && SMP)
-
-by selecting options only if SMP.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-tegra/Kconfig |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-nomadik/board-nhk8815.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index b442f15..1ec7f80 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -6,9 +6,9 @@ config ARCH_TEGRA_2x_SOC
- 	bool "Enable support for Tegra20 family"
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_ERRATA_720789
--	select ARM_ERRATA_742230
-+	select ARM_ERRATA_742230 if SMP
- 	select ARM_ERRATA_751472
--	select ARM_ERRATA_754327
-+	select ARM_ERRATA_754327 if SMP
- 	select ARM_ERRATA_764369 if SMP
- 	select ARM_GIC
- 	select CPU_FREQ_TABLE if CPU_FREQ
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index 98167a4..9f19069 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -27,7 +27,6 @@
+ #include <linux/pinctrl/machine.h>
+ #include <linux/platform_data/pinctrl-nomadik.h>
+ #include <linux/platform_data/clocksource-nomadik-mtu.h>
+-#include <linux/platform_data/mtd-nomadik-nand.h>
+ #include <asm/hardware/vic.h>
+ #include <asm/sizes.h>
+ #include <asm/mach-types.h>
 -- 
-1.7.10.4
+1.7.11.7
