@@ -1,23 +1,52 @@
-From: error27@gmail.com (Dan Carpenter)
-Date: Wed, 2 Jan 2013 08:10:36 +0300
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 02 Jan 2013 18:31:53 +1300
 Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
  IS_ERR_OR_NULL
-In-Reply-To: <50E32C06.5020104@gmail.com>
+In-Reply-To: <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
 References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
  <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
  <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
-Message-ID: <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
+ <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
+Message-ID: <1357104713.30504.8.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
+On Wed, 2013-01-02 at 08:10 +0300, Dan Carpenter wrote:
+> clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
+> 
+> I told Tony about this but everyone has been gone with end of year
+> holidays so it hasn't been addressed.
+> 
+> Tony, please fix it so people don't apply these patches until
+> clk_get() is updated to not return NULL.  It sucks to have to revert
+> patches.
+> 
+> regards,
+> dan carpenter
 
-I told Tony about this but everyone has been gone with end of year
-holidays so it hasn't been addressed.
+I posted the query to Mike Turquette, linux-kernel and linux-arm-kernel
+mailing lists, regarding the return of NULL when HAVE_CLK is undefined.
 
-Tony, please fix it so people don't apply these patches until
-clk_get() is updated to not return NULL.  It sucks to have to revert
-patches.
+Short Answer: A return value of NULL is valid and not an error therefore
+we should be using IS_ERR, not IS_ERR_OR_NULL on clk_get results.
 
-regards,
-dan carpenter
+I see the obvious problem this creates, and asked this question:
+
+If the driver can't operate with a NULL clk, it should use a
+IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
+
+
+And Russell's answer:
+
+Why should a _consumer_ of a clock care?  It is _very_ important that
+people get this idea - to a consumer, the struct clk is just an opaque
+cookie.  The fact that it appears to be a pointer does _not_ mean that
+the driver can do any kind of dereferencing on that pointer - it should
+never do so.
+
+Thread can be viewed here:
+https://lkml.org/lkml/2012/12/20/105
+
+
+Regards
+Tony Prisk
