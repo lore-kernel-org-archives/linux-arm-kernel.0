@@ -1,65 +1,58 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Wed, 2 Jan 2013 10:15:14 +0000
-Subject: [PATCH v4 0/4] pm: Add power off control
-In-Reply-To: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
-References: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAD58C2@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Jan 2013 10:15:54 +0000
+Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
+ IS_ERR_OR_NULL
+In-Reply-To: <alpine.DEB.2.02.1301021031490.1994@hadrien>
+References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
+ <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
+ <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
+ <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
+ <20130102092638.GB2631@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1301021031490.1994@hadrien>
+Message-ID: <20130102101554.GD2631@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 11:33:13, AnilKumar, Chimata wrote:
-> Add PM power_off control to rtc driver and PMIC status is set to
-> STATUS_OFF to shutdown PMIC if PWR_EN is toggled by RTC module.
+On Wed, Jan 02, 2013 at 10:44:32AM +0100, Julia Lawall wrote:
+> On Wed, 2 Jan 2013, Russell King - ARM Linux wrote:
 > 
-> System power off sequence:-
-> * Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
-> * Enable PMIC_POWER_EN in rtc module
-> * Set rtc ALARM2 time
-> * Enable ALARM2 interrupt
+> > On Wed, Jan 02, 2013 at 08:10:36AM +0300, Dan Carpenter wrote:
+> > > clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
+> > >
+> > > I told Tony about this but everyone has been gone with end of year
+> > > holidays so it hasn't been addressed.
+> > >
+> > > Tony, please fix it so people don't apply these patches until
+> > > clk_get() is updated to not return NULL.  It sucks to have to revert
+> > > patches.
+> >
+> > How about people stop using IS_ERR_OR_NULL for stuff which it shouldn't
+> > be used for?
 > 
-> These patches were tested on am335x-bone (BeagleBone). These patchs
-> are based on linux-next.
+> Perhaps the cases where clk_get returns NULL could have a comment
+> indicating that NULL does not represent a failure?
 
-Hi All,
+No.  More documentation is never the answer to people not reading
+existing documentation.
 
-Happy New Year
+> In 3.7.1, it looks like it might have been possible for NULL to be
+> returned by clk_get in arch/mips/loongson1/common/clock.c, but that
+> definition seems to be gone in a recent linux-next.  The remaining
+> definitions look OK.
 
-Gentle ping to this series
+How about people just read the API and comply with it rather than
+doing their own thing all the time?  We've already had at least one
+instance where someone has tried using IS_ERR() with the ioremap()
+return value.
 
-Thanks
-AnilKumar
- 
-> Changes from v3:
-> 	- TPS65217 mfd driver changes are accepted so dropped
-> 	  from this series.
-> 	- With recent changes in the kernel, reboot_mutex held BUG()
-> 	  is not seen so removed while(1); from rtc_power_off.
-> 	- Removed spinlock before while(1); which is not necessary.
-> 
-> Changes from v2:
-> 	- Incorporated Kevin's comment on v2
-> 	  * Enabled RTC in ompa2plus_defconfig
-> 
-> Changes from v1:
-> 	- Incorporated Vaibhav's comments on v1
-> 	  * Changed the time rollover logic with the help of
-> 	    rtc-lib APIs
-> 
-> AnilKumar Ch (3):
->   ARM: dts: AM33XX: Set pmic-shutdown-controller for BeagleBone
->   ARM: dts: AM33XX: Enable system power off control in am335x-bone
->   ARM: OMAP2+: omap2plus_defconfig: Enable RTC support
-> 
-> Colin Foe-Parker (1):
->   rtc: OMAP: Add system pm_power_off to rtc driver
-> 
->  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
->  arch/arm/boot/dts/am335x-bone.dts                  |    6 ++
->  arch/arm/configs/omap2plus_defconfig               |    1 +
->  drivers/rtc/rtc-omap.c                             |   74 +++++++++++++++++++-
->  4 files changed, 85 insertions(+), 1 deletion(-)
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
+Really, if you're going to program kernel space, it is very important
+that you *know* the interfaces that you're using and you comply with
+them.  Otherwise, you have no business saying that you're a kernel
+programmer.
+
+Yes, the odd mistake happens, but that's no excuse for the constant
+blatent mistakes with stuff like IS_ERR_OR_NULL() with clk_get()
+which just comes from total laziness on the part of the coder to
+understand the interfaces being used.  Hell, it's even documented
+in linux/clk.h - that just shows how many people read the
+documentation which has been around since the clk API came about.
