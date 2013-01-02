@@ -1,25 +1,28 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 02 Jan 2013 14:08:27 -0700
-Subject: [PATCH 2/2] ARM: tegra: moving the clock gating procedure to
- tegra_cpu_kill
-In-Reply-To: <20121223121231.GA16580@mudshark.cambridge.arm.com>
-References: <1355970519-28200-1-git-send-email-josephl@nvidia.com>
- <1355970519-28200-2-git-send-email-josephl@nvidia.com>
- <50D34467.9000006@wwwdotorg.org>
- <1356083897.26029.187.camel@jlo-ubuntu-64.nvidia.com>
- <50D4D345.6030804@wwwdotorg.org>
- <20121223112540.GF16237@mudshark.cambridge.arm.com>
- <20121223121231.GA16580@mudshark.cambridge.arm.com>
-Message-ID: <50E4A1CB.7060601@wwwdotorg.org>
+Date: Wed,  2 Jan 2013 14:12:21 -0700
+Subject: [PATCH] ARM: tegra: add kexec support to defconfig
+Message-ID: <1357161141-26430-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/23/2012 05:12 AM, Will Deacon wrote:
-... [kexec on ARM SMP discussion]
-> The best bet is probably to call disable_nonboot_cpus in machine shutdown,
-> before sending the stop and subsequent kill. It's very similar to your
-> initial suggestion, but without the #elif.
-> 
-> Does that work for you?
+From: Stephen Warren <swarren@nvidia.com>
 
-Yes, it does. I just sent a patch implementing that. Thanks.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/configs/tegra_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 742dc41..e621603 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -34,6 +34,7 @@ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ CONFIG_CPU_IDLE=y
+-- 
+1.7.10.4
