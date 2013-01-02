@@ -1,9 +1,7 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  2 Jan 2013 11:46:17 -0700
-Subject: [PATCH 2/2] ARM: tegra: enable gpio-poweroff driver in defconfig
-In-Reply-To: <1357152377-5918-1-git-send-email-swarren@wwwdotorg.org>
-References: <1357152377-5918-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1357152377-5918-2-git-send-email-swarren@wwwdotorg.org>
+Date: Wed,  2 Jan 2013 11:49:00 -0700
+Subject: [PATCH 1/3] ARM: tegra: seaboard: enable HDMI port
+Message-ID: <1357152542-5982-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +9,56 @@ From: Stephen Warren <swarren@nvidia.com>
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/configs/tegra_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/tegra20-seaboard.dts |   18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index a7827fd..a568c34 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -127,6 +127,8 @@ CONFIG_GPIO_TPS6586X=y
- CONFIG_GPIO_TPS65910=y
- CONFIG_POWER_SUPPLY=y
- CONFIG_BATTERY_SBS=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_GPIO=y
- CONFIG_SENSORS_LM90=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_MFD_TPS65910=y
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index 4204598..f9e3ad4 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -10,6 +10,18 @@
+ 		reg = <0x00000000 0x40000000>;
+ 	};
+ 
++	host1x {
++		hdmi {
++			status = "okay";
++
++			vdd-supply = <&hdmi_vdd_reg>;
++			pll-supply = <&hdmi_pll_reg>;
++
++			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
++			nvidia,hpd-gpio = <&gpio 111 0>; /* PN7 */
++		};
++	};
++
+ 	pinmux {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&state_default>;
+@@ -345,7 +357,7 @@
+ 		pinctrl-1 = <&state_i2cmux_pta>;
+ 		pinctrl-2 = <&state_i2cmux_idle>;
+ 
+-		i2c at 0 {
++		hdmi_ddc: i2c at 0 {
+ 			reg = <0>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -463,13 +475,13 @@
+ 					regulator-max-microvolt = <1800000>;
+ 				};
+ 
+-				ldo7 {
++				hdmi_vdd_reg: ldo7 {
+ 					regulator-name = "vdd_ldo7,avdd_hdmi,vdd_fuse";
+ 					regulator-min-microvolt = <3300000>;
+ 					regulator-max-microvolt = <3300000>;
+ 				};
+ 
+-				ldo8 {
++				hdmi_pll_reg: ldo8 {
+ 					regulator-name = "vdd_ldo8,avdd_hdmi_pll";
+ 					regulator-min-microvolt = <1800000>;
+ 					regulator-max-microvolt = <1800000>;
 -- 
 1.7.10.4
