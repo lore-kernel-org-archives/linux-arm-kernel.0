@@ -1,535 +1,148 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 02 Jan 2013 14:23:40 -0800
-Subject: [PATCH 03/26] ARM: S5P64X0: remove gpiolib.c file in mach-s5p64x0
+Date: Wed, 02 Jan 2013 14:23:44 -0800
+Subject: [PATCH 07/26] ARM: EXYNOS: move mach/pmu.h file into common.h
 In-Reply-To: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
 References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1357165443-3716-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1357165443-3716-8-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since S5P64X0 gpiolib is supported in drivers/gpio/gpio-samsung.c,
-this can be removed. Probably, removing this file is missed when
-S5P64X0 gpiolib was supported in drivers/gpio/.
-
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5p64x0/gpiolib.c |  508 ---------------------------------------
- 1 file changed, 508 deletions(-)
- delete mode 100644 arch/arm/mach-s5p64x0/gpiolib.c
+ arch/arm/mach-exynos/common.c           |    1 -
+ arch/arm/mach-exynos/common.h           |   20 ++++++++++++++++++
+ arch/arm/mach-exynos/cpuidle.c          |    3 ++-
+ arch/arm/mach-exynos/include/mach/pmu.h |   34 -------------------------------
+ arch/arm/mach-exynos/pm.c               |    3 ++-
+ arch/arm/mach-exynos/pmu.c              |    3 ++-
+ 6 files changed, 26 insertions(+), 38 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/include/mach/pmu.h
 
-diff --git a/arch/arm/mach-s5p64x0/gpiolib.c b/arch/arm/mach-s5p64x0/gpiolib.c
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index d6d0dc6..bec1c92 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -35,7 +35,6 @@
+ #include <mach/regs-irq.h>
+ #include <mach/regs-pmu.h>
+ #include <mach/regs-gpio.h>
+-#include <mach/pmu.h>
+ 
+ #include <plat/cpu.h>
+ #include <plat/clock.h>
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 04744f9..e1af3a9 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -64,4 +64,24 @@ extern struct smp_operations exynos_smp_ops;
+ 
+ extern void exynos_cpu_die(unsigned int cpu);
+ 
++/* PMU(Power Management Unit) support */
++
++#define PMU_TABLE_END	NULL
++
++enum sys_powerdown {
++	SYS_AFTR,
++	SYS_LPA,
++	SYS_SLEEP,
++	NUM_SYS_POWERDOWN,
++};
++
++extern unsigned long l2x0_regs_phys;
++struct exynos_pmu_conf {
++	void __iomem *reg;
++	unsigned int val[NUM_SYS_POWERDOWN];
++};
++
++extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
++extern void s3c_cpu_resume(void);
++
+ #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index 0509241..fcfe025 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -23,10 +23,11 @@
+ #include <asm/cpuidle.h>
+ #include <mach/regs-clock.h>
+ #include <mach/regs-pmu.h>
+-#include <mach/pmu.h>
+ 
+ #include <plat/cpu.h>
+ 
++#include "common.h"
++
+ #define REG_DIRECTGO_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+ 			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+ 			(S5P_VA_SYSRAM + 0x24) : S5P_INFORM0))
+diff --git a/arch/arm/mach-exynos/include/mach/pmu.h b/arch/arm/mach-exynos/include/mach/pmu.h
 deleted file mode 100644
-index 700dac6..0000000
---- a/arch/arm/mach-s5p64x0/gpiolib.c
+index 7c27c2d..0000000
+--- a/arch/arm/mach-exynos/include/mach/pmu.h
 +++ /dev/null
-@@ -1,508 +0,0 @@
--/* linux/arch/arm/mach-s5p64x0/gpiolib.c
+@@ -1,34 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/pmu.h
 - *
-- * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
+- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com/
 - *
-- * S5P64X0 - GPIOlib support
+- * EXYNOS4210 - PMU(Power Management Unit) support
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
 -*/
 -
--#include <linux/kernel.h>
--#include <linux/irq.h>
--#include <linux/io.h>
--#include <linux/gpio.h>
+-#ifndef __ASM_ARCH_PMU_H
+-#define __ASM_ARCH_PMU_H __FILE__
 -
--#include <mach/map.h>
--#include <mach/regs-gpio.h>
--#include <mach/regs-clock.h>
+-#define PMU_TABLE_END	NULL
 -
--#include <plat/cpu.h>
--#include <plat/gpio-core.h>
--#include <plat/gpio-cfg.h>
--#include <plat/gpio-cfg-helpers.h>
--
--/*
-- * S5P6440 GPIO bank summary:
-- *
-- * Bank	GPIOs	Style	SlpCon	ExtInt Group
-- * A	6	4Bit	Yes	1
-- * B	7	4Bit	Yes	1
-- * C	8	4Bit	Yes	2
-- * F	2	2Bit	Yes	4 [1]
-- * G	7	4Bit	Yes	5
-- * H	10	4Bit[2]	Yes	6
-- * I	16	2Bit	Yes	None
-- * J	12	2Bit	Yes	None
-- * N	16	2Bit	No	IRQ_EINT
-- * P	8	2Bit	Yes	8
-- * R	15	4Bit[2]	Yes	8
-- *
-- * S5P6450 GPIO bank summary:
-- *
-- * Bank	GPIOs	Style	SlpCon	ExtInt Group
-- * A	6	4Bit	Yes	1
-- * B	7	4Bit	Yes	1
-- * C	8	4Bit	Yes	2
-- * D	8	4Bit	Yes	None
-- * F	2	2Bit	Yes	None
-- * G	14	4Bit[2]	Yes	5
-- * H	10	4Bit[2]	Yes	6
-- * I	16	2Bit	Yes	None
-- * J	12	2Bit	Yes	None
-- * K	5	4Bit	Yes	None
-- * N	16	2Bit	No	IRQ_EINT
-- * P	11	2Bit	Yes	8
-- * Q	14	2Bit	Yes	None
-- * R	15	4Bit[2]	Yes	None
-- * S	8	2Bit	Yes	None
-- *
-- * [1] BANKF pins 14,15 do not form part of the external interrupt sources
-- * [2] BANK has two control registers, GPxCON0 and GPxCON1
-- */
--
--static int s5p64x0_gpiolib_rbank_4bit2_input(struct gpio_chip *chip,
--					     unsigned int offset)
--{
--	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
--	void __iomem *base = ourchip->base;
--	void __iomem *regcon = base;
--	unsigned long con;
--	unsigned long flags;
--
--	switch (offset) {
--	case 6:
--		offset += 1;
--	case 0:
--	case 1:
--	case 2:
--	case 3:
--	case 4:
--	case 5:
--		regcon -= 4;
--		break;
--	default:
--		offset -= 7;
--		break;
--	}
--
--	s3c_gpio_lock(ourchip, flags);
--
--	con = __raw_readl(regcon);
--	con &= ~(0xf << con_4bit_shift(offset));
--	__raw_writel(con, regcon);
--
--	s3c_gpio_unlock(ourchip, flags);
--
--	return 0;
--}
--
--static int s5p64x0_gpiolib_rbank_4bit2_output(struct gpio_chip *chip,
--					      unsigned int offset, int value)
--{
--	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
--	void __iomem *base = ourchip->base;
--	void __iomem *regcon = base;
--	unsigned long con;
--	unsigned long dat;
--	unsigned long flags;
--	unsigned con_offset  = offset;
--
--	switch (con_offset) {
--	case 6:
--		con_offset += 1;
--	case 0:
--	case 1:
--	case 2:
--	case 3:
--	case 4:
--	case 5:
--		regcon -= 4;
--		break;
--	default:
--		con_offset -= 7;
--		break;
--	}
--
--	s3c_gpio_lock(ourchip, flags);
--
--	con = __raw_readl(regcon);
--	con &= ~(0xf << con_4bit_shift(con_offset));
--	con |= 0x1 << con_4bit_shift(con_offset);
--
--	dat = __raw_readl(base + GPIODAT_OFF);
--	if (value)
--		dat |= 1 << offset;
--	else
--		dat &= ~(1 << offset);
--
--	__raw_writel(con, regcon);
--	__raw_writel(dat, base + GPIODAT_OFF);
--
--	s3c_gpio_unlock(ourchip, flags);
--
--	return 0;
--}
--
--int s5p64x0_gpio_setcfg_4bit_rbank(struct s3c_gpio_chip *chip,
--				   unsigned int off, unsigned int cfg)
--{
--	void __iomem *reg = chip->base;
--	unsigned int shift;
--	u32 con;
--
--	switch (off) {
--	case 0:
--	case 1:
--	case 2:
--	case 3:
--	case 4:
--	case 5:
--		shift = (off & 7) * 4;
--		reg -= 4;
--		break;
--	case 6:
--		shift = ((off + 1) & 7) * 4;
--		reg -= 4;
--	default:
--		shift = ((off + 1) & 7) * 4;
--		break;
--	}
--
--	if (s3c_gpio_is_cfg_special(cfg)) {
--		cfg &= 0xf;
--		cfg <<= shift;
--	}
--
--	con = __raw_readl(reg);
--	con &= ~(0xf << shift);
--	con |= cfg;
--	__raw_writel(con, reg);
--
--	return 0;
--}
--
--static struct s3c_gpio_cfg s5p64x0_gpio_cfgs[] = {
--	{
--		.cfg_eint	= 0,
--	}, {
--		.cfg_eint	= 7,
--	}, {
--		.cfg_eint	= 3,
--		.set_config	= s5p64x0_gpio_setcfg_4bit_rbank,
--	}, {
--		.cfg_eint	= 0,
--		.set_config	= s3c_gpio_setcfg_s3c24xx,
--		.get_config	= s3c_gpio_getcfg_s3c24xx,
--	}, {
--		.cfg_eint	= 2,
--		.set_config	= s3c_gpio_setcfg_s3c24xx,
--		.get_config	= s3c_gpio_getcfg_s3c24xx,
--	}, {
--		.cfg_eint	= 3,
--		.set_config	= s3c_gpio_setcfg_s3c24xx,
--		.get_config	= s3c_gpio_getcfg_s3c24xx,
--	},
+-enum sys_powerdown {
+-	SYS_AFTR,
+-	SYS_LPA,
+-	SYS_SLEEP,
+-	NUM_SYS_POWERDOWN,
 -};
 -
--static struct s3c_gpio_chip s5p6440_gpio_4bit[] = {
--	{
--		.base	= S5P64X0_GPA_BASE,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6440_GPA(0),
--			.ngpio	= S5P6440_GPIO_A_NR,
--			.label	= "GPA",
--		},
--	}, {
--		.base	= S5P64X0_GPB_BASE,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6440_GPB(0),
--			.ngpio	= S5P6440_GPIO_B_NR,
--			.label	= "GPB",
--		},
--	}, {
--		.base	= S5P64X0_GPC_BASE,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6440_GPC(0),
--			.ngpio	= S5P6440_GPIO_C_NR,
--			.label	= "GPC",
--		},
--	}, {
--		.base	= S5P64X0_GPG_BASE,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6440_GPG(0),
--			.ngpio	= S5P6440_GPIO_G_NR,
--			.label	= "GPG",
--		},
--	},
+-extern unsigned long l2x0_regs_phys;
+-struct exynos_pmu_conf {
+-	void __iomem *reg;
+-	unsigned int val[NUM_SYS_POWERDOWN];
 -};
 -
--static struct s3c_gpio_chip s5p6440_gpio_4bit2[] = {
--	{
--		.base	= S5P64X0_GPH_BASE + 0x4,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6440_GPH(0),
--			.ngpio	= S5P6440_GPIO_H_NR,
--			.label	= "GPH",
--		},
--	},
--};
+-extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
+-extern void s3c_cpu_resume(void);
 -
--static struct s3c_gpio_chip s5p6440_gpio_rbank_4bit2[] = {
--	{
--		.base	= S5P64X0_GPR_BASE + 0x4,
--		.config	= &s5p64x0_gpio_cfgs[2],
--		.chip	= {
--			.base	= S5P6440_GPR(0),
--			.ngpio	= S5P6440_GPIO_R_NR,
--			.label	= "GPR",
--		},
--	},
--};
--
--static struct s3c_gpio_chip s5p6440_gpio_2bit[] = {
--	{
--		.base	= S5P64X0_GPF_BASE,
--		.config	= &s5p64x0_gpio_cfgs[5],
--		.chip	= {
--			.base	= S5P6440_GPF(0),
--			.ngpio	= S5P6440_GPIO_F_NR,
--			.label	= "GPF",
--		},
--	}, {
--		.base	= S5P64X0_GPI_BASE,
--		.config	= &s5p64x0_gpio_cfgs[3],
--		.chip	= {
--			.base	= S5P6440_GPI(0),
--			.ngpio	= S5P6440_GPIO_I_NR,
--			.label	= "GPI",
--		},
--	}, {
--		.base	= S5P64X0_GPJ_BASE,
--		.config	= &s5p64x0_gpio_cfgs[3],
--		.chip	= {
--			.base	= S5P6440_GPJ(0),
--			.ngpio	= S5P6440_GPIO_J_NR,
--			.label	= "GPJ",
--		},
--	}, {
--		.base	= S5P64X0_GPN_BASE,
--		.config	= &s5p64x0_gpio_cfgs[4],
--		.chip	= {
--			.base	= S5P6440_GPN(0),
--			.ngpio	= S5P6440_GPIO_N_NR,
--			.label	= "GPN",
--		},
--	}, {
--		.base	= S5P64X0_GPP_BASE,
--		.config	= &s5p64x0_gpio_cfgs[5],
--		.chip	= {
--			.base	= S5P6440_GPP(0),
--			.ngpio	= S5P6440_GPIO_P_NR,
--			.label	= "GPP",
--		},
--	},
--};
--
--static struct s3c_gpio_chip s5p6450_gpio_4bit[] = {
--	{
--		.base	= S5P64X0_GPA_BASE,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6450_GPA(0),
--			.ngpio	= S5P6450_GPIO_A_NR,
--			.label	= "GPA",
--		},
--	}, {
--		.base	= S5P64X0_GPB_BASE,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6450_GPB(0),
--			.ngpio	= S5P6450_GPIO_B_NR,
--			.label	= "GPB",
--		},
--	}, {
--		.base	= S5P64X0_GPC_BASE,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6450_GPC(0),
--			.ngpio	= S5P6450_GPIO_C_NR,
--			.label	= "GPC",
--		},
--	}, {
--		.base	= S5P6450_GPD_BASE,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6450_GPD(0),
--			.ngpio	= S5P6450_GPIO_D_NR,
--			.label	= "GPD",
--		},
--	}, {
--		.base	= S5P6450_GPK_BASE,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6450_GPK(0),
--			.ngpio	= S5P6450_GPIO_K_NR,
--			.label	= "GPK",
--		},
--	},
--};
--
--static struct s3c_gpio_chip s5p6450_gpio_4bit2[] = {
--	{
--		.base	= S5P64X0_GPG_BASE + 0x4,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6450_GPG(0),
--			.ngpio	= S5P6450_GPIO_G_NR,
--			.label	= "GPG",
--		},
--	}, {
--		.base	= S5P64X0_GPH_BASE + 0x4,
--		.config	= &s5p64x0_gpio_cfgs[1],
--		.chip	= {
--			.base	= S5P6450_GPH(0),
--			.ngpio	= S5P6450_GPIO_H_NR,
--			.label	= "GPH",
--		},
--	},
--};
--
--static struct s3c_gpio_chip s5p6450_gpio_rbank_4bit2[] = {
--	{
--		.base	= S5P64X0_GPR_BASE + 0x4,
--		.config	= &s5p64x0_gpio_cfgs[2],
--		.chip	= {
--			.base	= S5P6450_GPR(0),
--			.ngpio	= S5P6450_GPIO_R_NR,
--			.label	= "GPR",
--		},
--	},
--};
--
--static struct s3c_gpio_chip s5p6450_gpio_2bit[] = {
--	{
--		.base	= S5P64X0_GPF_BASE,
--		.config	= &s5p64x0_gpio_cfgs[5],
--		.chip	= {
--			.base	= S5P6450_GPF(0),
--			.ngpio	= S5P6450_GPIO_F_NR,
--			.label	= "GPF",
--		},
--	}, {
--		.base	= S5P64X0_GPI_BASE,
--		.config	= &s5p64x0_gpio_cfgs[3],
--		.chip	= {
--			.base	= S5P6450_GPI(0),
--			.ngpio	= S5P6450_GPIO_I_NR,
--			.label	= "GPI",
--		},
--	}, {
--		.base	= S5P64X0_GPJ_BASE,
--		.config	= &s5p64x0_gpio_cfgs[3],
--		.chip	= {
--			.base	= S5P6450_GPJ(0),
--			.ngpio	= S5P6450_GPIO_J_NR,
--			.label	= "GPJ",
--		},
--	}, {
--		.base	= S5P64X0_GPN_BASE,
--		.config	= &s5p64x0_gpio_cfgs[4],
--		.chip	= {
--			.base	= S5P6450_GPN(0),
--			.ngpio	= S5P6450_GPIO_N_NR,
--			.label	= "GPN",
--		},
--	}, {
--		.base	= S5P64X0_GPP_BASE,
--		.config	= &s5p64x0_gpio_cfgs[5],
--		.chip	= {
--			.base	= S5P6450_GPP(0),
--			.ngpio	= S5P6450_GPIO_P_NR,
--			.label	= "GPP",
--		},
--	}, {
--		.base	= S5P6450_GPQ_BASE,
--		.config	= &s5p64x0_gpio_cfgs[4],
--		.chip	= {
--			.base	= S5P6450_GPQ(0),
--			.ngpio	= S5P6450_GPIO_Q_NR,
--			.label	= "GPQ",
--		},
--	}, {
--		.base	= S5P6450_GPS_BASE,
--		.config	= &s5p64x0_gpio_cfgs[5],
--		.chip	= {
--			.base	= S5P6450_GPS(0),
--			.ngpio	= S5P6450_GPIO_S_NR,
--			.label	= "GPS",
--		},
--	},
--};
--
--void __init s5p64x0_gpiolib_set_cfg(struct s3c_gpio_cfg *chipcfg, int nr_chips)
--{
--	for (; nr_chips > 0; nr_chips--, chipcfg++) {
--		if (!chipcfg->set_config)
--			chipcfg->set_config	= s3c_gpio_setcfg_s3c64xx_4bit;
--		if (!chipcfg->get_config)
--			chipcfg->get_config	= s3c_gpio_getcfg_s3c64xx_4bit;
--		if (!chipcfg->set_pull)
--			chipcfg->set_pull	= s3c_gpio_setpull_updown;
--		if (!chipcfg->get_pull)
--			chipcfg->get_pull	= s3c_gpio_getpull_updown;
--	}
--}
--
--static void __init s5p64x0_gpio_add_rbank_4bit2(struct s3c_gpio_chip *chip,
--						int nr_chips)
--{
--	for (; nr_chips > 0; nr_chips--, chip++) {
--		chip->chip.direction_input = s5p64x0_gpiolib_rbank_4bit2_input;
--		chip->chip.direction_output =
--					s5p64x0_gpiolib_rbank_4bit2_output;
--		s3c_gpiolib_add(chip);
--	}
--}
--
--static int __init s5p64x0_gpiolib_init(void)
--{
--	s5p64x0_gpiolib_set_cfg(s5p64x0_gpio_cfgs,
--				ARRAY_SIZE(s5p64x0_gpio_cfgs));
--
--	if (soc_is_s5p6450()) {
--		samsung_gpiolib_add_2bit_chips(s5p6450_gpio_2bit,
--					ARRAY_SIZE(s5p6450_gpio_2bit));
--
--		samsung_gpiolib_add_4bit_chips(s5p6450_gpio_4bit,
--					ARRAY_SIZE(s5p6450_gpio_4bit));
--
--		samsung_gpiolib_add_4bit2_chips(s5p6450_gpio_4bit2,
--					ARRAY_SIZE(s5p6450_gpio_4bit2));
--
--		s5p64x0_gpio_add_rbank_4bit2(s5p6450_gpio_rbank_4bit2,
--					ARRAY_SIZE(s5p6450_gpio_rbank_4bit2));
--	} else {
--		samsung_gpiolib_add_2bit_chips(s5p6440_gpio_2bit,
--					ARRAY_SIZE(s5p6440_gpio_2bit));
--
--		samsung_gpiolib_add_4bit_chips(s5p6440_gpio_4bit,
--					ARRAY_SIZE(s5p6440_gpio_4bit));
--
--		samsung_gpiolib_add_4bit2_chips(s5p6440_gpio_4bit2,
--					ARRAY_SIZE(s5p6440_gpio_4bit2));
--
--		s5p64x0_gpio_add_rbank_4bit2(s5p6440_gpio_rbank_4bit2,
--					ARRAY_SIZE(s5p6440_gpio_rbank_4bit2));
--	}
--
--	return 0;
--}
--core_initcall(s5p64x0_gpiolib_init);
+-#endif /* __ASM_ARCH_PMU_H */
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index b9b539c..f459afd 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -34,7 +34,8 @@
+ #include <mach/regs-clock.h>
+ #include <mach/regs-pmu.h>
+ #include <mach/pm-core.h>
+-#include <mach/pmu.h>
++
++#include "common.h"
+ 
+ static struct sleep_save exynos4_set_clksrc[] = {
+ 	{ .reg = EXYNOS4_CLKSRC_MASK_TOP		, .val = 0x00000001, },
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index 3a48c85..daebc1a 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -14,7 +14,8 @@
+ #include <linux/bug.h>
+ 
+ #include <mach/regs-clock.h>
+-#include <mach/pmu.h>
++
++#include "common.h"
+ 
+ static struct exynos_pmu_conf *exynos_pmu_config;
+ 
 -- 
 1.7.10.4
