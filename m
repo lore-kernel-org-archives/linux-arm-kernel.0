@@ -1,89 +1,116 @@
 From: avinashphilip@ti.com (Philip Avinash)
-Date: Wed, 2 Jan 2013 18:54:51 +0530
-Subject: [PATCH 4/7] ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK
+Date: Wed, 2 Jan 2013 18:54:52 +0530
+Subject: [PATCH 5/7] ARM: dts: AM33XX: Add PWMSS device tree nodes
 In-Reply-To: <1357133094-30806-1-git-send-email-avinashphilip@ti.com>
 References: <1357133094-30806-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1357133094-30806-5-git-send-email-avinashphilip@ti.com>
+Message-ID: <1357133094-30806-6-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EHRPWM module requires explicit clock gating of TBCLK from control
-module. Hence add TBCLK clock node in clock tree for EHRPWM modules.
+Add PWMSS device tree nodes in relation with ECAP & EHRPWM DT nodes to
+AM33XX SoC family. Also populates device tree nodes for ECAP & EHRPWM by
+adding necessary properties like pwm-cells, base reg & set disabled as
+status.
 
 Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+Reviewed-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
-- common clock frame work support
+ arch/arm/boot/dts/am33xx.dtsi |   84 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
 
- arch/arm/mach-omap2/cclock33xx_data.c |   30 ++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/control.h         |    8 ++++++++
- 2 files changed, 38 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
-index ea64ad6..7ff9bc9 100644
---- a/arch/arm/mach-omap2/cclock33xx_data.c
-+++ b/arch/arm/mach-omap2/cclock33xx_data.c
-@@ -832,6 +832,33 @@ static struct clk_hw_omap wdt1_fck_hw = {
- 
- DEFINE_STRUCT_CLK(wdt1_fck, wdt_ck_parents, gpio_fck_ops);
- 
-+static const char *pwmss_clk_parents[] = {
-+	"dpll_per_m2_ck",
-+};
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index c2f14e8..6aa51cb 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -385,5 +385,89 @@
+ 				mac-address = [ 00 00 00 00 00 00 ];
+ 			};
+ 		};
 +
-+static const struct clk_ops ehrpwm_tbclk_ops = {
-+	.enable		= &omap2_dflt_clk_enable,
-+	.disable	= &omap2_dflt_clk_disable,
-+};
++		epwmss0: epwmss at 48300000 {
++			compatible = "ti,am33xx-pwmss";
++			reg = <0x48300000 0x10>;
++			ti,hwmods = "epwmss0";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			status = "disabled";
++			ranges = <0x48300100 0x48300100 0x80   /* ECAP */
++				  0x48300180 0x48300180 0x80   /* EQEP */
++				  0x48300200 0x48300200 0x80>; /* EHRPWM */
 +
-+DEFINE_CLK_OMAP_MUX_GATE(ehrpwm0_tbclk, "l4ls_clkdm",
-+			 0, NULL, 0,
-+			 AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
-+			 AM33XX_PWMSS0_TBCLKEN_SHIFT,
-+			 NULL, pwmss_clk_parents, ehrpwm_tbclk_ops);
++			ecap0: ecap at 48300100 {
++				compatible = "ti,am33xx-ecap";
++				#pwm-cells = <3>;
++				reg = <0x48300100 0x80>;
++				ti,hwmods = "ecap0";
++				status = "disabled";
++			};
 +
-+DEFINE_CLK_OMAP_MUX_GATE(ehrpwm1_tbclk, "l4ls_clkdm",
-+			 0, NULL, 0,
-+			 AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
-+			 AM33XX_PWMSS1_TBCLKEN_SHIFT,
-+			 NULL, pwmss_clk_parents, ehrpwm_tbclk_ops);
++			ehrpwm0: ehrpwm at 48300200 {
++				compatible = "ti,am33xx-ehrpwm";
++				#pwm-cells = <3>;
++				reg = <0x48300200 0x80>;
++				ti,hwmods = "ehrpwm0";
++				status = "disabled";
++			};
++		};
 +
-+DEFINE_CLK_OMAP_MUX_GATE(ehrpwm2_tbclk, "l4ls_clkdm",
-+			 0, NULL, 0,
-+			 AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
-+			 AM33XX_PWMSS2_TBCLKEN_SHIFT,
-+			 NULL, pwmss_clk_parents, ehrpwm_tbclk_ops);
++		epwmss1: epwmss at 48302000 {
++			compatible = "ti,am33xx-pwmss";
++			reg = <0x48302000 0x10>;
++			ti,hwmods = "epwmss1";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			status = "disabled";
++			ranges = <0x48302100 0x48302100 0x80   /* ECAP */
++				  0x48302180 0x48302180 0x80   /* EQEP */
++				  0x48302200 0x48302200 0x80>; /* EHRPWM */
 +
- /*
-  * clkdev
-  */
-@@ -910,6 +937,9 @@ static struct omap_clk am33xx_clks[] = {
- 	CLK(NULL,	"clkout2_div_ck",	&clkout2_div_ck,	CK_AM33XX),
- 	CLK(NULL,	"timer_32k_ck",		&clkdiv32k_ick,	CK_AM33XX),
- 	CLK(NULL,	"timer_sys_ck",		&sys_clkin_ck,	CK_AM33XX),
-+	CLK("48300200.ehrpwm",	"tbclk",	&ehrpwm0_tbclk,	CK_AM33XX),
-+	CLK("48302200.ehrpwm",	"tbclk",	&ehrpwm1_tbclk,	CK_AM33XX),
-+	CLK("48304200.ehrpwm",	"tbclk",	&ehrpwm2_tbclk,	CK_AM33XX),
++			ecap1: ecap at 48302100 {
++				compatible = "ti,am33xx-ecap";
++				#pwm-cells = <3>;
++				reg = <0x48302100 0x80>;
++				ti,hwmods = "ecap1";
++				status = "disabled";
++			};
++
++			ehrpwm1: ehrpwm at 48302200 {
++				compatible = "ti,am33xx-ehrpwm";
++				#pwm-cells = <3>;
++				reg = <0x48302200 0x80>;
++				ti,hwmods = "ehrpwm1";
++				status = "disabled";
++			};
++		};
++
++		epwmss2: epwmss at 48304000 {
++			compatible = "ti,am33xx-pwmss";
++			reg = <0x48304000 0x10>;
++			ti,hwmods = "epwmss2";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			status = "disabled";
++			ranges = <0x48304100 0x48304100 0x80   /* ECAP */
++				  0x48304180 0x48304180 0x80   /* EQEP */
++				  0x48304200 0x48304200 0x80>; /* EHRPWM */
++
++			ecap2: ecap at 48304100 {
++				compatible = "ti,am33xx-ecap";
++				#pwm-cells = <3>;
++				reg = <0x48304100 0x80>;
++				ti,hwmods = "ecap2";
++				status = "disabled";
++			};
++
++			ehrpwm2: ehrpwm at 48304200 {
++				compatible = "ti,am33xx-ehrpwm";
++				#pwm-cells = <3>;
++				reg = <0x48304200 0x80>;
++				ti,hwmods = "ehrpwm2";
++				status = "disabled";
++			};
++		};
+ 	};
  };
- 
- 
-diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-index 3d944d3..ad4f1d8 100644
---- a/arch/arm/mach-omap2/control.h
-+++ b/arch/arm/mach-omap2/control.h
-@@ -358,6 +358,14 @@
- #define AM33XX_CONTROL_STATUS_SYSBOOT1_WIDTH		0x2
- #define AM33XX_CONTROL_STATUS_SYSBOOT1_MASK		(0x3 << 22)
- 
-+/* AM33XX PWMSS Control register */
-+#define AM33XX_PWMSS_TBCLK_CLKCTRL			0x664
-+
-+/* AM33XX  PWMSS Control bitfields */
-+#define AM33XX_PWMSS0_TBCLKEN_SHIFT			0
-+#define AM33XX_PWMSS1_TBCLKEN_SHIFT			1
-+#define AM33XX_PWMSS2_TBCLKEN_SHIFT			2
-+
- /* CONTROL OMAP STATUS register to identify OMAP3 features */
- #define OMAP3_CONTROL_OMAP_STATUS	0x044c
- 
 -- 
 1.7.9.5
