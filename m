@@ -1,119 +1,144 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  2 Jan 2013 22:41:20 +0100
-Subject: [PATCH 2/2] ARM: nomadik: bump the IRQ numbers again
-Message-ID: <1357162880-6954-1-git-send-email-linus.walleij@linaro.org>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu,  3 Jan 2013 10:47:20 +1300
+Subject: [PATCH] gpio: vt8500: memory cleanup missing
+Message-ID: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bump the IRQ numbers from offset at 1 (right above NO_IRQ)
-to 32. This is the painful way to learn that if you're using
-SPARSE_IRQ and avoid to define .nr_irqs in your machine,
-the first 16 IRQs will be pre-allocated, and the IRQdomain
-code (as the VIC core code before it) will then assume
-that all IRQ descriptors are pre-allocated, and 16 of them
-are - by somebody else. So mapping the IRQs will fail in
-irq_create_mapping(). Moving the offset upward rids us of
-this problem.
+This driver is missing a .remove callback, and the fail path on
+probe is incomplete.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+If an error occurs in vt8500_add_chips, gpio_base is not unmapped.
+The driver is also ignoring the return value from this function so
+if a chip fails to register it completes as successful.
+
+Replaced pr_err with dev_err in vt8500_add_chips since the device is
+available.
+
+There is also no .remove callback defined. To allow removing the
+registered chips, I have moved *vtchip to be a static global.
+
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- arch/arm/mach-nomadik/include/mach/irqs.h | 78 +++++++++++++++----------------
- 1 file changed, 39 insertions(+), 39 deletions(-)
+ drivers/gpio/gpio-vt8500.c |   53 ++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 41 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-nomadik/include/mach/irqs.h b/arch/arm/mach-nomadik/include/mach/irqs.h
-index b549d05..215f8cd 100644
---- a/arch/arm/mach-nomadik/include/mach/irqs.h
-+++ b/arch/arm/mach-nomadik/include/mach/irqs.h
-@@ -22,49 +22,49 @@
+diff --git a/drivers/gpio/gpio-vt8500.c b/drivers/gpio/gpio-vt8500.c
+index b53320a..a147b33 100644
+--- a/drivers/gpio/gpio-vt8500.c
++++ b/drivers/gpio/gpio-vt8500.c
+@@ -122,11 +122,13 @@ static struct vt8500_gpio_data wm8650_data = {
  
- #include <mach/hardware.h>
+ struct vt8500_gpio_chip {
+ 	struct gpio_chip		chip;
+-
+ 	const struct vt8500_gpio_bank_regoffsets *regs;
+ 	void __iomem	*base;
+ };
  
--#define IRQ_VIC_START		1	/* first VIC interrupt is 1 */
-+#define IRQ_VIC_START		32	/* first VIC interrupt is 1 */
++/* Pointer to our array of chips */
++static struct vt8500_gpio_chip *vtchip;
++
  
- /*
-  * Interrupt numbers generic for all Nomadik Chip cuts
-  */
--#define IRQ_WATCHDOG			1
--#define IRQ_SOFTINT			2
--#define IRQ_CRYPTO			3
--#define IRQ_OWM				4
--#define IRQ_MTU0			5
--#define IRQ_MTU1			6
--#define IRQ_GPIO0			7
--#define IRQ_GPIO1			8
--#define IRQ_GPIO2			9
--#define IRQ_GPIO3			10
--#define IRQ_RTC_RTT			11
--#define IRQ_SSP				12
--#define IRQ_UART0			13
--#define IRQ_DMA1			14
--#define IRQ_CLCD_MDIF			15
--#define IRQ_DMA0			16
--#define IRQ_PWRFAIL			17
--#define IRQ_UART1			18
--#define IRQ_FIRDA			19
--#define IRQ_MSP0			20
--#define IRQ_I2C0			21
--#define IRQ_I2C1			22
--#define IRQ_SDMMC			23
--#define IRQ_USBOTG			24
--#define IRQ_SVA_IT0			25
--#define IRQ_SVA_IT1			26
--#define IRQ_SAA_IT0			27
--#define IRQ_SAA_IT1			28
--#define IRQ_UART2			29
--#define IRQ_MSP2			30
--#define IRQ_L2CC			49
--#define IRQ_HPI				50
--#define IRQ_SKE				51
--#define IRQ_KP				52
--#define IRQ_MEMST			55
--#define IRQ_SGA_IT			59
--#define IRQ_USBM			61
--#define IRQ_MSP1			63
-+#define IRQ_WATCHDOG			(IRQ_VIC_START+0)
-+#define IRQ_SOFTINT			(IRQ_VIC_START+1)
-+#define IRQ_CRYPTO			(IRQ_VIC_START+2)
-+#define IRQ_OWM				(IRQ_VIC_START+3)
-+#define IRQ_MTU0			(IRQ_VIC_START+4)
-+#define IRQ_MTU1			(IRQ_VIC_START+5)
-+#define IRQ_GPIO0			(IRQ_VIC_START+6)
-+#define IRQ_GPIO1			(IRQ_VIC_START+7)
-+#define IRQ_GPIO2			(IRQ_VIC_START+8)
-+#define IRQ_GPIO3			(IRQ_VIC_START+9)
-+#define IRQ_RTC_RTT			(IRQ_VIC_START+10)
-+#define IRQ_SSP				(IRQ_VIC_START+11)
-+#define IRQ_UART0			(IRQ_VIC_START+12)
-+#define IRQ_DMA1			(IRQ_VIC_START+13)
-+#define IRQ_CLCD_MDIF			(IRQ_VIC_START+14)
-+#define IRQ_DMA0			(IRQ_VIC_START+15)
-+#define IRQ_PWRFAIL			(IRQ_VIC_START+16)
-+#define IRQ_UART1			(IRQ_VIC_START+17)
-+#define IRQ_FIRDA			(IRQ_VIC_START+18)
-+#define IRQ_MSP0			(IRQ_VIC_START+19)
-+#define IRQ_I2C0			(IRQ_VIC_START+20)
-+#define IRQ_I2C1			(IRQ_VIC_START+21)
-+#define IRQ_SDMMC			(IRQ_VIC_START+22)
-+#define IRQ_USBOTG			(IRQ_VIC_START+23)
-+#define IRQ_SVA_IT0			(IRQ_VIC_START+24)
-+#define IRQ_SVA_IT1			(IRQ_VIC_START+25)
-+#define IRQ_SAA_IT0			(IRQ_VIC_START+26)
-+#define IRQ_SAA_IT1			(IRQ_VIC_START+27)
-+#define IRQ_UART2			(IRQ_VIC_START+28)
-+#define IRQ_MSP2			(IRQ_VIC_START+29)
-+#define IRQ_L2CC			(IRQ_VIC_START+30)
-+#define IRQ_HPI				(IRQ_VIC_START+31)
-+#define IRQ_SKE				(IRQ_VIC_START+32)
-+#define IRQ_KP				(IRQ_VIC_START+33)
-+#define IRQ_MEMST			(IRQ_VIC_START+34)
-+#define IRQ_SGA_IT			(IRQ_VIC_START+35)
-+#define IRQ_USBM			(IRQ_VIC_START+36)
-+#define IRQ_MSP1			(IRQ_VIC_START+37)
+ #define to_vt8500(__chip) container_of(__chip, struct vt8500_gpio_chip, chip)
  
- #define NOMADIK_GPIO_OFFSET		(IRQ_VIC_START+64)
+@@ -224,7 +226,6 @@ static int vt8500_of_xlate(struct gpio_chip *gc,
+ static int vt8500_add_chips(struct platform_device *pdev, void __iomem *base,
+ 				const struct vt8500_gpio_data *data)
+ {
+-	struct vt8500_gpio_chip *vtchip;
+ 	struct gpio_chip *chip;
+ 	int i;
+ 	int pin_cnt = 0;
+@@ -233,7 +234,7 @@ static int vt8500_add_chips(struct platform_device *pdev, void __iomem *base,
+ 			sizeof(struct vt8500_gpio_chip) * data->num_banks,
+ 			GFP_KERNEL);
+ 	if (!vtchip) {
+-		pr_err("%s: failed to allocate chip memory\n", __func__);
++		dev_err(&pdev->dev, "failed to allocate chip memory\n");
+ 		return -ENOMEM;
+ 	}
  
+@@ -261,6 +262,7 @@ static int vt8500_add_chips(struct platform_device *pdev, void __iomem *base,
+ 
+ 		gpiochip_add(chip);
+ 	}
++
+ 	return 0;
+ }
+ 
+@@ -273,36 +275,63 @@ static struct of_device_id vt8500_gpio_dt_ids[] = {
+ 
+ static int vt8500_gpio_probe(struct platform_device *pdev)
+ {
++	int ret;
+ 	void __iomem *gpio_base;
+-	struct device_node *np;
++	struct device_node *np = pdev->dev.of_node;
+ 	const struct of_device_id *of_id =
+ 				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
+ 
+-	if (!of_id) {
+-		dev_err(&pdev->dev, "Failed to find gpio controller\n");
++	if (!np) {
++		dev_err(&pdev->dev, "GPIO node missing in devicetree\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	np = pdev->dev.of_node;
+-	if (!np) {
+-		dev_err(&pdev->dev, "Missing GPIO description in devicetree\n");
+-		return -EFAULT;
++	if (!of_id) {
++		dev_err(&pdev->dev, "No matching driver data\n");
++		return -ENODEV;
+ 	}
+ 
+ 	gpio_base = of_iomap(np, 0);
+ 	if (!gpio_base) {
+ 		dev_err(&pdev->dev, "Unable to map GPIO registers\n");
+-		of_node_put(np);
+ 		return -ENOMEM;
+ 	}
+ 
+-	vt8500_add_chips(pdev, gpio_base, of_id->data);
++	ret = vt8500_add_chips(pdev, gpio_base, of_id->data);
++	if (ret) {
++		iounmap(gpio_base);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int vt8500_gpio_remove(struct platform_device *pdev)
++{
++	int i;
++	int ret;
++	const struct vt8500_gpio_data *data;
++	void __iomem *gpio_base = vtchip[0].base;
++	const struct of_device_id *of_id =
++				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
++
++	data = of_id->data;
++
++	for (i = 0; i < data->num_banks; i++) {
++		ret = gpiochip_remove(&vtchip[i].chip);
++		if (ret)
++			dev_warn(&pdev->dev, "gpiochip_remove returned %d\n",
++				 ret);
++	}
++
++	iounmap(gpio_base);
+ 
+ 	return 0;
+ }
+ 
+ static struct platform_driver vt8500_gpio_driver = {
+ 	.probe		= vt8500_gpio_probe,
++	.remove		= vt8500_gpio_remove,
+ 	.driver		= {
+ 		.name	= "vt8500-gpio",
+ 		.owner	= THIS_MODULE,
 -- 
-1.7.11.7
+1.7.9.5
