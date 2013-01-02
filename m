@@ -1,50 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 2 Jan 2013 11:41:48 +0000
-Subject: [RFC PATCH 0/5] clockevents: decouple broadcast mechanism from
- drivers
-In-Reply-To: <50D43502.1070402@ti.com>
-References: <1355832418-31692-1-git-send-email-mark.rutland@arm.com>
- <50D43502.1070402@ti.com>
-Message-ID: <20130102114148.GB25907@e106331-lin.cambridge.arm.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 2 Jan 2013 17:29:34 +0530
+Subject: [PATCH] ARM: EXYNOS: fix uncompress.h and debug-macro.S for
+ EXYNOS5440
+In-Reply-To: <1356632834-8934-1-git-send-email-kgene.kim@samsung.com>
+References: <1356632834-8934-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CAK9yfHycpk6S1e3wW-8hLB7HM2tFykZGOSiz2jaYVwMf2khOUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 21, 2012 at 10:08:02AM +0000, Santosh Shilimkar wrote:
-> Mark,
-> 
-> On Tuesday 18 December 2012 05:36 PM, Mark Rutland wrote:
-> > In some SMP systems, cpu-local timers may stop delivering interrupts
-> > when in low power states, or not all CPUs may have local timers. To
-> > support these systems we have a mechanism for broadcasting timer ticks
-> > to other CPUs. This mechanism relies on the struct
-> > clock_event_device::broadcast function pointer, which is a
-> > driver-specific mechanism for broadcasting ticks to other CPUs.
-> >
-> > As the broadcast mechanism is architecture-specific, placing the
-> > broadcast function on struct clock_event_device ties each driver to a
-> > single architecture. Additionally the driver or architecture backend
-> > must handle the routing of broadcast ticks to the correct
-> > clock_event_device, leading to duplication of the list of active
-> > clock_event_devices.
-> >
-> > These patches introduce a generic mechanism for handling the receipt of
-> > timer broadcasts, and an optional architecture-specific broadcast
-> > function which allows drivers to be decoupled from a particular
-> > architecture will retaining support for timer tick broadcasts. These
-> > mechanisms are wired up for the arm port, and have been boot-tested on a
-> > pandaboard.
-> >
-> Apart from the relevant comments given against couple of patches and
-> Stephen's printk string comment, the series looks pretty good to me.
-> 
-> I have tested the series with CPUIdle where the broadcast is actually
-> used actively.
+Hi Kukjin,
 
-Great!
+On 27 December 2012 23:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> This patch fixes uart base address for uncompress and debug-macro
+> on EXYNOS5440.
+>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-exynos/include/mach/debug-macro.S |   25 +++++++++++++++++------
+>  arch/arm/mach-exynos/include/mach/map.h         |    1 +
+>  arch/arm/mach-exynos/include/mach/uncompress.h  |   20 +++++++++++-------
+>  3 files changed, 33 insertions(+), 13 deletions(-)
 
-> So feel free to add,
-> Reviewed-tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+With this patch I found that Origen board does not boot.
+It stops at "Uncompressing Linux...".
+Tested using your latest for-next branch.
 
-Thanks!
-
-Mark.
+---
+With warm regards,
+Sachin
