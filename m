@@ -1,75 +1,24 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 02 Jan 2013 13:29:49 -0700
-Subject: [PATCH v2] pinctrl/nomadik: add device tree support
-In-Reply-To: <1355992535-5383-1-git-send-email-linus.walleij@stericsson.com>
-References: <1355992535-5383-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <50E498BD.7070104@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 2 Jan 2013 12:31:27 -0800
+Subject: [PATCH v3 1/4] ODROID-X: dts: Add board dts file for ODROID-X
+In-Reply-To: <1356921314-12595-2-git-send-email-tobetter@gmail.com>
+References: <1356921314-12595-1-git-send-email-tobetter@gmail.com>
+ <1356921314-12595-2-git-send-email-tobetter@gmail.com>
+Message-ID: <CAOesGMgoyT2xTwgPBw1CASO-6iakpRLxEh1aad-LL7SxJ1+5Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/2012 01:35 AM, Linus Walleij wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
-> 
-> This implements pin multiplexing and pin configuration for
-> the Nomadik pin controller using the device tree.
+On Sun, Dec 30, 2012 at 6:35 PM, Dongjin Kim <tobetter@gmail.com> wrote:
+> Add initial dtb file for Hardkernel's ODROID-X board based on EXYNOS4412 SoC.
+>
+> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
+Patch 1-4:
 
-> +Required properties:
-> +- compatible: "stericsson,nmk_pinctrl"
+Acked-by: Olof Johansson <olof@lixom.net>
 
-- rather than _ is more typically used, but not a big deal.
+... but I think it might make sense to just add the file as one commit
+instead of splitting it across 4 as this series does.
 
-> +mux function to select on those pin(s)/group(s), and various pin configuration
-> +parameters, such as inputn output, pull up, pull down...
 
-s/n/,/ ?
-
-> +Example board file extract:
-> +
-> +	pinctrl {
-> +		compatible = "stericsson,nmk_pinctrl";
-> +		reg = <0x80157000 0x2000>;
-> +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&uart0_default_mode>;
-...
-> +	uart at 80120000 {
-> +		compatible = "arm,pl011", "arm,primecell";
-> +		reg = <0x80120000 0x1000>;
-> +		interrupts = <0 11 0x4>;
-> +
-> +		pinctrl-names = "default","sleep";
-> +		pinctrl-0 = <&uart0_default_mux>, <&uart0_default_mode>;
-> +		pinctrl-1 = <&uart0_sleep_mode>;
-> +	};
-
-Both pinctrl and uart at 80120000 are going to try and claim/use the
-content of &uart0_default_mode in that example, which I don't think will
-work.
-
-> +
-
-There's a blank line at the end of the file.
-
-> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-
-> +int nmk_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
-
-> +	unsigned reserve = 1;
-...> +	ret = of_property_read_string(np, "ste,function", &function);
-> +	if (ret < 0)
-> +		reserve = 0;
-
-It might be a little simpler to say:
-
-reserve = 0;
-...
-	ret = of_property_read_string(np, "ste,function", &function);
-	if (ret >= 0)
-		reserve = 1;
-
-but not a big deal I suppose.
-
-Aside from that,
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+-Olof
