@@ -1,72 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jan 2013 12:21:00 +0000
-Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
-In-Reply-To: <20130103120259.GB5193@mudshark.cambridge.arm.com>
-References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
- <50E4C9C6.20609@codeaurora.org>
- <20130103120259.GB5193@mudshark.cambridge.arm.com>
-Message-ID: <20130103122100.GN2631@n2100.arm.linux.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 3 Jan 2013 17:58:45 +0530
+Subject: [PATCH 0/2]  ARM: davinci: da850: add pinctrl support
+In-Reply-To: <F3DBB1B3EF102E4994C89758CFCA32412B5A55@DBDE01.ent.ti.com>
+References: <1354876051-25938-1-git-send-email-anilkumar.v@ti.com>
+ <F3DBB1B3EF102E4994C89758CFCA32412B5A55@DBDE01.ent.ti.com>
+Message-ID: <50E5797D.2030908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 12:02:59PM +0000, Will Deacon wrote:
-> You need the smp_send_stop call in order to send the cpu_kill (looks like
-> tegra needs die and then kill). So you really need hotplug support as well
-> as suspend for this to do much (if not, the secondaries end up spinning
-> with interrupts disabled which is probably the best we can do anyway).
+On 1/3/2013 4:57 PM, Kumar, Anil wrote:
+> Hi,
 > 
-> We could add SUSPEND as a KEXEC dependency if SMP (we already have HOTPLUG
-> there) if you like?
+> Gentle Ping. As there are no review comments on this patch series,
+> could you please pull this patch ?
 
-Or we could look into bringing in the code to do this when KEXEC is
-enabled - which would mean an amount of restructuring of the Kconfig
-files.
+Most folks are just getting back from holidays. Please wait some more
+for reviews to happen.
 
-In other words, go from this:
-
-config SUSPEND
-        bool "Suspend to RAM and standby"
-        depends on ARCH_SUSPEND_POSSIBLE
-        default y
-
-config HIBERNATE_CALLBACKS
-        bool
-
-config PM_SLEEP
-        def_bool y
-        depends on SUSPEND || HIBERNATE_CALLBACKS
-
-config PM_SLEEP_SMP
-        def_bool y
-        depends on SMP
-        depends on ARCH_SUSPEND_POSSIBLE || ARCH_HIBERNATION_POSSIBLE
-        depends on PM_SLEEP
-        select HOTPLUG
-        select HOTPLUG_CPU
-
-to:
-
-config SUSPEND
-	bool...
-	depends on ARCH_SUSPEND_POSSIBLE
-	default y
-	select PM_SLEEP
-
-config HIBERNATE_CALLBACKS
-	bool
-	select PM_SLEEP
-
-config PM_SLEEP
-	bool
-	select PM_SLEEP_SMP if SMP && (ARCH_SUSPEND_POSSIBLE || ARCH_HIBERNATION_POSSIBLE)
-
-config PM_SLEEP_SMP
-	bool
-        select HOTPLUG
-        select HOTPLUG_CPU
-
-This means we could have KEXEC select PM_SLEEP_SMP (and maybe PM_SLEEP) as
-required, rather than bringing in the entire suspend support just to have
-working kexec.
-
-However, how many platforms don't have suspend support enabled?
+Thanks,
+Sekhar
