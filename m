@@ -1,72 +1,78 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 3 Jan 2013 12:05:20 +0300
-Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
- IS_ERR_OR_NULL
-In-Reply-To: <1357104713.30504.8.camel@gitbox>
-References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
- <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
- <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
- <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
- <1357104713.30504.8.camel@gitbox>
-Message-ID: <20130103090520.GC7247@mwanda>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 03 Jan 2013 11:10:12 +0200
+Subject: [PATCH 1/1] arm :omap :DMA: fix a bug on reserving the omap SDMA
+ channels
+In-Reply-To: <50E5438A.1050902@ti.com>
+References: <1356813800-4705-1-git-send-email-ahemaily@gmail.com>
+ <50E5330B.2060007@ti.com> <50E5438A.1050902@ti.com>
+Message-ID: <50E54AF4.4030405@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 02, 2013 at 06:31:53PM +1300, Tony Prisk wrote:
-> On Wed, 2013-01-02 at 08:10 +0300, Dan Carpenter wrote:
-> > clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
-> > 
-> > I told Tony about this but everyone has been gone with end of year
-> > holidays so it hasn't been addressed.
-> > 
-> > Tony, please fix it so people don't apply these patches until
-> > clk_get() is updated to not return NULL.  It sucks to have to revert
-> > patches.
-> > 
-> > regards,
-> > dan carpenter
+On 01/03/13 10:38, Santosh Shilimkar wrote:
+> On Thursday 03 January 2013 12:58 PM, R Sricharan wrote:
+>> Hi,
+>>
+>> On Sunday 30 December 2012 02:13 AM, ahemaily at gmail.com wrote:
+>>> From: ahemaily <ahemaily@gmail.com>
+>>>
+>>> The variable  dma_lch_count  used for comparison
+>>> (omap_dma_reserve_channels <= dma_lch_count)
+>>> before it initialized to the value from omap_dma_dev_attr : d->lch_count.
+>>>
+>>> I change the place of dma_lch_count initialization to be before the
+>>> comparison.
+>>>
+>>> Signed-off-by: Abdelrahman Hemaily <ahemaily@gmail.com>
+>>> ---
+>>>   arch/arm/plat-omap/dma.c |    4 ++--
+>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+>>> index c76ed8b..cb3e321 100644
+>>> --- a/arch/arm/plat-omap/dma.c
+>>> +++ b/arch/arm/plat-omap/dma.c
+>>> @@ -2014,12 +2014,12 @@ static int __devinit
+>>> omap_system_dma_probe(struct platform_device *pdev)
+>>>
+>>>       d            = p->dma_attr;
+>>>       errata            = p->errata;
+>>> -
+>>> +    dma_lch_count           = d->lch_count;
+>>> +
+>>>       if ((d->dev_caps & RESERVE_CHANNEL) && omap_dma_reserve_channels
+>>>               && (omap_dma_reserve_channels <= dma_lch_count))
+>>>           d->lch_count    = omap_dma_reserve_channels;
+>>>
+>>> -    dma_lch_count        = d->lch_count;
+>>     By removing this line, you are effectively not assigning
+>>     d->lch_count after reserving. So the patch should only change
+>>     dma_lch_count in the above "if statement" to d->lch_count
+>>
+> You are right. I missed it in last review. Below should be enough.
 > 
-> I posted the query to Mike Turquette, linux-kernel and linux-arm-kernel
-> mailing lists, regarding the return of NULL when HAVE_CLK is undefined.
+> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+> index 37a488a..555ff7b 100644
+> --- a/arch/arm/plat-omap/dma.c
+> +++ b/arch/arm/plat-omap/dma.c
+> @@ -2019,7 +2019,7 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
+>      errata            = p->errata;
 > 
-> Short Answer: A return value of NULL is valid and not an error therefore
-> we should be using IS_ERR, not IS_ERR_OR_NULL on clk_get results.
+>      if ((d->dev_caps & RESERVE_CHANNEL) && omap_dma_reserve_channels
+> -            && (omap_dma_reserve_channels <= dma_lch_count))
+> +            && (omap_dma_reserve_channels <= d->lch_coun))
+
+It looks like the 't' is missing...                     ^^^^^
+
+>          d->lch_count    = omap_dma_reserve_channels;
 > 
-> I see the obvious problem this creates, and asked this question:
-> 
-> If the driver can't operate with a NULL clk, it should use a
-> IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
-> 
-> 
-> And Russell's answer:
-> 
-> Why should a _consumer_ of a clock care?  It is _very_ important that
-> people get this idea - to a consumer, the struct clk is just an opaque
-> cookie.  The fact that it appears to be a pointer does _not_ mean that
-> the driver can do any kind of dereferencing on that pointer - it should
-> never do so.
-> 
-> Thread can be viewed here:
-> https://lkml.org/lkml/2012/12/20/105
+>      dma_lch_count        = d->lch_count;
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
 
-Ah.  Grand.  Thanks...
-
-Btw. The documentation for clk_get() really should include some of
-this information.  I know Russell thinks that the driver authors are
-stupid and lazy, and it's probably true.  But if everyone makes the
-same mistake over and over, then it probably means we could put a
-special note:
-
-"Do not check this with IS_ERR_OR_NULL().  Null values are not an
-error.  Drivers should treat the return value as an opaque cookie
-and they should not dereference it."
-
-This is probably there in the file somewhere else, but I searched
-for "opaque", "cookie", and "dereference" and I didn't find
-anything.  I'm not saying the documentation isn't perfect, just that
-driver authors are lazy and stupid but we can't kill them so we have
-to live with them.
-
-regards,
-dan carpenter
+-- 
+Regards,
+Igor.
