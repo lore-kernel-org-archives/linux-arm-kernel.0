@@ -1,313 +1,424 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  2 Jan 2013 22:34:49 -0700
-Subject: [PATCH] mmc: add BCM2835 driver
-Message-ID: <1357191289-10455-1-git-send-email-swarren@wwwdotorg.org>
+Date: Wed,  2 Jan 2013 22:46:18 -0700
+Subject: [PATCH] i2c: add bcm2835 driver
+Message-ID: <1357191978-11038-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a very simple driver for the BCM2835 SoC, which is used in the
-Raspberry Pi board.
+This implements a very basic I2C host driver for the BCM2835 SoC. Missing
+features so far are:
+
+* Clock rate adjustment.
+* 10-bit addressing.
+* DMA.
 
 Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- .../devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt |   18 ++
- drivers/mmc/host/Kconfig                           |   11 +
- drivers/mmc/host/Makefile                          |    1 +
- drivers/mmc/host/sdhci-bcm2835.c                   |  227 ++++++++++++++++++++
- 4 files changed, 257 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
- create mode 100644 drivers/mmc/host/sdhci-bcm2835.c
+ .../devicetree/bindings/i2c/brcm,bcm2835-i2c.txt   |   20 ++
+ drivers/i2c/busses/Kconfig                         |   12 +
+ drivers/i2c/busses/Makefile                        |    1 +
+ drivers/i2c/busses/i2c-bcm2835.c                   |  331 ++++++++++++++++++++
+ 4 files changed, 364 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt
+ create mode 100644 drivers/i2c/busses/i2c-bcm2835.c
 
-diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
+diff --git a/Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt
 new file mode 100644
-index 0000000..59476fb
+index 0000000..e9de375
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
-@@ -0,0 +1,18 @@
-+Broadcom BCM2835 SDHCI controller
-+
-+This file documents differences between the core properties described
-+by mmc.txt and the properties that represent the BCM2835 controller.
++++ b/Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt
+@@ -0,0 +1,20 @@
++Broadcom BCM2835 I2C controller
 +
 +Required properties:
-+- compatible : Should be "brcm,bcm2835-sdhci".
-+- clocks : The clock feeding the SDHCI controller.
++- compatible : Should be "brcm,bcm2835-i2c".
++- reg: Should contain register location and length.
++- interrupts: Should contain interrupt.
++- clocks : The clock feeding the I2C controller.
++
++Recommended properties:
++- clock-frequency : desired I2C bus clock frequency in Hz.
 +
 +Example:
 +
-+sdhci: sdhci {
-+	compatible = "brcm,bcm2835-sdhci";
-+	reg = <0x7e300000 0x100>;
-+	interrupts = <2 30>;
-+	clocks = <&clk_mmc>;
-+	bus-width = <4>;
++i2c at 20205000 {
++	compatible = "brcm,bcm2835-i2c";
++	reg = <0x7e205000 0x1000>;
++	interrupts = <2 21>;
++	clocks = <&clk_i2c>;
++	clock-frequency = <100000>;
 +};
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index cc8a8fa..7684f7f 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -238,6 +238,17 @@ config MMC_SDHCI_S3C_DMA
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index bdca511..5aab774 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -319,6 +319,18 @@ config I2C_AU1550
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called i2c-au1550.
  
- 	  YMMV.
- 
-+config MMC_SDHCI_BCM2835
-+	tristate "SDHCI platform support for the BCM2835 SD/MMC Controller"
++config I2C_BCM2835
++	tristate "Broadcom BCM2835 I2C controller"
 +	depends on ARCH_BCM2835
-+	depends on MMC_SDHCI_PLTFM
-+	select MMC_SDHCI_IO_ACCESSORS
 +	help
-+	  This selects the BCM2835 SD/MMC controller. If you have a BCM2835
-+	  platform with SD or MMC devices, say Y or M here.
++	  If you say yes to this option, support will be included for the
++	  BCM2835 I2C controller.
 +
-+	  If unsure, say N.
++	  If you don't know what to do here, say N.
 +
- config MMC_OMAP
- 	tristate "TI OMAP Multimedia Card Interface support"
- 	depends on ARCH_OMAP
-diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-index e4e218c..d5ea0722 100644
---- a/drivers/mmc/host/Makefile
-+++ b/drivers/mmc/host/Makefile
-@@ -58,6 +58,7 @@ obj-$(CONFIG_MMC_SDHCI_DOVE)		+= sdhci-dove.o
- obj-$(CONFIG_MMC_SDHCI_TEGRA)		+= sdhci-tegra.o
- obj-$(CONFIG_MMC_SDHCI_OF_ESDHC)	+= sdhci-of-esdhc.o
- obj-$(CONFIG_MMC_SDHCI_OF_HLWD)		+= sdhci-of-hlwd.o
-+obj-$(CONFIG_MMC_SDHCI_BCM2835)		+= sdhci-bcm2835.o
- 
- ifeq ($(CONFIG_CB710_DEBUG),y)
- 	CFLAGS-cb710-mmc	+= -DDEBUG
-diff --git a/drivers/mmc/host/sdhci-bcm2835.c b/drivers/mmc/host/sdhci-bcm2835.c
++	  This support is also available as a module.  If so, the module
++	  will be called i2c-bcm2835.
++
+ config I2C_BLACKFIN_TWI
+ 	tristate "Blackfin TWI I2C support"
+ 	depends on BLACKFIN
+diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+index 6181f3f..a52a891 100644
+--- a/drivers/i2c/busses/Makefile
++++ b/drivers/i2c/busses/Makefile
+@@ -30,6 +30,7 @@ obj-$(CONFIG_I2C_POWERMAC)	+= i2c-powermac.o
+ # Embedded system I2C/SMBus host controller drivers
+ obj-$(CONFIG_I2C_AT91)		+= i2c-at91.o
+ obj-$(CONFIG_I2C_AU1550)	+= i2c-au1550.o
++obj-$(CONFIG_I2C_BCM2835)	+= i2c-bcm2835.o
+ obj-$(CONFIG_I2C_BLACKFIN_TWI)	+= i2c-bfin-twi.o
+ obj-$(CONFIG_I2C_CBUS_GPIO)	+= i2c-cbus-gpio.o
+ obj-$(CONFIG_I2C_CPM)		+= i2c-cpm.o
+diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
 new file mode 100644
-index 0000000..453825f
+index 0000000..c212471
 --- /dev/null
-+++ b/drivers/mmc/host/sdhci-bcm2835.c
-@@ -0,0 +1,227 @@
++++ b/drivers/i2c/busses/i2c-bcm2835.c
+@@ -0,0 +1,331 @@
 +/*
-+ * BCM2835 SDHCI
-+ * Copyright (C) 2012 Stephen Warren
-+ * Based on U-Boot's MMC driver for the BCM2835 by Oleksandr Tymoshenko & me
-+ * Portions of the code there were obviously based on the Linux kernel at:
-+ * git://github.com/raspberrypi/linux.git rpi-3.6.y
-+ * commit f5b930b "Main bcm2708 linux port" signed-off-by Dom Cobley.
++ * BCM2835 master mode driver
 + *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
 + *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+#include <linux/delay.h>
++#include <linux/clk.h>
++#include <linux/completion.h>
++#include <linux/err.h>
++#include <linux/i2c.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
 +#include <linux/module.h>
-+#include <linux/mmc/host.h>
-+#include "sdhci-pltfm.h"
++#include <linux/platform_device.h>
++#include <linux/slab.h>
 +
-+/*
-+ * 400KHz is max freq for card ID etc. Use that as min card clock. We need to
-+ * know the min to enable static calculation of max BCM2835_SDHCI_WRITE_DELAY.
-+ */
-+#define MIN_FREQ 400000
++#define BCM2835_I2C_C		0x0
++#define BCM2835_I2C_S		0x4
++#define BCM2835_I2C_DLEN	0x8
++#define BCM2835_I2C_A		0xc
++#define BCM2835_I2C_FIFO	0x10
++#define BCM2835_I2C_DIV		0x14
++#define BCM2835_I2C_DEL		0x18
++#define BCM2835_I2C_CLKT	0x1c
 +
-+/*
-+ * The Arasan has a bugette whereby it may lose the content of successive
-+ * writes to registers that are within two SD-card clock cycles of each other
-+ * (a clock domain crossing problem). It seems, however, that the data
-+ * register does not have this problem, which is just as well - otherwise we'd
-+ * have to nobble the DMA engine too.
-+ *
-+ * This should probably be dynamically calculated based on the actual card
-+ * frequency. However, this is the longest we'll have to wait, and doesn't
-+ * seem to slow access down too much, so the added complexity doesn't seem
-+ * worth it for now.
-+ *
-+ * 1/MIN_FREQ is (max) time per tick of eMMC clock.
-+ * 2/MIN_FREQ is time for two ticks.
-+ * Multiply by 1000000 to get uS per two ticks.
-+ * *1000000 for uSecs.
-+ * +1 for hack rounding.
-+ */
-+#define BCM2835_SDHCI_WRITE_DELAY	(((2 * 1000000) / MIN_FREQ) + 1)
++#define BCM2835_I2C_C_READ	BIT(0)
++#define BCM2835_I2C_C_CLEAR	BIT(4) /* bits 4 and 5 both clear */
++#define BCM2835_I2C_C_ST	BIT(7)
++#define BCM2835_I2C_C_INTD	BIT(8)
++#define BCM2835_I2C_C_INTT	BIT(9)
++#define BCM2835_I2C_C_INTR	BIT(10)
++#define BCM2835_I2C_C_I2CEN	BIT(15)
 +
-+struct bcm2835_sdhci {
-+	struct clk *clk;
-+	u32 shadow;
++#define BCM2835_I2C_S_TA	BIT(0)
++#define BCM2835_I2C_S_DONE	BIT(1)
++#define BCM2835_I2C_S_TXW	BIT(2)
++#define BCM2835_I2C_S_RXR	BIT(3)
++#define BCM2835_I2C_S_TXD	BIT(4)
++#define BCM2835_I2C_S_RXD	BIT(5)
++#define BCM2835_I2C_S_TXE	BIT(6)
++#define BCM2835_I2C_S_RXF	BIT(7)
++#define BCM2835_I2C_S_ERR	BIT(8)
++#define BCM2835_I2C_S_CLKT	BIT(9)
++#define BCM2835_I2C_S_LEN	BIT(10) /* Fake bit for SW error reporting */
++
++#define BCM2835_I2C_TIMEOUT (msecs_to_jiffies(1000))
++
++struct bcm2835_i2c_dev {
++	struct device *dev;
++	void __iomem *regs;
++	struct i2c_adapter adapter;
++	struct completion completion;
++	u32 msg_err;
++	u8 *msg_buf;
++	size_t msg_buf_remaining;
 +};
 +
-+static void bcm2835_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
++static inline void bcm2835_i2c_writel(struct bcm2835_i2c_dev *i2c_dev,
++				      u32 reg, u32 val)
 +{
-+	writel(val, host->ioaddr + reg);
-+
-+	udelay(BCM2835_SDHCI_WRITE_DELAY);
++	writel(val, i2c_dev->regs + reg);
 +}
 +
-+static inline u32 bcm2835_sdhci_readl(struct sdhci_host *host, int reg)
++static inline u32 bcm2835_i2c_readl(struct bcm2835_i2c_dev *i2c_dev, u32 reg)
 +{
-+	u32 val = readl(host->ioaddr + reg);
-+
-+	if (reg == SDHCI_CAPABILITIES)
-+		val |= SDHCI_CAN_VDD_330;
-+
-+	return val;
++	return readl(i2c_dev->regs + reg);
 +}
 +
-+static void bcm2835_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
++static void bcm2835_fill_txfifo(struct bcm2835_i2c_dev *i2c_dev)
 +{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct bcm2835_sdhci *bcm2835_host = pltfm_host->priv;
-+	u32 oldval = (reg == SDHCI_COMMAND) ? bcm2835_host->shadow :
-+		bcm2835_sdhci_readl(host, reg & ~3);
-+	u32 word_num = (reg >> 1) & 1;
-+	u32 word_shift = word_num * 16;
-+	u32 mask = 0xffff << word_shift;
-+	u32 newval = (oldval & ~mask) | (val << word_shift);
++	u32 val;
 +
-+	if (reg == SDHCI_TRANSFER_MODE)
-+		bcm2835_host->shadow = newval;
-+	else
-+		bcm2835_sdhci_writel(host, newval, reg & ~3);
++	for (;;) {
++		if (!i2c_dev->msg_buf_remaining)
++			return;
++		val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
++		if (!(val & BCM2835_I2C_S_TXD))
++			break;
++		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_FIFO,
++				   *i2c_dev->msg_buf);
++		i2c_dev->msg_buf++;
++		i2c_dev->msg_buf_remaining--;
++	}
 +}
 +
-+static u16 bcm2835_sdhci_readw(struct sdhci_host *host, int reg)
++static void bcm2835_drain_rxfifo(struct bcm2835_i2c_dev *i2c_dev)
 +{
-+	u32 val = bcm2835_sdhci_readl(host, (reg & ~3));
-+	u32 word_num = (reg >> 1) & 1;
-+	u32 word_shift = word_num * 16;
-+	u32 word = (val >> word_shift) & 0xffff;
++	u32 val;
 +
-+	return word;
++	for (;;) {
++		if (!i2c_dev->msg_buf_remaining)
++			return;
++		val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
++		if (!(val & BCM2835_I2C_S_RXD))
++			break;
++		*i2c_dev->msg_buf = bcm2835_i2c_readl(i2c_dev,
++						      BCM2835_I2C_FIFO);
++		i2c_dev->msg_buf++;
++		i2c_dev->msg_buf_remaining--;
++	}
 +}
 +
-+static void bcm2835_sdhci_writeb(struct sdhci_host *host, u8 val, int reg)
++static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 +{
-+	u32 oldval = bcm2835_sdhci_readl(host, reg & ~3);
-+	u32 byte_num = reg & 3;
-+	u32 byte_shift = byte_num * 8;
-+	u32 mask = 0xff << byte_shift;
-+	u32 newval = (oldval & ~mask) | (val << byte_shift);
++	struct bcm2835_i2c_dev *i2c_dev = data;
++	u32 val, err;
 +
-+	bcm2835_sdhci_writel(host, newval, reg & ~3);
++	val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, val);
++
++	err = val & (BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR);
++	if (err) {
++		i2c_dev->msg_err = err;
++		complete(&i2c_dev->completion);
++		return IRQ_HANDLED;
++	}
++
++	if (val & BCM2835_I2C_S_RXD) {
++		bcm2835_drain_rxfifo(i2c_dev);
++		if (!(val & BCM2835_I2C_S_DONE))
++			return IRQ_HANDLED;
++	}
++
++	if (val & BCM2835_I2C_S_DONE) {
++		if (i2c_dev->msg_buf_remaining)
++			i2c_dev->msg_err = BCM2835_I2C_S_LEN;
++		else
++			i2c_dev->msg_err = 0;
++		complete(&i2c_dev->completion);
++		return IRQ_HANDLED;
++	}
++
++	if (val & BCM2835_I2C_S_TXD) {
++		bcm2835_fill_txfifo(i2c_dev);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
 +}
 +
-+static u8 bcm2835_sdhci_readb(struct sdhci_host *host, int reg)
++static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
++				struct i2c_msg *msg)
 +{
-+	u32 val = bcm2835_sdhci_readl(host, (reg & ~3));
-+	u32 byte_num = reg & 3;
-+	u32 byte_shift = byte_num * 8;
-+	u32 byte = (val >> byte_shift) & 0xff;
-+
-+	return byte;
-+}
-+
-+static unsigned int bcm2835_sdhci_get_max_clock(struct sdhci_host *host)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct bcm2835_sdhci *bcm2835_host = pltfm_host->priv;
-+
-+	return clk_get_rate(bcm2835_host->clk);
-+}
-+
-+unsigned int bcm2835_sdhci_get_min_clock(struct sdhci_host *host)
-+{
-+	return MIN_FREQ;
-+}
-+
-+unsigned int bcm2835_sdhci_get_timeout_clock(struct sdhci_host *host)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct bcm2835_sdhci *bcm2835_host = pltfm_host->priv;
-+
-+	return clk_get_rate(bcm2835_host->clk);
-+}
-+
-+static struct sdhci_ops bcm2835_sdhci_ops = {
-+	.write_l = bcm2835_sdhci_writel,
-+	.write_w = bcm2835_sdhci_writew,
-+	.write_b = bcm2835_sdhci_writeb,
-+	.read_l = bcm2835_sdhci_readl,
-+	.read_w = bcm2835_sdhci_readw,
-+	.read_b = bcm2835_sdhci_readb,
-+	.get_max_clock = bcm2835_sdhci_get_max_clock,
-+	.get_min_clock = bcm2835_sdhci_get_min_clock,
-+	.get_timeout_clock = bcm2835_sdhci_get_timeout_clock,
-+};
-+
-+static struct sdhci_pltfm_data bcm2835_sdhci_pdata = {
-+	.quirks = SDHCI_QUIRK_BROKEN_CARD_DETECTION,
-+	.ops = &bcm2835_sdhci_ops,
-+};
-+
-+static int bcm2835_sdhci_probe(struct platform_device *pdev)
-+{
-+	struct sdhci_host *host;
-+	struct bcm2835_sdhci *bcm2835_host;
-+	struct sdhci_pltfm_host *pltfm_host;
++	u32 c;
 +	int ret;
 +
-+	host = sdhci_pltfm_init(pdev, &bcm2835_sdhci_pdata);
-+	if (IS_ERR(host))
-+		return PTR_ERR(host);
++	i2c_dev->msg_buf = msg->buf;
++	i2c_dev->msg_buf_remaining = msg->len;
++	INIT_COMPLETION(i2c_dev->completion);
 +
-+	bcm2835_host = devm_kzalloc(&pdev->dev, sizeof(*bcm2835_host),
-+					GFP_KERNEL);
-+	if (!bcm2835_host) {
-+		dev_err(mmc_dev(host->mmc),
-+			"failed to allocate bcm2835_sdhci\n");
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
++
++	if (msg->flags & I2C_M_RD) {
++		c = BCM2835_I2C_C_READ | BCM2835_I2C_C_INTR;
++	} else {
++		c = BCM2835_I2C_C_INTT;
++		bcm2835_fill_txfifo(i2c_dev);
++	}
++	c |= BCM2835_I2C_C_ST | BCM2835_I2C_C_INTD | BCM2835_I2C_C_I2CEN;
++
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_A, msg->addr);
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DLEN, msg->len);
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, c);
++
++	ret = wait_for_completion_timeout(&i2c_dev->completion,
++					  BCM2835_I2C_TIMEOUT);
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
++	if (WARN_ON(ret == 0)) {
++		dev_err(i2c_dev->dev, "i2c transfer timed out\n");
++		return -ETIMEDOUT;
++	}
++
++	if (likely(!i2c_dev->msg_err))
++		return 0;
++
++	if ((i2c_dev->msg_err & BCM2835_I2C_S_ERR) &&
++	    (msg->flags & I2C_M_IGNORE_NAK))
++		return 0;
++
++	dev_err(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
++
++	if (i2c_dev->msg_err & BCM2835_I2C_S_ERR)
++		return -EREMOTEIO;
++	else
++		return -EIO;
++}
++
++static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
++			    int num)
++{
++	struct bcm2835_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
++	int i;
++	int ret = 0;
++
++	for (i = 0; i < num; i++) {
++		ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i]);
++		if (ret)
++			break;
++	}
++
++	return ret ?: i;
++}
++
++static u32 bcm2835_i2c_func(struct i2c_adapter *adap)
++{
++	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
++}
++
++static const struct i2c_algorithm bcm2835_i2c_algo = {
++	.master_xfer	= bcm2835_i2c_xfer,
++	.functionality	= bcm2835_i2c_func,
++};
++
++static int __devinit bcm2835_i2c_probe(struct platform_device *pdev)
++{
++	struct bcm2835_i2c_dev *i2c_dev;
++	struct resource *mem, *requested, *irq;
++	int ret;
++	struct i2c_adapter *adap;
++
++	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
++	if (!i2c_dev) {
++		dev_err(&pdev->dev, "Cannot allocate i2c_dev\n");
++		return -ENOMEM;
++	}
++	platform_set_drvdata(pdev, i2c_dev);
++	i2c_dev->dev = &pdev->dev;
++	init_completion(&i2c_dev->completion);
++
++	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!mem) {
++		dev_err(&pdev->dev, "No mem resource\n");
++		return -ENODEV;
++	}
++
++	requested = devm_request_mem_region(&pdev->dev, mem->start,
++					    resource_size(mem),
++					    dev_name(&pdev->dev));
++	if (!requested) {
++		dev_err(&pdev->dev, "Could not claim register region\n");
++		return -EBUSY;
++	}
++
++	i2c_dev->regs = devm_ioremap(&pdev->dev, mem->start,
++				     resource_size(mem));
++	if (!i2c_dev->regs) {
++		dev_err(&pdev->dev, "Could not map registers\n");
 +		return -ENOMEM;
 +	}
 +
-+	pltfm_host = sdhci_priv(host);
-+	pltfm_host->priv = bcm2835_host;
-+
-+	bcm2835_host->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(bcm2835_host->clk)) {
-+		ret = PTR_ERR(bcm2835_host->clk);
-+		goto err;
++	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!irq) {
++		dev_err(&pdev->dev, "No IRQ resource\n");
++		return -ENODEV;
 +	}
 +
-+	return sdhci_add_host(host);
++	ret = devm_request_irq(&pdev->dev, irq->start, bcm2835_i2c_isr,
++			       IRQF_SHARED, dev_name(&pdev->dev), i2c_dev);
++	if (ret) {
++		dev_err(&pdev->dev, "Could not request IRQ\n");
++		return -ENODEV;
++	}
 +
-+err:
-+	sdhci_pltfm_free(pdev);
-+	return ret;
-+}
++	adap = &i2c_dev->adapter;
++	i2c_set_adapdata(adap, i2c_dev);
++	adap->owner = THIS_MODULE;
++	adap->class = I2C_CLASS_HWMON;
++	strlcpy(adap->name, "bcm2835 I2C adapter", sizeof(adap->name));
++	adap->algo = &bcm2835_i2c_algo;
++	adap->dev.parent = &pdev->dev;
++	adap->nr = -1;
 +
-+static int bcm2835_sdhci_remove(struct platform_device *pdev)
-+{
-+	struct sdhci_host *host = platform_get_drvdata(pdev);
-+	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
 +
-+	sdhci_remove_host(host, dead);
-+	sdhci_pltfm_free(pdev);
++	ret = i2c_add_numbered_adapter(adap);
++	if (ret) {
++		dev_err(&pdev->dev, "Could not add adapter\n");
++		return ret;
++	}
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id bcm2835_sdhci_of_match[] = {
-+	{ .compatible = "brcm,bcm2835-sdhci" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, bcm2835_sdhci_of_match);
++static int bcm2835_i2c_remove(struct platform_device *pdev)
++{
++	struct bcm2835_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
 +
-+static struct platform_driver bcm2835_sdhci_driver = {
-+	.driver = {
-+		.name = "sdhci-bcm2835",
-+		.owner = THIS_MODULE,
-+		.of_match_table = bcm2835_sdhci_of_match,
-+		.pm = SDHCI_PLTFM_PMOPS,
++	i2c_del_adapter(&i2c_dev->adapter);
++
++	return 0;
++}
++
++static const struct of_device_id bcm2835_i2c_of_match[] = {
++	{ .compatible = "brcm,bcm2835-i2c" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, bcm2835_i2c_of_match);
++
++static struct platform_driver bcm2835_i2c_driver = {
++	.probe		= bcm2835_i2c_probe,
++	.remove		= bcm2835_i2c_remove,
++	.driver		= {
++		.name	= "i2c-bcm2835",
++		.owner	= THIS_MODULE,
++		.of_match_table = bcm2835_i2c_of_match,
 +	},
-+	.probe = bcm2835_sdhci_probe,
-+	.remove = bcm2835_sdhci_remove,
 +};
-+module_platform_driver(bcm2835_sdhci_driver);
 +
-+MODULE_DESCRIPTION("BCM2835 SDHCI driver");
-+MODULE_AUTHOR("Stephen Warren");
++static int __init bcm2835_i2c_init_driver(void)
++{
++	return platform_driver_register(&bcm2835_i2c_driver);
++}
++module_init(bcm2835_i2c_init_driver);
++
++static void __exit bcm2835_i2c_exit_driver(void)
++{
++	platform_driver_unregister(&bcm2835_i2c_driver);
++}
++module_exit(bcm2835_i2c_exit_driver);
++
++MODULE_AUTHOR("Stephen Warren <swarren@wwwdotorg.org>");
++MODULE_DESCRIPTION("BCM2835 I2C bus adapter");
 +MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:i2c-bcm2835");
 -- 
 1.7.10.4
