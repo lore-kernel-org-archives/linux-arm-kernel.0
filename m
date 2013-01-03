@@ -1,49 +1,79 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 03 Jan 2013 07:58:11 -0600
-Subject: arm NO_IRQ = -1 - zynq axi_ethernet driver
-In-Reply-To: <CAHTX3d+dOm2AzK=g_UbEiJ2AQYJNJtfWHXGvrxK1TqM2nmEh7Q@mail.gmail.com>
-References: <CAHTX3d+dOm2AzK=g_UbEiJ2AQYJNJtfWHXGvrxK1TqM2nmEh7Q@mail.gmail.com>
-Message-ID: <50E58E73.6070308@gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 3 Jan 2013 15:06:56 +0100
+Subject: [PATCH 0/9] ARM: Initial support for Tegra 114 SoC.
+In-Reply-To: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
+References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20130103.160656.1043855724416946158.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2013 07:47 AM, Michal Simek wrote:
-> Hi Grand, Russell, Arnd, Olof and Rob,
-> 
-> I am getting one problem with axi_ethernet driver because I want to remove
-> NO_IRQ from axi_ethernet driver because NO_IRQ was setup to 0 and
-> removed from microblaze long time ago.
-> Some patches from reference.
-> "microblaze: Change NO_IRQ to 0"
-> sha1: 6c7a2676f594ca9a30203b4fd5dc26b53682cffe
-> and
-> "microblaze: Remove NO_IRQ from architecture"
-> sha1: 18e3b1075b1bc4a6027a6612fe70a5c81c209ec7
-> 
-> but we can also use this driver on arm Zynq platform.
-> It is easy to add
-> #ifndef NO_IRQ
-> #define NO_IRQ 0
-> #endif
-> to the driver to cover Microblaze case but it will be just workaround.
-> 
-> From patches description NO_IRQ shouldn't be used by any driver
-> + from Grant description
-> 
-> "As has been discussed many times[1], Using NO_IRQ set to anything other
-> than 0 is bug waiting to happen since many drivers follow the pattern
-> "if (!irq)" for testing whether or not an irq has been set."
-> 
-> + link
-> [1] http://lkml.org/lkml/2005/11/21/221
-> 
-> Was there any attempt to remove NO_IRQ from ARM?
-> Any problem to do it?
+Hi Stephen,
 
-It's not removed, but we've trimmed it out of most things. It appears
-that drivers are mostly not using it other than powerpc drivers. It is
-not really necessary to remove it from the arch. Drivers should simply
-check for (irq <= 0) for error cases. I'm not sure if there are any
-platforms left using irq 0 as a valid irq.
+Hiroshi Doyu <hdoyu@nvidia.com> wrote @ Thu, 20 Dec 2012 10:43:58 +0100:
 
-Rob
+> Hi,
+> 
+> This patchset adds initial support for the NVIDIA's new Tegra 114
+> SoC (T114) based on the ARM Cortex-A15 MP. It has the minimal support
+> to allow the kernel to boot up into shell console. This can be used as
+> a basis for adding other device drivers for this SoC. Currently there
+> are 2 evaluation boards available, "Dalmore" and "Pluto".
+
+I'll resend v2 of this series just with /cpus node in DT added. The
+rest would be same since TSC initialization and dynamic core
+detections are still necessary/valid for Tegra as backup of /cpus DT
+failure. Or if you take this series as is first, I'll make a /cpus DT
+patchset agaist this series.
+
+> This patchset is against Stephen Warren's linux-next_common branch:
+> 
+>   git://nv-tegra.nvidia.com/user/swarren/linux-2.6 linux-next_common
+> 
+> For those who want to try:
+> 
+>   $ make ARCH=arm tegra_defconfig
+>   $ scripts/config -e ARCH_TEGRA_114_SOC -d DRM -d SUSPEND \
+>     	-d PM_RUNTIME -d CPU_FREQ -d CPU_IDLE
+>   $ make ARCH=arm menuconfig # if needed to configure more
+>   $ make ARCH=arm all -j9
+> 
+> Verified that this single image booted up with "Dalmore(T114)",
+> "Pluto(T114)" and "Cardhu(T30)". For "Cardhu(T30)" with this single
+> image, SPI driver doesn't seem to afford the above configuration , it
+> hangs at boot-up. With SPI disabled, it's ok.
+> 
+> 
+> Hiroshi Doyu (9):
+>   ARM: tegra: fuse: Add chipid TEGRA114 0x35
+>   HACK: ARM: tegra: Use CLK_IGNORE_UNUSED for Tegra 114 SoC
+>   ARM: tegra: # of CPU cores detection w/ & w/o HAVE_ARM_SCU
+>   clocksource: tegra: Reorganize funcs by clock functionarities
+>   clocksource: tegra: Enable ARM arch_timer with TSC
+>   ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
+>   ARM: dt: tegra114: Add new board, Dalmore
+>   ARM: dt: tegra114: Add new board, Pluto
+>   ARM: tegra: Add initial support for Tegra 114 SoC.
+> 
+>  .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 +
+>  arch/arm/boot/dts/Makefile                         |    4 +-
+>  arch/arm/boot/dts/tegra114-dalmore.dts             |   21 ++
+>  arch/arm/boot/dts/tegra114-pluto.dts               |   21 ++
+>  arch/arm/boot/dts/tegra114.dtsi                    |   89 ++++++++
+>  arch/arm/mach-tegra/Kconfig                        |   10 +
+>  arch/arm/mach-tegra/Makefile                       |    1 +
+>  arch/arm/mach-tegra/board-dt-tegra114.c            |   48 +++++
+>  arch/arm/mach-tegra/common.c                       |    1 +
+>  arch/arm/mach-tegra/fuse.h                         |    1 +
+>  arch/arm/mach-tegra/platsmp.c                      |   31 ++-
+>  arch/arm/mach-tegra/tegra30_clocks_data.c          |    2 +
+>  drivers/clocksource/tegra20_timer.c                |  222 +++++++++++++-------
+>  13 files changed, 384 insertions(+), 78 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+>  create mode 100644 arch/arm/boot/dts/tegra114-dalmore.dts
+>  create mode 100644 arch/arm/boot/dts/tegra114-pluto.dts
+>  create mode 100644 arch/arm/boot/dts/tegra114.dtsi
+>  create mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
+> 
+> -- 
+> 1.7.9.5
+> 
