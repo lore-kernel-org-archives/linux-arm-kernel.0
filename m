@@ -1,117 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 3 Jan 2013 15:46:12 +0800
-Subject: [PATCH 1/2] ARM: mx25pdk: Add device tree support
-In-Reply-To: <1355262464-25401-1-git-send-email-festevam@gmail.com>
-References: <1355262464-25401-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130103074610.GC2566@S2101-09.ap.freescale.net>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Thu, 3 Jan 2013 07:54:38 +0000
+Subject: [PATCH v3 0/7] ARM: OMAP2+: AM33XX: Enable few drivers in
+ omap2plus_defconfig
+In-Reply-To: <CAOesGMj0yO5JxkDAeN1negip5dvwX9Y3syoU4JPsKnVJ0GucdQ@mail.gmail.com>
+References: <1357122451-7577-1-git-send-email-anilkumar@ti.com>
+ <CAOesGMj0yO5JxkDAeN1negip5dvwX9Y3syoU4JPsKnVJ0GucdQ@mail.gmail.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAD6FD3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 11, 2012 at 07:47:43PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, Jan 03, 2013 at 01:49:57, Olof Johansson wrote:
+> Hi,
 > 
-> Add basic device tree support for mx25pdk board.
+> On Wed, Jan 2, 2013 at 2:27 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
+> > This patch series enable tps65910, lis3lv02d accelerometer, tsl2550
+> > ambient light sensor, matrix keypad, tmp275 temperature sensor, gpio
+> > leds and D_CAN drivers in omap2plus_defconfig.
+> >
+> > These are the peripherals present in AM33XX family of devices.
+> >
+> > Changes from v2:
+> >         - Incorporated Tony's comments on v2
+> >           * Enabled as modules instead of kernel built-in drivers.
+> >         - Dropped 1st patch because it was accepted.
+> >
+> > Changes from v1:
+> >         - Incorporated martinez javier's comments on v1
+> >           * Enabled few more triggers in omap2plus_defconfig
+> >         - Included Igor's patch, which modifies the omap2plus
+> >           defconfig for AM33XX devices.
+> >
+> > AnilKumar Ch (7):
+> >   ARM: OMAP2+: omap2plus_defconfig: Add tps65910 support
+> >   ARM: OMAP2+: omap2plus_defconfig: Add lis3lv02d support
+> >   ARM: OMAP2+: omap2plus_defconfig: Add tsl2550 support
+> >   ARM: OMAP2+: omap2plus_defconfig: Add matrix-keypad support
+> >   ARM: OMAP2+: omap2plus_defconfig: Add tmp275 sensor support
+> >   ARM: OMAP2+: omap2plus_defconfig: Add leds-gpio support
+> >   ARM: OMAP2+: omap2plus_defconfig: Add D_CAN support
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  Documentation/devicetree/bindings/arm/fsl.txt |    4 +++
->  arch/arm/boot/dts/Makefile                    |    3 +-
->  arch/arm/boot/dts/imx25-pdk.dts               |   44 +++++++++++++++++++++++++
-
-Please follow how patch "ARM: dts: imx: use nodes label in board dts"
-does to create board level dts.  To rebase your patch on my imx/dt
-branch will be reasonable.
-
->  3 files changed, 50 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/imx25-pdk.dts
+> Doing this as 7 separate patches seems excessive to me. Just do it as
+> one single patch instead.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> index f798187..b98530c 100644
-> --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> @@ -5,6 +5,10 @@ i.MX23 Evaluation Kit
->  Required root node properties:
->      - compatible = "fsl,imx23-evk", "fsl,imx23";
->  
-> +i.MX25 Product Evaluation Kit
-> +Required root node properties:
-> +    - compatible = "fsl,imx25-pdk", "fsl,imx25";
-> +
->  i.MX28 Evaluation Kit
->  Required root node properties:
->      - compatible = "fsl,imx28-evk", "fsl,imx28";
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 2beab0c..b2df1e7 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -79,7 +79,8 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->  	armada-370-mirabox.dtb \
->  	armada-xp-db.dtb \
->  	armada-xp-openblocks-ax3-4.dtb
-> -dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
-> +dtb-$(CONFIG_ARCH_MXC) += imx25-pdk.dtb \
-> +	imx51-babbage.dtb \
->  	imx53-ard.dtb \
->  	imx53-evk.dtb \
->  	imx53-qsb.dtb \
-> diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-> new file mode 100644
-> index 0000000..bcdd393
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx25-pdk.dts
-> @@ -0,0 +1,44 @@
-> +/*
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "imx25.dtsi"
-> +
-> +/ {
-> +	model = "Freescale i.MX25 Product Development Kit";
-> +	compatible = "freescale,imx25pdk", "fsl,imx25";
 
-s/freescale,imx25pdk/fsl,imx25-pdk
+Hi Olof,
 
-> +
-> +	memory {
-> +		reg = <0x80000000 0x4000000>;
-> +	};
-> +
-> +	soc {
-> +		aips at 43f00000 {
-> +			uart1: serial at 43f90000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		spba at 50000000 {
-> +			fec: ethernet at 50038000 {
-> +				status = "okay";
+I will send v4 by merging all the patches into single patch.
 
-Let "status" be the last one.
-
-Shawn
-
-> +				phy-mode = "rmii";
-> +			};
-> +		};
-> +
-> +		emi at 80000000 {
-> +			nand at bb000000 {
-> +				nand-on-flash-bbt;
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +};
-> -- 
-> 1.7.9.5
-> 
+Thanks
+AnilKumar
