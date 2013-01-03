@@ -1,46 +1,91 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 03 Jan 2013 09:11:18 -0700
-Subject: [PATCH v2 05/11] ARM: dt: tegra30: Add device node for APB MISC
-In-Reply-To: <50E520FC.4070805@nvidia.com>
-References: <1356619644-18565-1-git-send-email-pgaikwad@nvidia.com>
- <1356619644-18565-6-git-send-email-pgaikwad@nvidia.com>
- <50E4AE19.1060503@wwwdotorg.org> <50E520FC.4070805@nvidia.com>
-Message-ID: <50E5ADA6.1070904@wwwdotorg.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 3 Jan 2013 14:27:35 -0200
+Subject: [PATCH v2] ARM: mx25pdk: Add device tree support
+Message-ID: <1357230455-12690-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2013 11:11 PM, Prashant Gaikwad wrote:
-> On Thursday 03 January 2013 03:30 AM, Stephen Warren wrote:
->> On 12/27/2012 07:47 AM, Prashant Gaikwad wrote:
->>> APB misc contains multiple registers required by different modules
->>> such as CAR.
->> I don't see a DT binding document that describes what
->> nvidia,tegra30-apbmisc means. Also, the register range for this new node
->> overlaps that for the pinmux node, so they can't both "request" their
->> register region. You may need multiple entries in the apbmisc reg
->> property to avoid this.
-> 
-> apbmisc reg for Tegra30 can be divided into following entries:
-> 
-> strap registers
-> jtag configuration registers
-> pull_up/pull_down control registers
-> vclk control registers
-> tvdac registers
-> chip id revision registers
-> pad control registers
-> 
-> This list is not same for Tegra20 and Tegra30.
+Add basic device tree support for mx25pdk board.
 
-OK. It sounds like we need a true APB MISC driver then, to abstract the
-differences; the clock driver really shouldn't be touching the APB MISC
-registers in all likelihood, unless a subset of the sections you mention
-above are truly dedicated to clock functionality.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Follow the new dt style and rebased against Shawn's imx/dt tree.
 
-> OR
-> 
-> another way is to add chip id revision register region to CAR node as
-> done for pinmux node and remove apb misc node.
+ Documentation/devicetree/bindings/arm/fsl.txt |    4 +++
+ arch/arm/boot/dts/Makefile                    |    1 +
+ arch/arm/boot/dts/imx25-pdk.dts               |   36 +++++++++++++++++++++++++
+ 3 files changed, 41 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx25-pdk.dts
 
-The pinmux controller doesn't have a reg entry for the chip ID register.
-I don't understand what you mean here.
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 4c25c98..e935d7d 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -5,6 +5,10 @@ i.MX23 Evaluation Kit
+ Required root node properties:
+     - compatible = "fsl,imx23-evk", "fsl,imx23";
+ 
++i.MX25 Product Development Kit
++Required root node properties:
++    - compatible = "fsl,imx25-pdk", "fsl,imx25";
++
+ i.MX27 Product Development Kit
+ Required root node properties:
+     - compatible = "fsl,imx27-pdk", "fsl,imx27";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e3ae5e2..ffcdb61 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -81,6 +81,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+ 	armada-xp-openblocks-ax3-4.dtb
+ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx25-karo-tx25.dtb \
++	imx25-pdk.dtb \
+ 	imx27-apf27.dtb \
+ 	imx27-pdk.dtb \
+ 	imx31-bug.dtb \
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+new file mode 100644
+index 0000000..b430ed7
+--- /dev/null
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -0,0 +1,36 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "imx25.dtsi"
++
++/ {
++	model = "Freescale i.MX25 Product Development Kit";
++	compatible = "fsl,imx25-pdk", "fsl,imx25";
++
++	memory {
++		reg = <0x80000000 0x4000000>;
++	};
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&fec {
++	status = "okay";
++	phy-mode = "rmii";
++};
++
++&nfc {
++	nand-on-flash-bbt;
++	status = "okay";
++};
+-- 
+1.7.9.5
