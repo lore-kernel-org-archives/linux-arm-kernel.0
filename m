@@ -1,55 +1,33 @@
-From: pratikp@codeaurora.org (Pratik Patel)
-Date: Thu, 3 Jan 2013 10:06:43 -0800
-Subject: CoreSight framework and drivers
-In-Reply-To: <20121223113239.GG16237@mudshark.cambridge.arm.com>
-References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
- <20121219112314.GA26329@mudshark.cambridge.arm.com>
- <50D1F37E.6000804@ti.com>
- <20121219212431.GC23594@pratikp-linux.qualcomm.com>
- <50D34EE5.8090407@ti.com>
- <20121220195127.GA14877@pratikp-linux.qualcomm.com>
- <50D3972E.4030607@ti.com>
- <20121221221828.GA2658@pratikp-linux.qualcomm.com>
- <20121223113239.GG16237@mudshark.cambridge.arm.com>
-Message-ID: <20130103180643.GA30277@pratikp-linux.qualcomm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 3 Jan 2013 11:08:52 -0700
+Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
+In-Reply-To: <20130103122100.GN2631@n2100.arm.linux.org.uk>
+References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
+ <50E4C9C6.20609@codeaurora.org>
+ <20130103120259.GB5193@mudshark.cambridge.arm.com>
+ <20130103122100.GN2631@n2100.arm.linux.org.uk>
+Message-ID: <20130103180852.GA7114@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 23, 2012 at 11:32:39AM +0000, Will Deacon wrote:
-> On Fri, Dec 21, 2012 at 10:18:28PM +0000, Pratik Patel wrote:
-> > What user interface do you plan to provide for the CTI? Maybe
-> > something consistent with other CoreSight components in sysfs to
-> > allow users to enable, disable, map and unmap ???
-> > 
-> > Please let me know your thoughts.
+On Thu, Jan 03, 2013 at 12:21:00PM +0000, Russell King - ARM Linux wrote:
+
+> This means we could have KEXEC select PM_SLEEP_SMP (and maybe PM_SLEEP) as
+> required, rather than bringing in the entire suspend support just to have
+> working kexec.
 > 
-> Rather than have your current approach of dev nodes + sysfs config files for
-> each coresight device, I think it might be better to follow something closer
-> to ftrace and stick per-device directories under debugfs/coresight/. Then you
-> can have a pipe file and some config files in the same directory for each
-> component. You also don't need to do any mapping operations with this (just
-> post-process the stream directly).
-> 
+> However, how many platforms don't have suspend support enabled?
 
-Thanks for the suggestion. I had initially debated between debugfs
-and sysfs but chose sysfs + dev nodes since using device attributes
-relieves the drivers from manually managing directories and files,
-its taken care of by the device and sysfs layers. Moreover, since
-these are physical devices, device attributes made sense at the
-time.
+I was looking into something similar to this for Kirkwood - my
+interest was in getting kexec to work, which means it needs to call
+the hibernation callbacks in the drivers prior to execing, otherwise
+there is a fairly high chance DMA will corrupt the kexec target.
 
-The map and unmap I was referring to was for the CTI trigger
-mappings. Dev nodes are currently intended to provide the raw
-data collected in the sinks.
+So this means the code needs the suspend support, however Kirkwood
+doesn't have any support for ARM_CPU_SUSPEND, which blocks enabling
+suspend at all for that platform. I was looking at moving the 'depends
+on CPU_..' from ARCH_SUSPEND_POSSIBLE to ARM_CPU_SUSPEND, which seemed
+to do the trick for kirkwood but I didn't study every possibility..
 
-Whats the advantage in using debugfs here?
-
-> It might also be fun to play with file redirection for sources and sinks, but
-> that's probably a bit too invasive.
-> 
-> Will
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Jason
