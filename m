@@ -1,40 +1,44 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 03 Jan 2013 15:39:08 +0400
-Subject: [PATCH v6] ARM: mtd: nand: davinci: add OF support for davinci
- nand controller
-In-Reply-To: <1357212752.16197.127.camel@shinybook.infradead.org>
-References: <1343632944-25971-1-git-send-email-hs@denx.de>
- <50E48DFD.2030908@mvista.com> <50E52D26.9010004@denx.de>
- <50E56AED.1000509@mvista.com>
- <1357212752.16197.127.camel@shinybook.infradead.org>
-Message-ID: <50E56DDC.8060804@mvista.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 3 Jan 2013 12:43:10 +0100 (CET)
+Subject: =?UTF-8?q?=5BPATCH=20133/493=5D=20remove=20use=20of=20=5F=5Fdevexit=5Fp?=
+In-Reply-To: <1353349642-3677-133-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-133-git-send-email-wfp5p@virginia.edu>
+Message-ID: <Pine.LNX.4.64.1301031235370.17494@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Bill
 
-On 03-01-2013 15:32, David Woodhouse wrote:
+On Mon, 19 Nov 2012, Bill Pemberton wrote:
 
->>>>> +#if defined(CONFIG_OF)
->>>>> +static const struct of_device_id davinci_nand_of_match[] = {
->>>>> +    {.compatible = "ti,davinci-nand", },
->>>>> +    {},
->>>>> +}
->>>>> +MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
+> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
+> needed.
 
->>> Hmm.. maybe this crept in later after I sent the patches? They were
->>> pending for a while ... I compiled it just yet again (based on my
->>> tree when I posted this patch based on commit:
+Doesn't this also make the use of __refdata in many locations like this
 
->>      I've just checked the archives: every patch version you posted had ';'
->> after '}' missing.
+[snip]
 
-> If it was built-in, rather than as a module, then MODULE_DEVICE_TABLE(?)
-> expands to nothing, and the structure gets to use the semicolon from the
-> end of that line.
+> diff --git a/drivers/media/platform/soc_camera/sh_mobile_csi2.c b/drivers/media/platform/soc_camera/sh_mobile_csi2.c
+> index 0528650..0d0344a 100644
+> --- a/drivers/media/platform/soc_camera/sh_mobile_csi2.c
+> +++ b/drivers/media/platform/soc_camera/sh_mobile_csi2.c
+> @@ -382,7 +382,7 @@ static __devexit int sh_csi2_remove(struct platform_device *pdev)
+>  }
+>  
+>  static struct platform_driver __refdata sh_csi2_pdrv = {
+> -	.remove	= __devexit_p(sh_csi2_remove),
+> +	.remove	= sh_csi2_remove,
+>  	.probe	= sh_csi2_probe,
+>  	.driver	= {
+>  		.name	= "sh-mobile-csi2",
 
-    Ah, that explains it: 'davinci_all_defconfig' has 
-CONFIG_MTD_NAND_DAVINCI=m, so that's how the error got triggered at last. 
-Probably worth adding this explanation to the changelog, how do you think?
+superfluous? If so, I'm sure you'd be happy to make a couple more patches 
+to continue this series ;-)
 
-WBR, Sergei
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
