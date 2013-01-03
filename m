@@ -1,20 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 3 Jan 2013 15:14:25 +0800
-Subject: [PATCH v2 2/3] ARM: dts: imx: Add imx51 KPP entry
-In-Reply-To: <1357010475-7331-2-git-send-email-Ying.Liu@freescale.com>
-References: <1357010475-7331-1-git-send-email-Ying.Liu@freescale.com>
- <1357010475-7331-2-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20130103071423.GB2566@S2101-09.ap.freescale.net>
+From: r.sricharan@ti.com (R Sricharan)
+Date: Thu, 3 Jan 2013 12:58:11 +0530
+Subject: [PATCH 1/1] arm :omap :DMA: fix a bug on reserving the omap SDMA
+ channels
+In-Reply-To: <1356813800-4705-1-git-send-email-ahemaily@gmail.com>
+References: <1356813800-4705-1-git-send-email-ahemaily@gmail.com>
+Message-ID: <50E5330B.2060007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 01, 2013 at 11:21:14AM +0800, Liu Ying wrote:
-> 1) Add KPP device node entry.
-> 2) Add one KPP pinctrl entry.
-> 
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+Hi,
 
-Patches #2 and #3 look good to me.  Will apply them after Dmitry
-applies the first one.
+On Sunday 30 December 2012 02:13 AM, ahemaily at gmail.com wrote:
+> From: ahemaily <ahemaily@gmail.com>
+>
+> The variable  dma_lch_count  used for comparison  (omap_dma_reserve_channels <= dma_lch_count)
+> before it initialized to the value from omap_dma_dev_attr : d->lch_count.
+>
+> I change the place of dma_lch_count initialization to be before the comparison.
+>
+> Signed-off-by: Abdelrahman Hemaily <ahemaily@gmail.com>
+> ---
+>   arch/arm/plat-omap/dma.c |    4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+> index c76ed8b..cb3e321 100644
+> --- a/arch/arm/plat-omap/dma.c
+> +++ b/arch/arm/plat-omap/dma.c
+> @@ -2014,12 +2014,12 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
+>
+>   	d			= p->dma_attr;
+>   	errata			= p->errata;
+> -
+> +	dma_lch_count           = d->lch_count;
+> +
+>   	if ((d->dev_caps & RESERVE_CHANNEL) && omap_dma_reserve_channels
+>   			&& (omap_dma_reserve_channels <= dma_lch_count))
+>   		d->lch_count	= omap_dma_reserve_channels;
+>
+> -	dma_lch_count		= d->lch_count;
+    By removing this line, you are effectively not assigning
+    d->lch_count after reserving. So the patch should only change
+    dma_lch_count in the above "if statement" to d->lch_count
 
-Shawn
+Regards,
+  Sricharan
