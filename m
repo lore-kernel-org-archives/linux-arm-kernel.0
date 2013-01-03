@@ -1,24 +1,38 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 03 Jan 2013 10:19:33 -0700
-Subject: [PATCH V2] ARM: tegra30: fix power up sequence for boot_secondary
-In-Reply-To: <1357198291-16500-1-git-send-email-josephl@nvidia.com>
-References: <1357198291-16500-1-git-send-email-josephl@nvidia.com>
-Message-ID: <50E5BDA5.6040505@wwwdotorg.org>
+Date: Thu, 03 Jan 2013 10:29:23 -0700
+Subject: [PATCH 1/2] timer: vt8500: Move system timer to clocksource
+In-Reply-To: <1357183510-8476-2-git-send-email-linux@prisktech.co.nz>
+References: <1357183510-8476-1-git-send-email-linux@prisktech.co.nz>
+ <1357183510-8476-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <50E5BFF3.9060805@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2013 12:31 AM, Joseph Lo wrote:
-> The power up sequence is different on the cold boot CPU and the CPU
-> that resumed from the hotplug. For the cold boot CPU, it was been power
-> gated as default. To power up the cold boot CPU, the power should be
-> un-gated by un toggling the power gate register manually.
+On 01/02/2013 08:25 PM, Tony Prisk wrote:
+> Move mach-vt8500/timer.c to drivers/clocksource/vt8500_timer.c
+> and make necessary changes to Kconfig and Makefile.
 > 
-> For the CPU that resumed from the hotplug, after un-halted the CPU. The
-> flow controller will un-gate the power of the CPU. No need to manually
-> control, just wait the power be resumed and continue the power up
-> sequence after the CPU power is ready.
-> 
-> Based on the work by:
-> Varun Wadekar <vwadekar@nvidia.com>
+> vt8500_timer is moved from vt8500.c to clocksource/vt8500_timer.c
+> and added to common.h for reference from the board descriptor.
 
-Applied to Tegra's for-3.9/soc branch.
+> diff --git a/arch/arm/mach-vt8500/common.h b/arch/arm/mach-vt8500/common.h
+
+> +/* defined in drivers/clocksource/vt8500_timer.c */
+> +extern struct sys_timer vt8500_timer;
+> +void __init vt8500_timer_init(void);
+
+struct sys_timer has been deleted; the patches to do so are in the most
+recent 2 linux-next. Another advantage of this change if your SoC
+supports DT is that you don't need to explicitly prototype a separate
+struct or function per clocksource driver, but board files can simply
+call clocksource_of_init(), and the core code will look up the
+appropriate clocksource driver to initialize using DT.
+
+You can find the series at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+arm-timer-rework
+
+I believe that branch should be stable now unless any bugs are found so
+you can base your changes on it; I plan to send a pull request to
+include that branch in arm-soc tomorrow morning.
