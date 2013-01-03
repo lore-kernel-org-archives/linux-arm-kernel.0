@@ -1,13 +1,13 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jan 2013 13:54:38 +0000
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 03 Jan 2013 07:58:11 -0600
 Subject: arm NO_IRQ = -1 - zynq axi_ethernet driver
 In-Reply-To: <CAHTX3d+dOm2AzK=g_UbEiJ2AQYJNJtfWHXGvrxK1TqM2nmEh7Q@mail.gmail.com>
 References: <CAHTX3d+dOm2AzK=g_UbEiJ2AQYJNJtfWHXGvrxK1TqM2nmEh7Q@mail.gmail.com>
-Message-ID: <20130103135438.GP2631@n2100.arm.linux.org.uk>
+Message-ID: <50E58E73.6070308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 02:47:08PM +0100, Michal Simek wrote:
+On 01/03/2013 07:47 AM, Michal Simek wrote:
 > Hi Grand, Russell, Arnd, Olof and Rob,
 > 
 > I am getting one problem with axi_ethernet driver because I want to remove
@@ -27,7 +27,7 @@ On Thu, Jan 03, 2013 at 02:47:08PM +0100, Michal Simek wrote:
 > #endif
 > to the driver to cover Microblaze case but it will be just workaround.
 > 
-> >From patches description NO_IRQ shouldn't be used by any driver
+> From patches description NO_IRQ shouldn't be used by any driver
 > + from Grant description
 > 
 > "As has been discussed many times[1], Using NO_IRQ set to anything other
@@ -38,9 +38,12 @@ On Thu, Jan 03, 2013 at 02:47:08PM +0100, Michal Simek wrote:
 > [1] http://lkml.org/lkml/2005/11/21/221
 > 
 > Was there any attempt to remove NO_IRQ from ARM?
+> Any problem to do it?
 
-We have been removing it gradually over time.  Any new platform should
-already be using 0 for no IRQ, and the only way to do this is to have
-drivers using NO_IRQ test for irq <= 0.
+It's not removed, but we've trimmed it out of most things. It appears
+that drivers are mostly not using it other than powerpc drivers. It is
+not really necessary to remove it from the arch. Drivers should simply
+check for (irq <= 0) for error cases. I'm not sure if there are any
+platforms left using irq 0 as a valid irq.
 
-Removing NO_IRQ=-1 on a single day is incredibly difficult.
+Rob
