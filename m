@@ -1,35 +1,128 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 3 Jan 2013 17:01:06 +0100
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <201301031556.31618.arnd@arndb.de>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130103143931.GA28451@avionic-0098.adnet.avionic-design.de>
- <201301031556.31618.arnd@arndb.de>
-Message-ID: <20130103160106.GA7086@avionic-0098.adnet.avionic-design.de>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 03 Jan 2013 11:03:58 -0500
+Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
+In-Reply-To: <20130103141301.GQ2631@n2100.arm.linux.org.uk>
+References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+ <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+ <20130103103815.GL2631@n2100.arm.linux.org.uk>
+ <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
+ <1357220165.10284.30.camel@gandalf.local.home>
+ <20130103141301.GQ2631@n2100.arm.linux.org.uk>
+Message-ID: <1357229038.10284.46.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 03:56:31PM +0000, Arnd Bergmann wrote:
-> On Thursday 03 January 2013, Thierry Reding wrote:
-> > Stephen proposed drivers/pci/host on IRC and I second that.
+On Thu, 2013-01-03 at 14:13 +0000, Russell King - ARM Linux wrote:
+
+> > 
+> > Or something similar, if that's what was done.
 > 
-> Agreed, I like that, too. There is a little problem with cross-platform
-> PCI hosts still because some portion of the interface is still arch
-> specific, but I don't see this as a show-stopper for moving drivers
-> there. The ARM specific drivers can still use the ARM interfaces
-> for now, until everything is made generic. If they are going to
-> be shared with other architectures, those can use the same interfaces
-> that ARM has. I think Microblaze, ARC and Metag are strong candidates
-> for doing this.
+> No.  What I want is some evidence that the patch author is not just
+> removing warnings by patching them away, but has thought about why
+> the warning is there, and that they've resolved the issues for why
+> that warning is there - and most importantly why the code is not built
+> in that configuration.
 
-Great, sounds like a plan. I'll move Tegra PCIe into drivers/pci/host
-then.
+OK, I understand you now.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130103/bf0e6ef1/attachment.sig>
+> 
+> The unwinder has many functions, none of which is marked in any way.
+> This is alluded to in this comment:
+> 
+> /*
+>  * return_address uses walk_stackframe to do it's work.  If both
+>  * CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses unwind
+>  * information.  For this to work in the function tracer many functions would
+>  * have to be marked with __notrace.  So for now just depend on
+>  * !CONFIG_ARM_UNWIND.
+>  */
+> 
+> So, what this means is that the function tracer can have hooks in the
+> unwinder code.  If one of those hooks is active, then there's the
+> possibility for recursion.
+
+Note, since this code was written, the function tracer has much better
+recursion protection. If one of the callbacks of the function tracer
+were to call return_address() and it triggered another traced function,
+the function tracer would simply drop it.
+
+Now this isn't true for function graph tracing, at least not for its
+internal use. That would need to be investigated to see if there's calls
+there (I don't see any). From what I see, the return_address() is used
+by ftrace's CALLER_ADDR1-6. These are used by the latency tracers
+(irqsoff, preemptoff) as well as lockdep.
+
+Looking at the code in trace_irqsoff.c (which does both irqsoff and
+preemptoff), it doesn't look as if the function graph callbacks use
+return_address() at all.
+
+The return_address() is used in the management of tracing where the irqs
+and preemption was disabled. Not by the functions called in between.
+
+Looks, like the worse that can happen if we allow using the unwind code
+here, is that we will see the functions it uses in the trace output. I
+don't see where a recursion bug could happen.
+
+But this would need more investigation to be sure.
+
+> 
+> I see no evidence in either of these patches that this issue has been
+> addressed in any way (let alone thought about.)  The approach here seems
+> to be "lets remove the comment, lets change the ifdefs to make the code
+> build, and lets remove the warning".
+> 
+> That's not acceptable.  We don't fix warnings to make them go away while
+> effectively hiding the original problem.
+
+I totally agree with you. But now I'm wondering if the problem exists
+even without these patches.
+
+> > 
+> > 
+> > > 
+> > > diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+> > > index 00df012..52ff2d4 100644
+> > > --- a/arch/arm/kernel/unwind.c
+> > > +++ b/arch/arm/kernel/unwind.c
+> > > @@ -327,7 +327,7 @@ static int unwind_exec_insn(struct
+> > > unwind_ctrl_block *ctrl)
+> > >   * Unwind a single frame starting with *sp for the symbol at *pc. It
+> > >   * updates the *pc and *sp with the new values.
+> > >   */
+> > > -int unwind_frame(struct stackframe *frame)
+> > > +int notrace unwind_frame(struct stackframe *frame)
+> > >  {
+> > >         unsigned long high, low;
+> > >         const struct unwind_idx *idx;
+> > > 
+> 
+> And what about search_index(), unwind_find_origin(), unwind_find_idx(),
+> unwind_get_byte(), unwind_exec_insn(), pr_debug(), pr_warning()?  Maybe
+> the compiler currently inlines all those functions, but todays compiler
+> behaviour is no guarantee of tomorrow's compiler behaviour.  We'd also
+> hope that list_move() would always be inlined and never traced.
+
+Some would definitely be traced. Note, that the "inline" keyword adds
+'notrace' now to remove those ambiguous cases.
+
+> 
+> It is possible that the ftrace code has some re-entrancy protection to
+> prevent the unwinder recursing back into the ftrace code, but that's not
+> mentioned in this patch... so it could be that needs to be explained.
+
+Function tracing does, and to the most extent so does function graph
+tracing as long as the return_address() isn't used internally. Looking
+at the code, I don't see where it is.
+
+> 
+> In summary, from what I can see in the patch, the reason why the ifdefs
+> are the way they are, and the reason the warning is there has not been
+> addressed; these patches just seem to be aimed just at removing a #warning
+> statement to make the warning go away.
+
+You're correct that this patch does not solve any of theses issues. Now,
+I'm thinking that ftrace has matured where these issues don't exist, and
+where they do, it will only cause noise in the trace than anything
+serious. But, this needs to be looked deeper to make sure.
+
+-- Steve
