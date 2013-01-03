@@ -1,21 +1,25 @@
-From: pengw@nvidia.com (Peng Wu)
-Date: Wed, 2 Jan 2013 16:16:59 -0800
-Subject: [PATCH 1/2] ARM: DT: tegra: Add board level compatible properties
-In-Reply-To: <50E4CD40.10903@wwwdotorg.org>
-References: <1357170831-7836-1-git-send-email-pengw@nvidia.com>
- <50E4CB34.6070205@wwwdotorg.org> <50E4CCB3.2040704@nvidia.com>
- <50E4CD40.10903@wwwdotorg.org>
-Message-ID: <50E4CDFB.6010301@nvidia.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 02 Jan 2013 16:41:00 -0800
+Subject: Fw: [PATCH 01/01] arm: fix a preempt_count() corruption for
+ CONFIG_PREEMPT=n
+In-Reply-To: <20121219000139.GV14363@n2100.arm.linux.org.uk>
+References: <20121215085129.71d203b2.pkluba@dension.com>
+ <50D10224.30600@codeaurora.org>
+ <20121219000139.GV14363@n2100.arm.linux.org.uk>
+Message-ID: <50E4D39C.1030001@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2013 04:13 PM, Stephen Warren wrote:
->>> Do you have any idea when SATA support could be added?
->> Oh, do you have SATA driver merged into upstream yet?
-> The driver isn't there yet, but it'd be great to add it.
+On 12/18/12 16:01, Russell King - ARM Linux wrote:
+> On Tue, Dec 18, 2012 at 03:54:12PM -0800, Stephen Boyd wrote:
+>> Can you try this patch? I'll probably send a follow up patch that
+>> consolidates the duplicated preempt_decrement code into some assembly
+>> macro. We may also want to fix it up so that assembly stubs call into
+>> the preempt tracer. I'm not sure how that works right now with VFP.
+> This looks like a sensible fix to me - once tested of course.
 
-SATA looks like share some code like clock with PCI-E, I think we are 
-working on upstream PCI-E driver. Anyway, I will look at this.
+Kluba, did the patch work for you?
 
-Thanks,
--Bryan
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
