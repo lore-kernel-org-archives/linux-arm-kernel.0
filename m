@@ -1,91 +1,34 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 3 Jan 2013 14:27:35 -0200
-Subject: [PATCH v2] ARM: mx25pdk: Add device tree support
-Message-ID: <1357230455-12690-1-git-send-email-fabio.estevam@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jan 2013 16:23:59 +0000
+Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
+In-Reply-To: <1357229038.10284.46.camel@gandalf.local.home>
+References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+ <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+ <20130103103815.GL2631@n2100.arm.linux.org.uk>
+ <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
+ <1357220165.10284.30.camel@gandalf.local.home>
+ <20130103141301.GQ2631@n2100.arm.linux.org.uk>
+ <1357229038.10284.46.camel@gandalf.local.home>
+Message-ID: <20130103162359.GR2631@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic device tree support for mx25pdk board.
+On Thu, Jan 03, 2013 at 11:03:58AM -0500, Steven Rostedt wrote:
+> On Thu, 2013-01-03 at 14:13 +0000, Russell King - ARM Linux wrote:
+> > In summary, from what I can see in the patch, the reason why the ifdefs
+> > are the way they are, and the reason the warning is there has not been
+> > addressed; these patches just seem to be aimed just at removing a #warning
+> > statement to make the warning go away.
+> 
+> You're correct that this patch does not solve any of theses issues. Now,
+> I'm thinking that ftrace has matured where these issues don't exist, and
+> where they do, it will only cause noise in the trace than anything
+> serious. But, this needs to be looked deeper to make sure.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Follow the new dt style and rebased against Shawn's imx/dt tree.
+Looking back in the archives, it seems that we had a problem with ftrace
+and the unwinder polluting the trace information:
 
- Documentation/devicetree/bindings/arm/fsl.txt |    4 +++
- arch/arm/boot/dts/Makefile                    |    1 +
- arch/arm/boot/dts/imx25-pdk.dts               |   36 +++++++++++++++++++++++++
- 3 files changed, 41 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx25-pdk.dts
+http://lists.arm.linux.org.uk/lurker/message/20090604.201745.1c41ee6c.en.html
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index 4c25c98..e935d7d 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -5,6 +5,10 @@ i.MX23 Evaluation Kit
- Required root node properties:
-     - compatible = "fsl,imx23-evk", "fsl,imx23";
- 
-+i.MX25 Product Development Kit
-+Required root node properties:
-+    - compatible = "fsl,imx25-pdk", "fsl,imx25";
-+
- i.MX27 Product Development Kit
- Required root node properties:
-     - compatible = "fsl,imx27-pdk", "fsl,imx27";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e3ae5e2..ffcdb61 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -81,6 +81,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-xp-openblocks-ax3-4.dtb
- dtb-$(CONFIG_ARCH_MXC) += \
- 	imx25-karo-tx25.dtb \
-+	imx25-pdk.dtb \
- 	imx27-apf27.dtb \
- 	imx27-pdk.dtb \
- 	imx31-bug.dtb \
-diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-new file mode 100644
-index 0000000..b430ed7
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-pdk.dts
-@@ -0,0 +1,36 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "imx25.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX25 Product Development Kit";
-+	compatible = "fsl,imx25-pdk", "fsl,imx25";
-+
-+	memory {
-+		reg = <0x80000000 0x4000000>;
-+	};
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&fec {
-+	status = "okay";
-+	phy-mode = "rmii";
-+};
-+
-+&nfc {
-+	nand-on-flash-bbt;
-+	status = "okay";
-+};
--- 
-1.7.9.5
+There's quite a bit of discussion in that thread about this which details
+why we came up with what we have today.
