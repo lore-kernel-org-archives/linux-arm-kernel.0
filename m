@@ -1,59 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 3 Jan 2013 22:03:54 +0000
-Subject: [PATCH v4 05/19] ARM: GIC: remove direct use of gic_raise_softirq
-In-Reply-To: <50E5E74C.20008@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 03 Jan 2013 16:04:59 -0600
+Subject: [PATCH v4 09/19] ARM: use common irqchip_init for GIC init
+In-Reply-To: <201301032141.19568.arnd@arndb.de>
 References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-6-git-send-email-robherring2@gmail.com>
- <50E5E74C.20008@wwwdotorg.org>
-Message-ID: <201301032203.54267.arnd@arndb.de>
+ <1357235668-9450-10-git-send-email-robherring2@gmail.com>
+ <201301032141.19568.arnd@arndb.de>
+Message-ID: <50E6008B.7050303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 January 2013, Stephen Warren wrote:
-> On 01/03/2013 10:54 AM, Rob Herring wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > In preparation of moving gic code to drivers/irqchip, remove the direct
-> > platform dependencies on gic_raise_softirq. Move the setup of
-> > smp_cross_call into the gic code and use arch_send_wakeup_ipi_mask
-> > function to trigger wake-up IPIs.
+On 01/03/2013 03:41 PM, Arnd Bergmann wrote:
+> On Thursday 03 January 2013, Rob Herring wrote:
+>> @@ -637,8 +638,6 @@ static int __init combiner_of_init(struct device_node *np,
+>>  }
+>>  
+>>  static const struct of_device_id exynos_dt_irq_match[] = {
+>> -       { .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+>> -       { .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
+>>         { .compatible = "samsung,exynos4210-combiner",
+>>                         .data = combiner_of_init, },
+>>         {},
+>> @@ -654,8 +653,10 @@ void __init exynos4_init_irq(void)
+>>         if (!of_have_populated_dt())
+>>                 gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU, gic_bank_offset, NULL);
+>>  #ifdef CONFIG_OF
+>> -       else
+>> +       else {
+>> +               irqchip_init();
+>>                 of_irq_init(exynos_dt_irq_match);
+>> +       }
+>>  #endif
 > 
-> For all the Tegra-related parts,
-> Acked-by: Stephen Warren <swarren@nvidia.com>
-> 
-> Will this series be put into an arm-soc (or other stable) branch that I
-> can pull into any Tegra branches in case there are any merge conflicts?
+> Is this an equivalent change? I thought you are supposed to call of_irq_init
+> only once so it can see the entire hierarchy. Or is it ok as long as the
+> top-level controllers are probed first?
 
-Yes, I think we should have it in arm-soc, there would be a lot of
-nasty conflicts otherwise.
+Yes, it is equivalent as the GIC will be initialized first. Ideally,
+this the exynos controller needs to be moved to drivers/irqchip as well
+and this can be removed, but I can't have all the fun.
 
-It probably makes sense to also have it in the tip tree if since
-Thomas Gleixner as the IRQ maintainer is the owner of this subsystem,
-unless he has other preferences.
-
-I would also suggest adding the patch below to the series. Note that
-I don't care who is maintaining drivers/irqchip, and Rob might want
-to be listed as well, but Thomas mentioned a couple of months ago
-that he wanted to get Cc'd on irqchip drivers patches.
-
-8<-----
-irqchip: add MAINTAINERS entry for drivers/irqchip
-
-The drivers/irqchip directory now contains generic irqchip drivers,
-so it makes sense to add them to the MAINTAINERS entry for the
-IRQ subsystem.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4e2a1f6..a828240 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4185,6 +4185,7 @@ M:	Thomas Gleixner <tglx@linutronix.de>
- S:	Maintained
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git irq/core
- F:	kernel/irq/
-+F:	drivers/irqchip/
- 
- IRQ DOMAINS (IRQ NUMBER MAPPING LIBRARY)
- M:	Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Rob
