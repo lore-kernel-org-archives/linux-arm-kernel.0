@@ -1,273 +1,202 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  3 Jan 2013 11:54:28 -0600
-Subject: [PATCH v4 19/19] irqchip: Move ARM vic.h to
- include/linux/irqchip/arm-vic.h
+Date: Thu,  3 Jan 2013 11:54:26 -0600
+Subject: [PATCH v4 17/19] ARM: spear: use common irqchip_init function
 In-Reply-To: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
 References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1357235668-9450-20-git-send-email-robherring2@gmail.com>
+Message-ID: <1357235668-9450-18-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Now that we have VIC moved to drivers/irqchip and all VIC DT init for
-platforms using irqchip_init, move gic.h and update the remaining
-includes.
+Convert spear DT irq initialization over to use common irqchip_init
+function.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
+Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: Shiraz Hashim <shiraz.hashim@st.com>
+Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-ep93xx/core.c                                         |    3 +--
- arch/arm/mach-netx/generic.c                                        |    2 +-
- arch/arm/mach-nomadik/cpu-8815.c                                    |    2 +-
- arch/arm/mach-s3c64xx/common.c                                      |    2 +-
- arch/arm/mach-s3c64xx/include/mach/regs-irq.h                       |    1 -
- arch/arm/mach-s3c64xx/include/mach/tick.h                           |    2 ++
- arch/arm/mach-s5p64x0/include/mach/regs-irq.h                       |    1 -
- arch/arm/mach-s5pc100/include/mach/regs-irq.h                       |    1 -
- arch/arm/mach-s5pc100/include/mach/tick.h                           |    2 ++
- arch/arm/mach-u300/core.c                                           |    2 +-
- arch/arm/mach-versatile/core.c                                      |    2 +-
- arch/arm/plat-samsung/s5p-irq-eint.c                                |    2 --
- arch/arm/plat-samsung/s5p-irq.c                                     |    3 +--
- drivers/irqchip/irq-vic.c                                           |    2 +-
- .../include/asm/hardware/vic.h => include/linux/irqchip/arm-vic.h   |    1 -
- 15 files changed, 12 insertions(+), 16 deletions(-)
- rename arch/arm/include/asm/hardware/vic.h => include/linux/irqchip/arm-vic.h (94%)
+ arch/arm/mach-spear3xx/include/mach/generic.h |    1 -
+ arch/arm/mach-spear3xx/spear300.c             |    3 ++-
+ arch/arm/mach-spear3xx/spear310.c             |    3 ++-
+ arch/arm/mach-spear3xx/spear320.c             |    3 ++-
+ arch/arm/mach-spear3xx/spear3xx.c             |   16 ----------------
+ arch/arm/mach-spear6xx/spear6xx.c             |   15 ++-------------
+ drivers/irqchip/spear-shirq.c                 |    3 +++
+ 7 files changed, 11 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index e85bf17..c533f37 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -34,6 +34,7 @@
- #include <linux/i2c-gpio.h>
- #include <linux/spi/spi.h>
- #include <linux/export.h>
-+#include <linux/irqchip/arm-vic.h>
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index ce19113..c26b7a4 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -30,7 +30,6 @@ extern struct pl08x_platform_data pl080_plat_data;
+ void __init spear_setup_of_timer(void);
+ void __init spear3xx_clk_init(void);
+ void __init spear3xx_map_io(void);
+-void __init spear3xx_dt_init_irq(void);
  
- #include <mach/hardware.h>
- #include <linux/platform_data/video-ep93xx.h>
-@@ -44,8 +45,6 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
+ void spear_restart(char, const char *);
  
--#include <asm/hardware/vic.h>
--
- #include "soc.h"
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index 7a11d85..499479b 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -14,6 +14,7 @@
+ #define pr_fmt(fmt) "SPEAr300: " fmt
  
- /*************************************************************************
-diff --git a/arch/arm/mach-netx/generic.c b/arch/arm/mach-netx/generic.c
-index aa62746..27c2cb7 100644
---- a/arch/arm/mach-netx/generic.c
-+++ b/arch/arm/mach-netx/generic.c
-@@ -23,9 +23,9 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
-+#include <linux/irqchip/arm-vic.h>
- #include <mach/hardware.h>
- #include <asm/mach/map.h>
--#include <asm/hardware/vic.h>
- #include <mach/netx-regs.h>
- #include <asm/mach/irq.h>
- 
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 1273931..3514046 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -25,13 +25,13 @@
- #include <linux/slab.h>
- #include <linux/irq.h>
- #include <linux/dma-mapping.h>
-+#include <linux/irqchip/arm-vic.h>
- #include <linux/platform_data/clk-nomadik.h>
- #include <linux/platform_data/pinctrl-nomadik.h>
- 
- #include <mach/hardware.h>
- #include <mach/irqs.h>
- #include <asm/mach/map.h>
--#include <asm/hardware/vic.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index aef303b..0b9c0ba 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -25,10 +25,10 @@
- #include <linux/dma-mapping.h>
- #include <linux/irq.h>
- #include <linux/gpio.h>
-+#include <linux/irqchip/arm-vic.h>
- 
+ #include <linux/amba/pl08x.h>
++#include <linux/irqchip.h>
+ #include <linux/of_platform.h>
  #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <asm/hardware/vic.h>
- #include <asm/system_misc.h>
+ #include <mach/generic.h>
+@@ -211,7 +212,7 @@ static void __init spear300_map_io(void)
  
- #include <mach/map.h>
-diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-irq.h b/arch/arm/mach-s3c64xx/include/mach/regs-irq.h
-index bcce68a..6a11278 100644
---- a/arch/arm/mach-s3c64xx/include/mach/regs-irq.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/regs-irq.h
-@@ -15,6 +15,5 @@
- #ifndef __ASM_ARCH_REGS_IRQ_H
- #define __ASM_ARCH_REGS_IRQ_H __FILE__
+ DT_MACHINE_START(SPEAR300_DT, "ST SPEAr300 SoC with Flattened Device Tree")
+ 	.map_io		=	spear300_map_io,
+-	.init_irq	=	spear3xx_dt_init_irq,
++	.init_irq	=	irqchip_init,
+ 	.timer		=	&spear3xx_timer,
+ 	.init_machine	=	spear300_dt_init,
+ 	.restart	=	spear_restart,
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index 9719f83..367d9be 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -15,6 +15,7 @@
  
--#include <asm/hardware/vic.h>
- 
- #endif /* __ASM_ARCH_6400_REGS_IRQ_H */
-diff --git a/arch/arm/mach-s3c64xx/include/mach/tick.h b/arch/arm/mach-s3c64xx/include/mach/tick.h
-index ebe18a9..db9c1b1 100644
---- a/arch/arm/mach-s3c64xx/include/mach/tick.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/tick.h
-@@ -15,6 +15,8 @@
- #ifndef __ASM_ARCH_TICK_H
- #define __ASM_ARCH_TICK_H __FILE__
- 
-+#include <linux/irqchip/arm-vic.h>
-+
- /* note, the timer interrutps turn up in 2 places, the vic and then
-  * the timer block. We take the VIC as the base at the moment.
-  */
-diff --git a/arch/arm/mach-s5p64x0/include/mach/regs-irq.h b/arch/arm/mach-s5p64x0/include/mach/regs-irq.h
-index 4aaebda..d60397d 100644
---- a/arch/arm/mach-s5p64x0/include/mach/regs-irq.h
-+++ b/arch/arm/mach-s5p64x0/include/mach/regs-irq.h
-@@ -13,7 +13,6 @@
- #ifndef __ASM_ARCH_REGS_IRQ_H
- #define __ASM_ARCH_REGS_IRQ_H __FILE__
- 
--#include <asm/hardware/vic.h>
- #include <mach/map.h>
- 
- #endif /* __ASM_ARCH_REGS_IRQ_H */
-diff --git a/arch/arm/mach-s5pc100/include/mach/regs-irq.h b/arch/arm/mach-s5pc100/include/mach/regs-irq.h
-index 4d9036d..7616278 100644
---- a/arch/arm/mach-s5pc100/include/mach/regs-irq.h
-+++ b/arch/arm/mach-s5pc100/include/mach/regs-irq.h
-@@ -14,6 +14,5 @@
- #define __ASM_ARCH_REGS_IRQ_H __FILE__
- 
- #include <mach/map.h>
--#include <asm/hardware/vic.h>
- 
- #endif /* __ASM_ARCH_REGS_IRQ_H */
-diff --git a/arch/arm/mach-s5pc100/include/mach/tick.h b/arch/arm/mach-s5pc100/include/mach/tick.h
-index 20f6873..0af8e41 100644
---- a/arch/arm/mach-s5pc100/include/mach/tick.h
-+++ b/arch/arm/mach-s5pc100/include/mach/tick.h
-@@ -15,6 +15,8 @@
- #ifndef __ASM_ARCH_TICK_H
- #define __ASM_ARCH_TICK_H __FILE__
- 
-+#include <linux/irqchip/arm-vic.h>
-+
- /* note, the timer interrutps turn up in 2 places, the vic and then
-  * the timer block. We take the VIC as the base at the moment.
-  */
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index a9d3bcf..26b48fa 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -31,11 +31,11 @@
- #include <linux/dma-mapping.h>
- #include <linux/platform_data/clk-u300.h>
- #include <linux/platform_data/pinctrl-coh901.h>
-+#include <linux/irqchip/arm-vic.h>
- 
- #include <asm/types.h>
- #include <asm/setup.h>
- #include <asm/memory.h>
--#include <asm/hardware/vic.h>
- #include <asm/mach/map.h>
- #include <asm/mach-types.h>
+ #include <linux/amba/pl08x.h>
+ #include <linux/amba/serial.h>
++#include <linux/irqchip.h>
+ #include <linux/of_platform.h>
  #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 5d59294..49ac384 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -32,6 +32,7 @@
- #include <linux/amba/mmci.h>
+ #include <mach/generic.h>
+@@ -253,7 +254,7 @@ static void __init spear310_map_io(void)
+ 
+ DT_MACHINE_START(SPEAR310_DT, "ST SPEAr310 SoC with Flattened Device Tree")
+ 	.map_io		=	spear310_map_io,
+-	.init_irq	=	spear3xx_dt_init_irq,
++	.init_irq	=	irqchip_init,
+ 	.timer		=	&spear3xx_timer,
+ 	.init_machine	=	spear310_dt_init,
+ 	.restart	=	spear_restart,
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index 3a22d842..34c212e 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -16,6 +16,7 @@
  #include <linux/amba/pl022.h>
- #include <linux/io.h>
-+#include <linux/irqchip/arm-vic.h>
- #include <linux/irqchip/versatile-fpga.h>
- #include <linux/gfp.h>
- #include <linux/clkdev.h>
-@@ -40,7 +41,6 @@
- #include <asm/irq.h>
- #include <asm/hardware/arm_timer.h>
- #include <asm/hardware/icst.h>
--#include <asm/hardware/vic.h>
- #include <asm/mach-types.h>
- 
+ #include <linux/amba/pl08x.h>
+ #include <linux/amba/serial.h>
++#include <linux/irqchip.h>
+ #include <linux/of_platform.h>
  #include <asm/mach/arch.h>
-diff --git a/arch/arm/plat-samsung/s5p-irq-eint.c b/arch/arm/plat-samsung/s5p-irq-eint.c
-index 974bf98..faa6516 100644
---- a/arch/arm/plat-samsung/s5p-irq-eint.c
-+++ b/arch/arm/plat-samsung/s5p-irq-eint.c
-@@ -17,8 +17,6 @@
- #include <linux/gpio.h>
- #include <linux/irqchip/arm-vic.h>
+ #include <mach/generic.h>
+@@ -267,7 +268,7 @@ static void __init spear320_map_io(void)
  
--#include <asm/hardware/vic.h>
--
- #include <plat/regs-irqtype.h>
+ DT_MACHINE_START(SPEAR320_DT, "ST SPEAr320 SoC with Flattened Device Tree")
+ 	.map_io		=	spear320_map_io,
+-	.init_irq	=	spear3xx_dt_init_irq,
++	.init_irq	=	irqchip_init,
+ 	.timer		=	&spear3xx_timer,
+ 	.init_machine	=	spear320_dt_init,
+ 	.restart	=	spear_restart,
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index 38fe95d..c6003ef 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -15,11 +15,8 @@
  
- #include <mach/map.h>
-diff --git a/arch/arm/plat-samsung/s5p-irq.c b/arch/arm/plat-samsung/s5p-irq.c
-index dfb47d6..103e371 100644
---- a/arch/arm/plat-samsung/s5p-irq.c
-+++ b/arch/arm/plat-samsung/s5p-irq.c
-@@ -13,8 +13,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
+ #include <linux/amba/pl022.h>
+ #include <linux/amba/pl08x.h>
+-#include <linux/irqchip/spear-shirq.h>
+-#include <linux/of_irq.h>
  #include <linux/io.h>
+ #include <asm/hardware/pl080.h>
+-#include <asm/hardware/vic.h>
+ #include <plat/pl080.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+@@ -119,16 +116,3 @@ static void __init spear3xx_timer_init(void)
+ struct sys_timer spear3xx_timer = {
+ 	.init = spear3xx_timer_init,
+ };
 -
+-static const struct of_device_id vic_of_match[] __initconst = {
+-	{ .compatible = "arm,pl190-vic", .data = vic_of_init, },
+-	{ .compatible = "st,spear300-shirq", .data = spear300_shirq_of_init, },
+-	{ .compatible = "st,spear310-shirq", .data = spear310_shirq_of_init, },
+-	{ .compatible = "st,spear320-shirq", .data = spear320_shirq_of_init, },
+-	{ /* Sentinel */ }
+-};
+-
+-void __init spear3xx_dt_init_irq(void)
+-{
+-	of_irq_init(vic_of_match);
+-}
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index 9d81068..3f6fac0 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -16,12 +16,11 @@
+ #include <linux/amba/pl08x.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
++#include <linux/irqchip.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+-#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <asm/hardware/pl080.h>
 -#include <asm/hardware/vic.h>
-+#include <linux/irqchip/arm-vic.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+ #include <asm/mach/map.h>
+@@ -425,19 +424,9 @@ static const char *spear600_dt_board_compat[] = {
+ 	NULL
+ };
  
- #include <mach/map.h>
- #include <plat/regs-timer.h>
-diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-index 554deaf..1fc2578 100644
---- a/drivers/irqchip/irq-vic.c
-+++ b/drivers/irqchip/irq-vic.c
-@@ -30,10 +30,10 @@
- #include <linux/syscore_ops.h>
- #include <linux/device.h>
- #include <linux/amba/bus.h>
-+#include <linux/irqchip/arm-vic.h>
+-static const struct of_device_id vic_of_match[] __initconst = {
+-	{ .compatible = "arm,pl190-vic", .data = vic_of_init, },
+-	{ /* Sentinel */ }
+-};
+-
+-static void __init spear6xx_dt_init_irq(void)
+-{
+-	of_irq_init(vic_of_match);
+-}
+-
+ DT_MACHINE_START(SPEAR600_DT, "ST SPEAr600 (Flattened Device Tree)")
+ 	.map_io		=	spear6xx_map_io,
+-	.init_irq	=	spear6xx_dt_init_irq,
++	.init_irq	=	irqchip_init,
+ 	.timer		=	&spear6xx_timer,
+ 	.init_machine	=	spear600_dt_init,
+ 	.restart	=	spear_restart,
+diff --git a/drivers/irqchip/spear-shirq.c b/drivers/irqchip/spear-shirq.c
+index 80e1d2f..9011b2e 100644
+--- a/drivers/irqchip/spear-shirq.c
++++ b/drivers/irqchip/spear-shirq.c
+@@ -300,6 +300,7 @@ int __init spear300_shirq_of_init(struct device_node *np,
+ 	return shirq_init(spear300_shirq_blocks,
+ 			ARRAY_SIZE(spear300_shirq_blocks), np);
+ }
++IRQCHIP_DECLARE(spear300_shirq, "st,spear300-shirq", spear300_shirq_of_init);
  
- #include <asm/exception.h>
- #include <asm/mach/irq.h>
--#include <asm/hardware/vic.h>
+ int __init spear310_shirq_of_init(struct device_node *np,
+ 		struct device_node *parent)
+@@ -307,6 +308,7 @@ int __init spear310_shirq_of_init(struct device_node *np,
+ 	return shirq_init(spear310_shirq_blocks,
+ 			ARRAY_SIZE(spear310_shirq_blocks), np);
+ }
++IRQCHIP_DECLARE(spear310_shirq, "st,spear310-shirq", spear310_shirq_of_init);
  
- #include "irqchip.h"
- 
-diff --git a/arch/arm/include/asm/hardware/vic.h b/include/linux/irqchip/arm-vic.h
-similarity index 94%
-rename from arch/arm/include/asm/hardware/vic.h
-rename to include/linux/irqchip/arm-vic.h
-index de7aad1..e3c82dc 100644
---- a/arch/arm/include/asm/hardware/vic.h
-+++ b/include/linux/irqchip/arm-vic.h
-@@ -32,6 +32,5 @@ struct pt_regs;
- void __vic_init(void __iomem *base, int irq_start, u32 vic_sources,
- 		u32 resume_sources, struct device_node *node);
- void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
--int vic_of_init(struct device_node *node, struct device_node *parent);
- 
- #endif
+ int __init spear320_shirq_of_init(struct device_node *np,
+ 		struct device_node *parent)
+@@ -314,3 +316,4 @@ int __init spear320_shirq_of_init(struct device_node *np,
+ 	return shirq_init(spear320_shirq_blocks,
+ 			ARRAY_SIZE(spear320_shirq_blocks), np);
+ }
++IRQCHIP_DECLARE(spear320_shirq, "st,spear320-shirq", spear320_shirq_of_init);
 -- 
 1.7.10.4
