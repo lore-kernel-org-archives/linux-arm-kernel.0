@@ -1,35 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 3 Jan 2013 16:35:36 +0800
-Subject: [PATCH] Add apf51 basic support
-In-Reply-To: <20121219203936.GG26326@pengutronix.de>
-References: <1355694591-7084-1-git-send-email-laurent.cans@gmail.com>
- <20121219203936.GG26326@pengutronix.de>
-Message-ID: <20130103083534.GD2566@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 3 Jan 2013 14:08:34 +0530
+Subject: [PATCH 1/1] arm :omap :DMA: fix a bug on reserving the omap SDMA
+ channels
+In-Reply-To: <50E5330B.2060007@ti.com>
+References: <1356813800-4705-1-git-send-email-ahemaily@gmail.com>
+ <50E5330B.2060007@ti.com>
+Message-ID: <50E5438A.1050902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 09:39:36PM +0100, Sascha Hauer wrote:
-> On Sun, Dec 16, 2012 at 10:49:51PM +0100, Laurent Cans wrote:
-> > Signed-off-by: Laurent Cans <laurent.cans@gmail.com>
-> > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> > ---
-> > +	clocks {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		ckih1 {
-> > +			compatible = "fsl,imx-ckih1", "fixed-clock";
-> > +			clock-frequency = <0>;
-> > +		};
-> > +
-> > +		osc {
-> > +			compatible = "fsl,imx-osc", "fixed-clock";
-> > +			clock-frequency = <33554432>;
-> > +		};
-> 
-> These compatible properties shouldn't be necessary, right?
-> 
-Use node path instead?  But imx51 clock driver is already using
-compatible property to identify the clocks.
+On Thursday 03 January 2013 12:58 PM, R Sricharan wrote:
+> Hi,
+>
+> On Sunday 30 December 2012 02:13 AM, ahemaily at gmail.com wrote:
+>> From: ahemaily <ahemaily@gmail.com>
+>>
+>> The variable  dma_lch_count  used for comparison
+>> (omap_dma_reserve_channels <= dma_lch_count)
+>> before it initialized to the value from omap_dma_dev_attr : d->lch_count.
+>>
+>> I change the place of dma_lch_count initialization to be before the
+>> comparison.
+>>
+>> Signed-off-by: Abdelrahman Hemaily <ahemaily@gmail.com>
+>> ---
+>>   arch/arm/plat-omap/dma.c |    4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+>> index c76ed8b..cb3e321 100644
+>> --- a/arch/arm/plat-omap/dma.c
+>> +++ b/arch/arm/plat-omap/dma.c
+>> @@ -2014,12 +2014,12 @@ static int __devinit
+>> omap_system_dma_probe(struct platform_device *pdev)
+>>
+>>       d            = p->dma_attr;
+>>       errata            = p->errata;
+>> -
+>> +    dma_lch_count           = d->lch_count;
+>> +
+>>       if ((d->dev_caps & RESERVE_CHANNEL) && omap_dma_reserve_channels
+>>               && (omap_dma_reserve_channels <= dma_lch_count))
+>>           d->lch_count    = omap_dma_reserve_channels;
+>>
+>> -    dma_lch_count        = d->lch_count;
+>     By removing this line, you are effectively not assigning
+>     d->lch_count after reserving. So the patch should only change
+>     dma_lch_count in the above "if statement" to d->lch_count
+>
+You are right. I missed it in last review. Below should be enough.
 
-Shawn
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index 37a488a..555ff7b 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -2019,7 +2019,7 @@ static int __devinit omap_system_dma_probe(struct 
+platform_device *pdev)
+  	errata			= p->errata;
+
+  	if ((d->dev_caps & RESERVE_CHANNEL) && omap_dma_reserve_channels
+-			&& (omap_dma_reserve_channels <= dma_lch_count))
++			&& (omap_dma_reserve_channels <= d->lch_coun))
+  		d->lch_count	= omap_dma_reserve_channels;
+
+  	dma_lch_count		= d->lch_count;
