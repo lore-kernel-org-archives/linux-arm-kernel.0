@@ -1,35 +1,164 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 3 Jan 2013 13:52:53 -0600
-Subject: [PATCH v4 19/19] irqchip: Move ARM vic.h to
- include/linux/irqchip/arm-vic.h
-In-Reply-To: <1357235668-9450-20-git-send-email-robherring2@gmail.com>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-20-git-send-email-robherring2@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F00206D69AB480@AUSP01VMBX24.collaborationhost.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Jan 2013 12:15:21 -0800
+Subject: [PATCH 6/8] ARM: OMAP2+: Disable code that currently does not
+ work with multiplaform
+In-Reply-To: <20121219192627.22098.10760.stgit@muffinssi.local>
+References: <20121219192354.22098.33408.stgit@muffinssi.local>
+ <20121219192627.22098.10760.stgit@muffinssi.local>
+Message-ID: <20130103201521.GI25633@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, January 03, 2013 10:54 AM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Now that we have VIC moved to drivers/irqchip and all VIC DT init for
-> platforms using irqchip_init, move gic.h and update the remaining
-> includes.
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: linux-samsung-soc at vger.kernel.org
-> ---
->  arch/arm/mach-ep93xx/core.c                                         |    3 +--
+Hi all,
 
-For ep93xx:
+Looks like we need to also disable mailbox to avoid dependencies to
+the mailbox series as it's being moved to live under drivers.
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+And we need to disable omap3isp as it tries to use the now private
+include <plat/*.h> headers.
+
+Updated patch below.
+
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 2 Jan 2013 10:24:09 -0800
+Subject: [PATCH] ARM: OMAP2+: Disable code that currently does not work with multiplaform
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+We still need to fix up few places for multiplatform support,
+but that can proceed separately. Fix the issue by making the
+problem drivers depends !ARCH_MULTIPLATFORM for now.
+
+The remaining pieces that are not multiplatform compatible
+for omap2+ SoCs are:
+
+1. Some drivers are using custom omap_dm_timer calls
+
+There are two drivers that are directly usign omap hardware
+timers for PWM and DSP clocking: drivers/media/rc/ir-rx51.c and
+drivers/staging/tidspbridge/core/dsp-clock.c. These can be
+fixed for multiplatform by allowing a minimal set of hardware
+timers to be accessed, and for some functionality by using the
+hrtimer framework.
+
+2. Hardware OMAP4_ERRATA_I688 needs to be fixed up
+
+This can't be enabled for multiplatform configurations in
+it's current form. It may be possible to fix it up to do
+instruction replacement early on during init. Luckily it
+looks like this errata does not seem to get hit with
+mainline kernel code alone at least currently.
+
+3. Legacy header needed for omap-sham.c
+
+Looks like it still needs mach/irqs.h for omap1 that
+does not exist for multiplatform systems. Just ifdef
+it for now.
+
+4. Mailbox is waiting to get moved to drivers
+
+Disable it for now to avoid adding a dependency to the
+mailbox patches.
+
+5. Camera omap3isp needs to be disabled
+
+The include <plat/*.h> files won't be available to drivers
+after multiplatform support is enabled.
+
+Cc: Timo Kokkonen <timo.t.kokkonen@iki.fi>
+Cc: Sean Young <sean@mess.org>
+Cc: "V?ctor Manuel J?quez Leal" <vjaquez@igalia.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: Omar Ramirez Luna <omar.ramirez@ti.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+[tony at atomide.com: updated to disable mailbox and omap3isp]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 41b581f..492d764 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -397,7 +397,7 @@ config OMAP3_SDRC_AC_TIMING
+ 
+ config OMAP4_ERRATA_I688
+ 	bool "OMAP4 errata: Async Bridge Corruption"
+-	depends on ARCH_OMAP4
++	depends on ARCH_OMAP4 && !ARCH_MULTIPLATFORM
+ 	select ARCH_HAS_BARRIERS
+ 	help
+ 	  If a data is stalled inside asynchronous bridge because of back
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index 665870d..03f1252 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -118,7 +118,7 @@ config OMAP_MUX_WARNINGS
+ 
+ config OMAP_MBOX_FWK
+ 	tristate "Mailbox framework support"
+-	depends on ARCH_OMAP
++	depends on ARCH_OMAP && !ARCH_MULTIPLATFORM
+ 	help
+ 	  Say Y here if you want to use OMAP Mailbox framework support for
+ 	  DSP, IVA1.0 and IVA2 in OMAP1/2/3.
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index 1d75e6f..d65f22c 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -38,7 +38,10 @@
+ #include <crypto/internal/hash.h>
+ 
+ #include <linux/omap-dma.h>
++
++#ifdef CONFIG_ARCH_OMAP1
+ #include <mach/irqs.h>
++#endif
+ 
+ #define SHA_REG_DIGEST(x)		(0x00 + ((x) * 0x04))
+ #define SHA_REG_DIN(x)			(0x1C + ((x) * 0x04))
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index 3dcfea6..eff53c9 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -99,7 +99,7 @@ config VIDEO_OMAP2
+ 
+ config VIDEO_OMAP3
+ 	tristate "OMAP 3 Camera support (EXPERIMENTAL)"
+-	depends on OMAP_IOVMM && VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && ARCH_OMAP3 && EXPERIMENTAL
++	depends on OMAP_IOVMM && VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && ARCH_OMAP3 && EXPERIMENTAL && !ARCH_MULTIPLATFORM
+ 	---help---
+ 	  Driver for an OMAP 3 camera controller.
+ 
+diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
+index 79ba242..19f3563 100644
+--- a/drivers/media/rc/Kconfig
++++ b/drivers/media/rc/Kconfig
+@@ -291,7 +291,7 @@ config IR_TTUSBIR
+ 
+ config IR_RX51
+ 	tristate "Nokia N900 IR transmitter diode"
+-	depends on OMAP_DM_TIMER && LIRC
++	depends on OMAP_DM_TIMER && LIRC && !ARCH_MULTIPLATFORM
+ 	---help---
+ 	   Say Y or M here if you want to enable support for the IR
+ 	   transmitter diode built in the Nokia N900 (RX51) device.
+diff --git a/drivers/staging/tidspbridge/Kconfig b/drivers/staging/tidspbridge/Kconfig
+index 0dd479f..60848f1 100644
+--- a/drivers/staging/tidspbridge/Kconfig
++++ b/drivers/staging/tidspbridge/Kconfig
+@@ -4,7 +4,7 @@
+ 
+ menuconfig TIDSPBRIDGE
+ 	tristate "DSP Bridge driver"
+-	depends on ARCH_OMAP3
++	depends on ARCH_OMAP3 && !ARCH_MULTIPLATFORM
+ 	select OMAP_MBOX_FWK
+ 	help
+ 	  DSP/BIOS Bridge is designed for platforms that contain a GPP and
