@@ -1,39 +1,23 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 3 Jan 2013 11:41:08 +0530
-Subject: [PATCH v2 05/11] ARM: dt: tegra30: Add device node for APB MISC
-In-Reply-To: <50E4AE19.1060503@wwwdotorg.org>
-References: <1356619644-18565-1-git-send-email-pgaikwad@nvidia.com>
- <1356619644-18565-6-git-send-email-pgaikwad@nvidia.com>
- <50E4AE19.1060503@wwwdotorg.org>
-Message-ID: <50E520FC.4070805@nvidia.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 3 Jan 2013 07:38:48 +0100
+Subject: [PATCH 4/4] ARM: tegra: Set SCU base address dynamically from DT
+In-Reply-To: <50E4845D.6020809@wwwdotorg.org>
+References: <1355725087-11363-1-git-send-email-hdoyu@nvidia.com><1355725087-11363-4-git-send-email-hdoyu@nvidia.com><50E4845D.6020809@wwwdotorg.org>
+Message-ID: <20130103.083848.1533296860718294309.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 January 2013 03:30 AM, Stephen Warren wrote:
-> On 12/27/2012 07:47 AM, Prashant Gaikwad wrote:
->> APB misc contains multiple registers required by different modules
->> such as CAR.
-> I don't see a DT binding document that describes what
-> nvidia,tegra30-apbmisc means. Also, the register range for this new node
-> overlaps that for the pinmux node, so they can't both "request" their
-> register region. You may need multiple entries in the apbmisc reg
-> property to avoid this.
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 2 Jan 2013 20:02:53 +0100:
 
-apbmisc reg for Tegra30 can be divided into following entries:
+> On 12/16/2012 11:18 PM, Hiroshi Doyu wrote:
+> > Set Snoop Control Unit(SCU) register base address dynamically from DT.
+> 
+> Hiroshi, what's the status on this patch series? I think Rob had
+> comments/objections on patch 4; are you going to post an updated series,
+> or is this series replaced by patch 3 in your Tegra114 series?
 
-strap registers
-jtag configuration registers
-pull_up/pull_down control registers
-vclk control registers
-tvdac registers
-chip id revision registers
-pad control registers
+As Rob suggested, at least, SCU base address should be detected in
+common code, scu_of_init() even if DT /cpus is the primary way to
+detect # of cores. I'll repost later.
 
-This list is not same for Tegra20 and Tegra30.
-
-OR
-
-another way is to add chip id revision register region to CAR node as 
-done for pinmux node and remove apb misc node.
-
-What is preferred?
+This patch can be done independent of Tegra114 series.
