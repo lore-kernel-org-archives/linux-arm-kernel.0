@@ -1,39 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Jan 2013 11:33:49 -0800
-Subject: [GIT PULL v2] ARM: OMAP2+: sparse & PRCM fixes for v3.8-rc1
-In-Reply-To: <alpine.DEB.2.00.1301021931430.17366@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1301021931430.17366@utopia.booyaka.com>
-Message-ID: <20130103193349.GG25633@atomide.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 3 Jan 2013 13:52:01 -0600
+Subject: [PATCH v4 14/19] ARM: remove unneeded vic.h includes
+In-Reply-To: <1357235668-9450-15-git-send-email-robherring2@gmail.com>
+References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
+ <1357235668-9450-15-git-send-email-robherring2@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F00206D69AB47F@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130102 11:41]:
-> Hi Tony,
-> 
-> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
-> 
->   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-a2-for-v3.8-rc
-> 
-> for you to fetch changes up to 7e7fff8254e318cede06a1a8c55b0d86dd4d8c5b:
-> 
->   ARM: OMAP2/3: PRM: fix bogus OMAP2xxx powerstate return values (2013-01-02 12:07:16 -0700)
-> 
-> ----------------------------------------------------------------
-> Some OMAP PRCM and sparse fixes against v3.8-rc1.  A basic set of test
-> logs are available here:
-> 
->     http://www.pwsan.com/omap/testlogs/prcm_fixes_b_3.8-rc/20130102120724/
-> 
-> The 3730 Beagle XM here has an intermittent failure mounting SD root,
-> but the suspicion right now is that this is due to a failing SD card,
-> rather than any change introduced by these patches.
-> 
-> This second version includes a few changes requested by Tony Lindgren.
+On Thursday, January 03, 2013 10:54 AM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> Numerous includes of asm/hardware/vic.h aren't needed, so remove them.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Hubert Feurstein <hubert.feurstein@contec.at>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: patches at opensource.wolfsonmicro.com
+> ---
+>  arch/arm/mach-ep93xx/adssphere.c              |    1 -
+>  arch/arm/mach-ep93xx/edb93xx.c                |    1 -
+>  arch/arm/mach-ep93xx/gesbc9312.c              |    1 -
+>  arch/arm/mach-ep93xx/micro9.c                 |    1 -
+>  arch/arm/mach-ep93xx/simone.c                 |    1 -
+>  arch/arm/mach-ep93xx/snappercl15.c            |    1 -
+>  arch/arm/mach-ep93xx/ts72xx.c                 |    1 -
+>  arch/arm/mach-ep93xx/vision_ep9307.c          |    1 -
 
-Thanks pulling into omap-for-v3.8-rc2/fixes.
+For ep93xx:
 
-Tony
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
