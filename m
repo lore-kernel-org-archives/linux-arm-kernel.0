@@ -1,80 +1,72 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 3 Jan 2013 10:01:18 +0100
-Subject: [PATCH] RFC: leds-pwm: don't disable pwm when setting brightness
- to 0
-In-Reply-To: <20121025080346.GB9921@S2101-09.ap.freescale.net>
-References: <20121024095603.GH639@pengutronix.de>
- <1351086766-5837-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20121025080346.GB9921@S2101-09.ap.freescale.net>
-Message-ID: <20130103090117.GA1845@avionic-0098.adnet.avionic-design.de>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 3 Jan 2013 12:05:20 +0300
+Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
+ IS_ERR_OR_NULL
+In-Reply-To: <1357104713.30504.8.camel@gitbox>
+References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
+ <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
+ <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
+ <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
+ <1357104713.30504.8.camel@gitbox>
+Message-ID: <20130103090520.GC7247@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 04:03:49PM +0800, Shawn Guo wrote:
-> On Wed, Oct 24, 2012 at 03:52:46PM +0200, Uwe Kleine-K?nig wrote:
-> > This fixes disabling the LED on i.MX28. The PWM hardware delays using
-> > the newly set pwm-config until the beginning of a new period.  It's very
-> > likely that pwm_disable is called before the current period ends. In
-> > case the LED was on brightness=max before the LED stays on because in
-> > the disabled PWM block the period never ends.
+On Wed, Jan 02, 2013 at 06:31:53PM +1300, Tony Prisk wrote:
+> On Wed, 2013-01-02 at 08:10 +0300, Dan Carpenter wrote:
+> > clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
 > > 
-> > It's unclear if the mxs-pwm driver doesn't implement the API as expected
-> > (i.e. it should block until the newly set config is effective) or if the
-> > leds-pwm driver makes wrong assumptions. This patch assumes the latter.
+> > I told Tony about this but everyone has been gone with end of year
+> > holidays so it hasn't been addressed.
 > > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Hello,
+> > Tony, please fix it so people don't apply these patches until
+> > clk_get() is updated to not return NULL.  It sucks to have to revert
+> > patches.
 > > 
-> > I'm not sure this is correct, but this is the workaround I'm using until
-> > I get some feed back.
+> > regards,
+> > dan carpenter
 > 
-> I'm fine with it, since it fixes a real problem.  Let's see what
-> Thierry says.
+> I posted the query to Mike Turquette, linux-kernel and linux-arm-kernel
+> mailing lists, regarding the return of NULL when HAVE_CLK is undefined.
+> 
+> Short Answer: A return value of NULL is valid and not an error therefore
+> we should be using IS_ERR, not IS_ERR_OR_NULL on clk_get results.
+> 
+> I see the obvious problem this creates, and asked this question:
+> 
+> If the driver can't operate with a NULL clk, it should use a
+> IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
+> 
+> 
+> And Russell's answer:
+> 
+> Why should a _consumer_ of a clock care?  It is _very_ important that
+> people get this idea - to a consumer, the struct clk is just an opaque
+> cookie.  The fact that it appears to be a pointer does _not_ mean that
+> the driver can do any kind of dereferencing on that pointer - it should
+> never do so.
+> 
+> Thread can be viewed here:
+> https://lkml.org/lkml/2012/12/20/105
+> 
 
-I lost track of this thread somehow, so sorry for not getting back to
-you earlier. The root cause of this problem seems to be that it isn't
-very well defined (actually not at all) what is supposed to happen in
-the case when a PWM is disabled.
+Ah.  Grand.  Thanks...
 
-There really are only two ways forward: a) we need to write down what
-the PWM subsystem expects to happen when a PWM is disabled or b) keep
-the currently undefined behaviour. With the latter I expect this kind
-of issue to keep popping up every once in a while with all sorts of
-ad-hoc solutions being implemented to solve the problem.
+Btw. The documentation for clk_get() really should include some of
+this information.  I know Russell thinks that the driver authors are
+stupid and lazy, and it's probably true.  But if everyone makes the
+same mistake over and over, then it probably means we could put a
+special note:
 
-I think the best option would be to have some definition about what the
-PWM signal should look like after a call to pwm_disable(). However this
-doesn't turn out to be as trivial as it sounds. For instance, the most
-straightforward definition in my opinion would be to specify that a PWM
-signal should be constantly low after the call to pwm_disable(). It is
-what I think most people would assume is the natural disable state of a
-PWM.
+"Do not check this with IS_ERR_OR_NULL().  Null values are not an
+error.  Drivers should treat the return value as an opaque cookie
+and they should not dereference it."
 
-However, one case where a similar problem was encountered involved a
-hardware design that used an external inverter to change the polarity of
-a PWM signal that was used to drive a backlight. In such a case, if the
-controller were programmed to keep the output low when disabling, the
-display would in fact be fully lit. This is further complicated by the
-fact that the controller allows the output level of the disabled PWM
-signal to be configured. This is nice because it means that pretty much
-any scenario is covered, but it also doesn't make it any easier to put
-this into a generic framework.
+This is probably there in the file somewhere else, but I searched
+for "opaque", "cookie", and "dereference" and I didn't find
+anything.  I'm not saying the documentation isn't perfect, just that
+driver authors are lazy and stupid but we can't kill them so we have
+to live with them.
 
-Having said that, I'm tempted to go with a simple definition like the
-above anyway and handle obscure cases with board-specific quirks. I
-don't see any other alternative that would allow the PWM framework to
-stay relatively simple and clean.
-
-Now I only have access to a limited amount of hardware and use-cases, so
-any comments and suggestions as well as requirements on other platforms
-are very welcome.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130103/7afc30a1/attachment-0001.sig>
+regards,
+dan carpenter
