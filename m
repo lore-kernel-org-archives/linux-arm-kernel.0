@@ -1,36 +1,80 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 3 Jan 2013 16:39:36 +0800
-Subject: [PATCH V3 0/5] ARM: tegra20: cpuidle: add power-down state
-In-Reply-To: <50E484ED.90108@wwwdotorg.org>
-References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
- <50E484ED.90108@wwwdotorg.org>
-Message-ID: <1357202376.3594.37.camel@jlo-ubuntu-64.nvidia.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 3 Jan 2013 10:01:18 +0100
+Subject: [PATCH] RFC: leds-pwm: don't disable pwm when setting brightness
+ to 0
+In-Reply-To: <20121025080346.GB9921@S2101-09.ap.freescale.net>
+References: <20121024095603.GH639@pengutronix.de>
+ <1351086766-5837-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20121025080346.GB9921@S2101-09.ap.freescale.net>
+Message-ID: <20130103090117.GA1845@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-01-03 at 03:05 +0800, Stephen Warren wrote:
-> On 12/17/2012 07:30 PM, Joseph Lo wrote:
-> > This adds a "powered-down" state in cpuidle for Tegra20. It requires power
-> > gating both CPU cores. When the CPU1 requests to enter "powered-down"
-> > state, it saves its own state and then enters WFI. When the CPU0 requests
-> > the same state, it attempts to put the CPU1 into reset to prevent it from
-> > waking up. Then power down both CPUs together and turn off the CPU rail.
+On Thu, Oct 25, 2012 at 04:03:49PM +0800, Shawn Guo wrote:
+> On Wed, Oct 24, 2012 at 03:52:46PM +0200, Uwe Kleine-K?nig wrote:
+> > This fixes disabling the LED on i.MX28. The PWM hardware delays using
+> > the newly set pwm-config until the beginning of a new period.  It's very
+> > likely that pwm_disable is called before the current period ends. In
+> > case the LED was on brightness=max before the LED stays on because in
+> > the disabled PWM block the period never ends.
 > > 
-> > If the CPU1 be woken up before CPU0 entering powered-down state, then it
-> > needs to restore it's CPU state and waits for next chance.
+> > It's unclear if the mxs-pwm driver doesn't implement the API as expected
+> > (i.e. it should block until the newly set config is effective) or if the
+> > leds-pwm driver makes wrong assumptions. This patch assumes the latter.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > Hello,
+> > 
+> > I'm not sure this is correct, but this is the workaround I'm using until
+> > I get some feed back.
 > 
-> Joseph,
-> 
-> What's the status of this series? It looks like there are quite a few
-> comments on V3; I assume you'll post a new version to address those.
-> Will you base the new version on top of Prashant's common clock cleanup
-> to remove the conflicts with that?
-> 
+> I'm fine with it, since it fixes a real problem.  Let's see what
+> Thierry says.
 
-Yes, I will re-base on top of Prashant's CCF rework in the next version.
-But there are some issues, I am co-working with Prashant to make sure
-every thing is work as usual. Will re-post this series later after
-everything be settled down.
+I lost track of this thread somehow, so sorry for not getting back to
+you earlier. The root cause of this problem seems to be that it isn't
+very well defined (actually not at all) what is supposed to happen in
+the case when a PWM is disabled.
 
-Thanks,
-Joseph
+There really are only two ways forward: a) we need to write down what
+the PWM subsystem expects to happen when a PWM is disabled or b) keep
+the currently undefined behaviour. With the latter I expect this kind
+of issue to keep popping up every once in a while with all sorts of
+ad-hoc solutions being implemented to solve the problem.
+
+I think the best option would be to have some definition about what the
+PWM signal should look like after a call to pwm_disable(). However this
+doesn't turn out to be as trivial as it sounds. For instance, the most
+straightforward definition in my opinion would be to specify that a PWM
+signal should be constantly low after the call to pwm_disable(). It is
+what I think most people would assume is the natural disable state of a
+PWM.
+
+However, one case where a similar problem was encountered involved a
+hardware design that used an external inverter to change the polarity of
+a PWM signal that was used to drive a backlight. In such a case, if the
+controller were programmed to keep the output low when disabling, the
+display would in fact be fully lit. This is further complicated by the
+fact that the controller allows the output level of the disabled PWM
+signal to be configured. This is nice because it means that pretty much
+any scenario is covered, but it also doesn't make it any easier to put
+this into a generic framework.
+
+Having said that, I'm tempted to go with a simple definition like the
+above anyway and handle obscure cases with board-specific quirks. I
+don't see any other alternative that would allow the PWM framework to
+stay relatively simple and clean.
+
+Now I only have access to a limited amount of hardware and use-cases, so
+any comments and suggestions as well as requirements on other platforms
+are very welcome.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130103/7afc30a1/attachment-0001.sig>
