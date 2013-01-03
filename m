@@ -1,47 +1,30 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 3 Jan 2013 08:39:50 -0800
-Subject: [PATCH 133/493] remove use of __devexit_p
-In-Reply-To: <Pine.LNX.4.64.1301031235370.17494@axis700.grange>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-133-git-send-email-wfp5p@virginia.edu>
- <Pine.LNX.4.64.1301031235370.17494@axis700.grange>
-Message-ID: <20130103163950.GA2350@kroah.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 3 Jan 2013 14:47:22 -0200
+Subject: [PATCH] ARM: dts: imx31-bug: Fix manufacturer compatible string
+Message-ID: <1357231642-12857-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 12:43:10PM +0100, Guennadi Liakhovetski wrote:
-> Hi Bill
-> 
-> On Mon, 19 Nov 2012, Bill Pemberton wrote:
-> 
-> > CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
-> > needed.
-> 
-> Doesn't this also make the use of __refdata in many locations like this
-> 
-> [snip]
-> 
-> > diff --git a/drivers/media/platform/soc_camera/sh_mobile_csi2.c b/drivers/media/platform/soc_camera/sh_mobile_csi2.c
-> > index 0528650..0d0344a 100644
-> > --- a/drivers/media/platform/soc_camera/sh_mobile_csi2.c
-> > +++ b/drivers/media/platform/soc_camera/sh_mobile_csi2.c
-> > @@ -382,7 +382,7 @@ static __devexit int sh_csi2_remove(struct platform_device *pdev)
-> >  }
-> >  
-> >  static struct platform_driver __refdata sh_csi2_pdrv = {
-> > -	.remove	= __devexit_p(sh_csi2_remove),
-> > +	.remove	= sh_csi2_remove,
-> >  	.probe	= sh_csi2_probe,
-> >  	.driver	= {
-> >  		.name	= "sh-mobile-csi2",
-> 
-> superfluous? If so, I'm sure you'd be happy to make a couple more patches 
-> to continue this series ;-)
+In the compatible field we should point the manufacturer of the board, which
+in this case is Buglabs.
 
-Yes, it does make it superfluous.  I'm still working on getting most of
-the original patches into Linus's tree, so let's wait for that to happen
-first before cleaning up the reset of these :)
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx31-bug.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-thanks,
-
-greg k-h
+diff --git a/arch/arm/boot/dts/imx31-bug.dts b/arch/arm/boot/dts/imx31-bug.dts
+index e0bcdde..9ac6f6b 100644
+--- a/arch/arm/boot/dts/imx31-bug.dts
++++ b/arch/arm/boot/dts/imx31-bug.dts
+@@ -14,7 +14,7 @@
+ 
+ / {
+ 	model = "Buglabs i.MX31 Bug 1.x";
+-	compatible = "fsl,imx31-bug", "fsl,imx31";
++	compatible = "buglabs,imx31-bug", "fsl,imx31";
+ 
+ 	memory {
+ 		reg = <0x80000000 0x8000000>; /* 128M */
+-- 
+1.7.9.5
