@@ -1,38 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 3 Jan 2013 21:38:07 +0000
-Subject: [PATCH v4 07/19] ARM: remove mach .handle_irq for GIC users
-In-Reply-To: <1357235668-9450-8-git-send-email-robherring2@gmail.com>
+Date: Thu, 3 Jan 2013 21:41:19 +0000
+Subject: [PATCH v4 09/19] ARM: use common irqchip_init for GIC init
+In-Reply-To: <1357235668-9450-10-git-send-email-robherring2@gmail.com>
 References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-8-git-send-email-robherring2@gmail.com>
-Message-ID: <201301032138.07460.arnd@arndb.de>
+ <1357235668-9450-10-git-send-email-robherring2@gmail.com>
+Message-ID: <201301032141.19568.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday 03 January 2013, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Now that the GIC initialization sets up the handle_arch_irq pointer, we
-> can remove it for all machines.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Anton Vorontsov <avorontsov@mvista.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Dinh Nguyen <dinguyen@altera.com>
-> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Olof Johansson <olof@lixom.net>
+> @@ -637,8 +638,6 @@ static int __init combiner_of_init(struct device_node *np,
+>  }
+>  
+>  static const struct of_device_id exynos_dt_irq_match[] = {
+> -       { .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+> -       { .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
+>         { .compatible = "samsung,exynos4210-combiner",
+>                         .data = combiner_of_init, },
+>         {},
+> @@ -654,8 +653,10 @@ void __init exynos4_init_irq(void)
+>         if (!of_have_populated_dt())
+>                 gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU, gic_bank_offset, NULL);
+>  #ifdef CONFIG_OF
+> -       else
+> +       else {
+> +               irqchip_init();
+>                 of_irq_init(exynos_dt_irq_match);
+> +       }
+>  #endif
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Is this an equivalent change? I thought you are supposed to call of_irq_init
+only once so it can see the entire hierarchy. Or is it ok as long as the
+top-level controllers are probed first?
+
+	Arnd
