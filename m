@@ -1,94 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jan 2013 10:00:27 +0000
-Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
- IS_ERR_OR_NULL
-In-Reply-To: <alpine.DEB.2.02.1301031010400.1989@hadrien>
-References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
- <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
- <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
- <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
- <1357104713.30504.8.camel@gitbox> <20130103090520.GC7247@mwanda>
- <alpine.DEB.2.02.1301031010400.1989@hadrien>
-Message-ID: <20130103100027.GK2631@n2100.arm.linux.org.uk>
+From: kpark3469@gmail.com (kpark3469 at gmail.com)
+Date: Thu,  3 Jan 2013 19:12:28 +0900
+Subject: [PATCH 1/2] arm: fix returning wrong CALLER_ADDRx
+Message-ID: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 10:14:13AM +0100, Julia Lawall wrote:
-> On Thu, 3 Jan 2013, Dan Carpenter wrote:
-> 
-> > On Wed, Jan 02, 2013 at 06:31:53PM +1300, Tony Prisk wrote:
-> > > On Wed, 2013-01-02 at 08:10 +0300, Dan Carpenter wrote:
-> > > > clk_get() returns NULL if CONFIG_HAVE_CLK is disabled.
-> > > >
-> > > > I told Tony about this but everyone has been gone with end of year
-> > > > holidays so it hasn't been addressed.
-> > > >
-> > > > Tony, please fix it so people don't apply these patches until
-> > > > clk_get() is updated to not return NULL.  It sucks to have to revert
-> > > > patches.
-> > > >
-> > > > regards,
-> > > > dan carpenter
-> > >
-> > > I posted the query to Mike Turquette, linux-kernel and linux-arm-kernel
-> > > mailing lists, regarding the return of NULL when HAVE_CLK is undefined.
-> > >
-> > > Short Answer: A return value of NULL is valid and not an error therefore
-> > > we should be using IS_ERR, not IS_ERR_OR_NULL on clk_get results.
-> > >
-> > > I see the obvious problem this creates, and asked this question:
-> > >
-> > > If the driver can't operate with a NULL clk, it should use a
-> > > IS_ERR_OR_NULL test to test for failure, rather than IS_ERR.
-> > >
-> > >
-> > > And Russell's answer:
-> > >
-> > > Why should a _consumer_ of a clock care?  It is _very_ important that
-> > > people get this idea - to a consumer, the struct clk is just an opaque
-> > > cookie.  The fact that it appears to be a pointer does _not_ mean that
-> > > the driver can do any kind of dereferencing on that pointer - it should
-> > > never do so.
-> > >
-> > > Thread can be viewed here:
-> > > https://lkml.org/lkml/2012/12/20/105
-> > >
-> >
-> > Ah.  Grand.  Thanks...
-> >
-> > Btw. The documentation for clk_get() really should include some of
-> > this information.  I know Russell thinks that the driver authors are
-> > stupid and lazy, and it's probably true.  But if everyone makes the
-> > same mistake over and over, then it probably means we could put a
-> > special note:
-> >
-> > "Do not check this with IS_ERR_OR_NULL().  Null values are not an
-> > error.  Drivers should treat the return value as an opaque cookie
-> > and they should not dereference it."
-> >
-> > This is probably there in the file somewhere else, but I searched
-> > for "opaque", "cookie", and "dereference" and I didn't find
-> > anything.  I'm not saying the documentation isn't perfect, just that
-> > driver authors are lazy and stupid but we can't kill them so we have
-> > to live with them.
-> 
-> I still think it would also be helpful for the definition that returns
-> NULL to have some documentation associated with it.  Having a feature
-> disabled and then trying to use the feature could reasonably considered to
-> lead to a failure, so it is not obvious what the NULL represents.
+From: sahara <keun-o.park@windriver.com>
 
-/**
- * clk_get - lookup and obtain a reference to a clock producer.
- * @dev: device for clock "consumer"
- * @id: clock consumer ID
- *
- * Returns a struct clk corresponding to the clock producer, or
- * valid IS_ERR() condition containing errno.  The implementation
- * uses @dev and @id to determine the clock consumer, and thereby
- * the clock producer.  (IOW, @id may be identical strings, but
- * clk_get may return different clock producers depending on @dev.)
- *
- * Drivers must assume that the clock source is not enabled.
- *
- * clk_get should not be called from within interrupt context.
- */
+This makes return_address return correct value for ftrace feature.
+unwind_frame does not update frame->lr but frame->pc for backtrace.
+And, the initialization for data.addr was missing so that wrong value
+returned when unwind_frame failed.
+
+Signed-off-by: sahara <keun-o.park@windriver.com>
+---
+ arch/arm/kernel/return_address.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
+index 8085417..fafedd8 100644
+--- a/arch/arm/kernel/return_address.c
++++ b/arch/arm/kernel/return_address.c
+@@ -26,7 +26,7 @@ static int save_return_addr(struct stackframe *frame, void *d)
+ 	struct return_address_data *data = d;
+ 
+ 	if (!data->level) {
+-		data->addr = (void *)frame->lr;
++		data->addr = (void *)frame->pc;
+ 
+ 		return 1;
+ 	} else {
+@@ -41,7 +41,8 @@ void *return_address(unsigned int level)
+ 	struct stackframe frame;
+ 	register unsigned long current_sp asm ("sp");
+ 
+-	data.level = level + 1;
++	data.level = level + 2;
++	data.addr = NULL;
+ 
+ 	frame.fp = (unsigned long)__builtin_frame_address(0);
+ 	frame.sp = current_sp;
+-- 
+1.7.1
