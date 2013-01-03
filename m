@@ -1,59 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jan 2013 11:21:02 +0000
-Subject: [PATCH RESEND 6/6] clk: s5p-g2d: Fix incorrect usage of
- IS_ERR_OR_NULL
-In-Reply-To: <20130103111040.GD7247@mwanda>
-References: <1355852048-23188-1-git-send-email-linux@prisktech.co.nz>
- <1355852048-23188-7-git-send-email-linux@prisktech.co.nz>
- <50D62BC9.9010706@mvista.com> <50E32C06.5020104@gmail.com>
- <CA+_b7DK2zbBzbCh15ikEAeGP5h-V9gQ_YcX15O-RNvWxCk8Zfg@mail.gmail.com>
- <1357104713.30504.8.camel@gitbox> <20130103090520.GC7247@mwanda>
- <20130103100000.GJ2631@n2100.arm.linux.org.uk> <20130103111040.GD7247@mwanda>
-Message-ID: <20130103112102.GM2631@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 03 Jan 2013 15:26:37 +0400
+Subject: [PATCH v6] ARM: mtd: nand: davinci: add OF support for davinci
+ nand controller
+In-Reply-To: <50E52D26.9010004@denx.de>
+References: <1343632944-25971-1-git-send-email-hs@denx.de>
+ <50E48DFD.2030908@mvista.com> <50E52D26.9010004@denx.de>
+Message-ID: <50E56AED.1000509@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 02:10:40PM +0300, Dan Carpenter wrote:
-> Come on...  Don't say we haven't read comment.  Obviously, the first
-> thing we did was read that comment.  I've read it many times at this
-> point and I still think we should add in a bit which says:
+Hello.
 
-So where does it give you in that comment permission to treat NULL any
-differently to any other non-IS_ERR() return value?
+On 03-01-2013 11:03, Heiko Schocher wrote:
 
-It is very clear: values where IS_ERR() is true are considered errors.
-Everything else is considered valid.
+>>> add OF support for the davinci nand controller.
 
-> "NOTE:  Drivers should treat the return value as an opaque cookie
-> and not dereference it.  NULL returns don't imply an error so don't
-> use IS_ERR_OR_NULL() to check for errors."
+>>> Signed-off-by: Heiko Schocher<hs@denx.de>
+>>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: devicetree-discuss at lists.ozlabs.org
+>>> Cc: linux-mtd at lists.infradead.org
+>>> Cc: David Woodhouse<dwmw2@infradead.org>
+>>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>>> Cc: Sekhar Nori<nsekhar@ti.com>
+>>> Cc: Wolfgang Denk<wd@denx.de>
+>>> Cc: Scott Wood<scottwood@freescale.com>
 
-No.  The one thing I've learnt through maintaining www.arm.linux.org.uk
-is that the more of these kinds of "lets add to documentation" suggestions
-you get, the more _unclear_ the documentation becomes, and the more it is
-open to bad interpretation, and the more suggestions to add more words you
-receive.
+>> [...]
 
-Concise documentation is the only way to go.  And what we have there today
-is concise and to the point.  It specifies it very clearly:
+>>> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+>>> index d94b03c..f386b3c 100644
+>>> --- a/drivers/mtd/nand/davinci_nand.c
+>>> +++ b/drivers/mtd/nand/davinci_nand.c
+>> [...]
+>>> @@ -518,9 +519,75 @@ static struct nand_ecclayout hwecc4_2048 __initconst = {
+>>>       },
+>>>   };
 
- * Returns a struct clk corresponding to the clock producer, or
- * valid IS_ERR() condition containing errno.
+>>> +#if defined(CONFIG_OF)
+>>> +static const struct of_device_id davinci_nand_of_match[] = {
+>>> +    {.compatible = "ti,davinci-nand", },
+>>> +    {},
+>>> +}
 
-That one sentence gives you all the information you need about it's return
-value.  It gives you two choices.  (1) a return value where IS_ERR() is
-true, which is an error, and (2) a return value where IS_ERR() is false,
-which is a valid cookie.
+>>     I have only one question: have you ever try to compile this patch with
+>> CONFIG_OF enabled? If you have, you would have noticed:
 
-Maybe you don't realise, but IS_ERR(NULL) is false.  Therefore, this falls
-into category (2).
+>> drivers/mtd/nand/davinci_nand.c:527: error: expected ?,? or ?;? before ?extern?
 
-You can't get clearer than that, unless you don't understand the IS_ERR()
-and associated macro.
+>>> +MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
 
-Moreover, it tells you the function to use to check the return value for
-errors.  IS_ERR().  It doesn't say IS_ERR_OR_NULL(), it says IS_ERR().
+> Hmm.. maybe this crept in later after I sent the patches? They were
+> pending for a while ... I compiled it just yet again (based on my
+> tree when I posted this patch based on commit:
 
-All it takes is for people to engage their grey cells and read the
-documentation as it stands, rather than trying to weasel their way around
-it and invent crap that it doesn't say.
+    I've just checked the archives: every patch version you posted had ';' 
+after '}' missing.
+
+WBR, Sergei
