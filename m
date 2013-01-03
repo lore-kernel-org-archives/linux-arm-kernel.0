@@ -1,48 +1,105 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 3 Jan 2013 12:49:25 +0100
-Subject: [PATCH 0/3] ARM: OMAP3/4: Correct support for PWM LEDs/backlight
-Message-ID: <1357213768-21266-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Thu, 3 Jan 2013 12:49:27 +0100
+Subject: [PATCH 2/3] ARM: OMAP: omap3beagle: Use the pwm_leds driver to
+ control the PMU_STAT led
+In-Reply-To: <1357213768-21266-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1357213768-21266-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1357213768-21266-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With the PWM backed driver the PMU_STAT led's brighness can be controlled.
+This needs the new drivers for the TWL PWM/LED to work.
 
-The pwm-leds driver update is going for 3.9:
-https://lkml.org/lkml/2012/12/21/99
-
-This series will make sure that in 3.9 we are going to have working LEDs and
-backlight on these boards.
-
-As a note: 4430SDP never had working backlight and the charger led did not
-worked for couple of releases already due to wrong pwm_id.
-
-On BeagleBoard we will be able to adjust the brighness of pmu_stat LED instead
-of full on/off.
-
-Zoom2 will have working keypad light and the backlight will be moved to be
-handled by the generic pwm-backlight driver.
-
-This series will also fix a compile error in board-zoom-display.c caused by the
-changes in twl-core - which I missed :(
-
-The DT support for these are going to be sent later.
-
-Tony: can you apply this - if it looks OK - so it will hit linux-next before the
-second batch of twl-core update?
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (3):
-  ARM: OMAP: board-4430sdp: Proper support for TWL6030 PWM LED/Backlight
-  ARM: OMAP: omap3beagle: Use the pwm_leds driver to control the PMU_STAT led
-  ARM: OMAP: zoom: Use pwm stack for lcd and keyboard backlight
+ arch/arm/mach-omap2/board-omap3beagle.c | 39 ++++++++++++++++++++++++++-------
+ 1 file changed, 31 insertions(+), 8 deletions(-)
 
- arch/arm/mach-omap2/board-4430sdp.c          | 31 ++++++++++++++-
- arch/arm/mach-omap2/board-omap3beagle.c      | 39 +++++++++++++++----
- arch/arm/mach-omap2/board-zoom-display.c     | 56 ----------------------------
- arch/arm/mach-omap2/board-zoom-peripherals.c | 53 +++++++++++++++++++++++++-
- 4 files changed, 113 insertions(+), 66 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 909e7fa..c5efd51 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -20,6 +20,8 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/leds.h>
++#include <linux/pwm.h>
++#include <linux/leds_pwm.h>
+ #include <linux/gpio.h>
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+@@ -55,6 +57,32 @@
+ 
+ #define	NAND_CS	0
+ 
++static struct pwm_lookup pwm_lookup[] = {
++	/* LEDB -> PMU_STAT */
++	PWM_LOOKUP("twl-pwmled", 1, "leds_pwm", "beagleboard::pmu_stat"),
++};
++
++static struct led_pwm pwm_leds[] = {
++	{
++		.name		= "beagleboard::pmu_stat",
++		.max_brightness	= 127,
++		.pwm_period_ns	= 333,
++	},
++};
++
++static struct led_pwm_platform_data pwm_data = {
++	.num_leds	= ARRAY_SIZE(pwm_leds),
++	.leds		= pwm_leds,
++};
++
++static struct platform_device leds_pwm = {
++	.name	= "leds_pwm",
++	.id	= -1,
++	.dev	= {
++		.platform_data = &pwm_data,
++	},
++};
++
+ /*
+  * OMAP3 Beagle revision
+  * Run time detection of Beagle revision is done by reading GPIO.
+@@ -292,9 +320,6 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ 	gpio_request_one(gpio + TWL4030_GPIO_MAX, beagle_config.usb_pwr_level,
+ 			"nEN_USB_PWR");
+ 
+-	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
+-	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
+-
+ 	return 0;
+ }
+ 
+@@ -376,11 +401,6 @@ static struct gpio_led gpio_leds[] = {
+ 		.default_trigger	= "mmc0",
+ 		.gpio			= 149,
+ 	},
+-	{
+-		.name			= "beagleboard::pmu_stat",
+-		.gpio			= -EINVAL,	/* gets replaced */
+-		.active_low		= true,
+-	},
+ };
+ 
+ static struct gpio_led_platform_data gpio_led_info = {
+@@ -428,6 +448,7 @@ static struct platform_device *omap3_beagle_devices[] __initdata = {
+ 	&leds_gpio,
+ 	&keys_gpio,
+ 	&madc_hwmon,
++	&leds_pwm,
+ };
+ 
+ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+@@ -532,6 +553,8 @@ static void __init omap3_beagle_init(void)
+ 	/* Ensure SDRC pins are mux'd for self-refresh */
+ 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+ 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
++
++	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
+ }
+ 
+ MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
 -- 
 1.8.0.2
