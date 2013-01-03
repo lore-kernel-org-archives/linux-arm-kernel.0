@@ -1,43 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 4 Jan 2013 00:40:07 +0100
-Subject: [GIT PULL] nomadik fixes for v3.8
-Message-ID: <CACRpkdb4yM_j9U05z0+bg1XBoqEsGY0xS-znkEUd15UfTP79Cw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 03 Jan 2013 17:59:15 -0600
+Subject: [PATCH v4 01/19] irqchip: add basic infrastructure
+In-Reply-To: <201301032136.51302.arnd@arndb.de>
+References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
+ <1357235668-9450-2-git-send-email-robherring2@gmail.com>
+ <201301032136.51302.arnd@arndb.de>
+Message-ID: <50E61B53.7080404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On 01/03/2013 03:36 PM, Arnd Bergmann wrote:
+> On Thursday 03 January 2013, Rob Herring wrote:
+>> So, upon the suggestion of Rob Herring and Arnd Bergmann, this commit
+>> introduces a small infrastructure that defines a central
+>> irqchip_init() function in drivers/irqchip/irqchip.c, which is meant
+>> to be called as the ->init_irq() callback of ARM platforms. This
+>> function calls of_irq_init() with an array that will progressively
+>> contain the compatible strings of each irq controller driver, and also
+>> a reference to the initialization functions of such drivers. The
+>> drivers/irqchip/irqchip.h header file, currently empty, is added to
+>> allow irq controller drivers to expose their initialization function
+>> to the main irqchip.c file. Note that the irq controller driver
+>> initialization function is responsible for setting the global
+>> handle_arch_irq() variable, so that ARM platforms no longer have to
+>> define the ->handle_irq field in their DT_MACHINE structure.
+> 
+> This changeset text looks like it refers to an older version of the
+> patch that did not have the section magic yet.
+> 
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
+>> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> 
+> I actually liked the old version better because it was more obvious
+> to the casual reader how it fits together, but I'm not going to
+> stand in the way if other people like it this way.
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-could you please pull these two fixes into ARM SoC for the v3.8-rc
-series, so Nomadik compiles and boots again...
+The timers are going down the same route, so we should agree on the
+direction. I was concerned too that it is a little too much magic, but
+it is a bit cleaner and should have fewer merge conflicts.
 
-Thanks!
-
-Linus Walleij
-
-
-The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
-
-  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nomadik-fixes-for-arm-soc
-
-for you to fetch changes up to d9621176872319a568d9892701410bcbfbd5b35c:
-
-  ARM: nomadik: bump the IRQ numbers again (2013-01-03 23:42:07 +0100)
-
-----------------------------------------------------------------
-Two fixes to the Nomadik:
-- Delete a dangling include
-- Bump IRQ numbers to offset at 32
-
-----------------------------------------------------------------
-Linus Walleij (2):
-      ARM: nomadik: delete dangling include
-      ARM: nomadik: bump the IRQ numbers again
-
- arch/arm/mach-nomadik/board-nhk8815.c     |  1 -
- arch/arm/mach-nomadik/include/mach/irqs.h | 78 +++++++++++++++----------------
- 2 files changed, 39 insertions(+), 40 deletions(-)
+Rob
