@@ -1,28 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Jan 2013 12:03:50 +0000
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jan 2013 12:21:00 +0000
 Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
-In-Reply-To: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
+In-Reply-To: <20130103120259.GB5193@mudshark.cambridge.arm.com>
 References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130103120349.GC5193@mudshark.cambridge.arm.com>
+ <50E4C9C6.20609@codeaurora.org>
+ <20130103120259.GB5193@mudshark.cambridge.arm.com>
+Message-ID: <20130103122100.GN2631@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 02, 2013 at 09:07:41PM +0000, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Thu, Jan 03, 2013 at 12:02:59PM +0000, Will Deacon wrote:
+> You need the smp_send_stop call in order to send the cpu_kill (looks like
+> tegra needs die and then kill). So you really need hotplug support as well
+> as suspend for this to do much (if not, the secondaries end up spinning
+> with interrupts disabled which is probably the best we can do anyway).
 > 
-> On Tegra at least, this change allows kexec to work with SMP enabled.
-> Without this,  machine_shutdown() simply puts all CPUs into a loop. If
-> the code of that loop is over-written, the CPUs may hang or crash (which
-> I do observe in practice), or cause the kexec'd kernel not to be able to
-> initialize them.
-> 
-> This fix has the added benefit that the kexec always happens on the boot
-> CPU, and thus kexec mirrors the initial kernel boot as much as possible.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> We could add SUSPEND as a KEXEC dependency if SMP (we already have HOTPLUG
+> there) if you like?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Or we could look into bringing in the code to do this when KEXEC is
+enabled - which would mean an amount of restructuring of the Kconfig
+files.
 
-Cheers Stephen,
+In other words, go from this:
 
-Will
+config SUSPEND
+        bool "Suspend to RAM and standby"
+        depends on ARCH_SUSPEND_POSSIBLE
+        default y
+
+config HIBERNATE_CALLBACKS
+        bool
+
+config PM_SLEEP
+        def_bool y
+        depends on SUSPEND || HIBERNATE_CALLBACKS
+
+config PM_SLEEP_SMP
+        def_bool y
+        depends on SMP
+        depends on ARCH_SUSPEND_POSSIBLE || ARCH_HIBERNATION_POSSIBLE
+        depends on PM_SLEEP
+        select HOTPLUG
+        select HOTPLUG_CPU
+
+to:
+
+config SUSPEND
+	bool...
+	depends on ARCH_SUSPEND_POSSIBLE
+	default y
+	select PM_SLEEP
+
+config HIBERNATE_CALLBACKS
+	bool
+	select PM_SLEEP
+
+config PM_SLEEP
+	bool
+	select PM_SLEEP_SMP if SMP && (ARCH_SUSPEND_POSSIBLE || ARCH_HIBERNATION_POSSIBLE)
+
+config PM_SLEEP_SMP
+	bool
+        select HOTPLUG
+        select HOTPLUG_CPU
+
+This means we could have KEXEC select PM_SLEEP_SMP (and maybe PM_SLEEP) as
+required, rather than bringing in the entire suspend support just to have
+working kexec.
+
+However, how many platforms don't have suspend support enabled?
