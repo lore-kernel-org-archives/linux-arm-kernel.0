@@ -1,43 +1,59 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 3 Jan 2013 12:58:50 -0600
-Subject: [PATCH 1/2] ARM: OMAP4: clock data: ABE DPLL need to be locked
- on all revisions
-In-Reply-To: <1357220811-29904-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1357220811-29904-1-git-send-email-peter.ujfalusi@ti.com>
- <1357220811-29904-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <50E5D4EA.5030001@ti.com>
+From: pratikp@codeaurora.org (Pratik Patel)
+Date: Thu, 3 Jan 2013 11:32:22 -0800
+Subject: CoreSight framework and drivers
+In-Reply-To: <50E491D5.3080106@ti.com>
+References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
+ <20121219112314.GA26329@mudshark.cambridge.arm.com>
+ <50D1F37E.6000804@ti.com>
+ <20121219212431.GC23594@pratikp-linux.qualcomm.com>
+ <50D34EE5.8090407@ti.com>
+ <20121220195127.GA14877@pratikp-linux.qualcomm.com>
+ <50D3972E.4030607@ti.com>
+ <20121221221828.GA2658@pratikp-linux.qualcomm.com>
+ <50E491D5.3080106@ti.com>
+Message-ID: <20130103193222.GC30277@pratikp-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On 01/03/2013 07:46 AM, Peter Ujfalusi wrote:
-> We need to lock ABE DPPL on al OMAP4 revisions, not only for OMAP446x
+On Wed, Jan 02, 2013 at 02:00:21PM -0600, Jon Hunter wrote:
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  arch/arm/mach-omap2/cclock44xx_data.c | 14 ++++++--------
->  1 file changed, 6 insertions(+), 8 deletions(-)
+> The code is largely based upon the existing cti helpers, which just had
+> a cti_map_trigger() function. The use-case you described is not
+> supported by the current helpers and so also not supported in my initial
+> implementation (although we should add this). Hence, it would be
+> probably best to split the cti_map_trigger() into two functions say,
+> cti_map_triggerin() and cti_map_triggerout(), to map a trigger
+> input/output to a channel.
 > 
-> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-> index 5789a5e..79c32ce 100644
-> --- a/arch/arm/mach-omap2/cclock44xx_data.c
-> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
-> @@ -2023,17 +2023,15 @@ int __init omap4xxx_clk_init(void)
->  				     ARRAY_SIZE(enable_init_clks));
->  
->  	/*
-> -	 * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
-> +	 * On OMAP4 the ABE DPLL fails to turn on if in idle low-power
->  	 * state when turning the ABE clock domain. Workaround this by
->  	 * locking the ABE DPLL on boot.
 
-I am not sure that this change to the comment is completely accurate. On
-OMAP4430 I did not see any issues with the DPLL failing to turn on if
-the DPLL was not locked. I only saw this particular problem on the 4460.
-Therefore, it may be better to leave the comment as-is and add an
-additional sentence to state that the DPLL should be locked for all
-OMAP4 devices for audio to work correctly.
+Yes, splitting the map function will provide more flexibility.
+One possibility is to cue the enable and disable functions from
+the mapping reference count for the CTI so that enable and
+disable are internal only functions.
 
-Cheers
-Jon
+In this case the flow would look something like:
+
+cti_get(cti1)
+cti_map_triggerin(cti1) -> enable cti1
+cti_get(cti2)
+cti_map_triggerin(cti2) -> enable cti2
+cti_map_triggerout(cti1) -> increment cti1 refcount
+
+cti_unmap_triggerin(cti2) -> disable cti2
+cti_put(cti2)
+cti_unmap_triggerout(cti1) -> decrement cti1 refcount
+cti_unmap_triggerin(cti1) -> disable cti1
+cti_put(cti1)
+
+With this, it is possible to push clock management inside enable
+and disable as opposed to get and put though it would imply
+enable being done before the actual mapping inside
+cti_map_triggerin/out and disable after unmapping in
+cti_unmap_triggerin/out. It might also mean cti_map_triggerin/out
+and cti_unmap_triggerin/out having a non-atomic context call
+semantics.
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
