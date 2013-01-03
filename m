@@ -1,105 +1,36 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Thu, 3 Jan 2013 14:07:59 +0530
-Subject: [PATCH v4] ARM: OMAP2+: AM33XX: omap2plus_defconfig: Add support for
- few drivers
-Message-ID: <1357202279-6094-1-git-send-email-anilkumar@ti.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 3 Jan 2013 16:39:36 +0800
+Subject: [PATCH V3 0/5] ARM: tegra20: cpuidle: add power-down state
+In-Reply-To: <50E484ED.90108@wwwdotorg.org>
+References: <1355797861-12759-1-git-send-email-josephl@nvidia.com>
+ <50E484ED.90108@wwwdotorg.org>
+Message-ID: <1357202376.3594.37.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds tps65910 PMIC, lis3lv02d accelerometer, tsl2550 ambient light sensor,
-tmp275 temperature sensor, matrix keypad, gbio based leds and D_CAN drivers
-support. These peripherals are present on AM33XX family of devices (EVM,
-BeagleBone and EVMSK). One has to manually enable these support to use the
-drivers, so this patch enables all the drivers in omap2plus_defconfig
+On Thu, 2013-01-03 at 03:05 +0800, Stephen Warren wrote:
+> On 12/17/2012 07:30 PM, Joseph Lo wrote:
+> > This adds a "powered-down" state in cpuidle for Tegra20. It requires power
+> > gating both CPU cores. When the CPU1 requests to enter "powered-down"
+> > state, it saves its own state and then enters WFI. When the CPU0 requests
+> > the same state, it attempts to put the CPU1 into reset to prevent it from
+> > waking up. Then power down both CPUs together and turn off the CPU rail.
+> > 
+> > If the CPU1 be woken up before CPU0 entering powered-down state, then it
+> > needs to restore it's CPU state and waits for next chance.
+> 
+> Joseph,
+> 
+> What's the status of this series? It looks like there are quite a few
+> comments on V3; I assume you'll post a new version to address those.
+> Will you base the new version on top of Prashant's common clock cleanup
+> to remove the conflicts with that?
+> 
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
-Changes from v3:
-	- Incorporated Olof Johansson's comments on v3
-	  * Combined all the patches into a single patch
+Yes, I will re-base on top of Prashant's CCF rework in the next version.
+But there are some issues, I am co-working with Prashant to make sure
+every thing is work as usual. Will re-post this series later after
+everything be settled down.
 
-Changes from v2:
-	- Incorporated Tony's comments on v2
-	  * Enabled as modules instead of kernel built-in drivers.
-	- Dropped 1st patch because it was accepted.
-
-Changes from v1:
-	- Incorporated martinez javier's comments on v1
-	  * Enabled few more triggers in omap2plus_defconfig
-	- Included Igor's patch, which modifies the omap2plus
-	  defconfig for AM33XX devices.
-
- arch/arm/configs/omap2plus_defconfig |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 19b7311..9fb2373 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -52,6 +52,11 @@ CONFIG_IP_PNP_RARP=y
- # CONFIG_INET_LRO is not set
- # CONFIG_IPV6 is not set
- CONFIG_NETFILTER=y
-+CONFIG_CAN=m
-+CONFIG_CAN_RAW=m
-+CONFIG_CAN_BCM=m
-+CONFIG_CAN_C_CAN=m
-+CONFIG_CAN_C_CAN_PLATFORM=m
- CONFIG_BT=m
- CONFIG_BT_HCIUART=m
- CONFIG_BT_HCIUART_H4=y
-@@ -81,6 +86,9 @@ CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_SENSORS_LIS3LV02D=m
-+CONFIG_SENSORS_TSL2550=m
-+CONFIG_SENSORS_LIS3_I2C=m
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_MULTI_LUN=y
-@@ -106,6 +114,7 @@ CONFIG_USB_KC2190=y
- CONFIG_INPUT_JOYDEV=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
-+CONFIG_KEYBOARD_MATRIX=m
- CONFIG_KEYBOARD_TWL4030=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ADS7846=y
-@@ -129,14 +138,17 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_TWL4030=y
- CONFIG_W1=y
- CONFIG_POWER_SUPPLY=y
-+CONFIG_SENSORS_LM75=m
- CONFIG_WATCHDOG=y
- CONFIG_OMAP_WATCHDOG=y
- CONFIG_TWL4030_WATCHDOG=y
- CONFIG_MFD_TPS65217=y
-+CONFIG_MFD_TPS65910=y
- CONFIG_REGULATOR_TWL4030=y
- CONFIG_REGULATOR_TPS65023=y
- CONFIG_REGULATOR_TPS6507X=y
- CONFIG_REGULATOR_TPS65217=y
-+CONFIG_REGULATOR_TPS65910=y
- CONFIG_FB=y
- CONFIG_FIRMWARE_EDID=y
- CONFIG_FB_MODE_HELPERS=y
-@@ -193,6 +205,16 @@ CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_SDIO_UART=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_ONESHOT=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=y
-+CONFIG_LEDS_TRIGGER_CPU=y
-+CONFIG_LEDS_TRIGGER_GPIO=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_TWL92330=y
- CONFIG_RTC_DRV_TWL4030=y
--- 
-1.7.9.5
+Thanks,
+Joseph
