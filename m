@@ -1,47 +1,32 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 3 Jan 2013 14:46:50 +0100
-Subject: [PATCH 1/2] ARM: OMAP4: clock data: ABE DPLL need to be locked on all
- revisions
+Date: Thu, 3 Jan 2013 14:46:51 +0100
+Subject: [PATCH 2/2] ARM: OMAP4: hwmod_data: Correct IDLEMODE for McPDM
 In-Reply-To: <1357220811-29904-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1357220811-29904-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1357220811-29904-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1357220811-29904-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to lock ABE DPPL on al OMAP4 revisions, not only for OMAP446x
+McPDM need to be configured to NO_IDLE mode when it is in used otherwise
+vital clocks will be gated which results 'slow motion' audio playback.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-omap2/cclock44xx_data.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-index 5789a5e..79c32ce 100644
---- a/arch/arm/mach-omap2/cclock44xx_data.c
-+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -2023,17 +2023,15 @@ int __init omap4xxx_clk_init(void)
- 				     ARRAY_SIZE(enable_init_clks));
- 
- 	/*
--	 * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
-+	 * On OMAP4 the ABE DPLL fails to turn on if in idle low-power
- 	 * state when turning the ABE clock domain. Workaround this by
- 	 * locking the ABE DPLL on boot.
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 129d508..584acf9 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2133,7 +2133,7 @@ static struct omap_hwmod omap44xx_mcpdm_hwmod = {
+ 	 * available, so it doesn't seem that we have any choice in
+ 	 * the kernel other than to avoid resetting it.
  	 */
--	if (cpu_is_omap446x()) {
--		rc = clk_set_parent(&abe_dpll_refclk_mux_ck, &sys_32k_ck);
--		if (!rc)
--			rc = clk_set_rate(&dpll_abe_ck, OMAP4_DPLL_ABE_DEFFREQ);
--		if (rc)
--			pr_err("%s: failed to configure ABE DPLL!\n", __func__);
--	}
-+	rc = clk_set_parent(&abe_dpll_refclk_mux_ck, &sys_32k_ck);
-+	if (!rc)
-+		rc = clk_set_rate(&dpll_abe_ck, OMAP4_DPLL_ABE_DEFFREQ);
-+	if (rc)
-+		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
- 
- 	return 0;
- }
+-	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
++	.flags		= HWMOD_EXT_OPT_MAIN_CLK | HWMOD_SWSUP_SIDLE,
+ 	.mpu_irqs	= omap44xx_mcpdm_irqs,
+ 	.sdma_reqs	= omap44xx_mcpdm_sdma_reqs,
+ 	.main_clk	= "mcpdm_fck",
 -- 
 1.8.0.2
