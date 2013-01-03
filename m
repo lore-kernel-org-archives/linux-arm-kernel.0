@@ -1,140 +1,23 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 3 Jan 2013 18:28:33 +0800
-Subject: [PATCH 1/9] ARM: PRIMA2: add CSR SiRFmarco device tree .dts
-In-Reply-To: <20130102121943.GC25907@e106331-lin.cambridge.arm.com>
-References: <1356005639-23466-1-git-send-email-Barry.Song@csr.com>
- <1356005639-23466-2-git-send-email-Barry.Song@csr.com>
- <20130102121943.GC25907@e106331-lin.cambridge.arm.com>
-Message-ID: <CAGsJ_4y06ZFZ-GOY08PgAwxP02oV0vAUuzXt+p6+gOcfpwitRw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jan 2013 10:38:15 +0000
+Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
+In-Reply-To: <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+ <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+Message-ID: <20130103103815.GL2631@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-Thanks very much for reviewing.
+On Thu, Jan 03, 2013 at 07:12:29PM +0900, kpark3469 at gmail.com wrote:
+> -#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
+> +#if defined(CONFIG_FRAME_POINTER) || defined(CONFIG_ARM_UNWIND)
+>  /*
+>   * return_address uses walk_stackframe to do it's work.  If both
+>   * CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses unwind
+> - * information.  For this to work in the function tracer many functions would
+> - * have to be marked with __notrace.  So for now just depend on
+> - * !CONFIG_ARM_UNWIND.
 
-2013/1/2, Mark Rutland <mark.rutland@arm.com>:
-> On Thu, Dec 20, 2012 at 12:13:51PM +0000, Barry Song wrote:
->> From: Barry Song <Baohua.Song@csr.com>
->>
->> SiRFmarco is a dual-core cortex-a9 SMP SoC from CSR. this patch
->> adds the .dtsi and a basic evb board .dts for it.
->>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> ---
->>  arch/arm/boot/dts/marco-evb.dts |   51 +++
->>  arch/arm/boot/dts/marco.dtsi    |  749
->> +++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 800 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/marco-evb.dts
->>  create mode 100644 arch/arm/boot/dts/marco.dtsi
->
-> [...]
->
->> diff --git a/arch/arm/boot/dts/marco.dtsi b/arch/arm/boot/dts/marco.dtsi
->> new file mode 100644
->> index 0000000..00b5eb7
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/marco.dtsi
->> @@ -0,0 +1,749 @@
->> +/*
->> + * DTS file for CSR SiRFmarco SoC
->> + *
->> + * Copyright (c) 2012 Cambridge Silicon Radio Limited, a CSR plc group
->> company.
->> + *
->> + * Licensed under GPLv2 or later.
->> + */
->> +
->> +/include/ "skeleton.dtsi"
->> +/ {
->> +       compatible = "sirf,marco";
->> +       #address-cells = <1>;
->> +       #size-cells = <1>;
->> +       interrupt-parent = <&gic>;
->> +
->> +       cpus {
->> +               cpu at 0 {
->> +                       compatible = "arm,cortex-a9";
->> +               };
->> +               cpu at 1 {
->> +                       compatible = "arm,cortex-a9";
->> +               };
->> +       };
->
-> It would be good if the cpu nodes had their reg property set, so the
-> logical
-> map can be populated. They should also have their device_type set to "cpu".
->
-agree.
-
->> +
->> +       axi {
->> +               compatible = "simple-bus";
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +               ranges = <0x40000000 0x40000000 0xa0000000>;
->> +
->> +               l2-cache-controller at c0030000 {
->> +                       compatible = "arm,pl310-cache",
->> "sirf,marco-pl310-cache";
->
-> I believe the order of these should be swapped such that the most specific
-> match comes first.
-
-agree since that compatible is a list of strings. The first string in
-the list specifies the exact device that the node represents in the
-form "<manufacturer>,<model>". The following strings represent other
-devices that the device is compatible with.
-
->
->> +                       reg = <0xc0030000 0x1000>;
->> +                       interrupts = <0 59 0>;
->> +                       arm,tag-latency = <1 1 1>;
->> +                       arm,data-latency = <1 1 1>;
->> +                       arm,filter-ranges = <0x40000000 0x80000000>;
->> +               };
->
-> [...]
->
->> +               peri-iobg {
->> +                       compatible = "simple-bus";
->> +                       #address-cells = <1>;
->> +                       #size-cells = <1>;
->> +                       ranges = <0xcc000000 0xcc000000 0x2000000>;
->> +
->> +                       timer at cc020000 {
->> +                               compatible = "sirf,marco-tick";
->> +                               reg = <0xcc020000 0x1000>;
->> +                               interrupts = <0 0 0
->> +                                             0 1 0
->> +                                             0 2 0
->> +                                             0 49 0
->> +                                             0 50 0
->> +                                             0 51 0>;
->
-> Small nit: could we have these individually bracketed as below? We're doing
-> this fairly consistently across platforms now.
-
-agree.
-
->
-> [...]
->
->> +                       gpio: pinctrl at cc120000 {
->> +                               #gpio-cells = <2>;
->> +                               #interrupt-cells = <2>;
->> +                               compatible = "sirf,marco-pinctrl";
->> +                               reg = <0xcc120000 0x10000>;
->> +                               interrupts = <0 43 0>,
->> +                                          <0 44 0>,
->> +                                          <0 45 0>,
->> +                                          <0 46 0>,
->> +                                          <0 47 0>;
->
-> From this point on you seem to bracket interrupts individually
-> consistently.
->
-> Thanks,
-> Mark.
-
--barry
+So what have you done about the issue referred in this comment?  Or do you
+believe that fixing warnings (even if they are explicit #warning statements)
+is far more important than code being functionally correct?
