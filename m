@@ -1,62 +1,58 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 3 Jan 2013 12:56:52 +0100
-Subject: [PATCH 0/3] ARM: OMAP3/4: Correct support for PWM LEDs/backlight
-In-Reply-To: <1357213768-21266-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1357213768-21266-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <50E57204.2090700@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Jan 2013 12:02:59 +0000
+Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
+In-Reply-To: <50E4C9C6.20609@codeaurora.org>
+References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
+ <50E4C9C6.20609@codeaurora.org>
+Message-ID: <20130103120259.GB5193@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Wed, Jan 02, 2013 at 11:59:02PM +0000, Stephen Boyd wrote:
+> On 01/02/13 13:07, Stephen Warren wrote:
+> > From: Stephen Warren <swarren@nvidia.com>
+> >
+> > On Tegra at least, this change allows kexec to work with SMP enabled.
+> > Without this,  machine_shutdown() simply puts all CPUs into a loop. If
+> > the code of that loop is over-written, the CPUs may hang or crash (which
+> > I do observe in practice), or cause the kexec'd kernel not to be able to
+> > initialize them.
+> >
+> > This fix has the added benefit that the kexec always happens on the boot
+> > CPU, and thus kexec mirrors the initial kernel boot as much as possible.
+> >
+> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > ---
+> > Russell, I assume this should go into the ARM patch tracker if OK?
+> >
+> >  arch/arm/kernel/process.c |    1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> > index f79dd1e..1893bda 100644
+> > --- a/arch/arm/kernel/process.c
+> > +++ b/arch/arm/kernel/process.c
+> > @@ -239,6 +239,7 @@ __setup("reboot=", reboot_setup);
+> >  
+> >  void machine_shutdown(void)
+> >  {
+> > +	disable_nonboot_cpus();
+> >  #ifdef CONFIG_SMP
+> >  	smp_send_stop();
+> >  #endif
+> 
+> How does this work in a CONFIG_SUSPEND=n build? It looks like
+> disable_nonboot_cpus() would be a no-op and so we wouldn't actually hot
+> unplug the other CPUs before sending the smp_send_stop(). And then the
+> smp_send_stop() seems a little unnecessary if we do actually shutdown
+> the other CPUs.
 
-On 01/03/2013 12:49 PM, Peter Ujfalusi wrote:
-> Hi,
-> 
-> The pwm-leds driver update is going for 3.9:
-> https://lkml.org/lkml/2012/12/21/99
-> 
-> This series will make sure that in 3.9 we are going to have working LEDs and
-> backlight on these boards.
-> 
-> As a note: 4430SDP never had working backlight and the charger led did not
-> worked for couple of releases already due to wrong pwm_id.
-> 
-> On BeagleBoard we will be able to adjust the brighness of pmu_stat LED instead
-> of full on/off.
-> 
-> Zoom2 will have working keypad light and the backlight will be moved to be
-> handled by the generic pwm-backlight driver.
-> 
-> This series will also fix a compile error in board-zoom-display.c caused by the
-> changes in twl-core - which I missed :(
-> 
-> The DT support for these are going to be sent later.
-> 
-> Tony: can you apply this - if it looks OK - so it will hit linux-next before the
-> second batch of twl-core update?
+You need the smp_send_stop call in order to send the cpu_kill (looks like
+tegra needs die and then kill). So you really need hotplug support as well
+as suspend for this to do much (if not, the secondaries end up spinning
+with interrupts disabled which is probably the best we can do anyway).
 
-The series has been generated on top of my previous series for audio support
-update of omap-twl4030:
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82615.html
+We could add SUSPEND as a KEXEC dependency if SMP (we already have HOTPLUG
+there) if you like?
 
-I can regenerate this without the depending series if you prefer that way.
-
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (3):
->   ARM: OMAP: board-4430sdp: Proper support for TWL6030 PWM LED/Backlight
->   ARM: OMAP: omap3beagle: Use the pwm_leds driver to control the PMU_STAT led
->   ARM: OMAP: zoom: Use pwm stack for lcd and keyboard backlight
-> 
->  arch/arm/mach-omap2/board-4430sdp.c          | 31 ++++++++++++++-
->  arch/arm/mach-omap2/board-omap3beagle.c      | 39 +++++++++++++++----
->  arch/arm/mach-omap2/board-zoom-display.c     | 56 ----------------------------
->  arch/arm/mach-omap2/board-zoom-peripherals.c | 53 +++++++++++++++++++++++++-
->  4 files changed, 113 insertions(+), 66 deletions(-)
-> 
-
-
--- 
-P?ter
+Will
