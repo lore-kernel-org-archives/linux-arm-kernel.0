@@ -1,34 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jan 2013 16:23:59 +0000
-Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
-In-Reply-To: <1357229038.10284.46.camel@gandalf.local.home>
-References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
- <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
- <20130103103815.GL2631@n2100.arm.linux.org.uk>
- <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
- <1357220165.10284.30.camel@gandalf.local.home>
- <20130103141301.GQ2631@n2100.arm.linux.org.uk>
- <1357229038.10284.46.camel@gandalf.local.home>
-Message-ID: <20130103162359.GR2631@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 3 Jan 2013 16:28:19 +0000
+Subject: [PATCH 9/9] ARM: tegra: Add initial support for Tegra 114 SoC.
+In-Reply-To: <1355996654-6579-10-git-send-email-hdoyu@nvidia.com>
+References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
+ <1355996654-6579-10-git-send-email-hdoyu@nvidia.com>
+Message-ID: <201301031628.19743.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 11:03:58AM -0500, Steven Rostedt wrote:
-> On Thu, 2013-01-03 at 14:13 +0000, Russell King - ARM Linux wrote:
-> > In summary, from what I can see in the patch, the reason why the ifdefs
-> > are the way they are, and the reason the warning is there has not been
-> > addressed; these patches just seem to be aimed just at removing a #warning
-> > statement to make the warning go away.
-> 
-> You're correct that this patch does not solve any of theses issues. Now,
-> I'm thinking that ftrace has matured where these issues don't exist, and
-> where they do, it will only cause noise in the trace than anything
-> serious. But, this needs to be looked deeper to make sure.
+On Thursday 20 December 2012, Hiroshi Doyu wrote:
+> +
+> +DT_MACHINE_START(TEGRA114_DT, "NVIDIA Tegra114 (Flattened Device Tree)")
+> +       .smp            = smp_ops(tegra_smp_ops),
+> +       .map_io         = tegra_map_common_io,
+> +       .init_early     = tegra30_init_early,
+> +       .init_irq       = tegra_dt_init_irq,
+> +       .handle_irq     = gic_handle_irq,
+> +       .init_time      = clocksource_of_init,
+> +       .init_machine   = tegra114_dt_init,
+> +       .init_late      = tegra_init_late,
+> +       .restart        = tegra_assert_system_reset,
+> +       .dt_compat      = tegra114_dt_board_compat,
+> +MACHINE_END
 
-Looking back in the archives, it seems that we had a problem with ftrace
-and the unwinder polluting the trace information:
+This one is so similar to Tegra30 that I wonder if it's actually worth keeping
+them separate still. The only difference I see is the clock initialization.
+Maybe that can be factored out to keep this the same as Tegra30.
 
-http://lists.arm.linux.org.uk/lurker/message/20090604.201745.1c41ee6c.en.html
+Or are you planning to add more SoC specific here that would make this harder?
 
-There's quite a bit of discussion in that thread about this which details
-why we came up with what we have today.
+	Arnd
