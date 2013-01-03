@@ -1,40 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 03 Jan 2013 14:45:02 -0700
-Subject: [PATCH] ARM: tegra: add kexec support to defconfig
-In-Reply-To: <20130103212903.GA27749@avionic-0098.adnet.avionic-design.de>
-References: <1357161141-26430-1-git-send-email-swarren@wwwdotorg.org>
- <20130103210541.GB4412@avionic-0098.adnet.avionic-design.de>
- <50E5F5A3.1060507@wwwdotorg.org>
- <20130103212903.GA27749@avionic-0098.adnet.avionic-design.de>
-Message-ID: <50E5FBDE.90804@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 3 Jan 2013 21:48:39 +0000
+Subject: [PATCH v4 13/19] ARM: remove mach .handle_irq for VIC users
+In-Reply-To: <1357235668-9450-14-git-send-email-robherring2@gmail.com>
+References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
+ <1357235668-9450-14-git-send-email-robherring2@gmail.com>
+Message-ID: <201301032148.39523.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2013 02:29 PM, Thierry Reding wrote:
-> On Thu, Jan 03, 2013 at 02:18:27PM -0700, Stephen Warren wrote:
->> On 01/03/2013 02:05 PM, Thierry Reding wrote:
->>> On Wed, Jan 02, 2013 at 02:12:21PM -0700, Stephen Warren
->>> wrote:
->>>> From: Stephen Warren <swarren@nvidia.com>
->>>> 
->>>> Signed-off-by: Stephen Warren <swarren@nvidia.com> --- 
->>>> arch/arm/configs/tegra_defconfig |    1 + 1 file changed, 1 
->>>> insertion(+)
->>>> 
->>>> diff --git a/arch/arm/configs/tegra_defconfig 
->>>> b/arch/arm/configs/tegra_defconfig index 742dc41..e621603
->>>> 100644 --- a/arch/arm/configs/tegra_defconfig +++ 
->>>> b/arch/arm/configs/tegra_defconfig @@ -34,6 +34,7 @@ 
->>>> CONFIG_AEABI=y CONFIG_HIGHMEM=y CONFIG_ZBOOT_ROM_TEXT=0x0 
->>>> CONFIG_ZBOOT_ROM_BSS=0x0 +CONFIG_KEXEC=y CONFIG_CPU_FREQ=y 
->>>> CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y CONFIG_CPU_IDLE=y
->>> 
->>> Interesting. What do you plan to use this for? kdump?
->> 
->> I plan to burn a kernel (and a small stub, and a DTB) into flash 
->> instead of U-Boot, and hence not have to rely on any bootloader.
+On Thursday 03 January 2013, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Why does that require kexec support?
+> Now that the VIC initialization sets up the handle_arch_irq pointer, we
+> can remove it for all machines and make it static.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Hubert Feurstein <hubert.feurstein@contec.at>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Shiraz Hashim <shiraz.hashim@st.com>
+> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Acked-by: Jamie Iles <jamie@jamieiles.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> Acked-by: Olof Johansson <olof@lixom.net>
 
-Because I'd be using that kernel plus an initrd to download the "real"
-kernel over e.g. TFTP and kexec it.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+However,
+
+> index 6894df1..d5ee437 100644
+> --- a/arch/arm/common/vic.c
+> +++ b/arch/arm/common/vic.c
+> @@ -83,6 +83,8 @@ static struct vic_device vic_devices[CONFIG_ARM_VIC_NR];
+>  
+>  static int vic_id;
+>  
+> +static void vic_handle_irq(struct pt_regs *regs);
+> +
+>  /**
+>   * vic_init2 - common initialisation code
+>   * @base: Base of the VIC.
+> @@ -466,7 +468,7 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
+>   * Keep iterating over all registered VIC's until there are no pending
+>   * interrupts.
+>   */
+> -asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
+> +static asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
+>  {
+>         int i, handled;
+>  
+
+I'm a big fan of the "no forward function declarations in .c files" rule. Can
+I convince to reorder the file contents instead to avoid the forward declaration?
+
+	Arnd
