@@ -1,42 +1,42 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 3 Jan 2013 16:11:43 +0100
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <CAErSpo4O9jCjLrdky2C-7EarJwBPSTRrhHb7pNsQNWcNNgenEw@mail.gmail.com>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130103143931.GA28451@avionic-0098.adnet.avionic-design.de>
- <CAErSpo4O9jCjLrdky2C-7EarJwBPSTRrhHb7pNsQNWcNNgenEw@mail.gmail.com>
-Message-ID: <20130103151140.GA28625@avionic-0098.adnet.avionic-design.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 03 Jan 2013 16:21:37 +0100
+Subject: [PATCH] ARM: Samsung: Export MIPI CSIS/DSIM PHY control functions
+Message-ID: <1357226497-25166-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 08:00:58AM -0700, Bjorn Helgaas wrote:
-> On Thu, Jan 3, 2013 at 7:39 AM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
-> > Hi everyone,
-> >
-> > Thomas' RFC series incited me to put in some more work on the Tegra PCIe
-> > controller driver. This in turn brought up an old issue: should we move
-> > PCIe controller drivers to some central location rather than keeping
-> > them in machine-specific directories? Last time I brought this up there
-> > was no consensus but I really think there's some value in keeping these
-> > drivers in a common location, especially now that a few people are
-> > starting to work on similar problems. It may also provide some more
-> > momentum to get the various DT implementations factored out of various
-> > architectures.
-> >
-> > Stephen proposed drivers/pci/host on IRC and I second that.
-> >
-> > Bjorn, is this something you would be on board with?
-> 
-> Sounds fine to me.
+The s5p_csis_phy_enable/s5p_dsim_phy_enable functions are now used
+directly by corresponding drivers and thus need to be exported so
+the drivers can be built as modules.
 
-Great! Thomas, does that work for you as well?
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/plat-samsung/setup-mipiphy.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130103/b057b741/attachment-0001.sig>
+diff --git a/arch/arm/plat-samsung/setup-mipiphy.c b/arch/arm/plat-samsung/setup-mipiphy.c
+index 1474593..66df315 100644
+--- a/arch/arm/plat-samsung/setup-mipiphy.c
++++ b/arch/arm/plat-samsung/setup-mipiphy.c
+@@ -8,6 +8,7 @@
+  * published by the Free Software Foundation.
+  */
+
++#include <linux/export.h>
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+@@ -50,8 +51,10 @@ int s5p_csis_phy_enable(int id, bool on)
+ {
+ 	return __s5p_mipi_phy_control(id, on, S5P_MIPI_DPHY_SRESETN);
+ }
++EXPORT_SYMBOL(s5p_csis_phy_enable);
+
+ int s5p_dsim_phy_enable(struct platform_device *pdev, bool on)
+ {
+ 	return __s5p_mipi_phy_control(pdev->id, on, S5P_MIPI_DPHY_MRESETN);
+ }
++EXPORT_SYMBOL(s5p_dsim_phy_enable);
+--
+1.7.9.5
