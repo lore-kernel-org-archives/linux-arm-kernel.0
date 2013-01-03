@@ -1,31 +1,34 @@
 From: panto@antoniou-consulting.com (Pantelis Antoniou)
-Date: Fri,  4 Jan 2013 00:32:22 +0200
-Subject: [PATCH] omap: am33xx-hwmod: Fix wrongly terminated
- am33xx_usbss_mpu_irqs array
-Message-ID: <1357252342-6166-1-git-send-email-panto@antoniou-consulting.com>
+Date: Fri,  4 Jan 2013 00:32:33 +0200
+Subject: [PATCH] arm: Export cache flush management symbols when !MULTI_CACHE
+Message-ID: <1357252353-6200-1-git-send-email-panto@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQ array must be terminated by -1 and not by -1+OMAP_INTC_START
-This led to having a resource list of 100s of IRQs.
+When compiling a kernel without CONFIG_MULTI_CACHE enabled the
+dma access functions end up not being exported. Fix it.
 
 Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/setup.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 081c71e..e402303 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -2070,7 +2070,7 @@ static struct omap_hwmod_irq_info am33xx_usbss_mpu_irqs[] = {
- 	{ .name = "usbss-irq", .irq = 17 + OMAP_INTC_START, },
- 	{ .name = "musb0-irq", .irq = 18 + OMAP_INTC_START, },
- 	{ .name = "musb1-irq", .irq = 19 + OMAP_INTC_START, },
--	{ .irq = -1 + OMAP_INTC_START, },
-+	{ .irq = -1, },
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 3f6cbb2..4540dad 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -931,3 +931,12 @@ const struct seq_operations cpuinfo_op = {
+ 	.stop	= c_stop,
+ 	.show	= c_show
  };
- 
- static struct omap_hwmod am33xx_usbss_hwmod = {
++
++/* export the cache management functions */
++#ifndef MULTI_CACHE
++
++EXPORT_SYMBOL(__glue(_CACHE,_dma_map_area));
++EXPORT_SYMBOL(__glue(_CACHE,_dma_unmap_area));
++EXPORT_SYMBOL(__glue(_CACHE,_dma_flush_range));
++
++#endif
 -- 
 1.7.12
