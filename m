@@ -1,52 +1,68 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 3 Jan 2013 20:37:34 +0800
-Subject: [PATCH v3 3/3] ARM i.MX51 babbage: Add keypad support
-In-Reply-To: <1357216654-12651-1-git-send-email-Ying.Liu@freescale.com>
-References: <1357216654-12651-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1357216654-12651-3-git-send-email-Ying.Liu@freescale.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 03 Jan 2013 08:36:05 -0500
+Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
+In-Reply-To: <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
+References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+ <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+ <20130103103815.GL2631@n2100.arm.linux.org.uk>
+ <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
+Message-ID: <1357220165.10284.30.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The keypad is on the accessory board of i.MX51 babbage
-main board and is driven by Keypad Port(KPP) in SoC.
-The keymap is the same to i.MX25 3stack platform as
-the accessory board schematic tells that it is designed
-in this way.
+On Thu, 2013-01-03 at 20:36 +0900, Keun-O Park wrote:
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+>         
+>         So what have you done about the issue referred in this
+>         comment?  Or do you
+>         believe that fixing warnings (even if they are explicit
+>         #warning statements)
+>         is far more important than code being functionally correct?
+> 
+> I admit that I missed to add notrace to unwind.c.
+> Do you think there's more to add?
+
+I think Russell wants a better change log. What was written sounds like
+the fix was to remove a warning. It wasn't very clear to how the warning
+is no longer relevant because of the new changes.
+
+The old change log:
+
 ---
- arch/arm/boot/dts/imx51-babbage.dts |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+This fixes a warning saying:
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 567e7ee..a9bb799 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -281,3 +281,25 @@
- 		mux-ext-port = <3>;
- 	};
- };
-+
-+&kpp {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_kpp_1>;
-+	linux,keymap = <0x00000067	/* KEY_UP */
-+			0x0001006c	/* KEY_DOWN */
-+			0x00020072	/* KEY_VOLUMEDOWN */
-+			0x00030066	/* KEY_HOME */
-+			0x0100006a	/* KEY_RIGHT */
-+			0x01010069	/* KEY_LEFT */
-+			0x0102001c	/* KEY_ENTER */
-+			0x01030073	/* KEY_VOLUMEUP */
-+			0x02000040	/* KEY_F6 */
-+			0x02010042	/* KEY_F8 */
-+			0x02020043	/* KEY_F9 */
-+			0x02030044	/* KEY_F10 */
-+			0x0300003b	/* KEY_F1 */
-+			0x0301003c	/* KEY_F2 */
-+			0x0302003d	/* KEY_F3 */
-+			0x03030074>;	/* KEY_POWER */
-+	status = "okay";
-+};
--- 
-1.7.1
+    warning: #warning "TODO: return_address should use unwind tables"
+
+And, this enables return_address using unwind information. If ARM_UNWIND is
+selected, unwind_frame in unwind.c will be called in walk_stackframe.
+---
+
+
+Maybe you wanted to say something like:
+
+---
+Now that the return_address code can safely use unwind tables, fix up
+the #ifdef statements to reflect this.
+---
+
+Or something similar, if that's what was done.
+
+-- Steve
+
+
+> 
+> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+> index 00df012..52ff2d4 100644
+> --- a/arch/arm/kernel/unwind.c
+> +++ b/arch/arm/kernel/unwind.c
+> @@ -327,7 +327,7 @@ static int unwind_exec_insn(struct
+> unwind_ctrl_block *ctrl)
+>   * Unwind a single frame starting with *sp for the symbol at *pc. It
+>   * updates the *pc and *sp with the new values.
+>   */
+> -int unwind_frame(struct stackframe *frame)
+> +int notrace unwind_frame(struct stackframe *frame)
+>  {
+>         unsigned long high, low;
+>         const struct unwind_idx *idx;
+> 
