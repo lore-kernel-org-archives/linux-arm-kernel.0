@@ -1,44 +1,104 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 3 Jan 2013 12:43:10 +0100 (CET)
-Subject: =?UTF-8?q?=5BPATCH=20133/493=5D=20remove=20use=20of=20=5F=5Fdevexit=5Fp?=
-In-Reply-To: <1353349642-3677-133-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-133-git-send-email-wfp5p@virginia.edu>
-Message-ID: <Pine.LNX.4.64.1301031235370.17494@axis700.grange>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 3 Jan 2013 12:49:26 +0100
+Subject: [PATCH 1/3] ARM: OMAP: board-4430sdp: Proper support for TWL6030 PWM
+ LED/Backlight
+In-Reply-To: <1357213768-21266-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1357213768-21266-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1357213768-21266-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill
+New PWM drivers are being prepared for twl series which will enable the use
+of all PWMs (PWMs and LEDs).
+They are implemented as generic PWM drivers to be able to use them for different
+purposes.
+The current platform code was broken: the leds_pwm driver was not able to pick
+up the PWM since the pwm_id was incorrect.
 
-On Mon, 19 Nov 2012, Bill Pemberton wrote:
+With the other patches we will be able to control the followings:
+LCD backlight via pwm-backlight driver
+Keypad leds via leds_pwm driver as normal LED
+Charging indicator via leds_pwm driver as normal LED
 
-> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
-> needed.
-
-Doesn't this also make the use of __refdata in many locations like this
-
-[snip]
-
-> diff --git a/drivers/media/platform/soc_camera/sh_mobile_csi2.c b/drivers/media/platform/soc_camera/sh_mobile_csi2.c
-> index 0528650..0d0344a 100644
-> --- a/drivers/media/platform/soc_camera/sh_mobile_csi2.c
-> +++ b/drivers/media/platform/soc_camera/sh_mobile_csi2.c
-> @@ -382,7 +382,7 @@ static __devexit int sh_csi2_remove(struct platform_device *pdev)
->  }
->  
->  static struct platform_driver __refdata sh_csi2_pdrv = {
-> -	.remove	= __devexit_p(sh_csi2_remove),
-> +	.remove	= sh_csi2_remove,
->  	.probe	= sh_csi2_probe,
->  	.driver	= {
->  		.name	= "sh-mobile-csi2",
-
-superfluous? If so, I'm sure you'd be happy to make a couple more patches 
-to continue this series ;-)
-
-Thanks
-Guennadi
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ arch/arm/mach-omap2/board-4430sdp.c | 31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 1cc6696..946b150 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -24,8 +24,10 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/fixed.h>
++#include <linux/pwm.h>
+ #include <linux/leds.h>
+ #include <linux/leds_pwm.h>
++#include <linux/pwm_backlight.h>
+ #include <linux/platform_data/omap4-keypad.h>
+ #include <linux/usb/musb.h>
+ 
+@@ -256,10 +258,20 @@ static struct gpio_led_platform_data sdp4430_led_data = {
+ 	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
+ };
+ 
++static struct pwm_lookup sdp4430_pwm_lookup[] = {
++	PWM_LOOKUP("twl-pwm", 0, "leds_pwm", "omap4::keypad"),
++	PWM_LOOKUP("twl-pwm", 1, "pwm-backlight", "backlight"),
++	PWM_LOOKUP("twl-pwmled", 0, "leds_pwm", "omap4:green:chrg"),
++};
++
+ static struct led_pwm sdp4430_pwm_leds[] = {
+ 	{
++		.name		= "omap4::keypad",
++		.max_brightness	= 127,
++		.pwm_period_ns	= 7812500,
++	},
++	{
+ 		.name		= "omap4:green:chrg",
+-		.pwm_id		= 1,
+ 		.max_brightness	= 255,
+ 		.pwm_period_ns	= 7812500,
+ 	},
+@@ -278,6 +290,21 @@ static struct platform_device sdp4430_leds_pwm = {
+ 	},
+ };
+ 
++static struct platform_pwm_backlight_data sdp4430_backlight_data = {
++	.pwm_id = 1,
++	.max_brightness = 127,
++	.dft_brightness = 127,
++	.pwm_period_ns = 7812500,
++};
++
++static struct platform_device sdp4430_backlight_pwm = {
++	.name   = "pwm-backlight",
++	.id     = -1,
++	.dev    = {
++		.platform_data = &sdp4430_backlight_data,
++	},
++};
++
+ static int omap_prox_activate(struct device *dev)
+ {
+ 	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 1);
+@@ -412,6 +439,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
+ 	&sdp4430_gpio_keys_device,
+ 	&sdp4430_leds_gpio,
+ 	&sdp4430_leds_pwm,
++	&sdp4430_backlight_pwm,
+ 	&sdp4430_vbat,
+ 	&sdp4430_dmic_codec,
+ 	&sdp4430_abe_audio,
+@@ -707,6 +735,7 @@ static void __init omap_4430sdp_init(void)
+ 				ARRAY_SIZE(sdp4430_spi_board_info));
+ 	}
+ 
++	pwm_add_table(sdp4430_pwm_lookup, ARRAY_SIZE(sdp4430_pwm_lookup));
+ 	status = omap4_keyboard_init(&sdp4430_keypad_data, &keypad_data);
+ 	if (status)
+ 		pr_err("Keypad initialization failed: %d\n", status);
+-- 
+1.8.0.2
