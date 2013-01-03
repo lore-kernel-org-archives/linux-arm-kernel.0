@@ -1,79 +1,113 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 3 Jan 2013 15:06:56 +0100
-Subject: [PATCH 0/9] ARM: Initial support for Tegra 114 SoC.
-In-Reply-To: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
-References: <1355996654-6579-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20130103.160656.1043855724416946158.hdoyu@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jan 2013 14:13:01 +0000
+Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
+In-Reply-To: <1357220165.10284.30.camel@gandalf.local.home>
+References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+ <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+ <20130103103815.GL2631@n2100.arm.linux.org.uk>
+ <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
+ <1357220165.10284.30.camel@gandalf.local.home>
+Message-ID: <20130103141301.GQ2631@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Thu, Jan 03, 2013 at 08:36:05AM -0500, Steven Rostedt wrote:
+> On Thu, 2013-01-03 at 20:36 +0900, Keun-O Park wrote:
+> >         So what have you done about the issue referred in this
+> >         comment?  Or do you
+> >         believe that fixing warnings (even if they are explicit
+> >         #warning statements)
+> >         is far more important than code being functionally correct?
+> > 
+> > I admit that I missed to add notrace to unwind.c.
+> > Do you think there's more to add?
+> 
+> I think Russell wants a better change log. What was written sounds like
+> the fix was to remove a warning. It wasn't very clear to how the warning
+> is no longer relevant because of the new changes.
+> 
+> The old change log:
+> 
+> ---
+> This fixes a warning saying:
+> 
+>     warning: #warning "TODO: return_address should use unwind tables"
+> 
+> And, this enables return_address using unwind information. If ARM_UNWIND is
+> selected, unwind_frame in unwind.c will be called in walk_stackframe.
+> ---
+> 
+> 
+> Maybe you wanted to say something like:
+> 
+> ---
+> Now that the return_address code can safely use unwind tables, fix up
+> the #ifdef statements to reflect this.
+> ---
+> 
+> Or something similar, if that's what was done.
 
-Hiroshi Doyu <hdoyu@nvidia.com> wrote @ Thu, 20 Dec 2012 10:43:58 +0100:
+No.  What I want is some evidence that the patch author is not just
+removing warnings by patching them away, but has thought about why
+the warning is there, and that they've resolved the issues for why
+that warning is there - and most importantly why the code is not built
+in that configuration.
 
-> Hi,
-> 
-> This patchset adds initial support for the NVIDIA's new Tegra 114
-> SoC (T114) based on the ARM Cortex-A15 MP. It has the minimal support
-> to allow the kernel to boot up into shell console. This can be used as
-> a basis for adding other device drivers for this SoC. Currently there
-> are 2 evaluation boards available, "Dalmore" and "Pluto".
+The unwinder has many functions, none of which is marked in any way.
+This is alluded to in this comment:
 
-I'll resend v2 of this series just with /cpus node in DT added. The
-rest would be same since TSC initialization and dynamic core
-detections are still necessary/valid for Tegra as backup of /cpus DT
-failure. Or if you take this series as is first, I'll make a /cpus DT
-patchset agaist this series.
+/*
+ * return_address uses walk_stackframe to do it's work.  If both
+ * CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses unwind
+ * information.  For this to work in the function tracer many functions would
+ * have to be marked with __notrace.  So for now just depend on
+ * !CONFIG_ARM_UNWIND.
+ */
 
-> This patchset is against Stephen Warren's linux-next_common branch:
+So, what this means is that the function tracer can have hooks in the
+unwinder code.  If one of those hooks is active, then there's the
+possibility for recursion.
+
+I see no evidence in either of these patches that this issue has been
+addressed in any way (let alone thought about.)  The approach here seems
+to be "lets remove the comment, lets change the ifdefs to make the code
+build, and lets remove the warning".
+
+That's not acceptable.  We don't fix warnings to make them go away while
+effectively hiding the original problem.
+
 > 
->   git://nv-tegra.nvidia.com/user/swarren/linux-2.6 linux-next_common
-> 
-> For those who want to try:
-> 
->   $ make ARCH=arm tegra_defconfig
->   $ scripts/config -e ARCH_TEGRA_114_SOC -d DRM -d SUSPEND \
->     	-d PM_RUNTIME -d CPU_FREQ -d CPU_IDLE
->   $ make ARCH=arm menuconfig # if needed to configure more
->   $ make ARCH=arm all -j9
-> 
-> Verified that this single image booted up with "Dalmore(T114)",
-> "Pluto(T114)" and "Cardhu(T30)". For "Cardhu(T30)" with this single
-> image, SPI driver doesn't seem to afford the above configuration , it
-> hangs at boot-up. With SPI disabled, it's ok.
+> -- Steve
 > 
 > 
-> Hiroshi Doyu (9):
->   ARM: tegra: fuse: Add chipid TEGRA114 0x35
->   HACK: ARM: tegra: Use CLK_IGNORE_UNUSED for Tegra 114 SoC
->   ARM: tegra: # of CPU cores detection w/ & w/o HAVE_ARM_SCU
->   clocksource: tegra: Reorganize funcs by clock functionarities
->   clocksource: tegra: Enable ARM arch_timer with TSC
->   ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
->   ARM: dt: tegra114: Add new board, Dalmore
->   ARM: dt: tegra114: Add new board, Pluto
->   ARM: tegra: Add initial support for Tegra 114 SoC.
-> 
->  .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 +
->  arch/arm/boot/dts/Makefile                         |    4 +-
->  arch/arm/boot/dts/tegra114-dalmore.dts             |   21 ++
->  arch/arm/boot/dts/tegra114-pluto.dts               |   21 ++
->  arch/arm/boot/dts/tegra114.dtsi                    |   89 ++++++++
->  arch/arm/mach-tegra/Kconfig                        |   10 +
->  arch/arm/mach-tegra/Makefile                       |    1 +
->  arch/arm/mach-tegra/board-dt-tegra114.c            |   48 +++++
->  arch/arm/mach-tegra/common.c                       |    1 +
->  arch/arm/mach-tegra/fuse.h                         |    1 +
->  arch/arm/mach-tegra/platsmp.c                      |   31 ++-
->  arch/arm/mach-tegra/tegra30_clocks_data.c          |    2 +
->  drivers/clocksource/tegra20_timer.c                |  222 +++++++++++++-------
->  13 files changed, 384 insertions(+), 78 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
->  create mode 100644 arch/arm/boot/dts/tegra114-dalmore.dts
->  create mode 100644 arch/arm/boot/dts/tegra114-pluto.dts
->  create mode 100644 arch/arm/boot/dts/tegra114.dtsi
->  create mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
-> 
-> -- 
-> 1.7.9.5
-> 
+> > 
+> > diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+> > index 00df012..52ff2d4 100644
+> > --- a/arch/arm/kernel/unwind.c
+> > +++ b/arch/arm/kernel/unwind.c
+> > @@ -327,7 +327,7 @@ static int unwind_exec_insn(struct
+> > unwind_ctrl_block *ctrl)
+> >   * Unwind a single frame starting with *sp for the symbol at *pc. It
+> >   * updates the *pc and *sp with the new values.
+> >   */
+> > -int unwind_frame(struct stackframe *frame)
+> > +int notrace unwind_frame(struct stackframe *frame)
+> >  {
+> >         unsigned long high, low;
+> >         const struct unwind_idx *idx;
+> > 
+
+And what about search_index(), unwind_find_origin(), unwind_find_idx(),
+unwind_get_byte(), unwind_exec_insn(), pr_debug(), pr_warning()?  Maybe
+the compiler currently inlines all those functions, but todays compiler
+behaviour is no guarantee of tomorrow's compiler behaviour.  We'd also
+hope that list_move() would always be inlined and never traced.
+
+It is possible that the ftrace code has some re-entrancy protection to
+prevent the unwinder recursing back into the ftrace code, but that's not
+mentioned in this patch... so it could be that needs to be explained.
+
+In summary, from what I can see in the patch, the reason why the ifdefs
+are the way they are, and the reason the warning is there has not been
+addressed; these patches just seem to be aimed just at removing a #warning
+statement to make the warning go away.
