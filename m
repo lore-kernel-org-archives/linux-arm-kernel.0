@@ -1,31 +1,27 @@
-From: pengw@nvidia.com (Peng Wu)
-Date: Wed, 2 Jan 2013 16:11:31 -0800
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 02 Jan 2013 17:13:52 -0700
 Subject: [PATCH 1/2] ARM: DT: tegra: Add board level compatible properties
-In-Reply-To: <50E4CB34.6070205@wwwdotorg.org>
+In-Reply-To: <50E4CCB3.2040704@nvidia.com>
 References: <1357170831-7836-1-git-send-email-pengw@nvidia.com>
- <50E4CB34.6070205@wwwdotorg.org>
-Message-ID: <50E4CCB3.2040704@nvidia.com>
+ <50E4CB34.6070205@wwwdotorg.org> <50E4CCB3.2040704@nvidia.com>
+Message-ID: <50E4CD40.10903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2013 04:05 PM, Stephen Warren wrote:
-> On 01/02/2013 04:53 PM, Bryan Wu wrote:
->> The compatible properties of Tegra SoC based boards or machines need
->> to be documented. This patch adds these board levle compatible
+On 01/02/2013 05:11 PM, Peng Wu wrote:
+> On 01/02/2013 04:05 PM, Stephen Warren wrote:
+>> On 01/02/2013 04:53 PM, Bryan Wu wrote:
+>>> The compatible properties of Tegra SoC based boards or machines need
+>>> to be documented. This patch adds these board levle compatible
+> 
+> My bad, Stephen could you please help me to fix this typo when you
+> merging this patch
+> 'levle' -> 'level'
 
-My bad, Stephen could you please help me to fix this typo when you 
-merging this patch
-'levle' -> 'level'
+Sure, I'll patch that up when applying.
 
->> properties into device tree binding document.
-> This series looks reasonable now. I'll apply it tomorrow.
+>> Do you have any idea when SATA support could be added?
 >
-> It should be easy enough to add HDMI support; the driver is there.
+> Oh, do you have SATA driver merged into upstream yet?
 
-OK, cool. I will take a look at this as long as driver is ready
-
-> Do you have any idea when SATA support could be added?
-Oh, do you have SATA driver merged into upstream yet?
-
-Thanks,
--Bryan
+The driver isn't there yet, but it'd be great to add it.
