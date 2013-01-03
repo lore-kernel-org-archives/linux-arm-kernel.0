@@ -1,42 +1,33 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 03 Jan 2013 16:21:37 +0100
-Subject: [PATCH] ARM: Samsung: Export MIPI CSIS/DSIM PHY control functions
-Message-ID: <1357226497-25166-1-git-send-email-s.nawrocki@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 03 Jan 2013 16:55 +0100
+Subject: Early kernel hang with big DTB appended
+Message-ID: <7811936.npteFbuYu2@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s5p_csis_phy_enable/s5p_dsim_phy_enable functions are now used
-directly by corresponding drivers and thus need to be exported so
-the drivers can be built as modules.
+Hi,
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/plat-samsung/setup-mipiphy.c |    3 +++
- 1 file changed, 3 insertions(+)
+I'm observing strange behavior when booting 3.8-rc1 and -rc2 with appended 
+DTB. The kernel hangs very early when the DTB is bigger than some 
+threshold somewhere around 24 KiB. With fullest possible low level UART 
+debugging (and printk patched to use printascii) I'm receiving following 
+output:
 
-diff --git a/arch/arm/plat-samsung/setup-mipiphy.c b/arch/arm/plat-samsung/setup-mipiphy.c
-index 1474593..66df315 100644
---- a/arch/arm/plat-samsung/setup-mipiphy.c
-+++ b/arch/arm/plat-samsung/setup-mipiphy.c
-@@ -8,6 +8,7 @@
-  * published by the Free Software Foundation.
-  */
+Uncompressing Linux... done, booting the kernel.
+Booting Linux on physical CPU 0xa00
+Linux version 3.8.0-rc1-00073-gdf6efca-dirty (t.figa at amdc1227) (gcc 
+version 4.5.2 (Gentoo 4.5.2 p1.2, pie-0.4.5) ) #2 SMP PREEMPT Thu Jan 3 
+15:37:35 CET 2013
+CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
+CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
 
-+#include <linux/export.h>
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
-@@ -50,8 +51,10 @@ int s5p_csis_phy_enable(int id, bool on)
- {
- 	return __s5p_mipi_phy_control(id, on, S5P_MIPI_DPHY_SRESETN);
- }
-+EXPORT_SYMBOL(s5p_csis_phy_enable);
+I tested on two Exynos-based boards (exynos4210-trats and one internal 
+exynos4412-based board) and same happens on both.
 
- int s5p_dsim_phy_enable(struct platform_device *pdev, bool on)
- {
- 	return __s5p_mipi_phy_control(pdev->id, on, S5P_MIPI_DPHY_MRESETN);
- }
-+EXPORT_SYMBOL(s5p_dsim_phy_enable);
---
-1.7.9.5
+Do you have any ideas?
+
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
