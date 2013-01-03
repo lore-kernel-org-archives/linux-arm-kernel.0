@@ -1,66 +1,57 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 03 Jan 2013 16:52:32 +0400
-Subject: [PATCH v5 13/22] mfd: omap-usb-host: override number of ports
- from platform data
-In-Reply-To: <1357138842-28964-14-git-send-email-rogerq@ti.com>
-References: <1357138842-28964-1-git-send-email-rogerq@ti.com>
- <1357138842-28964-14-git-send-email-rogerq@ti.com>
-Message-ID: <50E57F10.6030402@mvista.com>
+From: liu.y.victor@gmail.com (Liu Ying)
+Date: Thu, 3 Jan 2013 21:06:10 +0800
+Subject: [PATCH v2 1/3] Input: imx_keypad - Add device tree support
+In-Reply-To: <20130103071058.GA2566@S2101-09.ap.freescale.net>
+References: <1357010475-7331-1-git-send-email-Ying.Liu@freescale.com>
+ <20130103071058.GA2566@S2101-09.ap.freescale.net>
+Message-ID: <CA+8Hj83az-LGTrfQpb_Qh77N_9GCrbtO+374PyQ6hk4tYdCWdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 02-01-2013 19:00, Roger Quadros wrote:
-
-> Both OMAP4 and 5 exhibit the same revision ID in the REVISION register
-> but they have different number of ports i.e. 2 and 3 respectively.
-> So we can't rely on REVISION register for number of ports on OMAP5
-> and depend on platform data (or device tree) instead.
-
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-[...]
-
-> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-> index 5edb828..710460d 100644
-> --- a/drivers/mfd/omap-usb-host.c
-> +++ b/drivers/mfd/omap-usb-host.c
-> @@ -497,19 +497,27 @@ static int usbhs_omap_probe(struct platform_device *pdev)
->   	 */
->   	pm_runtime_put_sync(dev);
+2013/1/3 Shawn Guo <shawn.guo@linaro.org>:
+> On Tue, Jan 01, 2013 at 11:21:13AM +0800, Liu Ying wrote:
+>> +#ifdef CONFIG_OF
+>> +static inline int imx_keypad_check_dt(struct platform_device *pdev)
+>> +{
+>> +     struct device_node *np = pdev->dev.of_node;
+>> +
+>> +     if (!np)
+>> +             return -ENODEV;
+>> +
+>> +     return 0;
+>> +}
+>> +#else
+>> +static inline int imx_keypad_check_dt(struct platform_device *pdev)
+>> +{
+>> +     return -ENODEV;
+>> +}
+>> +#endif
+>> +
+>>  static int imx_keypad_probe(struct platform_device *pdev)
+>>  {
+>>       const struct matrix_keymap_data *keymap_data = pdev->dev.platform_data;
+>>       struct imx_keypad *keypad;
+>>       struct input_dev *input_dev;
+>>       struct resource *res;
+>> -     int irq, error, i;
+>> +     int irq, error, i, row, col, row_shift;
+>>
+>> -     if (keymap_data == NULL) {
+>> +     if (keymap_data == NULL && imx_keypad_check_dt(pdev)) {
 >
-> -	switch (omap->usbhs_rev) {
-> -	case OMAP_USBHS_REV1:
-> -		omap->nports = 3;
-> -		break;
-> -	case OMAP_USBHS_REV2:
-> -		omap->nports = 2;
-> -		break;
-> -	default:
-> -		omap->nports = OMAP3_HS_USB_PORTS;
-> -		dev_dbg(dev,
-> -		  "USB HOST Rev : 0x%d not recognized, assuming %d ports\n",
-> -		   omap->usbhs_rev, omap->nports);
-> -		break;
-> +	/*
-> +	 * If platform data contains nports then use that
-> +	 * else make out number of ports from USBHS revision
-> +	 */
-> +	if (pdata->nports) {
-> +		omap->nports = pdata->nports;
-> +	} else {
-> +		switch (omap->usbhs_rev) {
-> +		case OMAP_USBHS_REV1:
-> +			omap->nports = 3;
-> +			break;
-> +		case OMAP_USBHS_REV2:
-> +			omap->nports = 2;
-> +			break;
-> +		default:
-> +			omap->nports = OMAP3_HS_USB_PORTS;
-> +			dev_dbg(dev,
-> +			"USB HOST Rev:0x%d not recognized, assuming %d ports\n",
+> Shouldn't the following just equally work?
+>
+>         if (keymap_data == NULL && pdev->dev.of_node == NULL) {
+>
+> Shawn
+Yes, it looks better. I will do the change. Thanks.
+>
+>>               dev_err(&pdev->dev, "no keymap defined\n");
+>>               return -EINVAL;
+>>       }
+>
 
-    Please indent the string to the right somewhat, as it was before.
 
-WBR, Sergei
+
+-- 
+Liu Ying
