@@ -1,51 +1,44 @@
-From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Thu, 3 Jan 2013 11:27:49 +0000
-Subject: [PATCH 0/2]  ARM: davinci: da850: add pinctrl support
-References: <1354876051-25938-1-git-send-email-anilkumar.v@ti.com> 
-Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412B5A55@DBDE01.ent.ti.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Thu, 03 Jan 2013 11:32:32 +0000
+Subject: [PATCH v6] ARM: mtd: nand: davinci: add OF support for davinci
+ nand controller
+In-Reply-To: <50E56AED.1000509@mvista.com>
+References: <1343632944-25971-1-git-send-email-hs@denx.de>
+ <50E48DFD.2030908@mvista.com> <50E52D26.9010004@denx.de>
+ <50E56AED.1000509@mvista.com>
+Message-ID: <1357212752.16197.127.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2013-01-03 at 15:26 +0400, Sergei Shtylyov wrote:
+> >>> +#if defined(CONFIG_OF)
+> >>> +static const struct of_device_id davinci_nand_of_match[] = {
+> >>> +    {.compatible = "ti,davinci-nand", },
+> >>> +    {},
+> >>> +}
+> >>> +MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
+> 
+> > Hmm.. maybe this crept in later after I sent the patches? They were
+> > pending for a while ... I compiled it just yet again (based on my
+> > tree when I posted this patch based on commit:
+> 
+>     I've just checked the archives: every patch version you posted had ';' 
+> after '}' missing.
 
-Gentle Ping. As there are no review comments on this patch series,
-could you please pull this patch ?    
+If it was built-in, rather than as a module, then MODULE_DEVICE_TABLE(?)
+expands to nothing, and the structure gets to use the semicolon from the
+end of that line.
 
-Thanks,
-Anil
+-- 
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
 
-On Mon, Dec 17, 2012 at 09:56:45, Kumar, Anil wrote:
-> Hi All,
-> 
-> As pinctrl-single is required for handling Pad configuration of various 
-> DaVinci module(for e.g mcasp, i2c etc) with DT. Hence for this patch if
-> there are no review comments, could you pull this patch ?
-> 
-> Thanks,
-> Anil     
-> 
-> On Fri, Dec 07, 2012 at 15:57:29, Kumar, Anil wrote:
-> > This set of patches adds:
-> > 
-> > * Add pinctrl-single for handling Padconf registers.
-> > * Add NAND node to export NAND functionality on da850 EVM.
-> > * Add NAND pinctrl node to do pin mux according to pinctrl-single driver.
-> > 
-> > Kumar, Anil (2):
-> >   ARM: davinci: da850: add pinctrl driver entries
-> >   ARM: davinci: da850: add NAND driver entries
-> > 
-> >  .../devicetree/bindings/arm/davinci/pinctrl.txt    |   29 ++++++++++++++++++++
-> >  arch/arm/Kconfig                                   |    1 +
-> >  arch/arm/boot/dts/da850-evm.dts                    |   22 +++++++++++++++
-> >  arch/arm/boot/dts/da850.dtsi                       |   23 +++++++++++++++
-> >  arch/arm/configs/da8xx_omapl_defconfig             |    1 +
-> >  5 files changed, 76 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/davinci/pinctrl.txt
-> > 
-> > -- 
-> > 1.7.4.1
-> > 
-> > 
-> 
-> 
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6171 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130103/589e7477/attachment-0001.bin>
