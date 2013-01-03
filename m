@@ -1,44 +1,72 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 03 Jan 2013 20:56:47 +0300
-Subject: [PATCH v6] ARM: mtd: nand: davinci: add OF support for davinci
- nand controller
-In-Reply-To: <50E56DDC.8060804@mvista.com>
-References: <1343632944-25971-1-git-send-email-hs@denx.de>
- <50E48DFD.2030908@mvista.com> <50E52D26.9010004@denx.de>
- <50E56AED.1000509@mvista.com>
- <1357212752.16197.127.camel@shinybook.infradead.org>
- <50E56DDC.8060804@mvista.com>
-Message-ID: <50E5C65F.3050804@mvista.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 03 Jan 2013 11:58:57 -0500
+Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
+In-Reply-To: <20130103162359.GR2631@n2100.arm.linux.org.uk>
+References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+ <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+ <20130103103815.GL2631@n2100.arm.linux.org.uk>
+ <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
+ <1357220165.10284.30.camel@gandalf.local.home>
+ <20130103141301.GQ2631@n2100.arm.linux.org.uk>
+ <1357229038.10284.46.camel@gandalf.local.home>
+ <20130103162359.GR2631@n2100.arm.linux.org.uk>
+Message-ID: <1357232337.10284.67.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, 2013-01-03 at 16:23 +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 03, 2013 at 11:03:58AM -0500, Steven Rostedt wrote:
+> > On Thu, 2013-01-03 at 14:13 +0000, Russell King - ARM Linux wrote:
+> > > In summary, from what I can see in the patch, the reason why the ifdefs
+> > > are the way they are, and the reason the warning is there has not been
+> > > addressed; these patches just seem to be aimed just at removing a #warning
+> > > statement to make the warning go away.
+> > 
+> > You're correct that this patch does not solve any of theses issues. Now,
+> > I'm thinking that ftrace has matured where these issues don't exist, and
+> > where they do, it will only cause noise in the trace than anything
+> > serious. But, this needs to be looked deeper to make sure.
+> 
+> Looking back in the archives, it seems that we had a problem with ftrace
+> and the unwinder polluting the trace information:
+> 
+> http://lists.arm.linux.org.uk/lurker/message/20090604.201745.1c41ee6c.en.html
+> 
+> There's quite a bit of discussion in that thread about this which details
+> why we came up with what we have today.
 
-On 01/03/2013 02:39 PM, Sergei Shtylyov wrote:
+Thanks for the link. In fact, I see I was even involved :-)
 
->>>>>> +#if defined(CONFIG_OF)
->>>>>> +static const struct of_device_id davinci_nand_of_match[] = {
->>>>>> +    {.compatible = "ti,davinci-nand", },
->>>>>> +    {},
->>>>>> +}
->>>>>> +MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
+http://lists.arm.linux.org.uk/lurker/message/20090609.213448.b4e4d096.en.html
 
->>>> Hmm.. maybe this crept in later after I sent the patches? They were
->>>> pending for a while ... I compiled it just yet again (based on my
->>>> tree when I posted this patch based on commit:
+Just as I explained, the problem isn't a recursion bug, but just noise
+in the trace.
 
->>>      I've just checked the archives: every patch version you posted had ';'
->>> after '}' missing.
+Some of what is called by unwind_frame() will always be traced, and I
+wouldn't want 'notrace' annotation on those.
 
->> If it was built-in, rather than as a module, then MODULE_DEVICE_TABLE(?)
->> expands to nothing, and the structure gets to use the semicolon from the
->> end of that line.
+If anything, I would just suggest another config option that lets the
+user decide if they don't mind the messiness of the trace for the added
+benefit of where the latency output came from.
 
->    Ah, that explains it: 'davinci_all_defconfig' has CONFIG_MTD_NAND_DAVINCI=m,
-> so that's how the error got triggered at last. Probably worth adding this
-> explanation to the changelog, how do you think?
+Also, it's rather trivial to make the entire unwind.c not traced, by
+adding in the Makefile:
 
-   OK, I take your silence as a sign of consent. Changelog indeed needs to be
-rewritten a bit now.
+CFLAGS_REMOVE_unwind.o = -pg
 
-WBR, Sergei
+But that only stops the tracing of the unwind_*. Looks to be a lot of
+those. But it wont stop the tracing of:
+
+ kernel_text_address <-unwind_frame
+ core_kernel_text <-unwind_frame
+ search_index <-unwind_frame
+ etc.
+
+Heck, the user could just keep those from being traced by doing:
+
+ echo kernel_text_address core_kernel_text search_index > \
+   /sys/kernel/debug/tracing/set_ftrace_notrace
+
+If DYNAMIC_FTRACE is defined.
+
+-- Steve
