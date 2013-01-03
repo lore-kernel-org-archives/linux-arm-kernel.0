@@ -1,44 +1,94 @@
 From: kpark3469@gmail.com (kpark3469 at gmail.com)
-Date: Thu,  3 Jan 2013 19:12:28 +0900
-Subject: [PATCH 1/2] arm: fix returning wrong CALLER_ADDRx
-Message-ID: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+Date: Thu,  3 Jan 2013 19:12:29 +0900
+Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
+In-Reply-To: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+Message-ID: <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: sahara <keun-o.park@windriver.com>
 
-This makes return_address return correct value for ftrace feature.
-unwind_frame does not update frame->lr but frame->pc for backtrace.
-And, the initialization for data.addr was missing so that wrong value
-returned when unwind_frame failed.
+This fixes a warning saying:
+
+    warning: #warning "TODO: return_address should use unwind tables"
+
+And, this enables return_address using unwind information. If ARM_UNWIND is
+selected, unwind_frame in unwind.c will be called in walk_stackframe.
 
 Signed-off-by: sahara <keun-o.park@windriver.com>
 ---
- arch/arm/kernel/return_address.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/ftrace.h    |    6 ++----
+ arch/arm/kernel/return_address.c |   10 +++-------
+ arch/arm/kernel/stacktrace.c     |    3 +++
+ 3 files changed, 8 insertions(+), 11 deletions(-)
 
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index f89515a..3552ad9 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -32,13 +32,11 @@ extern void ftrace_call_old(void);
+ 
+ #ifndef __ASSEMBLY__
+ 
+-#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
++#if defined(CONFIG_FRAME_POINTER) || defined(CONFIG_ARM_UNWIND)
+ /*
+  * return_address uses walk_stackframe to do it's work.  If both
+  * CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses unwind
+- * information.  For this to work in the function tracer many functions would
+- * have to be marked with __notrace.  So for now just depend on
+- * !CONFIG_ARM_UNWIND.
++ * information.
+  */
+ 
+ void *return_address(unsigned int);
 diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
-index 8085417..fafedd8 100644
+index fafedd8..f202bc0 100644
 --- a/arch/arm/kernel/return_address.c
 +++ b/arch/arm/kernel/return_address.c
-@@ -26,7 +26,7 @@ static int save_return_addr(struct stackframe *frame, void *d)
- 	struct return_address_data *data = d;
+@@ -11,7 +11,7 @@
+ #include <linux/export.h>
+ #include <linux/ftrace.h>
  
- 	if (!data->level) {
--		data->addr = (void *)frame->lr;
-+		data->addr = (void *)frame->pc;
+-#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
++#if defined(CONFIG_FRAME_POINTER) || defined(CONFIG_ARM_UNWIND)
+ #include <linux/sched.h>
  
- 		return 1;
- 	} else {
-@@ -41,7 +41,8 @@ void *return_address(unsigned int level)
- 	struct stackframe frame;
- 	register unsigned long current_sp asm ("sp");
+ #include <asm/stacktrace.h>
+@@ -57,17 +57,13 @@ void *return_address(unsigned int level)
+ 		return NULL;
+ }
  
--	data.level = level + 1;
-+	data.level = level + 2;
-+	data.addr = NULL;
+-#else /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
+-
+-#if defined(CONFIG_ARM_UNWIND)
+-#warning "TODO: return_address should use unwind tables"
+-#endif
++#else /* CONFIG_FRAME_POINTER || CONFIG_ARM_UNWIND */
  
- 	frame.fp = (unsigned long)__builtin_frame_address(0);
- 	frame.sp = current_sp;
+ void *return_address(unsigned int level)
+ {
+ 	return NULL;
+ }
+ 
+-#endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) / else */
++#endif /* CONFIG_FRAME_POINTER || CONFIG_ARM_UNWIND */
+ 
+ EXPORT_SYMBOL_GPL(return_address);
+diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+index 00f79e5..aab144b 100644
+--- a/arch/arm/kernel/stacktrace.c
++++ b/arch/arm/kernel/stacktrace.c
+@@ -6,6 +6,9 @@
+ 
+ #if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
+ /*
++ * If both CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses
++ * unwind information. So for now just depend on !CONFIG_ARM_UNWIND.
++ *
+  * Unwind the current stack frame and store the new register values in the
+  * structure passed as argument. Unwinding is equivalent to a function return,
+  * hence the new PC value rather than LR should be used for backtrace.
 -- 
 1.7.1
