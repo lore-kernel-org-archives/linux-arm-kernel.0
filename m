@@ -1,51 +1,51 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Thu, 3 Jan 2013 07:54:38 +0000
-Subject: [PATCH v3 0/7] ARM: OMAP2+: AM33XX: Enable few drivers in
- omap2plus_defconfig
-In-Reply-To: <CAOesGMj0yO5JxkDAeN1negip5dvwX9Y3syoU4JPsKnVJ0GucdQ@mail.gmail.com>
-References: <1357122451-7577-1-git-send-email-anilkumar@ti.com>
- <CAOesGMj0yO5JxkDAeN1negip5dvwX9Y3syoU4JPsKnVJ0GucdQ@mail.gmail.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAD6FD3@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 3 Jan 2013 08:07:53 +0000
+Subject: [PATCH 1/2] timer: vt8500: Move system timer to clocksource
+In-Reply-To: <1357199114.25181.48.camel@joe-AO722>
+References: <1357183510-8476-1-git-send-email-linux@prisktech.co.nz>
+ <20130103073540.GB11309@core.coreip.homeip.net>
+ <1357199114.25181.48.camel@joe-AO722>
+Message-ID: <201301030807.53550.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 01:49:57, Olof Johansson wrote:
-> Hi,
+On Thursday 03 January 2013, Joe Perches wrote:
+> Also I think it'd be nicer to write something like:
 > 
-> On Wed, Jan 2, 2013 at 2:27 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
-> > This patch series enable tps65910, lis3lv02d accelerometer, tsl2550
-> > ambient light sensor, matrix keypad, tmp275 temperature sensor, gpio
-> > leds and D_CAN drivers in omap2plus_defconfig.
-> >
-> > These are the peripherals present in AM33XX family of devices.
-> >
-> > Changes from v2:
-> >         - Incorporated Tony's comments on v2
-> >           * Enabled as modules instead of kernel built-in drivers.
-> >         - Dropped 1st patch because it was accepted.
-> >
-> > Changes from v1:
-> >         - Incorporated martinez javier's comments on v1
-> >           * Enabled few more triggers in omap2plus_defconfig
-> >         - Included Igor's patch, which modifies the omap2plus
-> >           defconfig for AM33XX devices.
-> >
-> > AnilKumar Ch (7):
-> >   ARM: OMAP2+: omap2plus_defconfig: Add tps65910 support
-> >   ARM: OMAP2+: omap2plus_defconfig: Add lis3lv02d support
-> >   ARM: OMAP2+: omap2plus_defconfig: Add tsl2550 support
-> >   ARM: OMAP2+: omap2plus_defconfig: Add matrix-keypad support
-> >   ARM: OMAP2+: omap2plus_defconfig: Add tmp275 sensor support
-> >   ARM: OMAP2+: omap2plus_defconfig: Add leds-gpio support
-> >   ARM: OMAP2+: omap2plus_defconfig: Add D_CAN support
+>         struct device_node *np;
+>         int timer_irq;
+>         const char *reason;
 > 
-> Doing this as 7 separate patches seems excessive to me. Just do it as
-> one single patch instead.
+>         np = of_find_matching_node(NULL, vt8500_timer_ids);
+>         if (!np) {
+>                 reason = "timer";
+>             goto error;
+>         }
+>         regbase = of_iomap(np, 0);
+>         if (!regbase) {
+>                 reason = "iobase";
+>                 goto error_put;
+>         }
+>         timer_irq = irq_of_parse_and_map(np, 0);
+>         if (!timer_irq) {
+>                 reason = "irq";
+>                 goto error_remap;
+>         }
+>  
+>         ...
 > 
+> error_remap:
+>         unmap...;
+> error_put:
+>         of_node_put(np);
+> error:
+>         pr_err("%s: Missing %s description in Device Tree\n",
+>                __func__, reason);
+>         return;
 
-Hi Olof,
+Right, but that would be a separate cleanup patch, since the patch that
+Tony posted is just supposed to move the code around and change as little
+else as possible in the process. The cleanup can come either right before
+or right after the move.
 
-I will send v4 by merging all the patches into single patch.
-
-Thanks
-AnilKumar
+	Arnd
