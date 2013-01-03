@@ -1,94 +1,68 @@
-From: kpark3469@gmail.com (kpark3469 at gmail.com)
-Date: Thu,  3 Jan 2013 19:12:29 +0900
-Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
-In-Reply-To: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
-References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
-Message-ID: <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 3 Jan 2013 18:20:54 +0800
+Subject: [PATCH 3/9] ARM: PRIMA2: initialize l2x0 according to mach from DT
+In-Reply-To: <20130102134353.GD25907@e106331-lin.cambridge.arm.com>
+References: <1356005639-23466-1-git-send-email-Barry.Song@csr.com>
+ <1356005639-23466-4-git-send-email-Barry.Song@csr.com>
+ <20130102134353.GD25907@e106331-lin.cambridge.arm.com>
+Message-ID: <CAGsJ_4y-DggJNJFROUy-1UtXRDYZ+otiq1pJDw-_Sx+3z=JwtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: sahara <keun-o.park@windriver.com>
+2013/1/2, Mark Rutland <mark.rutland@arm.com>:
+> On Thu, Dec 20, 2012 at 12:13:53PM +0000, Barry Song wrote:
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> prima2 and marco have diffetent l2 cache configuration, so
+>> we initialize l2x0 cache based on dtb given to kernel.
+>>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
+>>  arch/arm/mach-prima2/l2x0.c |   14 ++++++++++++++
+>>  1 files changed, 14 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
+>> index c998377..909cc6f 100644
+>> --- a/arch/arm/mach-prima2/l2x0.c
+>> +++ b/arch/arm/mach-prima2/l2x0.c
+>> @@ -16,6 +16,11 @@ static struct of_device_id prima2_l2x0_ids[]  = {
+>>  	{},
+>>  };
+>>
+>> +static struct of_device_id marco_l2x0_ids[]  = {
+>> +	{ .compatible = "sirf,marco-pl310-cache" },
+>> +	{},
+>> +};
+>> +
+>>  static int __init sirfsoc_l2x0_init(void)
+>>  {
+>>  	struct device_node *np;
+>> @@ -26,6 +31,15 @@ static int __init sirfsoc_l2x0_init(void)
+>>  		return l2x0_of_init(0x40000, 0);
+>>  	}
+>>
+>> +	np = of_find_matching_node(NULL, marco_l2x0_ids);
+>> +	if (np) {
+>> +		pr_info("Initializing marco L2 cache\n");
+>> +		/* Way size: 32KB Associativity: 16-way */
+>> +		return l2x0_of_init((2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
+>> +			(1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT),
+>> +			L2X0_AUX_CTRL_MASK);
+>> +	}
+>> +
+>>  	return 0;
+>>  }
+>>  early_initcall(sirfsoc_l2x0_init);
+>
+> Rather than individually testing each match against the table, could you
+> not
+> place the configuration values in a struct, and map to this with
+> of_device_id::data?
 
-This fixes a warning saying:
+ok. good idea.
 
-    warning: #warning "TODO: return_address should use unwind tables"
-
-And, this enables return_address using unwind information. If ARM_UNWIND is
-selected, unwind_frame in unwind.c will be called in walk_stackframe.
-
-Signed-off-by: sahara <keun-o.park@windriver.com>
----
- arch/arm/include/asm/ftrace.h    |    6 ++----
- arch/arm/kernel/return_address.c |   10 +++-------
- arch/arm/kernel/stacktrace.c     |    3 +++
- 3 files changed, 8 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-index f89515a..3552ad9 100644
---- a/arch/arm/include/asm/ftrace.h
-+++ b/arch/arm/include/asm/ftrace.h
-@@ -32,13 +32,11 @@ extern void ftrace_call_old(void);
- 
- #ifndef __ASSEMBLY__
- 
--#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
-+#if defined(CONFIG_FRAME_POINTER) || defined(CONFIG_ARM_UNWIND)
- /*
-  * return_address uses walk_stackframe to do it's work.  If both
-  * CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses unwind
-- * information.  For this to work in the function tracer many functions would
-- * have to be marked with __notrace.  So for now just depend on
-- * !CONFIG_ARM_UNWIND.
-+ * information.
-  */
- 
- void *return_address(unsigned int);
-diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
-index fafedd8..f202bc0 100644
---- a/arch/arm/kernel/return_address.c
-+++ b/arch/arm/kernel/return_address.c
-@@ -11,7 +11,7 @@
- #include <linux/export.h>
- #include <linux/ftrace.h>
- 
--#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
-+#if defined(CONFIG_FRAME_POINTER) || defined(CONFIG_ARM_UNWIND)
- #include <linux/sched.h>
- 
- #include <asm/stacktrace.h>
-@@ -57,17 +57,13 @@ void *return_address(unsigned int level)
- 		return NULL;
- }
- 
--#else /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
--
--#if defined(CONFIG_ARM_UNWIND)
--#warning "TODO: return_address should use unwind tables"
--#endif
-+#else /* CONFIG_FRAME_POINTER || CONFIG_ARM_UNWIND */
- 
- void *return_address(unsigned int level)
- {
- 	return NULL;
- }
- 
--#endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) / else */
-+#endif /* CONFIG_FRAME_POINTER || CONFIG_ARM_UNWIND */
- 
- EXPORT_SYMBOL_GPL(return_address);
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index 00f79e5..aab144b 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -6,6 +6,9 @@
- 
- #if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
- /*
-+ * If both CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses
-+ * unwind information. So for now just depend on !CONFIG_ARM_UNWIND.
-+ *
-  * Unwind the current stack frame and store the new register values in the
-  * structure passed as argument. Unwinding is equivalent to a function return,
-  * hence the new PC value rather than LR should be used for backtrace.
--- 
-1.7.1
+>
+> Thanks,
+> Mark.
+>
+-barry
