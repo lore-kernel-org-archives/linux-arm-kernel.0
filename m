@@ -1,89 +1,53 @@
 From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Fri,  4 Jan 2013 10:35:43 -0600
-Subject: [PATCH 1/4 v10] arm: use devicetree to get smp_twd clock
+Date: Fri,  4 Jan 2013 10:35:44 -0600
+Subject: [PATCH 2/4 v10] clk,
+ highbank: Prevent glitches in non-bypass reset mode
 In-Reply-To: <1357317346-1120-1-git-send-email-mark.langsdorf@calxeda.com>
 References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
  <1357317346-1120-1-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <1357317346-1120-2-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <1357317346-1120-3-git-send-email-mark.langsdorf@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+The highbank clock will glitch with the current code if the
+clock rate is reset without relocking the PLL. Program the PLL
+correctly to prevent glitches.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Mike Turquette <mturquette@linaro.org>
 ---
-Changes from v9
-	Updated to work with 3.8 kernel.
-Changes from v4, v5, v6, v7, v8
+Changes from v6, v7, v8, v9
+        None.
+Changes from v5
+        Added Mike Turquette's ack.
+Changes from v4
         None.
 Changes from v3
-        No longer setting *clk to NULL in twd_get_clock().
+        Changelog text and patch name now correspond to the actual patch.
+        was clk, highbank: remove non-bypass reset mode.
 Changes from v2
-        Turned the check for the node pointer into an if-then-else statement.
-        Removed the second, redundant clk_get_rate.
-Changes from v1
         None.
+Changes from v1
+        Removed erroneous reformating.
 
- arch/arm/kernel/smp_twd.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ drivers/clk/clk-highbank.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 49f335d..dad2d81 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -239,12 +239,15 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
--static struct clk *twd_get_clock(void)
-+static struct clk *twd_get_clock(struct device_node *np)
- {
- 	struct clk *clk;
- 	int err;
- 
--	clk = clk_get_sys("smp_twd", NULL);
-+	if (np)
-+		clk = of_clk_get(np, 0);
-+	else
-+		clk = clk_get_sys("smp_twd", NULL);
- 	if (IS_ERR(clk)) {
- 		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
- 		return clk;
-@@ -257,6 +260,7 @@ static struct clk *twd_get_clock(void)
- 		return ERR_PTR(err);
+diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
+index 52fecad..3a0b723 100644
+--- a/drivers/clk/clk-highbank.c
++++ b/drivers/clk/clk-highbank.c
+@@ -182,8 +182,10 @@ static int clk_pll_set_rate(struct clk_hw *hwclk, unsigned long rate,
+ 		reg |= HB_PLL_EXT_ENA;
+ 		reg &= ~HB_PLL_EXT_BYPASS;
+ 	} else {
++		writel(reg | HB_PLL_EXT_BYPASS, hbclk->reg);
+ 		reg &= ~HB_PLL_DIVQ_MASK;
+ 		reg |= divq << HB_PLL_DIVQ_SHIFT;
++		writel(reg | HB_PLL_EXT_BYPASS, hbclk->reg);
  	}
+ 	writel(reg, hbclk->reg);
  
-+	twd_timer_rate = clk_get_rate(clk);
- 	return clk;
- }
- 
-@@ -285,7 +289,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	 * during the runtime of the system.
- 	 */
- 	if (!common_setup_called) {
--		twd_clk = twd_get_clock();
-+		twd_clk = twd_get_clock(NULL);
- 
- 		/*
- 		 * We use IS_ERR_OR_NULL() here, because if the clock stubs
-@@ -373,6 +377,8 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
- 	if (!twd_base)
- 		return -ENOMEM;
- 
-+	twd_clk = twd_get_clock(NULL);
-+
- 	return twd_local_timer_common_register();
- }
- 
-@@ -405,6 +411,8 @@ void __init twd_local_timer_of_register(void)
- 		goto out;
- 	}
- 
-+	twd_clk = twd_get_clock(np);
-+
- 	err = twd_local_timer_common_register();
- 
- out:
 -- 
 1.8.0.2
