@@ -1,39 +1,41 @@
-From: s-guiriec@ti.com (Sebastien Guiriec)
-Date: Fri, 4 Jan 2013 21:52:42 +0100
-Subject: [PATCH 1/3] ARM: OMAP2+: hwmod: rename flag to prevent hwmod
- code from touching IP block during init
-In-Reply-To: <alpine.DEB.2.00.1301041817460.25868@utopia.booyaka.com>
-References: <1357304526-21557-1-git-send-email-s-guiriec@ti.com>
- <1357304526-21557-2-git-send-email-s-guiriec@ti.com>
- <alpine.DEB.2.00.1301041817460.25868@utopia.booyaka.com>
-Message-ID: <50E7411A.1030207@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 4 Jan 2013 19:29:10 -0200
+Subject: [PATCH 2/2] ARM: disable errata work-arounds which access secure
+ registers
+In-Reply-To: <1355351150-15942-2-git-send-email-robherring2@gmail.com>
+References: <1355351150-15942-2-git-send-email-robherring2@gmail.com>
+Message-ID: <CAOMZO5BpB7-9=S76VgNh5txZ=G3Q0UOaX6Px4OcMa+cVUi-_gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2013 07:19 PM, Paul Walmsley wrote:
-> Hi Sebastien
+On Wed, Dec 12, 2012 at 8:25 PM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 >
-> On Fri, 4 Jan 2013, Sebastien Guiriec wrote:
+> In order to support secure and non-secure platforms in multi-platform
+> kernels, errata work-arounds that access secure only registers need to
+> be disabled. Make all the errata options that fit in this category
+> depend on !CONFIG_ARCH_MULTIPLATFORM.
 >
->> Rename HWMOD_EXT_OPT_MAIN_CLK flag to indicate that this IP block is
->> dependent on an off-chip functional clock that is not guaranteed to
->> be present during initialization. Same flag can be use for IP with
->> additional HW registers to control Auto IDLE mode.
->>
->> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+> This will effectively remove the errata options as platforms are
+> converted over to multi-platform.
 >
-> We already have the HWMOD_NO_INIT_RESET flag.  Wouldn't that accomplish
-> the same goal?
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-I am assuming that it was HWMOD_INIT_NO_RESET flag. This is not solving 
-the issue. After boot with this mode some of same clocks are still not 
-gated.
+With this patch applied I get:
 
->
-> Also I think we can reset the AESS during init.  I posted a patch for this
-> a few months ago, but looks like it got lost.  Will reply to one of your
-> other patches with more details.
->
->
-> - Paul
->
+$ make imx_v6_v7_defconfig
+warning: (SOC_IMX6Q && ARCH_TEGRA_2x_SOC && ARCH_TEGRA_3x_SOC) selects
+ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 &&
+!ARCH_MULTIPLATFORM)
+warning: (SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_743622
+which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
+warning: (SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_743622
+which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
+warning: (SOC_IMX6Q && ARCH_TEGRA_2x_SOC && ARCH_TEGRA_3x_SOC) selects
+ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 &&
+!ARCH_MULTIPLATFORM)
+#
+# configuration written to .config
+#
+
+Any suggestion?
