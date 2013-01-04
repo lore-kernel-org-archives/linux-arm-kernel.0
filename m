@@ -1,35 +1,177 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 4 Jan 2013 09:24:05 +0100
-Subject: [PATCH v4 01/19] irqchip: add basic infrastructure
-In-Reply-To: <50E61B53.7080404@gmail.com>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-2-git-send-email-robherring2@gmail.com>
- <201301032136.51302.arnd@arndb.de> <50E61B53.7080404@gmail.com>
-Message-ID: <20130104092405.4fb5b4f8@skate>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri,  4 Jan 2013 13:53:49 +0530
+Subject: [PATCH] ARM: DTS: exynos4210-origen: Add MAX8997 node entry
+Message-ID: <1357287829-21701-1-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rob Herring,
+The node entry is added as per documentation and legacy board file.
 
-On Thu, 03 Jan 2013 17:59:15 -0600, Rob Herring wrote:
+Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+---
+The patch is rebased on v3.8-rc1.
 
-> The timers are going down the same route, so we should agree on the
-> direction. I was concerned too that it is a little too much magic, but
-> it is a bit cleaner and should have fewer merge conflicts.
+ arch/arm/boot/dts/exynos4210-origen.dts |  150 +++++++++++++++++++++++++++++++
+ 1 files changed, 150 insertions(+), 0 deletions(-)
 
-Indeed. Before doing the section magic thing, there were explicit
-calls, and it was causing conflicts every time I was rebasing the patch
-series to shuffle things around.
-
-There are already gazillions of magic ELF sections being used all over
-the place, so I'd say this mechanism is no longer magic for most of the
-kernel people nowadays.
-
-Best regards,
-
-Thomas
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index f271001..362ef58 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -121,4 +121,154 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
++
++	i2c at 13860000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <20000>;
++		pinctrl-0 = <&i2c0_bus>;
++		pinctrl-names = "default";
++		status = "okay";
++
++		max8997_pmic at 66 {
++			compatible = "maxim,max8997-pmic";
++			reg = <0x66>;
++			interrupt-parent = <&gpx0>;
++			interrupts = <4 0>, <3 0>;
++
++			max8997,pmic-ignore-gpiodvs-side-effect;
++			max8997,pmic-buck125-default-dvs-idx = <0>;
++			max8997,pmic-buck125-dvs-gpios = <&gpx0 0 0>,
++							 <&gpx0 1 0>,
++							 <&gpx0 2 0>;
++			max8997,pmic-buck1-dvs-voltage = <1350000>, <1300000>,
++							 <1250000>, <1200000>,
++							 <1150000>, <1100000>,
++							 <1000000>, <950000>;
++			max8997,pmic-buck2-dvs-voltage = <1100000>, <1100000>,
++							 <1100000>, <1100000>,
++							 <1000000>, <1000000>,
++							 <1000000>, <1000000>;
++			max8997,pmic-buck5-dvs-voltage = <1200000>, <1200000>,
++							 <1200000>, <1200000>,
++							 <1200000>, <1200000>,
++							 <1200000>, <1200000>;
++
++			regulators {
++				ldo1_reg: LDO1 {
++					regulator-name = "VDD_ABB_3.3V";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				ldo2_reg: LDO2 {
++					regulator-name = "VDD_ALIVE_1.1V";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-always-on;
++				};
++
++				ldo3_reg: LDO3 {
++					regulator-name = "VMIPI_1.1V";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-always-on;
++				};
++
++				ldo4_reg: LDO4 {
++					regulator-name = "VDD_RTC_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt	= <1800000>;
++					regulator-always-on;
++				};
++
++				ldo6_reg: LDO6 {
++					regulator-name = "VMIPI_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt	= <1800000>;
++					regulator-always-on;
++				};
++
++				ldo7_reg: LDO7 {
++					regulator-name = "VDD_AUD_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt	= <1800000>;
++					regulator-always-on;
++				};
++
++				ldo8_reg: LDO8 {
++					regulator-name = "VADC_3.3V";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++				};
++
++				ldo9_reg: LDO9 {
++					regulator-name = "DVDD_SWB_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++
++				ldo10_reg: LDO10 {
++					regulator-name = "VDD_PLL_1.1V";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-always-on;
++				};
++
++				ldo11_reg: LDO11 {
++					regulator-name = "VDD_AUD_3V";
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++				};
++
++				ldo14_reg: LDO14 {
++					regulator-name = "AVDD18_SWB_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo17_reg: LDO17 {
++					regulator-name = "VDD_SWB_3.3V";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++				};
++
++				buck1_reg: BUCK1 {
++					regulator-name = "vdd_arm";
++					regulator-min-microvolt = <950000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck2_reg: BUCK2 {
++					regulator-name = "vdd_int";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck5_reg: BUCK5 {
++					regulator-name = "VDDQ_M1M2_1.2V";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++				};
++
++				buck7_reg: BUCK7 {
++					regulator-name = "VDD_LCD_3.3V";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-boot-on;
++				};
++			};
++		};
++	};
++
+ };
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.4.1
