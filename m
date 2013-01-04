@@ -1,177 +1,96 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri,  4 Jan 2013 13:53:49 +0530
-Subject: [PATCH] ARM: DTS: exynos4210-origen: Add MAX8997 node entry
-Message-ID: <1357287829-21701-1-git-send-email-tushar.behera@linaro.org>
+From: kpark3469@gmail.com (Keun-O Park)
+Date: Fri, 4 Jan 2013 17:45:49 +0900
+Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
+In-Reply-To: <1357232337.10284.67.camel@gandalf.local.home>
+References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+ <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+ <20130103103815.GL2631@n2100.arm.linux.org.uk>
+ <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
+ <1357220165.10284.30.camel@gandalf.local.home>
+ <20130103141301.GQ2631@n2100.arm.linux.org.uk>
+ <1357229038.10284.46.camel@gandalf.local.home>
+ <20130103162359.GR2631@n2100.arm.linux.org.uk>
+ <1357232337.10284.67.camel@gandalf.local.home>
+Message-ID: <CA+KhAHYbDU0Ajr5uPEjPxX2ECitvnK2ENOjmqjC=3G657GvG7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The node entry is added as per documentation and legacy board file.
+On Fri, Jan 4, 2013 at 1:58 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
+> On Thu, 2013-01-03 at 16:23 +0000, Russell King - ARM Linux wrote:
+>> On Thu, Jan 03, 2013 at 11:03:58AM -0500, Steven Rostedt wrote:
+>> > On Thu, 2013-01-03 at 14:13 +0000, Russell King - ARM Linux wrote:
+>> > > In summary, from what I can see in the patch, the reason why the ifdefs
+>> > > are the way they are, and the reason the warning is there has not been
+>> > > addressed; these patches just seem to be aimed just at removing a #warning
+>> > > statement to make the warning go away.
+>> >
+>> > You're correct that this patch does not solve any of theses issues. Now,
+>> > I'm thinking that ftrace has matured where these issues don't exist, and
+>> > where they do, it will only cause noise in the trace than anything
+>> > serious. But, this needs to be looked deeper to make sure.
+>>
+>> Looking back in the archives, it seems that we had a problem with ftrace
+>> and the unwinder polluting the trace information:
+>>
+>> http://lists.arm.linux.org.uk/lurker/message/20090604.201745.1c41ee6c.en.html
+>>
+>> There's quite a bit of discussion in that thread about this which details
+>> why we came up with what we have today.
+>
+> Thanks for the link. In fact, I see I was even involved :-)
+>
+> http://lists.arm.linux.org.uk/lurker/message/20090609.213448.b4e4d096.en.html
+>
+> Just as I explained, the problem isn't a recursion bug, but just noise
+> in the trace.
+>
+> Some of what is called by unwind_frame() will always be traced, and I
+> wouldn't want 'notrace' annotation on those.
+>
+> If anything, I would just suggest another config option that lets the
+> user decide if they don't mind the messiness of the trace for the added
+> benefit of where the latency output came from.
+>
+> Also, it's rather trivial to make the entire unwind.c not traced, by
+> adding in the Makefile:
+>
+> CFLAGS_REMOVE_unwind.o = -pg
+>
+> But that only stops the tracing of the unwind_*. Looks to be a lot of
+> those. But it wont stop the tracing of:
+>
+>  kernel_text_address <-unwind_frame
+>  core_kernel_text <-unwind_frame
+>  search_index <-unwind_frame
+>  etc.
+>
+> Heck, the user could just keep those from being traced by doing:
+>
+>  echo kernel_text_address core_kernel_text search_index > \
+>    /sys/kernel/debug/tracing/set_ftrace_notrace
+>
+> If DYNAMIC_FTRACE is defined.
+>
+> -- Steve
+>
+>
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
----
-The patch is rebased on v3.8-rc1.
+With "CFLAGS_REMOVE_unwind.o = -pg" and with CONFIG_PROVE_LOCKING
+turned on, I confirmed that
+there's no trace output like Steve mentioned.
+However, if I turn off CONFIG_PROVE_LOCKING, "irqsoff" and
+"preemptirqsoff" ftracer prints these lines :
 
- arch/arm/boot/dts/exynos4210-origen.dts |  150 +++++++++++++++++++++++++++++++
- 1 files changed, 150 insertions(+), 0 deletions(-)
+kernel_text_address <-unwind_frame
+core_kernel_text <-unwind_frame
+search_index <-unwind_frame
 
-diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
-index f271001..362ef58 100644
---- a/arch/arm/boot/dts/exynos4210-origen.dts
-+++ b/arch/arm/boot/dts/exynos4210-origen.dts
-@@ -121,4 +121,154 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-+
-+	i2c at 13860000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		samsung,i2c-sda-delay = <100>;
-+		samsung,i2c-max-bus-freq = <20000>;
-+		pinctrl-0 = <&i2c0_bus>;
-+		pinctrl-names = "default";
-+		status = "okay";
-+
-+		max8997_pmic at 66 {
-+			compatible = "maxim,max8997-pmic";
-+			reg = <0x66>;
-+			interrupt-parent = <&gpx0>;
-+			interrupts = <4 0>, <3 0>;
-+
-+			max8997,pmic-ignore-gpiodvs-side-effect;
-+			max8997,pmic-buck125-default-dvs-idx = <0>;
-+			max8997,pmic-buck125-dvs-gpios = <&gpx0 0 0>,
-+							 <&gpx0 1 0>,
-+							 <&gpx0 2 0>;
-+			max8997,pmic-buck1-dvs-voltage = <1350000>, <1300000>,
-+							 <1250000>, <1200000>,
-+							 <1150000>, <1100000>,
-+							 <1000000>, <950000>;
-+			max8997,pmic-buck2-dvs-voltage = <1100000>, <1100000>,
-+							 <1100000>, <1100000>,
-+							 <1000000>, <1000000>,
-+							 <1000000>, <1000000>;
-+			max8997,pmic-buck5-dvs-voltage = <1200000>, <1200000>,
-+							 <1200000>, <1200000>,
-+							 <1200000>, <1200000>,
-+							 <1200000>, <1200000>;
-+
-+			regulators {
-+				ldo1_reg: LDO1 {
-+					regulator-name = "VDD_ABB_3.3V";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+				};
-+
-+				ldo2_reg: LDO2 {
-+					regulator-name = "VDD_ALIVE_1.1V";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1100000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo3_reg: LDO3 {
-+					regulator-name = "VMIPI_1.1V";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1100000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo4_reg: LDO4 {
-+					regulator-name = "VDD_RTC_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt	= <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo6_reg: LDO6 {
-+					regulator-name = "VMIPI_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt	= <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo7_reg: LDO7 {
-+					regulator-name = "VDD_AUD_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt	= <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo8_reg: LDO8 {
-+					regulator-name = "VADC_3.3V";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo9_reg: LDO9 {
-+					regulator-name = "DVDD_SWB_2.8V";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo10_reg: LDO10 {
-+					regulator-name = "VDD_PLL_1.1V";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1100000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo11_reg: LDO11 {
-+					regulator-name = "VDD_AUD_3V";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
-+				};
-+
-+				ldo14_reg: LDO14 {
-+					regulator-name = "AVDD18_SWB_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo17_reg: LDO17 {
-+					regulator-name = "VDD_SWB_3.3V";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				buck1_reg: BUCK1 {
-+					regulator-name = "vdd_arm";
-+					regulator-min-microvolt = <950000>;
-+					regulator-max-microvolt = <1350000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck2_reg: BUCK2 {
-+					regulator-name = "vdd_int";
-+					regulator-min-microvolt = <900000>;
-+					regulator-max-microvolt = <1100000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck5_reg: BUCK5 {
-+					regulator-name = "VDDQ_M1M2_1.2V";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+				};
-+
-+				buck7_reg: BUCK7 {
-+					regulator-name = "VDD_LCD_3.3V";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-boot-on;
-+				};
-+			};
-+		};
-+	};
-+
- };
--- 
-1.7.4.1
+While I investigated the reason, I just found out there's two function
+with same name, trace_hardirqs_off.
+One in kernel/trace/trace_irqsoff.c and another in kernel/lockdep.c.
+And both symbols are exported.
+I am wondering whether it is intentionally maintained code to
+manipulate ftrace and lockdep or not.
+I guess it's probably not.
+
+-- Kpark
