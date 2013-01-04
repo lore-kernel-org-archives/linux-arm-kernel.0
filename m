@@ -1,32 +1,50 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 04 Jan 2013 14:21:46 -0800
-Subject: [PATCH 01/01] arm: fix a preempt_count() corruption for
- CONFIG_PREEMPT=n
-In-Reply-To: <20130104084850.4553bc6f.pkluba@dension.com>
-References: <20121215085129.71d203b2.pkluba@dension.com>
- <50D10224.30600@codeaurora.org>
- <20121219000139.GV14363@n2100.arm.linux.org.uk>
- <50E4D39C.1030001@codeaurora.org>
- <20130104084850.4553bc6f.pkluba@dension.com>
-Message-ID: <50E755FA.8040609@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  4 Jan 2013 20:27:27 -0200
+Subject: [PATCH] ARM: imx: Do not select some errata that depends on
+ !ARCH_MULTIPLATFORM
+Message-ID: <1357338447-6798-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/13 23:48, Patrik, Kluba wrote:
-> Sorry for being late, was on holiday. Yes, you were right,
-> CONFIG_DEBUG_PREEMPT (after breaking dependency on CONFIG_PREEMPT -
-> this is how I caught the exact place) and CONFIG_DEBUG_ATOMIC_SLEEP was
-> enabled due to bug hunting in own code (and found yet another at an
-> unexpected place). 
-> I have chosen #ifdef CONFIG_PREEMPT to match with assembly code, but
-> your solution seems more reasonable.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Did you test my patch? If so, can I get your tested by please so I can
-stick it in the patch tracker?
+Since commit 62e4d357a (ARM: 7609/1: disable errata work-arounds which access 
+secure registers) ARM_ERRATA_743622/751472 depends on !ARCH_MULTIPLATFORM.
 
-Thanks,
-Stephen
+Since imx has been converted to multiplatform, the following warning happens:
 
+$ make imx_v6_v7_defconfig
+warning: (SOC_IMX6Q && ARCH_TEGRA_2x_SOC && ARCH_TEGRA_3x_SOC) selects
+ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 &&
+!ARCH_MULTIPLATFORM)
+warning: (SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_743622
+which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
+warning: (SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_743622
+which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
+warning: (SOC_IMX6Q && ARCH_TEGRA_2x_SOC && ARCH_TEGRA_3x_SOC) selects
+ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 &&
+!ARCH_MULTIPLATFORM)
+
+Recommended approach is to remove ARM_ERRATA_743622/751472 from being selected
+by SOC_IMX6Q and apply such workarounds into the bootloader.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig |    2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 1ad0d76..3e628fd 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -841,8 +841,6 @@ config SOC_IMX6Q
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select ARM_CPU_SUSPEND if PM
+-	select ARM_ERRATA_743622
+-	select ARM_ERRATA_751472
+ 	select ARM_ERRATA_754322
+ 	select ARM_ERRATA_764369 if SMP
+ 	select ARM_ERRATA_775420
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
