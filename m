@@ -1,103 +1,370 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  4 Jan 2013 14:41:37 +0000
-Subject: [RFC 0/3] future of gemini platform
+Date: Fri,  4 Jan 2013 14:41:34 +0000
+Subject: [RFC 1/3] ARM: gemini: get platform to build again
 In-Reply-To: <1357310500-19848-1-git-send-email-arnd@arndb.de>
 References: <1357310500-19848-1-git-send-email-arnd@arndb.de>
-Message-ID: <1357310500-19848-5-git-send-email-arnd@arndb.de>
+Message-ID: <1357310500-19848-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gemini platform is quite broken at the moment due to bitrot,
-here are the two suggested solutions. We should either apply the
-first patch or the other two, depending on whether anyone still
-uses this.
+There is no defconfig file for gemini, which has lead to a lot
+of bitrot. This makes the broken board files, the gpio implementation
+and the reset logic work again, and fixes the build warnings
+that got introduced with the changes to the readl/writel prototypes.
 
-Ulli was last actively working on this about two years ago,
-so I assume that he has moved on, but if he or anyone else
-is still interested in keeping Gemini alive, any patches
-and testing are very welcome. Without a maintainer however,
-I see no point in keeping it.
-
-The fa526 CPU support is currently only used on Gemini,
-but Florian had some patches last year for it, so he might
-still need it. If there are still plans to get MCS814x
-or another fa526 based platform merged into mainline,
-we can keep this around, but unless I see a timeline
-for this, I would prefer to remove it for now. It should
-be trivial to revert that patch and bring it back if
-it's needed for a new platform.
-
-Arnd Bergmann (3):
-  ARM: gemini: get platform to build again
-  ARM: gemini: remove platform support
-  ARM: remove fa526 CPU support
-
- MAINTAINERS                                     |   14 --
- arch/arm/Kconfig                                |   10 +-
- arch/arm/Makefile                               |    2 -
- arch/arm/boot/compressed/head.S                 |   28 ---
- arch/arm/include/asm/barrier.h                  |    6 -
- arch/arm/include/asm/glue-cache.h               |    8 -
- arch/arm/include/asm/glue-proc.h                |    9 -
- arch/arm/include/asm/page.h                     |    8 -
- arch/arm/include/asm/tlbflush.h                 |   19 --
- arch/arm/mach-gemini/Kconfig                    |   40 ----
- arch/arm/mach-gemini/Makefile                   |   13 --
- arch/arm/mach-gemini/Makefile.boot              |    9 -
- arch/arm/mach-gemini/board-nas4220b.c           |  110 ---------
- arch/arm/mach-gemini/board-rut1xx.c             |   94 --------
- arch/arm/mach-gemini/board-wbd111.c             |  137 -----------
- arch/arm/mach-gemini/board-wbd222.c             |  137 -----------
- arch/arm/mach-gemini/common.h                   |   29 ---
- arch/arm/mach-gemini/devices.c                  |  118 ----------
- arch/arm/mach-gemini/gpio.c                     |  230 -------------------
- arch/arm/mach-gemini/idle.c                     |   29 ---
- arch/arm/mach-gemini/include/mach/debug-macro.S |   21 --
- arch/arm/mach-gemini/include/mach/entry-macro.S |   33 ---
- arch/arm/mach-gemini/include/mach/global_reg.h  |  278 -----------------------
- arch/arm/mach-gemini/include/mach/gpio.h        |   20 --
- arch/arm/mach-gemini/include/mach/hardware.h    |   74 ------
- arch/arm/mach-gemini/include/mach/irqs.h        |   53 -----
- arch/arm/mach-gemini/include/mach/system.h      |   23 --
- arch/arm/mach-gemini/include/mach/timex.h       |   13 --
- arch/arm/mach-gemini/include/mach/uncompress.h  |   44 ----
- arch/arm/mach-gemini/irq.c                      |  103 ---------
- arch/arm/mach-gemini/mm.c                       |   82 -------
- arch/arm/mach-gemini/time.c                     |   89 --------
- arch/arm/mm/Kconfig                             |   32 +--
- arch/arm/mm/Makefile                            |    4 -
- arch/arm/mm/cache-fa.S                          |  249 --------------------
- arch/arm/mm/copypage-fa.c                       |   86 -------
- arch/arm/mm/proc-fa526.S                        |  221 ------------------
- arch/arm/mm/tlb-fa.S                            |   69 ------
- 38 files changed, 3 insertions(+), 2541 deletions(-)
- delete mode 100644 arch/arm/mach-gemini/Kconfig
- delete mode 100644 arch/arm/mach-gemini/Makefile
- delete mode 100644 arch/arm/mach-gemini/Makefile.boot
- delete mode 100644 arch/arm/mach-gemini/board-nas4220b.c
- delete mode 100644 arch/arm/mach-gemini/board-rut1xx.c
- delete mode 100644 arch/arm/mach-gemini/board-wbd111.c
- delete mode 100644 arch/arm/mach-gemini/board-wbd222.c
- delete mode 100644 arch/arm/mach-gemini/common.h
- delete mode 100644 arch/arm/mach-gemini/devices.c
- delete mode 100644 arch/arm/mach-gemini/gpio.c
- delete mode 100644 arch/arm/mach-gemini/idle.c
- delete mode 100644 arch/arm/mach-gemini/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-gemini/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-gemini/include/mach/global_reg.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/gpio.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/irqs.h
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/Kconfig                             |    1 +
+ arch/arm/mach-gemini/Makefile                |    2 +-
+ arch/arm/mach-gemini/board-nas4220b.c        |    1 +
+ arch/arm/mach-gemini/board-rut1xx.c          |    2 ++
+ arch/arm/mach-gemini/board-wbd111.c          |    1 +
+ arch/arm/mach-gemini/board-wbd222.c          |    1 +
+ arch/arm/mach-gemini/common.h                |    2 ++
+ arch/arm/mach-gemini/gpio.c                  |   19 ++++++++++---------
+ arch/arm/mach-gemini/include/mach/hardware.h |    2 +-
+ arch/arm/mach-gemini/include/mach/system.h   |   23 -----------------------
+ arch/arm/mach-gemini/irq.c                   |    4 ++--
+ arch/arm/mach-gemini/mm.c                    |   22 +++++++++++-----------
+ arch/arm/mach-gemini/reset.c                 |   23 +++++++++++++++++++++++
+ 13 files changed, 56 insertions(+), 47 deletions(-)
  delete mode 100644 arch/arm/mach-gemini/include/mach/system.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/timex.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-gemini/irq.c
- delete mode 100644 arch/arm/mach-gemini/mm.c
- delete mode 100644 arch/arm/mach-gemini/time.c
- delete mode 100644 arch/arm/mm/cache-fa.S
- delete mode 100644 arch/arm/mm/copypage-fa.c
- delete mode 100644 arch/arm/mm/proc-fa526.S
- delete mode 100644 arch/arm/mm/tlb-fa.S
+ create mode 100644 arch/arm/mach-gemini/reset.c
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f95ba14..639a885 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -387,6 +387,7 @@ config ARCH_GEMINI
+ 	bool "Cortina Systems Gemini"
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_USES_GETTIMEOFFSET
++	select NEED_MACH_GPIO_H
+ 	select CPU_FA526
+ 	help
+ 	  Support for the Cortina Systems Gemini family SoCs
+diff --git a/arch/arm/mach-gemini/Makefile b/arch/arm/mach-gemini/Makefile
+index 7355c0b..7963a77 100644
+--- a/arch/arm/mach-gemini/Makefile
++++ b/arch/arm/mach-gemini/Makefile
+@@ -4,7 +4,7 @@
+ 
+ # Object file lists.
+ 
+-obj-y			:= irq.o mm.o time.o devices.o gpio.o idle.o
++obj-y			:= irq.o mm.o time.o devices.o gpio.o idle.o reset.o
+ 
+ # Board-specific support
+ obj-$(CONFIG_MACH_NAS4220B)	+= board-nas4220b.o
+diff --git a/arch/arm/mach-gemini/board-nas4220b.c b/arch/arm/mach-gemini/board-nas4220b.c
+index 5927d3c..6f24c9d 100644
+--- a/arch/arm/mach-gemini/board-nas4220b.c
++++ b/arch/arm/mach-gemini/board-nas4220b.c
+@@ -107,4 +107,5 @@ MACHINE_START(NAS4220B, "Raidsonic NAS IB-4220-B")
+ 	.init_irq	= gemini_init_irq,
+ 	.timer		= &ib4220b_timer,
+ 	.init_machine	= ib4220b_init,
++	.restart	= gemini_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-gemini/board-rut1xx.c b/arch/arm/mach-gemini/board-rut1xx.c
+index cd7437a..6ee1974 100644
+--- a/arch/arm/mach-gemini/board-rut1xx.c
++++ b/arch/arm/mach-gemini/board-rut1xx.c
+@@ -14,6 +14,7 @@
+ #include <linux/leds.h>
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
++#include <linux/sizes.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -91,4 +92,5 @@ MACHINE_START(RUT100, "Teltonika RUT100")
+ 	.init_irq	= gemini_init_irq,
+ 	.timer		= &rut1xx_timer,
+ 	.init_machine	= rut1xx_init,
++	.restart	= gemini_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-gemini/board-wbd111.c b/arch/arm/mach-gemini/board-wbd111.c
+index a367880..d885f8b 100644
+--- a/arch/arm/mach-gemini/board-wbd111.c
++++ b/arch/arm/mach-gemini/board-wbd111.c
+@@ -134,4 +134,5 @@ MACHINE_START(WBD111, "Wiliboard WBD-111")
+ 	.init_irq	= gemini_init_irq,
+ 	.timer		= &wbd111_timer,
+ 	.init_machine	= wbd111_init,
++	.restart	= gemini_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-gemini/board-wbd222.c b/arch/arm/mach-gemini/board-wbd222.c
+index f382811..96ca188 100644
+--- a/arch/arm/mach-gemini/board-wbd222.c
++++ b/arch/arm/mach-gemini/board-wbd222.c
+@@ -134,4 +134,5 @@ MACHINE_START(WBD222, "Wiliboard WBD-222")
+ 	.init_irq	= gemini_init_irq,
+ 	.timer		= &wbd222_timer,
+ 	.init_machine	= wbd222_init,
++	.restart	= gemini_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-gemini/common.h b/arch/arm/mach-gemini/common.h
+index 7670c39..38a4526 100644
+--- a/arch/arm/mach-gemini/common.h
++++ b/arch/arm/mach-gemini/common.h
+@@ -26,4 +26,6 @@ extern int platform_register_pflash(unsigned int size,
+ 				    struct mtd_partition *parts,
+ 				    unsigned int nr_parts);
+ 
++extern void gemini_restart(char mode, const char *cmd);
++
+ #endif /* __GEMINI_COMMON_H__ */
+diff --git a/arch/arm/mach-gemini/gpio.c b/arch/arm/mach-gemini/gpio.c
+index fdc7ef1..70bfa57 100644
+--- a/arch/arm/mach-gemini/gpio.c
++++ b/arch/arm/mach-gemini/gpio.c
+@@ -21,6 +21,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
++#include <mach/gpio.h>
+ 
+ #define GPIO_BASE(x)		IO_ADDRESS(GEMINI_GPIO_BASE(x))
+ 
+@@ -44,7 +45,7 @@
+ 
+ #define GPIO_PORT_NUM		3
+ 
+-static void _set_gpio_irqenable(unsigned int base, unsigned int index,
++static void _set_gpio_irqenable(void __iomem *base, unsigned int index,
+ 				int enable)
+ {
+ 	unsigned int reg;
+@@ -57,7 +58,7 @@ static void _set_gpio_irqenable(unsigned int base, unsigned int index,
+ static void gpio_ack_irq(struct irq_data *d)
+ {
+ 	unsigned int gpio = irq_to_gpio(d->irq);
+-	unsigned int base = GPIO_BASE(gpio / 32);
++	void __iomem *base = GPIO_BASE(gpio / 32);
+ 
+ 	__raw_writel(1 << (gpio % 32), base + GPIO_INT_CLR);
+ }
+@@ -65,7 +66,7 @@ static void gpio_ack_irq(struct irq_data *d)
+ static void gpio_mask_irq(struct irq_data *d)
+ {
+ 	unsigned int gpio = irq_to_gpio(d->irq);
+-	unsigned int base = GPIO_BASE(gpio / 32);
++	void __iomem *base = GPIO_BASE(gpio / 32);
+ 
+ 	_set_gpio_irqenable(base, gpio % 32, 0);
+ }
+@@ -73,7 +74,7 @@ static void gpio_mask_irq(struct irq_data *d)
+ static void gpio_unmask_irq(struct irq_data *d)
+ {
+ 	unsigned int gpio = irq_to_gpio(d->irq);
+-	unsigned int base = GPIO_BASE(gpio / 32);
++	void __iomem *base = GPIO_BASE(gpio / 32);
+ 
+ 	_set_gpio_irqenable(base, gpio % 32, 1);
+ }
+@@ -82,7 +83,7 @@ static int gpio_set_irq_type(struct irq_data *d, unsigned int type)
+ {
+ 	unsigned int gpio = irq_to_gpio(d->irq);
+ 	unsigned int gpio_mask = 1 << (gpio % 32);
+-	unsigned int base = GPIO_BASE(gpio / 32);
++	void __iomem *base = GPIO_BASE(gpio / 32);
+ 	unsigned int reg_both, reg_level, reg_type;
+ 
+ 	reg_type = __raw_readl(base + GPIO_INT_TYPE);
+@@ -120,7 +121,7 @@ static int gpio_set_irq_type(struct irq_data *d, unsigned int type)
+ 	__raw_writel(reg_level, base + GPIO_INT_LEVEL);
+ 	__raw_writel(reg_both, base + GPIO_INT_BOTH_EDGE);
+ 
+-	gpio_ack_irq(d->irq);
++	gpio_ack_irq(d);
+ 
+ 	return 0;
+ }
+@@ -153,7 +154,7 @@ static struct irq_chip gpio_irq_chip = {
+ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+ 				int dir)
+ {
+-	unsigned int base = GPIO_BASE(offset / 32);
++	void __iomem *base = GPIO_BASE(offset / 32);
+ 	unsigned int reg;
+ 
+ 	reg = __raw_readl(base + GPIO_DIR);
+@@ -166,7 +167,7 @@ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+ 
+ static void gemini_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ {
+-	unsigned int base = GPIO_BASE(offset / 32);
++	void __iomem *base = GPIO_BASE(offset / 32);
+ 
+ 	if (value)
+ 		__raw_writel(1 << (offset % 32), base + GPIO_DATA_SET);
+@@ -176,7 +177,7 @@ static void gemini_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ 
+ static int gemini_gpio_get(struct gpio_chip *chip, unsigned offset)
+ {
+-	unsigned int base = GPIO_BASE(offset / 32);
++	void __iomem *base = GPIO_BASE(offset / 32);
+ 
+ 	return (__raw_readl(base + GPIO_DATA_IN) >> (offset % 32)) & 1;
+ }
+diff --git a/arch/arm/mach-gemini/include/mach/hardware.h b/arch/arm/mach-gemini/include/mach/hardware.h
+index 8c950e1..98e7b0f 100644
+--- a/arch/arm/mach-gemini/include/mach/hardware.h
++++ b/arch/arm/mach-gemini/include/mach/hardware.h
+@@ -69,6 +69,6 @@
+ /*
+  * macro to get at IO space when running virtually
+  */
+-#define IO_ADDRESS(x)	((((x) & 0xFFF00000) >> 4) | ((x) & 0x000FFFFF) | 0xF0000000)
++#define IO_ADDRESS(x)	IOMEM((((x) & 0xFFF00000) >> 4) | ((x) & 0x000FFFFF) | 0xF0000000)
+ 
+ #endif
+diff --git a/arch/arm/mach-gemini/include/mach/system.h b/arch/arm/mach-gemini/include/mach/system.h
+deleted file mode 100644
+index a33b5a1..0000000
+--- a/arch/arm/mach-gemini/include/mach/system.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- *  Copyright (C) 2001-2006 Storlink, Corp.
+- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-#ifndef __MACH_SYSTEM_H
+-#define __MACH_SYSTEM_H
+-
+-#include <linux/io.h>
+-#include <mach/hardware.h>
+-#include <mach/global_reg.h>
+-
+-static inline void arch_reset(char mode, const char *cmd)
+-{
+-	__raw_writel(RESET_GLOBAL | RESET_CPU1,
+-		     IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_RESET);
+-}
+-
+-#endif /* __MACH_SYSTEM_H */
+diff --git a/arch/arm/mach-gemini/irq.c b/arch/arm/mach-gemini/irq.c
+index 020852d..30bef11 100644
+--- a/arch/arm/mach-gemini/irq.c
++++ b/arch/arm/mach-gemini/irq.c
+@@ -65,8 +65,8 @@ static struct irq_chip gemini_irq_chip = {
+ 
+ static struct resource irq_resource = {
+ 	.name	= "irq_handler",
+-	.start	= IO_ADDRESS(GEMINI_INTERRUPT_BASE),
+-	.end	= IO_ADDRESS(FIQ_STATUS(GEMINI_INTERRUPT_BASE)) + 4,
++	.start	= GEMINI_INTERRUPT_BASE,
++	.end	= FIQ_STATUS(GEMINI_INTERRUPT_BASE) + 4,
+ };
+ 
+ void __init gemini_init_irq(void)
+diff --git a/arch/arm/mach-gemini/mm.c b/arch/arm/mach-gemini/mm.c
+index 5194824..2c2cd28 100644
+--- a/arch/arm/mach-gemini/mm.c
++++ b/arch/arm/mach-gemini/mm.c
+@@ -19,57 +19,57 @@
+ /* Page table mapping for I/O region */
+ static struct map_desc gemini_io_desc[] __initdata = {
+ 	{
+-		.virtual	= IO_ADDRESS(GEMINI_GLOBAL_BASE),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GLOBAL_BASE),
+ 		.pfn		=__phys_to_pfn(GEMINI_GLOBAL_BASE),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+ 	}, {
+-		.virtual	= IO_ADDRESS(GEMINI_UART_BASE),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_UART_BASE),
+ 		.pfn		= __phys_to_pfn(GEMINI_UART_BASE),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+ 	}, {
+-		.virtual	= IO_ADDRESS(GEMINI_TIMER_BASE),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_TIMER_BASE),
+ 		.pfn		= __phys_to_pfn(GEMINI_TIMER_BASE),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+ 	}, {
+-		.virtual	= IO_ADDRESS(GEMINI_INTERRUPT_BASE),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_INTERRUPT_BASE),
+ 		.pfn		= __phys_to_pfn(GEMINI_INTERRUPT_BASE),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+ 	}, {
+-		.virtual	= IO_ADDRESS(GEMINI_POWER_CTRL_BASE),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_POWER_CTRL_BASE),
+ 		.pfn		= __phys_to_pfn(GEMINI_POWER_CTRL_BASE),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+ 	}, {
+-		.virtual	= IO_ADDRESS(GEMINI_GPIO_BASE(0)),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GPIO_BASE(0)),
+ 		.pfn		= __phys_to_pfn(GEMINI_GPIO_BASE(0)),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+ 	}, {
+-		.virtual	= IO_ADDRESS(GEMINI_GPIO_BASE(1)),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GPIO_BASE(1)),
+ 		.pfn		= __phys_to_pfn(GEMINI_GPIO_BASE(1)),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+ 	}, {
+-		.virtual	= IO_ADDRESS(GEMINI_GPIO_BASE(2)),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GPIO_BASE(2)),
+ 		.pfn		= __phys_to_pfn(GEMINI_GPIO_BASE(2)),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+ 	}, {
+-		.virtual	= IO_ADDRESS(GEMINI_FLASH_CTRL_BASE),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_FLASH_CTRL_BASE),
+ 		.pfn		= __phys_to_pfn(GEMINI_FLASH_CTRL_BASE),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+ 	}, {
+-		.virtual	= IO_ADDRESS(GEMINI_DRAM_CTRL_BASE),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_DRAM_CTRL_BASE),
+ 		.pfn		= __phys_to_pfn(GEMINI_DRAM_CTRL_BASE),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+ 	}, {
+-		.virtual	= IO_ADDRESS(GEMINI_GENERAL_DMA_BASE),
++		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GENERAL_DMA_BASE),
+ 		.pfn		= __phys_to_pfn(GEMINI_GENERAL_DMA_BASE),
+ 		.length		= SZ_512K,
+ 		.type 		= MT_DEVICE,
+diff --git a/arch/arm/mach-gemini/reset.c b/arch/arm/mach-gemini/reset.c
+new file mode 100644
+index 0000000..b266597
+--- /dev/null
++++ b/arch/arm/mach-gemini/reset.c
+@@ -0,0 +1,23 @@
++/*
++ *  Copyright (C) 2001-2006 Storlink, Corp.
++ *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#ifndef __MACH_SYSTEM_H
++#define __MACH_SYSTEM_H
++
++#include <linux/io.h>
++#include <mach/hardware.h>
++#include <mach/global_reg.h>
++
++void gemini_restart(char mode, const char *cmd)
++{
++	__raw_writel(RESET_GLOBAL | RESET_CPU1,
++		     IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_RESET);
++}
++
++#endif /* __MACH_SYSTEM_H */
 -- 
 1.7.10.4
