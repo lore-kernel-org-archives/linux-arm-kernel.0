@@ -1,23 +1,56 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 4 Jan 2013 19:59:49 +0000
-Subject: [PATCH v4 14/19] ARM: remove unneeded vic.h includes
-In-Reply-To: <1357235668-9450-15-git-send-email-robherring2@gmail.com>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-15-git-send-email-robherring2@gmail.com>
-Message-ID: <20130104195948.GO4627@opensource.wolfsonmicro.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 04 Jan 2013 13:02:33 -0700
+Subject: [PATCH] pinctrl/nomadik: Add "ste,config" property
+In-Reply-To: <1357316010-677-1-git-send-email-linus.walleij@stericsson.com>
+References: <1357316010-677-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <50E73559.60508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 11:54:23AM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On 01/04/2013 09:13 AM, Linus Walleij wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
 > 
-> Numerous includes of asm/hardware/vic.h aren't needed, so remove them.
+> The "ste,config" property will contain the pin config node.
+> It will be easier to define a pin configuration and use it by
+> reference without duplicating lines tedious.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130104/a8ff16be/attachment.sig>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
+
+> -- ste,input : <0/1/2/3>
+> +- ste,config: Handle of pin configuration node (ste,config = <&in_pu>)
+> +
+> +- ste,input : <0/1/2>
+
+The changes to ste,input and ste,sleep-output look like some unrelated
+change.
+
+I guess the idea of ste,input is quite neat, but ...
+
+>  Example board file extract:
+>  
+> +	in_pu: input_pull_up {
+> +		ste,input = <1>;
+> +	};
+
+... these nodes shouldn't be placed at the top-level of the device tree;
+housing them inside the pin controller node itself makes much more sense
+since the pin controller binding is able/allowed to define what goes
+inside the pin controller node, but shouldn't influence the top-level of
+the device tree.
+
+> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+
+> +	np_config = of_parse_phandle(np, "ste,config", 0);
+> +	if (np_config) {
+> +		for (i = 0; i < ARRAY_SIZE(nmk_cfg_params); i++) {
+> +			unsigned long cfg = 0;
+> +			int val;
+
+Is it worth making ste,config optional, so that config properties can be
+placed either into the node directly, or into a node referenced by
+ste,config? That might make doing one-off unusual configurations easier
+- no need to create a separate node that's only used once. Still, if
+that's unlikely on your HW, it's probably no big deal.
