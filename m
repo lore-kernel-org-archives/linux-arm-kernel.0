@@ -1,108 +1,95 @@
 From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 4 Jan 2013 12:30:54 +0530
-Subject: [PATCH 3/7] clk: sunxi: Use common of_clk_init() function
+Date: Fri, 4 Jan 2013 12:30:55 +0530
+Subject: [PATCH 4/7] clk: highbank: Use common of_clk_init() function
 In-Reply-To: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
 References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <1357282858-2112-3-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <1357282858-2112-4-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use common of_clk_init() function to initialize clocks.
+Use common of_clk_init() function for clocks initialization.
 
 Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 ---
- drivers/clk/clk-sunxi.c           |   30 ------------------------------
- drivers/clocksource/sunxi_timer.c |    4 ++--
- include/linux/clk/sunxi.h         |   22 ----------------------
- 3 files changed, 2 insertions(+), 54 deletions(-)
- delete mode 100644 drivers/clk/clk-sunxi.c
- delete mode 100644 include/linux/clk/sunxi.h
+ arch/arm/mach-highbank/core.h     |    1 -
+ arch/arm/mach-highbank/highbank.c |    3 ++-
+ drivers/clk/clk-highbank.c        |   18 ++++--------------
+ 3 files changed, 6 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/clk/clk-sunxi.c b/drivers/clk/clk-sunxi.c
-deleted file mode 100644
-index 0e831b5..0000000
---- a/drivers/clk/clk-sunxi.c
-+++ /dev/null
-@@ -1,30 +0,0 @@
--/*
-- * Copyright 2012 Maxime Ripard
-- *
-- * Maxime Ripard <maxime.ripard@free-electrons.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#include <linux/clk-provider.h>
--#include <linux/clkdev.h>
--#include <linux/clk/sunxi.h>
--#include <linux/of.h>
+diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+index 80235b4..3f65206 100644
+--- a/arch/arm/mach-highbank/core.h
++++ b/arch/arm/mach-highbank/core.h
+@@ -2,7 +2,6 @@
+ #define __HIGHBANK_CORE_H
+ 
+ extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+-extern void highbank_clocks_init(void);
+ extern void highbank_restart(char, const char *);
+ extern void __iomem *scu_base_addr;
+ 
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index f6ca285..fb148da 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -25,6 +25,7 @@
+ #include <linux/of_address.h>
+ #include <linux/smp.h>
+ #include <linux/amba/bus.h>
++#include <linux/clk-provider.h>
+ 
+ #include <asm/arch_timer.h>
+ #include <asm/cacheflush.h>
+@@ -116,7 +117,7 @@ static void __init highbank_timer_init(void)
+ 	WARN_ON(!timer_base);
+ 	irq = irq_of_parse_and_map(np, 0);
+ 
+-	highbank_clocks_init();
++	of_clk_init(NULL);
+ 	lookup.clk = of_clk_get(np, 0);
+ 	clkdev_add(&lookup);
+ 
+diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
+index 52fecad..5d1de2e 100644
+--- a/drivers/clk/clk-highbank.c
++++ b/drivers/clk/clk-highbank.c
+@@ -314,33 +314,23 @@ static void __init hb_pll_init(struct device_node *node)
+ {
+ 	hb_clk_init(node, &clk_pll_ops);
+ }
++CLK_OF_DECLARE(hb_pll, "calxeda,hb-pll-clock", hb_pll_init);
+ 
+ static void __init hb_a9periph_init(struct device_node *node)
+ {
+ 	hb_clk_init(node, &a9periphclk_ops);
+ }
++CLK_OF_DECLARE(hb_a9periph, "calxeda,hb-a9periph-clock", hb_a9periph_init);
+ 
+ static void __init hb_a9bus_init(struct device_node *node)
+ {
+ 	struct clk *clk = hb_clk_init(node, &a9bclk_ops);
+ 	clk_prepare_enable(clk);
+ }
++CLK_OF_DECLARE(hb_a9bus, "calxeda,hb-a9bus-clock", hb_a9bus_init);
+ 
+ static void __init hb_emmc_init(struct device_node *node)
+ {
+ 	hb_clk_init(node, &periclk_ops);
+ }
 -
 -static const __initconst struct of_device_id clk_match[] = {
 -	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+-	{ .compatible = "calxeda,hb-pll-clock", .data = hb_pll_init, },
+-	{ .compatible = "calxeda,hb-a9periph-clock", .data = hb_a9periph_init, },
+-	{ .compatible = "calxeda,hb-a9bus-clock", .data = hb_a9bus_init, },
+-	{ .compatible = "calxeda,hb-emmc-clock", .data = hb_emmc_init, },
 -	{}
 -};
 -
--void __init sunxi_init_clocks(void)
+-void __init highbank_clocks_init(void)
 -{
 -	of_clk_init(clk_match);
 -}
-diff --git a/drivers/clocksource/sunxi_timer.c b/drivers/clocksource/sunxi_timer.c
-index 6c2ed56..08e1756 100644
---- a/drivers/clocksource/sunxi_timer.c
-+++ b/drivers/clocksource/sunxi_timer.c
-@@ -23,7 +23,7 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/sunxi_timer.h>
--#include <linux/clk/sunxi.h>
-+#include <linux/clk-provider.h>
- 
- #define TIMER_CTL_REG		0x00
- #define TIMER_CTL_ENABLE		(1 << 0)
-@@ -124,7 +124,7 @@ void __init sunxi_timer_init(void)
- 	if (irq <= 0)
- 		panic("Can't parse IRQ");
- 
--	sunxi_init_clocks();
-+	of_clk_init(NULL);
- 
- 	clk = of_clk_get(node, 0);
- 	if (IS_ERR(clk))
-diff --git a/include/linux/clk/sunxi.h b/include/linux/clk/sunxi.h
-deleted file mode 100644
-index e074fdd..0000000
---- a/include/linux/clk/sunxi.h
-+++ /dev/null
-@@ -1,22 +0,0 @@
--/*
-- * Copyright 2012 Maxime Ripard
-- *
-- * Maxime Ripard <maxime.ripard@free-electrons.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#ifndef __LINUX_CLK_SUNXI_H_
--#define __LINUX_CLK_SUNXI_H_
--
--void __init sunxi_init_clocks(void);
--
--#endif
++CLK_OF_DECLARE(hb_emmc, "calxeda,hb-emmc-clock", hb_emmc_init);
 -- 
 1.7.4.1
