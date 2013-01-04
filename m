@@ -1,67 +1,66 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 4 Jan 2013 16:46:21 +0100
-Subject: [PATCH v2 1/2] ARM: OMAP4: clock data: Lock ABE DPLL on all
- revisions
-In-Reply-To: <50E6F0CA.60309@ti.com>
-References: <1357294163-4317-1-git-send-email-peter.ujfalusi@ti.com>
- <1357294163-4317-2-git-send-email-peter.ujfalusi@ti.com>
- <50E6F0CA.60309@ti.com>
-Message-ID: <50E6F94D.7090706@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Jan 2013 15:48:59 +0000
+Subject: [PATCH v3 2/7] vexpress: Match the "arm, sp810" DT entry for
+ clock initialisation
+In-Reply-To: <50E6F741.60804@codeaurora.org>
+References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
+ <1357309041-6192-3-git-send-email-catalin.marinas@arm.com>
+ <50E6F741.60804@codeaurora.org>
+Message-ID: <20130104154859.GH7148@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2013 04:10 PM, Jon Hunter wrote:
+On Fri, Jan 04, 2013 at 03:37:37PM +0000, Christopher Covington wrote:
+> On 01/04/2013 09:17 AM, Catalin Marinas wrote:
+> > Currently the clk-vexpress.c implementation relies on the vexpress code
+> > to call the vexpress_clk_of_init() function which performs the SP810
+> > initialisation. This patch adds "arm,sp810" to the clock DT match array
+> > allowing of_clk_init() to call the vexpress_sp810_of_setup() function.
+> > In case of CONFIG_ARM64, make vexpress_clk_of_init() an arch_initcall().
+> > 
+> > Note that SP810 requires the fixed clocks to be already registered.
+> > Since the clock subsystem does not handle DT dependencies, the
+> > corresponding DT entries must be in the correct order.
+> > 
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > ---
+> >  drivers/clk/versatile/clk-vexpress.c | 28 +++++++++++++++++-----------
+> >  include/linux/vexpress.h             |  2 +-
+> >  2 files changed, 18 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
+> > index 4f83ff9..a3754e7 100644
+> > --- a/drivers/clk/versatile/clk-vexpress.c
+> > +++ b/drivers/clk/versatile/clk-vexpress.c
 > 
-> On 01/04/2013 04:09 AM, Peter Ujfalusi wrote:
->> To avoid issues with audio caused by non locked ABE DPLL we should
->> make sure it is locked in all OMAP4 revisions.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->>
->> asda d
+> [...]
 > 
-> Not sure what the above is ;-)
+> > @@ -138,4 +128,20 @@ void __init vexpress_clk_of_init(void)
+> >  				"v2m-timer1", "sp804"));
+> >  }
+> >  
+> > +static const __initconst struct of_device_id vexpress_clk_match[] = {
+> > +	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+> > +	{ .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
+> > +	{ .compatible = "arm,sp810", .data = vexpress_sp810_of_setup, },
+> > +	{}
+> > +};
+> > +
+> > +int __init vexpress_clk_of_init(void)
+> > +{
+> > +	of_clk_init(vexpress_clk_match);
+> > +	return 0;
+> > +}
+> > +#ifdef CONFIG_ARM64
+> > +arch_initcall(vexpress_clk_of_init);
+> > +#endif
+> 
+> Any way to avoid the ifdef? Is it intended to be a temporarily solution?
 
-Argh, squashed patches without commit message cleanup...
-Paul: can you fix this up, or should I resend?
-
-> 
->> ---
->>  arch/arm/mach-omap2/cclock44xx_data.c | 13 ++++++-------
->>  1 file changed, 6 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
->> index 5789a5e..a2cc046 100644
->> --- a/arch/arm/mach-omap2/cclock44xx_data.c
->> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
->> @@ -2026,14 +2026,13 @@ int __init omap4xxx_clk_init(void)
->>  	 * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
->>  	 * state when turning the ABE clock domain. Workaround this by
->>  	 * locking the ABE DPLL on boot.
->> +	 * Lock the ABE DPLL in any case to avoid issues with audio.
->>  	 */
->> -	if (cpu_is_omap446x()) {
->> -		rc = clk_set_parent(&abe_dpll_refclk_mux_ck, &sys_32k_ck);
->> -		if (!rc)
->> -			rc = clk_set_rate(&dpll_abe_ck, OMAP4_DPLL_ABE_DEFFREQ);
->> -		if (rc)
->> -			pr_err("%s: failed to configure ABE DPLL!\n", __func__);
->> -	}
->> +	rc = clk_set_parent(&abe_dpll_refclk_mux_ck, &sys_32k_ck);
->> +	if (!rc)
->> +		rc = clk_set_rate(&dpll_abe_ck, OMAP4_DPLL_ABE_DEFFREQ);
->> +	if (rc)
->> +		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
->>  
->>  	return 0;
->>  }
-> 
-> Acked-by: Jon Hunter <jon-hunter@ti.com>
-> 
-> Cheers
-> Jon
-> 
-
+It's harder since ARMv7 vexpress needs to initialise the clocks earlier
+(v2m_dt_timer_init). On ARMv8 we always have the architected timers and
+can afford an arch_initcall() here.
 
 -- 
-P?ter
+Catalin
