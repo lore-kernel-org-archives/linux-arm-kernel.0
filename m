@@ -1,48 +1,65 @@
-From: pkluba@dension.com (Patrik, Kluba)
-Date: Fri, 4 Jan 2013 08:48:50 +0100
-Subject: [PATCH 01/01] arm: fix a preempt_count() corruption for
- CONFIG_PREEMPT=n
-In-Reply-To: <50E4D39C.1030001@codeaurora.org>
-References: <20121215085129.71d203b2.pkluba@dension.com>
- <50D10224.30600@codeaurora.org>
- <20121219000139.GV14363@n2100.arm.linux.org.uk>
- <50E4D39C.1030001@codeaurora.org>
-Message-ID: <20130104084850.4553bc6f.pkluba@dension.com>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Fri, 4 Jan 2013 13:26:49 +0530
+Subject: [PATCH v4 1/3] mtd: nand: omap2: Update nerrors using ecc.strength
+In-Reply-To: <1357286211-5012-1-git-send-email-avinashphilip@ti.com>
+References: <1357286211-5012-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <1357286211-5012-2-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 02 Jan 2013 16:41:00 -0800
-Stephen Boyd <sboyd@codeaurora.org> wrote:
+Remove check of ecc bytes with 13, number of errors can directly update
+from nand ecc strength. This will increase re-usability of the code.
+Also add macro definitions BCH8_ERROR_MAX & BCH4_ERROR_MAX for better
+readability and cleaner code.
 
-> On 12/18/12 16:01, Russell King - ARM Linux wrote:
-> > On Tue, Dec 18, 2012 at 03:54:12PM -0800, Stephen Boyd wrote:
-> >> Can you try this patch? I'll probably send a follow up patch that
-> >> consolidates the duplicated preempt_decrement code into some
-> >> assembly macro. We may also want to fix it up so that assembly
-> >> stubs call into the preempt tracer. I'm not sure how that works
-> >> right now with VFP.
-> > This looks like a sensible fix to me - once tested of course.
-> 
-> Kluba, did the patch work for you?
-> 
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+---
+Changes since v3:
+	- Update commit message.
 
-Sorry for being late, was on holiday. Yes, you were right,
-CONFIG_DEBUG_PREEMPT (after breaking dependency on CONFIG_PREEMPT -
-this is how I caught the exact place) and CONFIG_DEBUG_ATOMIC_SLEEP was
-enabled due to bug hunting in own code (and found yet another at an
-unexpected place). 
-I have chosen #ifdef CONFIG_PREEMPT to match with assembly code, but
-your solution seems more reasonable.
+ drivers/mtd/nand/omap2.c |   12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-Regards,
-Patrik
-
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index 1d333497c..7d907b7 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -117,6 +117,9 @@
+ 
+ #define OMAP24XX_DMA_GPMC		4
+ 
++#define BCH8_MAX_ERROR		8	/* upto 8 bit correctable */
++#define BCH4_MAX_ERROR		4	/* upto 4 bit correctable */
++
+ /* oob info generated runtime depending on ecc algorithm and layout selected */
+ static struct nand_ecclayout omap_oobinfo;
+ /* Define some generic bad / good block scan pattern which are used
+@@ -1041,7 +1044,7 @@ static void omap3_enable_hwecc_bch(struct mtd_info *mtd, int mode)
+ 	struct nand_chip *chip = mtd->priv;
+ 	u32 val;
+ 
+-	nerrors = (info->nand.ecc.bytes == 13) ? 8 : 4;
++	nerrors = info->nand.ecc.strength;
+ 	dev_width = (chip->options & NAND_BUSWIDTH_16) ? 1 : 0;
+ 	nsectors = 1;
+ 	/*
+@@ -1218,13 +1221,14 @@ static int omap3_init_bch(struct mtd_info *mtd, int ecc_opt)
+ 	struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
+ 						   mtd);
+ #ifdef CONFIG_MTD_NAND_OMAP_BCH8
+-	const int hw_errors = 8;
++	const int hw_errors = BCH8_MAX_ERROR;
+ #else
+-	const int hw_errors = 4;
++	const int hw_errors = BCH4_MAX_ERROR;
+ #endif
+ 	info->bch = NULL;
+ 
+-	max_errors = (ecc_opt == OMAP_ECC_BCH8_CODE_HW) ? 8 : 4;
++	max_errors = (ecc_opt == OMAP_ECC_BCH8_CODE_HW) ?
++		BCH8_MAX_ERROR : BCH4_MAX_ERROR;
+ 	if (max_errors != hw_errors) {
+ 		pr_err("cannot configure %d-bit BCH ecc, only %d-bit supported",
+ 		       max_errors, hw_errors);
 -- 
-Patrik KLUBA
-Software Developer at
-
-DENSION Audio Systems Ltd.
-H-1116 Budapest, Sztregova u. 1
-Phone: +36 1 463 0470
-Fax:   +36 1 463 0479
-Web:   www.dension.com
+1.7.9.5
