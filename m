@@ -1,220 +1,87 @@
 From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 4 Jan 2013 15:10:47 +0530
-Subject: [PATCH v3 3/9] arm: tegra: Move tegra_cpu_car.h to linux/clk/tegra.h
+Date: Fri, 4 Jan 2013 15:10:45 +0530
+Subject: [PATCH v3 1/9] ARM: tegra: Add function to read chipid
 In-Reply-To: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
 References: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <1357292453-28418-4-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <1357292453-28418-2-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tegra_cpu_car_ops struct is going to be accessed from drivers/clk/tegra.
-Move the tegra_cpu_car_ops to include/linux/clk/tegra.h.
+Add function to read chip id from APB MISC registers. This function
+will also get called from clock driver to flush write operations on
+apb bus.
 
 Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 ---
- arch/arm/mach-tegra/clock.c                        |    2 +-
- arch/arm/mach-tegra/cpuidle-tegra30.c              |    2 +-
- arch/arm/mach-tegra/hotplug.c                      |    2 +-
- arch/arm/mach-tegra/platsmp.c                      |    2 +-
- arch/arm/mach-tegra/pm.c                           |    2 +-
- arch/arm/mach-tegra/tegra20_clocks.c               |    2 +-
- arch/arm/mach-tegra/tegra20_clocks_data.c          |    2 +-
- arch/arm/mach-tegra/tegra30_clocks.c               |    2 +-
- arch/arm/mach-tegra/tegra30_clocks_data.c          |    2 +-
- .../tegra_cpu_car.h => include/linux/clk/tegra.h   |    6 +++---
- 10 files changed, 12 insertions(+), 12 deletions(-)
- rename arch/arm/mach-tegra/tegra_cpu_car.h => include/linux/clk/tegra.h (96%)
+ arch/arm/mach-tegra/fuse.c |   12 ++++++++++--
+ include/linux/tegra-soc.h  |   22 ++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 2 deletions(-)
+ create mode 100644 include/linux/tegra-soc.h
 
-diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-index 867bf8b..8c0ff06 100644
---- a/arch/arm/mach-tegra/clock.c
-+++ b/arch/arm/mach-tegra/clock.c
-@@ -26,10 +26,10 @@
- #include <linux/sched.h>
- #include <linux/seq_file.h>
- #include <linux/slab.h>
-+#include <linux/clk/tegra.h>
- 
- #include "board.h"
- #include "clock.h"
--#include "tegra_cpu_car.h"
- 
- /* Global data of Tegra CPU CAR ops */
- struct tegra_cpu_car_ops *tegra_cpu_car_ops;
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-index 5e8cbf5..0b8c667 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -24,6 +24,7 @@
- #include <linux/cpuidle.h>
- #include <linux/cpu_pm.h>
- #include <linux/clockchips.h>
-+#include <linux/clk/tegra.h>
- 
- #include <asm/cpuidle.h>
- #include <asm/proc-fns.h>
-@@ -32,7 +33,6 @@
- 
- #include "pm.h"
- #include "sleep.h"
--#include "tegra_cpu_car.h"
- 
- #ifdef CONFIG_PM_SLEEP
- static int tegra30_idle_lp2(struct cpuidle_device *dev,
-diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-index dca5141..2faea56 100644
---- a/arch/arm/mach-tegra/hotplug.c
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@ -10,12 +10,12 @@
-  */
+diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+index 8121742..2cd8ac9 100644
+--- a/arch/arm/mach-tegra/fuse.c
++++ b/arch/arm/mach-tegra/fuse.c
+@@ -20,6 +20,7 @@
  #include <linux/kernel.h>
- #include <linux/smp.h>
-+#include <linux/clk/tegra.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- 
- #include "sleep.h"
--#include "tegra_cpu_car.h"
- 
- static void (*tegra_hotplug_shutdown)(void);
- 
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 1b926df..dec6704 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -18,6 +18,7 @@
- #include <linux/jiffies.h>
- #include <linux/smp.h>
  #include <linux/io.h>
-+#include <linux/clk/tegra.h>
+ #include <linux/export.h>
++#include <linux/tegra-soc.h>
  
- #include <asm/cacheflush.h>
- #include <asm/hardware/gic.h>
-@@ -29,7 +30,6 @@
- #include "fuse.h"
- #include "flowctrl.h"
- #include "reset.h"
--#include "tegra_cpu_car.h"
- 
- #include "common.h"
- #include "iomap.h"
-diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index 1b11707..db44cd5 100644
---- a/arch/arm/mach-tegra/pm.c
-+++ b/arch/arm/mach-tegra/pm.c
-@@ -24,6 +24,7 @@
- #include <linux/cpu_pm.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/clk/tegra.h>
- 
- #include <asm/smp_plat.h>
- #include <asm/cacheflush.h>
-@@ -36,7 +37,6 @@
- #include "reset.h"
- #include "flowctrl.h"
- #include "sleep.h"
--#include "tegra_cpu_car.h"
- 
- #define TEGRA_POWER_CPU_PWRREQ_OE	(1 << 16)  /* CPU pwr req enable */
- 
-diff --git a/arch/arm/mach-tegra/tegra20_clocks.c b/arch/arm/mach-tegra/tegra20_clocks.c
-index 4eb6bc8..1a80ff6 100644
---- a/arch/arm/mach-tegra/tegra20_clocks.c
-+++ b/arch/arm/mach-tegra/tegra20_clocks.c
-@@ -26,12 +26,12 @@
- #include <linux/io.h>
- #include <linux/clkdev.h>
- #include <linux/clk.h>
-+#include <linux/clk/tegra.h>
- 
- #include "clock.h"
  #include "fuse.h"
  #include "iomap.h"
- #include "tegra2_emc.h"
--#include "tegra_cpu_car.h"
+@@ -105,6 +106,14 @@ static void tegra_get_process_id(void)
+ 	tegra_core_process_id = (reg >> 12) & 3;
+ }
  
- #define RST_DEVICES			0x004
- #define RST_DEVICES_SET			0x300
-diff --git a/arch/arm/mach-tegra/tegra20_clocks_data.c b/arch/arm/mach-tegra/tegra20_clocks_data.c
-index a23a073..022cdae 100644
---- a/arch/arm/mach-tegra/tegra20_clocks_data.c
-+++ b/arch/arm/mach-tegra/tegra20_clocks_data.c
-@@ -26,12 +26,12 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/clk.h>
-+#include <linux/clk/tegra.h>
++void tegra_read_chipid(void)
++{
++	u32 reg;
++
++	reg = readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804);
++	tegra_chip_id = (reg >> 8) & 0xff;
++}
++
+ void tegra_init_fuse(void)
+ {
+ 	u32 id;
+@@ -119,8 +128,7 @@ void tegra_init_fuse(void)
+ 	reg = tegra_apb_readl(TEGRA_APB_MISC_BASE + STRAP_OPT);
+ 	tegra_bct_strapping = (reg & RAM_ID_MASK) >> RAM_CODE_SHIFT;
  
- #include "clock.h"
- #include "fuse.h"
- #include "tegra2_emc.h"
- #include "tegra20_clocks.h"
--#include "tegra_cpu_car.h"
+-	id = readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804);
+-	tegra_chip_id = (id >> 8) & 0xff;
++	tegra_read_chipid();
  
- /* Clock definitions */
- 
-diff --git a/arch/arm/mach-tegra/tegra30_clocks.c b/arch/arm/mach-tegra/tegra30_clocks.c
-index d714777..4330787 100644
---- a/arch/arm/mach-tegra/tegra30_clocks.c
-+++ b/arch/arm/mach-tegra/tegra30_clocks.c
-@@ -28,6 +28,7 @@
- #include <linux/clk.h>
- #include <linux/cpufreq.h>
- #include <linux/syscore_ops.h>
-+#include <linux/clk/tegra.h>
- 
- #include <asm/clkdev.h>
- 
-@@ -36,7 +37,6 @@
- #include "clock.h"
- #include "fuse.h"
- #include "iomap.h"
--#include "tegra_cpu_car.h"
- 
- #define USE_PLL_LOCK_BITS 0
- 
-diff --git a/arch/arm/mach-tegra/tegra30_clocks_data.c b/arch/arm/mach-tegra/tegra30_clocks_data.c
-index 6942c7a..ee01711 100644
---- a/arch/arm/mach-tegra/tegra30_clocks_data.c
-+++ b/arch/arm/mach-tegra/tegra30_clocks_data.c
-@@ -28,11 +28,11 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/cpufreq.h>
-+#include <linux/clk/tegra.h>
- 
- #include "clock.h"
- #include "fuse.h"
- #include "tegra30_clocks.h"
--#include "tegra_cpu_car.h"
- 
- #define DEFINE_CLK_TEGRA(_name, _rate, _ops, _flags,		\
- 		   _parent_names, _parents, _parent)		\
-diff --git a/arch/arm/mach-tegra/tegra_cpu_car.h b/include/linux/clk/tegra.h
-similarity index 96%
-rename from arch/arm/mach-tegra/tegra_cpu_car.h
-rename to include/linux/clk/tegra.h
-index 9764d31..0977f2a 100644
---- a/arch/arm/mach-tegra/tegra_cpu_car.h
-+++ b/include/linux/clk/tegra.h
-@@ -14,8 +14,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
--#ifndef __MACH_TEGRA_CPU_CAR_H
--#define __MACH_TEGRA_CPU_CAR_H
-+#ifndef __LINUX_CLK_TEGRA_H_
-+#define __LINUX_CLK_TEGRA_H_
- 
- /*
-  * Tegra CPU clock and reset control ops
-@@ -121,4 +121,4 @@ static inline void tegra_cpu_clock_resume(void)
- void tegra20_cpu_car_ops_init(void);
- void tegra30_cpu_car_ops_init(void);
- 
--#endif /* __MACH_TEGRA_CPU_CAR_H */
-+#endif /* __LINUX_CLK_TEGRA_H_ */
+ 	switch (tegra_chip_id) {
+ 	case TEGRA20:
+diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
+new file mode 100644
+index 0000000..dcbc14c
+--- /dev/null
++++ b/include/linux/tegra-soc.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __LINUX_TEGRA_SOC_H_
++#define __LINUX_TEGRA_SOC_H_
++
++void tegra_read_chipid(void);
++
++#endif /* __LINUX_TEGRA_SOC_H_ */
 -- 
 1.7.4.1
