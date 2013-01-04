@@ -1,32 +1,54 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Fri, 4 Jan 2013 11:47:53 +0200
-Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Orion SoC
-In-Reply-To: <50E6A378.90503@ti.com>
-References: <1355482986-885-1-git-send-email-andrew@lunn.ch>
- <1355482986-885-2-git-send-email-andrew@lunn.ch> <50E6A378.90503@ti.com>
-Message-ID: <50E6A549.5050407@ti.com>
+From: gururaja.hebbar@ti.com (Hebbar Gururaja)
+Date: Fri, 4 Jan 2013 15:24:36 +0530
+Subject: [PATCH V2 1/2] ASoC: davinci-mcasp: Add pinctrl support
+In-Reply-To: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
+References: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1357293277-25543-2-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: "Hebbar, Gururaja" <gururaja.hebbar@ti.com>
 
-Hello again,
+Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+---
+Changes in V2
+	- no change
 
-On 04-01-2013 11:40, Eduardo Valentin wrote:
-> Hey Andrew,
->
-> On 14-12-2012 13:03, Andrew Lunn wrote:
->> From: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+:100644 100644 55e2bf6... 83d96eb... M	sound/soc/davinci/davinci-mcasp.c
+ sound/soc/davinci/davinci-mcasp.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-<cut>
-
->
-> I believe you forgot to request this memory. I suggest you do:
-> +    thermal_dev->base_addr = devm_request_and_ioremap(&pdev->dev,
-> res->start,
-> +                          res);
->
-
-small fix:
-
-+    thermal_dev->base_addr = devm_request_and_ioremap(&pdev->dev,
-+                                                      res);
+diff --git a/sound/soc/davinci/davinci-mcasp.c b/sound/soc/davinci/davinci-mcasp.c
+index 55e2bf6..83d96eb 100644
+--- a/sound/soc/davinci/davinci-mcasp.c
++++ b/sound/soc/davinci/davinci-mcasp.c
+@@ -25,6 +25,7 @@
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/of_device.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+@@ -1080,6 +1081,7 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
+ 	struct resource *mem, *ioarea, *res;
+ 	struct snd_platform_data *pdata;
+ 	struct davinci_audio_dev *dev;
++	struct pinctrl *pinctrl;
+ 	int ret;
+ 
+ 	if (!pdev->dev.platform_data && !pdev->dev.of_node) {
+@@ -1111,6 +1113,11 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
+ 		return -EBUSY;
+ 	}
+ 
++	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(pinctrl))
++		dev_warn(&pdev->dev,
++				"pins are not configured from the driver\n");
++
+ 	pm_runtime_enable(&pdev->dev);
+ 
+ 	ret = pm_runtime_get_sync(&pdev->dev);
+-- 
+1.7.9.5
