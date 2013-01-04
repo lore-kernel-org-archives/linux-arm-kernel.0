@@ -1,31 +1,47 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 4 Jan 2013 17:05:50 +0100
-Subject: dma: mv_xor: error handling fixes
-In-Reply-To: <1355404843-4587-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1355404843-4587-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130104170550.70a5b3e8@skate>
+Date: Fri, 4 Jan 2013 17:10:33 +0100
+Subject: [PATCH 2/2] dma: mv_xor: do not sync the DMA buffer after being
+ deallocated
+In-Reply-To: <1356636228-23096-2-git-send-email-lkundrak@v3.sk>
+References: <1356636228-23096-1-git-send-email-lkundrak@v3.sk>
+ <1356636228-23096-2-git-send-email-lkundrak@v3.sk>
+Message-ID: <20130104171033.4a244c3d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Andrew, Gr?gory,
+Dear Lubomir Rintel,
 
-On Thu, 13 Dec 2012 14:20:41 +0100, Thomas Petazzoni wrote:
-> Jason, Andrew, Gr?gory,
-> 
-> Here are two patches fixing error handling code in the mv_xor
-> initialization code. When the initialization of one particular XOR
-> channel fails, we have some cleanup code that isn't correct, and
-> triggers a kernel warning (fixed by the first patch) and then a kernel
-> crash (fixed by the second patch).
-> 
-> The original bug has been introduced in the big XOR series pushed for
-> 3.8, so ideally, those patches should be pushed for 3.8 as well (but
-> they can wait after 3.8-rc1 if needed).
+On Thu, 27 Dec 2012 20:23:48 +0100, Lubomir Rintel wrote:
 
-Any issue with those patches? Any reason for them not being pushed for
-3.8-rc?
+>  	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
+>  				MV_XOR_TEST_SIZE, DMA_FROM_DEVICE);
+> +	dma_unmap_single(dma_chan->device->dev, dest_dma, MV_XOR_TEST_SIZE,
+> +			 DMA_FROM_DEVICE);
 
-Thanks!
+I would assume that dma_unmap_single() implies a
+dma_sync_single_for_cpu() since you're unmapping the DMA buffer. So if
+you use dma_unmap_single(), I think you can remove the call to
+dma_sync_single_for_cpu().
+
+
+>  	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
+>  				PAGE_SIZE, DMA_FROM_DEVICE);
+> +	dma_unmap_page(dma_chan->device->dev, dest_dma, PAGE_SIZE,
+> +		       DMA_FROM_DEVICE);
+
+Ditto.
+
+Also, the mv_xor_memcpy_self_test() function not only dma_map_single()
+the destination buffer, but also the source buffer. So presumably, the
+source buffer should also be dma_unmap_single()'d.
+
+And for the mv_xor_xor_self_test() function, multiple source buffers
+are dma_map_page()'d, so they should all be dma_unmap_page()'d I guess,
+not only the destination buffer.
+
+Does that make sense?
+
+Thanks,
 
 Thomas
 -- 
