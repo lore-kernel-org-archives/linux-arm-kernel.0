@@ -1,45 +1,26 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 04 Jan 2013 11:16:26 -0500
-Subject: [PATCH v3 0/7] arm64: ARMv8 RTSM model SoC support
-In-Reply-To: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
-References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <50E7005A.7070307@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 04 Jan 2013 09:25:30 -0700
+Subject: [PATCH 2/2] clk: tegra30: Convert clk out to composite clk
+In-Reply-To: <1357278706-28149-2-git-send-email-pgaikwad@nvidia.com>
+References: <1357278706-28149-1-git-send-email-pgaikwad@nvidia.com>
+ <1357278706-28149-2-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <50E7027A.1090102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On 01/04/2013 09:17 AM, Catalin Marinas wrote:
-> Hi,
+On 01/03/2013 10:51 PM, Prashant Gaikwad wrote:
+> Convert clk out to composite clock type which removes
+> the mux clock.
 > 
-> That's the third version of the patch series adding support for the
-> ARMv8 RTSM model (vexpress-like) to the AArch64 kernel. There is no
-> SoC-specific code under arch/arm64/ as the kernel makes use of the
-> vexpress support already under drivers/ (apart from dts, defconfig and
-> some Kconfig changes).
-> 
-> The patches here can be found on this branch:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git soc-armv8-experimental
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> ---
+> This patch is rebased on ccf-rework for Tegra patch series. It is just to show
+> how clk-composite can be used, not to be merged. If patch 1 is accepted then
+> I would like to merge this patch to ccf-rework series.
 
-In case you weren't aware:
-
-git checkout catalin/soc-armv8-experimental
-ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- make vexpress_defconfig
-ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- make Image
-
-  CC      drivers/irqchip/gic.o
-drivers/irqchip/gic.c: In function 'gic_init':
-drivers/irqchip/gic.c:399:2: error: 'handle_arch_irq' undeclared (first use in this function)
-drivers/irqchip/gic.c:399:2: note: each undeclared identifier is reported only once for each function it appears in
-
-arm64 builds fine for me. I haven't tried merging Rob Herring's GIC
-stuff. I may just postpone further poking around until those changes
-land.
-
-Regards,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by the Linux Foundation
+Just so I'm clear, is the intent that patch 1 of this series gets
+reviewed/accepted, and then you'll repost an updated version of the
+Tegra CCF rework series that relies on patch 1? If so, patch 1 would
+need to be either taken through the Tegra tree, or put into a separate
+branch in the clock tree, so the Tegra tree can merge it as a dependency
+of the Tegra CCF rework branch.
