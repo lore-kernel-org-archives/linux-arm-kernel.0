@@ -1,34 +1,58 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  4 Jan 2013 17:44:14 +0000
-Subject: [PATCH 1/2] ARM: hyp: boot secondary CPUs through the right entry
- point
+Date: Fri,  4 Jan 2013 17:44:15 +0000
+Subject: [PATCH 2/2] ARM: hyp: simplify __hyp_stub_install epilog
 In-Reply-To: <1357321455-9264-1-git-send-email-marc.zyngier@arm.com>
 References: <1357321455-9264-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1357321455-9264-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1357321455-9264-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Secondary CPUs should use the __hyp_stub_install_secondary entry
-point, so boot mode inconsistencies can be detected.
+__hyp_stub_install duplicates quite a bit of safe_svcmode_maskall
+by forcing the CPU back to SVC. This is unnecessary, as
+safe_svcmode_maskall is called just after.
 
-Reported-by: Ian Molton <ian.molton@collabora.co.uk>
+Furthermore, the way we build SPSR_hyp is buggy as we fail to mask
+the interrupts, leading to interesting behaviours on TC2 + UEFI.
+
+The fix is to simply remove this code and rely on safe_svcmode_maskall
+to do the right thing.
+
+Cc: Dave Martin <dave.martin@linaro.org>
+Reported-by: Harry Liebel <harry.liebel@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/head.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/hyp-stub.S | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 4eee351..16abc83 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -331,7 +331,7 @@ ENTRY(secondary_startup)
- 	 * as it has already been validated by the primary processor.
- 	 */
- #ifdef CONFIG_ARM_VIRT_EXT
--	bl	__hyp_stub_install
-+	bl	__hyp_stub_install_secondary
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 65b2417..da7e19f 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -120,7 +120,8 @@ ENTRY(__hyp_stub_install_secondary)
+  * Eventually, CPU-specific code might be needed -- assume not for now
+  *
+  * This code relies on the "eret" instruction to synchronize the
+- * various coprocessor accesses.
++ * various coprocessor accesses. This is done when we switch to SVC
++ * (see safe_svcmode_maskall).
+  */
+ 	@ Now install the hypervisor stub:
+ 	adr	r7, __hyp_stub_vectors
+@@ -155,14 +156,7 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
+ 1:
  #endif
- 	safe_svcmode_maskall r9
  
+-	bic	r7, r4, #MODE_MASK
+-	orr	r7, r7, #SVC_MODE
+-THUMB(	orr	r7, r7, #PSR_T_BIT	)
+-	msr	spsr_cxsf, r7		@ This is SPSR_hyp.
+-
+-	__MSR_ELR_HYP(14)		@ msr elr_hyp, lr
+-	__ERET				@ return, switching to SVC mode
+-					@ The boot CPU mode is left in r4.
++	bx	lr			@ The boot CPU mode is left in r4.
+ ENDPROC(__hyp_stub_install_secondary)
+ 
+ __hyp_stub_do_trap:
 -- 
 1.8.1
