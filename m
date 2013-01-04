@@ -1,60 +1,20 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 4 Jan 2013 18:00:49 +0100
-Subject: [PATCH] pinctrl: add pinconf-generic defines for output
-Message-ID: <1357318849-12616-1-git-send-email-linus.walleij@stericsson.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Jan 2013 09:11:01 -0800
+Subject: Seeking wisdom.. Where is latest tree?
+In-Reply-To: <50E6E48F.2030309@bbn.com>
+References: <50E6E48F.2030309@bbn.com>
+Message-ID: <20130104171101.GA14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+* Martin Grossman <grossman@bbn.com> [130104 06:27]:
+> I'm stuck with a 3.5.7 not booting on an AM3517evm because of
+> all the high speed changes are just not working on this board.
+> 
+> SO, is the latest and greatest any better?  I'm willing to give
+> it a try but I don't know where all these patches I've been seeing
+> the past week are being applied to!
 
-This adds a definition of a generic output configuration
-for a certain pin when using the generic pin configuration
-library. Whereas driving pins low/high is usually a GPIO
-business, you may want to set up pins into a default state
-using hogs, and never touch them again. This helps out
-with that scenario.
+Hmm maybe give the current mainline tree at v3.8-rc2 a try?
 
-Based on a patch from Patrice Chotard.
-
-Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinconf-generic.c       | 1 +
- include/linux/pinctrl/pinconf-generic.h | 3 +++
- 2 files changed, 4 insertions(+)
-
-diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
-index 833a364..bcf8157 100644
---- a/drivers/pinctrl/pinconf-generic.c
-+++ b/drivers/pinctrl/pinconf-generic.c
-@@ -46,6 +46,7 @@ struct pin_config_item conf_items[] = {
- 	PCONFDUMP(PIN_CONFIG_INPUT_DEBOUNCE, "input debounce", "time units"),
- 	PCONFDUMP(PIN_CONFIG_POWER_SOURCE, "pin power source", "selector"),
- 	PCONFDUMP(PIN_CONFIG_LOW_POWER_MODE, "pin low power", "mode"),
-+	PCONFDUMP(PIN_CONFIG_OUTPUT, "pin output", "level"),
- };
- 
- void pinconf_generic_dump_pin(struct pinctrl_dev *pctldev,
-diff --git a/include/linux/pinctrl/pinconf-generic.h b/include/linux/pinctrl/pinconf-generic.h
-index 47a1bdd..b23d99d 100644
---- a/include/linux/pinctrl/pinconf-generic.h
-+++ b/include/linux/pinctrl/pinconf-generic.h
-@@ -62,6 +62,8 @@
-  *	operation, if several modes of operation are supported these can be
-  *	passed in the argument on a custom form, else just use argument 1
-  *	to indicate low power mode, argument 0 turns low power mode off.
-+ * @PIN_CONFIG_OUTPUT: this will configure the pin in output, use argument
-+ *	1 to indicate high level, argument 0 to indicate low level.
-  * @PIN_CONFIG_END: this is the last enumerator for pin configurations, if
-  *	you need to pass in custom configurations to the pin controller, use
-  *	PIN_CONFIG_END+1 as the base offset.
-@@ -79,6 +81,7 @@ enum pin_config_param {
- 	PIN_CONFIG_INPUT_DEBOUNCE,
- 	PIN_CONFIG_POWER_SOURCE,
- 	PIN_CONFIG_LOW_POWER_MODE,
-+	PIN_CONFIG_OUTPUT,
- 	PIN_CONFIG_END = 0x7FFF,
- };
- 
--- 
-1.7.11.3
+Tony
