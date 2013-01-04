@@ -1,53 +1,38 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 4 Jan 2013 12:30:58 +0530
-Subject: [PATCH 7/7] clk: vexpress: Use common of_clk_init() function
-In-Reply-To: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
-References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <1357282858-2112-7-git-send-email-pgaikwad@nvidia.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Fri, 04 Jan 2013 09:08:12 +0200
+Subject: [BUGFIX PATCH] video: mxsfb: fix crash when unblanking the display
+In-Reply-To: <20663.19785.221750.909491@ipc1.ka-ro>
+References: <1353588555-13168-1-git-send-email-LW@KARO-electronics.de>
+ <20663.19785.221750.909491@ipc1.ka-ro>
+Message-ID: <50E67FDC.3000905@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use common of_clk_init() function for clock initialization.
+On 11/29/2012 01:55 PM, Lothar Wa?mann wrote:
+> Hi,
+>
+> adding Juergen Beisert as the driver's author to the recipient list.
+>
+> Lothar Wa?mann writes:
+>> The VDCTRL4 register does not provide the MXS SET/CLR/TOGGLE feature.
+>> The write in mxsfb_disable_controller() sets the data_cnt for the LCD
+>> DMA to 0 which obviously means the max. count for the LCD DMA and
+>> leads to overwriting arbitrary memory when the display is unblanked.
+>>
+>> Note: I already sent this patch in December 2011 but noone picked it up obviously.
+>>
+>> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
- drivers/clk/versatile/clk-vexpress-osc.c |    1 +
- drivers/clk/versatile/clk-vexpress.c     |    8 +-------
- 2 files changed, 2 insertions(+), 7 deletions(-)
+Tested-by: Lauri Hintsala <lauri.hintsala@bluegiga.net>
 
-diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
-index dcb6ae0..256c8be 100644
---- a/drivers/clk/versatile/clk-vexpress-osc.c
-+++ b/drivers/clk/versatile/clk-vexpress-osc.c
-@@ -144,3 +144,4 @@ error:
- 		vexpress_config_func_put(osc->func);
- 	kfree(osc);
- }
-+CLK_OF_DECLARE(vexpress_soc, "arm,vexpress-osc", vexpress_osc_of_setup);
-diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
-index c742ac7..f889f2f 100644
---- a/drivers/clk/versatile/clk-vexpress.c
-+++ b/drivers/clk/versatile/clk-vexpress.c
-@@ -99,19 +99,13 @@ struct clk *vexpress_sp810_of_get(struct of_phandle_args *clkspec, void *data)
- 	return vexpress_sp810_timerclken[clkspec->args[0]];
- }
- 
--static const __initconst struct of_device_id vexpress_fixed_clk_match[] = {
--	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
--	{ .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
--	{}
--};
--
- void __init vexpress_clk_of_init(void)
- {
- 	struct device_node *node;
- 	struct clk *clk;
- 	struct clk *refclk, *timclk;
- 
--	of_clk_init(vexpress_fixed_clk_match);
-+	of_clk_init(NULL);
- 
- 	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
- 	vexpress_sp810_init(of_iomap(node, 0));
--- 
-1.7.4.1
+This fixes the CPU freezing. I really recommend to apply this patch into 
+mainline soon because unblanking freezes the whole system!!!
+
+Default value of consoleblank parameter is 600 seconds and the whole 
+system crashes every time when framebuffer console is activated after 
+that timeout. I wonder why this issue is still open in mainline kernel.
+
+Should this patch be added into stable versions too?
+
+Best Regards,
+Lauri Hintsala
