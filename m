@@ -1,53 +1,48 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  4 Jan 2013 14:17:17 +0000
-Subject: [PATCH v3 3/7] vexpress: Allow vexpress-sysreg to self-initialise
+Date: Fri,  4 Jan 2013 14:17:18 +0000
+Subject: [PATCH v3 4/7] arm64: Populate the platform devices
 In-Reply-To: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
 References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1357309041-6192-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1357309041-6192-5-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vexpress_sysreg_init() is a core_initcall() already and it can
-trigger the early initialisation if a matching node is found. This patch
-allows the SoC code to avoid calling vexpress_sysreg_of_early_init()
-explicitly.
+This patch add a device_initcall() to populate the platform devices
+(of_default_bus_match_table). This allows SoC implementations that do
+not require earlier initcalls to avoid any platform-specific code under
+arch/arm64.
+
+GIC and generic timer initialisation is done via FDT and CPU notifiers
+independently of the SoC code.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/mfd/vexpress-sysreg.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/setup.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
-index 733c06b..ff5d16c 100644
---- a/drivers/mfd/vexpress-sysreg.c
-+++ b/drivers/mfd/vexpress-sysreg.c
-@@ -318,8 +318,9 @@ void __init vexpress_sysreg_early_init(void __iomem *base)
- 	struct device_node *node = of_find_compatible_node(NULL, NULL,
- 			"arm,vexpress-sysreg");
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 7665a9b..894c1e5 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -39,6 +39,7 @@
+ #include <linux/proc_fs.h>
+ #include <linux/memblock.h>
+ #include <linux/of_fdt.h>
++#include <linux/of_platform.h>
  
--	if (node)
--		base = of_iomap(node, 0);
-+	if (!node)
-+		return;
-+	base = of_iomap(node, 0);
- 
- 	if (WARN_ON(!base))
- 		return;
-@@ -338,6 +339,8 @@ void __init vexpress_sysreg_early_init(void __iomem *base)
- 
- void __init vexpress_sysreg_of_early_init(void)
- {
-+	if (vexpress_sysreg_base)
-+		return;
- 	vexpress_sysreg_early_init(NULL);
+ #include <asm/cputype.h>
+ #include <asm/elf.h>
+@@ -289,6 +290,13 @@ static int __init topology_init(void)
  }
+ subsys_initcall(topology_init);
  
-@@ -470,6 +473,7 @@ static struct platform_driver vexpress_sysreg_driver = {
- 
- static int __init vexpress_sysreg_init(void)
- {
-+	vexpress_sysreg_of_early_init();
- 	return platform_driver_register(&vexpress_sysreg_driver);
- }
- core_initcall(vexpress_sysreg_init);
++static int __init arm64_device_probe(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	return 0;
++}
++device_initcall(arm64_device_probe);
++
+ static const char *hwcap_str[] = {
+ 	"fp",
+ 	"asimd",
