@@ -1,36 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 4 Jan 2013 19:47:36 +0800
-Subject: [PATCH v2] ARM: mx25pdk: Add device tree support
-In-Reply-To: <CAOMZO5BhkM34Pzz28kEzBmpFiDQemOnH9gja89Vh1v=FWs=JkA@mail.gmail.com>
-References: <1357230455-12690-1-git-send-email-fabio.estevam@freescale.com>
- <20130104051304.GA1887@S2101-09.ap.freescale.net>
- <CAOMZO5BhkM34Pzz28kEzBmpFiDQemOnH9gja89Vh1v=FWs=JkA@mail.gmail.com>
-Message-ID: <20130104114735.GE1887@S2101-09.ap.freescale.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 4 Jan 2013 17:20:21 +0530
+Subject: [PATCH v4 8/9] ARM: davinci: da850: Added dsp clock definition,
+ keyed to "davinci-rproc.0"
+In-Reply-To: <1355967254-16726-9-git-send-email-rtivy@ti.com>
+References: <1355967254-16726-1-git-send-email-rtivy@ti.com>
+ <1355967254-16726-9-git-send-email-rtivy@ti.com>
+Message-ID: <50E6C1FD.30405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 04, 2013 at 09:29:46AM -0200, Fabio Estevam wrote:
-> On Fri, Jan 4, 2013 at 3:13 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On 12/20/2012 7:04 AM, Robert Tivy wrote:
+> Signed-off-by: Robert Tivy <rtivy@ti.com>
+> ---
+>  arch/arm/mach-davinci/da850.c |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> >> +     model = "Freescale i.MX25 Product Development Kit";
-> >> +     compatible = "fsl,imx25-pdk", "fsl,imx25";
-> >> +
-> >> +     memory {
-> >> +             reg = <0x80000000 0x4000000>;
-> >
-> > Isn't imx25-pdk equipped with a 128 MB DDR?
-> 
-> Production version of the board has 64MB. Check this comment from FSL U-boot:
-> 
-> /* iMX25 V-1.0 has 128MB but V-1.1 has only 64MB */
-> #ifdef CONFIG_MX25_3DS_V10
-> #define PHYS_SDRAM_1_SIZE	(128 * 1024 * 1024)
-> #else
-> #define PHYS_SDRAM_1_SIZE       (64 * 1024 * 1024)
-> #endif
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 31ff65a..afc814f 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -369,6 +369,15 @@ static struct clk sata_clk = {
+>  	.flags		= PSC_FORCE,
+>  };
+>  
+> +static struct clk dsp_clk = {
+> +	.name		= "dsp",
+> +	.parent		= &pll0_sysclk1,
+> +	.domain		= DAVINCI_GPSC_DSPDOMAIN,
+> +	.lpsc		= DA8XX_LPSC0_GEM,
+> +	.flags		= PSC_LRST,
+> +	.reset		= davinci_clk_reset,
 
-I'm good then.  Let's target production version.  I will fix up the
-other minor comment I gave and apply the patch, so that you do not
-have to resend.
+Instead of each clock node initializing the reset function, this can be
+once in davinci_clk_init() whenever PSC_LRST is set in flags.
 
-Shawn
+Thanks,
+Sekhar
