@@ -1,56 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 04 Jan 2013 10:22:45 -0700
-Subject: [PATCH v3 0/9] Migrate Tegra to common clock framework
-In-Reply-To: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
-References: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <50E70FE5.9010001@wwwdotorg.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 04 Jan 2013 18:26:35 +0100
+Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
+In-Reply-To: <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1357315498-4570-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <50E710CB.8070007@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2013 02:40 AM, Prashant Gaikwad wrote:
-> This patchset does following:
-> 1. Decompose single tegra clock structure into multiple clocks.
-> 2. Try to use standard clock types supported by common clock framework.
-> 3. Use dynamic initialization.
-> 4. Move all clock code to drivers/clk/tegra from mach-tegra.
-> 5. Add device tree support for Tegra20 and Tegra30 clocks.
-> 6. Remove all legacy clock code from mach-tegra.
+On 04/01/13 17:04, Thomas Petazzoni wrote:
+> Signed-off-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+> ---
+> This is a fix for 3.8, should be pushed for some 3.8-rc.
+> ---
+>   arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    8 +++++++-
+>   1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> index 72a9dd0..3e9ee1b 100644
+> --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> @@ -23,7 +23,13 @@
+>
+>   	memory {
+>   		device_type = "memory";
+> -		reg =<0x00000000 0xC0000000>; /* 3 GB */
+> +		/*
+> +		 * The board has an additional 2 GB DRAM chip in an
+> +		 * expansion slot, but using it makes the system very
+> +		 * unstable: it even doesn't boot reliably. So we use
+> +		 * only the soldered 1 GB chip for now.
+> +		 */
+> +		reg =<0x00000000 0x40000000>; /* 1 GB */
+>   	};
+>
+>   	soc {
 
-I think there are bugs here. I applied all your clock patches on top of
-Tegra's for-next (see list below), and found that the following don't
-work on Springbank:
+Hi Thomas
 
-* HDMI display
-* Audio playback
-* WiFi
+How many different boards have you tried?
 
-I imagine the same issue would be seen on Harmony or Ventana since
-they're very similar. All of those functions work fine with Tegra's
-for-next branch (commit 5e30b49 "Merge branch 'for-3.9/defconfig' into
-for-next").
+I've not had problems with the board i have. Using the plathome supplied 
+kernel, i've rebuilt the kernel, which is a good memory test. Using 
+mainline, i've booted a number of times when developing the thermal 
+driver and not had problems.
 
-I didn't try Tegra30. I assume you'll test both SoCs...
+I would hate to disable 2GB of RAM just because your board has a fault.
 
-864e964 clk: vexpress: Use common of_clk_init() function
-c4e8389 clk: zynq: Use common of_clk_init() function
-2c9ff0c clk: vt8500: Use common of_clk_init() function
-db9c59c clk: highbank: Use common of_clk_init() function
-b40949b clk: sunxi: Use common of_clk_init() function
-f6d1492 clk: tegra: Use common of_clk_init() function
-f6fd2eb clk: add common of_clk_init() function
-70a8ea3 clk: tegra30: remove unused TEGRA_CLK_DUPLICATE()s
-3945e4f clk: tegra20: remove unused TEGRA_CLK_DUPLICATE()s
-587bcca arm: tegra30: remove auxdata
-52b982f arm: tegra20: remove auxdata
-3381359 ASoC: tegra: remove auxdata
-d31ea1b ARM: dt: tegra30: Add clock information
-542ddb5 ARM: dt: tegra20: Add clock information
-dd19f5f arm: tegra: Remove legacy clock code
-aaf17b6 arm: tegra: Migrate to new clock code
-458a3ae clk: tegra: add clock support for tegra30
-edb65f1 clk: tegra: add clock support for tegra20
-1786e1f ARM: Tegra: Define Tegra30 CAR binding
-7d77415 ARM: tegra: Define Tegra20 CAR binding
-a4798fa arm: tegra: Move tegra_cpu_car.h to linux/clk/tegra.h
-df05a02 clk: tegra: Add tegra specific clocks
-ad00a81 ARM: tegra: Add function to read chipid
+	Andrew
