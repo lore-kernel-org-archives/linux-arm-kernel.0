@@ -1,84 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  4 Jan 2013 17:45:09 +0100
-Subject: [PATCH 2/2] ARM: sunxi: Add the GPIOs node to the device tree
-In-Reply-To: <1357317909-12458-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1357317909-12458-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1357317909-12458-3-git-send-email-maxime.ripard@free-electrons.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri,  4 Jan 2013 17:59:56 +0100
+Subject: [PATCH 2/5] ARM: exynos: handle properly the return values
+In-Reply-To: <1357318799-24378-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1357318799-24378-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1357318799-24378-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun5i-a13.dtsi |   51 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+The cpuidle_register_driver return value is not checked.
+The init function returns always -EIO when cpuidle_register_device
+fails but the error could be different.
 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index e112189..dc650a6 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -14,6 +14,15 @@
- /include/ "sunxi.dtsi"
+This patch fixes that by checking the cpuidle_register_driver properly
+and returning the correct value when cpuidle_register_device fails.
+
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-exynos/cpuidle.c |   15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index f8dd1cd..a5fe194 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -193,13 +193,17 @@ static void __init exynos5_core_down_clk(void)
  
- / {
-+	aliases {
-+		gpio1 = &pb;
-+		gpio2 = &pc;
-+		gpio3 = &pd;
-+		gpio4 = &pe;
-+		gpio5 = &pf;
-+		gpio6 = &pg;
-+	};
-+
- 	memory {
- 		reg = <0x40000000 0x20000000>;
- 	};
-@@ -39,5 +48,47 @@
- 				allwinner,pull = <0>;
- 			};
- 		};
-+
-+		pb: gpio at 01c20824 {
-+			compatible = "allwinner,sunxi-gpio";
-+			reg = <0x01c20824 0x24>;
-+			gpio-controller;
-+			#gpio-cells = <1>;
-+		};
-+
-+		pc: gpio at 01c20848 {
-+			compatible = "allwinner,sunxi-gpio";
-+			reg = <0x01c20848 0x24>;
-+			gpio-controller;
-+			#gpio-cells = <1>;
-+		};
-+
-+		pd: gpio at 01c2086c {
-+			compatible = "allwinner,sunxi-gpio";
-+			reg = <0x01c2086c 0x24>;
-+			gpio-controller;
-+			#gpio-cells = <1>;
-+		};
-+
-+		pe: gpio at 01c20890 {
-+			compatible = "allwinner,sunxi-gpio";
-+			reg = <0x01c20890 0x24>;
-+			gpio-controller;
-+			#gpio-cells = <1>;
-+		};
-+
-+		pf: gpio at 01c208b4 {
-+			compatible = "allwinner,sunxi-gpio";
-+			reg = <0x01c208b4 0x24>;
-+			gpio-controller;
-+			#gpio-cells = <1>;
-+		};
-+
-+		pg: gpio at 01c208d8 {
-+			compatible = "allwinner,sunxi-gpio";
-+			reg = <0x01c208d8 0x24>;
-+			gpio-controller;
-+			#gpio-cells = <1>;
-+		};
- 	};
- };
+ static int __init exynos4_init_cpuidle(void)
+ {
+-	int cpu_id;
++	int cpu_id, ret;
+ 	struct cpuidle_device *device;
+ 
+ 	if (soc_is_exynos5250())
+ 		exynos5_core_down_clk();
+ 
+-	cpuidle_register_driver(&exynos4_idle_driver);
++	ret = cpuidle_register_driver(&exynos4_idle_driver);
++	if (ret) {
++		printk(KERN_ERR "CPUidle failed to register driver\n");
++		return ret;
++	}
+ 
+ 	for_each_cpu(cpu_id, cpu_online_mask) {
+ 		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
+@@ -209,9 +213,10 @@ static int __init exynos4_init_cpuidle(void)
+ 		if (cpu_id != 0)
+ 			device->state_count = 1;
+ 
+-		if (cpuidle_register_device(device)) {
+-			printk(KERN_ERR "CPUidle register device failed\n,");
+-			return -EIO;
++		ret = cpuidle_register_device(device);
++		if (ret) {
++			printk(KERN_ERR "CPUidle register device failed\n");
++			return ret;
+ 		}
+ 	}
+ 
 -- 
-1.7.10.4
+1.7.9.5
