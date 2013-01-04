@@ -1,50 +1,99 @@
-From: s-guiriec@ti.com (Sebastien Guiriec)
-Date: Fri, 4 Jan 2013 21:27:41 +0100
-Subject: [PATCH 2/3] ARM: OMAP4: hwmod data: do not enable or reset the
- AESS during kernel init
-In-Reply-To: <alpine.DEB.2.00.1301041833510.25868@utopia.booyaka.com>
-References: <1357304526-21557-1-git-send-email-s-guiriec@ti.com>
- <1357304526-21557-3-git-send-email-s-guiriec@ti.com>
- <alpine.DEB.2.00.1301041833510.25868@utopia.booyaka.com>
-Message-ID: <50E73B3D.4010705@ti.com>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Fri, 04 Jan 2013 12:29:46 -0800
+Subject: [PATCH v2] ARM: pxa27x: fix ac97 controller warm reset code
+In-Reply-To: <50E6AF88.8050800@compulab.co.il>
+References: <1357223976-9097-1-git-send-email-mikedunn@newsguy.com>
+ <50E67BAD.7070702@compulab.co.il> <50E6AF88.8050800@compulab.co.il>
+Message-ID: <50E73BBA.1050106@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2013 07:35 PM, Paul Walmsley wrote:
-> Hi Sebastien
+On 01/04/2013 02:31 AM, Igor Grinberg wrote:
+
+[..]
+
+
+> Looking at this one more time...
+> fb1bf8cd13 ([ARM] pxa: introduce processor specific pxa27x_assert_ac97reset())
+> also removed the call to pxa_gpio_mode() function which effectively set
+> AF to GPIO and configured the GPIO to output high.
+> (Later b1d9bf1d ([ARM] pxa: remove pxa_gpio_mode() and files) removed the
+> pxa_gpio_mode() function)
+> 
+> See below...
+
 >
-> On Fri, 4 Jan 2013, Sebastien Guiriec wrote:
->
->> The AESS on OMAP4 has additional register on top of SYS_CONFIG for
->> auto gatting configuration. In order to avoid running clock after
->> boot up we should avoid to enable and reset the module during boot up.
+>>>
+>>>  extern int keypad_set_wake(unsigned int on);
+>>>  #endif /* __ASM_ARCH_MFP_PXA27X_H */
+>>> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+>>> index 8047ee0..616cb87 100644
+>>> --- a/arch/arm/mach-pxa/pxa27x.c
+>>> +++ b/arch/arm/mach-pxa/pxa27x.c
+>>> @@ -47,9 +47,9 @@ void pxa27x_clear_otgph(void)
+>>>  EXPORT_SYMBOL(pxa27x_clear_otgph);
+>>>
+>>>  static unsigned long ac97_reset_config[] = {
+>>> -	GPIO113_GPIO,
+>>> +	GPIO113_AC97_nRESET_GPIO_HIGH,
+>>>  	GPIO113_AC97_nRESET,
+>>> -	GPIO95_GPIO,
+>>> +	GPIO95_AC97_nRESET_GPIO_HIGH,
+>>>  	GPIO95_AC97_nRESET,
+>>>  };
+>>>
 >>
->> Audio driver will be in charge of configuring the addition register.
+>
+
+
+>
+>>>
+>>>  extern int keypad_set_wake(unsigned int on);
+>>>  #endif /* __ASM_ARCH_MFP_PXA27X_H */
+>>> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+>>> index 8047ee0..616cb87 100644
+>>> --- a/arch/arm/mach-pxa/pxa27x.c
+>>> +++ b/arch/arm/mach-pxa/pxa27x.c
+>>> @@ -47,9 +47,9 @@ void pxa27x_clear_otgph(void)
+>>>  EXPORT_SYMBOL(pxa27x_clear_otgph);
+>>>
+>>>  static unsigned long ac97_reset_config[] = {
+>>> -	GPIO113_GPIO,
+>>> +	GPIO113_AC97_nRESET_GPIO_HIGH,
+>>>  	GPIO113_AC97_nRESET,
+>>> -	GPIO95_GPIO,
+>>> +	GPIO95_AC97_nRESET_GPIO_HIGH,
+>>>  	GPIO95_AC97_nRESET,
+>>>  };
+>>>
 >>
->> At its core, this patch is a workaround for an OMAP hardware problem.
->> It should be possible to configure the OMAP with good default reset
->> configuration of AESS IP for auto gatting mode.
->>
->> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
 >
-> What do you think about a slightly modified and updated version of:
->
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69853.html
 
-This solution is the better. I was thinking that Tony reject this 
-callback (but I realize that I miss the second series long time back).
 
-Paul,
-Do you want me to rebase this version and update the serie or are you 
-handle it?
 
->
-> ?  That way we can reset the IP block at startup, like most of our other
-> IP blocks, to avoid previous OS and bootloader dependencies.
+[..]
 
-Yes can be useful.
 
->
->
-> - Paul
->
+> The DRIVE_HIGH does not really configures the GPIO to output high, but
+> only sets the MFP_LPM_DRIVE_HIGH bit which in turn is only effective in
+> low power modes.
+> This means, that by doing the above, you just configure the MFP for GPIO output,
+> but do not assign it a value, so it gets driven with some undefined value.
+> This is not safe.
+> 
+> Can you please, check if the attached patch below does the job?	
+
+
+Yes, it does! (With a warning from gpiolib becaus gpio_request() was not called).
+
+In a different patch, I skip the ac97 warm reset if the link is up (which it
+always is when called), so honestly, I didn't functionally test my patch.
+Normally I wouldn't submit a patch without testing, but clearly the code was
+already broken anyway, and the change looked straightforward (danger!).
+
+With your patch and my other patch removed, the warm reset does not fail, as before.
+
+I am in your debt!  I will submit a new version of this patch soon.
+
+Thanks again,
+Mike
