@@ -1,64 +1,60 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  4 Jan 2013 14:17:15 +0000
-Subject: [PATCH v3 1/7] arm: Move sp810.h to include/linux/amba/
-In-Reply-To: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
-References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1357309041-6192-2-git-send-email-catalin.marinas@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 4 Jan 2013 16:26:34 +0200
+Subject: [PATCH 00/12] ARM: OMAP2+: powerdomain updates after the
+ functional power state conversion
+In-Reply-To: <20121209200108.3196.12452.stgit@dusk.lan>
+References: <20121209200108.3196.12452.stgit@dusk.lan>
+Message-ID: <1357309594.2221.112.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since it is now used by code under drivers/clk/ it makes sense for this
-file to be in a more generic location. This is required for building
-vexpress support on arm64.
+Hi Paul,
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-Cc: Shiraz Hashim <shiraz.hashim@st.com>
-Cc: Russell King <linux@arm.linux.org.uk>
+Tested this whole set on omap3beagle and omap4panda. The only regression
+I noticed was that cpu0 debug counters do not increment on omap4 after
+this set. The patch at the end fixes this problem. Other than that, you
+can add acked-by tag from me if you want, I went the code through
+quickly and don't have any comments to it.
+
+-Tero
+
+From: Tero Kristo <t-kristo@ti.com>
+Date: Thu, 3 Jan 2013 20:07:27 +0200
+Subject: [PATCH] ARM: OMAP4: PM: fix cpu0 statistics update during idle
+
+Cpu0 PM counters do not update, as the  cpu0 fpwrst is set to ON before
+calling pwrdm_post_transition. The optimized code checks whether the
+fpwrst is ON, and skips any further checks if this is the case. Fixed
+by re-ordering the code within omap4_mpuss_enter_lowpower function.
+
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/plat-spear/restart.c                                 | 2 +-
- drivers/clk/versatile/clk-vexpress.c                          | 3 +--
- {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h | 0
- 3 files changed, 2 insertions(+), 3 deletions(-)
- rename {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h (100%)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-spear/restart.c b/arch/arm/plat-spear/restart.c
-index 4f99011..7d4616d 100644
---- a/arch/arm/plat-spear/restart.c
-+++ b/arch/arm/plat-spear/restart.c
-@@ -11,8 +11,8 @@
-  * warranty of any kind, whether express or implied.
-  */
- #include <linux/io.h>
-+#include <linux/amba/sp810.h>
- #include <asm/system_misc.h>
--#include <asm/hardware/sp810.h>
- #include <mach/spear.h>
- #include <mach/generic.h>
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index 9acd52a..1bdd59e 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -269,10 +269,16 @@ int omap4_mpuss_enter_lowpower(unsigned int cpu,
+u8 fpwrst)
+ 	 * domain transition
+ 	 */
+ 	wakeup_cpu = smp_processor_id();
+-	WARN_ON(pwrdm_set_next_fpwrst(pm_info->pwrdm, PWRDM_FUNC_PWRST_ON));
  
-diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
-index c742ac7..4f83ff9 100644
---- a/drivers/clk/versatile/clk-vexpress.c
-+++ b/drivers/clk/versatile/clk-vexpress.c
-@@ -11,6 +11,7 @@
-  * Copyright (C) 2012 ARM Limited
-  */
++	/*
++	 * Due to optimizations to the code, pwrdm_post_transition
++	 * must be called prior to resetting cpu0 pwrst to ON,
++	 * otherwise cpu0 powerstate statistics don't update properly
++	 */
+ 	pwrdm_post_transition(NULL);
  
-+#include <linux/amba/sp810.h>
- #include <linux/clkdev.h>
- #include <linux/clk-provider.h>
- #include <linux/err.h>
-@@ -18,8 +19,6 @@
- #include <linux/of_address.h>
- #include <linux/vexpress.h>
++	WARN_ON(pwrdm_set_next_fpwrst(pm_info->pwrdm, PWRDM_FUNC_PWRST_ON));
++
+ 	return 0;
+ }
  
--#include <asm/hardware/sp810.h>
--
- static struct clk *vexpress_sp810_timerclken[4];
- static DEFINE_SPINLOCK(vexpress_sp810_lock);
- 
-diff --git a/arch/arm/include/asm/hardware/sp810.h b/include/linux/amba/sp810.h
-similarity index 100%
-rename from arch/arm/include/asm/hardware/sp810.h
-rename to include/linux/amba/sp810.h
+-- 
+1.7.4.1
