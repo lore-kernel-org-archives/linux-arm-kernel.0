@@ -1,344 +1,452 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  4 Jan 2013 14:17:21 +0000
-Subject: [PATCH v3 7/7] arm64: Add simple earlyprintk support
+Date: Fri,  4 Jan 2013 14:17:19 +0000
+Subject: [PATCH v3 5/7] arm64: Add dts files for the ARMv8 RTSM model
 In-Reply-To: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
 References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1357309041-6192-8-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1357309041-6192-6-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for "earlyprintk=" parameter on the kernel
-command line. The format is:
+From: Pawel Moll <Pawel.Moll@arm.com>
 
-  earlyprintk=<name>[,<addr>][,<options>]
-
-where <name> is the name of the (UART) device, e.g. "pl011", <addr> is
-the I/O address. The <options> aren't currently used.
-
-The mapping of the earlyprintk device is done very early during kernel
-boot and there are restrictions on which functions it can call. A
-special early_io_map() function is added which creates the mapping from
-the pre-defined EARLY_IOBASE to the device I/O address passed via the
-kernel parameter. The pgd entry corresponding to EARLY_IOBASE is
-pre-populated in head.S during kernel boot.
-
-Only PL011 is currently supported and it is assumed that the interface
-is already initialised by the boot loader before the kernel is started.
-
+Signed-off-by: Pawel Moll <Pawel.Moll@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- Documentation/arm64/memory.txt   |   2 +
- arch/arm64/Kconfig.debug         |   9 +++
- arch/arm64/include/asm/io.h      |   3 +
- arch/arm64/include/asm/memory.h  |   1 +
- arch/arm64/include/asm/mmu.h     |   1 +
- arch/arm64/kernel/Makefile       |   1 +
- arch/arm64/kernel/early_printk.c | 118 +++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/head.S         |  12 +++-
- arch/arm64/mm/mmu.c              |  42 ++++++++++++++
- 9 files changed, 187 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/kernel/early_printk.c
+ arch/arm64/boot/dts/Makefile                 |   2 +
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts       | 154 ++++++++++++++++++
+ arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 234 +++++++++++++++++++++++++++
+ arch/arm64/boot/dts/skeleton.dtsi            |  13 ++
+ 4 files changed, 403 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+ create mode 100644 arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+ create mode 100644 arch/arm64/boot/dts/skeleton.dtsi
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index d758702..5f583af 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -35,6 +35,8 @@ ffffffbc00000000	ffffffbdffffffff	   8GB		vmemmap
- 
- ffffffbe00000000	ffffffbffbbfffff	  ~8GB		[guard, future vmmemap]
- 
-+ffffffbffbc00000	ffffffbffbdfffff	   2MB		earlyprintk device
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index 801e2d7..6d9a147 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,3 +1,5 @@
++dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
 +
- ffffffbffbe00000	ffffffbffbe0ffff	  64KB		PCI I/O space
+ targets += dtbs
  
- ffffffbbffff0000	ffffffbcffffffff	  ~2MB		[guard]
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index d7553f2..79871cd 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -24,4 +24,13 @@ config DEBUG_STACK_USAGE
- 	  Enables the display of the minimum amount of free stack which each
- 	  task has ever had available in the sysrq-T output.
- 
-+config EARLY_PRINTK
-+	bool "Early printk support"
-+	default y
-+	help
-+	  Say Y here if you want to have an early console using the
-+	  earlyprintk=<name>[,<addr>][,<options>] kernel parameter. It
-+	  is assumed that the early console device has been initialised
-+	  by the boot loader prior to starting the Linux kernel.
-+
- endmenu
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index d2f05a6..57f12c9 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -230,6 +230,9 @@ extern void __iounmap(volatile void __iomem *addr);
- #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
- #define iounmap				__iounmap
- 
-+#define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF)
-+#define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PTE_PXN | PTE_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
-+
- #define ARCH_HAS_IOREMAP_WC
- #include <asm-generic/iomap.h>
- 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 1cac16a..381f556 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -43,6 +43,7 @@
- #define PAGE_OFFSET		UL(0xffffffc000000000)
- #define MODULES_END		(PAGE_OFFSET)
- #define MODULES_VADDR		(MODULES_END - SZ_64M)
-+#define EARLYCON_IOBASE		(MODULES_VADDR - SZ_4M)
- #define VA_BITS			(39)
- #define TASK_SIZE_64		(UL(1) << VA_BITS)
- 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index d4f7fd5..2494fc0 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -26,5 +26,6 @@ typedef struct {
- 
- extern void paging_init(void);
- extern void setup_mm_for_reboot(void);
-+extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
- 
- #endif
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 74239c3..a1cace4 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -17,6 +17,7 @@ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_SMP)			+= smp.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
-+arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
+ dtbs: $(addprefix $(obj)/, $(dtb-y))
+diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
 new file mode 100644
-index 0000000..7e320a2
+index 0000000..15df04c
 --- /dev/null
-+++ b/arch/arm64/kernel/early_printk.c
-@@ -0,0 +1,118 @@
++++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+@@ -0,0 +1,154 @@
 +/*
-+ * Earlyprintk support.
++ * ARM Ltd. Fast Models
 + *
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Author: Catalin Marinas <catalin.marinas@arm.com>
++ * Architecture Envelope Model (AEM) ARMv8-A
++ * ARMAEMv8AMPCT
 + *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * RTSM_VE_AEMv8A.lisa
 + */
-+#include <linux/kernel.h>
-+#include <linux/console.h>
-+#include <linux/init.h>
-+#include <linux/string.h>
-+#include <linux/mm.h>
-+#include <linux/io.h>
 +
-+#include <linux/amba/serial.h>
++/dts-v1/;
 +
-+static void __iomem *early_base;
-+static void (*printch)(char ch);
++/memreserve/ 0x80000000 0x00010000;
 +
-+/*
-+ * PL011 single character TX.
-+ */
-+static void pl011_printch(char ch)
-+{
-+	while (readl_relaxed(early_base + UART01x_FR) & UART01x_FR_TXFF)
-+		;
-+	writeb_relaxed(ch, early_base + UART01x_DR);
-+	while (readl_relaxed(early_base + UART01x_FR) & UART01x_FR_BUSY)
-+		;
-+}
++/ {
++	model = "RTSM_VE_AEMv8A";
++	compatible = "arm,rtsm_ve,aemv8a", "arm,vexpress";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
 +
-+struct earlycon_match {
-+	const char *name;
-+	void (*printch)(char ch);
++	chosen { };
++
++	aliases {
++		serial0 = &v2m_serial0;
++		serial1 = &v2m_serial1;
++		serial2 = &v2m_serial2;
++		serial3 = &v2m_serial3;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <1>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <2>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <3>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000 0 0x80000000>,
++		      <0x00000008 0x80000000 0 0x80000000>;
++	};
++
++	gic: interrupt-controller at 2c001000 {
++		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0 0x2c001000 0 0x1000>,
++		      <0 0x2c002000 0 0x100>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <1 14 0xff01>;
++		clock-frequency = <100000000>;
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <0 60 4>,
++			     <0 61 4>,
++			     <0 62 4>,
++			     <0 63 4>;
++	};
++
++	smb {
++		compatible = "simple-bus";
++
++		#address-cells = <2>;
++		#size-cells = <1>;
++		ranges = <0 0 0 0x08000000 0x04000000>,
++			 <1 0 0 0x14000000 0x04000000>,
++			 <2 0 0 0x18000000 0x04000000>,
++			 <3 0 0 0x1c000000 0x04000000>,
++			 <4 0 0 0x0c000000 0x04000000>,
++			 <5 0 0 0x10000000 0x04000000>;
++
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 63>;
++		interrupt-map = <0 0  0 &gic 0  0 4>,
++				<0 0  1 &gic 0  1 4>,
++				<0 0  2 &gic 0  2 4>,
++				<0 0  3 &gic 0  3 4>,
++				<0 0  4 &gic 0  4 4>,
++				<0 0  5 &gic 0  5 4>,
++				<0 0  6 &gic 0  6 4>,
++				<0 0  7 &gic 0  7 4>,
++				<0 0  8 &gic 0  8 4>,
++				<0 0  9 &gic 0  9 4>,
++				<0 0 10 &gic 0 10 4>,
++				<0 0 11 &gic 0 11 4>,
++				<0 0 12 &gic 0 12 4>,
++				<0 0 13 &gic 0 13 4>,
++				<0 0 14 &gic 0 14 4>,
++				<0 0 15 &gic 0 15 4>,
++				<0 0 16 &gic 0 16 4>,
++				<0 0 17 &gic 0 17 4>,
++				<0 0 18 &gic 0 18 4>,
++				<0 0 19 &gic 0 19 4>,
++				<0 0 20 &gic 0 20 4>,
++				<0 0 21 &gic 0 21 4>,
++				<0 0 22 &gic 0 22 4>,
++				<0 0 23 &gic 0 23 4>,
++				<0 0 24 &gic 0 24 4>,
++				<0 0 25 &gic 0 25 4>,
++				<0 0 26 &gic 0 26 4>,
++				<0 0 27 &gic 0 27 4>,
++				<0 0 28 &gic 0 28 4>,
++				<0 0 29 &gic 0 29 4>,
++				<0 0 30 &gic 0 30 4>,
++				<0 0 31 &gic 0 31 4>,
++				<0 0 32 &gic 0 32 4>,
++				<0 0 33 &gic 0 33 4>,
++				<0 0 34 &gic 0 34 4>,
++				<0 0 35 &gic 0 35 4>,
++				<0 0 36 &gic 0 36 4>,
++				<0 0 37 &gic 0 37 4>,
++				<0 0 38 &gic 0 38 4>,
++				<0 0 39 &gic 0 39 4>,
++				<0 0 40 &gic 0 40 4>,
++				<0 0 41 &gic 0 41 4>,
++				<0 0 42 &gic 0 42 4>;
++
++		/include/ "rtsm_ve-motherboard.dtsi"
++	};
 +};
 +
-+static const struct earlycon_match earlycon_match[] __initconst = {
-+	{ .name = "pl011", .printch = pl011_printch, },
-+	{}
-+};
-+
-+static void early_write(struct console *con, const char *s, unsigned n)
-+{
-+	while (n-- > 0) {
-+		if (*s == '\n')
-+			printch('\r');
-+		printch(*s);
-+		s++;
-+	}
-+}
-+
-+static struct console early_console = {
-+	.name =		"earlycon",
-+	.write =	early_write,
-+	.flags =	CON_PRINTBUFFER | CON_BOOT,
-+	.index =	-1,
-+};
-+
+diff --git a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+new file mode 100644
+index 0000000..b45e5f3
+--- /dev/null
++++ b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+@@ -0,0 +1,234 @@
 +/*
-+ * Parse earlyprintk=... parameter in the format:
++ * ARM Ltd. Fast Models
 + *
-+ *   <name>[,<addr>][,<options>]
++ * Versatile Express (VE) system model
++ * Motherboard component
 + *
-+ * and register the early console. It is assumed that the UART has been
-+ * initialised by the bootloader already.
++ * VEMotherBoard.lisa
 + */
-+static int __init setup_early_printk(char *buf)
-+{
-+	const struct earlycon_match *match = earlycon_match;
-+	phys_addr_t paddr = 0;
 +
-+	if (!buf) {
-+		pr_warning("No earlyprintk arguments passed.\n");
-+		return 0;
-+	}
++	motherboard {
++		arm,v2m-memory-map = "rs1";
++		compatible = "arm,vexpress,v2m-p1", "simple-bus";
++		#address-cells = <2>; /* SMB chipselect number and offset */
++		#size-cells = <1>;
++		#interrupt-cells = <1>;
++		ranges;
 +
-+	while (match->name) {
-+		size_t len = strlen(match->name);
-+		if (!strncmp(buf, match->name, len)) {
-+			buf += len;
-+			break;
-+		}
-+		match++;
-+	}
-+	if (!match->name) {
-+		pr_warning("Unknown earlyprintk arguments: %s\n", buf);
-+		return 0;
-+	}
++		flash at 0,00000000 {
++			compatible = "arm,vexpress-flash", "cfi-flash";
++			reg = <0 0x00000000 0x04000000>,
++			      <4 0x00000000 0x04000000>;
++			bank-width = <4>;
++		};
 +
-+	/* I/O address */
-+	if (!strncmp(buf, ",0x", 3)) {
-+		char *e;
-+		paddr = simple_strtoul(buf + 1, &e, 16);
-+		buf = e;
-+	}
-+	/* no options parsing yet */
++		vram at 2,00000000 {
++			compatible = "arm,vexpress-vram";
++			reg = <2 0x00000000 0x00800000>;
++		};
 +
-+	if (paddr)
-+		early_base = early_io_map(paddr, EARLYCON_IOBASE);
++		ethernet at 2,02000000 {
++			compatible = "smsc,lan91c111";
++			reg = <2 0x02000000 0x10000>;
++			interrupts = <15>;
++		};
 +
-+	printch = match->printch;
-+	register_console(&early_console);
++		v2m_clk24mhz: clk24mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <24000000>;
++			clock-output-names = "v2m:clk24mhz";
++		};
 +
-+	return 0;
-+}
++		v2m_refclk1mhz: refclk1mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <1000000>;
++			clock-output-names = "v2m:refclk1mhz";
++		};
 +
-+early_param("earlyprintk", setup_early_printk);
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 368ad1f..0a0a497 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -82,10 +82,8 @@
- 
- #ifdef CONFIG_ARM64_64K_PAGES
- #define MM_MMUFLAGS	PTE_ATTRINDX(MT_NORMAL) | PTE_FLAGS
--#define IO_MMUFLAGS	PTE_ATTRINDX(MT_DEVICE_nGnRE) | PTE_XN | PTE_FLAGS
- #else
- #define MM_MMUFLAGS	PMD_ATTRINDX(MT_NORMAL) | PMD_FLAGS
--#define IO_MMUFLAGS	PMD_ATTRINDX(MT_DEVICE_nGnRE) | PMD_SECT_XN | PMD_FLAGS
- #endif
- 
- /*
-@@ -368,6 +366,7 @@ ENDPROC(__calc_phys_offset)
-  *   - identity mapping to enable the MMU (low address, TTBR0)
-  *   - first few MB of the kernel linear mapping to jump to once the MMU has
-  *     been enabled, including the FDT blob (TTBR1)
-+ *   - UART mapping if CONFIG_EARLY_PRINTK is enabled (TTBR1)
-  */
- __create_page_tables:
- 	pgtbl	x25, x26, x24			// idmap_pg_dir and swapper_pg_dir addresses
-@@ -420,6 +419,15 @@ __create_page_tables:
- 	sub	x6, x6, #1			// inclusive range
- 	create_block_map x0, x7, x3, x5, x6
- 1:
-+#ifdef CONFIG_EARLY_PRINTK
-+	/*
-+	 * Create the pgd entry for the UART mapping. The full mapping is done
-+	 * later based earlyprintk kernel parameter.
-+	 */
-+	ldr	x5, =EARLYCON_IOBASE		// UART virtual address
-+	add	x0, x26, #2 * PAGE_SIZE		// section table address
-+	create_pgd_entry x26, x0, x5, x6, x7
-+#endif
- 	ret
- ENDPROC(__create_page_tables)
- 	.ltorg
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index a6885d8..f4dd585 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -25,6 +25,7 @@
- #include <linux/nodemask.h>
- #include <linux/memblock.h>
- #include <linux/fs.h>
-+#include <linux/io.h>
- 
- #include <asm/cputype.h>
- #include <asm/sections.h>
-@@ -251,6 +252,47 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 	} while (pgd++, addr = next, addr != end);
- }
- 
-+#ifdef CONFIG_EARLY_PRINTK
++		v2m_refclk32khz: refclk32khz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++			clock-output-names = "v2m:refclk32khz";
++		};
++
++		iofpga at 3,00000000 {
++			compatible = "arm,amba-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 3 0 0x200000>;
++
++			v2m_sysreg: sysreg at 010000 {
++				compatible = "arm,vexpress-sysreg";
++				reg = <0x010000 0x1000>;
++				gpio-controller;
++				#gpio-cells = <2>;
++			};
++
++			v2m_sysctl: sysctl at 020000 {
++				compatible = "arm,sp810", "arm,primecell";
++				reg = <0x020000 0x1000>;
++				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&v2m_clk24mhz>;
++				clock-names = "refclk", "timclk", "apb_pclk";
++				#clock-cells = <1>;
++				clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
++			};
++
++			aaci at 040000 {
++				compatible = "arm,pl041", "arm,primecell";
++				reg = <0x040000 0x1000>;
++				interrupts = <11>;
++				clocks = <&v2m_clk24mhz>;
++				clock-names = "apb_pclk";
++			};
++
++			mmci at 050000 {
++				compatible = "arm,pl180", "arm,primecell";
++				reg = <0x050000 0x1000>;
++				interrupts = <9 10>;
++				cd-gpios = <&v2m_sysreg 0 0>;
++				wp-gpios = <&v2m_sysreg 1 0>;
++				max-frequency = <12000000>;
++				vmmc-supply = <&v2m_fixed_3v3>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "mclk", "apb_pclk";
++			};
++
++			kmi at 060000 {
++				compatible = "arm,pl050", "arm,primecell";
++				reg = <0x060000 0x1000>;
++				interrupts = <12>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "KMIREFCLK", "apb_pclk";
++			};
++
++			kmi at 070000 {
++				compatible = "arm,pl050", "arm,primecell";
++				reg = <0x070000 0x1000>;
++				interrupts = <13>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "KMIREFCLK", "apb_pclk";
++			};
++
++			v2m_serial0: uart at 090000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x090000 0x1000>;
++				interrupts = <5>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "uartclk", "apb_pclk";
++			};
++
++			v2m_serial1: uart at 0a0000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x0a0000 0x1000>;
++				interrupts = <6>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "uartclk", "apb_pclk";
++			};
++
++			v2m_serial2: uart at 0b0000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x0b0000 0x1000>;
++				interrupts = <7>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "uartclk", "apb_pclk";
++			};
++
++			v2m_serial3: uart at 0c0000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x0c0000 0x1000>;
++				interrupts = <8>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "uartclk", "apb_pclk";
++			};
++
++			wdt at 0f0000 {
++				compatible = "arm,sp805", "arm,primecell";
++				reg = <0x0f0000 0x1000>;
++				interrupts = <0>;
++				clocks = <&v2m_refclk32khz>, <&v2m_clk24mhz>;
++				clock-names = "wdogclk", "apb_pclk";
++			};
++
++			v2m_timer01: timer at 110000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x110000 0x1000>;
++				interrupts = <2>;
++				clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&v2m_clk24mhz>;
++				clock-names = "timclken1", "timclken2", "apb_pclk";
++			};
++
++			v2m_timer23: timer at 120000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x120000 0x1000>;
++				interrupts = <3>;
++				clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&v2m_clk24mhz>;
++				clock-names = "timclken1", "timclken2", "apb_pclk";
++			};
++
++			rtc at 170000 {
++				compatible = "arm,pl031", "arm,primecell";
++				reg = <0x170000 0x1000>;
++				interrupts = <4>;
++				clocks = <&v2m_clk24mhz>;
++				clock-names = "apb_pclk";
++			};
++
++			clcd at 1f0000 {
++				compatible = "arm,pl111", "arm,primecell";
++				reg = <0x1f0000 0x1000>;
++				interrupts = <14>;
++				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
++				clock-names = "clcdclk", "apb_pclk";
++			};
++		};
++
++		v2m_fixed_3v3: fixedregulator at 0 {
++			compatible = "regulator-fixed";
++			regulator-name = "3V3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++
++		mcc {
++			compatible = "arm,vexpress,config-bus", "simple-bus";
++			arm,vexpress,config-bridge = <&v2m_sysreg>;
++
++			v2m_oscclk1: osc at 1 {
++				/* CLCD clock */
++				compatible = "arm,vexpress-osc";
++				arm,vexpress-sysreg,func = <1 1>;
++				freq-range = <23750000 63500000>;
++				#clock-cells = <0>;
++				clock-output-names = "v2m:oscclk1";
++			};
++
++			reset at 0 {
++				compatible = "arm,vexpress-reset";
++				arm,vexpress-sysreg,func = <5 0>;
++			};
++
++			muxfpga at 0 {
++				compatible = "arm,vexpress-muxfpga";
++				arm,vexpress-sysreg,func = <7 0>;
++			};
++
++			shutdown at 0 {
++				compatible = "arm,vexpress-shutdown";
++				arm,vexpress-sysreg,func = <8 0>;
++			};
++
++			reboot at 0 {
++				compatible = "arm,vexpress-reboot";
++				arm,vexpress-sysreg,func = <9 0>;
++			};
++
++			dvimode at 0 {
++				compatible = "arm,vexpress-dvimode";
++				arm,vexpress-sysreg,func = <11 0>;
++			};
++		};
++	};
+diff --git a/arch/arm64/boot/dts/skeleton.dtsi b/arch/arm64/boot/dts/skeleton.dtsi
+new file mode 100644
+index 0000000..38ead82
+--- /dev/null
++++ b/arch/arm64/boot/dts/skeleton.dtsi
+@@ -0,0 +1,13 @@
 +/*
-+ * Create an early I/O mapping using the pgd/pmd entries already populated
-+ * in head.S as this function is called too early to allocated any memory. The
-+ * mapping size is 2MB with 4KB pages or 64KB or 64KB pages.
++ * Skeleton device tree; the bare minimum needed to boot; just include and
++ * add a compatible value.  The bootloader will typically populate the memory
++ * node.
 + */
-+void __iomem * __init early_io_map(phys_addr_t phys, unsigned long virt)
-+{
-+	unsigned long size, mask;
-+	bool page64k = IS_ENABLED(ARM64_64K_PAGES);
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	pte_t *pte;
 +
-+	/*
-+	 * No early pte entries with !ARM64_64K_PAGES configuration, so using
-+	 * sections (pmd).
-+	 */
-+	size = page64k ? PAGE_SIZE : SECTION_SIZE;
-+	mask = ~(size - 1);
-+
-+	pgd = pgd_offset_k(virt);
-+	pud = pud_offset(pgd, virt);
-+	if (pud_none(*pud))
-+		return NULL;
-+	pmd = pmd_offset(pud, virt);
-+
-+	if (page64k) {
-+		if (pmd_none(*pmd))
-+			return NULL;
-+		pte = pte_offset_kernel(pmd, virt);
-+		set_pte(pte, __pte((phys & mask) | PROT_DEVICE_nGnRE));
-+	} else {
-+		set_pmd(pmd, __pmd((phys & mask) | PROT_SECT_DEVICE_nGnRE));
-+	}
-+
-+	return (void __iomem *)((virt & mask) + (phys & ~mask));
-+}
-+#endif
-+
- static void __init map_mem(void)
- {
- 	struct memblock_region *reg;
++/ {
++	#address-cells = <2>;
++	#size-cells = <1>;
++	chosen { };
++	aliases { };
++	memory { device_type = "memory"; reg = <0 0 0>; };
++};
