@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  4 Jan 2013 14:41:35 +0000
+Date: Fri,  4 Jan 2013 14:41:39 +0000
 Subject: [RFC 2/3] ARM: gemini: remove platform support
 In-Reply-To: <1357310500-19848-1-git-send-email-arnd@arndb.de>
 References: <1357310500-19848-1-git-send-email-arnd@arndb.de>
-Message-ID: <1357310500-19848-3-git-send-email-arnd@arndb.de>
+Message-ID: <1357310500-19848-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
