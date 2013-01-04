@@ -1,24 +1,21 @@
-From: vatsa@codeaurora.org (Srivatsa Vaddagiri)
-Date: Fri, 4 Jan 2013 11:29:34 -0800
-Subject: [PATCH 2/2] Revert "nohz: Fix idle ticks in cpu summary line
- of /proc/stat" (commit 7386cdbf2f57ea8cff3c9fde93f206e58b9fe13f).
-In-Reply-To: <50E6C776.7060707@mvista.com>
-References: <1357268337-8025-1-git-send-email-vatsa@codeaurora.org>
- <50E6C776.7060707@mvista.com>
-Message-ID: <20130104192934.GB29866@quicinc.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 04 Jan 2013 12:35:15 -0700
+Subject: [PATCH 1/2] ARM: tegra: clean up the CPUINIT section
+In-Reply-To: <1357291942-32433-1-git-send-email-josephl@nvidia.com>
+References: <1357291942-32433-1-git-send-email-josephl@nvidia.com>
+Message-ID: <50E72EF3.5020200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sergei Shtylyov <sshtylyov@mvista.com> [2013-01-04 16:13:42]:
-
-> >With offline cpus no longer beeing seen in nohz mode (ts->idle_active=0), we
-> >don't need the check for cpu_online() introduced in commit 7386cdbf. Offline
+On 01/04/2013 02:32 AM, Joseph Lo wrote:
+> There are some redundant codes in the CPUINIT section that was caused by
+> some codes not be organized well in "headsmp.S". Currently all the codes
+> in "headsmp.S" were put into CPUINIT section. But actually it doesn't
+> need to be loacted in CPUINIT section. There is no fuction access them
+> in CPUINIT section and we will relocate them to IRAM.
 > 
->    Please also specify the summary of that commit in parens (or
-> however you like).
+> These codes also caused some unnecessary functions that access these
+> codes been put into CPUINIT section too. This patch clean it up and put
+> them into normal text section.
 
-I had that in Subject line, but yes would be good to include in commit message
-as well. I will incorporate that change alongwith anything else required in
-next version of this patch.
-
-- vatsa
+Applied to Tegra's for-3.9/soc branch.
