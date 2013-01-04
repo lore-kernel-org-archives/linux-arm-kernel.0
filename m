@@ -1,59 +1,68 @@
-From: vatsa@codeaurora.org (Srivatsa Vaddagiri)
-Date: Thu,  3 Jan 2013 18:58:57 -0800
-Subject: [PATCH 2/2] Revert "nohz: Fix idle ticks in cpu summary line of
- /proc/stat" (commit 7386cdbf2f57ea8cff3c9fde93f206e58b9fe13f).
-Message-ID: <1357268337-8025-1-git-send-email-vatsa@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 03 Jan 2013 20:05:50 -0700
+Subject: [PATCH v2 05/11] ARM: dt: tegra30: Add device node for APB MISC
+In-Reply-To: <50E634D0.6080702@nvidia.com>
+References: <1356619644-18565-1-git-send-email-pgaikwad@nvidia.com>
+ <1356619644-18565-6-git-send-email-pgaikwad@nvidia.com>
+ <50E4AE19.1060503@wwwdotorg.org> <50E520FC.4070805@nvidia.com>
+ <50E5ADA6.1070904@wwwdotorg.org> <50E634D0.6080702@nvidia.com>
+Message-ID: <50E6470E.8090206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With offline cpus no longer beeing seen in nohz mode (ts->idle_active=0), we
-don't need the check for cpu_online() introduced in commit 7386cdbf. Offline
-cpu's idle time as last recorded in its ts->idle_sleeptime will be reported
-(thus excluding its offline time as part of idle time statistics).
+On 01/03/2013 06:48 PM, Prashant Gaikwad wrote:
+> On Thursday 03 January 2013 09:41 PM, Stephen Warren wrote:
+>> On 01/02/2013 11:11 PM, Prashant Gaikwad wrote:
+>>> On Thursday 03 January 2013 03:30 AM, Stephen Warren wrote:
+>>>> On 12/27/2012 07:47 AM, Prashant Gaikwad wrote:
+>>>>> APB misc contains multiple registers required by different modules
+>>>>> such as CAR.
+>>>> I don't see a DT binding document that describes what
+>>>> nvidia,tegra30-apbmisc means. Also, the register range for this new
+>>>> node
+>>>> overlaps that for the pinmux node, so they can't both "request" their
+>>>> register region. You may need multiple entries in the apbmisc reg
+>>>> property to avoid this.
+>>> apbmisc reg for Tegra30 can be divided into following entries:
+>>>
+>>> strap registers
+>>> jtag configuration registers
+>>> pull_up/pull_down control registers
+>>> vclk control registers
+>>> tvdac registers
+>>> chip id revision registers
+>>> pad control registers
+>>>
+>>> This list is not same for Tegra20 and Tegra30.
+>> OK. It sounds like we need a true APB MISC driver then, to abstract the
+>> differences; the clock driver really shouldn't be touching the APB MISC
+>> registers in all likelihood, unless a subset of the sections you mention
+>> above are truly dedicated to clock functionality.
+> 
+> I don't think it is a good idea to create a driver for APB MISC, all
+> registers are used by different drivers.
 
-Cc: mhocko at suse.cz
-Cc: srivatsa.bhat at linux.vnet.ibm.com
-Signed-off-by: Srivatsa Vaddagiri <vatsa@codeaurora.org>
----
- fs/proc/stat.c |   14 ++++----------
- 1 files changed, 4 insertions(+), 10 deletions(-)
+Well, it's even worse to have a bunch of other drivers randomly trample
+on a set of registers they don't own.
 
-diff --git a/fs/proc/stat.c b/fs/proc/stat.c
-index e296572..64c3b31 100644
---- a/fs/proc/stat.c
-+++ b/fs/proc/stat.c
-@@ -45,13 +45,10 @@ static cputime64_t get_iowait_time(int cpu)
- 
- static u64 get_idle_time(int cpu)
- {
--	u64 idle, idle_time = -1ULL;
--
--	if (cpu_online(cpu))
--		idle_time = get_cpu_idle_time_us(cpu, NULL);
-+	u64 idle, idle_time = get_cpu_idle_time_us(cpu, NULL);
- 
- 	if (idle_time == -1ULL)
--		/* !NO_HZ or cpu offline so we can rely on cpustat.idle */
-+		/* !NO_HZ so we can rely on cpustat.idle */
- 		idle = kcpustat_cpu(cpu).cpustat[CPUTIME_IDLE];
- 	else
- 		idle = usecs_to_cputime64(idle_time);
-@@ -61,13 +58,10 @@ static u64 get_idle_time(int cpu)
- 
- static u64 get_iowait_time(int cpu)
- {
--	u64 iowait, iowait_time = -1ULL;
--
--	if (cpu_online(cpu))
--		iowait_time = get_cpu_iowait_time_us(cpu, NULL);
-+	u64 iowait, iowait_time = get_cpu_iowait_time_us(cpu, NULL);
- 
- 	if (iowait_time == -1ULL)
--		/* !NO_HZ or cpu offline so we can rely on cpustat.iowait */
-+		/* !NO_HZ so we can rely on cpustat.iowait */
- 		iowait = kcpustat_cpu(cpu).cpustat[CPUTIME_IOWAIT];
- 	else
- 		iowait = usecs_to_cputime64(iowait_time);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> Only chip id revision registers are used in clock driver.
+
+There are already global variables exposed by the Tegra fuse driver; can
+you just read those?
+
+>>> OR
+>>>
+>>> another way is to add chip id revision register region to CAR node as
+>>> done for pinmux node and remove apb misc node.
+>>
+>> The pinmux controller doesn't have a reg entry for the chip ID register.
+>> I don't understand what you mean here.
+> 
+> I mean as we have separate entry for PAD control registers region in
+> pinmux node we can have also have separate entry for chid id revision
+> register region in CAR node.
+
+The pad control registers are part of the pinmux HW, so it makes perfect
+sense for the pinmux driver to control them. The APB misc registers
+aren't part of the clock register set, so it doesn't make sense to the
+clock driver to touch them.
