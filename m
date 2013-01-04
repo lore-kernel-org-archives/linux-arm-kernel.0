@@ -1,60 +1,101 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 4 Jan 2013 16:26:34 +0200
-Subject: [PATCH 00/12] ARM: OMAP2+: powerdomain updates after the
- functional power state conversion
-In-Reply-To: <20121209200108.3196.12452.stgit@dusk.lan>
-References: <20121209200108.3196.12452.stgit@dusk.lan>
-Message-ID: <1357309594.2221.112.camel@sokoban>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  4 Jan 2013 14:41:33 +0000
+Subject: [RFC 0/3] future of gemini platform
+Message-ID: <1357310500-19848-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+The gemini platform is quite broken at the moment due to bitrot,
+here are the two suggested solutions. We should either apply the
+first patch or the other two, depending on whether anyone still
+uses this.
 
-Tested this whole set on omap3beagle and omap4panda. The only regression
-I noticed was that cpu0 debug counters do not increment on omap4 after
-this set. The patch at the end fixes this problem. Other than that, you
-can add acked-by tag from me if you want, I went the code through
-quickly and don't have any comments to it.
+Ulli was last actively working on this about two years ago,
+so I assume that he has moved on, but if he or anyone else
+is still interested in keeping Gemini alive, any patches
+and testing are very welcome. Without a maintainer however,
+I see no point in keeping it.
 
--Tero
+The fa526 CPU support is currently only used on Gemini,
+but Florian had some patches last year for it, so he might
+still need it. If there are still plans to get MCS814x
+or another fa526 based platform merged into mainline,
+we can keep this around, but unless I see a timeline
+for this, I would prefer to remove it for now. It should
+be trivial to revert that patch and bring it back if
+it's needed for a new platform.
 
-From: Tero Kristo <t-kristo@ti.com>
-Date: Thu, 3 Jan 2013 20:07:27 +0200
-Subject: [PATCH] ARM: OMAP4: PM: fix cpu0 statistics update during idle
+Arnd Bergmann (3):
+  ARM: gemini: get platform to build again
+  ARM: gemini: remove platform support
+  ARM: remove fa526 CPU support
 
-Cpu0 PM counters do not update, as the  cpu0 fpwrst is set to ON before
-calling pwrdm_post_transition. The optimized code checks whether the
-fpwrst is ON, and skips any further checks if this is the case. Fixed
-by re-ordering the code within omap4_mpuss_enter_lowpower function.
+ MAINTAINERS                                     |   14 --
+ arch/arm/Kconfig                                |   10 +-
+ arch/arm/Makefile                               |    2 -
+ arch/arm/boot/compressed/head.S                 |   28 ---
+ arch/arm/include/asm/barrier.h                  |    6 -
+ arch/arm/include/asm/glue-cache.h               |    8 -
+ arch/arm/include/asm/glue-proc.h                |    9 -
+ arch/arm/include/asm/page.h                     |    8 -
+ arch/arm/include/asm/tlbflush.h                 |   19 --
+ arch/arm/mach-gemini/Kconfig                    |   40 ----
+ arch/arm/mach-gemini/Makefile                   |   13 --
+ arch/arm/mach-gemini/Makefile.boot              |    9 -
+ arch/arm/mach-gemini/board-nas4220b.c           |  110 ---------
+ arch/arm/mach-gemini/board-rut1xx.c             |   94 --------
+ arch/arm/mach-gemini/board-wbd111.c             |  137 -----------
+ arch/arm/mach-gemini/board-wbd222.c             |  137 -----------
+ arch/arm/mach-gemini/common.h                   |   29 ---
+ arch/arm/mach-gemini/devices.c                  |  118 ----------
+ arch/arm/mach-gemini/gpio.c                     |  230 -------------------
+ arch/arm/mach-gemini/idle.c                     |   29 ---
+ arch/arm/mach-gemini/include/mach/debug-macro.S |   21 --
+ arch/arm/mach-gemini/include/mach/entry-macro.S |   33 ---
+ arch/arm/mach-gemini/include/mach/global_reg.h  |  278 -----------------------
+ arch/arm/mach-gemini/include/mach/gpio.h        |   20 --
+ arch/arm/mach-gemini/include/mach/hardware.h    |   74 ------
+ arch/arm/mach-gemini/include/mach/irqs.h        |   53 -----
+ arch/arm/mach-gemini/include/mach/system.h      |   23 --
+ arch/arm/mach-gemini/include/mach/timex.h       |   13 --
+ arch/arm/mach-gemini/include/mach/uncompress.h  |   44 ----
+ arch/arm/mach-gemini/irq.c                      |  103 ---------
+ arch/arm/mach-gemini/mm.c                       |   82 -------
+ arch/arm/mach-gemini/time.c                     |   89 --------
+ arch/arm/mm/Kconfig                             |   32 +--
+ arch/arm/mm/Makefile                            |    4 -
+ arch/arm/mm/cache-fa.S                          |  249 --------------------
+ arch/arm/mm/copypage-fa.c                       |   86 -------
+ arch/arm/mm/proc-fa526.S                        |  221 ------------------
+ arch/arm/mm/tlb-fa.S                            |   69 ------
+ 38 files changed, 3 insertions(+), 2541 deletions(-)
+ delete mode 100644 arch/arm/mach-gemini/Kconfig
+ delete mode 100644 arch/arm/mach-gemini/Makefile
+ delete mode 100644 arch/arm/mach-gemini/Makefile.boot
+ delete mode 100644 arch/arm/mach-gemini/board-nas4220b.c
+ delete mode 100644 arch/arm/mach-gemini/board-rut1xx.c
+ delete mode 100644 arch/arm/mach-gemini/board-wbd111.c
+ delete mode 100644 arch/arm/mach-gemini/board-wbd222.c
+ delete mode 100644 arch/arm/mach-gemini/common.h
+ delete mode 100644 arch/arm/mach-gemini/devices.c
+ delete mode 100644 arch/arm/mach-gemini/gpio.c
+ delete mode 100644 arch/arm/mach-gemini/idle.c
+ delete mode 100644 arch/arm/mach-gemini/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-gemini/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-gemini/include/mach/global_reg.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/system.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-gemini/irq.c
+ delete mode 100644 arch/arm/mach-gemini/mm.c
+ delete mode 100644 arch/arm/mach-gemini/time.c
+ delete mode 100644 arch/arm/mm/cache-fa.S
+ delete mode 100644 arch/arm/mm/copypage-fa.c
+ delete mode 100644 arch/arm/mm/proc-fa526.S
+ delete mode 100644 arch/arm/mm/tlb-fa.S
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index 9acd52a..1bdd59e 100644
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -269,10 +269,16 @@ int omap4_mpuss_enter_lowpower(unsigned int cpu,
-u8 fpwrst)
- 	 * domain transition
- 	 */
- 	wakeup_cpu = smp_processor_id();
--	WARN_ON(pwrdm_set_next_fpwrst(pm_info->pwrdm, PWRDM_FUNC_PWRST_ON));
- 
-+	/*
-+	 * Due to optimizations to the code, pwrdm_post_transition
-+	 * must be called prior to resetting cpu0 pwrst to ON,
-+	 * otherwise cpu0 powerstate statistics don't update properly
-+	 */
- 	pwrdm_post_transition(NULL);
- 
-+	WARN_ON(pwrdm_set_next_fpwrst(pm_info->pwrdm, PWRDM_FUNC_PWRST_ON));
-+
- 	return 0;
- }
- 
 -- 
-1.7.4.1
+1.7.10.4
