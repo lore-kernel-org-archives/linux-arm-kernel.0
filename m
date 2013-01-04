@@ -1,46 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 4 Jan 2013 15:42:21 +0800
-Subject: [BUGFIX PATCH] video: mxsfb: fix crash when unblanking the display
-In-Reply-To: <50E67FDC.3000905@bluegiga.com>
-References: <1353588555-13168-1-git-send-email-LW@KARO-electronics.de>
- <20663.19785.221750.909491@ipc1.ka-ro>
- <50E67FDC.3000905@bluegiga.com>
-Message-ID: <20130104074219.GD1887@S2101-09.ap.freescale.net>
+From: pkluba@dension.com (Patrik, Kluba)
+Date: Fri, 4 Jan 2013 08:48:50 +0100
+Subject: [PATCH 01/01] arm: fix a preempt_count() corruption for
+ CONFIG_PREEMPT=n
+In-Reply-To: <50E4D39C.1030001@codeaurora.org>
+References: <20121215085129.71d203b2.pkluba@dension.com>
+ <50D10224.30600@codeaurora.org>
+ <20121219000139.GV14363@n2100.arm.linux.org.uk>
+ <50E4D39C.1030001@codeaurora.org>
+Message-ID: <20130104084850.4553bc6f.pkluba@dension.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 04, 2013 at 09:08:12AM +0200, Lauri Hintsala wrote:
-> On 11/29/2012 01:55 PM, Lothar Wa?mann wrote:
-> >Hi,
-> >
-> >adding Juergen Beisert as the driver's author to the recipient list.
-> >
-> >Lothar Wa?mann writes:
-> >>The VDCTRL4 register does not provide the MXS SET/CLR/TOGGLE feature.
-> >>The write in mxsfb_disable_controller() sets the data_cnt for the LCD
-> >>DMA to 0 which obviously means the max. count for the LCD DMA and
-> >>leads to overwriting arbitrary memory when the display is unblanked.
-> >>
-> >>Note: I already sent this patch in December 2011 but noone picked it up obviously.
-> >>
-> >>Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> 
-> Tested-by: Lauri Hintsala <lauri.hintsala@bluegiga.net>
-> 
-> This fixes the CPU freezing. I really recommend to apply this patch
-> into mainline soon because unblanking freezes the whole system!!!
-> 
-> Default value of consoleblank parameter is 600 seconds and the whole
-> system crashes every time when framebuffer console is activated
-> after that timeout. I wonder why this issue is still open in
-> mainline kernel.
+On Wed, 02 Jan 2013 16:41:00 -0800
+Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-Part of the reason is the FB maintainer's absence.  Let me try to send
-it through arm-soc tree.
-
+> On 12/18/12 16:01, Russell King - ARM Linux wrote:
+> > On Tue, Dec 18, 2012 at 03:54:12PM -0800, Stephen Boyd wrote:
+> >> Can you try this patch? I'll probably send a follow up patch that
+> >> consolidates the duplicated preempt_decrement code into some
+> >> assembly macro. We may also want to fix it up so that assembly
+> >> stubs call into the preempt tracer. I'm not sure how that works
+> >> right now with VFP.
+> > This looks like a sensible fix to me - once tested of course.
 > 
-> Should this patch be added into stable versions too?
+> Kluba, did the patch work for you?
 > 
-Yes, will do.
 
-Shawn
+Sorry for being late, was on holiday. Yes, you were right,
+CONFIG_DEBUG_PREEMPT (after breaking dependency on CONFIG_PREEMPT -
+this is how I caught the exact place) and CONFIG_DEBUG_ATOMIC_SLEEP was
+enabled due to bug hunting in own code (and found yet another at an
+unexpected place). 
+I have chosen #ifdef CONFIG_PREEMPT to match with assembly code, but
+your solution seems more reasonable.
+
+Regards,
+Patrik
+
+-- 
+Patrik KLUBA
+Software Developer at
+
+DENSION Audio Systems Ltd.
+H-1116 Budapest, Sztregova u. 1
+Phone: +36 1 463 0470
+Fax:   +36 1 463 0479
+Web:   www.dension.com
