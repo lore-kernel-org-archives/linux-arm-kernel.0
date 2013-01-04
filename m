@@ -1,33 +1,24 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 4 Jan 2013 17:18:13 +0000 (UTC)
-Subject: [PATCH v2 1/2] ARM: OMAP4: clock data: Lock ABE DPLL on all
- revisions
-In-Reply-To: <50E6F94D.7090706@ti.com>
-References: <1357294163-4317-1-git-send-email-peter.ujfalusi@ti.com>
- <1357294163-4317-2-git-send-email-peter.ujfalusi@ti.com>
- <50E6F0CA.60309@ti.com> <50E6F94D.7090706@ti.com>
-Message-ID: <alpine.DEB.2.00.1301041717410.25868@utopia.booyaka.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 4 Jan 2013 09:21:11 -0800
+Subject: [PATCH] ARM: DTS: exynos4210-origen: Add MAX8997 node entry
+In-Reply-To: <1357287829-21701-1-git-send-email-tushar.behera@linaro.org>
+References: <1357287829-21701-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <CAJuYYwQx0hFQmkLaggd2NdA_xommXGPBDbhj1AuSH5YuASWA-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Jan 2013, Peter Ujfalusi wrote:
+On 4 January 2013 00:23, Tushar Behera <tushar.behera@linaro.org> wrote:
+> The node entry is added as per documentation and legacy board file.
+>
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> ---
+> The patch is rebased on v3.8-rc1.
+>
+>  arch/arm/boot/dts/exynos4210-origen.dts |  150 +++++++++++++++++++++++++++++++
+>  1 files changed, 150 insertions(+), 0 deletions(-)
 
-> On 01/04/2013 04:10 PM, Jon Hunter wrote:
-> > 
-> > On 01/04/2013 04:09 AM, Peter Ujfalusi wrote:
-> >> To avoid issues with audio caused by non locked ABE DPLL we should
-> >> make sure it is locked in all OMAP4 revisions.
-> >>
-> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> >>
-> >> asda d
-> > 
-> > Not sure what the above is ;-)
-> 
-> Argh, squashed patches without commit message cleanup...
-> Paul: can you fix this up, or should I resend?
+This patch has already been posted. Here is the link:
+https://patchwork.kernel.org/patch/1794501/
 
-No worries, I'll fix it up here :-)
-
-
-- Paul
+Thanks,
+Thomas.
