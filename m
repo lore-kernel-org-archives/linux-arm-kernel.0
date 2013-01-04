@@ -1,75 +1,76 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 4 Jan 2013 16:06:53 +0200
-Subject: [PATCH v5 13/22] mfd: omap-usb-host: override number of ports
- from platform data
-In-Reply-To: <50E57F10.6030402@mvista.com>
-References: <1357138842-28964-1-git-send-email-rogerq@ti.com>
- <1357138842-28964-14-git-send-email-rogerq@ti.com>
- <50E57F10.6030402@mvista.com>
-Message-ID: <50E6E1FD.40604@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 4 Jan 2013 16:07:17 +0200
+Subject: [PATCH 07/12] ARM: OMAP2+: PM: use power domain functional
+ state in stats counters
+In-Reply-To: <20121209175314.6933.92188.stgit@dusk.lan>
+References: <20121209174545.6933.59371.stgit@dusk.lan>
+ <20121209175314.6933.92188.stgit@dusk.lan>
+Message-ID: <1357308437.2221.106.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2013 02:52 PM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 02-01-2013 19:00, Roger Quadros wrote:
-> 
->> Both OMAP4 and 5 exhibit the same revision ID in the REVISION register
->> but they have different number of ports i.e. 2 and 3 respectively.
->> So we can't rely on REVISION register for number of ports on OMAP5
->> and depend on platform data (or device tree) instead.
-> 
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> [...]
-> 
->> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
->> index 5edb828..710460d 100644
->> --- a/drivers/mfd/omap-usb-host.c
->> +++ b/drivers/mfd/omap-usb-host.c
->> @@ -497,19 +497,27 @@ static int usbhs_omap_probe(struct
->> platform_device *pdev)
->>        */
->>       pm_runtime_put_sync(dev);
->>
->> -    switch (omap->usbhs_rev) {
->> -    case OMAP_USBHS_REV1:
->> -        omap->nports = 3;
->> -        break;
->> -    case OMAP_USBHS_REV2:
->> -        omap->nports = 2;
->> -        break;
->> -    default:
->> -        omap->nports = OMAP3_HS_USB_PORTS;
->> -        dev_dbg(dev,
->> -          "USB HOST Rev : 0x%d not recognized, assuming %d ports\n",
->> -           omap->usbhs_rev, omap->nports);
->> -        break;
->> +    /*
->> +     * If platform data contains nports then use that
->> +     * else make out number of ports from USBHS revision
->> +     */
->> +    if (pdata->nports) {
->> +        omap->nports = pdata->nports;
->> +    } else {
->> +        switch (omap->usbhs_rev) {
->> +        case OMAP_USBHS_REV1:
->> +            omap->nports = 3;
->> +            break;
->> +        case OMAP_USBHS_REV2:
->> +            omap->nports = 2;
->> +            break;
->> +        default:
->> +            omap->nports = OMAP3_HS_USB_PORTS;
->> +            dev_dbg(dev,
->> +            "USB HOST Rev:0x%d not recognized, assuming %d ports\n",
-> 
->    Please indent the string to the right somewhat, as it was before.
-> 
+Hi Paul,
 
-OK. I will fix it in the pull request e-mail that i'll send in a while
-as a reply to the first message in this patchset.
+On Sun, 2012-12-09 at 10:53 -0700, Paul Walmsley wrote:
+> From: Jean Pihet <jean.pihet@newoldbits.com>
+> 
+> The PM code uses some counters to keep track of the power domains
+> transitions, in order to provide the information to drivers (in
+> pwrdm_get_context_loss_count) and to expose the information to
+> sysfs for debug purpose.
+> 
+> This patch provides the information for each functional state.
+> 
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> [paul at pwsan.com: use PWRDM_FPWRSTS_COUNT due to functional power state offset;
+>  use powerdomain.c fn to convert func pwrsts to names; rename 'state' to
+>  'fpwrst' to indicate use of func pwrsts; convert remaining users of the
+>  non-func pwrst API; add some kerneldoc]
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+>  arch/arm/mach-omap2/pm-debug.c    |   42 ++++-----
+>  arch/arm/mach-omap2/powerdomain.c |  167 ++++++++++++++++++-------------------
+>  arch/arm/mach-omap2/powerdomain.h |   17 ++--
+>  3 files changed, 108 insertions(+), 118 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+> index 806a06b..72cf9e0 100644
+> --- a/arch/arm/mach-omap2/pm-debug.c
+> +++ b/arch/arm/mach-omap2/pm-debug.c
+> @@ -53,13 +53,6 @@ enum {
+>  	DEBUG_FILE_TIMERS,
+>  };
+>  
+> -static const char pwrdm_state_names[][PWRDM_MAX_PWRSTS] = {
+> -	"OFF",
+> -	"RET",
+> -	"INA",
+> -	"ON"
+> -};
+> -
+>  void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
+>  {
+>  	s64 t;
+> @@ -70,7 +63,7 @@ void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
+>  	/* Update timer for previous state */
+>  	t = sched_clock();
+>  
+> -	pwrdm->state_timer[prev] += t - pwrdm->timer;
+> +	pwrdm->fpwrst_timer[prev - PWRDM_FPWRST_OFFSET] += t - pwrdm->timer;
+>  
+>  	pwrdm->timer = t;
+>  }
+> @@ -79,6 +72,7 @@ static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
+>  {
+>  	struct seq_file *s = (struct seq_file *)user;
+>  
+> +	/* XXX This needs to be implemented in a better way */
 
---
-cheers,
--roger
+IMO, this part should be dropped, or re-implemented completely. It is
+uninformative and I don't think anybody uses it. With the usecounting
+fixes in place, it is better than before but still doesn't provide too
+much useful information. Would be good to show the clocks that actually
+are enabled along with the clockdomain use counts, but in either case,
+it doesn't belong in the same debugfs file as the pwrdm counters.
+
+-Tero
