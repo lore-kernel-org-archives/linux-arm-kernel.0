@@ -1,26 +1,32 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 04 Jan 2013 09:25:30 -0700
-Subject: [PATCH 2/2] clk: tegra30: Convert clk out to composite clk
-In-Reply-To: <1357278706-28149-2-git-send-email-pgaikwad@nvidia.com>
-References: <1357278706-28149-1-git-send-email-pgaikwad@nvidia.com>
- <1357278706-28149-2-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <50E7027A.1090102@wwwdotorg.org>
+Date: Fri, 04 Jan 2013 09:30:32 -0700
+Subject: [PATCH 2/7] clk: tegra: Use common of_clk_init() function
+In-Reply-To: <1357282858-2112-2-git-send-email-pgaikwad@nvidia.com>
+References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
+ <1357282858-2112-2-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <50E703A8.1080808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2013 10:51 PM, Prashant Gaikwad wrote:
-> Convert clk out to composite clock type which removes
-> the mux clock.
-> 
-> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-> ---
-> This patch is rebased on ccf-rework for Tegra patch series. It is just to show
-> how clk-composite can be used, not to be merged. If patch 1 is accepted then
-> I would like to merge this patch to ccf-rework series.
+On 01/04/2013 12:00 AM, Prashant Gaikwad wrote:
+> Use common of_clk_init() function for clocks initialization.
 
-Just so I'm clear, is the intent that patch 1 of this series gets
-reviewed/accepted, and then you'll repost an updated version of the
-Tegra CCF rework series that relies on patch 1? If so, patch 1 would
-need to be either taken through the Tegra tree, or put into a separate
-branch in the clock tree, so the Tegra tree can merge it as a dependency
-of the Tegra CCF rework branch.
+>  drivers/clk/tegra/clk-tegra20.c |    3 ++-
+>  drivers/clk/tegra/clk-tegra30.c |    3 ++-
+
+Oh, so this series is written assuming that the Tegra CCF rework is
+already applied then? That makes the dependencies quite painful, since I
+think we'll end up with the following order being needed:
+
+1) clk: Add composite clock type
+   -> This would usually go through the clk tree.
+2) The Tegra CCF rework series
+   -> This must go through the Tegra tree due to lots of dependencies
+   and merge conflicts with other Tegra patches.
+3) This series
+   -> This would usually go through the clk tree.
+
+Is it possible to re-order the dependencies as (1) (3) (2), so that Mike
+can apply (1) and (3) to the clock tree, then I can use the clk tree as
+the basis for a branch in the Tegra tree to apply (2) and all the other
+Tegra patches that will conflict with (2)?
