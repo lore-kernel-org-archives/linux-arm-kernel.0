@@ -1,35 +1,25 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 4 Jan 2013 09:29:46 -0200
-Subject: [PATCH v2] ARM: mx25pdk: Add device tree support
-In-Reply-To: <20130104051304.GA1887@S2101-09.ap.freescale.net>
-References: <1357230455-12690-1-git-send-email-fabio.estevam@freescale.com>
- <20130104051304.GA1887@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5BhkM34Pzz28kEzBmpFiDQemOnH9gja89Vh1v=FWs=JkA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 4 Jan 2013 11:38:04 +0000
+Subject: [PATCH V2 1/2] ASoC: davinci-mcasp: Add pinctrl support
+In-Reply-To: <1357293277-25543-2-git-send-email-gururaja.hebbar@ti.com>
+References: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
+ <1357293277-25543-2-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20130104113803.GL4627@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 4, 2013 at 3:13 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Fri, Jan 04, 2013 at 03:24:36PM +0530, Hebbar Gururaja wrote:
+> From: "Hebbar, Gururaja" <gururaja.hebbar@ti.com>
+> 
+> Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
 
->> +     model = "Freescale i.MX25 Product Development Kit";
->> +     compatible = "fsl,imx25-pdk", "fsl,imx25";
->> +
->> +     memory {
->> +             reg = <0x80000000 0x4000000>;
->
-> Isn't imx25-pdk equipped with a 128 MB DDR?
-
-Production version of the board has 64MB. Check this comment from FSL U-boot:
-
-/* iMX25 V-1.0 has 128MB but V-1.1 has only 64MB */
-#ifdef CONFIG_MX25_3DS_V10
-#define PHYS_SDRAM_1_SIZE	(128 * 1024 * 1024)
-#else
-#define PHYS_SDRAM_1_SIZE       (64 * 1024 * 1024)
-#endif
-
-Should I use reg = <0x0 0x0>; instead and let the bootloader detect
-the RAM size?
-
-Regards,
-
-Fabio Estevam
+Linus has a change for this in the core which currently looks like it'll
+get merged in v3.8 so there doesn't seem to be any pressing need for
+driver specific changes that just set the defaults.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130104/7dd0594a/attachment.sig>
