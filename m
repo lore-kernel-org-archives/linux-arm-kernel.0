@@ -1,41 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 04 Jan 2013 18:37:26 +0100
-Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
-In-Reply-To: <20130104183139.20492204@skate>
-References: <1357315498-4570-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <50E710CB.8070007@lunn.ch> <20130104183139.20492204@skate>
-Message-ID: <50E71356.3030203@lunn.ch>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  4 Jan 2013 17:44:14 +0000
+Subject: [PATCH 1/2] ARM: hyp: boot secondary CPUs through the right entry
+ point
+In-Reply-To: <1357321455-9264-1-git-send-email-marc.zyngier@arm.com>
+References: <1357321455-9264-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1357321455-9264-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/13 18:31, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
->
-> On Fri, 04 Jan 2013 18:26:35 +0100, Andrew Lunn wrote:
->
->> How many different boards have you tried?
->
-> I've tried only one board, since I have only one.
->
->> I've not had problems with the board i have. Using the plathome supplied
->> kernel, i've rebuilt the kernel, which is a good memory test. Using
->> mainline, i've booted a number of times when developing the thermal
->> driver and not had problems.
->>
->> I would hate to disable 2GB of RAM just because your board has a fault.
->
-> Indeed. If you report that things work nicely on your board, then let's
-> discard this fix, and blame a hardware problem.
+Secondary CPUs should use the __hyp_stub_install_secondary entry
+point, so boot mode inconsistencies can be detected.
 
-Hi Thomas
+Reported-by: Ian Molton <ian.molton@collabora.co.uk>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kernel/head.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-It would be nice to have a sample size bigger than two.
-
-Anybody else have a OpenBlocks AX3-4 and can report if it works or not?
-
-Thomas, could you swap out the RAM module you have for a known good one?
-Can you test the RAM module in some other board you know works?
-
-Thanks
-     Andrew
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 4eee351..16abc83 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -331,7 +331,7 @@ ENTRY(secondary_startup)
+ 	 * as it has already been validated by the primary processor.
+ 	 */
+ #ifdef CONFIG_ARM_VIRT_EXT
+-	bl	__hyp_stub_install
++	bl	__hyp_stub_install_secondary
+ #endif
+ 	safe_svcmode_maskall r9
+ 
+-- 
+1.8.1
