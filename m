@@ -1,47 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Jan 2013 20:50:04 +0000
-Subject: [PATCH v3 0/7] arm64: ARMv8 RTSM model SoC support
-In-Reply-To: <50E7005A.7070307@codeaurora.org>
-References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
- <50E7005A.7070307@codeaurora.org>
-Message-ID: <CAHkRjk5w+bX+W1An0nkM0JUMR4QVO_ZVHx37vLJ9BDmO9DVxOg@mail.gmail.com>
+From: s-guiriec@ti.com (Sebastien Guiriec)
+Date: Fri, 4 Jan 2013 21:52:42 +0100
+Subject: [PATCH 1/3] ARM: OMAP2+: hwmod: rename flag to prevent hwmod
+ code from touching IP block during init
+In-Reply-To: <alpine.DEB.2.00.1301041817460.25868@utopia.booyaka.com>
+References: <1357304526-21557-1-git-send-email-s-guiriec@ti.com>
+ <1357304526-21557-2-git-send-email-s-guiriec@ti.com>
+ <alpine.DEB.2.00.1301041817460.25868@utopia.booyaka.com>
+Message-ID: <50E7411A.1030207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
-
-On 4 January 2013 16:16, Christopher Covington <cov@codeaurora.org> wrote:
-> On 01/04/2013 09:17 AM, Catalin Marinas wrote:
->> That's the third version of the patch series adding support for the
->> ARMv8 RTSM model (vexpress-like) to the AArch64 kernel. There is no
->> SoC-specific code under arch/arm64/ as the kernel makes use of the
->> vexpress support already under drivers/ (apart from dts, defconfig and
->> some Kconfig changes).
+On 01/04/2013 07:19 PM, Paul Walmsley wrote:
+> Hi Sebastien
+>
+> On Fri, 4 Jan 2013, Sebastien Guiriec wrote:
+>
+>> Rename HWMOD_EXT_OPT_MAIN_CLK flag to indicate that this IP block is
+>> dependent on an off-chip functional clock that is not guaranteed to
+>> be present during initialization. Same flag can be use for IP with
+>> additional HW registers to control Auto IDLE mode.
 >>
->> The patches here can be found on this branch:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git soc-armv8-experimental
+>> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
 >
-> In case you weren't aware:
->
-> git checkout catalin/soc-armv8-experimental
-> ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- make vexpress_defconfig
-> ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- make Image
->
->   CC      drivers/irqchip/gic.o
-> drivers/irqchip/gic.c: In function 'gic_init':
-> drivers/irqchip/gic.c:399:2: error: 'handle_arch_irq' undeclared (first use in this function)
-> drivers/irqchip/gic.c:399:2: note: each undeclared identifier is reported only once for each function it appears in
->
-> arm64 builds fine for me. I haven't tried merging Rob Herring's GIC
-> stuff. I may just postpone further poking around until those changes
-> land.
+> We already have the HWMOD_NO_INIT_RESET flag.  Wouldn't that accomplish
+> the same goal?
 
-I am aware of this, I have a temporary patch adding GIC support under
-drivers/irqchip/ (I should have named the config option ARM64_GIC to
-avoid building it with CONFIG_ARM). But the right approach is Rob's
-patches moving the GIC out of arch/arm/, so once they get into -next
-I'll drop mine.
+I am assuming that it was HWMOD_INIT_NO_RESET flag. This is not solving 
+the issue. After boot with this mode some of same clocks are still not 
+gated.
 
--- 
-Catalin
+>
+> Also I think we can reset the AESS during init.  I posted a patch for this
+> a few months ago, but looks like it got lost.  Will reply to one of your
+> other patches with more details.
+>
+>
+> - Paul
+>
