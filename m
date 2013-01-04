@@ -1,30 +1,37 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Sat, 5 Jan 2013 08:23:32 +0530
-Subject: [PATCH 2/2] clk: tegra30: Convert clk out to composite clk
-In-Reply-To: <50E7027A.1090102@wwwdotorg.org>
-References: <1357278706-28149-1-git-send-email-pgaikwad@nvidia.com>
- <1357278706-28149-2-git-send-email-pgaikwad@nvidia.com>
- <50E7027A.1090102@wwwdotorg.org>
-Message-ID: <50E795AC.5030106@nvidia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 4 Jan 2013 19:03:45 +0100
+Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
+In-Reply-To: <50E71356.3030203@lunn.ch>
+References: <1357315498-4570-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50E710CB.8070007@lunn.ch> <20130104183139.20492204@skate>
+ <50E71356.3030203@lunn.ch>
+Message-ID: <20130104190345.460151d1@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 January 2013 09:55 PM, Stephen Warren wrote:
-> On 01/03/2013 10:51 PM, Prashant Gaikwad wrote:
->> Convert clk out to composite clock type which removes
->> the mux clock.
->>
->> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
->> ---
->> This patch is rebased on ccf-rework for Tegra patch series. It is just to show
->> how clk-composite can be used, not to be merged. If patch 1 is accepted then
->> I would like to merge this patch to ccf-rework series.
-> Just so I'm clear, is the intent that patch 1 of this series gets
-> reviewed/accepted, and then you'll repost an updated version of the
-> Tegra CCF rework series that relies on patch 1? If so, patch 1 would
-> need to be either taken through the Tegra tree, or put into a separate
-> branch in the clock tree, so the Tegra tree can merge it as a dependency
-> of the Tegra CCF rework branch.
+Dear Andrew Lunn,
 
-Yes, that is my plan but you can tell whatever you are comfortable with. 
-I will re-order the dependencies.
+On Fri, 04 Jan 2013 18:37:26 +0100, Andrew Lunn wrote:
+
+> It would be nice to have a sample size bigger than two.
+
+Indeed.
+
+> Anybody else have a OpenBlocks AX3-4 and can report if it works or not?
+
+At least Gr?gory has one.
+
+> Thomas, could you swap out the RAM module you have for a known good one?
+> Can you test the RAM module in some other board you know works?
+
+Unfortunately, I don't see off-hand which other board I have in which I
+could test this RAM module, nor if I have a compatible RAM module to
+test things with.
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
