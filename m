@@ -1,29 +1,183 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Fri, 4 Jan 2013 11:12:20 -0500
-Subject: [Patch v1] arm: MVBEU Clk: Remove inappropriate __init tagging
-Message-ID: <CAMW5UfY_J8fOM8kGPXXUUL1dmAAksNsCJUxX2Pmq_3BvhxjT+g@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 4 Jan 2013 17:13:30 +0100
+Subject: [PATCH] pinctrl/nomadik: Add "ste,config" property
+Message-ID: <1357316010-677-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is based on my prior problem report and discussion on a 3.8-rc1
-kernel Oops and reboot hang.  I've tested it on top of 3.8-rc2 with
-the pending missing clk for USB patch on my Seagate GoFlex Net
-successfully.  Without this, 3.8 will not reboot on my system, the
-Orion WDT fails to probe correctly as well.
+From: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
 
-MVEBU: Remove invalid __init tag from clk function
-Modules need to be able to use this function outside of kernel init.
-This corrects an Oops triggered by the Orion WDT driver being built as
-a module.
-Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
---- a/drivers/clk/mvebu/clk-gating-ctrl.c 2013-01-02 21:13:21.000000000 -0500
-+++ b/drivers/clk/mvebu/clk-gating-ctrl.c 2013-01-03 11:40:44.000000000 -0500
-@@ -32,7 +32,7 @@
+The "ste,config" property will contain the pin config node.
+It will be easier to define a pin configuration and use it by
+reference without duplicating lines tedious.
 
- #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+This is made as an add-on patch to the first device-tree patch
+instead of respinning it for ease-of-review. We may squash it in
+the end if this approach is OK.
+---
+ .../devicetree/bindings/pinctrl/ste,nomadik.txt    | 56 +++++++++++++++-------
+ drivers/pinctrl/pinctrl-nomadik.c                  | 24 ++++++----
+ 2 files changed, 53 insertions(+), 27 deletions(-)
 
--static struct clk __init *mvebu_clk_gating_get_src(
-+static struct clk *mvebu_clk_gating_get_src(
-  struct of_phandle_args *clkspec, void *data)
- {
-  struct mvebu_gating_ctrl *ctrl = (struct mvebu_gating_ctrl *)data;
+diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
+index 8639234..8ee860c 100644
+--- a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
++++ b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
+@@ -26,11 +26,12 @@ Optional subnode-properties:
+ - ste,function: A string containing the name of the function to mux to the
+   pin or group.
+ 
+-- ste,input : <0/1/2/3>
++- ste,config: Handle of pin configuration node (ste,config = <&in_pu>)
++
++- ste,input : <0/1/2>
+ 	0: input with no pull
+ 	1: input with pull up,
+ 	2: input with pull down,
+-	3: input and keep last input configuration (no pull, pull up or pull down).
+ 
+ - ste,output: <0/1/2>
+ 	0: output low,
+@@ -41,10 +42,11 @@ Optional subnode-properties:
+ 	0: sleep mode disable,
+ 	1: sleep mode enable.
+ 
+-- ste,sleep-input: <0/1/2>
++- ste,sleep-input: <0/1/2/3>
+ 	0: sleep input with no pull,
+ 	1: sleep input with pull up,
+ 	2: sleep input with pull down.
++	3: sleep input and keep last input configuration (no pull, pull up or pull down).
+ 
+ - ste,sleep-output: <0/1/2>
+ 	0: sleep output low,
+@@ -65,12 +67,39 @@ Optional subnode-properties:
+ 
+ Example board file extract:
+ 
++	in_pu: input_pull_up {
++		ste,input = <1>;
++	};
++
++	out_hi: output_high {
++		ste,output = <1>;
++	};
++
++	slpm_in_wkup_pdis: slpm_in_wkup_pdis {
++		ste,sleep = <1>;
++		ste,sleep-input = <3>;
++		ste,sleep-wakeup = <1>;
++		ste,sleep-pull-disable = <0>;
++	};
++
++	slpm_out_hi_wkup_pdis: slpm_out_hi_wkup_pdis {
++		ste,sleep = <1>;
++		ste,sleep-output = <1>;
++		ste,sleep-wakeup = <1>;
++		ste,sleep-pull-disable = <0>;
++	};
++	slpm_out_wkup_pdis: slpm_out_wkup_pdis {
++		ste,sleep = <1>;
++		ste,sleep-output = <2>;
++		ste,sleep-wakeup = <1>;
++		ste,sleep-pull-disable = <0>;
++	};
++
+ 	pinctrl at 80157000 {
+ 		compatible = "stericsson,nmk-pinctrl";
+ 		reg = <0x80157000 0x2000>;
+ 
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&uart0_default_mode>;
+ 
+ 		uart0 {
+ 			uart0_default_mux: uart0_mux {
+@@ -82,35 +111,26 @@ Example board file extract:
+ 			uart0_default_mode: uart0_default {
+ 				uart0_default_cfg1 {
+ 					ste,pins = "GPIO0", "GPIO2";
+-					ste,input = <1>;
++					ste,config = <&in_pu>;
+ 				};
+ 
+ 				uart0_default_cfg2 {
+ 					ste,pins = "GPIO1", "GPIO3";
+-					ste,output = <1>;
++					ste,config = <&out_hi>;
+ 				};
+ 			};
+ 			uart0_sleep_mode: uart0_sleep {
+ 				uart0_sleep_cfg1 {
+ 					ste,pins = "GPIO0", "GPIO2";
+-					ste,sleep = <0>;
+-					ste,sleep-input = <0>;
+-					ste,sleep-wakeup = <1>;
+-					ste,sleep-pull-disable = <0>;
++					ste,config = <&slpm_in_wkup_pdis>;
+ 				};
+ 				uart0_sleep_cfg2 {
+ 					ste,pins = "GPIO1";
+-					ste,sleep = <0>;
+-					ste,sleep-output = <1>;
+-					ste,sleep-wakeup = <1>;
+-					ste,sleep-pull-disable = <0>;
++					ste,config = <&slpm_out_hi_wkup_pdis>;
+ 				};
+ 				uart0_sleep_cfg3 {
+ 					ste,pins = "GPIO3";
+-					ste,sleep = <0>;
+-					ste,sleep-output = <2>;
+-					ste,sleep-wakeup = <1>;
+-					ste,sleep-pull-disable = <0>;
++					ste,config = <&slpm_out_wkup_pdis>;
+ 				};
+ 			};
+ 		};
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index b508bd7..0355786 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -1691,23 +1691,29 @@ int nmk_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 	unsigned reserve = 0;
+ 	struct property *prop;
+ 	const char *group, *gpio_name;
++	struct device_node *np_config;
+ 
+ 	ret = of_property_read_string(np, "ste,function", &function);
+ 	if (ret >= 0)
+ 		reserve = 1;
+ 
+-	for (i = 0; i < ARRAY_SIZE(nmk_cfg_params); i++) {
+-		unsigned long cfg = 0;
+-		int val;
+-
+-		ret = of_property_read_u32(np, nmk_cfg_params[i].property, &val);
+-		if (ret != -EINVAL) {
+-			if (nmk_dt_pin_config(i, val, &cfg) == 0) {
+-				configs |= cfg;
+-				has_config = 1;
++	np_config = of_parse_phandle(np, "ste,config", 0);
++	if (np_config) {
++		for (i = 0; i < ARRAY_SIZE(nmk_cfg_params); i++) {
++			unsigned long cfg = 0;
++			int val;
++
++			ret = of_property_read_u32(np_config,
++					nmk_cfg_params[i].property, &val);
++			if (ret != -EINVAL) {
++				if (nmk_dt_pin_config(i, val, &cfg) == 0) {
++					configs |= cfg;
++					has_config = 1;
++				}
+ 			}
+ 		}
+ 	}
++
+ 	ret = of_property_count_strings(np, "ste,pins");
+ 	if (ret < 0)
+ 		goto exit;
+-- 
+1.7.11.3
