@@ -1,31 +1,47 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Fri, 4 Jan 2013 10:29:09 -0200
-Subject: [PATCH] ARM: dts: imx25-karo-tx25: Put status entry in the end
-Message-ID: <1357302549-12746-1-git-send-email-fabio.estevam@freescale.com>
+From: s-guiriec@ti.com (Sebastien Guiriec)
+Date: Fri, 4 Jan 2013 14:02:03 +0100
+Subject: [PATCH 0/3] ARM: OMAP4: Enable AESS IP.
+Message-ID: <1357304526-21557-1-git-send-email-s-guiriec@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just to keep consistency with other dts files, place 'status' entry as the last
-one.
+This patch serie extends the the hwmod HWMOD_EXT_OPT_MAIN_CLK flag for the
+AESS IP. This IP has additional register for Auto Gatting configuration. As
+it is used only for Audio the driver is not always loaded. We can reuse the
+same flag as McPDM to work around the HW problem due to bad reset value of
+AESS Auto gatting configuration register. 
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx25-karo-tx25.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+If we try to setup and reset AESS during boot time without this serie the
+next clocks will still remain enable.
 
-diff --git a/arch/arm/boot/dts/imx25-karo-tx25.dts b/arch/arm/boot/dts/imx25-karo-tx25.dts
-index eb9b9d1..1a9d049 100644
---- a/arch/arm/boot/dts/imx25-karo-tx25.dts
-+++ b/arch/arm/boot/dts/imx25-karo-tx25.dts
-@@ -26,8 +26,8 @@
- };
- 
- &fec {
--	status = "okay";
- 	phy-mode = "rmii";
-+	status = "okay";
- };
- 
- &nfc {
+omapconf abe cfg:
+|--------------------------------------------------------------|
+| ABE        Clock Domain Configuration                        |
+|--------------------------------|-----------------------------|
+| Clock State Transition control | HW-Auto                     |
+| Clock State                    |                             |
+|   ABE_24M_FCLK                 | GATED                       |
+|   ABE_ALWON_32K_CLK            | GATED                       |
+|   ABE_SYSCLK                   | GATED                       |
+|   24M_FCLK                     | GATED                       |
+|   ABE_ICLK2                    | RUNNING                     |
+|   DPLL_ABE_X2_CLK              | RUNNING                     |
+|   PAD_CLKS                     | GATED                       |
+|   SLIMBUS_CLK                  | GATED                       |
+| OPP Divider                    | ABE_CLK = DPLL_ABE_X2_CLK/1 |
+|--------------------------------------------------------------|
+
+Sebastien Guiriec (3):
+  ARM: OMAP2+: hwmod: rename flag to prevent hwmod code from touching
+    IP block during init
+  ARM: OMAP4: hwmod data: do not enable or reset the AESS during kernel
+    init
+  OMAP4: hwmod data: Enable AESS hwmod device
+
+ arch/arm/mach-omap2/omap_hwmod.c           |    2 +-
+ arch/arm/mach-omap2/omap_hwmod.h           |   10 ++++++++--
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   16 ++++++++++++----
+ 3 files changed, 21 insertions(+), 7 deletions(-)
+
 -- 
-1.7.9.5
+1.7.10.4
