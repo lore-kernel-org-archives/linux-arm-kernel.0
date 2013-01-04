@@ -1,47 +1,82 @@
 From: s-guiriec@ti.com (Sebastien Guiriec)
-Date: Fri, 4 Jan 2013 14:02:03 +0100
-Subject: [PATCH 0/3] ARM: OMAP4: Enable AESS IP.
-Message-ID: <1357304526-21557-1-git-send-email-s-guiriec@ti.com>
+Date: Fri, 4 Jan 2013 14:02:04 +0100
+Subject: [PATCH 1/3] ARM: OMAP2+: hwmod: rename flag to prevent hwmod code
+ from touching IP block during init
+In-Reply-To: <1357304526-21557-1-git-send-email-s-guiriec@ti.com>
+References: <1357304526-21557-1-git-send-email-s-guiriec@ti.com>
+Message-ID: <1357304526-21557-2-git-send-email-s-guiriec@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch serie extends the the hwmod HWMOD_EXT_OPT_MAIN_CLK flag for the
-AESS IP. This IP has additional register for Auto Gatting configuration. As
-it is used only for Audio the driver is not always loaded. We can reuse the
-same flag as McPDM to work around the HW problem due to bad reset value of
-AESS Auto gatting configuration register. 
+Rename HWMOD_EXT_OPT_MAIN_CLK flag to indicate that this IP block is
+dependent on an off-chip functional clock that is not guaranteed to
+be present during initialization. Same flag can be use for IP with
+additional HW registers to control Auto IDLE mode.
 
-If we try to setup and reset AESS during boot time without this serie the
-next clocks will still remain enable.
-
-omapconf abe cfg:
-|--------------------------------------------------------------|
-| ABE        Clock Domain Configuration                        |
-|--------------------------------|-----------------------------|
-| Clock State Transition control | HW-Auto                     |
-| Clock State                    |                             |
-|   ABE_24M_FCLK                 | GATED                       |
-|   ABE_ALWON_32K_CLK            | GATED                       |
-|   ABE_SYSCLK                   | GATED                       |
-|   24M_FCLK                     | GATED                       |
-|   ABE_ICLK2                    | RUNNING                     |
-|   DPLL_ABE_X2_CLK              | RUNNING                     |
-|   PAD_CLKS                     | GATED                       |
-|   SLIMBUS_CLK                  | GATED                       |
-| OPP Divider                    | ABE_CLK = DPLL_ABE_X2_CLK/1 |
-|--------------------------------------------------------------|
-
-Sebastien Guiriec (3):
-  ARM: OMAP2+: hwmod: rename flag to prevent hwmod code from touching
-    IP block during init
-  ARM: OMAP4: hwmod data: do not enable or reset the AESS during kernel
-    init
-  OMAP4: hwmod data: Enable AESS hwmod device
-
+Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+---
  arch/arm/mach-omap2/omap_hwmod.c           |    2 +-
  arch/arm/mach-omap2/omap_hwmod.h           |   10 ++++++++--
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   16 ++++++++++++----
- 3 files changed, 21 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
+ 3 files changed, 10 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 4653efb..640c179 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2447,7 +2447,7 @@ static int __init _setup_reset(struct omap_hwmod *oh)
+ 	if (oh->_state != _HWMOD_STATE_INITIALIZED)
+ 		return -EINVAL;
+ 
+-	if (oh->flags & HWMOD_EXT_OPT_MAIN_CLK)
++	if (oh->flags & HWMOD_NO_SETUP_RESET)
+ 		return -EPERM;
+ 
+ 	if (oh->rst_lines_cnt == 0) {
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+index 3ae852a..ce4bed4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -446,11 +446,17 @@ struct omap_hwmod_omap4_prcm {
+  *     in order to complete the reset. Optional clocks will be disabled
+  *     again after the reset.
+  * HWMOD_16BIT_REG: Module has 16bit registers
+- * HWMOD_EXT_OPT_MAIN_CLK: The only main functional clock source for
++ * HWMOD_NO_SETUP_RESET: This flag can be used for 2 problems:
++ *     1) The only main functional clock source for
+  *     this IP block comes from an off-chip source and is not always
+  *     enabled.  This prevents the hwmod code from being able to
+  *     enable and reset the IP block early.  XXX Eventually it should
+  *     be possible to query the clock framework for this information.
++ *     2) IP with additional registers for auto gatting control like AESS
++ *     For some IPs we need to set AUTO_GATTING_ENABLE bit. This bit is set
++ *     only when the associated driver is probed. If hwmod is enabling and
++ *     reseting the IP early without setting auto idle bit then clocks are
++ *     not gated.
+  */
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -461,7 +467,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_NO_IDLEST				(1 << 6)
+ #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
+ #define HWMOD_16BIT_REG				(1 << 8)
+-#define HWMOD_EXT_OPT_MAIN_CLK			(1 << 9)
++#define HWMOD_NO_SETUP_RESET			(1 << 9)
+ 
+ /*
+  * omap_hwmod._int_flags definitions
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 129d508..b340a4e 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2133,7 +2133,7 @@ static struct omap_hwmod omap44xx_mcpdm_hwmod = {
+ 	 * available, so it doesn't seem that we have any choice in
+ 	 * the kernel other than to avoid resetting it.
+ 	 */
+-	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
++	.flags		= HWMOD_NO_SETUP_RESET,
+ 	.mpu_irqs	= omap44xx_mcpdm_irqs,
+ 	.sdma_reqs	= omap44xx_mcpdm_sdma_reqs,
+ 	.main_clk	= "mcpdm_fck",
 -- 
 1.7.10.4
