@@ -1,20 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 Jan 2013 09:11:01 -0800
-Subject: Seeking wisdom.. Where is latest tree?
-In-Reply-To: <50E6E48F.2030309@bbn.com>
-References: <50E6E48F.2030309@bbn.com>
-Message-ID: <20130104171101.GA14149@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Jan 2013 17:11:59 +0000
+Subject: [PATCH v2 1/2] ARM: OMAP4: clock data: Lock ABE DPLL on all
+ revisions
+In-Reply-To: <50E6F0CA.60309@ti.com>
+References: <1357294163-4317-1-git-send-email-peter.ujfalusi@ti.com>
+ <1357294163-4317-2-git-send-email-peter.ujfalusi@ti.com>
+ <50E6F0CA.60309@ti.com>
+Message-ID: <20130104171159.GA2637@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Martin Grossman <grossman@bbn.com> [130104 06:27]:
-> I'm stuck with a 3.5.7 not booting on an AM3517evm because of
-> all the high speed changes are just not working on this board.
+On Fri, Jan 04, 2013 at 09:10:02AM -0600, Jon Hunter wrote:
 > 
-> SO, is the latest and greatest any better?  I'm willing to give
-> it a try but I don't know where all these patches I've been seeing
-> the past week are being applied to!
+> On 01/04/2013 04:09 AM, Peter Ujfalusi wrote:
+> > To avoid issues with audio caused by non locked ABE DPLL we should
+> > make sure it is locked in all OMAP4 revisions.
+> > 
+> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > 
+> > asda d
+> 
+> Not sure what the above is ;-)
 
-Hmm maybe give the current mainline tree at v3.8-rc2 a try?
-
-Tony
+And there I was, thinking it was referring to a chain of UK supermarkets. :)
