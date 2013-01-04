@@ -1,24 +1,56 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 4 Jan 2013 09:21:11 -0800
-Subject: [PATCH] ARM: DTS: exynos4210-origen: Add MAX8997 node entry
-In-Reply-To: <1357287829-21701-1-git-send-email-tushar.behera@linaro.org>
-References: <1357287829-21701-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <CAJuYYwQx0hFQmkLaggd2NdA_xommXGPBDbhj1AuSH5YuASWA-w@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 04 Jan 2013 10:22:45 -0700
+Subject: [PATCH v3 0/9] Migrate Tegra to common clock framework
+In-Reply-To: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
+References: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <50E70FE5.9010001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 January 2013 00:23, Tushar Behera <tushar.behera@linaro.org> wrote:
-> The node entry is added as per documentation and legacy board file.
->
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> ---
-> The patch is rebased on v3.8-rc1.
->
->  arch/arm/boot/dts/exynos4210-origen.dts |  150 +++++++++++++++++++++++++++++++
->  1 files changed, 150 insertions(+), 0 deletions(-)
+On 01/04/2013 02:40 AM, Prashant Gaikwad wrote:
+> This patchset does following:
+> 1. Decompose single tegra clock structure into multiple clocks.
+> 2. Try to use standard clock types supported by common clock framework.
+> 3. Use dynamic initialization.
+> 4. Move all clock code to drivers/clk/tegra from mach-tegra.
+> 5. Add device tree support for Tegra20 and Tegra30 clocks.
+> 6. Remove all legacy clock code from mach-tegra.
 
-This patch has already been posted. Here is the link:
-https://patchwork.kernel.org/patch/1794501/
+I think there are bugs here. I applied all your clock patches on top of
+Tegra's for-next (see list below), and found that the following don't
+work on Springbank:
 
-Thanks,
-Thomas.
+* HDMI display
+* Audio playback
+* WiFi
+
+I imagine the same issue would be seen on Harmony or Ventana since
+they're very similar. All of those functions work fine with Tegra's
+for-next branch (commit 5e30b49 "Merge branch 'for-3.9/defconfig' into
+for-next").
+
+I didn't try Tegra30. I assume you'll test both SoCs...
+
+864e964 clk: vexpress: Use common of_clk_init() function
+c4e8389 clk: zynq: Use common of_clk_init() function
+2c9ff0c clk: vt8500: Use common of_clk_init() function
+db9c59c clk: highbank: Use common of_clk_init() function
+b40949b clk: sunxi: Use common of_clk_init() function
+f6d1492 clk: tegra: Use common of_clk_init() function
+f6fd2eb clk: add common of_clk_init() function
+70a8ea3 clk: tegra30: remove unused TEGRA_CLK_DUPLICATE()s
+3945e4f clk: tegra20: remove unused TEGRA_CLK_DUPLICATE()s
+587bcca arm: tegra30: remove auxdata
+52b982f arm: tegra20: remove auxdata
+3381359 ASoC: tegra: remove auxdata
+d31ea1b ARM: dt: tegra30: Add clock information
+542ddb5 ARM: dt: tegra20: Add clock information
+dd19f5f arm: tegra: Remove legacy clock code
+aaf17b6 arm: tegra: Migrate to new clock code
+458a3ae clk: tegra: add clock support for tegra30
+edb65f1 clk: tegra: add clock support for tegra20
+1786e1f ARM: Tegra: Define Tegra30 CAR binding
+7d77415 ARM: tegra: Define Tegra20 CAR binding
+a4798fa arm: tegra: Move tegra_cpu_car.h to linux/clk/tegra.h
+df05a02 clk: tegra: Add tegra specific clocks
+ad00a81 ARM: tegra: Add function to read chipid
