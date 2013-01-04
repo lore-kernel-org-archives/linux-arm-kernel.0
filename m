@@ -1,21 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 04 Jan 2013 12:35:15 -0700
-Subject: [PATCH 1/2] ARM: tegra: clean up the CPUINIT section
-In-Reply-To: <1357291942-32433-1-git-send-email-josephl@nvidia.com>
-References: <1357291942-32433-1-git-send-email-josephl@nvidia.com>
-Message-ID: <50E72EF3.5020200@wwwdotorg.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 04 Jan 2013 23:42:30 +0300
+Subject: [PATCH 2/2] Revert "nohz: Fix idle ticks in cpu summary line
+ of /proc/stat" (commit 7386cdbf2f57ea8cff3c9fde93f206e58b9fe13f).
+In-Reply-To: <20130104192934.GB29866@quicinc.com>
+References: <1357268337-8025-1-git-send-email-vatsa@codeaurora.org>
+ <50E6C776.7060707@mvista.com> <20130104192934.GB29866@quicinc.com>
+Message-ID: <50E73EB6.9090100@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2013 02:32 AM, Joseph Lo wrote:
-> There are some redundant codes in the CPUINIT section that was caused by
-> some codes not be organized well in "headsmp.S". Currently all the codes
-> in "headsmp.S" were put into CPUINIT section. But actually it doesn't
-> need to be loacted in CPUINIT section. There is no fuction access them
-> in CPUINIT section and we will relocate them to IRAM.
-> 
-> These codes also caused some unnecessary functions that access these
-> codes been put into CPUINIT section too. This patch clean it up and put
-> them into normal text section.
+Hello.
 
-Applied to Tegra's for-3.9/soc branch.
+On 01/04/2013 10:29 PM, Srivatsa Vaddagiri wrote:
+
+>>> With offline cpus no longer beeing seen in nohz mode (ts->idle_active=0), we
+>>> don't need the check for cpu_online() introduced in commit 7386cdbf. Offline
+
+>>    Please also specify the summary of that commit in parens (or
+>> however you like).
+
+> I had that in Subject line, but yes would be good to include in commit message
+> as well. I will incorporate that change alongwith anything else required in
+> next version of this patch.
+
+   Ah, that was a revert with atypical subject -- didn't notice. Then there's no
+need to specify it twice.
+
+> - vatsa
+
+WBR, Sergei
