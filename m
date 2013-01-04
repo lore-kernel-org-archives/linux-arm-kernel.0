@@ -1,235 +1,117 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Fri, 4 Jan 2013 11:40:08 +0200
-Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Orion SoC
-In-Reply-To: <1355482986-885-2-git-send-email-andrew@lunn.ch>
-References: <1355482986-885-1-git-send-email-andrew@lunn.ch>
- <1355482986-885-2-git-send-email-andrew@lunn.ch>
-Message-ID: <50E6A378.90503@ti.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Fri, 4 Jan 2013 15:10:44 +0530
+Subject: [PATCH v3 0/9] Migrate Tegra to common clock framework
+Message-ID: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Andrew,
+This patchset does following:
+1. Decompose single tegra clock structure into multiple clocks.
+2. Try to use standard clock types supported by common clock framework.
+3. Use dynamic initialization.
+4. Move all clock code to drivers/clk/tegra from mach-tegra.
+5. Add device tree support for Tegra20 and Tegra30 clocks.
+6. Remove all legacy clock code from mach-tegra.
 
-On 14-12-2012 13:03, Andrew Lunn wrote:
-> From: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->
-> Some Orion SoC has thermal sensor.
-> This patch adds support for 88F6282 and 88F6283.
->
-> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->   .../devicetree/bindings/thermal/orion-thermal.txt  |   16 +++
->   drivers/thermal/Kconfig                            |    7 ++
->   drivers/thermal/Makefile                           |    1 +
->   drivers/thermal/orion_thermal.c                    |  133 ++++++++++++++++++++
->   4 files changed, 157 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/thermal/orion-thermal.txt
->   create mode 100644 drivers/thermal/orion_thermal.c
->
-> diff --git a/Documentation/devicetree/bindings/thermal/orion-thermal.txt b/Documentation/devicetree/bindings/thermal/orion-thermal.txt
-> new file mode 100644
-> index 0000000..5ce925d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/orion-thermal.txt
-> @@ -0,0 +1,16 @@
-> +* Orion Thermal
-> +
-> +This initial version is for Kirkwood 88F8262 & 88F6283 SoCs, however
-> +it is expected the driver will sometime in the future be expanded to
-> +also support Dove, using a different compatibility string.
-> +
-> +Required properties:
-> +- compatible : "marvell,kirkwood-thermal"
-> +- reg : Address range of the thermal registers
-> +
-> +Example:
-> +
-> +	thermal at 10078 {
-> +		compatible = "marvell,kirkwood";
-> +		reg = <0x10078 0x4>;
-> +	};
+Tested on Tegra30 (Cardhu) and Tegra20 (Ventana).
 
-How do you differentiate if the SoC has the temperature sensor? On your 
-patch description you are very clear saying that this supports only 
-88F8262 & 88F6283 SoCs.
+Changes from v2:
+Removed APB MISC node.
+Fixed some issues reported by Joseph Lo.
+Added function to read chip id revision register.
 
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index e1cb6bd..3bba13f 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -55,3 +55,10 @@ config EXYNOS_THERMAL
->   	help
->   	  If you say yes here you get support for TMU (Thermal Managment
->   	  Unit) on SAMSUNG EXYNOS series of SoC.
-> +
-> +config ORION_THERMAL
-> +	tristate "Temperature sensor on Marvel Orion SoCs"
-> +	depends on PLAT_ORION && THERMAL
-> +	help
-> +	  Support for the Orion thermal sensor driver into the Linux thermal
-> +	  framework. This currently supports only 88F6282 and 88F6283.
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index 885550d..2fc64aa 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -6,4 +6,5 @@ obj-$(CONFIG_THERMAL)		+= thermal_sys.o
->   obj-$(CONFIG_CPU_THERMAL)		+= cpu_cooling.o
->   obj-$(CONFIG_SPEAR_THERMAL)		+= spear_thermal.o
->   obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
-> +obj-$(CONFIG_ORION_THERMAL)         	+= orion_thermal.o
->   obj-$(CONFIG_EXYNOS_THERMAL)		+= exynos_thermal.o
-> diff --git a/drivers/thermal/orion_thermal.c b/drivers/thermal/orion_thermal.c
-> new file mode 100644
-> index 0000000..e8a2a68
-> --- /dev/null
-> +++ b/drivers/thermal/orion_thermal.c
-> @@ -0,0 +1,133 @@
-> +/*
-> + * Orion thermal sensor driver
-> + *
-> + * Copyright (C) 2012 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/thermal.h>
-> +
-> +#define THERMAL_VALID_OFFSET	9
-> +#define THERMAL_VALID_MASK	0x1
-> +#define THERMAL_TEMP_OFFSET	10
-> +#define THERMAL_TEMP_MASK	0x1FF
-> +
-> +/* Orion Thermal Sensor Dev Structure */
-> +struct orion_thermal_dev {
-> +	void __iomem *base_addr;
-> +};
-> +
-> +static int orion_get_temp(struct thermal_zone_device *thermal,
-> +			  unsigned long *temp)
-> +{
-> +	unsigned long reg;
-> +	struct orion_thermal_dev *thermal_dev = thermal->devdata;
-> +
-> +	reg = readl_relaxed(thermal_dev->base_addr);
-> +
-> +	/* Valid check */
-> +	if (!(reg >> THERMAL_VALID_OFFSET) & THERMAL_VALID_MASK) {
-> +		dev_info(&thermal->device,
+Changes from v1:
+Rebased on linux-next for 20121224.
 
-This state seams to be severe enough to get a dev_err level message.
+Prashant Gaikwad (8):
+  ARM: tegra: Add function to read chipid
+  clk: tegra: Add tegra specific clocks
+  arm: tegra: Move tegra_cpu_car.h to linux/clk/tegra.h
+  ARM: Tegra: Define Tegra30 CAR binding
+  clk: tegra: add clock support for tegra20
+  clk: tegra: add clock support for tegra30
+  arm: tegra: Migrate to new clock code
+  arm: tegra: Remove legacy clock code
 
-> +			 "Temperature sensor reading not valid\n");
-> +		return -EIO;
-> +	}
-> +
-> +	reg = (reg >> THERMAL_TEMP_OFFSET) & THERMAL_TEMP_MASK;
-> +	/* Calculate temperature. See Table 814 in 8262 hardware manual. */
-> +	*temp = ((322UL - reg) * 10000UL * 1000UL) / 13625UL;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct thermal_zone_device_ops ops = {
-> +	.get_temp = orion_get_temp,
-> +};
-> +
-> +static int orion_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *thermal = NULL;
-> +	struct orion_thermal_dev *thermal_dev;
-> +	struct resource *res;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	thermal_dev = devm_kzalloc(&pdev->dev, sizeof(*thermal_dev),
-> +				   GFP_KERNEL);
-> +	if (!thermal_dev) {
-> +		dev_err(&pdev->dev, "kzalloc fail\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	thermal_dev->base_addr = devm_ioremap(&pdev->dev, res->start,
-> +					      resource_size(res));
+Stephen Warren (1):
+  ARM: tegra: Define Tegra20 CAR binding
 
+ .../bindings/clock/nvidia,tegra20-car.txt          |  205 ++
+ .../bindings/clock/nvidia,tegra30-car.txt          |  270 +++
+ arch/arm/boot/dts/tegra20.dtsi                     |    6 +
+ arch/arm/boot/dts/tegra30.dtsi                     |    6 +
+ arch/arm/mach-tegra/Makefile                       |    5 -
+ arch/arm/mach-tegra/board-dt-tegra20.c             |   30 -
+ arch/arm/mach-tegra/board-dt-tegra30.c             |   31 -
+ arch/arm/mach-tegra/clock.c                        |  166 --
+ arch/arm/mach-tegra/clock.h                        |  153 --
+ arch/arm/mach-tegra/common.c                       |   44 +-
+ arch/arm/mach-tegra/cpu-tegra.c                    |    2 +-
+ arch/arm/mach-tegra/cpuidle-tegra30.c              |    2 +-
+ arch/arm/mach-tegra/fuse.c                         |   12 +-
+ arch/arm/mach-tegra/hotplug.c                      |    2 +-
+ arch/arm/mach-tegra/include/mach/clk.h             |   44 -
+ arch/arm/mach-tegra/pcie.c                         |    2 +-
+ arch/arm/mach-tegra/platsmp.c                      |    2 +-
+ arch/arm/mach-tegra/pm.c                           |    2 +-
+ arch/arm/mach-tegra/powergate.c                    |    2 +-
+ arch/arm/mach-tegra/tegra20_clocks.c               | 1623 -------------
+ arch/arm/mach-tegra/tegra20_clocks.h               |   42 -
+ arch/arm/mach-tegra/tegra20_clocks_data.c          | 1143 ---------
+ arch/arm/mach-tegra/tegra30_clocks.c               | 2506 --------------------
+ arch/arm/mach-tegra/tegra30_clocks.h               |   54 -
+ arch/arm/mach-tegra/tegra30_clocks_data.c          | 1425 -----------
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/tegra/Makefile                         |   11 +
+ drivers/clk/tegra/clk-audio-sync.c                 |   89 +
+ drivers/clk/tegra/clk-divider.c                    |  188 ++
+ drivers/clk/tegra/clk-periph-gate.c                |  182 ++
+ drivers/clk/tegra/clk-periph.c                     |  228 ++
+ drivers/clk/tegra/clk-pll-out.c                    |  124 +
+ drivers/clk/tegra/clk-pll.c                        |  674 ++++++
+ drivers/clk/tegra/clk-super.c                      |  154 ++
+ drivers/clk/tegra/clk-tegra20.c                    | 1244 ++++++++++
+ drivers/clk/tegra/clk-tegra30.c                    | 2037 ++++++++++++++++
+ drivers/clk/tegra/clk.c                            |   85 +
+ drivers/clk/tegra/clk.h                            |  486 ++++
+ drivers/dma/tegra20-apb-dma.c                      |    2 +-
+ drivers/gpu/drm/tegra/dc.c                         |    3 +-
+ drivers/gpu/drm/tegra/drm.c                        |    1 -
+ drivers/gpu/drm/tegra/hdmi.c                       |    3 +-
+ drivers/i2c/busses/i2c-tegra.c                     |    3 +-
+ drivers/input/keyboard/tegra-kbc.c                 |    2 +-
+ drivers/spi/spi-tegra20-sflash.c                   |    2 +-
+ drivers/spi/spi-tegra20-slink.c                    |    2 +-
+ drivers/staging/nvec/nvec.c                        |    3 +-
+ .../tegra_cpu_car.h => include/linux/clk/tegra.h   |   13 +-
+ include/linux/tegra-soc.h                          |   22 +
+ sound/soc/tegra/tegra30_ahub.c                     |    2 +-
+ 50 files changed, 6048 insertions(+), 7292 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt
+ delete mode 100644 arch/arm/mach-tegra/clock.c
+ delete mode 100644 arch/arm/mach-tegra/clock.h
+ delete mode 100644 arch/arm/mach-tegra/include/mach/clk.h
+ delete mode 100644 arch/arm/mach-tegra/tegra20_clocks.c
+ delete mode 100644 arch/arm/mach-tegra/tegra20_clocks.h
+ delete mode 100644 arch/arm/mach-tegra/tegra20_clocks_data.c
+ delete mode 100644 arch/arm/mach-tegra/tegra30_clocks.c
+ delete mode 100644 arch/arm/mach-tegra/tegra30_clocks.h
+ delete mode 100644 arch/arm/mach-tegra/tegra30_clocks_data.c
+ create mode 100644 drivers/clk/tegra/Makefile
+ create mode 100644 drivers/clk/tegra/clk-audio-sync.c
+ create mode 100644 drivers/clk/tegra/clk-divider.c
+ create mode 100644 drivers/clk/tegra/clk-periph-gate.c
+ create mode 100644 drivers/clk/tegra/clk-periph.c
+ create mode 100644 drivers/clk/tegra/clk-pll-out.c
+ create mode 100644 drivers/clk/tegra/clk-pll.c
+ create mode 100644 drivers/clk/tegra/clk-super.c
+ create mode 100644 drivers/clk/tegra/clk-tegra20.c
+ create mode 100644 drivers/clk/tegra/clk-tegra30.c
+ create mode 100644 drivers/clk/tegra/clk.c
+ create mode 100644 drivers/clk/tegra/clk.h
+ rename arch/arm/mach-tegra/tegra_cpu_car.h => include/linux/clk/tegra.h (91%)
+ create mode 100644 include/linux/tegra-soc.h
 
-I believe you forgot to request this memory. I suggest you do:
-+	thermal_dev->base_addr = devm_request_and_ioremap(&pdev->dev, res->start,
-+					      res);
-
-
-> +	if (!thermal_dev->base_addr) {
-> +		dev_err(&pdev->dev, "Failed to ioremap memory\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	thermal = thermal_zone_device_register("orion_thermal", 0, 0,
-> +				   thermal_dev, &ops, 0, 0);
-> +	if (IS_ERR(thermal)) {
-> +		dev_err(&pdev->dev,
-> +			"Failed to register thermal zone device\n");
-> +		return  PTR_ERR(thermal);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, thermal);
-> +
-> +	dev_info(&thermal->device,
-> +		 KBUILD_MODNAME ": Thermal sensor registered\n");
-
-Do you really need to be verbose? I suppose one can always check sysfs 
-entries to see if there is a successful driver & device binding...
-
-> +
-> +	return 0;
-> +}
-> +
-> +static int orion_thermal_exit(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *orion_thermal = platform_get_drvdata(pdev);
-> +
-> +	thermal_zone_device_unregister(orion_thermal);
-> +	platform_set_drvdata(pdev, NULL);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id orion_thermal_id_table[] = {
-> +	{ .compatible = "marvell,kirkwood-thermal" },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, orion_thermal_id_table);
-> +
-> +static struct platform_driver orion_thermal_driver = {
-> +	.probe = orion_thermal_probe,
-> +	.remove = orion_thermal_exit,
-> +	.driver = {
-> +		.name = "orion_thermal",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(orion_thermal_id_table),
-> +	},
-> +};
-> +
-> +module_platform_driver(orion_thermal_driver);
-> +
-> +MODULE_AUTHOR("Nobuhiro Iwamatsu <iwamatsu@nigauri.org>");
-> +MODULE_DESCRIPTION("orion thermal driver");
-> +MODULE_LICENSE("GPL");
->
+-- 
+1.7.4.1
