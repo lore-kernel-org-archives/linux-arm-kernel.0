@@ -1,183 +1,45 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 4 Jan 2013 17:13:30 +0100
-Subject: [PATCH] pinctrl/nomadik: Add "ste,config" property
-Message-ID: <1357316010-677-1-git-send-email-linus.walleij@stericsson.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 04 Jan 2013 11:16:26 -0500
+Subject: [PATCH v3 0/7] arm64: ARMv8 RTSM model SoC support
+In-Reply-To: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
+References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <50E7005A.7070307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+Hi Catalin,
 
-The "ste,config" property will contain the pin config node.
-It will be easier to define a pin configuration and use it by
-reference without duplicating lines tedious.
+On 01/04/2013 09:17 AM, Catalin Marinas wrote:
+> Hi,
+> 
+> That's the third version of the patch series adding support for the
+> ARMv8 RTSM model (vexpress-like) to the AArch64 kernel. There is no
+> SoC-specific code under arch/arm64/ as the kernel makes use of the
+> vexpress support already under drivers/ (apart from dts, defconfig and
+> some Kconfig changes).
+> 
+> The patches here can be found on this branch:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git soc-armv8-experimental
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-This is made as an add-on patch to the first device-tree patch
-instead of respinning it for ease-of-review. We may squash it in
-the end if this approach is OK.
----
- .../devicetree/bindings/pinctrl/ste,nomadik.txt    | 56 +++++++++++++++-------
- drivers/pinctrl/pinctrl-nomadik.c                  | 24 ++++++----
- 2 files changed, 53 insertions(+), 27 deletions(-)
+In case you weren't aware:
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-index 8639234..8ee860c 100644
---- a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-@@ -26,11 +26,12 @@ Optional subnode-properties:
- - ste,function: A string containing the name of the function to mux to the
-   pin or group.
- 
--- ste,input : <0/1/2/3>
-+- ste,config: Handle of pin configuration node (ste,config = <&in_pu>)
-+
-+- ste,input : <0/1/2>
- 	0: input with no pull
- 	1: input with pull up,
- 	2: input with pull down,
--	3: input and keep last input configuration (no pull, pull up or pull down).
- 
- - ste,output: <0/1/2>
- 	0: output low,
-@@ -41,10 +42,11 @@ Optional subnode-properties:
- 	0: sleep mode disable,
- 	1: sleep mode enable.
- 
--- ste,sleep-input: <0/1/2>
-+- ste,sleep-input: <0/1/2/3>
- 	0: sleep input with no pull,
- 	1: sleep input with pull up,
- 	2: sleep input with pull down.
-+	3: sleep input and keep last input configuration (no pull, pull up or pull down).
- 
- - ste,sleep-output: <0/1/2>
- 	0: sleep output low,
-@@ -65,12 +67,39 @@ Optional subnode-properties:
- 
- Example board file extract:
- 
-+	in_pu: input_pull_up {
-+		ste,input = <1>;
-+	};
-+
-+	out_hi: output_high {
-+		ste,output = <1>;
-+	};
-+
-+	slpm_in_wkup_pdis: slpm_in_wkup_pdis {
-+		ste,sleep = <1>;
-+		ste,sleep-input = <3>;
-+		ste,sleep-wakeup = <1>;
-+		ste,sleep-pull-disable = <0>;
-+	};
-+
-+	slpm_out_hi_wkup_pdis: slpm_out_hi_wkup_pdis {
-+		ste,sleep = <1>;
-+		ste,sleep-output = <1>;
-+		ste,sleep-wakeup = <1>;
-+		ste,sleep-pull-disable = <0>;
-+	};
-+	slpm_out_wkup_pdis: slpm_out_wkup_pdis {
-+		ste,sleep = <1>;
-+		ste,sleep-output = <2>;
-+		ste,sleep-wakeup = <1>;
-+		ste,sleep-pull-disable = <0>;
-+	};
-+
- 	pinctrl at 80157000 {
- 		compatible = "stericsson,nmk-pinctrl";
- 		reg = <0x80157000 0x2000>;
- 
- 		pinctrl-names = "default";
--		pinctrl-0 = <&uart0_default_mode>;
- 
- 		uart0 {
- 			uart0_default_mux: uart0_mux {
-@@ -82,35 +111,26 @@ Example board file extract:
- 			uart0_default_mode: uart0_default {
- 				uart0_default_cfg1 {
- 					ste,pins = "GPIO0", "GPIO2";
--					ste,input = <1>;
-+					ste,config = <&in_pu>;
- 				};
- 
- 				uart0_default_cfg2 {
- 					ste,pins = "GPIO1", "GPIO3";
--					ste,output = <1>;
-+					ste,config = <&out_hi>;
- 				};
- 			};
- 			uart0_sleep_mode: uart0_sleep {
- 				uart0_sleep_cfg1 {
- 					ste,pins = "GPIO0", "GPIO2";
--					ste,sleep = <0>;
--					ste,sleep-input = <0>;
--					ste,sleep-wakeup = <1>;
--					ste,sleep-pull-disable = <0>;
-+					ste,config = <&slpm_in_wkup_pdis>;
- 				};
- 				uart0_sleep_cfg2 {
- 					ste,pins = "GPIO1";
--					ste,sleep = <0>;
--					ste,sleep-output = <1>;
--					ste,sleep-wakeup = <1>;
--					ste,sleep-pull-disable = <0>;
-+					ste,config = <&slpm_out_hi_wkup_pdis>;
- 				};
- 				uart0_sleep_cfg3 {
- 					ste,pins = "GPIO3";
--					ste,sleep = <0>;
--					ste,sleep-output = <2>;
--					ste,sleep-wakeup = <1>;
--					ste,sleep-pull-disable = <0>;
-+					ste,config = <&slpm_out_wkup_pdis>;
- 				};
- 			};
- 		};
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index b508bd7..0355786 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -1691,23 +1691,29 @@ int nmk_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 	unsigned reserve = 0;
- 	struct property *prop;
- 	const char *group, *gpio_name;
-+	struct device_node *np_config;
- 
- 	ret = of_property_read_string(np, "ste,function", &function);
- 	if (ret >= 0)
- 		reserve = 1;
- 
--	for (i = 0; i < ARRAY_SIZE(nmk_cfg_params); i++) {
--		unsigned long cfg = 0;
--		int val;
--
--		ret = of_property_read_u32(np, nmk_cfg_params[i].property, &val);
--		if (ret != -EINVAL) {
--			if (nmk_dt_pin_config(i, val, &cfg) == 0) {
--				configs |= cfg;
--				has_config = 1;
-+	np_config = of_parse_phandle(np, "ste,config", 0);
-+	if (np_config) {
-+		for (i = 0; i < ARRAY_SIZE(nmk_cfg_params); i++) {
-+			unsigned long cfg = 0;
-+			int val;
-+
-+			ret = of_property_read_u32(np_config,
-+					nmk_cfg_params[i].property, &val);
-+			if (ret != -EINVAL) {
-+				if (nmk_dt_pin_config(i, val, &cfg) == 0) {
-+					configs |= cfg;
-+					has_config = 1;
-+				}
- 			}
- 		}
- 	}
-+
- 	ret = of_property_count_strings(np, "ste,pins");
- 	if (ret < 0)
- 		goto exit;
+git checkout catalin/soc-armv8-experimental
+ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- make vexpress_defconfig
+ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- make Image
+
+  CC      drivers/irqchip/gic.o
+drivers/irqchip/gic.c: In function 'gic_init':
+drivers/irqchip/gic.c:399:2: error: 'handle_arch_irq' undeclared (first use in this function)
+drivers/irqchip/gic.c:399:2: note: each undeclared identifier is reported only once for each function it appears in
+
+arm64 builds fine for me. I haven't tried merging Rob Herring's GIC
+stuff. I may just postpone further poking around until those changes
+land.
+
+Regards,
+Christopher
+
 -- 
-1.7.11.3
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by the Linux Foundation
