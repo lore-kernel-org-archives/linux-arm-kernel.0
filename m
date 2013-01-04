@@ -1,23 +1,57 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 04 Jan 2013 15:16:06 -0800 (PST)
-Subject: [PATCH v3 1/1 net-next] NET: FEC: dynamtic check DMA desc buff
- type
-In-Reply-To: <1357265063-30528-1-git-send-email-Frank.Li@freescale.com>
-References: <1357265063-30528-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20130104.151606.181887747842513051.davem@davemloft.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 04 Jan 2013 17:36:53 -0600
+Subject: [PATCH] ARM: imx: Do not select some errata that depends on
+ !ARCH_MULTIPLATFORM
+In-Reply-To: <1357338447-6798-1-git-send-email-festevam@gmail.com>
+References: <1357338447-6798-1-git-send-email-festevam@gmail.com>
+Message-ID: <50E76795.2000201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
-Date: Fri, 4 Jan 2013 10:04:23 +0800
-
-> MX6 and mx28 support enhanced DMA descriptor buff to support 1588
-> ptp. But MX25, MX3x, MX5x can't support enhanced DMA descriptor buff.
-> Check fec type and choose correct DMA descriptor buff type.
+On 01/04/2013 04:27 PM, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Remove static config CONFIG_FEC_PTP.
-> ptp function will be auto detected.
+> Since commit 62e4d357a (ARM: 7609/1: disable errata work-arounds which access 
+> secure registers) ARM_ERRATA_743622/751472 depends on !ARCH_MULTIPLATFORM.
 > 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> Since imx has been converted to multiplatform, the following warning happens:
+> 
+> $ make imx_v6_v7_defconfig
+> warning: (SOC_IMX6Q && ARCH_TEGRA_2x_SOC && ARCH_TEGRA_3x_SOC) selects
+> ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 &&
+> !ARCH_MULTIPLATFORM)
+> warning: (SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_743622
+> which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
+> warning: (SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_743622
+> which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
+> warning: (SOC_IMX6Q && ARCH_TEGRA_2x_SOC && ARCH_TEGRA_3x_SOC) selects
+> ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 &&
+> !ARCH_MULTIPLATFORM)
+> 
+> Recommended approach is to remove ARM_ERRATA_743622/751472 from being selected
+> by SOC_IMX6Q and apply such workarounds into the bootloader.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Applied.
+Broken and
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+> ---
+>  arch/arm/mach-imx/Kconfig |    2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 1ad0d76..3e628fd 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -841,8 +841,6 @@ config SOC_IMX6Q
+>  	select ARCH_HAS_CPUFREQ
+>  	select ARCH_HAS_OPP
+>  	select ARM_CPU_SUSPEND if PM
+> -	select ARM_ERRATA_743622
+> -	select ARM_ERRATA_751472
+>  	select ARM_ERRATA_754322
+>  	select ARM_ERRATA_764369 if SMP
+>  	select ARM_ERRATA_775420
+> 
