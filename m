@@ -1,133 +1,87 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 4 Jan 2013 16:17:02 +0200
-Subject: [PATCH v5 00/22] OMAP USB Host cleanup
-In-Reply-To: <1357138842-28964-1-git-send-email-rogerq@ti.com>
-References: <1357138842-28964-1-git-send-email-rogerq@ti.com>
-Message-ID: <50E6E45E.6010004@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri,  4 Jan 2013 14:17:16 +0000
+Subject: [PATCH v3 2/7] vexpress: Match the "arm,
+ sp810" DT entry for clock initialisation
+In-Reply-To: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
+References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1357309041-6192-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+Currently the clk-vexpress.c implementation relies on the vexpress code
+to call the vexpress_clk_of_init() function which performs the SP810
+initialisation. This patch adds "arm,sp810" to the clock DT match array
+allowing of_clk_init() to call the vexpress_sp810_of_setup() function.
+In case of CONFIG_ARM64, make vexpress_clk_of_init() an arch_initcall().
 
-Below is the pull request for this series. I've addressed the recent
-indentation issue pointed out by Sergei.
+Note that SP810 requires the fixed clocks to be already registered.
+Since the clock subsystem does not handle DT dependencies, the
+corresponding DT entries must be in the correct order.
 
-The following changes since commit cfa7abd7a92396923889fc870090b5d748c603ab:
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+---
+ drivers/clk/versatile/clk-vexpress.c | 28 +++++++++++++++++-----------
+ include/linux/vexpress.h             |  2 +-
+ 2 files changed, 18 insertions(+), 12 deletions(-)
 
-  Merge branch 'heads/fixes' into for-next (2013-01-02 12:40:04 -0800)
-
-are available in the git repository at:
-
-  git://github.com/rogerq/linux.git arm-for-next-usbhost9-part
-
-Roger Quadros (22):
-      mfd: omap-usb-tll: Avoid creating copy of platform data
-      mfd: omap-usb-tll: Fix channel count detection
-      mfd: omap-usb-tll: Use devm_kzalloc/ioremap and clean up error path
-      mfd: omap-usb-tll: Clean up clock handling
-      mfd: omap-usb-tll: introduce and use mode_needs_tll()
-      mfd: omap-usb-tll: Check for missing platform data in probe
-      mfd: omap-usb-tll: Fix error message
-      mfd: omap-usb-tll: serialize access to TLL device
-      mfd: omap-usb-tll: Add OMAP5 revision and HSIC support
-      mfd: omap_usb_host: Avoid creating copy of platform_data
-      mfd: omap-usb-host: Use devm_kzalloc() and devm_request_and_ioremap()
-      mfd: omap-usb-host: know about number of ports from revision register
-      mfd: omap-usb-host: override number of ports from platform data
-      mfd: omap-usb-host: cleanup clock management code
-      mfd: omap-usb-host: Manage HSIC clocks for HSIC mode
-      mfd: omap-usb-host: Get rid of unnecessary spinlock
-      mfd: omap-usb-host: clean up omap_usbhs_init()
-      USB: ehci-omap: Don't free gpios that we didn't request
-      ARM: OMAP3: clock data: get rid of unused USB host clock aliases
-and dummies
-      ARM: OMAP4: clock data: get rid of unused USB host clock aliases
-      mfd: omap-usb-host: Don't spam console on clk_set_parent failure
-      mdf: omap-usb-host: get rid of build warning
-
- arch/arm/mach-omap2/cclock3xxx_data.c  |   11 -
- arch/arm/mach-omap2/cclock44xx_data.c  |    7 -
- arch/arm/mach-omap2/usb-host.c         |    1 +
- arch/arm/mach-omap2/usb.h              |    1 +
- drivers/mfd/omap-usb-host.c            |  499
-+++++++++++++++++++-------------
- drivers/mfd/omap-usb-tll.c             |  244 +++++++++-------
- drivers/usb/host/ehci-omap.c           |    8 -
- include/linux/platform_data/usb-omap.h |    1 +
- 8 files changed, 435 insertions(+), 337 deletions(-)
-
---
-cheers,
--roger
-
-On 01/02/2013 05:00 PM, Roger Quadros wrote:
-> Hi,
-> 
-> This patchset addresses the following
-> 
-> - Avoid addressing clocks one by one by name and use a for loop + bunch
->   of cleanups.
-> - Get number of channels/ports dynamically either from revision register
->   or from platform data. Avoids getting clocks that are not present.
-> - Add OMAP5 and HSIC mode (Not tested)
-> 
-> v5:
-> - Rebased on top of todays arm-soc/for-next
-> - Removed the clock merging patch from the list.
-> - Updated patches 14, 19 and 20 to accomodate the above change.
-> - Added patch 22 to fix a build warning.
-> 
-> v4:
-> - Added appropriate maintainers in to/cc
-> - minor print message fix in patch 23 to maintain consistency
-> 
-> v3:
-> - Rebased on arm-soc/for-next commit f979306c4d38d213c6977aaf3b1115e8ded71e3a
-> - Rearranged patch that get rids of cpu_is_omap..() macros
-> - Coding style fixes
-> 
-> v2:
-> - Clocks are allocated dynamically based on number of ports available
-> on the platform
-> - Reduced console spam if non critical clocks are not found on the platform.
-> - Get rid of cpu_is_.. macros from USB host driver.
-> 
-> cheers,
-> -roger
-> 
-> ---
-> Roger Quadros (22):
->   mfd: omap-usb-tll: Avoid creating copy of platform data
->   mfd: omap-usb-tll: Fix channel count detection
->   mfd: omap-usb-tll: Use devm_kzalloc/ioremap and clean up error path
->   mfd: omap-usb-tll: Clean up clock handling
->   mfd: omap-usb-tll: introduce and use mode_needs_tll()
->   mfd: omap-usb-tll: Check for missing platform data in probe
->   mfd: omap-usb-tll: Fix error message
->   mfd: omap-usb-tll: serialize access to TLL device
->   mfd: omap-usb-tll: Add OMAP5 revision and HSIC support
->   mfd: omap_usb_host: Avoid creating copy of platform_data
->   mfd: omap-usb-host: Use devm_kzalloc() and devm_request_and_ioremap()
->   mfd: omap-usb-host: know about number of ports from revision register
->   mfd: omap-usb-host: override number of ports from platform data
->   mfd: omap-usb-host: cleanup clock management code
->   mfd: omap-usb-host: Manage HSIC clocks for HSIC mode
->   mfd: omap-usb-host: Get rid of unnecessary spinlock
->   mfd: omap-usb-host: clean up omap_usbhs_init()
->   USB: ehci-omap: Don't free gpios that we didn't request
->   ARM: OMAP3: clock data: get rid of unused USB host clock aliases and
->     dummies
->   ARM: OMAP4: clock data: get rid of unused USB host clock aliases
->   mfd: omap-usb-host: Don't spam console on clk_set_parent failure
->   mdf: omap-usb-host: get rid of build warning
-> 
->  arch/arm/mach-omap2/cclock3xxx_data.c  |   11 -
->  arch/arm/mach-omap2/cclock44xx_data.c  |    7 -
->  arch/arm/mach-omap2/usb-host.c         |    1 +
->  arch/arm/mach-omap2/usb.h              |    1 +
->  drivers/mfd/omap-usb-host.c            |  499 +++++++++++++++++++-------------
->  drivers/mfd/omap-usb-tll.c             |  244 +++++++++-------
->  drivers/usb/host/ehci-omap.c           |    8 -
->  include/linux/platform_data/usb-omap.h |    1 +
->  8 files changed, 435 insertions(+), 337 deletions(-)
-> 
+diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
+index 4f83ff9..a3754e7 100644
+--- a/drivers/clk/versatile/clk-vexpress.c
++++ b/drivers/clk/versatile/clk-vexpress.c
+@@ -98,21 +98,11 @@ struct clk *vexpress_sp810_of_get(struct of_phandle_args *clkspec, void *data)
+ 	return vexpress_sp810_timerclken[clkspec->args[0]];
+ }
+ 
+-static const __initconst struct of_device_id vexpress_fixed_clk_match[] = {
+-	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+-	{ .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
+-	{}
+-};
+-
+-void __init vexpress_clk_of_init(void)
++static void __init vexpress_sp810_of_setup(struct device_node *node)
+ {
+-	struct device_node *node;
+ 	struct clk *clk;
+ 	struct clk *refclk, *timclk;
+ 
+-	of_clk_init(vexpress_fixed_clk_match);
+-
+-	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
+ 	vexpress_sp810_init(of_iomap(node, 0));
+ 	of_clk_add_provider(node, vexpress_sp810_of_get, NULL);
+ 
+@@ -138,4 +128,20 @@ void __init vexpress_clk_of_init(void)
+ 				"v2m-timer1", "sp804"));
+ }
+ 
++static const __initconst struct of_device_id vexpress_clk_match[] = {
++	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
++	{ .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
++	{ .compatible = "arm,sp810", .data = vexpress_sp810_of_setup, },
++	{}
++};
++
++int __init vexpress_clk_of_init(void)
++{
++	of_clk_init(vexpress_clk_match);
++	return 0;
++}
++#ifdef CONFIG_ARM64
++arch_initcall(vexpress_clk_of_init);
++#endif
++
+ #endif
+diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
+index c52215f..b55ae6a 100644
+--- a/include/linux/vexpress.h
++++ b/include/linux/vexpress.h
+@@ -116,6 +116,6 @@ struct clk *vexpress_osc_setup(struct device *dev);
+ void vexpress_osc_of_setup(struct device_node *node);
+ 
+ void vexpress_clk_init(void __iomem *sp810_base);
+-void vexpress_clk_of_init(void);
++int vexpress_clk_of_init(void);
+ 
+ #endif
