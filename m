@@ -1,20 +1,28 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 4 Jan 2013 17:40:46 +0530
-Subject: [PATCH v4 0/9] ARM: davinci: remoteproc support
-In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C14311FCECD@DFLE08.ent.ti.com>
-References: <1355967254-16726-1-git-send-email-rtivy@ti.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FCECD@DFLE08.ent.ti.com>
-Message-ID: <50E6C6C6.3010907@ti.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 04 Jan 2013 16:13:42 +0400
+Subject: [PATCH 2/2] Revert "nohz: Fix idle ticks in cpu summary line
+ of /proc/stat" (commit 7386cdbf2f57ea8cff3c9fde93f206e58b9fe13f).
+In-Reply-To: <1357268337-8025-1-git-send-email-vatsa@codeaurora.org>
+References: <1357268337-8025-1-git-send-email-vatsa@codeaurora.org>
+Message-ID: <50E6C776.7060707@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2012 3:39 AM, Tivy, Robert wrote:
-> I have uploaded the commits corresponding to this patch set to a public repo on GitHub, forked from Linus' v3.7-rc2 tag on his "linux" repo.  These commits are on a branch named "davinci-remoteproc", here is the URL: https://github.com/RTivy/linux/tree/davinci-remoteproc
-> 
-> This should make for an easier review of the changes.
+Hello.
 
-Thanks. Is there a sample application we could use to exercise the
-driver? Looks like we need some firmware to load on the DSP too.
+On 04-01-2013 6:58, Srivatsa Vaddagiri wrote:
 
-Thanks,
-Sekhar
+> With offline cpus no longer beeing seen in nohz mode (ts->idle_active=0), we
+> don't need the check for cpu_online() introduced in commit 7386cdbf. Offline
+
+    Please also specify the summary of that commit in parens (or however you 
+like).
+
+> cpu's idle time as last recorded in its ts->idle_sleeptime will be reported
+> (thus excluding its offline time as part of idle time statistics).
+
+> Cc: mhocko at suse.cz
+> Cc: srivatsa.bhat at linux.vnet.ibm.com
+> Signed-off-by: Srivatsa Vaddagiri <vatsa@codeaurora.org>
+
+WBR, Sergei
