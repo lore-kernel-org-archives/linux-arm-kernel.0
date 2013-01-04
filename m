@@ -1,69 +1,115 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 4 Jan 2013 08:53:04 +0530
-Subject: [PATCH v2 05/11] ARM: dt: tegra30: Add device node for APB MISC
-In-Reply-To: <50E6470E.8090206@wwwdotorg.org>
-References: <1356619644-18565-1-git-send-email-pgaikwad@nvidia.com>
- <1356619644-18565-6-git-send-email-pgaikwad@nvidia.com>
- <50E4AE19.1060503@wwwdotorg.org> <50E520FC.4070805@nvidia.com>
- <50E5ADA6.1070904@wwwdotorg.org> <50E634D0.6080702@nvidia.com>
- <50E6470E.8090206@wwwdotorg.org>
-Message-ID: <50E64B18.8060806@nvidia.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu,  3 Jan 2013 20:55:27 -0700
+Subject: [PATCH] ARM: bcm2835: make use of CLKSRC_OF
+Message-ID: <1357271727-2065-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 January 2013 08:35 AM, Stephen Warren wrote:
-> On 01/03/2013 06:48 PM, Prashant Gaikwad wrote:
->> On Thursday 03 January 2013 09:41 PM, Stephen Warren wrote:
->>> On 01/02/2013 11:11 PM, Prashant Gaikwad wrote:
->>>> On Thursday 03 January 2013 03:30 AM, Stephen Warren wrote:
->>>>> On 12/27/2012 07:47 AM, Prashant Gaikwad wrote:
->>>>>> APB misc contains multiple registers required by different modules
->>>>>> such as CAR.
->>>>> I don't see a DT binding document that describes what
->>>>> nvidia,tegra30-apbmisc means. Also, the register range for this new
->>>>> node
->>>>> overlaps that for the pinmux node, so they can't both "request" their
->>>>> register region. You may need multiple entries in the apbmisc reg
->>>>> property to avoid this.
->>>> apbmisc reg for Tegra30 can be divided into following entries:
->>>>
->>>> strap registers
->>>> jtag configuration registers
->>>> pull_up/pull_down control registers
->>>> vclk control registers
->>>> tvdac registers
->>>> chip id revision registers
->>>> pad control registers
->>>>
->>>> This list is not same for Tegra20 and Tegra30.
->>> OK. It sounds like we need a true APB MISC driver then, to abstract the
->>> differences; the clock driver really shouldn't be touching the APB MISC
->>> registers in all likelihood, unless a subset of the sections you mention
->>> above are truly dedicated to clock functionality.
->> I don't think it is a good idea to create a driver for APB MISC, all
->> registers are used by different drivers.
-> Well, it's even worse to have a bunch of other drivers randomly trample
-> on a set of registers they don't own.
->
->> Only chip id revision registers are used in clock driver.
-> There are already global variables exposed by the Tegra fuse driver; can
-> you just read those?
+Using CLKSRC_OF enables deletion of the SoC-specific header
+bcm2835_timer.h, replacing the custom function bcm2835_timer_init() with
+the standardized automatic clocksource_of_init().
 
-It is not about variables or some value, we have to read some apb 
-register to flush the write operation in apb bus before we disable 
-peripheral clock.
-We are using chip id revision register for this purpose.
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+This is based on my arm-timer-rework branch, for which I'll send a pull
+request to arm-soc tomorrow.
 
->>>> OR
->>>>
->>>> another way is to add chip id revision register region to CAR node as
->>>> done for pinmux node and remove apb misc node.
->>> The pinmux controller doesn't have a reg entry for the chip ID register.
->>> I don't understand what you mean here.
->> I mean as we have separate entry for PAD control registers region in
->> pinmux node we can have also have separate entry for chid id revision
->> register region in CAR node.
-> The pad control registers are part of the pinmux HW, so it makes perfect
-> sense for the pinmux driver to control them. The APB misc registers
-> aren't part of the clock register set, so it doesn't make sense to the
-> clock driver to touch them.
+ arch/arm/Kconfig                    |    1 +
+ arch/arm/mach-bcm2835/bcm2835.c     |    4 ++--
+ drivers/clocksource/bcm2835_timer.c |    5 +++--
+ include/linux/bcm2835_timer.h       |   22 ----------------------
+ 4 files changed, 6 insertions(+), 26 deletions(-)
+ delete mode 100644 include/linux/bcm2835_timer.h
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 91f8d78..2d274df 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -345,6 +345,7 @@ config ARCH_BCM2835
+ 	select ARM_ERRATA_411920
+ 	select ARM_TIMER_SP804
+ 	select CLKDEV_LOOKUP
++	select CLKSRC_OF
+ 	select COMMON_CLK
+ 	select CPU_V6
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-bcm2835/bcm2835.c b/arch/arm/mach-bcm2835/bcm2835.c
+index 1a446a1..6f57859 100644
+--- a/arch/arm/mach-bcm2835/bcm2835.c
++++ b/arch/arm/mach-bcm2835/bcm2835.c
+@@ -17,8 +17,8 @@
+ #include <linux/irqchip/bcm2835.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+-#include <linux/bcm2835_timer.h>
+ #include <linux/clk/bcm2835.h>
++#include <linux/clocksource.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -132,7 +132,7 @@ DT_MACHINE_START(BCM2835, "BCM2835")
+ 	.init_irq = bcm2835_init_irq,
+ 	.handle_irq = bcm2835_handle_irq,
+ 	.init_machine = bcm2835_init,
+-	.init_time = bcm2835_timer_init,
++	.init_time = clocksource_of_init,
+ 	.restart = bcm2835_restart,
+ 	.dt_compat = bcm2835_compat
+ MACHINE_END
+diff --git a/drivers/clocksource/bcm2835_timer.c b/drivers/clocksource/bcm2835_timer.c
+index 7f796d8f..50c68fe 100644
+--- a/drivers/clocksource/bcm2835_timer.c
++++ b/drivers/clocksource/bcm2835_timer.c
+@@ -16,7 +16,6 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+ 
+-#include <linux/bcm2835_timer.h>
+ #include <linux/bitops.h>
+ #include <linux/clockchips.h>
+ #include <linux/clocksource.h>
+@@ -101,7 +100,7 @@ static struct of_device_id bcm2835_time_match[] __initconst = {
+ 	{}
+ };
+ 
+-void __init bcm2835_timer_init(void)
++static void __init bcm2835_timer_init(void)
+ {
+ 	struct device_node *node;
+ 	void __iomem *base;
+@@ -155,3 +154,5 @@ void __init bcm2835_timer_init(void)
+ 
+ 	pr_info("bcm2835: system timer (irq = %d)\n", irq);
+ }
++CLOCKSOURCE_OF_DECLARE(bcm2835, "brcm,bcm2835-system-timer",
++			bcm2835_timer_init);
+diff --git a/include/linux/bcm2835_timer.h b/include/linux/bcm2835_timer.h
+deleted file mode 100644
+index ca17aa8..0000000
+--- a/include/linux/bcm2835_timer.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * Copyright 2012 Simon Arlott
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#ifndef __BCM2835_TIMER_H
+-#define __BCM2835_TIMER_H
+-
+-#include <asm/mach/time.h>
+-
+-extern void bcm2835_timer_init(void);
+-
+-#endif
+-- 
+1.7.10.4
