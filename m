@@ -1,53 +1,50 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 4 Jan 2013 21:08:20 +0100
-Subject: [PATCH] ARM: tegra: add kexec support to defconfig
-In-Reply-To: <50E5FBDE.90804@wwwdotorg.org>
-References: <1357161141-26430-1-git-send-email-swarren@wwwdotorg.org>
- <20130103210541.GB4412@avionic-0098.adnet.avionic-design.de>
- <50E5F5A3.1060507@wwwdotorg.org>
- <20130103212903.GA27749@avionic-0098.adnet.avionic-design.de>
- <50E5FBDE.90804@wwwdotorg.org>
-Message-ID: <20130104200820.GC4577@avionic-0098.adnet.avionic-design.de>
+From: s-guiriec@ti.com (Sebastien Guiriec)
+Date: Fri, 4 Jan 2013 21:27:41 +0100
+Subject: [PATCH 2/3] ARM: OMAP4: hwmod data: do not enable or reset the
+ AESS during kernel init
+In-Reply-To: <alpine.DEB.2.00.1301041833510.25868@utopia.booyaka.com>
+References: <1357304526-21557-1-git-send-email-s-guiriec@ti.com>
+ <1357304526-21557-3-git-send-email-s-guiriec@ti.com>
+ <alpine.DEB.2.00.1301041833510.25868@utopia.booyaka.com>
+Message-ID: <50E73B3D.4010705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 02:45:02PM -0700, Stephen Warren wrote:
-> On 01/03/2013 02:29 PM, Thierry Reding wrote:
-> > On Thu, Jan 03, 2013 at 02:18:27PM -0700, Stephen Warren wrote:
-> >> On 01/03/2013 02:05 PM, Thierry Reding wrote:
-> >>> On Wed, Jan 02, 2013 at 02:12:21PM -0700, Stephen Warren
-> >>> wrote:
-> >>>> From: Stephen Warren <swarren@nvidia.com>
-> >>>> 
-> >>>> Signed-off-by: Stephen Warren <swarren@nvidia.com> --- 
-> >>>> arch/arm/configs/tegra_defconfig |    1 + 1 file changed, 1 
-> >>>> insertion(+)
-> >>>> 
-> >>>> diff --git a/arch/arm/configs/tegra_defconfig 
-> >>>> b/arch/arm/configs/tegra_defconfig index 742dc41..e621603
-> >>>> 100644 --- a/arch/arm/configs/tegra_defconfig +++ 
-> >>>> b/arch/arm/configs/tegra_defconfig @@ -34,6 +34,7 @@ 
-> >>>> CONFIG_AEABI=y CONFIG_HIGHMEM=y CONFIG_ZBOOT_ROM_TEXT=0x0 
-> >>>> CONFIG_ZBOOT_ROM_BSS=0x0 +CONFIG_KEXEC=y CONFIG_CPU_FREQ=y 
-> >>>> CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y CONFIG_CPU_IDLE=y
-> >>> 
-> >>> Interesting. What do you plan to use this for? kdump?
-> >> 
-> >> I plan to burn a kernel (and a small stub, and a DTB) into flash 
-> >> instead of U-Boot, and hence not have to rely on any bootloader.
-> > 
-> > Why does that require kexec support?
-> 
-> Because I'd be using that kernel plus an initrd to download the "real"
-> kernel over e.g. TFTP and kexec it.
+On 01/04/2013 07:35 PM, Paul Walmsley wrote:
+> Hi Sebastien
+>
+> On Fri, 4 Jan 2013, Sebastien Guiriec wrote:
+>
+>> The AESS on OMAP4 has additional register on top of SYS_CONFIG for
+>> auto gatting configuration. In order to avoid running clock after
+>> boot up we should avoid to enable and reset the module during boot up.
+>>
+>> Audio driver will be in charge of configuring the addition register.
+>>
+>> At its core, this patch is a workaround for an OMAP hardware problem.
+>> It should be possible to configure the OMAP with good default reset
+>> configuration of AESS IP for auto gatting mode.
+>>
+>> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+>
+> What do you think about a slightly modified and updated version of:
+>
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69853.html
 
-Right, that makes sense. Thanks for explaining.
+This solution is the better. I was thinking that Tony reject this 
+callback (but I realize that I miss the second series long time back).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130104/395cb0d5/attachment.sig>
+Paul,
+Do you want me to rebase this version and update the serie or are you 
+handle it?
+
+>
+> ?  That way we can reset the IP block at startup, like most of our other
+> IP blocks, to avoid previous OS and bootloader dependencies.
+
+Yes can be useful.
+
+>
+>
+> - Paul
+>
