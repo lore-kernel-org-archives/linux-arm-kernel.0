@@ -1,26 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 4 Jan 2013 12:26:12 +0000
-Subject: [PATCH V2 2/2] ASoC: Davinci: machine: Add device tree binding
-In-Reply-To: <1357293277-25543-3-git-send-email-gururaja.hebbar@ti.com>
-References: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
- <1357293277-25543-3-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20130104122612.GM4627@opensource.wolfsonmicro.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 4 Jan 2013 10:29:09 -0200
+Subject: [PATCH] ARM: dts: imx25-karo-tx25: Put status entry in the end
+Message-ID: <1357302549-12746-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 04, 2013 at 03:24:37PM +0530, Hebbar Gururaja wrote:
+Just to keep consistency with other dts files, place 'status' entry as the last
+one.
 
-> +		"MIC3L",                "Mic Bias 2V",
-> +		"MIC3R",                "Mic Bias 2V",
-> +		"Mic Bias 2V",          "Mic Jack",
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx25-karo-tx25.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The CODEC driver biases should be changed over to be supplies, this
-makes the above much more natural - the routing there is a hack for
-older versions of ASoc.  Otherwise this looks fine.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130104/2b3dc923/attachment.sig>
+diff --git a/arch/arm/boot/dts/imx25-karo-tx25.dts b/arch/arm/boot/dts/imx25-karo-tx25.dts
+index eb9b9d1..1a9d049 100644
+--- a/arch/arm/boot/dts/imx25-karo-tx25.dts
++++ b/arch/arm/boot/dts/imx25-karo-tx25.dts
+@@ -26,8 +26,8 @@
+ };
+ 
+ &fec {
+-	status = "okay";
+ 	phy-mode = "rmii";
++	status = "okay";
+ };
+ 
+ &nfc {
+-- 
+1.7.9.5
