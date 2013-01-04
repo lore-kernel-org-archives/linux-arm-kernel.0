@@ -1,16 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 4 Jan 2013 14:15:29 +0800
-Subject: [PATCH v4 09/19] ARM: use common irqchip_init for GIC init
-In-Reply-To: <1357235668-9450-10-git-send-email-robherring2@gmail.com>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-10-git-send-email-robherring2@gmail.com>
-Message-ID: <20130104061526.GC1887@S2101-09.ap.freescale.net>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Fri, 4 Jan 2013 11:59:43 +0530
+Subject: [PATCH v5] usb: phy: samsung: Add support to set pmu isolation
+In-Reply-To: <1356686018-18586-1-git-send-email-gautam.vivek@samsung.com>
+References: <CAFp+6iEUNjZewY1b3T-eCHeiZrouxYGPXtxHuNvJdi+UEKTNjg@mail.gmail.com>
+ <1356686018-18586-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <CAFp+6iHGCemgxQ_bV2PPsUk2vrXbwFRMgsEbUMEU+C433LurTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 11:54:18AM -0600, Rob Herring wrote:
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-...
->  arch/arm/mach-imx/mach-imx6q.c                 |    9 ++-------
+Hi,
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+On Fri, Dec 28, 2012 at 2:43 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> Adding support to parse device node data in order to get
+> required properties to set pmu isolation for usb-phy.
+>
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> ---
+>
+
+Any further comments on this ? Or does this seem fine ?
+
+
+-- 
+Thanks & Regards
+Vivek
