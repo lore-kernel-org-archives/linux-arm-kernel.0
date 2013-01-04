@@ -1,51 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 4 Jan 2013 17:10:33 +0100
-Subject: [PATCH 2/2] dma: mv_xor: do not sync the DMA buffer after being
- deallocated
-In-Reply-To: <1356636228-23096-2-git-send-email-lkundrak@v3.sk>
-References: <1356636228-23096-1-git-send-email-lkundrak@v3.sk>
- <1356636228-23096-2-git-send-email-lkundrak@v3.sk>
-Message-ID: <20130104171033.4a244c3d@skate>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Fri, 4 Jan 2013 11:12:20 -0500
+Subject: [Patch v1] arm: MVBEU Clk: Remove inappropriate __init tagging
+Message-ID: <CAMW5UfY_J8fOM8kGPXXUUL1dmAAksNsCJUxX2Pmq_3BvhxjT+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lubomir Rintel,
+This is based on my prior problem report and discussion on a 3.8-rc1
+kernel Oops and reboot hang.  I've tested it on top of 3.8-rc2 with
+the pending missing clk for USB patch on my Seagate GoFlex Net
+successfully.  Without this, 3.8 will not reboot on my system, the
+Orion WDT fails to probe correctly as well.
 
-On Thu, 27 Dec 2012 20:23:48 +0100, Lubomir Rintel wrote:
+MVEBU: Remove invalid __init tag from clk function
+Modules need to be able to use this function outside of kernel init.
+This corrects an Oops triggered by the Orion WDT driver being built as
+a module.
+Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
+--- a/drivers/clk/mvebu/clk-gating-ctrl.c 2013-01-02 21:13:21.000000000 -0500
++++ b/drivers/clk/mvebu/clk-gating-ctrl.c 2013-01-03 11:40:44.000000000 -0500
+@@ -32,7 +32,7 @@
 
->  	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
->  				MV_XOR_TEST_SIZE, DMA_FROM_DEVICE);
-> +	dma_unmap_single(dma_chan->device->dev, dest_dma, MV_XOR_TEST_SIZE,
-> +			 DMA_FROM_DEVICE);
+ #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
 
-I would assume that dma_unmap_single() implies a
-dma_sync_single_for_cpu() since you're unmapping the DMA buffer. So if
-you use dma_unmap_single(), I think you can remove the call to
-dma_sync_single_for_cpu().
-
-
->  	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
->  				PAGE_SIZE, DMA_FROM_DEVICE);
-> +	dma_unmap_page(dma_chan->device->dev, dest_dma, PAGE_SIZE,
-> +		       DMA_FROM_DEVICE);
-
-Ditto.
-
-Also, the mv_xor_memcpy_self_test() function not only dma_map_single()
-the destination buffer, but also the source buffer. So presumably, the
-source buffer should also be dma_unmap_single()'d.
-
-And for the mv_xor_xor_self_test() function, multiple source buffers
-are dma_map_page()'d, so they should all be dma_unmap_page()'d I guess,
-not only the destination buffer.
-
-Does that make sense?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-static struct clk __init *mvebu_clk_gating_get_src(
++static struct clk *mvebu_clk_gating_get_src(
+  struct of_phandle_args *clkspec, void *data)
+ {
+  struct mvebu_gating_ctrl *ctrl = (struct mvebu_gating_ctrl *)data;
