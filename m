@@ -1,32 +1,42 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 4 Jan 2013 11:09:23 +0100
-Subject: [PATCH v2 2/2] ARM: OMAP4: hwmod_data: Correct IDLEMODE for McPDM
-In-Reply-To: <1357294163-4317-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1357294163-4317-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1357294163-4317-3-git-send-email-peter.ujfalusi@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 04 Jan 2013 11:18:56 +0100
+Subject: Early kernel hang with big DTB appended
+In-Reply-To: <alpine.LFD.2.02.1301032144490.1263@xanadu.home>
+References: <7811936.npteFbuYu2@amdc1227>
+ <alpine.LFD.2.02.1301032144490.1263@xanadu.home>
+Message-ID: <35730055.SShm3zF9mO@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-McPDM need to be configured to NO_IDLE mode when it is in used otherwise
-vital clocks will be gated which results 'slow motion' audio playback.
+Hi Nicolas,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks for your reply.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 129d508..584acf9 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2133,7 +2133,7 @@ static struct omap_hwmod omap44xx_mcpdm_hwmod = {
- 	 * available, so it doesn't seem that we have any choice in
- 	 * the kernel other than to avoid resetting it.
- 	 */
--	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
-+	.flags		= HWMOD_EXT_OPT_MAIN_CLK | HWMOD_SWSUP_SIDLE,
- 	.mpu_irqs	= omap44xx_mcpdm_irqs,
- 	.sdma_reqs	= omap44xx_mcpdm_sdma_reqs,
- 	.main_clk	= "mcpdm_fck",
+On Thursday 03 of January 2013 21:48:05 Nicolas Pitre wrote:
+> On Thu, 3 Jan 2013, Tomasz Figa wrote:
+> > Hi,
+> > 
+> > I'm observing strange behavior when booting 3.8-rc1 and -rc2 with
+> > appended DTB. The kernel hangs very early when the DTB is bigger than
+> > some threshold somewhere around 24 KiB.
+> 
+> What is the address where you load your zImage?
+
+We are using uImages built with same parameters as those used in simple 
+'make uImage', just with a DTB appended to zImage before running mkimage 
+on it.
+
+By default the load address is set to 0x40008000, where 0x40000000 is DRAM 
+base.
+
+> What if you load it, say, at an offset of 16MB from the start of RAM?
+> Not that this is a fix, but at least that would help isolate the issue.
+
+Yes, it indeed helps. I tried with shifting the load address by 16 MiB to 
+0x41008000 (by adjusting mkimage parameters) and it now boots fine.
+
+Best regards,
 -- 
-1.8.0.2
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
