@@ -1,28 +1,26 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 04 Jan 2013 16:13:42 +0400
-Subject: [PATCH 2/2] Revert "nohz: Fix idle ticks in cpu summary line
- of /proc/stat" (commit 7386cdbf2f57ea8cff3c9fde93f206e58b9fe13f).
-In-Reply-To: <1357268337-8025-1-git-send-email-vatsa@codeaurora.org>
-References: <1357268337-8025-1-git-send-email-vatsa@codeaurora.org>
-Message-ID: <50E6C776.7060707@mvista.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 4 Jan 2013 12:26:12 +0000
+Subject: [PATCH V2 2/2] ASoC: Davinci: machine: Add device tree binding
+In-Reply-To: <1357293277-25543-3-git-send-email-gururaja.hebbar@ti.com>
+References: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
+ <1357293277-25543-3-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20130104122612.GM4627@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Jan 04, 2013 at 03:24:37PM +0530, Hebbar Gururaja wrote:
 
-On 04-01-2013 6:58, Srivatsa Vaddagiri wrote:
+> +		"MIC3L",                "Mic Bias 2V",
+> +		"MIC3R",                "Mic Bias 2V",
+> +		"Mic Bias 2V",          "Mic Jack",
 
-> With offline cpus no longer beeing seen in nohz mode (ts->idle_active=0), we
-> don't need the check for cpu_online() introduced in commit 7386cdbf. Offline
-
-    Please also specify the summary of that commit in parens (or however you 
-like).
-
-> cpu's idle time as last recorded in its ts->idle_sleeptime will be reported
-> (thus excluding its offline time as part of idle time statistics).
-
-> Cc: mhocko at suse.cz
-> Cc: srivatsa.bhat at linux.vnet.ibm.com
-> Signed-off-by: Srivatsa Vaddagiri <vatsa@codeaurora.org>
-
-WBR, Sergei
+The CODEC driver biases should be changed over to be supplies, this
+makes the above much more natural - the routing there is a hack for
+older versions of ASoc.  Otherwise this looks fine.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130104/2b3dc923/attachment.sig>
