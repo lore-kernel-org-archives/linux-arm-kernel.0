@@ -1,58 +1,38 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Sat,  5 Jan 2013 10:38:40 +0800
-Subject: [v3 PATCH 0/9] watchdog/at91sam9_wdt: Convert to use the new framework
-Message-ID: <1357353529-20901-1-git-send-email-wenyou.yang@atmel.com>
+Date: Sat,  5 Jan 2013 10:38:41 +0800
+Subject: [v3 PATCH 1/9] watchdog: add the function watchdog_is_open
+In-Reply-To: <1357353529-20901-1-git-send-email-wenyou.yang@atmel.com>
+References: <1357353529-20901-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1357353529-20901-2-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, All
+Add the function watchdog_is_open to check whether or not
+the /dev/watchdog? is opened
 
-The purpose of the patch series is to convert to use the watchdog framework,
-It is tested on at91sam9g25ek.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+ include/linux/watchdog.h |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-It is based on v3.8-rc2 + Fabio Porcedda's add timeout-sec property binding
-
-ChangeLog 
-v3:
-	1./ The helper function 'watchdog_is_open' is moved to
-	    include/linux/watchdog.h, as it can be useful for other watchdog
-	    drivers as well.
-
-	2./ Remove '__init' annotation from the function 'at91wdt_probe',
-	    since the driver becomes hot-plug aware now.
-	
-	3./ Rebase on v3.8-rc2
-
-v2:
-	1./ Remove the patches to add devive tree support which Fabio Porcedda
-	   has done and submitted.
-
-	2./ Replace __raw_readl, __raw_writel with readl_relaxed, writel_relaxed.
-
-	3./ Rebase on v3.7-rc8.
-
-Best Regards
-Wenyou Yang
-
-Wenyou Yang (9):
-  watchdog: add the function watchdog_is_open
-  watchdog/at91sam9_wdt: Remove at91wdt_private and add at91wdt_drvdata
-    struct
-  watchdog/at91sam9_wdt: Convert to use the watchdog framework
-  watchdog/at91sam9_wdt: Adjust the options of watchdog_info
-  watchdog/at91sam9_wdt: Add nowayout helpers to Watchdog Timer Driver
-    Kernel API
-  watchdog/at91sam9_wdt: Remove the __initdata of at91wdt_wdd
-  watchdog/at91sam9_wdt: Use module_platform_driver()
-  ARM: dts: add the watchdog nodes for at91sam9x5 and at91sam9n12 SoC
-  ARM: dts: add the watchdog nodes for at91sam9g25ek boards
-
- arch/arm/boot/dts/at91sam9n12.dtsi  |    6 +
- arch/arm/boot/dts/at91sam9x5.dtsi   |    6 +
- arch/arm/boot/dts/at91sam9x5ek.dtsi |    4 +
- drivers/watchdog/at91sam9_wdt.c     |  287 ++++++++++++++---------------------
- include/linux/watchdog.h            |    8 +
- 5 files changed, 137 insertions(+), 174 deletions(-)
-
+diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+index e40cc2b..7ea4465 100644
+--- a/include/linux/watchdog.h
++++ b/include/linux/watchdog.h
+@@ -111,6 +111,14 @@ static inline bool watchdog_active(struct watchdog_device *wdd)
+ 	return test_bit(WDOG_ACTIVE, &wdd->status);
+ }
+ 
++/* Use the following function to check whether or not
++ * the /dev/watchdog? is opened
++ */
++static inline bool watchdog_is_open(struct watchdog_device *wddev)
++{
++	return test_bit(WDOG_DEV_OPEN, &wddev->status);
++}
++
+ /* Use the following function to set the nowayout feature */
+ static inline void watchdog_set_nowayout(struct watchdog_device *wdd, bool nowayout)
+ {
 -- 
 1.7.9.5
