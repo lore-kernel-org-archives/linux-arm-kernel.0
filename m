@@ -1,18 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 5 Jan 2013 00:53:33 -0200
-Subject: [PATCH] ARM: imx: Do not select some errata that depends on
- !ARCH_MULTIPLATFORM
-In-Reply-To: <20130105010743.GG1887@S2101-09.ap.freescale.net>
-References: <1357338447-6798-1-git-send-email-festevam@gmail.com>
- <50E76795.2000201@gmail.com>
- <20130105010743.GG1887@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5DqhSO_s5_yFTYqrgkO9b4akaPSSvgrQOZDW9BP9rpygA@mail.gmail.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Sat, 5 Jan 2013 08:23:32 +0530
+Subject: [PATCH 2/2] clk: tegra30: Convert clk out to composite clk
+In-Reply-To: <50E7027A.1090102@wwwdotorg.org>
+References: <1357278706-28149-1-git-send-email-pgaikwad@nvidia.com>
+ <1357278706-28149-2-git-send-email-pgaikwad@nvidia.com>
+ <50E7027A.1090102@wwwdotorg.org>
+Message-ID: <50E795AC.5030106@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 4, 2013 at 11:07 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Friday 04 January 2013 09:55 PM, Stephen Warren wrote:
+> On 01/03/2013 10:51 PM, Prashant Gaikwad wrote:
+>> Convert clk out to composite clock type which removes
+>> the mux clock.
+>>
+>> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+>> ---
+>> This patch is rebased on ccf-rework for Tegra patch series. It is just to show
+>> how clk-composite can be used, not to be merged. If patch 1 is accepted then
+>> I would like to merge this patch to ccf-rework series.
+> Just so I'm clear, is the intent that patch 1 of this series gets
+> reviewed/accepted, and then you'll repost an updated version of the
+> Tegra CCF rework series that relies on patch 1? If so, patch 1 would
+> need to be either taken through the Tegra tree, or put into a separate
+> branch in the clock tree, so the Tegra tree can merge it as a dependency
+> of the Tegra CCF rework branch.
 
-> I think the patch should be put into Russell's the patch system to
-> have it go through the same branch that 7609/1 goes.
-
-Entered as 7612/1.
+Yes, that is my plan but you can tell whatever you are comfortable with. 
+I will re-order the dependencies.
