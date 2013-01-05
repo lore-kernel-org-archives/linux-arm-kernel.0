@@ -1,21 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Jan 2013 14:09:58 +0000
+From: ulrich.hecht@gmail.com (Ulrich Hecht)
+Date: Sat, 5 Jan 2013 15:49:33 +0100
 Subject: [PATCH] ARM: smp: return from ipi_cpu_stop()
-In-Reply-To: <1357391123-759-1-git-send-email-ulrich.hecht@gmail.com>
+In-Reply-To: <20130105140958.GW2631@n2100.arm.linux.org.uk>
 References: <1357391123-759-1-git-send-email-ulrich.hecht@gmail.com>
-Message-ID: <20130105140958.GW2631@n2100.arm.linux.org.uk>
+ <20130105140958.GW2631@n2100.arm.linux.org.uk>
+Message-ID: <CAO3366w39Cm0qZ1vtH+f9AZjbzoa0ycMfFJuWP5L4+j=6mq1PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 05, 2013 at 02:05:23PM +0100, Ulrich Hecht wrote:
-> ipi_cpu_stop() is supposed to mark a CPU offline, but it's the job of the
-> idle thread to actually shut it down.
+On Sat, Jan 5, 2013 at 3:09 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Plus, there's no guarantee what so ever that anything will happen in the
+> idle loop; this is not the _normal_ CPU shutdown path, this is the "oh
+> fsck, we need to stop all other CPUs because we panic'd" handler.
 
-Wrong.  Where do you get that idea from?
+So who's job is it then to call cpu_die()? Because that's what doesn't
+happen and leaves the second core spinning, wrecking the kexec'd
+kernel.
 
-If you look at what x86 does, you'll notice that it too puts the CPU
-into a busy loop.
-
-Plus, there's no guarantee what so ever that anything will happen in the
-idle loop; this is not the _normal_ CPU shutdown path, this is the "oh
-fsck, we need to stop all other CPUs because we panic'd" handler.
+CU
+Uli
