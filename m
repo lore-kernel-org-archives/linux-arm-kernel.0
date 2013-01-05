@@ -1,9 +1,11 @@
 From: josh.coombs@gmail.com (Joshua Coombs)
-Date: Fri,  4 Jan 2013 20:47:50 -0500
+Date: Fri,  4 Jan 2013 20:50:46 -0500
 Subject: [PATCH v2] clk: mvebu: Remove inappropriate __init tagging
-Message-ID: <1357350470-1477-1-git-send-email-josh.coombs@gmail.com>
+Message-ID: <1357350646-1513-1-git-send-email-josh.coombs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+If the Orion WDT driver is built as a module, an opps occurs during clk lookup when calling mvebu_clk_gating_get_src().  Remove the inappropriate __init tag so the function is available for modules after kernel init.
 
 Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
 ---
