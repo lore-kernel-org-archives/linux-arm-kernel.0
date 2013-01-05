@@ -1,31 +1,58 @@
-From: josh.coombs@gmail.com (Joshua Coombs)
-Date: Fri,  4 Jan 2013 20:50:46 -0500
-Subject: [PATCH v2] clk: mvebu: Remove inappropriate __init tagging
-Message-ID: <1357350646-1513-1-git-send-email-josh.coombs@gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Sat,  5 Jan 2013 10:38:40 +0800
+Subject: [v3 PATCH 0/9] watchdog/at91sam9_wdt: Convert to use the new framework
+Message-ID: <1357353529-20901-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the Orion WDT driver is built as a module, an opps occurs during clk lookup when calling mvebu_clk_gating_get_src().  Remove the inappropriate __init tag so the function is available for modules after kernel init.
+Hi, All
 
-Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
----
-This is a fix for a bug and is intended for 3.8-rc
+The purpose of the patch series is to convert to use the watchdog framework,
+It is tested on at91sam9g25ek.
 
- drivers/clk/mvebu/clk-gating-ctrl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It is based on v3.8-rc2 + Fabio Porcedda's add timeout-sec property binding
 
-diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
-index c6d3c26..8fa5408 100644
---- a/drivers/clk/mvebu/clk-gating-ctrl.c
-+++ b/drivers/clk/mvebu/clk-gating-ctrl.c
-@@ -32,7 +32,7 @@ struct mvebu_soc_descr {
- 
- #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
- 
--static struct clk __init *mvebu_clk_gating_get_src(
-+static struct clk *mvebu_clk_gating_get_src(
- 	struct of_phandle_args *clkspec, void *data)
- {
- 	struct mvebu_gating_ctrl *ctrl = (struct mvebu_gating_ctrl *)data;
+ChangeLog 
+v3:
+	1./ The helper function 'watchdog_is_open' is moved to
+	    include/linux/watchdog.h, as it can be useful for other watchdog
+	    drivers as well.
+
+	2./ Remove '__init' annotation from the function 'at91wdt_probe',
+	    since the driver becomes hot-plug aware now.
+	
+	3./ Rebase on v3.8-rc2
+
+v2:
+	1./ Remove the patches to add devive tree support which Fabio Porcedda
+	   has done and submitted.
+
+	2./ Replace __raw_readl, __raw_writel with readl_relaxed, writel_relaxed.
+
+	3./ Rebase on v3.7-rc8.
+
+Best Regards
+Wenyou Yang
+
+Wenyou Yang (9):
+  watchdog: add the function watchdog_is_open
+  watchdog/at91sam9_wdt: Remove at91wdt_private and add at91wdt_drvdata
+    struct
+  watchdog/at91sam9_wdt: Convert to use the watchdog framework
+  watchdog/at91sam9_wdt: Adjust the options of watchdog_info
+  watchdog/at91sam9_wdt: Add nowayout helpers to Watchdog Timer Driver
+    Kernel API
+  watchdog/at91sam9_wdt: Remove the __initdata of at91wdt_wdd
+  watchdog/at91sam9_wdt: Use module_platform_driver()
+  ARM: dts: add the watchdog nodes for at91sam9x5 and at91sam9n12 SoC
+  ARM: dts: add the watchdog nodes for at91sam9g25ek boards
+
+ arch/arm/boot/dts/at91sam9n12.dtsi  |    6 +
+ arch/arm/boot/dts/at91sam9x5.dtsi   |    6 +
+ arch/arm/boot/dts/at91sam9x5ek.dtsi |    4 +
+ drivers/watchdog/at91sam9_wdt.c     |  287 ++++++++++++++---------------------
+ include/linux/watchdog.h            |    8 +
+ 5 files changed, 137 insertions(+), 174 deletions(-)
+
 -- 
-1.8.0.2
+1.7.9.5
