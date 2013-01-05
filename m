@@ -1,40 +1,38 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 5 Jan 2013 21:44:22 +1100
-Subject: [PATCH 0/9] crypto: omap-sham - Updates & New Functionality
-In-Reply-To: <1356109449-11624-1-git-send-email-mgreer@animalcreek.com>
-References: <1356109449-11624-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <20130105104421.GC28670@gondor.apana.org.au>
+From: ulrich.hecht@gmail.com (Ulrich Hecht)
+Date: Sat,  5 Jan 2013 14:05:23 +0100
+Subject: [PATCH] ARM: smp: return from ipi_cpu_stop()
+Message-ID: <1357391123-759-1-git-send-email-ulrich.hecht@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 21, 2012 at 10:04:00AM -0700, Mark A. Greer wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
-> 
-> [This supersedes the omap-sham driver patches sent in the
->  "crypto: omap-sham updates" series sent a few weeks ago.]
-> 
-> This patch series does several things to the omap-sham crypto
-> driver including:
->  - converting to use pm_runtime
->  - adding suspend/resume support
->  - converting to use dmaengine API
->  - adding device tree support
->  - adding OMAP4/AM33XX support
->  - adding SHA224 and SHA256 support
->  - some minor cleanups
-> 
-> The patches are based on the current k.o. kernel, plus:
->  - the ARM hwmod, etc patches from
->    "[PATCH 00/15] OMAP SHAM & AES Crypto Updates"
->    (http://marc.info/?l=linux-omap&m=135610732120447&w=2)
->  - the EDMA dmaengine patches submitted by Matt Porter
->    "[RFC PATCH v3 00/16] DMA Engine support for AM33XX]"
->    (https://lkml.org/lkml/2012/10/18/256)
->  - some misc patches required by the EDMA patches
->  - a hack to fix the compilation error that the current k.o. kernel has
+ipi_cpu_stop() is supposed to mark a CPU offline, but it's the job of the
+idle thread to actually shut it down. It seems, however, that the idle
+thread doesn't get a chance to run because ipi_cpu_stop() disables all
+interrupts and does not return.  This keeps the platform-specific shutdown
+code from being executed, which causes big trouble when kexec'ing an SMP
+kernel.
 
-All applied.  Thaks a lot!
+This patch fixes the issue by removing the endless loop. Tested on a KZM9G
+board.
+
+Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+---
+ arch/arm/kernel/smp.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 84f4cbf..e72b025 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -571,9 +571,6 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 
+ 	local_fiq_disable();
+ 	local_irq_disable();
+-
+-	while (1)
+-		cpu_relax();
+ }
+ 
+ /*
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.7.7
