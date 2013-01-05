@@ -1,35 +1,33 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Sat, 5 Jan 2013 08:14:48 +0530
-Subject: [PATCH 2/7] clk: tegra: Use common of_clk_init() function
-In-Reply-To: <50E703A8.1080808@wwwdotorg.org>
-References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
- <1357282858-2112-2-git-send-email-pgaikwad@nvidia.com>
- <50E703A8.1080808@wwwdotorg.org>
-Message-ID: <50E793A0.4020702@nvidia.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 4 Jan 2013 18:46:03 -0800
+Subject: [GIT PULL] nomadik fixes for v3.8
+In-Reply-To: <CACRpkdb4yM_j9U05z0+bg1XBoqEsGY0xS-znkEUd15UfTP79Cw@mail.gmail.com>
+References: <CACRpkdb4yM_j9U05z0+bg1XBoqEsGY0xS-znkEUd15UfTP79Cw@mail.gmail.com>
+Message-ID: <CAOesGMiPt7Q=ANzm1W01mHpcJQHnAu6s3-u3E1jtMpik4mBxAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 January 2013 10:00 PM, Stephen Warren wrote:
-> On 01/04/2013 12:00 AM, Prashant Gaikwad wrote:
->> Use common of_clk_init() function for clocks initialization.
->>   drivers/clk/tegra/clk-tegra20.c |    3 ++-
->>   drivers/clk/tegra/clk-tegra30.c |    3 ++-
-> Oh, so this series is written assuming that the Tegra CCF rework is
-> already applied then? That makes the dependencies quite painful, since I
-> think we'll end up with the following order being needed:
+On Thu, Jan 3, 2013 at 3:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Hi ARM SoC folks,
 >
-> 1) clk: Add composite clock type
->     -> This would usually go through the clk tree.
-> 2) The Tegra CCF rework series
->     -> This must go through the Tegra tree due to lots of dependencies
->     and merge conflicts with other Tegra patches.
-> 3) This series
->     -> This would usually go through the clk tree.
+> could you please pull these two fixes into ARM SoC for the v3.8-rc
+> series, so Nomadik compiles and boots again...
 >
-> Is it possible to re-order the dependencies as (1) (3) (2), so that Mike
-> can apply (1) and (3) to the clock tree, then I can use the clk tree as
-> the basis for a branch in the Tegra tree to apply (2) and all the other
-> Tegra patches that will conflict with (2)?
+> Thanks!
+>
+> Linus Walleij
+>
+>
+> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+>
+>   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+> tags/nomadik-fixes-for-arm-soc
 
-If Mike approves the concept and implementation in (1) and (3) then I 
-will repost (2) and (3) with dependencies re-ordered.
+Pulled, thanks
+
+
+-Olof
