@@ -1,52 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Jan 2013 15:34:02 +0000
-Subject: [PATCH] ARM: smp: return from ipi_cpu_stop()
-In-Reply-To: <CAO3366w39Cm0qZ1vtH+f9AZjbzoa0ycMfFJuWP5L4+j=6mq1PQ@mail.gmail.com>
-References: <1357391123-759-1-git-send-email-ulrich.hecht@gmail.com>
- <20130105140958.GW2631@n2100.arm.linux.org.uk>
- <CAO3366w39Cm0qZ1vtH+f9AZjbzoa0ycMfFJuWP5L4+j=6mq1PQ@mail.gmail.com>
-Message-ID: <20130105153402.GX2631@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 5 Jan 2013 07:35:25 -0800
+Subject: [PATCH 0/2] Add GPIO driver for Allwinner SoCs
+In-Reply-To: <1357317909-12458-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1357317909-12458-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAOesGMiTZvLJ6cXwMFsFc6pBGoLUEkV+WMrDOqqCcs_TEnTtUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 05, 2013 at 03:49:33PM +0100, Ulrich Hecht wrote:
-> On Sat, Jan 5, 2013 at 3:09 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Plus, there's no guarantee what so ever that anything will happen in the
-> > idle loop; this is not the _normal_ CPU shutdown path, this is the "oh
-> > fsck, we need to stop all other CPUs because we panic'd" handler.
-> 
-> So who's job is it then to call cpu_die()? Because that's what doesn't
-> happen and leaves the second core spinning, wrecking the kexec'd
-> kernel.
+Hi,
 
-There's been discussions about how kexec should be handled, and it's
-still up in the air - mainly because this area has been left totally
-open architecturally about how it should be handled.  Many platforms
-don't provide any support what so ever for dealing with the secondary
-CPUs once they've been woken up, which makes the problem of what to
-do with a running CPU across a kexec event extremely difficult to
-deal with.
+On Fri, Jan 4, 2013 at 8:45 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> This patch adds support for the GPIOs for the Allwinner SoCs supported so
+> far.
+>
+> It comes on top of my previous pinctrl patchset, and has been tested on a
+> A13-Olinuxino from Olimex.
+>
+> Thanks,
+> Maxime
+>
+> Maxime Ripard (2):
+>   ARM: sunxi: gpio: Add Allwinner SoCs GPIO drivers
+>   ARM: sunxi: Add the GPIOs node to the device tree
+>
+>  .../devicetree/bindings/gpio/gpio-sunxi.txt        |   77 ++++++++++
+>  arch/arm/boot/dts/sun5i-a13.dtsi                   |   51 +++++++
+>  drivers/gpio/Kconfig                               |    6 +
+>  drivers/gpio/Makefile                              |    1 +
+>  drivers/gpio/gpio-sunxi.c                          |  150 ++++++++++++++++++++
+>  drivers/pinctrl/pinctrl-sunxi.c                    |  106 ++++++++++++++
+>  drivers/pinctrl/pinctrl-sunxi.h                    |    6 +-
 
-There's an idea to call disable_nonboot_cpus() from machine_shutdown(),
-but this results in that function being called multiple times by some
-paths, such as the restart path.
+I haven't looked closely at the patch yet, but this is a case where it
+makes sense to merge the gpio/pinctrl patch through Linus/Grant's
+tree, and merge the dtsi update through arm-soc -- while you need
+both, nothing is broken by having just one or the other, so taking the
+separate merge paths are fine.
 
-This suffers from the problem that machine_restart() is called from
-non-process contexts, which means that sleeping in _cpu_down() (called
-via disable_nonboot_cpus()) really isn't allowable.
+Linus, Grant, sound ok to you?
 
-It's really a bitch of a problem; if we had somewhere to put the CPUs
-(eg, back into the boot loader) for every platform, then we wouldn't
-have a problem - unfortunately we don't know if we still have a boot
-loader around once the kernel is running.
-
-But alas, such foresight is rather lacking.
-
-All the time that we have random different platforms going off and doing
-totally random different things, we're going to constantly hit these
-kinds of problems.  I don't think it's going to be long before these
-cause such a problem that we basically say "no, we're not going to make
-it work on platform X because platform X is just being stupid.  Get
-with the program, work with the community and design something sensible
-instead."
+-Olof
