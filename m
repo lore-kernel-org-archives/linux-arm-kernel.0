@@ -1,26 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Jan 2013 10:36:27 +0000
-Subject: [PATCH 1/2] cpuhotplug/nohz: Remove offline cpus from
- nohz-idle state
-In-Reply-To: <1357268318-7993-1-git-send-email-vatsa@codeaurora.org>
-References: <1357268318-7993-1-git-send-email-vatsa@codeaurora.org>
-Message-ID: <20130105103627.GU2631@n2100.arm.linux.org.uk>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sat, 5 Jan 2013 21:44:22 +1100
+Subject: [PATCH 0/9] crypto: omap-sham - Updates & New Functionality
+In-Reply-To: <1356109449-11624-1-git-send-email-mgreer@animalcreek.com>
+References: <1356109449-11624-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <20130105104421.GC28670@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 06:58:38PM -0800, Srivatsa Vaddagiri wrote:
-> I also think that the
-> wait_for_completion() based wait in ARM's __cpu_die() can be replaced with a
-> busy-loop based one, as the wait there in general should be terminated within
-> few cycles.
+On Fri, Dec 21, 2012 at 10:04:00AM -0700, Mark A. Greer wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> 
+> [This supersedes the omap-sham driver patches sent in the
+>  "crypto: omap-sham updates" series sent a few weeks ago.]
+> 
+> This patch series does several things to the omap-sham crypto
+> driver including:
+>  - converting to use pm_runtime
+>  - adding suspend/resume support
+>  - converting to use dmaengine API
+>  - adding device tree support
+>  - adding OMAP4/AM33XX support
+>  - adding SHA224 and SHA256 support
+>  - some minor cleanups
+> 
+> The patches are based on the current k.o. kernel, plus:
+>  - the ARM hwmod, etc patches from
+>    "[PATCH 00/15] OMAP SHAM & AES Crypto Updates"
+>    (http://marc.info/?l=linux-omap&m=135610732120447&w=2)
+>  - the EDMA dmaengine patches submitted by Matt Porter
+>    "[RFC PATCH v3 00/16] DMA Engine support for AM33XX]"
+>    (https://lkml.org/lkml/2012/10/18/256)
+>  - some misc patches required by the EDMA patches
+>  - a hack to fix the compilation error that the current k.o. kernel has
 
-Why open-code this stuff when we have infrastructure already in the kernel
-for waiting for stuff to happen?  I chose to use the standard infrastructure
-because its better tested, and avoids having to think about whether we need
-CPU barriers and such like to ensure that updates are seen in a timely
-manner.
-
-My stance on a lot of this idle/cpu dying code is that much of it can
-probably be cleaned up and merged into a single common implementation -
-in which case the use of standard infrastructure for things like waiting
-for other CPUs do stuff is even more justified.
+All applied.  Thaks a lot!
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
