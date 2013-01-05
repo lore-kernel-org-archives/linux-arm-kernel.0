@@ -1,57 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 04 Jan 2013 17:36:53 -0600
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 5 Jan 2013 09:07:48 +0800
 Subject: [PATCH] ARM: imx: Do not select some errata that depends on
  !ARCH_MULTIPLATFORM
-In-Reply-To: <1357338447-6798-1-git-send-email-festevam@gmail.com>
+In-Reply-To: <50E76795.2000201@gmail.com>
 References: <1357338447-6798-1-git-send-email-festevam@gmail.com>
-Message-ID: <50E76795.2000201@gmail.com>
+ <50E76795.2000201@gmail.com>
+Message-ID: <20130105010743.GG1887@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2013 04:27 PM, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Jan 04, 2013 at 05:36:53PM -0600, Rob Herring wrote:
+> On 01/04/2013 04:27 PM, Fabio Estevam wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > Since commit 62e4d357a (ARM: 7609/1: disable errata work-arounds which access 
+> > secure registers) ARM_ERRATA_743622/751472 depends on !ARCH_MULTIPLATFORM.
+> > 
+> > Since imx has been converted to multiplatform, the following warning happens:
+> > 
+> > $ make imx_v6_v7_defconfig
+> > warning: (SOC_IMX6Q && ARCH_TEGRA_2x_SOC && ARCH_TEGRA_3x_SOC) selects
+> > ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 &&
+> > !ARCH_MULTIPLATFORM)
+> > warning: (SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_743622
+> > which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
+> > warning: (SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_743622
+> > which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
+> > warning: (SOC_IMX6Q && ARCH_TEGRA_2x_SOC && ARCH_TEGRA_3x_SOC) selects
+> > ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 &&
+> > !ARCH_MULTIPLATFORM)
+> > 
+> > Recommended approach is to remove ARM_ERRATA_743622/751472 from being selected
+> > by SOC_IMX6Q and apply such workarounds into the bootloader.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Since commit 62e4d357a (ARM: 7609/1: disable errata work-arounds which access 
-> secure registers) ARM_ERRATA_743622/751472 depends on !ARCH_MULTIPLATFORM.
+> Broken and
 > 
-> Since imx has been converted to multiplatform, the following warning happens:
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 > 
-> $ make imx_v6_v7_defconfig
-> warning: (SOC_IMX6Q && ARCH_TEGRA_2x_SOC && ARCH_TEGRA_3x_SOC) selects
-> ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 &&
-> !ARCH_MULTIPLATFORM)
-> warning: (SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_743622
-> which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
-> warning: (SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_743622
-> which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
-> warning: (SOC_IMX6Q && ARCH_TEGRA_2x_SOC && ARCH_TEGRA_3x_SOC) selects
-> ARM_ERRATA_751472 which has unmet direct dependencies (CPU_V7 &&
-> !ARCH_MULTIPLATFORM)
-> 
-> Recommended approach is to remove ARM_ERRATA_743622/751472 from being selected
-> by SOC_IMX6Q and apply such workarounds into the bootloader.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+I think the patch should be put into Russell's the patch system to
+have it go through the same branch that 7609/1 goes.
 
-Broken and
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-> ---
->  arch/arm/mach-imx/Kconfig |    2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 1ad0d76..3e628fd 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -841,8 +841,6 @@ config SOC_IMX6Q
->  	select ARCH_HAS_CPUFREQ
->  	select ARCH_HAS_OPP
->  	select ARM_CPU_SUSPEND if PM
-> -	select ARM_ERRATA_743622
-> -	select ARM_ERRATA_751472
->  	select ARM_ERRATA_754322
->  	select ARM_ERRATA_764369 if SMP
->  	select ARM_ERRATA_775420
-> 
+Shawn
