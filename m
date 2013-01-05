@@ -1,36 +1,35 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Sat,  5 Jan 2013 10:38:49 +0800
-Subject: [v3 PATCH 9/9] ARM: dts: add the watchdog nodes for at91sam9g25ek
- boards
-In-Reply-To: <1357353529-20901-1-git-send-email-wenyou.yang@atmel.com>
-References: <1357353529-20901-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1357353529-20901-10-git-send-email-wenyou.yang@atmel.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Sat, 5 Jan 2013 08:14:48 +0530
+Subject: [PATCH 2/7] clk: tegra: Use common of_clk_init() function
+In-Reply-To: <50E703A8.1080808@wwwdotorg.org>
+References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
+ <1357282858-2112-2-git-send-email-pgaikwad@nvidia.com>
+ <50E703A8.1080808@wwwdotorg.org>
+Message-ID: <50E793A0.4020702@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on the at91sam9g25ek boards
+On Friday 04 January 2013 10:00 PM, Stephen Warren wrote:
+> On 01/04/2013 12:00 AM, Prashant Gaikwad wrote:
+>> Use common of_clk_init() function for clocks initialization.
+>>   drivers/clk/tegra/clk-tegra20.c |    3 ++-
+>>   drivers/clk/tegra/clk-tegra30.c |    3 ++-
+> Oh, so this series is written assuming that the Tegra CCF rework is
+> already applied then? That makes the dependencies quite painful, since I
+> think we'll end up with the following order being needed:
+>
+> 1) clk: Add composite clock type
+>     -> This would usually go through the clk tree.
+> 2) The Tegra CCF rework series
+>     -> This must go through the Tegra tree due to lots of dependencies
+>     and merge conflicts with other Tegra patches.
+> 3) This series
+>     -> This would usually go through the clk tree.
+>
+> Is it possible to re-order the dependencies as (1) (3) (2), so that Mike
+> can apply (1) and (3) to the clock tree, then I can use the clk tree as
+> the basis for a branch in the Tegra tree to apply (2) and all the other
+> Tegra patches that will conflict with (2)?
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: linux at arm.linux.org.uk
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/at91sam9x5ek.dtsi |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-index 8a7cf1d..afddf75 100644
---- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -69,6 +69,10 @@
- 				status = "okay";
- 			};
- 
-+			watchdog at fffffe40 {
-+				status = "okay";
-+			};
-+
- 			pinctrl at fffff400 {
- 				mmc0 {
- 					pinctrl_board_mmc0: mmc0-board {
--- 
-1.7.9.5
+If Mike approves the concept and implementation in (1) and (3) then I 
+will repost (2) and (3) with dependencies re-ordered.
