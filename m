@@ -1,38 +1,38 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Sat,  5 Jan 2013 10:38:41 +0800
-Subject: [v3 PATCH 1/9] watchdog: add the function watchdog_is_open
+Date: Sat,  5 Jan 2013 10:38:44 +0800
+Subject: [v3 PATCH 4/9] watchdog/at91sam9_wdt: Adjust the options of
+ watchdog_info
 In-Reply-To: <1357353529-20901-1-git-send-email-wenyou.yang@atmel.com>
 References: <1357353529-20901-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1357353529-20901-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1357353529-20901-5-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the function watchdog_is_open to check whether or not
-the /dev/watchdog? is opened
+Since the Watchdog Timer Mode Register can be only written only once,
+so the watchdog_info shall not support WDIOF_SETTIMEOUT
+and WDIOF_MAGICCLOSE options, remove them.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Cc: wim at iguana.be
+Cc: linux-watchdog at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
 ---
- include/linux/watchdog.h |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/watchdog/at91sam9_wdt.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-index e40cc2b..7ea4465 100644
---- a/include/linux/watchdog.h
-+++ b/include/linux/watchdog.h
-@@ -111,6 +111,14 @@ static inline bool watchdog_active(struct watchdog_device *wdd)
- 	return test_bit(WDOG_ACTIVE, &wdd->status);
- }
+diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+index febd028..a3d1a09 100644
+--- a/drivers/watchdog/at91sam9_wdt.c
++++ b/drivers/watchdog/at91sam9_wdt.c
+@@ -151,8 +151,7 @@ static int at91wdt_enable(struct watchdog_device *wddev, unsigned int timeout)
  
-+/* Use the following function to check whether or not
-+ * the /dev/watchdog? is opened
-+ */
-+static inline bool watchdog_is_open(struct watchdog_device *wddev)
-+{
-+	return test_bit(WDOG_DEV_OPEN, &wddev->status);
-+}
-+
- /* Use the following function to set the nowayout feature */
- static inline void watchdog_set_nowayout(struct watchdog_device *wdd, bool nowayout)
- {
+ static const struct watchdog_info at91_wdt_info = {
+ 	.identity	= DRV_NAME,
+-	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
+-						WDIOF_MAGICCLOSE,
++	.options	= WDIOF_KEEPALIVEPING,
+ };
+ 
+ static int at91wdt_start(struct watchdog_device *wddev)
 -- 
 1.7.9.5
