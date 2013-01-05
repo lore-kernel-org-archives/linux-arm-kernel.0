@@ -1,37 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 4 Jan 2013 19:03:45 +0100
-Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
-In-Reply-To: <50E71356.3030203@lunn.ch>
-References: <1357315498-4570-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <50E710CB.8070007@lunn.ch> <20130104183139.20492204@skate>
- <50E71356.3030203@lunn.ch>
-Message-ID: <20130104190345.460151d1@skate>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 5 Jan 2013 10:36:27 +0000
+Subject: [PATCH 1/2] cpuhotplug/nohz: Remove offline cpus from
+ nohz-idle state
+In-Reply-To: <1357268318-7993-1-git-send-email-vatsa@codeaurora.org>
+References: <1357268318-7993-1-git-send-email-vatsa@codeaurora.org>
+Message-ID: <20130105103627.GU2631@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+On Thu, Jan 03, 2013 at 06:58:38PM -0800, Srivatsa Vaddagiri wrote:
+> I also think that the
+> wait_for_completion() based wait in ARM's __cpu_die() can be replaced with a
+> busy-loop based one, as the wait there in general should be terminated within
+> few cycles.
 
-On Fri, 04 Jan 2013 18:37:26 +0100, Andrew Lunn wrote:
+Why open-code this stuff when we have infrastructure already in the kernel
+for waiting for stuff to happen?  I chose to use the standard infrastructure
+because its better tested, and avoids having to think about whether we need
+CPU barriers and such like to ensure that updates are seen in a timely
+manner.
 
-> It would be nice to have a sample size bigger than two.
-
-Indeed.
-
-> Anybody else have a OpenBlocks AX3-4 and can report if it works or not?
-
-At least Gr?gory has one.
-
-> Thomas, could you swap out the RAM module you have for a known good one?
-> Can you test the RAM module in some other board you know works?
-
-Unfortunately, I don't see off-hand which other board I have in which I
-could test this RAM module, nor if I have a compatible RAM module to
-test things with.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+My stance on a lot of this idle/cpu dying code is that much of it can
+probably be cleaned up and merged into a single common implementation -
+in which case the use of standard infrastructure for things like waiting
+for other CPUs do stuff is even more justified.
