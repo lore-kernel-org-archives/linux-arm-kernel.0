@@ -1,45 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 5 Jan 2013 07:35:25 -0800
-Subject: [PATCH 0/2] Add GPIO driver for Allwinner SoCs
-In-Reply-To: <1357317909-12458-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1357317909-12458-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAOesGMiTZvLJ6cXwMFsFc6pBGoLUEkV+WMrDOqqCcs_TEnTtUw@mail.gmail.com>
+Date: Sat,  5 Jan 2013 08:37:33 -0800
+Subject: [PATCH] ARM: clps711x: Fix bad merge of clockevents setup
+Message-ID: <1357403853-29620-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+I mismerged a previous branch from Alexander, and accidentally left
+in ARCH_USES_GETTIMEOFFSET. Remove it.
 
-On Fri, Jan 4, 2013 at 8:45 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> This patch adds support for the GPIOs for the Allwinner SoCs supported so
-> far.
->
-> It comes on top of my previous pinctrl patchset, and has been tested on a
-> A13-Olinuxino from Olimex.
->
-> Thanks,
-> Maxime
->
-> Maxime Ripard (2):
->   ARM: sunxi: gpio: Add Allwinner SoCs GPIO drivers
->   ARM: sunxi: Add the GPIOs node to the device tree
->
->  .../devicetree/bindings/gpio/gpio-sunxi.txt        |   77 ++++++++++
->  arch/arm/boot/dts/sun5i-a13.dtsi                   |   51 +++++++
->  drivers/gpio/Kconfig                               |    6 +
->  drivers/gpio/Makefile                              |    1 +
->  drivers/gpio/gpio-sunxi.c                          |  150 ++++++++++++++++++++
->  drivers/pinctrl/pinctrl-sunxi.c                    |  106 ++++++++++++++
->  drivers/pinctrl/pinctrl-sunxi.h                    |    6 +-
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Cc: Alexander Shiyan <shc_work@mail.ru>
+---
 
-I haven't looked closely at the patch yet, but this is a case where it
-makes sense to merge the gpio/pinctrl patch through Linus/Grant's
-tree, and merge the dtsi update through arm-soc -- while you need
-both, nothing is broken by having just one or the other, so taking the
-separate merge paths are fine.
+I have applied this to the fixes branch and will include in the next
+upstream pull request.
 
-Linus, Grant, sound ok to you?
+ arch/arm/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
--Olof
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f95ba14..ab864d9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -371,7 +371,6 @@ config ARCH_CNS3XXX
+ config ARCH_CLPS711X
+ 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select ARCH_USES_GETTIMEOFFSET
+ 	select AUTO_ZRELADDR
+ 	select CLKDEV_LOOKUP
+ 	select COMMON_CLK
+-- 
+1.7.10.1.488.g05fbf7a
