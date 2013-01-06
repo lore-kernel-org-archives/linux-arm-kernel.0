@@ -1,49 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 6 Jan 2013 16:22:00 +0000
-Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
-In-Reply-To: <50E5E967.3020805@wwwdotorg.org>
-References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
- <50E4C9C6.20609@codeaurora.org>
- <20130103120259.GB5193@mudshark.cambridge.arm.com>
- <20130103122100.GN2631@n2100.arm.linux.org.uk>
- <50E5E967.3020805@wwwdotorg.org>
-Message-ID: <20130106162200.GC11025@mudshark.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sun, 06 Jan 2013 17:23:26 +0100
+Subject: [PATCH 1/1] ARM: ux500:mach-ux500/cpuidle.c spinlock dis-matching
+In-Reply-To: <CAKvkGKdoWxmnRbNvn_SikRhzsyyzqEC99XtSM9ZeaVGjEA_Ydw@mail.gmail.com>
+References: <CAKvkGKdoWxmnRbNvn_SikRhzsyyzqEC99XtSM9ZeaVGjEA_Ydw@mail.gmail.com>
+Message-ID: <50E9A4FE.6090807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 08:26:15PM +0000, Stephen Warren wrote:
-> On 01/03/2013 05:21 AM, Russell King - ARM Linux wrote:
-> > On Thu, Jan 03, 2013 at 12:02:59PM +0000, Will Deacon wrote:
-> >> You need the smp_send_stop call in order to send the cpu_kill (looks like
-> >> tegra needs die and then kill). So you really need hotplug support as well
-> >> as suspend for this to do much (if not, the secondaries end up spinning
-> >> with interrupts disabled which is probably the best we can do anyway).
-> >>
-> >> We could add SUSPEND as a KEXEC dependency if SMP (we already have HOTPLUG
-> >> there) if you like?
-> > 
-> > Or we could look into bringing in the code to do this when KEXEC is
-> > enabled - which would mean an amount of restructuring of the Kconfig
-> > files.
+On 12/28/2012 08:06 AM, steve.zhan wrote:
+> Hi Daniel,
+
+Hi Steve,
+
+sorry I missed your email.
+
 > 
-> I'm not sure if any of this thread means we should hold off on this
-> patch, or just that the Kconfig could/should be enhanced later?
+>        I think we must unlock the master spinlock even
+> prcmu_gic_decouple function now always return 0.
+>        Could you give some infos about this?
 
-Well, Russell's suggestion looked easy enough to have a crack out so you
-could always post a series implementing it along with this patch.
+I agree, that would be cleaner.
 
-> One thing I did just notice with my patch: disable_nonboot_cpus() ends
-> up being called twice for the poweroff path:
+AFAICS, your patch does not solve the problem because 'recouple' will be
+false if prcmu_gic_decouple fails, so the lock will never be release.
+
+That will be simpler to do:
+
+if (prcmu_gic_decouple()) {
+	spin_unlock(&master);
+	goto out;
+}
+
+no ?
+
+> Thanks.
 > 
-> [   30.461847] Disabling non-boot CPUs ...
-> [   30.478797] CPU1: shutdown
-> [   30.492104] Power down.
-> [   30.494578] Disabling non-boot CPUs ...
+> diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
+> index b54884bd..b0759ce 100644
+> --- a/arch/arm/mach-ux500/cpuidle.c
+> +++ b/arch/arm/mach-ux500/cpuidle.c
+> @@ -29,6 +29,7 @@ static inline int ux500_enter_idle(struct cpuidle_device *dev,
+>  {
+>         int this_cpu = smp_processor_id();
+>         bool recouple = false;
+> +       bool locked = false;
 > 
-> Is this worth worrying about?
+>         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
+> 
+> @@ -39,6 +40,8 @@ static inline int ux500_enter_idle(struct cpuidle_device *dev,
+>                 if (!spin_trylock(&master_lock))
+>                         goto wfi;
+> 
+> +               locked = true;
+> +
+>                 /* decouple the gic from the A9 cores */
+>                 if (prcmu_gic_decouple())
+>                         goto out;
+> @@ -76,7 +79,7 @@ static inline int ux500_enter_idle(struct cpuidle_device *dev,
+>                 /* When we switch to retention, the prcmu is in charge
+>                  * of recoupling the gic automatically */
+>                 recouple = false;
+> -
+> +               locked = false;
+>                 spin_unlock(&master_lock);
+>         }
+>  wfi:
+> @@ -86,7 +89,8 @@ out:
+> 
+>         if (recouple) {
+>                 prcmu_gic_recouple();
+> -               spin_unlock(&master_lock);
+> +               if (locked)
+> +                       spin_unlock(&master_lock);
+>         }
+> 
+>         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &this_cpu);
+> 
+> 
+> 
+> Steve Zhan
+> 
 
-It's harmless but it's also pretty horrible. Unfortunately, I don't see
-what we can do about it: it's a direct side-effect of generic code calling
-disable_nonboot_cpus for poweroff and not for kexec.
 
-Will
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
