@@ -1,48 +1,39 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 06 Jan 2013 15:00:25 +0100
-Subject: [PATCH v2] ARM: pxa27x: fix ac97 controller warm reset code
-References: <1357223976-9097-1-git-send-email-mikedunn@newsguy.com>
- <50E67BAD.7070702@compulab.co.il> <50E6AF88.8050800@compulab.co.il>
- <87obh4it6n.fsf@free.fr> <50E92385.5020107@compulab.co.il>
-Message-ID: <87k3rqbedi.fsf@free.fr>
+Date: Sun, 06 Jan 2013 15:07:37 +0100
+Subject: [PATCH] ARM: PXA27x: fix workaround for AC97 reset
+In-Reply-To: <1357470761-14363-1-git-send-email-grinberg@compulab.co.il> (Igor
+ Grinberg's message of "Sun, 6 Jan 2013 13:12:41 +0200")
+References: <1357470761-14363-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <87fw2ebe1i.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Igor Grinberg <grinberg@compulab.co.il> writes:
 
-> On 01/04/13 22:34, Robert Jarzmik wrote:
->> This is not the original behaviour before commit
->> fb1bf8cd13bfa7ed0364ab0d82f717fc020d35f6.
->> 
->> The original behaviour was :
->>  - on = 1 => set GPIO as output GPIO, set to 1
->>  - on = 0 => set GPIO to the alternate function ac97reset, driven by PXA2xx AC97
->>  IP.
->> 
->> If you don't set the alternate function, the GCR register usage for reset is
->> useless, isn't it ? So why do you set the GPIO as "input" with on == 0 ?
+> Fix the workaround to a hardware bug in the AC97 controller of PXA27x.
+> A bug in the controller's warm reset functionality requires that the MFP
+> used by the controller as the AC97_RESET_n line be temporarily
+> reconfigured as a GPIO (AF0) and manually held high for the duration of
+> the warm reset cycle.
 >
-> Well, I've made a quick patch for Mike to test if this works and
-> since it works I will submit a proper one.
-Mmm...
+> The workaround was broken long ago by commit fb1bf8cd
+> ([ARM] pxa: introduce processor specific pxa27x_assert_ac97reset()).
+> The commit above changed the original workaround code in a way that
+> changed the MFP to AF0 (GPIO), but forgot to drive the GPIO high output.
+> This way, the GPIO state was left input (and undriven) and only worked
+> for boards with external pullup on the line.
+>
+> Fix the above breakage by actually configurring the GPIO for output high
+> in case of reset assert and returning it to default state
+> (AF2 and GPDR - input) in case of reset deassert.
 
-> To your question about setting the direction,
-> I'd like us to be on a safe side and not drive the pin if AF is not GPIO.
-> Although it should not meter and changing the AF to ac97reset should do the job,
-> but just to be on the safe side, as I think GPDR/GPCR/GPSR settings are preserved
-> even if you change the AF to something other than GPIO.
-
-I think I was not clear enough.
-
-My point is that if you program the GPIO as input, then the PXA will not drive
-the pin anymore. If you have a resistor doing the "pullup", everything will work
-(as I assume is the case in your board). If not, the AC97 codec (wm9713 and
-co...) could have its reset line asserted (ie. #RESET line), and *this* bothers me.
-
-So changing the AC97 #RESET line to "GPIO input" is incorrect, and I don't agree
-with the patch.
+NAK.
+If you return GPIO95 to AF-input, the GPIO95 will be "KP_DKIN<2>", ie. you'll
+map a keyboard input to a AC97 reset.
+As I said in a mail before, don't put a AC97 reset line as an input pin, this is
+not a sensible patch.
 
 Cheers.
 
--- 
+--
 Robert
