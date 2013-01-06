@@ -1,47 +1,49 @@
-From: laurent.cans@gmail.com (Laurent CANS)
-Date: Sun, 6 Jan 2013 17:19:13 +0100
-Subject: [PATCH] Add apf51 basic support
-In-Reply-To: <20130103083534.GD2566@S2101-09.ap.freescale.net>
-References: <1355694591-7084-1-git-send-email-laurent.cans@gmail.com>
- <20121219203936.GG26326@pengutronix.de>
- <20130103083534.GD2566@S2101-09.ap.freescale.net>
-Message-ID: <CAA1eMkFXVy9ti6o7nVZNtrMm=-ymaZhEKxvPRzWj9Uqp=HDt=Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 6 Jan 2013 16:22:00 +0000
+Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
+In-Reply-To: <50E5E967.3020805@wwwdotorg.org>
+References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
+ <50E4C9C6.20609@codeaurora.org>
+ <20130103120259.GB5193@mudshark.cambridge.arm.com>
+ <20130103122100.GN2631@n2100.arm.linux.org.uk>
+ <50E5E967.3020805@wwwdotorg.org>
+Message-ID: <20130106162200.GC11025@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/3 Shawn Guo <shawn.guo@linaro.org>:
-> On Wed, Dec 19, 2012 at 09:39:36PM +0100, Sascha Hauer wrote:
->> On Sun, Dec 16, 2012 at 10:49:51PM +0100, Laurent Cans wrote:
->> > Signed-off-by: Laurent Cans <laurent.cans@gmail.com>
->> > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
->> > ---
->> > +   clocks {
->> > +           #address-cells = <1>;
->> > +           #size-cells = <0>;
->> > +
->> > +           ckih1 {
->> > +                   compatible = "fsl,imx-ckih1", "fixed-clock";
->> > +                   clock-frequency = <0>;
->> > +           };
->> > +
->> > +           osc {
->> > +                   compatible = "fsl,imx-osc", "fixed-clock";
->> > +                   clock-frequency = <33554432>;
->> > +           };
->>
->> These compatible properties shouldn't be necessary, right?
->>
-> Use node path instead?  But imx51 clock driver is already using
-> compatible property to identify the clocks.
->
-> Shawn
->
+On Thu, Jan 03, 2013 at 08:26:15PM +0000, Stephen Warren wrote:
+> On 01/03/2013 05:21 AM, Russell King - ARM Linux wrote:
+> > On Thu, Jan 03, 2013 at 12:02:59PM +0000, Will Deacon wrote:
+> >> You need the smp_send_stop call in order to send the cpu_kill (looks like
+> >> tegra needs die and then kill). So you really need hotplug support as well
+> >> as suspend for this to do much (if not, the secondaries end up spinning
+> >> with interrupts disabled which is probably the best we can do anyway).
+> >>
+> >> We could add SUSPEND as a KEXEC dependency if SMP (we already have HOTPLUG
+> >> there) if you like?
+> > 
+> > Or we could look into bringing in the code to do this when KEXEC is
+> > enabled - which would mean an amount of restructuring of the Kconfig
+> > files.
+> 
+> I'm not sure if any of this thread means we should hold off on this
+> patch, or just that the Kconfig could/should be enhanced later?
 
-Hi shawn,
+Well, Russell's suggestion looked easy enough to have a crack out so you
+could always post a series implementing it along with this patch.
 
-I don't understand your remarks.
+> One thing I did just notice with my patch: disable_nonboot_cpus() ends
+> up being called twice for the poweroff path:
+> 
+> [   30.461847] Disabling non-boot CPUs ...
+> [   30.478797] CPU1: shutdown
+> [   30.492104] Power down.
+> [   30.494578] Disabling non-boot CPUs ...
+> 
+> Is this worth worrying about?
 
-The method used to define clocks is incorrect? What is the recommended
-method to define clocks?
+It's harmless but it's also pretty horrible. Unfortunately, I don't see
+what we can do about it: it's a direct side-effect of generic code calling
+disable_nonboot_cpus for poweroff and not for kexec.
 
-Laurent
+Will
