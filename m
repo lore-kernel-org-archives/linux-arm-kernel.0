@@ -1,44 +1,47 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Sat, 5 Jan 2013 17:40:14 -0800
-Subject: [PATCH 2/2] ab8500: promote ab8500_fg probe before ab8500_btemp
- probe
-In-Reply-To: <1354558375-15110-2-git-send-email-rajanikanth.hv@linaro.org>
-References: <1354558375-15110-1-git-send-email-rajanikanth.hv@linaro.org>
- <1354558375-15110-2-git-send-email-rajanikanth.hv@linaro.org>
-Message-ID: <20130106014013.GA15410@lizard.sbx05280.losalca.wayport.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 6 Jan 2013 10:10:44 +0800
+Subject: [PATCH 2/6] ARM: dts: fix highbank cpu mpidr values
+In-Reply-To: <1356884107-30991-3-git-send-email-robherring2@gmail.com>
+References: <1356884107-30991-1-git-send-email-robherring2@gmail.com>
+ <1356884107-30991-3-git-send-email-robherring2@gmail.com>
+Message-ID: <20130106021041.GA22517@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 03, 2012 at 11:42:55PM +0530, Rajanikanth H.V wrote:
-> From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
+On Sun, Dec 30, 2012 at 10:15:03AM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> ab8500_fg driver prepares instance list of fuelgauge which is
-> required by btemp driver for battery identification. So make sure
-> that ab8500 fuelgauge list is ready before btemp driver starts.
+> With the addition of commit a0ae0240 (ARM: kernel: add device tree init
+> map function), the cpu reg values must match the cpu mpidr register or we'll
+> get warnings. For some reason, the CLUSTERID on highbank is 9, so the reg
+> value needs to be 0x90n to quiet the warnings.
 > 
-> for '3.7-rc5': of git://git.infradead.org/battery-2.6.git
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 > ---
-
-This one, and "1/2 v2" applied, thanks!
-
->  drivers/power/Makefile |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/highbank.dts |   16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
 > 
-> diff --git a/drivers/power/Makefile b/drivers/power/Makefile
-> index 696e3a9..070c73d 100644
-> --- a/drivers/power/Makefile
-> +++ b/drivers/power/Makefile
-> @@ -38,7 +38,7 @@ obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
->  obj-$(CONFIG_BATTERY_JZ4740)	+= jz4740-battery.o
->  obj-$(CONFIG_BATTERY_INTEL_MID)	+= intel_mid_battery.o
->  obj-$(CONFIG_BATTERY_RX51)	+= rx51_battery.o
-> -obj-$(CONFIG_AB8500_BM)		+= ab8500_bmdata.o ab8500_charger.o ab8500_btemp.o ab8500_fg.o abx500_chargalg.o
-> +obj-$(CONFIG_AB8500_BM)		+= ab8500_bmdata.o ab8500_charger.o ab8500_fg.o ab8500_btemp.o abx500_chargalg.o
->  obj-$(CONFIG_CHARGER_ISP1704)	+= isp1704_charger.o
->  obj-$(CONFIG_CHARGER_MAX8903)	+= max8903_charger.o
->  obj-$(CONFIG_CHARGER_TWL4030)	+= twl4030_charger.o
-> -- 
-> 1.7.10.4
+> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
+> index 81e0bfa..5927a8d 100644
+> --- a/arch/arm/boot/dts/highbank.dts
+> +++ b/arch/arm/boot/dts/highbank.dts
+> @@ -30,37 +30,37 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  
+> -		cpu at 0 {
+> +		cpu at 900 {
+
+Just a reminder - this change will break highbank cpufreq driver that
+Mark is submitting.
+
+Shawn
+
+>  			compatible = "arm,cortex-a9";
+>  			device_type = "cpu";
+> -			reg = <0>;
+> +			reg = <0x900>;
+>  			next-level-cache = <&L2>;
+>  			clocks = <&a9pll>;
+>  			clock-names = "cpu";
+>  		};
