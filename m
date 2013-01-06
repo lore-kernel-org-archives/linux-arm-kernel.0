@@ -1,35 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 6 Jan 2013 11:56:28 -0500
-Subject: [PATCH 0/2] arm: cache-l2x0: aurora: Various bug fixes
-In-Reply-To: <1355925387-9564-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1355925387-9564-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130106165628.GA5075@titan.lakedaemon.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sun,  6 Jan 2013 18:34:45 +0100
+Subject: [PATCH 0/3] Add support for gpio expander pca9505 used on Mirabox
+Message-ID: <1357493688-25061-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 19, 2012 at 02:56:25PM +0100, Gregory CLEMENT wrote:
-> Hi,
-> 
-> Now that we have more devices and more boards supported, bugs shows
-> up. Here are a couple of fixes that have been tested on Aramda XP
-> based boards such as DB-78460-BP and DB-MV784MP-GP, and on Armada 370
-> based boards such as DB-88F6710-BP-DDR3 and Mirabox. They are 3.8
-> materials.
-> 
-> Thanks,
-> 
-> Gregory CLEMENT (2):
->   arm: cache-l2x0: aurora: Invalidate during clean operation with WT
->     enable
->   arm: cache-l2x0: aurora: Use writel_relaxed instead of writel
-> 
->  arch/arm/mm/cache-l2x0.c |   31 +++++++++++++++++++------------
->  1 file changed, 19 insertions(+), 12 deletions(-)
+Hello,
 
-Series:
+This patch set adds the support for the i2c gpio expander pca9505 used
+on the JTAG/GPIO box which can be connected to the Mirabox.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+To be able to use the pca9505 I had to do several changes in the
+driver. Indeed, until now the pca953x driver accessed all the bank of
+a given register in a single command using only a 32 bits
+variable. This expander comes with 40 GPIOs which no more fits in a 32
+variable. This patch set makes the accesses to the registers more
+generic by relying on an array of u8 variables. This fits exactly the
+way the registers are represented in the hardware.
 
-thx,
+Once the per-bank representation was added, it was easier to introduce
+helpers to access to a single register of a bank instead of reading or
+writing all the banks for a given register. As the GPIO API allows
+only the accesses to a single GPIO at a time there was no point to read
+and write all the other banks. Hence it should help to decrease the
+latency especially for the pca9505.
 
-Jason.
+However as the block GPIO API from Roland Stigge is incoming I kept
+the helpers used to access all the banks in the same time. I had to
+make some modifications in the arguments that these functions
+received, so it will have a conflict here. Currently my patch set is
+based on v3.8-rc2, but I am willing to rebase onto gpio-for-next once
+the GPIO block will be merged into it.
+
+I also expected some tested-by as I was only able to test the pca9505
+and I didn't test the IRQ part.
+
+Thanks!
+
+Gregory CLEMENT (3):
+  gpio: pca953x: make the register access by GPIO bank
+  gpio: pca953x: add support for pca9505
+  arm: mvebu: enable gpio expander over i2c on Mirabox platform
+
+ arch/arm/boot/dts/armada-370-mirabox.dts |   10 ++
+ drivers/gpio/gpio-pca953x.c              |  235 +++++++++++++++++++-----------
+ 2 files changed, 160 insertions(+), 85 deletions(-)
+
+-- 
+1.7.9.5
