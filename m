@@ -1,26 +1,29 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Sun, 6 Jan 2013 16:23:07 +0800
-Subject: [PATCH 1/1] net: fec: report correct hardware stamping info to
- ethtool
-In-Reply-To: <20130106082023.GC2276@netboy.at.omicron.at>
-References: <1357436318-12425-1-git-send-email-Frank.Li@freescale.com>
- <20130106082023.GC2276@netboy.at.omicron.at>
-Message-ID: <CAHrpEqQt-BptyFwuArp9apG+WoL2d8WDkzVPnx9X6YeNJ3cjQw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 6 Jan 2013 09:35:21 +0100
+Subject: Reboot hangs on Kirkwood ns2 boards with 3.8-rc2
+In-Reply-To: <20130106033455.GH1357@kw.sim.vm.gnt>
+References: <20130106033455.GH1357@kw.sim.vm.gnt>
+Message-ID: <20130106083521.GO17242@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/6 Richard Cochran <richardcochran@gmail.com>:
-> Frank,
->
-> You have a bad email address as one of the recipients:
->
->    linux-arm-kernel at lists.infradead.or
->                                     ***
+On Sun, Jan 06, 2013 at 04:34:55AM +0100, Simon Guinot wrote:
+> Hi Andrew and Jason,
+> 
+> While testing 3.8-rc2 on the ns2 boards (DT based), I noticed that
+> reboot is not working. After issuing a reboot, the kernel hangs. No
+> error messages are displayed. Moreover, on my non-DT Kirkwood boards,
+> reboot is working as expected.
+> 
+> Am I the only one to experiment this issue ?
 
-Thank you very much
+Hi Simon
 
->
-> You also did that last time. Please take care and fix it.
->
-> Thanks,
-> Richard
+No you are not the only one. There is a patch available, authored by
+me, which is identical to what you found.
+
+We have been a bit slow recently pushing fixes into 3.8-rc, vacations,
+etc. I plan to spend some time today collecting the fixes together and
+sending them upstream.
+
+	Andrew
