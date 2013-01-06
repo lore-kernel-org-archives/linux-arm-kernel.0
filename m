@@ -1,47 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 6 Jan 2013 10:10:44 +0800
-Subject: [PATCH 2/6] ARM: dts: fix highbank cpu mpidr values
-In-Reply-To: <1356884107-30991-3-git-send-email-robherring2@gmail.com>
-References: <1356884107-30991-1-git-send-email-robherring2@gmail.com>
- <1356884107-30991-3-git-send-email-robherring2@gmail.com>
-Message-ID: <20130106021041.GA22517@S2101-09.ap.freescale.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 6 Jan 2013 10:52:17 +0800
+Subject: [PATCH 0/9] ARM: PRIMA2: bringup new CSR SiRFmarco SMP SoC
+In-Reply-To: <1356005639-23466-1-git-send-email-Barry.Song@csr.com>
+References: <1356005639-23466-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <CAGsJ_4wxJR0y1OXEjN1wYY2BTfPXe=WJ7QC8anQMLYuywT5B2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 30, 2012 at 10:15:03AM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> With the addition of commit a0ae0240 (ARM: kernel: add device tree init
-> map function), the cpu reg values must match the cpu mpidr register or we'll
-> get warnings. For some reason, the CLUSTERID on highbank is 9, so the reg
-> value needs to be 0x90n to quiet the warnings.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/boot/dts/highbank.dts |   16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-> index 81e0bfa..5927a8d 100644
-> --- a/arch/arm/boot/dts/highbank.dts
-> +++ b/arch/arm/boot/dts/highbank.dts
-> @@ -30,37 +30,37 @@
->  		#address-cells = <1>;
->  		#size-cells = <0>;
->  
-> -		cpu at 0 {
-> +		cpu at 900 {
+Hi Arnd,
+happy new year.
 
-Just a reminder - this change will break highbank cpufreq driver that
-Mark is submitting.
+2012/12/20, Barry Song <Barry.Song@csr.com>:
+> this patch series enables the new CSR SiRFmarco SMP SoC.
+>
+> change list:
+> 1. Marco has different OS timer hardware with Prima2, so add a new
+> timer-marco
+> 2. add platsmp.c, headsmp.S and hotplug.c for MPcore support
+> 3. some hardwares have changed, like rstc, so use of_compatible to branch
+> Prima2
+>    and Marco
+> 4. add initial .dtsi for Marco SoC and initial .dts for the EVB
+> 5. use GIC for Marco instead of Prima2's IRQ controller
+> 6. add DEBUG_LL uart ports for Prima2 and Marco debug ports
+>
+> Barry Song (9):
+>   ARM: PRIMA2: add CSR SiRFmarco device tree .dts
+>   ARM: PRIMA2: enable AUTO_ZRELADDR for SIRF in Kconfig
+>   ARM: PRIMA2: initialize l2x0 according to mach from DT
+>   ARM: PRIMA2: mv timer to timer-prima2 as we will add timer-marco
+>   ARM: PRIMA2: rstc: enable the support for Marco
+>   ARM: PRIMA2: rtciobg: it is also compatible with marco
+>   ARM: PRIMA2: irq: make prima2 irq can work even we enable GIC for
+>     Marco
+>   ARM: PRIMA2: add new SiRFmarco SMP SoC infrastructures
+>   ARM: PRIMA2: provide two DEBUG_LL ports for prima2 and marco
+>
 
-Shawn
+except those from Mark, would you kindly give more feedbacks about
+this series? after this, i'd like to send out a series about SiRF
+firmware based on trustzone.
 
->  			compatible = "arm,cortex-a9";
->  			device_type = "cpu";
-> -			reg = <0>;
-> +			reg = <0x900>;
->  			next-level-cache = <&L2>;
->  			clocks = <&a9pll>;
->  			clock-names = "cpu";
->  		};
+-barry
