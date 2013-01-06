@@ -1,90 +1,58 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 06 Jan 2013 17:23:26 +0100
-Subject: [PATCH 1/1] ARM: ux500:mach-ux500/cpuidle.c spinlock dis-matching
-In-Reply-To: <CAKvkGKdoWxmnRbNvn_SikRhzsyyzqEC99XtSM9ZeaVGjEA_Ydw@mail.gmail.com>
-References: <CAKvkGKdoWxmnRbNvn_SikRhzsyyzqEC99XtSM9ZeaVGjEA_Ydw@mail.gmail.com>
-Message-ID: <50E9A4FE.6090807@linaro.org>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 06 Jan 2013 18:24:19 +0200
+Subject: [PATCH] ARM: PXA27x: fix workaround for AC97 reset
+In-Reply-To: <87fw2ebe1i.fsf@free.fr>
+References: <1357470761-14363-1-git-send-email-grinberg@compulab.co.il>
+ <87fw2ebe1i.fsf@free.fr>
+Message-ID: <50E9A533.2050106@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/28/2012 08:06 AM, steve.zhan wrote:
-> Hi Daniel,
+On 01/06/13 16:07, Robert Jarzmik wrote:
+> Igor Grinberg <grinberg@compulab.co.il> writes:
+> 
+>> Fix the workaround to a hardware bug in the AC97 controller of PXA27x.
+>> A bug in the controller's warm reset functionality requires that the MFP
+>> used by the controller as the AC97_RESET_n line be temporarily
+>> reconfigured as a GPIO (AF0) and manually held high for the duration of
+>> the warm reset cycle.
+>>
+>> The workaround was broken long ago by commit fb1bf8cd
+>> ([ARM] pxa: introduce processor specific pxa27x_assert_ac97reset()).
+>> The commit above changed the original workaround code in a way that
+>> changed the MFP to AF0 (GPIO), but forgot to drive the GPIO high output.
+>> This way, the GPIO state was left input (and undriven) and only worked
+>> for boards with external pullup on the line.
+>>
+>> Fix the above breakage by actually configurring the GPIO for output high
+>> in case of reset assert and returning it to default state
+>> (AF2 and GPDR - input) in case of reset deassert.
+> 
+> NAK.
+> If you return GPIO95 to AF-input, the GPIO95 will be "KP_DKIN<2>", ie. you'll
+> map a keyboard input to a AC97 reset.
 
-Hi Steve,
+I'm sorry, I don't understand what do you mean by "AF-input"?
+For GPIO95 AF1 means AC97_nRESET and GPDR settings should not meter at all.
+So setting GPDR for GPIO95/113 to input is only a safety measure.
 
-sorry I missed your email.
+> As I said in a mail before, don't put a AC97 reset line as an input pin, this is
+> not a sensible patch.
 
-> 
->        I think we must unlock the master spinlock even
-> prcmu_gic_decouple function now always return 0.
->        Could you give some infos about this?
+Hmmm... I've opened the PXA27x dev manual once again in several years.
+Ok. I was mislead by all the newer SoC where direction pins do not count
+unless the MFP in AF-GPIO. As I've remembered now, it is not true for PXA27x.
 
-I agree, that would be cleaner.
+This is what the manual says:
+"Each pin can be programmed as an output, an input, or as bidirectional
+for certain alternate functions (that override the value programmed in the
+GPIO direction registers)."
 
-AFAICS, your patch does not solve the problem because 'recouple' will be
-false if prcmu_gic_decouple fails, so the lock will never be release.
+So, you're right and GPDR does meter for AC97_nRESET.
+I'll send a v2.
 
-That will be simpler to do:
-
-if (prcmu_gic_decouple()) {
-	spin_unlock(&master);
-	goto out;
-}
-
-no ?
-
-> Thanks.
-> 
-> diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
-> index b54884bd..b0759ce 100644
-> --- a/arch/arm/mach-ux500/cpuidle.c
-> +++ b/arch/arm/mach-ux500/cpuidle.c
-> @@ -29,6 +29,7 @@ static inline int ux500_enter_idle(struct cpuidle_device *dev,
->  {
->         int this_cpu = smp_processor_id();
->         bool recouple = false;
-> +       bool locked = false;
-> 
->         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
-> 
-> @@ -39,6 +40,8 @@ static inline int ux500_enter_idle(struct cpuidle_device *dev,
->                 if (!spin_trylock(&master_lock))
->                         goto wfi;
-> 
-> +               locked = true;
-> +
->                 /* decouple the gic from the A9 cores */
->                 if (prcmu_gic_decouple())
->                         goto out;
-> @@ -76,7 +79,7 @@ static inline int ux500_enter_idle(struct cpuidle_device *dev,
->                 /* When we switch to retention, the prcmu is in charge
->                  * of recoupling the gic automatically */
->                 recouple = false;
-> -
-> +               locked = false;
->                 spin_unlock(&master_lock);
->         }
->  wfi:
-> @@ -86,7 +89,8 @@ out:
-> 
->         if (recouple) {
->                 prcmu_gic_recouple();
-> -               spin_unlock(&master_lock);
-> +               if (locked)
-> +                       spin_unlock(&master_lock);
->         }
-> 
->         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &this_cpu);
-> 
-> 
-> 
-> Steve Zhan
-> 
-
+Thanks!
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+Igor.
