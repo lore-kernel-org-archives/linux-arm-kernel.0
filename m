@@ -1,39 +1,76 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 06 Jan 2013 15:07:37 +0100
-Subject: [PATCH] ARM: PXA27x: fix workaround for AC97 reset
-In-Reply-To: <1357470761-14363-1-git-send-email-grinberg@compulab.co.il> (Igor
- Grinberg's message of "Sun, 6 Jan 2013 13:12:41 +0200")
-References: <1357470761-14363-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <87fw2ebe1i.fsf@free.fr>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 6 Jan 2013 15:08:21 +0100
+Subject: machine_is_dt() ?
+In-Reply-To: <20130106134113.GD2631@n2100.arm.linux.org.uk>
+References: <20130106131805.GQ17242@lunn.ch>
+ <20130106134113.GD2631@n2100.arm.linux.org.uk>
+Message-ID: <20130106140821.GR17242@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Igor Grinberg <grinberg@compulab.co.il> writes:
+On Sun, Jan 06, 2013 at 01:41:13PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Jan 06, 2013 at 02:18:05PM +0100, Andrew Lunn wrote:
+> > I'm moving the cpuidle code for Kirkwood into drivers/cpuidle. I'm
+> > following the way cpuidle-calxeda.c instantiates the driver, it uses
+> > module_init(calxeda_cpuidle_init) and calxeda_cpuidle_init() uses
+> > of_machine_is_compatible("calxeda,highbank") so only loading the
+> > driver in a ARCH_MULTIPLATFORM kernel when needed.
+> > 
+> > I can follow this model for when kirkwood is booted using device
+> > tree. However, i would also like to use the driver for those boards
+> > which are not yet converted to DT. In that situation, we have a kernel
+> > dedicate to kirkwood and the cpuidle driver is always relevant.
+> > 
+> > Thus i need to code something like:
+> > 
+> > (of_machine_is_compatible("marvell, kirkwood") ||
+> >  !machine_is_dt())
+> > 
+> > However, there is no macro machine_is_dt().
+> > 
+> > Is there a way to tell if a machine has been booted using a machine
+> > number as opposed to DT?
+> 
+> This doesn't seem to me to be the right way to deal with this.  What
+> you're suggesting would mean that if you built a multiplatform kernel
+> which included this driver, and booted it on a non-DT platform, you'd
+> have this driver registered.
 
-> Fix the workaround to a hardware bug in the AC97 controller of PXA27x.
-> A bug in the controller's warm reset functionality requires that the MFP
-> used by the controller as the AC97_RESET_n line be temporarily
-> reconfigured as a GPIO (AF0) and manually held high for the duration of
-> the warm reset cycle.
->
-> The workaround was broken long ago by commit fb1bf8cd
-> ([ARM] pxa: introduce processor specific pxa27x_assert_ac97reset()).
-> The commit above changed the original workaround code in a way that
-> changed the MFP to AF0 (GPIO), but forgot to drive the GPIO high output.
-> This way, the GPIO state was left input (and undriven) and only worked
-> for boards with external pullup on the line.
->
-> Fix the above breakage by actually configurring the GPIO for output high
-> in case of reset assert and returning it to default state
-> (AF2 and GPDR - input) in case of reset deassert.
+Hi Russel
 
-NAK.
-If you return GPIO95 to AF-input, the GPIO95 will be "KP_DKIN<2>", ie. you'll
-map a keyboard input to a AC97 reset.
-As I said in a mail before, don't put a AC97 reset line as an input pin, this is
-not a sensible patch.
+Yes, not what i want. I would need to limit it further to non-DT
+platform on Kirkwood.
 
-Cheers.
+> It looks to me like many of the CPUFREQ drivers just register themselves
+> if they've been built into the kernel.  No one's thought about making
+> them platform drivers or similar, so the current "if it's built-in, then
+> we use it" approach seems to have persisted.  As many of them are
+> initialized via a late_initcall(), I don't see any problem with them
+> being platform drivers, which will solve the problem in a way that's
+> well established.
+I actually went towards a platform driver to start with. See the
+discussion here:
 
---
-Robert
+https://patchwork.kernel.org/patch/1915171/
+
+About 1/2 way down, Rob Herring says:
+
+      Don't do a platform driver and just check the machine compatible
+      property which is what I did for highbank.
+
+What Rob mostly seems to be objecting to is that
+
++		cpuidle at 1418 {
++			compatible = "marvell,kirkwood-cpuidle";
++			reg = <0x1418 0x4>;
++		};
+
+does not describe hardware, so it does not belong in DT. Hence i will
+check of_machine_is_compatible() to see if its a marvell,kirkwood. But
+that does not help with old style boots.
+
+Should i make it both a platform driver for old style boots and check
+of_machine_is_compatible() for DT boots?
+
+Thanks
+	Andrew
