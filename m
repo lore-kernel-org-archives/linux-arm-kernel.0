@@ -1,67 +1,59 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 6 Jan 2013 18:24:10 +0000
-Subject: [GIT PULL] ARM: mvebu/kirkwood fixes for v3.8
-Message-ID: <mailman.18.1357496656.1035.linux-arm-kernel@lists.infradead.org>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Sun, 06 Jan 2013 11:04:15 -0800
+Subject: [PATCH v2] ARM: pxa27x: fix ac97 controller warm reset code
+In-Reply-To: <87k3rqbedi.fsf@free.fr>
+References: <1357223976-9097-1-git-send-email-mikedunn@newsguy.com>
+ <50E67BAD.7070702@compulab.co.il> <50E6AF88.8050800@compulab.co.il>
+ <87obh4it6n.fsf@free.fr> <50E92385.5020107@compulab.co.il>
+ <87k3rqbedi.fsf@free.fr>
+Message-ID: <50E9CAAF.4090907@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+On 01/06/2013 06:00 AM, Robert Jarzmik wrote:
+> Igor Grinberg <grinberg@compulab.co.il> writes:
+> 
+>> On 01/04/13 22:34, Robert Jarzmik wrote:
+>>> This is not the original behaviour before commit
+>>> fb1bf8cd13bfa7ed0364ab0d82f717fc020d35f6.
+>>>
+>>> The original behaviour was :
+>>>  - on = 1 => set GPIO as output GPIO, set to 1
+>>>  - on = 0 => set GPIO to the alternate function ac97reset, driven by PXA2xx AC97
+>>>  IP.
+>>>
+>>> If you don't set the alternate function, the GCR register usage for reset is
+>>> useless, isn't it ? So why do you set the GPIO as "input" with on == 0 ?
+>>
+>> Well, I've made a quick patch for Mike to test if this works and
+>> since it works I will submit a proper one.
+> Mmm...
+> 
+>> To your question about setting the direction,
+>> I'd like us to be on a safe side and not drive the pin if AF is not GPIO.
+>> Although it should not meter and changing the AF to ac97reset should do the job,
+>> but just to be on the safe side, as I think GPDR/GPCR/GPSR settings are preserved
+>> even if you change the AF to something other than GPIO.
+> 
+> I think I was not clear enough.
+> 
+> My point is that if you program the GPIO as input, then the PXA will not drive
+> the pin anymore. If you have a resistor doing the "pullup", everything will work
+> (as I assume is the case in your board). If not, the AC97 codec (wm9713 and
+> co...) could have its reset line asserted (ie. #RESET line), and *this* bothers me.
+> 
+> So changing the AC97 #RESET line to "GPIO input" is incorrect, and I don't agree
+> with the patch.
 
-  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
 
-are available in the git repository at:
+I believe the extra lines in Igor's patch just effectively set the direction but
+not the alt fn setting, which shouldn't do anything after the pin was configured
+for the alt fn.  But in fact, I skipped those lines in the patch I prepared.  I
+was too happy about discovering the reason warm reset continued to fail to
+quibble :) Thanks again Igor.
 
-  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.8
+Another change I made to Igor's patch is to drive the line (effectively set GPSR
+bit) before switching from the ac97_reset alt fn to gpio / AF0.  Will CC you on
+the patches.  They work well; warm and cold reset.  Yay!
 
-for you to fetch changes up to dab9206445952e64213582b2ab9077972850d65b:
-
-  dma: mv_xor: fix error handling for clocks (2013-01-06 17:53:28 +0000)
-
-----------------------------------------------------------------
-fixes for mvebu/kirkwood v3.8
- - use correct uart driver for mvebu boards
- - add a missing DT clocks
- - gpio-poweroff level vs. edge triggering, use gpio_is_valid()
- - remove an inappropriate __init, modules need to access function.
- - various DT fixes
- - error handling in mv_xor
-
-----------------------------------------------------------------
-Andrew Lunn (5):
-      ARM: Kirkwood: Fix missing clk for USB device.
-      Power: gpio-poweroff: Fix documentation and gpio_is_valid
-      ARM: Kirkwood: Fix missing sdio clock
-      ARM: Kirkwood: Use fixed-regulator instead of board gpio call
-      arm: mvebu: Add missing ; for cpu node.
-
-Gregory CLEMENT (1):
-      arm: mvebu: Use dw-apb-uart instead of ns16650 as UART driver
-
-Joshua Coombs (1):
-      clk: mvebu: Remove inappropriate __init tagging
-
-Nobuhiro Iwamatsu (1):
-      ARM: Kirkwood: Switch TWSI1 of 88f6282 to DT clock providers
-
-Thomas Petazzoni (4):
-      arm: mvebu: Armada XP MV78230 has two cores, not one
-      arm: mvebu: Armada XP MV78230 has only three Ethernet interfaces
-      dma: mv_xor: fix error handling of mv_xor_channel_add()
-      dma: mv_xor: fix error handling for clocks
-
- .../devicetree/bindings/gpio/gpio-poweroff.txt     | 20 +++++++++++--
- arch/arm/boot/dts/armada-370-xp.dtsi               |  6 ++--
- arch/arm/boot/dts/armada-xp-mv78230.dtsi           |  9 +++++-
- arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  8 ++++++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  8 ++++++
- arch/arm/boot/dts/armada-xp.dtsi                   | 14 +++------
- arch/arm/boot/dts/kirkwood-6282.dtsi               |  1 +
- arch/arm/boot/dts/kirkwood-topkick.dts             | 17 +++++++++++
- arch/arm/boot/dts/kirkwood.dtsi                    |  1 +
- arch/arm/configs/mvebu_defconfig                   |  4 +--
- arch/arm/mach-kirkwood/board-dt.c                  |  4 +++
- arch/arm/mach-kirkwood/board-usi_topkick.c         |  4 ---
- drivers/clk/mvebu/clk-gating-ctrl.c                |  2 +-
- drivers/dma/mv_xor.c                               |  9 ++++--
- drivers/power/reset/gpio-poweroff.c                | 33 ++++++++++------------
- 15 files changed, 95 insertions(+), 45 deletions(-)
+Mike
