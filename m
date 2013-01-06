@@ -1,114 +1,85 @@
 From: mikedunn@newsguy.com (Mike Dunn)
-Date: Sun,  6 Jan 2013 11:14:00 -0800
-Subject: [PATCH 4/4] ALSA: pxa27x: rename pxa27x_assert_ac97()
-In-Reply-To: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
-References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
-Message-ID: <1357499640-13871-5-git-send-email-mikedunn@newsguy.com>
+Date: Sun, 06 Jan 2013 11:26:35 -0800
+Subject: [PATCH v2] ARM: PXA27x: fix workaround for AC97 reset
+In-Reply-To: <1357490881-19015-1-git-send-email-grinberg@compulab.co.il>
+References: <87fw2ebe1i.fsf@free.fr>
+ <1357490881-19015-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <50E9CFEB.3030309@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does nothing functionally, it just gives the function a new name and
-modifies the prototype slightly in order to clarify what the function is doing
-(which is not necessarily asserting the reset).
-Some commentary also added.
+Whoops, I just submitted some patches that clash with this.  Sorry, didn't see
+this one.  I'll test this, and will resubmit my patches to work with this one if
+necessary.  Your code placement is probably better.
 
-Tested on a palm treo 680 machine.
+Thanks,
+Mike
 
-Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
----
 
-checkpatch.pl issues a warning for this patch:
-	      WARNING: externs should be avoided in .c files
-but I just want to rename the function.
-
- arch/arm/mach-pxa/pxa27x.c  |   29 +++++++++++++++++++----------
- sound/arm/pxa2xx-ac97-lib.c |    8 ++++----
- 2 files changed, 23 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index eea90fe..896bf94 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -53,26 +53,35 @@ static unsigned long ac97_reset_config[] = {
- 	GPIO95_AC97_nRESET,
- };
- 
--void pxa27x_assert_ac97reset(int reset_gpio, int on)
-+void pxa27x_configure_ac97reset(int reset_mfp, bool to_gpio)
- {
-+	/*
-+	 * This helper function is used to work around a bug in the pxa27x's
-+	 * ac97 controller during a warm reset.  The configuration of the
-+	 * reset_mfp is changed as follows:
-+	 * to_gpio == true: configured to generic output gpio and driven high
-+	 * to_gpio == false: configured to ac97 controller alt fn AC97_nRESET
-+	 */
-+
- 	/* set direction and level before switching from ac97 alt fn to gpio */
--	if (on) {
--		int ret = gpio_direction_output(reset_gpio, 1);
-+	if (to_gpio == true) {
-+		int ret = gpio_direction_output(reset_mfp, 1);
- 		if (ret) {
- 			pr_err("%s: gpio_direction_output failed: %d\n",
- 				__func__, ret);
- 			return;
- 		}
- 	}
--	if (reset_gpio == 113)
--		pxa2xx_mfp_config(on ? &ac97_reset_config[0] :
--				       &ac97_reset_config[1], 1);
- 
--	if (reset_gpio == 95)
--		pxa2xx_mfp_config(on ? &ac97_reset_config[2] :
--				       &ac97_reset_config[3], 1);
-+	if (reset_mfp == 113)
-+		pxa2xx_mfp_config(to_gpio ? &ac97_reset_config[0] :
-+				  &ac97_reset_config[1], 1);
-+
-+	if (reset_mfp == 95)
-+		pxa2xx_mfp_config(to_gpio ? &ac97_reset_config[2] :
-+				  &ac97_reset_config[3], 1);
- }
--EXPORT_SYMBOL_GPL(pxa27x_assert_ac97reset);
-+EXPORT_SYMBOL_GPL(pxa27x_configure_ac97reset);
- 
- /* Crystal clock: 13MHz */
- #define BASE_CLK	13000000
-diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
-index 416d2e3..fbac476 100644
---- a/sound/arm/pxa2xx-ac97-lib.c
-+++ b/sound/arm/pxa2xx-ac97-lib.c
-@@ -34,7 +34,7 @@ static struct clk *ac97_clk;
- static struct clk *ac97conf_clk;
- static int reset_gpio;
- 
--extern void pxa27x_assert_ac97reset(int reset_gpio, int on);
-+extern void pxa27x_configure_ac97reset(int reset_mfp, bool to_gpio);
- 
- /*
-  * Beware PXA27x bugs:
-@@ -140,10 +140,10 @@ static inline void pxa_ac97_warm_pxa27x(void)
- 	gsr_bits = 0;
- 
- 	/* warm reset broken on Bulverde, so manually keep AC97 reset high */
--	pxa27x_assert_ac97reset(reset_gpio, 1);
-+	pxa27x_configure_ac97reset(reset_gpio, true);
- 	udelay(10);
- 	GCR |= GCR_WARM_RST;
--	pxa27x_assert_ac97reset(reset_gpio, 0);
-+	pxa27x_configure_ac97reset(reset_gpio, false);
- 	udelay(500);
- }
- 
-@@ -351,7 +351,7 @@ int pxa2xx_ac97_hw_probe(struct platform_device *dev)
- 			       __func__, ret);
- 			goto err_conf;
- 		}
--		pxa27x_assert_ac97reset(reset_gpio, 0);
-+		pxa27x_configure_ac97reset(reset_gpio, false);
- 		ac97conf_clk = clk_get(&dev->dev, "AC97CONFCLK");
- 		if (IS_ERR(ac97conf_clk)) {
- 			ret = PTR_ERR(ac97conf_clk);
--- 
-1.7.8.6
+On 01/06/2013 08:48 AM, Igor Grinberg wrote:
+> Fix the workaround to a hardware bug in the AC97 controller of PXA27x.
+> A bug in the controller's warm reset functionality requires that the MFP
+> used by the controller as the AC97_RESET_n line be temporarily
+> reconfigured as a GPIO (AF0) and manually held high for the duration of
+> the warm reset cycle.
+> 
+> The workaround was broken long ago by commit fb1bf8cd
+> ([ARM] pxa: introduce processor specific pxa27x_assert_ac97reset()).
+> The commit above changed the original workaround code in a way that
+> changed the MFP to AF0 (GPIO), but forgot to drive the GPIO high output.
+> This way, the GPIO state was left input (and undriven) and only worked
+> for boards with external pullup on the line.
+> 
+> Fix the above breakage by actually configurring the GPIO for output high
+> in case of reset assert and returning it to default state
+> (AF1 - for GPIO95 and AF2 - for GPIO113) in case of reset deassert.
+> 
+> Reported-by: Mike Dunn <mikedunn@newsguy.com>
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> Cc: Mike Dunn <mikedunn@newsguy.com>
+> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: stable at vger.kernel.org
+> ---
+> v2:	Do not change the GPDR to input on reset deassert, as AC97
+> 	controller will not drive it (thanks Robert).
+> 	Also, this time really send to Mike.
+> 
+> Mike, Robert, can you test this one on boards with GPIO113 and GPIO95?
+> Thanks!
+> 
+>  arch/arm/mach-pxa/devices.c |   14 +++++++++++++-
+>  1 files changed, 13 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+> index daa86d3..03db2ce 100644
+> --- a/arch/arm/mach-pxa/devices.c
+> +++ b/arch/arm/mach-pxa/devices.c
+> @@ -5,6 +5,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/spi/pxa2xx_spi.h>
+>  #include <linux/i2c/pxa-i2c.h>
+> +#include <linux/gpio.h>
+>  
+>  #include <mach/udc.h>
+>  #include <linux/platform_data/usb-pxa3xx-ulpi.h>
+> @@ -488,7 +489,18 @@ struct platform_device pxa_device_ac97 = {
+>  
+>  void __init pxa_set_ac97_info(pxa2xx_audio_ops_t *ops)
+>  {
+> -	pxa_register_device(&pxa_device_ac97, ops);
+> +	int err = 0;
+> +
+> +	if (ops && gpio_is_valid(ops->reset_gpio)) {
+> +		err = gpio_request_one(ops->reset_gpio, GPIOF_INIT_HIGH,
+> +				       "ac97 rst");
+> +		if (err)
+> +			pr_err("%s: Failed requesting GPIO%d (ac97 rst): %d",
+> +			       __func__, ops->reset_gpio, err);
+> +	}
+> +
+> +	if (!err)
+> +		pxa_register_device(&pxa_device_ac97, ops);
+>  }
+>  
+>  #ifdef CONFIG_PXA25x
