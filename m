@@ -1,76 +1,67 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 6 Jan 2013 15:08:21 +0100
-Subject: machine_is_dt() ?
-In-Reply-To: <20130106134113.GD2631@n2100.arm.linux.org.uk>
-References: <20130106131805.GQ17242@lunn.ch>
- <20130106134113.GD2631@n2100.arm.linux.org.uk>
-Message-ID: <20130106140821.GR17242@lunn.ch>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 06 Jan 2013 18:10:38 +0200
+Subject: [PATCH v2] ARM: pxa27x: fix ac97 controller warm reset code
+In-Reply-To: <87k3rqbedi.fsf@free.fr>
+References: <1357223976-9097-1-git-send-email-mikedunn@newsguy.com>
+ <50E67BAD.7070702@compulab.co.il> <50E6AF88.8050800@compulab.co.il>
+ <87obh4it6n.fsf@free.fr> <50E92385.5020107@compulab.co.il>
+ <87k3rqbedi.fsf@free.fr>
+Message-ID: <50E9A1FE.2090907@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 06, 2013 at 01:41:13PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Jan 06, 2013 at 02:18:05PM +0100, Andrew Lunn wrote:
-> > I'm moving the cpuidle code for Kirkwood into drivers/cpuidle. I'm
-> > following the way cpuidle-calxeda.c instantiates the driver, it uses
-> > module_init(calxeda_cpuidle_init) and calxeda_cpuidle_init() uses
-> > of_machine_is_compatible("calxeda,highbank") so only loading the
-> > driver in a ARCH_MULTIPLATFORM kernel when needed.
-> > 
-> > I can follow this model for when kirkwood is booted using device
-> > tree. However, i would also like to use the driver for those boards
-> > which are not yet converted to DT. In that situation, we have a kernel
-> > dedicate to kirkwood and the cpuidle driver is always relevant.
-> > 
-> > Thus i need to code something like:
-> > 
-> > (of_machine_is_compatible("marvell, kirkwood") ||
-> >  !machine_is_dt())
-> > 
-> > However, there is no macro machine_is_dt().
-> > 
-> > Is there a way to tell if a machine has been booted using a machine
-> > number as opposed to DT?
+On 01/06/13 16:00, Robert Jarzmik wrote:
+> Igor Grinberg <grinberg@compulab.co.il> writes:
 > 
-> This doesn't seem to me to be the right way to deal with this.  What
-> you're suggesting would mean that if you built a multiplatform kernel
-> which included this driver, and booted it on a non-DT platform, you'd
-> have this driver registered.
+>> On 01/04/13 22:34, Robert Jarzmik wrote:
+>>> This is not the original behaviour before commit
+>>> fb1bf8cd13bfa7ed0364ab0d82f717fc020d35f6.
+>>>
+>>> The original behaviour was :
+>>>  - on = 1 => set GPIO as output GPIO, set to 1
+>>>  - on = 0 => set GPIO to the alternate function ac97reset, driven by PXA2xx AC97
+>>>  IP.
+>>>
+>>> If you don't set the alternate function, the GCR register usage for reset is
+>>> useless, isn't it ? So why do you set the GPIO as "input" with on == 0 ?
+>>
+>> Well, I've made a quick patch for Mike to test if this works and
+>> since it works I will submit a proper one.
+> Mmm...
+> 
+>> To your question about setting the direction,
+>> I'd like us to be on a safe side and not drive the pin if AF is not GPIO.
+>> Although it should not meter and changing the AF to ac97reset should do the job,
+>> but just to be on the safe side, as I think GPDR/GPCR/GPSR settings are preserved
+>> even if you change the AF to something other than GPIO.
+> 
+> I think I was not clear enough.
 
-Hi Russel
+Definitely...
 
-Yes, not what i want. I would need to limit it further to non-DT
-platform on Kirkwood.
+> 
+> My point is that if you program the GPIO as input, then the PXA will not drive
+> the pin anymore.
 
-> It looks to me like many of the CPUFREQ drivers just register themselves
-> if they've been built into the kernel.  No one's thought about making
-> them platform drivers or similar, so the current "if it's built-in, then
-> we use it" approach seems to have persisted.  As many of them are
-> initialized via a late_initcall(), I don't see any problem with them
-> being platform drivers, which will solve the problem in a way that's
-> well established.
-I actually went towards a platform driver to start with. See the
-discussion here:
+Not exactly. The MFP will not be driven by the GPIO subsystem,
+but it will be driven by the AC97 controller, as the for
+GPIO95 - AF1 means AC97_nRESET and for GPIO113 - AF2 also means AC97_nRESET.
+No problem here - it is driven as it used to be in the original code.
 
-https://patchwork.kernel.org/patch/1915171/
 
-About 1/2 way down, Rob Herring says:
+> If you have a resistor doing the "pullup", everything will work
+> (as I assume is the case in your board). If not, the AC97 codec (wm9713 and
+> co...) could have its reset line asserted (ie. #RESET line), and *this* bothers me.
 
-      Don't do a platform driver and just check the machine compatible
-      property which is what I did for highbank.
+That is what the original workaround did.
+Should not bother you, instead, can you test it?
 
-What Rob mostly seems to be objecting to is that
+> 
+> So changing the AC97 #RESET line to "GPIO input" is incorrect, and I don't agree
+> with the patch.
 
-+		cpuidle at 1418 {
-+			compatible = "marvell,kirkwood-cpuidle";
-+			reg = <0x1418 0x4>;
-+		};
+It is not incorrect, it just does not have any effect. Please, test it.
 
-does not describe hardware, so it does not belong in DT. Hence i will
-check of_machine_is_compatible() to see if its a marvell,kirkwood. But
-that does not help with old style boots.
-
-Should i make it both a platform driver for old style boots and check
-of_machine_is_compatible() for DT boots?
-
-Thanks
-	Andrew
+-- 
+Regards,
+Igor.
