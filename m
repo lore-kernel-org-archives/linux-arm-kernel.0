@@ -1,115 +1,67 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 6 Jan 2013 12:41:58 -0500
-Subject: [PATCH] arm: mvebu: Use dw-apb-uart instead of ns16650 as UART
- driver
-In-Reply-To: <1354640699-6066-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1354640699-6066-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130106174158.GD5075@titan.lakedaemon.net>
+Date: Sun, 6 Jan 2013 18:24:10 +0000
+Subject: [GIT PULL] ARM: mvebu/kirkwood fixes for v3.8
+Message-ID: <mailman.18.1357496656.1035.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 04, 2012 at 06:04:59PM +0100, Gregory CLEMENT wrote:
-> The UART controller used in the Armada 370 and Armada XP SoCs is the
-> Synopsys DesignWare 8250 (aka Synopsys DesignWare ABP UART). The
-> improper use of the ns16550 can lead to a kernel oops during boot if
-> a character is sent to the UART before the initialization of the
-> driver. The DW APB has an extra interrupt that gets raised when
-> writing to the LCR when busy. This explains why we need to use
-> dw-apb-uart driver to handle this.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
 
-Applied to mvebu/fixes.
+  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
 
-thx,
+are available in the git repository at:
 
-Jason.
+  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.8
 
-> ---
-> 
-> This patch fixed a bug introduced in 3.7, but as there are very few
-> boards supported in 3.7 (only the Armada 370 and Armada XP evaluation
-> boards), it is not a big deal if this patch is only applied for 3.8.
-> 
-> This patch is based on 3.7-rc8 and can be applied on top of the
-> current arm-soc/for-next with a trivial conflict on mvebu_defconfig.
-> 
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi |    6 ++++--
->  arch/arm/boot/dts/armada-xp.dtsi     |    6 ++++--
->  arch/arm/configs/mvebu_defconfig     |    2 +-
->  3 files changed, 9 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 16cc82c..03640f7 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -44,17 +44,19 @@
->  		ranges;
->  
->  		serial at d0012000 {
-> -				compatible = "ns16550";
-> +				compatible = "snps,dw-apb-uart";
->  				reg = <0xd0012000 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <41>;
-> +				reg-io-width = <4>;
->  				status = "disabled";
->  		};
->  		serial at d0012100 {
-> -				compatible = "ns16550";
-> +				compatible = "snps,dw-apb-uart";
->  				reg = <0xd0012100 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <42>;
-> +				reg-io-width = <4>;
->  				status = "disabled";
->  		};
->  
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 71d6b5d..9a0e744 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -29,17 +29,19 @@
->  
->  	soc {
->  		serial at d0012200 {
-> -				compatible = "ns16550";
-> +				compatible = "snps,dw-apb-uart";
->  				reg = <0xd0012200 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <43>;
-> +				reg-io-width = <4>;
->  				status = "disabled";
->  		};
->  		serial at d0012300 {
-> -				compatible = "ns16550";
-> +				compatible = "snps,dw-apb-uart";
->  				reg = <0xd0012300 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <44>;
-> +				reg-io-width = <4>;
->  				status = "disabled";
->  		};
->  
-> diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-> index 3458752..9e34084 100644
-> --- a/arch/arm/configs/mvebu_defconfig
-> +++ b/arch/arm/configs/mvebu_defconfig
-> @@ -22,7 +22,7 @@ CONFIG_VFP=y
->  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
-> -CONFIG_SERIAL_OF_PLATFORM=y
-> +CONFIG_SERIAL_8250_DW=y
->  CONFIG_GPIOLIB=y
->  CONFIG_GPIO_SYSFS=y
->  # CONFIG_USB_SUPPORT is not set
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+for you to fetch changes up to dab9206445952e64213582b2ab9077972850d65b:
+
+  dma: mv_xor: fix error handling for clocks (2013-01-06 17:53:28 +0000)
+
+----------------------------------------------------------------
+fixes for mvebu/kirkwood v3.8
+ - use correct uart driver for mvebu boards
+ - add a missing DT clocks
+ - gpio-poweroff level vs. edge triggering, use gpio_is_valid()
+ - remove an inappropriate __init, modules need to access function.
+ - various DT fixes
+ - error handling in mv_xor
+
+----------------------------------------------------------------
+Andrew Lunn (5):
+      ARM: Kirkwood: Fix missing clk for USB device.
+      Power: gpio-poweroff: Fix documentation and gpio_is_valid
+      ARM: Kirkwood: Fix missing sdio clock
+      ARM: Kirkwood: Use fixed-regulator instead of board gpio call
+      arm: mvebu: Add missing ; for cpu node.
+
+Gregory CLEMENT (1):
+      arm: mvebu: Use dw-apb-uart instead of ns16650 as UART driver
+
+Joshua Coombs (1):
+      clk: mvebu: Remove inappropriate __init tagging
+
+Nobuhiro Iwamatsu (1):
+      ARM: Kirkwood: Switch TWSI1 of 88f6282 to DT clock providers
+
+Thomas Petazzoni (4):
+      arm: mvebu: Armada XP MV78230 has two cores, not one
+      arm: mvebu: Armada XP MV78230 has only three Ethernet interfaces
+      dma: mv_xor: fix error handling of mv_xor_channel_add()
+      dma: mv_xor: fix error handling for clocks
+
+ .../devicetree/bindings/gpio/gpio-poweroff.txt     | 20 +++++++++++--
+ arch/arm/boot/dts/armada-370-xp.dtsi               |  6 ++--
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |  9 +++++-
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  8 ++++++
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  8 ++++++
+ arch/arm/boot/dts/armada-xp.dtsi                   | 14 +++------
+ arch/arm/boot/dts/kirkwood-6282.dtsi               |  1 +
+ arch/arm/boot/dts/kirkwood-topkick.dts             | 17 +++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |  1 +
+ arch/arm/configs/mvebu_defconfig                   |  4 +--
+ arch/arm/mach-kirkwood/board-dt.c                  |  4 +++
+ arch/arm/mach-kirkwood/board-usi_topkick.c         |  4 ---
+ drivers/clk/mvebu/clk-gating-ctrl.c                |  2 +-
+ drivers/dma/mv_xor.c                               |  9 ++++--
+ drivers/power/reset/gpio-poweroff.c                | 33 ++++++++++------------
+ 15 files changed, 95 insertions(+), 45 deletions(-)
