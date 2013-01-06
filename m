@@ -1,32 +1,37 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun,  6 Jan 2013 11:10:34 +0100
-Subject: [PATCH 01/11] ARM: Kirkwood: Fix missing clk for USB device.
+Date: Sun,  6 Jan 2013 11:10:39 +0100
+Subject: [PATCH 06/11] clk: mvebu: Remove inappropriate __init tagging
 In-Reply-To: <1357467044-4914-1-git-send-email-andrew@lunn.ch>
 References: <1357467044-4914-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1357467044-4914-2-git-send-email-andrew@lunn.ch>
+Message-ID: <1357467044-4914-7-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without the clock being held by a driver, it gets turned off at a bad
-time causing the SoC to lockup. This is often during reboot.
+From: Joshua Coombs <josh.coombs@gmail.com>
 
+If the Orion WDT driver is built as a module, an opps occurs during
+clk lookup when calling mvebu_clk_gating_get_src().  Remove the
+inappropriate __init tag so the function is available for modules
+after kernel init.
+
+Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Stefan Peter <s.peter@mpl.ch>
 ---
- arch/arm/boot/dts/kirkwood.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/mvebu/clk-gating-ctrl.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 7735cee..110d6cb 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -144,6 +144,7 @@
- 			compatible = "marvell,orion-ehci";
- 			reg = <0x50000 0x1000>;
- 			interrupts = <19>;
-+			clocks = <&gate_clk 3>;
- 			status = "okay";
- 		};
+diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
+index c6d3c26..8fa5408 100644
+--- a/drivers/clk/mvebu/clk-gating-ctrl.c
++++ b/drivers/clk/mvebu/clk-gating-ctrl.c
+@@ -32,7 +32,7 @@ struct mvebu_soc_descr {
  
+ #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+ 
+-static struct clk __init *mvebu_clk_gating_get_src(
++static struct clk *mvebu_clk_gating_get_src(
+ 	struct of_phandle_args *clkspec, void *data)
+ {
+ 	struct mvebu_gating_ctrl *ctrl = (struct mvebu_gating_ctrl *)data;
 -- 
 1.7.10.4
