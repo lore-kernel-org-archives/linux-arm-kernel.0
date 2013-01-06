@@ -1,42 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 6 Jan 2013 23:53:12 +0100
-Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
-In-Reply-To: <50E9EE7A.1080301@free-electrons.com>
-References: <1357315498-4570-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <50E710CB.8070007@lunn.ch> <20130104183139.20492204@skate>
- <50E71356.3030203@lunn.ch> <20130104190345.460151d1@skate>
- <50E9EE7A.1080301@free-electrons.com>
-Message-ID: <20130106235312.0839a879@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 7 Jan 2013 00:31:25 +0100
+Subject: [PATCH 1/3] pinctrl: exynos: add exynos5250 SoC specific data
+In-Reply-To: <017801cde453$77b03eb0$6710bc10$@samsung.com>
+References: <1355399644-29417-1-git-send-email-thomas.abraham@linaro.org>
+ <1355399644-29417-2-git-send-email-thomas.abraham@linaro.org>
+ <CACRpkdaQ10CgoFXtk4EyqL4LWVpsdEAdrmy5R-_Rqm5fJdqS4A@mail.gmail.com>
+ <CAJuYYwTZkzCXjowhKaJ253Oji07eDdEjMvNssyL1ThWtETswSQ@mail.gmail.com>
+ <017801cde453$77b03eb0$6710bc10$@samsung.com>
+Message-ID: <CACRpkdZKB1_1U1VZfYADwWfFpBum0Qc88kWtW37h7Z05RtSJfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On Thu, Dec 27, 2012 at 5:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-On Sun, 06 Jan 2013 22:36:58 +0100, Gregory CLEMENT wrote:
+> And I think, would be clear if the config could be changed like following.
+>
+> 8<----------------------------------------------------------------------
+> From: Kukjin Kim <kgene.kim@samsung.com>
+> Subject: [PATCH] pinctrl: exynos: change PINCTRL_EXYNOS option
+>
+> Since pinctrl-exynos can support exynos4 and exynos5 so changed
+> the option name to PINCTRL_EXYNOS for more clarity.
+>
+> Cc: Thomas Abraham <Thomas.abraham@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-> Until now I didn't notice any problem on this board with the 3GB enable.
-> 
-> I made more tests since I received this email, I booted (cold and hot boot)
-> the board dozens of times, and indeed every 5 or 10 reboot the kernel hanged
-> during boot at line:
-> "UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)"
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I think it hangs at the same place here.
+Shall I take this into the pinctrl tree?
 
-> After applying your patch, I didn't notice any hang after 20 boots. Do you
-> have a test pattern which make the kernel to hang each time to be sure that
-> it is the root of the problem?
-
-No, I don't have a specific pattern. It just hangs from time to time.
-Maybe 1 boot out of 5 or something like that. And it just hangs like it
-did for you.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yours,
+Linus Walleij
