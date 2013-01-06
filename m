@@ -1,35 +1,58 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Jan 2013 00:31:25 +0100
-Subject: [PATCH 1/3] pinctrl: exynos: add exynos5250 SoC specific data
-In-Reply-To: <017801cde453$77b03eb0$6710bc10$@samsung.com>
-References: <1355399644-29417-1-git-send-email-thomas.abraham@linaro.org>
- <1355399644-29417-2-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdaQ10CgoFXtk4EyqL4LWVpsdEAdrmy5R-_Rqm5fJdqS4A@mail.gmail.com>
- <CAJuYYwTZkzCXjowhKaJ253Oji07eDdEjMvNssyL1ThWtETswSQ@mail.gmail.com>
- <017801cde453$77b03eb0$6710bc10$@samsung.com>
-Message-ID: <CACRpkdZKB1_1U1VZfYADwWfFpBum0Qc88kWtW37h7Z05RtSJfA@mail.gmail.com>
+Date: Mon, 7 Jan 2013 00:46:10 +0100
+Subject: [PATCH 1/6] ARM: sunxi: Add pinctrl driver for Allwinner SoCs
+In-Reply-To: <1355948295-19680-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1355948295-19680-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1355948295-19680-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdYpnfWmo15vtUsvPobhFO3_wvYgaa04Mpa6QjWx2h+ezA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 27, 2012 at 5:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+On Wed, Dec 19, 2012 at 9:18 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-> And I think, would be clear if the config could be changed like following.
->
-> 8<----------------------------------------------------------------------
-> From: Kukjin Kim <kgene.kim@samsung.com>
-> Subject: [PATCH] pinctrl: exynos: change PINCTRL_EXYNOS option
->
-> Since pinctrl-exynos can support exynos4 and exynos5 so changed
-> the option name to PINCTRL_EXYNOS for more clarity.
->
-> Cc: Thomas Abraham <Thomas.abraham@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> The Allwinner SoCs have an IP module that handle both the muxing and the
+> GPIOs.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Sorry for very slow review :-( :-(
 
-Shall I take this into the pinctrl tree?
+>  include/linux/pinctrl/pinconf-generic.h            |    1 +
+
+Can you break this into a separate patch and rebase it?
+
+It does not apply anymore after v3.8...
+
+> diff --git a/include/linux/pinctrl/pinconf-generic.h b/include/linux/pinctrl/pinconf-generic.h
+> index 4f0abb9..5f5968d 100644
+> --- a/include/linux/pinctrl/pinconf-generic.h
+> +++ b/include/linux/pinctrl/pinconf-generic.h
+> @@ -74,6 +74,7 @@ enum pin_config_param {
+>         PIN_CONFIG_DRIVE_PUSH_PULL,
+>         PIN_CONFIG_DRIVE_OPEN_DRAIN,
+>         PIN_CONFIG_DRIVE_OPEN_SOURCE,
+> +       PIN_CONFIG_DRIVE_CURRENT,
+>         PIN_CONFIG_INPUT_SCHMITT,
+>         PIN_CONFIG_INPUT_DEBOUNCE,
+>         PIN_CONFIG_POWER_SOURCE,
+
+Above the definitions there is some kerneldoc and that is where this has to be
+defined.
+
+You also have to defines what the argument to this parameter is.
+
+I think it should be renamed PIN_CONFIG_DRIVE_STRENGTH and the
+argument should be the number of drivers stages.
+
+These things are constructed with totem-pole-like outputs and the number
+of totempoles define the drive strength, usually it will be something like
+
+1 = 2mA
+2 = 4mA
+3 = 6mA
+4 = 8mA
+
+or similar, as you see 2 mA for each added driver stage. The driver can
+convert to any internal representation...
 
 Yours,
 Linus Walleij
