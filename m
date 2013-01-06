@@ -1,35 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 6 Jan 2013 19:07:12 +0000
-Subject: [PATCH v4 10/19] irqchip: Move ARM gic.h to
- include/linux/irqchip/arm-gic.h
-In-Reply-To: <50E601A7.8010801@gmail.com>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-11-git-send-email-robherring2@gmail.com>
- <201301032144.52079.arnd@arndb.de> <50E601A7.8010801@gmail.com>
-Message-ID: <CAHkRjk5UCp60dTUPV8MkzK7ibDD5Aw_ahg_3iygMT3tZ3dUxbQ@mail.gmail.com>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Sun, 06 Jan 2013 11:13:22 -0800
+Subject: [PATCH v2] ARM: pxa27x: fix ac97 controller warm reset code
+In-Reply-To: <50E92385.5020107@compulab.co.il>
+References: <1357223976-9097-1-git-send-email-mikedunn@newsguy.com>
+ <50E67BAD.7070702@compulab.co.il> <50E6AF88.8050800@compulab.co.il>
+ <87obh4it6n.fsf@free.fr> <50E92385.5020107@compulab.co.il>
+Message-ID: <50E9CCD2.9000409@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 January 2013 22:09, Rob Herring <robherring2@gmail.com> wrote:
-> On 01/03/2013 03:44 PM, Arnd Bergmann wrote:
->> On Thursday 03 January 2013, Rob Herring wrote:
->>> From: Rob Herring <rob.herring@calxeda.com>
->>>
->>> Now that we have GIC moved to drivers/irqchip and all GIC DT init for
->>> platforms using irqchip_init, move gic.h and update the remaining
->>> includes.
+On 01/05/2013 11:11 PM, Igor Grinberg wrote:
+> On 01/04/13 22:34, Robert Jarzmik wrote:
+>> Igor Grinberg <grinberg@compulab.co.il> writes:
 >>
->> Can you elaborate on why this is done? Does any other code rely on the
->> header file being globally visible, or is there a more general reason
->> to move header files out of asm/ ?
->
-> KVM needs the register definitions for GIC distributor emulation.
-> Platform SMP code still needs gic_secondary_init.
+>>> On 01/04/13 08:50, Igor Grinberg wrote:
+>>>> On 01/03/13 16:39, Mike Dunn wrote:
+>>>>> fb1bf8cd13bfa7ed0364ab0d82f717fc020d35f6 
+>>>>> ([ARM] pxa: introduce processor specific pxa27x_assert_ac97reset())
+>>>>> which changed the mfp to a GPIO input instead of a high output.
+>>>
+>>> Looking at this one more time...
+>>> fb1bf8cd13 ([ARM] pxa: introduce processor specific pxa27x_assert_ac97reset())
+>>> also removed the call to pxa_gpio_mode() function which effectively set
+>>> AF to GPIO and configured the GPIO to output high.
+>>> (Later b1d9bf1d ([ARM] pxa: remove pxa_gpio_mode() and files) removed the
+>>> pxa_gpio_mode() function)
+>>>
+>>> See below...
+>>> The DRIVE_HIGH does not really configures the GPIO to output high, but
+>>> only sets the MFP_LPM_DRIVE_HIGH bit which in turn is only effective in
+>>> low power modes.
+>>> This means, that by doing the above, you just configure the MFP for GPIO output,
+>>> but do not assign it a value, so it gets driven with some undefined value.
+>>> This is not safe.
+>>>
+>>> Can you please, check if the attached patch below does the job?
+>>
+>> This is not the original behaviour before commit
+>> fb1bf8cd13bfa7ed0364ab0d82f717fc020d35f6.
+>>
+>> The original behaviour was :
+>>  - on = 1 => set GPIO as output GPIO, set to 1
+>>  - on = 0 => set GPIO to the alternate function ac97reset, driven by PXA2xx AC97
+>>  IP.
+>>
+>> If you don't set the alternate function, the GCR register usage for reset is
+>> useless, isn't it ? So why do you set the GPIO as "input" with on == 0 ?
+> 
+> Well, I've made a quick patch for Mike to test if this works and
+> since it works I will submit a proper one.
+> 
+> To your question about setting the direction,
+> I'd like us to be on a safe side and not drive the pin if AF is not GPIO.
 
-While I'm not arguing against this patch, for gic_secondary_init() we
-should use a CPU notifier. All platforms calling this function only
-pass 0 as argument (and it makes sense, since the GIC CPU interface is
-part of primary GIC).
 
--- 
-Catalin
+I just finished testing a patch that only sets the level and direction if
+switching from the ac97 alt fn to gpio, and it works fine.
+
+
+> Although it should not meter and changing the AF to ac97reset should do the job,
+> but just to be on the safe side, as I think GPDR/GPCR/GPSR settings are preserved
+> even if you change the AF to something other than GPIO.
+
+
+Yes, I think this is the case, but for simplicity my patch sets GPDR and GPSR
+every time the function is called.
+
+Thanks,
+Mike
