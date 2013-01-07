@@ -1,35 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 7 Jan 2013 18:10:22 +0100
-Subject: [PATCH 3.8-rc] arm: mvebu: add LEDs support to defconfig file
-In-Reply-To: <20130107170450.GK5075@titan.lakedaemon.net>
-References: <1357576034-24193-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130107170450.GK5075@titan.lakedaemon.net>
-Message-ID: <20130107181022.6c5f892e@skate>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 7 Jan 2013 18:12:24 +0100
+Subject: [PATCH] ARM: mx5: Fix MX53 flexcan2 clock
+In-Reply-To: <1357568820-15426-1-git-send-email-marex@denx.de>
+References: <1357568820-15426-1-git-send-email-marex@denx.de>
+Message-ID: <20130107171224.GA13025@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Mon, 7 Jan 2013 12:04:50 -0500, Jason Cooper wrote:
-> On Mon, Jan 07, 2013 at 05:27:14PM +0100, Thomas Petazzoni wrote:
-> > The OpenBlocks AX3-4 platform has several LEDs, so it sounds wise to
-> > enable LED support in mvebu_defconfig. We anticipate that more
-> > platforms using Marvell EBU SoCs will have LEDs in the future.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> > This is 3.8-rc material.
+On Mon, Jan 07, 2013 at 03:27:00PM +0100, Marek Vasut wrote:
+> The second FlexCAN port uses different clock than the first one, configure
+> correct clock to prevent hanging of the system during bringing up of the port.
 > 
-> Is this patch fixing a problem?  I'm inclined to queue this up for 3.9
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
-Well, it's just a defconfig update, and I think defconfig updates are
-generally accepted during the -rc cycle.
+Looks Good.
 
-Otherwise, I'm fine if it waits until 3.9.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Thomas
+Sascha
+
+> ---
+>  arch/arm/boot/dts/imx53.dtsi |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index 5b59763..abe0f0b 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -614,7 +614,7 @@
+>  				compatible = "fsl,imx53-flexcan", "fsl,p1010-flexcan";
+>  				reg = <0x53fcc000 0x4000>;
+>  				interrupts = <83>;
+> -				clocks = <&clks 158>, <&clks 157>;
+> +				clocks = <&clks 87>, <&clks 86>;
+>  				clock-names = "ipg", "per";
+>  				status = "disabled";
+>  			};
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
