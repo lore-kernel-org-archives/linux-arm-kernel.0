@@ -1,28 +1,32 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 7 Jan 2013 08:48:45 -0800
-Subject: [PATCH 3.9] Driver for 7-segment displays connected over GPIOs
-In-Reply-To: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130107164845.GA2911@kroah.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 7 Jan 2013 17:53:11 +0100
+Subject: [PATCH 4/4] arm: mvebu: indentation fixes for Armada 370/XP
+ .dtsi files
+In-Reply-To: <20130106090313.GP17242@lunn.ch>
+References: <1357315498-4570-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1357315498-4570-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130106090313.GP17242@lunn.ch>
+Message-ID: <20130107175311.3fbbf68d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 05:42:05PM +0100, Thomas Petazzoni wrote:
-> Dear drivers/{char,misc}/ maintainers,
+Dear Andrew Lunn,
+
+On Sun, 6 Jan 2013 10:03:13 +0100, Andrew Lunn wrote:
+
+> White space changes are not fixes, so should not really be submitted
+> for 3.8-rc. Lets commit these as cleanup in 3.9.
 > 
-> This patch series implements a simple driver for 7-segment displays
-> connected over GPIOs through a BCD encoder. The userspace interface of
-> the driver is very simple: just a "value" file in the sysfs directory
-> of the device, which can be written to (changes the value shown on the
-> 7-segment display) and read (gives the current value).
+> I will however create and submit a patch to add the missing ;
 
-If you ever add/remove/modify sysfs files, you have to also do the same
-for the Documentation/ABI/ files as well, please redo that in this patch
-series.
+Indeed, thanks. I'll resubmit an updated patch for 3.9 for some
+whitespace changes.
 
-But, the bigger question is, why is this a kernel driver at all?  Can't
-you do this from userspace today without any new kernel code?
+Thanks!
 
-thanks,
-
-greg k-h
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
