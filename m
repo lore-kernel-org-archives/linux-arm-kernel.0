@@ -1,35 +1,79 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 7 Jan 2013 11:20:34 -0500
-Subject: [PATCH v2 1/2] ARM: Dove: Add pinctrl clock to DT
-In-Reply-To: <1353957399-28799-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1353921525-25163-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1353957399-28799-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130107162034.GH5075@titan.lakedaemon.net>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 7 Jan 2013 17:23:00 +0100
+Subject: [PATCH] mmc: mmci: Fixup clock gating when freq is 0 for ST-variants
+Message-ID: <1357575780-9075-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 08:16:38PM +0100, Sebastian Hesselbarth wrote:
-> During merge of the mvebu patches a clock gate for pinctrl was
-> lost. This patch just readds the clock gate.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: Axel Lin <axel.lin@ingics.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/boot/dts/dove.dtsi |    1 +
->  1 file changed, 1 insertion(+)
+From: Johan Rudholm <johan.rudholm@stericsson.com>
 
-Both (v2) applied to mvebu/fixes
+In the ST Micro variant, the MMCICLOCK register must not be used to
+gate the clock. Instead use MMCIPOWER register and by clearing the
+PWR_ON bit to do this.
 
-thx,
+Signed-off-by: Johan Rudholm <johan.rudholm@stericsson.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
 
-Jason.
+This patch is affecting the ux500 variants only.
+
+It is uncertain whether this new variant data for gating the clock should be
+enabled for the nomadik and u300 variant as well. We should sort that out
+before merging with this patch.
+
+---
+ drivers/mmc/host/mmci.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 1507723..e3b191f 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -59,6 +59,7 @@ static unsigned int fmax = 515633;
+  * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
+  * @pwrreg_powerup: power up value for MMCIPOWER register
+  * @signal_direction: input/out direction of bus signals can be indicated
++ * @pwrreg_clkgate: MMCIPOWER register must be used to gate the clock
+  */
+ struct variant_data {
+ 	unsigned int		clkreg;
+@@ -71,6 +72,7 @@ struct variant_data {
+ 	bool			blksz_datactrl16;
+ 	u32			pwrreg_powerup;
+ 	bool			signal_direction;
++	bool			pwrreg_clkgate;
+ };
+ 
+ static struct variant_data variant_arm = {
+@@ -118,6 +120,7 @@ static struct variant_data variant_ux500 = {
+ 	.st_clkdiv		= true,
+ 	.pwrreg_powerup		= MCI_PWR_ON,
+ 	.signal_direction	= true,
++	.pwrreg_clkgate		= true,
+ };
+ 
+ static struct variant_data variant_ux500v2 = {
+@@ -131,6 +134,7 @@ static struct variant_data variant_ux500v2 = {
+ 	.blksz_datactrl16	= true,
+ 	.pwrreg_powerup		= MCI_PWR_ON,
+ 	.signal_direction	= true,
++	.pwrreg_clkgate		= true,
+ };
+ 
+ /*
+@@ -1154,6 +1158,13 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		}
+ 	}
+ 
++	/*
++	 * If clock = 0 and the variant requires the MMCIPOWER to be used for
++	 * gating the clock, the MCI_PWR_ON bit is cleared.
++	 */
++	if (!ios->clock && variant->pwrreg_clkgate)
++		pwr &= ~MCI_PWR_ON;
++
+ 	spin_lock_irqsave(&host->lock, flags);
+ 
+ 	mmci_set_clkreg(host, ios->clock);
+-- 
+1.7.10
