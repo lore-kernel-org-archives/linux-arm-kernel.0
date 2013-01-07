@@ -1,65 +1,56 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 07 Jan 2013 20:31:18 +0800
-Subject: [PATCH v2] arch/arm/mach-s5pv210: adding ifdef CONFIG_CPU_S5PV210
- to fix compiling issue
-In-Reply-To: <50EA972E.3040404@asianux.com>
-References: <50EA972E.3040404@asianux.com>
-Message-ID: <50EAC016.6090707@asianux.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 7 Jan 2013 21:01:39 +0800
+Subject: [PATCH] Add apf51 basic support
+In-Reply-To: <CAA1eMkFXVy9ti6o7nVZNtrMm=-ymaZhEKxvPRzWj9Uqp=HDt=Q@mail.gmail.com>
+References: <1355694591-7084-1-git-send-email-laurent.cans@gmail.com>
+ <20121219203936.GG26326@pengutronix.de>
+ <20130103083534.GD2566@S2101-09.ap.freescale.net>
+ <CAA1eMkFXVy9ti6o7nVZNtrMm=-ymaZhEKxvPRzWj9Uqp=HDt=Q@mail.gmail.com>
+Message-ID: <20130107130137.GA29281@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Jan 06, 2013 at 05:19:13PM +0100, Laurent CANS wrote:
+> 2013/1/3 Shawn Guo <shawn.guo@linaro.org>:
+> > On Wed, Dec 19, 2012 at 09:39:36PM +0100, Sascha Hauer wrote:
+> >> On Sun, Dec 16, 2012 at 10:49:51PM +0100, Laurent Cans wrote:
+> >> > Signed-off-by: Laurent Cans <laurent.cans@gmail.com>
+> >> > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> >> > ---
+> >> > +   clocks {
+> >> > +           #address-cells = <1>;
+> >> > +           #size-cells = <0>;
+> >> > +
+> >> > +           ckih1 {
+> >> > +                   compatible = "fsl,imx-ckih1", "fixed-clock";
+> >> > +                   clock-frequency = <0>;
+> >> > +           };
+> >> > +
+> >> > +           osc {
+> >> > +                   compatible = "fsl,imx-osc", "fixed-clock";
+> >> > +                   clock-frequency = <33554432>;
+> >> > +           };
+> >>
+> >> These compatible properties shouldn't be necessary, right?
+> >>
+> > Use node path instead?  But imx51 clock driver is already using
+> > compatible property to identify the clocks.
+> >
+> > Shawn
+> >
+> 
+> Hi shawn,
+> 
+> I don't understand your remarks.
+> 
+Or I misunderstood Sascha's comment?  I thought he was asking you to
+remove those compatible properties, and I do not understand how that
+would work, since clock code is looking for the node using the
+compatible property.
 
-  if not define CONFIG_CPU_S5PV210
+Shawn
 
-    it will define NULL in common.h for:
-      s5pv210_map_io, s5pv210_init_clocks, s5pv210_init, s5pv210_init_uarts
-
-    so need using #ifdef CONFIG_CPU_S5PV210 for them too, in common.c.
-      or compiling issue will occur.
-
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/mach-s5pv210/common.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-s5pv210/common.c
-index 9dfe93e..5c88f88 100644
---- a/arch/arm/mach-s5pv210/common.c
-+++ b/arch/arm/mach-s5pv210/common.c
-@@ -167,6 +167,8 @@ void __init s5pv210_init_io(struct map_desc *mach_desc, int size)
- 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
- }
- 
-+#ifdef CONFIG_CPU_S5PV210
-+
- void __init s5pv210_map_io(void)
- {
- 	/* initialise device information early */
-@@ -209,6 +211,9 @@ void __init s5pv210_init_clocks(int xtal)
- 	s5pv210_setup_clocks();
- }
- 
-+#endif /* CONFIG_CPU_S5PV210 */
-+
-+
- void __init s5pv210_init_irq(void)
- {
- 	u32 vic[4];	/* S5PV210 supports 4 VIC */
-@@ -227,6 +232,8 @@ struct bus_type s5pv210_subsys = {
- 	.dev_name	= "s5pv210-core",
- };
- 
-+#ifdef CONFIG_CPU_S5PV210
-+
- static struct device s5pv210_dev = {
- 	.bus	= &s5pv210_subsys,
- };
-@@ -249,3 +256,5 @@ void __init s5pv210_init_uarts(struct s3c2410_uartcfg *cfg, int no)
- {
- 	s3c24xx_init_uartdevs("s5pv210-uart", s5p_uart_resources, cfg, no);
- }
-+
-+#endif /* CONFIG_CPU_S5PV210 */
--- 
-1.7.10.4
+> The method used to define clocks is incorrect? What is the recommended
+> method to define clocks?
+> 
+> Laurent
