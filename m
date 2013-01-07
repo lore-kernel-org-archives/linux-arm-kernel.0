@@ -1,182 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  7 Jan 2013 17:26:58 +0100
-Subject: [PATCH 3.8-rc] arm: mvebu: use global interrupts for GPIOs on Armada
- XP
-Message-ID: <1357576018-24157-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon,  7 Jan 2013 17:27:14 +0100
+Subject: [PATCH 3.8-rc] arm: mvebu: add LEDs support to defconfig file
+Message-ID: <1357576034-24193-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada XP GPIO controller has two ways of notifying interrupts:
-using global interrupts or using per-CPU interrupts. In an attempt to
-use the best available features, the 'marvell,armadaxp-gpio'
-compatible string selects a variant of the gpio-mvebu driver that
-makes use of the per-CPU interrupts.
-
-Unfortunately, this doesn't work properly in a SMP context, because we
-fall into cases where the GPIO interrupt is enabled on CPU X at the
-GPIO controller level, but on CPU Y at the interrupt controller
-level. It is not yet clear how to fix that easily.
-
-So for 3.8, our approach is to switch to global interrupts for GPIOs,
-so that we do not fall into this per-CPU interrupts problem.
-
-This patch therefore fixes GPIO interrupts on Armada XP
-platforms. Without this patch, GPIO interrupts simply do not work
-reliably, because their proper operation depends on which CPU the code
-requesting the interrupt is running.
+The OpenBlocks AX3-4 platform has several LEDs, so it sounds wise to
+enable LED support in mvebu_defconfig. We anticipate that more
+platforms using Marvell EBU SoCs will have LEDs in the future.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
 This is 3.8-rc material.
 ---
- arch/arm/boot/dts/armada-xp-mv78230.dtsi |   14 ++++++--------
- arch/arm/boot/dts/armada-xp-mv78260.dtsi |   21 +++++++++------------
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |   21 +++++++++------------
- 3 files changed, 24 insertions(+), 32 deletions(-)
+ arch/arm/configs/mvebu_defconfig |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index 271855a..e041f42 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -50,27 +50,25 @@
- 		};
- 
- 		gpio0: gpio at d0018100 {
--			compatible = "marvell,armadaxp-gpio";
--			reg = <0xd0018100 0x40>,
--			    <0xd0018800 0x30>;
-+			compatible = "marvell,orion-gpio";
-+			reg = <0xd0018100 0x40>;
- 			ngpios = <32>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupts-cells = <2>;
--			interrupts = <16>, <17>, <18>, <19>;
-+			interrupts = <82>, <83>, <84>, <85>;
- 		};
- 
- 		gpio1: gpio at d0018140 {
--			compatible = "marvell,armadaxp-gpio";
--			reg = <0xd0018140 0x40>,
--			    <0xd0018840 0x30>;
-+			compatible = "marvell,orion-gpio";
-+			reg = <0xd0018140 0x40>;
- 			ngpios = <17>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupts-cells = <2>;
--			interrupts = <20>, <21>, <22>;
-+			interrupts = <87>, <88>, <89>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 1c1937d..9e23bd8 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -51,39 +51,36 @@
- 		};
- 
- 		gpio0: gpio at d0018100 {
--			compatible = "marvell,armadaxp-gpio";
--			reg = <0xd0018100 0x40>,
--			    <0xd0018800 0x30>;
-+			compatible = "marvell,orion-gpio";
-+			reg = <0xd0018100 0x40>;
- 			ngpios = <32>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupts-cells = <2>;
--			interrupts = <16>, <17>, <18>, <19>;
-+			interrupts = <82>, <83>, <84>, <85>;
- 		};
- 
- 		gpio1: gpio at d0018140 {
--			compatible = "marvell,armadaxp-gpio";
--			reg = <0xd0018140 0x40>,
--			    <0xd0018840 0x30>;
-+			compatible = "marvell,orion-gpio";
-+			reg = <0xd0018140 0x40>;
- 			ngpios = <32>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupts-cells = <2>;
--			interrupts = <20>, <21>, <22>, <23>;
-+			interrupts = <87>, <88>, <89>, <90>;
- 		};
- 
- 		gpio2: gpio at d0018180 {
--			compatible = "marvell,armadaxp-gpio";
--			reg = <0xd0018180 0x40>,
--			    <0xd0018870 0x30>;
-+			compatible = "marvell,orion-gpio";
-+			reg = <0xd0018180 0x40>;
- 			ngpios = <3>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupts-cells = <2>;
--			interrupts = <24>;
-+			interrupts = <91>;
- 		};
- 
- 		ethernet at d0034000 {
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index 4905cf3..9659661 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -66,39 +66,36 @@
- 		};
- 
- 		gpio0: gpio at d0018100 {
--			compatible = "marvell,armadaxp-gpio";
--			reg = <0xd0018100 0x40>,
--			    <0xd0018800 0x30>;
-+			compatible = "marvell,orion-gpio";
-+			reg = <0xd0018100 0x40>;
- 			ngpios = <32>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupts-cells = <2>;
--			interrupts = <16>, <17>, <18>, <19>;
-+			interrupts = <82>, <83>, <84>, <85>;
- 		};
- 
- 		gpio1: gpio at d0018140 {
--			compatible = "marvell,armadaxp-gpio";
--			reg = <0xd0018140 0x40>,
--			    <0xd0018840 0x30>;
-+			compatible = "marvell,orion-gpio";
-+			reg = <0xd0018140 0x40>;
- 			ngpios = <32>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupts-cells = <2>;
--			interrupts = <20>, <21>, <22>, <23>;
-+			interrupts = <87>, <88>, <89>, <90>;
- 		};
- 
- 		gpio2: gpio at d0018180 {
--			compatible = "marvell,armadaxp-gpio";
--			reg = <0xd0018180 0x40>,
--			    <0xd0018870 0x30>;
-+			compatible = "marvell,orion-gpio";
-+			reg = <0xd0018180 0x40>;
- 			ngpios = <3>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupts-cells = <2>;
--			interrupts = <24>;
-+			interrupts = <91>;
- 		};
- 
- 		ethernet at d0034000 {
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 3ba35f1..6b9e95d 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -40,6 +40,11 @@ CONFIG_I2C_MV64XXX=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_USB_SUPPORT is not set
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=m
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_S35390A=y
+ CONFIG_DMADEVICES=y
 -- 
 1.7.9.5
