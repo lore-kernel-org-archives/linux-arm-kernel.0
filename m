@@ -1,63 +1,65 @@
 From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Mon, 7 Jan 2013 17:35:25 +0530
-Subject: [PATCH] i2c: samsung: resume race fix
-In-Reply-To: <20121107114437.0a563c7e@endymion.delvare>
-References: <1352284106-24988-1-git-send-email-ch.naveen@samsung.com>
- <20121107114437.0a563c7e@endymion.delvare>
-Message-ID: <CAHfPSqCQ9e3VR3En+hQGWVOt0RRGsmHzHTFvBF+h2-rEX5oXhQ@mail.gmail.com>
+Date: Mon, 7 Jan 2013 17:36:17 +0530
+Subject: [PATCH 1/2] ARM: exynos5: Add gate clocks for HS-I2C
+In-Reply-To: <1356694851-1345-1-git-send-email-ch.naveen@samsung.com>
+References: <1356694851-1345-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <CAHfPSqCgYz8r05gBxOwCbi3a4_R0Kaatps8aOEmp_Ck=fakoFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 November 2012 16:14, Jean Delvare <khali@linux-fr.org> wrote:
-> On Wed, 07 Nov 2012 15:58:26 +0530, Naveen Krishna Chatradhi wrote:
->> Don't unmark the device as suspended until after it's been re-setup.
->>
->> The main race would be w.r.t. an i2c driver that gets resumed at the same
->> time (asyncronously), that is allowed to do a transfer since suspended
->> is set to 0 before reinit, but really should have seen the -EIO return
->> instead.
+On 28 December 2012 17:10, Naveen Krishna Chatradhi
+<ch.naveen@samsung.com> wrote:
+> Adds clock gating bits for High Speed I2C channels 0, 1, 2 and 3.
 >
-> I thought that the suspend order was children first and the resume
-> order was parent first?
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> ---
+>  arch/arm/mach-exynos/clock-exynos5.c |   24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
 >
-> If this can really happen then I am afraid this is an issue for more
-> than just i2c-s3c2410. The proposed solution is also not really
-> satisfactory, as the i2c client will certainly still fail to resume
-> properly (the only improvement is that now the failure is no longer
-> silent.)
->
->>
->> Signed-off-by: Olof Johansson <olofj@chromium.org>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->> ---
->>  drivers/i2c/busses/i2c-s3c2410.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
->> index 3e0335f..dbaf920 100644
->> --- a/drivers/i2c/busses/i2c-s3c2410.c
->> +++ b/drivers/i2c/busses/i2c-s3c2410.c
->> @@ -1134,10 +1134,10 @@ static int s3c24xx_i2c_resume(struct device *dev)
->>       struct platform_device *pdev = to_platform_device(dev);
->>       struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
->>
->> -     i2c->suspended = 0;
->>       clk_prepare_enable(i2c->clk);
->>       s3c24xx_i2c_init(i2c);
->>       clk_disable_unprepare(i2c->clk);
->> +     i2c->suspended = 0;
->>
->>       return 0;
->>  }
->
-> Acked-by: Jean Delvare <khali@linux-fr.org>
-I don't see this patch landed any where in linux-i2c tree, Though it was acked.
-Was it missed or should i be doing something for this to be merged ??
->
-> (Not perfect but still better than before.)
+> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+> index 0208c3a..f9fa0c7 100644
+> --- a/arch/arm/mach-exynos/clock-exynos5.c
+> +++ b/arch/arm/mach-exynos/clock-exynos5.c
+> @@ -753,6 +753,30 @@ static struct clk exynos5_init_clocks_off[] = {
+>                 .enable         = exynos5_clk_ip_peric_ctrl,
+>                 .ctrlbit        = (1 << 27),
+>         }, {
+> +               .name           = "hsi2c",
+> +               .devname        = "exynos5-hsi2c.0",
+> +               .enable         = exynos5_clk_ip_peric_ctrl,
+> +               .parent         = &exynos5_clk_aclk_66.clk,
+> +               .ctrlbit        = (1 << 28),
+> +       }, {
+> +               .name           = "hsi2c",
+> +               .devname        = "exynos5-hsi2c.1",
+> +               .enable         = exynos5_clk_ip_peric_ctrl,
+> +               .parent         = &exynos5_clk_aclk_66.clk,
+> +               .ctrlbit        = (1 << 29),
+> +       }, {
+> +               .name           = "hsi2c",
+> +               .devname        = "exynos5-hsi2c.2",
+> +               .enable         = exynos5_clk_ip_peric_ctrl,
+> +               .parent         = &exynos5_clk_aclk_66.clk,
+> +               .ctrlbit        = (1 << 30),
+> +       }, {
+> +               .name           = "hsi2c",
+> +               .devname        = "exynos5-hsi2c.3",
+> +               .enable         = exynos5_clk_ip_peric_ctrl,
+> +               .parent         = &exynos5_clk_aclk_66.clk,
+> +               .ctrlbit        = (1 << 31),
+> +       }, {
+>                 .name           = "usbhost",
+>                 .enable         = exynos5_clk_ip_fsys_ctrl ,
+>                 .ctrlbit        = (1 << 18),
+> --
+> 1.7.9.5
+
+Any comments on this patch please.
 >
 > --
-> Jean Delvare
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 
 
