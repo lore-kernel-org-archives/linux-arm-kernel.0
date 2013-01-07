@@ -1,70 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 07 Jan 2013 15:26:01 +0100
-Subject: [PATCH 1/3] gpio: pca953x: make the register access by GPIO bank
-In-Reply-To: <1357493688-25061-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1357493688-25061-1-git-send-email-gregory.clement@free-electrons.com>
- <1357493688-25061-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <50EADAF9.2030805@free-electrons.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon,  7 Jan 2013 15:27:00 +0100
+Subject: [PATCH] ARM: mx5: Fix MX53 flexcan2 clock
+Message-ID: <1357568820-15426-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+The second FlexCAN port uses different clock than the first one, configure
+correct clock to prevent hanging of the system during bringing up of the port.
 
-Le 06/01/2013 18:34, Gregory CLEMENT a ?crit :
-> +static int pca953x_write_regs(struct pca953x_chip *chip, int reg, u8 *val)
->  {
->  	int ret = 0;
->  
->  	if (chip->gpio_chip.ngpio <= 8)
-> -		ret = i2c_smbus_write_byte_data(chip->client, reg, val);
-> -	else if (chip->gpio_chip.ngpio == 24) {
-> -		cpu_to_le32s(&val);
-> +		ret = i2c_smbus_write_byte_data(chip->client, reg, *val);
-> +	else if (chip->gpio_chip.ngpio >= 24) {
-> +		int bank_shift = fls(chip->gpio_chip.ngpio) - 3;
->  		ret = i2c_smbus_write_i2c_block_data(chip->client,
-> -						(reg << 2) | REG_ADDR_AI,
-> -						3,
-> -						(u8 *) &val);
-> +					(reg << bank_shift) | REG_ADDR_AI,
-> +					NBANK(chip),
-> +					val);
->  	}
->  	else {
->  		switch (chip->chip_type) {
->  		case PCA953X_TYPE:
->  			ret = i2c_smbus_write_word_data(chip->client,
-> -							reg << 1, val);
-> +							reg << 1, (u16) *val);
->  			break;
->  		case PCA957X_TYPE:
->  			ret = i2c_smbus_write_byte_data(chip->client, reg << 1,
-> -							val & 0xff);
-> +							val[0]);
->  			if (ret < 0)
->  				break;
->  			ret = i2c_smbus_write_byte_data(chip->client,
->  							(reg << 1) + 1,
-> -							(val & 0xff00) >> 8);
-> +							val[1]);
->  			break;
->  		}
->  	}
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx53.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I just tested your patch on a PCA9555 on the Crystalfontz CFA-10049, and
-it doesn't work anywore. It returns ENXIO now when you use this
-function. As discussed on IRC, it seems that the fix would be to replace
-all the calls to fls(chip->gpio_chip.ngpio) by fls(chip->gpio_chip.ngpio
-- 1).
-
-Also, all the irq handling is not compiling anymore for trivial errors
-(variables not defined, incompatible types, etc.). So obviously, I
-couldn't test the changes you made on the IRQ related functions.
-
-Maxime
-
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 5b59763..abe0f0b 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -614,7 +614,7 @@
+ 				compatible = "fsl,imx53-flexcan", "fsl,p1010-flexcan";
+ 				reg = <0x53fcc000 0x4000>;
+ 				interrupts = <83>;
+-				clocks = <&clks 158>, <&clks 157>;
++				clocks = <&clks 87>, <&clks 86>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
