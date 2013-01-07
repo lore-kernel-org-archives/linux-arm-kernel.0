@@ -1,64 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Jan 2013 18:06:44 +0000
-Subject: [PATCH 3.9] Driver for 7-segment displays connected over GPIOs
-In-Reply-To: <20130107184352.2e90abfb@skate>
-References: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130107164845.GA2911@kroah.com> <20130107180708.2ffc1540@skate>
- <20130107172340.GA32401@kroah.com> <20130107184022.72b23aa9@skate>
- <20130107184352.2e90abfb@skate>
-Message-ID: <20130107180644.GE3222@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 7 Jan 2013 13:17:31 -0500
+Subject: [PATCH v2] ARM: kirkwood: convert Guruplug Server Plus to use
+ the device tree
+In-Reply-To: <20130107180849.GA28008@1wt.eu>
+References: <20121202155124.GA30807@1wt.eu>
+ <20121202230926.GJ12509@titan.lakedaemon.net>
+ <20121202232226.GL30822@1wt.eu>
+ <20121202234110.GM12509@titan.lakedaemon.net>
+ <20121209184004.GC28052@1wt.eu>
+ <20130107174831.GN5075@titan.lakedaemon.net>
+ <20130107180849.GA28008@1wt.eu>
+Message-ID: <20130107181731.GQ5075@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 06:43:52PM +0100, Thomas Petazzoni wrote:
-> On Mon, 7 Jan 2013 18:40:22 +0100, Thomas Petazzoni wrote:
-> > > > Not having a kernel driver means that gazillions of applications
-> > > > re-invent the same piece of code over and over again, have to hardcode
-> > > > the GPIO numbers for a given piece of hardware, while the kernel
-> > > > abstract all of this very nicely.
-> > > 
-> > > That sounds like a wonderful use of a userspace library to do this
-> > > properly.  Much like libusb does, right?
-> > > 
-> > > I still think as this can be done in userspace, it probably should be.
-> > 
-> > Understood. Patches discarded.
+On Mon, Jan 07, 2013 at 07:08:49PM +0100, Willy Tarreau wrote:
+> Hi Jason,
 > 
-> Thinking more about this. How would your userspace library know on which
-> GPIOs your 7-seg segment device is connected? Should it parse the
-> Device Tree from userspace? Given by the user-space application who
-> would have to hardcode the GPIO numbers, completely defeating the
-> hardware abstraction layer that the kernel intends to be?
+> On Mon, Jan 07, 2013 at 12:48:31PM -0500, Jason Cooper wrote:
+> > On Sun, Dec 09, 2012 at 07:40:04PM +0100, Willy Tarreau wrote:
+> > > From 075e116c6cb513af0e0b9d9167ddd47e1b084bca Mon Sep 17 00:00:00 2001
+> > > From: Willy Tarreau <w@1wt.eu>
+> > > Date: Sun, 9 Dec 2012 19:21:09 +0100
+> > > Subject: ARM: kirkwood: convert Guruplug Server Plus to device tree
+> > > 
+> > > Add a device tree entry for the Guruplug Server Plus board. This port
+> > > was based both on the work done on the dreamplug and the dockstar.
+> > > 
+> > > It builds, boots and works on my Guruplug Server Plus.
+> > > 
+> > > Signed-off-by: Willy Tarreau <w@1wt.eu>
+> > > ---
+> > >  arch/arm/boot/dts/Makefile                         |  1 +
+> > >  .../arm/boot/dts/kirkwood-guruplug-server-plus.dts | 94 ++++++++++++++++++++++
+> > >  arch/arm/mach-kirkwood/Kconfig                     |  7 ++
+> > >  arch/arm/mach-kirkwood/Makefile                    |  1 +
+> > >  arch/arm/mach-kirkwood/board-dt.c                  |  4 +
+> > >  arch/arm/mach-kirkwood/board-guruplug.c            | 39 +++++++++
+> > >  arch/arm/mach-kirkwood/common.h                    |  5 ++
+> > >  7 files changed, 151 insertions(+)
+> > >  create mode 100644 arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+> > >  create mode 100644 arch/arm/mach-kirkwood/board-guruplug.c
+> > 
+> > Applied to mvebu/boards.
+> 
+> I'm assuming you meant kirkwood instead of mvebu here, but thanks anyway !
 
-An application using the library gives it a list of GPIOs corresponding to
-the segments.  If you think about it, the library could also know about a
-group of 7-segs and output a multi-digit number in a sane manner.
+mach-mvebu is where everything is being migrated to once the DT
+conversion is complete.  We use the name internally to refer to any SoCs
+created by Marvell in the EBU division.
 
-There's also alphanumeric segmented displays too.  Do we want yet another
-different kernel driver for that or should that also be handled in
-userspace by the library?  What about a mixture of numeric and alphanumeric
-displays?
+So, yes, it's kirkwood, but it falls under mvebu stuff.  Just like dove
+and orion5x.
 
-Some radios I've seen have a mixture of these two types of display.  Others
-have partial displays too - take for instance a clock display.  The hours
-display only needs to display nothing or 1, or maybe nothing, 1, 2 (yes,
-you can get displays with segments missing.)
+hth,
 
-The contary point to this is... what about 7-segment displays which are
-scanned, where the cathodes of each display are commoned (so segment 'a'
-is shared between each 7-seg display) and the anodes are sequenced?
-Those are popular in certain consumer equipment (like radios) and I
-suspect such a display wouldn't be possible from userspace.  _However_
-again, there's nothing saying that it will always be a 7-seg display -
-it could be again a mixture.
-
-In the case of vacuum flourescent displays, these are very commonly
-scanned affairs (gate scanning with commoned anodes for the segments)
-in the manner I describe above, and included are segments for various
-functions (eg, a separate segment for the weekday name.)  We've all
-seen them on video recorders and such like over the years:
-http://en.wikipedia.org/wiki/File:Vacuum_fluorescent_1.jpg
-
-So really, there's a whole pile of display classes here that need to be
-thought about before anyone goes creating a single interface for just
-one specific display type.
+Jason.
