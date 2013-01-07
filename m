@@ -1,62 +1,67 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 07 Jan 2013 17:28:22 +0200
-Subject: [PATCH 1/4] ALSA: pxa2xx: fix ac97 cold reset
-In-Reply-To: <50EAD983.5060801@newsguy.com>
-References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
- <1357499640-13871-2-git-send-email-mikedunn@newsguy.com>
- <50EA9287.5030304@compulab.co.il> <50EACF4D.4000602@newsguy.com>
- <50EAD43C.2040406@compulab.co.il> <50EAD983.5060801@newsguy.com>
-Message-ID: <50EAE996.8080401@compulab.co.il>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 7 Jan 2013 16:34:31 +0100
+Subject: [GIT PULL] ux500 cpufreq and clksrc updates
+Message-ID: <CACRpkda7zAD0yFD8LT7K-F9HhEmJPOfcQ9fA35h=Yp8ThMyP9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/13 16:19, Mike Dunn wrote:
-> On 01/07/2013 05:57 AM, Igor Grinberg wrote:
->> On 01/07/13 15:36, Mike Dunn wrote:
->>> On 01/07/2013 01:16 AM, Igor Grinberg wrote:
->>>> On 01/06/13 21:13, Mike Dunn wrote:
->>>
->>>
->>> [..]
->>>
->>>
->>>>>  static inline void pxa_ac97_cold_pxa27x(void)
->>>>>  {
->>>>> +	unsigned int timeout;
->>>>> +
->>>>>  	GCR &=  GCR_COLD_RST;  /* clear everything but nCRST */
->>>>>  	GCR &= ~GCR_COLD_RST;  /* then assert nCRST */
->>>>>  
->>>>> @@ -157,8 +159,10 @@ static inline void pxa_ac97_cold_pxa27x(void)
->>>>>  	clk_enable(ac97conf_clk);
->>>>>  	udelay(5);
->>>>>  	clk_disable(ac97conf_clk);
->>>>> -	GCR = GCR_COLD_RST;
->>>>> -	udelay(50);
->>>>> +	GCR = GCR_COLD_RST | GCR_WARM_RST;
->>>>> +	timeout = 100;     /* wait for the codec-ready bit to be set */
->>>>> +	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
->>>>> +		mdelay(1);
->>>>
->>>> Can we use msleep() instead?
->>>> May be this will require to change the granularity to 10...
->>>
->>>
->>> Probably.  mdelay() is used by similiar code in the same file, so I just stayed
->>> consistent.  The code runs very infrequently, so I didn't worry about it.
->>
->> Well, if we can, I think we'd better do, no?
-> 
-> 
-> If you feel strongly about it, I'll defer to you.  But again my arguments are
-> (1) the code runs very infrequently, and (2) very similar code for the other pxa
-> family siblings uses mdelay().
+Hi ARM SoC maintainers,
 
-No, not too strong, but please, don't argument your code with something like:
-"there are other places where this is done", because it might be done
-improperly and just go in unnoticed.
+here is a pile of patches which pertain to the ux500 cpufreq and clksrc
+implementations. I have agreed with respective subsystem maintainer
+to take this through ARM SoC since I also have additional dependencies
+on top for multiplatform, which will likely build on top of these (but it's
+nice to get this in first).
+
+The clksrc and cpufreq changes are dependent on merge order and
+thus cannot pass through different trees.
+
+All of this is to be queued for-next (v3.9).
+
+Please pull it in!
+
+Yours,
+Linus Walleij
 
 
--- 
-Regards,
-Igor.
+The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+
+  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-cpufreq-for-arm-soc
+
+for you to fetch changes up to ec6691239373395d64fb73f50444f09a6f29d5ef:
+
+  cpufreq: db8500: set CPUFREQ_CONST_LOOPS (2013-01-07 16:03:43 +0100)
+
+----------------------------------------------------------------
+These are cpufreq updates for the ux500
+- Updates to the ux500 cpufreq driver
+- Support for delay timers in the MTU clksrc
+- Consequential updates to the cpufreq driver
+
+----------------------------------------------------------------
+Fabio Baltieri (2):
+      clocksource: nomadik-mtu: support timer-based delay
+      cpufreq: db8500: set CPUFREQ_CONST_LOOPS
+
+Jonas Aaberg (1):
+      cpufreq: dbx500: Minor code cleanup
+
+Lee Jones (3):
+      cpufreq: Give driver used for dbx500 family a more generic name
+      mfd: db8500: Update cpufreq device name
+      cpufreq: dbx500: Update file header
+
+Ulf Hansson (1):
+      cpufreq: dbx500: Move clk_get to probe
+
+ drivers/clocksource/nomadik-mtu.c                  |  11 +++
+ drivers/cpufreq/Makefile                           |   2 +-
+ .../cpufreq/{db8500-cpufreq.c => dbx500-cpufreq.c} | 101 +++++++++++----------
+ drivers/mfd/db8500-prcmu.c                         |   4 +-
+ 4 files changed, 65 insertions(+), 53 deletions(-)
+ rename drivers/cpufreq/{db8500-cpufreq.c => dbx500-cpufreq.c} (62%)
