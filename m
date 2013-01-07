@@ -1,32 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 7 Jan 2013 17:53:11 +0100
-Subject: [PATCH 4/4] arm: mvebu: indentation fixes for Armada 370/XP
- .dtsi files
-In-Reply-To: <20130106090313.GP17242@lunn.ch>
-References: <1357315498-4570-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1357315498-4570-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130106090313.GP17242@lunn.ch>
-Message-ID: <20130107175311.3fbbf68d@skate>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Mon, 7 Jan 2013 16:53:11 +0000
+Subject: [PATCH 3.8-rc] net: mvneta: fix driver operation in SMP context
+In-Reply-To: <1357576074-24245-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1357576074-24245-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1357577591.2658.16.camel@bwh-desktop.uk.solarflarecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
-
-On Sun, 6 Jan 2013 10:03:13 +0100, Andrew Lunn wrote:
-
-> White space changes are not fixes, so should not really be submitted
-> for 3.8-rc. Lets commit these as cleanup in 3.9.
+On Mon, 2013-01-07 at 17:27 +0100, Thomas Petazzoni wrote:
+> From: Dmitri Epshtein <dima@marvell.com>
 > 
-> I will however create and submit a patch to add the missing ;
+> In order for the driver to behave properly in a SMP context, the same
+> transmit queue should be used by the kernel in dev_queue_xmit() and in
+> the driver's mvneta_tx() function. To achieve that, the driver now
+> implements the ->ndo_select_txq() operation.
+>
+> For now, it always returns the same transmit queue, txq_def, until the
+> driver is expanded to properly take advantage of the multiqueue
+> capabilities of the hardware.
+[...]
 
-Indeed, thanks. I'll resubmit an updated patch for 3.9 for some
-whitespace changes.
+Well it looks like the driver already sets up multiple TX queues, and
+you just need to call skb_get_queue_mapping(skb) to look up the TX queue
+in mvneta_tx().
 
-Thanks!
+Also since the numbers of queues are variable you should be calling
+alloc_etherdev_mqs(sizeof(struct mvneta_port), txq_number, rxq_number)
+instead of alloc_etherdev_mq(..., 8) in mvneta_probe().
 
-Thomas
+If for some reason the current hardware initialisation doesn't actually
+work for more than 1 TX queue then change the number you pass to
+alloc_etherdev_mqs().
+
+Ben.
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
