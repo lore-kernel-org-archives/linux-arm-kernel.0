@@ -1,61 +1,76 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 7 Jan 2013 14:13:47 +0200
-Subject: [PATCH v2 01/11] clk: tegra: Add tegra specific clocks
-In-Reply-To: <1356619644-18565-2-git-send-email-pgaikwad@nvidia.com>
-References: <1356619644-18565-1-git-send-email-pgaikwad@nvidia.com>
- <1356619644-18565-2-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <20130107121347.GG26066@tbergstrom-lnx.Nvidia.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 7 Jan 2013 12:18:07 +0000
+Subject: [PATCH 2/2] ARM: hyp: simplify __hyp_stub_install epilog
+In-Reply-To: <1357321455-9264-3-git-send-email-marc.zyngier@arm.com>
+References: <1357321455-9264-1-git-send-email-marc.zyngier@arm.com>
+ <1357321455-9264-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130107121807.GA2050@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 27, 2012 at 03:47:14PM +0100, Prashant Gaikwad wrote:
-> Add tegra specific clocks, pll, pll_out, peripheral,
-> frac_divider, super.
+On Fri, Jan 04, 2013 at 05:44:15PM +0000, Marc Zyngier wrote:
+> __hyp_stub_install duplicates quite a bit of safe_svcmode_maskall
+> by forcing the CPU back to SVC. This is unnecessary, as
+> safe_svcmode_maskall is called just after.
 > 
+> Furthermore, the way we build SPSR_hyp is buggy as we fail to mask
+> the interrupts, leading to interesting behaviours on TC2 + UEFI.
+> 
+> The fix is to simply remove this code and rely on safe_svcmode_maskall
+> to do the right thing.
+> 
+> Cc: Dave Martin <dave.martin@linaro.org>
+> Reported-by: Harry Liebel <harry.liebel@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-...
+Although there is clearly a bug here, it looks like interrupts will
+promptly get masked afterwards due to save_svcmode_maskall.  This would
+only fail if there is an interrupts asserted during this hazard ...?
 
-> diff --git a/drivers/clk/tegra/clk-pll-out.c b/drivers/clk/tegra/clk-pll-out.c
-> new file mode 100644
-> index 0000000..60a117b
-> --- /dev/null
-> +++ b/drivers/clk/tegra/clk-pll-out.c
-> @@ -0,0 +1,124 @@
-> +/*
-> + * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/io.h>
-> +#include <linux/err.h>
-> +#include <linux/delay.h>
-> +#include <linux/slab.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/clk.h>
-> +
-> +#include "clk.h"
-> +
-> +#define to_clk_pll_out(_hw) container_of(_hw, struct tegra_clk_pll_out, hw)
-> +
-> +#define pll_out_enb(p) (BIT(p->enb_bit_idx))
-> +#define pll_out_rst(p) (BIT(p->rst_bit_idx))
-> +
+Anyway, There's certainly no sense in trying to drop down to SVC mode
+twice, so I agree that it is better to delegate that to the
+save_svcmode_maskall macro.
 
-Given that these 2 are always consecutive bits, wouldn't it make more sense to
-specify the bit offset once and then add 1 for the enable bit?
+Reviewed-by: Dave Martin <dave.martin@linaro.org>
 
-Cheers,
+Cheers
+---Dave
 
-Peter.
+> ---
+>  arch/arm/kernel/hyp-stub.S | 12 +++---------
+>  1 file changed, 3 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> index 65b2417..da7e19f 100644
+> --- a/arch/arm/kernel/hyp-stub.S
+> +++ b/arch/arm/kernel/hyp-stub.S
+> @@ -120,7 +120,8 @@ ENTRY(__hyp_stub_install_secondary)
+>   * Eventually, CPU-specific code might be needed -- assume not for now
+>   *
+>   * This code relies on the "eret" instruction to synchronize the
+> - * various coprocessor accesses.
+> + * various coprocessor accesses. This is done when we switch to SVC
+> + * (see safe_svcmode_maskall).
+>   */
+>  	@ Now install the hypervisor stub:
+>  	adr	r7, __hyp_stub_vectors
+> @@ -155,14 +156,7 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
+>  1:
+>  #endif
+>  
+> -	bic	r7, r4, #MODE_MASK
+> -	orr	r7, r7, #SVC_MODE
+> -THUMB(	orr	r7, r7, #PSR_T_BIT	)
+> -	msr	spsr_cxsf, r7		@ This is SPSR_hyp.
+> -
+> -	__MSR_ELR_HYP(14)		@ msr elr_hyp, lr
+> -	__ERET				@ return, switching to SVC mode
+> -					@ The boot CPU mode is left in r4.
+> +	bx	lr			@ The boot CPU mode is left in r4.
+>  ENDPROC(__hyp_stub_install_secondary)
+>  
+>  __hyp_stub_do_trap:
+> -- 
+> 1.8.1
+> 
+> 
