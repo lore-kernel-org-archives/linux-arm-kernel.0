@@ -1,46 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 7 Jan 2013 14:25:54 +0000
-Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
-In-Reply-To: <87ehhxahd1.fsf@xmission.com>
-References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
- <50E4C9C6.20609@codeaurora.org>
- <20130103120259.GB5193@mudshark.cambridge.arm.com>
- <20130103122100.GN2631@n2100.arm.linux.org.uk>
- <50E5E967.3020805@wwwdotorg.org>
- <20130106162200.GC11025@mudshark.cambridge.arm.com>
- <20130106164033.GA3222@n2100.arm.linux.org.uk>
- <87ehhxahd1.fsf@xmission.com>
-Message-ID: <20130107142554.GG13542@mudshark.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 07 Jan 2013 15:26:01 +0100
+Subject: [PATCH 1/3] gpio: pca953x: make the register access by GPIO bank
+In-Reply-To: <1357493688-25061-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1357493688-25061-1-git-send-email-gregory.clement@free-electrons.com>
+ <1357493688-25061-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <50EADAF9.2030805@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Gregory,
 
-On Mon, Jan 07, 2013 at 01:53:30AM +0000, Eric W. Biederman wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > The problem is... on ARM we're yet again shot in the foot through the
-> > unwillingness to architect certain aspects of the system: there is no
-> > architecturally known way to place CPUs into a reset state once they've
-> > been started up.  In other words, once a CPU starts executing kernel
-> > code, it needs to always execute kernel code or there must be some kind
-> > of platform specific hook to disable it.
-> >
-> > Maybe that's the answer here: have machine_shutdown() call out to some
-> > platform specific function to do the forced-takedown of secondary CPUs,
-> > and if there's no such specific function, then we use our present CPU
-> > stopping method of making them spin in a WFI loop with IRQs disabled.
-> 
-> Yes.  On x86 we have had the generic equivalent of disable_nonboot_cpus
-> in the machine_shutdown for a long time.
+Le 06/01/2013 18:34, Gregory CLEMENT a ?crit :
+> +static int pca953x_write_regs(struct pca953x_chip *chip, int reg, u8 *val)
+>  {
+>  	int ret = 0;
+>  
+>  	if (chip->gpio_chip.ngpio <= 8)
+> -		ret = i2c_smbus_write_byte_data(chip->client, reg, val);
+> -	else if (chip->gpio_chip.ngpio == 24) {
+> -		cpu_to_le32s(&val);
+> +		ret = i2c_smbus_write_byte_data(chip->client, reg, *val);
+> +	else if (chip->gpio_chip.ngpio >= 24) {
+> +		int bank_shift = fls(chip->gpio_chip.ngpio) - 3;
+>  		ret = i2c_smbus_write_i2c_block_data(chip->client,
+> -						(reg << 2) | REG_ADDR_AI,
+> -						3,
+> -						(u8 *) &val);
+> +					(reg << bank_shift) | REG_ADDR_AI,
+> +					NBANK(chip),
+> +					val);
+>  	}
+>  	else {
+>  		switch (chip->chip_type) {
+>  		case PCA953X_TYPE:
+>  			ret = i2c_smbus_write_word_data(chip->client,
+> -							reg << 1, val);
+> +							reg << 1, (u16) *val);
+>  			break;
+>  		case PCA957X_TYPE:
+>  			ret = i2c_smbus_write_byte_data(chip->client, reg << 1,
+> -							val & 0xff);
+> +							val[0]);
+>  			if (ret < 0)
+>  				break;
+>  			ret = i2c_smbus_write_byte_data(chip->client,
+>  							(reg << 1) + 1,
+> -							(val & 0xff00) >> 8);
+> +							val[1]);
+>  			break;
+>  		}
+>  	}
 
-Ok, we can do that that on ARM too, but we currently call machine_shutdown
-from machine_{power_off, halt, restart} so we just need to fix that and we
-will be doing functionally the same thing as x86.
+I just tested your patch on a PCA9555 on the Crystalfontz CFA-10049, and
+it doesn't work anywore. It returns ENXIO now when you use this
+function. As discussed on IRC, it seems that the fix would be to replace
+all the calls to fls(chip->gpio_chip.ngpio) by fls(chip->gpio_chip.ngpio
+- 1).
 
-> Please note the only code path that generically calls machine_shutdown()
-> is kernel_kexec() so if you wish you can avoid duplication by
-> refactoring you architecture specific code.
+Also, all the irq handling is not compiling anymore for trivial errors
+(variables not defined, incompatible types, etc.). So obviously, I
+couldn't test the changes you made on the IRQ related functions.
 
-Exactly, that sounds like the right way forward to me. Thanks.
+Maxime
 
-Will
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
