@@ -1,62 +1,38 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 07 Jan 2013 11:16:55 +0200
-Subject: [PATCH 1/4] ALSA: pxa2xx: fix ac97 cold reset
-In-Reply-To: <1357499640-13871-2-git-send-email-mikedunn@newsguy.com>
-References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
- <1357499640-13871-2-git-send-email-mikedunn@newsguy.com>
-Message-ID: <50EA9287.5030304@compulab.co.il>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 07 Jan 2013 10:20:04 +0100
+Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
+In-Reply-To: <20121222172133.GT23971@game.jcrosoft.org>
+References: <20121219183236.GP23971@game.jcrosoft.org>
+ <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
+ <50D2EBA1.4050305@free-electrons.com> <50D2EDE6.3090706@atmel.com>
+ <50D3340F.3090209@free-electrons.com> <50D33940.4000607@atmel.com>
+ <50D426C1.5050807@free-electrons.com>
+ <20121222172133.GT23971@game.jcrosoft.org>
+Message-ID: <50EA9344.8060002@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/13 21:13, Mike Dunn wrote:
-> Cold reset on the pxa27x currently fails and
+Le 22/12/2012 18:21, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+> On 10:07 Fri 21 Dec     , Maxime Ripard wrote:
+>> Le 20/12/2012 17:13, ludovic.desroches a ?crit :
+>>> I have not found other ways to deal with it properly. I would like to
+>>> have them hidden into the driver (depending on the compatible string)
+>>> but it will be a mess if we split parameters into dt and driver.
+>>
+>> I'm glad we feel the same way :)
+> I'm not I fee; exactly this opposte way
 > 
->      pxa2xx_ac97_try_cold_reset: cold reset timeout (GSR=0x44)
-> 
-> appears in the kernel log.  Through trial-and-error (the pxa270 developer's
-> manual is mostly incoherent on the topic of ac97 reset), I got cold reset to
-> complete by setting the WARM_RST bit in the GCR register (and later noticed that
-> pxa3xx does this for cold reset as well).  Also, a timeout loop is needed to
-> wait for the reset to complete.
-> 
-> Tested on a palm treo 680 machine.
-> 
-> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
-> ---
->  sound/arm/pxa2xx-ac97-lib.c |    8 ++++++--
->  1 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
-> index 6fc0ae9..1ecd0a66 100644
-> --- a/sound/arm/pxa2xx-ac97-lib.c
-> +++ b/sound/arm/pxa2xx-ac97-lib.c
-> @@ -148,6 +148,8 @@ static inline void pxa_ac97_warm_pxa27x(void)
->  
->  static inline void pxa_ac97_cold_pxa27x(void)
->  {
-> +	unsigned int timeout;
-> +
->  	GCR &=  GCR_COLD_RST;  /* clear everything but nCRST */
->  	GCR &= ~GCR_COLD_RST;  /* then assert nCRST */
->  
-> @@ -157,8 +159,10 @@ static inline void pxa_ac97_cold_pxa27x(void)
->  	clk_enable(ac97conf_clk);
->  	udelay(5);
->  	clk_disable(ac97conf_clk);
-> -	GCR = GCR_COLD_RST;
-> -	udelay(50);
-> +	GCR = GCR_COLD_RST | GCR_WARM_RST;
-> +	timeout = 100;     /* wait for the codec-ready bit to be set */
-> +	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
-> +		mdelay(1);
+> I do want to toucht the kernel code to add new soc
 
-Can we use msleep() instead?
-May be this will require to change the granularity to 10...
+This is an argument we already had, and yes, I still don't like these
+bindings.
 
->  }
->  #endif
->  
+And both this patchset and what Ludovic and you said in this thread have
+proven that this is something that can't be achieved, you'll always have
+to modify the driver anyway.
 
 -- 
-Regards,
-Igor.
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
