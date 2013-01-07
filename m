@@ -1,61 +1,49 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 07 Jan 2013 08:41:34 -0500
-Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
-In-Reply-To: <CA+KhAHYbDU0Ajr5uPEjPxX2ECitvnK2ENOjmqjC=3G657GvG7w@mail.gmail.com>
-References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
- <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
- <20130103103815.GL2631@n2100.arm.linux.org.uk>
- <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
- <1357220165.10284.30.camel@gandalf.local.home>
- <20130103141301.GQ2631@n2100.arm.linux.org.uk>
- <1357229038.10284.46.camel@gandalf.local.home>
- <20130103162359.GR2631@n2100.arm.linux.org.uk>
- <1357232337.10284.67.camel@gandalf.local.home>
- <CA+KhAHYbDU0Ajr5uPEjPxX2ECitvnK2ENOjmqjC=3G657GvG7w@mail.gmail.com>
-Message-ID: <1357566094.10284.83.camel@gandalf.local.home>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 07 Jan 2013 14:47:58 +0100
+Subject: [GIT PULL] MTU clksrc changes for v3.9
+In-Reply-To: <CACRpkdY3bdsCzva0+wrFQYLK-nRtNwQ_AYOEL5rpzjZAvMmh3Q@mail.gmail.com>
+References: <CACRpkdaFLNWj4qg=571K5pCrE01r6JoSOGoUvGGBOCeEW=3hYQ@mail.gmail.com>
+ <CACRpkdY3bdsCzva0+wrFQYLK-nRtNwQ_AYOEL5rpzjZAvMmh3Q@mail.gmail.com>
+Message-ID: <1401334.iRpc7dK4pf@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-01-04 at 17:45 +0900, Keun-O Park wrote:
-
-> With "CFLAGS_REMOVE_unwind.o = -pg" and with CONFIG_PROVE_LOCKING
-> turned on, I confirmed that
-> there's no trace output like Steve mentioned.
-> However, if I turn off CONFIG_PROVE_LOCKING, "irqsoff" and
-> "preemptirqsoff" ftracer prints these lines :
+On Monday, January 07, 2013 11:13:53 AM Linus Walleij wrote:
+> On Mon, Jan 7, 2013 at 11:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 > 
-> kernel_text_address <-unwind_frame
-> core_kernel_text <-unwind_frame
-> search_index <-unwind_frame
+> > Since there are some pending patches moving the ux500 cpufreq driver
+> > around here:
+> > http://marc.info/?l=linux-arm-kernel&m=135515323413100&w=2
+> > it should be applied to the cpufreq tree to minimize conflicts.
+> > Patches are ACKed by John Stultz.
+> >
+> > Please pull it into the cpufreq tree or advise on alternate path, we can
+> > also take this and the other cpufreq patches through the ARM SoC
+> > tree if you ACK them.
 > 
-> While I investigated the reason, I just found out there's two function
-> with same name, trace_hardirqs_off.
-> One in kernel/trace/trace_irqsoff.c and another in kernel/lockdep.c.
-> And both symbols are exported.
-> I am wondering whether it is intentionally maintained code to
-> manipulate ftrace and lockdep or not.
-> I guess it's probably not.
+> Thinking of it again I also sent out this patch messing around with the
+> cpufreq driver:
+> http://marc.info/?l=linux-arm-kernel&m=135754842927541&w=2
+> 
+> I think it may be best after all to take all of this through the ARM
+> SoC tree.
+> 
+> But I'd like your ACKs on the CPUfreq stuff though... The patch
+> here
+> "cpufreq: db8500: set CPUFREQ_CONST_LOOPS",
+> These five patches:
+> http://marc.info/?l=linux-arm-kernel&m=135515323413100&w=2
+> And the one just referenced:
+> http://marc.info/?l=linux-arm-kernel&m=135754842927541&w=2
+> 
+> Could you please help out?
 
-Both the irqsoff tracer from ftrace and lockdep came from the -rt patch.
-The two were very integrated at the time. When they were ported over to
-mainline, they still used the same infrastructure to hook into the
-locations of interrupts being disabled or enabled.
+Please regard these things as ACKed.
 
-trace_hardirqs_on/off() is the function that is called for both lockdep
-and ftrace's irqsoff tracer. So this was intentional. That way we didn't
-need to have two different callers at every location. But if lockdep
-isn't defined and ftrace irqsoff is, then ftrace would define the
-trace_hardirqs_on/off() routines, otherwise lockdep does. (These
-routines are within CONFIG_PROVE_LOCKING #ifdefs in
-kernel/trace/trace_irqsoff.c)
+Thanks,
+Rafael
 
-When both lockdep and irqsoff tracer are configured, then lockdep
-defines the trace_hardirqs_off_caller(), and calls time_hardirqs_off()
-in trace_irqsoff.c which does the same thing as the trace_hardirqs_off()
-does without lockdep.
 
-I'm not sure why one would add the annotations while adding
-PROVE_LOCKING doesn't. They both seems to use CALLER_ADDR0, but maybe
-there's another path that uses CALLER_ADDR1 without it.
-
--- Steve
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
