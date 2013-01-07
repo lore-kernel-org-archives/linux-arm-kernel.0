@@ -1,128 +1,63 @@
 From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Mon,  7 Jan 2013 12:21:54 +0100
-Subject: [PATCH 12/16] dmaengine: ste_dma40: minor cosmetic fixes
+Date: Mon,  7 Jan 2013 12:21:55 +0100
+Subject: [PATCH 13/16] dmaengine: ste_dma40: minor code readability fixes
 In-Reply-To: <1357557718-15676-1-git-send-email-fabio.baltieri@linaro.org>
 References: <1357557718-15676-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <1357557718-15676-13-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <1357557718-15676-14-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch contains various non functional cosmetic fixes.
+Use internal variables to the cycles to improve code readability, no
+functional changes.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 ---
- drivers/dma/ste_dma40.c    | 33 ++++++++++++---------------------
- drivers/dma/ste_dma40_ll.c |  2 +-
- 2 files changed, 13 insertions(+), 22 deletions(-)
+ drivers/dma/ste_dma40.c | 17 ++++++++---------
+ 1 file changed, 8 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index ff21dcb..623779e 100644
+index 623779e..e317deb 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -1609,13 +1609,11 @@ static void dma_tasklet(unsigned long data)
- 		if (async_tx_test_ack(&d40d->txd)) {
- 			d40_desc_remove(d40d);
- 			d40_desc_free(d40c, d40d);
--		} else {
--			if (!d40d->is_in_client_list) {
--				d40_desc_remove(d40d);
--				d40_lcla_free_all(d40c, d40d);
--				list_add_tail(&d40d->node, &d40c->client);
--				d40d->is_in_client_list = true;
--			}
-+		} else if (!d40d->is_in_client_list) {
-+			d40_desc_remove(d40d);
-+			d40_lcla_free_all(d40c, d40d);
-+			list_add_tail(&d40d->node, &d40c->client);
-+			d40d->is_in_client_list = true;
- 		}
- 	}
+@@ -639,19 +639,18 @@ static int d40_lcla_alloc_one(struct d40_chan *d40c,
+ 	unsigned long flags;
+ 	int i;
+ 	int ret = -EINVAL;
+-	int p;
  
-@@ -2123,7 +2121,6 @@ _exit:
+ 	spin_lock_irqsave(&d40c->base->lcla_pool.lock, flags);
  
- }
- 
+-	p = d40c->phy_chan->num * D40_LCLA_LINK_PER_EVENT_GRP;
 -
- static u32 stedma40_residue(struct dma_chan *chan)
- {
- 	struct d40_chan *d40c =
-@@ -2199,7 +2196,6 @@ d40_prep_sg_phy(struct d40_chan *chan, struct d40_desc *desc,
- 	return ret < 0 ? ret : 0;
- }
+ 	/*
+ 	 * Allocate both src and dst at the same time, therefore the half
+ 	 * start on 1 since 0 can't be used since zero is used as end marker.
+ 	 */
+ 	for (i = 1 ; i < D40_LCLA_LINK_PER_EVENT_GRP / 2; i++) {
+-		if (!d40c->base->lcla_pool.alloc_map[p + i]) {
+-			d40c->base->lcla_pool.alloc_map[p + i] = d40d;
++		int idx = d40c->phy_chan->num * D40_LCLA_LINK_PER_EVENT_GRP + i;
++
++		if (!d40c->base->lcla_pool.alloc_map[idx]) {
++			d40c->base->lcla_pool.alloc_map[idx] = d40d;
+ 			d40d->lcla_alloc++;
+ 			ret = i;
+ 			break;
+@@ -676,10 +675,10 @@ static int d40_lcla_free_all(struct d40_chan *d40c,
+ 	spin_lock_irqsave(&d40c->base->lcla_pool.lock, flags);
  
--
- static struct d40_desc *
- d40_prep_desc(struct d40_chan *chan, struct scatterlist *sg,
- 	      unsigned int sg_len, unsigned long dma_flags)
-@@ -2225,7 +2221,6 @@ d40_prep_desc(struct d40_chan *chan, struct scatterlist *sg,
- 		goto err;
- 	}
- 
--
- 	desc->lli_current = 0;
- 	desc->txd.flags = dma_flags;
- 	desc->txd.tx_submit = d40_tx_submit;
-@@ -2274,7 +2269,6 @@ d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
- 		return NULL;
- 	}
- 
--
- 	spin_lock_irqsave(&chan->lock, flags);
- 
- 	desc = d40_prep_desc(chan, sg_src, sg_len, dma_flags);
-@@ -2432,11 +2426,11 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
- 
- 		if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM)
- 			d40c->lcpa = d40c->base->lcpa_base +
--			  d40c->dma_cfg.src_dev_type * D40_LCPA_CHAN_SIZE;
-+				d40c->dma_cfg.src_dev_type * D40_LCPA_CHAN_SIZE;
- 		else
- 			d40c->lcpa = d40c->base->lcpa_base +
--			  d40c->dma_cfg.dst_dev_type *
--			  D40_LCPA_CHAN_SIZE + D40_LCPA_CHAN_DST_DELTA;
-+				d40c->dma_cfg.dst_dev_type *
-+				D40_LCPA_CHAN_SIZE + D40_LCPA_CHAN_DST_DELTA;
- 	}
- 
- 	dev_dbg(chan2dev(d40c), "allocated %s channel (phy %d%s)\n",
-@@ -2471,7 +2465,6 @@ static void d40_free_chan_resources(struct dma_chan *chan)
- 		return;
- 	}
- 
--
- 	spin_lock_irqsave(&d40c->lock, flags);
- 
- 	err = d40_free_dma(d40c);
-@@ -2514,12 +2507,10 @@ d40_prep_memcpy_sg(struct dma_chan *chan,
- 	return d40_prep_sg(chan, src_sg, dst_sg, src_nents, DMA_NONE, dma_flags);
- }
- 
--static struct dma_async_tx_descriptor *d40_prep_slave_sg(struct dma_chan *chan,
--							 struct scatterlist *sgl,
--							 unsigned int sg_len,
--							 enum dma_transfer_direction direction,
--							 unsigned long dma_flags,
--							 void *context)
-+static struct dma_async_tx_descriptor *
-+d40_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
-+		  unsigned int sg_len, enum dma_transfer_direction direction,
-+		  unsigned long dma_flags, void *context)
- {
- 	if (direction != DMA_DEV_TO_MEM && direction != DMA_MEM_TO_DEV)
- 		return NULL;
-diff --git a/drivers/dma/ste_dma40_ll.c b/drivers/dma/ste_dma40_ll.c
-index 1cfe7ab..7180e0d 100644
---- a/drivers/dma/ste_dma40_ll.c
-+++ b/drivers/dma/ste_dma40_ll.c
-@@ -251,7 +251,7 @@ d40_phy_buf_to_lli(struct d40_phy_lli *lli, dma_addr_t addr, u32 size,
- 
- 	return lli;
- 
-- err:
-+err:
- 	return NULL;
- }
- 
+ 	for (i = 1 ; i < D40_LCLA_LINK_PER_EVENT_GRP / 2; i++) {
+-		if (d40c->base->lcla_pool.alloc_map[d40c->phy_chan->num *
+-						    D40_LCLA_LINK_PER_EVENT_GRP + i] == d40d) {
+-			d40c->base->lcla_pool.alloc_map[d40c->phy_chan->num *
+-							D40_LCLA_LINK_PER_EVENT_GRP + i] = NULL;
++		int idx = d40c->phy_chan->num * D40_LCLA_LINK_PER_EVENT_GRP + i;
++
++		if (d40c->base->lcla_pool.alloc_map[idx] == d40d) {
++			d40c->base->lcla_pool.alloc_map[idx] = NULL;
+ 			d40d->lcla_alloc--;
+ 			if (d40d->lcla_alloc == 0) {
+ 				ret = 0;
 -- 
 1.7.12.1
