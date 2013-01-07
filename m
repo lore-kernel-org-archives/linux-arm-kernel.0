@@ -1,55 +1,46 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Mon, 07 Jan 2013 06:19:47 -0800
-Subject: [PATCH 1/4] ALSA: pxa2xx: fix ac97 cold reset
-In-Reply-To: <50EAD43C.2040406@compulab.co.il>
-References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
- <1357499640-13871-2-git-send-email-mikedunn@newsguy.com>
- <50EA9287.5030304@compulab.co.il> <50EACF4D.4000602@newsguy.com>
- <50EAD43C.2040406@compulab.co.il>
-Message-ID: <50EAD983.5060801@newsguy.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 7 Jan 2013 15:20:08 +0100
+Subject: FW: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save
+ power
+In-Reply-To: <CADz5_gJ+8D_vm8SnfsnbheFpwarAxGSmY27FW_cvc7YdDH9pow@mail.gmail.com>
+References: <25B60CDC2F704E4E9D88FFD52780CB4C08B00BD3B1@SC-VEXCH1.marvell.com>
+ <CADz5_gJ70KrHL5NoSPQbFdeHnQxWLh87zq6N+-V7J7Yq7t+aPQ@mail.gmail.com>
+ <CAPDyKFrt4zWmhyO-UJAFPOH=90n4OwRPv3nczr4jPGBnc_jT5w@mail.gmail.com>
+ <20121213101117.GF14363@n2100.arm.linux.org.uk>
+ <CAPDyKFrkNnudy_rCL4P3GjRjh3zZ0aGVLti8uLJaW4FfuXm9JQ@mail.gmail.com>
+ <CADz5_gJ+8D_vm8SnfsnbheFpwarAxGSmY27FW_cvc7YdDH9pow@mail.gmail.com>
+Message-ID: <CAPDyKFrW7Qcykzp837_iPXU-u8Jb7MpMrGNaHZM2-Q_tNfQ6jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2013 05:57 AM, Igor Grinberg wrote:
-> On 01/07/13 15:36, Mike Dunn wrote:
->> On 01/07/2013 01:16 AM, Igor Grinberg wrote:
->>> On 01/06/13 21:13, Mike Dunn wrote:
->>
->>
->> [..]
->>
->>
->>>>  static inline void pxa_ac97_cold_pxa27x(void)
->>>>  {
->>>> +	unsigned int timeout;
->>>> +
->>>>  	GCR &=  GCR_COLD_RST;  /* clear everything but nCRST */
->>>>  	GCR &= ~GCR_COLD_RST;  /* then assert nCRST */
->>>>  
->>>> @@ -157,8 +159,10 @@ static inline void pxa_ac97_cold_pxa27x(void)
->>>>  	clk_enable(ac97conf_clk);
->>>>  	udelay(5);
->>>>  	clk_disable(ac97conf_clk);
->>>> -	GCR = GCR_COLD_RST;
->>>> -	udelay(50);
->>>> +	GCR = GCR_COLD_RST | GCR_WARM_RST;
->>>> +	timeout = 100;     /* wait for the codec-ready bit to be set */
->>>> +	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
->>>> +		mdelay(1);
+On 13 December 2012 12:45, Kevin Liu <keyuan.liu@gmail.com> wrote:
+> 2012/12/13 Ulf Hansson <ulf.hansson@linaro.org>:
+>> On 13 December 2012 11:11, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Thu, Dec 13, 2012 at 10:04:46AM +0100, Ulf Hansson wrote:
+>>>> Anyway, this need to be thought of as future step, since this patch is
+>>>> not changing anything to that sequence as Kevin also is pointing out.
 >>>
->>> Can we use msleep() instead?
->>> May be this will require to change the granularity to 10...
+>>> Given that Kevin is talking about stuff in sdhci as if it affects MMCI,
+>>> and that neither of you have picked that up, you're *still* not gaining
+>>> any confidence from me that you're actually thinking about the changes
+>>> you're making.  So I'm not really caring about how many acks your patches
+>>> get, I'm still going to be reluctant to apply them without thinking about
+>>> them for a bit.
 >>
+>> MMCI is doing "pm_runtime_get_sync" in it suspend. So the same
+>> principles as Kevin is describing for sdhci goes for MMCI. Sorry if
+>> this was not clearly pointed out.
 >>
->> Probably.  mdelay() is used by similiar code in the same file, so I just stayed
->> consistent.  The code runs very infrequently, so I didn't worry about it.
-> 
-> Well, if we can, I think we'd better do, no?
+> sorry for my unclear words. I just use sdhci directly to explain this.
+> It's similar for sdhci and mmci on this point. pm_runtime is
+> temporarily disabled during suspend/resume.
+>
+> Thanks
+> Kevin
 
+Russell, is this enough for convincing you that everything has been
+thought of in this patch? Can we merge this?
 
-If you feel strongly about it, I'll defer to you.  But again my arguments are
-(1) the code runs very infrequently, and (2) very similar code for the other pxa
-family siblings uses mdelay().
-
-Thanks,
-Mike
+Kind regards
+Ulf Hansson
