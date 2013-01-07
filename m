@@ -1,38 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 07 Jan 2013 10:20:04 +0100
-Subject: [PATCH 1/3] ARM: AT91: IIO: add low and high res support for adc
-In-Reply-To: <20121222172133.GT23971@game.jcrosoft.org>
-References: <20121219183236.GP23971@game.jcrosoft.org>
- <1355942232-26251-1-git-send-email-plagnioj@jcrosoft.com>
- <50D2EBA1.4050305@free-electrons.com> <50D2EDE6.3090706@atmel.com>
- <50D3340F.3090209@free-electrons.com> <50D33940.4000607@atmel.com>
- <50D426C1.5050807@free-electrons.com>
- <20121222172133.GT23971@game.jcrosoft.org>
-Message-ID: <50EA9344.8060002@free-electrons.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Mon, 7 Jan 2013 09:20:16 +0000
+Subject: [alsa-devel] [PATCH V2 2/2] ASoC: Davinci: machine: Add device
+ tree binding
+In-Reply-To: <20130104122612.GM4627@opensource.wolfsonmicro.com>
+References: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
+ <1357293277-25543-3-git-send-email-gururaja.hebbar@ti.com>
+ <20130104122612.GM4627@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB3690C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/12/2012 18:21, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> On 10:07 Fri 21 Dec     , Maxime Ripard wrote:
->> Le 20/12/2012 17:13, ludovic.desroches a ?crit :
->>> I have not found other ways to deal with it properly. I would like to
->>> have them hidden into the driver (depending on the compatible string)
->>> but it will be a mess if we split parameters into dt and driver.
->>
->> I'm glad we feel the same way :)
-> I'm not I fee; exactly this opposte way
+On Fri, Jan 04, 2013 at 17:56:12, Mark Brown wrote:
+> On Fri, Jan 04, 2013 at 03:24:37PM +0530, Hebbar Gururaja wrote:
 > 
-> I do want to toucht the kernel code to add new soc
+> > +		"MIC3L",                "Mic Bias 2V",
+> > +		"MIC3R",                "Mic Bias 2V",
+> > +		"Mic Bias 2V",          "Mic Jack",
+> 
+> The CODEC driver biases should be changed over to be supplies, this
+> makes the above much more natural - the routing there is a hack for
+> older versions of ASoc.  
 
-This is an argument we already had, and yes, I still don't like these
-bindings.
+I will be looking into this now. To speed up the things, do you have any
+reference link/implementation which  I can refer to?
 
-And both this patchset and what Ludovic and you said in this thread have
-proven that this is something that can't be achieved, you'll always have
-to modify the driver anyway.
+I looked at the OMAP implementation but they are following the same (meaning both
+DT & non-DT use similar audio map for routing).
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+
+> Otherwise this looks fine.
+
+Thanks for the review.
+
+> 
+
+
+Regards, 
+Gururaja
