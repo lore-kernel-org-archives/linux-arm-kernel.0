@@ -1,28 +1,62 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 7 Jan 2013 11:16:55 +0100
-Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Orion SoC
-In-Reply-To: <50EA9E10.7080605@ti.com>
-References: <1355482986-885-1-git-send-email-andrew@lunn.ch>
- <1355482986-885-2-git-send-email-andrew@lunn.ch>
- <50E6A378.90503@ti.com> <50E6F6AA.4000905@lunn.ch>
- <50EA9E10.7080605@ti.com>
-Message-ID: <20130107101655.GS3392@lunn.ch>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 7 Jan 2013 11:29:01 +0100
+Subject: [PATCH] mmc: mmci: Gate the clock when freq is 0
+In-Reply-To: <20121221162132.GI14363@n2100.arm.linux.org.uk>
+References: <1355327421-20187-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121221162132.GI14363@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFoH2aOM+n0PB7qScbVOz_My=ZpAye3swgF6xiYBKou_=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> OK. Please put me on Cc so I will keep the review.
-> 
-> >We differentiate between the different SoCs by DT. Each has its own
-> >.dtsi file and we will put the node into only those which have the
-> >hardware.
-> 
-> Ok. That I understand, but my question was more into the difference
-> between 88F6282 and 88F6283. Do you need to differentiate those two?
+On 21 December 2012 17:21, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Dec 12, 2012 at 04:50:21PM +0100, Ulf Hansson wrote:
+>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+>> index edc3e9b..bf07823 100644
+>> --- a/drivers/mmc/host/mmci.c
+>> +++ b/drivers/mmc/host/mmci.c
+>> @@ -1147,6 +1147,15 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>               }
+>>       }
+>>
+>> +     /*
+>> +      * If clock = 0 and the block needs a certain value in the clreg
+>> +      * to function, we need to gate the clock by removing MCI_PWR_ON.
+>> +      * This is a special case for ST Micro variants, since the power
+>> +      * register in the ARM legacy case is used for powering the cards.
+>
+> I wish you'd stop using "legacy" when talking about the ARM primecell.
+> How can it be legacy when ARMs current development boards still use this
+> primecell?
+>
+>> +      */
+>> +     if (!ios->clock && variant->clkreg)
+>> +             pwr &= ~MCI_PWR_ON;
+>
+> This is horrid.  You're overloading the clkreg default value with another
+> meaning here - "if we have any bits set in the default value for the
+> MCICLOCK register, the MCIPOWER register has special meanings for the
+> power control bits".
 
-Hi Eduardo
+I was hesitating when we decided to use the clkreg value due to what
+you states here. Just to give you some more background.
 
-No, there is no need to differentiate between these. As far as the
-temperature sensor goes, they are identical. I've been testing on a
-88F6282 and Nobuhiro Iwamatsu on a 88F6283.
+By using clkreg default value you will get an implicit sequential
+dependency that you will write the default value to MMCICLOCK reg,
+_before_ writing the "power on" bit to the MMCIPOWER reg. Otherwise
+you will not be able to update MMCICLK reg after the "power on" bit in
+the MMCIPOWER reg has been set. That was the whole reason to why the
+clkreg default value was invented.
 
-	    Andrew
+Anyway, I still think your comment is valid so I suggest we add
+another variant data which meaning will indicate whether the MMCIPOWER
+register is used to control the actual power to the card. If that is
+the case we must not use the MMCIPOWER to gate the clock. Does that
+make sense?
+
+>
+> When you think about it as I've described it above, do you think this is
+> an acceptable solution to this problem?
+
+Kind regards
+Ulf Hansson
