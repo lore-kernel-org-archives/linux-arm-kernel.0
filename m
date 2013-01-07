@@ -1,52 +1,28 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 7 Jan 2013 18:40:22 +0100
-Subject: [PATCH 3.9] Driver for 7-segment displays connected over GPIOs
-In-Reply-To: <20130107172340.GA32401@kroah.com>
-References: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130107164845.GA2911@kroah.com> <20130107180708.2ffc1540@skate>
- <20130107172340.GA32401@kroah.com>
-Message-ID: <20130107184022.72b23aa9@skate>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 07 Jan 2013 10:41:57 -0700
+Subject: [PATCH] ARM: tegra30: make the wait time of CPU power up to
+ proportional to HZ
+In-Reply-To: <1357527374-31055-1-git-send-email-josephl@nvidia.com>
+References: <1357527374-31055-1-git-send-email-josephl@nvidia.com>
+Message-ID: <50EB08E5.8080503@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Greg Kroah-Hartman,
-
-On Mon, 7 Jan 2013 09:23:40 -0800, Greg Kroah-Hartman wrote:
-
-> > Indeed, it can be done from userspace since we're just controlling
-> > GPIOs. Having a kernel driver allows to describe this device in the
-> > Device Tree, like all other devices, and have it "magically" appear,
-> > with a convenient user-space interface.
+On 01/06/2013 07:56 PM, Joseph Lo wrote:
+> It would rather to use the API of time_to_jiffies than a constant number
+> of jiffies for the wait time of CPU power up.
 > 
-> Ok, that means you want to use the kernel-standard userspace interface
-> for displays, right?  If so, why not use it?  I thought we already
-> supported LCD displays already, isn't there an interface for it?  Don't
-> create random magic sysfs files without really thinking about it.
+> Based on the work by:
+> Sang-Hun Lee <sanlee@nvidia.com>
 
-Well, the LCD interface is about outputting pixel into a video memory.
-Quite different from:
+Applied to Tegra's for-3.9/soc branch.
 
-echo 6 > /sys/[...]/gpio-7seg.1/value
+> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
 
-No?
+> -		timeout = jiffies + 5*HZ;
+> +		timeout = jiffies + msecs_to_jiffies(50);
 
-> > Not having a kernel driver means that gazillions of applications
-> > re-invent the same piece of code over and over again, have to hardcode
-> > the GPIO numbers for a given piece of hardware, while the kernel
-> > abstract all of this very nicely.
-> 
-> That sounds like a wonderful use of a userspace library to do this
-> properly.  Much like libusb does, right?
-> 
-> I still think as this can be done in userspace, it probably should be.
-
-Understood. Patches discarded.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I did just want to confirm though; I think that changes the timeout from
+5 seconds to 50mS and similarly for the other change. I assume that was
+intended? The code certainly seemed to work just fine with this change
+when I tested it.
