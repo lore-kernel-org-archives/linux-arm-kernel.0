@@ -1,68 +1,33 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Mon, 7 Jan 2013 17:36:17 +0530
-Subject: [PATCH 1/2] ARM: exynos5: Add gate clocks for HS-I2C
-In-Reply-To: <1356694851-1345-1-git-send-email-ch.naveen@samsung.com>
-References: <1356694851-1345-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <CAHfPSqCgYz8r05gBxOwCbi3a4_R0Kaatps8aOEmp_Ck=fakoFg@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 7 Jan 2013 13:13:04 +0100
+Subject: [PATCH V2] mxs: spi: clear XFER_COUNT in ctrl0 field in DMA
+ descriptor
+In-Reply-To: <1356500931-31861-1-git-send-email-juha.lumme@gmail.com>
+References: <1356500931-31861-1-git-send-email-juha.lumme@gmail.com>
+Message-ID: <201301071313.04309.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 December 2012 17:10, Naveen Krishna Chatradhi
-<ch.naveen@samsung.com> wrote:
-> Adds clock gating bits for High Speed I2C channels 0, 1, 2 and 3.
->
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> ---
->  arch/arm/mach-exynos/clock-exynos5.c |   24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->
-> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-> index 0208c3a..f9fa0c7 100644
-> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> @@ -753,6 +753,30 @@ static struct clk exynos5_init_clocks_off[] = {
->                 .enable         = exynos5_clk_ip_peric_ctrl,
->                 .ctrlbit        = (1 << 27),
->         }, {
-> +               .name           = "hsi2c",
-> +               .devname        = "exynos5-hsi2c.0",
-> +               .enable         = exynos5_clk_ip_peric_ctrl,
-> +               .parent         = &exynos5_clk_aclk_66.clk,
-> +               .ctrlbit        = (1 << 28),
-> +       }, {
-> +               .name           = "hsi2c",
-> +               .devname        = "exynos5-hsi2c.1",
-> +               .enable         = exynos5_clk_ip_peric_ctrl,
-> +               .parent         = &exynos5_clk_aclk_66.clk,
-> +               .ctrlbit        = (1 << 29),
-> +       }, {
-> +               .name           = "hsi2c",
-> +               .devname        = "exynos5-hsi2c.2",
-> +               .enable         = exynos5_clk_ip_peric_ctrl,
-> +               .parent         = &exynos5_clk_aclk_66.clk,
-> +               .ctrlbit        = (1 << 30),
-> +       }, {
-> +               .name           = "hsi2c",
-> +               .devname        = "exynos5-hsi2c.3",
-> +               .enable         = exynos5_clk_ip_peric_ctrl,
-> +               .parent         = &exynos5_clk_aclk_66.clk,
-> +               .ctrlbit        = (1 << 31),
-> +       }, {
->                 .name           = "usbhost",
->                 .enable         = exynos5_clk_ip_fsys_ctrl ,
->                 .ctrlbit        = (1 << 18),
-> --
-> 1.7.9.5
+Dear Juha Lumme,
 
-Any comments on this patch please.
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> On MX23 the XFER_COUNT part in ctrl0 field in DMA descriptor was improperly
+> OR'd during the construction of DMA descriptor chain, instead of being
+> freshly set.
+> Because of that too many bytes were being expected from SPI during the last
+> DMA cycle.
+> This caused a timeout (SSP_TIMEOUT) to happen in the processing of the last
+> DMA descriptor, and thus reads and writes were failing.
+> This is a fix for the problem, by clearing XFER_COUNT bytes in ctrl0 before
+> setting the new XFER_COUNT for DMA descriptor.
+> 
+> Cc: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Signed-off-by: Juha Lumme <juha.lumme@gmail.com>
+> Acked-by: Marek Vasut <marex@denx.de>
 
+Bump? This is stable matter too.
 
-
--- 
-Shine bright,
-(: Nav :)
+Best regards,
+Marek Vasut
