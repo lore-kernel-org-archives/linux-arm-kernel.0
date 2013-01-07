@@ -1,95 +1,64 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Mon,  7 Jan 2013 13:55:14 -0800
-Subject: [PATCH 3/3] ALSA: pxa27x: rename pxa27x_assert_ac97reset()
-In-Reply-To: <1357595714-13698-1-git-send-email-mikedunn@newsguy.com>
-References: <1357595714-13698-1-git-send-email-mikedunn@newsguy.com>
-Message-ID: <1357595714-13698-4-git-send-email-mikedunn@newsguy.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon,  7 Jan 2013 23:51:34 +0100
+Subject: [PATCH V2 0/3] Add support for gpio expander pca9505 used on Mirabox
+Message-ID: <1357599097-19053-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does nothing functionally, it just gives the function a new name and
-modifies the prototype slightly in order to clarify what the function is doing
-(which is not necessarily asserting the reset).
-Some commentary also added.
+Hello,
 
-Tested on a palm treo 680 machine.
+This patch set adds the support for the i2c gpio expander pca9505 used
+on the JTAG/GPIO box which can be connected to the Mirabox.
 
-Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
----
- arch/arm/mach-pxa/pxa27x.c  |   20 ++++++++++++++------
- sound/arm/pxa2xx-ac97-lib.c |    8 ++++----
- 2 files changed, 18 insertions(+), 10 deletions(-)
+To be able to use the pca9505 I had to do several changes in the
+driver. Indeed, until now the pca953x driver accessed all the bank of
+a given register in a single command using only a 32 bits
+variable. This expander comes with 40 GPIOs which no more fits in a 32
+variable. This patch set makes the accesses to the registers more
+generic by relying on an array of u8 variables. This fits exactly the
+way the registers are represented in the hardware.
 
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 616cb87..69985b06 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -53,17 +53,25 @@ static unsigned long ac97_reset_config[] = {
- 	GPIO95_AC97_nRESET,
- };
- 
--void pxa27x_assert_ac97reset(int reset_gpio, int on)
-+void pxa27x_configure_ac97reset(int reset_gpio, bool to_gpio)
- {
-+	/*
-+	 * This helper function is used to work around a bug in the pxa27x's
-+	 * ac97 controller during a warm reset.  The configuration of the
-+	 * reset_gpio is changed as follows:
-+	 * to_gpio == true: configured to generic output gpio and driven high
-+	 * to_gpio == false: configured to ac97 controller alt fn AC97_nRESET
-+	 */
-+
- 	if (reset_gpio == 113)
--		pxa2xx_mfp_config(on ? &ac97_reset_config[0] :
--				       &ac97_reset_config[1], 1);
-+		pxa2xx_mfp_config(to_gpio ? &ac97_reset_config[0] :
-+				  &ac97_reset_config[1], 1);
- 
- 	if (reset_gpio == 95)
--		pxa2xx_mfp_config(on ? &ac97_reset_config[2] :
--				       &ac97_reset_config[3], 1);
-+		pxa2xx_mfp_config(to_gpio ? &ac97_reset_config[2] :
-+				  &ac97_reset_config[3], 1);
- }
--EXPORT_SYMBOL_GPL(pxa27x_assert_ac97reset);
-+EXPORT_SYMBOL_GPL(pxa27x_configure_ac97reset);
- 
- /* Crystal clock: 13MHz */
- #define BASE_CLK	13000000
-diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
-index fff7753..e6f4633 100644
---- a/sound/arm/pxa2xx-ac97-lib.c
-+++ b/sound/arm/pxa2xx-ac97-lib.c
-@@ -34,7 +34,7 @@ static struct clk *ac97_clk;
- static struct clk *ac97conf_clk;
- static int reset_gpio;
- 
--extern void pxa27x_assert_ac97reset(int reset_gpio, int on);
-+extern void pxa27x_configure_ac97reset(int reset_gpio, bool to_gpio);
- 
- /*
-  * Beware PXA27x bugs:
-@@ -140,10 +140,10 @@ static inline void pxa_ac97_warm_pxa27x(void)
- 	gsr_bits = 0;
- 
- 	/* warm reset broken on Bulverde, so manually keep AC97 reset high */
--	pxa27x_assert_ac97reset(reset_gpio, 1);
-+	pxa27x_configure_ac97reset(reset_gpio, true);
- 	udelay(10);
- 	GCR |= GCR_WARM_RST;
--	pxa27x_assert_ac97reset(reset_gpio, 0);
-+	pxa27x_configure_ac97reset(reset_gpio, false);
- 	udelay(500);
- }
- 
-@@ -358,7 +358,7 @@ int pxa2xx_ac97_hw_probe(struct platform_device *dev)
- 			       __func__, ret);
- 			goto err_conf;
- 		}
--		pxa27x_assert_ac97reset(reset_gpio, 0);
-+		pxa27x_configure_ac97reset(reset_gpio, false);
- 
- 		ac97conf_clk = clk_get(&dev->dev, "AC97CONFCLK");
- 		if (IS_ERR(ac97conf_clk)) {
+Once the per-bank representation was added, it was easier to introduce
+helpers to access to a single register of a bank instead of reading or
+writing all the banks for a given register. As the GPIO API allows
+only the accesses to a single GPIO at a time there was no point to read
+and write all the other banks. Hence it should help to decrease the
+latency especially for the pca9505.
+
+However as the block GPIO API from Roland Stigge is incoming I kept
+the helpers used to access all the banks in the same time. I had to
+make some modifications in the arguments that these functions
+received, so it will have a conflict here. Currently my patch set is
+based on v3.8-rc2, but I am willing to rebase onto gpio-for-next once
+the GPIO block will be merged into it.
+
+I also expected some tested-by as I was only able to test the pca9505
+and I didn't test the IRQ part.
+
+After the first feedback from Maxime Ripard I made some change in the
+patch set. Now accessing GPIO should work at least on pca9555, and the
+driver is compiling when IRQ is enable.
+
+I have also updated the branch gpio-pca9505 available at:
+https://github.com/MISL-EBU-System-SW/mainline-public.git
+
+Changelog:
+V1->V2:
+
+- Fix the way to calculate the shift used to apply to register to
+  access a given bank.
+- Fix all the pending issue in the IRQ part which appeared once I have
+  enable CONFIG_GPIO_PCA953X_IRQ!
+
+
+Gregory CLEMENT (3):
+  gpio: pca953x: make the register access by GPIO bank
+  gpio: pca953x: add support for pca9505
+  arm: mvebu: enable gpio expander over i2c on Mirabox platform
+
+ arch/arm/boot/dts/armada-370-mirabox.dts |   10 ++
+ drivers/gpio/gpio-pca953x.c              |  283 +++++++++++++++++++-----------
+ 2 files changed, 187 insertions(+), 106 deletions(-)
+
 -- 
-1.7.8.6
+1.7.9.5
