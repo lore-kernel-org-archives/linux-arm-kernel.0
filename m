@@ -1,67 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 7 Jan 2013 21:41:48 +0000
-Subject: [PATCH 3.9 1/3] misc: new driver for GPIO-connected 7-segment
- displays
-In-Reply-To: <20130107205854.1f019816@skate>
-References: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201301071943.40074.arnd@arndb.de> <20130107205854.1f019816@skate>
-Message-ID: <201301072141.48487.arnd@arndb.de>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Mon,  7 Jan 2013 13:55:11 -0800
+Subject: [PATCH 0/3] ALSA: pxa27x: ac97 reset fixes
+Message-ID: <1357595714-13698-1-git-send-email-mikedunn@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 January 2013, Thomas Petazzoni wrote:
-> Dear Arnd Bergmann,
-> 
-> On Mon, 7 Jan 2013 19:43:39 +0000, Arnd Bergmann wrote:
-> 
-> > >  .../devicetree/bindings/misc/gpio-7seg.txt         |   18 +++
-> > >  drivers/misc/Kconfig                               |   13 ++
-> > >  drivers/misc/Makefile                              |    1 +
-> > >  drivers/misc/gpio-7seg.c                           |  168 ++++++++++++++++++++
-> > 
-> > I wonder if it would make sense to merge this into the LED subsystem
-> > rather than having it as a standalone driver.
-> 
-> Hum, maybe. How do you see it fitting inside the LED subsystem? The
-> purpose of the device is quite different in its userspace to kernel
-> interface, no?
+AC97 reset is broken on the pxa27x.  These patches fix it by addressing multiple
+problems:
+  - cold reset fails because the GCR register is not set correctly
+  - warm reset fails because some code used to work around a hardware bug is
+    broken
+  - the intent of the work-around code is obfuscated by unfortunate function
+    naming
 
-The LED subsystem can be used by both in-kernel and by user space
-front-ends. It currently supports on/off, blinking and variable
-brightness LEDs. Adding 7-segment LEDs may be a stretch but also
-would fit into the same basic interface I think.
+This patch set replaces some earlier individual patches that had some problems.
+Thanks Robert and Igor.
 
-In addition, it would not have to be GPIO based, although that may
-be the only implementation we need for the foreseeable future.
-Well, unless you make a driver for PC-style "port-0x80" PCI
-cards.
+Changelog:
+v2:
+  - don't specify the LPM flag DRIVE_HIGH in #define for the mfp config
+  - patches 2 and 3 are combined into one patch
+  - mfp level and direction are set only once, during driver initialization
 
+Mike Dunn (3):
+  ALSA: pxa2xx: fix ac97 cold reset
+  ALSA: pxa27x: fix ac97 warm reset
+  ALSA: pxa27x: rename pxa27x_assert_ac97reset()
 
-> > > +	sdev->dev_attr.attr.name = "value";
-> > > +	sdev->dev_attr.attr.mode = S_IRUGO | S_IWUGO;
-> > > +	sdev->dev_attr.show = gpio_7seg_show;
-> > > +	sdev->dev_attr.store = gpio_7seg_store;
-> > 
-> > Any reason why you are not using the DEVICE_ATTR macro?
-> 
-> DEVICE_ATTR declares the structure, and I wanted one per gpio_7seg
-> device, which is dynamically allocated, so I thought that using
-> DEVICE_ATTR was not possible. But now that you point this, I realize
-> that I was stupid. I can perfectly live with one single global 'struct
-> device_attribute' that I register to several devices using
-> device_create_file(), no?
+ arch/arm/mach-pxa/include/mach/mfp-pxa27x.h |    3 ++
+ arch/arm/mach-pxa/pxa27x.c                  |   24 ++++++++++++------
+ sound/arm/pxa2xx-ac97-lib.c                 |   34 +++++++++++++++++++++-----
+ 3 files changed, 46 insertions(+), 15 deletions(-)
 
-Correct.
-
-> That said, is it worth the effort to continue polishing this driver,
-> after seeing the feedback from Greg about it? I don't mind working on
-> it more and fix the problems of course, but if the general answer is
-> that we don't want such a driver in the kernel, then I'd better not
-> spend more time on this.
-
-I only saw the discussion after I had sent my reply. I think that
-this driver in the form of a drivers/misc sysfs driver is not worth
-pursuing, but it may still be possible to integrate it nicely into
-the LED framework.
-
-	Arnd
+-- 
+1.7.8.6
