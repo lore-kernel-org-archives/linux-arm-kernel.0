@@ -1,79 +1,42 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 7 Jan 2013 16:13:33 +0100
-Subject: [PATCH] mfd: stmpe: Pull IRQ GPIO number from DT during DT-based
- probe
-In-Reply-To: <20130107150341.GT21994@gmail.com>
-References: <1357568989-16237-1-git-send-email-marex@denx.de>
- <20130107150341.GT21994@gmail.com>
-Message-ID: <201301071613.33573.marex@denx.de>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 7 Jan 2013 16:09:18 +0100
+Subject: Reboot hangs on Kirkwood ns2 boards with 3.8-rc2
+In-Reply-To: <20130106083521.GO17242@lunn.ch>
+References: <20130106033455.GH1357@kw.sim.vm.gnt>
+ <20130106083521.GO17242@lunn.ch>
+Message-ID: <20130107150918.GI1357@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lee Jones,
-
-> On Mon, 07 Jan 2013, Marek Vasut wrote:
-> > In case of a DT-based probe of the stmpe MFD driver, the irq_gpio was
-> > zero, which resulted in the driver failing to probe.
+On Sun, Jan 06, 2013 at 09:35:21AM +0100, Andrew Lunn wrote:
+> On Sun, Jan 06, 2013 at 04:34:55AM +0100, Simon Guinot wrote:
+> > Hi Andrew and Jason,
 > > 
-> > Implement DT properties "irq-over-gpio" and "irq-gpios" which are already
-> > used in "arch/arm/boot/dts/spear320-hmi.dts" to circumvent these
-> > problems.
+> > While testing 3.8-rc2 on the ns2 boards (DT based), I noticed that
+> > reboot is not working. After issuing a reboot, the kernel hangs. No
+> > error messages are displayed. Moreover, on my non-DT Kirkwood boards,
+> > reboot is working as expected.
+> > 
+> > Am I the only one to experiment this issue ?
 > 
-> This must have slipped through the gaps. It should be removed.
-
-True
-
-> > The new
-> > behaviour is the expected one and copies the behavior of
-> > platform_data-based probe.
+> Hi Simon
 > 
-> Blindly copying platform data behaviour to DT bindings is seldom a good
-> idea.
+> No you are not the only one. There is a patch available, authored by
+> me, which is identical to what you found.
 
-Do you have suggestions how to pass these information? I suspect the irq-over-
-gpio property can be killed, since if irq-gpios prop is there, it implies irq-
-over-gpio anyway.
+Arf, it's a shame I have missed this reports. It could have spared some
+time by asking at you earlier.
 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Lee Jones <lee.jones@linaro.org>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > Cc: Vipul Kumar Samar <vipulkumar.samar@st.com>
-> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> > ---
-> > 
-> >  drivers/mfd/stmpe.c |    5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-> > index 4b11202..fb9cd6f 100644
-> > --- a/drivers/mfd/stmpe.c
-> > +++ b/drivers/mfd/stmpe.c
-> > @@ -1018,6 +1018,11 @@ void stmpe_of_probe(struct stmpe_platform_data
-> > *pdata, struct device_node *np)
-> > 
-> >  	pdata->id = -1;
-> >  	pdata->irq_trigger = IRQF_TRIGGER_NONE;
-> > 
-> > +	pdata->irq_over_gpio = of_get_property(np, "irq-over-gpio", NULL);
-> 
-> This is a new DT binding and you haven't provided any documentation for it.
-> 
-> Also, there is no reason for the binding to exist.
-> 
-> Lots of drivers use GPIO pins as IRQs.
+About the issue itself. I understand that a clock is needed by the
+orion-ehci driver. But even if the clock is not provided by the DT, it
+should have been fixed by kirkwood_legacy_clk_init(), isn't ? What's
+wrong with this workaround ?
 
-Right, this can be removed and only the 'irq-gpios' can be kept around. What do 
-you say?
-
-> > +	pdata->irq_gpio = of_get_named_gpio(np, "irq-gpios", 0);
-> > +	if (!gpio_is_valid(pdata->irq_gpio))
-> > +		pdata->irq_gpio = -1;
-> > +
-> > 
-> >  	of_property_read_u32(np, "st,autosleep-timeout",
-> >  	
-> >  			&pdata->autosleep_timeout);
-
-Best regards,
-Marek Vasut
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130107/97467bf1/attachment.sig>
