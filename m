@@ -1,39 +1,61 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Mon, 07 Jan 2013 05:40:15 -0800
-Subject: [PATCH 2/4] ALSA: pxa27x: fix ac97 warm reset bug work-around code
-In-Reply-To: <50EA9607.7050408@compulab.co.il>
-References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
- <1357499640-13871-3-git-send-email-mikedunn@newsguy.com>
- <50EA9607.7050408@compulab.co.il>
-Message-ID: <50EAD03F.4050507@newsguy.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 07 Jan 2013 08:41:34 -0500
+Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
+In-Reply-To: <CA+KhAHYbDU0Ajr5uPEjPxX2ECitvnK2ENOjmqjC=3G657GvG7w@mail.gmail.com>
+References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+ <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+ <20130103103815.GL2631@n2100.arm.linux.org.uk>
+ <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
+ <1357220165.10284.30.camel@gandalf.local.home>
+ <20130103141301.GQ2631@n2100.arm.linux.org.uk>
+ <1357229038.10284.46.camel@gandalf.local.home>
+ <20130103162359.GR2631@n2100.arm.linux.org.uk>
+ <1357232337.10284.67.camel@gandalf.local.home>
+ <CA+KhAHYbDU0Ajr5uPEjPxX2ECitvnK2ENOjmqjC=3G657GvG7w@mail.gmail.com>
+Message-ID: <1357566094.10284.83.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2013 01:31 AM, Igor Grinberg wrote:
-> On 01/06/13 21:13, Mike Dunn wrote:
+On Fri, 2013-01-04 at 17:45 +0900, Keun-O Park wrote:
 
-
-[..]
-
-
->> diff --git a/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h b/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h
->> index a611ad3..8281e17 100644
->> --- a/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h
->> +++ b/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h
->> @@ -463,6 +463,9 @@
->>  	GPIO76_LCD_PCLK,	\
->>  	GPIO77_LCD_BIAS
->>  
->> +/* these enable a work-around for a hw bug in pxa27x during ac97 warm reset */
->> +#define GPIO113_AC97_nRESET_GPIO_HIGH MFP_CFG_OUT(GPIO113, AF0, DRIVE_HIGH)
->> +#define GPIO95_AC97_nRESET_GPIO_HIGH MFP_CFG_OUT(GPIO95, AF0, DRIVE_HIGH)
+> With "CFLAGS_REMOVE_unwind.o = -pg" and with CONFIG_PROVE_LOCKING
+> turned on, I confirmed that
+> there's no trace output like Steve mentioned.
+> However, if I turn off CONFIG_PROVE_LOCKING, "irqsoff" and
+> "preemptirqsoff" ftracer prints these lines :
 > 
-> Do we really need to change the LPM? Because DRIVE_* only affect LPM.
+> kernel_text_address <-unwind_frame
+> core_kernel_text <-unwind_frame
+> search_index <-unwind_frame
+> 
+> While I investigated the reason, I just found out there's two function
+> with same name, trace_hardirqs_off.
+> One in kernel/trace/trace_irqsoff.c and another in kernel/lockdep.c.
+> And both symbols are exported.
+> I am wondering whether it is intentionally maintained code to
+> manipulate ftrace and lockdep or not.
+> I guess it's probably not.
 
+Both the irqsoff tracer from ftrace and lockdep came from the -rt patch.
+The two were very integrated at the time. When they were ported over to
+mainline, they still used the same infrastructure to hook into the
+locations of interrupts being disabled or enabled.
 
-Oops, no, we don't.  In fact, since you pointed this out to me in your review of
-the earlier patch, I meant to remove it.  It does no harm, but should be removed
-for clarity.
+trace_hardirqs_on/off() is the function that is called for both lockdep
+and ftrace's irqsoff tracer. So this was intentional. That way we didn't
+need to have two different callers at every location. But if lockdep
+isn't defined and ftrace irqsoff is, then ftrace would define the
+trace_hardirqs_on/off() routines, otherwise lockdep does. (These
+routines are within CONFIG_PROVE_LOCKING #ifdefs in
+kernel/trace/trace_irqsoff.c)
 
-Thanks,
-Mike
+When both lockdep and irqsoff tracer are configured, then lockdep
+defines the trace_hardirqs_off_caller(), and calls time_hardirqs_off()
+in trace_irqsoff.c which does the same thing as the trace_hardirqs_off()
+does without lockdep.
+
+I'm not sure why one would add the annotations while adding
+PROVE_LOCKING doesn't. They both seems to use CALLER_ADDR0, but maybe
+there's another path that uses CALLER_ADDR1 without it.
+
+-- Steve
