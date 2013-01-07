@@ -1,42 +1,39 @@
 From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Mon,  7 Jan 2013 12:21:46 +0100
-Subject: [PATCH 04/16] dmaengine: ste_dma40: limit burst size to 16
+Date: Mon,  7 Jan 2013 12:21:47 +0100
+Subject: [PATCH 05/16] dmaengine: ste_dma40: don't check for
+ pm_runtime_suspended()
 In-Reply-To: <1357557718-15676-1-git-send-email-fabio.baltieri@linaro.org>
 References: <1357557718-15676-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <1357557718-15676-5-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <1357557718-15676-6-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Per Forlin <per.forlin@stericsson.com>
+From: Narayanan G <narayanan.gopalakrishnan@stericsson.com>
 
-The client is not aware of the maximum burst size in the dma driver.  If
-the size exceeds 16 set max to 16.
+The check for runtime suspend is not needed during a regular suspend, as
+the framework takes care of this.  This fixes the issue of DMA driver
+not letting the system to go to deepsleep in the first attempt.
 
-Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+Signed-off-by: Narayanan G <narayanan.gopalakrishnan@stericsson.com>
+Reviewed-by: Rabin Vincent <rabin.vincent@stericsson.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 ---
- drivers/dma/ste_dma40.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/dma/ste_dma40.c | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index f5724d9..2d0c63d 100644
+index 2d0c63d..760576b 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -2578,6 +2578,14 @@ static int d40_set_runtime_config(struct dma_chan *chan,
- 		return -EINVAL;
- 	}
+@@ -2782,8 +2782,6 @@ static int dma40_pm_suspend(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct d40_base *base = platform_get_drvdata(pdev);
+ 	int ret = 0;
+-	if (!pm_runtime_suspended(dev))
+-		return -EBUSY;
  
-+	if (src_maxburst > 16) {
-+		src_maxburst = 16;
-+		dst_maxburst = src_maxburst * src_addr_width / dst_addr_width;
-+	} else if (dst_maxburst > 16) {
-+		dst_maxburst = 16;
-+		src_maxburst = dst_maxburst * dst_addr_width / src_addr_width;
-+	}
-+
- 	ret = dma40_config_to_halfchannel(d40c, &cfg->src_info,
- 					  src_addr_width,
- 					  src_maxburst);
+ 	if (base->lcpa_regulator)
+ 		ret = regulator_disable(base->lcpa_regulator);
 -- 
 1.7.12.1
