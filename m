@@ -1,133 +1,79 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  7 Jan 2013 23:56:44 +0100
-Subject: [PATCH 08/11] ARM: nomadik: migrate MMC/SD card support to device tree
-Message-ID: <1357599404-7587-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  7 Jan 2013 23:56:51 +0100
+Subject: [PATCH 09/11] ARM: nomadik: add I2C devices to the device tree
+Message-ID: <1357599411-7619-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves over the MMC/SD card support to the device tree probe
-path. The special GPIO to bias the card detect line is kept,
-but the pin property is moved to the device tree as part of
-the MMC/SD card node.
+This adds the GPIO-based I2C devices to the Nomadik device tree.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-nomadik-s8815.dts    |  7 +++++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 13 ++++++++
- arch/arm/mach-nomadik/cpu-8815.c           | 48 +++++++++++++++++++++++++++++-
- 3 files changed, 67 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 52 ++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-index ff8a440..a123971 100644
---- a/arch/arm/boot/dts/ste-nomadik-s8815.dts
-+++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-@@ -24,4 +24,11 @@
- 			interrupt-parent = <&gpio3>;
- 		};
- 	};
-+
-+	/* This GPIO needs to be driven to enable card detect */
-+	amba {
-+		mmcsd: sdi at 101f6000 {
-+			cd-bias-gpios = <&gpio3 16 0x1>;
-+		};
-+	};
- };
 diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index 43b6d8c..1a12f10 100644
+index 1a12f10..58d6b6a 100644
 --- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
 +++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -187,5 +187,18 @@
- 			interrupt-parent = <&vica>;
- 			interrupts = <10>;
+@@ -134,6 +134,58 @@
  		};
-+
-+		mmcsd: sdi at 101f6000 {
-+			compatible = "arm,pl18x", "arm,primecell";
-+			reg = <0x101f6000 0x1000>;
-+			interrupt-parent = <&vica>;
-+			interrupts = <22>;
-+			max-frequency = <48000000>;
-+			bus-width = <4>;
-+			mmc-cap-mmc-highspeed;
-+			mmc-cap-sd-highspeed;
-+			cd-gpios = <&gpio3 15 0x1>;
-+			cd-inverted;
-+		};
  	};
- };
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 06f9a5b..3078c1c 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -35,6 +35,7 @@
- #include <linux/of_platform.h>
- #include <linux/mtd/fsmc.h>
- #include <linux/gpio.h>
-+#include <linux/amba/mmci.h>
  
- #include <mach/hardware.h>
- #include <mach/irqs.h>
-@@ -310,6 +311,50 @@ static int __init cpu8815_eth_init(void)
- }
- device_initcall(cpu8815_eth_init);
- 
-+/*
-+ * TODO:
-+ * cannot be set from device tree, convert to a proper DT
-+ * binding.
-+ */
-+static struct mmci_platform_data mmcsd_plat_data = {
-+	.ocr_mask = MMC_VDD_29_30,
-+};
++	/* I2C0 connected to the STw4811 power management chip */
++	i2c0 {
++		compatible = "i2c-gpio";
++		gpios = <&gpio1 31 0 /* sda */
++			 &gpio1 30 0 /* scl */
++			>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+/*
-+ * This GPIO pin turns on a line that is used to detect card insertion
-+ * on this board.
-+ */
-+static int __init cpu8815_mmcsd_init(void)
-+{
-+	struct device_node *cdbias;
-+	int gpio, err;
++		stw4811 at 2d {
++			   compatible = "st,stw4811";
++			   reg = <0x2d>;
++		};
++	};
 +
-+	cdbias = of_find_node_by_path("/amba/sdi at 101f6000");
-+	if (!cdbias) {
-+		pr_info("could not find MMC/SD controller node\n");
-+		return 0;
-+	}
-+	gpio = of_get_named_gpio(cdbias, "cd-bias-gpios", 0);
-+	if (gpio < 0) {
-+		pr_info("could not obtain MMC/SD controller GPIO\n");
-+		return 0;
-+	}
-+	err = gpio_request(gpio, "card detect bias");
-+	if (err) {
-+		pr_info("failed to request card detect bias GPIO %d\n", gpio);
-+		return -ENODEV;
-+	}
-+	err = gpio_direction_output(gpio, 0);
-+	if (err){
-+		pr_info("failed to set GPIO %d as output, low\n", gpio);
-+		return err;
-+	}
-+	pr_info("enabled CD bias GPIO %d, low\n", gpio);
-+	return 0;
-+}
-+device_initcall(cpu8815_mmcsd_init);
++	/* I2C1 connected to various sensors */
++	i2c1 {
++		compatible = "i2c-gpio";
++		gpios = <&gpio1 22 0 /* sda */
++			 &gpio1 21 0 /* scl */
++			>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
++		camera at 2d {
++			   compatible = "st,camera";
++			   reg = <0x10>;
++		};
++		stw5095 at 1a {
++			   compatible = "st,stw5095";
++			   reg = <0x1a>;
++		};
++		lis3lv02dl at 1d {
++			   compatible = "st,lis3lv02dl";
++			   reg = <0x1d>;
++		};
++	};
 +
- /* These are mostly to get the right device names for the clock lookups */
- static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO0_BASE,
-@@ -332,7 +377,8 @@ static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
- 		"rtc-pl031", NULL),
- 	OF_DEV_AUXDATA("stericsson,fsmc-nand", NOMADIK_FSMC_BASE,
- 		"fsmc-nand", &cpu8815_nand_data),
--
-+	OF_DEV_AUXDATA("arm,primecell", NOMADIK_SDI_BASE,
-+		"mmci", &mmcsd_plat_data),
- 	{ /* sentinel */ },
- };
- 
++	/* I2C2 connected to the USB portions of the STw4811 only */
++	i2c2 {
++		compatible = "i2c-gpio";
++		gpios = <&gpio2 10 0 /* sda */
++			 &gpio2 9 0 /* scl */
++			>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		stw4811 at 2d {
++			   compatible = "st,stw4811-usb";
++			   reg = <0x2d>;
++		};
++	};
++
+ 	amba {
+ 		compatible = "arm,amba-bus";
+ 		#address-cells = <1>;
 -- 
 1.7.11.7
