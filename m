@@ -1,103 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 07 Jan 2013 18:14:32 +0100
-Subject: [PATCH 3.8-rc] net: mvneta: fix driver operation in SMP context
-In-Reply-To: <1357576074-24245-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1357576074-24245-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <50EB0278.4010806@free-electrons.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 7 Jan 2013 17:21:01 +0000
+Subject: [PATCH v4 21/24] arm/v2m: initialize arch_timers even if v2m_timer
+ is not present
+In-Reply-To: <alpine.DEB.2.02.1209141347250.29232@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
+ <1347621207-11294-21-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1347625628.2497.65.camel@hornet>
+ <alpine.DEB.2.02.1209141347250.29232@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1301071719180.4981@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2013 05:27 PM, Thomas Petazzoni wrote:
-> From: Dmitri Epshtein <dima@marvell.com>
+On Fri, 14 Sep 2012, Stefano Stabellini wrote:
+> On Fri, 14 Sep 2012, Pawel Moll wrote:
+> > On Fri, 2012-09-14 at 12:13 +0100, Stefano Stabellini wrote:
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > CC: Russell King <linux@arm.linux.org.uk>
+> > > CC: Pawel Moll <pawel.moll@arm.com>
+> > > CC: Marc Zyngier <marc.zyngier@arm.com>
+> > > ---
+> > >  arch/arm/mach-vexpress/v2m.c |   11 ++++++-----
+> > >  1 files changed, 6 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> > > index 37608f2..4e567f7 100644
+> > > --- a/arch/arm/mach-vexpress/v2m.c
+> > > +++ b/arch/arm/mach-vexpress/v2m.c
+> > > @@ -621,16 +621,17 @@ static void __init v2m_dt_timer_init(void)
+> > >  
+> > >  	v2m_clk_init();
+> > >  
+> > > -	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
+> > > -	if (WARN_ON(err))
+> > > -		return;
+> > > -	node = of_find_node_by_path(path);
+> > > -	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
+> > >  	if (arch_timer_of_register() != 0)
+> > >  		twd_local_timer_of_register();
+> > >  
+> > >  	if (arch_timer_sched_clock_init() != 0)
+> > >  		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
+> > > +
+> > > +	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
+> > > +	if (WARN_ON(err))
+> > > +		return;
+> > > +	node = of_find_node_by_path(path);
+> > > +	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
+> > >  }
+> > >  
+> > >  static struct sys_timer v2m_dt_timer = {
+> > 
+> > Fair point. The alias is going to disappear anyway (I'm working on a VE
+> > platform rework right now), but in case I won't get it on time for 3.7,
+> > I'll make sure this one is merged instead.
 > 
-> In order for the driver to behave properly in a SMP context, the same
-> transmit queue should be used by the kernel in dev_queue_xmit() and in
-> the driver's mvneta_tx() function. To achieve that, the driver now
-> implements the ->ndo_select_txq() operation.
-> 
-> For now, it always returns the same transmit queue, txq_def, until the
-> driver is expanded to properly take advantage of the multiqueue
-> capabilities of the hardware.
-> 
-> Without this patch, the network driver crashes the kernel almost
-> immediately on Armada XP platforms, if the network load is at least a
-> little bit parallel (i.e several threads).
-> 
-> [Thomas Petazzoni: reword commit message]
-> Signed-off-by: Dmitri Epshtein <dima@marvell.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-I have tested this patch on my Armada XP DB board and on the
-OpenBlocks AX3 board. I confirmed that it fixes the problem when
-multiple thread are used.
-
-You can add my
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-and also my
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Or a combination of the two if you prefer!
-
-> ---
-> This is 3.8-rc material.
-> ---
->  drivers/net/ethernet/marvell/mvneta.c |   17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index b6025c3..af2c421 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -1310,6 +1310,17 @@ static u32 mvneta_skb_tx_csum(struct mvneta_port *pp, struct sk_buff *skb)
->  	return MVNETA_TX_L4_CSUM_NOT;
->  }
->  
-> +static u16 mvneta_tx_policy(struct mvneta_port *pp, struct sk_buff *skb)
-> +{
-> +	return (u16)txq_def;
-> +}
-> +
-> +static u16 mvneta_select_txq(struct net_device *dev, struct sk_buff *skb)
-> +{
-> +	struct mvneta_port *pp = netdev_priv(dev);
-> +	return mvneta_tx_policy(pp, skb);
-> +}
-> +
->  /* Returns rx queue pointer (find last set bit) according to causeRxTx
->   * value
->   */
-> @@ -1476,7 +1487,8 @@ error:
->  static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
->  {
->  	struct mvneta_port *pp = netdev_priv(dev);
-> -	struct mvneta_tx_queue *txq = &pp->txqs[txq_def];
-> +	u16 txq_id = mvneta_tx_policy(pp, skb);
-> +	struct mvneta_tx_queue *txq = &pp->txqs[txq_id];
->  	struct mvneta_tx_desc *tx_desc;
->  	struct netdev_queue *nq;
->  	int frags = 0;
-> @@ -1486,7 +1498,7 @@ static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
->  		goto out;
->  
->  	frags = skb_shinfo(skb)->nr_frags + 1;
-> -	nq    = netdev_get_tx_queue(dev, txq_def);
-> +	nq    = netdev_get_tx_queue(dev, txq_id);
->  
->  	/* Get a descriptor for the first part of the packet */
->  	tx_desc = mvneta_txq_next_desc_get(txq);
-> @@ -2550,6 +2562,7 @@ static const struct net_device_ops mvneta_netdev_ops = {
->  	.ndo_change_mtu      = mvneta_change_mtu,
->  	.ndo_tx_timeout      = mvneta_tx_timeout,
->  	.ndo_get_stats64     = mvneta_get_stats64,
-> +	.ndo_select_queue    = mvneta_select_txq,
->  };
->  
->  const struct ethtool_ops mvneta_eth_tool_ops = {
+> Great, thanks!
+> Should I leave this patch out of the Xen on ARM series for 3.7 then?
 > 
 
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I have just noticed that this patch hasn't been merged yet, but still we
+need it to boot Linux on Xen.
+Do you want me to rebase and resent?
