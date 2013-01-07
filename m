@@ -1,44 +1,177 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Jan 2013 10:56:18 +0000
-Subject: [PATCH v4 10/19] irqchip: Move ARM gic.h to
- include/linux/irqchip/arm-gic.h
-In-Reply-To: <50EA35AF.1000308@gmail.com>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-11-git-send-email-robherring2@gmail.com>
- <201301032144.52079.arnd@arndb.de> <50E601A7.8010801@gmail.com>
- <CAHkRjk5UCp60dTUPV8MkzK7ibDD5Aw_ahg_3iygMT3tZ3dUxbQ@mail.gmail.com>
- <50EA35AF.1000308@gmail.com>
-Message-ID: <20130107105618.GB29030@arm.com>
+From: zhanzhenbo@gmail.com (steve.zhan)
+Date: Mon, 7 Jan 2013 18:58:10 +0800
+Subject: [PATCH 1/1] ARM: ux500:mach-ux500/cpuidle.c spinlock dis-matching
+In-Reply-To: <50EA8D35.5020501@linaro.org>
+References: <CAKvkGKdoWxmnRbNvn_SikRhzsyyzqEC99XtSM9ZeaVGjEA_Ydw@mail.gmail.com>
+ <50E9A4FE.6090807@linaro.org>
+ <CAKvkGKcPumpRcxQrwWGXoWvG4Sk2niTiojfNU=2PnZ9zq_7EcQ@mail.gmail.com>
+ <50EA8D35.5020501@linaro.org>
+Message-ID: <CAKvkGKef00VwpZeVmme4=eAEDpCvPd6NjXHcLYhzQL1VY86Z_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 02:40:47AM +0000, Rob Herring wrote:
-> On 01/06/2013 01:07 PM, Catalin Marinas wrote:
-> > On 3 January 2013 22:09, Rob Herring <robherring2@gmail.com> wrote:
-> >> On 01/03/2013 03:44 PM, Arnd Bergmann wrote:
-> >>> On Thursday 03 January 2013, Rob Herring wrote:
-> >>>> From: Rob Herring <rob.herring@calxeda.com>
-> >>>>
-> >>>> Now that we have GIC moved to drivers/irqchip and all GIC DT init for
-> >>>> platforms using irqchip_init, move gic.h and update the remaining
-> >>>> includes.
-> >>>
-> >>> Can you elaborate on why this is done? Does any other code rely on the
-> >>> header file being globally visible, or is there a more general reason
-> >>> to move header files out of asm/ ?
-> >>
-> >> KVM needs the register definitions for GIC distributor emulation.
-> >> Platform SMP code still needs gic_secondary_init.
-> > 
-> > While I'm not arguing against this patch, for gic_secondary_init() we
-> > should use a CPU notifier. All platforms calling this function only
-> > pass 0 as argument (and it makes sense, since the GIC CPU interface is
-> > part of primary GIC).
-> 
-> I'm waiting for you to add that support for arm64. :) Then we can
-> convert arm platforms to use it.
+Hi Daniel,
+              Thank you.
 
-I'll do it, no problem ;)
+commit 99d0a05d163bd070eba7caab7e772206edbcbbc9
+Author: steve.zhan <zhanzhenbo@gmail.com>
+Date:   Mon Jan 7 18:19:14 2013 +0800
+
+    ARM: ux500: add spin_unlock(&master_lock).
+
+    Add the missing spin_unlock statement to unlock
+    master_lock when prcmu_gic_decouple() return TRUE
+
+    Signed-off-by: steve zhan <zhanzhenbo@gmail.com>
+
+diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
+index b54884bd..ce91493 100644
+--- a/arch/arm/mach-ux500/cpuidle.c
++++ b/arch/arm/mach-ux500/cpuidle.c
+@@ -40,8 +40,10 @@ static inline int ux500_enter_idle(struct
+cpuidle_device *dev,
+                        goto wfi;
+
+                /* decouple the gic from the A9 cores */
+-               if (prcmu_gic_decouple())
++               if (prcmu_gic_decouple()) {
++                       spin_unlock(&master_lock);
+                        goto out;
++               }
+
+                /* If an error occur, we will have to recouple the gic
+                 * manually */
+
+
+-------------
+steve zhan
+
+2013/1/7 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 01/07/2013 06:50 AM, steve.zhan wrote:
+>> Hi Daniel,
+>>
+>>     Happy new year, Thank you for reply.
+>> Sorry for that i have refer the old patch email.
+>> I have updated the patch, Pls check the URL:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138939.html
+>> Now i am using gmail GUI tools to send mail, i will switch email tool
+>> to MUTT to commit the other patchs in the future.
+>
+> Ok.
+>
+> Please do not introduce a new variable which is at the end pointless and
+> add more complexity.
+>
+> You can simply remove the if statement for prcmu_gic_decouple(), or
+> unlock if it fails.
+>
+> Thanks
+>   -- Daniel
+>
+>> --------------
+>> steve.zhan
+>>
+>> 2013/1/7, Daniel Lezcano <daniel.lezcano@linaro.org>:
+>>> On 12/28/2012 08:06 AM, steve.zhan wrote:
+>>>> Hi Daniel,
+>>>
+>>> Hi Steve,
+>>>
+>>> sorry I missed your email.
+>>>
+>>>>
+>>>>        I think we must unlock the master spinlock even
+>>>> prcmu_gic_decouple function now always return 0.
+>>>>        Could you give some infos about this?
+>>>
+>>> I agree, that would be cleaner.
+>>>
+>>> AFAICS, your patch does not solve the problem because 'recouple' will be
+>>> false if prcmu_gic_decouple fails, so the lock will never be release.
+>>>
+>>> That will be simpler to do:
+>>>
+>>> if (prcmu_gic_decouple()) {
+>>>      spin_unlock(&master);
+>>>      goto out;
+>>> }
+>>>
+>>> no ?
+>>>
+>>>> Thanks.
+>>>>
+>>>> diff --git a/arch/arm/mach-ux500/cpuidle.c
+>>>> b/arch/arm/mach-ux500/cpuidle.c
+>>>> index b54884bd..b0759ce 100644
+>>>> --- a/arch/arm/mach-ux500/cpuidle.c
+>>>> +++ b/arch/arm/mach-ux500/cpuidle.c
+>>>> @@ -29,6 +29,7 @@ static inline int ux500_enter_idle(struct cpuidle_device
+>>>> *dev,
+>>>>  {
+>>>>         int this_cpu = smp_processor_id();
+>>>>         bool recouple = false;
+>>>> +       bool locked = false;
+>>>>
+>>>>         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
+>>>>
+>>>> @@ -39,6 +40,8 @@ static inline int ux500_enter_idle(struct cpuidle_device
+>>>> *dev,
+>>>>                 if (!spin_trylock(&master_lock))
+>>>>                         goto wfi;
+>>>>
+>>>> +               locked = true;
+>>>> +
+>>>>                 /* decouple the gic from the A9 cores */
+>>>>                 if (prcmu_gic_decouple())
+>>>>                         goto out;
+>>>> @@ -76,7 +79,7 @@ static inline int ux500_enter_idle(struct cpuidle_device
+>>>> *dev,
+>>>>                 /* When we switch to retention, the prcmu is in charge
+>>>>                  * of recoupling the gic automatically */
+>>>>                 recouple = false;
+>>>> -
+>>>> +               locked = false;
+>>>>                 spin_unlock(&master_lock);
+>>>>         }
+>>>>  wfi:
+>>>> @@ -86,7 +89,8 @@ out:
+>>>>
+>>>>         if (recouple) {
+>>>>                 prcmu_gic_recouple();
+>>>> -               spin_unlock(&master_lock);
+>>>> +               if (locked)
+>>>> +                       spin_unlock(&master_lock);
+>>>>         }
+>>>>
+>>>>         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &this_cpu);
+>>>>
+>>>>
+>>>>
+>>>> Steve Zhan
+>>>>
+>>>
+>>>
+>>> --
+>>>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>>
+>>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>>> <http://twitter.com/#!/linaroorg> Twitter |
+>>> <http://www.linaro.org/linaro-blog/> Blog
+>>>
+>>>
+>>
+>>
+>
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
+
+
 
 -- 
-Catalin
+Steve Zhan
