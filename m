@@ -1,82 +1,70 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  7 Jan 2013 17:27:54 +0100
-Subject: [PATCH 3.8-rc] net: mvneta: fix driver operation in SMP context
-Message-ID: <1357576074-24245-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 7 Jan 2013 17:28:09 +0100
+Subject: [PATCH] mmc: mmci: Gate the clock when freq is 0
+In-Reply-To: <CAPDyKFoH2aOM+n0PB7qScbVOz_My=ZpAye3swgF6xiYBKou_=Q@mail.gmail.com>
+References: <1355327421-20187-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121221162132.GI14363@n2100.arm.linux.org.uk>
+ <CAPDyKFoH2aOM+n0PB7qScbVOz_My=ZpAye3swgF6xiYBKou_=Q@mail.gmail.com>
+Message-ID: <CAPDyKFrA+7B5XTrJVw2g2UvnnSxbUV=KFZsM+gPNKYksQ7coDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitri Epshtein <dima@marvell.com>
+On 7 January 2013 11:29, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 21 December 2012 17:21, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Wed, Dec 12, 2012 at 04:50:21PM +0100, Ulf Hansson wrote:
+>>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+>>> index edc3e9b..bf07823 100644
+>>> --- a/drivers/mmc/host/mmci.c
+>>> +++ b/drivers/mmc/host/mmci.c
+>>> @@ -1147,6 +1147,15 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>>               }
+>>>       }
+>>>
+>>> +     /*
+>>> +      * If clock = 0 and the block needs a certain value in the clreg
+>>> +      * to function, we need to gate the clock by removing MCI_PWR_ON.
+>>> +      * This is a special case for ST Micro variants, since the power
+>>> +      * register in the ARM legacy case is used for powering the cards.
+>>
+>> I wish you'd stop using "legacy" when talking about the ARM primecell.
+>> How can it be legacy when ARMs current development boards still use this
+>> primecell?
+>>
+>>> +      */
+>>> +     if (!ios->clock && variant->clkreg)
+>>> +             pwr &= ~MCI_PWR_ON;
+>>
+>> This is horrid.  You're overloading the clkreg default value with another
+>> meaning here - "if we have any bits set in the default value for the
+>> MCICLOCK register, the MCIPOWER register has special meanings for the
+>> power control bits".
+>
+> I was hesitating when we decided to use the clkreg value due to what
+> you states here. Just to give you some more background.
+>
+> By using clkreg default value you will get an implicit sequential
+> dependency that you will write the default value to MMCICLOCK reg,
+> _before_ writing the "power on" bit to the MMCIPOWER reg. Otherwise
+> you will not be able to update MMCICLK reg after the "power on" bit in
+> the MMCIPOWER reg has been set. That was the whole reason to why the
+> clkreg default value was invented.
+>
+> Anyway, I still think your comment is valid so I suggest we add
+> another variant data which meaning will indicate whether the MMCIPOWER
+> register is used to control the actual power to the card. If that is
+> the case we must not use the MMCIPOWER to gate the clock. Does that
+> make sense?
+>
+>>
+>> When you think about it as I've described it above, do you think this is
+>> an acceptable solution to this problem?
 
-In order for the driver to behave properly in a SMP context, the same
-transmit queue should be used by the kernel in dev_queue_xmit() and in
-the driver's mvneta_tx() function. To achieve that, the driver now
-implements the ->ndo_select_txq() operation.
+I just sent out a new patch to handle the clock gating for the ST
+variants. I decided to add a new variant data which is only indicating
+whether the power register should be used to gate the clock. It felt
+like the most proper way of doing this. Please have look when you have
+the time.
 
-For now, it always returns the same transmit queue, txq_def, until the
-driver is expanded to properly take advantage of the multiqueue
-capabilities of the hardware.
-
-Without this patch, the network driver crashes the kernel almost
-immediately on Armada XP platforms, if the network load is at least a
-little bit parallel (i.e several threads).
-
-[Thomas Petazzoni: reword commit message]
-Signed-off-by: Dmitri Epshtein <dima@marvell.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-This is 3.8-rc material.
----
- drivers/net/ethernet/marvell/mvneta.c |   17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index b6025c3..af2c421 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -1310,6 +1310,17 @@ static u32 mvneta_skb_tx_csum(struct mvneta_port *pp, struct sk_buff *skb)
- 	return MVNETA_TX_L4_CSUM_NOT;
- }
- 
-+static u16 mvneta_tx_policy(struct mvneta_port *pp, struct sk_buff *skb)
-+{
-+	return (u16)txq_def;
-+}
-+
-+static u16 mvneta_select_txq(struct net_device *dev, struct sk_buff *skb)
-+{
-+	struct mvneta_port *pp = netdev_priv(dev);
-+	return mvneta_tx_policy(pp, skb);
-+}
-+
- /* Returns rx queue pointer (find last set bit) according to causeRxTx
-  * value
-  */
-@@ -1476,7 +1487,8 @@ error:
- static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
- {
- 	struct mvneta_port *pp = netdev_priv(dev);
--	struct mvneta_tx_queue *txq = &pp->txqs[txq_def];
-+	u16 txq_id = mvneta_tx_policy(pp, skb);
-+	struct mvneta_tx_queue *txq = &pp->txqs[txq_id];
- 	struct mvneta_tx_desc *tx_desc;
- 	struct netdev_queue *nq;
- 	int frags = 0;
-@@ -1486,7 +1498,7 @@ static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
- 		goto out;
- 
- 	frags = skb_shinfo(skb)->nr_frags + 1;
--	nq    = netdev_get_tx_queue(dev, txq_def);
-+	nq    = netdev_get_tx_queue(dev, txq_id);
- 
- 	/* Get a descriptor for the first part of the packet */
- 	tx_desc = mvneta_txq_next_desc_get(txq);
-@@ -2550,6 +2562,7 @@ static const struct net_device_ops mvneta_netdev_ops = {
- 	.ndo_change_mtu      = mvneta_change_mtu,
- 	.ndo_tx_timeout      = mvneta_tx_timeout,
- 	.ndo_get_stats64     = mvneta_get_stats64,
-+	.ndo_select_queue    = mvneta_select_txq,
- };
- 
- const struct ethtool_ops mvneta_eth_tool_ops = {
--- 
-1.7.9.5
+Thanks!
+Ulf Hansson
