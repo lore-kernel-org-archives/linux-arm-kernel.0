@@ -1,45 +1,52 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 7 Jan 2013 10:47:47 +0100
-Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
-In-Reply-To: <20130106235312.0839a879@skate>
-References: <1357315498-4570-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <50E710CB.8070007@lunn.ch> <20130104183139.20492204@skate>
- <50E71356.3030203@lunn.ch> <20130104190345.460151d1@skate>
- <50E9EE7A.1080301@free-electrons.com>
- <20130106235312.0839a879@skate>
-Message-ID: <20130107094747.GR3392@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 7 Jan 2013 11:05:45 +0100
+Subject: [GIT PULL] MTU clksrc changes for v3.9
+Message-ID: <CACRpkdaFLNWj4qg=571K5pCrE01r6JoSOGoUvGGBOCeEW=3hYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 06, 2013 at 11:53:12PM +0100, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
-> 
-> On Sun, 06 Jan 2013 22:36:58 +0100, Gregory CLEMENT wrote:
-> 
-> > Until now I didn't notice any problem on this board with the 3GB enable.
-> > 
-> > I made more tests since I received this email, I booted (cold and hot boot)
-> > the board dozens of times, and indeed every 5 or 10 reboot the kernel hanged
-> > during boot at line:
-> > "UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)"
-> 
-> I think it hangs at the same place here.
-> 
-> > After applying your patch, I didn't notice any hang after 20 boots. Do you
-> > have a test pattern which make the kernel to hang each time to be sure that
-> > it is the root of the problem?
-> 
-> No, I don't have a specific pattern. It just hangs from time to time.
-> Maybe 1 boot out of 5 or something like that. And it just hangs like it
-> did for you.
+Hi Rafael,
 
-Hi Thomas, Gregory
+Hi, this is a pull request for stuff for the *next* merge window, enabling
+the MTU timer to be used for timer-based delay.
 
-I've been testing my board some more, using the PlatHome kernel
-installed on the device as i received it. I've rebooted the device 20
-times and not had a single problem.
+Since there are some pending patches moving the ux500 cpufreq driver
+around here:
+http://marc.info/?l=linux-arm-kernel&m=135515323413100&w=2
+it should be applied to the cpufreq tree to minimize conflicts.
+Patches are ACKed by John Stultz.
 
-I will now swap to a mainline kernel, 3.8-rc2 plus UART patch.
+Please pull it into the cpufreq tree or advise on alternate path, we can
+also take this and the other cpufreq patches through the ARM SoC
+tree if you ACK them.
 
-  Andrew
+Yours,
+Linus Walleij
+
+
+The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+
+  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/clksrc-mtu-for-arm-soc
+
+for you to fetch changes up to f644f2260aba851219e751a68ed2d37d6306fa0a:
+
+  cpufreq: db8500: set CPUFREQ_CONST_LOOPS (2013-01-06 23:55:51 +0100)
+
+----------------------------------------------------------------
+- Implement timer-based delay on the Nomadik MTU
+  clocksource
+- Modify CPUFREQ to account for the same change.
+
+----------------------------------------------------------------
+Fabio Baltieri (2):
+      clocksource: nomadik-mtu: support timer-based delay
+      cpufreq: db8500: set CPUFREQ_CONST_LOOPS
+
+ drivers/clocksource/nomadik-mtu.c | 11 +++++++++++
+ drivers/cpufreq/db8500-cpufreq.c  |  2 +-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
