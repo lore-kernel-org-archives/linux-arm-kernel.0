@@ -1,18 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 07 Jan 2013 10:10:16 -0700
-Subject: [PATCH 1/2] pinctrl/nomadik: simplify GPIO probe
-In-Reply-To: <1357568625-5979-1-git-send-email-linus.walleij@stericsson.com>
-References: <1357568625-5979-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <50EB0178.9020601@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 7 Jan 2013 18:10:22 +0100
+Subject: [PATCH 3.8-rc] arm: mvebu: add LEDs support to defconfig file
+In-Reply-To: <20130107170450.GK5075@titan.lakedaemon.net>
+References: <1357576034-24193-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130107170450.GK5075@titan.lakedaemon.net>
+Message-ID: <20130107181022.6c5f892e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2013 07:23 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Instead of jumping to a label later in the probe just return
-> with an error code whenever probe() fails. Make sure to remove
-> the gpiochip on irqdomain error now that we're at it.
+Dear Jason Cooper,
 
-The series,
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+On Mon, 7 Jan 2013 12:04:50 -0500, Jason Cooper wrote:
+> On Mon, Jan 07, 2013 at 05:27:14PM +0100, Thomas Petazzoni wrote:
+> > The OpenBlocks AX3-4 platform has several LEDs, so it sounds wise to
+> > enable LED support in mvebu_defconfig. We anticipate that more
+> > platforms using Marvell EBU SoCs will have LEDs in the future.
+> > 
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > ---
+> > This is 3.8-rc material.
+> 
+> Is this patch fixing a problem?  I'm inclined to queue this up for 3.9
+
+Well, it's just a defconfig update, and I think defconfig updates are
+generally accepted during the -rc cycle.
+
+Otherwise, I'm fine if it waits until 3.9.
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
