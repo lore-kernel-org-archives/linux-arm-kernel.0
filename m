@@ -1,62 +1,30 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 7 Jan 2013 11:29:01 +0100
-Subject: [PATCH] mmc: mmci: Gate the clock when freq is 0
-In-Reply-To: <20121221162132.GI14363@n2100.arm.linux.org.uk>
-References: <1355327421-20187-1-git-send-email-ulf.hansson@stericsson.com>
- <20121221162132.GI14363@n2100.arm.linux.org.uk>
-Message-ID: <CAPDyKFoH2aOM+n0PB7qScbVOz_My=ZpAye3swgF6xiYBKou_=Q@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 07 Jan 2013 18:35:41 +0800
+Subject: [stericsson:ux500-multiplatform 1/1] warning: (ARCH_BCM &&
+ UX500_SOC_COMMON && SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects
+ ARM_ERRATA_754322 which has unmet direct dependencies (CPU_V7)
+Message-ID: <50eaa4fd.vbg6otCIlpmFfQJ7%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 December 2012 17:21, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Dec 12, 2012 at 04:50:21PM +0100, Ulf Hansson wrote:
->> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->> index edc3e9b..bf07823 100644
->> --- a/drivers/mmc/host/mmci.c
->> +++ b/drivers/mmc/host/mmci.c
->> @@ -1147,6 +1147,15 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>               }
->>       }
->>
->> +     /*
->> +      * If clock = 0 and the block needs a certain value in the clreg
->> +      * to function, we need to gate the clock by removing MCI_PWR_ON.
->> +      * This is a special case for ST Micro variants, since the power
->> +      * register in the ARM legacy case is used for powering the cards.
->
-> I wish you'd stop using "legacy" when talking about the ARM primecell.
-> How can it be legacy when ARMs current development boards still use this
-> primecell?
->
->> +      */
->> +     if (!ios->clock && variant->clkreg)
->> +             pwr &= ~MCI_PWR_ON;
->
-> This is horrid.  You're overloading the clkreg default value with another
-> meaning here - "if we have any bits set in the default value for the
-> MCICLOCK register, the MCIPOWER register has special meanings for the
-> power control bits".
+tree:   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-multiplatform
+head:   661989c3ec725370271a2c00a2e5ab5a88f6b440
+commit: 661989c3ec725370271a2c00a2e5ab5a88f6b440 [1/1] ARM: ux500: convert to multiplatorm
+config: make ARCH=arm allnoconfig
 
-I was hesitating when we decided to use the clkreg value due to what
-you states here. Just to give you some more background.
+All warnings:
 
-By using clkreg default value you will get an implicit sequential
-dependency that you will write the default value to MMCICLOCK reg,
-_before_ writing the "power on" bit to the MMCIPOWER reg. Otherwise
-you will not be able to update MMCICLK reg after the "power on" bit in
-the MMCIPOWER reg has been set. That was the whole reason to why the
-clkreg default value was invented.
+warning: (UX500_SOC_COMMON) selects PINCTRL_NOMADIK which has unmet direct dependencies (PINCTRL && (ARCH_U8500 || ARCH_NOMADIK))
+warning: (UX500_SOC_COMMON && MACH_NOMADIK_8815NHK) selects CLKSRC_NOMADIK_MTU which has unmet direct dependencies (ARCH_NOMADIK || ARCH_U8500)
+warning: (ARCH_BCM && UX500_SOC_COMMON && SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_754322 which has unmet direct dependencies (CPU_V7)
+warning: (UX500_SOC_COMMON) selects PINCTRL_NOMADIK which has unmet direct dependencies (PINCTRL && (ARCH_U8500 || ARCH_NOMADIK))
+warning: (UX500_SOC_COMMON && MACH_NOMADIK_8815NHK) selects CLKSRC_NOMADIK_MTU which has unmet direct dependencies (ARCH_NOMADIK || ARCH_U8500)
+warning: (ARCH_BCM && UX500_SOC_COMMON && SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_754322 which has unmet direct dependencies (CPU_V7)
+--
+warning: (UX500_SOC_COMMON) selects PINCTRL_NOMADIK which has unmet direct dependencies (PINCTRL && (ARCH_U8500 || ARCH_NOMADIK))
+warning: (UX500_SOC_COMMON && MACH_NOMADIK_8815NHK) selects CLKSRC_NOMADIK_MTU which has unmet direct dependencies (ARCH_NOMADIK || ARCH_U8500)
+warning: (ARCH_BCM && UX500_SOC_COMMON && SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_754322 which has unmet direct dependencies (CPU_V7)
 
-Anyway, I still think your comment is valid so I suggest we add
-another variant data which meaning will indicate whether the MMCIPOWER
-register is used to control the actual power to the card. If that is
-the case we must not use the MMCIPOWER to gate the clock. Does that
-make sense?
-
->
-> When you think about it as I've described it above, do you think this is
-> an acceptable solution to this problem?
-
-Kind regards
-Ulf Hansson
+---
+0-DAY kernel build testing backend         Open Source Technology Center
+Fengguang Wu, Yuanhan Liu                              Intel Corporation
