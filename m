@@ -1,43 +1,63 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 7 Jan 2013 18:12:24 +0100
-Subject: [PATCH] ARM: mx5: Fix MX53 flexcan2 clock
-In-Reply-To: <1357568820-15426-1-git-send-email-marex@denx.de>
-References: <1357568820-15426-1-git-send-email-marex@denx.de>
-Message-ID: <20130107171224.GA13025@pengutronix.de>
+Date: Mon, 7 Jan 2013 18:13:44 +0100
+Subject: [PATCH] mtd: mxc_nand: Make use of supplied pinctrl data
+In-Reply-To: <1357568885-15507-1-git-send-email-marex@denx.de>
+References: <1357568885-15507-1-git-send-email-marex@denx.de>
+Message-ID: <20130107171344.GB13025@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 03:27:00PM +0100, Marek Vasut wrote:
-> The second FlexCAN port uses different clock than the first one, configure
-> correct clock to prevent hanging of the system during bringing up of the port.
+On Mon, Jan 07, 2013 at 03:28:05PM +0100, Marek Vasut wrote:
+> The MXC NAND driver doesn't consider the pinctrl data supplied via DT, which
+> will result in NAND pins not being properly configured.
+> 
+> Make the driver use pinctrl, but to prevent breakage on various boards, do not
+> fail if the pinctrl data are not available, only print a warning message.
 > 
 > Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-
-Looks Good.
+> Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
 
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
 Sascha
 
 > ---
->  arch/arm/boot/dts/imx53.dtsi |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/mtd/nand/mxc_nand.c |    6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index 5b59763..abe0f0b 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -614,7 +614,7 @@
->  				compatible = "fsl,imx53-flexcan", "fsl,p1010-flexcan";
->  				reg = <0x53fcc000 0x4000>;
->  				interrupts = <83>;
-> -				clocks = <&clks 158>, <&clks 157>;
-> +				clocks = <&clks 87>, <&clks 86>;
->  				clock-names = "ipg", "per";
->  				status = "disabled";
->  			};
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 45204e4..ed805fb 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -34,6 +34,7 @@
+>  #include <linux/completion.h>
+>  #include <linux/of_device.h>
+>  #include <linux/of_mtd.h>
+> +#include <linux/pinctrl/consumer.h>
+>  
+>  #include <asm/mach/flash.h>
+>  #include <linux/platform_data/mtd-mxc_nand.h>
+> @@ -1385,6 +1386,7 @@ static int mxcnd_probe(struct platform_device *pdev)
+>  	struct mtd_info *mtd;
+>  	struct mxc_nand_host *host;
+>  	struct resource *res;
+> +	struct pinctrl *pinctrl;
+>  	int err = 0;
+>  
+>  	/* Allocate memory for MTD device structure and private data */
+> @@ -1449,6 +1451,10 @@ static int mxcnd_probe(struct platform_device *pdev)
+>  	if (!res)
+>  		return -ENODEV;
+>  
+> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> +	if (IS_ERR(pinctrl))
+> +		dev_warn(&pdev->dev, "No PINCTRL data for the NAND driver!\n");
+> +
+>  	host->base = devm_request_and_ioremap(&pdev->dev, res);
+>  	if (!host->base)
+>  		return -ENOMEM;
 > -- 
 > 1.7.10.4
 > 
@@ -46,7 +66,6 @@ Sascha
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
