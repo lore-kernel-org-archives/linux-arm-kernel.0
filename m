@@ -1,29 +1,42 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 7 Jan 2013 19:20:31 +0100
-Subject: [PATCH v2] ARM: kirkwood: convert Guruplug Server Plus to use the
- device tree
-In-Reply-To: <20130107181731.GQ5075@titan.lakedaemon.net>
-References: <20121202155124.GA30807@1wt.eu>
- <20121202230926.GJ12509@titan.lakedaemon.net> <20121202232226.GL30822@1wt.eu>
- <20121202234110.GM12509@titan.lakedaemon.net> <20121209184004.GC28052@1wt.eu>
- <20130107174831.GN5075@titan.lakedaemon.net> <20130107180849.GA28008@1wt.eu>
- <20130107181731.GQ5075@titan.lakedaemon.net>
-Message-ID: <20130107182031.GB28008@1wt.eu>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 7 Jan 2013 10:36:42 -0800
+Subject: [PATCH 3.9] Driver for 7-segment displays connected over GPIOs
+In-Reply-To: <20130107185357.6da83d60@skate>
+References: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130107164845.GA2911@kroah.com> <20130107180708.2ffc1540@skate>
+ <20130107172340.GA32401@kroah.com> <20130107185357.6da83d60@skate>
+Message-ID: <20130107183642.GA26612@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 01:17:31PM -0500, Jason Cooper wrote:
-> mach-mvebu is where everything is being migrated to once the DT
-> conversion is complete.  We use the name internally to refer to any SoCs
-> created by Marvell in the EBU division.
+On Mon, Jan 07, 2013 at 06:53:57PM +0100, Thomas Petazzoni wrote:
+> Dear Greg Kroah-Hartman,
 > 
-> So, yes, it's kirkwood, but it falls under mvebu stuff.  Just like dove
-> and orion5x.
+> On Mon, 7 Jan 2013 09:23:40 -0800, Greg Kroah-Hartman wrote:
+> 
+> > > Not having a kernel driver means that gazillions of applications
+> > > re-invent the same piece of code over and over again, have to hardcode
+> > > the GPIO numbers for a given piece of hardware, while the kernel
+> > > abstract all of this very nicely.
+> > 
+> > That sounds like a wonderful use of a userspace library to do this
+> > properly.  Much like libusb does, right?
+> > 
+> > I still think as this can be done in userspace, it probably should be.
+> 
+> So that's why we have drivers/usb/misc/usbsevseg.c in the kernel, which
+> uses sysfs files to output text or numbers on a 7-segment display,
+> while it could all be done using libusb from userspace? Seems like back
+> in 2008 you Signed-off-by on the patch adding this driver :-)
 
-OK, that was not obvious to me, since till now for me mvebu was only
-the new armada370/XP boards. But that makes sense and it will certainly
-make code sharing easier !
+I don't remember what I committed a month ago, let alone 4 years ago.
+So trying to use that as an excuse as to why I should take your patch
+isn't a really good idea, sorry :)
 
-Thanks for your explanation!
+As Russell points out, if you want this in the kernel, it needs to have
+a good userspace api, and that needs a lot more work than just a single
+sysfs file.
 
-Willy
+thanks,
+
+greg k-h
