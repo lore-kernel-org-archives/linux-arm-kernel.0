@@ -1,100 +1,51 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 7 Jan 2013 16:29:50 -0700
-Subject: [PATCH 07/10] crypto: omap-aes - Add Device Tree Support
-In-Reply-To: <CA+Bv8XYz6mUJs82qAz=pvhkNDFe_Vp5Nv6918UPMGFAuAaU5Jw@mail.gmail.com>
-References: <1356109500-11719-1-git-send-email-mgreer@animalcreek.com>
- <1356109500-11719-8-git-send-email-mgreer@animalcreek.com>
- <CA+Bv8XYz6mUJs82qAz=pvhkNDFe_Vp5Nv6918UPMGFAuAaU5Jw@mail.gmail.com>
-Message-ID: <20130107232950.GB13938@animalcreek.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 07 Jan 2013 15:33:40 -0800
+Subject: [GIT PULL] Samsung fixes-2 for v3.8
+Message-ID: <081701cded2f$6dcf9960$496ecc20$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 28, 2012 at 02:06:02AM -0800, Russ Dill wrote:
-> On Fri, Dec 21, 2012 at 10:04 AM, Mark A. Greer <mgreer@animalcreek.com> wrote:
-> > From: "Mark A. Greer" <mgreer@animalcreek.com>
-> >
-> > Add Device Tree suport to the omap-aes crypto
-> > driver.  Currently, only support for OMAP2 and
-> > OMAP3 is being added but support for OMAP4 will
-> > be added in a subsequent patch.
-> >
-> > CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
-> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> > ---
-> >  drivers/crypto/omap-aes.c | 119 ++++++++++++++++++++++++++++++++++++----------
-> >  1 file changed, 93 insertions(+), 26 deletions(-)
-> >
-> > diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-> > index faf522f..68bf22d 100644
-> > --- a/drivers/crypto/omap-aes.c
-> > +++ b/drivers/crypto/omap-aes.c
-> > @@ -25,6 +25,9 @@
-> >  #include <linux/dmaengine.h>
-> >  #include <linux/omap-dma.h>
-> >  #include <linux/pm_runtime.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/of_address.h>
-> >  #include <linux/io.h>
-> >  #include <linux/crypto.h>
-> >  #include <linux/interrupt.h>
-> > @@ -819,11 +822,93 @@ static struct crypto_alg algs[] = {
-> >  }
-> >  };
-> >
-> > +#ifdef CONFIG_OF
-> > +static const struct of_device_id omap_aes_of_match[] = {
-> > +       {
-> > +               .compatible     = "ti,omap2-aes",
-> > +       },
-> > +       {},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, omap_aes_of_match);
-> 
-> I think you mean for the above section to be outside of the '#ifdef
-> CONFIG_OF' block.
+Hi Arnd, Olof
 
-Yes, I need to rework that.
+Here is Samsung-fixes-2 for v3.8.
+Most of them are EXYNOS5440 fixes which are for changing uart console, cpu
+id (typo)  and silent complaining gpio error in kernel boot.
 
-> > +static int omap_aes_get_res_of(struct omap_aes_dev *dd,
-> > +               struct device *dev, struct resource *res)
-> > +{
-> > +       struct device_node *node = dev->of_node;
-> > +       const struct of_device_id *match;
-> > +       int err = 0;
-> > +
-> > +       match = of_match_device(of_match_ptr(omap_aes_of_match), dev);
-> > +       if (!match) {
-> > +               dev_err(dev, "no compatible OF match\n");
-> > +               err = -EINVAL;
-> > +               goto err;
-> > +       }
-> > +
-> > +       err = of_address_to_resource(node, 0, res);
-> > +       if (err < 0) {
-> > +               dev_err(dev, "can't translate OF node address\n");
-> > +               err = -EINVAL;
-> > +               goto err;
-> > +       }
-> > +
-> > +       dd->dma_out = -1; /* Dummy value that's unused */
-> > +       dd->dma_in = -1; /* Dummy value that's unused */
-> > +
-> > +err:
-> > +       return err;
-> > +}
-> > +#else
-> > +static int omap_aes_get_res_dev(struct omap_aes_dev *dd,
-> > +               struct device *dev, struct resource *res)
-> > +{
-> > +       return -EINVAL;
-> > +}
-> 
-> And I think you mean this one to be omap_aes_get_res_of
+If any problems, please kindly let me know.
 
-I do. :(
+Thanks and a very happy new year.
 
-Thanks Russ. 
+- Kukjin
 
-Mark
---
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.8-samsung-fixes-2
+
+for you to fetch changes up to 61bcbc2af8be4cafb5723d4bd306053b70f52a7a:
+
+  ARM: EXYNOS: skip the clock initialization for exynos5440 (2013-01-05
+08:32:55 -0800)
+
+----------------------------------------------------------------
+Kukjin Kim (5):
+      ARM: SAMSUNG: fix the cpu id for EXYNOS5440
+      ARM: dts: use uart port0 for console on exynos5440-ssdk5440
+      ARM: dts: use uart port1 for console on exynos4210-smdkv310
+      ARM: EXYNOS: enable PINCTRL for EXYNOS5440
+      ARM: EXYNOS: skip the clock initialization for exynos5440
+
+Sean Paul (1):
+      ARM: EXYNOS: Revise HDMI resource size
+
+ arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 +-
+ arch/arm/boot/dts/exynos5250.dtsi         |    2 +-
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts |    2 +-
+ arch/arm/mach-exynos/Kconfig              |    2 ++
+ arch/arm/mach-exynos/common.c             |    7 +++++++
+ arch/arm/plat-samsung/include/plat/cpu.h  |    2 +-
+ 6 files changed, 13 insertions(+), 4 deletions(-)
