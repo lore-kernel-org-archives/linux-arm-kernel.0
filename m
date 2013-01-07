@@ -1,37 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 7 Jan 2013 12:34:11 +0100
-Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
-In-Reply-To: <20130107122613.64f4ace5@skate>
-References: <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <50E710CB.8070007@lunn.ch> <20130104183139.20492204@skate>
- <50E71356.3030203@lunn.ch> <20130104190345.460151d1@skate>
- <50E9EE7A.1080301@free-electrons.com>
- <20130106235312.0839a879@skate> <20130107094747.GR3392@lunn.ch>
- <20130107110712.GT3392@lunn.ch> <20130107122613.64f4ace5@skate>
-Message-ID: <20130107113411.GV3392@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Jan 2013 11:58:36 +0000
+Subject: CoreSight framework and drivers
+In-Reply-To: <20130103180643.GA30277@pratikp-linux.qualcomm.com>
+References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
+ <20121219112314.GA26329@mudshark.cambridge.arm.com>
+ <50D1F37E.6000804@ti.com>
+ <20121219212431.GC23594@pratikp-linux.qualcomm.com>
+ <50D34EE5.8090407@ti.com>
+ <20121220195127.GA14877@pratikp-linux.qualcomm.com>
+ <50D3972E.4030607@ti.com>
+ <20121221221828.GA2658@pratikp-linux.qualcomm.com>
+ <20121223113239.GG16237@mudshark.cambridge.arm.com>
+ <20130103180643.GA30277@pratikp-linux.qualcomm.com>
+Message-ID: <20130107115836.GB13542@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Image is also with an initramfs + appended DTB. My boot command is:
+On Thu, Jan 03, 2013 at 06:06:43PM +0000, Pratik Patel wrote:
+> On Sun, Dec 23, 2012 at 11:32:39AM +0000, Will Deacon wrote:
+> > On Fri, Dec 21, 2012 at 10:18:28PM +0000, Pratik Patel wrote:
+> > > What user interface do you plan to provide for the CTI? Maybe
+> > > something consistent with other CoreSight components in sysfs to
+> > > allow users to enable, disable, map and unmap ???
+> > > 
+> > > Please let me know your thoughts.
+> > 
+> > Rather than have your current approach of dev nodes + sysfs config files for
+> > each coresight device, I think it might be better to follow something closer
+> > to ftrace and stick per-device directories under debugfs/coresight/. Then you
+> > can have a pipe file and some config files in the same directory for each
+> > component. You also don't need to do any mapping operations with this (just
+> > post-process the stream directly).
+> > 
 > 
-> tftp 1000000 192.168.0.14:uImage.armada-xp-openblocks-ax3-4; bootm
+> Thanks for the suggestion. I had initially debated between debugfs
+> and sysfs but chose sysfs + dev nodes since using device attributes
+> relieves the drivers from manually managing directories and files,
+> its taken care of by the device and sysfs layers. Moreover, since
+> these are physical devices, device attributes made sense at the
+> time.
 > 
-> So I'm loading to a different address than you.
+> The map and unmap I was referring to was for the CTI trigger
+> mappings. Dev nodes are currently intended to provide the raw
+> data collected in the sinks.
+> 
+> Whats the advantage in using debugfs here?
 
-Hi Thomas
+The main things I like about debugfs are (a) it's a text-driven interface
+and easy to script with and (b) it matches what we do for ftrace.
 
-Uboot tells me:
+Furthermore, it means that subtle differences between devices can be hidden
+in the driver and not require different vendor tools for parsing the trace
+data.
 
-DRAM:   3 GB
-       CS 0: base 0x00000000 size  1 GB
-       CS 2: base 0x40000000 size  1 GB
-       CS 3: base 0x80000000 size  1 GB
-       Addresses 14M - 0M are saved for the U-Boot usage.
-
-1000000 would be towards the beginning of this area reserved for uboot.
-
-Could you try moving to somewhere outside of the first 14Mbytes and
-see if that helps.
-
-    Thanks
-	Andrew
+Will
