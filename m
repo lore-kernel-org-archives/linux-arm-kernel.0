@@ -1,132 +1,133 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  7 Jan 2013 23:56:37 +0100
-Subject: [PATCH 07/11] ARM: nomadik: convert SMSC91x ethernet to device tree
-Message-ID: <1357599397-7555-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  7 Jan 2013 23:56:44 +0100
+Subject: [PATCH 08/11] ARM: nomadik: migrate MMC/SD card support to device tree
+Message-ID: <1357599404-7587-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts the SMSC91x ethernet controller to use device
-tree. The existing solution from the board file, to request the
-GPIO triggering the ethernet IRQ from the board file is kept
-for the time being, but the GPIO number assignment is moved
-over to the device tree.
+This moves over the MMC/SD card support to the device tree probe
+path. The special GPIO to bias the card detect line is kept,
+but the pin property is moved to the device tree as part of
+the MMC/SD card node.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-nomadik-s8815.dts    |  9 ++++++++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 12 +++++++++++
- arch/arm/mach-nomadik/board-nhk8815.c      |  2 ++
- arch/arm/mach-nomadik/cpu-8815.c           | 34 ++++++++++++++++++++++++++++++
- 4 files changed, 57 insertions(+)
+ arch/arm/boot/dts/ste-nomadik-s8815.dts    |  7 +++++
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 13 ++++++++
+ arch/arm/mach-nomadik/cpu-8815.c           | 48 +++++++++++++++++++++++++++++-
+ 3 files changed, 67 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-index b698bc2..ff8a440 100644
+index ff8a440..a123971 100644
 --- a/arch/arm/boot/dts/ste-nomadik-s8815.dts
 +++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-@@ -15,4 +15,13 @@
- 	chosen {
- 		bootargs = "root=/dev/ram0 console=ttyAMA1,115200n8 earlyprintk";
+@@ -24,4 +24,11 @@
+ 			interrupt-parent = <&gpio3>;
+ 		};
  	};
 +
-+	/* The S8815 is using this very GPIO pin for the SMSC91x IRQs */
-+	external-bus at 34000000 {
-+		ethernet at 300 {
-+			gpios = <&gpio3 19 0x1>;
-+			interrupts = <19 0x1>;
-+			interrupt-parent = <&gpio3>;
++	/* This GPIO needs to be driven to enable card detect */
++	amba {
++		mmcsd: sdi at 101f6000 {
++			cd-bias-gpios = <&gpio3 16 0x1>;
 +		};
 +	};
  };
 diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index df60e08..43b6d8c 100644
+index 43b6d8c..1a12f10 100644
 --- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
 +++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -122,6 +122,18 @@
+@@ -187,5 +187,18 @@
+ 			interrupt-parent = <&vica>;
+ 			interrupts = <10>;
  		};
- 	};
- 
-+	external-bus at 34000000 {
-+		compatible = "simple-bus";
-+		reg = <0x34000000 0x1000000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x34000000 0x1000000>;
-+		ethernet at 300 {
-+			compatible = "smsc,lan91c111";
-+			reg = <0x300 0x0fd00>;
-+		};
-+	};
 +
- 	amba {
- 		compatible = "arm,amba-bus";
- 		#address-cells = <1>;
-diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
-index 33ce566..4bc5a97 100644
---- a/arch/arm/mach-nomadik/board-nhk8815.c
-+++ b/arch/arm/mach-nomadik/board-nhk8815.c
-@@ -240,6 +240,8 @@ static int __init nhk8815_eth_init(void)
- 	int gpio_nr = 115; /* hardwired in the board */
- 	int err;
- 
-+	if (!machine_is_nomadik())
-+		return 0;
- 	err = gpio_request(gpio_nr, "eth_irq");
- 	if (!err) err = gpio_direction_input(gpio_nr);
- 	if (err)
++		mmcsd: sdi at 101f6000 {
++			compatible = "arm,pl18x", "arm,primecell";
++			reg = <0x101f6000 0x1000>;
++			interrupt-parent = <&vica>;
++			interrupts = <22>;
++			max-frequency = <48000000>;
++			bus-width = <4>;
++			mmc-cap-mmc-highspeed;
++			mmc-cap-sd-highspeed;
++			cd-gpios = <&gpio3 15 0x1>;
++			cd-inverted;
++		};
+ 	};
+ };
 diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 543e2c0..06f9a5b 100644
+index 06f9a5b..3078c1c 100644
 --- a/arch/arm/mach-nomadik/cpu-8815.c
 +++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -30,9 +30,11 @@
- #include <linux/pinctrl/machine.h>
- #include <linux/platform_data/clocksource-nomadik-mtu.h>
- #include <linux/of_irq.h>
-+#include <linux/of_gpio.h>
- #include <linux/of_address.h>
+@@ -35,6 +35,7 @@
  #include <linux/of_platform.h>
  #include <linux/mtd/fsmc.h>
-+#include <linux/gpio.h>
+ #include <linux/gpio.h>
++#include <linux/amba/mmci.h>
  
  #include <mach/hardware.h>
  #include <mach/irqs.h>
-@@ -276,6 +278,38 @@ static struct fsmc_nand_platform_data cpu8815_nand_data = {
- 	.nand_timings = &cpu8815_nand_timings,
- };
+@@ -310,6 +311,50 @@ static int __init cpu8815_eth_init(void)
+ }
+ device_initcall(cpu8815_eth_init);
  
 +/*
-+ * The SMSC911x IRQ is connected to a GPIO pin, but the driver expects
-+ * to simply request an IRQ passed as a resource. So the GPIO pin needs
-+ * to be requested by this hog and set as input.
++ * TODO:
++ * cannot be set from device tree, convert to a proper DT
++ * binding.
 + */
-+static int __init cpu8815_eth_init(void)
-+{
-+	struct device_node *eth;
-+	int gpio, irq, err;
++static struct mmci_platform_data mmcsd_plat_data = {
++	.ocr_mask = MMC_VDD_29_30,
++};
 +
-+	eth = of_find_node_by_path("/external-bus at 34000000/ethernet at 300");
-+	if (!eth) {
-+		pr_info("could not find any ethernet controller\n");
++/*
++ * This GPIO pin turns on a line that is used to detect card insertion
++ * on this board.
++ */
++static int __init cpu8815_mmcsd_init(void)
++{
++	struct device_node *cdbias;
++	int gpio, err;
++
++	cdbias = of_find_node_by_path("/amba/sdi at 101f6000");
++	if (!cdbias) {
++		pr_info("could not find MMC/SD controller node\n");
 +		return 0;
 +	}
-+	gpio = of_get_gpio(eth, 0);
-+	err = gpio_request(gpio, "eth_irq");
++	gpio = of_get_named_gpio(cdbias, "cd-bias-gpios", 0);
++	if (gpio < 0) {
++		pr_info("could not obtain MMC/SD controller GPIO\n");
++		return 0;
++	}
++	err = gpio_request(gpio, "card detect bias");
 +	if (err) {
-+		pr_info("failed to request ethernet GPIO\n");
++		pr_info("failed to request card detect bias GPIO %d\n", gpio);
 +		return -ENODEV;
 +	}
-+	err = gpio_direction_input(gpio);
-+	if (err) {
-+		pr_info("failed to set ehernet GPIO as input\n");
-+		return -ENODEV;
++	err = gpio_direction_output(gpio, 0);
++	if (err){
++		pr_info("failed to set GPIO %d as output, low\n", gpio);
++		return err;
 +	}
-+	irq = gpio_to_irq(gpio);
-+	pr_info("enabled ethernet GPIO %d, IRQ %d\n", gpio, irq);
++	pr_info("enabled CD bias GPIO %d, low\n", gpio);
 +	return 0;
 +}
-+device_initcall(cpu8815_eth_init);
++device_initcall(cpu8815_mmcsd_init);
++
 +
  /* These are mostly to get the right device names for the clock lookups */
  static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
  	OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO0_BASE,
+@@ -332,7 +377,8 @@ static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
+ 		"rtc-pl031", NULL),
+ 	OF_DEV_AUXDATA("stericsson,fsmc-nand", NOMADIK_FSMC_BASE,
+ 		"fsmc-nand", &cpu8815_nand_data),
+-
++	OF_DEV_AUXDATA("arm,primecell", NOMADIK_SDI_BASE,
++		"mmci", &mmcsd_plat_data),
+ 	{ /* sentinel */ },
+ };
+ 
 -- 
 1.7.11.7
