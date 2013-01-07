@@ -1,26 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 7 Jan 2013 14:55:36 +0100
-Subject: [PATCH 00/11] Fixes for 3.8-rc
-In-Reply-To: <201301071347.45723.arnd@arndb.de>
-References: <1357467044-4914-1-git-send-email-andrew@lunn.ch>
- <201301071347.45723.arnd@arndb.de>
-Message-ID: <20130107135536.GY3392@lunn.ch>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 07 Jan 2013 15:57:16 +0200
+Subject: [PATCH 1/4] ALSA: pxa2xx: fix ac97 cold reset
+In-Reply-To: <50EACF4D.4000602@newsguy.com>
+References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
+ <1357499640-13871-2-git-send-email-mikedunn@newsguy.com>
+ <50EA9287.5030304@compulab.co.il> <50EACF4D.4000602@newsguy.com>
+Message-ID: <50EAD43C.2040406@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 01:47:45PM +0000, Arnd Bergmann wrote:
-> On Sunday 06 January 2013, Andrew Lunn wrote:
-> > This patchset is a collection of fixes for 3.8-rc for Marvell SoCs and
-> > drivers.
-> > 
-> > If nobody objects, i will send Olof and Arnd a pull request sometime
-> > Monday.
+On 01/07/13 15:36, Mike Dunn wrote:
+> On 01/07/2013 01:16 AM, Igor Grinberg wrote:
+>> On 01/06/13 21:13, Mike Dunn wrote:
 > 
-> The patches all look good to me.
+> 
+> [..]
+> 
+> 
+>>>  static inline void pxa_ac97_cold_pxa27x(void)
+>>>  {
+>>> +	unsigned int timeout;
+>>> +
+>>>  	GCR &=  GCR_COLD_RST;  /* clear everything but nCRST */
+>>>  	GCR &= ~GCR_COLD_RST;  /* then assert nCRST */
+>>>  
+>>> @@ -157,8 +159,10 @@ static inline void pxa_ac97_cold_pxa27x(void)
+>>>  	clk_enable(ac97conf_clk);
+>>>  	udelay(5);
+>>>  	clk_disable(ac97conf_clk);
+>>> -	GCR = GCR_COLD_RST;
+>>> -	udelay(50);
+>>> +	GCR = GCR_COLD_RST | GCR_WARM_RST;
+>>> +	timeout = 100;     /* wait for the codec-ready bit to be set */
+>>> +	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
+>>> +		mdelay(1);
+>>
+>> Can we use msleep() instead?
+>> May be this will require to change the granularity to 10...
+> 
+> 
+> Probably.  mdelay() is used by similiar code in the same file, so I just stayed
+> consistent.  The code runs very infrequently, so I didn't worry about it.
 
-Hi Arnd
+Well, if we can, I think we'd better do, no?
 
-Thanks for the review. Jason sent a pull request yesterday for these
-patches, plus one more for the UART on 370/XP.
 
-	 Andrew
+-- 
+Regards,
+Igor.
