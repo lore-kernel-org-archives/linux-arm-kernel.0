@@ -1,71 +1,116 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 7 Jan 2013 10:48:41 +0530
-Subject: [PATCH 5/5] ARM: dts: AM33XX: Add am335x-evmsk lcdc pincontrol info
-In-Reply-To: <cover.1357304150.git.afzal@ti.com>
-References: <cover.1357304150.git.afzal@ti.com>
-Message-ID: <eba71d3baa6a851ba3618ee0be80c0c2fabb1934.1357304151.git.afzal@ti.com>
+From: zhanzhenbo@gmail.com (steve.zhan)
+Date: Mon, 7 Jan 2013 13:50:19 +0800
+Subject: [PATCH 1/1] ARM: ux500:mach-ux500/cpuidle.c spinlock dis-matching
+In-Reply-To: <50E9A4FE.6090807@linaro.org>
+References: <CAKvkGKdoWxmnRbNvn_SikRhzsyyzqEC99XtSM9ZeaVGjEA_Ydw@mail.gmail.com>
+ <50E9A4FE.6090807@linaro.org>
+Message-ID: <CAKvkGKcPumpRcxQrwWGXoWvG4Sk2niTiojfNU=2PnZ9zq_7EcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update pin mux information for lcd panel on AM335X-EVMSK.
+Hi Daniel,
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/boot/dts/am335x-evmsk.dts |   35 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
+    Happy new year, Thank you for reply.
+Sorry for that i have refer the old patch email.
+I have updated the patch, Pls check the URL:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138939.html
+Now i am using gmail GUI tools to send mail, i will switch email tool
+to MUTT to commit the other patchs in the future.
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index a7e017b..6275a50 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -32,7 +32,7 @@
- 
- 	am33xx_pinmux: pinmux at 44e10800 {
- 		pinctrl-names = "default";
--		pinctrl-0 = <&user_leds_s0 &gpio_keys_s0>;
-+		pinctrl-0 = <&user_leds_s0 &gpio_keys_s0 &lcd_pins_s0>;
- 
- 		user_leds_s0: user_leds_s0 {
- 			pinctrl-single,pins = <
-@@ -51,6 +51,39 @@
- 				0x9c 0x27	/* gpmc_ben0_cle.gpio2_5, INPUT | MODE7 */
- 			>;
- 		};
-+
-+		lcd_pins_s0: lcd_pins_s0 {
-+			pinctrl-single,pins = <
-+				0x20 0x01
-+				0x24 0x01
-+				0x28 0x01
-+				0x2c 0x01
-+				0x30 0x01
-+				0x34 0x01
-+				0x38 0x01
-+				0x3c 0x01
-+				0xa0 0x08
-+				0xa4 0x08
-+				0xa8 0x08
-+				0xac 0x08
-+				0xb0 0x08
-+				0xb4 0x08
-+				0xb8 0x08
-+				0xbc 0x08
-+				0xc0 0x08
-+				0xc4 0x08
-+				0xc8 0x08
-+				0xcc 0x08
-+				0xd0 0x08
-+				0xd4 0x08
-+				0xd8 0x08
-+				0xdc 0x08
-+				0xe0 0x00
-+				0xe4 0x00
-+				0xe8 0x00
-+				0xec 0x00
-+			>;
-+		};
- 	};
- 
- 	ocp {
+
+
+--------------
+steve.zhan
+
+2013/1/7, Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 12/28/2012 08:06 AM, steve.zhan wrote:
+>> Hi Daniel,
+>
+> Hi Steve,
+>
+> sorry I missed your email.
+>
+>>
+>>        I think we must unlock the master spinlock even
+>> prcmu_gic_decouple function now always return 0.
+>>        Could you give some infos about this?
+>
+> I agree, that would be cleaner.
+>
+> AFAICS, your patch does not solve the problem because 'recouple' will be
+> false if prcmu_gic_decouple fails, so the lock will never be release.
+>
+> That will be simpler to do:
+>
+> if (prcmu_gic_decouple()) {
+> 	spin_unlock(&master);
+> 	goto out;
+> }
+>
+> no ?
+>
+>> Thanks.
+>>
+>> diff --git a/arch/arm/mach-ux500/cpuidle.c
+>> b/arch/arm/mach-ux500/cpuidle.c
+>> index b54884bd..b0759ce 100644
+>> --- a/arch/arm/mach-ux500/cpuidle.c
+>> +++ b/arch/arm/mach-ux500/cpuidle.c
+>> @@ -29,6 +29,7 @@ static inline int ux500_enter_idle(struct cpuidle_device
+>> *dev,
+>>  {
+>>         int this_cpu = smp_processor_id();
+>>         bool recouple = false;
+>> +       bool locked = false;
+>>
+>>         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
+>>
+>> @@ -39,6 +40,8 @@ static inline int ux500_enter_idle(struct cpuidle_device
+>> *dev,
+>>                 if (!spin_trylock(&master_lock))
+>>                         goto wfi;
+>>
+>> +               locked = true;
+>> +
+>>                 /* decouple the gic from the A9 cores */
+>>                 if (prcmu_gic_decouple())
+>>                         goto out;
+>> @@ -76,7 +79,7 @@ static inline int ux500_enter_idle(struct cpuidle_device
+>> *dev,
+>>                 /* When we switch to retention, the prcmu is in charge
+>>                  * of recoupling the gic automatically */
+>>                 recouple = false;
+>> -
+>> +               locked = false;
+>>                 spin_unlock(&master_lock);
+>>         }
+>>  wfi:
+>> @@ -86,7 +89,8 @@ out:
+>>
+>>         if (recouple) {
+>>                 prcmu_gic_recouple();
+>> -               spin_unlock(&master_lock);
+>> +               if (locked)
+>> +                       spin_unlock(&master_lock);
+>>         }
+>>
+>>         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &this_cpu);
+>>
+>>
+>>
+>> Steve Zhan
+>>
+>
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
+>
+
+
 -- 
-1.7.9.5
+Steve Zhan
