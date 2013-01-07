@@ -1,39 +1,38 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 06 Jan 2013 18:06:02 -0800
-Subject: [v3 PATCH 05/12] spi/atmel_spi: update the dt support
-In-Reply-To: <1357523413-27209-6-git-send-email-wenyou.yang@atmel.com>
-References: <1357523413-27209-1-git-send-email-wenyou.yang@atmel.com>
- <1357523413-27209-6-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1357524362.4940.16.camel@joe-AO722>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon,  7 Jan 2013 11:05:57 +0900
+Subject: [PATCH] ARM: shmobile: fix memory size for kota2_defconfig
+Message-ID: <1357524357-4934-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-01-07 at 09:50 +0800, Wenyou Yang wrote:
-> To meet the different spi IP version of atmel SoC,
-> add more compatible "atmel,at91rm9200-spi", "atmel,at91sam9260-spi"
-> "atmel,at91sam9g45-spi", "atmel,at91sam9x5-spi" with different
-> config and devtype.
+The CONFIG_MEMORY_SIZE value is interpreted as a 32 bit integer, which
+makes sense on a system without PAE. It appears that a trailing 0 was
+appended to the value and after some testing it appears that 0x1e000000 is
+the correct value.
 
-trivial comment:
+Without this patch, building kota2_defconfig results in:
 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-[]
-> @@ -230,11 +302,15 @@ struct atmel_spi_device {
->   * register, but I haven't checked that it exists on all chips, and
->   * this is cheaper anyway.
->   */
-> -static bool atmel_spi_is_v2(void)
-> +static bool atmel_spi_is_v2(struct atmel_spi *as)
+/home/arnd/linux-arm/arch/arm/kernel/setup.c:790:2: warning: large integer implicitly truncated to unsigned type [-Woverflow]
 
-There's a comment that needs updating above this now
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/kota2_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->  {
-> -	return !cpu_is_at91rm9200();
-> +	if (as->pdata->version == 2)
-> +		return true;
-> +	else
-> +		return false;
-
-	return as->pdata->version == 2;
-
-is rather more readable to me
+diff --git a/arch/arm/configs/kota2_defconfig b/arch/arm/configs/kota2_defconfig
+index fa83db1..57ad3d4 100644
+--- a/arch/arm/configs/kota2_defconfig
++++ b/arch/arm/configs/kota2_defconfig
+@@ -21,7 +21,7 @@ CONFIG_ARCH_SHMOBILE=y
+ CONFIG_KEYBOARD_GPIO_POLLED=y
+ CONFIG_ARCH_SH73A0=y
+ CONFIG_MACH_KOTA2=y
+-CONFIG_MEMORY_SIZE=0x1e0000000
++CONFIG_MEMORY_SIZE=0x1e000000
+ # CONFIG_SH_TIMER_TMU is not set
+ # CONFIG_SWP_EMULATE is not set
+ CONFIG_CPU_BPREDICT_DISABLE=y
+-- 
+1.7.10.4
