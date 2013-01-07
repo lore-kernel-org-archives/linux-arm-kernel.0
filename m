@@ -1,65 +1,88 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 07 Jan 2013 09:21:16 +0100
-Subject: [PATCH 0/3] Add support for gpio expander pca9505 used on Mirabox
-In-Reply-To: <1357493688-25061-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1357493688-25061-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <50EA857C.8090506@free-electrons.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 7 Jan 2013 09:34:49 +0100
+Subject: [PATCH v2 1/1 net-next] net: fec: report correct hardware
+ stamping info to ethtool
+In-Reply-To: <1357525507-16148-1-git-send-email-Frank.Li@freescale.com>
+References: <1357525507-16148-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20130107083449.GG1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2013 06:34 PM, Gregory CLEMENT wrote:
-> Hello,
+On Mon, Jan 07, 2013 at 10:25:07AM +0800, Frank Li wrote:
+> Report correct hardware stamping capability by ethtool interface.
+> The v1.0 ptp4l check it.
 > 
-> This patch set adds the support for the i2c gpio expander pca9505 used
-> on the JTAG/GPIO box which can be connected to the Mirabox.
-> 
-> To be able to use the pca9505 I had to do several changes in the
-> driver. Indeed, until now the pca953x driver accessed all the bank of
-> a given register in a single command using only a 32 bits
-> variable. This expander comes with 40 GPIOs which no more fits in a 32
-> variable. This patch set makes the accesses to the registers more
-> generic by relying on an array of u8 variables. This fits exactly the
-> way the registers are represented in the hardware.
-> 
-> Once the per-bank representation was added, it was easier to introduce
-> helpers to access to a single register of a bank instead of reading or
-> writing all the banks for a given register. As the GPIO API allows
-> only the accesses to a single GPIO at a time there was no point to read
-> and write all the other banks. Hence it should help to decrease the
-> latency especially for the pca9505.
-> 
-> However as the block GPIO API from Roland Stigge is incoming I kept
-> the helpers used to access all the banks in the same time. I had to
-> make some modifications in the arguments that these functions
-> received, so it will have a conflict here. Currently my patch set is
-> based on v3.8-rc2, but I am willing to rebase onto gpio-for-next once
-> the GPIO block will be merged into it.
-> 
-> I also expected some tested-by as I was only able to test the pca9505
-> and I didn't test the IRQ part.
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
 
-For those who are interested the branch gpio-pca9505 is available at:
-https://github.com/MISL-EBU-System-SW/mainline-public.git
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-This branch is based on v3.8-rc2 plus some fixes related to mvebu
-plateform and of course this patch set.
+Sascha
 
+> ---
+> Change v1->v2
+>  1. s/capibilty/capability/
+>  2. apply Sascha's feedback 
+>     avoid return the return value of ethtool_op_get_ts_info()
+>     when bufdesc_ex ==  1
 > 
-> Thanks!
+>  drivers/net/ethernet/freescale/fec.c |   31 ++++++++++++++++++++++++++++++-
+>  1 files changed, 30 insertions(+), 1 deletions(-)
 > 
-> Gregory CLEMENT (3):
->   gpio: pca953x: make the register access by GPIO bank
->   gpio: pca953x: add support for pca9505
->   arm: mvebu: enable gpio expander over i2c on Mirabox platform
+> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+> index a379319..1c117e5 100644
+> --- a/drivers/net/ethernet/freescale/fec.c
+> +++ b/drivers/net/ethernet/freescale/fec.c
+> @@ -1173,12 +1173,41 @@ static void fec_enet_get_drvinfo(struct net_device *ndev,
+>  	strcpy(info->bus_info, dev_name(&ndev->dev));
+>  }
+>  
+> +static int fec_enet_get_ts_info(struct net_device *ndev,
+> +				struct ethtool_ts_info *info)
+> +{
+> +	struct fec_enet_private *fep = netdev_priv(ndev);
+> +
+> +	if (fep->bufdesc_ex) {
+> +
+> +		info->so_timestamping = SOF_TIMESTAMPING_TX_SOFTWARE |
+> +					SOF_TIMESTAMPING_RX_SOFTWARE |
+> +					SOF_TIMESTAMPING_SOFTWARE |
+> +					SOF_TIMESTAMPING_TX_HARDWARE |
+> +					SOF_TIMESTAMPING_RX_HARDWARE |
+> +					SOF_TIMESTAMPING_RAW_HARDWARE;
+> +		if (fep->ptp_clock)
+> +			info->phc_index = ptp_clock_index(fep->ptp_clock);
+> +		else
+> +			info->phc_index = -1;
+> +
+> +		info->tx_types = (1 << HWTSTAMP_TX_OFF) |
+> +				 (1 << HWTSTAMP_TX_ON);
+> +
+> +		info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) |
+> +				   (1 << HWTSTAMP_FILTER_ALL);
+> +		return 0;
+> +	} else {
+> +		return ethtool_op_get_ts_info(ndev, info);
+> +	}
+> +}
+> +
+>  static const struct ethtool_ops fec_enet_ethtool_ops = {
+>  	.get_settings		= fec_enet_get_settings,
+>  	.set_settings		= fec_enet_set_settings,
+>  	.get_drvinfo		= fec_enet_get_drvinfo,
+>  	.get_link		= ethtool_op_get_link,
+> -	.get_ts_info		= ethtool_op_get_ts_info,
+> +	.get_ts_info		= fec_enet_get_ts_info,
+>  };
+>  
+>  static int fec_enet_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
+> -- 
+> 1.7.1
 > 
->  arch/arm/boot/dts/armada-370-mirabox.dts |   10 ++
->  drivers/gpio/gpio-pca953x.c              |  235 +++++++++++++++++++-----------
->  2 files changed, 160 insertions(+), 85 deletions(-)
 > 
-
+> 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
