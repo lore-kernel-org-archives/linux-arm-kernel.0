@@ -1,67 +1,36 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 7 Jan 2013 16:54:30 +0200
-Subject: [PATCH v2 08/11] clk: tegra: add clock support for tegra30
-In-Reply-To: <1356619644-18565-9-git-send-email-pgaikwad@nvidia.com>
-References: <1356619644-18565-1-git-send-email-pgaikwad@nvidia.com>
- <1356619644-18565-9-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <20130107145430.GH26066@tbergstrom-lnx.Nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Jan 2013 14:48:13 +0000
+Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
+In-Reply-To: <87ehhxahd1.fsf@xmission.com>
+References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
+ <50E4C9C6.20609@codeaurora.org>
+ <20130103120259.GB5193@mudshark.cambridge.arm.com>
+ <20130103122100.GN2631@n2100.arm.linux.org.uk>
+ <50E5E967.3020805@wwwdotorg.org>
+ <20130106162200.GC11025@mudshark.cambridge.arm.com>
+ <20130106164033.GA3222@n2100.arm.linux.org.uk> <87ehhxahd1.fsf@xmission.com>
+Message-ID: <20130107144812.GD3222@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 27, 2012 at 03:47:21PM +0100, Prashant Gaikwad wrote:
-> Add tegra30 clock support based on common clock framework.
-> 
-> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-> ---
->  drivers/clk/tegra/Makefile      |    1 +
->  drivers/clk/tegra/clk-tegra30.c | 1968 +++++++++++++++++++++++++++++++++++++++
->  drivers/clk/tegra/clk.h         |    6 +
->  3 files changed, 1975 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/clk/tegra/clk-tegra30.c
-> 
-> diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
-> index 00484fd..2b41b0f 100644
-> --- a/drivers/clk/tegra/Makefile
-> +++ b/drivers/clk/tegra/Makefile
-> @@ -8,3 +8,4 @@ obj-y                                   += clk-pll-out.o
->  obj-y                                  += clk-super.o
-> 
->  obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
-> +obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
-> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-> new file mode 100644
-> index 0000000..a5496fe
-> --- /dev/null
-> +++ b/drivers/clk/tegra/clk-tegra30.c
-> @@ -0,0 +1,1968 @@
-> +/*
-> + * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
+On Sun, Jan 06, 2013 at 05:53:30PM -0800, Eric W. Biederman wrote:
+> I have cleaned up the mess that is the reboot path once a bunch of years
+> ago, and apparently it is deteriorating again.
 
-...
+Unfortunately, that's what happens when lots of cooks get their fingers
+in a pie with no coordination.  This is why having maintainers is soo
+important for code - a good maintainer ensures that the code remains
+high quality by whatever means.
 
-> +       TEGRA_INIT_DATA_MUX("i2c1",     "div-clk",      "tegra-i2c.0",          mux_pllp_clkm,          CLK_SOURCE_I2C1,        12,     &periph_l_regs, TEGRA_PERIPH_ON_APB, i2c1),
-> +       TEGRA_INIT_DATA_MUX("i2c2",     "div-clk",      "tegra-i2c.1",          mux_pllp_clkm,          CLK_SOURCE_I2C2,        54,     &periph_h_regs, TEGRA_PERIPH_ON_APB, i2c2),
-> +       TEGRA_INIT_DATA_MUX("i2c3",     "div-clk",      "tegra-i2c.2",          mux_pllp_clkm,          CLK_SOURCE_I2C3,        67,     &periph_u_regs, TEGRA_PERIPH_ON_APB, i2c3),
-> +       TEGRA_INIT_DATA_MUX("i2c4",     "div-clk",      "tegra-i2c.3",          mux_pllp_clkm,          CLK_SOURCE_I2C4,        103,    &periph_v_regs, TEGRA_PERIPH_ON_APB, i2c4),
-> +       TEGRA_INIT_DATA_MUX("i2c5",     "div-clk",      "tegra-i2c.4",          mux_pllp_clkm,          CLK_SOURCE_I2C5,        47,     &periph_h_regs, TEGRA_PERIPH_ON_APB, i2c5),
+Code without maintainers is subject to modification in all kinds of
+random ways, including duplicating code amongst architectures which
+should be generic code - that happens because no one wants to understand
+what other architectures require.
 
-These clocks have a 16bit divider according to the TRM, so I think you need
-a new type for this?
-
-Cheers,
-
-Peter.
+Your original cleanups, afaik, are still all intact.  The problem is
+that since then, kexec has come along, and invented a new callback
+(machine_shutdown) which gets called while the system is still live
+in full SMP mode (and presumably all the devices are still running
+and potentially scribbling over memory with their DMA.)  Meanwhile
+kexec wants to pass control to the new kernel... that doesn't sound
+particularly clever to me.
