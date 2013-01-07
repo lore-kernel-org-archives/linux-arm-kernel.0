@@ -1,34 +1,58 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 07 Jan 2013 10:46:46 +0530
-Subject: [PATCH] ARM: DTS: exynos4210-origen: Add MAX8997 node entry
-In-Reply-To: <CAJuYYwQx0hFQmkLaggd2NdA_xommXGPBDbhj1AuSH5YuASWA-w@mail.gmail.com>
-References: <1357287829-21701-1-git-send-email-tushar.behera@linaro.org>
- <CAJuYYwQx0hFQmkLaggd2NdA_xommXGPBDbhj1AuSH5YuASWA-w@mail.gmail.com>
-Message-ID: <50EA5A3E.7000806@linaro.org>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 7 Jan 2013 10:47:54 +0530
+Subject: [PATCH 0/5] ARM: dts: AM33XX: lcdc support
+Message-ID: <cover.1357304150.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2013 10:51 PM, Thomas Abraham wrote:
-> On 4 January 2013 00:23, Tushar Behera <tushar.behera@linaro.org> wrote:
->> The node entry is added as per documentation and legacy board file.
->>
->> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
->> ---
->> The patch is rebased on v3.8-rc1.
->>
->>  arch/arm/boot/dts/exynos4210-origen.dts |  150 +++++++++++++++++++++++++++++++
->>  1 files changed, 150 insertions(+), 0 deletions(-)
+Hi,
 
-Please ignore this patch.
+This series add DT sources for AM335x SoC as well as AM335x based
+boards.
 
-> 
-> This patch has already been posted. Here is the link:
-> https://patchwork.kernel.org/patch/1794501/
-> 
+As pinmux is an SoC specific detail rather than IP specific one,
+addition of pin control has been done in a separate patch from
+the one in which display timings are added. Also it may aid in
+debugging in case of any issues.
 
-Sorry, had missed that patch. I have added a 'Tested-by' to the original
-patch.
+This has been tested on AM335x based boards like AM335x EVM and
+AM335x EVM-SK.
 
+This series is based on v3.8-rc2.
+
+This series has a dependency on,
+1. Series v16 "of: add display helper" by,
+	Steffen Trumtrar <s.trumtrar@pengutronix.de>
+2. Series v2 "video: da8xx-fb: runtime timing configuration" by,
+	me (Afzal Mohammed <afzal@ti.com>)
+3. Series "video: da8xx-fb: DT support" by,
+	me (Afzal Mohammed <afzal@ti.com>)
+
+To test on AM335x, in addition to the above, following changes,
+1. Patch "da8xx: Allow use by am33xx based devices" by,
+	Pantelis Antoniou <panto@antoniou-consulting.com>
+3. Series "HWMOD fixes for AM33xx PWM submodules and device tree nodes" by,
+	Philip, Avinash <avinashphilip@ti.com>
+would be required
+
+A tree with all above for testing is available
+ @git://gitorious.org/x0148406-public/linux-kernel.git da8xx-fb-dt
+
+
+Regards
+Afzal
+
+Afzal Mohammed (5):
+  ARM: dts: AM33XX: Add lcdc node
+  ARM: dts: AM33XX: Add am335x-evm lcdc panel timings
+  ARM: dts: AM33XX: Add am335x-evm lcdc pincontrol info
+  ARM: dts: AM33XX: Add am335x-evmsk lcdc panel timings
+  ARM: dts: AM33XX: Add am335x-evmsk lcdc pincontrol info
+
+ arch/arm/boot/dts/am335x-evm.dts   |   55 +++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/am335x-evmsk.dts |   55 +++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/am33xx.dtsi      |    8 ++++++
+ 3 files changed, 116 insertions(+), 2 deletions(-)
 
 -- 
-Tushar Behera
+1.7.9.5
