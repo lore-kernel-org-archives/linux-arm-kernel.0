@@ -1,44 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 7 Jan 2013 14:16:48 +0000
-Subject: [PATCH 4/4 v3] net/smsc911x: Provide common clock functionality
-In-Reply-To: <CACRpkda-4C+ezaZFSkxsNbmHnBN8RCoCeGePaOF-DzV0XnkzQw@mail.gmail.com>
-References: <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
- <CACRpkda79O_b3Z8g7Sy7vMtW9neZU4x-Z=iEQgjqu4X5tFKyhw@mail.gmail.com>
- <20121220192441.GC14363@n2100.arm.linux.org.uk>
- <20121220203514.GN2691@gmail.com>
- <20121220205113.GD14363@n2100.arm.linux.org.uk>
- <20121221091306.GO2691@gmail.com>
- <20121221092421.GG14363@n2100.arm.linux.org.uk>
- <20121221114105.GP2691@gmail.com>
- <20130103111450.GC14714@gmail.com>
- <CACRpkda-4C+ezaZFSkxsNbmHnBN8RCoCeGePaOF-DzV0XnkzQw@mail.gmail.com>
-Message-ID: <20130107141648.GR21994@gmail.com>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Mon, 07 Jan 2013 06:19:47 -0800
+Subject: [PATCH 1/4] ALSA: pxa2xx: fix ac97 cold reset
+In-Reply-To: <50EAD43C.2040406@compulab.co.il>
+References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
+ <1357499640-13871-2-git-send-email-mikedunn@newsguy.com>
+ <50EA9287.5030304@compulab.co.il> <50EACF4D.4000602@newsguy.com>
+ <50EAD43C.2040406@compulab.co.il>
+Message-ID: <50EAD983.5060801@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 03 Jan 2013, Linus Walleij wrote:
-
-> On Thu, Jan 3, 2013 at 12:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On 01/07/2013 05:57 AM, Igor Grinberg wrote:
+> On 01/07/13 15:36, Mike Dunn wrote:
+>> On 01/07/2013 01:16 AM, Igor Grinberg wrote:
+>>> On 01/06/13 21:13, Mike Dunn wrote:
+>>
+>>
+>> [..]
+>>
+>>
+>>>>  static inline void pxa_ac97_cold_pxa27x(void)
+>>>>  {
+>>>> +	unsigned int timeout;
+>>>> +
+>>>>  	GCR &=  GCR_COLD_RST;  /* clear everything but nCRST */
+>>>>  	GCR &= ~GCR_COLD_RST;  /* then assert nCRST */
+>>>>  
+>>>> @@ -157,8 +159,10 @@ static inline void pxa_ac97_cold_pxa27x(void)
+>>>>  	clk_enable(ac97conf_clk);
+>>>>  	udelay(5);
+>>>>  	clk_disable(ac97conf_clk);
+>>>> -	GCR = GCR_COLD_RST;
+>>>> -	udelay(50);
+>>>> +	GCR = GCR_COLD_RST | GCR_WARM_RST;
+>>>> +	timeout = 100;     /* wait for the codec-ready bit to be set */
+>>>> +	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
+>>>> +		mdelay(1);
+>>>
+>>> Can we use msleep() instead?
+>>> May be this will require to change the granularity to 10...
+>>
+>>
+>> Probably.  mdelay() is used by similiar code in the same file, so I just stayed
+>> consistent.  The code runs very infrequently, so I didn't worry about it.
 > 
-> > Some platforms provide clocks which require enabling before the
-> > SMSC911x chip will power on. This patch uses the new common clk
-> > framework to do just that. If no clock is provided, it will just
-> > be ignored and the driver will continue to assume that no clock
-> > is required for the chip to run successfully.
-> >
-> > Cc: Steve Glendinning <steve.glendinning@shawell.net>
-> > Cc: netdev at vger.kernel.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Looks all right to me now:
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Well, if we can, I think we'd better do, no?
 
-Great, thanks Linus.
 
-Who will take this patch now?
+If you feel strongly about it, I'll defer to you.  But again my arguments are
+(1) the code runs very infrequently, and (2) very similar code for the other pxa
+family siblings uses mdelay().
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Mike
