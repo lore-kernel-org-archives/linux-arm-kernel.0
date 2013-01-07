@@ -1,74 +1,59 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 07 Jan 2013 17:38:00 +0200
-Subject: [PATCH 3/4] ALSA: pxa27x: ac97 controller driver requests gpio
-In-Reply-To: <50EAD73C.3050401@newsguy.com>
-References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
- <1357499640-13871-4-git-send-email-mikedunn@newsguy.com>
- <50EA9710.3060107@compulab.co.il> <50EAD73C.3050401@newsguy.com>
-Message-ID: <50EAEBD8.40002@compulab.co.il>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 7 Jan 2013 16:32:29 +0100
+Subject: Reboot hangs on Kirkwood ns2 boards with 3.8-rc2
+In-Reply-To: <20130107152510.GZ3392@lunn.ch>
+References: <20130106033455.GH1357@kw.sim.vm.gnt>
+ <20130106083521.GO17242@lunn.ch>
+ <20130107150918.GI1357@kw.sim.vm.gnt>
+ <20130107152510.GZ3392@lunn.ch>
+Message-ID: <20130107153229.GK1357@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/13 16:10, Mike Dunn wrote:
-> On 01/07/2013 01:36 AM, Igor Grinberg wrote:
->> On 01/06/13 21:13, Mike Dunn wrote:
->>> During initialization, the ac97 driver must obtain the gpio for the mfp that is
->>> used by the ac97 controller as the AC97_nRESET line, or else gpiolib will issue
->>> a warning and stack dump.  Gpiolib may change this to a hard error soon.  The
->>> line is used during an ac97 warm reset for working around a hardware bug in the
->>> controller.
->>>
->>> Tested on a palm treo 680 machine.
->>>
->>> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
->>> ---
->>>  sound/arm/pxa2xx-ac97-lib.c |   10 +++++++++-
->>>  1 files changed, 9 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
->>> index 1ecd0a66..416d2e3 100644
->>> --- a/sound/arm/pxa2xx-ac97-lib.c
->>> +++ b/sound/arm/pxa2xx-ac97-lib.c
->>> @@ -18,6 +18,7 @@
->>>  #include <linux/delay.h>
->>>  #include <linux/module.h>
->>>  #include <linux/io.h>
->>> +#include <linux/gpio.h>
->>>  
->>>  #include <sound/ac97_codec.h>
->>>  #include <sound/pxa2xx-lib.h>
->>> @@ -344,7 +345,12 @@ int pxa2xx_ac97_hw_probe(struct platform_device *dev)
->>>  	}
->>>  
->>>  	if (cpu_is_pxa27x()) {
->>> -		/* Use GPIO 113 as AC97 Reset on Bulverde */
->>> +		ret = gpio_request(reset_gpio, "pxa27x ac97 reset");
->>> +		if (ret < 0) {
->>> +			pr_err("%s: gpio_request() failed: %d\n",
->>> +			       __func__, ret);
->>> +			goto err_conf;
->>> +		}
->>
->> I think if we are fine with the request in the driver,
->> then we should move the direction and value configuration also
->> to the driver, but let the pxa27x_assert_ac97reset() only switch
->> the AF.
+On Mon, Jan 07, 2013 at 04:25:10PM +0100, Andrew Lunn wrote:
+> On Mon, Jan 07, 2013 at 04:09:18PM +0100, Simon Guinot wrote:
+> > On Sun, Jan 06, 2013 at 09:35:21AM +0100, Andrew Lunn wrote:
+> > > On Sun, Jan 06, 2013 at 04:34:55AM +0100, Simon Guinot wrote:
+> > > > Hi Andrew and Jason,
+> > > > 
+> > > > While testing 3.8-rc2 on the ns2 boards (DT based), I noticed that
+> > > > reboot is not working. After issuing a reboot, the kernel hangs. No
+> > > > error messages are displayed. Moreover, on my non-DT Kirkwood boards,
+> > > > reboot is working as expected.
+> > > > 
+> > > > Am I the only one to experiment this issue ?
+> > > 
+> > > Hi Simon
+> > > 
+> > > No you are not the only one. There is a patch available, authored by
+> > > me, which is identical to what you found.
+> > 
+> > Arf, it's a shame I have missed this reports. It could have spared some
+> > time by asking at you earlier.
 > 
+> Hi Simon
 > 
-> Well, I won't make a fuss on this point, but with code that runs very
-> infrequently, I thought that the cost of a call to gpio_direction_output() was
-> worth the clarity and insurance.
+> Its often worth asking, or at least googling, before heading into a
+> git bisect.
+>  
+> > About the issue itself. I understand that a clock is needed by the
+> > orion-ehci driver. But even if the clock is not provided by the DT, it
+> > should have been fixed by kirkwood_legacy_clk_init(), isn't ? What's
+> > wrong with this workaround ?
+> 
+> kirkwood_legacy_clk_init() provides a clock with the old name. When
+> using DT, the device has the name "f1050000.ehci" and it looks for a
+> clock called "f1050000.ehci ". The legacy clock is called
+> "orion-ehci.0", which is what is expected when using old style
+> platform drivers instantiated in C.
 
-This is not about how frequent the code runs, but the fact that the arch code
-relies on sound code (outside of arch) to request the GPIO for it.
-I would recommend to place the GPIO request call along with the
-direction/value calls - in the same subsystem.
+OK, I get it. Thanks for the explanation.
 
-Also, the patch ordering is not good:
-patch 2 drives the GPIO, and patch 3 requests it,
-whereas it should be the other way around, so I would recommend to
-combine both into one.
-
--- 
-Regards,
-Igor.
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130107/75f4c8d2/attachment.sig>
