@@ -1,72 +1,71 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 7 Jan 2013 12:03:10 +0900
-Subject: [PATCH v4 00/81] SH pin control and GPIO rework
-In-Reply-To: <1799593.QvyAVKI32y@avalon>
-References: <1356735303-29474-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20121230001202.GF17416@verge.net.au> <1799593.QvyAVKI32y@avalon>
-Message-ID: <20130107030310.GA14865@verge.net.au>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Mon, 7 Jan 2013 10:25:07 +0800
+Subject: [PATCH v2 1/1 net-next] net: fec: report correct hardware stamping
+ info to ethtool
+Message-ID: <1357525507-16148-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 05:40:47PM +0100, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Sunday 30 December 2012 09:12:02 Simon Horman wrote:
-> > [ CC: linux-arm-kernel, Olof Johansson, Arnd Bergmann ]
-> > 
-> > On Fri, Dec 28, 2012 at 11:53:42PM +0100, Laurent Pinchart wrote:
-> > > Hi everybody,
-> > > 
-> > > Here's the fourth version of the SH pin control and GPIO rework patches.
-> > > The patches have been rebased on top of v3.8-rc1 but are otherwise
-> > > unchanged.
-> > > 
-> > > The series starts with the same additional platform-specific fixes as v3
-> > > (patches 4 to 7), I would appreciate if someone could review them
-> > > carefully.
-> > > 
-> > > You can get the series from my git tree at
-> > > 
-> > >         git://linuxtv.org/pinchartl/fbdev.git pinmux
-> > > 
-> > > I would like to push this set to v3.9 independently of the later rework
-> > > and OF-related sets. Simon, can you take it in your tree ?
-> > 
-> > Sure.
-> > 
-> > One inconvenience of my tree is that it goes via the arm-soc tree and as
-> > such things need to be split out into branches. I believe in the case of
-> > this series the patches will need to be split across soc, board and pfc
-> > branches. The branches may be based on each other.
-> > 
-> > Do you think the following scheme might work:
-> > 
-> > Patches 1 - 7: sh-soc
-> > Patches 8 - 21: pfc, based on sh-soc
-> > Patches 22 - 29: soc (ARM SoC), based on pfc
-> > Patches 30 - 42: sh-soc2, based on pfc
-> > Patches 43 - 50: pfc2, based on a merge of soc and sh-soc2
-> > Patches 51 - 54: soc2 (ARM SoC), based on pfc2
-> > Patches 55 - 66: pfc3, based on soc2
-> > Patches 67 - 78: sh-soc3, based on pfc3
-> > Patches 79 - 81: pfc4, based on sh-soc3
-> 
-> That looks good to me. Alternatively you could base pfc3 on top of a merge of 
-> soc and sh-soc2, and base pfc4 on top of a merge of soc2 and sh-soc3, but you 
-> might get conflicts in Kconfig and Makefile (they should be trivial to solve 
-> though).
+Report correct hardware stamping capability by ethtool interface.
+The v1.0 ptp4l check it.
 
-Thanks, I have used the modified scheme that you describe above and all
-seems well. In detail, I have done the following:
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+Change v1->v2
+ 1. s/capibilty/capability/
+ 2. apply Sascha's feedback 
+    avoid return the return value of ethtool_op_get_ts_info()
+    when bufdesc_ex ==  1
 
-Patches 1 - 7: sh-soc based on v3.8-rc1
-Patches 8 - 21: pfc, based on sh-soc
-Patches 22 - 29: soc (ARM SoC), based on pfc
-Patches 30 - 42: sh-soc2, based on pfc
-Patches 43 - 50 and 55 - 66: pfc2, based on a merge of soc and sh-soc2
-Patches 51 - 54: soc2 (ARM SoC), based on pfc2
-Patches 67 - 78: sh-soc3, based on pfc2
-Patches 79 - 81: pfc4, based on a merge of soc2 and sh-soc-3
+ drivers/net/ethernet/freescale/fec.c |   31 ++++++++++++++++++++++++++++++-
+ 1 files changed, 30 insertions(+), 1 deletions(-)
 
-Assuming that nothing nasty crops I plan to push the result to
-the renesas tree later today.
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index a379319..1c117e5 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -1173,12 +1173,41 @@ static void fec_enet_get_drvinfo(struct net_device *ndev,
+ 	strcpy(info->bus_info, dev_name(&ndev->dev));
+ }
+ 
++static int fec_enet_get_ts_info(struct net_device *ndev,
++				struct ethtool_ts_info *info)
++{
++	struct fec_enet_private *fep = netdev_priv(ndev);
++
++	if (fep->bufdesc_ex) {
++
++		info->so_timestamping = SOF_TIMESTAMPING_TX_SOFTWARE |
++					SOF_TIMESTAMPING_RX_SOFTWARE |
++					SOF_TIMESTAMPING_SOFTWARE |
++					SOF_TIMESTAMPING_TX_HARDWARE |
++					SOF_TIMESTAMPING_RX_HARDWARE |
++					SOF_TIMESTAMPING_RAW_HARDWARE;
++		if (fep->ptp_clock)
++			info->phc_index = ptp_clock_index(fep->ptp_clock);
++		else
++			info->phc_index = -1;
++
++		info->tx_types = (1 << HWTSTAMP_TX_OFF) |
++				 (1 << HWTSTAMP_TX_ON);
++
++		info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) |
++				   (1 << HWTSTAMP_FILTER_ALL);
++		return 0;
++	} else {
++		return ethtool_op_get_ts_info(ndev, info);
++	}
++}
++
+ static const struct ethtool_ops fec_enet_ethtool_ops = {
+ 	.get_settings		= fec_enet_get_settings,
+ 	.set_settings		= fec_enet_set_settings,
+ 	.get_drvinfo		= fec_enet_get_drvinfo,
+ 	.get_link		= ethtool_op_get_link,
+-	.get_ts_info		= ethtool_op_get_ts_info,
++	.get_ts_info		= fec_enet_get_ts_info,
+ };
+ 
+ static int fec_enet_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
+-- 
+1.7.1
