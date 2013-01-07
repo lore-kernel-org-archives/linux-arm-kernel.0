@@ -1,62 +1,80 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  7 Jan 2013 23:55:25 +0100
-Subject: [PATCH 00/11] switch the Nomadik to Device Tree
-Message-ID: <1357599325-7310-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  7 Jan 2013 23:55:49 +0100
+Subject: [PATCH 01/11] ARM: nomadik: move last custom calls to pinctrl
+Message-ID: <1357599349-7353-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements Device Tree support for the Nomadik S8815 and
-deletes the old board files.
+The I2C pins were still set up using custom nmk_* calls, move
+these to use the pinctrl mapping table instead. There was also
+a remaining call to turn the Ethernet pin to GPIO, and this is
+now done implicitly by the GPIO-to-pinctrl range translation
+calls.
 
-When another patch from today removing the <mach/irqs.h> file
-dependency from drivers/pinctrl/pinctrl-nomadik.c is merged
-I can also remove <mach/irqs.h> and move the machine over to
-multiplatform, quite easily, as it will then have all required
-things in place: generic clocks, SPARSE_IRQ, DT...
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-nomadik/board-nhk8815.c | 10 +++++++++-
+ arch/arm/mach-nomadik/i2c-8815nhk.c   | 11 -----------
+ 2 files changed, 9 insertions(+), 12 deletions(-)
 
-Caveats: some auxdata left, notably for naming some blocks
-to match the clock lookups. There is also an OCR mask thing
-which I think was debated in the past (Lee?)
-
-I would like to get this in first then fix the auxdatas one
-by one.
-
-Linus Walleij (11):
-  ARM: nomadik: move last custom calls to pinctrl
-  ARM: nomadik: initial devicetree support
-  ARM: nomadik: move pin maps to cpu file
-  ARM: nomadik: move remaining PrimeCells to device tree
-  ARM: nomadik: add FSMC NAND
-  ARM: nomadik: move GPIO and pinctrl to device tree
-  ARM: nomadik: convert SMSC91x ethernet to device tree
-  ARM: nomadik: migrate MMC/SD card support to device tree
-  ARM: nomadik: add I2C devices to the device tree
-  ARM: nomadik: delete old board files
-  ARM: nomadik: get rid of <mach/hardware.h>
-
- .../devicetree/bindings/mtd/fsmc-nand.txt          |   2 +-
- arch/arm/Kconfig                                   |   2 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/ste-nomadik-s8815.dts            |  34 ++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 256 ++++++++++++++
- arch/arm/mach-nomadik/Kconfig                      |  10 +-
- arch/arm/mach-nomadik/Makefile                     |   6 -
- arch/arm/mach-nomadik/board-nhk8815.c              | 359 --------------------
- arch/arm/mach-nomadik/cpu-8815.c                   | 370 +++++++++++++++------
- arch/arm/mach-nomadik/cpu-8815.h                   |   4 -
- arch/arm/mach-nomadik/i2c-8815nhk.c                |  88 -----
- arch/arm/mach-nomadik/include/mach/hardware.h      |  90 -----
- arch/arm/mach-nomadik/include/mach/irqs.h          |   2 -
- arch/arm/mach-nomadik/include/mach/uncompress.h    |   1 -
- drivers/mtd/nand/fsmc_nand.c                       |   1 +
- drivers/pinctrl/pinctrl-nomadik.c                  |   4 +
- 16 files changed, 578 insertions(+), 652 deletions(-)
- create mode 100644 arch/arm/boot/dts/ste-nomadik-s8815.dts
- create mode 100644 arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
- delete mode 100644 arch/arm/mach-nomadik/board-nhk8815.c
- delete mode 100644 arch/arm/mach-nomadik/cpu-8815.h
- delete mode 100644 arch/arm/mach-nomadik/i2c-8815nhk.c
- delete mode 100644 arch/arm/mach-nomadik/include/mach/hardware.h
-
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index 9f19069..75075ab 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -239,7 +239,6 @@ static int __init nhk8815_eth_init(void)
+ 	int err;
+ 
+ 	err = gpio_request(gpio_nr, "eth_irq");
+-	if (!err) err = nmk_gpio_set_mode(gpio_nr, NMK_GPIO_ALT_GPIO);
+ 	if (!err) err = gpio_direction_input(gpio_nr);
+ 	if (err)
+ 		pr_err("Error %i in %s\n", err, __func__);
+@@ -326,6 +325,15 @@ static struct pinctrl_map __initdata nhk8815_pinmap[] = {
+ 	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO111_H21", in_nopull),
+ 	/* CD bias drive */
+ 	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO112_J21", out_low),
++	/* I2C0 */
++	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO62_D3", in_pullup),
++	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO63_D2", in_pullup),
++	/* I2C1 */
++	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO53_L4", in_pullup),
++	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO54_L3", in_pullup),
++	/* I2C2 */
++	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO73_C21", in_pullup),
++	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO74_C20", in_pullup),
+ };
+ 
+ static void __init nhk8815_platform_init(void)
+diff --git a/arch/arm/mach-nomadik/i2c-8815nhk.c b/arch/arm/mach-nomadik/i2c-8815nhk.c
+index 0c2f662..f0e9e64 100644
+--- a/arch/arm/mach-nomadik/i2c-8815nhk.c
++++ b/arch/arm/mach-nomadik/i2c-8815nhk.c
+@@ -4,7 +4,6 @@
+ #include <linux/i2c-algo-bit.h>
+ #include <linux/i2c-gpio.h>
+ #include <linux/platform_device.h>
+-#include <linux/platform_data/pinctrl-nomadik.h>
+ 
+ /*
+  * There are two busses in the 8815NHK.
+@@ -57,18 +56,8 @@ static struct platform_device nhk8815_i2c_dev2 = {
+ 	},
+ };
+ 
+-static pin_cfg_t cpu8815_pins_i2c[] = {
+-	PIN_CFG_INPUT(62, GPIO, PULLUP),
+-	PIN_CFG_INPUT(63, GPIO, PULLUP),
+-	PIN_CFG_INPUT(53, GPIO, PULLUP),
+-	PIN_CFG_INPUT(54, GPIO, PULLUP),
+-	PIN_CFG_INPUT(73, GPIO, PULLUP),
+-	PIN_CFG_INPUT(74, GPIO, PULLUP),
+-};
+-
+ static int __init nhk8815_i2c_init(void)
+ {
+-	nmk_config_pins(cpu8815_pins_i2c, ARRAY_SIZE(cpu8815_pins_i2c));
+ 	platform_device_register(&nhk8815_i2c_dev0);
+ 	platform_device_register(&nhk8815_i2c_dev1);
+ 	platform_device_register(&nhk8815_i2c_dev2);
 -- 
 1.7.11.7
