@@ -1,28 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Jan 2013 00:52:28 +0100
-Subject: [PATCH v6 8/8] i2c: pxa: configure pinmux
-In-Reply-To: <1356083118-18857-9-git-send-email-haojian.zhuang@linaro.org>
-References: <1356083118-18857-1-git-send-email-haojian.zhuang@linaro.org>
- <1356083118-18857-9-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdYTwusd1thn=NS0JQhfJyeOpnDdMhmtOzt7AH4ODS7Lew@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 07 Jan 2013 01:49:02 +0100
+Subject: Common clock framework: mutex recursion when calling clk_prepare from
+ prepare handler
+Message-ID: <3826517.zOi8FASM36@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 21, 2012 at 10:45 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+Hello,
 
-> From: Haojian Zhuang <haojian.zhuang@gmail.com>
->
-> Configure pins by pinctrl driver.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I ran into a mutex recursion issue while trying to port the OMAP3 ISP driver 
+(drivers/media/platform/omap3isp) over to the common clock framework.
 
-Same comment as on the other patch.
+The OMAP3 ISP generates two programmable clocks named xclka and xclkb that are 
+routed out of the SoC. My goal is to expose them as common clock instances 
+through the common clock framework.
 
-And it's important that you send I2C patches to Wolfram
-Sang these days.
+The xclk[ab] clocks are children of the cam_mclk clock. They are controlled 
+through ISP registers that sit in the cam_fclk clock domain. The cam_mclk and 
+cam_fclk clocks sit in separate power domains.
 
-Yours,
-Linus Walleij
+To program the xclk clocks I need to enable the cam_fclk clock. As xclk[ab] 
+are not descendants of the cam_fclk clock, this operation needs to be 
+performed manually. I thus call clk_prepare_enable on the cam_fclk clock in 
+the xclk[ab] prepare handler. This is where things break, as the common clock 
+framework takes the prepare_lock mutex in clk_prepare, which results in a 
+mutex recursion deadlock as the prepare_lock mutex isn't recursive.
+
+What's the best way to solve this ? __clk_prepare (the unlocked version of 
+clk_prepare) isn't exported to drivers, and I'm not convinced it should be. 
+Turning prepare_lock into a recursive mutex might also work, but I'm not sure 
+what drawbacks this would have. Advices would be appreciated.
+
+-- 
+Regards,
+
+Laurent Pinchart
