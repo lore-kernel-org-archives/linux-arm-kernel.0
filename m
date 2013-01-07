@@ -1,56 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 7 Jan 2013 21:01:39 +0800
-Subject: [PATCH] Add apf51 basic support
-In-Reply-To: <CAA1eMkFXVy9ti6o7nVZNtrMm=-ymaZhEKxvPRzWj9Uqp=HDt=Q@mail.gmail.com>
-References: <1355694591-7084-1-git-send-email-laurent.cans@gmail.com>
- <20121219203936.GG26326@pengutronix.de>
- <20130103083534.GD2566@S2101-09.ap.freescale.net>
- <CAA1eMkFXVy9ti6o7nVZNtrMm=-ymaZhEKxvPRzWj9Uqp=HDt=Q@mail.gmail.com>
-Message-ID: <20130107130137.GA29281@S2101-09.ap.freescale.net>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Mon, 07 Jan 2013 14:00:35 +0100
+Subject: [RFC 0/3] future of gemini platform
+In-Reply-To: <1357310500-19848-1-git-send-email-arnd@arndb.de>
+References: <1357310500-19848-1-git-send-email-arnd@arndb.de>
+Message-ID: <50EAC6F3.1020206@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 06, 2013 at 05:19:13PM +0100, Laurent CANS wrote:
-> 2013/1/3 Shawn Guo <shawn.guo@linaro.org>:
-> > On Wed, Dec 19, 2012 at 09:39:36PM +0100, Sascha Hauer wrote:
-> >> On Sun, Dec 16, 2012 at 10:49:51PM +0100, Laurent Cans wrote:
-> >> > Signed-off-by: Laurent Cans <laurent.cans@gmail.com>
-> >> > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> >> > ---
-> >> > +   clocks {
-> >> > +           #address-cells = <1>;
-> >> > +           #size-cells = <0>;
-> >> > +
-> >> > +           ckih1 {
-> >> > +                   compatible = "fsl,imx-ckih1", "fixed-clock";
-> >> > +                   clock-frequency = <0>;
-> >> > +           };
-> >> > +
-> >> > +           osc {
-> >> > +                   compatible = "fsl,imx-osc", "fixed-clock";
-> >> > +                   clock-frequency = <33554432>;
-> >> > +           };
-> >>
-> >> These compatible properties shouldn't be necessary, right?
-> >>
-> > Use node path instead?  But imx51 clock driver is already using
-> > compatible property to identify the clocks.
-> >
-> > Shawn
-> >
-> 
-> Hi shawn,
-> 
-> I don't understand your remarks.
-> 
-Or I misunderstood Sascha's comment?  I thought he was asking you to
-remove those compatible properties, and I do not understand how that
-would work, since clock code is looking for the node using the
-compatible property.
+Hi Arnd,
 
-Shawn
+Le 01/04/13 15:41, Arnd Bergmann a ?crit :
+> The gemini platform is quite broken at the moment due to bitrot,
+> here are the two suggested solutions. We should either apply the
+> first patch or the other two, depending on whether anyone still
+> uses this.
+>
+> Ulli was last actively working on this about two years ago,
+> so I assume that he has moved on, but if he or anyone else
+> is still interested in keeping Gemini alive, any patches
+> and testing are very welcome. Without a maintainer however,
+> I see no point in keeping it.
+>
+> The fa526 CPU support is currently only used on Gemini,
+> but Florian had some patches last year for it, so he might
+> still need it. If there are still plans to get MCS814x
+> or another fa526 based platform merged into mainline,
+> we can keep this around, but unless I see a timeline
+> for this, I would prefer to remove it for now. It should
+> be trivial to revert that patch and bring it back if
+> it's needed for a new platform.
 
-> The method used to define clocks is incorrect? What is the recommended
-> method to define clocks?
-> 
-> Laurent
+I did not have actually hardware to port MCS814x to anything else than 
+MCS8140 (real ARM 926EJS core), while MCS8142 and MCS8144 actually use a 
+FA626 (not 526) core. Added in CC are Imre and Gabor who actually worked 
+on the Gemini machine and might be able to either give their go for 
+removal, or fix the issues.
+--
+Florian
