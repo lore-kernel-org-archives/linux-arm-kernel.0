@@ -1,76 +1,83 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 7 Jan 2013 19:21:46 +0000
-Subject: [PATCH v4 21/24] arm/v2m: initialize arch_timers even if v2m_timer
- is not present
-In-Reply-To: <50EB06A4.7030908@arm.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-21-git-send-email-stefano.stabellini@eu.citrix.com>
- <1347625628.2497.65.camel@hornet>
- <alpine.DEB.2.02.1209141347250.29232@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1301071719180.4981@kaball.uk.xensource.com>
- <50EB06A4.7030908@arm.com>
-Message-ID: <alpine.DEB.2.02.1301071921140.4981@kaball.uk.xensource.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 07 Jan 2013 20:33:55 +0100
+Subject: [PATCH v4 00/81] SH pin control and GPIO rework
+In-Reply-To: <20130107030310.GA14865@verge.net.au>
+References: <1356735303-29474-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1799593.QvyAVKI32y@avalon> <20130107030310.GA14865@verge.net.au>
+Message-ID: <3937593.RWUOL6AydO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Jan 2013, Marc Zyngier wrote:
-> On 07/01/13 17:21, Stefano Stabellini wrote:
-> > On Fri, 14 Sep 2012, Stefano Stabellini wrote:
-> >> On Fri, 14 Sep 2012, Pawel Moll wrote:
-> >>> On Fri, 2012-09-14 at 12:13 +0100, Stefano Stabellini wrote:
-> >>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> >>>> CC: Russell King <linux@arm.linux.org.uk>
-> >>>> CC: Pawel Moll <pawel.moll@arm.com>
-> >>>> CC: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> ---
-> >>>>  arch/arm/mach-vexpress/v2m.c |   11 ++++++-----
-> >>>>  1 files changed, 6 insertions(+), 5 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-> >>>> index 37608f2..4e567f7 100644
-> >>>> --- a/arch/arm/mach-vexpress/v2m.c
-> >>>> +++ b/arch/arm/mach-vexpress/v2m.c
-> >>>> @@ -621,16 +621,17 @@ static void __init v2m_dt_timer_init(void)
-> >>>>  
-> >>>>  	v2m_clk_init();
-> >>>>  
-> >>>> -	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
-> >>>> -	if (WARN_ON(err))
-> >>>> -		return;
-> >>>> -	node = of_find_node_by_path(path);
-> >>>> -	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
-> >>>>  	if (arch_timer_of_register() != 0)
-> >>>>  		twd_local_timer_of_register();
-> >>>>  
-> >>>>  	if (arch_timer_sched_clock_init() != 0)
-> >>>>  		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
-> >>>> +
-> >>>> +	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
-> >>>> +	if (WARN_ON(err))
-> >>>> +		return;
-> >>>> +	node = of_find_node_by_path(path);
-> >>>> +	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
-> >>>>  }
-> >>>>  
-> >>>>  static struct sys_timer v2m_dt_timer = {
-> >>>
-> >>> Fair point. The alias is going to disappear anyway (I'm working on a VE
-> >>> platform rework right now), but in case I won't get it on time for 3.7,
-> >>> I'll make sure this one is merged instead.
-> >>
-> >> Great, thanks!
-> >> Should I leave this patch out of the Xen on ARM series for 3.7 then?
-> >>
-> > 
-> > I have just noticed that this patch hasn't been merged yet, but still we
-> > need it to boot Linux on Xen.
-> > Do you want me to rebase and resent?
-> 
-> I'm looking at v3.8-rc2, and the code have changed significantly (see
-> 433683a66401adb0150792e725cc4f631c94de46).
-> 
-> If you don't have an "arm,sp804" device in your DT, it shouldn't get
-> registered and carry on registering the per-cpu timers. Can you check
-> that it fixes your issue?
+Hi Simon,
 
-Yes, sorry, my Linux tree wasn't up to date enough, thanks!
+On Monday 07 January 2013 12:03:10 Simon Horman wrote:
+> On Thu, Jan 03, 2013 at 05:40:47PM +0100, Laurent Pinchart wrote:
+> > On Sunday 30 December 2012 09:12:02 Simon Horman wrote:
+> > > [ CC: linux-arm-kernel, Olof Johansson, Arnd Bergmann ]
+> > > 
+> > > On Fri, Dec 28, 2012 at 11:53:42PM +0100, Laurent Pinchart wrote:
+> > > > Hi everybody,
+> > > > 
+> > > > Here's the fourth version of the SH pin control and GPIO rework
+> > > > patches. The patches have been rebased on top of v3.8-rc1 but are
+> > > > otherwise unchanged.
+> > > > 
+> > > > The series starts with the same additional platform-specific fixes as
+> > > > v3 (patches 4 to 7), I would appreciate if someone could review them
+> > > > carefully.
+> > > > 
+> > > > You can get the series from my git tree at
+> > > > 
+> > > >         git://linuxtv.org/pinchartl/fbdev.git pinmux
+> > > > 
+> > > > I would like to push this set to v3.9 independently of the later
+> > > > rework and OF-related sets. Simon, can you take it in your tree ?
+> > > 
+> > > Sure.
+> > > 
+> > > One inconvenience of my tree is that it goes via the arm-soc tree and as
+> > > such things need to be split out into branches. I believe in the case of
+> > > this series the patches will need to be split across soc, board and pfc
+> > > branches. The branches may be based on each other.
+> > > 
+> > > Do you think the following scheme might work:
+> > > 
+> > > Patches 1 - 7: sh-soc
+> > > Patches 8 - 21: pfc, based on sh-soc
+> > > Patches 22 - 29: soc (ARM SoC), based on pfc
+> > > Patches 30 - 42: sh-soc2, based on pfc
+> > > Patches 43 - 50: pfc2, based on a merge of soc and sh-soc2
+> > > Patches 51 - 54: soc2 (ARM SoC), based on pfc2
+> > > Patches 55 - 66: pfc3, based on soc2
+> > > Patches 67 - 78: sh-soc3, based on pfc3
+> > > Patches 79 - 81: pfc4, based on sh-soc3
+> > 
+> > That looks good to me. Alternatively you could base pfc3 on top of a merge
+> > of soc and sh-soc2, and base pfc4 on top of a merge of soc2 and sh-soc3,
+> > but you might get conflicts in Kconfig and Makefile (they should be
+> > trivial to solve though).
+> 
+> Thanks, I have used the modified scheme that you describe above and all
+> seems well. In detail, I have done the following:
+> 
+> Patches 1 - 7: sh-soc based on v3.8-rc1
+> Patches 8 - 21: pfc, based on sh-soc
+> Patches 22 - 29: soc (ARM SoC), based on pfc
+> Patches 30 - 42: sh-soc2, based on pfc
+> Patches 43 - 50 and 55 - 66: pfc2, based on a merge of soc and sh-soc2
+> Patches 51 - 54: soc2 (ARM SoC), based on pfc2
+> Patches 67 - 78: sh-soc3, based on pfc2
+> Patches 79 - 81: pfc4, based on a merge of soc2 and sh-soc-3
+> 
+> Assuming that nothing nasty crops I plan to push the result to
+> the renesas tree later today.
+
+Thank you.
+
+Linus acked the next patch series but there are still two issues I need to 
+solve. I'll repost the patches and send a pull request in the near future.
+
+-- 
+Regards,
+
+Laurent Pinchart
