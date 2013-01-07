@@ -1,112 +1,121 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Sun,  6 Jan 2013 17:23:51 -0800
-Subject: [PATCH 3/3] ARM: versatile: Make able to use UART ports for KGDB FIQ
- debugger
-In-Reply-To: <20130107012242.GA31052@lizard.mcd01528.sjc.wayport.net>
-References: <20130107012242.GA31052@lizard.mcd01528.sjc.wayport.net>
-Message-ID: <1357521831-6053-3-git-send-email-anton.vorontsov@linaro.org>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Sun, 06 Jan 2013 17:53:30 -0800
+Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
+In-Reply-To: <20130106164033.GA3222@n2100.arm.linux.org.uk> (Russell King's
+ message of "Sun, 6 Jan 2013 16:40:34 +0000")
+References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
+ <50E4C9C6.20609@codeaurora.org>
+ <20130103120259.GB5193@mudshark.cambridge.arm.com>
+ <20130103122100.GN2631@n2100.arm.linux.org.uk>
+ <50E5E967.3020805@wwwdotorg.org>
+ <20130106162200.GC11025@mudshark.cambridge.arm.com>
+ <20130106164033.GA3222@n2100.arm.linux.org.uk>
+Message-ID: <87ehhxahd1.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If enabled, kernel will able to enter KGDB upon serial line activity on
-UART ports.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Note that even with this patch and CONFIG_KGDB_FIQ is enabled, you still
-need to pass kgdb_fiq.enable=1 kernel command line option, otherwise UART
-will behave in a normal way.
+> On Sun, Jan 06, 2013 at 04:22:00PM +0000, Will Deacon wrote:
+>> On Thu, Jan 03, 2013 at 08:26:15PM +0000, Stephen Warren wrote:
+>> > On 01/03/2013 05:21 AM, Russell King - ARM Linux wrote:
+>> > > On Thu, Jan 03, 2013 at 12:02:59PM +0000, Will Deacon wrote:
+>> > >> You need the smp_send_stop call in order to send the cpu_kill (looks like
+>> > >> tegra needs die and then kill). So you really need hotplug support as well
+>> > >> as suspend for this to do much (if not, the secondaries end up spinning
+>> > >> with interrupts disabled which is probably the best we can do anyway).
+>> > >>
+>> > >> We could add SUSPEND as a KEXEC dependency if SMP (we already have HOTPLUG
+>> > >> there) if you like?
+>> > > 
+>> > > Or we could look into bringing in the code to do this when KEXEC is
+>> > > enabled - which would mean an amount of restructuring of the Kconfig
+>> > > files.
+>> > 
+>> > I'm not sure if any of this thread means we should hold off on this
+>> > patch, or just that the Kconfig could/should be enhanced later?
+>> 
+>> Well, Russell's suggestion looked easy enough to have a crack out so you
+>> could always post a series implementing it along with this patch.
+>> 
+>> > One thing I did just notice with my patch: disable_nonboot_cpus() ends
+>> > up being called twice for the poweroff path:
+>> > 
+>> > [   30.461847] Disabling non-boot CPUs ...
+>> > [   30.478797] CPU1: shutdown
+>> > [   30.492104] Power down.
+>> > [   30.494578] Disabling non-boot CPUs ...
+>> > 
+>> > Is this worth worrying about?
+>> 
+>> It's harmless but it's also pretty horrible. Unfortunately, I don't see
+>> what we can do about it: it's a direct side-effect of generic code calling
+>> disable_nonboot_cpus for poweroff and not for kexec.
+>
+> I think we're starting to hit the age old problem with software: over
+> time it becomes more difficult to change established software as it
+> becomes more risky to make changes, and no one wants to make those
+> changes through fear of breakign something else.
+>
+> Eventually, this results in someone declaring that the current project
+> is beyond hope, and the next Linus Torvalds comes along and the next
+> Linux kernel project will be born.  That probably isn't want people want,
+> but it's what will eventually happen when things just get too painful.
+>
+> Unless, of course, we start pushing back now and don't leave issues to
+> fester.
+>
+> However, that said, I can see why kexec does this.  I've not looked too
+> deeply into kexec, but I'd image that the path where the secondary CPUs
+> are not taken offline prior to kexec happening is to allow kexec to
+> be used for crash recovery, where you don't want to do too much in case
+> you re-tickle the bug that caused the original crash.
+>
+> I suspect what platforms like x86 do in this scenario (via
+> machine_shutdown) is to forcefully put the secondary CPUs into reset
+> and hold them there until the new kexec'd kernel gets going.
+>
+> The problem is... on ARM we're yet again shot in the foot through the
+> unwillingness to architect certain aspects of the system: there is no
+> architecturally known way to place CPUs into a reset state once they've
+> been started up.  In other words, once a CPU starts executing kernel
+> code, it needs to always execute kernel code or there must be some kind
+> of platform specific hook to disable it.
+>
+> Maybe that's the answer here: have machine_shutdown() call out to some
+> platform specific function to do the forced-takedown of secondary CPUs,
+> and if there's no such specific function, then we use our present CPU
+> stopping method of making them spin in a WFI loop with IRQs disabled.
 
-By default UART0 is used, but this can be changed via kgdb_fiq.uart_num
-kernel command line option.
+Yes.  On x86 we have had the generic equivalent of disable_nonboot_cpus
+in the machine_shutdown for a long time.
 
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
----
- arch/arm/Kconfig                   |  1 +
- arch/arm/mach-versatile/Makefile   |  1 +
- arch/arm/mach-versatile/kgdb_fiq.c | 55 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 57 insertions(+)
- create mode 100644 arch/arm/mach-versatile/kgdb_fiq.c
+Now I don't know the full history of what led someone to make a
+conscious choice to not call disable_nonboot_cpus() in kernel_kexec()
+before machine_shutdown() and machine_kexec().  But it was a deliberate
+choice and someone needs to dig up the reasons and review if the reasons
+are still valid before we can change the generic code path without
+introducing regressions.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index bde27c1..8fea25d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -338,6 +338,7 @@ config ARCH_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select PLAT_VERSATILE_CLOCK
- 	select VERSATILE_FPGA_IRQ
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	help
- 	  This enables support for ARM Ltd Versatile board.
- 
-diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
-index 81fa3fe..bfd761f 100644
---- a/arch/arm/mach-versatile/Makefile
-+++ b/arch/arm/mach-versatile/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
- obj-$(CONFIG_MACH_VERSATILE_AB)		+= versatile_ab.o
- obj-$(CONFIG_MACH_VERSATILE_DT)		+= versatile_dt.o
- obj-$(CONFIG_PCI)			+= pci.o
-+obj-$(CONFIG_KGDB_FIQ)			+= kgdb_fiq.o
-diff --git a/arch/arm/mach-versatile/kgdb_fiq.c b/arch/arm/mach-versatile/kgdb_fiq.c
-new file mode 100644
-index 0000000..dd92e40
---- /dev/null
-+++ b/arch/arm/mach-versatile/kgdb_fiq.c
-@@ -0,0 +1,55 @@
-+/*
-+ * KGDB FIQ board support
-+ *
-+ * Copyright 2012 Linaro Ltd.
-+ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kgdb.h>
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+#include <asm/hardware/vic.h>
-+
-+static void *kgdb_irq_base;
-+
-+static int kgdb_irq;
-+module_param_named(uart_num, kgdb_irq, int, 0600);
-+MODULE_PARM_DESC(uart_num, "UART<number> port to use for KGDB FIQ");
-+
-+static void kgdb_fiq_select(bool on)
-+{
-+	void __iomem *sel = kgdb_irq_base + VIC_INT_SELECT;
-+	u32 msk = 1 << kgdb_irq;
-+	u32 val;
-+
-+	pr_debug("rerouting VIC vector %d to %s\n", kgdb_irq,
-+		 on ? "FIQ" : "IRQ");
-+
-+	val = readl(sel);
-+	val &= ~msk;
-+	if (on)
-+		val |= msk;
-+	writel(val, sel);
-+}
-+
-+static bool kgdb_is_fiq_rised(void)
-+{
-+	return readl(kgdb_irq_base + VIC_FIQ_STATUS) & (1 << kgdb_irq);
-+}
-+
-+static int __init kgdb_fiq_init(void)
-+{
-+	kgdb_irq_base = __io_address(VERSATILE_VIC_BASE);
-+	kgdb_irq += INT_UARTINT0;
-+	WARN_ON(kgdb_irq > INT_UARTINT2);
-+
-+	return kgdb_register_fiq(kgdb_fiq_select, kgdb_is_fiq_rised);
-+}
-+console_initcall(kgdb_fiq_init);
--- 
-1.8.0.2
+I remember there being some problems when disable_nonboot_cpus() was
+added originially.  And if disable_nonboot_cpus disappears in
+configurations without power managment that is another problem, because
+platforms that have SMP always need that logic to happen.
+
+But what it looks like is whoever put disable_nonboot_cpus() on the kernel
+reboot path didn't do their homework, did a sloppy job and left us with
+a situation where we need to write both generic code and arch specific
+code to do the same thing.
+
+I have cleaned up the mess that is the reboot path once a bunch of years
+ago, and apparently it is deteriorating again.  Unfortunately right now
+I don't have the time or inclination to sort out whatever the nonsense
+disable_nonboot_cpus() has become.  What is required of
+machine_shutdown() is clear even if there is duplication with
+disable_nonboot_cpus().
+
+Please note the only code path that generically calls machine_shutdown()
+is kernel_kexec() so if you wish you can avoid duplication by
+refactoring you architecture specific code.
+
+Eric
