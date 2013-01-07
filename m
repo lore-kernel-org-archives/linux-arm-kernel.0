@@ -1,133 +1,105 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 07 Jan 2013 09:54:13 +0100
-Subject: [PATCH 1/1] ARM: ux500:mach-ux500/cpuidle.c spinlock dis-matching
-In-Reply-To: <CAKvkGKcPumpRcxQrwWGXoWvG4Sk2niTiojfNU=2PnZ9zq_7EcQ@mail.gmail.com>
-References: <CAKvkGKdoWxmnRbNvn_SikRhzsyyzqEC99XtSM9ZeaVGjEA_Ydw@mail.gmail.com>
- <50E9A4FE.6090807@linaro.org>
- <CAKvkGKcPumpRcxQrwWGXoWvG4Sk2niTiojfNU=2PnZ9zq_7EcQ@mail.gmail.com>
-Message-ID: <50EA8D35.5020501@linaro.org>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 07 Jan 2013 11:13:30 +0200
+Subject: [PATCH v2] ARM: PXA27x: fix workaround for AC97 reset
+In-Reply-To: <50E9F871.6030105@newsguy.com>
+References: <87fw2ebe1i.fsf@free.fr>
+ <1357490881-19015-1-git-send-email-grinberg@compulab.co.il>
+ <50E9F871.6030105@newsguy.com>
+Message-ID: <50EA91BA.6030207@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2013 06:50 AM, steve.zhan wrote:
-> Hi Daniel,
-> 
->     Happy new year, Thank you for reply.
-> Sorry for that i have refer the old patch email.
-> I have updated the patch, Pls check the URL:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138939.html
-> Now i am using gmail GUI tools to send mail, i will switch email tool
-> to MUTT to commit the other patchs in the future.
-
-Ok.
-
-Please do not introduce a new variable which is at the end pointless and
-add more complexity.
-
-You can simply remove the if statement for prcmu_gic_decouple(), or
-unlock if it fails.
-
-Thanks
-  -- Daniel
-
-> --------------
-> steve.zhan
-> 
-> 2013/1/7, Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 12/28/2012 08:06 AM, steve.zhan wrote:
->>> Hi Daniel,
+On 01/07/13 00:19, Mike Dunn wrote:
+> On 01/06/2013 08:48 AM, Igor Grinberg wrote:
+>> Fix the workaround to a hardware bug in the AC97 controller of PXA27x.
+>> A bug in the controller's warm reset functionality requires that the MFP
+>> used by the controller as the AC97_RESET_n line be temporarily
+>> reconfigured as a GPIO (AF0) and manually held high for the duration of
+>> the warm reset cycle.
 >>
->> Hi Steve,
+>> The workaround was broken long ago by commit fb1bf8cd
+>> ([ARM] pxa: introduce processor specific pxa27x_assert_ac97reset()).
+>> The commit above changed the original workaround code in a way that
+>> changed the MFP to AF0 (GPIO), but forgot to drive the GPIO high output.
+>> This way, the GPIO state was left input (and undriven) and only worked
+>> for boards with external pullup on the line.
 >>
->> sorry I missed your email.
->>
->>>
->>>        I think we must unlock the master spinlock even
->>> prcmu_gic_decouple function now always return 0.
->>>        Could you give some infos about this?
->>
->> I agree, that would be cleaner.
->>
->> AFAICS, your patch does not solve the problem because 'recouple' will be
->> false if prcmu_gic_decouple fails, so the lock will never be release.
->>
->> That will be simpler to do:
->>
->> if (prcmu_gic_decouple()) {
->> 	spin_unlock(&master);
->> 	goto out;
->> }
->>
->> no ?
->>
->>> Thanks.
->>>
->>> diff --git a/arch/arm/mach-ux500/cpuidle.c
->>> b/arch/arm/mach-ux500/cpuidle.c
->>> index b54884bd..b0759ce 100644
->>> --- a/arch/arm/mach-ux500/cpuidle.c
->>> +++ b/arch/arm/mach-ux500/cpuidle.c
->>> @@ -29,6 +29,7 @@ static inline int ux500_enter_idle(struct cpuidle_device
->>> *dev,
->>>  {
->>>         int this_cpu = smp_processor_id();
->>>         bool recouple = false;
->>> +       bool locked = false;
->>>
->>>         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
->>>
->>> @@ -39,6 +40,8 @@ static inline int ux500_enter_idle(struct cpuidle_device
->>> *dev,
->>>                 if (!spin_trylock(&master_lock))
->>>                         goto wfi;
->>>
->>> +               locked = true;
->>> +
->>>                 /* decouple the gic from the A9 cores */
->>>                 if (prcmu_gic_decouple())
->>>                         goto out;
->>> @@ -76,7 +79,7 @@ static inline int ux500_enter_idle(struct cpuidle_device
->>> *dev,
->>>                 /* When we switch to retention, the prcmu is in charge
->>>                  * of recoupling the gic automatically */
->>>                 recouple = false;
->>> -
->>> +               locked = false;
->>>                 spin_unlock(&master_lock);
->>>         }
->>>  wfi:
->>> @@ -86,7 +89,8 @@ out:
->>>
->>>         if (recouple) {
->>>                 prcmu_gic_recouple();
->>> -               spin_unlock(&master_lock);
->>> +               if (locked)
->>> +                       spin_unlock(&master_lock);
->>>         }
->>>
->>>         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &this_cpu);
->>>
->>>
->>>
->>> Steve Zhan
->>>
->>
->>
->> --
->>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>
->> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->> <http://twitter.com/#!/linaroorg> Twitter |
->> <http://www.linaro.org/linaro-blog/> Blog
->>
->>
+>> Fix the above breakage by actually configurring the GPIO for output high
+>> in case of reset assert and returning it to default state
+>> (AF1 - for GPIO95 and AF2 - for GPIO113) in case of reset deassert.
 > 
 > 
+> Hi Igor,
+> 
+> I pulled patches 2, 3, and 4 from my patch set (patch #1 fixes an unrelated
+> problem with ac97 cold reset) and replaced it with this, and warm reset works.
+> My pxa270 uses gpio 95 for reset, BTW.  I don't have a platform that uses 113.
 
+Thanks!
+
+> 
+> Honestly, I don't understand why it works :)  The pxa27x_assert_ac97reset()
+> function calls pxa2xx_mfp_config() with an input direction configuration when it
+> switches to gpio (AF0), so I don't see how the line remains an output driven
+> high.  I think you tried to explain that in the email exchange, but I'm still
+> confused.  I'm looking at __mfp_config_gpio(), and it looks like it's setting
+> the GPDR register.
+
+Yeah, I see your concern now...
+Probably, we still need a combination of both: like in v1 of my patch,
+just without changing the direction to input.
+
+> 
+> [..]
+> 
+> 
+>>  
+>>  void __init pxa_set_ac97_info(pxa2xx_audio_ops_t *ops)
+>>  {
+>> -	pxa_register_device(&pxa_device_ac97, ops);
+>> +	int err = 0;
+>> +
+>> +	if (ops && gpio_is_valid(ops->reset_gpio)) {
+>> +		err = gpio_request_one(ops->reset_gpio, GPIOF_INIT_HIGH,
+>> +				       "ac97 rst");
+>> +		if (err)
+>> +			pr_err("%s: Failed requesting GPIO%d (ac97 rst): %d",
+>> +			       __func__, ops->reset_gpio, err);
+>> +	}
+>> +
+>> +	if (!err)
+>> +		pxa_register_device(&pxa_device_ac97, ops);
+>>  }
+>>  
+>>  #ifdef CONFIG_PXA25x
+> 
+> 
+> On further thought, I'm not sure about doing this here.  This file is for all
+> pxa's, no?  The gpio only needs to be obtained for pxa270. 
+
+The only problem I can see here, is that the ops->reset_gpio
+may be uninitialized ( = 0 ) and that will be a problem as 0 is a valid GPIO,
+so there are several options here:
+1) Change all the users of pxa_set_ac97_info() that provide non-NULL ops pointer
+   to initialize the reset_gpio to -EINVAL (preferable)
+2) We can check cpu_is_pxa27x().
+3) We can check that provided GPIO is 95 or 113.
+
+> And even in that
+> case, the ac97 controller peripheral may not be used if no codec is attached, in
+> which case the pins are free to be used for any kind of gpio. 
+
+In such case you should not call pxa_set_ac97_info(), right?
+
+> It might be
+> better to have the ac97 driver request the gpio.
+
+Thought about that, but this means we request the GPIO in the driver but
+configure it (gpio_direction_out()) in the arch code - this is a bit awkward.
+
+I would go for implementing 1), unless we have no problem requesting the GPIO
+in the driver and driving it in the arch code...
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+Igor.
