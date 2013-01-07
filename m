@@ -1,67 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Jan 2013 16:34:31 +0100
-Subject: [GIT PULL] ux500 cpufreq and clksrc updates
-Message-ID: <CACRpkda7zAD0yFD8LT7K-F9HhEmJPOfcQ9fA35h=Yp8ThMyP9Q@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 07 Jan 2013 17:38:00 +0200
+Subject: [PATCH 3/4] ALSA: pxa27x: ac97 controller driver requests gpio
+In-Reply-To: <50EAD73C.3050401@newsguy.com>
+References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
+ <1357499640-13871-4-git-send-email-mikedunn@newsguy.com>
+ <50EA9710.3060107@compulab.co.il> <50EAD73C.3050401@newsguy.com>
+Message-ID: <50EAEBD8.40002@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On 01/07/13 16:10, Mike Dunn wrote:
+> On 01/07/2013 01:36 AM, Igor Grinberg wrote:
+>> On 01/06/13 21:13, Mike Dunn wrote:
+>>> During initialization, the ac97 driver must obtain the gpio for the mfp that is
+>>> used by the ac97 controller as the AC97_nRESET line, or else gpiolib will issue
+>>> a warning and stack dump.  Gpiolib may change this to a hard error soon.  The
+>>> line is used during an ac97 warm reset for working around a hardware bug in the
+>>> controller.
+>>>
+>>> Tested on a palm treo 680 machine.
+>>>
+>>> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+>>> ---
+>>>  sound/arm/pxa2xx-ac97-lib.c |   10 +++++++++-
+>>>  1 files changed, 9 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+>>> index 1ecd0a66..416d2e3 100644
+>>> --- a/sound/arm/pxa2xx-ac97-lib.c
+>>> +++ b/sound/arm/pxa2xx-ac97-lib.c
+>>> @@ -18,6 +18,7 @@
+>>>  #include <linux/delay.h>
+>>>  #include <linux/module.h>
+>>>  #include <linux/io.h>
+>>> +#include <linux/gpio.h>
+>>>  
+>>>  #include <sound/ac97_codec.h>
+>>>  #include <sound/pxa2xx-lib.h>
+>>> @@ -344,7 +345,12 @@ int pxa2xx_ac97_hw_probe(struct platform_device *dev)
+>>>  	}
+>>>  
+>>>  	if (cpu_is_pxa27x()) {
+>>> -		/* Use GPIO 113 as AC97 Reset on Bulverde */
+>>> +		ret = gpio_request(reset_gpio, "pxa27x ac97 reset");
+>>> +		if (ret < 0) {
+>>> +			pr_err("%s: gpio_request() failed: %d\n",
+>>> +			       __func__, ret);
+>>> +			goto err_conf;
+>>> +		}
+>>
+>> I think if we are fine with the request in the driver,
+>> then we should move the direction and value configuration also
+>> to the driver, but let the pxa27x_assert_ac97reset() only switch
+>> the AF.
+> 
+> 
+> Well, I won't make a fuss on this point, but with code that runs very
+> infrequently, I thought that the cost of a call to gpio_direction_output() was
+> worth the clarity and insurance.
 
-here is a pile of patches which pertain to the ux500 cpufreq and clksrc
-implementations. I have agreed with respective subsystem maintainer
-to take this through ARM SoC since I also have additional dependencies
-on top for multiplatform, which will likely build on top of these (but it's
-nice to get this in first).
+This is not about how frequent the code runs, but the fact that the arch code
+relies on sound code (outside of arch) to request the GPIO for it.
+I would recommend to place the GPIO request call along with the
+direction/value calls - in the same subsystem.
 
-The clksrc and cpufreq changes are dependent on merge order and
-thus cannot pass through different trees.
+Also, the patch ordering is not good:
+patch 2 drives the GPIO, and patch 3 requests it,
+whereas it should be the other way around, so I would recommend to
+combine both into one.
 
-All of this is to be queued for-next (v3.9).
-
-Please pull it in!
-
-Yours,
-Linus Walleij
-
-
-The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
-
-  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-cpufreq-for-arm-soc
-
-for you to fetch changes up to ec6691239373395d64fb73f50444f09a6f29d5ef:
-
-  cpufreq: db8500: set CPUFREQ_CONST_LOOPS (2013-01-07 16:03:43 +0100)
-
-----------------------------------------------------------------
-These are cpufreq updates for the ux500
-- Updates to the ux500 cpufreq driver
-- Support for delay timers in the MTU clksrc
-- Consequential updates to the cpufreq driver
-
-----------------------------------------------------------------
-Fabio Baltieri (2):
-      clocksource: nomadik-mtu: support timer-based delay
-      cpufreq: db8500: set CPUFREQ_CONST_LOOPS
-
-Jonas Aaberg (1):
-      cpufreq: dbx500: Minor code cleanup
-
-Lee Jones (3):
-      cpufreq: Give driver used for dbx500 family a more generic name
-      mfd: db8500: Update cpufreq device name
-      cpufreq: dbx500: Update file header
-
-Ulf Hansson (1):
-      cpufreq: dbx500: Move clk_get to probe
-
- drivers/clocksource/nomadik-mtu.c                  |  11 +++
- drivers/cpufreq/Makefile                           |   2 +-
- .../cpufreq/{db8500-cpufreq.c => dbx500-cpufreq.c} | 101 +++++++++++----------
- drivers/mfd/db8500-prcmu.c                         |   4 +-
- 4 files changed, 65 insertions(+), 53 deletions(-)
- rename drivers/cpufreq/{db8500-cpufreq.c => dbx500-cpufreq.c} (62%)
+-- 
+Regards,
+Igor.
