@@ -1,58 +1,36 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 7 Jan 2013 10:47:54 +0530
-Subject: [PATCH 0/5] ARM: dts: AM33XX: lcdc support
-Message-ID: <cover.1357304150.git.afzal@ti.com>
+Date: Mon, 7 Jan 2013 10:48:03 +0530
+Subject: [PATCH 1/5] ARM: dts: AM33XX: Add lcdc node
+In-Reply-To: <cover.1357304150.git.afzal@ti.com>
+References: <cover.1357304150.git.afzal@ti.com>
+Message-ID: <f4d5d2174efb07e4b69eb1ba0990a8db3b077ade.1357304150.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add lcdc node.
 
-This series add DT sources for AM335x SoC as well as AM335x based
-boards.
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
+ arch/arm/boot/dts/am33xx.dtsi |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-As pinmux is an SoC specific detail rather than IP specific one,
-addition of pin control has been done in a separate patch from
-the one in which display timings are added. Also it may aid in
-debugging in case of any issues.
-
-This has been tested on AM335x based boards like AM335x EVM and
-AM335x EVM-SK.
-
-This series is based on v3.8-rc2.
-
-This series has a dependency on,
-1. Series v16 "of: add display helper" by,
-	Steffen Trumtrar <s.trumtrar@pengutronix.de>
-2. Series v2 "video: da8xx-fb: runtime timing configuration" by,
-	me (Afzal Mohammed <afzal@ti.com>)
-3. Series "video: da8xx-fb: DT support" by,
-	me (Afzal Mohammed <afzal@ti.com>)
-
-To test on AM335x, in addition to the above, following changes,
-1. Patch "da8xx: Allow use by am33xx based devices" by,
-	Pantelis Antoniou <panto@antoniou-consulting.com>
-3. Series "HWMOD fixes for AM33xx PWM submodules and device tree nodes" by,
-	Philip, Avinash <avinashphilip@ti.com>
-would be required
-
-A tree with all above for testing is available
- @git://gitorious.org/x0148406-public/linux-kernel.git da8xx-fb-dt
-
-
-Regards
-Afzal
-
-Afzal Mohammed (5):
-  ARM: dts: AM33XX: Add lcdc node
-  ARM: dts: AM33XX: Add am335x-evm lcdc panel timings
-  ARM: dts: AM33XX: Add am335x-evm lcdc pincontrol info
-  ARM: dts: AM33XX: Add am335x-evmsk lcdc panel timings
-  ARM: dts: AM33XX: Add am335x-evmsk lcdc pincontrol info
-
- arch/arm/boot/dts/am335x-evm.dts   |   55 +++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/am335x-evmsk.dts |   55 +++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/am33xx.dtsi      |    8 ++++++
- 3 files changed, 116 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index c2f14e8..432d4bb8 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -385,5 +385,13 @@
+ 				mac-address = [ 00 00 00 00 00 00 ];
+ 			};
+ 		};
++
++		lcdc: lcdc at 4830e000 {
++			compatible = "ti,am3352-lcdc", "ti,da830-lcdc";
++			reg = <0x4830e000 0x1000>;
++			interrupts = <36>;
++			status = "disabled";
++			ti,hwmods = "lcdc";
++		};
+ 	};
+ };
 -- 
 1.7.9.5
