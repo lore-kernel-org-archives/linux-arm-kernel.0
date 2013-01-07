@@ -1,37 +1,17 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 06 Jan 2013 18:10:15 -0800
-Subject: [v3 PATCH 06/12] spi/atmel_spi: add dmaengine support
-In-Reply-To: <1357523413-27209-7-git-send-email-wenyou.yang@atmel.com>
-References: <1357523413-27209-1-git-send-email-wenyou.yang@atmel.com>
- <1357523413-27209-7-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1357524615.4940.19.camel@joe-AO722>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 7 Jan 2013 11:31:01 +0900
+Subject: [PATCH 1/2] ARM: shmobile: add function declarations for sh7372
+ DT helper functions
+In-Reply-To: <Pine.LNX.4.64.1212311213510.24596@axis700.grange>
+References: <Pine.LNX.4.64.1212311213510.24596@axis700.grange>
+Message-ID: <20130107023101.GM2935@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-01-07 at 09:50 +0800, Wenyou Yang wrote:
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
-[]
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-[]
-> +static inline bool atmel_spi_use_dma(struct atmel_spi *as,
-> +				struct spi_transfer *xfer)
-> +{
-> +	if ((as->use_dma) && (xfer->len >= DMA_MIN_BYTES))
-> +		return true;
-> +	else
-> +		return false;
-> +}
+On Mon, Dec 31, 2012 at 12:23:50PM +0100, Guennadi Liakhovetski wrote:
+> sh7372_add_early_devices_dt() and sh7372_add_standard_devices_dt() are
+> defined as global functions in arch/arm/mach-shmobile/setup-sh7372.c,
+> but their declarations are missing. Add them to common.h, where similar
+> functions for this and other SoC types are already declared.
 
-Same unnecessary form.
-
-	return as->use_dma && xfer->len >= DMA_MIN_BYTES;
-
-> +static inline bool atmel_spi_use_pdc(struct atmel_spi *as)
-> +{
-> +	if (as->use_pdc)
-> +		return true;
-> +	else
-> +		return false;
-> +}
-
-Does this function really need to exist at all?
+Thanks, applied to the soc branch.
