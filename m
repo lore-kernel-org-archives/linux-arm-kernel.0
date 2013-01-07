@@ -1,74 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 7 Jan 2013 16:37:25 +0000
-Subject: [GIT PULL V2] ARM: mvebu/kirkwood fixes for v3.8
-In-Reply-To: <E1TrutN-00017j-7o@merlin.infradead.org>
-Message-ID: <mailman.20.1357576650.1035.linux-arm-kernel@lists.infradead.org>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Mon, 07 Jan 2013 08:40:01 -0800
+Subject: [PATCH 3/4] ALSA: pxa27x: ac97 controller driver requests gpio
+In-Reply-To: <50EAEBD8.40002@compulab.co.il>
+References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
+ <1357499640-13871-4-git-send-email-mikedunn@newsguy.com>
+ <50EA9710.3060107@compulab.co.il> <50EAD73C.3050401@newsguy.com>
+ <50EAEBD8.40002@compulab.co.il>
+Message-ID: <50EAFA61.7000209@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+On 01/07/2013 07:38 AM, Igor Grinberg wrote:
+> On 01/07/13 16:10, Mike Dunn wrote:
 
-  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
 
-are available in the git repository at:
+[..]
 
-  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.8
 
-for you to fetch changes up to ba607b6238a1f418c45b9d7f73212bcc6922da53:
+>>
+>> Well, I won't make a fuss on this point, but with code that runs very
+>> infrequently, I thought that the cost of a call to gpio_direction_output() was
+>> worth the clarity and insurance.
+> 
+> This is not about how frequent the code runs, but the fact that the arch code
+> relies on sound code (outside of arch) to request the GPIO for it.
+> I would recommend to place the GPIO request call along with the
+> direction/value calls - in the same subsystem.
 
-  pinctrl: mvebu: make pdma clock on dove mandatory (2013-01-07 16:19:02 +0000)
 
-----------------------------------------------------------------
-fixes for mvebu/kirkwood v3.8
- - use correct uart driver for mvebu boards
- - add a missing DT clocks
- - gpio-poweroff level vs. edge triggering, use gpio_is_valid()
- - remove an inappropriate __init, modules need to access function.
- - various DT fixes
- - error handling in mv_xor
+OK.  This is in some shared pxa code called by the ac97 driver during
+initialization, where I earlier placed the gpio_request() calls only.
 
-----------------------------------------------------------------
-Andrew Lunn (5):
-      ARM: Kirkwood: Fix missing clk for USB device.
-      Power: gpio-poweroff: Fix documentation and gpio_is_valid
-      ARM: Kirkwood: Fix missing sdio clock
-      ARM: Kirkwood: Use fixed-regulator instead of board gpio call
-      arm: mvebu: Add missing ; for cpu node.
 
-Gregory CLEMENT (1):
-      arm: mvebu: Use dw-apb-uart instead of ns16650 as UART driver
+> 
+> Also, the patch ordering is not good:
+> patch 2 drives the GPIO, and patch 3 requests it,
+> whereas it should be the other way around, so I would recommend to
+> combine both into one.
 
-Joshua Coombs (1):
-      clk: mvebu: Remove inappropriate __init tagging
 
-Nobuhiro Iwamatsu (1):
-      ARM: Kirkwood: Switch TWSI1 of 88f6282 to DT clock providers
+Agreed.
 
-Sebastian Hesselbarth (2):
-      ARM: Dove: Add pinctrl clock to DT
-      pinctrl: mvebu: make pdma clock on dove mandatory
-
-Thomas Petazzoni (4):
-      arm: mvebu: Armada XP MV78230 has two cores, not one
-      arm: mvebu: Armada XP MV78230 has only three Ethernet interfaces
-      dma: mv_xor: fix error handling of mv_xor_channel_add()
-      dma: mv_xor: fix error handling for clocks
-
- .../devicetree/bindings/gpio/gpio-poweroff.txt     | 20 +++++++++++--
- arch/arm/boot/dts/armada-370-xp.dtsi               |  6 ++--
- arch/arm/boot/dts/armada-xp-mv78230.dtsi           |  9 +++++-
- arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  8 ++++++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  8 ++++++
- arch/arm/boot/dts/armada-xp.dtsi                   | 14 +++------
- arch/arm/boot/dts/dove.dtsi                        |  1 +
- arch/arm/boot/dts/kirkwood-6282.dtsi               |  1 +
- arch/arm/boot/dts/kirkwood-topkick.dts             | 17 +++++++++++
- arch/arm/boot/dts/kirkwood.dtsi                    |  1 +
- arch/arm/configs/mvebu_defconfig                   |  4 +--
- arch/arm/mach-kirkwood/board-dt.c                  |  4 +++
- arch/arm/mach-kirkwood/board-usi_topkick.c         |  4 ---
- drivers/clk/mvebu/clk-gating-ctrl.c                |  2 +-
- drivers/dma/mv_xor.c                               |  9 ++++--
- drivers/pinctrl/mvebu/pinctrl-dove.c               |  7 +++--
- drivers/power/reset/gpio-poweroff.c                | 33 ++++++++++------------
- 17 files changed, 101 insertions(+), 47 deletions(-)
+Thanks,
+Mike
