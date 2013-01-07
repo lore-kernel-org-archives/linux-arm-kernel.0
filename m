@@ -1,63 +1,69 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 07 Jan 2013 17:36:46 +0800
-Subject: [PATCH] arch/arm/mach-s5pv210: adding ifdef CONFIG_CPU_S5PV210 to
- fix compiling issue
-Message-ID: <50EA972E.3040404@asianux.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 07 Jan 2013 11:36:16 +0200
+Subject: [PATCH 3/4] ALSA: pxa27x: ac97 controller driver requests gpio
+In-Reply-To: <1357499640-13871-4-git-send-email-mikedunn@newsguy.com>
+References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
+ <1357499640-13871-4-git-send-email-mikedunn@newsguy.com>
+Message-ID: <50EA9710.3060107@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01/06/13 21:13, Mike Dunn wrote:
+> During initialization, the ac97 driver must obtain the gpio for the mfp that is
+> used by the ac97 controller as the AC97_nRESET line, or else gpiolib will issue
+> a warning and stack dump.  Gpiolib may change this to a hard error soon.  The
+> line is used during an ac97 warm reset for working around a hardware bug in the
+> controller.
+> 
+> Tested on a palm treo 680 machine.
+> 
+> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+> ---
+>  sound/arm/pxa2xx-ac97-lib.c |   10 +++++++++-
+>  1 files changed, 9 insertions(+), 1 deletions(-)
+> 
+> diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+> index 1ecd0a66..416d2e3 100644
+> --- a/sound/arm/pxa2xx-ac97-lib.c
+> +++ b/sound/arm/pxa2xx-ac97-lib.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/module.h>
+>  #include <linux/io.h>
+> +#include <linux/gpio.h>
+>  
+>  #include <sound/ac97_codec.h>
+>  #include <sound/pxa2xx-lib.h>
+> @@ -344,7 +345,12 @@ int pxa2xx_ac97_hw_probe(struct platform_device *dev)
+>  	}
+>  
+>  	if (cpu_is_pxa27x()) {
+> -		/* Use GPIO 113 as AC97 Reset on Bulverde */
+> +		ret = gpio_request(reset_gpio, "pxa27x ac97 reset");
+> +		if (ret < 0) {
+> +			pr_err("%s: gpio_request() failed: %d\n",
+> +			       __func__, ret);
+> +			goto err_conf;
+> +		}
 
-  if not define CONFIG_CPU_S5PV210
+I think if we are fine with the request in the driver,
+then we should move the direction and value configuration also
+to the driver, but let the pxa27x_assert_ac97reset() only switch
+the AF.
 
-    it will define NULL in common.h for:
-      s5pv210_map_io, s5pv210_init_clocks, s5pv210_init, s5pv210_init_uarts
+>  		pxa27x_assert_ac97reset(reset_gpio, 0);
+>  		ac97conf_clk = clk_get(&dev->dev, "AC97CONFCLK");
+>  		if (IS_ERR(ac97conf_clk)) {
+> @@ -388,6 +394,8 @@ EXPORT_SYMBOL_GPL(pxa2xx_ac97_hw_probe);
+>  
+>  void pxa2xx_ac97_hw_remove(struct platform_device *dev)
+>  {
+> +	if (cpu_is_pxa27x())
+> +		gpio_free(reset_gpio);
+>  	GCR |= GCR_ACLINK_OFF;
+>  	free_irq(IRQ_AC97, NULL);
+>  	if (ac97conf_clk) {
 
-    so need using #ifdef CONFIG_CPU_S5PV210 for them too, in common.c.
-      or compiling issue will occur.
-
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/mach-s5pv210/common.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-s5pv210/common.c
-index 9dfe93e..ad56485 100644
---- a/arch/arm/mach-s5pv210/common.c
-+++ b/arch/arm/mach-s5pv210/common.c
-@@ -167,6 +167,8 @@ void __init s5pv210_init_io(struct map_desc *mach_desc, int size)
- 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
- }
- 
-+#ifdef CONFIG_CPU_S5PV210
-+
- void __init s5pv210_map_io(void)
- {
- 	/* initialise device information early */
-@@ -209,6 +211,9 @@ void __init s5pv210_init_clocks(int xtal)
- 	s5pv210_setup_clocks();
- }
- 
-+#endif /* CONFIG_CPU_S5PV210 */
-+
-+
- void __init s5pv210_init_irq(void)
- {
- 	u32 vic[4];	/* S5PV210 supports 4 VIC */
-@@ -222,6 +227,8 @@ void __init s5pv210_init_irq(void)
- 	s5p_init_irq(vic, ARRAY_SIZE(vic));
- }
- 
-+#ifdef CONFIG_CPU_S5PV210
-+
- struct bus_type s5pv210_subsys = {
- 	.name		= "s5pv210-core",
- 	.dev_name	= "s5pv210-core",
-@@ -249,3 +256,5 @@ void __init s5pv210_init_uarts(struct s3c2410_uartcfg *cfg, int no)
- {
- 	s3c24xx_init_uartdevs("s5pv210-uart", s5p_uart_resources, cfg, no);
- }
-+
-+#endif /* CONFIG_CPU_S5PV210 */
 -- 
-1.7.10.4
+Regards,
+Igor.
