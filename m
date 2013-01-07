@@ -1,20 +1,34 @@
 From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 07 Jan 2013 10:43:49 +0530
-Subject: [PATCH] ARM: dts: add max8997 device node for exynos4210-origen
- board
-In-Reply-To: <1353664412-17678-1-git-send-email-thomas.abraham@linaro.org>
-References: <1353664412-17678-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <50EA598D.6090604@linaro.org>
+Date: Mon, 07 Jan 2013 10:46:46 +0530
+Subject: [PATCH] ARM: DTS: exynos4210-origen: Add MAX8997 node entry
+In-Reply-To: <CAJuYYwQx0hFQmkLaggd2NdA_xommXGPBDbhj1AuSH5YuASWA-w@mail.gmail.com>
+References: <1357287829-21701-1-git-send-email-tushar.behera@linaro.org>
+ <CAJuYYwQx0hFQmkLaggd2NdA_xommXGPBDbhj1AuSH5YuASWA-w@mail.gmail.com>
+Message-ID: <50EA5A3E.7000806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2012 03:23 PM, Thomas Abraham wrote:
-> Add max8997 regulator device node for exynos4210-origen board and list
-> all the supported regulators.
-> 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+On 01/04/2013 10:51 PM, Thomas Abraham wrote:
+> On 4 January 2013 00:23, Tushar Behera <tushar.behera@linaro.org> wrote:
+>> The node entry is added as per documentation and legacy board file.
+>>
+>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+>> ---
+>> The patch is rebased on v3.8-rc1.
+>>
+>>  arch/arm/boot/dts/exynos4210-origen.dts |  150 +++++++++++++++++++++++++++++++
+>>  1 files changed, 150 insertions(+), 0 deletions(-)
 
-Tested-by: Tushar Behera <tushar.behera@linaro.org>
+Please ignore this patch.
+
+> 
+> This patch has already been posted. Here is the link:
+> https://patchwork.kernel.org/patch/1794501/
+> 
+
+Sorry, had missed that patch. I have added a 'Tested-by' to the original
+patch.
+
 
 -- 
 Tushar Behera
