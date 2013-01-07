@@ -1,367 +1,89 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 7 Jan 2013 15:58:27 +0100
-Subject: [PATCH V3] mmc: mmci: Fixup and cleanup code for DMA handling
-Message-ID: <1357570707-28207-1-git-send-email-ulf.hansson@stericsson.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 07 Jan 2013 08:59:41 -0600
+Subject: machine_is_dt() ?
+In-Reply-To: <20130106140821.GR17242@lunn.ch>
+References: <20130106131805.GQ17242@lunn.ch>
+ <20130106134113.GD2631@n2100.arm.linux.org.uk>
+ <20130106140821.GR17242@lunn.ch>
+Message-ID: <50EAE2DD.805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On 01/06/2013 08:08 AM, Andrew Lunn wrote:
+> On Sun, Jan 06, 2013 at 01:41:13PM +0000, Russell King - ARM Linux wrote:
+>> On Sun, Jan 06, 2013 at 02:18:05PM +0100, Andrew Lunn wrote:
+>>> I'm moving the cpuidle code for Kirkwood into drivers/cpuidle. I'm
+>>> following the way cpuidle-calxeda.c instantiates the driver, it uses
+>>> module_init(calxeda_cpuidle_init) and calxeda_cpuidle_init() uses
+>>> of_machine_is_compatible("calxeda,highbank") so only loading the
+>>> driver in a ARCH_MULTIPLATFORM kernel when needed.
+>>>
+>>> I can follow this model for when kirkwood is booted using device
+>>> tree. However, i would also like to use the driver for those boards
+>>> which are not yet converted to DT. In that situation, we have a kernel
+>>> dedicate to kirkwood and the cpuidle driver is always relevant.
+>>>
+>>> Thus i need to code something like:
+>>>
+>>> (of_machine_is_compatible("marvell, kirkwood") ||
+>>>  !machine_is_dt())
+>>>
+>>> However, there is no macro machine_is_dt().
+>>>
+>>> Is there a way to tell if a machine has been booted using a machine
+>>> number as opposed to DT?
+>>
+>> This doesn't seem to me to be the right way to deal with this.  What
+>> you're suggesting would mean that if you built a multiplatform kernel
+>> which included this driver, and booted it on a non-DT platform, you'd
+>> have this driver registered.
+> 
+> Hi Russel
+> 
+> Yes, not what i want. I would need to limit it further to non-DT
+> platform on Kirkwood.
+> 
+>> It looks to me like many of the CPUFREQ drivers just register themselves
+>> if they've been built into the kernel.  No one's thought about making
+>> them platform drivers or similar, so the current "if it's built-in, then
+>> we use it" approach seems to have persisted.  As many of them are
+>> initialized via a late_initcall(), I don't see any problem with them
+>> being platform drivers, which will solve the problem in a way that's
+>> well established.
+> I actually went towards a platform driver to start with. See the
+> discussion here:
+> 
+> https://patchwork.kernel.org/patch/1915171/
+> 
+> About 1/2 way down, Rob Herring says:
+> 
+>       Don't do a platform driver and just check the machine compatible
+>       property which is what I did for highbank.
+> 
+> What Rob mostly seems to be objecting to is that
+> 
+> +		cpuidle at 1418 {
+> +			compatible = "marvell,kirkwood-cpuidle";
+> +			reg = <0x1418 0x4>;
+> +		};
+> 
+> does not describe hardware, so it does not belong in DT. Hence i will
+> check of_machine_is_compatible() to see if its a marvell,kirkwood. But
+> that does not help with old style boots.
+> 
+> Should i make it both a platform driver for old style boots and check
+> of_machine_is_compatible() for DT boots?
 
-The cookie is now used to indicate if dma_unmap_sg shall be
-done in post_request. At DMA errors, the DMA job is immediately
-not only terminated but also unmapped. To indicate that this
-has been done the cookie is reset to zero. post_request will
-thus only do dma_umap_sg for requests which has a cookie not set
-to zero.
+You could make the platform code create the platform device in the DT
+case as well. Not all platform devices have to come from a DT node and
+putting virtual devices in DT is wrong.
 
-Some corresponding duplicated code could then be removed and
-moreover some corrections at DMA errors for terminating the same
-DMA job twice has also been fixed.
+Rob
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Per Forlin <per.forlin@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
-
-This patch has been tested both on a u8500 board and an ARM-RealView
-PB1176 board.
-
-Changes in v3:
-	Add ack from Linus Walleij.
-	Rebased on top of Linux 3.8-rc2
-
-Changes in v2:
-	Rebased patch on top of Linux 3.7
-
----
- drivers/mmc/host/mmci.c |  190 ++++++++++++++++++++++++++---------------------
- 1 file changed, 106 insertions(+), 84 deletions(-)
-
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 1507723..0baa37b 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -134,6 +134,24 @@ static struct variant_data variant_ux500v2 = {
- };
- 
- /*
-+ * Validate mmc prerequisites
-+ */
-+static int mmci_validate_data(struct mmci_host *host,
-+			      struct mmc_data *data)
-+{
-+	if (!data)
-+		return 0;
-+
-+	if (!is_power_of_2(data->blksz)) {
-+		dev_err(mmc_dev(host->mmc),
-+			"unsupported block size (%d bytes)\n", data->blksz);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-  * This must be called with host->lock held
-  */
- static void mmci_write_clkreg(struct mmci_host *host, u32 clk)
-@@ -352,10 +370,33 @@ static inline void mmci_dma_release(struct mmci_host *host)
- 	host->dma_rx_channel = host->dma_tx_channel = NULL;
- }
- 
-+static void mmci_dma_data_error(struct mmci_host *host)
-+{
-+	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
-+	dmaengine_terminate_all(host->dma_current);
-+	host->dma_current = NULL;
-+	host->dma_desc_current = NULL;
-+	host->data->host_cookie = 0;
-+}
-+
- static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
- {
--	struct dma_chan *chan = host->dma_current;
-+	struct dma_chan *chan;
- 	enum dma_data_direction dir;
-+
-+	if (data->flags & MMC_DATA_READ) {
-+		dir = DMA_FROM_DEVICE;
-+		chan = host->dma_rx_channel;
-+	} else {
-+		dir = DMA_TO_DEVICE;
-+		chan = host->dma_tx_channel;
-+	}
-+
-+	dma_unmap_sg(chan->device->dev, data->sg, data->sg_len, dir);
-+}
-+
-+static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
-+{
- 	u32 status;
- 	int i;
- 
-@@ -374,19 +415,12 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
- 	 * contiguous buffers.  On TX, we'll get a FIFO underrun error.
- 	 */
- 	if (status & MCI_RXDATAAVLBLMASK) {
--		dmaengine_terminate_all(chan);
--		if (!data->error)
--			data->error = -EIO;
--	}
--
--	if (data->flags & MMC_DATA_WRITE) {
--		dir = DMA_TO_DEVICE;
--	} else {
--		dir = DMA_FROM_DEVICE;
-+		data->error = -EIO;
-+		mmci_dma_data_error(host);
- 	}
- 
- 	if (!data->host_cookie)
--		dma_unmap_sg(chan->device->dev, data->sg, data->sg_len, dir);
-+		mmci_dma_unmap(host, data);
- 
- 	/*
- 	 * Use of DMA with scatter-gather is impossible.
-@@ -396,16 +430,15 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
- 		dev_err(mmc_dev(host->mmc), "buggy DMA detected. Taking evasive action.\n");
- 		mmci_dma_release(host);
- 	}
--}
- 
--static void mmci_dma_data_error(struct mmci_host *host)
--{
--	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
--	dmaengine_terminate_all(host->dma_current);
-+	host->dma_current = NULL;
-+	host->dma_desc_current = NULL;
- }
- 
--static int mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
--			      struct mmci_host_next *next)
-+/* prepares DMA channel and DMA descriptor, returns non-zero on failure */
-+static int __mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
-+				struct dma_chan **dma_chan,
-+				struct dma_async_tx_descriptor **dma_desc)
- {
- 	struct variant_data *variant = host->variant;
- 	struct dma_slave_config conf = {
-@@ -423,16 +456,6 @@ static int mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
- 	enum dma_data_direction buffer_dirn;
- 	int nr_sg;
- 
--	/* Check if next job is already prepared */
--	if (data->host_cookie && !next &&
--	    host->dma_current && host->dma_desc_current)
--		return 0;
--
--	if (!next) {
--		host->dma_current = NULL;
--		host->dma_desc_current = NULL;
--	}
--
- 	if (data->flags & MMC_DATA_READ) {
- 		conf.direction = DMA_DEV_TO_MEM;
- 		buffer_dirn = DMA_FROM_DEVICE;
-@@ -462,29 +485,41 @@ static int mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
- 	if (!desc)
- 		goto unmap_exit;
- 
--	if (next) {
--		next->dma_chan = chan;
--		next->dma_desc = desc;
--	} else {
--		host->dma_current = chan;
--		host->dma_desc_current = desc;
--	}
-+	*dma_chan = chan;
-+	*dma_desc = desc;
- 
- 	return 0;
- 
-  unmap_exit:
--	if (!next)
--		dmaengine_terminate_all(chan);
- 	dma_unmap_sg(device->dev, data->sg, data->sg_len, buffer_dirn);
- 	return -ENOMEM;
- }
- 
-+static inline int mmci_dma_prep_data(struct mmci_host *host,
-+				     struct mmc_data *data)
-+{
-+	/* Check if next job is already prepared. */
-+	if (host->dma_current && host->dma_desc_current)
-+		return 0;
-+
-+	/* No job were prepared thus do it now. */
-+	return __mmci_dma_prep_data(host, data, &host->dma_current,
-+				    &host->dma_desc_current);
-+}
-+
-+static inline int mmci_dma_prep_next(struct mmci_host *host,
-+				     struct mmc_data *data)
-+{
-+	struct mmci_host_next *nd = &host->next_data;
-+	return __mmci_dma_prep_data(host, data, &nd->dma_chan, &nd->dma_desc);
-+}
-+
- static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
- {
- 	int ret;
- 	struct mmc_data *data = host->data;
- 
--	ret = mmci_dma_prep_data(host, host->data, NULL);
-+	ret = mmci_dma_prep_data(host, host->data);
- 	if (ret)
- 		return ret;
- 
-@@ -514,19 +549,11 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
- {
- 	struct mmci_host_next *next = &host->next_data;
- 
--	if (data->host_cookie && data->host_cookie != next->cookie) {
--		pr_warning("[%s] invalid cookie: data->host_cookie %d"
--		       " host->next_data.cookie %d\n",
--		       __func__, data->host_cookie, host->next_data.cookie);
--		data->host_cookie = 0;
--	}
--
--	if (!data->host_cookie)
--		return;
-+	WARN_ON(data->host_cookie && data->host_cookie != next->cookie);
-+	WARN_ON(!data->host_cookie && (next->dma_desc || next->dma_chan));
- 
- 	host->dma_desc_current = next->dma_desc;
- 	host->dma_current = next->dma_chan;
--
- 	next->dma_desc = NULL;
- 	next->dma_chan = NULL;
- }
-@@ -541,19 +568,13 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq,
- 	if (!data)
- 		return;
- 
--	if (data->host_cookie) {
--		data->host_cookie = 0;
-+	BUG_ON(data->host_cookie);
-+
-+	if (mmci_validate_data(host, data))
- 		return;
--	}
- 
--	/* if config for dma */
--	if (((data->flags & MMC_DATA_WRITE) && host->dma_tx_channel) ||
--	    ((data->flags & MMC_DATA_READ) && host->dma_rx_channel)) {
--		if (mmci_dma_prep_data(host, data, nd))
--			data->host_cookie = 0;
--		else
--			data->host_cookie = ++nd->cookie < 0 ? 1 : nd->cookie;
--	}
-+	if (!mmci_dma_prep_next(host, data))
-+		data->host_cookie = ++nd->cookie < 0 ? 1 : nd->cookie;
- }
- 
- static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
-@@ -561,29 +582,23 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
- {
- 	struct mmci_host *host = mmc_priv(mmc);
- 	struct mmc_data *data = mrq->data;
--	struct dma_chan *chan;
--	enum dma_data_direction dir;
- 
--	if (!data)
-+	if (!data || !data->host_cookie)
- 		return;
- 
--	if (data->flags & MMC_DATA_READ) {
--		dir = DMA_FROM_DEVICE;
--		chan = host->dma_rx_channel;
--	} else {
--		dir = DMA_TO_DEVICE;
--		chan = host->dma_tx_channel;
--	}
-+	mmci_dma_unmap(host, data);
- 
-+	if (err) {
-+		struct mmci_host_next *next = &host->next_data;
-+		struct dma_chan *chan;
-+		if (data->flags & MMC_DATA_READ)
-+			chan = host->dma_rx_channel;
-+		else
-+			chan = host->dma_tx_channel;
-+		dmaengine_terminate_all(chan);
- 
--	/* if config for dma */
--	if (chan) {
--		if (err)
--			dmaengine_terminate_all(chan);
--		if (data->host_cookie)
--			dma_unmap_sg(mmc_dev(host->mmc), data->sg,
--				     data->sg_len, dir);
--		mrq->data->host_cookie = 0;
-+		next->dma_desc = NULL;
-+		next->dma_chan = NULL;
- 	}
- }
- 
-@@ -604,6 +619,11 @@ static inline void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
- {
- }
- 
-+static inline void mmci_dma_finalize(struct mmci_host *host,
-+				     struct mmc_data *data)
-+{
-+}
-+
- static inline void mmci_dma_data_error(struct mmci_host *host)
- {
- }
-@@ -751,8 +771,10 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 		u32 remain, success;
- 
- 		/* Terminate the DMA transfer */
--		if (dma_inprogress(host))
-+		if (dma_inprogress(host)) {
- 			mmci_dma_data_error(host);
-+			mmci_dma_unmap(host, data);
-+		}
- 
- 		/*
- 		 * Calculate how far we are into the transfer.  Note that
-@@ -791,7 +813,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 
- 	if (status & MCI_DATAEND || data->error) {
- 		if (dma_inprogress(host))
--			mmci_dma_unmap(host, data);
-+			mmci_dma_finalize(host, data);
- 		mmci_stop_data(host);
- 
- 		if (!data->error)
-@@ -828,8 +850,10 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
- 	if (!cmd->data || cmd->error) {
- 		if (host->data) {
- 			/* Terminate the DMA transfer */
--			if (dma_inprogress(host))
-+			if (dma_inprogress(host)) {
- 				mmci_dma_data_error(host);
-+				mmci_dma_unmap(host, host->data);
-+			}
- 			mmci_stop_data(host);
- 		}
- 		mmci_request_end(host, cmd->mrq);
-@@ -1055,10 +1079,8 @@ static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 
- 	WARN_ON(host->mrq != NULL);
- 
--	if (mrq->data && !is_power_of_2(mrq->data->blksz)) {
--		dev_err(mmc_dev(mmc), "unsupported block size (%d bytes)\n",
--			mrq->data->blksz);
--		mrq->cmd->error = -EINVAL;
-+	mrq->cmd->error = mmci_validate_data(host, mrq->data);
-+	if (mrq->cmd->error) {
- 		mmc_request_done(mmc, mrq);
- 		return;
- 	}
--- 
-1.7.10
+> Thanks
+> 	Andrew
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> 
