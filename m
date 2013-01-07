@@ -1,75 +1,61 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 07 Jan 2013 11:42:03 +0200
-Subject: [PATCH 3/4] ALSA: pxa27x: ac97 controller driver requests gpio
-In-Reply-To: <50EA9710.3060107@compulab.co.il>
-References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
- <1357499640-13871-4-git-send-email-mikedunn@newsguy.com>
- <50EA9710.3060107@compulab.co.il>
-Message-ID: <50EA986B.70308@compulab.co.il>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 07 Jan 2013 10:43:38 +0100
+Subject: [PATCH v3] mxs: uart: allow setting RTS from software
+In-Reply-To: <50CA8E8C.5060906@freescale.com>
+References: <1355405263-29625-1-git-send-email-s.trumtrar@pengutronix.de>
+ <50CA8E8C.5060906@freescale.com>
+Message-ID: <50EA98CA.1060303@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/13 11:36, Igor Grinberg wrote:
-> On 01/06/13 21:13, Mike Dunn wrote:
->> During initialization, the ac97 driver must obtain the gpio for the mfp that is
->> used by the ac97 controller as the AC97_nRESET line, or else gpiolib will issue
->> a warning and stack dump.  Gpiolib may change this to a hard error soon.  The
->> line is used during an ac97 warm reset for working around a hardware bug in the
->> controller.
+On 12/14/2012 03:27 AM, Huang Shijie wrote:
+> ? 2012?12?13? 21:27, Steffen Trumtrar ??:
+>> With the patch "serial: mxs-auart: fix the wrong RTS hardware flow control" the
+>> mainline mxs-uart driver now sets RTSEN only when hardware flow control is
+>> enabled via software. It is not possible any longer to set RTS manually via
+>> software. However, the manual modification is a valid operation.
+>> Regain the possibility to set RTS via software and only set RTSEN when hardware
+>> flow control is explicitly enabled via settermios cflag CRTSCTS.
 >>
->> Tested on a palm treo 680 machine.
->>
->> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 >> ---
->>  sound/arm/pxa2xx-ac97-lib.c |   10 +++++++++-
->>  1 files changed, 9 insertions(+), 1 deletions(-)
+>>  drivers/tty/serial/mxs-auart.c |    4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
 >>
->> diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
->> index 1ecd0a66..416d2e3 100644
->> --- a/sound/arm/pxa2xx-ac97-lib.c
->> +++ b/sound/arm/pxa2xx-ac97-lib.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/delay.h>
->>  #include <linux/module.h>
->>  #include <linux/io.h>
->> +#include <linux/gpio.h>
+>> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+>> index 6db23b0..9f63f88 100644
+>> --- a/drivers/tty/serial/mxs-auart.c
+>> +++ b/drivers/tty/serial/mxs-auart.c
+>> @@ -412,10 +412,12 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
 >>  
->>  #include <sound/ac97_codec.h>
->>  #include <sound/pxa2xx-lib.h>
->> @@ -344,7 +345,12 @@ int pxa2xx_ac97_hw_probe(struct platform_device *dev)
+>>  	u32 ctrl = readl(u->membase + AUART_CTRL2);
+>>  
+>> -	ctrl &= ~AUART_CTRL2_RTSEN;
+>> +	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
+>>  	if (mctrl & TIOCM_RTS) {
+>>  		if (tty_port_cts_enabled(&u->state->port))
+>>  			ctrl |= AUART_CTRL2_RTSEN;
+>> +		else
+>> +			ctrl |= AUART_CTRL2_RTS;
 >>  	}
 >>  
->>  	if (cpu_is_pxa27x()) {
->> -		/* Use GPIO 113 as AC97 Reset on Bulverde */
->> +		ret = gpio_request(reset_gpio, "pxa27x ac97 reset");
->> +		if (ret < 0) {
->> +			pr_err("%s: gpio_request() failed: %d\n",
->> +			       __func__, ret);
->> +			goto err_conf;
->> +		}
-> 
-> I think if we are fine with the request in the driver,
-> then we should move the direction and value configuration also
-> to the driver, but let the pxa27x_assert_ac97reset() only switch
-> the AF.
+>>  	s->ctrl = mctrl;
+> Reviewed-by: Huang Shijie <b32955@freescale.com>
 
-Also this patch should be combined with 2/4.
+This patch is not not in today's next. What's the current status? Who
+will take it?
 
-> 
->>  		pxa27x_assert_ac97reset(reset_gpio, 0);
->>  		ac97conf_clk = clk_get(&dev->dev, "AC97CONFCLK");
->>  		if (IS_ERR(ac97conf_clk)) {
->> @@ -388,6 +394,8 @@ EXPORT_SYMBOL_GPL(pxa2xx_ac97_hw_probe);
->>  
->>  void pxa2xx_ac97_hw_remove(struct platform_device *dev)
->>  {
->> +	if (cpu_is_pxa27x())
->> +		gpio_free(reset_gpio);
->>  	GCR |= GCR_ACLINK_OFF;
->>  	free_irq(IRQ_AC97, NULL);
->>  	if (ac97conf_clk) {
-> 
-
+Marc
 -- 
-Regards,
-Igor.
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130107/65c0ab15/attachment.sig>
