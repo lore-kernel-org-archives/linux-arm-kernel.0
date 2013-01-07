@@ -1,35 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 7 Jan 2013 06:27:47 -0500
-Subject: [PATCH 3/4] Power: Reset: Power off by restarting
-In-Reply-To: <20130106220426.GE26928@lizard.sbx05280.losalca.wayport.net>
-References: <1356697512-3950-1-git-send-email-andrew@lunn.ch>
- <1356697512-3950-4-git-send-email-andrew@lunn.ch>
- <201212281959.38035.michael@walle.cc>
- <20130106220426.GE26928@lizard.sbx05280.losalca.wayport.net>
-Message-ID: <20130107112747.GE5075@titan.lakedaemon.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 7 Jan 2013 12:34:11 +0100
+Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
+In-Reply-To: <20130107122613.64f4ace5@skate>
+References: <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50E710CB.8070007@lunn.ch> <20130104183139.20492204@skate>
+ <50E71356.3030203@lunn.ch> <20130104190345.460151d1@skate>
+ <50E9EE7A.1080301@free-electrons.com>
+ <20130106235312.0839a879@skate> <20130107094747.GR3392@lunn.ch>
+ <20130107110712.GT3392@lunn.ch> <20130107122613.64f4ace5@skate>
+Message-ID: <20130107113411.GV3392@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 06, 2013 at 02:04:27PM -0800, Anton Vorontsov wrote:
-> On Fri, Dec 28, 2012 at 07:59:37PM +0100, Michael Walle wrote:
-> > Am Freitag 28 Dezember 2012, 13:25:11 schrieb Andrew Lunn:
-> > > Some devices, Buffalo Linkstation LS-XHL and LS-CHLv2 for example,
-> > > power-off by restarting to letting u-boot hold the SoC until the user
-> > > presses a key. Add a generic driver to implement this. It binds a
-> > > function to pm_power_off, which calls arm_pm_restart.
-> > > 
-> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> [...]
-> > Tested-by: Michael Walle <michael@walle.cc>
+> Image is also with an initramfs + appended DTB. My boot command is:
 > 
-> Applied (with a small cosmetic cleanups), thanks a lot!
+> tftp 1000000 192.168.0.14:uImage.armada-xp-openblocks-ax3-4; bootm
 > 
-> Note that I can also take the ARM patches together with the drivers (and
-> it would make sense to keep things bisectable). Should I?
+> So I'm loading to a different address than you.
 
-Please take patches 1 and 3 of this series (which it looks like you
-have).  I'll take 2 and 4 and list your stable tree as a dependency.
+Hi Thomas
 
-thx,
+Uboot tells me:
 
-Jason.
+DRAM:   3 GB
+       CS 0: base 0x00000000 size  1 GB
+       CS 2: base 0x40000000 size  1 GB
+       CS 3: base 0x80000000 size  1 GB
+       Addresses 14M - 0M are saved for the U-Boot usage.
+
+1000000 would be towards the beginning of this area reserved for uboot.
+
+Could you try moving to somewhere outside of the first 14Mbytes and
+see if that helps.
+
+    Thanks
+	Andrew
