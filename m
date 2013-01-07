@@ -1,25 +1,100 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Jan 2013 00:14:55 +0100
-Subject: machine_is_dt() ?
-In-Reply-To: <50EAE2DD.805@gmail.com>
-References: <20130106131805.GQ17242@lunn.ch>
- <20130106134113.GD2631@n2100.arm.linux.org.uk>
- <20130106140821.GR17242@lunn.ch> <50EAE2DD.805@gmail.com>
-Message-ID: <CACRpkdZSPzfVh2fwZwB84rhpCp+5_5QWXCzSUw71MTW=D399Vw@mail.gmail.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Mon, 7 Jan 2013 16:29:50 -0700
+Subject: [PATCH 07/10] crypto: omap-aes - Add Device Tree Support
+In-Reply-To: <CA+Bv8XYz6mUJs82qAz=pvhkNDFe_Vp5Nv6918UPMGFAuAaU5Jw@mail.gmail.com>
+References: <1356109500-11719-1-git-send-email-mgreer@animalcreek.com>
+ <1356109500-11719-8-git-send-email-mgreer@animalcreek.com>
+ <CA+Bv8XYz6mUJs82qAz=pvhkNDFe_Vp5Nv6918UPMGFAuAaU5Jw@mail.gmail.com>
+Message-ID: <20130107232950.GB13938@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 7, 2013 at 3:59 PM, Rob Herring <robherring2@gmail.com> wrote:
+On Fri, Dec 28, 2012 at 02:06:02AM -0800, Russ Dill wrote:
+> On Fri, Dec 21, 2012 at 10:04 AM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+> >
+> > Add Device Tree suport to the omap-aes crypto
+> > driver.  Currently, only support for OMAP2 and
+> > OMAP3 is being added but support for OMAP4 will
+> > be added in a subsequent patch.
+> >
+> > CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
+> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> > ---
+> >  drivers/crypto/omap-aes.c | 119 ++++++++++++++++++++++++++++++++++++----------
+> >  1 file changed, 93 insertions(+), 26 deletions(-)
+> >
+> > diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+> > index faf522f..68bf22d 100644
+> > --- a/drivers/crypto/omap-aes.c
+> > +++ b/drivers/crypto/omap-aes.c
+> > @@ -25,6 +25,9 @@
+> >  #include <linux/dmaengine.h>
+> >  #include <linux/omap-dma.h>
+> >  #include <linux/pm_runtime.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_device.h>
+> > +#include <linux/of_address.h>
+> >  #include <linux/io.h>
+> >  #include <linux/crypto.h>
+> >  #include <linux/interrupt.h>
+> > @@ -819,11 +822,93 @@ static struct crypto_alg algs[] = {
+> >  }
+> >  };
+> >
+> > +#ifdef CONFIG_OF
+> > +static const struct of_device_id omap_aes_of_match[] = {
+> > +       {
+> > +               .compatible     = "ti,omap2-aes",
+> > +       },
+> > +       {},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, omap_aes_of_match);
+> 
+> I think you mean for the above section to be outside of the '#ifdef
+> CONFIG_OF' block.
 
-> You could make the platform code create the platform device in the DT
-> case as well. Not all platform devices have to come from a DT node and
-> putting virtual devices in DT is wrong.
+Yes, I need to rework that.
 
-For the ux500 cpufreq we do exactly this.
+> > +static int omap_aes_get_res_of(struct omap_aes_dev *dd,
+> > +               struct device *dev, struct resource *res)
+> > +{
+> > +       struct device_node *node = dev->of_node;
+> > +       const struct of_device_id *match;
+> > +       int err = 0;
+> > +
+> > +       match = of_match_device(of_match_ptr(omap_aes_of_match), dev);
+> > +       if (!match) {
+> > +               dev_err(dev, "no compatible OF match\n");
+> > +               err = -EINVAL;
+> > +               goto err;
+> > +       }
+> > +
+> > +       err = of_address_to_resource(node, 0, res);
+> > +       if (err < 0) {
+> > +               dev_err(dev, "can't translate OF node address\n");
+> > +               err = -EINVAL;
+> > +               goto err;
+> > +       }
+> > +
+> > +       dd->dma_out = -1; /* Dummy value that's unused */
+> > +       dd->dma_in = -1; /* Dummy value that's unused */
+> > +
+> > +err:
+> > +       return err;
+> > +}
+> > +#else
+> > +static int omap_aes_get_res_dev(struct omap_aes_dev *dd,
+> > +               struct device *dev, struct resource *res)
+> > +{
+> > +       return -EINVAL;
+> > +}
+> 
+> And I think you mean this one to be omap_aes_get_res_of
 
-When the PRCMU probes in drivers/mfd/db8500-prcmu.c it spawns
-a db8500-cpufreq MFD child, and the db8500-cpufreq driver then
-probes as a platform device.
+I do. :(
 
-Yours,
-Linus Walleij
+Thanks Russ. 
+
+Mark
+--
