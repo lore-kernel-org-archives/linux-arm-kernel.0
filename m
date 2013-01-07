@@ -1,279 +1,145 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon,  7 Jan 2013 09:50:06 +0800
-Subject: [v3 PATCH 05/12] spi/atmel_spi: update the dt support
+Date: Mon,  7 Jan 2013 09:50:08 +0800
+Subject: [v3 PATCH 07/12] spi/atmel_spi: fix spi-atmel driver to adapt to
+ slave_config changes
 In-Reply-To: <1357523413-27209-1-git-send-email-wenyou.yang@atmel.com>
 References: <1357523413-27209-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1357523413-27209-6-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1357523413-27209-8-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To meet the different spi IP version of atmel SoC,
-add more compatible "atmel,at91rm9200-spi", "atmel,at91sam9260-spi"
-"atmel,at91sam9g45-spi", "atmel,at91sam9x5-spi" with different
-config and devtype.
+From: Richard Genoud <richard.genoud@gmail.com>
 
-The "has_dma_support" is used to select the dma engine transfer mode.
+This is the following of the patch e2b35f3dbfc080f15b72834d08f04f0269dbe9be
 
-The "has_wdrbt" indicate if there is the "WDRBT" bit in the Mode Register,
-WDRBT (Wait Data Read Before Transfer),if WDRBT is set,
-a transfer can start only if the Receive Data Register is empty,i.e. does not
-contain any unread data, to prevent overrun error in reception
-
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+[wenyou.yang at atmel.com: fix DMA: when enable both spi0 and spi1, spi0 doesn't work]
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Cc: grant.likely at secretlab.ca
+Cc: spi-devel-general at lists.sourceforge.net
 ---
- drivers/spi/spi-atmel.c |  137 ++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 118 insertions(+), 19 deletions(-)
+ drivers/spi/spi-atmel.c |   61 +++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 51 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 8f6f0a0..43374ca 100644
+index 68ac8e2..8131aa1 100644
 --- a/drivers/spi/spi-atmel.c
 +++ b/drivers/spi/spi-atmel.c
-@@ -71,6 +71,8 @@
- #define SPI_FDIV_SIZE				1
- #define SPI_MODFDIS_OFFSET			4
- #define SPI_MODFDIS_SIZE			1
-+#define SPI_WDRBT_OFFSET			5
-+#define SPI_WDRBT_SIZE				1
- #define SPI_LLB_OFFSET				7
- #define SPI_LLB_SIZE				1
- #define SPI_PCS_OFFSET				16
-@@ -186,6 +188,12 @@
-  * DMA transfers; transfer queue progress is driven by IRQs.  The clock
-  * framework provides the base clock, subdivided for each spi_device.
-  */
-+struct atmel_spi_pdata {
-+	u8	version;
-+	bool	has_dma_support;
-+	bool	has_wdrbt;
-+};
-+
- struct atmel_spi {
- 	spinlock_t		lock;
- 	unsigned long		flags;
-@@ -204,6 +212,7 @@ struct atmel_spi {
- 	struct spi_transfer	*next_transfer;
- 	unsigned long		next_remaining_bytes;
- 	int			done_status;
-+	struct atmel_spi_pdata	*pdata;
- 
- 	void			*buffer;
- 	dma_addr_t		buffer_dma;
-@@ -218,6 +227,69 @@ struct atmel_spi_device {
- #define BUFFER_SIZE		PAGE_SIZE
- #define INVALID_DMA_ADDRESS	0xffffffff
- 
-+static struct atmel_spi_pdata at91rm9200_config = {
-+	.version = 1,
-+	.has_dma_support = false,
-+	.has_wdrbt = false,
-+};
-+
-+static struct atmel_spi_pdata at91sam9260_config = {
-+	.version = 2,
-+	.has_dma_support = false,
-+	.has_wdrbt = false,
-+};
-+
-+static struct atmel_spi_pdata at91sam9g45_config = {
-+	.version = 2,
-+	.has_dma_support = false,
-+	.has_wdrbt = true,
-+};
-+
-+static struct atmel_spi_pdata at91sam9x5_config = {
-+	.version = 2,
-+	.has_dma_support = true,
-+	.has_wdrbt = true,
-+};
-+
-+static const struct platform_device_id atmel_spi_devtypes[] = {
-+	{
-+		.name = "spi-at91rm9200",
-+		.driver_data = (unsigned long) &at91rm9200_config,
-+	}, {
-+		.name = "spi-at91sam9260",
-+		.driver_data = (unsigned long) &at91sam9260_config,
-+	}, {
-+		.name = "spi-at91sam9g45",
-+		.driver_data = (unsigned long) &at91sam9g45_config,
-+	}, {
-+		.name = "spi-at91sam9x5",
-+		.driver_data = (unsigned long) &at91sam9x5_config,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+
-+#if defined(CONFIG_OF)
-+static const struct of_device_id atmel_spi_dt_ids[] = {
-+	{
-+		.compatible = "atmel,at91rm9200-spi",
-+		.data = &at91rm9200_config,
-+	} , {
-+		.compatible = "atmel,at91sam9260-spi",
-+		.data = &at91sam9260_config,
-+	} , {
-+		.compatible = "atmel,at91sam9g45-spi",
-+		.data = &at91sam9g45_config,
-+	} , {
-+		.compatible = "atmel,at91sam9x5-spi",
-+		.data = &at91sam9x5_config,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(of, atmel_spi_dt_ids);
-+#endif
-+
- /*
-  * Version 2 of the SPI controller has
-  *  - CR.LASTXFER
-@@ -230,11 +302,15 @@ struct atmel_spi_device {
-  * register, but I haven't checked that it exists on all chips, and
-  * this is cheaper anyway.
-  */
--static bool atmel_spi_is_v2(void)
-+static bool atmel_spi_is_v2(struct atmel_spi *as)
- {
--	return !cpu_is_at91rm9200();
-+	if (as->pdata->version == 2)
-+		return true;
-+	else
-+		return false;
+@@ -465,6 +465,37 @@ static inline int atmel_spi_xfer_can_be_chained(struct spi_transfer *xfer)
+ 	return xfer->delay_usecs == 0 && !xfer->cs_change;
  }
  
-+
- /*
-  * Earlier SPI controllers (e.g. on at91rm9200) have a design bug whereby
-  * they assume that spi slave device state will not change on deselect, so
-@@ -266,15 +342,21 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
- 	unsigned active = spi->mode & SPI_CS_HIGH;
- 	u32 mr;
- 
--	if (atmel_spi_is_v2()) {
-+	if (atmel_spi_is_v2(as)) {
- 		/*
- 		 * Always use CSR0. This ensures that the clock
- 		 * switches to the correct idle polarity before we
- 		 * toggle the CS.
- 		 */
- 		spi_writel(as, CSR0, asd->csr);
--		spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(MODFDIS)
--				| SPI_BIT(MSTR));
-+
-+		if (as->pdata->has_wdrbt)
-+			spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(MSTR)
-+					| SPI_BIT(MODFDIS) | SPI_BIT(WDRBT));
-+		else
-+			spi_writel(as, MR, SPI_BF(PCS, 0x0e)
-+					| SPI_BIT(MSTR) | SPI_BIT(MODFDIS));
-+
- 		mr = spi_readl(as, MR);
- 		gpio_set_value(asd->npcs_pin, active);
- 	} else {
-@@ -321,7 +403,7 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
- 			asd->npcs_pin, active ? " (low)" : "",
- 			mr);
- 
--	if (atmel_spi_is_v2() || spi->chip_select != 0)
-+	if (atmel_spi_is_v2(as) || spi->chip_select != 0)
- 		gpio_set_value(asd->npcs_pin, !active);
- }
- 
-@@ -734,7 +816,7 @@ static int atmel_spi_setup(struct spi_device *spi)
- 	}
- 
- 	/* see notes above re chipselect */
--	if (!atmel_spi_is_v2()
-+	if (!atmel_spi_is_v2(as)
- 			&& spi->chip_select == 0
- 			&& (spi->mode & SPI_CS_HIGH)) {
- 		dev_dbg(&spi->dev, "setup: can't be active-high\n");
-@@ -743,7 +825,7 @@ static int atmel_spi_setup(struct spi_device *spi)
- 
- 	/* v1 chips start out at half the peripheral bus speed. */
- 	bus_hz = clk_get_rate(as->clk);
--	if (!atmel_spi_is_v2())
-+	if (!atmel_spi_is_v2(as))
- 		bus_hz /= 2;
- 
- 	if (spi->max_speed_hz) {
-@@ -817,7 +899,7 @@ static int atmel_spi_setup(struct spi_device *spi)
- 		"setup: %lu Hz bpw %u mode 0x%x -> csr%d %08x\n",
- 		bus_hz / scbr, bits, spi->mode, spi->chip_select, csr);
- 
--	if (!atmel_spi_is_v2())
-+	if (!atmel_spi_is_v2(as))
- 		spi_writel(as, CSR0 + 4 * spi->chip_select, csr);
- 
- 	return 0;
-@@ -921,6 +1003,21 @@ static void atmel_spi_cleanup(struct spi_device *spi)
- 	kfree(asd);
- }
- 
-+static struct atmel_spi_pdata * __devinit atmel_spi_get_driver_data(
-+					struct platform_device *pdev)
++static int atmel_spi_dma_slave_config(struct atmel_spi *as,
++				struct dma_slave_config *slave_config)
 +{
-+	if (pdev->dev.of_node) {
-+		const struct of_device_id *match;
-+		match = of_match_node(atmel_spi_dt_ids, pdev->dev.of_node);
-+		if (!match)
-+			return NULL;
-+		return (struct atmel_spi_pdata *) match->data;
++	int err = 0;
++
++	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++
++	slave_config->dst_addr = (dma_addr_t)as->phybase + SPI_TDR;
++	slave_config->src_addr = (dma_addr_t)as->phybase + SPI_RDR;
++	slave_config->src_maxburst = 1;
++	slave_config->dst_maxburst = 1;
++	slave_config->device_fc = false;
++
++	slave_config->direction = DMA_MEM_TO_DEV;
++	if (dmaengine_slave_config(as->dma.chan_tx, slave_config)) {
++		dev_err(&as->pdev->dev,
++			"failed to configure tx dma channel\n");
++		err = -EINVAL;
 +	}
 +
-+	return (struct atmel_spi_pdata *)
-+			platform_get_device_id(pdev)->driver_data;
++	slave_config->direction = DMA_DEV_TO_MEM;
++	if (dmaengine_slave_config(as->dma.chan_rx, slave_config)) {
++		dev_err(&as->pdev->dev,
++			"failed to configure rx dma channel\n");
++		err = -EINVAL;
++	}
++
++	return err;
 +}
 +
- /*-------------------------------------------------------------------------*/
+ static bool filter(struct dma_chan *chan, void *slave)
+ {
+ 	struct	at_dma_slave *sl = slave;
+@@ -481,14 +512,12 @@ static int __devinit atmel_spi_configure_dma(struct atmel_spi *as)
+ {
+ 	struct at_dma_slave *sdata
+ 			= (struct at_dma_slave *)&as->pdata->dma_slave;
++	struct dma_slave_config	slave_config;
++	int err;
  
- static int atmel_spi_probe(struct platform_device *pdev)
-@@ -987,11 +1084,21 @@ static int atmel_spi_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out_unmap_regs;
+ 	if (sdata && sdata->dma_dev) {
+ 		dma_cap_mask_t mask;
  
-+	as->pdata = atmel_spi_get_driver_data(pdev);
-+	if (!as->pdata)
-+		goto out_unmap_regs;
-+
- 	/* Initialize the hardware */
- 	clk_enable(clk);
- 	spi_writel(as, CR, SPI_BIT(SWRST));
- 	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
--	spi_writel(as, MR, SPI_BIT(MSTR) | SPI_BIT(MODFDIS));
-+
-+	if (as->pdata->has_wdrbt)
-+		spi_writel(as, MR,
-+			SPI_BIT(MSTR) | SPI_BIT(MODFDIS) | SPI_BIT(WDRBT));
-+	else
-+		spi_writel(as, MR, SPI_BIT(MSTR) | SPI_BIT(MODFDIS));
-+
- 	spi_writel(as, PTCR, SPI_BIT(RXTDIS) | SPI_BIT(TXTDIS));
- 	spi_writel(as, CR, SPI_BIT(SPIEN));
- 
-@@ -1084,21 +1191,13 @@ static int atmel_spi_resume(struct platform_device *pdev)
- #define	atmel_spi_resume	NULL
- #endif
- 
--#if defined(CONFIG_OF)
--static const struct of_device_id atmel_spi_dt_ids[] = {
--	{ .compatible = "atmel,at91rm9200-spi" },
--	{ /* sentinel */ }
--};
+-		/* setup DMA addresses */
+-		sdata->rx_reg = (dma_addr_t)as->phybase + SPI_RDR;
+-		sdata->tx_reg = (dma_addr_t)as->phybase + SPI_TDR;
 -
--MODULE_DEVICE_TABLE(of, atmel_spi_dt_ids);
--#endif
+ 		/* Try to grab two DMA channels */
+ 		dma_cap_zero(mask);
+ 		dma_cap_set(DMA_SLAVE, mask);
+@@ -498,21 +527,27 @@ static int __devinit atmel_spi_configure_dma(struct atmel_spi *as)
+ 				dma_request_channel(mask, filter, sdata);
+ 	}
+ 	if (!as->dma.chan_rx || !as->dma.chan_tx) {
+-		if (as->dma.chan_rx)
+-			dma_release_channel(as->dma.chan_rx);
+-		if (as->dma.chan_tx)
+-			dma_release_channel(as->dma.chan_tx);
+ 		dev_err(&as->pdev->dev,
+ 			"DMA channel not available, unable to use SPI\n");
+-		return -EBUSY;
++		err = -EBUSY;
++		goto error;
+ 	}
+ 
++	err = atmel_spi_dma_slave_config(as, &slave_config);
++	if (err)
++		goto error;
++
+ 	dev_info(&as->pdev->dev,
+ 			"Using %s (tx) and %s (rx) for DMA transfers\n",
+ 			dma_chan_name(as->dma.chan_tx),
+ 			dma_chan_name(as->dma.chan_rx));
 -
- static struct platform_driver atmel_spi_driver = {
- 	.driver		= {
- 		.name	= "atmel_spi",
- 		.owner	= THIS_MODULE,
- 		.of_match_table	= of_match_ptr(atmel_spi_dt_ids),
- 	},
-+	.id_table	= atmel_spi_devtypes,
- 	.suspend	= atmel_spi_suspend,
- 	.resume		= atmel_spi_resume,
- 	.probe		= atmel_spi_probe,
+ 	return 0;
++error:
++	if (as->dma.chan_rx)
++		dma_release_channel(as->dma.chan_rx);
++	if (as->dma.chan_tx)
++		dma_release_channel(as->dma.chan_tx);
++	return err;
+ }
+ 
+ static void atmel_spi_stop_dma(struct atmel_spi *as)
+@@ -589,6 +624,7 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
+ 	struct dma_chan		*txchan = as->dma.chan_tx;
+ 	struct dma_async_tx_descriptor *rxdesc;
+ 	struct dma_async_tx_descriptor *txdesc;
++	struct dma_slave_config	slave_config;
+ 	dma_cookie_t		cookie;
+ 	u32	len = *plen;
+ 
+@@ -627,6 +663,10 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
+ 
+ 	*plen = len;
+ 
++	if (atmel_spi_dma_slave_config(as, &slave_config))
++		goto err_exit;
++
++
+ 	/* Send both scatterlists */
+ 	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
+ 					&as->dma.sgrx,
+@@ -675,6 +715,7 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
+ err_dma:
+ 	spi_writel(as, IDR, SPI_BIT(OVRES));
+ 	atmel_spi_stop_dma(as);
++err_exit:
+ 	atmel_spi_lock(as);
+ 	return -ENOMEM;
+ }
 -- 
 1.7.9.5
