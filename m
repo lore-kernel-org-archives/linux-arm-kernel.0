@@ -1,44 +1,31 @@
-From: anton@enomsg.org (Anton Vorontsov)
-Date: Sun, 6 Jan 2013 23:00:08 -0800
-Subject: [PATCH 3/4] Power: Reset: Power off by restarting
-In-Reply-To: <20130107064202.GB24650@lunn.ch>
-References: <1356697512-3950-1-git-send-email-andrew@lunn.ch>
- <1356697512-3950-4-git-send-email-andrew@lunn.ch>
- <201212281959.38035.michael@walle.cc>
- <20130106220426.GE26928@lizard.sbx05280.losalca.wayport.net>
- <20130107064202.GB24650@lunn.ch>
-Message-ID: <20130107070008.GB31407@lizard.gateway.2wire.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 7 Jan 2013 08:12:49 +0000 (UTC)
+Subject: [PATCH 2/3] ARM: OMAP4: hwmod data: do not enable or reset the
+ AESS during kernel init
+In-Reply-To: <50E73B3D.4010705@ti.com>
+References: <1357304526-21557-1-git-send-email-s-guiriec@ti.com>
+ <1357304526-21557-3-git-send-email-s-guiriec@ti.com>
+ <alpine.DEB.2.00.1301041833510.25868@utopia.booyaka.com>
+ <50E73B3D.4010705@ti.com>
+Message-ID: <alpine.DEB.2.00.1301070811140.2177@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 07:42:02AM +0100, Andrew Lunn wrote:
-> On Sun, Jan 06, 2013 at 02:04:27PM -0800, Anton Vorontsov wrote:
-> > On Fri, Dec 28, 2012 at 07:59:37PM +0100, Michael Walle wrote:
-> > > Am Freitag 28 Dezember 2012, 13:25:11 schrieb Andrew Lunn:
-> > > > Some devices, Buffalo Linkstation LS-XHL and LS-CHLv2 for example,
-> > > > power-off by restarting to letting u-boot hold the SoC until the user
-> > > > presses a key. Add a generic driver to implement this. It binds a
-> > > > function to pm_power_off, which calls arm_pm_restart.
-> > > > 
-> > > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > [...]
-> > > Tested-by: Michael Walle <michael@walle.cc>
-> > 
-> > Applied (with a small cosmetic cleanups), thanks a lot!
-> > 
-> > Note that I can also take the ARM patches together with the drivers (and
-> > it would make sense to keep things bisectable). Should I?
-> 
-> Hi Anton
-> 
-> Do you have a stable branch containing these patches?
+Hi
 
-Stable as in 'I don't rebase it'? Yes, I tend to not rebase the battery
-tree. It is here:
+On Fri, 4 Jan 2013, Sebastien Guiriec wrote:
 
-	git://git.infradead.org/battery-2.6.git master
+> Paul,
+> Do you want me to rebase this version and update the serie or are you handle
+> it?
 
-You can find the applied patches there.
+Sure, it would be great if you could take this over and test it and 
+repost.
 
-Thanks,
-Anton
+You might find the 'aess_reset_devel_3.9' branch at 
+git://git.pwsan.com/linux-2.6 useful.  It's a forward port of some of the 
+3.5-rc work.  It's only compile-tested, so you might need to tweak it to 
+get it to work.
+
+
+- Paul
