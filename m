@@ -1,76 +1,53 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 7 Jan 2013 12:18:07 +0000
-Subject: [PATCH 2/2] ARM: hyp: simplify __hyp_stub_install epilog
-In-Reply-To: <1357321455-9264-3-git-send-email-marc.zyngier@arm.com>
-References: <1357321455-9264-1-git-send-email-marc.zyngier@arm.com>
- <1357321455-9264-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130107121807.GA2050@linaro.org>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Mon, 7 Jan 2013 13:25:10 +0100
+Subject: [PATCH] i2c: samsung: resume race fix
+In-Reply-To: <CAHfPSqCQ9e3VR3En+hQGWVOt0RRGsmHzHTFvBF+h2-rEX5oXhQ@mail.gmail.com>
+References: <1352284106-24988-1-git-send-email-ch.naveen@samsung.com>
+ <20121107114437.0a563c7e@endymion.delvare>
+ <CAHfPSqCQ9e3VR3En+hQGWVOt0RRGsmHzHTFvBF+h2-rEX5oXhQ@mail.gmail.com>
+Message-ID: <20130107132510.7a6ce9ae@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 04, 2013 at 05:44:15PM +0000, Marc Zyngier wrote:
-> __hyp_stub_install duplicates quite a bit of safe_svcmode_maskall
-> by forcing the CPU back to SVC. This is unnecessary, as
-> safe_svcmode_maskall is called just after.
-> 
-> Furthermore, the way we build SPSR_hyp is buggy as we fail to mask
-> the interrupts, leading to interesting behaviours on TC2 + UEFI.
-> 
-> The fix is to simply remove this code and rely on safe_svcmode_maskall
-> to do the right thing.
-> 
-> Cc: Dave Martin <dave.martin@linaro.org>
-> Reported-by: Harry Liebel <harry.liebel@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, 7 Jan 2013 17:35:25 +0530, Naveen Krishna Ch wrote:
+> On 7 November 2012 16:14, Jean Delvare <khali@linux-fr.org> wrote:
+> > On Wed, 07 Nov 2012 15:58:26 +0530, Naveen Krishna Chatradhi wrote:
+> >> Don't unmark the device as suspended until after it's been re-setup.
+> >>
+> >> The main race would be w.r.t. an i2c driver that gets resumed at the same
+> >> time (asyncronously), that is allowed to do a transfer since suspended
+> >> is set to 0 before reinit, but really should have seen the -EIO return
+> >> instead.
+> >>
+> >> Signed-off-by: Olof Johansson <olofj@chromium.org>
+> >> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> >> ---
+> >>  drivers/i2c/busses/i2c-s3c2410.c |    2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+> >> index 3e0335f..dbaf920 100644
+> >> --- a/drivers/i2c/busses/i2c-s3c2410.c
+> >> +++ b/drivers/i2c/busses/i2c-s3c2410.c
+> >> @@ -1134,10 +1134,10 @@ static int s3c24xx_i2c_resume(struct device *dev)
+> >>       struct platform_device *pdev = to_platform_device(dev);
+> >>       struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+> >>
+> >> -     i2c->suspended = 0;
+> >>       clk_prepare_enable(i2c->clk);
+> >>       s3c24xx_i2c_init(i2c);
+> >>       clk_disable_unprepare(i2c->clk);
+> >> +     i2c->suspended = 0;
+> >>
+> >>       return 0;
+> >>  }
+> >
+> > Acked-by: Jean Delvare <khali@linux-fr.org>
+> I don't see this patch landed any where in linux-i2c tree, Though it was acked.
+> Was it missed or should i be doing something for this to be merged ??
 
-Although there is clearly a bug here, it looks like interrupts will
-promptly get masked afterwards due to save_svcmode_maskall.  This would
-only fail if there is an interrupts asserted during this hazard ...?
+Nothing needed from your side AFAIK, Wolfram should pick patches when I
+ack them, maybe this one was simply overlooked.
 
-Anyway, There's certainly no sense in trying to drop down to SVC mode
-twice, so I agree that it is better to delegate that to the
-save_svcmode_maskall macro.
-
-Reviewed-by: Dave Martin <dave.martin@linaro.org>
-
-Cheers
----Dave
-
-> ---
->  arch/arm/kernel/hyp-stub.S | 12 +++---------
->  1 file changed, 3 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-> index 65b2417..da7e19f 100644
-> --- a/arch/arm/kernel/hyp-stub.S
-> +++ b/arch/arm/kernel/hyp-stub.S
-> @@ -120,7 +120,8 @@ ENTRY(__hyp_stub_install_secondary)
->   * Eventually, CPU-specific code might be needed -- assume not for now
->   *
->   * This code relies on the "eret" instruction to synchronize the
-> - * various coprocessor accesses.
-> + * various coprocessor accesses. This is done when we switch to SVC
-> + * (see safe_svcmode_maskall).
->   */
->  	@ Now install the hypervisor stub:
->  	adr	r7, __hyp_stub_vectors
-> @@ -155,14 +156,7 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
->  1:
->  #endif
->  
-> -	bic	r7, r4, #MODE_MASK
-> -	orr	r7, r7, #SVC_MODE
-> -THUMB(	orr	r7, r7, #PSR_T_BIT	)
-> -	msr	spsr_cxsf, r7		@ This is SPSR_hyp.
-> -
-> -	__MSR_ELR_HYP(14)		@ msr elr_hyp, lr
-> -	__ERET				@ return, switching to SVC mode
-> -					@ The boot CPU mode is left in r4.
-> +	bx	lr			@ The boot CPU mode is left in r4.
->  ENDPROC(__hyp_stub_install_secondary)
->  
->  __hyp_stub_do_trap:
-> -- 
-> 1.8.1
-> 
-> 
+-- 
+Jean Delvare
