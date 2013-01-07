@@ -1,24 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Jan 2013 11:06:55 +0000
-Subject: [PATCH 2/4] ALSA: pxa27x: fix ac97 warm reset bug work-around code
-In-Reply-To: <50EA9607.7050408@compulab.co.il>
-References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
- <1357499640-13871-3-git-send-email-mikedunn@newsguy.com>
- <50EA9607.7050408@compulab.co.il>
-Message-ID: <20130107110655.GB3222@n2100.arm.linux.org.uk>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Mon,  7 Jan 2013 12:21:42 +0100
+Subject: [PATCH v2 00/16] various fixes and updates for ste_dma40
+Message-ID: <1357557718-15676-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 11:31:51AM +0200, Igor Grinberg wrote:
-> On 01/06/13 21:13, Mike Dunn wrote:
-> > +/* these enable a work-around for a hw bug in pxa27x during ac97 warm reset */
-> > +#define GPIO113_AC97_nRESET_GPIO_HIGH MFP_CFG_OUT(GPIO113, AF0, DRIVE_HIGH)
-> > +#define GPIO95_AC97_nRESET_GPIO_HIGH MFP_CFG_OUT(GPIO95, AF0, DRIVE_HIGH)
-> 
-> Do we really need to change the LPM? Because DRIVE_* only affect LPM.
+Hi all,
 
-Also, be very careful about driving output pins to peripherals high
-during sleep modes, especially if the peripherals are powered down.
-If they are powered down, you will drain power through the output
-into the peripheral to the extent that you _can_ cause it to remain
-partially powered up.
+this series contains many fixes and updates for the ste_dma40 driver.
+
+The first patches of the series were originally sent weeks ago but did not
+receive any feedback, so I'm also resending those, but I've rebased everything
+on top of v3.8-rc2 to avoid a (trivial) file rename conflict.
+
+Vinod, these should probably end up in the arm-soc tree so they can receive
+some testing from drivers using it.  Can I have your Acked-by for this?
+
+Thanks,
+Fabio
+
+
+Fabio Baltieri (7):
+  dmaengine: ste_dma40: add a done queue for completed descriptors
+  dmaengine: ste_dma40: add missing kernel-doc entry
+  dmaengine: ste_dma40: minor cosmetic fixes
+  dmaengine: ste_dma40: minor code readability fixes
+  dmaengine: ste_dma40: add software lli support
+  dmaengine: set_dma40: ignore spurious interrupts
+  dmaengine: set_dma40: balance clock in probe fail code
+
+Gerald Baeza (2):
+  dmaengine: ste_dma40: support fixed physical channel allocation
+  dmaengine: ste_dma40: physical channels number correction
+
+Narayanan (1):
+  dmaengine: ste_dma40: reset priority bit for logical channels
+
+Narayanan G (1):
+  dmaengine: ste_dma40: don't check for pm_runtime_suspended()
+
+Per Forlin (3):
+  dmaengine: ste_dma40: use writel_relaxed for lcxa
+  dmaengine: ste_dma40: set dma max seg size
+  dmaengine: ste_dma40: limit burst size to 16
+
+Rabin Vincent (1):
+  dmaengine: ste_dma40: don't allow high priority dest event lines
+
+Tong Liu (1):
+  dmaengine: ste_dma40: support more than 128 event lines
+
+ drivers/dma/ste_dma40.c                     | 489 +++++++++++++++++++++-------
+ drivers/dma/ste_dma40_ll.c                  |  29 +-
+ drivers/dma/ste_dma40_ll.h                  | 130 +++++++-
+ include/linux/platform_data/dma-ste-dma40.h |  13 +
+ 4 files changed, 518 insertions(+), 143 deletions(-)
+
+-- 
+1.7.12.1
