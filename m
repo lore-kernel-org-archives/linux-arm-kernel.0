@@ -1,83 +1,40 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 7 Jan 2013 12:06:08 +0200
-Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Orion SoC
-In-Reply-To: <50E6F6AA.4000905@lunn.ch>
-References: <1355482986-885-1-git-send-email-andrew@lunn.ch>
- <1355482986-885-2-git-send-email-andrew@lunn.ch> <50E6A378.90503@ti.com>
- <50E6F6AA.4000905@lunn.ch>
-Message-ID: <50EA9E10.7080605@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 7 Jan 2013 11:13:53 +0100
+Subject: [GIT PULL] MTU clksrc changes for v3.9
+In-Reply-To: <CACRpkdaFLNWj4qg=571K5pCrE01r6JoSOGoUvGGBOCeEW=3hYQ@mail.gmail.com>
+References: <CACRpkdaFLNWj4qg=571K5pCrE01r6JoSOGoUvGGBOCeEW=3hYQ@mail.gmail.com>
+Message-ID: <CACRpkdY3bdsCzva0+wrFQYLK-nRtNwQ_AYOEL5rpzjZAvMmh3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04-01-2013 17:35, Andrew Lunn wrote:
-> On 04/01/13 10:40, Eduardo Valentin wrote:
->> Hey Andrew,
->>
->> On 14-12-2012 13:03, Andrew Lunn wrote:
->>> From: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->>>
->>> Some Orion SoC has thermal sensor.
->>> This patch adds support for 88F6282 and 88F6283.
->>>
->>> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->>> ---
->>> .../devicetree/bindings/thermal/orion-thermal.txt | 16 +++
->>> drivers/thermal/Kconfig | 7 ++
->>> drivers/thermal/Makefile | 1 +
->>> drivers/thermal/orion_thermal.c | 133 ++++++++++++++++++++
->>> 4 files changed, 157 insertions(+)
->>> create mode 100644
->>> Documentation/devicetree/bindings/thermal/orion-thermal.txt
->>> create mode 100644 drivers/thermal/orion_thermal.c
->>>
->>> diff --git
->>> a/Documentation/devicetree/bindings/thermal/orion-thermal.txt
->>> b/Documentation/devicetree/bindings/thermal/orion-thermal.txt
->>> new file mode 100644
->>> index 0000000..5ce925d
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/thermal/orion-thermal.txt
->>> @@ -0,0 +1,16 @@
->>> +* Orion Thermal
->>> +
->>> +This initial version is for Kirkwood 88F8262 & 88F6283 SoCs, however
->>> +it is expected the driver will sometime in the future be expanded to
->>> +also support Dove, using a different compatibility string.
->>> +
->>> +Required properties:
->>> +- compatible : "marvell,kirkwood-thermal"
->>> +- reg : Address range of the thermal registers
->>> +
->>> +Example:
->>> +
->>> + thermal at 10078 {
->>> + compatible = "marvell,kirkwood";
->>> + reg = <0x10078 0x4>;
->>> + };
->>
->> How do you differentiate if the SoC has the temperature sensor? On your
->> patch description you are very clear saying that this supports only
->> 88F8262 & 88F6283 SoCs.
->
-> Hi Eduardo
->
-> Thanks for the comments. I will address them in the next version.
->
+On Mon, Jan 7, 2013 at 11:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-OK. Please put me on Cc so I will keep the review.
-
-> We differentiate between the different SoCs by DT. Each has its own
-> .dtsi file and we will put the node into only those which have the
-> hardware.
-
-Ok. That I understand, but my question was more into the difference 
-between 88F6282 and 88F6283. Do you need to differentiate those two? Is 
-there feature set which  is specific to one which is not present in the 
-second ? Because the DT entries you have you won't differentiate them, 
-besides you don't read any revision register to check the chip version. 
-That's my point.
-
+> Since there are some pending patches moving the ux500 cpufreq driver
+> around here:
+> http://marc.info/?l=linux-arm-kernel&m=135515323413100&w=2
+> it should be applied to the cpufreq tree to minimize conflicts.
+> Patches are ACKed by John Stultz.
 >
-> Thanks
->      Andrew
+> Please pull it into the cpufreq tree or advise on alternate path, we can
+> also take this and the other cpufreq patches through the ARM SoC
+> tree if you ACK them.
+
+Thinking of it again I also sent out this patch messing around with the
+cpufreq driver:
+http://marc.info/?l=linux-arm-kernel&m=135754842927541&w=2
+
+I think it may be best after all to take all of this through the ARM
+SoC tree.
+
+But I'd like your ACKs on the CPUfreq stuff though... The patch
+here
+"cpufreq: db8500: set CPUFREQ_CONST_LOOPS",
+These five patches:
+http://marc.info/?l=linux-arm-kernel&m=135515323413100&w=2
+And the one just referenced:
+http://marc.info/?l=linux-arm-kernel&m=135754842927541&w=2
+
+Could you please help out?
+
+Yours,
+Linus Walleij
