@@ -1,62 +1,44 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Mon, 07 Jan 2013 06:10:04 -0800
-Subject: [PATCH 3/4] ALSA: pxa27x: ac97 controller driver requests gpio
-In-Reply-To: <50EA9710.3060107@compulab.co.il>
-References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
- <1357499640-13871-4-git-send-email-mikedunn@newsguy.com>
- <50EA9710.3060107@compulab.co.il>
-Message-ID: <50EAD73C.3050401@newsguy.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 7 Jan 2013 14:16:48 +0000
+Subject: [PATCH 4/4 v3] net/smsc911x: Provide common clock functionality
+In-Reply-To: <CACRpkda-4C+ezaZFSkxsNbmHnBN8RCoCeGePaOF-DzV0XnkzQw@mail.gmail.com>
+References: <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
+ <CACRpkda79O_b3Z8g7Sy7vMtW9neZU4x-Z=iEQgjqu4X5tFKyhw@mail.gmail.com>
+ <20121220192441.GC14363@n2100.arm.linux.org.uk>
+ <20121220203514.GN2691@gmail.com>
+ <20121220205113.GD14363@n2100.arm.linux.org.uk>
+ <20121221091306.GO2691@gmail.com>
+ <20121221092421.GG14363@n2100.arm.linux.org.uk>
+ <20121221114105.GP2691@gmail.com>
+ <20130103111450.GC14714@gmail.com>
+ <CACRpkda-4C+ezaZFSkxsNbmHnBN8RCoCeGePaOF-DzV0XnkzQw@mail.gmail.com>
+Message-ID: <20130107141648.GR21994@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2013 01:36 AM, Igor Grinberg wrote:
-> On 01/06/13 21:13, Mike Dunn wrote:
->> During initialization, the ac97 driver must obtain the gpio for the mfp that is
->> used by the ac97 controller as the AC97_nRESET line, or else gpiolib will issue
->> a warning and stack dump.  Gpiolib may change this to a hard error soon.  The
->> line is used during an ac97 warm reset for working around a hardware bug in the
->> controller.
->>
->> Tested on a palm treo 680 machine.
->>
->> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
->> ---
->>  sound/arm/pxa2xx-ac97-lib.c |   10 +++++++++-
->>  1 files changed, 9 insertions(+), 1 deletions(-)
->>
->> diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
->> index 1ecd0a66..416d2e3 100644
->> --- a/sound/arm/pxa2xx-ac97-lib.c
->> +++ b/sound/arm/pxa2xx-ac97-lib.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/delay.h>
->>  #include <linux/module.h>
->>  #include <linux/io.h>
->> +#include <linux/gpio.h>
->>  
->>  #include <sound/ac97_codec.h>
->>  #include <sound/pxa2xx-lib.h>
->> @@ -344,7 +345,12 @@ int pxa2xx_ac97_hw_probe(struct platform_device *dev)
->>  	}
->>  
->>  	if (cpu_is_pxa27x()) {
->> -		/* Use GPIO 113 as AC97 Reset on Bulverde */
->> +		ret = gpio_request(reset_gpio, "pxa27x ac97 reset");
->> +		if (ret < 0) {
->> +			pr_err("%s: gpio_request() failed: %d\n",
->> +			       __func__, ret);
->> +			goto err_conf;
->> +		}
+On Thu, 03 Jan 2013, Linus Walleij wrote:
+
+> On Thu, Jan 3, 2013 at 12:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> I think if we are fine with the request in the driver,
-> then we should move the direction and value configuration also
-> to the driver, but let the pxa27x_assert_ac97reset() only switch
-> the AF.
+> > Some platforms provide clocks which require enabling before the
+> > SMSC911x chip will power on. This patch uses the new common clk
+> > framework to do just that. If no clock is provided, it will just
+> > be ignored and the driver will continue to assume that no clock
+> > is required for the chip to run successfully.
+> >
+> > Cc: Steve Glendinning <steve.glendinning@shawell.net>
+> > Cc: netdev at vger.kernel.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Looks all right to me now:
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
+Great, thanks Linus.
 
-Well, I won't make a fuss on this point, but with code that runs very
-infrequently, I thought that the cost of a call to gpio_direction_output() was
-worth the clarity and insurance.
+Who will take this patch now?
 
-Thanks,
-Mike
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
