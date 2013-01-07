@@ -1,35 +1,31 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Mon, 7 Jan 2013 17:59:34 +0100
-Subject: [PATCH v2 00/16] various fixes and updates for ste_dma40
-In-Reply-To: <20130107143356.GB15804@intel.com>
-References: <1357557718-15676-1-git-send-email-fabio.baltieri@linaro.org>
- <20130107143356.GB15804@intel.com>
-Message-ID: <20130107165934.GA16374@balto.lan>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 7 Jan 2013 18:04:21 +0100
+Subject: [PATCH 4/4] arm: mvebu: indentation fixes for Armada 370/XP
+ .dtsi files
+In-Reply-To: <20130107165546.GJ5075@titan.lakedaemon.net>
+References: <1357315498-4570-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1357315498-4570-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130106090313.GP17242@lunn.ch> <20130107175311.3fbbf68d@skate>
+ <20130107165546.GJ5075@titan.lakedaemon.net>
+Message-ID: <20130107180421.0231ff60@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 06:33:56AM -0800, Vinod Koul wrote:
-> On Mon, Jan 07, 2013 at 12:21:42PM +0100, Fabio Baltieri wrote:
-> > Hi all,
-> > 
-> > this series contains many fixes and updates for the ste_dma40 driver.
-> > 
-> > The first patches of the series were originally sent weeks ago but did not
-> > receive any feedback, so I'm also resending those, but I've rebased everything
-> > on top of v3.8-rc2 to avoid a (trivial) file rename conflict.
-> > 
-> > Vinod, these should probably end up in the arm-soc tree so they can receive
-> > some testing from drivers using it.  Can I have your Acked-by for this?
-> Sure the patchset looks fine by me
-> 
-> Acked-by: Vinod Koul <vinod.koul@intel.com>
+Dear Jason Cooper,
 
-Thanks Vinod!
+On Mon, 7 Jan 2013 11:55:46 -0500, Jason Cooper wrote:
 
-Linus, will you pick this up in ste-next for arm-soc?
+> I assume you're running a sed script of some sort.  If so, could you
+> also hit kirkwood-*.dts*, dove, orion5x?
+
+I am not running a sed script of some sort for now, but I'll come up
+with the  kirkwood, dove and orion5x changes as well.
 
 Thanks,
-Fabio
 
+Thomas
 -- 
-Fabio Baltieri
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
