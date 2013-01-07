@@ -1,29 +1,34 @@
 From: fengguang.wu@intel.com (kbuild test robot)
-Date: Mon, 07 Jan 2013 18:35:41 +0800
-Subject: [stericsson:ux500-multiplatform 1/1] warning: (ARCH_BCM &&
- UX500_SOC_COMMON && SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects
- ARM_ERRATA_754322 which has unmet direct dependencies (CPU_V7)
-Message-ID: <50eaa4fd.vbg6otCIlpmFfQJ7%fengguang.wu@intel.com>
+Date: Mon, 07 Jan 2013 18:41:10 +0800
+Subject: [stericsson:realview 1/1]
+ arch/arm/plat-versatile/fpga-id.c:13:27: fatal error: mach/hardware.h: No
+ such file or directory
+Message-ID: <50eaa646.pjHp1lCLCL33Xa6c%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-multiplatform
-head:   661989c3ec725370271a2c00a2e5ab5a88f6b440
-commit: 661989c3ec725370271a2c00a2e5ab5a88f6b440 [1/1] ARM: ux500: convert to multiplatorm
-config: make ARCH=arm allnoconfig
+tree:   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git realview
+head:   ceba20ea50c6138f0b71075b97b1de82cdb42ca4
+commit: ceba20ea50c6138f0b71075b97b1de82cdb42ca4 [1/1] ARM: print FPGA info on plat-versatile variants
+config: make ARCH=arm imx_v6_v7_defconfig
 
-All warnings:
+All error/warnings:
 
-warning: (UX500_SOC_COMMON) selects PINCTRL_NOMADIK which has unmet direct dependencies (PINCTRL && (ARCH_U8500 || ARCH_NOMADIK))
-warning: (UX500_SOC_COMMON && MACH_NOMADIK_8815NHK) selects CLKSRC_NOMADIK_MTU which has unmet direct dependencies (ARCH_NOMADIK || ARCH_U8500)
-warning: (ARCH_BCM && UX500_SOC_COMMON && SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_754322 which has unmet direct dependencies (CPU_V7)
-warning: (UX500_SOC_COMMON) selects PINCTRL_NOMADIK which has unmet direct dependencies (PINCTRL && (ARCH_U8500 || ARCH_NOMADIK))
-warning: (UX500_SOC_COMMON && MACH_NOMADIK_8815NHK) selects CLKSRC_NOMADIK_MTU which has unmet direct dependencies (ARCH_NOMADIK || ARCH_U8500)
-warning: (ARCH_BCM && UX500_SOC_COMMON && SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_754322 which has unmet direct dependencies (CPU_V7)
---
-warning: (UX500_SOC_COMMON) selects PINCTRL_NOMADIK which has unmet direct dependencies (PINCTRL && (ARCH_U8500 || ARCH_NOMADIK))
-warning: (UX500_SOC_COMMON && MACH_NOMADIK_8815NHK) selects CLKSRC_NOMADIK_MTU which has unmet direct dependencies (ARCH_NOMADIK || ARCH_U8500)
-warning: (ARCH_BCM && UX500_SOC_COMMON && SOC_IMX6Q && ARCH_TEGRA_3x_SOC) selects ARM_ERRATA_754322 which has unmet direct dependencies (CPU_V7)
+arch/arm/plat-versatile/fpga-id.c:13:27: fatal error: mach/hardware.h: No such file or directory
+compilation terminated.
+
+vim +13 arch/arm/plat-versatile/fpga-id.c
+
+ceba20ea Linus Walleij 2011-01-27   7   * Author: Linus Walleij <linus.walleij@stericsson.com>
+ceba20ea Linus Walleij 2011-01-27   8   */
+ceba20ea Linus Walleij 2011-01-27   9  #include <linux/kernel.h>
+ceba20ea Linus Walleij 2011-01-27  10  #include <linux/init.h>
+ceba20ea Linus Walleij 2011-01-27  11  #include <linux/io.h>
+ceba20ea Linus Walleij 2011-01-27  12  #include <asm/mach-types.h>
+ceba20ea Linus Walleij 2011-01-27 @13  #include <mach/hardware.h>
+ceba20ea Linus Walleij 2011-01-27  14  #include <mach/platform.h>
+ceba20ea Linus Walleij 2011-01-27  15  
+ceba20ea Linus Walleij 2011-01-27  16  struct versatile_fpga_id {
 
 ---
 0-DAY kernel build testing backend         Open Source Technology Center
