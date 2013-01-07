@@ -1,79 +1,182 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 7 Jan 2013 17:23:00 +0100
-Subject: [PATCH] mmc: mmci: Fixup clock gating when freq is 0 for ST-variants
-Message-ID: <1357575780-9075-1-git-send-email-ulf.hansson@stericsson.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon,  7 Jan 2013 17:26:58 +0100
+Subject: [PATCH 3.8-rc] arm: mvebu: use global interrupts for GPIOs on Armada
+ XP
+Message-ID: <1357576018-24157-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Johan Rudholm <johan.rudholm@stericsson.com>
+The Armada XP GPIO controller has two ways of notifying interrupts:
+using global interrupts or using per-CPU interrupts. In an attempt to
+use the best available features, the 'marvell,armadaxp-gpio'
+compatible string selects a variant of the gpio-mvebu driver that
+makes use of the per-CPU interrupts.
 
-In the ST Micro variant, the MMCICLOCK register must not be used to
-gate the clock. Instead use MMCIPOWER register and by clearing the
-PWR_ON bit to do this.
+Unfortunately, this doesn't work properly in a SMP context, because we
+fall into cases where the GPIO interrupt is enabled on CPU X at the
+GPIO controller level, but on CPU Y at the interrupt controller
+level. It is not yet clear how to fix that easily.
 
-Signed-off-by: Johan Rudholm <johan.rudholm@stericsson.com>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+So for 3.8, our approach is to switch to global interrupts for GPIOs,
+so that we do not fall into this per-CPU interrupts problem.
+
+This patch therefore fixes GPIO interrupts on Armada XP
+platforms. Without this patch, GPIO interrupts simply do not work
+reliably, because their proper operation depends on which CPU the code
+requesting the interrupt is running.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
-
-This patch is affecting the ux500 variants only.
-
-It is uncertain whether this new variant data for gating the clock should be
-enabled for the nomadik and u300 variant as well. We should sort that out
-before merging with this patch.
-
+This is 3.8-rc material.
 ---
- drivers/mmc/host/mmci.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi |   14 ++++++--------
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi |   21 +++++++++------------
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi |   21 +++++++++------------
+ 3 files changed, 24 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 1507723..e3b191f 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -59,6 +59,7 @@ static unsigned int fmax = 515633;
-  * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
-  * @pwrreg_powerup: power up value for MMCIPOWER register
-  * @signal_direction: input/out direction of bus signals can be indicated
-+ * @pwrreg_clkgate: MMCIPOWER register must be used to gate the clock
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -71,6 +72,7 @@ struct variant_data {
- 	bool			blksz_datactrl16;
- 	u32			pwrreg_powerup;
- 	bool			signal_direction;
-+	bool			pwrreg_clkgate;
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index 271855a..e041f42 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -50,27 +50,25 @@
+ 		};
+ 
+ 		gpio0: gpio at d0018100 {
+-			compatible = "marvell,armadaxp-gpio";
+-			reg = <0xd0018100 0x40>,
+-			    <0xd0018800 0x30>;
++			compatible = "marvell,orion-gpio";
++			reg = <0xd0018100 0x40>;
+ 			ngpios = <32>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupts-cells = <2>;
+-			interrupts = <16>, <17>, <18>, <19>;
++			interrupts = <82>, <83>, <84>, <85>;
+ 		};
+ 
+ 		gpio1: gpio at d0018140 {
+-			compatible = "marvell,armadaxp-gpio";
+-			reg = <0xd0018140 0x40>,
+-			    <0xd0018840 0x30>;
++			compatible = "marvell,orion-gpio";
++			reg = <0xd0018140 0x40>;
+ 			ngpios = <17>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupts-cells = <2>;
+-			interrupts = <20>, <21>, <22>;
++			interrupts = <87>, <88>, <89>;
+ 		};
+ 	};
  };
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 1c1937d..9e23bd8 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -51,39 +51,36 @@
+ 		};
  
- static struct variant_data variant_arm = {
-@@ -118,6 +120,7 @@ static struct variant_data variant_ux500 = {
- 	.st_clkdiv		= true,
- 	.pwrreg_powerup		= MCI_PWR_ON,
- 	.signal_direction	= true,
-+	.pwrreg_clkgate		= true,
- };
+ 		gpio0: gpio at d0018100 {
+-			compatible = "marvell,armadaxp-gpio";
+-			reg = <0xd0018100 0x40>,
+-			    <0xd0018800 0x30>;
++			compatible = "marvell,orion-gpio";
++			reg = <0xd0018100 0x40>;
+ 			ngpios = <32>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupts-cells = <2>;
+-			interrupts = <16>, <17>, <18>, <19>;
++			interrupts = <82>, <83>, <84>, <85>;
+ 		};
  
- static struct variant_data variant_ux500v2 = {
-@@ -131,6 +134,7 @@ static struct variant_data variant_ux500v2 = {
- 	.blksz_datactrl16	= true,
- 	.pwrreg_powerup		= MCI_PWR_ON,
- 	.signal_direction	= true,
-+	.pwrreg_clkgate		= true,
- };
+ 		gpio1: gpio at d0018140 {
+-			compatible = "marvell,armadaxp-gpio";
+-			reg = <0xd0018140 0x40>,
+-			    <0xd0018840 0x30>;
++			compatible = "marvell,orion-gpio";
++			reg = <0xd0018140 0x40>;
+ 			ngpios = <32>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupts-cells = <2>;
+-			interrupts = <20>, <21>, <22>, <23>;
++			interrupts = <87>, <88>, <89>, <90>;
+ 		};
  
- /*
-@@ -1154,6 +1158,13 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		}
- 	}
+ 		gpio2: gpio at d0018180 {
+-			compatible = "marvell,armadaxp-gpio";
+-			reg = <0xd0018180 0x40>,
+-			    <0xd0018870 0x30>;
++			compatible = "marvell,orion-gpio";
++			reg = <0xd0018180 0x40>;
+ 			ngpios = <3>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupts-cells = <2>;
+-			interrupts = <24>;
++			interrupts = <91>;
+ 		};
  
-+	/*
-+	 * If clock = 0 and the variant requires the MMCIPOWER to be used for
-+	 * gating the clock, the MCI_PWR_ON bit is cleared.
-+	 */
-+	if (!ios->clock && variant->pwrreg_clkgate)
-+		pwr &= ~MCI_PWR_ON;
-+
- 	spin_lock_irqsave(&host->lock, flags);
+ 		ethernet at d0034000 {
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index 4905cf3..9659661 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -66,39 +66,36 @@
+ 		};
  
- 	mmci_set_clkreg(host, ios->clock);
+ 		gpio0: gpio at d0018100 {
+-			compatible = "marvell,armadaxp-gpio";
+-			reg = <0xd0018100 0x40>,
+-			    <0xd0018800 0x30>;
++			compatible = "marvell,orion-gpio";
++			reg = <0xd0018100 0x40>;
+ 			ngpios = <32>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupts-cells = <2>;
+-			interrupts = <16>, <17>, <18>, <19>;
++			interrupts = <82>, <83>, <84>, <85>;
+ 		};
+ 
+ 		gpio1: gpio at d0018140 {
+-			compatible = "marvell,armadaxp-gpio";
+-			reg = <0xd0018140 0x40>,
+-			    <0xd0018840 0x30>;
++			compatible = "marvell,orion-gpio";
++			reg = <0xd0018140 0x40>;
+ 			ngpios = <32>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupts-cells = <2>;
+-			interrupts = <20>, <21>, <22>, <23>;
++			interrupts = <87>, <88>, <89>, <90>;
+ 		};
+ 
+ 		gpio2: gpio at d0018180 {
+-			compatible = "marvell,armadaxp-gpio";
+-			reg = <0xd0018180 0x40>,
+-			    <0xd0018870 0x30>;
++			compatible = "marvell,orion-gpio";
++			reg = <0xd0018180 0x40>;
+ 			ngpios = <3>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupts-cells = <2>;
+-			interrupts = <24>;
++			interrupts = <91>;
+ 		};
+ 
+ 		ethernet at d0034000 {
 -- 
-1.7.10
+1.7.9.5
