@@ -1,123 +1,29 @@
 From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Mon,  7 Jan 2013 12:21:52 +0100
-Subject: [PATCH 10/16] dmaengine: ste_dma40: add a done queue for completed
- descriptors
+Date: Mon,  7 Jan 2013 12:21:53 +0100
+Subject: [PATCH 11/16] dmaengine: ste_dma40: add missing kernel-doc entry
 In-Reply-To: <1357557718-15676-1-git-send-email-fabio.baltieri@linaro.org>
 References: <1357557718-15676-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <1357557718-15676-11-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <1357557718-15676-12-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is to keep the active queue for only those transfers which are
-actually active in the hardware.  Descriptors will be moved to the done
-queue after they are completed in the hardware (interrupt handler) but
-before all the cleanup work has been completed (tasklet).
-
-Mostly based on a previous patch by Rabin Vincent.
-
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 ---
- drivers/dma/ste_dma40.c | 37 +++++++++++++++++++++++++++++++++----
- 1 file changed, 33 insertions(+), 4 deletions(-)
+ include/linux/platform_data/dma-ste-dma40.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 67e565b..ff21dcb 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -382,6 +382,7 @@ struct d40_base;
-  * @client: Cliented owned descriptor list.
-  * @pending_queue: Submitted jobs, to be issued by issue_pending()
-  * @active: Active descriptor.
-+ * @done: Completed jobs
-  * @queue: Queued jobs.
-  * @prepare_queue: Prepared jobs.
-  * @dma_cfg: The client configuration of this dma channel.
-@@ -407,6 +408,7 @@ struct d40_chan {
- 	struct list_head		 client;
- 	struct list_head		 pending_queue;
- 	struct list_head		 active;
-+	struct list_head		 done;
- 	struct list_head		 queue;
- 	struct list_head		 prepare_queue;
- 	struct stedma40_chan_cfg	 dma_cfg;
-@@ -754,6 +756,11 @@ static void d40_phy_lli_load(struct d40_chan *chan, struct d40_desc *desc)
- 	writel(lli_dst->reg_lnk, base + D40_CHAN_REG_SDLNK);
- }
- 
-+static void d40_desc_done(struct d40_chan *d40c, struct d40_desc *desc)
-+{
-+	list_add_tail(&desc->node, &d40c->done);
-+}
-+
- static void d40_log_lli_to_lcxa(struct d40_chan *chan, struct d40_desc *desc)
- {
- 	struct d40_lcla_pool *pool = &chan->base->lcla_pool;
-@@ -914,6 +921,14 @@ static struct d40_desc *d40_first_queued(struct d40_chan *d40c)
- 	return d;
- }
- 
-+static struct d40_desc *d40_first_done(struct d40_chan *d40c)
-+{
-+	if (list_empty(&d40c->done))
-+		return NULL;
-+
-+	return list_first_entry(&d40c->done, struct d40_desc, node);
-+}
-+
- static int d40_psize_2_burst_size(bool is_log, int psize)
- {
- 	if (is_log) {
-@@ -1104,6 +1119,12 @@ static void d40_term_all(struct d40_chan *d40c)
- 	struct d40_desc *d40d;
- 	struct d40_desc *_d;
- 
-+	/* Release completed descriptors */
-+	while ((d40d = d40_first_done(d40c))) {
-+		d40_desc_remove(d40d);
-+		d40_desc_free(d40c, d40d);
-+	}
-+
- 	/* Release active descriptors */
- 	while ((d40d = d40_first_active_get(d40c))) {
- 		d40_desc_remove(d40d);
-@@ -1541,6 +1562,9 @@ static void dma_tc_handle(struct d40_chan *d40c)
- 		pm_runtime_put_autosuspend(d40c->base->dev);
- 	}
- 
-+	d40_desc_remove(d40d);
-+	d40_desc_done(d40c, d40d);
-+
- 	d40c->pending_tx++;
- 	tasklet_schedule(&d40c->tasklet);
- 
-@@ -1556,10 +1580,14 @@ static void dma_tasklet(unsigned long data)
- 
- 	spin_lock_irqsave(&d40c->lock, flags);
- 
--	/* Get first active entry from list */
--	d40d = d40_first_active_get(d40c);
--	if (d40d == NULL)
--		goto err;
-+	/* Get first entry from the done list */
-+	d40d = d40_first_done(d40c);
-+	if (d40d == NULL) {
-+		/* Check if we have reached here for cyclic job */
-+		d40d = d40_first_active_get(d40c);
-+		if (d40d == NULL || !d40d->cyclic)
-+			goto err;
-+	}
- 
- 	if (!d40d->cyclic)
- 		dma_cookie_complete(&d40d->txd);
-@@ -2823,6 +2851,7 @@ static void __init d40_chan_init(struct d40_base *base, struct dma_device *dma,
- 
- 		d40c->log_num = D40_PHY_CHAN;
- 
-+		INIT_LIST_HEAD(&d40c->done);
- 		INIT_LIST_HEAD(&d40c->active);
- 		INIT_LIST_HEAD(&d40c->queue);
- 		INIT_LIST_HEAD(&d40c->pending_queue);
+diff --git a/include/linux/platform_data/dma-ste-dma40.h b/include/linux/platform_data/dma-ste-dma40.h
+index 833cb95..b99024b 100644
+--- a/include/linux/platform_data/dma-ste-dma40.h
++++ b/include/linux/platform_data/dma-ste-dma40.h
+@@ -147,6 +147,7 @@ struct stedma40_chan_cfg {
+  * @memcpy_conf_log: default configuration of logical channel memcpy
+  * @disabled_channels: A vector, ending with -1, that marks physical channels
+  * that are for different reasons not available for the driver.
++ * @use_esram_lcla: flag for mapping the lcla into esram region
+  * @num_of_phy_chans: The number of physical channels implemented in HW.
+  * 0 means reading the number of channels from DMA HW but this is only valid
+  * for 'multiple of 4' channels, like 8.
 -- 
 1.7.12.1
