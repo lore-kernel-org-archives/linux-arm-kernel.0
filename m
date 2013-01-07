@@ -1,48 +1,48 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 7 Jan 2013 16:25:10 +0100
-Subject: Reboot hangs on Kirkwood ns2 boards with 3.8-rc2
-In-Reply-To: <20130107150918.GI1357@kw.sim.vm.gnt>
-References: <20130106033455.GH1357@kw.sim.vm.gnt>
- <20130106083521.GO17242@lunn.ch>
- <20130107150918.GI1357@kw.sim.vm.gnt>
-Message-ID: <20130107152510.GZ3392@lunn.ch>
+Date: Mon, 7 Jan 2013 16:27:39 +0100
+Subject: [PATCH 01/11] ARM: Kirkwood: Fix missing clk for USB device.
+In-Reply-To: <20130107151138.GJ1357@kw.sim.vm.gnt>
+References: <1357467044-4914-1-git-send-email-andrew@lunn.ch>
+ <1357467044-4914-2-git-send-email-andrew@lunn.ch>
+ <20130107151138.GJ1357@kw.sim.vm.gnt>
+Message-ID: <20130107152739.GA3392@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 04:09:18PM +0100, Simon Guinot wrote:
-> On Sun, Jan 06, 2013 at 09:35:21AM +0100, Andrew Lunn wrote:
-> > On Sun, Jan 06, 2013 at 04:34:55AM +0100, Simon Guinot wrote:
-> > > Hi Andrew and Jason,
-> > > 
-> > > While testing 3.8-rc2 on the ns2 boards (DT based), I noticed that
-> > > reboot is not working. After issuing a reboot, the kernel hangs. No
-> > > error messages are displayed. Moreover, on my non-DT Kirkwood boards,
-> > > reboot is working as expected.
-> > > 
-> > > Am I the only one to experiment this issue ?
+On Mon, Jan 07, 2013 at 04:11:38PM +0100, Simon Guinot wrote:
+> On Sun, Jan 06, 2013 at 11:10:34AM +0100, Andrew Lunn wrote:
+> > Without the clock being held by a driver, it gets turned off at a bad
+> > time causing the SoC to lockup. This is often during reboot.
 > > 
-> > Hi Simon
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > Tested-by: Stefan Peter <s.peter@mpl.ch>
+> > ---
+> >  arch/arm/boot/dts/kirkwood.dtsi |    1 +
+> >  1 file changed, 1 insertion(+)
 > > 
-> > No you are not the only one. There is a patch available, authored by
-> > me, which is identical to what you found.
+> > diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> > index 7735cee..110d6cb 100644
+> > --- a/arch/arm/boot/dts/kirkwood.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> > @@ -144,6 +144,7 @@
+> >  			compatible = "marvell,orion-ehci";
+> >  			reg = <0x50000 0x1000>;
+> >  			interrupts = <19>;
+> > +			clocks = <&gate_clk 3>;
+> >  			status = "okay";
+> >  		};
 > 
-> Arf, it's a shame I have missed this reports. It could have spared some
-> time by asking at you earlier.
+> Hi Andrew,
+> 
+> Maybe you also want to remove the clock alias workaround from
+> kirkwood_legacy_clk_init() ?
 
 Hi Simon
 
-Its often worth asking, or at least googling, before heading into a
-git bisect.
- 
-> About the issue itself. I understand that a clock is needed by the
-> orion-ehci driver. But even if the clock is not provided by the DT, it
-> should have been fixed by kirkwood_legacy_clk_init(), isn't ? What's
-> wrong with this workaround ?
+That is not really a fix. It does no harm being there.
 
-kirkwood_legacy_clk_init() provides a clock with the old name. When
-using DT, the device has the name "f1050000.ehci" and it looks for a
-clock called "f1050000.ehci ". The legacy clock is called
-"orion-ehci.0", which is what is expected when using old style
-platform drivers instantiated in C.
+We will remove it as a cleanup in 3.9. We can also remove the SDIO
+legacy clock as well, since Thomas has patches to convert that driver
+to DT.
 
-	 Andrew
+   Andrew
