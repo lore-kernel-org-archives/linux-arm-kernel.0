@@ -1,142 +1,79 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 7 Jan 2013 20:35:37 +0530
-Subject: [PATCH 1/2] ARM: davinci: da850: add pinctrl driver entries
-In-Reply-To: <1354876051-25938-2-git-send-email-anilkumar.v@ti.com>
-References: <1354876051-25938-1-git-send-email-anilkumar.v@ti.com>
- <1354876051-25938-2-git-send-email-anilkumar.v@ti.com>
-Message-ID: <50EAE441.4050804@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 7 Jan 2013 16:13:33 +0100
+Subject: [PATCH] mfd: stmpe: Pull IRQ GPIO number from DT during DT-based
+ probe
+In-Reply-To: <20130107150341.GT21994@gmail.com>
+References: <1357568989-16237-1-git-send-email-marex@denx.de>
+ <20130107150341.GT21994@gmail.com>
+Message-ID: <201301071613.33573.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anil,
+Dear Lee Jones,
 
-On 12/7/2012 3:57 PM, Kumar, Anil wrote:
-> For DT, DaVinci platform can use pinctrl-single driver for handling
-> padconf registers.
+> On Mon, 07 Jan 2013, Marek Vasut wrote:
+> > In case of a DT-based probe of the stmpe MFD driver, the irq_gpio was
+> > zero, which resulted in the driver failing to probe.
+> > 
+> > Implement DT properties "irq-over-gpio" and "irq-gpios" which are already
+> > used in "arch/arm/boot/dts/spear320-hmi.dts" to circumvent these
+> > problems.
 > 
-> Enable PINCTRL Kconfig for all DaVinci platform. Add required
-> pinctrl DT entries in da850 dts file.
+> This must have slipped through the gaps. It should be removed.
+
+True
+
+> > The new
+> > behaviour is the expected one and copies the behavior of
+> > platform_data-based probe.
 > 
-> Test procedure
->  1)Populate DT file with NAND node information.
->  2)Populate board DT file with pinmux information for NAND.
->  3)Boot and confirm NAND is detected by the kernel.
->  4)cat /proc/mtd to show partitions.
+> Blindly copying platform data behaviour to DT bindings is seldom a good
+> idea.
+
+Do you have suggestions how to pass these information? I suspect the irq-over-
+gpio property can be killed, since if irq-gpios prop is there, it implies irq-
+over-gpio anyway.
+
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Lee Jones <lee.jones@linaro.org>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > Cc: Vipul Kumar Samar <vipulkumar.samar@st.com>
+> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> > ---
+> > 
+> >  drivers/mfd/stmpe.c |    5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+> > index 4b11202..fb9cd6f 100644
+> > --- a/drivers/mfd/stmpe.c
+> > +++ b/drivers/mfd/stmpe.c
+> > @@ -1018,6 +1018,11 @@ void stmpe_of_probe(struct stmpe_platform_data
+> > *pdata, struct device_node *np)
+> > 
+> >  	pdata->id = -1;
+> >  	pdata->irq_trigger = IRQF_TRIGGER_NONE;
+> > 
+> > +	pdata->irq_over_gpio = of_get_property(np, "irq-over-gpio", NULL);
 > 
-> Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
-> ---
-> :000000 100644 0000000... f999d9e... A	Documentation/devicetree/bindings/arm/davinci/pinctrl.txt
-> :100644 100644 06e0adf... 54a5405... M	arch/arm/Kconfig
-> :100644 100644 37dc5a3... 8cac9d2... M	arch/arm/boot/dts/da850-evm.dts
-> :100644 100644 fbada87... 94471bc... M	arch/arm/boot/dts/da850.dtsi
-> :100644 100644 f292239... 0892db4... M	arch/arm/configs/da8xx_omapl_defconfig
->  .../devicetree/bindings/arm/davinci/pinctrl.txt    |   29 ++++++++++++++++++++
->  arch/arm/Kconfig                                   |    1 +
->  arch/arm/boot/dts/da850-evm.dts                    |    3 ++
->  arch/arm/boot/dts/da850.dtsi                       |   10 +++++++
->  arch/arm/configs/da8xx_omapl_defconfig             |    1 +
->  5 files changed, 44 insertions(+), 0 deletions(-)
+> This is a new DT binding and you haven't provided any documentation for it.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/davinci/pinctrl.txt b/Documentation/devicetree/bindings/arm/davinci/pinctrl.txt
-> new file mode 100644
-> index 0000000..f999d9e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/davinci/pinctrl.txt
-> @@ -0,0 +1,29 @@
-> +* Texas Instruments Davinci pinctrl-single
-> +
-> +This file provides information, what the device node for the
-> +davinci pinctrl-single interface contain.
-> +
-> +Required properties:
-> +- compatible: "pinctrl-single";
-> +
-> +- reg : offset and length of the register set for the mux registers
-> +
-> +- pinctrl-single,bit-per-mux: mask of allowed pinmux function bits in the
-> +  pinmux register
-> +
-> +- pinctrl-single,register-width: pinmux register access width in bits
-> +
-> +- pinctrl-single,function-mask:  mask of allowed pinmux function bits in
-> +  the pinmux register
-> +
-> +Example:
-> +pmx_core:pinmux at 14120 {
-> +		compatible = "pinctrl-single";
-> +		reg = <0x14120 0x50>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-single,bit-per-mux;
-> +		pinctrl-single,register-width = <32>;
-> +		pinctrl-single,function-mask = <0xffffffff>;
-> +};
+> Also, there is no reason for the binding to exist.
+> 
+> Lots of drivers use GPIO pins as IRQs.
 
-These bindings are already documented as part of
-Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt. No need to
-repeat.
+Right, this can be removed and only the 'irq-gpios' can be kept around. What do 
+you say?
 
-> +~
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 06e0adf..54a5405 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -924,6 +924,7 @@ config ARCH_DAVINCI
->  	select GENERIC_IRQ_CHIP
->  	select HAVE_IDE
->  	select NEED_MACH_GPIO_H
-> +	select PINCTRL
+> > +	pdata->irq_gpio = of_get_named_gpio(np, "irq-gpios", 0);
+> > +	if (!gpio_is_valid(pdata->irq_gpio))
+> > +		pdata->irq_gpio = -1;
+> > +
+> > 
+> >  	of_property_read_u32(np, "st,autosleep-timeout",
+> >  	
+> >  			&pdata->autosleep_timeout);
 
-No need to force this across DaVinci. You can select only for MACH_DA8XX_DT.
-
->  	select USE_OF
->  	select ZONE_DMA
->  	help
-> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> index 37dc5a3..8cac9d2 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -15,6 +15,9 @@
->  	model = "DA850/AM1808/OMAP-L138 EVM";
->  
->  	soc {
-> +		pmx_core:pinmux at 14120 {
-
-'pmx_core:pinmux at 1c14120' instead like the way uart is defined?
-
-> +			status = "okay";
-> +		};
->  		serial0: serial at 1c42000 {
->  			status = "okay";
->  		};
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index fbada87..94471bc 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -29,6 +29,16 @@
->  		#size-cells = <1>;
->  		ranges = <0x0 0x01c00000 0x400000>;
->  
-> +		pmx_core:pinmux at 14120 {
-> +			compatible = "pinctrl-single";
-> +			reg = <0x14120 0x50>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			pinctrl-single,bit-per-mux;
-> +			pinctrl-single,register-width = <32>;
-> +			pinctrl-single,function-mask = <0xffffffff>;
-> +			status = "disabled";
-> +		};
->  		serial0: serial at 1c42000 {
->  			compatible = "ns16550a";
->  			reg = <0x42000 0x100>;
-> diff --git a/arch/arm/configs/da8xx_omapl_defconfig b/arch/arm/configs/da8xx_omapl_defconfig
-> index f292239..0892db4 100644
-> --- a/arch/arm/configs/da8xx_omapl_defconfig
-> +++ b/arch/arm/configs/da8xx_omapl_defconfig
-
-I would like the defconfig changes to be separated out into a different
-patch.
-
-Thanks,
-Sekhar
+Best regards,
+Marek Vasut
