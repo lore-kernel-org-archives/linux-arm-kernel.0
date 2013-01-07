@@ -1,31 +1,65 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 7 Jan 2013 08:12:49 +0000 (UTC)
-Subject: [PATCH 2/3] ARM: OMAP4: hwmod data: do not enable or reset the
- AESS during kernel init
-In-Reply-To: <50E73B3D.4010705@ti.com>
-References: <1357304526-21557-1-git-send-email-s-guiriec@ti.com>
- <1357304526-21557-3-git-send-email-s-guiriec@ti.com>
- <alpine.DEB.2.00.1301041833510.25868@utopia.booyaka.com>
- <50E73B3D.4010705@ti.com>
-Message-ID: <alpine.DEB.2.00.1301070811140.2177@utopia.booyaka.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 07 Jan 2013 09:21:16 +0100
+Subject: [PATCH 0/3] Add support for gpio expander pca9505 used on Mirabox
+In-Reply-To: <1357493688-25061-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1357493688-25061-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <50EA857C.8090506@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On 01/06/2013 06:34 PM, Gregory CLEMENT wrote:
+> Hello,
+> 
+> This patch set adds the support for the i2c gpio expander pca9505 used
+> on the JTAG/GPIO box which can be connected to the Mirabox.
+> 
+> To be able to use the pca9505 I had to do several changes in the
+> driver. Indeed, until now the pca953x driver accessed all the bank of
+> a given register in a single command using only a 32 bits
+> variable. This expander comes with 40 GPIOs which no more fits in a 32
+> variable. This patch set makes the accesses to the registers more
+> generic by relying on an array of u8 variables. This fits exactly the
+> way the registers are represented in the hardware.
+> 
+> Once the per-bank representation was added, it was easier to introduce
+> helpers to access to a single register of a bank instead of reading or
+> writing all the banks for a given register. As the GPIO API allows
+> only the accesses to a single GPIO at a time there was no point to read
+> and write all the other banks. Hence it should help to decrease the
+> latency especially for the pca9505.
+> 
+> However as the block GPIO API from Roland Stigge is incoming I kept
+> the helpers used to access all the banks in the same time. I had to
+> make some modifications in the arguments that these functions
+> received, so it will have a conflict here. Currently my patch set is
+> based on v3.8-rc2, but I am willing to rebase onto gpio-for-next once
+> the GPIO block will be merged into it.
+> 
+> I also expected some tested-by as I was only able to test the pca9505
+> and I didn't test the IRQ part.
 
-On Fri, 4 Jan 2013, Sebastien Guiriec wrote:
+For those who are interested the branch gpio-pca9505 is available at:
+https://github.com/MISL-EBU-System-SW/mainline-public.git
 
-> Paul,
-> Do you want me to rebase this version and update the serie or are you handle
-> it?
+This branch is based on v3.8-rc2 plus some fixes related to mvebu
+plateform and of course this patch set.
 
-Sure, it would be great if you could take this over and test it and 
-repost.
+> 
+> Thanks!
+> 
+> Gregory CLEMENT (3):
+>   gpio: pca953x: make the register access by GPIO bank
+>   gpio: pca953x: add support for pca9505
+>   arm: mvebu: enable gpio expander over i2c on Mirabox platform
+> 
+>  arch/arm/boot/dts/armada-370-mirabox.dts |   10 ++
+>  drivers/gpio/gpio-pca953x.c              |  235 +++++++++++++++++++-----------
+>  2 files changed, 160 insertions(+), 85 deletions(-)
+> 
 
-You might find the 'aess_reset_devel_3.9' branch at 
-git://git.pwsan.com/linux-2.6 useful.  It's a forward port of some of the 
-3.5-rc work.  It's only compile-tested, so you might need to tweak it to 
-get it to work.
 
-
-- Paul
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
