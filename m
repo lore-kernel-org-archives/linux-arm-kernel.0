@@ -1,43 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon,  7 Jan 2013 15:29:49 +0100
-Subject: [PATCH] mfd: stmpe: Pull IRQ GPIO number from DT during DT-based probe
-Message-ID: <1357568989-16237-1-git-send-email-marex@denx.de>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Mon, 07 Jan 2013 06:34:33 -0800
+Subject: [PATCH 4/4] ALSA: pxa27x: rename pxa27x_assert_ac97()
+In-Reply-To: <50EA97EA.4030807@compulab.co.il>
+References: <1357499640-13871-1-git-send-email-mikedunn@newsguy.com>
+ <1357499640-13871-5-git-send-email-mikedunn@newsguy.com>
+ <50EA97EA.4030807@compulab.co.il>
+Message-ID: <50EADCF9.10307@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of a DT-based probe of the stmpe MFD driver, the irq_gpio was zero,
-which resulted in the driver failing to probe.
+On 01/07/2013 01:39 AM, Igor Grinberg wrote:
+> 
+> 
+> On 01/06/13 21:14, Mike Dunn wrote:
+>> This patch does nothing functionally, it just gives the function a new name and
+>> modifies the prototype slightly in order to clarify what the function is doing
+>> (which is not necessarily asserting the reset).
+>> Some commentary also added.
+>>
+>> Tested on a palm treo 680 machine.
+>>
+>> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+> 
+> This patch makes sense, but again raising your concern...
+> The gpio_direction_output(reset_gpio, 1) should be called after
+> the change to AF0.
 
-Implement DT properties "irq-over-gpio" and "irq-gpios" which are already used
-in "arch/arm/boot/dts/spear320-hmi.dts" to circumvent these problems. The new
-behaviour is the expected one and copies the behavior of platform_data-based
-probe.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Vipul Kumar Samar <vipulkumar.samar@st.com>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/mfd/stmpe.c |    5 +++++
- 1 file changed, 5 insertions(+)
+Can you clarify please?  Don't you mean *before* the change to AF0?  The proper
+values must be set in the GPDR and GPSR/GPCR before changing to AF0, no?  This
+not only makes intuitive sense, it is also consistent with the information in
+the pxa270 developer's manual.  Once AF0 is set, the last values that were set
+for direction and level take immediate effect, no?
 
-diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-index 4b11202..fb9cd6f 100644
---- a/drivers/mfd/stmpe.c
-+++ b/drivers/mfd/stmpe.c
-@@ -1018,6 +1018,11 @@ void stmpe_of_probe(struct stmpe_platform_data *pdata, struct device_node *np)
- 	pdata->id = -1;
- 	pdata->irq_trigger = IRQF_TRIGGER_NONE;
- 
-+	pdata->irq_over_gpio = of_get_property(np, "irq-over-gpio", NULL);
-+	pdata->irq_gpio = of_get_named_gpio(np, "irq-gpios", 0);
-+	if (!gpio_is_valid(pdata->irq_gpio))
-+		pdata->irq_gpio = -1;
-+
- 	of_property_read_u32(np, "st,autosleep-timeout",
- 			&pdata->autosleep_timeout);
- 
--- 
-1.7.10.4
+Thanks,
+Mike
