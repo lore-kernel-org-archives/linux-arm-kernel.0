@@ -1,35 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  7 Jan 2013 17:42:08 +0100
-Subject: [PATCH 3.9 3/3] arm: mvebu: add the 7-segment display DT informations
- to Armada XP DB
-In-Reply-To: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1357576928-29133-4-git-send-email-thomas.petazzoni@free-electrons.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 7 Jan 2013 11:44:15 -0500
+Subject: [PATCH 3.8-rc] net: mvneta: fix driver operation in SMP context
+In-Reply-To: <1357576074-24245-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1357576074-24245-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130107164415.GI5075@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a 7-segment display driver in the kernel, use it on
-the Marvell Armada XP DB evaluation board.
+On Mon, Jan 07, 2013 at 05:27:54PM +0100, Thomas Petazzoni wrote:
+> From: Dmitri Epshtein <dima@marvell.com>
+> 
+> In order for the driver to behave properly in a SMP context, the same
+> transmit queue should be used by the kernel in dev_queue_xmit() and in
+> the driver's mvneta_tx() function. To achieve that, the driver now
+> implements the ->ndo_select_txq() operation.
+> 
+> For now, it always returns the same transmit queue, txq_def, until the
+> driver is expanded to properly take advantage of the multiqueue
+> capabilities of the hardware.
+> 
+> Without this patch, the network driver crashes the kernel almost
+> immediately on Armada XP platforms, if the network load is at least a
+> little bit parallel (i.e several threads).
+> 
+> [Thomas Petazzoni: reword commit message]
+> Signed-off-by: Dmitri Epshtein <dima@marvell.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp-db.dts |    5 +++++
- 1 file changed, 5 insertions(+)
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 8e53b25..8654c1b 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -90,5 +90,10 @@
- 			phy = <&phy3>;
- 			phy-mode = "sgmii";
- 		};
-+		gpio-7seg at 0 {
-+			compatible = "generic,gpio-7seg";
-+			status = "okay";
-+			gpios = <&gpio0 26 0 &gpio0 27 0 &gpio1 16 0>;
-+		};
- 	};
- };
--- 
-1.7.9.5
+I'll assume this is going through -net, let me know if it should be
+otherwise.
+
+thx,
+
+Jason.
