@@ -1,36 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Jan 2013 14:48:13 +0000
-Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
-In-Reply-To: <87ehhxahd1.fsf@xmission.com>
-References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
- <50E4C9C6.20609@codeaurora.org>
- <20130103120259.GB5193@mudshark.cambridge.arm.com>
- <20130103122100.GN2631@n2100.arm.linux.org.uk>
- <50E5E967.3020805@wwwdotorg.org>
- <20130106162200.GC11025@mudshark.cambridge.arm.com>
- <20130106164033.GA3222@n2100.arm.linux.org.uk> <87ehhxahd1.fsf@xmission.com>
-Message-ID: <20130107144812.GD3222@n2100.arm.linux.org.uk>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 7 Jan 2013 06:33:56 -0800
+Subject: [PATCH v2 00/16] various fixes and updates for ste_dma40
+In-Reply-To: <1357557718-15676-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1357557718-15676-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <20130107143356.GB15804@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 06, 2013 at 05:53:30PM -0800, Eric W. Biederman wrote:
-> I have cleaned up the mess that is the reboot path once a bunch of years
-> ago, and apparently it is deteriorating again.
+On Mon, Jan 07, 2013 at 12:21:42PM +0100, Fabio Baltieri wrote:
+> Hi all,
+> 
+> this series contains many fixes and updates for the ste_dma40 driver.
+> 
+> The first patches of the series were originally sent weeks ago but did not
+> receive any feedback, so I'm also resending those, but I've rebased everything
+> on top of v3.8-rc2 to avoid a (trivial) file rename conflict.
+> 
+> Vinod, these should probably end up in the arm-soc tree so they can receive
+> some testing from drivers using it.  Can I have your Acked-by for this?
+Sure the patchset looks fine by me
 
-Unfortunately, that's what happens when lots of cooks get their fingers
-in a pie with no coordination.  This is why having maintainers is soo
-important for code - a good maintainer ensures that the code remains
-high quality by whatever means.
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-Code without maintainers is subject to modification in all kinds of
-random ways, including duplicating code amongst architectures which
-should be generic code - that happens because no one wants to understand
-what other architectures require.
-
-Your original cleanups, afaik, are still all intact.  The problem is
-that since then, kexec has come along, and invented a new callback
-(machine_shutdown) which gets called while the system is still live
-in full SMP mode (and presumably all the devices are still running
-and potentially scribbling over memory with their DMA.)  Meanwhile
-kexec wants to pass control to the new kernel... that doesn't sound
-particularly clever to me.
+> 
+> Thanks,
+> Fabio
+> 
+> 
+> Fabio Baltieri (7):
+>   dmaengine: ste_dma40: add a done queue for completed descriptors
+>   dmaengine: ste_dma40: add missing kernel-doc entry
+>   dmaengine: ste_dma40: minor cosmetic fixes
+>   dmaengine: ste_dma40: minor code readability fixes
+>   dmaengine: ste_dma40: add software lli support
+>   dmaengine: set_dma40: ignore spurious interrupts
+>   dmaengine: set_dma40: balance clock in probe fail code
+> 
+> Gerald Baeza (2):
+>   dmaengine: ste_dma40: support fixed physical channel allocation
+>   dmaengine: ste_dma40: physical channels number correction
+> 
+> Narayanan (1):
+>   dmaengine: ste_dma40: reset priority bit for logical channels
+> 
+> Narayanan G (1):
+>   dmaengine: ste_dma40: don't check for pm_runtime_suspended()
+> 
+> Per Forlin (3):
+>   dmaengine: ste_dma40: use writel_relaxed for lcxa
+>   dmaengine: ste_dma40: set dma max seg size
+>   dmaengine: ste_dma40: limit burst size to 16
+> 
+> Rabin Vincent (1):
+>   dmaengine: ste_dma40: don't allow high priority dest event lines
+> 
+> Tong Liu (1):
+>   dmaengine: ste_dma40: support more than 128 event lines
+> 
+>  drivers/dma/ste_dma40.c                     | 489 +++++++++++++++++++++-------
+>  drivers/dma/ste_dma40_ll.c                  |  29 +-
+>  drivers/dma/ste_dma40_ll.h                  | 130 +++++++-
+>  include/linux/platform_data/dma-ste-dma40.h |  13 +
+>  4 files changed, 518 insertions(+), 143 deletions(-)
+> 
+> -- 
+> 1.7.12.1
+> 
