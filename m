@@ -1,54 +1,43 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon,  7 Jan 2013 15:28:05 +0100
-Subject: [PATCH] mtd: mxc_nand: Make use of supplied pinctrl data
-Message-ID: <1357568885-15507-1-git-send-email-marex@denx.de>
+Date: Mon,  7 Jan 2013 15:29:49 +0100
+Subject: [PATCH] mfd: stmpe: Pull IRQ GPIO number from DT during DT-based probe
+Message-ID: <1357568989-16237-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MXC NAND driver doesn't consider the pinctrl data supplied via DT, which
-will result in NAND pins not being properly configured.
+In case of a DT-based probe of the stmpe MFD driver, the irq_gpio was zero,
+which resulted in the driver failing to probe.
 
-Make the driver use pinctrl, but to prevent breakage on various boards, do not
-fail if the pinctrl data are not available, only print a warning message.
+Implement DT properties "irq-over-gpio" and "irq-gpios" which are already used
+in "arch/arm/boot/dts/spear320-hmi.dts" to circumvent these problems. The new
+behaviour is the expected one and copies the behavior of platform_data-based
+probe.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Vipul Kumar Samar <vipulkumar.samar@st.com>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/mtd/nand/mxc_nand.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/mfd/stmpe.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 45204e4..ed805fb 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -34,6 +34,7 @@
- #include <linux/completion.h>
- #include <linux/of_device.h>
- #include <linux/of_mtd.h>
-+#include <linux/pinctrl/consumer.h>
+diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+index 4b11202..fb9cd6f 100644
+--- a/drivers/mfd/stmpe.c
++++ b/drivers/mfd/stmpe.c
+@@ -1018,6 +1018,11 @@ void stmpe_of_probe(struct stmpe_platform_data *pdata, struct device_node *np)
+ 	pdata->id = -1;
+ 	pdata->irq_trigger = IRQF_TRIGGER_NONE;
  
- #include <asm/mach/flash.h>
- #include <linux/platform_data/mtd-mxc_nand.h>
-@@ -1385,6 +1386,7 @@ static int mxcnd_probe(struct platform_device *pdev)
- 	struct mtd_info *mtd;
- 	struct mxc_nand_host *host;
- 	struct resource *res;
-+	struct pinctrl *pinctrl;
- 	int err = 0;
- 
- 	/* Allocate memory for MTD device structure and private data */
-@@ -1449,6 +1451,10 @@ static int mxcnd_probe(struct platform_device *pdev)
- 	if (!res)
- 		return -ENODEV;
- 
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl))
-+		dev_warn(&pdev->dev, "No PINCTRL data for the NAND driver!\n");
++	pdata->irq_over_gpio = of_get_property(np, "irq-over-gpio", NULL);
++	pdata->irq_gpio = of_get_named_gpio(np, "irq-gpios", 0);
++	if (!gpio_is_valid(pdata->irq_gpio))
++		pdata->irq_gpio = -1;
 +
- 	host->base = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!host->base)
- 		return -ENOMEM;
+ 	of_property_read_u32(np, "st,autosleep-timeout",
+ 			&pdata->autosleep_timeout);
+ 
 -- 
 1.7.10.4
