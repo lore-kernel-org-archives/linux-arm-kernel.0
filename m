@@ -1,78 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Jan 2013 17:32:20 +0000
-Subject: [PATCH v4 21/24] arm/v2m: initialize arch_timers even if v2m_timer
- is not present
-In-Reply-To: <alpine.DEB.2.02.1301071719180.4981@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-21-git-send-email-stefano.stabellini@eu.citrix.com>
- <1347625628.2497.65.camel@hornet>
- <alpine.DEB.2.02.1209141347250.29232@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1301071719180.4981@kaball.uk.xensource.com>
-Message-ID: <50EB06A4.7030908@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 7 Jan 2013 18:40:22 +0100
+Subject: [PATCH 3.9] Driver for 7-segment displays connected over GPIOs
+In-Reply-To: <20130107172340.GA32401@kroah.com>
+References: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130107164845.GA2911@kroah.com> <20130107180708.2ffc1540@skate>
+ <20130107172340.GA32401@kroah.com>
+Message-ID: <20130107184022.72b23aa9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/13 17:21, Stefano Stabellini wrote:
-> On Fri, 14 Sep 2012, Stefano Stabellini wrote:
->> On Fri, 14 Sep 2012, Pawel Moll wrote:
->>> On Fri, 2012-09-14 at 12:13 +0100, Stefano Stabellini wrote:
->>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>>> CC: Russell King <linux@arm.linux.org.uk>
->>>> CC: Pawel Moll <pawel.moll@arm.com>
->>>> CC: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm/mach-vexpress/v2m.c |   11 ++++++-----
->>>>  1 files changed, 6 insertions(+), 5 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
->>>> index 37608f2..4e567f7 100644
->>>> --- a/arch/arm/mach-vexpress/v2m.c
->>>> +++ b/arch/arm/mach-vexpress/v2m.c
->>>> @@ -621,16 +621,17 @@ static void __init v2m_dt_timer_init(void)
->>>>  
->>>>  	v2m_clk_init();
->>>>  
->>>> -	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
->>>> -	if (WARN_ON(err))
->>>> -		return;
->>>> -	node = of_find_node_by_path(path);
->>>> -	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
->>>>  	if (arch_timer_of_register() != 0)
->>>>  		twd_local_timer_of_register();
->>>>  
->>>>  	if (arch_timer_sched_clock_init() != 0)
->>>>  		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
->>>> +
->>>> +	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
->>>> +	if (WARN_ON(err))
->>>> +		return;
->>>> +	node = of_find_node_by_path(path);
->>>> +	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
->>>>  }
->>>>  
->>>>  static struct sys_timer v2m_dt_timer = {
->>>
->>> Fair point. The alias is going to disappear anyway (I'm working on a VE
->>> platform rework right now), but in case I won't get it on time for 3.7,
->>> I'll make sure this one is merged instead.
->>
->> Great, thanks!
->> Should I leave this patch out of the Xen on ARM series for 3.7 then?
->>
+Dear Greg Kroah-Hartman,
+
+On Mon, 7 Jan 2013 09:23:40 -0800, Greg Kroah-Hartman wrote:
+
+> > Indeed, it can be done from userspace since we're just controlling
+> > GPIOs. Having a kernel driver allows to describe this device in the
+> > Device Tree, like all other devices, and have it "magically" appear,
+> > with a convenient user-space interface.
 > 
-> I have just noticed that this patch hasn't been merged yet, but still we
-> need it to boot Linux on Xen.
-> Do you want me to rebase and resent?
+> Ok, that means you want to use the kernel-standard userspace interface
+> for displays, right?  If so, why not use it?  I thought we already
+> supported LCD displays already, isn't there an interface for it?  Don't
+> create random magic sysfs files without really thinking about it.
 
-I'm looking at v3.8-rc2, and the code have changed significantly (see
-433683a66401adb0150792e725cc4f631c94de46).
+Well, the LCD interface is about outputting pixel into a video memory.
+Quite different from:
 
-If you don't have an "arm,sp804" device in your DT, it shouldn't get
-registered and carry on registering the per-cpu timers. Can you check
-that it fixes your issue?
+echo 6 > /sys/[...]/gpio-7seg.1/value
+
+No?
+
+> > Not having a kernel driver means that gazillions of applications
+> > re-invent the same piece of code over and over again, have to hardcode
+> > the GPIO numbers for a given piece of hardware, while the kernel
+> > abstract all of this very nicely.
+> 
+> That sounds like a wonderful use of a userspace library to do this
+> properly.  Much like libusb does, right?
+> 
+> I still think as this can be done in userspace, it probably should be.
+
+Understood. Patches discarded.
 
 Thanks,
 
-	M.
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
