@@ -1,30 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 7 Jan 2013 12:51:23 -0500
-Subject: [PATCH V2] arm: mvebu: Improve the SMP support of the
- interrupt controller
-In-Reply-To: <1354740203-26665-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1354740203-26665-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130107175123.GO5075@titan.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 7 Jan 2013 18:53:57 +0100
+Subject: [PATCH 3.9] Driver for 7-segment displays connected over GPIOs
+In-Reply-To: <20130107172340.GA32401@kroah.com>
+References: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130107164845.GA2911@kroah.com> <20130107180708.2ffc1540@skate>
+ <20130107172340.GA32401@kroah.com>
+Message-ID: <20130107185357.6da83d60@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 05, 2012 at 09:43:23PM +0100, Gregory CLEMENT wrote:
-> This patch makes the interrupt controller driver more SMP aware for
-> the Armada XP SoCs. It adds the support for the per-CPU irq. It also
-> adds the implementation for the set_affinity hook.
+Dear Greg Kroah-Hartman,
+
+On Mon, 7 Jan 2013 09:23:40 -0800, Greg Kroah-Hartman wrote:
+
+> > Not having a kernel driver means that gazillions of applications
+> > re-invent the same piece of code over and over again, have to hardcode
+> > the GPIO numbers for a given piece of hardware, while the kernel
+> > abstract all of this very nicely.
 > 
-> Patch initialy wrote by Yehuda Yitschak and reworked by Gregory
-> CLEMENT.
+> That sounds like a wonderful use of a userspace library to do this
+> properly.  Much like libusb does, right?
 > 
-> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
->  arch/arm/mach-mvebu/irq-armada-370-xp.c |   52 +++++++++++++++++++++++++++++++
->  2 files changed, 53 insertions(+), 1 deletion(-)
+> I still think as this can be done in userspace, it probably should be.
 
-Applied to mvebu/boards
+So that's why we have drivers/usb/misc/usbsevseg.c in the kernel, which
+uses sysfs files to output text or numbers on a 7-segment display,
+while it could all be done using libusb from userspace? Seems like back
+in 2008 you Signed-off-by on the patch adding this driver :-)
 
-thx,
-
-Jason.
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
