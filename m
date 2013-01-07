@@ -1,145 +1,148 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  7 Jan 2013 23:56:20 +0100
-Subject: [PATCH 05/11] ARM: nomadik: add FSMC NAND
-Message-ID: <1357599380-7490-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  7 Jan 2013 23:56:28 +0100
+Subject: [PATCH 06/11] ARM: nomadik: move GPIO and pinctrl to device tree
+Message-ID: <1357599388-7523-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the FSMC NAND driver and flash partitions to the Nomadik
-device tree.
+This moves the instances of the Nomadik pin controller and the
+Nomadik GPIO blocks (also handled by the GPIO driver) over to
+the device tree. A new compatible string is added to the
+pin control driver in the process.
 
-The only compatible string accepted by this driver is currently
-"st,spear600-fsmc-nand" which is inappropriate for this system, so
-this patch adds the compatible value "stericsson,fsmc-nand" as
-well.
-
-Cc: linux-mtd at vger.kernel.org
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Artem Bityutskiy <dedekind1@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-I'm requesting an ACK from the MTD maintainers to be able to apply
-this patch through the ARM SoC tree.
----
- .../devicetree/bindings/mtd/fsmc-nand.txt          |  2 +-
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 38 ++++++++++++++++++++++
- arch/arm/mach-nomadik/cpu-8815.c                   | 15 +++++++++
- drivers/mtd/nand/fsmc_nand.c                       |  1 +
- 4 files changed, 55 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 52 ++++++++++++++++++++++++++++++
+ arch/arm/mach-nomadik/cpu-8815.c           | 21 +++++++++---
+ drivers/pinctrl/pinctrl-nomadik.c          |  4 +++
+ 3 files changed, 73 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
-index e3ea32e..2240ac0 100644
---- a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
-@@ -1,7 +1,7 @@
- * FSMC NAND
- 
- Required properties:
--- compatible : "st,spear600-fsmc-nand"
-+- compatible : "st,spear600-fsmc-nand", "stericsson,fsmc-nand"
- - reg : Address range of the mtd chip
- - reg-names: Should contain the reg names "fsmc_regs", "nand_data", "nand_addr" and "nand_cmd"
- 
 diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index 29986ea..8369eb0 100644
+index 8369eb0..df60e08 100644
 --- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
 +++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -32,6 +32,44 @@
+@@ -32,6 +32,58 @@
  		interrupts = <5>;
  	};
  
-+	/* A NAND flash of 128 MiB */
-+	fsmc: flash at 40000000 {
-+		compatible = "stericsson,fsmc-nand";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x10100000 0x1000	/* FSMC Register*/
-+		       0x40000000 0x2000	/* NAND Base DATA */
-+		       0x41000000 0x2000	/* NAND Base ADDR */
-+		       0x40800000 0x2000>;	/* NAND Base CMD */
-+		reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
-+		status = "okay";
-+
-+		partition at 0 {
-+		label = "X-Loader(NAND)";
-+			reg = <0x0 0x40000>;
-+		};
-+		partition at 40000 {
-+			label = "MemInit(NAND)";
-+			reg = <0x40000 0x40000>;
-+		};
-+		partition at 80000 {
-+			label = "BootLoader(NAND)";
-+			reg = <0x80000 0x200000>;
-+		};
-+		partition at 280000 {
-+			label = "Kernel zImage(NAND)";
-+			reg = <0x280000 0x300000>;
-+		};
-+		partition at 580000 {
-+			label = "Root Filesystem(NAND)";
-+			reg = <0x580000 0x1600000>;
-+		};
-+		partition at 1b80000 {
-+			label = "User Filesystem(NAND)";
-+			reg = <0x1b80000 0x6480000>;
-+		};
++	gpio0: gpio at 101e4000 {
++		compatible = "st,nomadik-gpio";
++		reg =  <0x101e4000 0x80>;
++		interrupt-parent = <&vica>;
++		interrupts = <6>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		gpio-bank = <0>;
 +	};
 +
- 	amba {
- 		compatible = "arm,amba-bus";
- 		#address-cells = <1>;
++	gpio1: gpio at 101e5000 {
++		compatible = "st,nomadik-gpio";
++		reg =  <0x101e5000 0x80>;
++		interrupt-parent = <&vica>;
++		interrupts = <7>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		gpio-bank = <1>;
++	};
++
++	gpio2: gpio at 101e6000 {
++		compatible = "st,nomadik-gpio";
++		reg =  <0x101e6000 0x80>;
++		interrupt-parent = <&vica>;
++		interrupts = <8>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		gpio-bank = <2>;
++	};
++
++	gpio3: gpio at 101e7000 {
++		compatible = "st,nomadik-gpio";
++		reg =  <0x101e7000 0x80>;
++		interrupt-parent = <&vica>;
++		interrupts = <9>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		gpio-bank = <3>;
++	};
++
++	pinctrl {
++		compatible = "stericsson,nmk-pinctrl-stn8815";
++	};
++
+ 	/* A NAND flash of 128 MiB */
+ 	fsmc: flash at 40000000 {
+ 		compatible = "stericsson,fsmc-nand";
 diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 10b9f20..6bec72f 100644
+index 6bec72f..543e2c0 100644
 --- a/arch/arm/mach-nomadik/cpu-8815.c
 +++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -32,6 +32,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-+#include <linux/mtd/fsmc.h>
+@@ -153,13 +153,15 @@ static int __init cpu8815_init(void)
+ 		/* No custom data yet */
+ 	};
  
- #include <mach/hardware.h>
- #include <mach/irqs.h>
-@@ -262,6 +263,17 @@ struct sys_timer cpu8815_of_timer = {
- 	.init	= cpu8815_timer_init_of,
- };
++	/* For e.g. device tree boots */
++	if (!machine_is_nomadik())
++		return 0;
++
+ 	cpu8815_add_gpios(cpu8815_gpio_base, ARRAY_SIZE(cpu8815_gpio_base),
+ 			  IRQ_GPIO0, &pdata);
+ 	cpu8815_add_pinctrl(NULL, "pinctrl-stn8815");
+-	if (machine_is_nomadik()) {
+-		amba_apb_device_add(NULL, "rng", NOMADIK_RNG_BASE, SZ_4K, 0, 0, NULL, 0);
+-		amba_apb_device_add(NULL, "rtc-pl031", NOMADIK_RTC_BASE, SZ_4K, IRQ_RTC_RTT, 0, NULL, 0);
+-	}
++	amba_apb_device_add(NULL, "rng", NOMADIK_RNG_BASE, SZ_4K, 0, 0, NULL, 0);
++	amba_apb_device_add(NULL, "rtc-pl031", NOMADIK_RTC_BASE, SZ_4K, IRQ_RTC_RTT, 0, NULL, 0);
+ 	return 0;
+ }
+ arch_initcall(cpu8815_init);
+@@ -276,6 +278,16 @@ static struct fsmc_nand_platform_data cpu8815_nand_data = {
  
-+static struct fsmc_nand_timings cpu8815_nand_timings = {
-+	.thiz	= 0,
-+	.thold	= 0x10,
-+	.twait	= 0x0A,
-+	.tset	= 0,
-+};
-+
-+static struct fsmc_nand_platform_data cpu8815_nand_data = {
-+	.nand_timings = &cpu8815_nand_timings,
-+};
-+
  /* These are mostly to get the right device names for the clock lookups */
  static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO0_BASE,
++		"gpio.0", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO1_BASE,
++		"gpio.1", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO2_BASE,
++		"gpio.2", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO3_BASE,
++		"gpio.3", NULL),
++	OF_DEV_AUXDATA("stericsson,nmk-pinctrl-stn8815", 0,
++		"pinctrl-stn8815", NULL),
  	OF_DEV_AUXDATA("arm,primecell", NOMADIK_UART0_BASE,
-@@ -272,6 +284,9 @@ static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
- 		"rng", NULL),
- 	OF_DEV_AUXDATA("arm,primecell", NOMADIK_RTC_BASE,
- 		"rtc-pl031", NULL),
-+	OF_DEV_AUXDATA("stericsson,fsmc-nand", NOMADIK_FSMC_BASE,
-+		"fsmc-nand", &cpu8815_nand_data),
-+
- 	{ /* sentinel */ },
- };
+ 		"uart0", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", NOMADIK_UART1_BASE,
+@@ -296,6 +308,7 @@ static void __init cpu8815_init_of(void)
+ 	/* At full speed latency must be >=2, so 0x249 in low bits */
+ 	l2x0_of_init(0x00730249, 0xfe000fff);
+ #endif
++	pinctrl_register_mappings(nhk8815_pinmap, ARRAY_SIZE(nhk8815_pinmap));
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			cpu8815_auxdata_lookup, NULL);
+ }
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index ef66f98..2c30849 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -1840,6 +1840,10 @@ static struct pinctrl_desc nmk_pinctrl_desc = {
  
-diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
-index 1d74464..dda07c6 100644
---- a/drivers/mtd/nand/fsmc_nand.c
-+++ b/drivers/mtd/nand/fsmc_nand.c
-@@ -1218,6 +1218,7 @@ static SIMPLE_DEV_PM_OPS(fsmc_nand_pm_ops, fsmc_nand_suspend, fsmc_nand_resume);
- #ifdef CONFIG_OF
- static const struct of_device_id fsmc_nand_id_table[] = {
- 	{ .compatible = "st,spear600-fsmc-nand" },
-+	{ .compatible = "stericsson,fsmc-nand" },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, fsmc_nand_id_table);
+ static const struct of_device_id nmk_pinctrl_match[] = {
+ 	{
++		.compatible = "stericsson,nmk-pinctrl-stn8815",
++		.data = (void *)PINCTRL_NMK_STN8815,
++	},
++	{
+ 		.compatible = "stericsson,nmk_pinctrl",
+ 		.data = (void *)PINCTRL_NMK_DB8500,
+ 	},
 -- 
 1.7.11.7
