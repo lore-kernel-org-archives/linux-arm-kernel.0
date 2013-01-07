@@ -1,61 +1,45 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 07 Jan 2013 10:43:38 +0100
-Subject: [PATCH v3] mxs: uart: allow setting RTS from software
-In-Reply-To: <50CA8E8C.5060906@freescale.com>
-References: <1355405263-29625-1-git-send-email-s.trumtrar@pengutronix.de>
- <50CA8E8C.5060906@freescale.com>
-Message-ID: <50EA98CA.1060303@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 7 Jan 2013 10:47:47 +0100
+Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
+In-Reply-To: <20130106235312.0839a879@skate>
+References: <1357315498-4570-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50E710CB.8070007@lunn.ch> <20130104183139.20492204@skate>
+ <50E71356.3030203@lunn.ch> <20130104190345.460151d1@skate>
+ <50E9EE7A.1080301@free-electrons.com>
+ <20130106235312.0839a879@skate>
+Message-ID: <20130107094747.GR3392@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2012 03:27 AM, Huang Shijie wrote:
-> ? 2012?12?13? 21:27, Steffen Trumtrar ??:
->> With the patch "serial: mxs-auart: fix the wrong RTS hardware flow control" the
->> mainline mxs-uart driver now sets RTSEN only when hardware flow control is
->> enabled via software. It is not possible any longer to set RTS manually via
->> software. However, the manual modification is a valid operation.
->> Regain the possibility to set RTS via software and only set RTSEN when hardware
->> flow control is explicitly enabled via settermios cflag CRTSCTS.
->>
->> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->> ---
->>  drivers/tty/serial/mxs-auart.c |    4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
->> index 6db23b0..9f63f88 100644
->> --- a/drivers/tty/serial/mxs-auart.c
->> +++ b/drivers/tty/serial/mxs-auart.c
->> @@ -412,10 +412,12 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
->>  
->>  	u32 ctrl = readl(u->membase + AUART_CTRL2);
->>  
->> -	ctrl &= ~AUART_CTRL2_RTSEN;
->> +	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
->>  	if (mctrl & TIOCM_RTS) {
->>  		if (tty_port_cts_enabled(&u->state->port))
->>  			ctrl |= AUART_CTRL2_RTSEN;
->> +		else
->> +			ctrl |= AUART_CTRL2_RTS;
->>  	}
->>  
->>  	s->ctrl = mctrl;
-> Reviewed-by: Huang Shijie <b32955@freescale.com>
+On Sun, Jan 06, 2013 at 11:53:12PM +0100, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
+> 
+> On Sun, 06 Jan 2013 22:36:58 +0100, Gregory CLEMENT wrote:
+> 
+> > Until now I didn't notice any problem on this board with the 3GB enable.
+> > 
+> > I made more tests since I received this email, I booted (cold and hot boot)
+> > the board dozens of times, and indeed every 5 or 10 reboot the kernel hanged
+> > during boot at line:
+> > "UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)"
+> 
+> I think it hangs at the same place here.
+> 
+> > After applying your patch, I didn't notice any hang after 20 boots. Do you
+> > have a test pattern which make the kernel to hang each time to be sure that
+> > it is the root of the problem?
+> 
+> No, I don't have a specific pattern. It just hangs from time to time.
+> Maybe 1 boot out of 5 or something like that. And it just hangs like it
+> did for you.
 
-This patch is not not in today's next. What's the current status? Who
-will take it?
+Hi Thomas, Gregory
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+I've been testing my board some more, using the PlatHome kernel
+installed on the device as i received it. I've rebooted the device 20
+times and not had a single problem.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 261 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130107/65c0ab15/attachment.sig>
+I will now swap to a mainline kernel, 3.8-rc2 plus UART patch.
+
+  Andrew
