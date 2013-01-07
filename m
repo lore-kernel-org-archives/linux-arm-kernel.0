@@ -1,46 +1,122 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 7 Jan 2013 15:20:08 +0100
-Subject: FW: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save
- power
-In-Reply-To: <CADz5_gJ+8D_vm8SnfsnbheFpwarAxGSmY27FW_cvc7YdDH9pow@mail.gmail.com>
-References: <25B60CDC2F704E4E9D88FFD52780CB4C08B00BD3B1@SC-VEXCH1.marvell.com>
- <CADz5_gJ70KrHL5NoSPQbFdeHnQxWLh87zq6N+-V7J7Yq7t+aPQ@mail.gmail.com>
- <CAPDyKFrt4zWmhyO-UJAFPOH=90n4OwRPv3nczr4jPGBnc_jT5w@mail.gmail.com>
- <20121213101117.GF14363@n2100.arm.linux.org.uk>
- <CAPDyKFrkNnudy_rCL4P3GjRjh3zZ0aGVLti8uLJaW4FfuXm9JQ@mail.gmail.com>
- <CADz5_gJ+8D_vm8SnfsnbheFpwarAxGSmY27FW_cvc7YdDH9pow@mail.gmail.com>
-Message-ID: <CAPDyKFrW7Qcykzp837_iPXU-u8Jb7MpMrGNaHZM2-Q_tNfQ6jw@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 7 Jan 2013 15:23:45 +0100
+Subject: [PATCH 1/2] pinctrl/nomadik: simplify GPIO probe
+Message-ID: <1357568625-5979-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2012 12:45, Kevin Liu <keyuan.liu@gmail.com> wrote:
-> 2012/12/13 Ulf Hansson <ulf.hansson@linaro.org>:
->> On 13 December 2012 11:11, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Thu, Dec 13, 2012 at 10:04:46AM +0100, Ulf Hansson wrote:
->>>> Anyway, this need to be thought of as future step, since this patch is
->>>> not changing anything to that sequence as Kevin also is pointing out.
->>>
->>> Given that Kevin is talking about stuff in sdhci as if it affects MMCI,
->>> and that neither of you have picked that up, you're *still* not gaining
->>> any confidence from me that you're actually thinking about the changes
->>> you're making.  So I'm not really caring about how many acks your patches
->>> get, I'm still going to be reluctant to apply them without thinking about
->>> them for a bit.
->>
->> MMCI is doing "pm_runtime_get_sync" in it suspend. So the same
->> principles as Kevin is describing for sdhci goes for MMCI. Sorry if
->> this was not clearly pointed out.
->>
-> sorry for my unclear words. I just use sdhci directly to explain this.
-> It's similar for sdhci and mmci on this point. pm_runtime is
-> temporarily disabled during suspend/resume.
->
-> Thanks
-> Kevin
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Russell, is this enough for convincing you that everything has been
-thought of in this patch? Can we merge this?
+Instead of jumping to a label later in the probe just return
+with an error code whenever probe() fails. Make sure to remove
+the gpiochip on irqdomain error now that we're at it.
 
-Kind regards
-Ulf Hansson
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-nomadik.c | 52 +++++++++++++--------------------------
+ 1 file changed, 17 insertions(+), 35 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index 0355786..66cce5f 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -1343,8 +1343,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 
+ 		if (of_property_read_u32(np, "gpio-bank", &dev->id)) {
+ 			dev_err(&dev->dev, "gpio-bank property not found\n");
+-			ret = -EINVAL;
+-			goto out;
++			return -EINVAL;
+ 		}
+ 
+ 		pdata->first_gpio = dev->id * NMK_GPIO_PER_CHIP;
+@@ -1352,41 +1351,29 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 	}
+ 
+ 	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		ret = -ENOENT;
+-		goto out;
+-	}
++	if (!res)
++		return -ENOENT;
+ 
+ 	irq = platform_get_irq(dev, 0);
+-	if (irq < 0) {
+-		ret = irq;
+-		goto out;
+-	}
++	if (irq < 0)
++		return irq;
+ 
+ 	secondary_irq = platform_get_irq(dev, 1);
+-	if (secondary_irq >= 0 && !pdata->get_secondary_status) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
++	if (secondary_irq >= 0 && !pdata->get_secondary_status)
++		return -EINVAL;
+ 
+ 	base = devm_request_and_ioremap(&dev->dev, res);
+-	if (!base) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
++	if (!base)
++		return -ENOMEM;
+ 
+ 	clk = devm_clk_get(&dev->dev, NULL);
+-	if (IS_ERR(clk)) {
+-		ret = PTR_ERR(clk);
+-		goto out;
+-	}
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
+ 	clk_prepare(clk);
+ 
+ 	nmk_chip = devm_kzalloc(&dev->dev, sizeof(*nmk_chip), GFP_KERNEL);
+-	if (!nmk_chip) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
++	if (!nmk_chip)
++		return -ENOMEM;
+ 
+ 	/*
+ 	 * The virt address in nmk_chip->addr is in the nomadik register space,
+@@ -1420,7 +1407,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 
+ 	ret = gpiochip_add(&nmk_chip->chip);
+ 	if (ret)
+-		goto out;
++		return ret;
+ 
+ 	BUG_ON(nmk_chip->bank >= ARRAY_SIZE(nmk_gpio_chips));
+ 
+@@ -1435,8 +1422,9 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 				&nmk_gpio_irq_simple_ops, nmk_chip);
+ 	if (!nmk_chip->domain) {
+ 		dev_err(&dev->dev, "failed to create irqdomain\n");
+-		ret = -ENOSYS;
+-		goto out;
++		/* Just do this, no matter if it fails */
++		ret = gpiochip_remove(&nmk_chip->chip);
++		return -ENOSYS;
+ 	}
+ 
+ 	nmk_gpio_init_irq(nmk_chip);
+@@ -1444,12 +1432,6 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 	dev_info(&dev->dev, "at address %p\n", nmk_chip->addr);
+ 
+ 	return 0;
+-
+-out:
+-	dev_err(&dev->dev, "Failure %i for GPIO %i-%i\n", ret,
+-		  pdata->first_gpio, pdata->first_gpio+31);
+-
+-	return ret;
+ }
+ 
+ static int nmk_get_groups_cnt(struct pinctrl_dev *pctldev)
+-- 
+1.7.11.3
