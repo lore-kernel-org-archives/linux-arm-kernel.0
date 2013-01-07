@@ -1,153 +1,76 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  7 Jan 2013 23:56:05 +0100
-Subject: [PATCH 03/11] ARM: nomadik: move pin maps to cpu file
-Message-ID: <1357599365-7426-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  7 Jan 2013 23:56:12 +0100
+Subject: [PATCH 04/11] ARM: nomadik: move remaining PrimeCells to device tree
+Message-ID: <1357599372-7458-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the pinctrl maps over to the CPU file and register them
-right before the pin controller itself. This way the pinmaps
-will also benefit the device tree boot.
+The two remaining PrimeCells, RNG and RTC, are migrated to the
+device tree for device tree boot.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-nomadik/board-nhk8815.c | 45 -----------------------------------
- arch/arm/mach-nomadik/cpu-8815.c      | 44 ++++++++++++++++++++++++++++++++++
- 2 files changed, 44 insertions(+), 45 deletions(-)
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 12 ++++++++++++
+ arch/arm/mach-nomadik/cpu-8815.c           | 11 +++++++++--
+ 2 files changed, 21 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
-index 754bf8a..33ce566 100644
---- a/arch/arm/mach-nomadik/board-nhk8815.c
-+++ b/arch/arm/mach-nomadik/board-nhk8815.c
-@@ -24,8 +24,6 @@
- #include <linux/mtd/partitions.h>
- #include <linux/i2c.h>
- #include <linux/io.h>
--#include <linux/pinctrl/machine.h>
--#include <linux/platform_data/pinctrl-nomadik.h>
- #include <linux/platform_data/clocksource-nomadik-mtu.h>
- #include <asm/hardware/vic.h>
- #include <asm/sizes.h>
-@@ -298,51 +296,8 @@ static struct i2c_board_info __initdata nhk8815_i2c2_devices[] = {
- 	},
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index 81284c5..29986ea 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -73,5 +73,17 @@
+ 			interrupts = <28>;
+ 			status = "disabled";
+ 		};
++
++		rng: rng at 101b0000 {
++			compatible = "arm,primecell";
++			reg = <0x101b0000 0x1000>;
++		};
++
++		rtc: rtc at 101e8000 {
++			compatible = "arm,pl031", "arm,primecell";
++			reg = <0x101e8000 0x1000>;
++			interrupt-parent = <&vica>;
++			interrupts = <10>;
++		};
+ 	};
  };
- 
--static unsigned long out_low[] = { PIN_OUTPUT_LOW };
--static unsigned long out_high[] = { PIN_OUTPUT_HIGH };
--static unsigned long in_nopull[] = { PIN_INPUT_NOPULL };
--static unsigned long in_pullup[] = { PIN_INPUT_PULLUP };
--
--static struct pinctrl_map __initdata nhk8815_pinmap[] = {
--	PIN_MAP_MUX_GROUP_DEFAULT("uart0", "pinctrl-stn8815", "u0_a_1", "u0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("uart1", "pinctrl-stn8815", "u1_a_1", "u1"),
--	/* Hog in MMC/SD card mux */
--	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-stn8815", "mmcsd_a_1", "mmcsd"),
--	/* MCCLK */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO8_B10", out_low),
--	/* MCCMD */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO9_A10", in_pullup),
--	/* MCCMDDIR */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO10_C11", out_high),
--	/* MCDAT3-0 */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO11_B11", in_pullup),
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO12_A11", in_pullup),
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO13_C12", in_pullup),
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO14_B12", in_pullup),
--	/* MCDAT0DIR */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO15_A12", out_high),
--	/* MCDAT31DIR */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO16_C13", out_high),
--	/* MCMSFBCLK */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO24_C15", in_pullup),
--	/* CD input GPIO */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO111_H21", in_nopull),
--	/* CD bias drive */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO112_J21", out_low),
--	/* I2C0 */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO62_D3", in_pullup),
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO63_D2", in_pullup),
--	/* I2C1 */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO53_L4", in_pullup),
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO54_L3", in_pullup),
--	/* I2C2 */
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO73_C21", in_pullup),
--	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO74_C20", in_pullup),
--};
--
- static void __init nhk8815_platform_init(void)
- {
--	pinctrl_register_mappings(nhk8815_pinmap, ARRAY_SIZE(nhk8815_pinmap));
- 	cpu8815_platform_init();
- 	nhk8815_onenand_init();
- 	platform_add_devices(nhk8815_platform_devices,
 diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index f595b04..a983f47 100644
+index a983f47..10b9f20 100644
 --- a/arch/arm/mach-nomadik/cpu-8815.c
 +++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -27,6 +27,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/platform_data/clk-nomadik.h>
- #include <linux/platform_data/pinctrl-nomadik.h>
-+#include <linux/pinctrl/machine.h>
- #include <linux/platform_data/clocksource-nomadik-mtu.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
-@@ -89,6 +90,48 @@ void cpu8815_add_gpios(resource_size_t *base, int num, int irq,
- 	}
- }
+@@ -39,6 +39,7 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ #include <asm/hardware/vic.h>
++#include <asm/mach-types.h>
  
-+static unsigned long out_low[] = { PIN_OUTPUT_LOW };
-+static unsigned long out_high[] = { PIN_OUTPUT_HIGH };
-+static unsigned long in_nopull[] = { PIN_INPUT_NOPULL };
-+static unsigned long in_pullup[] = { PIN_INPUT_PULLUP };
-+
-+static struct pinctrl_map __initdata nhk8815_pinmap[] = {
-+	PIN_MAP_MUX_GROUP_DEFAULT("uart0", "pinctrl-stn8815", "u0_a_1", "u0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("uart1", "pinctrl-stn8815", "u1_a_1", "u1"),
-+	/* Hog in MMC/SD card mux */
-+	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-stn8815", "mmcsd_a_1", "mmcsd"),
-+	/* MCCLK */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO8_B10", out_low),
-+	/* MCCMD */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO9_A10", in_pullup),
-+	/* MCCMDDIR */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO10_C11", out_high),
-+	/* MCDAT3-0 */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO11_B11", in_pullup),
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO12_A11", in_pullup),
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO13_C12", in_pullup),
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO14_B12", in_pullup),
-+	/* MCDAT0DIR */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO15_A12", out_high),
-+	/* MCDAT31DIR */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO16_C13", out_high),
-+	/* MCMSFBCLK */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO24_C15", in_pullup),
-+	/* CD input GPIO */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO111_H21", in_nopull),
-+	/* CD bias drive */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO112_J21", out_low),
-+	/* I2C0 */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO62_D3", in_pullup),
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO63_D2", in_pullup),
-+	/* I2C1 */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO53_L4", in_pullup),
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO54_L3", in_pullup),
-+	/* I2C2 */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO73_C21", in_pullup),
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO74_C20", in_pullup),
-+};
-+
- static inline void
- cpu8815_add_pinctrl(struct device *parent, const char *name)
- {
-@@ -98,6 +141,7 @@ cpu8815_add_pinctrl(struct device *parent, const char *name)
- 		.id = -1,
- 	};
- 
-+	pinctrl_register_mappings(nhk8815_pinmap, ARRAY_SIZE(nhk8815_pinmap));
- 	platform_device_register_full(&pdevinfo);
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -154,8 +155,10 @@ static int __init cpu8815_init(void)
+ 	cpu8815_add_gpios(cpu8815_gpio_base, ARRAY_SIZE(cpu8815_gpio_base),
+ 			  IRQ_GPIO0, &pdata);
+ 	cpu8815_add_pinctrl(NULL, "pinctrl-stn8815");
+-	amba_apb_device_add(NULL, "rng", NOMADIK_RNG_BASE, SZ_4K, 0, 0, NULL, 0);
+-	amba_apb_device_add(NULL, "rtc-pl031", NOMADIK_RTC_BASE, SZ_4K, IRQ_RTC_RTT, 0, NULL, 0);
++	if (machine_is_nomadik()) {
++		amba_apb_device_add(NULL, "rng", NOMADIK_RNG_BASE, SZ_4K, 0, 0, NULL, 0);
++		amba_apb_device_add(NULL, "rtc-pl031", NOMADIK_RTC_BASE, SZ_4K, IRQ_RTC_RTT, 0, NULL, 0);
++	}
+ 	return 0;
  }
+ arch_initcall(cpu8815_init);
+@@ -265,6 +268,10 @@ static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
+ 		"uart0", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", NOMADIK_UART1_BASE,
+ 		"uart1", NULL),
++	OF_DEV_AUXDATA("arm,primecell", NOMADIK_RNG_BASE,
++		"rng", NULL),
++	OF_DEV_AUXDATA("arm,primecell", NOMADIK_RTC_BASE,
++		"rtc-pl031", NULL),
+ 	{ /* sentinel */ },
+ };
  
 -- 
 1.7.11.7
