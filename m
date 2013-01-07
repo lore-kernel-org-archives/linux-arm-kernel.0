@@ -1,72 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 7 Jan 2013 20:58:54 +0100
-Subject: [PATCH 3.9 1/3] misc: new driver for GPIO-connected 7-segment
- displays
-In-Reply-To: <201301071943.40074.arnd@arndb.de>
-References: <1357576928-29133-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1357576928-29133-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <201301071943.40074.arnd@arndb.de>
-Message-ID: <20130107205854.1f019816@skate>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Jan 2013 12:03:38 -0800
+Subject: [PATCH] omap: am33xx-hwmod: Fix wrongly terminated
+ am33xx_usbss_mpu_irqs array
+In-Reply-To: <1357252342-6166-1-git-send-email-panto@antoniou-consulting.com>
+References: <1357252342-6166-1-git-send-email-panto@antoniou-consulting.com>
+Message-ID: <20130107200338.GD14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+* Pantelis Antoniou <panto@antoniou-consulting.com> [130103 14:35]:
+> The IRQ array must be terminated by -1 and not by -1+OMAP_INTC_START
+> This led to having a resource list of 100s of IRQs.
 
-On Mon, 7 Jan 2013 19:43:39 +0000, Arnd Bergmann wrote:
+This is a bug for sure introduced with commit a2cfc509 (ARM: OMAP3+:
+hwmod: Add AM33XX HWMOD data). Anybody care to ack this one?
 
-> >  .../devicetree/bindings/misc/gpio-7seg.txt         |   18 +++
-> >  drivers/misc/Kconfig                               |   13 ++
-> >  drivers/misc/Makefile                              |    1 +
-> >  drivers/misc/gpio-7seg.c                           |  168 ++++++++++++++++++++
+Regards,
+
+Tony
+ 
+> Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I wonder if it would make sense to merge this into the LED subsystem
-> rather than having it as a standalone driver.
-
-Hum, maybe. How do you see it fitting inside the LED subsystem? The
-purpose of the device is quite different in its userspace to kernel
-interface, no?
-
-> > diff --git a/Documentation/devicetree/bindings/misc/gpio-7seg.txt b/Documentation/devicetree/bindings/misc/gpio-7seg.txt
-> > new file mode 100644
-> > index 0000000..107d178
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/misc/gpio-7seg.txt
-> > @@ -0,0 +1,18 @@
-> > +* 7-segment driver connected over GPIO through a BCD decoder
-> > +
-> > +Required properties:
-> > +- compatible: "generic,gpio-7seg"
-> > +- gpios: list of GPIOs to use to control the 7-segment display
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> index 081c71e..e402303 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> @@ -2070,7 +2070,7 @@ static struct omap_hwmod_irq_info am33xx_usbss_mpu_irqs[] = {
+>  	{ .name = "usbss-irq", .irq = 17 + OMAP_INTC_START, },
+>  	{ .name = "musb0-irq", .irq = 18 + OMAP_INTC_START, },
+>  	{ .name = "musb1-irq", .irq = 19 + OMAP_INTC_START, },
+> -	{ .irq = -1 + OMAP_INTC_START, },
+> +	{ .irq = -1, },
+>  };
+>  
+>  static struct omap_hwmod am33xx_usbss_hwmod = {
+> -- 
+> 1.7.12
 > 
-> Maybe list the minimum and maximum number of gpio lines here?
-
-Indeed. Seems like it should be anywhere between 0 and 32 GPIOs.
-
-> > +	sdev->dev_attr.attr.name = "value";
-> > +	sdev->dev_attr.attr.mode = S_IRUGO | S_IWUGO;
-> > +	sdev->dev_attr.show = gpio_7seg_show;
-> > +	sdev->dev_attr.store = gpio_7seg_store;
-> 
-> Any reason why you are not using the DEVICE_ATTR macro?
-
-DEVICE_ATTR declares the structure, and I wanted one per gpio_7seg
-device, which is dynamically allocated, so I thought that using
-DEVICE_ATTR was not possible. But now that you point this, I realize
-that I was stupid. I can perfectly live with one single global 'struct
-device_attribute' that I register to several devices using
-device_create_file(), no?
-
-That said, is it worth the effort to continue polishing this driver,
-after seeing the feedback from Greg about it? I don't mind working on
-it more and fix the problems of course, but if the general answer is
-that we don't want such a driver in the kernel, then I'd better not
-spend more time on this.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
