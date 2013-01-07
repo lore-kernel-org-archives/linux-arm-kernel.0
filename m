@@ -1,32 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon,  7 Jan 2013 15:27:00 +0100
-Subject: [PATCH] ARM: mx5: Fix MX53 flexcan2 clock
-Message-ID: <1357568820-15426-1-git-send-email-marex@denx.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 7 Jan 2013 14:27:40 +0000
+Subject: [alsa-devel] [PATCH V2 2/2] ASoC: Davinci: machine: Add device
+ tree binding
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EB3690C@DBDE01.ent.ti.com>
+References: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
+ <1357293277-25543-3-git-send-email-gururaja.hebbar@ti.com>
+ <20130104122612.GM4627@opensource.wolfsonmicro.com>
+ <1BAFE6F6C881BF42822005164F1491C33EB3690C@DBDE01.ent.ti.com>
+Message-ID: <20130107142740.GG4544@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The second FlexCAN port uses different clock than the first one, configure
-correct clock to prevent hanging of the system during bringing up of the port.
+On Mon, Jan 07, 2013 at 09:20:16AM +0000, Hebbar, Gururaja wrote:
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx53.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> I will be looking into this now. To speed up the things, do you have any
+> reference link/implementation which  I can refer to?
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 5b59763..abe0f0b 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -614,7 +614,7 @@
- 				compatible = "fsl,imx53-flexcan", "fsl,p1010-flexcan";
- 				reg = <0x53fcc000 0x4000>;
- 				interrupts = <83>;
--				clocks = <&clks 158>, <&clks 157>;
-+				clocks = <&clks 87>, <&clks 86>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
- 			};
--- 
-1.7.10.4
+Any modern CODEC driver.
+
+> I looked at the OMAP implementation but they are following the same (meaning both
+> DT & non-DT use similar audio map for routing).
+
+You should use the same setup for DT and non-DT.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130107/9ffbd211/attachment.sig>
