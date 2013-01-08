@@ -1,51 +1,56 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 8 Jan 2013 01:02:38 +0000
-Subject: [v3 PATCH 06/12] spi/atmel_spi: add dmaengine support
-In-Reply-To: <1357524615.4940.19.camel@joe-AO722>
-References: <1357523413-27209-1-git-send-email-wenyou.yang@atmel.com>
- <1357523413-27209-7-git-send-email-wenyou.yang@atmel.com>
- <1357524615.4940.19.camel@joe-AO722>
-Message-ID: <B256D81BAE5131468A838E5D7A2436413A057056@penmbx02>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 8 Jan 2013 09:06:35 +0800
+Subject: [PATCH v3] mxs: uart: allow setting RTS from software
+In-Reply-To: <50EA98CA.1060303@pengutronix.de>
+References: <1355405263-29625-1-git-send-email-s.trumtrar@pengutronix.de>
+ <50CA8E8C.5060906@freescale.com> <50EA98CA.1060303@pengutronix.de>
+Message-ID: <20130108010631.GG29281@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 07, 2013 at 10:43:38AM +0100, Marc Kleine-Budde wrote:
+> On 12/14/2012 03:27 AM, Huang Shijie wrote:
+> > ? 2012?12?13? 21:27, Steffen Trumtrar ??:
+> >> With the patch "serial: mxs-auart: fix the wrong RTS hardware flow control" the
+> >> mainline mxs-uart driver now sets RTSEN only when hardware flow control is
+> >> enabled via software. It is not possible any longer to set RTS manually via
+> >> software. However, the manual modification is a valid operation.
+> >> Regain the possibility to set RTS via software and only set RTSEN when hardware
+> >> flow control is explicitly enabled via settermios cflag CRTSCTS.
+> >>
+> >> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> >> ---
+> >>  drivers/tty/serial/mxs-auart.c |    4 +++-
+> >>  1 file changed, 3 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> >> index 6db23b0..9f63f88 100644
+> >> --- a/drivers/tty/serial/mxs-auart.c
+> >> +++ b/drivers/tty/serial/mxs-auart.c
+> >> @@ -412,10 +412,12 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
+> >>  
+> >>  	u32 ctrl = readl(u->membase + AUART_CTRL2);
+> >>  
+> >> -	ctrl &= ~AUART_CTRL2_RTSEN;
+> >> +	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
+> >>  	if (mctrl & TIOCM_RTS) {
+> >>  		if (tty_port_cts_enabled(&u->state->port))
+> >>  			ctrl |= AUART_CTRL2_RTSEN;
+> >> +		else
+> >> +			ctrl |= AUART_CTRL2_RTS;
+> >>  	}
+> >>  
+> >>  	s->ctrl = mctrl;
+> > Reviewed-by: Huang Shijie <b32955@freescale.com>
+> 
+> This patch is not not in today's next. What's the current status? Who
+> will take it?
+> 
+I see stable at vger.kernel.org is on copy.  But it's not the correct way
+submit a fix for stable tree.  Check out Documentation/stable_kernel_rules.txt
+for the correct one.
 
+Remember to copy Greg Kroah-Hartman <gregkh@linuxfoundation.org> who
+is collecting serial patches believe.
 
-> -----Original Message-----
-> From: Joe Perches [mailto:joe at perches.com]
-> Sent: 2013?1?7? 10:10
-> To: Yang, Wenyou
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Ferre,
-> Nicolas; plagnioj at jcrosoft.com; richard.genoud at gmail.com; Lin, JM;
-> grant.likely at secretlab.ca; spi-devel-general at lists.sourceforge.net
-> Subject: Re: [v3 PATCH 06/12] spi/atmel_spi: add dmaengine support
-> 
-> On Mon, 2013-01-07 at 09:50 +0800, Wenyou Yang wrote:
-> > From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> []
-> > diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> []
-> > +static inline bool atmel_spi_use_dma(struct atmel_spi *as,
-> > +				struct spi_transfer *xfer)
-> > +{
-> > +	if ((as->use_dma) && (xfer->len >= DMA_MIN_BYTES))
-> > +		return true;
-> > +	else
-> > +		return false;
-> > +}
-> 
-> Same unnecessary form.
-> 
-> 	return as->use_dma && xfer->len >= DMA_MIN_BYTES;
-> 
-> > +static inline bool atmel_spi_use_pdc(struct atmel_spi *as)
-> > +{
-> > +	if (as->use_pdc)
-> > +		return true;
-> > +	else
-> > +		return false;
-> > +}
-> 
-> Does this function really need to exist at all?
-> 
-Thanks a lot for your advice.
+Shawn
