@@ -1,80 +1,41 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 08 Jan 2013 13:42:18 -0500
-Subject: [PATCH v5 08/12] ARM: KVM: vgic: retire queued, disabled interrupts
-In-Reply-To: <20130108184116.46558.3558.stgit@ubuntu>
-References: <20130108184116.46558.3558.stgit@ubuntu>
-Message-ID: <20130108184218.46558.21262.stgit@ubuntu>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Jan 2013 10:20:06 -0800
+Subject: [GIT PULL] few omap fixes for v3.8-rc2
+In-Reply-To: <CAOesGMhyYQoFYzqopGgwDwEVc4Gc74ERbRiJg_vhTmYf+V3_rA@mail.gmail.com>
+References: <20130108174816.GP14149@atomide.com>
+ <CAOesGMhyYQoFYzqopGgwDwEVc4Gc74ERbRiJg_vhTmYf+V3_rA@mail.gmail.com>
+Message-ID: <20130108182005.GR14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+* Olof Johansson <olof@lixom.net> [130108 10:04]:
+> On Tue, Jan 8, 2013 at 9:48 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+> >
+> >   Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8-rc2/fixes-signed-v2
+> >
+> > for you to fetch changes up to 6adba67eb0c4731ed0346731d024b2102f5b4d9d:
+> >
+> >   ARM: OMAP2+: am33xx-hwmod: Fix wrongly terminated am33xx_usbss_mpu_irqs array (2013-01-07 12:38:07 -0800)
+> >
+> > ----------------------------------------------------------------
+> > The biggest change is a fix to deal with different power state
+> > on omap2 registers that causes issues trying to use common PM code.
+> > Also fix few incorrect registers, and an issue for omap1 USB, and
+> > few sparse fixes for issues that sneaked in with all the clean-up.
+> 
+> Pulled, thanks. Not super-happy about the 100+ line delta for the 24xx
+> bugfix, but seems like it's needed.
 
-An interrupt may have been disabled after being made pending on the
-CPU interface (the classic case is a timer running while we're
-rebooting the guest - the interrupt would kick as soon as the CPU
-interface gets enabled, with deadly consequences).
+Yes sorry looks like Paul was attempting to drop the omap custom PM
+changes related to the drivers/i2c/bus/i2c-omap.c revert mess, but
+naturally it's now too late. AFAIK that patch could wait for v3.9
+too if necessary.
 
-The solution is to examine already active LRs, and check the
-interrupt is still enabled. If not, just retire it.
+Regards,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
----
- arch/arm/kvm/vgic.c |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
-
-diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-index 58237d5..49e8b27 100644
---- a/arch/arm/kvm/vgic.c
-+++ b/arch/arm/kvm/vgic.c
-@@ -71,6 +71,7 @@
- #define ACCESS_WRITE_VALUE	(3 << 1)
- #define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
- 
-+static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
- static void vgic_update_state(struct kvm *kvm);
- static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
- 
-@@ -344,6 +345,7 @@ static bool handle_mmio_clear_enable_reg(struct kvm_vcpu *vcpu,
- 	if (mmio->is_write) {
- 		if (offset < 4) /* Force SGI enabled */
- 			*reg |= 0xffff;
-+		vgic_retire_disabled_irqs(vcpu);
- 		vgic_update_state(vcpu->kvm);
- 		return true;
- 	}
-@@ -792,6 +794,34 @@ static void vgic_update_state(struct kvm *kvm)
- 	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
- #define MK_LR_PEND(src, irq)	\
- 	(GICH_LR_PENDING_BIT | ((src) << GICH_LR_PHYSID_CPUID_SHIFT) | (irq))
-+
-+/*
-+ * An interrupt may have been disabled after being made pending on the
-+ * CPU interface (the classic case is a timer running while we're
-+ * rebooting the guest - the interrupt would kick as soon as the CPU
-+ * interface gets enabled, with deadly consequences).
-+ *
-+ * The solution is to examine already active LRs, and check the
-+ * interrupt is still enabled. If not, just retire it.
-+ */
-+static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	int lr;
-+
-+	for_each_set_bit(lr, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-+		int irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
-+
-+		if (!vgic_irq_is_enabled(vcpu, irq)) {
-+			vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
-+			clear_bit(lr, vgic_cpu->lr_used);
-+			vgic_cpu->vgic_lr[lr] &= ~GICH_LR_STATE;
-+			if (vgic_irq_is_active(vcpu, irq))
-+				vgic_irq_clear_active(vcpu, irq);
-+		}
-+	}
-+}
-+
- /*
-  * Queue an interrupt to a CPU virtual interface. Return true on success,
-  * or false if it wasn't possible to queue it.
+Tony
