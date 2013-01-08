@@ -1,47 +1,85 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Tue, 8 Jan 2013 16:32:41 +0800
-Subject: [V2 PATCH 00/27] mv-usb fix and enhancement patches
-In-Reply-To: <CADApbei1BsSOyBkRLQo8gLJvOzyDJ5eeKQ6Gqk-ycXCgEEsNnQ@mail.gmail.com>
-References: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
- <20121130141012.GA17587@arwen.pp.htv.fi>
- <CAN1soZw=Zz8vuwbEnH4L2yHyjpOYopH8s=GxRdaXyKZuh8ZaqQ@mail.gmail.com>
- <CADApbei1BsSOyBkRLQo8gLJvOzyDJ5eeKQ6Gqk-ycXCgEEsNnQ@mail.gmail.com>
-Message-ID: <CADApbeg06Wq0VQcrgmTU0i6mJz=5BZ48vD2xzh3bHbDVTbog7Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 08 Jan 2013 09:32:54 +0100
+Subject: [PATCH V2 1/3] gpio: pca953x: make the register access by GPIO
+ bank
+In-Reply-To: <1357599097-19053-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1357599097-19053-1-git-send-email-gregory.clement@free-electrons.com>
+ <1357599097-19053-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <50EBD9B6.3090601@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 5, 2013 at 9:35 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
-> hi, Felipe
-> How about these patches? i see that 3.8-rc2 is tagged but these
-> patches are not merged. Thanks.
->
-> On Tue, Dec 4, 2012 at 3:34 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->> On Fri, Nov 30, 2012 at 10:10 PM, Felipe Balbi <balbi@ti.com> wrote:
->>> Hi,
->>>
->>> On Tue, Nov 27, 2012 at 10:05:59PM -0500, Chao Xie wrote:
->>>> The patches are divied into 4 parts
->>>> 1. bug fixes
->>>>   usb: gadget: mv_udc: use udc_start and udc_stop functions
->>>>   usb: gadget: mv_udc: use devm_xxx for probe
->>>>   usb: gadget: mv_udc: fix the clk APIs
->>>>   usb: otg: mv_otg: use devm_xxx for probe
->>>>   usb: otg: mv_otg: fix the clk APIs
->>>>   usb: host: ehci-mv: fix clk APIs
->>>>   usb: host: ehci-mv: remove unused variable
->>>>   usb: gadget: mv_udc: fix the value of tranceiver
->>>> Above patches are bug fixes.
->>>
->>> The gadget and OTG parts I will start queueing once v3.8-rc1 is tagged,
->>> please hang on.
->>>
->>> --
->>> balbi
->>
->> Acked for all patches in arch-mmp.
+Hi Gregory,
 
-hi, Felipe
-How about the patches for
-2. PHY driver
-3. external chip support?
-Do i need re-submit the patches? Thanks.
+On 07/01/2013 23:51, Gregory CLEMENT wrote:
+> -static int pca953x_write_reg(struct pca953x_chip *chip, int reg, u32 val)
+> +static int pca953x_read_single(struct pca953x_chip *chip, int reg, u32 *val,
+> +				int off)
+> +{
+> +	int ret;
+> +	int bank_shift = fls((chip->gpio_chip.ngpio - 1) / BANK_SZ);
+> +	int offset = off / BANK_SZ;
+> +
+> +	ret = i2c_smbus_read_byte_data(chip->client,
+> +				(reg << bank_shift) + offset);
+> +	*val = ret;
+> +
+> +	if (ret < 0) {
+> +		dev_err(&chip->client->dev, "failed reading register\n", reg);
+
+This triggers a warning, since you have an argument but nothing corresponding to it in your format string.
+
+>  static irqreturn_t pca953x_irq_handler(int irq, void *devid)
+>  {
+>  	struct pca953x_chip *chip = devid;
+> -	u32 pending;
+> -	u32 level;
+> +	u8 pending[MAX_BANK];
+> +	u8 level;
+> +	int i;
+>  
+> -	pending = pca953x_irq_pending(chip);
+> -
+> -	if (!pending)
+> +	if (!pca953x_irq_pending(chip, pending))
+>  		return IRQ_HANDLED;
+>  
+> -	do {
+> -		level = __ffs(pending);
+> -		handle_nested_irq(irq_find_mapping(chip->domain, level));
+> -
+> -		pending &= ~(1 << level);
+> -	} while (pending);
+> +	for (i = 0; i < NBANK(chip); i++) {
+> +		do {
+> +			level = __ffs(pending[i]);
+> +			handle_nested_irq(irq_find_mapping(chip->domain,
+> +							level + (BANK_SZ * i)));
+> +			pending[i] &= ~(1 << level);
+> +		} while (pending[i]);
+> +	}
+>  
+>  	return IRQ_HANDLED;
+>  }
+
+This triggers the following warning when an interrupt is raised:
+
+[   30.773500] ------------[ cut here ]------------
+[   30.778843] WARNING: at /home/tmp/linux/kernel/irq/irqdomain.c:137 irq_domain_legacy_revmap+0x2c/0x48()
+[   30.788375] Modules linked in:
+[   30.791531] [<c0014100>] (unwind_backtrace+0x0/0xf0) from [<c001c878>] (warn_slowpath_common+0x4c/0x64)
+[   30.801125] [<c001c878>] (warn_slowpath_common+0x4c/0x64) from [<c001c8ac>] (warn_slowpath_null+0x1c/0x24)
+[   30.810968] [<c001c8ac>] (warn_slowpath_null+0x1c/0x24) from [<c006b5e0>] (irq_domain_legacy_revmap+0x2c/0x48)
+[   30.821187] [<c006b5e0>] (irq_domain_legacy_revmap+0x2c/0x48) from [<c01c3734>] (pca953x_irq_handler+0x16c/0x1ac)
+[   30.831656] [<c01c3734>] (pca953x_irq_handler+0x16c/0x1ac) from [<c0068688>] (irq_thread+0xd0/0x124)
+[   30.841000] [<c0068688>] (irq_thread+0xd0/0x124) from [<c003c238>] (kthread+0xa4/0xb0)
+[   30.849125] [<c003c238>] (kthread+0xa4/0xb0) from [<c000ed48>] (ret_from_fork+0x14/0x2c)
+[   30.857375] ---[ end trace 09584b7a73100a49 ]---
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
