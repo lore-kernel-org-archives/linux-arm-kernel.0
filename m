@@ -1,35 +1,32 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Tue, 08 Jan 2013 10:30:45 +0100
-Subject: [PATCH RESEND] ARM: dts: AM33XX: Rename I2C and GPIO nodes
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EAD4863@DBDE01.ent.ti.com>
- (Chimata AnilKumar's message of "Wed, 2 Jan 2013 10:12:29 +0000")
-References: <1353498737-21174-1-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EAD4863@DBDE01.ent.ti.com>
-Message-ID: <8738ycaunu.fsf@dell.be.48ers.dk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 8 Jan 2013 09:41:34 +0000
+Subject: [PATCH] mfd: stmpe: Pull IRQ GPIO number from DT during DT-based
+ probe
+In-Reply-To: <50EB97E3.8050703@st.com>
+References: <1357568989-16237-1-git-send-email-marex@denx.de>
+ <20130107150341.GT21994@gmail.com>
+ <201301071613.33573.marex@denx.de>
+ <CAKohpon_h2ehq5Cf-fVyne33y7iyXCD35FVV1yuhgoDDstEcFQ@mail.gmail.com>
+ <50EB97E3.8050703@st.com>
+Message-ID: <20130108094134.GA21994@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "AnilKumar" == AnilKumar, Chimata <anilkumar@ti.com> writes:
+> >Both can be killed. gpios as interrupt lines can be requested as:
+> >
+> >  interrupt-parent =<&gpio-controller>;
+> >  interrupts =<25 0x1>;
+> >
+> >and probably the stmpe driver doesn't have to bother at all if
+> >interrupt was over gpio or not.
 
- AnilKumar> On Wed, Nov 21, 2012 at 17:22:17, AnilKumar, Chimata wrote:
- >> Rename I2C and GPIO nodes according to AM33XX TRM. According to
- >> AM33XX TRM device instances are starting from "0" like i2c0, i2c1
- >> and i2c3.
- >> 
- >> Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
- >> [panto at antoniou-consulting.com: initial patch by pantelis's]
- >> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
- >> ---
- >> Changes from first version:
- >> - Updated pantelis's patch
- >> * Modified based on linux-omap/master
- >> * Added GPIO nodes renaming as well
+> Yes, both can be killed and similarly we did for spear1340 machine
+> but some how we missed it on spear320-hmi.
 
- AnilKumar> Hi Tony/Benoit,
-
- AnilKumar> If there are no comments could you please pull this patch?
-
-Yes, please do.
+Bingo!
 
 -- 
-Bye, Peter Korsgaard
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
