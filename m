@@ -1,32 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 8 Jan 2013 14:54:00 +0800
-Subject: [PATCH 0/3] Add imx6q-cpufreq driver support
-Message-ID: <1357628043-19256-1-git-send-email-shawn.guo@linaro.org>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Tue, 08 Jan 2013 12:25:53 +0530
+Subject: [PATCH 1/2] cpuhotplug/nohz: Remove offline cpus from nohz-idle
+ state
+In-Reply-To: <20130105103627.GU2631@n2100.arm.linux.org.uk>
+References: <1357268318-7993-1-git-send-email-vatsa@codeaurora.org>
+ <20130105103627.GU2631@n2100.arm.linux.org.uk>
+Message-ID: <50EBC2F9.70303@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic cpufreq-cpu0 driver works well for imx6q before.  But it
-does not work for 1 GHz and 1.2 GHz operating points the series adds
-here.  We ended up with having to add an imx6q specific cpufreq driver
-to handle those special frequency and voltage scaling requirements for
-the new operating points.
+On 01/05/2013 04:06 PM, Russell King - ARM Linux wrote:
+> On Thu, Jan 03, 2013 at 06:58:38PM -0800, Srivatsa Vaddagiri wrote:
+>> I also think that the
+>> wait_for_completion() based wait in ARM's __cpu_die() can be replaced with a
+>> busy-loop based one, as the wait there in general should be terminated within
+>> few cycles.
+> 
+> Why open-code this stuff when we have infrastructure already in the kernel
+> for waiting for stuff to happen?  I chose to use the standard infrastructure
+> because its better tested, and avoids having to think about whether we need
+> CPU barriers and such like to ensure that updates are seen in a timely
+> manner.
+> 
+> My stance on a lot of this idle/cpu dying code is that much of it can
+> probably be cleaned up and merged into a single common implementation -
+> in which case the use of standard infrastructure for things like waiting
+> for other CPUs do stuff is even more justified.
 
-I expect patches #1 and #2 go via cpufreq tree and the #3 through
-arm-soc tree.
+On similar lines, Nikunj (in CC) and I had posted a patchset sometime ago to
+consolidate some of the CPU hotplug related code in the various architectures
+into a common standard implementation [1].
 
-Shawn Guo (3):
-  PM / OPP: Export more symbols for module usage
-  cpufreq: add imx6q-cpufreq driver
-  ARM: imx: enable imx6q-cpufreq support
+However, we ended up hitting a problem with Xen, because its existing code
+was unlike the other arch/ pieces [2]. At that time, we decided that we will
+first make the CPU online and offline paths symmetric in the generic code and
+then provide a common implementation of the duplicated bits in arch/, for the
+new CPU hotplug model [3].
 
- arch/arm/boot/dts/imx6q.dtsi    |   19 ++-
- arch/arm/mach-imx/mach-imx6q.c  |   64 ++++++++
- drivers/base/power/opp.c        |    2 +
- drivers/cpufreq/Kconfig.arm     |    9 ++
- drivers/cpufreq/Makefile        |    1 +
- drivers/cpufreq/imx6q-cpufreq.c |  325 +++++++++++++++++++++++++++++++++++++++
- 6 files changed, 414 insertions(+), 6 deletions(-)
- create mode 100644 drivers/cpufreq/imx6q-cpufreq.c
+I guess we should probably revisit it sometime, consolidating the code in
+incremental steps if not all at a time...
 
--- 
-1.7.9.5
+--
+[1]. http://lwn.net/Articles/500185/
+[2]. http://thread.gmane.org/gmane.linux.kernel.cross-arch/14342/focus=14430
+[3]. http://thread.gmane.org/gmane.linux.kernel.cross-arch/14342/focus=15567
+
+Regards,
+Srivatsa S. Bhat
