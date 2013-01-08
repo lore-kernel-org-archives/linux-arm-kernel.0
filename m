@@ -1,41 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 8 Jan 2013 12:59:29 +0000
-Subject: [PATCH 1/4] gpiolib: introduce descriptor-based GPIO interface
-In-Reply-To: <1357629535-26033-2-git-send-email-acourbot@nvidia.com>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
- <1357629535-26033-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <201301081259.29839.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 8 Jan 2013 14:01:36 +0100
+Subject: [PATCH 2/2] mxc: enable EHCI PER clock
+In-Reply-To: <20130108135230.78f23ba0@dell>
+References: <1355941777-99352-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <20121219202926.GB19651@pengutronix.de> <20130108135230.78f23ba0@dell>
+Message-ID: <201301081401.36280.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 January 2013, Alexandre Courbot wrote:
-> +struct gpio_desc *__must_check devm_gpiod_get(struct device *dev,
-> +                                                    const char *con_id)
-> +{
-> +       struct gpio_desc **dr;
-> +       struct gpio_desc *desc;
-> +
-> +       dr = devres_alloc(devm_gpio_release, sizeof(struct gpio_desc *),
-> +                         GFP_KERNEL);
-> +       if (!dr)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       desc = gpiod_get(dev, con_id);
-> +       if (IS_ERR_OR_NULL(desc)) {
-> +               devres_free(dr);
-> +               return desc;
-> +       }
+Dear gwenhael.goavec,
 
-Please avoid the use of IS_ERR_OR_NULL(), especially on interfaces you
-introduce yourself. AFAICT, gpiod_get cannot return NULL, so you
-should not check for that.
+> On Wed, 19 Dec 2012 21:29:26 +0100
+> 
+> Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Wed, Dec 19, 2012 at 07:29:37PM +0100, Gwenhael Goavec-Merou wrote:
+> > > EHCI PER clock (aka usb_div) must be enabled to have EHCI driver
+> > > working.
+> > > 
+> > > Signed-off-by: Gwenhael Goavec-Merou
+> > > <gwenhael.goavec-merou@armadeus.com> ---
+> > > 
+> > >  drivers/usb/host/ehci-mxc.c |   12 +++++++++++-
+> > >  1 files changed, 11 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+> > > index ec7f5d2..8050631 100644
+> > > --- a/drivers/usb/host/ehci-mxc.c
+> > > +++ b/drivers/usb/host/ehci-mxc.c
+> > > @@ -31,7 +31,7 @@
+> > > 
+> > >  #define ULPI_VIEWPORT_OFFSET	0x170
+> > >  
+> > >  struct ehci_mxc_priv {
+> > > 
+> > > -	struct clk *usbclk, *ahbclk, *phyclk;
+> > > +	struct clk *usbclk, *ahbclk, *perclk, *phyclk;
+> > > 
+> > >  	struct usb_hcd *hcd;
+> > >  
+> > >  };
+> > > 
+> > > @@ -150,6 +150,13 @@ static int ehci_mxc_drv_probe(struct
+> > > platform_device *pdev)
+> > > 
+> > >  	}
+> > >  	clk_prepare_enable(priv->ahbclk);
+> > > 
+> > > +	priv->perclk = devm_clk_get(&pdev->dev, "per");
+> > > +	if (IS_ERR(priv->perclk)) {
+> > > +		ret = PTR_ERR(priv->perclk);
+> > > +		goto err_clk_per;
+> > > +	}
+> > > +	clk_prepare_enable(priv->perclk);
+> > 
+> > Have you checked this clock is present on all SoCs using this driver?
+> 
+> Yes
+> 
+> > Other than that, +1 on using the chipidea driver as Fabio and Marek
+> > already noted.
+> 
+> True. But I need to use a non-dt board based on imx27. Chipidea is
+> not working yet for this chip and I have currently not enough time to do
+> that.
 
-> +       *dr = desc;
-> +       devres_add(dev, dr);
-> +
-> +       return 0;
-> +}
+You're on your own then, sorry :-(
 
-I'm pretty sure you meant to write 'return desc;' here.
-
-	Arnd
+Best regards,
+Marek Vasut
