@@ -1,26 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 8 Jan 2013 08:42:37 -0800
-Subject: [GIT PULL] mxs fixes for 3.8
-In-Reply-To: <20130108153526.GA20747@S2101-09.ap.freescale.net>
-References: <20130108153526.GA20747@S2101-09.ap.freescale.net>
-Message-ID: <CAOesGMiEcL_HUsWuE+Vnbayz3yRseqS7W0u0YrbA_iqE3kAbjQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Jan 2013 16:46:40 +0000
+Subject: [PATCH] ARM: Only initialize max_mapnr when using flatmem
+In-Reply-To: <1350935514-27422-1-git-send-email-spang@chromium.org>
+References: <1350935514-27422-1-git-send-email-spang@chromium.org>
+Message-ID: <20130108164640.GA30493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 8, 2013 at 7:35 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
->
->   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
->
-> are available in the git repository at:
->
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-fixes-3.8
->
-> for you to fetch changes up to 6c1ecba8d84841277d68140ef485335d5be28485:
->
->   video: mxsfb: fix crash when unblanking the display (2013-01-04 19:52:53 +0800)
+On Mon, Oct 22, 2012 at 03:51:54PM -0400, Michael Spang wrote:
+> The expression used to initialize max_mapnr is not appropriate for
+> sparsemem, since mem_map is NULL and pfn_to_page() only works on valid
+> pages. This patch leaves max_mapnr uninitialized for sparsemem.
+> 
+> For flatmem, the expression simplifies to copying max_pfn.
+> 
+> Signed-off-by: Michael Spang <spang@chromium.org>
+> ---
+>  arch/arm/mm/init.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> I'm not sure we need this variable it all - it looks like there are no
+> users.
 
-Pulled, thanks.
+Indeed, I've just confirmed that. I suggest we just get rid of it instead,
+like this:
 
+ arch/arm/mm/init.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
--Olof
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index ad722f1..bd93bdc 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -600,7 +600,11 @@ void __init mem_init(void)
+ 	extern u32 itcm_end;
+ #endif
+ 
+-	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
++	/*
++	 * We used to initialize max_mapnr here to be the same as max_pfn,
++	 * but as nothing uses it (we don't use the generic pfn_valid())
++	 * this has become unnecessary.
++	 */
+ 
+ 	/* this will put all unused low memory onto the freelists */
+ 	free_unused_memmap(&meminfo);
