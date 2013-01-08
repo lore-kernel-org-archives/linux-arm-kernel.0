@@ -1,34 +1,83 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 8 Jan 2013 23:35:28 +0800
-Subject: [GIT PULL] mxs fixes for 3.8
-Message-ID: <20130108153526.GA20747@S2101-09.ap.freescale.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 8 Jan 2013 16:34:47 +0100
+Subject: [PATCH v7 0/6] watchdog: dt: add support for the timeout-sec
+ dt property
+In-Reply-To: <1357639455-21935-1-git-send-email-fabio.porcedda@gmail.com>
+References: <1357639455-21935-1-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <20130108153447.GC7360@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+On 11:04 Tue 08 Jan     , Fabio Porcedda wrote:
+> Hi all,
+> this patchset add the timeout-sec property to the watchdog core,
+> to the at91sam9_wdt driver and on all framework enabled watchdog driver
+> with dt support.
+> The at91sam9_wdt is tested on evk-pr3,
+> the other drivers are compile tested only.
+> 
 
-  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+I'll prefer a macro to abstract the string in every driver
 
-are available in the git repository at:
+except this fine by me
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-fixes-3.8
+Best Regards,
+J.
 
-for you to fetch changes up to 6c1ecba8d84841277d68140ef485335d5be28485:
-
-  video: mxsfb: fix crash when unblanking the display (2013-01-04 19:52:53 +0800)
-
-----------------------------------------------------------------
-I have to send one critical mxsfb fix through arm-soc, as FB maintainer
-is unresponsive for quite a while.  People start complaining the missing
-of such an important fix.
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      ARM: dts: imx23-olinuxino: Fix IOMUX settings
-
-Lothar Wa?mann (1):
-      video: mxsfb: fix crash when unblanking the display
-
- arch/arm/boot/dts/imx23-olinuxino.dts |    8 ++++----
- drivers/video/mxsfb.c                 |    3 ++-
- 2 files changed, 6 insertions(+), 5 deletions(-)
+> Best regards
+> Fabio Porcedda
+> 
+> changes:
+> v7:
+>   - rebase over v3.8-rc2
+>   - remove the patch already merged
+> v6:
+>   - remove patch for function of_get_timeout_sec as aked by Rob Herring
+>   - add Acked-by: Jason Cooper <jason@lakedaemon.net>
+>   - add Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> v5:
+>   - fix codestyle for compilance ti checkpatch.pl about
+>     "ERROR: do not initialise statics to 0 or NULL"
+>     for s3c2410_wdt.c:56 and at91sam9_wdt.c:63
+> v4:
+>   - add of_get_timeout_sec
+>   - add s3c2410_wdt driver
+>   - split driver patch
+>   - fixed watchdog_init_timeout handling of min_timeout and max_timeout
+> v3:
+>   - rename watchdog_probe_dt_timeout ->  watchdog_init_timeout
+>   - move the watchdog_init_timeout function from inline to watchdog_core.c
+>   - add timeout parameter handling code to watchdog_init_timeout
+>   - add timeout-sec property to the pnx4008-wdt driver
+>   - add two small commit for fixup and cleanup
+> v2:
+>   - change "timeout" to "timeout-sec" as asked by Jean-Christophe
+>   - at91sam9_wdt: use the new helper function
+>   - at91sam9_wdt: add bounds checking
+>   - watchdog.h: add bounds checking
+> 
+> Fabio Porcedda (6):
+>   watchdog: core: dt: add support for the timeout-sec dt property
+>   watchdog: orion_wdt: add timeout-sec property binding
+>   watchdog: pnx4008: add timeout-sec property binding
+>   watchdog: s3c2410_wdt: add timeout-sec property binding
+>   watchdog: at91sam9_wdt: add timeout-sec property binding
+>   watchdog: orion_wdt: move the min_timeout initialization
+> 
+>  .../devicetree/bindings/watchdog/atmel-wdt.txt     |  4 +++
+>  .../devicetree/bindings/watchdog/marvel.txt        |  5 +++
+>  .../devicetree/bindings/watchdog/pnx4008-wdt.txt   |  4 +++
+>  .../devicetree/bindings/watchdog/samsung-wdt.txt   |  3 ++
+>  Documentation/watchdog/watchdog-kernel-api.txt     | 10 ++++++
+>  drivers/watchdog/Kconfig                           |  1 +
+>  drivers/watchdog/at91sam9_wdt.c                    | 16 ++++++++--
+>  drivers/watchdog/orion_wdt.c                       | 10 +++---
+>  drivers/watchdog/pnx4008_wdt.c                     |  7 ++--
+>  drivers/watchdog/s3c2410_wdt.c                     |  6 ++--
+>  drivers/watchdog/watchdog_core.c                   | 37 ++++++++++++++++++++++
+>  include/linux/watchdog.h                           |  3 ++
+>  12 files changed, 91 insertions(+), 15 deletions(-)
+> 
+> -- 
+> 1.8.0.3
+> 
