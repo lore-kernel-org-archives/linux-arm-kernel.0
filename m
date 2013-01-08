@@ -1,57 +1,29 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 08 Jan 2013 14:22:04 -0500 (EST)
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <201301081911.33089.arnd@arndb.de>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1211061802240.21033@xanadu.home> <50EC6CFF.5070309@arm.com>
- <201301081911.33089.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1301081419140.6300@xanadu.home>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 8 Jan 2013 21:22:46 +0100
+Subject: [PATCH] mtd: mxc_nand: Make use of supplied pinctrl data
+In-Reply-To: <20130108195826.GD7360@game.jcrosoft.org>
+References: <1357568885-15507-1-git-send-email-marex@denx.de>
+ <20130108195826.GD7360@game.jcrosoft.org>
+Message-ID: <201301082122.46815.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Jan 2013, Arnd Bergmann wrote:
+Dear Jean-Christophe PLAGNIOL-VILLARD,
 
-> On Tuesday 08 January 2013, Jonathan Austin wrote:
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 335e220..0561d87 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -305,6 +305,11 @@ config ARCH_REALVIEW
-> >          help
-> >            This enables support for ARM Ltd RealView boards.
+> On 15:28 Mon 07 Jan     , Marek Vasut wrote:
+> > The MXC NAND driver doesn't consider the pinctrl data supplied via DT,
+> > which will result in NAND pins not being properly configured.
 > > 
-> > +config ARCH_VEXPRESS_NOMMU
-> > +       bool "ARM Ltd. Versatile Express family (nommu)"
-> > +       depends on !MMU
-> > +       select ARCH_VEXPRESS
-> > +
-> >   config ARCH_VERSATILE
-> >          bool "ARM Ltd. Versatile family"
-> >          select ARCH_WANT_OPTIONAL_GPIOLIB
-> > ---->8----
+> > Make the driver use pinctrl, but to prevent breakage on various boards,
+> > do not fail if the pinctrl data are not available, only print a warning
+> > message.
 > 
-> Yes, I think this is the right approach.
+> nack
 > 
-> > With the other perhaps being to merge the ARCH_VEXPRESS option back in 
-> > to the 'choice' and create a ARCH_VEXPRESS_MULTI elsewhere...
-> 
-> That would needlessly break 'make oldconfig' for people that have
-> CONFIG_ARCH_VEXPRESS in their .config files or other scripts.
-> 
-> > Is that the sort of thing you had in mind, or is there another way 
-> > around that I'm missing?
-> 
-> I think it's good.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> we will at bus level
 
-Looks fine to me too.  Perhaps the vexpress option would logically fit 
-better if located after versatile instead of being in the middle of 
-realview and versatile.
+Can you please elaborate? I don't understand what you're complaining about at 
+all, sorry.
 
-Other than that:
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-Nicolas
+Best regards,
+Marek Vasut
