@@ -1,47 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 8 Jan 2013 13:13:19 -0800
-Subject: [PATCH] ARM: sunxi: fix struct sys_timer removal
-In-Reply-To: <50EC6FBC.2030100@free-electrons.com>
-References: <1357666417-8803-1-git-send-email-swarren@wwwdotorg.org>
- <50EC6FBC.2030100@free-electrons.com>
-Message-ID: <CAOesGMjWPvbhu0RVo5skcFTwTaqz=cLmjjduCiA+ZS9hwRpEjA@mail.gmail.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue,  8 Jan 2013 22:37:04 +0100
+Subject: [PATCH] pinctrl: mvebu: fix MPP6 value for kirkwood driver
+Message-ID: <1357681024-4686-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 8, 2013 at 11:13 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Stephen,
->
-> On 08/01/2013 18:33, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> Commit 6bb27d7 "ARM: delete struct sys_timer" removed struct sys_timer,
->> but didn't update mach-sunxi/sunxi.c for this change, even though the
->> sunxi timer implementation itself was updated. This caused a build break:
->>
->> arch/arm/mach-sunxi/sunxi.c:94:2: error: unknown field 'timer' specified in initializer
->> arch/arm/mach-sunxi/sunxi.c:94:12: error: 'sunxi_timer' undeclared here (not in a function)
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> Ideally, this commit would be squashed into 6bb27d7 in arm-soc's
->> timer-cleanup branch. However, that would change a few commit IDs, and
->> I've already pulled that branch into the Tegra and bcm2835 trees. I can
->> rebase those without issue if we co-ordinate so all the changes go into
->> the same linux-next version.
->>
->> However, since sunxi isn't actually enabled in any defconfig until
->> v3.8-rc2, perhaps it's OK to apply this change as a separate patch on
->> top of timer-rework, and ignore the bisect issue?
->
-> I'm fine with having it as a follow-up patch.
->
-> Also, you can add my
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Since I assume that Olof will apply this directly?
+Note that I am not sure about the MPP value for the PTP functionality.
+It seems that the PTP references have been removed from the Marvell
+hardware specifications available to me.
 
-Yep, sorry I missed the reply -- I've already applied it actually.
-Should show up in next linux-next.
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
+ drivers/pinctrl/mvebu/pinctrl-kirkwood.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-
--Olof
+diff --git a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+index fa6ce31..02d5b89 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
++++ b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+@@ -66,9 +66,9 @@ static struct mvebu_mpp_mode mv88f6xxx_mpp_modes[] = {
+ 		MPP_VAR_FUNCTION(0x5, "sata0", "act",    V(0, 1, 1, 1, 1, 0)),
+ 		MPP_VAR_FUNCTION(0xb, "lcd", "vsync",    V(0, 0, 0, 0, 1, 0))),
+ 	MPP_MODE(6,
+-		MPP_VAR_FUNCTION(0x0, "sysrst", "out",   V(1, 1, 1, 1, 1, 1)),
+-		MPP_VAR_FUNCTION(0x1, "spi", "mosi",     V(1, 1, 1, 1, 1, 1)),
+-		MPP_VAR_FUNCTION(0x2, "ptp", "trig",     V(1, 1, 1, 1, 0, 0))),
++		MPP_VAR_FUNCTION(0x1, "sysrst", "out",   V(1, 1, 1, 1, 1, 1)),
++		MPP_VAR_FUNCTION(0x2, "spi", "mosi",     V(1, 1, 1, 1, 1, 1)),
++		MPP_VAR_FUNCTION(0x3, "ptp", "trig",     V(1, 1, 1, 1, 0, 0))),
+ 	MPP_MODE(7,
+ 		MPP_VAR_FUNCTION(0x0, "gpo", NULL,       V(1, 1, 1, 1, 1, 1)),
+ 		MPP_VAR_FUNCTION(0x1, "pex", "rsto",     V(1, 1, 1, 1, 0, 1)),
+-- 
+1.7.10
