@@ -1,41 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 8 Jan 2013 13:06:02 +0000
-Subject: [PATCH 0/4] gpio: introduce descriptor-based interface
-In-Reply-To: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
+Date: Tue, 8 Jan 2013 13:07:04 +0000
+Subject: [PATCH 2/4] gpiolib: add gpiod_get and gpiod_put functions
+In-Reply-To: <1357629535-26033-3-git-send-email-acourbot@nvidia.com>
 References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <201301081306.02942.arnd@arndb.de>
+ <1357629535-26033-3-git-send-email-acourbot@nvidia.com>
+Message-ID: <201301081307.04229.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 08 January 2013, Alexandre Courbot wrote:
-> This series introduce a first take at implementing the RFC for the new GPIO API
-> that I submitted last month. It proposes a new, opaque descriptor-based GPIO API
-> that becomes available when GPIOlib is compiled, and provides a safer, more
-> abstract alternative to the current integer-based interface. GPIOlib internals
-> are also switched to use the descriptor logic, and the former integer API
-> becomes a lightweight wrapper around the new descriptor-based API.
 > 
-> Functionally speaking the new API is identical to the integer-based API, with
-> only the prefix changing from gpio_ to gpiod_. However, the second patch
-> introduces new functions for obtaining GPIOs from a device and a consumer name,
-> in a fashion similar to what is done with e.g. regulators and PWMs.
+> Adds new GPIO allocation functions that work with the opaque descriptor
+> interface.
+> 
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 
-I like the interface, good idea!
-
-A few questions:
-
-Is there a plan for migrating all the existing users of the current GPIO
-interface?
-
-How do you want to deal with drivers that work on platforms that currently
-don't use gpiolib but have their own implementation of asm/gpio.h? Are
-we going to phase them out?
-
-If we are adding a new way to deal with GPIOs, would it make sense to
-have that more closely integrated into pinctrl in one form or another?
-My feeling is that there is already a significant overlap between the
-two, and while the addition of the gpiod_* functions doesn't necessarily
-make this worse, it could be a chance to improve the current situation
-to make the interface more consistent with pinctrl.
+I think you need to reorder the patches slightly, since the gpiod_get
+function introduced here is already being used in the first patch, which
+breaks bisection.
 
 	Arnd
