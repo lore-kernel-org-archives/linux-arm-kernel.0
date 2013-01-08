@@ -1,25 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Jan 2013 14:25:31 +0000
-Subject: Fwd: how to check the hardware support of XN/XI bit support on
- ARM/MIPS platform
-In-Reply-To: <CALTRzTknSz4kNB6EE7-jb1NOj5OOc95ZqH9c=rwuN0DoROPvvw@mail.gmail.com>
-References: <CALTRzTn_2eaE7vr-tXwGKmO3fGqmif0hdrFEinQjbf6Dx=yHCg@mail.gmail.com>
- <CALTRzTknSz4kNB6EE7-jb1NOj5OOc95ZqH9c=rwuN0DoROPvvw@mail.gmail.com>
-Message-ID: <20130108142531.GA3931@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 8 Jan 2013 14:28:28 +0000
+Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
+ HAVE_ARM_SCU
+In-Reply-To: <1357649263-1098-4-git-send-email-hdoyu@nvidia.com>
+References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com>
+ <1357649263-1098-4-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20130108142828.GD2718@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 04, 2013 at 11:32:03AM +0530, Girish garg wrote:
->         char buf[8192];
->         fptr func;
+Hello,
+
+On Tue, Jan 08, 2013 at 12:47:37PM +0000, Hiroshi Doyu wrote:
+> The method to detect the number of CPU cores on Cortex-A9 MPCore and
+> Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
+> information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
+> have to read it from the system coprocessor(CP15), because the SCU on
+> Cortex-A15 MPCore does not have software readable registers. This
+> patch selects the correct method at runtime based on the CPU ID.
 > 
->         /* Put a RETN instruction in the buffer */
->         buf[0] = '\xc3';
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/platsmp.c |   31 ++++++++++++++++++++++++++++---
+>  1 file changed, 28 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> index 1b926df..68e76ef 100644
+> --- a/arch/arm/mach-tegra/platsmp.c
+> +++ b/arch/arm/mach-tegra/platsmp.c
+> @@ -23,6 +23,7 @@
+>  #include <asm/hardware/gic.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/smp_scu.h>
+> +#include <asm/cputype.h>
+>  
+>  #include <mach/powergate.h>
+>  
+> @@ -34,9 +35,13 @@
+>  #include "common.h"
+>  #include "iomap.h"
+>  
+> +#define CPU_MASK		0xff0ffff0
+> +#define CPU_CORTEX_A9		0x410fc090
+> +#define CPU_CORTEX_A15		0x410fc0f0
+> +
+>  extern void tegra_secondary_startup(void);
+>  
+> -static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
+> +static void __iomem *scu_base;
+>  
+>  #define EVP_CPU_RESET_VECTOR \
+>  	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
+> @@ -149,7 +154,26 @@ done:
+>   */
+>  static void __init tegra_smp_init_cpus(void)
+>  {
+> -	unsigned int i, ncores = scu_get_core_count(scu_base);
+> +	unsigned int i, cpu_id, ncores;
+> +	u32 l2ctlr;
+> +	phys_addr_t pa;
+> +
+> +	cpu_id = read_cpuid(CPUID_ID) & CPU_MASK;
+> +	switch (cpu_id) {
+> +	case CPU_CORTEX_A15:
+> +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
+> +		ncores = ((l2ctlr >> 24) & 3) + 1;
+> +		break;
 
-If you're going to be poking opcodes into the stack, you need to use
-the correct opcodes for the CPU you're using.
+[...]
 
-You also need to use the correct opcodes (and alignment) for the
-instruction set you're using - iow, if you're using ARM or Thumb.
+As mentioned last time [1], you should get this information from the dt
+instead.
 
-0xc3 on its own is not a valid ARM or Thumb instruction.
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138319.html
