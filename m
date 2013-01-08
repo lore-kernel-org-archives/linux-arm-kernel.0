@@ -1,43 +1,84 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 8 Jan 2013 15:10:29 -0800
-Subject: [GIT PULL] ux500 cpufreq and clksrc updates
-In-Reply-To: <CACRpkda7zAD0yFD8LT7K-F9HhEmJPOfcQ9fA35h=Yp8ThMyP9Q@mail.gmail.com>
-References: <CACRpkda7zAD0yFD8LT7K-F9HhEmJPOfcQ9fA35h=Yp8ThMyP9Q@mail.gmail.com>
-Message-ID: <20130108231029.GA15980@quad.lixom.net>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Tue, 8 Jan 2013 18:17:05 -0500
+Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+In-Reply-To: <1357684592.10453.7@snotra>
+References: <20130108184116.46558.3558.stgit@ubuntu>
+ <20130108184130.46558.60819.stgit@ubuntu>
+ <1357684592.10453.7@snotra>
+Message-ID: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 04:34:31PM +0100, Linus Walleij wrote:
-> Hi ARM SoC maintainers,
-> 
-> here is a pile of patches which pertain to the ux500 cpufreq and clksrc
-> implementations. I have agreed with respective subsystem maintainer
-> to take this through ARM SoC since I also have additional dependencies
-> on top for multiplatform, which will likely build on top of these (but it's
-> nice to get this in first).
-> 
-> The clksrc and cpufreq changes are dependent on merge order and
-> thus cannot pass through different trees.
-> 
-> All of this is to be queued for-next (v3.9).
-> 
-> Please pull it in!
-> 
-> Yours,
-> Linus Walleij
-> 
-> 
-> The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
-> 
->   Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-cpufreq-for-arm-soc
+On Tue, Jan 8, 2013 at 5:36 PM, Scott Wood <scottwood@freescale.com> wrote:
+> On 01/08/2013 12:41:30 PM, Christoffer Dall wrote:
+>>
+>> On ARM (and possibly other architectures) some bits are specific to the
+>> model being emulated for the guest and user space needs a way to tell
+>> the kernel about those bits.  An example is mmio device base addresses,
+>> where KVM must know the base address for a given device to properly
+>> emulate mmio accesses within a certain address range or directly map a
+>> device with virtualiation extensions into the guest address space.
+>>
+>> We try to make this API slightly more generic than for our specific use,
+>> but so far only the VGIC uses this feature.
+>>
+>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>> ---
+>>  Documentation/virtual/kvm/api.txt |   37
+>> +++++++++++++++++++++++++++++++++++++
+>>  arch/arm/include/uapi/asm/kvm.h   |   13 +++++++++++++
+>>  arch/arm/kvm/arm.c                |   23 ++++++++++++++++++++++-
+>>  include/uapi/linux/kvm.h          |    8 ++++++++
+>>  4 files changed, 80 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/api.txt
+>> b/Documentation/virtual/kvm/api.txt
+>> index 38066a7a..668956f 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -2206,6 +2206,43 @@ This ioctl returns the guest registers that are
+>> supported for the
+>>  KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+>>
+>>
+>> +4.80 KVM_SET_DEVICE_ADDRESS
+>> +
+>> +Capability: KVM_CAP_SET_DEVICE_ADDRESS
+>> +Architectures: arm
+>> +Type: vm ioctl
+>> +Parameters: struct kvm_device_address (in)
+>> +Returns: 0 on success, -1 on error
+>> +Errors:
+>> +  ENODEV: The device id is unknown
+>> +  ENXIO:  Device not supported on current system
+>> +  EEXIST: Address already set
+>> +  E2BIG:  Address outside guest physical address space
+>> +
+>> +struct kvm_device_address {
+>> +       __u64 id;
+>> +       __u64 addr;
+>> +};
+>
+>
+> What about this is really specific to addresses?  Can't we set other device
+> parameters this way?
+>
+> Sort of like a device equivalent of PPC's one-reg interface.
+>
+This has been discussed a number of times, and one or the other there
+is a need for userspace to tell KVM to present memory-mapped devices
+at a given address. It was also considered to make this specific to
+irqchip initialization, but irqchips are different and a lot of that
+code is x86-specific, so that approach was discarded.
 
+This *could* look something like this:
 
-Pulled into next/drivers.
+struct kvm_device_param {
+    u64 dev_id;
+    u64 param_id;
+    u64 value;
+};
 
+but that has less clear, or at least less specific, semantics.
 
--Olof
+-Christoffer
