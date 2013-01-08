@@ -1,27 +1,21 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 08 Jan 2013 15:52:05 -0700
-Subject: [v2 9/9] ARM: tegra: Add initial support for Tegra 114 SoC.
-In-Reply-To: <1357649263-1098-10-git-send-email-hdoyu@nvidia.com>
+Date: Tue, 08 Jan 2013 15:52:49 -0700
+Subject: [v2 2/9] HACK: ARM: tegra: Use CLK_IGNORE_UNUSED for Tegra 114 SoC
+In-Reply-To: <1357649263-1098-3-git-send-email-hdoyu@nvidia.com>
 References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com>
- <1357649263-1098-10-git-send-email-hdoyu@nvidia.com>
-Message-ID: <50ECA315.5000703@wwwdotorg.org>
+ <1357649263-1098-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <50ECA341.5020106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 01/08/2013 05:47 AM, Hiroshi Doyu wrote:
-> Add new Tegra 114 SoC support.
+> Use CLK_IGNORE_UNUSED for the Tegra 114 SoC to ensure
+> clk_disable_unused() is not called. Otherwise the system will die,
+> because the usecount of the clocks is incorrect. This patch will be
+> reverted once the Tegra 114 clocks are implemented.
 
-> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+> diff --git a/arch/arm/mach-tegra/tegra30_clocks_data.c b/arch/arm/mach-tegra/tegra30_clocks_data.c
 
->  static const struct of_device_id tegra_dt_irq_match[] __initconst = {
->  	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
-> +	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init },
->  	{ }
->  };
-
-It'd probably be a good idea to add newer entries at the start of this
-table. Not so much an issue here perhaps, but at least when
-instantiating drivers, the earlier entries match first irrespective of
-the order of compatible values in the DT node, due to a misfeature in
-the kernel code, which while it's in the process of being fixed, we
-probably still want to work around.
+Just as an FYI, I'll almost certainly apply Prashant's common clock
+conversion before this series, so this patch will need some rework to be
+applied on top of that.
