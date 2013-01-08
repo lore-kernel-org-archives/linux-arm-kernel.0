@@ -1,62 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Jan 2013 21:01:51 +0530
-Subject: [RFC v2 00/18] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <50EC3BE7.8070704@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 8 Jan 2013 23:35:28 +0800
+Subject: [GIT PULL] mxs fixes for 3.8
+Message-ID: <20130108153526.GA20747@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav,
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 
-On Monday 31 December 2012 06:36 PM, Vaibhav Bedia wrote:
-> Hi,
->
-> This is the second version of the patch series for adding suspend-resume
-> support for AM33XX. Based on the feedback received on the previous patch
-> series [1] almost all the patches have undergone a bit a rework.
->
-> The 1st two patches depend on the changes for mailbox code migration
-> from arch/arm/*-omap*/ to drivers/mailbox/ [2].
->
-> The patch series also depends on recent changes to the OMAP PM framework
-> by Paul Walmsley.
->
-> I found it easiest to apply the AM33XX suspend-resume patches on top of
-> Paul's TEST_pwrdm_post_fpwrst_devel_a_3.9 branch + the patches @ [2].
->
-> With these dependencies met, the PM code uses the firmware interface
-> and expects the userspace to load the WKUP_M3 binary before the
-> suspend-resume functionality is made available. The binary file (and
-> the source-code for WKUP_M3) can be obtained from the 'next' branch at
-> [3]. The WKUP_M3 binary can either be loaded post bootup via
-> the sysfs entry './sys/devices/ocp.2/wkup_m3.4/firmware' or
-> it can be included in the kernel image as part of the build process.
->
-> DDR3 specific changes have been skipped for now since mainline U-Boot
-> exhibited stability issues on all the DDR3 based AM335x boards that i could
-> lay my hands on.
->
-> I have done basic testing along with power measurments on the different
-> power rails on the AM335x EVM. PER domain transition on the BeagleBone fails
-> if the CPSW driver is included in the kernel and is yet to be root caused.
-> Along with this issue more extensive testing on other OMAP platforms is also
-> pending right now.
->
-> For more details on the AM335x suspend-resume support please refer to the
-> changelog in the different patches.
->
-I still haven't reviewed patch 15, 16 and 18 which adds suspend support.
-Will do that in coming days since they need a bit a closer look.
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
 
-But as mentioned in some of the patches, you need to split this series
-since except 15, 16 and 18 which adds suspend support, rest of the
-patches are
-- data file fixes
-- timer suspend/resume update
-- mailbox support, control module update.
+are available in the git repository at:
 
-Would be good to split the series to help the reviews.
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-fixes-3.8
 
-Regards
-Santosh
+for you to fetch changes up to 6c1ecba8d84841277d68140ef485335d5be28485:
+
+  video: mxsfb: fix crash when unblanking the display (2013-01-04 19:52:53 +0800)
+
+----------------------------------------------------------------
+I have to send one critical mxsfb fix through arm-soc, as FB maintainer
+is unresponsive for quite a while.  People start complaining the missing
+of such an important fix.
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: dts: imx23-olinuxino: Fix IOMUX settings
+
+Lothar Wa?mann (1):
+      video: mxsfb: fix crash when unblanking the display
+
+ arch/arm/boot/dts/imx23-olinuxino.dts |    8 ++++----
+ drivers/video/mxsfb.c                 |    3 ++-
+ 2 files changed, 6 insertions(+), 5 deletions(-)
