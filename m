@@ -1,36 +1,23 @@
-From: pkluba@dension.com (Patrik, Kluba)
-Date: Tue, 8 Jan 2013 12:51:14 +0100
-Subject: [PATCH 01/01] arm: fix a preempt_count() corruption for
- CONFIG_PREEMPT=n
-In-Reply-To: <50E755FA.8040609@codeaurora.org>
-References: <20121215085129.71d203b2.pkluba@dension.com>
- <50D10224.30600@codeaurora.org>
- <20121219000139.GV14363@n2100.arm.linux.org.uk>
- <50E4D39C.1030001@codeaurora.org>
- <20130104084850.4553bc6f.pkluba@dension.com>
- <50E755FA.8040609@codeaurora.org>
-Message-ID: <20130108125114.2292c2bb.pkluba@dension.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 8 Jan 2013 07:25:41 -0500
+Subject: [PATCH V2] arm: mvebu: Improve the SMP support of the
+ interrupt controller
+In-Reply-To: <2E2747FC8980BB40958FB06A958ED3550144C349E7C1@IL-MB01.marvell.com>
+References: <1354740203-26665-1-git-send-email-gregory.clement@free-electrons.com>
+ <20130107175123.GO5075@titan.lakedaemon.net>
+ <50EB348D.8000607@free-electrons.com>
+ <20130107210331.GR5075@titan.lakedaemon.net>
+ <50EB3916.7040205@free-electrons.com>
+ <2E2747FC8980BB40958FB06A958ED3550144C349E7C1@IL-MB01.marvell.com>
+Message-ID: <20130108122541.GS5075@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 04 Jan 2013 14:21:46 -0800
-Stephen Boyd <sboyd@codeaurora.org> wrote:
-
-> On 01/03/13 23:48, Patrik, Kluba wrote:
-> > Sorry for being late, was on holiday. Yes, you were right,
-> > CONFIG_DEBUG_PREEMPT (after breaking dependency on CONFIG_PREEMPT -
-> > this is how I caught the exact place) and CONFIG_DEBUG_ATOMIC_SLEEP
-> > was enabled due to bug hunting in own code (and found yet another
-> > at an unexpected place). 
-> > I have chosen #ifdef CONFIG_PREEMPT to match with assembly code, but
-> > your solution seems more reasonable.
+On Tue, Jan 08, 2013 at 09:15:57AM +0200, Yehuda Yitschak wrote:
+> Well, I also tested this patch, so...
 > 
-> Did you test my patch? If so, can I get your tested by please so I can
-> stick it in the patch tracker?
+> Tested-by: Yehuda Yitschak <yehuday@marvell.com>
 
-Yes, I have tested it. Here you are:
+Thanks, Yehuda.
 
-Tested-by: Patrik Kluba <pkluba@dension.com>
-
-Bye,
-Patrik
+Jason.
