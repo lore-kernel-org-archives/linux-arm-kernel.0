@@ -1,33 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 8 Jan 2013 15:31:16 -0200
-Subject: [PATCH 7/7] ARM i.MX51 babbage: Add display support
-In-Reply-To: <1357665800.2527.17.camel@pizza.hi.pengutronix.de>
-References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
- <CAOMZO5BnFZs+s-WFahtqyzCi15P9RBzKDzwdZNCJ4PmnQrFY1g@mail.gmail.com>
- <CAOMZO5AkRmhdB-JWQ5DFuQUJHibV7GGvvDeK7-cg7m8OnbHA_Q@mail.gmail.com>
- <201301081809.38537.marex@denx.de>
- <1357665800.2527.17.camel@pizza.hi.pengutronix.de>
-Message-ID: <CAOMZO5AKwfyxuy1TfSxQxJ0Ehq7YpO0WN73bz4V6L804tdK0kA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  8 Jan 2013 10:33:37 -0700
+Subject: [PATCH] ARM: sunxi: fix struct sys_timer removal
+Message-ID: <1357666417-8803-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+From: Stephen Warren <swarren@nvidia.com>
 
-On Tue, Jan 8, 2013 at 3:23 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+Commit 6bb27d7 "ARM: delete struct sys_timer" removed struct sys_timer,
+but didn't update mach-sunxi/sunxi.c for this change, even though the
+sunxi timer implementation itself was updated. This caused a build break:
 
-> Reordering the ipu_get_resources and imx_drm_add_crtc calls should resolve this:
->
-> From: Philipp Zabel <p.zabel@pengutronix.de>
-> Subject: [PATCH] staging: imx/drm: add crtc before registering interrupt
->  handler
->
-> If the bootloader already enabled the display, the interrupt handler
-> will be called as soon as it is registered. If the CRTC is not already
-> added at this time, the call to imx_drm_handle_vblank will result in
-> a NULL pointer dereference.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+arch/arm/mach-sunxi/sunxi.c:94:2: error: unknown field 'timer' specified in initializer
+arch/arm/mach-sunxi/sunxi.c:94:12: error: 'sunxi_timer' undeclared here (not in a function)
 
-This fixes the issue for me, thanks:
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Ideally, this commit would be squashed into 6bb27d7 in arm-soc's
+timer-cleanup branch. However, that would change a few commit IDs, and
+I've already pulled that branch into the Tegra and bcm2835 trees. I can
+rebase those without issue if we co-ordinate so all the changes go into
+the same linux-next version.
 
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+However, since sunxi isn't actually enabled in any defconfig until
+v3.8-rc2, perhaps it's OK to apply this change as a separate patch on
+top of timer-rework, and ignore the bisect issue?
+
+ arch/arm/mach-sunxi/sunxi.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 9be910f..cba4cd3 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -91,6 +91,6 @@ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
+ 	.init_irq	= sunxi_init_irq,
+ 	.handle_irq	= sunxi_handle_irq,
+ 	.restart	= sunxi_restart,
+-	.timer		= &sunxi_timer,
++	.init_time	= &sunxi_timer_init,
+ 	.dt_compat	= sunxi_board_dt_compat,
+ MACHINE_END
+-- 
+1.7.10.4
