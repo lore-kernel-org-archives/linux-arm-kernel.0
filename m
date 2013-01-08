@@ -1,47 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Jan 2013 16:46:40 +0000
-Subject: [PATCH] ARM: Only initialize max_mapnr when using flatmem
-In-Reply-To: <1350935514-27422-1-git-send-email-spang@chromium.org>
-References: <1350935514-27422-1-git-send-email-spang@chromium.org>
-Message-ID: <20130108164640.GA30493@n2100.arm.linux.org.uk>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 8 Jan 2013 17:55:54 +0100
+Subject: [PATCH] ARM: Kirkwood: convert ns2 boards to pinctrl
+In-Reply-To: <20130108163909.GU5075@titan.lakedaemon.net>
+References: <1357655778-32066-1-git-send-email-simon.guinot@sequanux.org>
+ <20130108161553.GE3392@lunn.ch>
+ <20130108161835.GN1357@kw.sim.vm.gnt>
+ <20130108163015.GF3392@lunn.ch>
+ <20130108163909.GU5075@titan.lakedaemon.net>
+Message-ID: <20130108165554.GO1357@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 03:51:54PM -0400, Michael Spang wrote:
-> The expression used to initialize max_mapnr is not appropriate for
-> sparsemem, since mem_map is NULL and pfn_to_page() only works on valid
-> pages. This patch leaves max_mapnr uninitialized for sparsemem.
+On Tue, Jan 08, 2013 at 11:39:09AM -0500, Jason Cooper wrote:
+> On Tue, Jan 08, 2013 at 05:30:15PM +0100, Andrew Lunn wrote:
+> > > Do you think it is still possible to merge this patch as a bug fix for
+> > > the current release ?
+> > 
+> > Hi Simon
+> > 
+> > The commit log will need some explanation why this is a fix. It
+> > currently looks like it just a conversion. Document what actually goes
+> > wrong and how this fixes it.
 > 
-> For flatmem, the expression simplifies to copying max_pfn.
+> hmm, I could change the patch subject to:
 > 
-> Signed-off-by: Michael Spang <spang@chromium.org>
-> ---
->  arch/arm/mm/init.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
+> -ARM: Kirkwood: convert ns2 boards to pinctrl
+> +ARM: Kirkwood: fix gpio by converting ns2 boards to pinctrl
 > 
-> I'm not sure we need this variable it all - it looks like there are no
-> users.
+> That's basically what the body says.  Sound good?
 
-Indeed, I've just confirmed that. I suggest we just get rid of it instead,
-like this:
+It would be perfect for me.
 
- arch/arm/mm/init.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+Thanks.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index ad722f1..bd93bdc 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -600,7 +600,11 @@ void __init mem_init(void)
- 	extern u32 itcm_end;
- #endif
- 
--	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
-+	/*
-+	 * We used to initialize max_mapnr here to be the same as max_pfn,
-+	 * but as nothing uses it (we don't use the generic pfn_valid())
-+	 * this has become unnecessary.
-+	 */
- 
- 	/* this will put all unused low memory onto the freelists */
- 	free_unused_memmap(&meminfo);
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130108/85c75115/attachment.sig>
