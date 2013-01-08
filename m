@@ -1,68 +1,61 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Tue, 8 Jan 2013 16:36:32 -0600
-Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
-In-Reply-To: <20130108184130.46558.60819.stgit@ubuntu> (from
- c.dall@virtualopensystems.com on Tue Jan  8 12:41:30 2013)
-References: <20130108184116.46558.3558.stgit@ubuntu>
- <20130108184130.46558.60819.stgit@ubuntu>
-Message-ID: <1357684592.10453.7@snotra>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 08 Jan 2013 15:41:42 -0700
+Subject: [v2 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
+In-Reply-To: <50EC444B.5060206@arm.com>
+References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com>
+ <1357649263-1098-6-git-send-email-hdoyu@nvidia.com>
+ <50EC444B.5060206@arm.com>
+Message-ID: <50ECA0A6.4090307@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2013 12:41:30 PM, Christoffer Dall wrote:
-> On ARM (and possibly other architectures) some bits are specific to  
-> the
-> model being emulated for the guest and user space needs a way to tell
-> the kernel about those bits.  An example is mmio device base  
-> addresses,
-> where KVM must know the base address for a given device to properly
-> emulate mmio accesses within a certain address range or directly map a
-> device with virtualiation extensions into the guest address space.
-> 
-> We try to make this API slightly more generic than for our specific  
-> use,
-> but so far only the VGIC uses this feature.
-> 
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> ---
->  Documentation/virtual/kvm/api.txt |   37  
-> +++++++++++++++++++++++++++++++++++++
->  arch/arm/include/uapi/asm/kvm.h   |   13 +++++++++++++
->  arch/arm/kvm/arm.c                |   23 ++++++++++++++++++++++-
->  include/uapi/linux/kvm.h          |    8 ++++++++
->  4 files changed, 80 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/virtual/kvm/api.txt  
-> b/Documentation/virtual/kvm/api.txt
-> index 38066a7a..668956f 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2206,6 +2206,43 @@ This ioctl returns the guest registers that  
-> are supported for the
->  KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
-> 
-> 
-> +4.80 KVM_SET_DEVICE_ADDRESS
-> +
-> +Capability: KVM_CAP_SET_DEVICE_ADDRESS
-> +Architectures: arm
-> +Type: vm ioctl
-> +Parameters: struct kvm_device_address (in)
-> +Returns: 0 on success, -1 on error
-> +Errors:
-> +  ENODEV: The device id is unknown
-> +  ENXIO:  Device not supported on current system
-> +  EEXIST: Address already set
-> +  E2BIG:  Address outside guest physical address space
-> +
-> +struct kvm_device_address {
-> +	__u64 id;
-> +	__u64 addr;
-> +};
+On 01/08/2013 09:07 AM, Marc Zyngier wrote:
+> On 08/01/13 12:47, Hiroshi Doyu wrote:
+>> Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
+>> timer than TMR0. If it's available, it will be used for clock source
+>> and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
+>> necessary for clock event.
 
-What about this is really specific to addresses?  Can't we set other  
-device parameters this way?
+>> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
 
-Sort of like a device equivalent of PPC's one-reg interface.
+>> +/* FIXME: only secure mode is supported. */
+> 
+> And this is a bug, as far as I'm concerned.
+> 
+>> +static int tegra_arch_timer_init(void)
 
--Scott
+>> +	clk = clk_get_sys("clk_m", NULL);
+>> +	if (IS_ERR(clk)) {
+>> +		freq = 12000000;
+>> +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
+>> +	} else {
+>> +		freq = clk_get_rate(clk);
+>> +		clk_put(clk);
+>> +	}
+>> +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
+>> +
+>> +	/* CNTFRQ */
+>> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
+>> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
+>> +	BUG_ON(val != freq);
+> 
+> No, not again! Like I said last year, this won't fly. So instead of
+> trying to work around a broken firmware, let's do the right thing.
+
+OK, so I understand you want to firmware/bootloader/... to write the
+value into that register instead, so this all works in non-secure mode
+(which sounds like a fine objection), but ...
+
+>> +
+>> +	val = readl_relaxed(tsc_base + TSC_CNTCR);
+>> +	val |= TSC_CNTCR_ENABLE | TSC_CNTCR_HDBG;
+>> +	writel_relaxed(val, tsc_base + TSC_CNTCR);
+>> +
+>> +	err = arch_timer_of_register();
+> 
+> What about adding an optional property to the binding, pointing to the
+> required clock? That would solve the above problem in a sensible way,
+> and your kernel wouldn't go bust.
+
+... I'm not sure how the comment about adding a clock to the DT binding
+is related to that. Sorry for not following the plot!
