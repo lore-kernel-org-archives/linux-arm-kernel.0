@@ -1,50 +1,32 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 8 Jan 2013 18:51:48 +0100
-Subject: [PATCH] ARM: Kirkwood: convert ns2 boards to pinctrl
-In-Reply-To: <20130108170736.GV5075@titan.lakedaemon.net>
-References: <1357655778-32066-1-git-send-email-simon.guinot@sequanux.org>
- <20130108161553.GE3392@lunn.ch>
- <20130108161835.GN1357@kw.sim.vm.gnt>
- <20130108163015.GF3392@lunn.ch>
- <20130108163909.GU5075@titan.lakedaemon.net>
- <20130108165554.GO1357@kw.sim.vm.gnt>
- <20130108170736.GV5075@titan.lakedaemon.net>
-Message-ID: <20130108175148.GP1357@kw.sim.vm.gnt>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 8 Jan 2013 10:01:06 -0800
+Subject: [GIT PULL] few omap fixes for v3.8-rc2
+In-Reply-To: <20130108174816.GP14149@atomide.com>
+References: <20130108174816.GP14149@atomide.com>
+Message-ID: <CAOesGMhyYQoFYzqopGgwDwEVc4Gc74ERbRiJg_vhTmYf+V3_rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 12:07:36PM -0500, Jason Cooper wrote:
-> On Tue, Jan 08, 2013 at 05:55:54PM +0100, Simon Guinot wrote:
-> > On Tue, Jan 08, 2013 at 11:39:09AM -0500, Jason Cooper wrote:
-> > > On Tue, Jan 08, 2013 at 05:30:15PM +0100, Andrew Lunn wrote:
-> > > > > Do you think it is still possible to merge this patch as a bug fix for
-> > > > > the current release ?
-> > > > 
-> > > > Hi Simon
-> > > > 
-> > > > The commit log will need some explanation why this is a fix. It
-> > > > currently looks like it just a conversion. Document what actually goes
-> > > > wrong and how this fixes it.
-> > > 
-> > > hmm, I could change the patch subject to:
-> > > 
-> > > -ARM: Kirkwood: convert ns2 boards to pinctrl
-> > > +ARM: Kirkwood: fix gpio by converting ns2 boards to pinctrl
-> > > 
-> > > That's basically what the body says.  Sound good?
-> > 
-> > It would be perfect for me.
-> > 
-> 
-> On second thought, I'll do "fix ns2 gpios by converting to pinctrl"
+On Tue, Jan 8, 2013 at 9:48 AM, Tony Lindgren <tony@atomide.com> wrote:
+> The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+>
+>   Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8-rc2/fixes-signed-v2
+>
+> for you to fetch changes up to 6adba67eb0c4731ed0346731d024b2102f5b4d9d:
+>
+>   ARM: OMAP2+: am33xx-hwmod: Fix wrongly terminated am33xx_usbss_mpu_irqs array (2013-01-07 12:38:07 -0800)
+>
+> ----------------------------------------------------------------
+> The biggest change is a fix to deal with different power state
+> on omap2 registers that causes issues trying to use common PM code.
+> Also fix few incorrect registers, and an issue for omap1 USB, and
+> few sparse fixes for issues that sneaked in with all the clean-up.
 
-OK, thanks.
+Pulled, thanks. Not super-happy about the 100+ line delta for the 24xx
+bugfix, but seems like it's needed.
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130108/95db0972/attachment.sig>
+-Olof
