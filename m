@@ -1,133 +1,196 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 8 Jan 2013 16:18:55 +0900
-Subject: [PATCH 4/4] gpiolib: add documentation for new gpiod_ API
-In-Reply-To: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1357629535-26033-5-git-send-email-acourbot@nvidia.com>
+From: liu.y.victor@gmail.com (Liu Ying)
+Date: Tue, 8 Jan 2013 15:35:13 +0800
+Subject: [PATCH v3 1/3] Input: imx_keypad - Add device tree support
+In-Reply-To: <1357216654-12651-1-git-send-email-Ying.Liu@freescale.com>
+References: <1357216654-12651-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <CA+8Hj80mxxXo4EQJ0UaD1uqZaAtkxiE1AHF63PTvTm8mjFVqow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
- Documentation/gpio.txt | 94 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 92 insertions(+), 2 deletions(-)
+Hi, Dmitry,
 
-diff --git a/Documentation/gpio.txt b/Documentation/gpio.txt
-index 77a1d11..871ccda 100644
---- a/Documentation/gpio.txt
-+++ b/Documentation/gpio.txt
-@@ -120,7 +120,8 @@ example, a number might be valid but temporarily unused on a given board.
- 
- Whether a platform supports multiple GPIO controllers is a platform-specific
- implementation issue, as are whether that support can leave "holes" in the space
--of GPIO numbers, and whether new controllers can be added at runtime.  Such issues
-+of GPIO numbers, and whether new controllers can be added at runtime.  Such
-+issues
- can affect things including whether adjacent GPIO numbers are both valid.
- 
- Using GPIOs
-@@ -302,7 +303,8 @@ are claimed, three additional calls are defined:
- 	 * 'flags', identical to gpio_request() wrt other arguments and
- 	 * return value
- 	 */
--	int gpio_request_one(unsigned gpio, unsigned long flags, const char *label);
-+	int gpio_request_one(unsigned gpio, unsigned long flags, const char
-+*label);
- 
- 	/* request multiple GPIOs in a single call
- 	 */
-@@ -773,3 +775,91 @@ differences between boards from user space.  This only affects the
- sysfs interface.  Polarity change can be done both before and after
- gpio_export(), and previously enabled poll(2) support for either
- rising or falling edge will be reconfigured to follow this setting.
-+
-+GPIO descriptor interface
-+=========================
-+A more secure, alternative GPIO interface is available through GPIOlib. Instead
-+of relying on integers (which can easily be forged and used without being
-+properly requested) to reference GPIOs, it uses a system of opaque descriptors
-+that must be properly obtained and disposed through the common get/put set of
-+functions. This ensures that all GPIO descriptors are valid at any time and
-+makes it unnecessary to check the validity of a GPIO. Apart from this
-+difference, the interface is similar to the integer-based one, excepted that the
-+gpio_ prefix is changed to gpiod_.
-+
-+This interface can be used in conjonction with the integer-based API, however
-+new drivers should really try to use the safer descriptor-based interface.
-+Drivers using this interface should depend on CONFIG_GPIOLIB being set, as it is
-+only available when GPIOlib is compiled in.
-+
-+Using GPIOs
-+-----------
-+GPIO consumers should include <linux/gpio/consumer.h> which declares the
-+consumer-side GPIO functions. GPIOs are obtained through gpiod_get:
-+
-+	struct gpio_desc *gpiod_get(struct device *dev,
-+				    const char *con_id);
-+
-+This will return the GPIO descriptor corresponding to the con_id function of
-+dev, or an error code in case of error. A devm variant is also available:
-+
-+	struct gpio_desc *devm_gpiod_get(struct device *dev,
-+					 const char *con_id);
-+
-+GPIO descriptors are disposed using the corresponding put functions:
-+
-+	void gpiod_put(struct gpio_desc *desc);
-+	void devm_gpiod_put(struct device *dev, struct gpio_desc *desc);
-+
-+A valid descriptor can then be used with one of the gpiod_ functions. Their
-+interface is identical to the integer-based API, excepted that they take a GPIO
-+descriptor instead of an integer:
-+
-+	int gpiod_direction_input(struct gpio_desc *desc);
-+	int gpiod_direction_output(struct gpio_desc *desc, int value);
-+	int gpiod_get_value(struct gpio_desc *desc);
-+	void gpiod_set_value(struct gpio_desc *desc, int value);
-+	...
-+
-+If you need to convert a descriptor to an integer or vice-versa, you can use
-+gpio_to_desc or desc_to_gpio:
-+
-+	struct gpio_desc *gpio_to_desc(unsigned gpio);
-+	int desc_to_gpio(const struct gpio_desc *desc);
-+
-+The same GPIO can be used by both interfaces as long as it has properly been
-+acquired by one of them (i.e. using either gpio_request() or gpiod_get()).
-+
-+Declaring GPIOs
-+---------------
-+GPIOs can be made available for devices either through board-specific lookup
-+tables, or using the device tree.
-+
-+Board-specific lookup tables match a device name and consumer ID to a GPIO chip
-+and GPIO number relative to that chip. They are declared as follows:
-+
-+	static struct gpio_lookup board_gpio_lookup[] = {
-+		GPIO_LOOKUP("tegra-gpio", 28, "backlight.1", "power"),
-+	};
-+
-+	static void __init board_init(void)
-+	{
-+		...
-+		gpiod_add_table(board_gpio_lookup,
-+				ARRAY_SIZE(board_gpio_lookup));
-+		...
-+	}
-+
-+In the driver side, the following code:
-+
-+	gpiod_get(dev, "power");
-+
-+will return the descriptor for GPIO 28 of the "tegra-gpio" chip provided
-+strcmp(dev_name(dev), "backlight.1") == 0.
-+
-+If the device tree is used, then the same "power" GPIO can be declared into the
-+device's node as follows:
-+
-+	power-gpios = <&gpio 28 0>;
-+
-+Note that gpiod_get() only allows to access the first GPIO specifier.
-\ No newline at end of file
+Do you have any more comment for version 3?
+
+Thanks.
+
+2013/1/3 Liu Ying <Ying.Liu@freescale.com>:
+> This patch adds device tree support for imx keypad driver.
+>
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> ---
+> Changes since v2:
+> - Improve the logic in the probe function to check whether
+>   DT-supplied data is presented or not.
+>
+> Changes since v1:
+> - Parse the array keypad->keycodes[] to get row and column
+>   mask value instead of parsing DT-supplied data again.
+> - Remove the pinctrl related code which sets row and column
+>   key pins.
+> - Leave matrix_keypad_build_keymap() to determine platform
+>   data and DT-supplied data precedence.
+> - Change DT compatible string from 'fsl,imx-kpp' to 'fsl,
+>   <soc>-kpp'.
+> ---
+>  .../devicetree/bindings/input/imx-keypad.txt       |   53 ++++++++++++++++++++
+>  drivers/input/keyboard/imx_keypad.c                |   42 +++++++++-------
+>  2 files changed, 77 insertions(+), 18 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/input/imx-keypad.txt
+>
+> diff --git a/Documentation/devicetree/bindings/input/imx-keypad.txt b/Documentation/devicetree/bindings/input/imx-keypad.txt
+> new file mode 100644
+> index 0000000..2ebaf7d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/imx-keypad.txt
+> @@ -0,0 +1,53 @@
+> +* Freescale i.MX Keypad Port(KPP) device tree bindings
+> +
+> +The KPP is designed to interface with a keypad matrix with 2-point contact
+> +or 3-point contact keys. The KPP is designed to simplify the software task
+> +of scanning a keypad matrix. The KPP is capable of detecting, debouncing,
+> +and decoding one or multiple keys pressed simultaneously on a keypad.
+> +
+> +Required SoC Specific Properties:
+> +- compatible: Should be "fsl,<soc>-kpp".
+> +
+> +- reg: Physical base address of the KPP and length of memory mapped
+> +  region.
+> +
+> +- interrupts: The KPP interrupt number to the CPU(s).
+> +
+> +- clocks: The clock provided by the SoC to the KPP. Some SoCs use dummy
+> +clock(The clock for the KPP is provided by the SoCs automatically).
+> +
+> +Required Board Specific Properties:
+> +- pinctrl-names: The definition can be found at
+> +pinctrl/pinctrl-bindings.txt.
+> +
+> +- pinctrl-0: The definition can be found at
+> +pinctrl/pinctrl-bindings.txt.
+> +
+> +- linux,keymap: The definition can be found at
+> +bindings/input/matrix-keymap.txt.
+> +
+> +Example:
+> +kpp: kpp at 73f94000 {
+> +       compatible = "fsl,imx51-kpp", "fsl,imx21-kpp";
+> +       reg = <0x73f94000 0x4000>;
+> +       interrupts = <60>;
+> +       clocks = <&clks 0>;
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_kpp_1>;
+> +       linux,keymap = <0x00000067      /* KEY_UP */
+> +                       0x0001006c      /* KEY_DOWN */
+> +                       0x00020072      /* KEY_VOLUMEDOWN */
+> +                       0x00030066      /* KEY_HOME */
+> +                       0x0100006a      /* KEY_RIGHT */
+> +                       0x01010069      /* KEY_LEFT */
+> +                       0x0102001c      /* KEY_ENTER */
+> +                       0x01030073      /* KEY_VOLUMEUP */
+> +                       0x02000040      /* KEY_F6 */
+> +                       0x02010042      /* KEY_F8 */
+> +                       0x02020043      /* KEY_F9 */
+> +                       0x02030044      /* KEY_F10 */
+> +                       0x0300003b      /* KEY_F1 */
+> +                       0x0301003c      /* KEY_F2 */
+> +                       0x0302003d      /* KEY_F3 */
+> +                       0x03030074>;    /* KEY_POWER */
+> +};
+> diff --git a/drivers/input/keyboard/imx_keypad.c b/drivers/input/keyboard/imx_keypad.c
+> index 6d150e3..83dc5cd 100644
+> --- a/drivers/input/keyboard/imx_keypad.c
+> +++ b/drivers/input/keyboard/imx_keypad.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/jiffies.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/timer.h>
+> @@ -414,15 +415,21 @@ open_err:
+>         return -EIO;
+>  }
+>
+> +static struct of_device_id imx_keypad_of_match[] = {
+> +       { .compatible = "fsl,imx21-kpp", },
+> +       { /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, imx_keypad_of_match);
+> +
+>  static int imx_keypad_probe(struct platform_device *pdev)
+>  {
+>         const struct matrix_keymap_data *keymap_data = pdev->dev.platform_data;
+>         struct imx_keypad *keypad;
+>         struct input_dev *input_dev;
+>         struct resource *res;
+> -       int irq, error, i;
+> +       int irq, error, i, row, col, row_shift;
+>
+> -       if (keymap_data == NULL) {
+> +       if (keymap_data == NULL && pdev->dev.of_node == NULL) {
+>                 dev_err(&pdev->dev, "no keymap defined\n");
+>                 return -EINVAL;
+>         }
+> @@ -480,22 +487,6 @@ static int imx_keypad_probe(struct platform_device *pdev)
+>                 goto failed_unmap;
+>         }
+>
+> -       /* Search for rows and cols enabled */
+> -       for (i = 0; i < keymap_data->keymap_size; i++) {
+> -               keypad->rows_en_mask |= 1 << KEY_ROW(keymap_data->keymap[i]);
+> -               keypad->cols_en_mask |= 1 << KEY_COL(keymap_data->keymap[i]);
+> -       }
+> -
+> -       if (keypad->rows_en_mask > ((1 << MAX_MATRIX_KEY_ROWS) - 1) ||
+> -           keypad->cols_en_mask > ((1 << MAX_MATRIX_KEY_COLS) - 1)) {
+> -               dev_err(&pdev->dev,
+> -                       "invalid key data (too many rows or colums)\n");
+> -               error = -EINVAL;
+> -               goto failed_clock_put;
+> -       }
+> -       dev_dbg(&pdev->dev, "enabled rows mask: %x\n", keypad->rows_en_mask);
+> -       dev_dbg(&pdev->dev, "enabled cols mask: %x\n", keypad->cols_en_mask);
+> -
+>         /* Init the Input device */
+>         input_dev->name = pdev->name;
+>         input_dev->id.bustype = BUS_HOST;
+> @@ -512,6 +503,20 @@ static int imx_keypad_probe(struct platform_device *pdev)
+>                 goto failed_clock_put;
+>         }
+>
+> +       /* Search for rows and cols enabled */
+> +       row_shift = get_count_order(MAX_MATRIX_KEY_COLS);
+> +       for (row = 0; row < MAX_MATRIX_KEY_ROWS; row++) {
+> +               for (col = 0; col < MAX_MATRIX_KEY_COLS; col++) {
+> +                       i = (row << row_shift) + col;
+> +                       if (keypad->keycodes[i]) {
+> +                               keypad->rows_en_mask |= 1 << row;
+> +                               keypad->cols_en_mask |= 1 << col;
+> +                       }
+> +               }
+> +       }
+> +       dev_dbg(&pdev->dev, "enabled rows mask: %x\n", keypad->rows_en_mask);
+> +       dev_dbg(&pdev->dev, "enabled cols mask: %x\n", keypad->cols_en_mask);
+> +
+>         __set_bit(EV_REP, input_dev->evbit);
+>         input_set_capability(input_dev, EV_MSC, MSC_SCAN);
+>         input_set_drvdata(input_dev, keypad);
+> @@ -631,6 +636,7 @@ static struct platform_driver imx_keypad_driver = {
+>                 .name   = "imx-keypad",
+>                 .owner  = THIS_MODULE,
+>                 .pm     = &imx_kbd_pm_ops,
+> +               .of_match_table = of_match_ptr(imx_keypad_of_match),
+>         },
+>         .probe          = imx_keypad_probe,
+>         .remove         = imx_keypad_remove,
+> --
+> 1.7.1
+>
+>
+
+
+
 -- 
-1.8.1
+Best Regards,
+Liu Ying
