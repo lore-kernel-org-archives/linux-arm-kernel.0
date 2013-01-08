@@ -1,105 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 Jan 2013 15:03:50 -0500
-Subject: [PATCH] Allow Marvell SATA driver to work with
- LEDS_TRIGGER_IDE_DISK
-In-Reply-To: <CAMW5UfY2vKEJ7K8tLJ1+JeKsr_hxtUTva9HGJxLan6k+KGdmvg@mail.gmail.com>
-References: <1357668987-3610-1-git-send-email-josh.coombs@gmail.com>
- <20130108190657.GW5075@titan.lakedaemon.net>
- <CAMW5UfY2vKEJ7K8tLJ1+JeKsr_hxtUTva9HGJxLan6k+KGdmvg@mail.gmail.com>
-Message-ID: <20130108200350.GX5075@titan.lakedaemon.net>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Tue, 8 Jan 2013 15:18:11 -0500
+Subject: [PATCH] ARM: dts: exynos5250: Set HDMI version to v1.4
+In-Reply-To: <1357592400-18117-1-git-send-email-seanpaul@chromium.org>
+References: <1357592400-18117-1-git-send-email-seanpaul@chromium.org>
+Message-ID: <CAOw6vbJRoFtrhhhf4t0KDu72TieKBQ0LDvgPVfi7Q4OwQUTqDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 02:18:04PM -0500, Josh Coombs wrote:
-> On Tue, Jan 8, 2013 at 2:06 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Tue, Jan 08, 2013 at 01:16:27PM -0500, Joshua Coombs wrote:
-> >> Add a call to the IDE LED Trigger within the Marvell SATA driver to allow
-> >> Marvell SoC devices to show SATA activity via GPIO connected LEDs.
-> >>
-> >> Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
-> >> ---
-> >>  drivers/ata/sata_mv.c | 3 +++
-> >>  drivers/leds/Kconfig  | 3 +--
-> >>  2 files changed, 4 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-> >> index 68f4fb5..4aaf6f0 100644
-> >> --- a/drivers/ata/sata_mv.c
-> >> +++ b/drivers/ata/sata_mv.c
-> >> @@ -71,6 +71,7 @@
-> >>  #include <scsi/scsi_cmnd.h>
-> >>  #include <scsi/scsi_device.h>
-> >>  #include <linux/libata.h>
-> >> +#include <linux/leds.h>
-> >>
-> >>  #define DRV_NAME     "sata_mv"
-> >>  #define DRV_VERSION  "1.28"
-> >> @@ -1156,6 +1157,8 @@ static void mv_start_edma(struct ata_port *ap, void __iomem *port_mmio,
-> >>  {
-> >>       int want_ncq = (protocol == ATA_PROT_NCQ);
-> >>
-> >> +     ledtrig_ide_activity();
-> >> +
-> >>       if (pp->pp_flags & MV_PP_FLAG_EDMA_EN) {
-> >>               int using_ncq = ((pp->pp_flags & MV_PP_FLAG_NCQ_EN) != 0);
-> >>               if (want_ncq != using_ncq)
-> >> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> >> index b58bc8a..d2071d0 100644
-> >> --- a/drivers/leds/Kconfig
-> >> +++ b/drivers/leds/Kconfig
-> >> @@ -496,10 +496,9 @@ config LEDS_TRIGGER_ONESHOT
-> >>
-> >>  config LEDS_TRIGGER_IDE_DISK
-> >>       bool "LED IDE Disk Trigger"
-> >> -     depends on IDE_GD_ATA
-> >>       depends on LEDS_TRIGGERS
-> >>       help
-> >> -       This allows LEDs to be controlled by IDE disk activity.
-> >> +       This allows LEDs to be controlled by IDE or SATA disk activity.
-> >>         If unsure, say Y.
-> >>
-> >>  config LEDS_TRIGGER_HEARTBEAT
-> >
-> >
-> > Hmmm, I'm not sure about this.  Ideally, wouldn't all sata users want to
-> > have this option?  In which case, it should be changed to
-> > LEDS_TRIGGER_DISK_IO or similar.  However, this seems to be the first
-> > attempt at it:
-> >
-> > $ git grep ledtrig_ide_activity -- drivers/ata/*.c
-> > ...nada...
-> > $
-> >
-> > At any rate, I'd like to see this patch extended to facilitate other
-> > sata drivers using it.  eg adjusting the naming more appropriately, and
-> > 'depends on IDE_GD_ATA || ATA' or similar.  In it's current state, it
-> > should depend on IDE_GD_ATA || SATA_MV.
-> >
-> I only have access to Marvell's SATA controller for testing, so that
-> is why I only targeted it.  The Kconfig depends change makes perfect
-> sense.
-> 
-> Changing the name of the trigger might cause hardship for those
-> already using it, as they will have to update scripts/etc to account
-> for the name change.  
+On Mon, Jan 7, 2013 at 4:00 PM, Sean Paul <seanpaul@chromium.org> wrote:
+> Set the HDMI version to v1.4 for all exynos5250 targets. This property
+> was previously being inferred by the existence of the hdmi node.
+>
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> ---
 
-I agree wrt to the sysfs interface, the current is 'ide-disk'.  Perhaps
-a 'disk-io' could be added, and then ide-disk could be
-legacy/deprecated?
+The patch adding the property has churned a bit from
+devicetree-discuss reviews. I'll upload this again after it's settled.
 
-Of course, /dev/sda refers to the first SCSI disk on my system, which
-doesn't have SCSI...  Maybe it's best just to leave the sysfs interface
-alone and extend the driver to support sata-attached disks as well.  I
-could also see device-mapper read/writes as triggers as well.
+Please drop.
 
-> Would it make more sense to add a second trigger
-> for SATA instead?
+Sean
 
-I'll leave that up to the led guys, I just wanted to raise the point
-that the driver could logically support other types of disks, and we
-should come up with a migration path instead of adding capabilities
-ad-hoc.
-
-thx,
-
-Jason.
+>  arch/arm/boot/dts/exynos5250.dtsi |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 2e3b6ef..9fb6845 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -576,6 +576,7 @@
+>                 compatible = "samsung,exynos5-hdmi";
+>                 reg = <0x14530000 0x100000>;
+>                 interrupts = <0 95 0>;
+> +               samsung,supports-hdmi-1.4;
+>         };
+>
+>         mixer {
+> --
+> 1.7.7.3
+>
