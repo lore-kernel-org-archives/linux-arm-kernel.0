@@ -1,28 +1,27 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 08 Jan 2013 15:49:27 -0700
-Subject: [v2 6/9] ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
-In-Reply-To: <1357649263-1098-7-git-send-email-hdoyu@nvidia.com>
+Date: Tue, 08 Jan 2013 15:52:05 -0700
+Subject: [v2 9/9] ARM: tegra: Add initial support for Tegra 114 SoC.
+In-Reply-To: <1357649263-1098-10-git-send-email-hdoyu@nvidia.com>
 References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com>
- <1357649263-1098-7-git-send-email-hdoyu@nvidia.com>
-Message-ID: <50ECA277.5050907@wwwdotorg.org>
+ <1357649263-1098-10-git-send-email-hdoyu@nvidia.com>
+Message-ID: <50ECA315.5000703@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 01/08/2013 05:47 AM, Hiroshi Doyu wrote:
-> Initial support for Tegra 114 SoC. This is expected to be included in
-> the board DTS files, Tegra 114 SoC based evaluation board family.
+> Add new Tegra 114 SoC support.
 
-> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
 
-> +	gic: interrupt-controller {
-> +		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-> +		reg = <0x50041000 0x1000
-> +		       0x50042000 0x1000>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +	};
+>  static const struct of_device_id tegra_dt_irq_match[] __initconst = {
+>  	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
+> +	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init },
+>  	{ }
+>  };
 
-Last time around, Marc Zyngier asked:
-
-> If this is indeed an A15 GIC, how about adding the GICH and GICV
-> regions, as well as the VGIC maintenance interrupt?
+It'd probably be a good idea to add newer entries at the start of this
+table. Not so much an issue here perhaps, but at least when
+instantiating drivers, the earlier entries match first irrespective of
+the order of compatible values in the DT node, due to a misfeature in
+the kernel code, which while it's in the process of being fixed, we
+probably still want to work around.
