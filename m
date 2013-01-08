@@ -1,57 +1,40 @@
-From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
-Date: Tue, 8 Jan 2013 13:52:30 +0100
-Subject: [PATCH 2/2] mxc: enable EHCI PER clock
-In-Reply-To: <20121219202926.GB19651@pengutronix.de>
-References: <1355941777-99352-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1355941777-99352-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <20121219202926.GB19651@pengutronix.de>
-Message-ID: <20130108135230.78f23ba0@dell>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Tue, 8 Jan 2013 12:52:44 +0000
+Subject: [PATCH 1/1 net-next] net: fec: enable pause frame to improve rx
+ prefomance for 1G network
+In-Reply-To: <1357634609-4112-1-git-send-email-Frank.Li@freescale.com>
+References: <1357634609-4112-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1357649564.29986.10.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Dec 2012 21:29:26 +0100
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On Tue, 2013-01-08 at 16:43 +0800, Frank Li wrote:
+> The limition of imx6 internal bus cause fec can't achieve 1G perfomance.
+> There will be many packages lost because FIFO over run.
 
-> On Wed, Dec 19, 2012 at 07:29:37PM +0100, Gwenhael Goavec-Merou wrote:
-> > EHCI PER clock (aka usb_div) must be enabled to have EHCI driver working.
-> > 
-> > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> > ---
-> >  drivers/usb/host/ehci-mxc.c |   12 +++++++++++-
-> >  1 files changed, 11 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> > index ec7f5d2..8050631 100644
-> > --- a/drivers/usb/host/ehci-mxc.c
-> > +++ b/drivers/usb/host/ehci-mxc.c
-> > @@ -31,7 +31,7 @@
-> >  #define ULPI_VIEWPORT_OFFSET	0x170
-> >  
-> >  struct ehci_mxc_priv {
-> > -	struct clk *usbclk, *ahbclk, *phyclk;
-> > +	struct clk *usbclk, *ahbclk, *perclk, *phyclk;
-> >  	struct usb_hcd *hcd;
-> >  };
-> >  
-> > @@ -150,6 +150,13 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
-> >  	}
-> >  	clk_prepare_enable(priv->ahbclk);
-> >  
-> > +	priv->perclk = devm_clk_get(&pdev->dev, "per");
-> > +	if (IS_ERR(priv->perclk)) {
-> > +		ret = PTR_ERR(priv->perclk);
-> > +		goto err_clk_per;
-> > +	}
-> > +	clk_prepare_enable(priv->perclk);
-> 
-> Have you checked this clock is present on all SoCs using this driver?
-> 
-Yes
->
-> Other than that, +1 on using the chipidea driver as Fabio and Marek
-> already noted.
->
-True. But I need to use a non-dt board based on imx27. Chipidea is
-not working yet for this chip and I have currently not enough time to do that.
+How sad...
 
-Gwenha?l
+> This patch enable pause frame flow control.
+[...]
+
+You should not enable pause frames unconditionally. It will cause
+compatibility problems with some switches.  It should be possible to
+control their use manually or through autonegotiation (if the medium
+supports that).
+
+You should:
+1. Implement the ethtool get_pauseparam and set_pauseparam operations.
+If the medium supports autoneog, use mii_advertise_flowctrl() in
+set_pauseparam to update pause frame advertising and then restart
+autoneg.
+2. Allow pause frame advertising to be changed through set_settings (I
+think phylib covers this for you).
+3. Program the MAC according to the the parameters set with
+set_pauseparam or (if pause autoneg was enabled) the result of autoneg.
+
+Ben.
+
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
