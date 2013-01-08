@@ -1,41 +1,139 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Jan 2013 10:20:06 -0800
-Subject: [GIT PULL] few omap fixes for v3.8-rc2
-In-Reply-To: <CAOesGMhyYQoFYzqopGgwDwEVc4Gc74ERbRiJg_vhTmYf+V3_rA@mail.gmail.com>
-References: <20130108174816.GP14149@atomide.com>
- <CAOesGMhyYQoFYzqopGgwDwEVc4Gc74ERbRiJg_vhTmYf+V3_rA@mail.gmail.com>
-Message-ID: <20130108182005.GR14149@atomide.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Tue, 08 Jan 2013 13:42:31 -0500
+Subject: [PATCH v5 10/12] ARM: KVM: VGIC control interface world switch
+In-Reply-To: <20130108184116.46558.3558.stgit@ubuntu>
+References: <20130108184116.46558.3558.stgit@ubuntu>
+Message-ID: <20130108184231.46558.37202.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [130108 10:04]:
-> On Tue, Jan 8, 2013 at 9:48 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
-> >
-> >   Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8-rc2/fixes-signed-v2
-> >
-> > for you to fetch changes up to 6adba67eb0c4731ed0346731d024b2102f5b4d9d:
-> >
-> >   ARM: OMAP2+: am33xx-hwmod: Fix wrongly terminated am33xx_usbss_mpu_irqs array (2013-01-07 12:38:07 -0800)
-> >
-> > ----------------------------------------------------------------
-> > The biggest change is a fix to deal with different power state
-> > on omap2 registers that causes issues trying to use common PM code.
-> > Also fix few incorrect registers, and an issue for omap1 USB, and
-> > few sparse fixes for issues that sneaked in with all the clean-up.
-> 
-> Pulled, thanks. Not super-happy about the 100+ line delta for the 24xx
-> bugfix, but seems like it's needed.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Yes sorry looks like Paul was attempting to drop the omap custom PM
-changes related to the drivers/i2c/bus/i2c-omap.c revert mess, but
-naturally it's now too late. AFAIK that patch could wait for v3.9
-too if necessary.
+Enable the VGIC control interface to be save-restored on world switch.
 
-Regards,
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+---
+ arch/arm/kernel/asm-offsets.c  |   12 ++++++
+ arch/arm/kvm/interrupts_head.S |   74 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 86 insertions(+)
 
-Tony
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index c8b3272..17cea2e 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -169,6 +169,18 @@ int main(void)
+   DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.hxfar));
+   DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.hpfar));
+   DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.hyp_pc));
++#ifdef CONFIG_KVM_ARM_VGIC
++  DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
++  DEFINE(VGIC_CPU_HCR,		offsetof(struct vgic_cpu, vgic_hcr));
++  DEFINE(VGIC_CPU_VMCR,		offsetof(struct vgic_cpu, vgic_vmcr));
++  DEFINE(VGIC_CPU_MISR,		offsetof(struct vgic_cpu, vgic_misr));
++  DEFINE(VGIC_CPU_EISR,		offsetof(struct vgic_cpu, vgic_eisr));
++  DEFINE(VGIC_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_elrsr));
++  DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
++  DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
++  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
++  DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
++#endif
+   DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
+ #endif
+   return 0; 
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index f59a580..b4276ed 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -1,3 +1,5 @@
++#include <asm/hardware/gic.h>
++
+ #define VCPU_USR_REG(_reg_nr)	(VCPU_USR_REGS + (_reg_nr * 4))
+ #define VCPU_USR_SP		(VCPU_USR_REG(13))
+ #define VCPU_USR_LR		(VCPU_USR_REG(14))
+@@ -371,6 +373,49 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  * Assumes vcpu pointer in vcpu reg
+  */
+ .macro save_vgic_state
++#ifdef CONFIG_KVM_ARM_VGIC
++	/* Get VGIC VCTRL base into r2 */
++	ldr	r2, [vcpu, #VCPU_KVM]
++	ldr	r2, [r2, #KVM_VGIC_VCTRL]
++	cmp	r2, #0
++	beq	2f
++
++	/* Compute the address of struct vgic_cpu */
++	add	r11, vcpu, #VCPU_VGIC_CPU
++
++	/* Save all interesting registers */
++	ldr	r3, [r2, #GICH_HCR]
++	ldr	r4, [r2, #GICH_VMCR]
++	ldr	r5, [r2, #GICH_MISR]
++	ldr	r6, [r2, #GICH_EISR0]
++	ldr	r7, [r2, #GICH_EISR1]
++	ldr	r8, [r2, #GICH_ELRSR0]
++	ldr	r9, [r2, #GICH_ELRSR1]
++	ldr	r10, [r2, #GICH_APR]
++
++	str	r3, [r11, #VGIC_CPU_HCR]
++	str	r4, [r11, #VGIC_CPU_VMCR]
++	str	r5, [r11, #VGIC_CPU_MISR]
++	str	r6, [r11, #VGIC_CPU_EISR]
++	str	r7, [r11, #(VGIC_CPU_EISR + 4)]
++	str	r8, [r11, #VGIC_CPU_ELRSR]
++	str	r9, [r11, #(VGIC_CPU_ELRSR + 4)]
++	str	r10, [r11, #VGIC_CPU_APR]
++
++	/* Clear GICH_HCR */
++	mov	r5, #0
++	str	r5, [r2, #GICH_HCR]
++
++	/* Save list registers */
++	add	r2, r2, #GICH_LR0
++	add	r3, r11, #VGIC_CPU_LR
++	ldr	r4, [r11, #VGIC_CPU_NR_LR]
++1:	ldr	r6, [r2], #4
++	str	r6, [r3], #4
++	subs	r4, r4, #1
++	bne	1b
++2:
++#endif
+ .endm
+ 
+ /*
+@@ -379,6 +424,35 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  * Assumes vcpu pointer in vcpu reg
+  */
+ .macro restore_vgic_state
++#ifdef CONFIG_KVM_ARM_VGIC
++	/* Get VGIC VCTRL base into r2 */
++	ldr	r2, [vcpu, #VCPU_KVM]
++	ldr	r2, [r2, #KVM_VGIC_VCTRL]
++	cmp	r2, #0
++	beq	2f
++
++	/* Compute the address of struct vgic_cpu */
++	add	r11, vcpu, #VCPU_VGIC_CPU
++
++	/* We only restore a minimal set of registers */
++	ldr	r3, [r11, #VGIC_CPU_HCR]
++	ldr	r4, [r11, #VGIC_CPU_VMCR]
++	ldr	r8, [r11, #VGIC_CPU_APR]
++
++	str	r3, [r2, #GICH_HCR]
++	str	r4, [r2, #GICH_VMCR]
++	str	r8, [r2, #GICH_APR]
++
++	/* Restore list registers */
++	add	r2, r2, #GICH_LR0
++	add	r3, r11, #VGIC_CPU_LR
++	ldr	r4, [r11, #VGIC_CPU_NR_LR]
++1:	ldr	r6, [r3], #4
++	str	r6, [r2], #4
++	subs	r4, r4, #1
++	bne	1b
++2:
++#endif
+ .endm
+ 
+ .equ vmentry,	0
