@@ -1,83 +1,121 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 8 Jan 2013 16:34:47 +0100
-Subject: [PATCH v7 0/6] watchdog: dt: add support for the timeout-sec
- dt property
-In-Reply-To: <1357639455-21935-1-git-send-email-fabio.porcedda@gmail.com>
-References: <1357639455-21935-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <20130108153447.GC7360@game.jcrosoft.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Jan 2013 16:07:39 +0000
+Subject: [v2 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
+In-Reply-To: <1357649263-1098-6-git-send-email-hdoyu@nvidia.com>
+References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com>
+ <1357649263-1098-6-git-send-email-hdoyu@nvidia.com>
+Message-ID: <50EC444B.5060206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:04 Tue 08 Jan     , Fabio Porcedda wrote:
-> Hi all,
-> this patchset add the timeout-sec property to the watchdog core,
-> to the at91sam9_wdt driver and on all framework enabled watchdog driver
-> with dt support.
-> The at91sam9_wdt is tested on evk-pr3,
-> the other drivers are compile tested only.
+On 08/01/13 12:47, Hiroshi Doyu wrote:
+> Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
+> timer than TMR0. If it's available, it will be used for clock source
+> and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
+> necessary for clock event.
 > 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>  .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 ++++
+>  drivers/clocksource/tegra20_timer.c                |   65 +++++++++++++++++++-
+>  2 files changed, 75 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> new file mode 100644
+> index 0000000..9de936a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> @@ -0,0 +1,11 @@
+> +NVIDIA Tegra Timer Stamp Counter(TSC)
+> +
+> +Required properties:
+> +- compatible : "nvidia,tegra114-tsc
+> +- reg : Should contain 1 register ranges(address and length)
+> +
+> +Example:
+> +	tsc {
+> +		compatible = "nvidia,tegra114-tsc";
+> +		reg = <0x700f0000 0x20000>;
+> +	};
+> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+> index 1d25de8..564266d 100644
+> --- a/drivers/clocksource/tegra20_timer.c
+> +++ b/drivers/clocksource/tegra20_timer.c
+> @@ -30,6 +30,7 @@
+>  #include <asm/mach/time.h>
+>  #include <asm/smp_twd.h>
+>  #include <asm/sched_clock.h>
+> +#include <asm/arch_timer.h>
+>  
+>  #define RTC_SECONDS            0x08
+>  #define RTC_SHADOW_SECONDS     0x0c
+> @@ -271,10 +272,72 @@ static void __init tegra20_init_tmr(void)
+>  	clockevents_register_device(&tegra_clockevent);
+>  }
+>  
+> +#define TSC_CNTCR		0		/* TSC control registers */
+> +#define TSC_CNTCR_ENABLE	(1 << 0)	/* Enable */
+> +#define TSC_CNTCR_HDBG		(1 << 1)	/* Halt on debug */
+> +
+> +#define TSC_CNTCV0		0x8		/* TSC counter (LSW) */
+> +#define TSC_CNTCV1		0xc		/* TSC counter (MSW) */
+> +#define TSC_CNTFID0		0x20		/* TSC freq id 0 */
+> +
+> +static const struct of_device_id tegra_tsc_match[] __initconst = {
+> +	{ .compatible = "nvidia,tegra114-tsc" },
+> +	{}
+> +};
+> +
+> +/* FIXME: only secure mode is supported. */
 
-I'll prefer a macro to abstract the string in every driver
+And this is a bug, as far as I'm concerned.
 
-except this fine by me
+> +static int tegra_arch_timer_init(void)
+> +{
+> +	int err;
+> +	struct device_node *np;
+> +	struct clk *clk;
+> +	void __iomem *tsc_base;
+> +	u32 freq, val;
+> +
+> +	np = of_find_matching_node(NULL, tegra_tsc_match);
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	tsc_base = of_iomap(np, 0);
+> +	if (!tsc_base)
+> +		return -ENODEV;
+> +
+> +	clk = clk_get_sys("clk_m", NULL);
+> +	if (IS_ERR(clk)) {
+> +		freq = 12000000;
+> +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
+> +	} else {
+> +		freq = clk_get_rate(clk);
+> +		clk_put(clk);
+> +	}
+> +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
+> +
+> +	/* CNTFRQ */
+> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
+> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
+> +	BUG_ON(val != freq);
 
-Best Regards,
-J.
+No, not again! Like I said last year, this won't fly. So instead of
+trying to work around a broken firmware, let's do the right thing.
 
-> Best regards
-> Fabio Porcedda
-> 
-> changes:
-> v7:
->   - rebase over v3.8-rc2
->   - remove the patch already merged
-> v6:
->   - remove patch for function of_get_timeout_sec as aked by Rob Herring
->   - add Acked-by: Jason Cooper <jason@lakedaemon.net>
->   - add Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> v5:
->   - fix codestyle for compilance ti checkpatch.pl about
->     "ERROR: do not initialise statics to 0 or NULL"
->     for s3c2410_wdt.c:56 and at91sam9_wdt.c:63
-> v4:
->   - add of_get_timeout_sec
->   - add s3c2410_wdt driver
->   - split driver patch
->   - fixed watchdog_init_timeout handling of min_timeout and max_timeout
-> v3:
->   - rename watchdog_probe_dt_timeout ->  watchdog_init_timeout
->   - move the watchdog_init_timeout function from inline to watchdog_core.c
->   - add timeout parameter handling code to watchdog_init_timeout
->   - add timeout-sec property to the pnx4008-wdt driver
->   - add two small commit for fixup and cleanup
-> v2:
->   - change "timeout" to "timeout-sec" as asked by Jean-Christophe
->   - at91sam9_wdt: use the new helper function
->   - at91sam9_wdt: add bounds checking
->   - watchdog.h: add bounds checking
-> 
-> Fabio Porcedda (6):
->   watchdog: core: dt: add support for the timeout-sec dt property
->   watchdog: orion_wdt: add timeout-sec property binding
->   watchdog: pnx4008: add timeout-sec property binding
->   watchdog: s3c2410_wdt: add timeout-sec property binding
->   watchdog: at91sam9_wdt: add timeout-sec property binding
->   watchdog: orion_wdt: move the min_timeout initialization
-> 
->  .../devicetree/bindings/watchdog/atmel-wdt.txt     |  4 +++
->  .../devicetree/bindings/watchdog/marvel.txt        |  5 +++
->  .../devicetree/bindings/watchdog/pnx4008-wdt.txt   |  4 +++
->  .../devicetree/bindings/watchdog/samsung-wdt.txt   |  3 ++
->  Documentation/watchdog/watchdog-kernel-api.txt     | 10 ++++++
->  drivers/watchdog/Kconfig                           |  1 +
->  drivers/watchdog/at91sam9_wdt.c                    | 16 ++++++++--
->  drivers/watchdog/orion_wdt.c                       | 10 +++---
->  drivers/watchdog/pnx4008_wdt.c                     |  7 ++--
->  drivers/watchdog/s3c2410_wdt.c                     |  6 ++--
->  drivers/watchdog/watchdog_core.c                   | 37 ++++++++++++++++++++++
->  include/linux/watchdog.h                           |  3 ++
->  12 files changed, 91 insertions(+), 15 deletions(-)
-> 
-> -- 
-> 1.8.0.3
-> 
+> +
+> +	val = readl_relaxed(tsc_base + TSC_CNTCR);
+> +	val |= TSC_CNTCR_ENABLE | TSC_CNTCR_HDBG;
+> +	writel_relaxed(val, tsc_base + TSC_CNTCR);
+> +
+> +	err = arch_timer_of_register();
+
+What about adding an optional property to the binding, pointing to the
+required clock? That would solve the above problem in a sensible way,
+and your kernel wouldn't go bust.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
