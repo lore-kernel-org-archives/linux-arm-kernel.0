@@ -1,43 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 8 Jan 2013 19:11:32 +0000
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <50EC6CFF.5070309@arm.com>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1211061802240.21033@xanadu.home> <50EC6CFF.5070309@arm.com>
-Message-ID: <201301081911.33089.arnd@arndb.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 08 Jan 2013 20:13:00 +0100
+Subject: [PATCH] ARM: sunxi: fix struct sys_timer removal
+In-Reply-To: <1357666417-8803-1-git-send-email-swarren@wwwdotorg.org>
+References: <1357666417-8803-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <50EC6FBC.2030100@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 January 2013, Jonathan Austin wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 335e220..0561d87 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -305,6 +305,11 @@ config ARCH_REALVIEW
->          help
->            This enables support for ARM Ltd RealView boards.
+Hi Stephen,
+
+On 08/01/2013 18:33, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> +config ARCH_VEXPRESS_NOMMU
-> +       bool "ARM Ltd. Versatile Express family (nommu)"
-> +       depends on !MMU
-> +       select ARCH_VEXPRESS
-> +
->   config ARCH_VERSATILE
->          bool "ARM Ltd. Versatile family"
->          select ARCH_WANT_OPTIONAL_GPIOLIB
-> ---->8----
+> Commit 6bb27d7 "ARM: delete struct sys_timer" removed struct sys_timer,
+> but didn't update mach-sunxi/sunxi.c for this change, even though the
+> sunxi timer implementation itself was updated. This caused a build break:
+> 
+> arch/arm/mach-sunxi/sunxi.c:94:2: error: unknown field 'timer' specified in initializer
+> arch/arm/mach-sunxi/sunxi.c:94:12: error: 'sunxi_timer' undeclared here (not in a function)
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Ideally, this commit would be squashed into 6bb27d7 in arm-soc's
+> timer-cleanup branch. However, that would change a few commit IDs, and
+> I've already pulled that branch into the Tegra and bcm2835 trees. I can
+> rebase those without issue if we co-ordinate so all the changes go into
+> the same linux-next version.
+> 
+> However, since sunxi isn't actually enabled in any defconfig until
+> v3.8-rc2, perhaps it's OK to apply this change as a separate patch on
+> top of timer-rework, and ignore the bisect issue?
 
-Yes, I think this is the right approach.
+I'm fine with having it as a follow-up patch.
 
-> With the other perhaps being to merge the ARCH_VEXPRESS option back in 
-> to the 'choice' and create a ARCH_VEXPRESS_MULTI elsewhere...
+Also, you can add my
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Since I assume that Olof will apply this directly?
 
-That would needlessly break 'make oldconfig' for people that have
-CONFIG_ARCH_VEXPRESS in their .config files or other scripts.
-
-> Is that the sort of thing you had in mind, or is there another way 
-> around that I'm missing?
-
-I think it's good.
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Maxime
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
