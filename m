@@ -1,44 +1,56 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 8 Jan 2013 08:47:21 -0600
-Subject: [PATCH 1/3] PM / OPP: Export more symbols for module usage
-In-Reply-To: <1357628043-19256-2-git-send-email-shawn.guo@linaro.org>
-References: <1357628043-19256-1-git-send-email-shawn.guo@linaro.org>
- <1357628043-19256-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130108144720.GA6062@kahuna>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 8 Jan 2013 15:49:54 +0100
+Subject: [PATCH] ARM: Kirkwood: convert ns2 boards to pinctrl
+In-Reply-To: <1357655778-32066-1-git-send-email-simon.guinot@sequanux.org>
+References: <1357655778-32066-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20130108144954.GC3392@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:54-20130108, Shawn Guo wrote:
-> Export opp_init_cpufreq_table and opp_free_cpufreq_table for module
-> usage.
+On Tue, Jan 08, 2013 at 03:36:18PM +0100, Simon Guinot wrote:
+> Note that the pinctrl conversion also fixes GPIO support for ns2 boards.
+> Since commit f9e75922: "ARM: Kirkwood: Make use of mvebu pincltl and
+> gpio", the mvbu_gpio driver is used for DT boards. As mvbu_gpio relies
+> on the pinctrl driver, then a pinctrl definition must be given to allow
+> the GPIO configuration.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
 > ---
->  drivers/base/power/opp.c |    2 ++
->  1 file changed, 2 insertions(+)
+>  arch/arm/boot/dts/kirkwood-ns2-common.dtsi |   16 ++++++++++++
+>  arch/arm/mach-kirkwood/board-ns2.c         |   38 ----------------------------
+>  2 files changed, 16 insertions(+), 38 deletions(-)
 > 
-> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-> index 50b2831..d16db9a 100644
-> --- a/drivers/base/power/opp.c
-> +++ b/drivers/base/power/opp.c
-> @@ -661,6 +661,7 @@ int opp_init_cpufreq_table(struct device *dev,
+> diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+> index 9bc6785..77d21ab 100644
+> --- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+> @@ -1,4 +1,5 @@
+>  /include/ "kirkwood.dtsi"
+> +/include/ "kirkwood-6281.dtsi"
 >  
->  	return 0;
->  }
-> +EXPORT_SYMBOL(opp_init_cpufreq_table);
+>  / {
+>  	chosen {
+> @@ -6,6 +7,21 @@
+>  	};
 >  
->  /**
->   * opp_free_cpufreq_table() - free the cpufreq table
-> @@ -678,6 +679,7 @@ void opp_free_cpufreq_table(struct device *dev,
->  	kfree(*table);
->  	*table = NULL;
->  }
-> +EXPORT_SYMBOL(opp_free_cpufreq_table);
->  #endif		/* CONFIG_CPU_FREQ */
+>  	ocp at f1000000 {
+> +		pinctrl: pinctrl at 10000 {
+> +			pinctrl-0 = < &pmx_spi &pmx_twsi0 &pmx_uart0
+> +					&pmx_ns2_sata0 &pmx_ns2_sata1>;
+> +			pinctrl-names = "default";
+> +
+> +			pmx_ns2_sata0: pmx-ns2-sata0 {
+> +				marvell,pins = "mpp21";
+> +				marvell,function = "sata0";
+> +			};
+> +			pmx_ns2_sata1: pmx-ns2-sata1 {
+> +				marvell,pins = "mpp20";
+> +				marvell,function = "sata1";
+> +			};
+> +		};
 
-Is'nt this already covered in 
-https://patchwork.kernel.org/patch/1847261/
-?
--- 
-Regards,
-Nishanth Menon
+Hi Simon
+
+Its normal to also list all the gpio pins here as well. 
+
+    Andrew
