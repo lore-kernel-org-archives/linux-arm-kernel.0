@@ -1,116 +1,61 @@
-From: Frank.Li@freescale.com (Frank Li)
-Date: Tue, 8 Jan 2013 16:43:29 +0800
-Subject: [PATCH 1/1 net-next] net: fec: enable pause frame to improve rx
- prefomance for 1G network
-Message-ID: <1357634609-4112-1-git-send-email-Frank.Li@freescale.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 8 Jan 2013 01:02:32 -0800
+Subject: Build failure with DMA_OMAP=m and a caller built-in
+In-Reply-To: <20130107203834.GB2637@n2100.arm.linux.org.uk>
+References: <1357449969.4324.25.camel@deadeye.wl.decadent.org.uk>
+ <20130107202106.GG14149@atomide.com>
+ <20130107203834.GB2637@n2100.arm.linux.org.uk>
+Message-ID: <20130108090231.GF19691@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The limition of imx6 internal bus cause fec can't achieve 1G perfomance.
-There will be many packages lost because FIFO over run.
-
-This patch enable pause frame flow control.
-
-Before this patch
-iperf -s -i 1
-TCP window size: 85.3 KByte (default)
-------------------------------------------------------------
-[  4] local 10.192.242.153 port 5001 connected with 10.192.242.94 port 49773
-[ ID] Interval       Transfer     Bandwidth
-[  4]  0.0- 1.0 sec  6.35 MBytes  53.3 Mbits/sec
-[  4]  1.0- 2.0 sec  3.39 MBytes  28.5 Mbits/sec
-[  4]  2.0- 3.0 sec  2.63 MBytes  22.1 Mbits/sec
-[  4]  3.0- 4.0 sec  1.10 MBytes  9.23 Mbits/sec
-
-ifconfig
-   RX packets:46195 errors:1859 dropped:1 overruns:1859 frame:1859
-
-After this patch
-iperf -s -i 1
-
-[  4] local 10.192.242.153 port 5001 connected with 10.192.242.94 port 49757
-[ ID] Interval       Transfer     Bandwidth
-[  4]  0.0- 1.0 sec  49.8 MBytes   418 Mbits/sec
-[  4]  1.0- 2.0 sec  50.1 MBytes   420 Mbits/sec
-[  4]  2.0- 3.0 sec  47.5 MBytes   399 Mbits/sec
-[  4]  3.0- 4.0 sec  45.9 MBytes   385 Mbits/sec
-[  4]  4.0- 5.0 sec  44.8 MBytes   376 Mbits/sec
-
-ifconfig
-   RX packets:2348454 errors:0 dropped:16 overruns:0 frame:0
-
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
-Signed-off-by: Fugang Duan  <B38611@freescale.com>
----
- drivers/net/ethernet/freescale/fec.c |   26 ++++++++++++++++++++++++++
- drivers/net/ethernet/freescale/fec.h |    4 ++++
- 2 files changed, 30 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 6dc2094..4928260 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -68,6 +68,14 @@
- 
- #define DRIVER_NAME	"fec"
- 
-+/* Pause frame feild and FIFO threshold */
-+#define FEC_ENET_FCE	(1 << 5)
-+#define FEC_ENET_RSEM_V	0x84
-+#define FEC_ENET_RSFL_V	16
-+#define FEC_ENET_RAEM_V	0x8
-+#define FEC_ENET_RAFL_V	0x8
-+#define FEC_ENET_OPD_V	0xFFF0
-+
- /* Controller is ENET-MAC */
- #define FEC_QUIRK_ENET_MAC		(1 << 0)
- /* Controller needs driver to swap frame */
-@@ -470,6 +478,21 @@ fec_restart(struct net_device *ndev, int duplex)
- 		}
- #endif
- 	}
-+
-+	/* enable pause frame*/
-+	if (id_entry->driver_data & FEC_QUIRK_HAS_GBIT) {
-+		rcntl |= FEC_ENET_FCE;
-+
-+		/* set FIFO thresh hold parameter to reduce overrun */
-+		writel(FEC_ENET_RSEM_V, fep->hwp + FEC_R_FIFO_RSEM);
-+		writel(FEC_ENET_RSFL_V, fep->hwp + FEC_R_FIFO_RSFL);
-+		writel(FEC_ENET_RAEM_V, fep->hwp + FEC_R_FIFO_RAEM);
-+		writel(FEC_ENET_RAFL_V, fep->hwp + FEC_R_FIFO_RAFL);
-+
-+		/* OPD */
-+		writel(FEC_ENET_OPD_V, fep->hwp + FEC_OPD);
-+	}
-+
- 	writel(rcntl, fep->hwp + FEC_R_CNTRL);
- 
- 	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
-@@ -1021,6 +1044,9 @@ static int fec_enet_mii_probe(struct net_device *ndev)
- 	else
- 		phy_dev->supported &= PHY_BASIC_FEATURES;
- 
-+	/* enable phy pause frame for any platform */
-+	phy_dev->supported |= ADVERTISED_Pause;
-+
- 	phy_dev->advertising = phy_dev->supported;
- 
- 	fep->phy_dev = phy_dev;
-diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index 4862394..7dac581 100644
---- a/drivers/net/ethernet/freescale/fec.h
-+++ b/drivers/net/ethernet/freescale/fec.h
-@@ -48,6 +48,10 @@
- #define FEC_R_DES_START		0x180 /* Receive descriptor ring */
- #define FEC_X_DES_START		0x184 /* Transmit descriptor ring */
- #define FEC_R_BUFF_SIZE		0x188 /* Maximum receive buff size */
-+#define FEC_R_FIFO_RSFL		0x190 /* Receive FIFO section full threshold */
-+#define FEC_R_FIFO_RSEM		0x194 /* Receive FIFO section empty threshold */
-+#define FEC_R_FIFO_RAEM		0x198 /* Receive FIFO almost empty threshold */
-+#define FEC_R_FIFO_RAFL		0x19c /* Receive FIFO almost full threshold */
- #define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
- #define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
- 
--- 
-1.7.1
+On Mon, Jan 07, 2013 at 08:38:34PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 07, 2013 at 12:21:06PM -0800, Tony Lindgren wrote:
+> > * Ben Hutchings <ben@decadent.org.uk> [130105 21:29]:
+> > > Various drivers use omap_dma_filter_fn() but don't depend on DMA_OMAP.
+> > > This is fine because there is a trivial inline definition in case
+> > > DMA_OMAP is disabled... until the caller is built-in and DMA_OMAP=m.
+> > > 
+> > > I tried adding the rather weird 'select DMA_OMAP if DMA_OMAP!=n' to
+> > > these drivers' kconfig symbols to promote it to built-in if necessary.
+> > > This sort of works but kconfig complains about the circular dependency
+> > > and it becomes impossible to disable DMA_OMAP in the 'make nconfig'
+> > > menu.  So that's not the right thing to do.
+> > > 
+> > > Any ideas?
+> > 
+> > Hmm let's ask Russell and Vinod what they are envisioning. I believe
+> > there was some talk about removing the filter functions?
+> 
+> The right thing is to nobble down and try and resolve the age old, much
+> talked about, common way to tie peripheral devices and their DMA engine
+> channels together by some means.
+> 
+> Unfortunately, it seems everyone has different views, and as yet it's
+> not reached any kind of concensus.  This has now been going on for a
+> couple of years in various forms.
+> 
+> The problem we have is that the way peripheral devices are connected to
+> their DMA engines can involve additional complexity, which if not handled
+> correctly results in some platforms being crippled by the API.
+> 
+> I think Vinod was working on something, however I've not heard anything on
+> that for a while now.
+My work was stalled due to other stuff at my workplace. I plan to spend some
+time on this pretty soon.
+> 
+> How we avoid this problem outside of OMAP is that the DMA filter function
+> gets passed from platform code, and we only ever allow the DMA engine
+> driver to be configured into the kernel (iow, non-modular).  This means
+> that the DMA users never directly reference the DMA engine driver itself.
+> However, as OMAP headed down the DT path, many drivers no longer make use
+> of platform data, which makes that approach impractical.
+> 
+> So, I'm afraid that OMAP's rather boxed into a corner over the various
+> different competing factions about how ARM should do X, Y and Z vs the
+> state of various subsystems.  So much for DT sorting out world hunger
+> and it never failing to solve any problem...
+> 
+> I'm sure it'll eventually get sorted, but how long that takes depends on
+> how long it takes to come up with a working API for connecting peripheral
+> devices with their DMA agent(s).
