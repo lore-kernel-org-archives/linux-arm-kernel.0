@@ -1,42 +1,35 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue,  8 Jan 2013 10:28:06 +0100
-Subject: [PATCH v3 RESEND] mxs: uart: allow setting RTS from software
-Message-ID: <1357637286-29178-1-git-send-email-s.trumtrar@pengutronix.de>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Tue, 08 Jan 2013 10:30:45 +0100
+Subject: [PATCH RESEND] ARM: dts: AM33XX: Rename I2C and GPIO nodes
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EAD4863@DBDE01.ent.ti.com>
+ (Chimata AnilKumar's message of "Wed, 2 Jan 2013 10:12:29 +0000")
+References: <1353498737-21174-1-git-send-email-anilkumar@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EAD4863@DBDE01.ent.ti.com>
+Message-ID: <8738ycaunu.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the patch "serial: mxs-auart: fix the wrong RTS hardware flow control" the
-mainline mxs-uart driver now sets RTSEN only when hardware flow control is
-enabled via software. It is not possible any longer to set RTS manually via
-software. However, the manual modification is a valid operation.
-Regain the possibility to set RTS via software and only set RTSEN when hardware
-flow control is explicitly enabled via settermios cflag CRTSCTS.
+>>>>> "AnilKumar" == AnilKumar, Chimata <anilkumar@ti.com> writes:
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Reviewed-by: Huang Shijie <b32955@freescale.com>
+ AnilKumar> On Wed, Nov 21, 2012 at 17:22:17, AnilKumar, Chimata wrote:
+ >> Rename I2C and GPIO nodes according to AM33XX TRM. According to
+ >> AM33XX TRM device instances are starting from "0" like i2c0, i2c1
+ >> and i2c3.
+ >> 
+ >> Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
+ >> [panto at antoniou-consulting.com: initial patch by pantelis's]
+ >> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+ >> ---
+ >> Changes from first version:
+ >> - Updated pantelis's patch
+ >> * Modified based on linux-omap/master
+ >> * Added GPIO nodes renaming as well
 
-Cc: stable at vger.kernel.org
----
- drivers/tty/serial/mxs-auart.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ AnilKumar> Hi Tony/Benoit,
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 6db23b0..9f63f88 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -412,10 +412,12 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
- 
- 	u32 ctrl = readl(u->membase + AUART_CTRL2);
- 
--	ctrl &= ~AUART_CTRL2_RTSEN;
-+	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
- 	if (mctrl & TIOCM_RTS) {
- 		if (tty_port_cts_enabled(&u->state->port))
- 			ctrl |= AUART_CTRL2_RTSEN;
-+		else
-+			ctrl |= AUART_CTRL2_RTS;
- 	}
- 
- 	s->ctrl = mctrl;
+ AnilKumar> If there are no comments could you please pull this patch?
+
+Yes, please do.
+
 -- 
-1.7.10.4
+Bye, Peter Korsgaard
