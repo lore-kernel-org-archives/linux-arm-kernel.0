@@ -1,37 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 8 Jan 2013 22:56:30 +0000
-Subject: Build failure with DMA_OMAP=m and a caller built-in
-In-Reply-To: <20130107203834.GB2637@n2100.arm.linux.org.uk>
-References: <1357449969.4324.25.camel@deadeye.wl.decadent.org.uk>
- <20130107202106.GG14149@atomide.com>
- <20130107203834.GB2637@n2100.arm.linux.org.uk>
-Message-ID: <201301082256.30639.arnd@arndb.de>
+Date: Tue, 8 Jan 2013 23:09:48 +0000
+Subject: [PATCH V3 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <CAKohpo=FjZuMOC-wuNc3q_FXbk546ttCLr55GkW9AL0Tz-HoBA@mail.gmail.com>
+References: <3100e691db3f94c22afd98b609a1568d7e70dfe7.1350360935.git.viresh.kumar@linaro.org>
+ <201212102208.52347.arnd@arndb.de>
+ <CAKohpo=FjZuMOC-wuNc3q_FXbk546ttCLr55GkW9AL0Tz-HoBA@mail.gmail.com>
+Message-ID: <201301082309.48676.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 January 2013, Russell King - ARM Linux wrote:
-> The problem we have is that the way peripheral devices are connected to
-> their DMA engines can involve additional complexity, which if not handled
-> correctly results in some platforms being crippled by the API.
+On Wednesday 12 December 2012, Viresh Kumar wrote:
+> I saw the binding document and it looks it can be applied to dw_dmac
+> too, as there is nothing special for it.
 > 
-> I think Vinod was working on something, however I've not heard anything on
-> that for a while now.
+> The question is how? We are already late for merge window and this
+> one is queued. Supplying a new patch, getting it reviewed/tested and
+> being pulled by Linus is not so easy :)
 > 
-> How we avoid this problem outside of OMAP is that the DMA filter function
-> gets passed from platform code, and we only ever allow the DMA engine
-> driver to be configured into the kernel (iow, non-modular).  This means
-> that the DMA users never directly reference the DMA engine driver itself.
-> However, as OMAP headed down the DT path, many drivers no longer make use
-> of platform data, which makes that approach impractical.
+> Two ways:
+> - Keep it as is, and i will fix it separately and quickly
+> - Drop it :(
 
-Hmm, it seems the generic DT binding for dmaengine missed the merge window
-again, Vinod's pull request came a bit too late for this[1].
-
-Anyway, once the binding and code from Jon Hunter is there, and the omap-dma
-converted over to use it, the problem should be gone, unless you see any
-other issues with it. Drivers no longer need to reference a filter function
-directly, since the dma channel can get described completely in the DT.
+It seems we got both lucky and unlucky here, as all the dmaengine patches,
+including this set and the generic DT bindings missed out in the end.
+So there is time to fix it all for 3.9.
 
 	Arnd
-
-[1] http://lkml.org/lkml/2012/12/21/466
