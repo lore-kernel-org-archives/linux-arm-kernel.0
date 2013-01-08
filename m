@@ -1,71 +1,62 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 Jan 2013 18:09:38 +0100
-Subject: [PATCH 7/7] ARM i.MX51 babbage: Add display support
-In-Reply-To: <CAOMZO5AkRmhdB-JWQ5DFuQUJHibV7GGvvDeK7-cg7m8OnbHA_Q@mail.gmail.com>
-References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
- <CAOMZO5BnFZs+s-WFahtqyzCi15P9RBzKDzwdZNCJ4PmnQrFY1g@mail.gmail.com>
- <CAOMZO5AkRmhdB-JWQ5DFuQUJHibV7GGvvDeK7-cg7m8OnbHA_Q@mail.gmail.com>
-Message-ID: <201301081809.38537.marex@denx.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 8 Jan 2013 17:11:03 +0000
+Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
+ HAVE_ARM_SCU
+In-Reply-To: <20130108162056.GA28618@e106331-lin.cambridge.arm.com>
+References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com>
+ <1357649263-1098-4-git-send-email-hdoyu@nvidia.com>
+ <20130108142828.GD2718@e106331-lin.cambridge.arm.com>
+ <20130108.165342.1996373920678167735.hdoyu@nvidia.com>
+ <20130108162056.GA28618@e106331-lin.cambridge.arm.com>
+Message-ID: <20130108171103.GA7417@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio Estevam,
+On Tue, Jan 08, 2013 at 04:21:38PM +0000, Mark Rutland wrote:
+> On Tue, Jan 08, 2013 at 02:53:42PM +0000, Hiroshi Doyu wrote:
 
-> On Tue, Jan 8, 2013 at 2:41 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > Hi Sascha,
+[...]
+
+> > > >  static void __init tegra_smp_init_cpus(void)
+> > > >  {
+> > > > -	unsigned int i, ncores = scu_get_core_count(scu_base);
+> > > > +	unsigned int i, cpu_id, ncores;
+> > > > +	u32 l2ctlr;
+> > > > +	phys_addr_t pa;
+> > > > +
+> > > > +	cpu_id = read_cpuid(CPUID_ID) & CPU_MASK;
+> > > > +	switch (cpu_id) {
+> > > > +	case CPU_CORTEX_A15:
+> > > > +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
+> > > > +		ncores = ((l2ctlr >> 24) & 3) + 1;
+> > > > +		break;
+> > > 
+> > > [...]
+> > > 
+> > > As mentioned last time [1], you should get this information from the dt
+> > > instead.
 > > 
-> > On Mon, Nov 12, 2012 at 1:23 PM, Sascha Hauer <s.hauer@pengutronix.de> 
-wrote:
-> >> The babbage board has a DVI-I output which allows to output analog
-> >> and digital signals simultaneously. This patch adds support for it
-> >> to the devicetree. The DDC signals are not wired up on the board, so
-> >> DRM will fall back on default VESA modes.
-> >> 
-> >> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > 
-> > I am running linux-next 20130108, which has this patch applied and I
+> > Most of platsmp.c:.smp_init_cpus() implementations seem just to
+> > overwrite # of cores by SCU/MRC detection. Is there any implementation
+> > to use the DT's # and skip SCU/MRC detection in .smp_init_cpus()?
 > 
-> > get the following on my mx51babbage:
-> Ok, good news. I see a nice penguin on my monitor now.
+> As far as I can see, there's no other platform which just relies on
+> arm_dt_init_cpu_maps. Until recently, it didn't exist, so that makes some
+> sense. As far as I can see, for the Tegra 114 you only need your smp_init_cpus
+> to call set_smp_cross_call(gic_raise_softirq). Everything else you do seems to
+> be handled by arm_dt_init_cpus.
 > 
-> Discussed with Marek and he proposed a quick workaround:
+> I think the best option would be to have a separate smp_ops for your dt
+> platforms where we know cpu nodes are populated (e.g. Tegra 114), where
+> smp_init_cpus is different to that for non-dt platforms. That way non dt
+> platforms can keep the SCU hack for now, and won't be broken, and the dt
+> platforms are far removed from the SCU hack and just use common infrastructure.
 > 
-> --- a/drivers/staging/imx-drm/ipuv3-crtc.c
-> +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-> @@ -343,6 +343,11 @@ static irqreturn_t ipu_irq_handler(int irq, void
-> *dev_id) {
->         struct ipu_crtc *ipu_crtc = dev_id;
-> 
-> +       if (!ipu_crtc->imx_crtc) {
-> +               pr_err("Spurious IPU IRQ\n");
-> +               return IRQ_HANDLED;
-> +       }
-> +
->         imx_drm_handle_vblank(ipu_crtc->imx_crtc);
-> 
->         if (ipu_crtc->newfb) {
-> 
-> It seems that this issue happened because bootloader leaves the IPU turned
-> on.
+> Maybe someone else has a better idea?
 
-To elaborate more on this stuff:
+Have a look at mach-vexpress/platsmp.c (keeping in mind that the
+GENERIC_SCU case will be refactored/removed since arm_dt_init_cpu_maps() is
+doing most of the required steps), please let me know what you think.
 
-491         ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
-492                         IPU_IRQ_EOF);
-493         ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, 
-ipu_irq_handler, 0,
-494                         "imx_drm", ipu_crtc);
-495         if (ret < 0) {
-496                 dev_err(ipu_crtc->dev, "irq request failed with %d.\n", 
-ret);
-497                 goto err_out;
-498         }
-499 
-500         disable_irq(ipu_crtc->irq);
-
-This code in drivers/staging/imx-drm/ipuv3-crtc.c is broken. If the IPU is on, 
-it produces an interrupt before the driver is fully set up. I didn't produce a 
-patch yet, I think I might offload this to someone else. Volunteers?
-
-Best regards,
-Marek Vasut
+Thanks,
+Lorenzo
