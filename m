@@ -1,41 +1,75 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Jan 2013 20:47:28 +0530
-Subject: [RFC v2 13/18] ARM: OMAP2+: AM33XX: timer: Interchance clkevt
- and clksrc timers
-In-Reply-To: <1356959231-17335-14-git-send-email-vaibhav.bedia@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-14-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <50EC3888.1070504@ti.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 8 Jan 2013 16:09:07 +0100
+Subject: [PATCH] ARM: Kirkwood: convert ns2 boards to pinctrl
+In-Reply-To: <20130108144954.GC3392@lunn.ch>
+References: <1357655778-32066-1-git-send-email-simon.guinot@sequanux.org>
+ <20130108144954.GC3392@lunn.ch>
+Message-ID: <20130108150907.GM1357@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
-> AM33XX has two timers (DTIMER0/1) in the WKUP domain.
-> On GP devices the source of DMTIMER0 is fixed to an
-> inaccurate internal 32k RC oscillator and this makes
-> the DMTIMER0 practically either as a clocksource or
-> as clockevent.
->
-> Currently the timer instance in WKUP domain is used
-> as the clockevent and the timer in non-WKUP domain
-> as the clocksource. DMTIMER1 in WKUP domain can keep
-> running in suspend from a 32K clock fed from external
-> OSC and can serve as the persistent clock for the kernel.
-> To enable this, interchange the timers used as clocksource
-> and clockevent for AM33XX.
->
-> For now a new DT property has been added to allow the timer code
-> to select the timer with the right property.
->
-> It has been pointed out by Santosh Shilimkar and Kevin Hilman
-> that such a change will result in soc-idle never being achieved
-> on AM33XX. There are other reasons why soc-idle does not look
-> feasible on AM33XX so for now we go ahead with the interchange
-> of the the timers. If at a later point of time we do come up
-> with an approach which makes soc-idle possible on AM33XX, this
-> can be revisited.
->
-Can you please explain other reasons as well for clarity ?
+On Tue, Jan 08, 2013 at 03:49:54PM +0100, Andrew Lunn wrote:
+> On Tue, Jan 08, 2013 at 03:36:18PM +0100, Simon Guinot wrote:
+> > Note that the pinctrl conversion also fixes GPIO support for ns2 boards.
+> > Since commit f9e75922: "ARM: Kirkwood: Make use of mvebu pincltl and
+> > gpio", the mvbu_gpio driver is used for DT boards. As mvbu_gpio relies
+> > on the pinctrl driver, then a pinctrl definition must be given to allow
+> > the GPIO configuration.
+> > 
+> > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> > ---
+> >  arch/arm/boot/dts/kirkwood-ns2-common.dtsi |   16 ++++++++++++
+> >  arch/arm/mach-kirkwood/board-ns2.c         |   38 ----------------------------
+> >  2 files changed, 16 insertions(+), 38 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+> > index 9bc6785..77d21ab 100644
+> > --- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+> > @@ -1,4 +1,5 @@
+> >  /include/ "kirkwood.dtsi"
+> > +/include/ "kirkwood-6281.dtsi"
+> >  
+> >  / {
+> >  	chosen {
+> > @@ -6,6 +7,21 @@
+> >  	};
+> >  
+> >  	ocp at f1000000 {
+> > +		pinctrl: pinctrl at 10000 {
+> > +			pinctrl-0 = < &pmx_spi &pmx_twsi0 &pmx_uart0
+> > +					&pmx_ns2_sata0 &pmx_ns2_sata1>;
+> > +			pinctrl-names = "default";
+> > +
+> > +			pmx_ns2_sata0: pmx-ns2-sata0 {
+> > +				marvell,pins = "mpp21";
+> > +				marvell,function = "sata0";
+> > +			};
+> > +			pmx_ns2_sata1: pmx-ns2-sata1 {
+> > +				marvell,pins = "mpp20";
+> > +				marvell,function = "sata1";
+> > +			};
+> > +		};
+> 
+> Hi Simon
+> 
+> Its normal to also list all the gpio pins here as well. 
 
-Regards
-Santosh
+I was not sure about that. As gpio_request triggers the mpp
+configuration at run time, IMHO there is no point for an initial and
+statical configuration, except for a documentation purpose. As GPIOs
+are also referenced in their dedicated driver nodes, I think that the
+informations about the pin are quite exhaustive. All the non-GPIO MPPs
+are listed in the pinctrl node. The other MPPs are GPIOs if requested
+by a driver. It is simple :)
+
+Do you think that the full MPP/GPIO list is really needed ?
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130108/5c06e391/attachment-0001.sig>
