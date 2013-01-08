@@ -1,105 +1,94 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Jan 2013 10:12:26 +0000
-Subject: [PATCH 09/11] ARM: nomadik: add I2C devices to the device tree
-In-Reply-To: <1357599411-7619-1-git-send-email-linus.walleij@linaro.org>
-References: <1357599411-7619-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130108101226.GC2718@e106331-lin.cambridge.arm.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Tue, 8 Jan 2013 11:17:43 +0100
+Subject: [v3 PATCH 7/9] watchdog/at91sam9_wdt: Use module_platform_driver()
+In-Reply-To: <1357353529-20901-8-git-send-email-wenyou.yang@atmel.com>
+References: <1357353529-20901-1-git-send-email-wenyou.yang@atmel.com>
+ <1357353529-20901-8-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <CAHkwnC8CTFxrJ8F=u=MqKW=cZ88SeoT+rA_hzW38jL8ffT9D2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 10:56:51PM +0000, Linus Walleij wrote:
-> This adds the GPIO-based I2C devices to the Nomadik device tree.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Sat, Jan 5, 2013 at 3:38 AM, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> Using module_platform_driver() replaces module_init() and module_exit()
+> and makes the code simpler.
+>
+> Remove '__init' annotation from the function 'at91wdt_probe'
+> since the driver becomes hot-plug aware now.
+>
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Cc: wim at iguana.be
+> Cc: linux-watchdog at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
 > ---
->  arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 52 ++++++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-> index 1a12f10..58d6b6a 100644
-> --- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-> +++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-> @@ -134,6 +134,58 @@
->  		};
->  	};
->  
-> +	/* I2C0 connected to the STw4811 power management chip */
-> +	i2c0 {
-> +		compatible = "i2c-gpio";
-> +		gpios = <&gpio1 31 0 /* sda */
-> +			 &gpio1 30 0 /* scl */
-> +			>;
+>  drivers/watchdog/at91sam9_wdt.c |   16 +++-------------
+>  1 file changed, 3 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+> index 94be9d6..7c13dda 100644
+> --- a/drivers/watchdog/at91sam9_wdt.c
+> +++ b/drivers/watchdog/at91sam9_wdt.c
+> @@ -204,7 +204,7 @@ static struct watchdog_device at91wdt_wdd = {
+>         .ops = &at91wdt_ops,
+>  };
+>
+> -static int __init at91wdt_probe(struct platform_device *pdev)
+> +static int at91wdt_probe(struct platform_device *pdev)
+>  {
+>         struct at91wdt_drvdata *driver_data;
+>         struct resource *r;
+> @@ -273,6 +273,7 @@ MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
+>  #endif
+>
+>  static struct platform_driver at91wdt_driver = {
+> +       .probe          = at91wdt_probe,
+>         .remove         = __exit_p(at91wdt_remove),
+>         .driver         = {
+>                 .name   = "at91_wdt",
+> @@ -281,18 +282,7 @@ static struct platform_driver at91wdt_driver = {
+>         },
+>  };
+>
+> -static int __init at91sam_wdt_init(void)
+> -{
+> -       return platform_driver_probe(&at91wdt_driver, at91wdt_probe);
+> -}
+> -
+> -static void __exit at91sam_wdt_exit(void)
+> -{
+> -       platform_driver_unregister(&at91wdt_driver);
+> -}
+> -
+> -module_init(at91sam_wdt_init);
+> -module_exit(at91sam_wdt_exit);
+> +module_platform_driver(at91wdt_driver);
+>
+>  MODULE_AUTHOR("Renaud CERRATO <r.cerrato@til-technologies.fr>");
+>  MODULE_DESCRIPTION("Watchdog driver for Atmel AT91SAM9x processors");
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Similarly to my previous comments, I think it'd be good to do individual
-bracketing:
+The module_platform_driver isn't a substitute of platform_driver_probe,
+because module_platform_driver  use platform_driver_register/unregister.
+Using that macro we lose the advantage of platform_driver_probe,
+as stated in:
 
-gpios = <&gpio1 31 0>,	/* sda */
-	<&gpio1 30 0>;	/* scl */
+https://lkml.org/lkml/2012/1/10/335
+On Tue, Jan 10, 2012 at 21:47, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> [...]
+>Still, setting up platform_driver.probe and removing __init from all probe
+>functions is not the right thing to do, as this make (non-__init) kernel code
+>size bigger, while none of these devices are hotpluggable and thus cannot
+>appear after bootup. That's why we have platform_driver_probe() in the
+>first place. So I think all of this should be reverted for non-hotpluggable
+>drivers.
+> [...]
 
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		stw4811 at 2d {
-> +			   compatible = "st,stw4811";
-> +			   reg = <0x2d>;
-> +		};
-> +	};
-> +
-> +	/* I2C1 connected to various sensors */
-> +	i2c1 {
-> +		compatible = "i2c-gpio";
-> +		gpios = <&gpio1 22 0 /* sda */
-> +			 &gpio1 21 0 /* scl */
-> +			>;
+Best regards
 
-And here.
-
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		camera at 2d {
-> +			   compatible = "st,camera";
-> +			   reg = <0x10>;
-> +		};
-> +		stw5095 at 1a {
-> +			   compatible = "st,stw5095";
-> +			   reg = <0x1a>;
-> +		};
-> +		lis3lv02dl at 1d {
-> +			   compatible = "st,lis3lv02dl";
-> +			   reg = <0x1d>;
-> +		};
-> +	};
-> +
-> +	/* I2C2 connected to the USB portions of the STw4811 only */
-> +	i2c2 {
-> +		compatible = "i2c-gpio";
-> +		gpios = <&gpio2 10 0 /* sda */
-> +			 &gpio2 9 0 /* scl */
-> +			>;
-
-And here too.
-
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		stw4811 at 2d {
-> +			   compatible = "st,stw4811-usb";
-> +			   reg = <0x2d>;
-> +		};
-> +	};
-> +
->  	amba {
->  		compatible = "arm,amba-bus";
->  		#address-cells = <1>;
-> -- 
-> 1.7.11.7
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-Thanks,
-Mark.
+--
+Fabio Porcedda
