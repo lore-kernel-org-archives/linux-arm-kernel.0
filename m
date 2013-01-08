@@ -1,76 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 Jan 2013 14:06:58 -0500
-Subject: [PATCH] Allow Marvell SATA driver to work with
- LEDS_TRIGGER_IDE_DISK
-In-Reply-To: <1357668987-3610-1-git-send-email-josh.coombs@gmail.com>
-References: <1357668987-3610-1-git-send-email-josh.coombs@gmail.com>
-Message-ID: <20130108190657.GW5075@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 8 Jan 2013 19:11:32 +0000
+Subject: Building for MMU-less vexpress targets
+In-Reply-To: <50EC6CFF.5070309@arm.com>
+References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1211061802240.21033@xanadu.home> <50EC6CFF.5070309@arm.com>
+Message-ID: <201301081911.33089.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 01:16:27PM -0500, Joshua Coombs wrote:
-> Add a call to the IDE LED Trigger within the Marvell SATA driver to allow
-> Marvell SoC devices to show SATA activity via GPIO connected LEDs.
+On Tuesday 08 January 2013, Jonathan Austin wrote:
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 335e220..0561d87 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -305,6 +305,11 @@ config ARCH_REALVIEW
+>          help
+>            This enables support for ARM Ltd RealView boards.
 > 
-> Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
-> ---
->  drivers/ata/sata_mv.c | 3 +++
->  drivers/leds/Kconfig  | 3 +--
->  2 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-> index 68f4fb5..4aaf6f0 100644
-> --- a/drivers/ata/sata_mv.c
-> +++ b/drivers/ata/sata_mv.c
-> @@ -71,6 +71,7 @@
->  #include <scsi/scsi_cmnd.h>
->  #include <scsi/scsi_device.h>
->  #include <linux/libata.h>
-> +#include <linux/leds.h>
->  
->  #define DRV_NAME	"sata_mv"
->  #define DRV_VERSION	"1.28"
-> @@ -1156,6 +1157,8 @@ static void mv_start_edma(struct ata_port *ap, void __iomem *port_mmio,
->  {
->  	int want_ncq = (protocol == ATA_PROT_NCQ);
->  
-> +	ledtrig_ide_activity();
+> +config ARCH_VEXPRESS_NOMMU
+> +       bool "ARM Ltd. Versatile Express family (nommu)"
+> +       depends on !MMU
+> +       select ARCH_VEXPRESS
 > +
->  	if (pp->pp_flags & MV_PP_FLAG_EDMA_EN) {
->  		int using_ncq = ((pp->pp_flags & MV_PP_FLAG_NCQ_EN) != 0);
->  		if (want_ncq != using_ncq)
-> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> index b58bc8a..d2071d0 100644
-> --- a/drivers/leds/Kconfig
-> +++ b/drivers/leds/Kconfig
-> @@ -496,10 +496,9 @@ config LEDS_TRIGGER_ONESHOT
->  
->  config LEDS_TRIGGER_IDE_DISK
->  	bool "LED IDE Disk Trigger"
-> -	depends on IDE_GD_ATA
->  	depends on LEDS_TRIGGERS
->  	help
-> -	  This allows LEDs to be controlled by IDE disk activity.
-> +	  This allows LEDs to be controlled by IDE or SATA disk activity.
->  	  If unsure, say Y.
->  
->  config LEDS_TRIGGER_HEARTBEAT
+>   config ARCH_VERSATILE
+>          bool "ARM Ltd. Versatile family"
+>          select ARCH_WANT_OPTIONAL_GPIOLIB
+> ---->8----
 
+Yes, I think this is the right approach.
 
-Hmmm, I'm not sure about this.  Ideally, wouldn't all sata users want to
-have this option?  In which case, it should be changed to
-LEDS_TRIGGER_DISK_IO or similar.  However, this seems to be the first
-attempt at it:
+> With the other perhaps being to merge the ARCH_VEXPRESS option back in 
+> to the 'choice' and create a ARCH_VEXPRESS_MULTI elsewhere...
 
-$ git grep ledtrig_ide_activity -- drivers/ata/*.c
-...nada...
-$ 
+That would needlessly break 'make oldconfig' for people that have
+CONFIG_ARCH_VEXPRESS in their .config files or other scripts.
 
-At any rate, I'd like to see this patch extended to facilitate other
-sata drivers using it.  eg adjusting the naming more appropriately, and
-'depends on IDE_GD_ATA || ATA' or similar.  In it's current state, it
-should depend on IDE_GD_ATA || SATA_MV.
+> Is that the sort of thing you had in mind, or is there another way 
+> around that I'm missing?
 
-thx,
+I think it's good.
 
-Jason.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
