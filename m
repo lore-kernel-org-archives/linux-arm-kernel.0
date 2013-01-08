@@ -1,89 +1,67 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Tue, 8 Jan 2013 14:18:04 -0500
-Subject: [PATCH] Allow Marvell SATA driver to work with
- LEDS_TRIGGER_IDE_DISK
-In-Reply-To: <20130108190657.GW5075@titan.lakedaemon.net>
-References: <1357668987-3610-1-git-send-email-josh.coombs@gmail.com>
- <20130108190657.GW5075@titan.lakedaemon.net>
-Message-ID: <CAMW5UfY2vKEJ7K8tLJ1+JeKsr_hxtUTva9HGJxLan6k+KGdmvg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 8 Jan 2013 19:21:16 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP AM3517/05: hwmod data: block WFI when EMAC
+ active
+In-Reply-To: <alpine.DEB.2.00.1212301828590.8175@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1212301828590.8175@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1301081916190.18536@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I only have access to Marvell's SATA controller for testing, so that
-is why I only targeted it.  The Kconfig depends change makes perfect
-sense.
+On Sun, 30 Dec 2012, Paul Walmsley wrote:
 
-Changing the name of the trigger might cause hardship for those
-already using it, as they will have to update scripts/etc to account
-for the name change.  Would it make more sense to add a second trigger
-for SATA instead?
+> However, for some reason, we don't have an EMAC hwmod -- probably some 
+> bug in the data -- so set the flag on the MDIO hwmod data instead.
 
-Josh C
+Mark and I discussed this in private E-mail.  Looks like I managed to 
+confuse AM33xx and AM3517 :-(  Here's the updated patch.
 
-On Tue, Jan 8, 2013 at 2:06 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Tue, Jan 08, 2013 at 01:16:27PM -0500, Joshua Coombs wrote:
->> Add a call to the IDE LED Trigger within the Marvell SATA driver to allow
->> Marvell SoC devices to show SATA activity via GPIO connected LEDs.
->>
->> Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
->> ---
->>  drivers/ata/sata_mv.c | 3 +++
->>  drivers/leds/Kconfig  | 3 +--
->>  2 files changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
->> index 68f4fb5..4aaf6f0 100644
->> --- a/drivers/ata/sata_mv.c
->> +++ b/drivers/ata/sata_mv.c
->> @@ -71,6 +71,7 @@
->>  #include <scsi/scsi_cmnd.h>
->>  #include <scsi/scsi_device.h>
->>  #include <linux/libata.h>
->> +#include <linux/leds.h>
->>
->>  #define DRV_NAME     "sata_mv"
->>  #define DRV_VERSION  "1.28"
->> @@ -1156,6 +1157,8 @@ static void mv_start_edma(struct ata_port *ap, void __iomem *port_mmio,
->>  {
->>       int want_ncq = (protocol == ATA_PROT_NCQ);
->>
->> +     ledtrig_ide_activity();
->> +
->>       if (pp->pp_flags & MV_PP_FLAG_EDMA_EN) {
->>               int using_ncq = ((pp->pp_flags & MV_PP_FLAG_NCQ_EN) != 0);
->>               if (want_ncq != using_ncq)
->> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
->> index b58bc8a..d2071d0 100644
->> --- a/drivers/leds/Kconfig
->> +++ b/drivers/leds/Kconfig
->> @@ -496,10 +496,9 @@ config LEDS_TRIGGER_ONESHOT
->>
->>  config LEDS_TRIGGER_IDE_DISK
->>       bool "LED IDE Disk Trigger"
->> -     depends on IDE_GD_ATA
->>       depends on LEDS_TRIGGERS
->>       help
->> -       This allows LEDs to be controlled by IDE disk activity.
->> +       This allows LEDs to be controlled by IDE or SATA disk activity.
->>         If unsure, say Y.
->>
->>  config LEDS_TRIGGER_HEARTBEAT
->
->
-> Hmmm, I'm not sure about this.  Ideally, wouldn't all sata users want to
-> have this option?  In which case, it should be changed to
-> LEDS_TRIGGER_DISK_IO or similar.  However, this seems to be the first
-> attempt at it:
->
-> $ git grep ledtrig_ide_activity -- drivers/ata/*.c
-> ...nada...
-> $
->
-> At any rate, I'd like to see this patch extended to facilitate other
-> sata drivers using it.  eg adjusting the naming more appropriately, and
-> 'depends on IDE_GD_ATA || ATA' or similar.  In it's current state, it
-> should depend on IDE_GD_ATA || SATA_MV.
->
-> thx,
->
-> Jason.
+
+- Paul
+
+
+From: Paul Walmsley <paul@pwsan.com>
+Date: Sun, 30 Dec 2012 10:36:36 -0700
+Subject: [PATCH] ARM: OMAP AM3517/05: hwmod data: block WFI when EMAC active
+
+According to Mark Greer, on OMAP AM3517/3505 chips, the EMAC is unable
+to wake the ARM up from WFI:
+
+    http://www.spinics.net/lists/arm-kernel/msg174734.html
+
+Further troubleshooting was unable to narrow the problem down.  So we
+don't have much choice other than to block WFI when the EMAC is active
+with the HWMOD_BLOCK_WFI flag.
+
+Based on Mark's original patch.  We're removing the omap_device-based
+pm_lats code, so a different approach was needed.
+
+This second version contains some corrections thanks to Mark's review.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Mark A. Greer <mgreer@animalcreek.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 8bb2628..7af28b7 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3493,7 +3493,13 @@ static struct omap_hwmod am35xx_emac_hwmod = {
+ 	.name		= "davinci_emac",
+ 	.mpu_irqs	= am35xx_emac_mpu_irqs,
+ 	.class		= &am35xx_emac_class,
+-	.flags		= HWMOD_NO_IDLEST,
++	/*
++	 * According to Mark Greer, the MPU will not return from WFI
++	 * when the EMAC signals an interrupt.  We're missing an EMAC
++	 * hwmod for some reason, so add the flag to the MDIO instead.
++	 * http://www.spinics.net/lists/arm-kernel/msg174734.html
++	 */
++	.flags		= (HWMOD_NO_IDLEST | HWMOD_BLOCK_WFI),
+ };
+ 
+ /* l3_core -> davinci emac interface */
+-- 
+1.7.10.4
