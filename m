@@ -1,61 +1,40 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 08 Jan 2013 10:17:59 +0200
-Subject: [PATCH 1/3] ALSA: pxa27x: fix ac97 cold reset
-In-Reply-To: <1357595714-13698-2-git-send-email-mikedunn@newsguy.com>
-References: <1357595714-13698-1-git-send-email-mikedunn@newsguy.com>
- <1357595714-13698-2-git-send-email-mikedunn@newsguy.com>
-Message-ID: <50EBD637.8020602@compulab.co.il>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Tue, 8 Jan 2013 13:50:17 +0530
+Subject: [PATCH V2 0/3] ARM: davinci: da850: add pinctrl support
+Message-ID: <1357633220-29827-1-git-send-email-anilkumar.v@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/13 23:55, Mike Dunn wrote:
-> Cold reset on the pxa27x currently fails and
-> 
->      pxa2xx_ac97_try_cold_reset: cold reset timeout (GSR=0x44)
-> 
-> appears in the kernel log.  Through trial-and-error (the pxa270 developer's
-> manual is mostly incoherent on the topic of ac97 reset), I got cold reset to
-> complete by setting the WARM_RST bit in the GCR register (and later noticed that
-> pxa3xx does this for cold reset as well).  Also, a timeout loop is needed to
-> wait for the reset to complete.
-> 
-> Tested on a palm treo 680 machine.
-> 
-> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+This set of patches adds:
 
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+* Add pinctrl-single for handling Padconf registers.
+* Add NAND node to export NAND functionality on da850 EVM.
+* Add NAND pinctrl node to do pin mux according to pinctrl-single driver.
 
-> ---
->  sound/arm/pxa2xx-ac97-lib.c |    8 ++++++--
->  1 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
-> index 6fc0ae9..1ecd0a66 100644
-> --- a/sound/arm/pxa2xx-ac97-lib.c
-> +++ b/sound/arm/pxa2xx-ac97-lib.c
-> @@ -148,6 +148,8 @@ static inline void pxa_ac97_warm_pxa27x(void)
->  
->  static inline void pxa_ac97_cold_pxa27x(void)
->  {
-> +	unsigned int timeout;
-> +
->  	GCR &=  GCR_COLD_RST;  /* clear everything but nCRST */
->  	GCR &= ~GCR_COLD_RST;  /* then assert nCRST */
->  
-> @@ -157,8 +159,10 @@ static inline void pxa_ac97_cold_pxa27x(void)
->  	clk_enable(ac97conf_clk);
->  	udelay(5);
->  	clk_disable(ac97conf_clk);
-> -	GCR = GCR_COLD_RST;
-> -	udelay(50);
-> +	GCR = GCR_COLD_RST | GCR_WARM_RST;
-> +	timeout = 100;     /* wait for the codec-ready bit to be set */
-> +	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
-> +		mdelay(1);
->  }
->  #endif
->  
+
+This series applies on top of tag next-20130107 git tree
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+
+This series is tested on da850 EVM.
+
+Changes since V1:
+
+ -Remove the binding documentation as already documented as part of
+  Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+ -Enable PINCTRL Kconfig for MACH_DA8XX_DT platform only.
+ -Fix the pinctrl driver node unit-address.
+ -Make separate patch for da8xx_omapl_defconfig changes.  
+
+Kumar, Anil (3):
+  ARM: davinci: da850: add pinctrl driver entries
+  ARM: davinci: da8xx defconfig: enable pinctrl config option
+  ARM: davinci: da850: add NAND driver entries
+
+ arch/arm/boot/dts/da850-evm.dts        |   22 ++++++++++++++++++++++
+ arch/arm/boot/dts/da850.dtsi           |   23 +++++++++++++++++++++++
+ arch/arm/configs/da8xx_omapl_defconfig |    1 +
+ arch/arm/mach-davinci/Kconfig          |    1 +
+ 4 files changed, 47 insertions(+), 0 deletions(-)
 
 -- 
-Regards,
-Igor.
+1.7.4.1
