@@ -1,81 +1,176 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 08 Jan 2013 13:41:23 -0500
-Subject: [PATCH v5 00/12] KVM/ARM vGIC support
-Message-ID: <20130108184116.46558.3558.stgit@ubuntu>
+Date: Tue, 08 Jan 2013 13:41:30 -0500
+Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+In-Reply-To: <20130108184116.46558.3558.stgit@ubuntu>
+References: <20130108184116.46558.3558.stgit@ubuntu>
+Message-ID: <20130108184130.46558.60819.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series implements support for the virtual generic
-interrupt controller architecture for KVM/ARM.
+On ARM (and possibly other architectures) some bits are specific to the
+model being emulated for the guest and user space needs a way to tell
+the kernel about those bits.  An example is mmio device base addresses,
+where KVM must know the base address for a given device to properly
+emulate mmio accesses within a certain address range or directly map a
+device with virtualiation extensions into the guest address space.
 
-This patch series can also be pulled from:
-    git://github.com/virtualopensystems/linux-kvm-arm.git
-            branch: kvm-arm-v15-vgic
+We try to make this API slightly more generic than for our specific use,
+but so far only the VGIC uses this feature.
 
-Changes since v4:
- - Large number of commenting and formatting changes
- - Don't rely on the vgic_hcr default value
- - Fix bug in irq_fgx expand/collapse functions
- - Sanitize use of bitmaps
- - Do not use elrsr when queueing an interrupt
- - Deassert SGIs and SPIs that have already been queued
- - Set VMCR to 0 on vcpu init
- - Compute number of list registers once at init time
- - Restructure bytemap/bitmap accessor functions
- - Improve readability by adding accessor functions
- - Define GICH_ constants in gic.h and use these in the vgic code
- - Explain SGI handling in comment
- - Error patch and return value fixes and cleanups
- - Use defines instead of all hardcoded IRQ numbers
- - Refactor level interrupt handling
- - Fix several maintenace-interrupt related bugs
- - Add CPU hotplug notifier
-
-Changes since v3:
- - Change struct kvm_device_addr to use 64 bits for ID field
-
-Changes since v2:
- - Get rid of hardcoded guest cpu and distributor physical addresses
-   and instead provide the address through the KVM_SET_DEVICE_ADDRESS
-   ioctl.
- - Fix level/edge bugs
- - Fix reboot bug: retire queued, disabled interrupts
-
+Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
+ Documentation/virtual/kvm/api.txt |   37 +++++++++++++++++++++++++++++++++++++
+ arch/arm/include/uapi/asm/kvm.h   |   13 +++++++++++++
+ arch/arm/kvm/arm.c                |   23 ++++++++++++++++++++++-
+ include/uapi/linux/kvm.h          |    8 ++++++++
+ 4 files changed, 80 insertions(+), 1 deletion(-)
 
-Christoffer Dall (2):
-      KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
-      ARM: KVM: VGIC accept vcpu and dist base addresses from user space
-
-Marc Zyngier (10):
-      ARM: KVM: Keep track of currently running vcpus
-      ARM: gic: define GICH offsets for VGIC support
-      ARM: KVM: Initial VGIC infrastructure code
-      ARM: KVM: VGIC distributor handling
-      ARM: KVM: VGIC virtual CPU interface management
-      ARM: KVM: vgic: retire queued, disabled interrupts
-      ARM: KVM: VGIC interrupt injection
-      ARM: KVM: VGIC control interface world switch
-      ARM: KVM: VGIC initialisation code
-      ARM: KVM: Add VGIC configuration option
-
-
- Documentation/virtual/kvm/api.txt   |   38 +
- arch/arm/include/asm/hardware/gic.h |   25 +
- arch/arm/include/asm/kvm_host.h     |   18 
- arch/arm/include/asm/kvm_vgic.h     |  220 +++++
- arch/arm/include/uapi/asm/kvm.h     |   16 
- arch/arm/kernel/asm-offsets.c       |   12 
- arch/arm/kvm/Kconfig                |    8 
- arch/arm/kvm/Makefile               |    1 
- arch/arm/kvm/arm.c                  |  162 ++++
- arch/arm/kvm/interrupts.S           |    4 
- arch/arm/kvm/interrupts_head.S      |   74 ++
- arch/arm/kvm/mmio.c                 |    3 
- arch/arm/kvm/vgic.c                 | 1492 +++++++++++++++++++++++++++++++++++
- include/uapi/linux/kvm.h            |    8 
- 14 files changed, 2069 insertions(+), 12 deletions(-)
- create mode 100644 arch/arm/include/asm/kvm_vgic.h
- create mode 100644 arch/arm/kvm/vgic.c
-
--- 
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 38066a7a..668956f 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2206,6 +2206,43 @@ This ioctl returns the guest registers that are supported for the
+ KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+ 
+ 
++4.80 KVM_SET_DEVICE_ADDRESS
++
++Capability: KVM_CAP_SET_DEVICE_ADDRESS
++Architectures: arm
++Type: vm ioctl
++Parameters: struct kvm_device_address (in)
++Returns: 0 on success, -1 on error
++Errors:
++  ENODEV: The device id is unknown
++  ENXIO:  Device not supported on current system
++  EEXIST: Address already set
++  E2BIG:  Address outside guest physical address space
++
++struct kvm_device_address {
++	__u64 id;
++	__u64 addr;
++};
++
++Specify a device address in the guest's physical address space where guests
++can access emulated or directly exposed devices, which the host kernel needs
++to know about. The id field is an architecture specific identifier for a
++specific device.
++
++ARM divides the id field into two parts, a device id and an address type id
++specific to the individual device.
++
++ ?bits:  | 63        ...       32 | 31    ...    16 | 15    ...    0 |
++  field: |        0x00000000      |     device id   |  addr type id  |
++
++ARM currently only require this when using the in-kernel GIC support for the
++hardware VGIC features, using KVM_ARM_DEVICE_VGIC_V2 as the device id.  When
++setting the base address for the guest's mapping of the VGIC virtual CPU
++and distributor interface, the ioctl must be called after calling
++KVM_CREATE_IRQCHIP, but before calling KVM_RUN on any of the VCPUs.  Calling
++this ioctl twice for any of the base addresses will return -EEXIST.
++
++
+ 5. The kvm_run structure
+ ------------------------
+ 
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 73b9615..09911a7 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -65,6 +65,19 @@ struct kvm_regs {
+ #define KVM_ARM_TARGET_CORTEX_A15	0
+ #define KVM_ARM_NUM_TARGETS		1
+ 
++/* KVM_SET_DEVICE_ADDRESS ioctl id encoding */
++#define KVM_DEVICE_TYPE_SHIFT		0
++#define KVM_DEVICE_TYPE_MASK		(0xffff << KVM_DEVICE_TYPE_SHIFT)
++#define KVM_DEVICE_ID_SHIFT		16
++#define KVM_DEVICE_ID_MASK		(0xffff << KVM_DEVICE_ID_SHIFT)
++
++/* Supported device IDs */
++#define KVM_ARM_DEVICE_VGIC_V2		0
++
++/* Supported VGIC address types  */
++#define KVM_VGIC_V2_ADDR_TYPE_DIST	0
++#define KVM_VGIC_V2_ADDR_TYPE_CPU	1
++
+ struct kvm_vcpu_init {
+ 	__u32 target;
+ 	__u32 features[7];
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index f42d828..2f39b04 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -165,6 +165,8 @@ int kvm_dev_ioctl_check_extension(long ext)
+ 	case KVM_CAP_COALESCED_MMIO:
+ 		r = KVM_COALESCED_MMIO_PAGE_OFFSET;
+ 		break;
++	case KVM_CAP_SET_DEVICE_ADDR:
++		r = 1;
+ 	case KVM_CAP_NR_VCPUS:
+ 		r = num_online_cpus();
+ 		break;
+@@ -805,10 +807,29 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+ 	return -EINVAL;
+ }
+ 
++static int kvm_vm_ioctl_set_device_address(struct kvm *kvm,
++					   struct kvm_device_address *dev_addr)
++{
++	return -ENODEV;
++}
++
+ long kvm_arch_vm_ioctl(struct file *filp,
+ 		       unsigned int ioctl, unsigned long arg)
+ {
+-	return -EINVAL;
++	struct kvm *kvm = filp->private_data;
++	void __user *argp = (void __user *)arg;
++
++	switch (ioctl) {
++	case KVM_SET_DEVICE_ADDRESS: {
++		struct kvm_device_address dev_addr;
++
++		if (copy_from_user(&dev_addr, argp, sizeof(dev_addr)))
++			return -EFAULT;
++		return kvm_vm_ioctl_set_device_address(kvm, &dev_addr);
++	}
++	default:
++		return -EINVAL;
++	}
+ }
+ 
+ static void cpu_init_hyp_mode(void *vector)
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index dc63665..03248d1 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -636,6 +636,7 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_IRQFD_RESAMPLE 82
+ #define KVM_CAP_PPC_BOOKE_WATCHDOG 83
+ #define KVM_CAP_PPC_HTAB_FD 84
++#define KVM_CAP_SET_DEVICE_ADDR 85
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
+@@ -783,6 +784,11 @@ struct kvm_msi {
+ 	__u8  pad[16];
+ };
+ 
++struct kvm_device_address {
++	__u64 id;
++	__u64 addr;
++};
++
+ /*
+  * ioctls for VM fds
+  */
+@@ -868,6 +874,8 @@ struct kvm_s390_ucas_mapping {
+ #define KVM_ALLOCATE_RMA	  _IOR(KVMIO,  0xa9, struct kvm_allocate_rma)
+ /* Available with KVM_CAP_PPC_HTAB_FD */
+ #define KVM_PPC_GET_HTAB_FD	  _IOW(KVMIO,  0xaa, struct kvm_get_htab_fd)
++/* Available with KVM_CAP_SET_DEVICE_ADDR */
++#define KVM_SET_DEVICE_ADDRESS	  _IOW(KVMIO,  0xab, struct kvm_device_address)
+ 
+ /*
+  * ioctls for vcpu fds
