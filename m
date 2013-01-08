@@ -1,47 +1,33 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Tue, 8 Jan 2013 22:59:17 +0530
-Subject: [PATCH] ARM: dts: correct the dw-mshc timing properties as per
- binding
-In-Reply-To: <CAD=FV=XUpLwZCn=bpShFqiPBzFBaAbWYn5-+-_OuTqC55sKi3Q@mail.gmail.com>
-References: <1357557585-30257-1-git-send-email-alim.akhtar@samsung.com>
- <CAD=FV=XUpLwZCn=bpShFqiPBzFBaAbWYn5-+-_OuTqC55sKi3Q@mail.gmail.com>
-Message-ID: <CAGOxZ52vsbmmmKBLZjvy2wZBDGeVTP5rwJ5Oc00oYUo2ztA2Dg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 8 Jan 2013 15:31:16 -0200
+Subject: [PATCH 7/7] ARM i.MX51 babbage: Add display support
+In-Reply-To: <1357665800.2527.17.camel@pizza.hi.pengutronix.de>
+References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
+ <CAOMZO5BnFZs+s-WFahtqyzCi15P9RBzKDzwdZNCJ4PmnQrFY1g@mail.gmail.com>
+ <CAOMZO5AkRmhdB-JWQ5DFuQUJHibV7GGvvDeK7-cg7m8OnbHA_Q@mail.gmail.com>
+ <201301081809.38537.marex@denx.de>
+ <1357665800.2527.17.camel@pizza.hi.pengutronix.de>
+Message-ID: <CAOMZO5AKwfyxuy1TfSxQxJ0Ehq7YpO0WN73bz4V6L804tdK0kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+Hi Philipp,
 
-On Tue, Jan 8, 2013 at 12:34 AM, Doug Anderson <dianders@chromium.org> wrote:
->
-> Alim,
->
-> On Mon, Jan 7, 2013 at 3:19 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
-> > As per the current exynos-dw-mshc bindings, dw-mshc-sdr-timing and
-> > dw-mshc-ddr-timing properties are having only two cells, these properties
-> > are wrongly set for exynos5250 based cros5250 and smdk5250 platfroms. This patch
-> > corrects above timing propreties for above platfroms
->
-> Thanks for catching this.  Given that this just removes a number from
-> the dts file that isn't read by the code, I don't expect any
-> functional change and I don't see any.
->
-> I also double-checked usage and compared to the current Chrome OS
-> tree.  The third number (that you removed) is already correctly
-> specified in the dts as "samsung,dw-mshc-ciu-div".  :)
+On Tue, Jan 8, 2013 at 3:23 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
 
- Yes, no functional changes as the removed number is passed using
-dw-mshc-ciu-div  property now as mentioned by you.
+> Reordering the ipu_get_resources and imx_drm_add_crtc calls should resolve this:
 >
+> From: Philipp Zabel <p.zabel@pengutronix.de>
+> Subject: [PATCH] staging: imx/drm: add crtc before registering interrupt
+>  handler
 >
+> If the bootloader already enabled the display, the interrupt handler
+> will be called as soon as it is registered. If the CRTC is not already
+> added at this time, the call to imx_drm_handle_vblank will result in
+> a NULL pointer dereference.
 >
-> > Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> Acked-by: Doug Anderson <dianders@chromium.org>
-Thanks!!!
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+This fixes the issue for me, thanks:
+
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
