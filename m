@@ -1,29 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 Jan 2013 21:22:46 +0100
-Subject: [PATCH] mtd: mxc_nand: Make use of supplied pinctrl data
-In-Reply-To: <20130108195826.GD7360@game.jcrosoft.org>
-References: <1357568885-15507-1-git-send-email-marex@denx.de>
- <20130108195826.GD7360@game.jcrosoft.org>
-Message-ID: <201301082122.46815.marex@denx.de>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Tue, 08 Jan 2013 21:38:27 +0100
+Subject: [PATCH v2] Device Tree binding for the mvsdio driver and related
+ changes
+In-Reply-To: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1550811.iJ6ejRLQ3V@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jean-Christophe PLAGNIOL-VILLARD,
+Hello Thomas,
 
-> On 15:28 Mon 07 Jan     , Marek Vasut wrote:
-> > The MXC NAND driver doesn't consider the pinctrl data supplied via DT,
-> > which will result in NAND pins not being properly configured.
-> > 
-> > Make the driver use pinctrl, but to prevent breakage on various boards,
-> > do not fail if the pinctrl data are not available, only print a warning
-> > message.
+On Friday 21 December 2012 15:48:59 Thomas Petazzoni wrote:
+> Hello,
 > 
-> nack
+> This series of patches adds a Device Tree binding to the mvsdio driver
+> (the driver for the SDIO interface found in many Marvell SoCs), and
+> uses this binding to enable the SDIO interface on Armada 370 and
+> Armada XP platforms, as well as converting the Kirkwood platforms to
+> using the Device Tree to probe the SDIO interface.
 > 
-> we will at bus level
+> The series has been tested on Kirkwood Topkick, Armada 370 Mirabox,
+> Armada XP OpenBlocks, Armada 370 DB and Armada XP DB. The changes on
+> the Dreamplug and MPLCEC4 boards should be tested by their respective
+> maintainers if possible.
 
-Can you please elaborate? I don't understand what you're complaining about at 
-all, sorry.
+Tested on DB-MV784MP-GP and RD-A370-A1 successfully with a 16GB card. Thanks!
 
-Best regards,
-Marek Vasut
+Tested-by: Florian Fainelli <florian@openwrt.org>
+-- 
+Florian
