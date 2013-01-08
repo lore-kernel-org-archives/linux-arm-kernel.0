@@ -1,343 +1,116 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 8 Jan 2013 14:46:31 +0530
-Subject: [PATCH 2/3] cpufreq: add imx6q-cpufreq driver
-In-Reply-To: <1357628043-19256-3-git-send-email-shawn.guo@linaro.org>
-References: <1357628043-19256-1-git-send-email-shawn.guo@linaro.org>
- <1357628043-19256-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAOh2x=mv9_iWt+y9cP0oA4WKs86Ne9nRP6CgKy_1COnPm57YOA@mail.gmail.com>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Tue, 8 Jan 2013 16:43:29 +0800
+Subject: [PATCH 1/1 net-next] net: fec: enable pause frame to improve rx
+ prefomance for 1G network
+Message-ID: <1357634609-4112-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+The limition of imx6 internal bus cause fec can't achieve 1G perfomance.
+There will be many packages lost because FIFO over run.
 
-Apart from Sascha's comments, please see few comment from my side:
+This patch enable pause frame flow control.
 
-On Tue, Jan 8, 2013 at 12:24 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> +static struct regulator *arm_reg;
-> +static struct regulator *pu_reg;
-> +static struct regulator *soc_reg;
+Before this patch
+iperf -s -i 1
+TCP window size: 85.3 KByte (default)
+------------------------------------------------------------
+[  4] local 10.192.242.153 port 5001 connected with 10.192.242.94 port 49773
+[ ID] Interval       Transfer     Bandwidth
+[  4]  0.0- 1.0 sec  6.35 MBytes  53.3 Mbits/sec
+[  4]  1.0- 2.0 sec  3.39 MBytes  28.5 Mbits/sec
+[  4]  2.0- 3.0 sec  2.63 MBytes  22.1 Mbits/sec
+[  4]  3.0- 4.0 sec  1.10 MBytes  9.23 Mbits/sec
 
-Can move to a single line, if you like.
+ifconfig
+   RX packets:46195 errors:1859 dropped:1 overruns:1859 frame:1859
 
-> +static struct clk *arm_clk;
-> +static struct clk *pll1_sys_clk;
-> +static struct clk *pll1_sw_clk;
-> +static struct clk *step_clk;
-> +static struct clk *pll2_pfd2_396m_clk;
+After this patch
+iperf -s -i 1
 
-same.
+[  4] local 10.192.242.153 port 5001 connected with 10.192.242.94 port 49757
+[ ID] Interval       Transfer     Bandwidth
+[  4]  0.0- 1.0 sec  49.8 MBytes   418 Mbits/sec
+[  4]  1.0- 2.0 sec  50.1 MBytes   420 Mbits/sec
+[  4]  2.0- 3.0 sec  47.5 MBytes   399 Mbits/sec
+[  4]  3.0- 4.0 sec  45.9 MBytes   385 Mbits/sec
+[  4]  4.0- 5.0 sec  44.8 MBytes   376 Mbits/sec
 
-> +static int imx6q_set_target(struct cpufreq_policy *policy,
-> +                           unsigned int target_freq, unsigned int relation)
-> +{
-> +       struct cpufreq_freqs freqs;
-> +       struct opp *opp;
-> +       unsigned long freq_hz, volt, volt_old;
-> +       unsigned int index, cpu;
-> +       int ret;
-> +
-> +       ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
-> +                                            relation, &index);
-> +       if (ret) {
-> +               pr_err("failed to match target freqency %d: %d\n",
+ifconfig
+   RX packets:2348454 errors:0 dropped:16 overruns:0 frame:0
 
-s/freqency/frequency
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Fugang Duan  <B38611@freescale.com>
+---
+ drivers/net/ethernet/freescale/fec.c |   26 ++++++++++++++++++++++++++
+ drivers/net/ethernet/freescale/fec.h |    4 ++++
+ 2 files changed, 30 insertions(+), 0 deletions(-)
 
-> +                      target_freq, ret);
-> +               return ret;
-> +       }
-> +
-> +       freq_hz = freq_table[index].frequency * 1000;
-> +       freqs.new = freq_hz / 1000;
-
-could be written as:
-
-       freqs.new = freq_table[index].frequency;
-       freq_hz = freqs.new * 1000;
-
-
-> +       freqs.old = clk_get_rate(arm_clk) / 1000;
-> +
-> +       if (freqs.old == freqs.new)
-> +               return 0;
-> +
-> +       for_each_online_cpu(cpu) {
-> +               freqs.cpu = cpu;
-> +               cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> +       }
-> +
-> +       opp = opp_find_freq_ceil(cpu_dev, &freq_hz);
-> +       if (IS_ERR(opp)) {
-> +               pr_err("failed to find OPP for %ld\n", freq_hz);
-> +               return PTR_ERR(opp);
-> +       }
-> +
-> +       volt = opp_get_voltage(opp);
-> +       volt_old = regulator_get_voltage(arm_reg);
-> +
-> +       pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
-> +                freqs.old / 1000, volt_old / 1000,
-> +                freqs.new / 1000, volt / 1000);
-> +
-> +       /* scaling up?  scale voltage before frequency */
-> +       if (freqs.new > freqs.old) {
-> +               ret = regulator_set_voltage_tol(arm_reg, volt, 0);
-> +               if (ret) {
-> +                       pr_err("failed to scale voltage up: %d\n", ret);
-> +                       freqs.new = freqs.old;
-
-is this useful?
-
-> +                       return ret;
-> +               }
-> +
-> +               /*
-> +                * Need to increase vddpu and vddsoc for safety
-> +                * if we are about to run at 1.2 GHz.
-> +                */
-> +               if (freqs.new == FREQ_1P2_GHZ / 1000) {
-> +                       regulator_set_voltage_tol(pu_reg,
-> +                                       PU_SOC_VOLTAGE_HIGH, 0);
-> +                       regulator_set_voltage_tol(soc_reg,
-> +                                       PU_SOC_VOLTAGE_HIGH, 0);
-> +               }
-> +       }
-> +
-> +       /*
-> +        * The setpoints are selected per PLL/PDF frequencies, so we need to
-> +        * reprogram PLL for frequency scaling.  The procedure of reprogramming
-> +        * PLL1 is as blow.
-> +        *
-> +        *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
-> +        *  - Disable pll1_sys_clk and reprogram it
-> +        *  - Enable pll1_sys_clk and reparent pll1_sw_clk back to it
-> +        *  - Disable pll2_pfd2_396m_clk
-> +        */
-> +       clk_prepare_enable(pll2_pfd2_396m_clk);
-> +       clk_set_parent(step_clk, pll2_pfd2_396m_clk);
-> +       clk_set_parent(pll1_sw_clk, step_clk);
-> +       clk_prepare_enable(pll1_sys_clk);
-> +       if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
-> +               clk_disable_unprepare(pll1_sys_clk);
-> +               clk_set_rate(pll1_sys_clk, freqs.new * 1000);
-> +               clk_prepare_enable(pll1_sys_clk);
-> +               clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> +               clk_disable_unprepare(pll2_pfd2_396m_clk);
-> +       } else {
-> +               /*
-> +                * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
-> +                * to provide the frequency.
-> +                */
-> +               clk_disable_unprepare(pll1_sys_clk);
-
-Are you doing anything in  clk_[un]prepare ? If not, do clk_[un]prepare
-at init and exit and do enable/disable here.
-
-> +       }
-> +
-> +       /* Ensure the arm clock divider is what we expect */
-> +       ret = clk_set_rate(arm_clk, freqs.new * 1000);
-> +       if (ret) {
-> +               pr_err("failed to set clock rate: %d\n", ret);
-> +               regulator_set_voltage_tol(arm_reg, volt_old, 0);
-> +               return ret;
-> +       }
-> +
-> +       /* scaling down?  scale voltage after frequency */
-> +       if (freqs.new < freqs.old) {
-> +               ret = regulator_set_voltage_tol(arm_reg, volt, 0);
-> +               if (ret)
-> +                       pr_warn("failed to scale voltage down: %d\n", ret);
-> +
-> +               if (freqs.old == FREQ_1P2_GHZ / 1000) {
-> +                       regulator_set_voltage_tol(pu_reg,
-> +                                       PU_SOC_VOLTAGE_NORMAL, 0);
-> +                       regulator_set_voltage_tol(soc_reg,
-> +                                       PU_SOC_VOLTAGE_NORMAL, 0);
-> +               }
-> +       }
-> +
-> +       for_each_online_cpu(cpu) {
-> +               freqs.cpu = cpu;
-> +               cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
-> +{
-> +       int ret;
-> +
-> +       if (policy->cpu != 0)
-> +               return -EINVAL;
-
-Why? The problem here is when you hot-unplug cpu0, init would be called for
-cpu1 and it would fail.
-
-> +
-> +       ret = cpufreq_frequency_table_cpuinfo(policy, freq_table);
-> +       if (ret) {
-> +               pr_err("invalid frequency table: %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       policy->cpuinfo.transition_latency = transition_latency;
-> +       policy->cur = clk_get_rate(arm_clk) / 1000;
-> +       policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
-> +       cpumask_setall(policy->cpus);
-> +       cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
-> +
-> +       return 0;
-> +}
-> +
-> +static int imx6q_cpufreq_exit(struct cpufreq_policy *policy)
-> +{
-> +       cpufreq_frequency_table_put_attr(policy->cpu);
-> +       return 0;
-> +}
-> +
-> +static struct freq_attr *imx6q_cpufreq_attr[] = {
-> +       &cpufreq_freq_attr_scaling_available_freqs,
-> +       NULL,
-> +};
-> +
-> +static struct cpufreq_driver imx6q_cpufreq_driver = {
-> +       .verify = imx6q_verify_speed,
-> +       .target = imx6q_set_target,
-> +       .get = imx6q_get_speed,
-> +       .init = imx6q_cpufreq_init,
-> +       .exit = imx6q_cpufreq_exit,
-> +       .name = "imx6q-cpufreq",
-> +       .attr = imx6q_cpufreq_attr,
-> +};
-> +
-> +static int imx6q_cpufreq_probe(struct platform_device *pdev)
-> +{
-> +       struct device_node *np;
-> +       int ret;
-> +
-> +       np = of_find_node_by_path("/cpus/cpu at 0");
-> +       if (!np) {
-> +               pr_err("failed to find cpu0 node\n");
-> +               return -ENOENT;
-> +       }
-> +
-> +       cpu_dev = get_cpu_device(0);
-> +       if (!cpu_dev) {
-> +               pr_err("failed to get cpu0 device\n");
-> +               ret = -ENODEV;
-> +               goto put_node;
-> +       }
-> +
-> +       cpu_dev->of_node = np;
-> +
-> +       arm_clk = clk_get(cpu_dev, "arm");
-> +       pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
-> +       pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
-> +       step_clk = clk_get(cpu_dev, "step");
-> +       pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
-> +       if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
-> +           IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
-> +               pr_err("failed to get clocks\n");
-> +               ret = -ENOENT;
-> +               goto put_node;
-
-That looks to be wrong. If clk failed for the last clk_get, you must
-free all other
-clks too.
-
-> +       }
-> +
-> +       arm_reg = regulator_get(cpu_dev, "arm");
-> +       pu_reg = regulator_get(cpu_dev, "pu");
-> +       soc_reg = regulator_get(cpu_dev, "soc");
-> +       if (!arm_reg || !pu_reg || !soc_reg) {
-> +               pr_err("failed to get regulators\n");
-> +               ret = -ENOENT;
-> +               goto put_clk;
-
-ditto
-
-> +       }
-> +
-> +       /* We expect an OPP table supplied by platform */
-> +       ret = opp_get_opp_count(cpu_dev);
-> +       if (ret < 0) {
-> +               pr_err("no OPP table is found: %d\n", ret);
-> +               goto put_reg;
-> +       }
-> +
-> +       ret = opp_init_cpufreq_table(cpu_dev, &freq_table);
-> +       if (ret) {
-> +               pr_err("failed to init cpufreq table: %d\n", ret);
-> +               goto put_reg;
-> +       }
-> +
-> +       if (of_property_read_u32(np, "clock-latency", &transition_latency))
-> +               transition_latency = CPUFREQ_ETERNAL;
-> +
-> +       ret = cpufreq_register_driver(&imx6q_cpufreq_driver);
-> +       if (ret) {
-> +               pr_err("failed register driver: %d\n", ret);
-> +               goto free_freq_table;
-> +       }
-> +
-> +       of_node_put(np);
-> +       return 0;
-> +
-> +free_freq_table:
-> +       opp_free_cpufreq_table(cpu_dev, &freq_table);
-> +put_reg:
-> +       regulator_put(soc_reg);
-> +       regulator_put(pu_reg);
-> +       regulator_put(arm_reg);
-> +put_clk:
-> +       clk_put(pll2_pfd2_396m_clk);
-> +       clk_put(step_clk);
-> +       clk_put(pll1_sw_clk);
-> +       clk_put(pll1_sys_clk);
-> +       clk_put(arm_clk);
-> +put_node:
-> +       of_node_put(np);
-> +       return ret;
-> +}
-> +
-> +static int imx6q_cpufreq_remove(struct platform_device *pdev)
-> +{
-> +       cpufreq_unregister_driver(&imx6q_cpufreq_driver);
-> +       opp_free_cpufreq_table(cpu_dev, &freq_table);
-> +       regulator_put(soc_reg);
-> +       regulator_put(pu_reg);
-> +       regulator_put(arm_reg);
-> +       clk_put(pll2_pfd2_396m_clk);
-> +       clk_put(step_clk);
-> +       clk_put(pll1_sw_clk);
-> +       clk_put(pll1_sys_clk);
-> +       clk_put(arm_clk);
-> +
-> +       return 0;
-> +}
-> +
-> +static struct platform_driver imx6q_cpufreq_platdrv = {
-> +       .driver = {
-> +               .name   = "imx6q_cpufreq",
-> +               .owner  = THIS_MODULE,
-> +       },
-> +       .probe          = imx6q_cpufreq_probe,
-> +       .remove         = imx6q_cpufreq_remove,
-> +};
-> +module_platform_driver(imx6q_cpufreq_platdrv);
-> +
-> +MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
-> +MODULE_DESCRIPTION("Freescale i.MX6Q cpufreq driver");
-> +MODULE_LICENSE("GPL");
-> --
-> 1.7.9.5
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 6dc2094..4928260 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -68,6 +68,14 @@
+ 
+ #define DRIVER_NAME	"fec"
+ 
++/* Pause frame feild and FIFO threshold */
++#define FEC_ENET_FCE	(1 << 5)
++#define FEC_ENET_RSEM_V	0x84
++#define FEC_ENET_RSFL_V	16
++#define FEC_ENET_RAEM_V	0x8
++#define FEC_ENET_RAFL_V	0x8
++#define FEC_ENET_OPD_V	0xFFF0
++
+ /* Controller is ENET-MAC */
+ #define FEC_QUIRK_ENET_MAC		(1 << 0)
+ /* Controller needs driver to swap frame */
+@@ -470,6 +478,21 @@ fec_restart(struct net_device *ndev, int duplex)
+ 		}
+ #endif
+ 	}
++
++	/* enable pause frame*/
++	if (id_entry->driver_data & FEC_QUIRK_HAS_GBIT) {
++		rcntl |= FEC_ENET_FCE;
++
++		/* set FIFO thresh hold parameter to reduce overrun */
++		writel(FEC_ENET_RSEM_V, fep->hwp + FEC_R_FIFO_RSEM);
++		writel(FEC_ENET_RSFL_V, fep->hwp + FEC_R_FIFO_RSFL);
++		writel(FEC_ENET_RAEM_V, fep->hwp + FEC_R_FIFO_RAEM);
++		writel(FEC_ENET_RAFL_V, fep->hwp + FEC_R_FIFO_RAFL);
++
++		/* OPD */
++		writel(FEC_ENET_OPD_V, fep->hwp + FEC_OPD);
++	}
++
+ 	writel(rcntl, fep->hwp + FEC_R_CNTRL);
+ 
+ 	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
+@@ -1021,6 +1044,9 @@ static int fec_enet_mii_probe(struct net_device *ndev)
+ 	else
+ 		phy_dev->supported &= PHY_BASIC_FEATURES;
+ 
++	/* enable phy pause frame for any platform */
++	phy_dev->supported |= ADVERTISED_Pause;
++
+ 	phy_dev->advertising = phy_dev->supported;
+ 
+ 	fep->phy_dev = phy_dev;
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index 4862394..7dac581 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -48,6 +48,10 @@
+ #define FEC_R_DES_START		0x180 /* Receive descriptor ring */
+ #define FEC_X_DES_START		0x184 /* Transmit descriptor ring */
+ #define FEC_R_BUFF_SIZE		0x188 /* Maximum receive buff size */
++#define FEC_R_FIFO_RSFL		0x190 /* Receive FIFO section full threshold */
++#define FEC_R_FIFO_RSEM		0x194 /* Receive FIFO section empty threshold */
++#define FEC_R_FIFO_RAEM		0x198 /* Receive FIFO almost empty threshold */
++#define FEC_R_FIFO_RAFL		0x19c /* Receive FIFO almost full threshold */
+ #define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
+ #define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
+ 
+-- 
+1.7.1
