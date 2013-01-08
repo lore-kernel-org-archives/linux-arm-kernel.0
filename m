@@ -1,28 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue,  8 Jan 2013 19:15:26 +0100
-Subject: [PATCH] power: reset: qnap-poweroff: Fix License String
-In-Reply-To: <20130106215509.GD26928@lizard.sbx05280.losalca.wayport.net>
-References: <20130106215509.GD26928@lizard.sbx05280.losalca.wayport.net>
-Message-ID: <1357668926-20598-1-git-send-email-andrew@lunn.ch>
+From: josh.coombs@gmail.com (Joshua Coombs)
+Date: Tue,  8 Jan 2013 13:16:27 -0500
+Subject: [PATCH] Allow Marvell SATA driver to work with LEDS_TRIGGER_IDE_DISK
+Message-ID: <1357668987-3610-1-git-send-email-josh.coombs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPLv2+ is not a valid license string. Replace it with one that is.
+Add a call to the IDE LED Trigger within the Marvell SATA driver to allow
+Marvell SoC devices to show SATA activity via GPIO connected LEDs.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
 ---
- drivers/power/reset/qnap-poweroff.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/ata/sata_mv.c | 3 +++
+ drivers/leds/Kconfig  | 3 +--
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
-index ca0b476..8af772b 100644
---- a/drivers/power/reset/qnap-poweroff.c
-+++ b/drivers/power/reset/qnap-poweroff.c
-@@ -121,4 +121,4 @@ module_platform_driver(qnap_power_off_driver);
+diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+index 68f4fb5..4aaf6f0 100644
+--- a/drivers/ata/sata_mv.c
++++ b/drivers/ata/sata_mv.c
+@@ -71,6 +71,7 @@
+ #include <scsi/scsi_cmnd.h>
+ #include <scsi/scsi_device.h>
+ #include <linux/libata.h>
++#include <linux/leds.h>
  
- MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
- MODULE_DESCRIPTION("QNAP Power off driver");
--MODULE_LICENSE("GPLv2+");
-+MODULE_LICENSE("GPL v2");
+ #define DRV_NAME	"sata_mv"
+ #define DRV_VERSION	"1.28"
+@@ -1156,6 +1157,8 @@ static void mv_start_edma(struct ata_port *ap, void __iomem *port_mmio,
+ {
+ 	int want_ncq = (protocol == ATA_PROT_NCQ);
+ 
++	ledtrig_ide_activity();
++
+ 	if (pp->pp_flags & MV_PP_FLAG_EDMA_EN) {
+ 		int using_ncq = ((pp->pp_flags & MV_PP_FLAG_NCQ_EN) != 0);
+ 		if (want_ncq != using_ncq)
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index b58bc8a..d2071d0 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -496,10 +496,9 @@ config LEDS_TRIGGER_ONESHOT
+ 
+ config LEDS_TRIGGER_IDE_DISK
+ 	bool "LED IDE Disk Trigger"
+-	depends on IDE_GD_ATA
+ 	depends on LEDS_TRIGGERS
+ 	help
+-	  This allows LEDs to be controlled by IDE disk activity.
++	  This allows LEDs to be controlled by IDE or SATA disk activity.
+ 	  If unsure, say Y.
+ 
+ config LEDS_TRIGGER_HEARTBEAT
 -- 
-1.7.10.4
+1.8.0.2
