@@ -1,70 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 Jan 2013 14:01:36 +0100
-Subject: [PATCH 2/2] mxc: enable EHCI PER clock
-In-Reply-To: <20130108135230.78f23ba0@dell>
-References: <1355941777-99352-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <20121219202926.GB19651@pengutronix.de> <20130108135230.78f23ba0@dell>
-Message-ID: <201301081401.36280.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 8 Jan 2013 13:06:02 +0000
+Subject: [PATCH 0/4] gpio: introduce descriptor-based interface
+In-Reply-To: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
+References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <201301081306.02942.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear gwenhael.goavec,
+On Tuesday 08 January 2013, Alexandre Courbot wrote:
+> This series introduce a first take at implementing the RFC for the new GPIO API
+> that I submitted last month. It proposes a new, opaque descriptor-based GPIO API
+> that becomes available when GPIOlib is compiled, and provides a safer, more
+> abstract alternative to the current integer-based interface. GPIOlib internals
+> are also switched to use the descriptor logic, and the former integer API
+> becomes a lightweight wrapper around the new descriptor-based API.
+> 
+> Functionally speaking the new API is identical to the integer-based API, with
+> only the prefix changing from gpio_ to gpiod_. However, the second patch
+> introduces new functions for obtaining GPIOs from a device and a consumer name,
+> in a fashion similar to what is done with e.g. regulators and PWMs.
 
-> On Wed, 19 Dec 2012 21:29:26 +0100
-> 
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Wed, Dec 19, 2012 at 07:29:37PM +0100, Gwenhael Goavec-Merou wrote:
-> > > EHCI PER clock (aka usb_div) must be enabled to have EHCI driver
-> > > working.
-> > > 
-> > > Signed-off-by: Gwenhael Goavec-Merou
-> > > <gwenhael.goavec-merou@armadeus.com> ---
-> > > 
-> > >  drivers/usb/host/ehci-mxc.c |   12 +++++++++++-
-> > >  1 files changed, 11 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> > > index ec7f5d2..8050631 100644
-> > > --- a/drivers/usb/host/ehci-mxc.c
-> > > +++ b/drivers/usb/host/ehci-mxc.c
-> > > @@ -31,7 +31,7 @@
-> > > 
-> > >  #define ULPI_VIEWPORT_OFFSET	0x170
-> > >  
-> > >  struct ehci_mxc_priv {
-> > > 
-> > > -	struct clk *usbclk, *ahbclk, *phyclk;
-> > > +	struct clk *usbclk, *ahbclk, *perclk, *phyclk;
-> > > 
-> > >  	struct usb_hcd *hcd;
-> > >  
-> > >  };
-> > > 
-> > > @@ -150,6 +150,13 @@ static int ehci_mxc_drv_probe(struct
-> > > platform_device *pdev)
-> > > 
-> > >  	}
-> > >  	clk_prepare_enable(priv->ahbclk);
-> > > 
-> > > +	priv->perclk = devm_clk_get(&pdev->dev, "per");
-> > > +	if (IS_ERR(priv->perclk)) {
-> > > +		ret = PTR_ERR(priv->perclk);
-> > > +		goto err_clk_per;
-> > > +	}
-> > > +	clk_prepare_enable(priv->perclk);
-> > 
-> > Have you checked this clock is present on all SoCs using this driver?
-> 
-> Yes
-> 
-> > Other than that, +1 on using the chipidea driver as Fabio and Marek
-> > already noted.
-> 
-> True. But I need to use a non-dt board based on imx27. Chipidea is
-> not working yet for this chip and I have currently not enough time to do
-> that.
+I like the interface, good idea!
 
-You're on your own then, sorry :-(
+A few questions:
 
-Best regards,
-Marek Vasut
+Is there a plan for migrating all the existing users of the current GPIO
+interface?
+
+How do you want to deal with drivers that work on platforms that currently
+don't use gpiolib but have their own implementation of asm/gpio.h? Are
+we going to phase them out?
+
+If we are adding a new way to deal with GPIOs, would it make sense to
+have that more closely integrated into pinctrl in one form or another?
+My feeling is that there is already a significant overlap between the
+two, and while the addition of the gpiod_* functions doesn't necessarily
+make this worse, it could be a chance to improve the current situation
+to make the interface more consistent with pinctrl.
+
+	Arnd
