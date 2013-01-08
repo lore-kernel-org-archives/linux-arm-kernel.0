@@ -1,336 +1,80 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue,  8 Jan 2013 11:57:43 -0700
-Subject: [PATCH v2 06/10] crypto: omap-aes - Remove usage of private DMA API
-In-Reply-To: <1357671467-32363-1-git-send-email-mgreer@animalcreek.com>
-References: <1357671467-32363-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1357671467-32363-7-git-send-email-mgreer@animalcreek.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Tue, 08 Jan 2013 19:01:19 +0000
+Subject: Building for MMU-less vexpress targets
+In-Reply-To: <alpine.LFD.2.02.1211061802240.21033@xanadu.home>
+References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+ <201211061733.44781.arnd@arndb.de>
+ <alpine.LFD.2.02.1211061533490.21033@xanadu.home>
+ <201211062114.49933.arnd@arndb.de>
+ <alpine.LFD.2.02.1211061802240.21033@xanadu.home>
+Message-ID: <50EC6CFF.5070309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+Nicolas,
 
-Remove usage of the private OMAP DMA API.
-The dmaengine API will be used instead.
+On 06/11/12 23:14, Nicolas Pitre wrote:
+> On Tue, 6 Nov 2012, Arnd Bergmann wrote:
+>
+>> On Tuesday 06 November 2012, Nicolas Pitre wrote:
+>
+>> The two options are either to make
+>> vexpress be single-platform when building for !MMU, or to allow multiplatform
+>> kernels to be built without MMU support in principle. I think the second
+>> option is more logical and avoids complex Kconfig constructs.
+>
+> Well, I'd rather prefer to think that the first option is the most
+> logical between those 2 options, regardless of Kconfig complexity
+> issues.
+>
+> I didn't look, but just making MULTIPLATFORM depend on !MMU, and
+> VEXPRESS depend on MULTIPLATFORM || MMU should be close to what is
+> needed, no?
+>
 
-CC: Russell King <rmk+kernel@arm.linux.org.uk>
-CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
----
- drivers/crypto/omap-aes.c | 133 ----------------------------------------------
- 1 file changed, 133 deletions(-)
+I've spent a little bit of time trying this, as both Arnd and you seemed 
+to be happy with a solution along these lines.
 
-diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 14ec9e2..faf522f 100644
---- a/drivers/crypto/omap-aes.c
-+++ b/drivers/crypto/omap-aes.c
-@@ -12,8 +12,6 @@
-  *
-  */
- 
--#define OMAP_AES_DMA_PRIVATE
--
- #define pr_fmt(fmt) "%s: " fmt, __func__
- 
- #include <linux/err.h>
-@@ -115,33 +113,21 @@ struct omap_aes_dev {
- 	struct ablkcipher_request	*req;
- 	size_t				total;
- 	struct scatterlist		*in_sg;
--#ifndef OMAP_AES_DMA_PRIVATE
- 	struct scatterlist		in_sgl;
--#endif
- 	size_t				in_offset;
- 	struct scatterlist		*out_sg;
--#ifndef OMAP_AES_DMA_PRIVATE
- 	struct scatterlist		out_sgl;
--#endif
- 	size_t				out_offset;
- 
- 	size_t			buflen;
- 	void			*buf_in;
- 	size_t			dma_size;
- 	int			dma_in;
--#ifdef OMAP_AES_DMA_PRIVATE
--	int			dma_lch_in;
--#else
- 	struct dma_chan		*dma_lch_in;
--#endif
- 	dma_addr_t		dma_addr_in;
- 	void			*buf_out;
- 	int			dma_out;
--#ifdef OMAP_AES_DMA_PRIVATE
--	int			dma_lch_out;
--#else
- 	struct dma_chan		*dma_lch_out;
--#endif
- 	dma_addr_t		dma_addr_out;
- };
- 
-@@ -206,17 +192,10 @@ static int omap_aes_write_ctrl(struct omap_aes_dev *dd)
- 		return err;
- 
- 	val = 0;
--#ifdef OMAP_AES_DMA_PRIVATE
--	if (dd->dma_lch_out >= 0)
--		val |= AES_REG_MASK_DMA_OUT_EN;
--	if (dd->dma_lch_in >= 0)
--		val |= AES_REG_MASK_DMA_IN_EN;
--#else
- 	if (dd->dma_lch_out != NULL)
- 		val |= AES_REG_MASK_DMA_OUT_EN;
- 	if (dd->dma_lch_in != NULL)
- 		val |= AES_REG_MASK_DMA_IN_EN;
--#endif
- 
- 	mask = AES_REG_MASK_DMA_IN_EN | AES_REG_MASK_DMA_OUT_EN;
- 
-@@ -244,22 +223,6 @@ static int omap_aes_write_ctrl(struct omap_aes_dev *dd)
- 
- 	omap_aes_write_mask(dd, AES_REG_CTRL, val, mask);
- 
--#ifdef OMAP_AES_DMA_PRIVATE
--	/* IN */
--	omap_set_dma_dest_params(dd->dma_lch_in, 0, OMAP_DMA_AMODE_CONSTANT,
--				 dd->phys_base + AES_REG_DATA, 0, 4);
--
--	omap_set_dma_dest_burst_mode(dd->dma_lch_in, OMAP_DMA_DATA_BURST_4);
--	omap_set_dma_src_burst_mode(dd->dma_lch_in, OMAP_DMA_DATA_BURST_4);
--
--	/* OUT */
--	omap_set_dma_src_params(dd->dma_lch_out, 0, OMAP_DMA_AMODE_CONSTANT,
--				dd->phys_base + AES_REG_DATA, 0, 4);
--
--	omap_set_dma_src_burst_mode(dd->dma_lch_out, OMAP_DMA_DATA_BURST_4);
--	omap_set_dma_dest_burst_mode(dd->dma_lch_out, OMAP_DMA_DATA_BURST_4);
--#endif
--
- 	return 0;
- }
- 
-@@ -284,23 +247,6 @@ static struct omap_aes_dev *omap_aes_find_dev(struct omap_aes_ctx *ctx)
- 	return dd;
- }
- 
--#ifdef OMAP_AES_DMA_PRIVATE
--static void omap_aes_dma_callback(int lch, u16 ch_status, void *data)
--{
--	struct omap_aes_dev *dd = data;
--
--	if (ch_status != OMAP_DMA_BLOCK_IRQ) {
--		pr_err("omap-aes DMA error status: 0x%hx\n", ch_status);
--		dd->err = -EIO;
--		dd->flags &= ~FLAGS_INIT; /* request to re-initialize */
--	} else if (lch == dd->dma_lch_in) {
--		return;
--	}
--
--	/* dma_lch_out - completed */
--	tasklet_schedule(&dd->done_task);
--}
--#else
- static void omap_aes_dma_out_callback(void *data)
- {
- 	struct omap_aes_dev *dd = data;
-@@ -308,22 +254,14 @@ static void omap_aes_dma_out_callback(void *data)
- 	/* dma_lch_out - completed */
- 	tasklet_schedule(&dd->done_task);
- }
--#endif
- 
- static int omap_aes_dma_init(struct omap_aes_dev *dd)
- {
- 	int err = -ENOMEM;
--#ifndef OMAP_AES_DMA_PRIVATE
- 	dma_cap_mask_t mask;
--#endif
- 
--#ifdef OMAP_AES_DMA_PRIVATE
--	dd->dma_lch_out = -1;
--	dd->dma_lch_in = -1;
--#else
- 	dd->dma_lch_out = NULL;
- 	dd->dma_lch_in = NULL;
--#endif
- 
- 	dd->buf_in = (void *)__get_free_pages(GFP_KERNEL, OMAP_AES_CACHE_SIZE);
- 	dd->buf_out = (void *)__get_free_pages(GFP_KERNEL, OMAP_AES_CACHE_SIZE);
-@@ -352,20 +290,6 @@ static int omap_aes_dma_init(struct omap_aes_dev *dd)
- 		goto err_map_out;
- 	}
- 
--#ifdef OMAP_AES_DMA_PRIVATE
--	err = omap_request_dma(dd->dma_in, "omap-aes-rx",
--			       omap_aes_dma_callback, dd, &dd->dma_lch_in);
--	if (err) {
--		dev_err(dd->dev, "Unable to request DMA channel\n");
--		goto err_dma_in;
--	}
--	err = omap_request_dma(dd->dma_out, "omap-aes-tx",
--			       omap_aes_dma_callback, dd, &dd->dma_lch_out);
--	if (err) {
--		dev_err(dd->dev, "Unable to request DMA channel\n");
--		goto err_dma_out;
--	}
--#else
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 
-@@ -382,16 +306,11 @@ static int omap_aes_dma_init(struct omap_aes_dev *dd)
- 		dev_err(dd->dev, "Unable to request out DMA channel\n");
- 		goto err_dma_out;
- 	}
--#endif
- 
- 	return 0;
- 
- err_dma_out:
--#ifdef OMAP_AES_DMA_PRIVATE
--	omap_free_dma(dd->dma_lch_in);
--#else
- 	dma_release_channel(dd->dma_lch_in);
--#endif
- err_dma_in:
- 	dma_unmap_single(dd->dev, dd->dma_addr_out, dd->buflen,
- 			 DMA_FROM_DEVICE);
-@@ -408,13 +327,8 @@ err_alloc:
- 
- static void omap_aes_dma_cleanup(struct omap_aes_dev *dd)
- {
--#ifdef OMAP_AES_DMA_PRIVATE
--	omap_free_dma(dd->dma_lch_out);
--	omap_free_dma(dd->dma_lch_in);
--#else
- 	dma_release_channel(dd->dma_lch_out);
- 	dma_release_channel(dd->dma_lch_in);
--#endif
- 	dma_unmap_single(dd->dev, dd->dma_addr_out, dd->buflen,
- 			 DMA_FROM_DEVICE);
- 	dma_unmap_single(dd->dev, dd->dma_addr_in, dd->buflen, DMA_TO_DEVICE);
-@@ -472,24 +386,15 @@ static int sg_copy(struct scatterlist **sg, size_t *offset, void *buf,
- 	return off;
- }
- 
--#ifdef OMAP_AES_DMA_PRIVATE
--static int omap_aes_crypt_dma(struct crypto_tfm *tfm, dma_addr_t dma_addr_in,
--			       dma_addr_t dma_addr_out, int length)
--#else
- static int omap_aes_crypt_dma(struct crypto_tfm *tfm,
- 		struct scatterlist *in_sg, struct scatterlist *out_sg)
--#endif
- {
- 	struct omap_aes_ctx *ctx = crypto_tfm_ctx(tfm);
- 	struct omap_aes_dev *dd = ctx->dd;
--#ifdef OMAP_AES_DMA_PRIVATE
--	int len32;
--#else
- 	struct dma_async_tx_descriptor *tx_in, *tx_out;
- 	struct dma_slave_config cfg;
- 	dma_addr_t dma_addr_in = sg_dma_address(in_sg);
- 	int ret, length = sg_dma_len(in_sg);
--#endif
- 
- 	pr_debug("len: %d\n", length);
- 
-@@ -499,28 +404,6 @@ static int omap_aes_crypt_dma(struct crypto_tfm *tfm,
- 		dma_sync_single_for_device(dd->dev, dma_addr_in, length,
- 					   DMA_TO_DEVICE);
- 
--#ifdef OMAP_AES_DMA_PRIVATE
--	len32 = DIV_ROUND_UP(length, sizeof(u32));
--
--	/* IN */
--	omap_set_dma_transfer_params(dd->dma_lch_in, OMAP_DMA_DATA_TYPE_S32,
--				     len32, 1, OMAP_DMA_SYNC_PACKET, dd->dma_in,
--					OMAP_DMA_DST_SYNC);
--
--	omap_set_dma_src_params(dd->dma_lch_in, 0, OMAP_DMA_AMODE_POST_INC,
--				dma_addr_in, 0, 0);
--
--	/* OUT */
--	omap_set_dma_transfer_params(dd->dma_lch_out, OMAP_DMA_DATA_TYPE_S32,
--				     len32, 1, OMAP_DMA_SYNC_PACKET,
--					dd->dma_out, OMAP_DMA_SRC_SYNC);
--
--	omap_set_dma_dest_params(dd->dma_lch_out, 0, OMAP_DMA_AMODE_POST_INC,
--				 dma_addr_out, 0, 0);
--
--	omap_start_dma(dd->dma_lch_in);
--	omap_start_dma(dd->dma_lch_out);
--#else
- 	memset(&cfg, 0, sizeof(cfg));
- 
- 	cfg.src_addr = dd->phys_base + AES_REG_DATA;
-@@ -573,7 +456,6 @@ static int omap_aes_crypt_dma(struct crypto_tfm *tfm,
- 
- 	dma_async_issue_pending(dd->dma_lch_in);
- 	dma_async_issue_pending(dd->dma_lch_out);
--#endif
- 
- 	/* start DMA or disable idle mode */
- 	omap_aes_write_mask(dd, AES_REG_MASK, AES_REG_MASK_START,
-@@ -589,10 +471,8 @@ static int omap_aes_crypt_dma_start(struct omap_aes_dev *dd)
- 	int err, fast = 0, in, out;
- 	size_t count;
- 	dma_addr_t addr_in, addr_out;
--#ifndef OMAP_AES_DMA_PRIVATE
- 	struct scatterlist *in_sg, *out_sg;
- 	int len32;
--#endif
- 
- 	pr_debug("total: %d\n", dd->total);
- 
-@@ -631,10 +511,8 @@ static int omap_aes_crypt_dma_start(struct omap_aes_dev *dd)
- 		addr_in = sg_dma_address(dd->in_sg);
- 		addr_out = sg_dma_address(dd->out_sg);
- 
--#ifndef OMAP_AES_DMA_PRIVATE
- 		in_sg = dd->in_sg;
- 		out_sg = dd->out_sg;
--#endif
- 
- 		dd->flags |= FLAGS_FAST;
- 
-@@ -643,7 +521,6 @@ static int omap_aes_crypt_dma_start(struct omap_aes_dev *dd)
- 		count = sg_copy(&dd->in_sg, &dd->in_offset, dd->buf_in,
- 				 dd->buflen, dd->total, 0);
- 
--#ifndef OMAP_AES_DMA_PRIVATE
- 		len32 = DIV_ROUND_UP(count, DMA_MIN) * DMA_MIN;
- 
- 		/*
-@@ -664,7 +541,6 @@ static int omap_aes_crypt_dma_start(struct omap_aes_dev *dd)
- 
- 		in_sg = &dd->in_sgl;
- 		out_sg = &dd->out_sgl;
--#endif
- 
- 		addr_in = dd->dma_addr_in;
- 		addr_out = dd->dma_addr_out;
-@@ -675,11 +551,7 @@ static int omap_aes_crypt_dma_start(struct omap_aes_dev *dd)
- 
- 	dd->total -= count;
- 
--#ifdef OMAP_AES_DMA_PRIVATE
--	err = omap_aes_crypt_dma(tfm, addr_in, addr_out, count);
--#else
- 	err = omap_aes_crypt_dma(tfm, in_sg, out_sg);
--#endif
- 	if (err) {
- 		dma_unmap_sg(dd->dev, dd->in_sg, 1, DMA_TO_DEVICE);
- 		dma_unmap_sg(dd->dev, dd->out_sg, 1, DMA_TO_DEVICE);
-@@ -709,13 +581,8 @@ static int omap_aes_crypt_dma_stop(struct omap_aes_dev *dd)
- 
- 	omap_aes_write_mask(dd, AES_REG_MASK, 0, AES_REG_MASK_START);
- 
--#ifdef OMAP_AES_DMA_PRIVATE
--	omap_stop_dma(dd->dma_lch_in);
--	omap_stop_dma(dd->dma_lch_out);
--#else
- 	dmaengine_terminate_all(dd->dma_lch_in);
- 	dmaengine_terminate_all(dd->dma_lch_out);
--#endif
- 
- 	if (dd->flags & FLAGS_FAST) {
- 		dma_unmap_sg(dd->dev, dd->out_sg, 1, DMA_FROM_DEVICE);
--- 
-1.7.12
+However, I can't seem to make it fall out quite so trivially so I wonder 
+if you'd mind clarifying what you were expecting:
+
+The problem that I see when I try to do this is that ARCH_VEXPRESS no 
+longer exists in the 'choice' for "ARM system type" in arch/arm/Kconfig. 
+A solution that allows selection of VEXPRESS as a single platform (!MMU) 
+and multi-platform (MMU) appears to need an entry in that 'choice' for 
+the single platform case, and a config option in 
+arch/arm/mach-vexpress/Kconfig for the multiplatform one.
+
+So it seems to me we need a shim in one of those two locations...
+
+As Will suggested a while back, the shim in arch/arm/Kconfig could look 
+like:
+
+---8<---
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 335e220..0561d87 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -305,6 +305,11 @@ config ARCH_REALVIEW
+         help
+           This enables support for ARM Ltd RealView boards.
+
++config ARCH_VEXPRESS_NOMMU
++       bool "ARM Ltd. Versatile Express family (nommu)"
++       depends on !MMU
++       select ARCH_VEXPRESS
++
+  config ARCH_VERSATILE
+         bool "ARM Ltd. Versatile family"
+         select ARCH_WANT_OPTIONAL_GPIOLIB
+---->8----
+
+With the other perhaps being to merge the ARCH_VEXPRESS option back in 
+to the 'choice' and create a ARCH_VEXPRESS_MULTI elsewhere...
+
+Is that the sort of thing you had in mind, or is there another way 
+around that I'm missing?
+
+Thanks,
+
+Jonny
