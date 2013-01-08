@@ -1,73 +1,57 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 8 Jan 2013 14:47:34 +0200
-Subject: [v2 0/9] ARM: Initial support for Tegra 114 SoC
-Message-ID: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com>
+From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
+Date: Tue, 8 Jan 2013 13:52:30 +0100
+Subject: [PATCH 2/2] mxc: enable EHCI PER clock
+In-Reply-To: <20121219202926.GB19651@pengutronix.de>
+References: <1355941777-99352-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1355941777-99352-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <20121219202926.GB19651@pengutronix.de>
+Message-ID: <20130108135230.78f23ba0@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 19 Dec 2012 21:29:26 +0100
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-This patchset adds initial support for NVIDIA's new Tegra 114 SoC
-(T114) based on the ARM Cortex-A15 MP. It has the minimal support to
-allow the kernel to boot up into shell console. This can be used as a
-basis for adding other device drivers for this SoC. Currently there
-are 2 evaluation boards available, "Dalmore" and "Pluto".
+> On Wed, Dec 19, 2012 at 07:29:37PM +0100, Gwenhael Goavec-Merou wrote:
+> > EHCI PER clock (aka usb_div) must be enabled to have EHCI driver working.
+> > 
+> > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> > ---
+> >  drivers/usb/host/ehci-mxc.c |   12 +++++++++++-
+> >  1 files changed, 11 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+> > index ec7f5d2..8050631 100644
+> > --- a/drivers/usb/host/ehci-mxc.c
+> > +++ b/drivers/usb/host/ehci-mxc.c
+> > @@ -31,7 +31,7 @@
+> >  #define ULPI_VIEWPORT_OFFSET	0x170
+> >  
+> >  struct ehci_mxc_priv {
+> > -	struct clk *usbclk, *ahbclk, *phyclk;
+> > +	struct clk *usbclk, *ahbclk, *perclk, *phyclk;
+> >  	struct usb_hcd *hcd;
+> >  };
+> >  
+> > @@ -150,6 +150,13 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+> >  	}
+> >  	clk_prepare_enable(priv->ahbclk);
+> >  
+> > +	priv->perclk = devm_clk_get(&pdev->dev, "per");
+> > +	if (IS_ERR(priv->perclk)) {
+> > +		ret = PTR_ERR(priv->perclk);
+> > +		goto err_clk_per;
+> > +	}
+> > +	clk_prepare_enable(priv->perclk);
+> 
+> Have you checked this clock is present on all SoCs using this driver?
+> 
+Yes
+>
+> Other than that, +1 on using the chipidea driver as Fabio and Marek
+> already noted.
+>
+True. But I need to use a non-dt board based on imx27. Chipidea is
+not working yet for this chip and I have currently not enough time to do that.
 
-This patchset is against Stephen Warren's linux-next_common branch:
-
-  git://nv-tegra.nvidia.com/user/swarren/linux-2.6 linux-next_common
-
-For those who want to try:
-
-  $ make ARCH=arm tegra_defconfig
-  $ scripts/config -e ARCH_TEGRA_114_SOC -d DRM -d SUSPEND \
-    	-d PM_RUNTIME -d CPU_FREQ -d CPU_IDLE
-  $ make ARCH=arm menuconfig # if needed to configure more
-  $ make ARCH=arm all -j9
-
-You may also want to enable CONFIG_ARM_APPENDED_DTB and
-CONFIG_ARM_ATAG_DTB_COMPAT if the bootloader doesn't support DT yet.
-
-Verified that this single image booted up with "Dalmore(T114)",
-"Pluto(T114)" and "Cardhu(T30)". For "Cardhu(T30)" with this single
-image, SPI driver doesn't seem to afford the above configuration , it
-hangs at boot-up. With SPI disabled, it's ok.
-
-v2:
-Rebased against the latest Stephen Warren's linux-next_common
-Add /cpus entry in DT
-Add comment to initialize TSC only in secure mode.
-
-Hiroshi Doyu (9):
-  ARM: tegra: fuse: Add chipid TEGRA114 0x35
-  HACK: ARM: tegra: Use CLK_IGNORE_UNUSED for Tegra 114 SoC
-  ARM: tegra: # of CPU cores detection w/ & w/o HAVE_ARM_SCU
-  clocksource: tegra: Reorganize funcs by clock functionarities
-  clocksource: tegra: Enable ARM arch_timer with TSC
-  ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
-  ARM: dt: tegra114: Add new board, Dalmore
-  ARM: dt: tegra114: Add new board, Pluto
-  ARM: tegra: Add initial support for Tegra 114 SoC.
-
- .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 +
- arch/arm/boot/dts/Makefile                         |    4 +-
- arch/arm/boot/dts/tegra114-dalmore.dts             |   21 ++
- arch/arm/boot/dts/tegra114-pluto.dts               |   21 ++
- arch/arm/boot/dts/tegra114.dtsi                    |  118 +++++++++++
- arch/arm/mach-tegra/Kconfig                        |   10 +
- arch/arm/mach-tegra/Makefile                       |    1 +
- arch/arm/mach-tegra/board-dt-tegra114.c            |   48 +++++
- arch/arm/mach-tegra/common.c                       |    1 +
- arch/arm/mach-tegra/fuse.h                         |    1 +
- arch/arm/mach-tegra/platsmp.c                      |   31 ++-
- arch/arm/mach-tegra/tegra30_clocks_data.c          |    2 +
- drivers/clocksource/tegra20_timer.c                |  223 +++++++++++++-------
- 13 files changed, 414 insertions(+), 78 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
- create mode 100644 arch/arm/boot/dts/tegra114-dalmore.dts
- create mode 100644 arch/arm/boot/dts/tegra114-pluto.dts
- create mode 100644 arch/arm/boot/dts/tegra114.dtsi
- create mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
-
--- 
-1.7.9.5
+Gwenha?l
