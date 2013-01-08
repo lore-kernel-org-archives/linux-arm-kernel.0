@@ -1,31 +1,44 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 8 Jan 2013 20:11:37 +0530
-Subject: [PATCH 2/3] cpufreq: add imx6q-cpufreq driver
-In-Reply-To: <20130108143554.GC19534@S2101-09.ap.freescale.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 8 Jan 2013 08:47:21 -0600
+Subject: [PATCH 1/3] PM / OPP: Export more symbols for module usage
+In-Reply-To: <1357628043-19256-2-git-send-email-shawn.guo@linaro.org>
 References: <1357628043-19256-1-git-send-email-shawn.guo@linaro.org>
- <1357628043-19256-3-git-send-email-shawn.guo@linaro.org>
- <CAOh2x=mv9_iWt+y9cP0oA4WKs86Ne9nRP6CgKy_1COnPm57YOA@mail.gmail.com>
- <20130108143554.GC19534@S2101-09.ap.freescale.net>
-Message-ID: <CAKohpomQuoUgPVp6e9_UrK0sk+z26cG36DoxH91LWSmBHD36BQ@mail.gmail.com>
+ <1357628043-19256-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130108144720.GA6062@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 January 2013 20:05, Shawn Guo <shawn.guo@linaro.org> wrote:
->> > +static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
->> > +{
->> > +       int ret;
->> > +
->> > +       if (policy->cpu != 0)
->> > +               return -EINVAL;
->>
->> Why? The problem here is when you hot-unplug cpu0, init would be called for
->> cpu1 and it would fail.
->>
->
-> On imx6q, we can never hot-unplug cpu0.  And all the cores of imx6q
-> share the clock and voltage, so have to scale together.  That's why
-> we only need to do this init for cpu0.
+On 14:54-20130108, Shawn Guo wrote:
+> Export opp_init_cpufreq_table and opp_free_cpufreq_table for module
+> usage.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/base/power/opp.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+> index 50b2831..d16db9a 100644
+> --- a/drivers/base/power/opp.c
+> +++ b/drivers/base/power/opp.c
+> @@ -661,6 +661,7 @@ int opp_init_cpufreq_table(struct device *dev,
+>  
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL(opp_init_cpufreq_table);
+>  
+>  /**
+>   * opp_free_cpufreq_table() - free the cpufreq table
+> @@ -678,6 +679,7 @@ void opp_free_cpufreq_table(struct device *dev,
+>  	kfree(*table);
+>  	*table = NULL;
+>  }
+> +EXPORT_SYMBOL(opp_free_cpufreq_table);
+>  #endif		/* CONFIG_CPU_FREQ */
 
-Ok, in that case too you don't need this code. init() wouldn't be
-called for any other
-cpu if policy->cpus is set correctly. So, that turns out to be a junk code.
+Is'nt this already covered in 
+https://patchwork.kernel.org/patch/1847261/
+?
+-- 
+Regards,
+Nishanth Menon
