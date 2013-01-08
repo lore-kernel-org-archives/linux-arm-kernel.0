@@ -1,170 +1,1702 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 08 Jan 2013 13:38:48 -0500
-Subject: [PATCH v5 02/14] ARM: Section based HYP idmap
+Date: Tue, 08 Jan 2013 13:38:55 -0500
+Subject: [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile KVM support
 In-Reply-To: <20130108183811.46302.58543.stgit@ubuntu>
 References: <20130108183811.46302.58543.stgit@ubuntu>
-Message-ID: <20130108183848.46302.77369.stgit@ubuntu>
+Message-ID: <20130108183855.46302.40539.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a method (hyp_idmap_setup) to populate a hyp pgd with an
-identity mapping of the code contained in the .hyp.idmap.text
-section.
+Targets KVM support for Cortex A-15 processors.
 
-Offer a method to drop this identity mapping through
-hyp_idmap_teardown.
+Contains all the framework components, make files, header files, some
+tracing functionality, and basic user space API.
 
-Make all the above depend on CONFIG_ARM_VIRT_EXT and CONFIG_ARM_LPAE.
+Only supported core is Cortex-A15 for now.
 
-Cc: Will Deacon <will.deacon@arm.com>
+Most functionality is in arch/arm/kvm/* or arch/arm/include/asm/kvm_*.h.
+
 Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
+Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
- arch/arm/include/asm/idmap.h                |    1 +
- arch/arm/include/asm/pgtable-3level-hwdef.h |    1 +
- arch/arm/kernel/vmlinux.lds.S               |    6 +++
- arch/arm/mm/idmap.c                         |   54 ++++++++++++++++++++++-----
- 4 files changed, 50 insertions(+), 12 deletions(-)
+ Documentation/virtual/kvm/api.txt  |   57 +++++-
+ arch/arm/Kconfig                   |    2 
+ arch/arm/Makefile                  |    1 
+ arch/arm/include/asm/kvm_arm.h     |   24 ++
+ arch/arm/include/asm/kvm_asm.h     |   58 ++++++
+ arch/arm/include/asm/kvm_coproc.h  |   24 ++
+ arch/arm/include/asm/kvm_emulate.h |   50 +++++
+ arch/arm/include/asm/kvm_host.h    |  114 ++++++++++++
+ arch/arm/include/uapi/asm/kvm.h    |  106 +++++++++++
+ arch/arm/kvm/Kconfig               |   55 ++++++
+ arch/arm/kvm/Makefile              |   21 ++
+ arch/arm/kvm/arm.c                 |  355 ++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/coproc.c              |   23 ++
+ arch/arm/kvm/emulate.c             |  155 ++++++++++++++++
+ arch/arm/kvm/guest.c               |  221 ++++++++++++++++++++++
+ arch/arm/kvm/init.S                |   19 ++
+ arch/arm/kvm/interrupts.S          |   19 ++
+ arch/arm/kvm/mmu.c                 |   17 ++
+ arch/arm/kvm/reset.c               |   74 ++++++++
+ arch/arm/kvm/trace.h               |   52 +++++
+ include/uapi/linux/kvm.h           |    7 +
+ 21 files changed, 1450 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/include/asm/kvm_arm.h
+ create mode 100644 arch/arm/include/asm/kvm_asm.h
+ create mode 100644 arch/arm/include/asm/kvm_coproc.h
+ create mode 100644 arch/arm/include/asm/kvm_emulate.h
+ create mode 100644 arch/arm/include/asm/kvm_host.h
+ create mode 100644 arch/arm/include/uapi/asm/kvm.h
+ create mode 100644 arch/arm/kvm/Kconfig
+ create mode 100644 arch/arm/kvm/Makefile
+ create mode 100644 arch/arm/kvm/arm.c
+ create mode 100644 arch/arm/kvm/coproc.c
+ create mode 100644 arch/arm/kvm/emulate.c
+ create mode 100644 arch/arm/kvm/guest.c
+ create mode 100644 arch/arm/kvm/init.S
+ create mode 100644 arch/arm/kvm/interrupts.S
+ create mode 100644 arch/arm/kvm/mmu.c
+ create mode 100644 arch/arm/kvm/reset.c
+ create mode 100644 arch/arm/kvm/trace.h
 
-diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
-index bf863ed..1a66f907 100644
---- a/arch/arm/include/asm/idmap.h
-+++ b/arch/arm/include/asm/idmap.h
-@@ -8,6 +8,7 @@
- #define __idmap __section(.idmap.text) noinline notrace
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index a4df553..4237c27 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -293,7 +293,7 @@ kvm_run' (see below).
+ 4.11 KVM_GET_REGS
  
- extern pgd_t *idmap_pgd;
-+extern pgd_t *hyp_pgd;
+ Capability: basic
+-Architectures: all
++Architectures: all except ARM
+ Type: vcpu ioctl
+ Parameters: struct kvm_regs (out)
+ Returns: 0 on success, -1 on error
+@@ -314,7 +314,7 @@ struct kvm_regs {
+ 4.12 KVM_SET_REGS
  
- void setup_mm_for_reboot(void);
+ Capability: basic
+-Architectures: all
++Architectures: all except ARM
+ Type: vcpu ioctl
+ Parameters: struct kvm_regs (in)
+ Returns: 0 on success, -1 on error
+@@ -600,7 +600,7 @@ struct kvm_fpu {
+ 4.24 KVM_CREATE_IRQCHIP
  
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index d795282..a2d404e 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -44,6 +44,7 @@
- #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 54)
- #define PMD_SECT_AP_WRITE	(_AT(pmdval_t, 0))
- #define PMD_SECT_AP_READ	(_AT(pmdval_t, 0))
-+#define PMD_SECT_AP1		(_AT(pmdval_t, 1) << 6)
- #define PMD_SECT_TEX(x)		(_AT(pmdval_t, 0))
+ Capability: KVM_CAP_IRQCHIP
+-Architectures: x86, ia64
++Architectures: x86, ia64, ARM
+ Type: vm ioctl
+ Parameters: none
+ Returns: 0 on success, -1 on error
+@@ -608,7 +608,8 @@ Returns: 0 on success, -1 on error
+ Creates an interrupt controller model in the kernel.  On x86, creates a virtual
+ ioapic, a virtual PIC (two PICs, nested), and sets up future vcpus to have a
+ local APIC.  IRQ routing for GSIs 0-15 is set to both PIC and IOAPIC; GSI 16-23
+-only go to the IOAPIC.  On ia64, a IOSAPIC is created.
++only go to the IOAPIC.  On ia64, a IOSAPIC is created. On ARM, a GIC is
++created.
  
- /*
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 11c1785..b571484 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -19,7 +19,11 @@
- 	ALIGN_FUNCTION();						\
- 	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
- 	*(.idmap.text)							\
--	VMLINUX_SYMBOL(__idmap_text_end) = .;
-+	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
-+	ALIGN_FUNCTION();						\
-+	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
-+	*(.hyp.idmap.text)						\
-+	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
  
- #ifdef CONFIG_HOTPLUG_CPU
- #define ARM_CPU_DISCARD(x)
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index 99db769..d9213a5 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -1,4 +1,6 @@
+ 4.25 KVM_IRQ_LINE
+@@ -1775,6 +1776,14 @@ registers, find a list below:
+   PPC   | KVM_REG_PPC_VPA_DTL   | 128
+   PPC   | KVM_REG_PPC_EPCR	| 32
+ 
++ARM registers are mapped using the lower 32 bits.  The upper 16 of that
++is the register group type, or coprocessor number:
++
++ARM core registers have the following id bit patterns:
++  0x4002 0000 0010 <index into the kvm_regs struct:16>
++
++
++
+ 4.69 KVM_GET_ONE_REG
+ 
+ Capability: KVM_CAP_ONE_REG
+@@ -2127,6 +2136,46 @@ written, then `n_invalid' invalid entries, invalidating any previously
+ valid entries found.
+ 
+ 
++4.77 KVM_ARM_VCPU_INIT
++
++Capability: basic
++Architectures: arm
++Type: vcpu ioctl
++Parameters: struct struct kvm_vcpu_init (in)
++Returns: 0 on success; -1 on error
++Errors:
++ ?EINVAL: ???the target is unknown, or the combination of features is invalid.
++ ?ENOENT: ???a features bit specified is unknown.
++
++This tells KVM what type of CPU to present to the guest, and what
++optional features it should have. ?This will cause a reset of the cpu
++registers to their initial values. ?If this is not called, KVM_RUN will
++return ENOEXEC for that vcpu.
++
++Note that because some registers reflect machine topology, all vcpus
++should be created before this ioctl is invoked.
++
++
++4.78 KVM_GET_REG_LIST
++
++Capability: basic
++Architectures: arm
++Type: vcpu ioctl
++Parameters: struct kvm_reg_list (in/out)
++Returns: 0 on success; -1 on error
++Errors:
++ ?E2BIG: ????the reg index list is too big to fit in the array specified by
++ ????????????the user (the number required will be written into n).
++
++struct kvm_reg_list {
++	__u64 n; /* number of registers in reg[] */
++	__u64 reg[0];
++};
++
++This ioctl returns the guest registers that are supported for the
++KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
++
++
+ 5. The kvm_run structure
+ ------------------------
+ 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f95ba14..887a0e6 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2317,3 +2317,5 @@ source "security/Kconfig"
+ source "crypto/Kconfig"
+ 
+ source "lib/Kconfig"
++
++source "arch/arm/kvm/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 30c443c..4bcd2d6 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -252,6 +252,7 @@ core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
+ core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
+ core-$(CONFIG_VFP)		+= arch/arm/vfp/
+ core-$(CONFIG_XEN)		+= arch/arm/xen/
++core-$(CONFIG_KVM_ARM_HOST) 	+= arch/arm/kvm/
+ 
+ # If we have a machine-specific directory, then include it in the build.
+ core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+new file mode 100644
+index 0000000..c196a22
+--- /dev/null
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#ifndef __ARM_KVM_ARM_H__
++#define __ARM_KVM_ARM_H__
++
++#include <asm/types.h>
++
++#endif /* __ARM_KVM_ARM_H__ */
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+new file mode 100644
+index 0000000..f9993e5
+--- /dev/null
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -0,0 +1,58 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#ifndef __ARM_KVM_ASM_H__
++#define __ARM_KVM_ASM_H__
++
++/* 0 is reserved as an invalid value. */
++#define c0_MPIDR	1	/* MultiProcessor ID Register */
++#define c0_CSSELR	2	/* Cache Size Selection Register */
++#define c1_SCTLR	3	/* System Control Register */
++#define c1_ACTLR	4	/* Auxilliary Control Register */
++#define c1_CPACR	5	/* Coprocessor Access Control */
++#define c2_TTBR0	6	/* Translation Table Base Register 0 */
++#define c2_TTBR0_high	7	/* TTBR0 top 32 bits */
++#define c2_TTBR1	8	/* Translation Table Base Register 1 */
++#define c2_TTBR1_high	9	/* TTBR1 top 32 bits */
++#define c2_TTBCR	10	/* Translation Table Base Control R. */
++#define c3_DACR		11	/* Domain Access Control Register */
++#define c5_DFSR		12	/* Data Fault Status Register */
++#define c5_IFSR		13	/* Instruction Fault Status Register */
++#define c5_ADFSR	14	/* Auxilary Data Fault Status R */
++#define c5_AIFSR	15	/* Auxilary Instrunction Fault Status R */
++#define c6_DFAR		16	/* Data Fault Address Register */
++#define c6_IFAR		17	/* Instruction Fault Address Register */
++#define c9_L2CTLR	18	/* Cortex A15 L2 Control Register */
++#define c10_PRRR	19	/* Primary Region Remap Register */
++#define c10_NMRR	20	/* Normal Memory Remap Register */
++#define c12_VBAR	21	/* Vector Base Address Register */
++#define c13_CID		22	/* Context ID Register */
++#define c13_TID_URW	23	/* Thread ID, User R/W */
++#define c13_TID_URO	24	/* Thread ID, User R/O */
++#define c13_TID_PRIV	25	/* Thread ID, Privileged */
++#define NR_CP15_REGS	26	/* Number of regs (incl. invalid) */
++
++#define ARM_EXCEPTION_RESET	  0
++#define ARM_EXCEPTION_UNDEFINED   1
++#define ARM_EXCEPTION_SOFTWARE    2
++#define ARM_EXCEPTION_PREF_ABORT  3
++#define ARM_EXCEPTION_DATA_ABORT  4
++#define ARM_EXCEPTION_IRQ	  5
++#define ARM_EXCEPTION_FIQ	  6
++
++#endif /* __ARM_KVM_ASM_H__ */
+diff --git a/arch/arm/include/asm/kvm_coproc.h b/arch/arm/include/asm/kvm_coproc.h
+new file mode 100644
+index 0000000..b6d023d
+--- /dev/null
++++ b/arch/arm/include/asm/kvm_coproc.h
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (C) 2012 Rusty Russell IBM Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#ifndef __ARM_KVM_COPROC_H__
++#define __ARM_KVM_COPROC_H__
++#include <linux/kvm_host.h>
++
++void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
++
++#endif /* __ARM_KVM_COPROC_H__ */
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+new file mode 100644
+index 0000000..17dad67
+--- /dev/null
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#ifndef __ARM_KVM_EMULATE_H__
++#define __ARM_KVM_EMULATE_H__
++
++#include <linux/kvm_host.h>
++#include <asm/kvm_asm.h>
++
++u32 *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
++u32 *vcpu_spsr(struct kvm_vcpu *vcpu);
++
++static inline u32 *vcpu_pc(struct kvm_vcpu *vcpu)
++{
++	return (u32 *)&vcpu->arch.regs.usr_regs.ARM_pc;
++}
++
++static inline u32 *vcpu_cpsr(struct kvm_vcpu *vcpu)
++{
++	return (u32 *)&vcpu->arch.regs.usr_regs.ARM_cpsr;
++}
++
++static inline bool mode_has_spsr(struct kvm_vcpu *vcpu)
++{
++	unsigned long cpsr_mode = vcpu->arch.regs.usr_regs.ARM_cpsr & MODE_MASK;
++	return (cpsr_mode > USR_MODE && cpsr_mode < SYSTEM_MODE);
++}
++
++static inline bool vcpu_mode_priv(struct kvm_vcpu *vcpu)
++{
++	unsigned long cpsr_mode = vcpu->arch.regs.usr_regs.ARM_cpsr & MODE_MASK;
++	return cpsr_mode > USR_MODE;;
++}
++
++#endif /* __ARM_KVM_EMULATE_H__ */
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+new file mode 100644
+index 0000000..92e89f3
+--- /dev/null
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -0,0 +1,114 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#ifndef __ARM_KVM_HOST_H__
++#define __ARM_KVM_HOST_H__
++
++#include <asm/kvm.h>
++#include <asm/kvm_asm.h>
++
++#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
++#define KVM_USER_MEM_SLOTS 32
++#define KVM_PRIVATE_MEM_SLOTS 4
++#define KVM_COALESCED_MMIO_PAGE_OFFSET 1
++
++#define KVM_VCPU_MAX_FEATURES 0
++
++/* We don't currently support large pages. */
++#define KVM_HPAGE_GFN_SHIFT(x)	0
++#define KVM_NR_PAGE_SIZES	1
++#define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
++
++struct kvm_vcpu;
++u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
++int kvm_target_cpu(void);
++int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
++void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
++
++struct kvm_arch {
++	/* VTTBR value associated with below pgd and vmid */
++	u64    vttbr;
++
++	/*
++	 * Anything that is not used directly from assembly code goes
++	 * here.
++	 */
++
++	/* The VMID generation used for the virt. memory system */
++	u64    vmid_gen;
++	u32    vmid;
++
++	/* Stage-2 page table */
++	pgd_t *pgd;
++};
++
++#define KVM_NR_MEM_OBJS     40
++
++/*
++ * We don't want allocation failures within the mmu code, so we preallocate
++ * enough memory for a single page fault in a cache.
++ */
++struct kvm_mmu_memory_cache {
++	int nobjs;
++	void *objects[KVM_NR_MEM_OBJS];
++};
++
++struct kvm_vcpu_arch {
++	struct kvm_regs regs;
++
++	int target; /* Processor target */
++	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
++
++	/* System control coprocessor (cp15) */
++	u32 cp15[NR_CP15_REGS];
++
++	/* The CPU type we expose to the VM */
++	u32 midr;
++
++	/* Exception Information */
++	u32 hsr;		/* Hyp Syndrome Register */
++	u32 hxfar;		/* Hyp Data/Inst Fault Address Register */
++	u32 hpfar;		/* Hyp IPA Fault Address Register */
++
++	/* Interrupt related fields */
++	u32 irq_lines;		/* IRQ and FIQ levels */
++
++	/* Hyp exception information */
++	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
++
++	/* Cache some mmu pages needed inside spinlock regions */
++	struct kvm_mmu_memory_cache mmu_page_cache;
++};
++
++struct kvm_vm_stat {
++	u32 remote_tlb_flush;
++};
++
++struct kvm_vcpu_stat {
++	u32 halt_wakeup;
++};
++
++struct kvm_vcpu_init;
++int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
++			const struct kvm_vcpu_init *init);
++unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
++int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
++struct kvm_one_reg;
++int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
++int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
++#endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+new file mode 100644
+index 0000000..c6298b1
+--- /dev/null
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -0,0 +1,106 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#ifndef __ARM_KVM_H__
++#define __ARM_KVM_H__
++
++#include <asm/types.h>
++#include <asm/ptrace.h>
++
++#define __KVM_HAVE_GUEST_DEBUG
++
++#define KVM_REG_SIZE(id)						\
++	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
++
++/* Valid for svc_regs, abt_regs, und_regs, irq_regs in struct kvm_regs */
++#define KVM_ARM_SVC_sp		svc_regs[0]
++#define KVM_ARM_SVC_lr		svc_regs[1]
++#define KVM_ARM_SVC_spsr	svc_regs[2]
++#define KVM_ARM_ABT_sp		abt_regs[0]
++#define KVM_ARM_ABT_lr		abt_regs[1]
++#define KVM_ARM_ABT_spsr	abt_regs[2]
++#define KVM_ARM_UND_sp		und_regs[0]
++#define KVM_ARM_UND_lr		und_regs[1]
++#define KVM_ARM_UND_spsr	und_regs[2]
++#define KVM_ARM_IRQ_sp		irq_regs[0]
++#define KVM_ARM_IRQ_lr		irq_regs[1]
++#define KVM_ARM_IRQ_spsr	irq_regs[2]
++
++/* Valid only for fiq_regs in struct kvm_regs */
++#define KVM_ARM_FIQ_r8		fiq_regs[0]
++#define KVM_ARM_FIQ_r9		fiq_regs[1]
++#define KVM_ARM_FIQ_r10		fiq_regs[2]
++#define KVM_ARM_FIQ_fp		fiq_regs[3]
++#define KVM_ARM_FIQ_ip		fiq_regs[4]
++#define KVM_ARM_FIQ_sp		fiq_regs[5]
++#define KVM_ARM_FIQ_lr		fiq_regs[6]
++#define KVM_ARM_FIQ_spsr	fiq_regs[7]
++
++struct kvm_regs {
++	struct pt_regs usr_regs;/* R0_usr - R14_usr, PC, CPSR */
++	__u32 svc_regs[3];	/* SP_svc, LR_svc, SPSR_svc */
++	__u32 abt_regs[3];	/* SP_abt, LR_abt, SPSR_abt */
++	__u32 und_regs[3];	/* SP_und, LR_und, SPSR_und */
++	__u32 irq_regs[3];	/* SP_irq, LR_irq, SPSR_irq */
++	__u32 fiq_regs[8];	/* R8_fiq - R14_fiq, SPSR_fiq */
++};
++
++/* Supported Processor Types */
++#define KVM_ARM_TARGET_CORTEX_A15	0
++#define KVM_ARM_NUM_TARGETS		1
++
++struct kvm_vcpu_init {
++	__u32 target;
++	__u32 features[7];
++};
++
++struct kvm_sregs {
++};
++
++struct kvm_fpu {
++};
++
++struct kvm_guest_debug_arch {
++};
++
++struct kvm_debug_exit_arch {
++};
++
++struct kvm_sync_regs {
++};
++
++struct kvm_arch_memory_slot {
++};
++
++/* If you need to interpret the index values, here is the key: */
++#define KVM_REG_ARM_COPROC_MASK		0x000000000FFF0000
++#define KVM_REG_ARM_COPROC_SHIFT	16
++#define KVM_REG_ARM_32_OPC2_MASK	0x0000000000000007
++#define KVM_REG_ARM_32_OPC2_SHIFT	0
++#define KVM_REG_ARM_OPC1_MASK		0x0000000000000078
++#define KVM_REG_ARM_OPC1_SHIFT		3
++#define KVM_REG_ARM_CRM_MASK		0x0000000000000780
++#define KVM_REG_ARM_CRM_SHIFT		7
++#define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
++#define KVM_REG_ARM_32_CRN_SHIFT	11
++
++/* Normal registers are mapped as coprocessor 16. */
++#define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
++#define KVM_REG_ARM_CORE_REG(name)	(offsetof(struct kvm_regs, name) / 4)
++
++#endif /* __ARM_KVM_H__ */
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+new file mode 100644
+index 0000000..4a01b6f
+--- /dev/null
++++ b/arch/arm/kvm/Kconfig
+@@ -0,0 +1,55 @@
++#
++# KVM configuration
++#
++
++source "virt/kvm/Kconfig"
++
++menuconfig VIRTUALIZATION
++	bool "Virtualization"
++	---help---
++	  Say Y here to get to see options for using your Linux host to run
++	  other operating systems inside virtual machines (guests).
++	  This option alone does not add any kernel code.
++
++	  If you say N, all options in this submenu will be skipped and
++	  disabled.
++
++if VIRTUALIZATION
++
++config KVM
++	bool "Kernel-based Virtual Machine (KVM) support"
++	select PREEMPT_NOTIFIERS
++	select ANON_INODES
++	select KVM_MMIO
++	select KVM_ARM_HOST
++	depends on ARM_VIRT_EXT && ARM_LPAE
++	---help---
++	  Support hosting virtualized guest machines. You will also
++	  need to select one or more of the processor modules below.
++
++	  This module provides access to the hardware capabilities through
++	  a character device node named /dev/kvm.
++
++	  If unsure, say N.
++
++config KVM_ARM_HOST
++	bool "KVM host support for ARM cpus."
++	depends on KVM
++	depends on MMU
++	---help---
++	  Provides host support for ARM processors.
++
++config KVM_ARM_MAX_VCPUS
++	int "Number maximum supported virtual CPUs per VM"
++	depends on KVM_ARM_HOST
++	default 4
++	help
++	  Static number of max supported virtual CPUs per VM.
++
++	  If you choose a high number, the vcpu structures will be quite
++	  large, so only choose a reasonable number that you expect to
++	  actually use.
++
++source drivers/virtio/Kconfig
++
++endif # VIRTUALIZATION
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+new file mode 100644
+index 0000000..dfc293f
+--- /dev/null
++++ b/arch/arm/kvm/Makefile
+@@ -0,0 +1,21 @@
++#
++# Makefile for Kernel-based Virtual Machine module
++#
++
++plus_virt := $(call as-instr,.arch_extension virt,+virt)
++ifeq ($(plus_virt),+virt)
++	plus_virt_def := -DREQUIRES_VIRT=1
++endif
++
++ccflags-y += -Ivirt/kvm -Iarch/arm/kvm
++CFLAGS_arm.o := -I. $(plus_virt_def)
++CFLAGS_mmu.o := -I.
++
++AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
++AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
++
++kvm-arm-y = $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
++
++obj-y += kvm-arm.o init.o interrupts.o
++obj-y += arm.o guest.o mmu.o emulate.o reset.o
++obj-y += coproc.o
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+new file mode 100644
+index 0000000..82cb338
+--- /dev/null
++++ b/arch/arm/kvm/arm.c
+@@ -0,0 +1,355 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#include <linux/errno.h>
++#include <linux/err.h>
++#include <linux/kvm_host.h>
 +#include <linux/module.h>
- #include <linux/kernel.h>
-+#include <linux/slab.h>
- 
- #include <asm/cputype.h>
- #include <asm/idmap.h>
-@@ -6,6 +8,7 @@
- #include <asm/pgtable.h>
- #include <asm/sections.h>
- #include <asm/system_info.h>
-+#include <asm/virt.h>
- 
- pgd_t *idmap_pgd;
- 
-@@ -59,11 +62,20 @@ static void idmap_add_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 	} while (pud++, addr = next, addr != end);
- }
- 
--static void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
-+static void identity_mapping_add(pgd_t *pgd, const char *text_start,
-+				 const char *text_end, unsigned long prot)
- {
--	unsigned long prot, next;
-+	unsigned long addr, end;
-+	unsigned long next;
++#include <linux/vmalloc.h>
++#include <linux/fs.h>
++#include <linux/mman.h>
++#include <linux/sched.h>
++#include <trace/events/kvm.h>
 +
-+	addr = virt_to_phys(text_start);
-+	end = virt_to_phys(text_end);
++#define CREATE_TRACE_POINTS
++#include "trace.h"
 +
-+	pr_info("Setting up static %sidentity map for 0x%llx - 0x%llx\n",
-+		prot ? "HYP " : "",
-+		(long long)addr, (long long)end);
-+	prot |= PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
- 
--	prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
- 	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
- 		prot |= PMD_BIT4;
- 
-@@ -74,28 +86,48 @@ static void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long e
- 	} while (pgd++, addr = next, addr != end);
- }
- 
-+#ifdef CONFIG_ARM_VIRT_EXT
-+pgd_t *hyp_pgd;
++#include <asm/unified.h>
++#include <asm/uaccess.h>
++#include <asm/ptrace.h>
++#include <asm/mman.h>
++#include <asm/cputype.h>
 +
-+extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
-+
-+static int __init init_static_idmap_hyp(void)
-+{
-+	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
-+	if (!hyp_pgd)
-+		return -ENOMEM;
-+
-+	identity_mapping_add(hyp_pgd, __hyp_idmap_text_start,
-+			     __hyp_idmap_text_end, PMD_SECT_AP1);
-+
-+	return 0;
-+}
-+#else
-+static int __init init_static_idmap_hyp(void)
-+{
-+	return 0;
-+}
++#ifdef REQUIRES_VIRT
++__asm__(".arch_extension	virt");
 +#endif
 +
- extern char  __idmap_text_start[], __idmap_text_end[];
++int kvm_arch_hardware_enable(void *garbage)
++{
++	return 0;
++}
++
++int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
++{
++	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
++}
++
++void kvm_arch_hardware_disable(void *garbage)
++{
++}
++
++int kvm_arch_hardware_setup(void)
++{
++	return 0;
++}
++
++void kvm_arch_hardware_unsetup(void)
++{
++}
++
++void kvm_arch_check_processor_compat(void *rtn)
++{
++	*(int *)rtn = 0;
++}
++
++void kvm_arch_sync_events(struct kvm *kvm)
++{
++}
++
++int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
++{
++	if (type)
++		return -EINVAL;
++
++	return 0;
++}
++
++int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
++{
++	return VM_FAULT_SIGBUS;
++}
++
++void kvm_arch_free_memslot(struct kvm_memory_slot *free,
++			   struct kvm_memory_slot *dont)
++{
++}
++
++int kvm_arch_create_memslot(struct kvm_memory_slot *slot, unsigned long npages)
++{
++	return 0;
++}
++
++void kvm_arch_destroy_vm(struct kvm *kvm)
++{
++	int i;
++
++	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
++		if (kvm->vcpus[i]) {
++			kvm_arch_vcpu_free(kvm->vcpus[i]);
++			kvm->vcpus[i] = NULL;
++		}
++	}
++}
++
++int kvm_dev_ioctl_check_extension(long ext)
++{
++	int r;
++	switch (ext) {
++	case KVM_CAP_USER_MEMORY:
++	case KVM_CAP_SYNC_MMU:
++	case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
++	case KVM_CAP_ONE_REG:
++		r = 1;
++		break;
++	case KVM_CAP_COALESCED_MMIO:
++		r = KVM_COALESCED_MMIO_PAGE_OFFSET;
++		break;
++	case KVM_CAP_NR_VCPUS:
++		r = num_online_cpus();
++		break;
++	case KVM_CAP_MAX_VCPUS:
++		r = KVM_MAX_VCPUS;
++		break;
++	default:
++		r = 0;
++		break;
++	}
++	return r;
++}
++
++long kvm_arch_dev_ioctl(struct file *filp,
++			unsigned int ioctl, unsigned long arg)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_set_memory_region(struct kvm *kvm,
++			       struct kvm_userspace_memory_region *mem,
++			       struct kvm_memory_slot old,
++			       int user_alloc)
++{
++	return 0;
++}
++
++int kvm_arch_prepare_memory_region(struct kvm *kvm,
++				   struct kvm_memory_slot *memslot,
++				   struct kvm_memory_slot old,
++				   struct kvm_userspace_memory_region *mem,
++				   bool user_alloc)
++{
++	return 0;
++}
++
++void kvm_arch_commit_memory_region(struct kvm *kvm,
++				   struct kvm_userspace_memory_region *mem,
++				   struct kvm_memory_slot old,
++				   bool user_alloc)
++{
++}
++
++void kvm_arch_flush_shadow_all(struct kvm *kvm)
++{
++}
++
++void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
++				   struct kvm_memory_slot *slot)
++{
++}
++
++struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
++{
++	int err;
++	struct kvm_vcpu *vcpu;
++
++	vcpu = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
++	if (!vcpu) {
++		err = -ENOMEM;
++		goto out;
++	}
++
++	err = kvm_vcpu_init(vcpu, kvm, id);
++	if (err)
++		goto free_vcpu;
++
++	return vcpu;
++free_vcpu:
++	kmem_cache_free(kvm_vcpu_cache, vcpu);
++out:
++	return ERR_PTR(err);
++}
++
++int kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
++{
++	return 0;
++}
++
++void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
++{
++}
++
++void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
++{
++	kvm_arch_vcpu_free(vcpu);
++}
++
++int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
++{
++	return 0;
++}
++
++int __attribute_const__ kvm_target_cpu(void)
++{
++	unsigned long implementor = read_cpuid_implementor();
++	unsigned long part_number = read_cpuid_part_number();
++
++	if (implementor != ARM_CPU_IMP_ARM)
++		return -EINVAL;
++
++	switch (part_number) {
++	case ARM_CPU_PART_CORTEX_A15:
++		return KVM_ARM_TARGET_CORTEX_A15;
++	default:
++		return -EINVAL;
++	}
++}
++
++int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
++{
++	return 0;
++}
++
++void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
++{
++}
++
++void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
++{
++}
++
++void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
++{
++}
++
++int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
++					struct kvm_guest_debug *dbg)
++{
++	return -EINVAL;
++}
++
++
++int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
++				    struct kvm_mp_state *mp_state)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
++				    struct kvm_mp_state *mp_state)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
++{
++	return 0;
++}
++
++int kvm_arch_vcpu_in_guest_mode(struct kvm_vcpu *v)
++{
++	return 0;
++}
++
++int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	return -EINVAL;
++}
++
++long kvm_arch_vcpu_ioctl(struct file *filp,
++			 unsigned int ioctl, unsigned long arg)
++{
++	struct kvm_vcpu *vcpu = filp->private_data;
++	void __user *argp = (void __user *)arg;
++
++	switch (ioctl) {
++	case KVM_ARM_VCPU_INIT: {
++		struct kvm_vcpu_init init;
++
++		if (copy_from_user(&init, argp, sizeof(init)))
++			return -EFAULT;
++
++		return kvm_vcpu_set_target(vcpu, &init);
++
++	}
++	case KVM_SET_ONE_REG:
++	case KVM_GET_ONE_REG: {
++		struct kvm_one_reg reg;
++		if (copy_from_user(&reg, argp, sizeof(reg)))
++			return -EFAULT;
++		if (ioctl == KVM_SET_ONE_REG)
++			return kvm_arm_set_reg(vcpu, &reg);
++		else
++			return kvm_arm_get_reg(vcpu, &reg);
++	}
++	case KVM_GET_REG_LIST: {
++		struct kvm_reg_list __user *user_list = argp;
++		struct kvm_reg_list reg_list;
++		unsigned n;
++
++		if (copy_from_user(&reg_list, user_list, sizeof(reg_list)))
++			return -EFAULT;
++		n = reg_list.n;
++		reg_list.n = kvm_arm_num_regs(vcpu);
++		if (copy_to_user(user_list, &reg_list, sizeof(reg_list)))
++			return -EFAULT;
++		if (n < reg_list.n)
++			return -E2BIG;
++		return kvm_arm_copy_reg_indices(vcpu, user_list->reg);
++	}
++	default:
++		return -EINVAL;
++	}
++}
++
++int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
++{
++	return -EINVAL;
++}
++
++long kvm_arch_vm_ioctl(struct file *filp,
++		       unsigned int ioctl, unsigned long arg)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_init(void *opaque)
++{
++	return 0;
++}
++
++/* NOP: Compiling as a module not supported */
++void kvm_arch_exit(void)
++{
++}
++
++static int arm_init(void)
++{
++	int rc = kvm_init(NULL, sizeof(struct kvm_vcpu), 0, THIS_MODULE);
++	return rc;
++}
++
++module_init(arm_init);
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+new file mode 100644
+index 0000000..0c43355
+--- /dev/null
++++ b/arch/arm/kvm/coproc.c
+@@ -0,0 +1,23 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Authors: Rusty Russell <rusty@rustcorp.com.au>
++ *          Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++#include <linux/kvm_host.h>
++
++void kvm_reset_coprocs(struct kvm_vcpu *vcpu)
++{
++}
+diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+new file mode 100644
+index 0000000..3eadc25
+--- /dev/null
++++ b/arch/arm/kvm/emulate.c
+@@ -0,0 +1,155 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#include <asm/kvm_emulate.h>
++
++#define VCPU_NR_MODES		6
++#define VCPU_REG_OFFSET_USR	0
++#define VCPU_REG_OFFSET_FIQ	1
++#define VCPU_REG_OFFSET_IRQ	2
++#define VCPU_REG_OFFSET_SVC	3
++#define VCPU_REG_OFFSET_ABT	4
++#define VCPU_REG_OFFSET_UND	5
++#define REG_OFFSET(_reg) \
++	(offsetof(struct kvm_regs, _reg) / sizeof(u32))
++
++#define USR_REG_OFFSET(_num) REG_OFFSET(usr_regs.uregs[_num])
++
++static const unsigned long vcpu_reg_offsets[VCPU_NR_MODES][15] = {
++	/* USR/SYS Registers */
++	[VCPU_REG_OFFSET_USR] = {
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
++		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
++		USR_REG_OFFSET(12), USR_REG_OFFSET(13),	USR_REG_OFFSET(14),
++	},
++
++	/* FIQ Registers */
++	[VCPU_REG_OFFSET_FIQ] = {
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7),
++		REG_OFFSET(fiq_regs[0]), /* r8 */
++		REG_OFFSET(fiq_regs[1]), /* r9 */
++		REG_OFFSET(fiq_regs[2]), /* r10 */
++		REG_OFFSET(fiq_regs[3]), /* r11 */
++		REG_OFFSET(fiq_regs[4]), /* r12 */
++		REG_OFFSET(fiq_regs[5]), /* r13 */
++		REG_OFFSET(fiq_regs[6]), /* r14 */
++	},
++
++	/* IRQ Registers */
++	[VCPU_REG_OFFSET_IRQ] = {
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
++		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
++		USR_REG_OFFSET(12),
++		REG_OFFSET(irq_regs[0]), /* r13 */
++		REG_OFFSET(irq_regs[1]), /* r14 */
++	},
++
++	/* SVC Registers */
++	[VCPU_REG_OFFSET_SVC] = {
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
++		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
++		USR_REG_OFFSET(12),
++		REG_OFFSET(svc_regs[0]), /* r13 */
++		REG_OFFSET(svc_regs[1]), /* r14 */
++	},
++
++	/* ABT Registers */
++	[VCPU_REG_OFFSET_ABT] = {
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
++		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
++		USR_REG_OFFSET(12),
++		REG_OFFSET(abt_regs[0]), /* r13 */
++		REG_OFFSET(abt_regs[1]), /* r14 */
++	},
++
++	/* UND Registers */
++	[VCPU_REG_OFFSET_UND] = {
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
++		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
++		USR_REG_OFFSET(12),
++		REG_OFFSET(und_regs[0]), /* r13 */
++		REG_OFFSET(und_regs[1]), /* r14 */
++	},
++};
++
++/*
++ * Return a pointer to the register number valid in the current mode of
++ * the virtual CPU.
++ */
++u32 *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num)
++{
++	u32 *reg_array = (u32 *)&vcpu->arch.regs;
++	u32 mode = *vcpu_cpsr(vcpu) & MODE_MASK;
++
++	switch (mode) {
++	case USR_MODE...SVC_MODE:
++		mode &= ~MODE32_BIT; /* 0 ... 3 */
++		break;
++
++	case ABT_MODE:
++		mode = VCPU_REG_OFFSET_ABT;
++		break;
++
++	case UND_MODE:
++		mode = VCPU_REG_OFFSET_UND;
++		break;
++
++	case SYSTEM_MODE:
++		mode = VCPU_REG_OFFSET_USR;
++		break;
++
++	default:
++		BUG();
++	}
++
++	return reg_array + vcpu_reg_offsets[mode][reg_num];
++}
++
++/*
++ * Return the SPSR for the current mode of the virtual CPU.
++ */
++u32 *vcpu_spsr(struct kvm_vcpu *vcpu)
++{
++	u32 mode = *vcpu_cpsr(vcpu) & MODE_MASK;
++	switch (mode) {
++	case SVC_MODE:
++		return &vcpu->arch.regs.KVM_ARM_SVC_spsr;
++	case ABT_MODE:
++		return &vcpu->arch.regs.KVM_ARM_ABT_spsr;
++	case UND_MODE:
++		return &vcpu->arch.regs.KVM_ARM_UND_spsr;
++	case IRQ_MODE:
++		return &vcpu->arch.regs.KVM_ARM_IRQ_spsr;
++	case FIQ_MODE:
++		return &vcpu->arch.regs.KVM_ARM_FIQ_spsr;
++	default:
++		BUG();
++	}
++}
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+new file mode 100644
+index 0000000..8db3811
+--- /dev/null
++++ b/arch/arm/kvm/guest.c
+@@ -0,0 +1,221 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#include <linux/errno.h>
++#include <linux/err.h>
++#include <linux/kvm_host.h>
++#include <linux/module.h>
++#include <linux/vmalloc.h>
++#include <linux/fs.h>
++#include <asm/uaccess.h>
++#include <asm/kvm.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_emulate.h>
++
++#define VM_STAT(x) { #x, offsetof(struct kvm, stat.x), KVM_STAT_VM }
++#define VCPU_STAT(x) { #x, offsetof(struct kvm_vcpu, stat.x), KVM_STAT_VCPU }
++
++struct kvm_stats_debugfs_item debugfs_entries[] = {
++	{ NULL }
++};
++
++int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
++{
++	return 0;
++}
++
++static u64 core_reg_offset_from_id(u64 id)
++{
++	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
++}
++
++static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	u32 __user *uaddr = (u32 __user *)(long)reg->addr;
++	struct kvm_regs *regs = &vcpu->arch.regs;
++	u64 off;
++
++	if (KVM_REG_SIZE(reg->id) != 4)
++		return -ENOENT;
++
++	/* Our ID is an index into the kvm_regs struct. */
++	off = core_reg_offset_from_id(reg->id);
++	if (off >= sizeof(*regs) / KVM_REG_SIZE(reg->id))
++		return -ENOENT;
++
++	return put_user(((u32 *)regs)[off], uaddr);
++}
++
++static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	u32 __user *uaddr = (u32 __user *)(long)reg->addr;
++	struct kvm_regs *regs = &vcpu->arch.regs;
++	u64 off, val;
++
++	if (KVM_REG_SIZE(reg->id) != 4)
++		return -ENOENT;
++
++	/* Our ID is an index into the kvm_regs struct. */
++	off = core_reg_offset_from_id(reg->id);
++	if (off >= sizeof(*regs) / KVM_REG_SIZE(reg->id))
++		return -ENOENT;
++
++	if (get_user(val, uaddr) != 0)
++		return -EFAULT;
++
++	if (off == KVM_REG_ARM_CORE_REG(usr_regs.ARM_cpsr)) {
++		unsigned long mode = val & MODE_MASK;
++		switch (mode) {
++		case USR_MODE:
++		case FIQ_MODE:
++		case IRQ_MODE:
++		case SVC_MODE:
++		case ABT_MODE:
++		case UND_MODE:
++			break;
++		default:
++			return -EINVAL;
++		}
++	}
++
++	((u32 *)regs)[off] = val;
++	return 0;
++}
++
++int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
++{
++	return -EINVAL;
++}
++
++static unsigned long num_core_regs(void)
++{
++	return sizeof(struct kvm_regs) / sizeof(u32);
++}
++
++/**
++ * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
++ *
++ * This is for all registers.
++ */
++unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
++{
++	return num_core_regs();
++}
++
++/**
++ * kvm_arm_copy_reg_indices - get indices of all registers.
++ *
++ * We do core registers right here, then we apppend coproc regs.
++ */
++int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
++{
++	unsigned int i;
++	const u64 core_reg = KVM_REG_ARM | KVM_REG_SIZE_U32 | KVM_REG_ARM_CORE;
++
++	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(u32); i++) {
++		if (put_user(core_reg | i, uindices))
++			return -EFAULT;
++		uindices++;
++	}
++
++	return 0;
++}
++
++int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	/* We currently use nothing arch-specific in upper 32 bits */
++	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM >> 32)
++		return -EINVAL;
++
++	/* Register group 16 means we want a core register. */
++	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
++		return get_core_reg(vcpu, reg);
++
++	return -EINVAL;
++}
++
++int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	/* We currently use nothing arch-specific in upper 32 bits */
++	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM >> 32)
++		return -EINVAL;
++
++	/* Register group 16 means we set a core register. */
++	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
++		return set_core_reg(vcpu, reg);
++
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
++				  struct kvm_sregs *sregs)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
++				  struct kvm_sregs *sregs)
++{
++	return -EINVAL;
++}
++
++int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
++			const struct kvm_vcpu_init *init)
++{
++	unsigned int i;
++
++	/* We can only do a cortex A15 for now. */
++	if (init->target != kvm_target_cpu())
++		return -EINVAL;
++
++	vcpu->arch.target = init->target;
++	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
++
++	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
++	for (i = 0; i < sizeof(init->features)*8; i++) {
++		if (init->features[i / 32] & (1 << (i % 32))) {
++			if (i >= KVM_VCPU_MAX_FEATURES)
++				return -ENOENT;
++			set_bit(i, vcpu->arch.features);
++		}
++	}
++
++	/* Now we know what it is, we can reset it. */
++	return kvm_reset_vcpu(vcpu);
++}
++
++int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
++				  struct kvm_translation *tr)
++{
++	return -EINVAL;
++}
+diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+new file mode 100644
+index 0000000..1dc8926
+--- /dev/null
++++ b/arch/arm/kvm/init.S
+@@ -0,0 +1,19 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++#include <asm/asm-offsets.h>
++#include <asm/kvm_asm.h>
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+new file mode 100644
+index 0000000..1dc8926
+--- /dev/null
++++ b/arch/arm/kvm/interrupts.S
+@@ -0,0 +1,19 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++#include <asm/asm-offsets.h>
++#include <asm/kvm_asm.h>
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+new file mode 100644
+index 0000000..10ed464
+--- /dev/null
++++ b/arch/arm/kvm/mmu.c
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
+diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+new file mode 100644
+index 0000000..b80256b
+--- /dev/null
++++ b/arch/arm/kvm/reset.c
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++#include <linux/compiler.h>
++#include <linux/errno.h>
++#include <linux/sched.h>
++#include <linux/kvm_host.h>
++#include <linux/kvm.h>
++
++#include <asm/unified.h>
++#include <asm/ptrace.h>
++#include <asm/cputype.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_coproc.h>
++
++/******************************************************************************
++ * Cortex-A15 Reset Values
++ */
++
++static const int a15_max_cpu_idx = 3;
++
++static struct kvm_regs a15_regs_reset = {
++	.usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
++};
++
++
++/*******************************************************************************
++ * Exported reset function
++ */
++
++/**
++ * kvm_reset_vcpu - sets core registers and cp15 registers to reset value
++ * @vcpu: The VCPU pointer
++ *
++ * This function finds the right table above and sets the registers on the
++ * virtual CPU struct to their architectually defined reset values.
++ */
++int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
++{
++	struct kvm_regs *cpu_reset;
++
++	switch (vcpu->arch.target) {
++	case KVM_ARM_TARGET_CORTEX_A15:
++		if (vcpu->vcpu_id > a15_max_cpu_idx)
++			return -EINVAL;
++		cpu_reset = &a15_regs_reset;
++		vcpu->arch.midr = read_cpuid_id();
++		break;
++	default:
++		return -ENODEV;
++	}
++
++	/* Reset core registers */
++	memcpy(&vcpu->arch.regs, cpu_reset, sizeof(vcpu->arch.regs));
++
++	/* Reset CP15 registers */
++	kvm_reset_coprocs(vcpu);
++
++	return 0;
++}
+diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
+new file mode 100644
+index 0000000..f8869c1
+--- /dev/null
++++ b/arch/arm/kvm/trace.h
+@@ -0,0 +1,52 @@
++#if !defined(_TRACE_KVM_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_KVM_H
++
++#include <linux/tracepoint.h>
++
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM kvm
++
++/*
++ * Tracepoints for entry/exit to guest
++ */
++TRACE_EVENT(kvm_entry,
++	TP_PROTO(unsigned long vcpu_pc),
++	TP_ARGS(vcpu_pc),
++
++	TP_STRUCT__entry(
++		__field(	unsigned long,	vcpu_pc		)
++	),
++
++	TP_fast_assign(
++		__entry->vcpu_pc		= vcpu_pc;
++	),
++
++	TP_printk("PC: 0x%08lx", __entry->vcpu_pc)
++);
++
++TRACE_EVENT(kvm_exit,
++	TP_PROTO(unsigned long vcpu_pc),
++	TP_ARGS(vcpu_pc),
++
++	TP_STRUCT__entry(
++		__field(	unsigned long,	vcpu_pc		)
++	),
++
++	TP_fast_assign(
++		__entry->vcpu_pc		= vcpu_pc;
++	),
++
++	TP_printk("PC: 0x%08lx", __entry->vcpu_pc)
++);
++
++
++
++#endif /* _TRACE_KVM_H */
++
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH arch/arm/kvm
++#undef TRACE_INCLUDE_FILE
++#define TRACE_INCLUDE_FILE trace
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index e6e5d4b..24978d5 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -764,6 +764,11 @@ struct kvm_dirty_tlb {
+ #define KVM_REG_SIZE_U512	0x0060000000000000ULL
+ #define KVM_REG_SIZE_U1024	0x0070000000000000ULL
  
- static int __init init_static_idmap(void)
- {
--	phys_addr_t idmap_start, idmap_end;
-+	int ret;
++struct kvm_reg_list {
++	__u64 n; /* number of regs */
++	__u64 reg[0];
++};
++
+ struct kvm_one_reg {
+ 	__u64 id;
+ 	__u64 addr;
+@@ -932,6 +937,8 @@ struct kvm_s390_ucas_mapping {
+ #define KVM_SET_ONE_REG		  _IOW(KVMIO,  0xac, struct kvm_one_reg)
+ /* VM is being stopped by host */
+ #define KVM_KVMCLOCK_CTRL	  _IO(KVMIO,   0xad)
++#define KVM_ARM_VCPU_INIT	  _IOW(KVMIO,  0xae, struct kvm_vcpu_init)
++#define KVM_GET_REG_LIST	  _IOWR(KVMIO, 0xb0, struct kvm_reg_list)
  
- 	idmap_pgd = pgd_alloc(&init_mm);
- 	if (!idmap_pgd)
- 		return -ENOMEM;
- 
--	/* Add an identity mapping for the physical address of the section. */
--	idmap_start = virt_to_phys((void *)__idmap_text_start);
--	idmap_end = virt_to_phys((void *)__idmap_text_end);
-+	identity_mapping_add(idmap_pgd, __idmap_text_start,
-+			     __idmap_text_end, 0);
- 
--	pr_info("Setting up static identity map for 0x%llx - 0x%llx\n",
--		(long long)idmap_start, (long long)idmap_end);
--	identity_mapping_add(idmap_pgd, idmap_start, idmap_end);
-+	ret = init_static_idmap_hyp();
- 
- 	/* Flush L1 for the hardware to see this page table content */
- 	flush_cache_louis();
- 
--	return 0;
-+	return ret;
- }
- early_initcall(init_static_idmap);
- 
+ #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
+ #define KVM_DEV_ASSIGN_PCI_2_3		(1 << 1)
