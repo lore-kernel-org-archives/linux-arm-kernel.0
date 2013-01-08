@@ -1,88 +1,41 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Jan 2013 20:45:10 +0530
-Subject: [RFC v2 12/18] ARM: OMAP2+: timer: Add suspend-resume callbacks
- for clockevent device
-In-Reply-To: <1356959231-17335-13-git-send-email-vaibhav.bedia@ti.com>
+Date: Tue, 8 Jan 2013 20:47:28 +0530
+Subject: [RFC v2 13/18] ARM: OMAP2+: AM33XX: timer: Interchance clkevt
+ and clksrc timers
+In-Reply-To: <1356959231-17335-14-git-send-email-vaibhav.bedia@ti.com>
 References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-13-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <50EC37FE.705@ti.com>
+ <1356959231-17335-14-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <50EC3888.1070504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
-> The current OMAP timer code registers two timers -
-> one as clocksource and one as clockevent.
-> AM33XX has only one usable timer in the WKUP domain
-> so one of the timers needs suspend-resume support
-> to restore the configuration to pre-suspend state.
+> AM33XX has two timers (DTIMER0/1) in the WKUP domain.
+> On GP devices the source of DMTIMER0 is fixed to an
+> inaccurate internal 32k RC oscillator and this makes
+> the DMTIMER0 practically either as a clocksource or
+> as clockevent.
 >
-> commit adc78e6 (timekeeping: Add suspend and resume
-> of clock event devices) introduced .suspend and .resume
-> callbacks for clock event devices. Leverages these
-> callbacks to have AM33XX clockevent timer which is
-> in not in WKUP domain to behave properly across system
-> suspend.
+> Currently the timer instance in WKUP domain is used
+> as the clockevent and the timer in non-WKUP domain
+> as the clocksource. DMTIMER1 in WKUP domain can keep
+> running in suspend from a 32K clock fed from external
+> OSC and can serve as the persistent clock for the kernel.
+> To enable this, interchange the timers used as clocksource
+> and clockevent for AM33XX.
 >
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Jon Hunter <jon-hunter@ti.com>
-> ---
-> v1->v2:
-> 	Get rid of harcoded timer id.
-> 	Note: since a platform device is not created for these timer
-> 	instances and because there's very minimal change needed for
-> 	restarting the timer a full blown context save and restore
-> 	has been skipped.
+> For now a new DT property has been added to allow the timer code
+> to select the timer with the right property.
 >
->   arch/arm/mach-omap2/timer.c |   33 +++++++++++++++++++++++++++++++++
->   1 files changed, 33 insertions(+), 0 deletions(-)
+> It has been pointed out by Santosh Shilimkar and Kevin Hilman
+> that such a change will result in soc-idle never being achieved
+> on AM33XX. There are other reasons why soc-idle does not look
+> feasible on AM33XX so for now we go ahead with the interchange
+> of the the timers. If at a later point of time we do come up
+> with an approach which makes soc-idle possible on AM33XX, this
+> can be revisited.
 >
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 691aa67..38f9cbc 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -128,6 +128,36 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
->   	}
->   }
->
-> +static void omap_clkevt_suspend(struct clock_event_device *unused)
-> +{
-> +	char name[10];
-> +	struct omap_hwmod *oh;
-> +
-> +	sprintf(name, "timer%d", clkev.id);
-> +	oh = omap_hwmod_lookup(name);
-> +	if (!oh)
-> +		return;
-> +
-> +	__omap_dm_timer_stop(&clkev, 1, clkev.rate);
-> +	omap_hwmod_idle(oh);
-> +}
-> +
-> +static void omap_clkevt_resume(struct clock_event_device *unused)
-> +{
-> +	char name[10];
-> +	struct omap_hwmod *oh;
-> +
-> +	sprintf(name, "timer%d", clkev.id);
-> +	oh = omap_hwmod_lookup(name);
-> +	if (!oh)
-> +		return;
-> +
-> +	omap_hwmod_enable(oh);
-> +	__omap_dm_timer_load_start(&clkev,
-> +			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
-> +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
-> +}
-> +
-Am still bit uncomfortable with direct hwmod usage in the suspend/resmue
-hooks.
+Can you please explain other reasons as well for clarity ?
 
-Jon, Any alternatives you can think of ?
-
-Regards,
+Regards
 Santosh
