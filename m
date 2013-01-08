@@ -1,30 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Jan 2013 20:52:37 +0530
-Subject: [RFC v2 17/18] ARM: OMAP2+: AM33XX: Select Mailbox when PM is
- enabled
-In-Reply-To: <1356959231-17335-18-git-send-email-vaibhav.bedia@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-18-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <50EC39BD.2020204@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 8 Jan 2013 23:26:47 +0800
+Subject: [GIT PULL] imx fixes for 3.8
+Message-ID: <20130108152646.GG19534@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
-> PM services on AM33XX depend on mailbox for communication
-> with WKUP-M3 core so ensure that the right config options
-> are selected. Thanks to Kevin Hilman <khilman@deeprootsystems.com>
-> for the suggestion on updating the Kconfig and not just
-> the omap2plus_defconfig which was done in the previous version
-> of the AM33XX suspend-resume support.
->
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Cc: Tony Lingren <tony@atomide.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> ---
-Unrelated to series. You can post this patch separately.
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 
-regards
-Santosh
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.8
+
+for you to fetch changes up to e37f0d5b32c2a66677d0f2a21431a87e7e9ce22d:
+
+  ARM: mx5: Fix MX53 flexcan2 clock (2013-01-08 08:53:07 +0800)
+
+----------------------------------------------------------------
+It includes one critical fix - wrong flexcan2 clock will hang system
+when the port gets brought up.  The other two are non-critical fixes,
+which are sent together here, since it's still early -rc stage.
+
+----------------------------------------------------------------
+Fabio Estevam (2):
+      clk: imx: Remove 'clock-output-names' from the examples
+      ARM: dts: imx31-bug: Fix manufacturer compatible string
+
+Marek Vasut (1):
+      ARM: mx5: Fix MX53 flexcan2 clock
+
+ .../devicetree/bindings/clock/imx23-clock.txt      |    5 -----
+ .../devicetree/bindings/clock/imx25-clock.txt      |    4 ----
+ .../devicetree/bindings/clock/imx28-clock.txt      |    5 -----
+ .../devicetree/bindings/clock/imx6q-clock.txt      |    4 ----
+ arch/arm/boot/dts/imx31-bug.dts                    |    2 +-
+ arch/arm/boot/dts/imx53.dtsi                       |    2 +-
+ 6 files changed, 2 insertions(+), 20 deletions(-)
