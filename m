@@ -1,47 +1,61 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Wed, 9 Jan 2013 11:42:06 -0500
-Subject: [PATCH v5 12/12] ARM: KVM: Add VGIC configuration option
-In-Reply-To: <50ED7083.5060401@mvista.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 9 Jan 2013 17:48:47 +0100
+Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
+In-Reply-To: <20130109162554.12103.38937.stgit@ubuntu>
 References: <20130108184116.46558.3558.stgit@ubuntu>
- <20130108184245.46558.83229.stgit@ubuntu>
- <50ED7083.5060401@mvista.com>
-Message-ID: <CANM98qLWrOEram-EN1wasG=PctUzsdZv-ctryNx70auyk39XSw@mail.gmail.com>
+ <20130109162554.12103.38937.stgit@ubuntu>
+Message-ID: <98D0981A-0EB4-4273-BFF8-B25C4BE5EE02@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 9, 2013 at 8:28 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> Hello.
->
->
-> On 08-01-2013 22:42, Christoffer Dall wrote:
->
->> From: Marc Zyngier <marc.zyngier@arm.com>
->
->
->> It is now possible to select the VGIC configuration option.
->
->
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
->> ---
->>   arch/arm/kvm/Kconfig |    8 ++++++++
->>   1 file changed, 8 insertions(+)
->
->
->> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
->> index 05227cb..d32e33f 100644
->> --- a/arch/arm/kvm/Kconfig
->> +++ b/arch/arm/kvm/Kconfig
->> @@ -51,6 +51,14 @@ config KVM_ARM_MAX_VCPUS
->>           large, so only choose a reasonable number that you expect to
->>           actually use.
->>
->> +config KVM_ARM_VGIC
->> +        bool "KVM support for Virtual GIC"
->
->
->    Please indent with tab, as below.
->
->
 
-fixed both, thanks.
+On 09.01.2013, at 17:26, Christoffer Dall wrote:
+
+> Renames the KVM_SET_DEVICE_ADDRESS to KVM_ARM_SET_DEVICE_ADDR
+> to make it obvious that this is ARM specific in lack of a better generic
+> interface.
+> 
+> Once we agree on a better interface the KVM/ARM code can also take
+> advantage of that, but until then we don't want to hold up the KVM/ARM
+> patches.
+
+Works for me. Scott, are you happy with this one too? We can start to introduce (and fix ARM) with a generic ioctl in the MPIC patches then.
+
+
+Alex
+
+> 
+> A new complete series of these patches including this change can be
+> pulled from:
+>  git://github.com/virtualopensystems/linux-kvm-arm.git
+>  kvm-arm-v15-devaddr-v2
+> 
+> -Christoffer
+> 
+> ---
+> 
+> Christoffer Dall (2):
+>      KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+>      ARM: KVM: VGIC accept vcpu and dist base addresses from user space
+> 
+> 
+> Documentation/virtual/kvm/api.txt   |   38 ++++++
+> arch/arm/include/asm/hardware/gic.h |   25 ++++
+> arch/arm/include/asm/kvm_host.h     |   18 +++
+> arch/arm/include/asm/kvm_vgic.h     |   89 +++++++++++++++
+> arch/arm/include/uapi/asm/kvm.h     |   16 +++
+> arch/arm/kvm/Makefile               |    1 
+> arch/arm/kvm/arm.c                  |   92 +++++++++++++++-
+> arch/arm/kvm/interrupts.S           |    4 +
+> arch/arm/kvm/mmio.c                 |    3 +
+> arch/arm/kvm/vgic.c                 |  206 +++++++++++++++++++++++++++++++++++
+> include/uapi/linux/kvm.h            |    8 +
+> 11 files changed, 498 insertions(+), 2 deletions(-)
+> create mode 100644 arch/arm/include/asm/kvm_vgic.h
+> create mode 100644 arch/arm/kvm/vgic.c
+> 
+> -- 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
