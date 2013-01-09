@@ -1,48 +1,51 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 9 Jan 2013 09:37:56 +0000
-Subject: [RFC v2 14/18] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <50ED1CB7.1090202@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-15-git-send-email-vaibhav.bedia@ti.com>
- <50EC3964.3060708@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433ECDD089@DBDE01.ent.ti.com>
- <50ED1CB7.1090202@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDD528@DBDE01.ent.ti.com>
+From: panto@antoniou-consulting.com (Pantelis Antoniou)
+Date: Wed, 9 Jan 2013 11:41:59 +0200
+Subject: [PATCH RESEND] ARM: dts: AM33XX: Rename I2C and GPIO nodes
+In-Reply-To: <50EC458D.9000408@ti.com>
+References: <1353498737-21174-1-git-send-email-anilkumar@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EAD4863@DBDE01.ent.ti.com>
+ <50EC458D.9000408@ti.com>
+Message-ID: <E39A9A16-8F1D-4EB0-8947-A33D995CA6B6@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 13:01:03, Shilimkar, Santosh wrote:
-> On Wednesday 09 January 2013 11:08 AM, Bedia, Vaibhav wrote:
-> > On Tue, Jan 08, 2013 at 20:51:08, Shilimkar, Santosh wrote:
-> >> On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
-> >>> Add minimal APIs for writing to the IPC and the M3_TXEV registers
-> >>> in the Control module. These will be used in a subsequent patch which
-> >>> adds suspend-resume support for AM33XX.
-> >>>
-> >>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> >>> Cc: Tony Lingren <tony@atomide.com>
-> >>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>> Cc: Benoit Cousson <b-cousson@ti.com>
-> >>> Cc: Paul Walmsley <paul@pwsan.com>
-> >>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> >>> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-> >>> ---
-> >> On Control module, we are trying to move driver/module
-> >> specific code to respective drivers. Can you not
-> >> add below code to ipc related driver component.
-> >>
-> >> If not, then patch as such is fine with me.
-> >>
-> >
-> > I had it in the pm33xx.c in the previous version. Kevin had asked me to
-> > move it to control.c. Should I revert move it back there?
-> >
-> pm33xx.c is not the right place. I was hoping to move to some driver.
-> If that is not possible then leave it in control module.
+Hi Benoit,
+
+On Jan 8, 2013, at 6:13 PM, Benoit Cousson wrote:
+
+> Hi Anil,
+> 
+> On 01/02/2013 11:12 AM, AnilKumar, Chimata wrote:
+>> On Wed, Nov 21, 2012 at 17:22:17, AnilKumar, Chimata wrote:
+>>> Rename I2C and GPIO nodes according to AM33XX TRM. According to
+>>> AM33XX TRM device instances are starting from "0" like i2c0, i2c1
+>>> and i2c3.
+>>> 
+>>> Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
+>>> [panto at antoniou-consulting.com: initial patch by pantelis's]
+>>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+>>> ---
+>>> Changes from first version:
+>>> 	- Updated pantelis's patch
+>>> 	  * Modified based on linux-omap/master
+>>> 	  * Added GPIO nodes renaming as well
+>> 
+>> Hi Tony/Benoit,
+>> 
+>> If there are no comments could you please pull this patch?
+> 
+> Yep, it is done.
+> 
+> The patch is available here:
+> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.9/dts
+> 
+> Regards,
+> Benoit
 > 
 
-I think I'll leave it here for now. Could I have you ack in that case?
+Note that when this lands in mainline, the DT patch bindings for DT overlays
+must be converted to the correct form.
 
-Thanks,
-Vaibhav
+Regards
+
+-- Pantelis
