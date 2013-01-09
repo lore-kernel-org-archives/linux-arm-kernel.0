@@ -1,79 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 9 Jan 2013 11:09:23 -0500 (EST)
-Subject: [PATCH] Proposed removal of IS_ERR_OR_NULL() (was: Re: [PATCH
- 1/4] gpiolib: introduce descriptor-based GPIO interface)
-In-Reply-To: <20130109155154.GN3931@n2100.arm.linux.org.uk>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
- <201301081259.29839.arnd@arndb.de>
- <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
- <201301091035.23206.arnd@arndb.de>
- <20130109104414.GF3931@n2100.arm.linux.org.uk>
- <20130109111055.GG3931@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301090932400.6300@xanadu.home>
- <20130109150427.GL3931@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301091020580.6300@xanadu.home>
- <20130109155154.GN3931@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1301091058070.6300@xanadu.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed,  9 Jan 2013 16:07:17 +0000
+Subject: [PATCHv2 08/11] arm: arch_timer: add arch_counter_set_user_access
+In-Reply-To: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1357747640-18594-9-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Jan 2013, Russell King - ARM Linux wrote:
+Several bits in CNTKCTL reset to 0, including PL0VTEN. For platforms
+using the generic timer which wish to have a fast gettimeofday vDSO
+implementation, these bits must be set to 1 by the kernel. On other
+platforms, the bootloader might enable userspace access when we don't
+want it.
 
-> On Wed, Jan 09, 2013 at 10:27:53AM -0500, Nicolas Pitre wrote:
-> > Anyone with good coccinelle skills around to deal with the users?
-> 
-> I'm not sure that's a solution.
+This patch adds arch_counter_set_user_access, which sets the PL0 access
+permissions to that required by the platform. For arm, this currently
+means disabling all userspace access.
 
-Well, I was thinking that coccinelle could handle the majority of the 
-354 users when the "fix" is obvious enough to be automated.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm/include/asm/arch_timer.h |   11 +++++++++++
+ arch/arm/kernel/arch_timer.c      |    2 ++
+ 2 files changed, 13 insertions(+), 0 deletions(-)
 
-That said, if we want people to fix their code, it is probably necessary 
-to merge your patch right away so the warnings are actually being seen, 
-and revert it right before the final v3.8 release if the remaining 
-warnings are still too numerous.  Repeat with next cycle.
-
-> For example:
-> 
->         err = gpio_request(en_vdd_1v05, "EN_VDD_1V05");
->         if (err) {
->                 pr_err("%s: gpio_request failed: %d\n", __func__, err);   
->                 return err;   
->         }
-> ...
->         regulator = regulator_get(NULL, "vdd_ldo0,vddio_pex_clk");
->         if (IS_ERR_OR_NULL(regulator)) {
->                 pr_err("%s: regulator_get failed: %d\n", __func__,
->                        (int)PTR_ERR(regulator));
->                 goto err_reg;
->         }
-> 
->         regulator_enable(regulator);
-> 
->         err = tegra_pcie_init(true, true);
-> ...
-> err_reg:
->         gpio_free(en_vdd_1v05);
->                 
->         return err;
-> }
-> 
-> Now, regulator_get() returns error-pointers for real errors when it's
-> configured in.  When regulator support is not configured, it returns
-> NULL.
-> 
-> So, one solution here would be:
-> 
-> 	if (IS_ERR(regulator)) {
-> 		err = PTR_ERR(regulator);
-> 		pr_err("%s: regulator_get failed: %d\n", __func__, err);
-> 		goto err_reg;
-> 	}
-> 
-> but leaves us with the question: is it safe to call tegra_pcie_init()
-> without regulator support?
-
-The best approach is to assume it is not, but unlike the current code, 
-this should be fixed by returning an appropriate error code instead of 0.
-
-
-Nicolas
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 701f2b7..05e3593 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -108,6 +108,17 @@ static inline u64 arch_counter_get_cntvct(void)
+ 	return cval;
+ }
+ 
++static inline void __cpuinit arch_counter_set_user_access(void)
++{
++	u32 cntkctl;
++
++	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
++
++	/* disable user access to everything */
++	cntkctl &= ~((3 << 8) | (7 << 0));
++
++	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
++}
+ 
+ #else
+ static inline int arch_timer_of_register(void)
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index 834d347..4f39e68 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -155,6 +155,8 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
+ 			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
+ 	}
+ 
++	arch_counter_set_user_access();
++
+ 	return 0;
+ }
+ 
+-- 
+1.7.0.4
