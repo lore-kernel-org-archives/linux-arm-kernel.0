@@ -1,65 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Jan 2013 15:51:54 +0000
-Subject: [PATCH] Proposed removal of IS_ERR_OR_NULL() (was: Re: [PATCH
- 1/4] gpiolib: introduce descriptor-based GPIO interface)
-In-Reply-To: <alpine.LFD.2.02.1301091020580.6300@xanadu.home>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
- <201301081259.29839.arnd@arndb.de>
- <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
- <201301091035.23206.arnd@arndb.de>
- <20130109104414.GF3931@n2100.arm.linux.org.uk>
- <20130109111055.GG3931@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301090932400.6300@xanadu.home>
- <20130109150427.GL3931@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301091020580.6300@xanadu.home>
-Message-ID: <20130109155154.GN3931@n2100.arm.linux.org.uk>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 9 Jan 2013 16:56:45 +0100
+Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+In-Reply-To: <0c1e99864fe87de92aa86a70504b9f73@localhost>
+References: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
+ <1357687783.10453.9@snotra>
+ <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
+ <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
+ <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
+ <86D3D406-05C3-4569-AD03-3223B46D47D9@suse.de>
+ <CAFEAcA9z+kaSpVU3c8dWDHEnuGEri1JRZeS2+F5d2EefnX0oyQ@mail.gmail.com>
+ <2ebf41d65170b9534c54c0c5f91a4b99@localhost>
+ <13B0CEB2-8D36-48AE-BE0E-02D6231052CF@suse.de>
+ <0c1e99864fe87de92aa86a70504b9f73@localhost>
+Message-ID: <54937915-46BE-4A50-B5AA-26940DEE6A92@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 10:27:53AM -0500, Nicolas Pitre wrote:
-> Anyone with good coccinelle skills around to deal with the users?
 
-I'm not sure that's a solution.
+On 09.01.2013, at 16:50, Marc Zyngier wrote:
 
-For example:
+> On Wed, 9 Jan 2013 16:28:03 +0100, Alexander Graf <agraf@suse.de> wrote:
+>> On 09.01.2013, at 16:22, Marc Zyngier wrote:
+>> 
+>>> On Wed, 9 Jan 2013 15:11:39 +0000, Peter Maydell
+>>> <peter.maydell@linaro.org>
+>>> wrote:
+>>>> On 9 January 2013 14:58, Alexander Graf <agraf@suse.de> wrote:
+>>>>> 
+>>>>> Yeah, that was the basic idea. Considering that the patch set hasn't
+>>>>> been going
+>>>>> in for another 2 months after that discussion indicates that this
+> isn't
+>>>>> too much of
+>>>>> an issue though :).
+>>>> 
+>>>> We might get there faster if people didn't keep nitpicking the APIs at
+>>> the
+>>>> last minute :-)
+>>> 
+>>> Exactly. We're trying hard to get the damned thing merged, and the
+>>> permanent API churn quickly becomes a burden.
+>> 
+>> As I said earlier, we have had a lot of experience in creating really
+> bad
+>> APIs in the past.
+> 
+> Is this one really bad? Again, what changed in the meantime that makes you
+> think this API is wrong?
 
-        err = gpio_request(en_vdd_1v05, "EN_VDD_1V05");
-        if (err) {
-                pr_err("%s: gpio_request failed: %d\n", __func__, err);   
-                return err;   
-        }
-...
-        regulator = regulator_get(NULL, "vdd_ldo0,vddio_pex_clk");
-        if (IS_ERR_OR_NULL(regulator)) {
-                pr_err("%s: regulator_get failed: %d\n", __func__,
-                       (int)PTR_ERR(regulator));
-                goto err_reg;
-        }
+I complained about it 2 months ago already.
 
-        regulator_enable(regulator);
+>> But how about making this one specific? Call it
+> KVM_ARM_SET_VGIC_ADDRESS,
+>> keep the rest as it is, resend it, and later we can come up with an
+>> actually generic interface.
+> 
+> Let's pretend you never wrote that, shall we? ;-)
 
-        err = tegra_pcie_init(true, true);
-...
-err_reg:
-        gpio_free(en_vdd_1v05);
-                
-        return err;
-}
+Why? The worst thing that happened to us so far were interfaces that looked generic and extensible and turned out not to be (see SET_SREGS in the ppc code). We have 2 options to circumvent this:
 
-Now, regulator_get() returns error-pointers for real errors when it's
-configured in.  When regulator support is not configured, it returns
-NULL.
+  1) Commonly agree on an interface that actually is extensible and use it throughout the code
+  2) Create a very specific interface for a single use case, keep it implemented "forever" and as soon as we need more, implement a more generic one that goes back to 1
 
-So, one solution here would be:
+Since the ARM patches have been out of tree for too long, I'm happy with going route 2 until we go back to square 1.
 
-	if (IS_ERR(regulator)) {
-		err = PTR_ERR(regulator);
-		pr_err("%s: regulator_get failed: %d\n", __func__, err);
-		goto err_reg;
-	}
 
-but leaves us with the question: is it safe to call tegra_pcie_init()
-without regulator support?
-
-The problem there is that "fixing" this causes a behavioural change in
-the code, and we don't know what effect that change may have.
+Alex
