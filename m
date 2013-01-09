@@ -1,31 +1,31 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 9 Jan 2013 12:11:54 +0000
-Subject: [PATCH 1/9] mailbox: OMAP: introduce mailbox framework
-In-Reply-To: <50D43FA4.8090000@st.com>
-References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
- <1355836212-17956-2-git-send-email-loic.pallardy-ext@stericsson.com>
- <20121218165909.GF4989@atomide.com> <50D423C2.3090009@st.com>
- <B5906170F1614E41A8A28DE3B8D121433EC9CF77@DBDE01.ent.ti.com>
- <50D43FA4.8090000@st.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDD8C1@DBDE01.ent.ti.com>
+From: prasanna.ps@samsung.com (Prasanna Kumar)
+Date: Wed, 09 Jan 2013 17:45:32 +0530
+Subject: [PATCH 1/2] arm: exynos5: Enable PM generic domain support in Kconfig
+In-Reply-To: <1357733733-18769-1-git-send-email-prasanna.ps@samsung.com>
+References: <1357733733-18769-1-git-send-email-prasanna.ps@samsung.com>
+Message-ID: <1357733733-18769-2-git-send-email-prasanna.ps@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Loic,
+This patch adds support to enable PM generic domains
+under Exynos5 family
 
-On Fri, Dec 21, 2012 at 16:23:24, Loic PALLARDY wrote:
-> 
-> 
-> On 12/21/2012 11:49 AM, Bedia, Vaibhav wrote:
-> > On Fri, Dec 21, 2012 at 14:24:26, Loic PALLARDY wrote:
-> >>
-> > I have a few patches which are dependent on this patch series.
-> > Could you please keep me in cc for the future versions.
-> >
-> Sure, I'll.
-> 
+Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+---
+ arch/arm/mach-exynos/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-When do you plan to post an updated version of these patches?
-
-Regards,
-Vaibhav
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index e103c29..871be97 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -63,6 +63,7 @@ config SOC_EXYNOS5250
+ 	depends on ARCH_EXYNOS5
+ 	select S5P_PM if PM
+ 	select S5P_SLEEP if PM
++	select PM_GENERIC_DOMAINS if PM
+ 	select S5P_DEV_MFC
+ 	select SAMSUNG_DMADEV
+ 	help
+-- 
+1.7.5.4
