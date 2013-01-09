@@ -1,76 +1,49 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed,  9 Jan 2013 21:43:14 +0100
-Subject: [PATCH 14/14] ARM: tegra: trimslice: Initialize PCIe from DT
+Date: Wed,  9 Jan 2013 21:43:07 +0100
+Subject: [PATCH 07/14] ARM: pci: Allow passing per-controller private data
 In-Reply-To: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1357764194-12677-15-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1357764194-12677-8-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the device tree support in place, probe the PCIe controller from
-the device tree and remove the corresponding workaround in the board
-file.
+In order to allow drivers to specify private data for each controller,
+this commit adds a private_data field to the struct hw_pci. This field
+is an array of nr_controllers pointers that will be used to initialize
+the private_data field of the corresponding controller's pci_sys_data
+structure.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
-Changes in v3:
-- update for new DT binding
+ arch/arm/include/asm/mach/pci.h | 1 +
+ arch/arm/kernel/bios32.c        | 3 +++
+ 2 files changed, 4 insertions(+)
 
-Changes in v2:
-- new patch
----
- arch/arm/boot/dts/tegra20-trimslice.dts | 12 ++++++++++++
- arch/arm/mach-tegra/board-dt-tegra20.c  |  8 --------
- 2 files changed, 12 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-index 4b6c486..ebb4c17 100644
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@ -301,6 +301,18 @@
- 		};
- 	};
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index db9fedb..5cf2e97 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -23,6 +23,7 @@ struct hw_pci {
+ #endif
+ 	struct pci_ops	*ops;
+ 	int		nr_controllers;
++	void		**private_data;
+ 	int		(*setup)(int nr, struct pci_sys_data *);
+ 	struct pci_bus *(*scan)(int nr, struct pci_sys_data *);
+ 	void		(*preinit)(void);
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index da7b0c9..a1f73b5 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -464,6 +464,9 @@ static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+ 		sys->map_irq = hw->map_irq;
+ 		INIT_LIST_HEAD(&sys->resources);
  
-+	pcie-controller {
-+		status = "okay";
++		if (hw->private_data)
++			sys->private_data = hw->private_data[nr];
 +
-+		pci at 0 {
-+			status = "okay";
-+		};
-+
-+		pci at 1 {
-+			status = "okay";
-+		};
-+	};
-+
- 	usb at c5000000 {
- 		status = "okay";
- 		nvidia,vbus-gpio = <&gpio 170 0>; /* gpio PV2 */
-diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-index 9e8256ab..67090fe 100644
---- a/arch/arm/mach-tegra/board-dt-tegra20.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-@@ -145,13 +145,6 @@ static void __init tegra_dt_init(void)
- 				tegra20_auxdata_lookup, NULL);
- }
+ 		ret = hw->setup(nr, sys);
  
--static void __init trimslice_init(void)
--{
--#ifdef CONFIG_TEGRA_PCI
--	platform_device_register(&tegra_pcie_device);
--#endif
--}
--
- static void __init paz00_init(void)
- {
- 	tegra_paz00_wifikill_init();
-@@ -161,7 +154,6 @@ static struct {
- 	char *machine;
- 	void (*init)(void);
- } board_init_funcs[] = {
--	{ "compulab,trimslice", trimslice_init },
- 	{ "compal,paz00", paz00_init },
- };
- 
+ 		if (ret > 0) {
 -- 
 1.8.1
