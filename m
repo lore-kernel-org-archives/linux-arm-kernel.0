@@ -1,32 +1,31 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  9 Jan 2013 10:06:05 +0000
-Subject: [PATCH 3/3] ARM: ux500: Add Snowball pin configuration for user LED
-In-Reply-To: <1357725965-27342-1-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Jan 2013 10:18:54 +0000
+Subject: [PATCH 2/3] ARM: ux500: Turn on the 'heartbeat' LED trigger
+In-Reply-To: <1357725965-27342-2-git-send-email-lee.jones@linaro.org>
 References: <1357725965-27342-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1357725965-27342-3-git-send-email-lee.jones@linaro.org>
+ <1357725965-27342-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <201301091018.55058.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we setup the GPIO pin responsible for illuminating the user
-LED on the Snowball low-cost development board.
+On Wednesday 09 January 2013, Lee Jones wrote:
+> diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+> index 5dea906..0f25b07 100644
+> --- a/arch/arm/mach-ux500/Kconfig
+> +++ b/arch/arm/mach-ux500/Kconfig
+> @@ -43,6 +43,8 @@ config MACH_HREFV60
+>  config MACH_SNOWBALL
+>         bool "U8500 Snowball platform"
+>         select MACH_MOP500
+> +       select LEDS_TRIGGERS
+> +       select LEDS_TRIGGER_HEARTBEAT
+>         help
+>           Include support for the snowball development platform.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-pins.c |    2 ++
- 1 file changed, 2 insertions(+)
+Be careful with "select" statements like this when there are other
+dependencies. I think LEDS_TRIGGERS depends on LEDS_CLASS, so this
+should probably be written as
 
-diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index 0a3f30d..d1a775c 100644
---- a/arch/arm/mach-ux500/board-mop500-pins.c
-+++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -747,6 +747,8 @@ static struct pinctrl_map __initdata snowball_pinmap[] = {
- 	DB8500_PIN_HOG("GPIO21_AB3", out_hi),
- 	/* Mux in "SM" which is used for the SMSC911x Ethernet adapter */
- 	DB8500_MUX_HOG("sm_b_1", "sm"),
-+	/* User LED */
-+	DB8500_PIN_HOG("GPIO142_C11", gpio_out_hi),
- 	/* Drive RSTn_LAN high */
- 	DB8500_PIN_HOG("GPIO141_C12", gpio_out_hi),
- 	/*  Accelerometer/Magnetometer */
--- 
-1.7.9.5
+	select LEDS_TRIGGERS if LEDS_CLASS
+
+	Arnd
