@@ -1,41 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 9 Jan 2013 08:55:55 +0000
-Subject: [PATCH 4/4 v3] net/smsc911x: Provide common clock functionality
-In-Reply-To: <CACRpkda-4C+ezaZFSkxsNbmHnBN8RCoCeGePaOF-DzV0XnkzQw@mail.gmail.com>
-References: <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
- <CACRpkda79O_b3Z8g7Sy7vMtW9neZU4x-Z=iEQgjqu4X5tFKyhw@mail.gmail.com>
- <20121220192441.GC14363@n2100.arm.linux.org.uk>
- <20121220203514.GN2691@gmail.com>
- <20121220205113.GD14363@n2100.arm.linux.org.uk>
- <20121221091306.GO2691@gmail.com>
- <20121221092421.GG14363@n2100.arm.linux.org.uk>
- <20121221114105.GP2691@gmail.com>
- <20130103111450.GC14714@gmail.com>
- <CACRpkda-4C+ezaZFSkxsNbmHnBN8RCoCeGePaOF-DzV0XnkzQw@mail.gmail.com>
-Message-ID: <20130109085555.GA31678@gmail.com>
+Date: Wed, 9 Jan 2013 08:56:36 +0000
+Subject: [PATCH 3/4] clk: ux500: Provide an alias for the SMSC911x
+ Ethernet chip
+In-Reply-To: <1355937587-31730-3-git-send-email-lee.jones@linaro.org>
+References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
+ <1355937587-31730-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130109085636.GB31678@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 03 Jan 2013, Linus Walleij wrote:
+On Wed, 19 Dec 2012, Lee Jones wrote:
 
-> On Thu, Jan 3, 2013 at 12:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> In the case of some of the ux500 platforms, an Ethernet chip is
+> placed on an extended bus which is traditionally used as a NAND
+> flash chip placeholder. The p3_pclk0 clock is used to control it,
+> so we are required to provide and easy way to access it from the
+> SMSC911x driver. We do this using an alias provided by this patch.
 > 
-> > Some platforms provide clocks which require enabling before the
-> > SMSC911x chip will power on. This patch uses the new common clk
-> > framework to do just that. If no clock is provided, it will just
-> > be ignored and the driver will continue to assume that no clock
-> > is required for the chip to run successfully.
-> >
-> > Cc: Steve Glendinning <steve.glendinning@shawell.net>
-> > Cc: netdev at vger.kernel.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/clk/ux500/u8500_clk.c |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> Looks all right to me now:
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+> index a601802..9d9add1 100644
+> --- a/drivers/clk/ux500/u8500_clk.c
+> +++ b/drivers/clk/ux500/u8500_clk.c
+> @@ -325,6 +325,7 @@ void u8500_clk_init(void)
+>  	clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", U8500_CLKRST3_BASE,
+>  				BIT(0), 0);
+>  	clk_register_clkdev(clk, "fsmc", NULL);
+> +	clk_register_clkdev(clk, NULL, "smsc911x");
+>  
+>  	clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", U8500_CLKRST3_BASE,
+>  				BIT(1), 0);
+> -- 
+> 1.7.9.5
+> 
 
 I still need a maintiner Ack for this before I can push it.
 
-Anyone?
+Mike?
 
 -- 
 Lee Jones
