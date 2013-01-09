@@ -1,172 +1,90 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 10 Jan 2013 04:46:45 +0900
-Subject: [PATCH] ARM: SAMSUNG: Gracefully exit on suspend failure
-In-Reply-To: <1357729952-14881-1-git-send-email-a.kesavan@samsung.com>
-References: <1357729952-14881-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <CAH9JG2WxW=+8PwhZ6r7akmwq2B2Qf=MqB4sB6DQypS0hEmAdvQ@mail.gmail.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Wed, 09 Jan 2013 11:48:00 -0800 (PST)
+Subject: [PATCH] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
+Message-ID: <1588881.pi23bvqp7D@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I wodner do you see the real case it's happened?
-It it's occured, does it better to find out the root cause?
+This patch adds the DTS file to support the Marvell RD-A370-A1
+(Reference Design) board also known as RD-88F6710 board. It is almost
+entirely similar to the DB-A370 board except that the first Ethernet PHY
+is SGMII-wired and the second is a switch which is RGMII-wired.
 
-Thank you,
-Kyungmin Park
+Signed-off-by: Florian Fainelli <florian@openwrt.org>
+---
+Thomas, Cl?ment, as support for other peripherals gets merged, I will update
+this DTS file to reflect this. Thanks!
 
-On Wed, Jan 9, 2013 at 8:12 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> As per the Exynos5250 User Manual:
->
-> When there are pending interrupt events, WFI/WFE instruction are
-> ignored. To cancel the power-down sequence follow these steps:
-> 1) Disable system power-down through CENTRAL_SEQ_CONFIGURATION
-> and CENTRAL_SEQ_CONFIGURATION_DMC registers
-> 2) Clear WAKEUP_STAT register
-> 3) Enable interrupt service routine for CPU
->
-> Code for early wakeup for exynos already exists; remove the panic
-> on suspend failure, clear the wakeup state register and return
-> error from cpu_suspend to indicate a failed suspend (to a user
-> daemon).
->
-> Older Samsung SoCs have similar panics and I have removed them all.
-> Haven't touched the S3C2410 sleep code.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c          |    6 ++++--
->  arch/arm/mach-s3c24xx/pm-s3c2412.c |    3 ++-
->  arch/arm/mach-s3c24xx/pm-s3c2416.c |    3 ++-
->  arch/arm/mach-s3c64xx/pm.c         |    3 ++-
->  arch/arm/mach-s5p64x0/pm.c         |    4 ++--
->  arch/arm/mach-s5pv210/pm.c         |    4 ++--
->  arch/arm/plat-samsung/pm.c         |    5 ++++-
->  7 files changed, 18 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index f459afd..55df38cd 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -92,8 +92,8 @@ static int exynos_cpu_suspend(unsigned long arg)
->         /* issue the standby signal into the pm unit. */
->         cpu_do_idle();
->
-> -       /* we should never get past here */
-> -       panic("sleep resumed to originator?");
-> +       pr_err("Failed to suspend the system\n");
-> +       return -EBUSY;
->  }
->
->  static void exynos_pm_prepare(void)
-> @@ -283,6 +283,8 @@ static void exynos_pm_resume(void)
->         if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
->                 tmp |= S5P_CENTRAL_LOWPWR_CFG;
->                 __raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-> +               /* clear the wakeup state register */
-> +               __raw_writel(0x0, S5P_WAKEUP_STAT);
->                 /* No need to perform below restore code */
->                 goto early_wakeup;
->         }
-> diff --git a/arch/arm/mach-s3c24xx/pm-s3c2412.c b/arch/arm/mach-s3c24xx/pm-s3c2412.c
-> index 206765c..a7bc30d 100644
-> --- a/arch/arm/mach-s3c24xx/pm-s3c2412.c
-> +++ b/arch/arm/mach-s3c24xx/pm-s3c2412.c
-> @@ -48,7 +48,8 @@ static int s3c2412_cpu_suspend(unsigned long arg)
->
->         s3c2412_sleep_enter();
->
-> -       panic("sleep resumed to originator?");
-> +       pr_err("Failed to suspend the system\n");
-> +       return -EBUSY;
->  }
->
->  static void s3c2412_pm_prepare(void)
-> diff --git a/arch/arm/mach-s3c24xx/pm-s3c2416.c b/arch/arm/mach-s3c24xx/pm-s3c2416.c
-> index 1bd4817..97a8d70 100644
-> --- a/arch/arm/mach-s3c24xx/pm-s3c2416.c
-> +++ b/arch/arm/mach-s3c24xx/pm-s3c2416.c
-> @@ -34,7 +34,8 @@ static int s3c2416_cpu_suspend(unsigned long arg)
->
->         s3c2412_sleep_enter();
->
-> -       panic("sleep resumed to originator?");
-> +       pr_err("Failed to suspend the system\n");
-> +       return -EBUSY;
->  }
->
->  static void s3c2416_pm_prepare(void)
-> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-> index f6b13a2..4d1accc 100644
-> --- a/arch/arm/mach-s3c64xx/pm.c
-> +++ b/arch/arm/mach-s3c64xx/pm.c
-> @@ -297,7 +297,8 @@ static int s3c64xx_cpu_suspend(unsigned long arg)
->
->         /* we should never get past here */
->
-> -       panic("sleep resumed to originator?");
-> +       pr_err("Failed to suspend the system\n");
-> +       return -EBUSY;
->  }
->
->  /* mapping of interrupts to parts of the wakeup mask */
-> diff --git a/arch/arm/mach-s5p64x0/pm.c b/arch/arm/mach-s5p64x0/pm.c
-> index 9cba18b..710651d 100644
-> --- a/arch/arm/mach-s5p64x0/pm.c
-> +++ b/arch/arm/mach-s5p64x0/pm.c
-> @@ -103,8 +103,8 @@ static int s5p64x0_cpu_suspend(unsigned long arg)
->             "mcr p15, 0, %0, c7, c10, 4\n\t"
->             "mcr p15, 0, %0, c7, c0, 4" : : "r" (tmp));
->
-> -       /* we should never get past here */
-> -       panic("sleep resumed to originator?");
-> +       pr_err("Failed to suspend the system\n");
-> +       return -EBUSY;
->  }
->
->  /* mapping of interrupts to parts of the wakeup mask */
-> diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
-> index 736bfb1..c584f49 100644
-> --- a/arch/arm/mach-s5pv210/pm.c
-> +++ b/arch/arm/mach-s5pv210/pm.c
-> @@ -104,8 +104,8 @@ static int s5pv210_cpu_suspend(unsigned long arg)
->             "mcr p15, 0, %0, c7, c10, 4\n\t"
->             "wfi" : : "r" (tmp));
->
-> -       /* we should never get past here */
-> -       panic("sleep resumed to originator?");
-> +       pr_err("Failed to suspend the system\n");
-> +       return -EBUSY;
->  }
->
->  static void s5pv210_pm_prepare(void)
-> diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-> index 1507028..aa4b06d 100644
-> --- a/arch/arm/plat-samsung/pm.c
-> +++ b/arch/arm/plat-samsung/pm.c
-> @@ -243,6 +243,7 @@ int (*pm_cpu_sleep)(unsigned long);
->
->  static int s3c_pm_enter(suspend_state_t state)
->  {
-> +       int ret;
->         /* ensure the debug is initialised (if enabled) */
->
->         s3c_pm_debug_init();
-> @@ -300,7 +301,9 @@ static int s3c_pm_enter(suspend_state_t state)
->          * we resume as it saves its own register state and restores it
->          * during the resume.  */
->
-> -       cpu_suspend(0, pm_cpu_sleep);
-> +       ret = cpu_suspend(0, pm_cpu_sleep);
-> +       if (ret)
-> +               return ret;
->
->         /* restore the system state */
->
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ arch/arm/boot/dts/armada-370-rd.dts |   61 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-370-rd.dts
+
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+new file mode 100644
+index 0000000..d62dfac
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -0,0 +1,61 @@
++/*
++ * Device Tree file for Marvell Armada 370 Reference Design board
++ * (RD-88F6710-A1)
++ *
++ *  Copied from arch/arm/boot/dts/armada-370-db.dts
++ *
++ *  Copyright (C) 2013 Florian Fainelli <florian@openwrt.org>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++/include/ "armada-370.dtsi"
++
++/ {
++	model = "Marvell Armada 370 Reference Design";
++	compatible = "marvell,a370-rd", "marvell,armada370", "marvell,armada-370-xp";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x20000000>; /* 512 MB */
++	};
++
++	soc {
++		serial at d0012000 {
++			clock-frequency = <200000000>;
++			status = "okay";
++		};
++		sata at d00a0000 {
++			nr-ports = <2>;
++			status = "okay";
++		};
++
++		mdio {
++			phy0: ethernet-phy at 0 {
++				reg = <0>;
++			};
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++
++		ethernet at d0070000 {
++			status = "okay";
++			phy = <&phy0>;
++			phy-mode = "sgmii";
++		};
++		ethernet at d0074000 {
++			status = "okay";
++			phy = <&phy1>;
++			phy-mode = "rgmii-id";
++		};
++	};
++};
+-- 
+1.7.10.4
