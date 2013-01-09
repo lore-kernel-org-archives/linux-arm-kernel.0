@@ -1,7 +1,10 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed,  9 Jan 2013 12:15:25 +0100
-Subject: [PATCH 0/3] Add and use new macro module_platform_driver_probe()
-Message-ID: <1357730128-23018-1-git-send-email-fabio.porcedda@gmail.com>
+Date: Wed,  9 Jan 2013 12:15:26 +0100
+Subject: [PATCH 1/3] driver core: add helper macro for platform_driver_probe()
+ boilerplate
+In-Reply-To: <1357730128-23018-1-git-send-email-fabio.porcedda@gmail.com>
+References: <1357730128-23018-1-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1357730128-23018-2-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,40 +13,46 @@ additional setup code then ends up being a block of duplicated
 boilerplate.  This patch adds a new macro,
 module_platform_driver_probe(), which replaces the
 module_init()/module_exit() registrations with template functions.
-    
+
 This macro use the same idea of module_platform_driver().
-    
+
 This macro is useful to stop the misuse of module_platform_driver() for
 removing the platform_driver_probe() boilerplate.
 
-Convert drivers/usb/* and drivers/watchdog/* to use
-module_platform_driver_probe().
+Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+Cc: Greg Kroah-Hartman <gregkh@suse.de>
+---
+ include/linux/platform_device.h | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Best regards
-
-Fabio Porcedda (3):
-  driver core: add helper macro for platform_driver_probe() boilerplate
-  watchdog: convert drivers/watchdog/* to use
-    module_platform_driver_probe
-  usb: converto drivers/usb/* to use module_platform_driver_probe()
-
- drivers/usb/gadget/at91_udc.c       | 12 +-----------
- drivers/usb/gadget/atmel_usba_udc.c | 12 +-----------
- drivers/usb/gadget/fusb300_udc.c    | 13 +------------
- drivers/usb/gadget/imx_udc.c        | 12 +-----------
- drivers/usb/gadget/lpc32xx_udc.c    | 12 +-----------
- drivers/usb/gadget/m66592-udc.c     | 12 +-----------
- drivers/usb/gadget/pxa25x_udc.c     | 15 +++------------
- drivers/usb/gadget/r8a66597-udc.c   | 15 ++-------------
- drivers/usb/otg/gpio_vbus.c         | 12 +-----------
- drivers/usb/otg/msm_otg.c           | 13 +------------
- drivers/watchdog/at32ap700x_wdt.c   | 12 +-----------
- drivers/watchdog/at91sam9_wdt.c     | 13 +------------
- drivers/watchdog/coh901327_wdt.c    | 12 +-----------
- drivers/watchdog/imx2_wdt.c         | 12 +-----------
- drivers/watchdog/txx9wdt.c          | 13 +------------
- include/linux/platform_device.h     | 18 ++++++++++++++++++
- 16 files changed, 36 insertions(+), 172 deletions(-)
-
+diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+index a9ded9a..c082c71 100644
+--- a/include/linux/platform_device.h
++++ b/include/linux/platform_device.h
+@@ -204,6 +204,24 @@ static inline void platform_set_drvdata(struct platform_device *pdev, void *data
+ 	module_driver(__platform_driver, platform_driver_register, \
+ 			platform_driver_unregister)
+ 
++/* module_platform_driver_probe() - Helper macro for drivers that don't do
++ * anything special in module init/exit.  This eliminates a lot of
++ * boilerplate.  Each module may only use this macro once, and
++ * calling it replaces module_init() and module_exit()
++ */
++#define module_platform_driver_probe(__platform_driver, __platform_probe) \
++static int __init __platform_driver##_init(void) \
++{ \
++	return platform_driver_probe(&(__platform_driver), \
++				     __platform_probe);    \
++} \
++module_init(__platform_driver##_init); \
++static void __exit __platform_driver##_exit(void) \
++{ \
++	platform_driver_unregister(&(__platform_driver)); \
++} \
++module_exit(__platform_driver##_exit);
++
+ extern struct platform_device *platform_create_bundle(struct platform_driver *driver,
+ 					int (*probe)(struct platform_device *),
+ 					struct resource *res, unsigned int n_res,
 -- 
 1.8.0.3
