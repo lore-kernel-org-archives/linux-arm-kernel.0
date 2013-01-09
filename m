@@ -1,212 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Jan 2013 16:21:45 +0000
-Subject: [PATCH] Proposed removal of IS_ERR_OR_NULL() (was: Re: [PATCH
- 1/4] gpiolib: introduce descriptor-based GPIO interface)
-In-Reply-To: <alpine.LFD.2.02.1301091058070.6300@xanadu.home>
-References: <201301081259.29839.arnd@arndb.de>
- <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
- <201301091035.23206.arnd@arndb.de>
- <20130109104414.GF3931@n2100.arm.linux.org.uk>
- <20130109111055.GG3931@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301090932400.6300@xanadu.home>
- <20130109150427.GL3931@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301091020580.6300@xanadu.home>
- <20130109155154.GN3931@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301091058070.6300@xanadu.home>
-Message-ID: <20130109162145.GO3931@n2100.arm.linux.org.uk>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Wed, 9 Jan 2013 11:29:31 -0500
+Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+In-Reply-To: <50ED96D2.6010108@arm.com>
+References: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
+ <1357687783.10453.9@snotra>
+ <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
+ <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
+ <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
+ <86D3D406-05C3-4569-AD03-3223B46D47D9@suse.de>
+ <CAFEAcA9z+kaSpVU3c8dWDHEnuGEri1JRZeS2+F5d2EefnX0oyQ@mail.gmail.com>
+ <2ebf41d65170b9534c54c0c5f91a4b99@localhost>
+ <13B0CEB2-8D36-48AE-BE0E-02D6231052CF@suse.de>
+ <0c1e99864fe87de92aa86a70504b9f73@localhost>
+ <54937915-46BE-4A50-B5AA-26940DEE6A92@suse.de>
+ <50ED96D2.6010108@arm.com>
+Message-ID: <CANM98qJmNTa-k0WwQk1QQwq6HectiUKT8-jtSP6TzA3fcLxJAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 11:09:23AM -0500, Nicolas Pitre wrote:
-> On Wed, 9 Jan 2013, Russell King - ARM Linux wrote:
-> 
-> > On Wed, Jan 09, 2013 at 10:27:53AM -0500, Nicolas Pitre wrote:
-> > > Anyone with good coccinelle skills around to deal with the users?
-> > 
-> > I'm not sure that's a solution.
-> 
-> Well, I was thinking that coccinelle could handle the majority of the 
-> 354 users when the "fix" is obvious enough to be automated.
-> 
-> That said, if we want people to fix their code, it is probably necessary 
-> to merge your patch right away so the warnings are actually being seen, 
-> and revert it right before the final v3.8 release if the remaining 
-> warnings are still too numerous.  Repeat with next cycle.
+On Wed, Jan 9, 2013 at 11:12 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 09/01/13 15:56, Alexander Graf wrote:
+>>
+>> On 09.01.2013, at 16:50, Marc Zyngier wrote:
+>>
+>>> On Wed, 9 Jan 2013 16:28:03 +0100, Alexander Graf <agraf@suse.de> wrote:
+>>>> On 09.01.2013, at 16:22, Marc Zyngier wrote:
+>>>>
+>>>>> On Wed, 9 Jan 2013 15:11:39 +0000, Peter Maydell
+>>>>> <peter.maydell@linaro.org>
+>>>>> wrote:
+>>>>>> On 9 January 2013 14:58, Alexander Graf <agraf@suse.de> wrote:
+>>>>>>>
+>>>>>>> Yeah, that was the basic idea. Considering that the patch set hasn't
+>>>>>>> been going
+>>>>>>> in for another 2 months after that discussion indicates that this
+>>> isn't
+>>>>>>> too much of
+>>>>>>> an issue though :).
+>>>>>>
+>>>>>> We might get there faster if people didn't keep nitpicking the APIs at
+>>>>> the
+>>>>>> last minute :-)
+>>>>>
+>>>>> Exactly. We're trying hard to get the damned thing merged, and the
+>>>>> permanent API churn quickly becomes a burden.
+>>>>
+>>>> As I said earlier, we have had a lot of experience in creating really
+>>> bad
+>>>> APIs in the past.
+>>>
+>>> Is this one really bad? Again, what changed in the meantime that makes you
+>>> think this API is wrong?
+>>
+>> I complained about it 2 months ago already.
+>>
+>>>> But how about making this one specific? Call it
+>>> KVM_ARM_SET_VGIC_ADDRESS,
+>>>> keep the rest as it is, resend it, and later we can come up with an
+>>>> actually generic interface.
+>>>
+>>> Let's pretend you never wrote that, shall we? ;-)
+>>
+>> Why? The worst thing that happened to us so far were interfaces that looked generic and extensible and turned out not to be (see SET_SREGS in the ppc code). We have 2 options to circumvent this:
+>>
+>>   1) Commonly agree on an interface that actually is extensible and use it throughout the code
+>>   2) Create a very specific interface for a single use case, keep it implemented "forever" and as soon as we need more, implement a more generic one that goes back to 1
+>>
+>> Since the ARM patches have been out of tree for too long, I'm happy with going route 2 until we go back to square 1.
+>
+> I really don't want to see that. Either we keep the API as it is, or we
+> change it for something that is really better and used by other
+> architectures. No point in turning it upside down if we're the only one
+> doing it.
+>
+> Oh, and as we're aiming for 3.9, it'd better be ready soon...
+>
+ok, I renamed it to KVM_ARM_SET_DEVICE_ADDR, using the same binary
+format, so user space tools remain compatible.
 
-Well, this is what I currently have for arch/arm thus far, and ooh look,
-we save some lines of code too.
+I'll be happy to help out with a more generic API, once the kvm/arm
+patches reach upstream.
 
- arch/arm/mach-integrator/integrator_ap.c |    4 +---
- arch/arm/mach-integrator/integrator_cp.c |    5 +----
- arch/arm/mach-omap2/omap_device.c        |   11 ++++-------
- arch/arm/mach-omap2/pm-debug.c           |    6 +++---
- arch/arm/mach-omap2/powerdomain.c        |    2 +-
- arch/arm/mach-tegra/board-harmony-pcie.c |    6 +++---
- arch/arm/mach-tegra/tegra2_emc.c         |    2 +-
- arch/arm/mach-ux500/cpu.c                |    3 +--
- arch/arm/plat-omap/dmtimer.c             |    4 ++--
- 9 files changed, 17 insertions(+), 26 deletions(-)
-
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 11e2a41..251f54f 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -547,9 +547,7 @@ static void __init ap_init_of(void)
- 	}
- 
- 	parent = soc_device_to_device(soc_dev);
--
--	if (!IS_ERR_OR_NULL(parent))
--		integrator_init_sysfs(parent, ap_sc_id);
-+	integrator_init_sysfs(parent, ap_sc_id);
- 
- 	of_platform_populate(root, of_default_bus_match_table,
- 			ap_auxdata_lookup, parent);
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 7322838..3fadadf 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -371,10 +371,7 @@ static void __init intcp_init_of(void)
- 	}
- 
- 	parent = soc_device_to_device(soc_dev);
--
--	if (!IS_ERR_OR_NULL(parent))
--		integrator_init_sysfs(parent, intcp_sc_id);
--
-+	integrator_init_sysfs(parent, intcp_sc_id);
- 	of_platform_populate(root, of_default_bus_match_table,
- 			intcp_auxdata_lookup, parent);
- }
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index e065daa..fabb32d 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -1157,20 +1157,17 @@ struct device *omap_device_get_by_hwmod_name(const char *oh_name)
- 	}
- 
- 	oh = omap_hwmod_lookup(oh_name);
--	if (IS_ERR_OR_NULL(oh)) {
-+	if (!oh) {
- 		WARN(1, "%s: no hwmod for %s\n", __func__,
- 			oh_name);
--		return ERR_PTR(oh ? PTR_ERR(oh) : -ENODEV);
-+		return -ENODEV;
- 	}
--	if (IS_ERR_OR_NULL(oh->od)) {
-+	if (!oh->od) {
- 		WARN(1, "%s: no omap_device for %s\n", __func__,
- 			oh_name);
--		return ERR_PTR(oh->od ? PTR_ERR(oh->od) : -ENODEV);
-+		return -ENODEV;
- 	}
- 
--	if (IS_ERR_OR_NULL(oh->od->pdev))
--		return ERR_PTR(oh->od->pdev ? PTR_ERR(oh->od->pdev) : -ENODEV);
--
- 	return &oh->od->pdev->dev;
- }
- EXPORT_SYMBOL(omap_device_get_by_hwmod_name);
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index e2c291f..548547e 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -219,7 +219,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *dir)
- 		return 0;
- 
- 	d = debugfs_create_dir(pwrdm->name, (struct dentry *)dir);
--	if (!(IS_ERR_OR_NULL(d)))
-+	if (d)
- 		(void) debugfs_create_file("suspend", S_IRUGO|S_IWUSR, d,
- 			(void *)pwrdm, &pwrdm_suspend_fops);
- 
-@@ -263,8 +263,8 @@ static int __init pm_dbg_init(void)
- 		return 0;
- 
- 	d = debugfs_create_dir("pm_debug", NULL);
--	if (IS_ERR_OR_NULL(d))
--		return PTR_ERR(d);
-+	if (!d)
-+		return -EINVAL;
- 
- 	(void) debugfs_create_file("count", S_IRUGO,
- 		d, (void *)DEBUG_FILE_COUNTERS, &debug_fops);
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index dea62a9..36a6918 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -1054,7 +1054,7 @@ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
- {
- 	int i;
- 
--	if (IS_ERR_OR_NULL(pwrdm)) {
-+	if (!pwrdm) {
- 		pr_debug("powerdomain: %s: invalid powerdomain pointer\n",
- 			 __func__);
- 		return 1;
-diff --git a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
-index 3cdc1bb..6d29e6a 100644
---- a/arch/arm/mach-tegra/board-harmony-pcie.c
-+++ b/arch/arm/mach-tegra/board-harmony-pcie.c
-@@ -56,9 +56,9 @@ int __init harmony_pcie_init(void)
- 	gpio_direction_output(en_vdd_1v05, 1);
- 
- 	regulator = regulator_get(NULL, "vdd_ldo0,vddio_pex_clk");
--	if (IS_ERR_OR_NULL(regulator)) {
--		pr_err("%s: regulator_get failed: %d\n", __func__,
--		       (int)PTR_ERR(regulator));
-+	if (IS_ERR(regulator)) {
-+		err = PTR_ERR(regulator);
-+		pr_err("%s: regulator_get failed: %d\n", __func__, err);
- 		goto err_reg;
- 	}
- 
-diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
-index 837c7b9..844c8d2 100644
---- a/arch/arm/mach-tegra/tegra2_emc.c
-+++ b/arch/arm/mach-tegra/tegra2_emc.c
-@@ -276,7 +276,7 @@ static struct tegra_emc_pdata __devinit *tegra_emc_fill_pdata(struct platform_de
- 	int i;
- 
- 	WARN_ON(pdev->dev.platform_data);
--	BUG_ON(IS_ERR_OR_NULL(c));
-+	BUG_ON(IS_ERR(c));
- 
- 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
- 	pdata->tables = devm_kzalloc(&pdev->dev, sizeof(*pdata->tables),
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 721e7b4..e31c2b4 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -151,8 +151,7 @@ struct device * __init ux500_soc_device_init(const char *soc_id)
- 	}
- 
- 	parent = soc_device_to_device(soc_dev);
--	if (!IS_ERR_OR_NULL(parent))
--		device_create_file(parent, &ux500_soc_attr);
-+	device_create_file(parent, &ux500_soc_attr);
- 
- 	return parent;
- }
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index d51b75b..c654bb8 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -140,7 +140,7 @@ static int omap_dm_timer_prepare(struct omap_dm_timer *timer)
- 	 */
- 	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
- 		timer->fclk = clk_get(&timer->pdev->dev, "fck");
--		if (WARN_ON_ONCE(IS_ERR_OR_NULL(timer->fclk))) {
-+		if (WARN_ON_ONCE(IS_ERR(timer->fclk))) {
- 			timer->fclk = NULL;
- 			dev_err(&timer->pdev->dev, ": No fclk handle.\n");
- 			return -EINVAL;
-@@ -500,7 +500,7 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
- 	}
- 
- 	parent = clk_get(&timer->pdev->dev, parent_name);
--	if (IS_ERR_OR_NULL(parent)) {
-+	if (IS_ERR(parent)) {
- 		pr_err("%s: %s not found\n", __func__, parent_name);
- 		return -EINVAL;
- 	}
+Thanks so far!
+-Christoffer
