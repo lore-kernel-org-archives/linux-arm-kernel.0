@@ -1,37 +1,34 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 9 Jan 2013 21:17:44 +0100
-Subject: [PATCH 2/3 V2] iio: mxs: Implement support for touchscreen
-In-Reply-To: <50EDCCB6.1070405@jic23.retrosnub.co.uk>
-References: <1355449598-15980-1-git-send-email-marex@denx.de>
- <201301082028.18440.marex@denx.de> <50EDCCB6.1070405@jic23.retrosnub.co.uk>
-Message-ID: <201301092117.44672.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Jan 2013 20:22:48 +0000
+Subject: [PATCH] ARM: nommu: re-enable use of vexpress without
+ ARCH_MULTIPLATFORM
+In-Reply-To: <alpine.LFD.2.02.1301091349390.6300@xanadu.home>
+References: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
+ <201301091843.48942.arnd@arndb.de>
+ <alpine.LFD.2.02.1301091349390.6300@xanadu.home>
+Message-ID: <201301092022.49130.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jonathan Cameron,
-
-> On 01/08/2013 07:28 PM, Marek Vasut wrote:
-> > Dear Jonathan Cameron,
-> > 
-> >> On 12/19/2012 05:01 PM, Marek Vasut wrote:
-> >>> Ccing Dmitry.
-> >>> 
-> >>> Also, Jonathan, can I get your review please?
-> >> 
-> >> Dratt caught me hiding from this one and hoping it would
-> >> go away ;)
-> > 
-> > Still not going away :)
-> > 
-> > Did I miss your reply maybe?
+On Wednesday 09 January 2013, Nicolas Pitre wrote:
+> On Wed, 9 Jan 2013, Arnd Bergmann wrote:
 > 
-> I certainly remember writing one!
+> > On a related topic, I still think we should fix ARCH_MULTI_V7 not
+> > to select ARCH_VEXPRESS unconditionally and come up with a better
+> > way to avoid having an empty platform list to make 'allnoconfig'
+> > still work.
 > 
-> http://marc.info/?l=linux-iio&m=135660790520224&w=2
-> looks about right...
+> The virtual guest platform support that Will and Marc did is small 
+> enough that it could always be selected in place of vexpress.
 
-Damn, sorry. I don't see it in my mailer so maybe it got lost. Anyway, did I 
-miss the reply from Dmitry as well?
+But that only helps when ARMv7 is selected, unless we want to build
+it only for ARMv4, v5 or v6 kernels.
 
-Best regards,
-Marek Vasut
+Besides, the only reason we can't have a kernel without any platform
+selected is that the linker script has code in it to intentionally
+barf on that because it's guaranteed not to boot on any hardware.
+
+If we decide that building an allnoconfig without any platform
+is actually ok, we could just as well rip out that error statement.
+
+	Arnd
