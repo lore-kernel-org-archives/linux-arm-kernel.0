@@ -1,41 +1,75 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Jan 2013 15:24:00 +0900
-Subject: [PATCH] ARM: mach-shmobile: armadillo: update defconfig
-Message-ID: <1357712640-3065-1-git-send-email-horms+renesas@verge.net.au>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 9 Jan 2013 07:25:09 +0100
+Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
+ HAVE_ARM_SCU
+In-Reply-To: <1357711661.28383.1.camel@jlo-ubuntu-64.nvidia.com>
+References: <20130108142651.GB3931@n2100.arm.linux.org.uk><20130109.074651.1513003283585604525.hdoyu@nvidia.com><1357711661.28383.1.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <20130109.082509.2246926906796416372.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Enable ARM_APPENDED_DTB
+Hi Joseph,
 
-  Typically the bootloader of an armadillo board does not support DT
-  so this option is useful.
+Joseph Lo <josephl@nvidia.com> wrote @ Wed, 9 Jan 2013 07:07:41 +0100:
 
-* Do not disable CONFIG_SUSPEND
+> On Wed, 2013-01-09 at 13:46 +0800, Hiroshi Doyu wrote:
+> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote @ Tue, 8 Jan 2013 15:26:51 +0100:
+> > 
+> > > On Tue, Jan 08, 2013 at 02:47:37PM +0200, Hiroshi Doyu wrote:
+> > > > The method to detect the number of CPU cores on Cortex-A9 MPCore and
+> > > > Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
+> > > > information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
+> > > > have to read it from the system coprocessor(CP15), because the SCU on
+> > > > Cortex-A15 MPCore does not have software readable registers. This
+> > > > patch selects the correct method at runtime based on the CPU ID.
+> > > > 
+> > > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > > > ---
+> > > >  arch/arm/mach-tegra/platsmp.c |   31 ++++++++++++++++++++++++++++---
+> > > >  1 file changed, 28 insertions(+), 3 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> > > > index 1b926df..68e76ef 100644
+> > > > --- a/arch/arm/mach-tegra/platsmp.c
+> > > > +++ b/arch/arm/mach-tegra/platsmp.c
+> > > > @@ -23,6 +23,7 @@
+> > > >  #include <asm/hardware/gic.h>
+> > > >  #include <asm/mach-types.h>
+> > > >  #include <asm/smp_scu.h>
+> > > > +#include <asm/cputype.h>
+> > > >  
+> > > >  #include <mach/powergate.h>
+> > > >  
+> > > > @@ -34,9 +35,13 @@
+> > > >  #include "common.h"
+> > > >  #include "iomap.h"
+> > > >  
+> > > > +#define CPU_MASK		0xff0ffff0
+> > > > +#define CPU_CORTEX_A9		0x410fc090
+> > > > +#define CPU_CORTEX_A15		0x410fc0f0
+> > > 
+> > > NAK. There's some patches around to make this stuff generic, we don't
+> > > need more ifdefs springing up.  We need to get those generic patches
+> > > in.
+> > 
+> > Does anyone give some pointers to the above patches?
+> 
+> Hi Hiroshi,
+> 
+> Please check "arch/arm/include/asm/cputype.h" in next-20130109. It just
+> be merged.
 
-  Suspend seems to work fine on the armadillo
+I found the following commit. Thanks.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/armadillo800eva_defconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+commit cd8dde6fc347b56b6cb9afa7cc0f9073da163176
+Author: Christoffer Dall <c.dall@virtualopensystems.com>
+Date:   Tue Dec 18 04:06:37 2012 +0000
 
-diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
-index 2e1a825..c29cf04 100644
---- a/arch/arm/configs/armadillo800eva_defconfig
-+++ b/arch/arm/configs/armadillo800eva_defconfig
-@@ -34,12 +34,12 @@ CONFIG_AEABI=y
- CONFIG_FORCE_MAX_ZONEORDER=13
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
- CONFIG_CMDLINE="console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw"
- CONFIG_CMDLINE_FORCE=y
- CONFIG_KEXEC=y
- CONFIG_VFP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--# CONFIG_SUSPEND is not set
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
--- 
-1.7.10.4
+    ARM: Define CPU part numbers and implementors
+    
+    Define implementor IDs, part numbers and Xscale architecture versions in
+    cputype.h.  Also create accessor functions for reading the implementor,
+    part number, and Xscale architecture versions from the CPUID regiser.
+    
+    Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+    Signed-off-by: Will Deacon <will.deacon@arm.com>
