@@ -1,56 +1,27 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 09 Jan 2013 11:50:14 +0000
-Subject: [PATCH v3 2/7] vexpress: Match the "arm, sp810" DT entry for
- clock initialisation
-In-Reply-To: <20130109113649.GB1673@arm.com>
-References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
- <1357309041-6192-3-git-send-email-catalin.marinas@arm.com>
- <1357666147.24697.27.camel@linaro1.home> <20130109113649.GB1673@arm.com>
-Message-ID: <1357732214.3222.11.camel@linaro1.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Jan 2013 11:52:29 +0000
+Subject: [PATCH 1/4] gpiolib: introduce descriptor-based GPIO interface
+In-Reply-To: <20130109111055.GG3931@n2100.arm.linux.org.uk>
+References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
+ <20130109104414.GF3931@n2100.arm.linux.org.uk>
+ <20130109111055.GG3931@n2100.arm.linux.org.uk>
+Message-ID: <201301091152.30047.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-09 at 11:36 +0000, Catalin Marinas wrote:
-> On Tue, Jan 08, 2013 at 05:29:07PM +0000, Jon Medhurst (Tixy) wrote:
-> > On Fri, 2013-01-04 at 14:17 +0000, Catalin Marinas wrote:
-> > > Currently the clk-vexpress.c implementation relies on the vexpress code
-> > > to call the vexpress_clk_of_init() function which performs the SP810
-> > > initialisation. This patch adds "arm,sp810" to the clock DT match array
-> > > allowing of_clk_init() to call the vexpress_sp810_of_setup() function.
-> > > In case of CONFIG_ARM64, make vexpress_clk_of_init() an arch_initcall().
-> > > 
-> > > Note that SP810 requires the fixed clocks to be already registered.
-> > > Since the clock subsystem does not handle DT dependencies, the
-> > > corresponding DT entries must be in the correct order.
-> > 
-> > Which they aren't on 32-bit vexpress ;-) leading to:
-> > 
-> >   ERROR: could not get clock /smb/motherboard/iofpga at 3,00000000/sysctl at 020000:refclk(0)
-> >   ERROR: could not get clock /smb/motherboard/iofpga at 3,00000000/sysctl at 020000:timclk(1)
-> >   ------------[ cut here ]------------
-> >   WARNING: at drivers/clk/versatile/clk-vexpress.c:112 vexpress_sp810_of_setup+0x43/0xc8()
-> >   Modules linked in:
-> >   [<c0011cbd>] (unwind_backtrace+0x1/0x9c) from [<c001c1a9>] (warn_slowpath_common+0x39/0x50)
-> >   [<c001c1a9>] (warn_slowpath_common+0x39/0x50) from [<c001c1d7>] (warn_slowpath_null+0x17/0x1c)
-> >   [<c001c1d7>] (warn_slowpath_null+0x17/0x1c) from [<c05b4fab>] (vexpress_sp810_of_setup+0x43/0xc8)
-> >   [<c05b4fab>] (vexpress_sp810_of_setup+0x43/0xc8) from [<c05b4e67>] (of_clk_init+0x1f/0x34)
-> >   [<c05b4e67>] (of_clk_init+0x1f/0x34) from [<c05b515d>] (vexpress_clk_of_init+0x9/0x10)
-> >   [<c05b515d>] (vexpress_clk_of_init+0x9/0x10) from [<c05a7d2b>] (v2m_dt_timer_init+0x7/0x78)
-> >   [<c05a7d2b>] (v2m_dt_timer_init+0x7/0x78) from [<c05a4d09>] (time_init+0x11/0x20)
-> >   [<c05a4d09>] (time_init+0x11/0x20) from [<c05a24fb>] (start_kernel+0x113/0x214)
-> >   [<c05a24fb>] (start_kernel+0x113/0x214) from [<8000807f>] (0x8000807f)
-> >   ---[ end trace 1b75b31a2719ed1c ]---
-> > 
-> > After moving all "fixed-clock" nodes to be the first devices in
-> > arch/arm/boot/dts/vexpress-v2m{-rs1,}.dtsi then all appears well. (I am
-> > only trying out patches 1-3 of this set at the moment).
+On Wednesday 09 January 2013, Russell King - ARM Linux wrote:
+>         d = debugfs_create_dir("pm_debug", NULL);
+>         if (IS_ERR_OR_NULL(d))
+>                 return PTR_ERR(d);
 > 
-> I'm waiting for Pawel's feedback (he's still on holiday). He may have a
-> better solution for the vexpress code than relying on the dts order but
-> for now the simples fix is to change the dts.
+> Well, covered above.  NULL is success here.
 
-Fair enough. But if the patch series gets used as is then another patch
-will need to be added to it to fix the device-trees.
+This one is actually worse, because in case of debugfs_create_dir,
+a negative error code is documented to mean "success": The debugfs
+functions intentionally return ERR_PTR(-ENODEV) when debugfs is
+disabled so that any code checking for NULL pretends it is a valid
+pointer, but that code is only allowed to pass this pointer into
+other debugfs functions that are also stubbed out and never
+dereference it.
 
--- 
-Tixy
+	Arnd
