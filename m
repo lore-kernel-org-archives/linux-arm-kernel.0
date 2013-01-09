@@ -1,82 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 9 Jan 2013 13:00:04 +0000
-Subject: [PATCH 2/3] ARM: ux500: Turn on the 'heartbeat' LED trigger
-In-Reply-To: <20130109123853.GJ3931@n2100.arm.linux.org.uk>
-References: <1357725965-27342-1-git-send-email-lee.jones@linaro.org>
- <1357725965-27342-2-git-send-email-lee.jones@linaro.org>
- <201301091018.55058.arnd@arndb.de>
- <20130109103510.GE3931@n2100.arm.linux.org.uk>
- <20130109110840.GD31678@gmail.com>
- <20130109111209.GH3931@n2100.arm.linux.org.uk>
- <20130109122323.GE31678@gmail.com>
- <20130109123853.GJ3931@n2100.arm.linux.org.uk>
-Message-ID: <20130109130004.GF31678@gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 09 Jan 2013 17:28:35 +0400
+Subject: [PATCH v5 12/12] ARM: KVM: Add VGIC configuration option
+In-Reply-To: <20130108184245.46558.83229.stgit@ubuntu>
+References: <20130108184116.46558.3558.stgit@ubuntu>
+ <20130108184245.46558.83229.stgit@ubuntu>
+Message-ID: <50ED7083.5060401@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Excuse my ignorance, but I'm a little confused by this.
-> > 
-> > What's the difference between 'select <OPTION>' in the Kconfig and
-> > 'CONFIG_<OPTION>=y' in the defconfig; besides the fact that if we
-> > do it in the Kconfig file, we can be more selective with regards to
-> > which platform it gets enabled on?
-> 
-> Take this in Kconfig:
-> 
-> config FOO
-> 	bool "FOO option"
-> 	select BAR
-> 
-> config BAR
-> 	bool "BAR option"
-> 
-> Now, irrespective of the default configuration file being used:
-> - if you don't enable FOO, then you can enable _and_ _disable_ BAR according
->   to your needs.
-> - if you enable FOO, then BAR will be _forcefully_ enabled and you can't
->   turn it off without first disabling FOO.
-> 
-> The default configuration file will specify the _default_ values for these
-> options, but if FOO ends up being enabled, BAR will be forcefully enabled
-> irrespective of what's in the configuration file.
-> 
-> With this instead:
-> 
-> config FOO
-> 	bool "FOO option"
-> 
-> config BAR
-> 	bool "BAR option"
-> 
-> Then, the two options are independent.  They can be enabled and disabled
-> by the configuration completely independently.  However, their default
-> values come from the default configuration file.  So, if the config file
-> has:
-> 
-> CONFIG_FOO=y
-> CONFIG_BAR=y
-> 
-> and you do a 'make oldconfig' then they will remain set.  If you use one
-> of the configuration editing tools, you'll be presented with them already
-> enabled, and you can turn them off independently.
-> 
-> So, putting this stuff in the default configuration file allows
-> _non-mandatory_ options to be disabled should the user desire without the
-> user having to edit the configuration files.
-> 
-> If a user has to edit the configuration files in order to configure the
-> kernel as they desire, then the configuration system has failed - or we
-> have failed to properly think out how to represent the allowable
-> configurations.
+Hello.
 
-Understood. Thanks for the explanation.
+On 08-01-2013 22:42, Christoffer Dall wrote:
 
-Linus, is it okay to put these in the defconfig instead?
+> From: Marc Zyngier <marc.zyngier@arm.com>
 
-If so, I'll fixup.
+> It is now possible to select the VGIC configuration option.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+> ---
+>   arch/arm/kvm/Kconfig |    8 ++++++++
+>   1 file changed, 8 insertions(+)
+
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index 05227cb..d32e33f 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -51,6 +51,14 @@ config KVM_ARM_MAX_VCPUS
+>   	  large, so only choose a reasonable number that you expect to
+>   	  actually use.
+>
+> +config KVM_ARM_VGIC
+> +        bool "KVM support for Virtual GIC"
+
+    Please indent with tab, as below.
+
+> +	depends on KVM_ARM_HOST && OF
+> +	select HAVE_KVM_IRQCHIP
+> +	default y
+> +	---help---
+> +	  Adds support for a hardware assisted, in-kernel GIC emulation.
+> +
+
+WBR, Sergei
