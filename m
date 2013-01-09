@@ -1,34 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 9 Jan 2013 14:41:10 +0800
-Subject: [PATCH] mtd: mxc_nand: Make use of supplied pinctrl data
-In-Reply-To: <201301082122.46815.marex@denx.de>
-References: <1357568885-15507-1-git-send-email-marex@denx.de>
- <20130108195826.GD7360@game.jcrosoft.org>
- <201301082122.46815.marex@denx.de>
-Message-ID: <20130109064107.GB12525@S2100-06.ap.freescale.net>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 09 Jan 2013 19:13:59 +1300
+Subject: [PATCH 1/4] arm: vt8500: Add support for Wondermedia WM8750/WM8850
+In-Reply-To: <1356650452-16559-2-git-send-email-linux@prisktech.co.nz>
+References: <1356650452-16559-1-git-send-email-linux@prisktech.co.nz>
+ <1356650452-16559-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1357712039.774.0.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 09:22:46PM +0100, Marek Vasut wrote:
-> Dear Jean-Christophe PLAGNIOL-VILLARD,
+On Fri, 2012-12-28 at 12:20 +1300, Tony Prisk wrote:
+> This patch adds support for the WM8750 (ARMv6) and WM8850 (ARMv7).
 > 
-> > On 15:28 Mon 07 Jan     , Marek Vasut wrote:
-> > > The MXC NAND driver doesn't consider the pinctrl data supplied via DT,
-> > > which will result in NAND pins not being properly configured.
-> > > 
-> > > Make the driver use pinctrl, but to prevent breakage on various boards,
-> > > do not fail if the pinctrl data are not available, only print a warning
-> > > message.
-> > 
-> > nack
-> > 
-> > we will at bus level
+> Common features across all SoCs are split into ARCH_VT8500 and
+> unique features are specified by each SoC option.
 > 
-> Can you please elaborate? I don't understand what you're complaining about at 
-> all, sorry.
-> 
-He is talking about patch [1] which is likely to hit mainline for 3.9.
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 
-Shawn
 
-[1] http://thread.gmane.org/gmane.linux.kernel/1409263
+Hi Arnd, Olof,
+
+Haven't heard anything re: this patch series. Problem?
+
+Regards
+Tony P
