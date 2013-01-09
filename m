@@ -1,51 +1,33 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 9 Jan 2013 07:00:31 +0100
-Subject: [v2 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
-In-Reply-To: <50ECA0A6.4090307@wwwdotorg.org>
-References: <1357649263-1098-6-git-send-email-hdoyu@nvidia.com><50EC444B.5060206@arm.com><50ECA0A6.4090307@wwwdotorg.org>
-Message-ID: <20130109.080031.1063344100374199123.hdoyu@nvidia.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Wed, 9 Jan 2013 06:02:40 +0000
+Subject: [RFC v2 07/18] ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod
+ with the right flags
+In-Reply-To: <50EC35C3.4020701@ti.com>
+References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
+ <1356959231-17335-8-git-send-email-vaibhav.bedia@ti.com>
+ <50EC35C3.4020701@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDD132@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 8 Jan 2013 23:41:42 +0100:
+On Tue, Jan 08, 2013 at 20:35:39, Shilimkar, Santosh wrote:
+> On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
+> > TPTC0 needs to be idled and put to standby under SW control.
+> > Add the appropriate flags in the TPTC0 hwmod entry.
+> >
+> Can you please expand TPTC0 in chane log.
 
-> On 01/08/2013 09:07 AM, Marc Zyngier wrote:
-> > On 08/01/13 12:47, Hiroshi Doyu wrote:
-> >> Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
-> >> timer than TMR0. If it's available, it will be used for clock source
-> >> and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
-> >> necessary for clock event.
-> 
-> >> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-> 
-> >> +/* FIXME: only secure mode is supported. */
-> > 
-> > And this is a bug, as far as I'm concerned.
-> > 
-> >> +static int tegra_arch_timer_init(void)
-> 
-> >> +	clk = clk_get_sys("clk_m", NULL);
-> >> +	if (IS_ERR(clk)) {
-> >> +		freq = 12000000;
-> >> +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
-> >> +	} else {
-> >> +		freq = clk_get_rate(clk);
-> >> +		clk_put(clk);
-> >> +	}
-> >> +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
-> >> +
-> >> +	/* CNTFRQ */
-> >> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
-> >> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
-> >> +	BUG_ON(val != freq);
-> > 
-> > No, not again! Like I said last year, this won't fly. So instead of
-> > trying to work around a broken firmware, let's do the right thing.
-> 
-> OK, so I understand you want to firmware/bootloader/... to write the
-> value into that register instead, so this all works in non-secure mode
-> (which sounds like a fine objection), but ...
+Third Party Transfer Controller. It's part of the DMA IP.
+Will add it in the changelog.
 
-If possible, I want to run kernel without bootloader initializing TSC
-. IOW, I want to allow legacy bootloaders to boot kernel with ARM arch
-timer.
+> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> > Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+> > ---
+> Patch is fine otherwise.
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> 
