@@ -1,91 +1,139 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 9 Jan 2013 06:49:46 +0100
-Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
- HAVE_ARM_SCU
-In-Reply-To: <50EC7450.4070806@wwwdotorg.org>
-References: <20130108.165342.1996373920678167735.hdoyu@nvidia.com><20130108162056.GA28618@e106331-lin.cambridge.arm.com><50EC7450.4070806@wwwdotorg.org>
-Message-ID: <20130109.074946.1167125688535781408.hdoyu@nvidia.com>
+Date: Wed, 9 Jan 2013 06:57:08 +0100
+Subject: [v2 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
+In-Reply-To: <50EC444B.5060206@arm.com>
+References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com><1357649263-1098-6-git-send-email-hdoyu@nvidia.com><50EC444B.5060206@arm.com>
+Message-ID: <20130109.075708.1662067562960541635.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marc,
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 8 Jan 2013 20:32:32 +0100:
+Marc Zyngier <marc.zyngier@arm.com> wrote @ Tue, 8 Jan 2013 17:07:39 +0100:
 
-> On 01/08/2013 09:21 AM, Mark Rutland wrote:
-> > On Tue, Jan 08, 2013 at 02:53:42PM +0000, Hiroshi Doyu wrote:
-> >> Mark Rutland <mark.rutland@arm.com> wrote @ Tue, 8 Jan 2013 15:28:28 +0100:
-> >>> On Tue, Jan 08, 2013 at 12:47:37PM +0000, Hiroshi Doyu wrote:
-> >>>> The method to detect the number of CPU cores on Cortex-A9 MPCore and
-> >>>> Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
-> >>>> information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
-> >>>> have to read it from the system coprocessor(CP15), because the SCU on
-> >>>> Cortex-A15 MPCore does not have software readable registers. This
-> >>>> patch selects the correct method at runtime based on the CPU ID.
-> ...
-> >>>>  static void __init tegra_smp_init_cpus(void)
-> >>>>  {
-> >>>> -	unsigned int i, ncores = scu_get_core_count(scu_base);
-> >>>> +	unsigned int i, cpu_id, ncores;
-> >>>> +	u32 l2ctlr;
-> >>>> +	phys_addr_t pa;
-> >>>> +
-> >>>> +	cpu_id = read_cpuid(CPUID_ID) & CPU_MASK;
-> >>>> +	switch (cpu_id) {
-> >>>> +	case CPU_CORTEX_A15:
-> >>>> +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
-> >>>> +		ncores = ((l2ctlr >> 24) & 3) + 1;
-> >>>> +		break;
-> >>>
-> >>> [...]
-> >>>
-> >>> As mentioned last time [1], you should get this information from the dt
-> >>> instead.
-> >>
-> >> Most of platsmp.c:.smp_init_cpus() implementations seem just to
-> >> overwrite # of cores by SCU/MRC detection. Is there any implementation
-> >> to use the DT's # and skip SCU/MRC detection in .smp_init_cpus()?
+> On 08/01/13 12:47, Hiroshi Doyu wrote:
+> > Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
+> > timer than TMR0. If it's available, it will be used for clock source
+> > and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
+> > necessary for clock event.
 > > 
-> > As far as I can see, there's no other platform which just relies on
-> > arm_dt_init_cpu_maps. Until recently, it didn't exist, so that makes some
-> > sense. As far as I can see, for the Tegra 114 you only need your smp_init_cpus
-> > to call set_smp_cross_call(gic_raise_softirq). Everything else you do seems to
-> > be handled by arm_dt_init_cpus.
-
-True.
-
-> > I think the best option would be to have a separate smp_ops for your dt
-> > platforms where we know cpu nodes are populated (e.g. Tegra 114), where
-> > smp_init_cpus is different to that for non-dt platforms. That way non dt
-> > platforms can keep the SCU hack for now, and won't be broken, and the dt
-> > platforms are far removed from the SCU hack and just use common
-> > infrastructure.
->
-> Tegra doesn't have any non-DT support now.
-
-What about falling down to SCU/MRC hack only when DT detection fails
-or no /cpus entry in DT?
-
-Can arm_dt_init_cpu_maps() return if it suceeds or not?
-
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> >  .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 ++++
+> >  drivers/clocksource/tegra20_timer.c                |   65 +++++++++++++++++++-
+> >  2 files changed, 75 insertions(+), 1 deletion(-)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> > new file mode 100644
+> > index 0000000..9de936a
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
+> > @@ -0,0 +1,11 @@
+> > +NVIDIA Tegra Timer Stamp Counter(TSC)
+> > +
+> > +Required properties:
+> > +- compatible : "nvidia,tegra114-tsc
+> > +- reg : Should contain 1 register ranges(address and length)
+> > +
+> > +Example:
+> > +	tsc {
+> > +		compatible = "nvidia,tegra114-tsc";
+> > +		reg = <0x700f0000 0x20000>;
+> > +	};
+> > diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+> > index 1d25de8..564266d 100644
+> > --- a/drivers/clocksource/tegra20_timer.c
+> > +++ b/drivers/clocksource/tegra20_timer.c
+> > @@ -30,6 +30,7 @@
+> >  #include <asm/mach/time.h>
+> >  #include <asm/smp_twd.h>
+> >  #include <asm/sched_clock.h>
+> > +#include <asm/arch_timer.h>
+> >  
+> >  #define RTC_SECONDS            0x08
+> >  #define RTC_SHADOW_SECONDS     0x0c
+> > @@ -271,10 +272,72 @@ static void __init tegra20_init_tmr(void)
+> >  	clockevents_register_device(&tegra_clockevent);
+> >  }
+> >  
+> > +#define TSC_CNTCR		0		/* TSC control registers */
+> > +#define TSC_CNTCR_ENABLE	(1 << 0)	/* Enable */
+> > +#define TSC_CNTCR_HDBG		(1 << 1)	/* Halt on debug */
+> > +
+> > +#define TSC_CNTCV0		0x8		/* TSC counter (LSW) */
+> > +#define TSC_CNTCV1		0xc		/* TSC counter (MSW) */
+> > +#define TSC_CNTFID0		0x20		/* TSC freq id 0 */
+> > +
+> > +static const struct of_device_id tegra_tsc_match[] __initconst = {
+> > +	{ .compatible = "nvidia,tegra114-tsc" },
+> > +	{}
+> > +};
+> > +
+> > +/* FIXME: only secure mode is supported. */
 > 
-> If we're going to make Tegra114 read the CPU information from DT, then
-> I'd rather just switch over all Tegra platforms to requiring CPU nodes
-> in the DT. We have few enough SoC variants that it should be easy to
-> switch everything to DT before adding Tegra114 support without causing
-> any problems.
+> And this is a bug, as far as I'm concerned.
+> 
+> > +static int tegra_arch_timer_init(void)
+> > +{
+> > +	int err;
+> > +	struct device_node *np;
+> > +	struct clk *clk;
+> > +	void __iomem *tsc_base;
+> > +	u32 freq, val;
+> > +
+> > +	np = of_find_matching_node(NULL, tegra_tsc_match);
+> > +	if (!np)
+> > +		return -ENODEV;
+> > +
+> > +	tsc_base = of_iomap(np, 0);
+> > +	if (!tsc_base)
+> > +		return -ENODEV;
+> > +
+> > +	clk = clk_get_sys("clk_m", NULL);
+> > +	if (IS_ERR(clk)) {
+> > +		freq = 12000000;
+> > +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
+> > +	} else {
+> > +		freq = clk_get_rate(clk);
+> > +		clk_put(clk);
+> > +	}
+> > +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
+> > +
+> > +	/* CNTFRQ */
+> > +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
+> > +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
+> > +	BUG_ON(val != freq);
+> 
+> No, not again! Like I said last year, this won't fly. So instead of
+> trying to work around a broken firmware, let's do the right thing.
+> 
+> > +
+> > +	val = readl_relaxed(tsc_base + TSC_CNTCR);
+> > +	val |= TSC_CNTCR_ENABLE | TSC_CNTCR_HDBG;
+> > +	writel_relaxed(val, tsc_base + TSC_CNTCR);
+> > +
+> > +	err = arch_timer_of_register();
+> 
+> What about adding an optional property to the binding, pointing to the
+> required clock? That would solve the above problem in a sensible way,
+> and your kernel wouldn't go bust.
 
-Possible.
+Could you explain a bit more? We have the follwing DT entries related to this:
 
-> But that all said, I'm not convinced it's a good idea to force the
-> information to be present in DT when it's just duplicating stuff that
-> can be runtime-probed from the HW...
+	tsc {
+		compatible = "nvidia,tegra114-tsc";
+		reg = <0x700f0000 0x20000>;
+	};
 
-That's also my concern somewhat.
+	...
 
-The main purpose to DT CPU core detection is for multiple CPU
-clusters. SCU/MRC cannot know anything outside of their own
-clusters. In tegra, we have 4 Cortex-A9/A15 core plus 1 shadow
-core. Switching those clusters is done transparently. The last A9/A15
-core is transparently switched back and forth to the shadow one. So in
-this case, SCU/MRC detection seems to work fine.
+	timer {
+		compatible = "arm,armv7-timer";
+		interrupts = <1 13 0xf08>,
+			     <1 14 0xf08>,
+			     <1 11 0xf08>,
+			     <1 10 0xf08>;
+	};
+
+The above "tsc" is needed for platform specific enabler for ARM arch timer.
