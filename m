@@ -1,90 +1,96 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Wed, 9 Jan 2013 10:17:04 -0500
-Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
-In-Reply-To: <CAFEAcA9z+kaSpVU3c8dWDHEnuGEri1JRZeS2+F5d2EefnX0oyQ@mail.gmail.com>
-References: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
- <1357687783.10453.9@snotra>
- <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
- <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
- <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
- <86D3D406-05C3-4569-AD03-3223B46D47D9@suse.de>
- <CAFEAcA9z+kaSpVU3c8dWDHEnuGEri1JRZeS2+F5d2EefnX0oyQ@mail.gmail.com>
-Message-ID: <CANM98qKXvfCohJrybZw+5V-GvgS+9kw04BhAzFTagzp_NdcUmA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 9 Jan 2013 15:17:00 +0000
+Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
+ HAVE_ARM_SCU
+In-Reply-To: <20130109.134641.1582472136842052082.hdoyu@nvidia.com>
+References: <20130108.165342.1996373920678167735.hdoyu@nvidia.com>
+ <20130108162056.GA28618@e106331-lin.cambridge.arm.com>
+ <20130108171103.GA7417@e102568-lin.cambridge.arm.com>
+ <20130109.134641.1582472136842052082.hdoyu@nvidia.com>
+Message-ID: <20130109151700.GB22147@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 9, 2013 at 10:11 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 9 January 2013 14:58, Alexander Graf <agraf@suse.de> wrote:
->>
->> On 09.01.2013, at 15:48, Peter Maydell wrote:
->>
->>> On 9 January 2013 10:02, Alexander Graf <agraf@suse.de> wrote:
->>>> I think we should make thus at least potentially generic. In fact, I wouldn't even
->>>> mind calling it DEV_REG with the same semantics as ONE_REG, just that it also
->>>> gets a unique dev id that gets created during in-kernel device creation and that
->>>> it's a vm ioctl.
->>>
->>> Well, we might want a DEV_REG, but you might as well just make ONE_REG
->>> OK as a VM ioctl, since there's no reason not to have not-per-cpu but not
->>> device registers. ONE_REG already supports dividing up the ID space so
->>> you can say which device or whatever is being used, because we had
->>> things like GIC registers in mind when we put that API together.
->>
->> ONE_REG's address space today doesn't include a field for the target device,
->
-> There's 16 bits of "register group type".
->
->> because that's already predetermined by the fd you run it on. Hence my
->> suggestion to add it as separate field, because then we keep the id space
->> mask-free.
->
-> Er, it already has masks for the different parts of ID space. That's a feature,
-> not a bug.
->
->>> However, this shouldn't be DEV_REG, because this isn't actually setting state
->>> in the irqchip device, it's configuring the kernel's part of the system model
->>> [compare wiring up irq routing, which also has a custom ioctl rather than a
->>> generic one]. As such it definitely needs to happen only before the VM is
->>> actually started and not during VM execution, unlike a DEV_REG which would
->>> presumably be generally valid.
->>
->> The same can be true for ONE_REG/SET_SREGS. On PPC we support setting
->> the PVR (CPU type) via SREGS because ONE_REG only came later. Setting
->> the CPU type only makes sense before you first start using a vcpu. After that
->> point it should be forbidden.
->>
->> So in a way, the irqchip memory address location is a device register, as it has
->> all the properties that a register on that device would have. It is
->>
->>   * per device
->>   * one id for one purpose
->>   * may or may not be writable during certain times
->
-> There's a distinction between "things you need to do in machine setup"
-> and "things you need to propagate for migration". It should be possible
-> to do a migration by doing a complete copy of all ONE_REG (and DEV_REG
-> if we have it) state from source to destination, so it needs to be always
-> possible to write them.
->
->> We would also keep the gates open to get a new register id one day for a second
->> address. Imagine an interrupt controller that splits its address mappings into
->> "PIC base registers" and "MSI target registers", though the MSI registers logically
->> belong to the PIC. Then the ioctl as designed here gets stuck too.
->
-> This is exactly what ARM's GIC has already. We have several memory regions
-> (one for the distributor, one for the cpu interface), and map them with several
-> calls to SET_DEVICE_ADDRESS.
->
->>> (b) we didn't need to tangle up and delay the KVM ARM work with a vague
->>> and unspecified desire for general configurability
->>
->> Yeah, that was the basic idea. Considering that the patch set hasn't been going
->> in for another 2 months after that discussion indicates that this isn't too much of
->> an issue though :).
->
-well, now it's actually going in, and it seems like this is the last
-issue. Let's hold our breaths here for a second and let me write up a
-new device attribute API and send that out, and if you guys can
-possibly live with it, then please consider accepting it.
+On Wed, Jan 09, 2013 at 11:46:41AM +0000, Hiroshi Doyu wrote:
+> Hi Lorenzo,
+> 
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Tue, 8 Jan 2013 18:11:03 +0100:
+> 
+> > On Tue, Jan 08, 2013 at 04:21:38PM +0000, Mark Rutland wrote:
+> > > On Tue, Jan 08, 2013 at 02:53:42PM +0000, Hiroshi Doyu wrote:
+> > 
+> > [...]
+> > 
+> > > > > >  static void __init tegra_smp_init_cpus(void)
+> > > > > >  {
+> > > > > > -	unsigned int i, ncores = scu_get_core_count(scu_base);
+> > > > > > +	unsigned int i, cpu_id, ncores;
+> > > > > > +	u32 l2ctlr;
+> > > > > > +	phys_addr_t pa;
+> > > > > > +
+> > > > > > +	cpu_id = read_cpuid(CPUID_ID) & CPU_MASK;
+> > > > > > +	switch (cpu_id) {
+> > > > > > +	case CPU_CORTEX_A15:
+> > > > > > +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
+> > > > > > +		ncores = ((l2ctlr >> 24) & 3) + 1;
+> > > > > > +		break;
+> > > > > 
+> > > > > [...]
+> > > > > 
+> > > > > As mentioned last time [1], you should get this information from the dt
+> > > > > instead.
+> > > > 
+> > > > Most of platsmp.c:.smp_init_cpus() implementations seem just to
+> > > > overwrite # of cores by SCU/MRC detection. Is there any implementation
+> > > > to use the DT's # and skip SCU/MRC detection in .smp_init_cpus()?
+> > > 
+> > > As far as I can see, there's no other platform which just relies on
+> > > arm_dt_init_cpu_maps. Until recently, it didn't exist, so that makes some
+> > > sense. As far as I can see, for the Tegra 114 you only need your smp_init_cpus
+> > > to call set_smp_cross_call(gic_raise_softirq). Everything else you do seems to
+> > > be handled by arm_dt_init_cpus.
+> > > 
+> > > I think the best option would be to have a separate smp_ops for your dt
+> > > platforms where we know cpu nodes are populated (e.g. Tegra 114), where
+> > > smp_init_cpus is different to that for non-dt platforms. That way non dt
+> > > platforms can keep the SCU hack for now, and won't be broken, and the dt
+> > > platforms are far removed from the SCU hack and just use common infrastructure.
+> > > 
+> > > Maybe someone else has a better idea?
+> > 
+> > Have a look at mach-vexpress/platsmp.c (keeping in mind that the
+> > GENERIC_SCU case will be refactored/removed since arm_dt_init_cpu_maps() is
+> > doing most of the required steps), please let me know what you think.
+> 
+> In tegra, we don't support non-DT. What about falling back SCU/MRC
+> based detection only when arm_dt_init_cpu_maps() fails?
+> 
+> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> index 68e76ef..51d24ae 100644
+> --- a/arch/arm/mach-tegra/platsmp.c
+> +++ b/arch/arm/mach-tegra/platsmp.c
+> @@ -152,7 +152,7 @@ done:
+>   * Initialise the CPU possible map early - this describes the CPUs
+>   * which may be present or become present in the system.
+>   */
+> -static void __init tegra_smp_init_cpus(void)
+> +static void __init tegra_smp_detect_cores(void)
+>  {
+>  	unsigned int i, cpu_id, ncores;
+>  	u32 l2ctlr;
+> @@ -183,6 +183,12 @@ static void __init tegra_smp_init_cpus(void)
+>  
+>  	for (i = 0; i < ncores; i++)
+>  		set_cpu_possible(i, true);
+> +}
+> +
+> +static void __init tegra_smp_init_cpus(void)
+> +{
+> +	if (!num_possible_cpus())
+> +		tegra_smp_detect_cores();
 
--Christoffer
+Thought about this, I would prefer writing an inline function that
+provides this information (DT missing /cpu information or parsing failure)
+instead of relying on num_possible_cpus to be == 0 as a way to check that.
+
+Lorenzo
