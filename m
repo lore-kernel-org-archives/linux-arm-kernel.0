@@ -1,56 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  9 Jan 2013 14:46:10 +0000
-Subject: [PATCHv2 4/4] arm: Add generic timer broadcast support
-In-Reply-To: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
-References: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1357742770-15028-5-git-send-email-mark.rutland@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 9 Jan 2013 14:48:00 +0000
+Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+In-Reply-To: <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
+References: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
+ <1357687783.10453.9@snotra>
+ <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
+ <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
+Message-ID: <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement timer_broadcast for the arm architecture, allowing for the use
-of clock_event_device_drivers decoupled from the timer tick broadcast
-mechanism.
+On 9 January 2013 10:02, Alexander Graf <agraf@suse.de> wrote:
+> I think we should make thus at least potentially generic. In fact, I wouldn't even
+> mind calling it DEV_REG with the same semantics as ONE_REG, just that it also
+> gets a unique dev id that gets created during in-kernel device creation and that
+> it's a vm ioctl.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/Kconfig      |    1 +
- arch/arm/kernel/smp.c |    3 +--
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Well, we might want a DEV_REG, but you might as well just make ONE_REG
+OK as a VM ioctl, since there's no reason not to have not-per-cpu but not
+device registers. ONE_REG already supports dividing up the ID space so
+you can say which device or whatever is being used, because we had
+things like GIC registers in mind when we put that API together.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f95ba14..b051266 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -4,6 +4,7 @@ config ARM
- 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAVE_CUSTOM_GPIO_H
-+	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_WANT_IPC_PARSE_VERSION
- 	select BUILDTIME_EXTABLE_SORT if MMU
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index a9d7e70..a901054 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -476,7 +476,7 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
- static DEFINE_PER_CPU(struct clock_event_device, percpu_clockevent);
- 
- #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
--static void smp_timer_broadcast(const struct cpumask *mask)
-+void tick_broadcast(const struct cpumask *mask)
- {
- 	smp_cross_call(mask, IPI_TIMER);
- }
-@@ -524,7 +524,6 @@ static void __cpuinit percpu_timer_setup(void)
- 	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
- 
- 	evt->cpumask = cpumask_of(cpu);
--	evt->broadcast = smp_timer_broadcast;
- 
- 	if (!lt_ops || lt_ops->setup(evt))
- 		broadcast_timer_setup(evt);
--- 
-1.7.0.4
+However, this shouldn't be DEV_REG, because this isn't actually setting state
+in the irqchip device, it's configuring the kernel's part of the system model
+[compare wiring up irq routing, which also has a custom ioctl rather than a
+generic one]. As such it definitely needs to happen only before the VM is
+actually started and not during VM execution, unlike a DEV_REG which would
+presumably be generally valid.
+
+> That way we wouldn't block our path to create two in-kernel irqchips one day.
+
+Er, SET_DEVICE_ADDRESS doesn't block us doing that; that's why it has
+an ID parameter.
+
+The discussion at the KVM forum, as I recall it was basically:
+ (a) some other ppc irqchips also want to set the base address for where
+their memory mapped registers live, so this isn't a totally ARM specific
+weirdness
+ (b) we didn't need to tangle up and delay the KVM ARM work with a vague
+and unspecified desire for general configurability
+
+-- PMM
