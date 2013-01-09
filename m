@@ -1,33 +1,59 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 9 Jan 2013 06:02:40 +0000
-Subject: [RFC v2 07/18] ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod
- with the right flags
-In-Reply-To: <50EC35C3.4020701@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-8-git-send-email-vaibhav.bedia@ti.com>
- <50EC35C3.4020701@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDD132@DBDE01.ent.ti.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 9 Jan 2013 14:07:41 +0800
+Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
+ HAVE_ARM_SCU
+In-Reply-To: <20130109.074651.1513003283585604525.hdoyu@nvidia.com>
+References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com>
+ <1357649263-1098-4-git-send-email-hdoyu@nvidia.com>
+ <20130108142651.GB3931@n2100.arm.linux.org.uk>
+ <20130109.074651.1513003283585604525.hdoyu@nvidia.com>
+Message-ID: <1357711661.28383.1.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 20:35:39, Shilimkar, Santosh wrote:
-> On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
-> > TPTC0 needs to be idled and put to standby under SW control.
-> > Add the appropriate flags in the TPTC0 hwmod entry.
-> >
-> Can you please expand TPTC0 in chane log.
-
-Third Party Transfer Controller. It's part of the DMA IP.
-Will add it in the changelog.
-
-> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Cc: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> > Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-> > ---
-> Patch is fine otherwise.
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Wed, 2013-01-09 at 13:46 +0800, Hiroshi Doyu wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote @ Tue, 8 Jan 2013 15:26:51 +0100:
 > 
+> > On Tue, Jan 08, 2013 at 02:47:37PM +0200, Hiroshi Doyu wrote:
+> > > The method to detect the number of CPU cores on Cortex-A9 MPCore and
+> > > Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
+> > > information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
+> > > have to read it from the system coprocessor(CP15), because the SCU on
+> > > Cortex-A15 MPCore does not have software readable registers. This
+> > > patch selects the correct method at runtime based on the CPU ID.
+> > > 
+> > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > > ---
+> > >  arch/arm/mach-tegra/platsmp.c |   31 ++++++++++++++++++++++++++++---
+> > >  1 file changed, 28 insertions(+), 3 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> > > index 1b926df..68e76ef 100644
+> > > --- a/arch/arm/mach-tegra/platsmp.c
+> > > +++ b/arch/arm/mach-tegra/platsmp.c
+> > > @@ -23,6 +23,7 @@
+> > >  #include <asm/hardware/gic.h>
+> > >  #include <asm/mach-types.h>
+> > >  #include <asm/smp_scu.h>
+> > > +#include <asm/cputype.h>
+> > >  
+> > >  #include <mach/powergate.h>
+> > >  
+> > > @@ -34,9 +35,13 @@
+> > >  #include "common.h"
+> > >  #include "iomap.h"
+> > >  
+> > > +#define CPU_MASK		0xff0ffff0
+> > > +#define CPU_CORTEX_A9		0x410fc090
+> > > +#define CPU_CORTEX_A15		0x410fc0f0
+> > 
+> > NAK. There's some patches around to make this stuff generic, we don't
+> > need more ifdefs springing up.  We need to get those generic patches
+> > in.
 > 
+> Does anyone give some pointers to the above patches?
+
+Hi Hiroshi,
+
+Please check "arch/arm/include/asm/cputype.h" in next-20130109. It just
+be merged.
