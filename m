@@ -1,63 +1,42 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Wed,  9 Jan 2013 14:31:13 +0100
-Subject: [PATCH RESEND] ARM: picoxcell: remove unnecessary header common.h
-Message-ID: <1357738273-20842-1-git-send-email-tklauser@distanz.ch>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Wed,  9 Jan 2013 19:11:24 +0530
+Subject: [PATCH RFC 0/3] vpif capture support for async subdevice probing
+Message-ID: <1357738887-8701-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 66314223 ("ARM: socfpga: initial support for Altera's
-SOCFPGA platform") struct sys_timer dw_apb_timer is an extern in
-<linux/dw_apb_timer.h>, so there is no need for common.h anymore,
-instead directly #include <asm/mach/time.h> in common.c
+This patch series adds support for vpif capture driver to support
+asynchronously register subdevices. The second patch add support for
+tvp514x decoder to support v4l-async and the last patch adds support
+for da850 evm to support v4l-async for vpif capture.
 
-Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
-Acked-by: Jamie Iles <jamie@jamieiles.com>
----
+This patch is based on v4l2-async patch
+(http://www.spinics.net/lists/linux-media/msg58420.html) from Guennadi.
 
-I looks like this hasn't made it into -next yet, thus I'm resending
-the patch already submitted on 5 October 2012 (with Jamie's ACK added).
+Need for this support:
+Currently bridge device drivers register devices for all subdevices 
+synchronously, tupically, during their probing. E.g. if an I2C CMOS sensor 
+is attached to a video bridge device, the bridge driver will create an I2C 
+device and wait for the respective I2C driver to probe. This makes linking 
+of devices straight forward, but this approach cannot be used with 
+intrinsically asynchronous and unordered device registration systems like 
+the Flattened Device Tree.
 
- arch/arm/mach-picoxcell/common.c |    3 +--
- arch/arm/mach-picoxcell/common.h |   17 -----------------
- 2 files changed, 1 insertions(+), 19 deletions(-)
- delete mode 100644 arch/arm/mach-picoxcell/common.h
+Similar impletation is to be done for vpif disaply, based on review comments
+on this series.
 
-diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
-index f6c0849..bc36f12 100644
---- a/arch/arm/mach-picoxcell/common.c
-+++ b/arch/arm/mach-picoxcell/common.c
-@@ -19,8 +19,7 @@
- #include <asm/mach/arch.h>
- #include <asm/hardware/vic.h>
- #include <asm/mach/map.h>
--
--#include "common.h"
-+#include <asm/mach/time.h>
- 
- #define PHYS_TO_IO(x)			(((x) & 0x00ffffff) | 0xfe000000)
- #define PICOXCELL_PERIPH_BASE		0x80000000
-diff --git a/arch/arm/mach-picoxcell/common.h b/arch/arm/mach-picoxcell/common.h
-deleted file mode 100644
-index a65cb02..0000000
---- a/arch/arm/mach-picoxcell/common.h
-+++ /dev/null
-@@ -1,17 +0,0 @@
--/*
-- * Copyright (c) 2011 Picochip Ltd., Jamie Iles
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * All enquiries to support at picochip.com
-- */
--#ifndef __PICOXCELL_COMMON_H__
--#define __PICOXCELL_COMMON_H__
--
--#include <asm/mach/time.h>
--
--extern struct sys_timer dw_apb_timer;
--
--#endif /* __PICOXCELL_COMMON_H__ */
+Lad, Prabhakar (3):
+  davinci: vpif: capture: add V4L2-async support
+  tvp514x: support asynchronous probing
+  ARM: da850/omap-l138: vpif capture convert to asynchronously register
+    of subdev
+
+ arch/arm/mach-davinci/board-da850-evm.c       |   57 +++++++-
+ drivers/media/i2c/tvp514x.c                   |   20 ++-
+ drivers/media/platform/davinci/vpif_capture.c |  171 ++++++++++++++++++-------
+ drivers/media/platform/davinci/vpif_capture.h |    2 +
+ include/media/davinci/vpif_types.h            |    2 +
+ 5 files changed, 192 insertions(+), 60 deletions(-)
+
 -- 
-1.7.5.4
+1.7.4.1
