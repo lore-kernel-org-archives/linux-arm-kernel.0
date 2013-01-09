@@ -1,100 +1,51 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Wed, 9 Jan 2013 11:28:07 +0530
-Subject: [PATCH v8 1/2] usb: phy: samsung: Introducing usb phy driver for
- hsotg
-In-Reply-To: <1843164.6kmf7C00lC@amdc1227>
-References: <1352888836-17192-1-git-send-email-p.paneri@samsung.com>
- <1465375.Xr1CJFmx11@flatron>
- <CAD6zSYO77GTqVux7B0wDsrj0+332-jU0ivqKY7ExRSKZuHYjDQ@mail.gmail.com>
- <1843164.6kmf7C00lC@amdc1227>
-Message-ID: <CAD6zSYPvAm2cSZ7wABYM3QNs9qbKf6yPKxdkP-RripK5OGrWag@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 9 Jan 2013 07:00:31 +0100
+Subject: [v2 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
+In-Reply-To: <50ECA0A6.4090307@wwwdotorg.org>
+References: <1357649263-1098-6-git-send-email-hdoyu@nvidia.com><50EC444B.5060206@arm.com><50ECA0A6.4090307@wwwdotorg.org>
+Message-ID: <20130109.080031.1063344100374199123.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 8 Jan 2013 23:41:42 +0100:
 
-Sorry! I I missed this comment of yours. Is it okay if we keep
-pmu_isolation as it is (as it does not seem much out of the line). We
-have already gone through a lot of rework and there has been no
-fruitful result :(
-Also after Viveks work, this is only milited to non DT SoCs.
+> On 01/08/2013 09:07 AM, Marc Zyngier wrote:
+> > On 08/01/13 12:47, Hiroshi Doyu wrote:
+> >> Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
+> >> timer than TMR0. If it's available, it will be used for clock source
+> >> and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
+> >> necessary for clock event.
+> 
+> >> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+> 
+> >> +/* FIXME: only secure mode is supported. */
+> > 
+> > And this is a bug, as far as I'm concerned.
+> > 
+> >> +static int tegra_arch_timer_init(void)
+> 
+> >> +	clk = clk_get_sys("clk_m", NULL);
+> >> +	if (IS_ERR(clk)) {
+> >> +		freq = 12000000;
+> >> +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
+> >> +	} else {
+> >> +		freq = clk_get_rate(clk);
+> >> +		clk_put(clk);
+> >> +	}
+> >> +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
+> >> +
+> >> +	/* CNTFRQ */
+> >> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
+> >> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
+> >> +	BUG_ON(val != freq);
+> > 
+> > No, not again! Like I said last year, this won't fly. So instead of
+> > trying to work around a broken firmware, let's do the right thing.
+> 
+> OK, so I understand you want to firmware/bootloader/... to write the
+> value into that register instead, so this all works in non-secure mode
+> (which sounds like a fine objection), but ...
 
-Thanks,
-Praveen
-
-On Wed, Nov 28, 2012 at 6:32 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Praveen,
->
-> On Friday 23 of November 2012 09:56:37 Praveen Paneri wrote:
->> >> +static void samsung_usbphy_enable(struct samsung_usbphy *sphy)
->> >> +{
->> >> +     void __iomem *regs = sphy->regs;
->> >> +     u32 phypwr;
->> >> +     u32 phyclk;
->> >> +     u32 rstcon;
->> >> +
->> >> +     /* set clock frequency for PLL */
->> >> +     phyclk = sphy->ref_clk_freq;
->> >> +     phypwr = readl(regs + SAMSUNG_PHYPWR);
->> >> +     rstcon = readl(regs + SAMSUNG_RSTCON);
->> >> +
->> >> +     switch (sphy->cpu_type) {
->> >> +     case TYPE_S3C64XX:
->> >> +             phyclk &= ~PHYCLK_COMMON_ON_N;
->> >> +             phypwr &= ~PHYPWR_NORMAL_MASK;
->> >> +             rstcon |= RSTCON_SWRST;
->> >> +             break;
->> >> +     case TYPE_EXYNOS4210:
->> >> +             phypwr &= ~PHYPWR_NORMAL_MASK_PHY0;
->> >> +             rstcon |= RSTCON_SWRST;
->> >> +     default:
->> >> +             break;
->> >> +     }
->> >> +
->> >> +     writel(phyclk, regs + SAMSUNG_PHYCLK);
->> >> +     /* set to normal of PHY0 */
->> >
->> > I don't understand this comment.
->>
->> Will change it to " Configure PHY0 for normal operation"
->> That should be more clear, I suppose.
->
-> Yes, much better.
->
->> >> + */
->> >> +
->> >> +#ifndef __SAMSUNG_USBPHY_PLATFORM_H
->> >> +#define __SAMSUNG_USBPHY_PLATFORM_H
->> >> +
->> >> +/**
->> >> + * samsung_usbphy_data - Platform data for USB PHY driver.
->> >> + * @pmu_isolation: Function to control usb phy isolation in PMU.
->> >> + */
->> >> +struct samsung_usbphy_data {
->> >> +     void (*pmu_isolation)(int on);
->> >
->> > I believe this should be named in a generic way. This is called PMU
->> > isolation on Exynos SoCs, but on S3C64xx it's USB PHY mask.
->>
->> Yes! I am aware of it. The fact that this ( MASK or ISOLATION) has
->> always been part of the PMU, pmu_isolation seems quite generic that
->> way. Though you can suggest a better name.
->
-> What do you think about set_isolation(int on) or power_isolation(int on)?
-Sorry! I don't understand the point here.Why to invest so much of time
-and evergy on things we want to remove soon.
-I am a bit reluctant to change this now, after sending 9 versions of
-the same code.
-Lets concentrate on more important things like AUXDATA removal or
-adding support for all DT enabled machines.
->
-> Best regards,
-> --
-> Tomasz Figa
-> Samsung Poland R&D Center
-> SW Solution Development, Linux Platform
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+If possible, I want to run kernel without bootloader initializing TSC
+. IOW, I want to allow legacy bootloaders to boot kernel with ARM arch
+timer.
