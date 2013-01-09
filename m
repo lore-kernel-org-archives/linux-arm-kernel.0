@@ -1,75 +1,31 @@
-From: prasanna.ps@samsung.com (Prasanna Kumar)
-Date: Wed, 09 Jan 2013 17:45:33 +0530
-Subject: [PATCH 2/2] ARM: dts: exynos5: Set up power domain for  MFC and
- G-scaler
-In-Reply-To: <1357733733-18769-1-git-send-email-prasanna.ps@samsung.com>
-References: <1357733733-18769-1-git-send-email-prasanna.ps@samsung.com>
-Message-ID: <1357733733-18769-3-git-send-email-prasanna.ps@samsung.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 9 Jan 2013 13:16:37 +0100
+Subject: [PATCH 0/3] can: Add D_CAN raminit support to am335x-evm
+In-Reply-To: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
+References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
+Message-ID: <50ED5FA5.9020305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree nodes for MFC and G-scaler power domains
-of exynos5.It binds these power-domain nodes to repsective device tree nodes.
+Hi Anil,
 
-Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
----
- arch/arm/boot/dts/exynos5250.dtsi |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+On 11/14/2012 07:08 PM, AnilKumar Ch wrote:
+> This patch series adds d_can raminit support to c_can/d_can driver,
+> which is required to init/de-init D_CAN message RAM (holds message
+> objects). Added corresponding DT changes to get resource of RAMINIT
+> register and device instance.
+> 
+> These patches were tested on AM335x-EVM along with pinctrl data addition
+> patch, which is not added to am335x-evm.dts (only supports CPLD profile#0)
+> because d_can1 is supported under CPLD profile#1.
+> 
+> AnilKumar Ch (3):
+>   can: c_can: Add d_can raminit support
+>   ARM: dts: AM33XX: Add d_can instances to aliases
+>   ARM: dts: AM33XX: Add memory resource to d_can node
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 30485de..6d0e87c 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -85,6 +85,7 @@
- 		compatible = "samsung,mfc-v6";
- 		reg = <0x11000000 0x10000>;
- 		interrupts = <0 96 0>;
-+		samsung,power-domain = <&pd_mfc>;
- 	};
- 
- 	rtc {
-@@ -554,28 +555,42 @@
- 		};
- 	};
- 
-+	pd_gsc: gsc-power-domain at 0x10044000 {
-+		compatible = "samsung,exynos4210-pd";
-+		reg = <0x10044000 0x20>;
-+	};
-+
-+	pd_mfc: mfc-power-domain at 0x10044040 {
-+		compatible = "samsung,exynos4210-pd";
-+		reg = <0x10044040 0x20>;
-+	};
-+
- 	gsc_0:  gsc at 0x13e00000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e00000 0x1000>;
- 		interrupts = <0 85 0>;
-+		samsung,power-domain = <&pd_gsc>;
- 	};
- 
- 	gsc_1:  gsc at 0x13e10000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e10000 0x1000>;
- 		interrupts = <0 86 0>;
-+		samsung,power-domain = <&pd_gsc>;
- 	};
- 
- 	gsc_2:  gsc at 0x13e20000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e20000 0x1000>;
- 		interrupts = <0 87 0>;
-+		samsung,power-domain = <&pd_gsc>;
- 	};
- 
- 	gsc_3:  gsc at 0x13e30000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e30000 0x1000>;
- 		interrupts = <0 88 0>;
-+		samsung,power-domain = <&pd_gsc>;
- 	};
- 
- 	hdmi {
--- 
-1.7.5.4
+I've just applied both DTS patches with Acked-by from Marc in my
+for_3.9/dts branch.
+
+Regards,
+Benoit
