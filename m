@@ -1,85 +1,19 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Wed, 9 Jan 2013 11:29:31 -0500
-Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
-In-Reply-To: <50ED96D2.6010108@arm.com>
-References: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
- <1357687783.10453.9@snotra>
- <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
- <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
- <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
- <86D3D406-05C3-4569-AD03-3223B46D47D9@suse.de>
- <CAFEAcA9z+kaSpVU3c8dWDHEnuGEri1JRZeS2+F5d2EefnX0oyQ@mail.gmail.com>
- <2ebf41d65170b9534c54c0c5f91a4b99@localhost>
- <13B0CEB2-8D36-48AE-BE0E-02D6231052CF@suse.de>
- <0c1e99864fe87de92aa86a70504b9f73@localhost>
- <54937915-46BE-4A50-B5AA-26940DEE6A92@suse.de>
- <50ED96D2.6010108@arm.com>
-Message-ID: <CANM98qJmNTa-k0WwQk1QQwq6HectiUKT8-jtSP6TzA3fcLxJAw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 9 Jan 2013 14:30:34 -0200
+Subject: [PATCH 3/4] ARM i.MX53: add dts for the TQ tqma53 module
+In-Reply-To: <1357739065-9153-4-git-send-email-s.trumtrar@pengutronix.de>
+References: <1357739065-9153-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1357739065-9153-4-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <CAOMZO5BXKbjh1J+ms2b4taGaT34xAUM+L3E4FouyZ6tOnQTofg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 9, 2013 at 11:12 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 09/01/13 15:56, Alexander Graf wrote:
->>
->> On 09.01.2013, at 16:50, Marc Zyngier wrote:
->>
->>> On Wed, 9 Jan 2013 16:28:03 +0100, Alexander Graf <agraf@suse.de> wrote:
->>>> On 09.01.2013, at 16:22, Marc Zyngier wrote:
->>>>
->>>>> On Wed, 9 Jan 2013 15:11:39 +0000, Peter Maydell
->>>>> <peter.maydell@linaro.org>
->>>>> wrote:
->>>>>> On 9 January 2013 14:58, Alexander Graf <agraf@suse.de> wrote:
->>>>>>>
->>>>>>> Yeah, that was the basic idea. Considering that the patch set hasn't
->>>>>>> been going
->>>>>>> in for another 2 months after that discussion indicates that this
->>> isn't
->>>>>>> too much of
->>>>>>> an issue though :).
->>>>>>
->>>>>> We might get there faster if people didn't keep nitpicking the APIs at
->>>>> the
->>>>>> last minute :-)
->>>>>
->>>>> Exactly. We're trying hard to get the damned thing merged, and the
->>>>> permanent API churn quickly becomes a burden.
->>>>
->>>> As I said earlier, we have had a lot of experience in creating really
->>> bad
->>>> APIs in the past.
->>>
->>> Is this one really bad? Again, what changed in the meantime that makes you
->>> think this API is wrong?
->>
->> I complained about it 2 months ago already.
->>
->>>> But how about making this one specific? Call it
->>> KVM_ARM_SET_VGIC_ADDRESS,
->>>> keep the rest as it is, resend it, and later we can come up with an
->>>> actually generic interface.
->>>
->>> Let's pretend you never wrote that, shall we? ;-)
->>
->> Why? The worst thing that happened to us so far were interfaces that looked generic and extensible and turned out not to be (see SET_SREGS in the ppc code). We have 2 options to circumvent this:
->>
->>   1) Commonly agree on an interface that actually is extensible and use it throughout the code
->>   2) Create a very specific interface for a single use case, keep it implemented "forever" and as soon as we need more, implement a more generic one that goes back to 1
->>
->> Since the ARM patches have been out of tree for too long, I'm happy with going route 2 until we go back to square 1.
->
-> I really don't want to see that. Either we keep the API as it is, or we
-> change it for something that is really better and used by other
-> architectures. No point in turning it upside down if we're the only one
-> doing it.
->
-> Oh, and as we're aiming for 3.9, it'd better be ready soon...
->
-ok, I renamed it to KVM_ARM_SET_DEVICE_ADDR, using the same binary
-format, so user space tools remain compatible.
+On Wed, Jan 9, 2013 at 11:44 AM, Steffen Trumtrar
+<s.trumtrar@pengutronix.de> wrote:
 
-I'll be happy to help out with a more generic API, once the kvm/arm
-patches reach upstream.
+> +
+> +&wdog1 {
+> +       status = "okay";
+> +};
 
-Thanks so far!
--Christoffer
+This can be removed, since imx53.dtsi already enables the watchdog.
