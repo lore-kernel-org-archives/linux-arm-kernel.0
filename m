@@ -1,68 +1,84 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 9 Jan 2013 16:56:45 +0100
-Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
-In-Reply-To: <0c1e99864fe87de92aa86a70504b9f73@localhost>
-References: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
- <1357687783.10453.9@snotra>
- <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
- <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
- <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
- <86D3D406-05C3-4569-AD03-3223B46D47D9@suse.de>
- <CAFEAcA9z+kaSpVU3c8dWDHEnuGEri1JRZeS2+F5d2EefnX0oyQ@mail.gmail.com>
- <2ebf41d65170b9534c54c0c5f91a4b99@localhost>
- <13B0CEB2-8D36-48AE-BE0E-02D6231052CF@suse.de>
- <0c1e99864fe87de92aa86a70504b9f73@localhost>
-Message-ID: <54937915-46BE-4A50-B5AA-26940DEE6A92@suse.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed,  9 Jan 2013 16:07:09 +0000
+Subject: [PATCHv3 00/11] Unify arm_generic and arch_timer drivers
+Message-ID: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is the rebase to an -rc I promised back in December [1].
 
-On 09.01.2013, at 16:50, Marc Zyngier wrote:
+Changes since v2:
+* Rebase to v3.8-rc2
+Changes since v1:
+* Rename arch_counter_{enable=>set}_user_access.
+* * Explicitly disable access to counters from userspace on arm.
+* * Add device_node refcounting fix.
+* * Fix conflict with Will Deacon's AArch64 vdso changes.
+* * Simplify the cpu notifier.
+* * Fix a couple of style issues.
 
-> On Wed, 9 Jan 2013 16:28:03 +0100, Alexander Graf <agraf@suse.de> wrote:
->> On 09.01.2013, at 16:22, Marc Zyngier wrote:
->> 
->>> On Wed, 9 Jan 2013 15:11:39 +0000, Peter Maydell
->>> <peter.maydell@linaro.org>
->>> wrote:
->>>> On 9 January 2013 14:58, Alexander Graf <agraf@suse.de> wrote:
->>>>> 
->>>>> Yeah, that was the basic idea. Considering that the patch set hasn't
->>>>> been going
->>>>> in for another 2 months after that discussion indicates that this
-> isn't
->>>>> too much of
->>>>> an issue though :).
->>>> 
->>>> We might get there faster if people didn't keep nitpicking the APIs at
->>> the
->>>> last minute :-)
->>> 
->>> Exactly. We're trying hard to get the damned thing merged, and the
->>> permanent API churn quickly becomes a burden.
->> 
->> As I said earlier, we have had a lot of experience in creating really
-> bad
->> APIs in the past.
-> 
-> Is this one really bad? Again, what changed in the meantime that makes you
-> think this API is wrong?
+Currently we have two drivers for the ARM generic / architected timer,
+arch_timer in arch/arm, and arm_generic in drivers/clocksource. This is
+an unnecessary duplication of code, and will only lead to maintenance
+headaches later.
 
-I complained about it 2 months ago already.
+This patch series splits the generic portion of the arch_timer out to
+drivers/clocksource, and ports the arm64 code to use it. The now unused
+arm_generic driver is removed in the process.
 
->> But how about making this one specific? Call it
-> KVM_ARM_SET_VGIC_ADDRESS,
->> keep the rest as it is, resend it, and later we can come up with an
->> actually generic interface.
-> 
-> Let's pretend you never wrote that, shall we? ;-)
+Separating the arch_timer driver from the arm-specific local_timer api
+currently loses us broadcast timer support. I've posted another series
+[2] which remedies this by decoupling the timer broadcast mechanism from
+drivers.
 
-Why? The worst thing that happened to us so far were interfaces that looked generic and extensible and turned out not to be (see SET_SREGS in the ppc code). We have 2 options to circumvent this:
+The series applies to v3.8-rc2, and has been tested on a TC2 test chip.
+It also applies to Catalin's soc-armv8-model branch [3], the result of
+which has been tested on an AArch64 model.
 
-  1) Commonly agree on an interface that actually is extensible and use it throughout the code
-  2) Create a very specific interface for a single use case, keep it implemented "forever" and as soon as we need more, implement a more generic one that goes back to 1
+Christoffer, this will conflict with one of your KVM/ARM architected
+timers support patches ([PATCH v5 1/4] ARM: arch_timers: switch to
+physical timers if HYP mode is available). I'm happy to fold that into
+this series if you're ok with that?
 
-Since the ARM patches have been out of tree for too long, I'm happy with going route 2 until we go back to square 1.
+Thanks,
+Mark
 
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138130.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140528.html
+[3] git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git soc-armv8-model
 
-Alex
+Mark Rutland (11):
+  arm: arch_timer: balance device_node refcounting
+  arm: arch_timer: remove redundant available check
+  arm: arch_timer: use u64/u32 for register data
+  arm: arch_timer: standardise counter reading
+  arm: arch_timer: split cntfrq accessor
+  arm: arch_timer: factor out register accessors
+  arm: arch_timer: divorce from local_timer api
+  arm: arch_timer: add arch_counter_set_user_access
+  arm: arch_timer: move core to drivers/clocksource
+  arm64: move from arm_generic to arm_arch_timer
+  Documentation: Add ARMv8 to arch_timer devicetree
+
+ .../devicetree/bindings/arm/arch_timer.txt         |    7 +-
+ arch/arm/Kconfig                                   |    3 +-
+ arch/arm/include/asm/arch_timer.h                  |  111 ++++-
+ arch/arm/kernel/arch_timer.c                       |  504 +-------------------
+ arch/arm/mach-omap2/Kconfig                        |    2 +-
+ arch/arm64/Kconfig                                 |    1 +
+ arch/arm64/include/asm/arch_timer.h                |  133 +++++
+ arch/arm64/include/asm/arm_generic.h               |  100 ----
+ arch/arm64/kernel/time.c                           |   29 +-
+ drivers/clocksource/Kconfig                        |    6 +-
+ drivers/clocksource/Makefile                       |    2 +-
+ drivers/clocksource/arm_arch_timer.c               |  375 +++++++++++++++
+ drivers/clocksource/arm_generic.c                  |  232 ---------
+ include/clocksource/arm_arch_timer.h               |   63 +++
+ include/clocksource/arm_generic.h                  |   21 -
+ 15 files changed, 734 insertions(+), 855 deletions(-)
+ create mode 100644 arch/arm64/include/asm/arch_timer.h
+ delete mode 100644 arch/arm64/include/asm/arm_generic.h
+ create mode 100644 drivers/clocksource/arm_arch_timer.c
+ delete mode 100644 drivers/clocksource/arm_generic.c
+ create mode 100644 include/clocksource/arm_arch_timer.h
+ delete mode 100644 include/clocksource/arm_generic.h
