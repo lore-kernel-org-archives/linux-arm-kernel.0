@@ -1,47 +1,77 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 10 Jan 2013 08:09:30 +1300
-Subject: [PATCH 1/4] arm: vt8500: Add support for Wondermedia WM8750/WM8850
-In-Reply-To: <CAOesGMj6XTuW9tPqYnawPvO-wJBd7s5M5xTfdvQcmEioHw=Pnw@mail.gmail.com>
-References: <1356650452-16559-1-git-send-email-linux@prisktech.co.nz>
- <1356650452-16559-2-git-send-email-linux@prisktech.co.nz>
- <1357712039.774.0.camel@gitbox>
- <CAOesGMj6XTuW9tPqYnawPvO-wJBd7s5M5xTfdvQcmEioHw=Pnw@mail.gmail.com>
-Message-ID: <1357758570.27076.8.camel@gitbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Jan 2013 19:11:04 +0000
+Subject: [PATCH 1/8] SH: intc: Add support OF for INTC
+In-Reply-To: <20130109115352.GB7337@e106331-lin.cambridge.arm.com>
+References: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
+ <1357713007-4005-2-git-send-email-horms+renesas@verge.net.au>
+ <20130109115352.GB7337@e106331-lin.cambridge.arm.com>
+Message-ID: <201301091911.04513.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-08 at 22:30 -0800, Olof Johansson wrote:
-> On Tue, Jan 8, 2013 at 10:13 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
-> > On Fri, 2012-12-28 at 12:20 +1300, Tony Prisk wrote:
-> >> This patch adds support for the WM8750 (ARMv6) and WM8850 (ARMv7).
-> >>
-> >> Common features across all SoCs are split into ARCH_VT8500 and
-> >> unique features are specified by each SoC option.
-> >>
-> >> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> >
-> >
-> > Hi Arnd, Olof,
-> >
-> > Haven't heard anything re: this patch series. Problem?
+On Wednesday 09 January 2013, Mark Rutland wrote:
+> Hi,
 > 
-> Nope, just wasn't sure if you would send a git pull request or if you
-> wanted them applied.
+> Thanks for updating the text, this is far easier to read than previously.
 > 
-> I'm out of time for tonight, but I'll look closer at them (and apply
-> them if all OK) tomorrow.
+> However, I'm still concerned by how complex the binding seems. As I don't have
+> any familiarity with the device, I don't know whether that's just an artifact
+> of the hardware or something that can be cleared up.
 > 
+> I think the approach used by the binding needs some serious review before this
+> should be merged. It seems far more complex than any existing interrupt
+> controller binding. Without a dts example for a complete board (complete with
+> devices wired up to the interrupt controller), it's difficult to judge how this
+> will work in practice.
 > 
-> -Olof
+> I've added Arnd to Cc in case he has any thoughts on the matter.
 
-I'm quite happy to send a pull request if that's what you prefer.
+Sorry for having been absent from this discussion for so long. I didn't
+realize there were 9 versions of this patch set.
 
-Generally people have just taken the patches straight from email, so
-everytime I've done a pull-request I get a reply back saying the patches
-have already been applied.
+I tend to agree with your interpretation above, but I may be missing
+important facts from the previous review rounds.
 
-Is there some 'rule' around pull-requests vs emailed patches?
-Should patches in pull-requests have Ack'd lines already?
+For all I can tell, the binding is an attempt to describe the
+entire drivers/sh/intc capabilities, which is probably not the
+best way to approach things. The sh intc driver is not just an
+irqchip driver, but rather a framework to describe arbitrary
+irqchips, which is what makes this so hard.
 
-Regards
-Tony P
+When I first looked at the situation last year, I suggested doing
+a new irqchip driver with a much simpler binding that can only
+handle the irq chips from shmobile, rather than the whole thing.
+
+I am not sure if the binding in the current form is already the
+"simplified" version, or if it actually implements all the
+capabilities of the intc driver.
+
+> > +       intca: interrupt-controller at 0 {
+> > +               compatible = "renesas,sh_intc";
+> > +               interrupt-controller;
+> > +               #address-cells = <1>;
+> > +               #size-cells = <1>;
+> > +               #interrupt-cells = <1>;
+> > +               ranges;
+> > +
+> > +               reg = <0xe6940000 0x200>, <0xe6950000 0x200>;
+> > +               group_size = <19>;
+> > +
+> > +               DIRC: intsrc1 { vector = <0x0560>; };
+> > +               ATAPI: intsrc2 { vector = <0x05E0>; };
+> 
+> This looks suspiciously like a way of encoding a device's interrupt information
+> into the interrupt controller's device node. That strikes me as being the wrong
+> way round.
+
+Agreed, it would be simpler to have e.g. #interrupt-cells = <4>, to describe
+the various offsets when needed (I forgot how many are actually required
+in practice, rather than being computable from the other numbers), and
+possibly a global interrupt-map/interrupt-map-mask property pair to map
+this into a flat number space.
+
+I need to take some more time to understand the actual requirements again,
+but IIRC it would be possible to do something much simpler than the
+proposed binding.
+
+	Arnd
