@@ -1,49 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 9 Jan 2013 07:15:18 +0100
-Subject: [PATCH] pinctrl: mvebu: fix MPP6 value for kirkwood driver
-In-Reply-To: <1357681024-4686-1-git-send-email-simon.guinot@sequanux.org>
-References: <1357681024-4686-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20130109061518.GL24650@lunn.ch>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  9 Jan 2013 15:23:49 +0900
+Subject: [PATCH] ARM: mach-shmobile: kzm9g: Enable ARM_APPENDED_DTB in
+ defconfig
+Message-ID: <1357712629-2992-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 10:37:04PM +0100, Simon Guinot wrote:
-> Note that I am not sure about the MPP value for the PTP functionality.
-> It seems that the PTP references have been removed from the Marvell
-> hardware specifications available to me.
-> 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> ---
->  drivers/pinctrl/mvebu/pinctrl-kirkwood.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-> index fa6ce31..02d5b89 100644
-> --- a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-> +++ b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-> @@ -66,9 +66,9 @@ static struct mvebu_mpp_mode mv88f6xxx_mpp_modes[] = {
->  		MPP_VAR_FUNCTION(0x5, "sata0", "act",    V(0, 1, 1, 1, 1, 0)),
->  		MPP_VAR_FUNCTION(0xb, "lcd", "vsync",    V(0, 0, 0, 0, 1, 0))),
->  	MPP_MODE(6,
-> -		MPP_VAR_FUNCTION(0x0, "sysrst", "out",   V(1, 1, 1, 1, 1, 1)),
-> -		MPP_VAR_FUNCTION(0x1, "spi", "mosi",     V(1, 1, 1, 1, 1, 1)),
-> -		MPP_VAR_FUNCTION(0x2, "ptp", "trig",     V(1, 1, 1, 1, 0, 0))),
-> +		MPP_VAR_FUNCTION(0x1, "sysrst", "out",   V(1, 1, 1, 1, 1, 1)),
-> +		MPP_VAR_FUNCTION(0x2, "spi", "mosi",     V(1, 1, 1, 1, 1, 1)),
-> +		MPP_VAR_FUNCTION(0x3, "ptp", "trig",     V(1, 1, 1, 1, 0, 0))),
->  	MPP_MODE(7,
->  		MPP_VAR_FUNCTION(0x0, "gpo", NULL,       V(1, 1, 1, 1, 1, 1)),
->  		MPP_VAR_FUNCTION(0x1, "pex", "rsto",     V(1, 1, 1, 1, 0, 1)),
-> -- 
-> 1.7.10
+Typically the bootloader of a kzm9g board does not support DT
+so this option is useful.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/kzm9g_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-I checked against the old MPP.H and the "88F6281 Integrated Controller
-Hardware Specifications".
-
-It is interesting that pin 6 cannot be used as a GP[IO] at all. Some
-of the other pins are limited to GPO, but this appears to be the only
-one which cannot be used at all.
-
-    Andrew
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index 7f6ec2c..c6005a0 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -39,6 +39,7 @@ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_CMDLINE="console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200"
+ CONFIG_KEXEC=y
+ CONFIG_VFP=y
+-- 
+1.7.10.4
