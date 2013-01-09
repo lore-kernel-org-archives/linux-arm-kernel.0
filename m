@@ -1,53 +1,36 @@
 From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 9 Jan 2013 05:31:45 +0000
-Subject: [RFC v2 13/18] ARM: OMAP2+: AM33XX: timer: Interchance clkevt
- and clksrc timers
-In-Reply-To: <50EC3888.1070504@ti.com>
+Date: Wed, 9 Jan 2013 05:38:26 +0000
+Subject: [RFC v2 17/18] ARM: OMAP2+: AM33XX: Select Mailbox when PM is
+ enabled
+In-Reply-To: <50EC39BD.2020204@ti.com>
 References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-14-git-send-email-vaibhav.bedia@ti.com>
- <50EC3888.1070504@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDD02B@DBDE01.ent.ti.com>
+ <1356959231-17335-18-git-send-email-vaibhav.bedia@ti.com>
+ <50EC39BD.2020204@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDD08F@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 20:47:28, Shilimkar, Santosh wrote:
+On Tue, Jan 08, 2013 at 20:52:37, Shilimkar, Santosh wrote:
 > On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
-> > AM33XX has two timers (DTIMER0/1) in the WKUP domain.
-> > On GP devices the source of DMTIMER0 is fixed to an
-> > inaccurate internal 32k RC oscillator and this makes
-> > the DMTIMER0 practically either as a clocksource or
-> > as clockevent.
+> > PM services on AM33XX depend on mailbox for communication
+> > with WKUP-M3 core so ensure that the right config options
+> > are selected. Thanks to Kevin Hilman <khilman@deeprootsystems.com>
+> > for the suggestion on updating the Kconfig and not just
+> > the omap2plus_defconfig which was done in the previous version
+> > of the AM33XX suspend-resume support.
 > >
-> > Currently the timer instance in WKUP domain is used
-> > as the clockevent and the timer in non-WKUP domain
-> > as the clocksource. DMTIMER1 in WKUP domain can keep
-> > running in suspend from a 32K clock fed from external
-> > OSC and can serve as the persistent clock for the kernel.
-> > To enable this, interchange the timers used as clocksource
-> > and clockevent for AM33XX.
-> >
-> > For now a new DT property has been added to allow the timer code
-> > to select the timer with the right property.
-> >
-> > It has been pointed out by Santosh Shilimkar and Kevin Hilman
-> > that such a change will result in soc-idle never being achieved
-> > on AM33XX. There are other reasons why soc-idle does not look
-> > feasible on AM33XX so for now we go ahead with the interchange
-> > of the the timers. If at a later point of time we do come up
-> > with an approach which makes soc-idle possible on AM33XX, this
-> > can be revisited.
-> >
-> Can you please explain other reasons as well for clarity ?
+> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> > Cc: Tony Lingren <tony@atomide.com>
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> > ---
+> Unrelated to series. You can post this patch separately.
 > 
 
-I guess from h/w perspective it boils down to lack of HW-AUTO and IO-Daisy
-chaining on AM33xx [1]. 
-
-Since there's no 32ksynctimer, do we also need to register DMTIMER1 as the persistent
-clock on AM33xx? This can only be done from DMTIMER1 which is currently serving as
-the clockevent.
+Ok. I kept it in this series so that it does not look to be 
+some random patch.
 
 Regards,
 Vaibhav
-
-[1] http://marc.info/?l=linux-arm-kernel&m=135238055717206&w=4
