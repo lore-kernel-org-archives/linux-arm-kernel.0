@@ -1,77 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 Jan 2013 19:11:04 +0000
-Subject: [PATCH 1/8] SH: intc: Add support OF for INTC
-In-Reply-To: <20130109115352.GB7337@e106331-lin.cambridge.arm.com>
-References: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
- <1357713007-4005-2-git-send-email-horms+renesas@verge.net.au>
- <20130109115352.GB7337@e106331-lin.cambridge.arm.com>
-Message-ID: <201301091911.04513.arnd@arndb.de>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Wed,  9 Jan 2013 19:17:59 +0000
+Subject: [PATCH v2] ARM: nommu: re-enable use of vexpress without
+ ARCH_MULTIPLATFORM
+In-Reply-To: <20130109184127.GA32690@mudshark.cambridge.arm.com>
+References: <20130109184127.GA32690@mudshark.cambridge.arm.com>
+Message-ID: <1357759079-19014-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 January 2013, Mark Rutland wrote:
-> Hi,
-> 
-> Thanks for updating the text, this is far easier to read than previously.
-> 
-> However, I'm still concerned by how complex the binding seems. As I don't have
-> any familiarity with the device, I don't know whether that's just an artifact
-> of the hardware or something that can be cleared up.
-> 
-> I think the approach used by the binding needs some serious review before this
-> should be merged. It seems far more complex than any existing interrupt
-> controller binding. Without a dts example for a complete board (complete with
-> devices wired up to the interrupt controller), it's difficult to judge how this
-> will work in practice.
-> 
-> I've added Arnd to Cc in case he has any thoughts on the matter.
+Since 617276307cd4c ("ARM: vexpress: convert to multi-platform") it has
+been impossible to select ARCH_VEXPRESS without ARCH_MULTIPLATFORM.
 
-Sorry for having been absent from this discussion for so long. I didn't
-realize there were 9 versions of this patch set.
+ARCH_MULTIPLATFORM doesn't make sense for NOMMU targets, not least
+because of the need to hard-code the memory map. However, it should
+still be possible to run NOMMU kernels on top of the Versatile Express
+by selecting it as the only platform.
 
-I tend to agree with your interpretation above, but I may be missing
-important facts from the previous review rounds.
+This patch creates a shim ARCH_VEXPRESS_NOMMU config option in the 'choice'
+for "ARM system type" to make this possible again.
 
-For all I can tell, the binding is an attempt to describe the
-entire drivers/sh/intc capabilities, which is probably not the
-best way to approach things. The sh intc driver is not just an
-irqchip driver, but rather a framework to describe arbitrary
-irqchips, which is what makes this so hard.
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Nicolas Pitre <nico@fluxnic.net>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+Changes since v1:
+Added the help text and changed authorship from Will to me (Jonathan)
 
-When I first looked at the situation last year, I suggested doing
-a new irqchip driver with a much simpler binding that can only
-handle the irq chips from shmobile, rather than the whole thing.
+ arch/arm/Kconfig |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-I am not sure if the binding in the current form is already the
-"simplified" version, or if it actually implements all the
-capabilities of the intc driver.
-
-> > +       intca: interrupt-controller at 0 {
-> > +               compatible = "renesas,sh_intc";
-> > +               interrupt-controller;
-> > +               #address-cells = <1>;
-> > +               #size-cells = <1>;
-> > +               #interrupt-cells = <1>;
-> > +               ranges;
-> > +
-> > +               reg = <0xe6940000 0x200>, <0xe6950000 0x200>;
-> > +               group_size = <19>;
-> > +
-> > +               DIRC: intsrc1 { vector = <0x0560>; };
-> > +               ATAPI: intsrc2 { vector = <0x05E0>; };
-> 
-> This looks suspiciously like a way of encoding a device's interrupt information
-> into the interrupt controller's device node. That strikes me as being the wrong
-> way round.
-
-Agreed, it would be simpler to have e.g. #interrupt-cells = <4>, to describe
-the various offsets when needed (I forgot how many are actually required
-in practice, rather than being computable from the other numbers), and
-possibly a global interrupt-map/interrupt-map-mask property pair to map
-this into a flat number space.
-
-I need to take some more time to understand the actual requirements again,
-but IIRC it would be possible to do something much simpler than the
-proposed binding.
-
-	Arnd
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 335e220..5b8a925 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -322,6 +322,21 @@ config ARCH_VERSATILE
+ 	help
+ 	  This enables support for ARM Ltd Versatile board.
+ 
++config ARCH_VEXPRESS_NOMMU
++	bool "ARM Ltd. Versatile Express family for NOMMU"
++	depends on !MMU
++	select ARCH_VEXPRESS
++	help
++	  This option enables support for systems using Cortex processor based
++	  ARM core and logic (FPGA) tiles on the Versatile Express motherboard,
++	  in configurations WITHOUT an MMU. You must boot using a Flattened
++	  Device Tree - the traditional ATAGs boot method is not usable with
++	  this configuration.
++
++	  If your system has an MMU and you want to make use of it, you
++	  should instead choose to build a multiplatform kernel and
++	  select ARCH_VEXPRESS
++
+ config ARCH_AT91
+ 	bool "Atmel AT91"
+ 	select ARCH_REQUIRE_GPIOLIB
+-- 
+1.7.9.5
