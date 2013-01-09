@@ -1,88 +1,136 @@
 From: s-guiriec@ti.com (Sebastien Guiriec)
-Date: Wed, 9 Jan 2013 16:03:07 +0100
-Subject: [PATCH v2 1/5] ARM: OMAP2+: hwmod: add enable_preprogram hook
+Date: Wed, 9 Jan 2013 16:03:09 +0100
+Subject: [PATCH v2 3/5] ARM: OMAP4+: AESS: enable internal auto-gating during
+ initial setup
 In-Reply-To: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
 References: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
-Message-ID: <1357743792-13917-2-git-send-email-s-guiriec@ti.com>
+Message-ID: <1357743792-13917-4-git-send-email-s-guiriec@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Paul Walmsley <paul@pwsan.com>
 
-After setup/enable, some IP blocks need some additional setting to
-indicate the PRCM that they are inactive until they are configured.
-Some examples on OMAP4 include the AESS and FSUSB IP blocks.
+Enable the AESS auto-gating control bit during AESS hwmod setup.  This
+fixes the following boot warning on OMAP4:
 
-To fix this cleanly, this patch adds another optional function
-pointer, setup_preprogram, to the IP block's hwmod data.  The function
-that is pointed to is called by the hwmod code immediately after the
-IP block is reset.
+omap_hwmod: aess: _wait_target_disable failed
+
+Without this patch, the AESS IP block does not indicate to the PRCM
+that it is idle after it is reset.  This prevents some types of SoC
+power management until something sets the auto-gating control bit.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
 Cc: Beno?t Cousson <b-cousson@ti.com>
 Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   18 ++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod.h |    2 ++
- 2 files changed, 20 insertions(+)
+ arch/arm/mach-omap2/Makefile               |    2 +-
+ arch/arm/mach-omap2/omap_hwmod.h           |    6 ++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
+ arch/arm/mach-omap2/omap_hwmod_reset.c     |   52 ++++++++++++++++++++++++++++
+ 4 files changed, 60 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_reset.c
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 4653efb..f37d22c 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2053,6 +2053,23 @@ static int _omap4_get_context_lost(struct omap_hwmod *oh)
- }
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 947cafe..d88788f 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -8,7 +8,7 @@ obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
+ 	 omap_device.o sram.o
  
- /**
-+ * _enable_preprogram - Pre-program an IP block during the _enable() process
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Some IP blocks (such as AESS) require some additional programming
-+ * after enable before they can enter idle.  If a function pointer to
-+ * do so is present in the hwmod data, then call it and pass along the
-+ * return value; otherwise, return 0.
-+ */
-+static int __init _enable_preprogram(struct omap_hwmod *oh)
-+{
-+	if (!oh->class->enable_preprogram)
-+		return 0;
-+
-+	return oh->class->enable_preprogram(oh);
-+}
-+
-+/**
-  * _enable - enable an omap_hwmod
-  * @oh: struct omap_hwmod *
-  *
-@@ -2156,6 +2173,7 @@ static int _enable(struct omap_hwmod *oh)
- 				_update_sysc_cache(oh);
- 			_enable_sysc(oh);
- 		}
-+		r = _enable_preprogram(oh);
- 	} else {
- 		if (soc_ops.disable_module)
- 			soc_ops.disable_module(oh);
+ omap-2-3-common				= irq.o
+-hwmod-common				= omap_hwmod.o \
++hwmod-common				= omap_hwmod.o omap_hwmod_reset.o \
+ 					  omap_hwmod_common_data.o
+ clock-common				= clock.o clock_common_data.o \
+ 					  clkt_dpll.o clkt_clksel.o
 diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index 3ae852a..41066b4 100644
+index 41066b4..6ec73cb 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.h
 +++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -501,6 +501,7 @@ struct omap_hwmod_omap4_prcm {
-  * @rev: revision of the IP class
-  * @pre_shutdown: ptr to fn to be executed immediately prior to device shutdown
-  * @reset: ptr to fn to be executed in place of the standard hwmod reset fn
-+ * @enable_preprogram:  ptr to fn to be executed during device enable
-  *
-  * Represent the class of a OMAP hardware "modules" (e.g. timer,
-  * smartreflex, gpio, uart...)
-@@ -524,6 +525,7 @@ struct omap_hwmod_class {
- 	u32					rev;
- 	int					(*pre_shutdown)(struct omap_hwmod *oh);
- 	int					(*reset)(struct omap_hwmod *oh);
-+	int					(*enable_preprogram)(struct omap_hwmod *oh);
+@@ -673,6 +673,12 @@ extern void __init omap_hwmod_init(void);
+ const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
+ 
+ /*
++ *
++ */
++
++extern int omap_hwmod_aess_preprogram(struct omap_hwmod *oh);
++
++/*
+  * Chip variant-specific hwmod init routines - XXX should be converted
+  * to use initcalls once the initial boot ordering is straightened out
+  */
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 584acf9..13e397f 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -322,6 +322,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_aess_sysc = {
+ static struct omap_hwmod_class omap44xx_aess_hwmod_class = {
+ 	.name	= "aess",
+ 	.sysc	= &omap44xx_aess_sysc,
++	.enable_preprogram = omap_hwmod_aess_preprogram,
  };
  
- /**
+ /* aess */
+diff --git a/arch/arm/mach-omap2/omap_hwmod_reset.c b/arch/arm/mach-omap2/omap_hwmod_reset.c
+new file mode 100644
+index 0000000..bba43fa
+--- /dev/null
++++ b/arch/arm/mach-omap2/omap_hwmod_reset.c
+@@ -0,0 +1,52 @@
++/*
++ * OMAP IP block custom reset and preprogramming stubs
++ *
++ * Copyright (C) 2012 Texas Instruments, Inc.
++ * Paul Walmsley
++ *
++ * A small number of IP blocks need custom reset and preprogramming
++ * functions.  The stubs in this file provide a standard way for the
++ * hwmod code to call these functions, which are to be located under
++ * drivers/.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
++ * 02110-1301 USA
++ */
++#include <linux/kernel.h>
++
++#include <sound/aess.h>
++
++#include "omap_hwmod.h"
++
++/**
++ * omap_hwmod_aess_preprogram - enable AESS internal autogating
++ * @oh: struct omap_hwmod *
++ *
++ * The AESS will not IdleAck to the PRCM until its internal autogating
++ * is enabled.  Since internal autogating is disabled by default after
++ * AESS reset, we must enable autogating after the hwmod code resets
++ * the AESS.  Returns 0.
++ */
++int omap_hwmod_aess_preprogram(struct omap_hwmod *oh)
++{
++	void __iomem *va;
++
++	va = omap_hwmod_get_mpu_rt_va(oh);
++	if (!va)
++		return -EINVAL;
++
++	aess_enable_autogating(va);
++
++	return 0;
++}
 -- 
 1.7.10.4
