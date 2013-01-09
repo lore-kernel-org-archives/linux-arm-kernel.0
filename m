@@ -1,71 +1,41 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 9 Jan 2013 12:23:23 +0000
-Subject: [PATCH 2/3] ARM: ux500: Turn on the 'heartbeat' LED trigger
-In-Reply-To: <20130109111209.GH3931@n2100.arm.linux.org.uk>
-References: <1357725965-27342-1-git-send-email-lee.jones@linaro.org>
- <1357725965-27342-2-git-send-email-lee.jones@linaro.org>
- <201301091018.55058.arnd@arndb.de>
- <20130109103510.GE3931@n2100.arm.linux.org.uk>
- <20130109110840.GD31678@gmail.com>
- <20130109111209.GH3931@n2100.arm.linux.org.uk>
-Message-ID: <20130109122323.GE31678@gmail.com>
+From: loic.pallardy@st.com (Loic PALLARDY)
+Date: Wed, 9 Jan 2013 13:29:39 +0100
+Subject: [PATCH 1/9] mailbox: OMAP: introduce mailbox framework
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ECDD8C1@DBDE01.ent.ti.com>
+References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
+ <1355836212-17956-2-git-send-email-loic.pallardy-ext@stericsson.com>
+ <20121218165909.GF4989@atomide.com> <50D423C2.3090009@st.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC9CF77@DBDE01.ent.ti.com>
+ <50D43FA4.8090000@st.com>
+ <B5906170F1614E41A8A28DE3B8D121433ECDD8C1@DBDE01.ent.ti.com>
+Message-ID: <50ED62B3.50000@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 09 Jan 2013, Russell King - ARM Linux wrote:
+Hi Vaibhav,
 
-> On Wed, Jan 09, 2013 at 11:08:40AM +0000, Lee Jones wrote:
-> > On Wed, 09 Jan 2013, Russell King - ARM Linux wrote:
-> > 
-> > > On Wed, Jan 09, 2013 at 10:18:54AM +0000, Arnd Bergmann wrote:
-> > > > On Wednesday 09 January 2013, Lee Jones wrote:
-> > > > > diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-> > > > > index 5dea906..0f25b07 100644
-> > > > > --- a/arch/arm/mach-ux500/Kconfig
-> > > > > +++ b/arch/arm/mach-ux500/Kconfig
-> > > > > @@ -43,6 +43,8 @@ config MACH_HREFV60
-> > > > >  config MACH_SNOWBALL
-> > > > >         bool "U8500 Snowball platform"
-> > > > >         select MACH_MOP500
-> > > > > +       select LEDS_TRIGGERS
-> > > > > +       select LEDS_TRIGGER_HEARTBEAT
-> > > > >         help
-> > > > >           Include support for the snowball development platform.
-> > > > 
-> > > > Be careful with "select" statements like this when there are other
-> > > > dependencies. I think LEDS_TRIGGERS depends on LEDS_CLASS, so this
-> > > > should probably be written as
-> > > > 
-> > > > 	select LEDS_TRIGGERS if LEDS_CLASS
-> > > 
-> > > Umm, this is also wrong for another reason.  LEDS is an optional feature.
-> > > It's not required for the platform to be functional.  So why the hell would
-> > > anyone want to _force_ such an optional feature to be mandatory?
-> > > 
-> > > This is something that the default config published for the platform should
-> > > be handling.
-> > 
-> > Do you mean <config_dir>/u8500_defconfig?
-> > 
-> > If so, that's wrong, as it covers many more boards than just Snowball
-> > and this is only applicable on the Snowball board. So how else can
-> > I enable this feature?
-> 
-> And why is it wrong to enable an optional feature in a defconfig which some
-> boards using that defconfig may want?
-> 
-> It's _less_ wrong than forcing user selectable options to be mandatorily
-> selected.
+On 01/09/2013 01:11 PM, Bedia, Vaibhav wrote:
+> Hi Loic,
+>
+> On Fri, Dec 21, 2012 at 16:23:24, Loic PALLARDY wrote:
+>>
+>>
+>> On 12/21/2012 11:49 AM, Bedia, Vaibhav wrote:
+>>> On Fri, Dec 21, 2012 at 14:24:26, Loic PALLARDY wrote:
+>>>>
+>>> I have a few patches which are dependent on this patch series.
+>>> Could you please keep me in cc for the future versions.
+>>>
+>> Sure, I'll.
+>>
+>
+> When do you plan to post an updated version of these patches?
+I'm synchronizing with Omar to include TI RPMsg and tidspbridge patches 
+in next update.
+So I plan update for end of the week, beginning of next week.
 
-Excuse my ignorance, but I'm a little confused by this.
-
-What's the difference between 'select <OPTION>' in the Kconfig and
-'CONFIG_<OPTION>=y' in the defconfig; besides the fact that if we
-do it in the Kconfig file, we can be more selective with regards to
-which platform it gets enabled on?
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Loic
+>
+> Regards,
+> Vaibhav
