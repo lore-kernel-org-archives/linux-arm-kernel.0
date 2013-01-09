@@ -1,69 +1,68 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 9 Jan 2013 15:58:04 +0100
-Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
-In-Reply-To: <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
-References: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
- <1357687783.10453.9@snotra>
- <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
- <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
- <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
-Message-ID: <86D3D406-05C3-4569-AD03-3223B46D47D9@suse.de>
+From: s-guiriec@ti.com (Sebastien Guiriec)
+Date: Wed, 9 Jan 2013 16:03:06 +0100
+Subject: [PATCH v2 0/5] ARM: OMAP4: Enable AESS IP.
+Message-ID: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+v2:
+- Add missing AESS memory banks.
+- Update the serie base on comments related earlier serie:
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69853.html
 
-On 09.01.2013, at 15:48, Peter Maydell wrote:
+The location of the callback has been updated in order to fit with AESS.
+Some call of PM runtime can be done by ASoC core when AESS is in RET so
+we need to ensure that the additional callback is call on enable
+also in order to have clock correctly stop.
 
-> On 9 January 2013 10:02, Alexander Graf <agraf@suse.de> wrote:
->> I think we should make thus at least potentially generic. In fact, I wouldn't even
->> mind calling it DEV_REG with the same semantics as ONE_REG, just that it also
->> gets a unique dev id that gets created during in-kernel device creation and that
->> it's a vm ioctl.
-> 
-> Well, we might want a DEV_REG, but you might as well just make ONE_REG
-> OK as a VM ioctl, since there's no reason not to have not-per-cpu but not
-> device registers. ONE_REG already supports dividing up the ID space so
-> you can say which device or whatever is being used, because we had
-> things like GIC registers in mind when we put that API together.
+v1:
+ARM: OMAP4: Enable AESS IP.
 
-ONE_REG's address space today doesn't include a field for the target device, because that's already predetermined by the fd you run it on. Hence my suggestion to add it as separate field, because then we keep the id space mask-free.
+This patch serie extends the the hwmod HWMOD_EXT_OPT_MAIN_CLK flag for the
+AESS IP. This IP has additional register for Auto Gatting configuration. As
+it is used only for Audio the driver is not always loaded. We can reuse the
+same flag as McPDM to work around the HW problem due to bad reset value of
+AESS Auto gatting configuration register. 
 
-> However, this shouldn't be DEV_REG, because this isn't actually setting state
-> in the irqchip device, it's configuring the kernel's part of the system model
-> [compare wiring up irq routing, which also has a custom ioctl rather than a
-> generic one]. As such it definitely needs to happen only before the VM is
-> actually started and not during VM execution, unlike a DEV_REG which would
-> presumably be generally valid.
+If we try to setup and reset AESS during boot time without this serie the
+next clocks will still remain enable.
 
-The same can be true for ONE_REG/SET_SREGS. On PPC we support setting the PVR (CPU type) via SREGS because ONE_REG only came later. Setting the CPU type only makes sense before you first start using a vcpu. After that point it should be forbidden.
+omapconf abe cfg:
+|--------------------------------------------------------------|
+| ABE        Clock Domain Configuration                        |
+|--------------------------------|-----------------------------|
+| Clock State Transition control | HW-Auto                     |
+| Clock State                    |                             |
+|   ABE_24M_FCLK                 | GATED                       |
+|   ABE_ALWON_32K_CLK            | GATED                       |
+|   ABE_SYSCLK                   | GATED                       |
+|   24M_FCLK                     | GATED                       |
+|   ABE_ICLK2                    | RUNNING                     |
+|   DPLL_ABE_X2_CLK              | RUNNING                     |
+|   PAD_CLKS                     | GATED                       |
+|   SLIMBUS_CLK                  | GATED                       |
+| OPP Divider                    | ABE_CLK = DPLL_ABE_X2_CLK/1 |
+|--------------------------------------------------------------|
 
-So in a way, the irqchip memory address location is a device register, as it has all the properties that a register on that device would have. It is
+Paul Walmsley (3):
+  ARM: OMAP2+: hwmod: add enable_preprogram hook
+  ASoC: TI AESS: add autogating-enable function, callable from
+    architecture code
+  ARM: OMAP4+: AESS: enable internal auto-gating during initial setup
 
-  * per device
-  * one id for one purpose
-  * may or may not be writable during certain times
+Sebastien Guiriec (2):
+  OMAP4: hwmod data: Enable AESS hwmod device
+  OMAP4: hwmod data: Update AESS data with memory bank area
 
-We would also keep the gates open to get a new register id one day for a second address. Imagine an interrupt controller that splits its address mappings into "PIC base registers" and "MSI target registers", though the MSI registers logically belong to the PIC. Then the ioctl as designed here gets stuck too.
+ arch/arm/mach-omap2/Makefile               |    2 +-
+ arch/arm/mach-omap2/omap_hwmod.c           |   18 ++++++++++
+ arch/arm/mach-omap2/omap_hwmod.h           |    8 +++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   49 +++++++++++++++++++++++--
+ arch/arm/mach-omap2/omap_hwmod_reset.c     |   52 +++++++++++++++++++++++++++
+ include/sound/aess.h                       |   53 ++++++++++++++++++++++++++++
+ 6 files changed, 178 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_reset.c
+ create mode 100644 include/sound/aess.h
 
-> 
->> That way we wouldn't block our path to create two in-kernel irqchips one day.
-> 
-> Er, SET_DEVICE_ADDRESS doesn't block us doing that; that's why it has
-> an ID parameter.
-> 
-> The discussion at the KVM forum, as I recall it was basically:
-> (a) some other ppc irqchips also want to set the base address for where
-> their memory mapped registers live, so this isn't a totally ARM specific
-> weirdness
-
-Yes.
-
-> (b) we didn't need to tangle up and delay the KVM ARM work with a vague
-> and unspecified desire for general configurability
-
-Yeah, that was the basic idea. Considering that the patch set hasn't been going in for another 2 months after that discussion indicates that this isn't too much of an issue though :).
-
-In fact, I do recall myself pointing out that we need some padding in that ioctl to accomodate for later usages like the ones above. Then we could later rename (or copy name) it and everyone'd be happy.
-
-
-Alex
+-- 
+1.7.10.4
