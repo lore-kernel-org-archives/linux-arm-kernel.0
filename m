@@ -1,102 +1,211 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed,  9 Jan 2013 21:43:00 +0100
-Subject: [PATCH 00/14] Rewrite Tegra PCIe driver
-Message-ID: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+Date: Wed,  9 Jan 2013 21:43:13 +0100
+Subject: [PATCH 13/14] ARM: tegra: harmony: Initialize PCIe from DT
+In-Reply-To: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1357764194-12677-14-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series contains an almost complete rewrite of the Tegra PCIe
-driver. The code is moved to the drivers/pci/host directory and turned
-into a proper platform driver, adding MSI and DT support while at it.
-Other PCI host controller drivers can be added to that directory in an
-attempt to make it easier to factor out common code.
+With the device tree support in place, probe the PCIe controller from
+the device tree and remove the corresponding workaround in the board
+file.
 
-Patches 1 to 4 add generic OF helpers to parse a PCI node's ranges
-property as well as obtain the bus, device and function numbers from a
-node's reg property.
-
-Patch 5 provides an implementation of a cache for I/O mappings. This can
-be used in situations where a large physical memory region needs to be
-ioremap()'ed. On Tegra, the PCIe standard and extended configuration
-spaces can be accessed through a 256 MiB window. Mapping that in one
-chunk is wasteful and may not always work because the vmalloc area may
-not be large enough. The implementation in this patch uses an LRU based
-approach to map a limited amount of pages on an as-needed basis.
-
-Patches 6 and 7 prepare the ARM PCI code to enable PCI host controller
-drivers to load after the init stage, which can happen due to deferred
-probing, and to allow private data to be passed for each controller.
-
-Patches 8 and 9 move some of the Tegra specific code around to allow it
-to be used from outside the arch/arm/mach-tegra directory.
-
-Patch 10 moves the Tegra PCIe controller driver to the drivers/pci/host
-directory and turns it into a proper platform driver. It also adds MSI
-(based on patches by NVIDIA) and DT support.
-
-Patches 11 to 14 add device tree based probing for the TEC, Harmony and
-TrimSlice boards.
-
-Thierry
-
-Andrew Murray (1):
-  of/pci: Provide support for parsing PCI DT ranges property
-
-Thierry Reding (13):
-  of/pci: Add of_pci_get_devfn() function
-  of/pci: Add of_pci_get_bus() function
-  of/pci: Add of_pci_parse_bus_range() function
-  lib: Add I/O map cache implementation
-  ARM: pci: Keep pci_common_init() around after init
-  ARM: pci: Allow passing per-controller private data
-  ARM: tegra: Move tegra_pcie_xclk_clamp() to PMC
-  ARM: tegra: Move pmc.h to include/mach
-  PCI: tegra: Move PCIe driver to drivers/pci/host
-  ARM: tegra: tamonten: Add PCIe support
-  ARM: tegra: tec: Add PCIe support
-  ARM: tegra: harmony: Initialize PCIe from DT
-  ARM: tegra: trimslice: Initialize PCIe from DT
-
- .../bindings/pci/nvidia,tegra20-pcie.txt           |  115 ++
- arch/arm/Kconfig                                   |    2 +
- arch/arm/boot/dts/tegra20-harmony.dts              |   20 +-
- arch/arm/boot/dts/tegra20-tamonten.dtsi            |    2 +-
- arch/arm/boot/dts/tegra20-tec.dts                  |  198 +++
- arch/arm/boot/dts/tegra20-trimslice.dts            |   12 +
- arch/arm/boot/dts/tegra20.dtsi                     |   45 +
- arch/arm/include/asm/mach/pci.h                    |    1 +
- arch/arm/kernel/bios32.c                           |    9 +-
- arch/arm/mach-tegra/Kconfig                        |    5 -
- arch/arm/mach-tegra/Makefile                       |    3 -
- arch/arm/mach-tegra/board-dt-tegra20.c             |   24 -
- arch/arm/mach-tegra/board-harmony-pcie.c           |   84 --
- arch/arm/mach-tegra/board.h                        |    4 +-
- arch/arm/mach-tegra/common.c                       |    2 +-
- arch/arm/mach-tegra/include/mach/pmc.h             |   24 +
- arch/arm/mach-tegra/iomap.h                        |    3 -
- arch/arm/mach-tegra/pcie.c                         |  887 -------------
- arch/arm/mach-tegra/pmc.c                          |   16 +
- arch/arm/mach-tegra/pmc.h                          |   23 -
- drivers/of/address.c                               |   63 +
- drivers/of/of_pci.c                                |   78 +-
- drivers/pci/Kconfig                                |    2 +
- drivers/pci/Makefile                               |    3 +
- drivers/pci/host/Kconfig                           |    8 +
- drivers/pci/host/Makefile                          |    1 +
- drivers/pci/host/pci-tegra.c                       | 1322 ++++++++++++++++++++
- include/linux/io.h                                 |   12 +
- include/linux/of_address.h                         |    9 +
- include/linux/of_pci.h                             |    3 +
- lib/ioremap.c                                      |  266 ++++
- 31 files changed, 2203 insertions(+), 1043 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+---
+ arch/arm/boot/dts/tegra20-harmony.dts    | 20 ++++++--
+ arch/arm/mach-tegra/Makefile             |  2 -
+ arch/arm/mach-tegra/board-dt-tegra20.c   | 12 -----
+ arch/arm/mach-tegra/board-harmony-pcie.c | 88 --------------------------------
+ 4 files changed, 16 insertions(+), 106 deletions(-)
  delete mode 100644 arch/arm/mach-tegra/board-harmony-pcie.c
- create mode 100644 arch/arm/mach-tegra/include/mach/pmc.h
- delete mode 100644 arch/arm/mach-tegra/pcie.c
- delete mode 100644 arch/arm/mach-tegra/pmc.h
- create mode 100644 drivers/pci/host/Kconfig
- create mode 100644 drivers/pci/host/Makefile
- create mode 100644 drivers/pci/host/pci-tegra.c
 
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index b506de9..e5b3aec 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -335,7 +335,7 @@
+ 					regulator-always-on;
+ 				};
+ 
+-				ldo0 {
++				pci_clk_reg: ldo0 {
+ 					regulator-name = "vdd_ldo0,vddio_pex_clk";
+ 					regulator-min-microvolt = <3300000>;
+ 					regulator-max-microvolt = <3300000>;
+@@ -419,6 +419,20 @@
+ 		nvidia,invert-interrupt;
+ 	};
+ 
++	pcie-controller {
++		pex-clk-supply = <&pci_clk_reg>;
++		vdd-supply = <&pci_vdd_reg>;
++		status = "okay";
++
++		pci at 1,0 {
++			status = "okay";
++		};
++
++		pci at 2,0 {
++			status = "okay";
++		};
++	};
++
+ 	usb at c5000000 {
+ 		status = "okay";
+ 	};
+@@ -481,7 +495,7 @@
+ 			enable-active-high;
+ 		};
+ 
+-		regulator at 3 {
++		pci_vdd_reg: regulator at 3 {
+ 			compatible = "regulator-fixed";
+ 			reg = <3>;
+ 			regulator-name = "vdd_1v05";
+@@ -489,8 +503,6 @@
+ 			regulator-max-microvolt = <1050000>;
+ 			gpio = <&pmic 2 0>;
+ 			enable-active-high;
+-			/* Hack until board-harmony-pcie.c is removed */
+-			status = "disabled";
+ 		};
+ 
+ 		regulator at 4 {
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 463a77e..9003d05 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -33,6 +33,4 @@ obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-dt-tegra20.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
+ 
+-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-harmony-pcie.o
+-
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-paz00.o
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index 5644dfb..9e8256ab 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -152,17 +152,6 @@ static void __init trimslice_init(void)
+ #endif
+ }
+ 
+-static void __init harmony_init(void)
+-{
+-#ifdef CONFIG_TEGRA_PCI
+-	int ret;
+-
+-	ret = harmony_pcie_init();
+-	if (ret)
+-		pr_err("harmony_pcie_init() failed: %d\n", ret);
+-#endif
+-}
+-
+ static void __init paz00_init(void)
+ {
+ 	tegra_paz00_wifikill_init();
+@@ -173,7 +162,6 @@ static struct {
+ 	void (*init)(void);
+ } board_init_funcs[] = {
+ 	{ "compulab,trimslice", trimslice_init },
+-	{ "nvidia,harmony", harmony_init },
+ 	{ "compal,paz00", paz00_init },
+ };
+ 
+diff --git a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
+deleted file mode 100644
+index 94c0529..0000000
+--- a/arch/arm/mach-tegra/board-harmony-pcie.c
++++ /dev/null
+@@ -1,88 +0,0 @@
+-/*
+- * arch/arm/mach-tegra/board-harmony-pcie.c
+- *
+- * Copyright (C) 2010 CompuLab, Ltd.
+- * Mike Rapoport <mike@compulab.co.il>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/gpio.h>
+-#include <linux/err.h>
+-#include <linux/of_gpio.h>
+-#include <linux/regulator/consumer.h>
+-
+-#include <asm/mach-types.h>
+-
+-#include <mach/pci-tegra.h>
+-
+-#include "board.h"
+-
+-#ifdef CONFIG_TEGRA_PCI
+-static int harmony_pcie_board_init(struct platform_device *pdev)
+-{
+-	struct device_node *np;
+-	int en_vdd_1v05;
+-	struct regulator *regulator = NULL;
+-	int err;
+-
+-	np = of_find_node_by_path("/regulators/regulator at 3");
+-	if (!np) {
+-		pr_err("%s: of_find_node_by_path failed\n", __func__);
+-		return -ENODEV;
+-	}
+-
+-	en_vdd_1v05 = of_get_named_gpio(np, "gpio", 0);
+-	if (en_vdd_1v05 < 0) {
+-		pr_err("%s: of_get_named_gpio failed: %d\n", __func__,
+-		       en_vdd_1v05);
+-		return en_vdd_1v05;
+-	}
+-
+-	err = gpio_request(en_vdd_1v05, "EN_VDD_1V05");
+-	if (err) {
+-		pr_err("%s: gpio_request failed: %d\n", __func__, err);
+-		return err;
+-	}
+-
+-	gpio_direction_output(en_vdd_1v05, 1);
+-
+-	regulator = regulator_get(NULL, "vdd_ldo0,vddio_pex_clk");
+-	if (IS_ERR_OR_NULL(regulator)) {
+-		pr_err("%s: regulator_get failed: %d\n", __func__,
+-		       (int)PTR_ERR(regulator));
+-		goto err_reg;
+-	}
+-
+-	regulator_enable(regulator);
+-
+-	return 0;
+-
+-err_reg:
+-	gpio_free(en_vdd_1v05);
+-
+-	return err;
+-}
+-
+-int __init harmony_pcie_init(void)
+-{
+-	tegra_pcie_pdata.init = harmony_pcie_board_init;
+-	platform_device_register(&tegra_pcie_device);
+-
+-	return 0;
+-}
+-#else
+-int __init harmony_pcie_init(void)
+-{
+-	return 0;
+-}
+-#endif
 -- 
 1.8.1
