@@ -1,784 +1,481 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Jan 2013 15:30:04 +0900
-Subject: [PATCH 5/8] ARM: shmobile: Add DT table of INTC for r8a7740
-In-Reply-To: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
-References: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1357713007-4005-6-git-send-email-horms+renesas@verge.net.au>
+From: p.paneri@samsung.com (Praveen Paneri)
+Date: Wed, 9 Jan 2013 12:00:29 +0530
+Subject: [PATCH v9 1/2] usb: phy: samsung: Introducing usb phy driver for
+ hsotg
+In-Reply-To: <1353666786-10584-1-git-send-email-p.paneri@samsung.com>
+References: <CAD6zSYO77GTqVux7B0wDsrj0+332-jU0ivqKY7ExRSKZuHYjDQ@mail.gmail.com>
+ <1353666786-10584-1-git-send-email-p.paneri@samsung.com>
+Message-ID: <CAD6zSYP3JGmZ7PMQBdh3TY6kVnfHz6NFwOOfY7XqvsvZ_n9=cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Hi Kukjin,
 
-Cc: Magnus Damm <damm@opensource.se>
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+It has been a long time since I posted these patches. It will be very
+kind of you to express your views about this series.
+If this looks fine to you, please ack.
 
----
+Thanks,
+Praveen
 
-v9
-* Update compatible string to use '-' instead of '_'
-* Remove group_size and add intc_groups to reflect updated bindings
-* Remove trailing 0 entries in regs lists, they are not needed.
----
- arch/arm/boot/dts/r8a7740.dtsi |  743 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 742 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 2418278..9efc4f3 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * Device Tree Source for the r8a7740 SoC
-+ * Device Tree Source for Renesas r8a7740
-  *
-  * Copyright (C) 2012 Renesas Solutions Corp.
-  *
-@@ -25,4 +25,745 @@
- 		      <0xe605800c 0x20>;
- 		#gpio-cells = <2>;
- 	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		intca: interrupt-controller at 0 {
-+			compatible = "renesas,sh-intc";
-+			interrupt-controller;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			#interrupt-cells = <1>;
-+			ranges;
-+
-+			reg = <0xe6940000 0x200>, <0xe6950000 0x200>;
-+
-+			DIRC: intsrc1 { vector = <0x0560>; };
-+			ATAPI: intsrc2 { vector = <0x05E0>; };
-+			IIC1_ALI: intsrc3 { vector = <0x0780>; };
-+			IIC1_TACKI: intsrc4 { vector = <0x07A0>; };
-+			IIC1_WAITI: intsrc5 { vector = <0x07C0>; };
-+			IIC1_DTEI: intsrc6 { vector = <0x07E0>; };
-+			AP_ARM_COMMTX: intsrc7 { vector = <0x0840>; };
-+			AP_ARM_COMMRX: intsrc8 { vector = <0x0860>; };
-+			MFI: intsrc9 { vector = <0x0900>; };
-+			MFIS: intsrc10 { vector = <0x0920>; };
-+			BBIF1: intsrc11 { vector = <0x0940>; };
-+			BBIF2: intsrc12 { vector = <0x0960>; };
-+			USBHSDMAC: intsrc13 { vector = <0x0A00>; };
-+			USBF_OUL_SOF: intsrc14 { vector = <0x0A20>; };
-+			USBF_IXL_INT: intsrc15 { vector = <0x0A40>; };
-+			SGX540: intsrc16 { vector = <0x0A60>; };
-+			CMT1_0: intsrc17 { vector = <0x0B00>; };
-+			CMT1_1: intsrc18 { vector = <0x0B20>; };
-+			CMT1_2: intsrc19 { vector = <0x0B40>; };
-+			CMT1_3: intsrc20 { vector = <0x0B60>; };
-+			CMT2: intsrc21 { vector = <0x0B80>; };
-+			CMT3: intsrc22 { vector = <0x0BA0>; };
-+			KEYSC: intsrc23 { vector = <0x0BE0>; };
-+			SCIFA0: intsrc24 { vector = <0x0C00>; };
-+			SCIFA1: intsrc25 { vector = <0x0C20>; };
-+			SCIFA2: intsrc26 { vector = <0x0C40>; };
-+			SCIFA3: intsrc27 { vector = <0x0C60>; };
-+			MSIOF2: intsrc28 { vector = <0x0C80>; };
-+			MSIOF1: intsrc29 { vector = <0x0D00>; };
-+			SCIFA4: intsrc30 { vector = <0x0D20>; };
-+			SCIFA5: intsrc31 { vector = <0x0D40>; };
-+			SCIFB: intsrc32 { vector = <0x0D60>; };
-+			FLCTL_FLSTEI: intsrc33 { vector = <0x0D80>; };
-+			FLCTL_FLTENDI: intsrc34 { vector = <0x0DA0>; };
-+			FLCTL_FLTREQ0I: intsrc35 { vector = <0x0DC0>; };
-+			FLCTL_FLTREQ1I: intsrc36 { vector = <0x0DE0>; };
-+			SDHI0_0: intsrc37 { vector = <0x0E00>; };
-+			SDHI0_1: intsrc38 { vector = <0x0E20>; };
-+			SDHI0_2: intsrc39 { vector = <0x0E40>; };
-+			SDHI0_3: intsrc40 { vector = <0x0E60>; };
-+			SDHI1_0: intsrc41 { vector = <0x0E80>; };
-+			SDHI1_1: intsrc42 { vector = <0x0EA0>; };
-+			SDHI1_2: intsrc43 { vector = <0x0EC0>; };
-+			SDHI1_3: intsrc44 { vector = <0x0EE0>; };
-+			AP_ARM_L2CINT: intsrc45 { vector = <0x0FA0>; };
-+			IRDA: intsrc46 { vector = <0x0480>; };
-+			TPU0: intsrc47 { vector = <0x04A0>; };
-+			SCIFA6: intsrc48 { vector = <0x04C0>; };
-+			SCIFA7: intsrc49 { vector = <0x04E0>; };
-+			GETHER: intsrc50 { vector = <0x0500>; };
-+			ICBS0: intsrc51 { vector = <0x0540>; };
-+			DDM: intsrc52 { vector = <0x1140>; };
-+			SDHI2_0: intsrc53 { vector = <0x1200>; };
-+			SDHI2_1: intsrc54 { vector = <0x1220>; };
-+			SDHI2_2: intsrc55 { vector = <0x1240>; };
-+			SDHI2_3: intsrc56 { vector = <0x1260>; };
-+			RWDT0: intsrc57 { vector = <0x1280>; };
-+			DMAC1_1_DEI0: intsrc58 { vector = <0x2000>; };
-+			DMAC1_1_DEI1: intsrc59 { vector = <0x2020>; };
-+			DMAC1_1_DEI2: intsrc60 { vector = <0x2040>; };
-+			DMAC1_1_DEI3: intsrc61 { vector = <0x2060>; };
-+			DMAC1_2_DEI4: intsrc62 { vector = <0x2080>; };
-+			DMAC1_2_DEI5: intsrc63 { vector = <0x20A0>; };
-+			DMAC1_2_DADERR: intsrc64 { vector = <0x20C0>; };
-+			DMAC2_1_DEI0: intsrc65 { vector = <0x2100>; };
-+			DMAC2_1_DEI1: intsrc66 { vector = <0x2120>; };
-+			DMAC2_1_DEI2: intsrc67 { vector = <0x2140>; };
-+			DMAC2_1_DEI3: intsrc68 { vector = <0x2160>; };
-+			DMAC2_2_DEI4: intsrc69 { vector = <0x2180>; };
-+			DMAC2_2_DEI5: intsrc70 { vector = <0x21A0>; };
-+			DMAC2_2_DADERR: intsrc71 { vector = <0x21C0>; };
-+			DMAC3_1_DEI0: intsrc72 { vector = <0x2200>; };
-+			DMAC3_1_DEI1: intsrc73 { vector = <0x2220>; };
-+			DMAC3_1_DEI2: intsrc74 { vector = <0x2240>; };
-+			DMAC3_1_DEI3: intsrc75 { vector = <0x2260>; };
-+			DMAC3_2_DEI4: intsrc76 { vector = <0x2280>; };
-+			DMAC3_2_DEI5: intsrc77 { vector = <0x22A0>; };
-+			DMAC3_2_DADERR: intsrc78 { vector = <0x22C0>; };
-+			SHWYSTAT_RT: intsrc79 { vector = <0x1300>; };
-+			SHWYSTAT_HS: intsrc80 { vector = <0x1320>; };
-+			SHWYSTAT_COM: intsrc81 { vector = <0x1340>; };
-+			HDMI: intsrc82 { vector = <0x1700>; };
-+			USBH_INT: intsrc83 { vector = <0x1540>; };
-+			USBH_OHCI: intsrc84 { vector = <0x1560>; };
-+			USBH_EHCI: intsrc85 { vector = <0x1580>; };
-+			USBH_PME: intsrc86 { vector = <0x15A0>; };
-+			USBH_BIND: intsrc87 { vector = <0x15C0>; };
-+			RSPI_OVRF: intsrc88 { vector = <0x1780>; };
-+			RSPI_SPTEF: intsrc89 { vector = <0x17A0>; };
-+			RSPI_SPRF: intsrc90 { vector = <0x17C0>; };
-+			SPU2_0: intsrc91 { vector = <0x1800>; };
-+			SPU2_1: intsrc92 { vector = <0x1820>; };
-+			FSI: intsrc93 { vector = <0x1840>; };
-+			FMSI: intsrc94 { vector = <0x1860>; };
-+			HDMI_SSS: intsrc95 { vector = <0x18A0>; };
-+			HDMI_KEY: intsrc96 { vector = <0x18C0>; };
-+			IPMMU: intsrc97 { vector = <0x1920>; };
-+			AP_ARM_CTIIRQ: intsrc98 { vector = <0x1980>; };
-+			AP_ARM_PMURQ: intsrc99 { vector = <0x19A0>; };
-+			MFIS2: intsrc100 { vector = <0x1A00>; };
-+			CPORTR2S: intsrc101 { vector = <0x1A20>; };
-+			CMT14: intsrc102 { vector = <0x1A40>; };
-+			CMT15: intsrc103 { vector = <0x1A60>; };
-+			MMCIF_0: intsrc104 { vector = <0x1AA0>; };
-+			MMCIF_1: intsrc105 { vector = <0x1AC0>; };
-+			MMCIF_2: intsrc106 { vector = <0x1AE0>; };
-+			SIM_ERI: intsrc107 { vector = <0x1C00>; };
-+			SIM_RXI: intsrc108 { vector = <0x1C20>; };
-+			SIM_TXI: intsrc109 { vector = <0x1C40>; };
-+			SIM_TEI: intsrc110 { vector = <0x1C60>; };
-+			STPRO_0: intsrc111 { vector = <0x1C80>; };
-+			STPRO_1: intsrc112 { vector = <0x1CA0>; };
-+			STPRO_2: intsrc113 { vector = <0x1CC0>; };
-+			STPRO_3: intsrc114 { vector = <0x1CE0>; };
-+			STPRO_4: intsrc115 { vector = <0x1D00>; };
-+
-+			intc_groups {
-+				DMAC1_1: intc_group0 {
-+					group = <&DMAC1_1_DEI0 &DMAC1_1_DEI1
-+							&DMAC1_1_DEI2 &DMAC1_1_DEI3>;
-+				};
-+
-+				DMAC1_2: intc_group1 {
-+					group = <&DMAC1_2_DEI4 &DMAC1_2_DEI5
-+							&DMAC1_2_DADERR>;
-+				};
-+
-+				DMAC2_1: intc_group2 {
-+					group = <&DMAC2_1_DEI0 &DMAC2_1_DEI1
-+							&DMAC2_1_DEI2 &DMAC2_1_DEI3>;
-+				};
-+
-+				DMAC2_2: intc_group3 {
-+					group = <&DMAC2_2_DEI4 &DMAC2_2_DEI5
-+							&DMAC2_2_DADERR>;
-+				};
-+
-+				DMAC3_1: intc_group4 {
-+					group = <&DMAC3_1_DEI0 &DMAC3_1_DEI1
-+							&DMAC3_1_DEI2 &DMAC3_1_DEI3>;
-+				};
-+
-+				DMAC3_2: intc_group5 {
-+					group = <&DMAC3_2_DEI4 &DMAC3_2_DEI5
-+							&DMAC3_2_DADERR>;
-+				};
-+
-+				AP_ARM1: intc_group6 {
-+					group = <&AP_ARM_COMMTX &AP_ARM_COMMRX>;
-+				};
-+
-+				AP_ARM2: intc_group7 {
-+					group = <&AP_ARM_CTIIRQ &AP_ARM_PMURQ>;
-+				};
-+
-+				USBF: intc_group8 {
-+					group = <&USBF_OUL_SOF &USBF_IXL_INT>;
-+				};
-+
-+				SDHI0: intc_group9 {
-+					group = <&SDHI0_0 &SDHI0_1 &SDHI0_2 &SDHI0_3>;
-+				};
-+
-+				SDHI1: intc_group10 {
-+					group = <&SDHI1_0 &SDHI1_1 &SDHI1_2 &SDHI1_3>;
-+				};
-+
-+				SDHI2: intc_group11 {
-+					group = <&SDHI2_0 &SDHI2_1 &SDHI2_2 &SDHI2_3>;
-+				};
-+
-+				SHWYSTAT: intc_group12 {
-+					group = <&SHWYSTAT_RT &SHWYSTAT_HS &SHWYSTAT_COM>;
-+				};
-+
-+				USBH1: intc_group13 {
-+					group = <&USBH_INT &USBH_OHCI>;
-+				};
-+
-+				USBH2: intc_group14 {
-+					group = <&USBH_EHCI &USBH_PME &USBH_BIND>;
-+				};
-+
-+				RSPI: intc_group15 {
-+					group = <&RSPI_OVRF &RSPI_SPTEF &RSPI_SPRF>;
-+				};
-+
-+				SPU2: intc_group16 {
-+					group = <&SPU2_0 &SPU2_1>;
-+				};
-+
-+				FLCTL: intc_group17 {
-+					group = <&FLCTL_FLSTEI &FLCTL_FLTENDI &FLCTL_FLTREQ0I
-+							&FLCTL_FLTREQ1I>;
-+				};
-+
-+				IIC1: intc_group18 {
-+					group = <&IIC1_ALI &IIC1_TACKI &IIC1_WAITI &IIC1_DTEI>;
-+				};
-+			};
-+
-+			intc_vectors {
-+				vector_table = <&DIRC &ATAPI &IIC1_ALI &IIC1_TACKI &IIC1_WAITI
-+					&IIC1_DTEI &AP_ARM_COMMTX &AP_ARM_COMMRX &MFI &MFIS &BBIF1
-+					&BBIF2 &USBHSDMAC &USBF_OUL_SOF &USBF_IXL_INT &SGX540 &CMT1_0
-+					&CMT1_1 &CMT1_2 &CMT1_3 &CMT2 &CMT3 &KEYSC &SCIFA0 &SCIFA1
-+					&SCIFA2 &SCIFA3 &MSIOF2 &MSIOF1 &SCIFA4 &SCIFA5 &SCIFB
-+					&FLCTL_FLSTEI &FLCTL_FLTENDI &FLCTL_FLTREQ0I &FLCTL_FLTREQ1I
-+					&SDHI0_0 &SDHI0_1 &SDHI0_2 &SDHI0_3
-+					&SDHI1_0 &SDHI1_1 &SDHI1_2 &SDHI1_3
-+					&AP_ARM_L2CINT &IRDA &TPU0 &SCIFA6 &SCIFA7
-+					&GETHER &ICBS0 &DDM &SDHI2_0 &SDHI2_1 &SDHI2_2 &SDHI2_3
-+					&RWDT0
-+					&DMAC1_1_DEI0 &DMAC1_1_DEI1 &DMAC1_1_DEI2 &DMAC1_1_DEI3
-+					&DMAC1_2_DEI4 &DMAC1_2_DEI5 &DMAC1_2_DADERR
-+					&DMAC2_1_DEI0 &DMAC2_1_DEI1 &DMAC2_1_DEI2 &DMAC2_1_DEI3
-+					&DMAC2_2_DEI4 &DMAC2_2_DEI5 &DMAC2_2_DADERR
-+					&DMAC3_1_DEI0 &DMAC3_1_DEI1 &DMAC3_1_DEI2 &DMAC3_1_DEI3
-+					&DMAC3_2_DEI4 &DMAC3_2_DEI5 &DMAC3_2_DADERR
-+					&SHWYSTAT_RT &SHWYSTAT_HS &SHWYSTAT_COM
-+					&USBH_INT &USBH_OHCI &USBH_EHCI &USBH_PME &USBH_BIND
-+					&HDMI
-+					&RSPI_OVRF &RSPI_SPTEF &RSPI_SPRF
-+					&SPU2_0 &SPU2_1 &FSI &FMSI &HDMI_SSS &HDMI_KEY
-+					&IPMMU &AP_ARM_CTIIRQ &AP_ARM_PMURQ &MFIS2
-+					&CPORTR2S
-+					&CMT14 &CMT15 &MMCIF_0 &MMCIF_1 &MMCIF_2
-+					&SIM_ERI &SIM_RXI &SIM_TXI &SIM_TEI
-+					&STPRO_0 &STPRO_1 &STPRO_2 &STPRO_3 &STPRO_4>;
-+			};
-+
-+			intc_mask_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_mask0 {
-+					reg = <0xe6940080 1>, <0xe69400c0 1>;
-+					reginfo = <&DMAC2_1_DEI3 &DMAC2_1_DEI2 &DMAC2_1_DEI1
-+						&DMAC2_1_DEI0 0 0 &AP_ARM_COMMTX &AP_ARM_COMMRX>;
-+				};
-+
-+				intc_mask1 {
-+					reg = <0xe6940084 1>, <0xe69400c4 1>;
-+					reginfo = <&ATAPI 0 &DIRC 0 &DMAC1_1_DEI3 &DMAC1_1_DEI2
-+						&DMAC1_1_DEI1 &DMAC1_1_DEI0>;
-+				};
-+
-+				intc_mask2 {
-+					reg = <0xe6940088 1>, <0xe69400c8 1>;
-+					reginfo = <0 0 0 0 &BBIF1 &BBIF2 &MFIS &MFI>;
-+				};
-+
-+				intc_mask3 {
-+					reg = <0xe694008c 1>, <0xe69400cc 1>;
-+					reginfo = <&DMAC3_1_DEI3 &DMAC3_1_DEI2 &DMAC3_1_DEI1
-+						&DMAC3_1_DEI0 &DMAC3_2_DADERR &DMAC3_2_DEI5
-+						&DMAC3_2_DEI4 &IRDA>;
-+				};
-+
-+				intc_mask4 {
-+					reg = <0xe6940090 1>, <0xe69400d0 1>;
-+					reginfo = <&DDM>;
-+				};
-+
-+				intc_mask5 {
-+					reg = <0xe6940094 1>, <0xe69400d4 1>;
-+					reginfo = <&KEYSC &DMAC1_2_DADERR &DMAC1_2_DEI5 &DMAC1_2_DEI4
-+							&SCIFA3 &SCIFA2 &SCIFA1 &SCIFA0>;
-+				};
-+
-+				intc_mask6 {
-+					reg = <0xe6940098 1>, <0xe69400d8 1>;
-+					reginfo = <&SCIFB &SCIFA5 &SCIFA4 &MSIOF1 0 0 &MSIOF2>;
-+				};
-+
-+				intc_mask7 {
-+					reg = <0xe694009c 1>, <0xe69400dc 1>;
-+					reginfo = <&SDHI0_3 &SDHI0_2 &SDHI0_1 &SDHI0_0 &FLCTL_FLTREQ1I
-+						&FLCTL_FLTREQ0I &FLCTL_FLTENDI &FLCTL_FLSTEI>;
-+				};
-+
-+				intc_mask8 {
-+					reg = <0xe69400a0 1>, <0xe69400e0 1>;
-+					reginfo = <&SDHI1_3 &SDHI1_2 &SDHI1_1 &SDHI1_0 0
-+						&USBHSDMAC 0 &AP_ARM_L2CINT>;
-+				};
-+
-+				intc_mask9 {
-+					reg = <0xe69400a4 1>, <0xe69400e4 1>;
-+					reginfo = <&CMT1_3 &CMT1_2 &CMT1_1
-+						&CMT1_0 &CMT2 &USBF_IXL_INT &USBF_OUL_SOF &SGX540>;
-+				};
-+
-+				intc_mask10 {
-+					reg = <0xe69400a8 1>, <0xe69400e8 1>;
-+					reginfo = <0 &DMAC2_2_DADERR &DMAC2_2_DEI5 &DMAC2_2_DEI4>;
-+				};
-+
-+				intc_mask11 {
-+					reg = <0xe69400ac 1>, <0xe69400ec 1>;
-+					reginfo = <&IIC1_DTEI &IIC1_WAITI
-+						&IIC1_TACKI &IIC1_ALI &ICBS0>;
-+				};
-+
-+				intc_mask12 {
-+					reg = <0xe69400b0 1>, <0xe69400f0 1>;
-+					reginfo = <0 0 &TPU0 &SCIFA6 &SCIFA7 &GETHER>;
-+				};
-+
-+				intc_mask13 {
-+					reg = <0xe69400b4 1>, <0xe69400f4 1>;
-+					reginfo = <&SDHI2_3 &SDHI2_2 &SDHI2_1
-+						&SDHI2_0 0 &CMT3 0 &RWDT0>;
-+				};
-+
-+				intc_mask14 {
-+					reg = <0xe6950080 1>, <0xe69500c0 1>;
-+					reginfo = <&SHWYSTAT_RT &SHWYSTAT_HS
-+						&SHWYSTAT_COM>;
-+				};
-+
-+				intc_mask15 {
-+					reg = <0xe6950088 1>, <0xe69500c8 1>;
-+					reginfo = <0 0 &USBH_INT &USBH_OHCI
-+						&USBH_EHCI &USBH_PME &USBH_BIND>;
-+				};
-+
-+				intc_mask16 {
-+					reg = <0xe6950090 1>, <0xe69500d0 1>;
-+					reginfo = <&HDMI 0 0 0 &RSPI_OVRF
-+						&RSPI_SPTEF &RSPI_SPRF>;
-+				};
-+
-+				intc_mask17 {
-+					reg = <0xe6950094 1>, <0xe69500d4 1>;
-+					reginfo = <&SPU2_0 &SPU2_1 &FSI &FMSI 0
-+						&HDMI_SSS &HDMI_KEY>;
-+				};
-+
-+				intc_mask18 {
-+					reg = <0xe6950098 1>, <0xe69500d8 1>;
-+					reginfo = <0 &IPMMU 0 0 &AP_ARM_CTIIRQ
-+						&AP_ARM_PMURQ>;
-+				};
-+
-+				intc_mask19 {
-+					reg = <0xe695009c 1>, <0xe69500dc 1>;
-+					reginfo = <&MFIS2 &CPORTR2S &CMT14 &CMT15
-+						0 &MMCIF_0 &MMCIF_1 &MMCIF_2>;
-+				};
-+
-+				intc_mask20 {
-+					reg = <0xe69500a4 1>, <0xe69500e4 1>;
-+					reginfo = <&SIM_ERI &SIM_RXI &SIM_TXI
-+						&SIM_TEI &STPRO_0 &STPRO_1 &STPRO_2 &STPRO_3>;
-+				};
-+
-+				intc_mask21 {
-+					reg = <0xe69500a8 1>, <0xe69500e8 1>;
-+					reginfo = <&STPRO_4>;
-+				};
-+			};
-+
-+			intc_prio_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_prio0 {
-+					reg = <0xe6940000 2>;
-+					field-width = <4>;
-+					reginfo = <&DMAC3_1 &DMAC3_2 &CMT2 &ICBS0>;
-+				};
-+
-+				intc_prio1 {
-+					reg = <0xe6940004 2>;
-+					field-width = <4>;
-+					reginfo =<&IRDA 0 &BBIF1 &BBIF2>;
-+				};
-+
-+				intc_prio2 {
-+					reg = <0xe6940008 2>;
-+					field-width = <4>;
-+					reginfo = <&ATAPI 0 &CMT1_1 &AP_ARM1>;
-+				};
-+
-+				intc_prio3 {
-+					reg = <0xe694000c 2>;
-+					field-width = <4>;
-+					reginfo = <0 0 &CMT1_2>;
-+				};
-+
-+				intc_prio4 {
-+					reg = <0xe6940010 2>;
-+					field-width = <4>;
-+					reginfo = <&DMAC1_1 &MFIS &MFI &USBF>;
-+				};
-+
-+				intc_prio5 {
-+					reg = <0xe6940014 2>;
-+					field-width = <4>;
-+					reginfo = <&KEYSC &DMAC1_2 &SGX540 &CMT1_0>;
-+				};
-+
-+				intc_prio6 {
-+					reg = <0xe6940018 2>;
-+					field-width = <4>;
-+					reginfo = <&SCIFA0 &SCIFA1 &SCIFA2 &SCIFA3>;
-+				};
-+
-+				intc_prio7 {
-+					reg = <0xe694001c 2>;
-+					field-width = <4>;
-+					reginfo = <&MSIOF2 &USBHSDMAC &FLCTL &SDHI0>;
-+				};
-+
-+				intc_prio8 {
-+					reg = <0xe6940020 2>;
-+					field-width = <4>;
-+					reginfo = <&MSIOF1 &SCIFA4 0 &IIC1>;
-+				};
-+
-+				intc_prio9 {
-+					reg = <0xe6940024 2>;
-+					field-width = <4>;
-+					reginfo = <&DMAC2_1 &DMAC2_2 &AP_ARM_L2CINT>;
-+				};
-+
-+				intc_prio10 {
-+					reg = <0xe6940028 2>;
-+					field-width = <4>;
-+					reginfo = <0 &CMT1_3 0 &SDHI1>;
-+				};
-+
-+				intc_prio11 {
-+					reg = <0xe694002c 2>;
-+					field-width = <4>;
-+					reginfo = <&TPU0 &SCIFA6 &SCIFA7 &GETHER>;
-+				};
-+
-+				intc_prio12 {
-+					reg = <0xe6940030 2>;
-+					field-width = <4>;
-+					reginfo = <0 &CMT3 0 &RWDT0>;
-+				};
-+
-+				intc_prio13 {
-+					reg = <0xe6940034 2>;
-+					field-width = <4>;
-+					reginfo = <&SCIFB &SCIFA5 0 &DDM>;
-+				};
-+
-+				intc_prio14 {
-+					reg = <0xe6940038 2>;
-+					field-width = <4>;
-+					reginfo = <0 0 &DIRC &SDHI2>;
-+				};
-+
-+				intc_prio15 {
-+					reg = <0xe6950000 2>;
-+					field-width = <4>;
-+					reginfo = <&SHWYSTAT>;
-+				};
-+
-+				intc_prio16 {
-+					reg = <0xe6950010 2>;
-+					field-width = <4>;
-+					reginfo = <&USBH1>;
-+				};
-+
-+				intc_prio17 {
-+					reg = <0xe6950014 2>;
-+					field-width = <4>;
-+					reginfo = <&USBH2>;
-+				};
-+
-+				intc_prio18 {
-+					reg = <0xe6950020 2>;
-+					field-width = <4>;
-+					reginfo = <&HDMI>;
-+				};
-+
-+				intc_prio19 {
-+					reg = <0xe6950024 2>;
-+					field-width = <4>;
-+					reginfo = <&RSPI>;
-+				};
-+
-+				intc_prio20 {
-+					reg = <0xe6950028 2>;
-+					field-width = <4>;
-+					reginfo = <&SPU2 0 &FSI &FMSI>;
-+				};
-+
-+				intc_prio21 {
-+					reg = <0xe695002c 2>;
-+					field-width = <4>;
-+					reginfo = <0 &HDMI_SSS &HDMI_KEY>;
-+				};
-+
-+				intc_prio22 {
-+					reg = <0xe6950030 2>;
-+					field-width = <4>;
-+					reginfo = <&IPMMU>;
-+				};
-+
-+				intc_prio23 {
-+					reg = <0xe6950034 2>;
-+					field-width = <4>;
-+					reginfo = <&AP_ARM2>;
-+				};
-+
-+				intc_prio24 {
-+					reg = <0xe6950038 2>;
-+					field-width = <4>;
-+					reginfo = <&MFIS2 &CPORTR2S &CMT14 &CMT15>;
-+				};
-+
-+				intc_prio25 {
-+					reg = <0xe695003c 2>;
-+					field-width = <4>;
-+					reginfo = <0 &MMCIF_0 &MMCIF_1 &MMCIF_2>;
-+				};
-+
-+				intc_prio26 {
-+					reg = <0xe6950048 2>;
-+					field-width = <4>;
-+					reginfo = <&SIM_ERI &SIM_RXI &SIM_TXI &SIM_TEI>;
-+				};
-+
-+				intc_prio27 {
-+					reg = <0xe695004c 2>;
-+					field-width = <4>;
-+					reginfo = <&STPRO_0 &STPRO_1 &STPRO_2 &STPRO_3>;
-+				};
-+
-+				intc_prio28 {
-+					reg = <0xe6950050 2>;
-+					field-width = <4>;
-+					reginfo = <&STPRO_4>;
-+				};
-+			};
-+		};
-+
-+		intca_irq_pins: interrupt-controller at 1{
-+			compatible = "renesas,sh-intc";
-+			interrupt-controller;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			#interrupt-cells = <1>;
-+			ranges;
-+
-+			reg = <0xe6900000 0x6c>;
-+
-+			IRQ0:	intsrc1 { vector = <0x200>; };
-+			IRQ1:	intsrc2 { vector = <0x220>; };
-+			IRQ2:	intsrc3 { vector = <0x240>; };
-+			IRQ3:	intsrc4 { vector = <0x260>; };
-+			IRQ4:	intsrc5 { vector = <0x280>; };
-+			IRQ5:	intsrc6 { vector = <0x2a0>; };
-+			IRQ6:	intsrc7 { vector = <0x2c0>; };
-+			IRQ7:	intsrc8 { vector = <0x2e0>; };
-+			IRQ8:	intsrc9 { vector = <0x300>; };
-+			IRQ9:	intsrc10 { vector = <0x320>; };
-+			IRQ10:	intsrc11 { vector = <0x340>; };
-+			IRQ11:	intsrc12 { vector = <0x360>; };
-+			IRQ12:	intsrc13 { vector = <0x380>; };
-+			IRQ13:	intsrc14 { vector = <0x3a0>; };
-+			IRQ14:	intsrc15 { vector = <0x3c0>; };
-+			IRQ15:	intsrc16 { vector = <0x3e0>; };
-+			IRQ16:	intsrc17 { vector = <0x3200>; };
-+			IRQ17:	intsrc18 { vector = <0x3220>; };
-+			IRQ18:	intsrc19 { vector = <0x3240>; };
-+			IRQ19:	intsrc20 { vector = <0x3260>; };
-+			IRQ20:	intsrc21 { vector = <0x3280>; };
-+			IRQ21:	intsrc22 { vector = <0x32a0>; };
-+			IRQ22:	intsrc23 { vector = <0x32c0>; };
-+			IRQ23:	intsrc24 { vector = <0x32e0>; };
-+			IRQ24:	intsrc25 { vector = <0x3300>; };
-+			IRQ25:	intsrc26 { vector = <0x3320>; };
-+			IRQ26:	intsrc27 { vector = <0x3340>; };
-+			IRQ27:	intsrc28 { vector = <0x3360>; };
-+			IRQ28:	intsrc29 { vector = <0x3380>; };
-+			IRQ29:	intsrc30 { vector = <0x33a0>; };
-+			IRQ30:	intsrc31 { vector = <0x33c0>; };
-+			IRQ31:	intsrc32 { vector = <0x33e0>; };
-+
-+			intc_vectors {
-+				vector_table = <&IRQ0 &IRQ1 &IRQ2 &IRQ3 &IRQ4 &IRQ5
-+								&IRQ6 &IRQ7 &IRQ8 &IRQ9 &IRQ10
-+								&IRQ11 &IRQ12 &IRQ13 &IRQ14 &IRQ15
-+								&IRQ16 &IRQ17 &IRQ18 &IRQ19 &IRQ20
-+								&IRQ21 &IRQ22 &IRQ23 &IRQ24 &IRQ25
-+								&IRQ26 &IRQ27 &IRQ28 &IRQ29 &IRQ30
-+								&IRQ31>;
-+			};
-+
-+			intc_mask_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_mask0 {
-+					reg = <0xe6900040 1>, <0xe6900060 1>;
-+					reginfo = <&IRQ0 &IRQ1 &IRQ2 &IRQ3 &IRQ4
-+							&IRQ5 &IRQ6 &IRQ7>;
-+				};
-+
-+				intc_mask1 {
-+					reg = <0xe6900044 1>, <0xe6900064 1>;
-+					reginfo = <&IRQ8 &IRQ9 &IRQ10 &IRQ11
-+							&IRQ12 &IRQ13 &IRQ14 &IRQ15>;
-+				};
-+
-+				intc_mask2 {
-+					reg = <0xe6900048 1>, <0xe6900068 1>;
-+					reginfo = <&IRQ16 &IRQ17 &IRQ18 &IRQ19
-+							&IRQ20 &IRQ21 &IRQ22 &IRQ23>;
-+				};
-+
-+				intc_mask3 {
-+					reg = <0xe690004C 1>, <0xe690006C 1>;
-+					reginfo = <&IRQ24 &IRQ25 &IRQ26 &IRQ27
-+							&IRQ28 &IRQ29 &IRQ30 &IRQ31>;
-+				};
-+			};
-+
-+			intc_prio_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_prio0 {
-+					reg = <0xe6900010 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ0 &IRQ1 &IRQ2 &IRQ3 &IRQ4 &IRQ5 &IRQ6 &IRQ7>;
-+				};
-+
-+				intc_prio1 {
-+					reg = <0xe6900014 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ8 &IRQ9 &IRQ10 &IRQ11
-+							&IRQ12 &IRQ13 &IRQ14 &IRQ15>;
-+				};
-+
-+				intc_prio2 {
-+					reg = <0xe6900018 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ16 &IRQ17 &IRQ18 &IRQ19
-+							&IRQ20 &IRQ21 &IRQ22 &IRQ23>;
-+				};
-+
-+				intc_prio3 {
-+					reg = <0xe690001C 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ24 &IRQ25 &IRQ26 &IRQ27
-+							&IRQ28 &IRQ29 &IRQ30 &IRQ31>;
-+				};
-+			};
-+
-+			intc_sense_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_sense0 {
-+					reg = <0xe6900000 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ0 &IRQ1 &IRQ2 &IRQ3 &IRQ4 &IRQ5 &IRQ6 &IRQ7>;
-+				};
-+
-+				intc_sense1 {
-+					reg = <0xe6900004 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ8 &IRQ9 &IRQ10 &IRQ11
-+							&IRQ12 &IRQ13 &IRQ14 &IRQ15>;
-+				};
-+
-+				intc_sense2 {
-+					reg = <0xe6900008 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ16 &IRQ17 &IRQ18 &IRQ19
-+							&IRQ20 &IRQ21 &IRQ22 &IRQ23>;
-+				};
-+
-+				intc_sense3 {
-+					reg = <0xe690000C 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ24 &IRQ25 &IRQ26 &IRQ27
-+							&IRQ28 &IRQ29 &IRQ30 &IRQ31>;
-+				};
-+			};
-+
-+			intc_ack_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_ack0 {
-+					reg = <0xe6900020 1>;
-+					reginfo = <&IRQ0 &IRQ1 &IRQ2 &IRQ3 &IRQ4 &IRQ5 &IRQ6 &IRQ7>;
-+				};
-+
-+				intc_ack1 {
-+					reg = <0xe6900024 1>;
-+					reginfo = <&IRQ8 &IRQ9 &IRQ10 &IRQ11
-+							&IRQ12 &IRQ13 &IRQ14 &IRQ15>;
-+				};
-+
-+				intc_ack2 {
-+					reg = <0xe6900028 1>;
-+					reginfo = <&IRQ16 &IRQ17 &IRQ18 &IRQ19
-+							&IRQ20 &IRQ21 &IRQ22 &IRQ23>;
-+				};
-+
-+				intc_ack3 {
-+					reg = <0xe690002C 1>;
-+					reginfo = <&IRQ24 &IRQ25 &IRQ26 &IRQ27
-+							&IRQ28 &IRQ29 &IRQ30 &IRQ31>;
-+				};
-+			};
-+		};
-+	};
- };
--- 
-1.7.10.4
+On Fri, Nov 23, 2012 at 4:03 PM, Praveen Paneri <p.paneri@samsung.com> wrote:
+> This driver uses usb_phy interface to interact with s3c-hsotg. Supports
+> phy_init and phy_shutdown functions to enable/disable usb phy. Support
+> will be extended to host controllers and more Samsung SoCs.
+>
+> Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  .../devicetree/bindings/usb/samsung-usbphy.txt     |   11 +
+>  drivers/usb/phy/Kconfig                            |    8 +
+>  drivers/usb/phy/Makefile                           |    1 +
+>  drivers/usb/phy/samsung-usbphy.c                   |  354 ++++++++++++++++++++
+>  include/linux/platform_data/samsung-usbphy.h       |   27 ++
+>  5 files changed, 401 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+>  create mode 100644 drivers/usb/phy/samsung-usbphy.c
+>  create mode 100644 include/linux/platform_data/samsung-usbphy.h
+>
+> diff --git a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+> new file mode 100644
+> index 0000000..7b26e2d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+> @@ -0,0 +1,11 @@
+> +* Samsung's usb phy transceiver
+> +
+> +The Samsung's phy transceiver is used for controlling usb otg phy for
+> +s3c-hsotg usb device controller.
+> +TODO: Adding the PHY binding with controller(s) according to the under
+> +developement generic PHY driver.
+> +
+> +Required properties:
+> +- compatible : should be "samsung,exynos4210-usbphy"
+> +- reg : base physical address of the phy registers and length of memory mapped
+> +       region.
+> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+> index 7eb73c5..17ad743 100644
+> --- a/drivers/usb/phy/Kconfig
+> +++ b/drivers/usb/phy/Kconfig
+> @@ -44,3 +44,11 @@ config USB_RCAR_PHY
+>
+>           To compile this driver as a module, choose M here: the
+>           module will be called rcar-phy.
+> +
+> +config SAMSUNG_USBPHY
+> +       bool "Samsung USB PHY controller Driver"
+> +       depends on USB_S3C_HSOTG
+> +       select USB_OTG_UTILS
+> +       help
+> +         Enable this to support Samsung USB phy controller for samsung
+> +         SoCs.
+> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
+> index 1a579a8..ec304f6 100644
+> --- a/drivers/usb/phy/Makefile
+> +++ b/drivers/usb/phy/Makefile
+> @@ -9,3 +9,4 @@ obj-$(CONFIG_USB_ISP1301)               += isp1301.o
+>  obj-$(CONFIG_MV_U3D_PHY)               += mv_u3d_phy.o
+>  obj-$(CONFIG_USB_EHCI_TEGRA)   += tegra_usb_phy.o
+>  obj-$(CONFIG_USB_RCAR_PHY)             += rcar-phy.o
+> +obj-$(CONFIG_SAMSUNG_USBPHY)           += samsung-usbphy.o
+> diff --git a/drivers/usb/phy/samsung-usbphy.c b/drivers/usb/phy/samsung-usbphy.c
+> new file mode 100644
+> index 0000000..5c5e1bb
+> --- /dev/null
+> +++ b/drivers/usb/phy/samsung-usbphy.c
+> @@ -0,0 +1,354 @@
+> +/* linux/drivers/usb/phy/samsung-usbphy.c
+> + *
+> + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+> + *              http://www.samsung.com
+> + *
+> + * Author: Praveen Paneri <p.paneri@samsung.com>
+> + *
+> + * Samsung USB2.0 High-speed OTG transceiver, talks to S3C HS OTG controller
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/usb/otg.h>
+> +#include <linux/platform_data/samsung-usbphy.h>
+> +
+> +/* Register definitions */
+> +
+> +#define SAMSUNG_PHYPWR                         (0x00)
+> +
+> +#define PHYPWR_NORMAL_MASK                     (0x19 << 0)
+> +#define PHYPWR_OTG_DISABLE                     (0x1 << 4)
+> +#define PHYPWR_ANALOG_POWERDOWN                        (0x1 << 3)
+> +#define PHYPWR_FORCE_SUSPEND                   (0x1 << 1)
+> +/* For Exynos4 */
+> +#define PHYPWR_NORMAL_MASK_PHY0                        (0x39 << 0)
+> +#define PHYPWR_SLEEP_PHY0                      (0x1 << 5)
+> +
+> +#define SAMSUNG_PHYCLK                         (0x04)
+> +
+> +#define PHYCLK_MODE_USB11                      (0x1 << 6)
+> +#define PHYCLK_EXT_OSC                         (0x1 << 5)
+> +#define PHYCLK_COMMON_ON_N                     (0x1 << 4)
+> +#define PHYCLK_ID_PULL                         (0x1 << 2)
+> +#define PHYCLK_CLKSEL_MASK                     (0x3 << 0)
+> +#define PHYCLK_CLKSEL_48M                      (0x0 << 0)
+> +#define PHYCLK_CLKSEL_12M                      (0x2 << 0)
+> +#define PHYCLK_CLKSEL_24M                      (0x3 << 0)
+> +
+> +#define SAMSUNG_RSTCON                         (0x08)
+> +
+> +#define RSTCON_PHYLINK_SWRST                   (0x1 << 2)
+> +#define RSTCON_HLINK_SWRST                     (0x1 << 1)
+> +#define RSTCON_SWRST                           (0x1 << 0)
+> +
+> +#ifndef MHZ
+> +#define MHZ (1000*1000)
+> +#endif
+> +
+> +enum samsung_cpu_type {
+> +       TYPE_S3C64XX,
+> +       TYPE_EXYNOS4210,
+> +};
+> +
+> +/*
+> + * struct samsung_usbphy - transceiver driver state
+> + * @phy: transceiver structure
+> + * @plat: platform data
+> + * @dev: The parent device supplied to the probe function
+> + * @clk: usb phy clock
+> + * @regs: usb phy register memory base
+> + * @ref_clk_freq: reference clock frequency selection
+> + * @cpu_type: machine identifier
+> + */
+> +struct samsung_usbphy {
+> +       struct usb_phy  phy;
+> +       struct samsung_usbphy_data *plat;
+> +       struct device   *dev;
+> +       struct clk      *clk;
+> +       void __iomem    *regs;
+> +       int             ref_clk_freq;
+> +       int             cpu_type;
+> +};
+> +
+> +#define phy_to_sphy(x)         container_of((x), struct samsung_usbphy, phy)
+> +
+> +/*
+> + * Returns reference clock frequency selection value
+> + */
+> +static int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
+> +{
+> +       struct clk *ref_clk;
+> +       int refclk_freq = 0;
+> +
+> +       ref_clk = clk_get(sphy->dev, "xusbxti");
+> +       if (IS_ERR(ref_clk)) {
+> +               dev_err(sphy->dev, "Failed to get reference clock\n");
+> +               return PTR_ERR(ref_clk);
+> +       }
+> +
+> +       switch (clk_get_rate(ref_clk)) {
+> +       case 12 * MHZ:
+> +               refclk_freq = PHYCLK_CLKSEL_12M;
+> +               break;
+> +       case 24 * MHZ:
+> +               refclk_freq = PHYCLK_CLKSEL_24M;
+> +               break;
+> +       case 48 * MHZ:
+> +               refclk_freq = PHYCLK_CLKSEL_48M;
+> +               break;
+> +       default:
+> +               if (sphy->cpu_type == TYPE_S3C64XX)
+> +                       refclk_freq = PHYCLK_CLKSEL_48M;
+> +               else
+> +                       refclk_freq = PHYCLK_CLKSEL_24M;
+> +               break;
+> +       }
+> +       clk_put(ref_clk);
+> +
+> +       return refclk_freq;
+> +}
+> +
+> +static void samsung_usbphy_enable(struct samsung_usbphy *sphy)
+> +{
+> +       void __iomem *regs = sphy->regs;
+> +       u32 phypwr;
+> +       u32 phyclk;
+> +       u32 rstcon;
+> +
+> +       /* set clock frequency for PLL */
+> +       phyclk = sphy->ref_clk_freq;
+> +       phypwr = readl(regs + SAMSUNG_PHYPWR);
+> +       rstcon = readl(regs + SAMSUNG_RSTCON);
+> +
+> +       switch (sphy->cpu_type) {
+> +       case TYPE_S3C64XX:
+> +               phyclk &= ~PHYCLK_COMMON_ON_N;
+> +               phypwr &= ~PHYPWR_NORMAL_MASK;
+> +               rstcon |= RSTCON_SWRST;
+> +               break;
+> +       case TYPE_EXYNOS4210:
+> +               phypwr &= ~PHYPWR_NORMAL_MASK_PHY0;
+> +               rstcon |= RSTCON_SWRST;
+> +       default:
+> +               break;
+> +       }
+> +
+> +       writel(phyclk, regs + SAMSUNG_PHYCLK);
+> +       /* Configure PHY0 for normal operation*/
+> +       writel(phypwr, regs + SAMSUNG_PHYPWR);
+> +       /* reset all ports of PHY and Link */
+> +       writel(rstcon, regs + SAMSUNG_RSTCON);
+> +       udelay(10);
+> +       rstcon &= ~RSTCON_SWRST;
+> +       writel(rstcon, regs + SAMSUNG_RSTCON);
+> +}
+> +
+> +static void samsung_usbphy_disable(struct samsung_usbphy *sphy)
+> +{
+> +       void __iomem *regs = sphy->regs;
+> +       u32 phypwr;
+> +
+> +       phypwr = readl(regs + SAMSUNG_PHYPWR);
+> +
+> +       switch (sphy->cpu_type) {
+> +       case TYPE_S3C64XX:
+> +               phypwr |= PHYPWR_NORMAL_MASK;
+> +               break;
+> +       case TYPE_EXYNOS4210:
+> +               phypwr |= PHYPWR_NORMAL_MASK_PHY0;
+> +       default:
+> +               break;
+> +       }
+> +
+> +       /* Disable analog and otg block power */
+> +       writel(phypwr, regs + SAMSUNG_PHYPWR);
+> +}
+> +
+> +/*
+> + * The function passed to the usb driver for phy initialization
+> + */
+> +static int samsung_usbphy_init(struct usb_phy *phy)
+> +{
+> +       struct samsung_usbphy *sphy;
+> +       int ret = 0;
+> +
+> +       sphy = phy_to_sphy(phy);
+> +
+> +       /* Enable the phy clock */
+> +       ret = clk_prepare_enable(sphy->clk);
+> +       if (ret) {
+> +               dev_err(sphy->dev, "%s: clk_prepare_enable failed\n", __func__);
+> +               return ret;
+> +       }
+> +
+> +       /* Disable phy isolation */
+> +       if (sphy->plat && sphy->plat->pmu_isolation)
+> +               sphy->plat->pmu_isolation(false);
+> +
+> +       /* Initialize usb phy registers */
+> +       samsung_usbphy_enable(sphy);
+> +
+> +       /* Disable the phy clock */
+> +       clk_disable_unprepare(sphy->clk);
+> +       return ret;
+> +}
+> +
+> +/*
+> + * The function passed to the usb driver for phy shutdown
+> + */
+> +static void samsung_usbphy_shutdown(struct usb_phy *phy)
+> +{
+> +       struct samsung_usbphy *sphy;
+> +
+> +       sphy = phy_to_sphy(phy);
+> +
+> +       if (clk_prepare_enable(sphy->clk)) {
+> +               dev_err(sphy->dev, "%s: clk_prepare_enable failed\n", __func__);
+> +               return;
+> +       }
+> +
+> +       /* De-initialize usb phy registers */
+> +       samsung_usbphy_disable(sphy);
+> +
+> +       /* Enable phy isolation */
+> +       if (sphy->plat && sphy->plat->pmu_isolation)
+> +               sphy->plat->pmu_isolation(true);
+> +
+> +       clk_disable_unprepare(sphy->clk);
+> +}
+> +
+> +static const struct of_device_id samsung_usbphy_dt_match[];
+> +
+> +static inline int samsung_usbphy_get_driver_data(struct platform_device *pdev)
+> +{
+> +       if (pdev->dev.of_node) {
+> +               const struct of_device_id *match;
+> +               match = of_match_node(samsung_usbphy_dt_match,
+> +                                                       pdev->dev.of_node);
+> +               return (int) match->data;
+> +       }
+> +
+> +       return platform_get_device_id(pdev)->driver_data;
+> +}
+> +
+> +static int __devinit samsung_usbphy_probe(struct platform_device *pdev)
+> +{
+> +       struct samsung_usbphy *sphy;
+> +       struct samsung_usbphy_data *pdata;
+> +       struct device *dev = &pdev->dev;
+> +       struct resource *phy_mem;
+> +       void __iomem    *phy_base;
+> +       struct clk *clk;
+> +
+> +       pdata = pdev->dev.platform_data;
+> +       if (!pdata) {
+> +               dev_err(&pdev->dev, "%s: no platform data defined\n", __func__);
+> +               return -EINVAL;
+> +       }
+> +
+> +       phy_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       if (!phy_mem) {
+> +               dev_err(dev, "%s: missing mem resource\n", __func__);
+> +               return -ENODEV;
+> +       }
+> +
+> +       phy_base = devm_request_and_ioremap(dev, phy_mem);
+> +       if (!phy_base) {
+> +               dev_err(dev, "%s: register mapping failed\n", __func__);
+> +               return -ENXIO;
+> +       }
+> +
+> +       sphy = devm_kzalloc(dev, sizeof(*sphy), GFP_KERNEL);
+> +       if (!sphy)
+> +               return -ENOMEM;
+> +
+> +       clk = devm_clk_get(dev, "otg");
+> +       if (IS_ERR(clk)) {
+> +               dev_err(dev, "Failed to get otg clock\n");
+> +               return PTR_ERR(clk);
+> +       }
+> +
+> +       sphy->dev               = &pdev->dev;
+> +       sphy->plat              = pdata;
+> +       sphy->regs              = phy_base;
+> +       sphy->clk               = clk;
+> +       sphy->phy.dev           = sphy->dev;
+> +       sphy->phy.label         = "samsung-usbphy";
+> +       sphy->phy.init          = samsung_usbphy_init;
+> +       sphy->phy.shutdown      = samsung_usbphy_shutdown;
+> +       sphy->cpu_type          = samsung_usbphy_get_driver_data(pdev);
+> +       sphy->ref_clk_freq      = samsung_usbphy_get_refclk_freq(sphy);
+> +
+> +       platform_set_drvdata(pdev, sphy);
+> +
+> +       return usb_add_phy(&sphy->phy, USB_PHY_TYPE_USB2);
+> +}
+> +
+> +static int __exit samsung_usbphy_remove(struct platform_device *pdev)
+> +{
+> +       struct samsung_usbphy *sphy = platform_get_drvdata(pdev);
+> +
+> +       usb_remove_phy(&sphy->phy);
+> +
+> +       return 0;
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id samsung_usbphy_dt_match[] = {
+> +       {
+> +               .compatible = "samsung,s3c64xx-usbphy",
+> +               .data = (void *)TYPE_S3C64XX,
+> +       }, {
+> +               .compatible = "samsung,exynos4210-usbphy",
+> +               .data = (void *)TYPE_EXYNOS4210,
+> +       },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(of, samsung_usbphy_dt_match);
+> +#endif
+> +
+> +static struct platform_device_id samsung_usbphy_driver_ids[] = {
+> +       {
+> +               .name           = "s3c64xx-usbphy",
+> +               .driver_data    = TYPE_S3C64XX,
+> +       }, {
+> +               .name           = "exynos4210-usbphy",
+> +               .driver_data    = TYPE_EXYNOS4210,
+> +       },
+> +       {},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(platform, samsung_usbphy_driver_ids);
+> +
+> +static struct platform_driver samsung_usbphy_driver = {
+> +       .probe          = samsung_usbphy_probe,
+> +       .remove         = __devexit_p(samsung_usbphy_remove),
+> +       .id_table       = samsung_usbphy_driver_ids,
+> +       .driver         = {
+> +               .name   = "samsung-usbphy",
+> +               .owner  = THIS_MODULE,
+> +               .of_match_table = of_match_ptr(samsung_usbphy_dt_match),
+> +       },
+> +};
+> +
+> +module_platform_driver(samsung_usbphy_driver);
+> +
+> +MODULE_DESCRIPTION("Samsung USB phy controller");
+> +MODULE_AUTHOR("Praveen Paneri <p.paneri@samsung.com>");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:samsung-usbphy");
+> diff --git a/include/linux/platform_data/samsung-usbphy.h b/include/linux/platform_data/samsung-usbphy.h
+> new file mode 100644
+> index 0000000..1bd24cb
+> --- /dev/null
+> +++ b/include/linux/platform_data/samsung-usbphy.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Copyright (C) 2012 Samsung Electronics Co.Ltd
+> + *             http://www.samsung.com/
+> + * Author: Praveen Paneri <p.paneri@samsung.com>
+> + *
+> + * Defines platform data for samsung usb phy driver.
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + */
+> +
+> +#ifndef __SAMSUNG_USBPHY_PLATFORM_H
+> +#define __SAMSUNG_USBPHY_PLATFORM_H
+> +
+> +/**
+> + * samsung_usbphy_data - Platform data for USB PHY driver.
+> + * @pmu_isolation: Function to control usb phy isolation in PMU.
+> + */
+> +struct samsung_usbphy_data {
+> +       void (*pmu_isolation)(int on);
+> +};
+> +
+> +extern void samsung_usbphy_set_pdata(struct samsung_usbphy_data *pd);
+> +
+> +#endif /* __SAMSUNG_USBPHY_PLATFORM_H */
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
