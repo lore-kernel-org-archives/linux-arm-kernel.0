@@ -1,40 +1,44 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 9 Jan 2013 09:54:23 +0100
-Subject: [PATCH 1/5] ARM: Kirkwood: Convert NS2 to gpio-poweroff.
-In-Reply-To: <20130109084112.GQ1357@kw.sim.vm.gnt>
-References: <1356704050-5047-1-git-send-email-andrew@lunn.ch>
- <20130109084112.GQ1357@kw.sim.vm.gnt>
-Message-ID: <20130109085423.GG3392@lunn.ch>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 9 Jan 2013 08:55:55 +0000
+Subject: [PATCH 4/4 v3] net/smsc911x: Provide common clock functionality
+In-Reply-To: <CACRpkda-4C+ezaZFSkxsNbmHnBN8RCoCeGePaOF-DzV0XnkzQw@mail.gmail.com>
+References: <1355937587-31730-4-git-send-email-lee.jones@linaro.org>
+ <CACRpkda79O_b3Z8g7Sy7vMtW9neZU4x-Z=iEQgjqu4X5tFKyhw@mail.gmail.com>
+ <20121220192441.GC14363@n2100.arm.linux.org.uk>
+ <20121220203514.GN2691@gmail.com>
+ <20121220205113.GD14363@n2100.arm.linux.org.uk>
+ <20121221091306.GO2691@gmail.com>
+ <20121221092421.GG14363@n2100.arm.linux.org.uk>
+ <20121221114105.GP2691@gmail.com>
+ <20130103111450.GC14714@gmail.com>
+ <CACRpkda-4C+ezaZFSkxsNbmHnBN8RCoCeGePaOF-DzV0XnkzQw@mail.gmail.com>
+Message-ID: <20130109085555.GA31678@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 09:41:13AM +0100, Simon Guinot wrote:
-> On Fri, Dec 28, 2012 at 03:14:10PM +0100, Andrew Lunn wrote:
-> > Remove C code and add a Device Tree node in its place.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> > 
-> > This is untested. I've been known to get the active hi/low the wrong
-> > way around so that the board powers off as the driver loads at boot
-> > time. So it would be very good to have a tested-by: sign off.
-> > 
-> > 
-> >  arch/arm/boot/dts/kirkwood-ns2-common.dtsi |    6 ++++++
-> >  arch/arm/mach-kirkwood/board-ns2.c         |   14 --------------
-> >  2 files changed, 6 insertions(+), 14 deletions(-)
+On Thu, 03 Jan 2013, Linus Walleij wrote:
+
+> On Thu, Jan 3, 2013 at 12:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> Tested-by: Simon Guinot <simon.guinot@sequanux.org>
+> > Some platforms provide clocks which require enabling before the
+> > SMSC911x chip will power on. This patch uses the new common clk
+> > framework to do just that. If no clock is provided, it will just
+> > be ignored and the driver will continue to assume that no clock
+> > is required for the chip to run successfully.
+> >
+> > Cc: Steve Glendinning <steve.glendinning@shawell.net>
+> > Cc: netdev at vger.kernel.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Andrew, do you want me to rebase your patch on the top of the pinctrl
-> conversion one ?
+> Looks all right to me now:
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Hi Simon
+I still need a maintiner Ack for this before I can push it.
 
-Thanks for testing.
+Anyone?
 
-What will probably be best is to wait until the next -rc comes out
-containing the pinctrl fixes and then rebase on top of that.
-
-Thanks
-	Andrew
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
