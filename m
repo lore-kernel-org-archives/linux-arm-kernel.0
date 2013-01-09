@@ -1,81 +1,229 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed,  9 Jan 2013 21:43:02 +0100
-Subject: [PATCH 02/14] of/pci: Add of_pci_get_devfn() function
+Date: Wed,  9 Jan 2013 21:43:12 +0100
+Subject: [PATCH 12/14] ARM: tegra: tec: Add PCIe support
 In-Reply-To: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1357764194-12677-3-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1357764194-12677-13-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function can be used to parse the device and function number from a
-standard 5-cell PCI resource. PCI_SLOT() and PCI_FUNC() can be used on
-the returned value obtain the device and function numbers respectively.
+Enable the first PCIe root port which is connected to an FPGA on the
+Tamonten Evaluation Carrier and add device nodes for each of the PCI
+endpoints available in the standard configuration.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
- drivers/of/of_pci.c    | 32 ++++++++++++++++++++++++++++----
- include/linux/of_pci.h |  1 +
- 2 files changed, 29 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/tegra20-tec.dts | 198 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 198 insertions(+)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 13e37e2..0dd52df 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -7,12 +7,13 @@
- static inline int __of_pci_pci_compare(struct device_node *node,
- 				       unsigned int devfn)
- {
--	unsigned int size;
--	const __be32 *reg = of_get_property(node, "reg", &size);
-+	int err;
+diff --git a/arch/arm/boot/dts/tegra20-tec.dts b/arch/arm/boot/dts/tegra20-tec.dts
+index 25f70ee..b75f979 100644
+--- a/arch/arm/boot/dts/tegra20-tec.dts
++++ b/arch/arm/boot/dts/tegra20-tec.dts
+@@ -60,6 +60,204 @@
+ 		};
+ 	};
  
--	if (!reg || size < 5 * sizeof(__be32))
-+	err = of_pci_get_devfn(node);
-+	if (err < 0)
- 		return 0;
--	return ((be32_to_cpup(&reg[0]) >> 8) & 0xff) == devfn;
++	pcie-controller {
++		vdd-supply = <&pci_vdd_reg>;
++		pex-clk-supply = <&pci_clk_reg>;
++		status = "okay";
 +
-+	return devfn == err;
- }
- 
- struct device_node *of_pci_find_child_device(struct device_node *parent,
-@@ -40,3 +41,26 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
- 	return NULL;
- }
- EXPORT_SYMBOL_GPL(of_pci_find_child_device);
++		pci at 1,0 {
++			bus-range = <0x01 0x0a>;
++			status = "okay";
 +
-+/**
-+ * of_pci_get_devfn() - Get device and function numbers for a device node
-+ * @np: device node
-+ *
-+ * Parses a standard 5-cell PCI resource and returns an 8-bit value that can
-+ * be passed to the PCI_SLOT() and PCI_FUNC() macros to extract the device
-+ * and function numbers respectively. On error a negative error code is
-+ * returned.
-+ */
-+int of_pci_get_devfn(struct device_node *np)
-+{
-+	unsigned int size;
-+	const __be32 *reg;
++			pci at 0,0 {
++				reg = <0x010000 0 0 0 0>;
++				bus-range = <0x02 0x0a>;
 +
-+	reg = of_get_property(np, "reg", &size);
++				compatible = "plda,pcie";
++				device_type = "pci";
 +
-+	if (!reg || size < 5 * sizeof(__be32))
-+		return -EINVAL;
++				#address-cells = <3>;
++				#size-cells = <2>;
 +
-+	return (be32_to_cpup(reg) >> 8) & 0xff;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_get_devfn);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index bb115de..91ec484 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -10,5 +10,6 @@ int of_irq_map_pci(const struct pci_dev *pdev, struct of_irq *out_irq);
- struct device_node;
- struct device_node *of_pci_find_child_device(struct device_node *parent,
- 					     unsigned int devfn);
-+int of_pci_get_devfn(struct device_node *np);
- 
- #endif
++				pci at 0,0 {
++					reg = <0x020000 0 0 0 0>;
++					bus-range = <0x03 0x03>;
++
++					compatible = "ad,pcie";
++					device_type = "pci";
++
++					#address-cells = <3>;
++					#size-cells = <2>;
++
++					pci-test-ep at 0,0 {
++						compatible = "ad,pcietest";
++						reg = <0x030000 0 0 0 0>;
++					};
++				};
++
++				pci at 1,0 {
++					reg = <0x020800 0 0 0 0>;
++					bus-range = <0x04 0x04>;
++
++					compatible = "ad,pcie";
++					device_type = "pci";
++
++					#address-cells = <3>;
++					#size-cells = <2>;
++
++					pci at 0,0 {
++						compatible = "opencores,spi";
++						reg = <0x040000 0 0 0 0>;
++
++						#address-cells = <1>;
++						#size-cells = <0>;
++
++						clock-frequency = <66000000>;
++
++						m25p80 at 0 {
++							compatible = "m25p80";
++							reg = <0>;
++
++							spi-max-frequency = <25000000>;
++
++							#address-cells = <1>;
++							#size-cells = <1>;
++
++							partition at 0 {
++								reg = <0x00000000 0x00400000>;
++								label = "FPGA";
++							};
++
++							partition at 400000 {
++								reg = <0x00400000 0x00400000>;
++								label = "FPGA (gold)";
++								read-only;
++							};
++						};
++					};
++				};
++
++				pci at 2,0 {
++					reg = <0x021000 0 0 0 0>;
++					bus-range = <0x05 0x05>;
++
++					compatible = "ad,pcie";
++					device_type = "pci";
++
++					#address-cells = <3>;
++					#size-cells = <2>;
++
++					pci-i2c-ep at 0,0 {
++						compatible = "opencores,i2c";
++						reg = <0x050000 0 0 0 0>;
++
++						clock-frequency = <66000000>;
++						reg-io-width = <4>;
++						reg-shift = <3>;
++					};
++				};
++
++				pci at 3,0 {
++					reg = <0x021800 0 0 0 0>;
++					bus-range = <0x06 0x06>;
++
++					compatible = "ad,pcie";
++					device_type = "pci";
++
++					#address-cells = <3>;
++					#size-cells = <2>;
++
++					pci at 0,0 {
++						compatible = "ad,gpio-ad64p";
++						reg = <0x060000 0 0 0 0>;
++
++						gpio-controller;
++						#gpio-cells = <2>;
++
++						interrupt-controller;
++						#interrupt-cells = <2>;
++					};
++				};
++
++				pci at 4,0 {
++					reg = <0x022000 0 0 0 0>;
++					bus-range = <0x07 0x07>;
++
++					compatible = "ad,pcie";
++					device_type = "pci";
++
++					#address-cells = <3>;
++					#size-cells = <2>;
++
++					pci at 0,0 {
++						compatible = "opencores,uart";
++						reg = <0x070000 0 0 0 0>;
++					};
++				};
++
++				pci at 5,0 {
++					reg = <0x022800 0 0 0 0>;
++					bus-range = <0x08 0x08>;
++
++					compatible = "ad,pcie";
++					device_type = "pci";
++
++					#address-cells = <3>;
++					#size-cells = <2>;
++
++					pci at 0,0 {
++						compatible = "opencores,ethmac";
++						reg = <0x080000 0 0 0 0>;
++					};
++				};
++
++				pci at 6,0 {
++					reg = <0x023000 0 0 0 0>;
++					bus-range = <0x09 0x09>;
++
++					compatible = "ad,pcie";
++					device_type = "pci";
++
++					#address-cells = <3>;
++					#size-cells = <2>;
++
++					pci at 0,0 {
++						compatible = "opencores,can";
++						reg = <0x090000 0 0 0 0>;
++					};
++				};
++
++				pci at 7,0 {
++					reg = <0x023800 0 0 0 0>;
++					bus-range = <0x0a 0x0a>;
++
++					compatible = "ad,pcie";
++					device_type = "pci";
++
++					#address-cells = <3>;
++					#size-cells = <2>;
++
++					pci at 0,0 {
++						compatible = "opencores,can";
++						reg = <0x0a0000 0 0 0 0>;
++					};
++				};
++			};
++		};
++	};
++
++	regulators {
++		pci_vdd_reg: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "vdd_1v05";
++			regulator-min-microvolt = <1050000>;
++			regulator-max-microvolt = <1050000>;
++			gpio = <&pmic 2 0>;
++			enable-active-high;
++		};
++	};
++
+ 	sound {
+ 		compatible = "ad,tegra-audio-wm8903-tec",
+ 			     "nvidia,tegra-audio-wm8903";
 -- 
 1.8.1
