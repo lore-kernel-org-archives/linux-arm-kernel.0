@@ -1,83 +1,78 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 08 Jan 2013 17:06:52 -0700
-Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
-In-Reply-To: <87ehhxahd1.fsf@xmission.com>
-References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
- <50E4C9C6.20609@codeaurora.org>
- <20130103120259.GB5193@mudshark.cambridge.arm.com>
- <20130103122100.GN2631@n2100.arm.linux.org.uk>
- <50E5E967.3020805@wwwdotorg.org>
- <20130106162200.GC11025@mudshark.cambridge.arm.com>
- <20130106164033.GA3222@n2100.arm.linux.org.uk> <87ehhxahd1.fsf@xmission.com>
-Message-ID: <50ECB49C.7010609@wwwdotorg.org>
+From: scottwood@freescale.com (Scott Wood)
+Date: Tue, 8 Jan 2013 18:12:59 -0600
+Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+In-Reply-To: <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
+ (from c.dall@virtualopensystems.com on Tue Jan  8 17:49:40 2013)
+Message-ID: <1357690379.10453.10@snotra>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2013 06:53 PM, Eric W. Biederman wrote:
-...
-> Yes.  On x86 we have had the generic equivalent of disable_nonboot_cpus
-> in the machine_shutdown for a long time.
+On 01/08/2013 05:49:40 PM, Christoffer Dall wrote:
+> On Tue, Jan 8, 2013 at 6:29 PM, Scott Wood <scottwood@freescale.com>  
+> wrote:
+> > On 01/08/2013 05:17:05 PM, Christoffer Dall wrote:
+> >> This *could* look something like this:
+> >>
+> >> struct kvm_device_param {
+> >>     u64 dev_id;
+> >>     u64 param_id;
+> >>     u64 value;
+> >> };
+> >>
+> >> but that has less clear, or at least less specific, semantics.
+> >
+> >
+> > Why is it less clear?  You need to have device-specific  
+> documentation for
+> > what "id" means, so why not also an enumeration of "param"s?  Or  
+> just keep
+> > it as is, and rename "address" to "value".  Whether "dev" and  
+> "param" are
+> > combined is orthogonal from whether it's used for non-address  
+> things.
+> 
+> less clear in the sense that you have to look at more code to see what
+> it does. I'm not saying that it's too unclear, at all, I'm actually
+> fine with it, but to make my point, we can make an ioctl that's called
+> do_something() that takes a struct with val0, val1, val2, val3, ...
 
-It looks like the x86 implementation does a bit more than
-disable_nonboot_cpus():
+Such an IOCTL would add nothing other than trading the limited and  
+cumbersome ioctl namespace for something structured a bit differently  
+(which isn't such a bad thing...).  A set device attribute ioctl would  
+constrain it to "take this number and convey it to the enumerated  
+device for the enumerated configuration purpose".  There's already room  
+for device-specific semantics since you can have multiple address types.
 
-disable_nonboot_cpus():
-	find first cpu in online cpu mask
-	disable everything else
+Regarding the dev/param split, it looks like you're doing the split  
+anyway -- might as well make them separate struct fields rather than an  
+architecture-specific bitfield encoding.
 
-x86's machine_shutdown():
-	default to rebooting on cpu 0
-	if user specified a different cpu, override default
-	bring that cpu online
-	disable everything else
+> > If you leave it as "address", either we'll have it being used for
+> > non-address things regardless of the name ("Not a typewriter!"), or  
+> there'll
+> > end up being yet more unnecessary ioctls, or device-specific things  
+> will end
+> > up getting shoved into CPU interfaces such as one-reg.  For  
+> example, on MPIC
+> > we need to be able to specify the version of the chip to emulate in  
+> addition
+> > to the address at which it lives.
+> >
+> > Also, why is it documented as an "arm" interface?  Shouldn't it be  
+> a generic
+> > interface, with other architectures currently not implementing any  
+> IDs?
+> > What in the kvm_arch_vm_ioctl() wrapper is arm-specific?
+> >
+> As I remember the argument for keeping this the point was that there
+> were other preferred methods for other archs to do this, and that ARM
+> was the only platform that had this explicit need, but maybe I'm
+> making this up.
 
-So, x86 always kexec's on a specific CPU, whereas if we use
-disable_nonboot_cpus() on ARM, we'll end up kexec'ing on whichever is
-the first online CPU, which might not be the actual boot CPU, and can vary.
+Well, at least PPC has this explicit need as well. :-)
 
-On Tegra this doesn't (currently?) matter since CPU 0 can't be taken
-offline due to our CPU hotplug driver disallowing it. But, perhaps other
-SoCs or future Tegra versions don't/won't have this restriction, so the
-difference will be material.
+Only the toplevel mechanism would be generic; it would be up to each  
+device to decide which (if any) configuration parameters it wants to  
+expose through it.
 
-Should the x86 code be lifted into the implementation of
-disable_nonboot_cpus()?
-
-For the record, here's what I can tell about what the various
-arch-specific machine_shutdown() do:
-
-ARM, ARM64: calls smp_send_stop()
-  -> disable_nonboot_cpus() would be correct
-
-IA64: shuts down all CPUs except the current one
-  -> disable_nonboot_cpus() would be correct
-
-Microblaze: nothing (but no SMP support?)
-  -> disable_nonboot_cpus() would be irrelevant, but fine
-
-MIPS: machine-specific:
-  Cavium Octeon: Shuts down CPUs, waits until num_online_cpus()==1
-    Not sure which CPU isn't shut down though; the current one?
-  Others: Nothing (but at least some have SMP support)
-  -> disable_nonboot_cpus() would be a behaviour change
-
-PPC: machine-specific
-  Only implementations either aren't for SMP, or do nothing (but
-presumably many have SMP support)
-  -> disable_nonboot_cpus() would be a behaviour change
-
-SH: smp_send_stop()
-  -> disable_nonboot_cpus() would be correct
-
-S390: nothing (but appears to have SMP support)
-  -> disable_nonboot_cpus() would be a behaviour change
-
-Tile: nothing (but bans kexec unless no SMP or only 1 CPU online)
-  -> disable_nonboot_cpus() would be irrelevant, but fine, and perhaps
-even allow removal of the kexec ban for SMP?
-
-So at least I don't see anything that would particularly indicate that
-having the kexec generic/core code call disable_nonboot_cpus() would
-cause problems; many architectures have done something like that
-themselves. That said, it certainly would cause some behavioural
-differences on some big platforms like PPC...
+-Scott
