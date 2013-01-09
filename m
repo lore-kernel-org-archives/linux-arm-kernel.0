@@ -1,43 +1,74 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 9 Jan 2013 16:17:58 -0700
-Subject: [PATCH 05/14] lib: Add I/O map cache implementation
-In-Reply-To: <50EDF95F.4070209@wwwdotorg.org>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <201301092119.57067.arnd@arndb.de>
- <20130109215428.GA13648@avionic-0098.adnet.avionic-design.de>
- <201301092210.49452.arnd@arndb.de> <50EDF95F.4070209@wwwdotorg.org>
-Message-ID: <20130109231758.GA27065@obsidianresearch.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 10 Jan 2013 00:41:43 +0100
+Subject: [RFC PATCH 1/7] ARM: common: vic: Parse interrupt and resume masks
+ from device tree
+In-Reply-To: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
+References: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1357774909-29938-2-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 04:12:31PM -0700, Stephen Warren wrote:
-> On 01/09/2013 03:10 PM, Arnd Bergmann wrote:
-> > On Wednesday 09 January 2013, Thierry Reding wrote:
-> >> What happens on Tegra is that we need to map 256 MiB of physical memory
-> >> to access all the PCIe extended configuration space. However, ioremap()
-> >> on such a large region fails if not enough vmalloc() space is available.
-> >>
-> >> This was observed when somebody tested this on CardHu which has a 1 GiB
-> >> of RAM and therefore remapping the full 256 MiB fails.
-> ...
-> > Have you checked if the hardware supports an alternative config
-> > space access mechanism that does not depend on a huge address range?
-> > A lot of them provide an index/data register pair somewhere, as the
-> > original PC implementation did.
-> 
-> That would be nice, but I've talked to the HW engineers, and there's no
-> indication that any alternative mechanism exists.
+This patch extends vic_of_init to parse valid interrupt sources
+and resume sources masks from device tree.
 
-It seems to be convention that extended config space is often only
-accessible through mmio space, that was true on x86 last I checked
-too..
+If mask values are not specified in device tree, all sources
+are assumed to be valid, as before this patch.
 
-You could decrease the size of the mapping to only span the bus
-numbers that are configured for use via DT.
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ Documentation/devicetree/bindings/arm/vic.txt | 6 ++++++
+ arch/arm/common/vic.c                         | 7 ++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-Are there any concerns about these config registers being accessed
-from a context where a new mapping can't be made? Interrupt? Machine
-Check? PCI-E Advanced Error Reporting?
-
-Cheers,
-Jason
+diff --git a/Documentation/devicetree/bindings/arm/vic.txt b/Documentation/devicetree/bindings/arm/vic.txt
+index 266716b..bb7137c 100644
+--- a/Documentation/devicetree/bindings/arm/vic.txt
++++ b/Documentation/devicetree/bindings/arm/vic.txt
+@@ -18,6 +18,9 @@ Required properties:
+ Optional properties:
+ 
+ - interrupts : Interrupt source for parent controllers if the VIC is nested.
++- interrupt-mask : Bit mask of valid interrupt sources (defaults to all valid)
++- wakeup-mask : Bit mask of interrupt sources that can wake up the system
++  (defaults to all allowed)
+ 
+ Example:
+ 
+@@ -26,4 +29,7 @@ Example:
+ 		interrupt-controller;
+ 		#interrupt-cells = <1>;
+ 		reg = <0x60000 0x1000>;
++
++		interrupt-mask = <0xffffff7f>;
++		wakeup-mask = <0x0000ff7f>;
+ 	};
+diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+index e4df17c..c2889da 100644
+--- a/arch/arm/common/vic.c
++++ b/arch/arm/common/vic.c
+@@ -407,6 +407,8 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *regs;
++	u32 interrupt_mask = ~0;
++	u32 wakeup_mask = ~0;
+ 
+ 	if (WARN(parent, "non-root VICs are not supported"))
+ 		return -EINVAL;
+@@ -415,10 +417,13 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ 	if (WARN_ON(!regs))
+ 		return -EIO;
+ 
++	of_property_read_u32(node, "interrupt-mask", &interrupt_mask);
++	of_property_read_u32(node, "wakeup-mask", &wakeup_mask);
++
+ 	/*
+ 	 * Passing -1 as first IRQ makes the simple domain allocate descriptors
+ 	 */
+-	__vic_init(regs, -1, ~0, ~0, node);
++	__vic_init(regs, -1, interrupt_mask, wakeup_mask, node);
+ 
+ 	return 0;
+ }
+-- 
+1.8.1
