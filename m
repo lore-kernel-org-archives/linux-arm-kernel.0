@@ -1,199 +1,162 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 09 Jan 2013 10:01:05 +0100
-Subject: [v2 5/9] clocksource: tegra: Enable ARM
- =?UTF-8?Q?arch=5Ftimer=20with?= =?UTF-8?Q?=20TSC?=
-In-Reply-To: <50ED1F8F.4060700@ti.com>
-References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com><1357649263-1098-6-git-send-email-hdoyu@nvidia.com><50EC444B.5060206@arm.com>
- <20130109.075708.1662067562960541635.hdoyu@nvidia.com>
- <50ED1F8F.4060700@ti.com>
-Message-ID: <79cf9366702f71f8c7add23b2aa0afec@localhost>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 09 Jan 2013 10:04:18 +0100
+Subject: [PATCH 7/7] ARM i.MX51 babbage: Add display support
+In-Reply-To: <201301081829.06441.marex@denx.de>
+References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
+ <201301081809.38537.marex@denx.de>
+ <1357665800.2527.17.camel@pizza.hi.pengutronix.de>
+ <201301081829.06441.marex@denx.de>
+Message-ID: <1357722258.2538.2.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Jan 2013 13:13:11 +0530, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Wednesday 09 January 2013 11:27 AM, Hiroshi Doyu wrote:
->> Hi Marc,
->>
->> Marc Zyngier <marc.zyngier@arm.com> wrote @ Tue, 8 Jan 2013 17:07:39
->> +0100:
->>
->>> On 08/01/13 12:47, Hiroshi Doyu wrote:
->>>> Add platform enabler for ARM arch_timer(TSC). TSC is more fine
-grained
->>>> timer than TMR0. If it's available, it will be used for clock source
->>>> and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
->>>> necessary for clock event.
->>>>
->>>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->>>> ---
->>>>   .../bindings/arm/tegra/nvidia,tegra114-tsc.txt     |   11 ++++
->>>>   drivers/clocksource/tegra20_timer.c                |   65
->>>>   +++++++++++++++++++-
->>>>   2 files changed, 75 insertions(+), 1 deletion(-)
->>>>   create mode 100644
->>>>   Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
->>>>
->>>> diff --git
->>>> a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
->>>> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
->>>> new file mode 100644
->>>> index 0000000..9de936a
->>>> --- /dev/null
->>>> +++
->>>> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra114-tsc.txt
->>>> @@ -0,0 +1,11 @@
->>>> +NVIDIA Tegra Timer Stamp Counter(TSC)
->>>> +
->>>> +Required properties:
->>>> +- compatible : "nvidia,tegra114-tsc
->>>> +- reg : Should contain 1 register ranges(address and length)
->>>> +
->>>> +Example:
->>>> +	tsc {
->>>> +		compatible = "nvidia,tegra114-tsc";
->>>> +		reg = <0x700f0000 0x20000>;
->>>> +	};
->>>> diff --git a/drivers/clocksource/tegra20_timer.c
->>>> b/drivers/clocksource/tegra20_timer.c
->>>> index 1d25de8..564266d 100644
->>>> --- a/drivers/clocksource/tegra20_timer.c
->>>> +++ b/drivers/clocksource/tegra20_timer.c
->>>> @@ -30,6 +30,7 @@
->>>>   #include <asm/mach/time.h>
->>>>   #include <asm/smp_twd.h>
->>>>   #include <asm/sched_clock.h>
->>>> +#include <asm/arch_timer.h>
->>>>
->>>>   #define RTC_SECONDS            0x08
->>>>   #define RTC_SHADOW_SECONDS     0x0c
->>>> @@ -271,10 +272,72 @@ static void __init tegra20_init_tmr(void)
->>>>   	clockevents_register_device(&tegra_clockevent);
->>>>   }
->>>>
->>>> +#define TSC_CNTCR		0		/* TSC control registers */
->>>> +#define TSC_CNTCR_ENABLE	(1 << 0)	/* Enable */
->>>> +#define TSC_CNTCR_HDBG		(1 << 1)	/* Halt on debug */
->>>> +
->>>> +#define TSC_CNTCV0		0x8		/* TSC counter (LSW) */
->>>> +#define TSC_CNTCV1		0xc		/* TSC counter (MSW) */
->>>> +#define TSC_CNTFID0		0x20		/* TSC freq id 0 */
->>>> +
->>>> +static const struct of_device_id tegra_tsc_match[] __initconst = {
->>>> +	{ .compatible = "nvidia,tegra114-tsc" },
->>>> +	{}
->>>> +};
->>>> +
->>>> +/* FIXME: only secure mode is supported. */
->>>
->>> And this is a bug, as far as I'm concerned.
->>>
->>>> +static int tegra_arch_timer_init(void)
->>>> +{
->>>> +	int err;
->>>> +	struct device_node *np;
->>>> +	struct clk *clk;
->>>> +	void __iomem *tsc_base;
->>>> +	u32 freq, val;
->>>> +
->>>> +	np = of_find_matching_node(NULL, tegra_tsc_match);
->>>> +	if (!np)
->>>> +		return -ENODEV;
->>>> +
->>>> +	tsc_base = of_iomap(np, 0);
->>>> +	if (!tsc_base)
->>>> +		return -ENODEV;
->>>> +
->>>> +	clk = clk_get_sys("clk_m", NULL);
->>>> +	if (IS_ERR(clk)) {
->>>> +		freq = 12000000;
->>>> +		pr_warn("Unable to get timer clock. Assuming 12Mhz input
-clock.\n");
->>>> +	} else {
->>>> +		freq = clk_get_rate(clk);
->>>> +		clk_put(clk);
->>>> +	}
->>>> +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
->>>> +
->>>> +	/* CNTFRQ */
->>>> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
->>>> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
->>>> +	BUG_ON(val != freq);
->>>
->>> No, not again! Like I said last year, this won't fly. So instead of
->>> trying to work around a broken firmware, let's do the right thing.
->>>
->>>> +
->>>> +	val = readl_relaxed(tsc_base + TSC_CNTCR);
->>>> +	val |= TSC_CNTCR_ENABLE | TSC_CNTCR_HDBG;
->>>> +	writel_relaxed(val, tsc_base + TSC_CNTCR);
->>>> +
->>>> +	err = arch_timer_of_register();
->>>
->>> What about adding an optional property to the binding, pointing to the
->>> required clock? That would solve the above problem in a sensible way,
->>> and your kernel wouldn't go bust.
->>
->> Could you explain a bit more? We have the follwing DT entries related
-to
->> this:
->>
->> 	tsc {
->> 		compatible = "nvidia,tegra114-tsc";
->> 		reg = <0x700f0000 0x20000>;
->> 	};
->>
->> 	...
->>
->> 	timer {
->> 		compatible = "arm,armv7-timer";
->> 		interrupts = <1 13 0xf08>,
->> 			     <1 14 0xf08>,
->> 			     <1 11 0xf08>,
->> 			     <1 10 0xf08>;
->> 	};
->>
-> Arch timer frequency can be specified in DT since the code
-> already has provision to extract it. Below is extract
-> from OMAP5 DT code.
+Hi Marek,
+
+Am Dienstag, den 08.01.2013, 18:29 +0100 schrieb Marek Vasut:
+> Dear Philipp Zabel,
 > 
-> timer {
->                                  compatible = "arm,armv7-timer";
+> > Am Dienstag, den 08.01.2013, 18:09 +0100 schrieb Marek Vasut:
+> > > Dear Fabio Estevam,
+> > > 
+> > > > On Tue, Jan 8, 2013 at 2:41 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > > > > Hi Sascha,
+> > > > > 
+> > > > > On Mon, Nov 12, 2012 at 1:23 PM, Sascha Hauer
+> > > > > <s.hauer@pengutronix.de>
+> > > 
+> > > wrote:
+> > > > >> The babbage board has a DVI-I output which allows to output analog
+> > > > >> and digital signals simultaneously. This patch adds support for it
+> > > > >> to the devicetree. The DDC signals are not wired up on the board, so
+> > > > >> DRM will fall back on default VESA modes.
+> > > > >> 
+> > > > >> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > > 
+> > > > > I am running linux-next 20130108, which has this patch applied and I
+> > > > 
+> > > > > get the following on my mx51babbage:
+> > > > Ok, good news. I see a nice penguin on my monitor now.
+> > > > 
+> > > > Discussed with Marek and he proposed a quick workaround:
+> > > > 
+> > > > --- a/drivers/staging/imx-drm/ipuv3-crtc.c
+> > > > +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+> > > > @@ -343,6 +343,11 @@ static irqreturn_t ipu_irq_handler(int irq, void
+> > > > *dev_id) {
+> > > > 
+> > > >         struct ipu_crtc *ipu_crtc = dev_id;
+> > > > 
+> > > > +       if (!ipu_crtc->imx_crtc) {
+> > > > +               pr_err("Spurious IPU IRQ\n");
+> > > > +               return IRQ_HANDLED;
+> > > > +       }
+> > > > +
+> > > > 
+> > > >         imx_drm_handle_vblank(ipu_crtc->imx_crtc);
+> > > >         
+> > > >         if (ipu_crtc->newfb) {
+> > > > 
+> > > > It seems that this issue happened because bootloader leaves the IPU
+> > > > turned on.
+> > > 
+> > > To elaborate more on this stuff:
+> > > 
+> > > 491         ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
+> > > 492                         IPU_IRQ_EOF);
+> > > 493         ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq,
+> > > ipu_irq_handler, 0,
+> > > 494                         "imx_drm", ipu_crtc);
+> > > 495         if (ret < 0) {
+> > > 496                 dev_err(ipu_crtc->dev, "irq request failed with
+> > > %d.\n", ret);
+> > > 497                 goto err_out;
+> > > 498         }
+> > > 499
+> > > 500         disable_irq(ipu_crtc->irq);
+> > > 
+> > > This code in drivers/staging/imx-drm/ipuv3-crtc.c is broken. If the IPU
+> > > is on, it produces an interrupt before the driver is fully set up. I
+> > > didn't produce a patch yet, I think I might offload this to someone
+> > > else. Volunteers?
+> > 
+> > Reordering the ipu_get_resources and imx_drm_add_crtc calls should resolve
+> > this:
+> > 
+> > From: Philipp Zabel <p.zabel@pengutronix.de>
+> > Subject: [PATCH] staging: imx/drm: add crtc before registering interrupt
+> >  handler
+> > 
+> > If the bootloader already enabled the display, the interrupt handler
+> > will be called as soon as it is registered. If the CRTC is not already
+> > added at this time, the call to imx_drm_handle_vblank will result in
+> > a NULL pointer dereference.
 > 
->                                  interrupts = <1 14 0x308>;
->                                  clock-frequency = <6144000>;
->                          };
-> 
-> I think thats what Marc is pointing out.
+> I ain't no IPU expert, but isn't adding the component before having it fully 
+> inited even worse?
 
-Almost. I already proposed this in the past, but because the source clock
-is variable in the Tegra case, this is not flexible enough.
+Good point, how about just moving the irq request out of
+ipu_get_resources into ipu_crtc_init, after adding the crtc:
 
-What I was suggesting was to do the following:
+From: Philipp Zabel <p.zabel@pengutronix.de>
+Subject: [PATCH] staging: imx/drm: request irq only after adding the crtc
 
-timer {
-        compatible = "arm,armv7-timer";
-        [...]
-        clocks = <&tsc>;
-}
+If the bootloader already enabled the display, the interrupt handler
+will be called as soon as it is registered. If the CRTC is not already
+added at this time, the call to imx_drm_handle_vblank will result in
+a NULL pointer dereference.
 
-tsc: tsc {
-        compatible = "nvidia,tegra114-tsc";
-        reg = <0x700f0000 0x20000>;
-        freq-range = <... ...>;
-        clock-output-names = "tsc";
-}
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/staging/imx-drm/ipuv3-crtc.c |   23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
 
-In the arch_timer code, start searching for the "clocks" property, and use
-that if there is one. Otherwise, fall back to "clock-frequency", and
-ultimately to reading CNTFRQ.
-
-This requires some changes (converting the tsc code to be a clock), but
-this is at least a proper description of the hardware, and should give you
-the required flexibility.
-
-Thanks,
-
-        M.
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index 4b3a019..b028b0d 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -483,17 +483,6 @@ static int ipu_get_resources(struct ipu_crtc *ipu_crtc,
+ 		goto err_out;
+ 	}
+ 
+-	ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
+-			IPU_IRQ_EOF);
+-	ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, ipu_irq_handler, 0,
+-			"imx_drm", ipu_crtc);
+-	if (ret < 0) {
+-		dev_err(ipu_crtc->dev, "irq request failed with %d.\n", ret);
+-		goto err_out;
+-	}
+-
+-	disable_irq(ipu_crtc->irq);
+-
+ 	return 0;
+ err_out:
+ 	ipu_put_resources(ipu_crtc);
+@@ -504,6 +493,7 @@ err_out:
+ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
+ 		struct ipu_client_platformdata *pdata)
+ {
++	struct ipu_soc *ipu = dev_get_drvdata(ipu_crtc->dev->parent);
+ 	int ret;
+ 
+ 	ret = ipu_get_resources(ipu_crtc, pdata);
+@@ -522,6 +512,17 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
+ 		goto err_put_resources;
+ 	}
+ 
++	ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
++			IPU_IRQ_EOF);
++	ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, ipu_irq_handler, 0,
++			"imx_drm", ipu_crtc);
++	if (ret < 0) {
++		dev_err(ipu_crtc->dev, "irq request failed with %d.\n", ret);
++		goto err_put_resources;
++	}
++
++	disable_irq(ipu_crtc->irq);
++
+ 	return 0;
+ 
+ err_put_resources:
 -- 
-Fast, cheap, reliable. Pick two.
+1.7.10.4
