@@ -1,20 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 Jan 2013 21:23:37 +0000
-Subject: [PATCH 11/14] ARM: tegra: tamonten: Add PCIe support
-In-Reply-To: <1357764194-12677-12-git-send-email-thierry.reding@avionic-design.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 9 Jan 2013 22:25:17 +0100
+Subject: [PATCH 00/14] Rewrite Tegra PCIe driver
+In-Reply-To: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <1357764194-12677-12-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <201301092123.37491.arnd@arndb.de>
+Message-ID: <20130109222517.3c590553@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 January 2013, Thierry Reding wrote:
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> ---
->  arch/arm/boot/dts/tegra20-tamonten.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Dear Thierry Reding,
 
-It's not clear how this one-line patch adds PCIe support to the
-platform. Are you missing the actual change here?
+On Wed,  9 Jan 2013 21:43:00 +0100, Thierry Reding wrote:
+> This patch series contains an almost complete rewrite of the Tegra PCIe
+> driver. The code is moved to the drivers/pci/host directory and turned
+> into a proper platform driver, adding MSI and DT support while at it.
+> Other PCI host controller drivers can be added to that directory in an
+> attempt to make it easier to factor out common code.
 
-	Arnd
+Thanks!
+
+I have started basing the Marvell PCIe code on some of your earlier
+versions. But apparently in this final version, you no longer have the
+emulated Host bridge. Why so?
+
+For the Marvell PCIe code, I've used your emulated Host bridge, and
+added an emulated PCI-to-PCI bridge implementation, in order to get the
+following hierarchy:
+
+ + Host Bridge
+   + PCI-to-PCI bridge
+     + PCI Device
+   + PCI-to-PCI bridge
+     + PCI device
+
+So, I instantiate one unique emulated Host Bridge, and then one
+emulated PCI-to-PCI Bridge for each PCIe interface that I have.
+
+The nice thing about that is that I can then read the configuration
+space of the PCI-to-PCI bridge to find out how much I/O space and
+memory space is needed for the device connected to this interface, and
+at which address is has been mapped. This greatly helps my "address
+decoding" problem, and removes the ad-hoc virtual space allocator I had
+written.
+
+Is there a reason for having given up on this idea? Is there still a
+hope for a different PCIe implementation to use this idea?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
