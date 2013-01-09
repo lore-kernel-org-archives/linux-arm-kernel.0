@@ -1,61 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 9 Jan 2013 14:49:38 +0000
-Subject: [PATCH v3 2/7] vexpress: Match the "arm, sp810" DT entry for
- clock initialisation
-In-Reply-To: <1357732214.3222.11.camel@linaro1.home>
-References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
- <1357309041-6192-3-git-send-email-catalin.marinas@arm.com>
- <1357666147.24697.27.camel@linaro1.home>
- <20130109113649.GB1673@arm.com>
- <1357732214.3222.11.camel@linaro1.home>
-Message-ID: <20130109144938.GD1673@arm.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 9 Jan 2013 15:58:04 +0100
+Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+In-Reply-To: <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
+References: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
+ <1357687783.10453.9@snotra>
+ <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
+ <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
+ <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
+Message-ID: <86D3D406-05C3-4569-AD03-3223B46D47D9@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 11:50:14AM +0000, Jon Medhurst (Tixy) wrote:
-> On Wed, 2013-01-09 at 11:36 +0000, Catalin Marinas wrote:
-> > On Tue, Jan 08, 2013 at 05:29:07PM +0000, Jon Medhurst (Tixy) wrote:
-> > > On Fri, 2013-01-04 at 14:17 +0000, Catalin Marinas wrote:
-> > > > Currently the clk-vexpress.c implementation relies on the vexpress code
-> > > > to call the vexpress_clk_of_init() function which performs the SP810
-> > > > initialisation. This patch adds "arm,sp810" to the clock DT match array
-> > > > allowing of_clk_init() to call the vexpress_sp810_of_setup() function.
-> > > > In case of CONFIG_ARM64, make vexpress_clk_of_init() an arch_initcall().
-> > > > 
-> > > > Note that SP810 requires the fixed clocks to be already registered.
-> > > > Since the clock subsystem does not handle DT dependencies, the
-> > > > corresponding DT entries must be in the correct order.
-> > > 
-> > > Which they aren't on 32-bit vexpress ;-) leading to:
-> > > 
-> > >   ERROR: could not get clock /smb/motherboard/iofpga at 3,00000000/sysctl at 020000:refclk(0)
-> > >   ERROR: could not get clock /smb/motherboard/iofpga at 3,00000000/sysctl at 020000:timclk(1)
-> > >   ------------[ cut here ]------------
-> > >   WARNING: at drivers/clk/versatile/clk-vexpress.c:112 vexpress_sp810_of_setup+0x43/0xc8()
-> > >   Modules linked in:
-> > >   [<c0011cbd>] (unwind_backtrace+0x1/0x9c) from [<c001c1a9>] (warn_slowpath_common+0x39/0x50)
-> > >   [<c001c1a9>] (warn_slowpath_common+0x39/0x50) from [<c001c1d7>] (warn_slowpath_null+0x17/0x1c)
-> > >   [<c001c1d7>] (warn_slowpath_null+0x17/0x1c) from [<c05b4fab>] (vexpress_sp810_of_setup+0x43/0xc8)
-> > >   [<c05b4fab>] (vexpress_sp810_of_setup+0x43/0xc8) from [<c05b4e67>] (of_clk_init+0x1f/0x34)
-> > >   [<c05b4e67>] (of_clk_init+0x1f/0x34) from [<c05b515d>] (vexpress_clk_of_init+0x9/0x10)
-> > >   [<c05b515d>] (vexpress_clk_of_init+0x9/0x10) from [<c05a7d2b>] (v2m_dt_timer_init+0x7/0x78)
-> > >   [<c05a7d2b>] (v2m_dt_timer_init+0x7/0x78) from [<c05a4d09>] (time_init+0x11/0x20)
-> > >   [<c05a4d09>] (time_init+0x11/0x20) from [<c05a24fb>] (start_kernel+0x113/0x214)
-> > >   [<c05a24fb>] (start_kernel+0x113/0x214) from [<8000807f>] (0x8000807f)
-> > >   ---[ end trace 1b75b31a2719ed1c ]---
-> > > 
-> > > After moving all "fixed-clock" nodes to be the first devices in
-> > > arch/arm/boot/dts/vexpress-v2m{-rs1,}.dtsi then all appears well. (I am
-> > > only trying out patches 1-3 of this set at the moment).
-> > 
-> > I'm waiting for Pawel's feedback (he's still on holiday). He may have a
-> > better solution for the vexpress code than relying on the dts order but
-> > for now the simples fix is to change the dts.
+
+On 09.01.2013, at 15:48, Peter Maydell wrote:
+
+> On 9 January 2013 10:02, Alexander Graf <agraf@suse.de> wrote:
+>> I think we should make thus at least potentially generic. In fact, I wouldn't even
+>> mind calling it DEV_REG with the same semantics as ONE_REG, just that it also
+>> gets a unique dev id that gets created during in-kernel device creation and that
+>> it's a vm ioctl.
 > 
-> Fair enough. But if the patch series gets used as is then another patch
-> will need to be added to it to fix the device-trees.
+> Well, we might want a DEV_REG, but you might as well just make ONE_REG
+> OK as a VM ioctl, since there's no reason not to have not-per-cpu but not
+> device registers. ONE_REG already supports dividing up the ID space so
+> you can say which device or whatever is being used, because we had
+> things like GIC registers in mind when we put that API together.
 
-Yes, indeed. I won't break 32-bit support ;)
+ONE_REG's address space today doesn't include a field for the target device, because that's already predetermined by the fd you run it on. Hence my suggestion to add it as separate field, because then we keep the id space mask-free.
 
--- 
-Catalin
+> However, this shouldn't be DEV_REG, because this isn't actually setting state
+> in the irqchip device, it's configuring the kernel's part of the system model
+> [compare wiring up irq routing, which also has a custom ioctl rather than a
+> generic one]. As such it definitely needs to happen only before the VM is
+> actually started and not during VM execution, unlike a DEV_REG which would
+> presumably be generally valid.
+
+The same can be true for ONE_REG/SET_SREGS. On PPC we support setting the PVR (CPU type) via SREGS because ONE_REG only came later. Setting the CPU type only makes sense before you first start using a vcpu. After that point it should be forbidden.
+
+So in a way, the irqchip memory address location is a device register, as it has all the properties that a register on that device would have. It is
+
+  * per device
+  * one id for one purpose
+  * may or may not be writable during certain times
+
+We would also keep the gates open to get a new register id one day for a second address. Imagine an interrupt controller that splits its address mappings into "PIC base registers" and "MSI target registers", though the MSI registers logically belong to the PIC. Then the ioctl as designed here gets stuck too.
+
+> 
+>> That way we wouldn't block our path to create two in-kernel irqchips one day.
+> 
+> Er, SET_DEVICE_ADDRESS doesn't block us doing that; that's why it has
+> an ID parameter.
+> 
+> The discussion at the KVM forum, as I recall it was basically:
+> (a) some other ppc irqchips also want to set the base address for where
+> their memory mapped registers live, so this isn't a totally ARM specific
+> weirdness
+
+Yes.
+
+> (b) we didn't need to tangle up and delay the KVM ARM work with a vague
+> and unspecified desire for general configurability
+
+Yeah, that was the basic idea. Considering that the patch set hasn't been going in for another 2 months after that discussion indicates that this isn't too much of an issue though :).
+
+In fact, I do recall myself pointing out that we need some padding in that ioctl to accomodate for later usages like the ones above. Then we could later rename (or copy name) it and everyone'd be happy.
+
+
+Alex
