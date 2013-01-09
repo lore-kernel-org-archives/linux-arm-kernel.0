@@ -1,68 +1,88 @@
 From: s-guiriec@ti.com (Sebastien Guiriec)
-Date: Wed, 9 Jan 2013 16:03:06 +0100
-Subject: [PATCH v2 0/5] ARM: OMAP4: Enable AESS IP.
-Message-ID: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
+Date: Wed, 9 Jan 2013 16:03:07 +0100
+Subject: [PATCH v2 1/5] ARM: OMAP2+: hwmod: add enable_preprogram hook
+In-Reply-To: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
+References: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
+Message-ID: <1357743792-13917-2-git-send-email-s-guiriec@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2:
-- Add missing AESS memory banks.
-- Update the serie base on comments related earlier serie:
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69853.html
+From: Paul Walmsley <paul@pwsan.com>
 
-The location of the callback has been updated in order to fit with AESS.
-Some call of PM runtime can be done by ASoC core when AESS is in RET so
-we need to ensure that the additional callback is call on enable
-also in order to have clock correctly stop.
+After setup/enable, some IP blocks need some additional setting to
+indicate the PRCM that they are inactive until they are configured.
+Some examples on OMAP4 include the AESS and FSUSB IP blocks.
 
-v1:
-ARM: OMAP4: Enable AESS IP.
+To fix this cleanly, this patch adds another optional function
+pointer, setup_preprogram, to the IP block's hwmod data.  The function
+that is pointed to is called by the hwmod code immediately after the
+IP block is reset.
 
-This patch serie extends the the hwmod HWMOD_EXT_OPT_MAIN_CLK flag for the
-AESS IP. This IP has additional register for Auto Gatting configuration. As
-it is used only for Audio the driver is not always loaded. We can reuse the
-same flag as McPDM to work around the HW problem due to bad reset value of
-AESS Auto gatting configuration register. 
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   18 ++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.h |    2 ++
+ 2 files changed, 20 insertions(+)
 
-If we try to setup and reset AESS during boot time without this serie the
-next clocks will still remain enable.
-
-omapconf abe cfg:
-|--------------------------------------------------------------|
-| ABE        Clock Domain Configuration                        |
-|--------------------------------|-----------------------------|
-| Clock State Transition control | HW-Auto                     |
-| Clock State                    |                             |
-|   ABE_24M_FCLK                 | GATED                       |
-|   ABE_ALWON_32K_CLK            | GATED                       |
-|   ABE_SYSCLK                   | GATED                       |
-|   24M_FCLK                     | GATED                       |
-|   ABE_ICLK2                    | RUNNING                     |
-|   DPLL_ABE_X2_CLK              | RUNNING                     |
-|   PAD_CLKS                     | GATED                       |
-|   SLIMBUS_CLK                  | GATED                       |
-| OPP Divider                    | ABE_CLK = DPLL_ABE_X2_CLK/1 |
-|--------------------------------------------------------------|
-
-Paul Walmsley (3):
-  ARM: OMAP2+: hwmod: add enable_preprogram hook
-  ASoC: TI AESS: add autogating-enable function, callable from
-    architecture code
-  ARM: OMAP4+: AESS: enable internal auto-gating during initial setup
-
-Sebastien Guiriec (2):
-  OMAP4: hwmod data: Enable AESS hwmod device
-  OMAP4: hwmod data: Update AESS data with memory bank area
-
- arch/arm/mach-omap2/Makefile               |    2 +-
- arch/arm/mach-omap2/omap_hwmod.c           |   18 ++++++++++
- arch/arm/mach-omap2/omap_hwmod.h           |    8 +++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   49 +++++++++++++++++++++++--
- arch/arm/mach-omap2/omap_hwmod_reset.c     |   52 +++++++++++++++++++++++++++
- include/sound/aess.h                       |   53 ++++++++++++++++++++++++++++
- 6 files changed, 178 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_reset.c
- create mode 100644 include/sound/aess.h
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 4653efb..f37d22c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2053,6 +2053,23 @@ static int _omap4_get_context_lost(struct omap_hwmod *oh)
+ }
+ 
+ /**
++ * _enable_preprogram - Pre-program an IP block during the _enable() process
++ * @oh: struct omap_hwmod *
++ *
++ * Some IP blocks (such as AESS) require some additional programming
++ * after enable before they can enter idle.  If a function pointer to
++ * do so is present in the hwmod data, then call it and pass along the
++ * return value; otherwise, return 0.
++ */
++static int __init _enable_preprogram(struct omap_hwmod *oh)
++{
++	if (!oh->class->enable_preprogram)
++		return 0;
++
++	return oh->class->enable_preprogram(oh);
++}
++
++/**
+  * _enable - enable an omap_hwmod
+  * @oh: struct omap_hwmod *
+  *
+@@ -2156,6 +2173,7 @@ static int _enable(struct omap_hwmod *oh)
+ 				_update_sysc_cache(oh);
+ 			_enable_sysc(oh);
+ 		}
++		r = _enable_preprogram(oh);
+ 	} else {
+ 		if (soc_ops.disable_module)
+ 			soc_ops.disable_module(oh);
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+index 3ae852a..41066b4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -501,6 +501,7 @@ struct omap_hwmod_omap4_prcm {
+  * @rev: revision of the IP class
+  * @pre_shutdown: ptr to fn to be executed immediately prior to device shutdown
+  * @reset: ptr to fn to be executed in place of the standard hwmod reset fn
++ * @enable_preprogram:  ptr to fn to be executed during device enable
+  *
+  * Represent the class of a OMAP hardware "modules" (e.g. timer,
+  * smartreflex, gpio, uart...)
+@@ -524,6 +525,7 @@ struct omap_hwmod_class {
+ 	u32					rev;
+ 	int					(*pre_shutdown)(struct omap_hwmod *oh);
+ 	int					(*reset)(struct omap_hwmod *oh);
++	int					(*enable_preprogram)(struct omap_hwmod *oh);
+ };
+ 
+ /**
 -- 
 1.7.10.4
