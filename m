@@ -1,53 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 9 Jan 2013 11:36:50 +0000
-Subject: [PATCH v3 2/7] vexpress: Match the "arm, sp810" DT entry for
- clock initialisation
-In-Reply-To: <1357666147.24697.27.camel@linaro1.home>
-References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
- <1357309041-6192-3-git-send-email-catalin.marinas@arm.com>
- <1357666147.24697.27.camel@linaro1.home>
-Message-ID: <20130109113649.GB1673@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 09 Jan 2013 12:43:38 +0100
+Subject: [PATCH v4 0/7] Add fully tested id switch and vbus connect detect
+ support for Chipidea
+In-Reply-To: <20130109032305.GA22404@nchen-desktop>
+References: <1356591603-23323-1-git-send-email-peter.chen@freescale.com>
+ <50EC3AD9.8000109@free-electrons.com> <20130109032305.GA22404@nchen-desktop>
+Message-ID: <50ED57EA.6080309@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 05:29:07PM +0000, Jon Medhurst (Tixy) wrote:
-> On Fri, 2013-01-04 at 14:17 +0000, Catalin Marinas wrote:
-> > Currently the clk-vexpress.c implementation relies on the vexpress code
-> > to call the vexpress_clk_of_init() function which performs the SP810
-> > initialisation. This patch adds "arm,sp810" to the clock DT match array
-> > allowing of_clk_init() to call the vexpress_sp810_of_setup() function.
-> > In case of CONFIG_ARM64, make vexpress_clk_of_init() an arch_initcall().
-> > 
-> > Note that SP810 requires the fixed clocks to be already registered.
-> > Since the clock subsystem does not handle DT dependencies, the
-> > corresponding DT entries must be in the correct order.
-> 
-> Which they aren't on 32-bit vexpress ;-) leading to:
-> 
->   ERROR: could not get clock /smb/motherboard/iofpga at 3,00000000/sysctl at 020000:refclk(0)
->   ERROR: could not get clock /smb/motherboard/iofpga at 3,00000000/sysctl at 020000:timclk(1)
->   ------------[ cut here ]------------
->   WARNING: at drivers/clk/versatile/clk-vexpress.c:112 vexpress_sp810_of_setup+0x43/0xc8()
->   Modules linked in:
->   [<c0011cbd>] (unwind_backtrace+0x1/0x9c) from [<c001c1a9>] (warn_slowpath_common+0x39/0x50)
->   [<c001c1a9>] (warn_slowpath_common+0x39/0x50) from [<c001c1d7>] (warn_slowpath_null+0x17/0x1c)
->   [<c001c1d7>] (warn_slowpath_null+0x17/0x1c) from [<c05b4fab>] (vexpress_sp810_of_setup+0x43/0xc8)
->   [<c05b4fab>] (vexpress_sp810_of_setup+0x43/0xc8) from [<c05b4e67>] (of_clk_init+0x1f/0x34)
->   [<c05b4e67>] (of_clk_init+0x1f/0x34) from [<c05b515d>] (vexpress_clk_of_init+0x9/0x10)
->   [<c05b515d>] (vexpress_clk_of_init+0x9/0x10) from [<c05a7d2b>] (v2m_dt_timer_init+0x7/0x78)
->   [<c05a7d2b>] (v2m_dt_timer_init+0x7/0x78) from [<c05a4d09>] (time_init+0x11/0x20)
->   [<c05a4d09>] (time_init+0x11/0x20) from [<c05a24fb>] (start_kernel+0x113/0x214)
->   [<c05a24fb>] (start_kernel+0x113/0x214) from [<8000807f>] (0x8000807f)
->   ---[ end trace 1b75b31a2719ed1c ]---
-> 
-> After moving all "fixed-clock" nodes to be the first devices in
-> arch/arm/boot/dts/vexpress-v2m{-rs1,}.dtsi then all appears well. (I am
-> only trying out patches 1-3 of this set at the moment).
+Hi Peter,
 
-I'm waiting for Pawel's feedback (he's still on holiday). He may have a
-better solution for the vexpress code than relying on the dts order but
-for now the simples fix is to change the dts. An even better solution
-would be for the of_clk_init() code to track dependencies.
+Thanks for your answer.
+
+On 09/01/2013 04:23, Peter Chen wrote:
+> On Tue, Jan 08, 2013 at 04:27:21PM +0100, Maxime Ripard wrote:
+>> Hi Peter,
+>>
+>> On 27/12/2012 07:59, Peter Chen wrote:
+>>> (Sorry for update slowly due to long time business trip)
+>>>
+>>> Changes for v4 mainly for 2/7, 3/7, 4/7, see individual
+>>> patch commit for detail.
+>>>
+>>> This patchset adds fully tested otg id switch function and
+>>> vbus connect/disconnect detection for chipidea driver.
+>>> The mainly design of id/vbus handling follows msm otg driver.
+>>> I hope the msm usb maintainer can have a look of this patchset,
+>>> and give some comments, and move the whole msm usb driver to
+>>> chipidea framework if possible in the future.
+>>>
+>>> This patchset is fully tested at i.mx6Q saberlite board.
+>>
+>> Have you tested it on a 3.8 kernel?
+> Hi Maxime,
+> 
+> I just tested my branch (https://github.com/hzpeterchen/linux-usb)
+> It works ok at i.mx6Q saberlite board.
+> The version is Linux version 3.8.0-rc2+, and it is based on greg's
+> usb-next(top of 102ee001912f67a7701f26a56ef2bcf84fc78028).
+
+Ok, I finally got what's going on.
+
+Commit 09f6ffde introduced a dependency on USB_EHCI_HCD for host mode,
+that in turn depends on USB_ARCH_HAS_EHCI, which isn't selected by MXS.
+It was thus removing the host mode support when switching from 3.7 to
+3.8, and I somehow overlooked that.
+Enabling the host mode solved the panic.
+
+> Please always enable both device and host mode for chipidea driver.
+> Current code still not consider all things for different mode config,
+> like device-only, host-only, otg.  In future, it is supposed to do
+> at dts file, and judge probe.
+
+Then isn't the gadget mode configuration option supposed to depends on
+the host mode if it's known to be broken otherwise?
+
+Thanks,
+Maxime
 
 -- 
-Catalin
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
