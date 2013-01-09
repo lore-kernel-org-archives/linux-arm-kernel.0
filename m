@@ -1,65 +1,156 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Wed, 9 Jan 2013 16:29:53 +0530
-Subject: [PATCH v3 0/9] Migrate Tegra to common clock framework
-In-Reply-To: <50EC8947.4080704@wwwdotorg.org>
-References: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
- <50E70FE5.9010001@wwwdotorg.org> <50EB6403.5090300@wwwdotorg.org>
- <50EC1CD3.3070308@nvidia.com> <50EC6A37.4000206@wwwdotorg.org>
- <50EC8947.4080704@wwwdotorg.org>
-Message-ID: <50ED4DA9.3090406@nvidia.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Wed, 09 Jan 2013 16:42:32 +0530
+Subject: [PATCH] ARM: SAMSUNG: Gracefully exit on suspend failure
+Message-ID: <1357729952-14881-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 January 2013 02:31 AM, Stephen Warren wrote:
-> On 01/08/2013 11:49 AM, Stephen Warren wrote:
->> On 01/08/2013 06:19 AM, Prashant Gaikwad wrote:
->>> On Tuesday 08 January 2013 05:40 AM, Stephen Warren wrote:
->>>> On 01/04/2013 10:22 AM, Stephen Warren wrote:
->>>>> On 01/04/2013 02:40 AM, Prashant Gaikwad wrote:
->>>>>> This patchset does following:
->>>>>> 1. Decompose single tegra clock structure into multiple clocks.
->>>>>> 2. Try to use standard clock types supported by common clock framework.
->>>>>> 3. Use dynamic initialization.
->>>>>> 4. Move all clock code to drivers/clk/tegra from mach-tegra.
->>>>>> 5. Add device tree support for Tegra20 and Tegra30 clocks.
->>>>>> 6. Remove all legacy clock code from mach-tegra.
->>>>> I think there are bugs here. I applied all your clock patches on top of
->>>>> Tegra's for-next (see list below), and found that the following don't
->>>>> work on Springbank:
->>>>>
->>>>> * HDMI display
->>>>> * Audio playback
->>>>> * WiFi
->>>> (BTW, I stopped Cc'ing linux-kernel@, but added linux-tegra@ instead...)
->>>>
->>>> Prashant, some updated testing results based off the "dev/ccf" branch
->>>> you sent me on our internal git server:
->> ...
->>> I have updated the internal branch with all the above mentioned fixes.
-> ...
->> The remaining item is the display issue on Tegra30, which I'll go look
->> at now.
-> The USB3 clock, which isn't used by any drivers on Tegra30, and hence
-> was disabled at boot, was set up incorrectly and ended up mapping to the
-> disp1 clock, and hence turned off the display. The following fixes it:
+As per the Exynos5250 User Manual:
 
-Stephen, thanks for the fix!! I have included this and PLLE fix; updated 
-internal branch.
+When there are pending interrupt events, WFI/WFE instruction are
+ignored. To cancel the power-down sequence follow these steps:
+1) Disable system power-down through CENTRAL_SEQ_CONFIGURATION
+and CENTRAL_SEQ_CONFIGURATION_DMC registers
+2) Clear WAKEUP_STAT register
+3) Enable interrupt service routine for CPU
 
-Please let me know if it is good to merge now, I will send the patches.
+Code for early wakeup for exynos already exists; remove the panic
+on suspend failure, clear the wakeup state register and return
+error from cpu_suspend to indicate a failed suspend (to a user
+daemon).
 
->> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
->> index f2f526e..0bac07c 100644
->> --- a/drivers/clk/tegra/clk-tegra30.c
->> +++ b/drivers/clk/tegra/clk-tegra30.c
->> @@ -1541,7 +1541,7 @@ static void __init tegra30_periph_clk_init(void)
->>   
->>   	/* usb3 */
->>   	clk = tegra_clk_periph_gate("usb3", "clk_m", 0, clk_base, 0, 59,
->> -				    &periph_l_regs, periph_clk_enb_refcnt);
->> +				    &periph_h_regs, periph_clk_enb_refcnt);
->>   	clk_register_clkdev(clk, NULL, "tegra-ehci.2");
->>   	clks[usb3] = clk;
-> I wonder if there are any other similar issues?
+Older Samsung SoCs have similar panics and I have removed them all.
+Haven't touched the S3C2410 sleep code.
 
-Reviewed, there were none.
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ arch/arm/mach-exynos/pm.c          |    6 ++++--
+ arch/arm/mach-s3c24xx/pm-s3c2412.c |    3 ++-
+ arch/arm/mach-s3c24xx/pm-s3c2416.c |    3 ++-
+ arch/arm/mach-s3c64xx/pm.c         |    3 ++-
+ arch/arm/mach-s5p64x0/pm.c         |    4 ++--
+ arch/arm/mach-s5pv210/pm.c         |    4 ++--
+ arch/arm/plat-samsung/pm.c         |    5 ++++-
+ 7 files changed, 18 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index f459afd..55df38cd 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -92,8 +92,8 @@ static int exynos_cpu_suspend(unsigned long arg)
+ 	/* issue the standby signal into the pm unit. */
+ 	cpu_do_idle();
+ 
+-	/* we should never get past here */
+-	panic("sleep resumed to originator?");
++	pr_err("Failed to suspend the system\n");
++	return -EBUSY;
+ }
+ 
+ static void exynos_pm_prepare(void)
+@@ -283,6 +283,8 @@ static void exynos_pm_resume(void)
+ 	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
+ 		tmp |= S5P_CENTRAL_LOWPWR_CFG;
+ 		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
++		/* clear the wakeup state register */
++		__raw_writel(0x0, S5P_WAKEUP_STAT);
+ 		/* No need to perform below restore code */
+ 		goto early_wakeup;
+ 	}
+diff --git a/arch/arm/mach-s3c24xx/pm-s3c2412.c b/arch/arm/mach-s3c24xx/pm-s3c2412.c
+index 206765c..a7bc30d 100644
+--- a/arch/arm/mach-s3c24xx/pm-s3c2412.c
++++ b/arch/arm/mach-s3c24xx/pm-s3c2412.c
+@@ -48,7 +48,8 @@ static int s3c2412_cpu_suspend(unsigned long arg)
+ 
+ 	s3c2412_sleep_enter();
+ 
+-	panic("sleep resumed to originator?");
++	pr_err("Failed to suspend the system\n");
++	return -EBUSY;
+ }
+ 
+ static void s3c2412_pm_prepare(void)
+diff --git a/arch/arm/mach-s3c24xx/pm-s3c2416.c b/arch/arm/mach-s3c24xx/pm-s3c2416.c
+index 1bd4817..97a8d70 100644
+--- a/arch/arm/mach-s3c24xx/pm-s3c2416.c
++++ b/arch/arm/mach-s3c24xx/pm-s3c2416.c
+@@ -34,7 +34,8 @@ static int s3c2416_cpu_suspend(unsigned long arg)
+ 
+ 	s3c2412_sleep_enter();
+ 
+-	panic("sleep resumed to originator?");
++	pr_err("Failed to suspend the system\n");
++	return -EBUSY;
+ }
+ 
+ static void s3c2416_pm_prepare(void)
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index f6b13a2..4d1accc 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -297,7 +297,8 @@ static int s3c64xx_cpu_suspend(unsigned long arg)
+ 
+ 	/* we should never get past here */
+ 
+-	panic("sleep resumed to originator?");
++	pr_err("Failed to suspend the system\n");
++	return -EBUSY;
+ }
+ 
+ /* mapping of interrupts to parts of the wakeup mask */
+diff --git a/arch/arm/mach-s5p64x0/pm.c b/arch/arm/mach-s5p64x0/pm.c
+index 9cba18b..710651d 100644
+--- a/arch/arm/mach-s5p64x0/pm.c
++++ b/arch/arm/mach-s5p64x0/pm.c
+@@ -103,8 +103,8 @@ static int s5p64x0_cpu_suspend(unsigned long arg)
+ 	    "mcr p15, 0, %0, c7, c10, 4\n\t"
+ 	    "mcr p15, 0, %0, c7, c0, 4" : : "r" (tmp));
+ 
+-	/* we should never get past here */
+-	panic("sleep resumed to originator?");
++	pr_err("Failed to suspend the system\n");
++	return -EBUSY;
+ }
+ 
+ /* mapping of interrupts to parts of the wakeup mask */
+diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
+index 736bfb1..c584f49 100644
+--- a/arch/arm/mach-s5pv210/pm.c
++++ b/arch/arm/mach-s5pv210/pm.c
+@@ -104,8 +104,8 @@ static int s5pv210_cpu_suspend(unsigned long arg)
+ 	    "mcr p15, 0, %0, c7, c10, 4\n\t"
+ 	    "wfi" : : "r" (tmp));
+ 
+-	/* we should never get past here */
+-	panic("sleep resumed to originator?");
++	pr_err("Failed to suspend the system\n");
++	return -EBUSY;
+ }
+ 
+ static void s5pv210_pm_prepare(void)
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 1507028..aa4b06d 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -243,6 +243,7 @@ int (*pm_cpu_sleep)(unsigned long);
+ 
+ static int s3c_pm_enter(suspend_state_t state)
+ {
++	int ret;
+ 	/* ensure the debug is initialised (if enabled) */
+ 
+ 	s3c_pm_debug_init();
+@@ -300,7 +301,9 @@ static int s3c_pm_enter(suspend_state_t state)
+ 	 * we resume as it saves its own register state and restores it
+ 	 * during the resume.  */
+ 
+-	cpu_suspend(0, pm_cpu_sleep);
++	ret = cpu_suspend(0, pm_cpu_sleep);
++	if (ret)
++		return ret;
+ 
+ 	/* restore the system state */
+ 
+-- 
+1.7.9.5
