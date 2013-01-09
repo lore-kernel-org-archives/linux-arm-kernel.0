@@ -1,71 +1,38 @@
 From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 9 Jan 2013 05:38:26 +0000
-Subject: [RFC v2 00/18] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <50EC3BE7.8070704@ti.com>
+Date: Wed, 9 Jan 2013 05:38:25 +0000
+Subject: [RFC v2 14/18] ARM: OMAP2+: AM33XX: control: Add some control
+ module registers and APIs
+In-Reply-To: <50EC3964.3060708@ti.com>
 References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <50EC3BE7.8070704@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDD096@DBDE01.ent.ti.com>
+ <1356959231-17335-15-git-send-email-vaibhav.bedia@ti.com>
+ <50EC3964.3060708@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDD089@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
-
-On Tue, Jan 08, 2013 at 21:01:51, Shilimkar, Santosh wrote:
-> Vaibhav,
+On Tue, Jan 08, 2013 at 20:51:08, Shilimkar, Santosh wrote:
+> On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
+> > Add minimal APIs for writing to the IPC and the M3_TXEV registers
+> > in the Control module. These will be used in a subsequent patch which
+> > adds suspend-resume support for AM33XX.
+> >
+> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> > Cc: Tony Lingren <tony@atomide.com>
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> > Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+> > ---
+> On Control module, we are trying to move driver/module
+> specific code to respective drivers. Can you not
+> add below code to ipc related driver component.
 > 
-> On Monday 31 December 2012 06:36 PM, Vaibhav Bedia wrote:
-> > Hi,
-> >
-> > This is the second version of the patch series for adding suspend-resume
-> > support for AM33XX. Based on the feedback received on the previous patch
-> > series [1] almost all the patches have undergone a bit a rework.
-> >
-> > The 1st two patches depend on the changes for mailbox code migration
-> > from arch/arm/*-omap*/ to drivers/mailbox/ [2].
-> >
-> > The patch series also depends on recent changes to the OMAP PM framework
-> > by Paul Walmsley.
-> >
-> > I found it easiest to apply the AM33XX suspend-resume patches on top of
-> > Paul's TEST_pwrdm_post_fpwrst_devel_a_3.9 branch + the patches @ [2].
-> >
-> > With these dependencies met, the PM code uses the firmware interface
-> > and expects the userspace to load the WKUP_M3 binary before the
-> > suspend-resume functionality is made available. The binary file (and
-> > the source-code for WKUP_M3) can be obtained from the 'next' branch at
-> > [3]. The WKUP_M3 binary can either be loaded post bootup via
-> > the sysfs entry './sys/devices/ocp.2/wkup_m3.4/firmware' or
-> > it can be included in the kernel image as part of the build process.
-> >
-> > DDR3 specific changes have been skipped for now since mainline U-Boot
-> > exhibited stability issues on all the DDR3 based AM335x boards that i could
-> > lay my hands on.
-> >
-> > I have done basic testing along with power measurments on the different
-> > power rails on the AM335x EVM. PER domain transition on the BeagleBone fails
-> > if the CPSW driver is included in the kernel and is yet to be root caused.
-> > Along with this issue more extensive testing on other OMAP platforms is also
-> > pending right now.
-> >
-> > For more details on the AM335x suspend-resume support please refer to the
-> > changelog in the different patches.
-> >
-> I still haven't reviewed patch 15, 16 and 18 which adds suspend support.
-> Will do that in coming days since they need a bit a closer look.
-> 
-> But as mentioned in some of the patches, you need to split this series
-> since except 15, 16 and 18 which adds suspend support, rest of the
-> patches are
-> - data file fixes
-> - timer suspend/resume update
-> - mailbox support, control module update.
-> 
-> Would be good to split the series to help the reviews.
+> If not, then patch as such is fine with me.
 > 
 
-Sure. I'll split it up like you mentioned. Since all these changes are needed for
-a working suspend-resume I kept it in a single series to reduce dependencies and
-also to help set an initial context for the AM33xx PM changes.
+I had it in the pm33xx.c in the previous version. Kevin had asked me to
+move it to control.c. Should I revert move it back there?
 
 Regards,
 Vaibhav
