@@ -1,38 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Jan 2013 10:44:14 +0000
-Subject: [PATCH 1/4] gpiolib: introduce descriptor-based GPIO interface
-In-Reply-To: <201301091035.23206.arnd@arndb.de>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
- <201301081259.29839.arnd@arndb.de>
- <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
- <201301091035.23206.arnd@arndb.de>
-Message-ID: <20130109104414.GF3931@n2100.arm.linux.org.uk>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Wed, 9 Jan 2013 16:29:53 +0530
+Subject: [PATCH v3 0/9] Migrate Tegra to common clock framework
+In-Reply-To: <50EC8947.4080704@wwwdotorg.org>
+References: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
+ <50E70FE5.9010001@wwwdotorg.org> <50EB6403.5090300@wwwdotorg.org>
+ <50EC1CD3.3070308@nvidia.com> <50EC6A37.4000206@wwwdotorg.org>
+ <50EC8947.4080704@wwwdotorg.org>
+Message-ID: <50ED4DA9.3090406@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 10:35:22AM +0000, Arnd Bergmann wrote:
-> On Wednesday 09 January 2013, Alexandre Courbot wrote:
-> > On Tue, Jan 8, 2013 at 9:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > Please avoid the use of IS_ERR_OR_NULL(), especially on interfaces you
-> > > introduce yourself. AFAICT, gpiod_get cannot return NULL, so you
-> > > should not check for that.
-> > 
-> > Sure - you sound like IS_ERR_OR_NULL() is generally considered evil,
-> 
-> Correct.
-> 
-> > may I ask why this is the case?
-> 
-> It's very hard to get right: either you are interested in the error code,
-> and then you don't have one in some cases, or you don't care but have
-> to check for it anyway. When you define a function, just make it clear
-> what the expected return values are, either NULL for error or a negative
-> ERR_PTR value, but not both.
+On Wednesday 09 January 2013 02:31 AM, Stephen Warren wrote:
+> On 01/08/2013 11:49 AM, Stephen Warren wrote:
+>> On 01/08/2013 06:19 AM, Prashant Gaikwad wrote:
+>>> On Tuesday 08 January 2013 05:40 AM, Stephen Warren wrote:
+>>>> On 01/04/2013 10:22 AM, Stephen Warren wrote:
+>>>>> On 01/04/2013 02:40 AM, Prashant Gaikwad wrote:
+>>>>>> This patchset does following:
+>>>>>> 1. Decompose single tegra clock structure into multiple clocks.
+>>>>>> 2. Try to use standard clock types supported by common clock framework.
+>>>>>> 3. Use dynamic initialization.
+>>>>>> 4. Move all clock code to drivers/clk/tegra from mach-tegra.
+>>>>>> 5. Add device tree support for Tegra20 and Tegra30 clocks.
+>>>>>> 6. Remove all legacy clock code from mach-tegra.
+>>>>> I think there are bugs here. I applied all your clock patches on top of
+>>>>> Tegra's for-next (see list below), and found that the following don't
+>>>>> work on Springbank:
+>>>>>
+>>>>> * HDMI display
+>>>>> * Audio playback
+>>>>> * WiFi
+>>>> (BTW, I stopped Cc'ing linux-kernel@, but added linux-tegra@ instead...)
+>>>>
+>>>> Prashant, some updated testing results based off the "dev/ccf" branch
+>>>> you sent me on our internal git server:
+>> ...
+>>> I have updated the internal branch with all the above mentioned fixes.
+> ...
+>> The remaining item is the display issue on Tegra30, which I'll go look
+>> at now.
+> The USB3 clock, which isn't used by any drivers on Tegra30, and hence
+> was disabled at boot, was set up incorrectly and ended up mapping to the
+> disp1 clock, and hence turned off the display. The following fixes it:
 
-Indeed, and any code which does this:
+Stephen, thanks for the fix!! I have included this and PLLE fix; updated 
+internal branch.
 
-	if (IS_ERR_OR_NULL(ptr))
-		return PTR_ERR(ptr);
+Please let me know if it is good to merge now, I will send the patches.
 
-is buggy because on NULL it returns 0, which is generally accepted as being
-"success".
+>> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+>> index f2f526e..0bac07c 100644
+>> --- a/drivers/clk/tegra/clk-tegra30.c
+>> +++ b/drivers/clk/tegra/clk-tegra30.c
+>> @@ -1541,7 +1541,7 @@ static void __init tegra30_periph_clk_init(void)
+>>   
+>>   	/* usb3 */
+>>   	clk = tegra_clk_periph_gate("usb3", "clk_m", 0, clk_base, 0, 59,
+>> -				    &periph_l_regs, periph_clk_enb_refcnt);
+>> +				    &periph_h_regs, periph_clk_enb_refcnt);
+>>   	clk_register_clkdev(clk, NULL, "tegra-ehci.2");
+>>   	clks[usb3] = clk;
+> I wonder if there are any other similar issues?
+
+Reviewed, there were none.
