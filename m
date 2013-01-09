@@ -1,70 +1,132 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Jan 2013 12:38:53 +0000
-Subject: [PATCH 2/3] ARM: ux500: Turn on the 'heartbeat' LED trigger
-In-Reply-To: <20130109122323.GE31678@gmail.com>
-References: <1357725965-27342-1-git-send-email-lee.jones@linaro.org>
- <1357725965-27342-2-git-send-email-lee.jones@linaro.org>
- <201301091018.55058.arnd@arndb.de>
- <20130109103510.GE3931@n2100.arm.linux.org.uk>
- <20130109110840.GD31678@gmail.com>
- <20130109111209.GH3931@n2100.arm.linux.org.uk>
- <20130109122323.GE31678@gmail.com>
-Message-ID: <20130109123853.GJ3931@n2100.arm.linux.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 9 Jan 2013 18:17:46 +0530
+Subject: [PATCH V2 3/3] ARM: davinci: da850: add NAND driver entries
+In-Reply-To: <1357633220-29827-4-git-send-email-anilkumar.v@ti.com>
+References: <1357633220-29827-1-git-send-email-anilkumar.v@ti.com>
+ <1357633220-29827-4-git-send-email-anilkumar.v@ti.com>
+Message-ID: <50ED66F2.8050006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 12:23:23PM +0000, Lee Jones wrote:
-> Excuse my ignorance, but I'm a little confused by this.
+On 1/8/2013 1:50 PM, Kumar, Anil wrote:
+> Add NAND driver entries to export NAND functionality on da850 EVM and
+> NAND pinctrl node to do pin mux according to pinctrl-single driver.
+
+Subject line should have DT and da850 evm somewhere.
+Otherwise NAND has been supported on DA850 for long.
+
 > 
-> What's the difference between 'select <OPTION>' in the Kconfig and
-> 'CONFIG_<OPTION>=y' in the defconfig; besides the fact that if we
-> do it in the Kconfig file, we can be more selective with regards to
-> which platform it gets enabled on?
+> Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
+> ---
+> :100644 100644 c7609d0... 382a7da... M	arch/arm/boot/dts/da850-evm.dts
+> :100644 100644 e9c6e82... 16e2ac2... M	arch/arm/boot/dts/da850.dtsi
+>  arch/arm/boot/dts/da850-evm.dts |   19 +++++++++++++++++++
+>  arch/arm/boot/dts/da850.dtsi    |   13 +++++++++++++
+>  2 files changed, 32 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+> index c7609d0..382a7da 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -28,4 +28,23 @@
+>  			status = "okay";
+>  		};
+>  	};
+> +	nand_cs3 at 62000000 {
+> +		status = "okay";
+> +	};
+> +};
+> +&pmx_core{
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <
+> +		&nand_cs3_pins
+> +	>;
 
-Take this in Kconfig:
+This means that the NAND pins are configured even if NAND is not
+probed. Right? This can be moved into the nand_cs3 node to avoid that. 
+And then when used with Linus Walleij's patch "drivers/pinctrl: grab 
+default handles from device core" which should be accepted soon, the 
+pins will be automatically setup when the NAND gets probed.
 
-config FOO
-	bool "FOO option"
-	select BAR
+> +
+> +	nand_cs3_pins: pinmux_nand_pins {
+> +		pinctrl-single,bits = <
+> +			0x1c 0x00110000  0x00ff0000     /* EMA_OE, EMA_WE */
+> +			0x1c 0x00000110  0x00000ff0     /* EMA_CS[4],EMA_CS[3]*/
+> +			0x24 0x11111111  0xffffffff     /* EMA_D[0], EMA_D[1], EMA_D[2], EMA_D[3],
+> +							   EMA_D[4], EMA_D[5], EMA_D[6], EMA_D[7] */
+> +			0x30 0x01100000  0x0ff00000     /* EMA_A[1], EMA_A[2] */
+> +		>;
+> +	};
 
-config BAR
-	bool "BAR option"
+I suspect a number of other boards using NAND on CS3 would have to 
+repeat these configurations. It will be better to move them into the 
+da850.dtsi file so it can be reused.
 
-Now, irrespective of the default configuration file being used:
-- if you don't enable FOO, then you can enable _and_ _disable_ BAR according
-  to your needs.
-- if you enable FOO, then BAR will be _forcefully_ enabled and you can't
-  turn it off without first disabling FOO.
+Since I am new to the DT and pinctrl stuff, I had to actually try these to 
+make sure what I am suggesting isn't nonsense. I came up with this 
+patch on top of your series. Please test it at your end and also see if you 
+are happy with the changes.
 
-The default configuration file will specify the _default_ values for these
-options, but if FOO ends up being enabled, BAR will be forcefully enabled
-irrespective of what's in the configuration file.
+Thanks,
+Sekhar
 
-With this instead:
-
-config FOO
-	bool "FOO option"
-
-config BAR
-	bool "BAR option"
-
-Then, the two options are independent.  They can be enabled and disabled
-by the configuration completely independently.  However, their default
-values come from the default configuration file.  So, if the config file
-has:
-
-CONFIG_FOO=y
-CONFIG_BAR=y
-
-and you do a 'make oldconfig' then they will remain set.  If you use one
-of the configuration editing tools, you'll be presented with them already
-enabled, and you can turn them off independently.
-
-So, putting this stuff in the default configuration file allows
-_non-mandatory_ options to be disabled should the user desire without the
-user having to edit the configuration files.
-
-If a user has to edit the configuration files in order to configure the
-kernel as they desire, then the configuration system has failed - or we
-have failed to properly think out how to represent the allowable
-configurations.
+---8<----
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 382a7da..52abb9d 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -30,21 +30,8 @@
+ 	};
+ 	nand_cs3@62000000 {
+ 		status = "okay";
++		pinctrl-names = "default";
++		pinctrl-0 = <&nand_cs3_pins>;
+ 	};
+ };
+-&pmx_core{
+-	pinctrl-names = "default";
+-	pinctrl-0 = <
+-		&nand_cs3_pins
+-	>;
+ 
+-	nand_cs3_pins: pinmux_nand_pins {
+-		pinctrl-single,bits = <
+-			0x1c 0x00110000  0x00ff0000     /* EMA_OE, EMA_WE */
+-			0x1c 0x00000110  0x00000ff0     /* EMA_CS[4],EMA_CS[3]*/
+-			0x24 0x11111111  0xffffffff     /* EMA_D[0], EMA_D[1], EMA_D[2], EMA_D[3],
+-							   EMA_D[4], EMA_D[5], EMA_D[6], EMA_D[7] */
+-			0x30 0x01100000  0x0ff00000     /* EMA_A[1], EMA_A[2] */
+-		>;
+-	};
+-};
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 6ab9730..c4b21a8 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -38,7 +38,25 @@
+ 			pinctrl-single,register-width = <32>;
+ 			pinctrl-single,function-mask = <0xffffffff>;
+ 			status = "disabled";
++
++			nand_cs3_pins: pinmux_nand_pins {
++				pinctrl-single,bits = <
++					/* EMA_OE, EMA_WE */
++					0x1c 0x00110000  0x00ff0000
++					/* EMA_CS[4],EMA_CS[3]*/
++					0x1c 0x00000110  0x00000ff0
++					/*
++					 * EMA_D[0], EMA_D[1], EMA_D[2],
++					 * EMA_D[3], EMA_D[4], EMA_D[5],
++					 * EMA_D[6], EMA_D[7]
++					 */
++					0x24 0x11111111  0xffffffff
++					/* EMA_A[1], EMA_A[2] */
++					0x30 0x01100000  0x0ff00000
++				>;
++			};
+ 		};
++
+ 		serial0: serial at 1c42000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x42000 0x100>;
