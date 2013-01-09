@@ -1,61 +1,64 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 9 Jan 2013 17:48:47 +0100
-Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
-In-Reply-To: <20130109162554.12103.38937.stgit@ubuntu>
-References: <20130108184116.46558.3558.stgit@ubuntu>
- <20130109162554.12103.38937.stgit@ubuntu>
-Message-ID: <98D0981A-0EB4-4273-BFF8-B25C4BE5EE02@suse.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 9 Jan 2013 17:52:13 +0100
+Subject: arm NO_IRQ = -1 - zynq axi_ethernet driver
+In-Reply-To: <50E58E73.6070308@gmail.com>
+References: <CAHTX3d+dOm2AzK=g_UbEiJ2AQYJNJtfWHXGvrxK1TqM2nmEh7Q@mail.gmail.com>
+ <50E58E73.6070308@gmail.com>
+Message-ID: <CAHTX3dKu_8gTL+z-ZNhJV+RhaTRU7hqAL7oA0A5a1A628x=7RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2013/1/3 Rob Herring <robherring2@gmail.com>:
+> On 01/03/2013 07:47 AM, Michal Simek wrote:
+>> Hi Grand, Russell, Arnd, Olof and Rob,
+>>
+>> I am getting one problem with axi_ethernet driver because I want to remove
+>> NO_IRQ from axi_ethernet driver because NO_IRQ was setup to 0 and
+>> removed from microblaze long time ago.
+>> Some patches from reference.
+>> "microblaze: Change NO_IRQ to 0"
+>> sha1: 6c7a2676f594ca9a30203b4fd5dc26b53682cffe
+>> and
+>> "microblaze: Remove NO_IRQ from architecture"
+>> sha1: 18e3b1075b1bc4a6027a6612fe70a5c81c209ec7
+>>
+>> but we can also use this driver on arm Zynq platform.
+>> It is easy to add
+>> #ifndef NO_IRQ
+>> #define NO_IRQ 0
+>> #endif
+>> to the driver to cover Microblaze case but it will be just workaround.
+>>
+>> From patches description NO_IRQ shouldn't be used by any driver
+>> + from Grant description
+>>
+>> "As has been discussed many times[1], Using NO_IRQ set to anything other
+>> than 0 is bug waiting to happen since many drivers follow the pattern
+>> "if (!irq)" for testing whether or not an irq has been set."
+>>
+>> + link
+>> [1] http://lkml.org/lkml/2005/11/21/221
+>>
+>> Was there any attempt to remove NO_IRQ from ARM?
+>> Any problem to do it?
+>
+> It's not removed, but we've trimmed it out of most things. It appears
+> that drivers are mostly not using it other than powerpc drivers. It is
+> not really necessary to remove it from the arch. Drivers should simply
+> check for (irq <= 0) for error cases. I'm not sure if there are any
+> platforms left using irq 0 as a valid irq.
 
-On 09.01.2013, at 17:26, Christoffer Dall wrote:
+Unfortunately microblaze system can use any IRQ number but MB NO_IRQ is 0
+that's why it shouldn't hurt because on ARM axi ethernet can't be on IRQ 0.
 
-> Renames the KVM_SET_DEVICE_ADDRESS to KVM_ARM_SET_DEVICE_ADDR
-> to make it obvious that this is ARM specific in lack of a better generic
-> interface.
-> 
-> Once we agree on a better interface the KVM/ARM code can also take
-> advantage of that, but until then we don't want to hold up the KVM/ARM
-> patches.
-
-Works for me. Scott, are you happy with this one too? We can start to introduce (and fix ARM) with a generic ioctl in the MPIC patches then.
+Thanks for hint,
+Michal
 
 
-Alex
 
-> 
-> A new complete series of these patches including this change can be
-> pulled from:
->  git://github.com/virtualopensystems/linux-kvm-arm.git
->  kvm-arm-v15-devaddr-v2
-> 
-> -Christoffer
-> 
-> ---
-> 
-> Christoffer Dall (2):
->      KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
->      ARM: KVM: VGIC accept vcpu and dist base addresses from user space
-> 
-> 
-> Documentation/virtual/kvm/api.txt   |   38 ++++++
-> arch/arm/include/asm/hardware/gic.h |   25 ++++
-> arch/arm/include/asm/kvm_host.h     |   18 +++
-> arch/arm/include/asm/kvm_vgic.h     |   89 +++++++++++++++
-> arch/arm/include/uapi/asm/kvm.h     |   16 +++
-> arch/arm/kvm/Makefile               |    1 
-> arch/arm/kvm/arm.c                  |   92 +++++++++++++++-
-> arch/arm/kvm/interrupts.S           |    4 +
-> arch/arm/kvm/mmio.c                 |    3 +
-> arch/arm/kvm/vgic.c                 |  206 +++++++++++++++++++++++++++++++++++
-> include/uapi/linux/kvm.h            |    8 +
-> 11 files changed, 498 insertions(+), 2 deletions(-)
-> create mode 100644 arch/arm/include/asm/kvm_vgic.h
-> create mode 100644 arch/arm/kvm/vgic.c
-> 
-> -- 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian
