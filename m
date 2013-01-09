@@ -1,94 +1,62 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 9 Jan 2013 17:17:02 +0100
-Subject: [PATCH V2] mmc: mmci: Fixup clock gating when freq is 0 for
- ST-variants
-Message-ID: <1357748222-26829-1-git-send-email-ulf.hansson@stericsson.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Wed, 9 Jan 2013 11:19:25 -0500
+Subject: [PATCH] Allow Marvell SATA driver to work with
+ LEDS_TRIGGER_IDE_DISK
+In-Reply-To: <A874F61F95741C4A9BA573A70FE3998F69E12010@DQHE02.ent.ti.com>
+References: <1357668987-3610-1-git-send-email-josh.coombs@gmail.com>
+ <20130108190657.GW5075@titan.lakedaemon.net>
+ <CAMW5UfY2vKEJ7K8tLJ1+JeKsr_hxtUTva9HGJxLan6k+KGdmvg@mail.gmail.com>
+ <20130108200350.GX5075@titan.lakedaemon.net>
+ <A874F61F95741C4A9BA573A70FE3998F69E12010@DQHE02.ent.ti.com>
+Message-ID: <CAMW5Ufb4LMPR86A7AMMeGzkcYzgGWVruGAQT6E7irAacZegzag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Johan Rudholm <johan.rudholm@stericsson.com>
+I'm testing a revised version of this patch that renames the trigger
+to just 'disk' and updates all documentation and default_trigger
+definitions to match.  I'm also registering the trigger name
+'ide-disk' for now so external tools/scripts/distros won't break while
+a depreciation time is chosen.
 
-In the ST Micro variant, the MMCICLOCK register must not be used to
-gate the clock. Instead use MMCIPOWER register and by clearing the
-PWR_ON bit to do this.
+Once I've verified this behaves on my system, I'm assuming a patch
+that touches 25 files should be broken up?  I'm thinking of submitting
+in the following chunks:
 
-Signed-off-by: Johan Rudholm <johan.rudholm@stericsson.com>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
+ledtrig-ide-disk to ledtrig-disk
+documentation updates
+default-trigger updates
+Marvell SATA adjusted to call the trigger
 
-Changes in v2:
-	Both the nomadik and u300 variants uses the MMCIPOWER register
-	to gate the clock. Enable this for those variants as well.
+Any objections or comments on this plan of attack?
 
----
- drivers/mmc/host/mmci.c |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Josh C
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 1507723..5272e97 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -59,6 +59,7 @@ static unsigned int fmax = 515633;
-  * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
-  * @pwrreg_powerup: power up value for MMCIPOWER register
-  * @signal_direction: input/out direction of bus signals can be indicated
-+ * @pwrreg_clkgate: MMCIPOWER register must be used to gate the clock
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -71,6 +72,7 @@ struct variant_data {
- 	bool			blksz_datactrl16;
- 	u32			pwrreg_powerup;
- 	bool			signal_direction;
-+	bool			pwrreg_clkgate;
- };
- 
- static struct variant_data variant_arm = {
-@@ -95,6 +97,7 @@ static struct variant_data variant_u300 = {
- 	.sdio			= true,
- 	.pwrreg_powerup		= MCI_PWR_ON,
- 	.signal_direction	= true,
-+	.pwrreg_clkgate		= true,
- };
- 
- static struct variant_data variant_nomadik = {
-@@ -106,6 +109,7 @@ static struct variant_data variant_nomadik = {
- 	.st_clkdiv		= true,
- 	.pwrreg_powerup		= MCI_PWR_ON,
- 	.signal_direction	= true,
-+	.pwrreg_clkgate		= true,
- };
- 
- static struct variant_data variant_ux500 = {
-@@ -118,6 +122,7 @@ static struct variant_data variant_ux500 = {
- 	.st_clkdiv		= true,
- 	.pwrreg_powerup		= MCI_PWR_ON,
- 	.signal_direction	= true,
-+	.pwrreg_clkgate		= true,
- };
- 
- static struct variant_data variant_ux500v2 = {
-@@ -131,6 +136,7 @@ static struct variant_data variant_ux500v2 = {
- 	.blksz_datactrl16	= true,
- 	.pwrreg_powerup		= MCI_PWR_ON,
- 	.signal_direction	= true,
-+	.pwrreg_clkgate		= true,
- };
- 
- /*
-@@ -1154,6 +1160,13 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		}
- 	}
- 
-+	/*
-+	 * If clock = 0 and the variant requires the MMCIPOWER to be used for
-+	 * gating the clock, the MCI_PWR_ON bit is cleared.
-+	 */
-+	if (!ios->clock && variant->pwrreg_clkgate)
-+		pwr &= ~MCI_PWR_ON;
-+
- 	spin_lock_irqsave(&host->lock, flags);
- 
- 	mmci_set_clkreg(host, ios->clock);
--- 
-1.7.10
+On Tue, Jan 8, 2013 at 8:29 PM, Kim, Milo <Milo.Kim@ti.com> wrote:
+>> -----Original Message-----
+>> From: linux-leds-owner at vger.kernel.org [mailto:linux-leds-
+>> owner at vger.kernel.org] On Behalf Of Jason Cooper
+>> Sent: Wednesday, January 09, 2013 5:04 AM
+>> To: Josh Coombs
+>> Cc: cooloney at gmail.com; linux-kernel at vger.kernel.org; linux-
+>> ide at vger.kernel.org; rpurdie at rpsys.net; linux ARM; jgarzik at pobox.com;
+>> linux-leds at vger.kernel.org
+>> Subject: Re: [PATCH] Allow Marvell SATA driver to work with
+>> LEDS_TRIGGER_IDE_DISK
+>>
+>> On Tue, Jan 08, 2013 at 02:18:04PM -0500, Josh Coombs wrote:
+>> > Would it make more sense to add a second trigger
+>> > for SATA instead?
+>>
+>> I'll leave that up to the led guys, I just wanted to raise the point
+>> that the driver could logically support other types of disks, and we
+>> should come up with a migration path instead of adding capabilities
+>> ad-hoc.
+>
+> I agree with Jason's suggestion. One more thing to consider.
+>
+> If we replace the name, 'ide-disk' or 'ide_disk' with general one,
+> then we should change the value of 'default_trigger' under arch directory also.
+> LED trigger works if the name is matched with trigger name of LED device.
+>
+> Thanks,
+> Milo
