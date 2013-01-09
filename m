@@ -1,55 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 9 Jan 2013 22:25:17 +0100
-Subject: [PATCH 00/14] Rewrite Tegra PCIe driver
-In-Reply-To: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20130109222517.3c590553@skate>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Jan 2013 21:27:05 +0000
+Subject: [PATCH 1/4] arm: vt8500: Add support for Wondermedia WM8750/WM8850
+In-Reply-To: <1357758570.27076.8.camel@gitbox>
+References: <1356650452-16559-1-git-send-email-linux@prisktech.co.nz>
+ <CAOesGMj6XTuW9tPqYnawPvO-wJBd7s5M5xTfdvQcmEioHw=Pnw@mail.gmail.com>
+ <1357758570.27076.8.camel@gitbox>
+Message-ID: <201301092127.05804.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry Reding,
+On Wednesday 09 January 2013, Tony Prisk wrote:
+> I'm quite happy to send a pull request if that's what you prefer.
+> 
+> Generally people have just taken the patches straight from email, so
+> everytime I've done a pull-request I get a reply back saying the patches
+> have already been applied.
+> 
+> Is there some 'rule' around pull-requests vs emailed patches?
 
-On Wed,  9 Jan 2013 21:43:00 +0100, Thierry Reding wrote:
-> This patch series contains an almost complete rewrite of the Tegra PCIe
-> driver. The code is moved to the drivers/pci/host directory and turned
-> into a proper platform driver, adding MSI and DT support while at it.
-> Other PCI host controller drivers can be added to that directory in an
-> attempt to make it easier to factor out common code.
+Generally, pull requests tend to be less work for us, so I prefer
+them. In particular, when you add a tag description or a signed
+tag, that gives automatically puts  nice text into the merge
+changeset.
 
-Thanks!
+> Should patches in pull-requests have Ack'd lines already?
 
-I have started basing the Marvell PCIe code on some of your earlier
-versions. But apparently in this final version, you no longer have the
-emulated Host bridge. Why so?
+Yes.
 
-For the Marvell PCIe code, I've used your emulated Host bridge, and
-added an emulated PCI-to-PCI bridge implementation, in order to get the
-following hierarchy:
-
- + Host Bridge
-   + PCI-to-PCI bridge
-     + PCI Device
-   + PCI-to-PCI bridge
-     + PCI device
-
-So, I instantiate one unique emulated Host Bridge, and then one
-emulated PCI-to-PCI Bridge for each PCIe interface that I have.
-
-The nice thing about that is that I can then read the configuration
-space of the PCI-to-PCI bridge to find out how much I/O space and
-memory space is needed for the device connected to this interface, and
-at which address is has been mapped. This greatly helps my "address
-decoding" problem, and removes the ad-hoc virtual space allocator I had
-written.
-
-Is there a reason for having given up on this idea? Is there still a
-hope for a different PCIe implementation to use this idea?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
