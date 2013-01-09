@@ -1,132 +1,36 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 9 Jan 2013 18:17:46 +0530
-Subject: [PATCH V2 3/3] ARM: davinci: da850: add NAND driver entries
-In-Reply-To: <1357633220-29827-4-git-send-email-anilkumar.v@ti.com>
-References: <1357633220-29827-1-git-send-email-anilkumar.v@ti.com>
- <1357633220-29827-4-git-send-email-anilkumar.v@ti.com>
-Message-ID: <50ED66F2.8050006@ti.com>
+From: prasanna.ps@samsung.com (Prasanna Kumar)
+Date: Wed, 09 Jan 2013 18:24:38 +0530
+Subject: [PATCH 0/3] ARM:exynos5:power-domain: Save and restore CLK_TOP_SRC3
+ via clock framework.
+Message-ID: <1357736081-19390-1-git-send-email-prasanna.ps@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/8/2013 1:50 PM, Kumar, Anil wrote:
-> Add NAND driver entries to export NAND functionality on da850 EVM and
-> NAND pinctrl node to do pin mux according to pinctrl-single driver.
+After Suspend-Resume operation of exynos5, CLK_TOP_SRC3 register modified
+while power gating G-scaler and MFC power domains.This is seen only after
+suspend and resume.
 
-Subject line should have DT and da850 evm somewhere.
-Otherwise NAND has been supported on DA850 for long.
+The solution to this problem is to save CLK_SRC_TOP3 register and restore
+it while powergating. But CLK_SRC_TOP3 register cannot accessed directly 
+by power domain code.
+Please refer below URL to know the background of this issue.
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14347.html.
 
-> 
-> Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
-> ---
-> :100644 100644 c7609d0... 382a7da... M	arch/arm/boot/dts/da850-evm.dts
-> :100644 100644 e9c6e82... 16e2ac2... M	arch/arm/boot/dts/da850.dtsi
->  arch/arm/boot/dts/da850-evm.dts |   19 +++++++++++++++++++
->  arch/arm/boot/dts/da850.dtsi    |   13 +++++++++++++
->  2 files changed, 32 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> index c7609d0..382a7da 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -28,4 +28,23 @@
->  			status = "okay";
->  		};
->  	};
-> +	nand_cs3 at 62000000 {
-> +		status = "okay";
-> +	};
-> +};
-> +&pmx_core{
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +		&nand_cs3_pins
-> +	>;
+This patch set adds clock framework support for save and restore
+clock register (CLK_SRC_TOP3)  for G-scaler and MFC power domains.
 
-This means that the NAND pins are configured even if NAND is not
-probed. Right? This can be moved into the nand_cs3 node to avoid that. 
-And then when used with Linus Walleij's patch "drivers/pinctrl: grab 
-default handles from device core" which should be accepted soon, the 
-pins will be automatically setup when the NAND gets probed.
+This patch set depends on
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14648.html
 
-> +
-> +	nand_cs3_pins: pinmux_nand_pins {
-> +		pinctrl-single,bits = <
-> +			0x1c 0x00110000  0x00ff0000     /* EMA_OE, EMA_WE */
-> +			0x1c 0x00000110  0x00000ff0     /* EMA_CS[4],EMA_CS[3]*/
-> +			0x24 0x11111111  0xffffffff     /* EMA_D[0], EMA_D[1], EMA_D[2], EMA_D[3],
-> +							   EMA_D[4], EMA_D[5], EMA_D[6], EMA_D[7] */
-> +			0x30 0x01100000  0x0ff00000     /* EMA_A[1], EMA_A[2] */
-> +		>;
-> +	};
+Prasanna Kumar (3):
+  ARM: dts: exynos5: Add power domain clocks to pd node of Gscaler and MFC
+  ARM:exynos5:dts: Bindings for clock definitions are added.
+  ARM: exynos5: Add clock save and restore operation(CLK_SRC_TOP3) using clock framework.
 
-I suspect a number of other boards using NAND on CS3 would have to 
-repeat these configurations. It will be better to move them into the 
-da850.dtsi file so it can be reused.
+ .../bindings/arm/exynos/power_domain.txt           |   14 ++
+ arch/arm/boot/dts/exynos5250.dtsi                  |    2 +
+ arch/arm/mach-exynos/pm_domains.c                  |  125 ++++++++++++++++++++
+ 3 files changed, 141 insertions(+), 0 deletions(-)
 
-Since I am new to the DT and pinctrl stuff, I had to actually try these to 
-make sure what I am suggesting isn't nonsense. I came up with this 
-patch on top of your series. Please test it at your end and also see if you 
-are happy with the changes.
-
-Thanks,
-Sekhar
-
----8<----
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 382a7da..52abb9d 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -30,21 +30,8 @@
- 	};
- 	nand_cs3@62000000 {
- 		status = "okay";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&nand_cs3_pins>;
- 	};
- };
--&pmx_core{
--	pinctrl-names = "default";
--	pinctrl-0 = <
--		&nand_cs3_pins
--	>;
- 
--	nand_cs3_pins: pinmux_nand_pins {
--		pinctrl-single,bits = <
--			0x1c 0x00110000  0x00ff0000     /* EMA_OE, EMA_WE */
--			0x1c 0x00000110  0x00000ff0     /* EMA_CS[4],EMA_CS[3]*/
--			0x24 0x11111111  0xffffffff     /* EMA_D[0], EMA_D[1], EMA_D[2], EMA_D[3],
--							   EMA_D[4], EMA_D[5], EMA_D[6], EMA_D[7] */
--			0x30 0x01100000  0x0ff00000     /* EMA_A[1], EMA_A[2] */
--		>;
--	};
--};
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 6ab9730..c4b21a8 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -38,7 +38,25 @@
- 			pinctrl-single,register-width = <32>;
- 			pinctrl-single,function-mask = <0xffffffff>;
- 			status = "disabled";
-+
-+			nand_cs3_pins: pinmux_nand_pins {
-+				pinctrl-single,bits = <
-+					/* EMA_OE, EMA_WE */
-+					0x1c 0x00110000  0x00ff0000
-+					/* EMA_CS[4],EMA_CS[3]*/
-+					0x1c 0x00000110  0x00000ff0
-+					/*
-+					 * EMA_D[0], EMA_D[1], EMA_D[2],
-+					 * EMA_D[3], EMA_D[4], EMA_D[5],
-+					 * EMA_D[6], EMA_D[7]
-+					 */
-+					0x24 0x11111111  0xffffffff
-+					/* EMA_A[1], EMA_A[2] */
-+					0x30 0x01100000  0x0ff00000
-+				>;
-+			};
- 		};
-+
- 		serial0: serial at 1c42000 {
- 			compatible = "ns16550a";
- 			reg = <0x42000 0x100>;
+-- 
+1.7.5.4
