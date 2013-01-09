@@ -1,47 +1,38 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Wed, 9 Jan 2013 16:10:38 -0600
-Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
-In-Reply-To: <4F8BA51C-1A21-4ED9-80CE-55ECB01C0AAD@suse.de> (from
- agraf@suse.de on Wed Jan  9 15:37:20 2013)
-Message-ID: <1357769438.18196.5@snotra>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Jan 2013 22:10:49 +0000
+Subject: [PATCH 05/14] lib: Add I/O map cache implementation
+In-Reply-To: <20130109215428.GA13648@avionic-0098.adnet.avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <201301092119.57067.arnd@arndb.de>
+ <20130109215428.GA13648@avionic-0098.adnet.avionic-design.de>
+Message-ID: <201301092210.49452.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2013 03:37:20 PM, Alexander Graf wrote:
+On Wednesday 09 January 2013, Thierry Reding wrote:
+> What happens on Tegra is that we need to map 256 MiB of physical memory
+> to access all the PCIe extended configuration space. However, ioremap()
+> on such a large region fails if not enough vmalloc() space is available.
 > 
-> 
-> Am 09.01.2013 um 22:15 schrieb Scott Wood <scottwood@freescale.com>:
-> 
-> > I get that there's a tradeoff between getting something in now,  
-> versus waiting until the API is more refined.  Tagging it with a  
-> particular ISA seems like an odd way of saying "soon to be  
-> deprecated", though.  What happens if we're still squabbling over the  
-> perfect replacement API when we're trying to push PPC MPIC stuff in?
-> 
-> Then we're the ones who have to come up with a good interface.
+> This was observed when somebody tested this on CardHu which has a 1 GiB
+> of RAM and therefore remapping the full 256 MiB fails.
 
-How about another bad one, with PPC in the name, and some pleas to  
-hurry things up? :-)
+Hmm, config space accesses are fairly rare and generally not expected
+to be fast, and 256 MB is really a huge waste of virtual address space,
+so I agree that just ioremapping the entire space is not a good
+solution.
 
-It's not as if there haven't been last-minute requests for API changes  
-on the PPC side in the past...
+However, it's not clear that a cache is necessary. Have you measured
+a significant performance benefit of this implementation over just
+iorempping and unmapping a single page for every config space access?
+Have you checked if the hardware supports an alternative config
+space access mechanism that does not depend on a huge address range?
+A lot of them provide an index/data register pair somewhere, as the
+original PC implementation did.
 
-> > Perhaps the threshold for an API becoming "permanent" should not be  
-> acceptance into the tree, but rather the removal of an "experimental"  
-> tag (including a way of shutting off experimental APIs to make sure  
-> you're not depending on them).  Sort of like CONFIG_EXPERIMENTAL,  
-> except actually used for its intended purpose (distributions should  
-> have it *off* by default), and preferably managed at runtime.  Sort  
-> of like drivers/staging, except for APIs rather than drivers.   
-> Changes at that point should require more justification than before  
-> merging, but would not have the strict compatibility requirement that  
-> non-experimental APIs have.  This would make collaboration and  
-> testing easier on APIs that aren't ready to be permanent.
-> 
-> This tag does exist. It's called "not in Linus' tree" :).
+Even if we actually want a cache, how about a private implementation
+that just remembers a single page in LRU? I doubt that there are
+more drivers that would benefit from a generalized version that you
+provide.
 
-Which makes it a pain for multiple people to work on a new feature,  
-especially when it spans components such as KVM and QEMU, and means  
-that it gets less testing before the point of no return.
-
--Scott
+	Arnd
