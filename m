@@ -1,33 +1,33 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Jan 2013 15:30:07 +0900
-Subject: [PATCH 8/8] ARM: shmobile: sh7372: Use DT initialisation of INTC
-In-Reply-To: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
-References: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1357713007-4005-9-git-send-email-horms+renesas@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 8 Jan 2013 22:30:27 -0800
+Subject: [PATCH 1/4] arm: vt8500: Add support for Wondermedia WM8750/WM8850
+In-Reply-To: <1357712039.774.0.camel@gitbox>
+References: <1356650452-16559-1-git-send-email-linux@prisktech.co.nz>
+ <1356650452-16559-2-git-send-email-linux@prisktech.co.nz>
+ <1357712039.774.0.camel@gitbox>
+Message-ID: <CAOesGMj6XTuW9tPqYnawPvO-wJBd7s5M5xTfdvQcmEioHw=Pnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+On Tue, Jan 8, 2013 at 10:13 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+> On Fri, 2012-12-28 at 12:20 +1300, Tony Prisk wrote:
+>> This patch adds support for the WM8750 (ARMv6) and WM8850 (ARMv7).
+>>
+>> Common features across all SoCs are split into ARCH_VT8500 and
+>> unique features are specified by each SoC option.
+>>
+>> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+>
+>
+> Hi Arnd, Olof,
+>
+> Haven't heard anything re: this patch series. Problem?
 
-Cc: Magnus Damm <damm@opensource.se>
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-sh7372.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Nope, just wasn't sure if you would send a git pull request or if you
+wanted them applied.
 
-diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
-index 7dbed95..9f9a3b5 100644
---- a/arch/arm/mach-shmobile/setup-sh7372.c
-+++ b/arch/arm/mach-shmobile/setup-sh7372.c
-@@ -1143,7 +1143,7 @@ DT_MACHINE_START(SH7372_DT, "Generic SH7372 (Flattened Device Tree)")
- 	.map_io		= sh7372_map_io,
- 	.init_early	= sh7372_add_early_devices_dt,
- 	.nr_irqs	= NR_IRQS_LEGACY,
--	.init_irq	= sh7372_init_irq,
-+	.init_irq	= sh7372_init_irq_of,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_machine	= sh7372_add_standard_devices_dt,
- 	.timer		= &shmobile_timer,
--- 
-1.7.10.4
+I'm out of time for tonight, but I'll look closer at them (and apply
+them if all OK) tomorrow.
+
+
+-Olof
