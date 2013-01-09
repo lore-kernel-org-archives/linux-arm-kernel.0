@@ -1,48 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 Jan 2013 22:14:24 +0000
-Subject: [PATCH] ARM: nommu: re-enable use of vexpress without
- ARCH_MULTIPLATFORM
-In-Reply-To: <alpine.LFD.2.02.1301091627010.6300@xanadu.home>
-References: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
- <201301092115.20327.arnd@arndb.de>
- <alpine.LFD.2.02.1301091627010.6300@xanadu.home>
-Message-ID: <201301092214.24639.arnd@arndb.de>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Wed, 9 Jan 2013 17:26:19 -0500
+Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
+In-Reply-To: <1357769438.18196.5@snotra>
+References: <4F8BA51C-1A21-4ED9-80CE-55ECB01C0AAD@suse.de>
+ <1357769438.18196.5@snotra>
+Message-ID: <CANM98qJDvC4jUdvGZMb_o91DdSOTGJg4M2cNsw_LmF7ncLidGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 January 2013, Nicolas Pitre wrote:
-> On Wed, 9 Jan 2013, Arnd Bergmann wrote:
-> 
-> > On Wednesday 09 January 2013, Nicolas Pitre wrote:
-> > > > If we decide that building an allnoconfig without any platform
-> > > > is actually ok, we could just as well rip out that error statement.
-> > > 
-> > > Is it expected for allnoconfig kernels to still boot on other 
-> > > architectures? If so I think we should try to still provide a valid 
-> > > config even in the allnoconfig case.
-> > 
-> > The practical use of a kernel without any device drivers or file
-> > systems is pretty low, I would not expect such a kernel to be
-> > any useful.
-> 
-> I didn't say "useful".  But at least "booting" e.g. to print out a 
-> kernel oops because no root filesystem is available or the like should 
-> be a minimum.  Having the wrong platform configured in might prevent 
-> even that from working, but at least we shouldn't allow for a kernel 
-> config that we know in advance has no chance of ever executing anywhere.
+On Wed, Jan 9, 2013 at 5:10 PM, Scott Wood <scottwood@freescale.com> wrote:
+> On 01/09/2013 03:37:20 PM, Alexander Graf wrote:
+>>
+>>
+>>
+>> Am 09.01.2013 um 22:15 schrieb Scott Wood <scottwood@freescale.com>:
+>>
+>> > I get that there's a tradeoff between getting something in now, versus
+>> > waiting until the API is more refined.  Tagging it with a particular ISA
+>> > seems like an odd way of saying "soon to be deprecated", though.  What
+>> > happens if we're still squabbling over the perfect replacement API when
+>> > we're trying to push PPC MPIC stuff in?
+>>
+>> Then we're the ones who have to come up with a good interface.
+>
+>
+> How about another bad one, with PPC in the name, and some pleas to hurry
+> things up? :-)
+>
+> It's not as if there haven't been last-minute requests for API changes on
+> the PPC side in the past...
+>
+>
 
-x86 allows you disable support for all the CPU types at the same time,
-although the default is to not give you the option and enable them
-all together, which means that allnoconfig may still boot, but
-randconfig may not. That is probably a reasonable compromise.
+This is getting out of hand.
 
-Maybe we could have the virtual platform as the default but make it
-invisible if CONFIG_EXPERT is disable. That would also make allnoconfig
-be reasonable. Thinking a bit more about the CPU setting for the
-virtual platform, I guess it actually makes sense to let the user
-build this for any CPU: It makes a very nice minimal kernel for
-running in qemu and easily allows you to test a rootfs that was
-built for an arbitrary CPU without having to support a specific
-SoC in qemu.
+Do you have another API for PPC, which was send for review and not
+commented on several months ago that we can unify right now?
 
-	Arnd
+If not, let's go with the ARM name and work on the generic API in the mean time.
+
+The end result will be something along 5 lines in a header files and 3
+lines in a switch case that return -EINVAL if the interface is
+completely deprecated later on, which is not a big problem.
+
+-Christoffer
