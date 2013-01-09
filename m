@@ -1,78 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 09 Jan 2013 16:12:02 +0000
-Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
-In-Reply-To: <54937915-46BE-4A50-B5AA-26940DEE6A92@suse.de>
-References: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
- <1357687783.10453.9@snotra>
- <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
- <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
- <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
- <86D3D406-05C3-4569-AD03-3223B46D47D9@suse.de>
- <CAFEAcA9z+kaSpVU3c8dWDHEnuGEri1JRZeS2+F5d2EefnX0oyQ@mail.gmail.com>
- <2ebf41d65170b9534c54c0c5f91a4b99@localhost>
- <13B0CEB2-8D36-48AE-BE0E-02D6231052CF@suse.de>
- <0c1e99864fe87de92aa86a70504b9f73@localhost>
- <54937915-46BE-4A50-B5AA-26940DEE6A92@suse.de>
-Message-ID: <50ED96D2.6010108@arm.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed, 9 Jan 2013 17:13:15 +0100
+Subject: [PATCH 2/2] ARM: shmobile: armadillo800eva: Reference DT
+ implementation
+In-Reply-To: <20130109020712.GC6496@verge.net.au>
+References: <1355851359-8871-1-git-send-email-hechtb+renesas@gmail.com>
+ <1355851359-8871-3-git-send-email-hechtb+renesas@gmail.com>
+ <20130109020712.GC6496@verge.net.au>
+Message-ID: <CABYn4sxsSMSosAVT8DZDupNP9m-vQN+88R2nyC58L-tcNW044Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/13 15:56, Alexander Graf wrote:
-> 
-> On 09.01.2013, at 16:50, Marc Zyngier wrote:
-> 
->> On Wed, 9 Jan 2013 16:28:03 +0100, Alexander Graf <agraf@suse.de> wrote:
->>> On 09.01.2013, at 16:22, Marc Zyngier wrote:
->>>
->>>> On Wed, 9 Jan 2013 15:11:39 +0000, Peter Maydell
->>>> <peter.maydell@linaro.org>
->>>> wrote:
->>>>> On 9 January 2013 14:58, Alexander Graf <agraf@suse.de> wrote:
->>>>>>
->>>>>> Yeah, that was the basic idea. Considering that the patch set hasn't
->>>>>> been going
->>>>>> in for another 2 months after that discussion indicates that this
->> isn't
->>>>>> too much of
->>>>>> an issue though :).
->>>>>
->>>>> We might get there faster if people didn't keep nitpicking the APIs at
->>>> the
->>>>> last minute :-)
->>>>
->>>> Exactly. We're trying hard to get the damned thing merged, and the
->>>> permanent API churn quickly becomes a burden.
->>>
->>> As I said earlier, we have had a lot of experience in creating really
->> bad
->>> APIs in the past.
+Hi Simon,
+
+2013/1/9 Simon Horman <horms@verge.net.au>:
+> On Tue, Dec 18, 2012 at 06:22:39PM +0100, Bastian Hecht wrote:
+>> Provide alternate board code for the Armadillo 800 EVA to
+>> demonstrate how DT may be used given the current state of
+>> driver device tree support. This is intended to act as a
+>> reference for mach-shmobile developers.
 >>
->> Is this one really bad? Again, what changed in the meantime that makes you
->> think this API is wrong?
-> 
-> I complained about it 2 months ago already.
-> 
->>> But how about making this one specific? Call it
->> KVM_ARM_SET_VGIC_ADDRESS,
->>> keep the rest as it is, resend it, and later we can come up with an
->>> actually generic interface.
+>> This is based on Simon Horman's reference implementation for
+>> the board kzm9g.
 >>
->> Let's pretend you never wrote that, shall we? ;-)
-> 
-> Why? The worst thing that happened to us so far were interfaces that looked generic and extensible and turned out not to be (see SET_SREGS in the ppc code). We have 2 options to circumvent this:
-> 
->   1) Commonly agree on an interface that actually is extensible and use it throughout the code
->   2) Create a very specific interface for a single use case, keep it implemented "forever" and as soon as we need more, implement a more generic one that goes back to 1
-> 
-> Since the ARM patches have been out of tree for too long, I'm happy with going route 2 until we go back to square 1.
+>> Currently only the ethernet controller is brought up.
+>
+> Thanks, looks good. I will apply this.
 
-I really don't want to see that. Either we keep the API as it is, or we
-change it for something that is really better and used by other
-architectures. No point in turning it upside down if we're the only one
-doing it.
+Thanks!
 
-Oh, and as we're aiming for 3.9, it'd better be ready soon...
+> Could you let me know what the status of
+> the DT bindings for sh-eth is?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I used the bindings that comply to the patch  "[v2,1/2] net: sh_eth:
+Add support of device tree probe" from 10/16/2012 from Iwamatsu-san. I
+hasn't found its way into v3.8-rc2 yet and I don't know anything more
+accurate about the merge process.
+
+Cheers,
+
+ Bastian
