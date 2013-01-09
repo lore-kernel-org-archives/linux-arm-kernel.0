@@ -1,44 +1,114 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 9 Jan 2013 10:08:49 +0100
-Subject: [PATCH] mtd: mxc_nand: Make use of supplied pinctrl data
-In-Reply-To: <20130109064107.GB12525@S2100-06.ap.freescale.net>
-References: <1357568885-15507-1-git-send-email-marex@denx.de>
- <201301082122.46815.marex@denx.de>
- <20130109064107.GB12525@S2100-06.ap.freescale.net>
-Message-ID: <201301091008.49832.marex@denx.de>
+Date: Wed, 9 Jan 2013 10:26:36 +0100
+Subject: [PATCH 7/7] ARM i.MX51 babbage: Add display support
+In-Reply-To: <1357722258.2538.2.camel@pizza.hi.pengutronix.de>
+References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
+ <201301081829.06441.marex@denx.de>
+ <1357722258.2538.2.camel@pizza.hi.pengutronix.de>
+Message-ID: <201301091026.36838.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Dear Philipp Zabel,
 
-> On Tue, Jan 08, 2013 at 09:22:46PM +0100, Marek Vasut wrote:
-> > Dear Jean-Christophe PLAGNIOL-VILLARD,
+> Hi Marek,
+> 
+> Am Dienstag, den 08.01.2013, 18:29 +0100 schrieb Marek Vasut:
+> > Dear Philipp Zabel,
 > > 
-> > > On 15:28 Mon 07 Jan     , Marek Vasut wrote:
-> > > > The MXC NAND driver doesn't consider the pinctrl data supplied via
-> > > > DT, which will result in NAND pins not being properly configured.
+> > > Am Dienstag, den 08.01.2013, 18:09 +0100 schrieb Marek Vasut:
+> > > > Dear Fabio Estevam,
 > > > > 
-> > > > Make the driver use pinctrl, but to prevent breakage on various
-> > > > boards, do not fail if the pinctrl data are not available, only
-> > > > print a warning message.
+> > > > > On Tue, Jan 8, 2013 at 2:41 PM, Fabio Estevam <festevam@gmail.com> 
+wrote:
+> > > > > > Hi Sascha,
+> > > > > > 
+> > > > > > On Mon, Nov 12, 2012 at 1:23 PM, Sascha Hauer
+> > > > > > <s.hauer@pengutronix.de>
+> > > > 
+> > > > wrote:
+> > > > > >> The babbage board has a DVI-I output which allows to output
+> > > > > >> analog and digital signals simultaneously. This patch adds
+> > > > > >> support for it to the devicetree. The DDC signals are not wired
+> > > > > >> up on the board, so DRM will fall back on default VESA modes.
+> > > > > >> 
+> > > > > >> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > > > 
+> > > > > > I am running linux-next 20130108, which has this patch applied
+> > > > > > and I
+> > > > > 
+> > > > > > get the following on my mx51babbage:
+> > > > > Ok, good news. I see a nice penguin on my monitor now.
+> > > > > 
+> > > > > Discussed with Marek and he proposed a quick workaround:
+> > > > > 
+> > > > > --- a/drivers/staging/imx-drm/ipuv3-crtc.c
+> > > > > +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+> > > > > @@ -343,6 +343,11 @@ static irqreturn_t ipu_irq_handler(int irq,
+> > > > > void *dev_id) {
+> > > > > 
+> > > > >         struct ipu_crtc *ipu_crtc = dev_id;
+> > > > > 
+> > > > > +       if (!ipu_crtc->imx_crtc) {
+> > > > > +               pr_err("Spurious IPU IRQ\n");
+> > > > > +               return IRQ_HANDLED;
+> > > > > +       }
+> > > > > +
+> > > > > 
+> > > > >         imx_drm_handle_vblank(ipu_crtc->imx_crtc);
+> > > > >         
+> > > > >         if (ipu_crtc->newfb) {
+> > > > > 
+> > > > > It seems that this issue happened because bootloader leaves the IPU
+> > > > > turned on.
+> > > > 
+> > > > To elaborate more on this stuff:
+> > > > 
+> > > > 491         ipu_crtc->irq = ipu_idmac_channel_irq(ipu,
+> > > > ipu_crtc->ipu_ch, 492                         IPU_IRQ_EOF);
+> > > > 493         ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq,
+> > > > ipu_irq_handler, 0,
+> > > > 494                         "imx_drm", ipu_crtc);
+> > > > 495         if (ret < 0) {
+> > > > 496                 dev_err(ipu_crtc->dev, "irq request failed with
+> > > > %d.\n", ret);
+> > > > 497                 goto err_out;
+> > > > 498         }
+> > > > 499
+> > > > 500         disable_irq(ipu_crtc->irq);
+> > > > 
+> > > > This code in drivers/staging/imx-drm/ipuv3-crtc.c is broken. If the
+> > > > IPU is on, it produces an interrupt before the driver is fully set
+> > > > up. I didn't produce a patch yet, I think I might offload this to
+> > > > someone else. Volunteers?
 > > > 
-> > > nack
+> > > Reordering the ipu_get_resources and imx_drm_add_crtc calls should
+> > > resolve this:
 > > > 
-> > > we will at bus level
+> > > From: Philipp Zabel <p.zabel@pengutronix.de>
+> > > Subject: [PATCH] staging: imx/drm: add crtc before registering
+> > > interrupt
+> > > 
+> > >  handler
+> > > 
+> > > If the bootloader already enabled the display, the interrupt handler
+> > > will be called as soon as it is registered. If the CRTC is not already
+> > > added at this time, the call to imx_drm_handle_vblank will result in
+> > > a NULL pointer dereference.
 > > 
-> > Can you please elaborate? I don't understand what you're complaining
-> > about at all, sorry.
+> > I ain't no IPU expert, but isn't adding the component before having it
+> > fully inited even worse?
 > 
-> He is talking about patch [1] which is likely to hit mainline for 3.9.
+> Good point, how about just moving the irq request out of
+> ipu_get_resources into ipu_crtc_init, after adding the crtc:
 > 
-> Shawn
+> From: Philipp Zabel <p.zabel@pengutronix.de>
+> Subject: [PATCH] staging: imx/drm: request irq only after adding the crtc
 > 
-> [1] http://thread.gmane.org/gmane.linux.kernel/1409263
+> If the bootloader already enabled the display, the interrupt handler
+> will be called as soon as it is registered. If the CRTC is not already
+> added at this time, the call to imx_drm_handle_vblank will result in
+> a NULL pointer dereference.
 
-Oh, this is good, thanks for explaining Shawn!
-
-Well, this patch can be applied as a fallback if it doesn't hit 3.9 , either way 
-works for me.
-
-Best regards,
-Marek Vasut
+Can we not just flush (and make sure it's disabled) the IRQ before requesting it 
+? That'd be probably the most sane way
