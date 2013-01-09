@@ -1,62 +1,47 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Wed, 9 Jan 2013 11:19:25 -0500
-Subject: [PATCH] Allow Marvell SATA driver to work with
- LEDS_TRIGGER_IDE_DISK
-In-Reply-To: <A874F61F95741C4A9BA573A70FE3998F69E12010@DQHE02.ent.ti.com>
-References: <1357668987-3610-1-git-send-email-josh.coombs@gmail.com>
- <20130108190657.GW5075@titan.lakedaemon.net>
- <CAMW5UfY2vKEJ7K8tLJ1+JeKsr_hxtUTva9HGJxLan6k+KGdmvg@mail.gmail.com>
- <20130108200350.GX5075@titan.lakedaemon.net>
- <A874F61F95741C4A9BA573A70FE3998F69E12010@DQHE02.ent.ti.com>
-Message-ID: <CAMW5Ufb4LMPR86A7AMMeGzkcYzgGWVruGAQT6E7irAacZegzag@mail.gmail.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Wed, 09 Jan 2013 11:26:03 -0500
+Subject: [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
+In-Reply-To: <20130108184116.46558.3558.stgit@ubuntu>
+References: <20130108184116.46558.3558.stgit@ubuntu>
+Message-ID: <20130109162554.12103.38937.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm testing a revised version of this patch that renames the trigger
-to just 'disk' and updates all documentation and default_trigger
-definitions to match.  I'm also registering the trigger name
-'ide-disk' for now so external tools/scripts/distros won't break while
-a depreciation time is chosen.
+Renames the KVM_SET_DEVICE_ADDRESS to KVM_ARM_SET_DEVICE_ADDR
+to make it obvious that this is ARM specific in lack of a better generic
+interface.
 
-Once I've verified this behaves on my system, I'm assuming a patch
-that touches 25 files should be broken up?  I'm thinking of submitting
-in the following chunks:
+Once we agree on a better interface the KVM/ARM code can also take
+advantage of that, but until then we don't want to hold up the KVM/ARM
+patches.
 
-ledtrig-ide-disk to ledtrig-disk
-documentation updates
-default-trigger updates
-Marvell SATA adjusted to call the trigger
+A new complete series of these patches including this change can be
+pulled from:
+  git://github.com/virtualopensystems/linux-kvm-arm.git
+  kvm-arm-v15-devaddr-v2
 
-Any objections or comments on this plan of attack?
+-Christoffer
 
-Josh C
+---
 
-On Tue, Jan 8, 2013 at 8:29 PM, Kim, Milo <Milo.Kim@ti.com> wrote:
->> -----Original Message-----
->> From: linux-leds-owner at vger.kernel.org [mailto:linux-leds-
->> owner at vger.kernel.org] On Behalf Of Jason Cooper
->> Sent: Wednesday, January 09, 2013 5:04 AM
->> To: Josh Coombs
->> Cc: cooloney at gmail.com; linux-kernel at vger.kernel.org; linux-
->> ide at vger.kernel.org; rpurdie at rpsys.net; linux ARM; jgarzik at pobox.com;
->> linux-leds at vger.kernel.org
->> Subject: Re: [PATCH] Allow Marvell SATA driver to work with
->> LEDS_TRIGGER_IDE_DISK
->>
->> On Tue, Jan 08, 2013 at 02:18:04PM -0500, Josh Coombs wrote:
->> > Would it make more sense to add a second trigger
->> > for SATA instead?
->>
->> I'll leave that up to the led guys, I just wanted to raise the point
->> that the driver could logically support other types of disks, and we
->> should come up with a migration path instead of adding capabilities
->> ad-hoc.
->
-> I agree with Jason's suggestion. One more thing to consider.
->
-> If we replace the name, 'ide-disk' or 'ide_disk' with general one,
-> then we should change the value of 'default_trigger' under arch directory also.
-> LED trigger works if the name is matched with trigger name of LED device.
->
-> Thanks,
-> Milo
+Christoffer Dall (2):
+      KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+      ARM: KVM: VGIC accept vcpu and dist base addresses from user space
+
+
+ Documentation/virtual/kvm/api.txt   |   38 ++++++
+ arch/arm/include/asm/hardware/gic.h |   25 ++++
+ arch/arm/include/asm/kvm_host.h     |   18 +++
+ arch/arm/include/asm/kvm_vgic.h     |   89 +++++++++++++++
+ arch/arm/include/uapi/asm/kvm.h     |   16 +++
+ arch/arm/kvm/Makefile               |    1 
+ arch/arm/kvm/arm.c                  |   92 +++++++++++++++-
+ arch/arm/kvm/interrupts.S           |    4 +
+ arch/arm/kvm/mmio.c                 |    3 +
+ arch/arm/kvm/vgic.c                 |  206 +++++++++++++++++++++++++++++++++++
+ include/uapi/linux/kvm.h            |    8 +
+ 11 files changed, 498 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/include/asm/kvm_vgic.h
+ create mode 100644 arch/arm/kvm/vgic.c
+
+-- 
