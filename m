@@ -1,29 +1,32 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 09 Jan 2013 16:09:37 -0500 (EST)
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Jan 2013 21:15:20 +0000
 Subject: [PATCH] ARM: nommu: re-enable use of vexpress without
  ARCH_MULTIPLATFORM
-In-Reply-To: <50EDD588.3040603@gmail.com>
+In-Reply-To: <alpine.LFD.2.02.1301091554250.6300@xanadu.home>
 References: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
- <201301091843.48942.arnd@arndb.de>
- <alpine.LFD.2.02.1301091349390.6300@xanadu.home>
- <201301092022.49130.arnd@arndb.de> <50EDD588.3040603@gmail.com>
-Message-ID: <alpine.LFD.2.02.1301091603230.6300@xanadu.home>
+ <201301092022.49130.arnd@arndb.de>
+ <alpine.LFD.2.02.1301091554250.6300@xanadu.home>
+Message-ID: <201301092115.20327.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Jan 2013, Rob Herring wrote:
+On Wednesday 09 January 2013, Nicolas Pitre wrote:
+> > If we decide that building an allnoconfig without any platform
+> > is actually ok, we could just as well rip out that error statement.
+> 
+> Is it expected for allnoconfig kernels to still boot on other 
+> architectures? If so I think we should try to still provide a valid 
+> config even in the allnoconfig case.
 
-> That patch is already posted, but Russell doesn't like it as you can
-> have a kernel that doesn't boot. You don't like the allno and randconfig
-> failures, so we're stuck. I think there are dozens of config options
-> that will make you not boot on any given platform, so failing to boot
-> because you did not select your machine is a non-issue.
+The practical use of a kernel without any device drivers or file
+systems is pretty low, I would not expect such a kernel to be
+any useful. Having a regular configuration where you just disable
+the platform support is a little different. This could happen
+when the platform you are building for depends on a specific
+feature to be enabled or disabled and that option is accidentally
+changed. E.g. when you turn off MMU support on a platform that
+depends on having that, we fall back to the default platform
+(versatile?). The same may happen when you build for a single
+board and one of it's dependencies goes away.
 
-Rather than simply accept that "there are dozens of config options that 
-will make you not boot on any given platform" and allow for this to be 
-used as an argument for future sloppiness, I think we should consider 
-fixing the config rules to avoid that situation as much as possible 
-instead.
-
-
-Nicolas
+	Arnd
