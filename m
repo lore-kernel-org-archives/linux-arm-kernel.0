@@ -1,55 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Jan 2013 11:12:09 +0000
-Subject: [PATCH 2/3] ARM: ux500: Turn on the 'heartbeat' LED trigger
-In-Reply-To: <20130109110840.GD31678@gmail.com>
-References: <1357725965-27342-1-git-send-email-lee.jones@linaro.org>
- <1357725965-27342-2-git-send-email-lee.jones@linaro.org>
- <201301091018.55058.arnd@arndb.de>
- <20130109103510.GE3931@n2100.arm.linux.org.uk>
- <20130109110840.GD31678@gmail.com>
-Message-ID: <20130109111209.GH3931@n2100.arm.linux.org.uk>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Wed,  9 Jan 2013 12:15:25 +0100
+Subject: [PATCH 0/3] Add and use new macro module_platform_driver_probe()
+Message-ID: <1357730128-23018-1-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 11:08:40AM +0000, Lee Jones wrote:
-> On Wed, 09 Jan 2013, Russell King - ARM Linux wrote:
-> 
-> > On Wed, Jan 09, 2013 at 10:18:54AM +0000, Arnd Bergmann wrote:
-> > > On Wednesday 09 January 2013, Lee Jones wrote:
-> > > > diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-> > > > index 5dea906..0f25b07 100644
-> > > > --- a/arch/arm/mach-ux500/Kconfig
-> > > > +++ b/arch/arm/mach-ux500/Kconfig
-> > > > @@ -43,6 +43,8 @@ config MACH_HREFV60
-> > > >  config MACH_SNOWBALL
-> > > >         bool "U8500 Snowball platform"
-> > > >         select MACH_MOP500
-> > > > +       select LEDS_TRIGGERS
-> > > > +       select LEDS_TRIGGER_HEARTBEAT
-> > > >         help
-> > > >           Include support for the snowball development platform.
-> > > 
-> > > Be careful with "select" statements like this when there are other
-> > > dependencies. I think LEDS_TRIGGERS depends on LEDS_CLASS, so this
-> > > should probably be written as
-> > > 
-> > > 	select LEDS_TRIGGERS if LEDS_CLASS
-> > 
-> > Umm, this is also wrong for another reason.  LEDS is an optional feature.
-> > It's not required for the platform to be functional.  So why the hell would
-> > anyone want to _force_ such an optional feature to be mandatory?
-> > 
-> > This is something that the default config published for the platform should
-> > be handling.
-> 
-> Do you mean <config_dir>/u8500_defconfig?
-> 
-> If so, that's wrong, as it covers many more boards than just Snowball
-> and this is only applicable on the Snowball board. So how else can
-> I enable this feature?
+For simple modules that contain a single platform_driver without any
+additional setup code then ends up being a block of duplicated
+boilerplate.  This patch adds a new macro,
+module_platform_driver_probe(), which replaces the
+module_init()/module_exit() registrations with template functions.
+    
+This macro use the same idea of module_platform_driver().
+    
+This macro is useful to stop the misuse of module_platform_driver() for
+removing the platform_driver_probe() boilerplate.
 
-And why is it wrong to enable an optional feature in a defconfig which some
-boards using that defconfig may want?
+Convert drivers/usb/* and drivers/watchdog/* to use
+module_platform_driver_probe().
 
-It's _less_ wrong than forcing user selectable options to be mandatorily
-selected.
+Best regards
+
+Fabio Porcedda (3):
+  driver core: add helper macro for platform_driver_probe() boilerplate
+  watchdog: convert drivers/watchdog/* to use
+    module_platform_driver_probe
+  usb: converto drivers/usb/* to use module_platform_driver_probe()
+
+ drivers/usb/gadget/at91_udc.c       | 12 +-----------
+ drivers/usb/gadget/atmel_usba_udc.c | 12 +-----------
+ drivers/usb/gadget/fusb300_udc.c    | 13 +------------
+ drivers/usb/gadget/imx_udc.c        | 12 +-----------
+ drivers/usb/gadget/lpc32xx_udc.c    | 12 +-----------
+ drivers/usb/gadget/m66592-udc.c     | 12 +-----------
+ drivers/usb/gadget/pxa25x_udc.c     | 15 +++------------
+ drivers/usb/gadget/r8a66597-udc.c   | 15 ++-------------
+ drivers/usb/otg/gpio_vbus.c         | 12 +-----------
+ drivers/usb/otg/msm_otg.c           | 13 +------------
+ drivers/watchdog/at32ap700x_wdt.c   | 12 +-----------
+ drivers/watchdog/at91sam9_wdt.c     | 13 +------------
+ drivers/watchdog/coh901327_wdt.c    | 12 +-----------
+ drivers/watchdog/imx2_wdt.c         | 12 +-----------
+ drivers/watchdog/txx9wdt.c          | 13 +------------
+ include/linux/platform_device.h     | 18 ++++++++++++++++++
+ 16 files changed, 36 insertions(+), 172 deletions(-)
+
+-- 
+1.8.0.3
