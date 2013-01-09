@@ -1,69 +1,41 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Wed, 9 Jan 2013 01:04:53 +0000
-Subject: [v3 PATCH 9/9] ARM: dts: add the watchdog nodes for
- at91sam9g25ek boards
-In-Reply-To: <20130108200149.GE7360@game.jcrosoft.org>
-References: <1357353529-20901-1-git-send-email-wenyou.yang@atmel.com>
- <1357353529-20901-10-git-send-email-wenyou.yang@atmel.com>
- <20130108200149.GE7360@game.jcrosoft.org>
-Message-ID: <B256D81BAE5131468A838E5D7A2436413A058680@penmbx02>
+From: Milo.Kim@ti.com (Kim, Milo)
+Date: Wed, 9 Jan 2013 01:29:44 +0000
+Subject: [PATCH] Allow Marvell SATA driver to work with
+ LEDS_TRIGGER_IDE_DISK
+In-Reply-To: <20130108200350.GX5075@titan.lakedaemon.net>
+References: <1357668987-3610-1-git-send-email-josh.coombs@gmail.com>
+ <20130108190657.GW5075@titan.lakedaemon.net>
+ <CAMW5UfY2vKEJ7K8tLJ1+JeKsr_hxtUTva9HGJxLan6k+KGdmvg@mail.gmail.com>
+ <20130108200350.GX5075@titan.lakedaemon.net>
+Message-ID: <A874F61F95741C4A9BA573A70FE3998F69E12010@DQHE02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
 > -----Original Message-----
-> From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
-> Sent: 2013?1?9? 4:02
-> To: Yang, Wenyou
-> Cc: linux-arm-kernel at lists.infradead.org; Ferre, Nicolas; Lin, JM;
-> linux at arm.linux.org.uk; linux-kernel at vger.kernel.org
-> Subject: Re: [v3 PATCH 9/9] ARM: dts: add the watchdog nodes for
-> at91sam9g25ek boards
+> From: linux-leds-owner at vger.kernel.org [mailto:linux-leds-
+> owner at vger.kernel.org] On Behalf Of Jason Cooper
+> Sent: Wednesday, January 09, 2013 5:04 AM
+> To: Josh Coombs
+> Cc: cooloney at gmail.com; linux-kernel at vger.kernel.org; linux-
+> ide at vger.kernel.org; rpurdie at rpsys.net; linux ARM; jgarzik at pobox.com;
+> linux-leds at vger.kernel.org
+> Subject: Re: [PATCH] Allow Marvell SATA driver to work with
+> LEDS_TRIGGER_IDE_DISK
 > 
-> On 10:38 Sat 05 Jan     , Wenyou Yang wrote:
-> > Tested on the at91sam9g25ek boards
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > Cc: linux at arm.linux.org.uk
-> > Cc: linux-kernel at vger.kernel.org
-> > ---
-> >  arch/arm/boot/dts/at91sam9x5ek.dtsi |    4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> > index 8a7cf1d..afddf75 100644
-> > --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> > +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> > @@ -69,6 +69,10 @@
-> >  				status = "okay";
-> >  			};
-> >
-> > +			watchdog at fffffe40 {
-> > +				status = "okay";
-> > +			};
-> > +
+> On Tue, Jan 08, 2013 at 02:18:04PM -0500, Josh Coombs wrote:
+> > Would it make more sense to add a second trigger
+> > for SATA instead?
 > 
-> use less today as the watchdog is shutdown at bootstrap level
-> 
-> and on at91 once shutdown we can not enable it again
+> I'll leave that up to the led guys, I just wanted to raise the point
+> that the driver could logically support other types of disks, and we
+> should come up with a migration path instead of adding capabilities
+> ad-hoc.
 
-Yes, you are right.
-But, If you want to use the watchdog, you should not disable the watchdog.
-Also in the new version at91bootstrap, it provide this config option.
+I agree with Jason's suggestion. One more thing to consider.
 
-If the watchdog is disabled in the bootstrap, "the watchdog has been disabled" will display in the dmesg.
+If we replace the name, 'ide-disk' or 'ide_disk' with general one,
+then we should change the value of 'default_trigger' under arch directory also.
+LED trigger works if the name is matched with trigger name of LED device.
 
-> 
-> Best Regards,
-> J.
-> >  			pinctrl at fffff400 {
-> >  				mmc0 {
-> >  					pinctrl_board_mmc0: mmc0-board {
-> > --
-> > 1.7.9.5
-> >
-
-Best Regards,
-Wenyou Yang
+Thanks,
+Milo
