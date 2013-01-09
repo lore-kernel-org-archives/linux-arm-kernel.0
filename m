@@ -1,51 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 09 Jan 2013 12:46:18 -0800
-Subject: [PATCHv2 0/4] clockevents: decouple broadcast mechanism from
- drivers
-In-Reply-To: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
-References: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <50EDD71A.5030406@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Jan 2013 20:48:04 +0000
+Subject: [PATCH] ARM: nommu: re-enable use of vexpress without
+ ARCH_MULTIPLATFORM
+In-Reply-To: <50EDD588.3040603@gmail.com>
+References: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
+ <201301091843.48942.arnd@arndb.de>
+ <alpine.LFD.2.02.1301091349390.6300@xanadu.home>
+ <201301092022.49130.arnd@arndb.de> <50EDD588.3040603@gmail.com>
+Message-ID: <20130109204804.GS3931@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/13 06:46, Mark Rutland wrote:
-> This is an updated version of the series I posted back in December:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137929.html
->
-> Changes since v1:
-> * Drop removal of guards in smp.c
-> * Removed useless evt->evt_handler check in tick_receive_broadcast
-> * Fix up tick_receive_broadcast when !GENERIC_CLOCKEVENTS_BROADCAST
-> * Fix checkpatch issues (multi-line strings)
->
-> Thanks go to Stephen Boyd and Santosh Shilimkar for their commments.
->
-> In some SMP systems, cpu-local timers may stop delivering interrupts
-> when in low power states, or not all CPUs may have local timers. To
-> support these systems we have a mechanism for broadcasting timer ticks
-> to other CPUs. This mechanism relies on the struct
-> clock_event_device::broadcast function pointer, which is a
-> driver-specific mechanism for broadcasting ticks to other CPUs.
->
-> As the broadcast mechanism is architecture-specific, placing the
-> broadcast function on struct clock_event_device ties each driver to a
-> single architecture. Additionally the driver or architecture backend
-> must handle the routing of broadcast ticks to the correct
-> clock_event_device, leading to duplication of the list of active
-> clock_event_devices.
->
-> These patches introduce a generic mechanism for handling the receipt of
-> timer broadcasts, and an optional architecture-specific broadcast
-> function which allows drivers to be decoupled from a particular
-> architecture will retaining support for timer tick broadcasts. These
-> mechanisms are wired up for the arm port, and have been boot-tested on a
-> pandaboard.
->
+On Wed, Jan 09, 2013 at 02:39:36PM -0600, Rob Herring wrote:
+> On 01/09/2013 02:22 PM, Arnd Bergmann wrote:
+> > On Wednesday 09 January 2013, Nicolas Pitre wrote:
+> >> On Wed, 9 Jan 2013, Arnd Bergmann wrote:
+> >>
+> >>> On a related topic, I still think we should fix ARCH_MULTI_V7 not
+> >>> to select ARCH_VEXPRESS unconditionally and come up with a better
+> >>> way to avoid having an empty platform list to make 'allnoconfig'
+> >>> still work.
+> >>
+> >> The virtual guest platform support that Will and Marc did is small 
+> >> enough that it could always be selected in place of vexpress.
+> > 
+> > But that only helps when ARMv7 is selected, unless we want to build
+> > it only for ARMv4, v5 or v6 kernels.
+> > 
+> > Besides, the only reason we can't have a kernel without any platform
+> > selected is that the linker script has code in it to intentionally
+> > barf on that because it's guaranteed not to boot on any hardware.
+> > 
+> > If we decide that building an allnoconfig without any platform
+> > is actually ok, we could just as well rip out that error statement.
+> > 
+> 
+> That patch is already posted, but Russell doesn't like it as you can
+> have a kernel that doesn't boot. You don't like the allno and randconfig
+> failures, so we're stuck. I think there are dozens of config options
+> that will make you not boot on any given platform, so failing to boot
+> because you did not select your machine is a non-issue.
 
-For the series:
+What I actually suggested is that we should be aiming for the DT side
+of things to get to the point where DT is just another _single_ platform
+as far as that code goes, and that DT should describe the hardware
+sufficiently well that we don't have multiple machine_desc things to
+select via DT - so a DT kernel would have exactly one machine_desc (or
+maybe even zero! - with the linker script check conditional on !CONFIG_OF)
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+That then gets rid of the issue entirely.
