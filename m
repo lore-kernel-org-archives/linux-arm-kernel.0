@@ -1,89 +1,56 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 9 Jan 2013 12:46:41 +0100
-Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
- HAVE_ARM_SCU
-In-Reply-To: <20130108171103.GA7417@e102568-lin.cambridge.arm.com>
-References: <20130108.165342.1996373920678167735.hdoyu@nvidia.com><20130108162056.GA28618@e106331-lin.cambridge.arm.com><20130108171103.GA7417@e102568-lin.cambridge.arm.com>
-Message-ID: <20130109.134641.1582472136842052082.hdoyu@nvidia.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 09 Jan 2013 11:50:14 +0000
+Subject: [PATCH v3 2/7] vexpress: Match the "arm, sp810" DT entry for
+ clock initialisation
+In-Reply-To: <20130109113649.GB1673@arm.com>
+References: <1357309041-6192-1-git-send-email-catalin.marinas@arm.com>
+ <1357309041-6192-3-git-send-email-catalin.marinas@arm.com>
+ <1357666147.24697.27.camel@linaro1.home> <20130109113649.GB1673@arm.com>
+Message-ID: <1357732214.3222.11.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Tue, 8 Jan 2013 18:11:03 +0100:
-
-> On Tue, Jan 08, 2013 at 04:21:38PM +0000, Mark Rutland wrote:
-> > On Tue, Jan 08, 2013 at 02:53:42PM +0000, Hiroshi Doyu wrote:
-> 
-> [...]
-> 
-> > > > >  static void __init tegra_smp_init_cpus(void)
-> > > > >  {
-> > > > > -	unsigned int i, ncores = scu_get_core_count(scu_base);
-> > > > > +	unsigned int i, cpu_id, ncores;
-> > > > > +	u32 l2ctlr;
-> > > > > +	phys_addr_t pa;
-> > > > > +
-> > > > > +	cpu_id = read_cpuid(CPUID_ID) & CPU_MASK;
-> > > > > +	switch (cpu_id) {
-> > > > > +	case CPU_CORTEX_A15:
-> > > > > +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
-> > > > > +		ncores = ((l2ctlr >> 24) & 3) + 1;
-> > > > > +		break;
-> > > > 
-> > > > [...]
-> > > > 
-> > > > As mentioned last time [1], you should get this information from the dt
-> > > > instead.
+On Wed, 2013-01-09 at 11:36 +0000, Catalin Marinas wrote:
+> On Tue, Jan 08, 2013 at 05:29:07PM +0000, Jon Medhurst (Tixy) wrote:
+> > On Fri, 2013-01-04 at 14:17 +0000, Catalin Marinas wrote:
+> > > Currently the clk-vexpress.c implementation relies on the vexpress code
+> > > to call the vexpress_clk_of_init() function which performs the SP810
+> > > initialisation. This patch adds "arm,sp810" to the clock DT match array
+> > > allowing of_clk_init() to call the vexpress_sp810_of_setup() function.
+> > > In case of CONFIG_ARM64, make vexpress_clk_of_init() an arch_initcall().
 > > > 
-> > > Most of platsmp.c:.smp_init_cpus() implementations seem just to
-> > > overwrite # of cores by SCU/MRC detection. Is there any implementation
-> > > to use the DT's # and skip SCU/MRC detection in .smp_init_cpus()?
+> > > Note that SP810 requires the fixed clocks to be already registered.
+> > > Since the clock subsystem does not handle DT dependencies, the
+> > > corresponding DT entries must be in the correct order.
 > > 
-> > As far as I can see, there's no other platform which just relies on
-> > arm_dt_init_cpu_maps. Until recently, it didn't exist, so that makes some
-> > sense. As far as I can see, for the Tegra 114 you only need your smp_init_cpus
-> > to call set_smp_cross_call(gic_raise_softirq). Everything else you do seems to
-> > be handled by arm_dt_init_cpus.
+> > Which they aren't on 32-bit vexpress ;-) leading to:
 > > 
-> > I think the best option would be to have a separate smp_ops for your dt
-> > platforms where we know cpu nodes are populated (e.g. Tegra 114), where
-> > smp_init_cpus is different to that for non-dt platforms. That way non dt
-> > platforms can keep the SCU hack for now, and won't be broken, and the dt
-> > platforms are far removed from the SCU hack and just use common infrastructure.
+> >   ERROR: could not get clock /smb/motherboard/iofpga at 3,00000000/sysctl at 020000:refclk(0)
+> >   ERROR: could not get clock /smb/motherboard/iofpga at 3,00000000/sysctl at 020000:timclk(1)
+> >   ------------[ cut here ]------------
+> >   WARNING: at drivers/clk/versatile/clk-vexpress.c:112 vexpress_sp810_of_setup+0x43/0xc8()
+> >   Modules linked in:
+> >   [<c0011cbd>] (unwind_backtrace+0x1/0x9c) from [<c001c1a9>] (warn_slowpath_common+0x39/0x50)
+> >   [<c001c1a9>] (warn_slowpath_common+0x39/0x50) from [<c001c1d7>] (warn_slowpath_null+0x17/0x1c)
+> >   [<c001c1d7>] (warn_slowpath_null+0x17/0x1c) from [<c05b4fab>] (vexpress_sp810_of_setup+0x43/0xc8)
+> >   [<c05b4fab>] (vexpress_sp810_of_setup+0x43/0xc8) from [<c05b4e67>] (of_clk_init+0x1f/0x34)
+> >   [<c05b4e67>] (of_clk_init+0x1f/0x34) from [<c05b515d>] (vexpress_clk_of_init+0x9/0x10)
+> >   [<c05b515d>] (vexpress_clk_of_init+0x9/0x10) from [<c05a7d2b>] (v2m_dt_timer_init+0x7/0x78)
+> >   [<c05a7d2b>] (v2m_dt_timer_init+0x7/0x78) from [<c05a4d09>] (time_init+0x11/0x20)
+> >   [<c05a4d09>] (time_init+0x11/0x20) from [<c05a24fb>] (start_kernel+0x113/0x214)
+> >   [<c05a24fb>] (start_kernel+0x113/0x214) from [<8000807f>] (0x8000807f)
+> >   ---[ end trace 1b75b31a2719ed1c ]---
 > > 
-> > Maybe someone else has a better idea?
+> > After moving all "fixed-clock" nodes to be the first devices in
+> > arch/arm/boot/dts/vexpress-v2m{-rs1,}.dtsi then all appears well. (I am
+> > only trying out patches 1-3 of this set at the moment).
 > 
-> Have a look at mach-vexpress/platsmp.c (keeping in mind that the
-> GENERIC_SCU case will be refactored/removed since arm_dt_init_cpu_maps() is
-> doing most of the required steps), please let me know what you think.
+> I'm waiting for Pawel's feedback (he's still on holiday). He may have a
+> better solution for the vexpress code than relying on the dts order but
+> for now the simples fix is to change the dts.
 
-In tegra, we don't support non-DT. What about falling back SCU/MRC
-based detection only when arm_dt_init_cpu_maps() fails?
+Fair enough. But if the patch series gets used as is then another patch
+will need to be added to it to fix the device-trees.
 
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 68e76ef..51d24ae 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -152,7 +152,7 @@ done:
-  * Initialise the CPU possible map early - this describes the CPUs
-  * which may be present or become present in the system.
-  */
--static void __init tegra_smp_init_cpus(void)
-+static void __init tegra_smp_detect_cores(void)
- {
- 	unsigned int i, cpu_id, ncores;
- 	u32 l2ctlr;
-@@ -183,6 +183,12 @@ static void __init tegra_smp_init_cpus(void)
- 
- 	for (i = 0; i < ncores; i++)
- 		set_cpu_possible(i, true);
-+}
-+
-+static void __init tegra_smp_init_cpus(void)
-+{
-+	if (!num_possible_cpus())
-+		tegra_smp_detect_cores();
- 
- 	set_smp_cross_call(gic_raise_softirq);
- }
+-- 
+Tixy
