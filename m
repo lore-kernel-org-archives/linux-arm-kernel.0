@@ -1,45 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 Jan 2013 18:43:48 +0000
-Subject: [PATCH] ARM: nommu: re-enable use of vexpress without
- ARCH_MULTIPLATFORM
-In-Reply-To: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
-References: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <201301091843.48942.arnd@arndb.de>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Wed, 9 Jan 2013 13:45:50 -0500
+Subject: [PATCH] Allow Marvell SATA driver to work with
+ LEDS_TRIGGER_IDE_DISK
+In-Reply-To: <50EDA154.6060407@pobox.com>
+References: <1357668987-3610-1-git-send-email-josh.coombs@gmail.com>
+ <50EDA154.6060407@pobox.com>
+Message-ID: <CAMW5UfaTX=2fQt=+2KiJCgnnUzeOXM4waMjYgyBj=RfQg6pDcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 January 2013, Jonathan Austin wrote:
-> From: Will Deacon <will.deacon@arm.com>
-> 
-> Since 617276307cd4c ("ARM: vexpress: convert to multi-platform") it has
-> been impossible to select ARCH_VEXPRESS without ARCH_MULTIPLATFORM.
-> 
-> ARCH_MULTIPLATFORM doesn't make sense for NOMMU targets, not least
-> because of the need to hard-code the memory map. However, it should
-> still be possible to run NOMMU kernels on top of the Versatile Express
-> by selecting it as the only platform.
-> 
-> This patch creates a shim ARCH_VEXPRESS_NOMMU config option in the 'choice'
-> for "ARM system type" to make this possible again.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-> CC: Nicolas Pitre <nico@fluxnic.net>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> ---
-> 
-> Arnd and Nicolas: I've removed your acks as I've changed the location
-> of the new block (as Nicolas suggested) and ever so slightly tweaked
-> the name of the new option.
+Digging back through the archives, this came up once in 2007, Alan Cox
+did not like the idea of globally adding this call into the critical
+paths of libata at the time. (I've seen it done via external patches
+in ata_qc_issue and ata_qc_complete for example.)  If that concern is
+no longer in place, I can redo with it within libata so it'll work for
+all libata driven devices similar to how it's handled for legacy IDE
+drivers now.
 
-The patch is still good. Generally you can leave an Ack when doing
-small changes but leaving the patch conceptually the same.
+Josh C
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-On a related topic, I still think we should fix ARCH_MULTI_V7 not
-to select ARCH_VEXPRESS unconditionally and come up with a better
-way to avoid having an empty platform list to make 'allnoconfig'
-still work.
-
-	Arnd
+On Wed, Jan 9, 2013 at 11:56 AM, Jeff Garzik <jgarzik@pobox.com> wrote:
+> On 01/08/2013 01:16 PM, Joshua Coombs wrote:
+>>
+>> Add a call to the IDE LED Trigger within the Marvell SATA driver to allow
+>> Marvell SoC devices to show SATA activity via GPIO connected LEDs.
+>>
+>> Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
+>> ---
+>>   drivers/ata/sata_mv.c | 3 +++
+>>   drivers/leds/Kconfig  | 3 +--
+>>   2 files changed, 4 insertions(+), 2 deletions(-)
+>
+>
+> NAK.  This is not appropriate at the specific driver level.  This would be
+> better implemented at a higher level.
+>
+>
+>
