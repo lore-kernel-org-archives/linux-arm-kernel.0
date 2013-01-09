@@ -1,24 +1,28 @@
-From: liu.y.victor@gmail.com (Liu Ying)
-Date: Wed, 9 Jan 2013 10:08:27 +0800
-Subject: [PATCH v3 2/3] ARM: dts: imx: Add imx51 KPP entry
-In-Reply-To: <20130108151338.GF19534@S2101-09.ap.freescale.net>
-References: <1357216654-12651-1-git-send-email-Ying.Liu@freescale.com>
- <1357216654-12651-2-git-send-email-Ying.Liu@freescale.com>
- <20130108151338.GF19534@S2101-09.ap.freescale.net>
-Message-ID: <CA+8Hj80m64NEUGiycvNFK5M7HYTWs9m28tTWHLzFK4ci0+zFiw@mail.gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 8 Jan 2013 18:57:08 -0800
+Subject: [GIT PULL] ARM: arm-soc fixes for 3.8-rc
+In-Reply-To: <20130108184920.GA1258@quad.lixom.net>
+References: <20130108184920.GA1258@quad.lixom.net>
+Message-ID: <CA+55aFxxv2h8TAxvwprdQEpaz4Ww5ime+t8rmpjnjv2t-mWYaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/8 Shawn Guo <shawn.guo@linaro.org>:
-> On Thu, Jan 03, 2013 at 08:37:33PM +0800, Liu Ying wrote:
->> 1) Add KPP device node entry.
->> 2) Add one KPP pinctrl entry.
->>
->> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+On Tue, Jan 8, 2013 at 10:49 AM, Olof Johansson <olof@lixom.net> wrote:
 >
-> Applied #2 and #3, thanks.
->
-Thanks Shawn and Dmitry for your review and applying this patch set!
+> A slightly larger delta than I'd ideally want by now, in part due to some
+> of the OMAP PM fixes that's adding a bit of code. I decided to include
+> it instead of push it to 3.9, but from here on out we'll be stricter.
 
--- 
-Liu Ying
+Ugh. Not only that, but:
+
+>   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
+
+you have both a branch called "fixes" and a tag called "fixes".
+Ambiguous. And when you ask me to pull like the above, it actually
+picks the branch, not the tag.
+
+Don't do this. Either use the unambiguous name ("tags/fixes" rather
+than just "fixes") or don't push out branches and tags that have the
+same name.
+
+                     Linus
