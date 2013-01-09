@@ -1,60 +1,43 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 9 Jan 2013 07:55:36 +0100
-Subject: [v2 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
-In-Reply-To: <50ED10F1.30001@wwwdotorg.org>
-References: <50ECA0A6.4090307@wwwdotorg.org><20130109.080031.1063344100374199123.hdoyu@nvidia.com><50ED10F1.30001@wwwdotorg.org>
-Message-ID: <20130109.085536.1185368963261877641.hdoyu@nvidia.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 9 Jan 2013 13:01:03 +0530
+Subject: [RFC v2 14/18] ARM: OMAP2+: AM33XX: control: Add some control
+ module registers and APIs
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ECDD089@DBDE01.ent.ti.com>
+References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
+ <1356959231-17335-15-git-send-email-vaibhav.bedia@ti.com>
+ <50EC3964.3060708@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433ECDD089@DBDE01.ent.ti.com>
+Message-ID: <50ED1CB7.1090202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 9 Jan 2013 07:40:49 +0100:
+On Wednesday 09 January 2013 11:08 AM, Bedia, Vaibhav wrote:
+> On Tue, Jan 08, 2013 at 20:51:08, Shilimkar, Santosh wrote:
+>> On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
+>>> Add minimal APIs for writing to the IPC and the M3_TXEV registers
+>>> in the Control module. These will be used in a subsequent patch which
+>>> adds suspend-resume support for AM33XX.
+>>>
+>>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>> Cc: Tony Lingren <tony@atomide.com>
+>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Cc: Benoit Cousson <b-cousson@ti.com>
+>>> Cc: Paul Walmsley <paul@pwsan.com>
+>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>>> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+>>> ---
+>> On Control module, we are trying to move driver/module
+>> specific code to respective drivers. Can you not
+>> add below code to ipc related driver component.
+>>
+>> If not, then patch as such is fine with me.
+>>
+>
+> I had it in the pm33xx.c in the previous version. Kevin had asked me to
+> move it to control.c. Should I revert move it back there?
+>
+pm33xx.c is not the right place. I was hoping to move to some driver.
+If that is not possible then leave it in control module.
 
-> On 01/08/2013 11:00 PM, Hiroshi Doyu wrote:
-> > Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 8 Jan 2013 23:41:42 +0100:
-> >> On 01/08/2013 09:07 AM, Marc Zyngier wrote:
-> >>> On 08/01/13 12:47, Hiroshi Doyu wrote:
-> >>>> Add platform enabler for ARM arch_timer(TSC). TSC is more fine grained
-> >>>> timer than TMR0. If it's available, it will be used for clock source
-> >>>> and sched_clock. Otherwise, TMR0 is used. In any case TMR0 is
-> >>>> necessary for clock event.
-> >>
-> >>>> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-> >>
-> >>>> +/* FIXME: only secure mode is supported. */
-> >>>
-> >>> And this is a bug, as far as I'm concerned.
-> >>>
-> >>>> +static int tegra_arch_timer_init(void)
-> >>
-> >>>> +	clk = clk_get_sys("clk_m", NULL);
-> >>>> +	if (IS_ERR(clk)) {
-> >>>> +		freq = 12000000;
-> >>>> +		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
-> >>>> +	} else {
-> >>>> +		freq = clk_get_rate(clk);
-> >>>> +		clk_put(clk);
-> >>>> +	}
-> >>>> +	writel_relaxed(freq, tsc_base + TSC_CNTFID0);
-> >>>> +
-> >>>> +	/* CNTFRQ */
-> >>>> +	asm("mcr p15, 0, %0, c14, c0, 0\n" : : "r" (freq));
-> >>>> +	asm("mrc p15, 0, %0, c14, c0, 0\n" : "=r" (val));
-> >>>> +	BUG_ON(val != freq);
-> >>>
-> >>> No, not again! Like I said last year, this won't fly. So instead of
-> >>> trying to work around a broken firmware, let's do the right thing.
-> >>
-> >> OK, so I understand you want to firmware/bootloader/... to write the
-> >> value into that register instead, so this all works in non-secure mode
-> >> (which sounds like a fine objection), but ...
-> > 
-> > If possible, I want to run kernel without bootloader initializing TSC
-> > . IOW, I want to allow legacy bootloaders to boot kernel with ARM arch
-> > timer.
-> 
-> Is it really hard to just fix the bootloader? Tegra114 is new enough,
-> and upstream support new enough, it should be fine to require a fixed
-> bootloader in order to run the upstream kernel even if we don't yet do
-> this right in the downstream kernels.
-
-Ok, I'll drop this part. Still kernel can boot up.
+Regards
+Santosh
