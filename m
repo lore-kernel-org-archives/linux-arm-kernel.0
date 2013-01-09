@@ -1,104 +1,172 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed,  9 Jan 2013 20:41:52 +0100
-Subject: [PATCH v2 2/2] ARM: SH-Mobile: sh73a0: Add CPU Hotplug
-In-Reply-To: <1357760512-2634-1-git-send-email-hechtb+renesas@gmail.com>
-References: <1357760512-2634-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <1357760512-2634-2-git-send-email-hechtb+renesas@gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 10 Jan 2013 04:46:45 +0900
+Subject: [PATCH] ARM: SAMSUNG: Gracefully exit on suspend failure
+In-Reply-To: <1357729952-14881-1-git-send-email-a.kesavan@samsung.com>
+References: <1357729952-14881-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <CAH9JG2WxW=+8PwhZ6r7akmwq2B2Qf=MqB4sB6DQypS0hEmAdvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the capability to add and remove CPUs on the fly.
-The Cortex-A9 offers the possibility to take single cores out of the
-MP Core. We add this capabilty taking care that caches are kept
-coherent. For verifying the shutdown we rely on the internal SH73A0
-Power Status Register PSTR.
+Hi,
+I wodner do you see the real case it's happened?
+It it's occured, does it better to find out the root cause?
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
----
-v2: don't use custom function sh73a0_do_wfi() but trust in cpu_do_idle()
+Thank you,
+Kyungmin Park
 
- arch/arm/mach-shmobile/smp-sh73a0.c |   36 +++++++++++++++++++++++++++++------
- 1 file changed, 30 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 5e36f5d..88aee9d 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -24,6 +24,7 @@
- #include <linux/io.h>
- #include <linux/delay.h>
- #include <mach/common.h>
-+#include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- #include <mach/sh73a0.h>
- #include <asm/smp_scu.h>
-@@ -36,6 +37,8 @@
- #define SBAR		IOMEM(0xe6180020)
- #define APARMBAREA	IOMEM(0xe6f10020)
- 
-+#define PSTR_SHUTDOWN_MODE	3
-+
- static void __iomem *scu_base_addr(void)
- {
- 	return (void __iomem *)0xf0000000;
-@@ -92,16 +95,20 @@ static void __init sh73a0_smp_init_cpus(void)
- 	shmobile_smp_init_cpus(ncores);
- }
- 
--static int __maybe_unused sh73a0_cpu_kill(unsigned int cpu)
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int sh73a0_cpu_kill(unsigned int cpu)
- {
-+
- 	int k;
-+	u32 pstr;
- 
--	/* this function is running on another CPU than the offline target,
--	 * here we need wait for shutdown code in platform_cpu_die() to
--	 * finish before asking SoC-specific code to power off the CPU core.
-+	/*
-+	 * wait until the power status register confirms the shutdown of the
-+	 * offline target
- 	 */
- 	for (k = 0; k < 1000; k++) {
--		if (shmobile_cpu_is_dead(cpu))
-+		pstr = (__raw_readl(PSTR) >> (4 * cpu)) & 3;
-+		if (pstr == PSTR_SHUTDOWN_MODE)
- 			return 1;
- 
- 		mdelay(1);
-@@ -110,6 +117,23 @@ static int __maybe_unused sh73a0_cpu_kill(unsigned int cpu)
- 	return 0;
- }
- 
-+static void sh73a0_cpu_die(unsigned int cpu)
-+{
-+	/*
-+	 * The ARM MPcore does not issue a cache coherency request for the L1
-+	 * cache when powering off single CPUs. We must take care of this and
-+	 * further caches.
-+	 */
-+	dsb();
-+	flush_cache_all();
-+
-+	/* Set power off mode. This takes the CPU out of the MP cluster */
-+	scu_power_mode(scu_base_addr(), SCU_PM_POWEROFF);
-+
-+	/* Enter shutdown mode */
-+	cpu_do_idle();
-+}
-+#endif /* CONFIG_HOTPLUG_CPU */
- 
- struct smp_operations sh73a0_smp_ops __initdata = {
- 	.smp_init_cpus		= sh73a0_smp_init_cpus,
-@@ -118,7 +142,7 @@ struct smp_operations sh73a0_smp_ops __initdata = {
- 	.smp_boot_secondary	= sh73a0_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_kill		= sh73a0_cpu_kill,
--	.cpu_die		= shmobile_cpu_die,
-+	.cpu_die		= sh73a0_cpu_die,
- 	.cpu_disable		= shmobile_cpu_disable,
- #endif
- };
--- 
-1.7.9.5
+On Wed, Jan 9, 2013 at 8:12 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+> As per the Exynos5250 User Manual:
+>
+> When there are pending interrupt events, WFI/WFE instruction are
+> ignored. To cancel the power-down sequence follow these steps:
+> 1) Disable system power-down through CENTRAL_SEQ_CONFIGURATION
+> and CENTRAL_SEQ_CONFIGURATION_DMC registers
+> 2) Clear WAKEUP_STAT register
+> 3) Enable interrupt service routine for CPU
+>
+> Code for early wakeup for exynos already exists; remove the panic
+> on suspend failure, clear the wakeup state register and return
+> error from cpu_suspend to indicate a failed suspend (to a user
+> daemon).
+>
+> Older Samsung SoCs have similar panics and I have removed them all.
+> Haven't touched the S3C2410 sleep code.
+>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pm.c          |    6 ++++--
+>  arch/arm/mach-s3c24xx/pm-s3c2412.c |    3 ++-
+>  arch/arm/mach-s3c24xx/pm-s3c2416.c |    3 ++-
+>  arch/arm/mach-s3c64xx/pm.c         |    3 ++-
+>  arch/arm/mach-s5p64x0/pm.c         |    4 ++--
+>  arch/arm/mach-s5pv210/pm.c         |    4 ++--
+>  arch/arm/plat-samsung/pm.c         |    5 ++++-
+>  7 files changed, 18 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index f459afd..55df38cd 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -92,8 +92,8 @@ static int exynos_cpu_suspend(unsigned long arg)
+>         /* issue the standby signal into the pm unit. */
+>         cpu_do_idle();
+>
+> -       /* we should never get past here */
+> -       panic("sleep resumed to originator?");
+> +       pr_err("Failed to suspend the system\n");
+> +       return -EBUSY;
+>  }
+>
+>  static void exynos_pm_prepare(void)
+> @@ -283,6 +283,8 @@ static void exynos_pm_resume(void)
+>         if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
+>                 tmp |= S5P_CENTRAL_LOWPWR_CFG;
+>                 __raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+> +               /* clear the wakeup state register */
+> +               __raw_writel(0x0, S5P_WAKEUP_STAT);
+>                 /* No need to perform below restore code */
+>                 goto early_wakeup;
+>         }
+> diff --git a/arch/arm/mach-s3c24xx/pm-s3c2412.c b/arch/arm/mach-s3c24xx/pm-s3c2412.c
+> index 206765c..a7bc30d 100644
+> --- a/arch/arm/mach-s3c24xx/pm-s3c2412.c
+> +++ b/arch/arm/mach-s3c24xx/pm-s3c2412.c
+> @@ -48,7 +48,8 @@ static int s3c2412_cpu_suspend(unsigned long arg)
+>
+>         s3c2412_sleep_enter();
+>
+> -       panic("sleep resumed to originator?");
+> +       pr_err("Failed to suspend the system\n");
+> +       return -EBUSY;
+>  }
+>
+>  static void s3c2412_pm_prepare(void)
+> diff --git a/arch/arm/mach-s3c24xx/pm-s3c2416.c b/arch/arm/mach-s3c24xx/pm-s3c2416.c
+> index 1bd4817..97a8d70 100644
+> --- a/arch/arm/mach-s3c24xx/pm-s3c2416.c
+> +++ b/arch/arm/mach-s3c24xx/pm-s3c2416.c
+> @@ -34,7 +34,8 @@ static int s3c2416_cpu_suspend(unsigned long arg)
+>
+>         s3c2412_sleep_enter();
+>
+> -       panic("sleep resumed to originator?");
+> +       pr_err("Failed to suspend the system\n");
+> +       return -EBUSY;
+>  }
+>
+>  static void s3c2416_pm_prepare(void)
+> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+> index f6b13a2..4d1accc 100644
+> --- a/arch/arm/mach-s3c64xx/pm.c
+> +++ b/arch/arm/mach-s3c64xx/pm.c
+> @@ -297,7 +297,8 @@ static int s3c64xx_cpu_suspend(unsigned long arg)
+>
+>         /* we should never get past here */
+>
+> -       panic("sleep resumed to originator?");
+> +       pr_err("Failed to suspend the system\n");
+> +       return -EBUSY;
+>  }
+>
+>  /* mapping of interrupts to parts of the wakeup mask */
+> diff --git a/arch/arm/mach-s5p64x0/pm.c b/arch/arm/mach-s5p64x0/pm.c
+> index 9cba18b..710651d 100644
+> --- a/arch/arm/mach-s5p64x0/pm.c
+> +++ b/arch/arm/mach-s5p64x0/pm.c
+> @@ -103,8 +103,8 @@ static int s5p64x0_cpu_suspend(unsigned long arg)
+>             "mcr p15, 0, %0, c7, c10, 4\n\t"
+>             "mcr p15, 0, %0, c7, c0, 4" : : "r" (tmp));
+>
+> -       /* we should never get past here */
+> -       panic("sleep resumed to originator?");
+> +       pr_err("Failed to suspend the system\n");
+> +       return -EBUSY;
+>  }
+>
+>  /* mapping of interrupts to parts of the wakeup mask */
+> diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
+> index 736bfb1..c584f49 100644
+> --- a/arch/arm/mach-s5pv210/pm.c
+> +++ b/arch/arm/mach-s5pv210/pm.c
+> @@ -104,8 +104,8 @@ static int s5pv210_cpu_suspend(unsigned long arg)
+>             "mcr p15, 0, %0, c7, c10, 4\n\t"
+>             "wfi" : : "r" (tmp));
+>
+> -       /* we should never get past here */
+> -       panic("sleep resumed to originator?");
+> +       pr_err("Failed to suspend the system\n");
+> +       return -EBUSY;
+>  }
+>
+>  static void s5pv210_pm_prepare(void)
+> diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+> index 1507028..aa4b06d 100644
+> --- a/arch/arm/plat-samsung/pm.c
+> +++ b/arch/arm/plat-samsung/pm.c
+> @@ -243,6 +243,7 @@ int (*pm_cpu_sleep)(unsigned long);
+>
+>  static int s3c_pm_enter(suspend_state_t state)
+>  {
+> +       int ret;
+>         /* ensure the debug is initialised (if enabled) */
+>
+>         s3c_pm_debug_init();
+> @@ -300,7 +301,9 @@ static int s3c_pm_enter(suspend_state_t state)
+>          * we resume as it saves its own register state and restores it
+>          * during the resume.  */
+>
+> -       cpu_suspend(0, pm_cpu_sleep);
+> +       ret = cpu_suspend(0, pm_cpu_sleep);
+> +       if (ret)
+> +               return ret;
+>
+>         /* restore the system state */
+>
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
