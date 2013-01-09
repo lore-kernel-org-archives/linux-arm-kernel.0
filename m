@@ -1,38 +1,18 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Wed, 9 Jan 2013 13:50:07 -0600
-Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
-In-Reply-To: <98D0981A-0EB4-4273-BFF8-B25C4BE5EE02@suse.de> (from
- agraf@suse.de on Wed Jan  9 10:48:47 2013)
-Message-ID: <1357761007.18196.0@snotra>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Jan 2013 19:52:59 +0000
+Subject: [PATCH] ARM: SAMSUNG: Gracefully exit on suspend failure
+In-Reply-To: <CAH9JG2WxW=+8PwhZ6r7akmwq2B2Qf=MqB4sB6DQypS0hEmAdvQ@mail.gmail.com>
+References: <1357729952-14881-1-git-send-email-a.kesavan@samsung.com>
+ <CAH9JG2WxW=+8PwhZ6r7akmwq2B2Qf=MqB4sB6DQypS0hEmAdvQ@mail.gmail.com>
+Message-ID: <20130109195259.GR3931@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2013 10:48:47 AM, Alexander Graf wrote:
-> 
-> On 09.01.2013, at 17:26, Christoffer Dall wrote:
-> 
-> > Renames the KVM_SET_DEVICE_ADDRESS to KVM_ARM_SET_DEVICE_ADDR
-> > to make it obvious that this is ARM specific in lack of a better  
-> generic
-> > interface.
-> >
-> > Once we agree on a better interface the KVM/ARM code can also take
-> > advantage of that, but until then we don't want to hold up the  
-> KVM/ARM
-> > patches.
-> 
-> Works for me. Scott, are you happy with this one too?
+On Thu, Jan 10, 2013 at 04:46:45AM +0900, Kyungmin Park wrote:
+> Hi,
+> I wodner do you see the real case it's happened?
+> It it's occured, does it better to find out the root cause?
 
-Not really, given that it will stay around forever even after something  
-new is introduced.
-
-If you're going to change the name, why not just change it to  
-KVM_SET_DEVICE_CONFIG?  Can we change the name later if nothing else  
-changes (so it's still binary compatible)?
-
-> We can start to introduce (and fix ARM) with a generic ioctl in the  
-> MPIC patches then.
-
-The ioctl is already generic, except for its name.
-
--Scott
+No.  It's better that if it does happen, the system remains functional
+so you _can_ debug why it happened.  If you cause the system to panic
+then you have to find some other way to get information out of it.
