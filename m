@@ -1,39 +1,28 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 09 Jan 2013 18:40:20 +0100
-Subject: [RFC PATCH 0/5] Use SRC to reset IP modules on i.MX5 and i.MX6
-In-Reply-To: <CAOMZO5Cgem3xyYg9MawnxXx_tDKgtiA_g6odu2wtnAeXWjdfmA@mail.gmail.com>
-References: <1357751839-19680-1-git-send-email-p.zabel@pengutronix.de>
- <CAOMZO5Cgem3xyYg9MawnxXx_tDKgtiA_g6odu2wtnAeXWjdfmA@mail.gmail.com>
-Message-ID: <1357753220.8747.3.camel@pizza.hi.pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Jan 2013 17:43:32 +0000
+Subject: [PATCH 05/10] ARM: OMAP2+: PM/powerdomain: move
+ omap_set_pwrdm_state() to powerdomain code
+In-Reply-To: <50C85ABD.8040409@ti.com>
+References: <20121209011755.19716.25244.stgit@dusk.lan>
+ <20121209012339.19716.10548.stgit@dusk.lan> <50C85ABD.8040409@ti.com>
+Message-ID: <20130109174332.GC2637@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Wed, Dec 12, 2012 at 03:51:49PM +0530, Vaibhav Hiremath wrote:
+> > -int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
+> > -{
+> > -	u8 curr_pwrst, next_pwrst;
+> > -	int sleep_switch = -1, ret = 0, hwsup = 0;
+> > -
+> > -	if (!pwrdm || IS_ERR(pwrdm))
+> 
+> You can use IS_ERR_OR_NULL here.
 
-Am Mittwoch, den 09.01.2013, 15:33 -0200 schrieb Fabio Estevam:
-> On Wed, Jan 9, 2013 at 3:17 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> > The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
-> > reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
-> >
-> > The following patches allow to link modules and SRC reset lines via phandle
-> > properties in the device tree. Drivers can then request their IP modules
-> > to be reset by the SRC.
-> > The IPU driver is made to use this mechanism during initialization, to
-> > improve robustness in the case of bootloaders leaving the IPU enabled.
-> >
-> > Fabio, does this help with your spurious interrupt issue?
-> 
-> I would like to give it a trym but I got some errors when trying to
-> apply these patches.
-> 
-> Which git tree should I use, or maybe do you have a git tree with them
-> applied so that I can quickly try?
-> 
-> Thanks,
-> 
-> Fabio Estevam
+As this is removing code...
 
-I rebased them onto next-20130109 (with this base compile-tested only).
-
-regards
-Philipp
+However, if you pay attention to linux-kernel or linux-arm-kernel, you will
+notice that I've sent a patch deprecating IS_ERR_OR_NULL() and I'm starting
+to remove its use.  IS_ERR_OR_NULL() creates more problems than it solves
+because people don't think about what the hell they're doing with it, or
+even whether it's appropriate to use it.
