@@ -1,49 +1,147 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed,  9 Jan 2013 21:43:07 +0100
-Subject: [PATCH 07/14] ARM: pci: Allow passing per-controller private data
+Date: Wed,  9 Jan 2013 21:43:08 +0100
+Subject: [PATCH 08/14] ARM: tegra: Move tegra_pcie_xclk_clamp() to PMC
 In-Reply-To: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1357764194-12677-8-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1357764194-12677-9-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to allow drivers to specify private data for each controller,
-this commit adds a private_data field to the struct hw_pci. This field
-is an array of nr_controllers pointers that will be used to initialize
-the private_data field of the corresponding controller's pci_sys_data
-structure.
+The PMC code already accesses to PMC registers so it makes sense to
+move this function there as well. While at it, rename the function to
+tegra_pmc_pcie_xclk_clamp() for consistency.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- arch/arm/include/asm/mach/pci.h | 1 +
- arch/arm/kernel/bios32.c        | 3 +++
- 2 files changed, 4 insertions(+)
+Changes in v3:
+- none
 
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index db9fedb..5cf2e97 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -23,6 +23,7 @@ struct hw_pci {
- #endif
- 	struct pci_ops	*ops;
- 	int		nr_controllers;
-+	void		**private_data;
- 	int		(*setup)(int nr, struct pci_sys_data *);
- 	struct pci_bus *(*scan)(int nr, struct pci_sys_data *);
- 	void		(*preinit)(void);
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index da7b0c9..a1f73b5 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -464,6 +464,9 @@ static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
- 		sys->map_irq = hw->map_irq;
- 		INIT_LIST_HEAD(&sys->resources);
+Changes in v2:
+- none
+---
+ arch/arm/mach-tegra/pcie.c | 30 ++++--------------------------
+ arch/arm/mach-tegra/pmc.c  | 16 ++++++++++++++++
+ arch/arm/mach-tegra/pmc.h  |  1 +
+ 3 files changed, 21 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
+index bffcd64..c2d55f8 100644
+--- a/arch/arm/mach-tegra/pcie.c
++++ b/arch/arm/mach-tegra/pcie.c
+@@ -42,6 +42,7 @@
  
-+		if (hw->private_data)
-+			sys->private_data = hw->private_data[nr];
+ #include "board.h"
+ #include "iomap.h"
++#include "pmc.h"
+ 
+ /* Hack - need to parse this from DT */
+ #define INT_PCIE_INTR 130
+@@ -148,17 +149,6 @@
+ #define  PADS_PLL_CTL_TXCLKREF_DIV10		(0 << 20)
+ #define  PADS_PLL_CTL_TXCLKREF_DIV5		(1 << 20)
+ 
+-/* PMC access is required for PCIE xclk (un)clamping */
+-#define PMC_SCRATCH42		0x144
+-#define PMC_SCRATCH42_PCX_CLAMP	(1 << 0)
+-
+-static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+-
+-#define pmc_writel(value, reg) \
+-	__raw_writel(value, reg_pmc_base + (reg))
+-#define pmc_readl(reg) \
+-	__raw_readl(reg_pmc_base + (reg))
+-
+ /*
+  * Tegra2 defines 1GB in the AXI address map for PCIe.
+  *
+@@ -640,18 +630,6 @@ static int tegra_pcie_enable_controller(void)
+ 	return 0;
+ }
+ 
+-static void tegra_pcie_xclk_clamp(bool clamp)
+-{
+-	u32 reg;
+-
+-	reg = pmc_readl(PMC_SCRATCH42) & ~PMC_SCRATCH42_PCX_CLAMP;
+-
+-	if (clamp)
+-		reg |= PMC_SCRATCH42_PCX_CLAMP;
+-
+-	pmc_writel(reg, PMC_SCRATCH42);
+-}
+-
+ static void tegra_pcie_power_off(void)
+ {
+ 	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
+@@ -659,7 +637,7 @@ static void tegra_pcie_power_off(void)
+ 	tegra_periph_reset_assert(tegra_pcie.pex_clk);
+ 
+ 	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
+-	tegra_pcie_xclk_clamp(true);
++	tegra_pmc_pcie_xclk_clamp(true);
+ }
+ 
+ static int tegra_pcie_power_regate(void)
+@@ -668,7 +646,7 @@ static int tegra_pcie_power_regate(void)
+ 
+ 	tegra_pcie_power_off();
+ 
+-	tegra_pcie_xclk_clamp(true);
++	tegra_pmc_pcie_xclk_clamp(true);
+ 
+ 	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
+ 	tegra_periph_reset_assert(tegra_pcie.afi_clk);
+@@ -682,7 +660,7 @@ static int tegra_pcie_power_regate(void)
+ 
+ 	tegra_periph_reset_deassert(tegra_pcie.afi_clk);
+ 
+-	tegra_pcie_xclk_clamp(false);
++	tegra_pmc_pcie_xclk_clamp(false);
+ 
+ 	clk_prepare_enable(tegra_pcie.afi_clk);
+ 	clk_prepare_enable(tegra_pcie.pex_clk);
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index d4fdb5f..a335a93 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -24,6 +24,10 @@
+ #define PMC_CTRL		0x0
+ #define PMC_CTRL_INTR_LOW	(1 << 17)
+ 
++/* PMC access is required for PCIE xclk (un)clamping */
++#define PMC_SCRATCH42		0x144
++#define PMC_SCRATCH42_PCX_CLAMP	(1 << 0)
 +
- 		ret = hw->setup(nr, sys);
+ static inline u32 tegra_pmc_readl(u32 reg)
+ {
+ 	return readl(IO_ADDRESS(TEGRA_PMC_BASE + reg));
+@@ -74,3 +78,15 @@ void __init tegra_pmc_init(void)
+ 		val &= ~PMC_CTRL_INTR_LOW;
+ 	tegra_pmc_writel(val, PMC_CTRL);
+ }
++
++void tegra_pmc_pcie_xclk_clamp(bool clamp)
++{
++	u32 reg;
++
++	reg = tegra_pmc_readl(PMC_SCRATCH42) & ~PMC_SCRATCH42_PCX_CLAMP;
++
++	if (clamp)
++		reg |= PMC_SCRATCH42_PCX_CLAMP;
++
++	tegra_pmc_writel(reg, PMC_SCRATCH42);
++}
+diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
+index 8995ee4..2631c9a 100644
+--- a/arch/arm/mach-tegra/pmc.h
++++ b/arch/arm/mach-tegra/pmc.h
+@@ -19,5 +19,6 @@
+ #define __MACH_TEGRA_PMC_H
  
- 		if (ret > 0) {
+ void tegra_pmc_init(void);
++void tegra_pmc_pcie_xclk_clamp(bool clamp);
+ 
+ #endif
 -- 
 1.8.1
