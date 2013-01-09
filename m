@@ -1,38 +1,50 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 9 Jan 2013 05:38:25 +0000
-Subject: [RFC v2 14/18] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <50EC3964.3060708@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-15-git-send-email-vaibhav.bedia@ti.com>
- <50EC3964.3060708@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDD089@DBDE01.ent.ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 9 Jan 2013 06:46:51 +0100
+Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
+ HAVE_ARM_SCU
+In-Reply-To: <20130108142651.GB3931@n2100.arm.linux.org.uk>
+References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com><1357649263-1098-4-git-send-email-hdoyu@nvidia.com><20130108142651.GB3931@n2100.arm.linux.org.uk>
+Message-ID: <20130109.074651.1513003283585604525.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 20:51:08, Shilimkar, Santosh wrote:
-> On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
-> > Add minimal APIs for writing to the IPC and the M3_TXEV registers
-> > in the Control module. These will be used in a subsequent patch which
-> > adds suspend-resume support for AM33XX.
-> >
-> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> > Cc: Tony Lingren <tony@atomide.com>
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Cc: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> > Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote @ Tue, 8 Jan 2013 15:26:51 +0100:
+
+> On Tue, Jan 08, 2013 at 02:47:37PM +0200, Hiroshi Doyu wrote:
+> > The method to detect the number of CPU cores on Cortex-A9 MPCore and
+> > Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
+> > information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
+> > have to read it from the system coprocessor(CP15), because the SCU on
+> > Cortex-A15 MPCore does not have software readable registers. This
+> > patch selects the correct method at runtime based on the CPU ID.
+> > 
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 > > ---
-> On Control module, we are trying to move driver/module
-> specific code to respective drivers. Can you not
-> add below code to ipc related driver component.
+> >  arch/arm/mach-tegra/platsmp.c |   31 ++++++++++++++++++++++++++++---
+> >  1 file changed, 28 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> > index 1b926df..68e76ef 100644
+> > --- a/arch/arm/mach-tegra/platsmp.c
+> > +++ b/arch/arm/mach-tegra/platsmp.c
+> > @@ -23,6 +23,7 @@
+> >  #include <asm/hardware/gic.h>
+> >  #include <asm/mach-types.h>
+> >  #include <asm/smp_scu.h>
+> > +#include <asm/cputype.h>
+> >  
+> >  #include <mach/powergate.h>
+> >  
+> > @@ -34,9 +35,13 @@
+> >  #include "common.h"
+> >  #include "iomap.h"
+> >  
+> > +#define CPU_MASK		0xff0ffff0
+> > +#define CPU_CORTEX_A9		0x410fc090
+> > +#define CPU_CORTEX_A15		0x410fc0f0
 > 
-> If not, then patch as such is fine with me.
-> 
+> NAK. There's some patches around to make this stuff generic, we don't
+> need more ifdefs springing up.  We need to get those generic patches
+> in.
 
-I had it in the pm33xx.c in the previous version. Kevin had asked me to
-move it to control.c. Should I revert move it back there?
-
-Regards,
-Vaibhav
+Does anyone give some pointers to the above patches?
