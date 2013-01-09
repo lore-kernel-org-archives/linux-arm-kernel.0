@@ -1,105 +1,77 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 9 Jan 2013 16:20:25 +0100
-Subject: [PATCH v5 01/12] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
-In-Reply-To: <CAFEAcA9z+kaSpVU3c8dWDHEnuGEri1JRZeS2+F5d2EefnX0oyQ@mail.gmail.com>
-References: <CANM98qL=tisS_6rqPYHvo+xJUfC_WzypHABK2H_Ac+4Sqwb3-A@mail.gmail.com>
- <1357687783.10453.9@snotra>
- <CANM98q+=5gZ+=muw4UHy5hQ8D6zqz--BLa4Z0C39dnUxeCOWfA@mail.gmail.com>
- <9D32C496-91DE-44FC-BB1A-305BCE4A90CD@suse.de>
- <CAFEAcA99j=9dVz1YwZPZJ5tXR7ODQ4rZN_vfN046Bf7Yc1SQKg@mail.gmail.com>
- <86D3D406-05C3-4569-AD03-3223B46D47D9@suse.de>
- <CAFEAcA9z+kaSpVU3c8dWDHEnuGEri1JRZeS2+F5d2EefnX0oyQ@mail.gmail.com>
-Message-ID: <92927B9A-1F0D-43A9-A5F9-0627DAE1E283@suse.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 9 Jan 2013 15:21:03 +0000
+Subject: [PATCH] Proposed removal of IS_ERR_OR_NULL() (was: Re: [PATCH
+ 1/4] gpiolib: introduce descriptor-based GPIO interface)
+In-Reply-To: <20130109150427.GL3931@n2100.arm.linux.org.uk>
+References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
+ <201301081259.29839.arnd@arndb.de>
+ <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
+ <201301091035.23206.arnd@arndb.de>
+ <20130109104414.GF3931@n2100.arm.linux.org.uk>
+ <20130109111055.GG3931@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1301090932400.6300@xanadu.home>
+ <20130109150427.GL3931@n2100.arm.linux.org.uk>
+Message-ID: <CACxGe6vXmJ5F4MC826BPSui1pckEzNa5-iaRSXa6TqHdp=UYzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jan 9, 2013 at 3:04 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> So, it seems there's some concensus building here, and it seems that
+> I've become the chosen victi^wvolunteer for this.  So, here's a patch.
+> It's missing a Guns-supplied-by: tag though.
+>
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> Subject: Mark IS_ERR_OR_NULL() deprecated
+>
+> IS_ERR_OR_NULL() attracts a lot of abuse: people use it without much
+> thought about it's effects.  Common errors include:
+>  1. checking the returned pointer for functions defined as only
+>     returning errno-pointer values, rather than using IS_ERR().
+>     This leads to: ptr = foo(); if (IS_ERR_OR_NULL(ptr)) return
+>      PTR_ERR(ptr);
+>  2. using it to check functions which only ever return NULL on error,
+>     thereby leading to another zero-error value return.
+> In the case of debugfs functions, these return errno-pointer values when
+> debugfs is configured out, which means code which blindly checks using
+> IS_ERR_OR_NULL() ends up returning errors, which is rather perverse for
+> something that's not implemented.
+>
+> Therefore, let's schedule it for removal in a few releases.
+>
+> Nicolas Pitre comments:
+>> I do agree with Russell here.  Despite the original intentions behind
+>> IS_ERR_OR_NULL() which were certainly legitimate, the end result in
+>> practice is less reliable code with increased maintenance costs.
+>> Unlike other convenience macros in the kernel, this one is giving a
+>> false sense of correctness with too many people falling in the trap
+>> of using it just because it is available.
+>>
+>> I strongly think this macro should simply be removed from the source
+>> tree entirely and the code reverted to explicit tests against NULL
+>> when appropriate.
+>
+> Suggested-by: David Howells <dhowells@redhat.com>
+> Tape-measuring-service-offered-by: Will Deacon <will.deacon@arm.com>
+> Victim-for-firing-sqad: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-On 09.01.2013, at 16:11, Peter Maydell wrote:
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-> On 9 January 2013 14:58, Alexander Graf <agraf@suse.de> wrote:
->> 
->> On 09.01.2013, at 15:48, Peter Maydell wrote:
->> 
->>> On 9 January 2013 10:02, Alexander Graf <agraf@suse.de> wrote:
->>>> I think we should make thus at least potentially generic. In fact, I wouldn't even
->>>> mind calling it DEV_REG with the same semantics as ONE_REG, just that it also
->>>> gets a unique dev id that gets created during in-kernel device creation and that
->>>> it's a vm ioctl.
->>> 
->>> Well, we might want a DEV_REG, but you might as well just make ONE_REG
->>> OK as a VM ioctl, since there's no reason not to have not-per-cpu but not
->>> device registers. ONE_REG already supports dividing up the ID space so
->>> you can say which device or whatever is being used, because we had
->>> things like GIC registers in mind when we put that API together.
->> 
->> ONE_REG's address space today doesn't include a field for the target device,
-> 
-> There's 16 bits of "register group type".
+I fully agree with doing this. While I'm not a fan of the PTR_ERR
+pattern, this does (hopefully) make users think just a little bit more
+about it.
 
-That's "register group", not "device id". It's constant per id. If you have an ARM register, it will always stay an ARM register. It's not going to change. But if you reuse those bits for the device id, they are going to change, because a device id is similar to a handle that should be returned by the device create ioctl.
+> ---
+> Ok, so I'm in the firing line for suggesting this, but it appears
+> several people wish this to happen.
+>
+> I'm not intending to push this patch forwards _just_ yet: we need to
+> sort out the existing users _first_ to prevent the kernel turning into
+> one hell of a mess of warnings.
 
-> 
->> because that's already predetermined by the fd you run it on. Hence my
->> suggestion to add it as separate field, because then we keep the id space
->> mask-free.
-> 
-> Er, it already has masks for the different parts of ID space. That's a feature,
-> not a bug.
+I currently see 355 users. That's a lot, but not inconceivable for an
+auditing effort for pulling them out instead of scheduling for future
+removal.
 
-All those masks are constant masks and only used to make reading the IDs easier. They never change within a single type of a register.
-
-> 
->>> However, this shouldn't be DEV_REG, because this isn't actually setting state
->>> in the irqchip device, it's configuring the kernel's part of the system model
->>> [compare wiring up irq routing, which also has a custom ioctl rather than a
->>> generic one]. As such it definitely needs to happen only before the VM is
->>> actually started and not during VM execution, unlike a DEV_REG which would
->>> presumably be generally valid.
->> 
->> The same can be true for ONE_REG/SET_SREGS. On PPC we support setting
->> the PVR (CPU type) via SREGS because ONE_REG only came later. Setting
->> the CPU type only makes sense before you first start using a vcpu. After that
->> point it should be forbidden.
->> 
->> So in a way, the irqchip memory address location is a device register, as it has
->> all the properties that a register on that device would have. It is
->> 
->>  * per device
->>  * one id for one purpose
->>  * may or may not be writable during certain times
-> 
-> There's a distinction between "things you need to do in machine setup"
-> and "things you need to propagate for migration". It should be possible
-> to do a migration by doing a complete copy of all ONE_REG (and DEV_REG
-> if we have it) state from source to destination, so it needs to be always
-> possible to write them.
-
-You need to somewhere encode a list of registers you want to synchronize for migration anyways. Don't include this register in that list then.
-
-> 
->> We would also keep the gates open to get a new register id one day for a second
->> address. Imagine an interrupt controller that splits its address mappings into
->> "PIC base registers" and "MSI target registers", though the MSI registers logically
->> belong to the PIC. Then the ioctl as designed here gets stuck too.
-> 
-> This is exactly what ARM's GIC has already. We have several memory regions
-> (one for the distributor, one for the cpu interface), and map them with several
-> calls to SET_DEVICE_ADDRESS.
-
-I see.
-
-> 
->>> (b) we didn't need to tangle up and delay the KVM ARM work with a vague
->>> and unspecified desire for general configurability
->> 
->> Yeah, that was the basic idea. Considering that the patch set hasn't been going
->> in for another 2 months after that discussion indicates that this isn't too much of
->> an issue though :).
-> 
-> We might get there faster if people didn't keep nitpicking the APIs at the
-> last minute :-)
-
-I guess we just had too much bad experience with designing horrible APIs in the past on the PPC side ;).
-
-
-Alex
+g.
