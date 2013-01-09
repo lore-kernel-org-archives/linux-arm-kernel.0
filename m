@@ -1,162 +1,44 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 09 Jan 2013 10:04:18 +0100
-Subject: [PATCH 7/7] ARM i.MX51 babbage: Add display support
-In-Reply-To: <201301081829.06441.marex@denx.de>
-References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
- <201301081809.38537.marex@denx.de>
- <1357665800.2527.17.camel@pizza.hi.pengutronix.de>
- <201301081829.06441.marex@denx.de>
-Message-ID: <1357722258.2538.2.camel@pizza.hi.pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 9 Jan 2013 10:08:49 +0100
+Subject: [PATCH] mtd: mxc_nand: Make use of supplied pinctrl data
+In-Reply-To: <20130109064107.GB12525@S2100-06.ap.freescale.net>
+References: <1357568885-15507-1-git-send-email-marex@denx.de>
+ <201301082122.46815.marex@denx.de>
+ <20130109064107.GB12525@S2100-06.ap.freescale.net>
+Message-ID: <201301091008.49832.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Dear Shawn Guo,
 
-Am Dienstag, den 08.01.2013, 18:29 +0100 schrieb Marek Vasut:
-> Dear Philipp Zabel,
+> On Tue, Jan 08, 2013 at 09:22:46PM +0100, Marek Vasut wrote:
+> > Dear Jean-Christophe PLAGNIOL-VILLARD,
+> > 
+> > > On 15:28 Mon 07 Jan     , Marek Vasut wrote:
+> > > > The MXC NAND driver doesn't consider the pinctrl data supplied via
+> > > > DT, which will result in NAND pins not being properly configured.
+> > > > 
+> > > > Make the driver use pinctrl, but to prevent breakage on various
+> > > > boards, do not fail if the pinctrl data are not available, only
+> > > > print a warning message.
+> > > 
+> > > nack
+> > > 
+> > > we will at bus level
+> > 
+> > Can you please elaborate? I don't understand what you're complaining
+> > about at all, sorry.
 > 
-> > Am Dienstag, den 08.01.2013, 18:09 +0100 schrieb Marek Vasut:
-> > > Dear Fabio Estevam,
-> > > 
-> > > > On Tue, Jan 8, 2013 at 2:41 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > > > > Hi Sascha,
-> > > > > 
-> > > > > On Mon, Nov 12, 2012 at 1:23 PM, Sascha Hauer
-> > > > > <s.hauer@pengutronix.de>
-> > > 
-> > > wrote:
-> > > > >> The babbage board has a DVI-I output which allows to output analog
-> > > > >> and digital signals simultaneously. This patch adds support for it
-> > > > >> to the devicetree. The DDC signals are not wired up on the board, so
-> > > > >> DRM will fall back on default VESA modes.
-> > > > >> 
-> > > > >> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > > 
-> > > > > I am running linux-next 20130108, which has this patch applied and I
-> > > > 
-> > > > > get the following on my mx51babbage:
-> > > > Ok, good news. I see a nice penguin on my monitor now.
-> > > > 
-> > > > Discussed with Marek and he proposed a quick workaround:
-> > > > 
-> > > > --- a/drivers/staging/imx-drm/ipuv3-crtc.c
-> > > > +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-> > > > @@ -343,6 +343,11 @@ static irqreturn_t ipu_irq_handler(int irq, void
-> > > > *dev_id) {
-> > > > 
-> > > >         struct ipu_crtc *ipu_crtc = dev_id;
-> > > > 
-> > > > +       if (!ipu_crtc->imx_crtc) {
-> > > > +               pr_err("Spurious IPU IRQ\n");
-> > > > +               return IRQ_HANDLED;
-> > > > +       }
-> > > > +
-> > > > 
-> > > >         imx_drm_handle_vblank(ipu_crtc->imx_crtc);
-> > > >         
-> > > >         if (ipu_crtc->newfb) {
-> > > > 
-> > > > It seems that this issue happened because bootloader leaves the IPU
-> > > > turned on.
-> > > 
-> > > To elaborate more on this stuff:
-> > > 
-> > > 491         ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
-> > > 492                         IPU_IRQ_EOF);
-> > > 493         ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq,
-> > > ipu_irq_handler, 0,
-> > > 494                         "imx_drm", ipu_crtc);
-> > > 495         if (ret < 0) {
-> > > 496                 dev_err(ipu_crtc->dev, "irq request failed with
-> > > %d.\n", ret);
-> > > 497                 goto err_out;
-> > > 498         }
-> > > 499
-> > > 500         disable_irq(ipu_crtc->irq);
-> > > 
-> > > This code in drivers/staging/imx-drm/ipuv3-crtc.c is broken. If the IPU
-> > > is on, it produces an interrupt before the driver is fully set up. I
-> > > didn't produce a patch yet, I think I might offload this to someone
-> > > else. Volunteers?
-> > 
-> > Reordering the ipu_get_resources and imx_drm_add_crtc calls should resolve
-> > this:
-> > 
-> > From: Philipp Zabel <p.zabel@pengutronix.de>
-> > Subject: [PATCH] staging: imx/drm: add crtc before registering interrupt
-> >  handler
-> > 
-> > If the bootloader already enabled the display, the interrupt handler
-> > will be called as soon as it is registered. If the CRTC is not already
-> > added at this time, the call to imx_drm_handle_vblank will result in
-> > a NULL pointer dereference.
+> He is talking about patch [1] which is likely to hit mainline for 3.9.
 > 
-> I ain't no IPU expert, but isn't adding the component before having it fully 
-> inited even worse?
+> Shawn
+> 
+> [1] http://thread.gmane.org/gmane.linux.kernel/1409263
 
-Good point, how about just moving the irq request out of
-ipu_get_resources into ipu_crtc_init, after adding the crtc:
+Oh, this is good, thanks for explaining Shawn!
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
-Subject: [PATCH] staging: imx/drm: request irq only after adding the crtc
+Well, this patch can be applied as a fallback if it doesn't hit 3.9 , either way 
+works for me.
 
-If the bootloader already enabled the display, the interrupt handler
-will be called as soon as it is registered. If the CRTC is not already
-added at this time, the call to imx_drm_handle_vblank will result in
-a NULL pointer dereference.
-
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/staging/imx-drm/ipuv3-crtc.c |   23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-index 4b3a019..b028b0d 100644
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -483,17 +483,6 @@ static int ipu_get_resources(struct ipu_crtc *ipu_crtc,
- 		goto err_out;
- 	}
- 
--	ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
--			IPU_IRQ_EOF);
--	ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, ipu_irq_handler, 0,
--			"imx_drm", ipu_crtc);
--	if (ret < 0) {
--		dev_err(ipu_crtc->dev, "irq request failed with %d.\n", ret);
--		goto err_out;
--	}
--
--	disable_irq(ipu_crtc->irq);
--
- 	return 0;
- err_out:
- 	ipu_put_resources(ipu_crtc);
-@@ -504,6 +493,7 @@ err_out:
- static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
- 		struct ipu_client_platformdata *pdata)
- {
-+	struct ipu_soc *ipu = dev_get_drvdata(ipu_crtc->dev->parent);
- 	int ret;
- 
- 	ret = ipu_get_resources(ipu_crtc, pdata);
-@@ -522,6 +512,17 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
- 		goto err_put_resources;
- 	}
- 
-+	ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
-+			IPU_IRQ_EOF);
-+	ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, ipu_irq_handler, 0,
-+			"imx_drm", ipu_crtc);
-+	if (ret < 0) {
-+		dev_err(ipu_crtc->dev, "irq request failed with %d.\n", ret);
-+		goto err_put_resources;
-+	}
-+
-+	disable_irq(ipu_crtc->irq);
-+
- 	return 0;
- 
- err_put_resources:
--- 
-1.7.10.4
+Best regards,
+Marek Vasut
