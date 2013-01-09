@@ -1,26 +1,24 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 9 Jan 2013 11:07:12 +0900
-Subject: [PATCH 2/2] ARM: shmobile: armadillo800eva: Reference DT
- implementation
-In-Reply-To: <1355851359-8871-3-git-send-email-hechtb+renesas@gmail.com>
-References: <1355851359-8871-1-git-send-email-hechtb+renesas@gmail.com>
- <1355851359-8871-3-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <20130109020712.GC6496@verge.net.au>
+From: liu.y.victor@gmail.com (Liu Ying)
+Date: Wed, 9 Jan 2013 10:08:27 +0800
+Subject: [PATCH v3 2/3] ARM: dts: imx: Add imx51 KPP entry
+In-Reply-To: <20130108151338.GF19534@S2101-09.ap.freescale.net>
+References: <1357216654-12651-1-git-send-email-Ying.Liu@freescale.com>
+ <1357216654-12651-2-git-send-email-Ying.Liu@freescale.com>
+ <20130108151338.GF19534@S2101-09.ap.freescale.net>
+Message-ID: <CA+8Hj80m64NEUGiycvNFK5M7HYTWs9m28tTWHLzFK4ci0+zFiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 06:22:39PM +0100, Bastian Hecht wrote:
-> Provide alternate board code for the Armadillo 800 EVA to
-> demonstrate how DT may be used given the current state of
-> driver device tree support. This is intended to act as a
-> reference for mach-shmobile developers.
-> 
-> This is based on Simon Horman's reference implementation for
-> the board kzm9g.
-> 
-> Currently only the ethernet controller is brought up.
+2013/1/8 Shawn Guo <shawn.guo@linaro.org>:
+> On Thu, Jan 03, 2013 at 08:37:33PM +0800, Liu Ying wrote:
+>> 1) Add KPP device node entry.
+>> 2) Add one KPP pinctrl entry.
+>>
+>> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+>
+> Applied #2 and #3, thanks.
+>
+Thanks Shawn and Dmitry for your review and applying this patch set!
 
-Thanks, looks good. I will apply this.
-
-Could you let me know what the status of
-the DT bindings for sh-eth is?
+-- 
+Liu Ying
