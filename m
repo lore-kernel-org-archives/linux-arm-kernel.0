@@ -1,49 +1,68 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  9 Jan 2013 19:28:09 +0100
-Subject: [PATCH] pinctrl: mvebu: Fix compiler warnings
-Message-ID: <1357756089-6028-1-git-send-email-andrew@lunn.ch>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 09 Jan 2013 13:30:01 -0500 (EST)
+Subject: [PATCH] ARM: nommu: re-enable use of vexpress without
+ ARCH_MULTIPLATFORM
+In-Reply-To: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
+References: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
+Message-ID: <alpine.LFD.2.02.1301091323440.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-match->data is const void * where as dev.platform_data is just void *.
-Add a cast to remove the const, which is causing the compiler warning:
+On Wed, 9 Jan 2013, Jonathan Austin wrote:
 
-drivers/pinctrl/mvebu/pinctrl-kirkwood.c:461:26: warning: assignment
-discards 'const' qualifier from pointer target type
+> From: Will Deacon <will.deacon@arm.com>
 
-Dove has the exact same warning, so gets the same cast.
+Did Will actually write the patch?  It rather looks like you are the one 
+folloing through, in which case you deserve the credits.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- drivers/pinctrl/mvebu/pinctrl-dove.c     |    2 +-
- drivers/pinctrl/mvebu/pinctrl-kirkwood.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+> Since 617276307cd4c ("ARM: vexpress: convert to multi-platform") it has
+> been impossible to select ARCH_VEXPRESS without ARCH_MULTIPLATFORM.
+> 
+> ARCH_MULTIPLATFORM doesn't make sense for NOMMU targets, not least
+> because of the need to hard-code the memory map. However, it should
+> still be possible to run NOMMU kernels on top of the Versatile Express
+> by selecting it as the only platform.
+> 
+> This patch creates a shim ARCH_VEXPRESS_NOMMU config option in the 'choice'
+> for "ARM system type" to make this possible again.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+> CC: Nicolas Pitre <nico@fluxnic.net>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> ---
+> 
+> Arnd and Nicolas: I've removed your acks as I've changed the location
+> of the new block (as Nicolas suggested) and ever so slightly tweaked
+> the name of the new option.
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index 40c9c3e..f2757df 100644
---- a/drivers/pinctrl/mvebu/pinctrl-dove.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -588,7 +588,7 @@ static int __devinit dove_pinctrl_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match =
- 		of_match_device(dove_pinctrl_of_match, &pdev->dev);
--	pdev->dev.platform_data = match->data;
-+	pdev->dev.platform_data = (void *)match->data;
- 
- 	/*
- 	 * General MPP Configuration Register is part of pdma registers.
-diff --git a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-index fa6ce31..33b1c49 100644
---- a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-@@ -458,7 +458,7 @@ static int __devinit kirkwood_pinctrl_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match =
- 		of_match_device(kirkwood_pinctrl_of_match, &pdev->dev);
--	pdev->dev.platform_data = match->data;
-+	pdev->dev.platform_data = (void *)match->data;
- 	return mvebu_pinctrl_probe(pdev);
- }
- 
--- 
-1.7.10.4
+Please add some help text to explain what this is for as well.
+
+And you may add my ACK back.
+
+
+
+> 
+>  arch/arm/Kconfig |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 335e220..3357d0b 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -322,6 +322,11 @@ config ARCH_VERSATILE
+>  	help
+>  	  This enables support for ARM Ltd Versatile board.
+>  
+> +config ARCH_VEXPRESS_NOMMU
+> +	bool "ARM Ltd. Versatile Express family for NOMMU"
+> +	depends on !MMU
+> +	select ARCH_VEXPRESS
+> +
+>  config ARCH_AT91
+>  	bool "Atmel AT91"
+>  	select ARCH_REQUIRE_GPIOLIB
+> -- 
+> 1.7.9.5
+> 
+> 
