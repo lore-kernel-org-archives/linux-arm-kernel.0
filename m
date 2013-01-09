@@ -1,278 +1,256 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed,  9 Jan 2013 12:15:28 +0100
-Subject: [PATCH 3/3] usb: converto drivers/usb/* to use
- module_platform_driver_probe()
-In-Reply-To: <1357730128-23018-1-git-send-email-fabio.porcedda@gmail.com>
-References: <1357730128-23018-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1357730128-23018-4-git-send-email-fabio.porcedda@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 9 Jan 2013 11:17:55 +0000
+Subject: [PATCH 3/8] ARM: shmobile: Add support OF of INTC for sh7372
+In-Reply-To: <1357713007-4005-4-git-send-email-horms+renesas@verge.net.au>
+References: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
+ <1357713007-4005-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130109111742.GA7337@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch converts the drivers in drivers/usb/* to use the
-module_platform_driver_probe() macro which makes the code smaller and
-a bit simpler.
+On Wed, Jan 09, 2013 at 06:30:02AM +0000, Simon Horman wrote:
+> From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> 
+> This CPU has four interrupt controllers (INTCA, pins-High and pins-Low).
+> This supports these.
+> Note: This supports DT of INTCA only.
+> 
+> Cc: Magnus Damm <damm@opensource.se>
+> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> ---
+> 
+> v9
+> * Update compatible string to use '-' instead of '_'
+> ---
+>  arch/arm/mach-shmobile/include/mach/common.h |    1 +
+>  arch/arm/mach-shmobile/intc-sh7372.c         |  113 ++++++++++++++++++++------
+>  2 files changed, 89 insertions(+), 25 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+> index d0a5790..223250b 100644
+> --- a/arch/arm/mach-shmobile/include/mach/common.h
+> +++ b/arch/arm/mach-shmobile/include/mach/common.h
+> @@ -18,6 +18,7 @@ extern int shmobile_enter_wfi(struct cpuidle_device *dev,
+>  			      struct cpuidle_driver *drv, int index);
+>  extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
+>  
+> +extern void sh7372_init_irq_of(void);
+>  extern void sh7372_init_irq(void);
+>  extern void sh7372_map_io(void);
+>  extern void sh7372_add_early_devices(void);
+> diff --git a/arch/arm/mach-shmobile/intc-sh7372.c b/arch/arm/mach-shmobile/intc-sh7372.c
+> index a91caad..bbde18d 100644
+> --- a/arch/arm/mach-shmobile/intc-sh7372.c
+> +++ b/arch/arm/mach-shmobile/intc-sh7372.c
+> @@ -16,6 +16,8 @@
+>   * along with this program; if not, write to the Free Software
+>   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+>   */
+> +#define pr_fmt(fmt) "intc: " fmt
+> +
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/interrupt.h>
+> @@ -551,23 +553,28 @@ static void intcs_demux(unsigned int irq, struct irq_desc *desc)
+>  
+>  static void __iomem *intcs_ffd2;
+>  static void __iomem *intcs_ffd5;
+> -
+> -void __init sh7372_init_irq(void)
+> +static void __iomem *intca_e694;
+> +static void __iomem *intca_e695;
+> +
+> +static void __init sh7372_init_intc(resource_size_t intca0_start,
+> +				    resource_size_t intca1_start,
+> +				    resource_size_t intcs0_start,
+> +				    resource_size_t intcs1_start,
+> +				    unsigned short vect)
+>  {
+>  	void __iomem *intevtsa;
+>  	int n;
+>  
+> -	intcs_ffd2 = ioremap_nocache(0xffd20000, PAGE_SIZE);
+> -	intevtsa = intcs_ffd2 + 0x100;
+> -	intcs_ffd5 = ioremap_nocache(0xffd50000, PAGE_SIZE);
+> +	intca_e694 = IOMEM(intca0_start);
+> +	intca_e695 = IOMEM(intca1_start);
+>  
+> -	register_intc_controller(&intca_desc);
+> -	register_intc_controller(&intca_irq_pins_lo_desc);
+> -	register_intc_controller(&intca_irq_pins_hi_desc);
+> -	register_intc_controller(&intcs_desc);
+> +	intcs_ffd2 = ioremap_nocache(intcs0_start, PAGE_SIZE);
+> +	intevtsa = intcs_ffd2 + 0x100;
+> +	intcs_ffd5 = ioremap_nocache(intcs1_start, PAGE_SIZE);
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-Cc: linux-usb at vger.kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- drivers/usb/gadget/at91_udc.c       | 12 +-----------
- drivers/usb/gadget/atmel_usba_udc.c | 12 +-----------
- drivers/usb/gadget/fusb300_udc.c    | 13 +------------
- drivers/usb/gadget/imx_udc.c        | 12 +-----------
- drivers/usb/gadget/lpc32xx_udc.c    | 12 +-----------
- drivers/usb/gadget/m66592-udc.c     | 12 +-----------
- drivers/usb/gadget/pxa25x_udc.c     | 15 +++------------
- drivers/usb/gadget/r8a66597-udc.c   | 15 ++-------------
- drivers/usb/otg/gpio_vbus.c         | 12 +-----------
- drivers/usb/otg/msm_otg.c           | 13 +------------
- 10 files changed, 13 insertions(+), 115 deletions(-)
+I think you need to check the return value of ioremap_nocache (it looks like it
+could return NULL), but I'm not certain of its semantics.
 
-diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-index f4a21f6..0143ffa 100644
---- a/drivers/usb/gadget/at91_udc.c
-+++ b/drivers/usb/gadget/at91_udc.c
-@@ -1982,17 +1982,7 @@ static struct platform_driver at91_udc_driver = {
- 	},
- };
- 
--static int __init udc_init_module(void)
--{
--	return platform_driver_probe(&at91_udc_driver, at91udc_probe);
--}
--module_init(udc_init_module);
--
--static void __exit udc_exit_module(void)
--{
--	platform_driver_unregister(&at91_udc_driver);
--}
--module_exit(udc_exit_module);
-+module_platform_driver_probe(at91_udc_driver, at91udc_probe);
- 
- MODULE_DESCRIPTION("AT91 udc driver");
- MODULE_AUTHOR("Thomas Rathbone, David Brownell");
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index a7aed84..bc19496 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -2066,17 +2066,7 @@ static struct platform_driver udc_driver = {
- 	},
- };
- 
--static int __init udc_init(void)
--{
--	return platform_driver_probe(&udc_driver, usba_udc_probe);
--}
--module_init(udc_init);
--
--static void __exit udc_exit(void)
--{
--	platform_driver_unregister(&udc_driver);
--}
--module_exit(udc_exit);
-+module_platform_driver_probe(udc_driver, usba_udc_probe);
- 
- MODULE_DESCRIPTION("Atmel USBA UDC driver");
- MODULE_AUTHOR("Haavard Skinnemoen (Atmel)");
-diff --git a/drivers/usb/gadget/fusb300_udc.c b/drivers/usb/gadget/fusb300_udc.c
-index 72cd5e6..fc7cb09 100644
---- a/drivers/usb/gadget/fusb300_udc.c
-+++ b/drivers/usb/gadget/fusb300_udc.c
-@@ -1547,15 +1547,4 @@ static struct platform_driver fusb300_driver = {
- 	},
- };
- 
--static int __init fusb300_udc_init(void)
--{
--	return platform_driver_probe(&fusb300_driver, fusb300_probe);
--}
--
--module_init(fusb300_udc_init);
--
--static void __exit fusb300_udc_cleanup(void)
--{
--	platform_driver_unregister(&fusb300_driver);
--}
--module_exit(fusb300_udc_cleanup);
-+module_platform_driver_probe(fusb300_driver, fusb300_probe);
-diff --git a/drivers/usb/gadget/imx_udc.c b/drivers/usb/gadget/imx_udc.c
-index a0eb857..8efd755 100644
---- a/drivers/usb/gadget/imx_udc.c
-+++ b/drivers/usb/gadget/imx_udc.c
-@@ -1556,17 +1556,7 @@ static struct platform_driver udc_driver = {
- 	.resume		= imx_udc_resume,
- };
- 
--static int __init udc_init(void)
--{
--	return platform_driver_probe(&udc_driver, imx_udc_probe);
--}
--module_init(udc_init);
--
--static void __exit udc_exit(void)
--{
--	platform_driver_unregister(&udc_driver);
--}
--module_exit(udc_exit);
-+module_platform_driver_probe(udc_driver, imx_udc_probe);
- 
- MODULE_DESCRIPTION("IMX USB Device Controller driver");
- MODULE_AUTHOR("Darius Augulis <augulis.darius@gmail.com>");
-diff --git a/drivers/usb/gadget/lpc32xx_udc.c b/drivers/usb/gadget/lpc32xx_udc.c
-index dd1c9b1..aa04089 100644
---- a/drivers/usb/gadget/lpc32xx_udc.c
-+++ b/drivers/usb/gadget/lpc32xx_udc.c
-@@ -3458,17 +3458,7 @@ static struct platform_driver lpc32xx_udc_driver = {
- 	},
- };
- 
--static int __init udc_init_module(void)
--{
--	return platform_driver_probe(&lpc32xx_udc_driver, lpc32xx_udc_probe);
--}
--module_init(udc_init_module);
--
--static void __exit udc_exit_module(void)
--{
--	platform_driver_unregister(&lpc32xx_udc_driver);
--}
--module_exit(udc_exit_module);
-+module_platform_driver_probe(lpc32xx_udc_driver, lpc32xx_udc_probe);
- 
- MODULE_DESCRIPTION("LPC32XX udc driver");
- MODULE_AUTHOR("Kevin Wells <kevin.wells@nxp.com>");
-diff --git a/drivers/usb/gadget/m66592-udc.c b/drivers/usb/gadget/m66592-udc.c
-index b6401f1..dfce0cf 100644
---- a/drivers/usb/gadget/m66592-udc.c
-+++ b/drivers/usb/gadget/m66592-udc.c
-@@ -1753,14 +1753,4 @@ static struct platform_driver m66592_driver = {
- 	},
- };
- 
--static int __init m66592_udc_init(void)
--{
--	return platform_driver_probe(&m66592_driver, m66592_probe);
--}
--module_init(m66592_udc_init);
--
--static void __exit m66592_udc_cleanup(void)
--{
--	platform_driver_unregister(&m66592_driver);
--}
--module_exit(m66592_udc_cleanup);
-+module_platform_driver_probe(m66592_driver, m66592_probe);
-diff --git a/drivers/usb/gadget/pxa25x_udc.c b/drivers/usb/gadget/pxa25x_udc.c
-index d4ca9f1..d52e869 100644
---- a/drivers/usb/gadget/pxa25x_udc.c
-+++ b/drivers/usb/gadget/pxa25x_udc.c
-@@ -2100,6 +2100,8 @@ static int __init pxa25x_udc_probe(struct platform_device *pdev)
- 	int retval, irq;
- 	u32 chiprev;
- 
-+	pr_info("%s: version %s\n", driver_name, DRIVER_VERSION);
-+
- 	/* insist on Intel/ARM/XScale */
- 	asm("mrc%? p15, 0, %0, c0, c0" : "=r" (chiprev));
- 	if ((chiprev & CP15R0_VENDOR_MASK) != CP15R0_XSCALE_VALUE) {
-@@ -2346,18 +2348,7 @@ static struct platform_driver udc_driver = {
- 	},
- };
- 
--static int __init udc_init(void)
--{
--	pr_info("%s: version %s\n", driver_name, DRIVER_VERSION);
--	return platform_driver_probe(&udc_driver, pxa25x_udc_probe);
--}
--module_init(udc_init);
--
--static void __exit udc_exit(void)
--{
--	platform_driver_unregister(&udc_driver);
--}
--module_exit(udc_exit);
-+module_platform_driver_probe(udc_driver, pxa25x_udc_probe);
- 
- MODULE_DESCRIPTION(DRIVER_DESC);
- MODULE_AUTHOR("Frank Becker, Robert Schwebel, David Brownell");
-diff --git a/drivers/usb/gadget/r8a66597-udc.c b/drivers/usb/gadget/r8a66597-udc.c
-index 5a80751..9a9fadd 100644
---- a/drivers/usb/gadget/r8a66597-udc.c
-+++ b/drivers/usb/gadget/r8a66597-udc.c
-@@ -2031,21 +2031,10 @@ static struct platform_driver r8a66597_driver = {
- 		.name =	(char *) udc_name,
- 	},
- };
--MODULE_ALIAS("platform:r8a66597_udc");
--
--static int __init r8a66597_udc_init(void)
--{
--	return platform_driver_probe(&r8a66597_driver, r8a66597_probe);
--}
--module_init(r8a66597_udc_init);
- 
--static void __exit r8a66597_udc_cleanup(void)
--{
--	platform_driver_unregister(&r8a66597_driver);
--}
--module_exit(r8a66597_udc_cleanup);
-+module_platform_driver_probe(r8a66597_driver, r8a66597_probe);
- 
- MODULE_DESCRIPTION("R8A66597 USB gadget driver");
- MODULE_LICENSE("GPL");
- MODULE_AUTHOR("Yoshihiro Shimoda");
--
-+MODULE_ALIAS("platform:r8a66597_udc");
-diff --git a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
-index a67ffe2..a7d4ac5 100644
---- a/drivers/usb/otg/gpio_vbus.c
-+++ b/drivers/usb/otg/gpio_vbus.c
-@@ -409,17 +409,7 @@ static struct platform_driver gpio_vbus_driver = {
- 	.remove  = __exit_p(gpio_vbus_remove),
- };
- 
--static int __init gpio_vbus_init(void)
--{
--	return platform_driver_probe(&gpio_vbus_driver, gpio_vbus_probe);
--}
--module_init(gpio_vbus_init);
--
--static void __exit gpio_vbus_exit(void)
--{
--	platform_driver_unregister(&gpio_vbus_driver);
--}
--module_exit(gpio_vbus_exit);
-+module_platform_driver_probe(gpio_vbus_driver, gpio_vbus_probe);
- 
- MODULE_DESCRIPTION("simple GPIO controlled OTG transceiver driver");
- MODULE_AUTHOR("Philipp Zabel");
-diff --git a/drivers/usb/otg/msm_otg.c b/drivers/usb/otg/msm_otg.c
-index 3b9f0d9..749fbf4 100644
---- a/drivers/usb/otg/msm_otg.c
-+++ b/drivers/usb/otg/msm_otg.c
-@@ -1756,18 +1756,7 @@ static struct platform_driver msm_otg_driver = {
- 	},
- };
- 
--static int __init msm_otg_init(void)
--{
--	return platform_driver_probe(&msm_otg_driver, msm_otg_probe);
--}
--
--static void __exit msm_otg_exit(void)
--{
--	platform_driver_unregister(&msm_otg_driver);
--}
--
--module_init(msm_otg_init);
--module_exit(msm_otg_exit);
-+module_platform_driver_probe(msm_otg_driver, msm_otg_probe);
- 
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("MSM USB transceiver driver");
--- 
-1.8.0.3
+>  
+>  	/* setup dummy cascade chip for INTCS */
+> -	n = evt2irq(0xf80);
+> +	n = evt2irq(vect);
+> +
+>  	irq_alloc_desc_at(n, numa_node_id());
+>  	irq_set_chip_and_handler_name(n, &dummy_irq_chip,
+>  				      handle_level_irq, "level");
+> @@ -581,6 +588,65 @@ void __init sh7372_init_irq(void)
+>  	iowrite16(0, intcs_ffd2 + 0x104);
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static unsigned short intevtsa_vect;
+> +
+> +#define INTC_RES_MAX 2
+> +static struct {
+> +	struct intc_desc intc_desc;
+> +	struct resource intc_res[INTC_RES_MAX];
+> +} intc_data __initdata;
+> +
+> +static int __init intc_of_init(struct device_node *np,
+> +			       struct device_node *parent)
+> +{
+> +	int ret, i;
+> +
+> +	memset(&intc_data, 0, sizeof(intc_data));
+> +
+> +	for (i = 0; i < INTC_RES_MAX; i++) {
+> +		ret = of_address_to_resource(np, i, &intc_data.intc_res[i]);
+> +		if (ret < 0)
+> +			break;
+> +	}
+> +
+> +	intc_data.intc_desc.name = (char *)of_node_full_name(np);
+> +	intc_data.intc_desc.resource = intc_data.intc_res;
+> +	intc_data.intc_desc.num_resources = i;
+> +
+> +	ret = of_sh_intc_get_intc(np, &intc_data.intc_desc);
+> +	if (ret)
+> +		return ret;
+> +
+> +	of_sh_intc_get_intevtsa_vect(np, &intevtsa_vect);
+> +
+> +	register_intc_controller(&intc_data.intc_desc);
+> +	return 0;
+> +}
+
+You seem to have the same code for r8a7740. They should be consolidated.
+
+> +
+> +static const struct of_device_id irq_of_match[] __initconst = {
+> +	{ .compatible = "renesas,sh-intc", .data = intc_of_init },
+> +	{ /*sentinel*/ }
+> +};
+> +
+> +void __init sh7372_init_irq_of(void)
+> +{
+> +	of_irq_init(irq_of_match);
+> +
+> +	register_intc_controller(&intcs_desc);
+
+What if of_irq_init fails?
+
+> +}
+> +#endif /* CONFIG_OF */
+> +
+> +void __init sh7372_init_irq(void)
+> +{
+> +	register_intc_controller(&intca_desc);
+> +	register_intc_controller(&intca_irq_pins_lo_desc);
+> +	register_intc_controller(&intca_irq_pins_hi_desc);
+> +	register_intc_controller(&intcs_desc);
+> +
+> +	sh7372_init_intc(0xe6940000, 0xe6950000, 0xffd20000, 0xffd50000, 0xf80);
+
+It might be better if these magic numbers were macro'd out for legibility.
+
+> +}
+> +
+>  static unsigned short ffd2[0x200];
+>  static unsigned short ffd5[0x100];
+>  
+> @@ -624,9 +690,6 @@ void sh7372_intcs_resume(void)
+>  		__raw_writeb(ffd5[k], intcs_ffd5 + k);
+>  }
+>  
+> -#define E694_BASE IOMEM(0xe6940000)
+> -#define E695_BASE IOMEM(0xe6950000)
+> -
+>  static unsigned short e694[0x200];
+>  static unsigned short e695[0x200];
+>  
+> @@ -635,22 +698,22 @@ void sh7372_intca_suspend(void)
+>  	int k;
+>  
+>  	for (k = 0x00; k <= 0x38; k += 4)
+> -		e694[k] = __raw_readw(E694_BASE + k);
+> +		e694[k] = __raw_readw(intca_e694 + k);
+>  
+>  	for (k = 0x80; k <= 0xb4; k += 4)
+> -		e694[k] = __raw_readb(E694_BASE + k);
+> +		e694[k] = __raw_readb(intca_e694 + k);
+>  
+>  	for (k = 0x180; k <= 0x1b4; k += 4)
+> -		e694[k] = __raw_readb(E694_BASE + k);
+> +		e694[k] = __raw_readb(intca_e694 + k);
+>  
+>  	for (k = 0x00; k <= 0x50; k += 4)
+> -		e695[k] = __raw_readw(E695_BASE + k);
+> +		e695[k] = __raw_readw(intca_e695 + k);
+>  
+>  	for (k = 0x80; k <= 0xa8; k += 4)
+> -		e695[k] = __raw_readb(E695_BASE + k);
+> +		e695[k] = __raw_readb(intca_e695 + k);
+>  
+>  	for (k = 0x180; k <= 0x1a8; k += 4)
+> -		e695[k] = __raw_readb(E695_BASE + k);
+> +		e695[k] = __raw_readb(intca_e695 + k);
+>  }
+
+I'm unfamiliar with the hardware, what are these registers being iterated over?
+
+How do they correspond to entries in the binding?
+
+>  
+>  void sh7372_intca_resume(void)
+> @@ -658,20 +721,20 @@ void sh7372_intca_resume(void)
+>  	int k;
+>  
+>  	for (k = 0x00; k <= 0x38; k += 4)
+> -		__raw_writew(e694[k], E694_BASE + k);
+> +		__raw_writew(e694[k], intca_e694 + k);
+>  
+>  	for (k = 0x80; k <= 0xb4; k += 4)
+> -		__raw_writeb(e694[k], E694_BASE + k);
+> +		__raw_writeb(e694[k], intca_e694 + k);
+>  
+>  	for (k = 0x180; k <= 0x1b4; k += 4)
+> -		__raw_writeb(e694[k], E694_BASE + k);
+> +		__raw_writeb(e694[k], intca_e694 + k);
+>  
+>  	for (k = 0x00; k <= 0x50; k += 4)
+> -		__raw_writew(e695[k], E695_BASE + k);
+> +		__raw_writew(e695[k], intca_e695 + k);
+>  
+>  	for (k = 0x80; k <= 0xa8; k += 4)
+> -		__raw_writeb(e695[k], E695_BASE + k);
+> +		__raw_writeb(e695[k], intca_e695 + k);
+>  
+>  	for (k = 0x180; k <= 0x1a8; k += 4)
+> -		__raw_writeb(e695[k], E695_BASE + k);
+> +		__raw_writeb(e695[k], intca_e695 + k);
+>  }
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+Thanks,
+Mark.
