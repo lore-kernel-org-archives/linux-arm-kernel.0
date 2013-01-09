@@ -1,147 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  9 Jan 2013 16:07:16 +0000
-Subject: [PATCHv2 07/11] arm: arch_timer: divorce from local_timer api
-In-Reply-To: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
-References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1357747640-18594-8-git-send-email-mark.rutland@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 9 Jan 2013 11:09:23 -0500 (EST)
+Subject: [PATCH] Proposed removal of IS_ERR_OR_NULL() (was: Re: [PATCH
+ 1/4] gpiolib: introduce descriptor-based GPIO interface)
+In-Reply-To: <20130109155154.GN3931@n2100.arm.linux.org.uk>
+References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
+ <201301081259.29839.arnd@arndb.de>
+ <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
+ <201301091035.23206.arnd@arndb.de>
+ <20130109104414.GF3931@n2100.arm.linux.org.uk>
+ <20130109111055.GG3931@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1301090932400.6300@xanadu.home>
+ <20130109150427.GL3931@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1301091020580.6300@xanadu.home>
+ <20130109155154.GN3931@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1301091058070.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the arch_timer driver is tied to the arm port, as it relies
-on code in arch/arm/smp.c to setup and teardown timers as cores are
-hotplugged on and off. The timer is registered through an arm-specific
-registration mechanism, preventing sharing the driver with the arm64
-port.
+On Wed, 9 Jan 2013, Russell King - ARM Linux wrote:
 
-This patch moves the driver to using a cpu notifier instead, making it
-easier to port.
+> On Wed, Jan 09, 2013 at 10:27:53AM -0500, Nicolas Pitre wrote:
+> > Anyone with good coccinelle skills around to deal with the users?
+> 
+> I'm not sure that's a solution.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/arch_timer.c |   52 +++++++++++++++++++++++------------------
- 1 files changed, 29 insertions(+), 23 deletions(-)
+Well, I was thinking that coccinelle could handle the majority of the 
+354 users when the "fix" is obvious enough to be automated.
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index eb08e53..834d347 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -21,7 +21,6 @@
- #include <linux/io.h>
- 
- #include <asm/delay.h>
--#include <asm/localtimer.h>
- #include <asm/arch_timer.h>
- #include <asm/sched_clock.h>
- 
-@@ -37,7 +36,7 @@ enum ppi_nr {
- 
- static int arch_timer_ppi[MAX_TIMER_PPI];
- 
--static struct clock_event_device __percpu **arch_timer_evt;
-+static struct clock_event_device __percpu *arch_timer_evt;
- static struct delay_timer arch_delay_timer;
- 
- static bool arch_timer_use_virtual = true;
-@@ -63,14 +62,14 @@ static irqreturn_t inline timer_handler(const int access,
- 
- static irqreturn_t arch_timer_handler_virt(int irq, void *dev_id)
- {
--	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
-+	struct clock_event_device *evt = dev_id;
- 
- 	return timer_handler(ARCH_TIMER_VIRT_ACCESS, evt);
- }
- 
- static irqreturn_t arch_timer_handler_phys(int irq, void *dev_id)
- {
--	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
-+	struct clock_event_device *evt = dev_id;
- 
- 	return timer_handler(ARCH_TIMER_PHYS_ACCESS, evt);
- }
-@@ -141,13 +140,13 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
- 		clk->set_next_event = arch_timer_set_next_event_phys;
- 	}
- 
-+	clk->cpumask = cpumask_of(smp_processor_id());
-+
- 	clk->set_mode(CLOCK_EVT_MODE_SHUTDOWN, NULL);
- 
- 	clockevents_config_and_register(clk, arch_timer_rate,
- 					0xf, 0x7fffffff);
- 
--	*__this_cpu_ptr(arch_timer_evt) = clk;
--
- 	if (arch_timer_use_virtual)
- 		enable_percpu_irq(arch_timer_ppi[VIRT_PPI], 0);
- 	else {
-@@ -245,12 +244,26 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
- 	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
- }
- 
--static struct local_timer_ops arch_timer_ops __cpuinitdata = {
--	.setup	= arch_timer_setup,
--	.stop	= arch_timer_stop,
--};
-+static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
-+					   unsigned long action, void *hcpu)
-+{
-+	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
-+
-+	switch (action & ~CPU_TASKS_FROZEN) {
-+	case CPU_STARTING:
-+		arch_timer_setup(evt);
-+		break;
-+	case CPU_DYING:
-+		arch_timer_stop(evt);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
- 
--static struct clock_event_device arch_timer_global_evt;
-+static struct notifier_block arch_timer_cpu_nb __cpuinitdata = {
-+	.notifier_call = arch_timer_cpu_notify,
-+};
- 
- static int __init arch_timer_register(void)
- {
-@@ -261,7 +274,7 @@ static int __init arch_timer_register(void)
- 	if (err)
- 		goto out;
- 
--	arch_timer_evt = alloc_percpu(struct clock_event_device *);
-+	arch_timer_evt = alloc_percpu(struct clock_event_device);
- 	if (!arch_timer_evt) {
- 		err = -ENOMEM;
- 		goto out;
-@@ -297,20 +310,13 @@ static int __init arch_timer_register(void)
- 		goto out_free;
- 	}
- 
--	err = local_timer_register(&arch_timer_ops);
--	if (err) {
--		/*
--		 * We couldn't register as a local timer (could be
--		 * because we're on a UP platform, or because some
--		 * other local timer is already present...). Try as a
--		 * global timer instead.
--		 */
--		arch_timer_global_evt.cpumask = cpumask_of(0);
--		err = arch_timer_setup(&arch_timer_global_evt);
--	}
-+	err = register_cpu_notifier(&arch_timer_cpu_nb);
- 	if (err)
- 		goto out_free_irq;
- 
-+	/* Immediately configure the timer on the boot CPU */
-+	arch_timer_setup(this_cpu_ptr(arch_timer_evt));
-+
- 	/* Use the architected timer for the delay loop. */
- 	arch_delay_timer.read_current_timer = &arch_timer_read_current_timer;
- 	arch_delay_timer.freq = arch_timer_rate;
--- 
-1.7.0.4
+That said, if we want people to fix their code, it is probably necessary 
+to merge your patch right away so the warnings are actually being seen, 
+and revert it right before the final v3.8 release if the remaining 
+warnings are still too numerous.  Repeat with next cycle.
+
+> For example:
+> 
+>         err = gpio_request(en_vdd_1v05, "EN_VDD_1V05");
+>         if (err) {
+>                 pr_err("%s: gpio_request failed: %d\n", __func__, err);   
+>                 return err;   
+>         }
+> ...
+>         regulator = regulator_get(NULL, "vdd_ldo0,vddio_pex_clk");
+>         if (IS_ERR_OR_NULL(regulator)) {
+>                 pr_err("%s: regulator_get failed: %d\n", __func__,
+>                        (int)PTR_ERR(regulator));
+>                 goto err_reg;
+>         }
+> 
+>         regulator_enable(regulator);
+> 
+>         err = tegra_pcie_init(true, true);
+> ...
+> err_reg:
+>         gpio_free(en_vdd_1v05);
+>                 
+>         return err;
+> }
+> 
+> Now, regulator_get() returns error-pointers for real errors when it's
+> configured in.  When regulator support is not configured, it returns
+> NULL.
+> 
+> So, one solution here would be:
+> 
+> 	if (IS_ERR(regulator)) {
+> 		err = PTR_ERR(regulator);
+> 		pr_err("%s: regulator_get failed: %d\n", __func__, err);
+> 		goto err_reg;
+> 	}
+> 
+> but leaves us with the question: is it safe to call tegra_pcie_init()
+> without regulator support?
+
+The best approach is to assume it is not, but unlike the current code, 
+this should be fixed by returning an appropriate error code instead of 0.
+
+
+Nicolas
