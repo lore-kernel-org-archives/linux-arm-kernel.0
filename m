@@ -1,50 +1,65 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 9 Jan 2013 15:23:05 +0530
-Subject: [RFC v2 14/18] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ECDD528@DBDE01.ent.ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-15-git-send-email-vaibhav.bedia@ti.com>
- <50EC3964.3060708@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433ECDD089@DBDE01.ent.ti.com>
- <50ED1CB7.1090202@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433ECDD528@DBDE01.ent.ti.com>
-Message-ID: <50ED3E01.9010400@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 9 Jan 2013 11:00:28 +0100
+Subject: [PATCH for 3.8] ARM: OMAP: zoom-display: Remove the use of
+ TWL4030_MODULE_PWM1
+Message-ID: <1357725628-25120-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 January 2013 03:07 PM, Bedia, Vaibhav wrote:
-> On Wed, Jan 09, 2013 at 13:01:03, Shilimkar, Santosh wrote:
->> On Wednesday 09 January 2013 11:08 AM, Bedia, Vaibhav wrote:
->>> On Tue, Jan 08, 2013 at 20:51:08, Shilimkar, Santosh wrote:
->>>> On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
->>>>> Add minimal APIs for writing to the IPC and the M3_TXEV registers
->>>>> in the Control module. These will be used in a subsequent patch which
->>>>> adds suspend-resume support for AM33XX.
->>>>>
->>>>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
->>>>> Cc: Tony Lingren <tony@atomide.com>
->>>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>> Cc: Benoit Cousson <b-cousson@ti.com>
->>>>> Cc: Paul Walmsley <paul@pwsan.com>
->>>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->>>>> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
->>>>> ---
->>>> On Control module, we are trying to move driver/module
->>>> specific code to respective drivers. Can you not
->>>> add below code to ipc related driver component.
->>>>
->>>> If not, then patch as such is fine with me.
->>>>
->>>
->>> I had it in the pm33xx.c in the previous version. Kevin had asked me to
->>> move it to control.c. Should I revert move it back there?
->>>
->> pm33xx.c is not the right place. I was hoping to move to some driver.
->> If that is not possible then leave it in control module.
->>
->
-> I think I'll leave it here for now. Could I have you ack in that case?
->
-Yep.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Use the future proof TWL_MODULE_PWM module id instead to aim the twl-core
+cleanup planed for 3.9 kernel cycle.
+
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+Hi Tony,
+
+can you queue this patch for 3.8 cycle?
+With the second part of my twl-core cleanup series I have overlooked this file
+since in my working tree I ahve already removed this part of the code and
+switched zoom to use the bl-pwm driver for the backlight.
+
+I will resend the series which is doing that on top of this patch:
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82724.html
+
+Thank you,
+Peter
+
+ arch/arm/mach-omap2/board-zoom-display.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-zoom-display.c b/arch/arm/mach-omap2/board-zoom-display.c
+index 1c7c834..8cef477 100644
+--- a/arch/arm/mach-omap2/board-zoom-display.c
++++ b/arch/arm/mach-omap2/board-zoom-display.c
+@@ -49,13 +49,13 @@ static void zoom_panel_disable_lcd(struct omap_dss_device *dssdev)
+ {
+ }
+ 
+-/*
+- * PWMA/B register offsets (TWL4030_MODULE_PWMA)
+- */
++/* Register offsets in TWL4030_MODULE_INTBR */
+ #define TWL_INTBR_PMBR1	0xD
+ #define TWL_INTBR_GPBR1	0xC
+-#define TWL_LED_PWMON	0x0
+-#define TWL_LED_PWMOFF	0x1
++
++/* Register offsets in TWL_MODULE_PWM */
++#define TWL_LED_PWMON	0x3
++#define TWL_LED_PWMOFF	0x4
+ 
+ static int zoom_set_bl_intensity(struct omap_dss_device *dssdev, int level)
+ {
+@@ -93,8 +93,8 @@ static int zoom_set_bl_intensity(struct omap_dss_device *dssdev, int level)
+ 	}
+ 
+ 	c = ((50 * (100 - level)) / 100) + 1;
+-	twl_i2c_write_u8(TWL4030_MODULE_PWM1, 0x7F, TWL_LED_PWMOFF);
+-	twl_i2c_write_u8(TWL4030_MODULE_PWM1, c, TWL_LED_PWMON);
++	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, TWL_LED_PWMOFF);
++	twl_i2c_write_u8(TWL_MODULE_PWM, c, TWL_LED_PWMON);
+ #else
+ 	pr_warn("Backlight not enabled\n");
+ #endif
+-- 
+1.8.1
