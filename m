@@ -1,23 +1,31 @@
-From: prasanna.ps@samsung.com (Prasanna Kumar)
-Date: Wed, 09 Jan 2013 17:45:31 +0530
-Subject: [PATCH 0/2] ARM: Exynos5 : Add Power domain device tree support for
- MFC and GSC
-Message-ID: <1357733733-18769-1-git-send-email-prasanna.ps@samsung.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Wed, 9 Jan 2013 12:11:54 +0000
+Subject: [PATCH 1/9] mailbox: OMAP: introduce mailbox framework
+In-Reply-To: <50D43FA4.8090000@st.com>
+References: <1355836212-17956-1-git-send-email-loic.pallardy-ext@stericsson.com>
+ <1355836212-17956-2-git-send-email-loic.pallardy-ext@stericsson.com>
+ <20121218165909.GF4989@atomide.com> <50D423C2.3090009@st.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC9CF77@DBDE01.ent.ti.com>
+ <50D43FA4.8090000@st.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDD8C1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Hi Loic,
 
-This patch set adds device tree support for power domains (Gscaler and
-MFC) of exynos5
+On Fri, Dec 21, 2012 at 16:23:24, Loic PALLARDY wrote:
+> 
+> 
+> On 12/21/2012 11:49 AM, Bedia, Vaibhav wrote:
+> > On Fri, Dec 21, 2012 at 14:24:26, Loic PALLARDY wrote:
+> >>
+> > I have a few patches which are dependent on this patch series.
+> > Could you please keep me in cc for the future versions.
+> >
+> Sure, I'll.
+> 
 
-Prasanna Kumar (2):
-  arm: exynos5: Enable PM generic domain support in Kconfig
-  ARM: dts: exynos5: Set up power domain for  MFC and G-scaler
+When do you plan to post an updated version of these patches?
 
- arch/arm/boot/dts/exynos5250.dtsi |   15 +++++++++++++++
- arch/arm/mach-exynos/Kconfig      |    1 +
- 2 files changed, 16 insertions(+), 0 deletions(-)
-
--- 
-1.7.5.4
+Regards,
+Vaibhav
