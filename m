@@ -1,38 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Jan 2013 10:35:10 +0000
-Subject: [PATCH 2/3] ARM: ux500: Turn on the 'heartbeat' LED trigger
-In-Reply-To: <201301091018.55058.arnd@arndb.de>
-References: <1357725965-27342-1-git-send-email-lee.jones@linaro.org>
- <1357725965-27342-2-git-send-email-lee.jones@linaro.org>
- <201301091018.55058.arnd@arndb.de>
-Message-ID: <20130109103510.GE3931@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Jan 2013 10:35:22 +0000
+Subject: [PATCH 1/4] gpiolib: introduce descriptor-based GPIO interface
+In-Reply-To: <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
+References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
+ <201301081259.29839.arnd@arndb.de>
+ <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
+Message-ID: <201301091035.23206.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 10:18:54AM +0000, Arnd Bergmann wrote:
-> On Wednesday 09 January 2013, Lee Jones wrote:
-> > diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-> > index 5dea906..0f25b07 100644
-> > --- a/arch/arm/mach-ux500/Kconfig
-> > +++ b/arch/arm/mach-ux500/Kconfig
-> > @@ -43,6 +43,8 @@ config MACH_HREFV60
-> >  config MACH_SNOWBALL
-> >         bool "U8500 Snowball platform"
-> >         select MACH_MOP500
-> > +       select LEDS_TRIGGERS
-> > +       select LEDS_TRIGGER_HEARTBEAT
-> >         help
-> >           Include support for the snowball development platform.
+On Wednesday 09 January 2013, Alexandre Courbot wrote:
+> On Tue, Jan 8, 2013 at 9:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > Please avoid the use of IS_ERR_OR_NULL(), especially on interfaces you
+> > introduce yourself. AFAICT, gpiod_get cannot return NULL, so you
+> > should not check for that.
 > 
-> Be careful with "select" statements like this when there are other
-> dependencies. I think LEDS_TRIGGERS depends on LEDS_CLASS, so this
-> should probably be written as
-> 
-> 	select LEDS_TRIGGERS if LEDS_CLASS
+> Sure - you sound like IS_ERR_OR_NULL() is generally considered evil,
 
-Umm, this is also wrong for another reason.  LEDS is an optional feature.
-It's not required for the platform to be functional.  So why the hell would
-anyone want to _force_ such an optional feature to be mandatory?
+Correct.
 
-This is something that the default config published for the platform should
-be handling.
+> may I ask why this is the case?
+
+It's very hard to get right: either you are interested in the error code,
+and then you don't have one in some cases, or you don't care but have
+to check for it anyway. When you define a function, just make it clear
+what the expected return values are, either NULL for error or a negative
+ERR_PTR value, but not both.
+
+	Arnd
