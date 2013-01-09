@@ -1,41 +1,42 @@
-From: Milo.Kim@ti.com (Kim, Milo)
-Date: Wed, 9 Jan 2013 01:29:44 +0000
-Subject: [PATCH] Allow Marvell SATA driver to work with
- LEDS_TRIGGER_IDE_DISK
-In-Reply-To: <20130108200350.GX5075@titan.lakedaemon.net>
-References: <1357668987-3610-1-git-send-email-josh.coombs@gmail.com>
- <20130108190657.GW5075@titan.lakedaemon.net>
- <CAMW5UfY2vKEJ7K8tLJ1+JeKsr_hxtUTva9HGJxLan6k+KGdmvg@mail.gmail.com>
- <20130108200350.GX5075@titan.lakedaemon.net>
-Message-ID: <A874F61F95741C4A9BA573A70FE3998F69E12010@DQHE02.ent.ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  8 Jan 2013 23:37:01 -0200
+Subject: [PATCH] ARM: clk-imx35: Fix build warnings with W=1
+Message-ID: <1357695421-6862-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-leds-owner at vger.kernel.org [mailto:linux-leds-
-> owner at vger.kernel.org] On Behalf Of Jason Cooper
-> Sent: Wednesday, January 09, 2013 5:04 AM
-> To: Josh Coombs
-> Cc: cooloney at gmail.com; linux-kernel at vger.kernel.org; linux-
-> ide at vger.kernel.org; rpurdie at rpsys.net; linux ARM; jgarzik at pobox.com;
-> linux-leds at vger.kernel.org
-> Subject: Re: [PATCH] Allow Marvell SATA driver to work with
-> LEDS_TRIGGER_IDE_DISK
-> 
-> On Tue, Jan 08, 2013 at 02:18:04PM -0500, Josh Coombs wrote:
-> > Would it make more sense to add a second trigger
-> > for SATA instead?
-> 
-> I'll leave that up to the led guys, I just wanted to raise the point
-> that the driver could logically support other types of disks, and we
-> should come up with a migration path instead of adding capabilities
-> ad-hoc.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I agree with Jason's suggestion. One more thing to consider.
+Fix the following warnings when building with W=1 option:
 
-If we replace the name, 'ide-disk' or 'ide_disk' with general one,
-then we should change the value of 'default_trigger' under arch directory also.
-LED trigger works if the name is matched with trigger name of LED device.
+arch/arm/mach-imx/clk-imx35.c: In function 'mx35_clocks_init':
+arch/arm/mach-imx/clk-imx35.c:70:12: warning: old-style function definition [-Wold-style-definition]
+arch/arm/mach-imx/clk-imx35.c:201:16: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
 
-Thanks,
-Milo
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx35.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index 66f3d65..219ab6c 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -67,13 +67,13 @@ enum mx35_clks {
+ 
+ static struct clk *clk[clk_max];
+ 
+-int __init mx35_clocks_init()
++int __init mx35_clocks_init(void)
+ {
+ 	void __iomem *base = MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR);
+ 	u32 pdr0, consumer_sel, hsp_sel;
+ 	struct arm_ahb_div *aad;
+ 	unsigned char *hsp_div;
+-	int i;
++	u32 i;
+ 
+ 	pdr0 = __raw_readl(base + MXC_CCM_PDR0);
+ 	consumer_sel = (pdr0 >> 16) & 0xf;
+-- 
+1.7.9.5
