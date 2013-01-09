@@ -1,75 +1,35 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 9 Jan 2013 07:25:09 +0100
-Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
- HAVE_ARM_SCU
-In-Reply-To: <1357711661.28383.1.camel@jlo-ubuntu-64.nvidia.com>
-References: <20130108142651.GB3931@n2100.arm.linux.org.uk><20130109.074651.1513003283585604525.hdoyu@nvidia.com><1357711661.28383.1.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <20130109.082509.2246926906796416372.hdoyu@nvidia.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  9 Jan 2013 15:29:59 +0900
+Subject: [RFC v9 0/8] ARM: shmobile: DT initialisation of INTC
+Message-ID: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joseph,
+The aims of this series are:
 
-Joseph Lo <josephl@nvidia.com> wrote @ Wed, 9 Jan 2013 07:07:41 +0100:
+* Add DT bindings to to INTC
+* Allowing sh7372 and r8a7740 ARM shmobile SoCs to use DT
+  to initialise INTCA
 
-> On Wed, 2013-01-09 at 13:46 +0800, Hiroshi Doyu wrote:
-> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote @ Tue, 8 Jan 2013 15:26:51 +0100:
-> > 
-> > > On Tue, Jan 08, 2013 at 02:47:37PM +0200, Hiroshi Doyu wrote:
-> > > > The method to detect the number of CPU cores on Cortex-A9 MPCore and
-> > > > Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
-> > > > information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
-> > > > have to read it from the system coprocessor(CP15), because the SCU on
-> > > > Cortex-A15 MPCore does not have software readable registers. This
-> > > > patch selects the correct method at runtime based on the CPU ID.
-> > > > 
-> > > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > > > ---
-> > > >  arch/arm/mach-tegra/platsmp.c |   31 ++++++++++++++++++++++++++++---
-> > > >  1 file changed, 28 insertions(+), 3 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-> > > > index 1b926df..68e76ef 100644
-> > > > --- a/arch/arm/mach-tegra/platsmp.c
-> > > > +++ b/arch/arm/mach-tegra/platsmp.c
-> > > > @@ -23,6 +23,7 @@
-> > > >  #include <asm/hardware/gic.h>
-> > > >  #include <asm/mach-types.h>
-> > > >  #include <asm/smp_scu.h>
-> > > > +#include <asm/cputype.h>
-> > > >  
-> > > >  #include <mach/powergate.h>
-> > > >  
-> > > > @@ -34,9 +35,13 @@
-> > > >  #include "common.h"
-> > > >  #include "iomap.h"
-> > > >  
-> > > > +#define CPU_MASK		0xff0ffff0
-> > > > +#define CPU_CORTEX_A9		0x410fc090
-> > > > +#define CPU_CORTEX_A15		0x410fc0f0
-> > > 
-> > > NAK. There's some patches around to make this stuff generic, we don't
-> > > need more ifdefs springing up.  We need to get those generic patches
-> > > in.
-> > 
-> > Does anyone give some pointers to the above patches?
-> 
-> Hi Hiroshi,
-> 
-> Please check "arch/arm/include/asm/cputype.h" in next-20130109. It just
-> be merged.
+Changes since v8
+* Address review of bindings by Mark Rutland
 
-I found the following commit. Thanks.
+Change between v7 and v8
+* Squash the first and second patch of the series and rename there result
+  "SH: intc: Add support OF for INTC"
 
-commit cd8dde6fc347b56b6cb9afa7cc0f9073da163176
-Author: Christoffer Dall <c.dall@virtualopensystems.com>
-Date:   Tue Dec 18 04:06:37 2012 +0000
+Changes between v5 and v7 (v6 was not publicly released)
+* Drop support for sh73a0 SoC.
+  To be useful this requires a fuller initialisation than jsut INCA.
+  In particular, cascade IRQs that are shared between INTC and GIC
+  need to be handled.
+* Drop board support
+  This will be revisited on a per-board basis, ideally with
+  filler INTC initialisation via DT in place
+* Drop GIC initialisation
+  This will also be revisited on a per-board basis.
+* Remove unused INTC DT helper functions
 
-    ARM: Define CPU part numbers and implementors
-    
-    Define implementor IDs, part numbers and Xscale architecture versions in
-    cputype.h.  Also create accessor functions for reading the implementor,
-    part number, and Xscale architecture versions from the CPUID regiser.
-    
-    Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
+Status:
+
+I am reasonably happy with this series and plan to merge the patch set.
