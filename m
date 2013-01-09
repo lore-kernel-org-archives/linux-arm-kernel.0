@@ -1,35 +1,39 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 09 Jan 2013 16:37:18 -0500 (EST)
-Subject: [PATCH] ARM: nommu: re-enable use of vexpress without
- ARCH_MULTIPLATFORM
-In-Reply-To: <201301092115.20327.arnd@arndb.de>
-References: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
- <201301092022.49130.arnd@arndb.de>
- <alpine.LFD.2.02.1301091554250.6300@xanadu.home>
- <201301092115.20327.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1301091627010.6300@xanadu.home>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 09 Jan 2013 21:38:35 +0000
+Subject: [PATCH 2/3 V2] iio: mxs: Implement support for touchscreen
+In-Reply-To: <201301092117.44672.marex@denx.de>
+References: <1355449598-15980-1-git-send-email-marex@denx.de>
+ <201301082028.18440.marex@denx.de> <50EDCCB6.1070405@jic23.retrosnub.co.uk>
+ <201301092117.44672.marex@denx.de>
+Message-ID: <50EDE35B.4070708@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Jan 2013, Arnd Bergmann wrote:
-
-> On Wednesday 09 January 2013, Nicolas Pitre wrote:
-> > > If we decide that building an allnoconfig without any platform
-> > > is actually ok, we could just as well rip out that error statement.
-> > 
-> > Is it expected for allnoconfig kernels to still boot on other 
-> > architectures? If so I think we should try to still provide a valid 
-> > config even in the allnoconfig case.
+On 01/09/2013 08:17 PM, Marek Vasut wrote:
+> Dear Jonathan Cameron,
 > 
-> The practical use of a kernel without any device drivers or file
-> systems is pretty low, I would not expect such a kernel to be
-> any useful.
-
-I didn't say "useful".  But at least "booting" e.g. to print out a 
-kernel oops because no root filesystem is available or the like should 
-be a minimum.  Having the wrong platform configured in might prevent 
-even that from working, but at least we shouldn't allow for a kernel 
-config that we know in advance has no chance of ever executing anywhere.
-
-
-Nicolas
+>> On 01/08/2013 07:28 PM, Marek Vasut wrote:
+>>> Dear Jonathan Cameron,
+>>>
+>>>> On 12/19/2012 05:01 PM, Marek Vasut wrote:
+>>>>> Ccing Dmitry.
+>>>>>
+>>>>> Also, Jonathan, can I get your review please?
+>>>>
+>>>> Dratt caught me hiding from this one and hoping it would
+>>>> go away ;)
+>>>
+>>> Still not going away :)
+>>>
+>>> Did I miss your reply maybe?
+>>
+>> I certainly remember writing one!
+>>
+>> http://marc.info/?l=linux-iio&m=135660790520224&w=2
+>> looks about right...
+> 
+> Damn, sorry. I don't see it in my mailer so maybe it got lost. Anyway, did I 
+> miss the reply from Dmitry as well?
+> 
+If you did, then so did I!  Don't think we've had any comment from Dmitry on
+this yet.
