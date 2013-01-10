@@ -1,94 +1,48 @@
-From: federico.vaga@gmail.com (Federico Vaga)
-Date: Thu, 10 Jan 2013 13:57:19 +0100
-Subject: [PATCH v5 2/3] sta2x11_vip: convert to videobuf2 and control
- framework
-In-Reply-To: <1357822010-30419-3-git-send-email-federico.vaga@gmail.com>
-References: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
- <1357822010-30419-3-git-send-email-federico.vaga@gmail.com>
-Message-ID: <3596574.18Q2Rh4jo9@harkonnen>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 Jan 2013 20:57:34 +0800
+Subject: [GIT PULL] imx uncompress debug for 3.9
+In-Reply-To: <20130110125547.GB8680@S2101-09.ap.freescale.net>
+References: <20130110125547.GB8680@S2101-09.ap.freescale.net>
+Message-ID: <CAAQ0ZWSdSU-pbLs9G9iouhhGvu1JtU==RA+qvkYGFA2to2aaNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-@Hans: here the output of v4l2-compliance that you request me for the v4 
-version. This is done on the v5 version where I applied your suggestion. I 
-have 1 warning but I don't understand where is the problem
+Forgot LAKML.  Sorry.
 
-Driver Info:
-	Driver name   : sta2x11_vip
-	Card type     : sta2x11_vip
-	Bus info      : PCI:0000:06:00.0
-	Driver version: 3.6.0
-	Capabilities  : 0x85000001
-		Video Capture
-		Read/Write
-		Streaming
-		Device Capabilities
-	Device Caps   : 0x05000001
-		Video Capture
-		Read/Write
-		Streaming
+Shawn
 
-Compliance test for device /dev/video0 (not using libv4l2):
-
-Required ioctls:
-	test VIDIOC_QUERYCAP: OK
-
-Allow for multiple opens:
-	test second video open: OK
-	test VIDIOC_QUERYCAP: OK
-	test VIDIOC_G/S_PRIORITY: OK
-
-Debug ioctls:
-	test VIDIOC_DBG_G_CHIP_IDENT: Not Supported
-	test VIDIOC_DBG_G/S_REGISTER: Not Supported
-	test VIDIOC_LOG_STATUS: OK
-
-Input ioctls:
-	test VIDIOC_G/S_TUNER: Not Supported
-	test VIDIOC_G/S_FREQUENCY: Not Supported
-	test VIDIOC_S_HW_FREQ_SEEK: OK
-	test VIDIOC_ENUMAUDIO: Not Supported
-	test VIDIOC_G/S/ENUMINPUT: OK
-	test VIDIOC_G/S_AUDIO: Not Supported
-	Inputs: 2 Audio Inputs: 0 Tuners: 0
-
-Output ioctls:
-	test VIDIOC_G/S_MODULATOR: Not Supported
-	test VIDIOC_G/S_FREQUENCY: Not Supported
-	test VIDIOC_ENUMAUDOUT: Not Supported
-	test VIDIOC_G/S/ENUMOUTPUT: Not Supported
-	test VIDIOC_G/S_AUDOUT: Not Supported
-	Outputs: 0 Audio Outputs: 0 Modulators: 0
-
-Control ioctls:
-	test VIDIOC_QUERYCTRL/MENU: OK
-	test VIDIOC_G/S_CTRL: OK
-	test VIDIOC_G/S/TRY_EXT_CTRLS: OK
-	test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
-	test VIDIOC_G/S_JPEGCOMP: Not Supported
-	Standard Controls: 5 Private Controls: 0
-
-Input/Output configuration ioctls:
-	test VIDIOC_ENUM/G/S/QUERY_STD: OK
-	test VIDIOC_ENUM/G/S/QUERY_DV_PRESETS: Not Supported
-	test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: Not Supported
-	test VIDIOC_DV_TIMINGS_CAP: Not Supported
-
-Format ioctls:
-	test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
-	test VIDIOC_G/S_PARM: OK
-	test VIDIOC_G_FBUF: Not Supported
-	test VIDIOC_G_FMT: OK
-	test VIDIOC_TRY_FMT: OK
-	test VIDIOC_S_FMT: OK
-	test VIDIOC_G_SLICED_VBI_CAP: Not Supported
-
-Buffer ioctls:
-	test VIDIOC_REQBUFS/CREATE_BUFS: OK
-	test read/write: OK
-
-Total: 36, Succeeded: 36, Failed: 0, Warnings: 1
-
-
--- 
-Federico Vaga
+On 10 January 2013 20:55, Shawn Guo <shawn.guo@linaro.org> wrote:
+> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+>
+>   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-uncompress-3.9
+>
+> for you to fetch changes up to 0edbac9d72158b443368d7002db387463fe08ffd:
+>
+>   ARM: uncompress: support uncompress debug for multiplatform build (2012-12-22 21:01:50 +0800)
+>
+> ----------------------------------------------------------------
+> I did not get any comment on the series, so would think it's an
+> acceptable solution for multiplatform build to get uncompress debug
+> capability back.
+>
+> ----------------------------------------------------------------
+> Shawn Guo (4):
+>       ARM: imx: use separated debug uart symbol for imx31 and imx35
+>       ARM: imx: support DEBUG_LL uart port selection for all i.MX SoCs
+>       ARM: imx: restore uncompress.h to a common place
+>       ARM: uncompress: support uncompress debug for multiplatform build
+>
+>  arch/arm/Kconfig.debug                    |   44 ++++++++++++---
+>  arch/arm/boot/compressed/misc.c           |    8 +--
+>  arch/arm/include/debug/imx-uart.h         |   88 +++++++++++++++++++++++++++++
+>  arch/arm/include/debug/imx.S              |   29 +---------
+>  arch/arm/include/debug/uncompress/dummy.h |    3 +
+>  arch/arm/include/debug/uncompress/imx.h   |   63 +++++++++++++++++++++
+>  6 files changed, 191 insertions(+), 44 deletions(-)
+>  create mode 100644 arch/arm/include/debug/imx-uart.h
+>  create mode 100644 arch/arm/include/debug/uncompress/dummy.h
+>  create mode 100644 arch/arm/include/debug/uncompress/imx.h
