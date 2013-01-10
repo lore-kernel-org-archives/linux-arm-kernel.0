@@ -1,17 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 Jan 2013 10:01:55 +0800
-Subject: [PATCH 2/4] ARM: dts: imx53: pinctrl update
-In-Reply-To: <1357739065-9153-3-git-send-email-s.trumtrar@pengutronix.de>
-References: <1357739065-9153-1-git-send-email-s.trumtrar@pengutronix.de>
- <1357739065-9153-3-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130110020154.GC2265@S2101-09.ap.freescale.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 9 Jan 2013 21:02:25 -0500
+Subject: [PATCH V2 1/4] rtc: Add support of rtc-mv for MVEBU SoCs
+In-Reply-To: <1355303186-9267-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1355303186-9267-1-git-send-email-gregory.clement@free-electrons.com>
+ <1355303186-9267-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130110020225.GD5075@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 02:44:23PM +0100, Steffen Trumtrar wrote:
-> Add pinctrl for cspi, csi.
-> Add new pingroups for can1 and uart3.
+On Wed, Dec 12, 2012 at 10:06:23AM +0100, Gregory CLEMENT wrote:
+> The Armada 370 and Armada XP Socs have the same controller that the
+> one used in the orion platforms. This patch enables the selection of
+> rtc-mv with mvebu platforms.
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Acked-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/rtc/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied, thanks.
+Applied to mvebu/drivers
+
+thx,
+
+Jason.
