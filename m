@@ -1,25 +1,17 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jan 2013 11:58:42 +0100
-Subject: [PATCH v4 19/19] irqchip: Move ARM vic.h to
- include/linux/irqchip/arm-vic.h
-In-Reply-To: <1357235668-9450-20-git-send-email-robherring2@gmail.com>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-20-git-send-email-robherring2@gmail.com>
-Message-ID: <CACRpkdZdR5YC7WEqQhxeNGbwreSnA2QmyRHFfeO1CncZSK6YVA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 Jan 2013 18:59:24 +0800
+Subject: [PATCH v2] ARM i.MX53: dts: add oftree for MBa53 baseboard
+In-Reply-To: <1357813647-22095-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1357813647-22095-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20130110105921.GH2265@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 3, 2013 at 6:54 PM, Rob Herring <robherring2@gmail.com> wrote:
+On Thu, Jan 10, 2013 at 11:27:27AM +0100, Steffen Trumtrar wrote:
+> The MBa53 is a baseboard for the TQMA53 embedded module. This enables/adds only
+> supported devices, i.e. it is not feature complete, because of missing drivers
+> in mainline linux.
+> 
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Now that we have VIC moved to drivers/irqchip and all VIC DT init for
-> platforms using irqchip_init, move gic.h and update the remaining
-> includes.
-
-This will need to be rebased on fixes merged for -rc3.
-
-Apart from that, Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Applied, thanks.
