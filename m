@@ -1,86 +1,98 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 10 Jan 2013 18:51:20 +0200
-Subject: [PATCH 00/14] USB: omap-ehci: Move PHY management to PHY driver
-Message-ID: <1357836694-30788-1-git-send-email-rogerq@ti.com>
+Date: Thu, 10 Jan 2013 18:51:22 +0200
+Subject: [PATCH 02/14] usb: phy: Add new API usb_get_phy_from_dev()
+In-Reply-To: <1357836694-30788-1-git-send-email-rogerq@ti.com>
+References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
+Message-ID: <1357836694-30788-3-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP's High Speed Host controller can interface to ULPI/UTMI
-PHY's transparently i.e. whithout requiring the device drivers to
-access the PHY [1]. However, the OS must ensure that the PHY has
-the necessary resources (power/clock/reset) enabled before it is used.
+This API allows PHY users to get the usb_phy data structure
+from a device handle.
 
-Till now, the omap-ehci driver was managing the power and reset of the PHY
-whereas, clock enabling was left to the bootloader or board files.
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ drivers/usb/otg/otg.c   |   36 ++++++++++++++++++++++++++++++++++++
+ include/linux/usb/phy.h |    6 ++++++
+ 2 files changed, 42 insertions(+), 0 deletions(-)
 
-In this patchset we make the NOP PHY driver (nop-usb-xceiv.c) handle
-all the PHY resources that are available so that it can be used by
-platforms like OMAP.
-
-The omap-ehci driver instantiates a PHY platform device for each port
-that is in PHY mode. It then uses the USB PHY APIs to manage the PHY.
-
-All this results in a much cleaner code and makes USB PHY resource management
-work properly on OMAP.
-
-NOTE: Only omap4panda board is adapted for the changes. So USB Host will
-break for other boards. Once we have done a priliminary review, I can adapt
-other boards as well.
-
-This patchset depends on the series
-https://lkml.org/lkml/2013/1/2/144
-git://github.com/rogerq/linux.git arm-for-next-usbhost9-part
-
---
-cheeer,
--roger
-
-[1] - In practice we would need to access the PHY to work around Silicon Erratas
-      in the OMAP's USB Host IP.
-
-Roger Quadros (14):
-  mfd: omap-usb-host: Consolidate OMAP USB-HS platform data
-  usb: phy: Add new API usb_get_phy_from_dev()
-  usb: xceiv: nop: Manage PHY clock
-  usb: phy: nop: Handle power supply regulator for the PHY
-  usb: phy: nop: Handle RESET for the PHY
-  mfd: omap-usb-host: update nports in platform_data
-  usb: ehci-omap: Instantiate PHY devices if required
-  mfd: omap-usb-host: Remove PHY reset handling code
-  usb: ehci-omap: Remove PHY reset handling code
-  usb: ehci-omap: Remove PHY regulator handling code
-  ARM: OMAP2+: omap4panda: Provide USB Host's PHY platform data
-  ARM: OMAP2+: omap4panda: Adapt HUB power to regulator framework
-  ARM: OMAP2+: omap4panda: Adapt HUB reset to regulator framework
-  ARM: OMAP2+: omap4panda: Remove irrelevant USB host platform data
-
- arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
- arch/arm/mach-omap2/board-3630sdp.c        |    2 +-
- arch/arm/mach-omap2/board-am3517crane.c    |    2 +-
- arch/arm/mach-omap2/board-am3517evm.c      |    2 +-
- arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
- arch/arm/mach-omap2/board-cm-t3517.c       |    2 +-
- arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
- arch/arm/mach-omap2/board-igep0020.c       |    4 +-
- arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
- arch/arm/mach-omap2/board-omap3evm.c       |    2 +-
- arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
- arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
- arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
- arch/arm/mach-omap2/board-omap4panda.c     |  117 +++++++++++++-----
- arch/arm/mach-omap2/board-overo.c          |    2 +-
- arch/arm/mach-omap2/board-zoom.c           |    2 +-
- arch/arm/mach-omap2/usb-host.c             |   30 +----
- arch/arm/mach-omap2/usb.h                  |   21 +---
- drivers/mfd/omap-usb-host.c                |   64 +---------
- drivers/mfd/omap-usb-tll.c                 |    8 +-
- drivers/usb/host/ehci-omap.c               |  182 ++++++++++++++--------------
- drivers/usb/otg/nop-usb-xceiv.c            |   86 +++++++++++++
- drivers/usb/otg/otg.c                      |   36 ++++++
- include/linux/platform_data/usb-omap.h     |   28 ++---
- include/linux/usb/nop-usb-xceiv.h          |    1 +
- include/linux/usb/phy.h                    |    6 +
- 26 files changed, 345 insertions(+), 266 deletions(-)
-
+diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
+index a30c041..ba3a568 100644
+--- a/drivers/usb/otg/otg.c
++++ b/drivers/usb/otg/otg.c
+@@ -35,6 +35,21 @@ static struct usb_phy *__usb_find_phy(struct list_head *list,
+ 	return ERR_PTR(-ENODEV);
+ }
+ 
++static struct usb_phy *__usb_find_phy_dev(struct list_head *list,
++	struct device *dev)
++{
++	struct usb_phy *phy;
++
++	list_for_each_entry(phy, list, head) {
++		if (phy->dev != dev)
++			continue;
++
++		return phy;
++	}
++
++	return ERR_PTR(-ENODEV);
++}
++
+ static void devm_usb_phy_release(struct device *dev, void *res)
+ {
+ 	struct usb_phy *phy = *(struct usb_phy **)res;
+@@ -77,6 +92,27 @@ struct usb_phy *devm_usb_get_phy(struct device *dev, enum usb_phy_type type)
+ }
+ EXPORT_SYMBOL(devm_usb_get_phy);
+ 
++struct usb_phy *usb_get_phy_from_dev(struct device *dev)
++{
++	struct usb_phy *phy = NULL;
++	unsigned long flags;
++
++	spin_lock_irqsave(&phy_lock, flags);
++
++	phy = __usb_find_phy_dev(&phy_list, dev);
++	if (IS_ERR(phy)) {
++		dev_err(dev, "%s: unable to find PHY\n", __func__);
++		goto done;
++	}
++
++	get_device(phy->dev);
++
++done:
++	spin_unlock_irqrestore(&phy_lock, flags);
++	return phy;
++}
++EXPORT_SYMBOL(usb_get_phy_from_dev);
++
+ /**
+  * usb_get_phy - find the USB PHY
+  * @type - the type of the phy the controller requires
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index a29ae1e..cd798c4 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -147,6 +147,7 @@ usb_phy_shutdown(struct usb_phy *x)
+ /* for usb host and peripheral controller drivers */
+ #ifdef CONFIG_USB_OTG_UTILS
+ extern struct usb_phy *usb_get_phy(enum usb_phy_type type);
++extern struct usb_phy *usb_get_phy_from_dev(struct device *dev);
+ extern struct usb_phy *devm_usb_get_phy(struct device *dev,
+ 	enum usb_phy_type type);
+ extern void usb_put_phy(struct usb_phy *);
+@@ -157,6 +158,11 @@ static inline struct usb_phy *usb_get_phy(enum usb_phy_type type)
+ 	return NULL;
+ }
+ 
++static inline struct usb_phy *usb_get_phy_from_dev(struct device *dev)
++{
++	return NULL;
++}
++
+ static inline struct usb_phy *devm_usb_get_phy(struct device *dev,
+ 	enum usb_phy_type type)
+ {
 -- 
 1.7.4.1
