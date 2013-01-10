@@ -1,53 +1,41 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 09 Jan 2013 17:40:01 -0800
-Subject: [PATCH] ARM: Samsung: Export MIPI CSIS/DSIM PHY control functions
-In-Reply-To: <1357226497-25166-1-git-send-email-s.nawrocki@samsung.com>
-References: <1357226497-25166-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <00e201cdeed3$69b40cd0$3d1c2670$@samsung.com>
+Date: Wed, 09 Jan 2013 17:41:55 -0800
+Subject: [PATCH] ARM: DTS: exynos4210-origen: Add MAX8997 node entry
+In-Reply-To: <50EA5A3E.7000806@linaro.org>
+References: <1357287829-21701-1-git-send-email-tushar.behera@linaro.org>
+ <CAJuYYwQx0hFQmkLaggd2NdA_xommXGPBDbhj1AuSH5YuASWA-w@mail.gmail.com>
+ <50EA5A3E.7000806@linaro.org>
+Message-ID: <00e301cdeed3$ae2dce00$0a896a00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+Tushar Behera wrote:
 > 
-> The s5p_csis_phy_enable/s5p_dsim_phy_enable functions are now used
-> directly by corresponding drivers and thus need to be exported so
-> the drivers can be built as modules.
+> On 01/04/2013 10:51 PM, Thomas Abraham wrote:
+> > On 4 January 2013 00:23, Tushar Behera <tushar.behera@linaro.org> wrote:
+> >> The node entry is added as per documentation and legacy board file.
+> >>
+> >> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> >> ---
+> >> The patch is rebased on v3.8-rc1.
+> >>
+> >>  arch/arm/boot/dts/exynos4210-origen.dts |  150
+> +++++++++++++++++++++++++++++++
+> >>  1 files changed, 150 insertions(+), 0 deletions(-)
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/plat-samsung/setup-mipiphy.c |    3 +++
->  1 file changed, 3 insertions(+)
+> Please ignore this patch.
 > 
-> diff --git a/arch/arm/plat-samsung/setup-mipiphy.c b/arch/arm/plat-
-> samsung/setup-mipiphy.c
-> index 1474593..66df315 100644
-> --- a/arch/arm/plat-samsung/setup-mipiphy.c
-> +++ b/arch/arm/plat-samsung/setup-mipiphy.c
-> @@ -8,6 +8,7 @@
->   * published by the Free Software Foundation.
->   */
-> 
-> +#include <linux/export.h>
->  #include <linux/kernel.h>
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
-> @@ -50,8 +51,10 @@ int s5p_csis_phy_enable(int id, bool on)
->  {
->  	return __s5p_mipi_phy_control(id, on, S5P_MIPI_DPHY_SRESETN);
->  }
-> +EXPORT_SYMBOL(s5p_csis_phy_enable);
-> 
->  int s5p_dsim_phy_enable(struct platform_device *pdev, bool on)
->  {
->  	return __s5p_mipi_phy_control(pdev->id, on,
-> S5P_MIPI_DPHY_MRESETN);
->  }
-> +EXPORT_SYMBOL(s5p_dsim_phy_enable);
-> --
-> 1.7.9.5
+OK.
 
-OK, applied.
+> >
+> > This patch has already been posted. Here is the link:
+> > https://patchwork.kernel.org/patch/1794501/
+> >
+> 
+> Sorry, had missed that patch. I have added a 'Tested-by' to the original
+> patch.
+> 
+OK, I will add 'Tested-by' when I apply that.
 
 Thanks.
 
