@@ -1,45 +1,50 @@
 From: mporter@ti.com (Matt Porter)
-Date: Thu, 10 Jan 2013 14:30:28 -0500
-Subject: [RFC PATCH v3 11/16] mmc: omap_hsmmc: limit max_segs with the
- EDMA DMAC
-In-Reply-To: <508E3BE6.3070609@ti.com>
+Date: Thu, 10 Jan 2013 14:35:47 -0500
+Subject: [RFC PATCH v3 16/16] ARM: dts: add AM33XX SPI support
+In-Reply-To: <508D1791.1040806@ti.com>
 References: <1350566815-409-1-git-send-email-mporter@ti.com>
- <1350566815-409-12-git-send-email-mporter@ti.com>
- <508E3BE6.3070609@ti.com>
-Message-ID: <20130110193028.GP14660@beef>
+ <1350566815-409-17-git-send-email-mporter@ti.com>
+ <508D1791.1040806@ti.com>
+Message-ID: <20130110193547.GQ14660@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2012 at 01:48:46PM +0530, Sekhar Nori wrote:
+On Sun, Oct 28, 2012 at 05:01:29PM +0530, Sekhar Nori wrote:
 > On 10/18/2012 6:56 PM, Matt Porter wrote:
-> > The EDMA DMAC has a hardware limitation that prevents supporting
-> > scatter gather lists with any number of segments. Since the EDMA
-> > DMA Engine driver sets the maximum segments to 16, we do the
-> > same.
-> > 
-> > TODO: this will be replaced once the DMA Engine API supports an
-> > API to query the DMAC's segment size limit.
+> > Adds AM33XX SPI support for am335x-bone and am335x-evm.
 > > 
 > > Signed-off-by: Matt Porter <mporter@ti.com>
 > > ---
-> >  drivers/mmc/host/omap_hsmmc.c |   10 ++++++++++
-> >  1 file changed, 10 insertions(+)
+> >  arch/arm/boot/dts/am335x-bone.dts |   17 +++++++++++++++
+> >  arch/arm/boot/dts/am335x-evm.dts  |    9 ++++++++
+> >  arch/arm/boot/dts/am33xx.dtsi     |   43 +++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 69 insertions(+)
 > > 
-> > diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> > index b327cd0..52bab01 100644
-> > --- a/drivers/mmc/host/omap_hsmmc.c
-> > +++ b/drivers/mmc/host/omap_hsmmc.c
-> > @@ -1828,6 +1828,16 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
-> >  	 * as we want. */
-> >  	mmc->max_segs = 1024;
+> > diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> > index 5510979..23edfd8 100644
+> > --- a/arch/arm/boot/dts/am335x-bone.dts
+> > +++ b/arch/arm/boot/dts/am335x-bone.dts
+> > @@ -18,6 +18,17 @@
+> >  		reg = <0x80000000 0x10000000>; /* 256 MB */
+> >  	};
 > >  
-> > +	/* Eventually we should get our max_segs limitation for EDMA by
-> > +	 * querying the dmaengine API */
+> > +	am3358_pinmux: pinmux at 44e10800 {
+> > +		spi1_pins: pinmux_spi1_pins {
+> > +			pinctrl-single,pins = <
+> > +				0x190 0x13	/* mcasp0_aclkx.spi1_sclk, OUTPUT_PULLUP | MODE3 */
+> > +				0x194 0x33	/* mcasp0_fsx.spi1_d0, INPUT_PULLUP | MODE3 */
+> > +				0x198 0x13	/* mcasp0_axr0.spi1_d1, OUTPUT_PULLUP | MODE3 */
+> > +				0x19c 0x13	/* mcasp0_ahclkr.spi1_cs0, OUTPUT_PULLUP | MODE3 */
+> > +			>;
 > 
-> Nit picking: This is not as per multi-line comment style in
-> Documentation/CodingStyle.
+> Is there a single pinmux setting that provides SPI functionality on the
+> bone headers? Or this is specific to a cape you tested with?
 
-Thanks :). This is dropped from v4 anyway, as I now use a call to
-dma_get_channel_caps() to determine the SG limits.
+No, there are two usable settings for spi1 and one setting for spi0.
+I'm dropping this from the series since it's specific to how I wired up
+the homebrew cape I use for spi testing on the Bone. I publish the
+branch where all these extra "test-specific" patches (that aren't intended
+to be merged) are at in the cover letter.  Anybody that needs context of
+how/what worked and was tested can grab them there.
 
 -Matt
