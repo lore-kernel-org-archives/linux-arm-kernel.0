@@ -1,51 +1,44 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 10 Jan 2013 09:36:47 +0100
-Subject: [PATCH 1/4] gpiolib: introduce descriptor-based GPIO interface
-In-Reply-To: <20130109111055.GG3931@n2100.arm.linux.org.uk>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
- <201301081259.29839.arnd@arndb.de>
- <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
- <201301091035.23206.arnd@arndb.de>
- <20130109104414.GF3931@n2100.arm.linux.org.uk>
- <20130109111055.GG3931@n2100.arm.linux.org.uk>
-Message-ID: <20130110083647.GA26256@avionic-0098.adnet.avionic-design.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 10 Jan 2013 17:42:58 +0900
+Subject: [PATCH 1/8] SH: intc: Add support OF for INTC
+In-Reply-To: <20130109115352.GB7337@e106331-lin.cambridge.arm.com>
+References: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
+ <1357713007-4005-2-git-send-email-horms+renesas@verge.net.au>
+ <20130109115352.GB7337@e106331-lin.cambridge.arm.com>
+Message-ID: <CANqRtoSvUdEbs-vkJZtAvVY5ypiBWeZwhPr39_nZpJj7MOtk0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 11:10:55AM +0000, Russell King - ARM Linux wrote:
-[...]
->         err = gpio_request(en_vdd_1v05, "EN_VDD_1V05");
->         if (err) {
->                 pr_err("%s: gpio_request failed: %d\n", __func__, err);
->                 return err;
->         }
-> 
->         gpio_direction_output(en_vdd_1v05, 1);
-> 
->         regulator = regulator_get(NULL, "vdd_ldo0,vddio_pex_clk");
->         if (IS_ERR_OR_NULL(regulator)) {
->                 pr_err("%s: regulator_get failed: %d\n", __func__,
->                        (int)PTR_ERR(regulator));
->                 goto err_reg;
->         }
-> ...
-> err_reg:
->         gpio_free(en_vdd_1v05);
-> 
->         return err;
-> }
-> 
-> So 'err' here is never set.  when IS_ERR_OR_NULL evaluates true.
-> Setting 'err' to PTR_ERR(regulator) is not correct because a NULL return
-> sets 'err' to zero.
+Hi Mark,
 
-FWIW, this one is fixed in the Tegra PCIe series I posted yesterday.
+On Wed, Jan 9, 2013 at 8:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> Thanks for updating the text, this is far easier to read than previously.
+>
+> However, I'm still concerned by how complex the binding seems. As I don't have
+> any familiarity with the device, I don't know whether that's just an artifact
+> of the hardware or something that can be cleared up.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/a9b222d3/attachment.sig>
+Iwamatsu-san wrote this binding based on our C version of the INTC
+tables. And I wrote the original INTC table code based on perhaps 30+
+data sheet. They code was initially designed to allow people to input
+data straight off the data sheet - this so we could support a wide
+range of slightly different interrupt controllers.
+
+> I think the approach used by the binding needs some serious review before this
+> should be merged. It seems far more complex than any existing interrupt
+> controller binding. Without a dts example for a complete board (complete with
+> devices wired up to the interrupt controller), it's difficult to judge how this
+> will work in practice.
+
+Feel free to review the code, but I am not sure why anyone would case
+about this Renesas specific legacy interrupt controller. If I were to
+chose how cycles should be spent then I think it is better to try to
+come up with power domain DT bindings for all SoC vendors.
+
+Also, there are the DT board code queued up that makes use of this controller.
+
+Thanks,
+
+/ magnus
