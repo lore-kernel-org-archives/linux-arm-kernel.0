@@ -1,112 +1,155 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 10 Jan 2013 08:21:30 +0100
-Subject: [PATCH 4/4] ARM i.MX53: dts: add oftree for MBa53 baseboard
-In-Reply-To: <20130110024543.GE2265@S2101-09.ap.freescale.net>
-References: <1357739065-9153-1-git-send-email-s.trumtrar@pengutronix.de>
- <1357739065-9153-5-git-send-email-s.trumtrar@pengutronix.de>
- <20130110024543.GE2265@S2101-09.ap.freescale.net>
-Message-ID: <20130110072130.GA17605@pengutronix.de>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Thu, 10 Jan 2013 07:37:40 +0000
+Subject: [PATCH V2 3/3] ARM: davinci: da850: add NAND driver entries
+In-Reply-To: <50ED66F2.8050006@ti.com>
+References: <1357633220-29827-1-git-send-email-anilkumar.v@ti.com>
+ <1357633220-29827-4-git-send-email-anilkumar.v@ti.com>
+ <50ED66F2.8050006@ti.com>
+Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412B80CA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, Jan 09, 2013 at 18:17:46, Nori, Sekhar wrote:
+> On 1/8/2013 1:50 PM, Kumar, Anil wrote:
+> > Add NAND driver entries to export NAND functionality on da850 EVM and
+> > NAND pinctrl node to do pin mux according to pinctrl-single driver.
+> 
+> Subject line should have DT and da850 evm somewhere.
+> Otherwise NAND has been supported on DA850 for long.
 
-On Thu, Jan 10, 2013 at 10:45:45AM +0800, Shawn Guo wrote:
-> On Wed, Jan 09, 2013 at 02:44:25PM +0100, Steffen Trumtrar wrote:
-> > The MBa53 is a baseboard for the TQMA53 embedded module. This enables/adds only
-> > supported devices, i.e. it is not feature complete, because of missing drivers
-> > in mainline linux.
+I will update it in V3 of this patch series.
+
+> 
 > > 
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
 > > ---
-> >  arch/arm/boot/dts/Makefile        |    1 +
-> >  arch/arm/boot/dts/imx53-MBa53.dts |  146 +++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 147 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/imx53-MBa53.dts
+> > :100644 100644 c7609d0... 382a7da... M	arch/arm/boot/dts/da850-evm.dts
+> > :100644 100644 e9c6e82... 16e2ac2... M	arch/arm/boot/dts/da850.dtsi
+> >  arch/arm/boot/dts/da850-evm.dts |   19 +++++++++++++++++++
+> >  arch/arm/boot/dts/da850.dtsi    |   13 +++++++++++++
+> >  2 files changed, 32 insertions(+), 0 deletions(-)
 > > 
-> I do not like the CamelCase in filename, and do not want to be the first
-> one doing that in  arch/arm/boot/dts.
+> > diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+> > index c7609d0..382a7da 100644
+> > --- a/arch/arm/boot/dts/da850-evm.dts
+> > +++ b/arch/arm/boot/dts/da850-evm.dts
+> > @@ -28,4 +28,23 @@
+> >  			status = "okay";
+> >  		};
+> >  	};
+> > +	nand_cs3 at 62000000 {
+> > +		status = "okay";
+> > +	};
+> > +};
+> > +&pmx_core{
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <
+> > +		&nand_cs3_pins
+> > +	>;
 > 
+> This means that the NAND pins are configured even if NAND is not
+> probed. Right?
 
-Okay, no problem. I will change that.
+Right 
 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index e44da40..04b05e8 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -84,6 +84,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
-> >  	imx53-evk.dtb \
-> >  	imx53-qsb.dtb \
-> >  	imx53-smd.dtb \
-> > +	imx53-MBa53.dtb \
-> 
-> Change it to lower case and sort it properly.
-> 
+> This can be moved into the nand_cs3 node to avoid that. 
+> And then when used with Linus Walleij's patch "drivers/pinctrl: grab 
+> default handles from device core" which should be accepted soon, the 
+> pins will be automatically setup when the NAND gets probed.
 
-Ditto.
+It is better. I will do it in V3 of this patch series.
 
-> >  	imx6q-arm2.dtb \
-> >  	imx6q-sabreauto.dtb \
-> >  	imx6q-sabrelite.dtb \
-> > diff --git a/arch/arm/boot/dts/imx53-MBa53.dts b/arch/arm/boot/dts/imx53-MBa53.dts
-> > new file mode 100644
-> > index 0000000..39ecaeb
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx53-MBa53.dts
-> > @@ -0,0 +1,146 @@
-> > +/*
-> > + * Copyright 2012 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 or later at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +/dts-v1/;
-> > +/include/ "imx53-tqma53.dtsi"
-> > +
-> > +/ {
-> > +	model = "TQ MBa53 starter kit";
-> > +	compatible = "tq,mba53", "tq,tqma53", "fsl,imx53";
-> > +
-> > +	backlight_reg:fixed at 0 {
-> 
-> The node name is not good.  Also we generally have a space between
-> label and node names.
-> 
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "lcd-supply";
-> > +		gpio = <&gpio2 5 0>;
-> > +		startup-delay-us = <5000>;
-> > +		enable-active-low;
-> > +        };
-> 
-> Use tab instead of space.
 > 
 > > +
-> > +	backlight {
-> > +		compatible = "pwm-backlight";
-> > +		pwms = <&pwm2 0 50000 0 0>;
-> > +		brightness-levels = <0 24 28 32 36 40 44 48 52 56 60 64 68 72 76 80 84 88 92 96 100>;
-> > +		default-brightness-level = <10>;
-> > +		enable-gpios = <&gpio7 7 0>;
-> > +		power-supply = <&backlight_reg>;
-> > +        };
+> > +	nand_cs3_pins: pinmux_nand_pins {
+> > +		pinctrl-single,bits = <
+> > +			0x1c 0x00110000  0x00ff0000     /* EMA_OE, EMA_WE */
+> > +			0x1c 0x00000110  0x00000ff0     /* EMA_CS[4],EMA_CS[3]*/
+> > +			0x24 0x11111111  0xffffffff     /* EMA_D[0], EMA_D[1], EMA_D[2], EMA_D[3],
+> > +							   EMA_D[4], EMA_D[5], EMA_D[6], EMA_D[7] */
+> > +			0x30 0x01100000  0x0ff00000     /* EMA_A[1], EMA_A[2] */
+> > +		>;
+> > +	};
 > 
-> Ditto
-> 
+> I suspect a number of other boards using NAND on CS3 would have to 
+> repeat these configurations. It will be better to move them into the 
+> da850.dtsi file so it can be reused.
 
-Hm, I wonder why my highlighting didn't show that. I will fix that and
-will resend this patch.
+> 
+> Since I am new to the DT and pinctrl stuff, I had to actually try these to 
+> make sure what I am suggesting isn't nonsense. I came up with this 
+> patch on top of your series. Please test it at your end
+
+Tested. It is working. 
+
+> and also see if you 
+> are happy with the changes.
+
+I do not think that it is good idea to move NAND pin mux information
+into da850.dtsi because this information is evm specific.
+if we will use this approach then we must use the same approach for
+other modules also as ASoC etc.   
 
 Thanks,
-Steffen
+Anil
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> ---8<----
+> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+> index 382a7da..52abb9d 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -30,21 +30,8 @@
+>  	};
+>  	nand_cs3 at 62000000 {
+>  		status = "okay";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&nand_cs3_pins>;
+>  	};
+>  };
+> -&pmx_core{
+> -	pinctrl-names = "default";
+> -	pinctrl-0 = <
+> -		&nand_cs3_pins
+> -	>;
+>  
+> -	nand_cs3_pins: pinmux_nand_pins {
+> -		pinctrl-single,bits = <
+> -			0x1c 0x00110000  0x00ff0000     /* EMA_OE, EMA_WE */
+> -			0x1c 0x00000110  0x00000ff0     /* EMA_CS[4],EMA_CS[3]*/
+> -			0x24 0x11111111  0xffffffff     /* EMA_D[0], EMA_D[1], EMA_D[2], EMA_D[3],
+> -							   EMA_D[4], EMA_D[5], EMA_D[6], EMA_D[7] */
+> -			0x30 0x01100000  0x0ff00000     /* EMA_A[1], EMA_A[2] */
+> -		>;
+> -	};
+> -};
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index 6ab9730..c4b21a8 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -38,7 +38,25 @@
+>  			pinctrl-single,register-width = <32>;
+>  			pinctrl-single,function-mask = <0xffffffff>;
+>  			status = "disabled";
+> +
+> +			nand_cs3_pins: pinmux_nand_pins {
+> +				pinctrl-single,bits = <
+> +					/* EMA_OE, EMA_WE */
+> +					0x1c 0x00110000  0x00ff0000
+> +					/* EMA_CS[4],EMA_CS[3]*/
+> +					0x1c 0x00000110  0x00000ff0
+> +					/*
+> +					 * EMA_D[0], EMA_D[1], EMA_D[2],
+> +					 * EMA_D[3], EMA_D[4], EMA_D[5],
+> +					 * EMA_D[6], EMA_D[7]
+> +					 */
+> +					0x24 0x11111111  0xffffffff
+> +					/* EMA_A[1], EMA_A[2] */
+> +					0x30 0x01100000  0x0ff00000
+> +				>;
+> +			};
+>  		};
+> +
+>  		serial0: serial at 1c42000 {
+>  			compatible = "ns16550a";
+>  			reg = <0x42000 0x100>;
+> 
