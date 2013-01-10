@@ -1,30 +1,91 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Thu, 10 Jan 2013 14:06:11 -0200
-Subject: [PATCH v5] modify videobuf2-dma-contig and update sta2x11_vip
-In-Reply-To: <1491201.YT9CD19YNt@harkonnen>
-References: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
- <1491201.YT9CD19YNt@harkonnen>
-Message-ID: <20130110140611.05feb735@redhat.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 10 Jan 2013 11:16:43 -0500 (EST)
+Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
+In-Reply-To: <20130110123321.GD4728@e102568-lin.cambridge.arm.com>
+References: <1357818507-8716-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130110121514.GD29952@linaro.org>
+ <20130110123321.GD4728@e102568-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1301101115350.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, 10 Jan 2013 16:22:39 +0100
-Federico Vaga <federico.vaga@gmail.com> escreveu:
+On Thu, 10 Jan 2013, Lorenzo Pieralisi wrote:
 
-> We have some new ideas for this new complex architecture (sta2x11) that can 
-> fix our DMA problems without change the existent code. Obviously, ideas arrive 
-> when I already sent the patches. Anyway, consider this patch series as an RFC. 
-> They are not ready for the mainline. I take some time to investigate on the 
-> architecture side of the project to try to fix our problem.
+> On Thu, Jan 10, 2013 at 12:15:14PM +0000, Dave Martin wrote:
+> > On Thu, Jan 10, 2013 at 11:48:27AM +0000, Lorenzo Pieralisi wrote:
+> > > Since the introduction of /cpu nodes bindings for ARM and the
+> > > corresponding parse function arm_dt_init_cpu_maps(), the cpu_logical_map
+> > > and the number of possible CPUs are set according to the DT /cpu
+> > > nodes entries. Currently most of the existing ARM SMP platforms detect the
+> > > number of cores through HW probing in their .smp_init_cpus functions and set
+> > > the possible CPU mask accordingly.
+> > > This method should be upgraded so that the CPU counting mechanism will be
+> > > based on DT, keeping legacy HW probing mechanism as a fall back solution.
+> > > 
+> > > In order to implement this fall back solution mechanism, the ARM DT code
+> > > should provide a helper function to platforms to check if the cpu map
+> > > has been properly initialized through DT. If the check fails the
+> > > platform will resort to legacy HW based cores counting mechanism.
+> > > 
+> > > This patch implements a trivial flag and a helper function that platform
+> > > can call to check whether DT based cpu map initialization and cores count
+> > > were completed successfully.
+> > > 
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > ---
+> > >  arch/arm/include/asm/prom.h | 10 ++++++++++
+> > >  arch/arm/kernel/devtree.c   |  5 +++++
+> > >  2 files changed, 15 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+> > > index a219227..487614a 100644
+> > > --- a/arch/arm/include/asm/prom.h
+> > > +++ b/arch/arm/include/asm/prom.h
+> > > @@ -18,6 +18,15 @@
+> > >  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+> > >  extern void arm_dt_memblock_reserve(void);
+> > >  extern void __init arm_dt_init_cpu_maps(void);
+> > > +/*
+> > > + * Return true if cpu map initialization has been
+> > > + * carried out correctly from DT
+> > > + */
+> > > +static inline bool __init arm_dt_cpu_map_valid(void)
+> > > +{
+> > > +	extern bool valid_dt_cpu_map;
+> > > +	return valid_dt_cpu_map;
+> > > +}
+> > >  
+> > >  #else /* CONFIG_OF */
+> > >  
+> > > @@ -28,6 +37,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
+> > >  
+> > >  static inline void arm_dt_memblock_reserve(void) { }
+> > >  static inline void arm_dt_init_cpu_maps(void) { }
+> > > +static inline bool __init arm_dt_cpu_map_valid(void) { return false; }
+> > >  
+> > >  #endif /* CONFIG_OF */
+> > >  #endif /* ASMARM_PROM_H */
+> > > diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> > > index 70f1bde..c82af3b 100644
+> > > --- a/arch/arm/kernel/devtree.c
+> > > +++ b/arch/arm/kernel/devtree.c
+> > > @@ -62,6 +62,10 @@ void __init arm_dt_memblock_reserve(void)
+> > >  		memblock_reserve(base, size);
+> > >  	}
+> > >  }
+> > > +/*
+> > > + * Export DT cpu map validity flag to platforms
+> > > + */
+> > > +bool valid_dt_cpu_map __initdata;
+> > 
+> > Is there any possibility of this being useful after boot?
+> > Hopefully not, but maybe there's something I haven't considered.
 > 
-> Anyway, if you consider interesting configure the gfp flags for dma-contig, I 
-> can propose a v6 series which correct the alloc coherent line.
-> 
-> Sorry for the spam :(
+> I do not think so, at least for the use cases I have envisaged at the moment,
+> but it is certainly something I should consider.
 
-This is not spam, it is part of the process of maturating a patchset ;)
+Let's simply adjust the code in the future if that ever becomes the 
+case.
 
-I'll just tag all those patches as RFC on linux-media patchwork.
 
-Regards,
-Mauro
+Nicolas
