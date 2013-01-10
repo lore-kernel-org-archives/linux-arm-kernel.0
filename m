@@ -1,32 +1,47 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 10 Jan 2013 10:23:59 +0900
-Subject: [PATCH 5/5] ARM: mach-shmobile: kzm9g: Enable ARM_APPENDED_DTB in
- defconfig
-In-Reply-To: <1357781039-14003-1-git-send-email-horms+renesas@verge.net.au>
-References: <1357781039-14003-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1357781039-14003-6-git-send-email-horms+renesas@verge.net.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 09 Jan 2013 17:29:28 -0800
+Subject: [PATCH 1/3] pinctrl: exynos: add exynos5250 SoC specific data
+In-Reply-To: <CACRpkdZKB1_1U1VZfYADwWfFpBum0Qc88kWtW37h7Z05RtSJfA@mail.gmail.com>
+References: <1355399644-29417-1-git-send-email-thomas.abraham@linaro.org>
+ <1355399644-29417-2-git-send-email-thomas.abraham@linaro.org>
+ <CACRpkdaQ10CgoFXtk4EyqL4LWVpsdEAdrmy5R-_Rqm5fJdqS4A@mail.gmail.com>
+ <CAJuYYwTZkzCXjowhKaJ253Oji07eDdEjMvNssyL1ThWtETswSQ@mail.gmail.com>
+ <017801cde453$77b03eb0$6710bc10$@samsung.com>
+ <CACRpkdZKB1_1U1VZfYADwWfFpBum0Qc88kWtW37h7Z05RtSJfA@mail.gmail.com>
+Message-ID: <00df01cdeed1$f08d73b0$d1a85b10$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Typically the bootloader of a kzm9g board does not support DT
-so this option is useful.
+Linus Walleij wrote:
+> 
+> On Thu, Dec 27, 2012 at 5:58 PM, Kukjin Kim <kgene.kim@samsung.com>
+> wrote:
+> 
+> > And I think, would be clear if the config could be changed like
+following.
+> >
+> > 8<----------------------------------------------------------------------
+> > From: Kukjin Kim <kgene.kim@samsung.com>
+> > Subject: [PATCH] pinctrl: exynos: change PINCTRL_EXYNOS option
+> >
+> > Since pinctrl-exynos can support exynos4 and exynos5 so changed
+> > the option name to PINCTRL_EXYNOS for more clarity.
+> >
+> > Cc: Thomas Abraham <Thomas.abraham@linaro.org>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Shall I take this into the pinctrl tree?
+> 
+Yes, please :-)
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/kzm9g_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+Just note, regarding Samsung pinctrl changes in the following:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+next/pinctrl-exynos
 
-diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-index 7f6ec2c..c6005a0 100644
---- a/arch/arm/configs/kzm9g_defconfig
-+++ b/arch/arm/configs/kzm9g_defconfig
-@@ -39,6 +39,7 @@ CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
- CONFIG_CMDLINE="console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200"
- CONFIG_KEXEC=y
- CONFIG_VFP=y
--- 
-1.7.10.4
+Thanks.
+
+- Kukjin
