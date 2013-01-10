@@ -1,78 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Jan 2013 21:50:47 +0000
-Subject: [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
- exit/setup
-In-Reply-To: <alpine.LFD.2.02.1301101232270.6300@xanadu.home>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
- <CAHkRjk4A+EMFRTVdfCUBNpAEUMWrOqbT2ki19Vska6dY_WrVXQ@mail.gmail.com>
- <alpine.LFD.2.02.1301101232270.6300@xanadu.home>
-Message-ID: <CAHkRjk5f5Rg6Sc8vLOashcesOdf8aQAtvHJ_PN_UJ3S2xEL30w@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 10 Jan 2013 15:07:43 -0700
+Subject: [PATCH v2] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <50EF27B4.60608@wwwdotorg.org>
+References: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
+ <50EF27B4.60608@wwwdotorg.org>
+Message-ID: <50EF3BAF.4010200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 January 2013 17:59, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Thu, 10 Jan 2013, Catalin Marinas wrote:
->
->> On 10 January 2013 00:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> > --- a/arch/arm/common/bL_entry.c
->> > +++ b/arch/arm/common/bL_entry.c
->> > @@ -116,3 +116,163 @@ int bL_cpu_powered_up(void)
->> >                 platform_ops->powered_up();
->> >         return 0;
->> >  }
->> > +
->> > +struct bL_sync_struct bL_sync;
->> > +
->> > +static void __sync_range(volatile void *p, size_t size)
->> > +{
->> > +       char *_p = (char *)p;
->> > +
->> > +       __cpuc_flush_dcache_area(_p, size);
->> > +       outer_flush_range(__pa(_p), __pa(_p + size));
->> > +       outer_sync();
-...
->> However, on the same CPU you can get a speculative load into L1 after
->> the L1 flush but before the L2 flush, so the reader case can fail.
+On 01/10/2013 01:42 PM, Stephen Warren wrote:
+> On 12/12/2012 01:25 PM, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
 >>
->> The sequence for readers is (note *L2* inval first):
->>
->> L2 inval
->> L1 inval
->
-> As you noted below and as I explained above, this can't be an inval
-> operation as that could discard a concurrent writer's update.
->
->> The sequence for writers is:
->>
->> L1 clean
->> L2 clean
->>
->> The bi-directional sequence (that's what you need) is:
->>
->> L1 clean
->> L2 clean+inval
->> L1 clean+inval
->>
->> The last L1 op must be clean+inval in case another CPU writes to this
->> location to avoid discarding the write.
->>
->> If you don't have an L2, you just end up with two L1 clean ops, so you
->> can probably put some checks.
->
-> In fact, since this is only used on A7/A15 right now, there is no outer
-> cache and the outer calls are effectively no-ops.  I'm wondering if
-> those should simply be removed until/unless there is some system showing
-> up with a need for them.
+>> This makes the device core auto-grab the pinctrl handle and set
+>> the "default" (PINCTRL_STATE_DEFAULT) state for every device
+>> that is present in the device model right before probe. This will
+>> account for the lion's share of embedded silicon devcies.
+> 
+> There are quite a few problems with this patch, and they end up
+> completely breaking at least Tegra in next-20130110.
+> 
+>> diff --git a/drivers/base/pinctrl.c b/drivers/base/pinctrl.c
+> 
+>> +int pinctrl_bind_pins(struct device *dev)
+>> +{
+>> +	struct dev_pin_info *dpi;
+>> +	int ret;
+>> +
+>> +	/* Allocate a pin state container on-the-fly */
+>> +	if (!dev->pins) {
+>> +		dpi = devm_kzalloc(dev, sizeof(*dpi), GFP_KERNEL);
+>> +		if (!dpi)
+>> +			return -ENOMEM;
+>> +	} else
+>> +		dpi = dev->pins;
+>> +
+>> +	/*
+>> +	 * Check if we already have a pinctrl handle, as we may arrive here
+>> +	 * after a deferral in the state selection below
+>> +	 */
+>> +	if (!dpi->p) {
+>> +		dpi->p = devm_pinctrl_get(dev);
+> 
+> That won't succeed for a pinctrl device that has a default state in
+> order to implement hogs. This will then cause the pin controller device
+> to always defer probe and never activate. This will leave HW
+> unconfigured and/or prevent other devices from successfully calling
+> pinctrl_get().
 
-You could. I expect multi-cluster systems to have integrated L2 cache
-and avoid explicit outer cache maintenance. But is there a chance that
-your patches could be generalised to existing systems with A9 (not b.L
-configuration but just hotplug or cpuidle support)? I haven't finished
-reading all the patches, so maybe that's not the case at all.
+I see that an attempt was made to solve this problem, in the patch
+immediately preceding this one (at least, as applied in the pinctrl
+tree). However, that patch only addresses the case where the pin
+controller is being looked up in the map, and not the case when
+converting device tree to the map in the first place. The patch below
+solves this:
 
-Anyway, my point is that if L1 is inner and L2 outer, the correct
-bi-derectional flushing sequence is slightly different.
-
--- 
-Catalin
+diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+index fe2d1af..fd40a11 100644
+--- a/drivers/pinctrl/devicetree.c
++++ b/drivers/pinctrl/devicetree.c
+@@ -141,6 +141,11 @@ static int dt_to_map_one_config(struct pinctrl *p,
+const char *statename,
+                pctldev = find_pinctrl_by_of_node(np_pctldev);
+                if (pctldev)
+                        break;
++               /* Do not defer probing of hogs (circular loop) */
++               if (np_pctldev == p->dev->of_node) {
++                       of_node_put(np_pctldev);
++                       return -ENODEV;
++               }
+        }
+        of_node_put(np_pctldev);
