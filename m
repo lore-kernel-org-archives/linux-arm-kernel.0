@@ -1,35 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Jan 2013 12:53:16 +0100
-Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename
- =?UTF-8?Q?KVM=5FSET=5FDEVI?= =?UTF-8?Q?CE=5FADDRESS?=
-In-Reply-To: <CAFEAcA87t5VP5TCUjtNHDPHM=uPSXirNSD5=GWgwZaHF-wOo6A@mail.gmail.com>
-References: <1357769438.18196.5@snotra>
- <97E481BC-F14D-4866-B44B-878833CA81DC@suse.de>
- <CAFEAcA87t5VP5TCUjtNHDPHM=uPSXirNSD5=GWgwZaHF-wOo6A@mail.gmail.com>
-Message-ID: <f1c3b1a5c2261578b5112e69af8c5180@localhost>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 Jan 2013 19:55:03 +0800
+Subject: [PATCH v2 1/2] cpufreq: add imx6q-cpufreq driver
+In-Reply-To: <CAKohpom2Z0LmTNjq6mbZAa=JvQfBeRBzfXU3Jifn8y_C6XJkQw@mail.gmail.com>
+References: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
+ <1357806863-6899-2-git-send-email-shawn.guo@linaro.org>
+ <CAKohpom2Z0LmTNjq6mbZAa=JvQfBeRBzfXU3Jifn8y_C6XJkQw@mail.gmail.com>
+Message-ID: <20130110115500.GJ2265@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Jan 2013 10:17:09 +0000, Peter Maydell
-<peter.maydell@linaro.org> wrote:
-> On 9 January 2013 22:30, Alexander Graf <agraf@suse.de> wrote:
->> In fact, in this particular case one could merge all of the patches
->> except for the
->> particular ioctl implementation and just give the respective addresses
->> default
->> values until there is an API to set them, similar to how we did things
->> with PVR
->> in the beginning.
+On Thu, Jan 10, 2013 at 02:15:44PM +0530, Viresh Kumar wrote:
+...
+> > +       clk_prepare_enable(pll2_pfd2_396m_clk);
+> > +       clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+> > +       clk_set_parent(pll1_sw_clk, step_clk);
+> > +       clk_prepare_enable(pll1_sys_clk);
 > 
-> That's what we started with and we got review comments saying "yuck,
-> don't hard code this"...
+> all these fns can fail too.. don't want to check return values?
+> 
+I initially had every single clk and regulator call return checked
+and error handled properly.  But the code becomes very messy with
+the error messages and recovering logic all over the places.  I think
+it's a bit over engineering, and made a compromise to only check limited
+ones to ensure the correctness at subsystem level.
 
-Even worse: hard-coding things breaks kvmtool (we do not emulate a
-vexpress and have a rather different memory map) and arm64 (the
-requirements on GIC mappings are different).
+> > +static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+> > +{
+> > +       int ret;
+> > +
+> 
+> So you finally removed the ugly check :)
+> 
+I just found though it's less optimal, removing the check does not
+really cause any problem for me.
 
-So hard coding addresses is already unacceptable.
+> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+Thanks.
+
+Shawn
