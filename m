@@ -1,57 +1,28 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 10 Jan 2013 21:06:28 +0300
-Subject: [PATCH 04/14] usb: phy: nop: Handle power supply regulator for
- the PHY
-In-Reply-To: <1357836694-30788-5-git-send-email-rogerq@ti.com>
-References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
- <1357836694-30788-5-git-send-email-rogerq@ti.com>
-Message-ID: <50EF0324.9060004@mvista.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu, 10 Jan 2013 18:12:53 +0100
+Subject: [PATCH 2/2] Fix phy_attach - forward dev_flags for phy_attach
+In-Reply-To: <BC373419EB4337418B2B595BAEDC155F015896370062@IL-MB01.marvell.com>
+References: <1357819234-27752-1-git-send-email-konszert@marvell.com>
+ <1357819234-27752-3-git-send-email-konszert@marvell.com>
+ <50EED2E4.80008@openwrt.org>
+ <BC373419EB4337418B2B595BAEDC155F015896370062@IL-MB01.marvell.com>
+Message-ID: <50EEF695.9060001@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Le 01/10/13 16:57, Kosta Zertsekel a ?crit :
+>> By the way, most, if not all of the phy_connect() users in drivers/net/ethernet/ also do not ensure they pass the phy device flags, so you might
+> want to fix this globally and not just for Marvell driver.
+> Indeed, phy_connect() mostly just pass zero intead of phy_dev->dev_flags.
+> But, I think, the guy that calls phy_connect() in its driver should know what he does, and,
+> probably, we should rely on him knowing his stuff.
+> The only evidence of the bug is when phy_dev->dev_flags was actually changed by PHY fixup callback
+> (see dns323-setup.c for example) and was *not* propagated to phy_connect() or phy_attach() as in pxa168_eth.c phy_init().
+> The code conforming to the former should be fixed IMHO.
 
-On 01/10/2013 07:51 PM, Roger Quadros wrote:
-
-> We use "vcc" as the supply name for the PHY's power supply.
-> The power supply will be enabled during .init() and disabled
-> during .shutdown()
-
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  drivers/usb/otg/nop-usb-xceiv.c |   18 ++++++++++++++++++
->  1 files changed, 18 insertions(+), 0 deletions(-)
-
-> diff --git a/drivers/usb/otg/nop-usb-xceiv.c b/drivers/usb/otg/nop-usb-xceiv.c
-> index 163f972..1c6db10 100644
-> --- a/drivers/usb/otg/nop-usb-xceiv.c
-> +++ b/drivers/usb/otg/nop-usb-xceiv.c
-[...]
-> @@ -70,6 +72,11 @@ static int nop_init(struct usb_phy *phy)
->  {
->  	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
->  
-> +	if (nop->vcc) {
-> +		if (regulator_enable(nop->vcc))
-> +			dev_err(phy->dev, "Failed to enable power\n");
-> +	}
-
-   Could be collapsed into single *if*.
-
-> +
->  	if (nop->clk)
->  		clk_enable(nop->clk);
->  
-> @@ -82,6 +89,11 @@ static void nop_shutdown(struct usb_phy *phy)
->  
->  	if (nop->clk)
->  		clk_disable(nop->clk);
-> +
-> +	if (nop->vcc) {
-> +		if (regulator_disable(nop->vcc))
-> +			dev_err(phy->dev, "Failed to disable power\n");
-> +	}
-
-   Same here.
-
-WBR, Sergei
+Actually, I wonder if we should not rather remove entirely the flags 
+argument, let the phy_connect() or phy_attach() callers modify the phy 
+device dev_flags like it does today (e.g: tg3) and modify phy_connect() 
+and phy_attach() to pass phy->dev_flags to phy_attach_direct().
+--
+Florian
