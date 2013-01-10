@@ -1,205 +1,283 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 09 Jan 2013 19:20:48 -0500
-Subject: [PATCH 13/16] drivers: misc: add ARM CCI support
+Date: Wed, 09 Jan 2013 19:20:50 -0500
+Subject: [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
+ exit/setup and CCI
 In-Reply-To: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1357777251-13541-14-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1357777251-13541-16-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+From: Dave Martin <dave.martin@linaro.org>
 
-On ARM multi-cluster systems coherency between cores running on
-different clusters is managed by the cache-coherent interconnect (CCI).
-It allows broadcasting of TLB invalidates and memory barriers and it
-guarantees cache coherency at system level.
+Add the required code to properly handle race free platform coherency exit
+to the DCSCB power down method.
 
-This patch enables the basic infrastructure required in Linux to
-handle and programme the CCI component. The first implementation is
-based on a platform device, its relative DT compatible property and
-a simple programming interface.
+The power_up_setup callback is used to enable the CCI interface for
+the cluster being brought up.  This must be done in assembly before
+the kernel environment is entered.
 
+Thanks to Achin Gupta and Nicolas Pitre for their help and
+contributions.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- drivers/misc/Kconfig    |   3 ++
- drivers/misc/Makefile   |   1 +
- drivers/misc/arm-cci.c  | 107 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/arm-cci.h |  30 ++++++++++++++
- 4 files changed, 141 insertions(+)
- create mode 100644 drivers/misc/arm-cci.c
- create mode 100644 include/linux/arm-cci.h
+ arch/arm/mach-vexpress/Kconfig       |  1 +
+ arch/arm/mach-vexpress/Makefile      |  2 +-
+ arch/arm/mach-vexpress/dcscb.c       | 90 +++++++++++++++++++++++++++---------
+ arch/arm/mach-vexpress/dcscb_setup.S | 77 ++++++++++++++++++++++++++++++
+ 4 files changed, 146 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm/mach-vexpress/dcscb_setup.S
 
-diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index b151b7c1bd..30d5be1ad2 100644
---- a/drivers/misc/Kconfig
-+++ b/drivers/misc/Kconfig
-@@ -499,6 +499,9 @@ config USB_SWITCH_FSA9480
- 	  stereo and mono audio, video, microphone and UART data to use
- 	  a common connector port.
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index e55c02562f..180633dda6 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -56,6 +56,7 @@ config ARCH_VEXPRESS_CA9X4
+ config ARCH_VEXPRESS_DCSCB
+ 	bool "Dual Cluster System Control Block (DCSCB) support"
+ 	depends on BIG_LITTLE
++	select ARM_CCI
+ 	help
+ 	  Support for the Dual Cluster System Configuration Block (DCSCB).
+ 	  This is needed to provide CPU and cluster power management
+diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+index 2253644054..f6e90f3272 100644
+--- a/arch/arm/mach-vexpress/Makefile
++++ b/arch/arm/mach-vexpress/Makefile
+@@ -6,6 +6,6 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
  
-+config ARM_CCI
-+       bool "ARM CCI driver support"
+ obj-y					:= v2m.o reset.o
+ obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+-obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o
++obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o	dcscb_setup.o
+ obj-$(CONFIG_SMP)			+= platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+index 59b690376f..95a2d0df20 100644
+--- a/arch/arm/mach-vexpress/dcscb.c
++++ b/arch/arm/mach-vexpress/dcscb.c
+@@ -15,6 +15,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/errno.h>
+ #include <linux/vexpress.h>
++#include <linux/arm-cci.h>
+ 
+ #include <asm/bL_entry.h>
+ #include <asm/proc-fns.h>
+@@ -104,6 +105,8 @@ static void dcscb_power_down(void)
+ 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+ 	BUG_ON(cpu >= 4 || cluster >= 2);
+ 
++	__bL_cpu_going_down(cpu, cluster);
 +
- source "drivers/misc/c2port/Kconfig"
- source "drivers/misc/eeprom/Kconfig"
- source "drivers/misc/cb710/Kconfig"
-diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
-index 2129377c0d..d052d109f9 100644
---- a/drivers/misc/Makefile
-+++ b/drivers/misc/Makefile
-@@ -49,3 +49,4 @@ obj-y				+= carma/
- obj-$(CONFIG_USB_SWITCH_FSA9480) += fsa9480.o
- obj-$(CONFIG_ALTERA_STAPL)	+=altera-stapl/
- obj-$(CONFIG_INTEL_MEI)		+= mei/
-+obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
-diff --git a/drivers/misc/arm-cci.c b/drivers/misc/arm-cci.c
+ 	arch_spin_lock(&dcscb_lock);
+ 	dcscb_use_count[cpu][cluster]--;
+ 	if (dcscb_use_count[cpu][cluster] == 0) {
+@@ -111,6 +114,7 @@ static void dcscb_power_down(void)
+ 		rst_hold |= cpumask;
+ 		if (((rst_hold | (rst_hold >> 4)) & cluster_mask) == cluster_mask) {
+ 			rst_hold |= (1 << 8);
++			BUG_ON(__bL_cluster_state(cluster) != CLUSTER_UP);
+ 			last_man = true;
+ 		}
+ 		writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
+@@ -124,35 +128,71 @@ static void dcscb_power_down(void)
+ 		skip_wfi = true;
+ 	} else
+ 		BUG();
+-	arch_spin_unlock(&dcscb_lock);
+ 
+-	/*
+-	 * Now let's clean our L1 cache and shut ourself down.
+-	 * If we're the last CPU in this cluster then clean L2 too.
+-	 */
+-
+-	/*
+-	 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
+-	 * a preliminary flush here for those CPUs.  At least, that's
+-	 * the theory -- without the extra flush, Linux explodes on
+-	 * RTSM (maybe not needed anymore, to be investigated)..
+-	 */
+-	flush_cache_louis();
+-	cpu_proc_fin();
++	if (last_man && __bL_outbound_enter_critical(cpu, cluster)) {
++		arch_spin_unlock(&dcscb_lock);
+ 
+-	if (!last_man) {
+-		flush_cache_louis();
+-	} else {
++		/*
++		 * Flush all cache levels for this cluster.
++		 *
++		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
++		 * a preliminary flush here for those CPUs.  At least, that's
++		 * the theory -- without the extra flush, Linux explodes on
++		 * RTSM (maybe not needed anymore, to be investigated).
++		 */
+ 		flush_cache_all();
++		cpu_proc_fin(); /* disable allocation into internal caches*/
++		flush_cache_all();
++
++		/*
++		 * This is a harmless no-op.  On platforms with a real
++		 * outer cache this might either be needed or not,
++		 * depending on where the outer cache sits.
++		 */
+ 		outer_flush_all();
++
++		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
++		asm volatile (
++			"mrc	p15, 0, ip, c1, c0, 1 \n\t"
++			"bic	ip, ip, #(1 << 6) @ clear SMP bit \n\t"
++			"mcr	p15, 0, ip, c1, c0, 1 \n\t"
++			"isb \n\t"
++			"dsb"
++			: : : "ip" );
++
++		/*
++		 * Disable cluster-level coherency by masking
++		 * incoming snoops and DVM messages:
++		 */
++		disable_cci(cluster);
++
++		__bL_outbound_leave_critical(cluster, CLUSTER_DOWN);
++	} else {
++		arch_spin_unlock(&dcscb_lock);
++
++		/*
++		 * Flush the local CPU cache.
++		 *
++		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
++		 * a preliminary flush here for those CPUs.  At least, that's
++		 * the theory -- without the extra flush, Linux explodes on
++		 * RTSM (maybe not needed anymore, to be investigated).
++		 */
++		flush_cache_louis();
++		cpu_proc_fin(); /* disable allocation into internal caches*/
++		flush_cache_louis();
++
++		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
++		asm volatile (
++			"mrc	p15, 0, ip, c1, c0, 1 \n\t"
++			"bic	ip, ip, #(1 << 6) @ clear SMP bit \n\t"
++			"mcr	p15, 0, ip, c1, c0, 1 \n\t"
++			"isb \n\t"
++			"dsb"
++			: : : "ip" );
+ 	}
+ 
+-	/* Disable local coherency by clearing the ACTLR "SMP" bit: */
+-	asm volatile (
+-		"mrc	p15, 0, ip, c1, c0, 1 \n\t"
+-		"bic	ip, ip, #(1 << 6) @ clear SMP bit \n\t"
+-		"mcr	p15, 0, ip, c1, c0, 1"
+-		: : : "ip" );
++	__bL_cpu_down(cpu, cluster);
+ 
+ 	/* Now we are prepared for power-down, do it: */
+ 	if (!skip_wfi)
+@@ -179,6 +219,8 @@ static void __init dcscb_usage_count_init(void)
+ 	dcscb_use_count[cpu][cluster] = 1;
+ }
+ 
++extern void dcscb_power_up_setup(void);
++
+ static int __init dcscb_init(void)
+ {
+ 	unsigned int cfg;
+@@ -193,6 +235,8 @@ static int __init dcscb_init(void)
+ 	dcscb_usage_count_init();
+ 
+ 	ret = bL_platform_power_register(&dcscb_power_ops);
++	if (!ret)
++		ret = bL_cluster_sync_init(dcscb_power_up_setup);
+ 	if (ret) {
+ 		iounmap(dcscb_base);
+ 		return ret;
+diff --git a/arch/arm/mach-vexpress/dcscb_setup.S b/arch/arm/mach-vexpress/dcscb_setup.S
 new file mode 100644
-index 0000000000..f329c43099
+index 0000000000..c75ee8c4db
 --- /dev/null
-+++ b/drivers/misc/arm-cci.c
-@@ -0,0 +1,107 @@
++++ b/arch/arm/mach-vexpress/dcscb_setup.S
+@@ -0,0 +1,77 @@
 +/*
-+ * CCI support
++ * arch/arm/include/asm/dcscb_setup.S
 + *
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
++ * Created by:  Dave Martin, 2012-06-22
++ * Copyright:   (C) 2012  Linaro Limited
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
 + */
 +
-+#include <linux/device.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/arm-cci.h>
 +
-+#define CCI400_EAG_OFFSET       0x4000
-+#define CCI400_KF_OFFSET        0x5000
++#include <linux/linkage.h>
++#include <asm/bL_entry.h>
 +
-+#define DRIVER_NAME	"CCI"
-+struct cci_drvdata {
-+	void __iomem *baseaddr;
-+	spinlock_t lock;
-+};
 +
-+static struct cci_drvdata *info;
++#define SLAVE_SNOOPCTL_OFFSET	0
++#define SNOOPCTL_SNOOP_ENABLE	(1 << 0)
++#define SNOOPCTL_DVM_ENABLE	(1 << 1)
 +
-+void disable_cci(int cluster)
-+{
-+	u32 cci_reg = cluster ? CCI400_KF_OFFSET : CCI400_EAG_OFFSET;
-+	writel_relaxed(0x0, info->baseaddr	+ cci_reg);
++#define CCI_STATUS_OFFSET	0xc
++#define STATUS_CHANGE_PENDING	(1 << 0)
 +
-+	while (readl_relaxed(info->baseaddr + 0xc) & 0x1)
-+			;
-+}
-+EXPORT_SYMBOL_GPL(disable_cci);
++#define CCI_SLAVE_OFFSET(n)	(0x1000 + 0x1000 * (n))
 +
-+static int __devinit cci_driver_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	int ret = 0;
++#define RTSM_CCI_PHYS_BASE	0x2c090000
++#define RTSM_CCI_SLAVE_A15	3
++#define RTSM_CCI_SLAVE_A7	4
 +
-+	info = kzalloc(sizeof(*info), GFP_KERNEL);
-+	if (!info) {
-+		dev_err(&pdev->dev, "unable to allocate mem\n");
-+		return -ENOMEM;
-+	}
++#define RTSM_CCI_A15_OFFSET	CCI_SLAVE_OFFSET(RTSM_CCI_SLAVE_A15)
++#define RTSM_CCI_A7_OFFSET	CCI_SLAVE_OFFSET(RTSM_CCI_SLAVE_A7)
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "No memory resource\n");
-+		ret = -EINVAL;
-+		goto mem_free;
-+	}
 +
-+	if (!request_mem_region(res->start, resource_size(res),
-+				dev_name(&pdev->dev))) {
-+		dev_err(&pdev->dev, "address 0x%x in use\n", (u32) res->start);
-+		ret = -EBUSY;
-+		goto mem_free;
-+	}
++ENTRY(dcscb_power_up_setup)
 +
-+	info->baseaddr = ioremap(res->start, resource_size(res));
-+	if (!info->baseaddr) {
-+		ret = -ENXIO;
-+		goto ioremap_err;
-+	}
++	cmp	r0, #0			@ check affinity level
++	beq	2f
 +
-+	platform_set_drvdata(pdev, info);
-+
-+	pr_info("CCI loaded at %p\n", info->baseaddr);
-+	return ret;
-+
-+ioremap_err:
-+	release_region(res->start, resource_size(res));
-+mem_free:
-+	kfree(info);
-+
-+	return ret;
-+}
-+
-+static const struct of_device_id arm_cci_matches[] = {
-+	{.compatible = "arm,cci"},
-+	{},
-+};
-+
-+static struct platform_driver cci_platform_driver = {
-+	.driver = {
-+		   .name = DRIVER_NAME,
-+		   .of_match_table = arm_cci_matches,
-+		  },
-+	.probe = cci_driver_probe,
-+};
-+
-+static int __init cci_init(void)
-+{
-+	return platform_driver_register(&cci_platform_driver);
-+}
-+
-+core_initcall(cci_init);
-diff --git a/include/linux/arm-cci.h b/include/linux/arm-cci.h
-new file mode 100644
-index 0000000000..ce3f705fb6
---- /dev/null
-+++ b/include/linux/arm-cci.h
-@@ -0,0 +1,30 @@
 +/*
-+ * CCI support
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * Enable cluster-level coherency, in preparation for turning on the MMU.
++ * The ACTLR SMP bit does not need to be set here, because cpu_resume()
++ * already restores that.
 + */
 +
-+#ifndef __LINUX_ARM_CCI_H
-+#define __LINUX_ARM_CCI_H
++	mrc	p15, 0, r0, c0, c0, 5	@ MPIDR
++	ubfx	r0, r0, #8, #4		@ cluster
 +
-+#ifdef CONFIG_ARM_CCI
-+extern void disable_cci(int cluster);
-+#else
-+static inline void disable_cci(int cluster) { }
-+#endif
++	@ A15/A7 may not require explicit L2 invalidation on reset, dependent
++	@ on hardware integration desicions.
++	@ For now, this code assumes that L2 is either already invalidated, or
++	@ invalidation is not required.
 +
-+#endif
++	ldr	r3, =RTSM_CCI_PHYS_BASE + RTSM_CCI_A15_OFFSET
++	cmp	r0, #0		@ A15 cluster?
++	addne	r3, r3, #RTSM_CCI_A7_OFFSET - RTSM_CCI_A15_OFFSET
++
++	@ r3 now points to the correct CCI slave register block
++
++	ldr	r0, [r3, #SLAVE_SNOOPCTL_OFFSET]
++	orr	r0, r0, #SNOOPCTL_SNOOP_ENABLE | SNOOPCTL_DVM_ENABLE
++	str	r0, [r3, #SLAVE_SNOOPCTL_OFFSET]	@ enable CCI snoops
++
++	@ Wait for snoop control change to complete:
++
++	ldr	r3, =RTSM_CCI_PHYS_BASE
++
++	b	1f
++0:	dsb
++1:	ldr	r0, [r3, #CCI_STATUS_OFFSET]
++	tst	r0, #STATUS_CHANGE_PENDING
++	bne	0b
++
++2:	@ Implementation-specific local CPU setup operations should go here,
++	@ if any.  In this case, there is nothing to do.
++
++	bx	lr
++ENDPROC(dcscb_power_up_setup)
 -- 
 1.8.0
