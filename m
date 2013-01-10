@@ -1,32 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 Jan 2013 17:09:43 -0700
-Subject: [PATCH 02/14] of/pci: Add of_pci_get_devfn() function
-In-Reply-To: <1357764194-12677-3-git-send-email-thierry.reding@avionic-design.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <1357764194-12677-3-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <50EF5847.7040507@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 10 Jan 2013 19:21:21 +0000
+Subject: [GIT PULL V2] ARM: mvebu fixes for v3.8-rc3
+In-Reply-To: <E1Tt8oT-0004Z0-0c@merlin.infradead.org>
+Message-ID: <mailman.23.1357862998.1035.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2013 01:43 PM, Thierry Reding wrote:
-> This function can be used to parse the device and function number from a
-> standard 5-cell PCI resource. PCI_SLOT() and PCI_FUNC() can be used on
-> the returned value obtain the device and function numbers respectively.
+The following changes since commit ba607b6238a1f418c45b9d7f73212bcc6922da53:
 
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+  pinctrl: mvebu: make pdma clock on dove mandatory (2013-01-07 16:19:02 +0000)
 
->  static inline int __of_pci_pci_compare(struct device_node *node,
->  				       unsigned int devfn)
->  {
-> +	int err;
->  
-> +	err = of_pci_get_devfn(node);
-> +	if (err < 0)
->  		return 0;
-> +
-> +	return devfn == err;
+are available in the git repository at:
 
-I know this is really picky, but calling that "err" when it's hopefully
-not an error but rather a PCI device/function ID seems a little obscure.
-Perhaps node_devfn? I assume that fact that devfn is unsigned and err is
-signed won't be an issue.
+  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.8-rc3
+
+for you to fetch changes up to 11d5993df2e1f65e3acfeb92a3febe88803b3e7f:
+
+  arm: mvebu: Fix memory size for Armada 370 DB (2013-01-10 19:16:51 +0000)
+
+----------------------------------------------------------------
+mvebu fixes for v3.8-rc3
+ - gpio fixes in mvebu, kirkwood, and dove
+ - small DT fix for mvebu (correct RAM size)
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      arm: mvebu: Fix memory size for Armada 370 DB
+
+Sebastian Hesselbarth (1):
+      ARM: Dove: add Cubox sdhci card detect gpio
+
+Simon Guinot (1):
+      ARM: Kirkwood: fix ns2 gpios by converting to pinctrl
+
+Thomas Petazzoni (1):
+      arm: mvebu: use global interrupts for GPIOs on Armada XP
+
+ arch/arm/boot/dts/armada-370-db.dts        |  2 +-
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi   | 14 +++++------
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi   | 21 +++++++----------
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi   | 21 +++++++----------
+ arch/arm/boot/dts/dove-cubox.dts           | 14 +++++++++--
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi | 16 +++++++++++++
+ arch/arm/mach-kirkwood/board-ns2.c         | 38 ------------------------------
+ 7 files changed, 53 insertions(+), 73 deletions(-)
