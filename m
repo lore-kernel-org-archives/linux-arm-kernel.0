@@ -1,69 +1,115 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 09 Jan 2013 19:20:43 -0500
-Subject: [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface of a
- dying CPU is disabled
+Date: Wed, 09 Jan 2013 19:20:44 -0500
+Subject: [PATCH 09/16] ARM: vexpress: Select the correct SMP operations at
+ run-time
 In-Reply-To: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1357777251-13541-9-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1357777251-13541-10-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise there might be some interrupts or IPIs becoming pending and the
-CPU will not enter low power mode when doing a WFI.  The effect of this
-is a CPU that loops back into the kernel, go through the first man
-election, signals itself as alive,  and prevent the cluster from being
-shut down.
+From: Jon Medhurst <tixy@linaro.org>
 
-This could benefit from a better solution.
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
 ---
- arch/arm/common/bL_platsmp.c        | 1 +
- arch/arm/common/gic.c               | 6 ++++++
- arch/arm/include/asm/hardware/gic.h | 2 ++
- 3 files changed, 9 insertions(+)
+ arch/arm/include/asm/mach/arch.h |  3 +++
+ arch/arm/kernel/setup.c          |  5 ++++-
+ arch/arm/mach-vexpress/core.h    |  2 ++
+ arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
+ arch/arm/mach-vexpress/v2m.c     |  2 +-
+ 5 files changed, 22 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
-index 0ae44123bf..6a3b251b97 100644
---- a/arch/arm/common/bL_platsmp.c
-+++ b/arch/arm/common/bL_platsmp.c
-@@ -68,6 +68,7 @@ static void __ref bL_cpu_die(unsigned int cpu)
- 	pcpu = mpidr & 0xff;
- 	pcluster = (mpidr >> 8) & 0xff;
- 	bL_set_entry_vector(pcpu, pcluster, NULL);
-+	gic_cpu_if_down();
- 	bL_cpu_power_down();
- }
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 917d4fcfd9..3d01c6d6c3 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -17,8 +17,10 @@ struct pt_regs;
+ struct smp_operations;
+ #ifdef CONFIG_SMP
+ #define smp_ops(ops) (&(ops))
++#define smp_init_ops(ops) (&(ops))
+ #else
+ #define smp_ops(ops) (struct smp_operations *)NULL
++#define smp_init_ops(ops) (void (*)(void))NULL
+ #endif
  
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 36ae03a3f5..760e8f4ca1 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -428,6 +428,12 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
- 	writel_relaxed(1, base + GIC_CPU_CTRL);
- }
+ struct machine_desc {
+@@ -42,6 +44,7 @@ struct machine_desc {
+ 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+ 	char			restart_mode;	/* default restart mode	*/
+ 	struct smp_operations	*smp;		/* SMP operations	*/
++	void			(*smp_init)(void);
+ 	void			(*fixup)(struct tag *, char **,
+ 					 struct meminfo *);
+ 	void			(*reserve)(void);/* reserve mem blocks	*/
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 3f6cbb2e3e..41edca8582 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
+ 	arm_dt_init_cpu_maps();
+ #ifdef CONFIG_SMP
+ 	if (is_smp()) {
+-		smp_set_ops(mdesc->smp);
++		if(mdesc->smp_init)
++			(*mdesc->smp_init)();
++		else
++			smp_set_ops(mdesc->smp);
+ 		smp_init_cpus();
+ 	}
+ #endif
+diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
+index f134cd4a85..3a761fd76c 100644
+--- a/arch/arm/mach-vexpress/core.h
++++ b/arch/arm/mach-vexpress/core.h
+@@ -6,6 +6,8 @@
  
-+void gic_cpu_if_down(void)
+ void vexpress_dt_smp_map_io(void);
+ 
++void vexpress_smp_init_ops(void);
++
+ extern struct smp_operations	vexpress_smp_ops;
+ 
+ extern void vexpress_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+index c5d70de9bb..e62a08b561 100644
+--- a/arch/arm/mach-vexpress/platsmp.c
++++ b/arch/arm/mach-vexpress/platsmp.c
+@@ -12,6 +12,7 @@
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+ #include <linux/io.h>
++#include <linux/of.h>
+ #include <linux/of_fdt.h>
+ #include <linux/vexpress.h>
+ 
+@@ -206,3 +207,14 @@ struct smp_operations __initdata vexpress_smp_ops = {
+ 	.cpu_die		= vexpress_cpu_die,
+ #endif
+ };
++
++void __init vexpress_smp_init_ops(void)
 +{
-+	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
-+	writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
++	struct smp_operations *ops = &vexpress_smp_ops;
++#ifdef CONFIG_BIG_LITTLE
++	extern struct smp_operations bL_smp_ops;
++	if(of_find_compatible_node(NULL, NULL, "arm,cci"))
++		ops = &bL_smp_ops;
++#endif
++	smp_set_ops(ops);
 +}
-+
- #ifdef CONFIG_CPU_PM
- /*
-  * Saves the GIC distributor registers during suspend or idle.  Must be called
-diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-index 4b1ce6cd47..2a7605492d 100644
---- a/arch/arm/include/asm/hardware/gic.h
-+++ b/arch/arm/include/asm/hardware/gic.h
-@@ -46,6 +46,8 @@ void gic_handle_irq(struct pt_regs *regs);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 011661a6c5..34172bd504 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -494,7 +494,7 @@ static const char * const v2m_dt_match[] __initconst = {
  
-+void gic_cpu_if_down(void);
-+
- static inline void gic_init(unsigned int nr, int start,
- 			    void __iomem *dist , void __iomem *cpu)
- {
+ DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
+ 	.dt_compat	= v2m_dt_match,
+-	.smp		= smp_ops(vexpress_smp_ops),
++	.smp_init	= smp_init_ops(vexpress_smp_init_ops),
+ 	.map_io		= v2m_dt_map_io,
+ 	.init_early	= v2m_dt_init_early,
+ 	.init_irq	= v2m_dt_init_irq,
 -- 
 1.8.0
