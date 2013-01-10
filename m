@@ -1,23 +1,94 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 Jan 2013 16:54:30 -0700
-Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <1357764194-12677-11-git-send-email-thierry.reding@avionic-design.de>
+Date: Thu, 10 Jan 2013 16:56:39 -0700
+Subject: [PATCH 14/14] ARM: tegra: trimslice: Initialize PCIe from DT
+In-Reply-To: <1357764194-12677-15-git-send-email-thierry.reding@avionic-design.de>
 References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <1357764194-12677-11-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <50EF54B6.6010100@wwwdotorg.org>
+ <1357764194-12677-15-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <50EF5537.6080602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 01/09/2013 01:43 PM, Thierry Reding wrote:
-> Move the PCIe driver from arch/arm/mach-tegra into the drivers/pci/host
-> directory. The motivation is to collect various host controller drivers
-> in the same location in order to facilitate refactoring.
+> With the device tree support in place, probe the PCIe controller from
+> the device tree and remove the corresponding workaround in the board
+> file.
+
+Thierry, there are a couple things missing from this patch; I include a
+fixup for you to squash in, but also see beyond that for a problem.
+
+>  arch/arm/boot/dts/tegra20-trimslice.dts |   26 +++++++++++++++++++++-----
+>  1 file changed, 21 insertions(+), 5 deletions(-)
 > 
-> The Tegra PCIe driver has been largely rewritten, both in order to turn
-> it into a proper platform driver and to add MSI (based on code by
-> Krishna Kishore <kthota@nvidia.com>) as well as device tree support.
+> diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+> index ebb4c17..41fc45b 100644
+> --- a/arch/arm/boot/dts/tegra20-trimslice.dts
+> +++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+> @@ -303,12 +303,10 @@
+>  
+>  	pcie-controller {
+>  		status = "okay";
+> +		pex-clk-supply = <&pci_clk_reg>;
+> +		vdd-supply = <&pci_vdd_reg>;
+>  
+> -		pci at 0 {
+> -			status = "okay";
+> -		};
+> -
+> -		pci at 1 {
+> +		pci at 1,0 {
+>  			status = "okay";
+>  		};
+>  	};
+> @@ -366,6 +364,24 @@
+>  			regulator-max-microvolt = <1800000>;
+>  			regulator-always-on;
+>  		};
+> +
+> +		pci_clk_reg: regulator at 2 {
+> +			compatible = "regulator-fixed";
+> +			reg = <2>;
+> +			regulator-name = "pci_clk";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		pci_vdd_reg: regulator at 3 {
+> +			compatible = "regulator-fixed";
+> +			reg = <3>;
+> +			regulator-name = "pci_vdd";
+> +			regulator-min-microvolt = <1050000>;
+> +			regulator-max-microvolt = <1050000>;
+> +			regulator-always-on;
+> +		};
+>  	};
+>  
+>  	sound {
+> -- 
+> 1.7.10.4
 
-This driver doesn't compile unless CONFIG_PCI_MSI is also enabled.
-Should it select that, or contain a few ifdefs?
+However, PCIe still doesn't work on TrimSlice; the device enumeration
+fails. The log is below:
 
-drivers/pci/host/pci-tegra.c:900: undefined reference to `write_msi_msg'
+> [    0.790425] tegra-pcie 80003000.pcie-controller: link 0 down, retrying
+> [    0.801351] tegra-pcie 80003000.pcie-controller: PCI host bridge to bus 0000:00
+> [    0.808945] pci_bus 0000:00: root bus resource [io  0x82000000-0x8200ffff]
+> [    0.816109] pci_bus 0000:00: root bus resource [mem 0xa0000000-0xafffffff]
+> [    0.823303] pci_bus 0000:00: root bus resource [mem 0xb0000000-0xbfffffff pref]
+> [    0.830893] pci_bus 0000:00: root bus resource [bus 00-ff]
+> [    0.836728] pci 0000:00:01.0: [10de:0bf0] type 01 class 0x060000
+> [    0.843097] pci 0000:00:01.0: PME# supported from D0 D1 D2 D3hot D3cold
+> [    0.850047] PCI: bus0: Fast back to back transfers disabled
+> [    0.855853] pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+> [    0.864308] tegra-pcie 80003000.pcie-controller: AXI response decoding error, signature: 10010001
+> [    0.873489] tegra-pcie 80003000.pcie-controller:   FPCI address: fe10010000
+
+^^^ For some reason, the config register access fails.
+
+> [    0.880760] PCI: bus1: Fast back to back transfers enabled
+> [    0.886482] pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+> [    0.893381] pci 0000:00:01.0: PCI bridge to [bus 01]
+> [    0.898577] PCI: enabling device 0000:00:01.0 (0140 -> 0143)
+> [    0.904535] pci 0000:00:01.0: nv_msi_ht_cap_quirk didn't locate host bridge
+
+With plain next-20130109, the device enumeration succeeds.
