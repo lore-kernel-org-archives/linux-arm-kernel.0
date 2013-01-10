@@ -1,37 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Jan 2013 10:44:35 -0800
-Subject: [PATCH 09/26] ARM: SAMSUNG: cleanup mach/gpio-fns.h gpio-track.h
- and gpio-nrs.h
-In-Reply-To: <CACRpkda5rKrY85GXgdzomE5q6q0btGKX6UGgCn3N5AzxLv=s7Q@mail.gmail.com>
-References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
- <1357165443-3716-10-git-send-email-kgene.kim@samsung.com>
- <CACRpkda5rKrY85GXgdzomE5q6q0btGKX6UGgCn3N5AzxLv=s7Q@mail.gmail.com>
-Message-ID: <027801cdef62$8aec2e20$a0c48a60$@samsung.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 11 Jan 2013 07:45:27 +1300
+Subject: [PATCH] gpio: vt8500: memory cleanup missing
+In-Reply-To: <CACRpkda+1MqPp-KBe5w+pTeHChE0Daa+U97dO+d1Px_Ssi_vHg@mail.gmail.com>
+References: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
+ <20130110105710.GA19944@n2100.arm.linux.org.uk>
+ <CACRpkda+1MqPp-KBe5w+pTeHChE0Daa+U97dO+d1Px_Ssi_vHg@mail.gmail.com>
+Message-ID: <1357843527.6075.9.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
+On Thu, 2013-01-10 at 13:02 +0100, Linus Walleij wrote:
+> On Thu, Jan 10, 2013 at 11:57 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Jan 03, 2013 at 10:47:20AM +1300, Tony Prisk wrote:
 > 
-> On Wed, Jan 2, 2013 at 11:23 PM, Kukjin Kim <kgene.kim@samsung.com>
-> wrote:
-> 
-> > remove <mach/gpio-fns.h>, <mach/gpio-track.h> and <plat/gpio-fns.h>
+> >> +static int vt8500_gpio_remove(struct platform_device *pdev)
+> >> +{
+> >> +     int i;
+> >> +     int ret;
+> >> +     const struct vt8500_gpio_data *data;
+> >> +     void __iomem *gpio_base = vtchip[0].base;
+> >> +     const struct of_device_id *of_id =
+> >> +                             of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
+> >> +
 > >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > You can get at the vtchip pointer if you put it into the platform device's
+> > driver data pointer.  That way, you're not artificially limiting this
+> > driver to just one device, and, with your changes it will go wrong if DT
+> > ever lists more than one device.
 > 
-> This really needs cleanup so
-
-Yes! And sorry for late ;-)
-Just note, I'm working on cleanup for other Samsung gpio stuff.
-
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Good point, I'm sloppy today :-(
 > 
-> I guess you will carry this through the Samsung tree?
+> Patch dropped.
+> 
+> Tony pls proceed as indicated by Russell.
+> 
+> Yours,
+> Linus Walleij
 
-Yes :-) Let me add your ack on that.
+I must have been having a 'stupid' day to not realise that. Will fix.
+Thanks Russell.
 
-Thanks.
-
-- Kukjin
+Regards
+Tony P
