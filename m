@@ -1,55 +1,28 @@
-From: kishon@ti.com (kishon)
-Date: Thu, 10 Jan 2013 16:23:11 +0530
-Subject: [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB
-In-Reply-To: <50EE90B6.2060308@ti.com>
-References: <1348047128-25692-1-git-send-email-kishon@ti.com>
- <505A8BAB.2020004@ti.com> <20121227183524.GB7097@blackmetal.musicnaut.iki.fi>
- <50EE5D61.1020307@ti.com> <50EE90B6.2060308@ti.com>
-Message-ID: <50EE9D97.6000803@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 10 Jan 2013 11:55:01 +0100
+Subject: [RFC PATCH 5/7] ARM: s3c64xx: Add board file for boot using
+ Device Tree
+In-Reply-To: <20130110105221.GG20956@opensource.wolfsonmicro.com>
+References: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
+ <1357774909-29938-6-git-send-email-tomasz.figa@gmail.com>
+ <20130110105221.GG20956@opensource.wolfsonmicro.com>
+Message-ID: <1513533.R0vnZSVmMe@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mark,
 
-On Thursday 10 January 2013 03:28 PM, Benoit Cousson wrote:
-> Hi Kishon,
->
-> On 01/10/2013 07:19 AM, kishon wrote:
->> On Friday 28 December 2012 12:05 AM, Aaro Koskinen wrote:
->>> Hi,
->>>
->>> On Thu, Sep 20, 2012 at 05:21:15AM +0200, Benoit Cousson wrote:
->>>> On 09/19/2012 11:32 AM, Kishon Vijay Abraham I wrote:
->>>>> This patch series adds dt data to get MUSB working in omap4 and omap3
->>>>>
->>>>> Changes from v2:
->>>>> * Changes the subject of all the patches to include "ARM: dts:"
->>>>> * Added reg property and interrupt property for "usb_otg_hs".
->>>>> Previously these
->>>>>     were obtained from ti,hwmods property.
->>>>> * Rebased on
->>>>>
->>>>> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
->>>>> devel-dt
->>>>>
->>>>> Changes from v1:
->>>>> Just removed the omap-usb2 dt data and sent that as a separate patch.
->>>>>
->>>>> Kishon Vijay Abraham I (3):
->>>>>     ARM: dts: Add twl6030-usb data
->>>>>     ARM: dts: Add twl4030-usb data
->>>>>     ARM: dts: omap: Add usb_otg and glue data
->>>>
->>>> Thanks for the update. I've just pulled the series for 3.7.
->>>
->>> I wonder what happened to the patch #3 (Add usb_otg and glue data)
->>> of this series? Why was it dropped? I cannot see it in 3.7 or 3.8-rc1.
->
-> I don't remember the context, can you repost it rebased on 3.8-rc2? Did
-> it generate some discussion at that time?
+On Thursday 10 of January 2013 10:52:22 Mark Brown wrote:
+> On Thu, Jan 10, 2013 at 12:41:47AM +0100, Tomasz Figa wrote:
+> > + * The following lookup table is used to override device names when
+> > devices + * are registered from device tree. This is temporarily
+> > added to enable + * device tree support addition for the Exynos4
+> > architecture.
+> Cut'n'paste.
 
-That patch also has SCM register. It might be rejected because of that. 
-Will work on the that.
+Oh my, you got me. ;)
 
-Thanks
-Kishon
+I will correct it in next version. Thanks for spotting this.
+
+Best regards,
+Tomasz Figa
