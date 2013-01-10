@@ -1,85 +1,28 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 Jan 2013 09:54:13 -0700
-Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
- HAVE_ARM_SCU
-In-Reply-To: <20130110.145813.1159140334089730421.hdoyu@nvidia.com>
-References: <20130108171103.GA7417@e102568-lin.cambridge.arm.com><20130109.134641.1582472136842052082.hdoyu@nvidia.com><20130109151700.GB22147@e102568-lin.cambridge.arm.com>
- <20130110.145813.1159140334089730421.hdoyu@nvidia.com>
-Message-ID: <50EEF235.7070200@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Jan 2013 16:57:53 +0000
+Subject: [PATCH v4 07/19] ARM: remove mach .handle_irq for GIC users
+In-Reply-To: <50EED264.1020709@gmail.com>
+References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
+ <1357235668-9450-8-git-send-email-robherring2@gmail.com>
+ <20130110110205.GC19944@n2100.arm.linux.org.uk> <50EED264.1020709@gmail.com>
+Message-ID: <20130110165753.GF19944@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2013 05:58 AM, Hiroshi Doyu wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Wed, 9 Jan 2013 16:17:00 +0100:
-...
-> With your "[PATCH] ARM: kernel: DT cpu map validity check helper
-> function", my original patch gets as below. I think that the following
-> "smp_detect_ncores()" function may be so generic that it could be
-> moved in some common place than platform?
+On Thu, Jan 10, 2013 at 08:38:28AM -0600, Rob Herring wrote:
+> On 01/10/2013 05:02 AM, Russell King - ARM Linux wrote:
+> > On Thu, Jan 03, 2013 at 11:54:16AM -0600, Rob Herring wrote:
+> >> -asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+> >> +static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+> > 
+> > NAK.  No, not "static asmlinkage".
 > 
-> From f5f2a43952ce75fe061b3808b994c3ceb07f1af1 Mon Sep 17 00:00:00 2001
-> From: Hiroshi Doyu <hdoyu@nvidia.com>
-> Date: Mon, 26 Nov 2012 12:25:14 +0200
-> Subject: [PATCH 1/1] ARM: tegra: # of CPU cores detection w/ & w/o
->  HAVE_ARM_SCU
-> 
-> The method to detect the number of CPU cores on Cortex-A9 MPCore and
-> Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
-> information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
-> have to read it from the system coprocessor(CP15), because the SCU on
-> Cortex-A15 MPCore does not have software readable registers. This
-> patch selects the correct method at runtime based on the CPU ID.
+> Okay will remove asmlinkage, but is there an issue with making this static?
 
-> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+No, just for the asmlinkage.  asmlinkage is used to mark functions which
+are called from assembly.  Making them static generally means you can't
+call them from assembly (unless you have asm() code in the .c file which
+does, like our kernel_thread() implementation used to).
 
-> +static int __init smp_detect_ncores(void)
-> +{
-> +	unsigned int ncores, mpidr;
-> +	u32 l2ctlr;
-> +	phys_addr_t pa;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +	switch (mpidr) {
-> +	case ARM_CPU_PART_CORTEX_A15:
-> +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
-> +		ncores = ((l2ctlr >> 24) & 3) + 1;
-> +		break;
-> +	case ARM_CPU_PART_CORTEX_A9:
-> +		/* Get SCU physical base */
-> +		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
-> +		scu_base = IO_ADDRESS(pa);
-> +		ncores = scu_get_core_count(scu_base);
-> +		break;
-> +	default:
-> +		pr_warn("Unsupported mpidr\n");
-> +		ncores = 1;
-> +		break;
-> +	}
-> +
-> +	return ncores;
-> +}
-
-Why not just remove that function...
-
->  /*
->   * Initialise the CPU possible map early - this describes the CPUs
->   * which may be present or become present in the system.
->   */
->  static void __init tegra_smp_init_cpus(void)
->  {
-> -	unsigned int i, ncores = scu_get_core_count(scu_base);
-> -
-> -	if (ncores > nr_cpu_ids) {
-> -		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
-> -			ncores, nr_cpu_ids);
-> -		ncores = nr_cpu_ids;
-> +	if (!arm_dt_cpu_map_valid()) {
-> +		unsigned int i, ncores;
-> +
-> +		ncores = smp_detect_ncores();
-
-And just say "ncores = 1" here?
-
-For Tegra, it's trivial to simply put the patch adding the required DT
-nodes before this patch, and then there's no need for any
-backwards-compatibility, since the nodes are guaranteed to be there.
+Ok, asmlinkage on ARM is a no-op, but it's useful cheap documentation to
+mark which C functions get called from assembly.
