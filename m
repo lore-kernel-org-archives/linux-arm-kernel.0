@@ -1,69 +1,44 @@
-From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Thu, 10 Jan 2013 16:00:38 +0530
-Subject: [PATCH V3 3/3] ARM: davinci: da850: add NAND driver DT entries
-In-Reply-To: <1357813838-26511-1-git-send-email-anilkumar.v@ti.com>
-References: <1357813838-26511-1-git-send-email-anilkumar.v@ti.com>
-Message-ID: <1357813838-26511-4-git-send-email-anilkumar.v@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 10 Jan 2013 12:30:25 +0200
+Subject: [V2 PATCH 20/27] usb: gadget: mv_udc: add extern chip support
+In-Reply-To: <1354071986-28032-21-git-send-email-chao.xie@marvell.com>
+References: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
+ <1354071986-28032-21-git-send-email-chao.xie@marvell.com>
+Message-ID: <20130110103025.GG28920@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NAND driver DT node and related pinctrl DT data to export NAND
-functionality on da850 evm.
+On Tue, Nov 27, 2012 at 10:06:19PM -0500, Chao Xie wrote:
+> Because arch-mmp will make use of irq domain for irq
+> allocation, the irqs allocated for PMIC is dynamical.
+> The vbus/idpin irqs from PMIC can not be passed by platform data.
+> Using the extern chip APIs provides by PHY driver can solve this
+> problem.
+> Marvell usb PHY driver provides a middle layer.
+> The PMIC usb drivers will help to register the callbacks in the
+> marvell usb PHY driver.
+> udc/otg/ehci driver will call the callbacks.
+> Then we do not need pass the information in platform data. It will
+> remove another block in the way of enabling device tree for usb.
+> 
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
 
-Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
----
-:100644 100644 c7609d0... 32ccecf... M	arch/arm/boot/dts/da850-evm.dts
-:100644 100644 e9c6e82... 16e2ac2... M	arch/arm/boot/dts/da850.dtsi
- arch/arm/boot/dts/da850-evm.dts |   16 ++++++++++++++++
- arch/arm/boot/dts/da850.dtsi    |   13 +++++++++++++
- 2 files changed, 29 insertions(+), 0 deletions(-)
+care to refresh ?
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index c7609d0..32ccecf 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -28,4 +28,20 @@
- 			status = "okay";
- 		};
- 	};
-+	nand_cs3 at 62000000 {
-+		status = "okay";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&nand_cs3_pins>;
-+	};
-+};
-+&pmx_core{
-+	nand_cs3_pins: pinmux_nand_pins {
-+		pinctrl-single,bits = <
-+			0x1c 0x00110000  0x00ff0000     /* EMA_OE, EMA_WE */
-+			0x1c 0x00000110  0x00000ff0     /* EMA_CS[4],EMA_CS[3]*/
-+			0x24 0x11111111  0xffffffff     /* EMA_D[0], EMA_D[1], EMA_D[2], EMA_D[3],
-+							   EMA_D[4], EMA_D[5], EMA_D[6], EMA_D[7] */
-+			0x30 0x01100000  0x0ff00000     /* EMA_A[1], EMA_A[2] */
-+		>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index e9c6e82..16e2ac2 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -67,4 +67,17 @@
- 			status = "disabled";
- 		};
- 	};
-+	nand_cs3 at 62000000 {
-+		compatible = "ti,davinci-nand";
-+		reg = <0x62000000 0x807ff
-+			0x68000000 0x8000>;
-+		ti,davinci-chipselect = <1>;
-+		ti,davinci-mask-ale = <0>;
-+		ti,davinci-mask-cle = <0>;
-+		ti,davinci-mask-chipsel = <0>;
-+		ti,davinci-ecc-mode = "hw";
-+		ti,davinci-ecc-bits = <4>;
-+		ti,davinci-nand-use-bbt;
-+		status = "disabled";
-+	};
- };
+patching file drivers/usb/gadget/mv_udc.h
+patching file drivers/usb/gadget/mv_udc_core.c
+Hunk #2 succeeded at 1125 (offset 3 lines).
+Hunk #3 succeeded at 1151 (offset 3 lines).
+Hunk #4 succeeded at 2231 with fuzz 2 (offset 36 lines).
+Hunk #5 FAILED at 2208.
+1 out of 5 hunks FAILED -- saving rejects to file drivers/usb/gadget/mv_udc_core.c.rej
+
 -- 
-1.7.4.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/9441f55c/attachment.sig>
