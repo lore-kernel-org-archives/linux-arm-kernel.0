@@ -1,52 +1,62 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Thu, 10 Jan 2013 04:11:42 +0000
-Subject: [PATCH 3/7] pwm: pwm-tiehrpwm: Update the clock handling of
- pwm-tiehrpwm driver
-In-Reply-To: <20130102133843.GA4414@avionic-0098.adnet.avionic-design.de>
-References: <1357133094-30806-1-git-send-email-avinashphilip@ti.com>
- <1357133094-30806-4-git-send-email-avinashphilip@ti.com>
- <20130102133843.GA4414@avionic-0098.adnet.avionic-design.de>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA5A510@DBDE01.ent.ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 10 Jan 2013 00:04:21 -0500 (EST)
+Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
+ management
+In-Reply-To: <50EE0F64.8020009@gmail.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <50EE0F64.8020009@gmail.com>
+Message-ID: <alpine.LFD.2.02.1301092353500.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 02, 2013 at 19:08:43, Thierry Reding wrote:
-> On Wed, Jan 02, 2013 at 06:54:50PM +0530, Philip Avinash wrote:
-> > The clock framework has changed and it's now better to invoke
-> > clock_prepare_enable() and clk_disable_unprepare() rather than the
-> > legacy clk_enable() and clk_disable() calls. This patch converts the
-> > pwm-tiehrpwm driver to the new framework.
-> > 
-> > Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-> > Cc: Thierry Reding <thierry.reding@avionic-design.de>
-> > ---
-> > In 3.8-rc1, common clock frame work support added to AM335x.
-> > 
-> >  drivers/pwm/pwm-tiehrpwm.c |    4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/pwm/pwm-tiehrpwm.c b/drivers/pwm/pwm-tiehrpwm.c
-> > index 72a6dd4..af6f162 100644
-> > --- a/drivers/pwm/pwm-tiehrpwm.c
-> > +++ b/drivers/pwm/pwm-tiehrpwm.c
-> > @@ -341,7 +341,7 @@ static int ehrpwm_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-> >  	configure_polarity(pc, pwm->hwpwm);
-> >  
-> >  	/* Enable TBCLK before enabling PWM device */
-> > -	clk_enable(pc->tbclk);
-> > +	clk_prepare_enable(pc->tbclk);
-> 
-> I apparently didn't catch this before, but maybe it would be useful to
-> check the return value here to make sure we only proceed if the clock
-> can actually be enabled.
+On Wed, 9 Jan 2013, Rob Herring wrote:
 
-Ok I will check return value & make it return status of pwm_enable().
-I will send it as individual patch in next series. I am waiting for
-reviews / acceptance of HWMOD and clock tree node patches.
-
-Thanks
-Avinash
-
+> On 01/09/2013 06:20 PM, Nicolas Pitre wrote:
+> > This is the initial public posting of the initial support for big.LITTLE.
+> > Included here is the code required to safely power up and down CPUs in a
+> > b.L system, whether this is via CPU hotplug, a cpuidle driver or the
+> > Linaro b.L in-kernel switcher[*] on top of this.  Only  SMP secondary
+> > boot and CPU hotplug support is included at this time.  Getting to this
+> > point already represents a significcant chunk of code as illustrated by
+> > the diffstat below.
+> > 
+> > This work was presented at Linaro Connect in Copenhagen by Dave Martin and
+> > myself.  The presentation slides are available here:
+> > 
+> > http://www.linaro.org/documents/download/f3569407bb1fb8bde0d6da80e285b832508f92f57223c
+> > 
+> > The code is now stable on both Fast Models as well as Virtual Express TC2
+> > and ready for public review.
+> > 
+> > Platform support is included for Fast Models implementing the
+> > Cortex-A15x4-A7x4 and Cortex-A15x1-A7x1 configurations.  To allow
+> > successful compilation, I also included a preliminary version of the
+> > CCI400 driver from Lorenzo Pieralisi.
+> > 
+> > Support for actual hardware such as Vexpress TC2 should come later,
+> > once the basic infrastructure from this series is merged.  A few DT
+> > bindings are used but not yet documented.
+> > 
+> > This series is made of the following parts:
+> > 
+> > Low-level support code:
+> > [PATCH 01/16] ARM: b.L: secondary kernel entry code
+> > [PATCH 02/16] ARM: b.L: introduce the CPU/cluster power API
+> > [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
+> > [PATCH 04/16] ARM: b.L: Add baremetal voting mutexes
+> > [PATCH 05/16] ARM: bL_head: vlock-based first man election
 > 
-> Thierry
-> 
+> After a quick scan, I have a basic question. How are any of these
+> specific to big.LITTLE? Isn't all this just general multi-cluster support?
+
+It is.  However, b.L is what brought the need for this multi-cluster 
+support, and being first it gave the name.
+
+I've been pondering about naming this code differently so not to imply 
+b.L but I couldn't come up with a good name/prefix.  The bL_ prefix is 
+really hard to beat!  So I decided to put it off until there is actually 
+some non b.L users for this code, at which point we can trivially rename 
+it.
+
+
+Nicolas
