@@ -1,27 +1,40 @@
-From: joro@8bytes.org ('Joerg Roedel')
-Date: Thu, 10 Jan 2013 19:38:23 +0100
-Subject: [PATCH v6 00/12] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <026e01cdef5d$364fd150$a2ef73f0$@samsung.com>
-References: <003301cde30b$c584c2d0$508e4870$%cho@samsung.com>
- <032401cde783$485ae1a0$d910a4e0$@samsung.com>
- <20130110171844.GA2650@8bytes.org>
- <026e01cdef5d$364fd150$a2ef73f0$@samsung.com>
-Message-ID: <20130110183823.GH25591@8bytes.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 10 Jan 2013 10:41:12 -0800
+Subject: [PATCH 01/26] gpio: samsung: remove inclusion <mach/regs-clock.h>
+In-Reply-To: <CACRpkdYhNHwqK3YkEKQedFvYDc6kuwesY4gmMroipnnhrLP6pA@mail.gmail.com>
+References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
+ <1357165443-3716-2-git-send-email-kgene.kim@samsung.com>
+ <CACRpkdYhNHwqK3YkEKQedFvYDc6kuwesY4gmMroipnnhrLP6pA@mail.gmail.com>
+Message-ID: <027701cdef62$12363bb0$36a2b310$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 10:06:24AM -0800, Kukjin Kim wrote:
-> You know, we have several options to avoid it. When you take this series in
-> your tree, you can provide topic branch for me. Or this series should be
-> separated for arch/arm/ and drivers/ for both trees, then only drivers/iommu
-> changes should be picked up in your tree. I'm OK both, let me know which one
-> you would prefer or other way.
+Linus Walleij wrote:
+> 
+> On Wed, Jan 2, 2013 at 11:23 PM, Kukjin Kim <kgene.kim@samsung.com>
+> wrote:
+> 
+> > The <mach/regs-clock.h> is not needed for gpio-samsung.
+> >
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> Applied to fixes, thanks.
+> 
+Thanks :-)
 
-I would like to take the final version of this patch-set (when you
-provided your Acked-by) into the arm/exynos branch in my tree. You can
-then pull in this branch to the Samsung tree and we can the conflicts
-this way.
+BTW, do you have any comments on following patches?
 
+[PATCH] gpio: samsung: silent build warning for EXYNOS5
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14443.html
 
-	Joerg
+[PATCH] gpio: samsung: fix pinctrl condition for exynos and exynos5440
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/14758
+
+[PATCH] gpio: samsung: skip gpio lib registration for EXYNOS5440
+http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/14673
+
+Any problems, please kindly let me know.
+
+- Kukjin
