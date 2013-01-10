@@ -1,80 +1,26 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 10 Jan 2013 12:15:14 +0000
-Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
-In-Reply-To: <1357818507-8716-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1357818507-8716-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130110121514.GD29952@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 10 Jan 2013 13:15:13 +0100
+Subject: [PATCH] arm: mvebu: Fix memory size for Armada 370 DB
+Message-ID: <1357820114-16855-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 11:48:27AM +0000, Lorenzo Pieralisi wrote:
-> Since the introduction of /cpu nodes bindings for ARM and the
-> corresponding parse function arm_dt_init_cpu_maps(), the cpu_logical_map
-> and the number of possible CPUs are set according to the DT /cpu
-> nodes entries. Currently most of the existing ARM SMP platforms detect the
-> number of cores through HW probing in their .smp_init_cpus functions and set
-> the possible CPU mask accordingly.
-> This method should be upgraded so that the CPU counting mechanism will be
-> based on DT, keeping legacy HW probing mechanism as a fall back solution.
-> 
-> In order to implement this fall back solution mechanism, the ARM DT code
-> should provide a helper function to platforms to check if the cpu map
-> has been properly initialized through DT. If the check fails the
-> platform will resort to legacy HW based cores counting mechanism.
-> 
-> This patch implements a trivial flag and a helper function that platform
-> can call to check whether DT based cpu map initialization and cores count
-> were completed successfully.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/include/asm/prom.h | 10 ++++++++++
->  arch/arm/kernel/devtree.c   |  5 +++++
->  2 files changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-> index a219227..487614a 100644
-> --- a/arch/arm/include/asm/prom.h
-> +++ b/arch/arm/include/asm/prom.h
-> @@ -18,6 +18,15 @@
->  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
->  extern void arm_dt_memblock_reserve(void);
->  extern void __init arm_dt_init_cpu_maps(void);
-> +/*
-> + * Return true if cpu map initialization has been
-> + * carried out correctly from DT
-> + */
-> +static inline bool __init arm_dt_cpu_map_valid(void)
-> +{
-> +	extern bool valid_dt_cpu_map;
-> +	return valid_dt_cpu_map;
-> +}
->  
->  #else /* CONFIG_OF */
->  
-> @@ -28,6 +37,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
->  
->  static inline void arm_dt_memblock_reserve(void) { }
->  static inline void arm_dt_init_cpu_maps(void) { }
-> +static inline bool __init arm_dt_cpu_map_valid(void) { return false; }
->  
->  #endif /* CONFIG_OF */
->  #endif /* ASMARM_PROM_H */
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index 70f1bde..c82af3b 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -62,6 +62,10 @@ void __init arm_dt_memblock_reserve(void)
->  		memblock_reserve(base, size);
->  	}
->  }
-> +/*
-> + * Export DT cpu map validity flag to platforms
-> + */
-> +bool valid_dt_cpu_map __initdata;
+Hello Jason and Andrew,
 
-Is there any possibility of this being useful after boot?
-Hopefully not, but maybe there's something I haven't considered.
+After reviewing patch from Florian for the Armada 370 RD, I realized
+that we made a mistake in the Armada 370 DB dts. The board comes with
+1GB of RAM and we declared only 512MB. This patch fixes this and is
+aimed to be applied on a 3.8 kernel. To be sure there were no problem
+with the ``extra'' 512MB I ran memtest on the whole memory without
+getting any erros.
 
-Cheers
----Dave
+Thanks,
+
+Gregory CLEMENT (1):
+  arm: mvebu: Fix memory size for Armada 370 DB
+
+ arch/arm/boot/dts/armada-370-db.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+-- 
+1.7.9.5
