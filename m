@@ -1,34 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 Jan 2013 16:34:21 +0800
-Subject: [PATCH v2 0/2] Add imx6q-cpufreq driver support
-Message-ID: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 10 Jan 2013 09:34:47 +0100
+Subject: [PATCH 00/14] Rewrite Tegra PCIe driver
+In-Reply-To: <20130110065537.GC15212@avionic-0098.adnet.avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130109222517.3c590553@skate>
+ <20130110065537.GC15212@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20130110093447.646ed07c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
- - Drop patch "PM / OPP: Export more symbols for module usage", as
-   there is already one "[PATCH 5/6 v9] power: export opp cpufreq
-   functions" from Mark Langsdorf.
- - Instead of having cpu_dev be the struct device retrieved from
-   get_cpu_device(), have it be &pdev->dev, so that we can use managed
-   functions to simplified the cleanup path.
- - Use dev_* rather than pr_* for message output
- - Fix Typos and others commented by Viresh and Sascha. 
+Dear Thierry Reding,
 
-Once the first patch gets accepted, I will apply the second one for
-going through arm-soc tree.
+On Thu, 10 Jan 2013 07:55:37 +0100, Thierry Reding wrote:
 
-Shawn Guo (2):
-  cpufreq: add imx6q-cpufreq driver
-  ARM: imx: enable imx6q-cpufreq support
+> The reason is that with the latest bindings the matching of root ports
+> to device tree nodes works as-is and nothing else indicates that the
+> emulated host bridge is actually required to make any of this work. So
+> in order not to introduce unneeded code I've left it out for now. If
+> somebody decides that we actually need this host bridge (for standards
+> compliance or whatnot) it could easily be added back.
 
- arch/arm/boot/dts/imx6q.dtsi    |   19 ++-
- arch/arm/mach-imx/mach-imx6q.c  |   65 +++++++++
- drivers/cpufreq/Kconfig.arm     |    9 ++
- drivers/cpufreq/Makefile        |    1 +
- drivers/cpufreq/imx6q-cpufreq.c |  296 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 384 insertions(+), 6 deletions(-)
- create mode 100644 drivers/cpufreq/imx6q-cpufreq.c
+Ok.
 
+> However, before the emulated bridge implementation can be merged I think
+> the PCI ID issue needs to be resolved.
+
+Indeed. I am not sure yet how to solve that, though.
+
+> > So, I instantiate one unique emulated Host Bridge, and then one
+> > emulated PCI-to-PCI Bridge for each PCIe interface that I have.
+> 
+> Oh dear, that's even worse than on Tegra. The Marvell hardware doesn't
+> even expose the root ports as PCI devices on the bus?
+
+My understanding is that no, it doesn't, but I am still figuring out
+many things in this PCIe topic.
+
+> I suppose that in your case it really makes sense because you already
+> need the emulated PCI-to-PCI bridges and therefore adding an emulated
+> host bridge doesn't add much. As I said, for Tegra everything still
+> works without, so I didn't see a reason to add needless code.
+
+Ok, thanks!
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
