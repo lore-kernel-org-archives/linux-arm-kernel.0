@@ -1,94 +1,77 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 Jan 2013 13:42:28 -0700
-Subject: [PATCH v2] drivers/pinctrl: grab default handles from device core
-In-Reply-To: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
-References: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <50EF27B4.60608@wwwdotorg.org>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 10 Jan 2013 15:49:59 -0500
+Subject: [RFC PATCH v3 16/16] ARM: dts: add AM33XX SPI support
+In-Reply-To: <20130110194653.GA32519@kahuna>
+References: <1350566815-409-1-git-send-email-mporter@ti.com>
+ <1350566815-409-17-git-send-email-mporter@ti.com>
+ <508D1791.1040806@ti.com> <20130110193547.GQ14660@beef>
+ <20130110194653.GA32519@kahuna>
+Message-ID: <20130110204959.GS14660@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 01:25 PM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This makes the device core auto-grab the pinctrl handle and set
-> the "default" (PINCTRL_STATE_DEFAULT) state for every device
-> that is present in the device model right before probe. This will
-> account for the lion's share of embedded silicon devcies.
+On Thu, Jan 10, 2013 at 01:46:53PM -0600, Nishanth Menon wrote:
+> On 14:35-20130110, Matt Porter wrote:
+> > On Sun, Oct 28, 2012 at 05:01:29PM +0530, Sekhar Nori wrote:
+> > > On 10/18/2012 6:56 PM, Matt Porter wrote:
+> > > > Adds AM33XX SPI support for am335x-bone and am335x-evm.
+> > > > 
+> > > > Signed-off-by: Matt Porter <mporter@ti.com>
+> > > > ---
+> > > >  arch/arm/boot/dts/am335x-bone.dts |   17 +++++++++++++++
+> > > >  arch/arm/boot/dts/am335x-evm.dts  |    9 ++++++++
+> > > >  arch/arm/boot/dts/am33xx.dtsi     |   43 +++++++++++++++++++++++++++++++++++++
+> > > >  3 files changed, 69 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> > > > index 5510979..23edfd8 100644
+> > > > --- a/arch/arm/boot/dts/am335x-bone.dts
+> > > > +++ b/arch/arm/boot/dts/am335x-bone.dts
+> > > > @@ -18,6 +18,17 @@
+> > > >  		reg = <0x80000000 0x10000000>; /* 256 MB */
+> > > >  	};
+> > > >  
+> > > > +	am3358_pinmux: pinmux at 44e10800 {
+> > > > +		spi1_pins: pinmux_spi1_pins {
+> > > > +			pinctrl-single,pins = <
+> > > > +				0x190 0x13	/* mcasp0_aclkx.spi1_sclk, OUTPUT_PULLUP | MODE3 */
+> > > > +				0x194 0x33	/* mcasp0_fsx.spi1_d0, INPUT_PULLUP | MODE3 */
+> > > > +				0x198 0x13	/* mcasp0_axr0.spi1_d1, OUTPUT_PULLUP | MODE3 */
+> minor comment:
+> doing as a 0x33 is better for both d1, d0 as D0,D1 can be switched between SDI and SDO
+> as needed with ti,pindir-d0-out-d1-in
 
-There are quite a few problems with this patch, and they end up
-completely breaking at least Tegra in next-20130110.
+Yes, thanks. Forgot about the new property and feature even though I
+told somebody about it yesterday. :)
 
-> diff --git a/drivers/base/pinctrl.c b/drivers/base/pinctrl.c
+> > > > +				0x19c 0x13	/* mcasp0_ahclkr.spi1_cs0, OUTPUT_PULLUP | MODE3 */
+> > > > +			>;
+> > > 
+> > > Is there a single pinmux setting that provides SPI functionality on the
+> > > bone headers? Or this is specific to a cape you tested with?
+> > 
+> > No, there are two usable settings for spi1 and one setting for spi0.
+> > I'm dropping this from the series since it's specific to how I wired up
+> > the homebrew cape I use for spi testing on the Bone. I publish the
+> > branch where all these extra "test-specific" patches (that aren't intended
+> > to be merged) are at in the cover letter.  Anybody that needs context of
+> > how/what worked and was tested can grab them there.
+> Possibly dumb question:
+> Cant we have pre-usable spi configurations?  Like spi1_configuration1_pins,
+> spi2_configuration1_pins, spi0_configuration1_pins? If documented with
+> P9 pin names in the bone dts, it saves a bit of effort in looking up
+> pad offset when dealing with capes.
 
-> +int pinctrl_bind_pins(struct device *dev)
-> +{
-> +	struct dev_pin_info *dpi;
-> +	int ret;
-> +
-> +	/* Allocate a pin state container on-the-fly */
-> +	if (!dev->pins) {
-> +		dpi = devm_kzalloc(dev, sizeof(*dpi), GFP_KERNEL);
+Yes, let's introduce these things separately. I plan to reintroduce
+patches to fix the incorrect 1-based numbering on many of the AM33xx as
+previous ones were dropped...and I think this makes sense on top of
+that.
 
-This is allocated using a devm_ function. If -EPROBE_DEFER is returned
-below after the assignment to dev->pins or if the driver's own probe()
-returns -EPROBE_DEFER, this allocation will be freed by the driver core.
-This can leave dev->pins pointing to something non-NULL, yet invalid.
-
-I haven't fully verified this, but I believe this issue is causing
-crashes on Tegra. Certainly if I force this code to follow the path that
-always allocates new structs or performs new gets, then the crashes go away.
-
-> +		if (!dpi)
-> +			return -ENOMEM;
-> +	} else
-> +		dpi = dev->pins;
-> +
-> +	/*
-> +	 * Check if we already have a pinctrl handle, as we may arrive here
-> +	 * after a deferral in the state selection below
-> +	 */
-> +	if (!dpi->p) {
-> +		dpi->p = devm_pinctrl_get(dev);
-
-That won't succeed for a pinctrl device that has a default state in
-order to implement hogs. This will then cause the pin controller device
-to always defer probe and never activate. This will leave HW
-unconfigured and/or prevent other devices from successfully calling
-pinctrl_get().
-
-This issue also happens on Tegra.
-
-> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-
-> @@ -734,9 +734,16 @@ static struct pinctrl *pinctrl_get_locked(struct device *dev)
->  	if (WARN_ON(!dev))
->  		return ERR_PTR(-EINVAL);
->  
-> +	/*
-> +	 * See if somebody else (such as the device core) has already
-> +	 * obtained a handle to the pinctrl for this device. In that case,
-> +	 * return another pointer to it.
-> +	 */
->  	p = find_pinctrl(dev);
-> -	if (p != NULL)
-> -		return ERR_PTR(-EBUSY);
-
-I deliberately returned an error here, because there's no reference
-counting on the struct pinctrl objects. If a driver calls pinctrl_get(),
-with the new code below, it will retrieve the same struct. If it later
-calls pinctrl_put(), the put will immediately free the structure. This
-will invalidate the pointers that reference it in struct device's pins
-field.
-
-This issue will probably trigger on Tegra, since we at least have a
-pinctrl-based I2C mux that calls pinctrl_get().
-
-> +	if (p != NULL) {
-> +		dev_dbg(dev, "obtain a copy of previously claimed pinctrl\n");
-> +		return p;
-> +	}
->  
->  	return create_pinctrl(dev);
->  }
-
-Perhaps we could remove this patch from linux-next, and have a V3?
+-Matt
+> -- 
+> Regards,
+> Nishanth Menon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
