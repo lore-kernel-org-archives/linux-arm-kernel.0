@@ -1,34 +1,94 @@
 From: federico.vaga@gmail.com (Federico Vaga)
-Date: Thu, 10 Jan 2013 13:46:50 +0100
-Subject: [PATCH v5 3/3] adv7180: remove {query/g_/s_}ctrl
-In-Reply-To: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
+Date: Thu, 10 Jan 2013 13:57:19 +0100
+Subject: [PATCH v5 2/3] sta2x11_vip: convert to videobuf2 and control
+ framework
+In-Reply-To: <1357822010-30419-3-git-send-email-federico.vaga@gmail.com>
 References: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
-Message-ID: <1357822010-30419-4-git-send-email-federico.vaga@gmail.com>
+ <1357822010-30419-3-git-send-email-federico.vaga@gmail.com>
+Message-ID: <3596574.18Q2Rh4jo9@harkonnen>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All drivers which use this subdevice use also the control framework.
-The v4l2_subdev_core_ops operations {query/g_/s_}ctrl are useless because
-device drivers will inherit controls from this subdevice.
+@Hans: here the output of v4l2-compliance that you request me for the v4 
+version. This is done on the v5 version where I applied your suggestion. I 
+have 1 warning but I don't understand where is the problem
 
-Signed-off-by: Federico Vaga <federico.vaga@gmail.com>
----
- drivers/media/i2c/adv7180.c | 3 ---
- 1 file modificato, 3 rimozioni(-)
+Driver Info:
+	Driver name   : sta2x11_vip
+	Card type     : sta2x11_vip
+	Bus info      : PCI:0000:06:00.0
+	Driver version: 3.6.0
+	Capabilities  : 0x85000001
+		Video Capture
+		Read/Write
+		Streaming
+		Device Capabilities
+	Device Caps   : 0x05000001
+		Video Capture
+		Read/Write
+		Streaming
 
-diff --git a/drivers/media/i2c/adv7180.c b/drivers/media/i2c/adv7180.c
-index 45ecf8d..43bc2b9 100644
---- a/drivers/media/i2c/adv7180.c
-+++ b/drivers/media/i2c/adv7180.c
-@@ -402,9 +402,6 @@ static const struct v4l2_subdev_video_ops adv7180_video_ops = {
- static const struct v4l2_subdev_core_ops adv7180_core_ops = {
- 	.g_chip_ident = adv7180_g_chip_ident,
- 	.s_std = adv7180_s_std,
--	.queryctrl = v4l2_subdev_queryctrl,
--	.g_ctrl = v4l2_subdev_g_ctrl,
--	.s_ctrl = v4l2_subdev_s_ctrl,
- };
- 
- static const struct v4l2_subdev_ops adv7180_ops = {
+Compliance test for device /dev/video0 (not using libv4l2):
+
+Required ioctls:
+	test VIDIOC_QUERYCAP: OK
+
+Allow for multiple opens:
+	test second video open: OK
+	test VIDIOC_QUERYCAP: OK
+	test VIDIOC_G/S_PRIORITY: OK
+
+Debug ioctls:
+	test VIDIOC_DBG_G_CHIP_IDENT: Not Supported
+	test VIDIOC_DBG_G/S_REGISTER: Not Supported
+	test VIDIOC_LOG_STATUS: OK
+
+Input ioctls:
+	test VIDIOC_G/S_TUNER: Not Supported
+	test VIDIOC_G/S_FREQUENCY: Not Supported
+	test VIDIOC_S_HW_FREQ_SEEK: OK
+	test VIDIOC_ENUMAUDIO: Not Supported
+	test VIDIOC_G/S/ENUMINPUT: OK
+	test VIDIOC_G/S_AUDIO: Not Supported
+	Inputs: 2 Audio Inputs: 0 Tuners: 0
+
+Output ioctls:
+	test VIDIOC_G/S_MODULATOR: Not Supported
+	test VIDIOC_G/S_FREQUENCY: Not Supported
+	test VIDIOC_ENUMAUDOUT: Not Supported
+	test VIDIOC_G/S/ENUMOUTPUT: Not Supported
+	test VIDIOC_G/S_AUDOUT: Not Supported
+	Outputs: 0 Audio Outputs: 0 Modulators: 0
+
+Control ioctls:
+	test VIDIOC_QUERYCTRL/MENU: OK
+	test VIDIOC_G/S_CTRL: OK
+	test VIDIOC_G/S/TRY_EXT_CTRLS: OK
+	test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
+	test VIDIOC_G/S_JPEGCOMP: Not Supported
+	Standard Controls: 5 Private Controls: 0
+
+Input/Output configuration ioctls:
+	test VIDIOC_ENUM/G/S/QUERY_STD: OK
+	test VIDIOC_ENUM/G/S/QUERY_DV_PRESETS: Not Supported
+	test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: Not Supported
+	test VIDIOC_DV_TIMINGS_CAP: Not Supported
+
+Format ioctls:
+	test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+	test VIDIOC_G/S_PARM: OK
+	test VIDIOC_G_FBUF: Not Supported
+	test VIDIOC_G_FMT: OK
+	test VIDIOC_TRY_FMT: OK
+	test VIDIOC_S_FMT: OK
+	test VIDIOC_G_SLICED_VBI_CAP: Not Supported
+
+Buffer ioctls:
+	test VIDIOC_REQBUFS/CREATE_BUFS: OK
+	test read/write: OK
+
+Total: 36, Succeeded: 36, Failed: 0, Warnings: 1
+
+
 -- 
-1.7.11.7
+Federico Vaga
