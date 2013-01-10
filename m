@@ -1,190 +1,235 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Jan 2013 23:05:42 +0000
-Subject: [PATCH 01/16] ARM: b.L: secondary kernel entry code
-In-Reply-To: <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
+Date: Thu, 10 Jan 2013 23:08:54 +0000
+Subject: [PATCH 02/16] ARM: b.L: introduce the CPU/cluster power API
+In-Reply-To: <1357777251-13541-3-git-send-email-nicolas.pitre@linaro.org>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130110230542.GB11628@mudshark.cambridge.arm.com>
+ <1357777251-13541-3-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130110230854.GC11628@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 12:20:36AM +0000, Nicolas Pitre wrote:
-> CPUs in a big.LITTLE systems have special needs when entering the kernel
-> due to a hotplug event, or when resuming from a deep sleep mode.
+On Thu, Jan 10, 2013 at 12:20:37AM +0000, Nicolas Pitre wrote:
+> This is the basic API used to handle the powering up/down of individual
+> CPUs in a big.LITTLE system.  The platform specific backend implementation
+> has the responsibility to also handle the cluster level power as well when
+> the first/last CPU in a cluster is brought up/down.
 > 
-> This is vectorized so multiple CPUs can enter the kernel in parallel
-> without serialization.
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/arm/common/bL_entry.c      | 88 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/bL_entry.h | 92 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 180 insertions(+)
 > 
-> Only the basic structure is introduced here.  This will be extended
-> later.
-> 
-> TODO: MPIDR based indexing should eventually be made runtime adjusted.
-
-Agreed.
-
 > diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
-> new file mode 100644
-> index 0000000000..80fff49417
-> --- /dev/null
+> index 80fff49417..41de0622de 100644
+> --- a/arch/arm/common/bL_entry.c
 > +++ b/arch/arm/common/bL_entry.c
-> @@ -0,0 +1,30 @@
-> +/*
-> + * arch/arm/common/bL_entry.c -- big.LITTLE kernel re-entry point
-> + *
-> + * Created by:  Nicolas Pitre, March 2012
-> + * Copyright:   (C) 2012  Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+> @@ -11,11 +11,13 @@
+>  
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+> +#include <linux/irqflags.h>
+>  
+>  #include <asm/bL_entry.h>
+>  #include <asm/barrier.h>
+>  #include <asm/proc-fns.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/idmap.h>
+>  
+>  extern volatile unsigned long bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
+>  
+> @@ -28,3 +30,89 @@ void bL_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
+>  	outer_clean_range(__pa(&bL_entry_vectors[cluster][cpu]),
+>  			  __pa(&bL_entry_vectors[cluster][cpu + 1]));
+>  }
 > +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
+> +static const struct bL_platform_power_ops *platform_ops;
 > +
-> +#include <asm/bL_entry.h>
-> +#include <asm/barrier.h>
-> +#include <asm/proc-fns.h>
-> +#include <asm/cacheflush.h>
-> +
-> +extern volatile unsigned long bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
-
-Does this actually need to be volatile? I'd have thought a compiler
-barrier in place of the smp_wmb below would be enough (following on from
-Catalin's comments).
-
-> +
-> +void bL_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
+> +int __init bL_platform_power_register(const struct bL_platform_power_ops *ops)
 > +{
-> +	unsigned long val = ptr ? virt_to_phys(ptr) : 0;
-> +	bL_entry_vectors[cluster][cpu] = val;
-> +	smp_wmb();
-> +	__cpuc_flush_dcache_area((void *)&bL_entry_vectors[cluster][cpu], 4);
-> +	outer_clean_range(__pa(&bL_entry_vectors[cluster][cpu]),
-> +			  __pa(&bL_entry_vectors[cluster][cpu + 1]));
+> +	if (platform_ops)
+> +		return -EBUSY;
+> +	platform_ops = ops;
+> +	return 0;
 > +}
-> diff --git a/arch/arm/common/bL_head.S b/arch/arm/common/bL_head.S
-> new file mode 100644
-> index 0000000000..9d351f2b4c
-> --- /dev/null
-> +++ b/arch/arm/common/bL_head.S
-> @@ -0,0 +1,81 @@
-> +/*
-> + * arch/arm/common/bL_head.S -- big.LITTLE kernel re-entry point
-> + *
-> + * Created by:  Nicolas Pitre, March 2012
-> + * Copyright:   (C) 2012  Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
 > +
-> +#include <linux/linkage.h>
-> +#include <asm/bL_entry.h>
-> +
-> +	.macro	pr_dbg	cpu, string
-> +#if defined(CONFIG_DEBUG_LL) && defined(DEBUG)
-> +	b	1901f
-> +1902:	.ascii	"CPU 0: \0CPU 1: \0CPU 2: \0CPU 3: \0"
-> +	.ascii	"CPU 4: \0CPU 5: \0CPU 6: \0CPU 7: \0"
-> +1903:	.asciz	"\string"
-> +	.align
-> +1901:	adr	r0, 1902b
-> +	add	r0, r0, \cpu, lsl #3
-> +	bl	printascii
-> +	adr	r0, 1903b
-> +	bl	printascii
-> +#endif
-> +	.endm
-> +
-> +	.arm
-> +	.align
-> +
-> +ENTRY(bL_entry_point)
-> +
-> + THUMB(	adr	r12, BSYM(1f)	)
-> + THUMB(	bx	r12		)
-> + THUMB(	.thumb			)
-> +1:
-> +	mrc	p15, 0, r0, c0, c0, 5
-> +	ubfx	r9, r0, #0, #4			@ r9 = cpu
-> +	ubfx	r10, r0, #8, #4			@ r10 = cluster
-> +	mov	r3, #BL_CPUS_PER_CLUSTER
-> +	mla	r4, r3, r10, r9			@ r4 = canonical CPU index
-> +	cmp	r4, #(BL_CPUS_PER_CLUSTER * BL_NR_CLUSTERS)
-> +	blo	2f
-> +
-> +	/* We didn't expect this CPU.  Try to make it quiet. */
-> +1:	wfi
-> +	wfe
-> +	b	1b
+> +int bL_cpu_power_up(unsigned int cpu, unsigned int cluster)
+> +{
+> +	if (!platform_ops)
+> +		return -EUNATCH;
 
-I realise this CPU is stuck at this point, but you should have a dsb
-before a wfi instruction. This could be problematic with the CCI this
-early, so maybe just a comment saying that it doesn't matter because we
-don't care about this core?
+Is this the right error code?
+
+> +	might_sleep();
+> +	return platform_ops->power_up(cpu, cluster);
+> +}
+> +
+> +typedef void (*phys_reset_t)(unsigned long);
+
+Maybe it's worth putting this typedef in a header file somewhere. It's
+also used by the soft reboot code.
 
 > +
-> +2:	pr_dbg	r4, "kernel bL_entry_point\n"
+> +void bL_cpu_power_down(void)
+> +{
+> +	phys_reset_t phys_reset;
+> +
+> +	BUG_ON(!platform_ops);
+
+Seems a bit overkill, or are we unrecoverable by this point?
+
+> +	BUG_ON(!irqs_disabled());
 > +
 > +	/*
-> +	 * MMU is off so we need to get to bL_entry_vectors in a
-> +	 * position independent way.
+> +	 * Do this before calling into the power_down method,
+> +	 * as it might not always be safe to do afterwards.
 > +	 */
-> +	adr	r5, 3f
-> +	ldr	r6, [r5]
-> +	add	r6, r5, r6			@ r6 = bL_entry_vectors
+> +	setup_mm_for_reboot();
 > +
-> +bL_entry_gated:
-> +	ldr	r5, [r6, r4, lsl #2]		@ r5 = CPU entry vector
-> +	cmp	r5, #0
-> +	wfeeq
-> +	beq	bL_entry_gated
-> +	pr_dbg	r4, "released\n"
-> +	bx	r5
+> +	platform_ops->power_down();
 > +
-> +	.align	2
+> +	/*
+> +	 * It is possible for a power_up request to happen concurrently
+> +	 * with a power_down request for the same CPU. In this case the
+> +	 * power_down method might not be able to actually enter a
+> +	 * powered down state with the WFI instruction if the power_up
+> +	 * method has removed the required reset condition.  The
+> +	 * power_down method is then allowed to return. We must perform
+> +	 * a re-entry in the kernel as if the power_up method just had
+> +	 * deasserted reset on the CPU.
+> +	 *
+> +	 * To simplify race issues, the platform specific implementation
+> +	 * must accommodate for the possibility of unordered calls to
+> +	 * power_down and power_up with a usage count. Therefore, if a
+> +	 * call to power_up is issued for a CPU that is not down, then
+> +	 * the next call to power_down must not attempt a full shutdown
+> +	 * but only do the minimum (normally disabling L1 cache and CPU
+> +	 * coherency) and return just as if a concurrent power_up request
+> +	 * had happened as described above.
+> +	 */
 > +
-> +3:	.word	bL_entry_vectors - .
+> +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+> +	phys_reset(virt_to_phys(bL_entry_point));
 > +
-> +ENDPROC(bL_entry_point)
+> +	/* should never get here */
+> +	BUG();
+> +}
 > +
-> +	.bss
-> +	.align	5
+> +void bL_cpu_suspend(u64 expected_residency)
+> +{
+> +	phys_reset_t phys_reset;
 > +
-> +	.type	bL_entry_vectors, #object
-> +ENTRY(bL_entry_vectors)
-> +	.space	4 * BL_NR_CLUSTERS * BL_CPUS_PER_CLUSTER
-
-Is there a particular reason to put this in the bss?
-
+> +	BUG_ON(!platform_ops);
+> +	BUG_ON(!irqs_disabled());
+> +
+> +	/* Very similar to bL_cpu_power_down() */
+> +	setup_mm_for_reboot();
+> +	platform_ops->suspend(expected_residency);
+> +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+> +	phys_reset(virt_to_phys(bL_entry_point));
+> +	BUG();
+> +}
+> +
+> +int bL_cpu_powered_up(void)
+> +{
+> +	if (!platform_ops)
+> +		return -EUNATCH;
+> +	if (platform_ops->powered_up)
+> +		platform_ops->powered_up();
+> +	return 0;
+> +}
 > diff --git a/arch/arm/include/asm/bL_entry.h b/arch/arm/include/asm/bL_entry.h
-> new file mode 100644
-> index 0000000000..ff623333a1
-> --- /dev/null
+> index ff623333a1..942d7f9f19 100644
+> --- a/arch/arm/include/asm/bL_entry.h
 > +++ b/arch/arm/include/asm/bL_entry.h
-> @@ -0,0 +1,35 @@
+> @@ -31,5 +31,97 @@ extern void bL_entry_point(void);
+>   */
+>  void bL_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr);
+>  
 > +/*
-> + * arch/arm/include/asm/bL_entry.h
-> + *
-> + * Created by:  Nicolas Pitre, April 2012
-> + * Copyright:   (C) 2012  Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
+> + * CPU/cluster power operations API for higher subsystems to use.
 > + */
 > +
-> +#ifndef BL_ENTRY_H
-> +#define BL_ENTRY_H
+> +/**
+> + * bL_cpu_power_up - make given CPU in given cluster runable
+> + *
+> + * @cpu: CPU number within given cluster
+> + * @cluster: cluster number for the CPU
+> + *
+> + * The identified CPU is brought out of reset.  If the cluster was powered
+> + * down then it is brought up as well, taking care not to let the other CPUs
+> + * in the cluster run, and ensuring appropriate cluster setup.
+> + *
+> + * Caller must ensure the appropriate entry vector is initialized with
+> + * bL_set_entry_vector() prior to calling this.
+> + *
+> + * This must be called in a sleepable context.  However, the implementation
+> + * is strongly encouraged to return early and let the operation happen
+> + * asynchronously, especially when significant delays are expected.
+> + *
+> + * If the operation cannot be performed then an error code is returned.
+> + */
+> +int bL_cpu_power_up(unsigned int cpu, unsigned int cluster);
 > +
-> +#define BL_CPUS_PER_CLUSTER	4
-> +#define BL_NR_CLUSTERS		2
+> +/**
+> + * bL_cpu_power_down - power the calling CPU down
+> + *
+> + * The calling CPU is powered down.
+> + *
+> + * If this CPU is found to be the "last man standing" in the cluster
+> + * then the cluster is prepared for power-down too.
+> + *
+> + * This must be called with interrupts disabled.
+> + *
+> + * This does not return.  Re-entry in the kernel is expected via
+> + * bL_entry_point.
+> + */
+> +void bL_cpu_power_down(void);
+> +
+> +/**
+> + * bL_cpu_suspend - bring the calling CPU in a suspended state
+> + *
+> + * @expected_residency: duration in microseconds the CPU is expected
+> + *			to remain suspended, or 0 if unknown/infinity.
+> + *
+> + * The calling CPU is suspended.  The expected residency argument is used
+> + * as a hint by the platform specific backend to implement the appropriate
+> + * sleep state level according to the knowledge it has on wake-up latency
+> + * for the given hardware.
+> + *
+> + * If this CPU is found to be the "last man standing" in the cluster
+> + * then the cluster may be prepared for power-down too, if the expected
+> + * residency makes it worthwhile.
+> + *
+> + * This must be called with interrupts disabled.
+> + *
+> + * This does not return.  Re-entry in the kernel is expected via
+> + * bL_entry_point.
+> + */
+> +void bL_cpu_suspend(u64 expected_residency);
+> +
+> +/**
+> + * bL_cpu_powered_up - housekeeping workafter a CPU has been powered up
+> + *
+> + * This lets the platform specific backend code perform needed housekeeping
+> + * work.  This must be called by the newly activated CPU as soon as it is
+> + * fully operational in kernel space, before it enables interrupts.
+> + *
+> + * If the operation cannot be performed then an error code is returned.
+> + */
+> +int bL_cpu_powered_up(void);
+> +
+> +/*
+> + * Platform specific methods used in the implementation of the above API.
+> + */
+> +struct bL_platform_power_ops {
+> +	int (*power_up)(unsigned int cpu, unsigned int cluster);
+> +	void (*power_down)(void);
+> +	void (*suspend)(u64);
+> +	void (*powered_up)(void);
+> +};
 
-Hmm, I see these have to be constant so you can allocate your space in
-the assembly file. In which case, I think it's worth changing their
-names to have MAX or LIMIT in them... maybe they could even be CONFIG
-options?
+It would be good if these prototypes matched the PSCI code, then platforms
+could just glue them together directly.
 
 Will
