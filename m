@@ -1,25 +1,22 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 10 Jan 2013 10:52:22 +0000
-Subject: [RFC PATCH 5/7] ARM: s3c64xx: Add board file for boot using
- Device Tree
-In-Reply-To: <1357774909-29938-6-git-send-email-tomasz.figa@gmail.com>
-References: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
- <1357774909-29938-6-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20130110105221.GG20956@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Jan 2013 11:52:28 +0100
+Subject: [PATCH 01/26] gpio: samsung: remove inclusion <mach/regs-clock.h>
+In-Reply-To: <1357165443-3716-2-git-send-email-kgene.kim@samsung.com>
+References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
+ <1357165443-3716-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CACRpkdYhNHwqK3YkEKQedFvYDc6kuwesY4gmMroipnnhrLP6pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 12:41:47AM +0100, Tomasz Figa wrote:
+On Wed, Jan 2, 2013 at 11:23 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-> + * The following lookup table is used to override device names when devices
-> + * are registered from device tree. This is temporarily added to enable
-> + * device tree support addition for the Exynos4 architecture.
+> The <mach/regs-clock.h> is not needed for gpio-samsung.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Cut'n'paste.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/1b0db75f/attachment.sig>
+Applied to fixes, thanks.
+
+Yours,
+Linus Walleij
