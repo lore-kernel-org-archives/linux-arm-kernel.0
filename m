@@ -1,32 +1,51 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 10 Jan 2013 17:01:50 +0300
-Subject: [PATCH v5 2/3] sta2x11_vip: convert to videobuf2 and control
- framework
-In-Reply-To: <1357822010-30419-3-git-send-email-federico.vaga@gmail.com>
-References: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
- <1357822010-30419-3-git-send-email-federico.vaga@gmail.com>
-Message-ID: <20130110140150.GA19949@mwanda>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Thu, 10 Jan 2013 14:02:53 +0000
+Subject: [PATCH v2 2/2] ARM: imx: enable imx6q-cpufreq support
+In-Reply-To: <20130110132053.GA9139@S2101-09.ap.freescale.net>
+References: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
+ <1357806863-6899-3-git-send-email-shawn.guo@linaro.org>
+ <B5906170F1614E41A8A28DE3B8D121433ECDF7BF@DBDE01.ent.ti.com>
+ <20130110110742.GI2265@S2101-09.ap.freescale.net>
+ <B5906170F1614E41A8A28DE3B8D121433ECDFC9B@DBDE01.ent.ti.com>
+ <20130110132053.GA9139@S2101-09.ap.freescale.net>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDFE3B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This would be easier to review if it were broken up into separate
-patches.
+On Thu, Jan 10, 2013 at 18:50:55, Shawn Guo wrote:
+> On Thu, Jan 10, 2013 at 01:02:30PM +0000, Bedia, Vaibhav wrote:
+> > In the current approach the OPP data is split across DT and kernel code. If you take the
+> > other approach all OPP entries can reside in DT and for someone just looking at that file
+> > there's no confusion about what the kernel could potentially support. Whether a particular
+> > an OPP should be supported is best decided at runtime.
+> > 
+> Listing the OPP that some Si rev can not support in DT is also
+> a confusion to people who is just looking at DTS.  To me, the approach
+> is not really doing anything better on this aspect.
+> 
 
-1) There are superflous white spaces changes
-2) Changes to the copyright
-3) pr_warning => pr_warn
-4) The REG_READ and REG_WRITE macros are now inline functions
-5) KBUILD_MODNAME is used instead of DRV_NAME
-6) It now uses the video_drvdata() function
-7) Lots of comments deleted.  For exmple, vidioc_enum_fmt_vid_cap()
-   didn't change.  Just the comments were deleted.
-8) Comments added for existing code.
-9) Other behavior changes not related to using videobuf2 like in
-   vidioc_try_fmt_vid_cap().
-10) etc...
+I still think putting the OPP data in a single place is better.
 
-If all the uninteresting changes are in separate patches it makes
-the complicated stuff much shorter and easier to review.
+> > Also, IMHO letting platforms invoke opp_add() is open to abuse and platforms should be
+> > restricted to invoking opp_enable/disable to indicate what's possible on a particular Si rev. 
+> > 
+> I do not see anything wrong with platform adding the OPP it can support.
+> Isn't omap_init_opp_table() being called by platform code?  I do not see
+> omap-cpufreq driver is calling a platform hook to do that.
+> 
+> Sorry, I'm not really a fan of platform hook, and I have spent past
+> couple years to minimize the use of it when converting IMX family to
+> device tree.
+> 
 
-regards,
-dan carpenter
+I don't know what the OMAP plans are but with DT + generic driver adoption I would expect most
+of it to go away. And adding the platform hook with the right DT data is just preparing
+things for the future with 2 potential users right now.
+
+If OPP data across Si rev starts looking very different all entries can be placed in a single
+place and the platform code enables what are relevant. Unless there's a Si rev specific blob a bunch
+of opp_add() calls ignoring what was passed defeats the purpose of moving the information out of the
+kernel.
+ 
+Regards,
+Vaibhav
