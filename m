@@ -1,42 +1,105 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 10 Jan 2013 15:36:01 +0100
-Subject: [RFC PATCH 0/5] Use SRC to reset IP modules on i.MX5 and i.MX6
-In-Reply-To: <CAOMZO5C28qgH5DVooxYg5p6tA7bsFJshr4qxZEyp05A1LR3JWA@mail.gmail.com>
-References: <1357751839-19680-1-git-send-email-p.zabel@pengutronix.de>
- <CAOMZO5Cgem3xyYg9MawnxXx_tDKgtiA_g6odu2wtnAeXWjdfmA@mail.gmail.com>
- <1357753220.8747.3.camel@pizza.hi.pengutronix.de>
- <CAOMZO5C_v92S0kBt66a2SsHGGGSBjJSP18-CQfWQ=sz0YW7ztg@mail.gmail.com>
- <CAOMZO5C28qgH5DVooxYg5p6tA7bsFJshr4qxZEyp05A1LR3JWA@mail.gmail.com>
-Message-ID: <1357828561.2363.676.camel@pizza.hi.pengutronix.de>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Thu, 10 Jan 2013 15:41:00 +0100
+Subject: [PATCH v5 2/3] sta2x11_vip: convert to videobuf2 and control
+ framework
+In-Reply-To: <3596574.18Q2Rh4jo9@harkonnen>
+References: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
+ <1357822010-30419-3-git-send-email-federico.vaga@gmail.com>
+ <3596574.18Q2Rh4jo9@harkonnen>
+Message-ID: <201301101541.01082.hansverk@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 09.01.2013, 15:57 -0200 schrieb Fabio Estevam:
-> On Wed, Jan 9, 2013 at 3:53 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Wed, Jan 9, 2013 at 3:40 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> >
-> >> I rebased them onto next-20130109 (with this base compile-tested only).
-> >
-> > Just tested it, but unfortunately I still get the crash.
-> 
-> Ok, since I am on mx51 I just added a:
-> 
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index 1f5d45e..8380b14 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -67,6 +67,7 @@
->                         compatible = "fsl,imx51-ipu";
->                         reg = <0x40000000 0x20000000>;
->                         interrupts = <11 10>;
-> +                       reset = <&src 2>;
->                 };
-> 
-> and now it works fine.
+On Thu 10 January 2013 13:57:19 Federico Vaga wrote:
+> @Hans: here the output of v4l2-compliance that you request me for the v4 
+> version. This is done on the v5 version where I applied your suggestion. I 
+> have 1 warning but I don't understand where is the problem
 
-Thanks, sorry for missing the essential part for i.MX51.
-So it seems hooking up the SRC to a common peripheral device reset call
-is the way to go.
+To see the warning you need to run v4l2-compliance with the '-v1' option.
 
-regards
-Philipp
+Hmm, I think I should probably change v4l2-compliance to show warnings by default
+and add an option that surpresses warnings. That might work better.
+
+Regards,
+
+	Hans
+
+> 
+> Driver Info:
+> 	Driver name   : sta2x11_vip
+> 	Card type     : sta2x11_vip
+> 	Bus info      : PCI:0000:06:00.0
+> 	Driver version: 3.6.0
+> 	Capabilities  : 0x85000001
+> 		Video Capture
+> 		Read/Write
+> 		Streaming
+> 		Device Capabilities
+> 	Device Caps   : 0x05000001
+> 		Video Capture
+> 		Read/Write
+> 		Streaming
+> 
+> Compliance test for device /dev/video0 (not using libv4l2):
+> 
+> Required ioctls:
+> 	test VIDIOC_QUERYCAP: OK
+> 
+> Allow for multiple opens:
+> 	test second video open: OK
+> 	test VIDIOC_QUERYCAP: OK
+> 	test VIDIOC_G/S_PRIORITY: OK
+> 
+> Debug ioctls:
+> 	test VIDIOC_DBG_G_CHIP_IDENT: Not Supported
+> 	test VIDIOC_DBG_G/S_REGISTER: Not Supported
+> 	test VIDIOC_LOG_STATUS: OK
+> 
+> Input ioctls:
+> 	test VIDIOC_G/S_TUNER: Not Supported
+> 	test VIDIOC_G/S_FREQUENCY: Not Supported
+> 	test VIDIOC_S_HW_FREQ_SEEK: OK
+> 	test VIDIOC_ENUMAUDIO: Not Supported
+> 	test VIDIOC_G/S/ENUMINPUT: OK
+> 	test VIDIOC_G/S_AUDIO: Not Supported
+> 	Inputs: 2 Audio Inputs: 0 Tuners: 0
+> 
+> Output ioctls:
+> 	test VIDIOC_G/S_MODULATOR: Not Supported
+> 	test VIDIOC_G/S_FREQUENCY: Not Supported
+> 	test VIDIOC_ENUMAUDOUT: Not Supported
+> 	test VIDIOC_G/S/ENUMOUTPUT: Not Supported
+> 	test VIDIOC_G/S_AUDOUT: Not Supported
+> 	Outputs: 0 Audio Outputs: 0 Modulators: 0
+> 
+> Control ioctls:
+> 	test VIDIOC_QUERYCTRL/MENU: OK
+> 	test VIDIOC_G/S_CTRL: OK
+> 	test VIDIOC_G/S/TRY_EXT_CTRLS: OK
+> 	test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
+> 	test VIDIOC_G/S_JPEGCOMP: Not Supported
+> 	Standard Controls: 5 Private Controls: 0
+> 
+> Input/Output configuration ioctls:
+> 	test VIDIOC_ENUM/G/S/QUERY_STD: OK
+> 	test VIDIOC_ENUM/G/S/QUERY_DV_PRESETS: Not Supported
+> 	test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: Not Supported
+> 	test VIDIOC_DV_TIMINGS_CAP: Not Supported
+> 
+> Format ioctls:
+> 	test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+> 	test VIDIOC_G/S_PARM: OK
+> 	test VIDIOC_G_FBUF: Not Supported
+> 	test VIDIOC_G_FMT: OK
+> 	test VIDIOC_TRY_FMT: OK
+> 	test VIDIOC_S_FMT: OK
+> 	test VIDIOC_G_SLICED_VBI_CAP: Not Supported
+> 
+> Buffer ioctls:
+> 	test VIDIOC_REQBUFS/CREATE_BUFS: OK
+> 	test read/write: OK
+> 
+> Total: 36, Succeeded: 36, Failed: 0, Warnings: 1
+> 
+> 
+> 
