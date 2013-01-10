@@ -1,211 +1,61 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Thu, 10 Jan 2013 12:07:52 -0800
-Subject: [PATCH 5/5] ARM: exynos: enable/disable cpuidle when cpu1 is
- down/up
-In-Reply-To: <1357318799-24378-5-git-send-email-daniel.lezcano@linaro.org>
-References: <1357318799-24378-1-git-send-email-daniel.lezcano@linaro.org>
- <1357318799-24378-5-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CADGdYn7y_SSmLoEpeRjL8PDSZS-YJwC1QpRcUocSSnDyM8BRhQ@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 10 Jan 2013 21:20:07 +0100
+Subject: [PATCH 05/14] lib: Add I/O map cache implementation
+In-Reply-To: <20130110192417.GA18478@obsidianresearch.com>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130109231758.GA27065@obsidianresearch.com>
+ <20130110071937.GG15212@avionic-0098.adnet.avionic-design.de>
+ <201301100917.19577.arnd@arndb.de>
+ <20130110102544.GA5546@avionic-0098.adnet.avionic-design.de>
+ <20130110182007.GA28004@obsidianresearch.com>
+ <20130110185505.GA22944@avionic-0098.adnet.avionic-design.de>
+ <20130110190327.GA23110@avionic-0098.adnet.avionic-design.de>
+ <20130110192417.GA18478@obsidianresearch.com>
+Message-ID: <20130110202007.GA26139@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thu, Jan 10, 2013 at 12:24:17PM -0700, Jason Gunthorpe wrote:
+> On Thu, Jan 10, 2013 at 08:03:27PM +0100, Thierry Reding wrote:
+> 
+> > > > You'd piece a mapping together, each bus requires 16 64k mappings, a
+> > > > simple 2d array of busnr*16 of pointers would do the trick. A more
+> > > > clever solution would be to allocate contiguous virtual memory and
+> > > > split that up..
+>  
+> > > Oh, I see. I'm not very familiar with the internals of remapping, so
+> > > I'll need to do some more reading. Thanks for the hints.
+> > 
+> > I forgot to ask. What's the advantage of having a contiguous virtual
+> > memory area and splitting it up versus remapping each chunk separately?
+> 
+> Not alot, really, but it saves you from the pointer array and
+> associated overhead. IIRC it is fairly easy to do in the kernel.
 
-This hotplug noifiers looks fine. I suppose it should add extra state
-C1 in cpu0. If it is done like below than for normal cases(when all
-cpu's are online) there wont be any statistics for C0 state also which
-is required. Other patches look good.
+I've been investigating this a bit, and one problem is that it will
+prevent the driver from ever building as a module because the necessary
+functions aren't exported and I'm not sure exporting them would be
+acceptable. Currently PCI host controller drivers with MSI support can't
+be built as modules because the MSI infrastructure requires it, but I
+briefly discussed this with Bjorn at some point and it should be easy to
+remove that requirement.
 
-Thanks,
-Amit
+> Arnd's version is good too, but you would be restricted to aligned
+> powers of two for the bus number range in the DT, which is probably
+> not that big a deal either?
 
-On Fri, Jan 4, 2013 at 8:59 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> What we have now is (1) cpu0 going always to WFI when cpu1 is up,
-> (2) cpu0 going to all states when cpu1 is down.
->
-> In other words, cpuidle is disabled when cpu1 is up and enabled
-> when cpu1 is down.
->
-> This patch use the cpu hotplug notifier to enable/disable cpuidle,
-> when the cpu1 is plugged or unplugged. That clarifies the code and
-> make it simpler.
->
-> Signed-off: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/mach-exynos/cpuidle.c |  117 +++++++++++++++++++++++-----------------
->  1 file changed, 69 insertions(+), 48 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> index e6f006b..d8f6f33 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -12,6 +12,8 @@
->  #include <linux/init.h>
->  #include <linux/cpuidle.h>
->  #include <linux/cpu_pm.h>
-> +#include <linux/notifier.h>
-> +#include <linux/cpu.h>
->  #include <linux/io.h>
->  #include <linux/export.h>
->  #include <linux/time.h>
-> @@ -36,31 +38,8 @@
->
->  #define S5P_CHECK_AFTR         0xFCBA0D10
->
-> -static int exynos4_enter_lowpower(struct cpuidle_device *dev,
-> -                               struct cpuidle_driver *drv,
-> -                               int index);
-> -
->  static struct cpuidle_device exynos4_cpuidle_device;
->
-> -static struct cpuidle_driver exynos4_idle_driver = {
-> -       .name                   = "exynos4_idle",
-> -       .owner                  = THIS_MODULE,
-> -       .en_core_tk_irqen       = 1,
-> -       .states = {
-> -               [0] = ARM_CPUIDLE_WFI_STATE,
-> -               [1] = {
-> -                       .enter            = exynos4_enter_lowpower,
-> -                       .exit_latency     = 300,
-> -                       .target_residency = 100000,
-> -                       .flags            = CPUIDLE_FLAG_TIME_VALID,
-> -                       .name             = "C1",
-> -                       .desc             = "ARM power down",
-> -               },
-> -       },
-> -       .state_count = 2,
-> -       .safe_state_index = 0,
-> -};
-> -
->  /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
->  static void exynos4_set_wakeupmask(void)
->  {
-> @@ -93,9 +72,9 @@ static int idle_finisher(unsigned long flags)
->         return 1;
->  }
->
-> -static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
-> -                               struct cpuidle_driver *drv,
-> -                               int index)
-> +static int exynos4_enter_lowpower(struct cpuidle_device *dev,
-> +                                 struct cpuidle_driver *drv,
-> +                                 int index)
->  {
->         unsigned long tmp;
->
-> @@ -143,22 +122,6 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
->         return index;
->  }
->
-> -static int exynos4_enter_lowpower(struct cpuidle_device *dev,
-> -                               struct cpuidle_driver *drv,
-> -                               int index)
-> -{
-> -       int new_index = index;
-> -
-> -       /* This mode only can be entered when other core's are offline */
-> -       if (num_online_cpus() > 1)
-> -               new_index = drv->safe_state_index;
-> -
-> -       if (new_index == 0)
-> -               return arm_cpuidle_simple_enter(dev, drv, new_index);
-> -       else
-> -               return exynos4_enter_core0_aftr(dev, drv, new_index);
-> -}
-> -
->  static void __init exynos5_core_down_clk(void)
->  {
->         unsigned int tmp;
-> @@ -191,6 +154,62 @@ static void __init exynos5_core_down_clk(void)
->         __raw_writel(tmp, EXYNOS5_PWR_CTRL2);
->  }
->
-> +static int cpu_hotplug_notify(struct notifier_block *n,
-> +                             unsigned long action, void *hcpu)
-> +{
-> +       int ret;
-> +
-> +       /*
-> +        * cpu0 can't be shutdown on Origen, so this routine is
-> +        * called only for cpu1.
-> +        */
-> +
-> +       switch (action & 0xf) {
-> +
-> +       case CPU_ONLINE:
-> +               cpuidle_pause_and_lock();
-> +               cpuidle_disable_device(&exynos4_cpuidle_device);
-> +               cpuidle_resume_and_unlock();
-> +               break;
-> +
-> +       case CPU_DEAD:
-> +               if (!exynos4_cpuidle_device.registered) {
-> +                       ret = cpuidle_register_device(&exynos4_cpuidle_device);
-> +                       WARN_ONCE(ret, "Failed to register cpuidle device");
-> +               } else {
-> +                       cpuidle_pause_and_lock();
-> +                       cpuidle_enable_device(&exynos4_cpuidle_device);
-> +                       cpuidle_resume_and_unlock();
-> +               }
-> +               break;
-> +       }
-> +
-> +       return NOTIFY_OK;
-> +}
-> +
-> +static struct notifier_block cpu_hotplug_notifier = {
-> +       .notifier_call = cpu_hotplug_notify,
-> +};
-> +
-> +static struct cpuidle_driver exynos4_idle_driver = {
-> +       .name                   = "exynos4_idle",
-> +       .owner                  = THIS_MODULE,
-> +       .en_core_tk_irqen       = 1,
-> +       .states = {
-> +               [0] = ARM_CPUIDLE_WFI_STATE,
-> +               [1] = {
-> +                       .enter            = exynos4_enter_lowpower,
-> +                       .exit_latency     = 300,
-> +                       .target_residency = 100000,
-> +                       .flags            = CPUIDLE_FLAG_TIME_VALID,
-> +                       .name             = "C1",
-> +                       .desc             = "ARM power down",
-> +               },
-> +       },
-> +       .state_count = 2,
-> +       .safe_state_index = 0,
-> +};
-> +
->  static int __init exynos4_init_cpuidle(void)
->  {
->         int ret;
-> @@ -204,12 +223,14 @@ static int __init exynos4_init_cpuidle(void)
->                 return ret;
->         }
->
-> -       ret = cpuidle_register_device(&exynos4_cpuidle_device);
-> -       if (ret) {
-> -               printk(KERN_ERR "CPUidle register device failed\n");
-> -               return ret;
-> -       }
-> +       ret = register_cpu_notifier(&cpu_hotplug_notifier);
-> +       if (ret)
-> +               goto out_unregister_driver;
-> +out:
-> +       return ret;
->
-> -       return 0;
-> +out_unregister_driver:
-> +       cpuidle_unregister_driver(&exynos4_idle_driver);
-> +       goto out;
->  }
->  device_initcall(exynos4_init_cpuidle);
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
+Stephen suggested on IRC that we could try to keep a bit of dynamicity
+in the allocation scheme if we create the bus mapping when the first
+device on the bus is probed and discard the mapping if no devices are
+found.
+
+Sounds like a good plan to me. Does anybody see any potential pitfalls?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/2ef4883c/attachment.sig>
