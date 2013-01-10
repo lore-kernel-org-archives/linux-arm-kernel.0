@@ -1,93 +1,198 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 10 Jan 2013 18:51:31 +0200
-Subject: [PATCH 11/14] ARM: OMAP2+: omap4panda: Provide USB Host's PHY
- platform data
+Date: Thu, 10 Jan 2013 18:51:27 +0200
+Subject: [PATCH 07/14] usb: ehci-omap: Instantiate PHY devices if required
 In-Reply-To: <1357836694-30788-1-git-send-email-rogerq@ti.com>
 References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
-Message-ID: <1357836694-30788-12-git-send-email-rogerq@ti.com>
+Message-ID: <1357836694-30788-8-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide platform data for the USB host's PHY.
+If the OMAP's Host controller is in PHY mode then we instantiate
+a platform device for the PHY (one for each port in PHY mode) and
+hold a reference to it so that we can use the usb_phy API, e.g.
+while suspend/resume.
 
-Also get rid of managing PHY clock. This will now be done by the phy driver.
-For that to work we create a clock alias that links the PHY clock name to the
-PHY device name.
+The platform data for the PHY must be supplied in the newly added
+.phy_config parameter in struct usbhs_omap_platform_data.
+
+The end goal is to move the PHY's reset and power handling code
+out of the ehci-omap driver and into the phy driver.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/board-omap4panda.c |   31 ++++++++++++++++++++-----------
- 1 files changed, 20 insertions(+), 11 deletions(-)
+ drivers/usb/host/ehci-omap.c           |   83 ++++++++++++++++++++++++++++++-
+ include/linux/platform_data/usb-omap.h |    8 +++
+ 2 files changed, 88 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index ee76830..350c4db 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -30,6 +30,7 @@
- #include <linux/regulator/fixed.h>
- #include <linux/ti_wilink_st.h>
- #include <linux/usb/musb.h>
-+#include <linux/usb/nop-usb-xceiv.h>
- #include <linux/wl12xx.h>
- #include <linux/platform_data/omap-abe-twl6040.h>
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index b96a4bf..e6a2d76 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -61,6 +61,11 @@
  
-@@ -139,6 +140,18 @@ static struct platform_device *panda_devices[] __initdata = {
- 	&btwilink_device,
- };
+ static const struct hc_driver ehci_omap_hc_driver;
  
-+static struct nop_usb_xceiv_platform_data phy_pdata0 = {
-+	.type = USB_PHY_TYPE_UNDEFINED,
-+	/* FREF_CLK3 provides the 19.2 MHz reference clock to the PHY */
-+	.clk_rate = 19200000,
++struct omap_ehci_hcd {
++	struct usb_hcd *hcd;
++	struct usb_phy **phy;	/* one PHY for each port */
++	int nports;
 +};
-+
-+static struct usbhs_phy_config phy_config0 = {
-+	.name = "nop_usb_xceiv",
-+	.pdata = &phy_pdata0,
-+	.pdata_size = sizeof(phy_pdata0),
-+};
-+
- static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
- 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
- 	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
-@@ -146,7 +159,8 @@ static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
- 	.phy_reset  = false,
- 	.reset_gpio_port[0]  = -EINVAL,
- 	.reset_gpio_port[1]  = -EINVAL,
--	.reset_gpio_port[2]  = -EINVAL
-+	.reset_gpio_port[2]  = -EINVAL,
-+	.phy_config[0] = &phy_config0,
- };
  
- static struct gpio panda_ehci_gpios[] __initdata = {
-@@ -157,16 +171,6 @@ static struct gpio panda_ehci_gpios[] __initdata = {
- static void __init omap4_ehci_init(void)
+ static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
  {
- 	int ret;
--	struct clk *phy_ref_clk;
--
--	/* FREF_CLK3 provides the 19.2 MHz reference clock to the PHY */
--	phy_ref_clk = clk_get(NULL, "auxclk3_ck");
--	if (IS_ERR(phy_ref_clk)) {
--		pr_err("Cannot request auxclk3\n");
--		return;
--	}
--	clk_set_rate(phy_ref_clk, 19200000);
--	clk_prepare_enable(phy_ref_clk);
+@@ -179,6 +184,8 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 	struct usbhs_omap_platform_data		*pdata = dev->platform_data;
+ 	struct resource				*res;
+ 	struct usb_hcd				*hcd;
++	struct omap_ehci_hcd			*omap_hcd;
++	struct usb_phy				*phy;
+ 	void __iomem				*regs;
+ 	int					ret = -ENODEV;
+ 	int					irq;
+@@ -193,6 +200,25 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
- 	/* disable the power to the usb hub prior to init and reset phy+hub */
- 	ret = gpio_request_array(panda_ehci_gpios,
-@@ -180,6 +184,11 @@ static void __init omap4_ehci_init(void)
- 	gpio_export(GPIO_HUB_NRESET, 0);
- 	gpio_set_value(GPIO_HUB_NRESET, 1);
- 
-+	/* FREF_CLK3 provides the 19.2 MHz reference clock to the PHY */
-+	ret = clk_add_alias("main_clk", "nop_usb_xceiv.0", "auxclk3_ck", NULL);
-+	if (ret)
-+		pr_err("Failed to add main_clk alias to auxclk3_ck\n");
++	if (!pdata) {
++		dev_err(dev, "Missing platform data\n");
++		return -ENODEV;
++	}
 +
- 	usbhs_init(&usbhs_bdata);
++	omap_hcd = devm_kzalloc(&pdev->dev, sizeof(*omap_hcd), GFP_KERNEL);
++	if (!omap_hcd) {
++		dev_err(dev, "Memory allocation failed\n");
++		return -ENOMEM;
++	}
++
++	omap_hcd->nports = pdata->nports;
++	i = sizeof(struct usb_phy *) * omap_hcd->nports;
++	omap_hcd->phy = devm_kzalloc(&pdev->dev, i, GFP_KERNEL);
++	if (!omap_hcd->phy) {
++		dev_err(dev, "Memory allocation failed\n");
++		return -ENOMEM;
++	}
++
+ 	irq = platform_get_irq_byname(pdev, "ehci-irq");
+ 	if (irq < 0) {
+ 		dev_err(dev, "EHCI irq failed\n");
+@@ -223,9 +249,15 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 	hcd->rsrc_start = res->start;
+ 	hcd->rsrc_len = resource_size(res);
+ 	hcd->regs = regs;
++	omap_hcd->hcd = hcd;
++
++	platform_set_drvdata(pdev, omap_hcd);
  
- 	/* enable power to hub */
+ 	/* get ehci regulator and enable */
+-	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
++	for (i = 0 ; i < omap_hcd->nports ; i++) {
++		struct platform_device *phy_pdev;
++		struct usbhs_phy_config *phy_config;
++
+ 		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY) {
+ 			pdata->regulator[i] = NULL;
+ 			continue;
+@@ -239,6 +271,33 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 		} else {
+ 			regulator_enable(pdata->regulator[i]);
+ 		}
++
++		/* instantiate PHY */
++		if (!pdata->phy_config[i]) {
++			dev_dbg(dev, "missing phy_config for port %d\n", i);
++			continue;
++		}
++
++		phy_config = pdata->phy_config[i];
++		phy_pdev = platform_device_register_data(&pdev->dev,
++				phy_config->name, i, phy_config->pdata,
++				phy_config->pdata_size);
++		if (IS_ERR(phy_pdev)) {
++			dev_dbg(dev, "error creating PHY device for port %d\n",
++					i);
++		}
++
++		phy = usb_get_phy_from_dev(&phy_pdev->dev);
++		if (IS_ERR(phy)) {
++			dev_dbg(dev, "could not get USB PHY for port %d\n", i);
++			platform_device_unregister(phy_pdev);
++			continue;
++		}
++
++		usb_phy_init(phy);
++		omap_hcd->phy[i] = phy;
++		/* bring PHY out of suspend */
++		usb_phy_set_suspend(omap_hcd->phy[i], 0);
+ 	}
+ 
+ 	pm_runtime_enable(dev);
+@@ -269,6 +328,12 @@ err_pm_runtime:
+ 	disable_put_regulator(pdata);
+ 	pm_runtime_put_sync(dev);
+ 	usb_put_hcd(hcd);
++	for (i = 0 ; i < omap_hcd->nports ; i++) {
++		phy = omap_hcd->phy[i];
++		if (!phy)
++			continue;
++		platform_device_unregister(to_platform_device(phy->dev));
++	}
+ 
+ err_io:
+ 	iounmap(regs);
+@@ -286,14 +351,26 @@ err_io:
+  */
+ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ {
+-	struct device *dev				= &pdev->dev;
+-	struct usb_hcd *hcd				= dev_get_drvdata(dev);
++	struct device *dev		= &pdev->dev;
++	struct omap_ehci_hcd *omap_hcd	= dev_get_drvdata(dev);
++	struct usb_hcd *hcd		= omap_hcd->hcd;
++	int i;
+ 
+ 	usb_remove_hcd(hcd);
+ 	disable_put_regulator(dev->platform_data);
+ 	iounmap(hcd->regs);
+ 	usb_put_hcd(hcd);
+ 
++	for (i = 0; i < omap_hcd->nports; i++) {
++		struct usb_phy *phy = omap_hcd->phy[i];
++
++		if (!phy)
++			continue;
++
++		usb_phy_shutdown(phy);
++		platform_device_unregister(to_platform_device(phy->dev));
++	}
++
+ 	pm_runtime_put_sync(dev);
+ 	pm_runtime_disable(dev);
+ 
+diff --git a/include/linux/platform_data/usb-omap.h b/include/linux/platform_data/usb-omap.h
+index d63eb7d..927b8a1 100644
+--- a/include/linux/platform_data/usb-omap.h
++++ b/include/linux/platform_data/usb-omap.h
+@@ -38,6 +38,12 @@ enum usbhs_omap_port_mode {
+ 	OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM
+ };
+ 
++struct usbhs_phy_config {
++	char *name;		/* binds to device driver */
++	void *pdata;		/* platform data for the phy */
++	size_t pdata_size;
++};
++
+ struct usbhs_omap_platform_data {
+ 	int				nports;
+ 	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
+@@ -49,6 +55,8 @@ struct usbhs_omap_platform_data {
+ 	unsigned			single_ulpi_bypass:1;
+ 	unsigned			es2_compatibility:1;
+ 	unsigned			phy_reset:1;
++
++	struct usbhs_phy_config		*phy_config[OMAP3_HS_USB_PORTS];
+ };
+ 
+ /*-------------------------------------------------------------------------*/
 -- 
 1.7.4.1
