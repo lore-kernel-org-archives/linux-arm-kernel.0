@@ -1,47 +1,52 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 10 Jan 2013 14:34:46 -0800
-Subject: [PATCH] hardlockup: detect hard lockups without NMIs using
- secondary cpus
-In-Reply-To: <20130110203833.GE14149@atomide.com>
-References: <1357783059-13923-1-git-send-email-ccross@android.com>
- <20130110203833.GE14149@atomide.com>
-Message-ID: <CAMbhsRR5azGw1-VhC4+9y7NfBPnZkBKnK34AqXdMFBsXPqdjCQ@mail.gmail.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Thu, 10 Jan 2013 16:40:12 -0600
+Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
+In-Reply-To: <20130110222801.GB17111@amt.cnet> (from mtosatti@redhat.com on
+ Thu Jan 10 16:28:01 2013)
+Message-ID: <1357857612.27576.19@snotra>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 12:38 PM, Tony Lindgren <tony@atomide.com> wrote:
->
-> * Colin Cross <ccross@android.com> [130109 18:05]:
-> > +static void watchdog_check_hardlockup_other_cpu(void)
-> > +{
-> > +     int cpu;
-> > +     cpumask_t cpus = watchdog_cpus;
-> > +
-> > +     /*
-> > +      * Test for hardlockups every 3 samples.  The sample period is
-> > +      *  watchdog_thresh * 2 / 5, so 3 samples gets us back to slightly over
-> > +      *  watchdog_thresh (over by 20%).
-> > +      */
-> > +     if (__this_cpu_read(hrtimer_interrupts) % 3 != 0)
-> > +             return;
-> > +
-> > +     /* check for a hardlockup on the next cpu */
-> > +     cpu = cpumask_next(smp_processor_id(), &cpus);
->
-> Hmm don't you want to check cpu_oneline_mask here and
-> return if the other CPU is offline?
+On 01/10/2013 04:28:01 PM, Marcelo Tosatti wrote:
+> On Wed, Jan 09, 2013 at 10:37:20PM +0100, Alexander Graf wrote:
+> >
+> > >
+> > >> >> We can start to introduce (and fix ARM) with a generic ioctl  
+> in the MPIC patches then.
+> > >> >
+> > >> > The ioctl is already generic, except for its name.
+> > >> It's making a few wrong assumptions:
+> > >>  * maximum size of value is u64
+> > >
+> > > This is tolerable IMHO.
+> > >
+> > >>  * combining device id (variable) with addr type id (const) into  
+> a single field. It could just be split into multiple fields
+> > >
+> > > I agree, but that could be lived with as well.
+> > >
+> > > I get that there's a tradeoff between getting something in now,  
+> versus waiting until the API is more refined.  Tagging it with a  
+> particular ISA seems like an odd way of saying "soon to be  
+> deprecated", though.  What happens if we're still squabbling over the  
+> perfect replacement API when we're trying to push PPC MPIC stuff in?
+> 
+> As mentioned, i fail to see the benefit in sharing 0.0x% of the code  
+> (the
+> interface), while the remaining code is not shared.
 
-watchdog_cpus is effectively a local copy of cpu_online_mask, but
-updated after the watchdog_nmi_touch in watchdog_nmi_enable.  This
-avoids a false positive after hotplugging in a cpu when
-cpu_online_mask is true but that cpu hasn't yet run it's first
-hrtimer.
+Pointlessly making things architecture-specific just makes more work  
+for people who later need the functionality on another architecture.   
+It might not be much in this case (unless a particular device ends up  
+being used on multiple architectures), but the principle still  
+applies.  It's also more work for tools like strace, and could get in  
+the way of the userspace caller using common code.
 
-> > +     if (cpu >= nr_cpu_ids)
-> > +             cpu = cpumask_first(&cpus);
-> > +     if (cpu == smp_processor_id())
-> > +             return;
->
-> Regards,
->
-> Tony
+> > Then we're the ones who have to come up with a good interface.
+> 
+> Or just have KVM_SET_PPC_DEVICE_ADDRESS. Is there a downside to that?
+
+Besides the above, and my original complaint that it shouldn't be  
+specific to addresses?
+
+-Scott
