@@ -1,95 +1,239 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 10 Jan 2013 10:56:51 +0900
-Subject: [PATCH 1/8] SH: intc: Add support OF for INTC
-In-Reply-To: <201301091911.04513.arnd@arndb.de>
-References: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
- <1357713007-4005-2-git-send-email-horms+renesas@verge.net.au>
- <20130109115352.GB7337@e106331-lin.cambridge.arm.com>
- <201301091911.04513.arnd@arndb.de>
-Message-ID: <20130110015651.GJ21832@verge.net.au>
+From: ccross@android.com (Colin Cross)
+Date: Wed,  9 Jan 2013 17:57:39 -0800
+Subject: [PATCH] hardlockup: detect hard lockups without NMIs using secondary
+ cpus
+Message-ID: <1357783059-13923-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 07:11:04PM +0000, Arnd Bergmann wrote:
-> On Wednesday 09 January 2013, Mark Rutland wrote:
-> > Hi,
-> > 
-> > Thanks for updating the text, this is far easier to read than previously.
-> > 
-> > However, I'm still concerned by how complex the binding seems. As I don't have
-> > any familiarity with the device, I don't know whether that's just an artifact
-> > of the hardware or something that can be cleared up.
-> > 
-> > I think the approach used by the binding needs some serious review before this
-> > should be merged. It seems far more complex than any existing interrupt
-> > controller binding. Without a dts example for a complete board (complete with
-> > devices wired up to the interrupt controller), it's difficult to judge how this
-> > will work in practice.
-> > 
-> > I've added Arnd to Cc in case he has any thoughts on the matter.
-> 
-> Sorry for having been absent from this discussion for so long. I didn't
-> realize there were 9 versions of this patch set.
-> 
-> I tend to agree with your interpretation above, but I may be missing
-> important facts from the previous review rounds.
-> 
-> For all I can tell, the binding is an attempt to describe the
-> entire drivers/sh/intc capabilities, which is probably not the
-> best way to approach things. The sh intc driver is not just an
-> irqchip driver, but rather a framework to describe arbitrary
-> irqchips, which is what makes this so hard.
-> 
-> When I first looked at the situation last year, I suggested doing
-> a new irqchip driver with a much simpler binding that can only
-> handle the irq chips from shmobile, rather than the whole thing.
-> 
-> I am not sure if the binding in the current form is already the
-> "simplified" version, or if it actually implements all the
-> capabilities of the intc driver.
+Emulate NMIs on systems where they are not available by using timer
+interrupts on other cpus.  Each cpu will use its softlockup hrtimer
+to check that the next cpu is processing hrtimer interrupts by
+verifying that a counter is increasing.
 
-I think its more on the side of implementing the capabilities of
-the intc driver than being simplified.
+This patch is useful on systems where the hardlockup detector is not
+available due to a lack of NMIs, for example most ARM SoCs.
+Without this patch any cpu stuck with interrupts disabled can
+cause a hardware watchdog reset with no debugging information,
+but with this patch the kernel can detect the lockup and panic,
+which can result in useful debugging info.
 
-Although some effort has gone into this patchset my primary
-aim is to provide something that provides the basis for supporting
-the INTC controller on all existing boards.
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ include/linux/nmi.h |    5 ++-
+ kernel/watchdog.c   |   98 ++++++++++++++++++++++++++++++++++++++++++++++++---
+ lib/Kconfig.debug   |   14 +++++++-
+ 3 files changed, 110 insertions(+), 7 deletions(-)
 
-I more than open to concrete ideas of how this can be achieved in agreeable way.
-
-> > > +       intca: interrupt-controller at 0 {
-> > > +               compatible = "renesas,sh_intc";
-> > > +               interrupt-controller;
-> > > +               #address-cells = <1>;
-> > > +               #size-cells = <1>;
-> > > +               #interrupt-cells = <1>;
-> > > +               ranges;
-> > > +
-> > > +               reg = <0xe6940000 0x200>, <0xe6950000 0x200>;
-> > > +               group_size = <19>;
-> > > +
-> > > +               DIRC: intsrc1 { vector = <0x0560>; };
-> > > +               ATAPI: intsrc2 { vector = <0x05E0>; };
-> > 
-> > This looks suspiciously like a way of encoding a device's interrupt information
-> > into the interrupt controller's device node. That strikes me as being the wrong
-> > way round.
-> 
-> Agreed, it would be simpler to have e.g. #interrupt-cells = <4>, to describe
-> the various offsets when needed (I forgot how many are actually required
-> in practice, rather than being computable from the other numbers), and
-> possibly a global interrupt-map/interrupt-map-mask property pair to map
-> this into a flat number space.
-
-I'm not sure that I see what you are getting at here.
-
-> I need to take some more time to understand the actual requirements again,
-> but IIRC it would be possible to do something much simpler than the
-> proposed binding.
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/include/linux/nmi.h b/include/linux/nmi.h
+index db50840..c8f8aa0 100644
+--- a/include/linux/nmi.h
++++ b/include/linux/nmi.h
+@@ -14,8 +14,11 @@
+  * may be used to reset the timeout - for code which intentionally
+  * disables interrupts for a long time. This call is stateless.
+  */
+-#if defined(CONFIG_HAVE_NMI_WATCHDOG) || defined(CONFIG_HARDLOCKUP_DETECTOR)
++#if defined(CONFIG_HAVE_NMI_WATCHDOG) || defined(CONFIG_HARDLOCKUP_DETECTOR_NMI)
+ #include <asm/nmi.h>
++#endif
++
++#if defined(CONFIG_HAVE_NMI_WATCHDOG) || defined(CONFIG_HARDLOCKUP_DETECTOR)
+ extern void touch_nmi_watchdog(void);
+ #else
+ static inline void touch_nmi_watchdog(void)
+diff --git a/kernel/watchdog.c b/kernel/watchdog.c
+index 75a2ab3..94c231e 100644
+--- a/kernel/watchdog.c
++++ b/kernel/watchdog.c
+@@ -44,6 +44,11 @@
+ static DEFINE_PER_CPU(bool, hard_watchdog_warn);
+ static DEFINE_PER_CPU(bool, watchdog_nmi_touch);
+ static DEFINE_PER_CPU(unsigned long, hrtimer_interrupts_saved);
++#endif
++#ifdef CONFIG_HARDLOCKUP_DETECTOR_OTHER_CPU
++static cpumask_t __read_mostly watchdog_cpus;
++#endif
++#ifdef CONFIG_HARDLOCKUP_DETECTOR_NMI
+ static DEFINE_PER_CPU(struct perf_event *, watchdog_ev);
+ #endif
+ 
+@@ -179,7 +184,7 @@ void touch_softlockup_watchdog_sync(void)
+ 	__raw_get_cpu_var(watchdog_touch_ts) = 0;
+ }
+ 
+-#ifdef CONFIG_HARDLOCKUP_DETECTOR
++#ifdef CONFIG_HARDLOCKUP_DETECTOR_NMI
+ /* watchdog detector functions */
+ static int is_hardlockup(void)
+ {
+@@ -193,6 +198,64 @@ static int is_hardlockup(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_HARDLOCKUP_DETECTOR_OTHER_CPU
++static int is_hardlockup_other_cpu(int cpu)
++{
++	unsigned long hrint = per_cpu(hrtimer_interrupts, cpu);
++
++	if (per_cpu(hrtimer_interrupts_saved, cpu) == hrint)
++		return 1;
++
++	per_cpu(hrtimer_interrupts_saved, cpu) = hrint;
++	return 0;
++}
++
++static void watchdog_check_hardlockup_other_cpu(void)
++{
++	int cpu;
++	cpumask_t cpus = watchdog_cpus;
++
++	/*
++	 * Test for hardlockups every 3 samples.  The sample period is
++	 *  watchdog_thresh * 2 / 5, so 3 samples gets us back to slightly over
++	 *  watchdog_thresh (over by 20%).
++	 */
++	if (__this_cpu_read(hrtimer_interrupts) % 3 != 0)
++		return;
++
++	/* check for a hardlockup on the next cpu */
++	cpu = cpumask_next(smp_processor_id(), &cpus);
++	if (cpu >= nr_cpu_ids)
++		cpu = cpumask_first(&cpus);
++	if (cpu == smp_processor_id())
++		return;
++
++	smp_rmb();
++
++	if (per_cpu(watchdog_nmi_touch, cpu) == true) {
++		per_cpu(watchdog_nmi_touch, cpu) = false;
++		return;
++	}
++
++	if (is_hardlockup_other_cpu(cpu)) {
++		/* only warn once */
++		if (per_cpu(hard_watchdog_warn, cpu) == true)
++			return;
++
++		if (hardlockup_panic)
++			panic("Watchdog detected hard LOCKUP on cpu %d", cpu);
++		else
++			WARN(1, "Watchdog detected hard LOCKUP on cpu %d", cpu);
++
++		per_cpu(hard_watchdog_warn, cpu) = true;
++	} else {
++		per_cpu(hard_watchdog_warn, cpu) = false;
++	}
++}
++#else
++static inline void watchdog_check_hardlockup_other_cpu(void) { return; }
++#endif
++
+ static int is_softlockup(unsigned long touch_ts)
+ {
+ 	unsigned long now = get_timestamp(smp_processor_id());
+@@ -204,7 +267,7 @@ static int is_softlockup(unsigned long touch_ts)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_HARDLOCKUP_DETECTOR
++#ifdef CONFIG_HARDLOCKUP_DETECTOR_NMI
+ 
+ static struct perf_event_attr wd_hw_attr = {
+ 	.type		= PERF_TYPE_HARDWARE,
+@@ -252,7 +315,7 @@ static void watchdog_overflow_callback(struct perf_event *event,
+ 	__this_cpu_write(hard_watchdog_warn, false);
+ 	return;
+ }
+-#endif /* CONFIG_HARDLOCKUP_DETECTOR */
++#endif /* CONFIG_HARDLOCKUP_DETECTOR_NMI */
+ 
+ static void watchdog_interrupt_count(void)
+ {
+@@ -272,6 +335,9 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
+ 	/* kick the hardlockup detector */
+ 	watchdog_interrupt_count();
+ 
++	/* test for hardlockups on the next cpu */
++	watchdog_check_hardlockup_other_cpu();
++
+ 	/* kick the softlockup detector */
+ 	wake_up_process(__this_cpu_read(softlockup_watchdog));
+ 
+@@ -396,7 +462,7 @@ static void watchdog(unsigned int cpu)
+ 	__touch_watchdog();
+ }
+ 
+-#ifdef CONFIG_HARDLOCKUP_DETECTOR
++#ifdef CONFIG_HARDLOCKUP_DETECTOR_NMI
+ /*
+  * People like the simple clean cpu node info on boot.
+  * Reduce the watchdog noise by only printing messages
+@@ -472,9 +538,31 @@ static void watchdog_nmi_disable(unsigned int cpu)
+ 	return;
+ }
+ #else
++#ifdef CONFIG_HARDLOCKUP_DETECTOR_OTHER_CPU
++static int watchdog_nmi_enable(unsigned int cpu)
++{
++	/*
++	 * The new cpu will be marked online before the first hrtimer interrupt
++	 * runs on it.  If another cpu tests for a hardlockup on the new cpu
++	 * before it has run its first hrtimer, it will get a false positive.
++	 * Touch the watchdog on the new cpu to delay the first check for at
++	 * least 3 sampling periods to guarantee one hrtimer has run on the new
++	 * cpu.
++	 */
++	per_cpu(watchdog_nmi_touch, cpu) = true;
++	smp_wmb();
++	cpumask_set_cpu(cpu, &watchdog_cpus);
++	return 0;
++}
++
++static void watchdog_nmi_disable(unsigned int cpu) {
++	cpumask_clear_cpu(cpu, &watchdog_cpus);
++}
++#else
+ static int watchdog_nmi_enable(unsigned int cpu) { return 0; }
+ static void watchdog_nmi_disable(unsigned int cpu) { return; }
+-#endif /* CONFIG_HARDLOCKUP_DETECTOR */
++#endif /* CONFIG_HARDLOCKUP_DETECTOR_OTHER_CPU */
++#endif /* CONFIG_HARDLOCKUP_DETECTOR_NMI */
+ 
+ /* prepare/enable/disable routines */
+ /* sysctl functions */
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index aaf8baf..f7c4859 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -191,15 +191,27 @@ config LOCKUP_DETECTOR
+ 	  The overhead should be minimal.  A periodic hrtimer runs to
+ 	  generate interrupts and kick the watchdog task every 4 seconds.
+ 	  An NMI is generated every 10 seconds or so to check for hardlockups.
++	  If NMIs are not available on the platform, every 12 seconds the
++	  hrtimer interrupt on one cpu will be used to check for hardlockups
++	  on the next cpu.
+ 
+ 	  The frequency of hrtimer and NMI events and the soft and hard lockup
+ 	  thresholds can be controlled through the sysctl watchdog_thresh.
+ 
+-config HARDLOCKUP_DETECTOR
++config HARDLOCKUP_DETECTOR_NMI
+ 	def_bool y
+ 	depends on LOCKUP_DETECTOR && !HAVE_NMI_WATCHDOG
+ 	depends on PERF_EVENTS && HAVE_PERF_EVENTS_NMI
+ 
++config HARDLOCKUP_DETECTOR_OTHER_CPU
++	def_bool y
++	depends on LOCKUP_DETECTOR && SMP
++	depends on !HARDLOCKUP_DETECTOR_NMI && !HAVE_NMI_WATCHDOG
++
++config HARDLOCKUP_DETECTOR
++	def_bool y
++	depends on HARDLOCKUP_DETECTOR_NMI || HARDLOCKUP_DETECTOR_OTHER_CPU
++
+ config BOOTPARAM_HARDLOCKUP_PANIC
+ 	bool "Panic (Reboot) On Hard Lockups"
+ 	depends on HARDLOCKUP_DETECTOR
+-- 
+1.7.7.3
