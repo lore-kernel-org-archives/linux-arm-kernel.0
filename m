@@ -1,50 +1,59 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 Jan 2013 11:48:06 +0800
-Subject: [PATCH] ARM: mxs: select USB_ARCH_HAS_EHCI
-In-Reply-To: <1357742162-27982-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1357742162-27982-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130110034805.GF2265@S2101-09.ap.freescale.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 09 Jan 2013 21:51:54 -0600
+Subject: [PATCH] ARM: nommu: re-enable use of vexpress without
+ ARCH_MULTIPLATFORM
+In-Reply-To: <20130109204804.GS3931@n2100.arm.linux.org.uk>
+References: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
+ <201301091843.48942.arnd@arndb.de>
+ <alpine.LFD.2.02.1301091349390.6300@xanadu.home>
+ <201301092022.49130.arnd@arndb.de> <50EDD588.3040603@gmail.com>
+ <20130109204804.GS3931@n2100.arm.linux.org.uk>
+Message-ID: <50EE3ADA.2070100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 03:36:02PM +0100, Maxime Ripard wrote:
-> Commit 09f6ffde introduced a dependency on USB_EHCI_HCD for the chipidea
-> USB host driver, that in turns depends on USB_ARCH_HAS_EHCI.
+On 01/09/2013 02:48 PM, Russell King - ARM Linux wrote:
+> On Wed, Jan 09, 2013 at 02:39:36PM -0600, Rob Herring wrote:
+>> On 01/09/2013 02:22 PM, Arnd Bergmann wrote:
+>>> On Wednesday 09 January 2013, Nicolas Pitre wrote:
+>>>> On Wed, 9 Jan 2013, Arnd Bergmann wrote:
+>>>>
+>>>>> On a related topic, I still think we should fix ARCH_MULTI_V7 not
+>>>>> to select ARCH_VEXPRESS unconditionally and come up with a better
+>>>>> way to avoid having an empty platform list to make 'allnoconfig'
+>>>>> still work.
+>>>>
+>>>> The virtual guest platform support that Will and Marc did is small 
+>>>> enough that it could always be selected in place of vexpress.
+>>>
+>>> But that only helps when ARMv7 is selected, unless we want to build
+>>> it only for ARMv4, v5 or v6 kernels.
+>>>
+>>> Besides, the only reason we can't have a kernel without any platform
+>>> selected is that the linker script has code in it to intentionally
+>>> barf on that because it's guaranteed not to boot on any hardware.
+>>>
+>>> If we decide that building an allnoconfig without any platform
+>>> is actually ok, we could just as well rip out that error statement.
+>>>
+>>
+>> That patch is already posted, but Russell doesn't like it as you can
+>> have a kernel that doesn't boot. You don't like the allno and randconfig
+>> failures, so we're stuck. I think there are dozens of config options
+>> that will make you not boot on any given platform, so failing to boot
+>> because you did not select your machine is a non-issue.
 > 
-> If this symbol is not selected by the ARCH, we are not able to use the
-> chipidea driver anymore.
+> What I actually suggested is that we should be aiming for the DT side
+> of things to get to the point where DT is just another _single_ platform
+> as far as that code goes, and that DT should describe the hardware
+> sufficiently well that we don't have multiple machine_desc things to
+> select via DT - so a DT kernel would have exactly one machine_desc (or
+> maybe even zero! - with the linker script check conditional on !CONFIG_OF)
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index f95ba14..c77d1d1 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -456,6 +456,7 @@ config ARCH_MXS
->  	select PINCTRL
->  	select SPARSE_IRQ
->  	select USE_OF
-> +	select USB_ARCH_HAS_EHCI
->  	help
->  	  Support for Freescale MXS-based family of processors
->  
+> That then gets rid of the issue entirely.
 
-I prefer to fix it with the patch below.
+I agree completely. I look at mach-highbank (and mach-virt) as what else
+needs to be done in terms of refactoring or moving to DT. That's
+certainly a long term goal, but what is the short term solution?
 
-Shawn
-
-diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
-index 4c90b51..640ae6c 100644
---- a/drivers/usb/Kconfig
-+++ b/drivers/usb/Kconfig
-@@ -37,6 +37,7 @@ config USB_ARCH_HAS_EHCI
-        default y if ARCH_W90X900
-        default y if ARCH_AT91
-        default y if ARCH_MXC
-+       default y if ARCH_MXS
-        default y if ARCH_OMAP3
-        default y if ARCH_CNS3XXX
-        default y if ARCH_VT8500
+Rob
