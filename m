@@ -1,36 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Jan 2013 20:30:55 +0000
-Subject: [PATCH v4 07/19] ARM: remove mach .handle_irq for GIC users
-In-Reply-To: <20130110165753.GF19944@n2100.arm.linux.org.uk>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <50EED264.1020709@gmail.com> <20130110165753.GF19944@n2100.arm.linux.org.uk>
-Message-ID: <201301102030.55736.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Jan 2013 12:38:33 -0800
+Subject: [PATCH] hardlockup: detect hard lockups without NMIs using
+ secondary cpus
+In-Reply-To: <1357783059-13923-1-git-send-email-ccross@android.com>
+References: <1357783059-13923-1-git-send-email-ccross@android.com>
+Message-ID: <20130110203833.GE14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 January 2013, Russell King - ARM Linux wrote:
-> On Thu, Jan 10, 2013 at 08:38:28AM -0600, Rob Herring wrote:
-> > On 01/10/2013 05:02 AM, Russell King - ARM Linux wrote:
-> > > On Thu, Jan 03, 2013 at 11:54:16AM -0600, Rob Herring wrote:
-> > >> -asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
-> > >> +static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
-> > > 
-> > > NAK.  No, not "static asmlinkage".
-> > 
-> > Okay will remove asmlinkage, but is there an issue with making this static?
-> 
-> No, just for the asmlinkage.  asmlinkage is used to mark functions which
-> are called from assembly.  Making them static generally means you can't
-> call them from assembly (unless you have asm() code in the .c file which
-> does, like our kernel_thread() implementation used to).
-> 
-> Ok, asmlinkage on ARM is a no-op, but it's useful cheap documentation to
-> mark which C functions get called from assembly.
+* Colin Cross <ccross@android.com> [130109 18:05]:
+> +static void watchdog_check_hardlockup_other_cpu(void)
+> +{
+> +	int cpu;
+> +	cpumask_t cpus = watchdog_cpus;
+> +
+> +	/*
+> +	 * Test for hardlockups every 3 samples.  The sample period is
+> +	 *  watchdog_thresh * 2 / 5, so 3 samples gets us back to slightly over
+> +	 *  watchdog_thresh (over by 20%).
+> +	 */
+> +	if (__this_cpu_read(hrtimer_interrupts) % 3 != 0)
+> +		return;
+> +
+> +	/* check for a hardlockup on the next cpu */
+> +	cpu = cpumask_next(smp_processor_id(), &cpus);
 
-But with patches 6 and 12, we just pass the function pointer into
-set_handle_irq(), which allows us to make the function itself
-static, but it will still get called from assembly through that
-function pointer, which matches the definition of asmlinkage
-as far as I can tell.
+Hmm don't you want to check cpu_oneline_mask here and
+return if the other CPU is offline?
 
-	Arnd
+> +	if (cpu >= nr_cpu_ids)
+> +		cpu = cpumask_first(&cpus);
+> +	if (cpu == smp_processor_id())
+> +		return;
+
+Regards,
+
+Tony
