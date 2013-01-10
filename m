@@ -1,253 +1,255 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 10 Jan 2013 14:15:44 +0530
-Subject: [PATCH v2 1/2] cpufreq: add imx6q-cpufreq driver
-In-Reply-To: <1357806863-6899-2-git-send-email-shawn.guo@linaro.org>
-References: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
- <1357806863-6899-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAKohpom2Z0LmTNjq6mbZAa=JvQfBeRBzfXU3Jifn8y_C6XJkQw@mail.gmail.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Thu, 10 Jan 2013 14:18:15 +0530
+Subject: [PATCH v5] usb: phy: samsung: Add support to set pmu isolation
+In-Reply-To: <50EDE438.6040805@gmail.com>
+References: <CAFp+6iEUNjZewY1b3T-eCHeiZrouxYGPXtxHuNvJdi+UEKTNjg@mail.gmail.com>
+ <1356686018-18586-1-git-send-email-gautam.vivek@samsung.com>
+ <50EDE438.6040805@gmail.com>
+Message-ID: <CAFp+6iEdYTt155BXDj2pZjgnD5PQBhz=nnT54QbuvfuHq2CyKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 January 2013 14:04, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Add an imx6q-cpufreq for Freescale i.MX6Q SoC to handle the hardware
+Hi Sylwester,
 
-                                       ^
-                                   driver
 
-> specific frequency and voltage scaling requirements.
+On Thu, Jan 10, 2013 at 3:12 AM, Sylwester Nawrocki
+<sylvester.nawrocki@gmail.com> wrote:
+> Hi,
 >
-> The driver supports module build and is instantiated by the platform
-> device/driver mechanism, so that it will be instantiated on other
-> platform, as IMX is built with multiplatform support.
 >
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/cpufreq/Kconfig.arm     |    9 ++
->  drivers/cpufreq/Makefile        |    1 +
->  drivers/cpufreq/imx6q-cpufreq.c |  296 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 306 insertions(+)
->  create mode 100644 drivers/cpufreq/imx6q-cpufreq.c
+> On 12/28/2012 10:13 AM, Vivek Gautam wrote:
+>>
+>> Adding support to parse device node data in order to get
+>> required properties to set pmu isolation for usb-phy.
+>>
+>> Signed-off-by: Vivek Gautam<gautam.vivek@samsung.com>
 >
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index a0b3661..9e628ba 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -77,6 +77,15 @@ config ARM_EXYNOS5250_CPUFREQ
->           This adds the CPUFreq driver for Samsung EXYNOS5250
->           SoC.
+> ...
 >
-> +config ARM_IMX6Q_CPUFREQ
-> +       tristate "Freescale i.MX6Q cpufreq support"
-> +       depends on SOC_IMX6Q
-> +       depends on REGULATOR_ANATOP
-> +       help
-> +         This adds cpufreq driver support for Freescale i.MX6Q SOC.
-> +
-> +         If in doubt, say N.
-> +
->  config ARM_SPEAR_CPUFREQ
->         bool "SPEAr CPUFreq support"
->         depends on PLAT_SPEAR
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index 1f254ec0..31699a0 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -49,6 +49,7 @@ obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)      += exynos-cpufreq.o
->  obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)   += exynos4210-cpufreq.o
->  obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)   += exynos4x12-cpufreq.o
->  obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)   += exynos5250-cpufreq.o
-> +obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)                += imx6q-cpufreq.o
->  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)     += omap-cpufreq.o
->  obj-$(CONFIG_ARM_SPEAR_CPUFREQ)                += spear-cpufreq.o
+>> --- a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+>> +++ b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+>> @@ -9,3 +9,38 @@ Required properties:
+>>   - compatible : should be "samsung,exynos4210-usbphy"
+>>   - reg : base physical address of the phy registers and length of memory
+>> mapped
+>>   region.
+>> +
+>> +Optional properties:
+>> +- #address-cells: should be '1' when usbphy node has a child node with
+>> 'reg'
+>> +  property.
+>> +- #size-cells: should be '1' when usbphy node has a child node with 'reg'
+>> +       property.
+>> +- ranges: allows valid translation between child's address space and
+>> parent's
+>> +  address space.
+>> +
+>> +- The child node 'usbphy-sys' to the node 'usbphy' is for the system
+>> controller
+>> +  interface for usb-phy. It should provide the following information
+>> required by
+>> +  usb-phy controller to control phy.
+>> +   - reg : base physical address of PHY control register in PMU which
+>> +           enables/disables the phy controller.
 >
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> new file mode 100644
-> index 0000000..218d8f1
-> --- /dev/null
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -0,0 +1,296 @@
-> +/*
-> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/cpu.h>
-> +#include <linux/cpufreq.h>
-> +#include <linux/err.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/opp.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/slab.h>
-> +
-> +#define PU_SOC_VOLTAGE_NORMAL  1250000
-> +#define PU_SOC_VOLTAGE_HIGH    1275000
-> +#define FREQ_1P2_GHZ           1200000000
-> +
-> +static struct regulator *arm_reg;
-> +static struct regulator *pu_reg;
-> +static struct regulator *soc_reg;
-> +
-> +static struct clk *arm_clk;
-> +static struct clk *pll1_sys_clk;
-> +static struct clk *pll1_sw_clk;
-> +static struct clk *step_clk;
-> +static struct clk *pll2_pfd2_396m_clk;
-> +
-> +static struct device *cpu_dev;
-> +static struct cpufreq_frequency_table *freq_table;
-> +static unsigned int transition_latency;
-> +
-> +static int imx6q_verify_speed(struct cpufreq_policy *policy)
-> +{
-> +       return cpufreq_frequency_table_verify(policy, freq_table);
-> +}
-> +
-> +static unsigned int imx6q_get_speed(unsigned int cpu)
-> +{
-> +       return clk_get_rate(arm_clk) / 1000;
-> +}
-> +
-> +static int imx6q_set_target(struct cpufreq_policy *policy,
-> +                           unsigned int target_freq, unsigned int relation)
-> +{
-> +       struct cpufreq_freqs freqs;
-> +       struct opp *opp;
-> +       unsigned long freq_hz, volt, volt_old;
-> +       unsigned int index, cpu;
-> +       int ret;
-> +
-> +       ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
-> +                                            relation, &index);
+>
+> On some SoCs USB_PHY_CONTROL registers don't belong to PMU. So maybe you
+> should
+> drop references to PMU, or list all SoC entities where USB_PHY_CONTROL
+> appears:
+> PMU, "MISC REGISTER", etc.
+>
 
-@Rafael: Why is this function used in our target routines? Isn't the caller
-supposed to send a valid freq from freq_table? All governors do it.
+On S3C64XX "USB_SIG_MASK" bit is in "OTHERS" register, which is actually part of
+system controller register map (clock controller + PM controller), and
+then S5P64XX onward
+this falls under PM controller's memory map. So, i thought of using
+reference to PMU.
+May be i am missing something here ?
+Will change this if you suggest.
 
-> +       if (ret) {
-> +               dev_err(cpu_dev, "failed to match target frequency %d: %d\n",
-> +                       target_freq, ret);
-> +               return ret;
-> +       }
-> +
-> +       freqs.new = freq_table[index].frequency;
-> +       freq_hz = freqs.new * 1000;
-> +       freqs.old = clk_get_rate(arm_clk) / 1000;
+> I would just rephrase this to:
+>
+>     - reg : base physical address of PHY_CONTROL registers
+>
+> "phy controller" might be confusing, since PHY CONTROLLER is an entity
+> separate
+> from PHY 0 and PHY 1 ?
+>
+Ok, will change this as suggested.
 
-clk_get_rate() can fail.
+>
+>> +           The size of this register is the total sum of size of all
+>> phy-control
+>
+>
+> And what about using PHY_CONTROL name as per the User Manuals ? That would
+> perhaps make it a bit easier to follow.
+>
+Sure this is better. We can use PHY_CONTROL to align with user manuals and avoid
+any confusions.
 
-> +
-> +       if (freqs.old == freqs.new)
-> +               return 0;
-> +
-> +       for_each_online_cpu(cpu) {
-> +               freqs.cpu = cpu;
-> +               cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> +       }
-> +
-> +       opp = opp_find_freq_ceil(cpu_dev, &freq_hz);
-> +       if (IS_ERR(opp)) {
-> +               dev_err(cpu_dev, "failed to find OPP for %ld\n", freq_hz);
-> +               return PTR_ERR(opp);
-> +       }
-> +
-> +       volt = opp_get_voltage(opp);
-> +       volt_old = regulator_get_voltage(arm_reg);
-> +
-> +       dev_dbg(cpu_dev, "%u MHz, %ld mV --> %u MHz, %ld mV\n",
-> +               freqs.old / 1000, volt_old / 1000,
-> +               freqs.new / 1000, volt / 1000);
-> +
-> +       /* scaling up?  scale voltage before frequency */
-> +       if (freqs.new > freqs.old) {
-> +               ret = regulator_set_voltage_tol(arm_reg, volt, 0);
-> +               if (ret) {
-> +                       dev_err(cpu_dev, "failed to scale voltage up: %d\n", ret);
-> +                       return ret;
-> +               }
-> +
-> +               /*
-> +                * Need to increase vddpu and vddsoc for safety
-> +                * if we are about to run at 1.2 GHz.
-> +                */
-> +               if (freqs.new == FREQ_1P2_GHZ / 1000) {
-> +                       regulator_set_voltage_tol(pu_reg,
-> +                                       PU_SOC_VOLTAGE_HIGH, 0);
-> +                       regulator_set_voltage_tol(soc_reg,
-> +                                       PU_SOC_VOLTAGE_HIGH, 0);
-> +               }
-> +       }
-> +
-> +       /*
-> +        * The setpoints are selected per PLL/PDF frequencies, so we need to
-> +        * reprogram PLL for frequency scaling.  The procedure of reprogramming
-> +        * PLL1 is as below.
-> +        *
-> +        *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
-> +        *  - Disable pll1_sys_clk and reprogram it
-> +        *  - Enable pll1_sys_clk and reparent pll1_sw_clk back to it
-> +        *  - Disable pll2_pfd2_396m_clk
-> +        */
-> +       clk_prepare_enable(pll2_pfd2_396m_clk);
-> +       clk_set_parent(step_clk, pll2_pfd2_396m_clk);
-> +       clk_set_parent(pll1_sw_clk, step_clk);
-> +       clk_prepare_enable(pll1_sys_clk);
+>
+>> +           registers that the SoC has. For example, the size will be
+>> +           '0x4' in case we have only one phy-control register (like in
+>> S3C64XX) or
+>> +           '0x8' in case we have two phy-control registers (like in
+>> Exynos4210)
+>> +           and so on.
+>> +
+>> +Example:
+>> + - Exynos4210
+>> +
+>> + usbphy at 125B0000 {
+>> + #address-cells =<1>;
+>> + #size-cells =<1>;
+>> + compatible = "samsung,exynos4210-usbphy";
+>> + reg =<0x125B0000 0x100>;
+>> + ranges;
+>> +
+>> + usbphy-sys {
+>> + /* USB device and host PHY_CONTROL registers */
+>> + reg =<0x10020704 0x8>;
+>> + };
+>> + };
+>
+> ...
+>
+>>   /*
+>> + * struct samsung_usbphy_drvdata - driver data for various SoC variants
+>> + * @cpu_type: machine identifier
+>> + * @devphy_en_mask: device phy enable mask for PHY CONTROL register
+>> + * @pmureg_devphy_offset: offset to DEVICE PHY CONTROL register from
+>> + *  mapped address of system controller.
+>> + *
+>> + * Here we have a separate mask for device type phy.
+>> + * Having different masks for host and device type phy helps
+>> + * in setting independent masks in case of SoCs like S5PV210,
+>> + * in which PHY0 and PHY1 enable bits belong to same register
+>> + * placed at position 0 and 1 respectively.
+>> + * Although for newer SoCs like exynos these bits belong to
+>> + * different registers altogether placed at position 0.
+>> + */
+>> +struct samsung_usbphy_drvdata {
+>> + int cpu_type;
+>> + int devphy_en_mask;
+>> + u32 pmureg_devphy_offset;
+>
+>
+> Perhaps just "devphy_reg_offset" would do ?
+>
+Sure, will amend this as suggested.
 
-all these fns can fail too.. don't want to check return values?
+>
+>> +};
+>> +
+>> +/*
+>>    * struct samsung_usbphy - transceiver driver state
+>>    * @phy: transceiver structure
+>>    * @plat: platform data
+>>    * @dev: The parent device supplied to the probe function
+>>    * @clk: usb phy clock
+>>    * @regs: usb phy register memory base
+>
+>
+> Is this more precisely:
+>
+>       * @regs: usb phy controller registers memory base
+>
+> ?
+this had been a part of Praveen's work submitted for initial
+samsung-usbphy driver,
+so didn't change anything in that. ;-)
+Will amend this as suggested.
 
-> +       if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
-> +               clk_disable_unprepare(pll1_sys_clk);
-> +               clk_set_rate(pll1_sys_clk, freqs.new * 1000);
-> +               clk_prepare_enable(pll1_sys_clk);
-> +               clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> +               clk_disable_unprepare(pll2_pfd2_396m_clk);
-> +       } else {
-> +               /*
-> +                * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
-> +                * to provide the frequency.
-> +                */
-> +               clk_disable_unprepare(pll1_sys_clk);
-> +       }
-> +
-> +       /* Ensure the arm clock divider is what we expect */
-> +       ret = clk_set_rate(arm_clk, freqs.new * 1000);
-> +       if (ret) {
-> +               dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
-> +               regulator_set_voltage_tol(arm_reg, volt_old, 0);
-> +               return ret;
-> +       }
-> +
-> +       /* scaling down?  scale voltage after frequency */
-> +       if (freqs.new < freqs.old) {
-> +               ret = regulator_set_voltage_tol(arm_reg, volt, 0);
-> +               if (ret)
-> +                       dev_warn(cpu_dev, "failed to scale voltage down: %d\n", ret);
-> +
-> +               if (freqs.old == FREQ_1P2_GHZ / 1000) {
-> +                       regulator_set_voltage_tol(pu_reg,
-> +                                       PU_SOC_VOLTAGE_NORMAL, 0);
-> +                       regulator_set_voltage_tol(soc_reg,
-> +                                       PU_SOC_VOLTAGE_NORMAL, 0);
-> +               }
-> +       }
-> +
-> +       for_each_online_cpu(cpu) {
-> +               freqs.cpu = cpu;
-> +               cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
-> +{
-> +       int ret;
-> +
+>>
+>> + * @pmureg: usb device phy-control pmu register memory base
+>
+>
+> Maybe something like this would be more clear:
+>
+> @pmureg: USB device PHY_CONTROL registers memory region base
+>
+Sure, will amend this.
 
-So you finally removed the ugly check :)
+> Note, that not on all SoCs USB_PHY_CONTROL registers belong to PMU.
+> Haven't you considered changing "pmureg" to ctrl_regs or something
+> else more generic ?
+>
+Same as mentioned in above comment in this context  for PMU register.
+Thought this could be self-explanatory for pmu interface to control phy.
+Will change this if you suggest.
 
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+>>    * @ref_clk_freq: reference clock frequency selection
+>> - * @cpu_type: machine identifier
+>> + * @drv_data: driver data available for different SoCs
+>>    */
+>>   struct samsung_usbphy {
+>>   struct usb_phy phy;
+>> @@ -81,12 +107,63 @@ struct samsung_usbphy {
+>>   struct device *dev;
+>>   struct clk *clk;
+>>   void __iomem *regs;
+>> + void __iomem *pmureg;
+>>   int ref_clk_freq;
+>> - int cpu_type;
+>> + const struct samsung_usbphy_drvdata *drv_data;
+>>   };
+>
+> ...
+>
+>> +/*
+>> + * Set isolation here for phy.
+>> + * SOCs control this by controlling corresponding PMU registers
+>
+>
+> Hmm, it's not always PMU registers. I would remove this sentence and
+> instead explain what's the meaning of 'on' argument, so it is clear
+> the PHY is deactivated when on != 0.
+>
+
+Ditto for PMU register comment,
+Will put an explanation for 'on' argument.
+
+>
+>> + */
+>> +static void samsung_usbphy_set_isolation(struct samsung_usbphy *sphy, int
+>> on)
+>> +{
+>> + static DEFINE_SPINLOCK(lock);
+>
+>
+> You probably don't need a global spinlock. Couldn't the spinlock be added
+> as struct samsung_usbhy field instead ?
+>
+True, will add a spinlock in the samsung_usbphy structure.
+
+>
+>> + unsigned long flags;
+>> + void __iomem *reg;
+>> + u32 reg_val;
+>> + u32 en_mask;
+>> +
+>> + if (!sphy->pmureg) {
+>> + dev_warn(sphy->dev, "Can't set pmu isolation\n");
+>> + return;
+>> + }
+>> +
+>> + reg = sphy->pmureg + sphy->drv_data->pmureg_devphy_offset;
+>> + en_mask = sphy->drv_data->devphy_en_mask;
+>> +
+>> + spin_lock_irqsave(&lock, flags);
+>> +
+>> + reg_val = readl(reg);
+>> + reg_val = on ? (reg_val&  ~en_mask) : (reg_val | en_mask);
+>
+>
+> Might be a good idea to use in this case plain if/else instead..
+>
+ok, will amend this.
+
+
+-- 
+Thanks & Regards
+Vivek
