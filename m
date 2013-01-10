@@ -1,46 +1,27 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 10 Jan 2013 19:21:21 +0000
-Subject: [GIT PULL V2] ARM: mvebu fixes for v3.8-rc3
-In-Reply-To: <E1Tt8oT-0004Z0-0c@merlin.infradead.org>
-Message-ID: <mailman.23.1357862998.1035.linux-arm-kernel@lists.infradead.org>
+Date: Thu, 10 Jan 2013 09:40:34 -0500
+Subject: [PATCH 2/3] ARM: remove unused arch_decomp_wdog()
+In-Reply-To: <1357827165-9320-3-git-send-email-shawn.guo@linaro.org>
+References: <1357827165-9320-1-git-send-email-shawn.guo@linaro.org>
+ <1357827165-9320-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130110144034.GM5075@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ba607b6238a1f418c45b9d7f73212bcc6922da53:
+On Thu, Jan 10, 2013 at 10:12:44PM +0800, Shawn Guo wrote:
+> With ARCH_HAS_DECOMP_WDOG removed from arch/arm/boot/compressed/decompress.c,
+> all the arch_decomp_wdog() definition at platform level is unneeded.
+> Remmove it.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-dove/include/mach/uncompress.h       |    1 -
+>  arch/arm/mach-kirkwood/include/mach/uncompress.h   |    1 -
+>  arch/arm/mach-mv78xx0/include/mach/uncompress.h    |    1 -
+>  arch/arm/mach-orion5x/include/mach/uncompress.h    |    1 -
 
-  pinctrl: mvebu: make pdma clock on dove mandatory (2013-01-07 16:19:02 +0000)
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-are available in the git repository at:
+thx,
 
-  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.8-rc3
-
-for you to fetch changes up to 11d5993df2e1f65e3acfeb92a3febe88803b3e7f:
-
-  arm: mvebu: Fix memory size for Armada 370 DB (2013-01-10 19:16:51 +0000)
-
-----------------------------------------------------------------
-mvebu fixes for v3.8-rc3
- - gpio fixes in mvebu, kirkwood, and dove
- - small DT fix for mvebu (correct RAM size)
-
-----------------------------------------------------------------
-Gregory CLEMENT (1):
-      arm: mvebu: Fix memory size for Armada 370 DB
-
-Sebastian Hesselbarth (1):
-      ARM: Dove: add Cubox sdhci card detect gpio
-
-Simon Guinot (1):
-      ARM: Kirkwood: fix ns2 gpios by converting to pinctrl
-
-Thomas Petazzoni (1):
-      arm: mvebu: use global interrupts for GPIOs on Armada XP
-
- arch/arm/boot/dts/armada-370-db.dts        |  2 +-
- arch/arm/boot/dts/armada-xp-mv78230.dtsi   | 14 +++++------
- arch/arm/boot/dts/armada-xp-mv78260.dtsi   | 21 +++++++----------
- arch/arm/boot/dts/armada-xp-mv78460.dtsi   | 21 +++++++----------
- arch/arm/boot/dts/dove-cubox.dts           | 14 +++++++++--
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi | 16 +++++++++++++
- arch/arm/mach-kirkwood/board-ns2.c         | 38 ------------------------------
- 7 files changed, 53 insertions(+), 73 deletions(-)
+Jason.
