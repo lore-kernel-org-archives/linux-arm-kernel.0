@@ -1,68 +1,86 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 10 Jan 2013 11:47:09 -0500 (EST)
-Subject: [PATCH 01/16] ARM: b.L: secondary kernel entry code
-In-Reply-To: <CAHkRjk65PEVDS6vi=07g_hef8yXOR+mTYV_Nchu1fAuLnOJLOw@mail.gmail.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
- <CAHkRjk65PEVDS6vi=07g_hef8yXOR+mTYV_Nchu1fAuLnOJLOw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1301101132080.6300@xanadu.home>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 10 Jan 2013 18:51:20 +0200
+Subject: [PATCH 00/14] USB: omap-ehci: Move PHY management to PHY driver
+Message-ID: <1357836694-30788-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Jan 2013, Catalin Marinas wrote:
+The OMAP's High Speed Host controller can interface to ULPI/UTMI
+PHY's transparently i.e. whithout requiring the device drivers to
+access the PHY [1]. However, the OS must ensure that the PHY has
+the necessary resources (power/clock/reset) enabled before it is used.
 
-> Hi Nico,
-> 
-> On 10 January 2013 00:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > --- /dev/null
-> > +++ b/arch/arm/common/bL_entry.c
-> ...
-> > +extern volatile unsigned long bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
-> 
-> IMHO, we should keep this array linear and ignore the cluster grouping
-> at this stage. This information could be added to latter patches that
-> actually need to know about the b.L topology.
+Till now, the omap-ehci driver was managing the power and reset of the PHY
+whereas, clock enabling was left to the bootloader or board files.
 
-That's virtually all of them.  Everything b.L related is always 
-expressed in terms of a cpu,cluster tuple at the low level.
+In this patchset we make the NOP PHY driver (nop-usb-xceiv.c) handle
+all the PHY resources that are available so that it can be used by
+platforms like OMAP.
 
-> This would also imply that we treat the MPIDR just as an ID without 
-> digging into its bit layout.
+The omap-ehci driver instantiates a PHY platform device for each port
+that is in PHY mode. It then uses the USB PHY APIs to manage the PHY.
 
-That makes for too large an index space.  We always end up needing to 
-break the MPIDR into a cpu,cluster thing as the MPIDR bits are too 
-sparse.
+All this results in a much cleaner code and makes USB PHY resource management
+work properly on OMAP.
 
-> > +void bL_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
-> > +{
-> > +       unsigned long val = ptr ? virt_to_phys(ptr) : 0;
-> > +       bL_entry_vectors[cluster][cpu] = val;
-> > +       smp_wmb();
-> > +       __cpuc_flush_dcache_area((void *)&bL_entry_vectors[cluster][cpu], 4);
-> > +       outer_clean_range(__pa(&bL_entry_vectors[cluster][cpu]),
-> > +                         __pa(&bL_entry_vectors[cluster][cpu + 1]));
-> 
-> Why are you using the smp_wmb() here? We don't need any barrier since
-> data cache ops by MVA are automatically ordered in relation to stores
-> to the same MVA (as long as the MVA is in Normal Cacheable memory).
+NOTE: Only omap4panda board is adapted for the changes. So USB Host will
+break for other boards. Once we have done a priliminary review, I can adapt
+other boards as well.
 
-That was the result of monkeying the write_pen_release() code.  I'll 
-remove that as the rest of the code added later doesn't use that anyway.
+This patchset depends on the series
+https://lkml.org/lkml/2013/1/2/144
+git://github.com/rogerq/linux.git arm-for-next-usbhost9-part
 
-> > --- /dev/null
-> > +++ b/arch/arm/common/bL_head.S
-> ...
-> > +ENTRY(bL_entry_point)
-> > +
-> > + THUMB(        adr     r12, BSYM(1f)   )
-> > + THUMB(        bx      r12             )
-> > + THUMB(        .thumb                  )
-> > +1:
-> > +       mrc     p15, 0, r0, c0, c0, 5
-> 
-> Minor thing, maybe a comment for this line like @ MPIDR.
+--
+cheeer,
+-roger
 
-ACK.
+[1] - In practice we would need to access the PHY to work around Silicon Erratas
+      in the OMAP's USB Host IP.
 
+Roger Quadros (14):
+  mfd: omap-usb-host: Consolidate OMAP USB-HS platform data
+  usb: phy: Add new API usb_get_phy_from_dev()
+  usb: xceiv: nop: Manage PHY clock
+  usb: phy: nop: Handle power supply regulator for the PHY
+  usb: phy: nop: Handle RESET for the PHY
+  mfd: omap-usb-host: update nports in platform_data
+  usb: ehci-omap: Instantiate PHY devices if required
+  mfd: omap-usb-host: Remove PHY reset handling code
+  usb: ehci-omap: Remove PHY reset handling code
+  usb: ehci-omap: Remove PHY regulator handling code
+  ARM: OMAP2+: omap4panda: Provide USB Host's PHY platform data
+  ARM: OMAP2+: omap4panda: Adapt HUB power to regulator framework
+  ARM: OMAP2+: omap4panda: Adapt HUB reset to regulator framework
+  ARM: OMAP2+: omap4panda: Remove irrelevant USB host platform data
 
-Nicolas
+ arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
+ arch/arm/mach-omap2/board-3630sdp.c        |    2 +-
+ arch/arm/mach-omap2/board-am3517crane.c    |    2 +-
+ arch/arm/mach-omap2/board-am3517evm.c      |    2 +-
+ arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
+ arch/arm/mach-omap2/board-cm-t3517.c       |    2 +-
+ arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
+ arch/arm/mach-omap2/board-igep0020.c       |    4 +-
+ arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
+ arch/arm/mach-omap2/board-omap3evm.c       |    2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
+ arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
+ arch/arm/mach-omap2/board-omap4panda.c     |  117 +++++++++++++-----
+ arch/arm/mach-omap2/board-overo.c          |    2 +-
+ arch/arm/mach-omap2/board-zoom.c           |    2 +-
+ arch/arm/mach-omap2/usb-host.c             |   30 +----
+ arch/arm/mach-omap2/usb.h                  |   21 +---
+ drivers/mfd/omap-usb-host.c                |   64 +---------
+ drivers/mfd/omap-usb-tll.c                 |    8 +-
+ drivers/usb/host/ehci-omap.c               |  182 ++++++++++++++--------------
+ drivers/usb/otg/nop-usb-xceiv.c            |   86 +++++++++++++
+ drivers/usb/otg/otg.c                      |   36 ++++++
+ include/linux/platform_data/usb-omap.h     |   28 ++---
+ include/linux/usb/nop-usb-xceiv.h          |    1 +
+ include/linux/usb/phy.h                    |    6 +
+ 26 files changed, 345 insertions(+), 266 deletions(-)
+
+-- 
+1.7.4.1
