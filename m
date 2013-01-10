@@ -1,25 +1,30 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 10 Jan 2013 17:53:00 +0530
-Subject: [PATCH V3 0/3] ARM: davinci: da850: add pinctrl support
-In-Reply-To: <1357813838-26511-1-git-send-email-anilkumar.v@ti.com>
-References: <1357813838-26511-1-git-send-email-anilkumar.v@ti.com>
-Message-ID: <50EEB2A4.3020103@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 10 Jan 2013 13:24:41 +0100
+Subject: Fix phy_init for Marvell network eth driver
+In-Reply-To: <1357819234-27752-1-git-send-email-konszert@marvell.com>
+References: <1357819234-27752-1-git-send-email-konszert@marvell.com>
+Message-ID: <20130110122441.GQ3392@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/10/2013 4:00 PM, Kumar, Anil wrote:
-> This set of patches adds:
+On Thu, Jan 10, 2013 at 02:00:32PM +0200, Kosta Zertsekel wrote:
+> Hi all,
+> resubmitting the patch for Marvell mv643xx driver (patch 1/2) adding the below explanation (thanks to Florian F.):
+> The D-Link DNS323_REV_C1 board has a specific PHY device fixup using the flag MARVELL_PHY_M1118_DNS323_LEDS which is set by the architecture code in arch/arm/mach-orion5x/dns323-setup.c. This flag is unfortunately lost during the call to phy_attach() in mv643xx_eth and therefore, the underlying Marvell PHY driver cannot make use of this flag to fixup the PHY device LEDs. This patch ensures the phy->dev_flags value is passed to the phy_attach() function such that the PHY device driver can
+> actually use it.
 > 
-> * Add pinctrl-single for handling Padconf registers.
-> * Add NAND node to export NAND functionality on da850 EVM.
-> * Add NAND pinctrl node to do pin mux according to pinctrl-single driver.
+> Also submitting new patch 2/2 using the same (or at least very close in meaning) explanation.
+> 
 
-Please do not spin versions so fast. Give some reasonable time for
-discussion to close before you send a new version. Dont want to see a
-flood of versions. It creates confusion.
+Hi Kosta
 
-Thanks,
-Sekhar
+This comment is supposed to be in the header of the patch. 
 
-PS: New address of Kevin Hilman per MAINTAINERS is
-khilman at deeprootsystems.com
+Since this comment is about a bug for the D-Link DNS323_REV_C1, the
+fix to DSA should be in a separate patch, again with a comment about
+the patch, why its needed, what if fixes etc.
+
+I suggest you take a look at Documentation/SubmittingPatches
+
+Thanks
+	Andrew
