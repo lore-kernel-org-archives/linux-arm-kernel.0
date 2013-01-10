@@ -1,23 +1,360 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 Jan 2013 09:58:23 +0800
-Subject: [PATCH 1/4] ARM i.MX53: Add UART2 for low-level debugging
-In-Reply-To: <1357739065-9153-2-git-send-email-s.trumtrar@pengutronix.de>
-References: <1357739065-9153-1-git-send-email-s.trumtrar@pengutronix.de>
- <1357739065-9153-2-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130110015821.GB2265@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 10 Jan 2013 10:58:38 +0900
+Subject: [PATCH 1/8] SH: intc: Add support OF for INTC
+In-Reply-To: <20130109115352.GB7337@e106331-lin.cambridge.arm.com>
+References: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
+ <1357713007-4005-2-git-send-email-horms+renesas@verge.net.au>
+ <20130109115352.GB7337@e106331-lin.cambridge.arm.com>
+Message-ID: <20130110015838.GK21832@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 02:44:22PM +0100, Steffen Trumtrar wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
+On Wed, Jan 09, 2013 at 11:53:52AM +0000, Mark Rutland wrote:
+> Hi,
 > 
-> This is needed for boards like the Garz & Fricke Vincell and
-> Vincell LT, that have the serial debugging console on UART2.
+> Thanks for updating the text, this is far easier to read than previously.
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> However, I'm still concerned by how complex the binding seems. As I don't have
+> any familiarity with the device, I don't know whether that's just an artifact
+> of the hardware or something that can be cleared up.
 
-I have a patch [1] to solve it for all imx and all uart ports.
+The bindings may not be ideal but I believe that the complexity
+reflects the complexity of the HW.
 
-Shawn
+> I think the approach used by the binding needs some serious review before this
+> should be merged. It seems far more complex than any existing interrupt
+> controller binding. Without a dts example for a complete board (complete with
+> devices wired up to the interrupt controller), it's difficult to judge how this
+> will work in practice.
 
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/205000/focus=205002
+The series includes dtsi files for the sh7372 and r8a7740 SoCs.
+These illustrate how the bindings may be used to describe the
+INTCA controller of SoCs.
+
+Below is a patch to make use of INTCA on the mackerel board which
+uses the sh7372 SoC.
+
+commit 1e89273655be10a44457d130bcc4a4b0dc4a4956
+Author: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Date:   Mon Dec 31 12:23:54 2012 +0100
+
+    ARM: shmobile: add a reference DT implementation for mackerel
+    
+    Add a DT-only mackerel implementation. So far it only contains a limited
+    set of devices, already implementing DT support. As more drivers are
+    extended with DT initialisation option, respective devices shall be added
+    to sh7372-mackerel-reference.dts.
+    
+    Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+    Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e44da40..7fb4696 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -123,7 +123,8 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	sh73a0-kzm9g.dtb \
+-	sh7372-mackerel.dtb
++	sh7372-mackerel.dtb \
++	sh7372-mackerel-reference.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+ 	spear1340-evb.dtb
+ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+diff --git a/arch/arm/boot/dts/sh7372-mackerel-reference.dts b/arch/arm/boot/dts/sh7372-mackerel-reference.dts
+new file mode 100644
+index 0000000..2fd1eff
+--- /dev/null
++++ b/arch/arm/boot/dts/sh7372-mackerel-reference.dts
+@@ -0,0 +1,131 @@
++/*
++ * Device Tree Source for the mackerel board
++ *
++ * Copyright (C) 2012 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++/include/ "sh7372.dtsi"
++
++/ {
++	model = "Mackerel (AP4 EVM 2nd)";
++	compatible = "renesas,mackerel-reference";
++
++	memory {
++		device_type = "memory";
++		reg = <0x40000000 0x10000000>;
++	};
++
++	reg_1p8v: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "1P8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	reg_3p3v: regulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	lan9220 at 14000000 {
++		compatible = "smsc,lan9220", "smsc,lan9115";
++		reg = <0x14000000 0x2000000>;
++		phy-mode = "mii";
++		interrupt-parent = <&intca_irq_pins_lo>;
++		interrupts = <0x2c0>;
++		reg-io-width = <4>;
++		smsc,irq-push-pull;
++		smsc,save-mac-address;
++		vddvario-supply = <&reg_1p8v>;
++		vdd33a-supply = <&reg_3p3v>;
++	};
++
++	i2c1: i2c at e6c20000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,rmobile-iic";
++		reg = <0xe6c20000 0x1000>;
++		interrupt-parent = <&intca>;
++		interrupts = <0x780 0x7a0 0x7c0 0x7e0>;
++
++		clock-frequency = <100000>;
++
++		accelerometer at 53 {
++			compatible = "analog-devices,adxl34x";
++			reg = <0x53>;
++			interrupt-parent = <&intca_irq_pins_hi>;
++			interrupts = <0x32a0>;
++		};
++	};
++
++	mmcif0: mmcif at 0xe6bd0000 {
++		compatible = "renesas,sh-mmcif", "renesas,sh7372-mmcif";
++		reg = <0xe6bd0000 0x100>;
++		interrupt-parent = <&intca>;
++		interrupts = <0x1ac0 0x1ae0>;
++		vmmc-supply = <&reg_1p8v>;
++	};
++
++	sdhi0: sdhi at 0xe6850000 {
++		compatible = "renesas,shmobile-sdhi";
++		reg = <0xe6850000 0x100>;
++		interrupt-parent = <&intca>;
++		interrupts = <0x0e00 0x0e20 0x0e40>;
++		vmmc-supply = <&reg_3p3v>;
++	};
++
++	sdhi1: sdhi at 0xe6860000 {
++		compatible = "renesas,shmobile-sdhi";
++		reg = <0xe6860000 0x100>;
++		interrupt-parent = <&intca>;
++		interrupts = <0x0e80 0x0ea0 0x0ec0>;
++		vmmc-supply = <&reg_1p8v>;
++	};
++
++	sdhi2: sdhi at 0xe6870000 {
++		compatible = "renesas,shmobile-sdhi";
++		reg = <0xe6870000 0x100>;
++		interrupt-parent = <&intca>;
++		interrupts = <0x1200 0x1220 0x1240>;
++		vmmc-supply = <&reg_3p3v>;
++	};
++
++	flash at 2000000 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "cfi-flash";
++		reg = <0x20000000 0x8000000>;
++		bank-width = <2>;
++		partition at 0 {
++			label = "loader";
++			reg = <0 0x80000>;
++		};
++		partition at 1 {
++			label = "bootenv";
++			reg = <0x80000 0x80000>;
++		};
++		partition at 2 {
++			label = "kernel_ro";
++			reg = <0x100000 0x800000>;
++		};
++		partition at 3 {
++			label = "kernel";
++			reg = <0x900000 0x800000>;
++		};
++		partition at 4 {
++			label = "data";
++			reg = <0x1100000 0x6f00000>;
++		};
++	};
++};
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 9255546..c25784b 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -76,6 +76,14 @@ config MACH_MACKEREL
+ 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
+ 	select USE_OF
+ 
++config MACH_MACKEREL_REFERENCE
++	bool "mackerel board - Reference Device Tree Implementation"
++	depends on ARCH_SH7372
++	select ARCH_REQUIRE_GPIOLIB
++	select REGULATOR_FIXED_VOLTAGE if REGULATOR
++	select SND_SOC_AK4642 if SND_SIMPLE_CARD
++	select USE_OF
++
+ config MACH_KOTA2
+ 	bool "KOTA2 board"
+ 	depends on ARCH_SH73A0
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index e1fac57..7723a8f 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -36,6 +36,7 @@ obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
+ obj-$(CONFIG_MACH_AP4EVB)	+= board-ap4evb.o
+ obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
+ obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
++obj-$(CONFIG_MACH_MACKEREL_REFERENCE)	+= board-mackerel-reference.o
+ obj-$(CONFIG_MACH_KOTA2)	+= board-kota2.o
+ obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+diff --git a/arch/arm/mach-shmobile/board-mackerel-reference.c b/arch/arm/mach-shmobile/board-mackerel-reference.c
+new file mode 100644
+index 0000000..1d83653
+--- /dev/null
++++ b/arch/arm/mach-shmobile/board-mackerel-reference.c
+@@ -0,0 +1,122 @@
++/*
++ * mackerel board support - Reference Device Tree Implementation
++ *
++ * Copyright (C) 2012 Renesas Solutions Corp.
++ *
++ * Copyright (C) 2010 Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
++ *
++ * based on ap4evb
++ * Copyright (C) 2010  Magnus Damm
++ * Copyright (C) 2008  Yoshihiro Shimoda
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++#include <linux/init.h>
++#include <linux/irq.h>
++#include <linux/gpio.h>
++
++#include <mach/common.h>
++#include <mach/irqs.h>
++#include <mach/sh7372.h>
++
++#include <asm/mach/arch.h>
++
++#define IRQ7 evt2irq(0x02e0)
++#define IRQ21 evt2irq(0x32a0)
++
++static void __init mackerel_init(void)
++{
++	sh7372_add_standard_devices_dt();
++
++	/* External clock source */
++	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
++
++	sh7372_pinmux_init();
++
++	/* enable SCIFA0 */
++	gpio_request(GPIO_FN_SCIFA0_TXD, NULL);
++	gpio_request(GPIO_FN_SCIFA0_RXD, NULL);
++
++	/* enable SMSC911X */
++	gpio_request(GPIO_FN_CS5A,	NULL);
++	gpio_request(GPIO_FN_IRQ6_39,	NULL);
++
++	/* enable Touchscreen */
++	gpio_request(GPIO_FN_IRQ7_40,	NULL);
++	irq_set_irq_type(IRQ7, IRQ_TYPE_LEVEL_LOW);
++
++	/* enable Accelerometer */
++	gpio_request(GPIO_FN_IRQ21,	NULL);
++	irq_set_irq_type(IRQ21, IRQ_TYPE_LEVEL_HIGH);
++
++	/* enable SDHI0 */
++	gpio_request(GPIO_FN_SDHIWP0, NULL);
++	gpio_request(GPIO_FN_SDHICMD0, NULL);
++	gpio_request(GPIO_FN_SDHICLK0, NULL);
++	gpio_request(GPIO_FN_SDHID0_3, NULL);
++	gpio_request(GPIO_FN_SDHID0_2, NULL);
++	gpio_request(GPIO_FN_SDHID0_1, NULL);
++	gpio_request(GPIO_FN_SDHID0_0, NULL);
++
++	/* SDHI0 PORT172 card-detect IRQ26 */
++	gpio_request(GPIO_FN_IRQ26_172, NULL);
++
++	/* enable SDHI1 */
++	gpio_request(GPIO_FN_SDHICMD1, NULL);
++	gpio_request(GPIO_FN_SDHICLK1, NULL);
++	gpio_request(GPIO_FN_SDHID1_3, NULL);
++	gpio_request(GPIO_FN_SDHID1_2, NULL);
++	gpio_request(GPIO_FN_SDHID1_1, NULL);
++	gpio_request(GPIO_FN_SDHID1_0, NULL);
++
++	/* enable SDHI2 */
++	gpio_request(GPIO_FN_SDHICMD2, NULL);
++	gpio_request(GPIO_FN_SDHICLK2, NULL);
++	gpio_request(GPIO_FN_SDHID2_3, NULL);
++	gpio_request(GPIO_FN_SDHID2_2, NULL);
++	gpio_request(GPIO_FN_SDHID2_1, NULL);
++	gpio_request(GPIO_FN_SDHID2_0, NULL);
++
++	/* card detect pin for microSD slot (CN23) */
++	gpio_request(GPIO_PORT162, NULL);
++	gpio_direction_input(GPIO_PORT162);
++
++	/* MMCIF */
++	gpio_request(GPIO_FN_MMCD0_0, NULL);
++	gpio_request(GPIO_FN_MMCD0_1, NULL);
++	gpio_request(GPIO_FN_MMCD0_2, NULL);
++	gpio_request(GPIO_FN_MMCD0_3, NULL);
++	gpio_request(GPIO_FN_MMCD0_4, NULL);
++	gpio_request(GPIO_FN_MMCD0_5, NULL);
++	gpio_request(GPIO_FN_MMCD0_6, NULL);
++	gpio_request(GPIO_FN_MMCD0_7, NULL);
++	gpio_request(GPIO_FN_MMCCMD0, NULL);
++	gpio_request(GPIO_FN_MMCCLK0, NULL);
++}
++
++static const char *mackerel_compat_dt[] __initdata = {
++	"renesas,mackerel-reference",
++	NULL,
++};
++
++DT_MACHINE_START(MACKEREL, "mackerel-reference")
++	.map_io		= sh7372_map_io,
++	.init_early	= sh7372_add_early_devices_dt,
++	.init_irq	= sh7372_init_irq_of,
++	.handle_irq	= shmobile_handle_irq_intc,
++	.init_machine	= mackerel_init,
++	.init_late	= sh7372_pm_init_late,
++	.timer		= &shmobile_timer,
++	.dt_compat	= mackerel_compat_dt,
++MACHINE_END
