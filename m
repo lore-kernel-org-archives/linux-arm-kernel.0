@@ -1,121 +1,51 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 10 Jan 2013 16:35:54 +0800
-Subject: [PATCH 4/4] usb: chipidea: imx: Add system suspend/resume API
-In-Reply-To: <1357806954-27960-1-git-send-email-peter.chen@freescale.com>
-References: <1357806954-27960-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1357806954-27960-4-git-send-email-peter.chen@freescale.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 10 Jan 2013 09:36:47 +0100
+Subject: [PATCH 1/4] gpiolib: introduce descriptor-based GPIO interface
+In-Reply-To: <20130109111055.GG3931@n2100.arm.linux.org.uk>
+References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
+ <201301081259.29839.arnd@arndb.de>
+ <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
+ <201301091035.23206.arnd@arndb.de>
+ <20130109104414.GF3931@n2100.arm.linux.org.uk>
+ <20130109111055.GG3931@n2100.arm.linux.org.uk>
+Message-ID: <20130110083647.GA26256@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the system suspend/resume procedure, the USB also
-needs to go suspend/resume procedure, this patch adds
-related APIs. It is tested at i.mx6q sabrelite. Meanwhile,
-it fixes the bug that the USB will out of work after
-system suspend/resume.
+On Wed, Jan 09, 2013 at 11:10:55AM +0000, Russell King - ARM Linux wrote:
+[...]
+>         err = gpio_request(en_vdd_1v05, "EN_VDD_1V05");
+>         if (err) {
+>                 pr_err("%s: gpio_request failed: %d\n", __func__, err);
+>                 return err;
+>         }
+> 
+>         gpio_direction_output(en_vdd_1v05, 1);
+> 
+>         regulator = regulator_get(NULL, "vdd_ldo0,vddio_pex_clk");
+>         if (IS_ERR_OR_NULL(regulator)) {
+>                 pr_err("%s: regulator_get failed: %d\n", __func__,
+>                        (int)PTR_ERR(regulator));
+>                 goto err_reg;
+>         }
+> ...
+> err_reg:
+>         gpio_free(en_vdd_1v05);
+> 
+>         return err;
+> }
+> 
+> So 'err' here is never set.  when IS_ERR_OR_NULL evaluates true.
+> Setting 'err' to PTR_ERR(regulator) is not correct because a NULL return
+> sets 'err' to zero.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/chipidea/bits.h        |    1 +
- drivers/usb/chipidea/ci13xxx_imx.c |   61 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+), 0 deletions(-)
+FWIW, this one is fixed in the Tegra PCIe series I posted yesterday.
 
-diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-index ba9c6ef..d1467bb 100644
---- a/drivers/usb/chipidea/bits.h
-+++ b/drivers/usb/chipidea/bits.h
-@@ -47,6 +47,7 @@
- #define PORTSC_FPR            BIT(6)
- #define PORTSC_SUSP           BIT(7)
- #define PORTSC_HSP            BIT(9)
-+#define PORTSC_PHCD           BIT(23) /* phy suspend mode */
- #define PORTSC_PTC            (0x0FUL << 16)
- 
- /* DEVLC */
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 342eab0..dd257b1 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -25,6 +25,7 @@
- #include <linux/mfd/syscon.h>
- 
- #include "ci.h"
-+#include "bits.h"
- #include "ci13xxx_imx.h"
- 
- #define pdev_to_phy(pdev) \
-@@ -321,6 +322,63 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int ci13xxx_imx_suspend(struct device *dev)
-+{
-+	struct ci13xxx_imx_data *data =
-+		platform_get_drvdata(to_platform_device(dev));
-+	struct platform_device *plat_ci;
-+	struct ci13xxx	*ci;
-+
-+	plat_ci = data->ci_pdev;
-+	ci = platform_get_drvdata(plat_ci);
-+
-+	hw_write(ci, OP_PORTSC, PORTSC_PHCD, 1);
-+
-+	if (data->phy)
-+		usb_phy_set_suspend(data->phy, 1);
-+
-+	clk_disable_unprepare(data->clk);
-+
-+	return 0;
-+}
-+
-+static int ci13xxx_imx_resume(struct device *dev)
-+{
-+	int ret;
-+	struct ci13xxx_imx_data *data =
-+		platform_get_drvdata(to_platform_device(dev));
-+	struct platform_device *plat_ci;
-+	struct ci13xxx	*ci;
-+
-+	plat_ci = data->ci_pdev;
-+	ci = platform_get_drvdata(plat_ci);
-+
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret) {
-+		dev_err(dev,
-+			"Failed to prepare or enable clock, err=%d\n", ret);
-+		return ret;
-+	}
-+
-+	if (hw_read(ci, OP_PORTSC, PORTSC_PHCD)) {
-+		hw_write(ci, OP_PORTSC, PORTSC_PHCD, 0);
-+		/* Some clks sync between Controller and USB PHY */
-+		mdelay(1);
-+	}
-+
-+	if (data->phy)
-+		usb_phy_set_suspend(data->phy, 0);
-+
-+	return ret;
-+}
-+
-+static const struct dev_pm_ops ci13xxx_imx_pm_ops = {
-+	.suspend	= ci13xxx_imx_suspend,
-+	.resume		= ci13xxx_imx_resume,
-+};
-+#endif
-+
- static const struct of_device_id ci13xxx_imx_dt_ids[] = {
- 	{ .compatible = "fsl,imx27-usb", },
- 	{ /* sentinel */ }
-@@ -334,6 +392,9 @@ static struct platform_driver ci13xxx_imx_driver = {
- 		.name = "imx_usb",
- 		.owner = THIS_MODULE,
- 		.of_match_table = ci13xxx_imx_dt_ids,
-+#ifdef CONFIG_PM
-+		.pm	= &ci13xxx_imx_pm_ops,
-+#endif
- 	 },
- };
- 
--- 
-1.7.0.4
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/a9b222d3/attachment.sig>
