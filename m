@@ -1,727 +1,610 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 11 Jan 2013 00:43:50 +0100
-Subject: [PATCH 1/2 V3] iio: mxs: Implement support for touchscreen
-Message-ID: <1357861431-8978-1-git-send-email-marex@denx.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Jan 2013 15:45:38 -0800
+Subject: [PATCH 01/14] mfd: omap-usb-host: Consolidate OMAP USB-HS
+ platform data
+In-Reply-To: <1357836694-30788-2-git-send-email-rogerq@ti.com>
+References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
+ <1357836694-30788-2-git-send-email-rogerq@ti.com>
+Message-ID: <20130110234537.GB15458@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements support for sampling of a touchscreen into
-the MXS LRADC driver. The LRADC block allows configuring some of
-it's channels into special mode where they either output the drive
-voltage or sample it, allowing it to operate a 4-wire or 5-wire
-resistive touchscreen.
+* Roger Quadros <rogerq@ti.com> [130110 08:54]:
+> Let's have a single platform data structure for the OMAP's High-Speed
+> USB host subsystem instead of having 3 separate ones i.e. one for
+> board data, one for USB Host (UHH) module and one for USB-TLL module.
+> 
+> This makes the code much simpler and avoids creating multiple copies of
+> platform data.
 
-In case the touchscreen mode is enabled, the LRADC slot #7 is
-reserved for touchscreen only, therefore it is not possible to
-sample 8 LRADC channels at time, but only 7 channels.
+I can apply just this patch alone into an immutable branch that
+we all can merge in as needed as long as we have acks for the USB
+and MFD parts.
 
-The touchscreen controller is configured such that the PENDOWN event
-disables touchscreen interrupts and triggers execution of worker
-thread, which then polls the touchscreen controller for X, Y and
-Pressure values. This reduces the overhead of interrupt-driven
-operation. Upon the PENUP event, the worker thread re-enables the
-PENDOWN detection interrupt and exits.
+Or does this one need to be changed based on Alan's comments
+on the EHCI lib related changes?
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Jonathan Cameron <jic23@kernel.org>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- .../bindings/staging/iio/adc/mxs-lradc.txt         |    6 +
- drivers/staging/iio/adc/mxs-lradc.c                |  473 +++++++++++++++++++-
- 2 files changed, 455 insertions(+), 24 deletions(-)
+Regards,
 
-V2: - Replace the use_touchscreen* with enum mxs_lradc_ts, which now tracks
-      touchscreen state (OFF, 4-wire, 5-wire)
-    - Add "stop_touchscreen" bit, which indicates the touchscreen is going down
-      and makes the driver not re-enable touchscreen interrupts and start any
-      new touchscreen works.
-    - Make all bitfields "unsigned int" instead of plain "int"
-    - Use switch(plate) in mxs_lradc_ts_sample()
-    - Cancel touchscreen thread in mxs_lradc_ts_close(), do this only after
-      we are sure touchscreen interrupt is off and will never be re-enabled.
-      This avoids serious race condition.
-    - Call input_free_device() if input_register_device() fails to avoid memory
-      leak.
-    - Do not call input_free_device() after input_unregister_device() in
-      mxs_lradc_ts_unregister() to avoid double-free
-
-V3: - Replace bitfields with bools
-    - Make sure touchscreen workQ doesn't cause race condition upon closing
-      the input device
-    - Make touchscreen allocation failure fatal
-    - Remove redundant check for lradc->ts_input in mxs_lradc_ts_unregister()
-    - Drop __devinit and __devexit
-
-diff --git a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-index 801d58c..4688205 100644
---- a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-+++ b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-@@ -5,6 +5,12 @@ Required properties:
- - reg: Address and length of the register set for the device
- - interrupts: Should contain the LRADC interrupts
+Tony
  
-+Optional properties:
-+- fsl,lradc-touchscreen-wires: Number of wires used to connect the touchscreen
-+                               to LRADC. Valid value is either 4 or 5. If this
-+                               property is not present, then the touchscreen is
-+                               disabled.
-+
- Examples:
- 
- 	lradc at 80050000 {
-diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-index 6249957..2db344b 100644
---- a/drivers/staging/iio/adc/mxs-lradc.c
-+++ b/drivers/staging/iio/adc/mxs-lradc.c
-@@ -32,6 +32,8 @@
- #include <linux/stmp_device.h>
- #include <linux/bitops.h>
- #include <linux/completion.h>
-+#include <linux/delay.h>
-+#include <linux/input.h>
- 
- #include <mach/mxs.h>
- #include <mach/common.h>
-@@ -59,6 +61,21 @@
- #define LRADC_DELAY_TIMER_PER	200
- #define LRADC_DELAY_TIMER_LOOP	5
- 
-+/*
-+ * Once the pen touches the touchscreen, the touchscreen switches from
-+ * IRQ-driven mode to polling mode to prevent interrupt storm. The polling
-+ * is realized by worker thread, which is called every 20 or so milliseconds.
-+ * This gives the touchscreen enough fluence and does not strain the system
-+ * too much.
-+ */
-+#define LRADC_TS_SAMPLE_DELAY_MS	5
-+
-+/*
-+ * The LRADC reads the following amount of samples from each touchscreen
-+ * channel and the driver then computes avarage of these.
-+ */
-+#define LRADC_TS_SAMPLE_AMOUNT		4
-+
- static const char * const mxs_lradc_irq_name[] = {
- 	"mxs-lradc-touchscreen",
- 	"mxs-lradc-thresh0",
-@@ -75,6 +92,12 @@ static const char * const mxs_lradc_irq_name[] = {
- 	"mxs-lradc-button1",
- };
- 
-+enum mxs_lradc_ts {
-+	MXS_LRADC_TOUCHSCREEN_NONE = 0,
-+	MXS_LRADC_TOUCHSCREEN_4WIRE,
-+	MXS_LRADC_TOUCHSCREEN_5WIRE,
-+};
-+
- struct mxs_lradc {
- 	struct device		*dev;
- 	void __iomem		*base;
-@@ -86,21 +109,69 @@ struct mxs_lradc {
- 	struct mutex		lock;
- 
- 	struct completion	completion;
-+
-+	/*
-+	 * Touchscreen LRADC channels receives a private slot in the CTRL4
-+	 * register, the slot #7. Therefore only 7 slots instead of 8 in the
-+	 * CTRL4 register can be mapped to LRADC channels when using the
-+	 * touchscreen.
-+	 *
-+	 * Furthermore, certain LRADC channels are shared between touchscreen
-+	 * and/or touch-buttons and generic LRADC block. Therefore when using
-+	 * either of these, these channels are not available for the regular
-+	 * sampling. The shared channels are as follows:
-+	 *
-+	 * CH0 -- Touch button #0
-+	 * CH1 -- Touch button #1
-+	 * CH2 -- Touch screen XPUL
-+	 * CH3 -- Touch screen YPLL
-+	 * CH4 -- Touch screen XNUL
-+	 * CH5 -- Touch screen YNLR
-+	 * CH6 -- Touch screen WIPER (5-wire only)
-+	 *
-+	 * The bitfields below represents which parts of the LRADC block are
-+	 * switched into special mode of operation. These channels can not
-+	 * be sampled as regular LRADC channels. The driver will refuse any
-+	 * attempt to sample these channels.
-+	 */
-+#define CHAN_MASK_TOUCHBUTTON		(0x3 << 0)
-+#define CHAN_MASK_TOUCHSCREEN_4WIRE	(0xf << 2)
-+#define CHAN_MASK_TOUCHSCREEN_5WIRE	(0x1f << 2)
-+	enum mxs_lradc_ts	use_touchscreen;
-+	bool			stop_touchscreen;
-+	bool			use_touchbutton;
-+
-+	struct input_dev	*ts_input;
-+	struct work_struct	ts_work;
- };
- 
- #define	LRADC_CTRL0				0x00
--#define LRADC_CTRL0_TOUCH_DETECT_ENABLE		(1 << 23)
--#define LRADC_CTRL0_TOUCH_SCREEN_TYPE		(1 << 22)
-+#define	LRADC_CTRL0_TOUCH_DETECT_ENABLE		(1 << 23)
-+#define	LRADC_CTRL0_TOUCH_SCREEN_TYPE		(1 << 22)
-+#define	LRADC_CTRL0_YNNSW	/* YM */	(1 << 21)
-+#define	LRADC_CTRL0_YPNSW	/* YP */	(1 << 20)
-+#define	LRADC_CTRL0_YPPSW	/* YP */	(1 << 19)
-+#define	LRADC_CTRL0_XNNSW	/* XM */	(1 << 18)
-+#define	LRADC_CTRL0_XNPSW	/* XM */	(1 << 17)
-+#define	LRADC_CTRL0_XPPSW	/* XP */	(1 << 16)
-+#define	LRADC_CTRL0_PLATE_MASK			(0x3f << 16)
- 
- #define	LRADC_CTRL1				0x10
--#define	LRADC_CTRL1_LRADC_IRQ(n)		(1 << (n))
--#define	LRADC_CTRL1_LRADC_IRQ_MASK		0x1fff
-+#define	LRADC_CTRL1_TOUCH_DETECT_IRQ_EN		(1 << 24)
- #define	LRADC_CTRL1_LRADC_IRQ_EN(n)		(1 << ((n) + 16))
- #define	LRADC_CTRL1_LRADC_IRQ_EN_MASK		(0x1fff << 16)
-+#define	LRADC_CTRL1_LRADC_IRQ_EN_OFFSET		16
-+#define	LRADC_CTRL1_TOUCH_DETECT_IRQ		(1 << 8)
-+#define	LRADC_CTRL1_LRADC_IRQ(n)		(1 << (n))
-+#define	LRADC_CTRL1_LRADC_IRQ_MASK		0x1fff
-+#define	LRADC_CTRL1_LRADC_IRQ_OFFSET		0
- 
- #define	LRADC_CTRL2				0x20
- #define	LRADC_CTRL2_TEMPSENSE_PWD		(1 << 15)
- 
-+#define	LRADC_STATUS				0x40
-+#define	LRADC_STATUS_TOUCH_DETECT_RAW		(1 << 0)
-+
- #define	LRADC_CH(n)				(0x50 + (0x10 * (n)))
- #define	LRADC_CH_ACCUMULATE			(1 << 29)
- #define	LRADC_CH_NUM_SAMPLES_MASK		(0x1f << 24)
-@@ -132,6 +203,7 @@ static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
- {
- 	struct mxs_lradc *lradc = iio_priv(iio_dev);
- 	int ret;
-+	unsigned long mask;
- 
- 	if (m != IIO_CHAN_INFO_RAW)
- 		return -EINVAL;
-@@ -140,6 +212,12 @@ static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
- 	if (chan->channel > LRADC_MAX_TOTAL_CHANS)
- 		return -EINVAL;
- 
-+	/* Validate the channel if it doesn't intersect with reserved chans. */
-+	bitmap_set(&mask, chan->channel, 1);
-+	ret = iio_validate_scan_mask_onehot(iio_dev, &mask);
-+	if (ret)
-+		return -EINVAL;
-+
- 	/*
- 	 * See if there is no buffered operation in progess. If there is, simply
- 	 * bail out. This can be improved to support both buffered and raw IO at
-@@ -161,7 +239,11 @@ static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
- 		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
- 	writel(0xff, lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
- 
--	writel(chan->channel, lradc->base + LRADC_CTRL4);
-+	/* Clean the slot's previous content, then set new one. */
-+	writel(LRADC_CTRL4_LRADCSELECT_MASK(0),
-+		lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_CLR);
-+	writel(chan->channel, lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_SET);
-+
- 	writel(0, lradc->base + LRADC_CH(0));
- 
- 	/* Enable the IRQ and start sampling the channel. */
-@@ -195,6 +277,270 @@ static const struct iio_info mxs_lradc_iio_info = {
- };
- 
- /*
-+ * Touchscreen handling
-+ */
-+enum lradc_ts_plate {
-+	LRADC_SAMPLE_X,
-+	LRADC_SAMPLE_Y,
-+	LRADC_SAMPLE_PRESSURE,
-+};
-+
-+static int mxs_lradc_ts_touched(struct mxs_lradc *lradc)
-+{
-+	uint32_t reg;
-+
-+	/* Enable touch detection. */
-+	writel(LRADC_CTRL0_PLATE_MASK,
-+		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-+	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
-+		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
-+
-+	msleep(LRADC_TS_SAMPLE_DELAY_MS);
-+
-+	reg = readl(lradc->base + LRADC_STATUS);
-+
-+	return reg & LRADC_STATUS_TOUCH_DETECT_RAW;
-+}
-+
-+static int32_t mxs_lradc_ts_sample(struct mxs_lradc *lradc,
-+				enum lradc_ts_plate plate, int change)
-+{
-+	unsigned long delay, jiff;
-+	uint32_t reg, ctrl0 = 0, chan = 0;
-+	/* The touchscreen always uses CTRL4 slot #7. */
-+	const uint8_t slot = 7;
-+	uint32_t val;
-+
-+	/*
-+	 * There are three correct configurations of the controller sampling
-+	 * the touchscreen, each of these configuration provides different
-+	 * information from the touchscreen.
-+	 *
-+	 * The following table describes the sampling configurations:
-+	 * +-------------+-------+-------+-------+
-+	 * | Wire \ Axis |   X   |   Y   |   Z   |
-+	 * +---------------------+-------+-------+
-+	 * |   X+ (CH2)  |   HI  |   TS  |   TS  |
-+	 * +-------------+-------+-------+-------+
-+	 * |   X- (CH4)  |   LO  |   SH  |   HI  |
-+	 * +-------------+-------+-------+-------+
-+	 * |   Y+ (CH3)  |   SH  |   HI  |   HI  |
-+	 * +-------------+-------+-------+-------+
-+	 * |   Y- (CH5)  |   TS  |   LO  |   SH  |
-+	 * +-------------+-------+-------+-------+
-+	 *
-+	 * HI ... strong '1'  ; LO ... strong '0'
-+	 * SH ... sample here ; TS ... tri-state
-+	 *
-+	 * There are a few other ways of obtaining the Z coordinate
-+	 * (aka. pressure), but the one in the table seems to be the
-+	 * most reliable one.
-+	 */
-+	switch (plate) {
-+	case LRADC_SAMPLE_X:
-+		ctrl0 = LRADC_CTRL0_XPPSW | LRADC_CTRL0_XNNSW;
-+		chan = 3;
-+		break;
-+	case LRADC_SAMPLE_Y:
-+		ctrl0 = LRADC_CTRL0_YPPSW | LRADC_CTRL0_YNNSW;
-+		chan = 4;
-+		break;
-+	case LRADC_SAMPLE_PRESSURE:
-+		ctrl0 = LRADC_CTRL0_YPPSW | LRADC_CTRL0_XNNSW;
-+		chan = 5;
-+		break;
-+	}
-+
-+	if (change) {
-+		writel(LRADC_CTRL0_PLATE_MASK,
-+			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-+		writel(ctrl0, lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
-+
-+		writel(LRADC_CTRL4_LRADCSELECT_MASK(slot),
-+			lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_CLR);
-+		writel(chan << LRADC_CTRL4_LRADCSELECT_OFFSET(slot),
-+			lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_SET);
-+	}
-+
-+	writel(0xffffffff, lradc->base + LRADC_CH(slot) + STMP_OFFSET_REG_CLR);
-+	writel(1 << slot, lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
-+
-+	delay = jiffies + msecs_to_jiffies(LRADC_TS_SAMPLE_DELAY_MS);
-+	do {
-+		jiff = jiffies;
-+		reg = readl_relaxed(lradc->base + LRADC_CTRL1);
-+		if (reg & LRADC_CTRL1_LRADC_IRQ(slot))
-+			break;
-+	} while (time_before(jiff, delay));
-+
-+	writel(LRADC_CTRL1_LRADC_IRQ(slot),
-+		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
-+
-+	if (time_after_eq(jiff, delay))
-+		return -ETIMEDOUT;
-+
-+	val = readl(lradc->base + LRADC_CH(slot));
-+	val &= LRADC_CH_VALUE_MASK;
-+
-+	return val;
-+}
-+
-+static int32_t mxs_lradc_ts_sample_filter(struct mxs_lradc *lradc,
-+				enum lradc_ts_plate plate)
-+{
-+	int32_t val, tot = 0;
-+	int i;
-+
-+	val = mxs_lradc_ts_sample(lradc, plate, 1);
-+
-+	/* Delay a bit so the touchscreen is stable. */
-+	mdelay(2);
-+
-+	for (i = 0; i < LRADC_TS_SAMPLE_AMOUNT; i++) {
-+		val = mxs_lradc_ts_sample(lradc, plate, 0);
-+		tot += val;
-+	}
-+
-+	return tot / LRADC_TS_SAMPLE_AMOUNT;
-+}
-+
-+static void mxs_lradc_ts_work(struct work_struct *ts_work)
-+{
-+	struct mxs_lradc *lradc = container_of(ts_work,
-+				struct mxs_lradc, ts_work);
-+	int val_x, val_y, val_p;
-+	bool valid = false;
-+
-+	while (mxs_lradc_ts_touched(lradc)) {
-+		/* Disable touch detector so we can sample the touchscreen. */
-+		writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
-+			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-+
-+		if (likely(valid)) {
-+			input_report_abs(lradc->ts_input, ABS_X, val_x);
-+			input_report_abs(lradc->ts_input, ABS_Y, val_y);
-+			input_report_abs(lradc->ts_input, ABS_PRESSURE, val_p);
-+			input_report_key(lradc->ts_input, BTN_TOUCH, 1);
-+			input_sync(lradc->ts_input);
-+		}
-+
-+		valid = false;
-+
-+		val_x = mxs_lradc_ts_sample_filter(lradc, LRADC_SAMPLE_X);
-+		if (val_x < 0)
-+			continue;
-+		val_y = mxs_lradc_ts_sample_filter(lradc, LRADC_SAMPLE_Y);
-+		if (val_y < 0)
-+			continue;
-+		val_p = mxs_lradc_ts_sample_filter(lradc, LRADC_SAMPLE_PRESSURE);
-+		if (val_p < 0)
-+			continue;
-+
-+		valid = true;
-+	}
-+
-+	input_report_abs(lradc->ts_input, ABS_PRESSURE, 0);
-+	input_report_key(lradc->ts_input, BTN_TOUCH, 0);
-+	input_sync(lradc->ts_input);
-+
-+	/* Do not restart the TS IRQ if the driver is shutting down. */
-+	if (lradc->stop_touchscreen)
-+		return;
-+
-+	/* Restart the touchscreen interrupts. */
-+	writel(LRADC_CTRL1_TOUCH_DETECT_IRQ,
-+		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
-+	writel(LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
-+		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_SET);
-+}
-+
-+static int mxs_lradc_ts_open(struct input_dev *dev)
-+{
-+	struct mxs_lradc *lradc = input_get_drvdata(dev);
-+
-+	/* The touchscreen is starting. */
-+	lradc->stop_touchscreen = false;
-+
-+	/* Enable the touch-detect circuitry. */
-+	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
-+		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
-+
-+	/* Enable the touch-detect IRQ. */
-+	writel(LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
-+		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_SET);
-+
-+	return 0;
-+}
-+
-+static void mxs_lradc_ts_close(struct input_dev *dev)
-+{
-+	struct mxs_lradc *lradc = input_get_drvdata(dev);
-+
-+	/* Indicate the touchscreen is stopping. */
-+	lradc->stop_touchscreen = true;
-+	mb();
-+
-+	/* Wait until touchscreen thread finishes any possible remnants. */
-+	cancel_work_sync(&lradc->ts_work);
-+
-+	/* Disable touchscreen touch-detect IRQ. */
-+	writel(LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
-+		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
-+
-+	/* Power-down touchscreen touch-detect circuitry. */
-+	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
-+		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-+}
-+
-+static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
-+{
-+	struct input_dev *input;
-+	struct device *dev = lradc->dev;
-+	int ret;
-+
-+	if (!lradc->use_touchscreen)
-+		return 0;
-+
-+	input = input_allocate_device();
-+	if (!input) {
-+		dev_err(dev, "Failed to allocate TS device!\n");
-+		lradc->use_touchscreen = MXS_LRADC_TOUCHSCREEN_NONE;
-+		return -ENOMEM;
-+	}
-+
-+	input->name = DRIVER_NAME;
-+	input->id.bustype = BUS_HOST;
-+	input->dev.parent = dev;
-+	input->open = mxs_lradc_ts_open;
-+	input->close = mxs_lradc_ts_close;
-+
-+	__set_bit(EV_ABS, input->evbit);
-+	__set_bit(EV_KEY, input->evbit);
-+	__set_bit(BTN_TOUCH, input->keybit);
-+	input_set_abs_params(input, ABS_X, 0, LRADC_CH_VALUE_MASK, 0, 0);
-+	input_set_abs_params(input, ABS_Y, 0, LRADC_CH_VALUE_MASK, 0, 0);
-+	input_set_abs_params(input, ABS_PRESSURE, 0, LRADC_CH_VALUE_MASK, 0, 0);
-+
-+	lradc->ts_input = input;
-+	input_set_drvdata(input, lradc);
-+	ret = input_register_device(input);
-+	if (ret)
-+		input_free_device(lradc->ts_input);
-+
-+	return ret;
-+}
-+
-+static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
-+{
-+	if (!lradc->use_touchscreen)
-+		return;
-+
-+	cancel_work_sync(&lradc->ts_work);
-+
-+	input_unregister_device(lradc->ts_input);
-+}
-+
-+/*
-  * IRQ Handling
-  */
- static irqreturn_t mxs_lradc_handle_irq(int irq, void *data)
-@@ -202,14 +548,24 @@ static irqreturn_t mxs_lradc_handle_irq(int irq, void *data)
- 	struct iio_dev *iio = data;
- 	struct mxs_lradc *lradc = iio_priv(iio);
- 	unsigned long reg = readl(lradc->base + LRADC_CTRL1);
-+	const uint32_t ts_irq_mask =
-+		LRADC_CTRL1_TOUCH_DETECT_IRQ_EN |
-+		LRADC_CTRL1_TOUCH_DETECT_IRQ;
- 
- 	if (!(reg & LRADC_CTRL1_LRADC_IRQ_MASK))
- 		return IRQ_NONE;
- 
- 	/*
--	 * Touchscreen IRQ handling code shall probably have priority
--	 * and therefore shall be placed here.
-+	 * Touchscreen IRQ handling code has priority and therefore
-+	 * is placed here. In case touchscreen IRQ arrives, disable
-+	 * it ASAP
- 	 */
-+	if (reg & LRADC_CTRL1_TOUCH_DETECT_IRQ) {
-+		writel(ts_irq_mask,
-+			lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
-+		if (!lradc->stop_touchscreen)
-+			schedule_work(&lradc->ts_work);
-+	}
- 
- 	if (iio_buffer_enabled(iio))
- 		iio_trigger_poll(iio->trig, iio_get_time_ns());
-@@ -306,8 +662,10 @@ static int mxs_lradc_buffer_preenable(struct iio_dev *iio)
- {
- 	struct mxs_lradc *lradc = iio_priv(iio);
- 	struct iio_buffer *buffer = iio->buffer;
--	int ret = 0, chan, ofs = 0, enable = 0;
--	uint32_t ctrl4 = 0;
-+	int ret = 0, chan, ofs = 0;
-+	unsigned long enable = 0;
-+	uint32_t ctrl4_set = 0;
-+	uint32_t ctrl4_clr = 0;
- 	uint32_t ctrl1_irq = 0;
- 	const uint32_t chan_value = LRADC_CH_ACCUMULATE |
- 		((LRADC_DELAY_TIMER_LOOP - 1) << LRADC_CH_NUM_SAMPLES_OFFSET);
-@@ -339,17 +697,20 @@ static int mxs_lradc_buffer_preenable(struct iio_dev *iio)
- 	writel(0xff, lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
- 
- 	for_each_set_bit(chan, buffer->scan_mask, LRADC_MAX_TOTAL_CHANS) {
--		ctrl4 |= chan << LRADC_CTRL4_LRADCSELECT_OFFSET(ofs);
-+		ctrl4_set |= chan << LRADC_CTRL4_LRADCSELECT_OFFSET(ofs);
-+		ctrl4_clr |= LRADC_CTRL4_LRADCSELECT_MASK(ofs);
- 		ctrl1_irq |= LRADC_CTRL1_LRADC_IRQ_EN(ofs);
- 		writel(chan_value, lradc->base + LRADC_CH(ofs));
--		enable |= 1 << ofs;
-+		bitmap_set(&enable, ofs, 1);
- 		ofs++;
- 	};
- 
- 	writel(LRADC_DELAY_TRIGGER_LRADCS_MASK | LRADC_DELAY_KICK,
- 		lradc->base + LRADC_DELAY(0) + STMP_OFFSET_REG_CLR);
- 
--	writel(ctrl4, lradc->base + LRADC_CTRL4);
-+	writel(ctrl4_clr, lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_CLR);
-+	writel(ctrl4_set, lradc->base + LRADC_CTRL4 + STMP_OFFSET_REG_SET);
-+
- 	writel(ctrl1_irq, lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_SET);
- 
- 	writel(enable << LRADC_DELAY_TRIGGER_LRADCS_OFFSET,
-@@ -384,9 +745,33 @@ static int mxs_lradc_buffer_postdisable(struct iio_dev *iio)
- static bool mxs_lradc_validate_scan_mask(struct iio_dev *iio,
- 					const unsigned long *mask)
- {
--	const int mw = bitmap_weight(mask, iio->masklength);
--
--	return mw <= LRADC_MAX_MAPPED_CHANS;
-+	struct mxs_lradc *lradc = iio_priv(iio);
-+	const int len = iio->masklength;
-+	const int map_chans = bitmap_weight(mask, len);
-+	int rsvd_chans = 0;
-+	unsigned long rsvd_mask = 0;
-+
-+	if (lradc->use_touchbutton)
-+		rsvd_mask |= CHAN_MASK_TOUCHBUTTON;
-+	if (lradc->use_touchscreen == MXS_LRADC_TOUCHSCREEN_4WIRE)
-+		rsvd_mask |= CHAN_MASK_TOUCHSCREEN_4WIRE;
-+	if (lradc->use_touchscreen == MXS_LRADC_TOUCHSCREEN_5WIRE)
-+		rsvd_mask |= CHAN_MASK_TOUCHSCREEN_5WIRE;
-+
-+	if (lradc->use_touchbutton)
-+		rsvd_chans++;
-+	if (lradc->use_touchscreen)
-+		rsvd_chans++;
-+
-+	/* Test for attempts to map channels with special mode of operation. */
-+	if (bitmap_intersects(mask, &rsvd_mask, len))
-+		return 0;
-+
-+	/* Test for attempts to map more channels then available slots. */
-+	if (map_chans + rsvd_chans > LRADC_MAX_MAPPED_CHANS)
-+		return 0;
-+
-+	return 1;
- }
- 
- static const struct iio_buffer_setup_ops mxs_lradc_buffer_ops = {
-@@ -435,15 +820,29 @@ static const struct iio_chan_spec mxs_lradc_chan_spec[] = {
- 
- static void mxs_lradc_hw_init(struct mxs_lradc *lradc)
- {
--	int i;
--	const uint32_t cfg =
-+	/* The ADC always uses DELAY CHANNEL 0. */
-+	const uint32_t adc_cfg =
-+		(1 << (LRADC_DELAY_TRIGGER_DELAYS_OFFSET + 0)) |
- 		(LRADC_DELAY_TIMER_PER << LRADC_DELAY_DELAY_OFFSET);
- 
- 	stmp_reset_block(lradc->base);
- 
--	for (i = 0; i < LRADC_MAX_DELAY_CHANS; i++)
--		writel(cfg | (1 << (LRADC_DELAY_TRIGGER_DELAYS_OFFSET + i)),
--			lradc->base + LRADC_DELAY(i));
-+	/* Configure DELAY CHANNEL 0 for generic ADC sampling. */
-+	writel(adc_cfg, lradc->base + LRADC_DELAY(0));
-+
-+	/* Disable remaining DELAY CHANNELs */
-+	writel(0, lradc->base + LRADC_DELAY(1));
-+	writel(0, lradc->base + LRADC_DELAY(2));
-+	writel(0, lradc->base + LRADC_DELAY(3));
-+
-+	/* Configure the touchscreen type */
-+	writel(LRADC_CTRL0_TOUCH_SCREEN_TYPE,
-+		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-+
-+	if (lradc->use_touchscreen == MXS_LRADC_TOUCHSCREEN_5WIRE) {
-+		writel(LRADC_CTRL0_TOUCH_SCREEN_TYPE,
-+			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
-+	}
- 
- 	/* Start internal temperature sensing. */
- 	writel(0, lradc->base + LRADC_CTRL2);
-@@ -460,12 +859,14 @@ static void mxs_lradc_hw_stop(struct mxs_lradc *lradc)
- 		writel(0, lradc->base + LRADC_DELAY(i));
- }
- 
--static int __devinit mxs_lradc_probe(struct platform_device *pdev)
-+static int mxs_lradc_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-+	struct device_node *node = dev->of_node;
- 	struct mxs_lradc *lradc;
- 	struct iio_dev *iio;
- 	struct resource *iores;
-+	uint32_t ts_wires = 0;
- 	int ret = 0;
- 	int i;
- 
-@@ -487,6 +888,21 @@ static int __devinit mxs_lradc_probe(struct platform_device *pdev)
- 		goto err_addr;
- 	}
- 
-+	INIT_WORK(&lradc->ts_work, mxs_lradc_ts_work);
-+
-+	/* Check if touchscreen is enabled in DT. */
-+	ret = of_property_read_u32(node, "fsl,lradc-touchscreen-wires",
-+				&ts_wires);
-+	if (ret)
-+		dev_info(dev, "Touchscreen not enabled.\n");
-+	else if (ts_wires == 4)
-+		lradc->use_touchscreen = MXS_LRADC_TOUCHSCREEN_4WIRE;
-+	else if (ts_wires == 5)
-+		lradc->use_touchscreen = MXS_LRADC_TOUCHSCREEN_5WIRE;
-+	else
-+		dev_warn(dev, "Unsupported number of touchscreen wires (%d)\n",
-+				ts_wires);
-+
- 	/* Grab all IRQ sources */
- 	for (i = 0; i < 13; i++) {
- 		lradc->irq[i] = platform_get_irq(pdev, i);
-@@ -524,11 +940,16 @@ static int __devinit mxs_lradc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_trig;
- 
-+	/* Register the touchscreen input device. */
-+	ret = mxs_lradc_ts_register(lradc);
-+	if (ret)
-+		goto err_dev;
-+
- 	/* Register IIO device. */
- 	ret = iio_device_register(iio);
- 	if (ret) {
- 		dev_err(dev, "Failed to register IIO device\n");
--		goto err_dev;
-+		goto err_ts;
- 	}
- 
- 	/* Configure the hardware. */
-@@ -536,6 +957,8 @@ static int __devinit mxs_lradc_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
-+err_ts:
-+	mxs_lradc_ts_unregister(lradc);
- err_dev:
- 	mxs_lradc_trigger_remove(iio);
- err_trig:
-@@ -545,11 +968,13 @@ err_addr:
- 	return ret;
- }
- 
--static int __devexit mxs_lradc_remove(struct platform_device *pdev)
-+static int mxs_lradc_remove(struct platform_device *pdev)
- {
- 	struct iio_dev *iio = platform_get_drvdata(pdev);
- 	struct mxs_lradc *lradc = iio_priv(iio);
- 
-+	mxs_lradc_ts_unregister(lradc);
-+
- 	mxs_lradc_hw_stop(lradc);
- 
- 	iio_device_unregister(iio);
-@@ -573,7 +998,7 @@ static struct platform_driver mxs_lradc_driver = {
- 		.of_match_table = mxs_lradc_dt_ids,
- 	},
- 	.probe	= mxs_lradc_probe,
--	.remove	= __devexit_p(mxs_lradc_remove),
-+	.remove	= mxs_lradc_remove,
- };
- 
- module_platform_driver(mxs_lradc_driver);
--- 
-1.7.10.4
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
+>  arch/arm/mach-omap2/board-3630sdp.c        |    2 +-
+>  arch/arm/mach-omap2/board-am3517crane.c    |    2 +-
+>  arch/arm/mach-omap2/board-am3517evm.c      |    2 +-
+>  arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
+>  arch/arm/mach-omap2/board-cm-t3517.c       |    2 +-
+>  arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
+>  arch/arm/mach-omap2/board-igep0020.c       |    4 +-
+>  arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
+>  arch/arm/mach-omap2/board-omap3evm.c       |    2 +-
+>  arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
+>  arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
+>  arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
+>  arch/arm/mach-omap2/board-omap4panda.c     |    2 +-
+>  arch/arm/mach-omap2/board-overo.c          |    2 +-
+>  arch/arm/mach-omap2/board-zoom.c           |    2 +-
+>  arch/arm/mach-omap2/usb-host.c             |   30 +++---------------
+>  arch/arm/mach-omap2/usb.h                  |   21 +------------
+>  drivers/mfd/omap-usb-host.c                |   46 ++++++++++++----------------
+>  drivers/mfd/omap-usb-tll.c                 |    8 ++--
+>  drivers/usb/host/ehci-omap.c               |    6 ++--
+>  include/linux/platform_data/usb-omap.h     |   26 ++++------------
+>  22 files changed, 56 insertions(+), 115 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+> index bb73afc..46147c8 100644
+> --- a/arch/arm/mach-omap2/board-3430sdp.c
+> +++ b/arch/arm/mach-omap2/board-3430sdp.c
+> @@ -424,7 +424,7 @@ static void enable_board_wakeup_source(void)
+>  		OMAP_WAKEUP_EN | OMAP_PIN_INPUT_PULLUP);
+>  }
+>  
+> -static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  
+>  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+> diff --git a/arch/arm/mach-omap2/board-3630sdp.c b/arch/arm/mach-omap2/board-3630sdp.c
+> index 050aaa7..78b1724 100644
+> --- a/arch/arm/mach-omap2/board-3630sdp.c
+> +++ b/arch/arm/mach-omap2/board-3630sdp.c
+> @@ -53,7 +53,7 @@ static void enable_board_wakeup_source(void)
+>  		OMAP_WAKEUP_EN | OMAP_PIN_INPUT_PULLUP);
+>  }
+>  
+> -static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  
+>  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+> diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
+> index 51b96a1..26f1916 100644
+> --- a/arch/arm/mach-omap2/board-am3517crane.c
+> +++ b/arch/arm/mach-omap2/board-am3517crane.c
+> @@ -40,7 +40,7 @@ static struct omap_board_mux board_mux[] __initdata = {
+>  };
+>  #endif
+>  
+> -static struct usbhs_omap_board_data usbhs_bdata __initdata = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+>  	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+> diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+> index f81a303..c76725d 100644
+> --- a/arch/arm/mach-omap2/board-am3517evm.c
+> +++ b/arch/arm/mach-omap2/board-am3517evm.c
+> @@ -274,7 +274,7 @@ static __init void am3517_evm_mcbsp1_init(void)
+>  	omap_ctrl_writel(devconf0, OMAP2_CONTROL_DEVCONF0);
+>  }
+>  
+> -static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+>  #if defined(CONFIG_PANEL_SHARP_LQ043T1DG01) || \
+>  		defined(CONFIG_PANEL_SHARP_LQ043T1DG01_MODULE)
+> diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
+> index b3102c2..cdf1d6e 100644
+> --- a/arch/arm/mach-omap2/board-cm-t35.c
+> +++ b/arch/arm/mach-omap2/board-cm-t35.c
+> @@ -418,7 +418,7 @@ static struct omap2_hsmmc_info mmc[] = {
+>  	{}	/* Terminator */
+>  };
+>  
+> -static struct usbhs_omap_board_data usbhs_bdata __initdata = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+> diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+> index ebbc2ad..cfa9098 100644
+> --- a/arch/arm/mach-omap2/board-cm-t3517.c
+> +++ b/arch/arm/mach-omap2/board-cm-t3517.c
+> @@ -166,7 +166,7 @@ static inline void cm_t3517_init_rtc(void) {}
+>  #define HSUSB2_RESET_GPIO	(147)
+>  #define USB_HUB_RESET_GPIO	(152)
+>  
+> -static struct usbhs_omap_board_data cm_t3517_ehci_pdata __initdata = {
+> +static struct usbhs_omap_platform_data cm_t3517_ehci_pdata __initdata = {
+>  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+> diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+> index 12865af..051ec0d 100644
+> --- a/arch/arm/mach-omap2/board-devkit8000.c
+> +++ b/arch/arm/mach-omap2/board-devkit8000.c
+> @@ -435,7 +435,7 @@ static struct platform_device *devkit8000_devices[] __initdata = {
+>  	&omap_dm9000_dev,
+>  };
+>  
+> -static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  
+>  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+> index 0f24cb8..cfba790 100644
+> --- a/arch/arm/mach-omap2/board-igep0020.c
+> +++ b/arch/arm/mach-omap2/board-igep0020.c
+> @@ -526,7 +526,7 @@ static void __init igep_i2c_init(void)
+>  	omap3_pmic_init("twl4030", &igep_twldata);
+>  }
+>  
+> -static const struct usbhs_omap_board_data igep2_usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data igep2_usbhs_bdata __initdata = {
+>  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+>  	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+> @@ -537,7 +537,7 @@ static const struct usbhs_omap_board_data igep2_usbhs_bdata __initconst = {
+>  	.reset_gpio_port[2] = -EINVAL,
+>  };
+>  
+> -static const struct usbhs_omap_board_data igep3_usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data igep3_usbhs_bdata __initdata = {
+>  	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+> index 22c483d..1cb114e 100644
+> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+> @@ -430,7 +430,7 @@ static struct platform_device *omap3_beagle_devices[] __initdata = {
+>  	&madc_hwmon,
+>  };
+>  
+> -static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  
+>  	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+> index 3985f35..7bdc8a4 100644
+> --- a/arch/arm/mach-omap2/board-omap3evm.c
+> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> @@ -538,7 +538,7 @@ static int __init omap3_evm_i2c_init(void)
+>  	return 0;
+>  }
+>  
+> -static struct usbhs_omap_board_data usbhs_bdata __initdata = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  
+>  	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+> diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+> index a53a668..145a6f8 100644
+> --- a/arch/arm/mach-omap2/board-omap3pandora.c
+> +++ b/arch/arm/mach-omap2/board-omap3pandora.c
+> @@ -567,7 +567,7 @@ static struct platform_device *omap3pandora_devices[] __initdata = {
+>  	&pandora_backlight,
+>  };
+>  
+> -static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  
+>  	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+> diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
+> index 53a6cbc..278ae95 100644
+> --- a/arch/arm/mach-omap2/board-omap3stalker.c
+> +++ b/arch/arm/mach-omap2/board-omap3stalker.c
+> @@ -361,7 +361,7 @@ static struct platform_device *omap3_stalker_devices[] __initdata = {
+>  	&keys_gpio,
+>  };
+>  
+> -static struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+> diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
+> index 263cb9c..65a285f 100644
+> --- a/arch/arm/mach-omap2/board-omap3touchbook.c
+> +++ b/arch/arm/mach-omap2/board-omap3touchbook.c
+> @@ -309,7 +309,7 @@ static struct platform_device *omap3_touchbook_devices[] __initdata = {
+>  	&keys_gpio,
+>  };
+>  
+> -static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  
+>  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+> index 5c8e9ce..ee76830 100644
+> --- a/arch/arm/mach-omap2/board-omap4panda.c
+> +++ b/arch/arm/mach-omap2/board-omap4panda.c
+> @@ -139,7 +139,7 @@ static struct platform_device *panda_devices[] __initdata = {
+>  	&btwilink_device,
+>  };
+>  
+> -static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+>  	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+> diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+> index c8fde3e..b1b0f09 100644
+> --- a/arch/arm/mach-omap2/board-overo.c
+> +++ b/arch/arm/mach-omap2/board-overo.c
+> @@ -457,7 +457,7 @@ static int __init overo_spi_init(void)
+>  	return 0;
+>  }
+>  
+> -static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+>  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+> diff --git a/arch/arm/mach-omap2/board-zoom.c b/arch/arm/mach-omap2/board-zoom.c
+> index d7fa31e..2d7a457 100644
+> --- a/arch/arm/mach-omap2/board-zoom.c
+> +++ b/arch/arm/mach-omap2/board-zoom.c
+> @@ -92,7 +92,7 @@ static struct mtd_partition zoom_nand_partitions[] = {
+>  	},
+>  };
+>  
+> -static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+> +static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+>  	.port_mode[0]		= OMAP_USBHS_PORT_MODE_UNUSED,
+>  	.port_mode[1]		= OMAP_EHCI_PORT_MODE_PHY,
+>  	.port_mode[2]		= OMAP_USBHS_PORT_MODE_UNUSED,
+> diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
+> index ee8c473..940aad4 100644
+> --- a/arch/arm/mach-omap2/usb-host.c
+> +++ b/arch/arm/mach-omap2/usb-host.c
+> @@ -37,11 +37,6 @@
+>  #define	USBHS_UHH_HWMODNAME	"usb_host_hs"
+>  #define USBHS_TLL_HWMODNAME	"usb_tll_hs"
+>  
+> -static struct usbhs_omap_platform_data		usbhs_data;
+> -static struct usbtll_omap_platform_data		usbtll_data;
+> -static struct ehci_hcd_omap_platform_data	ehci_data;
+> -static struct ohci_hcd_omap_platform_data	ohci_data;
+> -
+>  static struct omap_device_pm_latency omap_uhhtll_latency[] = {
+>  	  {
+>  		.deactivate_func = omap_device_idle_hwmods,
+> @@ -485,33 +480,18 @@ void __init setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+>  	}
+>  }
+>  
+> -void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
+> +void __init usbhs_init(struct usbhs_omap_platform_data *pdata)
+>  {
+>  	struct omap_hwmod	*uhh_hwm, *tll_hwm;
+>  	struct platform_device	*pdev;
+>  	int			bus_id = -1;
+> -	int			i;
+> -
+> -	for (i = 0; i < OMAP3_HS_USB_PORTS; i++) {
+> -		usbhs_data.port_mode[i] = pdata->port_mode[i];
+> -		usbtll_data.port_mode[i] = pdata->port_mode[i];
+> -		ohci_data.port_mode[i] = pdata->port_mode[i];
+> -		ehci_data.port_mode[i] = pdata->port_mode[i];
+> -		ehci_data.reset_gpio_port[i] = pdata->reset_gpio_port[i];
+> -		ehci_data.regulator[i] = pdata->regulator[i];
+> -	}
+> -	ehci_data.phy_reset = pdata->phy_reset;
+> -	ohci_data.es2_compatibility = pdata->es2_compatibility;
+> -	usbhs_data.ehci_data = &ehci_data;
+> -	usbhs_data.ohci_data = &ohci_data;
+> -	usbhs_data.nports = pdata->nports;
+>  
+>  	if (cpu_is_omap34xx()) {
+>  		setup_ehci_io_mux(pdata->port_mode);
+>  		setup_ohci_io_mux(pdata->port_mode);
+>  
+>  		if (omap_rev() <= OMAP3430_REV_ES2_1)
+> -			usbhs_data.single_ulpi_bypass = true;
+> +			pdata->single_ulpi_bypass = true;
+>  
+>  	} else if (cpu_is_omap44xx()) {
+>  		setup_4430ehci_io_mux(pdata->port_mode);
+> @@ -531,7 +511,7 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
+>  	}
+>  
+>  	pdev = omap_device_build(OMAP_USBTLL_DEVICE, bus_id, tll_hwm,
+> -				&usbtll_data, sizeof(usbtll_data),
+> +				pdata, sizeof(*pdata),
+>  				omap_uhhtll_latency,
+>  				ARRAY_SIZE(omap_uhhtll_latency), false);
+>  	if (IS_ERR(pdev)) {
+> @@ -541,7 +521,7 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
+>  	}
+>  
+>  	pdev = omap_device_build(OMAP_USBHS_DEVICE, bus_id, uhh_hwm,
+> -				&usbhs_data, sizeof(usbhs_data),
+> +				pdata, sizeof(*pdata),
+>  				omap_uhhtll_latency,
+>  				ARRAY_SIZE(omap_uhhtll_latency), false);
+>  	if (IS_ERR(pdev)) {
+> @@ -553,7 +533,7 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
+>  
+>  #else
+>  
+> -void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
+> +void __init usbhs_init(struct usbhs_omap_platform_data *pdata)
+>  {
+>  }
+>  
+> diff --git a/arch/arm/mach-omap2/usb.h b/arch/arm/mach-omap2/usb.h
+> index 7dc0f04..3319f5c 100644
+> --- a/arch/arm/mach-omap2/usb.h
+> +++ b/arch/arm/mach-omap2/usb.h
+> @@ -53,27 +53,8 @@
+>  #define USBPHY_OTGSESSEND_EN	(1 << 20)
+>  #define USBPHY_DATA_POLARITY	(1 << 23)
+>  
+> -struct usbhs_omap_board_data {
+> -	int				nports;
+> -	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
+> -
+> -	/* have to be valid if phy_reset is true and portx is in phy mode */
+> -	int	reset_gpio_port[OMAP3_HS_USB_PORTS];
+> -
+> -	/* Set this to true for ES2.x silicon */
+> -	unsigned			es2_compatibility:1;
+> -
+> -	unsigned			phy_reset:1;
+> -
+> -	/*
+> -	 * Regulators for USB PHYs.
+> -	 * Each PHY can have a separate regulator.
+> -	 */
+> -	struct regulator		*regulator[OMAP3_HS_USB_PORTS];
+> -};
+> -
+>  extern void usb_musb_init(struct omap_musb_board_data *board_data);
+> -extern void usbhs_init(const struct usbhs_omap_board_data *pdata);
+> +extern void usbhs_init(struct usbhs_omap_platform_data *pdata);
+>  
+>  extern void am35x_musb_reset(void);
+>  extern void am35x_musb_phy_power(u8 on);
+> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+> index 9612535..7180b00 100644
+> --- a/drivers/mfd/omap-usb-host.c
+> +++ b/drivers/mfd/omap-usb-host.c
+> @@ -185,19 +185,13 @@ err_end:
+>  static int omap_usbhs_alloc_children(struct platform_device *pdev)
+>  {
+>  	struct device				*dev = &pdev->dev;
+> -	struct usbhs_hcd_omap			*omap;
+> -	struct ehci_hcd_omap_platform_data	*ehci_data;
+> -	struct ohci_hcd_omap_platform_data	*ohci_data;
+> +	struct usbhs_omap_platform_data		*pdata = dev->platform_data;
+>  	struct platform_device			*ehci;
+>  	struct platform_device			*ohci;
+>  	struct resource				*res;
+>  	struct resource				resources[2];
+>  	int					ret;
+>  
+> -	omap = platform_get_drvdata(pdev);
+> -	ehci_data = omap->pdata->ehci_data;
+> -	ohci_data = omap->pdata->ohci_data;
+> -
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ehci");
+>  	if (!res) {
+>  		dev_err(dev, "EHCI get resource IORESOURCE_MEM failed\n");
+> @@ -214,8 +208,8 @@ static int omap_usbhs_alloc_children(struct platform_device *pdev)
+>  	}
+>  	resources[1] = *res;
+>  
+> -	ehci = omap_usbhs_alloc_child(OMAP_EHCI_DEVICE, resources, 2, ehci_data,
+> -		sizeof(*ehci_data), dev);
+> +	ehci = omap_usbhs_alloc_child(OMAP_EHCI_DEVICE, resources, 2, pdata,
+> +		sizeof(*pdata), dev);
+>  
+>  	if (!ehci) {
+>  		dev_err(dev, "omap_usbhs_alloc_child failed\n");
+> @@ -239,8 +233,8 @@ static int omap_usbhs_alloc_children(struct platform_device *pdev)
+>  	}
+>  	resources[1] = *res;
+>  
+> -	ohci = omap_usbhs_alloc_child(OMAP_OHCI_DEVICE, resources, 2, ohci_data,
+> -		sizeof(*ohci_data), dev);
+> +	ohci = omap_usbhs_alloc_child(OMAP_OHCI_DEVICE, resources, 2, pdata,
+> +		sizeof(*pdata), dev);
+>  	if (!ohci) {
+>  		dev_err(dev, "omap_usbhs_alloc_child failed\n");
+>  		ret = -ENOMEM;
+> @@ -441,13 +435,13 @@ static void omap_usbhs_init(struct device *dev)
+>  
+>  	dev_dbg(dev, "starting TI HSUSB Controller\n");
+>  
+> -	if (pdata->ehci_data->phy_reset) {
+> -		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+> -			gpio_request_one(pdata->ehci_data->reset_gpio_port[0],
+> +	if (pdata->phy_reset) {
+> +		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+> +			gpio_request_one(pdata->reset_gpio_port[0],
+>  					 GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
+>  
+> -		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+> -			gpio_request_one(pdata->ehci_data->reset_gpio_port[1],
+> +		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+> +			gpio_request_one(pdata->reset_gpio_port[1],
+>  					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
+>  
+>  		/* Hold the PHY in RESET for enough time till DIR is high */
+> @@ -473,19 +467,19 @@ static void omap_usbhs_init(struct device *dev)
+>  	dev_dbg(dev, "UHH setup done, uhh_hostconfig=%x\n", reg);
+>  
+>  	pm_runtime_put_sync(dev);
+> -	if (pdata->ehci_data->phy_reset) {
+> +	if (pdata->phy_reset) {
+>  		/* Hold the PHY in RESET for enough time till
+>  		 * PHY is settled and ready
+>  		 */
+>  		udelay(10);
+>  
+> -		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+> +		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+>  			gpio_set_value_cansleep
+> -				(pdata->ehci_data->reset_gpio_port[0], 1);
+> +				(pdata->reset_gpio_port[0], 1);
+>  
+> -		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+> +		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+>  			gpio_set_value_cansleep
+> -				(pdata->ehci_data->reset_gpio_port[1], 1);
+> +				(pdata->reset_gpio_port[1], 1);
+>  	}
+>  }
+>  
+> @@ -494,12 +488,12 @@ static void omap_usbhs_deinit(struct device *dev)
+>  	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
+>  	struct usbhs_omap_platform_data	*pdata = omap->pdata;
+>  
+> -	if (pdata->ehci_data->phy_reset) {
+> -		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+> -			gpio_free(pdata->ehci_data->reset_gpio_port[0]);
+> +	if (pdata->phy_reset) {
+> +		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+> +			gpio_free(pdata->reset_gpio_port[0]);
+>  
+> -		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+> -			gpio_free(pdata->ehci_data->reset_gpio_port[1]);
+> +		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+> +			gpio_free(pdata->reset_gpio_port[1]);
+>  	}
+>  }
+>  
+> diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
+> index e63dc0b..a729cf3 100644
+> --- a/drivers/mfd/omap-usb-tll.c
+> +++ b/drivers/mfd/omap-usb-tll.c
+> @@ -105,7 +105,7 @@
+>  
+>  struct usbtll_omap {
+>  	int					nch;	/* num. of channels */
+> -	struct usbtll_omap_platform_data	*pdata;
+> +	struct usbhs_omap_platform_data		*pdata;
+>  	struct clk				**ch_clk;
+>  };
+>  
+> @@ -210,7 +210,7 @@ static unsigned ohci_omap3_fslsmode(enum usbhs_omap_port_mode mode)
+>  static int usbtll_omap_probe(struct platform_device *pdev)
+>  {
+>  	struct device				*dev =  &pdev->dev;
+> -	struct usbtll_omap_platform_data	*pdata = dev->platform_data;
+> +	struct usbhs_omap_platform_data		*pdata = dev->platform_data;
+>  	void __iomem				*base;
+>  	struct resource				*res;
+>  	struct usbtll_omap			*tll;
+> @@ -376,7 +376,7 @@ static int usbtll_omap_remove(struct platform_device *pdev)
+>  static int usbtll_runtime_resume(struct device *dev)
+>  {
+>  	struct usbtll_omap			*tll = dev_get_drvdata(dev);
+> -	struct usbtll_omap_platform_data	*pdata = tll->pdata;
+> +	struct usbhs_omap_platform_data		*pdata = tll->pdata;
+>  	int i;
+>  
+>  	dev_dbg(dev, "usbtll_runtime_resume\n");
+> @@ -402,7 +402,7 @@ static int usbtll_runtime_resume(struct device *dev)
+>  static int usbtll_runtime_suspend(struct device *dev)
+>  {
+>  	struct usbtll_omap			*tll = dev_get_drvdata(dev);
+> -	struct usbtll_omap_platform_data	*pdata = tll->pdata;
+> +	struct usbhs_omap_platform_data		*pdata = tll->pdata;
+>  	int i;
+>  
+>  	dev_dbg(dev, "usbtll_runtime_suspend\n");
+> diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+> index e9d9b09..b96a4bf 100644
+> --- a/drivers/usb/host/ehci-omap.c
+> +++ b/drivers/usb/host/ehci-omap.c
+> @@ -107,7 +107,7 @@ static int omap_ehci_init(struct usb_hcd *hcd)
+>  {
+>  	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
+>  	int			rc;
+> -	struct ehci_hcd_omap_platform_data	*pdata;
+> +	struct usbhs_omap_platform_data	*pdata;
+>  
+>  	pdata = hcd->self.controller->platform_data;
+>  
+> @@ -151,7 +151,7 @@ static int omap_ehci_init(struct usb_hcd *hcd)
+>  }
+>  
+>  static void disable_put_regulator(
+> -		struct ehci_hcd_omap_platform_data *pdata)
+> +		struct usbhs_omap_platform_data *pdata)
+>  {
+>  	int i;
+>  
+> @@ -176,7 +176,7 @@ static void disable_put_regulator(
+>  static int ehci_hcd_omap_probe(struct platform_device *pdev)
+>  {
+>  	struct device				*dev = &pdev->dev;
+> -	struct ehci_hcd_omap_platform_data	*pdata = dev->platform_data;
+> +	struct usbhs_omap_platform_data		*pdata = dev->platform_data;
+>  	struct resource				*res;
+>  	struct usb_hcd				*hcd;
+>  	void __iomem				*regs;
+> diff --git a/include/linux/platform_data/usb-omap.h b/include/linux/platform_data/usb-omap.h
+> index 57707c7..d63eb7d 100644
+> --- a/include/linux/platform_data/usb-omap.h
+> +++ b/include/linux/platform_data/usb-omap.h
+> @@ -38,31 +38,17 @@ enum usbhs_omap_port_mode {
+>  	OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM
+>  };
+>  
+> -struct usbtll_omap_platform_data {
+> -	enum usbhs_omap_port_mode		port_mode[OMAP3_HS_USB_PORTS];
+> -};
+> -
+> -struct ehci_hcd_omap_platform_data {
+> +struct usbhs_omap_platform_data {
+> +	int				nports;
+>  	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
+>  	int				reset_gpio_port[OMAP3_HS_USB_PORTS];
+> -	struct regulator		*regulator[OMAP3_HS_USB_PORTS];
+> -	unsigned			phy_reset:1;
+> -};
+>  
+> -struct ohci_hcd_omap_platform_data {
+> -	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
+> -	unsigned			es2_compatibility:1;
+> -};
+> -
+> -struct usbhs_omap_platform_data {
+> -	int					nports;
+> -	enum usbhs_omap_port_mode		port_mode[OMAP3_HS_USB_PORTS];
+> -
+> -	struct ehci_hcd_omap_platform_data	*ehci_data;
+> -	struct ohci_hcd_omap_platform_data	*ohci_data;
+> +	struct regulator		*regulator[OMAP3_HS_USB_PORTS];
+>  
+>  	/* OMAP3 <= ES2.1 have a single ulpi bypass control bit */
+> -	unsigned				single_ulpi_bypass:1;
+> +	unsigned			single_ulpi_bypass:1;
+> +	unsigned			es2_compatibility:1;
+> +	unsigned			phy_reset:1;
+>  };
+>  
+>  /*-------------------------------------------------------------------------*/
+> -- 
+> 1.7.4.1
+> 
