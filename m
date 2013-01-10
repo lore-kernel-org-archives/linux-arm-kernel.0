@@ -1,48 +1,114 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 Jan 2013 20:57:34 +0800
-Subject: [GIT PULL] imx uncompress debug for 3.9
-In-Reply-To: <20130110125547.GB8680@S2101-09.ap.freescale.net>
-References: <20130110125547.GB8680@S2101-09.ap.freescale.net>
-Message-ID: <CAAQ0ZWSdSU-pbLs9G9iouhhGvu1JtU==RA+qvkYGFA2to2aaNA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 10 Jan 2013 12:57:35 +0000
+Subject: [PATCH] mfd: stmpe: Pull IRQ GPIO number from DT during DT-based
+ probe
+In-Reply-To: <CACRpkdZWi4M3HmO_rq1O9aGTKYR0iMLXJo+nos3hYu3C_DFRHQ@mail.gmail.com>
+References: <1357568989-16237-1-git-send-email-marex@denx.de>
+ <20130108094134.GA21994@gmail.com>
+ <201301081044.14876.marex@denx.de>
+ <201301081048.38149.marex@denx.de>
+ <CAKohpo=YnLJN4_xA1WTiJaZeb-Oyc=RypYUyaSibmn6G4X9m4A@mail.gmail.com>
+ <20130108111104.GF21994@gmail.com>
+ <CAKohpomiS+UFzgiJaQbm8aZVPY0jeYhm1k7Yndk50z8=K4LvGQ@mail.gmail.com>
+ <CACRpkdZWi4M3HmO_rq1O9aGTKYR0iMLXJo+nos3hYu3C_DFRHQ@mail.gmail.com>
+Message-ID: <20130110125735.GB4964@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forgot LAKML.  Sorry.
+On Thu, 10 Jan 2013, Linus Walleij wrote:
 
-Shawn
+> On Tue, Jan 8, 2013 at 12:14 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> > On 8 January 2013 16:41, Lee Jones <lee.jones@linaro.org> wrote:
+> >>> Hmm.. I tried a bit, but couldn't find any such call :(
+> >>> Probably an assumption is taken here. GPIO pins which are going to be used as
+> >>> interrupt lines, wouldn't be getting set in output mode at all. So,
+> >>> once they are put
+> >>> in input mode in beginning, nobody would change it ever.
+> >>>
+> >>> Much of gpio controllers configure gpio pins in input mode in their probe().
+> >>>
+> >>> Maybe, there is something else :)
+> >>
+> >> Pinctrl?
+> >
+> > I don't think pinctrl is playing with it. I searched for
+> > "direction_input" string and
+> > pinctrl routine also had similar name. I couldn't fine use of
+> > direction_input anywhere
+> > in kernel, for setting them as irqs for OF cases.
+> 
+> pinctrl has pinctrl_gpio_direction_input() and
+> pinctrl_gpio_direction_output() which are supposed to
+> be called *only* by GPIOlib frontends using pinctrl
+> as backend to control the pins.
+> 
+> But if it's a pinctrl driver using standard pinconfig from
+> include/linux/pinctrl/pinconf-generic.h
+> I'm all for adding a PIN_CONFIG_INPUT_ENABLE
+> to these definintions so it can be set up as input
+> at boot from the device tree using hogs or something,
+> that make things easy when using GPIOs as IRQ
+> providers only.
+> 
+> So the alternative is to just set up the IRQ using the
+> gpiolib functions for this: of_get_gpio() if you need the
+> number from DT, then gpio_request() and
+> gpio_direction_input() as on any GPIO. This can be
+> done in the device driver or board code depending
+> on use case.
+> 
+> In the Nomadik I did this (maybe ugly) hack for a
+> similar case:
+> 
+> +/*
+> + * The SMSC911x IRQ is connected to a GPIO pin, but the driver expects
+> + * to simply request an IRQ passed as a resource. So the GPIO pin needs
+> + * to be requested by this hog and set as input.
+> + */
+> +static int __init cpu8815_eth_init(void)
+> +{
+> +       struct device_node *eth;
+> +       int gpio, irq, err;
+> +
+> +       eth = of_find_node_by_path("/external-bus at 34000000/ethernet at 300");
+> +       if (!eth) {
+> +               pr_info("could not find any ethernet controller\n");
+> +               return 0;
+> +       }
+> +       gpio = of_get_gpio(eth, 0);
+> +       err = gpio_request(gpio, "eth_irq");
+> +       if (err) {
+> +               pr_info("failed to request ethernet GPIO\n");
+> +               return -ENODEV;
+> +       }
+> +       err = gpio_direction_input(gpio);
+> +       if (err) {
+> +               pr_info("failed to set ehernet GPIO as input\n");
+> +               return -ENODEV;
+> +       }
+> +       irq = gpio_to_irq(gpio);
+> +       pr_info("enabled ethernet GPIO %d, IRQ %d\n", gpio, irq);
+> +       return 0;
+> +}
+> +device_initcall(cpu8815_eth_init);
 
-On 10 January 2013 20:55, Shawn Guo <shawn.guo@linaro.org> wrote:
-> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
->
->   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
->
-> are available in the git repository at:
->
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-uncompress-3.9
->
-> for you to fetch changes up to 0edbac9d72158b443368d7002db387463fe08ffd:
->
->   ARM: uncompress: support uncompress debug for multiplatform build (2012-12-22 21:01:50 +0800)
->
-> ----------------------------------------------------------------
-> I did not get any comment on the series, so would think it's an
-> acceptable solution for multiplatform build to get uncompress debug
-> capability back.
->
-> ----------------------------------------------------------------
-> Shawn Guo (4):
->       ARM: imx: use separated debug uart symbol for imx31 and imx35
->       ARM: imx: support DEBUG_LL uart port selection for all i.MX SoCs
->       ARM: imx: restore uncompress.h to a common place
->       ARM: uncompress: support uncompress debug for multiplatform build
->
->  arch/arm/Kconfig.debug                    |   44 ++++++++++++---
->  arch/arm/boot/compressed/misc.c           |    8 +--
->  arch/arm/include/debug/imx-uart.h         |   88 +++++++++++++++++++++++++++++
->  arch/arm/include/debug/imx.S              |   29 +---------
->  arch/arm/include/debug/uncompress/dummy.h |    3 +
->  arch/arm/include/debug/uncompress/imx.h   |   63 +++++++++++++++++++++
->  6 files changed, 191 insertions(+), 44 deletions(-)
->  create mode 100644 arch/arm/include/debug/imx-uart.h
->  create mode 100644 arch/arm/include/debug/uncompress/dummy.h
->  create mode 100644 arch/arm/include/debug/uncompress/imx.h
+Yep, that looks pretty gross!
+
+> I haven't read review comments on that patch.
+> 
+> Maybe it's not such a good idea to add the GPIO to the device itself
+> when it's being hogged by board code like this. It's a bit of a grey area
+> so I'm a bit confused here.
+> 
+> Maybe the GPIO lib actually needs a "hog" mechanism that can
+> request and set GPIO pins as input/output on boot and then
+> forget about them.
+> 
+> Yours,
+> Linus Walleij
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
