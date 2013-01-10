@@ -1,27 +1,52 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 09 Jan 2013 17:37:05 -0800
-Subject: [PATCH] ARM: dts: exynos5250: Set HDMI version to v1.4
-In-Reply-To: <CAOw6vbJRoFtrhhhf4t0KDu72TieKBQ0LDvgPVfi7Q4OwQUTqDw@mail.gmail.com>
-References: <1357592400-18117-1-git-send-email-seanpaul@chromium.org>
- <CAOw6vbJRoFtrhhhf4t0KDu72TieKBQ0LDvgPVfi7Q4OwQUTqDw@mail.gmail.com>
-Message-ID: <00e101cdeed3$00a18d30$01e4a790$@samsung.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 10 Jan 2013 09:38:29 +0800
+Subject: [PATCH v4 0/7] Add fully tested id switch and vbus connect
+ detect support for Chipidea
+In-Reply-To: <50ED57EA.6080309@free-electrons.com>
+References: <1356591603-23323-1-git-send-email-peter.chen@freescale.com>
+ <50EC3AD9.8000109@free-electrons.com>
+ <20130109032305.GA22404@nchen-desktop>
+ <50ED57EA.6080309@free-electrons.com>
+Message-ID: <20130110013828.GA27399@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sean Paul wrote:
+On Wed, Jan 09, 2013 at 12:43:38PM +0100, Maxime Ripard wrote:
+> Hi Peter,
 > 
-> On Mon, Jan 7, 2013 at 4:00 PM, Sean Paul <seanpaul@chromium.org> wrote:
-> > Set the HDMI version to v1.4 for all exynos5250 targets. This property
-> > was previously being inferred by the existence of the hdmi node.
-> >
-> > Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> > ---
+> Thanks for your answer.
 > 
-> The patch adding the property has churned a bit from
-> devicetree-discuss reviews. I'll upload this again after it's settled.
 > 
-> Please drop.
+> > Please always enable both device and host mode for chipidea driver.
+> > Current code still not consider all things for different mode config,
+> > like device-only, host-only, otg.  In future, it is supposed to do
+> > at dts file, and judge probe.
 > 
-OK, thanks for your information.
+> Then isn't the gadget mode configuration option supposed to depends on
+> the host mode if it's known to be broken otherwise?
 
-- Kukjin
+At udc, it uses otg_set_peripheral, which depends on otg. OTG depends on
+both host and device are enabled.
+
+In fact, we don't need to use otg_set_peripheral at udc if all usb part
+is in chipidea driver, but currently, msm also uses chipidea/udc.c, and
+its otg and host is out of chipidea/
+
+I am working on suspend/resume, low power mode and wakeup on chipidea driver.
+After that, I will work on it.
+
+> 
+> Thanks,
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+> 
+
+-- 
+
+Best Regards,
+Peter Chen
