@@ -1,119 +1,90 @@
-From: mtosatti@redhat.com (Marcelo Tosatti)
-Date: Thu, 10 Jan 2013 20:21:25 -0200
-Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
-In-Reply-To: <1357766143.18196.2@snotra>
-References: <77BCD961-CD00-443B-B84E-1F4B41DFA003@suse.de>
- <1357766143.18196.2@snotra>
-Message-ID: <20130110222125.GA17111@amt.cnet>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 10 Jan 2013 17:31:08 -0500 (EST)
+Subject: [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
+ exit/setup
+In-Reply-To: <CAHkRjk5f5Rg6Sc8vLOashcesOdf8aQAtvHJ_PN_UJ3S2xEL30w@mail.gmail.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
+ <CAHkRjk4A+EMFRTVdfCUBNpAEUMWrOqbT2ki19Vska6dY_WrVXQ@mail.gmail.com>
+ <alpine.LFD.2.02.1301101232270.6300@xanadu.home>
+ <CAHkRjk5f5Rg6Sc8vLOashcesOdf8aQAtvHJ_PN_UJ3S2xEL30w@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1301101713380.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 03:15:43PM -0600, Scott Wood wrote:
-> On 01/09/2013 02:12:16 PM, Alexander Graf wrote:
+On Thu, 10 Jan 2013, Catalin Marinas wrote:
+
+> On 10 January 2013 17:59, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Thu, 10 Jan 2013, Catalin Marinas wrote:
 > >
-> >On 09.01.2013, at 20:50, Scott Wood wrote:
-> >
-> >> On 01/09/2013 10:48:47 AM, Alexander Graf wrote:
-> >>> On 09.01.2013, at 17:26, Christoffer Dall wrote:
-> >>> > Renames the KVM_SET_DEVICE_ADDRESS to KVM_ARM_SET_DEVICE_ADDR
-> >>> > to make it obvious that this is ARM specific in lack of a
-> >better generic
-> >>> > interface.
-> >>> >
-> >>> > Once we agree on a better interface the KVM/ARM code can also
-> >take
-> >>> > advantage of that, but until then we don't want to hold up
-> >the KVM/ARM
-> >>> > patches.
-> >>> Works for me. Scott, are you happy with this one too?
+> >> On 10 January 2013 00:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> >> > --- a/arch/arm/common/bL_entry.c
+> >> > +++ b/arch/arm/common/bL_entry.c
+> >> > @@ -116,3 +116,163 @@ int bL_cpu_powered_up(void)
+> >> >                 platform_ops->powered_up();
+> >> >         return 0;
+> >> >  }
+> >> > +
+> >> > +struct bL_sync_struct bL_sync;
+> >> > +
+> >> > +static void __sync_range(volatile void *p, size_t size)
+> >> > +{
+> >> > +       char *_p = (char *)p;
+> >> > +
+> >> > +       __cpuc_flush_dcache_area(_p, size);
+> >> > +       outer_flush_range(__pa(_p), __pa(_p + size));
+> >> > +       outer_sync();
+> ...
+> >> However, on the same CPU you can get a speculative load into L1 after
+> >> the L1 flush but before the L2 flush, so the reader case can fail.
 > >>
-> >> Not really, given that it will stay around forever even after
-> >something new is introduced.
-> >
-> >But only in ARM specific code.
-> 
-> ...which I'll probably have to deal with when Freescale's
-> virtualization-capable ARM chips come along.  I don't see "it's only
-> in that other architecture" as "it might as well not exist".
-
-Doesnt it make sense to make it extensible by adding some reserved
-space and a flags field? (to the ioctl) (independently of anything
-else).
-
-So that, say, supporting new ARM processors does not require adding 
-a new ioctl?
-
-Having a single ioctl does not increase code sharing significantly
-because large percentage of the code both in QEMU and the kernel are not
-shared (well perhaps except the interface).
-
-> >> If you're going to change the name, why not just change it to
-> >KVM_SET_DEVICE_CONFIG?  Can we change the name later if nothing
-> >else changes (so it's still binary compatible)?
-> >
-> >Because that again implies that it's generic enough. And to reach
-> >that conclusion will take more time than we should spend on this
-> >now.
-> 
-> If the conclusion later on is that it is good enough, can the name
-> be changed then?
-> 
-> >>> We can start to introduce (and fix ARM) with a generic ioctl in
-> >the MPIC patches then.
+> >> The sequence for readers is (note *L2* inval first):
 > >>
-> >> The ioctl is already generic, except for its name.
+> >> L2 inval
+> >> L1 inval
 > >
-> >It's making a few wrong assumptions:
+> > As you noted below and as I explained above, this can't be an inval
+> > operation as that could discard a concurrent writer's update.
 > >
-> >  * maximum size of value is u64
+> >> The sequence for writers is:
+> >>
+> >> L1 clean
+> >> L2 clean
+> >>
+> >> The bi-directional sequence (that's what you need) is:
+> >>
+> >> L1 clean
+> >> L2 clean+inval
+> >> L1 clean+inval
+> >>
+> >> The last L1 op must be clean+inval in case another CPU writes to this
+> >> location to avoid discarding the write.
+> >>
+> >> If you don't have an L2, you just end up with two L1 clean ops, so you
+> >> can probably put some checks.
+> >
+> > In fact, since this is only used on A7/A15 right now, there is no outer
+> > cache and the outer calls are effectively no-ops.  I'm wondering if
+> > those should simply be removed until/unless there is some system showing
+> > up with a need for them.
 > 
-> This is tolerable IMHO.
-> 
-> >  * combining device id (variable) with addr type id (const) into
-> >a single field. It could just be split into multiple fields
-> 
-> I agree, but that could be lived with as well.
-> 
-> I get that there's a tradeoff between getting something in now,
-> versus waiting until the API is more refined.  Tagging it with a
-> particular ISA seems like an odd way of saying "soon to be
-> deprecated", though.  What happens if we're still squabbling over
-> the perfect replacement API when we're trying to push PPC MPIC stuff
-> in?
-> 
-> Perhaps the threshold for an API becoming "permanent" should not be
-> acceptance into the tree, but rather the removal of an
-> "experimental" tag (including a way of shutting off experimental
-> APIs to make sure you're not depending on them).  Sort of like
-> CONFIG_EXPERIMENTAL, except actually used for its intended purpose
-> (distributions should have it *off* by default), and preferably
-> managed at runtime.  Sort of like drivers/staging, except for APIs
-> rather than drivers.  Changes at that point should require more
-> justification than before merging, but would not have the strict
-> compatibility requirement that non-experimental APIs have.  This
-> would make collaboration and testing easier on APIs that aren't
-> ready to be permanent.
-> 
-> >  * the id is 100% architecture specific. It shouldn't be. At
-> >least the "device id" field should be generic.
-> 
-> That's a documentation issue that could be changed to have all
-> architectures adopt what is currently specified for ARM, without
-> breaking compatibility.
-> 
-> >I'm not sure if we can come up with more problems in that API when
-> >staring at it a bit longer and/or we would actually start using it
-> >for more things. So for the sake of not holding up the ARM code,
-> >I'm perfectly fine to clutter ARM's ioctl handling code with an
-> >ioctl that is already deprecated at its introduction, as long as
-> >we don't hold everything else up meanwhile.
-> 
-> I'm not in a position to block it, and if I were I presumably would
-> have seen this in time for feedback to matter.  That's different
-> from actually being happy. :-)
->
-> -Scott
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> You could. I expect multi-cluster systems to have integrated L2 cache
+> and avoid explicit outer cache maintenance. But is there a chance that
+> your patches could be generalised to existing systems with A9 (not b.L
+> configuration but just hotplug or cpuidle support)? I haven't finished
+> reading all the patches, so maybe that's not the case at all.
+
+I suppose it could, although the special requirements put on the first 
+man / last man exist only for multi-cluster systems.  OTOH, existing A9 
+systems are already served by far less complex code already, so it is 
+really a matter of figuring out if the backend for those A9 systems 
+needed by this cluster code would be simpler than the existing code, in 
+which case that would certainly be beneficial.
+
+> Anyway, my point is that if L1 is inner and L2 outer, the correct
+> bi-derectional flushing sequence is slightly different.
+
+Agreed, I'll make sure to capture that in the code somehow.
+
+
+Nicolas
