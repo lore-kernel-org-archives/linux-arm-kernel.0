@@ -1,42 +1,57 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 10 Jan 2013 13:35:14 +0100
-Subject: [v2 6/9] ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
-In-Reply-To: <50ECA277.5050907@wwwdotorg.org>
-References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com><1357649263-1098-7-git-send-email-hdoyu@nvidia.com><50ECA277.5050907@wwwdotorg.org>
-Message-ID: <20130110.143514.1818842015582437961.hdoyu@nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 Jan 2013 20:41:35 +0800
+Subject: [GIT PULL] clockevent driver cleanup for 3.9
+Message-ID: <20130110124132.GA8680@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 8 Jan 2013 23:49:27 +0100:
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 
-> On 01/08/2013 05:47 AM, Hiroshi Doyu wrote:
-> > Initial support for Tegra 114 SoC. This is expected to be included in
-> > the board DTS files, Tegra 114 SoC based evaluation board family.
-> 
-> > diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-> 
-> > +	gic: interrupt-controller {
-> > +		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-> > +		reg = <0x50041000 0x1000
-> > +		       0x50042000 0x1000>;
-> > +		interrupt-controller;
-> > +		#interrupt-cells = <3>;
-> > +	};
-> 
-> Last time around, Marc Zyngier asked:
-> 
-> > If this is indeed an A15 GIC, how about adding the GICH and GICV
-> > regions, as well as the VGIC maintenance interrupt?
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
 
-I missed to update. I'll update v3 as bellow.
+are available in the git repository at:
 
-	gic: interrupt-controller {
-		compatible = "arm,cortex-a15-gic";
-		#interrupt-cells = <3>;
-		interrupt-controller;
-		reg = <0x50041000 0x1000>,
-		      <0x50042000 0x1000>,
-		      <0x50044000 0x2000>,
-		      <0x50046000 0x2000>;
-		interrupts = <1 9 0xf04>;
-	};
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/clean-clkevt-3.9
+
+for you to fetch changes up to ab8e73c98749a58c242b187c9799db70cd903157:
+
+  clocksource: use clockevents_config_and_register() where possible (2013-01-10 20:24:30 +0800)
+
+----------------------------------------------------------------
+As John has showed zero interest to collect clock event driver patches,
+I send both patches through arm-soc tree here.
+
+----------------------------------------------------------------
+Shawn Guo (2):
+      ARM: use clockevents_config_and_register() where possible
+      clocksource: use clockevents_config_and_register() where possible
+
+ arch/arm/mach-at91/at91rm9200_time.c     |    7 ++-----
+ arch/arm/mach-cns3xxx/core.c             |   13 +++----------
+ arch/arm/mach-exynos/mct.c               |   18 ++++--------------
+ arch/arm/mach-footbridge/dc21285-timer.c |    6 +-----
+ arch/arm/mach-imx/epit.c                 |   15 +++------------
+ arch/arm/mach-imx/time.c                 |   15 +++------------
+ arch/arm/mach-ixp4xx/common.c            |   11 ++---------
+ arch/arm/mach-lpc32xx/timer.c            |    9 +--------
+ arch/arm/mach-mmp/time.c                 |    7 ++-----
+ arch/arm/mach-msm/timer.c                |    6 +-----
+ arch/arm/mach-mxs/timer.c                |   24 +++++-------------------
+ arch/arm/mach-netx/time.c                |   10 ++--------
+ arch/arm/mach-omap1/time.c               |   11 ++---------
+ arch/arm/mach-omap1/timer32k.c           |   12 ++----------
+ arch/arm/mach-omap2/timer.c              |   13 +++----------
+ arch/arm/mach-prima2/timer.c             |   10 ++--------
+ arch/arm/mach-pxa/time.c                 |    8 ++------
+ arch/arm/mach-sa1100/time.c              |    8 ++------
+ arch/arm/mach-tegra/timer.c              |    8 ++------
+ arch/arm/mach-vt8500/timer.c             |    9 ++-------
+ arch/arm/mach-w90x900/time.c             |   10 ++--------
+ arch/arm/plat-iop/time.c                 |    9 ++-------
+ arch/arm/plat-orion/time.c               |    6 +-----
+ arch/arm/plat-samsung/s5p-time.c         |    9 +--------
+ arch/arm/plat-spear/time.c               |    8 +-------
+ drivers/clocksource/cs5535-clockevt.c    |   11 ++---------
+ drivers/clocksource/sunxi_timer.c        |   11 ++---------
+ drivers/clocksource/tcb_clksrc.c         |    7 +------
+ 28 files changed, 58 insertions(+), 233 deletions(-)
