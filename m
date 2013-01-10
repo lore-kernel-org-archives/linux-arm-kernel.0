@@ -1,74 +1,100 @@
-From: katsuki.uwatoko@toshiba.co.jp (katsuki.uwatoko at toshiba.co.jp)
-Date: Thu, 10 Jan 2013 03:06:56 +0000
-Subject: [PATCH] ARM: sched_clock: fix the timing of reading current
- clock cycles in cyc_to_sched_clock.
-In-Reply-To: <A6CD60A5D6958Ckatsuki.uwatoko@toshiba.co.jp>
-References: <A6CD60A5D6958Ckatsuki.uwatoko@toshiba.co.jp>
-Message-ID: <F3B6523425E7914AA6214ED358D820AF25D74921@TGXML316.toshiba.local>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 9 Jan 2013 22:13:26 -0500
+Subject: [PATCH v2] Device Tree binding for the mvsdio driver and
+ related changes
+In-Reply-To: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130110031326.GI5075@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thomas,
 
-I sent the attached patch six months ago and I did not get any responses, 
-but still I think that this is a bug.
+Thanks for the patches, I've merged them as follows:
 
-If any mistakes, please let me know.
+  * note, I've sorted them below in the order they will be merged
 
-Regards,
--- 
-UWATOKO Katsuki
+On Fri, Dec 21, 2012 at 03:48:59PM +0100, Thomas Petazzoni wrote:
+> Hello,
+> 
+> This series of patches adds a Device Tree binding to the mvsdio driver
+> (the driver for the SDIO interface found in many Marvell SoCs), and
+> uses this binding to enable the SDIO interface on Armada 370 and
+> Armada XP platforms, as well as converting the Kirkwood platforms to
+> using the Device Tree to probe the SDIO interface.
+> 
+> The series has been tested on Kirkwood Topkick, Armada 370 Mirabox,
+> Armada XP OpenBlocks, Armada 370 DB and Armada XP DB. The changes on
+> the Dreamplug and MPLCEC4 boards should be tested by their respective
+> maintainers if possible.
+> 
+> This series is obviously 3.9 material.
+> 
+> Here is a short description of the patches:
 
-> From:     UWATOKO Katsuki <katsuki.uwatoko@toshiba.co.jp>
-> To:       linux-arm-kernel at lists.infradead.org
-> Cc:       linux at arm.linux.org.uk
-> Subject:  [PATCH] ARM: sched_clock: fix the timing of reading current clock cycles in cyc_to_sched_clock.
-> Date:     Fri, 13 Jul 2012 12:16:04 +0900
+mvebu/cleanup
+
+>  * Patch 17 removes a useless header inclusion related to the SDIO
+>    interface to the Kirkwood Dockstar platform.
+
+mvebu/drivers
+
+>  * Patches 1 and 2 cleanup the mvsdio driver initialization by using
+>    the slot-gpio helpers for the card-detect and write-protect GPIOs
 > 
+>  * Patch 3 adds the Device Tree binding itself to the mvsdio driver
 > 
-> The current clock cycle (cyc) must be read after epoc_cyc and epoch_ns
-> are fixed.  The calculation result gets invalid when epoch_cyc is
-> updated after cyc is determined, because the result of (cyc -
-> epoch_cyc) is unsigned int.
+>  * Patch 4 adds pinctrl integration to the mvsdio driver
+
+mvebu/boards
+
+>  * Patches 18, 19 and 20 update the mvebu_defconfig to enable the
+>    mvsdio driver, as well as Wifi/Bluetooth drivers needed for the
+>    SD8787 chip connected over SDIO on the Globalscale Mirabox.
+
+mvebu/dt
+
+>  * Patch 5 adds Device Tree information to describe the SDIO interface
+>    on the Armada 370 and Armada XP SoCs.
 > 
-> Signed-off-by: UWATOKO Katsuki <katsuki.uwatoko@toshiba.co.jp>
-> ---
->  arch/arm/kernel/sched_clock.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
+>  * Patches 6 and 7 add pin muxing options for the SDIO interface on
+>    Armada 370 and Armada XP SoCs.
 > 
-> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-> index 27d186a..ab08671 100644
-> --- a/arch/arm/kernel/sched_clock.c
-> +++ b/arch/arm/kernel/sched_clock.c
-> @@ -44,7 +44,7 @@ static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
->  	return (cyc * mult) >> shift;
->  }
->  
-> -static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
-> +static unsigned long long cyc_to_sched_clock(u32 (*read)(void), u32 mask)
->  {
->  	u64 epoch_ns;
->  	u32 epoch_cyc;
-> @@ -63,7 +63,8 @@ static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
->  		smp_rmb();
->  	} while (epoch_cyc != cd.epoch_cyc_copy);
->  
-> -	return epoch_ns + cyc_to_ns((cyc - epoch_cyc) & mask, cd.mult, cd.shift);
-> +	return epoch_ns + cyc_to_ns((read() - epoch_cyc) & mask, cd.mult,
-> +				    cd.shift);
->  }
->  
->  /*
-> @@ -150,8 +151,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
->  
->  unsigned long long notrace sched_clock(void)
->  {
-> -	u32 cyc = read_sched_clock();
-> -	return cyc_to_sched_clock(cyc, sched_clock_mask);
-> +	return cyc_to_sched_clock(read_sched_clock, sched_clock_mask);
->  }
->  
->  void __init sched_clock_postinit(void)
-> -- 
-> 1.7.4.1
+>  * Patches 8, 9, 10 enable the SDIO interface on the Armada XP DB,
+>    Armada 370 DB and Globalscale Mirabox platforms.
 > 
+>  * Patch 11 adds Device Tree information to describe the SDIO
+>    interface on the Kirkwood SoCs.
+> 
+>  * Patches 12 and 13 convert the Dreamplug and mplcec4 Kirkwood
+>    platforms to use the Device Tree to probe their SDIO interface and
+>    mux the corresponding pins.
+> 
+>  * Patch 14 adds a pin mux option for the SDIO interface on the
+>    88F6282 SoC, which is used in the Topkick platform.
+
+Dropped (see my reply to the individual patch):
+
+>  * Patch 15 makes the Topkick DTS file inherit the kirkwood-8262.dtsi,
+>    so that it gets the pinctrl definition.
+> 
+>  * Patch 16 converts the Kirkwood Topkick platform to use the Device
+>    Tree to probe its SDIO interface and mux the corresponding pins.
+
+To give an idea of how it all pulls together so far, I have created a
+(prone to rebasing!) branch, mvebu/for-next in which I have done the
+following:
+
+git checkout v3.8-rc2
+git merge arm-soc/for-next
+git merge mvebu/fixes
+git merge mvebu/cleanup
+git merge mvebu/drivers
+git merge mvebu/boards
+git merge mvebu/dt
+
+So everything I've merged so far is in there, ready for testing.
+
+thx,
+
+Jason.
