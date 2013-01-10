@@ -1,114 +1,161 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 10 Jan 2013 12:57:35 +0000
-Subject: [PATCH] mfd: stmpe: Pull IRQ GPIO number from DT during DT-based
- probe
-In-Reply-To: <CACRpkdZWi4M3HmO_rq1O9aGTKYR0iMLXJo+nos3hYu3C_DFRHQ@mail.gmail.com>
-References: <1357568989-16237-1-git-send-email-marex@denx.de>
- <20130108094134.GA21994@gmail.com>
- <201301081044.14876.marex@denx.de>
- <201301081048.38149.marex@denx.de>
- <CAKohpo=YnLJN4_xA1WTiJaZeb-Oyc=RypYUyaSibmn6G4X9m4A@mail.gmail.com>
- <20130108111104.GF21994@gmail.com>
- <CAKohpomiS+UFzgiJaQbm8aZVPY0jeYhm1k7Yndk50z8=K4LvGQ@mail.gmail.com>
- <CACRpkdZWi4M3HmO_rq1O9aGTKYR0iMLXJo+nos3hYu3C_DFRHQ@mail.gmail.com>
-Message-ID: <20130110125735.GB4964@gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 10 Jan 2013 13:58:13 +0100
+Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
+ HAVE_ARM_SCU
+In-Reply-To: <20130109151700.GB22147@e102568-lin.cambridge.arm.com>
+References: <20130108171103.GA7417@e102568-lin.cambridge.arm.com><20130109.134641.1582472136842052082.hdoyu@nvidia.com><20130109151700.GB22147@e102568-lin.cambridge.arm.com>
+Message-ID: <20130110.145813.1159140334089730421.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Jan 2013, Linus Walleij wrote:
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Wed, 9 Jan 2013 16:17:00 +0100:
 
-> On Tue, Jan 8, 2013 at 12:14 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > On 8 January 2013 16:41, Lee Jones <lee.jones@linaro.org> wrote:
-> >>> Hmm.. I tried a bit, but couldn't find any such call :(
-> >>> Probably an assumption is taken here. GPIO pins which are going to be used as
-> >>> interrupt lines, wouldn't be getting set in output mode at all. So,
-> >>> once they are put
-> >>> in input mode in beginning, nobody would change it ever.
-> >>>
-> >>> Much of gpio controllers configure gpio pins in input mode in their probe().
-> >>>
-> >>> Maybe, there is something else :)
-> >>
-> >> Pinctrl?
-> >
-> > I don't think pinctrl is playing with it. I searched for
-> > "direction_input" string and
-> > pinctrl routine also had similar name. I couldn't fine use of
-> > direction_input anywhere
-> > in kernel, for setting them as irqs for OF cases.
-> 
-> pinctrl has pinctrl_gpio_direction_input() and
-> pinctrl_gpio_direction_output() which are supposed to
-> be called *only* by GPIOlib frontends using pinctrl
-> as backend to control the pins.
-> 
-> But if it's a pinctrl driver using standard pinconfig from
-> include/linux/pinctrl/pinconf-generic.h
-> I'm all for adding a PIN_CONFIG_INPUT_ENABLE
-> to these definintions so it can be set up as input
-> at boot from the device tree using hogs or something,
-> that make things easy when using GPIOs as IRQ
-> providers only.
-> 
-> So the alternative is to just set up the IRQ using the
-> gpiolib functions for this: of_get_gpio() if you need the
-> number from DT, then gpio_request() and
-> gpio_direction_input() as on any GPIO. This can be
-> done in the device driver or board code depending
-> on use case.
-> 
-> In the Nomadik I did this (maybe ugly) hack for a
-> similar case:
-> 
-> +/*
-> + * The SMSC911x IRQ is connected to a GPIO pin, but the driver expects
-> + * to simply request an IRQ passed as a resource. So the GPIO pin needs
-> + * to be requested by this hog and set as input.
-> + */
-> +static int __init cpu8815_eth_init(void)
-> +{
-> +       struct device_node *eth;
-> +       int gpio, irq, err;
-> +
-> +       eth = of_find_node_by_path("/external-bus at 34000000/ethernet at 300");
-> +       if (!eth) {
-> +               pr_info("could not find any ethernet controller\n");
-> +               return 0;
-> +       }
-> +       gpio = of_get_gpio(eth, 0);
-> +       err = gpio_request(gpio, "eth_irq");
-> +       if (err) {
-> +               pr_info("failed to request ethernet GPIO\n");
-> +               return -ENODEV;
-> +       }
-> +       err = gpio_direction_input(gpio);
-> +       if (err) {
-> +               pr_info("failed to set ehernet GPIO as input\n");
-> +               return -ENODEV;
-> +       }
-> +       irq = gpio_to_irq(gpio);
-> +       pr_info("enabled ethernet GPIO %d, IRQ %d\n", gpio, irq);
-> +       return 0;
-> +}
-> +device_initcall(cpu8815_eth_init);
+....
 
-Yep, that looks pretty gross!
+> > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> > index 68e76ef..51d24ae 100644
+> > --- a/arch/arm/mach-tegra/platsmp.c
+> > +++ b/arch/arm/mach-tegra/platsmp.c
+> > @@ -152,7 +152,7 @@ done:
+> >   * Initialise the CPU possible map early - this describes the CPUs
+> >   * which may be present or become present in the system.
+> >   */
+> > -static void __init tegra_smp_init_cpus(void)
+> > +static void __init tegra_smp_detect_cores(void)
+> >  {
+> >  	unsigned int i, cpu_id, ncores;
+> >  	u32 l2ctlr;
+> > @@ -183,6 +183,12 @@ static void __init tegra_smp_init_cpus(void)
+> >  
+> >  	for (i = 0; i < ncores; i++)
+> >  		set_cpu_possible(i, true);
+> > +}
+> > +
+> > +static void __init tegra_smp_init_cpus(void)
+> > +{
+> > +	if (!num_possible_cpus())
+> > +		tegra_smp_detect_cores();
+> 
+> Thought about this, I would prefer writing an inline function that
+> provides this information (DT missing /cpu information or parsing failure)
+> instead of relying on num_possible_cpus to be == 0 as a way to check that.
 
-> I haven't read review comments on that patch.
-> 
-> Maybe it's not such a good idea to add the GPIO to the device itself
-> when it's being hogged by board code like this. It's a bit of a grey area
-> so I'm a bit confused here.
-> 
-> Maybe the GPIO lib actually needs a "hog" mechanism that can
-> request and set GPIO pins as input/output on boot and then
-> forget about them.
-> 
-> Yours,
-> Linus Walleij
+With your "[PATCH] ARM: kernel: DT cpu map validity check helper
+function", my original patch gets as below. I think that the following
+"smp_detect_ncores()" function may be so generic that it could be
+moved in some common place than platform?
 
+>From f5f2a43952ce75fe061b3808b994c3ceb07f1af1 Mon Sep 17 00:00:00 2001
+From: Hiroshi Doyu <hdoyu@nvidia.com>
+Date: Mon, 26 Nov 2012 12:25:14 +0200
+Subject: [PATCH 1/1] ARM: tegra: # of CPU cores detection w/ & w/o
+ HAVE_ARM_SCU
+
+The method to detect the number of CPU cores on Cortex-A9 MPCore and
+Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
+information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
+have to read it from the system coprocessor(CP15), because the SCU on
+Cortex-A15 MPCore does not have software readable registers. This
+patch selects the correct method at runtime based on the CPU ID.
+
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/mach-tegra/platsmp.c |   54 ++++++++++++++++++++++++++++++++---------
+ 1 file changed, 43 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 6867030..9a1324a 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -24,6 +24,8 @@
+ #include <asm/mach-types.h>
+ #include <asm/smp_scu.h>
+ #include <asm/smp_plat.h>
++#include <asm/cputype.h>
++#include <asm/prom.h>
+ 
+ #include <mach/powergate.h>
+ 
+@@ -38,7 +40,7 @@
+ extern void tegra_secondary_startup(void);
+ 
+ static cpumask_t tegra_cpu_init_mask;
+-static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
++static void __iomem *scu_base;
+ 
+ #define EVP_CPU_RESET_VECTOR \
+ 	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
+@@ -177,23 +179,52 @@ done:
+ 	return status;
+ }
+ 
++static int __init smp_detect_ncores(void)
++{
++	unsigned int ncores, mpidr;
++	u32 l2ctlr;
++	phys_addr_t pa;
++
++	mpidr = read_cpuid_mpidr();
++	switch (mpidr) {
++	case ARM_CPU_PART_CORTEX_A15:
++		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
++		ncores = ((l2ctlr >> 24) & 3) + 1;
++		break;
++	case ARM_CPU_PART_CORTEX_A9:
++		/* Get SCU physical base */
++		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
++		scu_base = IO_ADDRESS(pa);
++		ncores = scu_get_core_count(scu_base);
++		break;
++	default:
++		pr_warn("Unsupported mpidr\n");
++		ncores = 1;
++		break;
++	}
++
++	return ncores;
++}
++
+ /*
+  * Initialise the CPU possible map early - this describes the CPUs
+  * which may be present or become present in the system.
+  */
+ static void __init tegra_smp_init_cpus(void)
+ {
+-	unsigned int i, ncores = scu_get_core_count(scu_base);
+-
+-	if (ncores > nr_cpu_ids) {
+-		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
+-			ncores, nr_cpu_ids);
+-		ncores = nr_cpu_ids;
++	if (!arm_dt_cpu_map_valid()) {
++		unsigned int i, ncores;
++
++		ncores = smp_detect_ncores();
++		if (ncores > nr_cpu_ids) {
++			pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
++				ncores, nr_cpu_ids);
++			ncores = nr_cpu_ids;
++		}
++		for (i = 0; i < ncores; i++)
++			set_cpu_possible(i, true);
+ 	}
+ 
+-	for (i = 0; i < ncores; i++)
+-		set_cpu_possible(i, true);
+-
+ 	set_smp_cross_call(gic_raise_softirq);
+ }
+ 
+@@ -202,7 +233,8 @@ static void __init tegra_smp_prepare_cpus(unsigned int max_cpus)
+ 	/* Always mark the boot CPU (CPU0) as initialized. */
+ 	cpumask_set_cpu(0, &tegra_cpu_init_mask);
+ 
+-	scu_enable(scu_base);
++	if (scu_base)
++		scu_enable(scu_base);
+ }
+ 
+ struct smp_operations tegra_smp_ops __initdata = {
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
