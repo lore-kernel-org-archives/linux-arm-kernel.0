@@ -1,27 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Jan 2013 14:22:45 +0000
-Subject: [PATCH] hardlockup: detect hard lockups without NMIs using
- secondary cpus
-In-Reply-To: <20130110140215.GP88797@redhat.com>
-References: <1357783059-13923-1-git-send-email-ccross@android.com>
- <20130110140215.GP88797@redhat.com>
-Message-ID: <20130110142245.GE19944@n2100.arm.linux.org.uk>
+From: federico.vaga@gmail.com (Federico Vaga)
+Date: Thu, 10 Jan 2013 15:32:37 +0100
+Subject: [PATCH v5 1/3] videobuf2-dma-contig: user can specify GFP flags
+In-Reply-To: <1357822010-30419-2-git-send-email-federico.vaga@gmail.com>
+References: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
+ <1357822010-30419-2-git-send-email-federico.vaga@gmail.com>
+Message-ID: <2134637.remWHy6RQA@harkonnen>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 09:02:15AM -0500, Don Zickus wrote:
-> On Wed, Jan 09, 2013 at 05:57:39PM -0800, Colin Cross wrote:
-> > Emulate NMIs on systems where they are not available by using timer
-> > interrupts on other cpus.  Each cpu will use its softlockup hrtimer
-> > to check that the next cpu is processing hrtimer interrupts by
-> > verifying that a counter is increasing.
-> > 
-> > This patch is useful on systems where the hardlockup detector is not
-> > available due to a lack of NMIs, for example most ARM SoCs.
-> 
-> I have seen other cpus, like Sparc I think, create a 'virtual NMI' by
-> reserving an IRQ line as 'special' (can not be masked).  Not sure if that
-> is something worth looking at here (or even possible).
 
-No it isn't, because that assumes that things like spin_lock_irqsave()
-won't mask that interrupt.  We don't have the facility to do that.
+>  struct vb2_dc_buf {
+> @@ -165,7 +166,8 @@ static void *vb2_dc_alloc(void *alloc_ctx, unsigned long
+> size) /* align image size to PAGE_SIZE */
+>  	size = PAGE_ALIGN(size);
+> 
+> -	buf->vaddr = dma_alloc_coherent(dev, size, &buf->dma_addr, 
+GFP_KERNEL);
+> +	buf->vaddr = dma_alloc_coherent(dev, size, &buf->dma_addr,
+> +									
+GFP_KERNEL | conf->mem_flags);
+
+Unfortunately, I forgot to remove this from Patch v4 series. I did not see it 
+while re-reading the first time. I'll send a new patch series (v6). It should 
+be:
+
+buf->vaddr = dma_alloc_coherent(dev, size, &buf->dma_addr, conf->mem_flags);
+
+
+I'm terribly sorry
+
+-- 
+Federico Vaga
