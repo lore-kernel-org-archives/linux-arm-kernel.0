@@ -1,38 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Jan 2013 16:18:39 +0530
-Subject: [PATCH] arch/arm/plat-omap: initializing dma_lch_count, before
- judging omap_dma_reserve_channels
-In-Reply-To: <50EE9815.2080402@asianux.com>
-References: <50EE9815.2080402@asianux.com>
-Message-ID: <50EE9C87.6060407@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Jan 2013 11:49:20 +0100
+Subject: [PATCH] gpio: vt8500: Export dedicated GPIO before multifunction
+ pins.
+In-Reply-To: <1356899374-9395-1-git-send-email-linux@prisktech.co.nz>
+References: <1356899374-9395-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <CACRpkdagdO3_6DmKYaCwmx4Jju=E_uy86_QqdKLA3+VK7JNPjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 January 2013 03:59 PM, Chen Gang wrote:
->
->    dma_lch_count is zero before 1st call of omap_system_dma_probe.
->    omap_dma_reserve_channels has value before 1st call of omap_system_dma_probe
->
->    when 1st call of omap_system_dma_probe
->      we need set dma_lch_count before use it for judging
->      or which will be failed for omap_dma_reserve_channels
->
->    additional info:
->      this patch is only for fixing bug, not touch the features.
->      so, not use d->lch_count instead of dma_lch_count for the statement:
->
->                          && (omap_dma_reserve_channels <= dma_lch_count))
->
-Why not ? Infact thats the right fix as mentioned in the review.
+On Sun, Dec 30, 2012 at 9:29 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
 
->      at least, now, current fixing is equal to above.
->      in the future
->        maybe omap_dma_reserve_channels can be set by outside (such as from /proc)
->        dma_lch_count is a static global variable which has effect to all devices.
->        maybe the original author do not hope the newer is larger than the older
+> The vendor does not provide numbering for gpio pins. Vendor source
+> exports dedicated gpio pins first, followed by multifunction pins.
+> As this is what end users expect, this patch changes vt8500 and wm8505
+> to do the same.
 >
-'omap_dma_reserve_channels' when used is suppose to be from command
-line. Hence the proposed fix in the review is the right one.
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 
-Regards
-santosh
+So how many existing userspace applications does this patch
+break? Has this system been widely deployed so a kernel
+upgrade will cause problems for people?
+
+But applied anyway, unless someone screams about it real
+soon now. That seems to be the only way to get people to tell
+us about their use cases.
+
+Could you consider adding names to the exported GPIO pins
+on the vt8500 series please? Then userspace can atleast
+try to locate the right pin.
+
+Yours,
+Linus Walleij
