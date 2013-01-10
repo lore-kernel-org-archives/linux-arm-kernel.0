@@ -1,42 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 10 Jan 2013 14:31:50 +0100
-Subject: [PATCH 2/3] gpio: pca953x: add support for pca9505
-In-Reply-To: <CACRpkdYu63TZDpHrGkg0cdqFCrVH1PiNFX8FcrxB9S_Vk9r=kg@mail.gmail.com>
-References: <1357493688-25061-1-git-send-email-gregory.clement@free-electrons.com>
- <1357493688-25061-3-git-send-email-gregory.clement@free-electrons.com>
- <CACRpkdYu63TZDpHrGkg0cdqFCrVH1PiNFX8FcrxB9S_Vk9r=kg@mail.gmail.com>
-Message-ID: <50EEC2C6.9070109@free-electrons.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Thu, 10 Jan 2013 14:38:18 +0100
+Subject: [PATCH] usb: musb: ux500: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <CACRpkdZD1i_tvDf6XFyk5muYjtDziQaMNGK6vvihhFJVztXUjw@mail.gmail.com>
+References: <1357577261-31536-1-git-send-email-fabio.baltieri@linaro.org>
+ <CACRpkdZD1i_tvDf6XFyk5muYjtDziQaMNGK6vvihhFJVztXUjw@mail.gmail.com>
+Message-ID: <20130110133818.GA22710@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2013 12:15 PM, Linus Walleij wrote:
-> On Sun, Jan 6, 2013 at 6:34 PM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
-> 
->> Now that pca953x driver can handle GPIO expanders with more than 32
->> bits this patch adds the support for the pca9505 which cam with 40
->> GPIOs.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> 
-> Applied, thanks.
-> 
 Hello Linus,
 
-I think it is a little too early to apply this patch because the 1st
-one still have bug and is not yet applied.
-
-So it should be better to wait for that the 1st patch is fine.
-
-Thanks.
-
-> Yours,
-> Linus Walleij
+On Thu, Jan 10, 2013 at 12:23:32PM +0100, Linus Walleij wrote:
+> On Mon, Jan 7, 2013 at 5:47 PM, Fabio Baltieri
+> <fabio.baltieri@linaro.org> wrote:
 > 
+> > This patch converts the module to use clk_prepare_enable and
+> > clk_disable_unprepare variants as required by common clock framework.
+> >
+> > Without this the system crash during probe function.
+> >
+> > Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
+Thanks for the ACK.  This bug was here unnoticed since 3.6 merge window,
+do you think it may make sense to add this driver to u8500_defconfig?  I
+can send a patch if you say so...
+
+Thanks,
+Fabio
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Fabio Baltieri
