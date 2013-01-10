@@ -1,72 +1,72 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 10 Jan 2013 14:45:51 +0200
-Subject: [PATCH 2/2] ARM: dts: omap: Add omap-usb2 dt data
-In-Reply-To: <50EE9517.3030703@ti.com>
-References: <1348050772-27819-1-git-send-email-kishon@ti.com>
- <1348050772-27819-3-git-send-email-kishon@ti.com>
- <50EE8A89.4010801@ti.com> <50EE921D.8020601@ti.com>
- <50EE9517.3030703@ti.com>
-Message-ID: <20130110124551.GU28920@arwen.pp.htv.fi>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Thu, 10 Jan 2013 13:50:48 +0100
+Subject: [PATCH 1/3] driver core: add helper macro for
+ platform_driver_probe() boilerplate
+In-Reply-To: <1357730128-23018-2-git-send-email-fabio.porcedda@gmail.com>
+References: <1357730128-23018-1-git-send-email-fabio.porcedda@gmail.com>
+ <1357730128-23018-2-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <CAHkwnC8bmDxZdy=xos6AnG1vPDtGhGF6S8FYFfbdKG9vrHCnYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 03:46:55PM +0530, kishon wrote:
-> Hi,
-> 
-> On Thursday 10 January 2013 03:34 PM, Benoit Cousson wrote:
-> >On 01/10/2013 10:31 AM, kishon wrote:
-> >>Hi Benoit,
-> >>
-> >>On Wednesday 19 September 2012 04:02 PM, Kishon Vijay Abraham I wrote:
-> >>>Add omap-usb2 data node in omap4 device tree file. Since omap-usb2 is
-> >>>connected to ocp2scp, omap-usb2 dt data is added as a child node
-> >>>of ocp2scp.
-> >>>
-> >>>Acked-by: Felipe Balbi <balbi@ti.com>
-> >>>Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >>
-> >>This patch is also missing in mainline :-(
-> >
-> >Well, in that case this was done on purpose :-)
-> >
-> >>
-> >>Thanks
-> >>Kishon
-> >>
-> >>>---
-> >>>   arch/arm/boot/dts/omap4.dtsi |    5 +++++
-> >>>   1 file changed, 5 insertions(+)
-> >>>
-> >>>diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> >>>index 4fbb9dc..28eaddc 100644
-> >>>--- a/arch/arm/boot/dts/omap4.dtsi
-> >>>+++ b/arch/arm/boot/dts/omap4.dtsi
-> >>>@@ -303,6 +303,11 @@
-> >>>               #size-cells = <1>;
-> >>>               ranges;
-> >>>               ti,hwmods = "ocp2scp_usb_phy";
-> >>>+            usb2phy at 4a0ad080 {
-> >>>+                compatible = "ti,omap-usb2";
-> >>>+                reg = <0x4a0ad080 0x58>,
-> >>>+                      <0x4a002300 0x4>; /* TO BE REMOVED: SCM */
-> >
-> >Rob and I did not agree to use that temp hack in the case of DT, so you
-> >were supposed to repost with a proper driver for the SCM part that
-> >control the USB.
-> 
-> Ok. Missed that. Will work on that.
+Hi Greg,
+I'm sorry, In the previous email I used your wrong email address,
+in this email I've used your correct email address.
 
-Didn't Tony say we should access SCM directly since it's a one time
-thing ?
+Best regards
+Fabio Porcedda
 
-Tony ?
+On Wed, Jan 9, 2013 at 12:15 PM, Fabio Porcedda
+<fabio.porcedda@gmail.com> wrote:
+> For simple modules that contain a single platform_driver without any
+> additional setup code then ends up being a block of duplicated
+> boilerplate.  This patch adds a new macro,
+> module_platform_driver_probe(), which replaces the
+> module_init()/module_exit() registrations with template functions.
+>
+> This macro use the same idea of module_platform_driver().
+>
+> This macro is useful to stop the misuse of module_platform_driver() for
+> removing the platform_driver_probe() boilerplate.
+>
+> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+> Cc: Greg Kroah-Hartman <gregkh@suse.de>
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/f6159f88/attachment.sig>
+Cc: Greg Kroah-Hartman (linuxfoundation.org)
+
+> ---
+>  include/linux/platform_device.h | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>
+> diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+> index a9ded9a..c082c71 100644
+> --- a/include/linux/platform_device.h
+> +++ b/include/linux/platform_device.h
+> @@ -204,6 +204,24 @@ static inline void platform_set_drvdata(struct platform_device *pdev, void *data
+>         module_driver(__platform_driver, platform_driver_register, \
+>                         platform_driver_unregister)
+>
+> +/* module_platform_driver_probe() - Helper macro for drivers that don't do
+> + * anything special in module init/exit.  This eliminates a lot of
+> + * boilerplate.  Each module may only use this macro once, and
+> + * calling it replaces module_init() and module_exit()
+> + */
+> +#define module_platform_driver_probe(__platform_driver, __platform_probe) \
+> +static int __init __platform_driver##_init(void) \
+> +{ \
+> +       return platform_driver_probe(&(__platform_driver), \
+> +                                    __platform_probe);    \
+> +} \
+> +module_init(__platform_driver##_init); \
+> +static void __exit __platform_driver##_exit(void) \
+> +{ \
+> +       platform_driver_unregister(&(__platform_driver)); \
+> +} \
+> +module_exit(__platform_driver##_exit);
+> +
+>  extern struct platform_device *platform_create_bundle(struct platform_driver *driver,
+>                                         int (*probe)(struct platform_device *),
+>                                         struct resource *res, unsigned int n_res,
+> --
+> 1.8.0.3
+>
