@@ -1,121 +1,60 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 10 Jan 2013 10:38:34 +0100
-Subject: [PATCH v2] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
-In-Reply-To: <3816648.2TVsTiMOWx@bender>
-References: <1588881.pi23bvqp7D@bender> <3816648.2TVsTiMOWx@bender>
-Message-ID: <50EE8C1A.7020700@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Jan 2013 09:44:44 +0000
+Subject: [PATCHv2 0/4] clockevents: decouple broadcast mechanism from
+ drivers
+In-Reply-To: <50EDD71A.5030406@codeaurora.org>
+References: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
+ <50EDD71A.5030406@codeaurora.org>
+Message-ID: <20130110094435.GA17741@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2013 08:56 PM, Florian Fainelli wrote:
-> This patch adds the DTS file to support the Marvell RD-A370-A1
-> (Reference Design board) also known as RD-88F6710 board. It is almost
-> entirely similar to the DB-A370 board except that the first Ethernet PHY
-> is SGMII-wired and the second is a switch which is RGMII-wired.
+On Wed, Jan 09, 2013 at 08:46:18PM +0000, Stephen Boyd wrote:
+> On 01/09/13 06:46, Mark Rutland wrote:
+> > This is an updated version of the series I posted back in December:
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137929.html
+> >
+> > Changes since v1:
+> > * Drop removal of guards in smp.c
+> > * Removed useless evt->evt_handler check in tick_receive_broadcast
+> > * Fix up tick_receive_broadcast when !GENERIC_CLOCKEVENTS_BROADCAST
+> > * Fix checkpatch issues (multi-line strings)
+> >
+> > Thanks go to Stephen Boyd and Santosh Shilimkar for their commments.
+> >
+> > In some SMP systems, cpu-local timers may stop delivering interrupts
+> > when in low power states, or not all CPUs may have local timers. To
+> > support these systems we have a mechanism for broadcasting timer ticks
+> > to other CPUs. This mechanism relies on the struct
+> > clock_event_device::broadcast function pointer, which is a
+> > driver-specific mechanism for broadcasting ticks to other CPUs.
+> >
+> > As the broadcast mechanism is architecture-specific, placing the
+> > broadcast function on struct clock_event_device ties each driver to a
+> > single architecture. Additionally the driver or architecture backend
+> > must handle the routing of broadcast ticks to the correct
+> > clock_event_device, leading to duplication of the list of active
+> > clock_event_devices.
+> >
+> > These patches introduce a generic mechanism for handling the receipt of
+> > timer broadcasts, and an optional architecture-specific broadcast
+> > function which allows drivers to be decoupled from a particular
+> > architecture will retaining support for timer tick broadcasts. These
+> > mechanisms are wired up for the arm port, and have been boot-tested on a
+> > pandaboard.
+> >
 > 
-> Signed-off-by: Florian Fainelli <florian@openwrt.org>
-
-Looks OK for me
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-> ---
-> Thomas, Cl?ment, as support for other peripherals gets merged, I will update
-> this DTS file to reflect this. Thanks!
+> For the series:
 > 
-> Changes since v1:
-> - added missing entry in arch/arm/boot/dts/Makefile to actually build the DTB
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Thanks!
+
 > 
->  arch/arm/boot/dts/Makefile          |    1 +
->  arch/arm/boot/dts/armada-370-rd.dts |   61 +++++++++++++++++++++++++++++++++++
->  2 files changed, 62 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-370-rd.dts
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index b7246d6..7a75171 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -78,6 +78,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
->  	msm8960-cdp.dtb
->  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->  	armada-370-mirabox.dtb \
-> +	armada-370-rd.dtb \
->  	armada-xp-db.dtb \
->  	armada-xp-openblocks-ax3-4.dtb
->  dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
-> diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-> new file mode 100644
-> index 0000000..d62dfac
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-370-rd.dts
-> @@ -0,0 +1,61 @@
-> +/*
-> + * Device Tree file for Marvell Armada 370 Reference Design board
-> + * (RD-88F6710-A1)
-> + *
-> + *  Copied from arch/arm/boot/dts/armada-370-db.dts
-> + *
-> + *  Copyright (C) 2013 Florian Fainelli <florian@openwrt.org>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "armada-370.dtsi"
-> +
-> +/ {
-> +	model = "Marvell Armada 370 Reference Design";
-> +	compatible = "marvell,a370-rd", "marvell,armada370", "marvell,armada-370-xp";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x20000000>; /* 512 MB */
-> +	};
-> +
-> +	soc {
-> +		serial at d0012000 {
-> +			clock-frequency = <200000000>;
-> +			status = "okay";
-> +		};
-> +		sata at d00a0000 {
-> +			nr-ports = <2>;
-> +			status = "okay";
-> +		};
-> +
-> +		mdio {
-> +			phy0: ethernet-phy at 0 {
-> +				reg = <0>;
-> +			};
-> +
-> +			phy1: ethernet-phy at 1 {
-> +				reg = <1>;
-> +			};
-> +		};
-> +
-> +		ethernet at d0070000 {
-> +			status = "okay";
-> +			phy = <&phy0>;
-> +			phy-mode = "sgmii";
-> +		};
-> +		ethernet at d0074000 {
-> +			status = "okay";
-> +			phy = <&phy1>;
-> +			phy-mode = "rgmii-id";
-> +		};
-> +	};
-> +};
 > 
 
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Mark.
