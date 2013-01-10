@@ -1,20 +1,85 @@
-From: konszert@marvell.com (Kosta Zertsekel)
-Date: Thu, 10 Jan 2013 14:27:33 +0200
-Subject: Fix phy_init for Marvell network eth driver
-In-Reply-To: <20130110122441.GQ3392@lunn.ch>
-References: <1357819234-27752-1-git-send-email-konszert@marvell.com>
- <20130110122441.GQ3392@lunn.ch>
-Message-ID: <BC373419EB4337418B2B595BAEDC155F01589636FF82@IL-MB01.marvell.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 10 Jan 2013 12:33:21 +0000
+Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
+In-Reply-To: <20130110121514.GD29952@linaro.org>
+References: <1357818507-8716-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130110121514.GD29952@linaro.org>
+Message-ID: <20130110123321.GD4728@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This comment is supposed to be in the header of the patch. 
-> Since this comment is about a bug for the D-Link DNS323_REV_C1, the fix to DSA should be in a separate patch, again with a comment about the patch, why its needed, what if fixes etc.
-> I suggest you take a look at Documentation/SubmittingPatches
+On Thu, Jan 10, 2013 at 12:15:14PM +0000, Dave Martin wrote:
+> On Thu, Jan 10, 2013 at 11:48:27AM +0000, Lorenzo Pieralisi wrote:
+> > Since the introduction of /cpu nodes bindings for ARM and the
+> > corresponding parse function arm_dt_init_cpu_maps(), the cpu_logical_map
+> > and the number of possible CPUs are set according to the DT /cpu
+> > nodes entries. Currently most of the existing ARM SMP platforms detect the
+> > number of cores through HW probing in their .smp_init_cpus functions and set
+> > the possible CPU mask accordingly.
+> > This method should be upgraded so that the CPU counting mechanism will be
+> > based on DT, keeping legacy HW probing mechanism as a fall back solution.
+> > 
+> > In order to implement this fall back solution mechanism, the ARM DT code
+> > should provide a helper function to platforms to check if the cpu map
+> > has been properly initialized through DT. If the check fails the
+> > platform will resort to legacy HW based cores counting mechanism.
+> > 
+> > This patch implements a trivial flag and a helper function that platform
+> > can call to check whether DT based cpu map initialization and cores count
+> > were completed successfully.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >  arch/arm/include/asm/prom.h | 10 ++++++++++
+> >  arch/arm/kernel/devtree.c   |  5 +++++
+> >  2 files changed, 15 insertions(+)
+> > 
+> > diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+> > index a219227..487614a 100644
+> > --- a/arch/arm/include/asm/prom.h
+> > +++ b/arch/arm/include/asm/prom.h
+> > @@ -18,6 +18,15 @@
+> >  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+> >  extern void arm_dt_memblock_reserve(void);
+> >  extern void __init arm_dt_init_cpu_maps(void);
+> > +/*
+> > + * Return true if cpu map initialization has been
+> > + * carried out correctly from DT
+> > + */
+> > +static inline bool __init arm_dt_cpu_map_valid(void)
+> > +{
+> > +	extern bool valid_dt_cpu_map;
+> > +	return valid_dt_cpu_map;
+> > +}
+> >  
+> >  #else /* CONFIG_OF */
+> >  
+> > @@ -28,6 +37,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
+> >  
+> >  static inline void arm_dt_memblock_reserve(void) { }
+> >  static inline void arm_dt_init_cpu_maps(void) { }
+> > +static inline bool __init arm_dt_cpu_map_valid(void) { return false; }
+> >  
+> >  #endif /* CONFIG_OF */
+> >  #endif /* ASMARM_PROM_H */
+> > diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> > index 70f1bde..c82af3b 100644
+> > --- a/arch/arm/kernel/devtree.c
+> > +++ b/arch/arm/kernel/devtree.c
+> > @@ -62,6 +62,10 @@ void __init arm_dt_memblock_reserve(void)
+> >  		memblock_reserve(base, size);
+> >  	}
+> >  }
+> > +/*
+> > + * Export DT cpu map validity flag to platforms
+> > + */
+> > +bool valid_dt_cpu_map __initdata;
+> 
+> Is there any possibility of this being useful after boot?
+> Hopefully not, but maybe there's something I haven't considered.
 
-Oh, I know. I am really sorry for the mess with 'git sendemail' (forgot --compose flag or something).
-I'll resend the patch "locally" with patch header email and then repost the both patches again on netdev and linux-arm-kernel.
-Sorry again.
+I do not think so, at least for the use cases I have envisaged at the moment,
+but it is certainly something I should consider.
 
 Thanks,
---- KostaZ 
+Lorenzo
