@@ -1,62 +1,80 @@
-From: nareshgbhat@gmail.com (Naresh Bhat)
-Date: Thu, 10 Jan 2013 17:42:55 +0530
-Subject: KEXEC on ARM cortex-a15
-In-Reply-To: <20121121102244.GA11990@mudshark.cambridge.arm.com>
-References: <CAJXQGfKpFfUwMeLGFAuTgQn5Yd2D9O271JM1VJ87Nio80tbwXw@mail.gmail.com>
- <20121119144417.GH3290@n2100.arm.linux.org.uk>
- <20121119151327.GG3205@mudshark.cambridge.arm.com>
- <CAJXQGf+BQ18GhR3emhK-ejTivqx_o=gtaO3-FjTiE3BMGydgsw@mail.gmail.com>
- <CAJXQGf+wfXGZ=PWN585dJDMX1nH+sRexf6UZujyjKM6rJeDiXQ@mail.gmail.com>
- <20121120160219.GF26475@mudshark.cambridge.arm.com>
- <CAJXQGfL4PRW9=MQO1XbogA40sHUzXorbFMe1WkiJ751Ej-h7=g@mail.gmail.com>
- <20121121102244.GA11990@mudshark.cambridge.arm.com>
-Message-ID: <CAJXQGf+QFeLvMr8SkUxB2u-xbRVXN2ttf1uPYbHvtog_ie-3Jw@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 10 Jan 2013 12:15:14 +0000
+Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
+In-Reply-To: <1357818507-8716-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1357818507-8716-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20130110121514.GD29952@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will Deacon,
+On Thu, Jan 10, 2013 at 11:48:27AM +0000, Lorenzo Pieralisi wrote:
+> Since the introduction of /cpu nodes bindings for ARM and the
+> corresponding parse function arm_dt_init_cpu_maps(), the cpu_logical_map
+> and the number of possible CPUs are set according to the DT /cpu
+> nodes entries. Currently most of the existing ARM SMP platforms detect the
+> number of cores through HW probing in their .smp_init_cpus functions and set
+> the possible CPU mask accordingly.
+> This method should be upgraded so that the CPU counting mechanism will be
+> based on DT, keeping legacy HW probing mechanism as a fall back solution.
+> 
+> In order to implement this fall back solution mechanism, the ARM DT code
+> should provide a helper function to platforms to check if the cpu map
+> has been properly initialized through DT. If the check fails the
+> platform will resort to legacy HW based cores counting mechanism.
+> 
+> This patch implements a trivial flag and a helper function that platform
+> can call to check whether DT based cpu map initialization and cores count
+> were completed successfully.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm/include/asm/prom.h | 10 ++++++++++
+>  arch/arm/kernel/devtree.c   |  5 +++++
+>  2 files changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+> index a219227..487614a 100644
+> --- a/arch/arm/include/asm/prom.h
+> +++ b/arch/arm/include/asm/prom.h
+> @@ -18,6 +18,15 @@
+>  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+>  extern void arm_dt_memblock_reserve(void);
+>  extern void __init arm_dt_init_cpu_maps(void);
+> +/*
+> + * Return true if cpu map initialization has been
+> + * carried out correctly from DT
+> + */
+> +static inline bool __init arm_dt_cpu_map_valid(void)
+> +{
+> +	extern bool valid_dt_cpu_map;
+> +	return valid_dt_cpu_map;
+> +}
+>  
+>  #else /* CONFIG_OF */
+>  
+> @@ -28,6 +37,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
+>  
+>  static inline void arm_dt_memblock_reserve(void) { }
+>  static inline void arm_dt_init_cpu_maps(void) { }
+> +static inline bool __init arm_dt_cpu_map_valid(void) { return false; }
+>  
+>  #endif /* CONFIG_OF */
+>  #endif /* ASMARM_PROM_H */
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index 70f1bde..c82af3b 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -62,6 +62,10 @@ void __init arm_dt_memblock_reserve(void)
+>  		memblock_reserve(base, size);
+>  	}
+>  }
+> +/*
+> + * Export DT cpu map validity flag to platforms
+> + */
+> +bool valid_dt_cpu_map __initdata;
 
-The KEXEC feature is working fine on ARM cortex-a15 versatile express
-target.  I have used bleeding edge kexec-tools and v3.8-rc2 kernel.
+Is there any possibility of this being useful after boot?
+Hopefully not, but maybe there's something I haven't considered.
 
-Thank you very  much for all the support and help.
-
-Regards
--Naresh Bhat
-
-On Wed, Nov 21, 2012 at 3:52 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Nov 21, 2012 at 08:21:21AM +0000, Naresh Bhat wrote:
->> Hi Will,
->>
->> I have disabled the SMP on host kernel.  But still I am facing the
->> issue as below
->>
->> bash-4.2# ls
->> uImage  vexpress.dtb
->> bash-4.2#
->> bash-4.2# kexec -f uImage --dtb=vexpress.dtb --command-line="console=ttyS0"
->
-> Can you try using a zImage instead and also specifying the console as
-> ttyAMA0, as it looks like you're using a vexpress?
->
->> Starting new kernel
->> Bye!
->> Uncompressing Linux...
->
-> This isn't really very helpful -- some more debugging on your part would be
-> appreciated to get an insight as to what's going wrong. You could either use
-> JTAG or put some early prints in the decompressor to work out where it goes
-> awry.
->
-> Useful things to know would be: the state of the CPU when the new kernel
-> image is entered (if you have JTAG, you could also look at the dtb in memory
-> to see that it looks sane) and also at which point in the decompressor it
-> goes wrong / takes an abort (usually it's when we enable the MMU).
->
-> Will
-
-
-
--- 
-"For things to change, we must change"
--Naresh Bhat
+Cheers
+---Dave
