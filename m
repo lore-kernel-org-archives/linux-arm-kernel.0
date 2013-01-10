@@ -1,33 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Jan 2013 10:57:10 +0000
-Subject: [PATCH] gpio: vt8500: memory cleanup missing
-In-Reply-To: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
-References: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130110105710.GA19944@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Jan 2013 11:58:42 +0100
+Subject: [PATCH v4 19/19] irqchip: Move ARM vic.h to
+ include/linux/irqchip/arm-vic.h
+In-Reply-To: <1357235668-9450-20-git-send-email-robherring2@gmail.com>
+References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
+ <1357235668-9450-20-git-send-email-robherring2@gmail.com>
+Message-ID: <CACRpkdZdR5YC7WEqQhxeNGbwreSnA2QmyRHFfeO1CncZSK6YVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 10:47:20AM +1300, Tony Prisk wrote:
-> There is also no .remove callback defined. To allow removing the
-> registered chips, I have moved *vtchip to be a static global.
+On Thu, Jan 3, 2013 at 6:54 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-What?  Why?
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> Now that we have VIC moved to drivers/irqchip and all VIC DT init for
+> platforms using irqchip_init, move gic.h and update the remaining
+> includes.
 
-> +/* Pointer to our array of chips */
-> +static struct vt8500_gpio_chip *vtchip;
-> +
-...
-> +static int vt8500_gpio_remove(struct platform_device *pdev)
-> +{
-> +	int i;
-> +	int ret;
-> +	const struct vt8500_gpio_data *data;
-> +	void __iomem *gpio_base = vtchip[0].base;
-> +	const struct of_device_id *of_id =
-> +				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
-> +
+This will need to be rebased on fixes merged for -rc3.
 
-You can get at the vtchip pointer if you put it into the platform device's
-driver data pointer.  That way, you're not artificially limiting this
-driver to just one device, and, with your changes it will go wrong if DT
-ever lists more than one device.
+Apart from that, Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
