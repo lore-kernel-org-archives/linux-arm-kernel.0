@@ -1,49 +1,53 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 10 Jan 2013 10:30:05 -0500 (EST)
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 10 Jan 2013 15:34:18 +0000
 Subject: [PATCH 01/16] ARM: b.L: secondary kernel entry code
-In-Reply-To: <50EE69C7.6010802@codeaurora.org>
+In-Reply-To: <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
  <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
- <50EE69C7.6010802@codeaurora.org>
-Message-ID: <alpine.LFD.2.02.1301101029120.6300@xanadu.home>
+Message-ID: <CAHkRjk65PEVDS6vi=07g_hef8yXOR+mTYV_Nchu1fAuLnOJLOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Jan 2013, Stephen Boyd wrote:
+Hi Nico,
 
-> On 1/9/2013 4:20 PM, Nicolas Pitre wrote:
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index f95ba14ae3..2271f02e8e 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1579,6 +1579,12 @@ config HAVE_ARM_TWD
-> >  	help
-> >  	  This options enables support for the ARM timer and watchdog unit
-> >  
-> > +config BIG_LITTLE
-> > +	bool "big.LITTLE support (Experimental)"
-> > +	depends on CPU_V7 && SMP && EXPERIMENTAL
-> 
-> I thought EXPERIMENTAL was being phased out?
+On 10 January 2013 00:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> --- /dev/null
+> +++ b/arch/arm/common/bL_entry.c
+...
+> +extern volatile unsigned long bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
 
-True.
+IMHO, we should keep this array linear and ignore the cluster grouping
+at this stage. This information could be added to latter patches that
+actually need to know about the b.L topology. This would also imply
+that we treat the MPIDR just as an ID without digging into its bit
+layout. But I haven't looked at the other patches yet to see how this
+would fit.
 
-> > diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-> > index e8a4e58f1b..50880c494f 100644
-> > --- a/arch/arm/common/Makefile
-> > +++ b/arch/arm/common/Makefile
-> > @@ -13,3 +13,6 @@ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
-> >  obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
-> >  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
-> >  obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
-> > +obj-$(CONFIG_FIQ_GLUE)		+= fiq_glue.o fiq_glue_setup.o
-> > +obj-$(CONFIG_FIQ_DEBUGGER)	+= fiq_debugger.o
-> 
-> This looks like non-related stuff?
+> +void bL_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
+> +{
+> +       unsigned long val = ptr ? virt_to_phys(ptr) : 0;
+> +       bL_entry_vectors[cluster][cpu] = val;
+> +       smp_wmb();
+> +       __cpuc_flush_dcache_area((void *)&bL_entry_vectors[cluster][cpu], 4);
+> +       outer_clean_range(__pa(&bL_entry_vectors[cluster][cpu]),
+> +                         __pa(&bL_entry_vectors[cluster][cpu + 1]));
 
-Indeed.  Rebase fallouts.
+Why are you using the smp_wmb() here? We don't need any barrier since
+data cache ops by MVA are automatically ordered in relation to stores
+to the same MVA (as long as the MVA is in Normal Cacheable memory).
 
-Thanks.
+> --- /dev/null
+> +++ b/arch/arm/common/bL_head.S
+...
+> +ENTRY(bL_entry_point)
+> +
+> + THUMB(        adr     r12, BSYM(1f)   )
+> + THUMB(        bx      r12             )
+> + THUMB(        .thumb                  )
+> +1:
+> +       mrc     p15, 0, r0, c0, c0, 5
 
+Minor thing, maybe a comment for this line like @ MPIDR.
 
-Nicolas
+-- 
+Catalin
