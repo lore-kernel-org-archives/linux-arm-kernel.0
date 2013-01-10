@@ -1,20 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jan 2013 12:07:25 +0100
-Subject: [PATCH v4 14/19] ARM: remove unneeded vic.h includes
-In-Reply-To: <1357235668-9450-15-git-send-email-robherring2@gmail.com>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-15-git-send-email-robherring2@gmail.com>
-Message-ID: <CACRpkdYsO-551KhCN6ZuUjUfFJinphtod8=Cbohpqx9z1dToXw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 Jan 2013 19:07:45 +0800
+Subject: [PATCH v2 2/2] ARM: imx: enable imx6q-cpufreq support
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ECDF7BF@DBDE01.ent.ti.com>
+References: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
+ <1357806863-6899-3-git-send-email-shawn.guo@linaro.org>
+ <B5906170F1614E41A8A28DE3B8D121433ECDF7BF@DBDE01.ent.ti.com>
+Message-ID: <20130110110742.GI2265@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 3, 2013 at 6:54 PM, Rob Herring <robherring2@gmail.com> wrote:
+On Thu, Jan 10, 2013 at 10:50:25AM +0000, Bedia, Vaibhav wrote:
+...
+> > +static void __init imx6q_opp_check_1p2ghz(struct device *cpu_dev)
+> > +{
+> > +	struct device_node *np;
+> > +	void __iomem *base;
+> > +	u32 val;
+> > +
+> > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ocotp");
+> > +	if (!np) {
+> > +		pr_warn("failed to find ocotp node\n");
+> > +		return;
+> > +	}
+> > +
+> > +	base = of_iomap(np, 0);
+> > +	if (!base) {
+> > +		pr_warn("failed to map ocotp\n");
+> > +		goto put_node;
+> > +	}
+> > +
+> > +	val = readl_relaxed(base + OCOTP_CFG3);
+> > +	val >>= OCOTP_CFG3_SPEED_SHIFT;
+> > +	if ((val & 0x3) == OCOTP_CFG3_SPEED_1P2GHZ)
+> > +		if (opp_add(cpu_dev, 1200000000, 1275000))
+> > +			pr_warn("failed to add 1.2 GHz operating point\n");
+> > +
+> 
+> I just happened to be thinking about the problem of enabling additional OPPs based on
+> some Si rev info for TI's AM335x. 
+> 
+> The other approach could be to register additional OPPs and mark then as disabled to begin with.
+> A platform specific hook could then be used to selectively enable the OPPs for based on the Si rev
+> info.
 
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Numerous includes of asm/hardware/vic.h aren't needed, so remove them.
+May I ask the advantage of this approach?  I hate to create
+platform_data merely for passing a platform specific hook to driver.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Shawn
