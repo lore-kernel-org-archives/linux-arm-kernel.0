@@ -1,38 +1,35 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 10 Jan 2013 14:51:51 +0100
+Date: Thu, 10 Jan 2013 14:54:49 +0100
 Subject: [RFC PATCH 1/5] ARM i.MX6q: Add GPU, VPU, IPU, and OpenVG
  resets to system reset controller
-In-Reply-To: <50EDB3D1.5010900@wwwdotorg.org>
+In-Reply-To: <20130110065622.GA7466@S2101-09.ap.freescale.net>
 References: <1357751839-19680-1-git-send-email-p.zabel@pengutronix.de>
  <1357751839-19680-2-git-send-email-p.zabel@pengutronix.de>
- <50EDB3D1.5010900@wwwdotorg.org>
-Message-ID: <1357825911.2363.667.camel@pizza.hi.pengutronix.de>
+ <20130110065622.GA7466@S2101-09.ap.freescale.net>
+Message-ID: <1357826089.2363.671.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-Am Mittwoch, den 09.01.2013, 11:15 -0700 schrieb Stephen Warren:
-> On 01/09/2013 10:17 AM, Philipp Zabel wrote:
+Am Donnerstag, den 10.01.2013, 14:56 +0800 schrieb Shawn Guo:
+> Hi Philipp,
+> 
+> On Wed, Jan 09, 2013 at 06:17:15PM +0100, Philipp Zabel wrote:
 > > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 > > ---
 > >  .../devicetree/bindings/reset/fsl,imx-src.txt      |   45 ++++++++++++++++++++
+> >  arch/arm/mach-imx/src.c                            |   41 ++++++++++++++++++
+> >  include/linux/imx-src.h                            |    6 +++
+> >  3 files changed, 92 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx-src.txt
+> >  create mode 100644 include/linux/imx-src.h
 > 
-> I proposed something very similar a while back; it may be useful to look
-> at the previous discussion there:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg202451.html
+> I'm with Stephen that we should try to create a common API for this.
+> Instead of ask device drivers to call IMX specific imx_src_reset(),
+> we should have them call some type of common API with struct device
+> as the argument.
 
-Thanks, I had started playing around with some "reset subsystem"
-patches, but so far shied away from what feels like a whole lot of code
-for little effect. I came to the same conclusion that replacing gpio
-resets would probably be overkill, but I was only peripherally aware of
-the tegra reset controller.
-So a simple common struct and some oftree parsing code in drivers/reset
-that can replace both the proposed imx patch and what
-tegra_periph_reset_* do would be considered useful?
-
-> Unfortunately, I haven't had time to follow up on the proposal.
+Agreed. At least for devices with a single dedicated reset line this
+would be a much better API.
 
 regards
 Philipp
