@@ -1,62 +1,48 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 10 Jan 2013 19:19:34 +0100
-Subject: [PATCH 2/3 V2] iio: mxs: Implement support for touchscreen
-In-Reply-To: <20130110174630.GB2797@core.coreip.homeip.net>
-References: <1355449598-15980-1-git-send-email-marex@denx.de>
- <201212191801.31920.marex@denx.de>
- <20130110005748.GA947@core.coreip.homeip.net>
- <201301101048.38036.marex@denx.de>
- <20130110174630.GB2797@core.coreip.homeip.net>
-Message-ID: <50EF0636.6090903@metafoo.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Jan 2013 18:26:55 +0000
+Subject: [PATCH 05/14] lib: Add I/O map cache implementation
+In-Reply-To: <20130110102544.GA5546@avionic-0098.adnet.avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <201301100917.19577.arnd@arndb.de>
+ <20130110102544.GA5546@avionic-0098.adnet.avionic-design.de>
+Message-ID: <201301101826.56248.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2013 06:46 PM, Dmitry Torokhov wrote:
-> On Thu, Jan 10, 2013 at 10:48:37AM +0100, Marek Vasut wrote:
->> Dear Dmitry Torokhov,
->>
->> [...]
->>>>> +	enum mxs_lradc_ts	use_touchscreen;
->>>>> +	unsigned int		stop_touchscreen:1;
->>>>> +	unsigned int		use_touchbutton:1;
->>>
->>> Can we make them bools instead of bit fields?
->>
->> Sure.
->> [...]
->>
->>>>> +static void mxs_lradc_ts_close(struct input_dev *dev)
->>>>> +{
->>>>> +	struct mxs_lradc *lradc = input_get_drvdata(dev);
->>>>> +
->>>>> +	/* Indicate the touchscreen is stopping. */
->>>>> +	lradc->stop_touchscreen = 1;
->>>>> +
->>>>> +	/* Disable touchscreen touch-detect IRQ. */
->>>>> +	writel(LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
->>>>> +		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
->>>>> +
->>>>> +	/* Power-down touchscreen touch-detect circuitry. */
->>>>> +	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
->>>>> +		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
->>>
->>> These 2 writes are racing with writes in mxs_lradc_ts_work(). I think
->>> you need to:
->>>
->>> 	lradc->stop_touchscreen = true;
->>> 	mb();
->>
->> Nice catch, do we need the memory barrier here though, is it not enough to 
->> reorder the cancel_work_sync() just before the register writes?
+On Thursday 10 January 2013, Thierry Reding wrote:
+> I don't understand how this would help. The encoding is like this:
 > 
-> You really need to make sure that setting lradc->stop_touchscreen =
-> true; is not reordered, because otherwise you may cancel the work,
-> interrupt happens and reschedules it, and then you set up the flag.
+>         [27:24] extended register number
+>         [23:16] bus number
+>         [15:11] device number
+>         [10: 8] function number
+>         [ 7: 0] register number
+> 
+> So it doesn't matter whether I use separate areas per bus or not. As
+> soon as the whole extended configuration space needs to be accessed a
+> whopping 28 bits (256 MiB) are required.
+> 
+> What you propose would work if only regular configuration space is
+> supported. I'm not sure if that's an option.
 
-Does it really matter? If it is rescheduled you get one event more reported
-after the device has been closed, but input core should ignore it anyway, or
-doesn't it?
+I mean something like:
 
-Btw. why not use threaded interrupts instead of irq + workqueue combo?
+struct tegra_bus_private {
+	...
+	void __iomem *config_space[16];
+};
 
-- Lars
+
+void tegra_scan_bus(struct pci_bus *bus)
+{
+	int i;
+	struct tegra_bus_private *priv = bus->dev->private;
+
+	for (i=0; i<16; i++)
+		priv->config_space[i] = ioremap(config_space_phys +
+				 65536 * bus->primary + i * SZ_1M, 65536);
+
+	...
+}
+
+	Arnd
