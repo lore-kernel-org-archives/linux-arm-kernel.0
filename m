@@ -1,48 +1,30 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Jan 2013 16:21:33 +0530
-Subject: [PATCH] arch/arm/plat-omap: initializing dma_lch_count, before
- judging omap_dma_reserve_channels
-In-Reply-To: <50EE9C87.6060407@ti.com>
-References: <50EE9815.2080402@asianux.com> <50EE9C87.6060407@ti.com>
-Message-ID: <50EE9D35.6060300@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Jan 2013 11:51:22 +0100
+Subject: [PATCH] gpio: vt8500: memory cleanup missing
+In-Reply-To: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
+References: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <CACRpkdYwn0uc1Nk+RMcx_AaZ5o6k2ug1rAAJrJCGNb9J4MwWhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 January 2013 04:18 PM, Santosh Shilimkar wrote:
-> On Thursday 10 January 2013 03:59 PM, Chen Gang wrote:
->>
->>    dma_lch_count is zero before 1st call of omap_system_dma_probe.
->>    omap_dma_reserve_channels has value before 1st call of
->> omap_system_dma_probe
->>
->>    when 1st call of omap_system_dma_probe
->>      we need set dma_lch_count before use it for judging
->>      or which will be failed for omap_dma_reserve_channels
->>
->>    additional info:
->>      this patch is only for fixing bug, not touch the features.
->>      so, not use d->lch_count instead of dma_lch_count for the statement:
->>
->>                          && (omap_dma_reserve_channels <= dma_lch_count))
->>
-> Why not ? Infact thats the right fix as mentioned in the review.
->
->>      at least, now, current fixing is equal to above.
->>      in the future
->>        maybe omap_dma_reserve_channels can be set by outside (such as
->> from /proc)
->>        dma_lch_count is a static global variable which has effect to
->> all devices.
->>        maybe the original author do not hope the newer is larger than
->> the older
->>
-> 'omap_dma_reserve_channels' when used is suppose to be from command
-> line. Hence the proposed fix in the review is the right one.
->
-Another thing. please fix the subject line. It should be something like
-below.
+On Wed, Jan 2, 2013 at 10:47 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
 
-ARM: OMAP: Fix the use of uninitialized dma_lch_count
+> This driver is missing a .remove callback, and the fail path on
+> probe is incomplete.
+>
+> If an error occurs in vt8500_add_chips, gpio_base is not unmapped.
+> The driver is also ignoring the return value from this function so
+> if a chip fails to register it completes as successful.
+>
+> Replaced pr_err with dev_err in vt8500_add_chips since the device is
+> available.
+>
+> There is also no .remove callback defined. To allow removing the
+> registered chips, I have moved *vtchip to be a static global.
+>
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 
-Regards
-santosh
+Applied to fixes, thanks!
+
+Yours,
+Linus Walleij
