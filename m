@@ -1,101 +1,77 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 10 Jan 2013 18:50:52 +0000
-Subject: [PATCH 14/16] ARM: TC2: ensure powerdown-time data is flushed
- from cache
-In-Reply-To: <1357777251-13541-15-git-send-email-nicolas.pitre@linaro.org>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-15-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130110185052.GF29952@linaro.org>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 10 Jan 2013 19:55:05 +0100
+Subject: [PATCH 05/14] lib: Add I/O map cache implementation
+In-Reply-To: <20130110182007.GA28004@obsidianresearch.com>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130109231758.GA27065@obsidianresearch.com>
+ <20130110071937.GG15212@avionic-0098.adnet.avionic-design.de>
+ <201301100917.19577.arnd@arndb.de>
+ <20130110102544.GA5546@avionic-0098.adnet.avionic-design.de>
+ <20130110182007.GA28004@obsidianresearch.com>
+Message-ID: <20130110185505.GA22944@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 07:20:49PM -0500, Nicolas Pitre wrote:
-> From: Dave Martin <dave.martin@linaro.org>
+On Thu, Jan 10, 2013 at 11:20:07AM -0700, Jason Gunthorpe wrote:
+> On Thu, Jan 10, 2013 at 11:25:44AM +0100, Thierry Reding wrote:
+> > On Thu, Jan 10, 2013 at 09:17:19AM +0000, Arnd Bergmann wrote:
+> > > On Thursday 10 January 2013, Thierry Reding wrote:
+> > > > On Wed, Jan 09, 2013 at 04:17:58PM -0700, Jason Gunthorpe wrote:
+> > > > > On Wed, Jan 09, 2013 at 04:12:31PM -0700, Stephen Warren wrote:
+> > > > > You could decrease the size of the mapping to only span the bus
+> > > > > numbers that are configured for use via DT.
+> > > > 
+> > > > That won't work, unfortunately. The mapping is such that the bus number
+> > > > is not encoded in the uppermost bits, the extended register number is.
+> > > > So the only thing that we could do is decrease the size of the extended
+> > > > register space for *all* devices.
+> > > 
+> > > But you could still a method to map 16 separate areas per bus, each 65536
+> > > bytes long, which results in 1MB per bus. That is probably ok, since
+> > > very few systems have more than a handful of buses in practice.
+> > > 
+> > > In theory, doing static mappings on a per-page base would let you
+> > > do 16 devices at a time, but it's probably worth doing at this fine
+> > > granularity.
+> > 
+> > I don't understand how this would help. The encoding is like this:
+> > 
+> > 	[27:24] extended register number
+> > 	[23:16] bus number
+> > 	[15:11] device number
+> > 	[10: 8] function number
+> > 	[ 7: 0] register number
+> > 
+> > So it doesn't matter whether I use separate areas per bus or not. As
+> > soon as the whole extended configuration space needs to be accessed a
+> > whopping 28 bits (256 MiB) are required.
+> 
+> You'd piece a mapping together, each bus requires 16 64k mappings, a
+> simple 2d array of busnr*16 of pointers would do the trick. A more
+> clever solution would be to allocate contiguous virtual memory and
+> split that up..
 
-To avoid confusion, the prefix in the subject line should be "CCI", not
-"TC2".  Any platform which calls disable_cci() after turning caches off
-and/or disabling the SMP bit may fall foul of this otherwise ... i.e.,
-any platform which has CCI.
+Oh, I see. I'm not very familiar with the internals of remapping, so
+I'll need to do some more reading. Thanks for the hints.
 
-Let me know if you want me to send you a modified patch.
+> > > Actually, AER probably needs this, and I believe some broken devices 
+> > > need to mask interrupts using the PCI command word in the config space,
+> > > it it can happen.
+> > 
+> > Ugh... that would kill any such dynamic mapping approach. Perhaps if we
+> > could mark a device as requiring a static mapping we could pin that
+> > cache entry. But that doesn't sound very encouraging.
+> 
+> AER applies to pretty much every PCI-E device these days.
 
-Cheers
----Daave
+So given there's no way around a segmented static mapping as you
+suggested, right?
 
-> Non-local variables used by the CCI management function called after
-> disabling the cache must be flushed out to main memory in advance,
-> otherwise incoherency of those values may occur if they are sitting
-> in the cache of some other CPU when cci_disable() executes.
-> 
-> This patch adds the appropriate flushing to the CCI driver to ensure
-> that the relevant data is available in RAM ahead of time.
-> 
-> Because this creates a dependency on arch-specific cacheflushing
-> functions, this patch also makes ARM_CCI depend on ARM.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
->  drivers/misc/Kconfig   |  1 +
->  drivers/misc/arm-cci.c | 21 +++++++++++++++++++--
->  2 files changed, 20 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-> index 30d5be1ad2..b24630696c 100644
-> --- a/drivers/misc/Kconfig
-> +++ b/drivers/misc/Kconfig
-> @@ -501,6 +501,7 @@ config USB_SWITCH_FSA9480
->  
->  config ARM_CCI
->         bool "ARM CCI driver support"
-> +	depends on ARM
->  
->  source "drivers/misc/c2port/Kconfig"
->  source "drivers/misc/eeprom/Kconfig"
-> diff --git a/drivers/misc/arm-cci.c b/drivers/misc/arm-cci.c
-> index f329c43099..739e1c96d3 100644
-> --- a/drivers/misc/arm-cci.c
-> +++ b/drivers/misc/arm-cci.c
-> @@ -21,8 +21,16 @@
->  #include <linux/slab.h>
->  #include <linux/arm-cci.h>
->  
-> -#define CCI400_EAG_OFFSET       0x4000
-> -#define CCI400_KF_OFFSET        0x5000
-> +#include <asm/cacheflush.h>
-> +#include <asm/memory.h>
-> +#include <asm/outercache.h>
-> +
-> +#include <asm/irq_regs.h>
-> +#include <asm/pmu.h>
-> +
-> +#define CCI400_PMCR                   0x0100
-> +#define CCI400_EAG_OFFSET             0x4000
-> +#define CCI400_KF_OFFSET              0x5000
->  
->  #define DRIVER_NAME	"CCI"
->  struct cci_drvdata {
-> @@ -73,6 +81,15 @@ static int __devinit cci_driver_probe(struct platform_device *pdev)
->  		goto ioremap_err;
->  	}
->  
-> +	/*
-> +	 * Multi-cluster systems may need this data when non-coherent, during
-> +	 * cluster power-up/power-down. Make sure it reaches main memory:
-> +	 */
-> +	__cpuc_flush_dcache_area(info, sizeof *info);
-> +	__cpuc_flush_dcache_area(&info, sizeof info);
-> +	outer_clean_range(virt_to_phys(info), virt_to_phys(info + 1));
-> +	outer_clean_range(virt_to_phys(&info), virt_to_phys(&info + 1));
-> +
->  	platform_set_drvdata(pdev, info);
->  
->  	pr_info("CCI loaded at %p\n", info->baseaddr);
-> -- 
-> 1.8.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/71919eef/attachment.sig>
