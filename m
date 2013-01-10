@@ -1,36 +1,98 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 10 Jan 2013 18:51:34 +0200
-Subject: [PATCH 14/14] ARM: OMAP2+: omap4panda: Remove irrelevant USB host
- platform data
-In-Reply-To: <1357836694-30788-1-git-send-email-rogerq@ti.com>
-References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
-Message-ID: <1357836694-30788-15-git-send-email-rogerq@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 10 Jan 2013 16:53:27 +0000
+Subject: [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
+ exit/setup
+In-Reply-To: <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <CAHkRjk4A+EMFRTVdfCUBNpAEUMWrOqbT2ki19Vska6dY_WrVXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These platform data bits are no longer used so remove them.
+On 10 January 2013 00:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> --- /dev/null
+> +++ b/Documentation/arm/big.LITTLE/cluster-pm-race-avoidance.txt
+> @@ -0,0 +1,498 @@
+> +Big.LITTLE cluster Power-up/power-down race avoidance algorithm
+> +===============================================================
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/mach-omap2/board-omap4panda.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+Nice description and ascii art :).
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index fd2f907..cde7316 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -220,12 +220,6 @@ static struct usbhs_phy_config phy_config0 = {
- 
- static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
- 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
--	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
--	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
--	.phy_reset  = false,
--	.reset_gpio_port[0]  = -EINVAL,
--	.reset_gpio_port[1]  = -EINVAL,
--	.reset_gpio_port[2]  = -EINVAL,
- 	.phy_config[0] = &phy_config0,
- };
- 
+> --- a/arch/arm/common/bL_entry.c
+> +++ b/arch/arm/common/bL_entry.c
+> @@ -116,3 +116,163 @@ int bL_cpu_powered_up(void)
+>                 platform_ops->powered_up();
+>         return 0;
+>  }
+> +
+> +struct bL_sync_struct bL_sync;
+> +
+> +static void __sync_range(volatile void *p, size_t size)
+> +{
+> +       char *_p = (char *)p;
+> +
+> +       __cpuc_flush_dcache_area(_p, size);
+> +       outer_flush_range(__pa(_p), __pa(_p + size));
+> +       outer_sync();
+
+The outer flush-range operations already contain a cache_sync, so an
+additional outer_sync() operation is not necessary.
+
+You (well, Dave) said that you use the flush instead of
+clean/invalidate to avoid races with other CPUs writing the location.
+However, on the same CPU you can get a speculative load into L1 after
+the L1 flush but before the L2 flush, so the reader case can fail.
+
+The sequence for readers is (note *L2* inval first):
+
+L2 inval
+L1 inval
+
+The sequence for writers is:
+
+L1 clean
+L2 clean
+
+The bi-directional sequence (that's what you need) is:
+
+L1 clean
+L2 clean+inval
+L1 clean+inval
+
+The last L1 op must be clean+inval in case another CPU writes to this
+location to avoid discarding the write.
+
+If you don't have an L2, you just end up with two L1 clean ops, so you
+can probably put some checks.
+
+> +#define sync_mem(ptr) __sync_range(ptr, sizeof *(ptr))
+> +
+> +/*
+> + * __bL_cpu_going_down: Indicates that the cpu is being torn down.
+> + *    This must be called at the point of committing to teardown of a CPU.
+> + *    The CPU cache (SCTRL.C bit) is expected to still be active.
+> + */
+> +void __bL_cpu_going_down(unsigned int cpu, unsigned int cluster)
+> +{
+> +       bL_sync.clusters[cluster].cpus[cpu].cpu = CPU_GOING_DOWN;
+> +       sync_mem(&bL_sync.clusters[cluster].cpus[cpu].cpu);
+> +}
+> +
+> +/*
+> + * __bL_cpu_down: Indicates that cpu teardown is complete and that the
+> + *    cluster can be torn down without disrupting this CPU.
+> + *    To avoid deadlocks, this must be called before a CPU is powered down.
+> + *    The CPU cache (SCTRL.C bit) is expected to be off.
+> + */
+> +void __bL_cpu_down(unsigned int cpu, unsigned int cluster)
+> +{
+> +       dsb();
+> +       bL_sync.clusters[cluster].cpus[cpu].cpu = CPU_DOWN;
+> +       sync_mem(&bL_sync.clusters[cluster].cpus[cpu].cpu);
+> +       sev();
+
+For the sev() here (and other functions in this patch) you need a
+dsb() before. I'm not sure outer_sync() has one.
+
 -- 
-1.7.4.1
+Catalin
