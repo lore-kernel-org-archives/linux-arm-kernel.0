@@ -1,48 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 10 Jan 2013 07:13:09 +0100
-Subject: [PATCH v2 15/20] arm: kirkwood: topkick: the Topkick platform
- uses a 88F6282 SoC
-In-Reply-To: <20130110022926.GH5075@titan.lakedaemon.net>
-References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1356101359-6054-16-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130110022926.GH5075@titan.lakedaemon.net>
-Message-ID: <20130110061309.GA9993@lunn.ch>
+From: kishon@ti.com (kishon)
+Date: Thu, 10 Jan 2013 11:49:13 +0530
+Subject: [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB
+In-Reply-To: <20121227183524.GB7097@blackmetal.musicnaut.iki.fi>
+References: <1348047128-25692-1-git-send-email-kishon@ti.com>
+ <505A8BAB.2020004@ti.com> <20121227183524.GB7097@blackmetal.musicnaut.iki.fi>
+Message-ID: <50EE5D61.1020307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 09:29:26PM -0500, Jason Cooper wrote:
-> On Fri, Dec 21, 2012 at 03:49:14PM +0100, Thomas Petazzoni wrote:
-> > The Topkick board uses a 88F6282 SoC, so the Device Tree Source
-> > describing the Topkick should inherit from kirkwood-6282.dtsi, which
-> > allows to take advantage of pin muxing capabilities.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> > Changes since v1:
-> >  * This patch is new in v2
-> > ---
-> >  arch/arm/boot/dts/kirkwood-topkick.dts |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-> > index c0de5a7..8f4a5b8 100644
-> > --- a/arch/arm/boot/dts/kirkwood-topkick.dts
-> > +++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-> > @@ -1,6 +1,7 @@
-> >  /dts-v1/;
-> >  
-> >  /include/ "kirkwood.dtsi"
-> > +/include/ "kirkwood-6282.dtsi"
-> 
-> Hmmm, shouldn't the cooresponding MPP.._GPIO and kirkwood_mpp_conf() be
-> removed as well?
+On Friday 28 December 2012 12:05 AM, Aaro Koskinen wrote:
+> Hi,
+>
+> On Thu, Sep 20, 2012 at 05:21:15AM +0200, Benoit Cousson wrote:
+>> On 09/19/2012 11:32 AM, Kishon Vijay Abraham I wrote:
+>>> This patch series adds dt data to get MUSB working in omap4 and omap3
+>>>
+>>> Changes from v2:
+>>> * Changes the subject of all the patches to include "ARM: dts:"
+>>> * Added reg property and interrupt property for "usb_otg_hs". Previously these
+>>>    were obtained from ti,hwmods property.
+>>> * Rebased on
+>>>    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git devel-dt
+>>>
+>>> Changes from v1:
+>>> Just removed the omap-usb2 dt data and sent that as a separate patch.
+>>>
+>>> Kishon Vijay Abraham I (3):
+>>>    ARM: dts: Add twl6030-usb data
+>>>    ARM: dts: Add twl4030-usb data
+>>>    ARM: dts: omap: Add usb_otg and glue data
+>>
+>> Thanks for the update. I've just pulled the series for 3.7.
+>
+> I wonder what happened to the patch #3 (Add usb_otg and glue data)
+> of this series? Why was it dropped? I cannot see it in 3.7 or 3.8-rc1.
 
-Hi Jason
+Benoit?
 
-I have some patches for that. I will dig them out over the weekend.
-
-I did have an issue with one of the LEDs. If i remember correctly, i
-sent you an email about it. Could you look back in your archive? 
-
-Thanks
-  Andrew
+-Kishon
