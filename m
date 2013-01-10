@@ -1,85 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 10 Jan 2013 12:33:21 +0000
-Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
-In-Reply-To: <20130110121514.GD29952@linaro.org>
-References: <1357818507-8716-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130110121514.GD29952@linaro.org>
-Message-ID: <20130110123321.GD4728@e102568-lin.cambridge.arm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 10 Jan 2013 13:35:14 +0100
+Subject: [v2 6/9] ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
+In-Reply-To: <50ECA277.5050907@wwwdotorg.org>
+References: <1357649263-1098-1-git-send-email-hdoyu@nvidia.com><1357649263-1098-7-git-send-email-hdoyu@nvidia.com><50ECA277.5050907@wwwdotorg.org>
+Message-ID: <20130110.143514.1818842015582437961.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 12:15:14PM +0000, Dave Martin wrote:
-> On Thu, Jan 10, 2013 at 11:48:27AM +0000, Lorenzo Pieralisi wrote:
-> > Since the introduction of /cpu nodes bindings for ARM and the
-> > corresponding parse function arm_dt_init_cpu_maps(), the cpu_logical_map
-> > and the number of possible CPUs are set according to the DT /cpu
-> > nodes entries. Currently most of the existing ARM SMP platforms detect the
-> > number of cores through HW probing in their .smp_init_cpus functions and set
-> > the possible CPU mask accordingly.
-> > This method should be upgraded so that the CPU counting mechanism will be
-> > based on DT, keeping legacy HW probing mechanism as a fall back solution.
-> > 
-> > In order to implement this fall back solution mechanism, the ARM DT code
-> > should provide a helper function to platforms to check if the cpu map
-> > has been properly initialized through DT. If the check fails the
-> > platform will resort to legacy HW based cores counting mechanism.
-> > 
-> > This patch implements a trivial flag and a helper function that platform
-> > can call to check whether DT based cpu map initialization and cores count
-> > were completed successfully.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  arch/arm/include/asm/prom.h | 10 ++++++++++
-> >  arch/arm/kernel/devtree.c   |  5 +++++
-> >  2 files changed, 15 insertions(+)
-> > 
-> > diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-> > index a219227..487614a 100644
-> > --- a/arch/arm/include/asm/prom.h
-> > +++ b/arch/arm/include/asm/prom.h
-> > @@ -18,6 +18,15 @@
-> >  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
-> >  extern void arm_dt_memblock_reserve(void);
-> >  extern void __init arm_dt_init_cpu_maps(void);
-> > +/*
-> > + * Return true if cpu map initialization has been
-> > + * carried out correctly from DT
-> > + */
-> > +static inline bool __init arm_dt_cpu_map_valid(void)
-> > +{
-> > +	extern bool valid_dt_cpu_map;
-> > +	return valid_dt_cpu_map;
-> > +}
-> >  
-> >  #else /* CONFIG_OF */
-> >  
-> > @@ -28,6 +37,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
-> >  
-> >  static inline void arm_dt_memblock_reserve(void) { }
-> >  static inline void arm_dt_init_cpu_maps(void) { }
-> > +static inline bool __init arm_dt_cpu_map_valid(void) { return false; }
-> >  
-> >  #endif /* CONFIG_OF */
-> >  #endif /* ASMARM_PROM_H */
-> > diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> > index 70f1bde..c82af3b 100644
-> > --- a/arch/arm/kernel/devtree.c
-> > +++ b/arch/arm/kernel/devtree.c
-> > @@ -62,6 +62,10 @@ void __init arm_dt_memblock_reserve(void)
-> >  		memblock_reserve(base, size);
-> >  	}
-> >  }
-> > +/*
-> > + * Export DT cpu map validity flag to platforms
-> > + */
-> > +bool valid_dt_cpu_map __initdata;
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 8 Jan 2013 23:49:27 +0100:
+
+> On 01/08/2013 05:47 AM, Hiroshi Doyu wrote:
+> > Initial support for Tegra 114 SoC. This is expected to be included in
+> > the board DTS files, Tegra 114 SoC based evaluation board family.
 > 
-> Is there any possibility of this being useful after boot?
-> Hopefully not, but maybe there's something I haven't considered.
+> > diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+> 
+> > +	gic: interrupt-controller {
+> > +		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+> > +		reg = <0x50041000 0x1000
+> > +		       0x50042000 0x1000>;
+> > +		interrupt-controller;
+> > +		#interrupt-cells = <3>;
+> > +	};
+> 
+> Last time around, Marc Zyngier asked:
+> 
+> > If this is indeed an A15 GIC, how about adding the GICH and GICV
+> > regions, as well as the VGIC maintenance interrupt?
 
-I do not think so, at least for the use cases I have envisaged at the moment,
-but it is certainly something I should consider.
+I missed to update. I'll update v3 as bellow.
 
-Thanks,
-Lorenzo
+	gic: interrupt-controller {
+		compatible = "arm,cortex-a15-gic";
+		#interrupt-cells = <3>;
+		interrupt-controller;
+		reg = <0x50041000 0x1000>,
+		      <0x50042000 0x1000>,
+		      <0x50044000 0x2000>,
+		      <0x50046000 0x2000>;
+		interrupts = <1 9 0xf04>;
+	};
