@@ -1,48 +1,52 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 10 Jan 2013 10:58:14 +0100
-Subject: [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB
-In-Reply-To: <50EE5D61.1020307@ti.com>
-References: <1348047128-25692-1-git-send-email-kishon@ti.com>
- <505A8BAB.2020004@ti.com> <20121227183524.GB7097@blackmetal.musicnaut.iki.fi>
- <50EE5D61.1020307@ti.com>
-Message-ID: <50EE90B6.2060308@ti.com>
+Date: Thu, 10 Jan 2013 11:04:13 +0100
+Subject: [PATCH 2/2] ARM: dts: omap: Add omap-usb2 dt data
+In-Reply-To: <50EE8A89.4010801@ti.com>
+References: <1348050772-27819-1-git-send-email-kishon@ti.com>
+ <1348050772-27819-3-git-send-email-kishon@ti.com> <50EE8A89.4010801@ti.com>
+Message-ID: <50EE921D.8020601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-On 01/10/2013 07:19 AM, kishon wrote:
-> On Friday 28 December 2012 12:05 AM, Aaro Koskinen wrote:
->> Hi,
+On 01/10/2013 10:31 AM, kishon wrote:
+> Hi Benoit,
+> 
+> On Wednesday 19 September 2012 04:02 PM, Kishon Vijay Abraham I wrote:
+>> Add omap-usb2 data node in omap4 device tree file. Since omap-usb2 is
+>> connected to ocp2scp, omap-usb2 dt data is added as a child node
+>> of ocp2scp.
 >>
->> On Thu, Sep 20, 2012 at 05:21:15AM +0200, Benoit Cousson wrote:
->>> On 09/19/2012 11:32 AM, Kishon Vijay Abraham I wrote:
->>>> This patch series adds dt data to get MUSB working in omap4 and omap3
->>>>
->>>> Changes from v2:
->>>> * Changes the subject of all the patches to include "ARM: dts:"
->>>> * Added reg property and interrupt property for "usb_otg_hs".
->>>> Previously these
->>>>    were obtained from ti,hwmods property.
->>>> * Rebased on
->>>>   
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
->>>> devel-dt
->>>>
->>>> Changes from v1:
->>>> Just removed the omap-usb2 dt data and sent that as a separate patch.
->>>>
->>>> Kishon Vijay Abraham I (3):
->>>>    ARM: dts: Add twl6030-usb data
->>>>    ARM: dts: Add twl4030-usb data
->>>>    ARM: dts: omap: Add usb_otg and glue data
->>>
->>> Thanks for the update. I've just pulled the series for 3.7.
+>> Acked-by: Felipe Balbi <balbi@ti.com>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> 
+> This patch is also missing in mainline :-(
+
+Well, in that case this was done on purpose :-)
+
+> 
+> Thanks
+> Kishon
+> 
+>> ---
+>>   arch/arm/boot/dts/omap4.dtsi |    5 +++++
+>>   1 file changed, 5 insertions(+)
 >>
->> I wonder what happened to the patch #3 (Add usb_otg and glue data)
->> of this series? Why was it dropped? I cannot see it in 3.7 or 3.8-rc1.
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index 4fbb9dc..28eaddc 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -303,6 +303,11 @@
+>>               #size-cells = <1>;
+>>               ranges;
+>>               ti,hwmods = "ocp2scp_usb_phy";
+>> +            usb2phy at 4a0ad080 {
+>> +                compatible = "ti,omap-usb2";
+>> +                reg = <0x4a0ad080 0x58>,
+>> +                      <0x4a002300 0x4>; /* TO BE REMOVED: SCM */
 
-I don't remember the context, can you repost it rebased on 3.8-rc2? Did
-it generate some discussion at that time?
+Rob and I did not agree to use that temp hack in the case of DT, so you
+were supposed to repost with a proper driver for the SCM part that
+control the USB.
 
+Regards,
 Benoit
