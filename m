@@ -1,245 +1,360 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 10 Jan 2013 17:34:22 +0900
-Subject: [PATCH 3/8] ARM: shmobile: Add support OF of INTC for sh7372
-In-Reply-To: <20130109111742.GA7337@e106331-lin.cambridge.arm.com>
-References: <1357713007-4005-1-git-send-email-horms+renesas@verge.net.au>
- <1357713007-4005-4-git-send-email-horms+renesas@verge.net.au>
- <20130109111742.GA7337@e106331-lin.cambridge.arm.com>
-Message-ID: <CANqRtoSNDtr2zPu0t0fCa7K7CEOtoLpHPdoVBWuJSFs0nCM32Q@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 Jan 2013 16:34:22 +0800
+Subject: [PATCH v2 1/2] cpufreq: add imx6q-cpufreq driver
+In-Reply-To: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
+References: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1357806863-6899-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Add an imx6q-cpufreq for Freescale i.MX6Q SoC to handle the hardware
+specific frequency and voltage scaling requirements.
 
-Thanks for your feedback!
+The driver supports module build and is instantiated by the platform
+device/driver mechanism, so that it will be instantiated on other
+platform, as IMX is built with multiplatform support.
 
-On Wed, Jan 9, 2013 at 8:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jan 09, 2013 at 06:30:02AM +0000, Simon Horman wrote:
->> From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
->>
->> This CPU has four interrupt controllers (INTCA, pins-High and pins-Low).
->> This supports these.
->> Note: This supports DT of INTCA only.
->>
->> Cc: Magnus Damm <damm@opensource.se>
->> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
->> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>
->> ---
->>
->> v9
->> * Update compatible string to use '-' instead of '_'
->> ---
->>  arch/arm/mach-shmobile/include/mach/common.h |    1 +
->>  arch/arm/mach-shmobile/intc-sh7372.c         |  113 ++++++++++++++++++++------
->>  2 files changed, 89 insertions(+), 25 deletions(-)
->>
->> diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
->> index d0a5790..223250b 100644
->> --- a/arch/arm/mach-shmobile/include/mach/common.h
->> +++ b/arch/arm/mach-shmobile/include/mach/common.h
->> @@ -18,6 +18,7 @@ extern int shmobile_enter_wfi(struct cpuidle_device *dev,
->>                             struct cpuidle_driver *drv, int index);
->>  extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
->>
->> +extern void sh7372_init_irq_of(void);
->>  extern void sh7372_init_irq(void);
->>  extern void sh7372_map_io(void);
->>  extern void sh7372_add_early_devices(void);
->> diff --git a/arch/arm/mach-shmobile/intc-sh7372.c b/arch/arm/mach-shmobile/intc-sh7372.c
->> index a91caad..bbde18d 100644
->> --- a/arch/arm/mach-shmobile/intc-sh7372.c
->> +++ b/arch/arm/mach-shmobile/intc-sh7372.c
->> @@ -16,6 +16,8 @@
->>   * along with this program; if not, write to the Free Software
->>   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
->>   */
->> +#define pr_fmt(fmt) "intc: " fmt
->> +
->>  #include <linux/kernel.h>
->>  #include <linux/init.h>
->>  #include <linux/interrupt.h>
->> @@ -551,23 +553,28 @@ static void intcs_demux(unsigned int irq, struct irq_desc *desc)
->>
->>  static void __iomem *intcs_ffd2;
->>  static void __iomem *intcs_ffd5;
->> -
->> -void __init sh7372_init_irq(void)
->> +static void __iomem *intca_e694;
->> +static void __iomem *intca_e695;
->> +
->> +static void __init sh7372_init_intc(resource_size_t intca0_start,
->> +                                 resource_size_t intca1_start,
->> +                                 resource_size_t intcs0_start,
->> +                                 resource_size_t intcs1_start,
->> +                                 unsigned short vect)
->>  {
->>       void __iomem *intevtsa;
->>       int n;
->>
->> -     intcs_ffd2 = ioremap_nocache(0xffd20000, PAGE_SIZE);
->> -     intevtsa = intcs_ffd2 + 0x100;
->> -     intcs_ffd5 = ioremap_nocache(0xffd50000, PAGE_SIZE);
->> +     intca_e694 = IOMEM(intca0_start);
->> +     intca_e695 = IOMEM(intca1_start);
->>
->> -     register_intc_controller(&intca_desc);
->> -     register_intc_controller(&intca_irq_pins_lo_desc);
->> -     register_intc_controller(&intca_irq_pins_hi_desc);
->> -     register_intc_controller(&intcs_desc);
->> +     intcs_ffd2 = ioremap_nocache(intcs0_start, PAGE_SIZE);
->> +     intevtsa = intcs_ffd2 + 0x100;
->> +     intcs_ffd5 = ioremap_nocache(intcs1_start, PAGE_SIZE);
->
-> I think you need to check the return value of ioremap_nocache (it looks like it
-> could return NULL), but I'm not certain of its semantics.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/cpufreq/Kconfig.arm     |    9 ++
+ drivers/cpufreq/Makefile        |    1 +
+ drivers/cpufreq/imx6q-cpufreq.c |  296 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 306 insertions(+)
+ create mode 100644 drivers/cpufreq/imx6q-cpufreq.c
 
-I guess we could, but I suppose it is somewhat unclear how we shall
-proceed in the case of failure.
-
-But regardless, this is not really changing any logic in the current code.
-
->>
->>       /* setup dummy cascade chip for INTCS */
->> -     n = evt2irq(0xf80);
->> +     n = evt2irq(vect);
->> +
->>       irq_alloc_desc_at(n, numa_node_id());
->>       irq_set_chip_and_handler_name(n, &dummy_irq_chip,
->>                                     handle_level_irq, "level");
->> @@ -581,6 +588,65 @@ void __init sh7372_init_irq(void)
->>       iowrite16(0, intcs_ffd2 + 0x104);
->>  }
->>
->> +#ifdef CONFIG_OF
->> +static unsigned short intevtsa_vect;
->> +
->> +#define INTC_RES_MAX 2
->> +static struct {
->> +     struct intc_desc intc_desc;
->> +     struct resource intc_res[INTC_RES_MAX];
->> +} intc_data __initdata;
->> +
->> +static int __init intc_of_init(struct device_node *np,
->> +                            struct device_node *parent)
->> +{
->> +     int ret, i;
->> +
->> +     memset(&intc_data, 0, sizeof(intc_data));
->> +
->> +     for (i = 0; i < INTC_RES_MAX; i++) {
->> +             ret = of_address_to_resource(np, i, &intc_data.intc_res[i]);
->> +             if (ret < 0)
->> +                     break;
->> +     }
->> +
->> +     intc_data.intc_desc.name = (char *)of_node_full_name(np);
->> +     intc_data.intc_desc.resource = intc_data.intc_res;
->> +     intc_data.intc_desc.num_resources = i;
->> +
->> +     ret = of_sh_intc_get_intc(np, &intc_data.intc_desc);
->> +     if (ret)
->> +             return ret;
->> +
->> +     of_sh_intc_get_intevtsa_vect(np, &intevtsa_vect);
->> +
->> +     register_intc_controller(&intc_data.intc_desc);
->> +     return 0;
->> +}
->
-> You seem to have the same code for r8a7740. They should be consolidated.
-
-The plan is to consolidate part of this code. There is also a chained
-interrupt handler that needs a bit more work, so we prefer to figure
-out how to tie in GIC platforms first then merge code together.
-
->> +
->> +static const struct of_device_id irq_of_match[] __initconst = {
->> +     { .compatible = "renesas,sh-intc", .data = intc_of_init },
->> +     { /*sentinel*/ }
->> +};
->> +
->> +void __init sh7372_init_irq_of(void)
->> +{
->> +     of_irq_init(irq_of_match);
->> +
->> +     register_intc_controller(&intcs_desc);
->
-> What if of_irq_init fails?
-
-Good question. Perhaps Iwamatsu-san can answer that. =)
-
->> +}
->> +#endif /* CONFIG_OF */
->> +
->> +void __init sh7372_init_irq(void)
->> +{
->> +     register_intc_controller(&intca_desc);
->> +     register_intc_controller(&intca_irq_pins_lo_desc);
->> +     register_intc_controller(&intca_irq_pins_hi_desc);
->> +     register_intc_controller(&intcs_desc);
->> +
->> +     sh7372_init_intc(0xe6940000, 0xe6950000, 0xffd20000, 0xffd50000, 0xf80);
->
-> It might be better if these magic numbers were macro'd out for legibility.
-
-Sure, why not?
-
->> +}
->> +
->>  static unsigned short ffd2[0x200];
->>  static unsigned short ffd5[0x100];
->>
->> @@ -624,9 +690,6 @@ void sh7372_intcs_resume(void)
->>               __raw_writeb(ffd5[k], intcs_ffd5 + k);
->>  }
->>
->> -#define E694_BASE IOMEM(0xe6940000)
->> -#define E695_BASE IOMEM(0xe6950000)
->> -
->>  static unsigned short e694[0x200];
->>  static unsigned short e695[0x200];
->>
->> @@ -635,22 +698,22 @@ void sh7372_intca_suspend(void)
->>       int k;
->>
->>       for (k = 0x00; k <= 0x38; k += 4)
->> -             e694[k] = __raw_readw(E694_BASE + k);
->> +             e694[k] = __raw_readw(intca_e694 + k);
->>
->>       for (k = 0x80; k <= 0xb4; k += 4)
->> -             e694[k] = __raw_readb(E694_BASE + k);
->> +             e694[k] = __raw_readb(intca_e694 + k);
->>
->>       for (k = 0x180; k <= 0x1b4; k += 4)
->> -             e694[k] = __raw_readb(E694_BASE + k);
->> +             e694[k] = __raw_readb(intca_e694 + k);
->>
->>       for (k = 0x00; k <= 0x50; k += 4)
->> -             e695[k] = __raw_readw(E695_BASE + k);
->> +             e695[k] = __raw_readw(intca_e695 + k);
->>
->>       for (k = 0x80; k <= 0xa8; k += 4)
->> -             e695[k] = __raw_readb(E695_BASE + k);
->> +             e695[k] = __raw_readb(intca_e695 + k);
->>
->>       for (k = 0x180; k <= 0x1a8; k += 4)
->> -             e695[k] = __raw_readb(E695_BASE + k);
->> +             e695[k] = __raw_readb(intca_e695 + k);
->>  }
->
-> I'm unfamiliar with the hardware, what are these registers being iterated over?
->
-> How do they correspond to entries in the binding?
-
-This is rather crude code to save and restore various registers that
-will be reset when the power domain is turned off. Ideally we want
-something more generic, but at this point the code exists and works.
-Perhaps in the long run we should follow the same style as the GIC.
-
-I hope that Iwamatsu-san (the original author) will follow up on this
-and post an incremental patch to fix things.
-
-Thanks,
-
-/ magnus
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index a0b3661..9e628ba 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -77,6 +77,15 @@ config ARM_EXYNOS5250_CPUFREQ
+ 	  This adds the CPUFreq driver for Samsung EXYNOS5250
+ 	  SoC.
+ 
++config ARM_IMX6Q_CPUFREQ
++	tristate "Freescale i.MX6Q cpufreq support"
++	depends on SOC_IMX6Q
++	depends on REGULATOR_ANATOP
++	help
++	  This adds cpufreq driver support for Freescale i.MX6Q SOC.
++
++	  If in doubt, say N.
++
+ config ARM_SPEAR_CPUFREQ
+ 	bool "SPEAr CPUFreq support"
+ 	depends on PLAT_SPEAR
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index 1f254ec0..31699a0 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -49,6 +49,7 @@ obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
++obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
+ obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)     += omap-cpufreq.o
+ obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
+ 
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+new file mode 100644
+index 0000000..218d8f1
+--- /dev/null
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -0,0 +1,296 @@
++/*
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/clk.h>
++#include <linux/cpu.h>
++#include <linux/cpufreq.h>
++#include <linux/err.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/opp.h>
++#include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
++#include <linux/slab.h>
++
++#define PU_SOC_VOLTAGE_NORMAL	1250000
++#define PU_SOC_VOLTAGE_HIGH	1275000
++#define FREQ_1P2_GHZ		1200000000
++
++static struct regulator *arm_reg;
++static struct regulator *pu_reg;
++static struct regulator *soc_reg;
++
++static struct clk *arm_clk;
++static struct clk *pll1_sys_clk;
++static struct clk *pll1_sw_clk;
++static struct clk *step_clk;
++static struct clk *pll2_pfd2_396m_clk;
++
++static struct device *cpu_dev;
++static struct cpufreq_frequency_table *freq_table;
++static unsigned int transition_latency;
++
++static int imx6q_verify_speed(struct cpufreq_policy *policy)
++{
++	return cpufreq_frequency_table_verify(policy, freq_table);
++}
++
++static unsigned int imx6q_get_speed(unsigned int cpu)
++{
++	return clk_get_rate(arm_clk) / 1000;
++}
++
++static int imx6q_set_target(struct cpufreq_policy *policy,
++			    unsigned int target_freq, unsigned int relation)
++{
++	struct cpufreq_freqs freqs;
++	struct opp *opp;
++	unsigned long freq_hz, volt, volt_old;
++	unsigned int index, cpu;
++	int ret;
++
++	ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
++					     relation, &index);
++	if (ret) {
++		dev_err(cpu_dev, "failed to match target frequency %d: %d\n",
++			target_freq, ret);
++		return ret;
++	}
++
++	freqs.new = freq_table[index].frequency;
++	freq_hz = freqs.new * 1000;
++	freqs.old = clk_get_rate(arm_clk) / 1000;
++
++	if (freqs.old == freqs.new)
++		return 0;
++
++	for_each_online_cpu(cpu) {
++		freqs.cpu = cpu;
++		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++	}
++
++	opp = opp_find_freq_ceil(cpu_dev, &freq_hz);
++	if (IS_ERR(opp)) {
++		dev_err(cpu_dev, "failed to find OPP for %ld\n", freq_hz);
++		return PTR_ERR(opp);
++	}
++
++	volt = opp_get_voltage(opp);
++	volt_old = regulator_get_voltage(arm_reg);
++
++	dev_dbg(cpu_dev, "%u MHz, %ld mV --> %u MHz, %ld mV\n",
++		freqs.old / 1000, volt_old / 1000,
++		freqs.new / 1000, volt / 1000);
++
++	/* scaling up?  scale voltage before frequency */
++	if (freqs.new > freqs.old) {
++		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
++		if (ret) {
++			dev_err(cpu_dev, "failed to scale voltage up: %d\n", ret);
++			return ret;
++		}
++
++		/*
++		 * Need to increase vddpu and vddsoc for safety
++		 * if we are about to run at 1.2 GHz.
++		 */
++		if (freqs.new == FREQ_1P2_GHZ / 1000) {
++			regulator_set_voltage_tol(pu_reg,
++					PU_SOC_VOLTAGE_HIGH, 0);
++			regulator_set_voltage_tol(soc_reg,
++					PU_SOC_VOLTAGE_HIGH, 0);
++		}
++	}
++
++	/*
++	 * The setpoints are selected per PLL/PDF frequencies, so we need to
++	 * reprogram PLL for frequency scaling.  The procedure of reprogramming
++	 * PLL1 is as below.
++	 *
++	 *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
++	 *  - Disable pll1_sys_clk and reprogram it
++	 *  - Enable pll1_sys_clk and reparent pll1_sw_clk back to it
++	 *  - Disable pll2_pfd2_396m_clk
++	 */
++	clk_prepare_enable(pll2_pfd2_396m_clk);
++	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
++	clk_set_parent(pll1_sw_clk, step_clk);
++	clk_prepare_enable(pll1_sys_clk);
++	if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
++		clk_disable_unprepare(pll1_sys_clk);
++		clk_set_rate(pll1_sys_clk, freqs.new * 1000);
++		clk_prepare_enable(pll1_sys_clk);
++		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
++		clk_disable_unprepare(pll2_pfd2_396m_clk);
++	} else {
++		/*
++		 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
++		 * to provide the frequency.
++		 */
++		clk_disable_unprepare(pll1_sys_clk);
++	}
++
++	/* Ensure the arm clock divider is what we expect */
++	ret = clk_set_rate(arm_clk, freqs.new * 1000);
++	if (ret) {
++		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
++		regulator_set_voltage_tol(arm_reg, volt_old, 0);
++		return ret;
++	}
++
++	/* scaling down?  scale voltage after frequency */
++	if (freqs.new < freqs.old) {
++		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
++		if (ret)
++			dev_warn(cpu_dev, "failed to scale voltage down: %d\n", ret);
++
++		if (freqs.old == FREQ_1P2_GHZ / 1000) {
++			regulator_set_voltage_tol(pu_reg,
++					PU_SOC_VOLTAGE_NORMAL, 0);
++			regulator_set_voltage_tol(soc_reg,
++					PU_SOC_VOLTAGE_NORMAL, 0);
++		}
++	}
++
++	for_each_online_cpu(cpu) {
++		freqs.cpu = cpu;
++		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++	}
++
++	return 0;
++}
++
++static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
++{
++	int ret;
++
++	ret = cpufreq_frequency_table_cpuinfo(policy, freq_table);
++	if (ret) {
++		dev_err(cpu_dev, "invalid frequency table: %d\n", ret);
++		return ret;
++	}
++
++	policy->cpuinfo.transition_latency = transition_latency;
++	policy->cur = clk_get_rate(arm_clk) / 1000;
++	policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
++	cpumask_setall(policy->cpus);
++	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
++
++	return 0;
++}
++
++static int imx6q_cpufreq_exit(struct cpufreq_policy *policy)
++{
++	cpufreq_frequency_table_put_attr(policy->cpu);
++	return 0;
++}
++
++static struct freq_attr *imx6q_cpufreq_attr[] = {
++	&cpufreq_freq_attr_scaling_available_freqs,
++	NULL,
++};
++
++static struct cpufreq_driver imx6q_cpufreq_driver = {
++	.verify = imx6q_verify_speed,
++	.target = imx6q_set_target,
++	.get = imx6q_get_speed,
++	.init = imx6q_cpufreq_init,
++	.exit = imx6q_cpufreq_exit,
++	.name = "imx6q-cpufreq",
++	.attr = imx6q_cpufreq_attr,
++};
++
++static int imx6q_cpufreq_probe(struct platform_device *pdev)
++{
++	struct device_node *np;
++	int ret;
++
++	cpu_dev = &pdev->dev;
++
++	np = of_find_node_by_path("/cpus/cpu at 0");
++	if (!np) {
++		dev_err(cpu_dev, "failed to find cpu0 node\n");
++		return -ENOENT;
++	}
++
++	cpu_dev->of_node = np;
++
++	arm_clk = devm_clk_get(cpu_dev, "arm");
++	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
++	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
++	step_clk = devm_clk_get(cpu_dev, "step");
++	pll2_pfd2_396m_clk = devm_clk_get(cpu_dev, "pll2_pfd2_396m");
++	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
++	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
++		dev_err(cpu_dev, "failed to get clocks\n");
++		ret = -ENOENT;
++		goto put_node;
++	}
++
++	arm_reg = devm_regulator_get(cpu_dev, "arm");
++	pu_reg = devm_regulator_get(cpu_dev, "pu");
++	soc_reg = devm_regulator_get(cpu_dev, "soc");
++	if (!arm_reg || !pu_reg || !soc_reg) {
++		dev_err(cpu_dev, "failed to get regulators\n");
++		ret = -ENOENT;
++		goto put_node;
++	}
++
++	/* We expect an OPP table supplied by platform */
++	ret = opp_get_opp_count(cpu_dev);
++	if (ret < 0) {
++		dev_err(cpu_dev, "no OPP table is found: %d\n", ret);
++		goto put_node;
++	}
++
++	ret = opp_init_cpufreq_table(cpu_dev, &freq_table);
++	if (ret) {
++		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
++		goto put_node;
++	}
++
++	if (of_property_read_u32(np, "clock-latency", &transition_latency))
++		transition_latency = CPUFREQ_ETERNAL;
++
++	ret = cpufreq_register_driver(&imx6q_cpufreq_driver);
++	if (ret) {
++		dev_err(cpu_dev, "failed register driver: %d\n", ret);
++		goto free_freq_table;
++	}
++
++	of_node_put(np);
++	return 0;
++
++free_freq_table:
++	opp_free_cpufreq_table(cpu_dev, &freq_table);
++put_node:
++	of_node_put(np);
++	return ret;
++}
++
++static int imx6q_cpufreq_remove(struct platform_device *pdev)
++{
++	cpufreq_unregister_driver(&imx6q_cpufreq_driver);
++	opp_free_cpufreq_table(cpu_dev, &freq_table);
++
++	return 0;
++}
++
++static struct platform_driver imx6q_cpufreq_platdrv = {
++	.driver = {
++		.name	= "imx6q-cpufreq",
++		.owner	= THIS_MODULE,
++	},
++	.probe		= imx6q_cpufreq_probe,
++	.remove		= imx6q_cpufreq_remove,
++};
++module_platform_driver(imx6q_cpufreq_platdrv);
++
++MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
++MODULE_DESCRIPTION("Freescale i.MX6Q cpufreq driver");
++MODULE_LICENSE("GPL");
+-- 
+1.7.9.5
