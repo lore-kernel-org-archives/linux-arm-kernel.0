@@ -1,52 +1,91 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 9 Jan 2013 21:29:26 -0500
-Subject: [PATCH v2 15/20] arm: kirkwood: topkick: the Topkick platform
- uses a 88F6282 SoC
-In-Reply-To: <1356101359-6054-16-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1356101359-6054-16-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130110022926.GH5075@titan.lakedaemon.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 Jan 2013 10:45:45 +0800
+Subject: [PATCH 4/4] ARM i.MX53: dts: add oftree for MBa53 baseboard
+In-Reply-To: <1357739065-9153-5-git-send-email-s.trumtrar@pengutronix.de>
+References: <1357739065-9153-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1357739065-9153-5-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20130110024543.GE2265@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 21, 2012 at 03:49:14PM +0100, Thomas Petazzoni wrote:
-> The Topkick board uses a 88F6282 SoC, so the Device Tree Source
-> describing the Topkick should inherit from kirkwood-6282.dtsi, which
-> allows to take advantage of pin muxing capabilities.
+On Wed, Jan 09, 2013 at 02:44:25PM +0100, Steffen Trumtrar wrote:
+> The MBa53 is a baseboard for the TQMA53 embedded module. This enables/adds only
+> supported devices, i.e. it is not feature complete, because of missing drivers
+> in mainline linux.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 > ---
-> Changes since v1:
->  * This patch is new in v2
-> ---
->  arch/arm/boot/dts/kirkwood-topkick.dts |    1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/Makefile        |    1 +
+>  arch/arm/boot/dts/imx53-MBa53.dts |  146 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 147 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx53-MBa53.dts
 > 
-> diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-> index c0de5a7..8f4a5b8 100644
-> --- a/arch/arm/boot/dts/kirkwood-topkick.dts
-> +++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-> @@ -1,6 +1,7 @@
->  /dts-v1/;
->  
->  /include/ "kirkwood.dtsi"
-> +/include/ "kirkwood-6282.dtsi"
+I do not like the CamelCase in filename, and do not want to be the first
+one doing that in  arch/arm/boot/dts.
 
-Hmmm, shouldn't the cooresponding MPP.._GPIO and kirkwood_mpp_conf() be
-removed as well?
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index e44da40..04b05e8 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -84,6 +84,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+>  	imx53-evk.dtb \
+>  	imx53-qsb.dtb \
+>  	imx53-smd.dtb \
+> +	imx53-MBa53.dtb \
 
-thx,
+Change it to lower case and sort it properly.
 
-Jason.
+>  	imx6q-arm2.dtb \
+>  	imx6q-sabreauto.dtb \
+>  	imx6q-sabrelite.dtb \
+> diff --git a/arch/arm/boot/dts/imx53-MBa53.dts b/arch/arm/boot/dts/imx53-MBa53.dts
+> new file mode 100644
+> index 0000000..39ecaeb
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx53-MBa53.dts
+> @@ -0,0 +1,146 @@
+> +/*
+> + * Copyright 2012 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx53-tqma53.dtsi"
+> +
+> +/ {
+> +	model = "TQ MBa53 starter kit";
+> +	compatible = "tq,mba53", "tq,tqma53", "fsl,imx53";
+> +
+> +	backlight_reg:fixed at 0 {
 
->  
->  / {
->  	model = "Univeral Scientific Industrial Co. Topkick-1281P2";
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The node name is not good.  Also we generally have a space between
+label and node names.
+
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "lcd-supply";
+> +		gpio = <&gpio2 5 0>;
+> +		startup-delay-us = <5000>;
+> +		enable-active-low;
+> +        };
+
+Use tab instead of space.
+
+> +
+> +	backlight {
+> +		compatible = "pwm-backlight";
+> +		pwms = <&pwm2 0 50000 0 0>;
+> +		brightness-levels = <0 24 28 32 36 40 44 48 52 56 60 64 68 72 76 80 84 88 92 96 100>;
+> +		default-brightness-level = <10>;
+> +		enable-gpios = <&gpio7 7 0>;
+> +		power-supply = <&backlight_reg>;
+> +        };
+
+Ditto
+
+Shawn
