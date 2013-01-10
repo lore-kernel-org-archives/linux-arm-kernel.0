@@ -1,49 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 Jan 2013 19:07:45 +0800
-Subject: [PATCH v2 2/2] ARM: imx: enable imx6q-cpufreq support
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ECDF7BF@DBDE01.ent.ti.com>
-References: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
- <1357806863-6899-3-git-send-email-shawn.guo@linaro.org>
- <B5906170F1614E41A8A28DE3B8D121433ECDF7BF@DBDE01.ent.ti.com>
-Message-ID: <20130110110742.GI2265@S2101-09.ap.freescale.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 10 Jan 2013 12:10:38 +0100
+Subject: [RFC PATCH 1/7] ARM: common: vic: Parse interrupt and resume
+ masks from device tree
+In-Reply-To: <20130110110314.GH20956@opensource.wolfsonmicro.com>
+References: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
+ <1357774909-29938-2-git-send-email-tomasz.figa@gmail.com>
+ <20130110110314.GH20956@opensource.wolfsonmicro.com>
+Message-ID: <25622346.hsAr9IOJWj@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 10:50:25AM +0000, Bedia, Vaibhav wrote:
-...
-> > +static void __init imx6q_opp_check_1p2ghz(struct device *cpu_dev)
-> > +{
-> > +	struct device_node *np;
-> > +	void __iomem *base;
-> > +	u32 val;
-> > +
-> > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ocotp");
-> > +	if (!np) {
-> > +		pr_warn("failed to find ocotp node\n");
-> > +		return;
-> > +	}
-> > +
-> > +	base = of_iomap(np, 0);
-> > +	if (!base) {
-> > +		pr_warn("failed to map ocotp\n");
-> > +		goto put_node;
-> > +	}
-> > +
-> > +	val = readl_relaxed(base + OCOTP_CFG3);
-> > +	val >>= OCOTP_CFG3_SPEED_SHIFT;
-> > +	if ((val & 0x3) == OCOTP_CFG3_SPEED_1P2GHZ)
-> > +		if (opp_add(cpu_dev, 1200000000, 1275000))
-> > +			pr_warn("failed to add 1.2 GHz operating point\n");
-> > +
+On Thursday 10 of January 2013 11:03:14 Mark Brown wrote:
+> On Thu, Jan 10, 2013 at 12:41:43AM +0100, Tomasz Figa wrote:
+> > +- interrupt-mask : Bit mask of valid interrupt sources (defaults to
+> > all valid) +- wakeup-mask : Bit mask of interrupt sources that can
+> > wake up the system +  (defaults to all allowed)
 > 
-> I just happened to be thinking about the problem of enabling additional OPPs based on
-> some Si rev info for TI's AM335x. 
-> 
-> The other approach could be to register additional OPPs and mark then as disabled to begin with.
-> A platform specific hook could then be used to selectively enable the OPPs for based on the Si rev
-> info.
+> Should this really be configured in the VIC itself?  It seems like
+> something that might change at runtime (for example, due to the user
+> configuring wakes in sysfs).
 
-May I ask the advantage of this approach?  I hate to create
-platform_data merely for passing a platform specific hook to driver.
+This is not the runtime interrupt/wakeup mask, but a global mask of 
+available interrupt/wakeup lines on particular platform, which still have 
+to be configured and enabled appropriately by user.
 
-Shawn
+Best regards,
+Tomasz Figa
