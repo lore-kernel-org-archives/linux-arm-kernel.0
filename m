@@ -1,35 +1,25 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 10 Jan 2013 11:52:22 +0100
-Subject: some question about usermode:kernel mode is not 2:2 or 1:3
-In-Reply-To: <CANudz+snNE9shBTosbVK+xV9P0NPNPR3OH3z5ey=+u_FcFTrkQ@mail.gmail.com>
-References: <CANudz+snNE9shBTosbVK+xV9P0NPNPR3OH3z5ey=+u_FcFTrkQ@mail.gmail.com>
-Message-ID: <5478233.oiXe2QDsbJ@flatron>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 10 Jan 2013 10:52:22 +0000
+Subject: [RFC PATCH 5/7] ARM: s3c64xx: Add board file for boot using
+ Device Tree
+In-Reply-To: <1357774909-29938-6-git-send-email-tomasz.figa@gmail.com>
+References: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
+ <1357774909-29938-6-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20130110105221.GG20956@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 10, 2013 at 12:41:47AM +0100, Tomasz Figa wrote:
 
-On Thursday 10 of January 2013 18:39:25 loody wrote:
-> hi all:
-> There are some hw limitations on my platform.
-> 1. dram size is only 128MB.
-> 2. cpu dram physical address range only from 0x0 ~ 0x8000000(128MB)
->     that means my PAGE_OFFSET cannot set as 2G or 3G
-> 
-> per above #1 and #2 limitation, I have to change  PAGE_OFFSET =
-> 0x4000000(64MB) Kernel booting very well.
-> but it will fail on running init, the first usermode program.
-> 
-> my question are:
-> A. I use codesourcety toolchain, is it possible this failure due to
-> toolchain not knowing the size limitation.
-> B. if A is correct, should I cross-compile own toolchain to link my own
-> kernel?
+> + * The following lookup table is used to override device names when devices
+> + * are registered from device tree. This is temporarily added to enable
+> + * device tree support addition for the Exynos4 architecture.
 
-You seem to confuse physical memory with virtual memory. Here's a nice 
-article about virtual memory on Linux:
-
-http://linux-mm.org/VirtualMemory
-
-Best regards,
-Tomasz Figa
+Cut'n'paste.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/1b0db75f/attachment.sig>
