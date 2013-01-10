@@ -1,139 +1,145 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 10 Jan 2013 15:03:50 +0100
-Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
- HAVE_ARM_SCU
-In-Reply-To: <20130110134723.GF4728@e102568-lin.cambridge.arm.com>
-References: <20130109151700.GB22147@e102568-lin.cambridge.arm.com><20130110.145813.1159140334089730421.hdoyu@nvidia.com><20130110134723.GF4728@e102568-lin.cambridge.arm.com>
-Message-ID: <20130110.160350.1128715111526546076.hdoyu@nvidia.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 10 Jan 2013 15:09:21 +0100
+Subject: [PATCH v3 06/18] ARM: clps711x: cdb89712: Special driver for
+ handling memory is removed
+In-Reply-To: <1353160644-22446-7-git-send-email-shc_work@mail.ru>
+References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
+ <1353160644-22446-7-git-send-email-shc_work@mail.ru>
+Message-ID: <20130110140921.GC14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Thu, 10 Jan 2013 14:47:23 +0100:
+Hello,
 
-> On Thu, Jan 10, 2013 at 12:58:13PM +0000, Hiroshi Doyu wrote:
-> > Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Wed, 9 Jan 2013 16:17:00 +0100:
-> > 
-> > ....
-> > 
-> > > > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-> > > > index 68e76ef..51d24ae 100644
-> > > > --- a/arch/arm/mach-tegra/platsmp.c
-> > > > +++ b/arch/arm/mach-tegra/platsmp.c
-> > > > @@ -152,7 +152,7 @@ done:
-> > > >   * Initialise the CPU possible map early - this describes the CPUs
-> > > >   * which may be present or become present in the system.
-> > > >   */
-> > > > -static void __init tegra_smp_init_cpus(void)
-> > > > +static void __init tegra_smp_detect_cores(void)
-> > > >  {
-> > > >  	unsigned int i, cpu_id, ncores;
-> > > >  	u32 l2ctlr;
-> > > > @@ -183,6 +183,12 @@ static void __init tegra_smp_init_cpus(void)
-> > > >  
-> > > >  	for (i = 0; i < ncores; i++)
-> > > >  		set_cpu_possible(i, true);
-> > > > +}
-> > > > +
-> > > > +static void __init tegra_smp_init_cpus(void)
-> > > > +{
-> > > > +	if (!num_possible_cpus())
-> > > > +		tegra_smp_detect_cores();
-> > > 
-> > > Thought about this, I would prefer writing an inline function that
-> > > provides this information (DT missing /cpu information or parsing failure)
-> > > instead of relying on num_possible_cpus to be == 0 as a way to check that.
-> > 
-> > With your "[PATCH] ARM: kernel: DT cpu map validity check helper
-> > function", my original patch gets as below. I think that the following
-> > "smp_detect_ncores()" function may be so generic that it could be
-> > moved in some common place than platform?
-> 
-> Possibly, but I have still some comments to add.
-> 
-> > 
-> > From f5f2a43952ce75fe061b3808b994c3ceb07f1af1 Mon Sep 17 00:00:00 2001
-> > From: Hiroshi Doyu <hdoyu@nvidia.com>
-> > Date: Mon, 26 Nov 2012 12:25:14 +0200
-> > Subject: [PATCH 1/1] ARM: tegra: # of CPU cores detection w/ & w/o
-> >  HAVE_ARM_SCU
-> > 
-> > The method to detect the number of CPU cores on Cortex-A9 MPCore and
-> > Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
-> > information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
-> > have to read it from the system coprocessor(CP15), because the SCU on
-> > Cortex-A15 MPCore does not have software readable registers. This
-> > patch selects the correct method at runtime based on the CPU ID.
-> > 
-> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > ---
-> >  arch/arm/mach-tegra/platsmp.c |   54 ++++++++++++++++++++++++++++++++---------
-> >  1 file changed, 43 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-> > index 6867030..9a1324a 100644
-> > --- a/arch/arm/mach-tegra/platsmp.c
-> > +++ b/arch/arm/mach-tegra/platsmp.c
-> > @@ -24,6 +24,8 @@
-> >  #include <asm/mach-types.h>
-> >  #include <asm/smp_scu.h>
-> >  #include <asm/smp_plat.h>
-> > +#include <asm/cputype.h>
-> > +#include <asm/prom.h>
-> >  
-> >  #include <mach/powergate.h>
-> >  
-> > @@ -38,7 +40,7 @@
-> >  extern void tegra_secondary_startup(void);
-> >  
-> >  static cpumask_t tegra_cpu_init_mask;
-> > -static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
-> > +static void __iomem *scu_base;
-> >  
-> >  #define EVP_CPU_RESET_VECTOR \
-> >  	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
-> > @@ -177,23 +179,52 @@ done:
-> >  	return status;
-> >  }
-> >  
-> > +static int __init smp_detect_ncores(void)
-> > +{
-> > +	unsigned int ncores, mpidr;
-> > +	u32 l2ctlr;
-> > +	phys_addr_t pa;
-> > +
-> > +	mpidr = read_cpuid_mpidr();
-> > +	switch (mpidr) {
-> > +	case ARM_CPU_PART_CORTEX_A15:
-> > +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
-> > +		ncores = ((l2ctlr >> 24) & 3) + 1;
-> > +		break;
-> 
-> I do not want to see the case above merged. We keep the existing legacy
-> methods there for legacy reasons and as a fall-back mechanism but I am not
-> keen on adding new HW probing code to detect the number of cores.
-> 
-> From A15/A7 onwards DT-only cpu map initialization is the way to go.
+I just stumbled over commit 86449336dd3c6e0edf97b971db2daa88917c1d7e
+(contained in v3.8-rc1) which is the result of this patch submission. So
+it's too late for a review comment, so if you care about my concerns you
+need to follow up with a new patch.
 
-Ok, then, smp_detect_ncores(void) could be...
+On Sat, Nov 17, 2012 at 05:57:12PM +0400, Alexander Shiyan wrote:
+> This patch provide migration to using "physmap-flash" and "mtd-ram"
+> drivers instead of using special driver for handling memory.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-clps711x/cdb89712.c              |   84 +++++++
+>  arch/arm/mach-clps711x/include/mach/hardware.h |    3 +
+>  drivers/mtd/maps/Kconfig                       |    7 -
+>  drivers/mtd/maps/Makefile                      |    1 -
+>  drivers/mtd/maps/cdb89712.c                    |  278 ------------------------
+>  5 files changed, 87 insertions(+), 286 deletions(-)
+>  delete mode 100644 drivers/mtd/maps/cdb89712.c
+> 
+> diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
+> index 235e625..24f573b 100644
+> --- a/arch/arm/mach-clps711x/cdb89712.c
+> +++ b/arch/arm/mach-clps711x/cdb89712.c
+> @@ -26,6 +26,10 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/platform_device.h>
+>  
+> +#include <linux/mtd/physmap.h>
+> +#include <linux/mtd/plat-ram.h>
+> +#include <linux/mtd/partitions.h>
+> +
+>  #include <mach/hardware.h>
+>  #include <asm/pgtable.h>
+>  #include <asm/page.h>
+> @@ -44,8 +48,88 @@ static struct resource cdb89712_cs8900_resource[] __initdata = {
+>  	DEFINE_RES_IRQ(CDB89712_CS8900_IRQ),
+>  };
+>  
+> +static struct mtd_partition cdb89712_flash_partitions[] __initdata = {
+> +	{
+> +		.name	= "Flash",
+> +		.offset	= 0,
+> +		.size	= MTDPART_SIZ_FULL,
+> +	},
+> +};
+> +
+> +static struct physmap_flash_data cdb89712_flash_pdata __initdata = {
+> +	.width		= 4,
+> +	.probe_type	= "map_rom",
+> +	.parts		= cdb89712_flash_partitions,
+> +	.nr_parts	= ARRAY_SIZE(cdb89712_flash_partitions),
+> +};
+> +
+> +static struct resource cdb89712_flash_resources[] __initdata = {
+> +	DEFINE_RES_MEM(CS0_PHYS_BASE, SZ_8M),
+> +};
+> +
+> +static struct platform_device cdb89712_flash_pdev __initdata = {
+> +	.name		= "physmap-flash",
+> +	.id		= 0,
+> +	.resource	= cdb89712_flash_resources,
+> +	.num_resources	= ARRAY_SIZE(cdb89712_flash_resources),
+> +	.dev	= {
+> +		.platform_data	= &cdb89712_flash_pdata,
+> +	},
+> +};
+> +
+> +static struct mtd_partition cdb89712_bootrom_partitions[] __initdata = {
+> +	{
+> +		.name	= "BootROM",
+> +		.offset	= 0,
+> +		.size	= MTDPART_SIZ_FULL,
+> +	},
+> +};
+> +
+> +static struct physmap_flash_data cdb89712_bootrom_pdata __initdata = {
+> +	.width		= 4,
+> +	.probe_type	= "map_rom",
+> +	.parts		= cdb89712_bootrom_partitions,
+> +	.nr_parts	= ARRAY_SIZE(cdb89712_bootrom_partitions),
+> +};
+> +
+> +static struct resource cdb89712_bootrom_resources[] __initdata = {
+> +	DEFINE_RES_NAMED(CS7_PHYS_BASE, SZ_128, "BOOTROM", IORESOURCE_MEM |
+> +			 IORESOURCE_CACHEABLE | IORESOURCE_READONLY),
+> +};
+> +
+> +static struct platform_device cdb89712_bootrom_pdev __initdata = {
+> +	.name		= "physmap-flash",
+> +	.id		= 1,
+> +	.resource	= cdb89712_bootrom_resources,
+> +	.num_resources	= ARRAY_SIZE(cdb89712_bootrom_resources),
+> +	.dev	= {
+> +		.platform_data	= &cdb89712_bootrom_pdata,
+> +	},
+> +};
+> +
+> +static struct platdata_mtd_ram cdb89712_sram_pdata __initdata = {
+> +	.bankwidth	= 4,
+> +};
+> +
+> +static struct resource cdb89712_sram_resources[] __initdata = {
+> +	DEFINE_RES_MEM(CLPS711X_SRAM_BASE, CLPS711X_SRAM_SIZE),
+> +};
+> +
+> +static struct platform_device cdb89712_sram_pdev __initdata = {
+> +	.name		= "mtd-ram",
+> +	.id		= 0,
+> +	.resource	= cdb89712_sram_resources,
+> +	.num_resources	= ARRAY_SIZE(cdb89712_sram_resources),
+> +	.dev	= {
+> +		.platform_data	= &cdb89712_sram_pdata,
+> +	},
+> +};
+> +
+>  static void __init cdb89712_init(void)
+>  {
+> +	platform_device_register(&cdb89712_flash_pdev);
+> +	platform_device_register(&cdb89712_bootrom_pdev);
+> +	platform_device_register(&cdb89712_sram_pdev);
+This is broken, all these structs are located in .init.data which is
+discarded after the machine is fully booted. Also platformdata must not
+live in init data. Consider using platform_device_register_full which
+allows more data to be init data.
 
-static int __init smp_detect_ncores(void)
-{
-	unsigned int ncores, mpidr;
-	phys_addr_t pa;
+Best regards
+Uwe
 
-	mpidr = read_cpuid_mpidr();
-	switch (mpidr) {
-	case ARM_CPU_PART_CORTEX_A9:
-		/* Get SCU physical base */
-		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
-		scu_base = IO_ADDRESS(pa);
-		ncores = scu_get_core_count(scu_base);
-		break;
-	case ARM_CPU_PART_CORTEX_A15:
-	default:
-		pr_warn("Unsupported MPIDR %x\n", mpidr);
-		ncores = 1;
-		break;
-	}
-	return ncores;
-}
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
