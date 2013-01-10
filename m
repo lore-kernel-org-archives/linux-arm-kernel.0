@@ -1,49 +1,40 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 10 Jan 2013 18:29:41 +0800
-Subject: [PATCH] arch/arm/plat-omap: initializing dma_lch_count, before judging
- omap_dma_reserve_channels
-Message-ID: <50EE9815.2080402@asianux.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 10 Jan 2013 12:29:15 +0200
+Subject: [V2 PATCH 08/27] usb: gadget: mv_udc: fix the value of tranceiver
+In-Reply-To: <1354071986-28032-9-git-send-email-chao.xie@marvell.com>
+References: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
+ <1354071986-28032-9-git-send-email-chao.xie@marvell.com>
+Message-ID: <20130110102915.GF28920@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 27, 2012 at 10:06:07PM -0500, Chao Xie wrote:
+> usally we will use udc->tranceiver == NULL or
+> udc->tranceiver != NULL.
+> So when failed to get the udc->tranceiver by usb_get_phy(), we
+> directly set udc->tranceiver to be NULL.
+> Then the source code will not need macro IS_ERR_OR_NULL() for
+> udc->tranceiver judgement. It can reduce the line size and make
+> the judgement simple.
+> 
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
 
-  dma_lch_count is zero before 1st call of omap_system_dma_probe.
-  omap_dma_reserve_channels has value before 1st call of omap_system_dma_probe
+care to refresh ?
 
-  when 1st call of omap_system_dma_probe
-    we need set dma_lch_count before use it for judging
-    or which will be failed for omap_dma_reserve_channels
+patching file drivers/usb/gadget/mv_udc_core.c
+Hunk #1 succeeded at 1408 with fuzz 2 (offset 14 lines).
+Hunk #2 FAILED at 2174.
+Hunk #3 succeeded at 2363 (offset 44 lines).
+Hunk #4 succeeded at 2442 with fuzz 1 (offset 56 lines).
+Hunk #5 succeeded at 2475 with fuzz 1 (offset 54 lines).
+1 out of 5 hunks FAILED -- saving rejects to file drivers/usb/gadget/mv_udc_core.c.rej
 
-  additional info:
-    this patch is only for fixing bug, not touch the features.
-    so, not use d->lch_count instead of dma_lch_count for the statement:
-
-                        && (omap_dma_reserve_channels <= dma_lch_count))
-
-    at least, now, current fixing is equal to above.
-    in the future
-      maybe omap_dma_reserve_channels can be set by outside (such as from /proc)
-      dma_lch_count is a static global variable which has effect to all devices.
-      maybe the original author do not hope the newer is larger than the older
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/plat-omap/dma.c |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index 4136b20..b382eef 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -2018,6 +2018,9 @@ static int omap_system_dma_probe(struct platform_device *pdev)
- 	d			= p->dma_attr;
- 	errata			= p->errata;
- 
-+	if (!dma_lch_count)
-+		dma_lch_count	= d->lch_count;
-+
- 	if ((d->dev_caps & RESERVE_CHANNEL) && omap_dma_reserve_channels
- 			&& (omap_dma_reserve_channels <= dma_lch_count))
- 		d->lch_count	= omap_dma_reserve_channels;
 -- 
-1.7.10.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/9b6efbae/attachment.sig>
