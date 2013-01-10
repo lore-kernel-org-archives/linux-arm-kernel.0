@@ -1,177 +1,105 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 Jan 2013 16:34:23 +0800
-Subject: [PATCH v2 2/2] ARM: imx: enable imx6q-cpufreq support
-In-Reply-To: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
-References: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1357806863-6899-3-git-send-email-shawn.guo@linaro.org>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 10 Jan 2013 16:35:51 +0800
+Subject: [PATCH 1/4] ARM: dts: mxs-phy: Change mxs phy clock usage
+Message-ID: <1357806954-27960-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update operating-points per hardware document and add support for
-1 GHz and 1.2 GHz frequencies.
+For mxs-phy user i.mx6q, the PHY's clock is controlled by
+hardware automatically, the software only needs to enable it
+at probe, this clock should be used like below:
 
-400 MHz, 800 MHz and 1 GHz should be supported by all i.MX6Q chips,
-while 1.2 GHz support needs to know from OTP fuse bit.
+- Enable at mxs-phy's probe, and disable at mxs-phy's remove, so
+The clk framework doesn't need to know it. But other mxs-phy user
+mx28/mx23 may need it, so we give mxs-phy a dummy clock for imx6q.
+- During the runtime, we don't need to control it.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- arch/arm/boot/dts/imx6q.dtsi   |   19 ++++++++----
- arch/arm/mach-imx/mach-imx6q.c |   65 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 78 insertions(+), 6 deletions(-)
+ .../devicetree/bindings/clock/imx6q-clock.txt      |    2 --
+ Documentation/devicetree/bindings/usb/mxs-phy.txt  |    2 ++
+ arch/arm/boot/dts/imx6q.dtsi                       |   10 +++++++---
+ arch/arm/mach-imx/clk-imx6q.c                      |    5 +----
+ 4 files changed, 10 insertions(+), 9 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+index d77b4e6..5666486 100644
+--- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+@@ -194,8 +194,6 @@ clocks and IDs.
+ 	ssi2_ipg		179
+ 	ssi3_ipg		180
+ 	rom			181
+-	usbphy1			182
+-	usbphy2			183
+ 	ldb_di0_div_3_5		184
+ 	ldb_di1_div_3_5		185
+ 	sata_ref		186
+diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+index 5835b27..384e700 100644
+--- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
++++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+@@ -4,10 +4,12 @@ Required properties:
+ - compatible: Should be "fsl,imx23-usbphy"
+ - reg: Should contain registers location and length
+ - interrupts: Should contain phy interrupt
++- The reg offset for PHY clock at anatop
+ 
+ Example:
+ usbphy1: usbphy at 020c9000 {
+ 	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+ 	reg = <0x020c9000 0x1000>;
+ 	interrupts = <0 44 0x04>;
++	anatop-phy-reg-offset = <0x10>;
+ };
 diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index d6265ca..17c5618 100644
+index d6265ca..d958c49 100644
 --- a/arch/arm/boot/dts/imx6q.dtsi
 +++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -38,12 +38,18 @@
- 			next-level-cache = <&L2>;
- 			operating-points = <
- 				/* kHz    uV */
--				792000  1100000
-+				996000  1250000
-+				792000  1150000
- 				396000  950000
--				198000  850000
- 			>;
- 			clock-latency = <61036>; /* two CLK32 periods */
--			cpu0-supply = <&reg_cpu>;
-+			clocks = <&clks 104>, <&clks 6>, <&clks 16>,
-+				 <&clks 17>, <&clks 170>;
-+			clock-names = "arm", "pll2_pfd2_396m", "step",
-+				      "pll1_sw", "pll1_sys";
-+			arm-supply = <&reg_arm>;
-+			pu-supply = <&reg_pu>;
-+			soc-supply = <&reg_soc>;
- 		};
+@@ -518,14 +518,18 @@
+ 				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+-				clocks = <&clks 182>;
+-			};
++				anatop-phy-reg-offset = <0x10>;
++				/* the clk is controllered by hardware */
++				clocks = <&clks 0>;
++	 		};
  
- 		cpu at 1 {
-@@ -471,7 +477,7 @@
- 					anatop-max-voltage = <2750000>;
- 				};
- 
--				reg_cpu: regulator-vddcore at 140 {
-+				reg_arm: regulator-vddcore at 140 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "cpu";
- 					regulator-min-microvolt = <725000>;
-@@ -485,7 +491,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				regulator-vddpu at 140 {
-+				reg_pu: regulator-vddpu at 140 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddpu";
- 					regulator-min-microvolt = <725000>;
-@@ -499,7 +505,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				regulator-vddsoc at 140 {
-+				reg_soc: regulator-vddsoc at 140 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
-@@ -965,6 +971,7 @@
+ 			usbphy2: usbphy at 020ca000 {
+ 				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+-				clocks = <&clks 183>;
++				anatop-phy-reg-offset = <0x20>;
++				/* the clk is controllered by hardware */
++				clocks = <&clks 0>;
  			};
  
- 			ocotp at 021bc000 {
-+				compatible = "fsl,imx6q-ocotp";
- 				reg = <0x021bc000 0x4000>;
- 			};
- 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 4eb1b3a..16f9a13 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/clk.h>
- #include <linux/clkdev.h>
-+#include <linux/cpu.h>
- #include <linux/cpuidle.h>
- #include <linux/delay.h>
- #include <linux/export.h>
-@@ -22,6 +23,7 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-+#include <linux/opp.h>
- #include <linux/phy.h>
- #include <linux/regmap.h>
- #include <linux/micrel_phy.h>
-@@ -209,9 +211,72 @@ static struct cpuidle_driver imx6q_cpuidle_driver = {
- 	.state_count		= 1,
+ 			snvs at 020cc000 {
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 7f2c10c..fa62bc9 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -153,7 +153,7 @@ enum mx6q_clks {
+ 	ssi2, ssi3, uart_ipg, uart_serial, usboh3, usdhc1, usdhc2, usdhc3,
+ 	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
+ 	pll4_audio, pll5_video, pll8_mlb, pll7_usb_host, pll6_enet, ssi1_ipg,
+-	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
++	ssi2_ipg, ssi3_ipg, rom, ldb_di0_div_3_5, ldb_di1_div_3_5,
+ 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref,
+ 	clk_max
  };
+@@ -208,9 +208,6 @@ int __init mx6q_clocks_init(void)
+ 	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x3);
+ 	clk[pll8_mlb]      = imx_clk_pllv3(IMX_PLLV3_MLB,	"pll8_mlb",	"osc", base + 0xd0, 0x0);
  
-+#define OCOTP_CFG3			0x440
-+#define OCOTP_CFG3_SPEED_SHIFT		16
-+#define OCOTP_CFG3_SPEED_1P2GHZ		0x3
-+
-+static void __init imx6q_opp_check_1p2ghz(struct device *cpu_dev)
-+{
-+	struct device_node *np;
-+	void __iomem *base;
-+	u32 val;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ocotp");
-+	if (!np) {
-+		pr_warn("failed to find ocotp node\n");
-+		return;
-+	}
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_warn("failed to map ocotp\n");
-+		goto put_node;
-+	}
-+
-+	val = readl_relaxed(base + OCOTP_CFG3);
-+	val >>= OCOTP_CFG3_SPEED_SHIFT;
-+	if ((val & 0x3) == OCOTP_CFG3_SPEED_1P2GHZ)
-+		if (opp_add(cpu_dev, 1200000000, 1275000))
-+			pr_warn("failed to add 1.2 GHz operating point\n");
-+
-+put_node:
-+	of_node_put(np);
-+}
-+
-+static void __init imx6q_opp_init(struct device *cpu_dev)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_node_by_path("/cpus/cpu at 0");
-+	if (!np) {
-+		pr_warn("failed to find cpu0 node\n");
-+		return;
-+	}
-+
-+	cpu_dev->of_node = np;
-+	if (of_init_opp_table(cpu_dev)) {
-+		pr_warn("failed to init OPP table\n");
-+		goto put_node;
-+	}
-+
-+	imx6q_opp_check_1p2ghz(cpu_dev);
-+
-+put_node:
-+	of_node_put(np);
-+}
-+
-+struct platform_device imx6q_cpufreq_pdev = {
-+	.name = "imx6q-cpufreq",
-+};
-+
- static void __init imx6q_init_late(void)
- {
- 	imx_cpuidle_init(&imx6q_cpuidle_driver);
-+
-+	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
-+		imx6q_opp_init(&imx6q_cpufreq_pdev.dev);
-+		platform_device_register(&imx6q_cpufreq_pdev);
-+	}
- }
+-	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 6);
+-	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 6);
+-
+ 	clk[sata_ref] = imx_clk_fixed_factor("sata_ref", "pll6_enet", 1, 5);
+ 	clk[pcie_ref] = imx_clk_fixed_factor("pcie_ref", "pll6_enet", 1, 4);
  
- static void __init imx6q_map_io(void)
 -- 
-1.7.9.5
+1.7.0.4
