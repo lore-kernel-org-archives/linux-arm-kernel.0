@@ -1,65 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Jan 2013 10:08:44 +0000
-Subject: [PATCH 0/4] gpio: introduce descriptor-based interface
-In-Reply-To: <2270940.DTxEYMZtED@percival>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
- <201301091046.13020.arnd@arndb.de> <2270940.DTxEYMZtED@percival>
-Message-ID: <201301101008.45091.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 10 Jan 2013 10:48:37 +0100
+Subject: [PATCH 2/3 V2] iio: mxs: Implement support for touchscreen
+In-Reply-To: <20130110005748.GA947@core.coreip.homeip.net>
+References: <1355449598-15980-1-git-send-email-marex@denx.de>
+ <201212191801.31920.marex@denx.de>
+ <20130110005748.GA947@core.coreip.homeip.net>
+Message-ID: <201301101048.38036.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 January 2013, Alex Courbot wrote:
-> On Wednesday 09 January 2013 18:46:12 Arnd Bergmann wrote:
-> > 
-> > Only legacy users did this. Initially there was only the header file,
-> > with the API declared but several different implementations of it.
-> > gpiolib was introduced later to reduce code duplication and allow having
-> > multiple implementations in the same kernel.
+Dear Dmitry Torokhov,
+
+[...]
+> > > +	enum mxs_lradc_ts	use_touchscreen;
+> > > +	unsigned int		stop_touchscreen:1;
+> > > +	unsigned int		use_touchbutton:1;
 > 
-> Does the following sound reasonable?
-> 1) Make sure every target that uses GENERIC_GPIO also implements its drivers 
-> using gpiolib, convert the (hopefully) few ones that don't to use gpiolib
-> 2) Make GENERIC_GPIO require GPIOLIB or just merge both options into a single 
-> one
-> 3) Turn gpio into a full subsystem (like pinctrl)
+> Can we make them bools instead of bit fields?
+
+Sure.
+[...]
+
+> > > +static void mxs_lradc_ts_close(struct input_dev *dev)
+> > > +{
+> > > +	struct mxs_lradc *lradc = input_get_drvdata(dev);
+> > > +
+> > > +	/* Indicate the touchscreen is stopping. */
+> > > +	lradc->stop_touchscreen = 1;
+> > > +
+> > > +	/* Disable touchscreen touch-detect IRQ. */
+> > > +	writel(LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
+> > > +		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
+> > > +
+> > > +	/* Power-down touchscreen touch-detect circuitry. */
+> > > +	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
+> > > +		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
 > 
-> This should make things less blurry and easier to maintain (less header files, 
-> only one interface, etc.) GPIO controllers would also be better integrated 
-> into the driver model.
-
-Yes, I think that would be good.
-
-I've tried to find platforms that don't yet use GPIOLIB and fortunately
-there are very few left:
-
-I found two that provide the generic gpio interfaces when gpiolib
-is disabled, but use gpiolib otherwise for the same hardware,
-arch/m68k/include/asm/mcfgpio.h and arch/blackfin/include/asm/gpio.h.
-I would assume that we can simply remove the non-gpiolib shortcut
-here at cost of a small overhead.
-
-Then there are a bunch that use gpiolib but have a nontrivial
-implementation of gpio_get_value and other functions. I'm not sure
-if these are a problematic with your code.
-
-> > Regarding the integration of pinctrl with gpio,
-> > I was thinking in the past that we could make pinctrl provide everything
-> > that gpiolib does, and have a generic gpiolib driver on top of pinctrl
-> > so that platforms don't need to implement both interfaces but only need
-> > to provide a pure pinctrl driver. Not sure if this makes any sense.
+> These 2 writes are racing with writes in mxs_lradc_ts_work(). I think
+> you need to:
 > 
-> That would work if all GPIOs were connected to a ball, but how about GPIO 
-> expanders that are external to the chip? They have no use for pinctrl AFAICT. 
-> On the other hand, maybe we can have one pinctrl-gpio driver for those chips 
-> where pinctrl alone can emulate all the functionality of a GPIO controller. 
-> Maybe such a driver exists already?
+> 	lradc->stop_touchscreen = true;
+> 	mb();
 
-I don't think we have that yet, but it would be another option: rather
-than putting a generic gpiolib driver on top of pinctrl, we could have
-pinctrl support for all gpios that go through gpiolib, and move device
-drivers over to use pinctrl as the way to manage gpios rather than the
-classic gpio drivers. That would be a larger change though, and require
-that we pull in the pinctrl subsystem on a lot of machines that don't
-need it today.
+Nice catch, do we need the memory barrier here though, is it not enough to 
+reorder the cancel_work_sync() just before the register writes?
 
-	Arnd
+> 	cancel_work_sync(&lradc->ts_work);
+> 	writel(LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
+> 		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
+> 	...
+
+[...]
+
+> > > +	lradc->ts_input = input;
+> > > +	input_set_drvdata(input, lradc);
+> > > +	ret = input_register_device(input);
+> > > +	if (ret)
+> > > +		input_free_device(lradc->ts_input);
+> > > +
+> > > +	return ret;
+> 
+> So why is allocation failure is not fatal bur registration is? I'd make
+> both fatal.
+
+Since it's still possible to operate the block even if touchscreen fails to 
+probe. If that happens, certainly something is already weird. I'd say both 
+should be fatal.
+
+> > > +}
+> > > +
+> > > +static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
+> > > +{
+> > > +	if (!lradc->use_touchscreen)
+> > > +		return;
+> > > +
+> > > +	if (!lradc->ts_input)
+> > > +		return;
+> 
+> Do we really need to check both conditions?
+
+Better safe than sorry, but lradc->ts_input should be non-NULL in case lradc-
+>use_touchscreen is set, so I'll remove it.
+
+[...]
