@@ -1,103 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jan 2013 12:42:53 +0100
-Subject: [PATCH] mfd: stmpe: Pull IRQ GPIO number from DT during DT-based
- probe
-In-Reply-To: <CAKohpomiS+UFzgiJaQbm8aZVPY0jeYhm1k7Yndk50z8=K4LvGQ@mail.gmail.com>
-References: <1357568989-16237-1-git-send-email-marex@denx.de>
- <20130108094134.GA21994@gmail.com>
- <201301081044.14876.marex@denx.de>
- <201301081048.38149.marex@denx.de>
- <CAKohpo=YnLJN4_xA1WTiJaZeb-Oyc=RypYUyaSibmn6G4X9m4A@mail.gmail.com>
- <20130108111104.GF21994@gmail.com>
- <CAKohpomiS+UFzgiJaQbm8aZVPY0jeYhm1k7Yndk50z8=K4LvGQ@mail.gmail.com>
-Message-ID: <CACRpkdZWi4M3HmO_rq1O9aGTKYR0iMLXJo+nos3hYu3C_DFRHQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 10 Jan 2013 11:48:27 +0000
+Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
+Message-ID: <1357818507-8716-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 8, 2013 at 12:14 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 8 January 2013 16:41, Lee Jones <lee.jones@linaro.org> wrote:
->>> Hmm.. I tried a bit, but couldn't find any such call :(
->>> Probably an assumption is taken here. GPIO pins which are going to be used as
->>> interrupt lines, wouldn't be getting set in output mode at all. So,
->>> once they are put
->>> in input mode in beginning, nobody would change it ever.
->>>
->>> Much of gpio controllers configure gpio pins in input mode in their probe().
->>>
->>> Maybe, there is something else :)
->>
->> Pinctrl?
->
-> I don't think pinctrl is playing with it. I searched for
-> "direction_input" string and
-> pinctrl routine also had similar name. I couldn't fine use of
-> direction_input anywhere
-> in kernel, for setting them as irqs for OF cases.
+Since the introduction of /cpu nodes bindings for ARM and the
+corresponding parse function arm_dt_init_cpu_maps(), the cpu_logical_map
+and the number of possible CPUs are set according to the DT /cpu
+nodes entries. Currently most of the existing ARM SMP platforms detect the
+number of cores through HW probing in their .smp_init_cpus functions and set
+the possible CPU mask accordingly.
+This method should be upgraded so that the CPU counting mechanism will be
+based on DT, keeping legacy HW probing mechanism as a fall back solution.
 
-pinctrl has pinctrl_gpio_direction_input() and
-pinctrl_gpio_direction_output() which are supposed to
-be called *only* by GPIOlib frontends using pinctrl
-as backend to control the pins.
+In order to implement this fall back solution mechanism, the ARM DT code
+should provide a helper function to platforms to check if the cpu map
+has been properly initialized through DT. If the check fails the
+platform will resort to legacy HW based cores counting mechanism.
 
-But if it's a pinctrl driver using standard pinconfig from
-include/linux/pinctrl/pinconf-generic.h
-I'm all for adding a PIN_CONFIG_INPUT_ENABLE
-to these definintions so it can be set up as input
-at boot from the device tree using hogs or something,
-that make things easy when using GPIOs as IRQ
-providers only.
+This patch implements a trivial flag and a helper function that platform
+can call to check whether DT based cpu map initialization and cores count
+were completed successfully.
 
-So the alternative is to just set up the IRQ using the
-gpiolib functions for this: of_get_gpio() if you need the
-number from DT, then gpio_request() and
-gpio_direction_input() as on any GPIO. This can be
-done in the device driver or board code depending
-on use case.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/include/asm/prom.h | 10 ++++++++++
+ arch/arm/kernel/devtree.c   |  5 +++++
+ 2 files changed, 15 insertions(+)
 
-In the Nomadik I did this (maybe ugly) hack for a
-similar case:
-
+diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+index a219227..487614a 100644
+--- a/arch/arm/include/asm/prom.h
++++ b/arch/arm/include/asm/prom.h
+@@ -18,6 +18,15 @@
+ extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+ extern void arm_dt_memblock_reserve(void);
+ extern void __init arm_dt_init_cpu_maps(void);
 +/*
-+ * The SMSC911x IRQ is connected to a GPIO pin, but the driver expects
-+ * to simply request an IRQ passed as a resource. So the GPIO pin needs
-+ * to be requested by this hog and set as input.
++ * Return true if cpu map initialization has been
++ * carried out correctly from DT
 + */
-+static int __init cpu8815_eth_init(void)
++static inline bool __init arm_dt_cpu_map_valid(void)
 +{
-+       struct device_node *eth;
-+       int gpio, irq, err;
-+
-+       eth = of_find_node_by_path("/external-bus at 34000000/ethernet at 300");
-+       if (!eth) {
-+               pr_info("could not find any ethernet controller\n");
-+               return 0;
-+       }
-+       gpio = of_get_gpio(eth, 0);
-+       err = gpio_request(gpio, "eth_irq");
-+       if (err) {
-+               pr_info("failed to request ethernet GPIO\n");
-+               return -ENODEV;
-+       }
-+       err = gpio_direction_input(gpio);
-+       if (err) {
-+               pr_info("failed to set ehernet GPIO as input\n");
-+               return -ENODEV;
-+       }
-+       irq = gpio_to_irq(gpio);
-+       pr_info("enabled ethernet GPIO %d, IRQ %d\n", gpio, irq);
-+       return 0;
++	extern bool valid_dt_cpu_map;
++	return valid_dt_cpu_map;
 +}
-+device_initcall(cpu8815_eth_init);
-
-I haven't read review comments on that patch.
-
-Maybe it's not such a good idea to add the GPIO to the device itself
-when it's being hogged by board code like this. It's a bit of a grey area
-so I'm a bit confused here.
-
-Maybe the GPIO lib actually needs a "hog" mechanism that can
-request and set GPIO pins as input/output on boot and then
-forget about them.
-
-Yours,
-Linus Walleij
+ 
+ #else /* CONFIG_OF */
+ 
+@@ -28,6 +37,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
+ 
+ static inline void arm_dt_memblock_reserve(void) { }
+ static inline void arm_dt_init_cpu_maps(void) { }
++static inline bool __init arm_dt_cpu_map_valid(void) { return false; }
+ 
+ #endif /* CONFIG_OF */
+ #endif /* ASMARM_PROM_H */
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 70f1bde..c82af3b 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -62,6 +62,10 @@ void __init arm_dt_memblock_reserve(void)
+ 		memblock_reserve(base, size);
+ 	}
+ }
++/*
++ * Export DT cpu map validity flag to platforms
++ */
++bool valid_dt_cpu_map __initdata;
+ 
+ /*
+  * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
+@@ -158,6 +162,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 	 * a reg property, the DT CPU list can be considered valid and the
+ 	 * logical map created in smp_setup_processor_id() can be overridden
+ 	 */
++	valid_dt_cpu_map = true;
+ 	for (i = 0; i < cpuidx; i++) {
+ 		set_cpu_possible(i, true);
+ 		cpu_logical_map(i) = tmp_map[i];
+-- 
+1.7.12
