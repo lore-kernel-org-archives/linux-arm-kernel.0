@@ -1,48 +1,27 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 09 Jan 2013 16:44:26 -0800
-Subject: [PATCH] ARM: s3c64xx: cpuidle: Fix missing header error with
- CONFIG_CPU_IDLE enabled
-In-Reply-To: <1357778378-5278-1-git-send-email-tomasz.figa@gmail.com>
-References: <1357778378-5278-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <00b801cdeecb$a5839c10$f08ad430$@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 10 Jan 2013 09:46:05 +0900
+Subject: [PATCH v2 1/2] ARM: SH-Mobile: sh73a0: Secondary CPUs handle own
+ SCU flags
+In-Reply-To: <1357760512-2634-1-git-send-email-hechtb+renesas@gmail.com>
+References: <1357760512-2634-1-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <20130110004605.GA29988@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+On Wed, Jan 09, 2013 at 08:41:51PM +0100, Bastian Hecht wrote:
+> From: Bastian Hecht <hechtb@gmail.com>
 > 
-> Recently the regs-syscon-power.h header was moved from
-> mach-s3c64xx/include/mach to mach-s3c64xx/, but cpuidle.c was not
-> updated to include the header from its new location, which caused
-> build error with CONFIG_CPU_IDLE enabled.
+> When booting secondary CPUs we have used the main CPU to set up the
+> Snoop Control Unit flags of these CPUs. It is a cleaner approach
+> if every CPU takes care of its own flags. We avoid the need for
+> locking and the program logic is more concise. With this patch the file
+> headsmp-sh73a0.S is added that contains a startup vector for secondary CPUs
+> that sets up its own SCU flags.
+> Further in sh73a0_smp_prepare_cpus() we can rely on the generic ARM helper
+> scu_power_mode(). This is possible as we don't cross borders anymore (every
+> CPU handles its own flags) and need no locking. So we can throw out the
+> needless function modify_scu_cpu_psr().
 > 
-> This patch fixed the problem by updating the include line with
-> proper header location.
-> 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/cpuidle.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-
-> s3c64xx/cpuidle.c
-> index e3e455b..50c66fe 100644
-> --- a/arch/arm/mach-s3c64xx/cpuidle.c
-> +++ b/arch/arm/mach-s3c64xx/cpuidle.c
-> @@ -20,8 +20,7 @@
-> 
->  #include <mach/map.h>
-> 
-> -#include <mach/regs-syscon-power.h>
-> -
-> +#include "regs-syscon-power.h"
->  #include "regs-sys.h"
-> 
->  static int s3c64xx_enter_idle(struct cpuidle_device *dev,
-> --
-> 1.8.1
+> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
 
-Oops, yes right. Thanks for your fix :-)
-
-Will apply. 
-
-- Kukjin
+Thanks, applied to the soc2 branch.
