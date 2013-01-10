@@ -1,68 +1,37 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 10 Jan 2013 10:44:31 -0800
-Subject: [PATCH 2/3 V2] iio: mxs: Implement support for touchscreen
-In-Reply-To: <50EF0636.6090903@metafoo.de>
-References: <1355449598-15980-1-git-send-email-marex@denx.de>
- <201212191801.31920.marex@denx.de>
- <20130110005748.GA947@core.coreip.homeip.net>
- <201301101048.38036.marex@denx.de>
- <20130110174630.GB2797@core.coreip.homeip.net>
- <50EF0636.6090903@metafoo.de>
-Message-ID: <20130110184431.GD2797@core.coreip.homeip.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 10 Jan 2013 10:44:35 -0800
+Subject: [PATCH 09/26] ARM: SAMSUNG: cleanup mach/gpio-fns.h gpio-track.h
+ and gpio-nrs.h
+In-Reply-To: <CACRpkda5rKrY85GXgdzomE5q6q0btGKX6UGgCn3N5AzxLv=s7Q@mail.gmail.com>
+References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
+ <1357165443-3716-10-git-send-email-kgene.kim@samsung.com>
+ <CACRpkda5rKrY85GXgdzomE5q6q0btGKX6UGgCn3N5AzxLv=s7Q@mail.gmail.com>
+Message-ID: <027801cdef62$8aec2e20$a0c48a60$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 07:19:34PM +0100, Lars-Peter Clausen wrote:
-> On 01/10/2013 06:46 PM, Dmitry Torokhov wrote:
-> > On Thu, Jan 10, 2013 at 10:48:37AM +0100, Marek Vasut wrote:
-> >> Dear Dmitry Torokhov,
-> >>
-> >> [...]
-> >>>>> +	enum mxs_lradc_ts	use_touchscreen;
-> >>>>> +	unsigned int		stop_touchscreen:1;
-> >>>>> +	unsigned int		use_touchbutton:1;
-> >>>
-> >>> Can we make them bools instead of bit fields?
-> >>
-> >> Sure.
-> >> [...]
-> >>
-> >>>>> +static void mxs_lradc_ts_close(struct input_dev *dev)
-> >>>>> +{
-> >>>>> +	struct mxs_lradc *lradc = input_get_drvdata(dev);
-> >>>>> +
-> >>>>> +	/* Indicate the touchscreen is stopping. */
-> >>>>> +	lradc->stop_touchscreen = 1;
-> >>>>> +
-> >>>>> +	/* Disable touchscreen touch-detect IRQ. */
-> >>>>> +	writel(LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
-> >>>>> +		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
-> >>>>> +
-> >>>>> +	/* Power-down touchscreen touch-detect circuitry. */
-> >>>>> +	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
-> >>>>> +		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-> >>>
-> >>> These 2 writes are racing with writes in mxs_lradc_ts_work(). I think
-> >>> you need to:
-> >>>
-> >>> 	lradc->stop_touchscreen = true;
-> >>> 	mb();
-> >>
-> >> Nice catch, do we need the memory barrier here though, is it not enough to 
-> >> reorder the cancel_work_sync() just before the register writes?
-> > 
-> > You really need to make sure that setting lradc->stop_touchscreen =
-> > true; is not reordered, because otherwise you may cancel the work,
-> > interrupt happens and reschedules it, and then you set up the flag.
+Linus Walleij wrote:
 > 
-> Does it really matter? If it is rescheduled you get one event more reported
-> after the device has been closed, but input core should ignore it anyway, or
-> doesn't it?
+> On Wed, Jan 2, 2013 at 11:23 PM, Kukjin Kim <kgene.kim@samsung.com>
+> wrote:
+> 
+> > remove <mach/gpio-fns.h>, <mach/gpio-track.h> and <plat/gpio-fns.h>
+> >
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> This really needs cleanup so
 
-But the problem is that if work runs again it will enable the interrupt.
-It is better to have all ducks in a row.
+Yes! And sorry for late ;-)
+Just note, I'm working on cleanup for other Samsung gpio stuff.
+
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I guess you will carry this through the Samsung tree?
+
+Yes :-) Let me add your ack on that.
 
 Thanks.
 
--- 
-Dmitry
+- Kukjin
