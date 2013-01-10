@@ -1,41 +1,32 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 10 Jan 2013 16:03:00 +0100
-Subject: [v2 5/9] clocksource: tegra: Enable ARM arch_timer with TSC
-In-Reply-To: <79cf9366702f71f8c7add23b2aa0afec@localhost>
-References: <20130109.075708.1662067562960541635.hdoyu@nvidia.com><50ED1F8F.4060700@ti.com><79cf9366702f71f8c7add23b2aa0afec@localhost>
-Message-ID: <20130110.170300.1995294118512465281.hdoyu@nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Jan 2013 16:03:55 +0100
+Subject: [PATCHv2] ARM: mxs: select USB_ARCH_HAS_EHCI
+Message-ID: <1357830235-15661-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Commit 09f6ffde introduced a dependency on USB_EHCI_HCD for the chipidea
+USB host driver, that in turns depends on USB_ARCH_HAS_EHCI.
 
-Marc Zyngier <marc.zyngier@arm.com> wrote @ Wed, 9 Jan 2013 10:01:05 +0100:
+If this symbol is not selected by the ARCH, we are not able to use the
+chipidea driver anymore.
 
-> Almost. I already proposed this in the past, but because the source clock
-> is variable in the Tegra case, this is not flexible enough.
-> 
-> What I was suggesting was to do the following:
-> 
-> timer {
->         compatible = "arm,armv7-timer";
->         [...]
->         clocks = <&tsc>;
-> }
-> 
-> tsc: tsc {
->         compatible = "nvidia,tegra114-tsc";
->         reg = <0x700f0000 0x20000>;
->         freq-range = <... ...>;
->         clock-output-names = "tsc";
-> }
-> 
-> In the arch_timer code, start searching for the "clocks" property, and use
-> that if there is one. Otherwise, fall back to "clock-frequency", and
-> ultimately to reading CNTFRQ.
-> 
-> This requires some changes (converting the tsc code to be a clock), but
-> this is at least a proper description of the hardware, and should give you
-> the required flexibility.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/usb/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-The above seems ok to me. I'll drop this original patch from this
-series for now until T114 clock comes to implement correctly.
+diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
+index 4c90b51..640ae6c 100644
+--- a/drivers/usb/Kconfig
++++ b/drivers/usb/Kconfig
+@@ -37,6 +37,7 @@ config USB_ARCH_HAS_EHCI
+ 	default y if ARCH_W90X900
+ 	default y if ARCH_AT91
+ 	default y if ARCH_MXC
++	default y if ARCH_MXS
+ 	default y if ARCH_OMAP3
+ 	default y if ARCH_CNS3XXX
+ 	default y if ARCH_VT8500
+-- 
+1.7.10.4
