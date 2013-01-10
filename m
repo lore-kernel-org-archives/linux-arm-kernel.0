@@ -1,20 +1,33 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 10 Jan 2013 10:17:09 +0000
-Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
-In-Reply-To: <97E481BC-F14D-4866-B44B-878833CA81DC@suse.de>
-References: <1357769438.18196.5@snotra>
- <97E481BC-F14D-4866-B44B-878833CA81DC@suse.de>
-Message-ID: <CAFEAcA87t5VP5TCUjtNHDPHM=uPSXirNSD5=GWgwZaHF-wOo6A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Jan 2013 10:21:43 +0000
+Subject: [PATCH 1/4] arm: vt8500: Add support for Wondermedia WM8750/WM8850
+In-Reply-To: <1357783407.28830.2.camel@gitbox>
+References: <1356650452-16559-1-git-send-email-linux@prisktech.co.nz>
+ <201301092127.05804.arnd@arndb.de> <1357783407.28830.2.camel@gitbox>
+Message-ID: <201301101021.44238.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 January 2013 22:30, Alexander Graf <agraf@suse.de> wrote:
-> In fact, in this particular case one could merge all of the patches except for the
-> particular ioctl implementation and just give the respective addresses default
-> values until there is an API to set them, similar to how we did things with PVR
-> in the beginning.
+On Thursday 10 January 2013, Tony Prisk wrote:
+> On Wed, 2013-01-09 at 21:27 +0000, Arnd Bergmann wrote:
+> > 
+> > > Should patches in pull-requests have Ack'd lines already?
+> 
+> This is what I thought - and the reason I haven't sent a pull-request
+> for the patch's - I haven't had any Ack's :)
+> 
 
-That's what we started with and we got review comments saying "yuck,
-don't hard code this"...
+Sorry, I think I misunderstood the question then. I meant that if
+you received an Acked-by statement, it should be part of the
+changeset comment by the time you send a pull request.
 
--- PMM
+There is also the rule that patches need to be reviewed on the
+mailing list before you submit them for inclusion. Like all
+rules, this can be bent a little for patches that are obvious
+correct bug fixes, especially when you are the platform
+maintainer. What you can do here is send the patches out to the
+mailing list without any additional Acks and send the pull
+request as the [PATCH 0/X] mail. We can then look at the
+patches if necessary or just pull in the branch straight away.
+
+	Arnd
