@@ -1,74 +1,211 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Jan 2013 12:00:37 -0800
-Subject: [PATCH for 3.8] ARM: OMAP: zoom-display: Remove the use of
- TWL4030_MODULE_PWM1
-In-Reply-To: <1357725628-25120-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1357725628-25120-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20130110200036.GC14149@atomide.com>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Thu, 10 Jan 2013 12:07:52 -0800
+Subject: [PATCH 5/5] ARM: exynos: enable/disable cpuidle when cpu1 is
+ down/up
+In-Reply-To: <1357318799-24378-5-git-send-email-daniel.lezcano@linaro.org>
+References: <1357318799-24378-1-git-send-email-daniel.lezcano@linaro.org>
+ <1357318799-24378-5-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CADGdYn7y_SSmLoEpeRjL8PDSZS-YJwC1QpRcUocSSnDyM8BRhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [130109 02:03]:
-> Use the future proof TWL_MODULE_PWM module id instead to aim the twl-core
-> cleanup planed for 3.9 kernel cycle.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Hi Daniel,
+
+This hotplug noifiers looks fine. I suppose it should add extra state
+C1 in cpu0. If it is done like below than for normal cases(when all
+cpu's are online) there wont be any statistics for C0 state also which
+is required. Other patches look good.
+
+Thanks,
+Amit
+
+On Fri, Jan 4, 2013 at 8:59 AM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> What we have now is (1) cpu0 going always to WFI when cpu1 is up,
+> (2) cpu0 going to all states when cpu1 is down.
+>
+> In other words, cpuidle is disabled when cpu1 is up and enabled
+> when cpu1 is down.
+>
+> This patch use the cpu hotplug notifier to enable/disable cpuidle,
+> when the cpu1 is plugged or unplugged. That clarifies the code and
+> make it simpler.
+>
+> Signed-off: Daniel Lezcano <daniel.lezcano@linaro.org>
 > ---
-> Hi Tony,
-> 
-> can you queue this patch for 3.8 cycle?
-> With the second part of my twl-core cleanup series I have overlooked this file
-> since in my working tree I ahve already removed this part of the code and
-> switched zoom to use the bl-pwm driver for the backlight.
-
-Looks like we're now in the oopses and regressions phase, so it's probably
-best that you just apply this to your series:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> I will resend the series which is doing that on top of this patch:
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82724.html
-> 
-> Thank you,
-> Peter
-> 
->  arch/arm/mach-omap2/board-zoom-display.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-zoom-display.c b/arch/arm/mach-omap2/board-zoom-display.c
-> index 1c7c834..8cef477 100644
-> --- a/arch/arm/mach-omap2/board-zoom-display.c
-> +++ b/arch/arm/mach-omap2/board-zoom-display.c
-> @@ -49,13 +49,13 @@ static void zoom_panel_disable_lcd(struct omap_dss_device *dssdev)
+>  arch/arm/mach-exynos/cpuidle.c |  117 +++++++++++++++++++++++-----------------
+>  1 file changed, 69 insertions(+), 48 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+> index e6f006b..d8f6f33 100644
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -12,6 +12,8 @@
+>  #include <linux/init.h>
+>  #include <linux/cpuidle.h>
+>  #include <linux/cpu_pm.h>
+> +#include <linux/notifier.h>
+> +#include <linux/cpu.h>
+>  #include <linux/io.h>
+>  #include <linux/export.h>
+>  #include <linux/time.h>
+> @@ -36,31 +38,8 @@
+>
+>  #define S5P_CHECK_AFTR         0xFCBA0D10
+>
+> -static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+> -                               struct cpuidle_driver *drv,
+> -                               int index);
+> -
+>  static struct cpuidle_device exynos4_cpuidle_device;
+>
+> -static struct cpuidle_driver exynos4_idle_driver = {
+> -       .name                   = "exynos4_idle",
+> -       .owner                  = THIS_MODULE,
+> -       .en_core_tk_irqen       = 1,
+> -       .states = {
+> -               [0] = ARM_CPUIDLE_WFI_STATE,
+> -               [1] = {
+> -                       .enter            = exynos4_enter_lowpower,
+> -                       .exit_latency     = 300,
+> -                       .target_residency = 100000,
+> -                       .flags            = CPUIDLE_FLAG_TIME_VALID,
+> -                       .name             = "C1",
+> -                       .desc             = "ARM power down",
+> -               },
+> -       },
+> -       .state_count = 2,
+> -       .safe_state_index = 0,
+> -};
+> -
+>  /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+>  static void exynos4_set_wakeupmask(void)
 >  {
+> @@ -93,9 +72,9 @@ static int idle_finisher(unsigned long flags)
+>         return 1;
 >  }
->  
-> -/*
-> - * PWMA/B register offsets (TWL4030_MODULE_PWMA)
-> - */
-> +/* Register offsets in TWL4030_MODULE_INTBR */
->  #define TWL_INTBR_PMBR1	0xD
->  #define TWL_INTBR_GPBR1	0xC
-> -#define TWL_LED_PWMON	0x0
-> -#define TWL_LED_PWMOFF	0x1
-> +
-> +/* Register offsets in TWL_MODULE_PWM */
-> +#define TWL_LED_PWMON	0x3
-> +#define TWL_LED_PWMOFF	0x4
->  
->  static int zoom_set_bl_intensity(struct omap_dss_device *dssdev, int level)
+>
+> -static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+> -                               struct cpuidle_driver *drv,
+> -                               int index)
+> +static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+> +                                 struct cpuidle_driver *drv,
+> +                                 int index)
 >  {
-> @@ -93,8 +93,8 @@ static int zoom_set_bl_intensity(struct omap_dss_device *dssdev, int level)
->  	}
->  
->  	c = ((50 * (100 - level)) / 100) + 1;
-> -	twl_i2c_write_u8(TWL4030_MODULE_PWM1, 0x7F, TWL_LED_PWMOFF);
-> -	twl_i2c_write_u8(TWL4030_MODULE_PWM1, c, TWL_LED_PWMON);
-> +	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, TWL_LED_PWMOFF);
-> +	twl_i2c_write_u8(TWL_MODULE_PWM, c, TWL_LED_PWMON);
->  #else
->  	pr_warn("Backlight not enabled\n");
->  #endif
-> -- 
-> 1.8.1
-> 
+>         unsigned long tmp;
+>
+> @@ -143,22 +122,6 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+>         return index;
+>  }
+>
+> -static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+> -                               struct cpuidle_driver *drv,
+> -                               int index)
+> -{
+> -       int new_index = index;
+> -
+> -       /* This mode only can be entered when other core's are offline */
+> -       if (num_online_cpus() > 1)
+> -               new_index = drv->safe_state_index;
+> -
+> -       if (new_index == 0)
+> -               return arm_cpuidle_simple_enter(dev, drv, new_index);
+> -       else
+> -               return exynos4_enter_core0_aftr(dev, drv, new_index);
+> -}
+> -
+>  static void __init exynos5_core_down_clk(void)
+>  {
+>         unsigned int tmp;
+> @@ -191,6 +154,62 @@ static void __init exynos5_core_down_clk(void)
+>         __raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+>  }
+>
+> +static int cpu_hotplug_notify(struct notifier_block *n,
+> +                             unsigned long action, void *hcpu)
+> +{
+> +       int ret;
+> +
+> +       /*
+> +        * cpu0 can't be shutdown on Origen, so this routine is
+> +        * called only for cpu1.
+> +        */
+> +
+> +       switch (action & 0xf) {
+> +
+> +       case CPU_ONLINE:
+> +               cpuidle_pause_and_lock();
+> +               cpuidle_disable_device(&exynos4_cpuidle_device);
+> +               cpuidle_resume_and_unlock();
+> +               break;
+> +
+> +       case CPU_DEAD:
+> +               if (!exynos4_cpuidle_device.registered) {
+> +                       ret = cpuidle_register_device(&exynos4_cpuidle_device);
+> +                       WARN_ONCE(ret, "Failed to register cpuidle device");
+> +               } else {
+> +                       cpuidle_pause_and_lock();
+> +                       cpuidle_enable_device(&exynos4_cpuidle_device);
+> +                       cpuidle_resume_and_unlock();
+> +               }
+> +               break;
+> +       }
+> +
+> +       return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block cpu_hotplug_notifier = {
+> +       .notifier_call = cpu_hotplug_notify,
+> +};
+> +
+> +static struct cpuidle_driver exynos4_idle_driver = {
+> +       .name                   = "exynos4_idle",
+> +       .owner                  = THIS_MODULE,
+> +       .en_core_tk_irqen       = 1,
+> +       .states = {
+> +               [0] = ARM_CPUIDLE_WFI_STATE,
+> +               [1] = {
+> +                       .enter            = exynos4_enter_lowpower,
+> +                       .exit_latency     = 300,
+> +                       .target_residency = 100000,
+> +                       .flags            = CPUIDLE_FLAG_TIME_VALID,
+> +                       .name             = "C1",
+> +                       .desc             = "ARM power down",
+> +               },
+> +       },
+> +       .state_count = 2,
+> +       .safe_state_index = 0,
+> +};
+> +
+>  static int __init exynos4_init_cpuidle(void)
+>  {
+>         int ret;
+> @@ -204,12 +223,14 @@ static int __init exynos4_init_cpuidle(void)
+>                 return ret;
+>         }
+>
+> -       ret = cpuidle_register_device(&exynos4_cpuidle_device);
+> -       if (ret) {
+> -               printk(KERN_ERR "CPUidle register device failed\n");
+> -               return ret;
+> -       }
+> +       ret = register_cpu_notifier(&cpu_hotplug_notifier);
+> +       if (ret)
+> +               goto out_unregister_driver;
+> +out:
+> +       return ret;
+>
+> -       return 0;
+> +out_unregister_driver:
+> +       cpuidle_unregister_driver(&exynos4_idle_driver);
+> +       goto out;
+>  }
+>  device_initcall(exynos4_init_cpuidle);
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
