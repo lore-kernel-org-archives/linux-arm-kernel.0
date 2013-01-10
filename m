@@ -1,82 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Jan 2013 10:34:48 -0800
-Subject: [PATCH v6 00/12] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-References: <003301cde30b$c584c2d0$508e4870$%cho@samsung.com>
- <032401cde783$485ae1a0$d910a4e0$@samsung.com>
- <20130110171844.GA2650@8bytes.org>
-Message-ID: <027601cdef61$2df576a0$89e063e0$@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Jan 2013 10:35:01 -0800
+Subject: [PATCH 2/2] ARM: dts: omap: Add omap-usb2 dt data
+In-Reply-To: <20130110124551.GU28920@arwen.pp.htv.fi>
+References: <1348050772-27819-1-git-send-email-kishon@ti.com>
+ <1348050772-27819-3-git-send-email-kishon@ti.com>
+ <50EE8A89.4010801@ti.com> <50EE921D.8020601@ti.com>
+ <50EE9517.3030703@ti.com> <20130110124551.GU28920@arwen.pp.htv.fi>
+Message-ID: <20130110183501.GX14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> 'Joerg Roedel' wrote:
-> >
-> > On Mon, Dec 31, 2012 at 10:18:46AM -0800, Kukjin Kim wrote:
-> > > Cho KyongHo wrote:
-> >
-> > > > Diffstats:
-> > > >  arch/arm/boot/dts/exynos5250-smdk5250.dts  |    2 +-
-> > > >  arch/arm/boot/dts/exynos5250.dtsi          |   27 +-
-> > > >  arch/arm/mach-exynos/Kconfig               |    5 -
-> > > >  arch/arm/mach-exynos/Makefile              |    1 -
-> > > >  arch/arm/mach-exynos/clock-exynos4.c       |   41 +-
-> > > >  arch/arm/mach-exynos/clock-exynos4210.c    |    9 +-
-> > > >  arch/arm/mach-exynos/clock-exynos4212.c    |   23 +-
-> > > >  arch/arm/mach-exynos/clock-exynos5.c       |   87 +-
-> > > >  arch/arm/mach-exynos/dev-sysmmu.c          |  274 ------
-> > > >  arch/arm/mach-exynos/include/mach/sysmmu.h |   66 --
-> > > >  arch/arm/mach-exynos/mach-exynos4-dt.c     |   34 +
-> > > >  arch/arm/mach-exynos/mach-exynos5-dt.c     |   30 +
-> > > >  drivers/iommu/Kconfig                      |    2 +-
-> > > >  drivers/iommu/Makefile                     |    2 +-
-> > > >  drivers/iommu/exynos-iommu.c               | 1477
-> > +++++++++++++++++++++--
-> > > > -----
-> > > >  15 files changed, 1284 insertions(+), 796 deletions(-)
+* Felipe Balbi <balbi@ti.com> [130110 04:49]:
+> On Thu, Jan 10, 2013 at 03:46:55PM +0530, kishon wrote:
+> > On Thursday 10 January 2013 03:34 PM, Benoit Cousson wrote:
 > > >
-> > > Joerg, it's time to merge this. If you don't mind, let me pick up this
-whole
-> > > series into Samsung tree because this touches many Samsung stuff.
-> >
-> > Well, looking at the diffstat the IOMMU changes are a lot larger than
-> > the exynos ones. So I think this should go through the IOMMU tree once
-> > the latest review comments are fixed.
-> >
-> If so, too many ugly merge conflicts will be happened when Linus merges
-for
-> v3.9 because the legacy(current) exynos clock stuff is going away in
-Samsung
-> tree and as I said, this touches Samsung stuff widely. Of course, Stephen
-> should complain the conflicts between your tree and mine once you apply
-> this whole series in your -next before Linus' merge for v3.9. I believe,
-you
-> don't want it.
+> > >Rob and I did not agree to use that temp hack in the case of DT, so you
+> > >were supposed to repost with a proper driver for the SCM part that
+> > >control the USB.
+> > 
+> > Ok. Missed that. Will work on that.
 > 
-> You know, we have several options to avoid it. When you take this series
-in
-> your tree, you can provide topic branch for me. Or this series should be
-> separated for arch/arm/ and drivers/ for both trees, then only
-> drivers/iommu changes should be picked up in your tree. I'm OK both, let
-me
-> know which one you would prefer or other way.
+> Didn't Tony say we should access SCM directly since it's a one time
+> thing ?
 > 
-Hmm, I think, just one [7/12] patch does matter so if you could create topic
-branch and apply [7/12] patch firstly before other drivers/ changes would be
-better to me. It's OK on both trees if I just _merge_ the first [7/12]
-commit in the topic branch you provided for exynos-iommu. But you know, you
-don't have to rebase it once I merge it in Samsung tree.
+> Tony ?
 
-How about?
+The SCM parts should be a separate driver that eventually will be
+a child of the minimal SCM core driver. The reason why it should be
+separate is because the SCM registers are in a different block as
+pointed out by Paul.
 
-> BTW, KyongHo, you need to update the clock changes for exynos-iommu
-> against on exynos common clock stuff.
-> 
-KyoungHo, your changes don't matter on exynos common clock stuff and I can
-take care in my tree. So no need more work for it in your side. If any
-updates, let you know.
+There's a good chance that we'll be able to eventually handle the USB
+SCM registers directly via pinctrl-single.c using pinconf-bits + generic
+pinconf binding. That is pending the changes from Haojian to implement
+generic pinconf for pinctrl-single.c.
 
-Thanks.
+As the USB SCM registers can get quite complex, I suggest creating a
+minimal driver to handle that, and then eventually that driver might
+just use the generic pinconf API for setting the SCM registers for
+things like bias voltage, pulls and comparators.
 
-- Kukjin
+Regards,
+
+Tony
