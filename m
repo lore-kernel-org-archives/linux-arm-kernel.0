@@ -1,59 +1,205 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 09 Jan 2013 19:20:51 -0500
-Subject: [PATCH 16/16] ARM: vexpress/dcscb: probe via device tree
+Date: Wed, 09 Jan 2013 19:20:48 -0500
+Subject: [PATCH 13/16] drivers: misc: add ARM CCI support
 In-Reply-To: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1357777251-13541-17-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1357777251-13541-14-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows for the DCSCB support to be compiled in and selected
-at run time.
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+On ARM multi-cluster systems coherency between cores running on
+different clusters is managed by the cache-coherent interconnect (CCI).
+It allows broadcasting of TLB invalidates and memory barriers and it
+guarantees cache coherency at system level.
+
+This patch enables the basic infrastructure required in Linux to
+handle and programme the CCI component. The first implementation is
+based on a platform device, its relative DT compatible property and
+a simple programming interface.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/mach-vexpress/dcscb.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ drivers/misc/Kconfig    |   3 ++
+ drivers/misc/Makefile   |   1 +
+ drivers/misc/arm-cci.c  | 107 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/arm-cci.h |  30 ++++++++++++++
+ 4 files changed, 141 insertions(+)
+ create mode 100644 drivers/misc/arm-cci.c
+ create mode 100644 include/linux/arm-cci.h
 
-diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 95a2d0df20..5990f1ff25 100644
---- a/arch/arm/mach-vexpress/dcscb.c
-+++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -14,6 +14,7 @@
- #include <linux/io.h>
- #include <linux/spinlock.h>
- #include <linux/errno.h>
-+#include <linux/of_address.h>
- #include <linux/vexpress.h>
- #include <linux/arm-cci.h>
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index b151b7c1bd..30d5be1ad2 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -499,6 +499,9 @@ config USB_SWITCH_FSA9480
+ 	  stereo and mono audio, video, microphone and UART data to use
+ 	  a common connector port.
  
-@@ -22,8 +23,6 @@
- #include <asm/cacheflush.h>
- 
- 
--#define DCSCB_PHYS_BASE	0x60000000
--
- #define RST_HOLD0	0x0
- #define RST_HOLD1	0x4
- #define SYS_SWRESET	0x8
-@@ -223,12 +222,16 @@ extern void dcscb_power_up_setup(void);
- 
- static int __init dcscb_init(void)
- {
-+	struct device_node *node;
- 	unsigned int cfg;
- 	int ret;
- 
--	dcscb_base = ioremap(DCSCB_PHYS_BASE, 0x1000);
-+	node = of_find_compatible_node(NULL, NULL, "arm,dcscb");
-+	if (!node)
-+		return -ENODEV;
-+	dcscb_base= of_iomap(node, 0);
- 	if (!dcscb_base)
--		return -ENOMEM;
-+		return -EINVAL;
- 	cfg = readl_relaxed(dcscb_base + DCS_CFG_R);
- 	dcscb_cluster_cpu_mask[0] = (1 << (((cfg >> 16) >> (0 << 2)) & 0xf)) - 1;
- 	dcscb_cluster_cpu_mask[1] = (1 << (((cfg >> 16) >> (1 << 2)) & 0xf)) - 1;
++config ARM_CCI
++       bool "ARM CCI driver support"
++
+ source "drivers/misc/c2port/Kconfig"
+ source "drivers/misc/eeprom/Kconfig"
+ source "drivers/misc/cb710/Kconfig"
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index 2129377c0d..d052d109f9 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -49,3 +49,4 @@ obj-y				+= carma/
+ obj-$(CONFIG_USB_SWITCH_FSA9480) += fsa9480.o
+ obj-$(CONFIG_ALTERA_STAPL)	+=altera-stapl/
+ obj-$(CONFIG_INTEL_MEI)		+= mei/
++obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
+diff --git a/drivers/misc/arm-cci.c b/drivers/misc/arm-cci.c
+new file mode 100644
+index 0000000000..f329c43099
+--- /dev/null
++++ b/drivers/misc/arm-cci.c
+@@ -0,0 +1,107 @@
++/*
++ * CCI support
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/arm-cci.h>
++
++#define CCI400_EAG_OFFSET       0x4000
++#define CCI400_KF_OFFSET        0x5000
++
++#define DRIVER_NAME	"CCI"
++struct cci_drvdata {
++	void __iomem *baseaddr;
++	spinlock_t lock;
++};
++
++static struct cci_drvdata *info;
++
++void disable_cci(int cluster)
++{
++	u32 cci_reg = cluster ? CCI400_KF_OFFSET : CCI400_EAG_OFFSET;
++	writel_relaxed(0x0, info->baseaddr	+ cci_reg);
++
++	while (readl_relaxed(info->baseaddr + 0xc) & 0x1)
++			;
++}
++EXPORT_SYMBOL_GPL(disable_cci);
++
++static int __devinit cci_driver_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	int ret = 0;
++
++	info = kzalloc(sizeof(*info), GFP_KERNEL);
++	if (!info) {
++		dev_err(&pdev->dev, "unable to allocate mem\n");
++		return -ENOMEM;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "No memory resource\n");
++		ret = -EINVAL;
++		goto mem_free;
++	}
++
++	if (!request_mem_region(res->start, resource_size(res),
++				dev_name(&pdev->dev))) {
++		dev_err(&pdev->dev, "address 0x%x in use\n", (u32) res->start);
++		ret = -EBUSY;
++		goto mem_free;
++	}
++
++	info->baseaddr = ioremap(res->start, resource_size(res));
++	if (!info->baseaddr) {
++		ret = -ENXIO;
++		goto ioremap_err;
++	}
++
++	platform_set_drvdata(pdev, info);
++
++	pr_info("CCI loaded at %p\n", info->baseaddr);
++	return ret;
++
++ioremap_err:
++	release_region(res->start, resource_size(res));
++mem_free:
++	kfree(info);
++
++	return ret;
++}
++
++static const struct of_device_id arm_cci_matches[] = {
++	{.compatible = "arm,cci"},
++	{},
++};
++
++static struct platform_driver cci_platform_driver = {
++	.driver = {
++		   .name = DRIVER_NAME,
++		   .of_match_table = arm_cci_matches,
++		  },
++	.probe = cci_driver_probe,
++};
++
++static int __init cci_init(void)
++{
++	return platform_driver_register(&cci_platform_driver);
++}
++
++core_initcall(cci_init);
+diff --git a/include/linux/arm-cci.h b/include/linux/arm-cci.h
+new file mode 100644
+index 0000000000..ce3f705fb6
+--- /dev/null
++++ b/include/linux/arm-cci.h
+@@ -0,0 +1,30 @@
++/*
++ * CCI support
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#ifndef __LINUX_ARM_CCI_H
++#define __LINUX_ARM_CCI_H
++
++#ifdef CONFIG_ARM_CCI
++extern void disable_cci(int cluster);
++#else
++static inline void disable_cci(int cluster) { }
++#endif
++
++#endif
 -- 
 1.8.0
