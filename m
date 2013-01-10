@@ -1,61 +1,46 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Thu, 10 Jan 2013 13:02:30 +0000
-Subject: [PATCH v2 2/2] ARM: imx: enable imx6q-cpufreq support
-In-Reply-To: <20130110110742.GI2265@S2101-09.ap.freescale.net>
-References: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
- <1357806863-6899-3-git-send-email-shawn.guo@linaro.org>
- <B5906170F1614E41A8A28DE3B8D121433ECDF7BF@DBDE01.ent.ti.com>
- <20130110110742.GI2265@S2101-09.ap.freescale.net>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECDFC9B@DBDE01.ent.ti.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 10 Jan 2013 08:20:57 -0500
+Subject: [PATCH] ARM: nommu: re-enable use of vexpress without
+ ARCH_MULTIPLATFORM
+In-Reply-To: <201301101016.44708.arnd@arndb.de>
+References: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
+ <20130109204804.GS3931@n2100.arm.linux.org.uk> <50EE3ADA.2070100@gmail.com>
+ <201301101016.44708.arnd@arndb.de>
+Message-ID: <50EEC039.3010905@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 16:37:45, Shawn Guo wrote:
-> On Thu, Jan 10, 2013 at 10:50:25AM +0000, Bedia, Vaibhav wrote:
-> ...
-> > > +static void __init imx6q_opp_check_1p2ghz(struct device *cpu_dev)
-> > > +{
-> > > +	struct device_node *np;
-> > > +	void __iomem *base;
-> > > +	u32 val;
-> > > +
-> > > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ocotp");
-> > > +	if (!np) {
-> > > +		pr_warn("failed to find ocotp node\n");
-> > > +		return;
-> > > +	}
-> > > +
-> > > +	base = of_iomap(np, 0);
-> > > +	if (!base) {
-> > > +		pr_warn("failed to map ocotp\n");
-> > > +		goto put_node;
-> > > +	}
-> > > +
-> > > +	val = readl_relaxed(base + OCOTP_CFG3);
-> > > +	val >>= OCOTP_CFG3_SPEED_SHIFT;
-> > > +	if ((val & 0x3) == OCOTP_CFG3_SPEED_1P2GHZ)
-> > > +		if (opp_add(cpu_dev, 1200000000, 1275000))
-> > > +			pr_warn("failed to add 1.2 GHz operating point\n");
-> > > +
-> > 
-> > I just happened to be thinking about the problem of enabling additional OPPs based on
-> > some Si rev info for TI's AM335x. 
-> > 
-> > The other approach could be to register additional OPPs and mark then as disabled to begin with.
-> > A platform specific hook could then be used to selectively enable the OPPs for based on the Si rev
-> > info.
-> 
-> May I ask the advantage of this approach?  I hate to create
-> platform_data merely for passing a platform specific hook to driver.
-> 
+On 01/10/2013 05:16 AM, Arnd Bergmann wrote:
 
-In the current approach the OPP data is split across DT and kernel code. If you take the
-other approach all OPP entries can reside in DT and for someone just looking at that file
-there's no confusion about what the kernel could potentially support. Whether a particular
-an OPP should be supported is best decided at runtime.
+[...]
 
-Also, IMHO letting platforms invoke opp_add() is open to abuse and platforms should be
-restricted to invoking opp_enable/disable to indicate what's possible on a particular Si rev. 
+> I'd certainly be happy with
+> 
+> * removing the intentional build error for ARCH_MULTIPLATFORM, but leaving
+>   it in for !ARCH_MULTIPLATFORM
+> * having mach-virt enabled by default on ARCH_MULTIPLATFORM, and only
+>   visible for EXPERT.
+> * making mach-virt compatible with all CPUs starting with ARM7.
+> 
+> That would make allnoconfig, allyesconfig and allmodconfig work (besides
+> all the other bugs) on qemu at least, avoid build errors with randconfig
+> and make it hard enough to build a kernel that doesn't run on anything.
+
+If this is going to be the approach, I would like to once again suggest that
+paths, configuration options, and compatibility strings along the lines of
+"mach-genericarmv7", "Generic ARMv7 Machine", and "linux,genericarmv7" be
+considered in place of "mach-virt", "Dummy Virtual Machine" and
+"linux,dummy-virt", respectively.
+
+Virtualization may have been the initial motivation for creating mach-virt,
+but the code is clearly also immediately applicable to other environments such
+as simulation/emulation, and sticking to a name like "Dummy Virtual Machine"
+makes it sound like such usage is erroneous.
 
 Regards,
-Vaibhav
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
+the Linux Foundation
