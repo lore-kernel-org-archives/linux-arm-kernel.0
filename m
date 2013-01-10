@@ -1,30 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jan 2013 11:51:22 +0100
-Subject: [PATCH] gpio: vt8500: memory cleanup missing
-In-Reply-To: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
-References: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <CACRpkdYwn0uc1Nk+RMcx_AaZ5o6k2ug1rAAJrJCGNb9J4MwWhw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 10 Jan 2013 11:52:22 +0100
+Subject: some question about usermode:kernel mode is not 2:2 or 1:3
+In-Reply-To: <CANudz+snNE9shBTosbVK+xV9P0NPNPR3OH3z5ey=+u_FcFTrkQ@mail.gmail.com>
+References: <CANudz+snNE9shBTosbVK+xV9P0NPNPR3OH3z5ey=+u_FcFTrkQ@mail.gmail.com>
+Message-ID: <5478233.oiXe2QDsbJ@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 2, 2013 at 10:47 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+Hi,
 
-> This driver is missing a .remove callback, and the fail path on
-> probe is incomplete.
->
-> If an error occurs in vt8500_add_chips, gpio_base is not unmapped.
-> The driver is also ignoring the return value from this function so
-> if a chip fails to register it completes as successful.
->
-> Replaced pr_err with dev_err in vt8500_add_chips since the device is
-> available.
->
-> There is also no .remove callback defined. To allow removing the
-> registered chips, I have moved *vtchip to be a static global.
->
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+On Thursday 10 of January 2013 18:39:25 loody wrote:
+> hi all:
+> There are some hw limitations on my platform.
+> 1. dram size is only 128MB.
+> 2. cpu dram physical address range only from 0x0 ~ 0x8000000(128MB)
+>     that means my PAGE_OFFSET cannot set as 2G or 3G
+> 
+> per above #1 and #2 limitation, I have to change  PAGE_OFFSET =
+> 0x4000000(64MB) Kernel booting very well.
+> but it will fail on running init, the first usermode program.
+> 
+> my question are:
+> A. I use codesourcety toolchain, is it possible this failure due to
+> toolchain not knowing the size limitation.
+> B. if A is correct, should I cross-compile own toolchain to link my own
+> kernel?
 
-Applied to fixes, thanks!
+You seem to confuse physical memory with virtual memory. Here's a nice 
+article about virtual memory on Linux:
 
-Yours,
-Linus Walleij
+http://linux-mm.org/VirtualMemory
+
+Best regards,
+Tomasz Figa
