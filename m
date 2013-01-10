@@ -1,84 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 10 Jan 2013 11:48:27 +0000
-Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
-Message-ID: <1357818507-8716-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 10 Jan 2013 06:50:31 -0500
+Subject: [PATCH v2 15/20] arm: kirkwood: topkick: the Topkick platform
+ uses a 88F6282 SoC
+In-Reply-To: <20130110061309.GA9993@lunn.ch>
+References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1356101359-6054-16-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130110022926.GH5075@titan.lakedaemon.net>
+ <20130110061309.GA9993@lunn.ch>
+Message-ID: <20130110115031.GJ5075@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the introduction of /cpu nodes bindings for ARM and the
-corresponding parse function arm_dt_init_cpu_maps(), the cpu_logical_map
-and the number of possible CPUs are set according to the DT /cpu
-nodes entries. Currently most of the existing ARM SMP platforms detect the
-number of cores through HW probing in their .smp_init_cpus functions and set
-the possible CPU mask accordingly.
-This method should be upgraded so that the CPU counting mechanism will be
-based on DT, keeping legacy HW probing mechanism as a fall back solution.
+On Thu, Jan 10, 2013 at 07:13:09AM +0100, Andrew Lunn wrote:
+> On Wed, Jan 09, 2013 at 09:29:26PM -0500, Jason Cooper wrote:
+> > On Fri, Dec 21, 2012 at 03:49:14PM +0100, Thomas Petazzoni wrote:
+> > > The Topkick board uses a 88F6282 SoC, so the Device Tree Source
+> > > describing the Topkick should inherit from kirkwood-6282.dtsi, which
+> > > allows to take advantage of pin muxing capabilities.
+> > > 
+> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > ---
+> > > Changes since v1:
+> > >  * This patch is new in v2
+> > > ---
+> > >  arch/arm/boot/dts/kirkwood-topkick.dts |    1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
+> > > index c0de5a7..8f4a5b8 100644
+> > > --- a/arch/arm/boot/dts/kirkwood-topkick.dts
+> > > +++ b/arch/arm/boot/dts/kirkwood-topkick.dts
+> > > @@ -1,6 +1,7 @@
+> > >  /dts-v1/;
+> > >  
+> > >  /include/ "kirkwood.dtsi"
+> > > +/include/ "kirkwood-6282.dtsi"
+> > 
+> > Hmmm, shouldn't the cooresponding MPP.._GPIO and kirkwood_mpp_conf() be
+> > removed as well?
+> 
+> Hi Jason
+> 
+> I have some patches for that. I will dig them out over the weekend.
+> 
+> I did have an issue with one of the LEDs. If i remember correctly, i
+> sent you an email about it. Could you look back in your archive? 
 
-In order to implement this fall back solution mechanism, the ARM DT code
-should provide a helper function to platforms to check if the cpu map
-has been properly initialized through DT. If the check fails the
-platform will resort to legacy HW based cores counting mechanism.
+Yes, I have it on my todo list.  Unfortunately, I haven't unpacked my
+dev plats after my office relocation.  :(  Hopefully, I'll get that set
+up this weekend.
 
-This patch implements a trivial flag and a helper function that platform
-can call to check whether DT based cpu map initialization and cores count
-were completed successfully.
+thx,
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/include/asm/prom.h | 10 ++++++++++
- arch/arm/kernel/devtree.c   |  5 +++++
- 2 files changed, 15 insertions(+)
-
-diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-index a219227..487614a 100644
---- a/arch/arm/include/asm/prom.h
-+++ b/arch/arm/include/asm/prom.h
-@@ -18,6 +18,15 @@
- extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
- extern void arm_dt_memblock_reserve(void);
- extern void __init arm_dt_init_cpu_maps(void);
-+/*
-+ * Return true if cpu map initialization has been
-+ * carried out correctly from DT
-+ */
-+static inline bool __init arm_dt_cpu_map_valid(void)
-+{
-+	extern bool valid_dt_cpu_map;
-+	return valid_dt_cpu_map;
-+}
- 
- #else /* CONFIG_OF */
- 
-@@ -28,6 +37,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
- 
- static inline void arm_dt_memblock_reserve(void) { }
- static inline void arm_dt_init_cpu_maps(void) { }
-+static inline bool __init arm_dt_cpu_map_valid(void) { return false; }
- 
- #endif /* CONFIG_OF */
- #endif /* ASMARM_PROM_H */
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 70f1bde..c82af3b 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -62,6 +62,10 @@ void __init arm_dt_memblock_reserve(void)
- 		memblock_reserve(base, size);
- 	}
- }
-+/*
-+ * Export DT cpu map validity flag to platforms
-+ */
-+bool valid_dt_cpu_map __initdata;
- 
- /*
-  * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
-@@ -158,6 +162,7 @@ void __init arm_dt_init_cpu_maps(void)
- 	 * a reg property, the DT CPU list can be considered valid and the
- 	 * logical map created in smp_setup_processor_id() can be overridden
- 	 */
-+	valid_dt_cpu_map = true;
- 	for (i = 0; i < cpuidx; i++) {
- 		set_cpu_possible(i, true);
- 		cpu_logical_map(i) = tmp_map[i];
--- 
-1.7.12
+Jason.
