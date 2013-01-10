@@ -1,26 +1,25 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 9 Jan 2013 21:03:50 -0500
-Subject: [PATCH V2 4/4] arm: mvebu: Update defconfig with Marvell RTC
- support
-In-Reply-To: <1355303186-9267-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1355303186-9267-1-git-send-email-gregory.clement@free-electrons.com>
- <1355303186-9267-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130110020350.GF5075@titan.lakedaemon.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 Jan 2013 10:09:04 +0800
+Subject: [PATCH 3/4] ARM i.MX53: add dts for the TQ tqma53 module
+In-Reply-To: <CAOMZO5BXKbjh1J+ms2b4taGaT34xAUM+L3E4FouyZ6tOnQTofg@mail.gmail.com>
+References: <1357739065-9153-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1357739065-9153-4-git-send-email-s.trumtrar@pengutronix.de>
+ <CAOMZO5BXKbjh1J+ms2b4taGaT34xAUM+L3E4FouyZ6tOnQTofg@mail.gmail.com>
+Message-ID: <20130110020903.GD2265@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 10:06:26AM +0100, Gregory CLEMENT wrote:
-> The RTC class driver is already part of the mvebu_defconfig but the
-> Marvell internal RTC not yet. Now that its support is added for mvebu
-> let's update the config file.
+On Wed, Jan 09, 2013 at 02:30:34PM -0200, Fabio Estevam wrote:
+> On Wed, Jan 9, 2013 at 11:44 AM, Steffen Trumtrar
+> <s.trumtrar@pengutronix.de> wrote:
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/configs/mvebu_defconfig |    1 +
->  1 file changed, 1 insertion(+)
+> > +
+> > +&wdog1 {
+> > +       status = "okay";
+> > +};
+> 
+> This can be removed, since imx53.dtsi already enables the watchdog.
 
-Applied to mvebu/boards
+I fixed it up and applied the patch.
 
-thx,
-
-Jason.
+Shawn
