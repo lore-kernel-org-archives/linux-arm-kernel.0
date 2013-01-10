@@ -1,72 +1,122 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 10 Jan 2013 13:50:48 +0100
-Subject: [PATCH 1/3] driver core: add helper macro for
- platform_driver_probe() boilerplate
-In-Reply-To: <1357730128-23018-2-git-send-email-fabio.porcedda@gmail.com>
-References: <1357730128-23018-1-git-send-email-fabio.porcedda@gmail.com>
- <1357730128-23018-2-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <CAHkwnC8bmDxZdy=xos6AnG1vPDtGhGF6S8FYFfbdKG9vrHCnYw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 10 Jan 2013 13:51:42 +0100
+Subject: [PATCH v2] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
+In-Reply-To: <3816648.2TVsTiMOWx@bender>
+References: <1588881.pi23bvqp7D@bender> <3816648.2TVsTiMOWx@bender>
+Message-ID: <50EEB95E.3070407@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-I'm sorry, In the previous email I used your wrong email address,
-in this email I've used your correct email address.
-
-Best regards
-Fabio Porcedda
-
-On Wed, Jan 9, 2013 at 12:15 PM, Fabio Porcedda
-<fabio.porcedda@gmail.com> wrote:
-> For simple modules that contain a single platform_driver without any
-> additional setup code then ends up being a block of duplicated
-> boilerplate.  This patch adds a new macro,
-> module_platform_driver_probe(), which replaces the
-> module_init()/module_exit() registrations with template functions.
->
-> This macro use the same idea of module_platform_driver().
->
-> This macro is useful to stop the misuse of module_platform_driver() for
-> removing the platform_driver_probe() boilerplate.
->
-> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> Cc: Greg Kroah-Hartman <gregkh@suse.de>
-
-Cc: Greg Kroah-Hartman (linuxfoundation.org)
-
+On 01/09/2013 08:56 PM, Florian Fainelli wrote:
+> This patch adds the DTS file to support the Marvell RD-A370-A1
+> (Reference Design board) also known as RD-88F6710 board. It is almost
+> entirely similar to the DB-A370 board except that the first Ethernet PHY
+> is SGMII-wired and the second is a switch which is RGMII-wired.
+> 
+> Signed-off-by: Florian Fainelli <florian@openwrt.org>
 > ---
->  include/linux/platform_device.h | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->
-> diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
-> index a9ded9a..c082c71 100644
-> --- a/include/linux/platform_device.h
-> +++ b/include/linux/platform_device.h
-> @@ -204,6 +204,24 @@ static inline void platform_set_drvdata(struct platform_device *pdev, void *data
->         module_driver(__platform_driver, platform_driver_register, \
->                         platform_driver_unregister)
->
-> +/* module_platform_driver_probe() - Helper macro for drivers that don't do
-> + * anything special in module init/exit.  This eliminates a lot of
-> + * boilerplate.  Each module may only use this macro once, and
-> + * calling it replaces module_init() and module_exit()
+> Thomas, Cl?ment, as support for other peripherals gets merged, I will update
+> this DTS file to reflect this. Thanks!
+> 
+> Changes since v1:
+> - added missing entry in arch/arm/boot/dts/Makefile to actually build the DTB
+> 
+>  arch/arm/boot/dts/Makefile          |    1 +
+>  arch/arm/boot/dts/armada-370-rd.dts |   61 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 62 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-370-rd.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b7246d6..7a75171 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -78,6 +78,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>  	msm8960-cdp.dtb
+>  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+>  	armada-370-mirabox.dtb \
+> +	armada-370-rd.dtb \
+>  	armada-xp-db.dtb \
+>  	armada-xp-openblocks-ax3-4.dtb
+>  dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+> diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+> new file mode 100644
+> index 0000000..d62dfac
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-370-rd.dts
+> @@ -0,0 +1,61 @@
+> +/*
+> + * Device Tree file for Marvell Armada 370 Reference Design board
+> + * (RD-88F6710-A1)
+> + *
+> + *  Copied from arch/arm/boot/dts/armada-370-db.dts
+> + *
+> + *  Copyright (C) 2013 Florian Fainelli <florian@openwrt.org>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
 > + */
-> +#define module_platform_driver_probe(__platform_driver, __platform_probe) \
-> +static int __init __platform_driver##_init(void) \
-> +{ \
-> +       return platform_driver_probe(&(__platform_driver), \
-> +                                    __platform_probe);    \
-> +} \
-> +module_init(__platform_driver##_init); \
-> +static void __exit __platform_driver##_exit(void) \
-> +{ \
-> +       platform_driver_unregister(&(__platform_driver)); \
-> +} \
-> +module_exit(__platform_driver##_exit);
 > +
->  extern struct platform_device *platform_create_bundle(struct platform_driver *driver,
->                                         int (*probe)(struct platform_device *),
->                                         struct resource *res, unsigned int n_res,
-> --
-> 1.8.0.3
->
+> +/dts-v1/;
+> +/include/ "armada-370.dtsi"
+> +
+> +/ {
+> +	model = "Marvell Armada 370 Reference Design";
+> +	compatible = "marvell,a370-rd", "marvell,armada370", "marvell,armada-370-xp";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x20000000>; /* 512 MB */
+Hi Florian,
+
+As you based your file on our (erroneous) dts, could you confirm that
+the RD-A370-A1 board have "only" 512MB?
+
+Thanks,
+
+> +	};
+> +
+> +	soc {
+> +		serial at d0012000 {
+> +			clock-frequency = <200000000>;
+> +			status = "okay";
+> +		};
+> +		sata at d00a0000 {
+> +			nr-ports = <2>;
+> +			status = "okay";
+> +		};
+> +
+> +		mdio {
+> +			phy0: ethernet-phy at 0 {
+> +				reg = <0>;
+> +			};
+> +
+> +			phy1: ethernet-phy at 1 {
+> +				reg = <1>;
+> +			};
+> +		};
+> +
+> +		ethernet at d0070000 {
+> +			status = "okay";
+> +			phy = <&phy0>;
+> +			phy-mode = "sgmii";
+> +		};
+> +		ethernet at d0074000 {
+> +			status = "okay";
+> +			phy = <&phy1>;
+> +			phy-mode = "rgmii-id";
+> +		};
+> +	};
+> +};
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
