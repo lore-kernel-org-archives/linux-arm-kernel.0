@@ -1,28 +1,33 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 10 Jan 2013 11:55:01 +0100
-Subject: [RFC PATCH 5/7] ARM: s3c64xx: Add board file for boot using
- Device Tree
-In-Reply-To: <20130110105221.GG20956@opensource.wolfsonmicro.com>
-References: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
- <1357774909-29938-6-git-send-email-tomasz.figa@gmail.com>
- <20130110105221.GG20956@opensource.wolfsonmicro.com>
-Message-ID: <1513533.R0vnZSVmMe@flatron>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Jan 2013 10:57:10 +0000
+Subject: [PATCH] gpio: vt8500: memory cleanup missing
+In-Reply-To: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
+References: <1357163240-23131-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130110105710.GA19944@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thu, Jan 03, 2013 at 10:47:20AM +1300, Tony Prisk wrote:
+> There is also no .remove callback defined. To allow removing the
+> registered chips, I have moved *vtchip to be a static global.
 
-On Thursday 10 of January 2013 10:52:22 Mark Brown wrote:
-> On Thu, Jan 10, 2013 at 12:41:47AM +0100, Tomasz Figa wrote:
-> > + * The following lookup table is used to override device names when
-> > devices + * are registered from device tree. This is temporarily
-> > added to enable + * device tree support addition for the Exynos4
-> > architecture.
-> Cut'n'paste.
+What?  Why?
 
-Oh my, you got me. ;)
+> +/* Pointer to our array of chips */
+> +static struct vt8500_gpio_chip *vtchip;
+> +
+...
+> +static int vt8500_gpio_remove(struct platform_device *pdev)
+> +{
+> +	int i;
+> +	int ret;
+> +	const struct vt8500_gpio_data *data;
+> +	void __iomem *gpio_base = vtchip[0].base;
+> +	const struct of_device_id *of_id =
+> +				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
+> +
 
-I will correct it in next version. Thanks for spotting this.
-
-Best regards,
-Tomasz Figa
+You can get at the vtchip pointer if you put it into the platform device's
+driver data pointer.  That way, you're not artificially limiting this
+driver to just one device, and, with your changes it will go wrong if DT
+ever lists more than one device.
