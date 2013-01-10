@@ -1,24 +1,43 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 10 Jan 2013 14:32:30 -0500 (EST)
-Subject: [PATCH 0/3] arch_decomp_wdog cleanup
-In-Reply-To: <1357827165-9320-1-git-send-email-shawn.guo@linaro.org>
-References: <1357827165-9320-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <alpine.LFD.2.02.1301101430200.6300@xanadu.home>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 10 Jan 2013 11:33:41 -0800
+Subject: [PATCH v6 00/12] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <20130110191207.GI25591@8bytes.org>
+References: <003301cde30b$c584c2d0$508e4870$%cho@samsung.com>
+ <032401cde783$485ae1a0$d910a4e0$@samsung.com>
+ <20130110171844.GA2650@8bytes.org>
+ <027601cdef61$2df576a0$89e063e0$@samsung.com>
+ <20130110191207.GI25591@8bytes.org>
+Message-ID: <02ae01cdef69$67d66200$37832600$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Jan 2013, Shawn Guo wrote:
+'Joerg Roedel' wrote:
+> 
+> On Thu, Jan 10, 2013 at 10:34:48AM -0800, Kukjin Kim wrote:
+> > Hmm, I think, just one [7/12] patch does matter so if you could create
+topic
+> > branch and apply [7/12] patch firstly before other drivers/ changes
+would
+> be
+> > better to me. It's OK on both trees if I just _merge_ the first [7/12]
+> > commit in the topic branch you provided for exynos-iommu. But you know,
+> you
+> > don't have to rebase it once I merge it in Samsung tree.
+> >
+> > How about?
+> 
+> Sounds good. Should I take the patch directly from this post? I would
+> add your Acked-by then and make it the base for the arm/exynos branch.
 
-> All the arch_decomp_wdog related codes are there without any users,
-> since ARCH_HAS_DECOMP_WDOG is only used by lib/inflate.c which however
-> is not used by arch/arm/boot/compressed/decompress.c.
+Sure, keep going on with
 
-It is also worth mentioning that CONFIG_S3C_BOOT_WATCHDOG is not set 
-anywhere.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-For those 3 patches:
+> Once the branch is set-up, as usual it will not be rebased.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+OK, good. Let me know the name of branch when you set-up it :-)
 
+Thanks.
 
-Nicolas
+- Kukjin
