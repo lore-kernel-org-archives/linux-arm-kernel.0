@@ -1,53 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Jan 2013 15:34:18 +0000
-Subject: [PATCH 01/16] ARM: b.L: secondary kernel entry code
-In-Reply-To: <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <CAHkRjk65PEVDS6vi=07g_hef8yXOR+mTYV_Nchu1fAuLnOJLOw@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Thu, 10 Jan 2013 19:39:16 +0400
+Subject: [PATCH v3 06/18] ARM: clps711x: cdb89712: Special driver for
+ handling memory is removed
+In-Reply-To: <20130110140921.GC14860@pengutronix.de>
+References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
+ <1353160644-22446-7-git-send-email-shc_work@mail.ru>
+ <20130110140921.GC14860@pengutronix.de>
+Message-ID: <20130110193916.16f1a92eb5048250004b6b03@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nico,
+On Thu, 10 Jan 2013 15:09:21 +0100
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
-On 10 January 2013 00:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> --- /dev/null
-> +++ b/arch/arm/common/bL_entry.c
 ...
-> +extern volatile unsigned long bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
+> >  static void __init cdb89712_init(void)
+> >  {
+> > +	platform_device_register(&cdb89712_flash_pdev);
+> > +	platform_device_register(&cdb89712_bootrom_pdev);
+> > +	platform_device_register(&cdb89712_sram_pdev);
+> This is broken, all these structs are located in .init.data which is
+> discarded after the machine is fully booted. Also platformdata must not
+> live in init data. Consider using platform_device_register_full which
+> allows more data to be init data.
 
-IMHO, we should keep this array linear and ignore the cluster grouping
-at this stage. This information could be added to latter patches that
-actually need to know about the b.L topology. This would also imply
-that we treat the MPIDR just as an ID without digging into its bit
-layout. But I haven't looked at the other patches yet to see how this
-would fit.
-
-> +void bL_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
-> +{
-> +       unsigned long val = ptr ? virt_to_phys(ptr) : 0;
-> +       bL_entry_vectors[cluster][cpu] = val;
-> +       smp_wmb();
-> +       __cpuc_flush_dcache_area((void *)&bL_entry_vectors[cluster][cpu], 4);
-> +       outer_clean_range(__pa(&bL_entry_vectors[cluster][cpu]),
-> +                         __pa(&bL_entry_vectors[cluster][cpu + 1]));
-
-Why are you using the smp_wmb() here? We don't need any barrier since
-data cache ops by MVA are automatically ordered in relation to stores
-to the same MVA (as long as the MVA is in Normal Cacheable memory).
-
-> --- /dev/null
-> +++ b/arch/arm/common/bL_head.S
-...
-> +ENTRY(bL_entry_point)
-> +
-> + THUMB(        adr     r12, BSYM(1f)   )
-> + THUMB(        bx      r12             )
-> + THUMB(        .thumb                  )
-> +1:
-> +       mrc     p15, 0, r0, c0, c0, 5
-
-Minor thing, maybe a comment for this line like @ MPIDR.
+I agree. Error is invisible when not using loadable modules, but will
+become apparent when using these.
+I will make the necessary changes. Thank you.
 
 -- 
-Catalin
+Alexander Shiyan <shc_work@mail.ru>
