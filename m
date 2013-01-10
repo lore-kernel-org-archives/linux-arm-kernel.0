@@ -1,39 +1,62 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 10 Jan 2013 10:24:27 -0800
-Subject: [REPOST PATCH v3 2/4] ARM: dts: Add disable-wp for sd card slot on
- smdk5250
-In-Reply-To: <1357842269-15062-1-git-send-email-dianders@chromium.org>
-References: <1354251857-21587-1-git-send-email-dianders@chromium.org>
- <1357842269-15062-1-git-send-email-dianders@chromium.org>
-Message-ID: <1357842269-15062-2-git-send-email-dianders@chromium.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 10 Jan 2013 19:19:34 +0100
+Subject: [PATCH 2/3 V2] iio: mxs: Implement support for touchscreen
+In-Reply-To: <20130110174630.GB2797@core.coreip.homeip.net>
+References: <1355449598-15980-1-git-send-email-marex@denx.de>
+ <201212191801.31920.marex@denx.de>
+ <20130110005748.GA947@core.coreip.homeip.net>
+ <201301101048.38036.marex@denx.de>
+ <20130110174630.GB2797@core.coreip.homeip.net>
+Message-ID: <50EF0636.6090903@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The next change will remove the code from the dw_mmc-exynos that added
-the DW_MCI_QUIRK_NO_WRITE_PROTECT.  Keep existing functionality of
-having no write protect pin on smdk5250 by adding the disable-wp
-property.
+On 01/10/2013 06:46 PM, Dmitry Torokhov wrote:
+> On Thu, Jan 10, 2013 at 10:48:37AM +0100, Marek Vasut wrote:
+>> Dear Dmitry Torokhov,
+>>
+>> [...]
+>>>>> +	enum mxs_lradc_ts	use_touchscreen;
+>>>>> +	unsigned int		stop_touchscreen:1;
+>>>>> +	unsigned int		use_touchbutton:1;
+>>>
+>>> Can we make them bools instead of bit fields?
+>>
+>> Sure.
+>> [...]
+>>
+>>>>> +static void mxs_lradc_ts_close(struct input_dev *dev)
+>>>>> +{
+>>>>> +	struct mxs_lradc *lradc = input_get_drvdata(dev);
+>>>>> +
+>>>>> +	/* Indicate the touchscreen is stopping. */
+>>>>> +	lradc->stop_touchscreen = 1;
+>>>>> +
+>>>>> +	/* Disable touchscreen touch-detect IRQ. */
+>>>>> +	writel(LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
+>>>>> +		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
+>>>>> +
+>>>>> +	/* Power-down touchscreen touch-detect circuitry. */
+>>>>> +	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
+>>>>> +		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+>>>
+>>> These 2 writes are racing with writes in mxs_lradc_ts_work(). I think
+>>> you need to:
+>>>
+>>> 	lradc->stop_touchscreen = true;
+>>> 	mb();
+>>
+>> Nice catch, do we need the memory barrier here though, is it not enough to 
+>> reorder the cancel_work_sync() just before the register writes?
+> 
+> You really need to make sure that setting lradc->stop_touchscreen =
+> true; is not reordered, because otherwise you may cancel the work,
+> interrupt happens and reschedules it, and then you set up the flag.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
----
-Changes in v3:
-- New for this version of the patch series.
+Does it really matter? If it is rescheduled you get one event more reported
+after the device has been closed, but input core should ignore it anyway, or
+doesn't it?
 
- arch/arm/boot/dts/exynos5250-smdk5250.dts |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Btw. why not use threaded interrupts instead of irq + workqueue combo?
 
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 942d576..75b9d83 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -146,6 +146,7 @@
- 			reg = <0>;
- 			bus-width = <4>;
- 			samsung,cd-pinmux-gpio = <&gpc3 2 2 3 3>;
-+			disable-wp;
- 			gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
- 				<&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
- 				<&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
--- 
-1.7.7.3
+- Lars
