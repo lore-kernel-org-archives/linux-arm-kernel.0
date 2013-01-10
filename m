@@ -1,23 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 10 Jan 2013 11:10:37 +0000
-Subject: [RFC PATCH 3/7] ARM: s3c64xx: Add support for OF-based VIC
- initialization
-In-Reply-To: <1357774909-29938-4-git-send-email-tomasz.figa@gmail.com>
-References: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
- <1357774909-29938-4-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20130110111037.GJ20956@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Jan 2013 12:13:42 +0100
+Subject: [PATCH 0/2] Add GPIO driver for Allwinner SoCs
+In-Reply-To: <CAOesGMiTZvLJ6cXwMFsFc6pBGoLUEkV+WMrDOqqCcs_TEnTtUw@mail.gmail.com>
+References: <1357317909-12458-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CAOesGMiTZvLJ6cXwMFsFc6pBGoLUEkV+WMrDOqqCcs_TEnTtUw@mail.gmail.com>
+Message-ID: <CACRpkdZQAim4_3E6RG=d4pJi80B6W-xzW7n=Od86VJNcPO4FVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 12:41:45AM +0100, Tomasz Figa wrote:
-> This patch modifies IRQ initialization code of S3C64xx to support
-> Device Tree-based initialization of VICs.
+On Sat, Jan 5, 2013 at 4:35 PM, Olof Johansson <olof@lixom.net> wrote:
 
-Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/0e98cde9/attachment.sig>
+> I haven't looked closely at the patch yet, but this is a case where it
+> makes sense to merge the gpio/pinctrl patch through Linus/Grant's
+> tree, and merge the dtsi update through arm-soc -- while you need
+> both, nothing is broken by having just one or the other, so taking the
+> separate merge paths are fine.
+>
+> Linus, Grant, sound ok to you?
+
+Sure. But I have requested a few changes to the patch set...
+
+Linus Walleij
