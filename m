@@ -1,40 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 10 Jan 2013 03:28:10 +0000
-Subject: [GIT PULL] ARM: mvebu fixes for v3.8-rc3
-Message-ID: <mailman.22.1357788495.1035.linux-arm-kernel@lists.infradead.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 Jan 2013 11:48:06 +0800
+Subject: [PATCH] ARM: mxs: select USB_ARCH_HAS_EHCI
+In-Reply-To: <1357742162-27982-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1357742162-27982-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130110034805.GF2265@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ba607b6238a1f418c45b9d7f73212bcc6922da53:
+On Wed, Jan 09, 2013 at 03:36:02PM +0100, Maxime Ripard wrote:
+> Commit 09f6ffde introduced a dependency on USB_EHCI_HCD for the chipidea
+> USB host driver, that in turns depends on USB_ARCH_HAS_EHCI.
+> 
+> If this symbol is not selected by the ARCH, we are not able to use the
+> chipidea driver anymore.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index f95ba14..c77d1d1 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -456,6 +456,7 @@ config ARCH_MXS
+>  	select PINCTRL
+>  	select SPARSE_IRQ
+>  	select USE_OF
+> +	select USB_ARCH_HAS_EHCI
+>  	help
+>  	  Support for Freescale MXS-based family of processors
+>  
 
-  pinctrl: mvebu: make pdma clock on dove mandatory (2013-01-07 16:19:02 +0000)
+I prefer to fix it with the patch below.
 
-are available in the git repository at:
+Shawn
 
-  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.8-rc3
-
-for you to fetch changes up to 9e1c96ed82562c05c89ee3eedee8d980e5c0d865:
-
-  ARM: Dove: add Cubox sdhci card detect gpio (2013-01-10 02:14:08 +0000)
-
-----------------------------------------------------------------
-mvebu fixes for v3.8-rc3
- - gpio fixes in mvebu, kirkwood, and dove
-
-----------------------------------------------------------------
-Sebastian Hesselbarth (1):
-      ARM: Dove: add Cubox sdhci card detect gpio
-
-Simon Guinot (1):
-      ARM: Kirkwood: fix ns2 gpios by converting to pinctrl
-
-Thomas Petazzoni (1):
-      arm: mvebu: use global interrupts for GPIOs on Armada XP
-
- arch/arm/boot/dts/armada-xp-mv78230.dtsi   | 14 +++++------
- arch/arm/boot/dts/armada-xp-mv78260.dtsi   | 21 +++++++----------
- arch/arm/boot/dts/armada-xp-mv78460.dtsi   | 21 +++++++----------
- arch/arm/boot/dts/dove-cubox.dts           | 14 +++++++++--
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi | 16 +++++++++++++
- arch/arm/mach-kirkwood/board-ns2.c         | 38 ------------------------------
- 6 files changed, 52 insertions(+), 72 deletions(-)
+diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
+index 4c90b51..640ae6c 100644
+--- a/drivers/usb/Kconfig
++++ b/drivers/usb/Kconfig
+@@ -37,6 +37,7 @@ config USB_ARCH_HAS_EHCI
+        default y if ARCH_W90X900
+        default y if ARCH_AT91
+        default y if ARCH_MXC
++       default y if ARCH_MXS
+        default y if ARCH_OMAP3
+        default y if ARCH_CNS3XXX
+        default y if ARCH_VT8500
