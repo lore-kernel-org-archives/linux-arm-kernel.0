@@ -1,28 +1,26 @@
-From: joro@8bytes.org ('Joerg Roedel')
-Date: Thu, 10 Jan 2013 20:12:08 +0100
-Subject: [PATCH v6 00/12] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <027601cdef61$2df576a0$89e063e0$@samsung.com>
-References: <003301cde30b$c584c2d0$508e4870$%cho@samsung.com>
- <032401cde783$485ae1a0$d910a4e0$@samsung.com>
- <20130110171844.GA2650@8bytes.org>
- <027601cdef61$2df576a0$89e063e0$@samsung.com>
-Message-ID: <20130110191207.GI25591@8bytes.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 10 Jan 2013 14:13:09 -0500 (EST)
+Subject: [PATCH 14/16] ARM: TC2: ensure powerdown-time data is flushed
+ from cache
+In-Reply-To: <20130110185052.GF29952@linaro.org>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-15-git-send-email-nicolas.pitre@linaro.org>
+ <20130110185052.GF29952@linaro.org>
+Message-ID: <alpine.LFD.2.02.1301101410540.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 10:34:48AM -0800, Kukjin Kim wrote:
-> Hmm, I think, just one [7/12] patch does matter so if you could create topic
-> branch and apply [7/12] patch firstly before other drivers/ changes would be
-> better to me. It's OK on both trees if I just _merge_ the first [7/12]
-> commit in the topic branch you provided for exynos-iommu. But you know, you
-> don't have to rebase it once I merge it in Samsung tree.
+On Thu, 10 Jan 2013, Dave Martin wrote:
+
+> On Wed, Jan 09, 2013 at 07:20:49PM -0500, Nicolas Pitre wrote:
+> > From: Dave Martin <dave.martin@linaro.org>
 > 
-> How about?
+> To avoid confusion, the prefix in the subject line should be "CCI", not
+> "TC2".
 
-Sounds good. Should I take the patch directly from this post? I would
-add your Acked-by then and make it the base for the arm/exynos branch.
-Once the branch is set-up, as usual it will not be rebased.
+Absolutely.  This is my mistake as I removed the TC2 changes from your 
+original patch to only keep the CCI ones, but forgot to update the patch 
+title.
 
 
-	Joerg
+Nicolas
