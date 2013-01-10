@@ -1,25 +1,27 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 10 Jan 2013 07:17:19 -0500
-Subject: Fix phy_init for Marvell network eth driver
-In-Reply-To: <1357819234-27752-1-git-send-email-konszert@marvell.com>
-References: <1357819234-27752-1-git-send-email-konszert@marvell.com>
-Message-ID: <20130110121719.GL5075@titan.lakedaemon.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 10 Jan 2013 17:49:13 +0530
+Subject: [PATCH V2 3/3] ARM: davinci: da850: add NAND driver entries
+In-Reply-To: <F3DBB1B3EF102E4994C89758CFCA32412B80CA@DBDE01.ent.ti.com>
+References: <1357633220-29827-1-git-send-email-anilkumar.v@ti.com>
+ <1357633220-29827-4-git-send-email-anilkumar.v@ti.com>
+ <50ED66F2.8050006@ti.com>
+ <F3DBB1B3EF102E4994C89758CFCA32412B80CA@DBDE01.ent.ti.com>
+Message-ID: <50EEB1C1.9060306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 02:00:32PM +0200, Kosta Zertsekel wrote:
-> Hi all,
-> resubmitting the patch for Marvell mv643xx driver (patch 1/2) adding the below explanation (thanks to Florian F.):
-> The D-Link DNS323_REV_C1 board has a specific PHY device fixup using the flag MARVELL_PHY_M1118_DNS323_LEDS which is set by the architecture code in arch/arm/mach-orion5x/dns323-setup.c. This flag is unfortunately lost during the call to phy_attach() in mv643xx_eth and therefore, the underlying Marvell PHY driver cannot make use of this flag to fixup the PHY device LEDs. This patch ensures the phy->dev_flags value is passed to the phy_attach() function such that the PHY device driver can
-> actually use it.
-> 
-> Also submitting new patch 2/2 using the same (or at least very close in meaning) explanation.
+On 1/10/2013 1:07 PM, Kumar, Anil wrote:
+> On Wed, Jan 09, 2013 at 18:17:46, Nori, Sekhar wrote:
 
-Could you please put the above description in the patch commit log for
-both patches?  Other than that,
+> I do not think that it is good idea to move NAND pin mux information
+> into da850.dtsi because this information is evm specific.
+> if we will use this approach then we must use the same approach for
+> other modules also as ASoC etc.   
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Why do you consider this EVM specific. IOW, which pins do you see
+changing on another board? BTW, if there are additional pins needed than
+what are listed, we can always add more pinux entries in the .dts files.
+The pins present in dtsi file should the base case.
 
-thx,
-
-Jason.
+Thanks,
+Sekhar
