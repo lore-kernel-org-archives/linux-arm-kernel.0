@@ -1,84 +1,53 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 10 Jan 2013 00:41:49 +0100
-Subject: [RFC PATCH 7/7] ARM: dts: Add dts file for S3C6410-based Mini6410
- board
-In-Reply-To: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 09 Jan 2013 16:15:23 -0800
+Subject: [RFC PATCH 4/7] ARM: s3c64xx: Fix build error with
+ CONFIG_S3C_DEV_FB disabled
+In-Reply-To: <1357774909-29938-5-git-send-email-tomasz.figa@gmail.com>
 References: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1357774909-29938-8-git-send-email-tomasz.figa@gmail.com>
+ <1357774909-29938-5-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <00a201cdeec7$99f5d560$cde18020$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic device tree sources for FriendlyARM Mini6410 board
-based on Samsung S3C6410 SoC.
+Tomasz Figa wrote:
+> 
+> If there is no board selecting CONFIG_S3C_DEV_FB enabled, build will fail
+on
+> arch/arm/mach-s3c64xx/pm.c, where s3c_device_fb is referenced.
+> 
+> This patch adds ifdef guard around the code making it compile only when
+> CONFIG_S3C_DEV_FB is enabled.
+> 
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/pm.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+> index f6b13a2..3686785 100644
+> --- a/arch/arm/mach-s3c64xx/pm.c
+> +++ b/arch/arm/mach-s3c64xx/pm.c
+> @@ -338,10 +338,10 @@ int __init s3c64xx_pm_init(void)
+> 
+>  	for (i = 0; i < ARRAY_SIZE(s3c64xx_pm_domains); i++)
+>  		pm_genpd_init(&s3c64xx_pm_domains[i]->pd, NULL, false);
+> -
+> +#ifdef CONFIG_S3C_DEV_FB
+>  	if (dev_get_platdata(&s3c_device_fb.dev))
+>  		pm_genpd_add_device(&s3c64xx_pm_f.pd,
+> &s3c_device_fb.dev);
+> -
+> +#endif
+>  	return 0;
+>  }
+> 
+> --
+> 1.8.1
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/s3c6410-mini6410.dts | 44 ++++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+)
- create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
+This should be separated patch from this series as a fix.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e44da40..9ca30ea 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -120,6 +120,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
- 	hrefprev60.dtb \
- 	hrefv60plus.dtb \
- 	ccu9540.dtb
-+dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	sh73a0-kzm9g.dtb \
-diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
-new file mode 100644
-index 0000000..a5ceade
---- /dev/null
-+++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
-@@ -0,0 +1,44 @@
-+/*
-+ * Samsung's S3C6410 based Mini6410 board device tree source
-+ *
-+ * Copyright (c) 2012 Tomasz Figa <tomasz.figa@gmail.com>
-+ *
-+ * Device tree source file for FriendlyARM Mini6410 board which is based on
-+ * Samsung's S3C6410 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+/include/ "s3c6410.dtsi"
-+
-+/ {
-+	model = "FriendlyARM Mini6410 board based on S3C6410";
-+	compatible = "friendlyarm,mini6410", "samsung,s3c6410";
-+
-+	memory {
-+		reg = <0x50000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttySAC0,115200n8 earlyprintk";
-+	};
-+
-+	serial at 7f005000 {
-+		status = "okay";
-+	};
-+
-+	serial at 7f005400 {
-+		status = "okay";
-+	};
-+
-+	serial at 7f005800 {
-+		status = "okay";
-+	};
-+
-+	serial at 7f005c00 {
-+		status = "okay";
-+	};
-+};
--- 
-1.8.1
+Let me pick this up into -fixes.
+
+Thanks.
+
+- Kukjin
