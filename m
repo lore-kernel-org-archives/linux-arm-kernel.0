@@ -1,63 +1,101 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 10 Jan 2013 11:48:32 -0700
-Subject: [PATCH 2/3] ARM: Orion: Bind the orion bridge interrupt
- controller through DT
-In-Reply-To: <50EE8FC5.50105@gmail.com>
-References: <1355188683-18208-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1355188683-18208-2-git-send-email-jgunthorpe@obsidianresearch.com>
- <20121211062430.GD25466@lunn.ch>
- <20121211065813.GA14843@obsidianresearch.com>
- <20121211071333.GR17242@lunn.ch>
- <20121211185535.GA14534@obsidianresearch.com>
- <20130110014734.GC5075@titan.lakedaemon.net>
- <20130110060710.GM24650@lunn.ch> <50EE8FC5.50105@gmail.com>
-Message-ID: <20130110184832.GB28004@obsidianresearch.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 10 Jan 2013 18:50:52 +0000
+Subject: [PATCH 14/16] ARM: TC2: ensure powerdown-time data is flushed
+ from cache
+In-Reply-To: <1357777251-13541-15-git-send-email-nicolas.pitre@linaro.org>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-15-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130110185052.GF29952@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 10:54:13AM +0100, Sebastian Hesselbarth wrote:
+On Wed, Jan 09, 2013 at 07:20:49PM -0500, Nicolas Pitre wrote:
+> From: Dave Martin <dave.martin@linaro.org>
 
-> >>>Kirkwood is already OK WRT the 0 IRQ, it is handled internally to
-> >>>get_irqnr_and_base.
-> >>>
-> >>>So, I will suggest to please test on dove as-is...
-> >>
-> >>Did you have a chance to test this on dove?
-> >
-> >Hi Jason
-> >
-> >We discussed this a little and I prefer Sebastians implementation.
-> >
-> >Sebastian, do you have time to work on your code and get it ready?
+To avoid confusion, the prefix in the subject line should be "CCI", not
+"TC2".  Any platform which calls disable_cci() after turning caches off
+and/or disabling the SMP bit may fall foul of this otherwise ... i.e.,
+any platform which has CCI.
+
+Let me know if you want me to send you a modified patch.
+
+Cheers
+---Daave
+
+> Non-local variables used by the CCI management function called after
+> disabling the cache must be flushed out to main memory in advance,
+> otherwise incoherency of those values may occur if they are sitting
+> in the cache of some other CPU when cci_disable() executes.
 > 
-> Jason, Andrew,
+> This patch adds the appropriate flushing to the CCI driver to ensure
+> that the relevant data is available in RAM ahead of time.
 > 
-> we chose to jump to irqchip instead of fixing old code. I thought
-> Jason Gunthorpe volunteered to get it ready? Moving to irqchip also
-> requires clksrc-orion or reimplementing orion into clksrc-mvebu.
-
-I looked into it, but at the time there was so much churn going into
-the merge window that it was too much to tackle, then there was/is
-holidays for me :) Feburary would probably be the soonest I could
-actually get my systems running the latest kernels and do any work on
-this subject.
-
-The drivers Sebastian posted looked close to what I posted, a few
-things like edge interrupts should be copied over from my patches
-though..
-
-The irqchip can be done prior to the timer, if the bridge cause
-decoding is left disabled in the DT then the existing timer should
-still work..
-
-There is a bunch of prep stuff that may still be pending:
- - Fixup remaining drivers (usb? ethernet?) to have DT bindings and
-   get the IRQ number through DT
- - Fixup the GPIO driver to dynamically allocate IRQs rather than
-   having a hardwired start (did the pinctl change fix this?)
- - Separate the non-DT and DT IRQ related stuff, the IRQ numbering
-   changes with the irqchip driver's dynamic allocation. This solves
-   the 0 IRQ problem..
- - Remove non-DT code? Andrew was talking about this..
-
-Jason
+> Because this creates a dependency on arch-specific cacheflushing
+> functions, this patch also makes ARM_CCI depend on ARM.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  drivers/misc/Kconfig   |  1 +
+>  drivers/misc/arm-cci.c | 21 +++++++++++++++++++--
+>  2 files changed, 20 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index 30d5be1ad2..b24630696c 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -501,6 +501,7 @@ config USB_SWITCH_FSA9480
+>  
+>  config ARM_CCI
+>         bool "ARM CCI driver support"
+> +	depends on ARM
+>  
+>  source "drivers/misc/c2port/Kconfig"
+>  source "drivers/misc/eeprom/Kconfig"
+> diff --git a/drivers/misc/arm-cci.c b/drivers/misc/arm-cci.c
+> index f329c43099..739e1c96d3 100644
+> --- a/drivers/misc/arm-cci.c
+> +++ b/drivers/misc/arm-cci.c
+> @@ -21,8 +21,16 @@
+>  #include <linux/slab.h>
+>  #include <linux/arm-cci.h>
+>  
+> -#define CCI400_EAG_OFFSET       0x4000
+> -#define CCI400_KF_OFFSET        0x5000
+> +#include <asm/cacheflush.h>
+> +#include <asm/memory.h>
+> +#include <asm/outercache.h>
+> +
+> +#include <asm/irq_regs.h>
+> +#include <asm/pmu.h>
+> +
+> +#define CCI400_PMCR                   0x0100
+> +#define CCI400_EAG_OFFSET             0x4000
+> +#define CCI400_KF_OFFSET              0x5000
+>  
+>  #define DRIVER_NAME	"CCI"
+>  struct cci_drvdata {
+> @@ -73,6 +81,15 @@ static int __devinit cci_driver_probe(struct platform_device *pdev)
+>  		goto ioremap_err;
+>  	}
+>  
+> +	/*
+> +	 * Multi-cluster systems may need this data when non-coherent, during
+> +	 * cluster power-up/power-down. Make sure it reaches main memory:
+> +	 */
+> +	__cpuc_flush_dcache_area(info, sizeof *info);
+> +	__cpuc_flush_dcache_area(&info, sizeof info);
+> +	outer_clean_range(virt_to_phys(info), virt_to_phys(info + 1));
+> +	outer_clean_range(virt_to_phys(&info), virt_to_phys(&info + 1));
+> +
+>  	platform_set_drvdata(pdev, info);
+>  
+>  	pr_info("CCI loaded at %p\n", info->baseaddr);
+> -- 
+> 1.8.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
