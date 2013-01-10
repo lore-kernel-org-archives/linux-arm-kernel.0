@@ -1,98 +1,85 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Jan 2013 16:53:27 +0000
-Subject: [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
- exit/setup
-In-Reply-To: <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <CAHkRjk4A+EMFRTVdfCUBNpAEUMWrOqbT2ki19Vska6dY_WrVXQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 10 Jan 2013 09:54:13 -0700
+Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
+ HAVE_ARM_SCU
+In-Reply-To: <20130110.145813.1159140334089730421.hdoyu@nvidia.com>
+References: <20130108171103.GA7417@e102568-lin.cambridge.arm.com><20130109.134641.1582472136842052082.hdoyu@nvidia.com><20130109151700.GB22147@e102568-lin.cambridge.arm.com>
+ <20130110.145813.1159140334089730421.hdoyu@nvidia.com>
+Message-ID: <50EEF235.7070200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 January 2013 00:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> --- /dev/null
-> +++ b/Documentation/arm/big.LITTLE/cluster-pm-race-avoidance.txt
-> @@ -0,0 +1,498 @@
-> +Big.LITTLE cluster Power-up/power-down race avoidance algorithm
-> +===============================================================
+On 01/10/2013 05:58 AM, Hiroshi Doyu wrote:
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Wed, 9 Jan 2013 16:17:00 +0100:
+...
+> With your "[PATCH] ARM: kernel: DT cpu map validity check helper
+> function", my original patch gets as below. I think that the following
+> "smp_detect_ncores()" function may be so generic that it could be
+> moved in some common place than platform?
+> 
+> From f5f2a43952ce75fe061b3808b994c3ceb07f1af1 Mon Sep 17 00:00:00 2001
+> From: Hiroshi Doyu <hdoyu@nvidia.com>
+> Date: Mon, 26 Nov 2012 12:25:14 +0200
+> Subject: [PATCH 1/1] ARM: tegra: # of CPU cores detection w/ & w/o
+>  HAVE_ARM_SCU
+> 
+> The method to detect the number of CPU cores on Cortex-A9 MPCore and
+> Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
+> information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
+> have to read it from the system coprocessor(CP15), because the SCU on
+> Cortex-A15 MPCore does not have software readable registers. This
+> patch selects the correct method at runtime based on the CPU ID.
 
-Nice description and ascii art :).
+> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
 
-> --- a/arch/arm/common/bL_entry.c
-> +++ b/arch/arm/common/bL_entry.c
-> @@ -116,3 +116,163 @@ int bL_cpu_powered_up(void)
->                 platform_ops->powered_up();
->         return 0;
->  }
-> +
-> +struct bL_sync_struct bL_sync;
-> +
-> +static void __sync_range(volatile void *p, size_t size)
+> +static int __init smp_detect_ncores(void)
 > +{
-> +       char *_p = (char *)p;
+> +	unsigned int ncores, mpidr;
+> +	u32 l2ctlr;
+> +	phys_addr_t pa;
 > +
-> +       __cpuc_flush_dcache_area(_p, size);
-> +       outer_flush_range(__pa(_p), __pa(_p + size));
-> +       outer_sync();
-
-The outer flush-range operations already contain a cache_sync, so an
-additional outer_sync() operation is not necessary.
-
-You (well, Dave) said that you use the flush instead of
-clean/invalidate to avoid races with other CPUs writing the location.
-However, on the same CPU you can get a speculative load into L1 after
-the L1 flush but before the L2 flush, so the reader case can fail.
-
-The sequence for readers is (note *L2* inval first):
-
-L2 inval
-L1 inval
-
-The sequence for writers is:
-
-L1 clean
-L2 clean
-
-The bi-directional sequence (that's what you need) is:
-
-L1 clean
-L2 clean+inval
-L1 clean+inval
-
-The last L1 op must be clean+inval in case another CPU writes to this
-location to avoid discarding the write.
-
-If you don't have an L2, you just end up with two L1 clean ops, so you
-can probably put some checks.
-
-> +#define sync_mem(ptr) __sync_range(ptr, sizeof *(ptr))
+> +	mpidr = read_cpuid_mpidr();
+> +	switch (mpidr) {
+> +	case ARM_CPU_PART_CORTEX_A15:
+> +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
+> +		ncores = ((l2ctlr >> 24) & 3) + 1;
+> +		break;
+> +	case ARM_CPU_PART_CORTEX_A9:
+> +		/* Get SCU physical base */
+> +		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
+> +		scu_base = IO_ADDRESS(pa);
+> +		ncores = scu_get_core_count(scu_base);
+> +		break;
+> +	default:
+> +		pr_warn("Unsupported mpidr\n");
+> +		ncores = 1;
+> +		break;
+> +	}
 > +
-> +/*
-> + * __bL_cpu_going_down: Indicates that the cpu is being torn down.
-> + *    This must be called at the point of committing to teardown of a CPU.
-> + *    The CPU cache (SCTRL.C bit) is expected to still be active.
-> + */
-> +void __bL_cpu_going_down(unsigned int cpu, unsigned int cluster)
-> +{
-> +       bL_sync.clusters[cluster].cpus[cpu].cpu = CPU_GOING_DOWN;
-> +       sync_mem(&bL_sync.clusters[cluster].cpus[cpu].cpu);
+> +	return ncores;
 > +}
+
+Why not just remove that function...
+
+>  /*
+>   * Initialise the CPU possible map early - this describes the CPUs
+>   * which may be present or become present in the system.
+>   */
+>  static void __init tegra_smp_init_cpus(void)
+>  {
+> -	unsigned int i, ncores = scu_get_core_count(scu_base);
+> -
+> -	if (ncores > nr_cpu_ids) {
+> -		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
+> -			ncores, nr_cpu_ids);
+> -		ncores = nr_cpu_ids;
+> +	if (!arm_dt_cpu_map_valid()) {
+> +		unsigned int i, ncores;
 > +
-> +/*
-> + * __bL_cpu_down: Indicates that cpu teardown is complete and that the
-> + *    cluster can be torn down without disrupting this CPU.
-> + *    To avoid deadlocks, this must be called before a CPU is powered down.
-> + *    The CPU cache (SCTRL.C bit) is expected to be off.
-> + */
-> +void __bL_cpu_down(unsigned int cpu, unsigned int cluster)
-> +{
-> +       dsb();
-> +       bL_sync.clusters[cluster].cpus[cpu].cpu = CPU_DOWN;
-> +       sync_mem(&bL_sync.clusters[cluster].cpus[cpu].cpu);
-> +       sev();
+> +		ncores = smp_detect_ncores();
 
-For the sev() here (and other functions in this patch) you need a
-dsb() before. I'm not sure outer_sync() has one.
+And just say "ncores = 1" here?
 
--- 
-Catalin
+For Tegra, it's trivial to simply put the patch adding the required DT
+nodes before this patch, and then there's no need for any
+backwards-compatibility, since the nodes are guaranteed to be there.
