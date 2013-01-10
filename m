@@ -1,59 +1,109 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 09 Jan 2013 21:51:54 -0600
-Subject: [PATCH] ARM: nommu: re-enable use of vexpress without
- ARCH_MULTIPLATFORM
-In-Reply-To: <20130109204804.GS3931@n2100.arm.linux.org.uk>
-References: <1357755328-17075-1-git-send-email-jonathan.austin@arm.com>
- <201301091843.48942.arnd@arndb.de>
- <alpine.LFD.2.02.1301091349390.6300@xanadu.home>
- <201301092022.49130.arnd@arndb.de> <50EDD588.3040603@gmail.com>
- <20130109204804.GS3931@n2100.arm.linux.org.uk>
-Message-ID: <50EE3ADA.2070100@gmail.com>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Thu, 10 Jan 2013 13:07:36 +0900
+Subject: [PATCH 0/4] gpio: introduce descriptor-based interface
+In-Reply-To: <201301091046.13020.arnd@arndb.de>
+References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
+ <CAAVeFu+vWe+ZGBPy2MMEv=7n-ob=F65rfz+b6ND9zk1d16LbEA@mail.gmail.com>
+ <201301091046.13020.arnd@arndb.de>
+Message-ID: <2270940.DTxEYMZtED@percival>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2013 02:48 PM, Russell King - ARM Linux wrote:
-> On Wed, Jan 09, 2013 at 02:39:36PM -0600, Rob Herring wrote:
->> On 01/09/2013 02:22 PM, Arnd Bergmann wrote:
->>> On Wednesday 09 January 2013, Nicolas Pitre wrote:
->>>> On Wed, 9 Jan 2013, Arnd Bergmann wrote:
->>>>
->>>>> On a related topic, I still think we should fix ARCH_MULTI_V7 not
->>>>> to select ARCH_VEXPRESS unconditionally and come up with a better
->>>>> way to avoid having an empty platform list to make 'allnoconfig'
->>>>> still work.
->>>>
->>>> The virtual guest platform support that Will and Marc did is small 
->>>> enough that it could always be selected in place of vexpress.
->>>
->>> But that only helps when ARMv7 is selected, unless we want to build
->>> it only for ARMv4, v5 or v6 kernels.
->>>
->>> Besides, the only reason we can't have a kernel without any platform
->>> selected is that the linker script has code in it to intentionally
->>> barf on that because it's guaranteed not to boot on any hardware.
->>>
->>> If we decide that building an allnoconfig without any platform
->>> is actually ok, we could just as well rip out that error statement.
->>>
->>
->> That patch is already posted, but Russell doesn't like it as you can
->> have a kernel that doesn't boot. You don't like the allno and randconfig
->> failures, so we're stuck. I think there are dozens of config options
->> that will make you not boot on any given platform, so failing to boot
->> because you did not select your machine is a non-issue.
+On Wednesday 09 January 2013 18:46:12 Arnd Bergmann wrote:
+> > The question is, do we want to totally get rid of the integer
+> > namespace? That would be the ultimate step, but would require another
+> > way to identify GPIOs (controller_device:offset might be such a way),
+> > and also to reorganize sysfs nodes. Wouldn't that be considered
+> > breaking user-space? 'cause we all know what happens to those who
+> > break user-space.
 > 
-> What I actually suggested is that we should be aiming for the DT side
-> of things to get to the point where DT is just another _single_ platform
-> as far as that code goes, and that DT should describe the hardware
-> sufficiently well that we don't have multiple machine_desc things to
-> select via DT - so a DT kernel would have exactly one machine_desc (or
-> maybe even zero! - with the linker script check conditional on !CONFIG_OF)
 > 
-> That then gets rid of the issue entirely.
+> The user interface could eventually be the only part of the kernel that
+> uses the numbers, but you are right that we cannot change that.
 
-I agree completely. I look at mach-highbank (and mach-virt) as what else
-needs to be done in terms of refactoring or moving to DT. That's
-certainly a long term goal, but what is the short term solution?
+That's sad, as it makes it necessary to maintain the global integer namespace 
+(assigning a base GPIO to each controller and making sure the controllers 
+ranges do no overlap) even if it is not used internally anymore. We could make 
+global numbers assignment transparent, but that would potentially change the 
+GPIO numbers in user-space and cause another incompatibility.
 
-Rob
+> > With the current code, a driver should depend on gpiolib being
+> > compiled if it uses the new interface. It is not even declared if
+> > gpiolib is not used.
+> > 
+> > Given that both interfaces are quite close, one could imagine having a
+> > gpiod wrapper around the integer namespace (the "opaque descriptors"
+> > would then just be casted integers). This way drivers would only need
+> > to depend on GENERIC_GPIO. It's a little bit weird to have gpiod
+> > wrapping around gpio in one case and the opposite in another though -
+> > I'd rather have these platforms convert to GPIO descriptors internally
+> > (or even better, to gpiolib), but this is probably asking too much.
+> 
+> 
+> I think it would be reasonable to force everybody to use gpiolib,
+> that's much easier than converting everyone to the descriptor based
+> interface.
+> 
+> 
+> > I do not know all the details of gpiolib's history, but why would
+> > anyone want to implement the generic gpio interface and not use
+> > gpiolib anyways?
+> 
+> 
+> Only legacy users did this. Initially there was only the header file,
+> with the API declared but several different implementations of it.
+> gpiolib was introduced later to reduce code duplication and allow having
+> multiple implementations in the same kernel.
+
+Does the following sound reasonable?
+1) Make sure every target that uses GENERIC_GPIO also implements its drivers 
+using gpiolib, convert the (hopefully) few ones that don't to use gpiolib
+2) Make GENERIC_GPIO require GPIOLIB or just merge both options into a single 
+one
+3) Turn gpio into a full subsystem (like pinctrl)
+
+This should make things less blurry and easier to maintain (less header files, 
+only one interface, etc.) GPIO controllers would also be better integrated 
+into the driver model.
+
+> > > If we are adding a new way to deal with GPIOs, would it make sense to
+> > > have that more closely integrated into pinctrl in one form or another?
+> > > My feeling is that there is already a significant overlap between the
+> > > two, and while the addition of the gpiod_* functions doesn't
+> > > necessarily
+> > > make this worse, it could be a chance to improve the current situation
+> > > to make the interface more consistent with pinctrl.
+> > 
+> > 
+> > That may be a chance to introduce deeper changes indeed - what do you
+> > have in mind exactly?
+> 
+> 
+> I don't know enough about pinctrl to have a specific idea yet, but maybe
+> someone else has ideas.
+
+I had a deeper look at pinctrl, and indeed I can see the connection between 
+the two. There already interfaces to link GPIO ranges to pin ranges and have 
+GPIO drivers switch the pin to the correct state when a GPIO is requested 
+(this, btw, should also be updated to not use global GPIO numbers at some 
+point). Maybe some tighter integration that I just don't see yet can be done 
+too.
+
+> Regarding the integration of pinctrl with gpio,
+> I was thinking in the past that we could make pinctrl provide everything
+> that gpiolib does, and have a generic gpiolib driver on top of pinctrl
+> so that platforms don't need to implement both interfaces but only need
+> to provide a pure pinctrl driver. Not sure if this makes any sense.
+
+That would work if all GPIOs were connected to a ball, but how about GPIO 
+expanders that are external to the chip? They have no use for pinctrl AFAICT. 
+On the other hand, maybe we can have one pinctrl-gpio driver for those chips 
+where pinctrl alone can emulate all the functionality of a GPIO controller. 
+Maybe such a driver exists already?
+
+But in general, I agree pinctrl should be a source of inspiration for how to 
+design GPIO. In particular, having a per-chip integer namespace instead of a 
+single global one is definitely something to take (and that's how things work 
+in the DT already).
+
+Alex.
