@@ -1,48 +1,240 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 10 Jan 2013 15:11:11 -0800
-Subject: [PATCH 1/5] ARM: mach-shmobile: mackerel: update defconfig
-In-Reply-To: <1357781039-14003-2-git-send-email-horms+renesas@verge.net.au>
-References: <1357781039-14003-1-git-send-email-horms+renesas@verge.net.au>
- <1357781039-14003-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130110231111.GA25944@quad.lixom.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Jan 2013 23:13:59 +0000
+Subject: [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
+ exit/setup
+In-Reply-To: <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130110231359.GD11628@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jan 10, 2013 at 10:23:55AM +0900, Simon Horman wrote:
-> * Enable ARM_APPENDED_DTB
+On Thu, Jan 10, 2013 at 12:20:38AM +0000, Nicolas Pitre wrote:
+> From: Dave Martin <dave.martin@linaro.org>
 > 
->   Typically the bootloader of a mackerel board does not support DT
->   so this option is useful
-> 
-> * Add "rw" to command line
-> 
->   This appears to be necessary for a successful NFS-root boot
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/configs/mackerel_defconfig |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
-> index 2098ce1..8519721 100644
-> --- a/arch/arm/configs/mackerel_defconfig
-> +++ b/arch/arm/configs/mackerel_defconfig
-> @@ -23,7 +23,8 @@ CONFIG_AEABI=y
->  CONFIG_FORCE_MAX_ZONEORDER=15
->  CONFIG_ZBOOT_ROM_TEXT=0x0
->  CONFIG_ZBOOT_ROM_BSS=0x0
-> -CONFIG_CMDLINE="console=tty0, console=ttySC0,115200 earlyprintk=sh-sci.0,115200 root=/dev/nfs nfsroot=,tcp,v3 ip=dhcp memchunk.vpu=64m memchunk.veu0=8m memchunk.spu0=2m mem=240m"
-> +CONFIG_ARM_APPENDED_DTB=y
-> +CONFIG_CMDLINE="console=tty0, console=ttySC0,115200 earlyprintk=sh-sci.0,115200 root=/dev/nfs nfsroot=,tcp,v3 ip=dhcp memchunk.vpu=64m memchunk.veu0=8m memchunk.spu0=2m mem=240m rw"
+> This provides helper methods to coordinate between CPUs coming down
+> and CPUs going up, as well as documentation on the used algorithms,
+> so that cluster teardown and setup
+> operations are not done for a cluster simultaneously.
 
-I don't think memchunk is used outside of arch/sh, so it can be dropped from
-this default cmdline?
+[...]
 
-Also, with DTB, there's little use for an in-kernel default command line since
-you can give one with the dtb instead. Perhaps just drop it alltogether and
-move it there?
+> +int __init bL_cluster_sync_init(void (*power_up_setup)(void))
+> +{
+> +       unsigned int i, j, mpidr, this_cluster;
+> +
+> +       BUILD_BUG_ON(BL_SYNC_CLUSTER_SIZE * BL_NR_CLUSTERS != sizeof bL_sync);
+> +       BUG_ON((unsigned long)&bL_sync & (__CACHE_WRITEBACK_GRANULE - 1));
+> +
+> +       /*
+> +        * Set initial CPU and cluster states.
+> +        * Only one cluster is assumed to be active at this point.
+> +        */
+> +       for (i = 0; i < BL_NR_CLUSTERS; i++) {
+> +               bL_sync.clusters[i].cluster = CLUSTER_DOWN;
+> +               bL_sync.clusters[i].inbound = INBOUND_NOT_COMING_UP;
+> +               for (j = 0; j < BL_CPUS_PER_CLUSTER; j++)
+> +                       bL_sync.clusters[i].cpus[j].cpu = CPU_DOWN;
+> +       }
+> +       asm ("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
 
+We have a helper for this...
 
--Olof
+> +       this_cluster = (mpidr >> 8) & 0xf;
+
+... and also this, thanks to Lorenzo's recent patches.
+
+> +       for_each_online_cpu(i)
+> +               bL_sync.clusters[this_cluster].cpus[i].cpu = CPU_UP;
+> +       bL_sync.clusters[this_cluster].cluster = CLUSTER_UP;
+> +       sync_mem(&bL_sync);
+> +
+> +       if (power_up_setup) {
+> +               bL_power_up_setup_phys = virt_to_phys(power_up_setup);
+> +               sync_mem(&bL_power_up_setup_phys);
+> +       }
+> +
+> +       return 0;
+> +}
+> diff --git a/arch/arm/common/bL_head.S b/arch/arm/common/bL_head.S
+> index 9d351f2b4c..f7a64ac127 100644
+> --- a/arch/arm/common/bL_head.S
+> +++ b/arch/arm/common/bL_head.S
+> @@ -7,11 +7,19 @@
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+> + *
+> + *
+> + * Refer to Documentation/arm/big.LITTLE/cluster-pm-race-avoidance.txt
+> + * for details of the synchronisation algorithms used here.
+>   */
+> 
+>  #include <linux/linkage.h>
+>  #include <asm/bL_entry.h>
+> 
+> +.if BL_SYNC_CLUSTER_CPUS
+> +.error "cpus must be the first member of struct bL_cluster_sync_struct"
+> +.endif
+> +
+>         .macro  pr_dbg  cpu, string
+>  #if defined(CONFIG_DEBUG_LL) && defined(DEBUG)
+>         b       1901f
+> @@ -52,12 +60,82 @@ ENTRY(bL_entry_point)
+>  2:     pr_dbg  r4, "kernel bL_entry_point\n"
+> 
+>         /*
+> -        * MMU is off so we need to get to bL_entry_vectors in a
+> +        * MMU is off so we need to get to various variables in a
+>          * position independent way.
+>          */
+>         adr     r5, 3f
+> -       ldr     r6, [r5]
+> +       ldmia   r5, {r6, r7, r8}
+>         add     r6, r5, r6                      @ r6 = bL_entry_vectors
+> +       ldr     r7, [r5, r7]                    @ r7 = bL_power_up_setup_phys
+> +       add     r8, r5, r8                      @ r8 = bL_sync
+> +
+> +       mov     r0, #BL_SYNC_CLUSTER_SIZE
+> +       mla     r8, r0, r10, r8                 @ r8 = bL_sync cluster base
+> +
+> +       @ Signal that this CPU is coming UP:
+> +       mov     r0, #CPU_COMING_UP
+> +       mov     r5, #BL_SYNC_CPU_SIZE
+> +       mla     r5, r9, r5, r8                  @ r5 = bL_sync cpu address
+> +       strb    r0, [r5]
+> +
+> +       dsb
+
+Why is a dmb not enough here? In fact, the same goes for most of these
+other than the one preceeding the sev. Is there an interaction with the
+different mappings for the cluster data that I've missed?
+
+> +
+> +       @ At this point, the cluster cannot unexpectedly enter the GOING_DOWN
+> +       @ state, because there is at least one active CPU (this CPU).
+> +
+> +       @ Check if the cluster has been set up yet:
+> +       ldrb    r0, [r8, #BL_SYNC_CLUSTER_CLUSTER]
+> +       cmp     r0, #CLUSTER_UP
+> +       beq     cluster_already_up
+> +
+> +       @ Signal that the cluster is being brought up:
+> +       mov     r0, #INBOUND_COMING_UP
+> +       strb    r0, [r8, #BL_SYNC_CLUSTER_INBOUND]
+> +
+> +       dsb
+> +
+> +       @ Any CPU trying to take the cluster into CLUSTER_GOING_DOWN from this
+> +       @ point onwards will observe INBOUND_COMING_UP and abort.
+> +
+> +       @ Wait for any previously-pending cluster teardown operations to abort
+> +       @ or complete:
+> +cluster_teardown_wait:
+> +       ldrb    r0, [r8, #BL_SYNC_CLUSTER_CLUSTER]
+> +       cmp     r0, #CLUSTER_GOING_DOWN
+> +       wfeeq
+> +       beq     cluster_teardown_wait
+> +
+> +       @ power_up_setup is responsible for setting up the cluster:
+> +
+> +       cmp     r7, #0
+> +       mov     r0, #1          @ second (cluster) affinity level
+> +       blxne   r7              @ Call power_up_setup if defined
+> +
+> +       @ Leave the cluster setup critical section:
+> +
+> +       dsb
+> +       mov     r0, #INBOUND_NOT_COMING_UP
+> +       strb    r0, [r8, #BL_SYNC_CLUSTER_INBOUND]
+> +       mov     r0, #CLUSTER_UP
+> +       strb    r0, [r8, #BL_SYNC_CLUSTER_CLUSTER]
+> +       dsb
+> +       sev
+> +
+> +cluster_already_up:
+> +       @ If a platform-specific CPU setup hook is needed, it is
+> +       @ called from here.
+> +
+> +       cmp     r7, #0
+> +       mov     r0, #0          @ first (CPU) affinity level
+> +       blxne   r7              @ Call power_up_setup if defined
+> +
+> +       @ Mark the CPU as up:
+> +
+> +       dsb
+> +       mov     r0, #CPU_UP
+> +       strb    r0, [r5]
+> +       dsb
+> +       sev
+> 
+>  bL_entry_gated:
+>         ldr     r5, [r6, r4, lsl #2]            @ r5 = CPU entry vector
+> @@ -70,6 +148,8 @@ bL_entry_gated:
+>         .align  2
+> 
+>  3:     .word   bL_entry_vectors - .
+> +       .word   bL_power_up_setup_phys - 3b
+> +       .word   bL_sync - 3b
+> 
+>  ENDPROC(bL_entry_point)
+> 
+> @@ -79,3 +159,7 @@ ENDPROC(bL_entry_point)
+>         .type   bL_entry_vectors, #object
+>  ENTRY(bL_entry_vectors)
+>         .space  4 * BL_NR_CLUSTERS * BL_CPUS_PER_CLUSTER
+> +
+> +       .type   bL_power_up_setup_phys, #object
+> +ENTRY(bL_power_up_setup_phys)
+> +       .space  4               @ set by bL_cluster_sync_init()
+> diff --git a/arch/arm/include/asm/bL_entry.h b/arch/arm/include/asm/bL_entry.h
+> index 942d7f9f19..167394d9a0 100644
+> --- a/arch/arm/include/asm/bL_entry.h
+> +++ b/arch/arm/include/asm/bL_entry.h
+> @@ -15,8 +15,37 @@
+>  #define BL_CPUS_PER_CLUSTER    4
+>  #define BL_NR_CLUSTERS         2
+> 
+> +/* Definitions for bL_cluster_sync_struct */
+> +#define CPU_DOWN               0x11
+> +#define CPU_COMING_UP          0x12
+> +#define CPU_UP                 0x13
+> +#define CPU_GOING_DOWN         0x14
+> +
+> +#define CLUSTER_DOWN           0x21
+> +#define CLUSTER_UP             0x22
+> +#define CLUSTER_GOING_DOWN     0x23
+> +
+> +#define INBOUND_NOT_COMING_UP  0x31
+> +#define INBOUND_COMING_UP      0x32
+
+Do these numbers signify anything? Why not 0, 1, 2 etc?
+
+> +
+> +/* This is a complete guess. */
+> +#define __CACHE_WRITEBACK_ORDER        6
+
+Is this CONFIG_ARM_L1_CACHE_SHIFT?
+
+> +#define __CACHE_WRITEBACK_GRANULE (1 << __CACHE_WRITEBACK_ORDER)
+> +
+> +/* Offsets for the bL_cluster_sync_struct members, for use in asm: */
+> +#define BL_SYNC_CLUSTER_CPUS   0
+
+Why not use asm-offsets.h for this?
+
+> +#define BL_SYNC_CPU_SIZE       __CACHE_WRITEBACK_GRANULE
+> +#define BL_SYNC_CLUSTER_CLUSTER \
+> +       (BL_SYNC_CLUSTER_CPUS + BL_SYNC_CPU_SIZE * BL_CPUS_PER_CLUSTER)
+> +#define BL_SYNC_CLUSTER_INBOUND \
+> +       (BL_SYNC_CLUSTER_CLUSTER + __CACHE_WRITEBACK_GRANULE)
+> +#define BL_SYNC_CLUSTER_SIZE \
+> +       (BL_SYNC_CLUSTER_INBOUND + __CACHE_WRITEBACK_GRANULE)
+> +
+
+Hmm, this looks pretty fragile to me but again, you need this stuff at
+compile time. Is there an architected maximum value for the writeback
+granule? Failing that, we may as well just use things like
+__cacheline_aligned if we're only using the L1 alignment anyway.
+
+Will
