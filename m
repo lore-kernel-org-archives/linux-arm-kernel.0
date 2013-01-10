@@ -1,116 +1,54 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 10 Jan 2013 17:54:34 -0500
-Subject: [RFC PATCH v3 05/16] ARM: edma: add AM33XX crossbar event support
-In-Reply-To: <508D12DC.8010400@ti.com>
-References: <1350566815-409-1-git-send-email-mporter@ti.com>
- <1350566815-409-6-git-send-email-mporter@ti.com>
- <508D12DC.8010400@ti.com>
-Message-ID: <20130110225434.GT14660@beef>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Jan 2013 23:01:49 +0000
+Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
+ management
+In-Reply-To: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130110230148.GA11628@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 28, 2012 at 04:41:24PM +0530, Sekhar Nori wrote:
-> On 10/18/2012 6:56 PM, Matt Porter wrote:
-> > Adds support for the per-EDMA channel event mux. This is required
-> > for any peripherals using DMA crossbar mapped events.
-> > 
-> > Signed-off-by: Matt Porter <mporter@ti.com>
-> > ---
-> >  arch/arm/common/edma.c             |   63 +++++++++++++++++++++++++++++++++++-
-> >  include/linux/platform_data/edma.h |    1 +
-> >  2 files changed, 63 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> > index 6d2a590..b761b7a 100644
-> > --- a/arch/arm/common/edma.c
-> > +++ b/arch/arm/common/edma.c
-> > @@ -1425,6 +1425,53 @@ static int edma_of_read_u32_to_s16_array(const struct device_node *np,
-> >  	return 0;
-> >  }
-> >  
-> > +static int edma_xbar_event_map(struct device *dev,
-> > +			       struct device_node *node,
-> > +			       struct edma_soc_info *pdata, int len)
-> > +{
-> > +	int ret = 0;
-> > +	int i;
-> > +	struct resource res;
-> > +	void *xbar;
-> > +	s16 (*xbar_chans)[2];
-> > +	u32 shift, offset, mux;
-> > +
-> > +	xbar_chans = devm_kzalloc(dev,
-> > +				  len/sizeof(s16) + 2*sizeof(s16),
-> > +				  GFP_KERNEL);
-> > +	if (!xbar_chans)
-> > +		return -ENOMEM;
-> > +
-> > +	ret = of_address_to_resource(node, 1, &res);
-> > +	if (IS_ERR_VALUE(ret))
-> > +		return -EIO;
-> > +
-> > +	xbar = devm_ioremap(dev, res.start, resource_size(&res));
-> > +	if (!xbar)
-> > +		return -EIO;
-> 
-> -ENOMEM is more appropiate for ioremap failures.
+Hi Nicolas,
 
-Fixed in v4.
+On Thu, Jan 10, 2013 at 12:20:35AM +0000, Nicolas Pitre wrote:
+> This is the initial public posting of the initial support for big.LITTLE.
+> Included here is the code required to safely power up and down CPUs in a
+> b.L system, whether this is via CPU hotplug, a cpuidle driver or the
+> Linaro b.L in-kernel switcher[*] on top of this.  Only  SMP secondary
+> boot and CPU hotplug support is included at this time.  Getting to this
+> point already represents a significcant chunk of code as illustrated by
+> the diffstat below.
 
-> 
-> > +
-> > +	ret = edma_of_read_u32_to_s16_array(node,
-> > +					    "ti,edma-xbar-event-map",
-> > +					    (s16 *)xbar_chans,
-> > +					    len/sizeof(u32));
-> > +	if (IS_ERR_VALUE(ret))
-> > +		return -EIO;
-> > +
-> > +	for (i = 0; xbar_chans[i][0] != -1; i++) {
-> > +		shift = (xbar_chans[i][1] % 4) * 8;
-> > +		offset = xbar_chans[i][1] >> 2;
-> > +		offset <<= 2;
-> > +		mux = __raw_readl((void *)((u32)xbar + offset));
-> 
-> Dont use __raw* variants of io accessors. There will be ordering issues
-> on ARMv7.
+I've just started going through this, so I have some comments on the first
+few patches. I'll try and get through the rest of it soon (but Christoffer
+is kicking me to look at kvm again too :)
 
-Fixed in v4.
+> Low-level support code:
+> [PATCH 01/16] ARM: b.L: secondary kernel entry code
+> [PATCH 02/16] ARM: b.L: introduce the CPU/cluster power API
+> [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
+> [PATCH 04/16] ARM: b.L: Add baremetal voting mutexes
+> [PATCH 05/16] ARM: bL_head: vlock-based first man election
 
-> 
-> > +		mux &= (~(0xff << shift));
-> > +		mux |= (xbar_chans[i][0] << shift);
-> 
-> Unnecessary parens above.
+I got this far, so I'll send my comments as replies to those.
 
-Fixed in v4.
-
+> Adaptation layer to hook with the generic kernel infrastructure:
+> [PATCH 06/16] ARM: b.L: generic SMP secondary bringup and hotplug
+> [PATCH 07/16] ARM: bL_platsmp.c: close the kernel entry gate before
+> [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface of a
+> [PATCH 09/16] ARM: vexpress: Select the correct SMP operations at
 > 
-> > +		__raw_writel(mux, (void *)((u32)xbar + offset));
-> > +	}
-> > +
-> > +	pdata->xbar_chans = xbar_chans;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >  static int edma_of_parse_dt(struct device *dev,
-> >  			    struct device_node *node,
-> >  			    struct edma_soc_info *pdata)
-> > @@ -1453,7 +1500,6 @@ static int edma_of_parse_dt(struct device *dev,
-> >  	pdata->n_slot = value;
-> >  
-> >  	pdata->n_cc = 1;
-> > -	/* This is unused */
-> 
-> The comment should have not been part of 4/16?
+> Fast Models support:
+> [PATCH 10/16] ARM: vexpress: introduce DCSCB support
+> [PATCH 11/16] ARM: vexpress/dcscb: add CPU use counts to the power
+> [PATCH 12/16] ARM: vexpress/dcscb: do not hardcode number of CPUs
+> [PATCH 13/16] drivers: misc: add ARM CCI support
+> [PATCH 14/16] ARM: TC2: ensure powerdown-time data is flushed from
+> [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
+> [PATCH 16/16] ARM: vexpress/dcscb: probe via device tree
 
-Correct. I moved the change to the correct patch in v4.
+These last six really need Pawel Moll on CC. He's on holiday at the moment,
+but he'll be back at the end of the month so I suggest pinging him then so
+they don't get lost.
 
-> 
-> Thanks,
-> Sekhar
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+Will
