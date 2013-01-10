@@ -1,44 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Jan 2013 15:42:58 -0800
-Subject: [PATCH] hardlockup: detect hard lockups without NMIs using
- secondary cpus
-In-Reply-To: <CAMbhsRR5azGw1-VhC4+9y7NfBPnZkBKnK34AqXdMFBsXPqdjCQ@mail.gmail.com>
-References: <1357783059-13923-1-git-send-email-ccross@android.com>
- <20130110203833.GE14149@atomide.com>
- <CAMbhsRR5azGw1-VhC4+9y7NfBPnZkBKnK34AqXdMFBsXPqdjCQ@mail.gmail.com>
-Message-ID: <20130110234258.GA15458@atomide.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 11 Jan 2013 00:43:51 +0100
+Subject: [PATCH 2/2] iio: mxs: Enable touchscreen on m28evk
+In-Reply-To: <1357861431-8978-1-git-send-email-marex@denx.de>
+References: <1357861431-8978-1-git-send-email-marex@denx.de>
+Message-ID: <1357861431-8978-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Colin Cross <ccross@android.com> [130110 14:37]:
-> On Thu, Jan 10, 2013 at 12:38 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > * Colin Cross <ccross@android.com> [130109 18:05]:
-> > > +static void watchdog_check_hardlockup_other_cpu(void)
-> > > +{
-> > > +     int cpu;
-> > > +     cpumask_t cpus = watchdog_cpus;
-> > > +
-> > > +     /*
-> > > +      * Test for hardlockups every 3 samples.  The sample period is
-> > > +      *  watchdog_thresh * 2 / 5, so 3 samples gets us back to slightly over
-> > > +      *  watchdog_thresh (over by 20%).
-> > > +      */
-> > > +     if (__this_cpu_read(hrtimer_interrupts) % 3 != 0)
-> > > +             return;
-> > > +
-> > > +     /* check for a hardlockup on the next cpu */
-> > > +     cpu = cpumask_next(smp_processor_id(), &cpus);
-> >
-> > Hmm don't you want to check cpu_oneline_mask here and
-> > return if the other CPU is offline?
-> 
-> watchdog_cpus is effectively a local copy of cpu_online_mask, but
-> updated after the watchdog_nmi_touch in watchdog_nmi_enable.  This
-> avoids a false positive after hotplugging in a cpu when
-> cpu_online_mask is true but that cpu hasn't yet run it's first
-> hrtimer.
+This patch adds necessary DT properties to m28evk to enable touchscreen
+in the LRADC block. The M28EVK is shipped with 4-wire resistive touchscreen.
 
-OK thanks for clarifying that.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx28-m28evk.dts |    1 +
+ 1 file changed, 1 insertion(+)
 
-Tony
+diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+index c718f91..712d99a 100644
+--- a/arch/arm/boot/dts/imx28-m28evk.dts
++++ b/arch/arm/boot/dts/imx28-m28evk.dts
+@@ -213,6 +213,7 @@
+ 
+ 			lradc at 80050000 {
+ 				status = "okay";
++				fsl,lradc-touchscreen-wires = <4>;
+ 			};
+ 
+ 			duart: serial at 80074000 {
+-- 
+1.7.10.4
