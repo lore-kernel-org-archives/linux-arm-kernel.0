@@ -1,40 +1,50 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Jan 2013 10:41:12 -0800
-Subject: [PATCH 01/26] gpio: samsung: remove inclusion <mach/regs-clock.h>
-In-Reply-To: <CACRpkdYhNHwqK3YkEKQedFvYDc6kuwesY4gmMroipnnhrLP6pA@mail.gmail.com>
-References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
- <1357165443-3716-2-git-send-email-kgene.kim@samsung.com>
- <CACRpkdYhNHwqK3YkEKQedFvYDc6kuwesY4gmMroipnnhrLP6pA@mail.gmail.com>
-Message-ID: <027701cdef62$12363bb0$36a2b310$@samsung.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 11 Jan 2013 07:44:33 +1300
+Subject: [PATCH] gpio: vt8500: Export dedicated GPIO before
+ multifunction pins.
+In-Reply-To: <CACRpkdagdO3_6DmKYaCwmx4Jju=E_uy86_QqdKLA3+VK7JNPjg@mail.gmail.com>
+References: <1356899374-9395-1-git-send-email-linux@prisktech.co.nz>
+ <CACRpkdagdO3_6DmKYaCwmx4Jju=E_uy86_QqdKLA3+VK7JNPjg@mail.gmail.com>
+Message-ID: <1357843473.6075.8.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
+On Thu, 2013-01-10 at 11:49 +0100, Linus Walleij wrote:
+> On Sun, Dec 30, 2012 at 9:29 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
 > 
-> On Wed, Jan 2, 2013 at 11:23 PM, Kukjin Kim <kgene.kim@samsung.com>
-> wrote:
-> 
-> > The <mach/regs-clock.h> is not needed for gpio-samsung.
+> > The vendor does not provide numbering for gpio pins. Vendor source
+> > exports dedicated gpio pins first, followed by multifunction pins.
+> > As this is what end users expect, this patch changes vt8500 and wm8505
+> > to do the same.
 > >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 > 
-> Applied to fixes, thanks.
+> So how many existing userspace applications does this patch
+> break? Has this system been widely deployed so a kernel
+> upgrade will cause problems for people?
 > 
-Thanks :-)
+> But applied anyway, unless someone screams about it real
+> soon now. That seems to be the only way to get people to tell
+> us about their use cases.
+> 
+> Could you consider adding names to the exported GPIO pins
+> on the vt8500 series please? Then userspace can atleast
+> try to locate the right pin.
+> 
+> Yours,
+> Linus Walleij
 
-BTW, do you have any comments on following patches?
+In terms of userspace apps, my best guess would be 'I dunno'. This was
+requested by the only end-user to ask a question since mainline support
+was added - He couldn't find the external GPIO's in the 200+ that were
+listed.
 
-[PATCH] gpio: samsung: silent build warning for EXYNOS5
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14443.html
+This also makes all the platforms the same now - external GPIO's are now
+exported first (0..x) which is better in the long term for userspace.
 
-[PATCH] gpio: samsung: fix pinctrl condition for exynos and exynos5440
-http://comments.gmane.org/gmane.linux.kernel.samsung-soc/14758
+The names is a bit of a problem, but I will try my best. We have limited
+datasheets etc from the vendor, so knowing what things do is a bit of a
+mystery sometimes.
 
-[PATCH] gpio: samsung: skip gpio lib registration for EXYNOS5440
-http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/14673
-
-Any problems, please kindly let me know.
-
-- Kukjin
+Regards
+Tony P
