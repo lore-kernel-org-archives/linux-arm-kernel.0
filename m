@@ -1,37 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Jan 2013 16:27:34 +0100
-Subject: [PATCHv2] ARM: mxs: select USB_ARCH_HAS_EHCI
-In-Reply-To: <20130110151659.GB9139@S2101-09.ap.freescale.net>
-References: <1357830235-15661-1-git-send-email-maxime.ripard@free-electrons.com>
- <20130110151659.GB9139@S2101-09.ap.freescale.net>
-Message-ID: <50EEDDE6.3030906@free-electrons.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 10 Jan 2013 10:30:05 -0500 (EST)
+Subject: [PATCH 01/16] ARM: b.L: secondary kernel entry code
+In-Reply-To: <50EE69C7.6010802@codeaurora.org>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
+ <50EE69C7.6010802@codeaurora.org>
+Message-ID: <alpine.LFD.2.02.1301101029120.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Wed, 9 Jan 2013, Stephen Boyd wrote:
 
-On 10/01/2013 16:17, Shawn Guo wrote:
-> On Thu, Jan 10, 2013 at 04:03:55PM +0100, Maxime Ripard wrote:
->> Commit 09f6ffde introduced a dependency on USB_EHCI_HCD for the chipidea
->> USB host driver, that in turns depends on USB_ARCH_HAS_EHCI.
->>
->> If this symbol is not selected by the ARCH, we are not able to use the
->> chipidea driver anymore.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  drivers/usb/Kconfig |    1 +
->>  1 file changed, 1 insertion(+)
+> On 1/9/2013 4:20 PM, Nicolas Pitre wrote:
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index f95ba14ae3..2271f02e8e 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1579,6 +1579,12 @@ config HAVE_ARM_TWD
+> >  	help
+> >  	  This options enables support for the ARM timer and watchdog unit
+> >  
+> > +config BIG_LITTLE
+> > +	bool "big.LITTLE support (Experimental)"
+> > +	depends on CPU_V7 && SMP && EXPERIMENTAL
 > 
-> Now, it should go via usb rather than arm-soc tree.
+> I thought EXPERIMENTAL was being phased out?
 
-Yes, that's what I thought just after sending the patch.
+True.
 
-Sorry for that
-Maxime
+> > diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+> > index e8a4e58f1b..50880c494f 100644
+> > --- a/arch/arm/common/Makefile
+> > +++ b/arch/arm/common/Makefile
+> > @@ -13,3 +13,6 @@ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+> >  obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+> >  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+> >  obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
+> > +obj-$(CONFIG_FIQ_GLUE)		+= fiq_glue.o fiq_glue_setup.o
+> > +obj-$(CONFIG_FIQ_DEBUGGER)	+= fiq_debugger.o
+> 
+> This looks like non-related stuff?
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Indeed.  Rebase fallouts.
+
+Thanks.
+
+
+Nicolas
