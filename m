@@ -1,69 +1,27 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 9 Jan 2013 20:44:29 -0500
-Subject: [PATCH V2] arm: mvebu: Improve the SMP support of the
- interrupt controller
-In-Reply-To: <50EB348D.8000607@free-electrons.com>
-References: <1354740203-26665-1-git-send-email-gregory.clement@free-electrons.com>
- <20130107175123.GO5075@titan.lakedaemon.net>
- <50EB348D.8000607@free-electrons.com>
-Message-ID: <20130110014429.GB5075@titan.lakedaemon.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 09 Jan 2013 17:46:55 -0800
+Subject: [PATCH] ARM: dts: correct the dw-mshc timing properties as per
+ binding
+In-Reply-To: <CAGOxZ52vsbmmmKBLZjvy2wZBDGeVTP5rwJ5Oc00oYUo2ztA2Dg@mail.gmail.com>
+References: <1357557585-30257-1-git-send-email-alim.akhtar@samsung.com>
+ <CAD=FV=XUpLwZCn=bpShFqiPBzFBaAbWYn5-+-_OuTqC55sKi3Q@mail.gmail.com>
+ <CAGOxZ52vsbmmmKBLZjvy2wZBDGeVTP5rwJ5Oc00oYUo2ztA2Dg@mail.gmail.com>
+Message-ID: <00e601cdeed4$60e2b4c0$22a81e40$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 09:48:13PM +0100, Gregory CLEMENT wrote:
-> On 01/07/2013 06:51 PM, Jason Cooper wrote:
-> > On Wed, Dec 05, 2012 at 09:43:23PM +0100, Gregory CLEMENT wrote:
-> >> This patch makes the interrupt controller driver more SMP aware for
-> >> the Armada XP SoCs. It adds the support for the per-CPU irq. It also
-> >> adds the implementation for the set_affinity hook.
-> >>
-> >> Patch initialy wrote by Yehuda Yitschak and reworked by Gregory
-> >> CLEMENT.
-> >>
-> >> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >> ---
-> >>  arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
-> >>  arch/arm/mach-mvebu/irq-armada-370-xp.c |   52 +++++++++++++++++++++++++++++++
-> >>  2 files changed, 53 insertions(+), 1 deletion(-)
-> > 
-> > Applied to mvebu/boards
+Alim Akhtar wrote:
 > 
-> Hi Jason,
-> thanks for taking this patch. Unfortunately it won't be enough. Indeed
-> after speaking with Marvell engineers we realized that the MPIC didn't
-> work as we expected. As it is written in the following patch: the MPIC,
-> unlike the GIC, allows several CPUs to acknowledge the same global
-> interrupt.
-> 
-> I joined the patch to this email, you can apply it on top of your
-> mvebu/boards or you can squash it with the previous patch.
-> 
-> Thanks,
-> 
-> Gregory
 
-> From e3d36240832be914034bb3fb55dcf65c5a9f01df Mon Sep 17 00:00:00 2001
-> From: Yehuda Yitschak <yehuday@marvell.com>
-> Date: Thu, 27 Dec 2012 13:03:36 +0200
-> Subject: [PATCH] arm: mvebu: Fix interrupt handling in SMP mode
-> 
-> The Multi Processor interrupt Controller (MPIC), unlike the GIC,
-> allows several CPUs to acknowledge the same global interrupt.
-> 
-> This patch introduces changes to avoid this situation by forbidding
-> multi-CPU interrupt affinity. This is done by setting the default
-> interrupt affinity to the boot CPU and rejecting the affinity requests
-> to more than one CPU.
-> 
-> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/irq-armada-370-xp.c |   26 +++++++++++++++++++++++---
->  1 file changed, 23 insertions(+), 3 deletions(-)
+[...]
 
-Applied to mvebu/boards
+> > > Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> >
+> > Tested-by: Doug Anderson <dianders@chromium.org>
+> > Acked-by: Doug Anderson <dianders@chromium.org>
 
-thx,
+Looks OK to me, applied.
 
-Jason.
+Thanks.
+
+- Kukjin
