@@ -1,100 +1,93 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 10 Jan 2013 18:51:30 +0200
-Subject: [PATCH 10/14] usb: ehci-omap: Remove PHY regulator handling code
+Date: Thu, 10 Jan 2013 18:51:31 +0200
+Subject: [PATCH 11/14] ARM: OMAP2+: omap4panda: Provide USB Host's PHY
+ platform data
 In-Reply-To: <1357836694-30788-1-git-send-email-rogerq@ti.com>
 References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
-Message-ID: <1357836694-30788-11-git-send-email-rogerq@ti.com>
+Message-ID: <1357836694-30788-12-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PHY regulator handling must be done in the PHY driver
+Provide platform data for the USB host's PHY.
+
+Also get rid of managing PHY clock. This will now be done by the phy driver.
+For that to work we create a clock alias that links the PHY clock name to the
+PHY device name.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/usb/host/ehci-omap.c |   31 +------------------------------
- 1 files changed, 1 insertions(+), 30 deletions(-)
+ arch/arm/mach-omap2/board-omap4panda.c |   31 ++++++++++++++++++++-----------
+ 1 files changed, 20 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index 46b28d6..02475c7 100644
---- a/drivers/usb/host/ehci-omap.c
-+++ b/drivers/usb/host/ehci-omap.c
-@@ -39,7 +39,6 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/usb/ulpi.h>
--#include <linux/regulator/consumer.h>
- #include <linux/pm_runtime.h>
- #include <linux/gpio.h>
- #include <linux/clk.h>
-@@ -105,19 +104,6 @@ static int omap_ehci_init(struct usb_hcd *hcd)
- 	return rc;
- }
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index ee76830..350c4db 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -30,6 +30,7 @@
+ #include <linux/regulator/fixed.h>
+ #include <linux/ti_wilink_st.h>
+ #include <linux/usb/musb.h>
++#include <linux/usb/nop-usb-xceiv.h>
+ #include <linux/wl12xx.h>
+ #include <linux/platform_data/omap-abe-twl6040.h>
  
--static void disable_put_regulator(
--		struct usbhs_omap_platform_data *pdata)
--{
--	int i;
+@@ -139,6 +140,18 @@ static struct platform_device *panda_devices[] __initdata = {
+ 	&btwilink_device,
+ };
+ 
++static struct nop_usb_xceiv_platform_data phy_pdata0 = {
++	.type = USB_PHY_TYPE_UNDEFINED,
++	/* FREF_CLK3 provides the 19.2 MHz reference clock to the PHY */
++	.clk_rate = 19200000,
++};
++
++static struct usbhs_phy_config phy_config0 = {
++	.name = "nop_usb_xceiv",
++	.pdata = &phy_pdata0,
++	.pdata_size = sizeof(phy_pdata0),
++};
++
+ static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+ 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+ 	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+@@ -146,7 +159,8 @@ static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+ 	.phy_reset  = false,
+ 	.reset_gpio_port[0]  = -EINVAL,
+ 	.reset_gpio_port[1]  = -EINVAL,
+-	.reset_gpio_port[2]  = -EINVAL
++	.reset_gpio_port[2]  = -EINVAL,
++	.phy_config[0] = &phy_config0,
+ };
+ 
+ static struct gpio panda_ehci_gpios[] __initdata = {
+@@ -157,16 +171,6 @@ static struct gpio panda_ehci_gpios[] __initdata = {
+ static void __init omap4_ehci_init(void)
+ {
+ 	int ret;
+-	struct clk *phy_ref_clk;
 -
--	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
--		if (pdata->regulator[i]) {
--			regulator_disable(pdata->regulator[i]);
--			regulator_put(pdata->regulator[i]);
--		}
+-	/* FREF_CLK3 provides the 19.2 MHz reference clock to the PHY */
+-	phy_ref_clk = clk_get(NULL, "auxclk3_ck");
+-	if (IS_ERR(phy_ref_clk)) {
+-		pr_err("Cannot request auxclk3\n");
+-		return;
 -	}
--}
--
- /* configure so an HC device and id are always provided */
- /* always called with process context; sleeping is OK */
+-	clk_set_rate(phy_ref_clk, 19200000);
+-	clk_prepare_enable(phy_ref_clk);
  
-@@ -140,7 +126,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 	int					ret = -ENODEV;
- 	int					irq;
- 	int					i;
--	char					supply[7];
+ 	/* disable the power to the usb hub prior to init and reset phy+hub */
+ 	ret = gpio_request_array(panda_ehci_gpios,
+@@ -180,6 +184,11 @@ static void __init omap4_ehci_init(void)
+ 	gpio_export(GPIO_HUB_NRESET, 0);
+ 	gpio_set_value(GPIO_HUB_NRESET, 1);
  
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -203,24 +188,12 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
++	/* FREF_CLK3 provides the 19.2 MHz reference clock to the PHY */
++	ret = clk_add_alias("main_clk", "nop_usb_xceiv.0", "auxclk3_ck", NULL);
++	if (ret)
++		pr_err("Failed to add main_clk alias to auxclk3_ck\n");
++
+ 	usbhs_init(&usbhs_bdata);
  
- 	platform_set_drvdata(pdev, omap_hcd);
- 
--	/* get ehci regulator and enable */
- 	for (i = 0 ; i < omap_hcd->nports ; i++) {
- 		struct platform_device *phy_pdev;
- 		struct usbhs_phy_config *phy_config;
- 
--		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY) {
--			pdata->regulator[i] = NULL;
-+		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY)
- 			continue;
--		}
--		snprintf(supply, sizeof(supply), "hsusb%d", i);
--		pdata->regulator[i] = regulator_get(dev, supply);
--		if (IS_ERR(pdata->regulator[i])) {
--			pdata->regulator[i] = NULL;
--			dev_dbg(dev,
--			"failed to get ehci port%d regulator\n", i);
--		} else {
--			regulator_enable(pdata->regulator[i]);
--		}
- 
- 		/* instantiate PHY */
- 		if (!pdata->phy_config[i]) {
-@@ -275,7 +248,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_pm_runtime:
--	disable_put_regulator(pdata);
- 	pm_runtime_put_sync(dev);
- 	usb_put_hcd(hcd);
- 	for (i = 0 ; i < omap_hcd->nports ; i++) {
-@@ -307,7 +279,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
- 	int i;
- 
- 	usb_remove_hcd(hcd);
--	disable_put_regulator(dev->platform_data);
- 	iounmap(hcd->regs);
- 	usb_put_hcd(hcd);
- 
+ 	/* enable power to hub */
 -- 
 1.7.4.1
