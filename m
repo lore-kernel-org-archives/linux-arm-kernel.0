@@ -1,35 +1,44 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Thu, 10 Jan 2013 17:18:40 +0100
-Subject: [PATCH] hardlockup: detect hard lockups without NMIs using
- secondary cpus
-In-Reply-To: <20130110142245.GE19944@n2100.arm.linux.org.uk>
-References: <1357783059-13923-1-git-send-email-ccross@android.com>
- <20130110140215.GP88797@redhat.com>
- <20130110142245.GE19944@n2100.arm.linux.org.uk>
-Message-ID: <CAFTL4hw_aRB8837stPgABFwHd9ifVqtV5Z5zX9MJ8rSFTSPNog@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 10 Jan 2013 17:20:16 +0100
+Subject: [PATCH v3 06/18] ARM: clps711x: cdb89712: Special driver for
+ handling memory is removed
+In-Reply-To: <20130110193916.16f1a92eb5048250004b6b03@mail.ru>
+References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
+ <1353160644-22446-7-git-send-email-shc_work@mail.ru>
+ <20130110140921.GC14860@pengutronix.de>
+ <20130110193916.16f1a92eb5048250004b6b03@mail.ru>
+Message-ID: <20130110162016.GD14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/10 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Thu, Jan 10, 2013 at 09:02:15AM -0500, Don Zickus wrote:
->> On Wed, Jan 09, 2013 at 05:57:39PM -0800, Colin Cross wrote:
->> > Emulate NMIs on systems where they are not available by using timer
->> > interrupts on other cpus.  Each cpu will use its softlockup hrtimer
->> > to check that the next cpu is processing hrtimer interrupts by
->> > verifying that a counter is increasing.
->> >
->> > This patch is useful on systems where the hardlockup detector is not
->> > available due to a lack of NMIs, for example most ARM SoCs.
->>
->> I have seen other cpus, like Sparc I think, create a 'virtual NMI' by
->> reserving an IRQ line as 'special' (can not be masked).  Not sure if that
->> is something worth looking at here (or even possible).
->
-> No it isn't, because that assumes that things like spin_lock_irqsave()
-> won't mask that interrupt.  We don't have the facility to do that.
+Hello Alexander,
 
-I believe sparc is doing something like this though. Look at
-arch/sparc/include/asm/irqflags_64.h, it seems NMIs are implemented
-there using an irq number that is not masked by this function.
+On Thu, Jan 10, 2013 at 07:39:16PM +0400, Alexander Shiyan wrote:
+> On Thu, 10 Jan 2013 15:09:21 +0100
+> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+> 
+> ...
+> > >  static void __init cdb89712_init(void)
+> > >  {
+> > > +	platform_device_register(&cdb89712_flash_pdev);
+> > > +	platform_device_register(&cdb89712_bootrom_pdev);
+> > > +	platform_device_register(&cdb89712_sram_pdev);
+> > This is broken, all these structs are located in .init.data which is
+> > discarded after the machine is fully booted. Also platformdata must not
+> > live in init data. Consider using platform_device_register_full which
+> > allows more data to be init data.
+> 
+> I agree. Error is invisible when not using loadable modules, but will
+> become apparent when using these.
+This is not true. It can trigger a problem for sure when you rebind the
+driver via sysfs. And in general you cannot assume that a driver doesn't
+need platform_data or it's struct platform_device during operation. Take
+for example physmap_flash_shutdown (defined in
+drivers/mtd/maps/physmap.c). Maybe even $(find /sys) triggers a problem.
 
-Not all archs can do that so easily I guess.
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
