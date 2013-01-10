@@ -1,50 +1,68 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 11 Jan 2013 07:44:33 +1300
-Subject: [PATCH] gpio: vt8500: Export dedicated GPIO before
- multifunction pins.
-In-Reply-To: <CACRpkdagdO3_6DmKYaCwmx4Jju=E_uy86_QqdKLA3+VK7JNPjg@mail.gmail.com>
-References: <1356899374-9395-1-git-send-email-linux@prisktech.co.nz>
- <CACRpkdagdO3_6DmKYaCwmx4Jju=E_uy86_QqdKLA3+VK7JNPjg@mail.gmail.com>
-Message-ID: <1357843473.6075.8.camel@gitbox>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 10 Jan 2013 10:44:31 -0800
+Subject: [PATCH 2/3 V2] iio: mxs: Implement support for touchscreen
+In-Reply-To: <50EF0636.6090903@metafoo.de>
+References: <1355449598-15980-1-git-send-email-marex@denx.de>
+ <201212191801.31920.marex@denx.de>
+ <20130110005748.GA947@core.coreip.homeip.net>
+ <201301101048.38036.marex@denx.de>
+ <20130110174630.GB2797@core.coreip.homeip.net>
+ <50EF0636.6090903@metafoo.de>
+Message-ID: <20130110184431.GD2797@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-01-10 at 11:49 +0100, Linus Walleij wrote:
-> On Sun, Dec 30, 2012 at 9:29 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+On Thu, Jan 10, 2013 at 07:19:34PM +0100, Lars-Peter Clausen wrote:
+> On 01/10/2013 06:46 PM, Dmitry Torokhov wrote:
+> > On Thu, Jan 10, 2013 at 10:48:37AM +0100, Marek Vasut wrote:
+> >> Dear Dmitry Torokhov,
+> >>
+> >> [...]
+> >>>>> +	enum mxs_lradc_ts	use_touchscreen;
+> >>>>> +	unsigned int		stop_touchscreen:1;
+> >>>>> +	unsigned int		use_touchbutton:1;
+> >>>
+> >>> Can we make them bools instead of bit fields?
+> >>
+> >> Sure.
+> >> [...]
+> >>
+> >>>>> +static void mxs_lradc_ts_close(struct input_dev *dev)
+> >>>>> +{
+> >>>>> +	struct mxs_lradc *lradc = input_get_drvdata(dev);
+> >>>>> +
+> >>>>> +	/* Indicate the touchscreen is stopping. */
+> >>>>> +	lradc->stop_touchscreen = 1;
+> >>>>> +
+> >>>>> +	/* Disable touchscreen touch-detect IRQ. */
+> >>>>> +	writel(LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
+> >>>>> +		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
+> >>>>> +
+> >>>>> +	/* Power-down touchscreen touch-detect circuitry. */
+> >>>>> +	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
+> >>>>> +		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+> >>>
+> >>> These 2 writes are racing with writes in mxs_lradc_ts_work(). I think
+> >>> you need to:
+> >>>
+> >>> 	lradc->stop_touchscreen = true;
+> >>> 	mb();
+> >>
+> >> Nice catch, do we need the memory barrier here though, is it not enough to 
+> >> reorder the cancel_work_sync() just before the register writes?
+> > 
+> > You really need to make sure that setting lradc->stop_touchscreen =
+> > true; is not reordered, because otherwise you may cancel the work,
+> > interrupt happens and reschedules it, and then you set up the flag.
 > 
-> > The vendor does not provide numbering for gpio pins. Vendor source
-> > exports dedicated gpio pins first, followed by multifunction pins.
-> > As this is what end users expect, this patch changes vt8500 and wm8505
-> > to do the same.
-> >
-> > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> 
-> So how many existing userspace applications does this patch
-> break? Has this system been widely deployed so a kernel
-> upgrade will cause problems for people?
-> 
-> But applied anyway, unless someone screams about it real
-> soon now. That seems to be the only way to get people to tell
-> us about their use cases.
-> 
-> Could you consider adding names to the exported GPIO pins
-> on the vt8500 series please? Then userspace can atleast
-> try to locate the right pin.
-> 
-> Yours,
-> Linus Walleij
+> Does it really matter? If it is rescheduled you get one event more reported
+> after the device has been closed, but input core should ignore it anyway, or
+> doesn't it?
 
-In terms of userspace apps, my best guess would be 'I dunno'. This was
-requested by the only end-user to ask a question since mainline support
-was added - He couldn't find the external GPIO's in the 200+ that were
-listed.
+But the problem is that if work runs again it will enable the interrupt.
+It is better to have all ducks in a row.
 
-This also makes all the platforms the same now - external GPIO's are now
-exported first (0..x) which is better in the long term for userspace.
+Thanks.
 
-The names is a bit of a problem, but I will try my best. We have limited
-datasheets etc from the vendor, so knowing what things do is a bit of a
-mystery sometimes.
-
-Regards
-Tony P
+-- 
+Dmitry
