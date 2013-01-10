@@ -1,91 +1,74 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 Jan 2013 10:45:45 +0800
-Subject: [PATCH 4/4] ARM i.MX53: dts: add oftree for MBa53 baseboard
-In-Reply-To: <1357739065-9153-5-git-send-email-s.trumtrar@pengutronix.de>
-References: <1357739065-9153-1-git-send-email-s.trumtrar@pengutronix.de>
- <1357739065-9153-5-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130110024543.GE2265@S2101-09.ap.freescale.net>
+From: katsuki.uwatoko@toshiba.co.jp (katsuki.uwatoko at toshiba.co.jp)
+Date: Thu, 10 Jan 2013 03:06:56 +0000
+Subject: [PATCH] ARM: sched_clock: fix the timing of reading current
+ clock cycles in cyc_to_sched_clock.
+In-Reply-To: <A6CD60A5D6958Ckatsuki.uwatoko@toshiba.co.jp>
+References: <A6CD60A5D6958Ckatsuki.uwatoko@toshiba.co.jp>
+Message-ID: <F3B6523425E7914AA6214ED358D820AF25D74921@TGXML316.toshiba.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 02:44:25PM +0100, Steffen Trumtrar wrote:
-> The MBa53 is a baseboard for the TQMA53 embedded module. This enables/adds only
-> supported devices, i.e. it is not feature complete, because of missing drivers
-> in mainline linux.
+Hi,
+
+I sent the attached patch six months ago and I did not get any responses, 
+but still I think that this is a bug.
+
+If any mistakes, please let me know.
+
+Regards,
+-- 
+UWATOKO Katsuki
+
+> From:     UWATOKO Katsuki <katsuki.uwatoko@toshiba.co.jp>
+> To:       linux-arm-kernel at lists.infradead.org
+> Cc:       linux at arm.linux.org.uk
+> Subject:  [PATCH] ARM: sched_clock: fix the timing of reading current clock cycles in cyc_to_sched_clock.
+> Date:     Fri, 13 Jul 2012 12:16:04 +0900
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> 
+> The current clock cycle (cyc) must be read after epoc_cyc and epoch_ns
+> are fixed.  The calculation result gets invalid when epoch_cyc is
+> updated after cyc is determined, because the result of (cyc -
+> epoch_cyc) is unsigned int.
+> 
+> Signed-off-by: UWATOKO Katsuki <katsuki.uwatoko@toshiba.co.jp>
 > ---
->  arch/arm/boot/dts/Makefile        |    1 +
->  arch/arm/boot/dts/imx53-MBa53.dts |  146 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 147 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx53-MBa53.dts
+>  arch/arm/kernel/sched_clock.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
 > 
-I do not like the CamelCase in filename, and do not want to be the first
-one doing that in  arch/arm/boot/dts.
-
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index e44da40..04b05e8 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -84,6 +84,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
->  	imx53-evk.dtb \
->  	imx53-qsb.dtb \
->  	imx53-smd.dtb \
-> +	imx53-MBa53.dtb \
-
-Change it to lower case and sort it properly.
-
->  	imx6q-arm2.dtb \
->  	imx6q-sabreauto.dtb \
->  	imx6q-sabrelite.dtb \
-> diff --git a/arch/arm/boot/dts/imx53-MBa53.dts b/arch/arm/boot/dts/imx53-MBa53.dts
-> new file mode 100644
-> index 0000000..39ecaeb
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-MBa53.dts
-> @@ -0,0 +1,146 @@
-> +/*
-> + * Copyright 2012 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "imx53-tqma53.dtsi"
-> +
-> +/ {
-> +	model = "TQ MBa53 starter kit";
-> +	compatible = "tq,mba53", "tq,tqma53", "fsl,imx53";
-> +
-> +	backlight_reg:fixed at 0 {
-
-The node name is not good.  Also we generally have a space between
-label and node names.
-
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "lcd-supply";
-> +		gpio = <&gpio2 5 0>;
-> +		startup-delay-us = <5000>;
-> +		enable-active-low;
-> +        };
-
-Use tab instead of space.
-
-> +
-> +	backlight {
-> +		compatible = "pwm-backlight";
-> +		pwms = <&pwm2 0 50000 0 0>;
-> +		brightness-levels = <0 24 28 32 36 40 44 48 52 56 60 64 68 72 76 80 84 88 92 96 100>;
-> +		default-brightness-level = <10>;
-> +		enable-gpios = <&gpio7 7 0>;
-> +		power-supply = <&backlight_reg>;
-> +        };
-
-Ditto
-
-Shawn
+> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+> index 27d186a..ab08671 100644
+> --- a/arch/arm/kernel/sched_clock.c
+> +++ b/arch/arm/kernel/sched_clock.c
+> @@ -44,7 +44,7 @@ static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
+>  	return (cyc * mult) >> shift;
+>  }
+>  
+> -static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
+> +static unsigned long long cyc_to_sched_clock(u32 (*read)(void), u32 mask)
+>  {
+>  	u64 epoch_ns;
+>  	u32 epoch_cyc;
+> @@ -63,7 +63,8 @@ static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
+>  		smp_rmb();
+>  	} while (epoch_cyc != cd.epoch_cyc_copy);
+>  
+> -	return epoch_ns + cyc_to_ns((cyc - epoch_cyc) & mask, cd.mult, cd.shift);
+> +	return epoch_ns + cyc_to_ns((read() - epoch_cyc) & mask, cd.mult,
+> +				    cd.shift);
+>  }
+>  
+>  /*
+> @@ -150,8 +151,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+>  
+>  unsigned long long notrace sched_clock(void)
+>  {
+> -	u32 cyc = read_sched_clock();
+> -	return cyc_to_sched_clock(cyc, sched_clock_mask);
+> +	return cyc_to_sched_clock(read_sched_clock, sched_clock_mask);
+>  }
+>  
+>  void __init sched_clock_postinit(void)
+> -- 
+> 1.7.4.1
+> 
