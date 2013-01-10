@@ -1,53 +1,24 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 09 Jan 2013 16:15:23 -0800
-Subject: [RFC PATCH 4/7] ARM: s3c64xx: Fix build error with
- CONFIG_S3C_DEV_FB disabled
-In-Reply-To: <1357774909-29938-5-git-send-email-tomasz.figa@gmail.com>
-References: <1357774909-29938-1-git-send-email-tomasz.figa@gmail.com>
- <1357774909-29938-5-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <00a201cdeec7$99f5d560$cde18020$@samsung.com>
+From: airlied@gmail.com (Dave Airlie)
+Date: Thu, 10 Jan 2013 10:16:10 +1000
+Subject: [RFC 0/4] TI LCDC DRM driver
+In-Reply-To: <1357704685-3600-1-git-send-email-robdclark@gmail.com>
+References: <1357704685-3600-1-git-send-email-robdclark@gmail.com>
+Message-ID: <CAPM=9tzZiQuVNdNhm9=iNWqAwk+uZRh0_YC3QLkyZbne5dfeyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> If there is no board selecting CONFIG_S3C_DEV_FB enabled, build will fail
-on
-> arch/arm/mach-s3c64xx/pm.c, where s3c_device_fb is referenced.
-> 
-> This patch adds ifdef guard around the code making it compile only when
-> CONFIG_S3C_DEV_FB is enabled.
-> 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/pm.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-> index f6b13a2..3686785 100644
-> --- a/arch/arm/mach-s3c64xx/pm.c
-> +++ b/arch/arm/mach-s3c64xx/pm.c
-> @@ -338,10 +338,10 @@ int __init s3c64xx_pm_init(void)
-> 
->  	for (i = 0; i < ARRAY_SIZE(s3c64xx_pm_domains); i++)
->  		pm_genpd_init(&s3c64xx_pm_domains[i]->pd, NULL, false);
-> -
-> +#ifdef CONFIG_S3C_DEV_FB
->  	if (dev_get_platdata(&s3c_device_fb.dev))
->  		pm_genpd_add_device(&s3c64xx_pm_f.pd,
-> &s3c_device_fb.dev);
-> -
-> +#endif
->  	return 0;
->  }
-> 
-> --
-> 1.8.1
+On Wed, Jan 9, 2013 at 2:11 PM, Rob Clark <robdclark@gmail.com> wrote:
+> Updated version of DRM driver for TI LCD Controller.  Since the initial
+> version of the patch, which only supported TFP410 DVI output, I've added
+> an output driver for LCD panels (for example, LCD3 or LCD7 cape for the
+> beagle-bone), and initial support for HDMI output via NXP TDA19988 HDMI
+> encoder (via i2c encoder-slave output driver).
+>
+> At this point, I think the basic lcdc drm driver plus TFP410 DVI output
+> (first patch) is in reasonable shape (barring potential rename, if lcdc
+> is too generic of a name... but I was not feeling creative enough yet to
+> pick a new name).
 
-This should be separated patch from this series as a fix.
+I'd like at least tilcdc :-)
 
-Let me pick this up into -fixes.
-
-Thanks.
-
-- Kukjin
+Dave.
