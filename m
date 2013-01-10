@@ -1,71 +1,33 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 10 Jan 2013 11:25:44 +0100
-Subject: [PATCH 05/14] lib: Add I/O map cache implementation
-In-Reply-To: <201301100917.19577.arnd@arndb.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <20130109231758.GA27065@obsidianresearch.com>
- <20130110071937.GG15212@avionic-0098.adnet.avionic-design.de>
- <201301100917.19577.arnd@arndb.de>
-Message-ID: <20130110102544.GA5546@avionic-0098.adnet.avionic-design.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 10 Jan 2013 12:26:55 +0200
+Subject: [V2 PATCH 01/27] usb: gadget: mv_udc: use udc_start and udc_stop
+ functions
+In-Reply-To: <1354071986-28032-2-git-send-email-chao.xie@marvell.com>
+References: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
+ <1354071986-28032-2-git-send-email-chao.xie@marvell.com>
+Message-ID: <20130110102655.GD28920@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 09:17:19AM +0000, Arnd Bergmann wrote:
-> On Thursday 10 January 2013, Thierry Reding wrote:
-> > On Wed, Jan 09, 2013 at 04:17:58PM -0700, Jason Gunthorpe wrote:
-> > > On Wed, Jan 09, 2013 at 04:12:31PM -0700, Stephen Warren wrote:
-> > > You could decrease the size of the mapping to only span the bus
-> > > numbers that are configured for use via DT.
-> > 
-> > That won't work, unfortunately. The mapping is such that the bus number
-> > is not encoded in the uppermost bits, the extended register number is.
-> > So the only thing that we could do is decrease the size of the extended
-> > register space for *all* devices.
+On Tue, Nov 27, 2012 at 10:06:00PM -0500, Chao Xie wrote:
+> This patches converts the driver into the new style start/stop
+> interface. As a result the driver no longer uses the static
+> global the_conroller variable.
 > 
-> But you could still a method to map 16 separate areas per bus, each 65536
-> bytes long, which results in 1MB per bus. That is probably ok, since
-> very few systems have more than a handful of buses in practice.
-> 
-> In theory, doing static mappings on a per-page base would let you
-> do 16 devices at a time, but it's probably worth doing at this fine
-> granularity.
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
 
-I don't understand how this would help. The encoding is like this:
+Care to refresh ?
 
-	[27:24] extended register number
-	[23:16] bus number
-	[15:11] device number
-	[10: 8] function number
-	[ 7: 0] register number
+patching file drivers/usb/gadget/mv_udc_core.c
+Hunk #9 FAILED at 2106.
+1 out of 15 hunks FAILED -- saving rejects to file drivers/usb/gadget/mv_udc_core.c.rej
 
-So it doesn't matter whether I use separate areas per bus or not. As
-soon as the whole extended configuration space needs to be accessed a
-whopping 28 bits (256 MiB) are required.
-
-What you propose would work if only regular configuration space is
-supported. I'm not sure if that's an option.
-
-> > > Are there any concerns about these config registers being accessed
-> > > from a context where a new mapping can't be made? Interrupt? Machine
-> > > Check? PCI-E Advanced Error Reporting?
-> > 
-> > I haven't checked but I would expect configuration space accesses to not
-> > happen in interrupt context. Usually they are limited to enumeration and
-> > driver probe.
-> 
-> Actually, AER probably needs this, and I believe some broken devices 
-> need to mask interrupts using the PCI command word in the config space,
-> it it can happen.
-
-Ugh... that would kill any such dynamic mapping approach. Perhaps if we
-could mark a device as requiring a static mapping we could pin that
-cache entry. But that doesn't sound very encouraging.
-
-Thierry
+-- 
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/11052bc4/attachment-0001.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/35aeb311/attachment.sig>
