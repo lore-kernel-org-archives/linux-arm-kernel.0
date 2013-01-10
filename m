@@ -1,22 +1,37 @@
-From: federico.vaga@gmail.com (Federico Vaga)
-Date: Thu, 10 Jan 2013 16:22:39 +0100
-Subject: [PATCH v5] modify videobuf2-dma-contig and update sta2x11_vip
-In-Reply-To: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
-References: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
-Message-ID: <1491201.YT9CD19YNt@harkonnen>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Jan 2013 16:27:34 +0100
+Subject: [PATCHv2] ARM: mxs: select USB_ARCH_HAS_EHCI
+In-Reply-To: <20130110151659.GB9139@S2101-09.ap.freescale.net>
+References: <1357830235-15661-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130110151659.GB9139@S2101-09.ap.freescale.net>
+Message-ID: <50EEDDE6.3030906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have some new ideas for this new complex architecture (sta2x11) that can 
-fix our DMA problems without change the existent code. Obviously, ideas arrive 
-when I already sent the patches. Anyway, consider this patch series as an RFC. 
-They are not ready for the mainline. I take some time to investigate on the 
-architecture side of the project to try to fix our problem.
+Hi Shawn,
 
-Anyway, if you consider interesting configure the gfp flags for dma-contig, I 
-can propose a v6 series which correct the alloc coherent line.
+On 10/01/2013 16:17, Shawn Guo wrote:
+> On Thu, Jan 10, 2013 at 04:03:55PM +0100, Maxime Ripard wrote:
+>> Commit 09f6ffde introduced a dependency on USB_EHCI_HCD for the chipidea
+>> USB host driver, that in turns depends on USB_ARCH_HAS_EHCI.
+>>
+>> If this symbol is not selected by the ARCH, we are not able to use the
+>> chipidea driver anymore.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ---
+>>  drivers/usb/Kconfig |    1 +
+>>  1 file changed, 1 insertion(+)
+> 
+> Now, it should go via usb rather than arm-soc tree.
 
-Sorry for the spam :(
+Yes, that's what I thought just after sending the patch.
+
+Sorry for that
+Maxime
 
 -- 
-Federico Vaga
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
