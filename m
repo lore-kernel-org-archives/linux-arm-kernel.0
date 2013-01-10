@@ -1,55 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 10 Jan 2013 06:50:31 -0500
-Subject: [PATCH v2 15/20] arm: kirkwood: topkick: the Topkick platform
- uses a 88F6282 SoC
-In-Reply-To: <20130110061309.GA9993@lunn.ch>
-References: <1356101359-6054-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1356101359-6054-16-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130110022926.GH5075@titan.lakedaemon.net>
- <20130110061309.GA9993@lunn.ch>
-Message-ID: <20130110115031.GJ5075@titan.lakedaemon.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 Jan 2013 12:53:16 +0100
+Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename
+ =?UTF-8?Q?KVM=5FSET=5FDEVI?= =?UTF-8?Q?CE=5FADDRESS?=
+In-Reply-To: <CAFEAcA87t5VP5TCUjtNHDPHM=uPSXirNSD5=GWgwZaHF-wOo6A@mail.gmail.com>
+References: <1357769438.18196.5@snotra>
+ <97E481BC-F14D-4866-B44B-878833CA81DC@suse.de>
+ <CAFEAcA87t5VP5TCUjtNHDPHM=uPSXirNSD5=GWgwZaHF-wOo6A@mail.gmail.com>
+Message-ID: <f1c3b1a5c2261578b5112e69af8c5180@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 07:13:09AM +0100, Andrew Lunn wrote:
-> On Wed, Jan 09, 2013 at 09:29:26PM -0500, Jason Cooper wrote:
-> > On Fri, Dec 21, 2012 at 03:49:14PM +0100, Thomas Petazzoni wrote:
-> > > The Topkick board uses a 88F6282 SoC, so the Device Tree Source
-> > > describing the Topkick should inherit from kirkwood-6282.dtsi, which
-> > > allows to take advantage of pin muxing capabilities.
-> > > 
-> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > ---
-> > > Changes since v1:
-> > >  * This patch is new in v2
-> > > ---
-> > >  arch/arm/boot/dts/kirkwood-topkick.dts |    1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-> > > index c0de5a7..8f4a5b8 100644
-> > > --- a/arch/arm/boot/dts/kirkwood-topkick.dts
-> > > +++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-> > > @@ -1,6 +1,7 @@
-> > >  /dts-v1/;
-> > >  
-> > >  /include/ "kirkwood.dtsi"
-> > > +/include/ "kirkwood-6282.dtsi"
-> > 
-> > Hmmm, shouldn't the cooresponding MPP.._GPIO and kirkwood_mpp_conf() be
-> > removed as well?
+On Thu, 10 Jan 2013 10:17:09 +0000, Peter Maydell
+<peter.maydell@linaro.org> wrote:
+> On 9 January 2013 22:30, Alexander Graf <agraf@suse.de> wrote:
+>> In fact, in this particular case one could merge all of the patches
+>> except for the
+>> particular ioctl implementation and just give the respective addresses
+>> default
+>> values until there is an API to set them, similar to how we did things
+>> with PVR
+>> in the beginning.
 > 
-> Hi Jason
-> 
-> I have some patches for that. I will dig them out over the weekend.
-> 
-> I did have an issue with one of the LEDs. If i remember correctly, i
-> sent you an email about it. Could you look back in your archive? 
+> That's what we started with and we got review comments saying "yuck,
+> don't hard code this"...
 
-Yes, I have it on my todo list.  Unfortunately, I haven't unpacked my
-dev plats after my office relocation.  :(  Hopefully, I'll get that set
-up this weekend.
+Even worse: hard-coding things breaks kvmtool (we do not emulate a
+vexpress and have a rather different memory map) and arm64 (the
+requirements on GIC mappings are different).
 
-thx,
+So hard coding addresses is already unacceptable.
 
-Jason.
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
