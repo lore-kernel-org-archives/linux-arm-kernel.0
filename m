@@ -1,60 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 10 Jan 2013 09:44:44 +0000
-Subject: [PATCHv2 0/4] clockevents: decouple broadcast mechanism from
- drivers
-In-Reply-To: <50EDD71A.5030406@codeaurora.org>
-References: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
- <50EDD71A.5030406@codeaurora.org>
-Message-ID: <20130110094435.GA17741@e106331-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 10 Jan 2013 09:51:15 +0000
+Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
+ HAVE_ARM_SCU
+In-Reply-To: <20130110.083143.258958175573018571.hdoyu@nvidia.com>
+References: <50EC7450.4070806@wwwdotorg.org>
+ <20130109.074946.1167125688535781408.hdoyu@nvidia.com>
+ <20130109113432.GA22147@e102568-lin.cambridge.arm.com>
+ <20130110.083143.258958175573018571.hdoyu@nvidia.com>
+Message-ID: <20130110095115.GB4728@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 08:46:18PM +0000, Stephen Boyd wrote:
-> On 01/09/13 06:46, Mark Rutland wrote:
-> > This is an updated version of the series I posted back in December:
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137929.html
-> >
-> > Changes since v1:
-> > * Drop removal of guards in smp.c
-> > * Removed useless evt->evt_handler check in tick_receive_broadcast
-> > * Fix up tick_receive_broadcast when !GENERIC_CLOCKEVENTS_BROADCAST
-> > * Fix checkpatch issues (multi-line strings)
-> >
-> > Thanks go to Stephen Boyd and Santosh Shilimkar for their commments.
-> >
-> > In some SMP systems, cpu-local timers may stop delivering interrupts
-> > when in low power states, or not all CPUs may have local timers. To
-> > support these systems we have a mechanism for broadcasting timer ticks
-> > to other CPUs. This mechanism relies on the struct
-> > clock_event_device::broadcast function pointer, which is a
-> > driver-specific mechanism for broadcasting ticks to other CPUs.
-> >
-> > As the broadcast mechanism is architecture-specific, placing the
-> > broadcast function on struct clock_event_device ties each driver to a
-> > single architecture. Additionally the driver or architecture backend
-> > must handle the routing of broadcast ticks to the correct
-> > clock_event_device, leading to duplication of the list of active
-> > clock_event_devices.
-> >
-> > These patches introduce a generic mechanism for handling the receipt of
-> > timer broadcasts, and an optional architecture-specific broadcast
-> > function which allows drivers to be decoupled from a particular
-> > architecture will retaining support for timer tick broadcasts. These
-> > mechanisms are wired up for the arm port, and have been boot-tested on a
-> > pandaboard.
-> >
-> 
-> For the series:
-> 
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+On Thu, Jan 10, 2013 at 06:31:43AM +0000, Hiroshi Doyu wrote:
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Wed, 9 Jan 2013 12:34:32 +0100:
 
-Thanks!
+[...]
 
+> > > > But that all said, I'm not convinced it's a good idea to force the
+> > > > information to be present in DT when it's just duplicating stuff that
+> > > > can be runtime-probed from the HW...
+> > > 
+> > > That's also my concern somewhat.
+> > > 
+> > > The main purpose to DT CPU core detection is for multiple CPU
+> > > clusters. SCU/MRC cannot know anything outside of their own
+> > > clusters. In tegra, we have 4 Cortex-A9/A15 core plus 1 shadow
+> > > core. Switching those clusters is done transparently. The last A9/A15
+> > > core is transparently switched back and forth to the shadow one. So in
+> > > this case, SCU/MRC detection seems to work fine.
+> > 
+> > You can probe the number of cores through SCU but remember
+> > that MPIDRs of existing CPUs are generated, not probed if the DT is not
+> > present (smp_setup_processor_id()). cpu_logical_map content, before the
+> > DT bindings were introduced, or even now if DT /cpu nodes are bogus, is
+> > simply generated as a sequential number but is not *probeable* per-se.
 > 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> 
+> Honestly I don't understand the above so well. Could you please
+> explain a little bit more?
 
-Mark.
+The DT /cpu bindings provide the kernel with a list of MPIDR ("reg"
+property) of all CPUs in the system. What I wanted to say is that, you
+can probe in HW the number of cores in some situations, but the DT
+provides more information than that, so I was debating the "duplicating
+stuff that can be runtime probed" point.
+
+In some platforms you can probe the number of cores in HW, but the MPIDR
+of existing CPUs is "generated" in smp_setup_processor_id() (you cannot
+probe the MPIDR of CPUs that are off or held in a pen), as a sequential number
+and stored in the cpu_logical_map. This works well for single cluster systems,
+since the MPIDR[23:0] of processors in a single cluster system is a sequential
+number starting from 0 (well, at least MPIDR[7:0], but let's not get bogged
+down into details).
+
+For multi-cluster systems this fails, and DT comes to the rescue along
+with its companion parsing function, arm_dt_init_cpu_maps().
+
+The long and short of it is: DT /cpu nodes are not there just for number
+of cores counting, but there is more. Probably on Tegra this is not
+needed at the moment, but this provides the groundwork for a generic and
+solid solution for all upcoming ARM platforms.
+
+I hope this helps, let me know if it is not clear.
+
+Lorenzo
