@@ -1,25 +1,34 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 10 Jan 2013 22:01:07 +0100
-Subject: [PATCH 0/2] Remove two redundent clk aliases
-Message-ID: <1357851669-25669-1-git-send-email-andrew@lunn.ch>
+Date: Thu, 10 Jan 2013 22:01:08 +0100
+Subject: [PATCH 1/2] ARM: Kirkwood: Remove redundent USB clock alias
+In-Reply-To: <1357851669-25669-1-git-send-email-andrew@lunn.ch>
+References: <1357851669-25669-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1357851669-25669-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both USB and MDIO are now instantiated using DT and these DT nodes
-have clocks properties. Remove the now redundant clkdev aliases.
+Now that USB is instantiated via DT, and the USB DT node has a clocks
+property, we no longer need a C coded clock alias. Remove it.
 
-The first patch has no dependencies.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/mach-kirkwood/board-dt.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-The second patch is dependent on the SDIO patchset "Device Tree
-binding for the mvsdio driver" by Thomas Petazzoni.
-
-
-Andrew Lunn (2):
-  ARM: Kirkwood: Remove redundent USB clock alias
-  ARM: Kirkwood: Remove redundent SDIO clock alias
-
- arch/arm/mach-kirkwood/board-dt.c |    9 ---------
- 1 file changed, 9 deletions(-)
-
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index dae6883..59fdb56 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -55,10 +55,6 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	orion_clkdev_add("0", "pcie",
+ 			 of_clk_get_from_provider(&clkspec));
+ 
+-	clkspec.args[0] = CGC_BIT_USB0;
+-	orion_clkdev_add(NULL, "orion-ehci.0",
+-			 of_clk_get_from_provider(&clkspec));
+-
+ 	clkspec.args[0] = CGC_BIT_PEX1;
+ 	orion_clkdev_add("1", "pcie",
+ 			 of_clk_get_from_provider(&clkspec));
 -- 
 1.7.10.4
