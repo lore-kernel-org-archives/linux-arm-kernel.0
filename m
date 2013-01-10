@@ -1,21 +1,22 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 10 Jan 2013 08:38:28 -0600
-Subject: [PATCH v4 07/19] ARM: remove mach .handle_irq for GIC users
-In-Reply-To: <20130110110205.GC19944@n2100.arm.linux.org.uk>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-8-git-send-email-robherring2@gmail.com>
- <20130110110205.GC19944@n2100.arm.linux.org.uk>
-Message-ID: <50EED264.1020709@gmail.com>
+From: federico.vaga@gmail.com (Federico Vaga)
+Date: Thu, 10 Jan 2013 16:22:39 +0100
+Subject: [PATCH v5] modify videobuf2-dma-contig and update sta2x11_vip
+In-Reply-To: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
+References: <1357822010-30419-1-git-send-email-federico.vaga@gmail.com>
+Message-ID: <1491201.YT9CD19YNt@harkonnen>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2013 05:02 AM, Russell King - ARM Linux wrote:
-> On Thu, Jan 03, 2013 at 11:54:16AM -0600, Rob Herring wrote:
->> -asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
->> +static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
-> 
-> NAK.  No, not "static asmlinkage".
+We have some new ideas for this new complex architecture (sta2x11) that can 
+fix our DMA problems without change the existent code. Obviously, ideas arrive 
+when I already sent the patches. Anyway, consider this patch series as an RFC. 
+They are not ready for the mainline. I take some time to investigate on the 
+architecture side of the project to try to fix our problem.
 
-Okay will remove asmlinkage, but is there an issue with making this static?
+Anyway, if you consider interesting configure the gfp flags for dma-contig, I 
+can propose a v6 series which correct the alloc coherent line.
 
-Rob
+Sorry for the spam :(
+
+-- 
+Federico Vaga
