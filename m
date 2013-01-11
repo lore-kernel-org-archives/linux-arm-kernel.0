@@ -1,41 +1,212 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 11 Jan 2013 11:12:18 -0800
-Subject: [GIT PULL] imx uncompress debug for 3.9
-In-Reply-To: <20130110125547.GB8680@S2101-09.ap.freescale.net>
-References: <20130110125547.GB8680@S2101-09.ap.freescale.net>
-Message-ID: <20130111191218.GA1148@quad.lixom.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 11 Jan 2013 14:13:39 -0500 (EST)
+Subject: [PATCH 10/16] ARM: vexpress: introduce DCSCB support
+In-Reply-To: <50F05606.9060703@ti.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-11-git-send-email-nicolas.pitre@linaro.org>
+ <50F05606.9060703@ti.com>
+Message-ID: <alpine.LFD.2.02.1301111408330.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
 
-On Thu, Jan 10, 2013 at 08:55:50PM +0800, Shawn Guo wrote:
-> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
-> 
->   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-uncompress-3.9
-> 
-> for you to fetch changes up to 0edbac9d72158b443368d7002db387463fe08ffd:
-> 
->   ARM: uncompress: support uncompress debug for multiplatform build (2012-12-22 21:01:50 +0800)
-> 
-> ----------------------------------------------------------------
-> I did not get any comment on the series, so would think it's an
-> acceptable solution for multiplatform build to get uncompress debug
-> capability back.
-> 
-> ----------------------------------------------------------------
-> Shawn Guo (4):
->       ARM: imx: use separated debug uart symbol for imx31 and imx35
->       ARM: imx: support DEBUG_LL uart port selection for all i.MX SoCs
->       ARM: imx: restore uncompress.h to a common place
->       ARM: uncompress: support uncompress debug for multiplatform build
+> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
+> > This adds basic CPU and cluster reset controls on RTSM for the
+> > A15x4-A7x4 model configuration using the Dual Cluster System
+> > Configuration Block (DCSCB).
+> > 
+> > The cache coherency interconnect (CCI) is not handled yet.
+> > 
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > ---
+> >   arch/arm/mach-vexpress/Kconfig  |   8 ++
+> >   arch/arm/mach-vexpress/Makefile |   1 +
+> >   arch/arm/mach-vexpress/dcscb.c  | 160
+> > ++++++++++++++++++++++++++++++++++++++++
+> >   3 files changed, 169 insertions(+)
+> >   create mode 100644 arch/arm/mach-vexpress/dcscb.c
+> > 
+> > diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> > index 99e63f5f99..e55c02562f 100644
+> > --- a/arch/arm/mach-vexpress/Kconfig
+> > +++ b/arch/arm/mach-vexpress/Kconfig
+> > @@ -53,4 +53,12 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
+> >   config ARCH_VEXPRESS_CA9X4
+> >   	bool "Versatile Express Cortex-A9x4 tile"
+> > 
+> > +config ARCH_VEXPRESS_DCSCB
+> > +	bool "Dual Cluster System Control Block (DCSCB) support"
+> > +	depends on BIG_LITTLE
+> > +	help
+> > +	  Support for the Dual Cluster System Configuration Block (DCSCB).
+> > +	  This is needed to provide CPU and cluster power management
+> > +	  on RTSM.
+> > +
+> >   endmenu
+> > diff --git a/arch/arm/mach-vexpress/Makefile
+> > b/arch/arm/mach-vexpress/Makefile
+> > index 80b64971fb..2253644054 100644
+> > --- a/arch/arm/mach-vexpress/Makefile
+> > +++ b/arch/arm/mach-vexpress/Makefile
+> > @@ -6,5 +6,6 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) :=
+> > -I$(srctree)/$(src)/include \
+> > 
+> >   obj-y					:= v2m.o reset.o
+> >   obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+> > +obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o
+> >   obj-$(CONFIG_SMP)			+= platsmp.o
+> >   obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+> > diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+> > new file mode 100644
+> > index 0000000000..cccd943cd4
+> > --- /dev/null
+> > +++ b/arch/arm/mach-vexpress/dcscb.c
+> > @@ -0,0 +1,160 @@
+> > +/*
+> > + * arch/arm/mach-vexpress/dcscb.c - Dual Cluster System Control Block
+> > + *
+> > + * Created by:	Nicolas Pitre, May 2012
+> > + * Copyright:	(C) 2012  Linaro Limited
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <linux/init.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/io.h>
+> > +#include <linux/spinlock.h>
+> > +#include <linux/errno.h>
+> > +#include <linux/vexpress.h>
+> > +
+> > +#include <asm/bL_entry.h>
+> > +#include <asm/proc-fns.h>
+> > +#include <asm/cacheflush.h>
+> > +
+> > +
+> > +#define DCSCB_PHYS_BASE	0x60000000
+> > +
+> > +#define RST_HOLD0	0x0
+> > +#define RST_HOLD1	0x4
+> > +#define SYS_SWRESET	0x8
+> > +#define RST_STAT0	0xc
+> > +#define RST_STAT1	0x10
+> > +#define EAG_CFG_R	0x20
+> > +#define EAG_CFG_W	0x24
+> > +#define KFC_CFG_R	0x28
+> > +#define KFC_CFG_W	0x2c
+> > +#define DCS_CFG_R	0x30
+> > +
+> > +/*
+> > + * We can't use regular spinlocks. In the switcher case, it is possible
+> > + * for an outbound CPU to call power_down() after its inbound counterpart
+> > + * is already live using the same logical CPU number which trips lockdep
+> > + * debugging.
+> > + */
+> > +static arch_spinlock_t dcscb_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+> > +
+> > +static void __iomem *dcscb_base;
+> > +
+> > +static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
+> > +{
+> > +	unsigned int rst_hold, cpumask = (1 << cpu);
+> > +
+> > +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> > +	if (cpu >= 4 || cluster >= 2)
+> > +		return -EINVAL;
+> > +
+> > +	/*
+> > +	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
+> > +	 * variant exists, we need to disable IRQs manually here.
+> > +	 */
+> > +	local_irq_disable();
+> > +	arch_spin_lock(&dcscb_lock);
+> > +
+> > +	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
+> > +	if (rst_hold & (1 << 8)) {
+> > +		/* remove cluster reset and add individual CPU's reset */
+> > +		rst_hold &= ~(1 << 8);
+> > +		rst_hold |= 0xf;
+> > +	}
+> > +	rst_hold &= ~(cpumask | (cpumask << 4));
+> > +	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
+> > +
+> > +	arch_spin_unlock(&dcscb_lock);
+> > +	local_irq_enable();
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void dcscb_power_down(void)
+> > +{
+> > +	unsigned int mpidr, cpu, cluster, rst_hold, cpumask, last_man;
+> > +
+> > +	asm ("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
+> > +	cpu = mpidr & 0xff;
+> > +	cluster = (mpidr >> 8) & 0xff;
+> > +	cpumask = (1 << cpu);
+> > +
+> > +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> > +	BUG_ON(cpu >= 4 || cluster >= 2);
+> > +
+> > +	arch_spin_lock(&dcscb_lock);
+> > +	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
+> > +	rst_hold |= cpumask;
+> > +	if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf)
+> > +		rst_hold |= (1 << 8);
+> > +	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
+> > +	arch_spin_unlock(&dcscb_lock);
+> > +	last_man = (rst_hold & (1 << 8));
+> > +
+> > +	/*
+> > +	 * Now let's clean our L1 cache and shut ourself down.
+> > +	 * If we're the last CPU in this cluster then clean L2 too.
+> > +	 */
+> > +
+> Do you wanted to have C bit clear code here ?
 
-See my comment on the last patch. I would prefer to see a generic solution
-instead of having to add a debug/uncompress/ file for every platform.
+cpu_proc_fin() does it.
 
+> > +	/*
+> > +	 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
+> > +	 * a preliminary flush here for those CPUs.  At least, that's
+> > +	 * the theory -- without the extra flush, Linux explodes on
+> > +	 * RTSM (maybe not needed anymore, to be investigated)..
+> > +	 */
+> > +	flush_cache_louis();
+> > +	cpu_proc_fin();
+> > +
+> > +	if (!last_man) {
+> > +		flush_cache_louis();
+> > +	} else {
+> > +		flush_cache_all();
+> > +		outer_flush_all();
+> > +	}
+> > +
+> > +	/* Disable local coherency by clearing the ACTLR "SMP" bit: */
+> > +	asm volatile (
+> > +		"mrc	p15, 0, ip, c1, c0, 1 \n\t"
+> > +		"bic	ip, ip, #(1 << 6) @ clear SMP bit \n\t"
+> > +		"mcr	p15, 0, ip, c1, c0, 1"
+> > +		: : : "ip" );
+> > +
+> > +	/* Now we are prepared for power-down, do it: */
+> You need dsb here, right ?
 
--Olof
+Probably.  However this code is being refactored significantly with 
+subsequent patches.  This intermediate step was kept not to introduce 
+too many concepts at once.
+
+> > +	wfi();
+> > +
+> > +	/* Not dead at this point?  Let our caller cope. */
+> > +}
+> > +
+> 
+> Regards
+> Santosh
+> 
+
+Nicolas
