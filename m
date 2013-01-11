@@ -1,79 +1,111 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Jan 2013 18:53:33 +0530
-Subject: [PATCHv2 04/11] arm: arch_timer: standardise counter reading
-In-Reply-To: <1357747640-18594-5-git-send-email-mark.rutland@arm.com>
-References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
- <1357747640-18594-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <50F01255.4060805@ti.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 11 Jan 2013 14:23:34 +0100
+Subject: [PATCH V2 2/2] ARM: dts: OMAP2+: Add PMU nodes
+In-Reply-To: <1355766548-5702-3-git-send-email-jon-hunter@ti.com>
+References: <1355766548-5702-1-git-send-email-jon-hunter@ti.com>
+ <1355766548-5702-3-git-send-email-jon-hunter@ti.com>
+Message-ID: <50F01256.7030701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
-> We're currently inconsistent with respect to our accesses to the
-> physical and virtual counters, mixing and matching the two.
->
-> This patch introduces and uses a function for accessing the correct
-> counter based on whether we're using physical or virtual interrupts.
-> All current accesses to the counter accessors are redirected through
-> it.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Hi Jon,
+
+On 12/17/2012 06:49 PM, Jon Hunter wrote:
+> Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
+> 
+> Please note that the node for OMAP4460 has been placed in a separate
+> header file for OMAP4460, because the node is not compatible with
+> OMAP4430. The node for OMAP4430 is not included because PMU is not
+> currently supported on OMAP4430 due to the absence of a cross-trigger
+> interface driver.
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+
+I've just applied this patch in my for_3.9/dts branch.
+
+I'm wondering if there is any dependency with the previous patch? If
+Tony ack it I can take it as well.
+
+Regards,
+Benoit
+
 > ---
->   arch/arm/kernel/arch_timer.c |   48 ++++++++++-------------------------------
->   1 files changed, 12 insertions(+), 36 deletions(-)
->
-> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-> index 498c29f..0d2681c 100644
-> --- a/arch/arm/kernel/arch_timer.c
-> +++ b/arch/arm/kernel/arch_timer.c
-> @@ -272,51 +272,32 @@ static int arch_timer_available(void)
->   	return 0;
->   }
->
-> -static u32 notrace arch_counter_get_cntpct32(void)
-> +u64 arch_timer_read_counter(void)
->   {
-> -	cycle_t cnt = arch_counter_get_cntpct();
-> -
-> -	/*
-> -	 * The sched_clock infrastructure only knows about counters
-> -	 * with at most 32bits. Forget about the upper 24 bits for the
-> -	 * time being...
-> -	 */
-> -	return (u32)cnt;
-> +	if (arch_timer_use_virtual)
-> +		return arch_counter_get_cntvct();
-> +	else
-> +		return arch_counter_get_cntpct();
->   }
->
-
-[...]
-
-> @@ -489,18 +470,13 @@ int __init arch_timer_of_register(void)
->
->   int __init arch_timer_sched_clock_init(void)
->   {
-> -	u32 (*cnt32)(void);
->   	int err;
->
->   	err = arch_timer_available();
->   	if (err)
->   		return err;
->
-> -	if (arch_timer_use_virtual)
-> -		cnt32 = arch_counter_get_cntvct32;
-> -	else
-> -		cnt32 = arch_counter_get_cntpct32;
-> -
-> -	setup_sched_clock(cnt32, 32, arch_timer_rate);
-> +	setup_sched_clock(arch_timer_read_counter32,
-> +			  32, arch_timer_rate);
->   	return 0;
->   }
->
-I think the original idea had merit since the check was needed
-in init code instead of proposed one which has if check for
-every counter read function. No ?
+>  arch/arm/boot/dts/omap2.dtsi         |    5 +++++
+>  arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
+>  arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
+>  arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
+>  4 files changed, 31 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/omap4460.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
+> index 761c4b6..27f5ea1 100644
+> --- a/arch/arm/boot/dts/omap2.dtsi
+> +++ b/arch/arm/boot/dts/omap2.dtsi
+> @@ -26,6 +26,11 @@
+>  		};
+>  	};
+>  
+> +	pmu {
+> +		compatible = "arm,arm1136-pmu";
+> +		interrupts = <3>;
+> +	};
+> +
+>  	soc {
+>  		compatible = "ti,omap-infra";
+>  		mpu {
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index 1acc261..6c63118 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -26,6 +26,12 @@
+>  		};
+>  	};
+>  
+> +	pmu {
+> +		compatible = "arm,cortex-a8-pmu";
+> +		interrupts = <3>;
+> +		ti,hwmods = "debugss";
+> +	};
+> +
+>  	/*
+>  	 * The soc node represents the soc top level view. It is uses for IPs
+>  	 * that are not memory mapped in the MPU view or for the MPU itself.
+> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+> index 73bc1a6..2a6e344 100644
+> --- a/arch/arm/boot/dts/omap4-panda-es.dts
+> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
+> @@ -5,7 +5,9 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> +
+>  /include/ "omap4-panda.dts"
+> +/include/ "omap4460.dtsi"
+>  
+>  /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
+>  &sound {
+> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+> new file mode 100644
+> index 0000000..0a1d38b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap4460.dtsi
+> @@ -0,0 +1,18 @@
+> +/*
+> + * Device Tree Source for OMAP4460 SoC
+> + *
+> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +/ {
+> +	pmu {
+> +		compatible = "arm,cortex-a9-pmu";
+> +		interrupts = <0 54 0x4>,
+> +			     <0 55 0x4>;
+> +		ti,hwmods = "debugss";
+> +	};
+> +};
+> 
