@@ -1,37 +1,35 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 11 Jan 2013 07:59:09 -0600
-Subject: [PATCH V2 2/2] ARM: dts: OMAP2+: Add PMU nodes
-In-Reply-To: <50F01256.7030701@ti.com>
-References: <1355766548-5702-1-git-send-email-jon-hunter@ti.com>
- <1355766548-5702-3-git-send-email-jon-hunter@ti.com>
- <50F01256.7030701@ti.com>
-Message-ID: <50F01AAD.8020003@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Jan 2013 14:07:58 +0000
+Subject: [PATCHv2 02/11] arm: arch_timer: remove redundant available check
+In-Reply-To: <50F00F8D.3050904@ti.com>
+References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+ <1357747640-18594-3-git-send-email-mark.rutland@arm.com>
+ <50F00F8D.3050904@ti.com>
+Message-ID: <20130111140748.GA19765@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Fri, Jan 11, 2013 at 01:11:41PM +0000, Santosh Shilimkar wrote:
+> On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
+> > This check is a holdover from the pre-devicetree days. As the timer
+> > is not probed except by platforms which register it via devicetree,
+> > it's not strictly necessary.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> Multi-platform build without DT could still benefit from the
+> check but I guess the most of the A15 based platform are DT
+> only, so its should be good to get rid of the check.
 
-On 01/11/2013 07:23 AM, Benoit Cousson wrote:
-> Hi Jon,
-> 
-> On 12/17/2012 06:49 PM, Jon Hunter wrote:
->> Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
->>
->> Please note that the node for OMAP4460 has been placed in a separate
->> header file for OMAP4460, because the node is not compatible with
->> OMAP4430. The node for OMAP4430 is not included because PMU is not
->> currently supported on OMAP4430 due to the absence of a cross-trigger
->> interface driver.
->>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> 
-> I've just applied this patch in my for_3.9/dts branch.
-> 
-> I'm wondering if there is any dependency with the previous patch? If
-> Tony ack it I can take it as well.
+Indeed. I'm under the impression that all platforms which might have an
+architected timer are devicetree only.
 
-I have been thinking about the best way to handle that. May be best for
-you to take both if Tony can ack the first.
+> 
+> Regards,
+> Santosh
+> 
 
-Cheers
-Jon
+Thanks,
+Mark.
