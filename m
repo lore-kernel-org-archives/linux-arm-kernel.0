@@ -1,18 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 11 Jan 2013 11:13:14 -0700
-Subject: [PATCH 1'/2] ARM: tegra20: Add cpu node
-In-Reply-To: <1357910815-31603-1-git-send-email-hdoyu@nvidia.com>
-References: <1357909914-28994-2-git-send-email-hdoyu@nvidia.com>
- <1357910815-31603-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <50F0563A.7010701@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Jan 2013 10:13:32 -0800
+Subject: [PATCH 01/14] mfd: omap-usb-host: Consolidate OMAP USB-HS
+ platform data
+In-Reply-To: <50EFDE10.9080902@ti.com>
+References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
+ <1357836694-30788-2-git-send-email-rogerq@ti.com>
+ <20130110234537.GB15458@atomide.com> <50EFDE10.9080902@ti.com>
+Message-ID: <20130111181331.GM14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2013 06:26 AM, Hiroshi Doyu wrote:
-> Add cpu node for tegra20.
+* Roger Quadros <rogerq@ti.com> [130111 01:43]:
+> Tony,
+> 
+> On 01/11/2013 01:45 AM, Tony Lindgren wrote:
+> > * Roger Quadros <rogerq@ti.com> [130110 08:54]:
+> >> Let's have a single platform data structure for the OMAP's High-Speed
+> >> USB host subsystem instead of having 3 separate ones i.e. one for
+> >> board data, one for USB Host (UHH) module and one for USB-TLL module.
+> >>
+> >> This makes the code much simpler and avoids creating multiple copies of
+> >> platform data.
+> > 
+> > I can apply just this patch alone into an immutable branch that
+> > we all can merge in as needed as long as we have acks for the USB
+> > and MFD parts.
+> > 
+> > Or does this one need to be changed based on Alan's comments
+> > on the EHCI lib related changes?
+> > 
+> 
+> This does not depend on EHCI lib based changes but it depends on the
+> OMAP USB Host cleanup series posted earlier.
 
-Applied the series to Tegra's for-3.9/soc branch, in anticipation of the
-Tegra114 changes being applied to that branch, which depend on these DT
-changes.
+Can we first apply just the minimal platform_data + board file + clock
+changes?
 
-I made some minor changes to capitalization of the commit messages.
+That way I can apply those to some immutable tree for everybody to use,
+and we cut off the dependency to the driver changes for the rest of the
+patches. And then I'm off the hook for the rest of the patches :)
+
+Tony
