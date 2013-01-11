@@ -1,53 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Jan 2013 09:53:30 -0800
-Subject: [PATCH v4 09/14] mmc: omap_hsmmc: set max_segs based on dma
- engine limitations
-In-Reply-To: <1357883330-5364-10-git-send-email-mporter@ti.com>
-References: <1357883330-5364-1-git-send-email-mporter@ti.com>
- <1357883330-5364-10-git-send-email-mporter@ti.com>
-Message-ID: <20130111175330.GH14149@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Jan 2013 17:54:53 +0000
+Subject: [PATCHv2 08/11] arm: arch_timer: add arch_counter_set_user_access
+In-Reply-To: <20130111165053.GB1794@arm.com>
+References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+ <1357747640-18594-9-git-send-email-mark.rutland@arm.com>
+ <50F01646.4010203@ti.com> <20130111165053.GB1794@arm.com>
+Message-ID: <20130111175452.GI19765@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matt Porter <mporter@ti.com> [130110 21:47]:
-> The EDMA DMAC has a hardware limitation that prevents supporting
-> scatter gather lists with any number of segments. The DMA Engine
-> API reports the maximum number of segments a channel can support
-> via the optional dma_get_channel_caps() API. If the nr_segs
-> capability is present, the value is used to configure mmc->max_segs
-> appropriately.
+On Fri, Jan 11, 2013 at 04:50:53PM +0000, Catalin Marinas wrote:
+> On Fri, Jan 11, 2013 at 01:40:22PM +0000, Santosh Shilimkar wrote:
+> > On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
+> > > Several bits in CNTKCTL reset to 0, including PL0VTEN. For platforms
+> > > using the generic timer which wish to have a fast gettimeofday vDSO
+> > > implementation, these bits must be set to 1 by the kernel. On other
+> > > platforms, the bootloader might enable userspace access when we don't
+> > > want it.
+> > >
+> > > This patch adds arch_counter_set_user_access, which sets the PL0 access
+> > > permissions to that required by the platform. For arm, this currently
+> > minor nit.
+> > s/arm/ARM
+> 
+> I think Mark meant arch/arm. Or we could call it AArch32 where we don't
+> use this feature.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  drivers/mmc/host/omap_hsmmc.c |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index e79b12d..f74bd69 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1769,6 +1769,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->  	const struct of_device_id *match;
->  	dma_cap_mask_t mask;
->  	unsigned tx_req, rx_req;
-> +	struct dmaengine_chan_caps *dma_chan_caps;
->  	struct pinctrl *pinctrl;
->  
->  	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
-> @@ -1935,6 +1936,11 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->  		goto err_irq;
->  	}
->  
-> +	/* Some DMA Engines only handle a limited number of SG segments */
-> +	dma_chan_caps = dma_get_channel_caps(host->rx_chan, DMA_DEV_TO_MEM);
-> +	if (dma_chan_caps && dma_chan_caps->seg_nr)
-> +		mmc->max_segs = dma_chan_caps->seg_nr;
-> +
->  	/* Request IRQ for MMC operations */
->  	ret = request_irq(host->irq, omap_hsmmc_irq, 0,
->  			mmc_hostname(mmc), host);
-> -- 
-> 1.7.9.5
-> 
+Indeed, I meant arch/arm. I'll try to be more consistent with that in future.
+
+Mark.
