@@ -1,50 +1,40 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 11 Jan 2013 13:06:44 +0200
-Subject: [PATCH 07/14] usb: ehci-omap: Instantiate PHY devices if required
-In-Reply-To: <50EFF075.5090203@ti.com>
-References: <Pine.LNX.4.44L0.1301101544140.1178-100000@iolanthe.rowland.org>
- <50EFF075.5090203@ti.com>
-Message-ID: <50EFF244.30001@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 11 Jan 2013 12:09:09 +0100
+Subject: [PATCH] mmc: mvsdio: Replace IS_ERR_NULL() is with IS_ERR()
+In-Reply-To: <20130111110210.GC30875@n2100.arm.linux.org.uk>
+References: <1357849755-8168-1-git-send-email-andrew@lunn.ch>
+ <20130111110210.GC30875@n2100.arm.linux.org.uk>
+Message-ID: <20130111120909.2cee1b8e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2013 12:59 PM, Roger Quadros wrote:
-> On 01/10/2013 10:48 PM, Alan Stern wrote:
->> On Thu, 10 Jan 2013, Roger Quadros wrote:
->>
->>> If the OMAP's Host controller is in PHY mode then we instantiate
->>> a platform device for the PHY (one for each port in PHY mode) and
->>> hold a reference to it so that we can use the usb_phy API, e.g.
->>> while suspend/resume.
->>>
->>> The platform data for the PHY must be supplied in the newly added
->>> .phy_config parameter in struct usbhs_omap_platform_data.
->>>
->>> The end goal is to move the PHY's reset and power handling code
->>> out of the ehci-omap driver and into the phy driver.
->>
->> As mentioned in another thread, I would prefer to have these changes to 
->> ehci-omap.c made after the driver is converted to the new "ehci-hcd is 
->> a library" scheme.  The patch below does the conversion; it is meant to 
->> apply on top of the similar patch for ehci-mxc posted recently on the 
->> linux-usb mailing list.
->>
->> After this conversion, the omap_ehci_hcd private data structure doesn't 
->> have to be allocated specifically.  It can be handled in the same way 
->> as the private data structure in the ehci-mxc patch.
->>
->> I haven't even tried to compile this.  Please let me know how it works.
->>
-> 
-> Alan,
-> 
-> Thanks for the patch. I've pasted the version that builds and works and
-> put you as the Author of the patch, hope it is fine.
-> 
-> I could not find the equivalent ehci-mxc implementation though. Any
-> pointers to that? Thanks.
+Dear Russell King - ARM Linux,
 
-OK I found it. Previously I was searching in the archives :P.
+On Fri, 11 Jan 2013 11:02:10 +0000, Russell King - ARM Linux wrote:
 
-cheers,
--roger
+> What remains?  The assumption that GPIO0 means "no GPIO" rather than
+> testing with gpio_valid() and the IRQ stuff.
+
+Patches that I have written have been merged by Jason Cooper and while
+adding the DT binding for this driver, it also converts it to use the
+MMC GPIO helpers from drivers/mmc/core/slot-gpio.c, which makes this
+whole GPIO initialization/cleanup a lot simpler.
+
+See:
+
+  http://git.infradead.org/users/jcooper/linux.git/commitdiff/c3833fbb117bb1a547d29b27a0de4418fa2d5a5a
+  http://git.infradead.org/users/jcooper/linux.git/commitdiff/e60a21ed4edb7f33010ab21cefcb20666a9bc7d7
+
+Also, note that Andrew Lunn has sent a v2 of his patch:
+
+Subject: [PATCH v2] mmc: mvsdio: Replace IS_ERR_OR_NULL() with IS_ERR()
+Date: Fri, 11 Jan 2013 08:27:52 +0100
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
