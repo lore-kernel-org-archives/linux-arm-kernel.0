@@ -1,91 +1,49 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 11 Jan 2013 12:56:28 +0100
-Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
- HAVE_ARM_SCU
-In-Reply-To: <20130111101134.GC30538@e102568-lin.cambridge.arm.com>
-References: <20130110.145813.1159140334089730421.hdoyu@nvidia.com><50EEF235.7070200@wwwdotorg.org><20130111101134.GC30538@e102568-lin.cambridge.arm.com>
-Message-ID: <20130111.135628.594268940275348411.hdoyu@nvidia.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 11 Jan 2013 06:59:08 -0500
+Subject: [PATCH 2/3] ARM: Orion: Bind the orion bridge interrupt
+ controller through DT
+In-Reply-To: <20130111091349.55ee0e77@skate>
+References: <20121211065813.GA14843@obsidianresearch.com>
+ <20121211071333.GR17242@lunn.ch>
+ <20121211185535.GA14534@obsidianresearch.com>
+ <20130110014734.GC5075@titan.lakedaemon.net>
+ <20130110060710.GM24650@lunn.ch> <50EE8FC5.50105@gmail.com>
+ <20130110184832.GB28004@obsidianresearch.com>
+ <20130110185737.GO5075@titan.lakedaemon.net>
+ <20130111040219.GA23206@obsidianresearch.com>
+ <20130111091349.55ee0e77@skate>
+Message-ID: <20130111115908.GQ5075@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Fri, 11 Jan 2013 11:11:34 +0100:
-
-> On Thu, Jan 10, 2013 at 04:54:13PM +0000, Stephen Warren wrote:
-> > On 01/10/2013 05:58 AM, Hiroshi Doyu wrote:
-> > > Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Wed, 9 Jan 2013 16:17:00 +0100:
-> > ...
-> > > With your "[PATCH] ARM: kernel: DT cpu map validity check helper
-> > > function", my original patch gets as below. I think that the following
-> > > "smp_detect_ncores()" function may be so generic that it could be
-> > > moved in some common place than platform?
-> > > 
-> > > From f5f2a43952ce75fe061b3808b994c3ceb07f1af1 Mon Sep 17 00:00:00 2001
-> > > From: Hiroshi Doyu <hdoyu@nvidia.com>
-> > > Date: Mon, 26 Nov 2012 12:25:14 +0200
-> > > Subject: [PATCH 1/1] ARM: tegra: # of CPU cores detection w/ & w/o
-> > >  HAVE_ARM_SCU
-> > > 
-> > > The method to detect the number of CPU cores on Cortex-A9 MPCore and
-> > > Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
-> > > information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
-> > > have to read it from the system coprocessor(CP15), because the SCU on
-> > > Cortex-A15 MPCore does not have software readable registers. This
-> > > patch selects the correct method at runtime based on the CPU ID.
-> > 
-> > > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-> > 
-> > > +static int __init smp_detect_ncores(void)
-> > > +{
-> > > +	unsigned int ncores, mpidr;
-> > > +	u32 l2ctlr;
-> > > +	phys_addr_t pa;
-> > > +
-> > > +	mpidr = read_cpuid_mpidr();
-> > > +	switch (mpidr) {
-> > > +	case ARM_CPU_PART_CORTEX_A15:
-> > > +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
-> > > +		ncores = ((l2ctlr >> 24) & 3) + 1;
-> > > +		break;
-> > > +	case ARM_CPU_PART_CORTEX_A9:
-> > > +		/* Get SCU physical base */
-> > > +		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
-> > > +		scu_base = IO_ADDRESS(pa);
-> > > +		ncores = scu_get_core_count(scu_base);
-> > > +		break;
-> > > +	default:
-> > > +		pr_warn("Unsupported mpidr\n");
-> > > +		ncores = 1;
-> > > +		break;
-> > > +	}
-> > > +
-> > > +	return ncores;
-> > > +}
-> > 
-> > Why not just remove that function...
-> > 
-> > >  /*
-> > >   * Initialise the CPU possible map early - this describes the CPUs
-> > >   * which may be present or become present in the system.
-> > >   */
-> > >  static void __init tegra_smp_init_cpus(void)
-> > >  {
-> > > -	unsigned int i, ncores = scu_get_core_count(scu_base);
-> > > -
-> > > -	if (ncores > nr_cpu_ids) {
-> > > -		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
-> > > -			ncores, nr_cpu_ids);
-> > > -		ncores = nr_cpu_ids;
-> > > +	if (!arm_dt_cpu_map_valid()) {
-> > > +		unsigned int i, ncores;
-> > > +
-> > > +		ncores = smp_detect_ncores();
-> > 
-> > And just say "ncores = 1" here?
-> > 
-> > For Tegra, it's trivial to simply put the patch adding the required DT
-> > nodes before this patch, and then there's no need for any
-> > backwards-compatibility, since the nodes are guaranteed to be there.
+On Fri, Jan 11, 2013 at 09:13:49AM +0100, Thomas Petazzoni wrote:
+> Dear Jason Gunthorpe,
 > 
-> If you are willing to accept that your code proposal is perfectly fine by me.
+> On Thu, 10 Jan 2013 21:02:19 -0700, Jason Gunthorpe wrote:
+> 
+> > I've attached the main mv dt patch as a MIME, sorry for the
+> > awkwardness, I am travelling and won't be available... Please feel
+> > free to re-post/alter as necessary. As I said before, I'm not happy
+> > with it because it doesn't follow the standard convention for MDIO
+> > phys.
+> 
+> The MDIO registers for the mv643xx_eth hardware are the same as the
+> ones for the mvneta hardware. Therefore, I've splitted this into the
+> mvmdio driver (available in mainline since 3.8,
+> drivers/net/ethernet/marvell). This allows to have a nicely separated
+> driver for the MDIO interface.
+> 
+> My plan was ultimately to modify the mv643xx_eth driver to use the
+> mvmdio driver, and then do a nice DT binding on top of that.
+> 
+> Does this sounds like a good plan?
 
-That's simple. I'll send ones to add cpu nodes, and then this without detection.
+I like it.  If you haven't already, please review the thread at
+
+http://www.spinics.net/lists/arm-kernel/msg186742.html
+
+to see some of the concerns already raised.
+
+thx,
+
+Jason.
