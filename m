@@ -1,74 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 11 Jan 2013 16:51:50 +0100
-Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
- THUMB mode
-In-Reply-To: <50F0310F.3070502@arm.com>
-References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <50F0310F.3070502@arm.com>
-Message-ID: <20130111155150.GL14860@pengutronix.de>
+From: joro@8bytes.org ('Joerg Roedel')
+Date: Fri, 11 Jan 2013 16:52:26 +0100
+Subject: [PATCH v6 00/12] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <02ae01cdef69$67d66200$37832600$@samsung.com>
+References: <003301cde30b$c584c2d0$508e4870$%cho@samsung.com>
+ <032401cde783$485ae1a0$d910a4e0$@samsung.com>
+ <20130110171844.GA2650@8bytes.org>
+ <027601cdef61$2df576a0$89e063e0$@samsung.com>
+ <20130110191207.GI25591@8bytes.org>
+ <02ae01cdef69$67d66200$37832600$@samsung.com>
+Message-ID: <20130111155226.GK25591@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonny,
+Hi Kukjin,
 
-On Fri, Jan 11, 2013 at 03:34:39PM +0000, Jonathan Austin wrote:
-> Hi Uwe,
-> On 11/01/13 11:39, Uwe Kleine-K?nig wrote:
-> >Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
-> >obviously these cannot enter the kernel in ARM mode. Make an exception
-> >for them and let them enter in THUMB mode.
+On Thu, Jan 10, 2013 at 11:33:41AM -0800, Kukjin Kim wrote:
+> Sure, keep going on with
 > 
-> Clearly something like this is necessary, but it isn't something I'd
-> like for people to start using *unless* they have a THUMB only CPU
-> (for example, to work around dodgy boot-loaders, etc)
-> 
-> Seeing as there are no THUMB-only CPUs with an MMU, I think we could
-> safely constrain this change to:
-> a) depend on !MMU
-> b) only touch head-nommu.S
-> 
-> Does that cause any issue for what you're doing.
-Would be ok for me, too. I don't care much.
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-> >diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> >index 3fd629d..bc3150c 100644
-> >--- a/arch/arm/mm/Kconfig
-> >+++ b/arch/arm/mm/Kconfig
-> >@@ -1,5 +1,11 @@
-> >  comment "Processor Type"
-> >
-> >+# Select this if your CPU doesn't support the 32 bit ARM instructions.
-> >+config THUMBONLY_CPU
-> >+	bool
-> >+	select THUMB2_KERNEL
-> >+	select ARM_THUMB
-> >+
-> >  # Select CPU types depending on the architecture selected.  This selects
-> >  # which CPUs we support in the kernel image, and the compiler instruction
-> >  # optimiser behaviour.
-> 
-> Also, a couple of minor questions about this:
-> - What's the rationale for the placement within the file - it looks
-> a bit curious up the top there.
-Conceptually it's a symbol that is selected by the different processor
-symbols. So IMHO it's fine to have it in front of the processor symbols.
-Maybe it should even go before the line reading:
+Done that. Applied the patch, some manual work was necessary as the
+patch didn't apply cleanly to v3.8-rc3. Please double-check if the
+result is correct.
 
-	comment "Processor Type"
+> OK, good. Let me know the name of branch when you set-up it :-)
 
-. OTOH similar symbols (like CPU_32v4, CPU_CP15) are at the end, too.
-So yes, probably it's better to move it further down. And maybe rename
-it to CPU_THUMBONLY?
+I pushed the branch to
 
-> - Given the fact that we don't want people using this except in very
-> specific circumstances, should we write a little bit of help for the
-> option?
-I can move what I wrote in the comment above the symbol into a help text
-instead.
+	git://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git arm/exynos
 
-Best regards
-Uwe
+>From there you can pull it into your tree.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Have fun,
+
+     Joerg
