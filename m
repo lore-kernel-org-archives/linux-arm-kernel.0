@@ -1,63 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 11 Jan 2013 16:17:05 +0900
-Subject: [PATCH 4/5] ARM: mach-shmobile: armadillo: update defconfig
+Date: Fri, 11 Jan 2013 16:17:06 +0900
+Subject: [PATCH 5/5] ARM: mach-shmobile: kzm9d: update defconfig
 In-Reply-To: <1357888626-4946-1-git-send-email-horms+renesas@verge.net.au>
 References: <1357888626-4946-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1357888626-4946-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1357888626-4946-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Enable ARM_APPENDED_DTB
-
-  Typically the bootloader of an armadillo board does not support DT
-  so this option is useful.
-
 * Do not disable SUSPEND
 
-  Suspend seems to work fine on the armadillo
+  Suspend seems to work fine on the kzm9d.
+
+  This is part of an effort reduce differences between mach-shmobile
+  defconfigs with a view to using a common defconfig.
 
 * Enable PM_RUNTIME
 
-  This also seems to work fine.
+  This also seems to work fine on the kzm9d.
 
-* Move command line to dts
+  This is part of an effort reduce differences between mach-shmobile
+  defconfigs with a view to using a common defconfig.
+
+* Move kernel command line from defconfig to dts.
 
   This brings us one small step closer to sharing defconfig
-  between armadillo and other boards
+  between kzm9d and other boards.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    4 ++++
- arch/arm/configs/armadillo800eva_defconfig    |    5 ++---
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/emev2-kzm9d.dts |    2 +-
+ arch/arm/configs/kzm9d_defconfig  |    4 +---
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index a7505a9..52cfead 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -15,6 +15,10 @@
- 	model = "armadillo 800 eva";
- 	compatible = "renesas,armadillo800eva";
+diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+index 297e3ba..b9b3241 100644
+--- a/arch/arm/boot/dts/emev2-kzm9d.dts
++++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+@@ -21,6 +21,6 @@
+ 	};
  
-+	chosen {
-+		bootargs = "console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw";
-+	};
-+
- 	memory {
- 		device_type = "memory";
- 		reg = <0x40000000 0x20000000>;
-diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
-index 2e1a825..f9e2701 100644
---- a/arch/arm/configs/armadillo800eva_defconfig
-+++ b/arch/arm/configs/armadillo800eva_defconfig
-@@ -34,12 +34,11 @@ CONFIG_AEABI=y
- CONFIG_FORCE_MAX_ZONEORDER=13
+ 	chosen {
+-		bootargs = "console=ttyS1,115200n81";
++		bootargs = "console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096";
+ 	};
+ };
+diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
+index 8c49df6..6c37f4a 100644
+--- a/arch/arm/configs/kzm9d_defconfig
++++ b/arch/arm/configs/kzm9d_defconfig
+@@ -32,11 +32,9 @@ CONFIG_FORCE_MAX_ZONEORDER=13
  CONFIG_ZBOOT_ROM_TEXT=0x0
  CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw"
+ CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_CMDLINE="console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096"
 -CONFIG_CMDLINE_FORCE=y
-+CONFIG_ARM_APPENDED_DTB=y
- CONFIG_KEXEC=y
  CONFIG_VFP=y
  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
 -# CONFIG_SUSPEND is not set
