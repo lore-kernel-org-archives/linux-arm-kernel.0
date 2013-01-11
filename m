@@ -1,80 +1,29 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Fri, 11 Jan 2013 12:33:15 -0500
-Subject: [kvmarm] [PATCH v2 2/2] ARM: KVM: Power State Coordination
- Interface implementation
-In-Reply-To: <50F04AD5.6020703@arm.com>
-References: <1357834005-23843-1-git-send-email-marc.zyngier@arm.com>
- <1357834005-23843-3-git-send-email-marc.zyngier@arm.com>
- <20130111171232.GH23505@n2100.arm.linux.org.uk>
- <50F04AD5.6020703@arm.com>
-Message-ID: <CANM98qJ2ZSwxMWFRWiunTQtoV7iFb3fn3Cf6VWvOndBcU=+Tmg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 11 Jan 2013 09:38:00 -0800
+Subject: [PATCH 0/3] arch_decomp_wdog cleanup
+In-Reply-To: <20130111170843.GG23505@n2100.arm.linux.org.uk>
+References: <1357827165-9320-1-git-send-email-shawn.guo@linaro.org>
+ <20130111170843.GG23505@n2100.arm.linux.org.uk>
+Message-ID: <054001cdf022$694200e0$3bc602a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 12:24 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 11/01/13 17:12, Russell King - ARM Linux wrote:
->> On Thu, Jan 10, 2013 at 04:06:45PM +0000, Marc Zyngier wrote:
->>> +int kvm_psci_call(struct kvm_vcpu *vcpu)
->>> +{
->>> +    unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->>> +    unsigned long val;
->>> +
->>> +    switch (psci_fn) {
->>> +    case KVM_PSCI_FN_CPU_OFF:
->>> +            kvm_psci_vcpu_off(vcpu);
->>> +            val = KVM_PSCI_RET_SUCCESS;
->>> +            break;
->>> +    case KVM_PSCI_FN_CPU_ON:
->>> +            val = kvm_psci_vcpu_on(vcpu);
->>> +            break;
->>> +    case KVM_PSCI_FN_CPU_SUSPEND:
->>> +    case KVM_PSCI_FN_MIGRATE:
->>> +            val = KVM_PSCI_RET_NI;
->>> +            break;
->>> +
->>> +    default:
->>> +            return -1;
->>> +    }
->>> +
->>> +    *vcpu_reg(vcpu, 0) = val;
->>> +    return 0;
->>> +}
->>
->> We were discussing recently on #kernel about kernel APIs and the way that
->> our integer-returning functions pretty much use 0 for success, and -errno
->> for failures, whereas our pointer-returning functions are a mess.
->>
->> And above we have something returning -1 to some other chunk of code outside
->> this compilation unit.  That doesn't sound particularly clever to me.
->
-> The original code used to return -EINVAL, see:
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-January/004509.html
->
-> Christoffer (Cc-ed) didn't like this, hence the -1. I'm happy to revert
-> the code to its original state though.
->
-I don't want to return -EINVAL, because for the rest of the KVM code
-this would mean kill the guest.
+Russell King - ARM Linux wrote:
+> 
+> On Thu, Jan 10, 2013 at 10:12:42PM +0800, Shawn Guo wrote:
+> > All the arch_decomp_wdog related codes are there without any users,
+> > since ARCH_HAS_DECOMP_WDOG is only used by lib/inflate.c which
+> however
+> > is not used by arch/arm/boot/compressed/decompress.c.
+> 
+> Hmm, this suggests that those samsung platforms haven't been booted for
+> a while - because the decompressor will enable the watchdog, but won't
+> pat it at all.  So, do we still need them in the kernel?
+> 
+Hmm, I didn't see its usage lately on relatively Samsun SoCs. But let me
+check again, the code is not used on every Samsung SoCs. So please hold on a
+couple of days, I already reply 'ack' on Samsung stuff though.
 
-The convention used in other archs of KVM as well as for ARM is that
-the handle_exit functions return:
+Thanks.
 
--ERRNO: Error, report this error to user space
-0: Everything is fine, but return to user space to let it do I/O
-emulation and whatever it wants to do
-1: Everything is fine, return directly to the guest without going to user space
-
-And then you do:
-if (handle_something() == 0)
-    return 1;
-
-which I thought was confusing, so I said make the function a bool, to
-avoid the confusion, like Rusty did for all the coprocessor emulation
-functions.
-
-There are obviously other ways to handle the "return 1" case, like
-having an extra state that you carry around, and we can change all the
-code to do that, but I just don't think it's worth it, as we are in
-fact quite close to the existing kernel API.
-
--Christoffer
+- Kukjin
