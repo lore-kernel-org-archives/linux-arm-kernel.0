@@ -1,163 +1,129 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 11 Jan 2013 18:07:57 +0000
-Subject: [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
- exit/setup
-In-Reply-To: <50F04FEA.1040205@ti.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
- <50F04FEA.1040205@ti.com>
-Message-ID: <20130111180757.GI1966@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 11 Jan 2013 18:09:38 +0000
+Subject: [kvmarm] [PATCH v2 2/2] ARM: KVM: Power State Coordination
+ Interface implementation
+In-Reply-To: <CANM98qLRsdFGxU6S5q2EqtCAmK8fOnbGWi8qXBktyuRkSaPAJg@mail.gmail.com>
+References: <1357834005-23843-1-git-send-email-marc.zyngier@arm.com>
+ <1357834005-23843-3-git-send-email-marc.zyngier@arm.com>
+ <20130111171232.GH23505@n2100.arm.linux.org.uk>	<50F04AD5.6020703@arm.com>
+ <CANM98qJ2ZSwxMWFRWiunTQtoV7iFb3fn3Cf6VWvOndBcU=+Tmg@mail.gmail.com>
+ <50F04F2F.80306@arm.com>
+ <CANM98qLRsdFGxU6S5q2EqtCAmK8fOnbGWi8qXBktyuRkSaPAJg@mail.gmail.com>
+Message-ID: <50F05562.3070107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 11:16:18PM +0530, Santosh Shilimkar wrote:
-
-[...]
-
-> >+Originally created and documented by Dave Martin for Linaro Limited, in
-> >+collaboration with Nicolas Pitre and Achin Gupta.
-> >+
-> Great write-up Dave!! I might have to do couple of more passes on it to
-> get overall idea, but surely this documentation is good start for
-> anybody reading/reviewing the big.LITTLE switcher code.
-
-Thanks for reading through it.  Partly, this was insurance against me
-forgetting how the code worked in between writing and posting it...
-but this is all quite subtle code, so it felt important to document
-it thoroughly.
-
+On 11/01/13 17:48, Christoffer Dall wrote:
+> On Fri, Jan 11, 2013 at 12:43 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 11/01/13 17:33, Christoffer Dall wrote:
+>>> On Fri, Jan 11, 2013 at 12:24 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> On 11/01/13 17:12, Russell King - ARM Linux wrote:
+>>>>> On Thu, Jan 10, 2013 at 04:06:45PM +0000, Marc Zyngier wrote:
+>>>>>> +int kvm_psci_call(struct kvm_vcpu *vcpu)
+>>>>>> +{
+>>>>>> +    unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>>>>>> +    unsigned long val;
+>>>>>> +
+>>>>>> +    switch (psci_fn) {
+>>>>>> +    case KVM_PSCI_FN_CPU_OFF:
+>>>>>> +            kvm_psci_vcpu_off(vcpu);
+>>>>>> +            val = KVM_PSCI_RET_SUCCESS;
+>>>>>> +            break;
+>>>>>> +    case KVM_PSCI_FN_CPU_ON:
+>>>>>> +            val = kvm_psci_vcpu_on(vcpu);
+>>>>>> +            break;
+>>>>>> +    case KVM_PSCI_FN_CPU_SUSPEND:
+>>>>>> +    case KVM_PSCI_FN_MIGRATE:
+>>>>>> +            val = KVM_PSCI_RET_NI;
+>>>>>> +            break;
+>>>>>> +
+>>>>>> +    default:
+>>>>>> +            return -1;
+>>>>>> +    }
+>>>>>> +
+>>>>>> +    *vcpu_reg(vcpu, 0) = val;
+>>>>>> +    return 0;
+>>>>>> +}
+>>>>>
+>>>>> We were discussing recently on #kernel about kernel APIs and the way that
+>>>>> our integer-returning functions pretty much use 0 for success, and -errno
+>>>>> for failures, whereas our pointer-returning functions are a mess.
+>>>>>
+>>>>> And above we have something returning -1 to some other chunk of code outside
+>>>>> this compilation unit.  That doesn't sound particularly clever to me.
+>>>>
+>>>> The original code used to return -EINVAL, see:
+>>>> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-January/004509.html
+>>>>
+>>>> Christoffer (Cc-ed) didn't like this, hence the -1. I'm happy to revert
+>>>> the code to its original state though.
+>>>>
+>>> I don't want to return -EINVAL, because for the rest of the KVM code
+>>> this would mean kill the guest.
+>>>
+>>> The convention used in other archs of KVM as well as for ARM is that
+>>> the handle_exit functions return:
+>>>
+>>> -ERRNO: Error, report this error to user space
+>>> 0: Everything is fine, but return to user space to let it do I/O
+>>> emulation and whatever it wants to do
+>>> 1: Everything is fine, return directly to the guest without going to user space
+>>
+>> That is assuming we propagate the handle_exit convention down to the
+>> leaf calls, and I object to that. The 3 possible values only apply to
+>> handle_exit, and we should keep that convention as local as possible,
+>> because this is the odd case.
 > 
-> >+Copyright (C) 2012  Linaro Limited
-> >+Distributed under the terms of Version 2 of the GNU General Public
-> >+License, as defined in linux/COPYING.
-> >diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
-> >index 41de0622de..1ea4ec9df0 100644
-> >--- a/arch/arm/common/bL_entry.c
-> >+++ b/arch/arm/common/bL_entry.c
-> >@@ -116,3 +116,163 @@ int bL_cpu_powered_up(void)
-> >  		platform_ops->powered_up();
-> >  	return 0;
-> >  }
-> >+
-> >+struct bL_sync_struct bL_sync;
-> >+
-> >+static void __sync_range(volatile void *p, size_t size)
-> >+{
-> >+	char *_p = (char *)p;
-> >+
-> >+	__cpuc_flush_dcache_area(_p, size);
-> >+	outer_flush_range(__pa(_p), __pa(_p + size));
-> >+	outer_sync();
-> >+}
-> >+
-> >+#define sync_mem(ptr) __sync_range(ptr, sizeof *(ptr))
-> >+
-> >+/*
-> /** as per kerneldoc.
+> I don't agree - it requires you to carefully follow a potentially deep
+> call trace to make sense of what it does, and worse, it's directly
+> misleading in the case of KVM/ARM. So either change it everywhere and
+> have a consistent calling convention or adhere to what we do elsewhere
+> and use the bool.
 
-Does kerneldoc not require the comment to be specially formatted?
+Sorry, but I do not buy this.
 
-I haven't played with that, so far.
+In this particular case, the meaning of the value returned has nothing
+to do with the handle_exit convention. We never return to user space,
+let alone signaling an error.
 
+Trying to force all the code in this convention makes it actually harder
+to review, because this is the exception in the kernel. This is why I
+suggest keeping the handle_exit return convention at this exact point,
+and not impose it on anything else.
+
+>>
+>>> And then you do:
+>>> if (handle_something() == 0)
+>>>     return 1;
+>>>
+>>> which I thought was confusing, so I said make the function a bool, to
+>>> avoid the confusion, like Rusty did for all the coprocessor emulation
+>>> functions.
+>>
+>> I don't see a compelling reason to propagate this convention to areas
+>> that do not require it. In the PSCI case, we have a basic
+>> handled/not-handled state, the later indicating the reason. The exit
+>> handling functions can convert the error codes to whatever the run loop
+>> requires.
+>>
 > 
-> >+ * __bL_cpu_going_down: Indicates that the cpu is being torn down.
-> >+ *    This must be called at the point of committing to teardown of a CPU.
-> >+ *    The CPU cache (SCTRL.C bit) is expected to still be active.
-> >+ */
-> >+void __bL_cpu_going_down(unsigned int cpu, unsigned int cluster)
-> >+{
-> >+	bL_sync.clusters[cluster].cpus[cpu].cpu = CPU_GOING_DOWN;
-> >+	sync_mem(&bL_sync.clusters[cluster].cpus[cpu].cpu);
-> >+}
-> >+
+> again, that's why I suggest returning a bool instead. You just said
+> it: it's a basic handled/not-handled state. Why do you want to return
+> -EINVAL if that's not propogated anywhere?
 > 
-> [..]
+> If the return codes are local and do not map reasonably to error codes
+> and more complicated than a bool, I would vote for a #define
+> HVC_HANDLE_SUCCESS, HVC_HANDLE_ERROR, HVC_HANDLE_XXXXXX, ...
 > 
-> >diff --git a/arch/arm/common/bL_head.S b/arch/arm/common/bL_head.S
-> >index 9d351f2b4c..f7a64ac127 100644
-> >--- a/arch/arm/common/bL_head.S
-> >+++ b/arch/arm/common/bL_head.S
-> >@@ -7,11 +7,19 @@
-> >   * This program is free software; you can redistribute it and/or modify
-> >   * it under the terms of the GNU General Public License version 2 as
-> >   * published by the Free Software Foundation.
-> >+ *
-> >+ *
-> >+ * Refer to Documentation/arm/big.LITTLE/cluster-pm-race-avoidance.txt
-> >+ * for details of the synchronisation algorithms used here.
-> >   */
-> >
-> >  #include <linux/linkage.h>
-> >  #include <asm/bL_entry.h>
-> >
-> >+.if BL_SYNC_CLUSTER_CPUS
-> >+.error "cpus must be the first member of struct bL_cluster_sync_struct"
-> >+.endif
-> >+
-> >  	.macro	pr_dbg	cpu, string
-> >  #if defined(CONFIG_DEBUG_LL) && defined(DEBUG)
-> >  	b	1901f
-> >@@ -52,12 +60,82 @@ ENTRY(bL_entry_point)
-> >  2:	pr_dbg	r4, "kernel bL_entry_point\n"
-> >
-> >  	/*
-> >-	 * MMU is off so we need to get to bL_entry_vectors in a
-> >+	 * MMU is off so we need to get to various variables in a
-> >  	 * position independent way.
-> >  	 */
-> >  	adr	r5, 3f
-> >-	ldr	r6, [r5]
-> >+	ldmia	r5, {r6, r7, r8}
-> >  	add	r6, r5, r6			@ r6 = bL_entry_vectors
-> >+	ldr	r7, [r5, r7]			@ r7 = bL_power_up_setup_phys
-> >+	add	r8, r5, r8			@ r8 = bL_sync
-> >+
-> >+	mov	r0, #BL_SYNC_CLUSTER_SIZE
-> >+	mla	r8, r0, r10, r8			@ r8 = bL_sync cluster base
-> >+
-> >+	@ Signal that this CPU is coming UP:
-> >+	mov	r0, #CPU_COMING_UP
-> >+	mov	r5, #BL_SYNC_CPU_SIZE
-> >+	mla	r5, r9, r5, r8			@ r5 = bL_sync cpu address
-> >+	strb	r0, [r5]
-> >+
-> >+	dsb
-> Do you really need above dsb(). With MMU off, the the store should
-
-The short answer is "maybe not".  Some of the barriers can be
-eliminated; some can be demoted to DSBs.  Others may be required but
-unnecessarily duplicated e.g., between bL_head.S and vlock.S.
-
-> any way make it to the main memory, No ?
-
-Yes, but this raises issues about precisely what the architecture
-guarantees about memory ordering in these scenarios.  The only obvious
-thing about that is that it's non-obvious.
-
-Strongly-Ordered memory is not quite the same as having explicit
-barriers everywhere.
-
-I need to have a careful think, but it should be possible to optimise
-a bit here.
-
 > 
-> >+
-> >+	@ At this point, the cluster cannot unexpectedly enter the GOING_DOWN
-> >+	@ state, because there is at least one active CPU (this CPU).
-> >+
-> >+	@ Check if the cluster has been set up yet:
-> >+	ldrb	r0, [r8, #BL_SYNC_CLUSTER_CLUSTER]
-> >+	cmp	r0, #CLUSTER_UP
-> >+	beq	cluster_already_up
-> >+
-> >+	@ Signal that the cluster is being brought up:
-> >+	mov	r0, #INBOUND_COMING_UP
-> >+	strb	r0, [r8, #BL_SYNC_CLUSTER_INBOUND]
-> >+
-> >+	dsb
-> Same comment.
+> 
+>>> There are obviously other ways to handle the "return 1" case, like
+>>> having an extra state that you carry around, and we can change all the
+>>> code to do that, but I just don't think it's worth it, as we are in
+>>> fact quite close to the existing kernel API.
+>>
+> 
 
-Same answer... for now
 
-Cheers
----Dave
+-- 
+Jazz is not dead. It just smells funny...
