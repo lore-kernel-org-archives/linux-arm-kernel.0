@@ -1,94 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Jan 2013 11:03:51 +0000
-Subject: [PATCH 04/16] ARM: b.L: Add baremetal voting mutexes
-In-Reply-To: <alpine.LFD.2.02.1301102131010.6300@xanadu.home>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-5-git-send-email-nicolas.pitre@linaro.org>
- <20130110231825.GE11628@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1301102131010.6300@xanadu.home>
-Message-ID: <20130111110351.GE12977@mudshark.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 11 Jan 2013 12:05:44 +0100
+Subject: [PATCH v7 3/3] Cortex-M3: Add support for exception handling
+In-Reply-To: <1350462872-16805-4-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1350462872-16805-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1350462872-16805-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20130111110544.GG14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 03:15:22AM +0000, Nicolas Pitre wrote:
-> On Thu, 10 Jan 2013, Will Deacon wrote:
-> > On Thu, Jan 10, 2013 at 12:20:39AM +0000, Nicolas Pitre wrote:
-> > > + * vlocks are currently only used to coordinate between CPUs which are
-> > > +   unable to enable their caches yet.  This means that the
-> > > +   implementation removes many of the barriers which would be required
-> > > +   when executing the algorithm in cached memory.
-> >
-> > I think you need to elaborate on this and clearly identify the
-> > requirements of the memory behaviour. In reality, these locks are hardly
-> > ever usable so we don't want them cropping up in driver code and the
-> > like!
-> 
-> Doesn't the following paragraph make that clear enough?
+Hello,
 
-I think it misses a lot out (e.g. we require single-copy atomicity
-guarantees for byte access, we require no speculation etc). Essentially,
-it's an imprecise definition of strongly-ordered memory. However, see
-below (the bit about removing the C implementation)...
+On Wed, Oct 17, 2012 at 10:34:32AM +0200, Uwe Kleine-K?nig wrote:
+> +/*
+> + * Register switch for ARMv7-M processors.
+> + * r0 = previous task_struct, r1 = previous thread_info, r2 = next thread_info
+> + * previous and next are guaranteed not to be the same.
+> + */
+> +ENTRY(__switch_to)
+> +	.fnstart
+> +	.cantunwind
+> +	add	ip, r1, #TI_CPU_SAVE
+> +	stmia	ip!, {r4 - r11}		@ Store most regs on stack
+> +	str	sp, [ip], #4
+> +	str	lr, [ip], #4
+> +	mov	r5, r0
+> +	add	r4, r2, #TI_CPU_SAVE
+> +	ldr	r0, =thread_notify_head
+> +	mov	r1, #THREAD_NOTIFY_SWITCH
+> +	bl	atomic_notifier_call_chain
+> +	mov	ip, r4
+> +	mov	r0, r5
+> +	ldmia	ip!, {r4 - r11}		@ Load all regs saved previously
+> +	ldr	sp, [ip], #4
+> +	ldr	pc, [ip]
+> +	.fnend
+> +ENDPROC(__switch_to)
+this code triggers a warning
 
-> Maybe we should rip out the C interface to avoid such abuses.  I think
-> that was initially added when we weren't sure if the C code had to be
-> involved.
+	This instruction may be unpredictable if executed on M-profile
+	cores with interrupts enabled.
 
-[...]
+with newer toolchains (seen with gcc 4.7.2) because of errata 752419
+(Interrupted loads to SP can cause erroneous behaviour) which badly
+affects the following instructions:
 
-> > > +#include <linux/linkage.h>
-> > > +#include "vlock.h"
-> > > +
-> > > +#if VLOCK_VOTING_SIZE > 4
-> >
-> > 4? Maybe a CONFIG option or a #define in an arch vlock.h?
-> 
-> The 4 here is actually related to the number of bytes in a word, to
-> decide whether or not a loop is needed for voters enumeration.  That is
-> not configurable.
+	ldr	sp,[Rn],#imm
+	ldr	sp,[Rn,#imm]!
 
-BYTES_PER_LONG then (or suitable shifting of BITS_PER_LONG)?
+I think it's not a problem here as irqs are off during task switching,
+but when changing
 
-> > > +#define VLOCK_VOTING_SIZE      ((BL_CPUS_PER_CLUSTER + 3) / 4 * 4)
-> >
-> > Huh?
-> 
-> Each ballot is one byte, and we pack them into words.  So this is the
-> size of the required words to hold all ballots.
+	ldr	sp, [ip], #4
+	ldr	pc, [ip]
 
-Ok, so this could make use of BYTES_PER_LONG too, just to make the reasoning
-more clear.
+to
 
-> > > +#define VLOCK_SIZE             (VLOCK_VOTING_OFFSET + VLOCK_VOTING_SIZE)
-> > > +#define VLOCK_OWNER_NONE       0
-> > > +
-> > > +#ifndef __ASSEMBLY__
-> > > +
-> > > +struct vlock {
-> > > +       char data[VLOCK_SIZE];
-> > > +};
-> >
-> > Does this mean the struct is only single byte aligned? You do word
-> > accesses to it in your vlock code and rely on atomicity, so I'd feel
-> > safer if it was aligned to 4 bytes, especially since this isn't being
-> > accessed via a normal mapping.
-> 
-> The structure size is always a multiple of 4 bytes.  Its alignment is
-> actually much larger than 4 as it needs to span a whole cache line not
-> to be overwritten by dirty line writeback.
+	ldr	sp, [ip]
+	ldr	pc, [ip, #4]!
 
-That's not implied from the structure definition.
+the result is equivalent and gcc is happy.
 
-> As I mentioned before, given that this structure is allocated and
-> accessed only by assembly code, we could simply remove all those unused
-> C definitions to avoid potential confusion and misuse.
+I fixed that accordingly in my for-next branch.
 
-Yes, I think removing the C definitions is a great idea. Then, we have a
-pure-asm implementation which is, as such, tied to ARM. In that case, the
-documentation can just refer to ARM memory types instead of loosely defining
-the required characteristics (i.e. state that device or strongly-ordered
-memory is required).
+Best regards
+Uwe
 
-Cheers,
-
-Will
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
