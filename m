@@ -1,36 +1,65 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 11 Jan 2013 11:40:32 +0200
-Subject: [PATCH 01/14] mfd: omap-usb-host: Consolidate OMAP USB-HS platform
- data
-In-Reply-To: <20130110234537.GB15458@atomide.com>
+Date: Fri, 11 Jan 2013 11:41:24 +0200
+Subject: [PATCH 04/14] usb: phy: nop: Handle power supply regulator for
+ the PHY
+In-Reply-To: <50EF0324.9060004@mvista.com>
 References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
- <1357836694-30788-2-git-send-email-rogerq@ti.com>
- <20130110234537.GB15458@atomide.com>
-Message-ID: <50EFDE10.9080902@ti.com>
+ <1357836694-30788-5-git-send-email-rogerq@ti.com>
+ <50EF0324.9060004@mvista.com>
+Message-ID: <50EFDE44.9010108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-
-On 01/11/2013 01:45 AM, Tony Lindgren wrote:
-> * Roger Quadros <rogerq@ti.com> [130110 08:54]:
->> Let's have a single platform data structure for the OMAP's High-Speed
->> USB host subsystem instead of having 3 separate ones i.e. one for
->> board data, one for USB Host (UHH) module and one for USB-TLL module.
->>
->> This makes the code much simpler and avoids creating multiple copies of
->> platform data.
+On 01/10/2013 08:06 PM, Sergei Shtylyov wrote:
+> Hello.
 > 
-> I can apply just this patch alone into an immutable branch that
-> we all can merge in as needed as long as we have acks for the USB
-> and MFD parts.
+> On 01/10/2013 07:51 PM, Roger Quadros wrote:
 > 
-> Or does this one need to be changed based on Alan's comments
-> on the EHCI lib related changes?
+>> We use "vcc" as the supply name for the PHY's power supply.
+>> The power supply will be enabled during .init() and disabled
+>> during .shutdown()
 > 
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  drivers/usb/otg/nop-usb-xceiv.c |   18 ++++++++++++++++++
+>>  1 files changed, 18 insertions(+), 0 deletions(-)
+> 
+>> diff --git a/drivers/usb/otg/nop-usb-xceiv.c b/drivers/usb/otg/nop-usb-xceiv.c
+>> index 163f972..1c6db10 100644
+>> --- a/drivers/usb/otg/nop-usb-xceiv.c
+>> +++ b/drivers/usb/otg/nop-usb-xceiv.c
+> [...]
+>> @@ -70,6 +72,11 @@ static int nop_init(struct usb_phy *phy)
+>>  {
+>>  	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
+>>  
+>> +	if (nop->vcc) {
+>> +		if (regulator_enable(nop->vcc))
+>> +			dev_err(phy->dev, "Failed to enable power\n");
+>> +	}
+> 
+>    Could be collapsed into single *if*.
 
-This does not depend on EHCI lib based changes but it depends on the
-OMAP USB Host cleanup series posted earlier.
+Right.
 
-regards,
+> 
+>> +
+>>  	if (nop->clk)
+>>  		clk_enable(nop->clk);
+>>  
+>> @@ -82,6 +89,11 @@ static void nop_shutdown(struct usb_phy *phy)
+>>  
+>>  	if (nop->clk)
+>>  		clk_disable(nop->clk);
+>> +
+>> +	if (nop->vcc) {
+>> +		if (regulator_disable(nop->vcc))
+>> +			dev_err(phy->dev, "Failed to disable power\n");
+>> +	}
+> 
+>    Same here.
+
+OK. I'll fix them in next spin.
+
+--cheers,
 -roger
