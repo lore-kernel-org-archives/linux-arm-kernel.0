@@ -1,39 +1,62 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Jan 2013 15:34:16 +0000
-Subject: [PATCH 5/6] ARM: virt: use PSR_N_BIT for detecting boot CPU mode
- mismatch
+Date: Fri, 11 Jan 2013 15:34:14 +0000
+Subject: [PATCH 3/6] ARM: virt: simplify __hyp_stub_install epilog
 In-Reply-To: <1357918457-20469-1-git-send-email-will.deacon@arm.com>
 References: <1357918457-20469-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1357918457-20469-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1357918457-20469-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During boot, we detect whether or not all CPUs are brought up in the
-same mode and signal this to the kernel using the N bit in the SPSR.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-This patch tidies up the checking code to use the PSR_N_BIT macro,
-rather than hardcoding the bit field and commenting it as such.
+__hyp_stub_install duplicates quite a bit of safe_svcmode_maskall
+by forcing the CPU back to SVC. This is unnecessary, as
+safe_svcmode_maskall is called just after.
 
+Furthermore, the way we build SPSR_hyp is buggy as we fail to mask
+the interrupts, leading to interesting behaviours on TC2 + UEFI.
+
+The fix is to simply remove this code and rely on safe_svcmode_maskall
+to do the right thing.
+
+Cc: <stable@vger.kernel.org>
+Reviewed-by: Dave Martin <dave.martin@linaro.org>
+Reported-by: Harry Liebel <harry.liebel@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/virt.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kernel/hyp-stub.S | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 86164df..50af92b 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -24,9 +24,9 @@
- /*
-  * Flag indicating that the kernel was not entered in the same mode on every
-  * CPU.  The zImage loader stashes this value in an SPSR, so we need an
-- * architecturally defined flag bit here (the N flag, as it happens)
-+ * architecturally defined flag bit here.
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 3c60256..1315c4c 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -120,7 +120,8 @@ ENTRY(__hyp_stub_install_secondary)
+  * Eventually, CPU-specific code might be needed -- assume not for now
+  *
+  * This code relies on the "eret" instruction to synchronize the
+- * various coprocessor accesses.
++ * various coprocessor accesses. This is done when we switch to SVC
++ * (see safe_svcmode_maskall).
   */
--#define BOOT_CPU_MODE_MISMATCH (1<<31)
-+#define BOOT_CPU_MODE_MISMATCH	PSR_N_BIT
+ 	@ Now install the hypervisor stub:
+ 	adr	r7, __hyp_stub_vectors
+@@ -155,14 +156,7 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
+ 1:
+ #endif
  
- #ifndef __ASSEMBLY__
+-	bic	r7, r4, #MODE_MASK
+-	orr	r7, r7, #SVC_MODE
+-THUMB(	orr	r7, r7, #PSR_T_BIT	)
+-	msr	spsr_cxsf, r7		@ This is SPSR_hyp.
+-
+-	__MSR_ELR_HYP(14)		@ msr elr_hyp, lr
+-	__ERET				@ return, switching to SVC mode
+-					@ The boot CPU mode is left in r4.
++	bx	lr			@ The boot CPU mode is left in r4.
+ ENDPROC(__hyp_stub_install_secondary)
  
+ __hyp_stub_do_trap:
 -- 
 1.8.0
