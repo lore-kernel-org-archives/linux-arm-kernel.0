@@ -1,43 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Jan 2013 16:43:30 +0000
-Subject: [PATCH 6/6] ARM: virt: hide CONFIG_ARM_VIRT_EXT from user
-In-Reply-To: <50F032F0.3070906@codeaurora.org>
-References: <1357918457-20469-1-git-send-email-will.deacon@arm.com>
- <1357918457-20469-7-git-send-email-will.deacon@arm.com>
- <50F032F0.3070906@codeaurora.org>
-Message-ID: <20130111164330.GA12464@mudshark.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 11 Jan 2013 17:45:31 +0100
+Subject: Early kernel hang with big DTB appended
+In-Reply-To: <7811936.npteFbuYu2@amdc1227>
+References: <7811936.npteFbuYu2@amdc1227>
+Message-ID: <20130111164531.GC13025@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 03:42:40PM +0000, Christopher Covington wrote:
-> Hi Will,
-
-Hello,
-
-> On 01/11/2013 10:34 AM, Will Deacon wrote:
-> > ARM_VIRT_EXT is a property of CPU_V7, but does not adversely affect
-> > other CPUs that can be built into the same kernel image (i.e. ARMv6+).
-> > 
-> > This patch defaults ARM_VIRT_EXT to y if CPU_V7, allowing hypervisors
-> > such as KVM to make better use of the option and being able to rely
-> > on hyp-mode boot support.
+On Thu, Jan 03, 2013 at 04:55:00PM +0100, Tomasz Figa wrote:
+> Hi,
 > 
-> [...]
+> I'm observing strange behavior when booting 3.8-rc1 and -rc2 with appended 
+> DTB. The kernel hangs very early when the DTB is bigger than some 
+> threshold somewhere around 24 KiB. With fullest possible low level UART 
+> debugging (and printk patched to use printascii) I'm receiving following 
+> output:
 > 
-> > @@ -640,11 +641,6 @@ config ARM_VIRT_EXT
-> >  	  use of this feature.  Refer to Documentation/arm/Booting for
-> >  	  details.
-> >  
-> > -	  It is safe to enable this option even if the kernel may not be
-> > -	  booted in HYP mode, may not have support for the
-> > -	  virtualization extensions, or may be booted with a
-> > -	  non-compliant bootloader.
+> Uncompressing Linux... done, booting the kernel.
+> Booting Linux on physical CPU 0xa00
+> Linux version 3.8.0-rc1-00073-gdf6efca-dirty (t.figa at amdc1227) (gcc 
+> version 4.5.2 (Gentoo 4.5.2 p1.2, pie-0.4.5) ) #2 SMP PREEMPT Thu Jan 3 
+> 15:37:35 CET 2013
+> CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
+> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
 > 
-> Why take this out?
+> I tested on two Exynos-based boards (exynos4210-trats and one internal 
+> exynos4412-based board) and same happens on both.
+> 
+> Do you have any ideas?
 
-I just removed that last paragraph because it's not user-selectable anymore,
-so this comment about enabling the option is redundant. I could remove all
-of the help text, but we have it for some other options that are selected
-automatically and it has a pointer to some documentation too.
+Another thing besides the things already mentioned is that the dtb may
+not cross a 1MiB boundary. The Kernel uses a single 1Mib section
+(aligned to 1Mib) to initially map the dtb. Once you cross that boundary
+parts of the dtb won't be accessible for the Kernel anymore.
 
-Will
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
