@@ -1,118 +1,43 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 11 Jan 2013 16:09:59 -0700
-Subject: [PATCH RFT 3/3] ARM: tegra: dts: seaboard: enable keyboard
-In-Reply-To: <1357911185-11048-3-git-send-email-ldewangan@nvidia.com>
-References: <1357911185-11048-1-git-send-email-ldewangan@nvidia.com>
- <1357911185-11048-3-git-send-email-ldewangan@nvidia.com>
-Message-ID: <50F09BC7.90607@wwwdotorg.org>
+Date: Fri, 11 Jan 2013 16:17:42 -0700
+Subject: [PATCH] clk: tegra: add KBC clock for Tegra20
+Message-ID: <1357946262-25823-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2013 06:33 AM, Laxman Dewangan wrote:
-> Enable tegra based keyboard controller and populate the key matrix for
-> seaboard. The key matrix was originally on driver code which is removed
-> to have clean driver. The key mapping is now passed through dts file.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> ---
-> Requesting for testing on seaboard.
-> I generated this patch as Stephen suggested to have one patch for dt file
-> entry for keys on seaboard.
+From: Stephen Warren <swarren@nvidia.com>
 
-To some extent this works; at least this patch series is probably almost
-OK, but there are a bunch of issues in the KBC driver obviously:
+This clock has been missing from all our upstream clock drivers. Add it
+by copying the tegra_clk_periph_gate() call from Tegra30; the data
+matches what's in the ChromeOS kernel for this clock.
 
-This series won't work on its own with the current Tegra for-next
-content, because:
+Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
+Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Mike, I'd need to apply this to the Tegra tree as part of the common
+clock framework conversion.
 
-a) The clock driver doesn't provide any KBC clock for Tegra20, either in
-the old Tegra clock driver, or the first conversion to the common clock
-framework, nor the most recent complete conversion to the common clock
-framework. Was the driver tested at all on the upstream kernel? I
-suppose it's just possible it was tested on Tegra30, although see below...
+ drivers/clk/tegra/clk-tegra20.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-This brings up the point that the clk_get() call in the KBC driver is
-probably wrong. At least with Prashant's latest common clock framework
-patches applied, clk_get() returns NULL, not an error pointer for a
-non-existent clock. As such, the following driver code succeeds:
-
-> 	kbc->clk = clk_get(&pdev->dev, NULL);
-> 	if (IS_ERR(kbc->clk)) {
-> 		dev_err(&pdev->dev, "failed to get keyboard clock\n");
-> 		err = PTR_ERR(kbc->clk);
-> 		goto err_iounmap;
-> 	}
-
-Should that check be if (!kbc-clk) instead? Or does the common clock
-framework require if (IS_ERR_OR_NULL(kbc->clk)); hopefully not since
-IS_ERR_OR_NULL shouldn't be used any more.
-
-This then causes the later call to tegra_periph_reset_{de,}assert() to
-crash since it generates a bogus pointer from the NULL pointer and
-dereferences it. I assume similar things happen before Prashant's latest
-clock patches.
-
-Oh, and the KBC clock is marked TEGRA_PERIPH_NO_RESET for Tegra30, and
-also for Tegra20 in the ChromeOS kernel; why is the driver trying to
-assert reset on a clock that doesn't support it?
-
-I hacked around this by adding the following to clk-tegra20.c on top of
-Prashant's latest patches:
-
-> 	/* kbc */
-> 	clk = tegra_clk_periph_gate("kbc", "clk_32k", TEGRA_PERIPH_NO_RESET |
-> 				    TEGRA_PERIPH_ON_APB, clk_base, 0,
-> 				    36, &periph_h_regs, periph_clk_enb_refcnt);
-> 	clk_register_clkdev(clk, NULL, "tegra-kbc");
-> 	clks[kbc] = clk;
-> 
-
-b) There is no AUXDATA in the board file, nor clocks properties in the
-.dts files, in this series to actually hook the KBC driver up to be able
-to get the correct clock. This leads me to suspect the driver was never
-tested upstream on either Tegra20 /or/ Tegra30.
-
-I hacked around this by applying the following:
-
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-> index 8e97825..9ca5e94 100644
-> --- a/arch/arm/boot/dts/tegra20.dtsi
-> +++ b/arch/arm/boot/dts/tegra20.dtsi
-> @@ -400,6 +400,7 @@
->                 reg = <0x7000e200 0x100>;
->                 interrupts = <0 85 0x04>;
->                 status = "disabled";
-> +               clocks = <&tegra_car 36>;
->         };
->  
->         pmc {
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> index 9dca3e4..e580045 100644
-> --- a/arch/arm/boot/dts/tegra30.dtsi
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -417,6 +417,7 @@
->                 reg = <0x7000e200 0x100>;
->                 interrupts = <0 85 0x04>;
->                 status = "disabled";
-> +               clocks = <&tegra_car 36>;
->         };
->  
->         pmc {
-
-I guess I can fold that fix into this series when I apply it, after
-Prashant's clock patches are merged.
-
-Once I hacked around the above issues, the driver doesn't work very well
-at all. There is a *long* delay between when I press a key and when it
-shows up (e.g. echo'd to the HDMI console). When I release the key the
-same keypress is generated twice. Or perhaps it's a repeat, but since
-it's *always* 2 extra keypresses and I doubt I always hold my finger on
-the key the exact same amount of time, I think it's key release that
-does this not repeat. I assume this would repro on any board, so you
-won't need Seaboard to debug it. Harmony is able to read the keyboard
-using the KBC.
-
-Even with the above, I was able to validate that the keymap in the
-Seaboard .dts file looks reasonable.
-
-However, please fix the KBC driver...
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index f40b6f7..5847b5e 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -896,6 +896,13 @@ static void __init tegra20_periph_clk_init(void)
+ 	clk_register_clkdev(clk, NULL, "timer");
+ 	clks[timer] = clk;
+ 
++	/* kbc */
++	clk = tegra_clk_periph_gate("kbc", "clk_32k", TEGRA_PERIPH_NO_RESET |
++				    TEGRA_PERIPH_ON_APB, clk_base, 0,
++				    36, &periph_h_regs, periph_clk_enb_refcnt);
++	clk_register_clkdev(clk, NULL, "tegra-kbc");
++	clks[kbc] = clk;
++
+ 	/* csus */
+ 	clk = tegra_clk_periph_gate("csus", "clk_m", TEGRA_PERIPH_NO_RESET,
+ 				    clk_base, 0, 92, &periph_u_regs,
+-- 
+1.7.10.4
