@@ -1,95 +1,40 @@
 From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Fri, 11 Jan 2013 04:37:10 +0000
-Subject: [RFC v2 12/18] ARM: OMAP2+: timer: Add suspend-resume callbacks
- for clockevent device
-In-Reply-To: <50EC37FE.705@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-13-git-send-email-vaibhav.bedia@ti.com>
- <50EC37FE.705@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECE0D51@DBDE01.ent.ti.com>
+Date: Fri, 11 Jan 2013 04:43:30 +0000
+Subject: [PATCH v2 2/2] ARM: imx: enable imx6q-cpufreq support
+In-Reply-To: <20130110144121.GC8680@S2101-09.ap.freescale.net>
+References: <1357806863-6899-1-git-send-email-shawn.guo@linaro.org>
+ <1357806863-6899-3-git-send-email-shawn.guo@linaro.org>
+ <B5906170F1614E41A8A28DE3B8D121433ECDF7BF@DBDE01.ent.ti.com>
+ <20130110110742.GI2265@S2101-09.ap.freescale.net>
+ <B5906170F1614E41A8A28DE3B8D121433ECDFC9B@DBDE01.ent.ti.com>
+ <20130110132053.GA9139@S2101-09.ap.freescale.net>
+ <B5906170F1614E41A8A28DE3B8D121433ECDFE3B@DBDE01.ent.ti.com>
+ <20130110144121.GC8680@S2101-09.ap.freescale.net>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECE0DA7@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 20:45:10, Shilimkar, Santosh wrote:
-> On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
-> > The current OMAP timer code registers two timers -
-> > one as clocksource and one as clockevent.
-> > AM33XX has only one usable timer in the WKUP domain
-> > so one of the timers needs suspend-resume support
-> > to restore the configuration to pre-suspend state.
-> >
-> > commit adc78e6 (timekeeping: Add suspend and resume
-> > of clock event devices) introduced .suspend and .resume
-> > callbacks for clock event devices. Leverages these
-> > callbacks to have AM33XX clockevent timer which is
-> > in not in WKUP domain to behave properly across system
-> > suspend.
-> >
-> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Cc: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> > Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Jon Hunter <jon-hunter@ti.com>
-> > ---
-> > v1->v2:
-> > 	Get rid of harcoded timer id.
-> > 	Note: since a platform device is not created for these timer
-> > 	instances and because there's very minimal change needed for
-> > 	restarting the timer a full blown context save and restore
-> > 	has been skipped.
-> >
-> >   arch/arm/mach-omap2/timer.c |   33 +++++++++++++++++++++++++++++++++
-> >   1 files changed, 33 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> > index 691aa67..38f9cbc 100644
-> > --- a/arch/arm/mach-omap2/timer.c
-> > +++ b/arch/arm/mach-omap2/timer.c
-> > @@ -128,6 +128,36 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
-> >   	}
-> >   }
-> >
-> > +static void omap_clkevt_suspend(struct clock_event_device *unused)
-> > +{
-> > +	char name[10];
-> > +	struct omap_hwmod *oh;
-> > +
-> > +	sprintf(name, "timer%d", clkev.id);
-> > +	oh = omap_hwmod_lookup(name);
-> > +	if (!oh)
-> > +		return;
-> > +
-> > +	__omap_dm_timer_stop(&clkev, 1, clkev.rate);
-> > +	omap_hwmod_idle(oh);
-> > +}
-> > +
-> > +static void omap_clkevt_resume(struct clock_event_device *unused)
-> > +{
-> > +	char name[10];
-> > +	struct omap_hwmod *oh;
-> > +
-> > +	sprintf(name, "timer%d", clkev.id);
-> > +	oh = omap_hwmod_lookup(name);
-> > +	if (!oh)
-> > +		return;
-> > +
-> > +	omap_hwmod_enable(oh);
-> > +	__omap_dm_timer_load_start(&clkev,
-> > +			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
-> > +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
-> > +}
-> > +
-> Am still bit uncomfortable with direct hwmod usage in the suspend/resmue
-> hooks.
-> 
-> Jon, Any alternatives you can think of ?
+On Thu, Jan 10, 2013 at 20:11:25, Shawn Guo wrote:
+> On Thu, Jan 10, 2013 at 02:02:53PM +0000, Bedia, Vaibhav wrote:
+> > On Thu, Jan 10, 2013 at 18:50:55, Shawn Guo wrote:
+> > > On Thu, Jan 10, 2013 at 01:02:30PM +0000, Bedia, Vaibhav wrote:
+> > > > In the current approach the OPP data is split across DT and kernel code. If you take the
+> > > > other approach all OPP entries can reside in DT and for someone just looking at that file
+> > > > there's no confusion about what the kernel could potentially support. Whether a particular
+> > > > an OPP should be supported is best decided at runtime.
+> > > > 
+> > > Listing the OPP that some Si rev can not support in DT is also
+> > > a confusion to people who is just looking at DTS.  To me, the approach
+> > > is not really doing anything better on this aspect.
+> > > 
+> > 
+> > I still think putting the OPP data in a single place is better.
+> > 
+> Okay, I agree with you on that and plan to commit the following changes.
+> But no, still no platform hook.
 > 
 
-Jon,
-
-Any suggestions here?
+Fair enough.
 
 Regards,
 Vaibhav
