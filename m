@@ -1,162 +1,207 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Jan 2013 23:57:48 +0530
-Subject: [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
- exit/setup and CCI
-In-Reply-To: <1357777251-13541-16-git-send-email-nicolas.pitre@linaro.org>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-16-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <50F059A4.4010107@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 11 Jan 2013 13:27:47 -0500 (EST)
+Subject: [PATCH 07/14] usb: ehci-omap: Instantiate PHY devices if required
+In-Reply-To: <50F037C9.40306@ti.com>
+Message-ID: <Pine.LNX.4.44L0.1301111302380.1730-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> From: Dave Martin <dave.martin@linaro.org>
->
-> Add the required code to properly handle race free platform coherency exit
-> to the DCSCB power down method.
->
-> The power_up_setup callback is used to enable the CCI interface for
-> the cluster being brought up.  This must be done in assembly before
-> the kernel environment is entered.
->
-> Thanks to Achin Gupta and Nicolas Pitre for their help and
-> contributions.
->
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
-[..]
+On Fri, 11 Jan 2013, Roger Quadros wrote:
 
-> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-> index 59b690376f..95a2d0df20 100644
-> --- a/arch/arm/mach-vexpress/dcscb.c
-> +++ b/arch/arm/mach-vexpress/dcscb.c
-> @@ -15,6 +15,7 @@
->   #include <linux/spinlock.h>
->   #include <linux/errno.h>
->   #include <linux/vexpress.h>
-> +#include <linux/arm-cci.h>
->
->   #include <asm/bL_entry.h>
->   #include <asm/proc-fns.h>
-> @@ -104,6 +105,8 @@ static void dcscb_power_down(void)
->   	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
->   	BUG_ON(cpu >= 4 || cluster >= 2);
->
-> +	__bL_cpu_going_down(cpu, cluster);
-> +
->   	arch_spin_lock(&dcscb_lock);
->   	dcscb_use_count[cpu][cluster]--;
->   	if (dcscb_use_count[cpu][cluster] == 0) {
-> @@ -111,6 +114,7 @@ static void dcscb_power_down(void)
->   		rst_hold |= cpumask;
->   		if (((rst_hold | (rst_hold >> 4)) & cluster_mask) == cluster_mask) {
->   			rst_hold |= (1 << 8);
-> +			BUG_ON(__bL_cluster_state(cluster) != CLUSTER_UP);
->   			last_man = true;
->   		}
->   		writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-> @@ -124,35 +128,71 @@ static void dcscb_power_down(void)
->   		skip_wfi = true;
->   	} else
->   		BUG();
-> -	arch_spin_unlock(&dcscb_lock);
->
-> -	/*
-> -	 * Now let's clean our L1 cache and shut ourself down.
-> -	 * If we're the last CPU in this cluster then clean L2 too.
-> -	 */
-> -
-> -	/*
-> -	 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
-> -	 * a preliminary flush here for those CPUs.  At least, that's
-> -	 * the theory -- without the extra flush, Linux explodes on
-> -	 * RTSM (maybe not needed anymore, to be investigated)..
-> -	 */
-> -	flush_cache_louis();
-> -	cpu_proc_fin();
-> +	if (last_man && __bL_outbound_enter_critical(cpu, cluster)) {
-> +		arch_spin_unlock(&dcscb_lock);
->
-> -	if (!last_man) {
-> -		flush_cache_louis();
-> -	} else {
-> +		/*
-> +		 * Flush all cache levels for this cluster.
-> +		 *
-> +		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
-> +		 * a preliminary flush here for those CPUs.  At least, that's
-> +		 * the theory -- without the extra flush, Linux explodes on
-> +		 * RTSM (maybe not needed anymore, to be investigated).
-> +		 */
->   		flush_cache_all();
-> +		cpu_proc_fin(); /* disable allocation into internal caches*/
-I see now. In previous patch I missed the cpu_proc_fin() which clears
-C bit
-> +		flush_cache_all();
-> +
-> +		/*
-> +		 * This is a harmless no-op.  On platforms with a real
-> +		 * outer cache this might either be needed or not,
-> +		 * depending on where the outer cache sits.
-> +		 */
->   		outer_flush_all();
-> +
-> +		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
-> +		asm volatile (
-> +			"mrc	p15, 0, ip, c1, c0, 1 \n\t"
-> +			"bic	ip, ip, #(1 << 6) @ clear SMP bit \n\t"
-> +			"mcr	p15, 0, ip, c1, c0, 1 \n\t"
-> +			"isb \n\t"
-> +			"dsb"
-> +			: : : "ip" );
-> +
-> +		/*
-> +		 * Disable cluster-level coherency by masking
-> +		 * incoming snoops and DVM messages:
-> +		 */
-> +		disable_cci(cluster);
-> +
-> +		__bL_outbound_leave_critical(cluster, CLUSTER_DOWN);
-> +	} else {
-> +		arch_spin_unlock(&dcscb_lock);
-> +
-> +		/*
-> +		 * Flush the local CPU cache.
-> +		 *
-> +		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
-> +		 * a preliminary flush here for those CPUs.  At least, that's
-> +		 * the theory -- without the extra flush, Linux explodes on
-> +		 * RTSM (maybe not needed anymore, to be investigated).
-> +		 */
-This is expected if the entire code is not in one stack frame and the
-additional flush is needed to avoid possible stack corruption. This
-issue has been discussed in past on the list.
+> Apart from what you mentioned I did some more trivial changes. e.g.
+> 
+> +       !IS_ENABLED(CONFIG_USB_EHCI_HCD_OMAP) && \
+> instead of
+> +	!defined(CONFIG_USB_EHCI_HCD_OMAP) && \
 
-> +		flush_cache_louis();
-> +		cpu_proc_fin(); /* disable allocation into internal caches*/
-> +		flush_cache_louis();
-> +
-> +		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
-> +		asm volatile (
-> +			"mrc	p15, 0, ip, c1, c0, 1 \n\t"
-> +			"bic	ip, ip, #(1 << 6) @ clear SMP bit \n\t"
-> +			"mcr	p15, 0, ip, c1, c0, 1 \n\t"
-> +			"isb \n\t"
-> +			"dsb"
-> +			: : : "ip" );
->   	}
->
-> -	/* Disable local coherency by clearing the ACTLR "SMP" bit: */
-> -	asm volatile (
-> -		"mrc	p15, 0, ip, c1, c0, 1 \n\t"
-> -		"bic	ip, ip, #(1 << 6) @ clear SMP bit \n\t"
-> -		"mcr	p15, 0, ip, c1, c0, 1"
-> -		: : : "ip" );
-> +	__bL_cpu_down(cpu, cluster);
->
->   	/* Now we are prepared for power-down, do it: */
->   	if (!skip_wfi)
+Ah, that's a very good catch.  There's another entry needing the same
+thing.  I'll put that in a separate preliminary patch, and also put
+the ehci->priv addition in there instead of including it with the
+ehci-mxc update.
 
-Regards,
-Santosh
+> use ehci_hcd_omap_driver instead of ehci_omap_driver
+
+Now fixed.
+
+> I tried using ehci->priv in ehci-omap driver but noticed that the
+> private data gets corrupted after the EHCI controller is running and has
+> enumerated a few devices.
+> 
+> If I disable USB_DEBUG then things are fine. Could it be possible
+> that someone is overflowing data when USB_DEBUG is enabled?
+> 
+> My implementation is pasted below. (May contain whitespace errors due to
+> MS exchange). Patch 2 attached in case.
+> 
+> What was happening there is that omap_priv->phy was not the same during
+> remove() as it was set to during probe().
+
+I don't understand -- your second patch doesn't use ehci->priv at all.  
+How can the private data be getting corrupted?
+
+Below is an updated version of your second patch.  You'll need to
+resolve one or two merge errors because it's not based on the same
+starting point as yours.  (And it totally omits the part affecting
+usb-omap.h.) But it will show you what needs to be done in order to use
+ehci->priv.
+
+> Would be nice if you could check if the same happens with ehci-mxc.
+
+I can't -- I don't have an ARM-based system.  But if you still see 
+problems, I can test with ehci-pci.
+
+Alan Stern
+
+
+
+Index: usb-3.7/drivers/usb/host/ehci-omap.c
+===================================================================
+--- usb-3.7.orig/drivers/usb/host/ehci-omap.c
++++ usb-3.7/drivers/usb/host/ehci-omap.c
+@@ -69,6 +69,10 @@ static const char hcd_name[] = "ehci-oma
+ 
+ /*-------------------------------------------------------------------------*/
+ 
++struct omap_ehci_hcd {
++	struct usb_phy **phy;	/* one PHY for each port */
++	int nports;
++};
+ 
+ static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
+ {
+@@ -177,7 +181,8 @@ static void disable_put_regulator(
+ static struct hc_driver __read_mostly ehci_omap_hc_driver;
+ 
+ static const struct ehci_driver_overrides ehci_omap_overrides __initdata = {
+-	.reset =	omap_ehci_init,
++	.reset =		omap_ehci_init,
++	.extra_priv_size =	sizeof(struct omap_ehci_hcd),
+ };
+ 
+ /**
+@@ -193,6 +198,8 @@ static int ehci_hcd_omap_probe(struct pl
+ 	struct ehci_hcd_omap_platform_data	*pdata = dev->platform_data;
+ 	struct resource				*res;
+ 	struct usb_hcd				*hcd;
++	struct omap_ehci_hcd			*omap_hcd;
++	struct usb_phy				*phy;
+ 	void __iomem				*regs;
+ 	int					ret = -ENODEV;
+ 	int					irq;
+@@ -207,6 +214,11 @@ static int ehci_hcd_omap_probe(struct pl
+ 		return -ENODEV;
+ 	}
+ 
++	if (!pdata) {
++		dev_err(dev, "Missing platform data\n");
++		return -ENODEV;
++	}
++
+ 	irq = platform_get_irq_byname(pdev, "ehci-irq");
+ 	if (irq < 0) {
+ 		dev_err(dev, "EHCI irq failed\n");
+@@ -238,8 +250,24 @@ static int ehci_hcd_omap_probe(struct pl
+ 	hcd->rsrc_len = resource_size(res);
+ 	hcd->regs = regs;
+ 
++	omap_hcd = (struct omap_ehci_hcd *) (hcd_to_ehci(hcd))->priv;
++
++	omap_hcd->nports = pdata->nports;
++	i = sizeof(struct usb_phy *) * omap_hcd->nports;
++	omap_hcd->phy = devm_kzalloc(&pdev->dev, i, GFP_KERNEL);
++	if (!omap_hcd->phy) {
++		dev_err(dev, "Memory allocation failed\n");
++		ret = -ENOMEM;
++		goto err_alloc_phy;
++	}
++
++	platform_set_drvdata(pdev, hcd);
++
+ 	/* get ehci regulator and enable */
+-	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
++	for (i = 0 ; i < omap_hcd->nports ; i++) {
++		struct platform_device *phy_pdev;
++		struct usbhs_phy_config *phy_config;
++
+ 		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY) {
+ 			pdata->regulator[i] = NULL;
+ 			continue;
+@@ -253,6 +281,33 @@ static int ehci_hcd_omap_probe(struct pl
+ 		} else {
+ 			regulator_enable(pdata->regulator[i]);
+ 		}
++
++		/* instantiate PHY */
++		if (!pdata->phy_config[i]) {
++			dev_dbg(dev, "missing phy_config for port %d\n", i);
++			continue;
++		}
++
++		phy_config = pdata->phy_config[i];
++		phy_pdev = platform_device_register_data(&pdev->dev,
++				phy_config->name, i, phy_config->pdata,
++				phy_config->pdata_size);
++		if (IS_ERR(phy_pdev)) {
++			dev_dbg(dev, "error creating PHY device for port %d\n",
++					i);
++		}
++
++		phy = usb_get_phy_from_dev(&phy_pdev->dev);
++		if (IS_ERR(phy)) {
++			dev_dbg(dev, "could not get USB PHY for port %d\n", i);
++			platform_device_unregister(phy_pdev);
++			continue;
++		}
++
++		usb_phy_init(phy);
++		omap_hcd->phy[i] = phy;
++		/* bring PHY out of suspend */
++		usb_phy_set_suspend(omap_hcd->phy[i], 0);
+ 	}
+ 
+ 	pm_runtime_enable(dev);
+@@ -282,6 +336,14 @@ static int ehci_hcd_omap_probe(struct pl
+ err_pm_runtime:
+ 	disable_put_regulator(pdata);
+ 	pm_runtime_put_sync(dev);
++	for (i = 0 ; i < omap_hcd->nports ; i++) {
++		phy = omap_hcd->phy[i];
++		if (!phy)
++			continue;
++		platform_device_unregister(to_platform_device(phy->dev));
++	}
++
++err_alloc_phy:
+ 	usb_put_hcd(hcd);
+ 
+ err_io:
+@@ -300,13 +362,26 @@ err_io:
+  */
+ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ {
+-	struct device *dev				= &pdev->dev;
+-	struct usb_hcd *hcd				= dev_get_drvdata(dev);
+-	struct ehci_hcd_omap_platform_data *pdata	= dev->platform_data;
++	struct device *dev		= &pdev->dev;
++	struct usb_hcd *hcd		= dev_get_drvdata(dev);
++	struct omap_ehci_hcd *omap_hcd;
++	int i;
+ 
+ 	usb_remove_hcd(hcd);
+ 	disable_put_regulator(dev->platform_data);
+ 	iounmap(hcd->regs);
++
++	omap_hcd = (struct omap_ehci_hcd *) (hcd_to_ehci(hcd))->priv;
++	for (i = 0; i < omap_hcd->nports; i++) {
++		struct usb_phy *phy = omap_hcd->phy[i];
++
++		if (!phy)
++			continue;
++
++		usb_phy_shutdown(phy);
++		platform_device_unregister(to_platform_device(phy->dev));
++	}
++
+ 	usb_put_hcd(hcd);
+ 
+ 	pm_runtime_put_sync(dev);
