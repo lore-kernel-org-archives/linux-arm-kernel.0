@@ -1,54 +1,56 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 11 Jan 2013 12:22:20 -0500
-Subject: [PATCH 6/6] ARM: virt: hide CONFIG_ARM_VIRT_EXT from user
-In-Reply-To: <20130111164330.GA12464@mudshark.cambridge.arm.com>
-References: <1357918457-20469-1-git-send-email-will.deacon@arm.com>
- <1357918457-20469-7-git-send-email-will.deacon@arm.com>
- <50F032F0.3070906@codeaurora.org>
- <20130111164330.GA12464@mudshark.cambridge.arm.com>
-Message-ID: <50F04A4C.6020302@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 11 Jan 2013 17:24:37 +0000
+Subject: [PATCH v2 2/2] ARM: KVM: Power State Coordination Interface
+ implementation
+In-Reply-To: <20130111171232.GH23505@n2100.arm.linux.org.uk>
+References: <1357834005-23843-1-git-send-email-marc.zyngier@arm.com>
+ <1357834005-23843-3-git-send-email-marc.zyngier@arm.com>
+ <20130111171232.GH23505@n2100.arm.linux.org.uk>
+Message-ID: <50F04AD5.6020703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2013 11:43 AM, Will Deacon wrote:
-> On Fri, Jan 11, 2013 at 03:42:40PM +0000, Christopher Covington wrote:
->> Hi Will,
+On 11/01/13 17:12, Russell King - ARM Linux wrote:
+> On Thu, Jan 10, 2013 at 04:06:45PM +0000, Marc Zyngier wrote:
+>> +int kvm_psci_call(struct kvm_vcpu *vcpu)
+>> +{
+>> +	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>> +	unsigned long val;
+>> +
+>> +	switch (psci_fn) {
+>> +	case KVM_PSCI_FN_CPU_OFF:
+>> +		kvm_psci_vcpu_off(vcpu);
+>> +		val = KVM_PSCI_RET_SUCCESS;
+>> +		break;
+>> +	case KVM_PSCI_FN_CPU_ON:
+>> +		val = kvm_psci_vcpu_on(vcpu);
+>> +		break;
+>> +	case KVM_PSCI_FN_CPU_SUSPEND:
+>> +	case KVM_PSCI_FN_MIGRATE:
+>> +		val = KVM_PSCI_RET_NI;
+>> +		break;
+>> +
+>> +	default:
+>> +		return -1;
+>> +	}
+>> +
+>> +	*vcpu_reg(vcpu, 0) = val;
+>> +	return 0;
+>> +}
 > 
-> Hello,
+> We were discussing recently on #kernel about kernel APIs and the way that
+> our integer-returning functions pretty much use 0 for success, and -errno
+> for failures, whereas our pointer-returning functions are a mess.
 > 
->> On 01/11/2013 10:34 AM, Will Deacon wrote:
->>> ARM_VIRT_EXT is a property of CPU_V7, but does not adversely affect
->>> other CPUs that can be built into the same kernel image (i.e. ARMv6+).
->>>
->>> This patch defaults ARM_VIRT_EXT to y if CPU_V7, allowing hypervisors
->>> such as KVM to make better use of the option and being able to rely
->>> on hyp-mode boot support.
->>
->> [...]
->>
->>> @@ -640,11 +641,6 @@ config ARM_VIRT_EXT
->>>  	  use of this feature.  Refer to Documentation/arm/Booting for
->>>  	  details.
->>>  
->>> -	  It is safe to enable this option even if the kernel may not be
->>> -	  booted in HYP mode, may not have support for the
->>> -	  virtualization extensions, or may be booted with a
->>> -	  non-compliant bootloader.
->>
->> Why take this out?
-> 
-> I just removed that last paragraph because it's not user-selectable anymore,
-> so this comment about enabling the option is redundant. I could remove all
-> of the help text, but we have it for some other options that are selected
-> automatically and it has a pointer to some documentation too.
+> And above we have something returning -1 to some other chunk of code outside
+> this compilation unit.  That doesn't sound particularly clever to me.
 
-It's not a big deal, but that paragraph helped me understand the (lack of)
-ramifications for v7 CPU's without the virtualization extensions, and I figure
-it might still be helpful for others as well.
+The original code used to return -EINVAL, see:
+https://lists.cs.columbia.edu/pipermail/kvmarm/2013-January/004509.html
 
-Christopher
+Christoffer (Cc-ed) didn't like this, hence the -1. I'm happy to revert
+the code to its original state though.
 
+	M.
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
-the Linux Foundation
+Jazz is not dead. It just smells funny...
