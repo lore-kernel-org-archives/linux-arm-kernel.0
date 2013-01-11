@@ -1,66 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 11 Jan 2013 16:17:38 +0000
-Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
-Message-ID: <1357921058-11322-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 11 Jan 2013 17:20:16 +0100
+Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
+ THUMB mode
+In-Reply-To: <20130111160753.GC23505@n2100.arm.linux.org.uk>
+References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130111160753.GC23505@n2100.arm.linux.org.uk>
+Message-ID: <20130111162016.GM14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the introduction of /cpu nodes bindings for ARM and the
-corresponding parse function arm_dt_init_cpu_maps(), the cpu_logical_map
-and the number of possible CPUs are set according to the DT /cpu
-nodes entries. Currently most of the existing ARM SMP platforms detect the
-number of cores through HW probing in their .smp_init_cpus functions and set
-the possible CPU mask accordingly.
-This method should be upgraded so that the CPU counting mechanism will be
-based on DT, keeping legacy HW probing mechanism as a fall back solution.
+Hi Russell,
 
-In order to implement this fall back solution mechanism, the ARM DT code
-should provide a helper function to platforms to check if the cpu map
-has been properly initialized through DT. If the check fails the
-platform will resort to legacy HW based cores counting mechanism.
+On Fri, Jan 11, 2013 at 04:07:53PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 11, 2013 at 12:39:57PM +0100, Uwe Kleine-K?nig wrote:
+> > +# Select this if your CPU doesn't support the 32 bit ARM instructions.
+> > +config THUMBONLY_CPU
+> > +	bool
+> > +	select THUMB2_KERNEL
+> > +	select ARM_THUMB
+> 
+> Hmm, not convinced this is the best solution.  Yes, fine for there to be
+> a THUMBONLY_CPU option, _but_ not the select statements onto user visible
+> symbols.  We can get this instead by:
+> 
+> config THUMB2_KERNEL
+>         bool "Compile the kernel in Thumb-2 mode" if !THUMBONLY_CPU
+>         depends on (CPU_V7 && !CPU_V6 && !CPU_V6K) || THUMBONLY_CPU
+> 	default y if THUMBONLY_CPU
+>         select AEABI
+>         select ARM_ASM_UNIFIED
+>         select ARM_UNWIND
+> 
+> and:
+> 
+> config ARM_THUMB
+>         bool "Support Thumb user binaries" if !THUMBONLY_CPU
+>         depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || \
+> 		   CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || \
+> 		   CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || \
+> 		   CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
+> 		   CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || \
+> 		   CPU_V6K || CPU_V7 || CPU_FEROCEON || THUMBONLY_CPU
+>         default y
+> 
+> And... I'm left wondering - should we have this instead:
+> 
+> config CPU_ARM
+> 	bool
+> 
+> config CPU_THUMB
+> 	bool
+> 
+> which indicates whether the CPU supports the ARM instruction set or the
+> Thumb instruction set (or both) - that should then allow us to select
+> those from the individual CPU_xxx options and eliminate that big long
+> list of dependencies against ARM_THUMB.
+I like your idea and I will come up with a patch.
 
-This patch implements a helper function that platforms can call to check
-whether DT based cpu map initialization and cores count were completed
-successfully.
+Thanks
+Uwe
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/include/asm/prom.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-index a219227..a913989 100644
---- a/arch/arm/include/asm/prom.h
-+++ b/arch/arm/include/asm/prom.h
-@@ -13,11 +13,21 @@
- 
- #define HAVE_ARCH_DEVTREE_FIXUPS
- 
-+#include <linux/cpumask.h>
-+
- #ifdef CONFIG_OF
- 
- extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
- extern void arm_dt_memblock_reserve(void);
- extern void __init arm_dt_init_cpu_maps(void);
-+/*
-+ * Return true if cpu map initialization has been
-+ * carried out correctly from DT
-+ */
-+static inline bool __init arm_dt_cpu_map_valid(void)
-+{
-+	return !!(num_possible_cpus());
-+}
- 
- #else /* CONFIG_OF */
- 
-@@ -28,6 +38,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
- 
- static inline void arm_dt_memblock_reserve(void) { }
- static inline void arm_dt_init_cpu_maps(void) { }
-+static inline bool __init arm_dt_cpu_map_valid(void) { return false; }
- 
- #endif /* CONFIG_OF */
- #endif /* ASMARM_PROM_H */
 -- 
-1.7.12
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
