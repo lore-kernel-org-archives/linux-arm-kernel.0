@@ -1,24 +1,24 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 11 Jan 2013 15:11:53 +0200
-Subject: [PATCH 1/2] ARM: tegra20: Add cpu node
+Date: Fri, 11 Jan 2013 15:11:54 +0200
+Subject: [PATCH 2/2] ARM: tegra30: Add cpu node
 In-Reply-To: <1357909914-28994-1-git-send-email-hdoyu@nvidia.com>
 References: <1357909914-28994-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1357909914-28994-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1357909914-28994-3-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpu node for tegra20.
+Add cpu node for tegra30.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- arch/arm/boot/dts/tegra20.dtsi |   29 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/tegra30.dtsi |   29 +++++++++++++++++++++++++++++
  1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 6e13d13..434360b 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -430,6 +430,35 @@
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 5b02ff0..df3214f 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -467,6 +467,35 @@
  		status = "disabled";
  	};
  
@@ -53,6 +53,6 @@ index 6e13d13..434360b 100644
 +
  	pmu {
  		compatible = "arm,cortex-a9-pmu";
- 		interrupts = <0 56 0x04
+ 		interrupts = <0 144 0x04
 -- 
 1.7.9.5
