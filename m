@@ -1,28 +1,57 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Fri, 11 Jan 2013 19:03:04 +0530
-Subject: [PATCH 2/3] ARM: tegra: config: enable KEYBOARD_TEGRA
-In-Reply-To: <1357911185-11048-1-git-send-email-ldewangan@nvidia.com>
-References: <1357911185-11048-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1357911185-11048-2-git-send-email-ldewangan@nvidia.com>
+Date: Fri, 11 Jan 2013 19:03:03 +0530
+Subject: [PATCH 1/3] ARM: DT: tegra: add DT entry for KBC controller
+Message-ID: <1357911185-11048-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+NVIDIA's Tegra SoCs have the matrix keyboard controller which
+supports 16x8 type of matrix. The number of rows and columns
+are configurable.
+
+Add DT entry for KBC controller.
+
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
- arch/arm/configs/tegra_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/tegra20.dtsi |    7 +++++++
+ arch/arm/boot/dts/tegra30.dtsi |    7 +++++++
+ 2 files changed, 14 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 254f31f..e350afb 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -107,6 +107,7 @@ CONFIG_BRCMFMAC=m
- CONFIG_RT2X00=y
- CONFIG_RT2800USB=m
- CONFIG_INPUT_EVDEV=y
-+CONFIG_KEYBOARD_TEGRA=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MPU3050=y
- # CONFIG_LEGACY_PTYS is not set
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index fe35c72..133d00d 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -352,6 +352,13 @@
+ 		status = "disabled";
+ 	};
+ 
++	kbc {
++		compatible = "nvidia,tegra20-kbc";
++		reg = <0x7000e200 0x100>;
++		interrupts = <0 85 0x04>;
++		status = "disabled";
++	};
++
+ 	pmc {
+ 		compatible = "nvidia,tegra20-pmc";
+ 		reg = <0x7000e400 0x400>;
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index f534a50..d060e46 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -368,6 +368,13 @@
+ 		status = "disabled";
+ 	};
+ 
++	kbc {
++		compatible = "nvidia,tegra30-kbc", "nvidia,tegra20-kbc";
++		reg = <0x7000e200 0x100>;
++		interrupts = <0 85 0x04>;
++		status = "disabled";
++	};
++
+ 	pmc {
+ 		compatible = "nvidia,tegra20-pmc", "nvidia,tegra30-pmc";
+ 		reg = <0x7000e400 0x400>;
 -- 
 1.7.1.1
