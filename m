@@ -1,125 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Jan 2013 17:57:49 +0000
-Subject: [PATCH 02/11] ARM: nomadik: initial devicetree support
-In-Reply-To: <20130111170411.320D73E20EC@localhost>
-References: <1357599359-7385-1-git-send-email-linus.walleij@linaro.org>
- <20130108095729.GA2718@e106331-lin.cambridge.arm.com>
- <20130111170411.320D73E20EC@localhost>
-Message-ID: <20130111175749.GJ19765@e106331-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Jan 2013 09:59:12 -0800
+Subject: [PATCH V2 1/2] ARM: OMAP2+: Prepare for device-tree PMU support
+In-Reply-To: <1355766548-5702-2-git-send-email-jon-hunter@ti.com>
+References: <1355766548-5702-1-git-send-email-jon-hunter@ti.com>
+ <1355766548-5702-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <20130111175911.GK14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 05:04:11PM +0000, Grant Likely wrote:
-> On Tue, 8 Jan 2013 09:57:29 +0000, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi,
-> > 
-> > I have a couple of comments on the dts{,i} portion.
-> > 
-> > On Mon, Jan 07, 2013 at 10:55:59PM +0000, Linus Walleij wrote:
-> > > Support basic device tree boot on the Nomadik. Implement the
-> > > support in the cpu file with the intent of deleting the board
-> > > files later. At this stage IRQ controllers, system timer,
-> > > l2x0 cache, UARTs and thus console boot is fully functional.
-> > > Patch out the code adding devices by initcalls for now so
-> > > as not to disturb the boot.
-> > > 
-> > > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > > ---
-> > >  arch/arm/boot/dts/Makefile                 |  1 +
-> > >  arch/arm/boot/dts/ste-nomadik-s8815.dts    | 18 ++++++
-> > >  arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 77 +++++++++++++++++++++++++
-> > >  arch/arm/mach-nomadik/board-nhk8815.c      |  4 ++
-> > >  arch/arm/mach-nomadik/cpu-8815.c           | 90 ++++++++++++++++++++++++++++++
-> > >  arch/arm/mach-nomadik/cpu-8815.h           |  1 +
-> > >  arch/arm/mach-nomadik/i2c-8815nhk.c        |  5 ++
-> > >  7 files changed, 196 insertions(+)
-> > >  create mode 100644 arch/arm/boot/dts/ste-nomadik-s8815.dts
-> > >  create mode 100644 arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-> > > 
-> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > > index e44da40..7bc5ba73 100644
-> > > --- a/arch/arm/boot/dts/Makefile
-> > > +++ b/arch/arm/boot/dts/Makefile
-> > > @@ -100,6 +100,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
-> > >  	imx28-m28evk.dtb \
-> > >  	imx28-sps1.dtb \
-> > >  	imx28-tx28.dtb
-> > > +dtb-$(CONFIG_ARCH_NOMADIK) += ste-nomadik-s8815.dtb
-> > >  dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
-> > >  	omap3-beagle.dtb \
-> > >  	omap3-beagle-xm.dtb \
-> > > diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-> > > new file mode 100644
-> > > index 0000000..b698bc2
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-> > > @@ -0,0 +1,18 @@
-> > > +/*
-> > > + * Device Tree for the ST-Ericsson Nomadik S8815 board
-> > > + * Produced by Calao Systems
-> > > + */
-> > > +
-> > > +/dts-v1/;
-> > > +/include/ "ste-nomadik-stn8815.dtsi"
-> > > +
-> > > +/ {
-> > > +	model = "ST-Ericsson Nomadik S8815";
-> > > +	compatible = "stericsson,nomadik";
-> > > +	#address-cells = <1>;
-> > > +	#size-cells = <1>;
-> > 
-> > Given there are addresses and sizes in the dtsi (but none in the dts), should
-> > #address-cells and #size-cells not be in the dtsi?
-> > 
-> > > +
-> > > +	chosen {
-> > > +		bootargs = "root=/dev/ram0 console=ttyAMA1,115200n8 earlyprintk";
-> > > +	};
-> > > +};
-> > > diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-> > > new file mode 100644
-> > > index 0000000..81284c5
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-> > > @@ -0,0 +1,77 @@
-> > > +/*
-> > > + * Device Tree for the ST-Ericsson Nomadik 8815 STn8815 SoC
-> > > + */
-> > > +/include/ "skeleton.dtsi"
-> > > +
-> > > +/ {
-> > > +	memory {
-> > > +	       reg = <0x00000000 0x04000000>;
-> > > +	       reg = <0x08000000 0x04000000>;
-> > 
-> > I believe that's not valid (duplicate property name).
-> > 
-> > Judging by other dts files under arch/arm/boot/dts, these should be two nodes,
-> > with their unit addresses set (and possibly device_type, which I see is set for
-> > some dts files, but not all).
+* Jon Hunter <jon-hunter@ti.com> [121217 09:51]:
+> If device-tree is present, then do not create the PMU device from within
+> the OMAP specific PMU code. This is required to allow device-tree to
+> create the PMU device from the PMU device-tree node.
 > 
-> One node should be just fine if the following form is used:
+> PMU is not currently supported for OMAP4430 (due to a dependency on
+> having a cross-trigger interface driver) and so ensure that this
+> indicated on boot with or without device-tree.
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+ 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>  arch/arm/mach-omap2/pmu.c |   14 +++++++++++---
+>  1 file changed, 11 insertions(+), 3 deletions(-)
 > 
-> 	memory {
-> 		reg = <0x00000000 0x04000000>,
-> 		      <0x08000000 0x04000000>;
-> 	};
+> diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
+> index eb78ae7..1a0799c 100644
+> --- a/arch/arm/mach-omap2/pmu.c
+> +++ b/arch/arm/mach-omap2/pmu.c
+> @@ -11,6 +11,8 @@
+>   * the Free Software Foundation; either version 2 of the License, or
+>   * (at your option) any later version.
+>   */
+> +#include <linux/of.h>
+> +
+>  #include <asm/pmu.h>
+>  
+>  #include "soc.h"
+> @@ -64,6 +66,15 @@ static int __init omap_init_pmu(void)
+>  	unsigned oh_num;
+>  	char **oh_names;
+>  
+> +	/* XXX Remove this check when the CTI driver is available */
+> +	if (cpu_is_omap443x()) {
+> +		pr_info("ARM PMU: not yet supported on OMAP4430 due to missing CTI driver\n");
+> +		return 0;
+> +	}
+> +
+> +	if (of_have_populated_dt())
+> +		return 0;
+> +
+>  	/*
+>  	 * To create an ARM-PMU device the following HWMODs
+>  	 * are required for the various OMAP2+ devices.
+> @@ -76,9 +87,6 @@ static int __init omap_init_pmu(void)
+>  	if (cpu_is_omap443x()) {
+>  		oh_num = ARRAY_SIZE(omap4430_pmu_oh_names);
+>  		oh_names = omap4430_pmu_oh_names;
+> -		/* XXX Remove the next two lines when CTI driver available */
+> -		pr_info("ARM PMU: not yet supported on OMAP4430 due to missing CTI driver\n");
+> -		return 0;
+>  	} else if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+>  		oh_num = ARRAY_SIZE(omap3_pmu_oh_names);
+>  		oh_names = omap3_pmu_oh_names;
+> -- 
+> 1.7.10.4
 > 
-
-That also makes sense.
-
-> > 
-> > Maybe I've misunderstood how this is laid out, but I can't see where we get a
-> > cpus node from in the board's dts. Has this just been forgotten?
-> 
-> A cpus node isn't required if it doesn't provide any non-discoverable
-> information.
-> 
-
-Seeing the discussion around the Tegra #CPUs detection code, I'd think we
-should have one:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140209.html
-
-Thanks,
-Mark.
