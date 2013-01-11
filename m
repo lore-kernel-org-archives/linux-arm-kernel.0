@@ -1,50 +1,95 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 11 Jan 2013 14:07:57 -0500 (EST)
-Subject: [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface of
- a dying CPU is disabled
-In-Reply-To: <50F054E7.9000004@ti.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-9-git-send-email-nicolas.pitre@linaro.org>
- <50F054E7.9000004@ti.com>
-Message-ID: <alpine.LFD.2.02.1301111405590.6300@xanadu.home>
+From: mtosatti@redhat.com (Marcelo Tosatti)
+Date: Fri, 11 Jan 2013 16:39:07 -0200
+Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
+In-Reply-To: <709FA96C-A3EF-489C-B0E9-59EEA7F8E62F@virtualopensystems.com>
+References: <1357866627.27576.21@snotra>
+ <709FA96C-A3EF-489C-B0E9-59EEA7F8E62F@virtualopensystems.com>
+Message-ID: <20130111183907.GA15113@amt.cnet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
-
-> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> > Otherwise there might be some interrupts or IPIs becoming pending and the
-> > CPU will not enter low power mode when doing a WFI.  The effect of this
-> > is a CPU that loops back into the kernel, go through the first man
-> > election, signals itself as alive,  and prevent the cluster from being
-> > shut down.
-> > 
-> > This could benefit from a better solution.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> >   arch/arm/common/bL_platsmp.c        | 1 +
-> >   arch/arm/common/gic.c               | 6 ++++++
-> >   arch/arm/include/asm/hardware/gic.h | 2 ++
-> >   3 files changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
-> > index 0ae44123bf..6a3b251b97 100644
-> > --- a/arch/arm/common/bL_platsmp.c
-> > +++ b/arch/arm/common/bL_platsmp.c
-> > @@ -68,6 +68,7 @@ static void __ref bL_cpu_die(unsigned int cpu)
-> >   	pcpu = mpidr & 0xff;
-> >   	pcluster = (mpidr >> 8) & 0xff;
-> >   	bL_set_entry_vector(pcpu, pcluster, NULL);
-> > +	gic_cpu_if_down();
+On Fri, Jan 11, 2013 at 02:26:51AM -0500, Christoffer Dall wrote:
+> On 10/01/2013, at 20.10, Scott Wood <scottwood@freescale.com> wrote:
 > 
-> So for a case where CPU still don't power down for some reason even
-> after CPU interface is disabled, can not listen to and SGI or PPI.
-> Not sure if this happens on big.LITTLE but i have seen one such issue
-> on Cortex-A9 based SOC.
+> > On 01/10/2013 06:35:02 PM, Marcelo Tosatti wrote:
+> >> On Thu, Jan 10, 2013 at 04:40:12PM -0600, Scott Wood wrote:
+> >> > On 01/10/2013 04:28:01 PM, Marcelo Tosatti wrote:
+> >> > >Or just have KVM_SET_PPC_DEVICE_ADDRESS. Is there a downside to that?
+> >> >
+> >> > Besides the above, and my original complaint that it shouldn't be
+> >> > specific to addresses?
+> >> >
+> >> > -Scott
+> >> I did not really grasp that ('shouldnt be specific to addresses'), but
+> >> anyway.
+> > 
+> > A device may have other configuration parameters that need to be set,
+> > besides addresses.  PPC MPIC will require information about the vendor
+> > and version, for example.
+> > 
+> >> OK, can you write down your proposed improvements to the interface?
+> >> In case you have something ready, otherwise there is time pressure
+> >> to merge the ARM port.
+> > 
+> > My original request was just to change the name to something like
+> > KVM_SET_DEVICE_CONFIG or KVM_SET_DEVICE_ATTR, and not make the id
+> > encoding architecture-specific (preferably, separate into a "device id"
+> > field and an "attribute id" field rather than using bitfields).  Actual
+> > values for device id could be architecture-specific (or there could be a
+> > global enumeration), and attribute id values would be device-specific.
+> > 
+> > Alex suggested that an ideal interface might accept values larger than 64
+> > bits, though I think it's good enough -- there are currently no proposed
+> > uses that need more than 64 bits for a single attribute (unlike ONE_REG),
+> > and if it is needed, such configuration could be split up between
+> > multiple attributes, or the attribute could specify that "value" be a
+> > userspace pointer to the actual data (as with ONE_REG).
+> > 
+> > Here's a writeup (the ARM details would go under ARM/vGIC-specific
+> > documentation):
+> > 
+> > 4.80 KVM_SET_DEVICE_ATTR
+> > 
+> > Capability: KVM_CAP_SET_DEVICE_ATTR
+> > Type: vm ioctl
+> > Parameters: struct kvm_device_attr (in)
+> > Returns: 0 on success, -1 on error
+> > Errors:
+> >  ENODEV: The device id is unknown
+> >  ENXIO:  Device not supported on current system
+> >  Other errors may be returned by specific devices and attributes.
+> > 
+> > struct kvm_device_attr {
+> >    __u32 device;
+> >    __u32 attr;
+> >    __u64 value;
+> > };
+> > 
+> > Specify an attribute of a device emulated or directly exposed by the
+> > kernel, which the host kernel needs to know about.  The device field is an
+> > architecture-specific identifier for a specific device.  The attr field
+> > is a device-specific identifier for a specific attribute.  Individual
+> > attributes may have particular requirements for when they can and cannot
+> > be set.
+> > 
+> >> That is, if you have interest/energy to spend in a possibly reusable
+> >> interface, as long as that does not delay integration of the ARM code,
+> >> i don't think the ARM people will mind that.
+> > 
+> > The impression I've been given is that just about any change will delay
+> > the integration at this point.  If that's the case, and everyone's OK
+> > with having an interface that is deprecated on arrival, then fine.
+> 
+> 
+> That is not entirely the case, but there wasn't event agreement on this revised API, and we didn't want to wait for weeks until a decision was made. Alex suggested we use a DEV_REG API similar to the ONE_REG API, but I am quite strongly against having such an API for this specific purpose as it is too semantically distant to what we do on ARM. (Having a DEV_REG API for other purposes might be fine though). 
+> 
+> So I have no problem with your suggestion, although we could consider having a size and addr field in the struct instead and be slightly more extensible. But I don't feel strongly about it. 
+> 
+> If we can agree on Scott's suggestion or with my modification (Alex, Gleb, Marcelo ?) then I'll change the KVM/ARM patches to use this and resend them right away. But we have to agree now!
+> 
+> If not, I really think we should keep things as they are now, as we're really discussing idealistic scenarios here, and the ARM patches have been out of tree for long enough. As Marcelo pointed out, the benefits of the perfect API are really minimal.
+> 
+> -Christoffer--
 
-Here the problem was the reverse i.e. a CPU wouldn't go down because 
-some pending SGIs prevented that.
-
-
-Nicolas
+Can you make KVM_SET_ARM_DEVICE address extensible? 
+Add some reserved space and a flags field.
