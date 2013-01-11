@@ -1,96 +1,83 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 11 Jan 2013 10:03:10 +0000
-Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
-In-Reply-To: <alpine.LFD.2.02.1301101115350.6300@xanadu.home>
-References: <1357818507-8716-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130110121514.GD29952@linaro.org>
- <20130110123321.GD4728@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.02.1301101115350.6300@xanadu.home>
-Message-ID: <20130111100309.GB30538@e102568-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Jan 2013 10:04:07 +0000
+Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
+In-Reply-To: <87d2xcfeew.fsf@xmission.com>
+References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
+ <50E4C9C6.20609@codeaurora.org>
+ <20130103120259.GB5193@mudshark.cambridge.arm.com>
+ <20130103122100.GN2631@n2100.arm.linux.org.uk>
+ <50E5E967.3020805@wwwdotorg.org>
+ <20130106162200.GC11025@mudshark.cambridge.arm.com>
+ <20130106164033.GA3222@n2100.arm.linux.org.uk> <87ehhxahd1.fsf@xmission.com>
+ <20130107144812.GD3222@n2100.arm.linux.org.uk> <87d2xcfeew.fsf@xmission.com>
+Message-ID: <20130111100407.GB30875@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 04:16:43PM +0000, Nicolas Pitre wrote:
-> On Thu, 10 Jan 2013, Lorenzo Pieralisi wrote:
+On Thu, Jan 10, 2013 at 09:59:35PM -0800, Eric W. Biederman wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 > 
-> > On Thu, Jan 10, 2013 at 12:15:14PM +0000, Dave Martin wrote:
-> > > On Thu, Jan 10, 2013 at 11:48:27AM +0000, Lorenzo Pieralisi wrote:
-> > > > Since the introduction of /cpu nodes bindings for ARM and the
-> > > > corresponding parse function arm_dt_init_cpu_maps(), the cpu_logical_map
-> > > > and the number of possible CPUs are set according to the DT /cpu
-> > > > nodes entries. Currently most of the existing ARM SMP platforms detect the
-> > > > number of cores through HW probing in their .smp_init_cpus functions and set
-> > > > the possible CPU mask accordingly.
-> > > > This method should be upgraded so that the CPU counting mechanism will be
-> > > > based on DT, keeping legacy HW probing mechanism as a fall back solution.
-> > > > 
-> > > > In order to implement this fall back solution mechanism, the ARM DT code
-> > > > should provide a helper function to platforms to check if the cpu map
-> > > > has been properly initialized through DT. If the check fails the
-> > > > platform will resort to legacy HW based cores counting mechanism.
-> > > > 
-> > > > This patch implements a trivial flag and a helper function that platform
-> > > > can call to check whether DT based cpu map initialization and cores count
-> > > > were completed successfully.
-> > > > 
-> > > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > > ---
-> > > >  arch/arm/include/asm/prom.h | 10 ++++++++++
-> > > >  arch/arm/kernel/devtree.c   |  5 +++++
-> > > >  2 files changed, 15 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-> > > > index a219227..487614a 100644
-> > > > --- a/arch/arm/include/asm/prom.h
-> > > > +++ b/arch/arm/include/asm/prom.h
-> > > > @@ -18,6 +18,15 @@
-> > > >  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
-> > > >  extern void arm_dt_memblock_reserve(void);
-> > > >  extern void __init arm_dt_init_cpu_maps(void);
-> > > > +/*
-> > > > + * Return true if cpu map initialization has been
-> > > > + * carried out correctly from DT
-> > > > + */
-> > > > +static inline bool __init arm_dt_cpu_map_valid(void)
-> > > > +{
-> > > > +	extern bool valid_dt_cpu_map;
-> > > > +	return valid_dt_cpu_map;
-> > > > +}
-> > > >  
-> > > >  #else /* CONFIG_OF */
-> > > >  
-> > > > @@ -28,6 +37,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
-> > > >  
-> > > >  static inline void arm_dt_memblock_reserve(void) { }
-> > > >  static inline void arm_dt_init_cpu_maps(void) { }
-> > > > +static inline bool __init arm_dt_cpu_map_valid(void) { return false; }
-> > > >  
-> > > >  #endif /* CONFIG_OF */
-> > > >  #endif /* ASMARM_PROM_H */
-> > > > diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> > > > index 70f1bde..c82af3b 100644
-> > > > --- a/arch/arm/kernel/devtree.c
-> > > > +++ b/arch/arm/kernel/devtree.c
-> > > > @@ -62,6 +62,10 @@ void __init arm_dt_memblock_reserve(void)
-> > > >  		memblock_reserve(base, size);
-> > > >  	}
-> > > >  }
-> > > > +/*
-> > > > + * Export DT cpu map validity flag to platforms
-> > > > + */
-> > > > +bool valid_dt_cpu_map __initdata;
-> > > 
-> > > Is there any possibility of this being useful after boot?
-> > > Hopefully not, but maybe there's something I haven't considered.
-> > 
-> > I do not think so, at least for the use cases I have envisaged at the moment,
-> > but it is certainly something I should consider.
+> > On Sun, Jan 06, 2013 at 05:53:30PM -0800, Eric W. Biederman wrote:
+> >> I have cleaned up the mess that is the reboot path once a bunch of years
+> >> ago, and apparently it is deteriorating again.
+> >
+> > Unfortunately, that's what happens when lots of cooks get their fingers
+> > in a pie with no coordination.  This is why having maintainers is soo
+> > important for code - a good maintainer ensures that the code remains
+> > high quality by whatever means.
+> >
+> > Code without maintainers is subject to modification in all kinds of
+> > random ways, including duplicating code amongst architectures which
+> > should be generic code - that happens because no one wants to understand
+> > what other architectures require.
 > 
-> Let's simply adjust the code in the future if that ever becomes the 
-> case.
+> I don't think you meant to but I have been rather strongly insulted.
 
-I will check against cpu_possible_mask, that will solve the problem and
-avoid this niggle.
+Why would you be insulted by the above?  It's a statement of fact that
+is true for anything.  Ever heard of the expression "Too many cooks
+spoil the broth" ?  Does that expression insult you too?
 
-Thanks,
-Lorenzo
+You've admitted that you don't have time to look at the shutdown/reboot
+paths very much, so they are by way of that fact lacking in maintainer
+input - but if you read the rest of what I wrote, I also commented that
+they were still in pretty good shape inspite of that.
+
+So actually, there's a complement there.  Shame you missed it.
+
+> Now sometimes_dangerously_hotunplug_all_but_one_cpu() on the reboot path 
+> was added just a few months ago in Oct 2012, and it appears to due to
+> weird ARM maintainership.
+
+Err.  No.  Stop trying to accuse people of being crap when there's no
+evidence:
+
+commit f96972f2dc6365421cf2366ebd61ee4cf060c8d5
+Author: Shawn Guo <shawn.guo@linaro.org>
+Date:   Thu Oct 4 17:12:23 2012 -0700
+
+    kernel/sys.c: call disable_nonboot_cpus() in kernel_restart()
+...
+    Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+    Cc: <stable@vger.kernel.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+No ARM maintainers were involved in that change.  I just checked my
+mailboxes for September 2012 which is when it was mailed to the list.
+It got missed, and Andrew replied and accepted the patch (as is
+illustrated by the sign-offs).  And even if _I_ had been involved with
+it, _I_ would not have spotted the x86 behaviour, just the same that
+Andrew didn't.
+
+Is this not itself evidence of my comment above: had the above change
+gone through someone who had a deep understanding of that code - iow,
+a maintainer, it probably would not have been committed to the kernel?
+
+To accuse others who have nothing to do with the area, and weren't
+involved with the change in any way of being responsible for that
+change is... well... I don't think there's anything that can be said
+to that which isn't inflamatory.
+
+It seems that, given your comments, the above commit needs to be reverted,
+and then _maybe_ the disable_nonboot_cpus() call should be added to ARMs
+machine_shutdown() instead.
