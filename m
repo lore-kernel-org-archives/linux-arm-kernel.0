@@ -1,32 +1,55 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 11 Jan 2013 01:05:34 +0100
-Subject: [RFC 0/4] TI LCDC DRM driver
-In-Reply-To: <CAPM=9tzZiQuVNdNhm9=iNWqAwk+uZRh0_YC3QLkyZbne5dfeyg@mail.gmail.com>
-References: <1357704685-3600-1-git-send-email-robdclark@gmail.com>
- <CAPM=9tzZiQuVNdNhm9=iNWqAwk+uZRh0_YC3QLkyZbne5dfeyg@mail.gmail.com>
-Message-ID: <1782274.DIo8UG5duX@avalon>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 10 Jan 2013 17:06:48 -0700
+Subject: [PATCH 01/14] of/pci: Provide support for parsing PCI DT ranges
+ property
+In-Reply-To: <1357764194-12677-2-git-send-email-thierry.reding@avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <1357764194-12677-2-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <50EF5798.6040405@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 January 2013 10:16:10 Dave Airlie wrote:
-> On Wed, Jan 9, 2013 at 2:11 PM, Rob Clark <robdclark@gmail.com> wrote:
-> > Updated version of DRM driver for TI LCD Controller.  Since the initial
-> > version of the patch, which only supported TFP410 DVI output, I've added
-> > an output driver for LCD panels (for example, LCD3 or LCD7 cape for the
-> > beagle-bone), and initial support for HDMI output via NXP TDA19988 HDMI
-> > encoder (via i2c encoder-slave output driver).
-> > 
-> > At this point, I think the basic lcdc drm driver plus TFP410 DVI output
-> > (first patch) is in reasonable shape (barring potential rename, if lcdc
-> > is too generic of a name... but I was not feeling creative enough yet to
-> > pick a new name).
+On 01/09/2013 01:43 PM, Thierry Reding wrote:
+> From: Andrew Murray <andrew.murray@arm.com>
 > 
-> I'd like at least tilcdc :-)
+> DT bindings for PCI host bridges often use the ranges property to describe
+> memory and IO ranges - this binding tends to be the same across architectures
+> yet several parsing implementations exist, e.g. arch/mips/pci/pci.c,
+> arch/powerpc/kernel/pci-common.c, arch/sparc/kernel/pci.c and
+> arch/microblaze/pci/pci-common.c (clone of PPC). Some of these duplicate
+> functionality provided by drivers/of/address.c.
+> 
+> This patch provides a common iterator-based parser for the ranges property, it
+> is hoped this will reduce DT representation differences between architectures
+> and that architectures will migrate in part to this new parser.
+...
 
-So do I :-) The Renesas LCD controller is also called LCDC, and they called 
-the fbdev driver sh_mobile_lcdcfb. tilcdc isn't *that* long in comparison :-)
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
 
--- 
-Regards,
+> +const __be32 *of_pci_process_ranges(struct device_node *node,
 
-Laurent Pinchart
+> +	while (from + np <= end) {
+> +		u64 cpu_addr, size;
+> +
+> +		cpu_addr = of_translate_address(node, from + na);
+> +		size = of_read_number(from + na + pna, ns);
+> +		res->flags = bus->get_flags(from);
+> +		from += np;
+> +
+> +		if (cpu_addr == OF_BAD_ADDR || size == 0)
+> +			continue;
+
+Hmmm. That seems to just ignore bad entries in the ranges property. Is
+that really the right thing to do? At least printing a diagnostic might
+be a good idea, even if the code does just soldier on in the hope
+everything still works.
+
+> +		res->name = node->full_name;
+> +		res->start = cpu_addr;
+> +		res->end = res->start + size - 1;
+> +		res->parent = res->child = res->sibling = NULL;
+> +		return from;
+> +	}
+> +
+> +	return NULL;
+> +}
