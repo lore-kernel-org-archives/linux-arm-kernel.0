@@ -1,22 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jan 2013 16:30:57 +0000
-Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
-In-Reply-To: <1357921058-11322-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1357921058-11322-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130111163057.GE23505@n2100.arm.linux.org.uk>
+Date: Fri, 11 Jan 2013 16:32:55 +0000
+Subject: [PATCH 07/14] usb: ehci-omap: Instantiate PHY devices if required
+In-Reply-To: <50F037C9.40306@ti.com>
+References: <Pine.LNX.4.44L0.1301111019340.1730-100000@iolanthe.rowland.org>
+ <50F037C9.40306@ti.com>
+Message-ID: <20130111163255.GF23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 04:17:38PM +0000, Lorenzo Pieralisi wrote:
-> This patch implements a helper function that platforms can call to check
-> whether DT based cpu map initialization and cores count were completed
-> successfully.
+On Fri, Jan 11, 2013 at 06:03:21PM +0200, Roger Quadros wrote:
+> diff --git a/include/linux/platform_data/usb-omap.h
+> b/include/linux/platform_data/usb-omap.h
+> index d63eb7d..927b8a1 100644
+> --- a/include/linux/platform_data/usb-omap.h
+> +++ b/include/linux/platform_data/usb-omap.h
+> @@ -38,6 +38,12 @@ enum usbhs_omap_port_mode {
+>  	OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM
+>  };
+> 
+> +struct usbhs_phy_config {
+> +	char *name;		/* binds to device driver */
 
-Umm, are you sure this works?  Two problems here:
-- the kernel boot marks the booting CPU (in our case, CPU0) as present,
-  possible and online before arch code gets called.  smp_init_cpus()
-  will be called with the maps already initialized per that.
-
-- this really needs to be paired with a patch showing how you intend it
-  to be used; merely adding the helper without any sign of it being used
-  means it's just bloat which may not end up being used.
+You may wish to consider making this const.
