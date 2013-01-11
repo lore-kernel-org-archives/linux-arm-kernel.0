@@ -1,119 +1,403 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 11 Jan 2013 13:31:29 +0530
-Subject: [PATCH v2 10/10] clk: tegra30: remove unused TEGRA_CLK_DUPLICATE()s
-In-Reply-To: <1357891289-23500-1-git-send-email-pgaikwad@nvidia.com>
-References: <1357891289-23500-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <1357891289-23500-10-git-send-email-pgaikwad@nvidia.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 11 Jan 2013 13:38:58 +0530
+Subject: [PATCH] usb: phy: samsung: Add support to set pmu isolation
+Message-ID: <1357891738-26259-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device tree support added for Tegra clocks look up is done from
-device tree, remove unused TEGRA_CLK_DUPLICATE()s.
+Adding support to parse device node data in order to get
+required properties to set pmu isolation for usb-phy.
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 ---
- drivers/clk/tegra/clk-tegra30.c |   70 ---------------------------------------
- 1 files changed, 0 insertions(+), 70 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-index 987312c..6d1ff86 100644
---- a/drivers/clk/tegra/clk-tegra30.c
-+++ b/drivers/clk/tegra/clk-tegra30.c
-@@ -1642,41 +1642,6 @@ static void __init tegra30_periph_clk_init(void)
- 	clk_register_clkdev(clk, "emc", NULL);
- 	clks[emc] = clk;
+Changes from v5:
+ - Using a global spin_lock member in 'samsung_usbphy' structure to be
+   used in samsung_usbphy_init() and samsung_usbphy_shutdown()
+   to take care of all register initialization sequence.
+ - Addressing few nits:
+        - Using devphy_reg_offset instead of 'pmureg_devphy_offset'
+        - Using if else block instead of ternary conditional statement
+          in samsung_usbphy_set_isolation()
+	- Using 'bool' type instead of 'int' for 'on' argument in
+	  samsung_usbphy_set_isolation()
+        - Amending few comments.
+
+ .../devicetree/bindings/usb/samsung-usbphy.txt     |   36 +++++
+ drivers/usb/phy/samsung-usbphy.c                   |  161 +++++++++++++++++---
+ 2 files changed, 175 insertions(+), 22 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+index 7b26e2d..22d06cf 100644
+--- a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
++++ b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+@@ -9,3 +9,39 @@ Required properties:
+ - compatible : should be "samsung,exynos4210-usbphy"
+ - reg : base physical address of the phy registers and length of memory mapped
+ 	region.
++
++Optional properties:
++- #address-cells: should be '1' when usbphy node has a child node with 'reg'
++		  property.
++- #size-cells: should be '1' when usbphy node has a child node with 'reg'
++	       property.
++- ranges: allows valid translation between child's address space and parent's
++	  address space.
++
++- The child node 'usbphy-sys' to the node 'usbphy' is for the system controller
++  interface for usb-phy. It should provide the following information required by
++  usb-phy controller to control phy.
++  - reg : base physical address of PHY_CONTROL registers.
++	  The size of this register is the total sum of size of all PHY_CONTROL
++	  registers that the SoC has. For example, the size will be
++	  '0x4' in case we have only one PHY_CONTROL register (e.g.
++	  OTHERS register in S3C64XX or USB_PHY_CONTROL register in S5PV210)
++	  and, '0x8' in case we have two PHY_CONTROL registers (e.g.
++	  USBDEVICE_PHY_CONTROL and USBHOST_PHY_CONTROL registers in exynos4x).
++	  and so on.
++
++Example:
++ - Exynos4210
++
++	usbphy at 125B0000 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "samsung,exynos4210-usbphy";
++		reg = <0x125B0000 0x100>;
++		ranges;
++
++		usbphy-sys {
++			/* USB device and host PHY_CONTROL registers */
++			reg = <0x10020704 0x8>;
++		};
++	};
+diff --git a/drivers/usb/phy/samsung-usbphy.c b/drivers/usb/phy/samsung-usbphy.c
+index 5c5e1bb5..7eec7c3 100644
+--- a/drivers/usb/phy/samsung-usbphy.c
++++ b/drivers/usb/phy/samsung-usbphy.c
+@@ -24,6 +24,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/usb/otg.h>
+ #include <linux/platform_data/samsung-usbphy.h>
  
--	/* i2c1-fast */
--	clk = clk_register_fixed_factor(NULL, "i2c1-fast", "pll_p_out3",
--					CLK_SET_RATE_PARENT, 1, 1);
--	clk_register_clkdev(clk, "fast-clk", "tegra-i2c.0");
--
--	/* i2c2-fast */
--	clk = clk_register_fixed_factor(NULL, "i2c2-fast", "pll_p_out3",
--					CLK_SET_RATE_PARENT, 1, 1);
--	clk_register_clkdev(clk, "fast-clk", "tegra-i2c.1");
--
--	/* i2c3-fast */
--	clk = clk_register_fixed_factor(NULL, "i2c3-fast", "pll_p_out3",
--					CLK_SET_RATE_PARENT, 1, 1);
--	clk_register_clkdev(clk, "fast-clk", "tegra-i2c.2");
--
--	/* i2c4-fast */
--	clk = clk_register_fixed_factor(NULL, "i2c4-fast", "pll_p_out3",
--					CLK_SET_RATE_PARENT, 1, 1);
--	clk_register_clkdev(clk, "fast-clk", "tegra-i2c.3");
--
--	/* i2c5-fast */
--	clk = clk_register_fixed_factor(NULL, "i2c5-fast", "pll_p_out3",
--					CLK_SET_RATE_PARENT, 1, 1);
--	clk_register_clkdev(clk, "fast-clk", "tegra-i2c.5");
--
--	/* dsi1-fixed */
--	clk = clk_register_fixed_factor(NULL, "dsi1-fixed", "pll_p_out3",
--					CLK_SET_RATE_PARENT, 1, 1);
--	clk_register_clkdev(clk, "dsi-fixed", "tegradc.0");
--
--	/* dsi2-fixed */
--	clk = clk_register_fixed_factor(NULL, "dsi2-fixed", "pll_p_out3",
--					CLK_SET_RATE_PARENT, 1, 1);
--	clk_register_clkdev(clk, "dsi-fixed", "tegradc.1");
--
- 	for (i = 0; i < ARRAY_SIZE(tegra_periph_clk_list); i++) {
- 		data = &tegra_periph_clk_list[i];
- 		clk = tegra_clk_periph(data->name, data->parent_names,
-@@ -1935,19 +1900,9 @@ static __initdata struct tegra_clk_init_table init_table[] = {
-  * table under two names.
-  */
- static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
--	TEGRA_CLK_DUPLICATE(uarta,  "serial8250.0", NULL),
--	TEGRA_CLK_DUPLICATE(uartb,  "serial8250.1", NULL),
--	TEGRA_CLK_DUPLICATE(uartc,  "serial8250.2", NULL),
--	TEGRA_CLK_DUPLICATE(uartd,  "serial8250.3", NULL),
--	TEGRA_CLK_DUPLICATE(uarte,  "serial8250.4", NULL),
- 	TEGRA_CLK_DUPLICATE(usbd, "utmip-pad", NULL),
- 	TEGRA_CLK_DUPLICATE(usbd, "tegra-ehci.0", NULL),
- 	TEGRA_CLK_DUPLICATE(usbd, "tegra-otg", NULL),
--	TEGRA_CLK_DUPLICATE(pll_p, "tegradc.0", "parent"),
--	TEGRA_CLK_DUPLICATE(pll_p, "tegradc.1", "parent"),
--	TEGRA_CLK_DUPLICATE(pll_d2_out0, "hdmi", "parent"),
--	TEGRA_CLK_DUPLICATE(dsib, "tegradc.0", "dsib"),
--	TEGRA_CLK_DUPLICATE(dsia, "tegradc.1", "dsia"),
- 	TEGRA_CLK_DUPLICATE(bsev, "tegra-avp", "bsev"),
- 	TEGRA_CLK_DUPLICATE(bsev, "nvavp", "bsev"),
- 	TEGRA_CLK_DUPLICATE(vde, "tegra-aes", "vde"),
-@@ -1956,33 +1911,8 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
- 	TEGRA_CLK_DUPLICATE(cml1, "tegra_sata_cml", NULL),
- 	TEGRA_CLK_DUPLICATE(cml0, "tegra_pcie", "cml"),
- 	TEGRA_CLK_DUPLICATE(pciex, "tegra_pcie", "pciex"),
--	TEGRA_CLK_DUPLICATE(i2c1, "tegra-i2c-slave.0", NULL),
--	TEGRA_CLK_DUPLICATE(i2c2, "tegra-i2c-slave.1", NULL),
--	TEGRA_CLK_DUPLICATE(i2c3, "tegra-i2c-slave.2", NULL),
--	TEGRA_CLK_DUPLICATE(i2c4, "tegra-i2c-slave.3", NULL),
--	TEGRA_CLK_DUPLICATE(i2c5, "tegra-i2c-slave.4", NULL),
--	TEGRA_CLK_DUPLICATE(sbc1, "spi_slave_tegra.0", NULL),
--	TEGRA_CLK_DUPLICATE(sbc2, "spi_slave_tegra.1", NULL),
--	TEGRA_CLK_DUPLICATE(sbc3, "spi_slave_tegra.2", NULL),
--	TEGRA_CLK_DUPLICATE(sbc4, "spi_slave_tegra.3", NULL),
--	TEGRA_CLK_DUPLICATE(sbc5, "spi_slave_tegra.4", NULL),
--	TEGRA_CLK_DUPLICATE(sbc6, "spi_slave_tegra.5", NULL),
- 	TEGRA_CLK_DUPLICATE(twd, "smp_twd", NULL),
- 	TEGRA_CLK_DUPLICATE(vcp, "nvavp", "vcp"),
--	TEGRA_CLK_DUPLICATE(i2s0, NULL, "i2s0"),
--	TEGRA_CLK_DUPLICATE(i2s1, NULL, "i2s1"),
--	TEGRA_CLK_DUPLICATE(i2s2, NULL, "i2s2"),
--	TEGRA_CLK_DUPLICATE(i2s3, NULL, "i2s3"),
--	TEGRA_CLK_DUPLICATE(i2s4, NULL, "i2s4"),
--	TEGRA_CLK_DUPLICATE(dam0, NULL, "dam0"),
--	TEGRA_CLK_DUPLICATE(dam1, NULL, "dam1"),
--	TEGRA_CLK_DUPLICATE(dam2, NULL, "dam2"),
--	TEGRA_CLK_DUPLICATE(spdif_in, NULL, "spdif_in"),
--	TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.0", "fast-clk"),
--	TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.1", "fast-clk"),
--	TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.2", "fast-clk"),
--	TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.3", "fast-clk"),
--	TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.4", "fast-clk"),
- 	TEGRA_CLK_DUPLICATE(clk_max, NULL, NULL), /* MUST be the last entry */
+@@ -60,20 +61,46 @@
+ #define MHZ (1000*1000)
+ #endif
+ 
++#define S3C64XX_USBPHY_ENABLE			(0x1 << 16)
++#define EXYNOS_USBPHY_ENABLE			(0x1 << 0)
++
+ enum samsung_cpu_type {
+ 	TYPE_S3C64XX,
+ 	TYPE_EXYNOS4210,
  };
  
+ /*
++ * struct samsung_usbphy_drvdata - driver data for various SoC variants
++ * @cpu_type: machine identifier
++ * @devphy_en_mask: device phy enable mask for PHY CONTROL register
++ * @devphy_reg_offset: offset to DEVICE PHY CONTROL register from
++ *		       mapped address of system controller.
++ *
++ *	Here we have a separate mask for device type phy.
++ *	Having different masks for host and device type phy helps
++ *	in setting independent masks in case of SoCs like S5PV210,
++ *	in which PHY0 and PHY1 enable bits belong to same register
++ *	placed at position 0 and 1 respectively.
++ *	Although for newer SoCs like exynos these bits belong to
++ *	different registers altogether placed@position 0.
++ */
++struct samsung_usbphy_drvdata {
++	int cpu_type;
++	int devphy_en_mask;
++	u32 devphy_reg_offset;
++};
++
++/*
+  * struct samsung_usbphy - transceiver driver state
+  * @phy: transceiver structure
+  * @plat: platform data
+  * @dev: The parent device supplied to the probe function
+  * @clk: usb phy clock
+- * @regs: usb phy register memory base
++ * @regs: usb phy controller registers memory base
++ * @pmuregs: USB device PHY_CONTROL register memory base
+  * @ref_clk_freq: reference clock frequency selection
+- * @cpu_type: machine identifier
++ * @drv_data: driver data available for different SoCs
++ * @lock: lock for phy operations
+  */
+ struct samsung_usbphy {
+ 	struct usb_phy	phy;
+@@ -81,12 +108,64 @@ struct samsung_usbphy {
+ 	struct device	*dev;
+ 	struct clk	*clk;
+ 	void __iomem	*regs;
++	void __iomem	*pmuregs;
+ 	int		ref_clk_freq;
+-	int		cpu_type;
++	const struct samsung_usbphy_drvdata *drv_data;
++	spinlock_t	lock;
+ };
+ 
+ #define phy_to_sphy(x)		container_of((x), struct samsung_usbphy, phy)
+ 
++static int samsung_usbphy_parse_dt(struct samsung_usbphy *sphy)
++{
++	struct device_node *usbphy_sys;
++
++	/* Getting node for system controller interface for usb-phy */
++	usbphy_sys = of_get_child_by_name(sphy->dev->of_node, "usbphy-sys");
++	if (!usbphy_sys)
++		dev_warn(sphy->dev, "No sys-controller interface for usb-phy\n");
++
++	sphy->pmuregs = of_iomap(usbphy_sys, 0);
++
++	of_node_put(usbphy_sys);
++
++	if (sphy->pmuregs == NULL) {
++		dev_err(sphy->dev, "Can't get usb-phy pmu control register\n");
++		return -ENODEV;
++	}
++
++	return 0;
++}
++
++/*
++ * Set isolation here for phy.
++ * Here 'on = true' would mean USB PHY block is isolated, hence
++ * de-activated and vice-versa.
++ */
++static void samsung_usbphy_set_isolation(struct samsung_usbphy *sphy, bool on)
++{
++	void __iomem *reg;
++	u32 reg_val;
++	u32 en_mask;
++
++	if (!sphy->pmuregs) {
++		dev_warn(sphy->dev, "Can't set pmu isolation\n");
++		return;
++	}
++
++	reg = sphy->pmuregs + sphy->drv_data->devphy_reg_offset;
++	en_mask = sphy->drv_data->devphy_en_mask;
++
++	reg_val = readl(reg);
++
++	if (on)
++		reg_val &= ~en_mask;
++	else
++		reg_val |= en_mask;
++
++	writel(reg_val, reg);
++}
++
+ /*
+  * Returns reference clock frequency selection value
+  */
+@@ -112,7 +191,7 @@ static int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
+ 		refclk_freq = PHYCLK_CLKSEL_48M;
+ 		break;
+ 	default:
+-		if (sphy->cpu_type == TYPE_S3C64XX)
++		if (sphy->drv_data->cpu_type == TYPE_S3C64XX)
+ 			refclk_freq = PHYCLK_CLKSEL_48M;
+ 		else
+ 			refclk_freq = PHYCLK_CLKSEL_24M;
+@@ -135,7 +214,7 @@ static void samsung_usbphy_enable(struct samsung_usbphy *sphy)
+ 	phypwr = readl(regs + SAMSUNG_PHYPWR);
+ 	rstcon = readl(regs + SAMSUNG_RSTCON);
+ 
+-	switch (sphy->cpu_type) {
++	switch (sphy->drv_data->cpu_type) {
+ 	case TYPE_S3C64XX:
+ 		phyclk &= ~PHYCLK_COMMON_ON_N;
+ 		phypwr &= ~PHYPWR_NORMAL_MASK;
+@@ -165,7 +244,7 @@ static void samsung_usbphy_disable(struct samsung_usbphy *sphy)
+ 
+ 	phypwr = readl(regs + SAMSUNG_PHYPWR);
+ 
+-	switch (sphy->cpu_type) {
++	switch (sphy->drv_data->cpu_type) {
+ 	case TYPE_S3C64XX:
+ 		phypwr |= PHYPWR_NORMAL_MASK;
+ 		break;
+@@ -185,6 +264,7 @@ static void samsung_usbphy_disable(struct samsung_usbphy *sphy)
+ static int samsung_usbphy_init(struct usb_phy *phy)
+ {
+ 	struct samsung_usbphy *sphy;
++	unsigned long flags;
+ 	int ret = 0;
+ 
+ 	sphy = phy_to_sphy(phy);
+@@ -196,13 +276,19 @@ static int samsung_usbphy_init(struct usb_phy *phy)
+ 		return ret;
+ 	}
+ 
++	spin_lock_irqsave(&sphy->lock, flags);
++
+ 	/* Disable phy isolation */
+ 	if (sphy->plat && sphy->plat->pmu_isolation)
+ 		sphy->plat->pmu_isolation(false);
++	else
++		samsung_usbphy_set_isolation(sphy, false);
+ 
+ 	/* Initialize usb phy registers */
+ 	samsung_usbphy_enable(sphy);
+ 
++	spin_unlock_irqrestore(&sphy->lock, flags);
++
+ 	/* Disable the phy clock */
+ 	clk_disable_unprepare(sphy->clk);
+ 	return ret;
+@@ -214,6 +300,7 @@ static int samsung_usbphy_init(struct usb_phy *phy)
+ static void samsung_usbphy_shutdown(struct usb_phy *phy)
+ {
+ 	struct samsung_usbphy *sphy;
++	unsigned long flags;
+ 
+ 	sphy = phy_to_sphy(phy);
+ 
+@@ -222,44 +309,47 @@ static void samsung_usbphy_shutdown(struct usb_phy *phy)
+ 		return;
+ 	}
+ 
++	spin_lock_irqsave(&sphy->lock, flags);
++
+ 	/* De-initialize usb phy registers */
+ 	samsung_usbphy_disable(sphy);
+ 
+ 	/* Enable phy isolation */
+ 	if (sphy->plat && sphy->plat->pmu_isolation)
+ 		sphy->plat->pmu_isolation(true);
++	else
++		samsung_usbphy_set_isolation(sphy, true);
++
++	spin_unlock_irqrestore(&sphy->lock, flags);
+ 
+ 	clk_disable_unprepare(sphy->clk);
+ }
+ 
+ static const struct of_device_id samsung_usbphy_dt_match[];
+ 
+-static inline int samsung_usbphy_get_driver_data(struct platform_device *pdev)
++static inline const struct samsung_usbphy_drvdata
++*samsung_usbphy_get_driver_data(struct platform_device *pdev)
+ {
+ 	if (pdev->dev.of_node) {
+ 		const struct of_device_id *match;
+ 		match = of_match_node(samsung_usbphy_dt_match,
+ 							pdev->dev.of_node);
+-		return (int) match->data;
++		return match->data;
+ 	}
+ 
+-	return platform_get_device_id(pdev)->driver_data;
++	return (struct samsung_usbphy_drvdata *)
++				platform_get_device_id(pdev)->driver_data;
+ }
+ 
+ static int __devinit samsung_usbphy_probe(struct platform_device *pdev)
+ {
+ 	struct samsung_usbphy *sphy;
+-	struct samsung_usbphy_data *pdata;
++	struct samsung_usbphy_data *pdata = pdev->dev.platform_data;
+ 	struct device *dev = &pdev->dev;
+ 	struct resource *phy_mem;
+ 	void __iomem	*phy_base;
+ 	struct clk *clk;
+-
+-	pdata = pdev->dev.platform_data;
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "%s: no platform data defined\n", __func__);
+-		return -EINVAL;
+-	}
++	int ret;
+ 
+ 	phy_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!phy_mem) {
+@@ -283,7 +373,19 @@ static int __devinit samsung_usbphy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(clk);
+ 	}
+ 
+-	sphy->dev		= &pdev->dev;
++	sphy->dev = dev;
++
++	if (dev->of_node) {
++		ret = samsung_usbphy_parse_dt(sphy);
++		if (ret < 0)
++			return ret;
++	} else {
++		if (!pdata) {
++			dev_err(dev, "no platform data specified\n");
++			return -EINVAL;
++		}
++	}
++
+ 	sphy->plat		= pdata;
+ 	sphy->regs		= phy_base;
+ 	sphy->clk		= clk;
+@@ -291,9 +393,11 @@ static int __devinit samsung_usbphy_probe(struct platform_device *pdev)
+ 	sphy->phy.label		= "samsung-usbphy";
+ 	sphy->phy.init		= samsung_usbphy_init;
+ 	sphy->phy.shutdown	= samsung_usbphy_shutdown;
+-	sphy->cpu_type		= samsung_usbphy_get_driver_data(pdev);
++	sphy->drv_data		= samsung_usbphy_get_driver_data(pdev);
+ 	sphy->ref_clk_freq	= samsung_usbphy_get_refclk_freq(sphy);
+ 
++	spin_lock_init(&sphy->lock);
++
+ 	platform_set_drvdata(pdev, sphy);
+ 
+ 	return usb_add_phy(&sphy->phy, USB_PHY_TYPE_USB2);
+@@ -305,17 +409,30 @@ static int __exit samsung_usbphy_remove(struct platform_device *pdev)
+ 
+ 	usb_remove_phy(&sphy->phy);
+ 
++	if (sphy->pmuregs)
++		iounmap(sphy->pmuregs);
++
+ 	return 0;
+ }
+ 
++static const struct samsung_usbphy_drvdata usbphy_s3c64xx = {
++	.cpu_type		= TYPE_S3C64XX,
++	.devphy_en_mask		= S3C64XX_USBPHY_ENABLE,
++};
++
++static const struct samsung_usbphy_drvdata usbphy_exynos4 = {
++	.cpu_type		= TYPE_EXYNOS4210,
++	.devphy_en_mask		= EXYNOS_USBPHY_ENABLE,
++};
++
+ #ifdef CONFIG_OF
+ static const struct of_device_id samsung_usbphy_dt_match[] = {
+ 	{
+ 		.compatible = "samsung,s3c64xx-usbphy",
+-		.data = (void *)TYPE_S3C64XX,
++		.data = &usbphy_s3c64xx,
+ 	}, {
+ 		.compatible = "samsung,exynos4210-usbphy",
+-		.data = (void *)TYPE_EXYNOS4210,
++		.data = &usbphy_exynos4,
+ 	},
+ 	{},
+ };
+@@ -325,10 +442,10 @@ MODULE_DEVICE_TABLE(of, samsung_usbphy_dt_match);
+ static struct platform_device_id samsung_usbphy_driver_ids[] = {
+ 	{
+ 		.name		= "s3c64xx-usbphy",
+-		.driver_data	= TYPE_S3C64XX,
++		.driver_data	= (unsigned long)&usbphy_s3c64xx,
+ 	}, {
+ 		.name		= "exynos4210-usbphy",
+-		.driver_data	= TYPE_EXYNOS4210,
++		.driver_data	= (unsigned long)&usbphy_exynos4,
+ 	},
+ 	{},
+ };
 -- 
-1.7.4.1
+1.7.6.5
