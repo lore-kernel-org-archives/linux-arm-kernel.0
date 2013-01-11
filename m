@@ -1,40 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 11 Jan 2013 16:17:03 +0900
-Subject: [PATCH 2/5] ARM: mach-shmobile: fix memory size for kota2_defconfig
+Date: Fri, 11 Jan 2013 16:17:04 +0900
+Subject: [PATCH 3/5] ARM: mach-shmobile: kzm9g: defconfig update
 In-Reply-To: <1357888626-4946-1-git-send-email-horms+renesas@verge.net.au>
 References: <1357888626-4946-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1357888626-4946-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1357888626-4946-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CONFIG_MEMORY_SIZE value is interpreted as a 32 bit integer, which
-makes sense on a system without PAE. It appears that a trailing 0 was
-appended to the value and after some testing it appears that 0x1e000000 is
-the correct value.
+* Enable ARM_APPENDED_DTB
 
-Without this patch, building kota2_defconfig results in:
+  Typically the bootloader of a kzm9g board does not support DT
+  so this option is useful.
 
-/home/arnd/linux-arm/arch/arm/kernel/setup.c:790:2: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+* Use voltage regulators by default
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
+* Move command line to dts
+
+  This brings us one small step closer to sharing defconfig
+  between kzm9g and other boards
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/kota2_defconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sh73a0-kzm9g.dts |    4 ++++
+ arch/arm/configs/kzm9g_defconfig   |    4 +++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/kota2_defconfig b/arch/arm/configs/kota2_defconfig
-index fa83db1..57ad3d4 100644
---- a/arch/arm/configs/kota2_defconfig
-+++ b/arch/arm/configs/kota2_defconfig
-@@ -21,7 +21,7 @@ CONFIG_ARCH_SHMOBILE=y
- CONFIG_KEYBOARD_GPIO_POLLED=y
- CONFIG_ARCH_SH73A0=y
- CONFIG_MACH_KOTA2=y
--CONFIG_MEMORY_SIZE=0x1e0000000
-+CONFIG_MEMORY_SIZE=0x1e000000
- # CONFIG_SH_TIMER_TMU is not set
- # CONFIG_SWP_EMULATE is not set
- CONFIG_CPU_BPREDICT_DISABLE=y
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+index bcb9119..9a43879 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+@@ -15,6 +15,10 @@
+ 	model = "KZM-A9-GT";
+ 	compatible = "renesas,kzm9g", "renesas,sh73a0";
+ 
++	chosen {
++		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200";
++	};
++
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x41000000 0x1e800000>;
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index afbae28..670c3b6 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -39,7 +39,7 @@ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200"
++CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_KEXEC=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+@@ -85,6 +85,8 @@ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_SH_MOBILE=y
+ CONFIG_GPIO_PCF857X=y
+ # CONFIG_HWMON is not set
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_DUMMY=y
+ CONFIG_FB=y
+ CONFIG_FB_SH_MOBILE_LCDC=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
 -- 
 1.7.10.4
