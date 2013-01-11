@@ -1,32 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 11 Jan 2013 17:20:12 +0000
-Subject: [PATCH] ARM: kernel: DT cpu map validity check helper function
-In-Reply-To: <20130111163057.GE23505@n2100.arm.linux.org.uk>
-References: <1357921058-11322-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130111163057.GE23505@n2100.arm.linux.org.uk>
-Message-ID: <20130111172012.GG30538@e102568-lin.cambridge.arm.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 11 Jan 2013 12:22:20 -0500
+Subject: [PATCH 6/6] ARM: virt: hide CONFIG_ARM_VIRT_EXT from user
+In-Reply-To: <20130111164330.GA12464@mudshark.cambridge.arm.com>
+References: <1357918457-20469-1-git-send-email-will.deacon@arm.com>
+ <1357918457-20469-7-git-send-email-will.deacon@arm.com>
+ <50F032F0.3070906@codeaurora.org>
+ <20130111164330.GA12464@mudshark.cambridge.arm.com>
+Message-ID: <50F04A4C.6020302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 04:30:57PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 11, 2013 at 04:17:38PM +0000, Lorenzo Pieralisi wrote:
-> > This patch implements a helper function that platforms can call to check
-> > whether DT based cpu map initialization and cores count were completed
-> > successfully.
+On 01/11/2013 11:43 AM, Will Deacon wrote:
+> On Fri, Jan 11, 2013 at 03:42:40PM +0000, Christopher Covington wrote:
+>> Hi Will,
 > 
-> Umm, are you sure this works?  Two problems here:
-> - the kernel boot marks the booting CPU (in our case, CPU0) as present,
->   possible and online before arch code gets called.  smp_init_cpus()
->   will be called with the maps already initialized per that.
+> Hello,
+> 
+>> On 01/11/2013 10:34 AM, Will Deacon wrote:
+>>> ARM_VIRT_EXT is a property of CPU_V7, but does not adversely affect
+>>> other CPUs that can be built into the same kernel image (i.e. ARMv6+).
+>>>
+>>> This patch defaults ARM_VIRT_EXT to y if CPU_V7, allowing hypervisors
+>>> such as KVM to make better use of the option and being able to rely
+>>> on hyp-mode boot support.
+>>
+>> [...]
+>>
+>>> @@ -640,11 +641,6 @@ config ARM_VIRT_EXT
+>>>  	  use of this feature.  Refer to Documentation/arm/Booting for
+>>>  	  details.
+>>>  
+>>> -	  It is safe to enable this option even if the kernel may not be
+>>> -	  booted in HYP mode, may not have support for the
+>>> -	  virtualization extensions, or may be booted with a
+>>> -	  non-compliant bootloader.
+>>
+>> Why take this out?
+> 
+> I just removed that last paragraph because it's not user-selectable anymore,
+> so this comment about enabling the option is redundant. I could remove all
+> of the help text, but we have it for some other options that are selected
+> automatically and it has a pointer to some documentation too.
 
-Gah, my bad, you are definitely right.
+It's not a big deal, but that paragraph helped me understand the (lack of)
+ramifications for v7 CPU's without the virtualization extensions, and I figure
+it might still be helpful for others as well.
 
-> - this really needs to be paired with a patch showing how you intend it
->   to be used; merely adding the helper without any sign of it being used
->   means it's just bloat which may not end up being used.
+Christopher
 
-Ok, that's a fair point, I will ask to get it merged with an implementation
-that relies on it, showing its usage.
-
-Thanks for the review,
-Lorenzo
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
+the Linux Foundation
