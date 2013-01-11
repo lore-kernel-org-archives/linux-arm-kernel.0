@@ -1,220 +1,197 @@
-From: kpark3469@gmail.com (Keun-O Park)
-Date: Fri, 11 Jan 2013 17:53:57 +0900
-Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
-In-Reply-To: <1357566094.10284.83.camel@gandalf.local.home>
-References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
- <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
- <20130103103815.GL2631@n2100.arm.linux.org.uk>
- <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
- <1357220165.10284.30.camel@gandalf.local.home>
- <20130103141301.GQ2631@n2100.arm.linux.org.uk>
- <1357229038.10284.46.camel@gandalf.local.home>
- <20130103162359.GR2631@n2100.arm.linux.org.uk>
- <1357232337.10284.67.camel@gandalf.local.home>
- <CA+KhAHYbDU0Ajr5uPEjPxX2ECitvnK2ENOjmqjC=3G657GvG7w@mail.gmail.com>
- <1357566094.10284.83.camel@gandalf.local.home>
-Message-ID: <CA+KhAHbOu8JxMuwajZYBAkex7pZag3oaTvz=EoLOQz5iZtUfsQ@mail.gmail.com>
+From: russ.dill@gmail.com (Russ Dill)
+Date: Fri, 11 Jan 2013 00:54:46 -0800
+Subject: [PATCH v4 1/4] rtc: OMAP: Add system pm_power_off to rtc driver
+In-Reply-To: <CA+Bv8XbfkdhZKXtve4VF6uxZB9rw=wj5tda9OxmSByM9k7wa3w@mail.gmail.com>
+References: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
+ <1355464997-19367-2-git-send-email-anilkumar@ti.com>
+ <CA+Bv8XbfkdhZKXtve4VF6uxZB9rw=wj5tda9OxmSByM9k7wa3w@mail.gmail.com>
+Message-ID: <CA+Bv8XaZzWindjhYnXLaqq5mJ6X0Hq=C7NUxW3aK3eh-d6ghtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 7, 2013 at 10:41 PM, Steven Rostedt <rostedt@goodmis.org> wrote:
+On Fri, Jan 11, 2013 at 12:08 AM, Russ Dill <russ.dill@gmail.com> wrote:
+> On Thu, Dec 13, 2012 at 10:03 PM, AnilKumar Ch <anilkumar@ti.com> wrote:
+>> From: Colin Foe-Parker <colin.foeparker@logicpd.com>
+>>
+>> Add system power off control to rtc driver which is the in-charge
+>> of controlling the BeagleBone system power. The power_off routine
+>> can be hooked up to "pm_power_off" system call.
+>>
+>> System power off sequence:-
+>> * Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
+>> * Enable PMIC_POWER_EN in rtc module
+>> * Set rtc ALARM2 time
+>> * Enable ALARM2 interrupt
+>>
+>> Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
+>> [anilkumar at ti.com: move poweroff additions to rtc driver]
+>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 >
-> On Fri, 2013-01-04 at 17:45 +0900, Keun-O Park wrote:
+> Looks good
 >
-> > With "CFLAGS_REMOVE_unwind.o = -pg" and with CONFIG_PROVE_LOCKING
-> > turned on, I confirmed that
-> > there's no trace output like Steve mentioned.
-> > However, if I turn off CONFIG_PROVE_LOCKING, "irqsoff" and
-> > "preemptirqsoff" ftracer prints these lines :
-> >
-> > kernel_text_address <-unwind_frame
-> > core_kernel_text <-unwind_frame
-> > search_index <-unwind_frame
-> >
-> > While I investigated the reason, I just found out there's two function
-> > with same name, trace_hardirqs_off.
-> > One in kernel/trace/trace_irqsoff.c and another in kernel/lockdep.c.
-> > And both symbols are exported.
-> > I am wondering whether it is intentionally maintained code to
-> > manipulate ftrace and lockdep or not.
-> > I guess it's probably not.
->
-> Both the irqsoff tracer from ftrace and lockdep came from the -rt patch.
-> The two were very integrated at the time. When they were ported over to
-> mainline, they still used the same infrastructure to hook into the
-> locations of interrupts being disabled or enabled.
->
-> trace_hardirqs_on/off() is the function that is called for both lockdep
-> and ftrace's irqsoff tracer. So this was intentional. That way we didn't
-> need to have two different callers at every location. But if lockdep
-> isn't defined and ftrace irqsoff is, then ftrace would define the
-> trace_hardirqs_on/off() routines, otherwise lockdep does. (These
-> routines are within CONFIG_PROVE_LOCKING #ifdefs in
-> kernel/trace/trace_irqsoff.c)
->
-> When both lockdep and irqsoff tracer are configured, then lockdep
-> defines the trace_hardirqs_off_caller(), and calls time_hardirqs_off()
-> in trace_irqsoff.c which does the same thing as the trace_hardirqs_off()
-> does without lockdep.
->
-> I'm not sure why one would add the annotations while adding
-> PROVE_LOCKING doesn't. They both seems to use CALLER_ADDR0, but maybe
-> there's another path that uses CALLER_ADDR1 without it.
->
-> -- Steve
->
->
+> Reviewed-by: Russ Dill <russ.dill@ti.com>
+> Acked-by: Russ Dill <russ.dill@ti.com>
 
-Hello Steve,
+Sorry, actually, small follow up. Is there any reason this uses
+readl/writel in some places rather than rtc_read/rtc_write?
 
-Much obliged for your explaining this.
-As your guess, there's another path that uses CALLER_ADDR1 without
-CONFIG_PROVE_LOCKING though both lockdep and ftrace's irqsoff tracer
-is turned on. In this case, ftrace's trace_hardirqs_on/off() would be
-called.
-And, as you said to me, if lockdep is off and ftrace's irqsoff is on,
-ftrace's trace_hardirqs_on/off() would be called.
-I think the proper way to avoid calling CALLER_ADDR1 will be calling
-trace_hardirqs_off_caller() instead of calling stop_critical_timing()
-directly in trace_hardirqs_off(). And, this will suppress the message
-outputs of unwind_frame.
-If you think this idea is okay, I will push the patch v2 to you.
-In my test result, it looks it's functionally correct.
-
-Thanks.
-
--- kpark
-
-
-diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-index f89515a..3552ad9 100644
---- a/arch/arm/include/asm/ftrace.h
-+++ b/arch/arm/include/asm/ftrace.h
-@@ -32,13 +32,11 @@ extern void ftrace_call_old(void);
-
- #ifndef __ASSEMBLY__
-
--#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
-+#if defined(CONFIG_FRAME_POINTER) || defined(CONFIG_ARM_UNWIND)
- /*
-  * return_address uses walk_stackframe to do it's work.  If both
-  * CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses unwind
-- * information.  For this to work in the function tracer many functions would
-- * have to be marked with __notrace.  So for now just depend on
-- * !CONFIG_ARM_UNWIND.
-+ * information.
-  */
-
- void *return_address(unsigned int);
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 5bbec7b..675fd62 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -9,6 +9,9 @@ ifdef CONFIG_FUNCTION_TRACER
- CFLAGS_REMOVE_ftrace.o = -pg
- CFLAGS_REMOVE_insn.o = -pg
- CFLAGS_REMOVE_patch.o = -pg
-+ifdef CONFIG_ARM_UNWIND
-+CFLAGS_REMOVE_unwind.o = -pg
-+endif
- endif
-
- CFLAGS_REMOVE_return_address.o = -pg
-diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
-index fafedd8..f202bc0 100644
---- a/arch/arm/kernel/return_address.c
-+++ b/arch/arm/kernel/return_address.c
-@@ -11,7 +11,7 @@
- #include <linux/export.h>
- #include <linux/ftrace.h>
-
--#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
-+#if defined(CONFIG_FRAME_POINTER) || defined(CONFIG_ARM_UNWIND)
- #include <linux/sched.h>
-
- #include <asm/stacktrace.h>
-@@ -57,17 +57,13 @@ void *return_address(unsigned int level)
- 		return NULL;
- }
-
--#else /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
--
--#if defined(CONFIG_ARM_UNWIND)
--#warning "TODO: return_address should use unwind tables"
--#endif
-+#else /* CONFIG_FRAME_POINTER || CONFIG_ARM_UNWIND */
-
- void *return_address(unsigned int level)
- {
- 	return NULL;
- }
-
--#endif /* if defined(CONFIG_FRAME_POINTER) &&
-!defined(CONFIG_ARM_UNWIND) / else */
-+#endif /* CONFIG_FRAME_POINTER || CONFIG_ARM_UNWIND */
-
- EXPORT_SYMBOL_GPL(return_address);
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index 00f79e5..aab144b 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -6,6 +6,9 @@
-
- #if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
- /*
-+ * If both CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses
-+ * unwind information. So for now just depend on !CONFIG_ARM_UNWIND.
-+ *
-  * Unwind the current stack frame and store the new register values in the
-  * structure passed as argument. Unwinding is equivalent to a function return,
-  * hence the new PC value rather than LR should be used for backtrace.
-diff --git a/kernel/trace/trace_irqsoff.c b/kernel/trace/trace_irqsoff.c
-index 713a2ca..6f207ed 100644
---- a/kernel/trace/trace_irqsoff.c
-+++ b/kernel/trace/trace_irqsoff.c
-@@ -483,20 +483,6 @@ inline void print_irqtrace_events(struct task_struct *curr)
- /*
-  * We are only interested in hardirq on/off events:
-  */
--void trace_hardirqs_on(void)
--{
--	if (!preempt_trace() && irq_trace())
--		stop_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
--}
--EXPORT_SYMBOL(trace_hardirqs_on);
--
--void trace_hardirqs_off(void)
--{
--	if (!preempt_trace() && irq_trace())
--		start_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
--}
--EXPORT_SYMBOL(trace_hardirqs_off);
--
- void trace_hardirqs_on_caller(unsigned long caller_addr)
- {
- 	if (!preempt_trace() && irq_trace())
-@@ -504,6 +490,12 @@ void trace_hardirqs_on_caller(unsigned long caller_addr)
- }
- EXPORT_SYMBOL(trace_hardirqs_on_caller);
-
-+void trace_hardirqs_on(void)
-+{
-+	trace_hardirqs_on_caller(CALLER_ADDR0);
-+}
-+EXPORT_SYMBOL(trace_hardirqs_on);
-+
- void trace_hardirqs_off_caller(unsigned long caller_addr)
- {
- 	if (!preempt_trace() && irq_trace())
-@@ -511,6 +503,12 @@ void trace_hardirqs_off_caller(unsigned long caller_addr)
- }
- EXPORT_SYMBOL(trace_hardirqs_off_caller);
-
-+void trace_hardirqs_off(void)
-+{
-+	trace_hardirqs_off_caller(CALLER_ADDR0);
-+}
-+EXPORT_SYMBOL(trace_hardirqs_off);
-+
- #endif /* CONFIG_PROVE_LOCKING */
- #endif /*  CONFIG_IRQSOFF_TRACER */
+>> ---
+>>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
+>>  drivers/rtc/rtc-omap.c                             |   74 +++++++++++++++++++-
+>>  2 files changed, 78 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+>> index b47aa41..8d9f4f9 100644
+>> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+>> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+>> @@ -6,6 +6,10 @@ Required properties:
+>>  - interrupts: rtc timer, alarm interrupts in order
+>>  - interrupt-parent: phandle for the interrupt controller
+>>
+>> +Optional properties:
+>> +- ti,system-power-controller: Telling whether or not rtc is controlling
+>> +  the system power.
+>> +
+>>  Example:
+>>
+>>  rtc at 1c23000 {
+>> @@ -14,4 +18,5 @@ rtc at 1c23000 {
+>>         interrupts = <19
+>>                       19>;
+>>         interrupt-parent = <&intc>;
+>> +       ti,system-power-controller;
+>>  };
+>> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+>> index 6009714..e6d4878 100644
+>> --- a/drivers/rtc/rtc-omap.c
+>> +++ b/drivers/rtc/rtc-omap.c
+>> @@ -72,6 +72,14 @@
+>>  #define OMAP_RTC_KICK0_REG             0x6c
+>>  #define OMAP_RTC_KICK1_REG             0x70
+>>
+>> +#define OMAP_RTC_ALARM2_SECONDS_REG    0x80
+>> +#define OMAP_RTC_ALARM2_MINUTES_REG    0x84
+>> +#define OMAP_RTC_ALARM2_HOURS_REG      0x88
+>> +#define OMAP_RTC_ALARM2_DAYS_REG       0x8c
+>> +#define OMAP_RTC_ALARM2_MONTHS_REG     0x90
+>> +#define OMAP_RTC_ALARM2_YEARS_REG      0x94
+>> +#define OMAP_RTC_PMIC_REG              0x98
+>> +
+>>  /* OMAP_RTC_CTRL_REG bit fields: */
+>>  #define OMAP_RTC_CTRL_SPLIT            (1<<7)
+>>  #define OMAP_RTC_CTRL_DISABLE          (1<<6)
+>> @@ -93,15 +101,21 @@
+>>  #define OMAP_RTC_STATUS_BUSY            (1<<0)
+>>
+>>  /* OMAP_RTC_INTERRUPTS_REG bit fields: */
+>> +#define OMAP_RTC_INTERRUPTS_IT_ALARM2   (1<<4)
+>>  #define OMAP_RTC_INTERRUPTS_IT_ALARM    (1<<3)
+>>  #define OMAP_RTC_INTERRUPTS_IT_TIMER    (1<<2)
+>>
+>> +/* OMAP_RTC_PMIC_REG bit fields: */
+>> +#define OMAP_RTC_PMIC_POWER_EN_EN       (1<<16)
+>> +
+>>  /* OMAP_RTC_KICKER values */
+>>  #define        KICK0_VALUE                     0x83e70b13
+>>  #define        KICK1_VALUE                     0x95a4f1e0
+>>
+>>  #define        OMAP_RTC_HAS_KICKER             0x1
+>>
+>> +#define SHUTDOWN_TIME_SEC              2
+>> +
+>>  static void __iomem    *rtc_base;
+>>
+>>  #define rtc_read(addr)         readb(rtc_base + (addr))
+>> @@ -290,6 +304,56 @@ static int omap_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
+>>         return 0;
+>>  }
+>>
+>> +/*
+>> + * rtc_power_off: Set the pmic power off sequence. The RTC generates
+>> + * pmic_pwr_enable control, which can be used to control an external
+>> + * PMIC.
+>> + */
+>> +static void rtc_power_off(void)
+>> +{
+>> +       u32 val;
+>> +       struct rtc_time tm;
+>> +       unsigned long time;
+>> +
+>> +       /* Set PMIC power enable */
+>> +       val = readl(rtc_base + OMAP_RTC_PMIC_REG);
+>> +       writel(val | OMAP_RTC_PMIC_POWER_EN_EN, rtc_base + OMAP_RTC_PMIC_REG);
+>> +
+>> +       /* Read rtc time */
+>> +       omap_rtc_read_time(NULL, &tm);
+>> +
+>> +       /* Convert Gregorian date to seconds since 01-01-1970 00:00:00 */
+>> +       rtc_tm_to_time(&tm, &time);
+>> +
+>> +       /* Add shutdown time to the current value */
+>> +       time += SHUTDOWN_TIME_SEC;
+>> +
+>> +       /* Convert seconds since 01-01-1970 00:00:00 to Gregorian date */
+>> +       rtc_time_to_tm(time, &tm);
+>> +
+>> +       if (tm2bcd(&tm) < 0)
+>> +               return;
+>> +
+>> +       pr_info("System will go to power_off state in approx. %d secs\n",
+>> +                       SHUTDOWN_TIME_SEC);
+>> +
+>> +       /*
+>> +        * pmic_pwr_enable is controlled by means of ALARM2 event. So here
+>> +        * programming alarm2 expiry time and enabling alarm2 interrupt
+>> +        */
+>> +       rtc_write(tm.tm_sec, OMAP_RTC_ALARM2_SECONDS_REG);
+>> +       rtc_write(tm.tm_min, OMAP_RTC_ALARM2_MINUTES_REG);
+>> +       rtc_write(tm.tm_hour, OMAP_RTC_ALARM2_HOURS_REG);
+>> +       rtc_write(tm.tm_mday, OMAP_RTC_ALARM2_DAYS_REG);
+>> +       rtc_write(tm.tm_mon, OMAP_RTC_ALARM2_MONTHS_REG);
+>> +       rtc_write(tm.tm_year, OMAP_RTC_ALARM2_YEARS_REG);
+>> +
+>> +       /* Enable alarm2 interrupt */
+>> +       val = readl(rtc_base + OMAP_RTC_INTERRUPTS_REG);
+>> +       writel(val | OMAP_RTC_INTERRUPTS_IT_ALARM2,
+>> +                               rtc_base + OMAP_RTC_INTERRUPTS_REG);
+>> +}
+>> +
+>>  static struct rtc_class_ops omap_rtc_ops = {
+>>         .read_time      = omap_rtc_read_time,
+>>         .set_time       = omap_rtc_set_time,
+>> @@ -327,12 +391,16 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+>>         struct resource         *res, *mem;
+>>         struct rtc_device       *rtc;
+>>         u8                      reg, new_ctrl;
+>> +       bool                    pm_off = false;
+>>         const struct platform_device_id *id_entry;
+>>         const struct of_device_id *of_id;
+>>
+>>         of_id = of_match_device(omap_rtc_of_match, &pdev->dev);
+>> -       if (of_id)
+>> +       if (of_id) {
+>>                 pdev->id_entry = of_id->data;
+>> +               pm_off = of_property_read_bool(pdev->dev.of_node,
+>> +                                       "ti,system-power-controller");
+>> +       }
+>>
+>>         omap_rtc_timer = platform_get_irq(pdev, 0);
+>>         if (omap_rtc_timer <= 0) {
+>> @@ -385,6 +453,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+>>         platform_set_drvdata(pdev, rtc);
+>>         dev_set_drvdata(&rtc->dev, mem);
+>>
+>> +       /* RTC power off */
+>> +       if (pm_off && !pm_power_off)
+>> +               pm_power_off = rtc_power_off;
+>> +
+>>         /* clear pending irqs, and set 1/second periodic,
+>>          * which we'll use instead of update irqs
+>>          */
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
