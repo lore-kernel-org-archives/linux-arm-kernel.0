@@ -1,49 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 11 Jan 2013 06:59:08 -0500
-Subject: [PATCH 2/3] ARM: Orion: Bind the orion bridge interrupt
- controller through DT
-In-Reply-To: <20130111091349.55ee0e77@skate>
-References: <20121211065813.GA14843@obsidianresearch.com>
- <20121211071333.GR17242@lunn.ch>
- <20121211185535.GA14534@obsidianresearch.com>
- <20130110014734.GC5075@titan.lakedaemon.net>
- <20130110060710.GM24650@lunn.ch> <50EE8FC5.50105@gmail.com>
- <20130110184832.GB28004@obsidianresearch.com>
- <20130110185737.GO5075@titan.lakedaemon.net>
- <20130111040219.GA23206@obsidianresearch.com>
- <20130111091349.55ee0e77@skate>
-Message-ID: <20130111115908.GQ5075@titan.lakedaemon.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 11 Jan 2013 12:05:39 +0000
+Subject: [PATCH 01/16] ARM: b.L: secondary kernel entry code
+In-Reply-To: <20130111114552.GB12560@localhost.cambridge.arm.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
+ <CAHkRjk65PEVDS6vi=07g_hef8yXOR+mTYV_Nchu1fAuLnOJLOw@mail.gmail.com>
+ <alpine.LFD.2.02.1301101132080.6300@xanadu.home>
+ <20130111114552.GB12560@localhost.cambridge.arm.com>
+Message-ID: <20130111120539.GD30538@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 09:13:49AM +0100, Thomas Petazzoni wrote:
-> Dear Jason Gunthorpe,
+On Fri, Jan 11, 2013 at 11:45:53AM +0000, Catalin Marinas wrote:
+> On Thu, Jan 10, 2013 at 04:47:09PM +0000, Nicolas Pitre wrote:
+> > On Thu, 10 Jan 2013, Catalin Marinas wrote:
+> > > On 10 January 2013 00:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > > > --- /dev/null
+> > > > +++ b/arch/arm/common/bL_entry.c
+> > > ...
+> > > > +extern volatile unsigned long bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
+> > > 
+> > > IMHO, we should keep this array linear and ignore the cluster grouping
+> > > at this stage. This information could be added to latter patches that
+> > > actually need to know about the b.L topology.
+> > 
+> > That's virtually all of them.  Everything b.L related is always 
+> > expressed in terms of a cpu,cluster tuple at the low level.
+> > 
+> > > This would also imply that we treat the MPIDR just as an ID without 
+> > > digging into its bit layout.
+> > 
+> > That makes for too large an index space.  We always end up needing to 
+> > break the MPIDR into a cpu,cluster thing as the MPIDR bits are too 
+> > sparse.
 > 
-> On Thu, 10 Jan 2013 21:02:19 -0700, Jason Gunthorpe wrote:
-> 
-> > I've attached the main mv dt patch as a MIME, sorry for the
-> > awkwardness, I am travelling and won't be available... Please feel
-> > free to re-post/alter as necessary. As I said before, I'm not happy
-> > with it because it doesn't follow the standard convention for MDIO
-> > phys.
-> 
-> The MDIO registers for the mv643xx_eth hardware are the same as the
-> ones for the mvneta hardware. Therefore, I've splitted this into the
-> mvmdio driver (available in mainline since 3.8,
-> drivers/net/ethernet/marvell). This allows to have a nicely separated
-> driver for the MDIO interface.
-> 
-> My plan was ultimately to modify the mv643xx_eth driver to use the
-> mvmdio driver, and then do a nice DT binding on top of that.
-> 
-> Does this sounds like a good plan?
+> You could find a way to compress this with some mask and shifts. We can
+> look at this later if we are to generalise this to non-b.L systems.
 
-I like it.  If you haven't already, please review the thread at
+The MPIDR linearization (a simple hash to convert it to a linear index) is
+planned anyway since code paths like cpu_{suspend/resume} do not work for
+multi-cluster systems as things stand.
 
-http://www.spinics.net/lists/arm-kernel/msg186742.html
-
-to see some of the concerns already raised.
-
-thx,
-
-Jason.
+Lorenzo
