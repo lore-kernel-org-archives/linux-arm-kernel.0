@@ -1,33 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 Jan 2013 21:38:24 +0800
-Subject: [shawnguo:cleanup/clockevents 2/2] ERROR:
- "clockevents_config_and_register" [drivers/clocksource/cs5535-clockevt.ko]
- undefined!
-In-Reply-To: <20130111122424.GB23972@localhost>
-References: <50efde33.imTwOnb1rtCKWsgz%yuanhan.liu@linux.intel.com>
- <20130111122424.GB23972@localhost>
-Message-ID: <20130111133822.GB24554@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Jan 2013 19:10:22 +0530
+Subject: [PATCHv2 08/11] arm: arch_timer: add arch_counter_set_user_access
+In-Reply-To: <1357747640-18594-9-git-send-email-mark.rutland@arm.com>
+References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+ <1357747640-18594-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <50F01646.4010203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 08:24:24PM +0800, Fengguang Wu wrote:
-> 
-> Hi Shawn,
-> 
-> FYI, kernel build failed on
-> 
-> tree:   git://git.linaro.org/people/shawnguo/linux-2.6.git cleanup/clockevents
-> head:   ab8e73c98749a58c242b187c9799db70cd903157
-> commit: ab8e73c98749a58c242b187c9799db70cd903157 [2/2] clocksource: use clockevents_config_and_register() where possible
-> config: i386-randconfig-b030 (attached as .config)
-> 
-> All error/warnings:
-> 
-> >> ERROR: "clockevents_config_and_register" [drivers/clocksource/cs5535-clockevt.ko] undefined!
-> 
-I will propose a patch to export clockevents_config_and_register() to
-fix the error.
+On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
+> Several bits in CNTKCTL reset to 0, including PL0VTEN. For platforms
+> using the generic timer which wish to have a fast gettimeofday vDSO
+> implementation, these bits must be set to 1 by the kernel. On other
+> platforms, the bootloader might enable userspace access when we don't
+> want it.
+>
+> This patch adds arch_counter_set_user_access, which sets the PL0 access
+> permissions to that required by the platform. For arm, this currently
+minor nit.
+s/arm/ARM
 
-Thanks Fengguang.
+> means disabling all userspace access.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>   arch/arm/include/asm/arch_timer.h |   11 +++++++++++
+>   arch/arm/kernel/arch_timer.c      |    2 ++
+>   2 files changed, 13 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+> index 701f2b7..05e3593 100644
+> --- a/arch/arm/include/asm/arch_timer.h
+> +++ b/arch/arm/include/asm/arch_timer.h
+> @@ -108,6 +108,17 @@ static inline u64 arch_counter_get_cntvct(void)
+>   	return cval;
+>   }
+>
+> +static inline void __cpuinit arch_counter_set_user_access(void)
+> +{
+> +	u32 cntkctl;
+> +
+> +	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
+> +
+> +	/* disable user access to everything */
+> +	cntkctl &= ~((3 << 8) | (7 << 0));
+> +
+> +	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
+> +}
+>
+>   #else
+>   static inline int arch_timer_of_register(void)
+> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+> index 834d347..4f39e68 100644
+> --- a/arch/arm/kernel/arch_timer.c
+> +++ b/arch/arm/kernel/arch_timer.c
+> @@ -155,6 +155,8 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
+>   			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
+>   	}
+>
+> +	arch_counter_set_user_access();
+So how do you expect platform to enabled the user-space access in case
+they want to access it for some cases.
 
-Shawn
+Regards
+Santosh
