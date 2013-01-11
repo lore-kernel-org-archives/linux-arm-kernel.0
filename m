@@ -1,36 +1,30 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 11 Jan 2013 14:28:24 -0500 (EST)
-Subject: [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
- exit/setup and CCI
-In-Reply-To: <50F059A4.4010107@ti.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-16-git-send-email-nicolas.pitre@linaro.org>
- <50F059A4.4010107@ti.com>
-Message-ID: <alpine.LFD.2.02.1301111425020.6300@xanadu.home>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Fri, 11 Jan 2013 14:33:34 -0500
+Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
+In-Reply-To: <20130111191808.GA18512@amt.cnet>
+References: <1357866627.27576.21@snotra>
+ <709FA96C-A3EF-489C-B0E9-59EEA7F8E62F@virtualopensystems.com>
+ <20130111183907.GA15113@amt.cnet>
+ <B5FF73B8-DAB5-4B6D-977C-7908483F660B@suse.de>
+ <20130111191808.GA18512@amt.cnet>
+Message-ID: <CANM98q+ud7EetQ3K-T4CftJUyV5xhUXNVPQ7NP7yBvLz4YjFgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
+On Fri, Jan 11, 2013 at 2:18 PM, Marcelo Tosatti <mtosatti@redhat.com> wrote:
+>> > Can you make KVM_SET_ARM_DEVICE address extensible?
+>> > Add some reserved space and a flags field.
+>>
+>> Can't we do this for the new ioctl that we all would agree on rather than the interim one that's only a short term solution for a greater problem?
+>>
+>>
+>> Alex
+>
+> OK.
+>
 
-> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> > From: Dave Martin <dave.martin@linaro.org>
-> > 
-> > +		/*
-> > +		 * Flush the local CPU cache.
-> > +		 *
-> > +		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
-> > +		 * a preliminary flush here for those CPUs.  At least, that's
-> > +		 * the theory -- without the extra flush, Linux explodes on
-> > +		 * RTSM (maybe not needed anymore, to be investigated).
-> > +		 */
-> This is expected if the entire code is not in one stack frame and the
-> additional flush is needed to avoid possible stack corruption. This
-> issue has been discussed in past on the list.
+Good. It's decided - the KVM/ARM patches remain in their current state
+with an ARM specific ioctl, and will transition to something generic
+post merge.
 
-I missed that.  Do you have a reference or pointer handy?
-
-What is strange is that this is 100% reproducible on RTSM while this 
-apparently is not an issue on real hardware so far.
-
-
-Nicolas
+-Christoffer
