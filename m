@@ -1,55 +1,131 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 11 Jan 2013 12:19:19 +0000
-Subject: [PATCH 01/16] ARM: b.L: secondary kernel entry code
-In-Reply-To: <20130111114552.GB12560@localhost.cambridge.arm.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
- <CAHkRjk65PEVDS6vi=07g_hef8yXOR+mTYV_Nchu1fAuLnOJLOw@mail.gmail.com>
- <alpine.LFD.2.02.1301101132080.6300@xanadu.home>
- <20130111114552.GB12560@localhost.cambridge.arm.com>
-Message-ID: <20130111121919.GG1966@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 11 Jan 2013 12:24:17 +0000
+Subject: [PATCH V2 2/6] ARM: tegra20: cpuidle: add powered-down state for
+ secondary CPU
+In-Reply-To: <1357888829.2034.39.camel@jlo-ubuntu-64.nvidia.com>
+References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
+ <1354701715-24150-3-git-send-email-josephl@nvidia.com>
+ <20121205105010.GA12999@e102568-lin.cambridge.arm.com>
+ <1357888829.2034.39.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <20130111122417.GE30538@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 11:45:53AM +0000, Catalin Marinas wrote:
-> On Thu, Jan 10, 2013 at 04:47:09PM +0000, Nicolas Pitre wrote:
-> > On Thu, 10 Jan 2013, Catalin Marinas wrote:
-> > > On 10 January 2013 00:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > > > --- /dev/null
-> > > > +++ b/arch/arm/common/bL_entry.c
-> > > ...
-> > > > +extern volatile unsigned long bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
-> > > 
-> > > IMHO, we should keep this array linear and ignore the cluster grouping
-> > > at this stage. This information could be added to latter patches that
-> > > actually need to know about the b.L topology.
-> > 
-> > That's virtually all of them.  Everything b.L related is always 
-> > expressed in terms of a cpu,cluster tuple at the low level.
-> > 
-> > > This would also imply that we treat the MPIDR just as an ID without 
-> > > digging into its bit layout.
-> > 
-> > That makes for too large an index space.  We always end up needing to 
-> > break the MPIDR into a cpu,cluster thing as the MPIDR bits are too 
-> > sparse.
+On Fri, Jan 11, 2013 at 07:20:29AM +0000, Joseph Lo wrote:
+> Hi Lorenzo,
 > 
-> You could find a way to compress this with some mask and shifts. We can
-> look at this later if we are to generalise this to non-b.L systems.
+> On Wed, 2012-12-05 at 18:50 +0800, Lorenzo Pieralisi wrote:
+> > On Wed, Dec 05, 2012 at 10:01:49AM +0000, Joseph Lo wrote:
+> > > The powered-down state of Tegra20 requires power gating both CPU cores.
+> > > When the secondary CPU requests to enter powered-down state, it saves
+> > > its own contexts and then enters WFI. The Tegra20 had a limition to
+> > > power down both CPU cores. The secondary CPU must waits for CPU0 in
+> > > powered-down state too. If the secondary CPU be woken up before CPU0
+> > > entering powered-down state, then it needs to restore its CPU states
+> > > and waits for next chance.
+> > >
+> > > Be aware of that, you may see the legacy power state "LP2" in the code
+> > > which is exactly the same meaning of "CPU power down".
+> > >
+> > > Based on the work by:
+> > > Colin Cross <ccross@android.com>
+> > > Gary King <gking@nvidia.com>
+> > >
+> > > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > > +
+> > > +#ifdef CONFIG_PM_SLEEP
+> > > +/*
+> > > + * tegra_pen_lock
+> > > + *
+> > > + * spinlock implementation with no atomic test-and-set and no coherence
+> > > + * using Peterson's algorithm on strongly-ordered registers
+> > > + * used to synchronize a cpu waking up from wfi with entering lp2 on idle
+> > > + *
+> > > + * SCRATCH37 = r1 = !turn (inverted from Peterson's algorithm)
+> > > + * on cpu 0:
+> > > + * SCRATCH38 = r2 = flag[0]
+> > > + * SCRATCH39 = r3 = flag[1]
+> > > + * on cpu1:
+> > > + * SCRATCH39 = r2 = flag[1]
+> > > + * SCRATCH38 = r3 = flag[0]
+> > > + *
+> > > + * must be called with MMU on
+> > > + * corrupts r0-r3, r12
+> > > + */
+> > > +ENTRY(tegra_pen_lock)
+> > > +       mov32   r3, TEGRA_PMC_VIRT
+> > > +       cpu_id  r0
+> > > +       add     r1, r3, #PMC_SCRATCH37
+> > > +       cmp     r0, #0
+> > > +       addeq   r2, r3, #PMC_SCRATCH38
+> > > +       addeq   r3, r3, #PMC_SCRATCH39
+> > > +       addne   r2, r3, #PMC_SCRATCH39
+> > > +       addne   r3, r3, #PMC_SCRATCH38
+> > > +
+> > > +       mov     r12, #1
+> > > +       str     r12, [r2]               @ flag[cpu] = 1
+> > > +       dsb
+> > > +       str     r12, [r1]               @ !turn = cpu
+> > > +1:     dsb
+> > > +       ldr     r12, [r3]
+> > > +       cmp     r12, #1                 @ flag[!cpu] == 1?
+> > > +       ldreq   r12, [r1]
+> > > +       cmpeq   r12, r0                 @ !turn == cpu?
+> > > +       beq     1b                      @ while !turn == cpu && flag[!cpu] == 1
+> > > +
+> > > +       mov     pc, lr                  @ locked
+> > > +ENDPROC(tegra_pen_lock)
+> > > +
+> > > +ENTRY(tegra_pen_unlock)
+> > > +       dsb
+> > > +       mov32   r3, TEGRA_PMC_VIRT
+> > > +       cpu_id  r0
+> > > +       cmp     r0, #0
+> > > +       addeq   r2, r3, #PMC_SCRATCH38
+> > > +       addne   r2, r3, #PMC_SCRATCH39
+> > > +       mov     r12, #0
+> > > +       str     r12, [r2]
+> > > +       mov     pc, lr
+> > > +ENDPROC(tegra_pen_unlock)
+> > 
+> > There is an ongoing work to make this locking scheme for MMU/coherency off
+> > paths ARM generic, and we do not want to merge yet another platform specific
+> > locking mechanism. I will point you to the patchset when it hits LAK.
+> > 
+> 
+> You did mention there is an ARM generic locking scheme for MMU/coherency
+> off case before. Do you mean the patch below?
+> 
+> https://patchwork.kernel.org/patch/1957911/
+> https://patchwork.kernel.org/patch/1957901/
 
-The b.L cluster handling code has multiple instances of this issue.
-We should either try to fix them all, or defer them all as being
-overkill for the foreseeable future.
+Those are used for first-man election when multiple CPUs come out of
+idle at once.
 
-For current platforms, the space saved in unlikely to be larger than
-the amount of code required to implement the optimisation.
+You should have a look at the entire series and in particular:
 
-I do think we need a good, generic way to map sparesely-populated,
-multidimensional topological node IDs to/from a linear space, but
-we should avoid reinventing that too many times.
+https://patchwork.kernel.org/patch/1957891/
+https://patchwork.kernel.org/patch/1957951/
 
-I think Lorenzo was already potentially looking at this issue in
-relation to managing cpu_logical_map.
+> I gave it a review today. Looks it can't fit our usage for CPU idle
+> powered-down mode on Tegra20.
+> 
+> The generic mechanism only can be used when CPUs in non coherent world.
+> But our usage needs the mechanism could be used in both coherent and non
+> coherent case. OK. The case is we need to sync the status about the CPU1
+> was ready to power down. In this case, the CPU0 is still in coherent
+> world but the CPU1 isn't. So we need the locking scheme could be still
+> safe in this situation.
 
-Cheers
----Dave
+I know, I implemented something of that sort for an A9 based development
+platform, that's why I pointed you to this new patchset.
+
+Have a look at the series, it should do what you want.
+
+> And the proposed scheme looks only for b.L system?
+
+No it works also for single cluster systems. Please have a look and let
+me know if you have any questions or comment on the thread so that
+authors can help you understand the code.
+
+Lorenzo
