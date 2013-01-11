@@ -1,58 +1,30 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 11 Jan 2013 15:11:54 +0200
-Subject: [PATCH 2/2] ARM: tegra30: Add cpu node
-In-Reply-To: <1357909914-28994-1-git-send-email-hdoyu@nvidia.com>
-References: <1357909914-28994-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1357909914-28994-3-git-send-email-hdoyu@nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Jan 2013 13:12:48 +0000
+Subject: [PATCH 00/18] AB8500 battery management series upgrade
+Message-ID: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpu node for tegra30.
+Hi Anton,
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/boot/dts/tegra30.dtsi |   29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+Here we go again. This patches include your suggested fixups.
 
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 5b02ff0..df3214f 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -467,6 +467,35 @@
- 		status = "disabled";
- 	};
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <2>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <3>;
-+		};
-+	};
-+
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
- 		interrupts = <0 144 0x04
--- 
-1.7.9.5
+Please find the next instalment of the AB8500 Power drivers upgrade.
+A lot of work has taken place on the internal development track, but
+little effort has gone into mainlining it. At last count there were
+around 70+ patches which are in need of forward-porting, then
+upstreaming. This patch-set aims to make a good start. :)
+
+ drivers/power/Kconfig                |   15 +
+ drivers/power/Makefile               |    1 +
+ drivers/power/ab8500_bmdata.c        |   18 +-
+ drivers/power/ab8500_btemp.c         |   27 +-
+ drivers/power/ab8500_charger.c       |  359 ++++++--
+ drivers/power/ab8500_fg.c            |  277 ++++--
+ drivers/power/abx500_chargalg.c      |   30 +-
+ drivers/power/pm2301_charger.c       | 1599 ++++++++++++++++++++++++++++++++++
+ include/linux/mfd/abx500.h           |    6 +-
+ include/linux/mfd/abx500/ab8500-bm.h |   10 +
+ include/linux/mfd/abx500/ab8500.h    |    5 +
+ include/linux/pm2301_charger.h       |   60 ++
+ 12 files changed, 2259 insertions(+), 148 deletions(-)
