@@ -1,44 +1,70 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 10 Jan 2013 21:02:19 -0700
-Subject: [PATCH 2/3] ARM: Orion: Bind the orion bridge interrupt
- controller through DT
-In-Reply-To: <20130110185737.GO5075@titan.lakedaemon.net>
-References: <1355188683-18208-2-git-send-email-jgunthorpe@obsidianresearch.com>
- <20121211062430.GD25466@lunn.ch>
- <20121211065813.GA14843@obsidianresearch.com>
- <20121211071333.GR17242@lunn.ch>
- <20121211185535.GA14534@obsidianresearch.com>
- <20130110014734.GC5075@titan.lakedaemon.net>
- <20130110060710.GM24650@lunn.ch> <50EE8FC5.50105@gmail.com>
- <20130110184832.GB28004@obsidianresearch.com>
- <20130110185737.GO5075@titan.lakedaemon.net>
-Message-ID: <20130111040219.GA23206@obsidianresearch.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 11 Jan 2013 05:02:10 +0100
+Subject: [PATCH 01/14] of/pci: Provide support for parsing PCI DT ranges
+ property
+In-Reply-To: <50EF5798.6040405@wwwdotorg.org>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <1357764194-12677-2-git-send-email-thierry.reding@avionic-design.de>
+ <50EF5798.6040405@wwwdotorg.org>
+Message-ID: <20130111040210.GC28094@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 01:57:37PM -0500, Jason Cooper wrote:
-> Jason,
+On Thu, Jan 10, 2013 at 05:06:48PM -0700, Stephen Warren wrote:
+> On 01/09/2013 01:43 PM, Thierry Reding wrote:
+> > From: Andrew Murray <andrew.murray@arm.com>
+> > 
+> > DT bindings for PCI host bridges often use the ranges property to describe
+> > memory and IO ranges - this binding tends to be the same across architectures
+> > yet several parsing implementations exist, e.g. arch/mips/pci/pci.c,
+> > arch/powerpc/kernel/pci-common.c, arch/sparc/kernel/pci.c and
+> > arch/microblaze/pci/pci-common.c (clone of PPC). Some of these duplicate
+> > functionality provided by drivers/of/address.c.
+> > 
+> > This patch provides a common iterator-based parser for the ranges property, it
+> > is hoped this will reduce DT representation differences between architectures
+> > and that architectures will migrate in part to this new parser.
+> ...
 > 
-> On Thu, Jan 10, 2013 at 11:48:32AM -0700, Jason Gunthorpe wrote:
-> > There is a bunch of prep stuff that may still be pending:
-> >  - Fixup remaining drivers (usb? ethernet?) to have DT bindings and
-> >    get the IRQ number through DT
+> > diff --git a/drivers/of/address.c b/drivers/of/address.c
 > 
-> any chance I could get you post your changes to the ethernet driver (DT
-> bindings)?  iirc, you said you had based them off of Ian Molton's work.
-> Even if you posted them RFC, it'd be a good place to start from,
-> reignite conversation and so forth.
+> > +const __be32 *of_pci_process_ranges(struct device_node *node,
+> 
+> > +	while (from + np <= end) {
+> > +		u64 cpu_addr, size;
+> > +
+> > +		cpu_addr = of_translate_address(node, from + na);
+> > +		size = of_read_number(from + na + pna, ns);
+> > +		res->flags = bus->get_flags(from);
+> > +		from += np;
+> > +
+> > +		if (cpu_addr == OF_BAD_ADDR || size == 0)
+> > +			continue;
+> 
+> Hmmm. That seems to just ignore bad entries in the ranges property. Is
+> that really the right thing to do? At least printing a diagnostic might
+> be a good idea, even if the code does just soldier on in the hope
+> everything still works.
 
-I've attached the main mv dt patch as a MIME, sorry for the
-awkwardness, I am travelling and won't be available... Please feel free
-to re-post/alter as necessary. As I said before, I'm not happy with
-it because it doesn't follow the standard convention for MDIO phys.
+That's true. However, erroring out here wouln't be useful either since a
+NULL return value is used to mark the end of the iteration and the
+caller would have to assume that no more ranges are present. Maybe
+that's better than continuing anyway, even if a message is printed.
 
-Jason
+Alternatively, the of_pci_process_ranges() could be changed to return an
+ERR_PTR() encoded errno. This is one case where it makes a lot of sense.
+I have a feeling that Grant won't like that very much, though.
+
+Another possibility would be to change away from an iterator-based
+approach and return an integer for the number of ranges and negative
+error code on failure while returning an allocated array of resources
+through an output parameter.
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0001-mv643xx.c-Add-basic-device-tree-support.patch
-Type: text/x-diff
-Size: 8357 bytes
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130110/4e6ac12c/attachment-0001.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130111/362dd519/attachment.sig>
