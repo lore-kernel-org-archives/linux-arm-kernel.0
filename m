@@ -1,94 +1,57 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 11 Jan 2013 10:11:34 +0000
-Subject: [v2 3/9] ARM: tegra: # of CPU cores detection w/ & w/o
- HAVE_ARM_SCU
-In-Reply-To: <50EEF235.7070200@wwwdotorg.org>
-References: <20130108171103.GA7417@e102568-lin.cambridge.arm.com>
- <20130109.134641.1582472136842052082.hdoyu@nvidia.com>
- <20130109151700.GB22147@e102568-lin.cambridge.arm.com>
- <20130110.145813.1159140334089730421.hdoyu@nvidia.com>
- <50EEF235.7070200@wwwdotorg.org>
-Message-ID: <20130111101134.GC30538@e102568-lin.cambridge.arm.com>
+From: zhanzhenbo@gmail.com (Steve zhan)
+Date: Fri, 11 Jan 2013 18:24:16 +0800
+Subject: Question:add
+Message-ID: <20130111102416.GA18438@android11.spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 04:54:13PM +0000, Stephen Warren wrote:
-> On 01/10/2013 05:58 AM, Hiroshi Doyu wrote:
-> > Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote @ Wed, 9 Jan 2013 16:17:00 +0100:
-> ...
-> > With your "[PATCH] ARM: kernel: DT cpu map validity check helper
-> > function", my original patch gets as below. I think that the following
-> > "smp_detect_ncores()" function may be so generic that it could be
-> > moved in some common place than platform?
-> > 
-> > From f5f2a43952ce75fe061b3808b994c3ceb07f1af1 Mon Sep 17 00:00:00 2001
-> > From: Hiroshi Doyu <hdoyu@nvidia.com>
-> > Date: Mon, 26 Nov 2012 12:25:14 +0200
-> > Subject: [PATCH 1/1] ARM: tegra: # of CPU cores detection w/ & w/o
-> >  HAVE_ARM_SCU
-> > 
-> > The method to detect the number of CPU cores on Cortex-A9 MPCore and
-> > Cortex-A15 MPCore is different. On Cortex-A9 MPCore we can get this
-> > information from the Snoop Control Unit(SCU). On Cortex-A15 MPCore we
-> > have to read it from the system coprocessor(CP15), because the SCU on
-> > Cortex-A15 MPCore does not have software readable registers. This
-> > patch selects the correct method at runtime based on the CPU ID.
-> 
-> > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-> 
-> > +static int __init smp_detect_ncores(void)
-> > +{
-> > +	unsigned int ncores, mpidr;
-> > +	u32 l2ctlr;
-> > +	phys_addr_t pa;
-> > +
-> > +	mpidr = read_cpuid_mpidr();
-> > +	switch (mpidr) {
-> > +	case ARM_CPU_PART_CORTEX_A15:
-> > +		asm("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
-> > +		ncores = ((l2ctlr >> 24) & 3) + 1;
-> > +		break;
-> > +	case ARM_CPU_PART_CORTEX_A9:
-> > +		/* Get SCU physical base */
-> > +		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
-> > +		scu_base = IO_ADDRESS(pa);
-> > +		ncores = scu_get_core_count(scu_base);
-> > +		break;
-> > +	default:
-> > +		pr_warn("Unsupported mpidr\n");
-> > +		ncores = 1;
-> > +		break;
-> > +	}
-> > +
-> > +	return ncores;
-> > +}
-> 
-> Why not just remove that function...
-> 
-> >  /*
-> >   * Initialise the CPU possible map early - this describes the CPUs
-> >   * which may be present or become present in the system.
-> >   */
-> >  static void __init tegra_smp_init_cpus(void)
-> >  {
-> > -	unsigned int i, ncores = scu_get_core_count(scu_base);
-> > -
-> > -	if (ncores > nr_cpu_ids) {
-> > -		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
-> > -			ncores, nr_cpu_ids);
-> > -		ncores = nr_cpu_ids;
-> > +	if (!arm_dt_cpu_map_valid()) {
-> > +		unsigned int i, ncores;
-> > +
-> > +		ncores = smp_detect_ncores();
-> 
-> And just say "ncores = 1" here?
-> 
-> For Tegra, it's trivial to simply put the patch adding the required DT
-> nodes before this patch, and then there's no need for any
-> backwards-compatibility, since the nodes are guaranteed to be there.
+All:
+	I have find that arm gic driver have not register irq_disable
+method, as below:
+static struct irq_chip gic_chip = {
+	.name			= "GIC",
+	.irq_mask		= gic_mask_irq,
+	.irq_unmask		= gic_unmask_irq,
+	.irq_eoi		= gic_eoi_irq,
+	.irq_set_type		= gic_set_type,
+	.irq_retrigger		= gic_retrigger,
+#ifdef CONFIG_SMP
+	.irq_set_affinity	= gic_set_affinity,
+#endif
+	.irq_set_wake		= gic_set_wake,
+};
 
-If you are willing to accept that your code proposal is perfectly fine by me.
+Question is: 
+	When some drivers want to disable irq, maybe it will call 
+linux standard inerface: irq_disable() that defined in include\
+linux\interrupt.h, this function will call
+void irq_disable(struct irq_desc *desc)
+{
+	irq_state_set_disabled(desc);
+	if (desc->irq_data.chip->irq_disable) {
+		desc->irq_data.chip->irq_disable(&desc->irq_data);
+		irq_state_set_masked(desc);
+	}
+}
 
-Thanks,
-Lorenzo
+Because gic have not register irq_diable method, so the interrupt can
+not disable immediately, it is enable until the interrupt come next time,
+then disalbed by mask because irq_state_set_disable(desc);
+
+I have checked irq_enable method:
+void irq_enable(struct irq_desc *desc)
+{
+	irq_state_clr_disabled(desc);
+	if (desc->irq_data.chip->irq_enable)
+		desc->irq_data.chip->irq_enable(&desc->irq_data);
+	else
+		desc->irq_data.chip->irq_unmask(&desc->irq_data);
+	irq_state_clr_masked(desc);
+}
+This method have do unmask when irq_enable method is not exist.
+
+Is it a good idea to add irq_mask call in irq_disable()?
+
+
+Regards,
+Steve
