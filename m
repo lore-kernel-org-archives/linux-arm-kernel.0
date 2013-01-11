@@ -1,212 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 11 Jan 2013 14:13:39 -0500 (EST)
-Subject: [PATCH 10/16] ARM: vexpress: introduce DCSCB support
-In-Reply-To: <50F05606.9060703@ti.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-11-git-send-email-nicolas.pitre@linaro.org>
- <50F05606.9060703@ti.com>
-Message-ID: <alpine.LFD.2.02.1301111408330.6300@xanadu.home>
+From: agraf@suse.de (Alexander Graf)
+Date: Fri, 11 Jan 2013 20:17:50 +0100
+Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
+In-Reply-To: <20130110222801.GB17111@amt.cnet>
+References: <1357766143.18196.2@snotra>
+ <4F8BA51C-1A21-4ED9-80CE-55ECB01C0AAD@suse.de>
+ <20130110222801.GB17111@amt.cnet>
+Message-ID: <DE6EF8D6-D999-40E9-8F32-7AE1C4A0EEF9@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
 
-> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> > This adds basic CPU and cluster reset controls on RTSM for the
-> > A15x4-A7x4 model configuration using the Dual Cluster System
-> > Configuration Block (DCSCB).
-> > 
-> > The cache coherency interconnect (CCI) is not handled yet.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> >   arch/arm/mach-vexpress/Kconfig  |   8 ++
-> >   arch/arm/mach-vexpress/Makefile |   1 +
-> >   arch/arm/mach-vexpress/dcscb.c  | 160
-> > ++++++++++++++++++++++++++++++++++++++++
-> >   3 files changed, 169 insertions(+)
-> >   create mode 100644 arch/arm/mach-vexpress/dcscb.c
-> > 
-> > diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> > index 99e63f5f99..e55c02562f 100644
-> > --- a/arch/arm/mach-vexpress/Kconfig
-> > +++ b/arch/arm/mach-vexpress/Kconfig
-> > @@ -53,4 +53,12 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
-> >   config ARCH_VEXPRESS_CA9X4
-> >   	bool "Versatile Express Cortex-A9x4 tile"
-> > 
-> > +config ARCH_VEXPRESS_DCSCB
-> > +	bool "Dual Cluster System Control Block (DCSCB) support"
-> > +	depends on BIG_LITTLE
-> > +	help
-> > +	  Support for the Dual Cluster System Configuration Block (DCSCB).
-> > +	  This is needed to provide CPU and cluster power management
-> > +	  on RTSM.
-> > +
-> >   endmenu
-> > diff --git a/arch/arm/mach-vexpress/Makefile
-> > b/arch/arm/mach-vexpress/Makefile
-> > index 80b64971fb..2253644054 100644
-> > --- a/arch/arm/mach-vexpress/Makefile
-> > +++ b/arch/arm/mach-vexpress/Makefile
-> > @@ -6,5 +6,6 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) :=
-> > -I$(srctree)/$(src)/include \
-> > 
-> >   obj-y					:= v2m.o reset.o
-> >   obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
-> > +obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o
-> >   obj-$(CONFIG_SMP)			+= platsmp.o
-> >   obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
-> > diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-> > new file mode 100644
-> > index 0000000000..cccd943cd4
-> > --- /dev/null
-> > +++ b/arch/arm/mach-vexpress/dcscb.c
-> > @@ -0,0 +1,160 @@
-> > +/*
-> > + * arch/arm/mach-vexpress/dcscb.c - Dual Cluster System Control Block
-> > + *
-> > + * Created by:	Nicolas Pitre, May 2012
-> > + * Copyright:	(C) 2012  Linaro Limited
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/init.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/io.h>
-> > +#include <linux/spinlock.h>
-> > +#include <linux/errno.h>
-> > +#include <linux/vexpress.h>
-> > +
-> > +#include <asm/bL_entry.h>
-> > +#include <asm/proc-fns.h>
-> > +#include <asm/cacheflush.h>
-> > +
-> > +
-> > +#define DCSCB_PHYS_BASE	0x60000000
-> > +
-> > +#define RST_HOLD0	0x0
-> > +#define RST_HOLD1	0x4
-> > +#define SYS_SWRESET	0x8
-> > +#define RST_STAT0	0xc
-> > +#define RST_STAT1	0x10
-> > +#define EAG_CFG_R	0x20
-> > +#define EAG_CFG_W	0x24
-> > +#define KFC_CFG_R	0x28
-> > +#define KFC_CFG_W	0x2c
-> > +#define DCS_CFG_R	0x30
-> > +
-> > +/*
-> > + * We can't use regular spinlocks. In the switcher case, it is possible
-> > + * for an outbound CPU to call power_down() after its inbound counterpart
-> > + * is already live using the same logical CPU number which trips lockdep
-> > + * debugging.
-> > + */
-> > +static arch_spinlock_t dcscb_lock = __ARCH_SPIN_LOCK_UNLOCKED;
-> > +
-> > +static void __iomem *dcscb_base;
-> > +
-> > +static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
-> > +{
-> > +	unsigned int rst_hold, cpumask = (1 << cpu);
-> > +
-> > +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> > +	if (cpu >= 4 || cluster >= 2)
-> > +		return -EINVAL;
-> > +
-> > +	/*
-> > +	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
-> > +	 * variant exists, we need to disable IRQs manually here.
-> > +	 */
-> > +	local_irq_disable();
-> > +	arch_spin_lock(&dcscb_lock);
-> > +
-> > +	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-> > +	if (rst_hold & (1 << 8)) {
-> > +		/* remove cluster reset and add individual CPU's reset */
-> > +		rst_hold &= ~(1 << 8);
-> > +		rst_hold |= 0xf;
-> > +	}
-> > +	rst_hold &= ~(cpumask | (cpumask << 4));
-> > +	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-> > +
-> > +	arch_spin_unlock(&dcscb_lock);
-> > +	local_irq_enable();
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static void dcscb_power_down(void)
-> > +{
-> > +	unsigned int mpidr, cpu, cluster, rst_hold, cpumask, last_man;
-> > +
-> > +	asm ("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
-> > +	cpu = mpidr & 0xff;
-> > +	cluster = (mpidr >> 8) & 0xff;
-> > +	cpumask = (1 << cpu);
-> > +
-> > +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> > +	BUG_ON(cpu >= 4 || cluster >= 2);
-> > +
-> > +	arch_spin_lock(&dcscb_lock);
-> > +	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-> > +	rst_hold |= cpumask;
-> > +	if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf)
-> > +		rst_hold |= (1 << 8);
-> > +	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-> > +	arch_spin_unlock(&dcscb_lock);
-> > +	last_man = (rst_hold & (1 << 8));
-> > +
-> > +	/*
-> > +	 * Now let's clean our L1 cache and shut ourself down.
-> > +	 * If we're the last CPU in this cluster then clean L2 too.
-> > +	 */
-> > +
-> Do you wanted to have C bit clear code here ?
+On 10.01.2013, at 23:28, Marcelo Tosatti wrote:
 
-cpu_proc_fin() does it.
-
-> > +	/*
-> > +	 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
-> > +	 * a preliminary flush here for those CPUs.  At least, that's
-> > +	 * the theory -- without the extra flush, Linux explodes on
-> > +	 * RTSM (maybe not needed anymore, to be investigated)..
-> > +	 */
-> > +	flush_cache_louis();
-> > +	cpu_proc_fin();
-> > +
-> > +	if (!last_man) {
-> > +		flush_cache_louis();
-> > +	} else {
-> > +		flush_cache_all();
-> > +		outer_flush_all();
-> > +	}
-> > +
-> > +	/* Disable local coherency by clearing the ACTLR "SMP" bit: */
-> > +	asm volatile (
-> > +		"mrc	p15, 0, ip, c1, c0, 1 \n\t"
-> > +		"bic	ip, ip, #(1 << 6) @ clear SMP bit \n\t"
-> > +		"mcr	p15, 0, ip, c1, c0, 1"
-> > +		: : : "ip" );
-> > +
-> > +	/* Now we are prepared for power-down, do it: */
-> You need dsb here, right ?
-
-Probably.  However this code is being refactored significantly with 
-subsequent patches.  This intermediate step was kept not to introduce 
-too many concepts at once.
-
-> > +	wfi();
-> > +
-> > +	/* Not dead at this point?  Let our caller cope. */
-> > +}
-> > +
+> On Wed, Jan 09, 2013 at 10:37:20PM +0100, Alexander Graf wrote:
+>> 
+>>> 
+>>>>>> We can start to introduce (and fix ARM) with a generic ioctl in the MPIC patches then.
+>>>>> 
+>>>>> The ioctl is already generic, except for its name.
+>>>> It's making a few wrong assumptions:
+>>>> * maximum size of value is u64
+>>> 
+>>> This is tolerable IMHO.
+>>> 
+>>>> * combining device id (variable) with addr type id (const) into a single field. It could just be split into multiple fields
+>>> 
+>>> I agree, but that could be lived with as well.
+>>> 
+>>> I get that there's a tradeoff between getting something in now, versus waiting until the API is more refined.  Tagging it with a particular ISA seems like an odd way of saying "soon to be deprecated", though.  What happens if we're still squabbling over the perfect replacement API when we're trying to push PPC MPIC stuff in?
 > 
-> Regards
-> Santosh
-> 
+> As mentioned, i fail to see the benefit in sharing 0.0x% of the code (the
+> interface), while the remaining code is not shared.
 
-Nicolas
+Important code sharing happens in user space.
+
+> 
+>> Then we're the ones who have to come up with a good interface.
+> 
+> Or just have KVM_SET_PPC_DEVICE_ADDRESS. Is there a downside to that?
+
+Yes. Harder to read code and a lack of commonality. Also it wouldn't cut it for us, as we need to set more than just addresses. But most of all I really hate to take a generic problem and solve it only for myself.
+
+Btw, x86 has the same issue too, it just only somehow got away with not caring too much about it. The LAPIC has a version register that Mac OS X guests read. If the version is too old, it doesn't boot. So some time ago we just changed the version register.
+
+The real, backwards compatible change however would've been to have user space tell us which version to emulate and set it accordingly. The way we did it basically broke backwards compatibility. We only got away with it because the register is rarely read.
+
+
+Alex
