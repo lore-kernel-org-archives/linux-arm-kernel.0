@@ -1,31 +1,71 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 Jan 2013 13:54:44 +0800
-Subject: [PATCH 3/3] ARM: samsung: remove unused arch_decomp_wdog() code
-In-Reply-To: <041c01cdefbf$c46fddb0$4d4f9910$@samsung.com>
-References: <1357827165-9320-1-git-send-email-shawn.guo@linaro.org>
- <1357827165-9320-4-git-send-email-shawn.guo@linaro.org>
- <041c01cdefbf$c46fddb0$4d4f9910$@samsung.com>
-Message-ID: <20130111055442.GA12579@S2101-09.ap.freescale.net>
+From: chuansheng.liu@intel.com (Liu, Chuansheng)
+Date: Fri, 11 Jan 2013 05:57:27 +0000
+Subject: [PATCH] hardlockup: detect hard lockups without NMIs using
+ secondary cpus
+In-Reply-To: <CAMbhsRS5S=bRWOAA_ft3josCX9kvarrqPX-sLnO02vB0NfZJ+w@mail.gmail.com>
+References: <1357783059-13923-1-git-send-email-ccross@android.com>
+ <27240C0AC20F114CBF8149A2696CBE4A200DD9@SHSMSX101.ccr.corp.intel.com>
+ <CAMbhsRS5S=bRWOAA_ft3josCX9kvarrqPX-sLnO02vB0NfZJ+w@mail.gmail.com>
+Message-ID: <27240C0AC20F114CBF8149A2696CBE4A2010CB@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 09:51:55PM -0800, Kukjin Kim wrote:
-> Shawn Guo wrote:
-> > 
-> > With ARCH_HAS_DECOMP_WDOG removed from
-> > arch/arm/boot/compressed/decompress.c,
-> > all the arch_decomp_wdog() related codes become unused.  Remove them.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> Looks good to me,
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-Thanks, Kim.
 
-> Do you want me to take this into Samsung tree?
-> 
-I would like to send them as a series to arm-soc.
 
-Shawn
+> -----Original Message-----
+> From: ccross at google.com [mailto:ccross at google.com] On Behalf Of Colin
+> Cross
+> Sent: Friday, January 11, 2013 1:34 PM
+> To: Liu, Chuansheng
+> Cc: linux-kernel at vger.kernel.org; Andrew Morton; Don Zickus; Ingo Molnar;
+> Thomas Gleixner; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] hardlockup: detect hard lockups without NMIs using
+> secondary cpus
+> 
+> On Thu, Jan 10, 2013 at 5:39 PM, Liu, Chuansheng
+> <chuansheng.liu@intel.com> wrote:
+> >
+> >
+> >> -----Original Message-----
+> >> From: Colin Cross [mailto:ccross at android.com]
+> >> Sent: Thursday, January 10, 2013 9:58 AM
+> >> To: linux-kernel at vger.kernel.org
+> >> Cc: Andrew Morton; Don Zickus; Ingo Molnar; Thomas Gleixner; Liu,
+> >> Chuansheng; linux-arm-kernel at lists.infradead.org; Colin Cross
+> >> Subject: [PATCH] hardlockup: detect hard lockups without NMIs using
+> >> secondary cpus
+> >>
+> >> Emulate NMIs on systems where they are not available by using timer
+> >> interrupts on other cpus.  Each cpu will use its softlockup hrtimer
+> >> to check that the next cpu is processing hrtimer interrupts by
+> >> verifying that a counter is increasing.
+> >>
+> >> This patch is useful on systems where the hardlockup detector is not
+> >> available due to a lack of NMIs, for example most ARM SoCs.
+> >> Without this patch any cpu stuck with interrupts disabled can
+> >> cause a hardware watchdog reset with no debugging information,
+> >> but with this patch the kernel can detect the lockup and panic,
+> >> which can result in useful debugging info.
+> >>
+> >> Signed-off-by: Colin Cross <ccross@android.com>
+> >> +static void watchdog_check_hardlockup_other_cpu(void)
+> >> +{
+> >> +     int cpu;
+> >> +     cpumask_t cpus = watchdog_cpus;
+> >> +
+> >> +     /*
+> >> +      * Test for hardlockups every 3 samples.  The sample period is
+> >> +      *  watchdog_thresh * 2 / 5, so 3 samples gets us back to slightly
+> over
+> >> +      *  watchdog_thresh (over by 20%).
+> >> +      */
+> >> +     if (__this_cpu_read(hrtimer_interrupts) % 3 != 0)
+> >> +             return;
+> >> +
+Another feeling is about __this_cpu_read(hrtimer_interrupts) % 3 != 0,
+It will cause the actual timeout value for hard lockup detection is not very fix, or even
+very short.
+Sometimes using 3 samples can detect the lockup case, but sometimes 1 sample.
+Is it the case?
+
+And in NMI case, the NMI interrupt is coming at least every watchdog_thresh.
