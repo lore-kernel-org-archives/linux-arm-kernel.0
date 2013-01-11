@@ -1,52 +1,36 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 11 Jan 2013 10:06:03 +0100
-Subject: [PATCH 1/2 V3] iio: mxs: Implement support for touchscreen
-In-Reply-To: <50EFCDF2.7090207@bluegiga.com>
-References: <1357861431-8978-1-git-send-email-marex@denx.de>
- <50EFCDF2.7090207@bluegiga.com>
-Message-ID: <201301111006.03722.marex@denx.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 11 Jan 2013 11:40:32 +0200
+Subject: [PATCH 01/14] mfd: omap-usb-host: Consolidate OMAP USB-HS platform
+ data
+In-Reply-To: <20130110234537.GB15458@atomide.com>
+References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
+ <1357836694-30788-2-git-send-email-rogerq@ti.com>
+ <20130110234537.GB15458@atomide.com>
+Message-ID: <50EFDE10.9080902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lauri Hintsala,
+Tony,
 
-> Hi,
+On 01/11/2013 01:45 AM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [130110 08:54]:
+>> Let's have a single platform data structure for the OMAP's High-Speed
+>> USB host subsystem instead of having 3 separate ones i.e. one for
+>> board data, one for USB Host (UHH) module and one for USB-TLL module.
+>>
+>> This makes the code much simpler and avoids creating multiple copies of
+>> platform data.
 > 
-> On 01/11/2013 01:43 AM, Marek Vasut wrote:
-> > This patch implements support for sampling of a touchscreen into
-> > the MXS LRADC driver. The LRADC block allows configuring some of
-> > it's channels into special mode where they either output the drive
-> > voltage or sample it, allowing it to operate a 4-wire or 5-wire
-> > resistive touchscreen.
-> > 
-> > In case the touchscreen mode is enabled, the LRADC slot #7 is
-> > reserved for touchscreen only, therefore it is not possible to
-> > sample 8 LRADC channels at time, but only 7 channels.
-> > 
-> > The touchscreen controller is configured such that the PENDOWN event
-> > disables touchscreen interrupts and triggers execution of worker
-> > thread, which then polls the touchscreen controller for X, Y and
-> > Pressure values. This reduces the overhead of interrupt-driven
-> > operation. Upon the PENUP event, the worker thread re-enables the
-> > PENDOWN detection interrupt and exits.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Jonathan Cameron <jic23@kernel.org>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > 
-> >   .../bindings/staging/iio/adc/mxs-lradc.txt         |    6 +
-> >   drivers/staging/iio/adc/mxs-lradc.c                |  473
-> >   +++++++++++++++++++- 2 files changed, 455 insertions(+), 24
-> >   deletions(-)
+> I can apply just this patch alone into an immutable branch that
+> we all can merge in as needed as long as we have acks for the USB
+> and MFD parts.
 > 
-> Works fine with apx4devkit.
+> Or does this one need to be changed based on Alan's comments
+> on the EHCI lib related changes?
 > 
-> Tested-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
 
-Thanks Lauri :)
+This does not depend on EHCI lib based changes but it depends on the
+OMAP USB Host cleanup series posted earlier.
 
-Best regards,
-Marek Vasut
+regards,
+-roger
