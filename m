@@ -1,675 +1,112 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Jan 2013 23:16:18 +0530
-Subject: [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
- exit/setup
-In-Reply-To: <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <50F04FEA.1040205@ti.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Fri, 11 Jan 2013 12:48:45 -0500
+Subject: [kvmarm] [PATCH v2 2/2] ARM: KVM: Power State Coordination
+ Interface implementation
+In-Reply-To: <50F04F2F.80306@arm.com>
+References: <1357834005-23843-1-git-send-email-marc.zyngier@arm.com>
+ <1357834005-23843-3-git-send-email-marc.zyngier@arm.com>
+ <20130111171232.GH23505@n2100.arm.linux.org.uk>
+ <50F04AD5.6020703@arm.com>
+ <CANM98qJ2ZSwxMWFRWiunTQtoV7iFb3fn3Cf6VWvOndBcU=+Tmg@mail.gmail.com>
+ <50F04F2F.80306@arm.com>
+Message-ID: <CANM98qLRsdFGxU6S5q2EqtCAmK8fOnbGWi8qXBktyuRkSaPAJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> From: Dave Martin <dave.martin@linaro.org>
+On Fri, Jan 11, 2013 at 12:43 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 11/01/13 17:33, Christoffer Dall wrote:
+>> On Fri, Jan 11, 2013 at 12:24 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 11/01/13 17:12, Russell King - ARM Linux wrote:
+>>>> On Thu, Jan 10, 2013 at 04:06:45PM +0000, Marc Zyngier wrote:
+>>>>> +int kvm_psci_call(struct kvm_vcpu *vcpu)
+>>>>> +{
+>>>>> +    unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>>>>> +    unsigned long val;
+>>>>> +
+>>>>> +    switch (psci_fn) {
+>>>>> +    case KVM_PSCI_FN_CPU_OFF:
+>>>>> +            kvm_psci_vcpu_off(vcpu);
+>>>>> +            val = KVM_PSCI_RET_SUCCESS;
+>>>>> +            break;
+>>>>> +    case KVM_PSCI_FN_CPU_ON:
+>>>>> +            val = kvm_psci_vcpu_on(vcpu);
+>>>>> +            break;
+>>>>> +    case KVM_PSCI_FN_CPU_SUSPEND:
+>>>>> +    case KVM_PSCI_FN_MIGRATE:
+>>>>> +            val = KVM_PSCI_RET_NI;
+>>>>> +            break;
+>>>>> +
+>>>>> +    default:
+>>>>> +            return -1;
+>>>>> +    }
+>>>>> +
+>>>>> +    *vcpu_reg(vcpu, 0) = val;
+>>>>> +    return 0;
+>>>>> +}
+>>>>
+>>>> We were discussing recently on #kernel about kernel APIs and the way that
+>>>> our integer-returning functions pretty much use 0 for success, and -errno
+>>>> for failures, whereas our pointer-returning functions are a mess.
+>>>>
+>>>> And above we have something returning -1 to some other chunk of code outside
+>>>> this compilation unit.  That doesn't sound particularly clever to me.
+>>>
+>>> The original code used to return -EINVAL, see:
+>>> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-January/004509.html
+>>>
+>>> Christoffer (Cc-ed) didn't like this, hence the -1. I'm happy to revert
+>>> the code to its original state though.
+>>>
+>> I don't want to return -EINVAL, because for the rest of the KVM code
+>> this would mean kill the guest.
+>>
+>> The convention used in other archs of KVM as well as for ARM is that
+>> the handle_exit functions return:
+>>
+>> -ERRNO: Error, report this error to user space
+>> 0: Everything is fine, but return to user space to let it do I/O
+>> emulation and whatever it wants to do
+>> 1: Everything is fine, return directly to the guest without going to user space
 >
-> This provides helper methods to coordinate between CPUs coming down
-> and CPUs going up, as well as documentation on the used algorithms,
-> so that cluster teardown and setup
-> operations are not done for a cluster simultaneously.
->
-> For use in the power_down() implementation:
->    * __bL_cpu_going_down(unsigned int cluster, unsigned int cpu)
->    * __bL_outbound_enter_critical(unsigned int cluster)
->    * __bL_outbound_leave_critical(unsigned int cluster)
->    * __bL_cpu_down(unsigned int cluster, unsigned int cpu)
->
-> The power_up_setup() helper should do platform-specific setup in
-> preparation for turning the CPU on, such as invalidating local caches
-> or entering coherency.  It must be assembler for now, since it must
-> run before the MMU can be switched on.  It is passed the affinity level
-> which should be initialized.
->
-> Because the bL_cluster_sync_struct content is looked-up and modified
-> with the cache enabled or disabled depending on the code path, it is
-> crucial to always ensure proper cache maintenance to update main memory
-> right away.  Therefore, any cached write must be followed by a cache clean
-> operation and any cached read must be preceded by a cache invalidate
-> operation on the accessed memory.
->
-> To avoid races where a reader would invalidate the cache and discard the
-> latest update from a writer before that writer had a chance to clean it
-> to RAM, we simply use cache flush (clean+invalidate) operations
-> everywhere.
->
-> Also, in order to prevent a cached writer from interfering with an
-> adjacent non-cached writer, we ensure each state variable is located to
-> a separate cache line.
->
-> Thanks to Nicolas Pitre and Achin Gupta for the help with this
-> patch.
->
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
->   .../arm/big.LITTLE/cluster-pm-race-avoidance.txt   | 498 +++++++++++++++++++++
->   arch/arm/common/bL_entry.c                         | 160 +++++++
->   arch/arm/common/bL_head.S                          |  88 +++-
->   arch/arm/include/asm/bL_entry.h                    |  62 +++
->   4 files changed, 806 insertions(+), 2 deletions(-)
->   create mode 100644 Documentation/arm/big.LITTLE/cluster-pm-race-avoidance.txt
->
-> diff --git a/Documentation/arm/big.LITTLE/cluster-pm-race-avoidance.txt b/Documentation/arm/big.LITTLE/cluster-pm-race-avoidance.txt
-> new file mode 100644
-> index 0000000000..d6151e0235
-> --- /dev/null
-> +++ b/Documentation/arm/big.LITTLE/cluster-pm-race-avoidance.txt
-> @@ -0,0 +1,498 @@
-> +Big.LITTLE cluster Power-up/power-down race avoidance algorithm
-> +===============================================================
-> +
-> +This file documents the algorithm which is used to coordinate CPU and
-> +cluster setup and teardown operations and to manage hardware coherency
-> +controls safely.
-> +
-> +The section "Rationale" explains what the algorithm is for and why it is
-> +needed.  "Basic model" explains general concepts using a simplified view
-> +of the system.  The other sections explain the actual details of the
-> +algorithm in use.
-> +
-> +
-> +Rationale
-> +---------
-> +
-> +In a system containing multiple CPUs, it is desirable to have the
-> +ability to turn off individual CPUs when the system is idle, reducing
-> +power consumption and thermal dissipation.
-> +
-> +In a system containing multiple clusters of CPUs, it is also desirable
-> +to have the ability to turn off entire clusters.
-> +
-> +Turning entire clusters off and on is a risky business, because it
-> +involves performing potentially destructive operations affecting a group
-> +of independently running CPUs, while the OS continues to run.  This
-> +means that we need some coordination in order to ensure that critical
-> +cluster-level operations are only performed when it is truly safe to do
-> +so.
-> +
-> +Simple locking may not be sufficient to solve this problem, because
-> +mechanisms like Linux spinlocks may rely on coherency mechanisms which
-> +are not immediately enabled when a cluster powers up.  Since enabling or
-> +disabling those mechanisms may itself be a non-atomic operation (such as
-> +writing some hardware registers and invalidating large caches), other
-> +methods of coordination are required in order to guarantee safe
-> +power-down and power-up at the cluster level.
-> +
-> +The mechanism presented in this document describes a coherent memory
-> +based protocol for performing the needed coordination.  It aims to be as
-> +lightweight as possible, while providing the required safety properties.
-> +
-> +
-> +Basic model
-> +-----------
-> +
-> +Each cluster and CPU is assigned a state, as follows:
-> +
-> +	DOWN
-> +	COMING_UP
-> +	UP
-> +	GOING_DOWN
-> +
-> +	    +---------> UP ----------+
-> +	    |                        v
-> +
-> +	COMING_UP                GOING_DOWN
-> +
-> +	    ^                        |
-> +	    +--------- DOWN <--------+
-> +
-> +
-> +DOWN:	The CPU or cluster is not coherent, and is either powered off or
-> +	suspended, or is ready to be powered off or suspended.
-> +
-> +COMING_UP: The CPU or cluster has committed to moving to the UP state.
-> +	It may be part way through the process of initialisation and
-> +	enabling coherency.
-> +
-> +UP:	The CPU or cluster is active and coherent at the hardware
-> +	level.  A CPU in this state is not necessarily being used
-> +	actively by the kernel.
-> +
-> +GOING_DOWN: The CPU or cluster has committed to moving to the DOWN
-> +	state.  It may be part way through the process of teardown and
-> +	coherency exit.
-> +
-> +
-> +Each CPU has one of these states assigned to it at any point in time.
-> +The CPU states are described in the "CPU state" section, below.
-> +
-> +Each cluster is also assigned a state, but it is necessary to split the
-> +state value into two parts (the "cluster" state and "inbound" state) and
-> +to introduce additional states in order to avoid races between different
-> +CPUs in the cluster simultaneously modifying the state.  The cluster-
-> +level states are described in the "Cluster state" section.
-> +
-> +To help distinguish the CPU states from cluster states in this
-> +discussion, the state names are given a CPU_ prefix for the CPU states,
-> +and a CLUSTER_ or INBOUND_ prefix for the cluster states.
-> +
-> +
-> +CPU state
-> +---------
-> +
-> +In this algorithm, each individual core in a multi-core processor is
-> +referred to as a "CPU".  CPUs are assumed to be single-threaded:
-> +therefore, a CPU can only be doing one thing at a single point in time.
-> +
-> +This means that CPUs fit the basic model closely.
-> +
-> +The algorithm defines the following states for each CPU in the system:
-> +
-> +	CPU_DOWN
-> +	CPU_COMING_UP
-> +	CPU_UP
-> +	CPU_GOING_DOWN
-> +
-> +	 cluster setup and
-> +	CPU setup complete          policy decision
-> +	      +-----------> CPU_UP ------------+
-> +	      |                                v
-> +
-> +	CPU_COMING_UP                   CPU_GOING_DOWN
-> +
-> +	      ^                                |
-> +	      +----------- CPU_DOWN <----------+
-> +	 policy decision           CPU teardown complete
-> +	or hardware event
-> +
-> +
-> +The definitions of the four states correspond closely to the states of
-> +the basic model.
-> +
-> +Transitions between states occur as follows.
-> +
-> +A trigger event (spontaneous) means that the CPU can transition to the
-> +next state as a result of making local progress only, with no
-> +requirement for any external event to happen.
-> +
-> +
-> +CPU_DOWN:
-> +
-> +	A CPU reaches the CPU_DOWN state when it is ready for
-> +	power-down.  On reaching this state, the CPU will typically
-> +	power itself down or suspend itself, via a WFI instruction or a
-> +	firmware call.
-> +
-> +	Next state:	CPU_COMING_UP
-> +	Conditions:	none
-> +
-> +	Trigger events:
-> +
-> +		a) an explicit hardware power-up operation, resulting
-> +		   from a policy decision on another CPU;
-> +
-> +		b) a hardware event, such as an interrupt.
-> +
-> +
-> +CPU_COMING_UP:
-> +
-> +	A CPU cannot start participating in hardware coherency until the
-> +	cluster is set up and coherent.  If the cluster is not ready,
-> +	then the CPU will wait in the CPU_COMING_UP state until the
-> +	cluster has been set up.
-> +
-> +	Next state:	CPU_UP
-> +	Conditions:	The CPU's parent cluster must be in CLUSTER_UP.
-> +	Trigger events:	Transition of the parent cluster to CLUSTER_UP.
-> +
-> +	Refer to the "Cluster state" section for a description of the
-> +	CLUSTER_UP state.
-> +
-> +
-> +CPU_UP:
-> +	When a CPU reaches the CPU_UP state, it is safe for the CPU to
-> +	start participating in local coherency.
-> +
-> +	This is done by jumping to the kernel's CPU resume code.
-> +
-> +	Note that the definition of this state is slightly different
-> +	from the basic model definition: CPU_UP does not mean that the
-> +	CPU is coherent yet, but it does mean that it is safe to resume
-> +	the kernel.  The kernel handles the rest of the resume
-> +	procedure, so the remaining steps are not visible as part of the
-> +	race avoidance algorithm.
-> +
-> +	The CPU remains in this state until an explicit policy decision
-> +	is made to shut down or suspend the CPU.
-> +
-> +	Next state:	CPU_GOING_DOWN
-> +	Conditions:	none
-> +	Trigger events:	explicit policy decision
-> +
-> +
-> +CPU_GOING_DOWN:
-> +
-> +	While in this state, the CPU exits coherency, including any
-> +	operations required to achieve this (such as cleaning data
-> +	caches).
-> +
-> +	Next state:	CPU_DOWN
-> +	Conditions:	local CPU teardown complete
-> +	Trigger events:	(spontaneous)
-> +
-> +
-> +Cluster state
-> +-------------
-> +
-> +A cluster is a group of connected CPUs with some common resources.
-> +Because a cluster contains multiple CPUs, it can be doing multiple
-> +things at the same time.  This has some implications.  In particular, a
-> +CPU can start up while another CPU is tearing the cluster down.
-> +
-> +In this discussion, the "outbound side" is the view of the cluster state
-> +as seen by a CPU tearing the cluster down.  The "inbound side" is the
-> +view of the cluster state as seen by a CPU setting the CPU up.
-> +
-> +In order to enable safe coordination in such situations, it is important
-> +that a CPU which is setting up the cluster can advertise its state
-> +independently of the CPU which is tearing down the cluster.  For this
-> +reason, the cluster state is split into two parts:
-> +
-> +	"cluster" state: The global state of the cluster; or the state
-> +		on the outbound side:
-> +
-> +		CLUSTER_DOWN
-> +		CLUSTER_UP
-> +		CLUSTER_GOING_DOWN
-> +
-> +	"inbound" state: The state of the cluster on the inbound side.
-> +
-> +		INBOUND_NOT_COMING_UP
-> +		INBOUND_COMING_UP
-> +
-> +
-> +	The different pairings of these states results in six possible
-> +	states for the cluster as a whole:
-> +
-> +	                            CLUSTER_UP
-> +	          +==========> INBOUND_NOT_COMING_UP -------------+
-> +	          #                                               |
-> +	                                                          |
-> +	     CLUSTER_UP     <----+                                |
-> +	  INBOUND_COMING_UP      |                                v
-> +
-> +	          ^             CLUSTER_GOING_DOWN       CLUSTER_GOING_DOWN
-> +	          #              INBOUND_COMING_UP <=== INBOUND_NOT_COMING_UP
-> +
-> +	    CLUSTER_DOWN         |                                |
-> +	  INBOUND_COMING_UP <----+                                |
-> +	                                                          |
-> +	          ^                                               |
-> +	          +===========     CLUSTER_DOWN      <------------+
-> +	                       INBOUND_NOT_COMING_UP
-> +
-> +	Transitions -----> can only be made by the outbound CPU, and
-> +	only involve changes to the "cluster" state.
-> +
-> +	Transitions ===##> can only be made by the inbound CPU, and only
-> +	involve changes to the "inbound" state, except where there is no
-> +	further transition possible on the outbound side (i.e., the
-> +	outbound CPU has put the cluster into the CLUSTER_DOWN state).
-> +
-> +	The race avoidance algorithm does not provide a way to determine
-> +	which exact CPUs within the cluster play these roles.  This must
-> +	be decided in advance by some other means.  Refer to the section
-> +	"Last man and first man selection" for more explanation.
-> +
-> +
-> +	CLUSTER_DOWN/INBOUND_NOT_COMING_UP is the only state where the
-> +	cluster can actually be powered down.
-> +
-> +	The parallelism of the inbound and outbound CPUs is observed by
-> +	the existence of two different paths from CLUSTER_GOING_DOWN/
-> +	INBOUND_NOT_COMING_UP (corresponding to GOING_DOWN in the basic
-> +	model) to CLUSTER_DOWN/INBOUND_COMING_UP (corresponding to
-> +	COMING_UP in the basic model).  The second path avoids cluster
-> +	teardown completely.
-> +
-> +	CLUSTER_UP/INBOUND_COMING_UP is equivalent to UP in the basic
-> +	model.  The final transition to CLUSTER_UP/INBOUND_NOT_COMING_UP
-> +	is trivial and merely resets the state machine ready for the
-> +	next cycle.
-> +
-> +	Details of the allowable transitions follow.
-> +
-> +	The next state in each case is notated
-> +
-> +		<cluster state>/<inbound state> (<transitioner>)
-> +
-> +	where the <transitioner> is the side on which the transition
-> +	can occur; either the inbound or the outbound side.
-> +
-> +
-> +CLUSTER_DOWN/INBOUND_NOT_COMING_UP:
-> +
-> +	Next state:	CLUSTER_DOWN/INBOUND_COMING_UP (inbound)
-> +	Conditions:	none
-> +	Trigger events:
-> +
-> +		a) an explicit hardware power-up operation, resulting
-> +		   from a policy decision on another CPU;
-> +
-> +		b) a hardware event, such as an interrupt.
-> +
-> +
-> +CLUSTER_DOWN/INBOUND_COMING_UP:
-> +
-> +	In this state, an inbound CPU sets up the cluster, including
-> +	enabling of hardware coherency at the cluster level and any
-> +	other operations (such as cache invalidation) which are required
-> +	in order to achieve this.
-> +
-> +	The purpose of this state is to do sufficient cluster-level
-> +	setup to enable other CPUs in the cluster to enter coherency
-> +	safely.
-> +
-> +	Next state:	CLUSTER_UP/INBOUND_COMING_UP (inbound)
-> +	Conditions:	cluster-level setup and hardware coherency complete
-> +	Trigger events:	(spontaneous)
-> +
-> +
-> +CLUSTER_UP/INBOUND_COMING_UP:
-> +
-> +	Cluster-level setup is complete and hardware coherency is
-> +	enabled for the cluster.  Other CPUs in the cluster can safely
-> +	enter coherency.
-> +
-> +	This is a transient state, leading immediately to
-> +	CLUSTER_UP/INBOUND_NOT_COMING_UP.  All other CPUs on the cluster
-> +	should consider treat these two states as equivalent.
-> +
-> +	Next state:	CLUSTER_UP/INBOUND_NOT_COMING_UP (inbound)
-> +	Conditions:	none
-> +	Trigger events:	(spontaneous)
-> +
-> +
-> +CLUSTER_UP/INBOUND_NOT_COMING_UP:
-> +
-> +	Cluster-level setup is complete and hardware coherency is
-> +	enabled for the cluster.  Other CPUs in the cluster can safely
-> +	enter coherency.
-> +
-> +	The cluster will remain in this state until a policy decision is
-> +	made to power the cluster down.
-> +
-> +	Next state:	CLUSTER_GOING_DOWN/INBOUND_NOT_COMING_UP (outbound)
-> +	Conditions:	none
-> +	Trigger events:	policy decision to power down the cluster
-> +
-> +
-> +CLUSTER_GOING_DOWN/INBOUND_NOT_COMING_UP:
-> +
-> +	An outbound CPU is tearing the cluster down.  The selected CPU
-> +	must wait in this state until all CPUs in the cluster are in the
-> +	CPU_DOWN state.
-> +
-> +	When all CPUs are in the CPU_DOWN state, the cluster can be torn
-> +	down, for example by cleaning data caches and exiting
-> +	cluster-level coherency.
-> +
-> +	To avoid wasteful unnecessary teardown operations, the outbound
-> +	should check the inbound cluster state for asynchronous
-> +	transitions to INBOUND_COMING_UP.  Alternatively, individual
-> +	CPUs can be checked for entry into CPU_COMING_UP or CPU_UP.
-> +
-> +
-> +	Next states:
-> +
-> +	CLUSTER_DOWN/INBOUND_NOT_COMING_UP (outbound)
-> +		Conditions:	cluster torn down and ready to power off
-> +		Trigger events:	(spontaneous)
-> +
-> +	CLUSTER_GOING_DOWN/INBOUND_COMING_UP (inbound)
-> +		Conditions:	none
-> +		Trigger events:
-> +
-> +			a) an explicit hardware power-up operation,
-> +			   resulting from a policy decision on another
-> +			   CPU;
-> +
-> +			b) a hardware event, such as an interrupt.
-> +
-> +
-> +CLUSTER_GOING_DOWN/INBOUND_COMING_UP:
-> +
-> +	The cluster is (or was) being torn down, but another CPU has
-> +	come online in the meantime and is trying to set up the cluster
-> +	again.
-> +
-> +	If the outbound CPU observes this state, it has two choices:
-> +
-> +		a) back out of teardown, restoring the cluster to the
-> +		   CLUSTER_UP state;
-> +
-> +		b) finish tearing the cluster down and put the cluster
-> +		   in the CLUSTER_DOWN state; the inbound CPU will
-> +		   set up the cluster again from there.
-> +
-> +	Choice (a) permits the removal of some latency by avoiding
-> +	unnecessary teardown and setup operations in situations where
-> +	the cluster is not really going to be powered down.
-> +
-> +
-> +	Next states:
-> +
-> +	CLUSTER_UP/INBOUND_COMING_UP (outbound)
-> +		Conditions:	cluster-level setup and hardware
-> +				coherency complete
-> +		Trigger events:	(spontaneous)
-> +
-> +	CLUSTER_DOWN/INBOUND_COMING_UP (outbound)
-> +		Conditions:	cluster torn down and ready to power off
-> +		Trigger events:	(spontaneous)
-> +
-> +
-> +Last man and First man selection
-> +--------------------------------
-> +
-> +The CPU which performs cluster tear-down operations on the outbound side
-> +is commonly referred to as the "last man".
-> +
-> +The CPU which performs cluster setup on the inbound side is commonly
-> +referred to as the "first man".
-> +
-> +The race avoidance algorithm documented above does not provide a
-> +mechanism to choose which CPUs should play these roles.
-> +
-> +
-> +Last man:
-> +
-> +When shutting down the cluster, all the CPUs involved are initially
-> +executing Linux and hence coherent.  Therefore, ordinary spinlocks can
-> +be used to select a last man safely, before the CPUs become
-> +non-coherent.
-> +
-> +
-> +First man:
-> +
-> +Because CPUs may power up asynchronously in response to external wake-up
-> +events, a dynamic mechanism is needed to make sure that only one CPU
-> +attempts to play the first man role and do the cluster-level
-> +initialisation: any other CPUs must wait for this to complete before
-> +proceeding.
-> +
-> +Cluster-level initialisation may involve actions such as configuring
-> +coherency controls in the bus fabric.
-> +
-> +The current implementation in bL_head.S uses a separate mutual exclusion
-> +mechanism to do this arbitration.  This mechanism is documented in
-> +detail in vlocks.txt.
-> +
-> +
-> +Features and Limitations
-> +------------------------
-> +
-> +Implementation:
-> +
-> +	The current ARM-based implementation is split between
-> +	arch/arm/common/bL_head.S (low-level inbound CPU operations) and
-> +	arch/arm/common/bL_entry.c (everything else):
-> +
-> +	__bL_cpu_going_down() signals the transition of a CPU to the
-> +		CPU_GOING_DOWN state.
-> +
-> +	__bL_cpu_down() signals the transition of a CPU to the CPU_DOWN
-> +		state.
-> +
-> +	A CPU transitions to CPU_COMING_UP and then to CPU_UP via the
-> +		low-level power-up code in bL_head.S.  This could
-> +		involve CPU-specific setup code, but in the current
-> +		implementation it does not.
-> +
-> +	__bL_outbound_enter_critical() and __bL_outbound_leave_critical()
-> +		handle transitions from CLUSTER_UP to CLUSTER_GOING_DOWN
-> +		and from there to CLUSTER_DOWN or back to CLUSTER_UP (in
-> +		the case of an aborted cluster power-down).
-> +
-> +		These functions are more complex than the __bL_cpu_*()
-> +		functions due to the extra inter-CPU coordination which
-> +		is needed for safe transitions at the cluster level.
-> +
-> +	A cluster transitions from CLUSTER_DOWN back to CLUSTER_UP via
-> +		the low-level power-up code in bL_head.S.  This
-> +		typically involves platform-specific setup code,
-> +		provided by the platform-specific power_up_setup
-> +		function registered via bL_cluster_sync_init.
-> +
-> +Deep topologies:
-> +
-> +	As currently described and implemented, the algorithm does not
-> +	support CPU topologies involving more than two levels (i.e.,
-> +	clusters of clusters are not supported).  The algorithm could be
-> +	extended by replicating the cluster-level states for the
-> +	additional topological levels, and modifying the transition
-> +	rules for the intermediate (non-outermost) cluster levels.
-> +
-> +
-> +Colophon
-> +--------
-> +
-> +Originally created and documented by Dave Martin for Linaro Limited, in
-> +collaboration with Nicolas Pitre and Achin Gupta.
-> +
-Great write-up Dave!! I might have to do couple of more passes on it to
-get overall idea, but surely this documentation is good start for
-anybody reading/reviewing the big.LITTLE switcher code.
+> That is assuming we propagate the handle_exit convention down to the
+> leaf calls, and I object to that. The 3 possible values only apply to
+> handle_exit, and we should keep that convention as local as possible,
+> because this is the odd case.
 
-> +Copyright (C) 2012  Linaro Limited
-> +Distributed under the terms of Version 2 of the GNU General Public
-> +License, as defined in linux/COPYING.
-> diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
-> index 41de0622de..1ea4ec9df0 100644
-> --- a/arch/arm/common/bL_entry.c
-> +++ b/arch/arm/common/bL_entry.c
-> @@ -116,3 +116,163 @@ int bL_cpu_powered_up(void)
->   		platform_ops->powered_up();
->   	return 0;
->   }
-> +
-> +struct bL_sync_struct bL_sync;
-> +
-> +static void __sync_range(volatile void *p, size_t size)
-> +{
-> +	char *_p = (char *)p;
-> +
-> +	__cpuc_flush_dcache_area(_p, size);
-> +	outer_flush_range(__pa(_p), __pa(_p + size));
-> +	outer_sync();
-> +}
-> +
-> +#define sync_mem(ptr) __sync_range(ptr, sizeof *(ptr))
-> +
-> +/*
-/** as per kerneldoc.
+I don't agree - it requires you to carefully follow a potentially deep
+call trace to make sense of what it does, and worse, it's directly
+misleading in the case of KVM/ARM. So either change it everywhere and
+have a consistent calling convention or adhere to what we do elsewhere
+and use the bool.
 
-> + * __bL_cpu_going_down: Indicates that the cpu is being torn down.
-> + *    This must be called at the point of committing to teardown of a CPU.
-> + *    The CPU cache (SCTRL.C bit) is expected to still be active.
-> + */
-> +void __bL_cpu_going_down(unsigned int cpu, unsigned int cluster)
-> +{
-> +	bL_sync.clusters[cluster].cpus[cpu].cpu = CPU_GOING_DOWN;
-> +	sync_mem(&bL_sync.clusters[cluster].cpus[cpu].cpu);
-> +}
-> +
-
-[..]
-
-> diff --git a/arch/arm/common/bL_head.S b/arch/arm/common/bL_head.S
-> index 9d351f2b4c..f7a64ac127 100644
-> --- a/arch/arm/common/bL_head.S
-> +++ b/arch/arm/common/bL_head.S
-> @@ -7,11 +7,19 @@
->    * This program is free software; you can redistribute it and/or modify
->    * it under the terms of the GNU General Public License version 2 as
->    * published by the Free Software Foundation.
-> + *
-> + *
-> + * Refer to Documentation/arm/big.LITTLE/cluster-pm-race-avoidance.txt
-> + * for details of the synchronisation algorithms used here.
->    */
 >
->   #include <linux/linkage.h>
->   #include <asm/bL_entry.h>
+>> And then you do:
+>> if (handle_something() == 0)
+>>     return 1;
+>>
+>> which I thought was confusing, so I said make the function a bool, to
+>> avoid the confusion, like Rusty did for all the coprocessor emulation
+>> functions.
 >
-> +.if BL_SYNC_CLUSTER_CPUS
-> +.error "cpus must be the first member of struct bL_cluster_sync_struct"
-> +.endif
-> +
->   	.macro	pr_dbg	cpu, string
->   #if defined(CONFIG_DEBUG_LL) && defined(DEBUG)
->   	b	1901f
-> @@ -52,12 +60,82 @@ ENTRY(bL_entry_point)
->   2:	pr_dbg	r4, "kernel bL_entry_point\n"
+> I don't see a compelling reason to propagate this convention to areas
+> that do not require it. In the PSCI case, we have a basic
+> handled/not-handled state, the later indicating the reason. The exit
+> handling functions can convert the error codes to whatever the run loop
+> requires.
 >
->   	/*
-> -	 * MMU is off so we need to get to bL_entry_vectors in a
-> +	 * MMU is off so we need to get to various variables in a
->   	 * position independent way.
->   	 */
->   	adr	r5, 3f
-> -	ldr	r6, [r5]
-> +	ldmia	r5, {r6, r7, r8}
->   	add	r6, r5, r6			@ r6 = bL_entry_vectors
-> +	ldr	r7, [r5, r7]			@ r7 = bL_power_up_setup_phys
-> +	add	r8, r5, r8			@ r8 = bL_sync
-> +
-> +	mov	r0, #BL_SYNC_CLUSTER_SIZE
-> +	mla	r8, r0, r10, r8			@ r8 = bL_sync cluster base
-> +
-> +	@ Signal that this CPU is coming UP:
-> +	mov	r0, #CPU_COMING_UP
-> +	mov	r5, #BL_SYNC_CPU_SIZE
-> +	mla	r5, r9, r5, r8			@ r5 = bL_sync cpu address
-> +	strb	r0, [r5]
-> +
-> +	dsb
-Do you really need above dsb(). With MMU off, the the store should any 
-way make it to the main memory, No ?
 
-> +
-> +	@ At this point, the cluster cannot unexpectedly enter the GOING_DOWN
-> +	@ state, because there is at least one active CPU (this CPU).
-> +
-> +	@ Check if the cluster has been set up yet:
-> +	ldrb	r0, [r8, #BL_SYNC_CLUSTER_CLUSTER]
-> +	cmp	r0, #CLUSTER_UP
-> +	beq	cluster_already_up
-> +
-> +	@ Signal that the cluster is being brought up:
-> +	mov	r0, #INBOUND_COMING_UP
-> +	strb	r0, [r8, #BL_SYNC_CLUSTER_INBOUND]
-> +
-> +	dsb
-Same comment.
+again, that's why I suggest returning a bool instead. You just said
+it: it's a basic handled/not-handled state. Why do you want to return
+-EINVAL if that's not propogated anywhere?
 
-Regards,
-Santosh
+If the return codes are local and do not map reasonably to error codes
+and more complicated than a bool, I would vote for a #define
+HVC_HANDLE_SUCCESS, HVC_HANDLE_ERROR, HVC_HANDLE_XXXXXX, ...
+
+
+
+>> There are obviously other ways to handle the "return 1" case, like
+>> having an extra state that you carry around, and we can change all the
+>> code to do that, but I just don't think it's worth it, as we are in
+>> fact quite close to the existing kernel API.
+>
