@@ -1,85 +1,40 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 10 Jan 2013 21:34:00 -0800
-Subject: [PATCH] hardlockup: detect hard lockups without NMIs using
- secondary cpus
-In-Reply-To: <27240C0AC20F114CBF8149A2696CBE4A200DD9@SHSMSX101.ccr.corp.intel.com>
-References: <1357783059-13923-1-git-send-email-ccross@android.com>
- <27240C0AC20F114CBF8149A2696CBE4A200DD9@SHSMSX101.ccr.corp.intel.com>
-Message-ID: <CAMbhsRS5S=bRWOAA_ft3josCX9kvarrqPX-sLnO02vB0NfZJ+w@mail.gmail.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 11 Jan 2013 13:39:18 +0800
+Subject: [PATCH] ARM: OMAP: Fix the use of uninitialized dma_lch_count
+In-Reply-To: <50EE9C87.6060407@ti.com>
+References: <50EE9815.2080402@asianux.com> <50EE9C87.6060407@ti.com>
+Message-ID: <50EFA586.5010508@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 5:39 PM, Liu, Chuansheng
-<chuansheng.liu@intel.com> wrote:
->
->
->> -----Original Message-----
->> From: Colin Cross [mailto:ccross at android.com]
->> Sent: Thursday, January 10, 2013 9:58 AM
->> To: linux-kernel at vger.kernel.org
->> Cc: Andrew Morton; Don Zickus; Ingo Molnar; Thomas Gleixner; Liu,
->> Chuansheng; linux-arm-kernel at lists.infradead.org; Colin Cross
->> Subject: [PATCH] hardlockup: detect hard lockups without NMIs using
->> secondary cpus
->>
->> Emulate NMIs on systems where they are not available by using timer
->> interrupts on other cpus.  Each cpu will use its softlockup hrtimer
->> to check that the next cpu is processing hrtimer interrupts by
->> verifying that a counter is increasing.
->>
->> This patch is useful on systems where the hardlockup detector is not
->> available due to a lack of NMIs, for example most ARM SoCs.
->> Without this patch any cpu stuck with interrupts disabled can
->> cause a hardware watchdog reset with no debugging information,
->> but with this patch the kernel can detect the lockup and panic,
->> which can result in useful debugging info.
->>
->> Signed-off-by: Colin Cross <ccross@android.com>
->> +static void watchdog_check_hardlockup_other_cpu(void)
->> +{
->> +     int cpu;
->> +     cpumask_t cpus = watchdog_cpus;
->> +
->> +     /*
->> +      * Test for hardlockups every 3 samples.  The sample period is
->> +      *  watchdog_thresh * 2 / 5, so 3 samples gets us back to slightly over
->> +      *  watchdog_thresh (over by 20%).
->> +      */
->> +     if (__this_cpu_read(hrtimer_interrupts) % 3 != 0)
->> +             return;
->> +
->> +     /* check for a hardlockup on the next cpu */
->> +     cpu = cpumask_next(smp_processor_id(), &cpus);
->> +     if (cpu >= nr_cpu_ids)
->> +             cpu = cpumask_first(&cpus);
->> +     if (cpu == smp_processor_id())
->> +             return;
->> +
->> +     smp_rmb();
->> +
->> +     if (per_cpu(watchdog_nmi_touch, cpu) == true) {
->> +             per_cpu(watchdog_nmi_touch, cpu) = false;
->> +             return;
->> +     }
->> +
->> +     if (is_hardlockup_other_cpu(cpu)) {
->> +             /* only warn once */
-> One possible case for new hotplug CPU that false hardlockup case.
-> 1/ Assume CPU1, CPU2 are online, CPU3 is being hotplug:
-> CPU3:                                            CPU2:
-> watchdog_nmi_enable()
->  per_cpu(watchdog_nmi_touch, cpu) = true;
->  cpumask_set_cpu(cpu, &watchdog_cpus);
->                                                  watchdog_check_hardlockup_other_cpu()
->                                                    per_cpu(watchdog_nmi_touch, cpu) = false; == > Here cpu is CPU3
->
-> 2/ Before CPU3's first hrtimer interrupt coming, CPU2 is been offlined.
->   Then CPU1's next CPU is CPU3. But we can not use CPU3's watchdog_nmi_touch to defense
->   false CPU3 hardlock more. When CPU1's hrtimer interrupt coming, it is possible report CPU3
->   false hard lockup.
->
-> Is it the case?
 
-Yes, this is the same race condition I pointed out in reply to Don
-Zickus earlier in the thread.  I think the easiest solution is to set
-per_cpu(watchdog_nmi_touch, next_cpu) = true during cpu offlining.
+  'omap_dma_reserve_channels' when used is suppose to be from command.
+    so, it alreay has value before 1st call of omap_system_dma_probe.
+    and it will never be changed again during running (not from ioctl).
+
+  but 'dma_lch_count' is zero before 1st call of omap_system_dma_probe.
+    so it will be failed for omap_dma_reserve_channels, when 1st call.
+
+  so, need use 'd->lch_count' instead of 'dma_lch_count' for judging.
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/plat-omap/dma.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index 4136b20..e06c34b 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -2019,7 +2019,7 @@ static int omap_system_dma_probe(struct platform_device *pdev)
+ 	errata			= p->errata;
+ 
+ 	if ((d->dev_caps & RESERVE_CHANNEL) && omap_dma_reserve_channels
+-			&& (omap_dma_reserve_channels <= dma_lch_count))
++			&& (omap_dma_reserve_channels < d->lch_count))
+ 		d->lch_count	= omap_dma_reserve_channels;
+ 
+ 	dma_lch_count		= d->lch_count;
+-- 
+1.7.10.4
