@@ -1,39 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Jan 2013 09:59:40 -0800
-Subject: [PATCH V2 2/2] ARM: dts: OMAP2+: Add PMU nodes
-In-Reply-To: <50F01AAD.8020003@ti.com>
-References: <1355766548-5702-1-git-send-email-jon-hunter@ti.com>
- <1355766548-5702-3-git-send-email-jon-hunter@ti.com>
- <50F01256.7030701@ti.com> <50F01AAD.8020003@ti.com>
-Message-ID: <20130111175939.GL14149@atomide.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri, 11 Jan 2013 18:00:28 +0000
+Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter
+ in THUMB mode
+In-Reply-To: <20130111160753.GC23505@n2100.arm.linux.org.uk>
+References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130111160753.GC23505@n2100.arm.linux.org.uk>
+Message-ID: <50F0533C.8070802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130111 06:02]:
-> Hi Benoit,
-> 
-> On 01/11/2013 07:23 AM, Benoit Cousson wrote:
-> > Hi Jon,
-> > 
-> > On 12/17/2012 06:49 PM, Jon Hunter wrote:
-> >> Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
-> >>
-> >> Please note that the node for OMAP4460 has been placed in a separate
-> >> header file for OMAP4460, because the node is not compatible with
-> >> OMAP4430. The node for OMAP4430 is not included because PMU is not
-> >> currently supported on OMAP4430 due to the absence of a cross-trigger
-> >> interface driver.
-> >>
-> >> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> > 
-> > I've just applied this patch in my for_3.9/dts branch.
-> > 
-> > I'm wondering if there is any dependency with the previous patch? If
-> > Tony ack it I can take it as well.
-> 
-> I have been thinking about the best way to handle that. May be best for
-> you to take both if Tony can ack the first.
+Hi Russell, Uwe
 
-Sounds good to me, I've acked it now.
+On 11/01/13 16:07, Russell King - ARM Linux wrote:
+> On Fri, Jan 11, 2013 at 12:39:57PM +0100, Uwe Kleine-K?nig wrote:
+>> +# Select this if your CPU doesn't support the 32 bit ARM instructions.
+>> +config THUMBONLY_CPU
+>> +	bool
+>> +	select THUMB2_KERNEL
+>> +	select ARM_THUMB
+> 
+> Hmm, not convinced this is the best solution.  Yes, fine for there to be
+> a THUMBONLY_CPU option, _but_ not the select statements onto user visible
+> symbols.  We can get this instead by:
 
-Tony
+I'm curious what it is about having the select statements onto user
+visible symbols that isn't good. Is it just that it will manipulate
+things underneath the users' feet? 
+
+(I'm not disagreeing! I like your proposal, but when I saw the
+original patch this didn't raise flags with me, so I'd like to
+understand the reasons)
+
+> config CPU_ARM
+> 	bool
+> 
+> config CPU_THUMB
+> 	bool
+
+The only thing I might add is that we don't want people confusing
+the selection of THUMB2_KERNEL with exclusively selecting CPU_THUMB
+(which should be very rare). The latter would imply the former, but
+in almost all cases where THUMB2_KERNEL is selected we should also
+have CPU_ARM selected...
+
+However things fall out, I'd still like to be *unable* to use
+THUMBONLY_CPU *with* an MMU, as it is a clear sign (at least for the
+foreseeable future) that something has been misunderstood.
+
+Jonny
