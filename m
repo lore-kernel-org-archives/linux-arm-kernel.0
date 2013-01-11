@@ -1,91 +1,129 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Jan 2013 15:28:58 +0000
-Subject: [PATCH 3/3] ARM: hw_breakpoint: Debug powerdown support for
- self-hosted debug
+Date: Fri, 11 Jan 2013 15:28:56 +0000
+Subject: [PATCH 1/3] ARM: coresight: common definition for (OS) Lock Access
+ Register key value
 In-Reply-To: <1357918138-20222-1-git-send-email-will.deacon@arm.com>
 References: <1357918138-20222-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1357918138-20222-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1357918138-20222-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dietmar Eggemann <dietmar.eggemann@arm.com>
 
-This patch introduces debug powerdown support for self-hosted debug for v7
-and v7.1 debug architecture for a SinglePower system, i.e. a system without a
-separate core and debug power domain. On a SinglePower system the OS Lock is
-lost over a powerdown.
+Coresight components and debug are using a common lock control mechansim.
+Writing 0xC5ACCE55 to the Lock Access Register (LAR) in case of a coresight
+components enables further access to the coresight device registers. Writing
+any other value to it removes the write access.
+Writing 0xC5ACCE55 to the OS Lock Access Register (OSLAR) in case of debug
+locks the debug register for further access to the debug registers. Writing
+any other value to it unlocks the debug registers.
 
-If CONFIG_CPU_PM is set the new function pm_init() registers hw_breakpoint
-with CPU PM for a system supporting OS Save and Restore.
+Unfortunately, the existing coresight code uses the terms lock and unlock the
+other way around. Unlocking stands for enabling write access and locking for
+removing write access.
 
-Receiving a CPU PM EXIT notifier indicates that a single CPU has exited a low
-power state. A call to reset_ctrl_regs() is hooked into the CPU PM EXIT
-notifier chain. This function makes sure that the sticky power-down is clear
-(only v7 debug), the OS Double Lock is clear (only v7.1 debug) and it clears
-the OS Lock for v7 debug (for a system supporting OS Save and Restore) and
-v7.1 debug. Furthermore, it clears any vector-catch events and all
-breakpoint/watchpoint control/value registers for v7 and v7.1 debug.
+That is why the definition of the LAR and OSLAR key value has been changed to
+CS_LAR_KEY.
 
 Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-[will: removed redundant has_ossr check]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/hw_breakpoint.c | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/cti.h                | 10 +++-------
+ arch/arm/include/asm/hardware/coresight.h |  6 +++---
+ arch/arm/kernel/hw_breakpoint.c           |  5 +++--
+ 3 files changed, 9 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm/include/asm/cti.h b/arch/arm/include/asm/cti.h
+index f2e5cad..2381199 100644
+--- a/arch/arm/include/asm/cti.h
++++ b/arch/arm/include/asm/cti.h
+@@ -2,6 +2,7 @@
+ #define __ASMARM_CTI_H
+ 
+ #include	<asm/io.h>
++#include	<asm/hardware/coresight.h>
+ 
+ /* The registers' definition is from section 3.2 of
+  * Embedded Cross Trigger Revision: r0p0
+@@ -35,11 +36,6 @@
+ #define		LOCKACCESS		0xFB0
+ #define		LOCKSTATUS		0xFB4
+ 
+-/* write this value to LOCKACCESS will unlock the module, and
+- * other value will lock the module
+- */
+-#define		LOCKCODE		0xC5ACCE55
+-
+ /**
+  * struct cti - cross trigger interface struct
+  * @base: mapped virtual address for the cti base
+@@ -146,7 +142,7 @@ static inline void cti_irq_ack(struct cti *cti)
+  */
+ static inline void cti_unlock(struct cti *cti)
+ {
+-	__raw_writel(LOCKCODE, cti->base + LOCKACCESS);
++	__raw_writel(CS_LAR_KEY, cti->base + LOCKACCESS);
+ }
+ 
+ /**
+@@ -158,6 +154,6 @@ static inline void cti_unlock(struct cti *cti)
+  */
+ static inline void cti_lock(struct cti *cti)
+ {
+-	__raw_writel(~LOCKCODE, cti->base + LOCKACCESS);
++	__raw_writel(~CS_LAR_KEY, cti->base + LOCKACCESS);
+ }
+ #endif
+diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
+index 7ecd793..0cf7a6b 100644
+--- a/arch/arm/include/asm/hardware/coresight.h
++++ b/arch/arm/include/asm/hardware/coresight.h
+@@ -36,7 +36,7 @@
+ /* CoreSight Component Registers */
+ #define CSCR_CLASS	0xff4
+ 
+-#define UNLOCK_MAGIC	0xc5acce55
++#define CS_LAR_KEY	0xc5acce55
+ 
+ /* ETM control register, "ETM Architecture", 3.3.1 */
+ #define ETMR_CTRL		0
+@@ -147,11 +147,11 @@
+ 
+ #define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
+ #define etm_unlock(t) \
+-	do { etm_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
++	do { etm_writel((t), CS_LAR_KEY, CSMR_LOCKACCESS); } while (0)
+ 
+ #define etb_lock(t) do { etb_writel((t), 0, CSMR_LOCKACCESS); } while (0)
+ #define etb_unlock(t) \
+-	do { etb_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
++	do { etb_writel((t), CS_LAR_KEY, CSMR_LOCKACCESS); } while (0)
+ 
+ #endif /* __ASM_HARDWARE_CORESIGHT_H */
+ 
 diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 201d440..5eae53e 100644
+index 5ff2e77..34e9375 100644
 --- a/arch/arm/kernel/hw_breakpoint.c
 +++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -28,6 +28,7 @@
- #include <linux/perf_event.h>
- #include <linux/hw_breakpoint.h>
- #include <linux/smp.h>
-+#include <linux/cpu_pm.h>
+@@ -35,6 +35,7 @@
+ #include <asm/hw_breakpoint.h>
+ #include <asm/kdebug.h>
+ #include <asm/traps.h>
++#include <asm/hardware/coresight.h>
  
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
-@@ -1032,6 +1033,30 @@ static struct notifier_block __cpuinitdata dbg_reset_nb = {
- 	.notifier_call = dbg_reset_notify,
- };
+ /* Breakpoint currently in use for each BRP. */
+ static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
+@@ -955,9 +956,9 @@ static void reset_ctrl_regs(void *unused)
  
-+#ifdef CONFIG_CPU_PM
-+static int dbg_cpu_pm_notify(struct notifier_block *self, unsigned long action,
-+			     void *v)
-+{
-+	if (action == CPU_PM_EXIT)
-+		reset_ctrl_regs(NULL);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block __cpuinitdata dbg_cpu_pm_nb = {
-+	.notifier_call = dbg_cpu_pm_notify,
-+};
-+
-+static void __init pm_init(void)
-+{
-+	cpu_pm_register_notifier(&dbg_cpu_pm_nb);
-+}
-+#else
-+static inline void pm_init(void)
-+{
-+}
-+#endif
-+
- static int __init arch_hw_breakpoint_init(void)
- {
- 	debug_arch = get_debug_arch();
-@@ -1081,8 +1106,9 @@ static int __init arch_hw_breakpoint_init(void)
- 	hook_ifault_code(FAULT_CODE_DEBUG, hw_breakpoint_pending, SIGTRAP,
- 			TRAP_HWBKPT, "breakpoint debug exception");
+ 	/*
+ 	 * Unconditionally clear the OS lock by writing a value
+-	 * other than 0xC5ACCE55 to the access register.
++	 * other than CS_LAR_KEY to the access register.
+ 	 */
+-	ARM_DBG_WRITE(c1, c0, 4, 0);
++	ARM_DBG_WRITE(c1, c0, 4, ~CS_LAR_KEY);
+ 	isb();
  
--	/* Register hotplug notifier. */
-+	/* Register hotplug and PM notifiers. */
- 	register_cpu_notifier(&dbg_reset_nb);
-+	pm_init();
- 	return 0;
- }
- arch_initcall(arch_hw_breakpoint_init);
+ 	/*
 -- 
 1.8.0
