@@ -1,54 +1,38 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Fri, 11 Jan 2013 15:34:39 +0000
-Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter
- in THUMB mode
-In-Reply-To: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <50F0310F.3070502@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Jan 2013 15:36:14 +0000
+Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
+In-Reply-To: <20130111034015.GA28094@avionic-0098.adnet.avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <50EF54B6.6010100@wwwdotorg.org>
+ <20130111034015.GA28094@avionic-0098.adnet.avionic-design.de>
+Message-ID: <201301111536.14799.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-On 11/01/13 11:39, Uwe Kleine-K?nig wrote:
-> Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
-> obviously these cannot enter the kernel in ARM mode. Make an exception
-> for them and let them enter in THUMB mode.
+On Friday 11 January 2013, Thierry Reding wrote:
+> Right, it'll need #ifdefs around the arch_{setup,teardown}_msi_irq(). Or
+> select PCI_MSI unconditionally. Once this is merged I was going to post
+> a patch that enables PCI_MSI in tegra_defconfig anyway. But it might be
+> better to keep it optional anyway since the remainder of the code copes
+> with it properly.
+> 
+Actually, we need something better than that. You cannot define
+arch_setup_msi_irq in a tegra specific pci host driver, because that
+will seriously mess up other platforms in multiplatform configurations
+by giving a link error when they also define this function, or with a
+run-time error when they don't support it.
 
-Clearly something like this is necessary, but it isn't something I'd 
-like for people to start using *unless* they have a THUMB only CPU (for 
-example, to work around dodgy boot-loaders, etc)
+I think what we should do here is fix it the right way by adding
+a pci host specific callback rather than an architecture specific
+callback in drivers/pci/msi.c. There is already a default version
+of arch_setup_msi_irqs (with s), and we can probably do the
+same for arch_setup_msi_irq (without s) to fall back to the
+arch version for most architectures.
+Most architectures (at least powerpc, sparc, ia64 and x86) already
+multiplex the msi handlers internally, but ARM does not because
+there is only one implementation (iop33x) at the moment.
 
-Seeing as there are no THUMB-only CPUs with an MMU, I think we could 
-safely constrain this change to:
-a) depend on !MMU
-b) only touch head-nommu.S
+We can add a generix multiplex and then move architectures over to
+use it.
 
-Does that cause any issue for what you're doing.
-
-[...]
-
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 3fd629d..bc3150c 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -1,5 +1,11 @@
->   comment "Processor Type"
->
-> +# Select this if your CPU doesn't support the 32 bit ARM instructions.
-> +config THUMBONLY_CPU
-> +	bool
-> +	select THUMB2_KERNEL
-> +	select ARM_THUMB
-> +
->   # Select CPU types depending on the architecture selected.  This selects
->   # which CPUs we support in the kernel image, and the compiler instruction
->   # optimiser behaviour.
-
-Also, a couple of minor questions about this:
-- What's the rationale for the placement within the file - it looks a 
-bit curious up the top there.
-- Given the fact that we don't want people using this except in very 
-specific circumstances, should we write a little bit of help for the option?
-
-
-Jonny
+	Arnd
