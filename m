@@ -1,21 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Jan 2013 12:56:43 +0530
-Subject: [PATCH] arch/arm/plat-omap: initializing dma_lch_count, before
- judging omap_dma_reserve_channels
-In-Reply-To: <50EF9D11.6050801@asianux.com>
-References: <50EE9815.2080402@asianux.com> <50EE9C87.6060407@ti.com>
- <50EF9D11.6050801@asianux.com>
-Message-ID: <50EFBEB3.4080207@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 11 Jan 2013 08:27:52 +0100
+Subject: [PATCH v2] mmc: mvsdio: Replace IS_ERR_OR_NULL() with IS_ERR()
+In-Reply-To: <20130111004323.GA12257@schnuecks.de>
+References: <20130111004323.GA12257@schnuecks.de>
+Message-ID: <1357889273-11553-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 January 2013 10:33 AM, Chen Gang wrote:
-> ? 2013?01?10? 18:48, Santosh Shilimkar ??:
->> 'omap_dma_reserve_channels' when used is suppose to be from command
->> line. Hence the proposed fix in the review is the right one.
-> 
->    ok, thank you for your suggestion.
-> 
->    I will send patch v2, also mark you as Signed-of-by.
-> 
-Acked-by: is just fine.
+A NULL is a valid clk cookie, so we should not be tested with
+IS_ERR_OR_NULL(). Replace it with IS_ERR().
+
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+
+This patch depends on Thomas Petazzoni DT patches for mvsdio, which changed
+the order of resource allocation etc.
+
+Simon
+
+You are correct about the indentation. As suggested, i moved the
+disable_unprepare() inside if (host).
+
+It should no longer be possible to have imbalanced clk operations:
+
+If mmc_alloc_host() fails, it goes to out. host is NULL, no clk calls.
+All other goto out occur after the clk_get() and when host is !NULL. clk
+calls are then made when !IS_ERR(host->clk), keeping this balanced.
+
+ drivers/mmc/host/mvsdio.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index feb16bd..196f085 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -818,14 +818,14 @@ out:
+ 		mmc_gpio_free_ro(mmc);
+ 		if (host->base)
+ 			iounmap(host->base);
++		if (!IS_ERR(host->clk)) {
++			clk_disable_unprepare(host->clk);
++			clk_put(host->clk);
++		}
+ 	}
+ 	if (r)
+ 		release_resource(r);
+ 	if (mmc)
+-		if (!IS_ERR_OR_NULL(host->clk)) {
+-			clk_disable_unprepare(host->clk);
+-			clk_put(host->clk);
+-		}
+ 		mmc_free_host(mmc);
+ 
+ 	return ret;
+-- 
+1.7.10.4
