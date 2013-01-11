@@ -1,31 +1,112 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Jan 2013 15:28:55 +0000
-Subject: [PATCH 0/3] hw_breakpoint updates for 3.9
-Message-ID: <1357918138-20222-1-git-send-email-will.deacon@arm.com>
+Date: Fri, 11 Jan 2013 15:28:57 +0000
+Subject: [PATCH 2/3] ARM: hw_breakpoint: Check function for OS Save and
+ Restore mechanism
+In-Reply-To: <1357918138-20222-1-git-send-email-will.deacon@arm.com>
+References: <1357918138-20222-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1357918138-20222-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Dietmar Eggemann <dietmar.eggemann@arm.com>
 
-I have a small handful of hw_breakpoint updates, all from Dietmar, that
-I plan to send via Russell for 3.9.
+v7 debug introduced OS Save and Restore mechanism. On a v7 debug SinglePower
+system, i.e a system without a separate core and debug power domain, which does
+not support external debug over powerdown, it is implementation defined whether
+OS Save and Restore is implemented.
+v7.1 debug requires OS Save and Restore mechanism. v6 debug and v6.1 debug do
+not implement it.
 
-Any comments, please shout.
+A new global variable bool has_ossr is introduced and is determined in
+arch_hw_breakpoint_init() like debug_arch or the number of BRPs/WRPs.
 
-Will
+The logic how to check if OS Save and Restore is supported has changed with
+this patch. In reset_ctrl_regs() a mask consisting of OSLM[1] (OSLSR.3) and
+OSLM[0] (OSLSR.0) was used to check if the system supports OS Save and
+Restore. In the new function core_has_os_save_restore() only OSLM[0] is used.
+It is not necessary to check OSLM[1] too since it is v7.1 debug specific and
+v7.1 debug requires OS Save and Restore and thus OS Lock.
 
+Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/hw_breakpoint.h |  3 +++
+ arch/arm/kernel/hw_breakpoint.c      | 28 +++++++++++++++++++++++-----
+ 2 files changed, 26 insertions(+), 5 deletions(-)
 
-Dietmar Eggemann (3):
-  ARM: coresight: common definition for (OS) Lock Access Register key
-    value
-  ARM: hw_breakpoint: Check function for OS Save and Restore mechanism
-  ARM: hw_breakpoint: Debug powerdown support for self-hosted debug
-
- arch/arm/include/asm/cti.h                | 10 ++---
- arch/arm/include/asm/hardware/coresight.h |  6 +--
- arch/arm/include/asm/hw_breakpoint.h      |  3 ++
- arch/arm/kernel/hw_breakpoint.c           | 61 +++++++++++++++++++++++++++----
- 4 files changed, 62 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
+index 01169dd..eef55ea 100644
+--- a/arch/arm/include/asm/hw_breakpoint.h
++++ b/arch/arm/include/asm/hw_breakpoint.h
+@@ -85,6 +85,9 @@ static inline void decode_ctrl_reg(u32 reg,
+ #define ARM_DSCR_HDBGEN		(1 << 14)
+ #define ARM_DSCR_MDBGEN		(1 << 15)
+ 
++/* OSLSR os lock model bits */
++#define ARM_OSLSR_OSLM0		(1 << 0)
++
+ /* opcode2 numbers for the co-processor instructions. */
+ #define ARM_OP2_BVR		4
+ #define ARM_OP2_BCR		5
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 34e9375..201d440 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -50,6 +50,9 @@ static int core_num_wrps;
+ /* Debug architecture version. */
+ static u8 debug_arch;
+ 
++/* Does debug architecture support OS Save and Restore? */
++static bool has_ossr;
++
+ /* Maximum supported watchpoint length. */
+ static u8 max_watchpoint_len;
+ 
+@@ -904,6 +907,23 @@ static struct undef_hook debug_reg_hook = {
+ 	.fn		= debug_reg_trap,
+ };
+ 
++/* Does this core support OS Save and Restore? */
++static bool core_has_os_save_restore(void)
++{
++	u32 oslsr;
++
++	switch (get_debug_arch()) {
++	case ARM_DEBUG_ARCH_V7_1:
++		return true;
++	case ARM_DEBUG_ARCH_V7_ECP14:
++		ARM_DBG_READ(c1, c1, 4, oslsr);
++		if (oslsr & ARM_OSLSR_OSLM0)
++			return true;
++	default:
++		return false;
++	}
++}
++
+ static void reset_ctrl_regs(void *unused)
+ {
+ 	int i, raw_num_brps, err = 0, cpu = smp_processor_id();
+@@ -931,11 +951,7 @@ static void reset_ctrl_regs(void *unused)
+ 		if ((val & 0x1) == 0)
+ 			err = -EPERM;
+ 
+-		/*
+-		 * Check whether we implement OS save and restore.
+-		 */
+-		ARM_DBG_READ(c1, c1, 4, val);
+-		if ((val & 0x9) == 0)
++		if (!has_ossr)
+ 			goto clear_vcr;
+ 		break;
+ 	case ARM_DEBUG_ARCH_V7_1:
+@@ -1025,6 +1041,8 @@ static int __init arch_hw_breakpoint_init(void)
+ 		return 0;
+ 	}
+ 
++	has_ossr = core_has_os_save_restore();
++
+ 	/* Determine how many BRPs/WRPs are available. */
+ 	core_num_brps = get_num_brps();
+ 	core_num_wrps = get_num_wrps();
 -- 
 1.8.0
