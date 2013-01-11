@@ -1,66 +1,45 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 11 Jan 2013 13:42:08 +0530
-Subject: [PATCH v3 0/9] Migrate Tegra to common clock framework
-In-Reply-To: <50EDAA39.3040609@wwwdotorg.org>
-References: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
- <50E70FE5.9010001@wwwdotorg.org> <50EB6403.5090300@wwwdotorg.org>
- <50EC1CD3.3070308@nvidia.com> <50EC6A37.4000206@wwwdotorg.org>
- <50EC8947.4080704@wwwdotorg.org> <50ED4DA9.3090406@nvidia.com>
- <50EDAA39.3040609@wwwdotorg.org>
-Message-ID: <50EFC958.2090900@nvidia.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Fri, 11 Jan 2013 10:31:46 +0200
+Subject: [PATCH 1/2 V3] iio: mxs: Implement support for touchscreen
+In-Reply-To: <1357861431-8978-1-git-send-email-marex@denx.de>
+References: <1357861431-8978-1-git-send-email-marex@denx.de>
+Message-ID: <50EFCDF2.7090207@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 January 2013 11:04 PM, Stephen Warren wrote:
-> On 01/09/2013 03:59 AM, Prashant Gaikwad wrote:
->> On Wednesday 09 January 2013 02:31 AM, Stephen Warren wrote:
->>> On 01/08/2013 11:49 AM, Stephen Warren wrote:
->>>> On 01/08/2013 06:19 AM, Prashant Gaikwad wrote:
->>>>> On Tuesday 08 January 2013 05:40 AM, Stephen Warren wrote:
->>>>>> On 01/04/2013 10:22 AM, Stephen Warren wrote:
->>>>>>> On 01/04/2013 02:40 AM, Prashant Gaikwad wrote:
->>>>>>>> This patchset does following:
->>>>>>>> 1. Decompose single tegra clock structure into multiple clocks.
->>>>>>>> 2. Try to use standard clock types supported by common clock
->>>>>>>> framework.
->>>>>>>> 3. Use dynamic initialization.
->>>>>>>> 4. Move all clock code to drivers/clk/tegra from mach-tegra.
->>>>>>>> 5. Add device tree support for Tegra20 and Tegra30 clocks.
->>>>>>>> 6. Remove all legacy clock code from mach-tegra.
->>>>>>> I think there are bugs here. I applied all your clock patches on
->>>>>>> top of
->>>>>>> Tegra's for-next (see list below), and found that the following don't
->>>>>>> work on Springbank:
->>>>>>>
->>>>>>> * HDMI display
->>>>>>> * Audio playback
->>>>>>> * WiFi
->>>>>> (BTW, I stopped Cc'ing linux-kernel@, but added linux-tegra@
->>>>>> instead...)
->>>>>>
->>>>>> Prashant, some updated testing results based off the "dev/ccf" branch
->>>>>> you sent me on our internal git server:
->>>> ...
->>>>> I have updated the internal branch with all the above mentioned fixes.
->>> ...
->>>> The remaining item is the display issue on Tegra30, which I'll go look
->>>> at now.
->>> The USB3 clock, which isn't used by any drivers on Tegra30, and hence
->>> was disabled at boot, was set up incorrectly and ended up mapping to the
->>> disp1 clock, and hence turned off the display. The following fixes it:
->> Stephen, thanks for the fix!! I have included this and PLLE fix; updated
->> internal branch.
-> Almost everything works great now.
+Hi,
 
-Great!!
-
-> However, I don't see any fix for the PLLE issue in the code; if there is
-> one it certainly doesn't work. Applying my previous hack makes it work.
-
-There is some difference between Tegra20 and Tegra30 PLLE implementation.
-Fixed in latest patches sent.
-
-> FYI, the branch I tested with is at
-> git://nv-tegra.nvidia.com/user/swarren/linux-2.6 test-ccf-rework-2
+On 01/11/2013 01:43 AM, Marek Vasut wrote:
+> This patch implements support for sampling of a touchscreen into
+> the MXS LRADC driver. The LRADC block allows configuring some of
+> it's channels into special mode where they either output the drive
+> voltage or sample it, allowing it to operate a 4-wire or 5-wire
+> resistive touchscreen.
 >
-> It's rebased onto the latest Tegra for-next.
+> In case the touchscreen mode is enabled, the LRADC slot #7 is
+> reserved for touchscreen only, therefore it is not possible to
+> sample 8 LRADC channels at time, but only 7 channels.
+>
+> The touchscreen controller is configured such that the PENDOWN event
+> disables touchscreen interrupts and triggers execution of worker
+> thread, which then polls the touchscreen controller for X, Y and
+> Pressure values. This reduces the overhead of interrupt-driven
+> operation. Upon the PENUP event, the worker thread re-enables the
+> PENDOWN detection interrupt and exits.
+>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>   .../bindings/staging/iio/adc/mxs-lradc.txt         |    6 +
+>   drivers/staging/iio/adc/mxs-lradc.c                |  473 +++++++++++++++++++-
+>   2 files changed, 455 insertions(+), 24 deletions(-)
+
+Works fine with apx4devkit.
+
+Tested-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+
+Best Regards,
+Lauri Hintsala
