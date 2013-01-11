@@ -1,48 +1,52 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 11 Jan 2013 10:32:02 +0100 (CET)
-Subject: [PATCH 1/2] ARM: shmobile: sh73a0: Add CPU sleep suspend
-In-Reply-To: <20121214134727.GL16382@verge.net.au>
-References: <1354709587-25288-1-git-send-email-hechtb+renesas@gmail.com>
- <CANqRtoQMweOU-Azfwu3-HXKx0Hr0seQYy1hi+arLHN-q=BSh+w@mail.gmail.com>
- <20121214134727.GL16382@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1301111031220.2604@axis700.grange>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 11 Jan 2013 10:06:03 +0100
+Subject: [PATCH 1/2 V3] iio: mxs: Implement support for touchscreen
+In-Reply-To: <50EFCDF2.7090207@bluegiga.com>
+References: <1357861431-8978-1-git-send-email-marex@denx.de>
+ <50EFCDF2.7090207@bluegiga.com>
+Message-ID: <201301111006.03722.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon
+Dear Lauri Hintsala,
 
-On Fri, 14 Dec 2012, Simon Horman wrote:
-
-> On Fri, Dec 14, 2012 at 12:23:06PM +0900, Magnus Damm wrote:
-> > On Wed, Dec 5, 2012 at 9:13 PM, Bastian Hecht <hechtb@gmail.com> wrote:
-> > > From: Bastian Hecht <hechtb@gmail.com>
-> > >
-> > > Add the lighest possible sleep mode on Cortex-A9 cores: CPU sleep. It is
-> > > entered by a simple dsb and wfi instruction via cpu_do_idle(). As just
-> > > clocks are stopped there is no need to save or restore any state of the
-> > > system.
-> > >
-> > > Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> Hi,
+> 
+> On 01/11/2013 01:43 AM, Marek Vasut wrote:
+> > This patch implements support for sampling of a touchscreen into
+> > the MXS LRADC driver. The LRADC block allows configuring some of
+> > it's channels into special mode where they either output the drive
+> > voltage or sample it, allowing it to operate a 4-wire or 5-wire
+> > resistive touchscreen.
 > > 
-> > Acked-by: Magnus Damm <damm@opensource.se>
+> > In case the touchscreen mode is enabled, the LRADC slot #7 is
+> > reserved for touchscreen only, therefore it is not possible to
+> > sample 8 LRADC channels at time, but only 7 channels.
+> > 
+> > The touchscreen controller is configured such that the PENDOWN event
+> > disables touchscreen interrupts and triggers execution of worker
+> > thread, which then polls the touchscreen controller for X, Y and
+> > Pressure values. This reduces the overhead of interrupt-driven
+> > operation. Upon the PENUP event, the worker thread re-enables the
+> > PENDOWN detection interrupt and exits.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: Jonathan Cameron <jic23@kernel.org>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > 
+> >   .../bindings/staging/iio/adc/mxs-lradc.txt         |    6 +
+> >   drivers/staging/iio/adc/mxs-lradc.c                |  473
+> >   +++++++++++++++++++- 2 files changed, 455 insertions(+), 24
+> >   deletions(-)
 > 
-> Hi Bastian,
+> Works fine with apx4devkit.
 > 
-> could you please re-spin this series on top of the soc5 or next
-> branches of my renesas tree on kernel.org?
-> 
-> Feel free to include Magnus's Ack unless you make any
-> non-trivial changes.
+> Tested-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
 
-It looks like this commit in your tree
+Thanks Lauri :)
 
-http://git.kernel.org/?p=linux/kernel/git/horms/renesas.git;a=commitdiff;h=1662b83628a0c6fd6d8a2a0dcf9b67577906e75b
-
-is broken, am I right?
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Best regards,
+Marek Vasut
