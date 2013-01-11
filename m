@@ -1,65 +1,35 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 11 Jan 2013 16:52:54 +0100 (CET)
-Subject: Question:add Iirq mask method in irq disable call.
-In-Reply-To: <CAKvkGKfG-3Y=azedkPyLwYffZKOE0sYH6LjMCfuMAgMKMBYWGA@mail.gmail.com>
-References: <CAKvkGKfG-3Y=azedkPyLwYffZKOE0sYH6LjMCfuMAgMKMBYWGA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1301111652100.7475@ionos>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Jan 2013 15:47:53 +0000
+Subject: [PATCH] cpsw: Add support to read cpu MAC address
+In-Reply-To: <1357917302-32550-1-git-send-email-michal.bachraty@streamunlimited.com>
+References: <1357917302-32550-1-git-send-email-michal.bachraty@streamunlimited.com>
+Message-ID: <20130111154753.GB23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013, steve.zhan wrote:
-> Resend Email because MUTT email send error.
-> 
-> 2013/1/11 Steve zhan <zhanzhenbo@gmail.com>:
-> > All:
-> >         I have find that arm gic driver have not register irq_disable
-> > method, as below:
-> > static struct irq_chip gic_chip = {
-> >         .name                   = "GIC",
-> >         .irq_mask               = gic_mask_irq,
-> >         .irq_unmask             = gic_unmask_irq,
-> >         .irq_eoi                = gic_eoi_irq,
-> >         .irq_set_type           = gic_set_type,
-> >         .irq_retrigger          = gic_retrigger,
-> > #ifdef CONFIG_SMP
-> >         .irq_set_affinity       = gic_set_affinity,
-> > #endif
-> >         .irq_set_wake           = gic_set_wake,
-> > };
-> >
-> > Question is:
-> >         When some drivers want to disable irq, maybe it will call
-> > linux standard inerface: irq_disable() that defined in include\
-> > linux\interrupt.h, this function will call
-> > void irq_disable(struct irq_desc *desc)
-> > {
-> >         irq_state_set_disabled(desc);
-> >         if (desc->irq_data.chip->irq_disable) {
-> >                 desc->irq_data.chip->irq_disable(&desc->irq_data);
-> >                 irq_state_set_masked(desc);
-> >         }
-> > }
-> >
-> > Because gic have not register irq_diable method, so the interrupt can
-> > not disable immediately, it is enable until the interrupt come next time,
-> > then disalbed by mask because irq_state_set_disable(desc);
-> >
-> > I have checked irq_enable method:
-> > void irq_enable(struct irq_desc *desc)
-> > {
-> >         irq_state_clr_disabled(desc);
-> >         if (desc->irq_data.chip->irq_enable)
-> >                 desc->irq_data.chip->irq_enable(&desc->irq_data);
-> >         else
-> >                 desc->irq_data.chip->irq_unmask(&desc->irq_data);
-> >         irq_state_clr_masked(desc);
-> > }
-> > This method have do unmask when irq_enable method is not exist.
-> >
-> > Is it a good idea to add irq_mask call in irq_disable()?
+On Fri, Jan 11, 2013 at 04:15:02PM +0100, Michal Bachraty wrote:
+> +	if (!request_mem_region(priv->conf_res->start,
+> +			resource_size(priv->conf_res), ndev->name)) {
+> +		dev_err(priv->dev, "failed request i/o region\n");
+> +		ret = -ENXIO;
+> +		goto clean_clk_ret;
+> +	}
+> +
+> +	regs = ioremap(priv->conf_res->start,
+> +				resource_size(priv->conf_res));
+> +	if (!regs) {
+> +		dev_err(priv->dev, "unable to map i/o region\n");
+> +		goto clean_configuration_iores_ret;
+> +	}
 
-No. It's a very bad idea. We intentionally disable interrupts lazy.
+In this day and age where error paths don't get any testing, and are
+frequently buggy, where we have alternative APIs which make those paths
+more reliable, I think we should do everything to make use of that.
 
-Thanks,
+And, to prove the point, your error paths are buggy.  Yes, you release
+the mem region correctly (well done for picking the right interface for
+that!) but the ioremap() is never cleaned up.
 
-	tglx
+So, any chance of converting the above to devm_request_and_ioremap() ?
+
+Thanks.
