@@ -1,29 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Jan 2013 12:05:31 -0800
-Subject: arm: mvebu: Fix compile for multiplatform when ARMv6 is selected
-Message-ID: <20130111200531.GO14149@atomide.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Fri, 11 Jan 2013 14:11:18 -0600
+Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
+In-Reply-To: <A6843D28-E2AF-4EFF-8C9B-232B804C01E7@suse.de> (from
+ agraf@suse.de on Fri Jan 11 09:42:55 2013)
+Message-ID: <1357935078.5475.10@snotra>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some systems compile in both ARMv6 and ARMv7 into multiplatform
-configurations. This means the default compiler flags are for ARMv6,
-and we will get:
+On 01/11/2013 09:42:55 AM, Alexander Graf wrote:
+> 
+> On 11.01.2013, at 02:10, Scott Wood wrote:
+> 
+> > struct kvm_device_attr {
+> > 	__u32 device;
+> 
+> This needs some semantic specification. Is device a constant value?  
+> Is it the return value of CREATE_IRQCHIP?
 
-arch/arm/mach-mvebu/coherency_ll.S: Assembler messages:
-arch/arm/mach-mvebu/coherency_ll.S:45: Error: selected processor does not support `dsb'
+As proposed, it's up to the architecture to provide that  
+specification.  In theory this could be used for things other than IRQ  
+chips.  We could still say that device creation functions return a  
+valid device ID (if the device has any attributes), as well as have  
+other architecture-specific ways of describing device IDs (static  
+enumeration).  Or we could have non-architecture-specific static  
+enumeration.  Or just require that all devices be explicitly created by  
+something that returns the ID.
 
-Fix this by specifying ARMv7 flags for coherency_ll.o.
+Do you have a preferred approach?
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -1,6 +1,8 @@
- ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 	-I$(srctree)/arch/arm/plat-orion/include
- 
-+AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
-+
- obj-y += system-controller.o
- obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o pmsu.o
- obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
+-Scott
