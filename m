@@ -1,43 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 11 Jan 2013 17:45:31 +0100
-Subject: Early kernel hang with big DTB appended
-In-Reply-To: <7811936.npteFbuYu2@amdc1227>
-References: <7811936.npteFbuYu2@amdc1227>
-Message-ID: <20130111164531.GC13025@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Jan 2013 16:46:35 +0000
+Subject: [PATCHv2 07/11] arm: arch_timer: divorce from local_timer api
+In-Reply-To: <50F014DF.7090205@ti.com>
+References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+ <1357747640-18594-8-git-send-email-mark.rutland@arm.com>
+ <50F014DF.7090205@ti.com>
+Message-ID: <20130111164635.GA1794@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 03, 2013 at 04:55:00PM +0100, Tomasz Figa wrote:
-> Hi,
-> 
-> I'm observing strange behavior when booting 3.8-rc1 and -rc2 with appended 
-> DTB. The kernel hangs very early when the DTB is bigger than some 
-> threshold somewhere around 24 KiB. With fullest possible low level UART 
-> debugging (and printk patched to use printascii) I'm receiving following 
-> output:
-> 
-> Uncompressing Linux... done, booting the kernel.
-> Booting Linux on physical CPU 0xa00
-> Linux version 3.8.0-rc1-00073-gdf6efca-dirty (t.figa at amdc1227) (gcc 
-> version 4.5.2 (Gentoo 4.5.2 p1.2, pie-0.4.5) ) #2 SMP PREEMPT Thu Jan 3 
-> 15:37:35 CET 2013
-> CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
-> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> 
-> I tested on two Exynos-based boards (exynos4210-trats and one internal 
-> exynos4412-based board) and same happens on both.
-> 
-> Do you have any ideas?
+On Fri, Jan 11, 2013 at 01:34:23PM +0000, Santosh Shilimkar wrote:
+> On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
+> > Currently, the arch_timer driver is tied to the arm port, as it relies
+> > on code in arch/arm/smp.c to setup and teardown timers as cores are
+> > hotplugged on and off. The timer is registered through an arm-specific
+> > registration mechanism, preventing sharing the driver with the arm64
+> > port.
+> >
+> > This patch moves the driver to using a cpu notifier instead, making it
+> > easier to port.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> This is really a nit idea. I think we should do the same
+> for ARM gic code.
 
-Another thing besides the things already mentioned is that the dtb may
-not cross a 1MiB boundary. The Kernel uses a single 1Mib section
-(aligned to 1Mib) to initially map the dtb. Once you cross that boundary
-parts of the dtb won't be accessible for the Kernel anymore.
-
-Sascha
+I plan to do the same once Rob's GIC patches get merged. In my
+soc-armv8-model branch I have a copy of gic.c into drivers/irqchip and
+the CPU interface is done automatically via a notifier. The only trick
+is to set the priority of the GIC notifier higher than the timer one.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Catalin
