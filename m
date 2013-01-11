@@ -1,69 +1,49 @@
-From: mtosatti@redhat.com (Marcelo Tosatti)
-Date: Thu, 10 Jan 2013 22:35:02 -0200
-Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
-In-Reply-To: <1357857612.27576.19@snotra>
-References: <20130110222801.GB17111@amt.cnet>
- <1357857612.27576.19@snotra>
-Message-ID: <20130111003502.GA27390@amt.cnet>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 11 Jan 2013 09:36:37 +0900
+Subject: [PATCH 1/5] ARM: mach-shmobile: mackerel: update defconfig
+In-Reply-To: <20130110231111.GA25944@quad.lixom.net>
+References: <1357781039-14003-1-git-send-email-horms+renesas@verge.net.au>
+ <1357781039-14003-2-git-send-email-horms+renesas@verge.net.au>
+ <20130110231111.GA25944@quad.lixom.net>
+Message-ID: <20130111003636.GE8415@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 04:40:12PM -0600, Scott Wood wrote:
-> On 01/10/2013 04:28:01 PM, Marcelo Tosatti wrote:
-> >On Wed, Jan 09, 2013 at 10:37:20PM +0100, Alexander Graf wrote:
-> >>
-> >> >
-> >> >> >> We can start to introduce (and fix ARM) with a generic
-> >ioctl in the MPIC patches then.
-> >> >> >
-> >> >> > The ioctl is already generic, except for its name.
-> >> >> It's making a few wrong assumptions:
-> >> >>  * maximum size of value is u64
-> >> >
-> >> > This is tolerable IMHO.
-> >> >
-> >> >>  * combining device id (variable) with addr type id (const)
-> >into a single field. It could just be split into multiple fields
-> >> >
-> >> > I agree, but that could be lived with as well.
-> >> >
-> >> > I get that there's a tradeoff between getting something in
-> >now, versus waiting until the API is more refined.  Tagging it
-> >with a particular ISA seems like an odd way of saying "soon to be
-> >deprecated", though.  What happens if we're still squabbling over
-> >the perfect replacement API when we're trying to push PPC MPIC
-> >stuff in?
-> >
-> >As mentioned, i fail to see the benefit in sharing 0.0x% of the
-> >code (the
-> >interface), while the remaining code is not shared.
+On Thu, Jan 10, 2013 at 03:11:11PM -0800, Olof Johansson wrote:
+> Hi,
 > 
-> Pointlessly making things architecture-specific just makes more work
-> for people who later need the functionality on another architecture.
-> It might not be much in this case (unless a particular device ends
-> up being used on multiple architectures), but the principle still
-> applies.  It's also more work for tools like strace, and could get
-> in the way of the userspace caller using common code.
+> On Thu, Jan 10, 2013 at 10:23:55AM +0900, Simon Horman wrote:
+> > * Enable ARM_APPENDED_DTB
+> > 
+> >   Typically the bootloader of a mackerel board does not support DT
+> >   so this option is useful
+> > 
+> > * Add "rw" to command line
+> > 
+> >   This appears to be necessary for a successful NFS-root boot
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/configs/mackerel_defconfig |    3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
+> > index 2098ce1..8519721 100644
+> > --- a/arch/arm/configs/mackerel_defconfig
+> > +++ b/arch/arm/configs/mackerel_defconfig
+> > @@ -23,7 +23,8 @@ CONFIG_AEABI=y
+> >  CONFIG_FORCE_MAX_ZONEORDER=15
+> >  CONFIG_ZBOOT_ROM_TEXT=0x0
+> >  CONFIG_ZBOOT_ROM_BSS=0x0
+> > -CONFIG_CMDLINE="console=tty0, console=ttySC0,115200 earlyprintk=sh-sci.0,115200 root=/dev/nfs nfsroot=,tcp,v3 ip=dhcp memchunk.vpu=64m memchunk.veu0=8m memchunk.spu0=2m mem=240m"
+> > +CONFIG_ARM_APPENDED_DTB=y
+> > +CONFIG_CMDLINE="console=tty0, console=ttySC0,115200 earlyprintk=sh-sci.0,115200 root=/dev/nfs nfsroot=,tcp,v3 ip=dhcp memchunk.vpu=64m memchunk.veu0=8m memchunk.spu0=2m mem=240m rw"
 > 
-> >> Then we're the ones who have to come up with a good interface.
-> >
-> >Or just have KVM_SET_PPC_DEVICE_ADDRESS. Is there a downside to that?
+> I don't think memchunk is used outside of arch/sh, so it can be dropped from
+> this default cmdline?
 > 
-> Besides the above, and my original complaint that it shouldn't be
-> specific to addresses?
-> 
-> -Scott
+> Also, with DTB, there's little use for an in-kernel default command line since
+> you can give one with the dtb instead. Perhaps just drop it alltogether and
+> move it there?
 
-I did not really grasp that ('shouldnt be specific to addresses'), but
-anyway.
-
-OK, can you write down your proposed improvements to the interface?
-In case you have something ready, otherwise there is time pressure 
-to merge the ARM port.
-
-That is, if you have interest/energy to spend in a possibly reusable 
-interface, as long as that does not delay integration of the ARM code,
-i don't think the ARM people will mind that.
-
-As mentioned in the thread, they (ARM) require configurable device 
-address.
+Thanks, I'll see about making both of those changes and repost.
