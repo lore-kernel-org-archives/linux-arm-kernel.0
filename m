@@ -1,31 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Jan 2013 17:54:53 +0000
-Subject: [PATCHv2 08/11] arm: arch_timer: add arch_counter_set_user_access
-In-Reply-To: <20130111165053.GB1794@arm.com>
-References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
- <1357747640-18594-9-git-send-email-mark.rutland@arm.com>
- <50F01646.4010203@ti.com> <20130111165053.GB1794@arm.com>
-Message-ID: <20130111175452.GI19765@e106331-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Jan 2013 09:54:55 -0800
+Subject: [PATCH v4 10/14] mmc: omap_hsmmc: add generic DMA request
+ support to the DT binding
+In-Reply-To: <1357883330-5364-11-git-send-email-mporter@ti.com>
+References: <1357883330-5364-1-git-send-email-mporter@ti.com>
+ <1357883330-5364-11-git-send-email-mporter@ti.com>
+Message-ID: <20130111175454.GI14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 04:50:53PM +0000, Catalin Marinas wrote:
-> On Fri, Jan 11, 2013 at 01:40:22PM +0000, Santosh Shilimkar wrote:
-> > On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
-> > > Several bits in CNTKCTL reset to 0, including PL0VTEN. For platforms
-> > > using the generic timer which wish to have a fast gettimeofday vDSO
-> > > implementation, these bits must be set to 1 by the kernel. On other
-> > > platforms, the bootloader might enable userspace access when we don't
-> > > want it.
-> > >
-> > > This patch adds arch_counter_set_user_access, which sets the PL0 access
-> > > permissions to that required by the platform. For arm, this currently
-> > minor nit.
-> > s/arm/ARM
+* Matt Porter <mporter@ti.com> [130110 21:47]:
+> The binding definition is based on the generic DMA request binding.
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+ 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   25 +++++++++++++++++++-
+>  1 file changed, 24 insertions(+), 1 deletion(-)
 > 
-> I think Mark meant arch/arm. Or we could call it AArch32 where we don't
-> use this feature.
-
-Indeed, I meant arch/arm. I'll try to be more consistent with that in future.
-
-Mark.
+> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+> index ed271fc..826cc51 100644
+> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+> @@ -20,8 +20,28 @@ ti,dual-volt: boolean, supports dual voltage cards
+>  ti,non-removable: non-removable slot (like eMMC)
+>  ti,needs-special-reset: Requires a special softreset sequence
+>  ti,needs-special-hs-handling: HSMMC IP needs special setting for handling High Speed
+> +dmas: DMA controller phandle and DMA request value ordered pair
+> +One tx and one rx pair is required.
+> +dma-names: DMA request names. These strings correspond 1:1 with
+> +the ordered pairs in dmas. The RX request must be "rx" and the
+> +TX request must be "tx".
+> +
+> +Examples:
+> +
+> +[hwmod populated DMA resources]
+> +
+> +	mmc1: mmc at 0x4809c000 {
+> +		compatible = "ti,omap4-hsmmc";
+> +		reg = <0x4809c000 0x400>;
+> +		ti,hwmods = "mmc1";
+> +		ti,dual-volt;
+> +		bus-width = <4>;
+> +		vmmc-supply = <&vmmc>; /* phandle to regulator node */
+> +		ti,non-removable;
+> +	};
+> +
+> +[generic DMA request binding]
+>  
+> -Example:
+>  	mmc1: mmc at 0x4809c000 {
+>  		compatible = "ti,omap4-hsmmc";
+>  		reg = <0x4809c000 0x400>;
+> @@ -30,4 +50,7 @@ Example:
+>  		bus-width = <4>;
+>  		vmmc-supply = <&vmmc>; /* phandle to regulator node */
+>  		ti,non-removable;
+> +		dmas = <&edma 24
+> +			&edma 25>;
+> +		dma-names = "tx", "rx";
+>  	};
+> -- 
+> 1.7.9.5
+> 
