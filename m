@@ -1,28 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 11 Jan 2013 11:22:38 -0800
-Subject: [PATCH 0/3] arch_decomp_wdog cleanup
-In-Reply-To: <20130111170843.GG23505@n2100.arm.linux.org.uk>
-References: <1357827165-9320-1-git-send-email-shawn.guo@linaro.org>
- <20130111170843.GG23505@n2100.arm.linux.org.uk>
-Message-ID: <20130111192238.GB1148@quad.lixom.net>
+Date: Fri, 11 Jan 2013 11:25:33 -0800
+Subject: [PATCH] ARM: integrator: move syscon remap for AP PCIv3
+In-Reply-To: <1357809529-3851-1-git-send-email-linus.walleij@linaro.org>
+References: <1357809529-3851-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20130111192533.GA1461@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 05:08:43PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 10, 2013 at 10:12:42PM +0800, Shawn Guo wrote:
-> > All the arch_decomp_wdog related codes are there without any users,
-> > since ARCH_HAS_DECOMP_WDOG is only used by lib/inflate.c which however
-> > is not used by arch/arm/boot/compressed/decompress.c.
+On Thu, Jan 10, 2013 at 10:18:49AM +0100, Linus Walleij wrote:
+> The Integrator/AP syscon remapping was done in the .setup()
+> function rather than .preinit() which is wrong - .preinit()
+> is called before .setup() and the former also use the syscon
+> base and cause a crash since it was not yet remapped.
 > 
-> Hmm, this suggests that those samsung platforms haven't been booted for
-> a while - because the decompressor will enable the watchdog, but won't
-> pat it at all.  So, do we still need them in the kernel?
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC guys: please apply this patch directly to the fixes branch
+> if there are no comments, it is a pure v3.8 regression fix for
+> the -rc:s and I do not expect to send more regression fixes for
+> the Integrators this cycle.
 
-Well, they haven't been booted with the watchdog enabled at least.
+Applied to fixes.
 
-> Other than that, this looks good.  Who's going to deal with it though?
-
-Given that it touches include files under mach-*/include, we might be better
-off taking it through arm-soc from conflicts point of view. Ok with you?
+Thanks!
 
 -Olof
