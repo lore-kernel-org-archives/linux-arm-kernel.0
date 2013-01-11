@@ -1,49 +1,86 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 11 Jan 2013 15:08:31 +0100
-Subject: [PATCH 2/2 v2] ASoC: atmel-ssc: add pinctrl selection to driver
-In-Reply-To: <cover.1357912706.git.nicolas.ferre@atmel.com>
-References: <cover.1357912706.git.nicolas.ferre@atmel.com>
-Message-ID: <d1060534f9dafe4baa9bec2506815ae63455ebd6.1357912706.git.nicolas.ferre@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Jan 2013 14:16:54 +0000
+Subject: [PATCHv2 05/11] arm: arch_timer: split cntfrq accessor
+In-Reply-To: <50F01350.4040107@ti.com>
+References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+ <1357747640-18594-6-git-send-email-mark.rutland@arm.com>
+ <50F01350.4040107@ti.com>
+Message-ID: <20130111141654.GB19765@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bo Shen <voice.shen@atmel.com>
+On Fri, Jan 11, 2013 at 01:27:44PM +0000, Santosh Shilimkar wrote:
+> On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
+> > The CNTFRQ register is not duplicated for physical and virtual timers,
+> > and accessing it as if it were is confusing.
+> >
+> > Instead, use a separate accessor which doesn't take the access type
+> > as a parameter.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >   arch/arm/kernel/arch_timer.c |   17 +++++++++--------
+> >   1 files changed, 9 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+> > index 0d2681c..fc87d3d 100644
+> > --- a/arch/arm/kernel/arch_timer.c
+> > +++ b/arch/arm/kernel/arch_timer.c
+> > @@ -51,8 +51,7 @@ static bool arch_timer_use_virtual = true;
+> >   #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
+> >
+> >   #define ARCH_TIMER_REG_CTRL		0
+> > -#define ARCH_TIMER_REG_FREQ		1
+> > -#define ARCH_TIMER_REG_TVAL		2
+> > +#define ARCH_TIMER_REG_TVAL		1
+> >
+> >   #define ARCH_TIMER_PHYS_ACCESS		0
+> >   #define ARCH_TIMER_VIRT_ACCESS		1
+> > @@ -101,9 +100,6 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
+> >   		case ARCH_TIMER_REG_TVAL:
+> >   			asm volatile("mrc p15, 0, %0, c14, c2, 0" : "=r" (val));
+> >   			break;
+> > -		case ARCH_TIMER_REG_FREQ:
+> > -			asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
+> > -			break;
+> >   		}
+> >   	}
+> >
+> > @@ -121,6 +117,13 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
+> >   	return val;
+> >   }
+> >
+> > +static inline u32 arch_timer_get_cntfrq(void)
+> > +{
+> > +	u32 val;
+> > +	asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
+> > +	return val;
+> > +}
+> > +
+> >   static inline u64 arch_counter_get_cntpct(void)
+> >   {
+> >   	u64 cval;
+> > @@ -253,9 +256,7 @@ static int arch_timer_available(void)
+> >   	u32 freq;
+> >
+> >   	if (arch_timer_rate == 0) {
+> > -		freq = arch_timer_reg_read(ARCH_TIMER_PHYS_ACCESS,
+> > -					   ARCH_TIMER_REG_FREQ);
+> > -
+> > +		freq = arch_timer_get_cntfrq();
+> Not related to this patch a new line here will be good.
 
-Add default pinctrl selection to atmel-ssc driver. The pinctrl
-is mandatory.
+Whoops. I hadn't intended to alter the line spacing here. I'll fix that up.
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-[nicolas.ferre at atmel.com: split dtsi and driver changes]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/misc/atmel-ssc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> >   		/* Check the timer frequency. */
+> >   		if (freq == 0) {
+> >   			pr_warn("Architected timer frequency not available\n");
+> >
+> Otherwise patch looks fine to me.
+> Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+> 
 
-diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-index 158da5a..3c09cbb 100644
---- a/drivers/misc/atmel-ssc.c
-+++ b/drivers/misc/atmel-ssc.c
-@@ -19,6 +19,7 @@
- #include <linux/module.h>
- 
- #include <linux/of.h>
-+#include <linux/pinctrl/consumer.h>
- 
- /* Serialize access to ssc_list and user count */
- static DEFINE_SPINLOCK(user_lock);
-@@ -131,6 +132,13 @@ static int ssc_probe(struct platform_device *pdev)
- 	struct resource *regs;
- 	struct ssc_device *ssc;
- 	const struct atmel_ssc_platform_data *plat_dat;
-+	struct pinctrl *pinctrl;
-+
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl)) {
-+		dev_err(&pdev->dev, "Failed to request pinctrl\n");
-+		return PTR_ERR(pinctrl);
-+	}
- 
- 	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
- 	if (!ssc) {
--- 
-1.8.0
+Thanks,
+Mark.
