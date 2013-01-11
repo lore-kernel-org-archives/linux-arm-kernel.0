@@ -1,86 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Jan 2013 14:16:54 +0000
-Subject: [PATCHv2 05/11] arm: arch_timer: split cntfrq accessor
-In-Reply-To: <50F01350.4040107@ti.com>
-References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
- <1357747640-18594-6-git-send-email-mark.rutland@arm.com>
- <50F01350.4040107@ti.com>
-Message-ID: <20130111141654.GB19765@e106331-lin.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 11 Jan 2013 22:20:58 +0800
+Subject: [PATCH] ARM: imx: fix build error with !CONFIG_SMP
+Message-ID: <1357914058-24712-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 01:27:44PM +0000, Santosh Shilimkar wrote:
-> On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
-> > The CNTFRQ register is not duplicated for physical and virtual timers,
-> > and accessing it as if it were is confusing.
-> >
-> > Instead, use a separate accessor which doesn't take the access type
-> > as a parameter.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >   arch/arm/kernel/arch_timer.c |   17 +++++++++--------
-> >   1 files changed, 9 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-> > index 0d2681c..fc87d3d 100644
-> > --- a/arch/arm/kernel/arch_timer.c
-> > +++ b/arch/arm/kernel/arch_timer.c
-> > @@ -51,8 +51,7 @@ static bool arch_timer_use_virtual = true;
-> >   #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
-> >
-> >   #define ARCH_TIMER_REG_CTRL		0
-> > -#define ARCH_TIMER_REG_FREQ		1
-> > -#define ARCH_TIMER_REG_TVAL		2
-> > +#define ARCH_TIMER_REG_TVAL		1
-> >
-> >   #define ARCH_TIMER_PHYS_ACCESS		0
-> >   #define ARCH_TIMER_VIRT_ACCESS		1
-> > @@ -101,9 +100,6 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
-> >   		case ARCH_TIMER_REG_TVAL:
-> >   			asm volatile("mrc p15, 0, %0, c14, c2, 0" : "=r" (val));
-> >   			break;
-> > -		case ARCH_TIMER_REG_FREQ:
-> > -			asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
-> > -			break;
-> >   		}
-> >   	}
-> >
-> > @@ -121,6 +117,13 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
-> >   	return val;
-> >   }
-> >
-> > +static inline u32 arch_timer_get_cntfrq(void)
-> > +{
-> > +	u32 val;
-> > +	asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
-> > +	return val;
-> > +}
-> > +
-> >   static inline u64 arch_counter_get_cntpct(void)
-> >   {
-> >   	u64 cval;
-> > @@ -253,9 +256,7 @@ static int arch_timer_available(void)
-> >   	u32 freq;
-> >
-> >   	if (arch_timer_rate == 0) {
-> > -		freq = arch_timer_reg_read(ARCH_TIMER_PHYS_ACCESS,
-> > -					   ARCH_TIMER_REG_FREQ);
-> > -
-> > +		freq = arch_timer_get_cntfrq();
-> Not related to this patch a new line here will be good.
+Commit 68b2532 (ARM: imx: select HAVE_IMX_SRC when SMP is enabled)
+introduces a build error with imx_v6_v7_defconfig when CONFIG_SMP is
+deselected.
 
-Whoops. I hadn't intended to alter the line spacing here. I'll fix that up.
+  LINK    vmlinux
+  LD      vmlinux.o
+  MODPOST vmlinux.o
+  GEN     .version
+  CHK     include/generated/compile.h
+  UPD     include/generated/compile.h
+  CC      init/version.o
+  LD      init/built-in.o
+arch/arm/mach-imx/built-in.o: In function `imx6q_restart':
+platform-ahci-imx.c:(.text+0x448c): undefined reference to `imx_src_prepare_restart'
+arch/arm/mach-imx/built-in.o: In function `imx6q_pm_enter':
+platform-ahci-imx.c:(.text+0x4544): undefined reference to `imx_set_cpu_jump'
+arch/arm/mach-imx/built-in.o: In function `imx6q_init_irq':
+platform-ahci-imx.c:(.init.text+0xbef0): undefined reference to `imx_src_init'
+make[1]: *** [vmlinux] Error 1
 
-> >   		/* Check the timer frequency. */
-> >   		if (freq == 0) {
-> >   			pr_warn("Architected timer frequency not available\n");
-> >
-> Otherwise patch looks fine to me.
-> Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
-> 
+While the commit adds 'def_bool y if SMP' for HAVE_IMX_SRC, it should
+not remove 'select HAVE_IMX_SRC' from SOC_IMX6Q, as the IMX6Q UP build
+also needs HAVE_IMX_SRC.  Add the HAVE_IMX_SRC select back for SOC_IMX6Q
+to fix above build error.
 
-Thanks,
-Mark.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 1ad0d76..8e2f292 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -853,6 +853,7 @@ config SOC_IMX6Q
+ 	select HAVE_CAN_FLEXCAN if CAN
+ 	select HAVE_IMX_GPC
+ 	select HAVE_IMX_MMDC
++	select HAVE_IMX_SRC
+ 	select HAVE_SMP
+ 	select MFD_SYSCON
+ 	select PINCTRL
+-- 
+1.7.9.5
