@@ -1,112 +1,106 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Fri, 11 Jan 2013 13:18:13 -0500
-Subject: [kvmarm] [PATCH v2 2/2] ARM: KVM: Power State Coordination
- Interface implementation
-In-Reply-To: <50F05562.3070107@arm.com>
-References: <1357834005-23843-1-git-send-email-marc.zyngier@arm.com>
- <1357834005-23843-3-git-send-email-marc.zyngier@arm.com>
- <20130111171232.GH23505@n2100.arm.linux.org.uk>
- <50F04AD5.6020703@arm.com>
- <CANM98qJ2ZSwxMWFRWiunTQtoV7iFb3fn3Cf6VWvOndBcU=+Tmg@mail.gmail.com>
- <50F04F2F.80306@arm.com>
- <CANM98qLRsdFGxU6S5q2EqtCAmK8fOnbGWi8qXBktyuRkSaPAJg@mail.gmail.com>
- <50F05562.3070107@arm.com>
-Message-ID: <CANM98qKXFazk6COcKB1x6dfi5R+ooJNCk+wv=wD=2vdSOCXD0w@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Jan 2013 23:50:07 +0530
+Subject: [PATCH 13/16] drivers: misc: add ARM CCI support
+In-Reply-To: <1357777251-13541-14-git-send-email-nicolas.pitre@linaro.org>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-14-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <50F057D7.1010808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 1:09 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 11/01/13 17:48, Christoffer Dall wrote:
->> On Fri, Jan 11, 2013 at 12:43 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On 11/01/13 17:33, Christoffer Dall wrote:
->>>> On Fri, Jan 11, 2013 at 12:24 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>> On 11/01/13 17:12, Russell King - ARM Linux wrote:
->>>>>> On Thu, Jan 10, 2013 at 04:06:45PM +0000, Marc Zyngier wrote:
->>>>>>> +int kvm_psci_call(struct kvm_vcpu *vcpu)
->>>>>>> +{
->>>>>>> +    unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->>>>>>> +    unsigned long val;
->>>>>>> +
->>>>>>> +    switch (psci_fn) {
->>>>>>> +    case KVM_PSCI_FN_CPU_OFF:
->>>>>>> +            kvm_psci_vcpu_off(vcpu);
->>>>>>> +            val = KVM_PSCI_RET_SUCCESS;
->>>>>>> +            break;
->>>>>>> +    case KVM_PSCI_FN_CPU_ON:
->>>>>>> +            val = kvm_psci_vcpu_on(vcpu);
->>>>>>> +            break;
->>>>>>> +    case KVM_PSCI_FN_CPU_SUSPEND:
->>>>>>> +    case KVM_PSCI_FN_MIGRATE:
->>>>>>> +            val = KVM_PSCI_RET_NI;
->>>>>>> +            break;
->>>>>>> +
->>>>>>> +    default:
->>>>>>> +            return -1;
->>>>>>> +    }
->>>>>>> +
->>>>>>> +    *vcpu_reg(vcpu, 0) = val;
->>>>>>> +    return 0;
->>>>>>> +}
->>>>>>
->>>>>> We were discussing recently on #kernel about kernel APIs and the way that
->>>>>> our integer-returning functions pretty much use 0 for success, and -errno
->>>>>> for failures, whereas our pointer-returning functions are a mess.
->>>>>>
->>>>>> And above we have something returning -1 to some other chunk of code outside
->>>>>> this compilation unit.  That doesn't sound particularly clever to me.
->>>>>
->>>>> The original code used to return -EINVAL, see:
->>>>> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-January/004509.html
->>>>>
->>>>> Christoffer (Cc-ed) didn't like this, hence the -1. I'm happy to revert
->>>>> the code to its original state though.
->>>>>
->>>> I don't want to return -EINVAL, because for the rest of the KVM code
->>>> this would mean kill the guest.
->>>>
->>>> The convention used in other archs of KVM as well as for ARM is that
->>>> the handle_exit functions return:
->>>>
->>>> -ERRNO: Error, report this error to user space
->>>> 0: Everything is fine, but return to user space to let it do I/O
->>>> emulation and whatever it wants to do
->>>> 1: Everything is fine, return directly to the guest without going to user space
->>>
->>> That is assuming we propagate the handle_exit convention down to the
->>> leaf calls, and I object to that. The 3 possible values only apply to
->>> handle_exit, and we should keep that convention as local as possible,
->>> because this is the odd case.
->>
->> I don't agree - it requires you to carefully follow a potentially deep
->> call trace to make sense of what it does, and worse, it's directly
->> misleading in the case of KVM/ARM. So either change it everywhere and
->> have a consistent calling convention or adhere to what we do elsewhere
->> and use the bool.
+On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
+> From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 >
-> Sorry, but I do not buy this.
+> On ARM multi-cluster systems coherency between cores running on
+> different clusters is managed by the cache-coherent interconnect (CCI).
+> It allows broadcasting of TLB invalidates and memory barriers and it
+> guarantees cache coherency at system level.
 >
-> In this particular case, the meaning of the value returned has nothing
-> to do with the handle_exit convention. We never return to user space,
-> let alone signaling an error.
+> This patch enables the basic infrastructure required in Linux to
+> handle and programme the CCI component. The first implementation is
+> based on a platform device, its relative DT compatible property and
+> a simple programming interface.
 >
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>   drivers/misc/Kconfig    |   3 ++
+>   drivers/misc/Makefile   |   1 +
+>   drivers/misc/arm-cci.c  | 107 ++++++++++++++++++++++++++++++++++++++++++++++++
+>   include/linux/arm-cci.h |  30 ++++++++++++++
+How about 'drivers/bus/' considering CCI is an interconnect bus (though
+for coherency)
 
-But that is by no means obvious.
-
-> Trying to force all the code in this convention makes it actually harder
-> to review, because this is the exception in the kernel. This is why I
-> suggest keeping the handle_exit return convention at this exact point,
-> and not impose it on anything else.
+>   4 files changed, 141 insertions(+)
+>   create mode 100644 drivers/misc/arm-cci.c
+>   create mode 100644 include/linux/arm-cci.h
 >
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index b151b7c1bd..30d5be1ad2 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -499,6 +499,9 @@ config USB_SWITCH_FSA9480
+>   	  stereo and mono audio, video, microphone and UART data to use
+>   	  a common connector port.
+>
+> +config ARM_CCI
+You might want add depends on ARM big.LITTTLE otherwise it will
+break build for other arch's with random configurations.
 
-Ok, then come up with a nicer convention, but using -EINVAL to mean I
-did not handle this one, maybe someone else will handle it, and it's
-not an error is definitely not easy to read.  What then if another
-function called from the same caller could actually return an error,
-would you have a switch case on the return value checking for EINVAL
-vs. EFAULT?
+[..]
 
-I repeat: what's the problem with a bool for this particular case,
-which would make it look like all the other sub-calls of handle exit
-functions - could we be consistent here?
+> diff --git a/drivers/misc/arm-cci.c b/drivers/misc/arm-cci.c
+> new file mode 100644
+> index 0000000000..f329c43099
+> --- /dev/null
+> +++ b/drivers/misc/arm-cci.c
+> @@ -0,0 +1,107 @@
+> +/*
+> + * CCI support
+> + *
+> + * Copyright (C) 2012 ARM Ltd.
+> + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/arm-cci.h>
+> +
+> +#define CCI400_EAG_OFFSET       0x4000
+> +#define CCI400_KF_OFFSET        0x5000
+> +
+> +#define DRIVER_NAME	"CCI"
+> +struct cci_drvdata {
+> +	void __iomem *baseaddr;
+> +	spinlock_t lock;
+> +};
+> +
+> +static struct cci_drvdata *info;
+> +
+> +void disable_cci(int cluster)
+> +{
+> +	u32 cci_reg = cluster ? CCI400_KF_OFFSET : CCI400_EAG_OFFSET;
+> +	writel_relaxed(0x0, info->baseaddr	+ cci_reg);
+> +
+> +	while (readl_relaxed(info->baseaddr + 0xc) & 0x1)
+> +			;
+> +}
+> +EXPORT_SYMBOL_GPL(disable_cci);
+> +
+Is more functionality going to be added for CCI driver. Having this
+much of driver code for just a disable_cci() functions seems like
+overkill.
 
--Christoffer
+Regards
+Santosh
