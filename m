@@ -1,38 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 Jan 2013 16:58:40 -0700
-Subject: [PATCH 13/14] ARM: tegra: harmony: Initialize PCIe from DT
-In-Reply-To: <1357764194-12677-14-git-send-email-thierry.reding@avionic-design.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <1357764194-12677-14-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <50EF55B0.7030106@wwwdotorg.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 11 Jan 2013 01:05:34 +0100
+Subject: [RFC 0/4] TI LCDC DRM driver
+In-Reply-To: <CAPM=9tzZiQuVNdNhm9=iNWqAwk+uZRh0_YC3QLkyZbne5dfeyg@mail.gmail.com>
+References: <1357704685-3600-1-git-send-email-robdclark@gmail.com>
+ <CAPM=9tzZiQuVNdNhm9=iNWqAwk+uZRh0_YC3QLkyZbne5dfeyg@mail.gmail.com>
+Message-ID: <1782274.DIo8UG5duX@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2013 01:43 PM, Thierry Reding wrote:
-> With the device tree support in place, probe the PCIe controller from
-> the device tree and remove the corresponding workaround in the board
-> file.
+On Thursday 10 January 2013 10:16:10 Dave Airlie wrote:
+> On Wed, Jan 9, 2013 at 2:11 PM, Rob Clark <robdclark@gmail.com> wrote:
+> > Updated version of DRM driver for TI LCD Controller.  Since the initial
+> > version of the patch, which only supported TFP410 DVI output, I've added
+> > an output driver for LCD panels (for example, LCD3 or LCD7 cape for the
+> > beagle-bone), and initial support for HDMI output via NXP TDA19988 HDMI
+> > encoder (via i2c encoder-slave output driver).
+> > 
+> > At this point, I think the basic lcdc drm driver plus TFP410 DVI output
+> > (first patch) is in reasonable shape (barring potential rename, if lcdc
+> > is too generic of a name... but I was not feeling creative enough yet to
+> > pick a new name).
+> 
+> I'd like at least tilcdc :-)
 
-For some reason, the ports on Harmony fail to initialize correctly with
-this driver, although they do with plain next-20130109:
+So do I :-) The Renesas LCD controller is also called LCDC, and they called 
+the fbdev driver sh_mobile_lcdcfb. tilcdc isn't *that* long in comparison :-)
 
-> [    2.698922] tegra-pcie 80003000.pcie-controller: link 0 down, retrying
-> [    2.925722] tegra-pcie 80003000.pcie-controller: link 0 down, retrying
-> [    3.155411] tegra-pcie 80003000.pcie-controller: link 0 down, retrying
-> [    3.178428] tegra-pcie 80003000.pcie-controller: link 0 down, ignoring
-> [    3.199713] tegra-pcie 80003000.pcie-controller: failed to add port pci: -19
+-- 
+Regards,
 
-^^^ There's definitely something plugged into this port, and it's
-enumerated OK with the old driver.
-
-> [    3.433551] tegra-pcie 80003000.pcie-controller: link 1 down, retrying
-> [    3.667624] tegra-pcie 80003000.pcie-controller: link 1 down, retrying
-...
-> [    3.901493] tegra-pcie 80003000.pcie-controller: link 1 down, retrying
-> [    3.902589] tegra-pcie 80003000.pcie-controller: link 1 down, ignoring
-> [    3.902615] tegra-pcie 80003000.pcie-controller: failed to add port pci: -19
-> [    3.903780] tegra-pcie 80003000.pcie-controller: PCI host bridge to bus 0000:00
-> [    3.903815] pci_bus 0000:00: root bus resource [io  0x82000000-0x8200ffff]
-> [    3.903844] pci_bus 0000:00: root bus resource [mem 0xa0000000-0xafffffff]
-> [    3.903871] pci_bus 0000:00: root bus resource [mem 0xb0000000-0xbfffffff pref]
-> [    3.903901] pci_bus 0000:00: root bus resource [bus 00-ff]
+Laurent Pinchart
