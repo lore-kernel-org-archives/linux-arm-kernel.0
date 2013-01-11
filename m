@@ -1,26 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 11 Jan 2013 12:18:50 -0800
-Subject: arm: mvebu: Fix compile for multiplatform when ARMv6 is selected
-In-Reply-To: <20130111200531.GO14149@atomide.com>
-References: <20130111200531.GO14149@atomide.com>
-Message-ID: <20130111201850.GA20524@quad.lixom.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Jan 2013 21:22:10 +0100
+Subject: [PATCH v2] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <50EF3BAF.4010200@wwwdotorg.org>
+References: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
+ <50EF27B4.60608@wwwdotorg.org> <50EF3BAF.4010200@wwwdotorg.org>
+Message-ID: <CACRpkdaHL=fj6f6a0AH0DaYzxRCen28rUv46O8yZ00gu81n1+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 12:05:31PM -0800, Tony Lindgren wrote:
-> Some systems compile in both ARMv6 and ARMv7 into multiplatform
-> configurations. This means the default compiler flags are for ARMv6,
-> and we will get:
-> 
-> arch/arm/mach-mvebu/coherency_ll.S: Assembler messages:
-> arch/arm/mach-mvebu/coherency_ll.S:45: Error: selected processor does not support `dsb'
-> 
-> Fix this by specifying ARMv7 flags for coherency_ll.o.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+On Thu, Jan 10, 2013 at 11:07 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-Applied to fixes, I don't expect Jason or others to complain about this
-so I took the liberty. :)
+> I see that an attempt was made to solve this problem, in the patch
+> immediately preceding this one (at least, as applied in the pinctrl
+> tree). However, that patch only addresses the case where the pin
+> controller is being looked up in the map, and not the case when
+> converting device tree to the map in the first place. The patch below
+> solves this:
+>
+> diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+> index fe2d1af..fd40a11 100644
+> --- a/drivers/pinctrl/devicetree.c
+> +++ b/drivers/pinctrl/devicetree.c
+> @@ -141,6 +141,11 @@ static int dt_to_map_one_config(struct pinctrl *p,
+> const char *statename,
+>                 pctldev = find_pinctrl_by_of_node(np_pctldev);
+>                 if (pctldev)
+>                         break;
+> +               /* Do not defer probing of hogs (circular loop) */
+> +               if (np_pctldev == p->dev->of_node) {
+> +                       of_node_put(np_pctldev);
+> +                       return -ENODEV;
+> +               }
+>         }
+>         of_node_put(np_pctldev);
 
+OK I've duplicated this, will send out as patch.
 
--Olof
+Yours,
+Linus Walleij
