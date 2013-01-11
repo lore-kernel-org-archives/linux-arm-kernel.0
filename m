@@ -1,162 +1,111 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 11 Jan 2013 13:33:50 -0500 (EST)
-Subject: [PATCH 02/16] ARM: b.L: introduce the CPU/cluster power API
-In-Reply-To: <50F04B4F.2070300@ti.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-3-git-send-email-nicolas.pitre@linaro.org>
- <50F04B4F.2070300@ti.com>
-Message-ID: <alpine.LFD.2.02.1301111312180.6300@xanadu.home>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 11 Jan 2013 19:48:19 +0100
+Subject: [PATCH 14/14] ARM: tegra: trimslice: Initialize PCIe from DT
+In-Reply-To: <50EF5537.6080602@wwwdotorg.org>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <1357764194-12677-15-git-send-email-thierry.reding@avionic-design.de>
+ <50EF5537.6080602@wwwdotorg.org>
+Message-ID: <20130111184819.GA18717@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
-
-> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> > This is the basic API used to handle the powering up/down of individual
-> > CPUs in a big.LITTLE system.  The platform specific backend implementation
-> > has the responsibility to also handle the cluster level power as well when
-> > the first/last CPU in a cluster is brought up/down.
+On Thu, Jan 10, 2013 at 04:56:39PM -0700, Stephen Warren wrote:
+> On 01/09/2013 01:43 PM, Thierry Reding wrote:
+> > With the device tree support in place, probe the PCIe controller from
+> > the device tree and remove the corresponding workaround in the board
+> > file.
+> 
+> Thierry, there are a couple things missing from this patch; I include a
+> fixup for you to squash in, but also see beyond that for a problem.
+> 
+> >  arch/arm/boot/dts/tegra20-trimslice.dts |   26 +++++++++++++++++++++-----
+> >  1 file changed, 21 insertions(+), 5 deletions(-)
 > > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> >   arch/arm/common/bL_entry.c      | 88
-> > +++++++++++++++++++++++++++++++++++++++
-> >   arch/arm/include/asm/bL_entry.h | 92
-> > +++++++++++++++++++++++++++++++++++++++++
-> >   2 files changed, 180 insertions(+)
-> > 
-> > diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
-> > index 80fff49417..41de0622de 100644
-> > --- a/arch/arm/common/bL_entry.c
-> > +++ b/arch/arm/common/bL_entry.c
-> > @@ -11,11 +11,13 @@
-> > 
-> >   #include <linux/kernel.h>
-> >   #include <linux/init.h>
-> > +#include <linux/irqflags.h>
-> > 
-> >   #include <asm/bL_entry.h>
-> >   #include <asm/barrier.h>
-> >   #include <asm/proc-fns.h>
-> >   #include <asm/cacheflush.h>
-> > +#include <asm/idmap.h>
-> > 
-> >   extern volatile unsigned long
-> > bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
-> > 
-> > @@ -28,3 +30,89 @@ void bL_set_entry_vector(unsigned cpu, unsigned cluster,
-> > void *ptr)
-> >   	outer_clean_range(__pa(&bL_entry_vectors[cluster][cpu]),
-> >   			  __pa(&bL_entry_vectors[cluster][cpu + 1]));
-> >   }
+> > diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+> > index ebb4c17..41fc45b 100644
+> > --- a/arch/arm/boot/dts/tegra20-trimslice.dts
+> > +++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+> > @@ -303,12 +303,10 @@
+> >  
+> >  	pcie-controller {
+> >  		status = "okay";
+> > +		pex-clk-supply = <&pci_clk_reg>;
+> > +		vdd-supply = <&pci_vdd_reg>;
+> >  
+> > -		pci at 0 {
+> > -			status = "okay";
+> > -		};
+> > -
+> > -		pci at 1 {
+> > +		pci at 1,0 {
+> >  			status = "okay";
+> >  		};
+> >  	};
+> > @@ -366,6 +364,24 @@
+> >  			regulator-max-microvolt = <1800000>;
+> >  			regulator-always-on;
+> >  		};
 > > +
-> > +static const struct bL_platform_power_ops *platform_ops;
+> > +		pci_clk_reg: regulator at 2 {
+> > +			compatible = "regulator-fixed";
+> > +			reg = <2>;
+> > +			regulator-name = "pci_clk";
+> > +			regulator-min-microvolt = <3300000>;
+> > +			regulator-max-microvolt = <3300000>;
+> > +			regulator-always-on;
+> > +		};
 > > +
-> > +int __init bL_platform_power_register(const struct bL_platform_power_ops
-> > *ops)
-> > +{
-> > +	if (platform_ops)
-> > +		return -EBUSY;
-> > +	platform_ops = ops;
-> > +	return 0;
-> > +}
-> > +
-> > +int bL_cpu_power_up(unsigned int cpu, unsigned int cluster)
-> > +{
-> > +	if (!platform_ops)
-> > +		return -EUNATCH;
-> > +	might_sleep();
-> > +	return platform_ops->power_up(cpu, cluster);
-> > +}
-> > +
-> > +typedef void (*phys_reset_t)(unsigned long);
-> > +
-> > +void bL_cpu_power_down(void)
-> > +{
-> > +	phys_reset_t phys_reset;
-> > +
-> > +	BUG_ON(!platform_ops);
-> > +	BUG_ON(!irqs_disabled());
-> > +
-> > +	/*
-> > +	 * Do this before calling into the power_down method,
-> > +	 * as it might not always be safe to do afterwards.
-> > +	 */
-> > +	setup_mm_for_reboot();
-> > +
-> > +	platform_ops->power_down();
-> > +
-> > +	/*
-> > +	 * It is possible for a power_up request to happen concurrently
-> > +	 * with a power_down request for the same CPU. In this case the
-> > +	 * power_down method might not be able to actually enter a
-> > +	 * powered down state with the WFI instruction if the power_up
-> > +	 * method has removed the required reset condition.  The
-> > +	 * power_down method is then allowed to return. We must perform
-> > +	 * a re-entry in the kernel as if the power_up method just had
-> > +	 * deasserted reset on the CPU.
-> > +	 *
-> > +	 * To simplify race issues, the platform specific implementation
-> > +	 * must accommodate for the possibility of unordered calls to
-> > +	 * power_down and power_up with a usage count. Therefore, if a
-> > +	 * call to power_up is issued for a CPU that is not down, then
-> > +	 * the next call to power_down must not attempt a full shutdown
-> > +	 * but only do the minimum (normally disabling L1 cache and CPU
-> > +	 * coherency) and return just as if a concurrent power_up request
-> > +	 * had happened as described above.
-> > +	 */
-> > +
-> > +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-> > +	phys_reset(virt_to_phys(bL_entry_point));
-> > +
-> > +	/* should never get here */
-> > +	BUG();
-> > +}
-> > +
-> > +void bL_cpu_suspend(u64 expected_residency)
-> > +{
-> > +	phys_reset_t phys_reset;
-> > +
-> > +	BUG_ON(!platform_ops);
-> > +	BUG_ON(!irqs_disabled());
-> > +
-> > +	/* Very similar to bL_cpu_power_down() */
-> > +	setup_mm_for_reboot();
-> > +	platform_ops->suspend(expected_residency);
-> > +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-> > +	phys_reset(virt_to_phys(bL_entry_point));
-> > +	BUG();
-> > 
-> I might be missing all the rationales behind not having a recovery for
-> CPUs entering suspend if they actualy come here because of some events.
-> This is pretty much possible in many scenario's and hence letting CPU
-> cpu come out of suspend should be possible. May be switcher code don't
-> have such requirement but it appeared bit off to me.
+> > +		pci_vdd_reg: regulator at 3 {
+> > +			compatible = "regulator-fixed";
+> > +			reg = <3>;
+> > +			regulator-name = "pci_vdd";
+> > +			regulator-min-microvolt = <1050000>;
+> > +			regulator-max-microvolt = <1050000>;
+> > +			regulator-always-on;
+> > +		};
+> >  	};
+> >  
+> >  	sound {
+> > -- 
+> > 1.7.10.4
+> 
+> However, PCIe still doesn't work on TrimSlice; the device enumeration
+> fails. The log is below:
+> 
+> > [    0.790425] tegra-pcie 80003000.pcie-controller: link 0 down, retrying
+> > [    0.801351] tegra-pcie 80003000.pcie-controller: PCI host bridge to bus 0000:00
+> > [    0.808945] pci_bus 0000:00: root bus resource [io  0x82000000-0x8200ffff]
+> > [    0.816109] pci_bus 0000:00: root bus resource [mem 0xa0000000-0xafffffff]
+> > [    0.823303] pci_bus 0000:00: root bus resource [mem 0xb0000000-0xbfffffff pref]
+> > [    0.830893] pci_bus 0000:00: root bus resource [bus 00-ff]
+> > [    0.836728] pci 0000:00:01.0: [10de:0bf0] type 01 class 0x060000
+> > [    0.843097] pci 0000:00:01.0: PME# supported from D0 D1 D2 D3hot D3cold
+> > [    0.850047] PCI: bus0: Fast back to back transfers disabled
+> > [    0.855853] pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+> > [    0.864308] tegra-pcie 80003000.pcie-controller: AXI response decoding error, signature: 10010001
+> > [    0.873489] tegra-pcie 80003000.pcie-controller:   FPCI address: fe10010000
+> 
+> ^^^ For some reason, the config register access fails.
+> 
+> > [    0.880760] PCI: bus1: Fast back to back transfers enabled
+> > [    0.886482] pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+> > [    0.893381] pci 0000:00:01.0: PCI bridge to [bus 01]
+> > [    0.898577] PCI: enabling device 0000:00:01.0 (0140 -> 0143)
+> > [    0.904535] pci 0000:00:01.0: nv_msi_ht_cap_quirk didn't locate host bridge
+> 
+> With plain next-20130109, the device enumeration succeeds.
 
-There are two things to consider here:
+That's very strange. I haven't seen that on my setup. Looks like I need
+to dig out the TrimSlice again and debug this. It'll take me a while and
+there are plenty of other requested changes already, so if I find a fix
+I can roll it into the next version.
 
-1) The CPU is suspended.  CPU state is lost. Next interrupt to wake up
-   the CPU will make it restart from the reset vector and re-entry in 
-   the kernel will happen via bL_entry_point to deal with the various 
-   cluster issues, to eventually resume kernel code via cpu_resume.  
-   Obviously, the machine specific backend code would have set the
-   bL_entry_point address in its machine specific reset vector in
-   advance.
-
-2) An interrupt comes along before the CPU is effectively suspended, say 
-   right before the backend code executes a WFI to shut the CPU down.  
-   The CPU and possibly cluster state was already set for being powered 
-   off.  We cannot simply return at this point as caches are off, the 
-   CPU is not coherent with the rest of the system anymore, etc.  So if 
-   the platform specific backend ever returns, say because the final WFI 
-   exited, then we have to go through the same arbitration process to 
-   restore the CPU and cluster state as if that was a hard reset.  Hence 
-   the cpu_reset call to loop back into bL_entry_point.
-
-In either cases, we simply cannot ever return from bL_cpu_suspend() 
-directly.  Of course, the caller is expected to have used 
-bL_set_entry_vector() beforehand, most probably with cpu_resume as 
-argument.
-
-
-Nicolas
+Thanks for testing,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130111/ab94f169/attachment-0001.sig>
