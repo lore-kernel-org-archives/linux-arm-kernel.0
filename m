@@ -1,153 +1,162 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 12 Jan 2013 00:04:40 +0530
-Subject: [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
- exit/setup
-In-Reply-To: <20130111180757.GI1966@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 11 Jan 2013 13:33:50 -0500 (EST)
+Subject: [PATCH 02/16] ARM: b.L: introduce the CPU/cluster power API
+In-Reply-To: <50F04B4F.2070300@ti.com>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
- <50F04FEA.1040205@ti.com> <20130111180757.GI1966@linaro.org>
-Message-ID: <50F05B40.40302@ti.com>
+ <1357777251-13541-3-git-send-email-nicolas.pitre@linaro.org>
+ <50F04B4F.2070300@ti.com>
+Message-ID: <alpine.LFD.2.02.1301111312180.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 January 2013 11:37 PM, Dave Martin wrote:
-> On Fri, Jan 11, 2013 at 11:16:18PM +0530, Santosh Shilimkar wrote:
->
-> [...]
->
->>> +Originally created and documented by Dave Martin for Linaro Limited, in
->>> +collaboration with Nicolas Pitre and Achin Gupta.
->>> +
->> Great write-up Dave!! I might have to do couple of more passes on it to
->> get overall idea, but surely this documentation is good start for
->> anybody reading/reviewing the big.LITTLE switcher code.
->
-> Thanks for reading through it.  Partly, this was insurance against me
-> forgetting how the code worked in between writing and posting it...
-> but this is all quite subtle code, so it felt important to document
-> it thoroughly.
->
->>
->>> +Copyright (C) 2012  Linaro Limited
->>> +Distributed under the terms of Version 2 of the GNU General Public
->>> +License, as defined in linux/COPYING.
->>> diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
->>> index 41de0622de..1ea4ec9df0 100644
->>> --- a/arch/arm/common/bL_entry.c
->>> +++ b/arch/arm/common/bL_entry.c
->>> @@ -116,3 +116,163 @@ int bL_cpu_powered_up(void)
->>>   		platform_ops->powered_up();
->>>   	return 0;
->>>   }
->>> +
->>> +struct bL_sync_struct bL_sync;
->>> +
->>> +static void __sync_range(volatile void *p, size_t size)
->>> +{
->>> +	char *_p = (char *)p;
->>> +
->>> +	__cpuc_flush_dcache_area(_p, size);
->>> +	outer_flush_range(__pa(_p), __pa(_p + size));
->>> +	outer_sync();
->>> +}
->>> +
->>> +#define sync_mem(ptr) __sync_range(ptr, sizeof *(ptr))
->>> +
->>> +/*
->> /** as per kerneldoc.
->
-> Does kerneldoc not require the comment to be specially formatted?
->
-> I haven't played with that, so far.
->
->>
->>> + * __bL_cpu_going_down: Indicates that the cpu is being torn down.
->>> + *    This must be called at the point of committing to teardown of a CPU.
->>> + *    The CPU cache (SCTRL.C bit) is expected to still be active.
->>> + */
->>> +void __bL_cpu_going_down(unsigned int cpu, unsigned int cluster)
->>> +{
->>> +	bL_sync.clusters[cluster].cpus[cpu].cpu = CPU_GOING_DOWN;
->>> +	sync_mem(&bL_sync.clusters[cluster].cpus[cpu].cpu);
->>> +}
->>> +
->>
->> [..]
->>
->>> diff --git a/arch/arm/common/bL_head.S b/arch/arm/common/bL_head.S
->>> index 9d351f2b4c..f7a64ac127 100644
->>> --- a/arch/arm/common/bL_head.S
->>> +++ b/arch/arm/common/bL_head.S
->>> @@ -7,11 +7,19 @@
->>>    * This program is free software; you can redistribute it and/or modify
->>>    * it under the terms of the GNU General Public License version 2 as
->>>    * published by the Free Software Foundation.
->>> + *
->>> + *
->>> + * Refer to Documentation/arm/big.LITTLE/cluster-pm-race-avoidance.txt
->>> + * for details of the synchronisation algorithms used here.
->>>    */
->>>
->>>   #include <linux/linkage.h>
->>>   #include <asm/bL_entry.h>
->>>
->>> +.if BL_SYNC_CLUSTER_CPUS
->>> +.error "cpus must be the first member of struct bL_cluster_sync_struct"
->>> +.endif
->>> +
->>>   	.macro	pr_dbg	cpu, string
->>>   #if defined(CONFIG_DEBUG_LL) && defined(DEBUG)
->>>   	b	1901f
->>> @@ -52,12 +60,82 @@ ENTRY(bL_entry_point)
->>>   2:	pr_dbg	r4, "kernel bL_entry_point\n"
->>>
->>>   	/*
->>> -	 * MMU is off so we need to get to bL_entry_vectors in a
->>> +	 * MMU is off so we need to get to various variables in a
->>>   	 * position independent way.
->>>   	 */
->>>   	adr	r5, 3f
->>> -	ldr	r6, [r5]
->>> +	ldmia	r5, {r6, r7, r8}
->>>   	add	r6, r5, r6			@ r6 = bL_entry_vectors
->>> +	ldr	r7, [r5, r7]			@ r7 = bL_power_up_setup_phys
->>> +	add	r8, r5, r8			@ r8 = bL_sync
->>> +
->>> +	mov	r0, #BL_SYNC_CLUSTER_SIZE
->>> +	mla	r8, r0, r10, r8			@ r8 = bL_sync cluster base
->>> +
->>> +	@ Signal that this CPU is coming UP:
->>> +	mov	r0, #CPU_COMING_UP
->>> +	mov	r5, #BL_SYNC_CPU_SIZE
->>> +	mla	r5, r9, r5, r8			@ r5 = bL_sync cpu address
->>> +	strb	r0, [r5]
->>> +
->>> +	dsb
->> Do you really need above dsb(). With MMU off, the the store should
->
-> The short answer is "maybe not".  Some of the barriers can be
-> eliminated; some can be demoted to DSBs.  Others may be required but
-> unnecessarily duplicated e.g., between bL_head.S and vlock.S.
->
->> any way make it to the main memory, No ?
->
-> Yes, but this raises issues about precisely what the architecture
-> guarantees about memory ordering in these scenarios.  The only obvious
-> thing about that is that it's non-obvious.
->
-Well at least ARM documents clearly says the memory accesses will be
-treated as strongly ordered with MMU OFF and that means they expect
-to make it to main memory.
+On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
 
-> Strongly-Ordered memory is not quite the same as having explicit
-> barriers everywhere.
->
-> I need to have a careful think, but it should be possible to optimise
-> a bit here.
->
-If the CCI comes in between that rule and if it needs a barrier to let
-it flush is WB to main memory then thats a different story.
+> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
+> > This is the basic API used to handle the powering up/down of individual
+> > CPUs in a big.LITTLE system.  The platform specific backend implementation
+> > has the responsibility to also handle the cluster level power as well when
+> > the first/last CPU in a cluster is brought up/down.
+> > 
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > ---
+> >   arch/arm/common/bL_entry.c      | 88
+> > +++++++++++++++++++++++++++++++++++++++
+> >   arch/arm/include/asm/bL_entry.h | 92
+> > +++++++++++++++++++++++++++++++++++++++++
+> >   2 files changed, 180 insertions(+)
+> > 
+> > diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
+> > index 80fff49417..41de0622de 100644
+> > --- a/arch/arm/common/bL_entry.c
+> > +++ b/arch/arm/common/bL_entry.c
+> > @@ -11,11 +11,13 @@
+> > 
+> >   #include <linux/kernel.h>
+> >   #include <linux/init.h>
+> > +#include <linux/irqflags.h>
+> > 
+> >   #include <asm/bL_entry.h>
+> >   #include <asm/barrier.h>
+> >   #include <asm/proc-fns.h>
+> >   #include <asm/cacheflush.h>
+> > +#include <asm/idmap.h>
+> > 
+> >   extern volatile unsigned long
+> > bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
+> > 
+> > @@ -28,3 +30,89 @@ void bL_set_entry_vector(unsigned cpu, unsigned cluster,
+> > void *ptr)
+> >   	outer_clean_range(__pa(&bL_entry_vectors[cluster][cpu]),
+> >   			  __pa(&bL_entry_vectors[cluster][cpu + 1]));
+> >   }
+> > +
+> > +static const struct bL_platform_power_ops *platform_ops;
+> > +
+> > +int __init bL_platform_power_register(const struct bL_platform_power_ops
+> > *ops)
+> > +{
+> > +	if (platform_ops)
+> > +		return -EBUSY;
+> > +	platform_ops = ops;
+> > +	return 0;
+> > +}
+> > +
+> > +int bL_cpu_power_up(unsigned int cpu, unsigned int cluster)
+> > +{
+> > +	if (!platform_ops)
+> > +		return -EUNATCH;
+> > +	might_sleep();
+> > +	return platform_ops->power_up(cpu, cluster);
+> > +}
+> > +
+> > +typedef void (*phys_reset_t)(unsigned long);
+> > +
+> > +void bL_cpu_power_down(void)
+> > +{
+> > +	phys_reset_t phys_reset;
+> > +
+> > +	BUG_ON(!platform_ops);
+> > +	BUG_ON(!irqs_disabled());
+> > +
+> > +	/*
+> > +	 * Do this before calling into the power_down method,
+> > +	 * as it might not always be safe to do afterwards.
+> > +	 */
+> > +	setup_mm_for_reboot();
+> > +
+> > +	platform_ops->power_down();
+> > +
+> > +	/*
+> > +	 * It is possible for a power_up request to happen concurrently
+> > +	 * with a power_down request for the same CPU. In this case the
+> > +	 * power_down method might not be able to actually enter a
+> > +	 * powered down state with the WFI instruction if the power_up
+> > +	 * method has removed the required reset condition.  The
+> > +	 * power_down method is then allowed to return. We must perform
+> > +	 * a re-entry in the kernel as if the power_up method just had
+> > +	 * deasserted reset on the CPU.
+> > +	 *
+> > +	 * To simplify race issues, the platform specific implementation
+> > +	 * must accommodate for the possibility of unordered calls to
+> > +	 * power_down and power_up with a usage count. Therefore, if a
+> > +	 * call to power_up is issued for a CPU that is not down, then
+> > +	 * the next call to power_down must not attempt a full shutdown
+> > +	 * but only do the minimum (normally disabling L1 cache and CPU
+> > +	 * coherency) and return just as if a concurrent power_up request
+> > +	 * had happened as described above.
+> > +	 */
+> > +
+> > +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+> > +	phys_reset(virt_to_phys(bL_entry_point));
+> > +
+> > +	/* should never get here */
+> > +	BUG();
+> > +}
+> > +
+> > +void bL_cpu_suspend(u64 expected_residency)
+> > +{
+> > +	phys_reset_t phys_reset;
+> > +
+> > +	BUG_ON(!platform_ops);
+> > +	BUG_ON(!irqs_disabled());
+> > +
+> > +	/* Very similar to bL_cpu_power_down() */
+> > +	setup_mm_for_reboot();
+> > +	platform_ops->suspend(expected_residency);
+> > +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+> > +	phys_reset(virt_to_phys(bL_entry_point));
+> > +	BUG();
+> > 
+> I might be missing all the rationales behind not having a recovery for
+> CPUs entering suspend if they actualy come here because of some events.
+> This is pretty much possible in many scenario's and hence letting CPU
+> cpu come out of suspend should be possible. May be switcher code don't
+> have such requirement but it appeared bit off to me.
 
-Anyway thanks for the answer.
-Regards
-Santosh
+There are two things to consider here:
+
+1) The CPU is suspended.  CPU state is lost. Next interrupt to wake up
+   the CPU will make it restart from the reset vector and re-entry in 
+   the kernel will happen via bL_entry_point to deal with the various 
+   cluster issues, to eventually resume kernel code via cpu_resume.  
+   Obviously, the machine specific backend code would have set the
+   bL_entry_point address in its machine specific reset vector in
+   advance.
+
+2) An interrupt comes along before the CPU is effectively suspended, say 
+   right before the backend code executes a WFI to shut the CPU down.  
+   The CPU and possibly cluster state was already set for being powered 
+   off.  We cannot simply return at this point as caches are off, the 
+   CPU is not coherent with the rest of the system anymore, etc.  So if 
+   the platform specific backend ever returns, say because the final WFI 
+   exited, then we have to go through the same arbitration process to 
+   restore the CPU and cluster state as if that was a hard reset.  Hence 
+   the cpu_reset call to loop back into bL_entry_point.
+
+In either cases, we simply cannot ever return from bL_cpu_suspend() 
+directly.  Of course, the caller is expected to have used 
+bL_set_entry_vector() beforehand, most probably with cpu_resume as 
+argument.
+
+
+Nicolas
