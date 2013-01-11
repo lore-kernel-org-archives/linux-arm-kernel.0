@@ -1,99 +1,175 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 11 Jan 2013 18:57:58 +0000
-Subject: [PATCH] ARM: VIC: use irq_domain_add_simple()
-In-Reply-To: <CACRpkdbtn4Pz3uLCxDGOBSVW7vfLECf2UZkT5+X9ip1ZZFb8Lw@mail.gmail.com>
-References: <1350392786-29191-1-git-send-email-linus.walleij@stericsson.com>
- <507D61E7.2080704@gmail.com>
- <CACxGe6tBLfj3CDDZAfGmznj3B-h4OfJsrRc+85w9fnxFH6Cd_Q@mail.gmail.com>
- <CACRpkdbtn4Pz3uLCxDGOBSVW7vfLECf2UZkT5+X9ip1ZZFb8Lw@mail.gmail.com>
-Message-ID: <20130111185758.45FF73E215F@localhost>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 12 Jan 2013 00:11:24 +0530
+Subject: [PATCH 02/16] ARM: b.L: introduce the CPU/cluster power API
+In-Reply-To: <alpine.LFD.2.02.1301111312180.6300@xanadu.home>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-3-git-send-email-nicolas.pitre@linaro.org>
+ <50F04B4F.2070300@ti.com> <alpine.LFD.2.02.1301111312180.6300@xanadu.home>
+Message-ID: <50F05CD4.8050905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Dec 2012 19:45:24 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Dec 19, 2012 at 12:34 AM, Grant Likely
-> <grant.likely@secretlab.ca> wrote:
-> 
-> > It looks to me like the below patch breaks versatile because it makes
-> > it try to register a linear irq_domain instead of the legacy one that
-> > it needs. Here are the relevant commits:
-> >
-> > 07c9249f1: "ARM: 7554/1: VIC: use irq_domain_add_simple()"
-> > 946c59a08: "ARM: vic: fix build warning caused by previous commit"
+On Saturday 12 January 2013 12:03 AM, Nicolas Pitre wrote:
+> On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
+>
+>> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
+>>> This is the basic API used to handle the powering up/down of individual
+>>> CPUs in a big.LITTLE system.  The platform specific backend implementation
+>>> has the responsibility to also handle the cluster level power as well when
+>>> the first/last CPU in a cluster is brought up/down.
+>>>
+>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+>>> ---
+>>>    arch/arm/common/bL_entry.c      | 88
+>>> +++++++++++++++++++++++++++++++++++++++
+>>>    arch/arm/include/asm/bL_entry.h | 92
+>>> +++++++++++++++++++++++++++++++++++++++++
+>>>    2 files changed, 180 insertions(+)
+>>>
+>>> diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
+>>> index 80fff49417..41de0622de 100644
+>>> --- a/arch/arm/common/bL_entry.c
+>>> +++ b/arch/arm/common/bL_entry.c
+>>> @@ -11,11 +11,13 @@
+>>>
+>>>    #include <linux/kernel.h>
+>>>    #include <linux/init.h>
+>>> +#include <linux/irqflags.h>
+>>>
+>>>    #include <asm/bL_entry.h>
+>>>    #include <asm/barrier.h>
+>>>    #include <asm/proc-fns.h>
+>>>    #include <asm/cacheflush.h>
+>>> +#include <asm/idmap.h>
+>>>
+>>>    extern volatile unsigned long
+>>> bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
+>>>
+>>> @@ -28,3 +30,89 @@ void bL_set_entry_vector(unsigned cpu, unsigned cluster,
+>>> void *ptr)
+>>>    	outer_clean_range(__pa(&bL_entry_vectors[cluster][cpu]),
+>>>    			  __pa(&bL_entry_vectors[cluster][cpu + 1]));
+>>>    }
+>>> +
+>>> +static const struct bL_platform_power_ops *platform_ops;
+>>> +
+>>> +int __init bL_platform_power_register(const struct bL_platform_power_ops
+>>> *ops)
+>>> +{
+>>> +	if (platform_ops)
+>>> +		return -EBUSY;
+>>> +	platform_ops = ops;
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +int bL_cpu_power_up(unsigned int cpu, unsigned int cluster)
+>>> +{
+>>> +	if (!platform_ops)
+>>> +		return -EUNATCH;
+>>> +	might_sleep();
+>>> +	return platform_ops->power_up(cpu, cluster);
+>>> +}
+>>> +
+>>> +typedef void (*phys_reset_t)(unsigned long);
+>>> +
+>>> +void bL_cpu_power_down(void)
+>>> +{
+>>> +	phys_reset_t phys_reset;
+>>> +
+>>> +	BUG_ON(!platform_ops);
+>>> +	BUG_ON(!irqs_disabled());
+>>> +
+>>> +	/*
+>>> +	 * Do this before calling into the power_down method,
+>>> +	 * as it might not always be safe to do afterwards.
+>>> +	 */
+>>> +	setup_mm_for_reboot();
+>>> +
+>>> +	platform_ops->power_down();
+>>> +
+>>> +	/*
+>>> +	 * It is possible for a power_up request to happen concurrently
+>>> +	 * with a power_down request for the same CPU. In this case the
+>>> +	 * power_down method might not be able to actually enter a
+>>> +	 * powered down state with the WFI instruction if the power_up
+>>> +	 * method has removed the required reset condition.  The
+>>> +	 * power_down method is then allowed to return. We must perform
+>>> +	 * a re-entry in the kernel as if the power_up method just had
+>>> +	 * deasserted reset on the CPU.
+>>> +	 *
+>>> +	 * To simplify race issues, the platform specific implementation
+>>> +	 * must accommodate for the possibility of unordered calls to
+>>> +	 * power_down and power_up with a usage count. Therefore, if a
+>>> +	 * call to power_up is issued for a CPU that is not down, then
+>>> +	 * the next call to power_down must not attempt a full shutdown
+>>> +	 * but only do the minimum (normally disabling L1 cache and CPU
+>>> +	 * coherency) and return just as if a concurrent power_up request
+>>> +	 * had happened as described above.
+>>> +	 */
+>>> +
+>>> +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+>>> +	phys_reset(virt_to_phys(bL_entry_point));
+>>> +
+>>> +	/* should never get here */
+>>> +	BUG();
+>>> +}
+>>> +
+>>> +void bL_cpu_suspend(u64 expected_residency)
+>>> +{
+>>> +	phys_reset_t phys_reset;
+>>> +
+>>> +	BUG_ON(!platform_ops);
+>>> +	BUG_ON(!irqs_disabled());
+>>> +
+>>> +	/* Very similar to bL_cpu_power_down() */
+>>> +	setup_mm_for_reboot();
+>>> +	platform_ops->suspend(expected_residency);
+>>> +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+>>> +	phys_reset(virt_to_phys(bL_entry_point));
+>>> +	BUG();
+>>>
+>> I might be missing all the rationales behind not having a recovery for
+>> CPUs entering suspend if they actualy come here because of some events.
+>> This is pretty much possible in many scenario's and hence letting CPU
+>> cpu come out of suspend should be possible. May be switcher code don't
+>> have such requirement but it appeared bit off to me.
+>
+> There are two things to consider here:
+>
+> 1) The CPU is suspended.  CPU state is lost. Next interrupt to wake up
+>     the CPU will make it restart from the reset vector and re-entry in
+>     the kernel will happen via bL_entry_point to deal with the various
+>     cluster issues, to eventually resume kernel code via cpu_resume.
+>     Obviously, the machine specific backend code would have set the
+>     bL_entry_point address in its machine specific reset vector in
+>     advance.
+This is the successful case and in that case you will anyway not hit the
+BUG.
+>
+> 2) An interrupt comes along before the CPU is effectively suspended, say
+>     right before the backend code executes a WFI to shut the CPU down.
+>     The CPU and possibly cluster state was already set for being powered
+>     off.  We cannot simply return at this point as caches are off, the
+>     CPU is not coherent with the rest of the system anymore, etc.  So if
+>     the platform specific backend ever returns, say because the final WFI
+>     exited, then we have to go through the same arbitration process to
+>     restore the CPU and cluster state as if that was a hard reset.  Hence
+>     the cpu_reset call to loop back into bL_entry_point.
+>
+This is the one I was thinking. Enabling C bit and SMP bit should be
+enough for CPU to get back to right state since the CPU has not lost
+the context all the registers including SP is intact and CPU should
+be able to resume.
 
-(sorry for the really late reply on this. I took a break at Christmas
-and jetlag has been beating up my concentration since I got back. I
-actually started writing this reply before Christmas, but the
-investigation sidetracked me enough that I never finished it.)
+> In either cases, we simply cannot ever return from bL_cpu_suspend()
+> directly.  Of course, the caller is expected to have used
+> bL_set_entry_vector() beforehand, most probably with cpu_resume as
+> argument.
+>
+The above might get complicated if when above situation happens on
+last CPU where even CCI gets disabled and then adding the rever code
+for all of that may not be worth. You approach is much safer.
+Thanks for explaining it further.
 
-> > I'm working on getting it properly sorted out (and more importantly
-> > *simplified*), but in the mean time I think the above two commits need
-> > to be reverted. Reverting them on my tree fixes booting for me.
-> 
-> Isn't that a bit violent, can't we just fix the real bug?
-
-I did try to fix the bug first, but it became more involved that I would
-like for a stablization change (and I went down a lot of rabbit trails
-in the process). I preferred reverting because this was all contained
-to a single driver which can be backed out easily to have another cycle
-for a correct fix. I did try your change though...
-
-> Does the below patch work for you, it does two things:
-> 
-> 1) Bump all Versatile IRQs to offset at 32, because it is using
->   IRQ 0 which is NO_IRQ and illegal anyway so it's anyway
->   a bug that should be fixed.
-> 
-> 2) Make sure we call irq_create_mapping() if the start IRQ is
->   anyway 0, as in the device tree case, and make sure to
->   actually pass zero in that case.
-
-In actual fact, only changing the offset to 32 is required to get
-Versatile to boot with DT. That platform doesn't yet use vic_of_init().
-It currently depends on pre-allocated irq_descs. Calling
-irq_create_mapping() doesn't resolve this. I now have patches to rework
-the versatile OF support to use irq_of_init(), but they aren't ready
-for posting yet. Merging the bump to offset 32 would be fine for now.
-
-> diff --git a/arch/arm/mach-versatile/include/mach/irqs.h
-> b/arch/arm/mach-versatile/include/mach/irqs.h
-> index bf44c61..0fd771c 100644
-> --- a/arch/arm/mach-versatile/include/mach/irqs.h
-> +++ b/arch/arm/mach-versatile/include/mach/irqs.h
-> @@ -25,7 +25,7 @@
->   *  IRQ interrupts definitions are the same as the INT definitions
->   *  held within platform.h
->   */
-> -#define IRQ_VIC_START		0
-> +#define IRQ_VIC_START		32
->  #define IRQ_WDOGINT		(IRQ_VIC_START + INT_WDOGINT)
->  #define IRQ_SOFTINT		(IRQ_VIC_START + INT_SOFTINT)
->  #define IRQ_COMMRx		(IRQ_VIC_START + INT_COMMRx)
-> @@ -100,7 +100,7 @@
->  /*
->   * Secondary interrupt controller
->   */
-> -#define IRQ_SIC_START		32
-> +#define IRQ_SIC_START		64
-
-Since you're touching this line anyway, please change to:
-
-#define IRQ_SIC_START			(IRQ_VIC_START + 32)
-
->  #define IRQ_SIC_MMCI0B 		(IRQ_SIC_START + SIC_INT_MMCI0B)
->  #define IRQ_SIC_MMCI1B 		(IRQ_SIC_START + SIC_INT_MMCI1B)
->  #define IRQ_SIC_KMI0		(IRQ_SIC_START + SIC_INT_KMI0)
-> @@ -120,7 +120,7 @@
->  #define IRQ_SIC_PCI1		(IRQ_SIC_START + SIC_INT_PCI1)
->  #define IRQ_SIC_PCI2		(IRQ_SIC_START + SIC_INT_PCI2)
->  #define IRQ_SIC_PCI3		(IRQ_SIC_START + SIC_INT_PCI3)
-> -#define IRQ_SIC_END		63
-> +#define IRQ_SIC_END		95
-
-Similarly here: #define IRQ_SIC_END (IRQ_SIC_START + 31)
-
-And then you can add my acked by for the irq number changes.
-
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-g.
+Regards,
+Santosh
