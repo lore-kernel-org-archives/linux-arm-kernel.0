@@ -1,35 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Jan 2013 14:07:58 +0000
-Subject: [PATCHv2 02/11] arm: arch_timer: remove redundant available check
-In-Reply-To: <50F00F8D.3050904@ti.com>
-References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
- <1357747640-18594-3-git-send-email-mark.rutland@arm.com>
- <50F00F8D.3050904@ti.com>
-Message-ID: <20130111140748.GA19765@e106331-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 11 Jan 2013 15:08:29 +0100
+Subject: [PATCH 0/2 v2] at91/ssc: fixes on ASoC tree for 3.8
+Message-ID: <cover.1357912706.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 01:11:41PM +0000, Santosh Shilimkar wrote:
-> On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
-> > This check is a holdover from the pre-devicetree days. As the timer
-> > is not probed except by platforms which register it via devicetree,
-> > it's not strictly necessary.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> Multi-platform build without DT could still benefit from the
-> check but I guess the most of the A15 based platform are DT
-> only, so its should be good to get rid of the check.
+Hi Mark, Olof, Arnd,
 
-Indeed. I'm under the impression that all platforms which might have an
-architected timer are devicetree only.
+This series goes on top of Linus' v3.8-rc3 and fixes an error that
+we have while compiling DTBs for AT91:
+ERROR (phandle_references): Reference to non-existent node or label
+"pinctrl_ssc0_tx"
 
-> 
-> Regards,
-> Santosh
-> 
+ERROR: Input tree has errors, aborting (use -f to force output)
+make[3]: *** [arch/arm/boot/dts/at91sam9g20ek.dtb] Error 2
 
-Thanks,
-Mark.
+I have included pending material that is dealing with SSC and pinctrl. The
+pinctrl part can be merged more easily now that the big pinctrl update for AT91
+has been merged upstream.
+
+This material was designed to enter Mark's fixes queue, but as discussed with
+Olof, we can imagine merging everything through arm-soc or split the series (of
+2 patches) and let them progress upstream separated (option that I do not like
+even if I know that the consequences are not so dramatic).
+So please, Olof, if you feel confortable with this series, tell us what you
+prefer and we will make our best to make this material go forward...
+
+Thanks for your help, best regards,
+
+v2: - remove the fix for typo in SSC status property: already merged upstream
+
+Bo Shen (2):
+  ARM: at91/dts: add pinctrl support for SSC peripheral
+  ASoC: atmel-ssc: add pinctrl selection to driver
+
+ arch/arm/boot/dts/at91sam9260.dtsi | 18 ++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9n12.dtsi | 26 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 32 +++++++++++++++++++++++++-------
+ drivers/misc/atmel-ssc.c           |  8 ++++++++
+ 6 files changed, 149 insertions(+), 7 deletions(-)
+
+-- 
+1.8.0
