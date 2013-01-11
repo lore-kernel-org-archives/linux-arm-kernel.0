@@ -1,33 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 Jan 2013 10:53:12 +0800
-Subject: [PATCH 0/3] arch_decomp_wdog cleanup
-In-Reply-To: <alpine.LFD.2.02.1301101430200.6300@xanadu.home>
-References: <1357827165-9320-1-git-send-email-shawn.guo@linaro.org>
- <alpine.LFD.2.02.1301101430200.6300@xanadu.home>
-Message-ID: <20130111025311.GD9139@S2101-09.ap.freescale.net>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Fri, 11 Jan 2013 03:06:16 +0000
+Subject: [PATCH 1/4] ARM: dts: mxs-phy: Change mxs phy clock usage
+In-Reply-To: <20130111022525.GC9139@S2101-09.ap.freescale.net>
+References: <1357806954-27960-1-git-send-email-peter.chen@freescale.com>
+ <20130111022525.GC9139@S2101-09.ap.freescale.net>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803D63A8D@039-SN2MPN1-022.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 02:32:30PM -0500, Nicolas Pitre wrote:
-> On Thu, 10 Jan 2013, Shawn Guo wrote:
+ 
+> On Thu, Jan 10, 2013 at 04:35:51PM +0800, Peter Chen wrote:
+> > For mxs-phy user i.mx6q, the PHY's clock is controlled by
+> > hardware automatically, the software only needs to enable it
+> > at probe, this clock should be used like below:
+> >
+> > - Enable at mxs-phy's probe, and disable at mxs-phy's remove, so
+> > The clk framework doesn't need to know it. But other mxs-phy user
+> > mx28/mx23 may need it, so we give mxs-phy a dummy clock for imx6q.
+> > - During the runtime, we don't need to control it.
+> >
+> Turning it into a dummy clock, you will have no way to maintain the
+> use count.  It could possibly cause parent clock be turned off while
+> usbphy is in use.
 > 
-> > All the arch_decomp_wdog related codes are there without any users,
-> > since ARCH_HAS_DECOMP_WDOG is only used by lib/inflate.c which however
-> > is not used by arch/arm/boot/compressed/decompress.c.
+> Let's try to find some other way.
 > 
-> It is also worth mentioning that CONFIG_S3C_BOOT_WATCHDOG is not set 
-> anywhere.
-> 
-Yeah, the commit log of patch #3 now looks like:
+I will keep the phyclk unchanged, but just let it control a reserved bit
+In that case, the clk framework will know USB is using PLL.
 
-    Besides the fact that CONFIG_S3C_BOOT_WATCHDOG is defined nowhere, with
-    ARCH_HAS_DECOMP_WDOG removed from arch/arm/boot/compressed/decompress.c,
-    all the arch_decomp_wdog() related codes are not unused.  Remove them.
+Meanwhile, the real USB PHY clk gate will only be open one time at
+phy driver's probe.
 
-> For those 3 patches:
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-Thanks, Nico.
-
-Shawn
+> Shawn
