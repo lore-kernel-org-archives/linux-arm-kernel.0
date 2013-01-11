@@ -1,32 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Jan 2013 21:12:43 +0100
-Subject: [PATCH v2] drivers/pinctrl: grab default handles from device core
-In-Reply-To: <50EF27B4.60608@wwwdotorg.org>
-References: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
- <50EF27B4.60608@wwwdotorg.org>
-Message-ID: <CACRpkdZ0b=ZohgaBH3qPH_O5TiWmXJXs6872D+YPVA9g4BssYg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Jan 2013 20:12:45 +0000
+Subject: [PATCH v4 00/14] DMA Engine support for AM33XX
+In-Reply-To: <20130111183349.GA14660@beef>
+References: <1357883330-5364-1-git-send-email-mporter@ti.com>
+ <201301111140.41584.arnd@arndb.de> <20130111183349.GA14660@beef>
+Message-ID: <201301112012.45981.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 9:42 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 12/12/2012 01:25 PM, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This makes the device core auto-grab the pinctrl handle and set
->> the "default" (PINCTRL_STATE_DEFAULT) state for every device
->> that is present in the device model right before probe. This will
->> account for the lion's share of embedded silicon devcies.
->
-> There are quite a few problems with this patch, and they end up
-> completely breaking at least Tegra in next-20130110.
+On Friday 11 January 2013, Matt Porter wrote:
+> We have tightly coupled the link-time dependency for
+> omap_dma_filter_fn by going down the path of using
+> dma_request_slave_channel_compat() as Tony suggested to avoid extra
+> ifdefry.
+> 
+> That dependency will go away naturally if all the "legacy" OMAP platforms
+> were required to only boot from DT...just as a newly added SoCs are.
+> 
+> Are you suggesting unwinding the _compat() approach?
 
-But I have not put this patch into linux-next.
+No, I was thinking we could define omap_dma_filter_fn to NULL
+for the DT-only case.
 
-I was still waiting for Greg to ACK it...
-
-Apparently it was included in a pull request to the SH tree or something,
-Simon can you remove these patches for now, this patch needs to
-be elaborated on in the pinctrl tree first.
-
-Yours,
-Linus Walleij
+	Arnd
