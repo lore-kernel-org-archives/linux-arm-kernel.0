@@ -1,36 +1,52 @@
-From: poeschel@lemonage.de (Lars Poeschel)
-Date: Fri, 11 Jan 2013 19:14:27 +0100
-Subject: [PATCH v4,
- 03/14] ARM: edma: add AM33XX support to the private EDMA API
-In-Reply-To: <1357883330-5364-4-git-send-email-mporter@ti.com>
-References: <1357883330-5364-4-git-send-email-mporter@ti.com>
-Message-ID: <201301111914.27712.poeschel@lemonage.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 11 Jan 2013 11:23:56 -0700
+Subject: [PATCH v3 0/9] Migrate Tegra to common clock framework
+In-Reply-To: <2615017.79obOGziy2@ax5200p>
+References: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
+ <50EDD693.2060905@wwwdotorg.org> <50EFC8DB.6090903@nvidia.com>
+ <2615017.79obOGziy2@ax5200p>
+Message-ID: <50F058BC.9090909@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+On 01/11/2013 08:59 AM, Marc Dietrich wrote:
+> On Friday 11 January 2013 13:40:03 Prashant Gaikwad wrote:
+>> On Thursday 10 January 2013 02:14 AM, Stephen Warren wrote:
+>>> On 01/09/2013 10:34 AM, Stephen Warren wrote:
+...
+>>> Your changes don't actually cause the driver to break though, since it
+>>> abuses clk_get_sys() to retrieve clocks under a different driver name,
+>>> which matches what the clock driver provides. However, I think you
+>>> should also include the following patch at the end of your series to fix
+>>> this up, so the clock looking happens through device tree:
+>>>
+>>>> diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
+>>>> index d8826ed..6d44076 100644
+>>>> --- a/drivers/staging/nvec/nvec.c
+>>>> +++ b/drivers/staging/nvec/nvec.c
+>>>> @@ -770,7 +770,7 @@ static int tegra_nvec_probe(struct platform_device
+>>>> *pdev)>> 
+>>>>                  return -ENODEV;
+>>>>          
+>>>>          }
+>>>>
+>>>> -       i2c_clk = clk_get_sys("tegra-i2c.2", "div-clk");
+>>>> +       i2c_clk = clk_get(&pdev->dev, "div-clk");
+>>>>
+>>>>          if (IS_ERR(i2c_clk)) {
+>>>>          
+>>>>                  dev_err(nvec->dev, "failed to get controller clock\n");
+>>>>                  return -ENODEV;
+>>
+>> Included in the latest patches sent.
+> 
+> em, not yet in V4.
 
-On Friday 11 January 2013 at 06:48:39, Matt Porter wrote:
+It's in V2 of the other series Prashant posted which sits on top of the
+CCF rework series.
 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index a3d189d..1951d63 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -24,6 +24,13 @@
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
->  #include <linux/slab.h>
-> +#include <linux/edma.h>
-> +#include <linux/err.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_dma.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/pm_runtime.h>
+> Maybe you can also adjust the TODO (2nd entry) file now 
+> that this issue is fixed.
 
-You add the include linux/of_dma.h here, but maybe you missed to add the file 
-itself. It is not in Linus v3.8-rc3 tree, not in the patches yours depend on 
-listed and not in your patchset.
-
-Regards,
-Lars
+I'll try to remember to repost an updated version of the patch which
+does that...
