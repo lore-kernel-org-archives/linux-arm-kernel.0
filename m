@@ -1,94 +1,52 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Fri, 11 Jan 2013 07:54:05 +0000
-Subject: [PATCH v4 05/14] dmaengine: edma: Add TI EDMA device tree binding
-In-Reply-To: <1357883330-5364-6-git-send-email-mporter@ti.com>
-References: <1357883330-5364-1-git-send-email-mporter@ti.com>
- <1357883330-5364-6-git-send-email-mporter@ti.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB3EBBD@DBDE01.ent.ti.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Fri, 11 Jan 2013 13:31:20 +0530
+Subject: [PATCH v2 01/10] spi: tegra: Do not use clock name to get clock
+Message-ID: <1357891289-23500-1-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 11:18:41, Porter, Matt wrote:
-> The binding definition is based on the generic DMA controller
-> binding.
-> 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  Documentation/devicetree/bindings/dma/ti-edma.txt |   51 +++++++++++++++++++++
->  1 file changed, 51 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> new file mode 100644
-> index 0000000..3344345
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> @@ -0,0 +1,51 @@
-> +TI EDMA
-> +
-> +Required properties:
-> +- compatible : "ti,edma3"
-> +- ti,hwmods: Name of the hwmods associated to the EDMA
-> +- ti,edma-regions: Number of regions
-> +- ti,edma-slots: Number of slots
-> +- ti,edma-queue-tc-map: List of transfer control to queue mappings
-> +- ti,edma-queue-priority-map: List of queue priority mappings
-> +- ti,edma-default-queue: Default queue value
-> +
-> +Optional properties:
-> +- ti,edma-reserved-channels: List of reserved channel regions
-> +- ti,edma-reserved-slots: List of reserved slot regions
-> +- ti,edma-xbar-event-map: Crossbar event to channel map
-> +
-> +Example:
-> +
-> +edma: edma at 49000000 {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
+Since Tegra spi devices do not have multiple clocks, no need to use
+clock name to get the clock.
 
-address-cells & size-cells are only required when current node is a parent 
-node & it has sibling/child nodes (that too if the child node uses "reg" 
-property).
+Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+---
+This series depends on v4 of Tegra's ccf-rework patch series.
+Tested on Ventana (Tegra20) and Cardhu (Tegra30).
+Rebased on Tegra's for-3.9/soc and for-3.9/cleanup.
 
-> +	reg = <0x49000000 0x10000>;
-> +	interrupt-parent = <&intc>;
-> +	interrupts = <12 13 14>;
-> +	compatible = "ti,edma3";
-> +	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-> +	#dma-cells = <1>;
-> +	dma-channels = <64>;
-> +	ti,edma-regions = <4>;
-> +	ti,edma-slots = <256>;
-> +	ti,edma-reserved-channels = <0  2
-> +				     14 2
-> +				     26 6
-> +				     48 4
-> +				     56 8>;
-> +	ti,edma-reserved-slots = <0  2
-> +				  14 2
-> +				  26 6
-> +				  48 4
-> +				  56 8
-> +				  64 127>;
-> +	ti,edma-queue-tc-map = <0 0
-> +				1 1
-> +				2 2>;
-> +	ti,edma-queue-priority-map = <0 0
-> +				      1 1
-> +				      2 2>;
-> +	ti,edma-default-queue = <0>;
-> +	ti,edma-xbar-event-map = <1 12
-> +				  2 13>;
-> +};
-> -- 
-> 1.7.9.5
-> 
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> 
+Changes from V1:
+- Fixed clock lookup for SPI and nvec drivers.
+- Add clock information for nvec in device tree.
+---
+ drivers/spi/spi-tegra20-sflash.c |    2 +-
+ drivers/spi/spi-tegra20-slink.c  |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-
-Regards, 
-Gururaja
+diff --git a/drivers/spi/spi-tegra20-sflash.c b/drivers/spi/spi-tegra20-sflash.c
+index 02feaa5..e5dce91 100644
+--- a/drivers/spi/spi-tegra20-sflash.c
++++ b/drivers/spi/spi-tegra20-sflash.c
+@@ -525,7 +525,7 @@ static int tegra_sflash_probe(struct platform_device *pdev)
+ 		goto exit_free_master;
+ 	}
+ 
+-	tsd->clk = devm_clk_get(&pdev->dev, "spi");
++	tsd->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(tsd->clk)) {
+ 		dev_err(&pdev->dev, "can not get clock\n");
+ 		ret = PTR_ERR(tsd->clk);
+diff --git a/drivers/spi/spi-tegra20-slink.c b/drivers/spi/spi-tegra20-slink.c
+index fa208a5..e255e7a 100644
+--- a/drivers/spi/spi-tegra20-slink.c
++++ b/drivers/spi/spi-tegra20-slink.c
+@@ -1191,7 +1191,7 @@ static int tegra_slink_probe(struct platform_device *pdev)
+ 		goto exit_free_master;
+ 	}
+ 
+-	tspi->clk = devm_clk_get(&pdev->dev, "slink");
++	tspi->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(tspi->clk)) {
+ 		dev_err(&pdev->dev, "can not get clock\n");
+ 		ret = PTR_ERR(tspi->clk);
+-- 
+1.7.4.1
