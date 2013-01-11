@@ -1,129 +1,31 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Jan 2013 15:28:56 +0000
-Subject: [PATCH 1/3] ARM: coresight: common definition for (OS) Lock Access
- Register key value
-In-Reply-To: <1357918138-20222-1-git-send-email-will.deacon@arm.com>
-References: <1357918138-20222-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1357918138-20222-2-git-send-email-will.deacon@arm.com>
+Date: Fri, 11 Jan 2013 15:28:55 +0000
+Subject: [PATCH 0/3] hw_breakpoint updates for 3.9
+Message-ID: <1357918138-20222-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dietmar Eggemann <dietmar.eggemann@arm.com>
+Hello,
 
-Coresight components and debug are using a common lock control mechansim.
-Writing 0xC5ACCE55 to the Lock Access Register (LAR) in case of a coresight
-components enables further access to the coresight device registers. Writing
-any other value to it removes the write access.
-Writing 0xC5ACCE55 to the OS Lock Access Register (OSLAR) in case of debug
-locks the debug register for further access to the debug registers. Writing
-any other value to it unlocks the debug registers.
+I have a small handful of hw_breakpoint updates, all from Dietmar, that
+I plan to send via Russell for 3.9.
 
-Unfortunately, the existing coresight code uses the terms lock and unlock the
-other way around. Unlocking stands for enabling write access and locking for
-removing write access.
+Any comments, please shout.
 
-That is why the definition of the LAR and OSLAR key value has been changed to
-CS_LAR_KEY.
+Will
 
-Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/cti.h                | 10 +++-------
- arch/arm/include/asm/hardware/coresight.h |  6 +++---
- arch/arm/kernel/hw_breakpoint.c           |  5 +++--
- 3 files changed, 9 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/cti.h b/arch/arm/include/asm/cti.h
-index f2e5cad..2381199 100644
---- a/arch/arm/include/asm/cti.h
-+++ b/arch/arm/include/asm/cti.h
-@@ -2,6 +2,7 @@
- #define __ASMARM_CTI_H
- 
- #include	<asm/io.h>
-+#include	<asm/hardware/coresight.h>
- 
- /* The registers' definition is from section 3.2 of
-  * Embedded Cross Trigger Revision: r0p0
-@@ -35,11 +36,6 @@
- #define		LOCKACCESS		0xFB0
- #define		LOCKSTATUS		0xFB4
- 
--/* write this value to LOCKACCESS will unlock the module, and
-- * other value will lock the module
-- */
--#define		LOCKCODE		0xC5ACCE55
--
- /**
-  * struct cti - cross trigger interface struct
-  * @base: mapped virtual address for the cti base
-@@ -146,7 +142,7 @@ static inline void cti_irq_ack(struct cti *cti)
-  */
- static inline void cti_unlock(struct cti *cti)
- {
--	__raw_writel(LOCKCODE, cti->base + LOCKACCESS);
-+	__raw_writel(CS_LAR_KEY, cti->base + LOCKACCESS);
- }
- 
- /**
-@@ -158,6 +154,6 @@ static inline void cti_unlock(struct cti *cti)
-  */
- static inline void cti_lock(struct cti *cti)
- {
--	__raw_writel(~LOCKCODE, cti->base + LOCKACCESS);
-+	__raw_writel(~CS_LAR_KEY, cti->base + LOCKACCESS);
- }
- #endif
-diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
-index 7ecd793..0cf7a6b 100644
---- a/arch/arm/include/asm/hardware/coresight.h
-+++ b/arch/arm/include/asm/hardware/coresight.h
-@@ -36,7 +36,7 @@
- /* CoreSight Component Registers */
- #define CSCR_CLASS	0xff4
- 
--#define UNLOCK_MAGIC	0xc5acce55
-+#define CS_LAR_KEY	0xc5acce55
- 
- /* ETM control register, "ETM Architecture", 3.3.1 */
- #define ETMR_CTRL		0
-@@ -147,11 +147,11 @@
- 
- #define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
- #define etm_unlock(t) \
--	do { etm_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
-+	do { etm_writel((t), CS_LAR_KEY, CSMR_LOCKACCESS); } while (0)
- 
- #define etb_lock(t) do { etb_writel((t), 0, CSMR_LOCKACCESS); } while (0)
- #define etb_unlock(t) \
--	do { etb_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
-+	do { etb_writel((t), CS_LAR_KEY, CSMR_LOCKACCESS); } while (0)
- 
- #endif /* __ASM_HARDWARE_CORESIGHT_H */
- 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 5ff2e77..34e9375 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -35,6 +35,7 @@
- #include <asm/hw_breakpoint.h>
- #include <asm/kdebug.h>
- #include <asm/traps.h>
-+#include <asm/hardware/coresight.h>
- 
- /* Breakpoint currently in use for each BRP. */
- static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
-@@ -955,9 +956,9 @@ static void reset_ctrl_regs(void *unused)
- 
- 	/*
- 	 * Unconditionally clear the OS lock by writing a value
--	 * other than 0xC5ACCE55 to the access register.
-+	 * other than CS_LAR_KEY to the access register.
- 	 */
--	ARM_DBG_WRITE(c1, c0, 4, 0);
-+	ARM_DBG_WRITE(c1, c0, 4, ~CS_LAR_KEY);
- 	isb();
- 
- 	/*
+Dietmar Eggemann (3):
+  ARM: coresight: common definition for (OS) Lock Access Register key
+    value
+  ARM: hw_breakpoint: Check function for OS Save and Restore mechanism
+  ARM: hw_breakpoint: Debug powerdown support for self-hosted debug
+
+ arch/arm/include/asm/cti.h                | 10 ++---
+ arch/arm/include/asm/hardware/coresight.h |  6 +--
+ arch/arm/include/asm/hw_breakpoint.h      |  3 ++
+ arch/arm/kernel/hw_breakpoint.c           | 61 +++++++++++++++++++++++++++----
+ 4 files changed, 62 insertions(+), 18 deletions(-)
+
 -- 
 1.8.0
