@@ -1,53 +1,38 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 10 Jan 2013 21:15:26 -0600
-Subject: [RFC 0/4] TI LCDC DRM driver
-In-Reply-To: <1782274.DIo8UG5duX@avalon>
-References: <1357704685-3600-1-git-send-email-robdclark@gmail.com>
- <CAPM=9tzZiQuVNdNhm9=iNWqAwk+uZRh0_YC3QLkyZbne5dfeyg@mail.gmail.com>
- <1782274.DIo8UG5duX@avalon>
-Message-ID: <CAF6AEGu4KJ27R6P7CiewVYSP22ZX+2=s6ZeNJv+Voh06gntBzg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 10 Jan 2013 22:25:29 -0500 (EST)
+Subject: [PATCH 0/3] arch_decomp_wdog cleanup
+In-Reply-To: <20130111025311.GD9139@S2101-09.ap.freescale.net>
+References: <1357827165-9320-1-git-send-email-shawn.guo@linaro.org>
+ <alpine.LFD.2.02.1301101430200.6300@xanadu.home>
+ <20130111025311.GD9139@S2101-09.ap.freescale.net>
+Message-ID: <alpine.LFD.2.02.1301102220230.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 6:05 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Thursday 10 January 2013 10:16:10 Dave Airlie wrote:
->> On Wed, Jan 9, 2013 at 2:11 PM, Rob Clark <robdclark@gmail.com> wrote:
->> > Updated version of DRM driver for TI LCD Controller.  Since the initial
->> > version of the patch, which only supported TFP410 DVI output, I've added
->> > an output driver for LCD panels (for example, LCD3 or LCD7 cape for the
->> > beagle-bone), and initial support for HDMI output via NXP TDA19988 HDMI
->> > encoder (via i2c encoder-slave output driver).
->> >
->> > At this point, I think the basic lcdc drm driver plus TFP410 DVI output
->> > (first patch) is in reasonable shape (barring potential rename, if lcdc
->> > is too generic of a name... but I was not feeling creative enough yet to
->> > pick a new name).
->>
->> I'd like at least tilcdc :-)
->
-> So do I :-) The Renesas LCD controller is also called LCDC, and they called
-> the fbdev driver sh_mobile_lcdcfb. tilcdc isn't *that* long in comparison :-)
+On Fri, 11 Jan 2013, Shawn Guo wrote:
 
-next version will be 'tilcdc' :-)
+> On Thu, Jan 10, 2013 at 02:32:30PM -0500, Nicolas Pitre wrote:
+> > On Thu, 10 Jan 2013, Shawn Guo wrote:
+> > 
+> > > All the arch_decomp_wdog related codes are there without any users,
+> > > since ARCH_HAS_DECOMP_WDOG is only used by lib/inflate.c which however
+> > > is not used by arch/arm/boot/compressed/decompress.c.
+> > 
+> > It is also worth mentioning that CONFIG_S3C_BOOT_WATCHDOG is not set 
+> > anywhere.
+> > 
+> Yeah, the commit log of patch #3 now looks like:
+> 
+>     Besides the fact that CONFIG_S3C_BOOT_WATCHDOG is defined nowhere, with
+>     ARCH_HAS_DECOMP_WDOG removed from arch/arm/boot/compressed/decompress.c,
+>     all the arch_decomp_wdog() related codes are not unused.  Remove them.
 
-I would appreciate some thoughts about more generic devicetree lcd
-panel parameters for the (ti)lcdc_panel patch..  from a functional
-standpoint, I think the lcd panel support part is also pretty much
-ready to go (I've added backlight support since the last version I
-sent), but I'm not really happy with the DT bindings for that because
-they seem to me a bit too hw specific, but I'm not really sure how
-they should look.
+"not unused" that means "used".  Probably you meant "not used" or "now 
+unused".
 
-Fwiw, on the CDF <-> KMS end of things, I'm sort of thinking the i2c
-encoder slave is not too far off.. just needs to be a bit decoupled
-from i2c.
+Also, "all the arch_decomp_wdog() related codes are ..." doesn't look 
+like proper english.  I'd say "all the arch_decomp_wdog() related 
+functions are .." or "all the arch_decomp_wdog() related code is ..".
 
-BR,
--R
 
-> --
-> Regards,
->
-> Laurent Pinchart
->
+Nicolas
