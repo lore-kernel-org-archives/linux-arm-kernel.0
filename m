@@ -1,131 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Jan 2013 09:55:45 -0800
-Subject: [PATCH v4 11/14] ARM: dts: add AM33XX MMC support
-In-Reply-To: <1357883330-5364-12-git-send-email-mporter@ti.com>
-References: <1357883330-5364-1-git-send-email-mporter@ti.com>
- <1357883330-5364-12-git-send-email-mporter@ti.com>
-Message-ID: <20130111175545.GJ14149@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Jan 2013 17:57:14 +0000
+Subject: [kvmarm] [PATCH v2 2/2] ARM: KVM: Power State Coordination
+ Interface implementation
+In-Reply-To: <CANM98qLRsdFGxU6S5q2EqtCAmK8fOnbGWi8qXBktyuRkSaPAJg@mail.gmail.com>
+References: <1357834005-23843-1-git-send-email-marc.zyngier@arm.com>
+ <1357834005-23843-3-git-send-email-marc.zyngier@arm.com>
+ <20130111171232.GH23505@n2100.arm.linux.org.uk> <50F04AD5.6020703@arm.com>
+ <CANM98qJ2ZSwxMWFRWiunTQtoV7iFb3fn3Cf6VWvOndBcU=+Tmg@mail.gmail.com>
+ <50F04F2F.80306@arm.com>
+ <CANM98qLRsdFGxU6S5q2EqtCAmK8fOnbGWi8qXBktyuRkSaPAJg@mail.gmail.com>
+Message-ID: <20130111175714.GK23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matt Porter <mporter@ti.com> [130110 21:47]:
-> Adds AM33XX MMC support for am335x-bone, am335x-evm, and
-> am335x-evmsk..
+On Fri, Jan 11, 2013 at 12:48:45PM -0500, Christoffer Dall wrote:
+> again, that's why I suggest returning a bool instead. You just said
+> it: it's a basic handled/not-handled state. Why do you want to return
+> -EINVAL if that's not propogated anywhere?
 
-This one should be queued separately by Benoit:
+We have a well established principle throughout the kernel interfaces that
+functions will return positive values for success and an appropriate -ve
+errno for failure.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  arch/arm/boot/dts/am335x-bone.dts  |    7 +++++++
->  arch/arm/boot/dts/am335x-evm.dts   |    7 +++++++
->  arch/arm/boot/dts/am335x-evmsk.dts |    7 +++++++
->  arch/arm/boot/dts/am33xx.dtsi      |   28 ++++++++++++++++++++++++++++
->  4 files changed, 49 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index 11b240c..a154ce0 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -120,6 +120,8 @@
->  		};
->  
->  		ldo3_reg: regulator at 5 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
->  			regulator-always-on;
->  		};
->  
-> @@ -136,3 +138,8 @@
->  &cpsw_emac1 {
->  	phy_id = <&davinci_mdio>, <1>;
->  };
-> +
-> +&mmc1 {
-> +	status = "okay";
-> +	vmmc-supply = <&ldo3_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> index d649644..2907da6 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -232,6 +232,8 @@
->  		};
->  
->  		vmmc_reg: regulator at 12 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
->  			regulator-always-on;
->  		};
->  	};
-> @@ -244,3 +246,8 @@
->  &cpsw_emac1 {
->  	phy_id = <&davinci_mdio>, <1>;
->  };
-> +
-> +&mmc1 {
-> +	status = "okay";
-> +	vmmc-supply = <&vmmc_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-> index f5a6162..f050c46 100644
-> --- a/arch/arm/boot/dts/am335x-evmsk.dts
-> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
-> @@ -244,7 +244,14 @@
->  		};
->  
->  		vmmc_reg: regulator at 12 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
->  			regulator-always-on;
->  		};
->  	};
->  };
-> +
-> +&mmc1 {
-> +	status = "okay";
-> +	vmmc-supply = <&vmmc_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index e711ffb..278b75d 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -235,6 +235,34 @@
->  			status = "disabled";
->  		};
->  
-> +		mmc1: mmc at 48060000 {
-> +			compatible = "ti,omap3-hsmmc";
-> +			ti,hwmods = "mmc1";
-> +			ti,dual-volt;
-> +			ti,needs-special-reset;
-> +			dmas = <&edma 24
-> +				&edma 25>;
-> +			dma-names = "tx", "rx";
-> +			status = "disabled";
-> +		};
-> +
-> +		mmc2: mmc at 481d8000 {
-> +			compatible = "ti,omap3-hsmmc";
-> +			ti,hwmods = "mmc2";
-> +			ti,needs-special-reset;
-> +			dmas = <&edma 2
-> +				&edma 3>;
-> +			dma-names = "tx", "rx";
-> +			status = "disabled";
-> +		};
-> +
-> +		mmc3: mmc at 47810000 {
-> +			compatible = "ti,omap3-hsmmc";
-> +			ti,hwmods = "mmc3";
-> +			ti,needs-special-reset;
-> +			status = "disabled";
-> +		};
-> +
->  		wdt2: wdt at 44e35000 {
->  			compatible = "ti,omap3-wdt";
->  			ti,hwmods = "wd_timer2";
-> -- 
-> 1.7.9.5
-> 
+We *certainly* hate functions which return 0 for failure and non-zero
+for success - it makes review a real pain because you start seeing code
+doing this:
+
+	if (!function()) {
+		deal_with_failure();
+	}
+
+and you have to then start looking at the function to properly understand
+what it's return semantics are.
+
+We have more than enough proof already that this doesn't work: people
+don't care to understand what the return values from functions mean.
+You only have to do an audit of a few of the IS_ERR_OR_NULL() uses to
+find that out, and you quickly realise that people just use what they
+_think_ is the right test and which happens to pass their very simple
+testing at the time.
+
+We've avoided major problems so far in the kernel by having most of the
+integer-returning functions following the established principle, and
+that's good.  I really really think that there must be a _very_ good
+reason, and overwhelming reason to deviate from the established
+principle in any large project.
