@@ -1,55 +1,48 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 11 Jan 2013 16:45:16 +0100
-Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <201301111536.14799.arnd@arndb.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <50EF54B6.6010100@wwwdotorg.org>
- <20130111034015.GA28094@avionic-0098.adnet.avionic-design.de>
- <201301111536.14799.arnd@arndb.de>
-Message-ID: <20130111154516.GA25335@avionic-0098.adnet.avionic-design.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Jan 2013 15:45:28 +0000
+Subject: [PATCH 1/2] ARM: ux500: Provide a link from AB8500 Pinctrl to the
+ PRCMU
+Message-ID: <1357919129-1928-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 03:36:14PM +0000, Arnd Bergmann wrote:
-> On Friday 11 January 2013, Thierry Reding wrote:
-> > Right, it'll need #ifdefs around the arch_{setup,teardown}_msi_irq(). Or
-> > select PCI_MSI unconditionally. Once this is merged I was going to post
-> > a patch that enables PCI_MSI in tegra_defconfig anyway. But it might be
-> > better to keep it optional anyway since the remainder of the code copes
-> > with it properly.
-> > 
-> Actually, we need something better than that. You cannot define
-> arch_setup_msi_irq in a tegra specific pci host driver, because that
-> will seriously mess up other platforms in multiplatform configurations
-> by giving a link error when they also define this function, or with a
-> run-time error when they don't support it.
-> 
-> I think what we should do here is fix it the right way by adding
-> a pci host specific callback rather than an architecture specific
-> callback in drivers/pci/msi.c. There is already a default version
-> of arch_setup_msi_irqs (with s), and we can probably do the
-> same for arch_setup_msi_irq (without s) to fall back to the
-> arch version for most architectures.
-> Most architectures (at least powerpc, sparc, ia64 and x86) already
-> multiplex the msi handlers internally, but ARM does not because
-> there is only one implementation (iop33x) at the moment.
-> 
-> We can add a generix multiplex and then move architectures over to
-> use it.
+The AB8500 Pinctrl driver uses PRCMU register addresses to
+control Pinctrl related functions. For this to happen, the
+Pinctrl driver needs the PRCMU base to work from. We can do
+that using standard Open Firmware (of_*) function calls, but
+first we need a mechanism to gain access to the PRCMU
+device node. We're going to use a Phandle in this case.
 
-I already hinted at that in one of the other subthreads. Having such a
-multiplex would also allow the driver to be built as a module. I had
-already thought about this when I was working on an earlier version of
-these patches. Basically these would be two ops attached to the host
-bridge, and the generic arch_setup_msi_irq() could then look that up
-given the struct pci_dev that is passed to it and call this new per-
-host bridge .setup_msi_irq().
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/dbx5x0.dtsi |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130111/2731df24/attachment.sig>
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index db69f3c..3381ba6 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -170,10 +170,9 @@
+ 			gpio-bank = <8>;
+ 		};
+ 
+-		pinctrl at 80157000 {
+-			// This is actually the PRCMU base address
+-			reg = <0x80157000 0x2000>;
++		pinctrl {
+ 			compatible = "stericsson,nmk_pinctrl";
++			prcm = <&prcmu>;
+ 		};
+ 
+ 		usb at a03e0000 {
+@@ -190,7 +189,7 @@
+ 			interrupts = <0 25 0x4>;
+ 		};
+ 
+-		prcmu at 80157000 {
++		prcmu: prcmu at 80157000 {
+ 			compatible = "stericsson,db8500-prcmu";
+ 			reg = <0x80157000 0x2000>;
+ 			interrupts = <0 47 0x4>;
+-- 
+1.7.9.5
