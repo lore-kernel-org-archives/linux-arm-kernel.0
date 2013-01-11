@@ -1,31 +1,48 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 11 Jan 2013 21:26:56 +0100
-Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
-In-Reply-To: <1357935078.5475.10@snotra>
-References: <1357935078.5475.10@snotra>
-Message-ID: <A31F44DA-736C-4B8B-A9EF-6A8481C3E08D@suse.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 11 Jan 2013 21:36:10 +0100
+Subject: [PATCH v2] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <CACRpkdZ0b=ZohgaBH3qPH_O5TiWmXJXs6872D+YPVA9g4BssYg@mail.gmail.com>
+References: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
+ <50EF27B4.60608@wwwdotorg.org>
+ <CACRpkdZ0b=ZohgaBH3qPH_O5TiWmXJXs6872D+YPVA9g4BssYg@mail.gmail.com>
+Message-ID: <9702060.jEbHySsCv0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
-
-Am 11.01.2013 um 21:11 schrieb Scott Wood <scottwood@freescale.com>:
-
-> On 01/11/2013 09:42:55 AM, Alexander Graf wrote:
->> On 11.01.2013, at 02:10, Scott Wood wrote:
->> > struct kvm_device_attr {
->> >    __u32 device;
->> This needs some semantic specification. Is device a constant value? Is it the return value of CREATE_IRQCHIP?
+On Friday 11 January 2013 21:12:43 Linus Walleij wrote:
+> On Thu, Jan 10, 2013 at 9:42 PM, Stephen Warren wrote:
+> > On 12/12/2012 01:25 PM, Linus Walleij wrote:
+> >> From: Linus Walleij <linus.walleij@linaro.org>
+> >> 
+> >> This makes the device core auto-grab the pinctrl handle and set
+> >> the "default" (PINCTRL_STATE_DEFAULT) state for every device
+> >> that is present in the device model right before probe. This will
+> >> account for the lion's share of embedded silicon devcies.
+> > 
+> > There are quite a few problems with this patch, and they end up
+> > completely breaking at least Tegra in next-20130110.
 > 
-> As proposed, it's up to the architecture to provide that specification.  In theory this could be used for things other than IRQ chips.  We could still say that device creation functions return a valid device ID (if the device has any attributes), as well as have other architecture-specific ways of describing device IDs (static enumeration).  Or we could have non-architecture-specific static enumeration.  Or just require that all devices be explicitly created by something that returns the ID.
+> But I have not put this patch into linux-next.
 > 
-> Do you have a preferred approach?
-
-I am a fan of dynamically generated ids that get returned from the create functions (like open() and an fd).
-
-I'm not sure if that would always work here though. It would mean that we explicitly have to create per-cpu interrupt controllers. Or append their state onto vcpu state.
-
-Alex
-
+> I was still waiting for Greg to ACK it...
 > 
-> -Scott
+> Apparently it was included in a pull request to the SH tree or something,
+> Simon can you remove these patches for now, this patch needs to
+> be elaborated on in the pinctrl tree first.
+
+I've sent several patch series for the SH PFC (Pin Function Controller) to the 
+linux-sh mailing list. One of the series included pinctrl core patches for 
+easier testing, but I made it clear that they should *not* be pushed to 
+mainline through the SH tree.
+
+Actually the whole PFC series have been found out today by Guennadi 
+Liakhovetski to be buggy. I will fix the problems and send a new version. In 
+the meantime the pinmux-pinctrl and pinmux-dt series should not be pushed to 
+mainline.
+
+-- 
+Regards,
+
+Laurent Pinchart
