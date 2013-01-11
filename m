@@ -1,52 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Jan 2013 15:34:15 +0000
-Subject: [PATCH 4/6] ARM: virt: avoid clobbering lr when forcing svc mode
+Date: Fri, 11 Jan 2013 15:34:17 +0000
+Subject: [PATCH 6/6] ARM: virt: hide CONFIG_ARM_VIRT_EXT from user
 In-Reply-To: <1357918457-20469-1-git-send-email-will.deacon@arm.com>
 References: <1357918457-20469-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1357918457-20469-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1357918457-20469-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+ARM_VIRT_EXT is a property of CPU_V7, but does not adversely affect
+other CPUs that can be built into the same kernel image (i.e. ARMv6+).
 
-The safe_svcmode_maskall macro is used to ensure that we are running in
-svc mode, causing an exception return from hvc mode if required.
+This patch defaults ARM_VIRT_EXT to y if CPU_V7, allowing hypervisors
+such as KVM to make better use of the option and being able to rely
+on hyp-mode boot support.
 
-This patch removes the unneeded lr clobber from the macro and operates
-entirely on the temporary parameter register instead.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-[will: updated comment]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/assembler.h | 10 +++-------
+ arch/arm/mm/Kconfig | 10 +++-------
  1 file changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index eb87200..05ee9ee 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -246,18 +246,14 @@
-  *
-  * This macro is intended for forcing the CPU into SVC mode at boot time.
-  * you cannot return to the original mode.
-- *
-- * Beware, it also clobers LR.
-  */
- .macro safe_svcmode_maskall reg:req
- #if __LINUX_ARM_ARCH__ >= 6
- 	mrs	\reg , cpsr
--	mov	lr , \reg
--	and	lr , lr , #MODE_MASK
--	cmp	lr , #HYP_MODE
--	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT
-+	eor	\reg, \reg, #HYP_MODE
-+	tst	\reg, #MODE_MASK
- 	bic	\reg , \reg , #MODE_MASK
--	orr	\reg , \reg , #SVC_MODE
-+	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT | SVC_MODE
- THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	bne	1f
- 	orr	\reg, \reg, #PSR_A_BIT
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 3fd629d..025d173 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -629,8 +629,9 @@ config ARM_THUMBEE
+ 	  make use of it. Say N for code that can run on CPUs without ThumbEE.
+ 
+ config ARM_VIRT_EXT
+-	bool "Native support for the ARM Virtualization Extensions"
+-	depends on MMU && CPU_V7
++	bool
++	depends on MMU
++	default y if CPU_V7
+ 	help
+ 	  Enable the kernel to make use of the ARM Virtualization
+ 	  Extensions to install hypervisors without run-time firmware
+@@ -640,11 +641,6 @@ config ARM_VIRT_EXT
+ 	  use of this feature.  Refer to Documentation/arm/Booting for
+ 	  details.
+ 
+-	  It is safe to enable this option even if the kernel may not be
+-	  booted in HYP mode, may not have support for the
+-	  virtualization extensions, or may be booted with a
+-	  non-compliant bootloader.
+-
+ config SWP_EMULATE
+ 	bool "Emulate SWP/SWPB instructions"
+ 	depends on !CPU_USE_DOMAINS && CPU_V7
 -- 
 1.8.0
