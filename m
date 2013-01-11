@@ -1,27 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 10 Jan 2013 09:40:34 -0500
-Subject: [PATCH 2/3] ARM: remove unused arch_decomp_wdog()
-In-Reply-To: <1357827165-9320-3-git-send-email-shawn.guo@linaro.org>
-References: <1357827165-9320-1-git-send-email-shawn.guo@linaro.org>
- <1357827165-9320-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130110144034.GM5075@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 10 Jan 2013 17:15:07 -0700
+Subject: [PATCH 09/14] ARM: tegra: Move pmc.h to include/mach
+In-Reply-To: <1357764194-12677-10-git-send-email-thierry.reding@avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <1357764194-12677-10-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <50EF598B.2030307@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 10:12:44PM +0800, Shawn Guo wrote:
-> With ARCH_HAS_DECOMP_WDOG removed from arch/arm/boot/compressed/decompress.c,
-> all the arch_decomp_wdog() definition at platform level is unneeded.
-> Remmove it.
+On 01/09/2013 01:43 PM, Thierry Reding wrote:
+> In preparation for moving the PCIe driver into the drivers/pci/host
+> directory, this header, which contains prototypes that are required by
+> the PCIe driver, needs to be moved to a globally visible location.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 > ---
->  arch/arm/mach-dove/include/mach/uncompress.h       |    1 -
->  arch/arm/mach-kirkwood/include/mach/uncompress.h   |    1 -
->  arch/arm/mach-mv78xx0/include/mach/uncompress.h    |    1 -
->  arch/arm/mach-orion5x/include/mach/uncompress.h    |    1 -
+> Note that eventually the code in pmc.c and powergate.c should probably
+> be split out into a separate driver. The PMC registers are also directly
+> accessed from tegra20_clocks.c and tegra30_clocks.c, so that it might be
+> required to provide that functionality through the new driver as well.
+> ---
+>  arch/arm/mach-tegra/common.c           |  2 +-
+>  arch/arm/mach-tegra/include/mach/pmc.h | 24 ++++++++++++++++++++++++
+>  arch/arm/mach-tegra/pmc.h              | 24 ------------------------
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
+On IRC, we'd talked about putting the public functionality in
+include/linux/tegra-pmc.h so that we wouldn't add to include/mach, which
+would make it harder to make Tegra support ARM multi-platform. Perhaps
+that IRC discussion happened after you posted this series?
