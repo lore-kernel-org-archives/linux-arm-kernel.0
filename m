@@ -1,57 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jan 2013 23:36:16 +0000
-Subject: [PATCH RFT 3/3] ARM: tegra: dts: seaboard: enable keyboard
-In-Reply-To: <50F09FCB.70809@wwwdotorg.org>
-References: <1357911185-11048-1-git-send-email-ldewangan@nvidia.com>
- <1357911185-11048-3-git-send-email-ldewangan@nvidia.com>
- <50F09BC7.90607@wwwdotorg.org>
- <20130111232438.GN23505@n2100.arm.linux.org.uk>
- <50F09FCB.70809@wwwdotorg.org>
-Message-ID: <20130111233615.GO23505@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Jan 2013 15:38:01 -0800
+Subject: ERROR: "__aeabi_uldivmod" [drivers/pinctrl/pinctrl-single.ko]
+ undefined!
+In-Reply-To: <CACRpkdYd9br=9G7FvjbKCebfMjqX6xcL5Oge+07MPTNadPapKw@mail.gmail.com>
+References: <20130111150001.GA23505@n2100.arm.linux.org.uk>
+ <CACRpkdYd9br=9G7FvjbKCebfMjqX6xcL5Oge+07MPTNadPapKw@mail.gmail.com>
+Message-ID: <20130111233801.GP14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 04:27:07PM -0700, Stephen Warren wrote:
-> On 01/11/2013 04:24 PM, Russell King - ARM Linux wrote:
-> > On Fri, Jan 11, 2013 at 04:09:59PM -0700, Stephen Warren wrote:
-> >> On 01/11/2013 06:33 AM, Laxman Dewangan wrote:
-> >>> 	kbc->clk = clk_get(&pdev->dev, NULL);
-> >>> 	if (IS_ERR(kbc->clk)) {
-> >>> 		dev_err(&pdev->dev, "failed to get keyboard clock\n");
-> >>> 		err = PTR_ERR(kbc->clk);
-> >>> 		goto err_iounmap;
-> >>> 	}
-> >>
-> >> Should that check be if (!kbc-clk) instead? Or does the common clock
-> >> framework require if (IS_ERR_OR_NULL(kbc->clk)); hopefully not since
-> >> IS_ERR_OR_NULL shouldn't be used any more.
-> > 
-> > /**
-> >  * clk_get - lookup and obtain a reference to a clock producer.
-> >  * @dev: device for clock "consumer"
-> >  * @id: clock consumer ID
-> >  *
-> >  * Returns a struct clk corresponding to the clock producer, or
-> >    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> >  * valid IS_ERR() condition containing errno.  ...
-> >    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> > 
-> > Or, put another way:
-> > 
-> > 	If (!IS_ERR(clk))
-> > 		The_Clock_Is_Valid();
-> > 	Else
-> > 		The_Clock_Is_Invalid();
-> > 		The_Error = PTR_ERR(clk);
+* Linus Walleij <linus.walleij@linaro.org> [130111 12:47]:
+> On Fri, Jan 11, 2013 at 4:00 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
 > 
-> OK, but that doesn't appear to be what happened in practice.
+> > The above error happens in builds including pinctrl-single - the reason
+> > is this, where resource_size_t may be 64-bit.
+> >
+> >                 gpio->range.pin_base = (r.start - pcs->res->start) / mux_bytes;
+> >                 gpio->range.npins = (r.end - r.start) / mux_bytes + 1;
+> >
+> > This leads to a 64-bit division by an extended 64-bit, resulting in the
+> > call to our (unimplemented) 64-bit-by-64-bit division routines.
+> >
+> > This needs fixing - you probably want to cast the difference down to an
+> > 'unsigned' first, and also maybe check that it does fit in an unsigned
+> > too?
+> 
+> Agreed, Haojian can you provide a tested patch for this?
+> I think you added this code...
+> 
+> Tony: please check and ACK.
 
-It's what I've been saying each time I see an abuse, the problem is
-people don't care to read the documentation provided let alone
-understand the interfaces.
+OK will check and ack.
 
-That's precisely why IS_ERR_OR_NULL() is to be removed.  One less
-thing for someone to throw a dart at as a selection method to use.
-Or maybe roll a dice.  Or whatever way they do seem to choose.
-(Whatever that is, it's not based on any sound engineering practice
-I can make out.)
+Tony
