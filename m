@@ -1,245 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jan 2013 11:02:10 +0000
-Subject: [PATCH] mmc: mvsdio: Replace IS_ERR_NULL() is with IS_ERR()
-In-Reply-To: <1357849755-8168-1-git-send-email-andrew@lunn.ch>
-References: <1357849755-8168-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20130111110210.GC30875@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Jan 2013 11:03:51 +0000
+Subject: [PATCH 04/16] ARM: b.L: Add baremetal voting mutexes
+In-Reply-To: <alpine.LFD.2.02.1301102131010.6300@xanadu.home>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-5-git-send-email-nicolas.pitre@linaro.org>
+ <20130110231825.GE11628@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1301102131010.6300@xanadu.home>
+Message-ID: <20130111110351.GE12977@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 09:29:15PM +0100, Andrew Lunn wrote:
-> A NULL is a valid clk cookie, so we should not be tested with
-> IS_ERR_NULL(). Replace it with IS_ERR().
+On Fri, Jan 11, 2013 at 03:15:22AM +0000, Nicolas Pitre wrote:
+> On Thu, 10 Jan 2013, Will Deacon wrote:
+> > On Thu, Jan 10, 2013 at 12:20:39AM +0000, Nicolas Pitre wrote:
+> > > + * vlocks are currently only used to coordinate between CPUs which are
+> > > +   unable to enable their caches yet.  This means that the
+> > > +   implementation removes many of the barriers which would be required
+> > > +   when executing the algorithm in cached memory.
+> >
+> > I think you need to elaborate on this and clearly identify the
+> > requirements of the memory behaviour. In reality, these locks are hardly
+> > ever usable so we don't want them cropping up in driver code and the
+> > like!
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  drivers/mmc/host/mvsdio.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Doesn't the following paragraph make that clear enough?
+
+I think it misses a lot out (e.g. we require single-copy atomicity
+guarantees for byte access, we require no speculation etc). Essentially,
+it's an imprecise definition of strongly-ordered memory. However, see
+below (the bit about removing the C implementation)...
+
+> Maybe we should rip out the C interface to avoid such abuses.  I think
+> that was initially added when we weren't sure if the C code had to be
+> involved.
+
+[...]
+
+> > > +#include <linux/linkage.h>
+> > > +#include "vlock.h"
+> > > +
+> > > +#if VLOCK_VOTING_SIZE > 4
+> >
+> > 4? Maybe a CONFIG option or a #define in an arch vlock.h?
 > 
-> diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-> index de4c20b..d0050fa 100644
-> --- a/drivers/mmc/host/mvsdio.c
-> +++ b/drivers/mmc/host/mvsdio.c
-> @@ -839,7 +839,7 @@ out:
->  	if (r)
->  		release_resource(r);
->  	if (mmc)
-> -		if (!IS_ERR_OR_NULL(host->clk)) {
-> +		if (!IS_ERR(host->clk)) {
->  			clk_disable_unprepare(host->clk);
->  			clk_put(host->clk);
->  		}
+> The 4 here is actually related to the number of bytes in a word, to
+> decide whether or not a loop is needed for voters enumeration.  That is
+> not configurable.
 
-Actually, no.
+BYTES_PER_LONG then (or suitable shifting of BITS_PER_LONG)?
 
-1. I've already recently pointed out that C is not python, and this code
-   is broken.  (Look at the lack of missing braces around the code you've
-   modified.)
-2. host->clk _can_ be NULL here.
+> > > +#define VLOCK_VOTING_SIZE      ((BL_CPUS_PER_CLUSTER + 3) / 4 * 4)
+> >
+> > Huh?
+> 
+> Each ballot is one byte, and we pack them into words.  So this is the
+> size of the required words to hold all ballots.
 
-Here's the (untested) bare minimum needed to fix this driver:
+Ok, so this could make use of BYTES_PER_LONG too, just to make the reasoning
+more clear.
 
- drivers/mmc/host/mvsdio.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
+> > > +#define VLOCK_SIZE             (VLOCK_VOTING_OFFSET + VLOCK_VOTING_SIZE)
+> > > +#define VLOCK_OWNER_NONE       0
+> > > +
+> > > +#ifndef __ASSEMBLY__
+> > > +
+> > > +struct vlock {
+> > > +       char data[VLOCK_SIZE];
+> > > +};
+> >
+> > Does this mean the struct is only single byte aligned? You do word
+> > accesses to it in your vlock code and rely on atomicity, so I'd feel
+> > safer if it was aligned to 4 bytes, especially since this isn't being
+> > accessed via a normal mapping.
+> 
+> The structure size is always a multiple of 4 bytes.  Its alignment is
+> actually much larger than 4 as it needs to span a whole cache line not
+> to be overwritten by dirty line writeback.
 
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index de4c20b..4190fb4 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -733,6 +733,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	host->dev = &pdev->dev;
- 	host->res = r;
- 	host->base_clock = mvsd_data->clock / 2;
-+	host->clk = ERR_PTR(-EINVAL);
- 
- 	mmc->ops = &mvsd_ops;
- 
-@@ -837,13 +838,14 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 			iounmap(host->base);
- 	}
- 	if (r)
--		release_resource(r);
--	if (mmc)
--		if (!IS_ERR_OR_NULL(host->clk)) {
-+		release_mem_resource(r->start, resource_size(r));
-+	if (mmc) {
-+		if (!IS_ERR(host->clk)) {
- 			clk_disable_unprepare(host->clk);
- 			clk_put(host->clk);
- 		}
- 		mmc_free_host(mmc);
-+	}
- 
- 	return ret;
- }
-@@ -866,7 +868,7 @@ static int __exit mvsd_remove(struct platform_device *pdev)
- 		del_timer_sync(&host->timer);
- 		mvsd_power_down(host);
- 		iounmap(host->base);
--		release_resource(host->res);
-+		release_mem_resource(host->res->start, resource_size(host->res);
- 
- 		if (!IS_ERR(host->clk)) {
- 			clk_disable_unprepare(host->clk);
+That's not implied from the structure definition.
 
+> As I mentioned before, given that this structure is allocated and
+> accessed only by assembly code, we could simply remove all those unused
+> C definitions to avoid potential confusion and misuse.
 
-But... we can do better than that.  We have the devm_* APIs which will
-make this code simpler, and less prone to these kinds of silly errors.
-I've left the request_irq()s alone because it isn't obvious to me that
-there isn't a reason for releasing the IRQ at a particular point in the
-cleanup, and there's no sign that IRQs may be asked on the device itself.
+Yes, I think removing the C definitions is a great idea. Then, we have a
+pure-asm implementation which is, as such, tied to ARM. In that case, the
+documentation can just refer to ARM memory types instead of loosely defining
+the required characteristics (i.e. state that device or strongly-ordered
+memory is required).
 
-Note also that I found another bug in this driver - it requests a region
-1K in size, but ioremaps 4K.  That's just wrong.  But anyway, the whole
-issue goes away with devm_request_and_ioremap().
+Cheers,
 
-What remains?  The assumption that GPIO0 means "no GPIO" rather than
-testing with gpio_valid() and the IRQ stuff.
-
- drivers/mmc/host/mvsdio.c |   61 +++++++++++++++-----------------------------
- 1 files changed, 21 insertions(+), 40 deletions(-)
-
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index de4c20b..4723310 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -50,7 +50,6 @@ struct mvsd_host {
- 	struct timer_list timer;
- 	struct mmc_host *mmc;
- 	struct device *dev;
--	struct resource *res;
- 	int irq;
- 	struct clk *clk;
- 	int gpio_card_detect;
-@@ -718,10 +717,6 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	if (!r || irq < 0 || !mvsd_data)
- 		return -ENXIO;
- 
--	r = request_mem_region(r->start, SZ_1K, DRIVER_NAME);
--	if (!r)
--		return -EBUSY;
--
- 	mmc = mmc_alloc_host(sizeof(struct mvsd_host), &pdev->dev);
- 	if (!mmc) {
- 		ret = -ENOMEM;
-@@ -731,8 +726,8 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	host = mmc_priv(mmc);
- 	host->mmc = mmc;
- 	host->dev = &pdev->dev;
--	host->res = r;
- 	host->base_clock = mvsd_data->clock / 2;
-+	host->clk = ERR_PTR(-EINVAL);
- 
- 	mmc->ops = &mvsd_ops;
- 
-@@ -752,7 +747,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&host->lock);
- 
--	host->base = ioremap(r->start, SZ_4K);
-+	host->base = devm_request_and_ioremap(&pdev->dev, r);
- 	if (!host->base) {
- 		ret = -ENOMEM;
- 		goto out;
-@@ -774,16 +769,15 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 
- 	/* Not all platforms can gate the clock, so it is not
- 	   an error if the clock does not exists. */
--	host->clk = clk_get(&pdev->dev, NULL);
--	if (!IS_ERR(host->clk)) {
-+	host->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(host->clk))
- 		clk_prepare_enable(host->clk);
--	}
- 
- 	if (mvsd_data->gpio_card_detect) {
--		ret = gpio_request(mvsd_data->gpio_card_detect,
--				   DRIVER_NAME " cd");
-+		ret = devm_gpio_request_one(&pdev->dev,
-+					    mvsd_data->gpio_card_detect,
-+					    GPIOF_IN, DRIVER_NAME " cd");
- 		if (ret == 0) {
--			gpio_direction_input(mvsd_data->gpio_card_detect);
- 			irq = gpio_to_irq(mvsd_data->gpio_card_detect);
- 			ret = request_irq(irq, mvsd_card_detect_irq,
- 					  IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING,
-@@ -792,17 +786,18 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 				host->gpio_card_detect =
- 					mvsd_data->gpio_card_detect;
- 			else
--				gpio_free(mvsd_data->gpio_card_detect);
-+				devm_gpio_free(&pdev->dev,
-+					       mvsd_data->gpio_card_detect);
- 		}
- 	}
- 	if (!host->gpio_card_detect)
- 		mmc->caps |= MMC_CAP_NEEDS_POLL;
- 
- 	if (mvsd_data->gpio_write_protect) {
--		ret = gpio_request(mvsd_data->gpio_write_protect,
--				   DRIVER_NAME " wp");
-+		ret = devm_gpio_request_one(&pdev->dev,
-+					    mvsd_data->gpio_write_protect,
-+				            GPIOF_IN, DRIVER_NAME " wp");
- 		if (ret == 0) {
--			gpio_direction_input(mvsd_data->gpio_write_protect);
- 			host->gpio_write_protect =
- 				mvsd_data->gpio_write_protect;
- 		}
-@@ -827,23 +822,15 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	if (host) {
- 		if (host->irq)
- 			free_irq(host->irq, host);
--		if (host->gpio_card_detect) {
-+		if (host->gpio_card_detect)
- 			free_irq(gpio_to_irq(host->gpio_card_detect), host);
--			gpio_free(host->gpio_card_detect);
--		}
--		if (host->gpio_write_protect)
--			gpio_free(host->gpio_write_protect);
--		if (host->base)
--			iounmap(host->base);
- 	}
--	if (r)
--		release_resource(r);
--	if (mmc)
--		if (!IS_ERR_OR_NULL(host->clk)) {
-+	if (mmc) {
-+		if (!IS_ERR(host->clk))
- 			clk_disable_unprepare(host->clk);
--			clk_put(host->clk);
--		}
-+
- 		mmc_free_host(mmc);
-+	}
- 
- 	return ret;
- }
-@@ -855,23 +842,17 @@ static int __exit mvsd_remove(struct platform_device *pdev)
- 	if (mmc) {
- 		struct mvsd_host *host = mmc_priv(mmc);
- 
--		if (host->gpio_card_detect) {
-+		if (host->gpio_card_detect)
- 			free_irq(gpio_to_irq(host->gpio_card_detect), host);
--			gpio_free(host->gpio_card_detect);
--		}
-+
- 		mmc_remove_host(mmc);
- 		free_irq(host->irq, host);
--		if (host->gpio_write_protect)
--			gpio_free(host->gpio_write_protect);
- 		del_timer_sync(&host->timer);
- 		mvsd_power_down(host);
--		iounmap(host->base);
--		release_resource(host->res);
- 
--		if (!IS_ERR(host->clk)) {
-+		if (!IS_ERR(host->clk))
- 			clk_disable_unprepare(host->clk);
--			clk_put(host->clk);
--		}
-+
- 		mmc_free_host(mmc);
- 	}
- 	platform_set_drvdata(pdev, NULL);
+Will
