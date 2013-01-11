@@ -1,45 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 12 Jan 2013 00:00:08 +0530
-Subject: [PATCH 01/16] ARM: b.L: secondary kernel entry code
-In-Reply-To: <alpine.LFD.2.02.1301111301300.6300@xanadu.home>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
- <50F048D7.6000904@ti.com> <alpine.LFD.2.02.1301111301300.6300@xanadu.home>
-Message-ID: <50F05A30.7030704@ti.com>
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 11 Jan 2013 13:33:49 -0500
+Subject: [PATCH v4 00/14] DMA Engine support for AM33XX
+In-Reply-To: <201301111140.41584.arnd@arndb.de>
+References: <1357883330-5364-1-git-send-email-mporter@ti.com>
+ <201301111140.41584.arnd@arndb.de>
+Message-ID: <20130111183349.GA14660@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 January 2013 11:40 PM, Nicolas Pitre wrote:
-> On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
->
->> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
->>> +ENTRY(bL_entry_point)
->>> +
->>> + THUMB(	adr	r12, BSYM(1f)	)
->>> + THUMB(	bx	r12		)
->>> + THUMB(	.thumb			)
->>> +1:
->>> +	mrc	p15, 0, r0, c0, c0, 5
->>> +	ubfx	r9, r0, #0, #4			@ r9 = cpu
->>> +	ubfx	r10, r0, #8, #4			@ r10 = cluster
->>> +	mov	r3, #BL_CPUS_PER_CLUSTER
->>> +	mla	r4, r3, r10, r9			@ r4 = canonical CPU index
->>> +	cmp	r4, #(BL_CPUS_PER_CLUSTER * BL_NR_CLUSTERS)
->>> +	blo	2f
->>> +
->>> +	/* We didn't expect this CPU.  Try to make it quiet. */
->>> +1:	wfi
->>> +	wfe
->>
->> Why do you need a wfe followed by wif ?
->> Just curious.
->
-> If the WFI doesn't work because an interrupt is pending then the WFE
-> might work better.  But as I mentioned before, this is not intended to
-> be used for other purposes than "we're really screwed so at least let's
-> try to cheaply quieten this CPU" case.
->
-Thanks for clarification.
+On Fri, Jan 11, 2013 at 11:40:41AM +0000, Arnd Bergmann wrote:
+> On Friday 11 January 2013, Matt Porter wrote:
+> > The approach taken is similar to how OMAP DMA is being converted to
+> > DMA Engine support. With the functional EDMA private API already
+> > existing in mach-davinci/dma.c, we first move that to an ARM common
+> > area so it can be shared. Adding DT and runtime PM support to the
+> > private EDMA API implementation allows it to run on AM33xx. AM33xx
+> > only boots using DT so we leverage Jon's generic DT DMA helpers to
+> > register EDMA DMAC with the of_dma framework and then add support
+> > for calling the dma_request_slave_channel() API to both the mmc
+> > and spi drivers.
+> 
+> I think this looks very good. What I wonder is whether we should
+> make the non-DT parts of the dmaengine driver compile-time
+> conditional on CONFIG_ATAGS though, so the slave drivers don't
+> have a link-time dependency on the dmaengine driver's 
+> omap_dma_filter_fn symbol when building without ATAGS support.
 
-Regards
-Santosh
+We have tightly coupled the link-time dependency for
+omap_dma_filter_fn by going down the path of using
+dma_request_slave_channel_compat() as Tony suggested to avoid extra
+ifdefry.
+
+That dependency will go away naturally if all the "legacy" OMAP platforms
+were required to only boot from DT...just as a newly added SoCs are.
+
+Are you suggesting unwinding the _compat() approach?
+
+-Matt
