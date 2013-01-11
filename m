@@ -1,243 +1,245 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 11 Jan 2013 12:59:01 +0200
-Subject: [PATCH 07/14] usb: ehci-omap: Instantiate PHY devices if required
-In-Reply-To: <Pine.LNX.4.44L0.1301101544140.1178-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1301101544140.1178-100000@iolanthe.rowland.org>
-Message-ID: <50EFF075.5090203@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Jan 2013 11:02:10 +0000
+Subject: [PATCH] mmc: mvsdio: Replace IS_ERR_NULL() is with IS_ERR()
+In-Reply-To: <1357849755-8168-1-git-send-email-andrew@lunn.ch>
+References: <1357849755-8168-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20130111110210.GC30875@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2013 10:48 PM, Alan Stern wrote:
-> On Thu, 10 Jan 2013, Roger Quadros wrote:
+On Thu, Jan 10, 2013 at 09:29:15PM +0100, Andrew Lunn wrote:
+> A NULL is a valid clk cookie, so we should not be tested with
+> IS_ERR_NULL(). Replace it with IS_ERR().
 > 
->> If the OMAP's Host controller is in PHY mode then we instantiate
->> a platform device for the PHY (one for each port in PHY mode) and
->> hold a reference to it so that we can use the usb_phy API, e.g.
->> while suspend/resume.
->>
->> The platform data for the PHY must be supplied in the newly added
->> .phy_config parameter in struct usbhs_omap_platform_data.
->>
->> The end goal is to move the PHY's reset and power handling code
->> out of the ehci-omap driver and into the phy driver.
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/mmc/host/mvsdio.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> As mentioned in another thread, I would prefer to have these changes to 
-> ehci-omap.c made after the driver is converted to the new "ehci-hcd is 
-> a library" scheme.  The patch below does the conversion; it is meant to 
-> apply on top of the similar patch for ehci-mxc posted recently on the 
-> linux-usb mailing list.
-> 
-> After this conversion, the omap_ehci_hcd private data structure doesn't 
-> have to be allocated specifically.  It can be handled in the same way 
-> as the private data structure in the ehci-mxc patch.
-> 
-> I haven't even tried to compile this.  Please let me know how it works.
-> 
+> diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+> index de4c20b..d0050fa 100644
+> --- a/drivers/mmc/host/mvsdio.c
+> +++ b/drivers/mmc/host/mvsdio.c
+> @@ -839,7 +839,7 @@ out:
+>  	if (r)
+>  		release_resource(r);
+>  	if (mmc)
+> -		if (!IS_ERR_OR_NULL(host->clk)) {
+> +		if (!IS_ERR(host->clk)) {
+>  			clk_disable_unprepare(host->clk);
+>  			clk_put(host->clk);
+>  		}
 
-Alan,
+Actually, no.
 
-Thanks for the patch. I've pasted the version that builds and works and
-put you as the Author of the patch, hope it is fine.
+1. I've already recently pointed out that C is not python, and this code
+   is broken.  (Look at the lack of missing braces around the code you've
+   modified.)
+2. host->clk _can_ be NULL here.
 
-I could not find the equivalent ehci-mxc implementation though. Any
-pointers to that? Thanks.
+Here's the (untested) bare minimum needed to fix this driver:
 
-cheers,
--roger
+ drivers/mmc/host/mvsdio.c |   10 ++++++----
+ 1 files changed, 6 insertions(+), 4 deletions(-)
 
->From fafa9c787bcf2ff3f46c07c045997614d7a8a417 Mon Sep 17 00:00:00 2001
-From: Alan Stern <stern@rowland.harvard.edu>
-Date: Fri, 11 Jan 2013 12:37:01 +0200
-Subject: [PATCH] USB: ehci-omap: Convert to platform driver
-
-Convert ehci-omap into a platform driver and use ehci-hcd
-as a library.
-
-CC: Alan Stern <stern@rowland.harvard.edu>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- drivers/usb/host/Kconfig     |    2 +-
- drivers/usb/host/Makefile    |    1 +
- drivers/usb/host/ehci-hcd.c  |    6 +---
- drivers/usb/host/ehci-omap.c |   76
-+++++++++++++++++++-----------------------
- 4 files changed, 37 insertions(+), 48 deletions(-)
-
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index d6bb128..432a463 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -155,7 +155,7 @@ config USB_EHCI_MXC
- 	  Variation of ARC USB block used in some Freescale chips.
-
- config USB_EHCI_HCD_OMAP
--	bool "EHCI support for OMAP3 and later chips"
-+	tristate "EHCI support for OMAP3 and later chips"
- 	depends on USB_EHCI_HCD && ARCH_OMAP
- 	default y
- 	---help---
-diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 1eb4c30..8a8d079 100644
---- a/drivers/usb/host/Makefile
-+++ b/drivers/usb/host/Makefile
-@@ -26,6 +26,7 @@ obj-$(CONFIG_PCI)		+= pci-quirks.o
- obj-$(CONFIG_USB_EHCI_HCD)	+= ehci-hcd.o
- obj-$(CONFIG_USB_EHCI_PCI)	+= ehci-pci.o
- obj-$(CONFIG_USB_EHCI_HCD_PLATFORM)	+= ehci-platform.o
-+obj-$(CONFIG_USB_EHCI_HCD_OMAP)	+= ehci-omap.o
-
- obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
- obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index c97503b..c44ef1d 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1260,11 +1260,6 @@ MODULE_LICENSE ("GPL");
- #define PLATFORM_DRIVER		ehci_hcd_sh_driver
- #endif
-
--#ifdef CONFIG_USB_EHCI_HCD_OMAP
--#include "ehci-omap.c"
--#define        PLATFORM_DRIVER         ehci_hcd_omap_driver
--#endif
--
- #ifdef CONFIG_PPC_PS3
- #include "ehci-ps3.c"
- #define	PS3_SYSTEM_BUS_DRIVER	ps3_ehci_driver
-@@ -1352,6 +1347,7 @@ MODULE_LICENSE ("GPL");
-
- #if !IS_ENABLED(CONFIG_USB_EHCI_PCI) && \
- 	!IS_ENABLED(CONFIG_USB_EHCI_HCD_PLATFORM) && \
-+	!IS_ENABLED(CONFIG_USB_EHCI_HCD_OMAP) && \
- 	!defined(CONFIG_USB_CHIPIDEA_HOST) && \
- 	!defined(PLATFORM_DRIVER) && \
- 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
-diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index b96a4bf..6388aa6 100644
---- a/drivers/usb/host/ehci-omap.c
-+++ b/drivers/usb/host/ehci-omap.c
-@@ -36,6 +36,9 @@
-  *	- convert to use hwmod and runtime PM
-  */
-
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/io.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/usb/ulpi.h>
-@@ -43,6 +46,10 @@
- #include <linux/pm_runtime.h>
- #include <linux/gpio.h>
- #include <linux/clk.h>
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+
-+#include "ehci.h"
-
- #include <linux/platform_data/usb-omap.h>
-
-@@ -57,9 +64,11 @@
- #define	EHCI_INSNREG05_ULPI_EXTREGADD_SHIFT		8
- #define	EHCI_INSNREG05_ULPI_WRDATA_SHIFT		0
-
--/*-------------------------------------------------------------------------*/
-+#define DRIVER_DESC "OMAP-EHCI Host Controller driver"
-
--static const struct hc_driver ehci_omap_hc_driver;
-+static const char hcd_name[] = "ehci-omap";
-+
-+/*-------------------------------------------------------------------------*/
-
-
- static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
-@@ -166,6 +175,12 @@ static void disable_put_regulator(
- /* configure so an HC device and id are always provided */
- /* always called with process context; sleeping is OK */
-
-+static struct hc_driver __read_mostly ehci_omap_hc_driver;
-+
-+static const struct ehci_driver_overrides ehci_omap_overrides
-__initdata = {
-+	.reset =	omap_ehci_init,
-+};
-+
- /**
-  * ehci_hcd_omap_probe - initialize TI-based HCDs
-  *
-@@ -315,56 +330,33 @@ static struct platform_driver ehci_hcd_omap_driver = {
- 	/*.suspend		= ehci_hcd_omap_suspend, */
- 	/*.resume		= ehci_hcd_omap_resume, */
- 	.driver = {
--		.name		= "ehci-omap",
-+		.name		= hcd_name,
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index de4c20b..4190fb4 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -733,6 +733,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 	host->dev = &pdev->dev;
+ 	host->res = r;
+ 	host->base_clock = mvsd_data->clock / 2;
++	host->clk = ERR_PTR(-EINVAL);
+ 
+ 	mmc->ops = &mvsd_ops;
+ 
+@@ -837,13 +838,14 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 			iounmap(host->base);
  	}
- };
+ 	if (r)
+-		release_resource(r);
+-	if (mmc)
+-		if (!IS_ERR_OR_NULL(host->clk)) {
++		release_mem_resource(r->start, resource_size(r));
++	if (mmc) {
++		if (!IS_ERR(host->clk)) {
+ 			clk_disable_unprepare(host->clk);
+ 			clk_put(host->clk);
+ 		}
+ 		mmc_free_host(mmc);
++	}
+ 
+ 	return ret;
+ }
+@@ -866,7 +868,7 @@ static int __exit mvsd_remove(struct platform_device *pdev)
+ 		del_timer_sync(&host->timer);
+ 		mvsd_power_down(host);
+ 		iounmap(host->base);
+-		release_resource(host->res);
++		release_mem_resource(host->res->start, resource_size(host->res);
+ 
+ 		if (!IS_ERR(host->clk)) {
+ 			clk_disable_unprepare(host->clk);
 
- /*-------------------------------------------------------------------------*/
 
--static const struct hc_driver ehci_omap_hc_driver = {
--	.description		= hcd_name,
--	.product_desc		= "OMAP-EHCI Host Controller",
--	.hcd_priv_size		= sizeof(struct ehci_hcd),
+But... we can do better than that.  We have the devm_* APIs which will
+make this code simpler, and less prone to these kinds of silly errors.
+I've left the request_irq()s alone because it isn't obvious to me that
+there isn't a reason for releasing the IRQ at a particular point in the
+cleanup, and there's no sign that IRQs may be asked on the device itself.
+
+Note also that I found another bug in this driver - it requests a region
+1K in size, but ioremaps 4K.  That's just wrong.  But anyway, the whole
+issue goes away with devm_request_and_ioremap().
+
+What remains?  The assumption that GPIO0 means "no GPIO" rather than
+testing with gpio_valid() and the IRQ stuff.
+
+ drivers/mmc/host/mvsdio.c |   61 +++++++++++++++-----------------------------
+ 1 files changed, 21 insertions(+), 40 deletions(-)
+
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index de4c20b..4723310 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -50,7 +50,6 @@ struct mvsd_host {
+ 	struct timer_list timer;
+ 	struct mmc_host *mmc;
+ 	struct device *dev;
+-	struct resource *res;
+ 	int irq;
+ 	struct clk *clk;
+ 	int gpio_card_detect;
+@@ -718,10 +717,6 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 	if (!r || irq < 0 || !mvsd_data)
+ 		return -ENXIO;
+ 
+-	r = request_mem_region(r->start, SZ_1K, DRIVER_NAME);
+-	if (!r)
+-		return -EBUSY;
 -
--	/*
--	 * generic hardware linkage
--	 */
--	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
--
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset			= omap_ehci_init,
--	.start			= ehci_run,
--	.stop			= ehci_stop,
--	.shutdown		= ehci_shutdown,
--
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue		= ehci_urb_enqueue,
--	.urb_dequeue		= ehci_urb_dequeue,
--	.endpoint_disable	= ehci_endpoint_disable,
--	.endpoint_reset		= ehci_endpoint_reset,
-+static int __init ehci_omap_init(void)
-+{
-+	if (usb_disabled())
-+		return -ENODEV;
-
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number	= ehci_get_frame,
-+	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-
--	/*
--	 * root hub support
--	 */
--	.hub_status_data	= ehci_hub_status_data,
--	.hub_control		= ehci_hub_control,
--	.bus_suspend		= ehci_bus_suspend,
--	.bus_resume		= ehci_bus_resume,
-+	ehci_init_driver(&ehci_omap_hc_driver, &ehci_omap_overrides);
-+	return platform_driver_register(&ehci_hcd_omap_driver);
-+}
-+module_init(ehci_omap_init);
-
--	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
--};
-+static void __exit ehci_omap_cleanup(void)
-+{
-+	platform_driver_unregister(&ehci_hcd_omap_driver);
-+}
-+module_exit(ehci_omap_cleanup);
-
- MODULE_ALIAS("platform:omap-ehci");
- MODULE_AUTHOR("Texas Instruments, Inc.");
- MODULE_AUTHOR("Felipe Balbi <felipe.balbi@nokia.com>");
-
-+MODULE_DESCRIPTION(DRIVER_DESC);
-+MODULE_LICENSE("GPL");
--- 
-1.7.4.1
+ 	mmc = mmc_alloc_host(sizeof(struct mvsd_host), &pdev->dev);
+ 	if (!mmc) {
+ 		ret = -ENOMEM;
+@@ -731,8 +726,8 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 	host = mmc_priv(mmc);
+ 	host->mmc = mmc;
+ 	host->dev = &pdev->dev;
+-	host->res = r;
+ 	host->base_clock = mvsd_data->clock / 2;
++	host->clk = ERR_PTR(-EINVAL);
+ 
+ 	mmc->ops = &mvsd_ops;
+ 
+@@ -752,7 +747,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 
+ 	spin_lock_init(&host->lock);
+ 
+-	host->base = ioremap(r->start, SZ_4K);
++	host->base = devm_request_and_ioremap(&pdev->dev, r);
+ 	if (!host->base) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -774,16 +769,15 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 
+ 	/* Not all platforms can gate the clock, so it is not
+ 	   an error if the clock does not exists. */
+-	host->clk = clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(host->clk)) {
++	host->clk = devm_clk_get(&pdev->dev, NULL);
++	if (!IS_ERR(host->clk))
+ 		clk_prepare_enable(host->clk);
+-	}
+ 
+ 	if (mvsd_data->gpio_card_detect) {
+-		ret = gpio_request(mvsd_data->gpio_card_detect,
+-				   DRIVER_NAME " cd");
++		ret = devm_gpio_request_one(&pdev->dev,
++					    mvsd_data->gpio_card_detect,
++					    GPIOF_IN, DRIVER_NAME " cd");
+ 		if (ret == 0) {
+-			gpio_direction_input(mvsd_data->gpio_card_detect);
+ 			irq = gpio_to_irq(mvsd_data->gpio_card_detect);
+ 			ret = request_irq(irq, mvsd_card_detect_irq,
+ 					  IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING,
+@@ -792,17 +786,18 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 				host->gpio_card_detect =
+ 					mvsd_data->gpio_card_detect;
+ 			else
+-				gpio_free(mvsd_data->gpio_card_detect);
++				devm_gpio_free(&pdev->dev,
++					       mvsd_data->gpio_card_detect);
+ 		}
+ 	}
+ 	if (!host->gpio_card_detect)
+ 		mmc->caps |= MMC_CAP_NEEDS_POLL;
+ 
+ 	if (mvsd_data->gpio_write_protect) {
+-		ret = gpio_request(mvsd_data->gpio_write_protect,
+-				   DRIVER_NAME " wp");
++		ret = devm_gpio_request_one(&pdev->dev,
++					    mvsd_data->gpio_write_protect,
++				            GPIOF_IN, DRIVER_NAME " wp");
+ 		if (ret == 0) {
+-			gpio_direction_input(mvsd_data->gpio_write_protect);
+ 			host->gpio_write_protect =
+ 				mvsd_data->gpio_write_protect;
+ 		}
+@@ -827,23 +822,15 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 	if (host) {
+ 		if (host->irq)
+ 			free_irq(host->irq, host);
+-		if (host->gpio_card_detect) {
++		if (host->gpio_card_detect)
+ 			free_irq(gpio_to_irq(host->gpio_card_detect), host);
+-			gpio_free(host->gpio_card_detect);
+-		}
+-		if (host->gpio_write_protect)
+-			gpio_free(host->gpio_write_protect);
+-		if (host->base)
+-			iounmap(host->base);
+ 	}
+-	if (r)
+-		release_resource(r);
+-	if (mmc)
+-		if (!IS_ERR_OR_NULL(host->clk)) {
++	if (mmc) {
++		if (!IS_ERR(host->clk))
+ 			clk_disable_unprepare(host->clk);
+-			clk_put(host->clk);
+-		}
++
+ 		mmc_free_host(mmc);
++	}
+ 
+ 	return ret;
+ }
+@@ -855,23 +842,17 @@ static int __exit mvsd_remove(struct platform_device *pdev)
+ 	if (mmc) {
+ 		struct mvsd_host *host = mmc_priv(mmc);
+ 
+-		if (host->gpio_card_detect) {
++		if (host->gpio_card_detect)
+ 			free_irq(gpio_to_irq(host->gpio_card_detect), host);
+-			gpio_free(host->gpio_card_detect);
+-		}
++
+ 		mmc_remove_host(mmc);
+ 		free_irq(host->irq, host);
+-		if (host->gpio_write_protect)
+-			gpio_free(host->gpio_write_protect);
+ 		del_timer_sync(&host->timer);
+ 		mvsd_power_down(host);
+-		iounmap(host->base);
+-		release_resource(host->res);
+ 
+-		if (!IS_ERR(host->clk)) {
++		if (!IS_ERR(host->clk))
+ 			clk_disable_unprepare(host->clk);
+-			clk_put(host->clk);
+-		}
++
+ 		mmc_free_host(mmc);
+ 	}
+ 	platform_set_drvdata(pdev, NULL);
