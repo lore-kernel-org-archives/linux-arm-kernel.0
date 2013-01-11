@@ -1,63 +1,29 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Fri, 11 Jan 2013 20:52:39 +0100
-Subject: [PATCH v3 0/9] Migrate Tegra to common clock framework
-In-Reply-To: <50F058BC.9090909@wwwdotorg.org>
-References: <1357292453-28418-1-git-send-email-pgaikwad@nvidia.com>
- <2615017.79obOGziy2@ax5200p> <50F058BC.9090909@wwwdotorg.org>
-Message-ID: <35738737.tYpi2RKzkU@ax5200p>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Jan 2013 12:05:31 -0800
+Subject: arm: mvebu: Fix compile for multiplatform when ARMv6 is selected
+Message-ID: <20130111200531.GO14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 January 2013 11:23:56 Stephen Warren wrote:
-> On 01/11/2013 08:59 AM, Marc Dietrich wrote:
-> > On Friday 11 January 2013 13:40:03 Prashant Gaikwad wrote:
-> >> On Thursday 10 January 2013 02:14 AM, Stephen Warren wrote:
-> >>> On 01/09/2013 10:34 AM, Stephen Warren wrote:
-> ...
-> 
-> >>> Your changes don't actually cause the driver to break though, since it
-> >>> abuses clk_get_sys() to retrieve clocks under a different driver name,
-> >>> which matches what the clock driver provides. However, I think you
-> >>> should also include the following patch at the end of your series to fix
-> >>> 
-> >>> this up, so the clock looking happens through device tree:
-> >>>> diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
-> >>>> index d8826ed..6d44076 100644
-> >>>> --- a/drivers/staging/nvec/nvec.c
-> >>>> +++ b/drivers/staging/nvec/nvec.c
-> >>>> @@ -770,7 +770,7 @@ static int tegra_nvec_probe(struct platform_device
-> >>>> *pdev)>>
-> >>>> 
-> >>>>                  return -ENODEV;
-> >>>>          
-> >>>>          }
-> >>>> 
-> >>>> -       i2c_clk = clk_get_sys("tegra-i2c.2", "div-clk");
-> >>>> +       i2c_clk = clk_get(&pdev->dev, "div-clk");
-> >>>> 
-> >>>>          if (IS_ERR(i2c_clk)) {
-> >>>>          
-> >>>>                  dev_err(nvec->dev, "failed to get controller
-> >>>>                  clock\n");
-> >>>>                  return -ENODEV;
-> >> 
-> >> Included in the latest patches sent.
-> > 
-> > em, not yet in V4.
-> 
-> It's in V2 of the other series Prashant posted which sits on top of the
-> CCF rework series.
+Some systems compile in both ARMv6 and ARMv7 into multiplatform
+configurations. This means the default compiler flags are for ARMv6,
+and we will get:
 
-ahh, sorry - I didn't see it because of the changed subject line.
+arch/arm/mach-mvebu/coherency_ll.S: Assembler messages:
+arch/arm/mach-mvebu/coherency_ll.S:45: Error: selected processor does not support `dsb'
 
-> > Maybe you can also adjust the TODO (2nd entry) file now
-> > that this issue is fixed.
-> 
-> I'll try to remember to repost an updated version of the patch which
-> does that...
+Fix this by specifying ARMv7 flags for coherency_ll.o.
 
-no need if it just adds this change. I'll need to update the file anyway soon.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Thanks
-
-Marc
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -1,6 +1,8 @@
+ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 	-I$(srctree)/arch/arm/plat-orion/include
+ 
++AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
++
+ obj-y += system-controller.o
+ obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o pmsu.o
+ obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
