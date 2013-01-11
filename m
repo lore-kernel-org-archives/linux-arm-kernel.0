@@ -1,24 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jan 2013 16:32:55 +0000
-Subject: [PATCH 07/14] usb: ehci-omap: Instantiate PHY devices if required
-In-Reply-To: <50F037C9.40306@ti.com>
-References: <Pine.LNX.4.44L0.1301111019340.1730-100000@iolanthe.rowland.org>
- <50F037C9.40306@ti.com>
-Message-ID: <20130111163255.GF23505@n2100.arm.linux.org.uk>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 11 Jan 2013 10:39:22 -0600
+Subject: [PATCH] ARM: dts: OMAP3: Add support for OMAP3430 SDP board
+Message-ID: <1357922362-7641-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 06:03:21PM +0200, Roger Quadros wrote:
-> diff --git a/include/linux/platform_data/usb-omap.h
-> b/include/linux/platform_data/usb-omap.h
-> index d63eb7d..927b8a1 100644
-> --- a/include/linux/platform_data/usb-omap.h
-> +++ b/include/linux/platform_data/usb-omap.h
-> @@ -38,6 +38,12 @@ enum usbhs_omap_port_mode {
->  	OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM
->  };
-> 
-> +struct usbhs_phy_config {
-> +	char *name;		/* binds to device driver */
+Adds basic device-tree support for OMAP3430 SDP board which has 256MB
+of RAM and uses the TWL4030 power management IC.
 
-You may wish to consider making this const.
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/boot/dts/Makefile         |    1 +
+ arch/arm/boot/dts/omap3430-sdp.dts |   46 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap3430-sdp.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e44da40..5d6dff0 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -104,6 +104,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-beagle.dtb \
+ 	omap3-beagle-xm.dtb \
+ 	omap3-evm.dtb \
++	omap3430-sdp.dtb \
+ 	omap3-tobi.dtb \
+ 	omap4-panda.dtb \
+ 	omap4-panda-a4.dtb \
+diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+new file mode 100644
+index 0000000..be0650d
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3430-sdp.dts
+@@ -0,0 +1,46 @@
++/*
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++/include/ "omap3.dtsi"
++
++/ {
++	model = "TI OMAP3430 SDP";
++	compatible = "ti,omap3430-sdp", "ti,omap3";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>; /* 256 MB */
++	};
++};
++
++&i2c1 {
++	clock-frequency = <2600000>;
++
++	twl: twl at 48 {
++		reg = <0x48>;
++		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
++		interrupt-parent = <&intc>;
++	};
++};
++
++/include/ "twl4030.dtsi"
++
++&mmc1 {
++	vmmc-supply = <&vmmc1>;
++	vmmc_aux-supply = <&vsim>;
++	bus-width = <8>;
++};
++
++&mmc2 {
++	status = "disabled";
++};
++
++&mmc3 {
++	status = "disabled";
++};
+-- 
+1.7.10.4
