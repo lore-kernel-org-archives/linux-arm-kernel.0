@@ -1,28 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 Jan 2013 12:02:35 +0800
-Subject: [PATCH 0/3] arch_decomp_wdog cleanup
-In-Reply-To: <alpine.LFD.2.02.1301102220230.6300@xanadu.home>
-References: <1357827165-9320-1-git-send-email-shawn.guo@linaro.org>
- <alpine.LFD.2.02.1301101430200.6300@xanadu.home>
- <20130111025311.GD9139@S2101-09.ap.freescale.net>
- <alpine.LFD.2.02.1301102220230.6300@xanadu.home>
-Message-ID: <20130111040233.GD8680@S2101-09.ap.freescale.net>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 11 Jan 2013 05:06:55 +0100
+Subject: [PATCH 02/14] of/pci: Add of_pci_get_devfn() function
+In-Reply-To: <50EF5847.7040507@wwwdotorg.org>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <1357764194-12677-3-git-send-email-thierry.reding@avionic-design.de>
+ <50EF5847.7040507@wwwdotorg.org>
+Message-ID: <20130111040655.GD28094@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 10:25:29PM -0500, Nicolas Pitre wrote:
-> "not unused" that means "used".  Probably you meant "not used" or "now 
-> unused".
+On Thu, Jan 10, 2013 at 05:09:43PM -0700, Stephen Warren wrote:
+> On 01/09/2013 01:43 PM, Thierry Reding wrote:
+> > This function can be used to parse the device and function number from a
+> > standard 5-cell PCI resource. PCI_SLOT() and PCI_FUNC() can be used on
+> > the returned value obtain the device and function numbers respectively.
 > 
-> Also, "all the arch_decomp_wdog() related codes are ..." doesn't look 
-> like proper english.  I'd say "all the arch_decomp_wdog() related 
-> functions are .." or "all the arch_decomp_wdog() related code is ..".
+> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
 > 
-English became the hard part of my life when I was a high school
-student :)
+> >  static inline int __of_pci_pci_compare(struct device_node *node,
+> >  				       unsigned int devfn)
+> >  {
+> > +	int err;
+> >  
+> > +	err = of_pci_get_devfn(node);
+> > +	if (err < 0)
+> >  		return 0;
+> > +
+> > +	return devfn == err;
+> 
+> I know this is really picky, but calling that "err" when it's hopefully
+> not an error but rather a PCI device/function ID seems a little obscure.
+> Perhaps node_devfn? I assume that fact that devfn is unsigned and err is
+> signed won't be an issue.
 
-    Besides the fact that CONFIG_S3C_BOOT_WATCHDOG is defined nowhere, with
-    ARCH_HAS_DECOMP_WDOG removed from arch/arm/boot/compressed/decompress.c,
-    all the arch_decomp_wdog() related code is not used.  Remove them.
+Maybe renaming the devfn parameter to data and using devfn for the local
+variable would be more obvious.
 
-Shawn
+The signedness shouldn't be problematic. devfn is an 8-bit unsigned
+integer and sign mismatch is excluded by the error return already.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130111/2bdd15f2/attachment.sig>
