@@ -1,31 +1,52 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Fri, 11 Jan 2013 14:11:18 -0600
-Subject: [kvmarm] [PATCH v5.1 0/2] KVM: ARM: Rename KVM_SET_DEVICE_ADDRESS
-In-Reply-To: <A6843D28-E2AF-4EFF-8C9B-232B804C01E7@suse.de> (from
- agraf@suse.de on Fri Jan 11 09:42:55 2013)
-Message-ID: <1357935078.5475.10@snotra>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sat, 12 Jan 2013 09:12:38 +1300
+Subject: [PATCH 0/4] arm: vt8500: Add support for Wondermedia WM8750/WM8850
+Message-ID: <1357935162-7672-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2013 09:42:55 AM, Alexander Graf wrote:
-> 
-> On 11.01.2013, at 02:10, Scott Wood wrote:
-> 
-> > struct kvm_device_attr {
-> > 	__u32 device;
-> 
-> This needs some semantic specification. Is device a constant value?  
-> Is it the return value of CREATE_IRQCHIP?
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 
-As proposed, it's up to the architecture to provide that  
-specification.  In theory this could be used for things other than IRQ  
-chips.  We could still say that device creation functions return a  
-valid device ID (if the device has any attributes), as well as have  
-other architecture-specific ways of describing device IDs (static  
-enumeration).  Or we could have non-architecture-specific static  
-enumeration.  Or just require that all devices be explicitly created by  
-something that returns the ID.
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
 
-Do you have a preferred approach?
+are available in the git repository at:
 
--Scott
+  git://server.prisktech.co.nz/git/linuxwmt.git tags/armsoc-3.9
+
+for you to fetch changes up to 82c8f175662873f7f7f4c78698888ee963d7d967:
+
+  arm: vt8500: Remove remaining mach includes (2012-12-28 21:05:19 +1300)
+
+----------------------------------------------------------------
+arm: vt8500: Add support for WM8750/WM8850. Cleanup multiplatform changes
+
+This patchset adds support for the WM8750 (ARMv6) and WM8850 (ARMv7), and
+cleans up changes for multiplatform configuration.
+
+Single platform Kconfig options are removed, along with the remaining
+mach/includes.
+
+The debug-macro.s is moved to arm/include/debug/ to allow DEBUG_LL on
+multi-platform.
+
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+
+----------------------------------------------------------------
+Tony Prisk (4):
+      arm: vt8500: Add support for Wondermedia WM8750/WM8850
+      arm: vt8500: Remove single platform Kconfig options
+      arm: vt8500: Convert debug-macro.S to be multiplatform friendly
+      arm: vt8500: Remove remaining mach includes
+
+ Documentation/devicetree/bindings/arm/vt8500.txt   |    8 +++++
+ arch/arm/Kconfig                                   |   16 ---------
+ arch/arm/Kconfig.debug                             |    8 +++++
+ .../mach/debug-macro.S => include/debug/vt8500.S}  |   24 ++++++++-----
+ arch/arm/mach-vt8500/Kconfig                       |   26 ++++++++++++--
+ arch/arm/mach-vt8500/include/mach/timex.h          |   26 --------------
+ arch/arm/mach-vt8500/include/mach/uncompress.h     |   37 --------------------
+ arch/arm/mach-vt8500/vt8500.c                      |    2 ++
+ 8 files changed, 56 insertions(+), 91 deletions(-)
+ rename arch/arm/{mach-vt8500/include/mach/debug-macro.S => include/debug/vt8500.S} (56%)
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/uncompress.h
