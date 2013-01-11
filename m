@@ -1,25 +1,30 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Jan 2013 18:41:41 +0530
-Subject: [PATCHv2 02/11] arm: arch_timer: remove redundant available check
-In-Reply-To: <1357747640-18594-3-git-send-email-mark.rutland@arm.com>
-References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
- <1357747640-18594-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <50F00F8D.3050904@ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 11 Jan 2013 15:11:52 +0200
+Subject: [PATCH 0/2] ARM: tegra: Add cpu node in device tree
+Message-ID: <1357909914-28994-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
-> This check is a holdover from the pre-devicetree days. As the timer
-> is not probed except by platforms which register it via devicetree,
-> it's not strictly necessary.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-Multi-platform build without DT could still benefit from the
-check but I guess the most of the A15 based platform are DT
-only, so its should be good to get rid of the check.
+Hi,
 
-Regards,
-Santosh
+>From the discussion(*1) of CPU core# detection, DT cpu node will be
+the only way to do it right. So we need to add cpu nodes on the
+existing Tegra SoCs(T20/T30) first in order to remove the existing A9
+SCU detection later, where DT cpu# detection fails, we would consider
+a single cpu core avalable.
+
+Tested only with T30.
+
+Hiroshi Doyu (2):
+  ARM: tegra20: Add cpu node
+  ARM: tegra30: Add cpu node
+
+ arch/arm/boot/dts/tegra20.dtsi |   29 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/tegra30.dtsi |   29 +++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
+
+*1:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140209.html
+
+-- 
+1.7.9.5
