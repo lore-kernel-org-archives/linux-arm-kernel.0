@@ -1,76 +1,48 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Fri, 11 Jan 2013 00:09:56 -0800
-Subject: [PATCH v4 0/4] pm: Add power off control
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EAD58C2@DBDE01.ent.ti.com>
-References: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EAD58C2@DBDE01.ent.ti.com>
-Message-ID: <CA+Bv8XbUa7xPd8V7LQCmFbbdQvORUK1X0xBPzAhKUFFjjho2jw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 11 Jan 2013 09:13:49 +0100
+Subject: [PATCH 2/3] ARM: Orion: Bind the orion bridge interrupt
+ controller through DT
+In-Reply-To: <20130111040219.GA23206@obsidianresearch.com>
+References: <1355188683-18208-2-git-send-email-jgunthorpe@obsidianresearch.com>
+ <20121211062430.GD25466@lunn.ch>
+ <20121211065813.GA14843@obsidianresearch.com>
+ <20121211071333.GR17242@lunn.ch>
+ <20121211185535.GA14534@obsidianresearch.com>
+ <20130110014734.GC5075@titan.lakedaemon.net>
+ <20130110060710.GM24650@lunn.ch> <50EE8FC5.50105@gmail.com>
+ <20130110184832.GB28004@obsidianresearch.com>
+ <20130110185737.GO5075@titan.lakedaemon.net>
+ <20130111040219.GA23206@obsidianresearch.com>
+Message-ID: <20130111091349.55ee0e77@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 2, 2013 at 2:15 AM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
-> On Fri, Dec 14, 2012 at 11:33:13, AnilKumar, Chimata wrote:
->> Add PM power_off control to rtc driver and PMIC status is set to
->> STATUS_OFF to shutdown PMIC if PWR_EN is toggled by RTC module.
->>
->> System power off sequence:-
->> * Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
->> * Enable PMIC_POWER_EN in rtc module
->> * Set rtc ALARM2 time
->> * Enable ALARM2 interrupt
->>
->> These patches were tested on am335x-bone (BeagleBone). These patchs
->> are based on linux-next.
->
-> Hi All,
->
-> Happy New Year
->
-> Gentle ping to this series
+Dear Jason Gunthorpe,
 
-I personally like the series, it certainly adds needed functionality.
-I just wish there was a way to get it without a possible 4 second
-delay.
+On Thu, 10 Jan 2013 21:02:19 -0700, Jason Gunthorpe wrote:
 
-> Thanks
-> AnilKumar
->
->> Changes from v3:
->>       - TPS65217 mfd driver changes are accepted so dropped
->>         from this series.
->>       - With recent changes in the kernel, reboot_mutex held BUG()
->>         is not seen so removed while(1); from rtc_power_off.
->>       - Removed spinlock before while(1); which is not necessary.
->>
->> Changes from v2:
->>       - Incorporated Kevin's comment on v2
->>         * Enabled RTC in ompa2plus_defconfig
->>
->> Changes from v1:
->>       - Incorporated Vaibhav's comments on v1
->>         * Changed the time rollover logic with the help of
->>           rtc-lib APIs
->>
->> AnilKumar Ch (3):
->>   ARM: dts: AM33XX: Set pmic-shutdown-controller for BeagleBone
->>   ARM: dts: AM33XX: Enable system power off control in am335x-bone
->>   ARM: OMAP2+: omap2plus_defconfig: Enable RTC support
->>
->> Colin Foe-Parker (1):
->>   rtc: OMAP: Add system pm_power_off to rtc driver
->>
->>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
->>  arch/arm/boot/dts/am335x-bone.dts                  |    6 ++
->>  arch/arm/configs/omap2plus_defconfig               |    1 +
->>  drivers/rtc/rtc-omap.c                             |   74 +++++++++++++++++++-
->>  4 files changed, 85 insertions(+), 1 deletion(-)
->>
->> --
->> 1.7.9.5
->>
->>
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> I've attached the main mv dt patch as a MIME, sorry for the
+> awkwardness, I am travelling and won't be available... Please feel
+> free to re-post/alter as necessary. As I said before, I'm not happy
+> with it because it doesn't follow the standard convention for MDIO
+> phys.
+
+The MDIO registers for the mv643xx_eth hardware are the same as the
+ones for the mvneta hardware. Therefore, I've splitted this into the
+mvmdio driver (available in mainline since 3.8,
+drivers/net/ethernet/marvell). This allows to have a nicely separated
+driver for the MDIO interface.
+
+My plan was ultimately to modify the mv643xx_eth driver to use the
+mvmdio driver, and then do a nice DT binding on top of that.
+
+Does this sounds like a good plan?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
