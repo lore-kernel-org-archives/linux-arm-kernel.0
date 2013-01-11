@@ -1,100 +1,104 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 11 Jan 2013 09:30:07 -0500
-Subject: [PATCH v4 05/14] dmaengine: edma: Add TI EDMA device tree binding
-In-Reply-To: <06e6ba0bd8984e1797c84d2926584909@DFLE72.ent.ti.com>
-References: <1357883330-5364-1-git-send-email-mporter@ti.com>
- <1357883330-5364-6-git-send-email-mporter@ti.com>
- <06e6ba0bd8984e1797c84d2926584909@DFLE72.ent.ti.com>
-Message-ID: <20130111143007.GX14660@beef>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Jan 2013 14:31:01 +0000
+Subject: [PATCHv2 06/11] arm: arch_timer: factor out register accessors
+In-Reply-To: <50F01456.3030001@ti.com>
+References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+ <1357747640-18594-7-git-send-email-mark.rutland@arm.com>
+ <50F01456.3030001@ti.com>
+Message-ID: <20130111143101.GC19765@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 07:54:05AM +0000, Hebbar, Gururaja wrote:
-> On Fri, Jan 11, 2013 at 11:18:41, Porter, Matt wrote:
-> > The binding definition is based on the generic DMA controller
-> > binding.
-> > 
-> > Signed-off-by: Matt Porter <mporter@ti.com>
+On Fri, Jan 11, 2013 at 01:32:06PM +0000, Santosh Shilimkar wrote:
+> On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
+> > Currently the arch_timer register accessors are thrown together with
+> > the main driver, preventing us from porting the driver to other
+> > architectures.
+> >
+> > This patch moves the register accessors into a header file, as with
+> > the arm64 version. Constants required by the accessors are also moved.
+> >
+> > Additionally isbs are added in arch_timer_get_cnt{v,p}ct to prevent
+> > the cpu from speculating the reads and returning stale values.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 > > ---
-> >  Documentation/devicetree/bindings/dma/ti-edma.txt |   51 +++++++++++++++++++++
-> >  1 file changed, 51 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> > new file mode 100644
-> > index 0000000..3344345
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> > @@ -0,0 +1,51 @@
-> > +TI EDMA
+> >   arch/arm/include/asm/arch_timer.h |  101 +++++++++++++++++++++++++++++++++++++
+> >   arch/arm/kernel/arch_timer.c      |   92 ---------------------------------
+> >   2 files changed, 101 insertions(+), 92 deletions(-)
+> >
+> > diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+> > index d40229d..701f2b7 100644
+> > --- a/arch/arm/include/asm/arch_timer.h
+> > +++ b/arch/arm/include/asm/arch_timer.h
+> > @@ -1,13 +1,114 @@
+> >   #ifndef __ASMARM_ARCH_TIMER_H
+> >   #define __ASMARM_ARCH_TIMER_H
+> >
+> > +#include <asm/barrier.h>
+> >   #include <asm/errno.h>
 > > +
-> > +Required properties:
-> > +- compatible : "ti,edma3"
-> > +- ti,hwmods: Name of the hwmods associated to the EDMA
-> > +- ti,edma-regions: Number of regions
-> > +- ti,edma-slots: Number of slots
-> > +- ti,edma-queue-tc-map: List of transfer control to queue mappings
-> > +- ti,edma-queue-priority-map: List of queue priority mappings
-> > +- ti,edma-default-queue: Default queue value
+> >   #include <linux/clocksource.h>
+> > +#include <linux/types.h>
+> >
+> >   #ifdef CONFIG_ARM_ARCH_TIMER
+> >   int arch_timer_of_register(void);
+> >   int arch_timer_sched_clock_init(void);
+> >   struct timecounter *arch_timer_get_timecounter(void);
 > > +
-> > +Optional properties:
-> > +- ti,edma-reserved-channels: List of reserved channel regions
-> > +- ti,edma-reserved-slots: List of reserved slot regions
-> > +- ti,edma-xbar-event-map: Crossbar event to channel map
+> > +#define ARCH_TIMER_CTRL_ENABLE		(1 << 0)
+> > +#define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
+> > +#define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
 > > +
-> > +Example:
+> > +#define ARCH_TIMER_REG_CTRL		0
+> > +#define ARCH_TIMER_REG_TVAL		1
 > > +
-> > +edma: edma at 49000000 {
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
+> > +#define ARCH_TIMER_PHYS_ACCESS		0
+> > +#define ARCH_TIMER_VIRT_ACCESS		1
+> > +
+> > +/*
+> > + * These register accessors are marked inline so the compiler can
+> > + * nicely work out which register we want, and chuck away the rest of
+> > + * the code. At least it does so with a recent GCC (4.6.3).
+> > + */
+> > +static inline void arch_timer_reg_write(const int access, const int reg, u32 val)
+> > +{
+> > +	if (access == ARCH_TIMER_PHYS_ACCESS) {
+> > +		switch (reg) {
+> > +		case ARCH_TIMER_REG_CTRL:
+> > +			asm volatile("mcr p15, 0, %0, c14, c2, 1" : : "r" (val));
+> > +			break;
+> > +		case ARCH_TIMER_REG_TVAL:
+> > +			asm volatile("mcr p15, 0, %0, c14, c2, 0" : : "r" (val));
+> > +			break;
+> > +		}
+> > +	}
+> > +
+> > +	if (access == ARCH_TIMER_VIRT_ACCESS) {
+> > +		switch (reg) {
+> > +		case ARCH_TIMER_REG_CTRL:
+> > +			asm volatile("mcr p15, 0, %0, c14, c3, 1" : : "r" (val));
+> > +			break;
+> > +		case ARCH_TIMER_REG_TVAL:
+> > +			asm volatile("mcr p15, 0, %0, c14, c3, 0" : : "r" (val));
+> > +			break;
+> > +		}
+> > +	}
+> > +
+> > +	isb();
+> > +}
+> The isb() additions is actually a sepoerate fix. I suggest you to split
+> the subject patch into 1) Movement of header data 2) isb() additions.
 > 
-> address-cells & size-cells are only required when current node is a parent 
-> node & it has sibling/child nodes (that too if the child node uses "reg" 
-> property).
+> Feel free to add my ack on updated patches if you agree.
 
-Yes, agreed. I addressed this in the actual dts but failed to update the
-binding itself. Will update.
+Thanks, will do.
 
-> 
-> > +	reg = <0x49000000 0x10000>;
-> > +	interrupt-parent = <&intc>;
-> > +	interrupts = <12 13 14>;
-> > +	compatible = "ti,edma3";
-> > +	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-> > +	#dma-cells = <1>;
-> > +	dma-channels = <64>;
-> > +	ti,edma-regions = <4>;
-> > +	ti,edma-slots = <256>;
-> > +	ti,edma-reserved-channels = <0  2
-> > +				     14 2
-> > +				     26 6
-> > +				     48 4
-> > +				     56 8>;
-> > +	ti,edma-reserved-slots = <0  2
-> > +				  14 2
-> > +				  26 6
-> > +				  48 4
-> > +				  56 8
-> > +				  64 127>;
-> > +	ti,edma-queue-tc-map = <0 0
-> > +				1 1
-> > +				2 2>;
-> > +	ti,edma-queue-priority-map = <0 0
-> > +				      1 1
-> > +				      2 2>;
-> > +	ti,edma-default-queue = <0>;
-> > +	ti,edma-xbar-event-map = <1 12
-> > +				  2 13>;
-> > +};
-> > -- 
-> > 1.7.9.5
-> > 
-> > _______________________________________________
-> > Davinci-linux-open-source mailing list
-> > Davinci-linux-open-source at linux.davincidsp.com
-> > http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> > 
+> Regards,
+> Santosh
 > 
 > 
-> Regards, 
-> Gururaja
+
+Mark.
