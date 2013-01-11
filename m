@@ -1,25 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Jan 2013 20:12:45 +0000
-Subject: [PATCH v4 00/14] DMA Engine support for AM33XX
-In-Reply-To: <20130111183349.GA14660@beef>
-References: <1357883330-5364-1-git-send-email-mporter@ti.com>
- <201301111140.41584.arnd@arndb.de> <20130111183349.GA14660@beef>
-Message-ID: <201301112012.45981.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 11 Jan 2013 12:18:50 -0800
+Subject: arm: mvebu: Fix compile for multiplatform when ARMv6 is selected
+In-Reply-To: <20130111200531.GO14149@atomide.com>
+References: <20130111200531.GO14149@atomide.com>
+Message-ID: <20130111201850.GA20524@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 January 2013, Matt Porter wrote:
-> We have tightly coupled the link-time dependency for
-> omap_dma_filter_fn by going down the path of using
-> dma_request_slave_channel_compat() as Tony suggested to avoid extra
-> ifdefry.
+On Fri, Jan 11, 2013 at 12:05:31PM -0800, Tony Lindgren wrote:
+> Some systems compile in both ARMv6 and ARMv7 into multiplatform
+> configurations. This means the default compiler flags are for ARMv6,
+> and we will get:
 > 
-> That dependency will go away naturally if all the "legacy" OMAP platforms
-> were required to only boot from DT...just as a newly added SoCs are.
+> arch/arm/mach-mvebu/coherency_ll.S: Assembler messages:
+> arch/arm/mach-mvebu/coherency_ll.S:45: Error: selected processor does not support `dsb'
 > 
-> Are you suggesting unwinding the _compat() approach?
+> Fix this by specifying ARMv7 flags for coherency_ll.o.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-No, I was thinking we could define omap_dma_filter_fn to NULL
-for the DT-only case.
+Applied to fixes, I don't expect Jason or others to complain about this
+so I took the liberty. :)
 
-	Arnd
+
+-Olof
