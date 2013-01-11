@@ -1,271 +1,269 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Jan 2013 13:12:50 +0000
-Subject: [PATCH 02/18] power: ab8500_bm: Skip first CCEOC irq for instant
- current
+Date: Fri, 11 Jan 2013 13:12:51 +0000
+Subject: [PATCH 03/18] power: ab8500_charger: Detect charger removal
 In-Reply-To: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
 References: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1357909986-9262-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1357909986-9262-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Johan Bjornstedt <johan.bjornstedt@stericsson.com>
-
-When enabling the CCEOC irq we might get false interrupt
-from ab8500-driver due to the latched value will be saved
-and interpreted as an IRQ when enabled
+Add two new work queues to provide USB and AC charger disconnect
+detection.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Johan Bjornstedt <johan.bjornstedt@stericsson.com>
-Signed-off-by: Henrik Solver <henrik.solver@stericsson.com>
-Reviewed-by: Karl KOMIEROWSKI <karl.komierowski@stericsson.com>
 ---
- drivers/power/ab8500_btemp.c         |   11 +++---
- drivers/power/ab8500_fg.c            |   63 +++++++++++++++++++++++++++++-----
- include/linux/mfd/abx500/ab8500-bm.h |    7 ++++
- 3 files changed, 66 insertions(+), 15 deletions(-)
+ drivers/power/ab8500_charger.c |  142 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 141 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/power/ab8500_btemp.c b/drivers/power/ab8500_btemp.c
-index 158cba5..efeb6dd 100644
---- a/drivers/power/ab8500_btemp.c
-+++ b/drivers/power/ab8500_btemp.c
-@@ -374,13 +374,10 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
- 		return ret;
- 	}
+diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
+index d6e1792..bbf7782e 100644
+--- a/drivers/power/ab8500_charger.c
++++ b/drivers/power/ab8500_charger.c
+@@ -31,6 +31,7 @@
+ #include <linux/mfd/abx500/ab8500-gpadc.h>
+ #include <linux/mfd/abx500/ux500_chargalg.h>
+ #include <linux/usb/otg.h>
++#include <linux/mutex.h>
  
--	/*
--	 * Since there is no interrupt when current measurement is done,
--	 * loop for over 250ms (250ms is one sample conversion time
--	 * with 32.768 Khz RTC clock). Note that a stop time must be set
--	 * since the ab8500_btemp_read_batctrl_voltage call can block and
--	 * take an unknown amount of time to complete.
--	 */
-+	do {
-+		msleep(20);
-+	} while (!ab8500_fg_inst_curr_started(di->fg));
+ /* Charger constants */
+ #define NO_PW_CONN			0
+@@ -68,6 +69,11 @@
+ #define MAIN_CH_NOK			0x01
+ #define VBUS_DET			0x80
+ 
++#define MAIN_CH_STATUS2_MAINCHGDROP		0x80
++#define MAIN_CH_STATUS2_MAINCHARGERDETDBNC	0x40
++#define USB_CH_VBUSDROP				0x40
++#define USB_CH_VBUSDETDBNC			0x01
 +
- 	i = 0;
+ /* UsbLineStatus register bit masks */
+ #define AB8500_USB_LINK_STATUS		0x78
+ #define AB8500_STD_HOST_SUSP		0x18
+@@ -82,6 +88,8 @@
+ /* Step up/down delay in us */
+ #define STEP_UDELAY			1000
  
- 	do {
-diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
-index df681a8..828529e 100644
---- a/drivers/power/ab8500_fg.c
-+++ b/drivers/power/ab8500_fg.c
-@@ -160,6 +160,7 @@ struct inst_curr_result_list {
-  * @recovery_cnt:	Counter for recovery mode
-  * @high_curr_cnt:	Counter for high current mode
-  * @init_cnt:		Counter for init mode
-+ * @nbr_cceoc_irq_cnt	Counter for number of CCEOC irqs received since enabled
-  * @recovery_needed:	Indicate if recovery is needed
-  * @high_curr_mode:	Indicate if we're in high current mode
-  * @init_capacity:	Indicate if initial capacity measuring should be done
-@@ -167,6 +168,7 @@ struct inst_curr_result_list {
-  * @calib_state		State during offset calibration
-  * @discharge_state:	Current discharge state
-  * @charge_state:	Current charge state
-+ * @ab8500_fg_started	Completion struct used for the instant current start
-  * @ab8500_fg_complete	Completion struct used for the instant current reading
-  * @flags:		Structure for information about events triggered
-  * @bat_cap:		Structure for battery capacity specific parameters
-@@ -199,6 +201,7 @@ struct ab8500_fg {
- 	int recovery_cnt;
- 	int high_curr_cnt;
- 	int init_cnt;
-+	int nbr_cceoc_irq_cnt;
- 	bool recovery_needed;
- 	bool high_curr_mode;
- 	bool init_capacity;
-@@ -206,6 +209,7 @@ struct ab8500_fg {
- 	enum ab8500_fg_calibration_state calib_state;
- 	enum ab8500_fg_discharge_state discharge_state;
- 	enum ab8500_fg_charge_state charge_state;
-+	struct completion ab8500_fg_started;
- 	struct completion ab8500_fg_complete;
- 	struct ab8500_fg_flags flags;
- 	struct ab8500_fg_battery_capacity bat_cap;
-@@ -524,13 +528,14 @@ cc_err:
-  * Note: This is part "one" and has to be called before
-  * ab8500_fg_inst_curr_finalize()
++#define CHARGER_STATUS_POLL 10 /* in ms */
++
+ /* UsbLineStatus register - usb types */
+ enum ab8500_charger_link_status {
+ 	USB_STAT_NOT_CONFIGURED,
+@@ -203,6 +211,10 @@ struct ab8500_charger_usb_state {
+  * @check_usbchgnotok_work:	Work for checking USB charger not ok status
+  * @kick_wd_work:		Work for kicking the charger watchdog in case
+  *				of ABB rev 1.* due to the watchog logic bug
++ * @ac_charger_attached_work:	Work for checking if AC charger is still
++ *				connected
++ * @usb_charger_attached_work:	Work for checking if USB charger is still
++ *				connected
+  * @ac_work:			Work for checking AC charger connection
+  * @detect_usb_type_work:	Work for detecting the USB type connected
+  * @usb_link_status_work:	Work for checking the new USB link status
+@@ -211,6 +223,7 @@ struct ab8500_charger_usb_state {
+  *				Work for checking Main thermal status
+  * @check_usb_thermal_prot_work:
+  *				Work for checking USB thermal status
++ * @charger_attached_mutex:	For controlling the wakelock
   */
-- int ab8500_fg_inst_curr_start(struct ab8500_fg *di)
-+int ab8500_fg_inst_curr_start(struct ab8500_fg *di)
- {
- 	u8 reg_val;
- 	int ret;
+ struct ab8500_charger {
+ 	struct device *dev;
+@@ -239,6 +252,8 @@ struct ab8500_charger {
+ 	struct delayed_work check_hw_failure_work;
+ 	struct delayed_work check_usbchgnotok_work;
+ 	struct delayed_work kick_wd_work;
++	struct delayed_work ac_charger_attached_work;
++	struct delayed_work usb_charger_attached_work;
+ 	struct work_struct ac_work;
+ 	struct work_struct detect_usb_type_work;
+ 	struct work_struct usb_link_status_work;
+@@ -247,6 +262,7 @@ struct ab8500_charger {
+ 	struct work_struct check_usb_thermal_prot_work;
+ 	struct usb_phy *usb_phy;
+ 	struct notifier_block nb;
++	struct mutex charger_attached_mutex;
+ };
  
- 	mutex_lock(&di->cc_lock);
- 
-+	di->nbr_cceoc_irq_cnt = 0;
- 	ret = abx500_get_register_interruptible(di->dev, AB8500_RTC,
- 		AB8500_RTC_CC_CONF_REG, &reg_val);
- 	if (ret < 0)
-@@ -558,6 +563,7 @@ cc_err:
+ /* AC properties */
+@@ -349,6 +365,19 @@ static void ab8500_charger_set_usb_connected(struct ab8500_charger *di,
+ 		dev_dbg(di->dev, "USB connected:%i\n", connected);
+ 		di->usb.charger_connected = connected;
+ 		sysfs_notify(&di->usb_chg.psy.dev->kobj, NULL, "present");
++
++		if (connected) {
++			mutex_lock(&di->charger_attached_mutex);
++			mutex_unlock(&di->charger_attached_mutex);
++
++			queue_delayed_work(di->charger_wq,
++					   &di->usb_charger_attached_work,
++					   HZ);
++		} else {
++			cancel_delayed_work_sync(&di->usb_charger_attached_work);
++			mutex_lock(&di->charger_attached_mutex);
++			mutex_unlock(&di->charger_attached_mutex);
++		}
  	}
- 
- 	/* Return and WFI */
-+	INIT_COMPLETION(di->ab8500_fg_started);
- 	INIT_COMPLETION(di->ab8500_fg_complete);
- 	enable_irq(di->irq);
- 
-@@ -569,6 +575,17 @@ fail:
  }
  
- /**
-+ * ab8500_fg_inst_curr_started() - check if fg conversion has started
-+ * @di:         pointer to the ab8500_fg structure
-+ *
-+ * Returns 1 if conversion started, 0 if still waiting
-+ */
-+int ab8500_fg_inst_curr_started(struct ab8500_fg *di)
+@@ -1706,6 +1735,84 @@ static void ab8500_charger_ac_work(struct work_struct *work)
+ 	sysfs_notify(&di->ac_chg.psy.dev->kobj, NULL, "present");
+ }
+ 
++static void ab8500_charger_usb_attached_work(struct work_struct *work)
 +{
-+	return completion_done(&di->ab8500_fg_started);
++	struct ab8500_charger *di = container_of(work,
++						 struct ab8500_charger,
++						 usb_charger_attached_work.work);
++	int usbch = (USB_CH_VBUSDROP | USB_CH_VBUSDETDBNC);
++	int ret, i;
++	u8 statval;
++
++	for (i = 0; i < 10; i++) {
++		ret = abx500_get_register_interruptible(di->dev,
++							AB8500_CHARGER,
++							AB8500_CH_USBCH_STAT1_REG,
++							&statval);
++		if (ret < 0) {
++			dev_err(di->dev, "ab8500 read failed %d\n", __LINE__);
++			goto reschedule;
++		}
++		if ((statval & usbch)) != usbch)
++			goto reschedule;
++
++		msleep(CHARGER_STATUS_POLL);
++	}
++
++	ab8500_charger_usb_en(&di->usb_chg, 0, 0, 0);
++
++	mutex_lock(&di->charger_attached_mutex);
++	mutex_unlock(&di->charger_attached_mutex);
++
++	return;
++
++reschedule:
++	queue_delayed_work(di->charger_wq,
++			   &di->usb_charger_attached_work,
++			   HZ);
 +}
 +
-+/**
-  * ab8500_fg_inst_curr_done() - check if fg conversion is done
-  * @di:         pointer to the ab8500_fg structure
-  *
-@@ -596,13 +613,15 @@ int ab8500_fg_inst_curr_finalize(struct ab8500_fg *di, int *res)
- 	int timeout;
- 
- 	if (!completion_done(&di->ab8500_fg_complete)) {
--		timeout = wait_for_completion_timeout(&di->ab8500_fg_complete,
-+		timeout = wait_for_completion_timeout(
-+			&di->ab8500_fg_complete,
- 			INS_CURR_TIMEOUT);
- 		dev_dbg(di->dev, "Finalize time: %d ms\n",
- 			((INS_CURR_TIMEOUT - timeout) * 1000) / HZ);
- 		if (!timeout) {
- 			ret = -ETIME;
- 			disable_irq(di->irq);
-+			di->nbr_cceoc_irq_cnt = 0;
- 			dev_err(di->dev, "completion timed out [%d]\n",
- 				__LINE__);
- 			goto fail;
-@@ -610,6 +629,7 @@ int ab8500_fg_inst_curr_finalize(struct ab8500_fg *di, int *res)
- 	}
- 
- 	disable_irq(di->irq);
-+	di->nbr_cceoc_irq_cnt = 0;
- 
- 	ret = abx500_mask_and_set_register_interruptible(di->dev,
- 			AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
-@@ -684,6 +704,7 @@ fail:
- int ab8500_fg_inst_curr_blocking(struct ab8500_fg *di)
- {
- 	int ret;
-+	int timeout;
- 	int res = 0;
- 
- 	ret = ab8500_fg_inst_curr_start(di);
-@@ -692,13 +713,32 @@ int ab8500_fg_inst_curr_blocking(struct ab8500_fg *di)
- 		return 0;
- 	}
- 
-+	/* Wait for CC to actually start */
-+	if (!completion_done(&di->ab8500_fg_started)) {
-+		timeout = wait_for_completion_timeout(
-+			&di->ab8500_fg_started,
-+			INS_CURR_TIMEOUT);
-+		dev_dbg(di->dev, "Start time: %d ms\n",
-+			((INS_CURR_TIMEOUT - timeout) * 1000) / HZ);
-+		if (!timeout) {
-+			ret = -ETIME;
-+			dev_err(di->dev, "completion timed out [%d]\n",
-+				__LINE__);
-+			goto fail;
++static void ab8500_charger_ac_attached_work(struct work_struct *work)
++{
++
++	struct ab8500_charger *di = container_of(work,
++						 struct ab8500_charger,
++						 ac_charger_attached_work.work);
++	int mainch = (MAIN_CH_STATUS2_MAINCHGDROP |
++		      MAIN_CH_STATUS2_MAINCHARGERDETDBNC);
++	int ret, i;
++	u8 statval;
++
++	for (i = 0; i < 10; i++) {
++		ret = abx500_get_register_interruptible(di->dev,
++							AB8500_CHARGER,
++							AB8500_CH_STATUS2_REG,
++							&statval);
++		if (ret < 0) {
++			dev_err(di->dev, "ab8500 read failed %d\n", __LINE__);
++			goto reschedule;
 +		}
++
++		if ((statval & mainch)) != mainch)
++			goto reschedule;
++
++		msleep(CHARGER_STATUS_POLL);
 +	}
 +
- 	ret = ab8500_fg_inst_curr_finalize(di, &res);
- 	if (ret) {
- 		dev_err(di->dev, "Failed to finalize fg_inst\n");
- 		return 0;
- 	}
- 
-+	dev_dbg(di->dev, "%s instant current: %d", __func__, res);
- 	return res;
-+fail:
-+	mutex_unlock(&di->cc_lock);
-+	return ret;
- }
- 
++	ab8500_charger_ac_en(&di->ac_chg, 0, 0, 0);
++	queue_work(di->charger_wq, &di->ac_work);
++
++	mutex_lock(&di->charger_attached_mutex);
++	mutex_unlock(&di->charger_attached_mutex);
++
++	return;
++
++reschedule:
++	queue_delayed_work(di->charger_wq,
++			   &di->ac_charger_attached_work,
++			   HZ);
++}
++
  /**
-@@ -1523,8 +1563,6 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
+  * ab8500_charger_detect_usb_type_work() - work to detect USB type
+  * @work:	Pointer to the work_struct structure
+@@ -1986,6 +2093,10 @@ static irqreturn_t ab8500_charger_mainchunplugdet_handler(int irq, void *_di)
+ 	dev_dbg(di->dev, "Main charger unplugged\n");
+ 	queue_work(di->charger_wq, &di->ac_work);
  
- 	case AB8500_FG_DISCHARGE_WAKEUP:
- 		ab8500_fg_coulomb_counter(di, true);
--		di->inst_curr = ab8500_fg_inst_curr_blocking(di);
--
- 		ab8500_fg_calc_cap_discharge_voltage(di, true);
- 
- 		di->fg_samples = SEC_TO_SAMPLE(
-@@ -1641,8 +1679,6 @@ static void ab8500_fg_periodic_work(struct work_struct *work)
- 		fg_periodic_work.work);
- 
- 	if (di->init_capacity) {
--		/* A dummy read that will return 0 */
--		di->inst_curr = ab8500_fg_inst_curr_blocking(di);
- 		/* Get an initial capacity calculation */
- 		ab8500_fg_calc_cap_discharge_voltage(di, true);
- 		ab8500_fg_check_capacity_limits(di, true);
-@@ -1828,7 +1864,13 @@ static void ab8500_fg_instant_work(struct work_struct *work)
- static irqreturn_t ab8500_fg_cc_data_end_handler(int irq, void *_di)
- {
- 	struct ab8500_fg *di = _di;
--	complete(&di->ab8500_fg_complete);
-+	if (!di->nbr_cceoc_irq_cnt) {
-+		di->nbr_cceoc_irq_cnt++;
-+		complete(&di->ab8500_fg_started);
-+	} else {
-+		di->nbr_cceoc_irq_cnt = 0;
-+		complete(&di->ab8500_fg_complete);
-+	}
++	cancel_delayed_work_sync(&di->ac_charger_attached_work);
++	mutex_lock(&di->charger_attached_mutex);
++	mutex_unlock(&di->charger_attached_mutex);
++
  	return IRQ_HANDLED;
  }
  
-@@ -2551,7 +2593,11 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
- 	di->fg_samples = SEC_TO_SAMPLE(di->bm->fg_params->init_timer);
- 	ab8500_fg_coulomb_counter(di, true);
+@@ -2003,6 +2114,11 @@ static irqreturn_t ab8500_charger_mainchplugdet_handler(int irq, void *_di)
+ 	dev_dbg(di->dev, "Main charger plugged\n");
+ 	queue_work(di->charger_wq, &di->ac_work);
  
--	/* Initialize completion used to notify completion of inst current */
-+	/*
-+	 * Initialize completion used to notify completion and start
-+	 * of inst current
-+	 */
-+	init_completion(&di->ab8500_fg_started);
- 	init_completion(&di->ab8500_fg_complete);
++	mutex_lock(&di->charger_attached_mutex);
++	mutex_unlock(&di->charger_attached_mutex);
++	queue_delayed_work(di->charger_wq,
++			   &di->ac_charger_attached_work,
++			   HZ);
+ 	return IRQ_HANDLED;
+ }
  
- 	/* Register interrupts */
-@@ -2571,6 +2617,7 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
+@@ -2637,7 +2753,7 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct abx500_bm_data *plat = pdev->dev.platform_data;
+ 	struct ab8500_charger *di;
+-	int irq, i, charger_status, ret = 0;
++	int irq, i, charger_status, ret = 0, ch_stat;
+ 
+ 	di = devm_kzalloc(&pdev->dev, sizeof(*di), GFP_KERNEL);
+ 	if (!di) {
+@@ -2716,12 +2832,19 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  	}
- 	di->irq = platform_get_irq_byname(pdev, "CCEOC");
- 	disable_irq(di->irq);
-+	di->nbr_cceoc_irq_cnt = 0;
+ 
++	mutex_init(&di->charger_attached_mutex);
++
+ 	/* Init work for HW failure check */
+ 	INIT_DEFERRABLE_WORK(&di->check_hw_failure_work,
+ 		ab8500_charger_check_hw_failure_work);
+ 	INIT_DEFERRABLE_WORK(&di->check_usbchgnotok_work,
+ 		ab8500_charger_check_usbchargernotok_work);
+ 
++	INIT_DELAYED_WORK(&di->ac_charger_attached_work,
++			  ab8500_charger_ac_attached_work);
++	INIT_DELAYED_WORK(&di->usb_charger_attached_work,
++			  ab8500_charger_usb_attached_work);
++
+ 	/*
+ 	 * For ABB revision 1.0 and 1.1 there is a bug in the watchdog
+ 	 * logic. That means we have to continously kick the charger
+@@ -2835,6 +2958,23 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
  
  	platform_set_drvdata(pdev, di);
  
-diff --git a/include/linux/mfd/abx500/ab8500-bm.h b/include/linux/mfd/abx500/ab8500-bm.h
-index 44310c9..6c6a02e 100644
---- a/include/linux/mfd/abx500/ab8500-bm.h
-+++ b/include/linux/mfd/abx500/ab8500-bm.h
-@@ -431,11 +431,18 @@ struct ab8500_fg *ab8500_fg_get(void);
- int ab8500_fg_inst_curr_blocking(struct ab8500_fg *dev);
- int ab8500_fg_inst_curr_start(struct ab8500_fg *di);
- int ab8500_fg_inst_curr_finalize(struct ab8500_fg *di, int *res);
-+int ab8500_fg_inst_curr_started(struct ab8500_fg *di);
- int ab8500_fg_inst_curr_done(struct ab8500_fg *di);
- 
- #else
-+int ab8500_fg_inst_curr_started(struct ab8500_fg *di)
-+{
-+	return 0;
-+}
++	mutex_lock(&di->charger_attached_mutex);
 +
- int ab8500_fg_inst_curr_done(struct ab8500_fg *di)
- {
-+	return 0;
- }
- static void ab8500_fg_reinit(void)
- {
++	ch_stat = ab8500_charger_detect_chargers(di);
++
++	if ((ch_stat & AC_PW_CONN) == AC_PW_CONN) {
++		queue_delayed_work(di->charger_wq,
++				   &di->ac_charger_attached_work,
++				   HZ);
++	}
++	if ((ch_stat & USB_PW_CONN) == USB_PW_CONN) {
++		queue_delayed_work(di->charger_wq,
++				   &di->usb_charger_attached_work,
++				   HZ);
++	}
++
++	mutex_unlock(&di->charger_attached_mutex);
++
+ 	return ret;
+ 
+ free_irq:
 -- 
 1.7.9.5
