@@ -1,62 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Jan 2013 15:34:14 +0000
-Subject: [PATCH 3/6] ARM: virt: simplify __hyp_stub_install epilog
-In-Reply-To: <1357918457-20469-1-git-send-email-will.deacon@arm.com>
-References: <1357918457-20469-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1357918457-20469-4-git-send-email-will.deacon@arm.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri, 11 Jan 2013 15:34:39 +0000
+Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter
+ in THUMB mode
+In-Reply-To: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <50F0310F.3070502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Hi Uwe,
+On 11/01/13 11:39, Uwe Kleine-K?nig wrote:
+> Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
+> obviously these cannot enter the kernel in ARM mode. Make an exception
+> for them and let them enter in THUMB mode.
 
-__hyp_stub_install duplicates quite a bit of safe_svcmode_maskall
-by forcing the CPU back to SVC. This is unnecessary, as
-safe_svcmode_maskall is called just after.
+Clearly something like this is necessary, but it isn't something I'd 
+like for people to start using *unless* they have a THUMB only CPU (for 
+example, to work around dodgy boot-loaders, etc)
 
-Furthermore, the way we build SPSR_hyp is buggy as we fail to mask
-the interrupts, leading to interesting behaviours on TC2 + UEFI.
+Seeing as there are no THUMB-only CPUs with an MMU, I think we could 
+safely constrain this change to:
+a) depend on !MMU
+b) only touch head-nommu.S
 
-The fix is to simply remove this code and rely on safe_svcmode_maskall
-to do the right thing.
+Does that cause any issue for what you're doing.
 
-Cc: <stable@vger.kernel.org>
-Reviewed-by: Dave Martin <dave.martin@linaro.org>
-Reported-by: Harry Liebel <harry.liebel@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/hyp-stub.S | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
+[...]
 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 3c60256..1315c4c 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -120,7 +120,8 @@ ENTRY(__hyp_stub_install_secondary)
-  * Eventually, CPU-specific code might be needed -- assume not for now
-  *
-  * This code relies on the "eret" instruction to synchronize the
-- * various coprocessor accesses.
-+ * various coprocessor accesses. This is done when we switch to SVC
-+ * (see safe_svcmode_maskall).
-  */
- 	@ Now install the hypervisor stub:
- 	adr	r7, __hyp_stub_vectors
-@@ -155,14 +156,7 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
- 1:
- #endif
- 
--	bic	r7, r4, #MODE_MASK
--	orr	r7, r7, #SVC_MODE
--THUMB(	orr	r7, r7, #PSR_T_BIT	)
--	msr	spsr_cxsf, r7		@ This is SPSR_hyp.
--
--	__MSR_ELR_HYP(14)		@ msr elr_hyp, lr
--	__ERET				@ return, switching to SVC mode
--					@ The boot CPU mode is left in r4.
-+	bx	lr			@ The boot CPU mode is left in r4.
- ENDPROC(__hyp_stub_install_secondary)
- 
- __hyp_stub_do_trap:
--- 
-1.8.0
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 3fd629d..bc3150c 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -1,5 +1,11 @@
+>   comment "Processor Type"
+>
+> +# Select this if your CPU doesn't support the 32 bit ARM instructions.
+> +config THUMBONLY_CPU
+> +	bool
+> +	select THUMB2_KERNEL
+> +	select ARM_THUMB
+> +
+>   # Select CPU types depending on the architecture selected.  This selects
+>   # which CPUs we support in the kernel image, and the compiler instruction
+>   # optimiser behaviour.
+
+Also, a couple of minor questions about this:
+- What's the rationale for the placement within the file - it looks a 
+bit curious up the top there.
+- Given the fact that we don't want people using this except in very 
+specific circumstances, should we write a little bit of help for the option?
+
+
+Jonny
