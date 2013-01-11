@@ -1,133 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Jan 2013 11:43:19 -0800
-Subject: [GIT PULL] enable multiplatform support for omap2+ for v3.9
-In-Reply-To: <20130110194217.GA14149@atomide.com>
-References: <20130110194217.GA14149@atomide.com>
-Message-ID: <20130111194319.GN14149@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 11 Jan 2013 11:53:31 -0800
+Subject: [PATCH 0/2 v2] at91/ssc: fixes on ASoC tree for 3.8
+In-Reply-To: <20130111193948.GA8677@opensource.wolfsonmicro.com>
+References: <cover.1357912706.git.nicolas.ferre@atmel.com>
+ <CAOesGMhhSkrvP7X=y8qmdMKKXZ694+1+ZXY3y6HK1E85qaN5sQ@mail.gmail.com>
+ <20130111193948.GA8677@opensource.wolfsonmicro.com>
+Message-ID: <20130111195331.GA2533@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130110 11:46]:
-> Hi Arnd, Olof,
+On Fri, Jan 11, 2013 at 07:39:49PM +0000, Mark Brown wrote:
+> On Fri, Jan 11, 2013 at 10:52:19AM -0800, Olof Johansson wrote:
+> > On Fri, Jan 11, 2013 at 6:08 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> > 
+> > > This material was designed to enter Mark's fixes queue, but as discussed with
+> > > Olof, we can imagine merging everything through arm-soc or split the series (of
+> > > 2 patches) and let them progress upstream separated (option that I do not like
+> > > even if I know that the consequences are not so dramatic).
+> > > So please, Olof, if you feel confortable with this series, tell us what you
+> > > prefer and we will make our best to make this material go forward...
 > 
-> Below is a pull request to enable multiplatform support for omap2+.
+> > You're setting yourself up for awkward merges. The driver change is
+> > strongly dependent on the device tree change by failing probe unless
+> > the device tree update is there, while before this patch, it still
+> > worked.
+> 
+> This is partly my fault for getting grumpy about adding the bolier plate
+> code without error checking - overall Linus' change to do the get in the
+> core seems like the most sane approach here.
+> 
+> > But to be honest, I don't think this is a fix, it's a feature that you
+> > just didn't include in time for the merge window. I don't really see
+> > them as appropriate 3.8 material at this point.
+> 
+> Jean-Christophe has been most insistent that pinctrl support is now
+> manadatory for all AT91 systems using device tree. 
 
-Now that -rc3 is out, here's this one rebased on v3.8-rc3 as requested
-by Olof.
+That's a noble goal but enforcing it early gives everyone a lot of pain, and
+quite honestly doesn't make sense. During transition it's better to be lenient
+and allow both old and new methods (without breakage), unless it causes
+significant extra churn.
 
-Regards,
+> Unfortunately
+> pinctrl support for AT91 only came in during the merge window and it
+> seems like it's sadly been impossible to do what seemd like the obvious
+> thing and add the pinctrl bindings to the DT prior to the merge down so
+> now we've got this mess.  I believe the way the pinctrl conversion was
+> done renders the audio driver non-functional without this series.
 
-Tony
+The problem is that at91 tries to do too much in a single release, and then do
+nothing in several releases after. If there was a steadier trickle of code
+coming in, then these kind of complex dependencies wouldn't show up all at
+once, and could be handled with much less overhead for everyone else involved.
+:(
+
+> 
+> > So, nack on this series. Please make the driver change non-dependent
+> > on the new dtsi contents, and merge that through the ASoC tree. Then
+> > the dtsi update can go through arm-soc, and later on you can make it
+> > mandatory.
+> 
+> Like I say I'm not thrilled about ignoring the return code TBH, nor am I
+> thrilled with the way this has been handled overall.  That said, the
+> current series does seem like the best of a bad job - as I understand it
+> we need something like this in v3.8 to make the driver functional.
+
+To be honest, if Atmel can't figure out how to merge a complete feature
+without causing intentional regressions during the merge window, and plan
+on brokenness to be fixed as late as in -rc4, then they deserve to have
+a broken platform. Unfortunately the victim of that is end users, and we
+don't want to leave them hanging. This really can't become a trend though.
+
+Sigh. Feel free to add:
+
+Reluctantly-acked-by: Olof Johansson <olof@lixom.net>
+
+to the patches when you apply them (based on IRC discussion, might as
+well take both through ASoC).
 
 
-The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
-
-  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9/multiplatform-enable-signed-v2
-
-for you to fetch changes up to ad1bb1b4e01c5ecbe32133ce6921d0e76cb76dcf:
-
-  ARM: OMAP2+: Remove now obsolete uncompress.h and debug-macro.S (2013-01-11 11:24:20 -0800)
-
-----------------------------------------------------------------
-The last dependency for enabling multiplatform support for omap2+ is now
-finally gone with commit 62e4d357 (ARM: 7609/1: disable errata work-arounds
-which access secure registers) that was preventing booting omap4.
-
-Note that make uImage will no longer work properly because of unspecified
-load address, so uImage needs to be created manually with:
-
-$ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
-	-n "Linux" -d zImage-omap2plus uImage-omap2plus
-
-You can also boot minimal vexpress configuration using qemu with:
-
-$ qemu-system-arm -machine vexpress-a9 -m 1024 -net nic -net user -serial stdio \
-	-append "console=ttyAMA0,115200n8 rw root=/dev/mmcblk0p2 rootwait" \
-	-kernel zImage-omap2plus -initrd initrd.img -sd rootfs.img
-
-Please note that some custom defconfigs now need to be updated to include
-the following options:
-
-CONFIG_ARCH_MULTIPLATFORM=y
-CONFIG_ARCH_MULTI_V7=y
-CONFIG_ARCH_OMAP2PLUS=y
-
-And possibly also:
-
-CONFIG_ARCH_MULTI_V6=y
-
-Updating is needed at least for RMK's minimal allnoconfig files.
-
-And if you need DEBUG_LL for earlyprintk, you now have to select the
-debug port manually with Kconfig.
-
-----------------------------------------------------------------
-Tony Lindgren (9):
-      ARM: OMAP2+: Limit omap initcalls to omap only on multiplatform kernels
-      ARM: OMAP2+: Use omap initcalls
-      ARM: OMAP: Fix i2c cmdline initcall for multiplatform
-      ARM: OMAP: Fix dmaengine init for multiplatform
-      ARM: OMAP2+: Add multiplatform debug_ll support
-      ARM: OMAP2+: Disable code that currently does not work with multiplaform
-      ARM: OMAP2+: Enable ARCH_MULTIPLATFORM support
-      ARM: OMAP2+: Add minimal support for booting vexpress
-      ARM: OMAP2+: Remove now obsolete uncompress.h and debug-macro.S
-
- arch/arm/Kconfig                                   |  13 +-
- arch/arm/Kconfig.debug                             |  56 +++++++
- arch/arm/configs/omap2plus_defconfig               |   6 +-
- .../debug-macro.S => include/debug/omap2plus.S}    | 137 +++++++++-------
- arch/arm/mach-omap1/dma.c                          |  18 ++-
- arch/arm/mach-omap1/i2c.c                          |   6 +
- arch/arm/mach-omap2/Kconfig                        |  25 ++-
- arch/arm/mach-omap2/Makefile                       |   3 +
- arch/arm/mach-omap2/board-omap3beagle.c            |   2 +-
- arch/arm/mach-omap2/board-rx51-video.c             |   3 +-
- arch/arm/mach-omap2/clock2xxx.c                    |   2 +-
- arch/arm/mach-omap2/clock3xxx.c                    |   2 +-
- arch/arm/mach-omap2/devices.c                      |   6 +-
- arch/arm/mach-omap2/dma.c                          |  23 ++-
- arch/arm/mach-omap2/drm.c                          |   2 +-
- arch/arm/mach-omap2/emu.c                          |   2 +-
- arch/arm/mach-omap2/fb.c                           |   4 +-
- arch/arm/mach-omap2/gpio.c                         |   5 +-
- arch/arm/mach-omap2/gpmc.c                         |   4 +-
- arch/arm/mach-omap2/hdq1w.c                        |   3 +-
- arch/arm/mach-omap2/hwspinlock.c                   |   2 +-
- arch/arm/mach-omap2/i2c.c                          |   5 +
- arch/arm/mach-omap2/include/mach/serial.h          |  37 -----
- arch/arm/mach-omap2/include/mach/uncompress.h      | 176 ---------------------
- arch/arm/mach-omap2/mcbsp.c                        |   3 +-
- arch/arm/mach-omap2/omap-iommu.c                   |   2 +-
- arch/arm/mach-omap2/omap2-restart.c                |   3 +-
- arch/arm/mach-omap2/omap4-common.c                 |   4 +-
- arch/arm/mach-omap2/omap_device.c                  |   5 +-
- arch/arm/mach-omap2/omap_hwmod.c                   |   2 +-
- arch/arm/mach-omap2/omap_phy_internal.c            |   2 +-
- arch/arm/mach-omap2/opp3xxx_data.c                 |   2 +-
- arch/arm/mach-omap2/opp4xxx_data.c                 |   2 +-
- arch/arm/mach-omap2/pm-debug.c                     |   2 +-
- arch/arm/mach-omap2/pm.c                           |   2 +-
- arch/arm/mach-omap2/pmu.c                          |   2 +-
- arch/arm/mach-omap2/prm3xxx.c                      |   2 +-
- arch/arm/mach-omap2/prm44xx.c                      |   2 +-
- arch/arm/mach-omap2/serial.c                       |   2 +-
- arch/arm/mach-omap2/smartreflex-class3.c           |   2 +-
- arch/arm/mach-omap2/soc.h                          |  29 ++++
- arch/arm/mach-omap2/timer.c                        |   2 +-
- arch/arm/mach-omap2/wd_timer.c                     |   2 +-
- arch/arm/plat-omap/Kconfig                         |  32 +---
- arch/arm/plat-omap/Makefile                        |   2 +
- arch/arm/plat-omap/i2c.c                           |   3 +-
- arch/arm/plat-omap/include/plat/i2c.h              |   6 +
- drivers/crypto/omap-sham.c                         |   3 +
- drivers/dma/omap-dma.c                             |  20 +--
- drivers/media/rc/Kconfig                           |   2 +-
- drivers/staging/tidspbridge/Kconfig                |   2 +-
- 51 files changed, 314 insertions(+), 370 deletions(-)
- rename arch/arm/{mach-omap2/include/mach/debug-macro.S => include/debug/omap2plus.S} (56%)
- delete mode 100644 arch/arm/mach-omap2/include/mach/uncompress.h
+-Olof
