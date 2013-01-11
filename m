@@ -1,33 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Jan 2013 21:44:02 +0100
-Subject: ERROR: "__aeabi_uldivmod" [drivers/pinctrl/pinctrl-single.ko]
- undefined!
-In-Reply-To: <20130111150001.GA23505@n2100.arm.linux.org.uk>
-References: <20130111150001.GA23505@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYd9br=9G7FvjbKCebfMjqX6xcL5Oge+07MPTNadPapKw@mail.gmail.com>
+Date: Fri, 11 Jan 2013 21:45:21 +0100
+Subject: [PATCH v2] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <9702060.jEbHySsCv0@avalon>
+References: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
+ <50EF27B4.60608@wwwdotorg.org>
+ <CACRpkdZ0b=ZohgaBH3qPH_O5TiWmXJXs6872D+YPVA9g4BssYg@mail.gmail.com>
+ <9702060.jEbHySsCv0@avalon>
+Message-ID: <CACRpkdbFH6RCEEnXO=A9FVa0B5rtE9RkjXz9Hhy+w7NvwcBCgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 4:00 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Fri, Jan 11, 2013 at 9:36 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
 
-> The above error happens in builds including pinctrl-single - the reason
-> is this, where resource_size_t may be 64-bit.
->
->                 gpio->range.pin_base = (r.start - pcs->res->start) / mux_bytes;
->                 gpio->range.npins = (r.end - r.start) / mux_bytes + 1;
->
-> This leads to a 64-bit division by an extended 64-bit, resulting in the
-> call to our (unimplemented) 64-bit-by-64-bit division routines.
->
-> This needs fixing - you probably want to cast the difference down to an
-> 'unsigned' first, and also maybe check that it does fit in an unsigned
-> too?
+> I've sent several patch series for the SH PFC (Pin Function Controller) to the
+> linux-sh mailing list. One of the series included pinctrl core patches for
+> easier testing, but I made it clear that they should *not* be pushed to
+> mainline through the SH tree.
 
-Agreed, Haojian can you provide a tested patch for this?
-I think you added this code...
-
-Tony: please check and ACK.
+No big deal, what fun is linux-next if we don't break it ;-)
 
 Yours,
 Linus Walleij
