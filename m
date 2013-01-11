@@ -1,60 +1,118 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Fri, 11 Jan 2013 23:12:20 +0100
-Subject: [REPOST PATCH 2/2] i2c: pxa: Use i2c-core to get bus number now
-In-Reply-To: <1357927027-4857-3-git-send-email-dianders@chromium.org>
-References: <1353522362-25519-2-git-send-email-dianders@chromium.org>
- <1357927027-4857-1-git-send-email-dianders@chromium.org>
- <1357927027-4857-3-git-send-email-dianders@chromium.org>
-Message-ID: <50F08E44.3050500@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 11 Jan 2013 16:09:59 -0700
+Subject: [PATCH RFT 3/3] ARM: tegra: dts: seaboard: enable keyboard
+In-Reply-To: <1357911185-11048-3-git-send-email-ldewangan@nvidia.com>
+References: <1357911185-11048-1-git-send-email-ldewangan@nvidia.com>
+ <1357911185-11048-3-git-send-email-ldewangan@nvidia.com>
+Message-ID: <50F09BC7.90607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 01/11/2013 06:57 PM, Doug Anderson wrote:
-> The commit: "i2c-core: dt: Pick i2c bus number from i2c alias if
-> present" adds support for automatically picking the bus number based
-> on the alias ID.  Remove the now unnecessary code from i2c-pxa that
-> did the same thing.
->
-> Signed-off-by: Doug Anderson<dianders@chromium.org>
-> Acked-by: Haojian Zhuang<haojian.zhuang@gmail.com>
+On 01/11/2013 06:33 AM, Laxman Dewangan wrote:
+> Enable tegra based keyboard controller and populate the key matrix for
+> seaboard. The key matrix was originally on driver code which is removed
+> to have clean driver. The key mapping is now passed through dts file.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 > ---
->   drivers/i2c/busses/i2c-pxa.c |    8 +-------
->   1 files changed, 1 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index 1034d93..8ee9fa0 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -1053,16 +1053,10 @@ static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
->   	struct device_node *np = pdev->dev.of_node;
->   	const struct of_device_id *of_id =
->   			of_match_device(i2c_pxa_dt_ids,&pdev->dev);
-> -	int ret;
->
->   	if (!of_id)
->   		return 1;
-> -	ret = of_alias_get_id(np, "i2c");
-> -	if (ret<  0) {
-> -		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
-> -		return ret;
-> -	}
-> -	pdev->id = ret;
-> +	pdev->id = -1;
+> Requesting for testing on seaboard.
+> I generated this patch as Stephen suggested to have one patch for dt file
+> entry for keys on seaboard.
 
-I think assignments like this are illegal. At this point the device is
-already registered and modifying pdev->id can cause issues at the core
-code.
+To some extent this works; at least this patch series is probably almost
+OK, but there are a bunch of issues in the KBC driver obviously:
 
-It might be better to have the bus number stored in struct pxa_i2c,
-initialized with pdev->id value for non-dt and now with -1 for dt case.
+This series won't work on its own with the current Tegra for-next
+content, because:
 
-I realize it is not something your patch is intended to deal with,
-but since you're touching this code maybe it's worth to fix that issue
-as well ?
+a) The clock driver doesn't provide any KBC clock for Tegra20, either in
+the old Tegra clock driver, or the first conversion to the common clock
+framework, nor the most recent complete conversion to the common clock
+framework. Was the driver tested at all on the upstream kernel? I
+suppose it's just possible it was tested on Tegra30, although see below...
 
---
+This brings up the point that the clk_get() call in the KBC driver is
+probably wrong. At least with Prashant's latest common clock framework
+patches applied, clk_get() returns NULL, not an error pointer for a
+non-existent clock. As such, the following driver code succeeds:
 
-Thanks,
-Sylwester
+> 	kbc->clk = clk_get(&pdev->dev, NULL);
+> 	if (IS_ERR(kbc->clk)) {
+> 		dev_err(&pdev->dev, "failed to get keyboard clock\n");
+> 		err = PTR_ERR(kbc->clk);
+> 		goto err_iounmap;
+> 	}
+
+Should that check be if (!kbc-clk) instead? Or does the common clock
+framework require if (IS_ERR_OR_NULL(kbc->clk)); hopefully not since
+IS_ERR_OR_NULL shouldn't be used any more.
+
+This then causes the later call to tegra_periph_reset_{de,}assert() to
+crash since it generates a bogus pointer from the NULL pointer and
+dereferences it. I assume similar things happen before Prashant's latest
+clock patches.
+
+Oh, and the KBC clock is marked TEGRA_PERIPH_NO_RESET for Tegra30, and
+also for Tegra20 in the ChromeOS kernel; why is the driver trying to
+assert reset on a clock that doesn't support it?
+
+I hacked around this by adding the following to clk-tegra20.c on top of
+Prashant's latest patches:
+
+> 	/* kbc */
+> 	clk = tegra_clk_periph_gate("kbc", "clk_32k", TEGRA_PERIPH_NO_RESET |
+> 				    TEGRA_PERIPH_ON_APB, clk_base, 0,
+> 				    36, &periph_h_regs, periph_clk_enb_refcnt);
+> 	clk_register_clkdev(clk, NULL, "tegra-kbc");
+> 	clks[kbc] = clk;
+> 
+
+b) There is no AUXDATA in the board file, nor clocks properties in the
+.dts files, in this series to actually hook the KBC driver up to be able
+to get the correct clock. This leads me to suspect the driver was never
+tested upstream on either Tegra20 /or/ Tegra30.
+
+I hacked around this by applying the following:
+
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> index 8e97825..9ca5e94 100644
+> --- a/arch/arm/boot/dts/tegra20.dtsi
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -400,6 +400,7 @@
+>                 reg = <0x7000e200 0x100>;
+>                 interrupts = <0 85 0x04>;
+>                 status = "disabled";
+> +               clocks = <&tegra_car 36>;
+>         };
+>  
+>         pmc {
+> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+> index 9dca3e4..e580045 100644
+> --- a/arch/arm/boot/dts/tegra30.dtsi
+> +++ b/arch/arm/boot/dts/tegra30.dtsi
+> @@ -417,6 +417,7 @@
+>                 reg = <0x7000e200 0x100>;
+>                 interrupts = <0 85 0x04>;
+>                 status = "disabled";
+> +               clocks = <&tegra_car 36>;
+>         };
+>  
+>         pmc {
+
+I guess I can fold that fix into this series when I apply it, after
+Prashant's clock patches are merged.
+
+Once I hacked around the above issues, the driver doesn't work very well
+at all. There is a *long* delay between when I press a key and when it
+shows up (e.g. echo'd to the HDMI console). When I release the key the
+same keypress is generated twice. Or perhaps it's a repeat, but since
+it's *always* 2 extra keypresses and I doubt I always hold my finger on
+the key the exact same amount of time, I think it's key release that
+does this not repeat. I assume this would repro on any board, so you
+won't need Seaboard to debug it. Harmony is able to read the keyboard
+using the KBC.
+
+Even with the above, I was able to validate that the keymap in the
+Seaboard .dts file looks reasonable.
+
+However, please fix the KBC driver...
