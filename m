@@ -1,37 +1,65 @@
-From: joro@8bytes.org ('Joerg Roedel')
-Date: Fri, 11 Jan 2013 16:52:26 +0100
-Subject: [PATCH v6 00/12] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <02ae01cdef69$67d66200$37832600$@samsung.com>
-References: <003301cde30b$c584c2d0$508e4870$%cho@samsung.com>
- <032401cde783$485ae1a0$d910a4e0$@samsung.com>
- <20130110171844.GA2650@8bytes.org>
- <027601cdef61$2df576a0$89e063e0$@samsung.com>
- <20130110191207.GI25591@8bytes.org>
- <02ae01cdef69$67d66200$37832600$@samsung.com>
-Message-ID: <20130111155226.GK25591@8bytes.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 11 Jan 2013 16:52:54 +0100 (CET)
+Subject: Question:add Iirq mask method in irq disable call.
+In-Reply-To: <CAKvkGKfG-3Y=azedkPyLwYffZKOE0sYH6LjMCfuMAgMKMBYWGA@mail.gmail.com>
+References: <CAKvkGKfG-3Y=azedkPyLwYffZKOE0sYH6LjMCfuMAgMKMBYWGA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1301111652100.7475@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
-
-On Thu, Jan 10, 2013 at 11:33:41AM -0800, Kukjin Kim wrote:
-> Sure, keep going on with
+On Fri, 11 Jan 2013, steve.zhan wrote:
+> Resend Email because MUTT email send error.
 > 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> 2013/1/11 Steve zhan <zhanzhenbo@gmail.com>:
+> > All:
+> >         I have find that arm gic driver have not register irq_disable
+> > method, as below:
+> > static struct irq_chip gic_chip = {
+> >         .name                   = "GIC",
+> >         .irq_mask               = gic_mask_irq,
+> >         .irq_unmask             = gic_unmask_irq,
+> >         .irq_eoi                = gic_eoi_irq,
+> >         .irq_set_type           = gic_set_type,
+> >         .irq_retrigger          = gic_retrigger,
+> > #ifdef CONFIG_SMP
+> >         .irq_set_affinity       = gic_set_affinity,
+> > #endif
+> >         .irq_set_wake           = gic_set_wake,
+> > };
+> >
+> > Question is:
+> >         When some drivers want to disable irq, maybe it will call
+> > linux standard inerface: irq_disable() that defined in include\
+> > linux\interrupt.h, this function will call
+> > void irq_disable(struct irq_desc *desc)
+> > {
+> >         irq_state_set_disabled(desc);
+> >         if (desc->irq_data.chip->irq_disable) {
+> >                 desc->irq_data.chip->irq_disable(&desc->irq_data);
+> >                 irq_state_set_masked(desc);
+> >         }
+> > }
+> >
+> > Because gic have not register irq_diable method, so the interrupt can
+> > not disable immediately, it is enable until the interrupt come next time,
+> > then disalbed by mask because irq_state_set_disable(desc);
+> >
+> > I have checked irq_enable method:
+> > void irq_enable(struct irq_desc *desc)
+> > {
+> >         irq_state_clr_disabled(desc);
+> >         if (desc->irq_data.chip->irq_enable)
+> >                 desc->irq_data.chip->irq_enable(&desc->irq_data);
+> >         else
+> >                 desc->irq_data.chip->irq_unmask(&desc->irq_data);
+> >         irq_state_clr_masked(desc);
+> > }
+> > This method have do unmask when irq_enable method is not exist.
+> >
+> > Is it a good idea to add irq_mask call in irq_disable()?
 
-Done that. Applied the patch, some manual work was necessary as the
-patch didn't apply cleanly to v3.8-rc3. Please double-check if the
-result is correct.
+No. It's a very bad idea. We intentionally disable interrupts lazy.
 
-> OK, good. Let me know the name of branch when you set-up it :-)
+Thanks,
 
-I pushed the branch to
-
-	git://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git arm/exynos
-
->From there you can pull it into your tree.
-
-Have fun,
-
-     Joerg
+	tglx
