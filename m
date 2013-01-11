@@ -1,113 +1,21 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 11 Jan 2013 15:20:29 +0800
-Subject: [PATCH V2 2/6] ARM: tegra20: cpuidle: add powered-down state
- for secondary CPU
-In-Reply-To: <20121205105010.GA12999@e102568-lin.cambridge.arm.com>
-References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
- <1354701715-24150-3-git-send-email-josephl@nvidia.com>
- <20121205105010.GA12999@e102568-lin.cambridge.arm.com>
-Message-ID: <1357888829.2034.39.camel@jlo-ubuntu-64.nvidia.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Jan 2013 12:56:43 +0530
+Subject: [PATCH] arch/arm/plat-omap: initializing dma_lch_count, before
+ judging omap_dma_reserve_channels
+In-Reply-To: <50EF9D11.6050801@asianux.com>
+References: <50EE9815.2080402@asianux.com> <50EE9C87.6060407@ti.com>
+ <50EF9D11.6050801@asianux.com>
+Message-ID: <50EFBEB3.4080207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On Wed, 2012-12-05 at 18:50 +0800, Lorenzo Pieralisi wrote:
-> On Wed, Dec 05, 2012 at 10:01:49AM +0000, Joseph Lo wrote:
-> > The powered-down state of Tegra20 requires power gating both CPU cores.
-> > When the secondary CPU requests to enter powered-down state, it saves
-> > its own contexts and then enters WFI. The Tegra20 had a limition to
-> > power down both CPU cores. The secondary CPU must waits for CPU0 in
-> > powered-down state too. If the secondary CPU be woken up before CPU0
-> > entering powered-down state, then it needs to restore its CPU states
-> > and waits for next chance.
-> >
-> > Be aware of that, you may see the legacy power state "LP2" in the code
-> > which is exactly the same meaning of "CPU power down".
-> >
-> > Based on the work by:
-> > Colin Cross <ccross@android.com>
-> > Gary King <gking@nvidia.com>
-> >
-> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> > +
-> > +#ifdef CONFIG_PM_SLEEP
-> > +/*
-> > + * tegra_pen_lock
-> > + *
-> > + * spinlock implementation with no atomic test-and-set and no coherence
-> > + * using Peterson's algorithm on strongly-ordered registers
-> > + * used to synchronize a cpu waking up from wfi with entering lp2 on idle
-> > + *
-> > + * SCRATCH37 = r1 = !turn (inverted from Peterson's algorithm)
-> > + * on cpu 0:
-> > + * SCRATCH38 = r2 = flag[0]
-> > + * SCRATCH39 = r3 = flag[1]
-> > + * on cpu1:
-> > + * SCRATCH39 = r2 = flag[1]
-> > + * SCRATCH38 = r3 = flag[0]
-> > + *
-> > + * must be called with MMU on
-> > + * corrupts r0-r3, r12
-> > + */
-> > +ENTRY(tegra_pen_lock)
-> > +       mov32   r3, TEGRA_PMC_VIRT
-> > +       cpu_id  r0
-> > +       add     r1, r3, #PMC_SCRATCH37
-> > +       cmp     r0, #0
-> > +       addeq   r2, r3, #PMC_SCRATCH38
-> > +       addeq   r3, r3, #PMC_SCRATCH39
-> > +       addne   r2, r3, #PMC_SCRATCH39
-> > +       addne   r3, r3, #PMC_SCRATCH38
-> > +
-> > +       mov     r12, #1
-> > +       str     r12, [r2]               @ flag[cpu] = 1
-> > +       dsb
-> > +       str     r12, [r1]               @ !turn = cpu
-> > +1:     dsb
-> > +       ldr     r12, [r3]
-> > +       cmp     r12, #1                 @ flag[!cpu] == 1?
-> > +       ldreq   r12, [r1]
-> > +       cmpeq   r12, r0                 @ !turn == cpu?
-> > +       beq     1b                      @ while !turn == cpu && flag[!cpu] == 1
-> > +
-> > +       mov     pc, lr                  @ locked
-> > +ENDPROC(tegra_pen_lock)
-> > +
-> > +ENTRY(tegra_pen_unlock)
-> > +       dsb
-> > +       mov32   r3, TEGRA_PMC_VIRT
-> > +       cpu_id  r0
-> > +       cmp     r0, #0
-> > +       addeq   r2, r3, #PMC_SCRATCH38
-> > +       addne   r2, r3, #PMC_SCRATCH39
-> > +       mov     r12, #0
-> > +       str     r12, [r2]
-> > +       mov     pc, lr
-> > +ENDPROC(tegra_pen_unlock)
+On Friday 11 January 2013 10:33 AM, Chen Gang wrote:
+> ? 2013?01?10? 18:48, Santosh Shilimkar ??:
+>> 'omap_dma_reserve_channels' when used is suppose to be from command
+>> line. Hence the proposed fix in the review is the right one.
 > 
-> There is an ongoing work to make this locking scheme for MMU/coherency off
-> paths ARM generic, and we do not want to merge yet another platform specific
-> locking mechanism. I will point you to the patchset when it hits LAK.
+>    ok, thank you for your suggestion.
 > 
-
-You did mention there is an ARM generic locking scheme for MMU/coherency
-off case before. Do you mean the patch below?
-
-https://patchwork.kernel.org/patch/1957911/
-https://patchwork.kernel.org/patch/1957901/
-
-I gave it a review today. Looks it can't fit our usage for CPU idle
-powered-down mode on Tegra20.
-
-The generic mechanism only can be used when CPUs in non coherent world.
-But our usage needs the mechanism could be used in both coherent and non
-coherent case. OK. The case is we need to sync the status about the CPU1
-was ready to power down. In this case, the CPU0 is still in coherent
-world but the CPU1 isn't. So we need the locking scheme could be still
-safe in this situation.
-
-And the proposed scheme looks only for b.L system?
-
-Thanks,
-Joseph
+>    I will send patch v2, also mark you as Signed-of-by.
+> 
+Acked-by: is just fine.
