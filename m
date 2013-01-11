@@ -1,54 +1,66 @@
-From: michal.bachraty@gmail.com (Michal Bachraty)
-Date: Fri, 18 Jan 2013 09:23:14 +0100
-Subject: [PATCH] am33xx: cpsw: default to ethernet hwaddr from efuse if
- not defined in dt
-In-Reply-To: <871udjlafn.fsf@dell.be.48ers.dk>
-References: <1358370073-32545-1-git-send-email-jacmet@sunsite.dk>
- <loom.20130117T105358-639@post.gmane.org>
- <87a9s7lq09.fsf@dell.be.48ers.dk>
- <20130117174528.GM14149@atomide.com>
- <871udjlafn.fsf@dell.be.48ers.dk>
-Message-ID: <CAAfrEwaDd5CU5fd2TbSD-8dMdOrCeC8f5LxPUGfqUsRs69BV+Q@mail.gmail.com>
+From: zhanzhenbo@gmail.com (steve.zhan)
+Date: Fri, 11 Jan 2013 11:52:44 -0000
+Subject: Question:add Iirq mask method in irq disable call.
+Message-ID: <CAKvkGKfG-3Y=azedkPyLwYffZKOE0sYH6LjMCfuMAgMKMBYWGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 11:19 PM, Peter Korsgaard <jacmet@sunsite.dk> wrote:
+Resend Email because MUTT email send error.
 
-> >>>>> "Tony" == Tony Lindgren <tony@atomide.com> writes:
+2013/1/11 Steve zhan <zhanzhenbo@gmail.com>:
+> All:
+>         I have find that arm gic driver have not register irq_disable
+> method, as below:
+> static struct irq_chip gic_chip = {
+>         .name                   = "GIC",
+>         .irq_mask               = gic_mask_irq,
+>         .irq_unmask             = gic_unmask_irq,
+>         .irq_eoi                = gic_eoi_irq,
+>         .irq_set_type           = gic_set_type,
+>         .irq_retrigger          = gic_retrigger,
+> #ifdef CONFIG_SMP
+>         .irq_set_affinity       = gic_set_affinity,
+> #endif
+>         .irq_set_wake           = gic_set_wake,
+> };
 >
-> Hi,
+> Question is:
+>         When some drivers want to disable irq, maybe it will call
+> linux standard inerface: irq_disable() that defined in include\
+> linux\interrupt.h, this function will call
+> void irq_disable(struct irq_desc *desc)
+> {
+>         irq_state_set_disabled(desc);
+>         if (desc->irq_data.chip->irq_disable) {
+>                 desc->irq_data.chip->irq_disable(&desc->irq_data);
+>                 irq_state_set_masked(desc);
+>         }
+> }
 >
->  >> The way I've handled it is similar to how it is done on atleast one
->  >> other arm subarchicture, see
->  >> arch/arm/mach-mxs/mach-mxs.c::update_fec_mac_prop()
+> Because gic have not register irq_diable method, so the interrupt can
+> not disable immediately, it is enable until the interrupt come next time,
+> then disalbed by mask because irq_state_set_disable(desc);
 >
->  Tony> Cool this seems like the cleanest way to deal with it so far. Can
->  Tony> you please resend with also linux-net and DT list Cc:d too?
+> I have checked irq_enable method:
+> void irq_enable(struct irq_desc *desc)
+> {
+>         irq_state_clr_disabled(desc);
+>         if (desc->irq_data.chip->irq_enable)
+>                 desc->irq_data.chip->irq_enable(&desc->irq_data);
+>         else
+>                 desc->irq_data.chip->irq_unmask(&desc->irq_data);
+>         irq_state_clr_masked(desc);
+> }
+> This method have do unmask when irq_enable method is not exist.
 >
->  Tony> Also the arch_initcall should be omap_arch_initcall in linux next
->  Tony> for consistency if we ever have SoC specific sections for those.
+> Is it a good idea to add irq_mask call in irq_disable()?
 >
-> Sure, resent with the initcall change and netdev/devicetree-discuss added.
 >
-> --
-> Bye, Peter Korsgaard
+> Regards,
+> Steve
 >
 
-Thanks,
-I added DT option mac-address-source because there is still possiblility to
-have mac address set by the u-boot in the future. Beaglebone have special
-eeprom on board, were you can have stored user MAC and u-boot can read
-eeprom
-data. Maybe some users will want this feature.  Also in cpsw dt binding
-documentation, there is mention  /* Filled in by U-Boot */.  For that
-purpose,
-code I proposed can easily deal with any driver exteds.
 
-Reading CPU mac address registers with (my approach) or without (your
-approach) DT should be more discussed. Also your way seems to be fine.
 
-Regards
-Michal
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130118/6d8983db/attachment-0001.html>
+-- 
+Steve Zhan
