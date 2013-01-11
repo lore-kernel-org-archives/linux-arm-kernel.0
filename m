@@ -1,44 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Jan 2013 23:37:35 +0530
-Subject: [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface
- of a dying CPU is disabled
-In-Reply-To: <1357777251-13541-9-git-send-email-nicolas.pitre@linaro.org>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-9-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <50F054E7.9000004@ti.com>
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 11 Jan 2013 13:21:46 -0500
+Subject: [PATCH v4,03/14] ARM: edma: add AM33XX support to the private
+ EDMA API
+In-Reply-To: <9fda86bbbec3444393fd5a2dc5135a5e@DFLE73.ent.ti.com>
+References: <1357883330-5364-4-git-send-email-mporter@ti.com>
+ <9fda86bbbec3444393fd5a2dc5135a5e@DFLE73.ent.ti.com>
+Message-ID: <20130111182146.GZ14660@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> Otherwise there might be some interrupts or IPIs becoming pending and the
-> CPU will not enter low power mode when doing a WFI.  The effect of this
-> is a CPU that loops back into the kernel, go through the first man
-> election, signals itself as alive,  and prevent the cluster from being
-> shut down.
->
-> This could benefit from a better solution.
->
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
->   arch/arm/common/bL_platsmp.c        | 1 +
->   arch/arm/common/gic.c               | 6 ++++++
->   arch/arm/include/asm/hardware/gic.h | 2 ++
->   3 files changed, 9 insertions(+)
->
-> diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
-> index 0ae44123bf..6a3b251b97 100644
-> --- a/arch/arm/common/bL_platsmp.c
-> +++ b/arch/arm/common/bL_platsmp.c
-> @@ -68,6 +68,7 @@ static void __ref bL_cpu_die(unsigned int cpu)
->   	pcpu = mpidr & 0xff;
->   	pcluster = (mpidr >> 8) & 0xff;
->   	bL_set_entry_vector(pcpu, pcluster, NULL);
-> +	gic_cpu_if_down();
+On Fri, Jan 11, 2013 at 06:14:27PM +0000, Lars Poeschel wrote:
+> Hi Matt,
+> 
+> On Friday 11 January 2013 at 06:48:39, Matt Porter wrote:
+> 
+> > diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> > index a3d189d..1951d63 100644
+> > --- a/arch/arm/common/edma.c
+> > +++ b/arch/arm/common/edma.c
+> > @@ -24,6 +24,13 @@
+> >  #include <linux/platform_device.h>
+> >  #include <linux/io.h>
+> >  #include <linux/slab.h>
+> > +#include <linux/edma.h>
+> > +#include <linux/err.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_device.h>
+> > +#include <linux/of_dma.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/pm_runtime.h>
+> 
+> You add the include linux/of_dma.h here, but maybe you missed to add the file 
+> itself. It is not in Linus v3.8-rc3 tree, not in the patches yours depend on 
+> listed and not in your patchset.
 
-So for a case where CPU still don't power down for some reason even
-after CPU interface is disabled, can not listen to and SGI or PPI.
-Not sure if this happens on big.LITTLE but i have seen one such issue
-on Cortex-A9 based SOC.
+of_dma.h comes in with the dependencies listed in the cover letter.
+Particularly, Vinod's dt_dmaengine branch in slave-dma.git contains Jon
+Hunter's OF DMA helpers series.
 
-Regards
-Santosh
+-Matt
