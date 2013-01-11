@@ -1,58 +1,167 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 11 Jan 2013 13:56:59 -0800
-Subject: [PATCH 0/4] arm: vt8500: Add support for Wondermedia WM8750/WM8850
-In-Reply-To: <1357935162-7672-1-git-send-email-linux@prisktech.co.nz>
-References: <1357935162-7672-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130111215659.GA16521@quad.lixom.net>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 11 Jan 2013 17:04:15 -0500
+Subject: [PATCH 2/2] arm: make return_address available for ARM_UNWIND
+In-Reply-To: <CA+KhAHbOu8JxMuwajZYBAkex7pZag3oaTvz=EoLOQz5iZtUfsQ@mail.gmail.com>
+References: <1357207949-3349-1-git-send-email-kpark3469@gmail.com>
+ <1357207949-3349-2-git-send-email-kpark3469@gmail.com>
+ <20130103103815.GL2631@n2100.arm.linux.org.uk>
+ <CA+KhAHbmjD7zTw+wcw84Abg3V1dD=0Ea4kUpYdGENQf1UOWphw@mail.gmail.com>
+ <1357220165.10284.30.camel@gandalf.local.home>
+ <20130103141301.GQ2631@n2100.arm.linux.org.uk>
+ <1357229038.10284.46.camel@gandalf.local.home>
+ <20130103162359.GR2631@n2100.arm.linux.org.uk>
+ <1357232337.10284.67.camel@gandalf.local.home>
+ <CA+KhAHYbDU0Ajr5uPEjPxX2ECitvnK2ENOjmqjC=3G657GvG7w@mail.gmail.com>
+ <1357566094.10284.83.camel@gandalf.local.home>
+ <CA+KhAHbOu8JxMuwajZYBAkex7pZag3oaTvz=EoLOQz5iZtUfsQ@mail.gmail.com>
+Message-ID: <1357941855.5141.43.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 2013-01-11 at 17:53 +0900, Keun-O Park wrote:
 
-On Sat, Jan 12, 2013 at 09:12:38AM +1300, Tony Prisk wrote:
-> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+> Hello Steve,
 > 
->   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://server.prisktech.co.nz/git/linuxwmt.git tags/armsoc-3.9
-> 
-> for you to fetch changes up to 82c8f175662873f7f7f4c78698888ee963d7d967:
-> 
->   arm: vt8500: Remove remaining mach includes (2012-12-28 21:05:19 +1300)
-> 
-> ----------------------------------------------------------------
-> arm: vt8500: Add support for WM8750/WM8850. Cleanup multiplatform changes
-> 
-> This patchset adds support for the WM8750 (ARMv6) and WM8850 (ARMv7), and
-> cleans up changes for multiplatform configuration.
-> 
-> Single platform Kconfig options are removed, along with the remaining
-> mach/includes.
-> 
-> The debug-macro.s is moved to arm/include/debug/ to allow DEBUG_LL on
-> multi-platform.
-> 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> 
-> ----------------------------------------------------------------
-> Tony Prisk (4):
->       arm: vt8500: Add support for Wondermedia WM8750/WM8850
->       arm: vt8500: Remove single platform Kconfig options
->       arm: vt8500: Convert debug-macro.S to be multiplatform friendly
->       arm: vt8500: Remove remaining mach includes
+> Much obliged for your explaining this.
+> As your guess, there's another path that uses CALLER_ADDR1 without
+> CONFIG_PROVE_LOCKING though both lockdep and ftrace's irqsoff tracer
+> is turned on. In this case, ftrace's trace_hardirqs_on/off() would be
+> called.
+> And, as you said to me, if lockdep is off and ftrace's irqsoff is on,
+> ftrace's trace_hardirqs_on/off() would be called.
+> I think the proper way to avoid calling CALLER_ADDR1 will be calling
+> trace_hardirqs_off_caller() instead of calling stop_critical_timing()
+> directly in trace_hardirqs_off(). And, this will suppress the message
+> outputs of unwind_frame.
 
-The first patch adds some Kconfig entries, and the second one removes them.
-Also, all but the first patch are really about multiplatform enablement.
+That will break the output for users that have a working CALLER_ADDR1.
 
-I suggest that you split off the last three (and rebase them to be
-independent), and apply them to a multiplatform branch for vt8500. Then the
-last one is a soc branch that goes on top of the multiplatform branch (i.e. you
-build it on top of multiplatform). That way we can pull in the multiplatform
-changes together with those for other platforms, and then take the wm8{7,8}50
-branch goes in with the other new-soc support from other platforms.
+> If you think this idea is okay, I will push the patch v2 to you.
+> In my test result, it looks it's functionally correct.
+> 
+> Thanks.
+> 
+> -- kpark
+> 
+> 
+> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+> index f89515a..3552ad9 100644
+> --- a/arch/arm/include/asm/ftrace.h
+> +++ b/arch/arm/include/asm/ftrace.h
+> @@ -32,13 +32,11 @@ extern void ftrace_call_old(void);
+> 
+>  #ifndef __ASSEMBLY__
+> 
+> -#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
+> +#if defined(CONFIG_FRAME_POINTER) || defined(CONFIG_ARM_UNWIND)
+>  /*
+>   * return_address uses walk_stackframe to do it's work.  If both
+>   * CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses unwind
+> - * information.  For this to work in the function tracer many functions would
+> - * have to be marked with __notrace.  So for now just depend on
+> - * !CONFIG_ARM_UNWIND.
+> + * information.
+>   */
+> 
+>  void *return_address(unsigned int);
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 5bbec7b..675fd62 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -9,6 +9,9 @@ ifdef CONFIG_FUNCTION_TRACER
+>  CFLAGS_REMOVE_ftrace.o = -pg
+>  CFLAGS_REMOVE_insn.o = -pg
+>  CFLAGS_REMOVE_patch.o = -pg
+> +ifdef CONFIG_ARM_UNWIND
+> +CFLAGS_REMOVE_unwind.o = -pg
+> +endif
 
-Does that make sense? I'll be happy to provide more explanation if it doesn't.
+You don't need to add the ifdef CONFIG_ARM_UNWIND. It's just setting a
+variable and if the unwind.o gets complied, it will apply the removal of
+-pg. If the unwind isn't compiled the variable will just be set but
+unused. No harm done.
 
--Olof
+>  endif
+> 
+>  CFLAGS_REMOVE_return_address.o = -pg
+
+
+
+> --- a/kernel/trace/trace_irqsoff.c
+> +++ b/kernel/trace/trace_irqsoff.c
+> @@ -483,20 +483,6 @@ inline void print_irqtrace_events(struct task_struct *curr)
+>  /*
+>   * We are only interested in hardirq on/off events:
+>   */
+> -void trace_hardirqs_on(void)
+> -{
+> -	if (!preempt_trace() && irq_trace())
+> -		stop_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
+> -}
+> -EXPORT_SYMBOL(trace_hardirqs_on);
+> -
+> -void trace_hardirqs_off(void)
+> -{
+> -	if (!preempt_trace() && irq_trace())
+> -		start_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
+> -}
+> -EXPORT_SYMBOL(trace_hardirqs_off);
+> -
+>  void trace_hardirqs_on_caller(unsigned long caller_addr)
+>  {
+>  	if (!preempt_trace() && irq_trace())
+> @@ -504,6 +490,12 @@ void trace_hardirqs_on_caller(unsigned long caller_addr)
+>  }
+>  EXPORT_SYMBOL(trace_hardirqs_on_caller);
+> 
+> +void trace_hardirqs_on(void)
+> +{
+> +	trace_hardirqs_on_caller(CALLER_ADDR0);
+> +}
+> +EXPORT_SYMBOL(trace_hardirqs_on);
+
+This is not equivalent. CALLER_ADDR0 will just give us what disabled the
+irqs (spin_lock_irq or local_irq_save), but wont give us who called
+that.
+
+If you can't handle CALLER_ADDR1, then define it to NULL or to
+CALLER_ADDR0.
+
+What the original output gives:
+
+jbd2/dm--1399    3d...    0us : _raw_spin_lock_irqsave
+<-ata_scsi_queuecmd
+
+which shows that the _raw_spin_lock_irqsave which disabled irqs was
+called by ata_scsi_queuecmd.
+
+With your patch we get:
+
+jbd2/dm--1407    3d...    0us : trace_hardirqs_off
+<-_raw_spin_lock_irqsave
+
+Which shows the internal function "trace_hardirqs_off" which is useless,
+as well as that the thing that disabled interrupts was
+_raw_spin_lock_irqsave. But we don't get who called
+_raw_spin_lock_irqsave.
+
+Thus you just broke the code for those that can handle CALLER_ADDR1.
+
+-- Steve
+
+> +
+>  void trace_hardirqs_off_caller(unsigned long caller_addr)
+>  {
+>  	if (!preempt_trace() && irq_trace())
+> @@ -511,6 +503,12 @@ void trace_hardirqs_off_caller(unsigned long caller_addr)
+>  }
+>  EXPORT_SYMBOL(trace_hardirqs_off_caller);
+> 
+> +void trace_hardirqs_off(void)
+> +{
+> +	trace_hardirqs_off_caller(CALLER_ADDR0);
+> +}
+> +EXPORT_SYMBOL(trace_hardirqs_off);
+> +
+>  #endif /* CONFIG_PROVE_LOCKING */
+>  #endif /*  CONFIG_IRQSOFF_TRACER */
