@@ -1,22 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jan 2013 15:00:01 +0000
-Subject: ERROR: "__aeabi_uldivmod" [drivers/pinctrl/pinctrl-single.ko]
- undefined!
-Message-ID: <20130111150001.GA23505@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Jan 2013 15:07:03 +0000
+Subject: [PATCHv2 08/11] arm: arch_timer: add arch_counter_set_user_access
+In-Reply-To: <20130111145451.GD19765@e106331-lin.cambridge.arm.com>
+References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+ <1357747640-18594-9-git-send-email-mark.rutland@arm.com>
+ <50F01646.4010203@ti.com>
+ <20130111145451.GD19765@e106331-lin.cambridge.arm.com>
+Message-ID: <20130111150703.GA13717@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Fri, Jan 11, 2013 at 02:54:52PM +0000, Mark Rutland wrote:
+> On Fri, Jan 11, 2013 at 01:40:22PM +0000, Santosh Shilimkar wrote:
+> > So how do you expect platform to enabled the user-space access in case
+> > they want to access it for some cases.
+> 
+> Unlike AArch64, at the moment we don't have the infrastructure to map this for
+> userspace accesses, so it isn't much of a problem.
+> 
+> If in future we wish to map it on 32bit platforms, the arm implementation of
+> arch_counter_set_user_access can be modified to allow userspace access to
+> specific registers, and additional code would be required to actually map it
+> into the user address space, etc.
 
-The above error happens in builds including pinctrl-single - the reason
-is this, where resource_size_t may be 64-bit.
+I'd also add that it's not up to a platform to decide whether to expose
+this to userspace: it needs to be an architecture-wide decision. Otherwise,
+userspace becomes SoC-specific, which is a complete disaster.
 
-                gpio->range.pin_base = (r.start - pcs->res->start) / mux_bytes;
-                gpio->range.npins = (r.end - r.start) / mux_bytes + 1;
+So, if userspace people want these available, they need to convince us to
+flip the switch. In the meantime, it should default to off so that if/when
+we do enable it we can do it in a sane manner for ARM (perhaps via the
+vectors page).
 
-This leads to a 64-bit division by an extended 64-bit, resulting in the
-call to our (unimplemented) 64-bit-by-64-bit division routines.
-
-This needs fixing - you probably want to cast the difference down to an
-'unsigned' first, and also maybe check that it does fit in an unsigned
-too?
+Will
