@@ -1,129 +1,80 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Jan 2013 22:56:39 +0530
-Subject: [PATCH 02/16] ARM: b.L: introduce the CPU/cluster power API
-In-Reply-To: <1357777251-13541-3-git-send-email-nicolas.pitre@linaro.org>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-3-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <50F04B4F.2070300@ti.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Fri, 11 Jan 2013 12:33:15 -0500
+Subject: [kvmarm] [PATCH v2 2/2] ARM: KVM: Power State Coordination
+ Interface implementation
+In-Reply-To: <50F04AD5.6020703@arm.com>
+References: <1357834005-23843-1-git-send-email-marc.zyngier@arm.com>
+ <1357834005-23843-3-git-send-email-marc.zyngier@arm.com>
+ <20130111171232.GH23505@n2100.arm.linux.org.uk>
+ <50F04AD5.6020703@arm.com>
+Message-ID: <CANM98qJ2ZSwxMWFRWiunTQtoV7iFb3fn3Cf6VWvOndBcU=+Tmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> This is the basic API used to handle the powering up/down of individual
-> CPUs in a big.LITTLE system.  The platform specific backend implementation
-> has the responsibility to also handle the cluster level power as well when
-> the first/last CPU in a cluster is brought up/down.
+On Fri, Jan 11, 2013 at 12:24 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 11/01/13 17:12, Russell King - ARM Linux wrote:
+>> On Thu, Jan 10, 2013 at 04:06:45PM +0000, Marc Zyngier wrote:
+>>> +int kvm_psci_call(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +    unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>>> +    unsigned long val;
+>>> +
+>>> +    switch (psci_fn) {
+>>> +    case KVM_PSCI_FN_CPU_OFF:
+>>> +            kvm_psci_vcpu_off(vcpu);
+>>> +            val = KVM_PSCI_RET_SUCCESS;
+>>> +            break;
+>>> +    case KVM_PSCI_FN_CPU_ON:
+>>> +            val = kvm_psci_vcpu_on(vcpu);
+>>> +            break;
+>>> +    case KVM_PSCI_FN_CPU_SUSPEND:
+>>> +    case KVM_PSCI_FN_MIGRATE:
+>>> +            val = KVM_PSCI_RET_NI;
+>>> +            break;
+>>> +
+>>> +    default:
+>>> +            return -1;
+>>> +    }
+>>> +
+>>> +    *vcpu_reg(vcpu, 0) = val;
+>>> +    return 0;
+>>> +}
+>>
+>> We were discussing recently on #kernel about kernel APIs and the way that
+>> our integer-returning functions pretty much use 0 for success, and -errno
+>> for failures, whereas our pointer-returning functions are a mess.
+>>
+>> And above we have something returning -1 to some other chunk of code outside
+>> this compilation unit.  That doesn't sound particularly clever to me.
 >
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
->   arch/arm/common/bL_entry.c      | 88 +++++++++++++++++++++++++++++++++++++++
->   arch/arm/include/asm/bL_entry.h | 92 +++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 180 insertions(+)
+> The original code used to return -EINVAL, see:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-January/004509.html
 >
-> diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
-> index 80fff49417..41de0622de 100644
-> --- a/arch/arm/common/bL_entry.c
-> +++ b/arch/arm/common/bL_entry.c
-> @@ -11,11 +11,13 @@
+> Christoffer (Cc-ed) didn't like this, hence the -1. I'm happy to revert
+> the code to its original state though.
 >
->   #include <linux/kernel.h>
->   #include <linux/init.h>
-> +#include <linux/irqflags.h>
->
->   #include <asm/bL_entry.h>
->   #include <asm/barrier.h>
->   #include <asm/proc-fns.h>
->   #include <asm/cacheflush.h>
-> +#include <asm/idmap.h>
->
->   extern volatile unsigned long bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
->
-> @@ -28,3 +30,89 @@ void bL_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
->   	outer_clean_range(__pa(&bL_entry_vectors[cluster][cpu]),
->   			  __pa(&bL_entry_vectors[cluster][cpu + 1]));
->   }
-> +
-> +static const struct bL_platform_power_ops *platform_ops;
-> +
-> +int __init bL_platform_power_register(const struct bL_platform_power_ops *ops)
-> +{
-> +	if (platform_ops)
-> +		return -EBUSY;
-> +	platform_ops = ops;
-> +	return 0;
-> +}
-> +
-> +int bL_cpu_power_up(unsigned int cpu, unsigned int cluster)
-> +{
-> +	if (!platform_ops)
-> +		return -EUNATCH;
-> +	might_sleep();
-> +	return platform_ops->power_up(cpu, cluster);
-> +}
-> +
-> +typedef void (*phys_reset_t)(unsigned long);
-> +
-> +void bL_cpu_power_down(void)
-> +{
-> +	phys_reset_t phys_reset;
-> +
-> +	BUG_ON(!platform_ops);
-> +	BUG_ON(!irqs_disabled());
-> +
-> +	/*
-> +	 * Do this before calling into the power_down method,
-> +	 * as it might not always be safe to do afterwards.
-> +	 */
-> +	setup_mm_for_reboot();
-> +
-> +	platform_ops->power_down();
-> +
-> +	/*
-> +	 * It is possible for a power_up request to happen concurrently
-> +	 * with a power_down request for the same CPU. In this case the
-> +	 * power_down method might not be able to actually enter a
-> +	 * powered down state with the WFI instruction if the power_up
-> +	 * method has removed the required reset condition.  The
-> +	 * power_down method is then allowed to return. We must perform
-> +	 * a re-entry in the kernel as if the power_up method just had
-> +	 * deasserted reset on the CPU.
-> +	 *
-> +	 * To simplify race issues, the platform specific implementation
-> +	 * must accommodate for the possibility of unordered calls to
-> +	 * power_down and power_up with a usage count. Therefore, if a
-> +	 * call to power_up is issued for a CPU that is not down, then
-> +	 * the next call to power_down must not attempt a full shutdown
-> +	 * but only do the minimum (normally disabling L1 cache and CPU
-> +	 * coherency) and return just as if a concurrent power_up request
-> +	 * had happened as described above.
-> +	 */
-> +
-> +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-> +	phys_reset(virt_to_phys(bL_entry_point));
-> +
-> +	/* should never get here */
-> +	BUG();
-> +}
-> +
-> +void bL_cpu_suspend(u64 expected_residency)
-> +{
-> +	phys_reset_t phys_reset;
-> +
-> +	BUG_ON(!platform_ops);
-> +	BUG_ON(!irqs_disabled());
-> +
-> +	/* Very similar to bL_cpu_power_down() */
-> +	setup_mm_for_reboot();
-> +	platform_ops->suspend(expected_residency);
-> +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-> +	phys_reset(virt_to_phys(bL_entry_point));
-> +	BUG();
->
-I might be missing all the rationales behind not having a recovery for
-CPUs entering suspend if they actualy come here because of some events.
-This is pretty much possible in many scenario's and hence letting CPU
-cpu come out of suspend should be possible. May be switcher code don't
-have such requirement but it appeared bit off to me.
+I don't want to return -EINVAL, because for the rest of the KVM code
+this would mean kill the guest.
 
-Regards
-Santosh
+The convention used in other archs of KVM as well as for ARM is that
+the handle_exit functions return:
+
+-ERRNO: Error, report this error to user space
+0: Everything is fine, but return to user space to let it do I/O
+emulation and whatever it wants to do
+1: Everything is fine, return directly to the guest without going to user space
+
+And then you do:
+if (handle_something() == 0)
+    return 1;
+
+which I thought was confusing, so I said make the function a bool, to
+avoid the confusion, like Rusty did for all the coprocessor emulation
+functions.
+
+There are obviously other ways to handle the "return 1" case, like
+having an extra state that you carry around, and we can change all the
+code to do that, but I just don't think it's worth it, as we are in
+fact quite close to the existing kernel API.
+
+-Christoffer
