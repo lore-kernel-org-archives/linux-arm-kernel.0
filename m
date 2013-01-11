@@ -1,75 +1,22 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Jan 2013 15:04:08 +0000
-Subject: [PATCHv2 09/11] arm: arch_timer: move core to drivers/clocksource
-In-Reply-To: <50F01830.5040205@ti.com>
-References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
- <1357747640-18594-10-git-send-email-mark.rutland@arm.com>
- <50F01830.5040205@ti.com>
-Message-ID: <20130111150408.GE19765@e106331-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Jan 2013 15:00:01 +0000
+Subject: ERROR: "__aeabi_uldivmod" [drivers/pinctrl/pinctrl-single.ko]
+ undefined!
+Message-ID: <20130111150001.GA23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 01:48:32PM +0000, Santosh Shilimkar wrote:
-> On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
-> > The core functionality of the arch_timer driver is not directly tied to
-> > anything under arch/arm, and can be split out.
-> >
-> > This patch factors out the core of the arch_timer driver, so it can be
-> > shared with other architectures. A couple of functions are added so
-> > that architecture-specific code can interact with the driver without
-> > needing to touch its internals.
-> >
-> > The ARM_ARCH_TIMER config variable is moved out to
-> > drivers/clocksource/Kconfig, existing uses in arch/arm are replaced with
-> > USE_ARM_ARCH_TIMER, which selects it.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >   arch/arm/Kconfig                     |    3 +-
-> >   arch/arm/include/asm/arch_timer.h    |   19 +--
-> >   arch/arm/kernel/arch_timer.c         |  375 ++--------------------------------
-> >   arch/arm/mach-omap2/Kconfig          |    2 +-
-> >   drivers/clocksource/Kconfig          |    3 +
-> >   drivers/clocksource/Makefile         |    1 +
-> >   drivers/clocksource/arm_arch_timer.c |  374 +++++++++++++++++++++++++++++++++
-> >   include/clocksource/arm_arch_timer.h |   63 ++++++
-> >   8 files changed, 465 insertions(+), 375 deletions(-)
-> >   create mode 100644 drivers/clocksource/arm_arch_timer.c
-> >   create mode 100644 include/clocksource/arm_arch_timer.h
-> >
-> It would have been easy if you have formated the patch with -C option.
-> That will just leave the delta changes only and hiding the file
-> movement related diff.
+Linus,
 
-Sorry, I'll make sure I do that next time.
+The above error happens in builds including pinctrl-single - the reason
+is this, where resource_size_t may be 64-bit.
 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index f95ba14..487696a 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1567,9 +1567,10 @@ config HAVE_ARM_SCU
-> >   	help
-> >   	  This option enables support for the ARM system coherency unit
-> >
-> > -config ARM_ARCH_TIMER
-> > +config USE_ARM_ARCH_TIMER
-> >   	bool "Architected timer support"
-> >   	depends on CPU_V7
-> > +	select ARM_ARCH_TIMER
-> >   	help
-> >   	  This option enables support for the ARM architected timer
-> >
-> How about HAVE_ARM_ARCH_TIMER in-line with HAVE_ARM_TWD. No strong
-> opinion though.
+                gpio->range.pin_base = (r.start - pcs->res->start) / mux_bytes;
+                gpio->range.npins = (r.end - r.start) / mux_bytes + 1;
 
-Sure. It'll also make it more consistent with HAVE_ARM_SCU.
+This leads to a 64-bit division by an extended 64-bit, resulting in the
+call to our (unimplemented) 64-bit-by-64-bit division routines.
 
-> 
-> Regards
-> Santosh
-> 
-
-Thanks,
-Mark.
+This needs fixing - you probably want to cast the difference down to an
+'unsigned' first, and also maybe check that it does fit in an unsigned
+too?
