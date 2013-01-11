@@ -1,87 +1,38 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Jan 2013 13:12:49 +0000
-Subject: [PATCH 01/18] power: ab8500_charger: Rename the power_loss function
+Date: Fri, 11 Jan 2013 13:12:52 +0000
+Subject: [PATCH 04/18] power: ab8500_fg: Replace msleep() with usleep_range()
+ for greater accuracy
 In-Reply-To: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
 References: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1357909986-9262-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1357909986-9262-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paer-Olof Haakansson <par-olof.hakansson@stericsson.com>
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
-Rename the ab8500_power_loss_handling function to a more
-descriptive name ab8500_enable_disable_sw_fallback
+Doing so provides a greater degree of accuracy when dealing with
+time-frames between 1us and 20ms. msleep() is only accurate for
+wake-ups greater than 20ms.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Robert Marklund <robert.marklund@stericsson.com>
-Reviewed-by: Par-Olof HAKANSSON <par-olof.hakansson@stericsson.com>
-Reviewed-by: Karl KOMIEROWSKI <karl.komierowski@stericsson.com>
-Tested-by: Par-Olof HAKANSSON <par-olof.hakansson@stericsson.com>
+Signed-off-by: Jonas ABERG <jonas.aberg@stericsson.com>
+Reviewed-by: Johan BJORNSTEDT <johan.bjornstedt@stericsson.com>
 ---
- drivers/power/ab8500_charger.c |   23 +++++++++++------------
- 1 file changed, 11 insertions(+), 12 deletions(-)
+ drivers/power/ab8500_fg.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-index 2ddface..d6e1792 100644
---- a/drivers/power/ab8500_charger.c
-+++ b/drivers/power/ab8500_charger.c
-@@ -270,20 +270,19 @@ static enum power_supply_property ab8500_charger_usb_props[] = {
- 	POWER_SUPPLY_PROP_CURRENT_NOW,
- };
+diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
+index 828529e..ca3ba88c 100644
+--- a/drivers/power/ab8500_fg.c
++++ b/drivers/power/ab8500_fg.c
+@@ -956,7 +956,7 @@ static int ab8500_fg_load_comp_volt_to_capacity(struct ab8500_fg *di)
+ 	do {
+ 		vbat += ab8500_fg_bat_voltage(di);
+ 		i++;
+-		msleep(5);
++		usleep_range(5000, 5001);
+ 	} while (!ab8500_fg_inst_curr_done(di));
  
--/**
-- * ab8500_power_loss_handling - set how we handle powerloss.
-- * @di:		pointer to the ab8500_charger structure
-- *
-- * Magic nummbers are from STE HW department.
-+/*
-+ * Function for enabling and disabling sw fallback mode
-+ * should always be disabled when no charger is connected.
-  */
--static void ab8500_power_loss_handling(struct ab8500_charger *di)
-+static void ab8500_enable_disable_sw_fallback(struct ab8500_charger *di,
-+		bool fallback)
- {
- 	u8 reg;
- 	int ret;
- 
--	dev_dbg(di->dev, "Autopower : %d\n", di->autopower);
-+	dev_dbg(di->dev, "SW Fallback: %d\n", fallback);
- 
--	/* read the autopower register */
-+	/* read the register containing fallback bit */
- 	ret = abx500_get_register_interruptible(di->dev, 0x15, 0x00, &reg);
- 	if (ret) {
- 		dev_err(di->dev, "%d write failed\n", __LINE__);
-@@ -297,12 +296,12 @@ static void ab8500_power_loss_handling(struct ab8500_charger *di)
- 		return;
- 	}
- 
--	if (di->autopower)
-+	if (fallback)
- 		reg |= 0x8;
- 	else
- 		reg &= ~0x8;
- 
--	/* write back the changed value to autopower reg */
-+	/* write back the changed fallback bit value to register */
- 	ret = abx500_set_register_interruptible(di->dev, 0x15, 0x00, reg);
- 	if (ret) {
- 		dev_err(di->dev, "%d write failed\n", __LINE__);
-@@ -332,12 +331,12 @@ static void ab8500_power_supply_changed(struct ab8500_charger *di,
- 		    !di->ac.charger_connected &&
- 		    di->autopower) {
- 			di->autopower = false;
--			ab8500_power_loss_handling(di);
-+			ab8500_enable_disable_sw_fallback(di, false);
- 		} else if (!di->autopower &&
- 			   (di->ac.charger_connected ||
- 			    di->usb.charger_connected)) {
- 			di->autopower = true;
--			ab8500_power_loss_handling(di);
-+			ab8500_enable_disable_sw_fallback(di, true);
- 		}
- 	}
- 	power_supply_changed(psy);
+ 	ab8500_fg_inst_curr_finalize(di, &di->inst_curr);
 -- 
 1.7.9.5
