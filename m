@@ -1,91 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 11 Jan 2013 12:39:57 +0100
-Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
- THUMB mode
-Message-ID: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Jan 2013 11:40:41 +0000
+Subject: [PATCH v4 00/14] DMA Engine support for AM33XX
+In-Reply-To: <1357883330-5364-1-git-send-email-mporter@ti.com>
+References: <1357883330-5364-1-git-send-email-mporter@ti.com>
+Message-ID: <201301111140.41584.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
-obviously these cannot enter the kernel in ARM mode. Make an exception
-for them and let them enter in THUMB mode.
+On Friday 11 January 2013, Matt Porter wrote:
+> The approach taken is similar to how OMAP DMA is being converted to
+> DMA Engine support. With the functional EDMA private API already
+> existing in mach-davinci/dma.c, we first move that to an ARM common
+> area so it can be shared. Adding DT and runtime PM support to the
+> private EDMA API implementation allows it to run on AM33xx. AM33xx
+> only boots using DT so we leverage Jon's generic DT DMA helpers to
+> register EDMA DMAC with the of_dma framework and then add support
+> for calling the dma_request_slave_channel() API to both the mmc
+> and spi drivers.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/kernel/head-nommu.S |    8 +++++++-
- arch/arm/kernel/head.S       |    8 +++++++-
- arch/arm/mm/Kconfig          |    6 ++++++
- 3 files changed, 20 insertions(+), 2 deletions(-)
+I think this looks very good. What I wonder is whether we should
+make the non-DT parts of the dmaengine driver compile-time
+conditional on CONFIG_ATAGS though, so the slave drivers don't
+have a link-time dependency on the dmaengine driver's 
+omap_dma_filter_fn symbol when building without ATAGS support.
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index 3782320..ae7ed46 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -32,15 +32,21 @@
-  * numbers for r1.
-  *
-  */
--	.arm
- 
- 	__HEAD
-+
-+#ifdef CONFIG_THUMBONLY_CPU
-+	.thumb
-+ENTRY(stext)
-+#else
-+	.arm
- ENTRY(stext)
- 
-  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
-  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-  THUMB(	.thumb			)	@ switch to Thumb now.
-  THUMB(1:			)
-+#endif
- 
- 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
- 						@ and irqs disabled
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 4eee351..0af2749 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -73,15 +73,21 @@
-  * crap here - that's what the boot loader (or in extreme, well justified
-  * circumstances, zImage) is for.
-  */
--	.arm
- 
- 	__HEAD
-+
-+#ifdef CONFIG_THUMBONLY_CPU
-+	.thumb
-+ENTRY(stext)
-+#else
-+	.arm
- ENTRY(stext)
- 
-  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
-  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-  THUMB(	.thumb			)	@ switch to Thumb now.
-  THUMB(1:			)
-+#endif
- 
- #ifdef CONFIG_ARM_VIRT_EXT
- 	bl	__hyp_stub_install
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 3fd629d..bc3150c 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -1,5 +1,11 @@
- comment "Processor Type"
- 
-+# Select this if your CPU doesn't support the 32 bit ARM instructions.
-+config THUMBONLY_CPU
-+	bool
-+	select THUMB2_KERNEL
-+	select ARM_THUMB
-+
- # Select CPU types depending on the architecture selected.  This selects
- # which CPUs we support in the kernel image, and the compiler instruction
- # optimiser behaviour.
--- 
-1.7.10.4
+	Arnd
