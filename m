@@ -1,26 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jan 2013 11:11:28 +0000
-Subject: [PATCH] mmc: mvsdio: Replace IS_ERR_NULL() is with IS_ERR()
-In-Reply-To: <20130111120909.2cee1b8e@skate>
-References: <1357849755-8168-1-git-send-email-andrew@lunn.ch>
- <20130111110210.GC30875@n2100.arm.linux.org.uk>
- <20130111120909.2cee1b8e@skate>
-Message-ID: <20130111111128.GE30875@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 11 Jan 2013 12:14:56 +0100
+Subject: [PATCH v7 3/3] Cortex-M3: Add support for exception handling
+In-Reply-To: <20130111110926.GD30875@n2100.arm.linux.org.uk>
+References: <1350462872-16805-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1350462872-16805-4-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130111110544.GG14860@pengutronix.de>
+ <20130111110926.GD30875@n2100.arm.linux.org.uk>
+Message-ID: <20130111111456.GH14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 12:09:09PM +0100, Thomas Petazzoni wrote:
-> Dear Russell King - ARM Linux,
-> 
-> On Fri, 11 Jan 2013 11:02:10 +0000, Russell King - ARM Linux wrote:
-> 
-> > What remains?  The assumption that GPIO0 means "no GPIO" rather than
-> > testing with gpio_valid() and the IRQ stuff.
-> 
-> Patches that I have written have been merged by Jason Cooper and while
-> adding the DT binding for this driver, it also converts it to use the
-> MMC GPIO helpers from drivers/mmc/core/slot-gpio.c, which makes this
-> whole GPIO initialization/cleanup a lot simpler.
+Hello Russell,
 
-Please also fix the whole raft of other crap in this driver too, as
-I've highlighted previously and in these patches.
+On Fri, Jan 11, 2013 at 11:09:26AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 11, 2013 at 12:05:44PM +0100, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Wed, Oct 17, 2012 at 10:34:32AM +0200, Uwe Kleine-K?nig wrote:
+> > > +/*
+> > > + * Register switch for ARMv7-M processors.
+> > > + * r0 = previous task_struct, r1 = previous thread_info, r2 = next thread_info
+> > > + * previous and next are guaranteed not to be the same.
+> > > + */
+> > > +ENTRY(__switch_to)
+> > > +	.fnstart
+> > > +	.cantunwind
+> > > +	add	ip, r1, #TI_CPU_SAVE
+> > > +	stmia	ip!, {r4 - r11}		@ Store most regs on stack
+> > > +	str	sp, [ip], #4
+> > > +	str	lr, [ip], #4
+> > > +	mov	r5, r0
+> > > +	add	r4, r2, #TI_CPU_SAVE
+> > > +	ldr	r0, =thread_notify_head
+> > > +	mov	r1, #THREAD_NOTIFY_SWITCH
+> > > +	bl	atomic_notifier_call_chain
+> > > +	mov	ip, r4
+> > > +	mov	r0, r5
+> > > +	ldmia	ip!, {r4 - r11}		@ Load all regs saved previously
+> > > +	ldr	sp, [ip], #4
+> > > +	ldr	pc, [ip]
+> > > +	.fnend
+> > > +ENDPROC(__switch_to)
+> > this code triggers a warning
+> > 
+> > 	This instruction may be unpredictable if executed on M-profile
+> > 	cores with interrupts enabled.
+> > 
+> > with newer toolchains (seen with gcc 4.7.2) because of errata 752419
+> > (Interrupted loads to SP can cause erroneous behaviour) which badly
+> > affects the following instructions:
+> > 
+> > 	ldr	sp,[Rn],#imm
+> > 	ldr	sp,[Rn,#imm]!
+> 
+> Wonder if that means we need to fix it in entry-armv.S too, as it uses
+> the same sequence for Thumb:
+> 
+>  THUMB( ldr     sp, [ip], #4               )
+>  THUMB( ldr     pc, [ip]                   )
+> 
+> and, of course, M-profile stuff is also Thumb.
+entry-armv.S is not affected as this code snipplet is for switching from
+ARM to THUMB mode on kernel entry. The M-profile CPUs don't have a ARM
+mode, so this code isn't active for them anyhow. (I have a patch in my
+queue to allow entry in Thumb mode for thumb-only CPUs.)
+
+Best regards and thanks for your heedfulness,
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
