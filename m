@@ -1,31 +1,91 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 11 Jan 2013 10:28:57 -0500 (EST)
-Subject: [PATCH 07/14] usb: ehci-omap: Instantiate PHY devices if required
-In-Reply-To: <50EFF075.5090203@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1301111019340.1730-100000@iolanthe.rowland.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Jan 2013 15:28:58 +0000
+Subject: [PATCH 3/3] ARM: hw_breakpoint: Debug powerdown support for
+ self-hosted debug
+In-Reply-To: <1357918138-20222-1-git-send-email-will.deacon@arm.com>
+References: <1357918138-20222-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1357918138-20222-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013, Roger Quadros wrote:
+From: Dietmar Eggemann <dietmar.eggemann@arm.com>
 
-> Alan,
-> 
-> Thanks for the patch. I've pasted the version that builds and works and
-> put you as the Author of the patch, hope it is fine.
+This patch introduces debug powerdown support for self-hosted debug for v7
+and v7.1 debug architecture for a SinglePower system, i.e. a system without a
+separate core and debug power domain. On a SinglePower system the OS Lock is
+lost over a powerdown.
 
-As far as I can see, yours is the same as what I posted except that:
+If CONFIG_CPU_PM is set the new function pm_init() registers hw_breakpoint
+with CPU PM for a system supporting OS Save and Restore.
 
-	You altered the changes to ehci-hcd.c and Makefile to remove 
-	the dependency on the ehci-mxc patch;
+Receiving a CPU PM EXIT notifier indicates that a single CPU has exited a low
+power state. A call to reset_ctrl_regs() is hooked into the CPU PM EXIT
+notifier chain. This function makes sure that the sticky power-down is clear
+(only v7 debug), the OS Double Lock is clear (only v7.1 debug) and it clears
+the OS Lock for v7 debug (for a system supporting OS Save and Restore) and
+v7.1 debug. Furthermore, it clears any vector-catch events and all
+breakpoint/watchpoint control/value registers for v7 and v7.1 debug.
 
-	You made an unimportant whitespace change in ehci-omap.c
-	(moved a blank line before ehci_write()).
+Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+[will: removed redundant has_ossr check]
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/hw_breakpoint.c | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
-Right?  It's hard to compare the patches directly because the one you 
-posted was whitespace-damaged.
-
-Anyway, if this is okay and there's nothing wrong with the ehci-mxc 
-change (other than the comment for ehci->priv), I'll submit both of 
-them to Greg soon.
-
-Alan Stern
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 201d440..5eae53e 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -28,6 +28,7 @@
+ #include <linux/perf_event.h>
+ #include <linux/hw_breakpoint.h>
+ #include <linux/smp.h>
++#include <linux/cpu_pm.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+@@ -1032,6 +1033,30 @@ static struct notifier_block __cpuinitdata dbg_reset_nb = {
+ 	.notifier_call = dbg_reset_notify,
+ };
+ 
++#ifdef CONFIG_CPU_PM
++static int dbg_cpu_pm_notify(struct notifier_block *self, unsigned long action,
++			     void *v)
++{
++	if (action == CPU_PM_EXIT)
++		reset_ctrl_regs(NULL);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block __cpuinitdata dbg_cpu_pm_nb = {
++	.notifier_call = dbg_cpu_pm_notify,
++};
++
++static void __init pm_init(void)
++{
++	cpu_pm_register_notifier(&dbg_cpu_pm_nb);
++}
++#else
++static inline void pm_init(void)
++{
++}
++#endif
++
+ static int __init arch_hw_breakpoint_init(void)
+ {
+ 	debug_arch = get_debug_arch();
+@@ -1081,8 +1106,9 @@ static int __init arch_hw_breakpoint_init(void)
+ 	hook_ifault_code(FAULT_CODE_DEBUG, hw_breakpoint_pending, SIGTRAP,
+ 			TRAP_HWBKPT, "breakpoint debug exception");
+ 
+-	/* Register hotplug notifier. */
++	/* Register hotplug and PM notifiers. */
+ 	register_cpu_notifier(&dbg_reset_nb);
++	pm_init();
+ 	return 0;
+ }
+ arch_initcall(arch_hw_breakpoint_init);
+-- 
+1.8.0
