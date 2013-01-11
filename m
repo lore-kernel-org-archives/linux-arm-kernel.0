@@ -1,29 +1,75 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 11 Jan 2013 09:56:29 -0500
-Subject: [PATCH v2] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
-In-Reply-To: <50F02570.9050208@openwrt.org>
-References: <1588881.pi23bvqp7D@bender> <3816648.2TVsTiMOWx@bender>
- <50F02570.9050208@openwrt.org>
-Message-ID: <20130111145629.GB31640@titan.lakedaemon.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Jan 2013 15:04:08 +0000
+Subject: [PATCHv2 09/11] arm: arch_timer: move core to drivers/clocksource
+In-Reply-To: <50F01830.5040205@ti.com>
+References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+ <1357747640-18594-10-git-send-email-mark.rutland@arm.com>
+ <50F01830.5040205@ti.com>
+Message-ID: <20130111150408.GE19765@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian,
+On Fri, Jan 11, 2013 at 01:48:32PM +0000, Santosh Shilimkar wrote:
+> On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
+> > The core functionality of the arch_timer driver is not directly tied to
+> > anything under arch/arm, and can be split out.
+> >
+> > This patch factors out the core of the arch_timer driver, so it can be
+> > shared with other architectures. A couple of functions are added so
+> > that architecture-specific code can interact with the driver without
+> > needing to touch its internals.
+> >
+> > The ARM_ARCH_TIMER config variable is moved out to
+> > drivers/clocksource/Kconfig, existing uses in arch/arm are replaced with
+> > USE_ARM_ARCH_TIMER, which selects it.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >   arch/arm/Kconfig                     |    3 +-
+> >   arch/arm/include/asm/arch_timer.h    |   19 +--
+> >   arch/arm/kernel/arch_timer.c         |  375 ++--------------------------------
+> >   arch/arm/mach-omap2/Kconfig          |    2 +-
+> >   drivers/clocksource/Kconfig          |    3 +
+> >   drivers/clocksource/Makefile         |    1 +
+> >   drivers/clocksource/arm_arch_timer.c |  374 +++++++++++++++++++++++++++++++++
+> >   include/clocksource/arm_arch_timer.h |   63 ++++++
+> >   8 files changed, 465 insertions(+), 375 deletions(-)
+> >   create mode 100644 drivers/clocksource/arm_arch_timer.c
+> >   create mode 100644 include/clocksource/arm_arch_timer.h
+> >
+> It would have been easy if you have formated the patch with -C option.
+> That will just leave the delta changes only and hiding the file
+> movement related diff.
 
-On Fri, Jan 11, 2013 at 03:45:04PM +0100, Florian Fainelli wrote:
-> Le 01/09/13 20:56, Florian Fainelli a ?crit :
-> >This patch adds the DTS file to support the Marvell RD-A370-A1
-> >(Reference Design board) also known as RD-88F6710 board. It is almost
-> >entirely similar to the DB-A370 board except that the first Ethernet PHY
-> >is SGMII-wired and the second is a switch which is RGMII-wired.
+Sorry, I'll make sure I do that next time.
+
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index f95ba14..487696a 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1567,9 +1567,10 @@ config HAVE_ARM_SCU
+> >   	help
+> >   	  This option enables support for the ARM system coherency unit
+> >
+> > -config ARM_ARCH_TIMER
+> > +config USE_ARM_ARCH_TIMER
+> >   	bool "Architected timer support"
+> >   	depends on CPU_V7
+> > +	select ARM_ARCH_TIMER
+> >   	help
+> >   	  This option enables support for the ARM architected timer
+> >
+> How about HAVE_ARM_ARCH_TIMER in-line with HAVE_ARM_TWD. No strong
+> opinion though.
+
+Sure. It'll also make it more consistent with HAVE_ARM_SCU.
+
 > 
-> Who is going to take this patch? Since this is a new DTS file there
-> are little chances it breaks anything, could it be taken for an
-> upcoming 3.8-rc?
+> Regards
+> Santosh
+> 
 
-No, only fixes go in for the current -rc.  It'll be included for v3.9, I
-have it in my queue.
-
-thx,
-
-Jason.
+Thanks,
+Mark.
