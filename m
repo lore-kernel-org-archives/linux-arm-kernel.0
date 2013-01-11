@@ -1,58 +1,45 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 11 Jan 2013 10:43:47 +0100
-Subject: [RFC 0/4] TI LCDC DRM driver
-In-Reply-To: <CAF6AEGu4KJ27R6P7CiewVYSP22ZX+2=s6ZeNJv+Voh06gntBzg@mail.gmail.com>
-References: <1357704685-3600-1-git-send-email-robdclark@gmail.com>
- <1782274.DIo8UG5duX@avalon>
- <CAF6AEGu4KJ27R6P7CiewVYSP22ZX+2=s6ZeNJv+Voh06gntBzg@mail.gmail.com>
-Message-ID: <3774584.dvuStQDo3V@avalon>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 11 Jan 2013 10:47:37 +0100
+Subject: [PATCH v7 0/3] Yet another update for the Cortex-M3 series
+In-Reply-To: <1350462872-16805-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1350462872-16805-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20130111094737.GF14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hello Russell,
 
-On Thursday 10 January 2013 21:15:26 Rob Clark wrote:
-> On Thu, Jan 10, 2013 at 6:05 PM, Laurent Pinchart wrote:
-> > On Thursday 10 January 2013 10:16:10 Dave Airlie wrote:
-> >> On Wed, Jan 9, 2013 at 2:11 PM, Rob Clark <robdclark@gmail.com> wrote:
-> >> > Updated version of DRM driver for TI LCD Controller.  Since the initial
-> >> > version of the patch, which only supported TFP410 DVI output, I've
-> >> > added
-> >> > an output driver for LCD panels (for example, LCD3 or LCD7 cape for the
-> >> > beagle-bone), and initial support for HDMI output via NXP TDA19988 HDMI
-> >> > encoder (via i2c encoder-slave output driver).
-> >> > 
-> >> > At this point, I think the basic lcdc drm driver plus TFP410 DVI output
-> >> > (first patch) is in reasonable shape (barring potential rename, if lcdc
-> >> > is too generic of a name... but I was not feeling creative enough yet
-> >> > to
-> >> > pick a new name).
-> >> 
-> >> I'd like at least tilcdc :-)
-> > 
-> > So do I :-) The Renesas LCD controller is also called LCDC, and they
-> > called the fbdev driver sh_mobile_lcdcfb. tilcdc isn't *that* long in
-> > comparison :-)
->
-> next version will be 'tilcdc' :-)
+On Wed, Oct 17, 2012 at 10:34:29AM +0200, Uwe Kleine-K?nig wrote:
+> the only change since v6 is a rebase on top of v3.7-rc1 and so on Al
+> Viro's changes to kernel_execve().
 > 
-> I would appreciate some thoughts about more generic devicetree lcd
-> panel parameters for the (ti)lcdc_panel patch..  from a functional
-> standpoint, I think the lcd panel support part is also pretty much
-> ready to go (I've added backlight support since the last version I
-> sent), but I'm not really happy with the DT bindings for that because
-> they seem to me a bit too hw specific, but I'm not really sure how
-> they should look.
+> These patches merge just fine into today's next and I put them into my
+> branch that Stephen will pick for the next next.
+> 
+> As before this doesn't make a functional M3 port as there are still some
+> missing items. If you want to see the code live I also updated the efm32
+> branch in my repository to be based on these patches. This code works,
+> but isn't suitable for mainline yet. You can run it on EnergyMicro's
+> efm32 devboard.
+> 
+> Best regards
+> Uwe
+> 
+> Catalin Marinas (1):
+>   Cortex-M3: Add base support for Cortex-M3
+> 
+> Uwe Kleine-K?nig (2):
+>   ARM: make cr_alignment read-only #ifndef CONFIG_CPU_CP15
+>   Cortex-M3: Add support for exception handling
+These patches are in next since next-20121018 without any reported
+problems. What do you think about inclusion for 3.9-rc1?
 
-How urgent is that ? I will be offline next week, can it wait until I come 
-back ? (That's more of a rhetorical question I'm afraid, as I'm pretty sure I 
-won't have time to review that today :-S)
+They are based on 3.7-rc1 and I'm currently porting my tree to 3.8-rc3
+to test there.
 
-> Fwiw, on the CDF <-> KMS end of things, I'm sort of thinking the i2c
-> encoder slave is not too far off.. just needs to be a bit decoupled
-> from i2c.
+Best regards
+Uwe
 
 -- 
-Regards,
-
-Laurent Pinchart
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
