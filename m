@@ -1,88 +1,74 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Jan 2013 15:45:29 +0000
-Subject: [PATCH 2/2] pinctrl: nomadik: Allow prcm_base to be extracted from
- Device Tree
-In-Reply-To: <1357919129-1928-1-git-send-email-lee.jones@linaro.org>
-References: <1357919129-1928-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1357919129-1928-2-git-send-email-lee.jones@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 11 Jan 2013 16:51:50 +0100
+Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
+ THUMB mode
+In-Reply-To: <50F0310F.3070502@arm.com>
+References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <50F0310F.3070502@arm.com>
+Message-ID: <20130111155150.GL14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Nomadik Pinctrl driver requires access to some PRCMU registers
-in order to run with full functionality. When Device Tree is
-disabled the required PRCMU base address is passed in via platform
-data, so in order for Device Tree booting to be as functional, we
-need a similar mechanism to fetch it from Device Tree.
+Hi Jonny,
 
-The new semantics goes like this: Parse the Device Tree and look
-for the PRCMU node using a provided Phandle. Obtain the ioremaped
-address from that node. If one was supplied via platform data
-over-write it with anything found in Device Tree. Fail if either
-the prcm_base can't be found if we're running on anything other
-than an STN8815 ASIC.
+On Fri, Jan 11, 2013 at 03:34:39PM +0000, Jonathan Austin wrote:
+> Hi Uwe,
+> On 11/01/13 11:39, Uwe Kleine-K?nig wrote:
+> >Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
+> >obviously these cannot enter the kernel in ARM mode. Make an exception
+> >for them and let them enter in THUMB mode.
+> 
+> Clearly something like this is necessary, but it isn't something I'd
+> like for people to start using *unless* they have a THUMB only CPU
+> (for example, to work around dodgy boot-loaders, etc)
+> 
+> Seeing as there are no THUMB-only CPUs with an MMU, I think we could
+> safely constrain this change to:
+> a) depend on !MMU
+> b) only touch head-nommu.S
+> 
+> Does that cause any issue for what you're doing.
+Would be ok for me, too. I don't care much.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/pinctrl/pinctrl-nomadik.c |   29 ++++++++++++++++++-----------
- 1 file changed, 18 insertions(+), 11 deletions(-)
+> >diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> >index 3fd629d..bc3150c 100644
+> >--- a/arch/arm/mm/Kconfig
+> >+++ b/arch/arm/mm/Kconfig
+> >@@ -1,5 +1,11 @@
+> >  comment "Processor Type"
+> >
+> >+# Select this if your CPU doesn't support the 32 bit ARM instructions.
+> >+config THUMBONLY_CPU
+> >+	bool
+> >+	select THUMB2_KERNEL
+> >+	select ARM_THUMB
+> >+
+> >  # Select CPU types depending on the architecture selected.  This selects
+> >  # which CPUs we support in the kernel image, and the compiler instruction
+> >  # optimiser behaviour.
+> 
+> Also, a couple of minor questions about this:
+> - What's the rationale for the placement within the file - it looks
+> a bit curious up the top there.
+Conceptually it's a symbol that is selected by the different processor
+symbols. So IMHO it's fine to have it in front of the processor symbols.
+Maybe it should even go before the line reading:
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index 292c909..4954302 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -25,6 +25,7 @@
- #include <linux/irqdomain.h>
- #include <linux/slab.h>
- #include <linux/of_device.h>
-+#include <linux/of_address.h>
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/pinctrl/pinmux.h>
- #include <linux/pinctrl/pinconf.h>
-@@ -1856,6 +1857,7 @@ static int nmk_pinctrl_probe(struct platform_device *pdev)
- {
- 	const struct platform_device_id *platid = platform_get_device_id(pdev);
- 	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *prcm_np;
- 	struct nmk_pinctrl *npct;
- 	struct resource *res;
- 	unsigned int version = 0;
-@@ -1884,21 +1886,26 @@ static int nmk_pinctrl_probe(struct platform_device *pdev)
- 	if (version == PINCTRL_NMK_DB8540)
- 		nmk_pinctrl_db8540_init(&npct->soc);
- 
-+	if (np) {
-+		prcm_np = of_parse_phandle(np, "prcm", 0);
-+		if (prcm_np)
-+			npct->prcm_base = of_iomap(prcm_np, 0);
-+	}
-+
-+	/* Allow platform passed information to over-write DT. */
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (res) {
-+	if (res)
- 		npct->prcm_base = devm_ioremap(&pdev->dev, res->start,
- 					       resource_size(res));
--		if (!npct->prcm_base) {
--			dev_err(&pdev->dev,
--				"failed to ioremap PRCM registers\n");
--			return -ENOMEM;
-+	if (!npct->prcm_base) {
-+		if (version == PINCTRL_NMK_STN8815) {
-+			dev_info(&pdev->dev,
-+				 "No PRCM base, "
-+				 "assuming no ALT-Cx control is available\n");
-+		} else {
-+			dev_err(&pdev->dev, "missing PRCM base address\n");
-+			return -EINVAL;
- 		}
--	} else if (version == PINCTRL_NMK_STN8815) {
--		dev_info(&pdev->dev,
--			 "No PRCM base, assume no ALT-Cx control is available\n");
--	} else {
--		dev_err(&pdev->dev, "missing PRCM base address\n");
--		return -EINVAL;
- 	}
- 
- 	/*
+	comment "Processor Type"
+
+. OTOH similar symbols (like CPU_32v4, CPU_CP15) are at the end, too.
+So yes, probably it's better to move it further down. And maybe rename
+it to CPU_THUMBONLY?
+
+> - Given the fact that we don't want people using this except in very
+> specific circumstances, should we write a little bit of help for the
+> option?
+I can move what I wrote in the comment above the symbol into a help text
+instead.
+
+Best regards
+Uwe
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
