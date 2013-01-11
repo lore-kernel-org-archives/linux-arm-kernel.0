@@ -1,39 +1,29 @@
 From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 11 Jan 2013 13:16:22 +0530
-Subject: [PATCH v4 4/9] ARM: tegra: Define Tegra20 CAR binding
+Date: Fri, 11 Jan 2013 13:16:23 +0530
+Subject: [PATCH v4 5/9] ARM: Tegra: Define Tegra30 CAR binding
 In-Reply-To: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com>
 References: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <1357890387-23245-5-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <1357890387-23245-6-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+The device tree binding models Tegra30 CAR (Clock And Reset)
+as a single monolithic clock provider.
 
-The Tegra20 CAR (Clock And Reset) Controller controls most aspects of
-most clocks within Tegra20. The device tree binding models this as a
-single monolithic clock provider, which exports many clocks. This reduces
-the number of nodes needed in device tree to represent these clocks.
-
-This binding is only useful for Tegra20; the set of clocks that exists on
-Tegra30 is sufficiently different to merit its own binding.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Acked-by: Simon Glass <sjg@chromium.org>
-[pgaikwad: Added mux clk ids and sorted CAR node]
 Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 ---
- .../bindings/clock/nvidia,tegra20-car.txt          |  205 ++++++++++++++++++++
- arch/arm/boot/dts/tegra20.dtsi                     |    6 +
- 2 files changed, 211 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
+ .../bindings/clock/nvidia,tegra30-car.txt          |  262 ++++++++++++++++++++
+ arch/arm/boot/dts/tegra30.dtsi                     |    6 +
+ 2 files changed, 268 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt
 
-diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
+diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt
 new file mode 100644
-index 0000000..0921fac
+index 0000000..121d203
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
-@@ -0,0 +1,205 @@
-+NVIDIA Tegra20 Clock And Reset Controller
++++ b/Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt
+@@ -0,0 +1,262 @@
++NVIDIA Tegra30 Clock And Reset Controller
 +
 +This binding uses the common clock binding:
 +Documentation/devicetree/bindings/clock/clock-bindings.txt
@@ -42,32 +32,32 @@ index 0000000..0921fac
 +for muxing and gating Tegra's clocks, and setting their rates.
 +
 +Required properties :
-+- compatible : Should be "nvidia,tegra20-car"
++- compatible : Should be "nvidia,tegra30-car"
 +- reg : Should contain CAR registers location and length
 +- clocks : Should contain phandle and clock specifiers for two clocks:
 +  the 32 KHz "32k_in", and the board-specific oscillator "osc".
 +- #clock-cells : Should be 1.
 +  In clock consumers, this cell represents the clock ID exposed by the CAR.
 +
-+  The first 96 clocks are numbered to match the bits in the CAR's CLK_OUT_ENB
++  The first 130 clocks are numbered to match the bits in the CAR's CLK_OUT_ENB
 +  registers. These IDs often match those in the CAR's RST_DEVICES registers,
 +  but not in all cases. Some bits in CLK_OUT_ENB affect multiple clocks. In
-+  this case, those clocks are assigned IDs above 95 in order to highlight
++  this case, those clocks are assigned IDs above 160 in order to highlight
 +  this issue. Implementations that interpret these clock IDs as bit values
 +  within the CLK_OUT_ENB or RST_DEVICES registers should be careful to
 +  explicitly handle these special cases.
 +
-+  The balance of the clocks controlled by the CAR are assigned IDs of 96 and
++  The balance of the clocks controlled by the CAR are assigned IDs of 160 and
 +  above.
 +
 +  0	cpu
 +  1	unassigned
 +  2	unassigned
-+  3	ac97
++  3	unassigned
 +  4	rtc
-+  5	tmr
-+  6	uart1
-+  7	unassigned	(register bit affects uart2 and vfir)
++  5	timer
++  6	uarta
++  7	unassigned	(register bit affects uartb and vfir)
 +  8	gpio
 +  9	sdmmc2
 +  10	unassigned	(register bit affects spdif_in and spdif_out)
@@ -76,7 +66,7 @@ index 0000000..0921fac
 +  13	ndflash
 +  14	sdmmc1
 +  15	sdmmc4
-+  16	twc
++  16	unassigned
 +  17	pwm
 +  18	i2s2
 +  19	epp
@@ -85,38 +75,38 @@ index 0000000..0921fac
 +  22	usbd
 +  23	isp
 +  24	3d
-+  25	ide
++  25	unassigned
 +  26	disp2
 +  27	disp1
 +  28	host1x
 +  29	vcp
-+  30	unassigned
-+  31	cache2
++  30	i2s0
++  31	cop_cache
 +
-+  32	mem
++  32	mc
 +  33	ahbdma
 +  34	apbdma
 +  35	unassigned
 +  36	kbc
-+  37	stat_mon
++  37	statmon
 +  38	pmc
-+  39	fuse
++  39	unassigned	(register bit affects fuse and fuse_burn)
 +  40	kfuse
 +  41	sbc1
-+  42	snor
-+  43	spi1
++  42	nor
++  43	unassigned
 +  44	sbc2
-+  45	xio
++  45	unassigned
 +  46	sbc3
-+  47	dvc
-+  48	dsi
-+  49	unassigned	(register bit affects tvo and cve)
++  47	i2c5
++  48	dsia
++  49	unassigned	(register bit affects cve and tvo)
 +  50	mipi
 +  51	hdmi
 +  52	csi
 +  53	tvdac
 +  54	i2c2
-+  55	uart3
++  55	uartc
 +  56	unassigned
 +  57	emc
 +  58	usb2
@@ -127,8 +117,8 @@ index 0000000..0921fac
 +  63	bsev
 +
 +  64	speedo
-+  65	uart4
-+  66	uart5
++  65	uartd
++  66	uarte
 +  67	i2c3
 +  68	sbc4
 +  69	sdmmc3
@@ -136,72 +126,129 @@ index 0000000..0921fac
 +  71	owr
 +  72	afi
 +  73	csite
-+  74	unassigned
++  74	pciex
 +  75	avpucq
 +  76	la
 +  77	unassigned
 +  78	unassigned
-+  79	unassigned
-+  80	unassigned
-+  81	unassigned
-+  82	unassigned
++  79	dtv
++  80	ndspeed
++  81	i2cslow
++  82	dsib
 +  83	unassigned
 +  84	irama
 +  85	iramb
 +  86	iramc
 +  87	iramd
 +  88	cram2
-+  89	audio_2x	a/k/a audio_2x_sync_clk
-+  90	clk_d
++  89	unassigned
++  90	audio_2x	a/k/a audio_2x_sync_clk
 +  91	unassigned
-+  92	sus
-+  93	cdev1
-+  94	cdev2
++  92	csus
++  93	cdev2
++  94	cdev1
 +  95	unassigned
 +
-+  96	uart2
-+  97	vfir
-+  98	spdif_in
-+  99	spdif_out
-+  100	vi
-+  101	vi_sensor
-+  102	tvo
-+  103	cve
-+  104	osc
-+  105	clk_32k		a/k/a clk_s
-+  106	clk_m
-+  107	sclk
-+  108	cclk
-+  109	hclk
-+  110	pclk
-+  111	blink
-+  112	pll_a
-+  113	pll_a_out0
-+  114	pll_c
-+  115	pll_c_out1
-+  116	pll_d
-+  117	pll_d_out0
-+  118	pll_e
-+  119	pll_m
-+  120	pll_m_out1
-+  121	pll_p
-+  122	pll_p_out1
-+  123	pll_p_out2
-+  124	pll_p_out3
-+  125	pll_p_out4
-+  126	pll_s
-+  127	pll_u
-+  128	pll_x
-+  129	cop		a/k/a avp
-+  130	audio		a/k/a audio_sync_clk
-+  131	pll_ref
-+  132	twd
++  96	cpu_g
++  97	cpu_lp
++  98	3d2
++  99	mselect
++  100	tsensor
++  101	i2s3
++  102	i2s4
++  103	i2c4
++  104	sbc5
++  105	sbc6
++  106	d_audio
++  107	apbif
++  108	dam0
++  109	dam1
++  110	dam2
++  111	hda2codec_2x
++  112	atomics
++  113	audio0_2x
++  114	audio1_2x
++  115	audio2_2x
++  116	audio3_2x
++  117	audio4_2x
++  118	audio5_2x
++  119	actmon
++  120	extern1
++  121	extern2
++  122	extern3
++  123	sata_oob
++  124	sata
++  125	hda
++  127	se
++  128	hda2hdmi
++  129	sata_cold
++
++  160	uartb
++  161	vfir
++  162	spdif_in
++  163	spdif_out
++  164	vi
++  165	vi_sensor
++  166	fuse
++  167	fuse_burn
++  168	cve
++  169	tvo
++
++  170	clk_32k
++  171	clk_m
++  172	clk_m_div2
++  173	clk_m_div4
++  174	pll_ref
++  175	pll_c
++  176	pll_c_out1
++  177	pll_m
++  178	pll_m_out1
++  179	pll_p
++  180	pll_p_out1
++  181	pll_p_out2
++  182	pll_p_out3
++  183	pll_p_out4
++  184	pll_a
++  185	pll_a_out0
++  186	pll_d
++  187	pll_d_out0
++  188	pll_d2
++  189	pll_d2_out0
++  190	pll_u
++  191	pll_x
++  192	pll_x_out0
++  193	pll_e
++  194	spdif_in_sync
++  195	i2s0_sync
++  196	i2s1_sync
++  197	i2s2_sync
++  198	i2s3_sync
++  199	i2s4_sync
++  200	vimclk
++  201	audio0
++  202	audio1
++  203	audio2
++  204	audio3
++  205	audio4
++  206	audio5
++  207	clk_out_1 (extern1)
++  208	clk_out_2 (extern2)
++  209	clk_out_3 (extern3)
++  210	sclk
++  211	blink
++  212	cclk_g
++  213	cclk_lp
++  214	twd
++  215	cml0
++  216	cml1
++  217	hclk
++  218	pclk
 +
 +Example SoC include file:
 +
 +/ {
 +	tegra_car: clock {
-+		compatible = "nvidia,tegra20-car";
++		compatible = "nvidia,tegra30-car";
 +		reg = <0x60006000 0x1000>;
 +		#clock-cells = <1>;
 +	};
@@ -215,7 +262,7 @@ index 0000000..0921fac
 +
 +/ {
 +	clocks {
-+		compatible = "simple-bus";
++		compatible = "simple-bug";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
 +
@@ -238,22 +285,22 @@ index 0000000..0921fac
 +		clocks = <&clk_32k> <&osc>;
 +	};
 +};
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index b8effa1..5b104f1 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -123,6 +123,12 @@
- 			      0 42 0x04>;
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 529fdb8..6765646 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -125,6 +125,12 @@
+ 			      0 122 0x04>;
  	};
  
 +	tegra_car: clock {
-+		compatible = "nvidia,tegra20-car";
++		compatible = "nvidia,tegra30-car";
 +		reg = <0x60006000 0x1000>;
 +		#clock-cells = <1>;
 +	};
 +
  	apbdma: dma {
- 		compatible = "nvidia,tegra20-apbdma";
- 		reg = <0x6000a000 0x1200>;
+ 		compatible = "nvidia,tegra30-apbdma", "nvidia,tegra20-apbdma";
+ 		reg = <0x6000a000 0x1400>;
 -- 
 1.7.4.1
