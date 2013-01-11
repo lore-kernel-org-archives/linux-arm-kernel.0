@@ -1,111 +1,77 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 11 Jan 2013 14:23:34 +0100
-Subject: [PATCH V2 2/2] ARM: dts: OMAP2+: Add PMU nodes
-In-Reply-To: <1355766548-5702-3-git-send-email-jon-hunter@ti.com>
-References: <1355766548-5702-1-git-send-email-jon-hunter@ti.com>
- <1355766548-5702-3-git-send-email-jon-hunter@ti.com>
-Message-ID: <50F01256.7030701@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Jan 2013 18:57:44 +0530
+Subject: [PATCHv2 05/11] arm: arch_timer: split cntfrq accessor
+In-Reply-To: <1357747640-18594-6-git-send-email-mark.rutland@arm.com>
+References: <1357747640-18594-1-git-send-email-mark.rutland@arm.com>
+ <1357747640-18594-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <50F01350.4040107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On 12/17/2012 06:49 PM, Jon Hunter wrote:
-> Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
-> 
-> Please note that the node for OMAP4460 has been placed in a separate
-> header file for OMAP4460, because the node is not compatible with
-> OMAP4430. The node for OMAP4430 is not included because PMU is not
-> currently supported on OMAP4430 due to the absence of a cross-trigger
-> interface driver.
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-
-I've just applied this patch in my for_3.9/dts branch.
-
-I'm wondering if there is any dependency with the previous patch? If
-Tony ack it I can take it as well.
-
-Regards,
-Benoit
-
+On Wednesday 09 January 2013 09:37 PM, Mark Rutland wrote:
+> The CNTFRQ register is not duplicated for physical and virtual timers,
+> and accessing it as if it were is confusing.
+>
+> Instead, use a separate accessor which doesn't take the access type
+> as a parameter.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/boot/dts/omap2.dtsi         |    5 +++++
->  arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
->  arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
->  arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
->  4 files changed, 31 insertions(+)
->  create mode 100644 arch/arm/boot/dts/omap4460.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-> index 761c4b6..27f5ea1 100644
-> --- a/arch/arm/boot/dts/omap2.dtsi
-> +++ b/arch/arm/boot/dts/omap2.dtsi
-> @@ -26,6 +26,11 @@
->  		};
->  	};
->  
-> +	pmu {
-> +		compatible = "arm,arm1136-pmu";
-> +		interrupts = <3>;
-> +	};
+>   arch/arm/kernel/arch_timer.c |   17 +++++++++--------
+>   1 files changed, 9 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+> index 0d2681c..fc87d3d 100644
+> --- a/arch/arm/kernel/arch_timer.c
+> +++ b/arch/arm/kernel/arch_timer.c
+> @@ -51,8 +51,7 @@ static bool arch_timer_use_virtual = true;
+>   #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
+>
+>   #define ARCH_TIMER_REG_CTRL		0
+> -#define ARCH_TIMER_REG_FREQ		1
+> -#define ARCH_TIMER_REG_TVAL		2
+> +#define ARCH_TIMER_REG_TVAL		1
+>
+>   #define ARCH_TIMER_PHYS_ACCESS		0
+>   #define ARCH_TIMER_VIRT_ACCESS		1
+> @@ -101,9 +100,6 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
+>   		case ARCH_TIMER_REG_TVAL:
+>   			asm volatile("mrc p15, 0, %0, c14, c2, 0" : "=r" (val));
+>   			break;
+> -		case ARCH_TIMER_REG_FREQ:
+> -			asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
+> -			break;
+>   		}
+>   	}
+>
+> @@ -121,6 +117,13 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
+>   	return val;
+>   }
+>
+> +static inline u32 arch_timer_get_cntfrq(void)
+> +{
+> +	u32 val;
+> +	asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
+> +	return val;
+> +}
 > +
->  	soc {
->  		compatible = "ti,omap-infra";
->  		mpu {
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 1acc261..6c63118 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -26,6 +26,12 @@
->  		};
->  	};
->  
-> +	pmu {
-> +		compatible = "arm,cortex-a8-pmu";
-> +		interrupts = <3>;
-> +		ti,hwmods = "debugss";
-> +	};
-> +
->  	/*
->  	 * The soc node represents the soc top level view. It is uses for IPs
->  	 * that are not memory mapped in the MPU view or for the MPU itself.
-> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-> index 73bc1a6..2a6e344 100644
-> --- a/arch/arm/boot/dts/omap4-panda-es.dts
-> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
-> @@ -5,7 +5,9 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> +
->  /include/ "omap4-panda.dts"
-> +/include/ "omap4460.dtsi"
->  
->  /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
->  &sound {
-> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-> new file mode 100644
-> index 0000000..0a1d38b
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap4460.dtsi
-> @@ -0,0 +1,18 @@
-> +/*
-> + * Device Tree Source for OMAP4460 SoC
-> + *
-> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/ {
-> +	pmu {
-> +		compatible = "arm,cortex-a9-pmu";
-> +		interrupts = <0 54 0x4>,
-> +			     <0 55 0x4>;
-> +		ti,hwmods = "debugss";
-> +	};
-> +};
-> 
+>   static inline u64 arch_counter_get_cntpct(void)
+>   {
+>   	u64 cval;
+> @@ -253,9 +256,7 @@ static int arch_timer_available(void)
+>   	u32 freq;
+>
+>   	if (arch_timer_rate == 0) {
+> -		freq = arch_timer_reg_read(ARCH_TIMER_PHYS_ACCESS,
+> -					   ARCH_TIMER_REG_FREQ);
+> -
+> +		freq = arch_timer_get_cntfrq();
+Not related to this patch a new line here will be good.
+>   		/* Check the timer frequency. */
+>   		if (freq == 0) {
+>   			pr_warn("Architected timer frequency not available\n");
+>
+Otherwise patch looks fine to me.
+Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
