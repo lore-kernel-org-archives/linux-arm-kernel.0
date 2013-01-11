@@ -1,38 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Jan 2013 15:36:14 +0000
-Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <20130111034015.GA28094@avionic-0098.adnet.avionic-design.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <50EF54B6.6010100@wwwdotorg.org>
- <20130111034015.GA28094@avionic-0098.adnet.avionic-design.de>
-Message-ID: <201301111536.14799.arnd@arndb.de>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 11 Jan 2013 10:42:40 -0500
+Subject: [PATCH 6/6] ARM: virt: hide CONFIG_ARM_VIRT_EXT from user
+In-Reply-To: <1357918457-20469-7-git-send-email-will.deacon@arm.com>
+References: <1357918457-20469-1-git-send-email-will.deacon@arm.com>
+ <1357918457-20469-7-git-send-email-will.deacon@arm.com>
+Message-ID: <50F032F0.3070906@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 January 2013, Thierry Reding wrote:
-> Right, it'll need #ifdefs around the arch_{setup,teardown}_msi_irq(). Or
-> select PCI_MSI unconditionally. Once this is merged I was going to post
-> a patch that enables PCI_MSI in tegra_defconfig anyway. But it might be
-> better to keep it optional anyway since the remainder of the code copes
-> with it properly.
+Hi Will,
+
+On 01/11/2013 10:34 AM, Will Deacon wrote:
+> ARM_VIRT_EXT is a property of CPU_V7, but does not adversely affect
+> other CPUs that can be built into the same kernel image (i.e. ARMv6+).
 > 
-Actually, we need something better than that. You cannot define
-arch_setup_msi_irq in a tegra specific pci host driver, because that
-will seriously mess up other platforms in multiplatform configurations
-by giving a link error when they also define this function, or with a
-run-time error when they don't support it.
+> This patch defaults ARM_VIRT_EXT to y if CPU_V7, allowing hypervisors
+> such as KVM to make better use of the option and being able to rely
+> on hyp-mode boot support.
 
-I think what we should do here is fix it the right way by adding
-a pci host specific callback rather than an architecture specific
-callback in drivers/pci/msi.c. There is already a default version
-of arch_setup_msi_irqs (with s), and we can probably do the
-same for arch_setup_msi_irq (without s) to fall back to the
-arch version for most architectures.
-Most architectures (at least powerpc, sparc, ia64 and x86) already
-multiplex the msi handlers internally, but ARM does not because
-there is only one implementation (iop33x) at the moment.
+[...]
 
-We can add a generix multiplex and then move architectures over to
-use it.
+> @@ -640,11 +641,6 @@ config ARM_VIRT_EXT
+>  	  use of this feature.  Refer to Documentation/arm/Booting for
+>  	  details.
+>  
+> -	  It is safe to enable this option even if the kernel may not be
+> -	  booted in HYP mode, may not have support for the
+> -	  virtualization extensions, or may be booted with a
+> -	  non-compliant bootloader.
 
-	Arnd
+Why take this out?
+
+[...]
+
+Regards,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
+the Linux Foundation
