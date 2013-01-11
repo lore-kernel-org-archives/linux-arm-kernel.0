@@ -1,39 +1,38 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Jan 2013 13:13:00 +0000
-Subject: [PATCH 12/18] power: ab8500_btemp: remove superfluous BTEMP thermal
- comp.
+Date: Fri, 11 Jan 2013 13:13:03 +0000
+Subject: [PATCH 15/18] power: ab8500_charger: remove unused defines.
 In-Reply-To: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
 References: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1357909986-9262-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <1357909986-9262-16-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hakan Berg <hakan.berg@stericsson.com>
+From: Marcus Cooper <marcus.xm.cooper@stericsson.com>
 
-BTEMP thermal compensation factor times 10 is applied in two
-places, probe and get_property. Removed from probe.
+Cleanup of the ab8500_charger driver.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Hakan Berg <hakan.berg@stericsson.com>
+Signed-off-by: Marcus Cooper <marcus.xm.cooper@stericsson.com>
 Reviewed-by: Karl KOMIEROWSKI <karl.komierowski@stericsson.com>
 ---
- drivers/power/ab8500_btemp.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/power/ab8500_charger.c |    5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/drivers/power/ab8500_btemp.c b/drivers/power/ab8500_btemp.c
-index 6f6a715..c882a9a 100644
---- a/drivers/power/ab8500_btemp.c
-+++ b/drivers/power/ab8500_btemp.c
-@@ -1030,8 +1030,8 @@ static int __devinit ab8500_btemp_probe(struct platform_device *pdev)
- 		ab8500_btemp_periodic_work);
+diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
+index 30193ea..2769e91 100644
+--- a/drivers/power/ab8500_charger.c
++++ b/drivers/power/ab8500_charger.c
+@@ -115,11 +115,6 @@ enum ab8500_charger_link_status {
+ 	USB_STAT_CARKIT_1,
+ 	USB_STAT_CARKIT_2,
+ 	USB_STAT_ACA_DOCK_CHARGER,
+-	USB_STAT_SAMSUNG_USB_PHY_DIS,
+-	USB_STAT_SAMSUNG_USB_PHY_ENA,
+-	USB_STAT_SAMSUNG_UART_PHY_DIS,
+-	USB_STAT_SAMSUNG_UART_PHY_ENA,
+-	USB_STAT_MOTOROLA_USB_PHY_ENA,
+ };
  
- 	/* Set BTEMP thermal limits. Low and Med are fixed */
--	di->btemp_ranges.btemp_low_limit = BTEMP_THERMAL_LOW_LIMIT * 10;
--	di->btemp_ranges.btemp_med_limit = BTEMP_THERMAL_MED_LIMIT * 10;
-+	di->btemp_ranges.btemp_low_limit = BTEMP_THERMAL_LOW_LIMIT;
-+	di->btemp_ranges.btemp_med_limit = BTEMP_THERMAL_MED_LIMIT;
- 
- 	ret = abx500_get_register_interruptible(di->dev, AB8500_CHARGER,
- 		AB8500_BTEMP_HIGH_TH, &val);
+ enum ab8500_usb_state {
 -- 
 1.7.9.5
