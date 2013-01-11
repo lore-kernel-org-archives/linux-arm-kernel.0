@@ -1,82 +1,200 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 11 Jan 2013 11:53:31 -0800
-Subject: [PATCH 0/2 v2] at91/ssc: fixes on ASoC tree for 3.8
-In-Reply-To: <20130111193948.GA8677@opensource.wolfsonmicro.com>
-References: <cover.1357912706.git.nicolas.ferre@atmel.com>
- <CAOesGMhhSkrvP7X=y8qmdMKKXZ694+1+ZXY3y6HK1E85qaN5sQ@mail.gmail.com>
- <20130111193948.GA8677@opensource.wolfsonmicro.com>
-Message-ID: <20130111195331.GA2533@quad.lixom.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 11 Jan 2013 14:54:00 -0500 (EST)
+Subject: [PATCH 02/16] ARM: b.L: introduce the CPU/cluster power API
+In-Reply-To: <50F05CD4.8050905@ti.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-3-git-send-email-nicolas.pitre@linaro.org>
+ <50F04B4F.2070300@ti.com> <alpine.LFD.2.02.1301111312180.6300@xanadu.home>
+ <50F05CD4.8050905@ti.com>
+Message-ID: <alpine.LFD.2.02.1301111432200.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 07:39:49PM +0000, Mark Brown wrote:
-> On Fri, Jan 11, 2013 at 10:52:19AM -0800, Olof Johansson wrote:
-> > On Fri, Jan 11, 2013 at 6:08 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+On Sat, 12 Jan 2013, Santosh Shilimkar wrote:
+
+> On Saturday 12 January 2013 12:03 AM, Nicolas Pitre wrote:
+> > On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
 > > 
-> > > This material was designed to enter Mark's fixes queue, but as discussed with
-> > > Olof, we can imagine merging everything through arm-soc or split the series (of
-> > > 2 patches) and let them progress upstream separated (option that I do not like
-> > > even if I know that the consequences are not so dramatic).
-> > > So please, Olof, if you feel confortable with this series, tell us what you
-> > > prefer and we will make our best to make this material go forward...
-> 
-> > You're setting yourself up for awkward merges. The driver change is
-> > strongly dependent on the device tree change by failing probe unless
-> > the device tree update is there, while before this patch, it still
-> > worked.
-> 
-> This is partly my fault for getting grumpy about adding the bolier plate
-> code without error checking - overall Linus' change to do the get in the
-> core seems like the most sane approach here.
-> 
-> > But to be honest, I don't think this is a fix, it's a feature that you
-> > just didn't include in time for the merge window. I don't really see
-> > them as appropriate 3.8 material at this point.
-> 
-> Jean-Christophe has been most insistent that pinctrl support is now
-> manadatory for all AT91 systems using device tree. 
+> > > On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
+> > > > This is the basic API used to handle the powering up/down of individual
+> > > > CPUs in a big.LITTLE system.  The platform specific backend
+> > > > implementation
+> > > > has the responsibility to also handle the cluster level power as well
+> > > > when
+> > > > the first/last CPU in a cluster is brought up/down.
+> > > > 
+> > > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > > > ---
+> > > >    arch/arm/common/bL_entry.c      | 88
+> > > > +++++++++++++++++++++++++++++++++++++++
+> > > >    arch/arm/include/asm/bL_entry.h | 92
+> > > > +++++++++++++++++++++++++++++++++++++++++
+> > > >    2 files changed, 180 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
+> > > > index 80fff49417..41de0622de 100644
+> > > > --- a/arch/arm/common/bL_entry.c
+> > > > +++ b/arch/arm/common/bL_entry.c
+> > > > @@ -11,11 +11,13 @@
+> > > > 
+> > > >    #include <linux/kernel.h>
+> > > >    #include <linux/init.h>
+> > > > +#include <linux/irqflags.h>
+> > > > 
+> > > >    #include <asm/bL_entry.h>
+> > > >    #include <asm/barrier.h>
+> > > >    #include <asm/proc-fns.h>
+> > > >    #include <asm/cacheflush.h>
+> > > > +#include <asm/idmap.h>
+> > > > 
+> > > >    extern volatile unsigned long
+> > > > bL_entry_vectors[BL_NR_CLUSTERS][BL_CPUS_PER_CLUSTER];
+> > > > 
+> > > > @@ -28,3 +30,89 @@ void bL_set_entry_vector(unsigned cpu, unsigned
+> > > > cluster,
+> > > > void *ptr)
+> > > >    	outer_clean_range(__pa(&bL_entry_vectors[cluster][cpu]),
+> > > >    			  __pa(&bL_entry_vectors[cluster][cpu + 1]));
+> > > >    }
+> > > > +
+> > > > +static const struct bL_platform_power_ops *platform_ops;
+> > > > +
+> > > > +int __init bL_platform_power_register(const struct
+> > > > bL_platform_power_ops
+> > > > *ops)
+> > > > +{
+> > > > +	if (platform_ops)
+> > > > +		return -EBUSY;
+> > > > +	platform_ops = ops;
+> > > > +	return 0;
+> > > > +}
+> > > > +
+> > > > +int bL_cpu_power_up(unsigned int cpu, unsigned int cluster)
+> > > > +{
+> > > > +	if (!platform_ops)
+> > > > +		return -EUNATCH;
+> > > > +	might_sleep();
+> > > > +	return platform_ops->power_up(cpu, cluster);
+> > > > +}
+> > > > +
+> > > > +typedef void (*phys_reset_t)(unsigned long);
+> > > > +
+> > > > +void bL_cpu_power_down(void)
+> > > > +{
+> > > > +	phys_reset_t phys_reset;
+> > > > +
+> > > > +	BUG_ON(!platform_ops);
+> > > > +	BUG_ON(!irqs_disabled());
+> > > > +
+> > > > +	/*
+> > > > +	 * Do this before calling into the power_down method,
+> > > > +	 * as it might not always be safe to do afterwards.
+> > > > +	 */
+> > > > +	setup_mm_for_reboot();
+> > > > +
+> > > > +	platform_ops->power_down();
+> > > > +
+> > > > +	/*
+> > > > +	 * It is possible for a power_up request to happen concurrently
+> > > > +	 * with a power_down request for the same CPU. In this case the
+> > > > +	 * power_down method might not be able to actually enter a
+> > > > +	 * powered down state with the WFI instruction if the power_up
+> > > > +	 * method has removed the required reset condition.  The
+> > > > +	 * power_down method is then allowed to return. We must perform
+> > > > +	 * a re-entry in the kernel as if the power_up method just had
+> > > > +	 * deasserted reset on the CPU.
+> > > > +	 *
+> > > > +	 * To simplify race issues, the platform specific implementation
+> > > > +	 * must accommodate for the possibility of unordered calls to
+> > > > +	 * power_down and power_up with a usage count. Therefore, if a
+> > > > +	 * call to power_up is issued for a CPU that is not down, then
+> > > > +	 * the next call to power_down must not attempt a full shutdown
+> > > > +	 * but only do the minimum (normally disabling L1 cache and CPU
+> > > > +	 * coherency) and return just as if a concurrent power_up request
+> > > > +	 * had happened as described above.
+> > > > +	 */
+> > > > +
+> > > > +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+> > > > +	phys_reset(virt_to_phys(bL_entry_point));
+> > > > +
+> > > > +	/* should never get here */
+> > > > +	BUG();
+> > > > +}
+> > > > +
+> > > > +void bL_cpu_suspend(u64 expected_residency)
+> > > > +{
+> > > > +	phys_reset_t phys_reset;
+> > > > +
+> > > > +	BUG_ON(!platform_ops);
+> > > > +	BUG_ON(!irqs_disabled());
+> > > > +
+> > > > +	/* Very similar to bL_cpu_power_down() */
+> > > > +	setup_mm_for_reboot();
+> > > > +	platform_ops->suspend(expected_residency);
+> > > > +	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+> > > > +	phys_reset(virt_to_phys(bL_entry_point));
+> > > > +	BUG();
+> > > > 
+> > > I might be missing all the rationales behind not having a recovery for
+> > > CPUs entering suspend if they actualy come here because of some events.
+> > > This is pretty much possible in many scenario's and hence letting CPU
+> > > cpu come out of suspend should be possible. May be switcher code don't
+> > > have such requirement but it appeared bit off to me.
+> > 
+> > There are two things to consider here:
+> > 
+> > 1) The CPU is suspended.  CPU state is lost. Next interrupt to wake up
+> >     the CPU will make it restart from the reset vector and re-entry in
+> >     the kernel will happen via bL_entry_point to deal with the various
+> >     cluster issues, to eventually resume kernel code via cpu_resume.
+> >     Obviously, the machine specific backend code would have set the
+> >     bL_entry_point address in its machine specific reset vector in
+> >     advance.
+> This is the successful case and in that case you will anyway not hit the
+> BUG.
+> > 
+> > 2) An interrupt comes along before the CPU is effectively suspended, say
+> >     right before the backend code executes a WFI to shut the CPU down.
+> >     The CPU and possibly cluster state was already set for being powered
+> >     off.  We cannot simply return at this point as caches are off, the
+> >     CPU is not coherent with the rest of the system anymore, etc.  So if
+> >     the platform specific backend ever returns, say because the final WFI
+> >     exited, then we have to go through the same arbitration process to
+> >     restore the CPU and cluster state as if that was a hard reset.  Hence
+> >     the cpu_reset call to loop back into bL_entry_point.
+> > 
+> This is the one I was thinking. Enabling C bit and SMP bit should be
+> enough for CPU to get back to right state since the CPU has not lost
+> the context all the registers including SP is intact and CPU should
+> be able to resume.
 
-That's a noble goal but enforcing it early gives everyone a lot of pain, and
-quite honestly doesn't make sense. During transition it's better to be lenient
-and allow both old and new methods (without breakage), unless it causes
-significant extra churn.
+No.  If we are the last man then the CCI is disabled and we cannot just 
+enable the C and SMP bits anymore without turning the CCI back on.  And 
+even if we are not the last man, maybe another CPU is concurrently going 
+through the same code and that one _is_ the last man, in which case it 
+will have waited until we are done flushing our cache to turn off the 
+CCI but we don't know about that.  And yet another CPU might be coming 
+up just at the same moment but this one will want to turn on the CCI and 
+that has to be done in a controlled way, and that control is performed 
+in the code from bL_entry_point.  So, in short, we cannot just return 
+from here.
 
-> Unfortunately
-> pinctrl support for AT91 only came in during the merge window and it
-> seems like it's sadly been impossible to do what seemd like the obvious
-> thing and add the pinctrl bindings to the DT prior to the merge down so
-> now we've got this mess.  I believe the way the pinctrl conversion was
-> done renders the audio driver non-functional without this series.
+> > In either cases, we simply cannot ever return from bL_cpu_suspend()
+> > directly.  Of course, the caller is expected to have used
+> > bL_set_entry_vector() beforehand, most probably with cpu_resume as
+> > argument.
+> > 
+> The above might get complicated if when above situation happens on
+> last CPU where even CCI gets disabled and then adding the rever code
+> for all of that may not be worth. You approach is much safer.
 
-The problem is that at91 tries to do too much in a single release, and then do
-nothing in several releases after. If there was a steadier trickle of code
-coming in, then these kind of complex dependencies wouldn't show up all at
-once, and could be handled with much less overhead for everyone else involved.
-:(
+Indeed.  Furthermore, that revert code does exist already: it is all in 
+bL_head.S.  Hence the cpu_reset(bL_entry_point) call.
 
-> 
-> > So, nack on this series. Please make the driver change non-dependent
-> > on the new dtsi contents, and merge that through the ASoC tree. Then
-> > the dtsi update can go through arm-soc, and later on you can make it
-> > mandatory.
-> 
-> Like I say I'm not thrilled about ignoring the return code TBH, nor am I
-> thrilled with the way this has been handled overall.  That said, the
-> current series does seem like the best of a bad job - as I understand it
-> we need something like this in v3.8 to make the driver functional.
+> Thanks for explaining it further.
 
-To be honest, if Atmel can't figure out how to merge a complete feature
-without causing intentional regressions during the merge window, and plan
-on brokenness to be fixed as late as in -rc4, then they deserve to have
-a broken platform. Unfortunately the victim of that is end users, and we
-don't want to leave them hanging. This really can't become a trend though.
-
-Sigh. Feel free to add:
-
-Reluctantly-acked-by: Olof Johansson <olof@lixom.net>
-
-to the patches when you apply them (based on IRC discussion, might as
-well take both through ASoC).
+No problem.  That literally took us months to get this code 
+right so it might not be fully obvious to others after the first look.
 
 
--Olof
+Nicolas
