@@ -1,42 +1,16 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 11 Jan 2013 17:43:52 -0700
-Subject: [PATCH 1/2] arm: tegra: Add new DT property to USB node.
-In-Reply-To: <20130112001414.GA21909@kroah.com>
-References: <50CF89AF.3000308@wwwdotorg.org>
- <Pine.LNX.4.44L0.1212171704060.1409-100000@iolanthe.rowland.org>
- <20130112001414.GA21909@kroah.com>
-Message-ID: <50F0B1C8.400@wwwdotorg.org>
+Date: Fri, 11 Jan 2013 17:44:55 -0700
+Subject: [PATCH] arm: tegra: remove USB address related macros from iomap.h
+In-Reply-To: <1355805061-22789-1-git-send-email-vbyravarasu@nvidia.com>
+References: <1355805061-22789-1-git-send-email-vbyravarasu@nvidia.com>
+Message-ID: <50F0B207.8000205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2013 05:14 PM, Greg KH wrote:
-> On Mon, Dec 17, 2012 at 05:04:41PM -0500, Alan Stern wrote:
->> On Mon, 17 Dec 2012, Stephen Warren wrote:
->>
->>> On 12/13/2012 11:59 PM, Venu Byravarasu wrote:
->>>> As Tegra USB host driver is using instance number for resetting
->>>> PORT0 twice, adding a new DT property for handling this.
->>>
->>> Alan, Greg, Felip,e
->>>
->>> This series looks fine to me.
->>>
->>> I'd like to take all the Tegra-related USB patches through the Tegra
->>> tree for 3.9 if possible (so I'm looking for your acks here). I believe
->>> Venu plans to significantly clean up the EHCI/PHY driver split for
->>> Tegra, rework the drivers, and add support for Tegra30 in addition to
->>> Tegra20. Some of this requires changes to some Tegra board files and
->>> device trees to maintain "git bisect" I don't know for sure yet, but I
->>> believe that rework may also end up conflicting with other clock-related
->>> rework that will show up for Tegra in 3.9. Are you OK with this? I'll
->>> certainly look for your review/acks on the patches before picking them
->>> up though.
->>
->> Regarding the changes to drivers/usb/host/ehci-tegra.c:
->>
->> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> 
-> That's fine with me as well, feel free to think that I have now dropped
-> all tegra-related patches from my queue, you can take them all :)
+On 12/17/2012 09:31 PM, Venu Byravarasu wrote:
+> USB register base address and sizes defined in iomap.h
+> are not used in any files other than board-dt-tegra20.c.
+> Hence removed those defines from header file and using
+> the absolute values in board files.
 
 Thanks, applied to Tegra's for-3.9/usb branch.
