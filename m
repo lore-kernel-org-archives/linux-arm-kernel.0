@@ -1,38 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Jan 2013 21:12:25 +0000
-Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <20130112123640.GA22505@avionic-0098.adnet.avionic-design.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <20130111154516.GA25335@avionic-0098.adnet.avionic-design.de>
- <20130112123640.GA22505@avionic-0098.adnet.avionic-design.de>
-Message-ID: <201301122112.25772.arnd@arndb.de>
+Date: Sat, 12 Jan 2013 21:14:07 +0000
+Subject: [PATCH v2 0/3] Use helper clockevents_config_and_register()
+In-Reply-To: <1357991406-22778-1-git-send-email-shawn.guo@linaro.org>
+References: <1357991406-22778-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201301122114.07278.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 January 2013, Thierry Reding wrote:
-> > I already hinted at that in one of the other subthreads. Having such a
-> > multiplex would also allow the driver to be built as a module. I had
-> > already thought about this when I was working on an earlier version of
-> > these patches. Basically these would be two ops attached to the host
-> > bridge, and the generic arch_setup_msi_irq() could then look that up
-> > given the struct pci_dev that is passed to it and call this new per-
-> > host bridge .setup_msi_irq().
+On Saturday 12 January 2013, Shawn Guo wrote:
+> The clockevent core is able to figure out the best mult and shift,
+> calculate min_delta_ns and max_delta_ns, with the necessary info passed
+> into clockevents_config_and_register().  Use this handy helper to make
+> the drivers less error prone and save some LOC.
 > 
-> struct pci_ops looks like a good place to put these. They'll be
-> available from each struct pci_bus, so should be easy to call from
-> arch_setup_msi_irq().
+> Changes since v1:
+>  - Add one patch to export clockevents_config_and_register for fixing
+>    the error [1] reported by Fengguang.
+>  - Add Acked-by and Tested-by tags given by people (Thanks!)
 > 
-> Any objections?
-> 
+> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/209152
 
-struct pci_ops has a long history of being specifically about
-config space read/write operations, so on the one hand it does
-not feel like the right place to put interrupt specific operations,
-but on the other hand, the name sounds appropriate and I cannot
-think of any other place to put this, so it's fine with me.
+Very nice series!
 
-The only alternative I can think of is to introduce a new
-structure next to it in struct pci_bus, but that feels a bit
-pointless. Maybe Bjorn has a preference one way or the other.
-
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
