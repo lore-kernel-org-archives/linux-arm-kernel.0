@@ -1,32 +1,54 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 11 Jan 2013 18:53:19 -0800
-Subject: [PATCH] ARM: OMAP4: clock/hwmod data: remove MODULEMODE entries
- in mux + gate combos
-In-Reply-To: <alpine.DEB.2.00.1212172240101.29833@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1212172240101.29833@utopia.booyaka.com>
-Message-ID: <20130112025319.4361.29079@quantum>
+Date: Fri, 11 Jan 2013 18:56:38 -0800
+Subject: [PATCH] clk: max77686: Fix return value checking for devm_kzalloc
+In-Reply-To: <1355816625.32595.0.camel@phoenix>
+References: <1355816625.32595.0.camel@phoenix>
+Message-ID: <20130112025638.4361.85705@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Paul Walmsley (2012-12-17 14:41:13)
-> Convert all DEFINE_OMAP_MUX_GATE() combinations that list MODULEMODE
-> registers in their gate arguments to DEFINE_OMAP_MUX(), dropping the
-> MODULEMODE data.  This is possible because the MODULEMODE bits control
-> IP blocks, not clocks; and the hwmod code takes care of IP block
-> control.  Rename these clocks to reflect the original multiplexer name
-> as specified in the comments.  And convert the hwmod data to use the
-> multiplexer clock name.
+Quoting Axel Lin (2012-12-17 23:43:45)
+> devm_kzalloc returns NULL on failure.
 > 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Beno?t Cousson <b-cousson@ti.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> ---
-> 
-> Seems to boot with omap2plus_defconfig, anyway.
-> 
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
 
-It looks good to me, and I am happy to see fewer clocks in favor of
-using the hwmods.  However I did not test it.
+Pulled into clk-next.
 
-Regards,
+Thanks for the patch,
 Mike
+
+> ---
+>  drivers/clk/clk-max77686.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
+> index d098f72..8944214 100644
+> --- a/drivers/clk/clk-max77686.c
+> +++ b/drivers/clk/clk-max77686.c
+> @@ -132,7 +132,7 @@ static int max77686_clk_register(struct device *dev,
+>  
+>         max77686->lookup = devm_kzalloc(dev, sizeof(struct clk_lookup),
+>                                         GFP_KERNEL);
+> -       if (IS_ERR(max77686->lookup))
+> +       if (!max77686->lookup)
+>                 return -ENOMEM;
+>  
+>         max77686->lookup->con_id = hw->init->name;
+> @@ -151,13 +151,13 @@ static int max77686_clk_probe(struct platform_device *pdev)
+>  
+>         max77686_clks = devm_kzalloc(&pdev->dev, sizeof(struct max77686_clk *)
+>                                         * MAX77686_CLKS_NUM, GFP_KERNEL);
+> -       if (IS_ERR(max77686_clks))
+> +       if (!max77686_clks)
+>                 return -ENOMEM;
+>  
+>         for (i = 0; i < MAX77686_CLKS_NUM; i++) {
+>                 max77686_clks[i] = devm_kzalloc(&pdev->dev,
+>                                         sizeof(struct max77686_clk), GFP_KERNEL);
+> -               if (IS_ERR(max77686_clks[i]))
+> +               if (!max77686_clks[i])
+>                         return -ENOMEM;
+>         }
+>  
+> -- 
+> 1.7.9.5
