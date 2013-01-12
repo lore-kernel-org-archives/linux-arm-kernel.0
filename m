@@ -1,101 +1,148 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 11 Jan 2013 19:35:04 -0800
-Subject: [PATCH] arm: exynos4: Fix suspend/resume hang
-In-Reply-To: <1357883278-26239-1-git-send-email-inderpal.singh@linaro.org>
-References: <1357883278-26239-1-git-send-email-inderpal.singh@linaro.org>
-Message-ID: <CAJuYYwQQuC4tgzy-umpyDHAUmLcROzq9ayZOico813Rssa+JvQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 11 Jan 2013 19:54:31 -0800
+Subject: [PATCH 1/2] clk: Add debug clk summary
+In-Reply-To: <1356529583-19535-1-git-send-email-pgaikwad@nvidia.com>
+References: <1356529583-19535-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20130112035431.4361.12997@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 January 2013 21:47, Inderpal Singh <inderpal.singh@linaro.org> wrote:
-> commit d0341c61a2 removed the l2 cache save/restore from pm.c and commit
-> 7c6035b63b added the l2 cache restoration in sleep.s to early enable the
-> cache in resume path.
->
-> With these changes the system hangs while resuming when vdd_arm
-> is turned off in suspended state. The cache needs to be invalidated
-> before turning it on, as it was being done before mentioned commits.
->
-> Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+Quoting Prashant Gaikwad (2012-12-26 05:46:22)
+> Adds debug file "clk_summary" in /sys/kernel/debug/clk dir.
+> It helps to view all the clock registered in human-readable format.
+> 
+> For example:
+>    clock                        enable_cnt  prepare_cnt  rate
+> ---------------------------------------------------------------------
+>  i2s0_sync                      0           0            24000000
+>  spdif_in_sync                  0           0            24000000
+>     spdif_mux                   0           0            24000000
+>        spdif                    0           0            24000000
+>           spdif_doubler         0           0            48000000
+>              spdif_div          0           0            48000000
+>                 spdif_2x        0           0            48000000
+>  clk_32k                        2           2            32768
+>     blink_override              1           1            32768
+>        blink                    1           1            32768
+>  clk_m                          2           2            12000000
+>     clk_out_3_mux               0           0            12000000
+>        clk_out_3                0           0            12000000
+>     pll_ref                     3           3            12000000
+>        pll_e_mux                0           0            12000000
+>           pll_e                 0           0            100000000
+>              cml0               0           0            100000000
+>              cml1               0           0            100000000
+>              pciex              0           0            100000000
+>        pll_d2                   0           0            1000000
+>           pll_d2_out0           0           0            500000
+>        pll_d                    0           0            1000000
+>           pll_d_out0            0           0            500000
+>              dsib_mux           0           0            500000
+>                 dsib            0           0            500000
+>              dsia               0           0            500000
+> 
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+
+Thanks for the respin of patch #1 and for generating the JSON output
+format in patch #2.  I've taken both of these into clk-next.
+
+Regards,
+Mike
+
 > ---
->  arch/arm/mach-exynos/common.h     |    1 +
->  arch/arm/mach-exynos/pm.c         |    4 ++++
->  arch/arm/plat-samsung/s5p-sleep.S |   23 +++++++++++++++++++++++
->  3 files changed, 28 insertions(+)
->
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index af33872..056d9ce 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -78,6 +78,7 @@ enum sys_powerdown {
->  };
->
->  extern unsigned long l2x0_regs_phys;
-> +extern unsigned long wake_reason_reg_phys;
->  struct exynos_pmu_conf {
->         void __iomem *reg;
->         unsigned int val[NUM_SYS_POWERDOWN];
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index f459afd..b10513c 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -220,6 +220,10 @@ static __init int exynos_pm_drvinit(void)
->
->         s3c_pm_init();
->
-> +#ifdef CONFIG_CACHE_L2X0
-> +       if (!soc_is_exynos5250() && !soc_is_exynos5440())
-> +               wake_reason_reg_phys = virt_to_phys(S5P_INFORM1);
-> +#endif
->         /* All wakeup disable */
->
->         tmp = __raw_readl(S5P_WAKEUP_MASK);
-> diff --git a/arch/arm/plat-samsung/s5p-sleep.S b/arch/arm/plat-samsung/s5p-sleep.S
-> index bdf6dad..74331e2 100644
-> --- a/arch/arm/plat-samsung/s5p-sleep.S
-> +++ b/arch/arm/plat-samsung/s5p-sleep.S
-> @@ -24,6 +24,7 @@
->  #include <linux/linkage.h>
->  #include <asm/asm-offsets.h>
->  #include <asm/hardware/cache-l2x0.h>
-> +#include <mach/regs-pmu.h>
->
->  /*
->   *      The following code is located into the .data section. This is to
-> @@ -67,6 +68,25 @@ ENTRY(s3c_cpu_resume)
->         str     r2, [r1, #L2X0_PREFETCH_CTRL]
->         ldr     r2, [r0, #L2X0_R_PWR_CTRL]
->         str     r2, [r1, #L2X0_POWER_CTRL]
+>  drivers/clk/clk.c |   67 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 67 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 56e4495e..d79c088 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -34,6 +34,67 @@ static struct dentry *rootdir;
+>  static struct dentry *orphandir;
+>  static int inited = 0;
+>  
+> +static void clk_summary_show_one(struct seq_file *s, struct clk *c, int level)
+> +{
+> +       if (!c)
+> +               return;
 > +
-> +        /* check resume reason */
-> +       adr     r0, wake_reason_reg_phys
-> +       ldr     r0, [r0]
-> +       ldr     r2, [r0]
-> +       ldr     r0, =S5P_CHECK_SLEEP
-> +       cmp     r0, r2
-> +       bne     turn_cache_on
+> +       seq_printf(s, "%*s%-*s %-11d %-12d %-10lu",
+> +                  level * 3 + 1, "",
+> +                  30 - level * 3, c->name,
+> +                  c->enable_count, c->prepare_count, c->rate);
+> +       seq_printf(s, "\n");
+> +}
 > +
-> +       /* Invalidate the cache if resume from sleep */
-> +       ldr     r2, =0xffff
-> +       str     r2, [r1, #L2X0_INV_WAY]
-> +wait:
-> +       ldr     r2, [r1, #L2X0_INV_WAY]
-> +       ldr     r0, =0xffff
-> +       ands    r2, r2, r0
-> +       bne     wait
+> +static void clk_summary_show_subtree(struct seq_file *s, struct clk *c,
+> +                                    int level)
+> +{
+> +       struct clk *child;
+> +       struct hlist_node *tmp;
 > +
-> +turn_cache_on:
->         mov     r2, #1
->         str     r2, [r1, #L2X0_CTRL]
->  resume_l2on:
-> @@ -77,4 +97,7 @@ ENDPROC(s3c_cpu_resume)
->         .globl l2x0_regs_phys
->  l2x0_regs_phys:
->         .long   0
-> +       .globl wake_reason_reg_phys
-> +wake_reason_reg_phys:
-> +       .long   0
->  #endif
-
-
-Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+> +       if (!c)
+> +               return;
+> +
+> +       clk_summary_show_one(s, c, level);
+> +
+> +       hlist_for_each_entry(child, tmp, &c->children, child_node)
+> +               clk_summary_show_subtree(s, child, level + 1);
+> +}
+> +
+> +static int clk_summary_show(struct seq_file *s, void *data)
+> +{
+> +       struct clk *c;
+> +       struct hlist_node *tmp;
+> +
+> +       seq_printf(s, "   clock                        enable_cnt  prepare_cnt  rate\n");
+> +       seq_printf(s, "---------------------------------------------------------------------\n");
+> +
+> +       mutex_lock(&prepare_lock);
+> +
+> +       hlist_for_each_entry(c, tmp, &clk_root_list, child_node)
+> +               clk_summary_show_subtree(s, c, 0);
+> +
+> +       hlist_for_each_entry(c, tmp, &clk_orphan_list, child_node)
+> +               clk_summary_show_subtree(s, c, 0);
+> +
+> +       mutex_unlock(&prepare_lock);
+> +
+> +       return 0;
+> +}
+> +
+> +
+> +static int clk_summary_open(struct inode *inode, struct file *file)
+> +{
+> +       return single_open(file, clk_summary_show, inode->i_private);
+> +}
+> +
+> +static const struct file_operations clk_summary_fops = {
+> +       .open           = clk_summary_open,
+> +       .read           = seq_read,
+> +       .llseek         = seq_lseek,
+> +       .release        = single_release,
+> +};
+> +
+>  /* caller must hold prepare_lock */
+>  static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
+>  {
+> @@ -167,12 +228,18 @@ static int __init clk_debug_init(void)
+>  {
+>         struct clk *clk;
+>         struct hlist_node *tmp;
+> +       struct dentry *d;
+>  
+>         rootdir = debugfs_create_dir("clk", NULL);
+>  
+>         if (!rootdir)
+>                 return -ENOMEM;
+>  
+> +       d = debugfs_create_file("clk_summary", S_IRUGO, rootdir, NULL,
+> +                               &clk_summary_fops);
+> +       if (!d)
+> +               return -ENOMEM;
+> +
+>         orphandir = debugfs_create_dir("orphans", rootdir);
+>  
+>         if (!orphandir)
+> -- 
+> 1.7.4.1
