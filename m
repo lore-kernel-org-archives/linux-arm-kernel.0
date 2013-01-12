@@ -1,42 +1,47 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 12 Jan 2013 16:09:49 +1300
-Subject: [PATCH 0/4] arm: vt8500: Add support for Wondermedia WM8750/WM8850
-In-Reply-To: <1357960163.8515.3.camel@gitbox>
-References: <1357935162-7672-1-git-send-email-linux@prisktech.co.nz>
- <20130111215659.GA16521@quad.lixom.net> <1357960044.8515.0.camel@gitbox>
- <1357960163.8515.3.camel@gitbox>
-Message-ID: <1357960189.8515.4.camel@gitbox>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 12 Jan 2013 11:29:37 +0800
+Subject: [PATCH 4/4] ARM: uncompress: support uncompress debug for
+ multiplatform build
+In-Reply-To: <20130111191116.GA999@quad.lixom.net>
+References: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
+ <1355319945-3199-5-git-send-email-shawn.guo@linaro.org>
+ <20130111191116.GA999@quad.lixom.net>
+Message-ID: <20130112032934.GA14865@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit
-ce3f386fdf10d79eaf6ebd63bb7adbd95f08f9f0:
+On Fri, Jan 11, 2013 at 11:11:16AM -0800, Olof Johansson wrote:
+> Hi,
+> 
+> On Wed, Dec 12, 2012 at 09:45:45PM +0800, Shawn Guo wrote:
+> > When moving to multiplatform build, platforms lose the output from
+> > decompressor.  Not only does it mean that we will never see message
+> > "Uncompressing Linux... done, booting the kernel.", but also that
+> > the debug facility in arch/arm/boot/compressed/head.S outputs nothing
+> > even DEBUG is turned on.
+> > 
+> > The patch follows the approach handling DEBUG_LL to create a Kconfig
+> > symbol CONFIG_UNCOMPRESS_INCLUDE for choosing the correct uncompress
+> > header.  For traditional build, mach/uncompress.h will be included in
+> > arch/arm/boot/compressed/misc.c.  For multiplatform build with none
+> > DEBUG_LL port enabled, debug/uncompress/dummy.h will be used.  And
+> > for multiplatform build with a DEBUG_LL port, platform specific
+> > uncompress header like debug/uncompress/imx.h will come to play.
+> > 
+> > Different from traditional build that uncompress output and DEBUG_LL
+> > are two separated pieces, for multiplatform build uncompress output
+> > becomes a subset of DEBUG_LL and will not work unless DEBUG_LL is
+> > enabled.
+> > 
+> > The arch/arm/include/debug/uncompress/imx.h is cleaned up and added
+> > here as an example to show how this approach works.
+> 
+> Since this requires you to define a debug uart to get uncompress output,
+> it would make more sense to do a generic wrapper that uses the debug
+> code generically, instead of having to add this kind of wrapper for
+> every platform. That would solve it for all of them at once.
+> 
+I'm not entirely sure about what you mean here.  Can you please
+elaborate that generic wrapper in your mind a little bit?
 
-  arm: vt8500: Remove remaining mach includes (2013-01-12 15:47:39
-+1300)
-
-are available in the git repository at:
-
-  git://server.prisktech.co.nz/git/linuxwmt.git tags/armsoc-3.9
-
-for you to fetch changes up to 8d31bfa551b9a1a61119e6d8fde08d0fa8cdfafb:
-
-  arm: vt8500: Add support for Wondermedia WM8750/WM8850 (2013-01-12
-15:51:24 +1300)
-
-----------------------------------------------------------------
-arm: vt8500: Add support for WM8750 and WM8850 SoCs.
-
-This pull should be on top of:
-git://server.prisktech.co.nz/git/linuxwmt.git
-tags/vt8500-multiplatform-3.9
-
-----------------------------------------------------------------
-Tony Prisk (1):
-      arm: vt8500: Add support for Wondermedia WM8750/WM8850
-
- Documentation/devicetree/bindings/arm/vt8500.txt |    8 ++++++++
- arch/arm/mach-vt8500/Kconfig                     |   16
-++++++++++++++++
- arch/arm/mach-vt8500/vt8500.c                    |    2 ++
- 3 files changed, 26 insertions(+)
+Shawn
