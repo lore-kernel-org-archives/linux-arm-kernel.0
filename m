@@ -1,124 +1,52 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 12 Jan 2013 12:23:48 +0530
-Subject: [PATCH 13/16] drivers: misc: add ARM CCI support
-In-Reply-To: <alpine.LFD.2.02.1301111414390.6300@xanadu.home>
+Date: Sat, 12 Jan 2013 12:51:24 +0530
+Subject: [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
+ exit/setup and CCI
+In-Reply-To: <alpine.LFD.2.02.1301111425020.6300@xanadu.home>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-14-git-send-email-nicolas.pitre@linaro.org>
- <50F057D7.1010808@ti.com> <alpine.LFD.2.02.1301111414390.6300@xanadu.home>
-Message-ID: <50F1087C.4060900@ti.com>
+ <1357777251-13541-16-git-send-email-nicolas.pitre@linaro.org>
+ <50F059A4.4010107@ti.com> <alpine.LFD.2.02.1301111425020.6300@xanadu.home>
+Message-ID: <50F10EF4.9070909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 January 2013 12:52 AM, Nicolas Pitre wrote:
+On Saturday 12 January 2013 12:58 AM, Nicolas Pitre wrote:
 > On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
 >
 >> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
->>> From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> From: Dave Martin <dave.martin@linaro.org>
 >>>
->>> On ARM multi-cluster systems coherency between cores running on
->>> different clusters is managed by the cache-coherent interconnect (CCI).
->>> It allows broadcasting of TLB invalidates and memory barriers and it
->>> guarantees cache coherency at system level.
->>>
->>> This patch enables the basic infrastructure required in Linux to
->>> handle and programme the CCI component. The first implementation is
->>> based on a platform device, its relative DT compatible property and
->>> a simple programming interface.
->>>
->>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->>> ---
->>>    drivers/misc/Kconfig    |   3 ++
->>>    drivers/misc/Makefile   |   1 +
->>>    drivers/misc/arm-cci.c  | 107
->>> ++++++++++++++++++++++++++++++++++++++++++++++++
->>>    include/linux/arm-cci.h |  30 ++++++++++++++
->> How about 'drivers/bus/' considering CCI is an interconnect bus (though
->> for coherency)
+>>> +		/*
+>>> +		 * Flush the local CPU cache.
+>>> +		 *
+>>> +		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
+>>> +		 * a preliminary flush here for those CPUs.  At least, that's
+>>> +		 * the theory -- without the extra flush, Linux explodes on
+>>> +		 * RTSM (maybe not needed anymore, to be investigated).
+>>> +		 */
+>> This is expected if the entire code is not in one stack frame and the
+>> additional flush is needed to avoid possible stack corruption. This
+>> issue has been discussed in past on the list.
 >
-> Yes, I like that better.
+> I missed that.  Do you have a reference or pointer handy?
 >
-Great.
+> What is strange is that this is 100% reproducible on RTSM while this
+> apparently is not an issue on real hardware so far.
+>
+I tried searching archives and realized the discussion was in private
+email thread. There are some bits and pieces on list but not all the
+information.
 
->>>    4 files changed, 141 insertions(+)
->>>    create mode 100644 drivers/misc/arm-cci.c
->>>    create mode 100644 include/linux/arm-cci.h
->>>
->>> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
->>> index b151b7c1bd..30d5be1ad2 100644
->>> --- a/drivers/misc/Kconfig
->>> +++ b/drivers/misc/Kconfig
->>> @@ -499,6 +499,9 @@ config USB_SWITCH_FSA9480
->>>    	  stereo and mono audio, video, microphone and UART data to use
->>>    	  a common connector port.
->>>
->>> +config ARM_CCI
->> You might want add depends on ARM big.LITTTLE otherwise it will
->> break build for other arch's with random configurations.
->
-> As far as this patch goes, this is buildable on other architectures too.
-> The next patch changes that though.
->
-Thanks.
+The main issue RMK pointed out is- An additional L1 flush needed
+to avoid the effective change of view of memory when the C bit is
+turned off, and the cache is no longer searched for local CPU accesses.
 
->> [..]
->>
->>> diff --git a/drivers/misc/arm-cci.c b/drivers/misc/arm-cci.c
->>> new file mode 100644
->>> index 0000000000..f329c43099
->>> --- /dev/null
->>> +++ b/drivers/misc/arm-cci.c
->>> @@ -0,0 +1,107 @@
->>> +/*
->>> + * CCI support
->>> + *
->>> + * Copyright (C) 2012 ARM Ltd.
->>> + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->>> + * kind, whether express or implied; without even the implied warranty
->>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + */
->>> +
->>> +#include <linux/device.h>
->>> +#include <linux/io.h>
->>> +#include <linux/module.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/slab.h>
->>> +#include <linux/arm-cci.h>
->>> +
->>> +#define CCI400_EAG_OFFSET       0x4000
->>> +#define CCI400_KF_OFFSET        0x5000
->>> +
->>> +#define DRIVER_NAME	"CCI"
->>> +struct cci_drvdata {
->>> +	void __iomem *baseaddr;
->>> +	spinlock_t lock;
->>> +};
->>> +
->>> +static struct cci_drvdata *info;
->>> +
->>> +void disable_cci(int cluster)
->>> +{
->>> +	u32 cci_reg = cluster ? CCI400_KF_OFFSET : CCI400_EAG_OFFSET;
->>> +	writel_relaxed(0x0, info->baseaddr	+ cci_reg);
->>> +
->>> +	while (readl_relaxed(info->baseaddr + 0xc) & 0x1)
->>> +			;
->>> +}
->>> +EXPORT_SYMBOL_GPL(disable_cci);
->>> +
->> Is more functionality going to be added for CCI driver. Having this
->> much of driver code for just a disable_cci() functions seems like
->> overkill.
->
-> Yes.  More code will appear here to provide pmu functionalities, etc.
->
-Good to know.
+In your case dcscb_power_down() has updated the stack which can be hit
+in cache line and hence cache is dirty now. Then cpu_proc_fin() clears
+the C-bit and hence for sub sequent calls the L1 cache won't be
+searched. You then call flush_cache_all() which again updates the
+stack but avoids searching the L1 cache. So it overwrites previous
+saved stack frame. This seems to be an issue in your case as well.
 
 Regards,
 Santosh
