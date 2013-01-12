@@ -1,25 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Jan 2013 21:14:07 +0000
-Subject: [PATCH v2 0/3] Use helper clockevents_config_and_register()
-In-Reply-To: <1357991406-22778-1-git-send-email-shawn.guo@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 12 Jan 2013 16:25:23 -0500
+Subject: [PATCH v2 2/3] ARM: use clockevents_config_and_register()
+ where possible
+In-Reply-To: <1357991406-22778-3-git-send-email-shawn.guo@linaro.org>
 References: <1357991406-22778-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201301122114.07278.arnd@arndb.de>
+ <1357991406-22778-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130112212523.GD13433@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 January 2013, Shawn Guo wrote:
+On Sat, Jan 12, 2013 at 07:50:05PM +0800, Shawn Guo wrote:
 > The clockevent core is able to figure out the best mult and shift,
 > calculate min_delta_ns and max_delta_ns, with the necessary info passed
-> into clockevents_config_and_register().  Use this handy helper to make
-> the drivers less error prone and save some LOC.
+> into clockevents_config_and_register().  Use this combined configure
+> and register function where possible to make the codes less error prone
+> and gain some positive diff stat.
 > 
-> Changes since v1:
->  - Add one patch to export clockevents_config_and_register for fixing
->    the error [1] reported by Fengguang.
->  - Add Acked-by and Tested-by tags given by people (Thanks!)
-> 
-> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/209152
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Reviewed-by: Anton Vorontsov <cbouatmailru@gmail.com>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Tested-by: Roland Stigge <stigge@antcom.de>
+> Acked-by: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: David Brown <davidb@codeaurora.org>
+> Tested-by: Tony Lindgren <tony@atomide.com>
+> Acked-by: Barry Song <baohua.song@csr.com>
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> Acked-by: Tony Prisk <linux@prisktech.co.nz>
+> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+> Cc: Wan ZongShun <mcuos.com@gmail.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+...
+>  arch/arm/plat-orion/time.c               |    6 +-----
+...
 
-Very nice series!
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+thx,
+
+Jason.
