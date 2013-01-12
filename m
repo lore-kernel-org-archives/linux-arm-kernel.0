@@ -1,116 +1,110 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 12 Jan 2013 10:06:44 +0100
-Subject: [PATCH 1/2] ARM: sunxi: gpio: Add Allwinner SoCs GPIO drivers
-In-Reply-To: <CACRpkda0yhVvCW9edWBi3XusfS4NaiWqKsoCfLpT9+X5iO-GXg@mail.gmail.com>
-References: <1357317909-12458-1-git-send-email-maxime.ripard@free-electrons.com>
- <1357317909-12458-2-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkda0yhVvCW9edWBi3XusfS4NaiWqKsoCfLpT9+X5iO-GXg@mail.gmail.com>
-Message-ID: <50F127A4.907@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 12 Jan 2013 09:31:50 +0000
+Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
+References: <1357863807-380-1-git-send-email-rtivy@ti.com>
+ <1357863807-380-7-git-send-email-rtivy@ti.com>
+ <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
+Message-ID: <20130112093149.GP23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Jan 11, 2013 at 02:26:19PM +0200, Ohad Ben-Cohen wrote:
+> > +static int davinci_rproc_start(struct rproc *rproc)
+> > +{
+> > +       struct platform_device *pdev = to_platform_device(rproc->dev.parent);
+> > +       struct device *dev = rproc->dev.parent;
+> > +       struct davinci_rproc *drproc = rproc->priv;
+> > +       struct clk *dsp_clk;
+> > +       struct resource *r;
+> > +       unsigned long host1cfg_physaddr;
+> > +       unsigned int host1cfg_offset;
+> > +       int ret;
+> > +
+> > +       remoteprocdev = pdev;
+> > +
+> > +       /* hw requires the start (boot) address be on 1KB boundary */
+> > +       if (rproc->bootaddr & 0x3ff) {
+> > +               dev_err(dev, "invalid boot address: must be aligned to 1KB\n");
+> > +
+> > +               return -EINVAL;
+> > +       }
+> > +
+> > +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +       if (IS_ERR_OR_NULL(r)) {
 
-On 10/01/2013 12:06, Linus Walleij wrote:
-> On Fri, Jan 4, 2013 at 5:45 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> +static int __devinit
->> +sunxi_pinctrl_register_gpio_ranges(struct sunxi_pinctrl *pctl)
->> +{
->> +       int id = 0, base = 0, npins = 1, i, prev_pin = -1;
->> +       struct pinctrl_gpio_range *range;
->> +
->> +       for (i = 0; i < pctl->desc->npins; i++) {
->> +               const struct sunxi_desc_pin *pin = pctl->desc->pins + i;
->> +               unsigned pin_num = pin->pin.number;
->> +
->> +               if (prev_pin < 0) {
->> +                       prev_pin = pin_num;
->> +                       base = pin_num;
->> +               } else if (prev_pin + 1 != pin_num) {
->> +                       range = devm_kzalloc(pctl->dev,
->> +                                       sizeof(*range),
->> +                                       GFP_KERNEL);
->> +                       if (!range)
->> +                               return -ENOMEM;
->> +
->> +                       range->name = "sunxi";
->> +                       range->id = id;
->> +                       range->base = base;
->> +                       range->pin_base = base;
->> +                       range->npins = npins;
->> +
->> +                       pinctrl_add_gpio_range(pctl->pctl_dev, range);
->> +
->> +                       id++;
->> +                       npins = 1;
->> +                       prev_pin = pin_num;
->> +                       base = prev_pin;
->> +               } else {
->> +                       prev_pin++;
->> +                       npins++;
->> +               }
->> +       }
->> +
->> +       range = devm_kzalloc(pctl->dev, sizeof(*range),
->> +                       GFP_KERNEL);
->> +       if (!range)
->> +               return -ENOMEM;
->> +
->> +       range->name = "sunxi";
->> +       range->id = id;
->> +       range->base = base;
->> +       range->pin_base = base;
->> +       range->npins = npins;
->> +
->> +       pinctrl_add_gpio_range(pctl->pctl_dev, range);
->> +
->> +       return 0;
->> +}
-> 
-> Really hairy way to add ranges right?
+No, this is buggy.  Go and look up to see what the return ranges are
+for this function.
 
-Yes... I didn't find any best way to do so. It was either that or
-duplicate the already existing informations we had about the pins ranges
-into a ranges array, which is pretty error-prone.
+> > +               dev_err(dev, "platform_get_resource() error: %ld\n",
+> > +                       PTR_ERR(r));
+> > +
+> > +               return PTR_ERR(r);
 
-I guess I could add some comments though.
+Which results in this being a bug.
 
-> Registering ranges from the pinctrl side is deprecated and discouraged.
-> 
-> Instead register the ranges from the GPIO driver.
-> 
-> Use gpiochip_add_pin_range() from the GPIO driver.
-> 
-> An example is provided in
-> drivers/pinctrl/pinctrl-coh901.c
+> > +       }
+> > +       host1cfg_physaddr = (unsigned long)r->start;
+> > +
+> > +       irq = platform_get_irq(pdev, 0);
+> > +       if (irq < 0) {
+> > +               dev_err(dev, "platform_get_irq(pdev, 0) error: %d\n", irq);
+> > +
+> > +               return irq;
+> > +       }
+> > +
+> > +       irq_data = irq_get_irq_data(irq);
+> > +       if (IS_ERR_OR_NULL(irq_data)) {
 
-Ok, will do. But we need to find a way to share the pins arrays between
-the pinctrl and gpio drivers then.
+Again, bug.
 
-Maybe add a pinctrl-sunxi-pins.h file? or merge the pinctrl and gpio
-drivers?
+> > +               dev_err(dev, "irq_get_irq_data(%d) error: %ld\n",
+> > +                       irq, PTR_ERR(irq_data));
+> > +
+> > +               return PTR_ERR(irq_data);
 
-I'm kind of reluctant to merging the drivers into one single messy file,
-but if that's the way to go, fine.
+Which results in this being a bug.
 
-> 
-> After you have done this, you can probably get rid of this as well:
-> 
-> +static int __init sunxi_gpio_init(void)
-> +{
-> +       return platform_driver_register(&sunxi_gpio_driver);
-> +}
-> +postcore_initcall(sunxi_gpio_init);
-> 
-> This will become a simple module_init() if you are handling
-> deferred probe correctly.
+> > +       }
+> > +       ack_fxn = irq_data->chip->irq_ack;
+> > +
+> > +       ret = request_threaded_irq(irq, davinci_rproc_callback, handle_event,
+> > +               0, "davinci-remoteproc", drproc);
+> > +       if (ret) {
+> > +               dev_err(dev, "request_threaded_irq error: %d\n", ret);
+> > +
+> > +               return ret;
+> > +       }
+> > +
+> > +       syscfg0_base = ioremap(host1cfg_physaddr & PAGE_MASK, SZ_4K);
+> > +       host1cfg_offset = offset_in_page(host1cfg_physaddr);
+> > +       writel(rproc->bootaddr, syscfg0_base + host1cfg_offset);
+> > +
+> > +       dsp_clk = clk_get(dev, NULL);
+> > +       if (IS_ERR_OR_NULL(dsp_clk)) {
 
-Ok. Thanks for your review!
-Maxime
+And another bug.
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> > +               dev_err(dev, "clk_get error: %ld\n", PTR_ERR(dsp_clk));
+> > +               ret = PTR_ERR(dsp_clk);
+
+And again, results in this being a bug.
+
+> > +               goto fail;
+> > +       }
+...
+> > +       ret = rproc_add(rproc);
+> > +       if (ret)
+> > +               goto free_rproc;
+> > +
+> > +       /*
+> > +        * rproc_add() can end up enabling the DSP's clk with the DSP
+> > +        * *not* in reset, but davinci_rproc_start() needs the DSP to be
+> > +        * held in reset at the time it is called.
+> > +        */
+> > +       dsp_clk = clk_get(rproc->dev.parent, NULL);
+> > +       davinci_clk_reset_assert(dsp_clk);
+> > +       clk_put(dsp_clk);
+
+BUG: what if clk_get() fails here?
