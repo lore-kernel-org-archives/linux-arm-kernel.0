@@ -1,58 +1,105 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 12 Jan 2013 12:20:01 +0530
-Subject: [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface
- of a dying CPU is disabled
-In-Reply-To: <alpine.LFD.2.02.1301111405590.6300@xanadu.home>
+Date: Sat, 12 Jan 2013 12:22:20 +0530
+Subject: [PATCH 10/16] ARM: vexpress: introduce DCSCB support
+In-Reply-To: <alpine.LFD.2.02.1301111408330.6300@xanadu.home>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-9-git-send-email-nicolas.pitre@linaro.org>
- <50F054E7.9000004@ti.com> <alpine.LFD.2.02.1301111405590.6300@xanadu.home>
-Message-ID: <50F10799.3000501@ti.com>
+ <1357777251-13541-11-git-send-email-nicolas.pitre@linaro.org>
+ <50F05606.9060703@ti.com> <alpine.LFD.2.02.1301111408330.6300@xanadu.home>
+Message-ID: <50F10824.2010904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 January 2013 12:37 AM, Nicolas Pitre wrote:
+On Saturday 12 January 2013 12:43 AM, Nicolas Pitre wrote:
 > On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
 >
 >> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
->>> Otherwise there might be some interrupts or IPIs becoming pending and the
->>> CPU will not enter low power mode when doing a WFI.  The effect of this
->>> is a CPU that loops back into the kernel, go through the first man
->>> election, signals itself as alive,  and prevent the cluster from being
->>> shut down.
+>>> This adds basic CPU and cluster reset controls on RTSM for the
+>>> A15x4-A7x4 model configuration using the Dual Cluster System
+>>> Configuration Block (DCSCB).
 >>>
->>> This could benefit from a better solution.
+>>> The cache coherency interconnect (CCI) is not handled yet.
 >>>
 >>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 >>> ---
->>>    arch/arm/common/bL_platsmp.c        | 1 +
->>>    arch/arm/common/gic.c               | 6 ++++++
->>>    arch/arm/include/asm/hardware/gic.h | 2 ++
->>>    3 files changed, 9 insertions(+)
+>>>    arch/arm/mach-vexpress/Kconfig  |   8 ++
+>>>    arch/arm/mach-vexpress/Makefile |   1 +
+>>>    arch/arm/mach-vexpress/dcscb.c  | 160
+>>> ++++++++++++++++++++++++++++++++++++++++
+>>>    3 files changed, 169 insertions(+)
+>>>    create mode 100644 arch/arm/mach-vexpress/dcscb.c
 >>>
->>> diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
->>> index 0ae44123bf..6a3b251b97 100644
->>> --- a/arch/arm/common/bL_platsmp.c
->>> +++ b/arch/arm/common/bL_platsmp.c
->>> @@ -68,6 +68,7 @@ static void __ref bL_cpu_die(unsigned int cpu)
->>>    	pcpu = mpidr & 0xff;
->>>    	pcluster = (mpidr >> 8) & 0xff;
->>>    	bL_set_entry_vector(pcpu, pcluster, NULL);
->>> +	gic_cpu_if_down();
->>
->> So for a case where CPU still don't power down for some reason even
->> after CPU interface is disabled, can not listen to and SGI or PPI.
->> Not sure if this happens on big.LITTLE but i have seen one such issue
->> on Cortex-A9 based SOC.
->
-> Here the problem was the reverse i.e. a CPU wouldn't go down because
-> some pending SGIs prevented that.
->
-I understood that part. What I was saying is, with CPU IF disabled and
-if CPU doesn't enter into the intended low power state and if the wakeup
-mechanism on that CPU is SGI/SPI, CPU may never wakeup and can lead to
-dead lock. I have seen this scenario on OMAP especially in CPUidle path.
-It may not be relevant for switcher considering, you almost force CPU to
-enter to low power state :-)
+[..]
 
-Regards,
+>>> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+>>> new file mode 100644
+>>> index 0000000000..cccd943cd4
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-vexpress/dcscb.c
+[..]
+
+>>> +static void dcscb_power_down(void)
+>>> +{
+>>> +	unsigned int mpidr, cpu, cluster, rst_hold, cpumask, last_man;
+>>> +
+>>> +	asm ("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
+>>> +	cpu = mpidr & 0xff;
+>>> +	cluster = (mpidr >> 8) & 0xff;
+>>> +	cpumask = (1 << cpu);
+>>> +
+>>> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+>>> +	BUG_ON(cpu >= 4 || cluster >= 2);
+>>> +
+>>> +	arch_spin_lock(&dcscb_lock);
+>>> +	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
+>>> +	rst_hold |= cpumask;
+>>> +	if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf)
+>>> +		rst_hold |= (1 << 8);
+>>> +	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
+>>> +	arch_spin_unlock(&dcscb_lock);
+>>> +	last_man = (rst_hold & (1 << 8));
+>>> +
+>>> +	/*
+>>> +	 * Now let's clean our L1 cache and shut ourself down.
+>>> +	 * If we're the last CPU in this cluster then clean L2 too.
+>>> +	 */
+>>> +
+>> Do you wanted to have C bit clear code here ?
+>
+> cpu_proc_fin() does it.
+>
+Yep. I noticed that in next patch when read the comment.
+
+>>> +	/*
+>>> +	 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
+>>> +	 * a preliminary flush here for those CPUs.  At least, that's
+>>> +	 * the theory -- without the extra flush, Linux explodes on
+>>> +	 * RTSM (maybe not needed anymore, to be investigated)..
+>>> +	 */
+>>> +	flush_cache_louis();
+>>> +	cpu_proc_fin();
+>>> +
+>>> +	if (!last_man) {
+>>> +		flush_cache_louis();
+>>> +	} else {
+>>> +		flush_cache_all();
+>>> +		outer_flush_all();
+>>> +	}
+>>> +
+>>> +	/* Disable local coherency by clearing the ACTLR "SMP" bit: */
+>>> +	asm volatile (
+>>> +		"mrc	p15, 0, ip, c1, c0, 1 \n\t"
+>>> +		"bic	ip, ip, #(1 << 6) @ clear SMP bit \n\t"
+>>> +		"mcr	p15, 0, ip, c1, c0, 1"
+>>> +		: : : "ip" );
+>>> +
+>>> +	/* Now we are prepared for power-down, do it: */
+>> You need dsb here, right ?
+>
+> Probably.  However this code is being refactored significantly with
+> subsequent patches.  This intermediate step was kept not to introduce
+> too many concepts at once.
+>
+Yes. I do see updates in subsequent patch.
+
+Regards
 Santosh
