@@ -1,16 +1,379 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 11 Jan 2013 17:44:55 -0700
-Subject: [PATCH] arm: tegra: remove USB address related macros from iomap.h
-In-Reply-To: <1355805061-22789-1-git-send-email-vbyravarasu@nvidia.com>
-References: <1355805061-22789-1-git-send-email-vbyravarasu@nvidia.com>
-Message-ID: <50F0B207.8000205@wwwdotorg.org>
+From: rtivy@ti.com (Tivy, Robert)
+Date: Sat, 12 Jan 2013 02:26:30 +0000
+Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
+References: <1357863807-380-1-git-send-email-rtivy@ti.com>
+ <1357863807-380-7-git-send-email-rtivy@ti.com>
+ <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
+Message-ID: <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 09:31 PM, Venu Byravarasu wrote:
-> USB register base address and sizes defined in iomap.h
-> are not used in any files other than board-dt-tegra20.c.
-> Hence removed those defines from header file and using
-> the absolute values in board files.
+Hi Ohad,
 
-Thanks, applied to Tegra's for-3.9/usb branch.
+Glad to see you jump in the fray, please see responses below...
+
+> -----Original Message-----
+> From: Ohad Ben-Cohen [mailto:ohad at wizery.com]
+> Sent: Friday, January 11, 2013 4:26 AM
+> To: Tivy, Robert
+> Cc: davinci-linux-open-source; linux-arm; Nori, Sekhar; Ring, Chris;
+> Grosen, Mark; rob at landley.net; linux-doc at vger.kernel.org; Chemparathy,
+> Cyril
+> Subject: Re: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
+> OMAP-L138 DSP
+> 
+> Hi Robert,
+> 
+> I'm happy to see this driver going upstream, thanks for pushing!
+> 
+> Please see below my few comments. PS - sorry for the belated review.
+> 
+> On Fri, Jan 11, 2013 at 2:23 AM, Robert Tivy <rtivy@ti.com> wrote:
+> > +config DAVINCI_REMOTEPROC
+> > +       tristate "DaVinci DA850/OMAPL138 remoteproc support
+> (EXPERIMENTAL)"
+> > +       depends on ARCH_DAVINCI_DA850
+> > +       select REMOTEPROC
+> > +       select RPMSG
+> > +       select FW_LOADER
+> 
+> This one gets selected by CONFIG_REMOTEPROC, so you don't need to do so
+> too.
+
+>From drivers/remoteproc/Kconfig:
+	# REMOTEPROC gets selected by whoever wants it
+	config REMOTEPROC
+	        tristate
+	        depends on EXPERIMENTAL
+	        depends on HAS_DMA
+	        select FW_CONFIG
+	        select VIRTIO
+
+Is FW_CONFIG above supposed to be FW_LOADER?
+
+I don't see any support for FW_CONFIG anywhere in the kernel.
+
+> 
+> > diff --git a/drivers/remoteproc/davinci_remoteproc.c
+> b/drivers/remoteproc/davinci_remoteproc.c
+> > new file mode 100644
+> > index 0000000..fc6fd72
+> > --- /dev/null
+> > +++ b/drivers/remoteproc/davinci_remoteproc.c
+> > +static char *fw_name;
+> > +module_param(fw_name, charp, S_IRUGO);
+> > +MODULE_PARM_DESC(fw_name, "\n\t\tName of DSP firmware file in
+> /lib/firmware");
+> > +
+> > +/*
+> > + * OMAP-L138 Technical References:
+> > + * http://www.ti.com/product/omap-l138
+> > + */
+> > +#define SYSCFG_CHIPSIG_OFFSET 0x174
+> > +#define SYSCFG_CHIPSIG_CLR_OFFSET 0x178
+> > +#define SYSCFG_CHIPINT0 (1 << 0)
+> > +#define SYSCFG_CHIPINT1 (1 << 1)
+> > +#define SYSCFG_CHIPINT2 (1 << 2)
+> > +#define SYSCFG_CHIPINT3 (1 << 3)
+> > +
+> > +/**
+> > + * struct davinci_rproc - davinci remote processor state
+> > + * @rproc: rproc handle
+> 
+> Add @dsp_clk ?
+
+Yep.
+
+> 
+> > + */
+> > +struct davinci_rproc {
+> > +       struct rproc *rproc;
+> > +       struct clk *dsp_clk;
+> > +};
+> > +
+> > +static void __iomem *syscfg0_base;
+> > +static struct platform_device *remoteprocdev;
+> > +static struct irq_data *irq_data;
+> > +static void (*ack_fxn)(struct irq_data *data);
+> > +static int irq;
+> 
+> Is it safe to maintain these as globals (i.e. what if we have more
+> than a single pdev instance) ?
+
+I think it makes sense for some of them to be globals, will review/change accordingly.
+
+> 
+> > +
+> > +/**
+> > + * handle_event() - inbound virtqueue message workqueue function
+> > + *
+> > + * This funciton is registered as a kernel thread and is scheduled
+> by the
+> 
+> typo
+
+Will fix.
+
+> 
+> > + * kernel handler.
+> > + */
+> > +static irqreturn_t handle_event(int irq, void *p)
+> > +{
+> > +       struct rproc *rproc = platform_get_drvdata(remoteprocdev);
+> 
+> It's probably better to pass this as an irq cookie instead of relying
+> on global data
+
+Agreed, will change.
+
+> 
+> > +
+> > +       /* Process incoming buffers on our vring */
+> > +       while (IRQ_HANDLED == rproc_vq_interrupt(rproc, 0))
+> > +               ;
+> 
+> This is interesting. IIUC, you want a single irq event to trigger
+> processing of all the available messages. It makes sense, but I'm not
+> sure we need this to be platform-specific.
+
+YUC :)
+
+> 
+> > +
+> > +       /* Must allow wakeup of potenitally blocking senders: */
+> > +       rproc_vq_interrupt(rproc, 1);
+> 
+> IIUC, you do this is because you have a single irq for all the vrings
+> (PCMIIW).
+
+YUC again.
+
+> 
+> We may want to add something in these lines to the generic remoteproc
+> framework, as additional platforms require it (e.g. keystone). I
+> remember a similar patch by Cyril was circulating internally but never
+> hit the mailing lists - you may want to take it even though it would
+> probably need to be refreshed.
+
+Ok, I got Cyril's patch (sent privately by you) and will incorporate it in the generic processing, and modify davinci_remoteproc.c to:
+	while (IRQ_HANDLED == rproc_vq_interrupt(rproc, -1))
+		;
+
+> 
+> > +static int davinci_rproc_start(struct rproc *rproc)
+> > +{
+> > +       struct platform_device *pdev = to_platform_device(rproc-
+> >dev.parent);
+> > +       struct device *dev = rproc->dev.parent;
+> > +       struct davinci_rproc *drproc = rproc->priv;
+> > +       struct clk *dsp_clk;
+> > +       struct resource *r;
+> > +       unsigned long host1cfg_physaddr;
+> > +       unsigned int host1cfg_offset;
+> > +       int ret;
+> > +
+> > +       remoteprocdev = pdev;
+> > +
+> > +       /* hw requires the start (boot) address be on 1KB boundary */
+> > +       if (rproc->bootaddr & 0x3ff) {
+> > +               dev_err(dev, "invalid boot address: must be aligned
+> to 1KB\n");
+> > +
+> > +               return -EINVAL;
+> > +       }
+> > +
+> > +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +       if (IS_ERR_OR_NULL(r)) {
+> > +               dev_err(dev, "platform_get_resource() error: %ld\n",
+> > +                       PTR_ERR(r));
+> > +
+> > +               return PTR_ERR(r);
+> > +       }
+> > +       host1cfg_physaddr = (unsigned long)r->start;
+> > +
+> > +       irq = platform_get_irq(pdev, 0);
+> > +       if (irq < 0) {
+> > +               dev_err(dev, "platform_get_irq(pdev, 0) error: %d\n",
+> irq);
+> > +
+> > +               return irq;
+> > +       }
+> > +
+> > +       irq_data = irq_get_irq_data(irq);
+> > +       if (IS_ERR_OR_NULL(irq_data)) {
+> > +               dev_err(dev, "irq_get_irq_data(%d) error: %ld\n",
+> > +                       irq, PTR_ERR(irq_data));
+> > +
+> > +               return PTR_ERR(irq_data);
+> > +       }
+> > +       ack_fxn = irq_data->chip->irq_ack;
+> > +
+> > +       ret = request_threaded_irq(irq, davinci_rproc_callback,
+> handle_event,
+> > +               0, "davinci-remoteproc", drproc);
+> > +       if (ret) {
+> > +               dev_err(dev, "request_threaded_irq error: %d\n",
+> ret);
+> > +
+> > +               return ret;
+> > +       }
+> > +
+> > +       syscfg0_base = ioremap(host1cfg_physaddr & PAGE_MASK, SZ_4K);
+> > +       host1cfg_offset = offset_in_page(host1cfg_physaddr);
+> > +       writel(rproc->bootaddr, syscfg0_base + host1cfg_offset);
+> > +
+> > +       dsp_clk = clk_get(dev, NULL);
+> > +       if (IS_ERR_OR_NULL(dsp_clk)) {
+> > +               dev_err(dev, "clk_get error: %ld\n",
+> PTR_ERR(dsp_clk));
+> > +               ret = PTR_ERR(dsp_clk);
+> > +               goto fail;
+> > +       }
+> 
+> There's a lot in this ->start() method that better move to ->probe()
+> because it should be invoked only once throughout the life cycle of
+> this driver (probably most of the code above). Can you please take a
+> look?
+
+Will take a look.
+
+> 
+> > +/* kick a virtqueue */
+> > +static void davinci_rproc_kick(struct rproc *rproc, int vqid)
+> > +{
+> > +       int timed_out;
+> > +       unsigned long timeout;
+> > +
+> > +       timed_out = 0;
+> > +       timeout = jiffies + HZ/100;
+> > +
+> > +       /* Poll for ack from other side first */
+> > +       while (readl(syscfg0_base + SYSCFG_CHIPSIG_OFFSET) &
+> > +               SYSCFG_CHIPINT2)
+> > +               if (time_after(jiffies, timeout)) {
+> > +                       dev_err(rproc->dev.parent, "failed to receive
+> ack\n");
+> > +                       timed_out = 1;
+> > +
+> > +                       break;
+> > +               }
+> 
+> Can you please explain what this ack is a bit ? Just out of curiosity.
+
+We're currently handling the CHIPINT lines as "level"s, since they're completely controlled by SW.  The interruptor raises the line and the interruptee lowers (clears) it.  In a situation where every interrupt is considered to be a signal of new data arrival we need to make sure that the other side has "seen" the previous interrupt before we raise another one.  For the OMAP-L138 DSP VirtQueue implementation (in the sysbios-rpmsg repo) this is currently the case - each DSP interrupt indicates new vring availability.  This behavior is due to the fact that the OMAP-L138 port is trying to emulate an omap mailbox.
+
+> 
+> > +static int davinci_rproc_probe(struct platform_device *pdev)
+> > +{
+> > +       struct da8xx_rproc_pdata *pdata = pdev->dev.platform_data;
+> > +       struct davinci_rproc *drproc;
+> > +       struct rproc *rproc;
+> > +       struct clk *dsp_clk;
+> > +       int ret;
+> > +
+> > +       if (!fw_name) {
+> > +               dev_err(&pdev->dev, "No firmware file specified\n");
+> > +
+> > +               return -EINVAL;
+> > +       }
+> 
+> There are a few issues with this fw_name module param:
+> 
+> 1. Usually we don't rely on users providing the firmware file name for
+> drivers to work. Drivers should know the name beforehand, and if there
+> may be several different instances of firmwares (for different cores
+> you may have), then it's just better to get it from the platform data.
+
+Is this suggesting that there be separate platform device instances for each different potential fw, and that each platform device instance hardcodes the fw filename?
+
+> 
+> 2. You may still want to have such a module param in order to be able
+> to override the default firmware name (for debugging purposes?), but
+> I'm not sure it should be davinci-specific. if we do want it to be
+> then please prefix the name with 'davinci'.
+
+Sekhar asked that there not be a default fw name, so there's conflicting feedback on this point.  I prefer to have a default name plus the module parameter override (but don't have much opinion on whether it should be davinci-specific (and passed with davinci_remoteproc.ko) or general (and passed with remoteproc.ko), please advise).
+
+Since the fw file (i.e., DSP program) is typically paired with a particular Linux app, I like the ability to specify the fw filename at runtime, depending on the Linux app I need to run.
+
+> 
+> > +       ret = rproc_add(rproc);
+> > +       if (ret)
+> > +               goto free_rproc;
+> > +
+> > +       /*
+> > +        * rproc_add() can end up enabling the DSP's clk with the DSP
+> > +        * *not* in reset, but davinci_rproc_start() needs the DSP to
+> be
+> > +        * held in reset at the time it is called.
+> > +        */
+> > +       dsp_clk = clk_get(rproc->dev.parent, NULL);
+> > +       davinci_clk_reset_assert(dsp_clk);
+> > +       clk_put(dsp_clk);
+> 
+> This looks racy. Don't you prefer to assert the reset line before you
+> call rproc_add ?
+
+I would prefer that, as long as the reset state is not changed by rproc_add().  I will look into it.
+
+> 
+> > +static int __devexit davinci_rproc_remove(struct platform_device
+> *pdev)
+> > +{
+> > +       struct rproc *rproc = platform_get_drvdata(pdev);
+> > +       int ret;
+> > +
+> > +       ret = rproc_del(rproc);
+> > +       if (ret)
+> > +               return ret;
+> 
+> Personally I'd not test ret here.
+> 
+> I know there's a nice check for !rproc inside rproc_del, but frankly
+> I'd prefer the system to crash if the developer blew up so badly. It's
+> nothing I'd want to be silently buried.
+
+Ok, I'll trust you on this one :)
+
+> 
+> > diff --git a/include/linux/platform_data/da8xx-remoteproc.h
+> b/include/linux/platform_data/da8xx-remoteproc.h
+> > new file mode 100644
+> > index 0000000..50e8c55
+> > --- /dev/null
+> > +++ b/include/linux/platform_data/da8xx-remoteproc.h
+> > @@ -0,0 +1,33 @@
+> > +/*
+> > + * Remote Processor
+> > + *
+> > + * Copyright (C) 2011-2012 Texas Instruments, Inc.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License
+> > + * version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#ifndef __DA8XX_REMOTEPROC_H__
+> > +#define __DA8XX_REMOTEPROC_H__
+> > +
+> > +#include <linux/remoteproc.h>
+> 
+> You should be able to avoid including this header by forward declaring
+> struct rproc_ops.
+
+Will do.
+
+Thanks & Regards,
+
+- Rob
+
+> 
+> Thanks,
+> Ohad.
