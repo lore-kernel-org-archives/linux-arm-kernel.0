@@ -1,105 +1,124 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 12 Jan 2013 12:22:20 +0530
-Subject: [PATCH 10/16] ARM: vexpress: introduce DCSCB support
-In-Reply-To: <alpine.LFD.2.02.1301111408330.6300@xanadu.home>
+Date: Sat, 12 Jan 2013 12:23:48 +0530
+Subject: [PATCH 13/16] drivers: misc: add ARM CCI support
+In-Reply-To: <alpine.LFD.2.02.1301111414390.6300@xanadu.home>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-11-git-send-email-nicolas.pitre@linaro.org>
- <50F05606.9060703@ti.com> <alpine.LFD.2.02.1301111408330.6300@xanadu.home>
-Message-ID: <50F10824.2010904@ti.com>
+ <1357777251-13541-14-git-send-email-nicolas.pitre@linaro.org>
+ <50F057D7.1010808@ti.com> <alpine.LFD.2.02.1301111414390.6300@xanadu.home>
+Message-ID: <50F1087C.4060900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 January 2013 12:43 AM, Nicolas Pitre wrote:
+On Saturday 12 January 2013 12:52 AM, Nicolas Pitre wrote:
 > On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
 >
 >> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
->>> This adds basic CPU and cluster reset controls on RTSM for the
->>> A15x4-A7x4 model configuration using the Dual Cluster System
->>> Configuration Block (DCSCB).
+>>> From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 >>>
->>> The cache coherency interconnect (CCI) is not handled yet.
+>>> On ARM multi-cluster systems coherency between cores running on
+>>> different clusters is managed by the cache-coherent interconnect (CCI).
+>>> It allows broadcasting of TLB invalidates and memory barriers and it
+>>> guarantees cache coherency at system level.
+>>>
+>>> This patch enables the basic infrastructure required in Linux to
+>>> handle and programme the CCI component. The first implementation is
+>>> based on a platform device, its relative DT compatible property and
+>>> a simple programming interface.
 >>>
 >>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 >>> ---
->>>    arch/arm/mach-vexpress/Kconfig  |   8 ++
->>>    arch/arm/mach-vexpress/Makefile |   1 +
->>>    arch/arm/mach-vexpress/dcscb.c  | 160
->>> ++++++++++++++++++++++++++++++++++++++++
->>>    3 files changed, 169 insertions(+)
->>>    create mode 100644 arch/arm/mach-vexpress/dcscb.c
+>>>    drivers/misc/Kconfig    |   3 ++
+>>>    drivers/misc/Makefile   |   1 +
+>>>    drivers/misc/arm-cci.c  | 107
+>>> ++++++++++++++++++++++++++++++++++++++++++++++++
+>>>    include/linux/arm-cci.h |  30 ++++++++++++++
+>> How about 'drivers/bus/' considering CCI is an interconnect bus (though
+>> for coherency)
+>
+> Yes, I like that better.
+>
+Great.
+
+>>>    4 files changed, 141 insertions(+)
+>>>    create mode 100644 drivers/misc/arm-cci.c
+>>>    create mode 100644 include/linux/arm-cci.h
 >>>
-[..]
+>>> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+>>> index b151b7c1bd..30d5be1ad2 100644
+>>> --- a/drivers/misc/Kconfig
+>>> +++ b/drivers/misc/Kconfig
+>>> @@ -499,6 +499,9 @@ config USB_SWITCH_FSA9480
+>>>    	  stereo and mono audio, video, microphone and UART data to use
+>>>    	  a common connector port.
+>>>
+>>> +config ARM_CCI
+>> You might want add depends on ARM big.LITTTLE otherwise it will
+>> break build for other arch's with random configurations.
+>
+> As far as this patch goes, this is buildable on other architectures too.
+> The next patch changes that though.
+>
+Thanks.
 
->>> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+>> [..]
+>>
+>>> diff --git a/drivers/misc/arm-cci.c b/drivers/misc/arm-cci.c
 >>> new file mode 100644
->>> index 0000000000..cccd943cd4
+>>> index 0000000000..f329c43099
 >>> --- /dev/null
->>> +++ b/arch/arm/mach-vexpress/dcscb.c
-[..]
-
->>> +static void dcscb_power_down(void)
+>>> +++ b/drivers/misc/arm-cci.c
+>>> @@ -0,0 +1,107 @@
+>>> +/*
+>>> + * CCI support
+>>> + *
+>>> + * Copyright (C) 2012 ARM Ltd.
+>>> + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>>> + * kind, whether express or implied; without even the implied warranty
+>>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + */
+>>> +
+>>> +#include <linux/device.h>
+>>> +#include <linux/io.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/slab.h>
+>>> +#include <linux/arm-cci.h>
+>>> +
+>>> +#define CCI400_EAG_OFFSET       0x4000
+>>> +#define CCI400_KF_OFFSET        0x5000
+>>> +
+>>> +#define DRIVER_NAME	"CCI"
+>>> +struct cci_drvdata {
+>>> +	void __iomem *baseaddr;
+>>> +	spinlock_t lock;
+>>> +};
+>>> +
+>>> +static struct cci_drvdata *info;
+>>> +
+>>> +void disable_cci(int cluster)
 >>> +{
->>> +	unsigned int mpidr, cpu, cluster, rst_hold, cpumask, last_man;
+>>> +	u32 cci_reg = cluster ? CCI400_KF_OFFSET : CCI400_EAG_OFFSET;
+>>> +	writel_relaxed(0x0, info->baseaddr	+ cci_reg);
 >>> +
->>> +	asm ("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
->>> +	cpu = mpidr & 0xff;
->>> +	cluster = (mpidr >> 8) & 0xff;
->>> +	cpumask = (1 << cpu);
+>>> +	while (readl_relaxed(info->baseaddr + 0xc) & 0x1)
+>>> +			;
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(disable_cci);
 >>> +
->>> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
->>> +	BUG_ON(cpu >= 4 || cluster >= 2);
->>> +
->>> +	arch_spin_lock(&dcscb_lock);
->>> +	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
->>> +	rst_hold |= cpumask;
->>> +	if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf)
->>> +		rst_hold |= (1 << 8);
->>> +	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
->>> +	arch_spin_unlock(&dcscb_lock);
->>> +	last_man = (rst_hold & (1 << 8));
->>> +
->>> +	/*
->>> +	 * Now let's clean our L1 cache and shut ourself down.
->>> +	 * If we're the last CPU in this cluster then clean L2 too.
->>> +	 */
->>> +
->> Do you wanted to have C bit clear code here ?
+>> Is more functionality going to be added for CCI driver. Having this
+>> much of driver code for just a disable_cci() functions seems like
+>> overkill.
 >
-> cpu_proc_fin() does it.
+> Yes.  More code will appear here to provide pmu functionalities, etc.
 >
-Yep. I noticed that in next patch when read the comment.
+Good to know.
 
->>> +	/*
->>> +	 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
->>> +	 * a preliminary flush here for those CPUs.  At least, that's
->>> +	 * the theory -- without the extra flush, Linux explodes on
->>> +	 * RTSM (maybe not needed anymore, to be investigated)..
->>> +	 */
->>> +	flush_cache_louis();
->>> +	cpu_proc_fin();
->>> +
->>> +	if (!last_man) {
->>> +		flush_cache_louis();
->>> +	} else {
->>> +		flush_cache_all();
->>> +		outer_flush_all();
->>> +	}
->>> +
->>> +	/* Disable local coherency by clearing the ACTLR "SMP" bit: */
->>> +	asm volatile (
->>> +		"mrc	p15, 0, ip, c1, c0, 1 \n\t"
->>> +		"bic	ip, ip, #(1 << 6) @ clear SMP bit \n\t"
->>> +		"mcr	p15, 0, ip, c1, c0, 1"
->>> +		: : : "ip" );
->>> +
->>> +	/* Now we are prepared for power-down, do it: */
->> You need dsb here, right ?
->
-> Probably.  However this code is being refactored significantly with
-> subsequent patches.  This intermediate step was kept not to introduce
-> too many concepts at once.
->
-Yes. I do see updates in subsequent patch.
-
-Regards
+Regards,
 Santosh
