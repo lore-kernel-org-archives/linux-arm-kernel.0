@@ -1,36 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Jan 2013 09:16:51 -0800
-Subject: [PATCH 0/4] arm: vt8500: Add support for Wondermedia WM8750/WM8850
-In-Reply-To: <1357960044.8515.0.camel@gitbox>
-References: <1357935162-7672-1-git-send-email-linux@prisktech.co.nz>
- <20130111215659.GA16521@quad.lixom.net>
- <1357960044.8515.0.camel@gitbox>
-Message-ID: <20130112171651.GC24073@quad.lixom.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 12 Jan 2013 12:19:54 -0500 (EST)
+Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
+ THUMB mode
+In-Reply-To: <20130111155150.GL14860@pengutronix.de>
+References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <50F0310F.3070502@arm.com> <20130111155150.GL14860@pengutronix.de>
+Message-ID: <alpine.LFD.2.02.1301121219140.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 12, 2013 at 04:07:24PM +1300, Tony Prisk wrote:
-> > I suggest that you split off the last three (and rebase them to be
-> > independent), and apply them to a multiplatform branch for vt8500. Then the
-> > last one is a soc branch that goes on top of the multiplatform branch (i.e. you
-> > build it on top of multiplatform). That way we can pull in the multiplatform
-> > changes together with those for other platforms, and then take the wm8{7,8}50
-> > branch goes in with the other new-soc support from other platforms.
-> > 
-> > Does that make sense? I'll be happy to provide more explanation if it doesn't.
-> > 
-> > -Olof
+On Fri, 11 Jan 2013, Uwe Kleine-K?nig wrote:
+
+> Hi Jonny,
 > 
-> I think I understand - pull requests to follow.
+> On Fri, Jan 11, 2013 at 03:34:39PM +0000, Jonathan Austin wrote:
+> > Hi Uwe,
+> > On 11/01/13 11:39, Uwe Kleine-K?nig wrote:
+> > >Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
+> > >obviously these cannot enter the kernel in ARM mode. Make an exception
+> > >for them and let them enter in THUMB mode.
+> > 
+> > Clearly something like this is necessary, but it isn't something I'd
+> > like for people to start using *unless* they have a THUMB only CPU
+> > (for example, to work around dodgy boot-loaders, etc)
+> > 
+> > Seeing as there are no THUMB-only CPUs with an MMU, I think we could
+> > safely constrain this change to:
+> > a) depend on !MMU
+> > b) only touch head-nommu.S
+> > 
+> > Does that cause any issue for what you're doing.
+> Would be ok for me, too. I don't care much.
 
-Looks good, thanks for fixing it up. Next time feel free to change to
-fresh subjects on the pull requests. :)
-
-I don't see your PGP key uploaded to the public key servers, and you
-likely don't have it signed by anyone else. If you have a chance, please
-try to get it signed by a few people. Ideal time to do that is if you're
-going to any conferences, but there are also local people around the
-world that can meet up sometimes.
+Please do so then.  I had the same concern.
 
 
--Olof
+Nicolas
