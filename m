@@ -1,75 +1,32 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 11 Jan 2013 18:45:33 -0800
-Subject: [PATCH] clk: factor: calculate rate by do_div
-In-Reply-To: <CAN1soZzOy7K6u8Q-kCr0ZC9c2b8BBDpma_vbci1iFq7yCu1jqQ@mail.gmail.com>
-References: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
- <CAN1soZze6Ogn_zi7JJN0JNzoMFkHLJyKyjTV7rSWUmQhwRU0NQ@mail.gmail.com>
- <CAN1soZxJ_JCEVV5v99tFi22fq5AEOCBj1D5PY=vmGGW_gDWuJQ@mail.gmail.com>
- <CAPtuhTg4NZqSAAaRvOb+0E_Op0Ye8+h=XeRyees-M-DpXXziqQ@mail.gmail.com>
- <CAN1soZzOy7K6u8Q-kCr0ZC9c2b8BBDpma_vbci1iFq7yCu1jqQ@mail.gmail.com>
-Message-ID: <20130112024533.4361.29468@quantum>
+Date: Fri, 11 Jan 2013 18:53:19 -0800
+Subject: [PATCH] ARM: OMAP4: clock/hwmod data: remove MODULEMODE entries
+ in mux + gate combos
+In-Reply-To: <alpine.DEB.2.00.1212172240101.29833@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1212172240101.29833@utopia.booyaka.com>
+Message-ID: <20130112025319.4361.29079@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Haojian Zhuang (2012-12-15 22:27:58)
-> On Sun, Dec 16, 2012 at 4:54 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> > On Sat, Dec 15, 2012 at 8:41 AM, Haojian Zhuang
-> > <haojian.zhuang@gmail.com> wrote:
-> >> On Tue, Dec 4, 2012 at 9:32 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> >>> On Mon, Dec 3, 2012 at 4:14 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> >>>> clk->rate = parent->rate / div * mult
-> >>>>
-> >>>> The formula is OK. But it may overflow while we do operate with
-> >>>> unsigned long. So use do_div instead.
-> >>>>
-> >>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> >>>> ---
-> >>>>  drivers/clk/clk-fixed-factor.c |    5 ++++-
-> >>>>  1 file changed, 4 insertions(+), 1 deletion(-)
-> >>>>
-> >>>> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> >>>> index a489985..1ef271e 100644
-> >>>> --- a/drivers/clk/clk-fixed-factor.c
-> >>>> +++ b/drivers/clk/clk-fixed-factor.c
-> >>>> @@ -28,8 +28,11 @@ static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
-> >>>>                 unsigned long parent_rate)
-> >>>>  {
-> >>>>         struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
-> >>>> +       unsigned long long int rate;
-> >>>>
-> >>>> -       return parent_rate * fix->mult / fix->div;
-> >>>> +       rate = (unsigned long long int)parent_rate * fix->mult;
-> >>>> +       do_div(rate, fix->div);
-> >>>> +       return (unsigned long)rate;
-> >>>>  }
-> >>>>
-> >>>>  static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
-> >>>> --
-> >>>> 1.7.10.4
-> >>>>
-> >>>
-> >>> Correct Mike's email address.
-> >>
-> >> Any comments? Does it mean that nobody want to fix the bug?
-> >
-> > Thanks for the patch.  My apologies for letting this one slip through
-> > the cracks but my normal email workflow was unavoidably disrupted and
-> > I find myself playing catch-up with pending patches.
-> >
-> > The patch looks good to me but I'll change the $SUBJECT to "clk:
-> > fixed-factor: round_rate should use do_div" and do some testing before
-> > taking it in.
-> >
-> > Regards,
-> > Mike
+Quoting Paul Walmsley (2012-12-17 14:41:13)
+> Convert all DEFINE_OMAP_MUX_GATE() combinations that list MODULEMODE
+> registers in their gate arguments to DEFINE_OMAP_MUX(), dropping the
+> MODULEMODE data.  This is possible because the MODULEMODE bits control
+> IP blocks, not clocks; and the hwmod code takes care of IP block
+> control.  Rename these clocks to reflect the original multiplexer name
+> as specified in the comments.  And convert the hwmod data to use the
+> multiplexer clock name.
 > 
-> It's nice. Thank you.
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Beno?t Cousson <b-cousson@ti.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> ---
+> 
+> Seems to boot with omap2plus_defconfig, anyway.
 > 
 
-Pulled the fix into clk-next.
+It looks good to me, and I am happy to see fewer clocks in favor of
+using the hwmods.  However I did not test it.
 
-Thanks for the patch,
+Regards,
 Mike
-
-> Best Regards
-> Haojian
