@@ -1,54 +1,89 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 11 Jan 2013 18:56:38 -0800
-Subject: [PATCH] clk: max77686: Fix return value checking for devm_kzalloc
-In-Reply-To: <1355816625.32595.0.camel@phoenix>
-References: <1355816625.32595.0.camel@phoenix>
-Message-ID: <20130112025638.4361.85705@quantum>
+Date: Fri, 11 Jan 2013 19:03:50 -0800
+Subject: [PATCH] clk: max77686: Remove unnecessary NULL checking for
+ container_of()
+In-Reply-To: <1355817292.32595.2.camel@phoenix>
+References: <1355817292.32595.2.camel@phoenix>
+Message-ID: <20130112030350.4361.71934@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Axel Lin (2012-12-17 23:43:45)
-> devm_kzalloc returns NULL on failure.
+Quoting Axel Lin (2012-12-17 23:54:52)
+> container_of() never returns NULL, thus remove the NULL checking for it.
+> Also rename get_max77686_clk() to to_max77686_clk() for better readability.
 > 
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
-
-Pulled into clk-next.
-
-Thanks for the patch,
-Mike
-
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 > ---
->  drivers/clk/clk-max77686.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  drivers/clk/clk-max77686.c |   30 ++++++++----------------------
+>  1 file changed, 8 insertions(+), 22 deletions(-)
 > 
 > diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-> index d098f72..8944214 100644
+> index 8944214..3680f66 100644
 > --- a/drivers/clk/clk-max77686.c
 > +++ b/drivers/clk/clk-max77686.c
-> @@ -132,7 +132,7 @@ static int max77686_clk_register(struct device *dev,
+> @@ -44,48 +44,34 @@ struct max77686_clk {
+>         struct clk_lookup *lookup;
+>  };
 >  
->         max77686->lookup = devm_kzalloc(dev, sizeof(struct clk_lookup),
->                                         GFP_KERNEL);
-> -       if (IS_ERR(max77686->lookup))
-> +       if (!max77686->lookup)
->                 return -ENOMEM;
+> -static struct max77686_clk *get_max77686_clk(struct clk_hw *hw)
+> +static struct max77686_clk *to_max77686_clk(struct clk_hw *hw)
+>  {
+>         return container_of(hw, struct max77686_clk, hw);
+>  }
 >  
->         max77686->lookup->con_id = hw->init->name;
-> @@ -151,13 +151,13 @@ static int max77686_clk_probe(struct platform_device *pdev)
+>  static int max77686_clk_prepare(struct clk_hw *hw)
+>  {
+> -       struct max77686_clk *max77686;
+> -       int ret;
+> -
+> -       max77686 = get_max77686_clk(hw);
+> -       if (!max77686)
+> -               return -ENOMEM;
+> -
+> -       ret = regmap_update_bits(max77686->iodev->regmap,
+> -               MAX77686_REG_32KHZ, max77686->mask, max77686->mask);
+> +       struct max77686_clk *max77686 = to_max77686_clk(hw);
 >  
->         max77686_clks = devm_kzalloc(&pdev->dev, sizeof(struct max77686_clk *)
->                                         * MAX77686_CLKS_NUM, GFP_KERNEL);
-> -       if (IS_ERR(max77686_clks))
-> +       if (!max77686_clks)
->                 return -ENOMEM;
+> -       return ret;
+> +       return regmap_update_bits(max77686->iodev->regmap,
+> +                                 MAX77686_REG_32KHZ, max77686->mask,
+> +                                 max77686->mask);
+>  }
 >  
->         for (i = 0; i < MAX77686_CLKS_NUM; i++) {
->                 max77686_clks[i] = devm_kzalloc(&pdev->dev,
->                                         sizeof(struct max77686_clk), GFP_KERNEL);
-> -               if (IS_ERR(max77686_clks[i]))
-> +               if (!max77686_clks[i])
->                         return -ENOMEM;
->         }
+>  static void max77686_clk_unprepare(struct clk_hw *hw)
+>  {
+> -       struct max77686_clk *max77686;
+> -
+> -       max77686 = get_max77686_clk(hw);
+> -       if (!max77686)
+> -               return;
+> +       struct max77686_clk *max77686 = to_max77686_clk(hw);
+>  
+>         regmap_update_bits(max77686->iodev->regmap,
+> -               MAX77686_REG_32KHZ, max77686->mask, ~max77686->mask);
+> +                          MAX77686_REG_32KHZ, max77686->mask, 0);
+
+Looks like the change to ~max77686->mask snuck in.  It is not mentioned
+in the changelog.  Care to respin the patch without the change?
+
+Thanks,
+Mike
+
+>  }
+>  
+>  static int max77686_clk_is_enabled(struct clk_hw *hw)
+>  {
+> -       struct max77686_clk *max77686;
+> +       struct max77686_clk *max77686 = to_max77686_clk(hw);
+>         int ret;
+>         u32 val;
+>  
+> -       max77686 = get_max77686_clk(hw);
+> -       if (!max77686)
+> -               return -ENOMEM;
+> -
+>         ret = regmap_read(max77686->iodev->regmap,
+>                                 MAX77686_REG_32KHZ, &val);
 >  
 > -- 
 > 1.7.9.5
