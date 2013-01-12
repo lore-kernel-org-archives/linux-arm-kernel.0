@@ -1,22 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 12 Jan 2013 00:05:28 +0000
-Subject: [PATCH] ASoC: fsl: fix multiple definition of init_module
-In-Reply-To: <1357832636-11463-1-git-send-email-shawn.guo@linaro.org>
-References: <1357832636-11463-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130112000528.GE7873@opensource.wolfsonmicro.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 11 Jan 2013 16:14:14 -0800
+Subject: [PATCH 1/2] arm: tegra: Add new DT property to USB node.
+In-Reply-To: <Pine.LNX.4.44L0.1212171704060.1409-100000@iolanthe.rowland.org>
+References: <50CF89AF.3000308@wwwdotorg.org>
+ <Pine.LNX.4.44L0.1212171704060.1409-100000@iolanthe.rowland.org>
+Message-ID: <20130112001414.GA21909@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 11:43:56PM +0800, Shawn Guo wrote:
-> With commit f2818d0 (ASoC: fsl: fix miscompilation of snd-soc-imx-pcm),
-> we will see the following build error when building modules with
-> CONFIG_SND_IMX_SOC=m in imx_v6_v7_defconfig.
+On Mon, Dec 17, 2012 at 05:04:41PM -0500, Alan Stern wrote:
+> On Mon, 17 Dec 2012, Stephen Warren wrote:
+> 
+> > On 12/13/2012 11:59 PM, Venu Byravarasu wrote:
+> > > As Tegra USB host driver is using instance number for resetting
+> > > PORT0 twice, adding a new DT property for handling this.
+> > 
+> > Alan, Greg, Felip,e
+> > 
+> > This series looks fine to me.
+> > 
+> > I'd like to take all the Tegra-related USB patches through the Tegra
+> > tree for 3.9 if possible (so I'm looking for your acks here). I believe
+> > Venu plans to significantly clean up the EHCI/PHY driver split for
+> > Tegra, rework the drivers, and add support for Tegra30 in addition to
+> > Tegra20. Some of this requires changes to some Tegra board files and
+> > device trees to maintain "git bisect" I don't know for sure yet, but I
+> > believe that rework may also end up conflicting with other clock-related
+> > rework that will show up for Tegra in 3.9. Are you OK with this? I'll
+> > certainly look for your review/acks on the patches before picking them
+> > up though.
+> 
+> Regarding the changes to drivers/usb/host/ehci-tegra.c:
+> 
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130112/c8451c7c/attachment.sig>
+That's fine with me as well, feel free to think that I have now dropped
+all tegra-related patches from my queue, you can take them all :)
+
+thanks,
+
+greg k-h
