@@ -1,26 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Jan 2013 11:58:48 +0000
-Subject: [PATCH 3/4] ARM: imx: restore uncompress.h to a common place
-In-Reply-To: <20130112110438.GB14865@S2101-09.ap.freescale.net>
-References: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
- <50F101F4.8080009@gmail.com>
- <20130112110438.GB14865@S2101-09.ap.freescale.net>
-Message-ID: <201301121158.49128.arnd@arndb.de>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Sat, 12 Jan 2013 13:36:40 +0100
+Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
+In-Reply-To: <20130111154516.GA25335@avionic-0098.adnet.avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <50EF54B6.6010100@wwwdotorg.org>
+ <20130111034015.GA28094@avionic-0098.adnet.avionic-design.de>
+ <201301111536.14799.arnd@arndb.de>
+ <20130111154516.GA25335@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20130112123640.GA22505@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 January 2013, Shawn Guo wrote:
-> On Sat, Jan 12, 2013 at 07:25:56AM +0100, Dirk Behme wrote:
-
-> > In case you touch these patches again, you might check if the above
-> > path and file name in the file header should be adapted to the new
-> > file location, too.
+On Fri, Jan 11, 2013 at 04:45:16PM +0100, Thierry Reding wrote:
+> On Fri, Jan 11, 2013 at 03:36:14PM +0000, Arnd Bergmann wrote:
+> > On Friday 11 January 2013, Thierry Reding wrote:
+> > > Right, it'll need #ifdefs around the arch_{setup,teardown}_msi_irq(). Or
+> > > select PCI_MSI unconditionally. Once this is merged I was going to post
+> > > a patch that enables PCI_MSI in tegra_defconfig anyway. But it might be
+> > > better to keep it optional anyway since the remainder of the code copes
+> > > with it properly.
+> > > 
+> > Actually, we need something better than that. You cannot define
+> > arch_setup_msi_irq in a tegra specific pci host driver, because that
+> > will seriously mess up other platforms in multiplatform configurations
+> > by giving a link error when they also define this function, or with a
+> > run-time error when they don't support it.
 > > 
-> I would not bother to update that.  To me, it's quite pointless to have
-> a full file name there.  If I can choose, I would remove it completely.
+> > I think what we should do here is fix it the right way by adding
+> > a pci host specific callback rather than an architecture specific
+> > callback in drivers/pci/msi.c. There is already a default version
+> > of arch_setup_msi_irqs (with s), and we can probably do the
+> > same for arch_setup_msi_irq (without s) to fall back to the
+> > arch version for most architectures.
+> > Most architectures (at least powerpc, sparc, ia64 and x86) already
+> > multiplex the msi handlers internally, but ARM does not because
+> > there is only one implementation (iop33x) at the moment.
+> > 
+> > We can add a generix multiplex and then move architectures over to
+> > use it.
+> 
+> I already hinted at that in one of the other subthreads. Having such a
+> multiplex would also allow the driver to be built as a module. I had
+> already thought about this when I was working on an earlier version of
+> these patches. Basically these would be two ops attached to the host
+> bridge, and the generic arch_setup_msi_irq() could then look that up
+> given the struct pci_dev that is passed to it and call this new per-
+> host bridge .setup_msi_irq().
 
-I agree, they tend to all get wrong over time. It's not worth
-removing those statements all at once, but I also remove them
-when moving files and I remember.
+struct pci_ops looks like a good place to put these. They'll be
+available from each struct pci_bus, so should be easy to call from
+arch_setup_msi_irq().
 
-	Arnd
+Any objections?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130112/2b53d8cf/attachment.sig>
