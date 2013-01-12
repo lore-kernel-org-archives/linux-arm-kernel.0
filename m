@@ -1,52 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 12 Jan 2013 12:51:24 +0530
-Subject: [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
- exit/setup and CCI
-In-Reply-To: <alpine.LFD.2.02.1301111425020.6300@xanadu.home>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-16-git-send-email-nicolas.pitre@linaro.org>
- <50F059A4.4010107@ti.com> <alpine.LFD.2.02.1301111425020.6300@xanadu.home>
-Message-ID: <50F10EF4.9070909@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 12 Jan 2013 09:54:17 +0100
+Subject: [PATCH 0/2] Add GPIO driver for Allwinner SoCs
+In-Reply-To: <CACRpkdZQAim4_3E6RG=d4pJi80B6W-xzW7n=Od86VJNcPO4FVw@mail.gmail.com>
+References: <1357317909-12458-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CAOesGMiTZvLJ6cXwMFsFc6pBGoLUEkV+WMrDOqqCcs_TEnTtUw@mail.gmail.com>
+ <CACRpkdZQAim4_3E6RG=d4pJi80B6W-xzW7n=Od86VJNcPO4FVw@mail.gmail.com>
+Message-ID: <50F124B9.30000@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 January 2013 12:58 AM, Nicolas Pitre wrote:
-> On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
->
->> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
->>> From: Dave Martin <dave.martin@linaro.org>
->>>
->>> +		/*
->>> +		 * Flush the local CPU cache.
->>> +		 *
->>> +		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
->>> +		 * a preliminary flush here for those CPUs.  At least, that's
->>> +		 * the theory -- without the extra flush, Linux explodes on
->>> +		 * RTSM (maybe not needed anymore, to be investigated).
->>> +		 */
->> This is expected if the entire code is not in one stack frame and the
->> additional flush is needed to avoid possible stack corruption. This
->> issue has been discussed in past on the list.
->
-> I missed that.  Do you have a reference or pointer handy?
->
-> What is strange is that this is 100% reproducible on RTSM while this
-> apparently is not an issue on real hardware so far.
->
-I tried searching archives and realized the discussion was in private
-email thread. There are some bits and pieces on list but not all the
-information.
+On 10/01/2013 12:13, Linus Walleij wrote:
+> On Sat, Jan 5, 2013 at 4:35 PM, Olof Johansson <olof@lixom.net> wrote:
+> 
+>> I haven't looked closely at the patch yet, but this is a case where it
+>> makes sense to merge the gpio/pinctrl patch through Linus/Grant's
+>> tree, and merge the dtsi update through arm-soc -- while you need
+>> both, nothing is broken by having just one or the other, so taking the
+>> separate merge paths are fine.
+>>
+>> Linus, Grant, sound ok to you?
+> 
+> Sure. But I have requested a few changes to the patch set...
 
-The main issue RMK pointed out is- An additional L1 flush needed
-to avoid the effective change of view of memory when the C bit is
-turned off, and the cache is no longer searched for local CPU accesses.
+And we need to merge the pinctrl patches first also.
 
-In your case dcscb_power_down() has updated the stack which can be hit
-in cache line and hence cache is dirty now. Then cpu_proc_fin() clears
-the C-bit and hence for sub sequent calls the L1 cache won't be
-searched. You then call flush_cache_all() which again updates the
-stack but avoids searching the L1 cache. So it overwrites previous
-saved stack frame. This seems to be an issue in your case as well.
+Maxime
 
-Regards,
-Santosh
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
