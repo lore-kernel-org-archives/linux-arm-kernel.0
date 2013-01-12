@@ -1,77 +1,75 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 11 Jan 2013 18:40:41 -0800
-Subject: [PATCH] clk: export __clk_get_name for re-use in imx-ipu-v3 and
- others
-In-Reply-To: <20121217085952.GH26326@pengutronix.de>
-References: <1355400745-7320-1-git-send-email-ndevos@redhat.com>
- <20121217085952.GH26326@pengutronix.de>
-Message-ID: <20130112024041.4361.91427@quantum>
+Date: Fri, 11 Jan 2013 18:45:33 -0800
+Subject: [PATCH] clk: factor: calculate rate by do_div
+In-Reply-To: <CAN1soZzOy7K6u8Q-kCr0ZC9c2b8BBDpma_vbci1iFq7yCu1jqQ@mail.gmail.com>
+References: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
+ <CAN1soZze6Ogn_zi7JJN0JNzoMFkHLJyKyjTV7rSWUmQhwRU0NQ@mail.gmail.com>
+ <CAN1soZxJ_JCEVV5v99tFi22fq5AEOCBj1D5PY=vmGGW_gDWuJQ@mail.gmail.com>
+ <CAPtuhTg4NZqSAAaRvOb+0E_Op0Ye8+h=XeRyees-M-DpXXziqQ@mail.gmail.com>
+ <CAN1soZzOy7K6u8Q-kCr0ZC9c2b8BBDpma_vbci1iFq7yCu1jqQ@mail.gmail.com>
+Message-ID: <20130112024533.4361.29468@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sascha Hauer (2012-12-17 00:59:52)
-> On Thu, Dec 13, 2012 at 01:12:25PM +0100, Niels de Vos wrote:
-> > This fixes the following error when building for arm-imx:
-> > > ERROR: "__clk_get_name" [drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.ko] undefined!
-> > > make[1]: *** [__modpost] Error 1
-> > > make: *** [modules] Error 2
-> > 
-> > There are valid usecases to get the name of a clock, be it for debugging
-> > purposes or to register a children of a clock like done in this IPU driver.
-> > Therefore exporting __clk_get_name() and make it available for others makes
-> > sense.
+Quoting Haojian Zhuang (2012-12-15 22:27:58)
+> On Sun, Dec 16, 2012 at 4:54 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> > On Sat, Dec 15, 2012 at 8:41 AM, Haojian Zhuang
+> > <haojian.zhuang@gmail.com> wrote:
+> >> On Tue, Dec 4, 2012 at 9:32 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> >>> On Mon, Dec 3, 2012 at 4:14 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> >>>> clk->rate = parent->rate / div * mult
+> >>>>
+> >>>> The formula is OK. But it may overflow while we do operate with
+> >>>> unsigned long. So use do_div instead.
+> >>>>
+> >>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> >>>> ---
+> >>>>  drivers/clk/clk-fixed-factor.c |    5 ++++-
+> >>>>  1 file changed, 4 insertions(+), 1 deletion(-)
+> >>>>
+> >>>> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> >>>> index a489985..1ef271e 100644
+> >>>> --- a/drivers/clk/clk-fixed-factor.c
+> >>>> +++ b/drivers/clk/clk-fixed-factor.c
+> >>>> @@ -28,8 +28,11 @@ static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
+> >>>>                 unsigned long parent_rate)
+> >>>>  {
+> >>>>         struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
+> >>>> +       unsigned long long int rate;
+> >>>>
+> >>>> -       return parent_rate * fix->mult / fix->div;
+> >>>> +       rate = (unsigned long long int)parent_rate * fix->mult;
+> >>>> +       do_div(rate, fix->div);
+> >>>> +       return (unsigned long)rate;
+> >>>>  }
+> >>>>
+> >>>>  static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
+> >>>> --
+> >>>> 1.7.10.4
+> >>>>
+> >>>
+> >>> Correct Mike's email address.
+> >>
+> >> Any comments? Does it mean that nobody want to fix the bug?
+> >
+> > Thanks for the patch.  My apologies for letting this one slip through
+> > the cracks but my normal email workflow was unavoidably disrupted and
+> > I find myself playing catch-up with pending patches.
+> >
+> > The patch looks good to me but I'll change the $SUBJECT to "clk:
+> > fixed-factor: round_rate should use do_div" and do some testing before
+> > taking it in.
+> >
+> > Regards,
+> > Mike
 > 
-> Gnerally I think the name of a clock shouldn't be a secret, so:
-> 
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> It's nice. Thank you.
 > 
 
-I've taken this into clk-next, but I'm not too pleased with it for any
-purpose other than debugging.  For this reason I opted to keep the
-double underscores (as opposed to EXPORTing a new clk_get_name which
-calls __clk_get_name) to make all users of the API feel uneasy and
-otherwise of low character.
+Pulled the fix into clk-next.
 
-Currently the clock framework relies on parent names for registering
-clocks from defined in static data but this limitation isn't really true
-for clocks defined as part of DT.  More to think about for the future.
-
-Regards,
+Thanks for the patch,
 Mike
 
-> > 
-> > Reported-by: Peter Robinson <pbrobinson@gmail.com>
-> > CC: Sascha Hauer <s.hauer@pengutronix.de>
-> > CC: Mike Turquette <mturquette@linaro.org>
-> > Signed-off-by: Niels de Vos <ndevos@redhat.com>
-> > ---
-> >  drivers/clk/clk.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 251e45d..fbe0f3a 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -259,10 +259,11 @@ late_initcall(clk_disable_unused);
-> >  
-> >  /***    helper functions   ***/
-> >  
-> > -inline const char *__clk_get_name(struct clk *clk)
-> > +const char *__clk_get_name(struct clk *clk)
-> >  {
-> >       return !clk ? NULL : clk->name;
-> >  }
-> > +EXPORT_SYMBOL_GPL(__clk_get_name);
-> >  
-> >  inline struct clk_hw *__clk_get_hw(struct clk *clk)
-> >  {
-> > -- 
-> > 1.7.11.7
-> > 
-> > 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> Best Regards
+> Haojian
