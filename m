@@ -1,38 +1,124 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 12 Jan 2013 12:19:54 -0500 (EST)
-Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
- THUMB mode
-In-Reply-To: <20130111155150.GL14860@pengutronix.de>
-References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <50F0310F.3070502@arm.com> <20130111155150.GL14860@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1301121219140.6300@xanadu.home>
+Date: Sat, 12 Jan 2013 12:33:07 -0500 (EST)
+Subject: [PATCH V2 2/6] ARM: tegra20: cpuidle: add powered-down state for
+ secondary CPU
+In-Reply-To: <1357888829.2034.39.camel@jlo-ubuntu-64.nvidia.com>
+References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
+ <1354701715-24150-3-git-send-email-josephl@nvidia.com>
+ <20121205105010.GA12999@e102568-lin.cambridge.arm.com>
+ <1357888829.2034.39.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <alpine.LFD.2.02.1301121227390.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013, Uwe Kleine-K?nig wrote:
+On Fri, 11 Jan 2013, Joseph Lo wrote:
 
-> Hi Jonny,
+> Hi Lorenzo,
 > 
-> On Fri, Jan 11, 2013 at 03:34:39PM +0000, Jonathan Austin wrote:
-> > Hi Uwe,
-> > On 11/01/13 11:39, Uwe Kleine-K?nig wrote:
-> > >Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
-> > >obviously these cannot enter the kernel in ARM mode. Make an exception
-> > >for them and let them enter in THUMB mode.
+> On Wed, 2012-12-05 at 18:50 +0800, Lorenzo Pieralisi wrote:
+> > On Wed, Dec 05, 2012 at 10:01:49AM +0000, Joseph Lo wrote:
+> > > The powered-down state of Tegra20 requires power gating both CPU cores.
+> > > When the secondary CPU requests to enter powered-down state, it saves
+> > > its own contexts and then enters WFI. The Tegra20 had a limition to
+> > > power down both CPU cores. The secondary CPU must waits for CPU0 in
+> > > powered-down state too. If the secondary CPU be woken up before CPU0
+> > > entering powered-down state, then it needs to restore its CPU states
+> > > and waits for next chance.
+> > >
+> > > Be aware of that, you may see the legacy power state "LP2" in the code
+> > > which is exactly the same meaning of "CPU power down".
+> > >
+> > > Based on the work by:
+> > > Colin Cross <ccross@android.com>
+> > > Gary King <gking@nvidia.com>
+> > >
+> > > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > > +
+> > > +#ifdef CONFIG_PM_SLEEP
+> > > +/*
+> > > + * tegra_pen_lock
+> > > + *
+> > > + * spinlock implementation with no atomic test-and-set and no coherence
+> > > + * using Peterson's algorithm on strongly-ordered registers
+> > > + * used to synchronize a cpu waking up from wfi with entering lp2 on idle
+> > > + *
+> > > + * SCRATCH37 = r1 = !turn (inverted from Peterson's algorithm)
+> > > + * on cpu 0:
+> > > + * SCRATCH38 = r2 = flag[0]
+> > > + * SCRATCH39 = r3 = flag[1]
+> > > + * on cpu1:
+> > > + * SCRATCH39 = r2 = flag[1]
+> > > + * SCRATCH38 = r3 = flag[0]
+> > > + *
+> > > + * must be called with MMU on
+> > > + * corrupts r0-r3, r12
+> > > + */
+> > > +ENTRY(tegra_pen_lock)
+> > > +       mov32   r3, TEGRA_PMC_VIRT
+> > > +       cpu_id  r0
+> > > +       add     r1, r3, #PMC_SCRATCH37
+> > > +       cmp     r0, #0
+> > > +       addeq   r2, r3, #PMC_SCRATCH38
+> > > +       addeq   r3, r3, #PMC_SCRATCH39
+> > > +       addne   r2, r3, #PMC_SCRATCH39
+> > > +       addne   r3, r3, #PMC_SCRATCH38
+> > > +
+> > > +       mov     r12, #1
+> > > +       str     r12, [r2]               @ flag[cpu] = 1
+> > > +       dsb
+> > > +       str     r12, [r1]               @ !turn = cpu
+> > > +1:     dsb
+> > > +       ldr     r12, [r3]
+> > > +       cmp     r12, #1                 @ flag[!cpu] == 1?
+> > > +       ldreq   r12, [r1]
+> > > +       cmpeq   r12, r0                 @ !turn == cpu?
+> > > +       beq     1b                      @ while !turn == cpu && flag[!cpu] == 1
+> > > +
+> > > +       mov     pc, lr                  @ locked
+> > > +ENDPROC(tegra_pen_lock)
+> > > +
+> > > +ENTRY(tegra_pen_unlock)
+> > > +       dsb
+> > > +       mov32   r3, TEGRA_PMC_VIRT
+> > > +       cpu_id  r0
+> > > +       cmp     r0, #0
+> > > +       addeq   r2, r3, #PMC_SCRATCH38
+> > > +       addne   r2, r3, #PMC_SCRATCH39
+> > > +       mov     r12, #0
+> > > +       str     r12, [r2]
+> > > +       mov     pc, lr
+> > > +ENDPROC(tegra_pen_unlock)
 > > 
-> > Clearly something like this is necessary, but it isn't something I'd
-> > like for people to start using *unless* they have a THUMB only CPU
-> > (for example, to work around dodgy boot-loaders, etc)
+> > There is an ongoing work to make this locking scheme for MMU/coherency off
+> > paths ARM generic, and we do not want to merge yet another platform specific
+> > locking mechanism. I will point you to the patchset when it hits LAK.
 > > 
-> > Seeing as there are no THUMB-only CPUs with an MMU, I think we could
-> > safely constrain this change to:
-> > a) depend on !MMU
-> > b) only touch head-nommu.S
-> > 
-> > Does that cause any issue for what you're doing.
-> Would be ok for me, too. I don't care much.
+> 
+> You did mention there is an ARM generic locking scheme for MMU/coherency
+> off case before. Do you mean the patch below?
+> 
+> https://patchwork.kernel.org/patch/1957911/
+> https://patchwork.kernel.org/patch/1957901/
+> 
+> I gave it a review today. Looks it can't fit our usage for CPU idle
+> powered-down mode on Tegra20.
+> 
+> The generic mechanism only can be used when CPUs in non coherent world.
+> But our usage needs the mechanism could be used in both coherent and non
+> coherent case. OK. The case is we need to sync the status about the CPU1
+> was ready to power down. In this case, the CPU0 is still in coherent
+> world but the CPU1 isn't. So we need the locking scheme could be still
+> safe in this situation.
 
-Please do so then.  I had the same concern.
+Those patches above are dealing with CPUs coming back up.  If you look 
+at the rest of the series, especially the DCSCB one providing real usage 
+example, you'll see that we do have a mix of coherent and non-coherent 
+states that need to coordinate amongst themselves.
+
+> And the proposed scheme looks only for b.L system?
+
+It was initiated for b.L hence the name, but that is applicable to other 
+systems as well.
 
 
 Nicolas
