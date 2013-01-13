@@ -1,37 +1,28 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 13 Jan 2013 15:12:36 -0500
-Subject: [PATCH v2] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
-In-Reply-To: <50F30DAD.3090105@openwrt.org>
-References: <1588881.pi23bvqp7D@bender> <3816648.2TVsTiMOWx@bender>
- <50F02570.9050208@openwrt.org>
- <20130111145629.GB31640@titan.lakedaemon.net>
- <50F30DAD.3090105@openwrt.org>
-Message-ID: <20130113201236.GO13433@titan.lakedaemon.net>
+Date: Sun, 13 Jan 2013 15:43:48 -0500
+Subject: [PATCH v2] mmc: mvsdio: Replace IS_ERR_OR_NULL() with IS_ERR()
+In-Reply-To: <1357889273-11553-1-git-send-email-andrew@lunn.ch>
+References: <20130111004323.GA12257@schnuecks.de>
+ <1357889273-11553-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20130113204348.GR13433@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 13, 2013 at 08:40:29PM +0100, Florian Fainelli wrote:
-> Le 11/01/2013 15:56, Jason Cooper a ?crit :
-> >Florian,
-> >
-> >On Fri, Jan 11, 2013 at 03:45:04PM +0100, Florian Fainelli wrote:
-> >>Le 01/09/13 20:56, Florian Fainelli a ?crit :
-> >>>This patch adds the DTS file to support the Marvell RD-A370-A1
-> >>>(Reference Design board) also known as RD-88F6710 board. It is almost
-> >>>entirely similar to the DB-A370 board except that the first Ethernet PHY
-> >>>is SGMII-wired and the second is a switch which is RGMII-wired.
-> >>
-> >>Who is going to take this patch? Since this is a new DTS file there
-> >>are little chances it breaks anything, could it be taken for an
-> >>upcoming 3.8-rc?
-> >
-> >No, only fixes go in for the current -rc.  It'll be included for v3.9, I
-> >have it in my queue.
+On Fri, Jan 11, 2013 at 08:27:52AM +0100, Andrew Lunn wrote:
+> A NULL is a valid clk cookie, so we should not be tested with
+> IS_ERR_OR_NULL(). Replace it with IS_ERR().
 > 
-> Jason, I don't see this patch in the pull request you just sent for
-> 3.9, should it be? Thanks!
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+> 
+> This patch depends on Thomas Petazzoni DT patches for mvsdio, which changed
+> the order of resource allocation etc.
 
-Not yet, I'm working my though the holiday backlog chronologically.
+grrr, I'm seeing fixes depending on features :(  Any way to avoid that?
+
+In light of Russell's comments, shall I wait for a v3?  All of Thomas'
+mvsdio work is now waiting on this.  I'd like to get that in as early as
+possible.
 
 thx,
 
