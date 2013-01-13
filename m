@@ -1,67 +1,142 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 13 Jan 2013 02:10:55 +0100
-Subject: [PATCH 3/6] ARM: s3c64xx: Add support for OF-based VIC initialization
+Date: Sun, 13 Jan 2013 02:10:56 +0100
+Subject: [PATCH 4/6] ARM: s3c64xx: Add board file for boot using Device Tree
 In-Reply-To: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
 References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1358039458-31960-4-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1358039458-31960-5-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies IRQ initialization code of S3C64xx to support
-Device Tree-based initialization of VICs.
+This patch adds board file that will be used to boot S3C64xx-based boards
+using Device Tree.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/mach-s3c64xx/common.c | 16 ++++++++++++++++
- arch/arm/mach-s3c64xx/common.h |  4 ++++
- 2 files changed, 20 insertions(+)
+ arch/arm/mach-s3c64xx/Kconfig           | 13 +++++
+ arch/arm/mach-s3c64xx/Makefile          |  1 +
+ arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c | 84 +++++++++++++++++++++++++++++++++
+ 3 files changed, 98 insertions(+)
+ create mode 100644 arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
 
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index aef303b..b9c5bec 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -19,6 +19,7 @@
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/ioport.h>
-+#include <linux/of_irq.h>
- #include <linux/serial_core.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
-@@ -181,6 +182,21 @@ core_initcall(s3c64xx_dev_init);
- 			 1 << (IRQ_HSMMC1 - IRQ_VIC1_BASE) |	\
- 			 1 << (IRQ_HSMMC2 - IRQ_VIC1_BASE))
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id s3c64xx_dt_irq_match[] = {
-+	{ .compatible = "arm,pl192-vic", .data = vic_of_init, },
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 283cb77..b1c7106 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -311,3 +311,16 @@ config MACH_WLF_CRAGG_6410
+ 	select SAMSUNG_GPIO_EXTRA128
+ 	help
+ 	  Machine support for the Wolfson Cragganmore S3C6410 variant.
++
++config MACH_S3C64XX_DT
++	bool "Samsung S3C6400/S3C6410 machine using Device Tree"
++	select CPU_S3C6400
++	select CPU_S3C6410
++	select USE_OF
++	help
++	  Machine support for Samsung S3C6400/S3C6410 machines with Device Tree
++	  enabled.
++	  Select this if a fdt blob is available for your S3C64XX SoC based
++	  board.
++	  Note: This is under development and not all peripherals can be
++	  supported with this machine file.
+diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+index f9ce1dc..59b3d06 100644
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@ -58,3 +58,4 @@ obj-$(CONFIG_MACH_SMARTQ7)		+= mach-smartq7.o
+ obj-$(CONFIG_MACH_SMDK6400)		+= mach-smdk6400.o
+ obj-$(CONFIG_MACH_SMDK6410)		+= mach-smdk6410.o
+ obj-$(CONFIG_MACH_WLF_CRAGG_6410)	+= mach-crag6410.o mach-crag6410-module.o
++obj-$(CONFIG_MACH_S3C64XX_DT)		+= mach-s3c64xx-dt.o
+diff --git a/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+new file mode 100644
+index 0000000..974af2a
+--- /dev/null
++++ b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+@@ -0,0 +1,84 @@
++/*
++ * Samsung's S3C64XX flattened device tree enabled machine
++ *
++ * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/of_platform.h>
++#include <linux/serial_core.h>
++
++#include <asm/mach/arch.h>
++#include <asm/hardware/vic.h>
++#include <mach/map.h>
++
++#include <plat/cpu.h>
++#include <plat/regs-serial.h>
++#include <plat/samsung-time.h>
++
++#include "common.h"
++
++/*
++ * The following lookup table is used to override device names when devices
++ * are registered from device tree. This is temporarily added to enable
++ * device tree support addition for the S3C64xx architecture.
++ *
++ * For drivers that require platform data to be provided from the machine
++ * file, a platform data pointer can also be supplied along with the
++ * devices names. Usually, the platform data elements that cannot be parsed
++ * from the device tree by the drivers (example: function pointers) are
++ * supplied. But it should be noted that this is a temporary mechanism and
++ * at some point, the drivers should be capable of parsing all the platform
++ * data from the device tree.
++ */
++static const struct of_dev_auxdata s3c64xx_auxdata_lookup[] __initconst = {
++	OF_DEV_AUXDATA("samsung,s3c6400-uart", 0x7f005000,
++				"s3c6400-uart.0", NULL),
++	OF_DEV_AUXDATA("samsung,s3c6400-uart", 0x7f005400,
++				"s3c6400-uart.1", NULL),
++	OF_DEV_AUXDATA("samsung,s3c6400-uart", 0x7f005800,
++				"s3c6400-uart.2", NULL),
++	OF_DEV_AUXDATA("samsung,s3c6400-uart", 0x7f005c00,
++				"s3c6400-uart.3", NULL),
++	OF_DEV_AUXDATA("samsung,s3c6410-sdhci", 0x7c200000,
++				"s3c-sdhci.0", NULL),
++	OF_DEV_AUXDATA("samsung,s3c6410-sdhci", 0x7c300000,
++				"s3c-sdhci.1", NULL),
++	OF_DEV_AUXDATA("samsung,s3c6410-sdhci", 0x7c400000,
++				"s3c-sdhci.2", NULL),
 +	{},
 +};
 +
-+void __init s3c64xx_of_init_irq(void)
++static void __init s3c64xx_dt_map_io(void)
 +{
-+	of_irq_init(s3c64xx_dt_irq_match);
-+
-+	/* FIXME: add the timer sub-irqs */
-+	s3c_init_vic_timer_irq(5, IRQ_TIMER0);
++	s3c64xx_init_io(NULL, 0);
++	s3c24xx_init_clocks(12000000);
++	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
 +}
-+#endif
 +
- void __init s3c64xx_init_irq(u32 vic0_valid, u32 vic1_valid)
- {
- 	printk(KERN_DEBUG "%s: initialising interrupts\n", __func__);
-diff --git a/arch/arm/mach-s3c64xx/common.h b/arch/arm/mach-s3c64xx/common.h
-index 6cfc99b..711f3e0 100644
---- a/arch/arm/mach-s3c64xx/common.h
-+++ b/arch/arm/mach-s3c64xx/common.h
-@@ -58,4 +58,8 @@ int __init s3c64xx_pm_late_initcall(void);
- static inline int s3c64xx_pm_late_initcall(void) { return 0; }
- #endif
- 
-+#ifdef CONFIG_OF
-+extern void s3c64xx_of_init_irq(void);
-+#endif
++static void __init s3c64xx_dt_machine_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table,
++				s3c64xx_auxdata_lookup, NULL);
++}
 +
- #endif /* __ARCH_ARM_MACH_S3C64XX_COMMON_H */
++static char const *s3c64xx_dt_compat[] __initdata = {
++	"samsung,s3c6400",
++	"samsung,s3c6410",
++	NULL
++};
++
++DT_MACHINE_START(S3C6400_DT, "Samsung S3C64xx (Flattened Device Tree)")
++	/* Maintainer: Tomasz Figa <tomasz.figa@gmail.com> */
++	.init_irq	= s3c64xx_of_init_irq,
++	.map_io		= s3c64xx_dt_map_io,
++	.handle_irq	= vic_handle_irq,
++	.init_machine	= s3c64xx_dt_machine_init,
++	.init_late	= s3c64xx_init_late,
++	.timer		= &samsung_timer,
++	.dt_compat	= s3c64xx_dt_compat,
++	.restart        = s3c64xx_restart,
++MACHINE_END
 -- 
 1.8.1
