@@ -1,71 +1,52 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 13 Jan 2013 13:49:47 +0200
-Subject: [PATCH] ARM: PXA3xx: program the CSMSADRCFG register
-Message-ID: <1358077787-31518-1-git-send-email-grinberg@compulab.co.il>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Sun, 13 Jan 2013 14:18:57 +0100
+Subject: [PATCH 2/2] dma: mv_xor: do not sync the DMA buffer after
+ being deallocated
+In-Reply-To: <20130104171033.4a244c3d@skate>
+References: <1356636228-23096-1-git-send-email-lkundrak@v3.sk>
+ <1356636228-23096-2-git-send-email-lkundrak@v3.sk>
+ <20130104171033.4a244c3d@skate>
+Message-ID: <1358083137.13136.1.camel@hobbes>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Chip Select Configuration Register must be programmed to 0x2 in
-order to achieve the correct behavior of the Static Memory Controller.
+On Fri, 2013-01-04 at 17:10 +0100, Thomas Petazzoni wrote:
+> Dear Lubomir Rintel,
+> 
+> On Thu, 27 Dec 2012 20:23:48 +0100, Lubomir Rintel wrote:
+> 
+> >  	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
+> >  				MV_XOR_TEST_SIZE, DMA_FROM_DEVICE);
+> > +	dma_unmap_single(dma_chan->device->dev, dest_dma, MV_XOR_TEST_SIZE,
+> > +			 DMA_FROM_DEVICE);
+> 
+> I would assume that dma_unmap_single() implies a
+> dma_sync_single_for_cpu() since you're unmapping the DMA buffer. So if
+> you use dma_unmap_single(), I think you can remove the call to
+> dma_sync_single_for_cpu().
 
-Without this patch devices wired to DFI and accessed through SMC cannot
-be accessed after resume from S2.
+Yes, it indeed seems to be the case (comment for arm_dma_unmap_page():
+"After this call, reads by the CPU to the buffer are guaranteed to see
+whatever the device wrote there.".
 
-Do not rely on the boot loader to program the CSMSADRCFG register by
-programming it in the kernel smemc module.
+> >  	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
+> >  				PAGE_SIZE, DMA_FROM_DEVICE);
+> > +	dma_unmap_page(dma_chan->device->dev, dest_dma, PAGE_SIZE,
+> > +		       DMA_FROM_DEVICE);
+> 
+> Ditto.
+> 
+> Also, the mv_xor_memcpy_self_test() function not only dma_map_single()
+> the destination buffer, but also the source buffer. So presumably, the
+> source buffer should also be dma_unmap_single()'d.
+> 
+> And for the mv_xor_xor_self_test() function, multiple source buffers
+> are dma_map_page()'d, so they should all be dma_unmap_page()'d I guess,
+> not only the destination buffer.
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Cc: stable at vger.kernel.org
----
- arch/arm/mach-pxa/include/mach/smemc.h |    1 +
- arch/arm/mach-pxa/smemc.c              |   15 ++++++++++++++-
- 2 files changed, 15 insertions(+), 1 deletions(-)
+Those get released by the mv_xor_run_tx_complete_actions() callback.
 
-diff --git a/arch/arm/mach-pxa/include/mach/smemc.h b/arch/arm/mach-pxa/include/mach/smemc.h
-index b7de471..b802f28 100644
---- a/arch/arm/mach-pxa/include/mach/smemc.h
-+++ b/arch/arm/mach-pxa/include/mach/smemc.h
-@@ -37,6 +37,7 @@
- #define CSADRCFG1	(SMEMC_VIRT + 0x84)  /* Address Configuration Register for CS1 */
- #define CSADRCFG2	(SMEMC_VIRT + 0x88)  /* Address Configuration Register for CS2 */
- #define CSADRCFG3	(SMEMC_VIRT + 0x8C)  /* Address Configuration Register for CS3 */
-+#define CSMSADRCFG	(SMEMC_VIRT + 0xA0)  /* Chip Select Configuration Register */
- 
- /*
-  * More handy macros for PCMCIA
-diff --git a/arch/arm/mach-pxa/smemc.c b/arch/arm/mach-pxa/smemc.c
-index 7992305..f38aa89 100644
---- a/arch/arm/mach-pxa/smemc.c
-+++ b/arch/arm/mach-pxa/smemc.c
-@@ -40,6 +40,8 @@ static void pxa3xx_smemc_resume(void)
- 	__raw_writel(csadrcfg[1], CSADRCFG1);
- 	__raw_writel(csadrcfg[2], CSADRCFG2);
- 	__raw_writel(csadrcfg[3], CSADRCFG3);
-+	/* CSMSADRCFG wakes up in its default state (0), so we need to set it */
-+	__raw_writel(0x2, CSMSADRCFG);
- }
- 
- static struct syscore_ops smemc_syscore_ops = {
-@@ -49,8 +51,19 @@ static struct syscore_ops smemc_syscore_ops = {
- 
- static int __init smemc_init(void)
- {
--	if (cpu_is_pxa3xx())
-+	if (cpu_is_pxa3xx()) {
-+		/*
-+		 * The only documentation we have on the
-+		 * Chip Select Configuration Register (CSMSADRCFG) is that
-+		 * it must be programmed to 0x2.
-+		 * Moreover, in the bit definitions, the second bit
-+		 * (CSMSADRCFG[1]) is called "SETALWAYS".
-+		 * Other bits are reserved in this register.
-+		 */
-+		__raw_writel(0x2, CSMSADRCFG);
-+
- 		register_syscore_ops(&smemc_syscore_ops);
-+	}
- 
- 	return 0;
- }
--- 
-1.7.3.4
+I will follow up with an updated patch.
+
+Regards,
+Lubo
