@@ -1,142 +1,89 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 13 Jan 2013 02:10:56 +0100
-Subject: [PATCH 4/6] ARM: s3c64xx: Add board file for boot using Device Tree
+Date: Sun, 13 Jan 2013 02:10:58 +0100
+Subject: [PATCH 6/6] ARM: dts: Add dts file for S3C6410-based Mini6410 board
 In-Reply-To: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
 References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1358039458-31960-5-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1358039458-31960-7-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds board file that will be used to boot S3C64xx-based boards
-using Device Tree.
+This patch adds basic device tree sources for FriendlyARM Mini6410 board
+based on Samsung S3C6410 SoC.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/mach-s3c64xx/Kconfig           | 13 +++++
- arch/arm/mach-s3c64xx/Makefile          |  1 +
- arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c | 84 +++++++++++++++++++++++++++++++++
- 3 files changed, 98 insertions(+)
- create mode 100644 arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+ arch/arm/boot/dts/Makefile             |  1 +
+ arch/arm/boot/dts/s3c6410-mini6410.dts | 50 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 51 insertions(+)
+ create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 283cb77..b1c7106 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -311,3 +311,16 @@ config MACH_WLF_CRAGG_6410
- 	select SAMSUNG_GPIO_EXTRA128
- 	help
- 	  Machine support for the Wolfson Cragganmore S3C6410 variant.
-+
-+config MACH_S3C64XX_DT
-+	bool "Samsung S3C6400/S3C6410 machine using Device Tree"
-+	select CPU_S3C6400
-+	select CPU_S3C6410
-+	select USE_OF
-+	help
-+	  Machine support for Samsung S3C6400/S3C6410 machines with Device Tree
-+	  enabled.
-+	  Select this if a fdt blob is available for your S3C64XX SoC based
-+	  board.
-+	  Note: This is under development and not all peripherals can be
-+	  supported with this machine file.
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index f9ce1dc..59b3d06 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -58,3 +58,4 @@ obj-$(CONFIG_MACH_SMARTQ7)		+= mach-smartq7.o
- obj-$(CONFIG_MACH_SMDK6400)		+= mach-smdk6400.o
- obj-$(CONFIG_MACH_SMDK6410)		+= mach-smdk6410.o
- obj-$(CONFIG_MACH_WLF_CRAGG_6410)	+= mach-crag6410.o mach-crag6410-module.o
-+obj-$(CONFIG_MACH_S3C64XX_DT)		+= mach-s3c64xx-dt.o
-diff --git a/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e44da40..9ca30ea 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -120,6 +120,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
+ 	hrefprev60.dtb \
+ 	hrefv60plus.dtb \
+ 	ccu9540.dtb
++dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	sh73a0-kzm9g.dtb \
+diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
 new file mode 100644
-index 0000000..974af2a
+index 0000000..9ac82c2
 --- /dev/null
-+++ b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
-@@ -0,0 +1,84 @@
++++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
+@@ -0,0 +1,50 @@
 +/*
-+ * Samsung's S3C64XX flattened device tree enabled machine
++ * Samsung's S3C6410 based Mini6410 board device tree source
 + *
 + * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
++ *
++ * Device tree source file for FriendlyARM Mini6410 board which is based on
++ * Samsung's S3C6410 SoC.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 +*/
 +
-+#include <linux/of_platform.h>
-+#include <linux/serial_core.h>
++/dts-v1/;
++/include/ "s3c6410.dtsi"
 +
-+#include <asm/mach/arch.h>
-+#include <asm/hardware/vic.h>
-+#include <mach/map.h>
++/ {
++	model = "FriendlyARM Mini6410 board based on S3C6410";
++	compatible = "friendlyarm,mini6410", "samsung,s3c6410";
 +
-+#include <plat/cpu.h>
-+#include <plat/regs-serial.h>
-+#include <plat/samsung-time.h>
++	memory {
++		reg = <0x50000000 0x10000000>;
++	};
 +
-+#include "common.h"
++	chosen {
++		bootargs = "console=ttySAC0,115200n8 earlyprintk rootwait root=/dev/mmcblk0p1";
++	};
 +
-+/*
-+ * The following lookup table is used to override device names when devices
-+ * are registered from device tree. This is temporarily added to enable
-+ * device tree support addition for the S3C64xx architecture.
-+ *
-+ * For drivers that require platform data to be provided from the machine
-+ * file, a platform data pointer can also be supplied along with the
-+ * devices names. Usually, the platform data elements that cannot be parsed
-+ * from the device tree by the drivers (example: function pointers) are
-+ * supplied. But it should be noted that this is a temporary mechanism and
-+ * at some point, the drivers should be capable of parsing all the platform
-+ * data from the device tree.
-+ */
-+static const struct of_dev_auxdata s3c64xx_auxdata_lookup[] __initconst = {
-+	OF_DEV_AUXDATA("samsung,s3c6400-uart", 0x7f005000,
-+				"s3c6400-uart.0", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c6400-uart", 0x7f005400,
-+				"s3c6400-uart.1", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c6400-uart", 0x7f005800,
-+				"s3c6400-uart.2", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c6400-uart", 0x7f005c00,
-+				"s3c6400-uart.3", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c6410-sdhci", 0x7c200000,
-+				"s3c-sdhci.0", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c6410-sdhci", 0x7c300000,
-+				"s3c-sdhci.1", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c6410-sdhci", 0x7c400000,
-+				"s3c-sdhci.2", NULL),
-+	{},
++	serial at 7f005000 {
++		status = "okay";
++	};
++
++	serial at 7f005400 {
++		status = "okay";
++	};
++
++	serial at 7f005800 {
++		status = "okay";
++	};
++
++	serial at 7f005c00 {
++		status = "okay";
++	};
++
++	sdhci at 7c200000 {
++		bus-width = <4>;
++		non-removable;
++		status = "okay";
++	};
 +};
-+
-+static void __init s3c64xx_dt_map_io(void)
-+{
-+	s3c64xx_init_io(NULL, 0);
-+	s3c24xx_init_clocks(12000000);
-+	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
-+}
-+
-+static void __init s3c64xx_dt_machine_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+				s3c64xx_auxdata_lookup, NULL);
-+}
-+
-+static char const *s3c64xx_dt_compat[] __initdata = {
-+	"samsung,s3c6400",
-+	"samsung,s3c6410",
-+	NULL
-+};
-+
-+DT_MACHINE_START(S3C6400_DT, "Samsung S3C64xx (Flattened Device Tree)")
-+	/* Maintainer: Tomasz Figa <tomasz.figa@gmail.com> */
-+	.init_irq	= s3c64xx_of_init_irq,
-+	.map_io		= s3c64xx_dt_map_io,
-+	.handle_irq	= vic_handle_irq,
-+	.init_machine	= s3c64xx_dt_machine_init,
-+	.init_late	= s3c64xx_init_late,
-+	.timer		= &samsung_timer,
-+	.dt_compat	= s3c64xx_dt_compat,
-+	.restart        = s3c64xx_restart,
-+MACHINE_END
 -- 
 1.8.1
