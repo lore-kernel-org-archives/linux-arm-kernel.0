@@ -1,28 +1,54 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Sun, 13 Jan 2013 05:25:44 -0800
-Subject: [PATCH v4 2/7] pl080.h: moved from arm/include/asm/hardware to
- include/linux/amba/
-In-Reply-To: <20121210222516.GA31546@mail.gnudd.com>
-References: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
- <1355146956-6009-3-git-send-email-ciminaghi@gnudd.com>
- <CACRpkdbF6S6nOQFwv+tmS4LXhnnwkQxzmGYmH3Xn6TM4E34r8g@mail.gmail.com>
- <20121210222516.GA31546@mail.gnudd.com>
-Message-ID: <20130113132544.GZ19691@intel.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 13 Jan 2013 15:13:36 +0100
+Subject: [PATCH 1/2 V4] iio: mxs: Implement support for touchscreen
+In-Reply-To: <50F2922F.904@kernel.org>
+References: <1357947308-11226-1-git-send-email-marex@denx.de>
+ <20130113030903.GA27264@core.coreip.homeip.net> <50F2922F.904@kernel.org>
+Message-ID: <201301131513.36953.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 11:25:17PM +0100, Davide Ciminaghi wrote:
-> On Mon, Dec 10, 2012 at 10:44:09PM +0100, Linus Walleij wrote:
-> > On Mon, Dec 10, 2012 at 2:42 PM, Davide Ciminaghi <ciminaghi@gnudd.com> wrote:
+Dear Jonathan Cameron,
+
+> On 01/13/2013 03:09 AM, Dmitry Torokhov wrote:
+> > On Sat, Jan 12, 2013 at 12:35:07AM +0100, Marek Vasut wrote:
+> >> This patch implements support for sampling of a touchscreen into
+> >> the MXS LRADC driver. The LRADC block allows configuring some of
+> >> it's channels into special mode where they either output the drive
+> >> voltage or sample it, allowing it to operate a 4-wire or 5-wire
+> >> resistive touchscreen.
+> >> 
+> >> In case the touchscreen mode is enabled, the LRADC slot #7 is
+> >> reserved for touchscreen only, therefore it is not possible to
+> >> sample 8 LRADC channels at time, but only 7 channels.
+> >> 
+> >> The touchscreen controller is configured such that the PENDOWN event
+> >> disables touchscreen interrupts and triggers execution of worker
+> >> thread, which then polls the touchscreen controller for X, Y and
+> >> Pressure values. This reduces the overhead of interrupt-driven
+> >> operation. Upon the PENUP event, the worker thread re-enables the
+> >> PENDOWN detection interrupt and exits.
+> >> 
+> >> Signed-off-by: Marek Vasut <marex@denx.de>
+> >> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 > > 
-> > > From: Alessandro Rubini <rubini@gnudd.com>
-> > >
-> > > The header is used by drivers/dma/amba-pl08x.c, which can be compiled
-> > > under x86, where PL080 exists under a PCI-to-AMBA bridge. This patche
-> > > moves it where it can be accessed by other architectures, and fixes
-> > > all users.
+> > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> 
+> I've added this to the togreg branch of
+> git://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git
+> 
+> Note it did not directly apply as I'm guessing you have a slightly
+> out of date tree.
 
-Applied, Thanks
+Ah yes, it was still based off of stable 3.7 .
 
---
-~Vinod
+> Please could you check I didn't mess up the
+> fixing up of the patch. There was a fair bit of fuzz and the devinit
+> devexit stuff shouldn't have been in your patch in the first place.
+
+Checked just now, looks OK to me, thanks!
+
+> Shawn, do you want to take the board device tree patch or shall
+> I take that one as well?
+> 
+> Jonathan
