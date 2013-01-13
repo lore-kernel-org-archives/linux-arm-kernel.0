@@ -1,54 +1,48 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 13 Jan 2013 15:13:36 +0100
-Subject: [PATCH 1/2 V4] iio: mxs: Implement support for touchscreen
-In-Reply-To: <50F2922F.904@kernel.org>
-References: <1357947308-11226-1-git-send-email-marex@denx.de>
- <20130113030903.GA27264@core.coreip.homeip.net> <50F2922F.904@kernel.org>
-Message-ID: <201301131513.36953.marex@denx.de>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 13 Jan 2013 16:50:47 +0100
+Subject: [PATCH] ARM: at91: fix board-rm9200-dt after sys_timer conversion
+Message-ID: <1358092247-20318-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jonathan Cameron,
+After "ARM: delete struct sys_timer" board-rm9200-dt
+fails compilation with the following error:
 
-> On 01/13/2013 03:09 AM, Dmitry Torokhov wrote:
-> > On Sat, Jan 12, 2013 at 12:35:07AM +0100, Marek Vasut wrote:
-> >> This patch implements support for sampling of a touchscreen into
-> >> the MXS LRADC driver. The LRADC block allows configuring some of
-> >> it's channels into special mode where they either output the drive
-> >> voltage or sample it, allowing it to operate a 4-wire or 5-wire
-> >> resistive touchscreen.
-> >> 
-> >> In case the touchscreen mode is enabled, the LRADC slot #7 is
-> >> reserved for touchscreen only, therefore it is not possible to
-> >> sample 8 LRADC channels at time, but only 7 channels.
-> >> 
-> >> The touchscreen controller is configured such that the PENDOWN event
-> >> disables touchscreen interrupts and triggers execution of worker
-> >> thread, which then polls the touchscreen controller for X, Y and
-> >> Pressure values. This reduces the overhead of interrupt-driven
-> >> operation. Upon the PENUP event, the worker thread re-enables the
-> >> PENDOWN detection interrupt and exits.
-> >> 
-> >> Signed-off-by: Marek Vasut <marex@denx.de>
-> >> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > 
-> > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> 
-> I've added this to the togreg branch of
-> git://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git
-> 
-> Note it did not directly apply as I'm guessing you have a slightly
-> out of date tree.
+  CC      arch/arm/mach-at91/board-rm9200-dt.o
+arch/arm/mach-at91/board-rm9200-dt.c:50:2: error: unknown field 'timer' specified in initializer
+arch/arm/mach-at91/board-rm9200-dt.c:50:13: error: 'at91rm9200_timer' undeclared here (not in a function)
+make[1]: *** [arch/arm/mach-at91/board-rm9200-dt.o] Error 1
+make: *** [arch/arm/mach-at91] Error 2
 
-Ah yes, it was still based off of stable 3.7 .
+This is a fall out from the timer conversion. Fix it by
+converting board-rm9200-dt to use new timer init
+function as well.
 
-> Please could you check I didn't mess up the
-> fixing up of the patch. There was a fair bit of fuzz and the devinit
-> devexit stuff shouldn't have been in your patch in the first place.
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
 
-Checked just now, looks OK to me, thanks!
+Hi Stephen,
 
-> Shawn, do you want to take the board device tree patch or shall
-> I take that one as well?
-> 
-> Jonathan
+Feel free to fold this fix into your patch if it's possible.
+
+regards
+Joachim Eastwood
+
+ arch/arm/mach-at91/board-rm9200-dt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-at91/board-rm9200-dt.c b/arch/arm/mach-at91/board-rm9200-dt.c
+index 5f9ce3d..3fcb662 100644
+--- a/arch/arm/mach-at91/board-rm9200-dt.c
++++ b/arch/arm/mach-at91/board-rm9200-dt.c
+@@ -47,7 +47,7 @@ static const char *at91rm9200_dt_board_compat[] __initdata = {
+ };
+ 
+ DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
+-	.timer		= &at91rm9200_timer,
++	.init_time      = at91rm9200_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= at91rm9200_dt_initialize,
+-- 
+1.8.0
