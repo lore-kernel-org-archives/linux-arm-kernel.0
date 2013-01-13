@@ -1,31 +1,30 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 13 Jan 2013 19:19:20 +1300
-Subject: [PATCH] mmc: vt8500: Remove erroneous __exitp in wmt_mci_driver
-Message-ID: <1358057960-24540-1-git-send-email-linux@prisktech.co.nz>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 13 Jan 2013 09:57:56 +0100
+Subject: [PATCH 1/7] clk: add common of_clk_init() function
+In-Reply-To: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
+References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <50F27714.3060906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the __devinit/__devexit attributes having been removed, this
-__exitp attribute causes an unused function warning and should be
-removed as well.
+Hi Prashant,
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- drivers/mmc/host/wmt-sdmmc.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 04/01/2013 08:00, Prashant Gaikwad wrote:
+> Modify of_clk_init function so that it will determine which
+> driver to initialize based on device tree instead of each driver
+> registering to it.
+> 
+> Based on a similar patch for drivers/irqchip by Thomas Petazzoni and
+> drivers/clocksource by Stephen Warren.
 
-diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
-index 154f0e8..c6d0015 100644
---- a/drivers/mmc/host/wmt-sdmmc.c
-+++ b/drivers/mmc/host/wmt-sdmmc.c
-@@ -1012,7 +1012,7 @@ static const struct dev_pm_ops wmt_mci_pm = {
- 
- static struct platform_driver wmt_mci_driver = {
- 	.probe = wmt_mci_probe,
--	.remove = __exit_p(wmt_mci_remove),
-+	.remove = wmt_mci_remove,
- 	.driver = {
- 		.name = DRIVER_NAME,
- 		.owner = THIS_MODULE,
+I finally had some time to test your changes on sunxi, and you can add
+for patches 1 and 3:
+Acked-by: Maxime Ripard <maxime.ripard@anandra.org>
+
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
