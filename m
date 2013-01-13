@@ -1,33 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 13 Jan 2013 19:24:29 +0000
-Subject: [PATCH V3] mmc: mmci: Fixup and cleanup code for DMA handling
-In-Reply-To: <1357570707-28207-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1357570707-28207-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20130113192428.GU23505@n2100.arm.linux.org.uk>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Sun, 13 Jan 2013 20:40:29 +0100
+Subject: [PATCH v2] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
+In-Reply-To: <20130111145629.GB31640@titan.lakedaemon.net>
+References: <1588881.pi23bvqp7D@bender> <3816648.2TVsTiMOWx@bender>
+ <50F02570.9050208@openwrt.org> <20130111145629.GB31640@titan.lakedaemon.net>
+Message-ID: <50F30DAD.3090105@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 03:58:27PM +0100, Ulf Hansson wrote:
-> @@ -374,19 +415,12 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
->  	 * contiguous buffers.  On TX, we'll get a FIFO underrun error.
->  	 */
->  	if (status & MCI_RXDATAAVLBLMASK) {
-> -		dmaengine_terminate_all(chan);
-> -		if (!data->error)
-> -			data->error = -EIO;
-> -	}
-> -
-> -	if (data->flags & MMC_DATA_WRITE) {
-> -		dir = DMA_TO_DEVICE;
-> -	} else {
-> -		dir = DMA_FROM_DEVICE;
-> +		data->error = -EIO;
-> +		mmci_dma_data_error(host);
+Le 11/01/2013 15:56, Jason Cooper a ?crit :
+> Florian,
+>
+> On Fri, Jan 11, 2013 at 03:45:04PM +0100, Florian Fainelli wrote:
+>> Le 01/09/13 20:56, Florian Fainelli a ?crit :
+>>> This patch adds the DTS file to support the Marvell RD-A370-A1
+>>> (Reference Design board) also known as RD-88F6710 board. It is almost
+>>> entirely similar to the DB-A370 board except that the first Ethernet PHY
+>>> is SGMII-wired and the second is a switch which is RGMII-wired.
+>>
+>> Who is going to take this patch? Since this is a new DTS file there
+>> are little chances it breaks anything, could it be taken for an
+>> upcoming 3.8-rc?
+>
+> No, only fixes go in for the current -rc.  It'll be included for v3.9, I
+> have it in my queue.
 
-Please explain the change of behaviour here.  Before your change, we _only_
-set data->error if the error is not set.  Here, we overwrite the error code
-no matter what.  What is the reasoning for that change?
-
-The reason the code is like it _was_ is so that any bytes remaining in the
-FIFO are _only_ reported as an error if there wasn't a preceding error.
-That is the behaviour I desired when I wrote this code.
+Jason, I don't see this patch in the pull request you just sent for 3.9, 
+should it be? Thanks!
+--
+Florian
