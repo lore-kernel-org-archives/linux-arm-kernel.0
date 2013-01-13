@@ -1,48 +1,32 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 13 Jan 2013 16:50:47 +0100
-Subject: [PATCH] ARM: at91: fix board-rm9200-dt after sys_timer conversion
-Message-ID: <1358092247-20318-1-git-send-email-manabian@gmail.com>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Sun, 13 Jan 2013 16:56:42 +0100
+Subject: [PATCH] ARM: imx: platform-imx-fb: modifies platform device name
+Message-ID: <1358092603-13480-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After "ARM: delete struct sys_timer" board-rm9200-dt
-fails compilation with the following error:
+From: Gwenhael Goavec-Merou <gwe@trabucayre.com>
 
-  CC      arch/arm/mach-at91/board-rm9200-dt.o
-arch/arm/mach-at91/board-rm9200-dt.c:50:2: error: unknown field 'timer' specified in initializer
-arch/arm/mach-at91/board-rm9200-dt.c:50:13: error: 'at91rm9200_timer' undeclared here (not in a function)
-make[1]: *** [arch/arm/mach-at91/board-rm9200-dt.o] Error 1
-make: *** [arch/arm/mach-at91] Error 2
+Framebuffer platform device is now identified by a device id (imx1-fb or
+imx21-fb) instead of by driver name (imx-fb).
 
-This is a fall out from the timer conversion. Fix it by
-converting board-rm9200-dt to use new timer init
-function as well.
-
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 ---
-
-Hi Stephen,
-
-Feel free to fold this fix into your patch if it's possible.
-
-regards
-Joachim Eastwood
-
- arch/arm/mach-at91/board-rm9200-dt.c | 2 +-
+ arch/arm/mach-imx/devices/platform-imx-fb.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-at91/board-rm9200-dt.c b/arch/arm/mach-at91/board-rm9200-dt.c
-index 5f9ce3d..3fcb662 100644
---- a/arch/arm/mach-at91/board-rm9200-dt.c
-+++ b/arch/arm/mach-at91/board-rm9200-dt.c
-@@ -47,7 +47,7 @@ static const char *at91rm9200_dt_board_compat[] __initdata = {
- };
- 
- DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
--	.timer		= &at91rm9200_timer,
-+	.init_time      = at91rm9200_timer_init,
- 	.map_io		= at91_map_io,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= at91rm9200_dt_initialize,
+diff --git a/arch/arm/mach-imx/devices/platform-imx-fb.c b/arch/arm/mach-imx/devices/platform-imx-fb.c
+index 10b0ed3..25a47c6 100644
+--- a/arch/arm/mach-imx/devices/platform-imx-fb.c
++++ b/arch/arm/mach-imx/devices/platform-imx-fb.c
+@@ -54,7 +54,7 @@ struct platform_device *__init imx_add_imx_fb(
+ 			.flags = IORESOURCE_IRQ,
+ 		},
+ 	};
+-	return imx_add_platform_device_dmamask("imx-fb", 0,
++	return imx_add_platform_device_dmamask(data->devid, 0,
+ 			res, ARRAY_SIZE(res),
+ 			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
+ }
 -- 
-1.8.0
+1.7.12.4
