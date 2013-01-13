@@ -1,52 +1,28 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Sun, 13 Jan 2013 14:18:57 +0100
-Subject: [PATCH 2/2] dma: mv_xor: do not sync the DMA buffer after
- being deallocated
-In-Reply-To: <20130104171033.4a244c3d@skate>
-References: <1356636228-23096-1-git-send-email-lkundrak@v3.sk>
- <1356636228-23096-2-git-send-email-lkundrak@v3.sk>
- <20130104171033.4a244c3d@skate>
-Message-ID: <1358083137.13136.1.camel@hobbes>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 13 Jan 2013 05:25:44 -0800
+Subject: [PATCH v4 2/7] pl080.h: moved from arm/include/asm/hardware to
+ include/linux/amba/
+In-Reply-To: <20121210222516.GA31546@mail.gnudd.com>
+References: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+ <1355146956-6009-3-git-send-email-ciminaghi@gnudd.com>
+ <CACRpkdbF6S6nOQFwv+tmS4LXhnnwkQxzmGYmH3Xn6TM4E34r8g@mail.gmail.com>
+ <20121210222516.GA31546@mail.gnudd.com>
+Message-ID: <20130113132544.GZ19691@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-01-04 at 17:10 +0100, Thomas Petazzoni wrote:
-> Dear Lubomir Rintel,
-> 
-> On Thu, 27 Dec 2012 20:23:48 +0100, Lubomir Rintel wrote:
-> 
-> >  	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
-> >  				MV_XOR_TEST_SIZE, DMA_FROM_DEVICE);
-> > +	dma_unmap_single(dma_chan->device->dev, dest_dma, MV_XOR_TEST_SIZE,
-> > +			 DMA_FROM_DEVICE);
-> 
-> I would assume that dma_unmap_single() implies a
-> dma_sync_single_for_cpu() since you're unmapping the DMA buffer. So if
-> you use dma_unmap_single(), I think you can remove the call to
-> dma_sync_single_for_cpu().
+On Mon, Dec 10, 2012 at 11:25:17PM +0100, Davide Ciminaghi wrote:
+> On Mon, Dec 10, 2012 at 10:44:09PM +0100, Linus Walleij wrote:
+> > On Mon, Dec 10, 2012 at 2:42 PM, Davide Ciminaghi <ciminaghi@gnudd.com> wrote:
+> > 
+> > > From: Alessandro Rubini <rubini@gnudd.com>
+> > >
+> > > The header is used by drivers/dma/amba-pl08x.c, which can be compiled
+> > > under x86, where PL080 exists under a PCI-to-AMBA bridge. This patche
+> > > moves it where it can be accessed by other architectures, and fixes
+> > > all users.
 
-Yes, it indeed seems to be the case (comment for arm_dma_unmap_page():
-"After this call, reads by the CPU to the buffer are guaranteed to see
-whatever the device wrote there.".
+Applied, Thanks
 
-> >  	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
-> >  				PAGE_SIZE, DMA_FROM_DEVICE);
-> > +	dma_unmap_page(dma_chan->device->dev, dest_dma, PAGE_SIZE,
-> > +		       DMA_FROM_DEVICE);
-> 
-> Ditto.
-> 
-> Also, the mv_xor_memcpy_self_test() function not only dma_map_single()
-> the destination buffer, but also the source buffer. So presumably, the
-> source buffer should also be dma_unmap_single()'d.
-> 
-> And for the mv_xor_xor_self_test() function, multiple source buffers
-> are dma_map_page()'d, so they should all be dma_unmap_page()'d I guess,
-> not only the destination buffer.
-
-Those get released by the mv_xor_run_tx_complete_actions() callback.
-
-I will follow up with an updated patch.
-
-Regards,
-Lubo
+--
+~Vinod
