@@ -1,66 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 Jan 2013 12:12:47 +0000
-Subject: [PATCHv2 1/4] clockevents: Add generic timer broadcast receiver
-In-Reply-To: <alpine.LFD.2.02.1301141247020.7475@ionos>
-References: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
- <1357742770-15028-2-git-send-email-mark.rutland@arm.com>
- <alpine.LFD.2.02.1301141204421.7475@ionos>
- <20130114112951.GC7990@e106331-lin.cambridge.arm.com>
- <alpine.LFD.2.02.1301141247020.7475@ionos>
-Message-ID: <20130114121247.GD7990@e106331-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Jan 2013 12:18:16 +0000
+Subject: [PATCH 04/14] usb: phy: nop: Handle power supply regulator for
+ the PHY
+In-Reply-To: <50F3F12B.4080906@ti.com>
+References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
+ <1357836694-30788-5-git-send-email-rogerq@ti.com>
+ <20130111171726.GI23505@n2100.arm.linux.org.uk> <50F3D5E2.4000102@ti.com>
+ <20130114112549.GY23505@n2100.arm.linux.org.uk> <50F3F12B.4080906@ti.com>
+Message-ID: <20130114121816.GZ23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 11:50:55AM +0000, Thomas Gleixner wrote:
-> On Mon, 14 Jan 2013, Mark Rutland wrote:
-> 
-> > On Mon, Jan 14, 2013 at 11:06:31AM +0000, Thomas Gleixner wrote:
-> > > On Wed, 9 Jan 2013, Mark Rutland wrote:
-> > > > +#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-> > > > +extern int tick_receive_broadcast(void);
-> > > > +#else
-> > > > +static inline int tick_receive_broadcast(void)
-> > > > +{
-> > > > +	return 0;
-> > > > +}
-> > > 
-> > > What's the inline function for? If an arch does not have broadcasting
-> > > support it should not have a receive broadcast function call either.
+On Mon, Jan 14, 2013 at 01:51:07PM +0200, Roger Quadros wrote:
+> On 01/14/2013 01:25 PM, Russell King - ARM Linux wrote:
+> > Also consider... is dev_err() appropriate for an "error", for which you
+> > print a message and continue as if nothing went wrong.  To me that sounds
+> > more like a warning than an error, so maybe dev_warn() would be more
+> > appropriate?
 > > 
-> > That was how this was originally structured [1], but Santosh suggested this
-> > would break the build for !GENERIC_CLOCKEVENTS_BROADCAST [1]. It means that the
-> > arch-specific receive path (i.e. IPI handler) doesn't have to be #ifdef'd,
-> > which makes it less ugly.
-> 
-> Hmm. If you want to keep the IPI around unconditionally the inline
-> makes some sense, though the question is whether keeping an unused IPI
-> around makes sense in the first place. I'd rather see a warning that
-> an unexpected IPI happened than a silent inline function being called.
+> I used dev_dbg(), because we don't treat not getting the power supply
+> regulator as that serious.
 
-How about I add a warning (e.g. "Impossible timer broadcast received.") and
-return -EOPNOTSUPP when !GENERIC_CLOCKEVENTS_BROADCAST?
-
-> > > Is anything going to use the return value?
-> > 
-> > I'd added this after looking at the x86 lapic timers, where interrupts might
-> > remain pending over a kexec, and lapic interrupts come up before timers are
-> > registered. The return value is useful for shutting down the timer in that case
-> > (see x86's local_apic_timer_interrupt).
-> 
-> Right, though then you need to check for evt->event_handler as well.
-
-I thought this previously also [1], but I couldn't find any path such that a
-tick_cpu_device would have an evtdev without an event_handler. We always set the
-handler before setting evtdev, and alway wipe evtdev before wiping the handler.
-
-Have I missed something?
-
-> Thanks,
-> 
-> 	tglx
-> 
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138092.html
+This comment is about what you do when regulator_enable() and the like
+returns non-zero.
