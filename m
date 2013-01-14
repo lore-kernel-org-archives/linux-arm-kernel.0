@@ -1,29 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Jan 2013 17:23:46 +0000
-Subject: [PATCH] arm: kernel/perf_event_cpu.c: fix error null pointer
- dereference check
-In-Reply-To: <1358183933-29160-1-git-send-email-dinggnu@gmail.com>
-References: <1358183933-29160-1-git-send-email-dinggnu@gmail.com>
-Message-ID: <20130114172346.GK23505@n2100.arm.linux.org.uk>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Mon, 14 Jan 2013 12:33:05 -0500
+Subject: [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile KVM support
+In-Reply-To: <20130114162415.GF23505@n2100.arm.linux.org.uk>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183855.46302.40539.stgit@ubuntu>
+ <20130114162415.GF23505@n2100.arm.linux.org.uk>
+Message-ID: <CANM98qLHao0dJU57MbAtopVpTJDOVdqNtw5JT-DXyQNa7iD_qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 05:18:53PM +0000, Cong Ding wrote:
-> the pointer cpu_pmu is used without null pointer dereference check, and is
-> checked after the using of it, so we move the null pointer check to before the
-> first use.
+On Mon, Jan 14, 2013 at 11:24 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 08, 2013 at 01:38:55PM -0500, Christoffer Dall wrote:
+>> +     /* -ENOENT for unknown features, -EINVAL for invalid combinations. */
+>> +     for (i = 0; i < sizeof(init->features)*8; i++) {
+>> +             if (init->features[i / 32] & (1 << (i % 32))) {
+>
+> Isn't this an open-coded version of test_bit() ?
 
-The NULL pointer check is not necessary.  cpu_pmu_init() is called
-after cpu_pmu has already been dereferenced by its caller:
+indeed, nicely spotted:
 
-        cpu_pmu = pmu;
-        cpu_pmu->plat_device = pdev;
-        cpu_pmu_init(cpu_pmu);
+commit 608588674144e403ad0ea3c93066f3175bd5cf88
+Author: Christoffer Dall <c.dall@virtualopensystems.com>
+Date:   Mon Jan 14 12:30:07 2013 -0500
 
-So...
+    KVM: ARM: Use test-bit instead of open-coded version
 
-> -	/* Ensure the PMU has sane values out of reset. */
-> -	if (cpu_pmu && cpu_pmu->reset)
+    Makes the code more readable, also adds spaces around the asterisk.
 
-Just replace this with:
-	if (cpu_pmu->reset)
+    Cc: Russell King <linux@arm.linux.org.uk>
+    Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index 65ae563..2339d96 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -193,8 +193,8 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+ 	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+
+ 	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
+-	for (i = 0; i < sizeof(init->features)*8; i++) {
+-		if (init->features[i / 32] & (1 << (i % 32))) {
++	for (i = 0; i < sizeof(init->features) * 8; i++) {
++		if (test_bit(i, (void *)init->features)) {
+ 			if (i >= KVM_VCPU_MAX_FEATURES)
+ 				return -ENOENT;
+ 			set_bit(i, vcpu->arch.features);
+--
+
+Thanks,
+-Christoffer
