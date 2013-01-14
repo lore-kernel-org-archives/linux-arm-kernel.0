@@ -1,37 +1,110 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 14 Jan 2013 21:48:54 +0800
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 14 Jan 2013 07:55:36 -0600
 Subject: [PATCH] ARM: imx: disable cpu in .cpu_kill hook
-In-Reply-To: <20130114133208.GC23505@n2100.arm.linux.org.uk>
+In-Reply-To: <1358168977-9631-1-git-send-email-shawn.guo@linaro.org>
 References: <1358168977-9631-1-git-send-email-shawn.guo@linaro.org>
- <20130114133208.GC23505@n2100.arm.linux.org.uk>
-Message-ID: <20130114134853.GD24575@S2101-09.ap.freescale.net>
+Message-ID: <50F40E58.4030808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 01:32:08PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 14, 2013 at 09:09:37PM +0800, Shawn Guo wrote:
-> >  void imx_cpu_die(unsigned int cpu)
-> >  {
-> > +	static int spurious;
-> > +
-> >  	cpu_enter_lowpower();
-> > -	imx_enable_cpu(cpu, false);
-> > +	cpu_do_idle();
-> > +	cpu_leave_lowpower();
-> >  
-> > -	/* spin here until hardware takes it down */
-> > -	while (1)
-> > -		;
-> > +	pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, ++spurious);
+On 01/14/2013 07:09 AM, Shawn Guo wrote:
+> It's buggy to disable the cpu that is being hot-unplugged in .cpu_die
+> hook which runs on the cpu itself.  Instead, it should be done in
+> .cpu_kill which runs on the thread (another cpu) that asks for shutting
+> down the cpu.  Move imx_enable_cpu(cpu, false) call into .cpu_kill
+> hook, and leave the cpu to be hot-unplugged in WFI with a recovery call
+> cpu_leave_lowpower(), so that we can get a more stable cpu hot-plug
+> operation.
 > 
-> Returning from the platform cpu die implementation should only be done
-> in extreme situations, particularly where there's no possibility for the
-> CPU to actually be taken offline (in other words, the ARM development
-> platforms where there is _no_ possibility of powering down or resetting
-> the secondary CPUs individually.)
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-imx/common.h  |    1 +
+>  arch/arm/mach-imx/hotplug.c |   31 +++++++++++++++++++++++++++----
+>  arch/arm/mach-imx/platsmp.c |    1 +
+>  3 files changed, 29 insertions(+), 4 deletions(-)
 > 
-Indeed.  I have to admit that I have copied the code from Vexpress but
-never seen it actually runs on my platform.  Will remove the recovery
-completely.
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index 7191ab4..fa36fb8 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -142,6 +142,7 @@ extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+>  extern void imx6q_clock_map_io(void);
+>  
+>  extern void imx_cpu_die(unsigned int cpu);
+> +extern int imx_cpu_kill(unsigned int cpu);
+>  
+>  #ifdef CONFIG_PM
+>  extern void imx6q_pm_init(void);
+> diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+> index 3dec962..a9b4096 100644
+> --- a/arch/arm/mach-imx/hotplug.c
+> +++ b/arch/arm/mach-imx/hotplug.c
+> @@ -38,6 +38,22 @@ static inline void cpu_enter_lowpower(void)
+>  	  : "cc");
+>  }
+>  
+> +static inline void cpu_leave_lowpower(void)
+> +{
+> +	unsigned int v;
+> +
+> +	asm volatile(
+> +		"mrc	p15, 0, %0, c1, c0, 0\n"
+> +	"	orr	%0, %0, %1\n"
+> +	"	mcr	p15, 0, %0, c1, c0, 0\n"
 
-Shawn
+Can't you do:
+
+set_cr(get_cr() | CR_C);
+
+> +	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> +	"	orr	%0, %0, %2\n"
+> +	"	mcr	p15, 0, %0, c1, c0, 1\n"
+
+Setting or clearing the SMP bit is showing up in multiple places
+(big.LITTLE series, Tegra cpuidle). I did inline versions of
+set_auxcr/get_auxcr for highbank cpuidle. We should be make those common.
+
+Rob
+
+> +	  : "=&r" (v)
+> +	  : "Ir" (CR_C), "Ir" (0x40)
+> +	  : "cc");
+> +}
+> +
+>  /*
+>   * platform-specific code to shutdown a CPU
+>   *
+> @@ -45,10 +61,17 @@ static inline void cpu_enter_lowpower(void)
+>   */
+>  void imx_cpu_die(unsigned int cpu)
+>  {
+> +	static int spurious;
+> +
+>  	cpu_enter_lowpower();
+> -	imx_enable_cpu(cpu, false);
+> +	cpu_do_idle();
+> +	cpu_leave_lowpower();
+>  
+> -	/* spin here until hardware takes it down */
+> -	while (1)
+> -		;
+> +	pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, ++spurious);
+> +}
+> +
+> +int imx_cpu_kill(unsigned int cpu)
+> +{
+> +	imx_enable_cpu(cpu, false);
+> +	return 1;
+>  }
+> diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+> index 3777b80..66fae88 100644
+> --- a/arch/arm/mach-imx/platsmp.c
+> +++ b/arch/arm/mach-imx/platsmp.c
+> @@ -92,5 +92,6 @@ struct smp_operations  imx_smp_ops __initdata = {
+>  	.smp_boot_secondary	= imx_boot_secondary,
+>  #ifdef CONFIG_HOTPLUG_CPU
+>  	.cpu_die		= imx_cpu_die,
+> +	.cpu_kill		= imx_cpu_kill,
+>  #endif
+>  };
+> 
