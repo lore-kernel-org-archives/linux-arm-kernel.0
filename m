@@ -1,23 +1,52 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 14 Jan 2013 20:17:26 +0000
-Subject: [PATCH v2 01/10] spi: tegra: Do not use clock name to get clock
-In-Reply-To: <50F07CF4.2090502@wwwdotorg.org>
-References: <1357891289-23500-1-git-send-email-pgaikwad@nvidia.com>
- <50F07CF4.2090502@wwwdotorg.org>
-Message-ID: <20130114201726.C11F73E249D@localhost>
+Date: Mon, 14 Jan 2013 20:26:51 +0000
+Subject: [PATCH] cpsw: Add support to read cpu MAC address
+In-Reply-To: <1357917302-32550-1-git-send-email-michal.bachraty@streamunlimited.com>
+References: <1357917302-32550-1-git-send-email-michal.bachraty@streamunlimited.com>
+Message-ID: <20130114202651.5360F3E249D@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013 13:58:28 -0700, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 01/11/2013 01:01 AM, Prashant Gaikwad wrote:
-> > Since Tegra spi devices do not have multiple clocks, no need to use
-> > clock name to get the clock.
+On Fri, 11 Jan 2013 16:15:02 +0100, Michal Bachraty <michal.bachraty@streamunlimited.com> wrote:
+> Signed-off-by: Michal Bachraty <michal.bachraty@streamunlimited.com>
+> ---
+>  Documentation/devicetree/bindings/net/cpsw.txt |   10 +-
+>  arch/arm/boot/dts/am33xx.dtsi                  |    5 +-
+>  drivers/net/ethernet/ti/cpsw.c                 |  121 +++++++++++++++++++++---
+>  include/linux/platform_data/cpsw.h             |    8 ++
+>  4 files changed, 128 insertions(+), 16 deletions(-)
 > 
-> Cc'ing in the SPI maintainers as an FYI and for Acks; this patch needs
-> to go through the Tegra tree due to dependencies.
+> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+> index dcaabe9..432122c 100644
+> --- a/Documentation/devicetree/bindings/net/cpsw.txt
+> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
+> @@ -4,7 +4,7 @@ TI SoC Ethernet Switch Controller Device Tree Bindings
+>  Required properties:
+>  - compatible		: Should be "ti,cpsw"
+>  - reg			: physical base address and size of the cpsw
+> -			  registers map
+> +			  registers map and mac-address cpu config registers
+>  - interrupts		: property with a value describing the interrupt
+>  			  number
+>  - interrupt-parent	: The parent interrupt controller
+> @@ -25,17 +25,23 @@ Required properties:
+>  - slave_reg_ofs		: Specifies slave register offset
+>  - sliver_reg_ofs	: Specifies slave sliver register offset
+>  - phy_id		: Specifies slave phy id
+> -- mac-address		: Specifies slave MAC address
+>  
+>  Optional properties:
+>  - ti,hwmods		: Must be "cpgmac0"
+>  - no_bd_ram		: Must be 0 or 1
+> +- mac-address-source 	: Specifies source of MAC address ("user-defined-mac",
+> +			  "cpu-id0-mac", "cpu-id01-mac", "random-mac"). If not
+> +			  specified, "cpu-id0-mac" is selected
+
+Drop the '-mac' suffix on the values. The property is already named
+"mac-address-source", so I think it is already unambiguious from the
+context.  :-)
+
+Otherwise the patch looks good to me, but I haven't gone over the code
+in fine detail.
 
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-No problem merging it via the Tegra tree.
-
-g.
