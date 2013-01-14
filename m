@@ -1,186 +1,74 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Mon, 14 Jan 2013 12:27:21 +0200
-Subject: [PATCH v5 02/14] ARM: Section based HYP idmap
-In-Reply-To: <20130108183848.46302.77369.stgit@ubuntu>
-References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108183848.46302.77369.stgit@ubuntu>
-Message-ID: <20130114102721.GB4751@redhat.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 14 Jan 2013 11:34:05 +0100
+Subject: [PATCH v3 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
+ platform_device_id
+In-Reply-To: <20130114102444.GD10874@arwen.pp.htv.fi>
+References: <1358158361-25550-1-git-send-email-peter.chen@freescale.com>
+ <1358158361-25550-2-git-send-email-peter.chen@freescale.com>
+ <20130114101642.GB10874@arwen.pp.htv.fi> <50F3DB8D.6050104@pengutronix.de>
+ <20130114102444.GD10874@arwen.pp.htv.fi>
+Message-ID: <50F3DF1D.3040706@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 01:38:48PM -0500, Christoffer Dall wrote:
-> Add a method (hyp_idmap_setup) to populate a hyp pgd with an
-> identity mapping of the code contained in the .hyp.idmap.text
-> section.
+On 01/14/2013 11:24 AM, Felipe Balbi wrote:
+> On Mon, Jan 14, 2013 at 11:18:53AM +0100, Marc Kleine-Budde wrote:
+>> On 01/14/2013 11:16 AM, Felipe Balbi wrote:
+>>> Hi,
+>>>
+>>> On Mon, Jan 14, 2013 at 06:12:39PM +0800, Peter Chen wrote:
+>>>> @@ -2756,22 +2753,41 @@ static int fsl_udc_otg_resume(struct device *dev)
+>>>>  
+>>>>  	return fsl_udc_resume(NULL);
+>>>>  }
+>>>> -
+>>>>  /*-------------------------------------------------------------------------
+>>>>  	Register entry point for the peripheral controller driver
+>>>>  --------------------------------------------------------------------------*/
+>>>> -
+>>>> +static const struct platform_device_id fsl_udc_devtype[] = {
+>>>> +	{
+>>>> +		.name = "imx-udc-mx25",
+>>>> +		.driver_data = IMX25_UDC,
+>>>> +	}, {
+>>>> +		.name = "imx-udc-mx27",
+>>>> +		.driver_data = IMX27_UDC,
+>>>> +	}, {
+>>>> +		.name = "imx-udc-mx31",
+>>>> +		.driver_data = IMX31_UDC,
+>>>> +	}, {
+>>>> +		.name = "imx-udc-mx35",
+>>>> +		.driver_data = IMX35_UDC,
+>>>> +	}, {
+>>>> +		.name = "imx-udc-mx51",
+>>>> +		.driver_data = IMX51_UDC,
+>>>> +	}
+>>>> +};
+>>>
+>>> I wonder if your driver-data is actually needed since you can use string
+>>> comparisson to achieve the exact same outcome.
+>>
+>> Why use a string compare, if the kernel infrastructure already does this
+>> for you?
 > 
-> Offer a method to drop this identity mapping through
-> hyp_idmap_teardown.
-> 
-> Make all the above depend on CONFIG_ARM_VIRT_EXT and CONFIG_ARM_LPAE.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> ---
->  arch/arm/include/asm/idmap.h                |    1 +
->  arch/arm/include/asm/pgtable-3level-hwdef.h |    1 +
->  arch/arm/kernel/vmlinux.lds.S               |    6 +++
->  arch/arm/mm/idmap.c                         |   54 ++++++++++++++++++++++-----
->  4 files changed, 50 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
-> index bf863ed..1a66f907 100644
-> --- a/arch/arm/include/asm/idmap.h
-> +++ b/arch/arm/include/asm/idmap.h
-> @@ -8,6 +8,7 @@
->  #define __idmap __section(.idmap.text) noinline notrace
->  
->  extern pgd_t *idmap_pgd;
-> +extern pgd_t *hyp_pgd;
->  
->  void setup_mm_for_reboot(void);
->  
-> diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-> index d795282..a2d404e 100644
-> --- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-> +++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-> @@ -44,6 +44,7 @@
->  #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 54)
->  #define PMD_SECT_AP_WRITE	(_AT(pmdval_t, 0))
->  #define PMD_SECT_AP_READ	(_AT(pmdval_t, 0))
-> +#define PMD_SECT_AP1		(_AT(pmdval_t, 1) << 6)
->  #define PMD_SECT_TEX(x)		(_AT(pmdval_t, 0))
->  
->  /*
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 11c1785..b571484 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -19,7 +19,11 @@
->  	ALIGN_FUNCTION();						\
->  	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
->  	*(.idmap.text)							\
-> -	VMLINUX_SYMBOL(__idmap_text_end) = .;
-> +	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
-> +	ALIGN_FUNCTION();						\
-> +	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
-> +	*(.hyp.idmap.text)						\
-> +	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
->  
->  #ifdef CONFIG_HOTPLUG_CPU
->  #define ARM_CPU_DISCARD(x)
-> diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-> index 99db769..d9213a5 100644
-> --- a/arch/arm/mm/idmap.c
-> +++ b/arch/arm/mm/idmap.c
-> @@ -1,4 +1,6 @@
-> +#include <linux/module.h>
->  #include <linux/kernel.h>
-> +#include <linux/slab.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/idmap.h>
-> @@ -6,6 +8,7 @@
->  #include <asm/pgtable.h>
->  #include <asm/sections.h>
->  #include <asm/system_info.h>
-> +#include <asm/virt.h>
->  
->  pgd_t *idmap_pgd;
->  
-> @@ -59,11 +62,20 @@ static void idmap_add_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
->  	} while (pud++, addr = next, addr != end);
->  }
->  
-> -static void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
-> +static void identity_mapping_add(pgd_t *pgd, const char *text_start,
-> +				 const char *text_end, unsigned long prot)
->  {
-> -	unsigned long prot, next;
-> +	unsigned long addr, end;
-> +	unsigned long next;
-> +
-> +	addr = virt_to_phys(text_start);
-> +	end = virt_to_phys(text_end);
-How does this work with phys addresses greater than 32bit (with
-LPAE)? This was the same before the patch too, but I am still
-curious. Since __virt_to_phys() returns unsigned long kernel cannot be
-put in high memory, right?
+> what do you mean ? What kernel infrastructure is doing waht for me ?
 
+The kernel infrastructure is doing the string compare for you to match
+the device against the driver (via platform_device_id->name). You get
+the a pointer to the driver_data for free. So you don't need any string
+compare in the driver later.
 
-> +
-> +	pr_info("Setting up static %sidentity map for 0x%llx - 0x%llx\n",
-> +		prot ? "HYP " : "",
-> +		(long long)addr, (long long)end);
-> +	prot |= PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
->  
-> -	prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
->  	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
->  		prot |= PMD_BIT4;
->  
-> @@ -74,28 +86,48 @@ static void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long e
->  	} while (pgd++, addr = next, addr != end);
->  }
->  
-> +#ifdef CONFIG_ARM_VIRT_EXT
-> +pgd_t *hyp_pgd;
-> +
-> +extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
-> +
-> +static int __init init_static_idmap_hyp(void)
-> +{
-> +	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
-> +	if (!hyp_pgd)
-> +		return -ENOMEM;
-> +
-> +	identity_mapping_add(hyp_pgd, __hyp_idmap_text_start,
-> +			     __hyp_idmap_text_end, PMD_SECT_AP1);
-> +
-> +	return 0;
-> +}
-> +#else
-> +static int __init init_static_idmap_hyp(void)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
->  extern char  __idmap_text_start[], __idmap_text_end[];
->  
->  static int __init init_static_idmap(void)
->  {
-> -	phys_addr_t idmap_start, idmap_end;
-> +	int ret;
->  
->  	idmap_pgd = pgd_alloc(&init_mm);
->  	if (!idmap_pgd)
->  		return -ENOMEM;
->  
-> -	/* Add an identity mapping for the physical address of the section. */
-> -	idmap_start = virt_to_phys((void *)__idmap_text_start);
-> -	idmap_end = virt_to_phys((void *)__idmap_text_end);
-> +	identity_mapping_add(idmap_pgd, __idmap_text_start,
-> +			     __idmap_text_end, 0);
->  
-> -	pr_info("Setting up static identity map for 0x%llx - 0x%llx\n",
-> -		(long long)idmap_start, (long long)idmap_end);
-> -	identity_mapping_add(idmap_pgd, idmap_start, idmap_end);
-> +	ret = init_static_idmap_hyp();
->  
->  	/* Flush L1 for the hardware to see this page table content */
->  	flush_cache_louis();
->  
-> -	return 0;
-> +	return ret;
->  }
->  early_initcall(init_static_idmap);
->  
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
---
-			Gleb.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130114/102df909/attachment-0001.sig>
