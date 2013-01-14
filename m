@@ -1,79 +1,62 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Mon, 14 Jan 2013 22:46:54 +0200
-Subject: OMAP baseline test results for v3.8-rc3
-In-Reply-To: <20130114191459.GA9402@arwen.pp.htv.fi>
-References: <alpine.DEB.2.00.1301141756460.20390@utopia.booyaka.com>
- <20130114184018.GA18224@blackmetal.musicnaut.iki.fi>
- <20130114191459.GA9402@arwen.pp.htv.fi>
-Message-ID: <20130114204654.GB18224@blackmetal.musicnaut.iki.fi>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 14 Jan 2013 12:56:02 -0800
+Subject: [PATCH v2 09/10] clk: tegra20: remove unused
+ TEGRA_CLK_DUPLICATE()s
+In-Reply-To: <50F07D87.4000405@wwwdotorg.org>
+References: <1357891289-23500-1-git-send-email-pgaikwad@nvidia.com>
+ <1357891289-23500-9-git-send-email-pgaikwad@nvidia.com>
+ <50F07D87.4000405@wwwdotorg.org>
+Message-ID: <20130114205602.23734.72506@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 09:14:59PM +0200, Felipe Balbi wrote:
-> On Mon, Jan 14, 2013 at 08:40:18PM +0200, Aaro Koskinen wrote:
-> > On Mon, Jan 14, 2013 at 05:59:12PM +0000, Paul Walmsley wrote:
-> > > Here are some basic OMAP test results for Linux v3.8-rc3.
-> > > Logs and other details at:
-> > > 
-> > >     http://www.pwsan.com/omap/testlogs/test_v3.8-rc3/20130109222058/
-> > > 
-> > > 
-> > > Test summary
-> > > ------------
-> > > 
-> > > Boot to userspace:
-> > >     Pass ( 9/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
-> > >   	   	  3730beaglexm, 37xxevm, 4430es2panda, 5912osk,
-> > > 		  4460pandaes
-> > >     FAIL ( 2/11): am335xbone, cmt3517 
+Quoting Stephen Warren (2013-01-11 13:00:55)
+> On 01/11/2013 01:01 AM, Prashant Gaikwad wrote:
+> > With device tree support added for Tegra clocks look up is done from
+> > device tree, remove unused TEGRA_CLK_DUPLICATE()s.
+> 
+> Cc'ing in the drivers/clk maintainer as an FYI and for Acks; this patch
+> needs to go through the Tegra tree due to dependencies.
+> 
+
+Acked-by: Mike Turquette <mturquette@linaro.org>
+
+> > Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> > ---
+> >  drivers/clk/tegra/clk-tegra20.c |   17 -----------------
+> >  1 files changed, 0 insertions(+), 17 deletions(-)
 > > 
-> > N900 boot is unstable again, I2C issues are back.
-> 
-> damn!
-> 
-> > Boot succeeds and fails randomly. Let's see if this can be bisected.
-> > The same kernel works on N950.
-> 
-> fair enough, it might be something related to some errata fix which
-> might have been missed. Can you apply this small patch just so I know if
-> there is something pending in CNT reg ?
-
-[    0.207946] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
-[    0.208129] twl 1-0048: power (irq 343) chaining IRQs 346..353
-[    0.209350] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
-[    1.218749] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[    1.218811] omap_i2c omap_i2c.1: SA 0049 CON 9602 CNT 0004
-[    2.234374] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[    2.234436] omap_i2c omap_i2c.1: SA 0049 CON 9602 CNT 0004
-[    2.234466] twl: Write failed (mod 2, reg 0x12 count 1)
-[    3.249999] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[    3.250030] omap_i2c omap_i2c.1: SA 0049 CON 9602 CNT 0004
-[    3.250061] twl: Write failed (mod 2, reg 0x12 count 1)
-
-> you might also want to try merging my latest i2c patches, which missed
-> the merge window, as they might help with this issue too.
-> 
-> The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
-> 
->   Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git i2c-deferred-STP
-
-I could not reproduce the issue with these. Tested around 20 boots.
-There's a noticeable delay (over 4 secs!) around where I2C is initialized
-and used for the first time, but no errors and the boot completes:
-
-[    0.187530] SCSI subsystem initialized
-[    0.188110] usbcore: registered new interface driver usbfs
-[    0.188415] usbcore: registered new interface driver hub
-[    0.188781] usbcore: registered new device driver usb
-[    0.189453] musb-omap2430 musb-omap2430: invalid resource
-[    4.296905] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
-[    4.297088] twl 1-0048: power (irq 343) chaining IRQs 346..353
-[    4.329010] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
-[    4.470123] VUSB1V5: 1500 mV normal standby
-[    4.470916] VUSB1V8: 1800 mV normal standby
-
-A.
+> > diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+> > index 4875261..9383b85 100644
+> > --- a/drivers/clk/tegra/clk-tegra20.c
+> > +++ b/drivers/clk/tegra/clk-tegra20.c
+> > @@ -1174,28 +1174,11 @@ static __initdata struct tegra_clk_init_table init_table[] = {
+> >   * table under two names.
+> >   */
+> >  static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
+> > -     TEGRA_CLK_DUPLICATE(uarta,  "serial8250.0", NULL),
+> > -     TEGRA_CLK_DUPLICATE(uartb,  "serial8250.1", NULL),
+> > -     TEGRA_CLK_DUPLICATE(uartc,  "serial8250.2", NULL),
+> > -     TEGRA_CLK_DUPLICATE(uartd,  "serial8250.3", NULL),
+> > -     TEGRA_CLK_DUPLICATE(uarte,  "serial8250.4", NULL),
+> >       TEGRA_CLK_DUPLICATE(usbd,   "utmip-pad",    NULL),
+> >       TEGRA_CLK_DUPLICATE(usbd,   "tegra-ehci.0", NULL),
+> >       TEGRA_CLK_DUPLICATE(usbd,   "tegra-otg",    NULL),
+> > -     TEGRA_CLK_DUPLICATE(pll_p,   "tegradc.0",    "parent"),
+> > -     TEGRA_CLK_DUPLICATE(pll_p,   "tegradc.1",    "parent"),
+> > -     TEGRA_CLK_DUPLICATE(pll_d_out0,   "hdmi",    "parent"),
+> > -     TEGRA_CLK_DUPLICATE(gr2d,   "tegra_grhost", "gr2d"),
+> > -     TEGRA_CLK_DUPLICATE(gr3d,   "tegra_grhost", "gr3d"),
+> > -     TEGRA_CLK_DUPLICATE(epp,    "tegra_grhost", "epp"),
+> > -     TEGRA_CLK_DUPLICATE(mpe,    "tegra_grhost", "mpe"),
+> > -     TEGRA_CLK_DUPLICATE(vde,    "tegra-aes",    "vde"),
+> >       TEGRA_CLK_DUPLICATE(cclk,   NULL,           "cpu"),
+> >       TEGRA_CLK_DUPLICATE(twd,    "smp_twd",      NULL),
+> > -     TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.0", "fast-clk"),
+> > -     TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.1", "fast-clk"),
+> > -     TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.2", "fast-clk"),
+> > -     TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.3", "fast-clk"),
+> >       TEGRA_CLK_DUPLICATE(clk_max, NULL, NULL), /* Must be the last entry */
+> >  };
+> >  
+> >
