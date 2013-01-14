@@ -1,35 +1,124 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Jan 2013 18:43:19 +0000
-Subject: [PATCH v5 13/14] KVM: ARM: Handle I/O aborts
-In-Reply-To: <CANM98qKASA_YML6L0KDHNsPShA+rfE2E=XXznqG4+dNn+939kg@mail.gmail.com>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Mon, 14 Jan 2013 20:49:09 +0200
+Subject: [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile KVM support
+In-Reply-To: <20130108183855.46302.40539.stgit@ubuntu>
 References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108184005.46302.38495.stgit@ubuntu>
- <20130114164326.GH23505@n2100.arm.linux.org.uk>
- <CANM98qKASA_YML6L0KDHNsPShA+rfE2E=XXznqG4+dNn+939kg@mail.gmail.com>
-Message-ID: <20130114184319.GN23505@n2100.arm.linux.org.uk>
+ <20130108183855.46302.40539.stgit@ubuntu>
+Message-ID: <20130114184908.GB12489@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 01:25:39PM -0500, Christoffer Dall wrote:
-> However, unifying all instruction decoding within arch/arm is quite
-> the heavy task, and requires agreeing on some canonical API that
-> people can live with and it will likely take a long time.  I seem to
-> recall there were also arguments against unifying kprobe code with
-> other instruction decoding, as the kprobe code was also written to
-> work highly optimized under certain assumptions, if I understood
-> previous comments correctly.
+A couple of general question about ABI. If they were already answered
+just refer me to the previous discussion.
 
-Yes, I know Rusty had a go.
+On Tue, Jan 08, 2013 at 01:38:55PM -0500, Christoffer Dall wrote:
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index a4df553..4237c27 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -293,7 +293,7 @@ kvm_run' (see below).
+>  4.11 KVM_GET_REGS
+>  
+>  Capability: basic
+> -Architectures: all
+> +Architectures: all except ARM
+>  Type: vcpu ioctl
+>  Parameters: struct kvm_regs (out)
+>  Returns: 0 on success, -1 on error
+> @@ -314,7 +314,7 @@ struct kvm_regs {
+>  4.12 KVM_SET_REGS
+>  
+>  Capability: basic
+> -Architectures: all
+> +Architectures: all except ARM
+>  Type: vcpu ioctl
+>  Parameters: struct kvm_regs (in)
+>  Returns: 0 on success, -1 on error
+> @@ -600,7 +600,7 @@ struct kvm_fpu {
+>  4.24 KVM_CREATE_IRQCHIP
+Why KVM_GET_REGS/KVM_SET_REGS are not usable for arm?
 
-What I think may make sense is to unify this and the alignment code.
-They're really after the same things, which are:
+>  
+>  Capability: KVM_CAP_IRQCHIP
+> -Architectures: x86, ia64
+> +Architectures: x86, ia64, ARM
+>  Type: vm ioctl
+>  Parameters: none
+>  Returns: 0 on success, -1 on error
+> @@ -608,7 +608,8 @@ Returns: 0 on success, -1 on error
+>  Creates an interrupt controller model in the kernel.  On x86, creates a virtual
+>  ioapic, a virtual PIC (two PICs, nested), and sets up future vcpus to have a
+>  local APIC.  IRQ routing for GSIs 0-15 is set to both PIC and IOAPIC; GSI 16-23
+> -only go to the IOAPIC.  On ia64, a IOSAPIC is created.
+> +only go to the IOAPIC.  On ia64, a IOSAPIC is created. On ARM, a GIC is
+> +created.
+>  
+>  
+>  4.25 KVM_IRQ_LINE
+> @@ -1775,6 +1776,14 @@ registers, find a list below:
+>    PPC   | KVM_REG_PPC_VPA_DTL   | 128
+>    PPC   | KVM_REG_PPC_EPCR	| 32
+>  
+> +ARM registers are mapped using the lower 32 bits.  The upper 16 of that
+> +is the register group type, or coprocessor number:
+> +
+> +ARM core registers have the following id bit patterns:
+> +  0x4002 0000 0010 <index into the kvm_regs struct:16>
+> +
+> +
+> +
+>  4.69 KVM_GET_ONE_REG
+>  
+>  Capability: KVM_CAP_ONE_REG
+> @@ -2127,6 +2136,46 @@ written, then `n_invalid' invalid entries, invalidating any previously
+>  valid entries found.
+>  
+>  
+> +4.77 KVM_ARM_VCPU_INIT
+> +
+> +Capability: basic
+> +Architectures: arm
+> +Type: vcpu ioctl
+> +Parameters: struct struct kvm_vcpu_init (in)
+> +Returns: 0 on success; -1 on error
+> +Errors:
+> + ?EINVAL: ???the target is unknown, or the combination of features is invalid.
+> + ?ENOENT: ???a features bit specified is unknown.
+> +
+> +This tells KVM what type of CPU to present to the guest, and what
+> +optional features it should have. ?This will cause a reset of the cpu
+> +registers to their initial values. ?If this is not called, KVM_RUN will
+> +return ENOEXEC for that vcpu.
+> +
+Can different vcpus of the same VM be of different type?
 
-- Given an instruction, and register set, calculate the address of the
-  access, size, number of accesses, and the source/destination registers.
-- Update the register set as though the instruction had been executed
-  by the CPU.
+> +Note that because some registers reflect machine topology, all vcpus
+> +should be created before this ioctl is invoked.
+How cpu hot plug suppose to work?
 
-However, I've changed tack slightly from the above in the last 10 minutes
-or so.  I'm thinking a little more that we might be able to take what we
-already have in alignment.c and provide it with a set of accessors
-according to size etc.
+> +
+> +
+> +4.78 KVM_GET_REG_LIST
+> +
+> +Capability: basic
+> +Architectures: arm
+> +Type: vcpu ioctl
+> +Parameters: struct kvm_reg_list (in/out)
+> +Returns: 0 on success; -1 on error
+> +Errors:
+> + ?E2BIG: ????the reg index list is too big to fit in the array specified by
+> + ????????????the user (the number required will be written into n).
+> +
+> +struct kvm_reg_list {
+> +	__u64 n; /* number of registers in reg[] */
+> +	__u64 reg[0];
+> +};
+> +
+> +This ioctl returns the guest registers that are supported for the
+> +KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+> +
+> +
+Doesn't userspace know what registers are supported by each CPU type?
+
+--
+			Gleb.
