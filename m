@@ -1,66 +1,54 @@
-From: zhanzhenbo@gmail.com (steve.zhan)
-Date: Fri, 11 Jan 2013 11:52:44 -0000
-Subject: Question:add Iirq mask method in irq disable call.
-Message-ID: <CAKvkGKfG-3Y=azedkPyLwYffZKOE0sYH6LjMCfuMAgMKMBYWGA@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 14 Jan 2013 23:26:59 -0000
+Subject: [PATCH v8 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <20130114180602.GV14149@atomide.com>
+References: <1355481404-27695-1-git-send-email-zonque@gmail.com>
+ <1355481404-27695-6-git-send-email-zonque@gmail.com>
+ <CALF0-+UbqFF17X1Ok1s1AGKg6SBmvMc1mvjVuZb=Ej7xo+qcmA@mail.gmail.com>
+ <20130114180602.GV14149@atomide.com>
+Message-ID: <CACTFLAMT2-6VRkNSO3OF6X=afTYKRz=JcDkYqqyZ4VNT5xBVkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resend Email because MUTT email send error.
+On Jan 15, 2013 2:06 AM, "Tony Lindgren" <tony@atomide.com> wrote:
+>
+> * Ezequiel Garcia <elezegarcia@gmail.com> [121223 13:49]:
+> > On Fri, Dec 14, 2012 at 7:36 AM, Daniel Mack <zonque@gmail.com> wrote:
+> > > +
+> > > +Example for an AM33xx board:
+> > > +
+> > > +       gpmc: gpmc at 50000000 {
+> > > +               compatible = "ti,am3352-gpmc";
+> > > +               ti,hwmods = "gpmc";
+> > > +               reg = <0x50000000 0x1000000>;
+> > > +               interrupts = <100>;
+> > > +               gpmc,num-cs = <8>;
+> > > +               gpmc,num-waitpins = <2>;
+> > > +               #address-cells = <2>;
+> > > +               #size-cells = <1>;
+> > > +               ranges = <0 0 0x08000000 0x2000>;       /* CS0: NAND
+*/
+> > > +
+> > > +               nand at 0,0 {
+> > > +                       reg = <0 0 0>; /* CS0, offset 0 */
+> >
+> > I'm a bit confused by this: what are the other two values in "reg"?
+> > I see you've only added a binding for CS.
+> >
+> > I've extended a bit on your work and added a binding to enable OneNAND
+> > device on my IGEP board.
+> >
+> > I might send some patches in case anyone wants to give it a try.
+>
+> Daniel, should this be updated to just pass the CS?
 
-2013/1/11 Steve zhan <zhanzhenbo@gmail.com>:
-> All:
->         I have find that arm gic driver have not register irq_disable
-> method, as below:
-> static struct irq_chip gic_chip = {
->         .name                   = "GIC",
->         .irq_mask               = gic_mask_irq,
->         .irq_unmask             = gic_unmask_irq,
->         .irq_eoi                = gic_eoi_irq,
->         .irq_set_type           = gic_set_type,
->         .irq_retrigger          = gic_retrigger,
-> #ifdef CONFIG_SMP
->         .irq_set_affinity       = gic_set_affinity,
-> #endif
->         .irq_set_wake           = gic_set_wake,
-> };
->
-> Question is:
->         When some drivers want to disable irq, maybe it will call
-> linux standard inerface: irq_disable() that defined in include\
-> linux\interrupt.h, this function will call
-> void irq_disable(struct irq_desc *desc)
-> {
->         irq_state_set_disabled(desc);
->         if (desc->irq_data.chip->irq_disable) {
->                 desc->irq_data.chip->irq_disable(&desc->irq_data);
->                 irq_state_set_masked(desc);
->         }
-> }
->
-> Because gic have not register irq_diable method, so the interrupt can
-> not disable immediately, it is enable until the interrupt come next time,
-> then disalbed by mask because irq_state_set_disable(desc);
->
-> I have checked irq_enable method:
-> void irq_enable(struct irq_desc *desc)
-> {
->         irq_state_clr_disabled(desc);
->         if (desc->irq_data.chip->irq_enable)
->                 desc->irq_data.chip->irq_enable(&desc->irq_data);
->         else
->                 desc->irq_data.chip->irq_unmask(&desc->irq_data);
->         irq_state_clr_masked(desc);
-> }
-> This method have do unmask when irq_enable method is not exist.
->
-> Is it a good idea to add irq_mask call in irq_disable()?
->
->
-> Regards,
-> Steve
->
+No, as Rob pointed out earlier in a thread about this topic, the 'ranges'
+feature will help doing the math for the offset calculation eventually, so
+we need to pass all three values.
 
-
-
--- 
-Steve Zhan
+Regards,
+Daniel
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130114/c232814c/attachment.html>
