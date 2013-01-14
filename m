@@ -1,25 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 Jan 2013 08:52:36 +0100
-Subject: [PATCH 02/11] ARM: nomadik: initial devicetree support
-In-Reply-To: <CACRpkdafi_0ERh6A8BVNXp8k0p2zA9NUWNUfHc-Nvhe=KCuJ0w@mail.gmail.com>
-References: <1357599359-7385-1-git-send-email-linus.walleij@linaro.org>
- <1358148382.2198.2.camel@gitbox>
- <CACRpkdafi_0ERh6A8BVNXp8k0p2zA9NUWNUfHc-Nvhe=KCuJ0w@mail.gmail.com>
-Message-ID: <CACRpkdatCnkk0xihKevbqahQN+VA36E95hmDieCVWVX2yQY5xw@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 14 Jan 2013 09:52:50 +0200
+Subject: [PATCH 2/2] ARM: tegra: Use DT /cpu node to detect number of CPU core
+In-Reply-To: <1358149970-28156-1-git-send-email-hdoyu@nvidia.com>
+References: <1358149970-28156-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1358149970-28156-2-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 8:51 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Jan 14, 2013 at 8:26 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
->
-> Do you know if there a now a frozen branch I can base my
-> patches on?
+SCU based detection only works with Cortex-A9 MP and it doesn't
+support ones with multiple clusters. The only way to detect number of
+CPU core correctly is with DT /cpu node. If DT /cpu node based
+detection fails, we just simply fall back a single core in Tegra SoCs.
 
->> The patches for this change are in arm-soc: timer/cleanup.
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+Based on the discussion:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140608.html
+---
+ arch/arm/mach-tegra/platsmp.c |   17 +++--------------
+ 1 file changed, 3 insertions(+), 14 deletions(-)
 
-Ooops stupid me. Too little coffee.
-
-I'll fix!
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 6867030..456e7cc 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -24,6 +24,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/smp_scu.h>
+ #include <asm/smp_plat.h>
++#include <asm/prom.h>
+ 
+ #include <mach/powergate.h>
+ 
+@@ -177,22 +178,10 @@ done:
+ 	return status;
+ }
+ 
+-/*
+- * Initialise the CPU possible map early - this describes the CPUs
+- * which may be present or become present in the system.
+- */
+ static void __init tegra_smp_init_cpus(void)
+ {
+-	unsigned int i, ncores = scu_get_core_count(scu_base);
+-
+-	if (ncores > nr_cpu_ids) {
+-		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
+-			ncores, nr_cpu_ids);
+-		ncores = nr_cpu_ids;
+-	}
+-
+-	for (i = 0; i < ncores; i++)
+-		set_cpu_possible(i, true);
++	if (!arm_dt_cpu_map_valid())
++		set_cpu_possible(0, true);
+ 
+ 	set_smp_cross_call(gic_raise_softirq);
+ }
+-- 
+1.7.9.5
