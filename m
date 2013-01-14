@@ -1,27 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jan 2013 09:22:22 -0800
-Subject: linux-next: manual merge of the arm-soc tree with the crypto tree
-In-Reply-To: <20130114134908.094003722be0612c20574338@canb.auug.org.au>
-References: <20130114134908.094003722be0612c20574338@canb.auug.org.au>
-Message-ID: <20130114172221.GU14149@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 Jan 2013 17:23:26 +0000
+Subject: [PATCH 07/16] ARM: bL_platsmp.c: close the kernel entry gate
+ before hot-unplugging a CPU
+In-Reply-To: <alpine.LFD.2.02.1301141207360.6300@xanadu.home>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-8-git-send-email-nicolas.pitre@linaro.org>
+ <20130114163755.GB31341@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1301141151510.6300@xanadu.home>
+ <20130114170028.GD31341@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1301141207360.6300@xanadu.home>
+Message-ID: <20130114172326.GF31341@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Rothwell <sfr@canb.auug.org.au> [130113 18:52]:
-> Hi all,
+On Mon, Jan 14, 2013 at 05:15:07PM +0000, Nicolas Pitre wrote:
+> On Mon, 14 Jan 2013, Will Deacon wrote:
+> > On Mon, Jan 14, 2013 at 04:53:41PM +0000, Nicolas Pitre wrote:
+> > > The bL_set_entry_vector() includes a cache flush which itself has a DSB.  
+> > > Hence my previous interrogation.
+> > 
+> > For L1, sure, we always have the dsb for v7. However, for the outer-cache we
+> > only have a dsb by virtue of a spin_unlock in l2x0.c... it seems a bit risky
+> > to rely on that for ordering your entry_vector write with the power_on.
+> > 
+> > I think the best bet is to put a barrier in power_on, before invoking the
+> > platform_ops function and similarly for power_off.
+> > 
+> > What do you reckon?
 > 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/crypto/omap-sham.c between commit dfd061d5a8f5 ("crypto:
-> omap-sham - Add code to use dmaengine API") from the crypto tree and
-> commit a62a6e98c370 ("ARM: OMAP2+: Disable code that currently does not
-> work with multiplaform") from the arm-soc tree.
+> I much prefer adding barriers inside the API when they are needed for 
+> proper execution of the API intent.  So if I call bL_set_entry_vector(), 
+> I trust that by the time it returns the vector is indeed set and ready 
+> for use by other processors.
 > 
-> I fixed it up (the former removed the include that the latter protected)
-> and can carry the fix as necessary (no action is required).
+> The same could be said about the outer cache ops.  If a DSB is needed 
+> for their intent to be valid, then why isn't this DSB always implied by 
+> the corresponding cache op calls?  And as you say, there is already one 
+> implied by the spinlock used there, so that is not if things would 
+> change much in practice.
 
-Thanks, yes the crypto tree changes fixed up things so the changes
-coming from arm-soc tree are not needed any longer.
+Ok, so we can fix the outer_cache functions as suggested by Catalin. That
+still leaves the GIC CPU interface problem in the later patch, which uses a
+writel_relaxed to disable the CPU interface, so I suppose we can just put
+a dsb at the end of gic_cpu_if_down().
 
-Regards,
-
-Tony
+Will
