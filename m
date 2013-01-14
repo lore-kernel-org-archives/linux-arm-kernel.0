@@ -1,240 +1,109 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 14 Jan 2013 17:02:55 -0500
-Subject: [PATCH v5 07/12] ARM: KVM: VGIC virtual CPU interface management
-In-Reply-To: <20130114154231.GG18935@mudshark.cambridge.arm.com>
-References: <20130108184116.46558.3558.stgit@ubuntu>
- <20130108184211.46558.74646.stgit@ubuntu>
- <20130114154231.GG18935@mudshark.cambridge.arm.com>
-Message-ID: <CANM98qJ_Pb5bT0k7bAhv6i1YTj6GxvNE6vvY49OZrqsKpF3xOA@mail.gmail.com>
+Date: Mon, 14 Jan 2013 17:08:39 -0500
+Subject: [PATCH v5 3/4] ARM: KVM: arch_timers: Add timer world switch
+In-Reply-To: <50F445BC.6050507@arm.com>
+References: <20130108184259.46758.17939.stgit@ubuntu>
+ <20130108184327.46758.70599.stgit@ubuntu>
+ <20130114152101.GD18935@mudshark.cambridge.arm.com>
+ <50F445BC.6050507@arm.com>
+Message-ID: <CANM98qLsq7=PRNu4-5-N2GaAuLFOUfpy-yEWb6LpZri3WQ8JwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 10:42 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jan 08, 2013 at 06:42:11PM +0000, Christoffer Dall wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, Jan 14, 2013 at 12:51 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 14/01/13 15:21, Will Deacon wrote:
+>> On Tue, Jan 08, 2013 at 06:43:27PM +0000, Christoffer Dall wrote:
+>>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>>
+>>> Do the necessary save/restore dance for the timers in the world
+>>> switch code. In the process, allow the guest to read the physical
+>>> counter, which is useful for its own clock_event_device.
 >>
->> Add VGIC virtual CPU interface code, picking pending interrupts
->> from the distributor and stashing them in the VGIC control interface
->> list registers.
+>> [...]
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
->> ---
->>  arch/arm/include/asm/kvm_vgic.h |   30 ++++
->>  arch/arm/kvm/vgic.c             |  327 +++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 356 insertions(+), 1 deletion(-)
+>>> @@ -476,6 +513,7 @@ vcpu     .req    r0              @ vcpu pointer always in r0
+>>>   * for the host.
+>>>   *
+>>>   * Assumes vcpu pointer in vcpu reg
+>>> + * Clobbers r2-r4
+>>>   */
+>>>  .macro restore_timer_state
+>>>      @ Disallow physical timer access for the guest
+>>> @@ -484,6 +522,30 @@ vcpu    .req    r0              @ vcpu pointer always in r0
+>>>      orr     r2, r2, #CNTHCTL_PL1PCTEN
+>>>      bic     r2, r2, #CNTHCTL_PL1PCEN
+>>>      mcr     p15, 4, r2, c14, c1, 0  @ CNTHCTL
+>>> +
+>>> +#ifdef CONFIG_KVM_ARM_TIMER
+>>> +    ldr     r4, [vcpu, #VCPU_KVM]
+>>> +    ldr     r2, [r4, #KVM_TIMER_ENABLED]
+>>> +    cmp     r2, #0
+>>> +    beq     1f
+>>> +
+>>> +    ldr     r2, [r4, #KVM_TIMER_CNTVOFF]
+>>> +    ldr     r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
+>>> +    mcrr    p15, 4, r2, r3, c14     @ CNTVOFF
+>>> +    isb
+>>> +
+>>> +    ldr     r4, =VCPU_TIMER_CNTV_CVAL
+>>> +    add     vcpu, vcpu, r4
+>>> +    ldrd    r2, r3, [vcpu]
+>>> +    sub     vcpu, vcpu, r4
+>>> +    mcrr    p15, 3, r2, r3, c14     @ CNTV_CVAL
+>>> +
+>>> +    ldr     r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
+>>> +    and     r2, r2, #3
+>>> +    mcr     p15, 0, r2, c14, c3, 1  @ CNTV_CTL
+>>> +    isb
 >>
->> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
->> index 9ff0d9c..b3133c4 100644
->> --- a/arch/arm/include/asm/kvm_vgic.h
->> +++ b/arch/arm/include/asm/kvm_vgic.h
->> @@ -110,8 +110,33 @@ struct vgic_dist {
->>  };
->>
->>  struct vgic_cpu {
->> +#ifdef CONFIG_KVM_ARM_VGIC
->> +       /* per IRQ to LR mapping */
->> +       u8              vgic_irq_lr_map[VGIC_NR_IRQS];
->> +
->> +       /* Pending interrupts on this VCPU */
->> +       DECLARE_BITMAP( pending_percpu, VGIC_NR_PRIVATE_IRQS);
->> +       DECLARE_BITMAP( pending_shared, VGIC_NR_SHARED_IRQS);
->> +
->> +       /* Bitmap of used/free list registers */
->> +       DECLARE_BITMAP( lr_used, 64);
->> +
->> +       /* Number of list registers on this CPU */
->> +       int             nr_lr;
->> +
->> +       /* CPU vif control registers for world switch */
->> +       u32             vgic_hcr;
->> +       u32             vgic_vmcr;
->> +       u32             vgic_misr;      /* Saved only */
->> +       u32             vgic_eisr[2];   /* Saved only */
->> +       u32             vgic_elrsr[2];  /* Saved only */
->> +       u32             vgic_apr;
->> +       u32             vgic_lr[64];    /* A15 has only 4... */
+>> How many of these isbs are actually needed, given that we're going to make
+>> an exception return to the guest? The last one certainly looks redundant and
+>> I can't see the need for ordering CNTVOFF vs CNTV_CVAL. I can see an
+>> argument to putting one *before* CNTV_CTL, but you don't have one there!
 >
-> Have a #define for the maximum number of list registers.
+> CNTVOFF directly influences whether or not CNTV_CVAL will trigger or
+> not. Maybe I'm just being paranoid and moving the isb after CNTV_CVAL is
+> enough.
 >
->> +#endif
->>  };
->>
->> +#define LR_EMPTY       0xff
->> +
->>  struct kvm;
->>  struct kvm_vcpu;
->>  struct kvm_run;
->> @@ -119,9 +144,14 @@ struct kvm_exit_mmio;
->>
->>  #ifdef CONFIG_KVM_ARM_VGIC
->>  int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
->> +void kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu);
->> +void kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu);
->
-> Same comment as for the arch timer (flush/sync).
->
->> +int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->>  bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>                       struct kvm_exit_mmio *mmio);
->>
->> +#define irqchip_in_kernel(k)   (!!((k)->arch.vgic.vctrl_base))
->> +
->>  #else
->>  static inline int kvm_vgic_hyp_init(void)
->>  {
->> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
->> index bd2bd7f..58237d5 100644
->> --- a/arch/arm/kvm/vgic.c
->> +++ b/arch/arm/kvm/vgic.c
->> @@ -152,6 +152,34 @@ static int vgic_irq_is_enabled(struct kvm_vcpu *vcpu, int irq)
->>         return vgic_bitmap_get_irq_val(&dist->irq_enabled, vcpu->vcpu_id, irq);
->>  }
->>
->> +static int vgic_irq_is_active(struct kvm_vcpu *vcpu, int irq)
->> +{
->> +       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +
->> +       return vgic_bitmap_get_irq_val(&dist->irq_active, vcpu->vcpu_id, irq);
->> +}
->> +
->> +static void vgic_irq_set_active(struct kvm_vcpu *vcpu, int irq)
->> +{
->> +       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +
->> +       vgic_bitmap_set_irq_val(&dist->irq_active, vcpu->vcpu_id, irq, 1);
->> +}
->> +
->> +static void vgic_irq_clear_active(struct kvm_vcpu *vcpu, int irq)
->> +{
->> +       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +
->> +       vgic_bitmap_set_irq_val(&dist->irq_active, vcpu->vcpu_id, irq, 0);
->> +}
->> +
->> +static int vgic_dist_irq_is_pending(struct kvm_vcpu *vcpu, int irq)
->> +{
->> +       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +
->> +       return vgic_bitmap_get_irq_val(&dist->irq_state, vcpu->vcpu_id, irq);
->> +}
->> +
->>  static void vgic_dist_irq_set(struct kvm_vcpu *vcpu, int irq)
->>  {
->>         struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> @@ -711,7 +739,30 @@ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
->>
->>  static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
->>  {
->> -       return 0;
->> +       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +       unsigned long *pending, *enabled, *pend_percpu, *pend_shared;
->> +       unsigned long pending_private, pending_shared;
->> +       int vcpu_id;
->> +
->> +       vcpu_id = vcpu->vcpu_id;
->> +       pend_percpu = vcpu->arch.vgic_cpu.pending_percpu;
->> +       pend_shared = vcpu->arch.vgic_cpu.pending_shared;
->> +
->> +       pending = vgic_bitmap_get_cpu_map(&dist->irq_state, vcpu_id);
->> +       enabled = vgic_bitmap_get_cpu_map(&dist->irq_enabled, vcpu_id);
->> +       bitmap_and(pend_percpu, pending, enabled, VGIC_NR_PRIVATE_IRQS);
->> +
->> +       pending = vgic_bitmap_get_shared_map(&dist->irq_state);
->> +       enabled = vgic_bitmap_get_shared_map(&dist->irq_enabled);
->> +       bitmap_and(pend_shared, pending, enabled, VGIC_NR_SHARED_IRQS);
->> +       bitmap_and(pend_shared, pend_shared,
->> +                  vgic_bitmap_get_shared_map(&dist->irq_spi_target[vcpu_id]),
->> +                  VGIC_NR_SHARED_IRQS);
->> +
->> +       pending_private = find_first_bit(pend_percpu, VGIC_NR_PRIVATE_IRQS);
->> +       pending_shared = find_first_bit(pend_shared, VGIC_NR_SHARED_IRQS);
->> +       return (pending_private < VGIC_NR_PRIVATE_IRQS ||
->> +               pending_shared < VGIC_NR_SHARED_IRQS);
->>  }
->>
->>  /*
->> @@ -737,6 +788,280 @@ static void vgic_update_state(struct kvm *kvm)
->>         }
->>  }
->>
->> +#define LR_CPUID(lr)   \
->> +       (((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
->> +#define MK_LR_PEND(src, irq)   \
->> +       (GICH_LR_PENDING_BIT | ((src) << GICH_LR_PHYSID_CPUID_SHIFT) | (irq))
->> +/*
->> + * Queue an interrupt to a CPU virtual interface. Return true on success,
->> + * or false if it wasn't possible to queue it.
->> + */
->> +static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
->> +{
->> +       struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->> +       int lr;
->> +
->> +       /* Sanitize the input... */
->> +       BUG_ON(sgi_source_id & ~7);
->> +       BUG_ON(sgi_source_id && irq > 15);
->
-> You can use your new NR_SGIS definition here.
+> The last one is definitively superfluous.
 >
 
-This should address the remaining comments:
+can't we also get rid of the isb on the return path then?
 
-commit 43957095ec5476beb198f4c4630dfc3e2f3951db
-Author: Christoffer Dall <c.dall@virtualopensystems.com>
-Date:   Mon Jan 14 16:59:38 2013 -0500
+do you agree with this patch:
 
-    KVM: ARM: vgic: Define VGIC_MAX_LRS
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 57cfa84..7e6eedf 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -492,7 +492,6 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	str	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
+ 	bic	r2, #1			@ Clear ENABLE
+ 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
+-	isb
 
-    Define maximum number of link registers we can handle instead of using
-    literals in the code.  If an architecture reports more link registers
-    than we support, only use the number we can support.
+ 	mrrc	p15, 3, r2, r3, c14	@ CNTV_CVAL
+ 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
+@@ -532,18 +531,17 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	ldr	r2, [r4, #KVM_TIMER_CNTVOFF]
+ 	ldr	r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
+ 	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
+-	isb
 
-    Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+ 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
+ 	add	vcpu, vcpu, r4
+ 	ldrd	r2, r3, [vcpu]
+ 	sub	vcpu, vcpu, r4
+ 	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
++	isb
 
-diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
-index 1ace491..f9d1977 100644
---- a/arch/arm/include/asm/kvm_vgic.h
-+++ b/arch/arm/include/asm/kvm_vgic.h
-@@ -33,6 +33,7 @@
- #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
- #define VGIC_NR_SHARED_IRQS	(VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
- #define VGIC_MAX_CPUS		KVM_MAX_VCPUS
-+#define VGIC_MAX_LRS		64
-
- /* Sanity checks... */
- #if (VGIC_MAX_CPUS > 8)
-@@ -120,7 +121,7 @@ struct vgic_cpu {
- 	DECLARE_BITMAP(	pending_shared, VGIC_NR_SHARED_IRQS);
-
- 	/* Bitmap of used/free list registers */
--	DECLARE_BITMAP(	lr_used, 64);
-+	DECLARE_BITMAP(	lr_used, VGIC_MAX_LRS);
-
- 	/* Number of list registers on this CPU */
- 	int		nr_lr;
-@@ -132,7 +133,7 @@ struct vgic_cpu {
- 	u32		vgic_eisr[2];	/* Saved only */
- 	u32		vgic_elrsr[2];	/* Saved only */
- 	u32		vgic_apr;
--	u32		vgic_lr[64];	/* A15 has only 4... */
-+	u32		vgic_lr[VGIC_MAX_LRS];
+ 	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
+ 	and	r2, r2, #3
+ 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
+-	isb
+ 1:
  #endif
- };
-
-diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-index a0d283c..90a99fd 100644
---- a/arch/arm/kvm/vgic.c
-+++ b/arch/arm/kvm/vgic.c
-@@ -1345,6 +1345,8 @@ int kvm_vgic_hyp_init(void)
-
- 	vgic_nr_lr = readl_relaxed(vgic_vctrl_base + GICH_VTR);
- 	vgic_nr_lr = (vgic_nr_lr & 0x1f) + 1;
-+	if (vgic_nr_lr > VGIC_MAX_LRS)
-+		vgic_nr_lr = VGIC_MAX_LRS; /* TODO: Clear remaining LRs */
-
- 	ret = create_hyp_io_mappings(vgic_vctrl_base,
- 				     vgic_vctrl_base + resource_size(&vctrl_res),
+ .endm
 --
 
 Thanks,
