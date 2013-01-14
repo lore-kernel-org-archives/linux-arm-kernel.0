@@ -1,109 +1,66 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 14 Jan 2013 22:16:09 +0800
-Subject: [PATCH v4 3/3] ARM: i.MX clock: Change the connection-id for
- fsl-usb2-udc
-In-Reply-To: <1358172969-14898-1-git-send-email-peter.chen@freescale.com>
-References: <1358172969-14898-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1358172969-14898-4-git-send-email-peter.chen@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 14 Jan 2013 22:23:21 +0800
+Subject: [PATCH v2] ARM: imx: disable cpu in .cpu_kill hook
+Message-ID: <1358173401-13158-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we use platform_device_id for fsl-usb2-udc driver, it needs to
-change clk connection-id, or the related devm_clk_get will be failed.
+It's buggy to disable the cpu that is being hot-unplugged in .cpu_die
+hook which runs on the cpu itself.  Instead, it should be done in
+.cpu_kill which runs on the thread (another cpu) that asks for shutting
+down the cpu.  Move imx_enable_cpu(cpu, false) call into .cpu_kill
+hook, and leave the cpu to be hot-unplugged in WFI within .cpu_die,
+so that we can get a more stable cpu hot-plug operation.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/clk-imx25.c       |    6 +++---
- arch/arm/mach-imx/clk-imx27.c       |    6 +++---
- arch/arm/mach-imx/clk-imx31.c       |    6 +++---
- arch/arm/mach-imx/clk-imx35.c       |    6 +++---
- arch/arm/mach-imx/clk-imx51-imx53.c |    6 +++---
- 5 files changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/mach-imx/common.h  |    1 +
+ arch/arm/mach-imx/hotplug.c |   10 ++++++----
+ arch/arm/mach-imx/platsmp.c |    1 +
+ 3 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index b197aa7..67e353d 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -254,9 +254,9 @@ int __init mx25_clocks_init(void)
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usbotg_ahb], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx25");
-+	clk_register_clkdev(clk[usbotg_ahb], "ahb", "imx-udc-mx25");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx25");
- 	clk_register_clkdev(clk[nfc_ipg_per], NULL, "imx25-nand.0");
- 	/* i.mx25 has the i.mx35 type cspi */
- 	clk_register_clkdev(clk[cspi1_ipg], NULL, "imx35-cspi.0");
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 4c1d1e4..1ffe3b5 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -236,9 +236,9 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
- 	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "imx27-camera.0");
- 	clk_register_clkdev(clk[per4_gate], "per", "imx27-camera.0");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "imx-udc-mx27");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "mxc-ehci.0");
-diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-index 8be64e0..ef66eaf 100644
---- a/arch/arm/mach-imx/clk-imx31.c
-+++ b/arch/arm/mach-imx/clk-imx31.c
-@@ -139,9 +139,9 @@ int __init mx31_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[usb_div_post], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usb_gate], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div_post], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_gate], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div_post], "per", "imx-udc-mx31");
-+	clk_register_clkdev(clk[usb_gate], "ahb", "imx-udc-mx31");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx31");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
- 	/* i.mx31 has the i.mx21 type uart */
- 	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index 66f3d65..69fe9c8 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -251,9 +251,9 @@ int __init mx35_clocks_init()
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usbotg_gate], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx35");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx35");
-+	clk_register_clkdev(clk[usbotg_gate], "ahb", "imx-udc-mx35");
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
- 	clk_register_clkdev(clk[nfc_div], NULL, "imx25-nand.0");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 579023f..fb7cb84 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -269,9 +269,9 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[usboh3_per_gate], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usboh3_gate], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usboh3_gate], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usboh3_per_gate], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usboh3_gate], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usboh3_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usboh3_per_gate], "per", "imx-udc-mx51");
-+	clk_register_clkdev(clk[usboh3_gate], "ipg", "imx-udc-mx51");
-+	clk_register_clkdev(clk[usboh3_gate], "ahb", "imx-udc-mx51");
- 	clk_register_clkdev(clk[nfc_gate], NULL, "imx51-nand");
- 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 7191ab4..fa36fb8 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -142,6 +142,7 @@ extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+ extern void imx6q_clock_map_io(void);
+ 
+ extern void imx_cpu_die(unsigned int cpu);
++extern int imx_cpu_kill(unsigned int cpu);
+ 
+ #ifdef CONFIG_PM
+ extern void imx6q_pm_init(void);
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+index 3dec962..7bc5fe1 100644
+--- a/arch/arm/mach-imx/hotplug.c
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -46,9 +46,11 @@ static inline void cpu_enter_lowpower(void)
+ void imx_cpu_die(unsigned int cpu)
+ {
+ 	cpu_enter_lowpower();
+-	imx_enable_cpu(cpu, false);
++	cpu_do_idle();
++}
+ 
+-	/* spin here until hardware takes it down */
+-	while (1)
+-		;
++int imx_cpu_kill(unsigned int cpu)
++{
++	imx_enable_cpu(cpu, false);
++	return 1;
+ }
+diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+index 3777b80..66fae88 100644
+--- a/arch/arm/mach-imx/platsmp.c
++++ b/arch/arm/mach-imx/platsmp.c
+@@ -92,5 +92,6 @@ struct smp_operations  imx_smp_ops __initdata = {
+ 	.smp_boot_secondary	= imx_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= imx_cpu_die,
++	.cpu_kill		= imx_cpu_kill,
+ #endif
+ };
 -- 
-1.7.0.4
+1.7.9.5
