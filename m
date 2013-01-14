@@ -1,37 +1,26 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 14 Jan 2013 14:57:50 +0000
-Subject: [PATCH 1/1] ARM: ux500: Disable Power Supply and Battery Management
- by default
-Message-ID: <1358175470-5041-1-git-send-email-lee.jones@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 14 Jan 2013 23:02:11 +0800
+Subject: [PATCH v3 0/2] Add imx6q-cpufreq driver support
+Message-ID: <1358175733-13475-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AB8500 Battery Management collection of drivers are more than a
-little bit broken. There is lots of work still on-going in that area
-and it's improving day by day; however, it's not ready to be enabled
-by default just yet.
+Changes since v2:
+ - Fix typo in commit log
+ - Put all OPPs in dts and disable 1.2 GHz one for Si revs that do not
+   support it in kernel.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/configs/u8500_defconfig |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Shawn Guo (2):
+  cpufreq: add imx6q-cpufreq driver
+  ARM: imx: enable imx6q-cpufreq support
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 231dca6..426270f 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -66,9 +66,9 @@ CONFIG_SPI=y
- CONFIG_SPI_PL022=y
- CONFIG_GPIO_STMPE=y
- CONFIG_GPIO_TC3589X=y
--CONFIG_POWER_SUPPLY=y
--CONFIG_AB8500_BM=y
--CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL=y
-+# CONFIG_POWER_SUPPLY is not set
-+# CONFIG_AB8500_BM is not set
-+# CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL is not set
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_MFD_STMPE=y
+ arch/arm/boot/dts/imx6q.dtsi    |   20 ++-
+ arch/arm/mach-imx/mach-imx6q.c  |   65 +++++++++
+ drivers/cpufreq/Kconfig.arm     |    9 ++
+ drivers/cpufreq/Makefile        |    1 +
+ drivers/cpufreq/imx6q-cpufreq.c |  296 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 385 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/cpufreq/imx6q-cpufreq.c
+
 -- 
 1.7.9.5
