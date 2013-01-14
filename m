@@ -1,35 +1,28 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 13 Jan 2013 22:42:59 +0100
-Subject: [PATCH v2] mmc: mvsdio: Replace IS_ERR_OR_NULL() with IS_ERR()
-In-Reply-To: <20130113204348.GR13433@titan.lakedaemon.net>
-References: <20130111004323.GA12257@schnuecks.de>
- <1357889273-11553-1-git-send-email-andrew@lunn.ch>
- <20130113204348.GR13433@titan.lakedaemon.net>
-Message-ID: <20130113214259.GE17242@lunn.ch>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 14 Jan 2013 08:37:04 +0800
+Subject: [PATCH] ARM: imx: imxfb: fix imxfb_info configuration order
+In-Reply-To: <1358092603-13480-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1358092603-13480-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+ <1358092603-13480-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20130114003702.GA24575@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 13, 2013 at 03:43:48PM -0500, Jason Cooper wrote:
-> On Fri, Jan 11, 2013 at 08:27:52AM +0100, Andrew Lunn wrote:
-> > A NULL is a valid clk cookie, so we should not be tested with
-> > IS_ERR_OR_NULL(). Replace it with IS_ERR().
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> > 
-> > This patch depends on Thomas Petazzoni DT patches for mvsdio, which changed
-> > the order of resource allocation etc.
+On Sun, Jan 13, 2013 at 04:56:43PM +0100, Gwenhael Goavec-Merou wrote:
+> From: Gwenhael Goavec-Merou <gwe@trabucayre.com>
 > 
-> grrr, I'm seeing fixes depending on features :(  Any way to avoid that?
+> The devtype field for fbi (struct imxfb_info) must be set after memset call to
+> avoid some wrong behaviour (pixel size).
 > 
-> In light of Russell's comments, shall I wait for a v3?  All of Thomas'
-> mvsdio work is now waiting on this.  I'd like to get that in as early as
-> possible.
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 
-Well, im guessing doing the fixes first will require changes to Thomas
-features. 
+Gwenhael,
 
-Did you try putting Russells patch in first? How bad are the
-conflicts?
+Thanks for fixing the problems left from patch e69dc9a (video: imxfb:
+remove cpu_is_xxx by using platform_device_id).
 
-	Andrew
+Considering the absence of FB maintainer, I will send both patches
+through arm-soc tree for -rc.  But since it's still a FB patch,
+I changed the patch prefix to "video: imxfb: ...".
+
+Shawn
