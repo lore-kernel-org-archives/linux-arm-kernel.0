@@ -1,57 +1,83 @@
-From: sivaramn@nvidia.com (Sivaram Nair)
-Date: Mon, 14 Jan 2013 09:28:55 +0200
-Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
-In-Reply-To: <1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
-References: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com>
- <1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <20130114072855.GB17884@sivaramn-lnx>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 14 Jan 2013 15:34:28 +0800
+Subject: [v4 PATCH 03/12] spi/atmel_spi: status information passed through
+ controller data
+In-Reply-To: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
+References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1358148877-18679-4-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 08:46:20AM +0100, Prashant Gaikwad wrote:
-> +static int _program_pll(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
-> +                       unsigned long rate)
-> +{
-> +       struct tegra_clk_pll *pll = to_clk_pll(hw);
-> +       unsigned long flags = 0;
-> +       u32 divp, val, old_base;
-> +       int state;
-> +
-> +       divp = __ffs(cfg->p);
-> +
-> +       if (pll->flags & TEGRA_PLLU)
-> +               divp ^= 1;
-> +
-> +       if (pll->lock)
-> +               spin_lock_irqsave(pll->lock, flags);
-> +
-> +       old_base = val = pll_readl_base(pll);
-> +       val &= ~((divm_mask(pll) << pll->divm_shift) |
-> +                (divn_mask(pll) << pll->divn_shift) |
-> +                (divp_mask(pll) << pll->divp_shift));
-> +       val |= ((cfg->m << pll->divm_shift) |
-> +               (cfg->n << pll->divn_shift) |
-> +               (divp << pll->divp_shift));
-> +       if (val == old_base) {
-> +               if (pll->lock)
-> +                       spin_unlock_irqrestore(pll->lock, flags);
-> +               return 0;
-> +       }
-> +
-> +       state = clk_pll_is_enabled(hw);
-> +
-> +       if (state) {
-> +               if (pll->lock)
-> +                       spin_unlock_irqrestore(pll->lock, flags);
-> +
-> +               clk_pll_disable(hw);
-> +               val &= ~(PLL_BASE_BYPASS | PLL_BASE_ENABLE);
-> +
-> +               if (pll->lock)
-> +                       spin_lock_irqsave(pll->lock, flags);
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Instead of doing spin_unlock, disable and spin_lock, can't we use
-_clk_pll_disable here, without the locks?
+The status of transfer is stored in controller data structure
+so that it can be used not only by atmel_spi_msg_done() function.
+This will be useful for upcoming dmaengine enabled driver.
 
-regards,
-Sivaram
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: grant.likely at secretlab.ca
+Cc: spi-devel-general at lists.sourceforge.net
+---
+ drivers/spi/spi-atmel.c |   13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 9782206..687075e 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -202,6 +202,7 @@ struct atmel_spi {
+ 	unsigned long		current_remaining_bytes;
+ 	struct spi_transfer	*next_transfer;
+ 	unsigned long		next_remaining_bytes;
++	int			done_status;
+ 
+ 	void			*buffer;
+ 	dma_addr_t		buffer_dma;
+@@ -545,15 +546,15 @@ static void atmel_spi_dma_unmap_xfer(struct spi_master *master,
+ 
+ static void
+ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
+-		struct spi_message *msg, int status, int stay)
++		struct spi_message *msg, int stay)
+ {
+-	if (!stay || status < 0)
++	if (!stay || as->done_status < 0)
+ 		cs_deactivate(as, msg->spi);
+ 	else
+ 		as->stay = msg->spi;
+ 
+ 	list_del(&msg->queue);
+-	msg->status = status;
++	msg->status = as->done_status;
+ 
+ 	dev_dbg(master->dev.parent,
+ 		"xfer complete: %u bytes transferred\n",
+@@ -565,6 +566,7 @@ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
+ 
+ 	as->current_transfer = NULL;
+ 	as->next_transfer = NULL;
++	as->done_status = 0;
+ 
+ 	/* continue if needed */
+ 	if (list_empty(&as->queue) || as->stopping)
+@@ -642,7 +644,8 @@ atmel_spi_interrupt(int irq, void *dev_id)
+ 		/* Clear any overrun happening while cleaning up */
+ 		spi_readl(as, SR);
+ 
+-		atmel_spi_msg_done(master, as, msg, -EIO, 0);
++		as->done_status = -EIO;
++		atmel_spi_msg_done(master, as, msg, 0);
+ 	} else if (pending & (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX))) {
+ 		ret = IRQ_HANDLED;
+ 
+@@ -660,7 +663,7 @@ atmel_spi_interrupt(int irq, void *dev_id)
+ 
+ 			if (atmel_spi_xfer_is_last(msg, xfer)) {
+ 				/* report completed message */
+-				atmel_spi_msg_done(master, as, msg, 0,
++				atmel_spi_msg_done(master, as, msg,
+ 						xfer->cs_change);
+ 			} else {
+ 				if (xfer->cs_change) {
+-- 
+1.7.9.5
