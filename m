@@ -1,108 +1,49 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 14 Jan 2013 13:06:00 +0200
-Subject: [PATCH v3 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
- platform_device_id
-In-Reply-To: <50F3E5E8.2000905@pengutronix.de>
-References: <1358158361-25550-1-git-send-email-peter.chen@freescale.com>
- <1358158361-25550-2-git-send-email-peter.chen@freescale.com>
- <20130114101642.GB10874@arwen.pp.htv.fi>
- <50F3DB8D.6050104@pengutronix.de>
- <20130114102444.GD10874@arwen.pp.htv.fi>
- <50F3DF1D.3040706@pengutronix.de>
- <20130114103952.GF10874@arwen.pp.htv.fi>
- <50F3E301.7040509@pengutronix.de>
- <20130114105357.GH10874@arwen.pp.htv.fi>
- <50F3E5E8.2000905@pengutronix.de>
-Message-ID: <20130114110600.GI10874@arwen.pp.htv.fi>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 14 Jan 2013 12:06:31 +0100 (CET)
+Subject: [PATCHv2 1/4] clockevents: Add generic timer broadcast
+ receiver
+In-Reply-To: <1357742770-15028-2-git-send-email-mark.rutland@arm.com>
+References: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
+ <1357742770-15028-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <alpine.LFD.2.02.1301141204421.7475@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 12:03:04PM +0100, Marc Kleine-Budde wrote:
-> On 01/14/2013 11:53 AM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Mon, Jan 14, 2013 at 11:50:41AM +0100, Marc Kleine-Budde wrote:
-> >> On 01/14/2013 11:39 AM, Felipe Balbi wrote:
-> >>> On Mon, Jan 14, 2013 at 11:34:05AM +0100, Marc Kleine-Budde wrote:
-> >>>> On 01/14/2013 11:24 AM, Felipe Balbi wrote:
-> >>>>> On Mon, Jan 14, 2013 at 11:18:53AM +0100, Marc Kleine-Budde wrote:
-> >>>>>> On 01/14/2013 11:16 AM, Felipe Balbi wrote:
-> >>>>>>> Hi,
-> >>>>>>>
-> >>>>>>> On Mon, Jan 14, 2013 at 06:12:39PM +0800, Peter Chen wrote:
-> >>>>>>>> @@ -2756,22 +2753,41 @@ static int fsl_udc_otg_resume(struct device *dev)
-> >>>>>>>>  
-> >>>>>>>>  	return fsl_udc_resume(NULL);
-> >>>>>>>>  }
-> >>>>>>>> -
-> >>>>>>>>  /*-------------------------------------------------------------------------
-> >>>>>>>>  	Register entry point for the peripheral controller driver
-> >>>>>>>>  --------------------------------------------------------------------------*/
-> >>>>>>>> -
-> >>>>>>>> +static const struct platform_device_id fsl_udc_devtype[] = {
-> >>>>>>>> +	{
-> >>>>>>>> +		.name = "imx-udc-mx25",
-> >>>>>>>> +		.driver_data = IMX25_UDC,
-> >>>>>>>> +	}, {
-> >>>>>>>> +		.name = "imx-udc-mx27",
-> >>>>>>>> +		.driver_data = IMX27_UDC,
-> >>>>>>>> +	}, {
-> >>>>>>>> +		.name = "imx-udc-mx31",
-> >>>>>>>> +		.driver_data = IMX31_UDC,
-> >>>>>>>> +	}, {
-> >>>>>>>> +		.name = "imx-udc-mx35",
-> >>>>>>>> +		.driver_data = IMX35_UDC,
-> >>>>>>>> +	}, {
-> >>>>>>>> +		.name = "imx-udc-mx51",
-> >>>>>>>> +		.driver_data = IMX51_UDC,
-> >>>>>>>> +	}
-> >>>>>>>> +};
-> >>>>>>>
-> >>>>>>> I wonder if your driver-data is actually needed since you can use string
-> >>>>>>> comparisson to achieve the exact same outcome.
-> >>>>>>
-> >>>>>> Why use a string compare, if the kernel infrastructure already does this
-> >>>>>> for you?
-> >>>>>
-> >>>>> what do you mean ? What kernel infrastructure is doing waht for me ?
-> >>>>
-> >>>> The kernel infrastructure is doing the string compare for you to match
-> >>>> the device against the driver (via platform_device_id->name). You get
-> >>>> the a pointer to the driver_data for free. So you don't need any string
-> >>>> compare in the driver later.
-> >>>
-> >>> but current driver data is just duplicating name with an integer, it's
-> >>> pretty useless driver data.
-> >>
-> >> I don't think so - another argument:
-> >> Less code. As struct platform_device_id is a static array the space is
-> >> allocated anyway. So it doesn't make any difference if driver_data is
-> >> NULL or not. Later you just need to make an integer comparison instead
-> >> of a call to a strcmp(), if you have a switch/case and IMX*_UDC is an
-> >> enum, the compiler will warn you if you've missed an IMX variant.
-> > 
-> > fair enough, but then don't create a different enum value for each imx
-> > instance if they're mostly the same. Differentiate only what's actually
-> > different.
-> 
-> Usually there isn't any Changelog between IP cores used in the different
-> fsl processors (at least available outside of fsl), that makes it quite
-> difficult to say if something found on one imx is really the same as on
-> the other one. And they (usually) don't provide any versioning
-> information in a register or the documentation.
-> 
-> just my 2?
+On Wed, 9 Jan 2013, Mark Rutland wrote:
+> +#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+> +extern int tick_receive_broadcast(void);
+> +#else
+> +static inline int tick_receive_broadcast(void)
+> +{
+> +	return 0;
+> +}
 
-$SUBJECT is trying to differentiate a single feature (or maybe two) to
-replace cpu_is_xxx(), then expose that on driver_data without creating
-one enum value for each release from fsl.
+What's the inline function for? If an arch does not have broadcasting
+support it should not have a receive broadcast function call either.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130114/ade53040/attachment.sig>
+> +#endif
+> +
+>  #ifdef CONFIG_GENERIC_CLOCKEVENTS
+>  extern void clockevents_notify(unsigned long reason, void *arg);
+>  #else
+> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+> index f113755..5079bb7 100644
+> --- a/kernel/time/tick-broadcast.c
+> +++ b/kernel/time/tick-broadcast.c
+> @@ -125,6 +125,18 @@ int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu)
+>  	return ret;
+>  }
+>  
+> +int tick_receive_broadcast(void)
+> +{
+> +	struct tick_device *td = this_cpu_ptr(&tick_cpu_device);
+> +	struct clock_event_device *evt = td->evtdev;
+> +
+> +	if (!evt)
+> +		return -ENODEV;
+
+Is anything going to use the return value?
+
+Thanks,
+
+	tglx
