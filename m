@@ -1,31 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Jan 2013 09:20:07 +0000
-Subject: [PATCH 3/4] serial: vt8500: UART uses gated clock rather than
- 24Mhz reference
-In-Reply-To: <1358129060-9399-4-git-send-email-linux@prisktech.co.nz>
-References: <1358129060-9399-1-git-send-email-linux@prisktech.co.nz>
- <1358129060-9399-4-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130114092007.GW23505@n2100.arm.linux.org.uk>
+Date: Mon, 14 Jan 2013 09:27:20 +0000
+Subject: [PATCH 2/2] ARM: tegra: Use DT /cpu node to detect number of
+ CPU core
+In-Reply-To: <1358149970-28156-2-git-send-email-hdoyu@nvidia.com>
+References: <1358149970-28156-1-git-send-email-hdoyu@nvidia.com>
+ <1358149970-28156-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20130114092720.GX23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 03:04:18PM +1300, Tony Prisk wrote:
-> -	if (vt8500_port->clk) {
-> -		vt8500_port->uart.uartclk = clk_get_rate(vt8500_port->clk);
-> -	} else {
-> -		/* use the default of 24Mhz if not specified and warn */
-> -		pr_warn("%s: serial clock source not specified\n", __func__);
-> -		vt8500_port->uart.uartclk = 24000000;
-> +	if (IS_ERR(vt8500_port->clk)) {
-> +		dev_err(&pdev->dev, "failed to get clock\n");
-> +		ret = -EINVAL;
-> +		goto err;
-> +	}
-> +
-> +	ret = clk_prepare_enable(vt8500_port->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to enable clock\n");
-> +		goto err;
+On Mon, Jan 14, 2013 at 09:52:50AM +0200, Hiroshi Doyu wrote:
+> +	if (!arm_dt_cpu_map_valid())
+> +		set_cpu_possible(0, true);
 
-Looks like you get rid of the initialization of vt8500_port->uart.uartclk
-here.  Was that intentional?
+You don't need to do any of this (and, therefore, I don't think you even
+need the first patch.)
+
+The generic boot code will set CPU0 as possible, present and online.  Think
+about it: you're booting on that very CPU so it better be possible, present
+and online.  If it isn't, what CPU is executing your code?
+
+arm_dt_init_cpu_maps() will only ever set _additional_ CPUs in the possible
+map.
+
+Ergo, by the time the above code is run, CPU0 will already be marked as
+possible.  Therefore, the above code and arm_dt_cpu_map_valid() is not
+required.
