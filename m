@@ -1,103 +1,44 @@
-From: achin.gupta@arm.com (Achin Gupta)
-Date: Mon, 14 Jan 2013 18:05:10 +0000
-Subject: [PATCH 06/16] ARM: b.L: generic SMP secondary bringup and hotplug
- support
-In-Reply-To: <50F053BF.8090302@ti.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-7-git-send-email-nicolas.pitre@linaro.org>
- <50F053BF.8090302@ti.com>
-Message-ID: <CAMpgmWCxQMoncnMqy_bzB+mBU7eGO_L4fR+Q5uMaxdFn4mL5PA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Jan 2013 10:06:02 -0800
+Subject: [PATCH v8 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC
+ timings and NAND
+In-Reply-To: <CALF0-+UbqFF17X1Ok1s1AGKg6SBmvMc1mvjVuZb=Ej7xo+qcmA@mail.gmail.com>
+References: <1355481404-27695-1-git-send-email-zonque@gmail.com>
+ <1355481404-27695-6-git-send-email-zonque@gmail.com>
+ <CALF0-+UbqFF17X1Ok1s1AGKg6SBmvMc1mvjVuZb=Ej7xo+qcmA@mail.gmail.com>
+Message-ID: <20130114180602.GV14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+* Ezequiel Garcia <elezegarcia@gmail.com> [121223 13:49]:
+> On Fri, Dec 14, 2012 at 7:36 AM, Daniel Mack <zonque@gmail.com> wrote:
+> > +
+> > +Example for an AM33xx board:
+> > +
+> > +       gpmc: gpmc at 50000000 {
+> > +               compatible = "ti,am3352-gpmc";
+> > +               ti,hwmods = "gpmc";
+> > +               reg = <0x50000000 0x1000000>;
+> > +               interrupts = <100>;
+> > +               gpmc,num-cs = <8>;
+> > +               gpmc,num-waitpins = <2>;
+> > +               #address-cells = <2>;
+> > +               #size-cells = <1>;
+> > +               ranges = <0 0 0x08000000 0x2000>;       /* CS0: NAND */
+> > +
+> > +               nand at 0,0 {
+> > +                       reg = <0 0 0>; /* CS0, offset 0 */
+> 
+> I'm a bit confused by this: what are the other two values in "reg"?
+> I see you've only added a binding for CS.
+> 
+> I've extended a bit on your work and added a binding to enable OneNAND
+> device on my IGEP board.
+> 
+> I might send some patches in case anyone wants to give it a try.
 
-On Fri, Jan 11, 2013 at 6:02 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
->>
->> Now that the b.L power API is in place, we can use it for SMP secondary
->> bringup and CPU hotplug in a generic fashion.
->>
->> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->> ---
->>   arch/arm/common/Makefile     |  2 +-
->>   arch/arm/common/bL_platsmp.c | 79
->> ++++++++++++++++++++++++++++++++++++++++++++
->>   2 files changed, 80 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm/common/bL_platsmp.c
->>
->> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
->> index 894c2ddf9b..59b36db7cc 100644
->> --- a/arch/arm/common/Makefile
->> +++ b/arch/arm/common/Makefile
->> @@ -15,4 +15,4 @@ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
->>   obj-$(CONFIG_ARM_TIMER_SP804) += timer-sp.o
->>   obj-$(CONFIG_FIQ_GLUE)                += fiq_glue.o fiq_glue_setup.o
->>   obj-$(CONFIG_FIQ_DEBUGGER)    += fiq_debugger.o
->> -obj-$(CONFIG_BIG_LITTLE)       += bL_head.o bL_entry.o vlock.o
->> +obj-$(CONFIG_BIG_LITTLE)       += bL_head.o bL_entry.o bL_platsmp.o
->> vlock.o
->> diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
->> new file mode 100644
->> index 0000000000..0acb9f4685
->> --- /dev/null
->> +++ b/arch/arm/common/bL_platsmp.c
->> @@ -0,0 +1,79 @@
->> +/*
->> + * linux/arch/arm/mach-vexpress/bL_platsmp.c
->> + *
->> + * Created by:  Nicolas Pitre, November 2012
->> + * Copyright:   (C) 2012  Linaro Limited
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * Code to handle secondary CPU bringup and hotplug for the bL power API.
->> + */
->> +
->> +#include <linux/init.h>
->> +#include <linux/smp.h>
->> +
->> +#include <asm/bL_entry.h>
->> +#include <asm/smp_plat.h>
->> +#include <asm/hardware/gic.h>
->> +
->> +static void __init simple_smp_init_cpus(void)
->> +{
->> +       set_smp_cross_call(gic_raise_softirq);
->> +}
->> +
->> +static int __cpuinit bL_boot_secondary(unsigned int cpu, struct
->> task_struct *idle)
->> +{
->> +       unsigned int pcpu, pcluster, ret;
->> +       extern void secondary_startup(void);
->> +
->> +       pcpu = cpu_logical_map(cpu) & 0xff;
->> +       pcluster = (cpu_logical_map(cpu) >> 8) & 0xff;
->> +       pr_debug("%s: logical CPU %d is physical CPU %d cluster %d\n",
->> +                __func__, cpu, pcpu, pcluster);
->> +
->> +       bL_set_entry_vector(pcpu, pcluster, NULL);
->> +       ret = bL_cpu_power_up(pcpu, pcluster);
->> +       if (ret)
->> +               return ret;
->> +       bL_set_entry_vector(pcpu, pcluster, secondary_startup);
->> +       gic_raise_softirq(cpumask_of(cpu), 0);
->> +       sev();
->
-> softirq() should be enough to break a CPU if it is in standby with
-> wfe state. Is that additional sev() needed here ?
+Daniel, should this be updated to just pass the CS?
 
-Not if the target cpu has its I & F bits disabled and that would be the
-case with a secondary waiting to be woken up
+Regards,
 
-thanks,
-Achin
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Tony
