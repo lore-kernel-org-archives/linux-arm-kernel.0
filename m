@@ -1,147 +1,103 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 14 Jan 2013 17:59:12 +0000 (UTC)
-Subject: OMAP baseline test results for v3.8-rc3
-Message-ID: <alpine.DEB.2.00.1301141756460.20390@utopia.booyaka.com>
+From: achin.gupta@arm.com (Achin Gupta)
+Date: Mon, 14 Jan 2013 18:05:10 +0000
+Subject: [PATCH 06/16] ARM: b.L: generic SMP secondary bringup and hotplug
+ support
+In-Reply-To: <50F053BF.8090302@ti.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-7-git-send-email-nicolas.pitre@linaro.org>
+ <50F053BF.8090302@ti.com>
+Message-ID: <CAMpgmWCxQMoncnMqy_bzB+mBU7eGO_L4fR+Q5uMaxdFn4mL5PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Santosh,
 
-Here are some basic OMAP test results for Linux v3.8-rc3.
-Logs and other details at:
+On Fri, Jan 11, 2013 at 6:02 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
+>>
+>> Now that the b.L power API is in place, we can use it for SMP secondary
+>> bringup and CPU hotplug in a generic fashion.
+>>
+>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+>> ---
+>>   arch/arm/common/Makefile     |  2 +-
+>>   arch/arm/common/bL_platsmp.c | 79
+>> ++++++++++++++++++++++++++++++++++++++++++++
+>>   2 files changed, 80 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm/common/bL_platsmp.c
+>>
+>> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+>> index 894c2ddf9b..59b36db7cc 100644
+>> --- a/arch/arm/common/Makefile
+>> +++ b/arch/arm/common/Makefile
+>> @@ -15,4 +15,4 @@ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+>>   obj-$(CONFIG_ARM_TIMER_SP804) += timer-sp.o
+>>   obj-$(CONFIG_FIQ_GLUE)                += fiq_glue.o fiq_glue_setup.o
+>>   obj-$(CONFIG_FIQ_DEBUGGER)    += fiq_debugger.o
+>> -obj-$(CONFIG_BIG_LITTLE)       += bL_head.o bL_entry.o vlock.o
+>> +obj-$(CONFIG_BIG_LITTLE)       += bL_head.o bL_entry.o bL_platsmp.o
+>> vlock.o
+>> diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
+>> new file mode 100644
+>> index 0000000000..0acb9f4685
+>> --- /dev/null
+>> +++ b/arch/arm/common/bL_platsmp.c
+>> @@ -0,0 +1,79 @@
+>> +/*
+>> + * linux/arch/arm/mach-vexpress/bL_platsmp.c
+>> + *
+>> + * Created by:  Nicolas Pitre, November 2012
+>> + * Copyright:   (C) 2012  Linaro Limited
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * Code to handle secondary CPU bringup and hotplug for the bL power API.
+>> + */
+>> +
+>> +#include <linux/init.h>
+>> +#include <linux/smp.h>
+>> +
+>> +#include <asm/bL_entry.h>
+>> +#include <asm/smp_plat.h>
+>> +#include <asm/hardware/gic.h>
+>> +
+>> +static void __init simple_smp_init_cpus(void)
+>> +{
+>> +       set_smp_cross_call(gic_raise_softirq);
+>> +}
+>> +
+>> +static int __cpuinit bL_boot_secondary(unsigned int cpu, struct
+>> task_struct *idle)
+>> +{
+>> +       unsigned int pcpu, pcluster, ret;
+>> +       extern void secondary_startup(void);
+>> +
+>> +       pcpu = cpu_logical_map(cpu) & 0xff;
+>> +       pcluster = (cpu_logical_map(cpu) >> 8) & 0xff;
+>> +       pr_debug("%s: logical CPU %d is physical CPU %d cluster %d\n",
+>> +                __func__, cpu, pcpu, pcluster);
+>> +
+>> +       bL_set_entry_vector(pcpu, pcluster, NULL);
+>> +       ret = bL_cpu_power_up(pcpu, pcluster);
+>> +       if (ret)
+>> +               return ret;
+>> +       bL_set_entry_vector(pcpu, pcluster, secondary_startup);
+>> +       gic_raise_softirq(cpumask_of(cpu), 0);
+>> +       sev();
+>
+> softirq() should be enough to break a CPU if it is in standby with
+> wfe state. Is that additional sev() needed here ?
 
-    http://www.pwsan.com/omap/testlogs/test_v3.8-rc3/20130109222058/
+Not if the target cpu has its I & F bits disabled and that would be the
+case with a secondary waiting to be woken up
 
+thanks,
+Achin
 
-Test summary
-------------
-
-Boot to userspace:
-    Pass ( 9/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
-  	   	  3730beaglexm, 37xxevm, 4430es2panda, 5912osk,
-		  4460pandaes
-    FAIL ( 2/11): am335xbone, cmt3517 
-  
-PM ret/off, suspend + dynamic idle:
-    Pass (3/3): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM ret, suspend + dynamic idle:
-    Pass (1/2): 4460pandaes
-    FAIL (1/2): 4430es2panda
-
-PM ret, dynamic idle:
-    FAIL (1/1): 2430sdp
-
-
-Failing tests: fixed by posted patches
---------------------------------------
-
-Other:
-
-* 2420N800: powers down 30 seconds after boot
-  - Presumably due to missing CBUS patches for watchdog control
-  - http://lkml.org/lkml/2012/9/3/265
-  - http://marc.info/?l=linux-omap&m=135274739624125&w=2
-  - http://marc.info/?l=linux-omap&m=135664195831104&w=2
-
-
-Failing tests: needing investigation
-------------------------------------
-
-Build tests:
-
-* rmk_3430_ldp_allnoconfig, rmk_4430_sdp_allnoconfig: twl4030 build failures
-  - in drivers/mfd/twl-core.c
-
-Boot tests:
-
-* am335xbone: hangs after "Starting kernel"
-  - Cause unknown
-  - http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82297.html
-
-* 3517EVM & CM-T3517: boot hangs with NFS root
-  - Likely some Kconfig, board file, and PM issues with EMAC
-  - Longstanding bug
-
-* CM-T3517: boot hangs with MMC root
-  - Due to missing MMC setup in board file
-  - http://www.spinics.net/lists/arm-kernel/msg211471.html
-
-Boot warnings:
-
-* 3530es3beagle, 3730beaglexm, 37xxevm: nand_scan_ident() warning
-  - "at drivers/mtd/nand/nand_base.c:2861 nand_scan_ident+0xdb4/0xf90()"
-  - http://marc.info/?l=linux-omap&m=135630897110185&w=2
-
-* CM-T3517: L3 in-band error with IPSS during boot
-  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
-  - Longstanding issue; does not occur on the 3517EVM
-
-PM tests:
-
-* 2430sdp: pwrdm state mismatch(dsp_pwrdm) 0 != 3
-  - need to doublecheck wakeup dependencies
-
-* 2430sdp: power domains not entering retention
-  - Cause unknown
-
-* 4430es2panda, 4460pandaes: pwrdm state mismatch on CAM, DSS, ABE
-
-* 4460pandaes: pwrdm state mismatch on IVAHD, TESLA 
-
-* 4430es2panda: CORE, TESLA, IVAHD, L3INIT didn't enter target state
-  - Probably due to lack of reset code for M3, DSP, SL2IF, FSUSB
-    per discussion with Tero Kristo
-  - Likely dependent on the bootloader version
-    - fails with 2012.07-00136-g755de79
-
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock gate ("debug ignore_loglevel")
-  - Cause unknown
-  - Not yet part of the automated test suite
-  - Re-tested at v3.7; still failing:
-    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
-
-Other:
-
-* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
-  - Unknown cause; could be due to the lack of hierarchical enable/disable
-    in hwmod code
-  - Jon Hunter reports this does not appear with the same X-loader/bootloader
-    on his 4430ES2.3 Panda, so could be ES-level dependent
-
-
-Failing tests: needing local investigation (may be due to testbed issues)
--------------------------------------------------------------------------
-
-Boot tests:
-
-* AM335x Beaglebone: omap2plus_defconfig kernels don't boot
-  - May be fixed now, pending retest:
-    - http://marc.info/?l=linux-omap&m=135082257727502&w=2
-  - Not yet part of the automated test suite
-  - Nishanth Menon & Vaibhav Hiremath report that it works for them
-  * May be due to an old U-boot with FDT support problems used here?
-    Pending local investigation and re-test
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.8-rc2 (d1c3ed669a2d452cacfb48c2d171a1f364dae2ed)):
-   text     data      bss    total  kernel
-   +216       +8        0     +224  am33xx_only
-   +256        0        0     +256  n800_multi_omap2xxx
-   +256        0        0     +256  n800_only_a
-    +24       +8        0      +32  omap1_defconfig
-    +28        0        0      +28  omap1_defconfig_1510innovator_only
-    +16       -8        0       +8  omap1_defconfig_5912osk_only
-   +328      +80        0     +408  omap2plus_defconfig
-   +268       +8        0     +276  omap2plus_defconfig_2430sdp_only
-   +316       -8        0     +308  omap2plus_defconfig_cpupm
-   +256      +80        0     +336  omap2plus_defconfig_no_pm
-   +136       +8        0     +144  omap2plus_defconfig_omap2_4_only
-    +16      -16        0        0  omap2plus_defconfig_omap3_4_only
-    +48      -16        0      +32  rmk_omap3430_ldp_oldconfig
-    -88       +8        0      -80  rmk_omap4430_sdp_oldconfig
-
-
-- Paul
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
