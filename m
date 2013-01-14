@@ -1,60 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Jan 2013 15:21:01 +0000
-Subject: [PATCH v5 3/4] ARM: KVM: arch_timers: Add timer world switch
-In-Reply-To: <20130108184327.46758.70599.stgit@ubuntu>
-References: <20130108184259.46758.17939.stgit@ubuntu>
- <20130108184327.46758.70599.stgit@ubuntu>
-Message-ID: <20130114152101.GD18935@mudshark.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Jan 2013 15:21:22 +0000
+Subject: Question: ARM: local timers: add num_possible_cpus() in
+ local_timer_register()
+In-Reply-To: <CAKvkGKfxT6cQF6rXmYZEL5tJbtsm0Yv4i1D_9NXQRsdbNFi2PQ@mail.gmail.com>
+References: <20130114133345.GA26701@android11.spreadtrum.com>
+ <50F413EA.5010403@arm.com>
+ <CAKvkGKfxT6cQF6rXmYZEL5tJbtsm0Yv4i1D_9NXQRsdbNFi2PQ@mail.gmail.com>
+Message-ID: <50F42272.3010804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 06:43:27PM +0000, Christoffer Dall wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
+On 14/01/13 14:31, steve.zhan wrote:
+> Hi,
+>     Russel, Marc,
+> 2013/1/14 Marc Zyngier <marc.zyngier@arm.com>:
+>> On 14/01/13 13:33, Steve zhan wrote:
+>>
+>> Hi Steve,
+>>
+>>>       Do you think we should add num_possible_cpus() in
+>>> local_timer_register() function, When core number is
+>>>> 1, then reutrn TRUE? Enable the local timer only if
+>>> we have more than one CPU, if the current config is
+>>> SMP and setup_max_cpus >= 1, but if smp_init_cpus in
+>>> platform code have set cpu possible value to One(that
+>>> maybe read number from scu or other hardware), then
+>>> percpu_timer_setup in smp_prepare_cpus have no chance
+>>> to be called.
+>>>
+>>>       For local timer, because local_timer_register have
+>>> return 1, that will miss global timer register.
+>>>
+>>>       Could you pls check it?
+>>
+>> I'm not sure I understand your question.
+>>
+>> We only enable the use of the SMP local timers infrastructure if we're
+>> SMP and we have more that one CPU. If you only have one CPU up and
+>> running, then you can still use your CPU local timer as a global timer.
+>>
+>> What would we gain by using the local timer infrastructure when we're
+>> not running on SMP hardware?
+>>
+>>         M.
+>> --
+>> Jazz is not dead. It just smells funny...
+>>
 > 
-> Do the necessary save/restore dance for the timers in the world
-> switch code. In the process, allow the guest to read the physical
-> counter, which is useful for its own clock_event_device.
+> For these code:
+>         err = local_timer_register(&arch_timer_ops);
+>         if (err) {
+>                 /*
+>                  * We couldn't register as a local timer (could be
+>                  * because we're on a UP platform, or because some
+>                  * other local timer is already present...). Try as a
+>                  * global timer instead.
+>                  */
+>                 arch_timer_global_evt.cpumask = cpumask_of(0);
+>                 err = arch_timer_setup(&arch_timer_global_evt);
+>         }
+> 
+> if err == 0, we have no register global arch timer,  but platform code
+> platsmp.c will set
+> cpu possible number to one, that let percpu_timer_setup in
+> smp_prepare_cpus have no
+> chance to call becaue ncores = num_possible_cpus() is one.
+> Is this right?
 
-[...]
+Ah, I get it now. Yes, this is a problem. Mark Rutland's patch series
+actually fixes this issue entirely though. You may want to check it out.
 
-> @@ -476,6 +513,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->   * for the host.
->   *
->   * Assumes vcpu pointer in vcpu reg
-> + * Clobbers r2-r4
->   */
->  .macro restore_timer_state
->  	@ Disallow physical timer access for the guest
-> @@ -484,6 +522,30 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	orr	r2, r2, #CNTHCTL_PL1PCTEN
->  	bic	r2, r2, #CNTHCTL_PL1PCEN
->  	mcr	p15, 4, r2, c14, c1, 0	@ CNTHCTL
-> +
-> +#ifdef CONFIG_KVM_ARM_TIMER
-> +	ldr	r4, [vcpu, #VCPU_KVM]
-> +	ldr	r2, [r4, #KVM_TIMER_ENABLED]
-> +	cmp	r2, #0
-> +	beq	1f
-> +
-> +	ldr	r2, [r4, #KVM_TIMER_CNTVOFF]
-> +	ldr	r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
-> +	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
-> +	isb
-> +
-> +	ldr	r4, =VCPU_TIMER_CNTV_CVAL
-> +	add	vcpu, vcpu, r4
-> +	ldrd	r2, r3, [vcpu]
-> +	sub	vcpu, vcpu, r4
-> +	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
-> +
-> +	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
-> +	and	r2, r2, #3
-> +	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
-> +	isb
-
-How many of these isbs are actually needed, given that we're going to make
-an exception return to the guest? The last one certainly looks redundant and
-I can't see the need for ordering CNTVOFF vs CNTV_CVAL. I can see an
-argument to putting one *before* CNTV_CTL, but you don't have one there!
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
