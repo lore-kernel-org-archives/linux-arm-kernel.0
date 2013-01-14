@@ -1,122 +1,55 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 14 Jan 2013 16:47:57 +0100 (CET)
-Subject: [PATCH v2 2/3] mmc: remove unncessary mmc_gpio_free_cd() call
- from slot-gpio users
-In-Reply-To: <1355236340-21304-3-git-send-email-shawn.guo@linaro.org>
-References: <1355236340-21304-1-git-send-email-shawn.guo@linaro.org>
- <1355236340-21304-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <Pine.LNX.4.64.1301141647300.1303@axis700.grange>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 Jan 2013 16:00:51 +0000
+Subject: [PATCH v5 00/14] KVM/ARM Implementation
+In-Reply-To: <20130108183811.46302.58543.stgit@ubuntu>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+Message-ID: <20130114160051.GH18935@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Dec 2012, Shawn Guo wrote:
+Hi Christoffer,
 
-> Since slot-gpio uses devm_* managed functions in mmc_gpio_request_cd()
-> now, we can remove those mmc_gpio_free_cd() call from host drivers'
-> .probe() error path and .remove().
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On Tue, Jan 08, 2013 at 06:38:34PM +0000, Christoffer Dall wrote:
+> The following series implements KVM support for ARM processors,
+> specifically on the Cortex-A15 platform.
 
-(for mmcif and tmio)
+[...]
 
-Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+This is looking pretty good to me now and I feel that the longer it stays
+out-of-tree, the more issues will creep in (without continual effort from
+yourself and others). I've sent some minor comments (mainly vgic-related)
+so, if you fix those, then you can add:
 
-Thanks
-Guennadi
+  Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-> ---
->  drivers/mmc/host/sdhci-pxav3.c  |    5 -----
->  drivers/mmc/host/sh_mmcif.c     |    6 ------
->  drivers/mmc/host/tmio_mmc_pio.c |    8 --------
->  3 files changed, 19 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> index fad0966..b7ee776 100644
-> --- a/drivers/mmc/host/sdhci-pxav3.c
-> +++ b/drivers/mmc/host/sdhci-pxav3.c
-> @@ -316,7 +316,6 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->  err_add_host:
->  	clk_disable_unprepare(clk);
->  	clk_put(clk);
-> -	mmc_gpio_free_cd(host->mmc);
->  err_cd_req:
->  err_clk_get:
->  	sdhci_pltfm_free(pdev);
-> @@ -329,16 +328,12 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
->  	struct sdhci_host *host = platform_get_drvdata(pdev);
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->  	struct sdhci_pxa *pxa = pltfm_host->priv;
-> -	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
->  
->  	sdhci_remove_host(host, 1);
->  
->  	clk_disable_unprepare(pltfm_host->clk);
->  	clk_put(pltfm_host->clk);
->  
-> -	if (gpio_is_valid(pdata->ext_cd_gpio))
-> -		mmc_gpio_free_cd(host->mmc);
-> -
->  	sdhci_pltfm_free(pdev);
->  	kfree(pxa);
->  
-> diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
-> index 9b8efac..2f229e0 100644
-> --- a/drivers/mmc/host/sh_mmcif.c
-> +++ b/drivers/mmc/host/sh_mmcif.c
-> @@ -1410,8 +1410,6 @@ static int sh_mmcif_probe(struct platform_device *pdev)
->  	return ret;
->  
->  emmcaddh:
-> -	if (pd && pd->use_cd_gpio)
-> -		mmc_gpio_free_cd(mmc);
->  erqcd:
->  	free_irq(irq[1], host);
->  ereqirq1:
-> @@ -1433,7 +1431,6 @@ ealloch:
->  static int sh_mmcif_remove(struct platform_device *pdev)
->  {
->  	struct sh_mmcif_host *host = platform_get_drvdata(pdev);
-> -	struct sh_mmcif_plat_data *pd = pdev->dev.platform_data;
->  	int irq[2];
->  
->  	host->dying = true;
-> @@ -1442,9 +1439,6 @@ static int sh_mmcif_remove(struct platform_device *pdev)
->  
->  	dev_pm_qos_hide_latency_limit(&pdev->dev);
->  
-> -	if (pd && pd->use_cd_gpio)
-> -		mmc_gpio_free_cd(host->mmc);
-> -
->  	mmc_remove_host(host->mmc);
->  	sh_mmcif_writel(host->addr, MMCIF_CE_INT_MASK, MASK_ALL);
->  
-> diff --git a/drivers/mmc/host/tmio_mmc_pio.c b/drivers/mmc/host/tmio_mmc_pio.c
-> index 50bf495..0f992e9 100644
-> --- a/drivers/mmc/host/tmio_mmc_pio.c
-> +++ b/drivers/mmc/host/tmio_mmc_pio.c
-> @@ -1060,16 +1060,8 @@ EXPORT_SYMBOL(tmio_mmc_host_probe);
->  void tmio_mmc_host_remove(struct tmio_mmc_host *host)
->  {
->  	struct platform_device *pdev = host->pdev;
-> -	struct tmio_mmc_data *pdata = host->pdata;
->  	struct mmc_host *mmc = host->mmc;
->  
-> -	if (pdata->flags & TMIO_MMC_USE_GPIO_CD)
-> -		/*
-> -		 * This means we can miss a card-eject, but this is anyway
-> -		 * possible, because of delayed processing of hotplug events.
-> -		 */
-> -		mmc_gpio_free_cd(mmc);
-> -
->  	if (!host->native_hotplug)
->  		pm_runtime_get_sync(&pdev->dev);
->  
-> -- 
-> 1.7.9.5
-> 
-> 
+for the series.
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Now, there's a lot of code here and merging isn't completely
+straightforward. I propose:
+
+  * The first series should go via Russell's tree. It depends on my
+    perf branch for the CPU type stuff, but that should go in for 3.9
+    anyway (also via Russell).
+
+  * The vGIC patches need rebasing on top of Rob Herring's work, which
+    he sent a pull for over the weekend:
+
+      http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/141488.html
+
+    In light of that, this stuff will need to go via arm-soc.
+
+  * The hyp arch-timers are in a similar situation to the vGIC: Mark Rutland
+    is moving those into drivers:
+
+      http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140560.html
+
+    so the kvm bits will need rebasing appropriately and also sent to
+    arm-soc (Mark -- I assume you intend to send a PULL for 3.9 for those
+    patches?)
+
+Obviously this is all open for discussion, but that seems like the easiest
+option to me.
+
+Cheers,
+
+Will
