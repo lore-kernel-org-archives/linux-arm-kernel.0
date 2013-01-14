@@ -1,52 +1,79 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 14 Jan 2013 20:26:51 +0000
-Subject: [PATCH] cpsw: Add support to read cpu MAC address
-In-Reply-To: <1357917302-32550-1-git-send-email-michal.bachraty@streamunlimited.com>
-References: <1357917302-32550-1-git-send-email-michal.bachraty@streamunlimited.com>
-Message-ID: <20130114202651.5360F3E249D@localhost>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Mon, 14 Jan 2013 22:46:54 +0200
+Subject: OMAP baseline test results for v3.8-rc3
+In-Reply-To: <20130114191459.GA9402@arwen.pp.htv.fi>
+References: <alpine.DEB.2.00.1301141756460.20390@utopia.booyaka.com>
+ <20130114184018.GA18224@blackmetal.musicnaut.iki.fi>
+ <20130114191459.GA9402@arwen.pp.htv.fi>
+Message-ID: <20130114204654.GB18224@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013 16:15:02 +0100, Michal Bachraty <michal.bachraty@streamunlimited.com> wrote:
-> Signed-off-by: Michal Bachraty <michal.bachraty@streamunlimited.com>
-> ---
->  Documentation/devicetree/bindings/net/cpsw.txt |   10 +-
->  arch/arm/boot/dts/am33xx.dtsi                  |    5 +-
->  drivers/net/ethernet/ti/cpsw.c                 |  121 +++++++++++++++++++++---
->  include/linux/platform_data/cpsw.h             |    8 ++
->  4 files changed, 128 insertions(+), 16 deletions(-)
+On Mon, Jan 14, 2013 at 09:14:59PM +0200, Felipe Balbi wrote:
+> On Mon, Jan 14, 2013 at 08:40:18PM +0200, Aaro Koskinen wrote:
+> > On Mon, Jan 14, 2013 at 05:59:12PM +0000, Paul Walmsley wrote:
+> > > Here are some basic OMAP test results for Linux v3.8-rc3.
+> > > Logs and other details at:
+> > > 
+> > >     http://www.pwsan.com/omap/testlogs/test_v3.8-rc3/20130109222058/
+> > > 
+> > > 
+> > > Test summary
+> > > ------------
+> > > 
+> > > Boot to userspace:
+> > >     Pass ( 9/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
+> > >   	   	  3730beaglexm, 37xxevm, 4430es2panda, 5912osk,
+> > > 		  4460pandaes
+> > >     FAIL ( 2/11): am335xbone, cmt3517 
+> > 
+> > N900 boot is unstable again, I2C issues are back.
 > 
-> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-> index dcaabe9..432122c 100644
-> --- a/Documentation/devicetree/bindings/net/cpsw.txt
-> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
-> @@ -4,7 +4,7 @@ TI SoC Ethernet Switch Controller Device Tree Bindings
->  Required properties:
->  - compatible		: Should be "ti,cpsw"
->  - reg			: physical base address and size of the cpsw
-> -			  registers map
-> +			  registers map and mac-address cpu config registers
->  - interrupts		: property with a value describing the interrupt
->  			  number
->  - interrupt-parent	: The parent interrupt controller
-> @@ -25,17 +25,23 @@ Required properties:
->  - slave_reg_ofs		: Specifies slave register offset
->  - sliver_reg_ofs	: Specifies slave sliver register offset
->  - phy_id		: Specifies slave phy id
-> -- mac-address		: Specifies slave MAC address
->  
->  Optional properties:
->  - ti,hwmods		: Must be "cpgmac0"
->  - no_bd_ram		: Must be 0 or 1
-> +- mac-address-source 	: Specifies source of MAC address ("user-defined-mac",
-> +			  "cpu-id0-mac", "cpu-id01-mac", "random-mac"). If not
-> +			  specified, "cpu-id0-mac" is selected
+> damn!
+> 
+> > Boot succeeds and fails randomly. Let's see if this can be bisected.
+> > The same kernel works on N950.
+> 
+> fair enough, it might be something related to some errata fix which
+> might have been missed. Can you apply this small patch just so I know if
+> there is something pending in CNT reg ?
 
-Drop the '-mac' suffix on the values. The property is already named
-"mac-address-source", so I think it is already unambiguious from the
-context.  :-)
+[    0.207946] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
+[    0.208129] twl 1-0048: power (irq 343) chaining IRQs 346..353
+[    0.209350] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
+[    1.218749] omap_i2c omap_i2c.1: timeout waiting for bus ready
+[    1.218811] omap_i2c omap_i2c.1: SA 0049 CON 9602 CNT 0004
+[    2.234374] omap_i2c omap_i2c.1: timeout waiting for bus ready
+[    2.234436] omap_i2c omap_i2c.1: SA 0049 CON 9602 CNT 0004
+[    2.234466] twl: Write failed (mod 2, reg 0x12 count 1)
+[    3.249999] omap_i2c omap_i2c.1: timeout waiting for bus ready
+[    3.250030] omap_i2c omap_i2c.1: SA 0049 CON 9602 CNT 0004
+[    3.250061] twl: Write failed (mod 2, reg 0x12 count 1)
 
-Otherwise the patch looks good to me, but I haven't gone over the code
-in fine detail.
+> you might also want to try merging my latest i2c patches, which missed
+> the merge window, as they might help with this issue too.
+> 
+> The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+> 
+>   Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git i2c-deferred-STP
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+I could not reproduce the issue with these. Tested around 20 boots.
+There's a noticeable delay (over 4 secs!) around where I2C is initialized
+and used for the first time, but no errors and the boot completes:
+
+[    0.187530] SCSI subsystem initialized
+[    0.188110] usbcore: registered new interface driver usbfs
+[    0.188415] usbcore: registered new interface driver hub
+[    0.188781] usbcore: registered new device driver usb
+[    0.189453] musb-omap2430 musb-omap2430: invalid resource
+[    4.296905] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
+[    4.297088] twl 1-0048: power (irq 343) chaining IRQs 346..353
+[    4.329010] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
+[    4.470123] VUSB1V5: 1500 mV normal standby
+[    4.470916] VUSB1V8: 1800 mV normal standby
+
+A.
