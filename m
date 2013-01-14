@@ -1,74 +1,97 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 14 Jan 2013 12:15:07 -0500 (EST)
-Subject: [PATCH 07/16] ARM: bL_platsmp.c: close the kernel entry gate
- before hot-unplugging a CPU
-In-Reply-To: <20130114170028.GD31341@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Jan 2013 17:15:28 +0000
+Subject: [PATCH 03/16] ARM: b.L: introduce helpers for platform
+ coherency exit/setup
+In-Reply-To: <20130114170851.GA1967@linaro.org>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-8-git-send-email-nicolas.pitre@linaro.org>
- <20130114163755.GB31341@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1301141151510.6300@xanadu.home>
- <20130114170028.GD31341@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1301141207360.6300@xanadu.home>
+ <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
+ <20130114170851.GA1967@linaro.org>
+Message-ID: <20130114171528.GF23616@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jan 2013, Will Deacon wrote:
-
-> On Mon, Jan 14, 2013 at 04:53:41PM +0000, Nicolas Pitre wrote:
-> > On Mon, 14 Jan 2013, Will Deacon wrote:
-> > 
-> > > On Thu, Jan 10, 2013 at 12:20:42AM +0000, Nicolas Pitre wrote:
-> > > > If for whatever reason a CPU is unexpectedly awaken, it shouldn't
-> > > > re-enter the kernel by using whatever entry vector that might have
-> > > > been set by a previous operation.
-> > > > 
-> > > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > > > ---
-> > > >  arch/arm/common/bL_platsmp.c | 5 +++++
-> > > >  1 file changed, 5 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
-> > > > index 0acb9f4685..0ae44123bf 100644
-> > > > --- a/arch/arm/common/bL_platsmp.c
-> > > > +++ b/arch/arm/common/bL_platsmp.c
-> > > > @@ -63,6 +63,11 @@ static int bL_cpu_disable(unsigned int cpu)
-> > > >  
-> > > >  static void __ref bL_cpu_die(unsigned int cpu)
-> > > >  {
-> > > > +	unsigned int mpidr, pcpu, pcluster;
-> > > > +	asm ("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
-> > > > +	pcpu = mpidr & 0xff;
-> > > > +	pcluster = (mpidr >> 8) & 0xff;
-> > > 
-> > > Usual comment about helper functions :)
-> > > 
-> > > > +	bL_set_entry_vector(pcpu, pcluster, NULL);
-> > > 
-> > > Similar to the power_on story, you need a barrier here (unless you change
-> > > your platform_ops API to require barriers).
-> > 
-> > The bL_set_entry_vector() includes a cache flush which itself has a DSB.  
-> > Hence my previous interrogation.
+On Mon, Jan 14, 2013 at 05:08:51PM +0000, Dave Martin wrote:
+> From b64f305c90e7ea585992df2d710f62ec6a7b5395 Mon Sep 17 00:00:00 2001
+> From: Dave Martin <dave.martin@linaro.org>
+> Date: Mon, 14 Jan 2013 16:25:47 +0000
+> Subject: [PATCH] ARM: b.L: Fix outer cache handling for coherency setup/exit helpers
 > 
-> For L1, sure, we always have the dsb for v7. However, for the outer-cache we
-> only have a dsb by virtue of a spin_unlock in l2x0.c... it seems a bit risky
-> to rely on that for ordering your entry_vector write with the power_on.
+> This patch addresses the following issues:
 > 
-> I think the best bet is to put a barrier in power_on, before invoking the
-> platform_ops function and similarly for power_off.
+>   * When invalidating stale data from the cache before a read,
+>     outer caches must be invalidated _before_ inner caches, not
+>     after, otherwise stale data may be re-filled from outer to
+>     inner after the inner cache is flushed.
 > 
-> What do you reckon?
+>     We still retain an inner clean before touching the outer cache,
+>     to avoid stale data being rewritten from there into the outer
+>     cache after the outer cache is flushed.
+> 
+>   * All the sync_mem() calls synchronise either reads or writes,
+>     but not both.  This patch splits sync_mem() into separate
+>     functions for reads and writes, to avoid excessive inner
+>     flushes in the write case.
+> 
+>     The two functions are different from the original sync_mem(),
+>     to fix the above issues.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+> NOTE: This patch is build-tested only.
+> 
+>  arch/arm/common/bL_entry.c |   57 ++++++++++++++++++++++++++++++++++----------
+>  1 files changed, 44 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
+> index 1ea4ec9..3e1a404 100644
+> --- a/arch/arm/common/bL_entry.c
+> +++ b/arch/arm/common/bL_entry.c
+> @@ -119,16 +119,47 @@ int bL_cpu_powered_up(void)
+>  
+>  struct bL_sync_struct bL_sync;
+>  
+> -static void __sync_range(volatile void *p, size_t size)
+> +/*
+> + * Ensure preceding writes to *p by this CPU are visible to
+> + * subsequent reads by other CPUs:
+> + */
+> +static void __sync_range_w(volatile void *p, size_t size)
+>  {
+>  	char *_p = (char *)p;
+>  
+>  	__cpuc_flush_dcache_area(_p, size);
+> -	outer_flush_range(__pa(_p), __pa(_p + size));
+> +	outer_clean_range(__pa(_p), __pa(_p + size));
+>  	outer_sync();
 
-I much prefer adding barriers inside the API when they are needed for 
-proper execution of the API intent.  So if I call bL_set_entry_vector(), 
-I trust that by the time it returns the vector is indeed set and ready 
-for use by other processors.
+It's not part of your patch but I thought about commenting here. The
+outer_clean_range() already has a cache_sync() operation, so no need for
+the additional outer_sync().
 
-The same could be said about the outer cache ops.  If a DSB is needed 
-for their intent to be valid, then why isn't this DSB always implied by 
-the corresponding cache op calls?  And as you say, there is already one 
-implied by the spinlock used there, so that is not if things would 
-change much in practice.
+>  }
+>  
+> -#define sync_mem(ptr) __sync_range(ptr, sizeof *(ptr))
+> +/*
+> + * Ensure preceding writes to *p by other CPUs are visible to
+> + * subsequent reads by this CPU:
+> + */
+> +static void __sync_range_r(volatile void *p, size_t size)
+> +{
+> +	char *_p = (char *)p;
+> +
+> +#ifdef CONFIG_OUTER_CACHE
+> +	if (outer_cache.flush_range) {
+> +		/*
+> +		 * Ensure ditry data migrated from other CPUs into our cache
+> +		 * are cleaned out safely before the outer cache is cleaned:
+> +		 */
+> +		__cpuc_flush_dcache_area(_p, size);
+> +
+> +		/* Clean and invalidate stale data for *p from outer ... */
+> +		outer_flush_range(__pa(_p), __pa(_p + size));
+> +		outer_sync();
 
+Same here.
 
-Nicolas
+-- 
+Catalin
