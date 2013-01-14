@@ -1,108 +1,423 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 14 Jan 2013 16:53:53 -0500 (EST)
-Subject: [PATCH v2] ARM: let CPUs not being able to run in ARM mode enter
- in THUMB mode
-In-Reply-To: <1358162123-30113-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1358162123-30113-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1301141653260.6300@xanadu.home>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Mon, 14 Jan 2013 16:55:09 -0500
+Subject: [PATCH v5 06/12] ARM: KVM: VGIC distributor handling
+In-Reply-To: <20130114153955.GF18935@mudshark.cambridge.arm.com>
+References: <20130108184116.46558.3558.stgit@ubuntu>
+ <20130108184204.46558.51956.stgit@ubuntu>
+ <20130114153955.GF18935@mudshark.cambridge.arm.com>
+Message-ID: <CANM98qKPaqF2JU5Aw4hoBq67KUd9d8tabPk=+yUOfOLWJEQYjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jan 2013, Uwe Kleine-K?nig wrote:
+On Mon, Jan 14, 2013 at 10:39 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jan 08, 2013 at 06:42:04PM +0000, Christoffer Dall wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Add the GIC distributor emulation code. A number of the GIC features
+>> are simply ignored as they are not required to boot a Linux guest.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>> ---
+>>  arch/arm/include/asm/kvm_vgic.h |   82 +++++
+>>  arch/arm/kvm/vgic.c             |  593 +++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 674 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
+>> index 270dcd2..9ff0d9c 100644
+>> --- a/arch/arm/include/asm/kvm_vgic.h
+>> +++ b/arch/arm/include/asm/kvm_vgic.h
+>> @@ -19,12 +19,94 @@
+>>  #ifndef __ASM_ARM_KVM_VGIC_H
+>>  #define __ASM_ARM_KVM_VGIC_H
+>>
+>> +#include <linux/kernel.h>
+>> +#include <linux/kvm.h>
+>> +#include <linux/kvm_host.h>
+>> +#include <linux/irqreturn.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/types.h>
+>>  #include <asm/hardware/gic.h>
+>>
+>> +#define VGIC_NR_IRQS           128
+>> +#define VGIC_NR_SGIS           16
+>
+> Now that you have this, you can use it in a few places (see also the BUG_ONs
+> in vgic_queue_irq).
+>
+>> +#define VGIC_NR_PPIS           16
+>> +#define VGIC_NR_PRIVATE_IRQS   (VGIC_NR_SGIS + VGIC_NR_PPIS)
+>> +#define VGIC_NR_SHARED_IRQS    (VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
+>> +#define VGIC_MAX_CPUS          KVM_MAX_VCPUS
+>> +
+>> +/* Sanity checks... */
+>> +#if (VGIC_MAX_CPUS > 8)
+>> +#error Invalid number of CPU interfaces
+>> +#endif
+>> +
+>> +#if (VGIC_NR_IRQS & 31)
+>> +#error "VGIC_NR_IRQS must be a multiple of 32"
+>> +#endif
+>> +
+>> +#if (VGIC_NR_IRQS > 1024)
+>> +#error "VGIC_NR_IRQS must be <= 1024"
+>> +#endif
+>> +
+>> +/*
+>> + * The GIC distributor registers describing interrupts have two parts:
+>> + * - 32 per-CPU interrupts (SGI + PPI)
+>> + * - a bunch of shared interrupts (SPI)
+>> + */
+>> +struct vgic_bitmap {
+>> +       union {
+>> +               u32 reg[VGIC_NR_PRIVATE_IRQS / 32];
+>> +               DECLARE_BITMAP(reg_ul, VGIC_NR_PRIVATE_IRQS);
+>> +       } percpu[VGIC_MAX_CPUS];
+>> +       union {
+>> +               u32 reg[VGIC_NR_SHARED_IRQS / 32];
+>> +               DECLARE_BITMAP(reg_ul, VGIC_NR_SHARED_IRQS);
+>> +       } shared;
+>> +};
+>> +
+>> +struct vgic_bytemap {
+>> +       u32 percpu[VGIC_MAX_CPUS][VGIC_NR_PRIVATE_IRQS / 4];
+>> +       u32 shared[VGIC_NR_SHARED_IRQS  / 4];
+>> +};
+>> +
+>>  struct vgic_dist {
+>> +#ifdef CONFIG_KVM_ARM_VGIC
+>> +       spinlock_t              lock;
+>> +
+>> +       /* Virtual control interface mapping */
+>> +       void __iomem            *vctrl_base;
+>> +
+>>         /* Distributor and vcpu interface mapping in the guest */
+>>         phys_addr_t             vgic_dist_base;
+>>         phys_addr_t             vgic_cpu_base;
+>> +
+>> +       /* Distributor enabled */
+>> +       u32                     enabled;
+>> +
+>> +       /* Interrupt enabled (one bit per IRQ) */
+>> +       struct vgic_bitmap      irq_enabled;
+>> +
+>> +       /* Interrupt 'pin' level */
+>> +       struct vgic_bitmap      irq_state;
+>> +
+>> +       /* Level-triggered interrupt in progress */
+>> +       struct vgic_bitmap      irq_active;
+>> +
+>> +       /* Interrupt priority. Not used yet. */
+>> +       struct vgic_bytemap     irq_priority;
+>> +
+>> +       /* Level/edge triggered */
+>> +       struct vgic_bitmap      irq_cfg;
+>> +
+>> +       /* Source CPU per SGI and target CPU */
+>> +       u8                      irq_sgi_sources[VGIC_MAX_CPUS][16];
+>
+> VGIC_NR_SGIS
+>
+>
+>> +static u32 vgic_get_target_reg(struct kvm *kvm, int irq)
+>> +{
+>> +       struct vgic_dist *dist = &kvm->arch.vgic;
+>> +       struct kvm_vcpu *vcpu;
+>> +       int i, c;
+>> +       unsigned long *bmap;
+>> +       u32 val = 0;
+>> +
+>> +       irq -= VGIC_NR_PRIVATE_IRQS;
+>> +
+>> +       kvm_for_each_vcpu(c, vcpu, kvm) {
+>> +               bmap = vgic_bitmap_get_shared_map(&dist->irq_spi_target[c]);
+>> +               for (i = 0; i < GICD_IRQS_PER_ITARGETSR; i++)
+>> +                       if (test_bit(irq + i, bmap))
+>> +                               val |= 1 << (c + i * 8);
+>> +       }
+>> +
+>> +       return val;
+>> +}
+>> +
+>> +static void vgic_set_target_reg(struct kvm *kvm, u32 val, int irq)
+>> +{
+>> +       struct vgic_dist *dist = &kvm->arch.vgic;
+>> +       struct kvm_vcpu *vcpu;
+>> +       int i, c;
+>> +       unsigned long *bmap;
+>> +       u32 target;
+>> +
+>> +       BUG_ON(irq & 3);
+>> +       BUG_ON(irq < VGIC_NR_PRIVATE_IRQS);
+>
+> This is now different to vgic_Get_target_reg, which doesn't have the
+> BUG_ONs. Can we remove these ones too?
+>
+>> +       irq -= VGIC_NR_PRIVATE_IRQS;
+>> +
+>> +       /*
+>> +        * Pick the LSB in each byte. This ensures we target exactly
+>> +        * one vcpu per IRQ. If the byte is null, assume we target
+>> +        * CPU0.
+>> +        */
+>> +       for (i = 0; i < GICD_IRQS_PER_ITARGETSR; i++) {
+>> +               int shift = i * GICD_CPUTARGETS_BITS;
+>> +               target = ffs((val >> shift) & 0xffU);
+>> +               target = target ? (target - 1) : 0;
+>> +               dist->irq_spi_cpu[irq + i] = target;
+>> +               kvm_for_each_vcpu(c, vcpu, kvm) {
+>> +                       bmap = vgic_bitmap_get_shared_map(&dist->irq_spi_target[c]);
+>> +                       if (c == target)
+>> +                               set_bit(irq + i, bmap);
+>> +                       else
+>> +                               clear_bit(irq + i, bmap);
+>> +               }
+>> +       }
+>> +}
+>
+> [...]
+>
+>>  static const struct mmio_range vgic_ranges[] = {
+>> +       {                       /* CTRL, TYPER, IIDR */
+>> +               .base           = 0,
+>> +               .len            = 12,
+>> +               .handle_mmio    = handle_mmio_misc,
+>> +       },
+>> +       {                       /* IGROUPRn */
+>> +               .base           = 0x80,
+>> +               .len            = VGIC_NR_IRQS / 8,
+>> +               .handle_mmio    = handle_mmio_raz_wi,
+>> +       },
+>> +       {                       /* ISENABLERn */
+>> +               .base           = 0x100,
+>> +               .len            = VGIC_NR_IRQS / 8,
+>> +               .handle_mmio    = handle_mmio_set_enable_reg,
+>> +       },
+>> +       {                       /* ICENABLERn */
+>> +               .base           = 0x180,
+>> +               .len            = VGIC_NR_IRQS / 8,
+>> +               .handle_mmio    = handle_mmio_clear_enable_reg,
+>> +       },
+>> +       {                       /* ISPENDRn */
+>> +               .base           = 0x200,
+>> +               .len            = VGIC_NR_IRQS / 8,
+>> +               .handle_mmio    = handle_mmio_set_pending_reg,
+>> +       },
+>> +       {                       /* ICPENDRn */
+>> +               .base           = 0x280,
+>> +               .len            = VGIC_NR_IRQS / 8,
+>> +               .handle_mmio    = handle_mmio_clear_pending_reg,
+>> +       },
+>> +       {                       /* ISACTIVERn */
+>> +               .base           = 0x300,
+>> +               .len            = VGIC_NR_IRQS / 8,
+>> +               .handle_mmio    = handle_mmio_raz_wi,
+>> +       },
+>> +       {                       /* ICACTIVERn */
+>> +               .base           = 0x380,
+>> +               .len            = VGIC_NR_IRQS / 8,
+>> +               .handle_mmio    = handle_mmio_raz_wi,
+>> +       },
+>> +       {                       /* IPRIORITYRn */
+>> +               .base           = 0x400,
+>> +               .len            = VGIC_NR_IRQS,
+>> +               .handle_mmio    = handle_mmio_priority_reg,
+>> +       },
+>> +       {                       /* ITARGETSRn */
+>> +               .base           = 0x800,
+>> +               .len            = VGIC_NR_IRQS,
+>> +               .handle_mmio    = handle_mmio_target_reg,
+>> +       },
+>> +       {                       /* ICFGRn */
+>> +               .base           = 0xC00,
+>> +               .len            = VGIC_NR_IRQS / 4,
+>> +               .handle_mmio    = handle_mmio_cfg_reg,
+>> +       },
+>> +       {                       /* SGIRn */
+>> +               .base           = 0xF00,
+>> +               .len            = 4,
+>> +               .handle_mmio    = handle_mmio_sgi_reg,
+>> +       },
+>>         {}
+>>  };
+>
+> You've added named definitions for these constants to the GIC header file,
+> so please replace these immediates with those and delete the comments.
+>
+The following two commits should address your concerns:
 
-> Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
-> obviously these cannot enter the kernel in ARM mode. Make an exception
-> for them and let them enter in THUMB mode.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+commit ff4648faa6fd3342ce72e537a8068ab21d4085c8
+Author: Christoffer Dall <c.dall@virtualopensystems.com>
+Date:   Mon Jan 14 16:53:21 2013 -0500
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+    KVM: ARM: vgic: Use defines instead of hardcoded numbers.
+
+    Address reviewer comments.
+
+    Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+
+diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
+index f5f270b..1ace491 100644
+--- a/arch/arm/include/asm/kvm_vgic.h
++++ b/arch/arm/include/asm/kvm_vgic.h
+@@ -99,7 +99,7 @@ struct vgic_dist {
+ 	struct vgic_bitmap	irq_cfg;
+
+ 	/* Source CPU per SGI and target CPU */
+-	u8			irq_sgi_sources[VGIC_MAX_CPUS][16];
++	u8			irq_sgi_sources[VGIC_MAX_CPUS][VGIC_NR_SGIS];
+
+ 	/* Target CPU for each IRQ */
+ 	u8			irq_spi_cpu[VGIC_NR_SHARED_IRQS];
+diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
+index 25daa07..a0d283c 100644
+--- a/arch/arm/kvm/vgic.c
++++ b/arch/arm/kvm/vgic.c
+@@ -447,9 +447,6 @@ static void vgic_set_target_reg(struct kvm *kvm,
+u32 val, int irq)
+ 	unsigned long *bmap;
+ 	u32 target;
+
+-	BUG_ON(irq & 3);
+-	BUG_ON(irq < VGIC_NR_PRIVATE_IRQS);
+-
+ 	irq -= VGIC_NR_PRIVATE_IRQS;
+
+ 	/*
+@@ -598,63 +595,63 @@ struct mmio_range {
+ };
+
+ static const struct mmio_range vgic_ranges[] = {
+-	{			/* CTRL, TYPER, IIDR */
+-		.base		= 0,
++	{
++		.base		= GIC_DIST_CTRL,
+ 		.len		= 12,
+ 		.handle_mmio	= handle_mmio_misc,
+ 	},
+-	{			/* IGROUPRn */
+-		.base		= 0x80,
++	{
++		.base		= GIC_DIST_IGROUP,
+ 		.len		= VGIC_NR_IRQS / 8,
+ 		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+-	{			/* ISENABLERn */
+-		.base		= 0x100,
++	{
++		.base		= GIC_DIST_ENABLE_SET,
+ 		.len		= VGIC_NR_IRQS / 8,
+ 		.handle_mmio	= handle_mmio_set_enable_reg,
+ 	},
+-	{			/* ICENABLERn */
+-		.base		= 0x180,
++	{
++		.base		= GIC_DIST_ENABLE_CLEAR,
+ 		.len		= VGIC_NR_IRQS / 8,
+ 		.handle_mmio	= handle_mmio_clear_enable_reg,
+ 	},
+-	{			/* ISPENDRn */
+-		.base		= 0x200,
++	{
++		.base		= GIC_DIST_PENDING_SET,
+ 		.len		= VGIC_NR_IRQS / 8,
+ 		.handle_mmio	= handle_mmio_set_pending_reg,
+ 	},
+-	{			/* ICPENDRn */
+-		.base		= 0x280,
++	{
++		.base		= GIC_DIST_PENDING_CLEAR,
+ 		.len		= VGIC_NR_IRQS / 8,
+ 		.handle_mmio	= handle_mmio_clear_pending_reg,
+ 	},
+-	{			/* ISACTIVERn */
+-		.base		= 0x300,
++	{
++		.base		= GIC_DIST_ACTIVE_SET,
+ 		.len		= VGIC_NR_IRQS / 8,
+ 		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+-	{			/* ICACTIVERn */
+-		.base		= 0x380,
++	{
++		.base		= GIC_DIST_ACTIVE_CLEAR,
+ 		.len		= VGIC_NR_IRQS / 8,
+ 		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+-	{			/* IPRIORITYRn */
+-		.base		= 0x400,
++	{
++		.base		= GIC_DIST_PRI,
+ 		.len		= VGIC_NR_IRQS,
+ 		.handle_mmio	= handle_mmio_priority_reg,
+ 	},
+-	{			/* ITARGETSRn */
+-		.base		= 0x800,
++	{
++		.base		= GIC_DIST_TARGET,
+ 		.len		= VGIC_NR_IRQS,
+ 		.handle_mmio	= handle_mmio_target_reg,
+ 	},
+-	{			/* ICFGRn */
+-		.base		= 0xC00,
++	{
++		.base		= GIC_DIST_CONFIG,
+ 		.len		= VGIC_NR_IRQS / 4,
+ 		.handle_mmio	= handle_mmio_cfg_reg,
+ 	},
+-	{			/* SGIRn */
+-		.base		= 0xF00,
++	{
++		.base		= GIC_DIST_SOFTINT,
+ 		.len		= 4,
+ 		.handle_mmio	= handle_mmio_sgi_reg,
+ 	},
+@@ -856,7 +853,7 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu,
+u8 sgi_source_id, int irq)
+
+ 	/* Sanitize the input... */
+ 	BUG_ON(sgi_source_id & ~7);
+-	BUG_ON(sgi_source_id && irq > 15);
++	BUG_ON(sgi_source_id && irq >= VGIC_NR_SGIS);
+ 	BUG_ON(irq >= VGIC_NR_IRQS);
+
+ 	kvm_debug("Queue IRQ%d\n", irq);
+--
 
 
-> ---
-> Changes since (implicit) v1,
-> id: 1357904397-8476-1-git-send-email-u.kleine-koenig at pengutronix.de:
-> 
->  - drop modification to entry for MMU machines
->  - don't select user-visible symbols
->  - rename THUMBONLY_CPU to CPU_THUMBONLY
->  - move CPU_THUMBONLY definition further down in arch/arm/mm/Kconfig
-> 
->  arch/arm/Kconfig             |    3 ++-
->  arch/arm/kernel/head-nommu.S |    8 +++++++-
->  arch/arm/mm/Kconfig          |    9 ++++++++-
->  3 files changed, 17 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 67874b8..e04c779 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1656,8 +1656,9 @@ config HZ
->  	default 100
->  
->  config THUMB2_KERNEL
-> -	bool "Compile the kernel in Thumb-2 mode"
-> +	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
->  	depends on CPU_V7 && !CPU_V6 && !CPU_V6K
-> +	default y if CPU_THUMBONLY
->  	select AEABI
->  	select ARM_ASM_UNIFIED
->  	select ARM_UNWIND
-> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> index 3782320..e8ecae2 100644
-> --- a/arch/arm/kernel/head-nommu.S
-> +++ b/arch/arm/kernel/head-nommu.S
-> @@ -32,15 +32,21 @@
->   * numbers for r1.
->   *
->   */
-> -	.arm
->  
->  	__HEAD
-> +
-> +#ifdef CONFIG_CPU_THUMBONLY
-> +	.thumb
-> +ENTRY(stext)
-> +#else
-> +	.arm
->  ENTRY(stext)
->  
->   THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
->   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
->   THUMB(	.thumb			)	@ switch to Thumb now.
->   THUMB(1:			)
-> +#endif
->  
->  	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
->  						@ and irqs disabled
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 3fd629d..8defd63 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -397,6 +397,13 @@ config CPU_V7
->  	select CPU_PABRT_V7
->  	select CPU_TLB_V7 if MMU
->  
-> +config CPU_THUMBONLY
-> +	bool
-> +	# There are no CPUs available with MMU that don't implement an ARM ISA:
-> +	depends on !MMU
-> +	help
-> +	  Select this if your CPU doesn't support the 32 bit ARM instructions.
-> +
->  # Figure out what processor architecture version we should be using.
->  # This defines the compiler instruction set which depends on the machine type.
->  config CPU_32v3
-> @@ -608,7 +615,7 @@ config ARCH_DMA_ADDR_T_64BIT
->  	bool
->  
->  config ARM_THUMB
-> -	bool "Support Thumb user binaries"
-> +	bool "Support Thumb user binaries" if !CPU_THUMBONLY
->  	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || CPU_V7 || CPU_FEROCEON
->  	default y
->  	help
-> -- 
-> 1.7.10.4
-> 
+commit 940c2382e1d1cb6831d35ceeccb02c3d3f76a45c
+Author: Christoffer Dall <c.dall@virtualopensystems.com>
+Date:   Mon Jan 14 16:51:30 2013 -0500
+
+    ARM: gic: add missing distributor defintions
+
+    Add missing register map offsets for the distributor and rename
+    GIC_DIST_ACTIVE_BIT to GIC_DIST_ACTIVE_SET to be consistent.
+
+    Cc: Marc Zyniger <marc.zyngier@arm.com>
+    Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+
+diff --git a/arch/arm/include/asm/hardware/gic.h
+b/arch/arm/include/asm/hardware/gic.h
+index dd1add1..6cad421 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -22,11 +22,13 @@
+
+ #define GIC_DIST_CTRL			0x000
+ #define GIC_DIST_CTR			0x004
++#define GIC_DIST_IGROUP			0x080
+ #define GIC_DIST_ENABLE_SET		0x100
+ #define GIC_DIST_ENABLE_CLEAR		0x180
+ #define GIC_DIST_PENDING_SET		0x200
+ #define GIC_DIST_PENDING_CLEAR		0x280
+-#define GIC_DIST_ACTIVE_BIT		0x300
++#define GIC_DIST_ACTIVE_SET		0x300
++#define GIC_DIST_ACTIVE_CLEAR		0x380
+ #define GIC_DIST_PRI			0x400
+ #define GIC_DIST_TARGET			0x800
+ #define GIC_DIST_CONFIG			0xc00
+--
+
+Thanks,
+-Christoffer
