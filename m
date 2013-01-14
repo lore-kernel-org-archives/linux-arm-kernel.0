@@ -1,43 +1,72 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 Jan 2013 10:16:05 -0800
-Subject: [PATCH v2 0/3] Use helper clockevents_config_and_register()
-In-Reply-To: <alpine.LFD.2.02.1301141222130.7475@ionos>
-References: <1357991406-22778-1-git-send-email-shawn.guo@linaro.org>
- <201301122114.07278.arnd@arndb.de>
- <alpine.LFD.2.02.1301141222130.7475@ionos>
-Message-ID: <20130114181605.GB31901@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 Jan 2013 11:16:40 -0700
+Subject: [PATCH] clk: tegra: ensure all provided clock values are valid cookies
+Message-ID: <1358187400-6824-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 12:23:16PM +0100, Thomas Gleixner wrote:
-> On Sat, 12 Jan 2013, Arnd Bergmann wrote:
-> > On Saturday 12 January 2013, Shawn Guo wrote:
-> > > The clockevent core is able to figure out the best mult and shift,
-> > > calculate min_delta_ns and max_delta_ns, with the necessary info passed
-> > > into clockevents_config_and_register().  Use this handy helper to make
-> > > the drivers less error prone and save some LOC.
-> > > 
-> > > Changes since v1:
-> > >  - Add one patch to export clockevents_config_and_register for fixing
-> > >    the error [1] reported by Fengguang.
-> > >  - Add Acked-by and Tested-by tags given by people (Thanks!)
-> > > 
-> > > [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/209152
-> > 
-> > Very nice series!
-> > 
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
-> 
-> Arnd, can you take the whole lot via the ARM tree? The export should
-> not cause any conflicts, and if it does Linus should be able to solve
-> it :)
+From: Stephen Warren <swarren@nvidia.com>
 
-(with the presumed s/Arnd/Arnd or Olof/)
+Tegra's clock implementation uses pointers as the clock cookies, and
+hence chooses to make NULL an invalid clock cookie. However, there are
+gaps in the assigned device tree clock IDs, and hence the array mapping
+DT clock ID contains entries with NULL values (uninitialized BSS) unless
+explicit action is taken. This patch enhances the Tegra clock code to
+detect this case and explicitly initialize those lookup table entries to
+an error value. This prevents clk_get() from ever returning NULL. Hence,
+Tegra's clock APIs don't have to check the clock cookie they're passed
+for NULL.
 
-Great! I've applied these to a clockevent/cleanup topic branch in arm-soc,
-together with the added acks, etc.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Mike, this also will need to go through the Tegra tree; just looking for
+any review/ack from you. Thanks.
 
+ drivers/clk/tegra/clk-tegra20.c |    5 ++++-
+ drivers/clk/tegra/clk-tegra30.c |    5 ++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
--Olof
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index 5847b5e..e59ac14 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -1243,12 +1243,15 @@ void __init tegra20_clock_init(struct device_node *np)
+ 	tegra20_audio_clk_init();
+ 
+ 
+-	for (i = 0; i < ARRAY_SIZE(clks); i++)
++	for (i = 0; i < ARRAY_SIZE(clks); i++) {
+ 		if (IS_ERR(clks[i])) {
+ 			pr_err("Tegra20 clk %d: register failed with %ld\n",
+ 			       i, PTR_ERR(clks[i]));
+ 			BUG();
+ 		}
++		if (!clks[i])
++			clks[i] = ERR_PTR(-EINVAL);
++	}
+ 
+ 	tegra_init_dup_clks(tegra_clk_duplicates, clks, clk_max);
+ 
+diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+index 987312c..9c0b2ee 100644
+--- a/drivers/clk/tegra/clk-tegra30.c
++++ b/drivers/clk/tegra/clk-tegra30.c
+@@ -2022,12 +2022,15 @@ void __init tegra30_clock_init(struct device_node *np)
+ 	tegra30_audio_clk_init();
+ 	tegra30_pmc_clk_init();
+ 
+-	for (i = 0; i < ARRAY_SIZE(clks); i++)
++	for (i = 0; i < ARRAY_SIZE(clks); i++) {
+ 		if (IS_ERR(clks[i])) {
+ 			pr_err("Tegra30 clk %d: register failed with %ld\n",
+ 			       i, PTR_ERR(clks[i]));
+ 			BUG();
+ 		}
++		if (!clks[i])
++			clks[i] = ERR_PTR(-EINVAL);
++	}
+ 
+ 	tegra_init_dup_clks(tegra_clk_duplicates, clks, clk_max);
+ 
+-- 
+1.7.10.4
