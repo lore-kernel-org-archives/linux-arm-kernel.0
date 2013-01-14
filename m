@@ -1,95 +1,114 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 14 Jan 2013 10:49:25 +0100
-Subject: [PATCH 2/2] ARM: tegra: Use DT /cpu node to detect number of
- CPU core
-In-Reply-To: <20130114092720.GX23505@n2100.arm.linux.org.uk>
-References: <1358149970-28156-1-git-send-email-hdoyu@nvidia.com><1358149970-28156-2-git-send-email-hdoyu@nvidia.com><20130114092720.GX23505@n2100.arm.linux.org.uk>
-Message-ID: <20130114.114925.1476619399284636466.hdoyu@nvidia.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 14 Jan 2013 10:50:50 +0100
+Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
+ THUMB mode
+In-Reply-To: <20130111162016.GM14860@pengutronix.de>
+References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130111160753.GC23505@n2100.arm.linux.org.uk>
+ <20130111162016.GM14860@pengutronix.de>
+Message-ID: <20130114095050.GO14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hello Russell,
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote @ Mon, 14 Jan 2013 10:27:20 +0100:
+On Fri, Jan 11, 2013 at 05:20:16PM +0100, Uwe Kleine-K?nig wrote:
+> On Fri, Jan 11, 2013 at 04:07:53PM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Jan 11, 2013 at 12:39:57PM +0100, Uwe Kleine-K?nig wrote:
+> > > +# Select this if your CPU doesn't support the 32 bit ARM instructions.
+> > > +config THUMBONLY_CPU
+> > > +	bool
+> > > +	select THUMB2_KERNEL
+> > > +	select ARM_THUMB
+> > 
+> > Hmm, not convinced this is the best solution.  Yes, fine for there to be
+> > a THUMBONLY_CPU option, _but_ not the select statements onto user visible
+> > symbols.  We can get this instead by:
+> > 
+> > config THUMB2_KERNEL
+> >         bool "Compile the kernel in Thumb-2 mode" if !THUMBONLY_CPU
+> >         depends on (CPU_V7 && !CPU_V6 && !CPU_V6K) || THUMBONLY_CPU
+> > 	default y if THUMBONLY_CPU
+> >         select AEABI
+> >         select ARM_ASM_UNIFIED
+> >         select ARM_UNWIND
+> > 
+> > and:
+> > 
+> > config ARM_THUMB
+> >         bool "Support Thumb user binaries" if !THUMBONLY_CPU
+> >         depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || \
+> > 		   CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || \
+> > 		   CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || \
+> > 		   CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
+> > 		   CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || \
+> > 		   CPU_V6K || CPU_V7 || CPU_FEROCEON || THUMBONLY_CPU
+> >         default y
+> > 
+> > And... I'm left wondering - should we have this instead:
+> > 
+> > config CPU_ARM
+> > 	bool
+> > 
+> > config CPU_THUMB
+> > 	bool
+> > 
+> > which indicates whether the CPU supports the ARM instruction set or the
+> > Thumb instruction set (or both) - that should then allow us to select
+> > those from the individual CPU_xxx options and eliminate that big long
+> > list of dependencies against ARM_THUMB.
+> I like your idea and I will come up with a patch.
+This looks nice and clean, but after having thought about it for a while
+it turns out not to be that easy.
 
-> On Mon, Jan 14, 2013 at 09:52:50AM +0200, Hiroshi Doyu wrote:
-> > +	if (!arm_dt_cpu_map_valid())
-> > +		set_cpu_possible(0, true);
-> 
-> You don't need to do any of this (and, therefore, I don't think you even
-> need the first patch.)
-> 
-> The generic boot code will set CPU0 as possible, present and online.  Think
-> about it: you're booting on that very CPU so it better be possible, present
-> and online.  If it isn't, what CPU is executing your code?
-> 
-> arm_dt_init_cpu_maps() will only ever set _additional_ CPUs in the possible
-> map.
-> 
-> Ergo, by the time the above code is run, CPU0 will already be marked as
-> possible.  Therefore, the above code and arm_dt_cpu_map_valid() is not
-> required.
+For THUMB2_KERNEL only CPUs must be supported that can do Thumb2. That
+means the logic must be something like:
 
-Right.
+	config THUMB2_KERNEL
+		bool "Compile the kernel in Thumb-2 mode" if ALL_CONFIGURED_CPUS_SUPPORT_ARM
+		depends on ALL_CONFIGURED_CPUS_SUPPORT_THUMB2
+		default y if !ALL_CONFIGURED_CPUS_SUPPORT_ARM
 
-In Tegra, we've decided to not use SCU based detection at all any more
-and to continue with a single core even when DT cpu detection
-fails. For Tegra, "arm_dt_cpu_map_valid()" is not necessary. For other
-SoCs, this would be necessary when they want to detect again with
-SCU.
+for the ALL_CONFIGURED_CPUS_SUPPORT_ARM and .._THUMB2 symbols to do the
+right thing, we'd need something like:
 
-Now this original Tegra patch would be independet of the 1st patch as
-below:
+	config CPU_32v4
+		bool
+		...
+		select ISA_ARM
+		select ISA_THUMB_NONE
 
->From 36061aff7a772524a1d1785884889619042d4445 Mon Sep 17 00:00:00 2001
-From: Hiroshi Doyu <hdoyu@nvidia.com>
-Date: Mon, 26 Nov 2012 12:25:14 +0200
-Subject: [PATCH 1/1] ARM: tegra: Use DT /cpu node to detect number of CPU
- core
+	config CPU_32v4T
+		bool
+		...
+		select ISA_ARM
+		select ISA_THUMB1
+	...
+	config CPU_32v7
+		bool
+		select ISA_ARM
+		select ISA_THUMB2
 
-SCU based detection only works with Cortex-A9 MP and it doesn't
-support ones with multiple clusters. The only way to detect number of
-CPU core correctly is with DT /cpu node.
+	config CPU_32v7M
+		bool
+		select ISA_ARM_NONE
+		select ISA_THUMB2
 
-Tegra SoCs decided to use DT detection as the only way and to not use
-SCU based detection at all. Even if DT /cpu node based detection
-fails, it continues with a single core
+	config ALL_CONFIGURED_CPUS_SUPPORT_ARM
+		bool
+		default ISA_ARM && !ISA_ARM_NONE
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
-Based on the discussion:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140608.html
----
- arch/arm/mach-tegra/platsmp.c |   15 ---------------
- 1 file changed, 15 deletions(-)
+	config ALL_CONFIGURED_CPUS_SUPPORT_THUMB2
+		bool
+		default ISA_THUMB2 && !ISA_THUMB1 && !ISA_THUMB_NONE
 
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 6867030..689ee4b 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -177,23 +177,8 @@ done:
- 	return status;
- }
- 
--/*
-- * Initialise the CPU possible map early - this describes the CPUs
-- * which may be present or become present in the system.
-- */
- static void __init tegra_smp_init_cpus(void)
- {
--	unsigned int i, ncores = scu_get_core_count(scu_base);
--
--	if (ncores > nr_cpu_ids) {
--		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
--			ncores, nr_cpu_ids);
--		ncores = nr_cpu_ids;
--	}
--
--	for (i = 0; i < ncores; i++)
--		set_cpu_possible(i, true);
--
- 	set_smp_cross_call(gic_raise_softirq);
- }
- 
+which looks less nice than what I thought first.
+
+What do you think? Is it still worthwhile to implement this?
+
+Best regards
+Uwe
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
