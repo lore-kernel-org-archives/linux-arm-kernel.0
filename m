@@ -1,100 +1,64 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 14 Jan 2013 17:56:32 +0800
-Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
- management
-In-Reply-To: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1358157392.19304.243.camel@jlo-ubuntu-64.nvidia.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Mon, 14 Jan 2013 09:57:07 +0000
+Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
+In-Reply-To: <20130113095806.GA31966@avionic-0098.adnet.avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130111154516.GA25335@avionic-0098.adnet.avionic-design.de>
+ <20130112123640.GA22505@avionic-0098.adnet.avionic-design.de>
+ <201301122112.25772.arnd@arndb.de>
+ <20130113095806.GA31966@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20130114095706.GA23467@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Sun, Jan 13, 2013 at 09:58:06AM +0000, Thierry Reding wrote:
+> On Sat, Jan 12, 2013 at 09:12:25PM +0000, Arnd Bergmann wrote:
+> > On Saturday 12 January 2013, Thierry Reding wrote:
+> > > > I already hinted at that in one of the other subthreads. Having such a
+> > > > multiplex would also allow the driver to be built as a module. I had
+> > > > already thought about this when I was working on an earlier version of
+> > > > these patches. Basically these would be two ops attached to the host
+> > > > bridge, and the generic arch_setup_msi_irq() could then look that up
+> > > > given the struct pci_dev that is passed to it and call this new per-
+> > > > host bridge .setup_msi_irq().
+> > > 
+> > > struct pci_ops looks like a good place to put these. They'll be
+> > > available from each struct pci_bus, so should be easy to call from
+> > > arch_setup_msi_irq().
+> > > 
+> > > Any objections?
+> > > 
+> > 
+> > struct pci_ops has a long history of being specifically about
+> > config space read/write operations, so on the one hand it does
+> > not feel like the right place to put interrupt specific operations,
+> > but on the other hand, the name sounds appropriate and I cannot
+> > think of any other place to put this, so it's fine with me.
+> > 
+> > The only alternative I can think of is to introduce a new
+> > structure next to it in struct pci_bus, but that feels a bit
+> > pointless. Maybe Bjorn has a preference one way or the other.
+> 
+> The name pci_ops is certainly generic enough. Also the comment above the
+> structure declaration says "Low-level architecture-dependent routines",
+> which applies to the MSI functions as well.
 
-On Thu, 2013-01-10 at 08:20 +0800, Nicolas Pitre wrote:
-> This is the initial public posting of the initial support for big.LITTLE.
-> Included here is the code required to safely power up and down CPUs in a
-> b.L system, whether this is via CPU hotplug, a cpuidle driver or the
-> Linaro b.L in-kernel switcher[*] on top of this.  Only  SMP secondary
-> boot and CPU hotplug support is included at this time.  Getting to this
-> point already represents a significcant chunk of code as illustrated by
-> the diffstat below.
-> 
-> This work was presented at Linaro Connect in Copenhagen by Dave Martin and
-> myself.  The presentation slides are available here:
-> 
-> http://www.linaro.org/documents/download/f3569407bb1fb8bde0d6da80e285b832508f92f57223c
-> 
-> The code is now stable on both Fast Models as well as Virtual Express TC2
-> and ready for public review.
-> 
-> Platform support is included for Fast Models implementing the
-> Cortex-A15x4-A7x4 and Cortex-A15x1-A7x1 configurations.  To allow
-> successful compilation, I also included a preliminary version of the
-> CCI400 driver from Lorenzo Pieralisi.
-> 
-> Support for actual hardware such as Vexpress TC2 should come later,
-> once the basic infrastructure from this series is merged.  A few DT
-> bindings are used but not yet documented.
-> 
-> This series is made of the following parts:
-> 
-> Low-level support code:
-> [PATCH 01/16] ARM: b.L: secondary kernel entry code
-> [PATCH 02/16] ARM: b.L: introduce the CPU/cluster power API
-> [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
-> [PATCH 04/16] ARM: b.L: Add baremetal voting mutexes
-> [PATCH 05/16] ARM: bL_head: vlock-based first man election
-> 
-> Adaptation layer to hook with the generic kernel infrastructure:
-> [PATCH 06/16] ARM: b.L: generic SMP secondary bringup and hotplug
-> [PATCH 07/16] ARM: bL_platsmp.c: close the kernel entry gate before
-> [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface of a
-> [PATCH 09/16] ARM: vexpress: Select the correct SMP operations at
-> 
-> Fast Models support:
-> [PATCH 10/16] ARM: vexpress: introduce DCSCB support
-> [PATCH 11/16] ARM: vexpress/dcscb: add CPU use counts to the power
-> [PATCH 12/16] ARM: vexpress/dcscb: do not hardcode number of CPUs
-> [PATCH 13/16] drivers: misc: add ARM CCI support
-> [PATCH 14/16] ARM: TC2: ensure powerdown-time data is flushed from
-> [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
-> [PATCH 16/16] ARM: vexpress/dcscb: probe via device tree
-> 
+I've previously looked into this. It seems that architectures handle this
+in different ways, some use vector tables, others use a multiplex and others
+just let the end user implement the callback directly.
 
-Thanks for introducing this series.
-I am taking a look at this series. It introduced an algorithm for
-syncing and avoid racing when syncing the power status of clusters and
-CPUs. Do you think these codes could have a chance to become a generic
-framework?
+I've made an attempt to find a more common way. Though my implementation, which
+I will try to share later today for reference provides a registration function
+in drivers/pci/msi.c to provide implementations of the
+(setup|teardown)_msi_irq(s) ops. This seems slightly better than the current
+approach and doesn't break existing users - but is still ugly.
 
-The Tegra chip series had a similar design for CPU clusters and it had
-limitation that the CPU0 always needs to be the last CPU to be shut down
-before cluster power down as well. I believe it can also get benefits of
-this works. We indeed need a similar algorithm to sync CPUs power status
-before cluster power down and switching.
+At present the PCI and MSI frameworks are largely uncoupled from each other and
+so I was keen to not pollute PCI structures (e.g. pci_ops) with MSI ops. Just
+because most PCI host bridges also provide MSI support I don't think there is a
+reason why they should always come as a pair or be provided by the same chip.
 
-The "bL_entry.c", "bL_entry.S", "bL_entry.h", "vlock.h" and "vlock.S"
-looks have a chance to be a common framework for ARM platform even if it
-just support one cluster. Because some systems had the limitations for
-cluster power down. That's why the coupled cpuidle been introduced. And
-this framework could be enabled automatically if platform dependent or
-by menuconfig.
+Perhaps the solution is to support MSI controller drivers and a means to
+associate them with PCI host controller drivers?
 
-For ex,
-	select CPUS_CLUSTERS_POWER_SYNC_FRAMEWORK if SMP && CPU_PM
-
-How do you think of this suggestion?
-
-BTW, some questions...
-1. The "bL_entry_point" looks like a first run function when CPUs just
-power up, then jumping to original reset vector that it should be
-called. Do you think this should be a function and be called by reset
-handler? Or in your design, this should be called as soon as possible
-when the CPU power be resumed?
-
-2. Does the Last_man mechanism should implement in platform specific
-code to check something like cpu_online_status and if there is a
-limitation for the specific last CPU to be powered down?
-
-Thanks,
-Joseph
+Andrew Murray
