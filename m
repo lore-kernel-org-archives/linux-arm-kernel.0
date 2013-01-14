@@ -1,66 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jan 2013 09:18:14 -0800
-Subject: [PATCH 01/14] mfd: omap-usb-host: Consolidate OMAP USB-HS
- platform data
-In-Reply-To: <50F3EBEF.8040809@ti.com>
-References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
- <1357836694-30788-2-git-send-email-rogerq@ti.com>
- <20130110234537.GB15458@atomide.com> <50EFDE10.9080902@ti.com>
- <20130111181331.GM14149@atomide.com> <50F3EBEF.8040809@ti.com>
-Message-ID: <20130114171814.GT14149@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 14 Jan 2013 12:18:24 -0500 (EST)
+Subject: [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface of
+ a dying CPU is disabled
+In-Reply-To: <20130114170210.GE31341@mudshark.cambridge.arm.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-9-git-send-email-nicolas.pitre@linaro.org>
+ <20130114163902.GC31341@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1301141154130.6300@xanadu.home>
+ <20130114170210.GE31341@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1301141216020.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [130114 03:31]:
-> On 01/11/2013 08:13 PM, Tony Lindgren wrote:
-> > * Roger Quadros <rogerq@ti.com> [130111 01:43]:
-> >> Tony,
-> >>
-> >> On 01/11/2013 01:45 AM, Tony Lindgren wrote:
-> >>> * Roger Quadros <rogerq@ti.com> [130110 08:54]:
-> >>>> Let's have a single platform data structure for the OMAP's High-Speed
-> >>>> USB host subsystem instead of having 3 separate ones i.e. one for
-> >>>> board data, one for USB Host (UHH) module and one for USB-TLL module.
-> >>>>
-> >>>> This makes the code much simpler and avoids creating multiple copies of
-> >>>> platform data.
-> >>>
-> >>> I can apply just this patch alone into an immutable branch that
-> >>> we all can merge in as needed as long as we have acks for the USB
-> >>> and MFD parts.
-> >>>
-> >>> Or does this one need to be changed based on Alan's comments
-> >>> on the EHCI lib related changes?
-> >>>
-> >>
-> >> This does not depend on EHCI lib based changes but it depends on the
-> >> OMAP USB Host cleanup series posted earlier.
-> > 
-> > Can we first apply just the minimal platform_data + board file + clock
-> > changes?
-> > 
-> We could, but I'll then have to make changes to the patches in the first
-> series and re-post them. Do you want me to do that?
+On Mon, 14 Jan 2013, Will Deacon wrote:
 
-Yes please. Otherwise we'll unnecessarily complicate the dependencies between 
-arch/arm/*omap* code and the drivers. And we've certainly had enough of
-self-inflicted merge conflicts with the omap usb code already :)
- 
-> > That way I can apply those to some immutable tree for everybody to use,
-> > and we cut off the dependency to the driver changes for the rest of the
-> > patches. And then I'm off the hook for the rest of the patches :)
+> On Mon, Jan 14, 2013 at 04:54:52PM +0000, Nicolas Pitre wrote:
+> > On Mon, 14 Jan 2013, Will Deacon wrote:
 > > 
+> > > On Thu, Jan 10, 2013 at 12:20:43AM +0000, Nicolas Pitre wrote:
+> > > > Otherwise there might be some interrupts or IPIs becoming pending and the
+> > > > CPU will not enter low power mode when doing a WFI.  The effect of this
+> > > > is a CPU that loops back into the kernel, go through the first man
+> > > > election, signals itself as alive,  and prevent the cluster from being
+> > > > shut down.
+> > > > 
+> > > > This could benefit from a better solution.
+> > > > 
+> > > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > > > ---
+> > > >  arch/arm/common/bL_platsmp.c        | 1 +
+> > > >  arch/arm/common/gic.c               | 6 ++++++
+> > > >  arch/arm/include/asm/hardware/gic.h | 2 ++
+> > > >  3 files changed, 9 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
+> > > > index 0ae44123bf..6a3b251b97 100644
+> > > > --- a/arch/arm/common/bL_platsmp.c
+> > > > +++ b/arch/arm/common/bL_platsmp.c
+> > > > @@ -68,6 +68,7 @@ static void __ref bL_cpu_die(unsigned int cpu)
+> > > >  	pcpu = mpidr & 0xff;
+> > > >  	pcluster = (mpidr >> 8) & 0xff;
+> > > >  	bL_set_entry_vector(pcpu, pcluster, NULL);
+> > > > +	gic_cpu_if_down();
+> > > 
+> > > I'm starting to sound like a stuck record (and not a very tuneful one at
+> > > that) but... I think you need a barrier here.
+> > 
+> > And I'm getting puzzled at the repetition.  ;-)
 > 
-> Or you could just ack this patch ;). The platform data is specific to
-> USB host only :)
+> Sorry! This case is more interesting though, because you also want to order
+> the cpu_if_down GIC write so that it completes before we do the power_off.
 
-Well it's not just this patch. It's the clock related patches in your
-earlier seriers that will conflict with any attempts to move the clock
-data to live under drivers/clk/omap where it needs to go. And the three
-patches at the end of this series to add platform data (which look fine),
-but will likely conflict with something else. Let's try do do these changes
-in a way where the dependencies are cut to minimum where possible.
+In this case I'm leaning toward removing that gic_cpu_if_down() 
+entirely.  I'm not convinced it is necessary, and if it is then we 
+probably have a bug somewhere else.
 
-Regards,
 
-Tony
+Nicolas
