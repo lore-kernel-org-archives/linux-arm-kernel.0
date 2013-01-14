@@ -1,96 +1,31 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 14 Jan 2013 11:18:27 +0200
-Subject: [PATCH v2 1/1] usb: fsl-mxc-udc: fix build error due to
- mach/hardware.h
-In-Reply-To: <20130114091343.GB9039@nchen-desktop>
-References: <1358147897-8599-1-git-send-email-peter.chen@freescale.com>
- <20130114074858.GA10176@arwen.pp.htv.fi>
- <20130114081732.GA9039@nchen-desktop>
- <20130114085027.GF10176@arwen.pp.htv.fi>
- <20130114091343.GB9039@nchen-desktop>
-Message-ID: <20130114091827.GG10176@arwen.pp.htv.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Jan 2013 09:20:07 +0000
+Subject: [PATCH 3/4] serial: vt8500: UART uses gated clock rather than
+ 24Mhz reference
+In-Reply-To: <1358129060-9399-4-git-send-email-linux@prisktech.co.nz>
+References: <1358129060-9399-1-git-send-email-linux@prisktech.co.nz>
+ <1358129060-9399-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130114092007.GW23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 05:13:44PM +0800, Peter Chen wrote:
-> On Mon, Jan 14, 2013 at 10:50:27AM +0200, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Mon, Jan 14, 2013 at 04:17:35PM +0800, Peter Chen wrote:
-> > > On Mon, Jan 14, 2013 at 09:48:58AM +0200, Felipe Balbi wrote:
-> > > > Hi,
-> > > > 
-> > > > On Mon, Jan 14, 2013 at 03:18:17PM +0800, Peter Chen wrote:
-> > > > > It changes the driver to use platform_device_id rather than cpu_is_xxx
-> > > > > to determine the SoC type, and updates the platform code accordingly.
-> > > > > 
-> > > > > Compile ok at imx_v6_v7_defconfig with CONFIG_USB_FSL_USB2 enable.
-> > > > > Tested at mx51 bbg board, it works ok after enable phy clock
-> > > > > (Need another patch to fix this problem)
-> > > > > 
-> > > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > > 
-> > > > not good for -rc. You have to break this down as you're solving at least
-> > > > three different problems with this patch.
-> > > 
-> > > Felipe, all my changes are for this problem, these are fix build error and
-> > > let it work.
-> > > 
-> > >  arch/arm/mach-imx/clk-imx25.c                     |    6 +-
-> > >  arch/arm/mach-imx/clk-imx27.c                     |    6 +-
-> > >  arch/arm/mach-imx/clk-imx31.c                     |    6 +-
-> > >  arch/arm/mach-imx/clk-imx35.c                     |    6 +-
-> > >  arch/arm/mach-imx/clk-imx51-imx53.c               |    6 +-
-> > > 
-> > >  As we change the connection-id, we need to change clock file or
-> > >  the devm_clk_get will be failed.
-> > 
-> > right right, that's ok.
-> > 
-> > >  arch/arm/mach-imx/devices/devices-common.h        |    1 +
-> > >  arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c |   15 +++---
-> > > 
-> > >  We need to differentiate SoCs, so I use platform_device_id to
-> > >  instead of cpu_ix_xxx(), this is for machine file change
-> > 
-> > fair enough.
-> > 
-> > >  drivers/usb/gadget/fsl_mxc_udc.c                  |   23 +++++----
-> > >  drivers/usb/gadget/fsl_udc_core.c                 |   52 +++++++++++++-------
-> > >  drivers/usb/gadget/fsl_usb2_udc.h                 |   13 ++++--
-> > >  include/linux/fsl_devices.h                       |    8 +++
-> > > 
-> > >  Need to get platform_device_id at driver, and replace the cpu_is_xxx to
-> > >  platform_device_id. Meanwhile, needs a solution for replace
-> > >  MX35_IO_ADDRESS.
-> > 
-> > ok, here we go:
-> > 
-> > You just listed to me three different fixes and each fix should be on a
-> > separate patch. Meaning that you should have one single patch to convert
-> > MX35_IO_ADDRESS() into ioremap(), another patch should be removing
-> > cpu_is_xxx() and the third one fixing connection-id.
-> > 
-> > As you might remember, we want patches to be self-contained logical
-> > units and your patch contains 3 of such logical units.
-> > 
-> 
-> OK, three patches. Thanks.
-> 
-> The reason I thought two patches is this build break contains two problems,
-> (MX35_IO_ADDRESS & cpu_is_xxx()).
-> I would like fix it together, in that case, the git bisect will only
-> show one build error at most.
+On Mon, Jan 14, 2013 at 03:04:18PM +1300, Tony Prisk wrote:
+> -	if (vt8500_port->clk) {
+> -		vt8500_port->uart.uartclk = clk_get_rate(vt8500_port->clk);
+> -	} else {
+> -		/* use the default of 24Mhz if not specified and warn */
+> -		pr_warn("%s: serial clock source not specified\n", __func__);
+> -		vt8500_port->uart.uartclk = 24000000;
+> +	if (IS_ERR(vt8500_port->clk)) {
+> +		dev_err(&pdev->dev, "failed to get clock\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +
+> +	ret = clk_prepare_enable(vt8500_port->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable clock\n");
+> +		goto err;
 
-right, still those are two different problems, so they should be fixed
-in two separate patches, I'm sorry.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130114/a8627afa/attachment.sig>
+Looks like you get rid of the initialization of vt8500_port->uart.uartclk
+here.  Was that intentional?
