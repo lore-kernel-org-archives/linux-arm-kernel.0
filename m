@@ -1,65 +1,34 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 14 Jan 2013 17:13:09 -0500 (EST)
-Subject: Early kernel hang with big DTB appended
-In-Reply-To: <20130111164531.GC13025@pengutronix.de>
-References: <7811936.npteFbuYu2@amdc1227>
- <20130111164531.GC13025@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1301141655570.6300@xanadu.home>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 14 Jan 2013 14:16:38 -0800
+Subject: [GIT PULL] timer: vt8500: Move timer code to drivers/clocksource
+In-Reply-To: <1358140171-25390-1-git-send-email-linux@prisktech.co.nz>
+References: <1358140171-25390-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130114221638.GA28091@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013, Sascha Hauer wrote:
-
-> On Thu, Jan 03, 2013 at 04:55:00PM +0100, Tomasz Figa wrote:
-> > Hi,
-> > 
-> > I'm observing strange behavior when booting 3.8-rc1 and -rc2 with appended 
-> > DTB. The kernel hangs very early when the DTB is bigger than some 
-> > threshold somewhere around 24 KiB. With fullest possible low level UART 
-> > debugging (and printk patched to use printascii) I'm receiving following 
-> > output:
-> > 
-> > Uncompressing Linux... done, booting the kernel.
-> > Booting Linux on physical CPU 0xa00
-> > Linux version 3.8.0-rc1-00073-gdf6efca-dirty (t.figa at amdc1227) (gcc 
-> > version 4.5.2 (Gentoo 4.5.2 p1.2, pie-0.4.5) ) #2 SMP PREEMPT Thu Jan 3 
-> > 15:37:35 CET 2013
-> > CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
-> > CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> > 
-> > I tested on two Exynos-based boards (exynos4210-trats and one internal 
-> > exynos4412-based board) and same happens on both.
-> > 
-> > Do you have any ideas?
+On Mon, Jan 14, 2013 at 06:09:30PM +1300, Tony Prisk wrote:
+> Hi Olof,
 > 
-> Another thing besides the things already mentioned is that the dtb may
-> not cross a 1MiB boundary. The Kernel uses a single 1Mib section
-> (aligned to 1Mib) to initially map the dtb. Once you cross that boundary
-> parts of the dtb won't be accessible for the Kernel anymore.
+> Not sure if I have done this correctly but this is the patch to move the
+> vt8500/timer.c code into drivers/clocksource.
+> 
+> I based it on timer/cleanup from armsoc (hopefully this is right - if not, a
+> few pointers in the right direction would be appreciated).
+> 
+> Regards
+> Tony P
+> 
+> 
+> The following changes since commit 1c2584c3a1c882fec729147a46d822522552e38c:
+> 
+>   ARM: sunxi: fix struct sys_timer removal (2013-01-08 10:50:43 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://server.prisktech.co.nz/git/linuxwmt.git tags/vt8500/timer
 
-Crap.  You're right.  This patch should fix this issue.
-
-@Tomasz: please could you confirm this fixes your initial problem?
+Thanks, pulled and merged into next/cleanup.
 
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 4eee351f46..61fcb18c7e 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -246,6 +246,7 @@ __create_page_tables:
- 
- 	/*
- 	 * Then map boot params address in r2 if specified.
-+	 * We map 2 sections in case the ATAGs/DTB crosses a section boundary.
- 	 */
- 	mov	r0, r2, lsr #SECTION_SHIFT
- 	movs	r0, r0, lsl #SECTION_SHIFT
-@@ -253,6 +254,8 @@ __create_page_tables:
- 	addne	r3, r3, #PAGE_OFFSET
- 	addne	r3, r4, r3, lsr #(SECTION_SHIFT - PMD_ORDER)
- 	orrne	r6, r7, r0
-+	strne	r6, [r3], #1 << PMD_ORDER
-+	addne	r6, r6, #1 << SECTION_SHIFT
- 	strne	r6, [r3]
- 
- #ifdef CONFIG_DEBUG_LL
+-Olof
