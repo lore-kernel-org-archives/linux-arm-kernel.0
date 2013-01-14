@@ -1,40 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Jan 2013 17:40:20 +0000
-Subject: [PATCH] arm: kernel/perf_event_cpu.c: fix error null pointer
- dereference check
-In-Reply-To: <20130114173826.GA917@gmail.com>
-References: <1358183933-29160-1-git-send-email-dinggnu@gmail.com>
- <20130114172346.GK23505@n2100.arm.linux.org.uk>
- <20130114173826.GA917@gmail.com>
-Message-ID: <20130114174020.GH31341@mudshark.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 Jan 2013 10:42:22 -0700
+Subject: [PATCH] ARM: at91: fix board-rm9200-dt after sys_timer conversion
+Message-ID: <1358185342-7518-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 05:38:26PM +0000, Cong Ding wrote:
-> On Mon, Jan 14, 2013 at 05:23:46PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Jan 14, 2013 at 05:18:53PM +0000, Cong Ding wrote:
-> > > the pointer cpu_pmu is used without null pointer dereference check, and is
-> > > checked after the using of it, so we move the null pointer check to before the
-> > > first use.
-> > 
-> > The NULL pointer check is not necessary.  cpu_pmu_init() is called
-> > after cpu_pmu has already been dereferenced by its caller:
-> > 
-> >         cpu_pmu = pmu;
-> >         cpu_pmu->plat_device = pdev;
-> >         cpu_pmu_init(cpu_pmu);
-> > 
-> > So...
-> > 
-> > > -	/* Ensure the PMU has sane values out of reset. */
-> > > -	if (cpu_pmu && cpu_pmu->reset)
-> > 
-> > Just replace this with:
-> > 	if (cpu_pmu->reset)
-> Thanks Russell, I will send version 2.
+From: Joachim Eastwood <manabian@gmail.com>
 
-No need, I've taken this into my perf/updates branch.
+After "ARM: delete struct sys_timer" board-rm9200-dt
+fails compilation with the following error:
 
-Thanks,
+  CC      arch/arm/mach-at91/board-rm9200-dt.o
+arch/arm/mach-at91/board-rm9200-dt.c:50:2: error: unknown field 'timer' specified in initializer
+arch/arm/mach-at91/board-rm9200-dt.c:50:13: error: 'at91rm9200_timer' undeclared here (not in a function)
+make[1]: *** [arch/arm/mach-at91/board-rm9200-dt.o] Error 1
+make: *** [arch/arm/mach-at91] Error 2
 
-Will
+This is a fall out from the timer conversion. Fix it by
+converting board-rm9200-dt to use new timer init
+function as well.
+
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Olof, Arnd, another fix for the timer-cleanup branch in arm-soc.
+
+ arch/arm/mach-at91/board-rm9200-dt.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-at91/board-rm9200-dt.c b/arch/arm/mach-at91/board-rm9200-dt.c
+index 5f9ce3d..3fcb662 100644
+--- a/arch/arm/mach-at91/board-rm9200-dt.c
++++ b/arch/arm/mach-at91/board-rm9200-dt.c
+@@ -47,7 +47,7 @@ static const char *at91rm9200_dt_board_compat[] __initdata = {
+ };
+ 
+ DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
+-	.timer		= &at91rm9200_timer,
++	.init_time      = at91rm9200_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= at91rm9200_dt_initialize,
+-- 
+1.7.10.4
