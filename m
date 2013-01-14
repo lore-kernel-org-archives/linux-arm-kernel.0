@@ -1,61 +1,87 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 14 Jan 2013 09:52:50 +0200
-Subject: [PATCH 2/2] ARM: tegra: Use DT /cpu node to detect number of CPU core
-In-Reply-To: <1358149970-28156-1-git-send-email-hdoyu@nvidia.com>
-References: <1358149970-28156-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1358149970-28156-2-git-send-email-hdoyu@nvidia.com>
+Date: Mon, 14 Jan 2013 09:52:49 +0200
+Subject: [PATCH 1/2] ARM: kernel: DT cpu map validity check helper function
+Message-ID: <1358149970-28156-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SCU based detection only works with Cortex-A9 MP and it doesn't
-support ones with multiple clusters. The only way to detect number of
-CPU core correctly is with DT /cpu node. If DT /cpu node based
-detection fails, we just simply fall back a single core in Tegra SoCs.
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
-Based on the discussion:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140608.html
----
- arch/arm/mach-tegra/platsmp.c |   17 +++--------------
- 1 file changed, 3 insertions(+), 14 deletions(-)
+Since the introduction of /cpu nodes bindings for ARM and the
+corresponding parse function arm_dt_init_cpu_maps(), the cpu_logical_map
+and the number of possible CPUs are set according to the DT /cpu
+nodes entries. Currently most of the existing ARM SMP platforms detect the
+number of cores through HW probing in their .smp_init_cpus functions and set
+the possible CPU mask accordingly.
+This method should be upgraded so that the CPU counting mechanism will be
+based on DT, keeping legacy HW probing mechanism as a fall back solution.
 
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 6867030..456e7cc 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -24,6 +24,7 @@
- #include <asm/mach-types.h>
- #include <asm/smp_scu.h>
- #include <asm/smp_plat.h>
-+#include <asm/prom.h>
+In order to implement this fall back solution mechanism, the ARM DT code
+should provide a helper function to platforms to check if the cpu map
+has been properly initialized through DT. If the check fails the
+platform will resort to legacy HW based cores counting mechanism.
+
+This patch implements a helper function that platforms can call to check
+whether DT based cpu map initialization and cores count were completed
+successfully.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/include/asm/prom.h |   10 ++++++++++
+ arch/arm/kernel/devtree.c   |    6 ++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+index a219227..487614a 100644
+--- a/arch/arm/include/asm/prom.h
++++ b/arch/arm/include/asm/prom.h
+@@ -18,6 +18,15 @@
+ extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+ extern void arm_dt_memblock_reserve(void);
+ extern void __init arm_dt_init_cpu_maps(void);
++/*
++ * Return true if cpu map initialization has been
++ * carried out correctly from DT
++ */
++static inline bool __init arm_dt_cpu_map_valid(void)
++{
++	extern bool valid_dt_cpu_map;
++	return valid_dt_cpu_map;
++}
  
- #include <mach/powergate.h>
+ #else /* CONFIG_OF */
  
-@@ -177,22 +178,10 @@ done:
- 	return status;
+@@ -28,6 +37,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
+ 
+ static inline void arm_dt_memblock_reserve(void) { }
+ static inline void arm_dt_init_cpu_maps(void) { }
++static inline bool __init arm_dt_cpu_map_valid(void) { return false; }
+ 
+ #endif /* CONFIG_OF */
+ #endif /* ASMARM_PROM_H */
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 70f1bde..4d8d1ec 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -64,6 +64,11 @@ void __init arm_dt_memblock_reserve(void)
  }
  
--/*
-- * Initialise the CPU possible map early - this describes the CPUs
-- * which may be present or become present in the system.
-- */
- static void __init tegra_smp_init_cpus(void)
- {
--	unsigned int i, ncores = scu_get_core_count(scu_base);
--
--	if (ncores > nr_cpu_ids) {
--		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
--			ncores, nr_cpu_ids);
--		ncores = nr_cpu_ids;
--	}
--
--	for (i = 0; i < ncores; i++)
--		set_cpu_possible(i, true);
-+	if (!arm_dt_cpu_map_valid())
-+		set_cpu_possible(0, true);
- 
- 	set_smp_cross_call(gic_raise_softirq);
- }
+ /*
++ * Export DT cpu map validity flag to platforms
++ */
++bool valid_dt_cpu_map __initdata;
++
++/*
+  * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
+  * and builds the cpu logical map array containing MPIDR values related to
+  * logical cpus
+@@ -158,6 +163,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 	 * a reg property, the DT CPU list can be considered valid and the
+ 	 * logical map created in smp_setup_processor_id() can be overridden
+ 	 */
++	valid_dt_cpu_map = true;
+ 	for (i = 0; i < cpuidx; i++) {
+ 		set_cpu_possible(i, true);
+ 		cpu_logical_map(i) = tmp_map[i];
 -- 
 1.7.9.5
