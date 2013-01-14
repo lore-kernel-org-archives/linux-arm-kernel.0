@@ -1,108 +1,49 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 14 Jan 2013 20:56:33 +0800
-Subject: [PATCH v3 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
- platform_device_id
-In-Reply-To: <20130114110600.GI10874@arwen.pp.htv.fi>
-References: <1358158361-25550-2-git-send-email-peter.chen@freescale.com>
- <20130114101642.GB10874@arwen.pp.htv.fi>
- <50F3DB8D.6050104@pengutronix.de>
- <20130114102444.GD10874@arwen.pp.htv.fi>
- <50F3DF1D.3040706@pengutronix.de>
- <20130114103952.GF10874@arwen.pp.htv.fi>
- <50F3E301.7040509@pengutronix.de>
- <20130114105357.GH10874@arwen.pp.htv.fi>
- <50F3E5E8.2000905@pengutronix.de>
- <20130114110600.GI10874@arwen.pp.htv.fi>
-Message-ID: <20130114125632.GA30157@nchen-desktop>
+Date: Mon, 14 Jan 2013 20:58:56 +0800
+Subject: [PATCH v3 2/3] usb: fsl_mxc_udc: replace MX35_IO_ADDRESS to
+ ioremap
+In-Reply-To: <20130114101708.GC10874@arwen.pp.htv.fi>
+References: <1358158361-25550-1-git-send-email-peter.chen@freescale.com>
+ <1358158361-25550-3-git-send-email-peter.chen@freescale.com>
+ <20130114101708.GC10874@arwen.pp.htv.fi>
+Message-ID: <20130114125855.GB30157@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 01:06:00PM +0200, Felipe Balbi wrote:
-> On Mon, Jan 14, 2013 at 12:03:04PM +0100, Marc Kleine-Budde wrote:
-> > On 01/14/2013 11:53 AM, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Mon, Jan 14, 2013 at 11:50:41AM +0100, Marc Kleine-Budde wrote:
-> > >> On 01/14/2013 11:39 AM, Felipe Balbi wrote:
-> > >>> On Mon, Jan 14, 2013 at 11:34:05AM +0100, Marc Kleine-Budde wrote:
-> > >>>> On 01/14/2013 11:24 AM, Felipe Balbi wrote:
-> > >>>>> On Mon, Jan 14, 2013 at 11:18:53AM +0100, Marc Kleine-Budde wrote:
-> > >>>>>> On 01/14/2013 11:16 AM, Felipe Balbi wrote:
-> > >>>>>>> Hi,
-> > >>>>>>>
-> > >>>>>>> On Mon, Jan 14, 2013 at 06:12:39PM +0800, Peter Chen wrote:
-> > >>>>>>>> @@ -2756,22 +2753,41 @@ static int fsl_udc_otg_resume(struct device *dev)
-> > >>>>>>>>  
-> > >>>>>>>>  	return fsl_udc_resume(NULL);
-> > >>>>>>>>  }
-> > >>>>>>>> -
-> > >>>>>>>>  /*-------------------------------------------------------------------------
-> > >>>>>>>>  	Register entry point for the peripheral controller driver
-> > >>>>>>>>  --------------------------------------------------------------------------*/
-> > >>>>>>>> -
-> > >>>>>>>> +static const struct platform_device_id fsl_udc_devtype[] = {
-> > >>>>>>>> +	{
-> > >>>>>>>> +		.name = "imx-udc-mx25",
-> > >>>>>>>> +		.driver_data = IMX25_UDC,
-> > >>>>>>>> +	}, {
-> > >>>>>>>> +		.name = "imx-udc-mx27",
-> > >>>>>>>> +		.driver_data = IMX27_UDC,
-> > >>>>>>>> +	}, {
-> > >>>>>>>> +		.name = "imx-udc-mx31",
-> > >>>>>>>> +		.driver_data = IMX31_UDC,
-> > >>>>>>>> +	}, {
-> > >>>>>>>> +		.name = "imx-udc-mx35",
-> > >>>>>>>> +		.driver_data = IMX35_UDC,
-> > >>>>>>>> +	}, {
-> > >>>>>>>> +		.name = "imx-udc-mx51",
-> > >>>>>>>> +		.driver_data = IMX51_UDC,
-> > >>>>>>>> +	}
-> > >>>>>>>> +};
-> > >>>>>>>
-> > >>>>>>> I wonder if your driver-data is actually needed since you can use string
-> > >>>>>>> comparisson to achieve the exact same outcome.
-> > >>>>>>
-> > >>>>>> Why use a string compare, if the kernel infrastructure already does this
-> > >>>>>> for you?
-> > >>>>>
-> > >>>>> what do you mean ? What kernel infrastructure is doing waht for me ?
-> > >>>>
-> > >>>> The kernel infrastructure is doing the string compare for you to match
-> > >>>> the device against the driver (via platform_device_id->name). You get
-> > >>>> the a pointer to the driver_data for free. So you don't need any string
-> > >>>> compare in the driver later.
-> > >>>
-> > >>> but current driver data is just duplicating name with an integer, it's
-> > >>> pretty useless driver data.
-> > >>
-> > >> I don't think so - another argument:
-> > >> Less code. As struct platform_device_id is a static array the space is
-> > >> allocated anyway. So it doesn't make any difference if driver_data is
-> > >> NULL or not. Later you just need to make an integer comparison instead
-> > >> of a call to a strcmp(), if you have a switch/case and IMX*_UDC is an
-> > >> enum, the compiler will warn you if you've missed an IMX variant.
-> > > 
-> > > fair enough, but then don't create a different enum value for each imx
-> > > instance if they're mostly the same. Differentiate only what's actually
-> > > different.
+On Mon, Jan 14, 2013 at 12:17:08PM +0200, Felipe Balbi wrote:
+> On Mon, Jan 14, 2013 at 06:12:40PM +0800, Peter Chen wrote:
+> > As mach/hardware.h is deleted, we can't visit platform code at driver.
+> > It has no phy driver to combine with this controller, so it has to use
+> > ioremap to map phy address as a workaround.
 > > 
-> > Usually there isn't any Changelog between IP cores used in the different
-> > fsl processors (at least available outside of fsl), that makes it quite
-> > difficult to say if something found on one imx is really the same as on
-> > the other one. And they (usually) don't provide any versioning
-> > information in a register or the documentation.
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/gadget/fsl_mxc_udc.c |   12 +++++++-----
+> >  1 files changed, 7 insertions(+), 5 deletions(-)
 > > 
-> > just my 2?
+> > diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
+> > index 6df45f7..0e858e6 100644
+> > --- a/drivers/usb/gadget/fsl_mxc_udc.c
+> > +++ b/drivers/usb/gadget/fsl_mxc_udc.c
+> > @@ -23,7 +23,8 @@ static struct clk *mxc_per_clk;
+> >  static struct clk *mxc_ipg_clk;
+> >  
+> >  /* workaround ENGcm09152 for i.MX35 */
+> > -#define USBPHYCTRL_OTGBASE_OFFSET	0x608
+> > +#define MX35_USBPHYCTRL_OFFSET		0x600
+> > +#define USBPHYCTRL_OTGBASE_OFFSET	0x8
+> >  #define USBPHYCTRL_EVDO			(1 << 23)
+> >  
+> >  int fsl_udc_clk_init(enum fsl_udc_type devtype, struct platform_device *pdev)
+> > @@ -83,15 +84,16 @@ void fsl_udc_clk_finalize(enum fsl_udc_type devtype,
+> >  	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+> >  	if (devtype == IMX35_UDC) {
+> >  		unsigned int v;
+> > +		void __iomem *phy_regs = ioremap((unsigned long)pdata->regs +
+> > +						MX35_USBPHYCTRL_OFFSET, 512);
 > 
-> $SUBJECT is trying to differentiate a single feature (or maybe two) to
-> replace cpu_is_xxx(), then expose that on driver_data without creating
-> one enum value for each release from fsl.
-
-Felipe, every one or two SoCs may have their special operations for
-integrate PHY interface, clk operation, or workaround for IC limitation.
-
-Maybe, it will add more future or SoCs (maybe not for this driver)
-in the future, using enum is easier than string comparison for expanding something.
+> as I said before, this should be passed via struct resource, not pdata.
+My careless, will change at next version
 > 
 > -- 
 > balbi
