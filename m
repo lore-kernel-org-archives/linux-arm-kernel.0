@@ -1,33 +1,47 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Mon, 14 Jan 2013 14:05:14 -0500
-Subject: [PATCH] mmc: sdhci: query card presence from cd-gpio before
- asking SDHCI
-In-Reply-To: <1355210622-9753-1-git-send-email-shawn.guo@linaro.org> (Shawn
- Guo's message of "Tue, 11 Dec 2012 15:23:42 +0800")
-References: <1355210622-9753-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <87y5fvtwk5.fsf@laptop.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Jan 2013 20:09:27 +0100
+Subject: [PATCH] ARM: sunxi: Use the Synosys APB UART instead of ns8250
+Message-ID: <1358190567-6304-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+The UART controller used in the A10/A13 is the Synopsys DesignWare 8250.
+The wrong use of a regular 8250 driver may lead to a oops during kernel
+boot with "irq 17: nobody cared", because the apb UART as an extra
+interrupt that gets raised when writing to the LCR when busy.
 
-On Tue, Dec 11 2012, Shawn Guo wrote:
-> Call mmc_gpio_get_cd() to query card presence from cd-gpio before
-> asking SDHCI.  The rationale behind this change is that flag
-> SDHCI_QUIRK_BROKEN_CARD_DETECTION is designed for SDHCI controller to
-> tell that SDHCI_PRESENT_STATE is broken, and it should be used for this
-> case only.  So when cd-gpio is being used, the controller should set
-> the flag to tell that SDHCI_PRESENT_STATE is not available.
->
-> However, the existing code will skip checking cd-gpio as long as flag
-> SDHCI_QUIRK_BROKEN_CARD_DETECTION is set.  Change the querying order
-> between cd-gpio and SDHCI to support the rationale above.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sunxi.dtsi |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Thanks, pushed to mmc-next for 3.9.
-
-- Chris.
+diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+index 8bbc2bf..8b36abe 100644
+--- a/arch/arm/boot/dts/sunxi.dtsi
++++ b/arch/arm/boot/dts/sunxi.dtsi
+@@ -60,19 +60,21 @@
+ 		};
+ 
+ 		uart0: uart at 01c28000 {
+-			compatible = "ns8250";
++			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+ 			interrupts = <1>;
+ 			reg-shift = <2>;
++			reg-io-width = <4>;
+ 			clock-frequency = <24000000>;
+ 			status = "disabled";
+ 		};
+ 
+ 		uart1: uart at 01c28400 {
+-			compatible = "ns8250";
++			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28400 0x400>;
+ 			interrupts = <2>;
+ 			reg-shift = <2>;
++			reg-io-width = <4>;
+ 			clock-frequency = <24000000>;
+ 			status = "disabled";
+ 		};
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.10.4
