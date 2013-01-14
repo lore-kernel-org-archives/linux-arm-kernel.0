@@ -1,109 +1,74 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 14 Jan 2013 18:12:41 +0800
-Subject: [PATCH v3 3/3] ARM: i.MX clock: Change the connection-id for
- fsl-usb2-udc
-In-Reply-To: <1358158361-25550-1-git-send-email-peter.chen@freescale.com>
-References: <1358158361-25550-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1358158361-25550-4-git-send-email-peter.chen@freescale.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Mon, 14 Jan 2013 11:15:42 +0100
+Subject: [GIT PULL] ste_dma40 updates for 3.9
+Message-ID: <20130114101542.GA5363@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we use platform_device_id for fsl-usb2-udc driver, it needs to
-change clk connection-id, or the related devm_clk_get will be failed.
+Hello Arnd, Olof,
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/mach-imx/clk-imx25.c       |    6 +++---
- arch/arm/mach-imx/clk-imx27.c       |    6 +++---
- arch/arm/mach-imx/clk-imx31.c       |    6 +++---
- arch/arm/mach-imx/clk-imx35.c       |    6 +++---
- arch/arm/mach-imx/clk-imx51-imx53.c |    6 +++---
- 5 files changed, 15 insertions(+), 15 deletions(-)
+This contains a series of updates and fixes for the ste_dma40 driver.
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index b197aa7..67e353d 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -254,9 +254,9 @@ int __init mx25_clocks_init(void)
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usbotg_ahb], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx25");
-+	clk_register_clkdev(clk[usbotg_ahb], "ahb", "imx-udc-mx25");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx25");
- 	clk_register_clkdev(clk[nfc_ipg_per], NULL, "imx25-nand.0");
- 	/* i.mx25 has the i.mx35 type cspi */
- 	clk_register_clkdev(clk[cspi1_ipg], NULL, "imx35-cspi.0");
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 4c1d1e4..1ffe3b5 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -236,9 +236,9 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
- 	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "imx27-camera.0");
- 	clk_register_clkdev(clk[per4_gate], "per", "imx27-camera.0");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "imx-udc-mx27");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "mxc-ehci.0");
-diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-index 8be64e0..ef66eaf 100644
---- a/arch/arm/mach-imx/clk-imx31.c
-+++ b/arch/arm/mach-imx/clk-imx31.c
-@@ -139,9 +139,9 @@ int __init mx31_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[usb_div_post], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usb_gate], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div_post], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_gate], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div_post], "per", "imx-udc-mx31");
-+	clk_register_clkdev(clk[usb_gate], "ahb", "imx-udc-mx31");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx31");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
- 	/* i.mx31 has the i.mx21 type uart */
- 	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index 66f3d65..69fe9c8 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -251,9 +251,9 @@ int __init mx35_clocks_init()
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usbotg_gate], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx35");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx35");
-+	clk_register_clkdev(clk[usbotg_gate], "ahb", "imx-udc-mx35");
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
- 	clk_register_clkdev(clk[nfc_div], NULL, "imx25-nand.0");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 579023f..fb7cb84 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -269,9 +269,9 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[usboh3_per_gate], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usboh3_gate], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usboh3_gate], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usboh3_per_gate], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usboh3_gate], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usboh3_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usboh3_per_gate], "per", "imx-udc-mx51");
-+	clk_register_clkdev(clk[usboh3_gate], "ipg", "imx-udc-mx51");
-+	clk_register_clkdev(clk[usboh3_gate], "ahb", "imx-udc-mx51");
- 	clk_register_clkdev(clk[nfc_gate], NULL, "imx51-nand");
- 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
+The driver is specific for the ux500, and the patches were acked by both Linus
+Walleij, and Vinod Koul (dmaengine), who agreed to push this through arm-soc.
+
+Can you please pull those in for -next?
+
+Thanks,
+Fabio
+
+
+The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+
+  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/fabiobaltieri/linux.git tags/ux500-dma40
+
+for you to fetch changes up to da2ac56a1bc9c6c56244aa9ca990d5c5c7574b5f:
+
+  dmaengine: set_dma40: balance clock in probe fail code (2013-01-14 10:51:16 +0100)
+
+----------------------------------------------------------------
+Various fixes and updates for the ste_dma40 driver.
+
+----------------------------------------------------------------
+Fabio Baltieri (7):
+      dmaengine: ste_dma40: add a done queue for completed descriptors
+      dmaengine: ste_dma40: add missing kernel-doc entry
+      dmaengine: ste_dma40: minor cosmetic fixes
+      dmaengine: ste_dma40: minor code readability fixes
+      dmaengine: ste_dma40: add software lli support
+      dmaengine: set_dma40: ignore spurious interrupts
+      dmaengine: set_dma40: balance clock in probe fail code
+
+Gerald Baeza (2):
+      dmaengine: ste_dma40: support fixed physical channel allocation
+      dmaengine: ste_dma40: physical channels number correction
+
+Narayanan (1):
+      dmaengine: ste_dma40: reset priority bit for logical channels
+
+Narayanan G (1):
+      dmaengine: ste_dma40: don't check for pm_runtime_suspended()
+
+Per Forlin (3):
+      dmaengine: ste_dma40: use writel_relaxed for lcxa
+      dmaengine: ste_dma40: set dma max seg size
+      dmaengine: ste_dma40: limit burst size to 16
+
+Rabin Vincent (1):
+      dmaengine: ste_dma40: don't allow high priority dest event lines
+
+Tong Liu (1):
+      dmaengine: ste_dma40: support more than 128 event lines
+
+ drivers/dma/ste_dma40.c                     | 489 +++++++++++++++++++++-------
+ drivers/dma/ste_dma40_ll.c                  |  29 +-
+ drivers/dma/ste_dma40_ll.h                  | 130 +++++++-
+ include/linux/platform_data/dma-ste-dma40.h |  13 +
+ 4 files changed, 518 insertions(+), 143 deletions(-)
+
 -- 
-1.7.0.4
+Fabio Baltieri
