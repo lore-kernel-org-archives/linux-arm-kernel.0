@@ -1,198 +1,159 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 14 Jan 2013 15:11:58 -0800
-Subject: [PATCH] clk: vt8500: Add support for WM8750/WM8850 PLL clocks
-In-Reply-To: <1356657882-18218-1-git-send-email-linux@prisktech.co.nz>
-References: <1356657882-18218-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130114231158.23734.65888@quantum>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 14 Jan 2013 15:49:14 -0800
+Subject: [PATCH v2] hardlockup: detect hard lockups without NMIs using
+ secondary cpus
+In-Reply-To: <1357941108-14138-1-git-send-email-ccross@android.com>
+References: <1357941108-14138-1-git-send-email-ccross@android.com>
+Message-ID: <20130114154914.6d69eb27.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Prisk (2012-12-27 17:24:41)
-> This patch adds support for the new PLL module found in WM8750 and
-> WM8850 SoCs.
-> 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+On Fri, 11 Jan 2013 13:51:48 -0800
+Colin Cross <ccross@android.com> wrote:
 
-Tony,
+> Emulate NMIs on systems where they are not available by using timer
+> interrupts on other cpus.  Each cpu will use its softlockup hrtimer
+> to check that the next cpu is processing hrtimer interrupts by
+> verifying that a counter is increasing.
 
-This has been taken into clk-next.
+Seems sensible.
 
-Thanks,
-Mike
+> This patch is useful on systems where the hardlockup detector is not
+> available due to a lack of NMIs, for example most ARM SoCs.
+> Without this patch any cpu stuck with interrupts disabled can
+> cause a hardware watchdog reset with no debugging information,
+> but with this patch the kernel can detect the lockup and panic,
+> which can result in useful debugging info.
 
-> ---
->  drivers/clk/clk-vt8500.c |  102 +++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 100 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
-> index fe25570..d3fefa4 100644
-> --- a/drivers/clk/clk-vt8500.c
-> +++ b/drivers/clk/clk-vt8500.c
-> @@ -41,6 +41,7 @@ struct clk_device {
->  
->  #define PLL_TYPE_VT8500                0
->  #define PLL_TYPE_WM8650                1
-> +#define PLL_TYPE_WM8750                2
->  
->  struct clk_pll {
->         struct clk_hw   hw;
-> @@ -298,6 +299,16 @@ static __init void vtwm_device_clk_init(struct device_node *node)
->  #define WM8650_BITS_TO_VAL(m, d1, d2)                                  \
->                                 ((d2 << 13) | (d1 << 10) | (m & 0x3FF))
->  
-> +/* Helper macros for PLL_WM8750 */
-> +#define WM8750_PLL_MUL(x)      (((x >> 16) & 0xFF) + 1)
-> +#define WM8750_PLL_DIV(x)      ((((x >> 8) & 1) + 1) * (1 << (x & 7)))
-> +
-> +#define WM8750_BITS_TO_FREQ(r, m, d1, d2)                              \
-> +                               (r * (m+1) / ((d1+1) * (1 << d2)))
-> +
-> +#define WM8750_BITS_TO_VAL(f, m, d1, d2)                               \
-> +               ((f << 24) | ((m - 1) << 16) | ((d1 - 1) << 8) | d2)
-> +
->  
->  static void vt8500_find_pll_bits(unsigned long rate, unsigned long parent_rate,
->                                 u32 *multiplier, u32 *prediv)
-> @@ -366,11 +377,82 @@ static void wm8650_find_pll_bits(unsigned long rate, unsigned long parent_rate,
->         *divisor2 = div2;
->  }
->  
-> +static u32 wm8750_get_filter(u32 parent_rate, u32 divisor1)
+But we don't get the target cpu's stack, yes?  That's a pretty big loss.
+
+>
+> ...
+>
+> +#ifdef CONFIG_HARDLOCKUP_DETECTOR_OTHER_CPU
+> +static unsigned int watchdog_next_cpu(unsigned int cpu)
 > +{
-> +       /* calculate frequency (MHz) after pre-divisor */
-> +       u32 freq = (parent_rate / 1000000) / (divisor1 + 1);
+> +	cpumask_t cpus = watchdog_cpus;
+
+cpumask_t can be tremendously huge and putting one on the stack is
+risky.  Can we use watchdog_cpus directly here?  Perhaps with a lock? 
+or take a copy into a static local, with a lock?
+
+> +	unsigned int next_cpu;
 > +
-> +       if ((freq < 10) || (freq > 200))
-> +               pr_warn("%s: PLL recommended input frequency 10..200Mhz (requested %d Mhz)\n",
-> +                               __func__, freq);
+> +	next_cpu = cpumask_next(cpu, &cpus);
+> +	if (next_cpu >= nr_cpu_ids)
+> +		next_cpu = cpumask_first(&cpus);
 > +
-> +       if (freq >= 166)
-> +               return 7;
-> +       else if (freq >= 104)
-> +               return 6;
-> +       else if (freq >= 65)
-> +               return 5;
-> +       else if (freq >= 42)
-> +               return 4;
-> +       else if (freq >= 26)
-> +               return 3;
-> +       else if (freq >= 16)
-> +               return 2;
-> +       else if (freq >= 10)
-> +               return 1;
+> +	if (next_cpu == cpu)
+> +		return nr_cpu_ids;
 > +
-> +       return 0;
+> +	return next_cpu;
 > +}
 > +
-> +static void wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
-> +                               u32 *filter, u32 *multiplier, u32 *divisor1, u32 *divisor2)
+> +static int is_hardlockup_other_cpu(unsigned int cpu)
 > +{
-> +       u32 mul, div1, div2;
-> +       u32 best_mul, best_div1, best_div2;
-> +       unsigned long tclk, rate_err, best_err;
+> +	unsigned long hrint = per_cpu(hrtimer_interrupts, cpu);
 > +
-> +       best_err = (unsigned long)-1;
+> +	if (per_cpu(hrtimer_interrupts_saved, cpu) == hrint)
+> +		return 1;
 > +
-> +       /* Find the closest match (lower or equal to requested) */
-> +       for (div1 = 1; div1 >= 0; div1--)
-> +               for (div2 = 7; div2 >= 0; div2--)
-> +                       for (mul = 0; mul <= 255; mul++) {
-> +                               tclk = parent_rate * (mul + 1) / ((div1 + 1) * (1 << div2));
-> +                               if (tclk > rate)
-> +                                       continue;
-> +                               /* error will always be +ve */
-> +                               rate_err = rate - tclk;
-> +                               if (rate_err == 0) {
-> +                                       *filter = wm8750_get_filter(parent_rate, div1);
-> +                                       *multiplier = mul;
-> +                                       *divisor1 = div1;
-> +                                       *divisor2 = div2;
-> +                                       return;
-> +                               }
-> +
-> +                               if (rate_err < best_err) {
-> +                                       best_err = rate_err;
-> +                                       best_mul = mul;
-> +                                       best_div1 = div1;
-> +                                       best_div2 = div2;
-> +                               }
-> +                       }
-> +
-> +       /* if we got here, it wasn't an exact match */
-> +       pr_warn("%s: requested rate %lu, found rate %lu\n", __func__, rate,
-> +                                                       rate - best_err);
-> +
-> +       *filter = wm8750_get_filter(parent_rate, best_div1);
-> +       *multiplier = best_mul;
-> +       *divisor1 = best_div1;
-> +       *divisor2 = best_div2;
+> +	per_cpu(hrtimer_interrupts_saved, cpu) = hrint;
+> +	return 0;
 > +}
-> +
->  static int vtwm_pll_set_rate(struct clk_hw *hw, unsigned long rate,
->                                 unsigned long parent_rate)
->  {
->         struct clk_pll *pll = to_clk_pll(hw);
-> -       u32 mul, div1, div2;
-> +       u32 filter, mul, div1, div2;
->         u32 pll_val;
->         unsigned long flags = 0;
->  
-> @@ -385,6 +467,9 @@ static int vtwm_pll_set_rate(struct clk_hw *hw, unsigned long rate,
->                 wm8650_find_pll_bits(rate, parent_rate, &mul, &div1, &div2);
->                 pll_val = WM8650_BITS_TO_VAL(mul, div1, div2);
->                 break;
-> +       case PLL_TYPE_WM8750:
-> +               wm8750_find_pll_bits(rate, parent_rate, &filter, &mul, &div1, &div2);
-> +               pll_val = WM8750_BITS_TO_VAL(filter, mul, div1, div2);
->         default:
->                 pr_err("%s: invalid pll type\n", __func__);
->                 return 0;
-> @@ -405,7 +490,7 @@ static long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
->                                 unsigned long *prate)
->  {
->         struct clk_pll *pll = to_clk_pll(hw);
-> -       u32 mul, div1, div2;
-> +       u32 filter, mul, div1, div2;
->         long round_rate;
->  
->         switch (pll->type) {
-> @@ -417,6 +502,9 @@ static long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
->                 wm8650_find_pll_bits(rate, *prate, &mul, &div1, &div2);
->                 round_rate = WM8650_BITS_TO_FREQ(*prate, mul, div1, div2);
->                 break;
-> +       case PLL_TYPE_WM8750:
-> +               wm8750_find_pll_bits(rate, *prate, &filter, &mul, &div1, &div2);
-> +               round_rate = WM8750_BITS_TO_FREQ(*prate, mul, div1, div2);
->         default:
->                 round_rate = 0;
->         }
-> @@ -440,6 +528,10 @@ static unsigned long vtwm_pll_recalc_rate(struct clk_hw *hw,
->                 pll_freq = parent_rate * WM8650_PLL_MUL(pll_val);
->                 pll_freq /= WM8650_PLL_DIV(pll_val);
->                 break;
-> +       case PLL_TYPE_WM8750:
-> +               pll_freq = parent_rate * WM8750_PLL_MUL(pll_val);
-> +               pll_freq /= WM8750_PLL_DIV(pll_val);
-> +               break;
->         default:
->                 pll_freq = 0;
->         }
-> @@ -508,10 +600,16 @@ static void __init wm8650_pll_init(struct device_node *node)
->         vtwm_pll_clk_init(node, PLL_TYPE_WM8650);
->  }
->  
-> +static void __init wm8750_pll_init(struct device_node *node)
+
+This could return a bool type.
+
+> +static void watchdog_check_hardlockup_other_cpu(void)
 > +{
-> +       vtwm_pll_clk_init(node, PLL_TYPE_WM8750);
-> +}
+> +	unsigned int next_cpu;
 > +
->  static const __initconst struct of_device_id clk_match[] = {
->         { .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
->         { .compatible = "via,vt8500-pll-clock", .data = vt8500_pll_init, },
->         { .compatible = "wm,wm8650-pll-clock", .data = wm8650_pll_init, },
-> +       { .compatible = "wm,wm8750-pll-clock", .data = wm8750_pll_init, },
->         { .compatible = "via,vt8500-device-clock",
->                                         .data = vtwm_device_clk_init, },
->         { /* sentinel */ }
-> -- 
-> 1.7.9.5
+> +	/*
+> +	 * Test for hardlockups every 3 samples.  The sample period is
+> +	 *  watchdog_thresh * 2 / 5, so 3 samples gets us back to slightly over
+> +	 *  watchdog_thresh (over by 20%).
+> +	 */
+> +	if (__this_cpu_read(hrtimer_interrupts) % 3 != 0)
+> +		return;
+
+The hardwired interval Seems Wrong.  watchdog_thresh is tunable at runtime.
+
+The comment could do with some fleshing out.  *why* do we want to test
+at an interval "slightly over watchdog_thresh"?  What's going on here?
+
+> +	/* check for a hardlockup on the next cpu */
+> +	next_cpu = watchdog_next_cpu(smp_processor_id());
+> +	if (next_cpu >= nr_cpu_ids)
+> +		return;
+> +
+> +	smp_rmb();
+
+Mystery barrier (always) needs an explanatory comment, please.
+
+> +	if (per_cpu(watchdog_nmi_touch, next_cpu) == true) {
+> +		per_cpu(watchdog_nmi_touch, next_cpu) = false;
+> +		return;
+> +	}
+
+I wonder if a well-timed CPU plug/unplug could result in two CPUs
+simultaneously checking one other CPU's state.
+
+> +	if (is_hardlockup_other_cpu(next_cpu)) {
+> +		/* only warn once */
+> +		if (per_cpu(hard_watchdog_warn, next_cpu) == true)
+> +			return;
+> +
+> +		if (hardlockup_panic)
+> +			panic("Watchdog detected hard LOCKUP on cpu %u", next_cpu);
+> +		else
+> +			WARN(1, "Watchdog detected hard LOCKUP on cpu %u", next_cpu);
+
+I suggest we use messages here which make it clear to people who read
+kernel output that this was triggered by hrtimers, not by NMI.  Most
+importantly because people will need to know that the CPU which locked
+up is *not this CPU* and that any backtrace from the reporting CPU is
+misleading.
+
+Also, there was never any sense in making the LOCKUP all-caps ;)
+
+> +		per_cpu(hard_watchdog_warn, next_cpu) = true;
+> +	} else {
+> +		per_cpu(hard_watchdog_warn, next_cpu) = false;
+> +	}
+> +}
+> +#else
+> +static inline void watchdog_check_hardlockup_other_cpu(void) { return; }
+> +#endif
+> +
+>
+> ...
+>
+> --- a/lib/Kconfig.debug
+> +++ b/lib/Kconfig.debug
+> @@ -191,15 +191,27 @@ config LOCKUP_DETECTOR
+>  	  The overhead should be minimal.  A periodic hrtimer runs to
+>  	  generate interrupts and kick the watchdog task every 4 seconds.
+>  	  An NMI is generated every 10 seconds or so to check for hardlockups.
+> +	  If NMIs are not available on the platform, every 12 seconds the
+
+hm.  Is the old "4 seconds" still true/accurate/complete?
+
+> +	  hrtimer interrupt on one cpu will be used to check for hardlockups
+> +	  on the next cpu.
+>  
+>  	  The frequency of hrtimer and NMI events and the soft and hard lockup
+>  	  thresholds can be controlled through the sysctl watchdog_thresh.
+>  
+> -config HARDLOCKUP_DETECTOR
+> +config HARDLOCKUP_DETECTOR_NMI
+>  	def_bool y
+>  	depends on LOCKUP_DETECTOR && !HAVE_NMI_WATCHDOG
+>  	depends on PERF_EVENTS && HAVE_PERF_EVENTS_NMI
+
+Confused.  I'd have expected this to depend on HAVE_NMI_WATCHDOG,
+rather than -no-that.  What does "HAVE_NMI_WATCHDOG" actually mean and
+what's happening here?
+
+>
+> ...
+>
