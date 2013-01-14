@@ -1,35 +1,31 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Mon, 14 Jan 2013 10:36:57 +0100
-Subject: [PATCH v2] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
-In-Reply-To: <20130113201236.GO13433@titan.lakedaemon.net>
-References: <1588881.pi23bvqp7D@bender> <3816648.2TVsTiMOWx@bender>
- <50F02570.9050208@openwrt.org> <20130111145629.GB31640@titan.lakedaemon.net>
- <50F30DAD.3090105@openwrt.org> <20130113201236.GO13433@titan.lakedaemon.net>
-Message-ID: <50F3D1B9.9070002@openwrt.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 14 Jan 2013 11:48:45 +0200
+Subject: [PATCH 07/14] usb: ehci-omap: Instantiate PHY devices if required
+In-Reply-To: <20130111163255.GF23505@n2100.arm.linux.org.uk>
+References: <Pine.LNX.4.44L0.1301111019340.1730-100000@iolanthe.rowland.org>
+ <50F037C9.40306@ti.com> <20130111163255.GF23505@n2100.arm.linux.org.uk>
+Message-ID: <50F3D47D.1020103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/13/13 21:12, Jason Cooper a ?crit :
-> On Sun, Jan 13, 2013 at 08:40:29PM +0100, Florian Fainelli wrote:
->> Le 11/01/2013 15:56, Jason Cooper a ?crit :
->>> Florian,
->>>
->>> On Fri, Jan 11, 2013 at 03:45:04PM +0100, Florian Fainelli wrote:
->>>> Le 01/09/13 20:56, Florian Fainelli a ?crit :
->>>>> This patch adds the DTS file to support the Marvell RD-A370-A1
->>>>> (Reference Design board) also known as RD-88F6710 board. It is almost
->>>>> entirely similar to the DB-A370 board except that the first Ethernet PHY
->>>>> is SGMII-wired and the second is a switch which is RGMII-wired.
->>>> Who is going to take this patch? Since this is a new DTS file there
->>>> are little chances it breaks anything, could it be taken for an
->>>> upcoming 3.8-rc?
->>> No, only fixes go in for the current -rc.  It'll be included for v3.9, I
->>> have it in my queue.
->> Jason, I don't see this patch in the pull request you just sent for
->> 3.9, should it be? Thanks!
-> Not yet, I'm working my though the holiday backlog chronologically.
+On 01/11/2013 06:32 PM, Russell King - ARM Linux wrote:
+> On Fri, Jan 11, 2013 at 06:03:21PM +0200, Roger Quadros wrote:
+>> diff --git a/include/linux/platform_data/usb-omap.h
+>> b/include/linux/platform_data/usb-omap.h
+>> index d63eb7d..927b8a1 100644
+>> --- a/include/linux/platform_data/usb-omap.h
+>> +++ b/include/linux/platform_data/usb-omap.h
+>> @@ -38,6 +38,12 @@ enum usbhs_omap_port_mode {
+>>  	OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM
+>>  };
+>>
+>> +struct usbhs_phy_config {
+>> +	char *name;		/* binds to device driver */
+> 
+> You may wish to consider making this const.
+> 
+OK.
 
-Ok, then you might want to hold this one a little, so I add mvsdio 
-bindings to this DTS file as well. Thanks!
 --
-Florian
+cheers,
+-roger
