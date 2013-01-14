@@ -1,110 +1,76 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 14 Jan 2013 17:08:39 -0500
-Subject: [PATCH v5 3/4] ARM: KVM: arch_timers: Add timer world switch
-In-Reply-To: <50F445BC.6050507@arm.com>
-References: <20130108184259.46758.17939.stgit@ubuntu>
- <20130108184327.46758.70599.stgit@ubuntu>
- <20130114152101.GD18935@mudshark.cambridge.arm.com>
- <50F445BC.6050507@arm.com>
-Message-ID: <CANM98qLsq7=PRNu4-5-N2GaAuLFOUfpy-yEWb6LpZri3WQ8JwA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 Jan 2013 15:09:16 -0700
+Subject: [PATCH RFT 3/3] ARM: tegra: dts: seaboard: enable keyboard
+In-Reply-To: <50F134C9.1040203@nvidia.com>
+References: <1357911185-11048-1-git-send-email-ldewangan@nvidia.com>
+ <1357911185-11048-3-git-send-email-ldewangan@nvidia.com>
+ <50F09BC7.90607@wwwdotorg.org> <50F134C9.1040203@nvidia.com>
+Message-ID: <50F4820C.2050806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 12:51 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 14/01/13 15:21, Will Deacon wrote:
->> On Tue, Jan 08, 2013 at 06:43:27PM +0000, Christoffer Dall wrote:
->>> From: Marc Zyngier <marc.zyngier@arm.com>
+On 01/12/2013 03:02 AM, Laxman Dewangan wrote:
+> On Saturday 12 January 2013 04:39 AM, Stephen Warren wrote:
+>> On 01/11/2013 06:33 AM, Laxman Dewangan wrote:
+>>> Enable tegra based keyboard controller and populate the key matrix for
+>>> seaboard. The key matrix was originally on driver code which is removed
+>>> to have clean driver. The key mapping is now passed through dts file.
 >>>
->>> Do the necessary save/restore dance for the timers in the world
->>> switch code. In the process, allow the guest to read the physical
->>> counter, which is useful for its own clock_event_device.
->>
->> [...]
->>
->>> @@ -476,6 +513,7 @@ vcpu     .req    r0              @ vcpu pointer always in r0
->>>   * for the host.
->>>   *
->>>   * Assumes vcpu pointer in vcpu reg
->>> + * Clobbers r2-r4
->>>   */
->>>  .macro restore_timer_state
->>>      @ Disallow physical timer access for the guest
->>> @@ -484,6 +522,30 @@ vcpu    .req    r0              @ vcpu pointer always in r0
->>>      orr     r2, r2, #CNTHCTL_PL1PCTEN
->>>      bic     r2, r2, #CNTHCTL_PL1PCEN
->>>      mcr     p15, 4, r2, c14, c1, 0  @ CNTHCTL
->>> +
->>> +#ifdef CONFIG_KVM_ARM_TIMER
->>> +    ldr     r4, [vcpu, #VCPU_KVM]
->>> +    ldr     r2, [r4, #KVM_TIMER_ENABLED]
->>> +    cmp     r2, #0
->>> +    beq     1f
->>> +
->>> +    ldr     r2, [r4, #KVM_TIMER_CNTVOFF]
->>> +    ldr     r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
->>> +    mcrr    p15, 4, r2, r3, c14     @ CNTVOFF
->>> +    isb
->>> +
->>> +    ldr     r4, =VCPU_TIMER_CNTV_CVAL
->>> +    add     vcpu, vcpu, r4
->>> +    ldrd    r2, r3, [vcpu]
->>> +    sub     vcpu, vcpu, r4
->>> +    mcrr    p15, 3, r2, r3, c14     @ CNTV_CVAL
->>> +
->>> +    ldr     r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
->>> +    and     r2, r2, #3
->>> +    mcr     p15, 0, r2, c14, c3, 1  @ CNTV_CTL
->>> +    isb
->>
->> How many of these isbs are actually needed, given that we're going to make
->> an exception return to the guest? The last one certainly looks redundant and
->> I can't see the need for ordering CNTVOFF vs CNTV_CVAL. I can see an
->> argument to putting one *before* CNTV_CTL, but you don't have one there!
+>>> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+>>> ---
+>>> Requesting for testing on seaboard.
+>>> I generated this patch as Stephen suggested to have one patch for dt
+>>> file
+>>> entry for keys on seaboard.
+> 
+> Thanks for testing.
+
+>> Oh, and the KBC clock is marked TEGRA_PERIPH_NO_RESET for Tegra30, and
+>> also for Tegra20 in the ChromeOS kernel; why is the driver trying to
+>> assert reset on a clock that doesn't support it?
 >
-> CNTVOFF directly influences whether or not CNTV_CVAL will trigger or
-> not. Maybe I'm just being paranoid and moving the isb after CNTV_CVAL is
-> enough.
->
-> The last one is definitively superfluous.
->
+> This is something our kbc controller reset and clock design.
+> KBC controller is on Always Power ON domain so that it can work even
+> when system is in sleep.
+> The KBC clock is enabled through two places, PMC control register and
+> CAR register set.
+> KBC controller is only reset through PMC control register.
+> This is not well implemented either on our downstream or in mainline.
+> Sometime back I tried to implement it in downstream but was having lots
+> of comment and not able to complete this. Possibly we will talk
+> internally that how can we implement this.
 
-can't we also get rid of the isb on the return path then?
+I guess there's little point in the KBC driver calling the Tegra clock
+reset APIs then. Still, since the code is already there and it's not
+doing any harm, I guess it's fine to leave it there; if we ever enhance
+the clock driver to implement reset for those clocks via the PMC, it
+will all just magically work.
 
-do you agree with this patch:
+>> Once I hacked around the above issues, the driver doesn't work very well
+>> at all. There is a *long* delay between when I press a key and when it
+>> shows up (e.g. echo'd to the HDMI console). When I release the key the
+>> same keypress is generated twice. Or perhaps it's a repeat, but since
+>> it's *always* 2 extra keypresses and I doubt I always hold my finger on
+>> the key the exact same amount of time, I think it's key release that
+>> does this not repeat. I assume this would repro on any board, so you
+>> won't need Seaboard to debug it. Harmony is able to read the keyboard
+>> using the KBC.
+>>
+>> Even with the above, I was able to validate that the keymap in the
+>> Seaboard .dts file looks reasonable.
+>>
+>> However, please fix the KBC driver...
+> 
+> I did not see any issue with the 3x3 matrix. I think all these about is
+> to tuning debaunce and other parameter also. Another thing is that to
+> make sure that all pinmuxes are properly configured.
 
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index 57cfa84..7e6eedf 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -492,7 +492,6 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 	str	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
- 	bic	r2, #1			@ Clear ENABLE
- 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
--	isb
+OK, I'll go look at some downstream kernels for Seaboard and see if the
+debounce etc. parameters all match up.
 
- 	mrrc	p15, 3, r2, r3, c14	@ CNTV_CVAL
- 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
-@@ -532,18 +531,17 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 	ldr	r2, [r4, #KVM_TIMER_CNTVOFF]
- 	ldr	r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
- 	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
--	isb
+> However, again I will try to enable kbc on harmony and run it.
 
- 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
- 	add	vcpu, vcpu, r4
- 	ldrd	r2, r3, [vcpu]
- 	sub	vcpu, vcpu, r4
- 	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
-+	isb
-
- 	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
- 	and	r2, r2, #3
- 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
--	isb
- 1:
- #endif
- .endm
---
-
-Thanks,
--Christoffer
+That would be extremely useful; I worry that if you tested it on
+Tegra114, that means using a downstream kernel only, and also whether
+there are any HW differences between SoC versions. That's quite a lot of
+variables that could explain the issues I'm seeing.
