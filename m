@@ -1,118 +1,104 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 14 Jan 2013 12:00:42 +0100
-Subject: Introducing Aggressive Low Memory Booster [1]
-In-Reply-To: <1358091177.96940.YahooMailNeo@web160103.mail.bf1.yahoo.com>
-References: <1334483226.20721.YahooMailNeo@web162003.mail.bf1.yahoo.com>
- <1334842941.92324.YahooMailNeo@web162006.mail.bf1.yahoo.com>
- <1358091177.96940.YahooMailNeo@web160103.mail.bf1.yahoo.com>
-Message-ID: <201301141200.43240.b.zolnierkie@samsung.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 14 Jan 2013 12:03:04 +0100
+Subject: [PATCH v3 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
+ platform_device_id
+In-Reply-To: <20130114105357.GH10874@arwen.pp.htv.fi>
+References: <1358158361-25550-1-git-send-email-peter.chen@freescale.com>
+ <1358158361-25550-2-git-send-email-peter.chen@freescale.com>
+ <20130114101642.GB10874@arwen.pp.htv.fi> <50F3DB8D.6050104@pengutronix.de>
+ <20130114102444.GD10874@arwen.pp.htv.fi> <50F3DF1D.3040706@pengutronix.de>
+ <20130114103952.GF10874@arwen.pp.htv.fi> <50F3E301.7040509@pengutronix.de>
+ <20130114105357.GH10874@arwen.pp.htv.fi>
+Message-ID: <50F3E5E8.2000905@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 13 January 2013 16:32:57 PINTU KUMAR wrote:
+On 01/14/2013 11:53 AM, Felipe Balbi wrote:
 > Hi,
 > 
-> Here I am trying to introduce a new feature in kernel called "Aggressive Low Memory Booster".
-> The main advantage of this will be to boost the available free memory of the system to "certain level" during extremely low memory condition.
+> On Mon, Jan 14, 2013 at 11:50:41AM +0100, Marc Kleine-Budde wrote:
+>> On 01/14/2013 11:39 AM, Felipe Balbi wrote:
+>>> On Mon, Jan 14, 2013 at 11:34:05AM +0100, Marc Kleine-Budde wrote:
+>>>> On 01/14/2013 11:24 AM, Felipe Balbi wrote:
+>>>>> On Mon, Jan 14, 2013 at 11:18:53AM +0100, Marc Kleine-Budde wrote:
+>>>>>> On 01/14/2013 11:16 AM, Felipe Balbi wrote:
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> On Mon, Jan 14, 2013 at 06:12:39PM +0800, Peter Chen wrote:
+>>>>>>>> @@ -2756,22 +2753,41 @@ static int fsl_udc_otg_resume(struct device *dev)
+>>>>>>>>  
+>>>>>>>>  	return fsl_udc_resume(NULL);
+>>>>>>>>  }
+>>>>>>>> -
+>>>>>>>>  /*-------------------------------------------------------------------------
+>>>>>>>>  	Register entry point for the peripheral controller driver
+>>>>>>>>  --------------------------------------------------------------------------*/
+>>>>>>>> -
+>>>>>>>> +static const struct platform_device_id fsl_udc_devtype[] = {
+>>>>>>>> +	{
+>>>>>>>> +		.name = "imx-udc-mx25",
+>>>>>>>> +		.driver_data = IMX25_UDC,
+>>>>>>>> +	}, {
+>>>>>>>> +		.name = "imx-udc-mx27",
+>>>>>>>> +		.driver_data = IMX27_UDC,
+>>>>>>>> +	}, {
+>>>>>>>> +		.name = "imx-udc-mx31",
+>>>>>>>> +		.driver_data = IMX31_UDC,
+>>>>>>>> +	}, {
+>>>>>>>> +		.name = "imx-udc-mx35",
+>>>>>>>> +		.driver_data = IMX35_UDC,
+>>>>>>>> +	}, {
+>>>>>>>> +		.name = "imx-udc-mx51",
+>>>>>>>> +		.driver_data = IMX51_UDC,
+>>>>>>>> +	}
+>>>>>>>> +};
+>>>>>>>
+>>>>>>> I wonder if your driver-data is actually needed since you can use string
+>>>>>>> comparisson to achieve the exact same outcome.
+>>>>>>
+>>>>>> Why use a string compare, if the kernel infrastructure already does this
+>>>>>> for you?
+>>>>>
+>>>>> what do you mean ? What kernel infrastructure is doing waht for me ?
+>>>>
+>>>> The kernel infrastructure is doing the string compare for you to match
+>>>> the device against the driver (via platform_device_id->name). You get
+>>>> the a pointer to the driver_data for free. So you don't need any string
+>>>> compare in the driver later.
+>>>
+>>> but current driver data is just duplicating name with an integer, it's
+>>> pretty useless driver data.
+>>
+>> I don't think so - another argument:
+>> Less code. As struct platform_device_id is a static array the space is
+>> allocated anyway. So it doesn't make any difference if driver_data is
+>> NULL or not. Later you just need to make an integer comparison instead
+>> of a call to a strcmp(), if you have a switch/case and IMX*_UDC is an
+>> enum, the compiler will warn you if you've missed an IMX variant.
 > 
-> Please provide your comments to improve further.
+> fair enough, but then don't create a different enum value for each imx
+> instance if they're mostly the same. Differentiate only what's actually
+> different.
 
-Could you please post the code somewhere so it can be reviewed?
+Usually there isn't any Changelog between IP cores used in the different
+fsl processors (at least available outside of fsl), that makes it quite
+difficult to say if something found on one imx is really the same as on
+the other one. And they (usually) don't provide any versioning
+information in a register or the documentation.
 
-Thanks,
---
-Bartlomiej Zolnierkiewicz
-Samsung Poland R&D Center
+just my 2?
+Marc
 
-> Can it be used along with vmpressure_fd ???
-> 
-> 
-> It can be invoked as follows:
->     a) Automatically by kernel memory management when the memory threshold falls below 10MB.
->     b) From user space program/scripts by passing the "required amount of memory to be reclaimed".
->     Example: echo 100 > /dev/shrinkmem
->     c) using sys interface - /sys/kernel/debug/shrinkallmem
->     d) using an ioctl call and returning number of pages reclaimed.
->     e) using a new system call - shrinkallmem(&nrpages);
->     f) During CMA to reclaim and shrink a specific CMA regions.
-> 
-> 
-> I have developed a kernel module to verify the (b) part.
-> 
-> Here is the snapshot of the write call:
-> +static ssize_t shrinkmem_write(struct file *file, const char *buff,
-> +                                size_t length, loff_t *pos)
-> +{
-> +        int ret = -1;
-> +        unsigned long memsize = 0;
-> +        unsigned long nr_reclaim = 0;
-> +        unsigned long pages = 0;
-> +        ret = kstrtoul_from_user(buff, length, 0, &memsize);
-> +        if (ret < 0) {
-> +                printk(KERN_ERR "[SHRINKMEM]: kstrtoul_from_user: Failed !\n");
-> +                return -1;
-> +        }
-> +        printk(KERN_INFO "[SHRINKMEM]: memsize(in MB) = %ld\n",
-> +                                (unsigned long)memsize);
-> +        memsize = memsize*(1024UL*1024UL);
-> +        nr_reclaim = memsize / PAGE_SIZE;
-> +        pages = shrink_all_memory(nr_reclaim);
-> +        printk(KERN_INFO "<SHRINKMEM>: Number of Pages Freed: %lu\n", pages);
-> +        return pages;
-> +}
-> Please note: This requires CONFIG_HIBERNATION to be permanently enabled in the kernel.
-> 
-> 
-> Several experiments have been performed on Ubuntu(kernel 3.3) to verify it under low memory conditions.
-> 
-> Following are some results obtained:
-> -------------------------------------
-> 
-> Node 0, zone      DMA    290    115      0      0      0      0      0      0      0      0      0
-> Node 0, zone   Normal    304    540    116     13      2      2      0      0      0      0      0
-> =========================
->              total       used       free     shared    buffers     cached
-> Mem:           497        487         10          0         63        303
-> -/+ buffers/cache:        120        376
-> Swap:         1458         34       1424
-> Total:        1956        522       1434
-> =========================
-> Total Memory Freed: 342 MB
-> Total Memory Freed: 53 MB
-> Total Memory Freed: 23 MB
-> Total Memory Freed: 10 MB
-> Total Memory Freed: 15 MB
-> Total Memory Freed: -1 MB
-> Node 0, zone      DMA      6      6      7      8     10      9      7      4      1      0      0
-> Node 0, zone   Normal   2129   2612   2166   1723   1260    759    359    108     10      0      0
-> =========================
->              total       used       free     shared    buffers     cached
-> Mem:           497         47        449          0          0          5
-> -/+ buffers/cache:         41        455
-> Swap:         1458         97       1361
-> Total:        1956        145       1811
-> =========================
-> 
-> It was verified using a sample shell script "reclaim_memory.sh" which keeps recovering memory by doing "echo 500 > /dev/shrinkmem" until no further reclaim is possible.
-> 
-> The experiments were performed with various scenarios as follows:
-> a) Just after the boot up - (could recover around 150MB with 512MB RAM)
-> b) After running many applications include youtube videos, large tar files download - 
-> 
->    [until free mem becomes < 10MB]
->    [Could recover around 300MB in one shot]
-> c) Run reclaim, while download is in progress and video still playing - (Not applications killed)
-> 
-> d) revoke all background applications again, after running reclaim - (No impact, normal behavior)
->    [Just it took little extra time to launch, as if it was launched for first time]
-> 
-> 
-> Please see more discussions on this in the last year mailing list:
-> 
-> https://lkml.org/lkml/2012/4/15/35 
-> 
-> 
-> Thank You!
-> With regards,
-> Pintu Kumar
-> Samsung - India
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130114/a34cc75b/attachment-0001.sig>
