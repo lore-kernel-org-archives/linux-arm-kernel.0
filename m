@@ -1,48 +1,66 @@
-From: smoch@web.de (Soeren Moch)
-Date: Mon, 14 Jan 2013 12:56:57 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <50F3F289.3090402@web.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 Jan 2013 12:12:47 +0000
+Subject: [PATCHv2 1/4] clockevents: Add generic timer broadcast receiver
+In-Reply-To: <alpine.LFD.2.02.1301141247020.7475@ionos>
+References: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
+ <1357742770-15028-2-git-send-email-mark.rutland@arm.com>
+ <alpine.LFD.2.02.1301141204421.7475@ionos>
+ <20130114112951.GC7990@e106331-lin.cambridge.arm.com>
+ <alpine.LFD.2.02.1301141247020.7475@ionos>
+Message-ID: <20130114121247.GD7990@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.2012 15:31, Marek Szyprowski wrote:
-> dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
-> regardless the flags provided by the caller. This causes excessive
-> pruning of emergency memory pools without any good reason. Additionaly,
-> on ARM architecture any driver which is using dmapools will sooner or
-> later  trigger the following error:
-> "ERROR: 256 KiB atomic DMA coherent pool is too small!
-> Please increase it with coherent_pool= kernel parameter!".
-> Increasing the coherent pool size usually doesn't help much and only
-> delays such error, because all GFP_ATOMIC DMA allocations are always
-> served from the special, very limited memory pool.
->
-> This patch changes the dmapool code to correctly use gfp flags provided
-> by the dmapool caller.
->
-> Reported-by: Soeren Moch <smoch@web.de>
-> Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Soeren Moch <smoch@web.de>
+On Mon, Jan 14, 2013 at 11:50:55AM +0000, Thomas Gleixner wrote:
+> On Mon, 14 Jan 2013, Mark Rutland wrote:
+> 
+> > On Mon, Jan 14, 2013 at 11:06:31AM +0000, Thomas Gleixner wrote:
+> > > On Wed, 9 Jan 2013, Mark Rutland wrote:
+> > > > +#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+> > > > +extern int tick_receive_broadcast(void);
+> > > > +#else
+> > > > +static inline int tick_receive_broadcast(void)
+> > > > +{
+> > > > +	return 0;
+> > > > +}
+> > > 
+> > > What's the inline function for? If an arch does not have broadcasting
+> > > support it should not have a receive broadcast function call either.
+> > 
+> > That was how this was originally structured [1], but Santosh suggested this
+> > would break the build for !GENERIC_CLOCKEVENTS_BROADCAST [1]. It means that the
+> > arch-specific receive path (i.e. IPI handler) doesn't have to be #ifdef'd,
+> > which makes it less ugly.
+> 
+> Hmm. If you want to keep the IPI around unconditionally the inline
+> makes some sense, though the question is whether keeping an unused IPI
+> around makes sense in the first place. I'd rather see a warning that
+> an unexpected IPI happened than a silent inline function being called.
 
-Now I tested linux-3.7.1 (this patch is included there) on my Marvell
-Kirkwood system. I still see
+How about I add a warning (e.g. "Impossible timer broadcast received.") and
+return -EOPNOTSUPP when !GENERIC_CLOCKEVENTS_BROADCAST?
 
-   ERROR: 1024 KiB atomic DMA coherent pool is too small!
-   Please increase it with coherent_pool= kernel parameter!
+> > > Is anything going to use the return value?
+> > 
+> > I'd added this after looking at the x86 lapic timers, where interrupts might
+> > remain pending over a kexec, and lapic interrupts come up before timers are
+> > registered. The return value is useful for shutting down the timer in that case
+> > (see x86's local_apic_timer_interrupt).
+> 
+> Right, though then you need to check for evt->event_handler as well.
 
-after several hours of runtime under heavy load with SATA and
-DVB-Sticks (em28xx / drxk and dib0700).
+I thought this previously also [1], but I couldn't find any path such that a
+tick_cpu_device would have an evtdev without an event_handler. We always set the
+handler before setting evtdev, and alway wipe evtdev before wiping the handler.
 
-As already reported earlier this patch improved the behavior compared to 
-linux-3.6.x and 3.7.0 (error after several ten minutes runtime), but
-I still see a regression compared to linux-3.5.x. With this kernel the
-same system with same workload runs flawlessly.
+Have I missed something?
 
-Regards,
-Soeren
+> Thanks,
+> 
+> 	tglx
+> 
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138092.html
