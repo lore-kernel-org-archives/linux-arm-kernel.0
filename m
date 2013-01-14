@@ -1,44 +1,71 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 14 Jan 2013 15:19:29 +0800
-Subject: [PATCH] mtd: gpmi: dump the BCH registers
-Message-ID: <1358147969-31878-1-git-send-email-b32955@freescale.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 14 Jan 2013 16:17:35 +0800
+Subject: [PATCH v2 1/1] usb: fsl-mxc-udc: fix build error due to
+ mach/hardware.h
+In-Reply-To: <20130114074858.GA10176@arwen.pp.htv.fi>
+References: <1358147897-8599-1-git-send-email-peter.chen@freescale.com>
+ <20130114074858.GA10176@arwen.pp.htv.fi>
+Message-ID: <20130114081732.GA9039@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dump the BCH registers in gpmi_dump_info().
+On Mon, Jan 14, 2013 at 09:48:58AM +0200, Felipe Balbi wrote:
+> Hi,
+> 
+> On Mon, Jan 14, 2013 at 03:18:17PM +0800, Peter Chen wrote:
+> > It changes the driver to use platform_device_id rather than cpu_is_xxx
+> > to determine the SoC type, and updates the platform code accordingly.
+> > 
+> > Compile ok at imx_v6_v7_defconfig with CONFIG_USB_FSL_USB2 enable.
+> > Tested at mx51 bbg board, it works ok after enable phy clock
+> > (Need another patch to fix this problem)
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> 
+> not good for -rc. You have to break this down as you're solving at least
+> three different problems with this patch.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/mtd/nand/gpmi-nand/bch-regs.h |    2 ++
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c |    5 +++++
- 2 files changed, 7 insertions(+), 0 deletions(-)
+Felipe, all my changes are for this problem, these are fix build error and
+let it work.
 
-diff --git a/drivers/mtd/nand/gpmi-nand/bch-regs.h b/drivers/mtd/nand/gpmi-nand/bch-regs.h
-index a092451..d67bca5 100644
---- a/drivers/mtd/nand/gpmi-nand/bch-regs.h
-+++ b/drivers/mtd/nand/gpmi-nand/bch-regs.h
-@@ -103,4 +103,6 @@
- 		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)	\
- 		: ((v) & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)		\
- 	)
-+
-+#define HW_BCH_VERSION				0x00000160
- #endif
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index d84699c..01cc570 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -208,6 +208,11 @@ void gpmi_dump_info(struct gpmi_nand_data *this)
- 	}
+ arch/arm/mach-imx/clk-imx25.c                     |    6 +-
+ arch/arm/mach-imx/clk-imx27.c                     |    6 +-
+ arch/arm/mach-imx/clk-imx31.c                     |    6 +-
+ arch/arm/mach-imx/clk-imx35.c                     |    6 +-
+ arch/arm/mach-imx/clk-imx51-imx53.c               |    6 +-
+
+ As we change the connection-id, we need to change clock file or
+ the devm_clk_get will be failed.
  
- 	/* start to print out the BCH info */
-+	pr_err("Show BCH registers :\n");
-+	for (i = 0; i <= HW_BCH_VERSION / 0x10 + 1; i++) {
-+		reg = readl(r->bch_regs + i * 0x10);
-+		pr_err("offset 0x%.3x : 0x%.8x\n", i * 0x10, reg);
-+	}
- 	pr_err("BCH Geometry :\n");
- 	pr_err("GF length              : %u\n", geo->gf_len);
- 	pr_err("ECC Strength           : %u\n", geo->ecc_strength);
+ arch/arm/mach-imx/devices/devices-common.h        |    1 +
+ arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c |   15 +++---
+
+ We need to differentiate SoCs, so I use platform_device_id to
+ instead of cpu_ix_xxx(), this is for machine file change
+
+ drivers/usb/gadget/fsl_mxc_udc.c                  |   23 +++++----
+ drivers/usb/gadget/fsl_udc_core.c                 |   52 +++++++++++++-------
+ drivers/usb/gadget/fsl_usb2_udc.h                 |   13 ++++--
+ include/linux/fsl_devices.h                       |    8 +++
+
+ Need to get platform_device_id at driver, and replace the cpu_is_xxx to
+ platform_device_id. Meanwhile, needs a solution for replace
+ MX35_IO_ADDRESS.
+
+> 
+> Besides there are parts which are not related to the build break.
+
+I can split this patch to two patches, one is driver part, the other is
+machine part. It can also fix build break, but it needs two
+patches to let the udc work.
+
+> 
+> -- 
+> balbi
+
+
+
 -- 
-1.7.0.4
+
+Best Regards,
+Peter Chen
