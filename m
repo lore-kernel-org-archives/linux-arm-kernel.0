@@ -1,87 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 13 Jan 2013 19:08:49 -0600
-Subject: [PATCH 1/6] ARM: common: vic: Parse interrupt and resume masks
- from device tree
-In-Reply-To: <1358039458-31960-2-git-send-email-tomasz.figa@gmail.com>
-References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
- <1358039458-31960-2-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <50F35AA1.1010902@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 14 Jan 2013 09:12:43 +0800
+Subject: [PATCH 1/1] usb: fsl-mxc-udc: fix build error due to
+ mach/hardware.h
+In-Reply-To: <20130111125059.GA12715@arwen.pp.htv.fi>
+References: <1357898188-10540-1-git-send-email-peter.chen@freescale.com>
+ <20130111125059.GA12715@arwen.pp.htv.fi>
+Message-ID: <20130114011241.GC24575@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2013 07:10 PM, Tomasz Figa wrote:
-> This patch extends vic_of_init to parse valid interrupt sources
-> and resume sources masks from device tree.
+Balbi,
+
+On Fri, Jan 11, 2013 at 02:50:59PM +0200, Felipe Balbi wrote:
+> As I said before, this patch is too big for -rc and is unnecessary
+> considering patch I wrote above. Note that there is no problems in
+> checking if ULPI PHY clk is 60MHz on all arches and, for the workaround,
+> you already have a runtime check.
 > 
-> If mask values are not specified in device tree, all sources
-> are assumed to be valid, as before this patch.
+Ok, I did not have these facts on my mind.  If these are true, the
+cpu_is_xxx() shouldn't be necessary there from the beginning, and we
+can simply remove them then.
+
+> Shawn, it can be broken down into smaller pieces because you can *FIX
+> THE COMPILE BREAKAGE* with a very small patch as above (only issue now
+> is usage of MX32_IO_ADDRESS()).
 > 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  Documentation/devicetree/bindings/arm/vic.txt | 6 ++++++
->  arch/arm/common/vic.c                         | 7 ++++++-
->  2 files changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/vic.txt b/Documentation/devicetree/bindings/arm/vic.txt
-> index 266716b..bb7137c 100644
-> --- a/Documentation/devicetree/bindings/arm/vic.txt
-> +++ b/Documentation/devicetree/bindings/arm/vic.txt
-> @@ -18,6 +18,9 @@ Required properties:
->  Optional properties:
->  
->  - interrupts : Interrupt source for parent controllers if the VIC is nested.
-> +- interrupt-mask : Bit mask of valid interrupt sources (defaults to all valid)
+The MX35_IO_ADDRESS() also seems unnecessary, since as Peter's patch
+suggested that pdata->regs can be used instead.
 
-Can you explain why this is needed and is not just the OR of all
-interrupts described in the DT?
-
-> +- wakeup-mask : Bit mask of interrupt sources that can wake up the system
-> +  (defaults to all allowed)
-
-Seems like this would be all VIC interrupts unless the wake-up handling
-is done in some shadow controller. If the former is true, then wake-up
-capability is really a property of individual devices. If the later,
-then this property would belong in that shadow controller.
-
-Rob
-
->  
->  Example:
->  
-> @@ -26,4 +29,7 @@ Example:
->  		interrupt-controller;
->  		#interrupt-cells = <1>;
->  		reg = <0x60000 0x1000>;
-> +
-> +		interrupt-mask = <0xffffff7f>;
-> +		wakeup-mask = <0x0000ff7f>;
->  	};
-> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-> index e4df17c..c2889da 100644
-> --- a/arch/arm/common/vic.c
-> +++ b/arch/arm/common/vic.c
-> @@ -407,6 +407,8 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
->  int __init vic_of_init(struct device_node *node, struct device_node *parent)
->  {
->  	void __iomem *regs;
-> +	u32 interrupt_mask = ~0;
-> +	u32 wakeup_mask = ~0;
->  
->  	if (WARN(parent, "non-root VICs are not supported"))
->  		return -EINVAL;
-> @@ -415,10 +417,13 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
->  	if (WARN_ON(!regs))
->  		return -EIO;
->  
-> +	of_property_read_u32(node, "interrupt-mask", &interrupt_mask);
-> +	of_property_read_u32(node, "wakeup-mask", &wakeup_mask);
-> +
->  	/*
->  	 * Passing -1 as first IRQ makes the simple domain allocate descriptors
->  	 */
-> -	__vic_init(regs, -1, ~0, ~0, node);
-> +	__vic_init(regs, -1, interrupt_mask, wakeup_mask, node);
->  
->  	return 0;
->  }
-> 
+Shawn
