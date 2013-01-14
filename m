@@ -1,59 +1,45 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 14 Jan 2013 12:18:24 -0500 (EST)
-Subject: [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface of
- a dying CPU is disabled
-In-Reply-To: <20130114170210.GE31341@mudshark.cambridge.arm.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-9-git-send-email-nicolas.pitre@linaro.org>
- <20130114163902.GC31341@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1301141154130.6300@xanadu.home>
- <20130114170210.GE31341@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1301141216020.6300@xanadu.home>
+From: dinggnu@gmail.com (Cong Ding)
+Date: Mon, 14 Jan 2013 17:18:53 +0000
+Subject: [PATCH] arm: kernel/perf_event_cpu.c: fix error null pointer
+ dereference check
+Message-ID: <1358183933-29160-1-git-send-email-dinggnu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jan 2013, Will Deacon wrote:
+the pointer cpu_pmu is used without null pointer dereference check, and is
+checked after the using of it, so we move the null pointer check to before the
+first use.
 
-> On Mon, Jan 14, 2013 at 04:54:52PM +0000, Nicolas Pitre wrote:
-> > On Mon, 14 Jan 2013, Will Deacon wrote:
-> > 
-> > > On Thu, Jan 10, 2013 at 12:20:43AM +0000, Nicolas Pitre wrote:
-> > > > Otherwise there might be some interrupts or IPIs becoming pending and the
-> > > > CPU will not enter low power mode when doing a WFI.  The effect of this
-> > > > is a CPU that loops back into the kernel, go through the first man
-> > > > election, signals itself as alive,  and prevent the cluster from being
-> > > > shut down.
-> > > > 
-> > > > This could benefit from a better solution.
-> > > > 
-> > > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > > > ---
-> > > >  arch/arm/common/bL_platsmp.c        | 1 +
-> > > >  arch/arm/common/gic.c               | 6 ++++++
-> > > >  arch/arm/include/asm/hardware/gic.h | 2 ++
-> > > >  3 files changed, 9 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
-> > > > index 0ae44123bf..6a3b251b97 100644
-> > > > --- a/arch/arm/common/bL_platsmp.c
-> > > > +++ b/arch/arm/common/bL_platsmp.c
-> > > > @@ -68,6 +68,7 @@ static void __ref bL_cpu_die(unsigned int cpu)
-> > > >  	pcpu = mpidr & 0xff;
-> > > >  	pcluster = (mpidr >> 8) & 0xff;
-> > > >  	bL_set_entry_vector(pcpu, pcluster, NULL);
-> > > > +	gic_cpu_if_down();
-> > > 
-> > > I'm starting to sound like a stuck record (and not a very tuneful one at
-> > > that) but... I think you need a barrier here.
-> > 
-> > And I'm getting puzzled at the repetition.  ;-)
-> 
-> Sorry! This case is more interesting though, because you also want to order
-> the cpu_if_down GIC write so that it completes before we do the power_off.
+Signed-off-by: Cong Ding <dinggnu@gmail.com>
+---
+ arch/arm/kernel/perf_event_cpu.c |   14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-In this case I'm leaning toward removing that gic_cpu_if_down() 
-entirely.  I'm not convinced it is necessary, and if it is then we 
-probably have a bug somewhere else.
-
-
-Nicolas
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index efa5295..16aa979 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -142,13 +142,15 @@ static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 		raw_spin_lock_init(&events->pmu_lock);
+ 	}
+ 
+-	cpu_pmu->get_hw_events	= cpu_pmu_get_cpu_events;
+-	cpu_pmu->request_irq	= cpu_pmu_request_irq;
+-	cpu_pmu->free_irq	= cpu_pmu_free_irq;
++	if (cpu_pmu) {
++		cpu_pmu->get_hw_events	= cpu_pmu_get_cpu_events;
++		cpu_pmu->request_irq	= cpu_pmu_request_irq;
++		cpu_pmu->free_irq	= cpu_pmu_free_irq;
+ 
+-	/* Ensure the PMU has sane values out of reset. */
+-	if (cpu_pmu && cpu_pmu->reset)
+-		on_each_cpu(cpu_pmu->reset, cpu_pmu, 1);
++		/* Ensure the PMU has sane values out of reset. */
++		if (cpu_pmu->reset)
++			on_each_cpu(cpu_pmu->reset, cpu_pmu, 1);
++	}
+ }
+ 
+ /*
+-- 
+1.7.9.5
