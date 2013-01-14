@@ -1,27 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Jan 2013 17:24:01 +0000
-Subject: [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface of
- a dying CPU is disabled
-In-Reply-To: <alpine.LFD.2.02.1301141216020.6300@xanadu.home>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-9-git-send-email-nicolas.pitre@linaro.org>
- <20130114163902.GC31341@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1301141154130.6300@xanadu.home>
- <20130114170210.GE31341@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1301141216020.6300@xanadu.home>
-Message-ID: <20130114172401.GG31341@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Jan 2013 17:23:46 +0000
+Subject: [PATCH] arm: kernel/perf_event_cpu.c: fix error null pointer
+ dereference check
+In-Reply-To: <1358183933-29160-1-git-send-email-dinggnu@gmail.com>
+References: <1358183933-29160-1-git-send-email-dinggnu@gmail.com>
+Message-ID: <20130114172346.GK23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 05:18:24PM +0000, Nicolas Pitre wrote:
-> On Mon, 14 Jan 2013, Will Deacon wrote:
-> > Sorry! This case is more interesting though, because you also want to order
-> > the cpu_if_down GIC write so that it completes before we do the power_off.
-> 
-> In this case I'm leaning toward removing that gic_cpu_if_down() 
-> entirely.  I'm not convinced it is necessary, and if it is then we 
-> probably have a bug somewhere else.
+On Mon, Jan 14, 2013 at 05:18:53PM +0000, Cong Ding wrote:
+> the pointer cpu_pmu is used without null pointer dereference check, and is
+> checked after the using of it, so we move the null pointer check to before the
+> first use.
 
-Or that :)
+The NULL pointer check is not necessary.  cpu_pmu_init() is called
+after cpu_pmu has already been dereferenced by its caller:
 
-Will
+        cpu_pmu = pmu;
+        cpu_pmu->plat_device = pdev;
+        cpu_pmu_init(cpu_pmu);
+
+So...
+
+> -	/* Ensure the PMU has sane values out of reset. */
+> -	if (cpu_pmu && cpu_pmu->reset)
+
+Just replace this with:
+	if (cpu_pmu->reset)
