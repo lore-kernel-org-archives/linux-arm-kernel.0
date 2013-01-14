@@ -1,5 +1,5 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Jan 2013 17:11:49 +0000
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 14 Jan 2013 12:15:07 -0500 (EST)
 Subject: [PATCH 07/16] ARM: bL_platsmp.c: close the kernel entry gate
  before hot-unplugging a CPU
 In-Reply-To: <20130114170028.GD31341@mudshark.cambridge.arm.com>
@@ -8,11 +8,12 @@ References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
  <20130114163755.GB31341@mudshark.cambridge.arm.com>
  <alpine.LFD.2.02.1301141151510.6300@xanadu.home>
  <20130114170028.GD31341@mudshark.cambridge.arm.com>
-Message-ID: <20130114171149.GE23616@arm.com>
+Message-ID: <alpine.LFD.2.02.1301141207360.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 05:00:28PM +0000, Will Deacon wrote:
+On Mon, 14 Jan 2013, Will Deacon wrote:
+
 > On Mon, Jan 14, 2013 at 04:53:41PM +0000, Nicolas Pitre wrote:
 > > On Mon, 14 Jan 2013, Will Deacon wrote:
 > > 
@@ -52,13 +53,22 @@ On Mon, Jan 14, 2013 at 05:00:28PM +0000, Will Deacon wrote:
 > For L1, sure, we always have the dsb for v7. However, for the outer-cache we
 > only have a dsb by virtue of a spin_unlock in l2x0.c... it seems a bit risky
 > to rely on that for ordering your entry_vector write with the power_on.
+> 
+> I think the best bet is to put a barrier in power_on, before invoking the
+> platform_ops function and similarly for power_off.
+> 
+> What do you reckon?
 
-I was discussing this with Dave earlier, I think we need to fix the
-outer-cache functions even for the UP case to include a barrier (for
-PL310 actually we may need to read a register as the cache_wait is a
-no-op). We assume that cache functions (both inner and outer) fully
-complete the operation before returning and there is no additional need
-for barriers.
+I much prefer adding barriers inside the API when they are needed for 
+proper execution of the API intent.  So if I call bL_set_entry_vector(), 
+I trust that by the time it returns the vector is indeed set and ready 
+for use by other processors.
 
--- 
-Catalin
+The same could be said about the outer cache ops.  If a DSB is needed 
+for their intent to be valid, then why isn't this DSB always implied by 
+the corresponding cache op calls?  And as you say, there is already one 
+implied by the spinlock used there, so that is not if things would 
+change much in practice.
+
+
+Nicolas
