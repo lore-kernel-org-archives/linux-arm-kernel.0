@@ -1,75 +1,125 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 14 Jan 2013 12:39:52 +0200
-Subject: [PATCH v3 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
- platform_device_id
-In-Reply-To: <50F3DF1D.3040706@pengutronix.de>
-References: <1358158361-25550-1-git-send-email-peter.chen@freescale.com>
- <1358158361-25550-2-git-send-email-peter.chen@freescale.com>
- <20130114101642.GB10874@arwen.pp.htv.fi>
- <50F3DB8D.6050104@pengutronix.de>
- <20130114102444.GD10874@arwen.pp.htv.fi>
- <50F3DF1D.3040706@pengutronix.de>
-Message-ID: <20130114103952.GF10874@arwen.pp.htv.fi>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 14 Jan 2013 11:43:30 +0100
+Subject: [PATCH 4/4] ARM: tegra: Set SCU base address dynamically from DT
+In-Reply-To: <50CF258E.2080207@gmail.com>
+References: <1355725087-11363-1-git-send-email-hdoyu@nvidia.com><1355725087-11363-4-git-send-email-hdoyu@nvidia.com><50CF258E.2080207@gmail.com>
+Message-ID: <20130114.124330.851549576173829665.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 11:34:05AM +0100, Marc Kleine-Budde wrote:
-> On 01/14/2013 11:24 AM, Felipe Balbi wrote:
-> > On Mon, Jan 14, 2013 at 11:18:53AM +0100, Marc Kleine-Budde wrote:
-> >> On 01/14/2013 11:16 AM, Felipe Balbi wrote:
-> >>> Hi,
-> >>>
-> >>> On Mon, Jan 14, 2013 at 06:12:39PM +0800, Peter Chen wrote:
-> >>>> @@ -2756,22 +2753,41 @@ static int fsl_udc_otg_resume(struct device *dev)
-> >>>>  
-> >>>>  	return fsl_udc_resume(NULL);
-> >>>>  }
-> >>>> -
-> >>>>  /*-------------------------------------------------------------------------
-> >>>>  	Register entry point for the peripheral controller driver
-> >>>>  --------------------------------------------------------------------------*/
-> >>>> -
-> >>>> +static const struct platform_device_id fsl_udc_devtype[] = {
-> >>>> +	{
-> >>>> +		.name = "imx-udc-mx25",
-> >>>> +		.driver_data = IMX25_UDC,
-> >>>> +	}, {
-> >>>> +		.name = "imx-udc-mx27",
-> >>>> +		.driver_data = IMX27_UDC,
-> >>>> +	}, {
-> >>>> +		.name = "imx-udc-mx31",
-> >>>> +		.driver_data = IMX31_UDC,
-> >>>> +	}, {
-> >>>> +		.name = "imx-udc-mx35",
-> >>>> +		.driver_data = IMX35_UDC,
-> >>>> +	}, {
-> >>>> +		.name = "imx-udc-mx51",
-> >>>> +		.driver_data = IMX51_UDC,
-> >>>> +	}
-> >>>> +};
-> >>>
-> >>> I wonder if your driver-data is actually needed since you can use string
-> >>> comparisson to achieve the exact same outcome.
-> >>
-> >> Why use a string compare, if the kernel infrastructure already does this
-> >> for you?
+Rob Herring <robherring2@gmail.com> wrote @ Mon, 17 Dec 2012 15:00:46 +0100:
+
+> On 12/17/2012 12:18 AM, Hiroshi Doyu wrote:
+> > Set Snoop Control Unit(SCU) register base address dynamically from DT.
 > > 
-> > what do you mean ? What kernel infrastructure is doing waht for me ?
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> >  arch/arm/mach-tegra/platsmp.c |   23 ++++++++++++++++++++---
+> >  1 file changed, 20 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> > index 1b926df..45c0b79 100644
+> > --- a/arch/arm/mach-tegra/platsmp.c
+> > +++ b/arch/arm/mach-tegra/platsmp.c
+> > @@ -18,6 +18,8 @@
+> >  #include <linux/jiffies.h>
+> >  #include <linux/smp.h>
+> >  #include <linux/io.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> >  
+> >  #include <asm/cacheflush.h>
+> >  #include <asm/hardware/gic.h>
+> > @@ -36,7 +38,7 @@
+> >  
+> >  extern void tegra_secondary_startup(void);
+> >  
+> > -static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
+> > +static void __iomem *scu_base;
+> >  
+> >  #define EVP_CPU_RESET_VECTOR \
+> >  	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
+> > @@ -143,14 +145,28 @@ done:
+> >  	return status;
+> >  }
+> >  
+> > +static const struct of_device_id cortex_a9_scu_match[] __initconst = {
+> > +	{ .compatible = "arm,cortex-a9-scu", },
+> > +	{}
+> > +};
+> > +
+> >  /*
+> >   * Initialise the CPU possible map early - this describes the CPUs
+> >   * which may be present or become present in the system.
+> >   */
+> >  static void __init tegra_smp_init_cpus(void)
+> >  {
+> > -	unsigned int i, ncores = scu_get_core_count(scu_base);
+> > +	struct device_node *np;
+> > +	unsigned int i, ncores = 1;
+> > +
+> > +	np = of_find_matching_node(NULL, cortex_a9_scu_match);
+> > +	if (!np)
+> > +		return;
+> > +	scu_base = of_iomap(np, 0);
 > 
-> The kernel infrastructure is doing the string compare for you to match
-> the device against the driver (via platform_device_id->name). You get
-> the a pointer to the driver_data for free. So you don't need any string
-> compare in the driver later.
+> Did you actually test this? Unless something changed, ioremap does not
+> work this early. The only reason to have it mapped this early is to get
+> the core count, but that doesn't work on A15 or A7. So we really need to
+> get core count/mask in a standard way. At least some work to get core
+> count from DT went into 3.8.
+> 
+> BTW, you can get the scu address on the A9 by reading cp15 register:
+> 
+> 	/* Get SCU base */
+> 	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
+> 
+> It's still probably good to have the DT node, but the reg property can
+> be optional in this case.
+> 
+> We need to move away from having the DT matching code within the
+> platforms. This should all be moved to the scu code in a scu_of_init
+> function that could be called from common code.
 
-but current driver data is just duplicating name with an integer, it's
-pretty useless driver data.
+If we can get SCU base address from CP15, do we still need SCU entry
+in DT? If not, the following would be the only API to get SCU base?
 
+>From 9bbecb50759f39d9c762977145407ea4f8a4d5ac Mon Sep 17 00:00:00 2001
+From: Hiroshi Doyu <hdoyu@nvidia.com>
+Date: Mon, 14 Jan 2013 12:35:33 +0200
+Subject: [PATCH 1/1] ARM: Add API to detect SCU base address from CP15
+
+Add API to detect SCU base address from CP15.
+
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/include/asm/smp_scu.h |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index 4eb6d00..6015ede 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -6,6 +6,20 @@
+ #define SCU_PM_POWEROFF	3
+ 
+ #ifndef __ASSEMBLER__
++static inline phys_addr_t scu_get_base(void)
++{
++	phys_addr_t pa;
++	unsigned long part_number = read_cpuid_part_number();
++
++	switch (part_number) {
++	case ARM_CPU_PART_CORTEX_A9:
++		/* Get SCU physical base */
++		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
++		return pa;
++	default:
++		return 0;
++	}
++}
+ unsigned int scu_get_core_count(void __iomem *);
+ void scu_enable(void __iomem *);
+ int scu_power_mode(void __iomem *, unsigned int);
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130114/f338144b/attachment.sig>
+1.7.9.5
