@@ -1,29 +1,70 @@
-From: dinggnu@gmail.com (Cong Ding)
-Date: Mon, 14 Jan 2013 17:51:00 +0000
-Subject: [PATCH] arm: mach-s3c24xx/common.c: fix uninitialized variable warning
-Message-ID: <1358185860-5425-1-git-send-email-dinggnu@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Jan 2013 17:51:56 +0000
+Subject: [PATCH v5 3/4] ARM: KVM: arch_timers: Add timer world switch
+In-Reply-To: <20130114152101.GD18935@mudshark.cambridge.arm.com>
+References: <20130108184259.46758.17939.stgit@ubuntu>
+ <20130108184327.46758.70599.stgit@ubuntu>
+ <20130114152101.GD18935@mudshark.cambridge.arm.com>
+Message-ID: <50F445BC.6050507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the use of variable tmp is uninitialized, so we fix it.
+On 14/01/13 15:21, Will Deacon wrote:
+> On Tue, Jan 08, 2013 at 06:43:27PM +0000, Christoffer Dall wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Do the necessary save/restore dance for the timers in the world
+>> switch code. In the process, allow the guest to read the physical
+>> counter, which is useful for its own clock_event_device.
+> 
+> [...]
+> 
+>> @@ -476,6 +513,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+>>   * for the host.
+>>   *
+>>   * Assumes vcpu pointer in vcpu reg
+>> + * Clobbers r2-r4
+>>   */
+>>  .macro restore_timer_state
+>>  	@ Disallow physical timer access for the guest
+>> @@ -484,6 +522,30 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+>>  	orr	r2, r2, #CNTHCTL_PL1PCTEN
+>>  	bic	r2, r2, #CNTHCTL_PL1PCEN
+>>  	mcr	p15, 4, r2, c14, c1, 0	@ CNTHCTL
+>> +
+>> +#ifdef CONFIG_KVM_ARM_TIMER
+>> +	ldr	r4, [vcpu, #VCPU_KVM]
+>> +	ldr	r2, [r4, #KVM_TIMER_ENABLED]
+>> +	cmp	r2, #0
+>> +	beq	1f
+>> +
+>> +	ldr	r2, [r4, #KVM_TIMER_CNTVOFF]
+>> +	ldr	r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
+>> +	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
+>> +	isb
+>> +
+>> +	ldr	r4, =VCPU_TIMER_CNTV_CVAL
+>> +	add	vcpu, vcpu, r4
+>> +	ldrd	r2, r3, [vcpu]
+>> +	sub	vcpu, vcpu, r4
+>> +	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
+>> +
+>> +	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
+>> +	and	r2, r2, #3
+>> +	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
+>> +	isb
+> 
+> How many of these isbs are actually needed, given that we're going to make
+> an exception return to the guest? The last one certainly looks redundant and
+> I can't see the need for ordering CNTVOFF vs CNTV_CVAL. I can see an
+> argument to putting one *before* CNTV_CTL, but you don't have one there!
 
-Signed-off-by: Cong Ding <dinggnu@gmail.com>
----
- arch/arm/mach-s3c24xx/common.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+CNTVOFF directly influences whether or not CNTV_CVAL will trigger or
+not. Maybe I'm just being paranoid and moving the isb after CNTV_CVAL is
+enough.
 
-diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
-index 0c9e9a7..6bcf87f 100644
---- a/arch/arm/mach-s3c24xx/common.c
-+++ b/arch/arm/mach-s3c24xx/common.c
-@@ -197,7 +197,7 @@ static unsigned long s3c24xx_read_idcode_v4(void)
- 
- static void s3c24xx_default_idle(void)
- {
--	unsigned long tmp;
-+	unsigned long tmp = 0;
- 	int i;
- 
- 	/* idle the system by using the idle mode which will wait for an
+The last one is definitively superfluous.
+
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
