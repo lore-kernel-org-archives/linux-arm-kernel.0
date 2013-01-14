@@ -1,21 +1,27 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 14 Jan 2013 11:29:13 -0500 (EST)
-Subject: [PATCH] ARM: imx: disable cpu in .cpu_kill hook
-In-Reply-To: <50F40E58.4030808@gmail.com>
-References: <1358168977-9631-1-git-send-email-shawn.guo@linaro.org>
- <50F40E58.4030808@gmail.com>
-Message-ID: <alpine.LFD.2.02.1301141127370.6300@xanadu.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 Jan 2013 09:34:49 -0700
+Subject: [PATCH] timer: vt8500: Move timer code to drivers/clocksource
+In-Reply-To: <1358140171-25390-2-git-send-email-linux@prisktech.co.nz>
+References: <1358140171-25390-1-git-send-email-linux@prisktech.co.nz>
+ <1358140171-25390-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <50F433A9.8020105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jan 2013, Rob Herring wrote:
+On 01/13/2013 10:09 PM, Tony Prisk wrote:
+> This patch moves arch-vt8500/timer.c into drivers/clocksource and
+> updates the necessary Kconfig/Makefile options.
 
-> Setting or clearing the SMP bit is showing up in multiple places
-> (big.LITTLE series, Tegra cpuidle). I did inline versions of
-> set_auxcr/get_auxcr for highbank cpuidle. We should be make those common.
+> diff --git a/include/linux/vt8500_timer.h b/include/linux/vt8500_timer.h
 
-Could you do that like now and send it to RMK for his stable branch?  
-This way I could rebase the b.L series on top.
+> +#ifndef __VT8500_TIMER_H
+> +#define __VT8500_TIMER_H
+> +
+> +#include <asm/mach/time.h>
+> +
+> +void vt8500_timer_init(void);
+> +
+> +#endif
 
-
-Nicolas
+Is VT8500 DT-only? If so, it'd be nice not to add this header, but
+instead use CLOCKSOURCE_OF_DECLARE() inside the driver C file.
