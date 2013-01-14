@@ -1,68 +1,87 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 14 Jan 2013 17:31:58 -0500
-Subject: [PATCH v5 00/14] KVM/ARM Implementation
-In-Reply-To: <20130114160051.GH18935@mudshark.cambridge.arm.com>
-References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130114160051.GH18935@mudshark.cambridge.arm.com>
-Message-ID: <CANM98qL9SZHtQSij5K1z7FADF224fkwBfPmXypgoooLD0htO9Q@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 Jan 2013 15:32:27 -0700
+Subject: [PATCH RFT 3/3] ARM: tegra: dts: seaboard: enable keyboard
+In-Reply-To: <50F4820C.2050806@wwwdotorg.org>
+References: <1357911185-11048-1-git-send-email-ldewangan@nvidia.com>
+ <1357911185-11048-3-git-send-email-ldewangan@nvidia.com>
+ <50F09BC7.90607@wwwdotorg.org> <50F134C9.1040203@nvidia.com>
+ <50F4820C.2050806@wwwdotorg.org>
+Message-ID: <50F4877B.2090409@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 11:00 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Christoffer,
->
-> On Tue, Jan 08, 2013 at 06:38:34PM +0000, Christoffer Dall wrote:
->> The following series implements KVM support for ARM processors,
->> specifically on the Cortex-A15 platform.
->
-> [...]
->
-> This is looking pretty good to me now and I feel that the longer it stays
-> out-of-tree, the more issues will creep in (without continual effort from
-> yourself and others). I've sent some minor comments (mainly vgic-related)
-> so, if you fix those, then you can add:
->
->   Reviewed-by: Will Deacon <will.deacon@arm.com>
->
-> for the series.
+On 01/14/2013 03:09 PM, Stephen Warren wrote:
+> On 01/12/2013 03:02 AM, Laxman Dewangan wrote:
+>> On Saturday 12 January 2013 04:39 AM, Stephen Warren wrote:
+>>> On 01/11/2013 06:33 AM, Laxman Dewangan wrote:
+>>>> Enable tegra based keyboard controller and populate the key matrix for
+>>>> seaboard. The key matrix was originally on driver code which is removed
+>>>> to have clean driver. The key mapping is now passed through dts file.
+>>>>
+>>>> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+>>>> ---
+>>>> Requesting for testing on seaboard.
+>>>> I generated this patch as Stephen suggested to have one patch for dt
+>>>> file
+>>>> entry for keys on seaboard.
+>>
+>> Thanks for testing.
 
-A big thanks!
+>>> Once I hacked around the above issues, the driver doesn't work very well
+>>> at all. There is a *long* delay between when I press a key and when it
+>>> shows up (e.g. echo'd to the HDMI console). When I release the key the
+>>> same keypress is generated twice. Or perhaps it's a repeat, but since
+>>> it's *always* 2 extra keypresses and I doubt I always hold my finger on
+>>> the key the exact same amount of time, I think it's key release that
+>>> does this not repeat. I assume this would repro on any board, so you
+>>> won't need Seaboard to debug it. Harmony is able to read the keyboard
+>>> using the KBC.
+>>>
+>>> Even with the above, I was able to validate that the keymap in the
+>>> Seaboard .dts file looks reasonable.
+>>>
+>>> However, please fix the KBC driver...
+>>
+>> I did not see any issue with the 3x3 matrix. I think all these about is
+>> to tuning debaunce and other parameter also. Another thing is that to
+>> make sure that all pinmuxes are properly configured.
+> 
+> OK, I'll go look at some downstream kernels for Seaboard and see if the
+> debounce etc. parameters all match up.
 
->
-> Now, there's a lot of code here and merging isn't completely
-> straightforward. I propose:
->
->   * The first series should go via Russell's tree. It depends on my
->     perf branch for the CPU type stuff, but that should go in for 3.9
->     anyway (also via Russell).
->
+How odd. The problems were indeed solved by using the downstream
+debounce/... timings. It's odd that using a shorter debounce time leads
+to /not/ generating spurious keypress events; perhaps the HW is buggy
+for the extremely large debounce value that you chose.
 
-Great.
+I also noticed that one entry in the keymap had a typo.
 
->   * The vGIC patches need rebasing on top of Rob Herring's work, which
->     he sent a pull for over the weekend:
->
->       http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/141488.html
->
->     In light of that, this stuff will need to go via arm-soc.
->
->   * The hyp arch-timers are in a similar situation to the vGIC: Mark Rutland
->     is moving those into drivers:
->
->       http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140560.html
->
->     so the kvm bits will need rebasing appropriately and also sent to
->     arm-soc (Mark -- I assume you intend to send a PULL for 3.9 for those
->     patches?)
->
-> Obviously this is all open for discussion, but that seems like the easiest
-> option to me.
->
-Makes good sense. Given that there are no other major disputes over
-the code we are a couple of people strongly hoping that this can
-happen for 3.9.
+Can you please roll the patch below into yours:
 
-In any case, I'll do whatever makes the process the easiest for you guys.
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts
+b/arch/arm/boot/dts/tegra20-seaboard.dts
+index b22522d..2e87330 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -614,8 +614,9 @@
 
-Best,
--Christoffer
+        kbc {
+                status = "okay";
+-               nvidia,debounce-delay-ms = <640>;
+-               nvidia,repeat-delay-ms = <1>;
++               nvidia,debounce-delay-ms = <32>;
++               nvidia,repeat-delay-ms = <160>;
++               nvidia,ghost-filter;
+                nvidia,kbc-row-pins = <0 1 2 3 4 5 6 7 8 9 10 11 12 13
+14 15>;
+                nvidia,kbc-col-pins = <16 17 18 19 20 21 22 23>;
+                linux,keymap = <0x00020011      /* KEY_W */
+@@ -672,7 +673,7 @@
+                                0x0805002A      /* KEY_LEFTSHIFT */
+
+                                0x09050061      /* KEY_RIGHTCTRL */
+-                               0x0907001B      /* KEY_LEFTCTRL */
++                               0x0907001D      /* KEY_LEFTCTRL */
+
+                                0x0B00001A      /* KEY_LEFTBRACE */
+                                0x0B010019      /* KEY_P */
