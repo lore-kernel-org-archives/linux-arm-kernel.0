@@ -1,65 +1,68 @@
-From: joshc@eso.teric.us (Josh Cartwright)
-Date: Mon, 14 Jan 2013 16:32:20 -0600
-Subject: [PATCH] arm: mach-zynq/timer.c: fix memory leakage
-In-Reply-To: <1358198331-31949-1-git-send-email-dinggnu@gmail.com>
-References: <1358198331-31949-1-git-send-email-dinggnu@gmail.com>
-Message-ID: <20130114223220.GC28312@kryptos>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Mon, 14 Jan 2013 17:31:58 -0500
+Subject: [PATCH v5 00/14] KVM/ARM Implementation
+In-Reply-To: <20130114160051.GH18935@mudshark.cambridge.arm.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130114160051.GH18935@mudshark.cambridge.arm.com>
+Message-ID: <CANM98qL9SZHtQSij5K1z7FADF224fkwBfPmXypgoooLD0htO9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 10:18:46PM +0100, Cong Ding wrote:
-> the variable ttccs allocated isn't freed when error occurs, so we call kfree
-> before return.
-> 
-> Signed-off-by: Cong Ding <dinggnu@gmail.com>
-> ---
->  arch/arm/mach-zynq/timer.c |   25 ++++++++++++++++---------
->  1 file changed, 16 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-zynq/timer.c b/arch/arm/mach-zynq/timer.c
-> index f9fbc9c..df04761 100644
-> --- a/arch/arm/mach-zynq/timer.c
-> +++ b/arch/arm/mach-zynq/timer.c
-> @@ -203,15 +203,15 @@ static void __init zynq_ttc_setup_clocksource(struct device_node *np,
->  
->  	err = of_property_read_u32(np, "reg", &reg);
->  	if (WARN_ON(err))
-> -		return;
-> +		goto out;
->  
->  	clk = of_clk_get_by_name(np, "cpu_1x");
->  	if (WARN_ON(IS_ERR(clk)))
-> -		return;
-> +		goto out;
->  
->  	err = clk_prepare_enable(clk);
->  	if (WARN_ON(err))
-> -		return;
-> +		goto out;
->  
->  	ttccs->xttc.base_addr = base + reg * 4;
->  
-> @@ -229,7 +229,10 @@ static void __init zynq_ttc_setup_clocksource(struct device_node *np,
->  
->  	err = clocksource_register_hz(&ttccs->cs, clk_get_rate(clk) / PRESCALE);
->  	if (WARN_ON(err))
-> -		return;
-> +		goto out;
-> +	return;
-> +out:
-> +	kfree(ttccs);
->  }
+On Mon, Jan 14, 2013 at 11:00 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Christoffer,
+>
+> On Tue, Jan 08, 2013 at 06:38:34PM +0000, Christoffer Dall wrote:
+>> The following series implements KVM support for ARM processors,
+>> specifically on the Cortex-A15 platform.
+>
+> [...]
+>
+> This is looking pretty good to me now and I feel that the longer it stays
+> out-of-tree, the more issues will creep in (without continual effort from
+> yourself and others). I've sent some minor comments (mainly vgic-related)
+> so, if you fix those, then you can add:
+>
+>   Reviewed-by: Will Deacon <will.deacon@arm.com>
+>
+> for the series.
 
-Okay...hmm.  If initialization of the timer fails, you'll have bigger
-issues then just a small memory leak.  Especially since right now the
-TTC is the only supported timer on zynq.
+A big thanks!
 
-But okay, to be forward looking we should probably properly handle these
-error cases.
+>
+> Now, there's a lot of code here and merging isn't completely
+> straightforward. I propose:
+>
+>   * The first series should go via Russell's tree. It depends on my
+>     perf branch for the CPU type stuff, but that should go in for 3.9
+>     anyway (also via Russell).
+>
 
-You've only handled the memory leak here, but there are other potential
-leaks that you should be handling (the clk handle, clock event
-interrupt, ioremap()'d region, etc).  Could you take care of those while
-your at it?
+Great.
 
-   Josh
+>   * The vGIC patches need rebasing on top of Rob Herring's work, which
+>     he sent a pull for over the weekend:
+>
+>       http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/141488.html
+>
+>     In light of that, this stuff will need to go via arm-soc.
+>
+>   * The hyp arch-timers are in a similar situation to the vGIC: Mark Rutland
+>     is moving those into drivers:
+>
+>       http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140560.html
+>
+>     so the kvm bits will need rebasing appropriately and also sent to
+>     arm-soc (Mark -- I assume you intend to send a PULL for 3.9 for those
+>     patches?)
+>
+> Obviously this is all open for discussion, but that seems like the easiest
+> option to me.
+>
+Makes good sense. Given that there are no other major disputes over
+the code we are a couple of people strongly hoping that this can
+happen for 3.9.
+
+In any case, I'll do whatever makes the process the easiest for you guys.
+
+Best,
+-Christoffer
