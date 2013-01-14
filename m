@@ -1,124 +1,166 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 14 Jan 2013 09:05:25 -0500 (EST)
-Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
- management
-In-Reply-To: <1358157392.19304.243.camel@jlo-ubuntu-64.nvidia.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1358157392.19304.243.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <alpine.LFD.2.02.1301140849020.6300@xanadu.home>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 14 Jan 2013 14:14:22 +0000
+Subject: [PATCH v2] gpio: vt8500: memory cleanup missing
+In-Reply-To: <1357844986-21891-1-git-send-email-linux@prisktech.co.nz>
+References: <1357844986-21891-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130114141422.80D6D3E232D@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jan 2013, Joseph Lo wrote:
-
-> Hi Nicolas,
+On Fri, 11 Jan 2013 08:09:46 +1300, Tony Prisk <linux@prisktech.co.nz> wrote:
+> This driver is missing a .remove callback, and the fail path on
+> probe is incomplete.
 > 
-> On Thu, 2013-01-10 at 08:20 +0800, Nicolas Pitre wrote:
-> > This is the initial public posting of the initial support for big.LITTLE.
-> > Included here is the code required to safely power up and down CPUs in a
-> > b.L system, whether this is via CPU hotplug, a cpuidle driver or the
-> > Linaro b.L in-kernel switcher[*] on top of this.  Only  SMP secondary
-> > boot and CPU hotplug support is included at this time.  Getting to this
-> > point already represents a significcant chunk of code as illustrated by
-> > the diffstat below.
-> > 
-> > This work was presented at Linaro Connect in Copenhagen by Dave Martin and
-> > myself.  The presentation slides are available here:
-> > 
-> > http://www.linaro.org/documents/download/f3569407bb1fb8bde0d6da80e285b832508f92f57223c
-> > 
-> > The code is now stable on both Fast Models as well as Virtual Express TC2
-> > and ready for public review.
-> > 
-> > Platform support is included for Fast Models implementing the
-> > Cortex-A15x4-A7x4 and Cortex-A15x1-A7x1 configurations.  To allow
-> > successful compilation, I also included a preliminary version of the
-> > CCI400 driver from Lorenzo Pieralisi.
-> > 
-> > Support for actual hardware such as Vexpress TC2 should come later,
-> > once the basic infrastructure from this series is merged.  A few DT
-> > bindings are used but not yet documented.
-> > 
-> > This series is made of the following parts:
-> > 
-> > Low-level support code:
-> > [PATCH 01/16] ARM: b.L: secondary kernel entry code
-> > [PATCH 02/16] ARM: b.L: introduce the CPU/cluster power API
-> > [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
-> > [PATCH 04/16] ARM: b.L: Add baremetal voting mutexes
-> > [PATCH 05/16] ARM: bL_head: vlock-based first man election
-> > 
-> > Adaptation layer to hook with the generic kernel infrastructure:
-> > [PATCH 06/16] ARM: b.L: generic SMP secondary bringup and hotplug
-> > [PATCH 07/16] ARM: bL_platsmp.c: close the kernel entry gate before
-> > [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface of a
-> > [PATCH 09/16] ARM: vexpress: Select the correct SMP operations at
-> > 
-> > Fast Models support:
-> > [PATCH 10/16] ARM: vexpress: introduce DCSCB support
-> > [PATCH 11/16] ARM: vexpress/dcscb: add CPU use counts to the power
-> > [PATCH 12/16] ARM: vexpress/dcscb: do not hardcode number of CPUs
-> > [PATCH 13/16] drivers: misc: add ARM CCI support
-> > [PATCH 14/16] ARM: TC2: ensure powerdown-time data is flushed from
-> > [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
-> > [PATCH 16/16] ARM: vexpress/dcscb: probe via device tree
-> > 
+> If an error occurs in vt8500_add_chips, gpio_base is not unmapped.
+> The driver is also ignoring the return value from this function so
+> if a chip fails to register it completes as successful.
 > 
-> Thanks for introducing this series.
-> I am taking a look at this series. It introduced an algorithm for
-> syncing and avoid racing when syncing the power status of clusters and
-> CPUs. Do you think these codes could have a chance to become a generic
-> framework?
-
-Yes.  As I mentioned before, the bL_ prefix is implied only by the fact 
-that big.LITTLE was the motivation for creating this code.
-
-> The Tegra chip series had a similar design for CPU clusters and it 
-had
-> limitation that the CPU0 always needs to be the last CPU to be shut down
-> before cluster power down as well. I believe it can also get benefits of
-> this works. We indeed need a similar algorithm to sync CPUs power status
-> before cluster power down and switching.
+> Replaced pr_err with dev_err in vt8500_add_chips since the device is
+> available.
 > 
-> The "bL_entry.c", "bL_entry.S", "bL_entry.h", "vlock.h" and "vlock.S"
-> looks have a chance to be a common framework for ARM platform even if it
-> just support one cluster. Because some systems had the limitations for
-> cluster power down. That's why the coupled cpuidle been introduced. And
-> this framework could be enabled automatically if platform dependent or
-> by menuconfig.
-
-Absolutely.
-
-
-> For ex,
-> 	select CPUS_CLUSTERS_POWER_SYNC_FRAMEWORK if SMP && CPU_PM
+> There is also no .remove callback defined. To allow removing the
+> registered chips, I have moved *vtchip to be a static global.
 > 
-> How do you think of this suggestion?
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+> v2:
+> Remove global variable and use platform_set_drvdata instead.
+> 
+>  drivers/gpio/gpio-vt8500.c |   51 +++++++++++++++++++++++++++++++++++---------
+>  1 file changed, 41 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-vt8500.c b/drivers/gpio/gpio-vt8500.c
+> index b53320a..87e59b5 100644
+> --- a/drivers/gpio/gpio-vt8500.c
+> +++ b/drivers/gpio/gpio-vt8500.c
+> @@ -233,10 +233,12 @@ static int vt8500_add_chips(struct platform_device *pdev, void __iomem *base,
+>  			sizeof(struct vt8500_gpio_chip) * data->num_banks,
+>  			GFP_KERNEL);
+>  	if (!vtchip) {
+> -		pr_err("%s: failed to allocate chip memory\n", __func__);
+> +		dev_err(&pdev->dev, "failed to allocate chip memory\n");
+>  		return -ENOMEM;
+>  	}
+>  
+> +	platform_set_drvdata(pdev, vtchip);
+> +
+>  	for (i = 0; i < data->num_banks; i++) {
+>  		vtchip[i].base = base;
+>  		vtchip[i].regs = &data->banks[i];
+> @@ -261,6 +263,7 @@ static int vt8500_add_chips(struct platform_device *pdev, void __iomem *base,
+>  
+>  		gpiochip_add(chip);
+>  	}
+> +
+>  	return 0;
+>  }
+>  
 
-I'd prefer a more concise name though.
+Watch out; irrelevant whitespace change here. From a maintainer point of
+voiew, I'm less confident about a patch when I see unrelated whitespace
+changes because it suggests that there are things in the patch that you
+don't intend. It helps me out a lot if this stuff gets scrubbed before I
+see it.
 
-> BTW, some questions...
-> 1. The "bL_entry_point" looks like a first run function when CPUs just
-> power up, then jumping to original reset vector that it should be
-> called. Do you think this should be a function and be called by reset
-> handler? Or in your design, this should be called as soon as possible
-> when the CPU power be resumed?
+> @@ -273,36 +276,64 @@ static struct of_device_id vt8500_gpio_dt_ids[] = {
+>  
+>  static int vt8500_gpio_probe(struct platform_device *pdev)
+>  {
+> +	int ret;
+>  	void __iomem *gpio_base;
+> -	struct device_node *np;
+> +	struct device_node *np = pdev->dev.of_node;
+>  	const struct of_device_id *of_id =
+>  				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
+>  
+> -	if (!of_id) {
+> -		dev_err(&pdev->dev, "Failed to find gpio controller\n");
+> +	if (!np) {
+> +		dev_err(&pdev->dev, "GPIO node missing in devicetree\n");
+>  		return -ENODEV;
+>  	}
+>  
+> -	np = pdev->dev.of_node;
+> -	if (!np) {
+> -		dev_err(&pdev->dev, "Missing GPIO description in devicetree\n");
+> -		return -EFAULT;
+> +	if (!of_id) {
+> +		dev_err(&pdev->dev, "No matching driver data\n");
+> +		return -ENODEV;
+>  	}
 
-This should be called as soon as possible.
+Why is this flipped around? I don't see any functional reason for this
+change.
 
-> 2. Does the Last_man mechanism should implement in platform specific
-> code to check something like cpu_online_status and if there is a
-> limitation for the specific last CPU to be powered down?
+In actual fact, since the driver needs both it only needs to test for
+the of_id. If there is no node, then of_id will never be set.
 
-The selection of the last man is accomplished using a platform specific 
-mechanism.  By the time this has to be done, the CPU is already dead as 
-far as the Linux kernel is concerned, and therefore the generic CPU map 
-is not reliable.  In the DCSCB case we simply look at the hardware reset 
-register being modified to directly determine the last man.  On TC2 (not 
-yet posted) we have to keep a local map of online CPUs.
+>  
+>  	gpio_base = of_iomap(np, 0);
+>  	if (!gpio_base) {
+>  		dev_err(&pdev->dev, "Unable to map GPIO registers\n");
+> -		of_node_put(np);
+>  		return -ENOMEM;
+>  	}
+>  
+> -	vt8500_add_chips(pdev, gpio_base, of_id->data);
+> +	ret = vt8500_add_chips(pdev, gpio_base, of_id->data);
+> +	if (ret) {
+> +		iounmap(gpio_base);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int vt8500_gpio_remove(struct platform_device *pdev)
+> +{
+> +	int i;
+> +	int ret;
+> +	const struct vt8500_gpio_data *data;
+> +	struct vt8500_gpio_chip *vtchip = platform_get_drvdata(pdev);
+> +	void __iomem *gpio_base = vtchip[0].base;
+> +	const struct of_device_id *of_id =
+> +				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
+> +
+> +	data = of_id->data;
+> +
+> +	for (i = 0; i < data->num_banks; i++) {
 
-In your case, the selection of the last man would simply be forced on 
-CPU0.
+It would make for simpler code all around if num_banks was cached in the
+vt8500_gpio_chip structure during the .probe() routine. It looks wrong
+to be calling of_match_device() in the remove hook.
 
+Otherwise this iteration looks much better.
 
-Nicolas
+g.
+
+> +		ret = gpiochip_remove(&vtchip[i].chip);
+> +		if (ret)
+> +			dev_warn(&pdev->dev, "gpiochip_remove returned %d\n",
+> +				 ret);
+> +	}
+> +
+> +	iounmap(gpio_base);
+>  
+>  	return 0;
+>  }
+>  
+>  static struct platform_driver vt8500_gpio_driver = {
+>  	.probe		= vt8500_gpio_probe,
+> +	.remove		= vt8500_gpio_remove,
+>  	.driver		= {
+>  		.name	= "vt8500-gpio",
+>  		.owner	= THIS_MODULE,
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
