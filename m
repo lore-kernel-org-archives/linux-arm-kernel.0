@@ -1,45 +1,37 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 14 Jan 2013 17:37:01 +0400
-Subject: [PATCH 2/4] serial: vt8500: ioremap'd resource is never freed
-In-Reply-To: <1358129060-9399-3-git-send-email-linux@prisktech.co.nz>
-References: <1358129060-9399-1-git-send-email-linux@prisktech.co.nz>
- <1358129060-9399-3-git-send-email-linux@prisktech.co.nz>
-Message-ID: <50F409FD.9070700@mvista.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 14 Jan 2013 21:48:54 +0800
+Subject: [PATCH] ARM: imx: disable cpu in .cpu_kill hook
+In-Reply-To: <20130114133208.GC23505@n2100.arm.linux.org.uk>
+References: <1358168977-9631-1-git-send-email-shawn.guo@linaro.org>
+ <20130114133208.GC23505@n2100.arm.linux.org.uk>
+Message-ID: <20130114134853.GD24575@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Jan 14, 2013 at 01:32:08PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 14, 2013 at 09:09:37PM +0800, Shawn Guo wrote:
+> >  void imx_cpu_die(unsigned int cpu)
+> >  {
+> > +	static int spurious;
+> > +
+> >  	cpu_enter_lowpower();
+> > -	imx_enable_cpu(cpu, false);
+> > +	cpu_do_idle();
+> > +	cpu_leave_lowpower();
+> >  
+> > -	/* spin here until hardware takes it down */
+> > -	while (1)
+> > -		;
+> > +	pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, ++spurious);
+> 
+> Returning from the platform cpu die implementation should only be done
+> in extreme situations, particularly where there's no possibility for the
+> CPU to actually be taken offline (in other words, the ARM development
+> platforms where there is _no_ possibility of powering down or resetting
+> the secondary CPUs individually.)
+> 
+Indeed.  I have to admit that I have copied the code from Vexpress but
+never seen it actually runs on my platform.  Will remove the recovery
+completely.
 
-On 14-01-2013 6:04, Tony Prisk wrote:
-
-> Memory mapped via ioremap call is never released. Rather than add an
-> iounmap call, change allocation function to devm_request_and_ioremap.
-
-> Also, change the error on failure for this call to -EBUSY rather than
-> -ENOMEM.
-
-    Not really well justified. See below.
-
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
->   drivers/tty/serial/vt8500_serial.c |    4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-
-> diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
-> index 4c4a58d..8865afd 100644
-> --- a/drivers/tty/serial/vt8500_serial.c
-> +++ b/drivers/tty/serial/vt8500_serial.c
-> @@ -615,9 +615,9 @@ static int vt8500_serial_probe(struct platform_device *pdev)
->   	snprintf(vt8500_port->name, sizeof(vt8500_port->name),
->   		 "VT8500 UART%d", pdev->id);
->
-> -	vt8500_port->uart.membase = ioremap(mmres->start, resource_size(mmres));
-> +	vt8500_port->uart.membase = devm_request_and_ioremap(&pdev->dev, mmres);
->   	if (!vt8500_port->uart.membase) {
-> -		ret = -ENOMEM;
-> +		ret = -EBUSY;
-
-    According to the comment to devm_request_and_ioremap(), the recommended 
-return code on its failure -EADDRNOTAVAIL.
-
-WBR, Sergei
+Shawn
