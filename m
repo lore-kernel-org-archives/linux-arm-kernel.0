@@ -1,60 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Jan 2013 10:49:53 +0000
-Subject: [PATCH v5 02/14] ARM: Section based HYP idmap
-In-Reply-To: <20130114102721.GB4751@redhat.com>
-References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108183848.46302.77369.stgit@ubuntu>
- <20130114102721.GB4751@redhat.com>
-Message-ID: <20130114104952.GA4939@mudshark.cambridge.arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 14 Jan 2013 11:50:41 +0100
+Subject: [PATCH v3 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
+ platform_device_id
+In-Reply-To: <20130114103952.GF10874@arwen.pp.htv.fi>
+References: <1358158361-25550-1-git-send-email-peter.chen@freescale.com>
+ <1358158361-25550-2-git-send-email-peter.chen@freescale.com>
+ <20130114101642.GB10874@arwen.pp.htv.fi> <50F3DB8D.6050104@pengutronix.de>
+ <20130114102444.GD10874@arwen.pp.htv.fi> <50F3DF1D.3040706@pengutronix.de>
+ <20130114103952.GF10874@arwen.pp.htv.fi>
+Message-ID: <50F3E301.7040509@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 10:27:21AM +0000, Gleb Natapov wrote:
-> On Tue, Jan 08, 2013 at 01:38:48PM -0500, Christoffer Dall wrote:
-> > Add a method (hyp_idmap_setup) to populate a hyp pgd with an
-> > identity mapping of the code contained in the .hyp.idmap.text
-> > section.
-> > 
-> > Offer a method to drop this identity mapping through
-> > hyp_idmap_teardown.
-> > 
-> > Make all the above depend on CONFIG_ARM_VIRT_EXT and CONFIG_ARM_LPAE.
-> > 
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> > ---
-> >  arch/arm/include/asm/idmap.h                |    1 +
-> >  arch/arm/include/asm/pgtable-3level-hwdef.h |    1 +
-> >  arch/arm/kernel/vmlinux.lds.S               |    6 +++
-> >  arch/arm/mm/idmap.c                         |   54 ++++++++++++++++++++++-----
-> >  4 files changed, 50 insertions(+), 12 deletions(-)
+On 01/14/2013 11:39 AM, Felipe Balbi wrote:
+> On Mon, Jan 14, 2013 at 11:34:05AM +0100, Marc Kleine-Budde wrote:
+>> On 01/14/2013 11:24 AM, Felipe Balbi wrote:
+>>> On Mon, Jan 14, 2013 at 11:18:53AM +0100, Marc Kleine-Budde wrote:
+>>>> On 01/14/2013 11:16 AM, Felipe Balbi wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On Mon, Jan 14, 2013 at 06:12:39PM +0800, Peter Chen wrote:
+>>>>>> @@ -2756,22 +2753,41 @@ static int fsl_udc_otg_resume(struct device *dev)
+>>>>>>  
+>>>>>>  	return fsl_udc_resume(NULL);
+>>>>>>  }
+>>>>>> -
+>>>>>>  /*-------------------------------------------------------------------------
+>>>>>>  	Register entry point for the peripheral controller driver
+>>>>>>  --------------------------------------------------------------------------*/
+>>>>>> -
+>>>>>> +static const struct platform_device_id fsl_udc_devtype[] = {
+>>>>>> +	{
+>>>>>> +		.name = "imx-udc-mx25",
+>>>>>> +		.driver_data = IMX25_UDC,
+>>>>>> +	}, {
+>>>>>> +		.name = "imx-udc-mx27",
+>>>>>> +		.driver_data = IMX27_UDC,
+>>>>>> +	}, {
+>>>>>> +		.name = "imx-udc-mx31",
+>>>>>> +		.driver_data = IMX31_UDC,
+>>>>>> +	}, {
+>>>>>> +		.name = "imx-udc-mx35",
+>>>>>> +		.driver_data = IMX35_UDC,
+>>>>>> +	}, {
+>>>>>> +		.name = "imx-udc-mx51",
+>>>>>> +		.driver_data = IMX51_UDC,
+>>>>>> +	}
+>>>>>> +};
+>>>>>
+>>>>> I wonder if your driver-data is actually needed since you can use string
+>>>>> comparisson to achieve the exact same outcome.
+>>>>
+>>>> Why use a string compare, if the kernel infrastructure already does this
+>>>> for you?
+>>>
+>>> what do you mean ? What kernel infrastructure is doing waht for me ?
+>>
+>> The kernel infrastructure is doing the string compare for you to match
+>> the device against the driver (via platform_device_id->name). You get
+>> the a pointer to the driver_data for free. So you don't need any string
+>> compare in the driver later.
+> 
+> but current driver data is just duplicating name with an integer, it's
+> pretty useless driver data.
 
-[...]
+I don't think so - another argument:
+Less code. As struct platform_device_id is a static array the space is
+allocated anyway. So it doesn't make any difference if driver_data is
+NULL or not. Later you just need to make an integer comparison instead
+of a call to a strcmp(), if you have a switch/case and IMX*_UDC is an
+enum, the compiler will warn you if you've missed an IMX variant.
 
-> > -static void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
-> > +static void identity_mapping_add(pgd_t *pgd, const char *text_start,
-> > +				 const char *text_end, unsigned long prot)
-> >  {
-> > -	unsigned long prot, next;
-> > +	unsigned long addr, end;
-> > +	unsigned long next;
-> > +
-> > +	addr = virt_to_phys(text_start);
-> > +	end = virt_to_phys(text_end);
-> How does this work with phys addresses greater than 32bit (with
-> LPAE)? This was the same before the patch too, but I am still
-> curious. Since __virt_to_phys() returns unsigned long kernel cannot be
-> put in high memory, right?
+Marc
 
-Well, AArch32 (arch/arm/) only supports 32-bit virtual addresses by virtue
-of the fact that our registers are only 32 bits wide, so we can't
-identity-map physical addresses above the 4GB boundary.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-You may want to look at the keystone patches from TI for insight about
-kernels at high (>32-bit) addresses, although I've not seen any activity
-around that for some time now (which is a pity, because the code-patching
-stuff was in a good shape).
-
-Will
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130114/fb23c595/attachment.sig>
