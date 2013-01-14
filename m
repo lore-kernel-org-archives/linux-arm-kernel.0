@@ -1,85 +1,74 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Jan 2013 15:05:32 +0000
-Subject: [PATCH 5/6] ARM: dts: Add basic dts include files for Samsung
- S3C64xx SoCs
-In-Reply-To: <20130114144841.GE7990@e106331-lin.cambridge.arm.com>
-References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
- <1358039458-31960-6-git-send-email-tomasz.figa@gmail.com>
- <20130114144841.GE7990@e106331-lin.cambridge.arm.com>
-Message-ID: <20130114150531.GE21142@e102568-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 Jan 2013 15:09:17 +0000
+Subject: [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile KVM support
+In-Reply-To: <20130108183855.46302.40539.stgit@ubuntu>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183855.46302.40539.stgit@ubuntu>
+Message-ID: <20130114150917.GA18935@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 02:48:41PM +0000, Mark Rutland wrote:
-> Hello,
+On Tue, Jan 08, 2013 at 06:38:55PM +0000, Christoffer Dall wrote:
+> Targets KVM support for Cortex A-15 processors.
 > 
-> This all looks good. I just have a couple of comments about the cpus node.
+> Contains all the framework components, make files, header files, some
+> tracing functionality, and basic user space API.
 > 
-> On Sun, Jan 13, 2013 at 01:10:57AM +0000, Tomasz Figa wrote:
-> > This patch adds basic device tree definitions for Samsung S3C64xx SoCs.
-> > 
-> > Since all the SoCs in the series are very similar, the files are created
-> > hierarchically - one file for the whole series and then separate files
-> > for particular SoCs including the common one.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Only supported core is Cortex-A15 for now.
 > 
-> [...]
+> Most functionality is in arch/arm/kvm/* or arch/arm/include/asm/kvm_*.h.
 > 
-> > diff --git a/arch/arm/boot/dts/s3c64xx.dtsi b/arch/arm/boot/dts/s3c64xx.dtsi
-> > new file mode 100644
-> > index 0000000..55d6e08
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/s3c64xx.dtsi
-> > @@ -0,0 +1,97 @@
-> > +/*
-> > + * Samsung's S3C64xx SoC series common device tree source
-> > + *
-> > + * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
-> > + *
-> > + * Samsung's S3C64xx SoC series device nodes are listed in this file.
-> > + * Particular SoCs from S3C64xx series can include this file and provide
-> > + * values for SoCs specfic bindings.
-> > + *
-> > + * Note: This file does not include device nodes for all the controllers in
-> > + * S3C64xx SoCs. As device tree coverage for S3C64xx increases, additional
-> > + * nodes can be added to this file.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +/include/ "skeleton.dtsi"
-> > +
-> > +/ {
-> > +	cpus {
-> > +		cpu at 0 {
-> > +			compatible = "arm,arm1176jzf-s";
-> > +		};
-> > +	};
-> 
-> You can drop the unit address from the cpu node - it's meant to be there to
-> differentiate multiple nodes (and is supposed to match the reg property, which
-> the 1176jzf-s can't have, as it doesn't have an MPIDR).
+> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
+> Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+> ---
+>  Documentation/virtual/kvm/api.txt  |   57 +++++-
+>  arch/arm/Kconfig                   |    2
+>  arch/arm/Makefile                  |    1
+>  arch/arm/include/asm/kvm_arm.h     |   24 ++
+>  arch/arm/include/asm/kvm_asm.h     |   58 ++++++
+>  arch/arm/include/asm/kvm_coproc.h  |   24 ++
+>  arch/arm/include/asm/kvm_emulate.h |   50 +++++
+>  arch/arm/include/asm/kvm_host.h    |  114 ++++++++++++
+>  arch/arm/include/uapi/asm/kvm.h    |  106 +++++++++++
 
-Well, this is a point that I should consider since the kernel docs I wrote are
-misleading, they require the reg property that can not be there on UP.
-True, MPIDR does not exist in this case, but I have to document this in the
-bindings since it is unclear.
+[...]
 
-> 
-> Also, "arm,arm1176jzf-s" isn't listed in the binding doc. There was a question
-> about how to maintain this list [1], but I can't seem to find a conclusion, if
-> any were reached.  It might be worth appending "arm,arm1176" to the compatible
-> list for the cpu node in case we want to enable something via dt for all 1176
-> variations.
-> 
-> Dave, Lorenzo, any thoughts?
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> new file mode 100644
+> index 0000000..c6298b1
+> --- /dev/null
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -0,0 +1,106 @@
+> +/*
+> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+> + */
+> +
+> +#ifndef __ARM_KVM_H__
+> +#define __ARM_KVM_H__
+> +
+> +#include <asm/types.h>
+> +#include <asm/ptrace.h>
 
-Eh, frankly I do not know how to handle this. Either we add a compatible
-string to the bindings anytime a DT gets merged in the kernel but how
-to maintain it, it has to be defined. Happy to hear some feedback on
-this.
+I think you want linux/types.h, as asm/types.h isn't exported from what I
+can tell. make headers_check screams about it too:
 
-Lorenzo
+/home/will/sources/linux/linux/usr/include/asm/kvm.h:22: include of <linux/types.h> is preferred over <asm/types.h>
+/home/will/sources/linux/linux/usr/include/asm/kvm.h:57: found __[us]{8,16,32,64} type without #include <linux/types.h>
+
+Will
