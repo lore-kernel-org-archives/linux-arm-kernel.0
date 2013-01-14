@@ -1,178 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Jan 2013 15:42:31 +0000
-Subject: [PATCH v5 07/12] ARM: KVM: VGIC virtual CPU interface management
-In-Reply-To: <20130108184211.46558.74646.stgit@ubuntu>
-References: <20130108184116.46558.3558.stgit@ubuntu>
- <20130108184211.46558.74646.stgit@ubuntu>
-Message-ID: <20130114154231.GG18935@mudshark.cambridge.arm.com>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Mon, 14 Jan 2013 08:43:35 -0700
+Subject: [PATCH v3 1/2] cpufreq: add imx6q-cpufreq driver
+In-Reply-To: <1358175733-13475-2-git-send-email-shawn.guo@linaro.org>
+References: <1358175733-13475-1-git-send-email-shawn.guo@linaro.org>
+ <1358175733-13475-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <50F427A7.7000203@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 06:42:11PM +0000, Christoffer Dall wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Add VGIC virtual CPU interface code, picking pending interrupts
-> from the distributor and stashing them in the VGIC control interface
-> list registers.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> ---
->  arch/arm/include/asm/kvm_vgic.h |   30 ++++
->  arch/arm/kvm/vgic.c             |  327 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 356 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
-> index 9ff0d9c..b3133c4 100644
-> --- a/arch/arm/include/asm/kvm_vgic.h
-> +++ b/arch/arm/include/asm/kvm_vgic.h
-> @@ -110,8 +110,33 @@ struct vgic_dist {
->  };
-> 
->  struct vgic_cpu {
-> +#ifdef CONFIG_KVM_ARM_VGIC
-> +       /* per IRQ to LR mapping */
-> +       u8              vgic_irq_lr_map[VGIC_NR_IRQS];
-> +
-> +       /* Pending interrupts on this VCPU */
-> +       DECLARE_BITMAP( pending_percpu, VGIC_NR_PRIVATE_IRQS);
-> +       DECLARE_BITMAP( pending_shared, VGIC_NR_SHARED_IRQS);
-> +
-> +       /* Bitmap of used/free list registers */
-> +       DECLARE_BITMAP( lr_used, 64);
-> +
-> +       /* Number of list registers on this CPU */
-> +       int             nr_lr;
-> +
-> +       /* CPU vif control registers for world switch */
-> +       u32             vgic_hcr;
-> +       u32             vgic_vmcr;
-> +       u32             vgic_misr;      /* Saved only */
-> +       u32             vgic_eisr[2];   /* Saved only */
-> +       u32             vgic_elrsr[2];  /* Saved only */
-> +       u32             vgic_apr;
-> +       u32             vgic_lr[64];    /* A15 has only 4... */
+Hi Shawn,
 
-Have a #define for the maximum number of list registers.
-
-> +#endif
->  };
-> 
-> +#define LR_EMPTY       0xff
+On 01/14/2013 08:02 AM, Shawn Guo wrote:
+> Add an imx6q-cpufreq driver for Freescale i.MX6Q SoC to handle the
+> hardware specific frequency and voltage scaling requirements.
+>
+>
+ > <snip>
+ >
+> --- /dev/null
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -0,0 +1,296 @@
+>
+> <snip>
+>
 > +
->  struct kvm;
->  struct kvm_vcpu;
->  struct kvm_run;
-> @@ -119,9 +144,14 @@ struct kvm_exit_mmio;
-> 
->  #ifdef CONFIG_KVM_ARM_VGIC
->  int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
-> +void kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu);
-> +void kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu);
-
-Same comment as for the arch timer (flush/sync).
-
-> +int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->  bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->                       struct kvm_exit_mmio *mmio);
-> 
-> +#define irqchip_in_kernel(k)   (!!((k)->arch.vgic.vctrl_base))
-> +
->  #else
->  static inline int kvm_vgic_hyp_init(void)
->  {
-> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-> index bd2bd7f..58237d5 100644
-> --- a/arch/arm/kvm/vgic.c
-> +++ b/arch/arm/kvm/vgic.c
-> @@ -152,6 +152,34 @@ static int vgic_irq_is_enabled(struct kvm_vcpu *vcpu, int irq)
->         return vgic_bitmap_get_irq_val(&dist->irq_enabled, vcpu->vcpu_id, irq);
->  }
-> 
-> +static int vgic_irq_is_active(struct kvm_vcpu *vcpu, int irq)
+> +static int imx6q_set_target(struct cpufreq_policy *policy,
+> +			    unsigned int target_freq, unsigned int relation)
 > +{
-> +       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>
+> <snip>
+>
 > +
-> +       return vgic_bitmap_get_irq_val(&dist->irq_active, vcpu->vcpu_id, irq);
-> +}
+> +	/* scaling up?  scale voltage before frequency */
+> +	if (freqs.new > freqs.old) {
+> +		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+> +		if (ret) {
+> +			dev_err(cpu_dev, "failed to scale voltage up: %d\n", ret);
+> +			return ret;
+> +		}
 > +
-> +static void vgic_irq_set_active(struct kvm_vcpu *vcpu, int irq)
-> +{
-> +       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +
-> +       vgic_bitmap_set_irq_val(&dist->irq_active, vcpu->vcpu_id, irq, 1);
-> +}
-> +
-> +static void vgic_irq_clear_active(struct kvm_vcpu *vcpu, int irq)
-> +{
-> +       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +
-> +       vgic_bitmap_set_irq_val(&dist->irq_active, vcpu->vcpu_id, irq, 0);
-> +}
-> +
-> +static int vgic_dist_irq_is_pending(struct kvm_vcpu *vcpu, int irq)
-> +{
-> +       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +
-> +       return vgic_bitmap_get_irq_val(&dist->irq_state, vcpu->vcpu_id, irq);
-> +}
-> +
->  static void vgic_dist_irq_set(struct kvm_vcpu *vcpu, int irq)
->  {
->         struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> @@ -711,7 +739,30 @@ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
-> 
->  static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
->  {
-> -       return 0;
-> +       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +       unsigned long *pending, *enabled, *pend_percpu, *pend_shared;
-> +       unsigned long pending_private, pending_shared;
-> +       int vcpu_id;
-> +
-> +       vcpu_id = vcpu->vcpu_id;
-> +       pend_percpu = vcpu->arch.vgic_cpu.pending_percpu;
-> +       pend_shared = vcpu->arch.vgic_cpu.pending_shared;
-> +
-> +       pending = vgic_bitmap_get_cpu_map(&dist->irq_state, vcpu_id);
-> +       enabled = vgic_bitmap_get_cpu_map(&dist->irq_enabled, vcpu_id);
-> +       bitmap_and(pend_percpu, pending, enabled, VGIC_NR_PRIVATE_IRQS);
-> +
-> +       pending = vgic_bitmap_get_shared_map(&dist->irq_state);
-> +       enabled = vgic_bitmap_get_shared_map(&dist->irq_enabled);
-> +       bitmap_and(pend_shared, pending, enabled, VGIC_NR_SHARED_IRQS);
-> +       bitmap_and(pend_shared, pend_shared,
-> +                  vgic_bitmap_get_shared_map(&dist->irq_spi_target[vcpu_id]),
-> +                  VGIC_NR_SHARED_IRQS);
-> +
-> +       pending_private = find_first_bit(pend_percpu, VGIC_NR_PRIVATE_IRQS);
-> +       pending_shared = find_first_bit(pend_shared, VGIC_NR_SHARED_IRQS);
-> +       return (pending_private < VGIC_NR_PRIVATE_IRQS ||
-> +               pending_shared < VGIC_NR_SHARED_IRQS);
->  }
-> 
->  /*
-> @@ -737,6 +788,280 @@ static void vgic_update_state(struct kvm *kvm)
->         }
->  }
-> 
-> +#define LR_CPUID(lr)   \
-> +       (((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
-> +#define MK_LR_PEND(src, irq)   \
-> +       (GICH_LR_PENDING_BIT | ((src) << GICH_LR_PHYSID_CPUID_SHIFT) | (irq))
-> +/*
-> + * Queue an interrupt to a CPU virtual interface. Return true on success,
-> + * or false if it wasn't possible to queue it.
-> + */
-> +static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
-> +{
-> +       struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +       int lr;
-> +
-> +       /* Sanitize the input... */
-> +       BUG_ON(sgi_source_id & ~7);
-> +       BUG_ON(sgi_source_id && irq > 15);
+> +		/*
+> +		 * Need to increase vddpu and vddsoc for safety
+> +		 * if we are about to run at 1.2 GHz.
+> +		 */
+> +		if (freqs.new == FREQ_1P2_GHZ / 1000) {
+> +			regulator_set_voltage_tol(pu_reg,
+> +					PU_SOC_VOLTAGE_HIGH, 0);
+> +			regulator_set_voltage_tol(soc_reg,
+> +					PU_SOC_VOLTAGE_HIGH, 0);
+> +		}
 
-You can use your new NR_SGIS definition here.
+I believe you need a delay here to let the LDOs ramp before changing
+the CPU frequency.
 
-Will
+According to the i.MX6Q reference manual, with the factory default
+step times in PMU_MISC2 and the maximum voltage swing is
+	1.25V (1.2GHz) - 0.95V (400MHz) == 0.325V
+
+or 13 steps at 25mV.
+
+The default step time is 0.000021333s (512 clocks at 24MHz), so
+the worst case delay needed is ~280uS.
+
+This could also be done in the regulator driver, but that may
+require multiple delays if multiple rails are changed.
+
+Regards,
+
+
+Eric
