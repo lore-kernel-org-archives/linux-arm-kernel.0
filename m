@@ -1,74 +1,79 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Jan 2013 17:53:46 +0000
-Subject: [PATCH 08/16] ARM: bL_platsmp.c: make sure the GIC interface of
- a dying CPU is disabled
-In-Reply-To: <alpine.LFD.2.02.1301121134390.6300@xanadu.home>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-9-git-send-email-nicolas.pitre@linaro.org>
- <50F054E7.9000004@ti.com>
- <alpine.LFD.2.02.1301111405590.6300@xanadu.home>
- <50F10799.3000501@ti.com>
- <alpine.LFD.2.02.1301121134390.6300@xanadu.home>
-Message-ID: <20130114175345.GG21142@e102568-lin.cambridge.arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 14 Jan 2013 18:54:22 +0100
+Subject: [PATCH v3 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
+ platform_device_id
+In-Reply-To: <20130114174054.GB12611@arwen.pp.htv.fi>
+References: <20130114101642.GB10874@arwen.pp.htv.fi>
+ <50F3DB8D.6050104@pengutronix.de> <20130114102444.GD10874@arwen.pp.htv.fi>
+ <50F3DF1D.3040706@pengutronix.de> <20130114103952.GF10874@arwen.pp.htv.fi>
+ <50F3E301.7040509@pengutronix.de> <20130114105357.GH10874@arwen.pp.htv.fi>
+ <50F3E5E8.2000905@pengutronix.de> <20130114110600.GI10874@arwen.pp.htv.fi>
+ <20130114125632.GA30157@nchen-desktop>
+ <20130114174054.GB12611@arwen.pp.htv.fi>
+Message-ID: <50F4464E.7000605@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 12, 2013 at 04:47:19PM +0000, Nicolas Pitre wrote:
-> On Sat, 12 Jan 2013, Santosh Shilimkar wrote:
+On 01/14/2013 06:40 PM, Felipe Balbi wrote:
+> Hi,
 > 
-> > On Saturday 12 January 2013 12:37 AM, Nicolas Pitre wrote:
-> > > On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
-> > > 
-> > > > On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> > > > > Otherwise there might be some interrupts or IPIs becoming pending and
-> > > > > the
-> > > > > CPU will not enter low power mode when doing a WFI.  The effect of this
-> > > > > is a CPU that loops back into the kernel, go through the first man
-> > > > > election, signals itself as alive,  and prevent the cluster from being
-> > > > > shut down.
-> > > > > 
-> > > > > This could benefit from a better solution.
-> > > > > 
-> > > > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > > > > ---
-> > > > >    arch/arm/common/bL_platsmp.c        | 1 +
-> > > > >    arch/arm/common/gic.c               | 6 ++++++
-> > > > >    arch/arm/include/asm/hardware/gic.h | 2 ++
-> > > > >    3 files changed, 9 insertions(+)
-> > > > > 
-> > > > > diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
-> > > > > index 0ae44123bf..6a3b251b97 100644
-> > > > > --- a/arch/arm/common/bL_platsmp.c
-> > > > > +++ b/arch/arm/common/bL_platsmp.c
-> > > > > @@ -68,6 +68,7 @@ static void __ref bL_cpu_die(unsigned int cpu)
-> > > > >    	pcpu = mpidr & 0xff;
-> > > > >    	pcluster = (mpidr >> 8) & 0xff;
-> > > > >    	bL_set_entry_vector(pcpu, pcluster, NULL);
-> > > > > +	gic_cpu_if_down();
-> > > > 
-> > > > So for a case where CPU still don't power down for some reason even
-> > > > after CPU interface is disabled, can not listen to and SGI or PPI.
-> > > > Not sure if this happens on big.LITTLE but i have seen one such issue
-> > > > on Cortex-A9 based SOC.
-> > > 
-> > > Here the problem was the reverse i.e. a CPU wouldn't go down because
-> > > some pending SGIs prevented that.
-> > > 
-> > I understood that part. What I was saying is, with CPU IF disabled and
-> > if CPU doesn't enter into the intended low power state and if the wakeup
-> > mechanism on that CPU is SGI/SPI, CPU may never wakeup and can lead to
-> > dead lock. I have seen this scenario on OMAP especially in CPUidle path.
+> On Mon, Jan 14, 2013 at 08:56:33PM +0800, Peter Chen wrote:
 > 
-> Obviously, on the CPU idle path, you should not turn off the GIC 
-> interface as this might lose the ability to wake the CPU up with a 
-> pending interrupt, if your system is so configured.
+> <snip>
+> 
+>>>> Usually there isn't any Changelog between IP cores used in the different
+>>>> fsl processors (at least available outside of fsl), that makes it quite
+>>>> difficult to say if something found on one imx is really the same as on
+>>>> the other one. And they (usually) don't provide any versioning
+>>>> information in a register or the documentation.
+>>>>
+>>>> just my 2?
+>>>
+>>> $SUBJECT is trying to differentiate a single feature (or maybe two) to
+>>> replace cpu_is_xxx(), then expose that on driver_data without creating
+>>> one enum value for each release from fsl.
+>>
+>> Felipe, every one or two SoCs may have their special operations for
+>> integrate PHY interface, clk operation, or workaround for IC
+>> limitation.
+> 
+> the particular PHY and clk used should be hidden by phy layer and clk
+> API respectively. Workarounds, fair enough, we need to handle them; but
+> ideally those should be based on runtime revision detection, not some
+> hackery using driver_data.
 
-That's platform specific. On TC2 turning GIC CPU IF off is pivotal otherwise
-the CPU receiving an IRQ can complete wfi and be reset by firmware when
-executing in the middle of nowhere, leading to a system lock-up.
+If this is actually possible, I'd love to do this. But IP vendor don't
+include a version register in their cores. :(
 
-Disabling the GIC CPU IF must not be added to the gic_cpu_save() code,
-but we do need a helper function to disable the CPU IF for platforms
-that need this to happen to function properly (eg TC2).
+>> Maybe, it will add more future or SoCs (maybe not for this driver) in
+>> the future, using enum is easier than string comparison for expanding
+>> something.
+> 
+> a) I never told you to *not* use enum. I said that creating DEVICE_A,
+> DEVICE_B, DEVICE_C, DEVICE_D and DEVICE_E values when DEVICE_B,
+> DEVICE_C and DEVICE_E behave exactly the same is unnecessary.
+> 
+> b) you can't be expecting to add future SoCs support to fsl udc, I have
+> already said and will repeat for the last time: move to chipidea ASAP.
+> 
+> New SoCs cannot be added to fsl udc, you *must* use chipidea for
+> anything new and move the legacy to chipidea eventually. I will wait for
+> a full year for you to do that, but after that I will have to start
+> deleting drivers for the sake of avoid duplication of effort.
 
-Lorenzo
++1
+
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130114/d69ca078/attachment-0001.sig>
