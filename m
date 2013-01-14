@@ -1,49 +1,25 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 14 Jan 2013 12:06:31 +0100 (CET)
-Subject: [PATCHv2 1/4] clockevents: Add generic timer broadcast
- receiver
-In-Reply-To: <1357742770-15028-2-git-send-email-mark.rutland@arm.com>
-References: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
- <1357742770-15028-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <alpine.LFD.2.02.1301141204421.7475@ionos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Jan 2013 11:07:53 +0000
+Subject: [PATCH 0/9] ARM: PRIMA2: bringup new CSR SiRFmarco SMP SoC
+In-Reply-To: <CAGsJ_4wxJR0y1OXEjN1wYY2BTfPXe=WJ7QC8anQMLYuywT5B2A@mail.gmail.com>
+References: <1356005639-23466-1-git-send-email-Barry.Song@csr.com>
+ <CAGsJ_4wxJR0y1OXEjN1wYY2BTfPXe=WJ7QC8anQMLYuywT5B2A@mail.gmail.com>
+Message-ID: <201301141107.53449.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Jan 2013, Mark Rutland wrote:
-> +#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-> +extern int tick_receive_broadcast(void);
-> +#else
-> +static inline int tick_receive_broadcast(void)
-> +{
-> +	return 0;
-> +}
+On Sunday 06 January 2013, Barry Song wrote:
+> except those from Mark, would you kindly give more feedbacks about
+> this series? after this, i'd like to send out a series about SiRF
+> firmware based on trustzone.
 
-What's the inline function for? If an arch does not have broadcasting
-support it should not have a receive broadcast function call either.
+Hi Barry,
 
-> +#endif
-> +
->  #ifdef CONFIG_GENERIC_CLOCKEVENTS
->  extern void clockevents_notify(unsigned long reason, void *arg);
->  #else
-> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-> index f113755..5079bb7 100644
-> --- a/kernel/time/tick-broadcast.c
-> +++ b/kernel/time/tick-broadcast.c
-> @@ -125,6 +125,18 @@ int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu)
->  	return ret;
->  }
->  
-> +int tick_receive_broadcast(void)
-> +{
-> +	struct tick_device *td = this_cpu_ptr(&tick_cpu_device);
-> +	struct clock_event_device *evt = td->evtdev;
-> +
-> +	if (!evt)
-> +		return -ENODEV;
+Sorry for the late reply. I have looked at the patches and have no
+further comments besides what Mark already mentioned.
 
-Is anything going to use the return value?
+Patch 4/9 will unfortunately conflict with the removal of struct sys_timer,
+but we can probably handle that, or you base your patches on top of
+the timer/cleanup branch in arm-soc.
 
-Thanks,
-
-	tglx
+	Arnd
