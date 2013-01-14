@@ -1,30 +1,66 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 14 Jan 2013 09:17:37 -0800
-Subject: [PATCH 04/18] power: ab8500_fg: Replace msleep() with
- usleep_range() for greater accuracy
-In-Reply-To: <1357909986-9262-5-git-send-email-lee.jones@linaro.org>
-References: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
- <1357909986-9262-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <1358183857.19400.13.camel@joe-AO722>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Jan 2013 09:18:14 -0800
+Subject: [PATCH 01/14] mfd: omap-usb-host: Consolidate OMAP USB-HS
+ platform data
+In-Reply-To: <50F3EBEF.8040809@ti.com>
+References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
+ <1357836694-30788-2-git-send-email-rogerq@ti.com>
+ <20130110234537.GB15458@atomide.com> <50EFDE10.9080902@ti.com>
+ <20130111181331.GM14149@atomide.com> <50F3EBEF.8040809@ti.com>
+Message-ID: <20130114171814.GT14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-01-11 at 13:12 +0000, Lee Jones wrote:
-> Doing so provides a greater degree of accuracy when dealing with
-> time-frames between 1us and 20ms. msleep() is only accurate for
-> wake-ups greater than 20ms.
-[]
-> diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
-[]
-> @@ -956,7 +956,7 @@ static int ab8500_fg_load_comp_volt_to_capacity(struct ab8500_fg *di)
->  	do {
->  		vbat += ab8500_fg_bat_voltage(di);
->  		i++;
-> -		msleep(5);
-> +		usleep_range(5000, 5001);
+* Roger Quadros <rogerq@ti.com> [130114 03:31]:
+> On 01/11/2013 08:13 PM, Tony Lindgren wrote:
+> > * Roger Quadros <rogerq@ti.com> [130111 01:43]:
+> >> Tony,
+> >>
+> >> On 01/11/2013 01:45 AM, Tony Lindgren wrote:
+> >>> * Roger Quadros <rogerq@ti.com> [130110 08:54]:
+> >>>> Let's have a single platform data structure for the OMAP's High-Speed
+> >>>> USB host subsystem instead of having 3 separate ones i.e. one for
+> >>>> board data, one for USB Host (UHH) module and one for USB-TLL module.
+> >>>>
+> >>>> This makes the code much simpler and avoids creating multiple copies of
+> >>>> platform data.
+> >>>
+> >>> I can apply just this patch alone into an immutable branch that
+> >>> we all can merge in as needed as long as we have acks for the USB
+> >>> and MFD parts.
+> >>>
+> >>> Or does this one need to be changed based on Alan's comments
+> >>> on the EHCI lib related changes?
+> >>>
+> >>
+> >> This does not depend on EHCI lib based changes but it depends on the
+> >> OMAP USB Host cleanup series posted earlier.
+> > 
+> > Can we first apply just the minimal platform_data + board file + clock
+> > changes?
+> > 
+> We could, but I'll then have to make changes to the patches in the first
+> series and re-post them. Do you want me to do that?
 
-If you're going to give a range that small
-you might as well use usleep instead.
+Yes please. Otherwise we'll unnecessarily complicate the dependencies between 
+arch/arm/*omap* code and the drivers. And we've certainly had enough of
+self-inflicted merge conflicts with the omap usb code already :)
+ 
+> > That way I can apply those to some immutable tree for everybody to use,
+> > and we cut off the dependency to the driver changes for the rest of the
+> > patches. And then I'm off the hook for the rest of the patches :)
+> > 
+> 
+> Or you could just ack this patch ;). The platform data is specific to
+> USB host only :)
 
-Otherwise, add some tolerance to allow any
-other coalesced wakeup to occur.
+Well it's not just this patch. It's the clock related patches in your
+earlier seriers that will conflict with any attempts to move the clock
+data to live under drivers/clk/omap where it needs to go. And the three
+patches at the end of this series to add platform data (which look fine),
+but will likely conflict with something else. Let's try do do these changes
+in a way where the dependencies are cut to minimum where possible.
+
+Regards,
+
+Tony
