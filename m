@@ -1,88 +1,145 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 14 Jan 2013 15:34:25 +0800
-Subject: [v4 PATCH 00/12] atmel spi controller with dmaengine and device tree
- support
-Message-ID: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
+Date: Mon, 14 Jan 2013 15:34:32 +0800
+Subject: [v4 PATCH 07/12] spi/atmel_spi: fix spi-atmel driver to adapt to
+ slave_config changes
+In-Reply-To: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
+References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1358148877-18679-8-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All, 
+From: Richard Genoud <richard.genoud@gmail.com>
 
-This set of patches is to add dmaengine and device tree support for atmel spi.
-The work is based on Nicolas and Richard's work.
-It is tested on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and at91sam9g20ek.
+This is the following of the patch e2b35f3dbfc080f15b72834d08f04f0269dbe9be
 
-It is based on v3.8-rc3.
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+[wenyou.yang at atmel.com: fix DMA: when enable both spi0 and spi1, spi0 doesn't work]
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Cc: grant.likely at secretlab.ca
+Cc: spi-devel-general at lists.sourceforge.net
+---
+ drivers/spi/spi-atmel.c |   61 +++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 51 insertions(+), 10 deletions(-)
 
-Changelog:
-v4:
-	1./ Take Joe Perches's advance, rewrite atmel_spi_is_v2(struct atmel_spi *as)
-	     and atmel_spi_use_dma(struct atmel_spi *as),
-	     and remove atmel_spi_use_pdc(struct atmel_spi *as).
-
-	2./ Rebase on v3.8-rc3.
-
-V3:
-	1./ Rebase on v3.8-rc2.
-
-	2./ Remove some Jean-Christophe's patches which has been
-	    applied on v3.8-rc2.
-
-	3./ Remove spi property "cs-gpios" from the SoC dtsi files
-	    to the board dts files to avoid some useless pin conflicts.
-
-v2: 
-   	1./ Remove the patch :PATCH]mtd: m25p80: change the m25p80_read to reading page to page
-	    which purpose to fix the BUG: when run "flashcp /bin/busybox /dev/mtdX" in 
-	    the at91sam9g25ek with DMA mode, it arises a OOPS. 
-	    Now fix it in this patch:
-	    [PATHC] spi/atmel_spi: add dmaengine support changing to fix the [BUG].
-
-	2./ Remove two patches:
-   	    which purpose to read dts property to select SPI IP version and DMA mode
-	    Now they will be gat from device tree different compatile.
-
-	3./ Fix DMA: when enable both spi0 AND spi1, the spi0 doesn't work BUG.
-
-	4./ Rebase v3.7-rc8.
-
-Best Regards,
-Wenyou Yang.
-
-Nicolas Ferre (5):
-  spi/atmel_spi: add physical base address
-  spi/atmel_spi: call unmapping on transfers buffers
-  spi/atmel_spi: status information passed through controller data
-  spi/atmel_spi: add flag to controller data for lock operations
-  spi/atmel_spi: add dmaengine support
-
-Richard Genoud (6):
-  spi/atmel_spi: fix spi-atmel driver to adapt to slave_config changes
-  spi/atmel_spi: correct 16 bits transfers using PIO
-  spi/atmel_spi: correct 16 bits transfer with DMA
-  ARM: at91: add clocks for spi dt entries
-  ARM: dts: add spi nodes for atmel SoC
-  ARM: dts: add spi nodes for the atmel boards
-
-Wenyou Yang (1):
-  spi/atmel_spi: update the dt support
-
- arch/arm/boot/dts/at91sam9260.dtsi          |   18 +
- arch/arm/boot/dts/at91sam9263.dtsi          |   18 +
- arch/arm/boot/dts/at91sam9263ek.dts         |   14 +
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   14 +
- arch/arm/boot/dts/at91sam9g45.dtsi          |   18 +
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |   14 +
- arch/arm/boot/dts/at91sam9n12.dtsi          |   18 +
- arch/arm/boot/dts/at91sam9n12ek.dts         |   14 +
- arch/arm/boot/dts/at91sam9x5.dtsi           |   18 +
- arch/arm/boot/dts/at91sam9x5ek.dtsi         |   14 +
- arch/arm/mach-at91/at91sam9260.c            |    2 +
- arch/arm/mach-at91/at91sam9g45.c            |    2 +
- arch/arm/mach-at91/at91sam9n12.c            |    2 +
- arch/arm/mach-at91/at91sam9x5.c             |    2 +
- drivers/spi/spi-atmel.c                     |  809 ++++++++++++++++++++++++---
- 15 files changed, 908 insertions(+), 69 deletions(-)
-
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 0d242dc..4d80074 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -451,6 +451,37 @@ static inline int atmel_spi_xfer_can_be_chained(struct spi_transfer *xfer)
+ 	return xfer->delay_usecs == 0 && !xfer->cs_change;
+ }
+ 
++static int atmel_spi_dma_slave_config(struct atmel_spi *as,
++				struct dma_slave_config *slave_config)
++{
++	int err = 0;
++
++	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++
++	slave_config->dst_addr = (dma_addr_t)as->phybase + SPI_TDR;
++	slave_config->src_addr = (dma_addr_t)as->phybase + SPI_RDR;
++	slave_config->src_maxburst = 1;
++	slave_config->dst_maxburst = 1;
++	slave_config->device_fc = false;
++
++	slave_config->direction = DMA_MEM_TO_DEV;
++	if (dmaengine_slave_config(as->dma.chan_tx, slave_config)) {
++		dev_err(&as->pdev->dev,
++			"failed to configure tx dma channel\n");
++		err = -EINVAL;
++	}
++
++	slave_config->direction = DMA_DEV_TO_MEM;
++	if (dmaengine_slave_config(as->dma.chan_rx, slave_config)) {
++		dev_err(&as->pdev->dev,
++			"failed to configure rx dma channel\n");
++		err = -EINVAL;
++	}
++
++	return err;
++}
++
+ static bool filter(struct dma_chan *chan, void *slave)
+ {
+ 	struct	at_dma_slave *sl = slave;
+@@ -467,14 +498,12 @@ static int __devinit atmel_spi_configure_dma(struct atmel_spi *as)
+ {
+ 	struct at_dma_slave *sdata
+ 			= (struct at_dma_slave *)&as->pdata->dma_slave;
++	struct dma_slave_config	slave_config;
++	int err;
+ 
+ 	if (sdata && sdata->dma_dev) {
+ 		dma_cap_mask_t mask;
+ 
+-		/* setup DMA addresses */
+-		sdata->rx_reg = (dma_addr_t)as->phybase + SPI_RDR;
+-		sdata->tx_reg = (dma_addr_t)as->phybase + SPI_TDR;
+-
+ 		/* Try to grab two DMA channels */
+ 		dma_cap_zero(mask);
+ 		dma_cap_set(DMA_SLAVE, mask);
+@@ -484,21 +513,27 @@ static int __devinit atmel_spi_configure_dma(struct atmel_spi *as)
+ 				dma_request_channel(mask, filter, sdata);
+ 	}
+ 	if (!as->dma.chan_rx || !as->dma.chan_tx) {
+-		if (as->dma.chan_rx)
+-			dma_release_channel(as->dma.chan_rx);
+-		if (as->dma.chan_tx)
+-			dma_release_channel(as->dma.chan_tx);
+ 		dev_err(&as->pdev->dev,
+ 			"DMA channel not available, unable to use SPI\n");
+-		return -EBUSY;
++		err = -EBUSY;
++		goto error;
+ 	}
+ 
++	err = atmel_spi_dma_slave_config(as, &slave_config);
++	if (err)
++		goto error;
++
+ 	dev_info(&as->pdev->dev,
+ 			"Using %s (tx) and %s (rx) for DMA transfers\n",
+ 			dma_chan_name(as->dma.chan_tx),
+ 			dma_chan_name(as->dma.chan_rx));
+-
+ 	return 0;
++error:
++	if (as->dma.chan_rx)
++		dma_release_channel(as->dma.chan_rx);
++	if (as->dma.chan_tx)
++		dma_release_channel(as->dma.chan_tx);
++	return err;
+ }
+ 
+ static void atmel_spi_stop_dma(struct atmel_spi *as)
+@@ -575,6 +610,7 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
+ 	struct dma_chan		*txchan = as->dma.chan_tx;
+ 	struct dma_async_tx_descriptor *rxdesc;
+ 	struct dma_async_tx_descriptor *txdesc;
++	struct dma_slave_config	slave_config;
+ 	dma_cookie_t		cookie;
+ 	u32	len = *plen;
+ 
+@@ -613,6 +649,10 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
+ 
+ 	*plen = len;
+ 
++	if (atmel_spi_dma_slave_config(as, &slave_config))
++		goto err_exit;
++
++
+ 	/* Send both scatterlists */
+ 	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
+ 					&as->dma.sgrx,
+@@ -661,6 +701,7 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
+ err_dma:
+ 	spi_writel(as, IDR, SPI_BIT(OVRES));
+ 	atmel_spi_stop_dma(as);
++err_exit:
+ 	atmel_spi_lock(as);
+ 	return -ENOMEM;
+ }
 -- 
 1.7.9.5
