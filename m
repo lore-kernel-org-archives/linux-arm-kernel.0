@@ -1,44 +1,105 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jan 2013 10:06:02 -0800
-Subject: [PATCH v8 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC
- timings and NAND
-In-Reply-To: <CALF0-+UbqFF17X1Ok1s1AGKg6SBmvMc1mvjVuZb=Ej7xo+qcmA@mail.gmail.com>
-References: <1355481404-27695-1-git-send-email-zonque@gmail.com>
- <1355481404-27695-6-git-send-email-zonque@gmail.com>
- <CALF0-+UbqFF17X1Ok1s1AGKg6SBmvMc1mvjVuZb=Ej7xo+qcmA@mail.gmail.com>
-Message-ID: <20130114180602.GV14149@atomide.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 14 Jan 2013 18:10:06 +0000
+Subject: [PATCH 03/16] ARM: b.L: introduce helpers for platform coherency
+ exit/setup
+In-Reply-To: <20130114171528.GF23616@arm.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-4-git-send-email-nicolas.pitre@linaro.org>
+ <20130114170851.GA1967@linaro.org> <20130114171528.GF23616@arm.com>
+Message-ID: <20130114181006.GB1967@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ezequiel Garcia <elezegarcia@gmail.com> [121223 13:49]:
-> On Fri, Dec 14, 2012 at 7:36 AM, Daniel Mack <zonque@gmail.com> wrote:
-> > +
-> > +Example for an AM33xx board:
-> > +
-> > +       gpmc: gpmc at 50000000 {
-> > +               compatible = "ti,am3352-gpmc";
-> > +               ti,hwmods = "gpmc";
-> > +               reg = <0x50000000 0x1000000>;
-> > +               interrupts = <100>;
-> > +               gpmc,num-cs = <8>;
-> > +               gpmc,num-waitpins = <2>;
-> > +               #address-cells = <2>;
-> > +               #size-cells = <1>;
-> > +               ranges = <0 0 0x08000000 0x2000>;       /* CS0: NAND */
-> > +
-> > +               nand at 0,0 {
-> > +                       reg = <0 0 0>; /* CS0, offset 0 */
+On Mon, Jan 14, 2013 at 05:15:28PM +0000, Catalin Marinas wrote:
+> On Mon, Jan 14, 2013 at 05:08:51PM +0000, Dave Martin wrote:
+> > From b64f305c90e7ea585992df2d710f62ec6a7b5395 Mon Sep 17 00:00:00 2001
+> > From: Dave Martin <dave.martin@linaro.org>
+> > Date: Mon, 14 Jan 2013 16:25:47 +0000
+> > Subject: [PATCH] ARM: b.L: Fix outer cache handling for coherency setup/exit helpers
+> > 
+> > This patch addresses the following issues:
+> > 
+> >   * When invalidating stale data from the cache before a read,
+> >     outer caches must be invalidated _before_ inner caches, not
+> >     after, otherwise stale data may be re-filled from outer to
+> >     inner after the inner cache is flushed.
+> > 
+> >     We still retain an inner clean before touching the outer cache,
+> >     to avoid stale data being rewritten from there into the outer
+> >     cache after the outer cache is flushed.
+> > 
+> >   * All the sync_mem() calls synchronise either reads or writes,
+> >     but not both.  This patch splits sync_mem() into separate
+> >     functions for reads and writes, to avoid excessive inner
+> >     flushes in the write case.
+> > 
+> >     The two functions are different from the original sync_mem(),
+> >     to fix the above issues.
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > ---
+> > NOTE: This patch is build-tested only.
+> > 
+> >  arch/arm/common/bL_entry.c |   57 ++++++++++++++++++++++++++++++++++----------
+> >  1 files changed, 44 insertions(+), 13 deletions(-)
+> > 
+> > diff --git a/arch/arm/common/bL_entry.c b/arch/arm/common/bL_entry.c
+> > index 1ea4ec9..3e1a404 100644
+> > --- a/arch/arm/common/bL_entry.c
+> > +++ b/arch/arm/common/bL_entry.c
+> > @@ -119,16 +119,47 @@ int bL_cpu_powered_up(void)
+> >  
+> >  struct bL_sync_struct bL_sync;
+> >  
+> > -static void __sync_range(volatile void *p, size_t size)
+> > +/*
+> > + * Ensure preceding writes to *p by this CPU are visible to
+> > + * subsequent reads by other CPUs:
+> > + */
+> > +static void __sync_range_w(volatile void *p, size_t size)
+> >  {
+> >  	char *_p = (char *)p;
+> >  
+> >  	__cpuc_flush_dcache_area(_p, size);
+> > -	outer_flush_range(__pa(_p), __pa(_p + size));
+> > +	outer_clean_range(__pa(_p), __pa(_p + size));
+> >  	outer_sync();
 > 
-> I'm a bit confused by this: what are the other two values in "reg"?
-> I see you've only added a binding for CS.
+> It's not part of your patch but I thought about commenting here. The
+> outer_clean_range() already has a cache_sync() operation, so no need for
+> the additional outer_sync().
 > 
-> I've extended a bit on your work and added a binding to enable OneNAND
-> device on my IGEP board.
+> >  }
+> >  
+> > -#define sync_mem(ptr) __sync_range(ptr, sizeof *(ptr))
+> > +/*
+> > + * Ensure preceding writes to *p by other CPUs are visible to
+> > + * subsequent reads by this CPU:
+> > + */
+> > +static void __sync_range_r(volatile void *p, size_t size)
+> > +{
+> > +	char *_p = (char *)p;
+> > +
+> > +#ifdef CONFIG_OUTER_CACHE
+> > +	if (outer_cache.flush_range) {
+> > +		/*
+> > +		 * Ensure ditry data migrated from other CPUs into our cache
+> > +		 * are cleaned out safely before the outer cache is cleaned:
+> > +		 */
+> > +		__cpuc_flush_dcache_area(_p, size);
+> > +
+> > +		/* Clean and invalidate stale data for *p from outer ... */
+> > +		outer_flush_range(__pa(_p), __pa(_p + size));
+> > +		outer_sync();
 > 
-> I might send some patches in case anyone wants to give it a try.
+> Same here.
 
-Daniel, should this be updated to just pass the CS?
+Ah, right.  I've seen code do this in various places, and just copy-
+pasted it under the assumption that it is needed.  Our discussion abouto
+ensuring that outer_sync() really does guarantee completion of its
+effects on return still applies.
 
-Regards,
+Are there any situations when outer_sync() should be called explicitly?
 
-Tony
+Cheers
+---Dave
