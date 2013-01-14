@@ -1,67 +1,171 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 14 Jan 2013 15:34:34 +0800
-Subject: [v4 PATCH 09/12] spi/atmel_spi: correct 16 bits transfer with DMA
+Date: Mon, 14 Jan 2013 15:34:36 +0800
+Subject: [v4 PATCH 11/12] ARM: dts: add spi nodes for atmel SoC
 In-Reply-To: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
 References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1358148877-18679-10-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1358148877-18679-12-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Richard Genoud <richard.genoud@gmail.com>
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-Cc: grant.likely at secretlab.ca
-Cc: spi-devel-general at lists.sourceforge.net
+[wenyou.yang at atmel.com: add spi nodes for sam9260, sam9263, sam9g45 and sam9n12]
+[wenyou.yang at atmel.com: remove spi property "cs-gpios" to the board dts files]
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Cc: linux at arm.linux.org.uk
 ---
- drivers/spi/spi-atmel.c |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/at91sam9260.dtsi |   18 ++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi |   18 ++++++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi |   18 ++++++++++++++++++
+ arch/arm/boot/dts/at91sam9n12.dtsi |   18 ++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  |   18 ++++++++++++++++++
+ 5 files changed, 90 insertions(+)
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index a20cd03..8984563 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -452,12 +452,18 @@ static inline int atmel_spi_xfer_can_be_chained(struct spi_transfer *xfer)
- }
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index 68bccf4..9586fe1 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -453,6 +453,24 @@
+ 				status = "disabled";
+ 			};
  
- static int atmel_spi_dma_slave_config(struct atmel_spi *as,
--				struct dma_slave_config *slave_config)
-+				struct dma_slave_config *slave_config,
-+				u8 bits_per_word)
- {
- 	int err = 0;
++			spi0: spi at fffc8000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9260-spi";
++				reg = <0xfffc8000 0x200>;
++				interrupts = <12 4 3>;
++				status = "disabled";
++			};
++
++			spi1: spi at fffcc000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9260-spi";
++				reg = <0xfffcc000 0x200>;
++				interrupts = <13 4 3>;
++				status = "disabled";
++			};
++
+ 			adc0: adc at fffe0000 {
+ 				compatible = "atmel,at91sam9260-adc";
+ 				reg = <0xfffe0000 0x100>;
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 32ec62c..636b882 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -426,6 +426,24 @@
+ 				reg = <0xfffffd40 0x10>;
+ 				status = "disabled";
+ 			};
++
++			spi0: spi at fffa4000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9260-spi";
++				reg = <0xfffa4000 0x200>;
++				interrupts = <14 4 3>;
++				status = "disabled";
++			};
++
++			spi1: spi at fffa8000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9260-spi";
++				reg = <0xfffa8000 0x200>;
++				interrupts = <15 4 3>;
++				status = "disabled";
++			};
+ 		};
  
--	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
--	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	if (bits_per_word > 8) {
-+		slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+		slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+	} else {
-+		slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+		slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	}
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 231858f..0100b80 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -495,6 +495,24 @@
+ 				reg = <0xfffffd40 0x10>;
+ 				status = "disabled";
+ 			};
++
++			spi0: spi at fffa4000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9g45-spi";
++				reg = <0xfffa4000 0x200>;
++				interrupts = <14 4 3>;
++				status = "disabled";
++			};
++
++			spi1: spi at fffa8000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9g45-spi";
++				reg = <0xfffa8000 0x200>;
++				interrupts = <15 4 3>;
++				status = "disabled";
++			};
+ 		};
  
- 	slave_config->dst_addr = (dma_addr_t)as->phybase + SPI_TDR;
- 	slave_config->src_addr = (dma_addr_t)as->phybase + SPI_RDR;
-@@ -519,7 +525,7 @@ static int __devinit atmel_spi_configure_dma(struct atmel_spi *as)
- 		goto error;
- 	}
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index e9efb34..86d5357 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -355,6 +355,24 @@
+ 				#size-cells = <0>;
+ 				status = "disabled";
+ 			};
++
++			spi0: spi at f0000000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9x5-spi";
++				reg = <0xf0000000 0x100>;
++				interrupts = <13 4 3>;
++				status = "disabled";
++			};
++
++			spi1: spi at f0004000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9x5-spi";
++				reg = <0xf0004000 0x100>;
++				interrupts = <14 4 3>;
++				status = "disabled";
++			};
+ 		};
  
--	err = atmel_spi_dma_slave_config(as, &slave_config);
-+	err = atmel_spi_dma_slave_config(as, &slave_config, 8);
- 	if (err)
- 		goto error;
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 40ac3a4..8ea2f7d 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -473,6 +473,24 @@
+ 					trigger-value = <0x6>;
+ 				};
+ 			};
++
++			spi0: spi at f0000000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9x5-spi";
++				reg = <0xf0000000 0x100>;
++				interrupts = <13 4 3>;
++				status = "disabled";
++			};
++
++			spi1: spi at f0004000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9x5-spi";
++				reg = <0xf0004000 0x100>;
++				interrupts = <14 4 3>;
++				status = "disabled";
++			};
+ 		};
  
-@@ -653,10 +659,9 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
- 
- 	*plen = len;
- 
--	if (atmel_spi_dma_slave_config(as, &slave_config))
-+	if (atmel_spi_dma_slave_config(as, &slave_config, 8))
- 		goto err_exit;
- 
--
- 	/* Send both scatterlists */
- 	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
- 					&as->dma.sgrx,
+ 		nand0: nand at 40000000 {
 -- 
 1.7.9.5
