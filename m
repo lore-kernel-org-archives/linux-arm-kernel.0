@@ -1,14 +1,17 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 14 Jan 2013 15:04:16 +1300
-Subject: [PATCH 1/4] serial: vt8500: Fix range-checking on vt8500_uart_ports
+Date: Mon, 14 Jan 2013 15:04:17 +1300
+Subject: [PATCH 2/4] serial: vt8500: ioremap'd resource is never freed
 In-Reply-To: <1358129060-9399-1-git-send-email-linux@prisktech.co.nz>
 References: <1358129060-9399-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1358129060-9399-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1358129060-9399-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix two instances where the index to vt8500_uart_ports is tested
-against > VT8500_MAX_PORTS. Correct usage should be >= VT8500_MAX_PORTS.
+Memory mapped via ioremap call is never released. Rather than add an
+iounmap call, change allocation function to devm_request_and_ioremap.
+
+Also, change the error on failure for this call to -EBUSY rather than
+-ENOMEM.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
@@ -16,26 +19,20 @@ Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
-index 8fd1814..4c4a58d 100644
+index 4c4a58d..8865afd 100644
 --- a/drivers/tty/serial/vt8500_serial.c
 +++ b/drivers/tty/serial/vt8500_serial.c
-@@ -569,7 +569,7 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+@@ -615,9 +615,9 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+ 	snprintf(vt8500_port->name, sizeof(vt8500_port->name),
+ 		 "VT8500 UART%d", pdev->id);
  
- 	if (np)
- 		port = of_alias_get_id(np, "serial");
--		if (port > VT8500_MAX_PORTS)
-+		if (port >= VT8500_MAX_PORTS)
- 			port = -1;
- 	else
- 		port = -1;
-@@ -580,7 +580,7 @@ static int vt8500_serial_probe(struct platform_device *pdev)
- 					sizeof(vt8500_ports_in_use));
+-	vt8500_port->uart.membase = ioremap(mmres->start, resource_size(mmres));
++	vt8500_port->uart.membase = devm_request_and_ioremap(&pdev->dev, mmres);
+ 	if (!vt8500_port->uart.membase) {
+-		ret = -ENOMEM;
++		ret = -EBUSY;
+ 		goto err;
  	}
  
--	if (port > VT8500_MAX_PORTS)
-+	if (port >= VT8500_MAX_PORTS)
- 		return -ENODEV;
- 
- 	/* reserve the port id */
 -- 
 1.7.9.5
