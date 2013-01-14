@@ -1,28 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Jan 2013 13:35:44 +0000
-Subject: Question: ARM: local timers: add num_possible_cpus() in
- local_timer_register()
-In-Reply-To: <20130114133345.GA26701@android11.spreadtrum.com>
-References: <20130114133345.GA26701@android11.spreadtrum.com>
-Message-ID: <20130114133543.GD23505@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 14 Jan 2013 17:37:01 +0400
+Subject: [PATCH 2/4] serial: vt8500: ioremap'd resource is never freed
+In-Reply-To: <1358129060-9399-3-git-send-email-linux@prisktech.co.nz>
+References: <1358129060-9399-1-git-send-email-linux@prisktech.co.nz>
+ <1358129060-9399-3-git-send-email-linux@prisktech.co.nz>
+Message-ID: <50F409FD.9070700@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 09:33:45PM +0800, Steve zhan wrote:
-> Hi Marc,
-> 
-> 	Do you think we should add num_possible_cpus() in 
-> local_timer_register() function, When core number is 
-> > 1, then reutrn TRUE? Enable the local timer only if 
-> we have more than one CPU, if the current config is
-> SMP and setup_max_cpus >= 1, but if smp_init_cpus in 
-> platform code have set cpu possible value to One(that 
-> maybe read number from scu or other hardware), then 
-> percpu_timer_setup in smp_prepare_cpus have no chance
-> to be called.
-> 
-> 	For local timer, because local_timer_register have
-> return 1, that will miss global timer register. 
+Hello.
 
-What about platforms where all they have are the local timers and no
-global timer?
+On 14-01-2013 6:04, Tony Prisk wrote:
+
+> Memory mapped via ioremap call is never released. Rather than add an
+> iounmap call, change allocation function to devm_request_and_ioremap.
+
+> Also, change the error on failure for this call to -EBUSY rather than
+> -ENOMEM.
+
+    Not really well justified. See below.
+
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+>   drivers/tty/serial/vt8500_serial.c |    4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+
+> diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
+> index 4c4a58d..8865afd 100644
+> --- a/drivers/tty/serial/vt8500_serial.c
+> +++ b/drivers/tty/serial/vt8500_serial.c
+> @@ -615,9 +615,9 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+>   	snprintf(vt8500_port->name, sizeof(vt8500_port->name),
+>   		 "VT8500 UART%d", pdev->id);
+>
+> -	vt8500_port->uart.membase = ioremap(mmres->start, resource_size(mmres));
+> +	vt8500_port->uart.membase = devm_request_and_ioremap(&pdev->dev, mmres);
+>   	if (!vt8500_port->uart.membase) {
+> -		ret = -ENOMEM;
+> +		ret = -EBUSY;
+
+    According to the comment to devm_request_and_ioremap(), the recommended 
+return code on its failure -EADDRNOTAVAIL.
+
+WBR, Sergei
