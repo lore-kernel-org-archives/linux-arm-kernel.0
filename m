@@ -1,34 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 Jan 2013 10:14:24 -0800
-Subject: [PATCH] ARM: at91: fix board-rm9200-dt after sys_timer conversion
-In-Reply-To: <1358185342-7518-1-git-send-email-swarren@wwwdotorg.org>
-References: <1358185342-7518-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130114181424.GA31901@quad.lixom.net>
+Date: Mon, 14 Jan 2013 10:16:05 -0800
+Subject: [PATCH v2 0/3] Use helper clockevents_config_and_register()
+In-Reply-To: <alpine.LFD.2.02.1301141222130.7475@ionos>
+References: <1357991406-22778-1-git-send-email-shawn.guo@linaro.org>
+ <201301122114.07278.arnd@arndb.de>
+ <alpine.LFD.2.02.1301141222130.7475@ionos>
+Message-ID: <20130114181605.GB31901@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 10:42:22AM -0700, Stephen Warren wrote:
-> From: Joachim Eastwood <manabian@gmail.com>
+On Mon, Jan 14, 2013 at 12:23:16PM +0100, Thomas Gleixner wrote:
+> On Sat, 12 Jan 2013, Arnd Bergmann wrote:
+> > On Saturday 12 January 2013, Shawn Guo wrote:
+> > > The clockevent core is able to figure out the best mult and shift,
+> > > calculate min_delta_ns and max_delta_ns, with the necessary info passed
+> > > into clockevents_config_and_register().  Use this handy helper to make
+> > > the drivers less error prone and save some LOC.
+> > > 
+> > > Changes since v1:
+> > >  - Add one patch to export clockevents_config_and_register for fixing
+> > >    the error [1] reported by Fengguang.
+> > >  - Add Acked-by and Tested-by tags given by people (Thanks!)
+> > > 
+> > > [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/209152
+> > 
+> > Very nice series!
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> After "ARM: delete struct sys_timer" board-rm9200-dt
-> fails compilation with the following error:
+> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 > 
->   CC      arch/arm/mach-at91/board-rm9200-dt.o
-> arch/arm/mach-at91/board-rm9200-dt.c:50:2: error: unknown field 'timer' specified in initializer
-> arch/arm/mach-at91/board-rm9200-dt.c:50:13: error: 'at91rm9200_timer' undeclared here (not in a function)
-> make[1]: *** [arch/arm/mach-at91/board-rm9200-dt.o] Error 1
-> make: *** [arch/arm/mach-at91] Error 2
-> 
-> This is a fall out from the timer conversion. Fix it by
-> converting board-rm9200-dt to use new timer init
-> function as well.
-> 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Olof, Arnd, another fix for the timer-cleanup branch in arm-soc.
+> Arnd, can you take the whole lot via the ARM tree? The export should
+> not cause any conflicts, and if it does Linus should be able to solve
+> it :)
 
-Applied to timer/cleanup. Thanks!
+(with the presumed s/Arnd/Arnd or Olof/)
+
+Great! I've applied these to a clockevent/cleanup topic branch in arm-soc,
+together with the added acks, etc.
 
 
 -Olof
