@@ -1,56 +1,42 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 14 Jan 2013 20:58:56 +0800
-Subject: [PATCH v3 2/3] usb: fsl_mxc_udc: replace MX35_IO_ADDRESS to
- ioremap
-In-Reply-To: <20130114101708.GC10874@arwen.pp.htv.fi>
-References: <1358158361-25550-1-git-send-email-peter.chen@freescale.com>
- <1358158361-25550-3-git-send-email-peter.chen@freescale.com>
- <20130114101708.GC10874@arwen.pp.htv.fi>
-Message-ID: <20130114125855.GB30157@nchen-desktop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Jan 2013 13:07:07 +0000
+Subject: [PATCH v5 02/14] ARM: Section based HYP idmap
+In-Reply-To: <20130114110756.GA10209@redhat.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183848.46302.77369.stgit@ubuntu> <20130114102721.GB4751@redhat.com>
+ <20130114104952.GA4939@mudshark.cambridge.arm.com>
+ <20130114110756.GA10209@redhat.com>
+Message-ID: <20130114130707.GA23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 12:17:08PM +0200, Felipe Balbi wrote:
-> On Mon, Jan 14, 2013 at 06:12:40PM +0800, Peter Chen wrote:
-> > As mach/hardware.h is deleted, we can't visit platform code at driver.
-> > It has no phy driver to combine with this controller, so it has to use
-> > ioremap to map phy address as a workaround.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/gadget/fsl_mxc_udc.c |   12 +++++++-----
-> >  1 files changed, 7 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
-> > index 6df45f7..0e858e6 100644
-> > --- a/drivers/usb/gadget/fsl_mxc_udc.c
-> > +++ b/drivers/usb/gadget/fsl_mxc_udc.c
-> > @@ -23,7 +23,8 @@ static struct clk *mxc_per_clk;
-> >  static struct clk *mxc_ipg_clk;
-> >  
-> >  /* workaround ENGcm09152 for i.MX35 */
-> > -#define USBPHYCTRL_OTGBASE_OFFSET	0x608
-> > +#define MX35_USBPHYCTRL_OFFSET		0x600
-> > +#define USBPHYCTRL_OTGBASE_OFFSET	0x8
-> >  #define USBPHYCTRL_EVDO			(1 << 23)
-> >  
-> >  int fsl_udc_clk_init(enum fsl_udc_type devtype, struct platform_device *pdev)
-> > @@ -83,15 +84,16 @@ void fsl_udc_clk_finalize(enum fsl_udc_type devtype,
-> >  	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
-> >  	if (devtype == IMX35_UDC) {
-> >  		unsigned int v;
-> > +		void __iomem *phy_regs = ioremap((unsigned long)pdata->regs +
-> > +						MX35_USBPHYCTRL_OFFSET, 512);
-> 
-> as I said before, this should be passed via struct resource, not pdata.
-My careless, will change at next version
-> 
-> -- 
-> balbi
+On Mon, Jan 14, 2013 at 01:07:56PM +0200, Gleb Natapov wrote:
+> Ah, of course. This is ident map so by definition it cannot map phys
+> addresses above 4G. And since __virt_to_phys() suppose to work only on
+> ident map it's OK to returns unsigned long.
 
+Let's get this right... the lack of correct definition in these
+comments needs correction.
 
+Firstly, __virt_to_phys() is an ARM-arch private function.  Only
+ARM-arch private code should be using it - it must not be used outside
+that context.
 
--- 
+Secondly, it's "public" counterpart, virt_to_phys(), and itself are
+valid _only_ for what we call the "kernel direct map", which are the
+addresses corresponding with the lowmem pages mapped from PAGE_OFFSET
+up to the _start_ of vmalloc space.  No other mapping is valid for this.
 
-Best Regards,
-Peter Chen
+That means that addresses in the identity mapping, if the identity
+mapping is outside of the range {PAGE_OFFSET..vmalloc start}, are _not_
+valid for virt_to_phys().
+
+The same is true of their counterparts, __phys_to_virt() and
+phys_to_virt().  These are _only_ valid for physical addresses
+corresponding to the pages mapped in as "lowmem" and they will return
+addresses for that mapping of the pages.
+
+Both these functions are invalid when used on highmem pages.
+*virt_to_phys() is invalid when used on pointers returned from
+ioremap(), vmalloc(), vmap(), dma_alloc_coherent(), and any other
+interface which remaps memory.
