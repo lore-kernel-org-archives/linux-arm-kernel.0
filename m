@@ -1,42 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Jan 2013 13:32:08 +0000
-Subject: [PATCH] ARM: imx: disable cpu in .cpu_kill hook
-In-Reply-To: <1358168977-9631-1-git-send-email-shawn.guo@linaro.org>
-References: <1358168977-9631-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130114133208.GC23505@n2100.arm.linux.org.uk>
+From: zhanzhenbo@gmail.com (Steve zhan)
+Date: Mon, 14 Jan 2013 21:33:45 +0800
+Subject: Question: ARM: local timers: add num_possible_cpus() in
+ local_timer_register()
+Message-ID: <20130114133345.GA26701@android11.spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 09:09:37PM +0800, Shawn Guo wrote:
->  void imx_cpu_die(unsigned int cpu)
->  {
-> +	static int spurious;
-> +
->  	cpu_enter_lowpower();
-> -	imx_enable_cpu(cpu, false);
-> +	cpu_do_idle();
-> +	cpu_leave_lowpower();
->  
-> -	/* spin here until hardware takes it down */
-> -	while (1)
-> -		;
-> +	pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, ++spurious);
+Hi Marc,
 
-Returning from the platform cpu die implementation should only be done
-in extreme situations, particularly where there's no possibility for the
-CPU to actually be taken offline (in other words, the ARM development
-platforms where there is _no_ possibility of powering down or resetting
-the secondary CPUs individually.)
+	Do you think we should add num_possible_cpus() in 
+local_timer_register() function, When core number is 
+> 1, then reutrn TRUE? Enable the local timer only if 
+we have more than one CPU, if the current config is
+SMP and setup_max_cpus >= 1, but if smp_init_cpus in 
+platform code have set cpu possible value to One(that 
+maybe read number from scu or other hardware), then 
+percpu_timer_setup in smp_prepare_cpus have no chance
+to be called.
 
-I'm actually thinking about supplementing cpu_die() in arch/arm/kernel/smp.c
-with a warning:
+	For local timer, because local_timer_register have
+return 1, that will miss global timer register. 
 
-@@ -259,6 +259,9 @@ void __ref cpu_die(void)
-         */
-        platform_cpu_die(cpu);
+	Could you pls check it?
 
-+       pr_warn("CPU%u: platform cpu_die() returned, trying to resuscitate\n",
-+               cpu);
-+
 
-so that people get warned of this buggy behaviour.
+Regards,
+Steve.
