@@ -1,70 +1,77 @@
-From: zhanzhenbo@gmail.com (steve.zhan)
-Date: Mon, 14 Jan 2013 22:31:43 +0800
-Subject: Question: ARM: local timers: add num_possible_cpus() in
- local_timer_register()
-In-Reply-To: <50F413EA.5010403@arm.com>
-References: <20130114133345.GA26701@android11.spreadtrum.com>
- <50F413EA.5010403@arm.com>
-Message-ID: <CAKvkGKfxT6cQF6rXmYZEL5tJbtsm0Yv4i1D_9NXQRsdbNFi2PQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 Jan 2013 14:48:41 +0000
+Subject: [PATCH 5/6] ARM: dts: Add basic dts include files for Samsung
+ S3C64xx SoCs
+In-Reply-To: <1358039458-31960-6-git-send-email-tomasz.figa@gmail.com>
+References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
+ <1358039458-31960-6-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20130114144841.GE7990@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-    Russel, Marc,
-2013/1/14 Marc Zyngier <marc.zyngier@arm.com>:
-> On 14/01/13 13:33, Steve zhan wrote:
->
-> Hi Steve,
->
->>       Do you think we should add num_possible_cpus() in
->> local_timer_register() function, When core number is
->>> 1, then reutrn TRUE? Enable the local timer only if
->> we have more than one CPU, if the current config is
->> SMP and setup_max_cpus >= 1, but if smp_init_cpus in
->> platform code have set cpu possible value to One(that
->> maybe read number from scu or other hardware), then
->> percpu_timer_setup in smp_prepare_cpus have no chance
->> to be called.
->>
->>       For local timer, because local_timer_register have
->> return 1, that will miss global timer register.
->>
->>       Could you pls check it?
->
-> I'm not sure I understand your question.
->
-> We only enable the use of the SMP local timers infrastructure if we're
-> SMP and we have more that one CPU. If you only have one CPU up and
-> running, then you can still use your CPU local timer as a global timer.
->
-> What would we gain by using the local timer infrastructure when we're
-> not running on SMP hardware?
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
+Hello,
 
-For these code:
-        err = local_timer_register(&arch_timer_ops);
-        if (err) {
-                /*
-                 * We couldn't register as a local timer (could be
-                 * because we're on a UP platform, or because some
-                 * other local timer is already present...). Try as a
-                 * global timer instead.
-                 */
-                arch_timer_global_evt.cpumask = cpumask_of(0);
-                err = arch_timer_setup(&arch_timer_global_evt);
-        }
+This all looks good. I just have a couple of comments about the cpus node.
 
-if err == 0, we have no register global arch timer,  but platform code
-platsmp.c will set
-cpu possible number to one, that let percpu_timer_setup in
-smp_prepare_cpus have no
-chance to call becaue ncores = num_possible_cpus() is one.
-Is this right?
+On Sun, Jan 13, 2013 at 01:10:57AM +0000, Tomasz Figa wrote:
+> This patch adds basic device tree definitions for Samsung S3C64xx SoCs.
+> 
+> Since all the SoCs in the series are very similar, the files are created
+> hierarchically - one file for the whole series and then separate files
+> for particular SoCs including the common one.
+> 
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 
+[...]
 
--- 
-Steve Zhan
+> diff --git a/arch/arm/boot/dts/s3c64xx.dtsi b/arch/arm/boot/dts/s3c64xx.dtsi
+> new file mode 100644
+> index 0000000..55d6e08
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/s3c64xx.dtsi
+> @@ -0,0 +1,97 @@
+> +/*
+> + * Samsung's S3C64xx SoC series common device tree source
+> + *
+> + * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
+> + *
+> + * Samsung's S3C64xx SoC series device nodes are listed in this file.
+> + * Particular SoCs from S3C64xx series can include this file and provide
+> + * values for SoCs specfic bindings.
+> + *
+> + * Note: This file does not include device nodes for all the controllers in
+> + * S3C64xx SoCs. As device tree coverage for S3C64xx increases, additional
+> + * nodes can be added to this file.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,arm1176jzf-s";
+> +		};
+> +	};
+
+You can drop the unit address from the cpu node - it's meant to be there to
+differentiate multiple nodes (and is supposed to match the reg property, which
+the 1176jzf-s can't have, as it doesn't have an MPIDR).
+
+Also, "arm,arm1176jzf-s" isn't listed in the binding doc. There was a question
+about how to maintain this list [1], but I can't seem to find a conclusion, if
+any were reached.  It might be worth appending "arm,arm1176" to the compatible
+list for the cpu node in case we want to enable something via dt for all 1176
+variations.
+
+Dave, Lorenzo, any thoughts?
+
+[...]
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/131362.html
