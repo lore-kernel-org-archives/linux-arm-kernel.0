@@ -1,59 +1,49 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 14 Jan 2013 07:33:00 +0200
-Subject: [PATCH v4 7/9] clk: tegra: add clock support for tegra30
-In-Reply-To: <50F086E2.6010806@wwwdotorg.org>
-References: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com>
- <1357890387-23245-8-git-send-email-pgaikwad@nvidia.com>
- <20130111141725.ce3177ad04fc700186dc694d@nvidia.com>
- <50F086E2.6010806@wwwdotorg.org>
-Message-ID: <20130114073300.ac8d5d4ffffe2d881798a2a2@nvidia.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 14 Jan 2013 18:47:35 +1300
+Subject: [Bulk] [PATCH] timer: vt8500: Move timer code to
+ drivers/clocksource
+In-Reply-To: <1358140429.25452.1.camel@gitbox>
+References: <1358140171-25390-1-git-send-email-linux@prisktech.co.nz>
+ <1358140171-25390-2-git-send-email-linux@prisktech.co.nz>
+ <1358140429.25452.1.camel@gitbox>
+Message-ID: <1358142455.25591.1.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013 22:40:50 +0100
-Stephen Warren <swarren@wwwdotorg.org> wrote:
-
-> On 01/11/2013 05:17 AM, Hiroshi Doyu wrote:
-> > On Fri, 11 Jan 2013 08:46:25 +0100
-> > Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
+On Mon, 2013-01-14 at 18:13 +1300, Tony Prisk wrote:
+> On Mon, 2013-01-14 at 18:09 +1300, Tony Prisk wrote:
+> > This patch moves arch-vt8500/timer.c into drivers/clocksource and
+> > updates the necessary Kconfig/Makefile options.
 > > 
-> >> Add tegra30 clock support based on common clock framework.
-> >>
-> >> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-> > .......
-> >> +static void __init tegra30_pll_init(void)
-> >> +{
-> >> +       struct clk *clk;
-> >> +
-> >> +       /* PLLC */
-> >> +       clk = tegra_clk_pll("pll_c", "pll_ref", clk_base, pmc_base, 0,
-> >> +                           0, &pll_c_params,
-> >> +                           TEGRA_PLL_HAS_CPCON | TEGRA_PLL_USE_LOCK,
-> >> +                           pll_c_freq_table, NULL);
-> >> +       clk_register_clkdev(clk, "pll_c", NULL);
-> >> +       clks[pll_c] = clk;
-> > 
-> > Just I noticed that there are quite many same itegration of:
-> > 
-> > 	clk_register_clkdev(clk, <ID name>, ?);
-> > 	clks[<ID>] = clk;
-> > 
-> > ID == <ID name>
-> > 
-> > Can any macro/func do the above at once?
+> > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> > ---
+> >  arch/arm/mach-vt8500/Kconfig       |    1 +
+> >  arch/arm/mach-vt8500/Makefile      |    2 +-
+> >  arch/arm/mach-vt8500/common.h      |    1 -
+> >  arch/arm/mach-vt8500/timer.c       |  184 ------------------------------------
+> >  arch/arm/mach-vt8500/vt8500.c      |    1 +
+> >  drivers/clocksource/Kconfig        |    3 +
+> >  drivers/clocksource/Makefile       |    1 +
+> >  drivers/clocksource/vt8500_timer.c |  184 ++++++++++++++++++++++++++++++++++++
+> >  include/linux/vt8500_timer.h       |   22 +++++
+> >  9 files changed, 213 insertions(+), 186 deletions(-)
+> >  delete mode 100644 arch/arm/mach-vt8500/timer.c
+> >  create mode 100644 drivers/clocksource/vt8500_timer.c
+> >  create mode 100644 include/linux/vt8500_timer.h
 > 
-> To my mind, a macro would obfuscate this fairly simple code, unless
-> there is a table somewhere the maps <ID> to <ID name> which would allow
-> saving some code space (I just looked; I don't think there is).
+> Darn.. forgot the -m again. I'll await your feedback regarding the
+> basing of the patch first (and any other feedback), then I'll redo it
+> with the correct stats.
+> 
+> Regards
+> Tony P
 
-Agree that those 2 lines may be too simple. I thought that ##string##
-could do the above. One of the benefit to make them at once is that
-we'll get a single entry point to register clkdev in tegra. For
-example, if you insert some debug print in it, it would shows all
-clkdev registration.
+Oh grr.. forget this completely. It doesn't take into account the
+patches I already sent for WM8850.
 
-> Eventually (later cleanup), I wouldn't be surprised if both parameters
-> to clk_register_clkdev() became NULL in most cases, since most lookups
-> are through DT by the end of this series.
+I guess it needs to be based on timer/cleanup + vt8500/wm8x50.
 
-Ok.
+Need a little advise on how to handle this one please :)
+
+Regards
+Tony P
