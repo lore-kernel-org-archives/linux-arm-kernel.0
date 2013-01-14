@@ -1,63 +1,36 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 14 Jan 2013 10:52:32 -0800
-Subject: [REPOST PATCH 2/2] i2c: pxa: Use i2c-core to get bus number now
-In-Reply-To: <50F08E44.3050500@gmail.com>
-References: <1353522362-25519-2-git-send-email-dianders@chromium.org>
- <1357927027-4857-1-git-send-email-dianders@chromium.org>
- <1357927027-4857-3-git-send-email-dianders@chromium.org>
- <50F08E44.3050500@gmail.com>
-Message-ID: <CAD=FV=WXx6mdj5HBmPcxKPvQ0TeHSwmmzFmwTvrOqZ2qAthvpg@mail.gmail.com>
+Date: Mon, 14 Jan 2013 10:53:20 -0800
+Subject: [PATCH v2 0/2] Add automatic bus number support for i2c busses with
+ device tree
+In-Reply-To: <1357927027-4857-2-git-send-email-dianders@chromium.org>
+References: <1357927027-4857-2-git-send-email-dianders@chromium.org>
+Message-ID: <1358189602-24180-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester,
+This was suggested by Mark Brown in response to a patch for adding
+this functionality only for the s3c2410 bus:
+  https://lkml.org/lkml/2012/11/20/681
 
-Thanks for the review...
+I have also modified the i2c-pxa driver to use this new functionality.
 
-On Fri, Jan 11, 2013 at 2:12 PM, Sylwester Nawrocki
-<sylvester.nawrocki@gmail.com> wrote:
->> -       ret = of_alias_get_id(np, "i2c");
->> -       if (ret<  0) {
->> -               dev_err(&pdev->dev, "failed to get alias id, errno %d\n",
->> ret);
->> -               return ret;
->> -       }
->> -       pdev->id = ret;
->> +       pdev->id = -1;
->
->
-> I think assignments like this are illegal. At this point the device is
-> already registered and modifying pdev->id can cause issues at the core
-> code.
+Changes in v2:
+- No longer tweak pdev->id as per Sylwester Nawrocki.
+- No longer add the dev ID to the adap.name.  Other drivers don't
+  include the device ID here and it doesn't make sense with
+  dynamically (or automatically) allocated IDs.
+- Use dev_name(&dev->dev) to register for the IRQ; this matches what
+  the i2c-s3c2410.c does and handles dynamically allocated IDs.
+- This change was only compile-tested (corgi_defconfig), since I don't
+  have access to a board that uses this driver.
 
-Good catch.  I think the old code is just as illegal since it was also
-assigning to pdev->id, but I'm happy to spin the patch.
+Doug Anderson (2):
+  i2c-core: dt: Pick i2c bus number from i2c alias if present
+  i2c: pxa: Use i2c-core to get bus number now
 
-> It might be better to have the bus number stored in struct pxa_i2c,
-> initialized with pdev->id value for non-dt and now with -1 for dt case.
+ drivers/i2c/busses/i2c-pxa.c |   20 ++++----
+ drivers/i2c/i2c-core.c       |  105 ++++++++++++++++++++++++++++++-----------
+ 2 files changed, 86 insertions(+), 39 deletions(-)
 
-I'll just init i2c->adap.nr before calling i2c_pxa_probe_dt().  Then
-i2c_pxa_probe_dt() can adjust the number.  Hopefully this is OK.
-
-> I realize it is not something your patch is intended to deal with,
-> but since you're touching this code maybe it's worth to fix that issue
-> as well ?
-
-Sure, I've spun it.  While doing this I realized a few other issues
-relating to the ID number.  Specifically:
-
-* We were using the id (as %u) when creating 'i2c->adap.name'.  This
-probably gave a very nonsensical ID.  I'm just going to remove the
-device number from the adap.name.  That matches what i2c-s3c2410.c
-does.  As far as I can tell the adap.name isn't actually used for
-much.
-
-* The name was being used in request_irq().  I've changed this to be
-like i2c-s3c2410 and use dev_name().  On my current board that means
-that the name comes from the table in of_platform_populate().  ...but
-that table is supposed to be going away.  If I remove that i2c parts
-of that table I get names like '12c60000.i2c', which should be fine
-for passing to request_irq().
-
-
--Doug
+-- 
+1.7.7.3
