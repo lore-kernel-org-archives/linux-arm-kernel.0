@@ -1,69 +1,57 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 14 Jan 2013 20:26:22 +1300
-Subject: [PATCH 02/11] ARM: nomadik: initial devicetree support
-In-Reply-To: <1357599359-7385-1-git-send-email-linus.walleij@linaro.org>
-References: <1357599359-7385-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1358148382.2198.2.camel@gitbox>
+From: sivaramn@nvidia.com (Sivaram Nair)
+Date: Mon, 14 Jan 2013 09:28:55 +0200
+Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
+In-Reply-To: <1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
+References: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com>
+ <1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20130114072855.GB17884@sivaramn-lnx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-01-07 at 23:55 +0100, Linus Walleij wrote:
-> Support basic device tree boot on the Nomadik. Implement the
-> support in the cpu file with the intent of deleting the board
-> files later. At this stage IRQ controllers, system timer,
-> l2x0 cache, UARTs and thus console boot is fully functional.
-> Patch out the code adding devices by initcalls for now so
-> as not to disturb the boot.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-...
-> +static void __init cpu8815_timer_init_of(void)
+On Fri, Jan 11, 2013 at 08:46:20AM +0100, Prashant Gaikwad wrote:
+> +static int _program_pll(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
+> +                       unsigned long rate)
 > +{
-> +	struct device_node *mtu;
-> +	void __iomem *base;
-> +	int irq;
-> +	u32 src_cr;
+> +       struct tegra_clk_pll *pll = to_clk_pll(hw);
+> +       unsigned long flags = 0;
+> +       u32 divp, val, old_base;
+> +       int state;
 > +
-> +	mtu = of_find_node_by_path("/mtu0");
-> +	if (!mtu)
-> +		return;
-> +	base = of_iomap(mtu, 0);
-> +	if (WARN_ON(!base))
-> +		return;
-> +	irq = irq_of_parse_and_map(mtu, 0);
+> +       divp = __ffs(cfg->p);
 > +
-> +	pr_info("Remapped MTU @ %p, irq: %d\n", base, irq);
+> +       if (pll->flags & TEGRA_PLLU)
+> +               divp ^= 1;
 > +
-> +	/* Configure timer sources in "system reset controller" ctrl reg */
-> +	src_cr = readl(base);
-> +	src_cr &= SRC_CR_INIT_MASK;
-> +	src_cr |= SRC_CR_INIT_VAL;
-> +	writel(src_cr, base);
+> +       if (pll->lock)
+> +               spin_lock_irqsave(pll->lock, flags);
 > +
-> +	nmdk_timer_init(base, irq);
-> +}
+> +       old_base = val = pll_readl_base(pll);
+> +       val &= ~((divm_mask(pll) << pll->divm_shift) |
+> +                (divn_mask(pll) << pll->divn_shift) |
+> +                (divp_mask(pll) << pll->divp_shift));
+> +       val |= ((cfg->m << pll->divm_shift) |
+> +               (cfg->n << pll->divn_shift) |
+> +               (divp << pll->divp_shift));
+> +       if (val == old_base) {
+> +               if (pll->lock)
+> +                       spin_unlock_irqrestore(pll->lock, flags);
+> +               return 0;
+> +       }
 > +
-> +struct sys_timer cpu8815_of_timer = {
-> +	.init	= cpu8815_timer_init_of,
-> +};
+> +       state = clk_pll_is_enabled(hw);
 > +
+> +       if (state) {
+> +               if (pll->lock)
+> +                       spin_unlock_irqrestore(pll->lock, flags);
+> +
+> +               clk_pll_disable(hw);
+> +               val &= ~(PLL_BASE_BYPASS | PLL_BASE_ENABLE);
+> +
+> +               if (pll->lock)
+> +                       spin_lock_irqsave(pll->lock, flags);
 
-struct sys_timer is disappearing in 3.9
+Instead of doing spin_unlock, disable and spin_lock, can't we use
+_clk_pll_disable here, without the locks?
 
->+DT_MACHINE_START(NOMADIK_DT, "ST-Ericsson Nomadik 8815")
->+       .map_io         = cpu8815_map_io,
->+       .init_irq       = cpu8815_init_irq_of,
->+       .handle_irq     = vic_handle_irq,
->+       .timer          = &cpu8815_of_timer,
->+       .init_machine   = cpu8815_init_of,
->+       .restart        = cpu8815_restart,
->+       .dt_compat      = cpu8815_board_compat,
->+MACHINE_END
-
-You will be able to use .init_timer = cpu8815_of_timer in place of the
-struct sys_timer.
-
-The patches for this change are in arm-soc: timer/cleanup.
-
-Regards
-Tony P
+regards,
+Sivaram
