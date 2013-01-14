@@ -1,78 +1,36 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 14 Jan 2013 15:34:35 +0800
-Subject: [v4 PATCH 10/12] ARM: at91: add clocks for spi dt entries
-In-Reply-To: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
-References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1358148877-18679-11-git-send-email-wenyou.yang@atmel.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 14 Jan 2013 09:48:58 +0200
+Subject: [PATCH v2 1/1] usb: fsl-mxc-udc: fix build error due to
+ mach/hardware.h
+In-Reply-To: <1358147897-8599-1-git-send-email-peter.chen@freescale.com>
+References: <1358147897-8599-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130114074858.GA10176@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Genoud <richard.genoud@gmail.com>
+Hi,
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-[<wenyou.yang at atmel.com: declare the spi clocks for sam9260, at91sam9g45, and at91sam9n12]
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: linux at arm.linux.org.uk
-Cc: plagnioj at jcrosoft.com
-Cc: linux at maxim.org.za
----
- arch/arm/mach-at91/at91sam9260.c |    2 ++
- arch/arm/mach-at91/at91sam9g45.c |    2 ++
- arch/arm/mach-at91/at91sam9n12.c |    2 ++
- arch/arm/mach-at91/at91sam9x5.c  |    2 ++
- 4 files changed, 8 insertions(+)
+On Mon, Jan 14, 2013 at 03:18:17PM +0800, Peter Chen wrote:
+> It changes the driver to use platform_device_id rather than cpu_is_xxx
+> to determine the SoC type, and updates the platform code accordingly.
+> 
+> Compile ok at imx_v6_v7_defconfig with CONFIG_USB_FSL_USB2 enable.
+> Tested at mx51 bbg board, it works ok after enable phy clock
+> (Need another patch to fix this problem)
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index b67cd53..44199bc 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -232,6 +232,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t2_clk", "fffdc000.timer", &tc5_clk),
- 	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
- 	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
-+	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
-+	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index d3addee..2ec5efe 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -262,6 +262,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("mci_clk", "fffd0000.mmc", &mmc1_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fff84000.i2c", &twi0_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fff88000.i2c", &twi1_clk),
-+	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
-+	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff200.gpio", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-index 5dfc8fd..ccd0783 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -172,6 +172,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
-+	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
-+	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioAB_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCD_clk),
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 44a9a62..a200d8a 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -237,6 +237,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "f8018000.i2c", &twi2_clk),
-+	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
-+	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioAB_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCD_clk),
+not good for -rc. You have to break this down as you're solving at least
+three different problems with this patch.
+
+Besides there are parts which are not related to the build break.
+
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130114/abb4c364/attachment-0001.sig>
