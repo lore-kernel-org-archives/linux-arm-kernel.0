@@ -1,59 +1,65 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 14 Jan 2013 14:11:42 -0800
-Subject: [PATCH] usb: phy: samsung: Add support to set pmu isolation
-In-Reply-To: <1357891738-26259-1-git-send-email-gautam.vivek@samsung.com>
-References: <1357891738-26259-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <CAD=FV=Vxdjo5aOU25a-iDNDaiGZCu0+G-p5y1NifXHUJBF0AHg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 14 Jan 2013 17:13:09 -0500 (EST)
+Subject: Early kernel hang with big DTB appended
+In-Reply-To: <20130111164531.GC13025@pengutronix.de>
+References: <7811936.npteFbuYu2@amdc1227>
+ <20130111164531.GC13025@pengutronix.de>
+Message-ID: <alpine.LFD.2.02.1301141655570.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vivek,
+On Fri, 11 Jan 2013, Sascha Hauer wrote:
 
-Sorry for being so absent from these reviews.  I'll try to look over a
-few patches today, but please don't hold up anything on account of my
-reviews.  I'm definitely a bit of an interested bystander in USB land.
- ;)
+> On Thu, Jan 03, 2013 at 04:55:00PM +0100, Tomasz Figa wrote:
+> > Hi,
+> > 
+> > I'm observing strange behavior when booting 3.8-rc1 and -rc2 with appended 
+> > DTB. The kernel hangs very early when the DTB is bigger than some 
+> > threshold somewhere around 24 KiB. With fullest possible low level UART 
+> > debugging (and printk patched to use printascii) I'm receiving following 
+> > output:
+> > 
+> > Uncompressing Linux... done, booting the kernel.
+> > Booting Linux on physical CPU 0xa00
+> > Linux version 3.8.0-rc1-00073-gdf6efca-dirty (t.figa at amdc1227) (gcc 
+> > version 4.5.2 (Gentoo 4.5.2 p1.2, pie-0.4.5) ) #2 SMP PREEMPT Thu Jan 3 
+> > 15:37:35 CET 2013
+> > CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
+> > CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> > 
+> > I tested on two Exynos-based boards (exynos4210-trats and one internal 
+> > exynos4412-based board) and same happens on both.
+> > 
+> > Do you have any ideas?
+> 
+> Another thing besides the things already mentioned is that the dtb may
+> not cross a 1MiB boundary. The Kernel uses a single 1Mib section
+> (aligned to 1Mib) to initially map the dtb. Once you cross that boundary
+> parts of the dtb won't be accessible for the Kernel anymore.
 
-In general things look pretty good here.  :)  One last comment below...
+Crap.  You're right.  This patch should fix this issue.
 
-On Fri, Jan 11, 2013 at 12:08 AM, Vivek Gautam
-<gautam.vivek@samsung.com> wrote:> +static int
-samsung_usbphy_parse_dt(struct samsung_usbphy *sphy)
-> +{
-> +       struct device_node *usbphy_sys;
-> +
-> +       /* Getting node for system controller interface for usb-phy */
-> +       usbphy_sys = of_get_child_by_name(sphy->dev->of_node, "usbphy-sys");
-> +       if (!usbphy_sys)
-> +               dev_warn(sphy->dev, "No sys-controller interface for usb-phy\n");
-
-Seems like you ought to return with an error here.  Calling of_iomap()
-with a NULL value seems undesirable.
-
-> +
-> +       sphy->pmuregs = of_iomap(usbphy_sys, 0);
-> +
-> +       of_node_put(usbphy_sys);
-> +
-> +       if (sphy->pmuregs == NULL) {
-> +               dev_err(sphy->dev, "Can't get usb-phy pmu control register\n");
-> +               return -ENODEV;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +/*
-> + * Set isolation here for phy.
-> + * Here 'on = true' would mean USB PHY block is isolated, hence
-> + * de-activated and vice-versa.
-> + */
-
-Thank you very much for this comment.  :)  This explains one of the
-confusions I had earlier...
+@Tomasz: please could you confirm this fixes your initial problem?
 
 
-Once you fix the one error condition above you can add my
-"Reviewed-by".  Thanks!
-
--Doug
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 4eee351f46..61fcb18c7e 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -246,6 +246,7 @@ __create_page_tables:
+ 
+ 	/*
+ 	 * Then map boot params address in r2 if specified.
++	 * We map 2 sections in case the ATAGs/DTB crosses a section boundary.
+ 	 */
+ 	mov	r0, r2, lsr #SECTION_SHIFT
+ 	movs	r0, r0, lsl #SECTION_SHIFT
+@@ -253,6 +254,8 @@ __create_page_tables:
+ 	addne	r3, r3, #PAGE_OFFSET
+ 	addne	r3, r4, r3, lsr #(SECTION_SHIFT - PMD_ORDER)
+ 	orrne	r6, r7, r0
++	strne	r6, [r3], #1 << PMD_ORDER
++	addne	r6, r6, #1 << SECTION_SHIFT
+ 	strne	r6, [r3]
+ 
+ #ifdef CONFIG_DEBUG_LL
