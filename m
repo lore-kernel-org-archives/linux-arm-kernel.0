@@ -1,362 +1,85 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 14 Jan 2013 23:02:12 +0800
-Subject: [PATCH v3 1/2] cpufreq: add imx6q-cpufreq driver
-In-Reply-To: <1358175733-13475-1-git-send-email-shawn.guo@linaro.org>
-References: <1358175733-13475-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1358175733-13475-2-git-send-email-shawn.guo@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 14 Jan 2013 15:05:32 +0000
+Subject: [PATCH 5/6] ARM: dts: Add basic dts include files for Samsung
+ S3C64xx SoCs
+In-Reply-To: <20130114144841.GE7990@e106331-lin.cambridge.arm.com>
+References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
+ <1358039458-31960-6-git-send-email-tomasz.figa@gmail.com>
+ <20130114144841.GE7990@e106331-lin.cambridge.arm.com>
+Message-ID: <20130114150531.GE21142@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an imx6q-cpufreq driver for Freescale i.MX6Q SoC to handle the
-hardware specific frequency and voltage scaling requirements.
+On Mon, Jan 14, 2013 at 02:48:41PM +0000, Mark Rutland wrote:
+> Hello,
+> 
+> This all looks good. I just have a couple of comments about the cpus node.
+> 
+> On Sun, Jan 13, 2013 at 01:10:57AM +0000, Tomasz Figa wrote:
+> > This patch adds basic device tree definitions for Samsung S3C64xx SoCs.
+> > 
+> > Since all the SoCs in the series are very similar, the files are created
+> > hierarchically - one file for the whole series and then separate files
+> > for particular SoCs including the common one.
+> > 
+> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> 
+> [...]
+> 
+> > diff --git a/arch/arm/boot/dts/s3c64xx.dtsi b/arch/arm/boot/dts/s3c64xx.dtsi
+> > new file mode 100644
+> > index 0000000..55d6e08
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/s3c64xx.dtsi
+> > @@ -0,0 +1,97 @@
+> > +/*
+> > + * Samsung's S3C64xx SoC series common device tree source
+> > + *
+> > + * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
+> > + *
+> > + * Samsung's S3C64xx SoC series device nodes are listed in this file.
+> > + * Particular SoCs from S3C64xx series can include this file and provide
+> > + * values for SoCs specfic bindings.
+> > + *
+> > + * Note: This file does not include device nodes for all the controllers in
+> > + * S3C64xx SoCs. As device tree coverage for S3C64xx increases, additional
+> > + * nodes can be added to this file.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +/include/ "skeleton.dtsi"
+> > +
+> > +/ {
+> > +	cpus {
+> > +		cpu at 0 {
+> > +			compatible = "arm,arm1176jzf-s";
+> > +		};
+> > +	};
+> 
+> You can drop the unit address from the cpu node - it's meant to be there to
+> differentiate multiple nodes (and is supposed to match the reg property, which
+> the 1176jzf-s can't have, as it doesn't have an MPIDR).
 
-The driver supports module build and is instantiated by the platform
-device/driver mechanism, so that it will not be instantiated on other
-platforms, as IMX is built with multiplatform support.
+Well, this is a point that I should consider since the kernel docs I wrote are
+misleading, they require the reg property that can not be there on UP.
+True, MPIDR does not exist in this case, but I have to document this in the
+bindings since it is unclear.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
----
- drivers/cpufreq/Kconfig.arm     |    9 ++
- drivers/cpufreq/Makefile        |    1 +
- drivers/cpufreq/imx6q-cpufreq.c |  296 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 306 insertions(+)
- create mode 100644 drivers/cpufreq/imx6q-cpufreq.c
+> 
+> Also, "arm,arm1176jzf-s" isn't listed in the binding doc. There was a question
+> about how to maintain this list [1], but I can't seem to find a conclusion, if
+> any were reached.  It might be worth appending "arm,arm1176" to the compatible
+> list for the cpu node in case we want to enable something via dt for all 1176
+> variations.
+> 
+> Dave, Lorenzo, any thoughts?
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index a0b3661..9e628ba 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -77,6 +77,15 @@ config ARM_EXYNOS5250_CPUFREQ
- 	  This adds the CPUFreq driver for Samsung EXYNOS5250
- 	  SoC.
- 
-+config ARM_IMX6Q_CPUFREQ
-+	tristate "Freescale i.MX6Q cpufreq support"
-+	depends on SOC_IMX6Q
-+	depends on REGULATOR_ANATOP
-+	help
-+	  This adds cpufreq driver support for Freescale i.MX6Q SOC.
-+
-+	  If in doubt, say N.
-+
- config ARM_SPEAR_CPUFREQ
- 	bool "SPEAr CPUFreq support"
- 	depends on PLAT_SPEAR
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 1f254ec0..31699a0 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -49,6 +49,7 @@ obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
-+obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
- obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)     += omap-cpufreq.o
- obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
- 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-new file mode 100644
-index 0000000..218d8f1
---- /dev/null
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -0,0 +1,296 @@
-+/*
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
-+#include <linux/cpufreq.h>
-+#include <linux/err.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/opp.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/slab.h>
-+
-+#define PU_SOC_VOLTAGE_NORMAL	1250000
-+#define PU_SOC_VOLTAGE_HIGH	1275000
-+#define FREQ_1P2_GHZ		1200000000
-+
-+static struct regulator *arm_reg;
-+static struct regulator *pu_reg;
-+static struct regulator *soc_reg;
-+
-+static struct clk *arm_clk;
-+static struct clk *pll1_sys_clk;
-+static struct clk *pll1_sw_clk;
-+static struct clk *step_clk;
-+static struct clk *pll2_pfd2_396m_clk;
-+
-+static struct device *cpu_dev;
-+static struct cpufreq_frequency_table *freq_table;
-+static unsigned int transition_latency;
-+
-+static int imx6q_verify_speed(struct cpufreq_policy *policy)
-+{
-+	return cpufreq_frequency_table_verify(policy, freq_table);
-+}
-+
-+static unsigned int imx6q_get_speed(unsigned int cpu)
-+{
-+	return clk_get_rate(arm_clk) / 1000;
-+}
-+
-+static int imx6q_set_target(struct cpufreq_policy *policy,
-+			    unsigned int target_freq, unsigned int relation)
-+{
-+	struct cpufreq_freqs freqs;
-+	struct opp *opp;
-+	unsigned long freq_hz, volt, volt_old;
-+	unsigned int index, cpu;
-+	int ret;
-+
-+	ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
-+					     relation, &index);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed to match target frequency %d: %d\n",
-+			target_freq, ret);
-+		return ret;
-+	}
-+
-+	freqs.new = freq_table[index].frequency;
-+	freq_hz = freqs.new * 1000;
-+	freqs.old = clk_get_rate(arm_clk) / 1000;
-+
-+	if (freqs.old == freqs.new)
-+		return 0;
-+
-+	for_each_online_cpu(cpu) {
-+		freqs.cpu = cpu;
-+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+	}
-+
-+	opp = opp_find_freq_ceil(cpu_dev, &freq_hz);
-+	if (IS_ERR(opp)) {
-+		dev_err(cpu_dev, "failed to find OPP for %ld\n", freq_hz);
-+		return PTR_ERR(opp);
-+	}
-+
-+	volt = opp_get_voltage(opp);
-+	volt_old = regulator_get_voltage(arm_reg);
-+
-+	dev_dbg(cpu_dev, "%u MHz, %ld mV --> %u MHz, %ld mV\n",
-+		freqs.old / 1000, volt_old / 1000,
-+		freqs.new / 1000, volt / 1000);
-+
-+	/* scaling up?  scale voltage before frequency */
-+	if (freqs.new > freqs.old) {
-+		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
-+		if (ret) {
-+			dev_err(cpu_dev, "failed to scale voltage up: %d\n", ret);
-+			return ret;
-+		}
-+
-+		/*
-+		 * Need to increase vddpu and vddsoc for safety
-+		 * if we are about to run at 1.2 GHz.
-+		 */
-+		if (freqs.new == FREQ_1P2_GHZ / 1000) {
-+			regulator_set_voltage_tol(pu_reg,
-+					PU_SOC_VOLTAGE_HIGH, 0);
-+			regulator_set_voltage_tol(soc_reg,
-+					PU_SOC_VOLTAGE_HIGH, 0);
-+		}
-+	}
-+
-+	/*
-+	 * The setpoints are selected per PLL/PDF frequencies, so we need to
-+	 * reprogram PLL for frequency scaling.  The procedure of reprogramming
-+	 * PLL1 is as below.
-+	 *
-+	 *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
-+	 *  - Disable pll1_sys_clk and reprogram it
-+	 *  - Enable pll1_sys_clk and reparent pll1_sw_clk back to it
-+	 *  - Disable pll2_pfd2_396m_clk
-+	 */
-+	clk_prepare_enable(pll2_pfd2_396m_clk);
-+	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
-+	clk_set_parent(pll1_sw_clk, step_clk);
-+	clk_prepare_enable(pll1_sys_clk);
-+	if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
-+		clk_disable_unprepare(pll1_sys_clk);
-+		clk_set_rate(pll1_sys_clk, freqs.new * 1000);
-+		clk_prepare_enable(pll1_sys_clk);
-+		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-+		clk_disable_unprepare(pll2_pfd2_396m_clk);
-+	} else {
-+		/*
-+		 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
-+		 * to provide the frequency.
-+		 */
-+		clk_disable_unprepare(pll1_sys_clk);
-+	}
-+
-+	/* Ensure the arm clock divider is what we expect */
-+	ret = clk_set_rate(arm_clk, freqs.new * 1000);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
-+		regulator_set_voltage_tol(arm_reg, volt_old, 0);
-+		return ret;
-+	}
-+
-+	/* scaling down?  scale voltage after frequency */
-+	if (freqs.new < freqs.old) {
-+		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
-+		if (ret)
-+			dev_warn(cpu_dev, "failed to scale voltage down: %d\n", ret);
-+
-+		if (freqs.old == FREQ_1P2_GHZ / 1000) {
-+			regulator_set_voltage_tol(pu_reg,
-+					PU_SOC_VOLTAGE_NORMAL, 0);
-+			regulator_set_voltage_tol(soc_reg,
-+					PU_SOC_VOLTAGE_NORMAL, 0);
-+		}
-+	}
-+
-+	for_each_online_cpu(cpu) {
-+		freqs.cpu = cpu;
-+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+	}
-+
-+	return 0;
-+}
-+
-+static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
-+{
-+	int ret;
-+
-+	ret = cpufreq_frequency_table_cpuinfo(policy, freq_table);
-+	if (ret) {
-+		dev_err(cpu_dev, "invalid frequency table: %d\n", ret);
-+		return ret;
-+	}
-+
-+	policy->cpuinfo.transition_latency = transition_latency;
-+	policy->cur = clk_get_rate(arm_clk) / 1000;
-+	policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
-+	cpumask_setall(policy->cpus);
-+	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
-+
-+	return 0;
-+}
-+
-+static int imx6q_cpufreq_exit(struct cpufreq_policy *policy)
-+{
-+	cpufreq_frequency_table_put_attr(policy->cpu);
-+	return 0;
-+}
-+
-+static struct freq_attr *imx6q_cpufreq_attr[] = {
-+	&cpufreq_freq_attr_scaling_available_freqs,
-+	NULL,
-+};
-+
-+static struct cpufreq_driver imx6q_cpufreq_driver = {
-+	.verify = imx6q_verify_speed,
-+	.target = imx6q_set_target,
-+	.get = imx6q_get_speed,
-+	.init = imx6q_cpufreq_init,
-+	.exit = imx6q_cpufreq_exit,
-+	.name = "imx6q-cpufreq",
-+	.attr = imx6q_cpufreq_attr,
-+};
-+
-+static int imx6q_cpufreq_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np;
-+	int ret;
-+
-+	cpu_dev = &pdev->dev;
-+
-+	np = of_find_node_by_path("/cpus/cpu at 0");
-+	if (!np) {
-+		dev_err(cpu_dev, "failed to find cpu0 node\n");
-+		return -ENOENT;
-+	}
-+
-+	cpu_dev->of_node = np;
-+
-+	arm_clk = devm_clk_get(cpu_dev, "arm");
-+	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
-+	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
-+	step_clk = devm_clk_get(cpu_dev, "step");
-+	pll2_pfd2_396m_clk = devm_clk_get(cpu_dev, "pll2_pfd2_396m");
-+	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
-+	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
-+		dev_err(cpu_dev, "failed to get clocks\n");
-+		ret = -ENOENT;
-+		goto put_node;
-+	}
-+
-+	arm_reg = devm_regulator_get(cpu_dev, "arm");
-+	pu_reg = devm_regulator_get(cpu_dev, "pu");
-+	soc_reg = devm_regulator_get(cpu_dev, "soc");
-+	if (!arm_reg || !pu_reg || !soc_reg) {
-+		dev_err(cpu_dev, "failed to get regulators\n");
-+		ret = -ENOENT;
-+		goto put_node;
-+	}
-+
-+	/* We expect an OPP table supplied by platform */
-+	ret = opp_get_opp_count(cpu_dev);
-+	if (ret < 0) {
-+		dev_err(cpu_dev, "no OPP table is found: %d\n", ret);
-+		goto put_node;
-+	}
-+
-+	ret = opp_init_cpufreq_table(cpu_dev, &freq_table);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
-+		goto put_node;
-+	}
-+
-+	if (of_property_read_u32(np, "clock-latency", &transition_latency))
-+		transition_latency = CPUFREQ_ETERNAL;
-+
-+	ret = cpufreq_register_driver(&imx6q_cpufreq_driver);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed register driver: %d\n", ret);
-+		goto free_freq_table;
-+	}
-+
-+	of_node_put(np);
-+	return 0;
-+
-+free_freq_table:
-+	opp_free_cpufreq_table(cpu_dev, &freq_table);
-+put_node:
-+	of_node_put(np);
-+	return ret;
-+}
-+
-+static int imx6q_cpufreq_remove(struct platform_device *pdev)
-+{
-+	cpufreq_unregister_driver(&imx6q_cpufreq_driver);
-+	opp_free_cpufreq_table(cpu_dev, &freq_table);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver imx6q_cpufreq_platdrv = {
-+	.driver = {
-+		.name	= "imx6q-cpufreq",
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe		= imx6q_cpufreq_probe,
-+	.remove		= imx6q_cpufreq_remove,
-+};
-+module_platform_driver(imx6q_cpufreq_platdrv);
-+
-+MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
-+MODULE_DESCRIPTION("Freescale i.MX6Q cpufreq driver");
-+MODULE_LICENSE("GPL");
--- 
-1.7.9.5
+Eh, frankly I do not know how to handle this. Either we add a compatible
+string to the bindings anytime a DT gets merged in the kernel but how
+to maintain it, it has to be defined. Happy to hear some feedback on
+this.
+
+Lorenzo
