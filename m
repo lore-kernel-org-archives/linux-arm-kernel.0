@@ -1,74 +1,100 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Jan 2013 15:09:17 +0000
-Subject: [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile KVM support
-In-Reply-To: <20130108183855.46302.40539.stgit@ubuntu>
+Date: Mon, 14 Jan 2013 15:11:06 +0000
+Subject: [PATCH v5 04/14] KVM: ARM: Hypervisor initialization
+In-Reply-To: <20130108183903.46302.97512.stgit@ubuntu>
 References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108183855.46302.40539.stgit@ubuntu>
-Message-ID: <20130114150917.GA18935@mudshark.cambridge.arm.com>
+ <20130108183903.46302.97512.stgit@ubuntu>
+Message-ID: <20130114151106.GB18935@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 06:38:55PM +0000, Christoffer Dall wrote:
-> Targets KVM support for Cortex A-15 processors.
+On Tue, Jan 08, 2013 at 06:39:03PM +0000, Christoffer Dall wrote:
+> Sets up KVM code to handle all exceptions taken to Hyp mode.
 > 
-> Contains all the framework components, make files, header files, some
-> tracing functionality, and basic user space API.
+> When the kernel is booted in Hyp mode, calling an hvc instruction with r0
+> pointing to the new vectors, the HVBAR is changed to the the vector pointers.
+> This allows subsystems (like KVM here) to execute code in Hyp-mode with the
+> MMU disabled.
 > 
-> Only supported core is Cortex-A15 for now.
+> We initialize other Hyp-mode registers and enables the MMU for Hyp-mode from
+> the id-mapped hyp initialization code. Afterwards, the HVBAR is changed to
+> point to KVM Hyp vectors used to catch guest faults and to switch to Hyp mode
+> to perform a world-switch into a KVM guest.
 > 
-> Most functionality is in arch/arm/kvm/* or arch/arm/include/asm/kvm_*.h.
-> 
-> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
-> Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> ---
->  Documentation/virtual/kvm/api.txt  |   57 +++++-
->  arch/arm/Kconfig                   |    2
->  arch/arm/Makefile                  |    1
->  arch/arm/include/asm/kvm_arm.h     |   24 ++
->  arch/arm/include/asm/kvm_asm.h     |   58 ++++++
->  arch/arm/include/asm/kvm_coproc.h  |   24 ++
->  arch/arm/include/asm/kvm_emulate.h |   50 +++++
->  arch/arm/include/asm/kvm_host.h    |  114 ++++++++++++
->  arch/arm/include/uapi/asm/kvm.h    |  106 +++++++++++
+> Also provides memory mapping code to map required code pages, data structures,
+> and I/O regions  accessed in Hyp mode at the same virtual address as the host
+> kernel virtual addresses, but which conforms to the architectural requirements
+> for translations in Hyp mode. This interface is added in arch/arm/kvm/arm_mmu.c
+> and comprises:
+>  - create_hyp_mappings(from, to);
+>  - create_hyp_io_mappings(from, to, phys_addr);
+>  - free_hyp_pmds();
 
 [...]
 
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> new file mode 100644
-> index 0000000..c6298b1
-> --- /dev/null
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -0,0 +1,106 @@
-> +/*
-> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-> + */
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 82cb338..2dddc58 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -34,11 +34,21 @@
+>  #include <asm/ptrace.h>
+>  #include <asm/mman.h>
+>  #include <asm/cputype.h>
+> +#include <asm/tlbflush.h>
+> +#include <asm/virt.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_asm.h>
+> +#include <asm/kvm_mmu.h>
+> 
+>  #ifdef REQUIRES_VIRT
+>  __asm__(".arch_extension       virt");
+>  #endif
+> 
+> +static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
+> +static struct vfp_hard_struct __percpu *kvm_host_vfp_state;
+> +static unsigned long hyp_default_vectors;
 > +
-> +#ifndef __ARM_KVM_H__
-> +#define __ARM_KVM_H__
 > +
-> +#include <asm/types.h>
-> +#include <asm/ptrace.h>
+>  int kvm_arch_hardware_enable(void *garbage)
+>  {
+>         return 0;
+> @@ -336,9 +346,176 @@ long kvm_arch_vm_ioctl(struct file *filp,
+>         return -EINVAL;
+>  }
+> 
+> +static void cpu_init_hyp_mode(void *vector)
+> +{
+> +       unsigned long long pgd_ptr;
+> +       unsigned long hyp_stack_ptr;
+> +       unsigned long stack_page;
+> +       unsigned long vector_ptr;
+> +
+> +       /* Switch from the HYP stub to our own HYP init vector */
+> +       __hyp_set_vectors((unsigned long)vector);
+> +
+> +       pgd_ptr = (unsigned long long)kvm_mmu_get_httbr();
+> +       stack_page = __get_cpu_var(kvm_arm_hyp_stack_page);
+> +       hyp_stack_ptr = stack_page + PAGE_SIZE;
+> +       vector_ptr = (unsigned long)__kvm_hyp_vector;
+> +
+> +       /*
+> +        * Call initialization code, and switch to the full blown
+> +        * HYP code. The init code corrupts r12, so set the clobber
+> +        * list accordingly.
+> +        */
+> +       asm volatile (
+> +               "mov    r0, %[pgd_ptr_low]\n\t"
+> +               "mov    r1, %[pgd_ptr_high]\n\t"
+> +               "mov    r2, %[hyp_stack_ptr]\n\t"
+> +               "mov    r3, %[vector_ptr]\n\t"
+> +               "hvc    #0\n\t" : :
+> +               [pgd_ptr_low] "r" ((unsigned long)(pgd_ptr & 0xffffffff)),
+> +               [pgd_ptr_high] "r" ((unsigned long)(pgd_ptr >> 32ULL)),
+> +               [hyp_stack_ptr] "r" (hyp_stack_ptr),
+> +               [vector_ptr] "r" (vector_ptr) :
+> +               "r0", "r1", "r2", "r3", "r12");
+> +}
 
-I think you want linux/types.h, as asm/types.h isn't exported from what I
-can tell. make headers_check screams about it too:
-
-/home/will/sources/linux/linux/usr/include/asm/kvm.h:22: include of <linux/types.h> is preferred over <asm/types.h>
-/home/will/sources/linux/linux/usr/include/asm/kvm.h:57: found __[us]{8,16,32,64} type without #include <linux/types.h>
+Use kvm_call_hyp here instead.
 
 Will
