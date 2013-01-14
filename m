@@ -1,45 +1,99 @@
-From: dinggnu@gmail.com (Cong Ding)
-Date: Mon, 14 Jan 2013 17:18:53 +0000
-Subject: [PATCH] arm: kernel/perf_event_cpu.c: fix error null pointer
- dereference check
-Message-ID: <1358183933-29160-1-git-send-email-dinggnu@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 Jan 2013 10:21:39 -0700
+Subject: [PATCH] ARM: tegra: swap cache-/interrupt-ctrlr nodes in DT
+Message-ID: <1358184099-7249-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the pointer cpu_pmu is used without null pointer dereference check, and is
-checked after the using of it, so we move the null pointer check to before the
-first use.
+From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Cong Ding <dinggnu@gmail.com>
+This ensures nodes are sorted in order of reg address. This makes it
+easier to compare against e.g. the U-Boot device trees, and is simply
+consistent and clean.
+
+While we're at it, remove the unit address from the cache-controller
+node name, since it's unique without it.
+
+Reported-by: Allen Martin <amartin@nvidia.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/kernel/perf_event_cpu.c |   14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+I intend to apply this immediately since it's trivial.
 
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index efa5295..16aa979 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -142,13 +142,15 @@ static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 		raw_spin_lock_init(&events->pmu_lock);
- 	}
+ arch/arm/boot/dts/tegra20.dtsi |   18 +++++++++---------
+ arch/arm/boot/dts/tegra30.dtsi |   18 +++++++++---------
+ 2 files changed, 18 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 1ddbefd..dcd220c 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -105,15 +105,6 @@
+ 		interrupts = <1 13 0x304>;
+ 	};
  
--	cpu_pmu->get_hw_events	= cpu_pmu_get_cpu_events;
--	cpu_pmu->request_irq	= cpu_pmu_request_irq;
--	cpu_pmu->free_irq	= cpu_pmu_free_irq;
-+	if (cpu_pmu) {
-+		cpu_pmu->get_hw_events	= cpu_pmu_get_cpu_events;
-+		cpu_pmu->request_irq	= cpu_pmu_request_irq;
-+		cpu_pmu->free_irq	= cpu_pmu_free_irq;
+-	cache-controller at 50043000 {
+-		compatible = "arm,pl310-cache";
+-		reg = <0x50043000 0x1000>;
+-		arm,data-latency = <5 5 2>;
+-		arm,tag-latency = <4 4 2>;
+-		cache-unified;
+-		cache-level = <2>;
+-	};
+-
+ 	intc: interrupt-controller {
+ 		compatible = "arm,cortex-a9-gic";
+ 		reg = <0x50041000 0x1000
+@@ -122,6 +113,15 @@
+ 		#interrupt-cells = <3>;
+ 	};
  
--	/* Ensure the PMU has sane values out of reset. */
--	if (cpu_pmu && cpu_pmu->reset)
--		on_each_cpu(cpu_pmu->reset, cpu_pmu, 1);
-+		/* Ensure the PMU has sane values out of reset. */
-+		if (cpu_pmu->reset)
-+			on_each_cpu(cpu_pmu->reset, cpu_pmu, 1);
-+	}
- }
++	cache-controller {
++		compatible = "arm,pl310-cache";
++		reg = <0x50043000 0x1000>;
++		arm,data-latency = <5 5 2>;
++		arm,tag-latency = <4 4 2>;
++		cache-unified;
++		cache-level = <2>;
++	};
++
+ 	timer at 60005000 {
+ 		compatible = "nvidia,tegra20-timer";
+ 		reg = <0x60005000 0x60>;
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index dc6dc51..63a0d9b 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -105,15 +105,6 @@
+ 		interrupts = <1 13 0xf04>;
+ 	};
  
- /*
+-	cache-controller at 50043000 {
+-		compatible = "arm,pl310-cache";
+-		reg = <0x50043000 0x1000>;
+-		arm,data-latency = <6 6 2>;
+-		arm,tag-latency = <5 5 2>;
+-		cache-unified;
+-		cache-level = <2>;
+-	};
+-
+ 	intc: interrupt-controller {
+ 		compatible = "arm,cortex-a9-gic";
+ 		reg = <0x50041000 0x1000
+@@ -122,6 +113,15 @@
+ 		#interrupt-cells = <3>;
+ 	};
+ 
++	cache-controller {
++		compatible = "arm,pl310-cache";
++		reg = <0x50043000 0x1000>;
++		arm,data-latency = <6 6 2>;
++		arm,tag-latency = <5 5 2>;
++		cache-unified;
++		cache-level = <2>;
++	};
++
+ 	timer at 60005000 {
+ 		compatible = "nvidia,tegra30-timer", "nvidia,tegra20-timer";
+ 		reg = <0x60005000 0x400>;
 -- 
-1.7.9.5
+1.7.10.4
