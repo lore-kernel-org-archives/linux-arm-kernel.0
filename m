@@ -1,51 +1,58 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 14 Jan 2013 12:33:05 -0500
-Subject: [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile KVM support
-In-Reply-To: <20130114162415.GF23505@n2100.arm.linux.org.uk>
+Date: Mon, 14 Jan 2013 12:38:17 -0500
+Subject: [PATCH v5 08/14] KVM: ARM: Emulation framework and CP15 emulation
+In-Reply-To: <20130114163636.GG23505@n2100.arm.linux.org.uk>
 References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108183855.46302.40539.stgit@ubuntu>
- <20130114162415.GF23505@n2100.arm.linux.org.uk>
-Message-ID: <CANM98qLHao0dJU57MbAtopVpTJDOVdqNtw5JT-DXyQNa7iD_qw@mail.gmail.com>
+ <20130108183931.46302.60921.stgit@ubuntu>
+ <20130114163636.GG23505@n2100.arm.linux.org.uk>
+Message-ID: <CANM98qJpbrOsDcDmcGJp6fogLZHCFxghDg6zMXyt8jaXzm1QsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 11:24 AM, Russell King - ARM Linux
+On Mon, Jan 14, 2013 at 11:36 AM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Tue, Jan 08, 2013 at 01:38:55PM -0500, Christoffer Dall wrote:
->> +     /* -ENOENT for unknown features, -EINVAL for invalid combinations. */
->> +     for (i = 0; i < sizeof(init->features)*8; i++) {
->> +             if (init->features[i / 32] & (1 << (i % 32))) {
+> On Tue, Jan 08, 2013 at 01:39:31PM -0500, Christoffer Dall wrote:
+>> +     /*
+>> +      * Check whether this vcpu requires the cache to be flushed on
+>> +      * this physical CPU. This is a consequence of doing dcache
+>> +      * operations by set/way on this vcpu. We do it here to be in
+>> +      * a non-preemptible section.
+>> +      */
+>> +     if (cpumask_test_cpu(cpu, &vcpu->arch.require_dcache_flush)) {
+>> +             cpumask_clear_cpu(cpu, &vcpu->arch.require_dcache_flush);
 >
-> Isn't this an open-coded version of test_bit() ?
+> There is cpumask_test_and_clear_cpu() which may be better for this.
 
-indeed, nicely spotted:
+nice:
 
-commit 608588674144e403ad0ea3c93066f3175bd5cf88
+commit d31686fadb74ad564f6a5acabdebe411de86d77d
 Author: Christoffer Dall <c.dall@virtualopensystems.com>
-Date:   Mon Jan 14 12:30:07 2013 -0500
+Date:   Mon Jan 14 12:36:53 2013 -0500
 
-    KVM: ARM: Use test-bit instead of open-coded version
+    KVM: ARM: Use cpumask_test_and_clear_cpu
 
-    Makes the code more readable, also adds spaces around the asterisk.
+    Nicer shorter cleaner code. Ahhhh.
 
     Cc: Russell King <linux@arm.linux.org.uk>
     Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 65ae563..2339d96 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -193,8 +193,8 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
- 	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index b5c6ab1..fdd4a7c 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -352,10 +352,8 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ 	 * operations by set/way on this vcpu. We do it here to be in
+ 	 * a non-preemptible section.
+ 	 */
+-	if (cpumask_test_cpu(cpu, &vcpu->arch.require_dcache_flush)) {
+-		cpumask_clear_cpu(cpu, &vcpu->arch.require_dcache_flush);
++	if (cpumask_test_and_clear_cpu(cpu, &vcpu->arch.require_dcache_flush))
+ 		flush_cache_all(); /* We'd really want v7_flush_dcache_all() */
+-	}
 
- 	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
--	for (i = 0; i < sizeof(init->features)*8; i++) {
--		if (init->features[i / 32] & (1 << (i % 32))) {
-+	for (i = 0; i < sizeof(init->features) * 8; i++) {
-+		if (test_bit(i, (void *)init->features)) {
- 			if (i >= KVM_VCPU_MAX_FEATURES)
- 				return -ENOENT;
- 			set_bit(i, vcpu->arch.features);
+ 	kvm_arm_set_running_vcpu(vcpu);
+ }
+
 --
 
 Thanks,
