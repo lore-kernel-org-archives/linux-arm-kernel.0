@@ -1,129 +1,206 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 14 Jan 2013 12:58:13 -0800
-Subject: [PATCH v2 10/10] clk: tegra30: remove unused
- TEGRA_CLK_DUPLICATE()s
-In-Reply-To: <50F07DA0.6000806@wwwdotorg.org>
-References: <1357891289-23500-1-git-send-email-pgaikwad@nvidia.com>
- <1357891289-23500-10-git-send-email-pgaikwad@nvidia.com>
- <50F07DA0.6000806@wwwdotorg.org>
-Message-ID: <20130114205813.23734.19743@quantum>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Mon, 14 Jan 2013 16:08:54 -0500
+Subject: [PATCH v5 04/12] ARM: KVM: Initial VGIC infrastructure code
+In-Reply-To: <20130114153107.GE18935@mudshark.cambridge.arm.com>
+References: <20130108184116.46558.3558.stgit@ubuntu>
+ <20130108184150.46558.35674.stgit@ubuntu>
+ <20130114153107.GE18935@mudshark.cambridge.arm.com>
+Message-ID: <CANM98q+y4GoHmqh-CS+fDnfbDbBQHQOY05urer5DMgy9b1X5ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Warren (2013-01-11 13:01:20)
-> On 01/11/2013 01:01 AM, Prashant Gaikwad wrote:
-> > With device tree support added for Tegra clocks look up is done from
-> > device tree, remove unused TEGRA_CLK_DUPLICATE()s.
-> 
-> Cc'ing in the drivers/clk maintainer as an FYI and for Acks; this patch
-> needs to go through the Tegra tree due to dependencies.
-> 
+On Mon, Jan 14, 2013 at 10:31 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jan 08, 2013 at 06:41:51PM +0000, Christoffer Dall wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Wire the basic framework code for VGIC support and the initial in-kernel
+>> MMIO support code for the VGIC, used for the distributor emulation.
+>
+> [...]
+>
+>> +/**
+>> + * vgic_reg_access - access vgic register
+>> + * @mmio:   pointer to the data describing the mmio access
+>> + * @reg:    pointer to the virtual backing of vgic distributor data
+>> + * @offset: least significant 2 bits used for word offset
+>> + * @mode:   ACCESS_ mode (see defines above)
+>> + *
+>> + * Helper to make vgic register access easier using one of the access
+>> + * modes defined for vgic register access
+>> + * (read,raz,write-ignored,setbit,clearbit,write)
+>> + */
+>> +static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+>> +                           phys_addr_t offset, int mode)
+>> +{
+>> +       int shift = (offset & 3) * 8;
+>> +       u32 mask;
+>> +       u32 regval;
+>> +
+>> +       /*
+>> +        * Any alignment fault should have been delivered to the guest
+>> +        * directly (ARM ARM B3.12.7 "Prioritization of aborts").
+>> +        */
+>> +
+>> +       mask = (~0U) >> shift;
+>> +       if (reg) {
+>> +               regval = *reg;
+>> +       } else {
+>> +               BUG_ON(mode != (ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED));
+>> +               regval = 0;
+>> +       }
+>> +
+>> +       if (mmio->is_write) {
+>> +               u32 data = (*((u32 *)mmio->data) & mask) << shift;
+>> +               switch (ACCESS_WRITE_MASK(mode)) {
+>> +               case ACCESS_WRITE_IGNORED:
+>> +                       return;
+>> +
+>> +               case ACCESS_WRITE_SETBIT:
+>> +                       regval |= data;
+>> +                       break;
+>> +
+>> +               case ACCESS_WRITE_CLEARBIT:
+>> +                       regval &= ~data;
+>> +                       break;
+>> +
+>> +               case ACCESS_WRITE_VALUE:
+>> +                       regval = (regval & ~(mask << shift)) | data;
+>> +                       break;
+>> +               }
+>> +               *reg = regval;
+>> +       } else {
+>> +               switch (ACCESS_READ_MASK(mode)) {
+>> +               case ACCESS_READ_RAZ:
+>> +                       regval = 0;
+>> +                       /* fall through */
+>> +
+>> +               case ACCESS_READ_VALUE:
+>> +                       *((u32 *)mmio->data) = (regval >> shift) & mask;
+>> +               }
+>> +       }
+>> +}
+>
+> As I mentioned previously, I suspect that this doesn't work with big-endian
+> systems. Whilst that's reasonable for the moment, a comment would be useful
+> for the unlucky soul that decides to do that work in future (or add
+> accessors for mmio->data as I suggested before).
+>
+admittedly this really hurts my brain, but I think there's actually no
+problem with endianness: whatever comes in mmio->data will have native
+endianness and the vgic is always little-endian, so a guest would have
+to make sure to do its own endianness conversion before writing data,
+or did I get this backwards? (some nasty feeling about if the OS is
+compiled in another endianness than the hardware everything may
+break).
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Anyhow, I think there's another bug in this code though. Please take a
+look and see if you agree:
 
-> > Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-> > ---
-> >  drivers/clk/tegra/clk-tegra30.c |   70 ---------------------------------------
-> >  1 files changed, 0 insertions(+), 70 deletions(-)
-> > 
-> > diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-> > index 987312c..6d1ff86 100644
-> > --- a/drivers/clk/tegra/clk-tegra30.c
-> > +++ b/drivers/clk/tegra/clk-tegra30.c
-> > @@ -1642,41 +1642,6 @@ static void __init tegra30_periph_clk_init(void)
-> >       clk_register_clkdev(clk, "emc", NULL);
-> >       clks[emc] = clk;
-> >  
-> > -     /* i2c1-fast */
-> > -     clk = clk_register_fixed_factor(NULL, "i2c1-fast", "pll_p_out3",
-> > -                                     CLK_SET_RATE_PARENT, 1, 1);
-> > -     clk_register_clkdev(clk, "fast-clk", "tegra-i2c.0");
-> > -
-> > -     /* i2c2-fast */
-> > -     clk = clk_register_fixed_factor(NULL, "i2c2-fast", "pll_p_out3",
-> > -                                     CLK_SET_RATE_PARENT, 1, 1);
-> > -     clk_register_clkdev(clk, "fast-clk", "tegra-i2c.1");
-> > -
-> > -     /* i2c3-fast */
-> > -     clk = clk_register_fixed_factor(NULL, "i2c3-fast", "pll_p_out3",
-> > -                                     CLK_SET_RATE_PARENT, 1, 1);
-> > -     clk_register_clkdev(clk, "fast-clk", "tegra-i2c.2");
-> > -
-> > -     /* i2c4-fast */
-> > -     clk = clk_register_fixed_factor(NULL, "i2c4-fast", "pll_p_out3",
-> > -                                     CLK_SET_RATE_PARENT, 1, 1);
-> > -     clk_register_clkdev(clk, "fast-clk", "tegra-i2c.3");
-> > -
-> > -     /* i2c5-fast */
-> > -     clk = clk_register_fixed_factor(NULL, "i2c5-fast", "pll_p_out3",
-> > -                                     CLK_SET_RATE_PARENT, 1, 1);
-> > -     clk_register_clkdev(clk, "fast-clk", "tegra-i2c.5");
-> > -
-> > -     /* dsi1-fixed */
-> > -     clk = clk_register_fixed_factor(NULL, "dsi1-fixed", "pll_p_out3",
-> > -                                     CLK_SET_RATE_PARENT, 1, 1);
-> > -     clk_register_clkdev(clk, "dsi-fixed", "tegradc.0");
-> > -
-> > -     /* dsi2-fixed */
-> > -     clk = clk_register_fixed_factor(NULL, "dsi2-fixed", "pll_p_out3",
-> > -                                     CLK_SET_RATE_PARENT, 1, 1);
-> > -     clk_register_clkdev(clk, "dsi-fixed", "tegradc.1");
-> > -
-> >       for (i = 0; i < ARRAY_SIZE(tegra_periph_clk_list); i++) {
-> >               data = &tegra_periph_clk_list[i];
-> >               clk = tegra_clk_periph(data->name, data->parent_names,
-> > @@ -1935,19 +1900,9 @@ static __initdata struct tegra_clk_init_table init_table[] = {
-> >   * table under two names.
-> >   */
-> >  static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
-> > -     TEGRA_CLK_DUPLICATE(uarta,  "serial8250.0", NULL),
-> > -     TEGRA_CLK_DUPLICATE(uartb,  "serial8250.1", NULL),
-> > -     TEGRA_CLK_DUPLICATE(uartc,  "serial8250.2", NULL),
-> > -     TEGRA_CLK_DUPLICATE(uartd,  "serial8250.3", NULL),
-> > -     TEGRA_CLK_DUPLICATE(uarte,  "serial8250.4", NULL),
-> >       TEGRA_CLK_DUPLICATE(usbd, "utmip-pad", NULL),
-> >       TEGRA_CLK_DUPLICATE(usbd, "tegra-ehci.0", NULL),
-> >       TEGRA_CLK_DUPLICATE(usbd, "tegra-otg", NULL),
-> > -     TEGRA_CLK_DUPLICATE(pll_p, "tegradc.0", "parent"),
-> > -     TEGRA_CLK_DUPLICATE(pll_p, "tegradc.1", "parent"),
-> > -     TEGRA_CLK_DUPLICATE(pll_d2_out0, "hdmi", "parent"),
-> > -     TEGRA_CLK_DUPLICATE(dsib, "tegradc.0", "dsib"),
-> > -     TEGRA_CLK_DUPLICATE(dsia, "tegradc.1", "dsia"),
-> >       TEGRA_CLK_DUPLICATE(bsev, "tegra-avp", "bsev"),
-> >       TEGRA_CLK_DUPLICATE(bsev, "nvavp", "bsev"),
-> >       TEGRA_CLK_DUPLICATE(vde, "tegra-aes", "vde"),
-> > @@ -1956,33 +1911,8 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
-> >       TEGRA_CLK_DUPLICATE(cml1, "tegra_sata_cml", NULL),
-> >       TEGRA_CLK_DUPLICATE(cml0, "tegra_pcie", "cml"),
-> >       TEGRA_CLK_DUPLICATE(pciex, "tegra_pcie", "pciex"),
-> > -     TEGRA_CLK_DUPLICATE(i2c1, "tegra-i2c-slave.0", NULL),
-> > -     TEGRA_CLK_DUPLICATE(i2c2, "tegra-i2c-slave.1", NULL),
-> > -     TEGRA_CLK_DUPLICATE(i2c3, "tegra-i2c-slave.2", NULL),
-> > -     TEGRA_CLK_DUPLICATE(i2c4, "tegra-i2c-slave.3", NULL),
-> > -     TEGRA_CLK_DUPLICATE(i2c5, "tegra-i2c-slave.4", NULL),
-> > -     TEGRA_CLK_DUPLICATE(sbc1, "spi_slave_tegra.0", NULL),
-> > -     TEGRA_CLK_DUPLICATE(sbc2, "spi_slave_tegra.1", NULL),
-> > -     TEGRA_CLK_DUPLICATE(sbc3, "spi_slave_tegra.2", NULL),
-> > -     TEGRA_CLK_DUPLICATE(sbc4, "spi_slave_tegra.3", NULL),
-> > -     TEGRA_CLK_DUPLICATE(sbc5, "spi_slave_tegra.4", NULL),
-> > -     TEGRA_CLK_DUPLICATE(sbc6, "spi_slave_tegra.5", NULL),
-> >       TEGRA_CLK_DUPLICATE(twd, "smp_twd", NULL),
-> >       TEGRA_CLK_DUPLICATE(vcp, "nvavp", "vcp"),
-> > -     TEGRA_CLK_DUPLICATE(i2s0, NULL, "i2s0"),
-> > -     TEGRA_CLK_DUPLICATE(i2s1, NULL, "i2s1"),
-> > -     TEGRA_CLK_DUPLICATE(i2s2, NULL, "i2s2"),
-> > -     TEGRA_CLK_DUPLICATE(i2s3, NULL, "i2s3"),
-> > -     TEGRA_CLK_DUPLICATE(i2s4, NULL, "i2s4"),
-> > -     TEGRA_CLK_DUPLICATE(dam0, NULL, "dam0"),
-> > -     TEGRA_CLK_DUPLICATE(dam1, NULL, "dam1"),
-> > -     TEGRA_CLK_DUPLICATE(dam2, NULL, "dam2"),
-> > -     TEGRA_CLK_DUPLICATE(spdif_in, NULL, "spdif_in"),
-> > -     TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.0", "fast-clk"),
-> > -     TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.1", "fast-clk"),
-> > -     TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.2", "fast-clk"),
-> > -     TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.3", "fast-clk"),
-> > -     TEGRA_CLK_DUPLICATE(pll_p_out3, "tegra-i2c.4", "fast-clk"),
-> >       TEGRA_CLK_DUPLICATE(clk_max, NULL, NULL), /* MUST be the last entry */
-> >  };
-> >  
-> >
+commit 3cab2b93a6f6acd3c043e584f23b94ab8f1bbd66
+Author: Christoffer Dall <c.dall@virtualopensystems.com>
+Date:   Mon Jan 14 15:55:18 2013 -0500
+
+    KVM: ARM: Limit vgic read/writes to load/store length
+
+    The vgic read/write operations did not consider ldrb/strb masks, and
+    would therefore unintentionally overwrite parts of a register.
+
+    Consider for example a store of a single byte to a word-aligned address
+    of one of the priority registers, that would cause the 3 most
+    significant bytes to be overwritten with zeros.
+
+    Cc: Marc Zyniger <marc.zyngier@arm.com>
+    Cc: Will Deacon <will.deacon@arm.com>
+    Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+
+diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
+index 25daa07..5c1bcf5 100644
+--- a/arch/arm/kvm/vgic.c
++++ b/arch/arm/kvm/vgic.c
+@@ -233,6 +233,16 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu
+*vcpu, int irq)
+ 			  vcpu->arch.vgic_cpu.pending_shared);
+ }
+
++static u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
++{
++	return *((u32 *)mmio->data) & mask;
++}
++
++static void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
++{
++	*((u32 *)mmio->data) = value & mask;
++}
++
+ /**
+  * vgic_reg_access - access vgic register
+  * @mmio:   pointer to the data describing the mmio access
+@@ -247,8 +257,8 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu
+*vcpu, int irq)
+ static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+ 			    phys_addr_t offset, int mode)
+ {
+-	int shift = (offset & 3) * 8;
+-	u32 mask;
++	int word_offset = (offset & 3) * 8;
++	u32 mask = (1UL << (mmio->len * 8)) - 1;
+ 	u32 regval;
+
+ 	/*
+@@ -256,7 +266,6 @@ static void vgic_reg_access(struct kvm_exit_mmio
+*mmio, u32 *reg,
+ 	 * directly (ARM ARM B3.12.7 "Prioritization of aborts").
+ 	 */
+
+-	mask = (~0U) >> shift;
+ 	if (reg) {
+ 		regval = *reg;
+ 	} else {
+@@ -265,7 +274,7 @@ static void vgic_reg_access(struct kvm_exit_mmio
+*mmio, u32 *reg,
+ 	}
+
+ 	if (mmio->is_write) {
+-		u32 data = (*((u32 *)mmio->data) & mask) << shift;
++		u32 data = mmio_data_read(mmio, mask) << word_offset;
+ 		switch (ACCESS_WRITE_MASK(mode)) {
+ 		case ACCESS_WRITE_IGNORED:
+ 			return;
+@@ -279,7 +288,7 @@ static void vgic_reg_access(struct kvm_exit_mmio
+*mmio, u32 *reg,
+ 			break;
+
+ 		case ACCESS_WRITE_VALUE:
+-			regval = (regval & ~(mask << shift)) | data;
++			regval = (regval & ~(mask << word_offset)) | data;
+ 			break;
+ 		}
+ 		*reg = regval;
+@@ -290,7 +299,7 @@ static void vgic_reg_access(struct kvm_exit_mmio
+*mmio, u32 *reg,
+ 			/* fall through */
+
+ 		case ACCESS_READ_VALUE:
+-			*((u32 *)mmio->data) = (regval >> shift) & mask;
++			mmio_data_write(mmio, mask, regval >> word_offset);
+ 		}
+ 	}
+ }
+@@ -702,6 +711,12 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu,
+struct kvm_run *run,
+ 	    (mmio->phys_addr + mmio->len) > (base + KVM_VGIC_V2_DIST_SIZE))
+ 		return false;
+
++	/* We don't support ldrd / strd or ldm / stm to the emulated vgic */
++	if (mmio->len > 4) {
++		kvm_inject_dabt(vcpu, mmio->phys_addr);
++		return true;
++	}
++
+ 	range = find_matching_range(vgic_ranges, mmio, base);
+ 	if (unlikely(!range || !range->handle_mmio)) {
+ 		pr_warn("Unhandled access %d %08llx %d\n",
+--
+
+Thanks,
+-Christoffer
