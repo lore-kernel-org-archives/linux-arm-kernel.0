@@ -1,16 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Jan 2013 16:24:15 +0000
-Subject: [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile KVM support
-In-Reply-To: <20130108183855.46302.40539.stgit@ubuntu>
-References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108183855.46302.40539.stgit@ubuntu>
-Message-ID: <20130114162415.GF23505@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 14 Jan 2013 11:29:13 -0500 (EST)
+Subject: [PATCH] ARM: imx: disable cpu in .cpu_kill hook
+In-Reply-To: <50F40E58.4030808@gmail.com>
+References: <1358168977-9631-1-git-send-email-shawn.guo@linaro.org>
+ <50F40E58.4030808@gmail.com>
+Message-ID: <alpine.LFD.2.02.1301141127370.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 08, 2013 at 01:38:55PM -0500, Christoffer Dall wrote:
-> +	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
-> +	for (i = 0; i < sizeof(init->features)*8; i++) {
-> +		if (init->features[i / 32] & (1 << (i % 32))) {
+On Mon, 14 Jan 2013, Rob Herring wrote:
 
-Isn't this an open-coded version of test_bit() ?
+> Setting or clearing the SMP bit is showing up in multiple places
+> (big.LITTLE series, Tegra cpuidle). I did inline versions of
+> set_auxcr/get_auxcr for highbank cpuidle. We should be make those common.
+
+Could you do that like now and send it to RMK for his stable branch?  
+This way I could rebase the b.L series on top.
+
+
+Nicolas
