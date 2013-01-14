@@ -1,166 +1,48 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 14 Jan 2013 14:14:22 +0000
-Subject: [PATCH v2] gpio: vt8500: memory cleanup missing
-In-Reply-To: <1357844986-21891-1-git-send-email-linux@prisktech.co.nz>
-References: <1357844986-21891-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130114141422.80D6D3E232D@localhost>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 14 Jan 2013 22:15:21 +0800
+Subject: [PATCH] ARM: imx: correct low-power mode setting
+Message-ID: <1358172921-9863-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jan 2013 08:09:46 +1300, Tony Prisk <linux@prisktech.co.nz> wrote:
-> This driver is missing a .remove callback, and the fail path on
-> probe is incomplete.
-> 
-> If an error occurs in vt8500_add_chips, gpio_base is not unmapped.
-> The driver is also ignoring the return value from this function so
-> if a chip fails to register it completes as successful.
-> 
-> Replaced pr_err with dev_err in vt8500_add_chips since the device is
-> available.
-> 
-> There is also no .remove callback defined. To allow removing the
-> registered chips, I have moved *vtchip to be a static global.
-> 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
-> v2:
-> Remove global variable and use platform_set_drvdata instead.
-> 
->  drivers/gpio/gpio-vt8500.c |   51 +++++++++++++++++++++++++++++++++++---------
->  1 file changed, 41 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-vt8500.c b/drivers/gpio/gpio-vt8500.c
-> index b53320a..87e59b5 100644
-> --- a/drivers/gpio/gpio-vt8500.c
-> +++ b/drivers/gpio/gpio-vt8500.c
-> @@ -233,10 +233,12 @@ static int vt8500_add_chips(struct platform_device *pdev, void __iomem *base,
->  			sizeof(struct vt8500_gpio_chip) * data->num_banks,
->  			GFP_KERNEL);
->  	if (!vtchip) {
-> -		pr_err("%s: failed to allocate chip memory\n", __func__);
-> +		dev_err(&pdev->dev, "failed to allocate chip memory\n");
->  		return -ENOMEM;
->  	}
->  
-> +	platform_set_drvdata(pdev, vtchip);
-> +
->  	for (i = 0; i < data->num_banks; i++) {
->  		vtchip[i].base = base;
->  		vtchip[i].regs = &data->banks[i];
-> @@ -261,6 +263,7 @@ static int vt8500_add_chips(struct platform_device *pdev, void __iomem *base,
->  
->  		gpiochip_add(chip);
->  	}
-> +
->  	return 0;
->  }
->  
+The hardware reset value of bit CCM_CLPCR_LPM enables WAIT mode
+(WAIT_UNCLOCKED) by default.  However this is undesirable because
+WAIT mode should only be enabled when there is a driver managing
+ARM clock gating.  Correct the initial power mode to WAIT_CLOCKED
+(disable WAIT mode).  While at it, the power mode after resuming
+is also set back to WAIT_CLOCKED from STOP_POWER_OFF.
 
-Watch out; irrelevant whitespace change here. From a maintainer point of
-voiew, I'm less confident about a patch when I see unrelated whitespace
-changes because it suggests that there are things in the patch that you
-don't intend. It helps me out a lot if this stuff gets scrubbed before I
-see it.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/clk-imx6q.c |    3 +++
+ arch/arm/mach-imx/pm-imx6q.c  |    1 +
+ 2 files changed, 4 insertions(+)
 
-> @@ -273,36 +276,64 @@ static struct of_device_id vt8500_gpio_dt_ids[] = {
->  
->  static int vt8500_gpio_probe(struct platform_device *pdev)
->  {
-> +	int ret;
->  	void __iomem *gpio_base;
-> -	struct device_node *np;
-> +	struct device_node *np = pdev->dev.of_node;
->  	const struct of_device_id *of_id =
->  				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
->  
-> -	if (!of_id) {
-> -		dev_err(&pdev->dev, "Failed to find gpio controller\n");
-> +	if (!np) {
-> +		dev_err(&pdev->dev, "GPIO node missing in devicetree\n");
->  		return -ENODEV;
->  	}
->  
-> -	np = pdev->dev.of_node;
-> -	if (!np) {
-> -		dev_err(&pdev->dev, "Missing GPIO description in devicetree\n");
-> -		return -EFAULT;
-> +	if (!of_id) {
-> +		dev_err(&pdev->dev, "No matching driver data\n");
-> +		return -ENODEV;
->  	}
-
-Why is this flipped around? I don't see any functional reason for this
-change.
-
-In actual fact, since the driver needs both it only needs to test for
-the of_id. If there is no node, then of_id will never be set.
-
->  
->  	gpio_base = of_iomap(np, 0);
->  	if (!gpio_base) {
->  		dev_err(&pdev->dev, "Unable to map GPIO registers\n");
-> -		of_node_put(np);
->  		return -ENOMEM;
->  	}
->  
-> -	vt8500_add_chips(pdev, gpio_base, of_id->data);
-> +	ret = vt8500_add_chips(pdev, gpio_base, of_id->data);
-> +	if (ret) {
-> +		iounmap(gpio_base);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int vt8500_gpio_remove(struct platform_device *pdev)
-> +{
-> +	int i;
-> +	int ret;
-> +	const struct vt8500_gpio_data *data;
-> +	struct vt8500_gpio_chip *vtchip = platform_get_drvdata(pdev);
-> +	void __iomem *gpio_base = vtchip[0].base;
-> +	const struct of_device_id *of_id =
-> +				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
-> +
-> +	data = of_id->data;
-> +
-> +	for (i = 0; i < data->num_banks; i++) {
-
-It would make for simpler code all around if num_banks was cached in the
-vt8500_gpio_chip structure during the .probe() routine. It looks wrong
-to be calling of_match_device() in the remove hook.
-
-Otherwise this iteration looks much better.
-
-g.
-
-> +		ret = gpiochip_remove(&vtchip[i].chip);
-> +		if (ret)
-> +			dev_warn(&pdev->dev, "gpiochip_remove returned %d\n",
-> +				 ret);
-> +	}
-> +
-> +	iounmap(gpio_base);
->  
->  	return 0;
->  }
->  
->  static struct platform_driver vt8500_gpio_driver = {
->  	.probe		= vt8500_gpio_probe,
-> +	.remove		= vt8500_gpio_remove,
->  	.driver		= {
->  		.name	= "vt8500-gpio",
->  		.owner	= THIS_MODULE,
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 7f2c10c..c0c4e72 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -436,6 +436,9 @@ int __init mx6q_clocks_init(void)
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clk[clks_init_on[i]]);
+ 
++	/* Set initial power mode */
++	imx6q_set_lpm(WAIT_CLOCKED);
++
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt");
+ 	base = of_iomap(np, 0);
+ 	WARN_ON(!base);
+diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+index a17543d..ee42d20 100644
+--- a/arch/arm/mach-imx/pm-imx6q.c
++++ b/arch/arm/mach-imx/pm-imx6q.c
+@@ -41,6 +41,7 @@ static int imx6q_pm_enter(suspend_state_t state)
+ 		cpu_suspend(0, imx6q_suspend_finish);
+ 		imx_smp_prepare();
+ 		imx_gpc_post_resume();
++		imx6q_set_lpm(WAIT_CLOCKED);
+ 		break;
+ 	default:
+ 		return -EINVAL;
 -- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+1.7.9.5
