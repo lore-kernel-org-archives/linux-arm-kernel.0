@@ -1,69 +1,41 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 14 Jan 2013 15:17:26 +0100 (CET)
-Subject: [PATCHv2 1/4] clockevents: Add generic timer broadcast
- receiver
-In-Reply-To: <20130114121247.GD7990@e106331-lin.cambridge.arm.com>
-References: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
- <1357742770-15028-2-git-send-email-mark.rutland@arm.com>
- <alpine.LFD.2.02.1301141204421.7475@ionos>
- <20130114112951.GC7990@e106331-lin.cambridge.arm.com>
- <alpine.LFD.2.02.1301141247020.7475@ionos>
- <20130114121247.GD7990@e106331-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1301141318460.7475@ionos>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Jan 2013 14:19:22 +0000
+Subject: Question: ARM: local timers: add num_possible_cpus() in
+ local_timer_register()
+In-Reply-To: <20130114133345.GA26701@android11.spreadtrum.com>
+References: <20130114133345.GA26701@android11.spreadtrum.com>
+Message-ID: <50F413EA.5010403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jan 2013, Mark Rutland wrote:
-> On Mon, Jan 14, 2013 at 11:50:55AM +0000, Thomas Gleixner wrote:
-> > On Mon, 14 Jan 2013, Mark Rutland wrote:
-> > 
-> > > On Mon, Jan 14, 2013 at 11:06:31AM +0000, Thomas Gleixner wrote:
-> > > > On Wed, 9 Jan 2013, Mark Rutland wrote:
-> > > > > +#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-> > > > > +extern int tick_receive_broadcast(void);
-> > > > > +#else
-> > > > > +static inline int tick_receive_broadcast(void)
-> > > > > +{
-> > > > > +	return 0;
-> > > > > +}
-> > > > 
-> > > > What's the inline function for? If an arch does not have broadcasting
-> > > > support it should not have a receive broadcast function call either.
-> > > 
-> > > That was how this was originally structured [1], but Santosh suggested this
-> > > would break the build for !GENERIC_CLOCKEVENTS_BROADCAST [1]. It means that the
-> > > arch-specific receive path (i.e. IPI handler) doesn't have to be #ifdef'd,
-> > > which makes it less ugly.
-> > 
-> > Hmm. If you want to keep the IPI around unconditionally the inline
-> > makes some sense, though the question is whether keeping an unused IPI
-> > around makes sense in the first place. I'd rather see a warning that
-> > an unexpected IPI happened than a silent inline function being called.
+On 14/01/13 13:33, Steve zhan wrote:
+
+Hi Steve,
+
+> 	Do you think we should add num_possible_cpus() in 
+> local_timer_register() function, When core number is 
+>> 1, then reutrn TRUE? Enable the local timer only if 
+> we have more than one CPU, if the current config is
+> SMP and setup_max_cpus >= 1, but if smp_init_cpus in 
+> platform code have set cpu possible value to One(that 
+> maybe read number from scu or other hardware), then 
+> percpu_timer_setup in smp_prepare_cpus have no chance
+> to be called.
 > 
-> How about I add a warning (e.g. "Impossible timer broadcast received.") and
-> return -EOPNOTSUPP when !GENERIC_CLOCKEVENTS_BROADCAST?
-
-You still need to do something with the return value in the arch IPI
-code, right?
-
-> > > > Is anything going to use the return value?
-> > > 
-> > > I'd added this after looking at the x86 lapic timers, where interrupts might
-> > > remain pending over a kexec, and lapic interrupts come up before timers are
-> > > registered. The return value is useful for shutting down the timer in that case
-> > > (see x86's local_apic_timer_interrupt).
-> > 
-> > Right, though then you need to check for evt->event_handler as well.
+> 	For local timer, because local_timer_register have
+> return 1, that will miss global timer register. 
 > 
-> I thought this previously also [1], but I couldn't find any path such that a
-> tick_cpu_device would have an evtdev without an event_handler. We always set the
-> handler before setting evtdev, and alway wipe evtdev before wiping the handler.
-> 
-> Have I missed something?
+> 	Could you pls check it?
 
-That's an x86 specific issue. Though we could try and make that
-functionality completely generic.
+I'm not sure I understand your question.
 
-Thanks,
+We only enable the use of the SMP local timers infrastructure if we're
+SMP and we have more that one CPU. If you only have one CPU up and
+running, then you can still use your CPU local timer as a global timer.
 
-	tglx
+What would we gain by using the local timer infrastructure when we're
+not running on SMP hardware?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
