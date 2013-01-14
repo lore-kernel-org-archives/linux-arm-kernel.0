@@ -1,51 +1,115 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Jan 2013 12:35:35 +0000
-Subject: [PATCH 2/2] ARM: tegra: Use DT /cpu node to detect number of CPU
- core
-In-Reply-To: <20130114.114925.1476619399284636466.hdoyu@nvidia.com>
-References: <1358149970-28156-1-git-send-email-hdoyu@nvidia.com>
- <1358149970-28156-2-git-send-email-hdoyu@nvidia.com>
- <20130114092720.GX23505@n2100.arm.linux.org.uk>
- <20130114.114925.1476619399284636466.hdoyu@nvidia.com>
-Message-ID: <20130114123535.GB21142@e102568-lin.cambridge.arm.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 14 Jan 2013 20:56:33 +0800
+Subject: [PATCH v3 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
+ platform_device_id
+In-Reply-To: <20130114110600.GI10874@arwen.pp.htv.fi>
+References: <1358158361-25550-2-git-send-email-peter.chen@freescale.com>
+ <20130114101642.GB10874@arwen.pp.htv.fi>
+ <50F3DB8D.6050104@pengutronix.de>
+ <20130114102444.GD10874@arwen.pp.htv.fi>
+ <50F3DF1D.3040706@pengutronix.de>
+ <20130114103952.GF10874@arwen.pp.htv.fi>
+ <50F3E301.7040509@pengutronix.de>
+ <20130114105357.GH10874@arwen.pp.htv.fi>
+ <50F3E5E8.2000905@pengutronix.de>
+ <20130114110600.GI10874@arwen.pp.htv.fi>
+Message-ID: <20130114125632.GA30157@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 09:49:25AM +0000, Hiroshi Doyu wrote:
-> Hi Russell,
-> 
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote @ Mon, 14 Jan 2013 10:27:20 +0100:
-> 
-> > On Mon, Jan 14, 2013 at 09:52:50AM +0200, Hiroshi Doyu wrote:
-> > > +	if (!arm_dt_cpu_map_valid())
-> > > +		set_cpu_possible(0, true);
+On Mon, Jan 14, 2013 at 01:06:00PM +0200, Felipe Balbi wrote:
+> On Mon, Jan 14, 2013 at 12:03:04PM +0100, Marc Kleine-Budde wrote:
+> > On 01/14/2013 11:53 AM, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Mon, Jan 14, 2013 at 11:50:41AM +0100, Marc Kleine-Budde wrote:
+> > >> On 01/14/2013 11:39 AM, Felipe Balbi wrote:
+> > >>> On Mon, Jan 14, 2013 at 11:34:05AM +0100, Marc Kleine-Budde wrote:
+> > >>>> On 01/14/2013 11:24 AM, Felipe Balbi wrote:
+> > >>>>> On Mon, Jan 14, 2013 at 11:18:53AM +0100, Marc Kleine-Budde wrote:
+> > >>>>>> On 01/14/2013 11:16 AM, Felipe Balbi wrote:
+> > >>>>>>> Hi,
+> > >>>>>>>
+> > >>>>>>> On Mon, Jan 14, 2013 at 06:12:39PM +0800, Peter Chen wrote:
+> > >>>>>>>> @@ -2756,22 +2753,41 @@ static int fsl_udc_otg_resume(struct device *dev)
+> > >>>>>>>>  
+> > >>>>>>>>  	return fsl_udc_resume(NULL);
+> > >>>>>>>>  }
+> > >>>>>>>> -
+> > >>>>>>>>  /*-------------------------------------------------------------------------
+> > >>>>>>>>  	Register entry point for the peripheral controller driver
+> > >>>>>>>>  --------------------------------------------------------------------------*/
+> > >>>>>>>> -
+> > >>>>>>>> +static const struct platform_device_id fsl_udc_devtype[] = {
+> > >>>>>>>> +	{
+> > >>>>>>>> +		.name = "imx-udc-mx25",
+> > >>>>>>>> +		.driver_data = IMX25_UDC,
+> > >>>>>>>> +	}, {
+> > >>>>>>>> +		.name = "imx-udc-mx27",
+> > >>>>>>>> +		.driver_data = IMX27_UDC,
+> > >>>>>>>> +	}, {
+> > >>>>>>>> +		.name = "imx-udc-mx31",
+> > >>>>>>>> +		.driver_data = IMX31_UDC,
+> > >>>>>>>> +	}, {
+> > >>>>>>>> +		.name = "imx-udc-mx35",
+> > >>>>>>>> +		.driver_data = IMX35_UDC,
+> > >>>>>>>> +	}, {
+> > >>>>>>>> +		.name = "imx-udc-mx51",
+> > >>>>>>>> +		.driver_data = IMX51_UDC,
+> > >>>>>>>> +	}
+> > >>>>>>>> +};
+> > >>>>>>>
+> > >>>>>>> I wonder if your driver-data is actually needed since you can use string
+> > >>>>>>> comparisson to achieve the exact same outcome.
+> > >>>>>>
+> > >>>>>> Why use a string compare, if the kernel infrastructure already does this
+> > >>>>>> for you?
+> > >>>>>
+> > >>>>> what do you mean ? What kernel infrastructure is doing waht for me ?
+> > >>>>
+> > >>>> The kernel infrastructure is doing the string compare for you to match
+> > >>>> the device against the driver (via platform_device_id->name). You get
+> > >>>> the a pointer to the driver_data for free. So you don't need any string
+> > >>>> compare in the driver later.
+> > >>>
+> > >>> but current driver data is just duplicating name with an integer, it's
+> > >>> pretty useless driver data.
+> > >>
+> > >> I don't think so - another argument:
+> > >> Less code. As struct platform_device_id is a static array the space is
+> > >> allocated anyway. So it doesn't make any difference if driver_data is
+> > >> NULL or not. Later you just need to make an integer comparison instead
+> > >> of a call to a strcmp(), if you have a switch/case and IMX*_UDC is an
+> > >> enum, the compiler will warn you if you've missed an IMX variant.
+> > > 
+> > > fair enough, but then don't create a different enum value for each imx
+> > > instance if they're mostly the same. Differentiate only what's actually
+> > > different.
 > > 
-> > You don't need to do any of this (and, therefore, I don't think you even
-> > need the first patch.)
+> > Usually there isn't any Changelog between IP cores used in the different
+> > fsl processors (at least available outside of fsl), that makes it quite
+> > difficult to say if something found on one imx is really the same as on
+> > the other one. And they (usually) don't provide any versioning
+> > information in a register or the documentation.
 > > 
-> > The generic boot code will set CPU0 as possible, present and online.  Think
-> > about it: you're booting on that very CPU so it better be possible, present
-> > and online.  If it isn't, what CPU is executing your code?
-> > 
-> > arm_dt_init_cpu_maps() will only ever set _additional_ CPUs in the possible
-> > map.
-> > 
-> > Ergo, by the time the above code is run, CPU0 will already be marked as
-> > possible.  Therefore, the above code and arm_dt_cpu_map_valid() is not
-> > required.
+> > just my 2?
 > 
-> Right.
-> 
-> In Tegra, we've decided to not use SCU based detection at all any more
-> and to continue with a single core even when DT cpu detection
-> fails. For Tegra, "arm_dt_cpu_map_valid()" is not necessary. For other
-> SoCs, this would be necessary when they want to detect again with
-> SCU.
+> $SUBJECT is trying to differentiate a single feature (or maybe two) to
+> replace cpu_is_xxx(), then expose that on driver_data without creating
+> one enum value for each release from fsl.
 
-Correct. I will keep my patch around and repost it if and when we want other
-platforms to rely on legacy HW number of cores count discovery.
+Felipe, every one or two SoCs may have their special operations for
+integrate PHY interface, clk operation, or workaround for IC limitation.
 
-Given that's going to be temporary legacy code anyway, I hope we won't need it
-at all.
+Maybe, it will add more future or SoCs (maybe not for this driver)
+in the future, using enum is easier than string comparison for expanding something.
+> 
+> -- 
+> balbi
 
-Lorenzo
+
+
+-- 
+
+Best Regards,
+Peter Chen
