@@ -1,103 +1,39 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 15 Jan 2013 09:35:36 -0500
-Subject: [PATCH] ARM: KVM: avoid add/sub on vcpu pointer
-In-Reply-To: <1358248829-13764-1-git-send-email-marc.zyngier@arm.com>
-References: <1358248829-13764-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CANM98qLGKWaDu0jbTecqBrCabDRbZZtzjUbXAy0tBBvzmsSXCQ@mail.gmail.com>
+From: kishon@ti.com (kishon)
+Date: Tue, 15 Jan 2013 20:09:22 +0530
+Subject: [RFC PATCH 0/7] usb: musb: add driver for control module
+In-Reply-To: <201301151341.08297.arnd@arndb.de>
+References: <1358239378-10030-1-git-send-email-kishon@ti.com>
+ <201301151341.08297.arnd@arndb.de>
+Message-ID: <50F56A1A.3040504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 6:20 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Doing arithmetic on the vcpu pointer can be avoided by using
-> another register as a base. Saves a few instructions on the
-> switch path.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/interrupts_head.S | 32 ++++++++++++++------------------
->  1 file changed, 14 insertions(+), 18 deletions(-)
->
-> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> index 0e423be..d2442f9 100644
-> --- a/arch/arm/kvm/interrupts_head.S
-> +++ b/arch/arm/kvm/interrupts_head.S
-> @@ -264,11 +264,10 @@ vcpu      .req    r0              @ vcpu pointer always in r0
->         str     r3, [vcpu, #CP15_OFFSET(c1_CPACR)]
->         str     r4, [vcpu, #CP15_OFFSET(c2_TTBCR)]
->         str     r5, [vcpu, #CP15_OFFSET(c3_DACR)]
-> -       add     vcpu, vcpu, #CP15_OFFSET(c2_TTBR0)
-> -       strd    r6, r7, [vcpu]
-> -       add     vcpu, vcpu, #CP15_OFFSET(c2_TTBR1) - CP15_OFFSET(c2_TTBR0)
-> -       strd    r8, r9, [vcpu]
-> -       sub     vcpu, vcpu, #CP15_OFFSET(c2_TTBR1)
-> +       add     r2, vcpu, #CP15_OFFSET(c2_TTBR0)
-> +       strd    r6, r7, [r2]
-> +       add     r2, vcpu, #CP15_OFFSET(c2_TTBR1)
-> +       strd    r8, r9, [r2]
->         str     r10, [vcpu, #CP15_OFFSET(c10_PRRR)]
->         str     r11, [vcpu, #CP15_OFFSET(c10_NMRR)]
->         str     r12, [vcpu, #CP15_OFFSET(c0_CSSELR)]
-> @@ -362,11 +361,10 @@ vcpu      .req    r0              @ vcpu pointer always in r0
->         ldr     r3, [vcpu, #CP15_OFFSET(c1_CPACR)]
->         ldr     r4, [vcpu, #CP15_OFFSET(c2_TTBCR)]
->         ldr     r5, [vcpu, #CP15_OFFSET(c3_DACR)]
-> -       add     vcpu, vcpu, #CP15_OFFSET(c2_TTBR0)
-> -       ldrd    r6, r7, [vcpu]
-> -       add     vcpu, vcpu, #CP15_OFFSET(c2_TTBR1) - CP15_OFFSET(c2_TTBR0)
-> -       ldrd    r8, r9, [vcpu]
-> -       sub     vcpu, vcpu, #CP15_OFFSET(c2_TTBR1)
-> +       add     r12, vcpu, #CP15_OFFSET(c2_TTBR0)
-> +       ldrd    r6, r7, [r12]
-> +       add     r12, vcpu, #CP15_OFFSET(c2_TTBR1)
-> +       ldrd    r8, r9, [r12]
->         ldr     r10, [vcpu, #CP15_OFFSET(c10_PRRR)]
->         ldr     r11, [vcpu, #CP15_OFFSET(c10_NMRR)]
->         ldr     r12, [vcpu, #CP15_OFFSET(c0_CSSELR)]
-> @@ -479,7 +477,7 @@ vcpu        .req    r0              @ vcpu pointer always in r0
->   * for the host.
->   *
->   * Assumes vcpu pointer in vcpu reg
-> - * Clobbers r2-r4
-> + * Clobbers r2-r5
->   */
->  .macro save_timer_state
->  #ifdef CONFIG_KVM_ARM_TIMER
-> @@ -496,9 +494,8 @@ vcpu        .req    r0              @ vcpu pointer always in r0
->
->         mrrc    p15, 3, r2, r3, c14     @ CNTV_CVAL
->         ldr     r4, =VCPU_TIMER_CNTV_CVAL
-> -       add     vcpu, vcpu, r4
-> -       strd    r2, r3, [vcpu]
-> -       sub     vcpu, vcpu, r4
-> +       add     r5, vcpu, r4
-> +       strd    r2, r3, [r5]
->
->  1:
->  #endif
-> @@ -513,7 +510,7 @@ vcpu        .req    r0              @ vcpu pointer always in r0
->   * for the host.
->   *
->   * Assumes vcpu pointer in vcpu reg
-> - * Clobbers r2-r4
-> + * Clobbers r2-r5
->   */
->  .macro restore_timer_state
->         @ Disallow physical timer access for the guest
-> @@ -534,9 +531,8 @@ vcpu        .req    r0              @ vcpu pointer always in r0
->         mcrr    p15, 4, r2, r3, c14     @ CNTVOFF
->
->         ldr     r4, =VCPU_TIMER_CNTV_CVAL
-> -       add     vcpu, vcpu, r4
-> -       ldrd    r2, r3, [vcpu]
-> -       sub     vcpu, vcpu, r4
-> +       add     r5, vcpu, r4
-> +       ldrd    r2, r3, [r5]
->         mcrr    p15, 3, r2, r3, c14     @ CNTV_CVAL
->         isb
->
-> --
-> 1.8.1
->
-much nicer, thanks.
+Hi Arnd,
 
--Christoffer
+On Tuesday 15 January 2013 07:11 PM, Arnd Bergmann wrote:
+> On Tuesday 15 January 2013, Kishon Vijay Abraham I wrote:
+>> Added a new driver for the usb part of control module. This has an API
+>> to power on the USB2 phy and an API to write to the mailbox depending on
+>> whether MUSB has to act in host mode or in device mode.
+>>
+>> Writing to control module registers for doing the above task which was
+>> previously done in omap glue and in omap-usb2 phy is removed.
+>>
+>> Also added the dt data to get MUSB working in OMAP platforms.
+>> This series has patches for both drivers and ARCH folders, so If it has to
+>> be split I'll do it.
+>>
+>
+> The series looks good to me, I just had a minor comment on one patch.
+>
+> One a somewhat related topic, I wonder whether there are any plans
+> on your side to change this driver to support multiple bus glues
+> to be built for one kernel image. With a multiplatform kernel, we
+> may need all of TUSB6010/OMAP2PLUS/DSPS/UX500 for instance.
+
+We don't have plans as of now. I actually don't expect any changes in 
+the driver other than the Kconfig changes. Anyways the probe of glue's 
+other than the platform it's running won't get called. right Felipe?
+
+Thanks
+Kishon
