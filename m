@@ -1,65 +1,47 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 14 Jan 2013 17:40:28 -0800
-Subject: [PATCH v2] hardlockup: detect hard lockups without NMIs using
- secondary cpus
-In-Reply-To: <CAMbhsRR29Zhje9mGtUwHfUsX+eFsggYkVMHPyQ+zgrGUp_rqTQ@mail.gmail.com>
-References: <1357941108-14138-1-git-send-email-ccross@android.com>
- <20130114154914.6d69eb27.akpm@linux-foundation.org>
- <CAMbhsRR29Zhje9mGtUwHfUsX+eFsggYkVMHPyQ+zgrGUp_rqTQ@mail.gmail.com>
-Message-ID: <CAMbhsRQ9orwuHYo4CwFUYnBqSyTnQX458xCr9xJfwc2Y2WVmVw@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 15 Jan 2013 09:43:45 +0800
+Subject: [PATCH] clk: prima2: enable dt-binding clkdev mapping
+In-Reply-To: <20130114215259.23734.68185@quantum>
+References: <1355993491-21233-1-git-send-email-Barry.Song@csr.com>
+ <20130114215259.23734.68185@quantum>
+Message-ID: <CAGsJ_4wMsFk2EKuXtH5=+PJUSJrcg-tPJFU2bvbYvH_J8BEHJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 4:19 PM, Colin Cross <ccross@android.com> wrote:
-> On Mon, Jan 14, 2013 at 3:49 PM, Andrew Morton
-> <akpm@linux-foundation.org> wrote:
->> On Fri, 11 Jan 2013 13:51:48 -0800
->> Colin Cross <ccross@android.com> wrote:
->>
->>> Emulate NMIs on systems where they are not available by using timer
->>> interrupts on other cpus.  Each cpu will use its softlockup hrtimer
->>> to check that the next cpu is processing hrtimer interrupts by
->>> verifying that a counter is increasing.
->>
->> Seems sensible.
->>
->>> This patch is useful on systems where the hardlockup detector is not
->>> available due to a lack of NMIs, for example most ARM SoCs.
->>> Without this patch any cpu stuck with interrupts disabled can
->>> cause a hardware watchdog reset with no debugging information,
->>> but with this patch the kernel can detect the lockup and panic,
->>> which can result in useful debugging info.
->>
->> But we don't get the target cpu's stack, yes?  That's a pretty big loss.
->
-> It's a huge loss, but its still useful.  For one, it can separate
-> "linux locked up one cpu" bugs from "the whole cpu complex stopped
-> responding" bugs, which are much more common than you would hope on
-> ARM cpus.  Also, as a separate patch I'm hoping to add reading the
-> DBGPCSR register of both cpus during panic, which will at least give
-> you the PC of the cpu that is stuck.
->
->>>
->>> ...
->>>
->>> +#ifdef CONFIG_HARDLOCKUP_DETECTOR_OTHER_CPU
->>> +static unsigned int watchdog_next_cpu(unsigned int cpu)
->>> +{
->>> +     cpumask_t cpus = watchdog_cpus;
->>
->> cpumask_t can be tremendously huge and putting one on the stack is
->> risky.  Can we use watchdog_cpus directly here?  Perhaps with a lock?
->> or take a copy into a static local, with a lock?
->
-> Sure, I can use a lock around it.  I'm used to very small numbers of cpus.
->
+Hi Mike,
 
-On second thought, I'm just going to remove the local copy and read
-the global directly.  watchdog_cpus is updated with atomic bitmask
-operations, so there is no erroneous value that could be returned when
-referencing the global directly that couldn't also occur with a
-slightly different order of updates.  The local copy is also not
-completely atomic, since the bitmask could span multiple words.  All
-intermediate values during multiple sequential updates should already
-be handled by setting watchdog_nmi_touch on the appropriate cpus
-during watchdog_nmi_enable and watchdog_nmi_disable.
+2013/1/15 Mike Turquette <mturquette@linaro.org>:
+> Quoting Barry Song (2012-12-20 00:51:31)
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> this patche deletes hard code that registers clkdev by things like:
+>> clk_register_clkdev(clk, NULL, "b0030000.nand");
+>> clk_register_clkdev(clk, NULL, "b0040000.audio");
+>> clk_register_clkdev(clk, NULL, "b0080000.usp");
+>> prima2 clock controller becomes a clock provider and  every dt node
+>> just declares its clock sources by dt prop.
+>>
+>> it also makes us easier to extend this driver to support both prima2
+>> and marco as marco has different address mapping with prima2.
+>>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>
+> Barry,
+>
+> The changes to clk-prima2.c look OK to me.  Did you want me to take this
+> patch through clk-next?
+
+yes. since it has no conflict with what i am handling in my machine codes.
+
+>
+> Thanks,
+> Mike
+>
+>> ---
+>>  .../devicetree/bindings/clock/prima2-clock.txt     |   73 +++++++
+>>  arch/arm/boot/dts/prima2.dtsi                      |   31 +++-
+>>  drivers/clk/clk-prima2.c                           |  205 ++++++++------------
+>>  3 files changed, 183 insertions(+), 126 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/prima2-clock.txt
+
+-barry
