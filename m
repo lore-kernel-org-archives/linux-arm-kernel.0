@@ -1,104 +1,51 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 15 Jan 2013 09:32:25 +0200
-Subject: OMAP baseline test results for v3.8-rc3
-In-Reply-To: <20130114224222.GC18224@blackmetal.musicnaut.iki.fi>
-References: <alpine.DEB.2.00.1301141756460.20390@utopia.booyaka.com>
- <20130114184018.GA18224@blackmetal.musicnaut.iki.fi>
- <20130114191459.GA9402@arwen.pp.htv.fi>
- <20130114204654.GB18224@blackmetal.musicnaut.iki.fi>
- <20130114211846.GA10699@arwen.pp.htv.fi>
- <20130114224222.GC18224@blackmetal.musicnaut.iki.fi>
-Message-ID: <20130115073225.GB14505@arwen.pp.htv.fi>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Tue, 15 Jan 2013 13:34:41 +0530
+Subject: [PATCH] ARM: davinci: da850 evm: pass platform data for adv7343
+ encoder
+Message-ID: <1358237081-2584-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Without this patch the adv7343 encoder was being set to default
+configuration which caused display not to work on this board.
+This patch passes the necessary platform data required for adv7343
+encoder to work on da850 evm.
 
-On Tue, Jan 15, 2013 at 12:42:22AM +0200, Aaro Koskinen wrote:
-> On Mon, Jan 14, 2013 at 11:18:46PM +0200, Felipe Balbi wrote:
-> > On Mon, Jan 14, 2013 at 10:46:54PM +0200, Aaro Koskinen wrote:
-> > > [    0.207946] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
-> > > [    0.208129] twl 1-0048: power (irq 343) chaining IRQs 346..353
-> > > [    0.209350] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
-> > > [    1.218749] omap_i2c omap_i2c.1: timeout waiting for bus ready
-> > > [    1.218811] omap_i2c omap_i2c.1: SA 0049 CON 9602 CNT 0004
-> > 
-> > here's the issue, there is unloaded data in the FIFO. Can you enable
-> > full I2C debugging logs ?
-> 
-> If I enable I2C DEBUGs, the problem is not reproducible. Everything
-> looks normal:
-> 
-> [    0.270141] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
-> [    0.270294] twl 1-0048: power (irq 343) chaining IRQs 346..353
-> [    0.270477] i2c i2c-1: master_xfer[0] W, addr=0x49, len=1
-> [    0.270538] i2c i2c-1: master_xfer[1] R, addr=0x49, len=1
-> [    0.270568] omap_i2c omap_i2c.1: addr: 0x0049, len: 1, flags: 0x0, stop: 0
-> [    0.270629] omap_i2c omap_i2c.1: IRQ (ISR = 0x0010)
-> [    0.270690] omap_i2c omap_i2c.1: IRQ (ISR = 0x0004)
-> [    0.270751] omap_i2c omap_i2c.1: addr: 0x0049, len: 1, flags: 0x1, stop: 1
-> [    0.270843] omap_i2c omap_i2c.1: IRQ (ISR = 0x0008)
-> [    0.270874] omap_i2c omap_i2c.1: IRQ (ISR = 0x0004)
-> [    0.270935] i2c i2c-1: master_xfer[0] W, addr=0x49, len=2
-> [    0.270965] omap_i2c omap_i2c.1: addr: 0x0049, len: 2, flags: 0x0, stop: 1
-> [    0.271026] omap_i2c omap_i2c.1: IRQ (ISR = 0x0010)
-> [    0.271118] omap_i2c omap_i2c.1: IRQ (ISR = 0x0004)
-> [    0.272155] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
+Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+---
+ This patch is dependent on http://patchwork.linuxtv.org/patch/16272/
 
-still another race ? I'll look into it.
+ arch/arm/mach-davinci/board-da850-evm.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-> > > >   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git i2c-deferred-STP
-> > > 
-> > > I could not reproduce the issue with these. Tested around 20 boots.
-> > > There's a noticeable delay (over 4 secs!) around where I2C is initialized
-> > > and used for the first time, but no errors and the boot completes:
-> > > 
-> > > [    0.187530] SCSI subsystem initialized
-> > > [    0.188110] usbcore: registered new interface driver usbfs
-> > > [    0.188415] usbcore: registered new interface driver hub
-> > > [    0.188781] usbcore: registered new device driver usb
-> > > [    0.189453] musb-omap2430 musb-omap2430: invalid resource
-> > > [    4.296905] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
-> > > [    4.297088] twl 1-0048: power (irq 343) chaining IRQs 346..353
-> > > [    4.329010] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
-> > > [    4.470123] VUSB1V5: 1500 mV normal standby
-> > > [    4.470916] VUSB1V8: 1800 mV normal standby
-> > 
-> > cool, at least it works, but looks like there is something still weird
-> > going on. Can you enable full logs so I see what's happening ?
-> 
-> With your patches, all DEBUG logs are identical (there is same
-> amount I2C of transfers), except there is only a single interrupt per
-> transfer. Still, the transfers are taking considerably longer, and we
-> see those delays in the boot:
-> 
-> [    4.281280] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
-> [    4.281433] twl 1-0048: power (irq 343) chaining IRQs 346..353
-> [    4.281616] i2c i2c-1: master_xfer[0] W, addr=0x49, len=1
-> [    4.281677] i2c i2c-1: master_xfer[1] R, addr=0x49, len=1
-> [    4.281707] omap_i2c omap_i2c.1: addr: 0x0049, len: 1, flags: 0x0, stop: 0
-> [    4.281799] omap_i2c omap_i2c.1: IRQ (ISR = 0x0010)
-> [    4.281829] omap_i2c omap_i2c.1: addr: 0x0049, len: 1, flags: 0x1, stop: 1
-> [    4.281921] omap_i2c omap_i2c.1: IRQ (ISR = 0x0008)
-> [    4.296905] i2c i2c-1: master_xfer[0] W, addr=0x49, len=2
-> [    4.296936] omap_i2c omap_i2c.1: addr: 0x0049, len: 2, flags: 0x0, stop: 1
-> [    4.296997] omap_i2c omap_i2c.1: IRQ (ISR = 0x0010)
-> [    4.313476] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
-> 
-> This log excerpt has only 3 transfers, but the time duration is already
-> 10x longer compared to vanilla 3.8-rc3.
-
-weird, there's nothing extremely expensive added by my patchset, I'll go
-over them and try to figure out what's going on.
-
-Thanks for notifying me about it.
-
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 0299915..d0e3ec3 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -1256,11 +1256,24 @@ static struct vpif_capture_config da850_vpif_capture_config = {
+ };
+ 
+ /* VPIF display configuration */
++
++static struct adv7343_platform_data adv7343_pdata = {
++	.mode_config = {
++		.dac_3 = 1,
++		.dac_2 = 1,
++		.dac_1 = 1,
++	},
++	.sd_config = {
++		.sd_dac_out1 = 1,
++	},
++};
++
+ static struct vpif_subdev_info da850_vpif_subdev[] = {
+ 	{
+ 		.name = "adv7343",
+ 		.board_info = {
+ 			I2C_BOARD_INFO("adv7343", 0x2a),
++			.platform_data = &adv7343_pdata,
+ 		},
+ 	},
+ };
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130115/263fe819/attachment-0001.sig>
+1.7.4.1
