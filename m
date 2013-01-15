@@ -1,58 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 14 Jan 2013 21:26:50 -0700
-Subject: [PATCH] ARM: bcm2835: fix clock node aliasing in device tree
-Message-ID: <1358224010-6619-1-git-send-email-swarren@wwwdotorg.org>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 15 Jan 2013 17:53:03 +1300
+Subject: [PATCH] timer: vt8500: Move timer code to drivers/clocksource
+In-Reply-To: <50F433A9.8020105@wwwdotorg.org>
+References: <1358140171-25390-1-git-send-email-linux@prisktech.co.nz>
+ <1358140171-25390-2-git-send-email-linux@prisktech.co.nz>
+ <50F433A9.8020105@wwwdotorg.org>
+Message-ID: <1358225583.5576.1.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both clock nodes in the current device tree are named "clock" and hence
-end up being the same node. Rename the nodes to different names to avoid
-this. In fact, fixed-clock uses the node name as the clock name, so name
-the nodes after the clock they represent. Move the clocks into a
-"clocks" sub-node to group them and avoid any possible naming conflicts
-with other nodes also named after the device type.
+On Mon, 2013-01-14 at 09:34 -0700, Stephen Warren wrote:
+> On 01/13/2013 10:09 PM, Tony Prisk wrote:
+> > This patch moves arch-vt8500/timer.c into drivers/clocksource and
+> > updates the necessary Kconfig/Makefile options.
+> 
+> > diff --git a/include/linux/vt8500_timer.h b/include/linux/vt8500_timer.h
+> 
+> > +#ifndef __VT8500_TIMER_H
+> > +#define __VT8500_TIMER_H
+> > +
+> > +#include <asm/mach/time.h>
+> > +
+> > +void vt8500_timer_init(void);
+> > +
+> > +#endif
+> 
+> Is VT8500 DT-only? If so, it'd be nice not to add this header, but
+> instead use CLOCKSOURCE_OF_DECLARE() inside the driver C file.
 
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
----
- arch/arm/boot/dts/bcm2835.dtsi |   26 +++++++++++++++++---------
- 1 file changed, 17 insertions(+), 9 deletions(-)
+Agreed - I didn't like the header when I added it but I didn't know of
+another way and based in on the sunxi code.
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index c69a591..4bf2a87 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -89,15 +89,23 @@
- 		};
- 	};
- 
--	clk_i2c: clock {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <150000000>;
--	};
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 
--	clk_mmc: clock {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <100000000>;
-+		clk_mmc: mmc {
-+			compatible = "fixed-clock";
-+			reg = <0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <100000000>;
-+		};
-+
-+		clk_i2c: i2c {
-+			compatible = "fixed-clock";
-+			reg = <1>;
-+			#clock-cells = <0>;
-+			clock-frequency = <150000000>;
-+		};
- 	};
- };
--- 
-1.7.10.4
+Unfortunately Olof already pulled it into arm-soc, so I will try get
+another patch done to undo it :)
+
+Regards
+Tony P
