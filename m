@@ -1,43 +1,38 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 14 Jan 2013 17:53:40 -0800
-Subject: [PATCH v2] hardlockup: detect hard lockups without NMIs using
- secondary cpus
-In-Reply-To: <CAFTL4hxnCn13PigcWjrcnSV9RAz5gSX-VtQk9J8HEbQco7jbbQ@mail.gmail.com>
-References: <1357941108-14138-1-git-send-email-ccross@android.com>
- <CAFTL4hzYkPCmkfqBafkTA5E_snkLoC_y3p9xwumj=L1xWAWK0g@mail.gmail.com>
- <CAMbhsRQv=ogNmkK=Np6JGM-iuG=aocqb_4aMBC6CW5mpkGvpmw@mail.gmail.com>
- <CAFTL4hxnCn13PigcWjrcnSV9RAz5gSX-VtQk9J8HEbQco7jbbQ@mail.gmail.com>
-Message-ID: <CAMbhsRQiK=rChiNdwM5M6t=1v_iKwYLhUn=HLW5kSkBzQdso8g@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 15 Jan 2013 10:29:32 +0800
+Subject: [PATCH v5 0/3] Fix the Build error for fsl_mxc_udc.c
+Message-ID: <1358216975-1404-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 4:25 PM, Frederic Weisbecker <fweisbec@gmail.com> wrote:
-> 2013/1/15 Colin Cross <ccross@android.com>:
->> On Mon, Jan 14, 2013 at 4:13 PM, Frederic Weisbecker <fweisbec@gmail.com> wrote:
->>> I believe this is pretty much what the RCU stall detector does
->>> already: checks for other CPUs being responsive. The only difference
->>> is on how it checks that. For RCU it's about checking for CPUs
->>> reporting quiescent states when requested to do so. In your case it's
->>> about ensuring the hrtimer interrupt is well handled.
->>>
->>> One thing you can do is to enqueue an RCU callback (cal_rcu()) every
->>> minute so you can force other CPUs to report quiescent states
->>> periodically and thus check for lockups.
->>
->> That's a good point, I'll take a look at using that.  A minute is too
->> long, some SoCs have maximum HW watchdog periods of under 30 seconds,
->> but a call_rcu every 10-20 seconds might be sufficient.
->
-> Sure. And you can tune CONFIG_RCU_CPU_STALL_TIMEOUT accordingly.
+Changes for v5:
+- Using strcmp to get specific SoC
+- Delete one cpu_is_mx35() as it has already pdata runtime check
 
-After considering this, I think the hrtimer watchdog is more useful.
-RCU stalls are not usually panic events, and I wouldn't want to add a
-panic on every RCU stall.  The lack of stack traces on the affected
-cpu makes a panic important.  I'm planning to add an ARM DBGPCSR panic
-handler, which will be able to dump the PC of a stuck cpu even if it
-is not responding to interrupts.  kexec or kgdb on panic might also
-allow some inspection of the stack on stuck cpu.
+Changes for v4:
+- Using pdev's struct resource to do ioremap
+- Add ioremap return value check
 
-Failing to process interrupts is a much more serious event than an RCU
-stall, and being able to detect them separately may be very valuable
-for debugging.
+Changes for v3:
+- Split the one big patch into three patches
+
+Changes for v2:
+- Add const for fsl_udc_devtype
+- Do ioremap for phy address at fsl-mxc-udc
+
+Peter Chen (3):
+  usb: fsl-mxc-udc: replace cpu_is_xxx() with platform_device_id
+  usb: fsl_mxc_udc: replace MX35_IO_ADDRESS to ioremap
+  ARM: i.MX clock: Change the connection-id for fsl-usb2-udc
+
+ arch/arm/mach-imx/clk-imx25.c                     |    6 +-
+ arch/arm/mach-imx/clk-imx27.c                     |    6 +-
+ arch/arm/mach-imx/clk-imx31.c                     |    6 +-
+ arch/arm/mach-imx/clk-imx35.c                     |    6 +-
+ arch/arm/mach-imx/clk-imx51-imx53.c               |    6 +-
+ arch/arm/mach-imx/devices/devices-common.h        |    1 +
+ arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c |   15 ++++---
+ drivers/usb/gadget/fsl_mxc_udc.c                  |   40 ++++++++++++------
+ drivers/usb/gadget/fsl_udc_core.c                 |   46 +++++++++++++--------
+ drivers/usb/gadget/fsl_usb2_udc.h                 |    5 +-
+ 10 files changed, 82 insertions(+), 55 deletions(-)
