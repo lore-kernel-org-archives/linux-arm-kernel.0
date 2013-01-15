@@ -1,30 +1,46 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 15 Jan 2013 17:59:05 +0530
-Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
- OMAP-L138 DSP
-In-Reply-To: <CAK=WgbbShpqxS7zrDs97HkjpyWq0xzW3b9KHLBBs_V3YzdJKiA@mail.gmail.com>
-References: <1357863807-380-1-git-send-email-rtivy@ti.com>
- <1357863807-380-7-git-send-email-rtivy@ti.com>
- <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
- <50F51E43.2090605@ti.com>
- <CAK=WgbbShpqxS7zrDs97HkjpyWq0xzW3b9KHLBBs_V3YzdJKiA@mail.gmail.com>
-Message-ID: <50F54B91.4030406@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 15 Jan 2013 07:33:07 -0500
+Subject: [PATCH 3/4] Enable ecc-mode selection in the driver
+In-Reply-To: <2d08c4c072fd4922a6056362adb96a455307d583.1358242644.git.s.peter@mpl.ch>
+References: <cover.1358242644.git.s.peter@mpl.ch>
+ <2d08c4c072fd4922a6056362adb96a455307d583.1358242644.git.s.peter@mpl.ch>
+Message-ID: <20130115123307.GA13433@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/15/2013 3:33 PM, Ohad Ben-Cohen wrote:
-> On Tue, Jan 15, 2013 at 11:15 AM, Sekhar Nori <nsekhar@ti.com> wrote:
->> Right, and platform data is not the way to achieve this.
-> 
-> How do you suggest to handle platforms with multiple different remote
-> processors (driven by the same driver) ?
-> 
-> Requiring the user to indicate the fw name for each processor is
-> somewhat error prone/cumbersome.
+Stefan,
 
-May be rproc_alloc() could auto-assign the firmware name to something
-like 'rproc%d-fw' if firmware name passed to it is NULL?
+This is a good-looking patch series, nice and small!  A few comments:
 
-Thanks,
-Sekhar
+On Tue, Jan 15, 2013 at 01:13:12PM +0100, Stefan Peter wrote:
+> In order to be able to use the ecc-mode, add the bch module to the default
+> settings for the kirwood boards and enable the activation in orin-nand.c
+
+s/orin-nand/orion-nand/
+
+> 
+> Signed-off-by: Stefan Peter <s.peter@mpl.ch>
+> ---
+> diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
+> index 93f3794..4a9d3f7 100644
+> --- a/arch/arm/configs/kirkwood_defconfig
+> +++ b/arch/arm/configs/kirkwood_defconfig
+> @@ -84,6 +84,7 @@ CONFIG_MTD_CFI_STAA=y
+>  CONFIG_MTD_PHYSMAP=y
+>  CONFIG_MTD_M25P80=y
+>  CONFIG_MTD_NAND=y
+> +CONFIG_MTD_NAND_ECC_BCH=y
+>  CONFIG_MTD_NAND_ORION=y
+>  CONFIG_BLK_DEV_LOOP=y
+>  # CONFIG_SCSI_PROC_FS is not set
+
+Please make the defconfig change a separate patch.
+
+As a general note (this series shouldn't be a problem), please sort the
+series so that you add the driver feature first, then enable it in
+defconfig, then use it in DT.  This way, a future bisection won't run
+into any nasty surprises, other than what they're looking for. ;-)
+
+thx,
+
+Jason.
