@@ -1,45 +1,56 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 15 Jan 2013 15:52:52 -0800
-Subject: [PATCH 2/4] clk: ux500: Ensure the FMSC clock is obtainable
-In-Reply-To: <1355937587-31730-2-git-send-email-lee.jones@linaro.org>
+Date: Tue, 15 Jan 2013 15:53:23 -0800
+Subject: [PATCH 3/4] clk: ux500: Provide an alias for the SMSC911x
+ Ethernet chip
+In-Reply-To: <20130109085636.GB31678@gmail.com>
 References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
- <1355937587-31730-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130115235252.23734.21408@quantum>
+ <1355937587-31730-3-git-send-email-lee.jones@linaro.org>
+ <20130109085636.GB31678@gmail.com>
+Message-ID: <20130115235323.23734.52234@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lee Jones (2012-12-19 09:19:45)
-> The FMSC clock is traditionally used for NAND flash devices when
-> used on the ux500 series platforms. This patch makes it searchable
-> during a clock-name search.
+Quoting Lee Jones (2013-01-09 00:56:36)
+> On Wed, 19 Dec 2012, Lee Jones wrote:
 > 
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > In the case of some of the ux500 platforms, an Ethernet chip is
+> > placed on an extended bus which is traditionally used as a NAND
+> > flash chip placeholder. The p3_pclk0 clock is used to control it,
+> > so we are required to provide and easy way to access it from the
+> > SMSC911x driver. We do this using an alias provided by this patch.
+> > 
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/clk/ux500/u8500_clk.c |    1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+> > index a601802..9d9add1 100644
+> > --- a/drivers/clk/ux500/u8500_clk.c
+> > +++ b/drivers/clk/ux500/u8500_clk.c
+> > @@ -325,6 +325,7 @@ void u8500_clk_init(void)
+> >       clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", U8500_CLKRST3_BASE,
+> >                               BIT(0), 0);
+> >       clk_register_clkdev(clk, "fsmc", NULL);
+> > +     clk_register_clkdev(clk, NULL, "smsc911x");
+> >  
+> >       clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", U8500_CLKRST3_BASE,
+> >                               BIT(1), 0);
+> > -- 
+> > 1.7.9.5
+> > 
+> 
+> I still need a maintiner Ack for this before I can push it.
+> 
+> Mike?
+> 
 
 Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Who do you want this series to go through?
-
-Regards,
-Mike
-
-> ---
->  drivers/clk/ux500/u8500_clk.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-> index 6b889a0..a601802 100644
-> --- a/drivers/clk/ux500/u8500_clk.c
-> +++ b/drivers/clk/ux500/u8500_clk.c
-> @@ -324,7 +324,7 @@ void u8500_clk_init(void)
->  
->         clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", U8500_CLKRST3_BASE,
->                                 BIT(0), 0);
-> -       clk_register_clkdev(clk, NULL, "fsmc");
-> +       clk_register_clkdev(clk, "fsmc", NULL);
->  
->         clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", U8500_CLKRST3_BASE,
->                                 BIT(1), 0);
 > -- 
-> 1.7.9.5
+> Lee Jones
+> Linaro ST-Ericsson Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
