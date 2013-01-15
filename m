@@ -1,25 +1,39 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 15 Jan 2013 12:03:26 +0200
-Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
- OMAP-L138 DSP
-In-Reply-To: <50F51E43.2090605@ti.com>
-References: <1357863807-380-1-git-send-email-rtivy@ti.com>
- <1357863807-380-7-git-send-email-rtivy@ti.com>
- <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
- <50F51E43.2090605@ti.com>
-Message-ID: <CAK=WgbbShpqxS7zrDs97HkjpyWq0xzW3b9KHLBBs_V3YzdJKiA@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 15 Jan 2013 06:54:29 -0300
+Subject: [PATCH 5/6] arm: mvebu: Enable USB controllers on Armada XP
+ OpenBlocks AX3-4 board
+In-Reply-To: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1358243670-11935-5-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 11:15 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> Right, and platform data is not the way to achieve this.
+Cc: Lior Amsalem <alior@marvell.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-How do you suggest to handle platforms with multiple different remote
-processors (driven by the same driver) ?
-
-Requiring the user to indicate the fw name for each processor is
-somewhat error prone/cumbersome.
-
-Thanks,
-Ohad.
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index b24644f..55f5b6f 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -127,5 +127,14 @@
+ 			nr-ports = <2>;
+ 			status = "okay";
+ 		};
++		usb at d0050000 {
++			status = "okay";
++		};
++		usb at d0051000 {
++			status = "okay";
++		};
++		usb at d0052000 {
++			status = "okay";
++		};
+ 	};
+ };
+-- 
+1.7.8.6
