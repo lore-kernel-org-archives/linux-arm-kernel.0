@@ -1,33 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Jan 2013 10:56:20 -0800
-Subject: [PATCH v8 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC
- timings and NAND
-In-Reply-To: <CALF0-+WpCc=291-thQz2=U_kBFztaq50j+U=Hm8C9ho3UZBejw@mail.gmail.com>
-References: <1355481404-27695-1-git-send-email-zonque@gmail.com>
- <1355481404-27695-6-git-send-email-zonque@gmail.com>
- <CALF0-+UbqFF17X1Ok1s1AGKg6SBmvMc1mvjVuZb=Ej7xo+qcmA@mail.gmail.com>
- <20130114180602.GV14149@atomide.com>
- <CACTFLAMT2-6VRkNSO3OF6X=afTYKRz=JcDkYqqyZ4VNT5xBVkw@mail.gmail.com>
- <20130115180324.GZ14149@atomide.com>
- <CALF0-+WpCc=291-thQz2=U_kBFztaq50j+U=Hm8C9ho3UZBejw@mail.gmail.com>
-Message-ID: <20130115185620.GC14149@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 15 Jan 2013 11:59:08 -0700
+Subject: [PATCH 1/3] ARM: DT: tegra: add DT entry for KBC controller
+In-Reply-To: <1357911185-11048-1-git-send-email-ldewangan@nvidia.com>
+References: <1357911185-11048-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <50F5A6FC.4090104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ezequiel Garcia <elezegarcia@gmail.com> [130115 10:13]:
-> On Tue, Jan 15, 2013 at 3:03 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Daniel Mack <zonque@gmail.com> [130114 15:30]:
-> >
-> > OK thanks. Applying this set into omap-for-v3.9/gpmc.
-
-Looks like we need ack from for one of the patches Artem before
-I can push them out, replied to that patch with Artem in Cc.
-
-> > Also sounds like Ezequiel needs to update his follow up patches accordingly.
-> >
+On 01/11/2013 06:33 AM, Laxman Dewangan wrote:
+> NVIDIA's Tegra SoCs have the matrix keyboard controller which
+> supports 16x8 type of matrix. The number of rows and columns
+> are configurable.
 > 
-> Ok, I'll do that anytime this week.
+> Add DT entry for KBC controller.
 
-OK thanks.
+Applied to Tegra's for-3.9/dt branch.
 
-Tony
+I added the required clocks property for this patch to work with
+Prashant's common clock framework port, although it's commented out so
+far, until the CCF rework is actually applied.
