@@ -1,32 +1,42 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Jan 2013 09:42:30 +0900
-Subject: shmobile and struct sys_timer removal conflicts
-In-Reply-To: <50F445E5.6010203@wwwdotorg.org>
-References: <50F445E5.6010203@wwwdotorg.org>
-Message-ID: <20130115004230.GZ7185@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 15 Jan 2013 09:49:30 +0900
+Subject: [GIT PULL v2] Renesas ARM-based SoC defconfig for v3.9
+Message-ID: <1358210975-26970-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 10:52:37AM -0700, Stephen Warren wrote:
-> Simon,
-> 
-> I notice that the following shmobile-related commits in next-20130114
-> add new ARM machine descriptors, but set the .timer field rather than
-> the new .init_time field. I believe the code in these commits won't
-> build in linux-next or Linux 3.9 once it's released:
-> 
-> a625586 ARM: mach-shmobile: kzm9g: Reference DT implementation
-> ac0876f ARM: shmobile: armadillo800eva: Reference DT implementation
-> be1fc65 ARM: shmobile: add a reference DT implementation for mackerel
-> 66f1162 ARM: mach-shmobile: sh73a0: Minimal setup using DT
-> 
-> In order to solve this problem, you'll need to adjust those changes
-> according to:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git timer/cleanup
-> 
-> (where "adjust" is probably "rebase on top of")
+Hi Olof, Hi Arnd,
 
-Hi Stephen,
+please consider the following defconfig enhancements for 3.9.
 
-thanks. I'll get this sorted out.
+----------------------------------------------------------------
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git 
+
+for you to fetch changes up to 8098df15c26b2bf16924df5a134d1a649692ab62:
+
+  ARM: mach-shmobile: kzm9d: update defconfig (2013-01-15 08:57:09 +0900)
+
+----------------------------------------------------------------
+Simon Horman (5):
+      ARM: mach-shmobile: mackerel: update defconfig
+      ARM: mach-shmobile: fix memory size for kota2_defconfig
+      ARM: mach-shmobile: kzm9g: defconfig update
+      ARM: mach-shmobile: armadillo: update defconfig
+      ARM: mach-shmobile: kzm9d: update defconfig
+
+ arch/arm/boot/dts/emev2-kzm9d.dts             |    2 +-
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    4 ++++
+ arch/arm/boot/dts/sh7372-mackerel.dts         |    4 ++++
+ arch/arm/boot/dts/sh73a0-kzm9g.dts            |    4 ++++
+ arch/arm/configs/armadillo800eva_defconfig    |    5 ++---
+ arch/arm/configs/kota2_defconfig              |    2 +-
+ arch/arm/configs/kzm9d_defconfig              |    4 +---
+ arch/arm/configs/kzm9g_defconfig              |    4 +++-
+ arch/arm/configs/mackerel_defconfig           |    2 +-
+ 9 files changed, 21 insertions(+), 10 deletions(-)
