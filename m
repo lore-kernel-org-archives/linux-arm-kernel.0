@@ -1,47 +1,43 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 15 Jan 2013 09:43:45 +0800
-Subject: [PATCH] clk: prima2: enable dt-binding clkdev mapping
-In-Reply-To: <20130114215259.23734.68185@quantum>
-References: <1355993491-21233-1-git-send-email-Barry.Song@csr.com>
- <20130114215259.23734.68185@quantum>
-Message-ID: <CAGsJ_4wMsFk2EKuXtH5=+PJUSJrcg-tPJFU2bvbYvH_J8BEHJQ@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 14 Jan 2013 17:53:40 -0800
+Subject: [PATCH v2] hardlockup: detect hard lockups without NMIs using
+ secondary cpus
+In-Reply-To: <CAFTL4hxnCn13PigcWjrcnSV9RAz5gSX-VtQk9J8HEbQco7jbbQ@mail.gmail.com>
+References: <1357941108-14138-1-git-send-email-ccross@android.com>
+ <CAFTL4hzYkPCmkfqBafkTA5E_snkLoC_y3p9xwumj=L1xWAWK0g@mail.gmail.com>
+ <CAMbhsRQv=ogNmkK=Np6JGM-iuG=aocqb_4aMBC6CW5mpkGvpmw@mail.gmail.com>
+ <CAFTL4hxnCn13PigcWjrcnSV9RAz5gSX-VtQk9J8HEbQco7jbbQ@mail.gmail.com>
+Message-ID: <CAMbhsRQiK=rChiNdwM5M6t=1v_iKwYLhUn=HLW5kSkBzQdso8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-2013/1/15 Mike Turquette <mturquette@linaro.org>:
-> Quoting Barry Song (2012-12-20 00:51:31)
->> From: Barry Song <Baohua.Song@csr.com>
+On Mon, Jan 14, 2013 at 4:25 PM, Frederic Weisbecker <fweisbec@gmail.com> wrote:
+> 2013/1/15 Colin Cross <ccross@android.com>:
+>> On Mon, Jan 14, 2013 at 4:13 PM, Frederic Weisbecker <fweisbec@gmail.com> wrote:
+>>> I believe this is pretty much what the RCU stall detector does
+>>> already: checks for other CPUs being responsive. The only difference
+>>> is on how it checks that. For RCU it's about checking for CPUs
+>>> reporting quiescent states when requested to do so. In your case it's
+>>> about ensuring the hrtimer interrupt is well handled.
+>>>
+>>> One thing you can do is to enqueue an RCU callback (cal_rcu()) every
+>>> minute so you can force other CPUs to report quiescent states
+>>> periodically and thus check for lockups.
 >>
->> this patche deletes hard code that registers clkdev by things like:
->> clk_register_clkdev(clk, NULL, "b0030000.nand");
->> clk_register_clkdev(clk, NULL, "b0040000.audio");
->> clk_register_clkdev(clk, NULL, "b0080000.usp");
->> prima2 clock controller becomes a clock provider and  every dt node
->> just declares its clock sources by dt prop.
->>
->> it also makes us easier to extend this driver to support both prima2
->> and marco as marco has different address mapping with prima2.
->>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> That's a good point, I'll take a look at using that.  A minute is too
+>> long, some SoCs have maximum HW watchdog periods of under 30 seconds,
+>> but a call_rcu every 10-20 seconds might be sufficient.
 >
-> Barry,
->
-> The changes to clk-prima2.c look OK to me.  Did you want me to take this
-> patch through clk-next?
+> Sure. And you can tune CONFIG_RCU_CPU_STALL_TIMEOUT accordingly.
 
-yes. since it has no conflict with what i am handling in my machine codes.
+After considering this, I think the hrtimer watchdog is more useful.
+RCU stalls are not usually panic events, and I wouldn't want to add a
+panic on every RCU stall.  The lack of stack traces on the affected
+cpu makes a panic important.  I'm planning to add an ARM DBGPCSR panic
+handler, which will be able to dump the PC of a stuck cpu even if it
+is not responding to interrupts.  kexec or kgdb on panic might also
+allow some inspection of the stack on stuck cpu.
 
->
-> Thanks,
-> Mike
->
->> ---
->>  .../devicetree/bindings/clock/prima2-clock.txt     |   73 +++++++
->>  arch/arm/boot/dts/prima2.dtsi                      |   31 +++-
->>  drivers/clk/clk-prima2.c                           |  205 ++++++++------------
->>  3 files changed, 183 insertions(+), 126 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/clock/prima2-clock.txt
-
--barry
+Failing to process interrupts is a much more serious event than an RCU
+stall, and being able to detect them separately may be very valuable
+for debugging.
