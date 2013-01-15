@@ -1,44 +1,46 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Jan 2013 17:45:28 +0000
-Subject: [PATCHv4 11/14] arm64: arm_generic: prevent reading stale time
+Date: Tue, 15 Jan 2013 17:45:30 +0000
+Subject: [PATCHv4 13/14] Documentation: Add ARMv8 to arch_timer devicetree
 In-Reply-To: <1358271931-7761-1-git-send-email-mark.rutland@arm.com>
 References: <1358271931-7761-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1358271931-7761-12-git-send-email-mark.rutland@arm.com>
+Message-ID: <1358271931-7761-14-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently arch_counter_get_cnt{p,v}ct can be speculated, allowing for
-stale time values to be read. This could be problematic for the delay
-loop and other sensitive functions, as the time delta could jump around
-unexpectedly.
+Currently the documentation for the arch_timer devicetree binding only
+lists "arm,armv7-timer".
 
-This patch adds isbs to arch_counter_get_cnt{p,v}ct, preventing this
-possibility.
+Add "arm,armv8-timer" to the list of compatible strings.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm64/include/asm/arm_generic.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/arm/arch_timer.txt         |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arm_generic.h b/arch/arm64/include/asm/arm_generic.h
-index df2aeb8..6ece2f1 100644
---- a/arch/arm64/include/asm/arm_generic.h
-+++ b/arch/arm64/include/asm/arm_generic.h
-@@ -83,6 +83,7 @@ static inline cycle_t arch_counter_get_cntpct(void)
- {
- 	cycle_t cval;
+diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+index 52478c8..20746e5 100644
+--- a/Documentation/devicetree/bindings/arm/arch_timer.txt
++++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+@@ -1,13 +1,14 @@
+ * ARM architected timer
  
-+	isb();
- 	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
+-ARM Cortex-A7 and Cortex-A15 have a per-core architected timer, which
+-provides per-cpu timers.
++ARM cores may have a per-core architected timer, which provides per-cpu timers.
  
- 	return cval;
-@@ -92,6 +93,7 @@ static inline cycle_t arch_counter_get_cntvct(void)
- {
- 	cycle_t cval;
+ The timer is attached to a GIC to deliver its per-processor interrupts.
  
-+	isb();
- 	asm volatile("mrs %0, cntvct_el0" : "=r" (cval));
+ ** Timer node properties:
  
- 	return cval;
+-- compatible : Should at least contain "arm,armv7-timer".
++- compatible : Should at least contain one of
++	"arm,armv7-timer"
++	"arm,armv8-timer"
+ 
+ - interrupts : Interrupt list for secure, non-secure, virtual and
+   hypervisor timers, in that order.
 -- 
 1.7.0.4
