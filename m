@@ -1,148 +1,96 @@
-From: achin.gupta@arm.com (Achin Gupta)
-Date: Tue, 15 Jan 2013 11:18:44 +0000
-Subject: [PATCH 06/16] ARM: b.L: generic SMP secondary bringup and hotplug
- support
-In-Reply-To: <50F4F807.3010806@ti.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-7-git-send-email-nicolas.pitre@linaro.org>
- <50F053BF.8090302@ti.com>
- <CAMpgmWCxQMoncnMqy_bzB+mBU7eGO_L4fR+Q5uMaxdFn4mL5PA@mail.gmail.com>
- <50F4F807.3010806@ti.com>
-Message-ID: <CAMpgmWCzCxwenDs7XPh7D+shEJcj_ObWcUGZG-xMtd15XL-3Vg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Jan 2013 11:20:29 +0000
+Subject: [PATCH] ARM: KVM: avoid add/sub on vcpu pointer
+Message-ID: <1358248829-13764-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+Doing arithmetic on the vcpu pointer can be avoided by using
+another register as a base. Saves a few instructions on the
+switch path.
 
-On Tue, Jan 15, 2013 at 6:32 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Monday 14 January 2013 11:35 PM, Achin Gupta wrote:
->>
->> Hi Santosh,
->>
->> On Fri, Jan 11, 2013 at 6:02 PM, Santosh Shilimkar
->> <santosh.shilimkar@ti.com> wrote:
->>>
->>> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
->>>>
->>>>
->>>> Now that the b.L power API is in place, we can use it for SMP secondary
->>>> bringup and CPU hotplug in a generic fashion.
->>>>
->>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->>>> ---
->>>>    arch/arm/common/Makefile     |  2 +-
->>>>    arch/arm/common/bL_platsmp.c | 79
->>>> ++++++++++++++++++++++++++++++++++++++++++++
->>>>    2 files changed, 80 insertions(+), 1 deletion(-)
->>>>    create mode 100644 arch/arm/common/bL_platsmp.c
->>>>
->>>> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
->>>> index 894c2ddf9b..59b36db7cc 100644
->>>> --- a/arch/arm/common/Makefile
->>>> +++ b/arch/arm/common/Makefile
->>>> @@ -15,4 +15,4 @@ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
->>>>    obj-$(CONFIG_ARM_TIMER_SP804) += timer-sp.o
->>>>    obj-$(CONFIG_FIQ_GLUE)                += fiq_glue.o fiq_glue_setup.o
->>>>    obj-$(CONFIG_FIQ_DEBUGGER)    += fiq_debugger.o
->>>> -obj-$(CONFIG_BIG_LITTLE)       += bL_head.o bL_entry.o vlock.o
->>>> +obj-$(CONFIG_BIG_LITTLE)       += bL_head.o bL_entry.o bL_platsmp.o
->>>> vlock.o
->>>> diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
->>>> new file mode 100644
->>>> index 0000000000..0acb9f4685
->>>> --- /dev/null
->>>> +++ b/arch/arm/common/bL_platsmp.c
->>>> @@ -0,0 +1,79 @@
->>>> +/*
->>>> + * linux/arch/arm/mach-vexpress/bL_platsmp.c
->>>> + *
->>>> + * Created by:  Nicolas Pitre, November 2012
->>>> + * Copyright:   (C) 2012  Linaro Limited
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License version 2 as
->>>> + * published by the Free Software Foundation.
->>>> + *
->>>> + * Code to handle secondary CPU bringup and hotplug for the bL power
->>>> API.
->>>> + */
->>>> +
->>>> +#include <linux/init.h>
->>>> +#include <linux/smp.h>
->>>> +
->>>> +#include <asm/bL_entry.h>
->>>> +#include <asm/smp_plat.h>
->>>> +#include <asm/hardware/gic.h>
->>>> +
->>>> +static void __init simple_smp_init_cpus(void)
->>>> +{
->>>> +       set_smp_cross_call(gic_raise_softirq);
->>>> +}
->>>> +
->>>> +static int __cpuinit bL_boot_secondary(unsigned int cpu, struct
->>>> task_struct *idle)
->>>> +{
->>>> +       unsigned int pcpu, pcluster, ret;
->>>> +       extern void secondary_startup(void);
->>>> +
->>>> +       pcpu = cpu_logical_map(cpu) & 0xff;
->>>> +       pcluster = (cpu_logical_map(cpu) >> 8) & 0xff;
->>>> +       pr_debug("%s: logical CPU %d is physical CPU %d cluster %d\n",
->>>> +                __func__, cpu, pcpu, pcluster);
->>>> +
->>>> +       bL_set_entry_vector(pcpu, pcluster, NULL);
->>>> +       ret = bL_cpu_power_up(pcpu, pcluster);
->>>> +       if (ret)
->>>> +               return ret;
->>>> +       bL_set_entry_vector(pcpu, pcluster, secondary_startup);
->>>> +       gic_raise_softirq(cpumask_of(cpu), 0);
->>>> +       sev();
->>>
->>>
->>> softirq() should be enough to break a CPU if it is in standby with
->>> wfe state. Is that additional sev() needed here ?
->>
->>
->> Not if the target cpu has its I & F bits disabled and that would be the
->> case with a secondary waiting to be woken up
->>
-> This is interesting since CPU is actually in standby state and this
-> was not my understanding so far. Your statement at least contradicts
-> the ARM ARM (B1.8.12 Wait For Interrupt)
-> -----------------------
-> The processor can remain in the WFI low-power state until it is reset, or it
-> detects one of the following WFI wake-up
-> events:
-> ? a physical IRQ interrupt, regardless of the value of the CPSR.I bit
-> ? a physical FIQ interrupt, regardless of the value of the CPSR.F bit
-> ----------------------------------
->
-> Are you referring to some new behavior on latest ARMv7 CPUs ?
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/interrupts_head.S | 32 ++++++++++++++------------------
+ 1 file changed, 14 insertions(+), 18 deletions(-)
 
-You are abs right about the 'wfi' behaviour. I was talking about the effect
-of interrupts on a cpu thats in 'wfe'.
-
-The power up process takes place in two steps. The first step involves
-sending an ipi which will either:
-
-a. cause the power controller to bring the processor out of reset
-b. cause the processor to exit from wfi (most probably in the bootloader code)
-
-The cpu then enters Linux (bL_entry_point) and after doing any cluster setup
-waits in 'wfe' if its 'bL_entry_vector' has not been set as yet. The
-'sev' is meant
-to poke the cpu once this has been done.
-
-Its not required in this case as we have already set 'bL_entry_vector' , issued
-a barrier & flushed the cache line. So if the incoming cpu sees a 0 in
-its vector
-then that would be a symptom of a different problem.
-
-Thanks,
-Achin
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 0e423be..d2442f9 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -264,11 +264,10 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	str	r3, [vcpu, #CP15_OFFSET(c1_CPACR)]
+ 	str	r4, [vcpu, #CP15_OFFSET(c2_TTBCR)]
+ 	str	r5, [vcpu, #CP15_OFFSET(c3_DACR)]
+-	add	vcpu, vcpu, #CP15_OFFSET(c2_TTBR0)
+-	strd	r6, r7, [vcpu]
+-	add	vcpu, vcpu, #CP15_OFFSET(c2_TTBR1) - CP15_OFFSET(c2_TTBR0)
+-	strd	r8, r9, [vcpu]
+-	sub	vcpu, vcpu, #CP15_OFFSET(c2_TTBR1)
++	add	r2, vcpu, #CP15_OFFSET(c2_TTBR0)
++	strd	r6, r7, [r2]
++	add	r2, vcpu, #CP15_OFFSET(c2_TTBR1)
++	strd	r8, r9, [r2]
+ 	str	r10, [vcpu, #CP15_OFFSET(c10_PRRR)]
+ 	str	r11, [vcpu, #CP15_OFFSET(c10_NMRR)]
+ 	str	r12, [vcpu, #CP15_OFFSET(c0_CSSELR)]
+@@ -362,11 +361,10 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	ldr	r3, [vcpu, #CP15_OFFSET(c1_CPACR)]
+ 	ldr	r4, [vcpu, #CP15_OFFSET(c2_TTBCR)]
+ 	ldr	r5, [vcpu, #CP15_OFFSET(c3_DACR)]
+-	add	vcpu, vcpu, #CP15_OFFSET(c2_TTBR0)
+-	ldrd	r6, r7, [vcpu]
+-	add	vcpu, vcpu, #CP15_OFFSET(c2_TTBR1) - CP15_OFFSET(c2_TTBR0)
+-	ldrd	r8, r9, [vcpu]
+-	sub	vcpu, vcpu, #CP15_OFFSET(c2_TTBR1)
++	add	r12, vcpu, #CP15_OFFSET(c2_TTBR0)
++	ldrd	r6, r7, [r12]
++	add	r12, vcpu, #CP15_OFFSET(c2_TTBR1)
++	ldrd	r8, r9, [r12]
+ 	ldr	r10, [vcpu, #CP15_OFFSET(c10_PRRR)]
+ 	ldr	r11, [vcpu, #CP15_OFFSET(c10_NMRR)]
+ 	ldr	r12, [vcpu, #CP15_OFFSET(c0_CSSELR)]
+@@ -479,7 +477,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  * for the host.
+  *
+  * Assumes vcpu pointer in vcpu reg
+- * Clobbers r2-r4
++ * Clobbers r2-r5
+  */
+ .macro save_timer_state
+ #ifdef CONFIG_KVM_ARM_TIMER
+@@ -496,9 +494,8 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 
+ 	mrrc	p15, 3, r2, r3, c14	@ CNTV_CVAL
+ 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
+-	add	vcpu, vcpu, r4
+-	strd	r2, r3, [vcpu]
+-	sub	vcpu, vcpu, r4
++	add	r5, vcpu, r4
++	strd	r2, r3, [r5]
+ 
+ 1:
+ #endif
+@@ -513,7 +510,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  * for the host.
+  *
+  * Assumes vcpu pointer in vcpu reg
+- * Clobbers r2-r4
++ * Clobbers r2-r5
+  */
+ .macro restore_timer_state
+ 	@ Disallow physical timer access for the guest
+@@ -534,9 +531,8 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
+ 
+ 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
+-	add	vcpu, vcpu, r4
+-	ldrd	r2, r3, [vcpu]
+-	sub	vcpu, vcpu, r4
++	add	r5, vcpu, r4
++	ldrd	r2, r3, [r5]
+ 	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
+ 	isb
+ 
+-- 
+1.8.1
