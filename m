@@ -1,125 +1,62 @@
 From: mporter@ti.com (Matt Porter)
-Date: Tue, 15 Jan 2013 15:32:51 -0500
-Subject: [PATCH v5 11/14] ARM: dts: add AM33XX MMC support
+Date: Tue, 15 Jan 2013 15:32:53 -0500
+Subject: [PATCH v5 13/14] spi: omap2-mcspi: add generic DMA request support to
+ the DT binding
 In-Reply-To: <1358281974-8411-1-git-send-email-mporter@ti.com>
 References: <1358281974-8411-1-git-send-email-mporter@ti.com>
-Message-ID: <1358281974-8411-12-git-send-email-mporter@ti.com>
+Message-ID: <1358281974-8411-14-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds AM33XX MMC support for am335x-bone, am335x-evm, and
-am335x-evmsk.
+The binding definition is based on the generic DMA request binding.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/am335x-bone.dts  |    7 +++++++
- arch/arm/boot/dts/am335x-evm.dts   |    7 +++++++
- arch/arm/boot/dts/am335x-evmsk.dts |    7 +++++++
- arch/arm/boot/dts/am33xx.dtsi      |   28 ++++++++++++++++++++++++++++
- 4 files changed, 49 insertions(+)
+ Documentation/devicetree/bindings/spi/omap-spi.txt |   28 +++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 11b240c..a154ce0 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -120,6 +120,8 @@
- 		};
+diff --git a/Documentation/devicetree/bindings/spi/omap-spi.txt b/Documentation/devicetree/bindings/spi/omap-spi.txt
+index 938809c..3bd8eed 100644
+--- a/Documentation/devicetree/bindings/spi/omap-spi.txt
++++ b/Documentation/devicetree/bindings/spi/omap-spi.txt
+@@ -10,7 +10,18 @@ Required properties:
+ 			  input. The default is D0 as input and
+ 			  D1 as output.
  
- 		ldo3_reg: regulator at 5 {
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
- 		};
+-Example:
++Optional properties:
++- dmas: List of DMA controller phandle and DMA request ordered
++	pairs. One tx and one rx pair is required for each chip
++	select.
++- dma-names: List of DMA request names. These strings correspond
++	1:1 with the ordered pairs in dmas. The string naming is
++	to be "rxN" and "txN" for RX and TX requests,
++	respectively, where N equals the chip select number.
++
++Examples:
++
++[hwmod populated DMA resources]
  
-@@ -136,3 +138,8 @@
- &cpsw_emac1 {
- 	phy_id = <&davinci_mdio>, <1>;
+ mcspi1: mcspi at 1 {
+     #address-cells = <1>;
+@@ -20,3 +31,18 @@ mcspi1: mcspi at 1 {
+     ti,spi-num-cs = <4>;
  };
-+
-+&mmc1 {
-+	status = "okay";
-+	vmmc-supply = <&ldo3_reg>;
-+};
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index d649644..2907da6 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -232,6 +232,8 @@
- 		};
  
- 		vmmc_reg: regulator at 12 {
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
- 		};
- 	};
-@@ -244,3 +246,8 @@
- &cpsw_emac1 {
- 	phy_id = <&davinci_mdio>, <1>;
- };
++[generic DMA request binding]
 +
-+&mmc1 {
-+	status = "okay";
-+	vmmc-supply = <&vmmc_reg>;
++mcspi1: mcspi at 1 {
++    #address-cells = <1>;
++    #size-cells = <0>;
++    compatible = "ti,omap4-mcspi";
++    ti,hwmods = "mcspi1";
++    ti,spi-num-cs = <2>;
++    dmas = <&edma 42
++	    &edma 43
++	    &edma 44
++	    &edma 45>;
++    dma-names = "tx0", "rx0", "tx1", "rx1";
 +};
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index f5a6162..f050c46 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -244,7 +244,14 @@
- 		};
- 
- 		vmmc_reg: regulator at 12 {
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
- 		};
- 	};
- };
 +
-+&mmc1 {
-+	status = "okay";
-+	vmmc-supply = <&vmmc_reg>;
-+};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index e711ffb..278b75d 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -235,6 +235,34 @@
- 			status = "disabled";
- 		};
- 
-+		mmc1: mmc at 48060000 {
-+			compatible = "ti,omap3-hsmmc";
-+			ti,hwmods = "mmc1";
-+			ti,dual-volt;
-+			ti,needs-special-reset;
-+			dmas = <&edma 24
-+				&edma 25>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
-+
-+		mmc2: mmc at 481d8000 {
-+			compatible = "ti,omap3-hsmmc";
-+			ti,hwmods = "mmc2";
-+			ti,needs-special-reset;
-+			dmas = <&edma 2
-+				&edma 3>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
-+
-+		mmc3: mmc at 47810000 {
-+			compatible = "ti,omap3-hsmmc";
-+			ti,hwmods = "mmc3";
-+			ti,needs-special-reset;
-+			status = "disabled";
-+		};
-+
- 		wdt2: wdt at 44e35000 {
- 			compatible = "ti,omap3-wdt";
- 			ti,hwmods = "wd_timer2";
 -- 
 1.7.9.5
