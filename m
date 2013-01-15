@@ -1,37 +1,104 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 15 Jan 2013 12:55:44 +0000
-Subject: [PATCH 04/26] mfd: ab8500-sysctrl.c: Provide charging as reset reason
+Date: Tue, 15 Jan 2013 12:55:46 +0000
+Subject: [PATCH 06/26] mfd: ab8500-sysctrl: Provide configuration for
+ SysClkReqRfClkBuf registers
 In-Reply-To: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
 References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1358254566-12419-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1358254566-12419-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Aaberg <jonas.aberg@stericsson.com>
+From: Kennet Wallden <kennet.wallden@stericsson.com>
 
-It's possible to supply a string to provide a reason for
-triggering a restart. In this case our reason is to enter
-charging-only mode, as a charger was found to be present.
+Add the possibility to pass configuration settings for
+SysCl1kReqRfClkBuf to SysClk8ReqRfClkBuf via platform data.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-Reviewed-by: Karl KOMIEROWSKI <karl.komierowski@stericsson.com>
+Signed-off-by: Kennet Wallden <kennet.wallden@stericsson.com>
+Reviewed-by: Karl-Johan PERNTZ <karl-johan.perntz@stericsson.com>
+Reviewed-by: Bengt JONSSON <bengt.g.jonsson@stericsson.com>
 ---
- drivers/mfd/ab8500-sysctrl.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mfd/ab8500-sysctrl.c              |   25 +++++++++++++++++++++++++
+ include/linux/mfd/abx500/ab8500-sysctrl.h |    5 +++++
+ include/linux/mfd/abx500/ab8500.h         |    2 ++
+ 3 files changed, 32 insertions(+)
 
 diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-index 26216e7..cf58f69 100644
+index cf58f69..19a024e 100644
 --- a/drivers/mfd/ab8500-sysctrl.c
 +++ b/drivers/mfd/ab8500-sysctrl.c
-@@ -59,7 +59,7 @@ void ab8500_power_off(void)
- 			       "Charger \"%s\" is connected with known battery."
- 			       " Rebooting.\n",
- 			       pss[i]);
--			machine_restart(NULL);
-+			machine_restart("charging");
- 		}
- 	}
+@@ -113,11 +113,36 @@ int ab8500_sysctrl_write(u16 reg, u8 mask, u8 value)
+ static int __devinit ab8500_sysctrl_probe(struct platform_device *pdev)
+ {
+ 	struct ab8500_platform_data *plat;
++	struct ab8500_sysctrl_platform_data *pdata;
  
+ 	sysctrl_dev = &pdev->dev;
+ 	plat = dev_get_platdata(pdev->dev.parent);
+ 	if (plat->pm_power_off)
+ 		pm_power_off = ab8500_power_off;
++
++	pdata = plat->sysctrl;
++
++	if (pdata) {
++		int ret;
++		int i;
++		int j;
++		for (i = AB8500_SYSCLKREQ1RFCLKBUF;
++		     i <= AB8500_SYSCLKREQ8RFCLKBUF; i++) {
++			j = i - AB8500_SYSCLKREQ1RFCLKBUF;
++			ret = ab8500_sysctrl_write(i, 0xff,
++						   pdata->initial_req_buf_config[j]);
++			dev_dbg(&pdev->dev,
++				"Setting SysClkReq%dRfClkBuf 0x%X\n",
++				j + 1,
++				pdata->initial_req_buf_config[j]);
++			if (ret < 0) {
++				dev_err(&pdev->dev,
++					"unable to set sysClkReq%dRfClkBuf: "
++					"%d\n", j + 1, ret);
++			}
++		}
++	}
++
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/mfd/abx500/ab8500-sysctrl.h b/include/linux/mfd/abx500/ab8500-sysctrl.h
+index 10eb509..ebf12e7 100644
+--- a/include/linux/mfd/abx500/ab8500-sysctrl.h
++++ b/include/linux/mfd/abx500/ab8500-sysctrl.h
+@@ -37,6 +37,11 @@ static inline int ab8500_sysctrl_clear(u16 reg, u8 bits)
+ 	return ab8500_sysctrl_write(reg, bits, 0);
+ }
+ 
++/* Configuration data for SysClkReq1RfClkBuf - SysClkReq8RfClkBuf */
++struct ab8500_sysctrl_platform_data {
++	u8 initial_req_buf_config[8];
++};
++
+ /* Registers */
+ #define AB8500_TURNONSTATUS		0x100
+ #define AB8500_RESETSTATUS		0x101
+diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
+index 96840c4..3f4e6d1 100644
+--- a/include/linux/mfd/abx500/ab8500.h
++++ b/include/linux/mfd/abx500/ab8500.h
+@@ -270,6 +270,7 @@ struct regulator_reg_init;
+ struct regulator_init_data;
+ struct ab8500_gpio_platform_data;
+ struct ab8500_codec_platform_data;
++struct ab8500_sysctrl_platform_data;
+ 
+ /**
+  * struct ab8500_platform_data - AB8500 platform data
+@@ -291,6 +292,7 @@ struct ab8500_platform_data {
+ 	struct regulator_init_data *regulator;
+ 	struct ab8500_gpio_platform_data *gpio;
+ 	struct ab8500_codec_platform_data *codec;
++	struct ab8500_sysctrl_platform_data *sysctrl;
+ };
+ 
+ extern int __devinit ab8500_init(struct ab8500 *ab8500,
 -- 
 1.7.9.5
