@@ -1,28 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Jan 2013 12:44:12 +0000
-Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <20130115120855.GA5637@avionic-0098.adnet.avionic-design.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <20130114095706.GA23467@arm.com>
- <20130115120855.GA5637@avionic-0098.adnet.avionic-design.de>
-Message-ID: <201301151244.12767.arnd@arndb.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 15 Jan 2013 14:49:26 +0200
+Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <50F54B91.4030406@ti.com>
+References: <1357863807-380-1-git-send-email-rtivy@ti.com>
+ <1357863807-380-7-git-send-email-rtivy@ti.com>
+ <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
+ <50F51E43.2090605@ti.com>
+ <CAK=WgbbShpqxS7zrDs97HkjpyWq0xzW3b9KHLBBs_V3YzdJKiA@mail.gmail.com>
+ <50F54B91.4030406@ti.com>
+Message-ID: <CAK=WgbYwM2WPWrTp9U+nk_96RY3YYumzo0KxFpV0fDwU6dR+aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 January 2013, Thierry Reding wrote:
-> I'm not sure I follow you're reasoning here. Is it possible to use MSIs
-> without PCI? If not then I think there's little sense in keeping the
-> implementations separate.
+On Tue, Jan 15, 2013 at 2:29 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> May be rproc_alloc() could auto-assign the firmware name to something
+> like 'rproc%d-fw' if firmware name passed to it is NULL?
 
-Conceptually, you can use MSI for any device, but the Linux interfaces
-for MSI are tied to PCI. If you use an MSI controller for a non-PCI
-device, it would probably just appear as a regular interrupt controller.
+I prefer we use name-based filenames instead to make it easier for
+users (and us developers).
 
-> Furthermore, if MSI controller and PCI host bridge are separate entities
-> how do you look up the MSI controller given a PCI device?
+We can probably do something like "rproc-%s-fw" with pdata->name
+assuming we/you do maintain a meaningful name in the latter.
 
-The host bridge can contain a pointer ot the MSI controller. You can
-have multiple host bridges sharing a single MSI controller or you
-can have separate ones for each host.
-
-	Arnd
+Thanks,
+Ohad.
