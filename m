@@ -1,51 +1,65 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 15 Jan 2013 20:54:19 +0100
-Subject: [PATCH 0/6] arm: mvebu: Add support for USB host controllers in
- Armada 370/XP
-In-Reply-To: <50F5289D.80903@free-electrons.com>
-References: <50F5289D.80903@free-electrons.com>
-Message-ID: <9636031.hlmqlZtOEo@bender>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 15 Jan 2013 21:05:50 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20130115165642.GA25500@titan.lakedaemon.net>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
+ <50F3F289.3090402@web.de> <20130115165642.GA25500@titan.lakedaemon.net>
+Message-ID: <50F5B69E.1070101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ezequiel,
+On 01/15/2013 05:56 PM, Jason Cooper wrote:
+> Greg,
+>
+> I've added you to the this thread hoping for a little insight into USB
+> drivers and their use of coherent and GFP_ATOMIC.  Am I barking up the
+> wrong tree by looking a the drivers?
+>
+> On Mon, Jan 14, 2013 at 12:56:57PM +0100, Soeren Moch wrote:
+>> On 20.11.2012 15:31, Marek Szyprowski wrote:
+>>> dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
+>>> regardless the flags provided by the caller. This causes excessive
+>>> pruning of emergency memory pools without any good reason. Additionaly,
+>>> on ARM architecture any driver which is using dmapools will sooner or
+>>> later  trigger the following error:
+>>> "ERROR: 256 KiB atomic DMA coherent pool is too small!
+>>> Please increase it with coherent_pool= kernel parameter!".
+>>> Increasing the coherent pool size usually doesn't help much and only
+>>> delays such error, because all GFP_ATOMIC DMA allocations are always
+>>> served from the special, very limited memory pool.
+>>>
+>>> This patch changes the dmapool code to correctly use gfp flags provided
+>>> by the dmapool caller.
+>>>
+>>> Reported-by: Soeren Moch<smoch@web.de>
+>>> Reported-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+>>> Signed-off-by: Marek Szyprowski<m.szyprowski@samsung.com>
+>>> Tested-by: Andrew Lunn<andrew@lunn.ch>
+>>> Tested-by: Soeren Moch<smoch@web.de>
+>>
+>> Now I tested linux-3.7.1 (this patch is included there) on my Marvell
+>> Kirkwood system. I still see
+>>
+>>    ERROR: 1024 KiB atomic DMA coherent pool is too small!
+>>    Please increase it with coherent_pool= kernel parameter!
+>>
+>> after several hours of runtime under heavy load with SATA and
+>> DVB-Sticks (em28xx / drxk and dib0700).
+>
+> Could you try running the system w/o the em28xx stick and see how it
+> goes with v3.7.1?
 
-On Tuesday 15 January 2013 06:59:57 Ezequiel Garcia wrote:
-> Hi,
-> 
-> This small patch set enables USB support on Armada 370 and Armada XP platforms.
-> It's based on Jason Cooper's mvebu/dt branch.
-> 
-> Any comments or feedback are welcome.
+Jason,
 
-I successfully tested this serie on a Marvell RD-A370-A1 and a DB-MV784MP-GP:
+can you point out what you think we should be looking for?
 
-Tested-by: Florian Fainelli <florian@openwrt.org>
+I grep'd for 'GFP_' in  drivers/media/usb and especially for dvb-usb
+(dib0700) it looks like most of the buffers in usb-urb.c are allocated
+GFP_ATOMIC. em28xx also allocates some of the buffers atomic.
 
-Thanks!
+If we look for a mem leak in one of the above drivers (including sata_mv),
+is there an easy way to keep track of allocated and freed kernel memory?
 
-> 
-> Ezequiel Garcia (6):
->  arm: mvebu: Add support for USB host controllers in Armada 370/XP
->  arm: mvebu: Enable USB controllers on Armada 370 evaluation board
->  arm: mvebu: Enable USB controllers on Armada 370 Mirabox board
->  arm: mvebu: Enable USB controllers on Armada XP evaluation board
->  arm: mvebu: Enable USB controllers on Armada XP OpenBlocks AX3-4 board
->  arm: mvebu: Update defconfig to select USB support
-> 
->  arch/arm/boot/dts/armada-370-db.dts              |    8 ++++++++
->  arch/arm/boot/dts/armada-370-mirabox.dts         |    8 ++++++++
->  arch/arm/boot/dts/armada-370-xp.dtsi             |   15 +++++++++++++++
->  arch/arm/boot/dts/armada-370.dtsi                |    9 +++++++++
->  arch/arm/boot/dts/armada-xp-db.dts               |   12 ++++++++++++
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    9 +++++++++
->  arch/arm/boot/dts/armada-xp.dtsi                 |   17 +++++++++++++++++
->  arch/arm/configs/mvebu_defconfig                 |    5 ++++-
->  arch/arm/mach-mvebu/Kconfig                      |    1 +
->  9 files changed, 83 insertions(+), 1 deletions(-)
->  
-> Thanks!
-> 
-> 
--- 
-Florian
+Sebastian
