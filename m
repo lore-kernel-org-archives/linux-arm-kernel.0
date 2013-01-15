@@ -1,32 +1,26 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 15 Jan 2013 19:27:33 +0200
-Subject: [v3 6/9] ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
-In-Reply-To: <50F58A13.10301@wwwdotorg.org>
-References: <1358237598-32413-1-git-send-email-hdoyu@nvidia.com>
- <1358237598-32413-7-git-send-email-hdoyu@nvidia.com>
- <50F58A13.10301@wwwdotorg.org>
-Message-ID: <20130115172733.GS4118@tbergstrom-lnx.Nvidia.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 15 Jan 2013 12:29:22 -0500 (EST)
+Subject: [RFC PATCH 0/4] b.L: Memory barriers and miscellaneous tidyups
+In-Reply-To: <1358268498-8086-1-git-send-email-dave.martin@linaro.org>
+References: <1358268498-8086-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.02.1301151228070.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 05:55:47PM +0100, Stephen Warren wrote:
-> On 01/15/2013 01:13 AM, Hiroshi Doyu wrote:
-> > Initial support for Tegra 114 SoC. This is expected to be included in
-> > the board DTS files, Tegra 114 SoC based evaluation board family.
-> 
-> This series looks fine to me. Assuming no other comments, I'll apply
-> once CCF is applied and you've done the rebase you mentioned for patch 2.
-> 
-> Note that I'll apply most patches to Tegra's for-3.9/soc branch (the
-> code) but the 3 device tree patches to Tegra's for-3.9/dt branch, since
-> it's fine for the DT files to appear later than the code supporting the
-> SoC, since this is all new features.
-> 
-> One question: The .dts files don't include any clocks properties. I
-> assume Peter will add these when he posts the Tegra114 CCF code?
+On Tue, 15 Jan 2013, Dave Martin wrote:
 
-Yes. I will add those as part of the Tegra114 CCF series.
+> After much head-scratching and discussion, I have concluded that we
+> need comprehensive memory barriers in order to ensure that the
+> low-level synchronisation code executes robustly on all platforms.
+> 
+> DSBs are excessive on most situations though, so many DSBs can be
+> replces with DMBs.
+> 
+> As was observed in review, providing a C interface to the vlocks
+> makes little sense, so this series gets rid of it.
 
-Cheers,
+Thanks.  I have already removed the C stuff in my version but I'll merge 
+the rest no problem.
 
-Peter.
+
+Nicolas
