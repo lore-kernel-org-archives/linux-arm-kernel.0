@@ -1,31 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 Jan 2013 22:44:33 -0800
-Subject: [GIT PULL v2] Renesas ARM-based SoC defconfig for v3.9
-In-Reply-To: <1358210975-26970-1-git-send-email-horms+renesas@verge.net.au>
-References: <1358210975-26970-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAOesGMjL6RWMvurtCLRwWbDtF3=2VyFDWL+op3bEH22A-eEGuQ@mail.gmail.com>
+Date: Mon, 14 Jan 2013 22:48:15 -0800
+Subject: [GIT PULL] ste_dma40 updates for 3.9
+In-Reply-To: <20130114101542.GA5363@balto.lan>
+References: <20130114101542.GA5363@balto.lan>
+Message-ID: <CAOesGMg6FqsaqZiGeK14n4==dF-y=iMYSGRDBYSwkGWO0J69Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Jan 14, 2013 at 4:49 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Hi Olof, Hi Arnd,
+On Mon, Jan 14, 2013 at 2:15 AM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
+> Hello Arnd, Olof,
 >
-> please consider the following defconfig enhancements for 3.9.
+> This contains a series of updates and fixes for the ste_dma40 driver.
 >
-> ----------------------------------------------------------------
-> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+> The driver is specific for the ux500, and the patches were acked by both Linus
+> Walleij, and Vinod Koul (dmaengine), who agreed to push this through arm-soc.
 >
->   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
+> Can you please pull those in for -next?
 
-Missing branch or tag name? defconfig branch looks like the right one,
-but please confirm.
+While I don't mind taking this through arm-soc, I don't see a strong
+reason to do so?
 
+This series of patches only modify the ste_dma40 driver, there are no
+corresponding changes under arch/arm that need to be coordinated or
+considered w.r.t. merge conflicts. I.e. they all seem nicely isolated
+to only the driver.
+
+So is there a specific reason for why these shouldn't just go in
+through the dmaengine tree?
+
+
+Thanks,
 
 -Olof
