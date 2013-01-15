@@ -1,86 +1,70 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 15 Jan 2013 08:16:29 -0800
-Subject: [PATCH] ARM: AM33XX: clock: SET_RATE_PARENT in lcd path
-In-Reply-To: <1358256897-26275-1-git-send-email-afzal@ti.com>
-References: <1358256897-26275-1-git-send-email-afzal@ti.com>
-Message-ID: <20130115161629.23734.45853@quantum>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 15 Jan 2013 17:21:22 +0100
+Subject: [kvmarm] [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile
+ KVM support
+In-Reply-To: <20130115153555.GF12489@redhat.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183855.46302.40539.stgit@ubuntu> <20130114184908.GB12489@redhat.com>
+ <CANM98qJoOxG_g7Dz+65vfGmzi3MOXqE=AjbVBtimeqLL9TgV8w@mail.gmail.com>
+ <20130115133207.GM11529@redhat.com>
+ <FE4B72B9-F302-49BA-98D7-E674247BD093@suse.de>
+ <20130115153555.GF12489@redhat.com>
+Message-ID: <50F58202.6010006@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Afzal Mohammed (2013-01-15 05:34:57)
-> LCDC clock node is a one that does not have set rate capability. It
-> just passes on the rate that is sent downstream by it's parent. While
-> lcdc clock parent and it's grand parent - dpll_disp_m2_ck and
-> dpll_disp_ck has the capability to configure rate.
-> 
-> And the default rates provided by LCDC clock's ancestors are not
-> sufficient to obtain pixel clock for current LCDC use cases, hence
-> currently display would not work on AM335x SoC's (with driver
-> modifications in platfrom independent way).
-> 
-> Hence inform clock framework to propogate set rate for LCDC clock as
-> well as it's parent - dpll_disp_m2_ck. With this change, set rate on
-> LCDC clock would get propogated till dpll_disp_ck via dpll_disp_m2_ck,
-> hence allowing the driver (same driver is used in DaVinci too) to set
-> rates using LCDC clock without worrying about platform dependent clock
-> details.
-> 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
-> 
-> Based on v3.8-rc3
-> 
->  arch/arm/mach-omap2/cclock33xx_data.c |    9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
-> index ea64ad6..b731216 100644
-> --- a/arch/arm/mach-omap2/cclock33xx_data.c
-> +++ b/arch/arm/mach-omap2/cclock33xx_data.c
-> @@ -284,9 +284,10 @@ DEFINE_STRUCT_CLK(dpll_disp_ck, dpll_core_ck_parents, dpll_ddr_ck_ops);
->   * TODO: Add clksel here (sys_clkin, CORE_CLKOUTM6, PER_CLKOUTM2
->   * and ALT_CLK1/2)
->   */
-> -DEFINE_CLK_DIVIDER(dpll_disp_m2_ck, "dpll_disp_ck", &dpll_disp_ck, 0x0,
-> -                  AM33XX_CM_DIV_M2_DPLL_DISP, AM33XX_DPLL_CLKOUT_DIV_SHIFT,
-> -                  AM33XX_DPLL_CLKOUT_DIV_WIDTH, CLK_DIVIDER_ONE_BASED, NULL);
-> +DEFINE_CLK_DIVIDER(dpll_disp_m2_ck, "dpll_disp_ck", &dpll_disp_ck,
-> +                  CLK_SET_RATE_PARENT, AM33XX_CM_DIV_M2_DPLL_DISP,
-> +                  AM33XX_DPLL_CLKOUT_DIV_SHIFT, AM33XX_DPLL_CLKOUT_DIV_WIDTH,
-> +                  CLK_DIVIDER_ONE_BASED, NULL);
->  
->  /* DPLL_PER */
->  static struct dpll_data dpll_per_dd = {
-> @@ -932,6 +933,8 @@ int __init am33xx_clk_init(void)
->                 cpu_clkflg = CK_AM33XX;
->         }
->  
-> +       lcd_gclk.flags |= CLK_SET_RATE_PARENT;
-> +
+On 01/15/2013 04:35 PM, Gleb Natapov wrote:
+> On Tue, Jan 15, 2013 at 02:43:26PM +0100, Alexander Graf wrote:
+>> On 15.01.2013, at 14:32, Gleb Natapov wrote:
+>>
+>>> On Mon, Jan 14, 2013 at 05:17:31PM -0500, Christoffer Dall wrote:
+>>>> On Mon, Jan 14, 2013 at 1:49 PM, Gleb Natapov<gleb@redhat.com>  wrote:
+>>>>> A couple of general question about ABI. If they were already answered
+>>>>> just refer me to the previous discussion.
+>>>>>
+>>>>> On Tue, Jan 08, 2013 at 01:38:55PM -0500, Christoffer Dall wrote:
+>>>>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>>>>>> index a4df553..4237c27 100644
+>>>>>> --- a/Documentation/virtual/kvm/api.txt
+>>>>>> +++ b/Documentation/virtual/kvm/api.txt
+>>>>>> @@ -293,7 +293,7 @@ kvm_run' (see below).
+>>>>>> 4.11 KVM_GET_REGS
+>>>>>>
+>>>>>> Capability: basic
+>>>>>> -Architectures: all
+>>>>>> +Architectures: all except ARM
+>>>>>> Type: vcpu ioctl
+>>>>>> Parameters: struct kvm_regs (out)
+>>>>>> Returns: 0 on success, -1 on error
+>>>>>> @@ -314,7 +314,7 @@ struct kvm_regs {
+>>>>>> 4.12 KVM_SET_REGS
+>>>>>>
+>>>>>> Capability: basic
+>>>>>> -Architectures: all
+>>>>>> +Architectures: all except ARM
+>>>>>> Type: vcpu ioctl
+>>>>>> Parameters: struct kvm_regs (in)
+>>>>>> Returns: 0 on success, -1 on error
+>>>>>> @@ -600,7 +600,7 @@ struct kvm_fpu {
+>>>>>> 4.24 KVM_CREATE_IRQCHIP
+>>>>> Why KVM_GET_REGS/KVM_SET_REGS are not usable for arm?
+>>>>>
+>>>> We use the ONE_REG API instead and we don't want to support two
+>>>> separate APIs to user space.
+>>>>
+>>> I suppose fetching all registers is not anywhere on a fast path in
+>>> userspace :)
+>> If it's ever going to be in a fast path, we will add MULTI_REG which will feature an array of ONE_REG structs to fetch multiple registers at once.
+>>
+> And I hope it will not be. On x86 only the broken vmware PV
+> interface requires reading registers for emulation.
+>
+> This reminds me the question I wanted to ask you about ONE_REG
+> interface. Why architecture is encoded in register name? Is architecture
+> implied by HW the code is running on anyway?
 
-Afzal,
+It provides for nice sanity checks. Also, 64 bits are quite a lot, so we 
+can easily waste a few bits for redundancy.
 
-This is a bit hacky.  Someone looking at the definition of struct
-lcd_gclk above cannot easily tell that CLK_SET_RATE_PARENT is set below.
-Also if other clocks need flags set at a later date then this will
-become a big ugly block of flag setting.
 
-I hope to move away from these macros some day, but in the mean time it
-might be good to have a DEFINE_STRUCT_CLK_FLAGS macro which adds in an
-argument struct clk->flags.
-
-Paul, any thoughts on yet another macro?
-
-Thanks,
-Mike
-
->         for (c = am33xx_clks; c < am33xx_clks + ARRAY_SIZE(am33xx_clks); c++) {
->                 if (c->cpu & cpu_clkflg) {
->                         clkdev_add(&c->lk);
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Alex
