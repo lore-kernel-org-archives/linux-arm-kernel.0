@@ -1,82 +1,51 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 15 Jan 2013 17:25:13 +0100
-Subject: [kvmarm] [PATCH v5 06/14] KVM: ARM: Inject IRQs and FIQs from
- userspace
-In-Reply-To: <20130115151757.GD12489@redhat.com>
-References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108183917.46302.55603.stgit@ubuntu> <20130115095622.GJ11529@redhat.com>
- <CAFEAcA9wEtXu6B-4bUuezntvybhu8MCYfciKhdLK_Cs--qP8_w@mail.gmail.com>
- <20130115125241.GK11529@redhat.com>
- <CAFEAcA8gzD4F4BPKR_dSDDD-iyv0ONt6H+yrj_nHifeCFBfpPA@mail.gmail.com>
- <20130115151757.GD12489@redhat.com>
-Message-ID: <50F582E9.40402@suse.de>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 15 Jan 2013 08:32:21 -0800
+Subject: [PATCH v2] hardlockup: detect hard lockups without NMIs using
+ secondary cpus
+In-Reply-To: <CAFTL4hzYkPCmkfqBafkTA5E_snkLoC_y3p9xwumj=L1xWAWK0g@mail.gmail.com>
+References: <1357941108-14138-1-git-send-email-ccross@android.com>
+ <CAFTL4hzYkPCmkfqBafkTA5E_snkLoC_y3p9xwumj=L1xWAWK0g@mail.gmail.com>
+Message-ID: <20130115163221.GN3384@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2013 04:17 PM, Gleb Natapov wrote:
-> On Tue, Jan 15, 2013 at 02:04:47PM +0000, Peter Maydell wrote:
->> On 15 January 2013 12:52, Gleb Natapov<gleb@redhat.com>  wrote:
->>> On Tue, Jan 15, 2013 at 12:15:01PM +0000, Peter Maydell wrote:
->>>> On 15 January 2013 09:56, Gleb Natapov<gleb@redhat.com>  wrote:
->>>>>> ARM can signal an interrupt either at the CPU level, or at the in-kernel irqchip
->>>>> CPU level interrupt should use KVM_INTERRUPT instead.
->>>> No, that would be wrong. KVM_INTERRUPT is for interrupts which must be
->>>> delivered synchronously to the CPU. KVM_IRQ_LINE is for interrupts which
->>>> can be fed to the kernel asynchronously. It happens that on x86 "must be
->>>> delivered synchronously" and "not going to in kernel irqchip" are the same, but
->>>> this isn't true for other archs. For ARM all our interrupts can be fed
->>>> to the kernel asynchronously, and so we use KVM_IRQ_LINE in all
->>>> cases.
->>> I do no quite understand what you mean by synchronously and
->>> asynchronously.
->> Synchronously: the vcpu has to be stopped and userspace then
->> feeds in the interrupt to be taken when the guest is resumed.
->> Asynchronously: any old thread can tell the kernel there's an
->> interrupt, and the guest vcpu then deals with it when needed
->> (the vcpu thread may leave the guest but doesn't come out of
->> the host kernel to qemu).
->>
->>> The difference between KVM_INTERRUPT and KVM_IRQ_LINE line
->>> is that former is used when destination cpu is known to userspace later
->>> is used when kernel code is involved in figuring out the destination.
->> This doesn't match up with Avi's explanation at all.
->>
->>> The
->>> injections themselves are currently synchronous for both of them on x86
->>> and ARM. i.e vcpu is kicked out from guest mode when interrupt need to
->>> be injected into a guest and vcpu state is changed to inject interrupt
->>> during next guest entry. In the near feature x86 will be able to inject
->>> interrupt without kicking vcpu out from the guest mode does ARM plan to
->>> do the same? For GIC interrupts or for IRQ/FIQ or for both?
->>>
->>>> There was a big discussion thread about this on kvm and qemu-devel last
->>>> July (and we cleaned up some of the QEMU code to not smoosh together
->>>> all these different concepts under "do I have an irqchip or not?").
->>> Do you have a pointer?
->>    http://lists.gnu.org/archive/html/qemu-devel/2012-07/msg02460.html
->> and there was a later longer (but less clear) thread which included
->> this mail from Avi:
->>    http://lists.gnu.org/archive/html/qemu-devel/2012-07/msg02872.html
->> basically explaining that the reason for the weird synchronous
->> KVM_INTERRUPT API is that it's emulating a weird synchronous
->> hardware interface which is specific to x86. ARM doesn't have
->> a synchronous interface in the same way, so it's much more
->> straightforward to use KVM_IRQ_LINE.
->>
-> OK. I see. So basically Avi saw KVM_INTERRUPT as an oddball interface
-> required only for APIC emulation in userspace. It is used for PIC also,
-> where this is not strictly needed, but this is for historical reasons
-> (KVM_IRQ_LINE was introduces late and it is GSI centric on x86).
->
-> Thank you for the pointer.
+On Tue, Jan 15, 2013 at 01:13:10AM +0100, Frederic Weisbecker wrote:
+> 2013/1/11 Colin Cross <ccross@android.com>:
+> > Emulate NMIs on systems where they are not available by using timer
+> > interrupts on other cpus.  Each cpu will use its softlockup hrtimer
+> > to check that the next cpu is processing hrtimer interrupts by
+> > verifying that a counter is increasing.
+> >
+> > This patch is useful on systems where the hardlockup detector is not
+> > available due to a lack of NMIs, for example most ARM SoCs.
+> > Without this patch any cpu stuck with interrupts disabled can
+> > cause a hardware watchdog reset with no debugging information,
+> > but with this patch the kernel can detect the lockup and panic,
+> > which can result in useful debugging info.
+> >
+> > Signed-off-by: Colin Cross <ccross@android.com>
+> 
+> I believe this is pretty much what the RCU stall detector does
+> already: checks for other CPUs being responsive. The only difference
+> is on how it checks that. For RCU it's about checking for CPUs
+> reporting quiescent states when requested to do so. In your case it's
+> about ensuring the hrtimer interrupt is well handled.
+> 
+> One thing you can do is to enqueue an RCU callback (cal_rcu()) every
+> minute so you can force other CPUs to report quiescent states
+> periodically and thus check for lockups.
 
-Yeah, please keep in mind that KVM_INTERRUPT is not a unified interface 
-either. In fact, it is asynchronous on PPC :). And it's called 
-KVM_S390_INTERRUPT on s390 and also asynchronous. X86 is the oddball here.
+This would work in all but one case, and that is where RCU believes
+that the non-responsive CPU is in dyntick-idle mode.  In that case,
+RCU would not be expecting it to respond and would therefore ignore
+any non-responsiveness.
 
-But I don't care whether we call the ioctl to steer CPU interrupt pins 
-KVM_INTERRUPT, KVM_S390_INTERRUPT or KVM_IRQ_LINE, as long as the code 
-makes it obvious what is happening.
+> Now you'll face the same problem in the end: if you don't have NMIs,
+> you won't have a very useful report.
 
+Indeed, I must confess that I have thus far chickened out on solving
+the general NMI problem.  The RCU stall detector does try to look at
+stacks remotely in some cases, but this is often unreliable, and some
+architectures seem to refuse to produce a remote stack trace.
 
-Alex
+							Thanx, Paul
