@@ -1,60 +1,48 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 16 Jan 2013 12:30:41 +1300
-Subject: [PATCH v2] mtd: vt8500: Add support for Wondermedia Serial
- Flash Controller
-In-Reply-To: <1358277072.1668.2.camel@kyv>
-References: <1356901207-13536-1-git-send-email-linux@prisktech.co.nz>
- <1358261750.2731.148.camel@sauron.fi.intel.com>
- <1358271907.31593.1.camel@gitbox> <1358277072.1668.2.camel@kyv>
-Message-ID: <1358292641.11794.1.camel@gitbox>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Tue, 15 Jan 2013 16:36:35 -0700
+Subject: [PATCH] crypto: omap-sham - Fix compile errors when CONFIG_OF
+ not defined
+In-Reply-To: <1358283182-29392-1-git-send-email-mgreer@animalcreek.com>
+References: <1358283182-29392-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <20130115233635.GB527@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-15 at 21:11 +0200, Artem Bityutskiy wrote:
-> On Wed, 2013-01-16 at 06:45 +1300, Tony Prisk wrote:
-> > On Tue, 2013-01-15 at 16:55 +0200, Artem Bityutskiy wrote:
-> > > On Mon, 2012-12-31 at 10:00 +1300, Tony Prisk wrote:
-> > > > This patch adds support for the Wondermedia serial flash controller
-> > > > found on WM8505, WM8650 and WM8850 SoCs.
-> > > > 
-> > > > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> > > > ---
-> > > > v2: Whitespace tidyup
-> > > 
-> > > Hi, would you please take a look at these warings, identified by aiaiai:
-> > > 
-> > > Successfully built configuration "x86_64_defconfig,x86_64,", results:
-> > > 
-> > > --- before_patching.log
-> > > +++ after_patching.log
-> > > @@ @@
-> > > +drivers/mtd/devices/wmt_sflash.c: In function ?sf_read?:
-> > > +drivers/mtd/devices/wmt_sflash.c:425:9: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat]
-> > > +drivers/mtd/devices/wmt_sflash.c: In function ?sf_sector_write?:
-> > > +drivers/mtd/devices/wmt_sflash.c:442:16: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-> > > +drivers/mtd/devices/wmt_sflash.c:442:24: warning: cast removes address space of expression [sparse]
-> > > +drivers/mtd/devices/wmt_sflash.c:458:16: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-> > > +drivers/mtd/devices/wmt_sflash.c:458:31: warning: incorrect type in argument 1 (different address spaces) [sparse]
-> > > +drivers/mtd/devices/wmt_sflash.c:458:31:    expected void volatile [noderef] <asn:2>*dst [sparse]
-> > > +drivers/mtd/devices/wmt_sflash.c:458:31:    got unsigned char [usertype] *<noident> [sparse]
-> > > +drivers/mtd/devices/wmt_sflash.c:465:17: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-> > > +drivers/mtd/devices/wmt_sflash.c:465:39: warning: incorrect type in argument 1 (different address spaces) [sparse]
-> > > +drivers/mtd/devices/wmt_sflash.c:465:39:    expected void volatile [noderef] <asn:2>*dst [sparse]
-> > > +drivers/mtd/devices/wmt_sflash.c:465:39:    got unsigned char [usertype] *<noident> [sparse]
-> > > 
-> > 
-> > Apologies - This driver shouldn't be selectable for x86_64.
-> > It is an ARM driver for an embedded device. Will fix.
+On Tue, Jan 15, 2013 at 01:53:02PM -0700, Mark A. Greer wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
 > 
-> Note, there are also warnings when it is compiled for other platforms,
-> not only x86_64. Take a look at them. Also note, than many warnings come
-> from sparse, you probably just did not run it.
+> Fix the compile errors created by commit 2545e8d
+> (crypto: omap-sham - Add Device Tree Support)
+> when CONFIG_OF is not defined.  This includes
+> changing omap_sham_get_res_dev() to omap_sham_get_res_of()
+> and creating an empty version of omap_sham_of_match[].
 > 
+> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> ---
+>  drivers/crypto/omap-sham.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+> index edff981..dc2d354 100644
+> --- a/drivers/crypto/omap-sham.c
+> +++ b/drivers/crypto/omap-sham.c
+> @@ -1607,7 +1607,11 @@ err:
+>  	return err;
+>  }
+>  #else
+> -static int omap_sham_get_res_dev(struct omap_sham_dev *dd,
+> +static const struct of_device_id omap_sham_of_match[] = {
+> +	{},
+> +};
+> +
+> +static int omap_sham_get_res_of(struct omap_sham_dev *dd,
+>  		struct device *dev, struct resource *res)
+>  {
+>  	return -EINVAL;
+> -- 
+> 1.7.12
 
-I posted the patch for this problem this morning. It should only be
-selectable on arch-vt8500 and the new patch fixes this problem.
+I meant to add that this applies to the current cryptodev/master repo/branch.
 
-It incorrectly depended on MTD rather than ARCH_VT8500
-
-Regards
-Tony P
+Mark
+--
