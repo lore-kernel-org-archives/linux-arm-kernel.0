@@ -1,66 +1,65 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 15 Jan 2013 09:31:31 +0800
-Subject: [PATCH v3 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
- platform_device_id
-In-Reply-To: <20130114175724.GD12611@arwen.pp.htv.fi>
-References: <50F3DF1D.3040706@pengutronix.de>
- <20130114103952.GF10874@arwen.pp.htv.fi>
- <50F3E301.7040509@pengutronix.de>
- <20130114105357.GH10874@arwen.pp.htv.fi>
- <50F3E5E8.2000905@pengutronix.de>
- <20130114110600.GI10874@arwen.pp.htv.fi>
- <20130114125632.GA30157@nchen-desktop>
- <20130114174054.GB12611@arwen.pp.htv.fi>
- <50F4464E.7000605@pengutronix.de>
- <20130114175724.GD12611@arwen.pp.htv.fi>
-Message-ID: <20130115013130.GA16514@nchen-desktop>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 14 Jan 2013 17:40:28 -0800
+Subject: [PATCH v2] hardlockup: detect hard lockups without NMIs using
+ secondary cpus
+In-Reply-To: <CAMbhsRR29Zhje9mGtUwHfUsX+eFsggYkVMHPyQ+zgrGUp_rqTQ@mail.gmail.com>
+References: <1357941108-14138-1-git-send-email-ccross@android.com>
+ <20130114154914.6d69eb27.akpm@linux-foundation.org>
+ <CAMbhsRR29Zhje9mGtUwHfUsX+eFsggYkVMHPyQ+zgrGUp_rqTQ@mail.gmail.com>
+Message-ID: <CAMbhsRQ9orwuHYo4CwFUYnBqSyTnQX458xCr9xJfwc2Y2WVmVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 07:57:24PM +0200, Felipe Balbi wrote:
-> On Mon, Jan 14, 2013 at 06:54:22PM +0100, Marc Kleine-Budde wrote:
-> > On 01/14/2013 06:40 PM, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Mon, Jan 14, 2013 at 08:56:33PM +0800, Peter Chen wrote:
-> > > 
-> > > <snip>
-> > > 
-> > >>>> Usually there isn't any Changelog between IP cores used in the different
-> > >>>> fsl processors (at least available outside of fsl), that makes it quite
-> > >>>> difficult to say if something found on one imx is really the same as on
-> > >>>> the other one. And they (usually) don't provide any versioning
-> > >>>> information in a register or the documentation.
-> > >>>>
-> > >>>> just my 2?
-> > >>>
-> > >>> $SUBJECT is trying to differentiate a single feature (or maybe two) to
-> > >>> replace cpu_is_xxx(), then expose that on driver_data without creating
-> > >>> one enum value for each release from fsl.
-> > >>
-> > >> Felipe, every one or two SoCs may have their special operations for
-> > >> integrate PHY interface, clk operation, or workaround for IC
-> > >> limitation.
-> > > 
-> > > the particular PHY and clk used should be hidden by phy layer and clk
-> > > API respectively. Workarounds, fair enough, we need to handle them; but
-> > > ideally those should be based on runtime revision detection, not some
-> > > hackery using driver_data.
-> > 
-> > If this is actually possible, I'd love to do this. But IP vendor don't
-> > include a version register in their cores. :(
-> 
-> then fair enough, driver_data or platform_data is the way to go, still
-> my point (a) below is valid.
-I will send v5 patch with your suggestion.
+On Mon, Jan 14, 2013 at 4:19 PM, Colin Cross <ccross@android.com> wrote:
+> On Mon, Jan 14, 2013 at 3:49 PM, Andrew Morton
+> <akpm@linux-foundation.org> wrote:
+>> On Fri, 11 Jan 2013 13:51:48 -0800
+>> Colin Cross <ccross@android.com> wrote:
+>>
+>>> Emulate NMIs on systems where they are not available by using timer
+>>> interrupts on other cpus.  Each cpu will use its softlockup hrtimer
+>>> to check that the next cpu is processing hrtimer interrupts by
+>>> verifying that a counter is increasing.
+>>
+>> Seems sensible.
+>>
+>>> This patch is useful on systems where the hardlockup detector is not
+>>> available due to a lack of NMIs, for example most ARM SoCs.
+>>> Without this patch any cpu stuck with interrupts disabled can
+>>> cause a hardware watchdog reset with no debugging information,
+>>> but with this patch the kernel can detect the lockup and panic,
+>>> which can result in useful debugging info.
+>>
+>> But we don't get the target cpu's stack, yes?  That's a pretty big loss.
+>
+> It's a huge loss, but its still useful.  For one, it can separate
+> "linux locked up one cpu" bugs from "the whole cpu complex stopped
+> responding" bugs, which are much more common than you would hope on
+> ARM cpus.  Also, as a separate patch I'm hoping to add reading the
+> DBGPCSR register of both cpus during panic, which will at least give
+> you the PC of the cpu that is stuck.
+>
+>>>
+>>> ...
+>>>
+>>> +#ifdef CONFIG_HARDLOCKUP_DETECTOR_OTHER_CPU
+>>> +static unsigned int watchdog_next_cpu(unsigned int cpu)
+>>> +{
+>>> +     cpumask_t cpus = watchdog_cpus;
+>>
+>> cpumask_t can be tremendously huge and putting one on the stack is
+>> risky.  Can we use watchdog_cpus directly here?  Perhaps with a lock?
+>> or take a copy into a static local, with a lock?
+>
+> Sure, I can use a lock around it.  I'm used to very small numbers of cpus.
+>
 
-> 
-> -- 
-> balbi
-
-
-
--- 
-
-Best Regards,
-Peter Chen
+On second thought, I'm just going to remove the local copy and read
+the global directly.  watchdog_cpus is updated with atomic bitmask
+operations, so there is no erroneous value that could be returned when
+referencing the global directly that couldn't also occur with a
+slightly different order of updates.  The local copy is also not
+completely atomic, since the bitmask could span multiple words.  All
+intermediate values during multiple sequential updates should already
+be handled by setting watchdog_nmi_touch on the appropriate cpus
+during watchdog_nmi_enable and watchdog_nmi_disable.
