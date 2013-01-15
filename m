@@ -1,140 +1,130 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 15 Jan 2013 21:13:36 +0800
-Subject: [PATCH] ARM: remove unnecessary 'select GENERIC_GPIO'
-Message-ID: <1358255616-3171-1-git-send-email-shawn.guo@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 15 Jan 2013 14:18:53 +0100
+Subject: [PATCH RESEND 6/6 v13] gpio: Add block gpio to several gpio
+ drivers
+In-Reply-To: <1358250716-21986-7-git-send-email-stigge@antcom.de>
+References: <1358250716-21986-1-git-send-email-stigge@antcom.de>
+ <1358250716-21986-7-git-send-email-stigge@antcom.de>
+Message-ID: <50F5573D.4060007@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only use of GENERIC_GPIO (defined by architecture) in GPIO subsystem
-is being selected by GPIOLIB.  Also there are no any use of the option
-at architecture level. Only two sub-architectures shmobile and orion
-really use the option as below.
+Hi,
 
-  arch/arm/mach-shmobile/Makefile:obj-$(CONFIG_GENERIC_GPIO)      += $(pfc-y)
-  arch/arm/plat-orion/Makefile:orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
+Le 15/01/2013 12:51, Roland Stigge a ?crit :
+> This patch adds block GPIO support to several gpio drivers.
+>
+> This implements block GPIO only for some selected drivers since block GPIO is
+> an optional feature which may not be suitable for every GPIO hardware. (With
+> automatic fallback to the single GPIO functions if not available in a driver.)
+>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>
+> ---
+>   drivers/gpio/Kconfig              |    2
+>   drivers/gpio/gpio-em.c            |   23 ++++++++++
+>   drivers/gpio/gpio-ge.c            |   29 +++++++++++++
+>   drivers/gpio/gpio-generic.c       |   56 +++++++++++++++++++++++++
+>   drivers/gpio/gpio-ks8695.c        |   34 +++++++++++++++
+>   drivers/gpio/gpio-lpc32xx.c       |   82 ++++++++++++++++++++++++++++++++++++++
+>   drivers/gpio/gpio-max730x.c       |   61 ++++++++++++++++++++++++++++
+>   drivers/gpio/gpio-max732x.c       |   59 +++++++++++++++++++++++++++
+>   drivers/gpio/gpio-mc33880.c       |   16 +++++++
+>   drivers/gpio/gpio-ml-ioh.c        |   27 ++++++++++++
+>   drivers/gpio/gpio-mm-lantiq.c     |   22 ++++++++++
+>   drivers/gpio/gpio-mpc5200.c       |   64 +++++++++++++++++++++++++++++
+>   drivers/gpio/gpio-mpc8xxx.c       |   41 +++++++++++++++++++
+>   drivers/gpio/gpio-pca953x.c       |   64 +++++++++++++++++++++++++++++
+>   drivers/gpio/gpio-pcf857x.c       |   24 +++++++++++
+>   drivers/gpio/gpio-pch.c           |   27 ++++++++++++
+>   drivers/gpio/gpio-pl061.c         |   17 +++++++
+>   drivers/gpio/gpio-sa1100.c        |   20 +++++++++
+>   drivers/gpio/gpio-samsung.c       |   31 ++++++++++++++
+>   drivers/gpio/gpio-twl6040.c       |   32 ++++++++++++++
+>   drivers/gpio/gpio-ucb1400.c       |   23 ++++++++++
+>   drivers/gpio/gpio-vt8500.c        |   24 +++++++++++
+>   drivers/gpio/gpio-xilinx.c        |   44 ++++++++++++++++++++
+>   drivers/pinctrl/pinctrl-at91.c    |   29 +++++++++++++
 
-Remove all those unnecessary sub-architecture level selection of
-GENERIC_GPIO, which are there only for confusing people.
+I do not want to delay the process of inclusion for this patch series. 
+But I have a little question on AT91 driver modification...
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/Kconfig                |    9 ---------
- arch/arm/mach-bcm/Kconfig       |    1 -
- arch/arm/mach-picoxcell/Kconfig |    1 -
- arch/arm/mach-vt8500/Kconfig    |    1 -
- 4 files changed, 12 deletions(-)
+>   drivers/pinctrl/pinctrl-nomadik.c |   36 ++++++++++++++++
+>   25 files changed, 887 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 67874b8..c217521 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -347,7 +347,6 @@ config ARCH_BCM2835
- 	select COMMON_CLK
- 	select CPU_V6
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
- 	select MULTI_IRQ_HANDLER
- 	select PINCTRL
- 	select PINCTRL_BCM2835
-@@ -644,7 +643,6 @@ config ARCH_TEGRA
- 	select CLKSRC_MMIO
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
-@@ -744,7 +742,6 @@ config ARCH_S3C24XX
- 	select ARCH_HAS_CPUFREQ
- 	select ARCH_USES_GETTIMEOFFSET
- 	select CLKDEV_LOOKUP
--	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-@@ -787,7 +784,6 @@ config ARCH_S5P64X0
- 	select CLKSRC_MMIO
- 	select CPU_V6
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-@@ -802,7 +798,6 @@ config ARCH_S5PC100
- 	select ARCH_USES_GETTIMEOFFSET
- 	select CLKDEV_LOOKUP
- 	select CPU_V7
--	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-@@ -820,7 +815,6 @@ config ARCH_S5PV210
- 	select CLKSRC_MMIO
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-@@ -838,7 +832,6 @@ config ARCH_EXYNOS
- 	select CLKDEV_LOOKUP
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-@@ -873,7 +866,6 @@ config ARCH_U300
- 	select COMMON_CLK
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
- 	select HAVE_TCM
- 	select SPARSE_IRQ
- 	help
-@@ -957,7 +949,6 @@ config ARCH_VT8500_SINGLE
- 	select COMMON_CLK
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select MULTI_IRQ_HANDLER
- 	select SPARSE_IRQ
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 48705c1..bf02471 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -7,7 +7,6 @@ config ARCH_BCM
- 	select ARM_GIC
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
- 	select GENERIC_TIME
- 	select GPIO_BCM
- 	select SPARSE_IRQ
-diff --git a/arch/arm/mach-picoxcell/Kconfig b/arch/arm/mach-picoxcell/Kconfig
-index 868796f..13bae78 100644
---- a/arch/arm/mach-picoxcell/Kconfig
-+++ b/arch/arm/mach-picoxcell/Kconfig
-@@ -7,7 +7,6 @@ config ARCH_PICOXCELL
- 	select DW_APB_TIMER
- 	select DW_APB_TIMER_OF
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
- 	select HAVE_TCM
- 	select NO_IOPORT
- 	select SPARSE_IRQ
-diff --git a/arch/arm/mach-vt8500/Kconfig b/arch/arm/mach-vt8500/Kconfig
-index 2ed0b7d..8464497 100644
---- a/arch/arm/mach-vt8500/Kconfig
-+++ b/arch/arm/mach-vt8500/Kconfig
-@@ -6,7 +6,6 @@ config ARCH_VT8500
- 	select CLKDEV_LOOKUP
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_GPIO
- 	select HAVE_CLK
- 	help
- 	  Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
+[..]
+
+> --- linux-2.6.orig/drivers/pinctrl/pinctrl-at91.c
+> +++ linux-2.6/drivers/pinctrl/pinctrl-at91.c
+> @@ -49,6 +49,7 @@ struct at91_gpio_chip {
+>   	struct clk		*clock;		/* associated clock */
+>   	struct irq_domain	*domain;	/* associated irq domain */
+>   	struct at91_pinctrl_mux_ops *ops;	/* ops */
+> +	unsigned long		mask_cache;	/* cached mask for block gpio */
+>   };
+>
+>   #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
+> @@ -1125,6 +1126,32 @@ static void at91_gpio_set(struct gpio_ch
+>   	writel_relaxed(mask, pio + (val ? PIO_SODR : PIO_CODR));
+>   }
+>
+> +static unsigned long at91_gpio_get_block(struct gpio_chip *chip,
+> +					 unsigned long mask)
+> +{
+> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+> +	void __iomem *pio = at91_gpio->regbase;
+> +	u32 pdsr;
+> +
+> +	pdsr = __raw_readl(pio + PIO_PDSR);
+
+Maybe you should use readl_relaxed() here as it is used in the 
+at91_gpio_[get|set]() functions.
+
+
+> +	return pdsr & mask;
+> +}
+> +
+> +static void at91_gpio_set_block(struct gpio_chip *chip, unsigned long mask,
+> +				unsigned long val)
+> +{
+> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+> +	void __iomem *pio = at91_gpio->regbase;
+> +
+> +	/* Do synchronous data output with a single write access */
+> +	if (mask != at91_gpio->mask_cache) {
+> +		at91_gpio->mask_cache = mask;
+> +		__raw_writel(~mask, pio + PIO_OWDR);
+> +		__raw_writel(mask, pio + PIO_OWER);
+> +	}
+> +	__raw_writel(val, pio + PIO_ODSR);
+
+Ditto.
+
+> +}
+> +
+>   static int at91_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
+>   				int val)
+>   {
+> @@ -1435,8 +1462,10 @@ static struct gpio_chip at91_gpio_templa
+>   	.free			= at91_gpio_free,
+>   	.direction_input	= at91_gpio_direction_input,
+>   	.get			= at91_gpio_get,
+> +	.get_block		= at91_gpio_get_block,
+>   	.direction_output	= at91_gpio_direction_output,
+>   	.set			= at91_gpio_set,
+> +	.set_block		= at91_gpio_set_block,
+>   	.to_irq			= at91_gpio_to_irq,
+>   	.dbg_show		= at91_gpio_dbg_show,
+>   	.can_sleep		= 0,
+> --- linux-2.6.orig/drivers/pinctrl/pinctrl-nomadik.c
+> +++ linux-2.6/drivers/pinctrl/pinctrl-nomadik.c
+
+[..]
+
+Otherwise, seems ok to me ; for AT91 part:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Best regards,
 -- 
-1.7.9.5
+Nicolas Ferre
