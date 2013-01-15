@@ -1,171 +1,104 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 15 Jan 2013 12:54:49 +0530
-Subject: [PATCH v2 3/3 RFT] ARM: tegra: dts: seaboard: enable keyboard
-Message-ID: <1358234689-18126-1-git-send-email-ldewangan@nvidia.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 15 Jan 2013 09:32:25 +0200
+Subject: OMAP baseline test results for v3.8-rc3
+In-Reply-To: <20130114224222.GC18224@blackmetal.musicnaut.iki.fi>
+References: <alpine.DEB.2.00.1301141756460.20390@utopia.booyaka.com>
+ <20130114184018.GA18224@blackmetal.musicnaut.iki.fi>
+ <20130114191459.GA9402@arwen.pp.htv.fi>
+ <20130114204654.GB18224@blackmetal.musicnaut.iki.fi>
+ <20130114211846.GA10699@arwen.pp.htv.fi>
+ <20130114224222.GC18224@blackmetal.musicnaut.iki.fi>
+Message-ID: <20130115073225.GB14505@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable tegra based keyboard controller and populate the key matrix for
-seaboard. The key matrix was originally on driver code which is removed
-to have clean driver. The key mapping is now passed through dts file.
+Hi,
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
-Added the configuration of kbc parameter as suggested by Stephen and
-corrected type for LEFTCTRL.
+On Tue, Jan 15, 2013 at 12:42:22AM +0200, Aaro Koskinen wrote:
+> On Mon, Jan 14, 2013 at 11:18:46PM +0200, Felipe Balbi wrote:
+> > On Mon, Jan 14, 2013 at 10:46:54PM +0200, Aaro Koskinen wrote:
+> > > [    0.207946] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
+> > > [    0.208129] twl 1-0048: power (irq 343) chaining IRQs 346..353
+> > > [    0.209350] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
+> > > [    1.218749] omap_i2c omap_i2c.1: timeout waiting for bus ready
+> > > [    1.218811] omap_i2c omap_i2c.1: SA 0049 CON 9602 CNT 0004
+> > 
+> > here's the issue, there is unloaded data in the FIFO. Can you enable
+> > full I2C debugging logs ?
+> 
+> If I enable I2C DEBUGs, the problem is not reproducible. Everything
+> looks normal:
+> 
+> [    0.270141] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
+> [    0.270294] twl 1-0048: power (irq 343) chaining IRQs 346..353
+> [    0.270477] i2c i2c-1: master_xfer[0] W, addr=0x49, len=1
+> [    0.270538] i2c i2c-1: master_xfer[1] R, addr=0x49, len=1
+> [    0.270568] omap_i2c omap_i2c.1: addr: 0x0049, len: 1, flags: 0x0, stop: 0
+> [    0.270629] omap_i2c omap_i2c.1: IRQ (ISR = 0x0010)
+> [    0.270690] omap_i2c omap_i2c.1: IRQ (ISR = 0x0004)
+> [    0.270751] omap_i2c omap_i2c.1: addr: 0x0049, len: 1, flags: 0x1, stop: 1
+> [    0.270843] omap_i2c omap_i2c.1: IRQ (ISR = 0x0008)
+> [    0.270874] omap_i2c omap_i2c.1: IRQ (ISR = 0x0004)
+> [    0.270935] i2c i2c-1: master_xfer[0] W, addr=0x49, len=2
+> [    0.270965] omap_i2c omap_i2c.1: addr: 0x0049, len: 2, flags: 0x0, stop: 1
+> [    0.271026] omap_i2c omap_i2c.1: IRQ (ISR = 0x0010)
+> [    0.271118] omap_i2c omap_i2c.1: IRQ (ISR = 0x0004)
+> [    0.272155] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
 
- arch/arm/boot/dts/tegra20-seaboard.dts |  139 ++++++++++++++++++++++++++++++++
- 1 files changed, 139 insertions(+), 0 deletions(-)
+still another race ? I'll look into it.
 
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index f9e3ad4..2e87330 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -612,6 +612,145 @@
- 		};
- 	};
- 
-+	kbc {
-+		status = "okay";
-+		nvidia,debounce-delay-ms = <32>;
-+		nvidia,repeat-delay-ms = <160>;
-+		nvidia,ghost-filter;
-+		nvidia,kbc-row-pins = <0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15>;
-+		nvidia,kbc-col-pins = <16 17 18 19 20 21 22 23>;
-+		linux,keymap = <0x00020011	/* KEY_W */
-+				0x0003001F	/* KEY_S */
-+				0x0004001E	/* KEY_A */
-+				0x0005002C	/* KEY_Z */
-+				0x000701d0	/* KEY_FN */
-+
-+				0x0107007D	/* KEY_LEFTMETA */
-+				0x02060064 	/* KEY_RIGHTALT */
-+				0x02070038	/* KEY_LEFTALT */
-+
-+				0x03000006	/* KEY_5 */
-+				0x03010005	/* KEY_4 */
-+				0x03020013	/* KEY_R */
-+				0x03030012	/* KEY_E */
-+				0x03040021	/* KEY_F */
-+				0x03050020	/* KEY_D */
-+				0x0306002D	/* KEY_X */
-+
-+				0x04000008	/* KEY_7 */
-+				0x04010007	/* KEY_6 */
-+				0x04020014	/* KEY_T */
-+				0x04030023	/* KEY_H */
-+				0x04040022	/* KEY_G */
-+				0x0405002F	/* KEY_V */
-+				0x0406002E	/* KEY_C */
-+				0x04070039	/* KEY_SPACE */
-+
-+				0x0500000A	/* KEY_9 */
-+				0x05010009	/* KEY_8 */
-+				0x05020016	/* KEY_U */
-+				0x05030015	/* KEY_Y */
-+				0x05040024	/* KEY_J */
-+				0x05050031	/* KEY_N */
-+				0x05060030	/* KEY_B */
-+				0x0507002B	/* KEY_BACKSLASH */
-+
-+				0x0600000C	/* KEY_MINUS */
-+				0x0601000B	/* KEY_0 */
-+				0x06020018	/* KEY_O */
-+				0x06030017	/* KEY_I */
-+				0x06040026	/* KEY_L */
-+				0x06050025	/* KEY_K */
-+				0x06060033	/* KEY_COMMA */
-+				0x06070032	/* KEY_M */
-+
-+				0x0701000D	/* KEY_EQUAL */
-+				0x0702001B	/* KEY_RIGHTBRACE */
-+				0x0703001C	/* KEY_ENTER */
-+				0x0707008B	/* KEY_MENU */
-+
-+				0x08040036	/* KEY_RIGHTSHIFT */
-+				0x0805002A	/* KEY_LEFTSHIFT */
-+
-+				0x09050061	/* KEY_RIGHTCTRL */
-+				0x0907001D	/* KEY_LEFTCTRL */
-+
-+				0x0B00001A	/* KEY_LEFTBRACE */
-+				0x0B010019	/* KEY_P */
-+				0x0B020028	/* KEY_APOSTROPHE */
-+				0x0B030027	/* KEY_SEMICOLON */
-+				0x0B040035	/* KEY_SLASH */
-+				0x0B050034	/* KEY_DOT */
-+
-+				0x0C000044	/* KEY_F10 */
-+				0x0C010043	/* KEY_F9 */
-+				0x0C02000E	/* KEY_BACKSPACE */
-+				0x0C030004	/* KEY_3 */
-+				0x0C040003	/* KEY_2 */
-+				0x0C050067	/* KEY_UP */
-+				0x0C0600D2	/* KEY_PRINT */
-+				0x0C070077	/* KEY_PAUSE */
-+
-+				0x0D00006E	/* KEY_INSERT */
-+				0x0D01006F	/* KEY_DELETE */
-+				0x0D030068	/* KEY_PAGEUP  */
-+				0x0D04006D	/* KEY_PAGEDOWN */
-+				0x0D05006A	/* KEY_RIGHT */
-+				0x0D06006C	/* KEY_DOWN */
-+				0x0D070069	/* KEY_LEFT */
-+
-+				0x0E000057	/* KEY_F11 */
-+				0x0E010058	/* KEY_F12 */
-+				0x0E020042	/* KEY_F8 */
-+				0x0E030010	/* KEY_Q */
-+				0x0E04003E	/* KEY_F4 */
-+				0x0E05003D	/* KEY_F3 */
-+				0x0E060002	/* KEY_1 */1
-+				0x0E070041	/* KEY_F7 */
-+
-+				0x0F000001	/* KEY_ESC */
-+				0x0F010029	/* KEY_GRAVE */
-+				0x0F02003F	/* KEY_F5 */
-+				0x0F03000F	/* KEY_TAB */
-+				0x0F04003B	/* KEY_F1 */
-+				0x0F05003C	/* KEY_F2 */
-+				0x0F06003A	/* KEY_CAPSLOCK */
-+				0x0F070040	/* KEY_F6 */
-+
-+				/* Software Handled Function Keys */
-+				0x14000047	/* KEY_KP7 */
-+
-+				0x15000049	/* KEY_KP9 */
-+				0x15010048	/* KEY_KP8 */
-+				0x1502004B	/* KEY_KP4 */
-+				0x1504004F	/* KEY_KP1 */
-+
-+				0x1601004E	/* KEY_KPSLASH */
-+				0x1602004D	/* KEY_KP6 */
-+				0x1603004C	/* KEY_KP5 */
-+				0x16040051	/* KEY_KP3 */
-+				0x16050050	/* KEY_KP2 */
-+				0x16070052	/* KEY_KP0 */
-+
-+				0x1B010037	/* KEY_KPASTERISK */
-+				0x1B03004A	/* KEY_KPMINUS */
-+				0x1B04004E	/* KEY_KPPLUS */
-+				0x1B050053	/* KEY_KPDOT */
-+
-+				0x1C050073	/* KEY_VOLUMEUP */
-+
-+				0x1D030066	/* KEY_HOME */
-+				0x1D04006B	/* KEY_END */
-+				0x1D0500E0	/* KEY_BRIGHTNESSDOWN */
-+				0x1D060072	/* KEY_VOLUMEDOWN */
-+				0x1D0700E1	/* KEY_BRIGHTNESSUP */
-+
-+				0x1E000045	/* KEY_NUMLOCK */
-+				0x1E010046	/* KEY_SCROLLLOCK */
-+				0x1E020071	/* KEY_MUTE */
-+
-+				0x1F04008A>;	/* KEY_HELP */
-+	};
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
+> > > >   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git i2c-deferred-STP
+> > > 
+> > > I could not reproduce the issue with these. Tested around 20 boots.
+> > > There's a noticeable delay (over 4 secs!) around where I2C is initialized
+> > > and used for the first time, but no errors and the boot completes:
+> > > 
+> > > [    0.187530] SCSI subsystem initialized
+> > > [    0.188110] usbcore: registered new interface driver usbfs
+> > > [    0.188415] usbcore: registered new interface driver hub
+> > > [    0.188781] usbcore: registered new device driver usb
+> > > [    0.189453] musb-omap2430 musb-omap2430: invalid resource
+> > > [    4.296905] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
+> > > [    4.297088] twl 1-0048: power (irq 343) chaining IRQs 346..353
+> > > [    4.329010] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
+> > > [    4.470123] VUSB1V5: 1500 mV normal standby
+> > > [    4.470916] VUSB1V8: 1800 mV normal standby
+> > 
+> > cool, at least it works, but looks like there is something still weird
+> > going on. Can you enable full logs so I see what's happening ?
+> 
+> With your patches, all DEBUG logs are identical (there is same
+> amount I2C of transfers), except there is only a single interrupt per
+> transfer. Still, the transfers are taking considerably longer, and we
+> see those delays in the boot:
+> 
+> [    4.281280] twl 1-0048: PIH (irq 23) chaining IRQs 338..346
+> [    4.281433] twl 1-0048: power (irq 343) chaining IRQs 346..353
+> [    4.281616] i2c i2c-1: master_xfer[0] W, addr=0x49, len=1
+> [    4.281677] i2c i2c-1: master_xfer[1] R, addr=0x49, len=1
+> [    4.281707] omap_i2c omap_i2c.1: addr: 0x0049, len: 1, flags: 0x0, stop: 0
+> [    4.281799] omap_i2c omap_i2c.1: IRQ (ISR = 0x0010)
+> [    4.281829] omap_i2c omap_i2c.1: addr: 0x0049, len: 1, flags: 0x1, stop: 1
+> [    4.281921] omap_i2c omap_i2c.1: IRQ (ISR = 0x0008)
+> [    4.296905] i2c i2c-1: master_xfer[0] W, addr=0x49, len=2
+> [    4.296936] omap_i2c omap_i2c.1: addr: 0x0049, len: 2, flags: 0x0, stop: 1
+> [    4.296997] omap_i2c omap_i2c.1: IRQ (ISR = 0x0010)
+> [    4.313476] twl4030_gpio twl4030_gpio: gpio (irq 338) chaining IRQs 354..371
+> 
+> This log excerpt has only 3 transfers, but the time duration is already
+> 10x longer compared to vanilla 3.8-rc3.
+
+weird, there's nothing extremely expensive added by my patchset, I'll go
+over them and try to figure out what's going on.
+
+Thanks for notifying me about it.
+
 -- 
-1.7.1.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130115/263fe819/attachment-0001.sig>
