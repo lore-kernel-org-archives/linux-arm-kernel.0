@@ -1,106 +1,384 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 15 Jan 2013 16:37:36 +0800
-Subject: [PATCH 2/2] gpio: devm_gpio_* support should not depend on GPIOLIB
-In-Reply-To: <1358239056-703-1-git-send-email-shawn.guo@linaro.org>
-References: <1358239056-703-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1358239056-703-3-git-send-email-shawn.guo@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 15 Jan 2013 14:12:52 +0530
+Subject: [RFC PATCH 1/7] drivers: usb: phy: add a new driver for usb part of
+ control module
+In-Reply-To: <1358239378-10030-1-git-send-email-kishon@ti.com>
+References: <1358239378-10030-1-git-send-email-kishon@ti.com>
+Message-ID: <1358239378-10030-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some architectures (e.g. blackfin) provide gpio API without requiring
-GPIOLIB support (ARCH_WANT_OPTIONAL_GPIOLIB).  devm_gpio_* functions
-should also work for these architectures, since they do not really
-depend on GPIOLIB.
+Added a new driver for the usb part of control module. This has an API
+to power on the USB2 phy and an API to write to the mailbox depending on
+whether MUSB has to act in host mode or in device mode.
 
-Add a new option GPIO_DEVRES (enabled by default) to control the build
-of devres.c, and move devm_gpio_* function declarations out from #ifdef
-CONFIG_GPIOLIB in include/asm-generic/gpio.h, so that they can be
-available to client drivers without unnecessary dependency on GPIOLIB.
+Writing to control module registers for doing the above task which was
+previously done in omap glue and in omap-usb2 phy will be removed.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/gpio/Kconfig       |    3 +++
- drivers/gpio/Makefile      |    3 ++-
- include/asm-generic/gpio.h |   17 ++++++++---------
- 3 files changed, 13 insertions(+), 10 deletions(-)
+ Documentation/devicetree/bindings/usb/omap-usb.txt |   21 +-
+ drivers/usb/phy/Kconfig                            |    9 +
+ drivers/usb/phy/Makefile                           |    1 +
+ drivers/usb/phy/omap-control-usb.c                 |  204 ++++++++++++++++++++
+ include/linux/usb/omap_control_usb.h               |   73 +++++++
+ 5 files changed, 307 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/usb/phy/omap-control-usb.c
+ create mode 100644 include/linux/usb/omap_control_usb.h
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 682de75..d972932 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -30,6 +30,9 @@ config ARCH_REQUIRE_GPIOLIB
- 	  Selecting this from the architecture code will cause the gpiolib
- 	  code to always get built in.
+diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
+index 29a043e..d58dae3 100644
+--- a/Documentation/devicetree/bindings/usb/omap-usb.txt
++++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+@@ -1,4 +1,4 @@
+-OMAP GLUE
++OMAP GLUE AND OTHER OMAP SPECIFIC COMPONENTS
  
-+config GPIO_DEVRES
-+	def_bool y
-+	depends on HAS_IOMEM
- 
- 
- menuconfig GPIOLIB
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index c5aebd0..36ca605 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -2,7 +2,8 @@
- 
- ccflags-$(CONFIG_DEBUG_GPIO)	+= -DDEBUG
- 
--obj-$(CONFIG_GPIOLIB)		+= gpiolib.o devres.o
-+obj-$(CONFIG_GPIO_DEVRES)	+= devres.o
-+obj-$(CONFIG_GPIOLIB)		+= gpiolib.o
- obj-$(CONFIG_OF_GPIO)		+= gpiolib-of.o
- obj-$(CONFIG_GPIO_ACPI)		+= gpiolib-acpi.o
- 
-diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-index 2341014..71fd984 100644
---- a/include/asm-generic/gpio.h
-+++ b/include/asm-generic/gpio.h
-@@ -7,6 +7,8 @@
- #include <linux/of.h>
- #include <linux/pinctrl/pinctrl.h>
- 
-+struct device;
+ OMAP MUSB GLUE
+  - compatible : Should be "ti,omap4-musb" or "ti,omap3-musb"
+@@ -31,3 +31,22 @@ Board specific device node entry
+ 	mode = <3>;
+ 	power = <50>;
+ };
 +
- #ifdef CONFIG_GPIOLIB
++OMAP CONTROL USB
++
++Required properties:
++ - compatible: Should be "ti,omap-control-usb"
++ - reg : Address and length of the register set for the device. It contains
++   the address of "control_dev_conf" and "otghs_control".
++ - reg-names: The names of the register addresses corresponding to the registers
++   filled in "reg".
++ - ti,has_mailbox: This is used to specify if the platform uses mailbox in
++   control module.
++
++omap_control_usb at 4a002300 {
++	compatible = "ti,omap-control-usb";
++	reg = <0x4a002300 0x4>,
++	      <0x4a00233c 0x4>;
++	reg-names = "control_dev_conf", "otghs_control";
++	ti,has_mailbox;
++};
+diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+index 5de6e7f..a7277ee 100644
+--- a/drivers/usb/phy/Kconfig
++++ b/drivers/usb/phy/Kconfig
+@@ -14,6 +14,15 @@ config OMAP_USB2
+ 	  The USB OTG controller communicates with the comparator using this
+ 	  driver.
  
- #include <linux/compiler.h>
-@@ -42,7 +44,6 @@ static inline bool gpio_is_valid(int number)
- 	return number >= 0 && number < ARCH_NR_GPIOS;
- }
++config OMAP_CONTROL_USB
++	tristate "OMAP CONTROL USB Driver"
++	depends on ARCH_OMAP2PLUS
++	help
++	  Enable this to add support for the USB part present in the control
++	  module. This driver has API to power on the PHY and to write to the
++	  mailbox. The mailbox is present only in omap4 and the register to
++	  power on the PHY is present in omap4 and omap5.
++
+ config USB_ISP1301
+ 	tristate "NXP ISP1301 USB transceiver support"
+ 	depends on USB || USB_GADGET
+diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
+index 1a579a8..0dea4d2 100644
+--- a/drivers/usb/phy/Makefile
++++ b/drivers/usb/phy/Makefile
+@@ -5,6 +5,7 @@
+ ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
  
--struct device;
- struct gpio;
- struct seq_file;
- struct module;
-@@ -192,12 +193,6 @@ extern int gpio_request_one(unsigned gpio, unsigned long flags, const char *labe
- extern int gpio_request_array(const struct gpio *array, size_t num);
- extern void gpio_free_array(const struct gpio *array, size_t num);
- 
--/* bindings for managed devices that want to request gpios */
--int devm_gpio_request(struct device *dev, unsigned gpio, const char *label);
--int devm_gpio_request_one(struct device *dev, unsigned gpio,
--			  unsigned long flags, const char *label);
--void devm_gpio_free(struct device *dev, unsigned int gpio);
--
- #ifdef CONFIG_GPIO_SYSFS
- 
- /*
-@@ -280,9 +275,13 @@ static inline void gpio_set_value_cansleep(unsigned gpio, int value)
- 
- #endif /* !CONFIG_GPIOLIB */
- 
--#ifndef CONFIG_GPIO_SYSFS
-+/* bindings for managed devices that want to request gpios */
-+int devm_gpio_request(struct device *dev, unsigned gpio, const char *label);
-+int devm_gpio_request_one(struct device *dev, unsigned gpio,
-+			  unsigned long flags, const char *label);
-+void devm_gpio_free(struct device *dev, unsigned int gpio);
- 
--struct device;
-+#ifndef CONFIG_GPIO_SYSFS
- 
- /* sysfs support is only available with gpiolib, where it's optional */
- 
+ obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
++obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
+ obj-$(CONFIG_USB_ISP1301)		+= isp1301.o
+ obj-$(CONFIG_MV_U3D_PHY)		+= mv_u3d_phy.o
+ obj-$(CONFIG_USB_EHCI_TEGRA)	+= tegra_usb_phy.o
+diff --git a/drivers/usb/phy/omap-control-usb.c b/drivers/usb/phy/omap-control-usb.c
+new file mode 100644
+index 0000000..bed41a9
+--- /dev/null
++++ b/drivers/usb/phy/omap-control-usb.c
+@@ -0,0 +1,204 @@
++/*
++ * omap-control-usb.c - The USB part of control module.
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * Author: Kishon Vijay Abraham I <kishon@ti.com>
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/usb/omap_control_usb.h>
++
++static struct omap_control_usb *control_usb;
++
++/**
++ * get_omap_control_dev - returns the device pointer for this control device
++ *
++ * This API should be called to get the device pointer for this control
++ * module device. This device pointer should be passed to all other API's
++ * in this driver.
++ *
++ * To be used by PHY driver and glue driver
++ */
++struct device *get_omap_control_dev(void)
++{
++	if (!control_usb)
++		return ERR_PTR(-ENODEV);
++
++	return control_usb->dev;
++}
++EXPORT_SYMBOL_GPL(get_omap_control_dev);
++
++/**
++ * omap_control_usb_phy_power - power on/off the phy using control module reg
++ * @dev: the control module device
++ * @on: 0 or 1, based on powering on or off the PHY
++ */
++void omap_control_usb_phy_power(struct device *dev, int on)
++{
++	u32 val;
++	struct omap_control_usb	*control_usb = dev_get_drvdata(dev);
++
++	if (on) {
++		val = readl(control_usb->dev_conf);
++		if (val & PHY_PD)
++			writel(~PHY_PD, control_usb->dev_conf);
++	} else {
++		writel(PHY_PD, control_usb->dev_conf);
++	}
++}
++EXPORT_SYMBOL_GPL(omap_control_usb_phy_power);
++
++/**
++ * omap_control_usb_host_mode - set AVALID, VBUSVALID and ID pin in grounded
++ * @dev: struct device *
++ *
++ * This is an API to write to the mailbox register to notify the usb core that
++ * a usb device has been connected.
++ */
++void omap_control_usb_host_mode(struct device *dev)
++{
++	u32 val;
++	struct omap_control_usb	*control_usb = dev_get_drvdata(dev);
++
++	val = AVALID | VBUSVALID;
++
++	writel(val, control_usb->otghs_control);
++}
++EXPORT_SYMBOL_GPL(omap_control_usb_host_mode);
++
++/**
++ * omap_control_usb_device_mode - set AVALID, VBUSVALID and ID pin in high
++ * impedance
++ * @dev: struct device *
++ *
++ * This is an API to write to the mailbox register to notify the usb core that
++ * it has been connected to a usb host.
++ */
++void omap_control_usb_device_mode(struct device *dev)
++{
++	u32 val;
++	struct omap_control_usb	*control_usb = dev_get_drvdata(dev);
++
++	val = IDDIG | AVALID | VBUSVALID;
++
++	writel(val, control_usb->otghs_control);
++}
++EXPORT_SYMBOL_GPL(omap_control_usb_device_mode);
++
++/**
++ * omap_control_usb_set_sessionend - Enable SESSIONEND and IDIG to high
++ * impedance
++ * @dev: struct device *
++ *
++ * This is an API to write to the mailbox register to notify the usb core
++ * it's now in disconnected state.
++ */
++void omap_control_usb_set_sessionend(struct device *dev)
++{
++	u32 val;
++	struct omap_control_usb	*control_usb = dev_get_drvdata(dev);
++
++	val = SESSEND | IDDIG;
++
++	writel(val, control_usb->otghs_control);
++}
++EXPORT_SYMBOL_GPL(omap_control_usb_set_sessionend);
++
++static int omap_control_usb_probe(struct platform_device *pdev)
++{
++	struct resource	*res;
++	struct device_node *np = pdev->dev.of_node;
++	struct omap_control_usb_platform_data *pdata = pdev->dev.platform_data;
++
++	control_usb = devm_kzalloc(&pdev->dev, sizeof(*control_usb),
++	    GFP_KERNEL);
++	if (!control_usb) {
++		dev_err(&pdev->dev, "unable to alloc memory for control usb\n");
++		return -ENOMEM;
++	}
++
++	if (np) {
++		control_usb->has_mailbox = of_property_read_bool(np,
++		    "ti,has_mailbox");
++	} else if (pdata) {
++		control_usb->has_mailbox = pdata->has_mailbox;
++	} else {
++		dev_err(&pdev->dev, "no pdata present\n");
++		return -EINVAL;
++	}
++
++	control_usb->dev	= &pdev->dev;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
++	    "control_dev_conf");
++	control_usb->dev_conf = devm_request_and_ioremap(&pdev->dev, res);
++	if (control_usb->dev_conf == NULL) {
++		dev_err(&pdev->dev, "Failed to obtain io memory\n");
++		return -ENXIO;
++	}
++
++	if (control_usb->has_mailbox) {
++		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
++		    "otghs_control");
++		control_usb->otghs_control = devm_request_and_ioremap(
++		    &pdev->dev, res);
++		if (control_usb->otghs_control == NULL) {
++			dev_err(&pdev->dev, "Failed to obtain io memory\n");
++			return -ENXIO;
++		}
++	}
++
++	dev_set_drvdata(control_usb->dev, control_usb);
++
++	return 0;
++}
++
++#ifdef CONFIG_OF
++static const struct of_device_id omap_control_usb_id_table[] = {
++	{ .compatible = "ti,omap-control-usb" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, omap_control_usb_id_table);
++#endif
++
++static struct platform_driver omap_control_usb_driver = {
++	.probe		= omap_control_usb_probe,
++	.driver		= {
++		.name	= "omap-control-usb",
++		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(omap_control_usb_id_table),
++	},
++};
++
++static int __init omap_control_usb_init(void)
++{
++	return platform_driver_register(&omap_control_usb_driver);
++}
++subsys_initcall(omap_control_usb_init);
++
++static void __exit omap_control_usb_exit(void)
++{
++	platform_driver_unregister(&omap_control_usb_driver);
++}
++module_exit(omap_control_usb_exit);
++
++MODULE_ALIAS("platform: omap_control_usb");
++MODULE_AUTHOR("Texas Instruments Inc.");
++MODULE_DESCRIPTION("OMAP CONTROL USB DRIVER");
++MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/usb/omap_control_usb.h b/include/linux/usb/omap_control_usb.h
+new file mode 100644
+index 0000000..fbc7407
+--- /dev/null
++++ b/include/linux/usb/omap_control_usb.h
+@@ -0,0 +1,73 @@
++/*
++ * omap_control_usb.h - Header file for the USB part of control module.
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * Author: Kishon Vijay Abraham I <kishon@ti.com>
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __OMAP_CONTROL_USB_H__
++#define __OMAP_CONTROL_USB_H__
++
++struct omap_control_usb {
++	struct device *dev;
++
++	u32 __iomem *dev_conf;
++	u32 __iomem *otghs_control;
++
++	u8 has_mailbox:1;
++};
++
++struct omap_control_usb_platform_data {
++	u8 has_mailbox:1;
++};
++
++#define	PHY_PD		BIT(0)
++
++#define	AVALID		BIT(0)
++#define	BVALID		BIT(1)
++#define	VBUSVALID	BIT(2)
++#define	SESSEND		BIT(3)
++#define	IDDIG		BIT(4)
++
++#if (defined(CONFIG_OMAP_CONTROL_USB) || \
++				defined(CONFIG_OMAP_CONTROL_USB_MODULE))
++extern struct device *get_omap_control_dev(void);
++extern void omap_control_usb_phy_power(struct device *dev, int on);
++extern void omap_control_usb_host_mode(struct device *dev);
++extern void omap_control_usb_device_mode(struct device *dev);
++extern void omap_control_usb_set_sessionend(struct device *dev);
++#else
++static inline struct device *get_omap_control_dev()
++{
++	return ERR_PTR(-ENODEV);
++}
++
++static inline void omap_control_usb_phy_power(struct device *dev, int on)
++{
++}
++
++static inline void omap_control_usb_host_mode(struct device *dev)
++{
++}
++
++static inline void omap_control_usb_device_mode(struct device *dev)
++{
++}
++
++static inline void omap_control_usb_set_sessionend(struct device *dev)
++{
++}
++#endif
++
++#endif	/* __OMAP_CONTROL_USB_H__ */
 -- 
 1.7.9.5
