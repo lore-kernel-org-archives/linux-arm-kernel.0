@@ -1,124 +1,162 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 15 Jan 2013 18:34:01 +0000
-Subject: [PATCH 13/16] drivers: misc: add ARM CCI support
-In-Reply-To: <alpine.LFD.2.02.1301111414390.6300@xanadu.home>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-14-git-send-email-nicolas.pitre@linaro.org>
- <50F057D7.1010808@ti.com>
- <alpine.LFD.2.02.1301111414390.6300@xanadu.home>
-Message-ID: <20130115183401.GD1983@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 15 Jan 2013 11:36:39 -0700
+Subject: [PATCH 3/4] pinctrl: add abx500 pinctrl driver core
+In-Reply-To: <1358242984-5160-1-git-send-email-linus.walleij@stericsson.com>
+References: <1358242984-5160-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <50F5A1B7.20504@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 02:22:10PM -0500, Nicolas Pitre wrote:
-> On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
+On 01/15/2013 02:43 AM, Linus Walleij wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
 > 
-> > On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> > > From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > 
-> > > On ARM multi-cluster systems coherency between cores running on
-> > > different clusters is managed by the cache-coherent interconnect (CCI).
-> > > It allows broadcasting of TLB invalidates and memory barriers and it
-> > > guarantees cache coherency at system level.
-> > > 
-> > > This patch enables the basic infrastructure required in Linux to
-> > > handle and programme the CCI component. The first implementation is
-> > > based on a platform device, its relative DT compatible property and
-> > > a simple programming interface.
-> > > 
-> > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > > ---
-> > >   drivers/misc/Kconfig    |   3 ++
-> > >   drivers/misc/Makefile   |   1 +
-> > >   drivers/misc/arm-cci.c  | 107
-> > > ++++++++++++++++++++++++++++++++++++++++++++++++
-> > >   include/linux/arm-cci.h |  30 ++++++++++++++
-> > How about 'drivers/bus/' considering CCI is an interconnect bus (though
-> > for coherency)
-> 
-> Yes, I like that better.
-> 
-> > >   4 files changed, 141 insertions(+)
-> > >   create mode 100644 drivers/misc/arm-cci.c
-> > >   create mode 100644 include/linux/arm-cci.h
-> > > 
-> > > diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-> > > index b151b7c1bd..30d5be1ad2 100644
-> > > --- a/drivers/misc/Kconfig
-> > > +++ b/drivers/misc/Kconfig
-> > > @@ -499,6 +499,9 @@ config USB_SWITCH_FSA9480
-> > >   	  stereo and mono audio, video, microphone and UART data to use
-> > >   	  a common connector port.
-> > > 
-> > > +config ARM_CCI
-> > You might want add depends on ARM big.LITTTLE otherwise it will
-> > break build for other arch's with random configurations.
-> 
-> As far as this patch goes, this is buildable on other architectures too.  
-> The next patch changes that though.
-> 
-> > [..]
-> > 
-> > > diff --git a/drivers/misc/arm-cci.c b/drivers/misc/arm-cci.c
-> > > new file mode 100644
-> > > index 0000000000..f329c43099
-> > > --- /dev/null
-> > > +++ b/drivers/misc/arm-cci.c
-> > > @@ -0,0 +1,107 @@
-> > > +/*
-> > > + * CCI support
-> > > + *
-> > > + * Copyright (C) 2012 ARM Ltd.
-> > > + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or modify
-> > > + * it under the terms of the GNU General Public License version 2 as
-> > > + * published by the Free Software Foundation.
-> > > + *
-> > > + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> > > + * kind, whether express or implied; without even the implied warranty
-> > > + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > > + * GNU General Public License for more details.
-> > > + */
-> > > +
-> > > +#include <linux/device.h>
-> > > +#include <linux/io.h>
-> > > +#include <linux/module.h>
-> > > +#include <linux/platform_device.h>
-> > > +#include <linux/slab.h>
-> > > +#include <linux/arm-cci.h>
-> > > +
-> > > +#define CCI400_EAG_OFFSET       0x4000
-> > > +#define CCI400_KF_OFFSET        0x5000
-> > > +
-> > > +#define DRIVER_NAME	"CCI"
-> > > +struct cci_drvdata {
-> > > +	void __iomem *baseaddr;
-> > > +	spinlock_t lock;
-> > > +};
-> > > +
-> > > +static struct cci_drvdata *info;
-> > > +
-> > > +void disable_cci(int cluster)
-> > > +{
-> > > +	u32 cci_reg = cluster ? CCI400_KF_OFFSET : CCI400_EAG_OFFSET;
-> > > +	writel_relaxed(0x0, info->baseaddr	+ cci_reg);
-> > > +
-> > > +	while (readl_relaxed(info->baseaddr + 0xc) & 0x1)
-> > > +			;
-> > > +}
-> > > +EXPORT_SYMBOL_GPL(disable_cci);
-> > > +
-> > Is more functionality going to be added for CCI driver. Having this
-> > much of driver code for just a disable_cci() functions seems like
-> > overkill.
-> 
-> Yes.  More code will appear here to provide pmu functionalities, etc.
+> This adds the AB8500 core driver, which will be utilized by
+> the follow-on drivers for different ABx500 variants.
+> Sselect the driver from the DBX500_SOC, as this chip is
+> powering and clocking that SoC.
 
-There's also a load of QoS configuration and other stuff which we could
-control, in principle.  Normally the optimum settings are a property of
-the hardware, so maybe we would always just rely on the firmware to
-set up a sensible configuration.
+> diff --git a/drivers/pinctrl/pinctrl-abx500.c b/drivers/pinctrl/pinctrl-abx500.c
 
-Cheers
----Dave
+> +static int abx500_gpio_get(struct gpio_chip *chip, unsigned offset)
+
+Shouldn't this call abx500_gpio_get_bit(), just like abx500_gpio_set()
+calls abx500_gpio_set_bit()?
+
+> +static int abx500_gpio_direction_output(struct gpio_chip *chip,
+> +					unsigned offset,
+> +					int val)
+...
+> +	/* disable pull down */
+...
+> +	/* if supported, disable both pull down and pull up */
+
+Why the need to override those options?
+
+> +static u8 abx500_get_mode(struct pinctrl_dev *pctldev, struct gpio_chip *chip,
+> +		unsigned gpio)
+
+> +	if (af.gpiosel_bit == UNUSED)
+> +		return ABX500_DEFAULT;
+
+That's odd; abx500_set_mode() seems to allow setting the mode to
+something other than default even if (af.gpiosel_bit == UNUSED). Are
+set_mode/get_mode actually correct inverses of each-other?
+
+> +static int abx500_gpio_irq_init(struct abx500_pinctrl *pct)
+...
+> +#ifdef CONFIG_ARM
+> +		set_irq_flags(irq, IRQF_VALID);
+> +#else
+> +		irq_set_noprobe(irq);
+> +#endif
+
+I assume that ifdef is always set one particular way?
+
+> +static void abx500_gpio_irq_remove(struct abx500_pinctrl *pct)
+...
+> +#ifdef CONFIG_ARM
+> +		set_irq_flags(irq, 0);
+> +#endif
+
+Same there.
+
+> +static void abx500_pmx_disable(struct pinctrl_dev *pctldev,
+> +			    unsigned function, unsigned group)
+> +{
+> +	struct abx500_pinctrl *pct = pinctrl_dev_get_drvdata(pctldev);
+> +	const struct abx500_pingroup *g;
+> +
+> +	g = &pct->soc->groups[group];
+> +	if (g->altsetting < 0)
+> +		return;
+> +
+> +	/* Poke out the mux, set the pin to some default state? */
+> +	dev_dbg(pct->dev, "disable group %s, %u pins\n", g->name, g->npins);
+> +}
+
+That looks basically unimplemented, and the comment seems like a FIXME?
+
+> +int abx500_gpio_request_enable(struct pinctrl_dev *pctldev,
+> +			    struct pinctrl_gpio_range *range,
+> +			    unsigned offset)
+...
+> +	/*
+> +	 * by default, for ABx5xx family, GPIO mode is selected by
+> +	 * writing 1 in GPIOSELx registers
+> +	 */
+> +	ret = abx500_mask_and_set_register_interruptible(pct->dev,
+> +		AB8500_MISC, reg, 1 << pos, 1 << pos);
+
+It sounds like this should be implemented using abx500_set_mode()?
+
+> +int abx500_pin_config_set(struct pinctrl_dev *pctldev,
+> +		       unsigned pin,
+> +		       unsigned long config)
+
+> +	switch (param) {
+> +	case PIN_CONFIG_BIAS_PULL_DOWN:
+> +		/*
+> +		 * if argument = 1 set the pull down
+> +		 * else clear the pull down
+> +		 */
+> +		ret = abx500_gpio_direction_input(chip, offset);
+
+That looks odd; why force the pin to be a GPIO just to enable a pull down?
+
+> +		/* check if pin supports pull updown feature */
+> +		if (pullud && pin >= pullud->first_pin	&& pin <= pullud->last_pin)
+> +			ret = abx500_config_pull_updown(pct,
+> +				offset,
+> +				argument ? ABX500_GPIO_PULL_DOWN : ABX500_GPIO_PULL_NONE);
+> +		else
+> +			ret = abx500_gpio_set_bits(chip, AB8500_GPIO_PUD1_REG,
+> +				offset, argument ? 0 : 1);
+
+Hmm. Wouldn't it be better to remove the if statement, and just store
+ABX500_GPIO_PULL_DOWN or 0, and ABX500_GPIO_PULL_NONE or 1, in the soc_data?
+
+> +static int __devinit abx500_gpio_probe(struct platform_device *pdev)
+
+> +	/* Poke in other ASIC variants here */
+> +	switch (platid->driver_data) {
+> +	case PINCTRL_AB8500:
+> +		abx500_pinctrl_ab8500_init(&pct->soc);
+> +		break;
+> +	case PINCTRL_AB8540:
+> +		abx500_pinctrl_ab8540_init(&pct->soc);
+> +		break;
+> +	case PINCTRL_AB9540:
+> +		abx500_pinctrl_ab9540_init(&pct->soc);
+> +		break;
+> +	case PINCTRL_AB8505:
+> +		abx500_pinctrl_ab8505_init(&pct->soc);
+> +		break;
+> +	default:
+> +		dev_err(&pdev->dev, "Unsupported pinctrl sub driver (%d)\n",
+> +				(int) platid->driver_data);
+> +		return -EINVAL;
+> +	}
+
+Most of those functions don't exist yet. I see there are dummy inlines
+below for them if the /config/ options aren't turned on, but what's to
+stop somebody turning on the config option before the real
+implementation exists?
+
+In the past, Arnd requested that each variant had a separate top-level
+driver object that called into a utility probe() function, rather than
+having a probe() function that knew about all the SoC variants, and
+dispatched out to a variant-specific function.
+
+> +static int __devexit abx500_gpio_remove(struct platform_device *pdev)
+
+> +	platform_set_drvdata(pdev, NULL);
+
+There's no point doing that; nothing should touch the drvdata while the
+device doesn't exist (or isn't probed rather).
+
+> +	mutex_destroy(&pct->lock);
+> +	kfree(pct);
+
+That was allocated using devm_kzalloc(). There's no point freeing it
+here, and if there were, devm_kfree() should be used, or a double-free
+will occur.
