@@ -1,65 +1,154 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 15 Jan 2013 19:33:16 +0800
-Subject: [PATCH v2 1/4] ARM i.MX6: use reserved bit for mxs phy clock gate
-In-Reply-To: <1358230117-19443-1-git-send-email-peter.chen@freescale.com>
-References: <1358230117-19443-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130115113313.GB32113@S2101-09.ap.freescale.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 15 Jan 2013 11:34:28 +0000
+Subject: [PATCH V2 2/6] ARM: tegra20: cpuidle: add powered-down state for
+ secondary CPU
+In-Reply-To: <1358218844.8513.30.camel@jlo-ubuntu-64.nvidia.com>
+References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
+ <1354701715-24150-3-git-send-email-josephl@nvidia.com>
+ <20121205105010.GA12999@e102568-lin.cambridge.arm.com>
+ <1357888829.2034.39.camel@jlo-ubuntu-64.nvidia.com>
+ <20130111122417.GE30538@e102568-lin.cambridge.arm.com>
+ <1358218844.8513.30.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <20130115113427.GC26424@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 02:08:34PM +0800, Peter Chen wrote:
-> For mxs-phy user i.mx6q, the PHY's clock is controlled by
-> hardware automatically, the software only needs to enable it
-> at probe, disable it at remove. During the runtime,
-> we don't need to control it. So for the usbphy clk policy:
+On Tue, Jan 15, 2013 at 03:00:44AM +0000, Joseph Lo wrote:
+> On Fri, 2013-01-11 at 20:24 +0800, Lorenzo Pieralisi wrote:
+> > On Fri, Jan 11, 2013 at 07:20:29AM +0000, Joseph Lo wrote:
+> > > On Wed, 2012-12-05 at 18:50 +0800, Lorenzo Pieralisi wrote:
+> > > > On Wed, Dec 05, 2012 at 10:01:49AM +0000, Joseph Lo wrote:
+> > > > > The powered-down state of Tegra20 requires power gating both CPU cores.
+> > > > > When the secondary CPU requests to enter powered-down state, it saves
+> > > > > its own contexts and then enters WFI. The Tegra20 had a limition to
+> > > > > power down both CPU cores. The secondary CPU must waits for CPU0 in
+> > > > > powered-down state too. If the secondary CPU be woken up before CPU0
+> > > > > entering powered-down state, then it needs to restore its CPU states
+> > > > > and waits for next chance.
+> > > > >
+> > > > > Be aware of that, you may see the legacy power state "LP2" in the code
+> > > > > which is exactly the same meaning of "CPU power down".
+> > > > >
+> > > > > Based on the work by:
+> > > > > Colin Cross <ccross@android.com>
+> > > > > Gary King <gking@nvidia.com>
+> > > > >
+> > > > > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > > > > +
+> > > > > +#ifdef CONFIG_PM_SLEEP
+> > > > > +/*
+> > > > > + * tegra_pen_lock
+> > > > > + *
+> > > > > + * spinlock implementation with no atomic test-and-set and no coherence
+> > > > > + * using Peterson's algorithm on strongly-ordered registers
+> > > > > + * used to synchronize a cpu waking up from wfi with entering lp2 on idle
+> > > > > + *
+> > > > > + * SCRATCH37 = r1 = !turn (inverted from Peterson's algorithm)
+> > > > > + * on cpu 0:
+> > > > > + * SCRATCH38 = r2 = flag[0]
+> > > > > + * SCRATCH39 = r3 = flag[1]
+> > > > > + * on cpu1:
+> > > > > + * SCRATCH39 = r2 = flag[1]
+> > > > > + * SCRATCH38 = r3 = flag[0]
+> > > > > + *
+> > > > > + * must be called with MMU on
+> > > > > + * corrupts r0-r3, r12
+> > > > > + */
+> > > > > +ENTRY(tegra_pen_lock)
+> > > > > +       mov32   r3, TEGRA_PMC_VIRT
+> > > > > +       cpu_id  r0
+> > > > > +       add     r1, r3, #PMC_SCRATCH37
+> > > > > +       cmp     r0, #0
+> > > > > +       addeq   r2, r3, #PMC_SCRATCH38
+> > > > > +       addeq   r3, r3, #PMC_SCRATCH39
+> > > > > +       addne   r2, r3, #PMC_SCRATCH39
+> > > > > +       addne   r3, r3, #PMC_SCRATCH38
+> > > > > +
+> > > > > +       mov     r12, #1
+> > > > > +       str     r12, [r2]               @ flag[cpu] = 1
+> > > > > +       dsb
+> > > > > +       str     r12, [r1]               @ !turn = cpu
+> > > > > +1:     dsb
+> > > > > +       ldr     r12, [r3]
+> > > > > +       cmp     r12, #1                 @ flag[!cpu] == 1?
+> > > > > +       ldreq   r12, [r1]
+> > > > > +       cmpeq   r12, r0                 @ !turn == cpu?
+> > > > > +       beq     1b                      @ while !turn == cpu && flag[!cpu] == 1
+> > > > > +
+> > > > > +       mov     pc, lr                  @ locked
+> > > > > +ENDPROC(tegra_pen_lock)
+> > > > > +
+> > > > > +ENTRY(tegra_pen_unlock)
+> > > > > +       dsb
+> > > > > +       mov32   r3, TEGRA_PMC_VIRT
+> > > > > +       cpu_id  r0
+> > > > > +       cmp     r0, #0
+> > > > > +       addeq   r2, r3, #PMC_SCRATCH38
+> > > > > +       addne   r2, r3, #PMC_SCRATCH39
+> > > > > +       mov     r12, #0
+> > > > > +       str     r12, [r2]
+> > > > > +       mov     pc, lr
+> > > > > +ENDPROC(tegra_pen_unlock)
+> > > > 
+> > > > There is an ongoing work to make this locking scheme for MMU/coherency off
+> > > > paths ARM generic, and we do not want to merge yet another platform specific
+> > > > locking mechanism. I will point you to the patchset when it hits LAK.
+> > > > 
+> > > 
+> > > You did mention there is an ARM generic locking scheme for MMU/coherency
+> > > off case before. Do you mean the patch below?
+> > > 
+> > > https://patchwork.kernel.org/patch/1957911/
+> > > https://patchwork.kernel.org/patch/1957901/
+> > 
+> > Those are used for first-man election when multiple CPUs come out of
+> > idle at once.
+> > 
+> > You should have a look at the entire series and in particular:
+> > 
+> > https://patchwork.kernel.org/patch/1957891/
+> > https://patchwork.kernel.org/patch/1957951/
+> > 
+> > > I gave it a review today. Looks it can't fit our usage for CPU idle
+> > > powered-down mode on Tegra20.
+> > > 
+> > > The generic mechanism only can be used when CPUs in non coherent world.
+> > > But our usage needs the mechanism could be used in both coherent and non
+> > > coherent case. OK. The case is we need to sync the status about the CPU1
+> > > was ready to power down. In this case, the CPU0 is still in coherent
+> > > world but the CPU1 isn't. So we need the locking scheme could be still
+> > > safe in this situation.
+> > 
+> > I know, I implemented something of that sort for an A9 based development
+> > platform, that's why I pointed you to this new patchset.
+> > 
+> > Have a look at the series, it should do what you want.
+> > 
+> Hi Lorenzo,
 > 
-> - Keep refcount for usbphy as clk framework needs to know if
-> it is off or on.
+> May I upstream this stuff first? I can promise to you I will re-work a
+> common CPUs and cluster power sync wrappers (platform_power_ops) for all
+> Tegra series that based on the generic framework. Because we didn't have
+> this work in Tegra tree yet and we indeed need it for supporting cluster
+> power down and switching.
+> 
+> But it need lots of time for re-work, testing and verification. And I
+> have lots of patches that need the function of cpu suspend that be
+> introduced in this patch series to support platform suspend for Tegra.
+> 
+> So I am asking the permission here for upstream this series first and I
+> will continue the job to come out a common CPUs and cluster power sync
+> wrappers for Tegra that we indeed need it to support cluster power down
+> and switching.
 
-Just checked the reference manual, it seems that not only bit 6
-(EN_USB_CLKS) but also bit 12 (POWER) are controlled by USB hardware.
-If this is true, I think that PLL3 and PLL7 are really designed for
-USB PHY use only.  Do you actually see other real users of these two
-PLLs on imx6q besides USB PHY?  If not, we can just provide a dummy
-clock to mxs-phy driver on imx6q, and keep real clocks usbphy1 and
-usbphy2 there for platform init function to enable them if USB support
-is built in.  Then, we can save all these dirty hacks.  Thoughts?
+I understand that and you should not ask me permission :-) since I am
+not a maintainer. I just wanted to save you some effort, you will end
+up rewriting the whole thing anyway IMHO and I think the power API would
+have saved you time if it were there before.
 
-Shawn
+Again, it is not my call, I am more than happy to review your code but
+that's all I can do.
 
-> - Use reserved bit, in that case, clk_enable/disable will
-> only update refcount, but without any hardware effects.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
-> Changes for v2:
-> - Use reserved bit for usb phy clk control
-> 
->  arch/arm/mach-imx/clk-imx6q.c |   10 ++++++++--
->  1 files changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 7f2c10c..85dcc89 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -208,8 +208,14 @@ int __init mx6q_clocks_init(void)
->  	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x3);
->  	clk[pll8_mlb]      = imx_clk_pllv3(IMX_PLLV3_MLB,	"pll8_mlb",	"osc", base + 0xd0, 0x0);
->  
-> -	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 6);
-> -	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 6);
-> +	/*
-> +	 * Bit 20 is the reserved and read-only bit, we do this only for:
-> +	 * - Do nothing for usbphy clk_enable/disable
-> +	 * - Keep refcount when do usbphy clk_enable/disable, in that case,
-> +	 * the clk framework can know the USB phy clk is on or off
-> +	 */
-> +	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 20);
-> +	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 20);
->  
->  	clk[sata_ref] = imx_clk_fixed_factor("sata_ref", "pll6_enet", 1, 5);
->  	clk[pcie_ref] = imx_clk_fixed_factor("pcie_ref", "pll6_enet", 1, 4);
-> -- 
-> 1.7.0.4
-> 
-> 
+If you need help to integrate the power API please do ask questions.
+
+Lorenzo
