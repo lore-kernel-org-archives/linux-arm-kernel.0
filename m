@@ -1,61 +1,62 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 15 Jan 2013 19:04:57 +0530
-Subject: [PATCH] ARM: AM33XX: clock: SET_RATE_PARENT in lcd path
-Message-ID: <1358256897-26275-1-git-send-email-afzal@ti.com>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Tue, 15 Jan 2013 15:34:55 +0200
+Subject: [PATCH v5 13/14] KVM: ARM: Handle I/O aborts
+In-Reply-To: <50F559C4.8080900@arm.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108184005.46302.38495.stgit@ubuntu>
+ <20130115131855.GL11529@redhat.com> <50F559C4.8080900@arm.com>
+Message-ID: <20130115133455.GN11529@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LCDC clock node is a one that does not have set rate capability. It
-just passes on the rate that is sent downstream by it's parent. While
-lcdc clock parent and it's grand parent - dpll_disp_m2_ck and
-dpll_disp_ck has the capability to configure rate.
+On Tue, Jan 15, 2013 at 01:29:40PM +0000, Marc Zyngier wrote:
+> On 15/01/13 13:18, Gleb Natapov wrote:
+> > On Tue, Jan 08, 2013 at 01:40:05PM -0500, Christoffer Dall wrote:
+> >> When the guest accesses I/O memory this will create data abort
+> >> exceptions and they are handled by decoding the HSR information
+> >> (physical address, read/write, length, register) and forwarding reads
+> >> and writes to QEMU which performs the device emulation.
+> >>
+> >> Certain classes of load/store operations do not support the syndrome
+> >> information provided in the HSR and we therefore must be able to fetch
+> >> the offending instruction from guest memory and decode it manually.
+> >>
+> >> We only support instruction decoding for valid reasonable MMIO operations
+> >> where trapping them do not provide sufficient information in the HSR (no
+> >> 16-bit Thumb instructions provide register writeback that we care about).
+> >>
+> >> The following instruction types are NOT supported for MMIO operations
+> >> despite the HSR not containing decode info:
+> >>  - any Load/Store multiple
+> >>  - any load/store exclusive
+> >>  - any load/store dual
+> >>  - anything with the PC as the dest register
+> >>
+> >> This requires changing the general flow somewhat since new calls to run
+> >> the VCPU must check if there's a pending MMIO load and perform the write
+> >> after userspace has made the data available.
+> >>
+> >> Rusty Russell fixed a horrible race pointed out by Ben Herrenschmidt:
+> >> (1) Guest complicated mmio instruction traps.
+> >> (2) The hardware doesn't tell us enough, so we need to read the actual
+> >>     instruction which was being exectuted.
+> >> (3) KVM maps the instruction virtual address to a physical address.
+> >> (4) The guest (SMP) swaps out that page, and fills it with something else.
+> >> (5) We read the physical address, but now that's the wrong thing.
+> > How can this happen?! The guest cannot reuse physical page before it
+> > flushes it from all vcpus tlb cache. For that it needs to send
+> > synchronous IPI to all vcpus and IPI will not be processed by a vcpu
+> > while it does emulation.
+> 
+> I don't know how this works on x86, but a KVM/ARM guest can definitely
+> handle an IPI.
+> 
+How can a vcpu handle an IPI while it is not in a guest mode?
 
-And the default rates provided by LCDC clock's ancestors are not
-sufficient to obtain pixel clock for current LCDC use cases, hence
-currently display would not work on AM335x SoC's (with driver
-modifications in platfrom independent way).
-
-Hence inform clock framework to propogate set rate for LCDC clock as
-well as it's parent - dpll_disp_m2_ck. With this change, set rate on
-LCDC clock would get propogated till dpll_disp_ck via dpll_disp_m2_ck,
-hence allowing the driver (same driver is used in DaVinci too) to set
-rates using LCDC clock without worrying about platform dependent clock
-details.
-
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
-
-Based on v3.8-rc3
-
- arch/arm/mach-omap2/cclock33xx_data.c |    9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
-index ea64ad6..b731216 100644
---- a/arch/arm/mach-omap2/cclock33xx_data.c
-+++ b/arch/arm/mach-omap2/cclock33xx_data.c
-@@ -284,9 +284,10 @@ DEFINE_STRUCT_CLK(dpll_disp_ck, dpll_core_ck_parents, dpll_ddr_ck_ops);
-  * TODO: Add clksel here (sys_clkin, CORE_CLKOUTM6, PER_CLKOUTM2
-  * and ALT_CLK1/2)
-  */
--DEFINE_CLK_DIVIDER(dpll_disp_m2_ck, "dpll_disp_ck", &dpll_disp_ck, 0x0,
--		   AM33XX_CM_DIV_M2_DPLL_DISP, AM33XX_DPLL_CLKOUT_DIV_SHIFT,
--		   AM33XX_DPLL_CLKOUT_DIV_WIDTH, CLK_DIVIDER_ONE_BASED, NULL);
-+DEFINE_CLK_DIVIDER(dpll_disp_m2_ck, "dpll_disp_ck", &dpll_disp_ck,
-+		   CLK_SET_RATE_PARENT, AM33XX_CM_DIV_M2_DPLL_DISP,
-+		   AM33XX_DPLL_CLKOUT_DIV_SHIFT, AM33XX_DPLL_CLKOUT_DIV_WIDTH,
-+		   CLK_DIVIDER_ONE_BASED, NULL);
+> Furthermore, TLB invalidation doesn't require an IPI on ARMv7 (unless
+> we're doing some set/way operation which is handled separately).
+> 
+What prevents a page to be swapped out while code is fetched from it?
  
- /* DPLL_PER */
- static struct dpll_data dpll_per_dd = {
-@@ -932,6 +933,8 @@ int __init am33xx_clk_init(void)
- 		cpu_clkflg = CK_AM33XX;
- 	}
- 
-+	lcd_gclk.flags |= CLK_SET_RATE_PARENT;
-+
- 	for (c = am33xx_clks; c < am33xx_clks + ARRAY_SIZE(am33xx_clks); c++) {
- 		if (c->cpu & cpu_clkflg) {
- 			clkdev_add(&c->lk);
--- 
-1.7.9.5
+--
+			Gleb.
