@@ -1,88 +1,78 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 15 Jan 2013 16:07:16 +0100
-Subject: [Linaro-mm-sig][RFC] ARM: dma-mapping: Add DMA attribute to skip
- iommu mapping
-In-Reply-To: <1357639944-12050-1-git-send-email-abhinav.k@samsung.com>
-References: <1357639944-12050-1-git-send-email-abhinav.k@samsung.com>
-Message-ID: <50F570A4.70606@samsung.com>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Tue, 15 Jan 2013 17:17:57 +0200
+Subject: [kvmarm] [PATCH v5 06/14] KVM: ARM: Inject IRQs and FIQs from
+ userspace
+In-Reply-To: <CAFEAcA8gzD4F4BPKR_dSDDD-iyv0ONt6H+yrj_nHifeCFBfpPA@mail.gmail.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183917.46302.55603.stgit@ubuntu>
+ <20130115095622.GJ11529@redhat.com>
+ <CAFEAcA9wEtXu6B-4bUuezntvybhu8MCYfciKhdLK_Cs--qP8_w@mail.gmail.com>
+ <20130115125241.GK11529@redhat.com>
+ <CAFEAcA8gzD4F4BPKR_dSDDD-iyv0ONt6H+yrj_nHifeCFBfpPA@mail.gmail.com>
+Message-ID: <20130115151757.GD12489@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jan 15, 2013 at 02:04:47PM +0000, Peter Maydell wrote:
+> On 15 January 2013 12:52, Gleb Natapov <gleb@redhat.com> wrote:
+> > On Tue, Jan 15, 2013 at 12:15:01PM +0000, Peter Maydell wrote:
+> >> On 15 January 2013 09:56, Gleb Natapov <gleb@redhat.com> wrote:
+> >> >> ARM can signal an interrupt either at the CPU level, or at the in-kernel irqchip
+> >> > CPU level interrupt should use KVM_INTERRUPT instead.
+> >>
+> >> No, that would be wrong. KVM_INTERRUPT is for interrupts which must be
+> >> delivered synchronously to the CPU. KVM_IRQ_LINE is for interrupts which
+> >> can be fed to the kernel asynchronously. It happens that on x86 "must be
+> >> delivered synchronously" and "not going to in kernel irqchip" are the same, but
+> >> this isn't true for other archs. For ARM all our interrupts can be fed
+> >> to the kernel asynchronously, and so we use KVM_IRQ_LINE in all
+> >> cases.
+> 
+> > I do no quite understand what you mean by synchronously and
+> > asynchronously.
+> 
+> Synchronously: the vcpu has to be stopped and userspace then
+> feeds in the interrupt to be taken when the guest is resumed.
+> Asynchronously: any old thread can tell the kernel there's an
+> interrupt, and the guest vcpu then deals with it when needed
+> (the vcpu thread may leave the guest but doesn't come out of
+> the host kernel to qemu).
+> 
+> > The difference between KVM_INTERRUPT and KVM_IRQ_LINE line
+> > is that former is used when destination cpu is known to userspace later
+> > is used when kernel code is involved in figuring out the destination.
+> 
+> This doesn't match up with Avi's explanation at all.
+> 
+> > The
+> > injections themselves are currently synchronous for both of them on x86
+> > and ARM. i.e vcpu is kicked out from guest mode when interrupt need to
+> > be injected into a guest and vcpu state is changed to inject interrupt
+> > during next guest entry. In the near feature x86 will be able to inject
+> > interrupt without kicking vcpu out from the guest mode does ARM plan to
+> > do the same? For GIC interrupts or for IRQ/FIQ or for both?
+> >
+> >> There was a big discussion thread about this on kvm and qemu-devel last
+> >> July (and we cleaned up some of the QEMU code to not smoosh together
+> >> all these different concepts under "do I have an irqchip or not?").
+> > Do you have a pointer?
+> 
+>   http://lists.gnu.org/archive/html/qemu-devel/2012-07/msg02460.html
+> and there was a later longer (but less clear) thread which included
+> this mail from Avi:
+>   http://lists.gnu.org/archive/html/qemu-devel/2012-07/msg02872.html
+> basically explaining that the reason for the weird synchronous
+> KVM_INTERRUPT API is that it's emulating a weird synchronous
+> hardware interface which is specific to x86. ARM doesn't have
+> a synchronous interface in the same way, so it's much more
+> straightforward to use KVM_IRQ_LINE.
+> 
+OK. I see. So basically Avi saw KVM_INTERRUPT as an oddball interface
+required only for APIC emulation in userspace. It is used for PIC also,
+where this is not strictly needed, but this is for historical reasons
+(KVM_IRQ_LINE was introduces late and it is GSI centric on x86).
 
-On 1/8/2013 11:12 AM, Abhinav Kochhar wrote:
-> Adding a new dma attribute which can be used by the
-> platform drivers to avoid creating iommu mappings.
-> In some cases the buffers are allocated by display
-> controller driver using dma alloc apis but are not
-> used for scanout. Though the buffers are allocated
-> by display controller but are only used for sharing
-> among different devices.
-> With this attribute the platform drivers can choose
-> not to create iommu mapping at the time of buffer
-> allocation and only create the mapping when they
-> access this buffer.
->
-> Change-Id: I2178b3756170982d814e085ca62474d07b616a21
-> Signed-off-by: Abhinav Kochhar <abhinav.k@samsung.com>
-> ---
->   arch/arm/mm/dma-mapping.c |    8 +++++---
->   include/linux/dma-attrs.h |    1 +
->   2 files changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index c0f0f43..e73003c 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1279,9 +1279,11 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
->   	if (!pages)
->   		return NULL;
->   
-> -	*handle = __iommu_create_mapping(dev, pages, size);
-> -	if (*handle == DMA_ERROR_CODE)
-> -		goto err_buffer;
-> +	if (!dma_get_attr(DMA_ATTR_NO_IOMMU_MAPPING, attrs)) {
-> +		*handle = __iommu_create_mapping(dev, pages, size);
-> +		if (*handle == DMA_ERROR_CODE)
-> +			goto err_buffer;
-> +	}
->   
->   	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
->   		return pages;
-> diff --git a/include/linux/dma-attrs.h b/include/linux/dma-attrs.h
-> index c8e1831..1f04419 100644
-> --- a/include/linux/dma-attrs.h
-> +++ b/include/linux/dma-attrs.h
-> @@ -15,6 +15,7 @@ enum dma_attr {
->   	DMA_ATTR_WEAK_ORDERING,
->   	DMA_ATTR_WRITE_COMBINE,
->   	DMA_ATTR_NON_CONSISTENT,
-> +	DMA_ATTR_NO_IOMMU_MAPPING,
->   	DMA_ATTR_NO_KERNEL_MAPPING,
->   	DMA_ATTR_SKIP_CPU_SYNC,
->   	DMA_ATTR_FORCE_CONTIGUOUS,
+Thank you for the pointer.
 
-I'm sorry, but from my perspective this patch and the yet another dma
-attribute shows that there is something fishy happening in the exynos-drm
-driver. Creating a mapping in DMA address space is the MAIN purpose of
-the DMA mapping subsystem, so adding an attribute which skips this
-operation already should give you a sign of warning that something is
-not used right.
-
-It looks that dma-mapping in the current state is simply not adequate
-for this driver. I noticed that DRM drivers are already known for
-implementing a lots of common code for their own with slightly changed
-behavior, like custom page manager/allocator. It looks that exynos-drm
-driver grew to the point where it also needs such features. It already
-contains custom code for CPU cache handling, IOMMU and contiguous
-memory special cases management. I would advise to drop DMA-mapping
-API completely, avoid adding yet another dozen of DMA attributes useful
-only for one driver and implement your own memory manager with direct
-usage of IOMMU API, alloc_pages() and dma_alloc_pages_from_contiguous().
-This way DMA mapping subsystem can be kept simple, robust and easy to
-understand without confusing or conflicting parts.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+--
+			Gleb.
