@@ -1,43 +1,30 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Tue, 15 Jan 2013 14:26:00 +0200
-Subject: [PATCH 1/3] MTD: at91: atmel_nand: for PMECC, add code to
- choose the ecc bits and sector size according to the ONFI parameter ECC
- requirement.
-In-Reply-To: <1355912840-29501-2-git-send-email-josh.wu@atmel.com>
-References: <1355912840-29501-1-git-send-email-josh.wu@atmel.com>
- <1355912840-29501-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <1358252760.2731.133.camel@sauron.fi.intel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 15 Jan 2013 17:59:05 +0530
+Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <CAK=WgbbShpqxS7zrDs97HkjpyWq0xzW3b9KHLBBs_V3YzdJKiA@mail.gmail.com>
+References: <1357863807-380-1-git-send-email-rtivy@ti.com>
+ <1357863807-380-7-git-send-email-rtivy@ti.com>
+ <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
+ <50F51E43.2090605@ti.com>
+ <CAK=WgbbShpqxS7zrDs97HkjpyWq0xzW3b9KHLBBs_V3YzdJKiA@mail.gmail.com>
+Message-ID: <50F54B91.4030406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I cannot compile this patch:
-
-ERROR (phandle_references): Reference to non-existent node or label "pinctrl_ssc0_tx"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-make[2]: *** [arch/arm/boot/dts/at91sam9g20ek.dtb] Error 2
-
-
-On Wed, 2012-12-19 at 18:27 +0800, Josh Wu wrote:
-> This patch will check NAND flash's ecc minimum requirement in ONFI parameter. If it is equal or smaller than pmecc-cap in dtsi, then use ecc_bits in ONFI. otherwise, return an error since pmecc-cap in dtsi don't meet the ecc minimum reqirement.
+On 1/15/2013 3:33 PM, Ohad Ben-Cohen wrote:
+> On Tue, Jan 15, 2013 at 11:15 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> Right, and platform data is not the way to achieve this.
 > 
-> This patch also check sector size (codeword) requirement in ONFI. If it is equal or bigger than sector_size in dtsi, then use the one of ONFI. otherwise return error.
+> How do you suggest to handle platforms with multiple different remote
+> processors (driven by the same driver) ?
 > 
-> Currently we don't support to read the ECC parameter in ONFI extended parameter page. So in that case we just use the value specified in dts.
-> 
-> For non-ONFI nand flash, we assume the minimum ecc requirement is 2bits in 512 bytes.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> Requiring the user to indicate the fw name for each processor is
+> somewhat error prone/cumbersome.
 
-Please, wrap the lines like kernel developers usually do.
+May be rproc_alloc() could auto-assign the firmware name to something
+like 'rproc%d-fw' if firmware name passed to it is NULL?
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130115/49c8872d/attachment.sig>
+Thanks,
+Sekhar
