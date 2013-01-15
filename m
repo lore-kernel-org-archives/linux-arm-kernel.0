@@ -1,43 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Jan 2013 12:17:53 +0000
-Subject: [GIT PULL] hyp-boot fixes for 3.8
-Message-ID: <20130115121753.GB5649@mudshark.cambridge.arm.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Tue, 15 Jan 2013 14:26:00 +0200
+Subject: [PATCH 1/3] MTD: at91: atmel_nand: for PMECC, add code to
+ choose the ecc bits and sector size according to the ONFI parameter ECC
+ requirement.
+In-Reply-To: <1355912840-29501-2-git-send-email-josh.wu@atmel.com>
+References: <1355912840-29501-1-git-send-email-josh.wu@atmel.com>
+ <1355912840-29501-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <1358252760.2731.133.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+I cannot compile this patch:
 
-As I mentioned previously, a bunch of fixes to the hyp-boot code have been
-accumulating in the branch I originally targeted for 3.9. Given that these
-should all go to stable, I've split the fixes out for 3.8 and put them on
-their own branch for you to pull (see below).
+ERROR (phandle_references): Reference to non-existent node or label "pinctrl_ssc0_tx"
 
-Cheers,
+ERROR: Input tree has errors, aborting (use -f to force output)
+make[2]: *** [arch/arm/boot/dts/at91sam9g20ek.dtb] Error 2
 
-Will
 
---->8
+On Wed, 2012-12-19 at 18:27 +0800, Josh Wu wrote:
+> This patch will check NAND flash's ecc minimum requirement in ONFI parameter. If it is equal or smaller than pmecc-cap in dtsi, then use ecc_bits in ONFI. otherwise, return an error since pmecc-cap in dtsi don't meet the ecc minimum reqirement.
+> 
+> This patch also check sector size (codeword) requirement in ONFI. If it is equal or bigger than sector_size in dtsi, then use the one of ONFI. otherwise return error.
+> 
+> Currently we don't support to read the ECC parameter in ONFI extended parameter page. So in that case we just use the value specified in dts.
+> 
+> For non-ONFI nand flash, we assume the minimum ecc requirement is 2bits in 512 bytes.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+Please, wrap the lines like kernel developers usually do.
 
-  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/virt/hyp-boot/fixes
-
-for you to fetch changes up to d01723479e6a6c70c83295f7847477a016d5e14a:
-
-  ARM: virt: simplify __hyp_stub_install epilog (2013-01-10 21:08:55 +0000)
-
-----------------------------------------------------------------
-Dave Martin (1):
-      ARM: virt: Avoid bx instruction for compatibility with <=ARMv4
-
-Marc Zyngier (2):
-      ARM: virt: boot secondary CPUs through the right entry point
-      ARM: virt: simplify __hyp_stub_install epilog
-
- arch/arm/kernel/head.S     |  2 +-
- arch/arm/kernel/hyp-stub.S | 18 ++++++------------
- 2 files changed, 7 insertions(+), 13 deletions(-)
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130115/49c8872d/attachment.sig>
