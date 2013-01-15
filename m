@@ -1,46 +1,86 @@
-From: mporter@ti.com (Matt Porter)
-Date: Tue, 15 Jan 2013 15:32:54 -0500
-Subject: [PATCH v5 14/14] ARM: dts: add AM33XX SPI DMA support
-In-Reply-To: <1358281974-8411-1-git-send-email-mporter@ti.com>
-References: <1358281974-8411-1-git-send-email-mporter@ti.com>
-Message-ID: <1358281974-8411-15-git-send-email-mporter@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 15 Jan 2013 21:46:03 +0100
+Subject: [PATCH v3] clk: mvebu/clk-cpu.c: fix memory leakage
+In-Reply-To: <20130115184423.GC7211@gmail.com>
+References: <1358183892-28928-1-git-send-email-dinggnu@gmail.com>
+ <50F563EC.3030804@free-electrons.com> <20130115152307.GA25615@gmail.com>
+ <20130115153716.GF13433@titan.lakedaemon.net>
+ <50F584F5.6030007@free-electrons.com> <20130115182629.GB7211@gmail.com>
+ <50F5A1A9.2030803@free-electrons.com> <20130115184423.GC7211@gmail.com>
+Message-ID: <50F5C00B.10108@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds DMA resources to the AM33XX SPI nodes.
+On 01/15/2013 07:44 PM, Cong Ding wrote:
+> the variable cpuclk and clk_name should be properly freed when error happens.
+Dear Cong Ding,
 
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+Thanks for you efforts!
+I am happy with this patch and I tested it on the Armada XP DB board, so
+you can now add my:
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 278b75d..8fd3648 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -356,6 +356,11 @@
- 			interrupt = <65>;
- 			ti,spi-num-cs = <2>;
- 			ti,hwmods = "spi0";
-+			dmas = <&edma 16
-+				&edma 17
-+				&edma 18
-+				&edma 19>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
- 			status = "disabled";
- 		};
- 
-@@ -367,6 +372,11 @@
- 			interrupt = <125>;
- 			ti,spi-num-cs = <2>;
- 			ti,hwmods = "spi1";
-+			dmas = <&edma 42
-+				&edma 43
-+				&edma 44
-+				&edma 45>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
- 			status = "disabled";
- 		};
- 
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Mike,
+
+could you take this patch for 3.8-rc fixes?
+
+If you prefer, Jason agrees to take it, but you probably didn't notice it,
+because he uses your former(and no more valid) email when he wrote this.
+
+Thanks,
+
+Gregory
+
+> 
+> Signed-off-by: Cong Ding <dinggnu@gmail.com>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  drivers/clk/mvebu/clk-cpu.c |    9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
+> index ff004578..9dd2551 100644
+> --- a/drivers/clk/mvebu/clk-cpu.c
+> +++ b/drivers/clk/mvebu/clk-cpu.c
+> @@ -124,7 +124,7 @@ void __init of_cpu_clk_setup(struct device_node *node)
+>  
+>  	clks = kzalloc(ncpus * sizeof(*clks), GFP_KERNEL);
+>  	if (WARN_ON(!clks))
+> -		return;
+> +		goto clks_out;
+>  
+>  	for_each_node_by_type(dn, "cpu") {
+>  		struct clk_init_data init;
+> @@ -134,11 +134,11 @@ void __init of_cpu_clk_setup(struct device_node *node)
+>  		int cpu, err;
+>  
+>  		if (WARN_ON(!clk_name))
+> -			return;
+> +			goto bail_out;
+>  
+>  		err = of_property_read_u32(dn, "reg", &cpu);
+>  		if (WARN_ON(err))
+> -			return;
+> +			goto bail_out;
+>  
+>  		sprintf(clk_name, "cpu%d", cpu);
+>  		parent_clk = of_clk_get(node, 0);
+> @@ -167,6 +167,9 @@ void __init of_cpu_clk_setup(struct device_node *node)
+>  	return;
+>  bail_out:
+>  	kfree(clks);
+> +	while(ncpus--)
+> +		kfree(cpuclk[ncpus].clk_name);
+> +clks_out:
+>  	kfree(cpuclk);
+>  }
+>  
+> 
+
+
 -- 
-1.7.9.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
