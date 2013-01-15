@@ -1,64 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 Jan 2013 11:04:01 -0800
-Subject: [PATCH 4/4] ARM: uncompress: support uncompress debug for
- multiplatform build
-In-Reply-To: <20130112032934.GA14865@S2101-09.ap.freescale.net>
-References: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
- <1355319945-3199-5-git-send-email-shawn.guo@linaro.org>
- <20130111191116.GA999@quad.lixom.net>
- <20130112032934.GA14865@S2101-09.ap.freescale.net>
-Message-ID: <20130115190401.GA28333@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Jan 2013 19:05:11 +0000
+Subject: [Linaro-mm-sig][RFC] ARM: dma-mapping: Add DMA attribute to skip
+ iommu mapping
+In-Reply-To: <50F570A4.70606@samsung.com>
+References: <1357639944-12050-1-git-send-email-abhinav.k@samsung.com>
+ <50F570A4.70606@samsung.com>
+Message-ID: <201301151905.11704.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 12, 2013 at 11:29:37AM +0800, Shawn Guo wrote:
-> On Fri, Jan 11, 2013 at 11:11:16AM -0800, Olof Johansson wrote:
-> > Hi,
-> > 
-> > On Wed, Dec 12, 2012 at 09:45:45PM +0800, Shawn Guo wrote:
-> > > When moving to multiplatform build, platforms lose the output from
-> > > decompressor.  Not only does it mean that we will never see message
-> > > "Uncompressing Linux... done, booting the kernel.", but also that
-> > > the debug facility in arch/arm/boot/compressed/head.S outputs nothing
-> > > even DEBUG is turned on.
-> > > 
-> > > The patch follows the approach handling DEBUG_LL to create a Kconfig
-> > > symbol CONFIG_UNCOMPRESS_INCLUDE for choosing the correct uncompress
-> > > header.  For traditional build, mach/uncompress.h will be included in
-> > > arch/arm/boot/compressed/misc.c.  For multiplatform build with none
-> > > DEBUG_LL port enabled, debug/uncompress/dummy.h will be used.  And
-> > > for multiplatform build with a DEBUG_LL port, platform specific
-> > > uncompress header like debug/uncompress/imx.h will come to play.
-> > > 
-> > > Different from traditional build that uncompress output and DEBUG_LL
-> > > are two separated pieces, for multiplatform build uncompress output
-> > > becomes a subset of DEBUG_LL and will not work unless DEBUG_LL is
-> > > enabled.
-> > > 
-> > > The arch/arm/include/debug/uncompress/imx.h is cleaned up and added
-> > > here as an example to show how this approach works.
-> > 
-> > Since this requires you to define a debug uart to get uncompress output,
-> > it would make more sense to do a generic wrapper that uses the debug
-> > code generically, instead of having to add this kind of wrapper for
-> > every platform. That would solve it for all of them at once.
-> > 
-> I'm not entirely sure about what you mean here.  Can you please
-> elaborate that generic wrapper in your mind a little bit?
+On Tuesday 15 January 2013, Marek Szyprowski wrote:
+> I'm sorry, but from my perspective this patch and the yet another dma
+> attribute shows that there is something fishy happening in the exynos-drm
+> driver. Creating a mapping in DMA address space is the MAIN purpose of
+> the DMA mapping subsystem, so adding an attribute which skips this
+> operation already should give you a sign of warning that something is
+> not used right.
+> 
+> It looks that dma-mapping in the current state is simply not adequate
+> for this driver. I noticed that DRM drivers are already known for
+> implementing a lots of common code for their own with slightly changed
+> behavior, like custom page manager/allocator. It looks that exynos-drm
+> driver grew to the point where it also needs such features. It already
+> contains custom code for CPU cache handling, IOMMU and contiguous
+> memory special cases management. I would advise to drop DMA-mapping
+> API completely, avoid adding yet another dozen of DMA attributes useful
+> only for one driver and implement your own memory manager with direct
+> usage of IOMMU API, alloc_pages() and dma_alloc_pages_from_contiguous().
+> This way DMA mapping subsystem can be kept simple, robust and easy to
+> understand without confusing or conflicting parts.
 
-Hi,
+Makes sense. DRM drivers and KVM are the two cases where you typically
+want to use the iommu API rather than the dma-mapping API, because you
+need protection between multiple concurrent user contexts.
 
-Sorry for the delay in responding.
-
-Most functionality to deal with this already exist in the
-include/debug/*.S files files, you just need to instantiate the macros
-somewhere (compressed/head.S, or a separate file), and wrap the calls
-to those instantiated assembly functions in a generic header file.
-
-That way, every platform that has a DEBUG_LL implementation should be able to
-reuse that, and no need to enable every platform one by one.
-
-Or am I missing some complexity involved here?
-
-
--Olof
+	Arnd
