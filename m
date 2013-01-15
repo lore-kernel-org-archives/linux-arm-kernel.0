@@ -1,48 +1,69 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue, 15 Jan 2013 16:36:35 -0700
-Subject: [PATCH] crypto: omap-sham - Fix compile errors when CONFIG_OF
- not defined
-In-Reply-To: <1358283182-29392-1-git-send-email-mgreer@animalcreek.com>
-References: <1358283182-29392-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <20130115233635.GB527@animalcreek.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 16 Jan 2013 12:52:24 +1300
+Subject: [PATCH v2] mtd: vt8500: Add support for Wondermedia Serial
+ Flash Controller
+In-Reply-To: <1358278604.1668.11.camel@kyv>
+References: <1358272414-6266-1-git-send-email-linux@prisktech.co.nz>
+ <1358278604.1668.11.camel@kyv>
+Message-ID: <1358293944.11794.3.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 01:53:02PM -0700, Mark A. Greer wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+On Tue, 2013-01-15 at 21:36 +0200, Artem Bityutskiy wrote:
+> On Wed, 2013-01-16 at 06:53 +1300, Tony Prisk wrote:
+> > This patch adds support for the Wondermedia serial flash controller
+> > found on WM8505, WM8650 and WM8850 SoCs.
+> > 
+> > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 > 
-> Fix the compile errors created by commit 2545e8d
-> (crypto: omap-sham - Add Device Tree Support)
-> when CONFIG_OF is not defined.  This includes
-> changing omap_sham_get_res_dev() to omap_sham_get_res_of()
-> and creating an empty version of omap_sham_of_match[].
+> Would please you also send a defconfig which I can use to compile-test
+> this?
 > 
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> ---
->  drivers/crypto/omap-sham.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-> index edff981..dc2d354 100644
-> --- a/drivers/crypto/omap-sham.c
-> +++ b/drivers/crypto/omap-sham.c
-> @@ -1607,7 +1607,11 @@ err:
->  	return err;
->  }
->  #else
-> -static int omap_sham_get_res_dev(struct omap_sham_dev *dd,
-> +static const struct of_device_id omap_sham_of_match[] = {
-> +	{},
-> +};
-> +
-> +static int omap_sham_get_res_of(struct omap_sham_dev *dd,
->  		struct device *dev, struct resource *res)
->  {
->  	return -EINVAL;
-> -- 
-> 1.7.12
 
-I meant to add that this applies to the current cryptodev/master repo/branch.
+This should be sufficient. I haven't done a defconfig for arch-vt8500
+yet as multiplatform-only support has gone through in this window and
+any previous defconfig would now be useless. This defconfig is based on
+3.8-rc3 - some features may not be available in earlier revisions.
 
-Mark
---
+
+CONFIG_EXPERIMENTAL=y
+CONFIG_NO_HZ=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_ARCH_VT8500_SINGLE=y
+# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+CONFIG_ARM_ARCH_TIMER=y
+CONFIG_AEABI=y
+CONFIG_HIGHMEM=y
+CONFIG_HIGHPTE=y
+CONFIG_ARM_APPENDED_DTB=y
+CONFIG_VFP=y
+CONFIG_NEON=y
+CONFIG_NET=y
+CONFIG_BLK_DEV_SD=y
+CONFIG_NETDEVICES=y
+CONFIG_NET_CALXEDA_XGMAC=y
+CONFIG_SMSC911X=y
+CONFIG_STMMAC_ETH=y
+CONFIG_SERIAL_CORE=y
+CONFIG_SERIAL_CORE_CONSOLE=y
+CONFIG_SERIAL_VT8500=y
+CONFIG_SERIAL_VT8500_CONSOLE=y
+CONFIG_GPIO_VT8500=y
+CONFIG_GPIOLIB=y
+CONFIG_FB=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_FB_VT8500=y
+CONFIG_FB_WM8505=y
+CONFIG_RTC_CLASS=y
+CONFIG_RTC_DRV_VT8500=y
+CONFIG_USB=y
+CONFIG_MMC=y
+CONFIG_PWM=y
+CONFIG_PWM_VT8500=y
+CONFIG_MTD=y
+CONFIG_MTD_WMT_SFLASH=y
+CONFIG_DMADEVICES=y
+
+
+Regards
+Tony P
