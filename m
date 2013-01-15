@@ -1,75 +1,39 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 15 Jan 2013 15:13:00 +0100
-Subject: [PATCH] clk: mvebu/clk-cpu.c: fix memory leakage
-In-Reply-To: <1358183892-28928-1-git-send-email-dinggnu@gmail.com>
-References: <1358183892-28928-1-git-send-email-dinggnu@gmail.com>
-Message-ID: <50F563EC.3030804@free-electrons.com>
+From: kishon@ti.com (kishon)
+Date: Tue, 15 Jan 2013 19:54:23 +0530
+Subject: [RFC PATCH 1/7] drivers: usb: phy: add a new driver for usb part
+ of control module
+In-Reply-To: <201301151336.47546.arnd@arndb.de>
+References: <1358239378-10030-1-git-send-email-kishon@ti.com>
+ <1358239378-10030-2-git-send-email-kishon@ti.com>
+ <201301151336.47546.arnd@arndb.de>
+Message-ID: <50F56697.9060803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Cong Ding,
+Hi Arnd,
 
-On 01/14/2013 06:18 PM, Cong Ding wrote:
-> the variable cpuclk and clk_name should be properly freed.
-> 
+On Tuesday 15 January 2013 07:06 PM, Arnd Bergmann wrote:
+> On Tuesday 15 January 2013, Kishon Vijay Abraham I wrote:
+>> +OMAP CONTROL USB
+>> +
+>> +Required properties:
+>> + - compatible: Should be "ti,omap-control-usb"
+>> + - reg : Address and length of the register set for the device. It contains
+>> +   the address of "control_dev_conf" and "otghs_control".
+>> + - reg-names: The names of the register addresses corresponding to the registers
+>> +   filled in "reg".
+>> + - ti,has_mailbox: This is used to specify if the platform uses mailbox in
+>> +   control module.
+>
+> I wonder whether we need to have a phandle here to connect the control device
+> to the actual usb device. What happens if you have multiple instances of
+> each?
 
-Thanks for reporting this memory leak and for your patch but I think
-we could do even better, see below:
+Good point :-). Currently, none of the OMAP platforms have multiple 
+control modules and it doesn't seem to be in the future (AFAIK). While 
+it might be simpler to support multiple control devices with phandle, it 
+might face the same complications as faced by the USB PHY framework for 
+non-dt boot.
 
-> Signed-off-by: Cong Ding <dinggnu@gmail.com>
-> ---
->  drivers/clk/mvebu/clk-cpu.c |    9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-> index ff004578..1a0d84f 100644
-> --- a/drivers/clk/mvebu/clk-cpu.c
-> +++ b/drivers/clk/mvebu/clk-cpu.c
-> @@ -124,7 +124,7 @@ void __init of_cpu_clk_setup(struct device_node *node)
->  
->  	clks = kzalloc(ncpus * sizeof(*clks), GFP_KERNEL);
->  	if (WARN_ON(!clks))
-> -		return;
-> +		goto clks_out;
->  
->  	for_each_node_by_type(dn, "cpu") {
->  		struct clk_init_data init;
-> @@ -134,11 +134,11 @@ void __init of_cpu_clk_setup(struct device_node *node)
->  		int cpu, err;
->  
->  		if (WARN_ON(!clk_name))
-> -			return;
-> +			goto clk_name_out;
-
-I agree
-
->  
->  		err = of_property_read_u32(dn, "reg", &cpu);
->  		if (WARN_ON(err))
-> -			return;
-> +			goto bail_out;
-
-I agree
-
->  
->  		sprintf(clk_name, "cpu%d", cpu);
->  		parent_clk = of_clk_get(node, 0);
-> @@ -166,7 +166,10 @@ void __init of_cpu_clk_setup(struct device_node *node)
->  
->  	return;
->  bail_out:
-> +	kfree(clk_name);
-
-Here you free only one clk_name whereas we could have previous clk_name which have
-been already allocated during the for_each_node_by_type loop.
-
-A more annoying thing is that you use clk_name whereas it is only valid in the
-for_each_node_by_type statement and then this patch breaks the compilation:
-
-drivers/clk/mvebu/clk-cpu.c: In function ?of_cpu_clk_setup?:
-drivers/clk/mvebu/clk-cpu.c:169:8: error: ?clk_name? undeclared (first use in this function)
-drivers/clk/mvebu/clk-cpu.c:169:8: note: each undeclared identifier is reported only once for each function it appears in
-
-Thanks,
-
-Gregory
+Thanks
+Kishon
