@@ -1,26 +1,123 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 15 Jan 2013 09:16:39 +0100
-Subject: OMAP baseline test results for v3.8-rc3
-In-Reply-To: <alpine.DEB.2.00.1301141756460.20390@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1301141756460.20390@utopia.booyaka.com>
-Message-ID: <50F51067.5090008@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 15 Jan 2013 16:37:35 +0800
+Subject: [PATCH 1/2] gpio: fix warning of 'struct gpio_chip' declaration
+In-Reply-To: <1358239056-703-1-git-send-email-shawn.guo@linaro.org>
+References: <1358239056-703-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1358239056-703-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+The struct gpio_chip is only defined inside #ifdef CONFIG_GPIOLIB,
+but it's referenced by gpiochip_add_pin_range() and
+gpiochip_remove_pin_ranges() which are outside #ifdef CONFIG_GPIOLIB.
+Thus, we see the following warning when building blackfin image, where
+GPIOLIB is not required.
 
-On 01/14/2013 06:59 PM, Paul Walmsley wrote:
-> Failing tests: needing investigation
-> ------------------------------------
-> 
-> Build tests:
-> 
-> * rmk_3430_ldp_allnoconfig, rmk_4430_sdp_allnoconfig: twl4030 build failures
->   - in drivers/mfd/twl-core.c
+  CC      arch/blackfin/kernel/bfin_gpio.o
+  CC      init/version.o
+In file included from arch/blackfin/include/asm/gpio.h:321,
+                 from arch/blackfin/kernel/bfin_gpio.c:15:
+include/asm-generic/gpio.h:298: warning: ?struct gpio_chip? declared inside parameter list
+include/asm-generic/gpio.h:298: warning: its scope is only this definition or declaration, which is probably not what you want
+include/asm-generic/gpio.h:304: warning: ?struct gpio_chip? declared inside parameter list
 
-The following patch fixes these:
-https://lkml.org/lkml/2012/12/24/3
+Move pinctrl trunk into #ifdef CONFIG_GPIOLIB to fix the warning,
+since it appears that pinctrl gpio range support depends on GPIOLIB.
 
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ include/asm-generic/gpio.h |   74 ++++++++++++++++++++++----------------------
+ 1 file changed, 37 insertions(+), 37 deletions(-)
 
+diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+index 20ca766..2341014 100644
+--- a/include/asm-generic/gpio.h
++++ b/include/asm-generic/gpio.h
+@@ -212,6 +212,43 @@ extern void gpio_unexport(unsigned gpio);
+ 
+ #endif	/* CONFIG_GPIO_SYSFS */
+ 
++#ifdef CONFIG_PINCTRL
++
++/**
++ * struct gpio_pin_range - pin range controlled by a gpio chip
++ * @head: list for maintaining set of pin ranges, used internally
++ * @pctldev: pinctrl device which handles corresponding pins
++ * @range: actual range of pins controlled by a gpio controller
++ */
++
++struct gpio_pin_range {
++	struct list_head node;
++	struct pinctrl_dev *pctldev;
++	struct pinctrl_gpio_range range;
++};
++
++int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
++			   unsigned int gpio_offset, unsigned int pin_offset,
++			   unsigned int npins);
++void gpiochip_remove_pin_ranges(struct gpio_chip *chip);
++
++#else
++
++static inline int
++gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
++		       unsigned int gpio_offset, unsigned int pin_offset,
++		       unsigned int npins)
++{
++	return 0;
++}
++
++static inline void
++gpiochip_remove_pin_ranges(struct gpio_chip *chip)
++{
++}
++
++#endif /* CONFIG_PINCTRL */
++
+ #else	/* !CONFIG_GPIOLIB */
+ 
+ static inline bool gpio_is_valid(int number)
+@@ -270,41 +307,4 @@ static inline void gpio_unexport(unsigned gpio)
+ }
+ #endif	/* CONFIG_GPIO_SYSFS */
+ 
+-#ifdef CONFIG_PINCTRL
+-
+-/**
+- * struct gpio_pin_range - pin range controlled by a gpio chip
+- * @head: list for maintaining set of pin ranges, used internally
+- * @pctldev: pinctrl device which handles corresponding pins
+- * @range: actual range of pins controlled by a gpio controller
+- */
+-
+-struct gpio_pin_range {
+-	struct list_head node;
+-	struct pinctrl_dev *pctldev;
+-	struct pinctrl_gpio_range range;
+-};
+-
+-int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
+-			   unsigned int gpio_offset, unsigned int pin_offset,
+-			   unsigned int npins);
+-void gpiochip_remove_pin_ranges(struct gpio_chip *chip);
+-
+-#else
+-
+-static inline int
+-gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
+-		       unsigned int gpio_offset, unsigned int pin_offset,
+-		       unsigned int npins)
+-{
+-	return 0;
+-}
+-
+-static inline void
+-gpiochip_remove_pin_ranges(struct gpio_chip *chip)
+-{
+-}
+-
+-#endif /* CONFIG_PINCTRL */
+-
+ #endif /* _ASM_GENERIC_GPIO_H */
 -- 
-P?ter
+1.7.9.5
