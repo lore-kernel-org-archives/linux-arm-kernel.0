@@ -1,109 +1,71 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 15 Jan 2013 10:29:35 +0800
-Subject: [PATCH v5 3/3] ARM: i.MX clock: Change the connection-id for
- fsl-usb2-udc
-In-Reply-To: <1358216975-1404-1-git-send-email-peter.chen@freescale.com>
-References: <1358216975-1404-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1358216975-1404-4-git-send-email-peter.chen@freescale.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 15 Jan 2013 10:44:08 +0800
+Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
+ management
+In-Reply-To: <alpine.LFD.2.02.1301140849020.6300@xanadu.home>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1358157392.19304.243.camel@jlo-ubuntu-64.nvidia.com>
+ <alpine.LFD.2.02.1301140849020.6300@xanadu.home>
+Message-ID: <1358217848.8513.14.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we use platform_device_id for fsl-usb2-udc driver, it needs to
-change clk connection-id, or the related devm_clk_get will be failed.
+On Mon, 2013-01-14 at 22:05 +0800, Nicolas Pitre wrote:
+> On Mon, 14 Jan 2013, Joseph Lo wrote:
+> 
+> > Hi Nicolas,
+> > 
+> > On Thu, 2013-01-10 at 08:20 +0800, Nicolas Pitre wrote:
+> > > This is the initial public posting of the initial support for big.LITTLE.
+> > > Included here is the code required to safely power up and down CPUs in a
+> > > b.L system, whether this is via CPU hotplug, a cpuidle driver or the
+> > > Linaro b.L in-kernel switcher[*] on top of this.  Only  SMP secondary
+> > > boot and CPU hotplug support is included at this time.  Getting to this
+> > > point already represents a significcant chunk of code as illustrated by
+> > > the diffstat below.
+> > > 
+> > > 
+> > 
+> > Thanks for introducing this series.
+> > I am taking a look at this series. It introduced an algorithm for
+> > syncing and avoid racing when syncing the power status of clusters and
+> > CPUs. Do you think these codes could have a chance to become a generic
+> > framework?
+> 
+> Yes.  As I mentioned before, the bL_ prefix is implied only by the fact 
+> that big.LITTLE was the motivation for creating this code.
+> 
+> > The Tegra chip series had a similar design for CPU clusters and it 
+> had
+> > limitation that the CPU0 always needs to be the last CPU to be shut down
+> > before cluster power down as well. I believe it can also get benefits of
+> > this works. We indeed need a similar algorithm to sync CPUs power status
+> > before cluster power down and switching.
+> > 
+> > The "bL_entry.c", "bL_entry.S", "bL_entry.h", "vlock.h" and "vlock.S"
+> > looks have a chance to be a common framework for ARM platform even if it
+> > just support one cluster. Because some systems had the limitations for
+> > cluster power down. That's why the coupled cpuidle been introduced. And
+> > this framework could be enabled automatically if platform dependent or
+> > by menuconfig.
+> 
+> Absolutely.
+> 
+So do you have a plan to make it become a generic framework in this
+series or later work?
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/mach-imx/clk-imx25.c       |    6 +++---
- arch/arm/mach-imx/clk-imx27.c       |    6 +++---
- arch/arm/mach-imx/clk-imx31.c       |    6 +++---
- arch/arm/mach-imx/clk-imx35.c       |    6 +++---
- arch/arm/mach-imx/clk-imx51-imx53.c |    6 +++---
- 5 files changed, 15 insertions(+), 15 deletions(-)
+(And I will add some common power sync wrapper functions that based on
+this framework for all Tegra series.)
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index b197aa7..67e353d 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -254,9 +254,9 @@ int __init mx25_clocks_init(void)
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usbotg_ahb], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx25");
-+	clk_register_clkdev(clk[usbotg_ahb], "ahb", "imx-udc-mx25");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx25");
- 	clk_register_clkdev(clk[nfc_ipg_per], NULL, "imx25-nand.0");
- 	/* i.mx25 has the i.mx35 type cspi */
- 	clk_register_clkdev(clk[cspi1_ipg], NULL, "imx35-cspi.0");
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 4c1d1e4..1ffe3b5 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -236,9 +236,9 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
- 	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "imx27-camera.0");
- 	clk_register_clkdev(clk[per4_gate], "per", "imx27-camera.0");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "imx-udc-mx27");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "mxc-ehci.0");
-diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-index 8be64e0..ef66eaf 100644
---- a/arch/arm/mach-imx/clk-imx31.c
-+++ b/arch/arm/mach-imx/clk-imx31.c
-@@ -139,9 +139,9 @@ int __init mx31_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[usb_div_post], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usb_gate], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div_post], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_gate], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div_post], "per", "imx-udc-mx31");
-+	clk_register_clkdev(clk[usb_gate], "ahb", "imx-udc-mx31");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx31");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
- 	/* i.mx31 has the i.mx21 type uart */
- 	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index 66f3d65..69fe9c8 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -251,9 +251,9 @@ int __init mx35_clocks_init()
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usbotg_gate], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx35");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx35");
-+	clk_register_clkdev(clk[usbotg_gate], "ahb", "imx-udc-mx35");
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
- 	clk_register_clkdev(clk[nfc_div], NULL, "imx25-nand.0");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 579023f..fb7cb84 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -269,9 +269,9 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[usboh3_per_gate], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usboh3_gate], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usboh3_gate], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usboh3_per_gate], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usboh3_gate], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usboh3_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usboh3_per_gate], "per", "imx-udc-mx51");
-+	clk_register_clkdev(clk[usboh3_gate], "ipg", "imx-udc-mx51");
-+	clk_register_clkdev(clk[usboh3_gate], "ahb", "imx-udc-mx51");
- 	clk_register_clkdev(clk[nfc_gate], NULL, "imx51-nand");
- 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
--- 
-1.7.0.4
+> 
+> > For ex,
+> > 	select CPUS_CLUSTERS_POWER_SYNC_FRAMEWORK if SMP && CPU_PM
+> > 
+> > How do you think of this suggestion?
+> 
+> I'd prefer a more concise name though.
+> 
+Sure. :-)
+
+Thanks,
+Joseph
