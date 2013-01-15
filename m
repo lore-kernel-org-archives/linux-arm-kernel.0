@@ -1,428 +1,578 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 15 Jan 2013 10:42:46 +0100
-Subject: [PATCH 1/4] mfd: ab8500: update header file and version detection
-Message-ID: <1358242966-5049-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 15 Jan 2013 10:42:55 +0100
+Subject: [PATCH 2/4] gpio: delete AB8500 driver
+Message-ID: <1358242975-5084-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This updates the AB8500 register map with defines for a few
-new chip variants and adds version detection helpers to handle
-the different variants.
+The AB8500 GPIO driver has been marked BROKEN for ages, and we
+have something better in store: a shiny new pinctrl driver. So
+let use delete this old driver as the first step.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- include/linux/mfd/abx500/ab8500.h | 277 ++++++++++++++++++++++++++++++--------
- 1 file changed, 222 insertions(+), 55 deletions(-)
+ drivers/gpio/Kconfig       |   6 -
+ drivers/gpio/Makefile      |   1 -
+ drivers/gpio/gpio-ab8500.c | 520 ---------------------------------------------
+ 3 files changed, 527 deletions(-)
+ delete mode 100644 drivers/gpio/gpio-ab8500.c
 
-diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
-index 1cb5698..e640ea0 100644
---- a/include/linux/mfd/abx500/ab8500.h
-+++ b/include/linux/mfd/abx500/ab8500.h
-@@ -24,7 +24,7 @@ enum ab8500_version {
- 	AB8500_VERSION_AB8500 = 0x0,
- 	AB8500_VERSION_AB8505 = 0x1,
- 	AB8500_VERSION_AB9540 = 0x2,
--	AB8500_VERSION_AB8540 = 0x3,
-+	AB8500_VERSION_AB8540 = 0x4,
- 	AB8500_VERSION_UNDEFINED,
- };
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 682de75..e5116fa 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -657,12 +657,6 @@ config GPIO_JANZ_TTL
+ 	  This driver provides support for driving the pins in output
+ 	  mode only. Input mode is not supported.
  
-@@ -32,6 +32,7 @@ enum ab8500_version {
- #define AB8500_CUTEARLY	0x00
- #define AB8500_CUT1P0	0x10
- #define AB8500_CUT1P1	0x11
-+#define AB8500_CUT1P2	0x12 /* Only valid for AB8540 */
- #define AB8500_CUT2P0	0x20
- #define AB8500_CUT3P0	0x30
- #define AB8500_CUT3P3	0x33
-@@ -39,6 +40,7 @@ enum ab8500_version {
- /*
-  * AB8500 bank addresses
-  */
-+#define AB8500_M_FSM_RANK	0x0
- #define AB8500_SYS_CTRL1_BLOCK	0x1
- #define AB8500_SYS_CTRL2_BLOCK	0x2
- #define AB8500_REGU_CTRL1	0x3
-@@ -58,6 +60,7 @@ enum ab8500_version {
- #define AB8500_DEVELOPMENT	0x11
- #define AB8500_DEBUG		0x12
- #define AB8500_PROD_TEST	0x13
-+#define AB8500_STE_TEST		0x14
- #define AB8500_OTP_EMUL		0x15
+-config GPIO_AB8500
+-	bool "ST-Ericsson AB8500 Mixed Signal Circuit gpio functions"
+-	depends on AB8500_CORE && BROKEN
+-	help
+-	  Select this to enable the AB8500 IC GPIO driver
+-
+ config GPIO_TPS6586X
+ 	bool "TPS6586X GPIO"
+ 	depends on MFD_TPS6586X
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index c5aebd0..45a388c 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -10,7 +10,6 @@ obj-$(CONFIG_GPIO_ACPI)		+= gpiolib-acpi.o
+ obj-$(CONFIG_GPIO_GENERIC)	+= gpio-generic.o
  
- /*
-@@ -65,11 +68,11 @@ enum ab8500_version {
-  * Values used to index into array ab8500_irq_regoffset[] defined in
-  * drivers/mdf/ab8500-core.c
-  */
--/* Definitions for AB8500 and AB9540 */
-+/* Definitions for AB8500, AB9540 and AB8540 */
- /* ab8500_irq_regoffset[0] -> IT[Source|Latch|Mask]1 */
- #define AB8500_INT_MAIN_EXT_CH_NOT_OK	0 /* not 8505/9540 */
--#define AB8500_INT_UN_PLUG_TV_DET	1 /* not 8505/9540 */
--#define AB8500_INT_PLUG_TV_DET		2 /* not 8505/9540 */
-+#define AB8500_INT_UN_PLUG_TV_DET	1 /* not 8505/9540/8540 */
-+#define AB8500_INT_PLUG_TV_DET		2 /* not 8505/9540/8540 */
- #define AB8500_INT_TEMP_WARM		3
- #define AB8500_INT_PON_KEY2DB_F		4
- #define AB8500_INT_PON_KEY2DB_R		5
-@@ -77,18 +80,19 @@ enum ab8500_version {
- #define AB8500_INT_PON_KEY1DB_R		7
- /* ab8500_irq_regoffset[1] -> IT[Source|Latch|Mask]2 */
- #define AB8500_INT_BATT_OVV		8
--#define AB8500_INT_MAIN_CH_UNPLUG_DET	10 /* not 8505 */
--#define AB8500_INT_MAIN_CH_PLUG_DET	11 /* not 8505 */
-+#define AB8500_INT_MAIN_CH_UNPLUG_DET	10 /* not 8505/8540 */
-+#define AB8500_INT_MAIN_CH_PLUG_DET	11 /* not 8505/8540 */
- #define AB8500_INT_VBUS_DET_F		14
- #define AB8500_INT_VBUS_DET_R		15
- /* ab8500_irq_regoffset[2] -> IT[Source|Latch|Mask]3 */
- #define AB8500_INT_VBUS_CH_DROP_END	16
- #define AB8500_INT_RTC_60S		17
- #define AB8500_INT_RTC_ALARM		18
-+#define AB8540_INT_BIF_INT		19
- #define AB8500_INT_BAT_CTRL_INDB	20
- #define AB8500_INT_CH_WD_EXP		21
- #define AB8500_INT_VBUS_OVV		22
--#define AB8500_INT_MAIN_CH_DROP_END	23 /* not 8505/9540 */
-+#define AB8500_INT_MAIN_CH_DROP_END	23 /* not 8505/9540/8540 */
- /* ab8500_irq_regoffset[3] -> IT[Source|Latch|Mask]4 */
- #define AB8500_INT_CCN_CONV_ACC		24
- #define AB8500_INT_INT_AUD		25
-@@ -99,7 +103,7 @@ enum ab8500_version {
- #define AB8500_INT_BUP_CHG_NOT_OK	30
- #define AB8500_INT_BUP_CHG_OK		31
- /* ab8500_irq_regoffset[4] -> IT[Source|Latch|Mask]5 */
--#define AB8500_INT_GP_HW_ADC_CONV_END	32 /* not 8505 */
-+#define AB8500_INT_GP_HW_ADC_CONV_END	32 /* not 8505/8540 */
- #define AB8500_INT_ACC_DETECT_1DB_F	33
- #define AB8500_INT_ACC_DETECT_1DB_R	34
- #define AB8500_INT_ACC_DETECT_22DB_F	35
-@@ -108,23 +112,23 @@ enum ab8500_version {
- #define AB8500_INT_ACC_DETECT_21DB_R	38
- #define AB8500_INT_GP_SW_ADC_CONV_END	39
- /* ab8500_irq_regoffset[5] -> IT[Source|Latch|Mask]7 */
--#define AB8500_INT_GPIO6R		40 /* not 8505/9540 */
--#define AB8500_INT_GPIO7R		41 /* not 8505/9540 */
--#define AB8500_INT_GPIO8R		42 /* not 8505/9540 */
--#define AB8500_INT_GPIO9R		43 /* not 8505/9540 */
--#define AB8500_INT_GPIO10R		44
--#define AB8500_INT_GPIO11R		45
--#define AB8500_INT_GPIO12R		46 /* not 8505 */
--#define AB8500_INT_GPIO13R		47
-+#define AB8500_INT_GPIO6R		40 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO7R		41 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO8R		42 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO9R		43 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO10R		44 /* not 8540 */
-+#define AB8500_INT_GPIO11R		45 /* not 8540 */
-+#define AB8500_INT_GPIO12R		46 /* not 8505/8540 */
-+#define AB8500_INT_GPIO13R		47 /* not 8540 */
- /* ab8500_irq_regoffset[6] -> IT[Source|Latch|Mask]8 */
--#define AB8500_INT_GPIO24R		48 /* not 8505 */
--#define AB8500_INT_GPIO25R		49 /* not 8505 */
--#define AB8500_INT_GPIO36R		50 /* not 8505/9540 */
--#define AB8500_INT_GPIO37R		51 /* not 8505/9540 */
--#define AB8500_INT_GPIO38R		52 /* not 8505/9540 */
--#define AB8500_INT_GPIO39R		53 /* not 8505/9540 */
--#define AB8500_INT_GPIO40R		54
--#define AB8500_INT_GPIO41R		55
-+#define AB8500_INT_GPIO24R		48 /* not 8505/8540 */
-+#define AB8500_INT_GPIO25R		49 /* not 8505/8540 */
-+#define AB8500_INT_GPIO36R		50 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO37R		51 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO38R		52 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO39R		53 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO40R		54 /* not 8540 */
-+#define AB8500_INT_GPIO41R		55 /* not 8540 */
- /* ab8500_irq_regoffset[7] -> IT[Source|Latch|Mask]9 */
- #define AB8500_INT_GPIO6F		56 /* not 8505/9540 */
- #define AB8500_INT_GPIO7F		57 /* not 8505/9540 */
-@@ -135,14 +139,14 @@ enum ab8500_version {
- #define AB8500_INT_GPIO12F		62 /* not 8505 */
- #define AB8500_INT_GPIO13F		63
- /* ab8500_irq_regoffset[8] -> IT[Source|Latch|Mask]10 */
--#define AB8500_INT_GPIO24F		64 /* not 8505 */
--#define AB8500_INT_GPIO25F		65 /* not 8505 */
--#define AB8500_INT_GPIO36F		66 /* not 8505/9540 */
--#define AB8500_INT_GPIO37F		67 /* not 8505/9540 */
--#define AB8500_INT_GPIO38F		68 /* not 8505/9540 */
--#define AB8500_INT_GPIO39F		69 /* not 8505/9540 */
--#define AB8500_INT_GPIO40F		70
--#define AB8500_INT_GPIO41F		71
-+#define AB8500_INT_GPIO24F		64 /* not 8505/8540 */
-+#define AB8500_INT_GPIO25F		65 /* not 8505/8540 */
-+#define AB8500_INT_GPIO36F		66 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO37F		67 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO38F		68 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO39F		69 /* not 8505/9540/8540 */
-+#define AB8500_INT_GPIO40F		70 /* not 8540 */
-+#define AB8500_INT_GPIO41F		71 /* not 8540 */
- /* ab8500_irq_regoffset[9] -> IT[Source|Latch|Mask]12 */
- #define AB8500_INT_ADP_SOURCE_ERROR	72
- #define AB8500_INT_ADP_SINK_ERROR	73
-@@ -160,42 +164,44 @@ enum ab8500_version {
- #define AB8500_INT_SRP_DETECT		88
- #define AB8500_INT_USB_CHARGER_NOT_OKR	89
- #define AB8500_INT_ID_WAKEUP_R		90
-+#define AB8500_INT_ID_DET_PLUGR         91 /* 8505/9540 cut2.0 */
- #define AB8500_INT_ID_DET_R1R		92
- #define AB8500_INT_ID_DET_R2R		93
- #define AB8500_INT_ID_DET_R3R		94
- #define AB8500_INT_ID_DET_R4R		95
- /* ab8500_irq_regoffset[12] -> IT[Source|Latch|Mask]21 */
--#define AB8500_INT_ID_WAKEUP_F		96
--#define AB8500_INT_ID_DET_R1F		98
--#define AB8500_INT_ID_DET_R2F		99
--#define AB8500_INT_ID_DET_R3F		100
--#define AB8500_INT_ID_DET_R4F		101
--#define AB8500_INT_CHAUTORESTARTAFTSEC  102
-+#define AB8500_INT_ID_WAKEUP_F		96 /* not 8505/9540 */
-+#define AB8500_INT_ID_DET_PLUGF		97 /* 8505/9540 cut2.0 */
-+#define AB8500_INT_ID_DET_R1F		98 /* not 8505/9540 */
-+#define AB8500_INT_ID_DET_R2F		99 /* not 8505/9540 */
-+#define AB8500_INT_ID_DET_R3F		100 /* not 8505/9540 */
-+#define AB8500_INT_ID_DET_R4F		101 /* not 8505/9540 */
-+#define AB8500_INT_CHAUTORESTARTAFTSEC	102 /* not 8505/9540 */
- #define AB8500_INT_CHSTOPBYSEC		103
- /* ab8500_irq_regoffset[13] -> IT[Source|Latch|Mask]22 */
- #define AB8500_INT_USB_CH_TH_PROT_F	104
--#define AB8500_INT_USB_CH_TH_PROT_R    105
-+#define AB8500_INT_USB_CH_TH_PROT_R	105
- #define AB8500_INT_MAIN_CH_TH_PROT_F	106 /* not 8505/9540 */
- #define AB8500_INT_MAIN_CH_TH_PROT_R	107 /* not 8505/9540 */
- #define AB8500_INT_CHCURLIMNOHSCHIRP	109
- #define AB8500_INT_CHCURLIMHSCHIRP	110
- #define AB8500_INT_XTAL32K_KO		111
- 
--/* Definitions for AB9540 */
-+/* Definitions for AB9540 / AB8505 */
- /* ab8500_irq_regoffset[14] -> IT[Source|Latch|Mask]13 */
--#define AB9540_INT_GPIO50R		113
--#define AB9540_INT_GPIO51R		114 /* not 8505 */
--#define AB9540_INT_GPIO52R		115
--#define AB9540_INT_GPIO53R		116
--#define AB9540_INT_GPIO54R		117 /* not 8505 */
-+#define AB9540_INT_GPIO50R		113 /* not 8540 */
-+#define AB9540_INT_GPIO51R		114 /* not 8505/8540 */
-+#define AB9540_INT_GPIO52R		115 /* not 8540 */
-+#define AB9540_INT_GPIO53R		116 /* not 8540 */
-+#define AB9540_INT_GPIO54R		117 /* not 8505/8540 */
- #define AB9540_INT_IEXT_CH_RF_BFN_R	118
--#define AB9540_INT_IEXT_CH_RF_BFN_F	119
- /* ab8500_irq_regoffset[15] -> IT[Source|Latch|Mask]14 */
--#define AB9540_INT_GPIO50F		121
--#define AB9540_INT_GPIO51F		122 /* not 8505 */
--#define AB9540_INT_GPIO52F		123
--#define AB9540_INT_GPIO53F		124
--#define AB9540_INT_GPIO54F		125 /* not 8505 */
-+#define AB9540_INT_GPIO50F		121 /* not 8540 */
-+#define AB9540_INT_GPIO51F		122 /* not 8505/8540 */
-+#define AB9540_INT_GPIO52F		123 /* not 8540 */
-+#define AB9540_INT_GPIO53F		124 /* not 8540 */
-+#define AB9540_INT_GPIO54F		125 /* not 8505/8540 */
-+#define AB9540_INT_IEXT_CH_RF_BFN_F	126
- /* ab8500_irq_regoffset[16] -> IT[Source|Latch|Mask]25 */
- #define AB8505_INT_KEYSTUCK		128
- #define AB8505_INT_IKR			129
-@@ -204,6 +210,87 @@ enum ab8500_version {
- #define AB8505_INT_KEYDEGLITCH		132
- #define AB8505_INT_MODPWRSTATUSF	134
- #define AB8505_INT_MODPWRSTATUSR	135
-+/* ab8500_irq_regoffset[17] -> IT[Source|Latch|Mask]6 */
-+#define AB8500_INT_HOOK_DET_NEG_F	138
-+#define AB8500_INT_HOOK_DET_NEG_R	139
-+#define AB8500_INT_HOOK_DET_POS_F	140
-+#define AB8500_INT_HOOK_DET_POS_R	141
-+#define AB8500_INT_PLUG_DET_COMP_F	142
-+#define AB8500_INT_PLUG_DET_COMP_R	143
-+/* ab8500_irq_regoffset[18] -> IT[Source|Latch|Mask]23 */
-+#define AB8505_INT_COLL			144
-+#define AB8505_INT_RESERR		145
-+#define AB8505_INT_FRAERR		146
-+#define AB8505_INT_COMERR		147
-+#define AB8505_INT_SPDSET		148
-+#define AB8505_INT_DSENT		149
-+#define AB8505_INT_DREC			150
-+#define AB8505_INT_ACC_INT		151
-+/* ab8500_irq_regoffset[19] -> IT[Source|Latch|Mask]24 */
-+#define AB8505_INT_NOPINT		152
-+/* ab8540_irq_regoffset[20] -> IT[Source|Latch|Mask]26 */
-+#define AB8540_INT_IDPLUGDETCOMPF	160
-+#define AB8540_INT_IDPLUGDETCOMPR	161
-+#define AB8540_INT_FMDETCOMPLOF		162
-+#define AB8540_INT_FMDETCOMPLOR		163
-+#define AB8540_INT_FMDETCOMPHIF		164
-+#define AB8540_INT_FMDETCOMPHIR		165
-+#define AB8540_INT_ID5VDETCOMPF		166
-+#define AB8540_INT_ID5VDETCOMPR		167
-+/* ab8540_irq_regoffset[21] -> IT[Source|Latch|Mask]27 */
-+#define AB8540_INT_GPIO43F		168
-+#define AB8540_INT_GPIO43R		169
-+#define AB8540_INT_GPIO44F		170
-+#define AB8540_INT_GPIO44R		171
-+#define AB8540_INT_KEYPOSDETCOMPF	172
-+#define AB8540_INT_KEYPOSDETCOMPR	173
-+#define AB8540_INT_KEYNEGDETCOMPF	174
-+#define AB8540_INT_KEYNEGDETCOMPR	175
-+/* ab8540_irq_regoffset[22] -> IT[Source|Latch|Mask]28 */
-+#define AB8540_INT_GPIO1VBATF		176
-+#define AB8540_INT_GPIO1VBATR		177
-+#define AB8540_INT_GPIO2VBATF		178
-+#define AB8540_INT_GPIO2VBATR		179
-+#define AB8540_INT_GPIO3VBATF		180
-+#define AB8540_INT_GPIO3VBATR		181
-+#define AB8540_INT_GPIO4VBATF		182
-+#define AB8540_INT_GPIO4VBATR		183
-+/* ab8540_irq_regoffset[23] -> IT[Source|Latch|Mask]29 */
-+#define AB8540_INT_SYSCLKREQ2F		184
-+#define AB8540_INT_SYSCLKREQ2R		185
-+#define AB8540_INT_SYSCLKREQ3F		186
-+#define AB8540_INT_SYSCLKREQ3R		187
-+#define AB8540_INT_SYSCLKREQ4F		188
-+#define AB8540_INT_SYSCLKREQ4R		189
-+#define AB8540_INT_SYSCLKREQ5F		190
-+#define AB8540_INT_SYSCLKREQ5R		191
-+/* ab8540_irq_regoffset[24] -> IT[Source|Latch|Mask]30 */
-+#define AB8540_INT_PWMOUT1F		192
-+#define AB8540_INT_PWMOUT1R		193
-+#define AB8540_INT_PWMCTRL0F		194
-+#define AB8540_INT_PWMCTRL0R		195
-+#define AB8540_INT_PWMCTRL1F		196
-+#define AB8540_INT_PWMCTRL1R		197
-+#define AB8540_INT_SYSCLKREQ6F		198
-+#define AB8540_INT_SYSCLKREQ6R		199
-+/* ab8540_irq_regoffset[25] -> IT[Source|Latch|Mask]31 */
-+#define AB8540_INT_PWMEXTVIBRA1F	200
-+#define AB8540_INT_PWMEXTVIBRA1R	201
-+#define AB8540_INT_PWMEXTVIBRA2F	202
-+#define AB8540_INT_PWMEXTVIBRA2R	203
-+#define AB8540_INT_PWMOUT2F		204
-+#define AB8540_INT_PWMOUT2R		205
-+#define AB8540_INT_PWMOUT3F		206
-+#define AB8540_INT_PWMOUT3R		207
-+/* ab8540_irq_regoffset[26] -> IT[Source|Latch|Mask]32 */
-+#define AB8540_INT_ADDATA2F		208
-+#define AB8540_INT_ADDATA2R		209
-+#define AB8540_INT_DADATA2F		210
-+#define AB8540_INT_DADATA2R		211
-+#define AB8540_INT_FSYNC2F		212
-+#define AB8540_INT_FSYNC2R		213
-+#define AB8540_INT_BITCLK2F		214
-+#define AB8540_INT_BITCLK2R		215
- 
- /*
-  * AB8500_AB9540_NR_IRQS is used when configuring the IRQ numbers for the
-@@ -213,13 +300,24 @@ enum ab8500_version {
-  * which is larger.
-  */
- #define AB8500_NR_IRQS			112
--#define AB8505_NR_IRQS			136
--#define AB9540_NR_IRQS			136
-+#define AB8505_NR_IRQS			153
-+#define AB9540_NR_IRQS			153
-+#define AB8540_NR_IRQS			216
- /* This is set to the roof of any AB8500 chip variant IRQ counts */
--#define AB8500_MAX_NR_IRQS		AB9540_NR_IRQS
-+#define AB8500_MAX_NR_IRQS		AB8540_NR_IRQS
- 
- #define AB8500_NUM_IRQ_REGS		14
--#define AB9540_NUM_IRQ_REGS		17
-+#define AB9540_NUM_IRQ_REGS		20
-+#define AB8540_NUM_IRQ_REGS		27
-+
-+/* Turn On Status Event */
-+#define AB8500_POR_ON_VBAT		0x01
-+#define AB8500_POW_KEY_1_ON		0x02
-+#define AB8500_POW_KEY_2_ON		0x04
-+#define AB8500_RTC_ALARM		0x08
-+#define AB8500_MAIN_CH_DET		0x10
-+#define AB8500_VBUS_DET			0x20
-+#define AB8500_USB_ID_DET		0x40
- 
- /**
-  * struct ab8500 - ab8500 internal structure
-@@ -335,10 +433,79 @@ static inline int is_ab8500_2p0_or_earlier(struct ab8500 *ab)
- 	return (is_ab8500(ab) && (ab->chip_id <= AB8500_CUT2P0));
- }
- 
-+static inline int is_ab8500_3p3_or_earlier(struct ab8500 *ab)
-+{
-+	return (is_ab8500(ab) && (ab->chip_id <= AB8500_CUT3P3));
-+}
-+
- /* exclude also ab8505, ab9540... */
- static inline int is_ab8500_2p0(struct ab8500 *ab)
- {
- 	return (is_ab8500(ab) && (ab->chip_id == AB8500_CUT2P0));
- }
- 
-+static inline int is_ab8505_1p0_or_earlier(struct ab8500 *ab)
-+{
-+	return (is_ab8505(ab) && (ab->chip_id <= AB8500_CUT1P0));
-+}
-+
-+static inline int is_ab8505_2p0(struct ab8500 *ab)
-+{
-+	return (is_ab8505(ab) && (ab->chip_id == AB8500_CUT2P0));
-+}
-+
-+static inline int is_ab9540_1p0_or_earlier(struct ab8500 *ab)
-+{
-+	return (is_ab9540(ab) && (ab->chip_id <= AB8500_CUT1P0));
-+}
-+
-+static inline int is_ab9540_2p0(struct ab8500 *ab)
-+{
-+	return (is_ab9540(ab) && (ab->chip_id == AB8500_CUT2P0));
-+}
-+
-+/*
-+ * Be careful, the marketing name for this chip is 2.1
-+ * but the value read from the chip is 3.0 (0x30)
-+ */
-+static inline int is_ab9540_3p0(struct ab8500 *ab)
-+{
-+	return (is_ab9540(ab) && (ab->chip_id == AB8500_CUT3P0));
-+}
-+
-+static inline int is_ab8540_1p0_or_earlier(struct ab8500 *ab)
-+{
-+	return is_ab8540(ab) && (ab->chip_id <= AB8500_CUT1P0);
-+}
-+
-+static inline int is_ab8540_1p1_or_earlier(struct ab8500 *ab)
-+{
-+	return is_ab8540(ab) && (ab->chip_id <= AB8500_CUT1P1);
-+}
-+
-+static inline int is_ab8540_1p2_or_earlier(struct ab8500 *ab)
-+{
-+	return is_ab8540(ab) && (ab->chip_id <= AB8500_CUT1P2);
-+}
-+
-+static inline int is_ab8540_2p0_or_earlier(struct ab8500 *ab)
-+{
-+	return is_ab8540(ab) && (ab->chip_id <= AB8500_CUT2P0);
-+}
-+
-+static inline int is_ab8540_2p0(struct ab8500 *ab)
-+{
-+	return is_ab8540(ab) && (ab->chip_id == AB8500_CUT2P0);
-+}
-+
-+static inline int is_ab8505_2p0_earlier(struct ab8500 *ab)
-+{
-+	return (is_ab8505(ab) && (ab->chip_id < AB8500_CUT2P0));
-+}
-+
-+static inline int is_ab9540_2p0_or_earlier(struct ab8500 *ab)
-+{
-+	return (is_ab9540(ab) && (ab->chip_id < AB8500_CUT2P0));
-+}
-+
- #endif /* MFD_AB8500_H */
+ obj-$(CONFIG_GPIO_74X164)	+= gpio-74x164.o
+-obj-$(CONFIG_GPIO_AB8500)	+= gpio-ab8500.o
+ obj-$(CONFIG_GPIO_ADNP)		+= gpio-adnp.o
+ obj-$(CONFIG_GPIO_ADP5520)	+= gpio-adp5520.o
+ obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
+diff --git a/drivers/gpio/gpio-ab8500.c b/drivers/gpio/gpio-ab8500.c
+deleted file mode 100644
+index 983ad42..0000000
+--- a/drivers/gpio/gpio-ab8500.c
++++ /dev/null
+@@ -1,520 +0,0 @@
+-/*
+- * Copyright (C) ST-Ericsson SA 2011
+- *
+- * Author: BIBEK BASU <bibek.basu@stericsson.com>
+- * License terms: GNU General Public License (GPL) version 2
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/kernel.h>
+-#include <linux/types.h>
+-#include <linux/slab.h>
+-#include <linux/init.h>
+-#include <linux/module.h>
+-#include <linux/err.h>
+-#include <linux/platform_device.h>
+-#include <linux/gpio.h>
+-#include <linux/irq.h>
+-#include <linux/interrupt.h>
+-#include <linux/mfd/ab8500.h>
+-#include <linux/mfd/abx500.h>
+-#include <linux/mfd/ab8500/gpio.h>
+-
+-/*
+- * GPIO registers offset
+- * Bank: 0x10
+- */
+-#define AB8500_GPIO_SEL1_REG	0x00
+-#define AB8500_GPIO_SEL2_REG	0x01
+-#define AB8500_GPIO_SEL3_REG	0x02
+-#define AB8500_GPIO_SEL4_REG	0x03
+-#define AB8500_GPIO_SEL5_REG	0x04
+-#define AB8500_GPIO_SEL6_REG	0x05
+-
+-#define AB8500_GPIO_DIR1_REG	0x10
+-#define AB8500_GPIO_DIR2_REG	0x11
+-#define AB8500_GPIO_DIR3_REG	0x12
+-#define AB8500_GPIO_DIR4_REG	0x13
+-#define AB8500_GPIO_DIR5_REG	0x14
+-#define AB8500_GPIO_DIR6_REG	0x15
+-
+-#define AB8500_GPIO_OUT1_REG	0x20
+-#define AB8500_GPIO_OUT2_REG	0x21
+-#define AB8500_GPIO_OUT3_REG	0x22
+-#define AB8500_GPIO_OUT4_REG	0x23
+-#define AB8500_GPIO_OUT5_REG	0x24
+-#define AB8500_GPIO_OUT6_REG	0x25
+-
+-#define AB8500_GPIO_PUD1_REG	0x30
+-#define AB8500_GPIO_PUD2_REG	0x31
+-#define AB8500_GPIO_PUD3_REG	0x32
+-#define AB8500_GPIO_PUD4_REG	0x33
+-#define AB8500_GPIO_PUD5_REG	0x34
+-#define AB8500_GPIO_PUD6_REG	0x35
+-
+-#define AB8500_GPIO_IN1_REG	0x40
+-#define AB8500_GPIO_IN2_REG	0x41
+-#define AB8500_GPIO_IN3_REG	0x42
+-#define AB8500_GPIO_IN4_REG	0x43
+-#define AB8500_GPIO_IN5_REG	0x44
+-#define AB8500_GPIO_IN6_REG	0x45
+-#define AB8500_GPIO_ALTFUN_REG	0x45
+-#define ALTFUN_REG_INDEX	6
+-#define AB8500_NUM_GPIO		42
+-#define AB8500_NUM_VIR_GPIO_IRQ	16
+-
+-enum ab8500_gpio_action {
+-	NONE,
+-	STARTUP,
+-	SHUTDOWN,
+-	MASK,
+-	UNMASK
+-};
+-
+-struct ab8500_gpio {
+-	struct gpio_chip chip;
+-	struct ab8500 *parent;
+-	struct device *dev;
+-	struct mutex lock;
+-	u32 irq_base;
+-	enum ab8500_gpio_action irq_action;
+-	u16 rising;
+-	u16 falling;
+-};
+-/**
+- * to_ab8500_gpio() - get the pointer to ab8500_gpio
+- * @chip:	Member of the structure ab8500_gpio
+- */
+-static inline struct ab8500_gpio *to_ab8500_gpio(struct gpio_chip *chip)
+-{
+-	return container_of(chip, struct ab8500_gpio, chip);
+-}
+-
+-static int ab8500_gpio_set_bits(struct gpio_chip *chip, u8 reg,
+-					unsigned offset, int val)
+-{
+-	struct ab8500_gpio *ab8500_gpio = to_ab8500_gpio(chip);
+-	u8 pos = offset % 8;
+-	int ret;
+-
+-	reg = reg + (offset / 8);
+-	ret = abx500_mask_and_set_register_interruptible(ab8500_gpio->dev,
+-				AB8500_MISC, reg, 1 << pos, val << pos);
+-	if (ret < 0)
+-		dev_err(ab8500_gpio->dev, "%s write failed\n", __func__);
+-	return ret;
+-}
+-/**
+- * ab8500_gpio_get() - Get the particular GPIO value
+- * @chip: Gpio device
+- * @offset: GPIO number to read
+- */
+-static int ab8500_gpio_get(struct gpio_chip *chip, unsigned offset)
+-{
+-	struct ab8500_gpio *ab8500_gpio = to_ab8500_gpio(chip);
+-	u8 mask = 1 << (offset % 8);
+-	u8 reg = AB8500_GPIO_OUT1_REG + (offset / 8);
+-	int ret;
+-	u8 data;
+-	ret = abx500_get_register_interruptible(ab8500_gpio->dev, AB8500_MISC,
+-						reg, &data);
+-	if (ret < 0) {
+-		dev_err(ab8500_gpio->dev, "%s read failed\n", __func__);
+-		return ret;
+-	}
+-	return (data & mask) >> (offset % 8);
+-}
+-
+-static void ab8500_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+-{
+-	struct ab8500_gpio *ab8500_gpio = to_ab8500_gpio(chip);
+-	int ret;
+-	/* Write the data */
+-	ret = ab8500_gpio_set_bits(chip, AB8500_GPIO_OUT1_REG, offset, 1);
+-	if (ret < 0)
+-		dev_err(ab8500_gpio->dev, "%s write failed\n", __func__);
+-}
+-
+-static int ab8500_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
+-					int val)
+-{
+-	int ret;
+-	/* set direction as output */
+-	ret = ab8500_gpio_set_bits(chip, AB8500_GPIO_DIR1_REG, offset, 1);
+-	if (ret < 0)
+-		return ret;
+-	/* disable pull down */
+-	ret = ab8500_gpio_set_bits(chip, AB8500_GPIO_PUD1_REG, offset, 1);
+-	if (ret < 0)
+-		return ret;
+-	/* set the output as 1 or 0 */
+-	return ab8500_gpio_set_bits(chip, AB8500_GPIO_OUT1_REG, offset, val);
+-
+-}
+-
+-static int ab8500_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+-{
+-	/* set the register as input */
+-	return ab8500_gpio_set_bits(chip, AB8500_GPIO_DIR1_REG, offset, 0);
+-}
+-
+-static int ab8500_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+-{
+-	/*
+-	 * Only some GPIOs are interrupt capable, and they are
+-	 * organized in discontiguous clusters:
+-	 *
+-	 *	GPIO6 to GPIO13
+-	 *	GPIO24 and GPIO25
+-	 *	GPIO36 to GPIO41
+-	 */
+-	static struct ab8500_gpio_irq_cluster {
+-		int start;
+-		int end;
+-	} clusters[] = {
+-		{.start = 6,  .end = 13},
+-		{.start = 24, .end = 25},
+-		{.start = 36, .end = 41},
+-	};
+-	struct ab8500_gpio *ab8500_gpio = to_ab8500_gpio(chip);
+-	int base = ab8500_gpio->irq_base;
+-	int i;
+-
+-	for (i = 0; i < ARRAY_SIZE(clusters); i++) {
+-		struct ab8500_gpio_irq_cluster *cluster = &clusters[i];
+-
+-		if (offset >= cluster->start && offset <= cluster->end)
+-			return base + offset - cluster->start;
+-
+-		/* Advance by the number of gpios in this cluster */
+-		base += cluster->end - cluster->start + 1;
+-	}
+-
+-	return -EINVAL;
+-}
+-
+-static struct gpio_chip ab8500gpio_chip = {
+-	.label			= "ab8500_gpio",
+-	.owner			= THIS_MODULE,
+-	.direction_input	= ab8500_gpio_direction_input,
+-	.get			= ab8500_gpio_get,
+-	.direction_output	= ab8500_gpio_direction_output,
+-	.set			= ab8500_gpio_set,
+-	.to_irq			= ab8500_gpio_to_irq,
+-};
+-
+-static unsigned int irq_to_rising(unsigned int irq)
+-{
+-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+-	int offset = irq - ab8500_gpio->irq_base;
+-	int new_irq = offset +  AB8500_INT_GPIO6R
+-			+ ab8500_gpio->parent->irq_base;
+-	return new_irq;
+-}
+-
+-static unsigned int irq_to_falling(unsigned int irq)
+-{
+-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+-	int offset = irq - ab8500_gpio->irq_base;
+-	int new_irq = offset +  AB8500_INT_GPIO6F
+-			+  ab8500_gpio->parent->irq_base;
+-	return new_irq;
+-
+-}
+-
+-static unsigned int rising_to_irq(unsigned int irq, void *dev)
+-{
+-	struct ab8500_gpio *ab8500_gpio = dev;
+-	int offset = irq - AB8500_INT_GPIO6R
+-			- ab8500_gpio->parent->irq_base ;
+-	int new_irq = offset + ab8500_gpio->irq_base;
+-	return new_irq;
+-}
+-
+-static unsigned int falling_to_irq(unsigned int irq, void *dev)
+-{
+-	struct ab8500_gpio *ab8500_gpio = dev;
+-	int offset = irq - AB8500_INT_GPIO6F
+-			- ab8500_gpio->parent->irq_base ;
+-	int new_irq = offset + ab8500_gpio->irq_base;
+-	return new_irq;
+-
+-}
+-
+-/*
+- * IRQ handler
+- */
+-
+-static irqreturn_t handle_rising(int irq, void *dev)
+-{
+-
+-	handle_nested_irq(rising_to_irq(irq , dev));
+-	return IRQ_HANDLED;
+-}
+-
+-static irqreturn_t handle_falling(int irq, void *dev)
+-{
+-
+-	handle_nested_irq(falling_to_irq(irq, dev));
+-	return IRQ_HANDLED;
+-}
+-
+-static void ab8500_gpio_irq_lock(unsigned int irq)
+-{
+-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+-	mutex_lock(&ab8500_gpio->lock);
+-}
+-
+-static void ab8500_gpio_irq_sync_unlock(unsigned int irq)
+-{
+-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+-	int offset = irq - ab8500_gpio->irq_base;
+-	bool rising = ab8500_gpio->rising & BIT(offset);
+-	bool falling = ab8500_gpio->falling & BIT(offset);
+-	int ret;
+-
+-	switch (ab8500_gpio->irq_action)	{
+-	case STARTUP:
+-		if (rising)
+-			ret = request_threaded_irq(irq_to_rising(irq),
+-					NULL, handle_rising,
+-					IRQF_TRIGGER_RISING,
+-					"ab8500-gpio-r", ab8500_gpio);
+-		if (falling)
+-			ret = request_threaded_irq(irq_to_falling(irq),
+-				       NULL, handle_falling,
+-				       IRQF_TRIGGER_FALLING,
+-				       "ab8500-gpio-f", ab8500_gpio);
+-		break;
+-	case SHUTDOWN:
+-		if (rising)
+-			free_irq(irq_to_rising(irq), ab8500_gpio);
+-		if (falling)
+-			free_irq(irq_to_falling(irq), ab8500_gpio);
+-		break;
+-	case MASK:
+-		if (rising)
+-			disable_irq(irq_to_rising(irq));
+-		if (falling)
+-			disable_irq(irq_to_falling(irq));
+-		break;
+-	case UNMASK:
+-		if (rising)
+-			enable_irq(irq_to_rising(irq));
+-		if (falling)
+-			enable_irq(irq_to_falling(irq));
+-		break;
+-	case NONE:
+-		break;
+-	}
+-	ab8500_gpio->irq_action = NONE;
+-	ab8500_gpio->rising &= ~(BIT(offset));
+-	ab8500_gpio->falling &= ~(BIT(offset));
+-	mutex_unlock(&ab8500_gpio->lock);
+-}
+-
+-
+-static void ab8500_gpio_irq_mask(unsigned int irq)
+-{
+-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+-	ab8500_gpio->irq_action = MASK;
+-}
+-
+-static void ab8500_gpio_irq_unmask(unsigned int irq)
+-{
+-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+-	ab8500_gpio->irq_action = UNMASK;
+-}
+-
+-static int ab8500_gpio_irq_set_type(unsigned int irq, unsigned int type)
+-{
+-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+-	int offset = irq - ab8500_gpio->irq_base;
+-
+-	if (type == IRQ_TYPE_EDGE_BOTH) {
+-		ab8500_gpio->rising =  BIT(offset);
+-		ab8500_gpio->falling = BIT(offset);
+-	} else if (type == IRQ_TYPE_EDGE_RISING) {
+-		ab8500_gpio->rising =  BIT(offset);
+-	} else  {
+-		ab8500_gpio->falling = BIT(offset);
+-	}
+-	return 0;
+-}
+-
+-unsigned int ab8500_gpio_irq_startup(unsigned int irq)
+-{
+-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+-	ab8500_gpio->irq_action = STARTUP;
+-	return 0;
+-}
+-
+-void ab8500_gpio_irq_shutdown(unsigned int irq)
+-{
+-	struct ab8500_gpio *ab8500_gpio = get_irq_chip_data(irq);
+-	ab8500_gpio->irq_action = SHUTDOWN;
+-}
+-
+-static struct irq_chip ab8500_gpio_irq_chip = {
+-	.name			= "ab8500-gpio",
+-	.startup		= ab8500_gpio_irq_startup,
+-	.shutdown		= ab8500_gpio_irq_shutdown,
+-	.bus_lock		= ab8500_gpio_irq_lock,
+-	.bus_sync_unlock	= ab8500_gpio_irq_sync_unlock,
+-	.mask			= ab8500_gpio_irq_mask,
+-	.unmask			= ab8500_gpio_irq_unmask,
+-	.set_type		= ab8500_gpio_irq_set_type,
+-};
+-
+-static int ab8500_gpio_irq_init(struct ab8500_gpio *ab8500_gpio)
+-{
+-	u32 base = ab8500_gpio->irq_base;
+-	int irq;
+-
+-	for (irq = base; irq < base + AB8500_NUM_VIR_GPIO_IRQ ; irq++) {
+-		set_irq_chip_data(irq, ab8500_gpio);
+-		set_irq_chip_and_handler(irq, &ab8500_gpio_irq_chip,
+-				handle_simple_irq);
+-		set_irq_nested_thread(irq, 1);
+-#ifdef CONFIG_ARM
+-		set_irq_flags(irq, IRQF_VALID);
+-#else
+-		set_irq_noprobe(irq);
+-#endif
+-	}
+-
+-	return 0;
+-}
+-
+-static void ab8500_gpio_irq_remove(struct ab8500_gpio *ab8500_gpio)
+-{
+-	int base = ab8500_gpio->irq_base;
+-	int irq;
+-
+-	for (irq = base; irq < base + AB8500_NUM_VIR_GPIO_IRQ; irq++) {
+-#ifdef CONFIG_ARM
+-		set_irq_flags(irq, 0);
+-#endif
+-		set_irq_chip_and_handler(irq, NULL, NULL);
+-		set_irq_chip_data(irq, NULL);
+-	}
+-}
+-
+-static int ab8500_gpio_probe(struct platform_device *pdev)
+-{
+-	struct ab8500_platform_data *ab8500_pdata =
+-				dev_get_platdata(pdev->dev.parent);
+-	struct ab8500_gpio_platform_data *pdata;
+-	struct ab8500_gpio *ab8500_gpio;
+-	int ret;
+-	int i;
+-
+-	pdata = ab8500_pdata->gpio;
+-	if (!pdata)	{
+-		dev_err(&pdev->dev, "gpio platform data missing\n");
+-		return -ENODEV;
+-	}
+-
+-	ab8500_gpio = kzalloc(sizeof(struct ab8500_gpio), GFP_KERNEL);
+-	if (ab8500_gpio == NULL) {
+-		dev_err(&pdev->dev, "failed to allocate memory\n");
+-		return -ENOMEM;
+-	}
+-	ab8500_gpio->dev = &pdev->dev;
+-	ab8500_gpio->parent = dev_get_drvdata(pdev->dev.parent);
+-	ab8500_gpio->chip = ab8500gpio_chip;
+-	ab8500_gpio->chip.ngpio = AB8500_NUM_GPIO;
+-	ab8500_gpio->chip.dev = &pdev->dev;
+-	ab8500_gpio->chip.base = pdata->gpio_base;
+-	ab8500_gpio->irq_base = pdata->irq_base;
+-	/* initialize the lock */
+-	mutex_init(&ab8500_gpio->lock);
+-	/*
+-	 * AB8500 core will handle and clear the IRQ
+-	 * configre GPIO based on config-reg value.
+-	 * These values are for selecting the PINs as
+-	 * GPIO or alternate function
+-	 */
+-	for (i = AB8500_GPIO_SEL1_REG; i <= AB8500_GPIO_SEL6_REG; i++)	{
+-		ret = abx500_set_register_interruptible(ab8500_gpio->dev,
+-				AB8500_MISC, i,
+-				pdata->config_reg[i]);
+-		if (ret < 0)
+-			goto out_free;
+-	}
+-	ret = abx500_set_register_interruptible(ab8500_gpio->dev, AB8500_MISC,
+-				AB8500_GPIO_ALTFUN_REG,
+-				pdata->config_reg[ALTFUN_REG_INDEX]);
+-	if (ret < 0)
+-		goto out_free;
+-
+-	ret = ab8500_gpio_irq_init(ab8500_gpio);
+-	if (ret)
+-		goto out_free;
+-	ret = gpiochip_add(&ab8500_gpio->chip);
+-	if (ret) {
+-		dev_err(&pdev->dev, "unable to add gpiochip: %d\n",
+-				ret);
+-		goto out_rem_irq;
+-	}
+-	platform_set_drvdata(pdev, ab8500_gpio);
+-	return 0;
+-
+-out_rem_irq:
+-	ab8500_gpio_irq_remove(ab8500_gpio);
+-out_free:
+-	mutex_destroy(&ab8500_gpio->lock);
+-	kfree(ab8500_gpio);
+-	return ret;
+-}
+-
+-/*
+- * ab8500_gpio_remove() - remove Ab8500-gpio driver
+- * @pdev :	Platform device registered
+- */
+-static int ab8500_gpio_remove(struct platform_device *pdev)
+-{
+-	struct ab8500_gpio *ab8500_gpio = platform_get_drvdata(pdev);
+-	int ret;
+-
+-	ret = gpiochip_remove(&ab8500_gpio->chip);
+-	if (ret < 0) {
+-		dev_err(ab8500_gpio->dev, "unable to remove gpiochip: %d\n",
+-			ret);
+-		return ret;
+-	}
+-
+-	platform_set_drvdata(pdev, NULL);
+-	mutex_destroy(&ab8500_gpio->lock);
+-	kfree(ab8500_gpio);
+-
+-	return 0;
+-}
+-
+-static struct platform_driver ab8500_gpio_driver = {
+-	.driver = {
+-		.name = "ab8500-gpio",
+-		.owner = THIS_MODULE,
+-	},
+-	.probe = ab8500_gpio_probe,
+-	.remove = ab8500_gpio_remove,
+-};
+-
+-static int __init ab8500_gpio_init(void)
+-{
+-	return platform_driver_register(&ab8500_gpio_driver);
+-}
+-arch_initcall(ab8500_gpio_init);
+-
+-static void __exit ab8500_gpio_exit(void)
+-{
+-	platform_driver_unregister(&ab8500_gpio_driver);
+-}
+-module_exit(ab8500_gpio_exit);
+-
+-MODULE_AUTHOR("BIBEK BASU <bibek.basu@stericsson.com>");
+-MODULE_DESCRIPTION("Driver allows to use AB8500 unused pins to be used as GPIO");
+-MODULE_ALIAS("platform:ab8500-gpio");
+-MODULE_LICENSE("GPL v2");
 -- 
 1.7.11.3
