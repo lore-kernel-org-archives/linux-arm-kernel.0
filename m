@@ -1,64 +1,88 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 15 Jan 2013 17:04:32 +0200
-Subject: [RFC PATCH 0/7] usb: musb: add driver for control module
-In-Reply-To: <50F56A1A.3040504@ti.com>
-References: <1358239378-10030-1-git-send-email-kishon@ti.com>
- <201301151341.08297.arnd@arndb.de> <50F56A1A.3040504@ti.com>
-Message-ID: <20130115150432.GB26272@arwen.pp.htv.fi>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 15 Jan 2013 16:07:16 +0100
+Subject: [Linaro-mm-sig][RFC] ARM: dma-mapping: Add DMA attribute to skip
+ iommu mapping
+In-Reply-To: <1357639944-12050-1-git-send-email-abhinav.k@samsung.com>
+References: <1357639944-12050-1-git-send-email-abhinav.k@samsung.com>
+Message-ID: <50F570A4.70606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Tue, Jan 15, 2013 at 08:09:22PM +0530, kishon wrote:
-> Hi Arnd,
-> 
-> On Tuesday 15 January 2013 07:11 PM, Arnd Bergmann wrote:
-> >On Tuesday 15 January 2013, Kishon Vijay Abraham I wrote:
-> >>Added a new driver for the usb part of control module. This has an API
-> >>to power on the USB2 phy and an API to write to the mailbox depending on
-> >>whether MUSB has to act in host mode or in device mode.
-> >>
-> >>Writing to control module registers for doing the above task which was
-> >>previously done in omap glue and in omap-usb2 phy is removed.
-> >>
-> >>Also added the dt data to get MUSB working in OMAP platforms.
-> >>This series has patches for both drivers and ARCH folders, so If it has to
-> >>be split I'll do it.
-> >>
-> >
-> >The series looks good to me, I just had a minor comment on one patch.
-> >
-> >One a somewhat related topic, I wonder whether there are any plans
-> >on your side to change this driver to support multiple bus glues
-> >to be built for one kernel image. With a multiplatform kernel, we
-> >may need all of TUSB6010/OMAP2PLUS/DSPS/UX500 for instance.
-> 
-> We don't have plans as of now. I actually don't expect any changes in
-> the driver other than the Kconfig changes. Anyways the probe of
-> glue's other than the platform it's running won't get called. right
-> Felipe?
+On 1/8/2013 11:12 AM, Abhinav Kochhar wrote:
+> Adding a new dma attribute which can be used by the
+> platform drivers to avoid creating iommu mappings.
+> In some cases the buffers are allocated by display
+> controller driver using dma alloc apis but are not
+> used for scanout. Though the buffers are allocated
+> by display controller but are only used for sharing
+> among different devices.
+> With this attribute the platform drivers can choose
+> not to create iommu mapping at the time of buffer
+> allocation and only create the mapping when they
+> access this buffer.
+>
+> Change-Id: I2178b3756170982d814e085ca62474d07b616a21
+> Signed-off-by: Abhinav Kochhar <abhinav.k@samsung.com>
+> ---
+>   arch/arm/mm/dma-mapping.c |    8 +++++---
+>   include/linux/dma-attrs.h |    1 +
+>   2 files changed, 6 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index c0f0f43..e73003c 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1279,9 +1279,11 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+>   	if (!pages)
+>   		return NULL;
+>   
+> -	*handle = __iommu_create_mapping(dev, pages, size);
+> -	if (*handle == DMA_ERROR_CODE)
+> -		goto err_buffer;
+> +	if (!dma_get_attr(DMA_ATTR_NO_IOMMU_MAPPING, attrs)) {
+> +		*handle = __iommu_create_mapping(dev, pages, size);
+> +		if (*handle == DMA_ERROR_CODE)
+> +			goto err_buffer;
+> +	}
+>   
+>   	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
+>   		return pages;
+> diff --git a/include/linux/dma-attrs.h b/include/linux/dma-attrs.h
+> index c8e1831..1f04419 100644
+> --- a/include/linux/dma-attrs.h
+> +++ b/include/linux/dma-attrs.h
+> @@ -15,6 +15,7 @@ enum dma_attr {
+>   	DMA_ATTR_WEAK_ORDERING,
+>   	DMA_ATTR_WRITE_COMBINE,
+>   	DMA_ATTR_NON_CONSISTENT,
+> +	DMA_ATTR_NO_IOMMU_MAPPING,
+>   	DMA_ATTR_NO_KERNEL_MAPPING,
+>   	DMA_ATTR_SKIP_CPU_SYNC,
+>   	DMA_ATTR_FORCE_CONTIGUOUS,
 
-AFAICT there's nothing preventing those from being built together as
-long as you don't use DMA (yeah, that's a touchy subject still with
-MUSB).
+I'm sorry, but from my perspective this patch and the yet another dma
+attribute shows that there is something fishy happening in the exynos-drm
+driver. Creating a mapping in DMA address space is the MAIN purpose of
+the DMA mapping subsystem, so adding an attribute which skips this
+operation already should give you a sign of warning that something is
+not used right.
 
-If there are any build breaks, please report them so bus glue owners can
-fix. I see that at least the davinci folks need to work a bit
+It looks that dma-mapping in the current state is simply not adequate
+for this driver. I noticed that DRM drivers are already known for
+implementing a lots of common code for their own with slightly changed
+behavior, like custom page manager/allocator. It looks that exynos-drm
+driver grew to the point where it also needs such features. It already
+contains custom code for CPU cache handling, IOMMU and contiguous
+memory special cases management. I would advise to drop DMA-mapping
+API completely, avoid adding yet another dozen of DMA attributes useful
+only for one driver and implement your own memory manager with direct
+usage of IOMMU API, alloc_pages() and dma_alloc_pages_from_contiguous().
+This way DMA mapping subsystem can be kept simple, robust and easy to
+understand without confusing or conflicting parts.
 
-$ git grep -e "mach\/" drivers/usb/musb/
-drivers/usb/musb/da8xx.c:#include <mach/da8xx.h>
-drivers/usb/musb/davinci.c:#include <mach/cputype.h>
-drivers/usb/musb/davinci.c:#include <mach/hardware.h>
-
-I'm adding Ravi B to the loop here for those.
-
+Best regards
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130115/b9e42659/attachment.sig>
+Marek Szyprowski
+Samsung Poland R&D Center
