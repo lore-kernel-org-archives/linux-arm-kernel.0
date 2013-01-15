@@ -1,43 +1,153 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue, 15 Jan 2013 11:52:14 -0700
-Subject: [PATCH] dmaengine: omap-dma: Allow DMA controller to prefetch data
-In-Reply-To: <20121119163727.GB9758@animalcreek.com>
-References: <20121119163727.GB9758@animalcreek.com>
-Message-ID: <20130115185214.GA3165@animalcreek.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 15 Jan 2013 18:53:06 +0000
+Subject: [PATCH 06/16] ARM: b.L: generic SMP secondary bringup and
+ hotplug support
+In-Reply-To: <CAMpgmWCzCxwenDs7XPh7D+shEJcj_ObWcUGZG-xMtd15XL-3Vg@mail.gmail.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-7-git-send-email-nicolas.pitre@linaro.org>
+ <50F053BF.8090302@ti.com>
+ <CAMpgmWCxQMoncnMqy_bzB+mBU7eGO_L4fR+Q5uMaxdFn4mL5PA@mail.gmail.com>
+ <50F4F807.3010806@ti.com>
+ <CAMpgmWCzCxwenDs7XPh7D+shEJcj_ObWcUGZG-xMtd15XL-3Vg@mail.gmail.com>
+Message-ID: <20130115185306.GF1983@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 09:37:27AM -0700, Mark A. Greer wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+On Tue, Jan 15, 2013 at 11:18:44AM +0000, Achin Gupta wrote:
+> Hi Santosh,
 > 
-> Enable DMA prefetching for non-cyclic DMAs by setting the
-> 'OMAP_DMA_DST_SYNC_PREFETCH' flag when there is a destination
-> synchronized DMA transfer.  Prefetching is not allowed on
-> source synchronized DMA transfers.  It is not allowed on
-> cyclic DMAs either since that can cause issues with some
-> users (e.g., suspending/resuming audio).
+> On Tue, Jan 15, 2013 at 6:32 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+> > On Monday 14 January 2013 11:35 PM, Achin Gupta wrote:
+> >>
+> >> Hi Santosh,
+> >>
+> >> On Fri, Jan 11, 2013 at 6:02 PM, Santosh Shilimkar
+> >> <santosh.shilimkar@ti.com> wrote:
+> >>>
+> >>> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
+> >>>>
+> >>>>
+> >>>> Now that the b.L power API is in place, we can use it for SMP secondary
+> >>>> bringup and CPU hotplug in a generic fashion.
+> >>>>
+> >>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> >>>> ---
+> >>>>    arch/arm/common/Makefile     |  2 +-
+> >>>>    arch/arm/common/bL_platsmp.c | 79
+> >>>> ++++++++++++++++++++++++++++++++++++++++++++
+> >>>>    2 files changed, 80 insertions(+), 1 deletion(-)
+> >>>>    create mode 100644 arch/arm/common/bL_platsmp.c
+> >>>>
+> >>>> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+> >>>> index 894c2ddf9b..59b36db7cc 100644
+> >>>> --- a/arch/arm/common/Makefile
+> >>>> +++ b/arch/arm/common/Makefile
+> >>>> @@ -15,4 +15,4 @@ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+> >>>>    obj-$(CONFIG_ARM_TIMER_SP804) += timer-sp.o
+> >>>>    obj-$(CONFIG_FIQ_GLUE)                += fiq_glue.o fiq_glue_setup.o
+> >>>>    obj-$(CONFIG_FIQ_DEBUGGER)    += fiq_debugger.o
+> >>>> -obj-$(CONFIG_BIG_LITTLE)       += bL_head.o bL_entry.o vlock.o
+> >>>> +obj-$(CONFIG_BIG_LITTLE)       += bL_head.o bL_entry.o bL_platsmp.o
+> >>>> vlock.o
+> >>>> diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
+> >>>> new file mode 100644
+> >>>> index 0000000000..0acb9f4685
+> >>>> --- /dev/null
+> >>>> +++ b/arch/arm/common/bL_platsmp.c
+> >>>> @@ -0,0 +1,79 @@
+> >>>> +/*
+> >>>> + * linux/arch/arm/mach-vexpress/bL_platsmp.c
+> >>>> + *
+> >>>> + * Created by:  Nicolas Pitre, November 2012
+> >>>> + * Copyright:   (C) 2012  Linaro Limited
+> >>>> + *
+> >>>> + * This program is free software; you can redistribute it and/or modify
+> >>>> + * it under the terms of the GNU General Public License version 2 as
+> >>>> + * published by the Free Software Foundation.
+> >>>> + *
+> >>>> + * Code to handle secondary CPU bringup and hotplug for the bL power
+> >>>> API.
+> >>>> + */
+> >>>> +
+> >>>> +#include <linux/init.h>
+> >>>> +#include <linux/smp.h>
+> >>>> +
+> >>>> +#include <asm/bL_entry.h>
+> >>>> +#include <asm/smp_plat.h>
+> >>>> +#include <asm/hardware/gic.h>
+> >>>> +
+> >>>> +static void __init simple_smp_init_cpus(void)
+> >>>> +{
+> >>>> +       set_smp_cross_call(gic_raise_softirq);
+> >>>> +}
+> >>>> +
+> >>>> +static int __cpuinit bL_boot_secondary(unsigned int cpu, struct
+> >>>> task_struct *idle)
+> >>>> +{
+> >>>> +       unsigned int pcpu, pcluster, ret;
+> >>>> +       extern void secondary_startup(void);
+> >>>> +
+> >>>> +       pcpu = cpu_logical_map(cpu) & 0xff;
+> >>>> +       pcluster = (cpu_logical_map(cpu) >> 8) & 0xff;
+> >>>> +       pr_debug("%s: logical CPU %d is physical CPU %d cluster %d\n",
+> >>>> +                __func__, cpu, pcpu, pcluster);
+> >>>> +
+> >>>> +       bL_set_entry_vector(pcpu, pcluster, NULL);
+> >>>> +       ret = bL_cpu_power_up(pcpu, pcluster);
+> >>>> +       if (ret)
+> >>>> +               return ret;
+> >>>> +       bL_set_entry_vector(pcpu, pcluster, secondary_startup);
+> >>>> +       gic_raise_softirq(cpumask_of(cpu), 0);
+> >>>> +       sev();
+> >>>
+> >>>
+> >>> softirq() should be enough to break a CPU if it is in standby with
+> >>> wfe state. Is that additional sev() needed here ?
+> >>
+> >>
+> >> Not if the target cpu has its I & F bits disabled and that would be the
+> >> case with a secondary waiting to be woken up
+> >>
+> > This is interesting since CPU is actually in standby state and this
+> > was not my understanding so far. Your statement at least contradicts
+> > the ARM ARM (B1.8.12 Wait For Interrupt)
+> > -----------------------
+> > The processor can remain in the WFI low-power state until it is reset, or it
+> > detects one of the following WFI wake-up
+> > events:
+> > ? a physical IRQ interrupt, regardless of the value of the CPSR.I bit
+> > ? a physical FIQ interrupt, regardless of the value of the CPSR.F bit
+> > ----------------------------------
+> >
+> > Are you referring to some new behavior on latest ARMv7 CPUs ?
 > 
-> CC: Russell King <rmk+kernel@arm.linux.org.uk>
-> CC: P?ter Ujfalusi <peter.ujfalusi@ti.com>
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> ---
->  drivers/dma/omap-dma.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> You are abs right about the 'wfi' behaviour. I was talking about the effect
+> of interrupts on a cpu thats in 'wfe'.
 > 
-> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> index bb2d8e7..3932eab 100644
-> --- a/drivers/dma/omap-dma.c
-> +++ b/drivers/dma/omap-dma.c
-> @@ -310,7 +310,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
->  		dev_addr = c->cfg.dst_addr;
->  		dev_width = c->cfg.dst_addr_width;
->  		burst = c->cfg.dst_maxburst;
-> -		sync_type = OMAP_DMA_DST_SYNC;
-> +		sync_type = OMAP_DMA_DST_SYNC_PREFETCH;
->  	} else {
->  		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
->  		return NULL;
-> -- 
-> 1.7.12
+> The power up process takes place in two steps. The first step involves
+> sending an ipi which will either:
+> 
+> a. cause the power controller to bring the processor out of reset
+> b. cause the processor to exit from wfi (most probably in the bootloader code)
+> 
+> The cpu then enters Linux (bL_entry_point) and after doing any cluster setup
+> waits in 'wfe' if its 'bL_entry_vector' has not been set as yet. The
+> 'sev' is meant
+> to poke the cpu once this has been done.
+> 
+> Its not required in this case as we have already set 'bL_entry_vector' , issued
+> a barrier & flushed the cache line. So if the incoming cpu sees a 0 in
+> its vector
+> then that would be a symptom of a different problem.
 
-Ping?
+Perhaps this could be made a bit clearer by defining two helpers,
+bL_entry_close_gate() and bL_entry_open_gate().  The sev() is only
+applicable for opening the gate, and could be buried in
+bL_entry_open_gate().
+
+This is pretty specialised low-level code though, so I'm not sure that
+the abstraction is worth it.
+
+Cheers
+---Dave
