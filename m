@@ -1,62 +1,28 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Tue, 15 Jan 2013 15:34:55 +0200
-Subject: [PATCH v5 13/14] KVM: ARM: Handle I/O aborts
-In-Reply-To: <50F559C4.8080900@arm.com>
-References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108184005.46302.38495.stgit@ubuntu>
- <20130115131855.GL11529@redhat.com> <50F559C4.8080900@arm.com>
-Message-ID: <20130115133455.GN11529@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Jan 2013 13:36:47 +0000
+Subject: [RFC PATCH 1/7] drivers: usb: phy: add a new driver for usb part
+ of control module
+In-Reply-To: <1358239378-10030-2-git-send-email-kishon@ti.com>
+References: <1358239378-10030-1-git-send-email-kishon@ti.com>
+ <1358239378-10030-2-git-send-email-kishon@ti.com>
+Message-ID: <201301151336.47546.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 01:29:40PM +0000, Marc Zyngier wrote:
-> On 15/01/13 13:18, Gleb Natapov wrote:
-> > On Tue, Jan 08, 2013 at 01:40:05PM -0500, Christoffer Dall wrote:
-> >> When the guest accesses I/O memory this will create data abort
-> >> exceptions and they are handled by decoding the HSR information
-> >> (physical address, read/write, length, register) and forwarding reads
-> >> and writes to QEMU which performs the device emulation.
-> >>
-> >> Certain classes of load/store operations do not support the syndrome
-> >> information provided in the HSR and we therefore must be able to fetch
-> >> the offending instruction from guest memory and decode it manually.
-> >>
-> >> We only support instruction decoding for valid reasonable MMIO operations
-> >> where trapping them do not provide sufficient information in the HSR (no
-> >> 16-bit Thumb instructions provide register writeback that we care about).
-> >>
-> >> The following instruction types are NOT supported for MMIO operations
-> >> despite the HSR not containing decode info:
-> >>  - any Load/Store multiple
-> >>  - any load/store exclusive
-> >>  - any load/store dual
-> >>  - anything with the PC as the dest register
-> >>
-> >> This requires changing the general flow somewhat since new calls to run
-> >> the VCPU must check if there's a pending MMIO load and perform the write
-> >> after userspace has made the data available.
-> >>
-> >> Rusty Russell fixed a horrible race pointed out by Ben Herrenschmidt:
-> >> (1) Guest complicated mmio instruction traps.
-> >> (2) The hardware doesn't tell us enough, so we need to read the actual
-> >>     instruction which was being exectuted.
-> >> (3) KVM maps the instruction virtual address to a physical address.
-> >> (4) The guest (SMP) swaps out that page, and fills it with something else.
-> >> (5) We read the physical address, but now that's the wrong thing.
-> > How can this happen?! The guest cannot reuse physical page before it
-> > flushes it from all vcpus tlb cache. For that it needs to send
-> > synchronous IPI to all vcpus and IPI will not be processed by a vcpu
-> > while it does emulation.
-> 
-> I don't know how this works on x86, but a KVM/ARM guest can definitely
-> handle an IPI.
-> 
-How can a vcpu handle an IPI while it is not in a guest mode?
+On Tuesday 15 January 2013, Kishon Vijay Abraham I wrote:
+> +OMAP CONTROL USB
+> +
+> +Required properties:
+> + - compatible: Should be "ti,omap-control-usb"
+> + - reg : Address and length of the register set for the device. It contains
+> +   the address of "control_dev_conf" and "otghs_control".
+> + - reg-names: The names of the register addresses corresponding to the registers
+> +   filled in "reg".
+> + - ti,has_mailbox: This is used to specify if the platform uses mailbox in
+> +   control module.
 
-> Furthermore, TLB invalidation doesn't require an IPI on ARMv7 (unless
-> we're doing some set/way operation which is handled separately).
-> 
-What prevents a page to be swapped out while code is fetched from it?
- 
---
-			Gleb.
+I wonder whether we need to have a phandle here to connect the control device
+to the actual usb device. What happens if you have multiple instances of
+each?
+
+	Arnd
