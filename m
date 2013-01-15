@@ -1,148 +1,164 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 15 Jan 2013 12:55:59 +0000
-Subject: [PATCH 19/26] mfd: ab8500-debugfs: Allow number of IRQs to be
- provided more dynamically
+Date: Tue, 15 Jan 2013 12:56:02 +0000
+Subject: [PATCH 22/26] mfd: ab8500-gpadc: Add runtime pm support
 In-Reply-To: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
 References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1358254566-12419-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <1358254566-12419-23-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@stericsson.com>
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
-With the introduction of new AB* platforms, it's important to allow
-as much code reuse as possible. By allowing a system's number of IRQs
-to be dynamically passed, we can reuse almost all of the -debugfs
-driver.
+Add runtime pm support to speed up multiple ADC reads in a row.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Reviewed-by: Ulf HANSSON <ulf.hansson@stericsson.com>
 ---
- drivers/mfd/ab8500-debugfs.c |   51 +++++++++++++++++++++++++++++++++---------
- 1 file changed, 41 insertions(+), 10 deletions(-)
+ drivers/mfd/ab8500-gpadc.c |   70 ++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 64 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index ec57e43..d23b6cc 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -94,10 +94,11 @@ static u32 debug_address;
+diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+index 6f97c599..1fd8f78 100644
+--- a/drivers/mfd/ab8500-gpadc.c
++++ b/drivers/mfd/ab8500-gpadc.c
+@@ -12,6 +12,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/spinlock.h>
+ #include <linux/delay.h>
++#include <linux/pm_runtime.h>
+ #include <linux/platform_device.h>
+ #include <linux/completion.h>
+ #include <linux/regulator/consumer.h>
+@@ -82,6 +83,9 @@
+ /* This is used to not lose precision when dividing to get gain and offset */
+ #define CALIB_SCALE			1000
  
- static int irq_first;
- static int irq_last;
--static u32 irq_count[AB8500_NR_IRQS];
-+static u32 *irq_count;
-+static int num_irqs;
++/* Time in ms before disabling regulator */
++#define GPADC_AUDOSUSPEND_DELAY		1
++
+ enum cal_channels {
+ 	ADC_INPUT_VMAIN = 0,
+ 	ADC_INPUT_BTEMP,
+@@ -282,8 +286,9 @@ int ab8500_gpadc_read_raw(struct ab8500_gpadc *gpadc, u8 channel)
+ 		return -ENODEV;
  
--static struct device_attribute *dev_attr[AB8500_NR_IRQS];
--static char *event_name[AB8500_NR_IRQS];
-+static struct device_attribute **dev_attr;
-+static char **event_name;
+ 	mutex_lock(&gpadc->ab8500_gpadc_lock);
++
+ 	/* Enable VTVout LDO this is required for GPADC */
+-	regulator_enable(gpadc->regu);
++	pm_runtime_get_sync(gpadc->dev);
  
- /**
-  * struct ab8500_reg_range
-@@ -483,7 +484,7 @@ static irqreturn_t ab8500_debug_handler(int irq, void *data)
- 	struct kobject *kobj = (struct kobject *)data;
- 	unsigned int irq_abb = irq - irq_first;
- 
--	if (irq_abb < AB8500_NR_IRQS)
-+	if (irq_abb < num_irqs)
- 		irq_count[irq_abb]++;
- 	/*
- 	 * This makes it possible to use poll for events (POLLPRI | POLLERR)
-@@ -1338,7 +1339,7 @@ static ssize_t show_irq(struct device *dev,
- 		return err;
- 
- 	irq_index = name - irq_first;
--	if (irq_index >= AB8500_NR_IRQS)
-+	if (irq_index >= num_irqs)
- 		return -EINVAL;
- 	else
- 		return sprintf(buf, "%u\n", irq_count[irq_index]);
-@@ -1374,7 +1375,7 @@ static ssize_t ab8500_subscribe_write(struct file *file,
+ 	/* Check if ADC is not busy, lock and proceed */
+ 	do {
+@@ -397,8 +402,10 @@ int ab8500_gpadc_read_raw(struct ab8500_gpadc *gpadc, u8 channel)
+ 		dev_err(gpadc->dev, "gpadc_conversion: disable gpadc failed\n");
+ 		goto out;
  	}
- 
- 	irq_index = user_val - irq_first;
--	if (irq_index >= AB8500_NR_IRQS)
-+	if (irq_index >= num_irqs)
- 		return -EINVAL;
- 
- 	/*
-@@ -1438,7 +1439,7 @@ static ssize_t ab8500_unsubscribe_write(struct file *file,
- 	}
- 
- 	irq_index = user_val - irq_first;
--	if (irq_index >= AB8500_NR_IRQS)
-+	if (irq_index >= num_irqs)
- 		return -EINVAL;
- 
- 	/* Set irq count to 0 when unsubscribe */
-@@ -1519,21 +1520,40 @@ static struct dentry *ab8500_gpadc_dir;
- static int __devinit ab8500_debug_probe(struct platform_device *plf)
- {
- 	struct dentry *file;
-+	int ret = -ENOMEM;
-+	struct ab8500 *ab8500;
- 	debug_bank = AB8500_MISC;
- 	debug_address = AB8500_REV_REG & 0x00FF;
- 
-+	ab8500 = dev_get_drvdata(plf->dev.parent);
-+	num_irqs = ab8500->mask_size;
+-	/* Disable VTVout LDO this is required for GPADC */
+-	regulator_disable(gpadc->regu);
 +
-+	irq_count = kzalloc(sizeof(irq_count)*num_irqs, GFP_KERNEL);
-+	if (!irq_count)
-+		return -ENOMEM;
++	pm_runtime_mark_last_busy(gpadc->dev);
++	pm_runtime_put_autosuspend(gpadc->dev);
 +
-+	dev_attr = kzalloc(sizeof(*dev_attr)*num_irqs,GFP_KERNEL);
-+	if (!dev_attr)
-+		goto out_freeirq_count;
-+
-+	event_name = kzalloc(sizeof(*event_name)*num_irqs, GFP_KERNEL);
-+	if (!event_name)
-+		goto out_freedev_attr;
-+
- 	irq_first = platform_get_irq_byname(plf, "IRQ_FIRST");
- 	if (irq_first < 0) {
- 		dev_err(&plf->dev, "First irq not found, err %d\n",
- 				irq_first);
--		return irq_first;
-+		ret = irq_first;
-+		goto out_freeevent_name;
- 	}
+ 	mutex_unlock(&gpadc->ab8500_gpadc_lock);
  
- 	irq_last = platform_get_irq_byname(plf, "IRQ_LAST");
- 	if (irq_last < 0) {
- 		dev_err(&plf->dev, "Last irq not found, err %d\n",
- 				irq_last);
--		return irq_last;
-+		ret = irq_last;
-+                goto out_freeevent_name;
- 	}
- 
- 	ab8500_dir = debugfs_create_dir(AB8500_NAME_STRING, NULL);
-@@ -1656,12 +1676,23 @@ err:
- 	if (ab8500_dir)
- 		debugfs_remove_recursive(ab8500_dir);
- 	dev_err(&plf->dev, "failed to create debugfs entries.\n");
--	return -ENOMEM;
-+out_freeevent_name:
-+	kfree(event_name);
-+out_freedev_attr:
-+	kfree(dev_attr);
-+out_freeirq_count:
-+	kfree(irq_count);
+ 	return (high_data << 8) | low_data;
+@@ -412,7 +419,9 @@ out:
+ 	 */
+ 	(void) abx500_set_register_interruptible(gpadc->dev, AB8500_GPADC,
+ 		AB8500_GPADC_CTRL1_REG, DIS_GPADC);
+-	regulator_disable(gpadc->regu);
 +
-+	return ret;
++	pm_runtime_put(gpadc->dev);
++
+ 	mutex_unlock(&gpadc->ab8500_gpadc_lock);
+ 	dev_err(gpadc->dev,
+ 		"gpadc_conversion: Failed to AD convert channel %d\n", channel);
+@@ -571,6 +580,30 @@ static void ab8500_gpadc_read_calibration_data(struct ab8500_gpadc *gpadc)
+ 		gpadc->cal_data[ADC_INPUT_VBAT].offset);
  }
  
- static int __devexit ab8500_debug_remove(struct platform_device *plf)
- {
- 	debugfs_remove_recursive(ab8500_dir);
-+	kfree(event_name);
-+	kfree(dev_attr);
-+	kfree(irq_count);
++static int ab8500_gpadc_runtime_suspend(struct device *dev)
++{
++	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
 +
++	regulator_disable(gpadc->regu);
++	return 0;
++}
++
++static int ab8500_gpadc_runtime_resume(struct device *dev)
++{
++	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
++
++	regulator_enable(gpadc->regu);
++	return 0;
++}
++
++static int ab8500_gpadc_runtime_idle(struct device *dev)
++{
++	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
++
++	pm_runtime_suspend(dev);
++	return 0;
++}
++
+ static int __devinit ab8500_gpadc_probe(struct platform_device *pdev)
+ {
+ 	int ret = 0;
+@@ -615,6 +648,16 @@ static int __devinit ab8500_gpadc_probe(struct platform_device *pdev)
+ 		dev_err(gpadc->dev, "failed to get vtvout LDO\n");
+ 		goto fail_irq;
+ 	}
++
++	platform_set_drvdata(pdev, gpadc);
++
++	regulator_enable(gpadc->regu);
++
++	pm_runtime_set_autosuspend_delay(gpadc->dev, GPADC_AUDOSUSPEND_DELAY);
++	pm_runtime_use_autosuspend(gpadc->dev);
++	pm_runtime_set_active(gpadc->dev);
++	pm_runtime_enable(gpadc->dev);
++
+ 	ab8500_gpadc_read_calibration_data(gpadc);
+ 	list_add_tail(&gpadc->node, &ab8500_gpadc_list);
+ 	dev_dbg(gpadc->dev, "probe success\n");
+@@ -635,19 +678,34 @@ static int __devexit ab8500_gpadc_remove(struct platform_device *pdev)
+ 	list_del(&gpadc->node);
+ 	/* remove interrupt  - completion of Sw ADC conversion */
+ 	free_irq(gpadc->irq, gpadc);
+-	/* disable VTVout LDO that is being used by GPADC */
+-	regulator_put(gpadc->regu);
++
++	pm_runtime_get_sync(gpadc->dev);
++	pm_runtime_disable(gpadc->dev);
++
++	regulator_disable(gpadc->regu);
++
++	pm_runtime_set_suspended(gpadc->dev);
++
++	pm_runtime_put_noidle(gpadc->dev);
++
+ 	kfree(gpadc);
+ 	gpadc = NULL;
  	return 0;
  }
+ 
++static const struct dev_pm_ops ab8500_gpadc_pm_ops = {
++	SET_RUNTIME_PM_OPS(ab8500_gpadc_runtime_suspend,
++			   ab8500_gpadc_runtime_resume,
++			   ab8500_gpadc_runtime_idle)
++};
++
+ static struct platform_driver ab8500_gpadc_driver = {
+ 	.probe = ab8500_gpadc_probe,
+ 	.remove = __devexit_p(ab8500_gpadc_remove),
+ 	.driver = {
+ 		.name = "ab8500-gpadc",
+ 		.owner = THIS_MODULE,
++		.pm = &ab8500_gpadc_pm_ops,
+ 	},
+ };
  
 -- 
 1.7.9.5
