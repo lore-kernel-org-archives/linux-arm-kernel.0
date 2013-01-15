@@ -1,40 +1,29 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue, 15 Jan 2013 13:53:02 -0700
-Subject: [PATCH] crypto: omap-sham - Fix compile errors when CONFIG_OF not
- defined
-Message-ID: <1358283182-29392-1-git-send-email-mgreer@animalcreek.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 15 Jan 2013 15:57:00 -0500
+Subject: [PATCH v3] clk: mvebu/clk-cpu.c: fix memory leakage
+In-Reply-To: <50F5C00B.10108@free-electrons.com>
+References: <1358183892-28928-1-git-send-email-dinggnu@gmail.com>
+ <50F563EC.3030804@free-electrons.com>
+ <20130115152307.GA25615@gmail.com>
+ <20130115153716.GF13433@titan.lakedaemon.net>
+ <50F584F5.6030007@free-electrons.com>
+ <20130115182629.GB7211@gmail.com>
+ <50F5A1A9.2030803@free-electrons.com>
+ <20130115184423.GC7211@gmail.com>
+ <50F5C00B.10108@free-electrons.com>
+Message-ID: <20130115205700.GE25500@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+On Tue, Jan 15, 2013 at 09:46:03PM +0100, Gregory CLEMENT wrote:
+> If you prefer, Jason agrees to take it, but you probably didn't notice it,
+> because he uses your former(and no more valid) email when he wrote this.
 
-Fix the compile errors created by commit 2545e8d
-(crypto: omap-sham - Add Device Tree Support)
-when CONFIG_OF is not defined.  This includes
-changing omap_sham_get_res_dev() to omap_sham_get_res_of()
-and creating an empty version of omap_sham_of_match[].
+Actually, I caught that after I hit send.  I resent (just to him), so he
+should have it in his inbox.
 
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
----
- drivers/crypto/omap-sham.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+I've also updated my email alias accordingly.
 
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index edff981..dc2d354 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -1607,7 +1607,11 @@ err:
- 	return err;
- }
- #else
--static int omap_sham_get_res_dev(struct omap_sham_dev *dd,
-+static const struct of_device_id omap_sham_of_match[] = {
-+	{},
-+};
-+
-+static int omap_sham_get_res_of(struct omap_sham_dev *dd,
- 		struct device *dev, struct resource *res)
- {
- 	return -EINVAL;
--- 
-1.7.12
+thx,
+
+Jason.
