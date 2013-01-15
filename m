@@ -1,61 +1,40 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Tue, 15 Jan 2013 21:11:12 +0200
-Subject: [PATCH v2] mtd: vt8500: Add support for Wondermedia Serial
- Flash Controller
-In-Reply-To: <1358271907.31593.1.camel@gitbox>
-References: <1356901207-13536-1-git-send-email-linux@prisktech.co.nz>
- <1358261750.2731.148.camel@sauron.fi.intel.com>
- <1358271907.31593.1.camel@gitbox>
-Message-ID: <1358277072.1668.2.camel@kyv>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 15 Jan 2013 11:14:50 -0800
+Subject: [GIT PULL] ste_dma40 updates for 3.9
+In-Reply-To: <CACRpkdZh=5FBDCuSFWYw8t-1Snm1xuS_EyVTUyQ-8kwVgjWuPA@mail.gmail.com>
+References: <20130114101542.GA5363@balto.lan>
+ <CAOesGMg6FqsaqZiGeK14n4==dF-y=iMYSGRDBYSwkGWO0J69Yg@mail.gmail.com>
+ <CACRpkdZh=5FBDCuSFWYw8t-1Snm1xuS_EyVTUyQ-8kwVgjWuPA@mail.gmail.com>
+Message-ID: <20130115191450.GA28615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-16 at 06:45 +1300, Tony Prisk wrote:
-> On Tue, 2013-01-15 at 16:55 +0200, Artem Bityutskiy wrote:
-> > On Mon, 2012-12-31 at 10:00 +1300, Tony Prisk wrote:
-> > > This patch adds support for the Wondermedia serial flash controller
-> > > found on WM8505, WM8650 and WM8850 SoCs.
-> > > 
-> > > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> > > ---
-> > > v2: Whitespace tidyup
-> > 
-> > Hi, would you please take a look at these warings, identified by aiaiai:
-> > 
-> > Successfully built configuration "x86_64_defconfig,x86_64,", results:
-> > 
-> > --- before_patching.log
-> > +++ after_patching.log
-> > @@ @@
-> > +drivers/mtd/devices/wmt_sflash.c: In function ?sf_read?:
-> > +drivers/mtd/devices/wmt_sflash.c:425:9: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat]
-> > +drivers/mtd/devices/wmt_sflash.c: In function ?sf_sector_write?:
-> > +drivers/mtd/devices/wmt_sflash.c:442:16: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-> > +drivers/mtd/devices/wmt_sflash.c:442:24: warning: cast removes address space of expression [sparse]
-> > +drivers/mtd/devices/wmt_sflash.c:458:16: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-> > +drivers/mtd/devices/wmt_sflash.c:458:31: warning: incorrect type in argument 1 (different address spaces) [sparse]
-> > +drivers/mtd/devices/wmt_sflash.c:458:31:    expected void volatile [noderef] <asn:2>*dst [sparse]
-> > +drivers/mtd/devices/wmt_sflash.c:458:31:    got unsigned char [usertype] *<noident> [sparse]
-> > +drivers/mtd/devices/wmt_sflash.c:465:17: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-> > +drivers/mtd/devices/wmt_sflash.c:465:39: warning: incorrect type in argument 1 (different address spaces) [sparse]
-> > +drivers/mtd/devices/wmt_sflash.c:465:39:    expected void volatile [noderef] <asn:2>*dst [sparse]
-> > +drivers/mtd/devices/wmt_sflash.c:465:39:    got unsigned char [usertype] *<noident> [sparse]
-> > 
+On Tue, Jan 15, 2013 at 09:53:05AM +0100, Linus Walleij wrote:
+> On Tue, Jan 15, 2013 at 7:48 AM, Olof Johansson <olof@lixom.net> wrote:
 > 
-> Apologies - This driver shouldn't be selectable for x86_64.
-> It is an ARM driver for an embedded device. Will fix.
+> > This series of patches only modify the ste_dma40 driver, there are no
+> > corresponding changes under arch/arm that need to be coordinated or
+> > considered w.r.t. merge conflicts. I.e. they all seem nicely isolated
+> > to only the driver.
+> >
+> > So is there a specific reason for why these shouldn't just go in
+> > through the dmaengine tree?
+> 
+> One reason would be if there are DMA bindings to device tree coming
+> this merge window, as I'm told, and it implicates a lot of platform code
+> changes on top of this as we adopt to it.
+> 
+> But maybe this will be wholly confined to the DMAengine tree?
 
-Note, there are also warnings when it is compiled for other platforms,
-not only x86_64. Take a look at them. Also note, than many warnings come
-from sparse, you probably just did not run it.
+Changing platform code in the driver trees is asking for conflicts at
+merge time and a grumpy Linus, I'd prefer to merge arch/arm/* through
+arm-soc in that case.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130115/fcf878d1/attachment.sig>
+Either way, this branch can be merged into dmaengine as a branch pull,
+and if needed we can bring it in as a dependency on arm-soc. We would
+need the same for the dmaengine DT bindings branch as a base. Of course,
+that requires that Vinod doesn't rebase his branch and keeps the merge
+intact. Vinod, is that compatible with your workflow?
+
+
+-Olof
