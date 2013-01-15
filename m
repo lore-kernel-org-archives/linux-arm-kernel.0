@@ -1,57 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Jan 2013 13:29:40 +0000
-Subject: [PATCH v5 13/14] KVM: ARM: Handle I/O aborts
-In-Reply-To: <20130115131855.GL11529@redhat.com>
-References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108184005.46302.38495.stgit@ubuntu> <20130115131855.GL11529@redhat.com>
-Message-ID: <50F559C4.8080900@arm.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 15 Jan 2013 14:30:55 +0100
+Subject: [PATCH RESEND 6/6 v13] gpio: Add block gpio to several gpio
+ drivers
+In-Reply-To: <50F5573D.4060007@atmel.com>
+References: <1358250716-21986-1-git-send-email-stigge@antcom.de>
+ <1358250716-21986-7-git-send-email-stigge@antcom.de>
+ <50F5573D.4060007@atmel.com>
+Message-ID: <50F55A0F.6010303@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/13 13:18, Gleb Natapov wrote:
-> On Tue, Jan 08, 2013 at 01:40:05PM -0500, Christoffer Dall wrote:
->> When the guest accesses I/O memory this will create data abort
->> exceptions and they are handled by decoding the HSR information
->> (physical address, read/write, length, register) and forwarding reads
->> and writes to QEMU which performs the device emulation.
+On 01/15/2013 02:18 PM, Nicolas Ferre wrote:
+>> --- linux-2.6.orig/drivers/pinctrl/pinctrl-at91.c
+>> +++ linux-2.6/drivers/pinctrl/pinctrl-at91.c
+>> @@ -49,6 +49,7 @@ struct at91_gpio_chip {
+>>       struct clk        *clock;        /* associated clock */
+>>       struct irq_domain    *domain;    /* associated irq domain */
+>>       struct at91_pinctrl_mux_ops *ops;    /* ops */
+>> +    unsigned long        mask_cache;    /* cached mask for block gpio */
+>>   };
 >>
->> Certain classes of load/store operations do not support the syndrome
->> information provided in the HSR and we therefore must be able to fetch
->> the offending instruction from guest memory and decode it manually.
+>>   #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip,
+>> chip)
+>> @@ -1125,6 +1126,32 @@ static void at91_gpio_set(struct gpio_ch
+>>       writel_relaxed(mask, pio + (val ? PIO_SODR : PIO_CODR));
+>>   }
 >>
->> We only support instruction decoding for valid reasonable MMIO operations
->> where trapping them do not provide sufficient information in the HSR (no
->> 16-bit Thumb instructions provide register writeback that we care about).
->>
->> The following instruction types are NOT supported for MMIO operations
->> despite the HSR not containing decode info:
->>  - any Load/Store multiple
->>  - any load/store exclusive
->>  - any load/store dual
->>  - anything with the PC as the dest register
->>
->> This requires changing the general flow somewhat since new calls to run
->> the VCPU must check if there's a pending MMIO load and perform the write
->> after userspace has made the data available.
->>
->> Rusty Russell fixed a horrible race pointed out by Ben Herrenschmidt:
->> (1) Guest complicated mmio instruction traps.
->> (2) The hardware doesn't tell us enough, so we need to read the actual
->>     instruction which was being exectuted.
->> (3) KVM maps the instruction virtual address to a physical address.
->> (4) The guest (SMP) swaps out that page, and fills it with something else.
->> (5) We read the physical address, but now that's the wrong thing.
-> How can this happen?! The guest cannot reuse physical page before it
-> flushes it from all vcpus tlb cache. For that it needs to send
-> synchronous IPI to all vcpus and IPI will not be processed by a vcpu
-> while it does emulation.
+>> +static unsigned long at91_gpio_get_block(struct gpio_chip *chip,
+>> +                     unsigned long mask)
+>> +{
+>> +    struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+>> +    void __iomem *pio = at91_gpio->regbase;
+>> +    u32 pdsr;
+>> +
+>> +    pdsr = __raw_readl(pio + PIO_PDSR);
+> 
+> Maybe you should use readl_relaxed() here as it is used in the
+> at91_gpio_[get|set]() functions.
 
-I don't know how this works on x86, but a KVM/ARM guest can definitely
-handle an IPI.
+Thanks for the note! Seem to have missed this when forward porting in
+pinctrl-at91.c was due.
 
-Furthermore, TLB invalidation doesn't require an IPI on ARMv7 (unless
-we're doing some set/way operation which is handled separately).
+Will include the respective change in a subsequent update.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Roland
