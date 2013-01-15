@@ -1,50 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Jan 2013 12:00:12 +0000
-Subject: [PATCHv2 1/4] clockevents: Add generic timer broadcast receiver
-In-Reply-To: <alpine.LFD.2.02.1301151224300.7475@ionos>
-References: <1357742770-15028-1-git-send-email-mark.rutland@arm.com>
- <1357742770-15028-2-git-send-email-mark.rutland@arm.com>
- <alpine.LFD.2.02.1301141204421.7475@ionos>
- <20130114112951.GC7990@e106331-lin.cambridge.arm.com>
- <alpine.LFD.2.02.1301141247020.7475@ionos>
- <20130114121247.GD7990@e106331-lin.cambridge.arm.com>
- <alpine.LFD.2.02.1301141318460.7475@ionos>
- <20130114153612.GF7990@e106331-lin.cambridge.arm.com>
- <alpine.LFD.2.02.1301151224300.7475@ionos>
-Message-ID: <20130115120012.GA23333@e106331-lin.cambridge.arm.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 15 Jan 2013 13:08:55 +0100
+Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
+In-Reply-To: <20130114095706.GA23467@arm.com>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130111154516.GA25335@avionic-0098.adnet.avionic-design.de>
+ <20130112123640.GA22505@avionic-0098.adnet.avionic-design.de>
+ <201301122112.25772.arnd@arndb.de>
+ <20130113095806.GA31966@avionic-0098.adnet.avionic-design.de>
+ <20130114095706.GA23467@arm.com>
+Message-ID: <20130115120855.GA5637@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 11:24:53AM +0000, Thomas Gleixner wrote:
-> On Mon, 14 Jan 2013, Mark Rutland wrote:
-> > On Mon, Jan 14, 2013 at 02:17:26PM +0000, Thomas Gleixner wrote:
-> > > > I thought this previously also [1], but I couldn't find any path such that a
-> > > > tick_cpu_device would have an evtdev without an event_handler. We always set the
-> > > > handler before setting evtdev, and alway wipe evtdev before wiping the handler.
+On Mon, Jan 14, 2013 at 09:57:07AM +0000, Andrew Murray wrote:
+> On Sun, Jan 13, 2013 at 09:58:06AM +0000, Thierry Reding wrote:
+> > On Sat, Jan 12, 2013 at 09:12:25PM +0000, Arnd Bergmann wrote:
+> > > On Saturday 12 January 2013, Thierry Reding wrote:
+> > > > > I already hinted at that in one of the other subthreads. Having such a
+> > > > > multiplex would also allow the driver to be built as a module. I had
+> > > > > already thought about this when I was working on an earlier version of
+> > > > > these patches. Basically these would be two ops attached to the host
+> > > > > bridge, and the generic arch_setup_msi_irq() could then look that up
+> > > > > given the struct pci_dev that is passed to it and call this new per-
+> > > > > host bridge .setup_msi_irq().
 > > > > 
-> > > > Have I missed something?
+> > > > struct pci_ops looks like a good place to put these. They'll be
+> > > > available from each struct pci_bus, so should be easy to call from
+> > > > arch_setup_msi_irq().
+> > > > 
+> > > > Any objections?
+> > > > 
 > > > 
-> > > That's an x86 specific issue. Though we could try and make that
-> > > functionality completely generic.
+> > > struct pci_ops has a long history of being specifically about
+> > > config space read/write operations, so on the one hand it does
+> > > not feel like the right place to put interrupt specific operations,
+> > > but on the other hand, the name sounds appropriate and I cannot
+> > > think of any other place to put this, so it's fine with me.
+> > > 
+> > > The only alternative I can think of is to introduce a new
+> > > structure next to it in struct pci_bus, but that feels a bit
+> > > pointless. Maybe Bjorn has a preference one way or the other.
 > > 
-> > Just to check: is the evt->event_handler check necessary?
+> > The name pci_ops is certainly generic enough. Also the comment above the
+> > structure declaration says "Low-level architecture-dependent routines",
+> > which applies to the MSI functions as well.
 > 
-> For x86 yes. See the comment.
-
-Ah, sorry. I misunderstood on my initial reading.
-
-I've posted a version with the evt->event_handler check restored, and the
-tick_receive_broadcast stub removed when !CONFIG_GENERIC_CLOCKEVENTS_BROADCAST:
-
-https://lkml.org/lkml/2013/1/14/276
-
-The generic clockevents patches (based on v3.8-rc3) can also be found at
-git://linux-arm.org/linux-mr.git tags/timer-broadcast-v3-core
-
-> Thanks,
+> I've previously looked into this. It seems that architectures handle this
+> in different ways, some use vector tables, others use a multiplex and others
+> just let the end user implement the callback directly.
 > 
-> 	tglx
+> I've made an attempt to find a more common way. Though my implementation, which
+> I will try to share later today for reference provides a registration function
+> in drivers/pci/msi.c to provide implementations of the
+> (setup|teardown)_msi_irq(s) ops. This seems slightly better than the current
+> approach and doesn't break existing users - but is still ugly.
 > 
+> At present the PCI and MSI frameworks are largely uncoupled from each other and
+> so I was keen to not pollute PCI structures (e.g. pci_ops) with MSI ops. Just
+> because most PCI host bridges also provide MSI support I don't think there is a
+> reason why they should always come as a pair or be provided by the same chip.
+> 
+> Perhaps the solution is to support MSI controller drivers and a means to
+> associate them with PCI host controller drivers?
 
-Thanks,
-Mark.
+I'm not sure I follow you're reasoning here. Is it possible to use MSIs
+without PCI? If not then I think there's little sense in keeping the
+implementations separate.
+
+Furthermore, if MSI controller and PCI host bridge are separate entities
+how do you look up the MSI controller given a PCI device?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130115/7c267b3a/attachment-0001.sig>
