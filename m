@@ -1,45 +1,109 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 15 Jan 2013 12:00:41 +0200
-Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
- OMAP-L138 DSP
-In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
-References: <1357863807-380-1-git-send-email-rtivy@ti.com>
- <1357863807-380-7-git-send-email-rtivy@ti.com>
- <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
-Message-ID: <CAK=WgbbNygzphujf9df8_qj4e2ddKJ_1OkQzz7-a7e9QuP8idA@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 15 Jan 2013 06:54:25 -0300
+Subject: [PATCH 1/6] arm: mvebu: Add support for USB host controllers in
+ Armada 370/XP
+Message-ID: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+The Armada 370 and Armada XP SoC has an Orion EHCI USB controller.
+This patch adds support for this controller in Armada 370
+and Armada XP SoC common device tree files.
 
-On Sat, Jan 12, 2013 at 4:26 AM, Tivy, Robert <rtivy@ti.com> wrote:
-> Is FW_CONFIG above supposed to be FW_LOADER?
+Cc: Lior Amsalem <alior@marvell.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi |   15 +++++++++++++++
+ arch/arm/boot/dts/armada-370.dtsi    |    9 +++++++++
+ arch/arm/boot/dts/armada-xp.dtsi     |   17 +++++++++++++++++
+ arch/arm/mach-mvebu/Kconfig          |    1 +
+ 4 files changed, 42 insertions(+), 0 deletions(-)
 
-That FW_CONFIG is completely bogus of course. care to fix it in your series?
-
-> We're currently handling the CHIPINT lines as "level"s, since they're completely controlled by SW.  The interruptor raises the line and the interruptee lowers (clears) it.  In a situation where every interrupt is considered to be a signal of new data arrival we need to make sure that the other side has "seen" the previous interrupt before we raise another one.
-
-What if we don't ? Can the DSP side just go over the vrings until no
-new msg is left (similar to what you do on the Linux side) ?
-
-> Is this suggesting that there be separate platform device instances for each different potential fw, and that each platform device instance hardcodes the fw filename?
-
-In principle this same driver can drive many instances of remote
-processors you may have on your board. E.g. in OMAP the same driver
-controls both the M3s and the DSP. pdata is then used to hold
-information specific to the hw instance.
-
-I'm not sure if there's (or will be) any DaVinci platform with several
-remote processors but it's a better practice to write the code as if
-there is/will be - it's usually cleaner and will just work in case a
-platform with multiple rprocs does show up one day.
-
-> Sekhar asked that there not be a default fw name, so there's conflicting feedback on this point.  I prefer to have a default name plus the module parameter override (but don't have much opinion on whether it should be davinci-specific (and passed with davinci_remoteproc.ko) or general (and passed with remoteproc.ko), please advise).
->
-> Since the fw file (i.e., DSP program) is typically paired with a particular Linux app, I like the ability to specify the fw filename at runtime, depending on the Linux app I need to run.
-
-Sure, no reason why not to allow users to override the default fw name.
-
-Thanks,
-Ohad.
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 28276fe..fa025c4 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -145,6 +145,21 @@
+ 			clocks = <&gateclk 17>;
+ 			status = "disabled";
+ 		};
++
++		usb at d0050000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0xd0050000 0x500>;
++			interrupts = <45>;
++			status = "disabled";
++		};
++
++		usb at d0051000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0xd0051000 0x500>;
++			interrupts = <46>;
++			status = "disabled";
++		};
++
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 88f9bab..8188d13 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -144,5 +144,14 @@
+ 				dmacap,memset;
+ 			};
+ 		};
++
++		usb at d0050000 {
++			clocks = <&coreclk 0>;
++		};
++
++		usb at d0051000 {
++			clocks = <&coreclk 0>;
++		};
++
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 390ba98..1443949 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -134,5 +134,22 @@
+ 				dmacap,memset;
+ 			};
+ 		};
++
++		usb at d0050000 {
++			clocks = <&gateclk 18>;
++		};
++
++		usb at d0051000 {
++			clocks = <&gateclk 19>;
++		};
++
++		usb at d0052000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0xd0052000 0x500>;
++			interrupts = <47>;
++			clocks = <&gateclk 20>;
++			status = "disabled";
++		};
++
+ 	};
+ };
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 440b13e..5e4fcde 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -24,6 +24,7 @@ config MACH_ARMADA_370_XP
+ 	select HAVE_SMP
+ 	select CACHE_L2X0
+ 	select CPU_PJ4B
++	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 
+ config MACH_ARMADA_370
+ 	bool "Marvell Armada 370 boards"
+-- 
+1.7.8.6
