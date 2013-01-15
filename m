@@ -1,38 +1,41 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue, 15 Jan 2013 17:53:03 +1300
-Subject: [PATCH] timer: vt8500: Move timer code to drivers/clocksource
-In-Reply-To: <50F433A9.8020105@wwwdotorg.org>
-References: <1358140171-25390-1-git-send-email-linux@prisktech.co.nz>
- <1358140171-25390-2-git-send-email-linux@prisktech.co.nz>
- <50F433A9.8020105@wwwdotorg.org>
-Message-ID: <1358225583.5576.1.camel@gitbox>
+Date: Tue, 15 Jan 2013 17:58:03 +1300
+Subject: [PATCH 1/4] serial: vt8500: Fix range-checking on vt8500_uart_ports
+In-Reply-To: <1358225886-5686-1-git-send-email-linux@prisktech.co.nz>
+References: <1358225886-5686-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1358225886-5686-2-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-01-14 at 09:34 -0700, Stephen Warren wrote:
-> On 01/13/2013 10:09 PM, Tony Prisk wrote:
-> > This patch moves arch-vt8500/timer.c into drivers/clocksource and
-> > updates the necessary Kconfig/Makefile options.
-> 
-> > diff --git a/include/linux/vt8500_timer.h b/include/linux/vt8500_timer.h
-> 
-> > +#ifndef __VT8500_TIMER_H
-> > +#define __VT8500_TIMER_H
-> > +
-> > +#include <asm/mach/time.h>
-> > +
-> > +void vt8500_timer_init(void);
-> > +
-> > +#endif
-> 
-> Is VT8500 DT-only? If so, it'd be nice not to add this header, but
-> instead use CLOCKSOURCE_OF_DECLARE() inside the driver C file.
+Fix two instances where the index to vt8500_uart_ports is tested
+against > VT8500_MAX_PORTS. Correct usage should be >= VT8500_MAX_PORTS.
 
-Agreed - I didn't like the header when I added it but I didn't know of
-another way and based in on the sunxi code.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ drivers/tty/serial/vt8500_serial.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Unfortunately Olof already pulled it into arm-soc, so I will try get
-another patch done to undo it :)
-
-Regards
-Tony P
+diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
+index 8fd1814..4c4a58d 100644
+--- a/drivers/tty/serial/vt8500_serial.c
++++ b/drivers/tty/serial/vt8500_serial.c
+@@ -569,7 +569,7 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+ 
+ 	if (np)
+ 		port = of_alias_get_id(np, "serial");
+-		if (port > VT8500_MAX_PORTS)
++		if (port >= VT8500_MAX_PORTS)
+ 			port = -1;
+ 	else
+ 		port = -1;
+@@ -580,7 +580,7 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+ 					sizeof(vt8500_ports_in_use));
+ 	}
+ 
+-	if (port > VT8500_MAX_PORTS)
++	if (port >= VT8500_MAX_PORTS)
+ 		return -ENODEV;
+ 
+ 	/* reserve the port id */
+-- 
+1.7.9.5
