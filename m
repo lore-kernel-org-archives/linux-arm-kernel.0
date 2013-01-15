@@ -1,44 +1,24 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 15 Jan 2013 16:48:18 +0000
-Subject: [RFC PATCH 4/4] ARM: vexpress/dcscb: power_up_setup memory barrier
- cleanup
-In-Reply-To: <1358268498-8086-1-git-send-email-dave.martin@linaro.org>
-References: <1358268498-8086-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1358268498-8086-5-git-send-email-dave.martin@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 15 Jan 2013 09:55:47 -0700
+Subject: [v3 6/9] ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
+In-Reply-To: <1358237598-32413-7-git-send-email-hdoyu@nvidia.com>
+References: <1358237598-32413-1-git-send-email-hdoyu@nvidia.com>
+ <1358237598-32413-7-git-send-email-hdoyu@nvidia.com>
+Message-ID: <50F58A13.10301@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bL_head framework has sufficient barriers to ensure correct
-globally observed ordering of explicit memory accesses done by the
-power_up_setup function.
+On 01/15/2013 01:13 AM, Hiroshi Doyu wrote:
+> Initial support for Tegra 114 SoC. This is expected to be included in
+> the board DTS files, Tegra 114 SoC based evaluation board family.
 
-This patch removes the unnecessary DSB from dcscb_setup.S.
+This series looks fine to me. Assuming no other comments, I'll apply
+once CCF is applied and you've done the rebase you mentioned for patch 2.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/mach-vexpress/dcscb_setup.S |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+Note that I'll apply most patches to Tegra's for-3.9/soc branch (the
+code) but the 3 device tree patches to Tegra's for-3.9/dt branch, since
+it's fine for the DT files to appear later than the code supporting the
+SoC, since this is all new features.
 
-diff --git a/arch/arm/mach-vexpress/dcscb_setup.S b/arch/arm/mach-vexpress/dcscb_setup.S
-index c75ee8c..e338be7 100644
---- a/arch/arm/mach-vexpress/dcscb_setup.S
-+++ b/arch/arm/mach-vexpress/dcscb_setup.S
-@@ -64,14 +64,13 @@ ENTRY(dcscb_power_up_setup)
- 
- 	ldr	r3, =RTSM_CCI_PHYS_BASE
- 
--	b	1f
--0:	dsb
- 1:	ldr	r0, [r3, #CCI_STATUS_OFFSET]
- 	tst	r0, #STATUS_CHANGE_PENDING
--	bne	0b
-+	bne	1b
- 
- 2:	@ Implementation-specific local CPU setup operations should go here,
- 	@ if any.  In this case, there is nothing to do.
- 
- 	bx	lr
-+
- ENDPROC(dcscb_power_up_setup)
--- 
-1.7.4.1
+One question: The .dts files don't include any clocks properties. I
+assume Peter will add these when he posts the Tegra114 CCF code?
