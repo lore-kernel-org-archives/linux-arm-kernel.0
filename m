@@ -1,55 +1,32 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 14 Jan 2013 16:30:39 -0800
-Subject: [PATCH v2] hardlockup: detect hard lockups without NMIs using
- secondary cpus
-In-Reply-To: <20130114162504.e667a4be.akpm@linux-foundation.org>
-References: <1357941108-14138-1-git-send-email-ccross@android.com>
- <20130114154914.6d69eb27.akpm@linux-foundation.org>
- <CAMbhsRR29Zhje9mGtUwHfUsX+eFsggYkVMHPyQ+zgrGUp_rqTQ@mail.gmail.com>
- <20130114162504.e667a4be.akpm@linux-foundation.org>
-Message-ID: <CAMbhsRRM+60gUTRuYzT5sAgLPP7Fj=T78Z3E_hZVmajY-wqGeQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 15 Jan 2013 09:42:30 +0900
+Subject: shmobile and struct sys_timer removal conflicts
+In-Reply-To: <50F445E5.6010203@wwwdotorg.org>
+References: <50F445E5.6010203@wwwdotorg.org>
+Message-ID: <20130115004230.GZ7185@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 4:25 PM, Andrew Morton
-<akpm@linux-foundation.org> wrote:
-> On Mon, 14 Jan 2013 16:19:23 -0800
-> Colin Cross <ccross@android.com> wrote:
->
->> >> +static void watchdog_check_hardlockup_other_cpu(void)
->> >> +{
->> >> +     unsigned int next_cpu;
->> >> +
->> >> +     /*
->> >> +      * Test for hardlockups every 3 samples.  The sample period is
->> >> +      *  watchdog_thresh * 2 / 5, so 3 samples gets us back to slightly over
->> >> +      *  watchdog_thresh (over by 20%).
->> >> +      */
->> >> +     if (__this_cpu_read(hrtimer_interrupts) % 3 != 0)
->> >> +             return;
->> >
->> > The hardwired interval Seems Wrong.  watchdog_thresh is tunable at runtime.
->> >
->> > The comment could do with some fleshing out.  *why* do we want to test
->> > at an interval "slightly over watchdog_thresh"?  What's going on here?
->>
->> I'll reword it.  We don't want to be slightly over watchdog_thresh,
->> ideally we would be exactly at watchdog_thresh.  However, since this
->> relies on the hrtimer interrupts that are scheduled at watchdog_thresh
->> * 2 / 5, there is no multiple of hrtimer_interrupts that will result
->> in watchdog_thresh.  watchdog_thresh * 2 / 5 * 3 (watchdog_thresh *
->> 1.2) is the closest I can get to testing for a hardlockup once every
->> watchdog_thresh seconds.
->
-> It needs more than rewording, doesn't it?  What happens if watchdog_thresh is
-> altered at runtime?
+On Mon, Jan 14, 2013 at 10:52:37AM -0700, Stephen Warren wrote:
+> Simon,
+> 
+> I notice that the following shmobile-related commits in next-20130114
+> add new ARM machine descriptors, but set the .timer field rather than
+> the new .init_time field. I believe the code in these commits won't
+> build in linux-next or Linux 3.9 once it's released:
+> 
+> a625586 ARM: mach-shmobile: kzm9g: Reference DT implementation
+> ac0876f ARM: shmobile: armadillo800eva: Reference DT implementation
+> be1fc65 ARM: shmobile: add a reference DT implementation for mackerel
+> 66f1162 ARM: mach-shmobile: sh73a0: Minimal setup using DT
+> 
+> In order to solve this problem, you'll need to adjust those changes
+> according to:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git timer/cleanup
+> 
+> (where "adjust" is probably "rebase on top of")
 
-I'm not sure what you mean.  If watchdog_thresh changes, the next
-hrtimer interrupt on each cpu will move the following hrtimer
-interrupt forward by the new watchdog_thresh * 2 / 5.  There may be a
-single cycle of watchdog checks at an intermediate period, but nothing
-bad should happen.
+Hi Stephen,
 
-This code doesn't ever deal with watchdog_thresh directly, it is only
-counting hrtimer interrupts.  3 hrtimer interrupts is always a
-reasonable approximation of watchdog_thresh.
+thanks. I'll get this sorted out.
