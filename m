@@ -1,73 +1,74 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 15 Jan 2013 11:44:23 -0500 (EST)
-Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
- management
-In-Reply-To: <1358217848.8513.14.camel@jlo-ubuntu-64.nvidia.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1358157392.19304.243.camel@jlo-ubuntu-64.nvidia.com>
- <alpine.LFD.2.02.1301140849020.6300@xanadu.home>
- <1358217848.8513.14.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <alpine.LFD.2.02.1301151140550.6300@xanadu.home>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 15 Jan 2013 16:48:15 +0000
+Subject: [RFC PATCH 1/4] ARM: b.L: Remove C declarations for vlocks
+In-Reply-To: <1358268498-8086-1-git-send-email-dave.martin@linaro.org>
+References: <1358268498-8086-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1358268498-8086-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Jan 2013, Joseph Lo wrote:
+Vlocks are only useful in very specialised situations, so the
+precence of a C header file is more confusing than helpful.  All
+current use of vlocks, including allocation of space for the lock
+structures themselves, is done in assembler.
 
-> On Mon, 2013-01-14 at 22:05 +0800, Nicolas Pitre wrote:
-> > On Mon, 14 Jan 2013, Joseph Lo wrote:
-> > 
-> > > Hi Nicolas,
-> > > 
-> > > On Thu, 2013-01-10 at 08:20 +0800, Nicolas Pitre wrote:
-> > > > This is the initial public posting of the initial support for big.LITTLE.
-> > > > Included here is the code required to safely power up and down CPUs in a
-> > > > b.L system, whether this is via CPU hotplug, a cpuidle driver or the
-> > > > Linaro b.L in-kernel switcher[*] on top of this.  Only  SMP secondary
-> > > > boot and CPU hotplug support is included at this time.  Getting to this
-> > > > point already represents a significcant chunk of code as illustrated by
-> > > > the diffstat below.
-> > > > 
-> > > > 
-> > > 
-> > > Thanks for introducing this series.
-> > > I am taking a look at this series. It introduced an algorithm for
-> > > syncing and avoid racing when syncing the power status of clusters and
-> > > CPUs. Do you think these codes could have a chance to become a generic
-> > > framework?
-> > 
-> > Yes.  As I mentioned before, the bL_ prefix is implied only by the fact 
-> > that big.LITTLE was the motivation for creating this code.
-> > 
-> > > The Tegra chip series had a similar design for CPU clusters and it 
-> > had
-> > > limitation that the CPU0 always needs to be the last CPU to be shut down
-> > > before cluster power down as well. I believe it can also get benefits of
-> > > this works. We indeed need a similar algorithm to sync CPUs power status
-> > > before cluster power down and switching.
-> > > 
-> > > The "bL_entry.c", "bL_entry.S", "bL_entry.h", "vlock.h" and "vlock.S"
-> > > looks have a chance to be a common framework for ARM platform even if it
-> > > just support one cluster. Because some systems had the limitations for
-> > > cluster power down. That's why the coupled cpuidle been introduced. And
-> > > this framework could be enabled automatically if platform dependent or
-> > > by menuconfig.
-> > 
-> > Absolutely.
-> > 
-> So do you have a plan to make it become a generic framework in this
-> series or later work?
+This patch removes the C interface, so that people are not tempted
+to use vlocks when they shouldn't.
 
-It is already generic, except for the name.  In other words, you could 
-start using this code already.
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/common/vlock.h |   43 -------------------------------------------
+ 1 files changed, 0 insertions(+), 43 deletions(-)
+ delete mode 100644 arch/arm/common/vlock.h
 
-I'm still debating a good substitute for the bL_ prefix in this series 
-to give it the appearance of generic code.
-
-
-> (And I will add some common power sync wrapper functions that based on
-> this framework for all Tegra series.)
-
-Great!
-
-
-Nicolas
+diff --git a/arch/arm/common/vlock.h b/arch/arm/common/vlock.h
+deleted file mode 100644
+index 94c29a6..0000000
+--- a/arch/arm/common/vlock.h
++++ /dev/null
+@@ -1,43 +0,0 @@
+-/*
+- * vlock.h - simple voting lock implementation
+- *
+- * Created by:	Dave Martin, 2012-08-16
+- * Copyright:	(C) 2012  Linaro Limited
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License along
+- * with this program; if not, write to the Free Software Foundation, Inc.,
+- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+- */
+-
+-#ifndef __VLOCK_H
+-#define __VLOCK_H
+-
+-#include <asm/bL_entry.h>
+-
+-#define VLOCK_OWNER_OFFSET	0
+-#define VLOCK_VOTING_OFFSET	4
+-#define VLOCK_VOTING_SIZE	((BL_CPUS_PER_CLUSTER + 3) / 4 * 4)
+-#define VLOCK_SIZE		(VLOCK_VOTING_OFFSET + VLOCK_VOTING_SIZE)
+-#define VLOCK_OWNER_NONE	0
+-
+-#ifndef __ASSEMBLY__
+-
+-struct vlock {
+-	char data[VLOCK_SIZE];
+-};
+-
+-int vlock_trylock(struct vlock *lock, unsigned int owner);
+-void vlock_unlock(struct vlock *lock);
+-
+-#endif /* __ASSEMBLY__ */
+-#endif /* ! __VLOCK_H */
+-- 
+1.7.4.1
