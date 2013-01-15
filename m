@@ -1,28 +1,73 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 15 Jan 2013 14:49:26 +0200
-Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
- OMAP-L138 DSP
-In-Reply-To: <50F54B91.4030406@ti.com>
-References: <1357863807-380-1-git-send-email-rtivy@ti.com>
- <1357863807-380-7-git-send-email-rtivy@ti.com>
- <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
- <50F51E43.2090605@ti.com>
- <CAK=WgbbShpqxS7zrDs97HkjpyWq0xzW3b9KHLBBs_V3YzdJKiA@mail.gmail.com>
- <50F54B91.4030406@ti.com>
-Message-ID: <CAK=WgbYwM2WPWrTp9U+nk_96RY3YYumzo0KxFpV0fDwU6dR+aA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 15 Jan 2013 13:51:19 +0100
+Subject: [PATCH 3/4] Enable ecc-mode selection in the driver
+In-Reply-To: <2d08c4c072fd4922a6056362adb96a455307d583.1358242644.git.s.peter@mpl.ch>
+References: <cover.1358242644.git.s.peter@mpl.ch>
+ <2d08c4c072fd4922a6056362adb96a455307d583.1358242644.git.s.peter@mpl.ch>
+Message-ID: <20130115125119.GH13482@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 2:29 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> May be rproc_alloc() could auto-assign the firmware name to something
-> like 'rproc%d-fw' if firmware name passed to it is NULL?
+On Tue, Jan 15, 2013 at 01:13:12PM +0100, Stefan Peter wrote:
+> In order to be able to use the ecc-mode, add the bch module to the default
+> settings for the kirwood boards and enable the activation in orin-nand.c
+> 
+> Signed-off-by: Stefan Peter <s.peter@mpl.ch>
+> ---
+> diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
+> index 93f3794..4a9d3f7 100644
+> --- a/arch/arm/configs/kirkwood_defconfig
+> +++ b/arch/arm/configs/kirkwood_defconfig
+> @@ -84,6 +84,7 @@ CONFIG_MTD_CFI_STAA=y
+>  CONFIG_MTD_PHYSMAP=y
+>  CONFIG_MTD_M25P80=y
+>  CONFIG_MTD_NAND=y
+> +CONFIG_MTD_NAND_ECC_BCH=y
+>  CONFIG_MTD_NAND_ORION=y
+>  CONFIG_BLK_DEV_LOOP=y
+>  # CONFIG_SCSI_PROC_FS is not set
+> diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+> index cd72b92..1a35257 100644
+> --- a/drivers/mtd/nand/orion_nand.c
+> +++ b/drivers/mtd/nand/orion_nand.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of.h>
+> +#include <linux/of_mtd.h>
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/nand.h>
+>  #include <linux/mtd/partitions.h>
+> @@ -130,6 +131,7 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+>  		if (!of_property_read_u32(pdev->dev.of_node,
+>  						"chip-delay", &val))
+>  			board->chip_delay = (u8)val;
+> +		board->ecc_mode = of_get_nand_ecc_mode(pdev->dev.of_node);
 
-I prefer we use name-based filenames instead to make it easier for
-users (and us developers).
+>  	} else
+>  		board = pdev->dev.platform_data;
+>  
+> @@ -140,7 +142,8 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+>  	nc->IO_ADDR_R = nc->IO_ADDR_W = io_base;
+>  	nc->cmd_ctrl = orion_nand_cmd_ctrl;
+>  	nc->read_buf = orion_nand_read_buf;
+> -	nc->ecc.mode = NAND_ECC_SOFT;
+> +	nc->ecc.mode = board->ecc_mode == NAND_ECC_SOFT_BCH ?
+> +		NAND_ECC_SOFT_BCH : NAND_ECC_SOFT;
 
-We can probably do something like "rproc-%s-fw" with pdata->name
-assuming we/you do maintain a meaningful name in the latter.
+Hi Stefan
 
-Thanks,
-Ohad.
+What about a user that wants one of the other valid values?
+NAND_ECC_OOB_FIRST, NAND_ECC_HW_SYNDROME, etc.
+
+Would:
+
+	if (IS_ERR(board->ecc_mode)) {
+		nc->ecc.mode = NAND_ECC_SOFT;
+		dev_info(&pdev->dev, "Defaulting to NAND_ECC_SOFT");
+	} else
+		nc->ecc.mode = board->ecc_mode
+
+be better?
+
+   Andrew
