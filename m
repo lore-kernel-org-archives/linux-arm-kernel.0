@@ -1,40 +1,75 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 Jan 2013 11:14:50 -0800
-Subject: [GIT PULL] ste_dma40 updates for 3.9
-In-Reply-To: <CACRpkdZh=5FBDCuSFWYw8t-1Snm1xuS_EyVTUyQ-8kwVgjWuPA@mail.gmail.com>
-References: <20130114101542.GA5363@balto.lan>
- <CAOesGMg6FqsaqZiGeK14n4==dF-y=iMYSGRDBYSwkGWO0J69Yg@mail.gmail.com>
- <CACRpkdZh=5FBDCuSFWYw8t-1Snm1xuS_EyVTUyQ-8kwVgjWuPA@mail.gmail.com>
-Message-ID: <20130115191450.GA28615@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 Jan 2013 10:52:51 -0800
+Subject: [PATCH v8 2/5] mtd: omap-nand: pass device_node in platform data
+In-Reply-To: <1355481404-27695-3-git-send-email-zonque@gmail.com>
+References: <1355481404-27695-1-git-send-email-zonque@gmail.com>
+ <1355481404-27695-3-git-send-email-zonque@gmail.com>
+Message-ID: <20130115185251.GB14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 09:53:05AM +0100, Linus Walleij wrote:
-> On Tue, Jan 15, 2013 at 7:48 AM, Olof Johansson <olof@lixom.net> wrote:
+Artem,
+
+Looks like this patch related to making GPMC work with DT was
+never sent to linux-mtd or to you so adding to cc.
+
+Is this OK to apply along with the GPMC patches, or do you want to
+take this separately with the MTD patches?
+
+Regards,
+
+Tony
+
+* Daniel Mack <zonque@gmail.com> [121214 02:39]:
+> Pass an optional device_node pointer in the platform data, which in turn
+> will be put into a mtd_part_parser_data. This way, code that sets up the
+> platform devices can pass along the node from DT so that the partitions
+> can be parsed.
 > 
-> > This series of patches only modify the ste_dma40 driver, there are no
-> > corresponding changes under arch/arm that need to be coordinated or
-> > considered w.r.t. merge conflicts. I.e. they all seem nicely isolated
-> > to only the driver.
-> >
-> > So is there a specific reason for why these shouldn't just go in
-> > through the dmaengine tree?
+> For non-DT boards, this change has no effect.
 > 
-> One reason would be if there are DMA bindings to device tree coming
-> this merge window, as I'm told, and it implicates a lot of platform code
-> changes on top of this as we adopt to it.
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  drivers/mtd/nand/omap2.c                     | 4 +++-
+>  include/linux/platform_data/mtd-nand-omap2.h | 4 +++-
+>  2 files changed, 6 insertions(+), 2 deletions(-)
 > 
-> But maybe this will be wholly confined to the DMAengine tree?
-
-Changing platform code in the driver trees is asking for conflicts at
-merge time and a grumpy Linus, I'd prefer to merge arch/arm/* through
-arm-soc in that case.
-
-Either way, this branch can be merged into dmaengine as a branch pull,
-and if needed we can bring it in as a dependency on arm-soc. We would
-need the same for the dmaengine DT bindings branch as a base. Of course,
-that requires that Vinod doesn't rebase his branch and keeps the merge
-intact. Vinod, is that compatible with your workflow?
-
-
--Olof
+> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> index 0002d5e..1d333497c 100644
+> --- a/drivers/mtd/nand/omap2.c
+> +++ b/drivers/mtd/nand/omap2.c
+> @@ -1332,6 +1332,7 @@ static int omap_nand_probe(struct platform_device *pdev)
+>  	dma_cap_mask_t mask;
+>  	unsigned sig;
+>  	struct resource			*res;
+> +	struct mtd_part_parser_data	ppdata = {};
+>  
+>  	pdata = pdev->dev.platform_data;
+>  	if (pdata == NULL) {
+> @@ -1557,7 +1558,8 @@ static int omap_nand_probe(struct platform_device *pdev)
+>  		goto out_release_mem_region;
+>  	}
+>  
+> -	mtd_device_parse_register(&info->mtd, NULL, NULL, pdata->parts,
+> +	ppdata.of_node = pdata->of_node;
+> +	mtd_device_parse_register(&info->mtd, NULL, &ppdata, pdata->parts,
+>  				  pdata->nr_parts);
+>  
+>  	platform_set_drvdata(pdev, &info->mtd);
+> diff --git a/include/linux/platform_data/mtd-nand-omap2.h b/include/linux/platform_data/mtd-nand-omap2.h
+> index 24d32ca..6bf9ef4 100644
+> --- a/include/linux/platform_data/mtd-nand-omap2.h
+> +++ b/include/linux/platform_data/mtd-nand-omap2.h
+> @@ -60,6 +60,8 @@ struct omap_nand_platform_data {
+>  	int			devsize;
+>  	enum omap_ecc           ecc_opt;
+>  	struct gpmc_nand_regs	reg;
+> -};
+>  
+> +	/* for passing the partitions */
+> +	struct device_node	*of_node;
+> +};
+>  #endif
+> -- 
+> 1.7.11.7
+> 
