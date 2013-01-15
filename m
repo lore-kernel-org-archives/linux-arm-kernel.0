@@ -1,76 +1,275 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 15 Jan 2013 12:55:48 +0000
-Subject: [PATCH 08/26] mfd: abx500-core: Provide an API to dump all ABx500
- registers
+Date: Tue, 15 Jan 2013 12:55:49 +0000
+Subject: [PATCH 09/26] mfd: ab8500-debugfs: Provide a means for a user
+ subscribe to IRQs
 In-Reply-To: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
 References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1358254566-12419-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1358254566-12419-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mian Yousaf Kaukab <mian.yousaf.kaukab@stericsson.com>
-
-Some drivers can detect subsystem failures e.g. shared memory driver
-can detect modem sub system failures. It would be helpful in analyzing
-these failures if AB register dump is available at that point. This
-patch adds the API for the drivers to dump AB registers in the kernel
-log.
+Allow users to subscribe to and view IRQ events live from debugfs.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Mian Yousaf Kaukab <mian.yousaf.kaukab@stericsson.com>
-Reviewed-by: Linus WALLEIJ <linus.walleij@stericsson.com>
-Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
 ---
- drivers/mfd/abx500-core.c  |   16 ++++++++++++++++
- include/linux/mfd/abx500.h |    2 ++
- 2 files changed, 18 insertions(+)
+ drivers/mfd/ab8500-debugfs.c |  197 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 197 insertions(+)
 
-diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
-index 7ce65f4..9818afb 100644
---- a/drivers/mfd/abx500-core.c
-+++ b/drivers/mfd/abx500-core.c
-@@ -153,6 +153,22 @@ int abx500_startup_irq_enabled(struct device *dev, unsigned int irq)
- }
- EXPORT_SYMBOL(abx500_startup_irq_enabled);
+diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
+index c4cb806..71df8e4 100644
+--- a/drivers/mfd/ab8500-debugfs.c
++++ b/drivers/mfd/ab8500-debugfs.c
+@@ -11,6 +11,9 @@
+ #include <linux/module.h>
+ #include <linux/debugfs.h>
+ #include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/kobject.h>
++#include <linux/slab.h>
  
-+void abx500_dump_all_banks(void)
-+{
-+	struct abx500_ops *ops;
-+	struct device dummy_child = {0};
-+	struct abx500_device_entry *dev_entry;
-+
-+	list_for_each_entry(dev_entry, &abx500_list, list) {
-+		dummy_child.parent = dev_entry->dev;
-+		ops = &dev_entry->ops;
-+
-+		if ((ops != NULL) && (ops->dump_all_banks != NULL))
-+			ops->dump_all_banks(&dummy_child);
-+	}
-+}
-+EXPORT_SYMBOL(abx500_dump_all_banks);
-+
- MODULE_AUTHOR("Mattias Wallin <mattias.wallin@stericsson.com>");
- MODULE_DESCRIPTION("ABX500 core driver");
- MODULE_LICENSE("GPL");
-diff --git a/include/linux/mfd/abx500.h b/include/linux/mfd/abx500.h
-index 5d5298d..2667af4 100644
---- a/include/linux/mfd/abx500.h
-+++ b/include/linux/mfd/abx500.h
-@@ -326,6 +326,7 @@ int abx500_mask_and_set_register_interruptible(struct device *dev, u8 bank,
- int abx500_get_chip_id(struct device *dev);
- int abx500_event_registers_startup_state_get(struct device *dev, u8 *event);
- int abx500_startup_irq_enabled(struct device *dev, unsigned int irq);
-+void abx500_dump_all_banks(void);
+ #include <linux/mfd/abx500.h>
+ #include <linux/mfd/abx500/ab8500.h>
+@@ -18,6 +21,9 @@
+ static u32 debug_bank;
+ static u32 debug_address;
  
- struct abx500_ops {
- 	int (*get_chip_id) (struct device *);
-@@ -336,6 +337,7 @@ struct abx500_ops {
- 	int (*mask_and_set_register) (struct device *, u8, u8, u8, u8);
- 	int (*event_registers_startup_state_get) (struct device *, u8 *);
- 	int (*startup_irq_enabled) (struct device *, unsigned int);
-+	void (*dump_all_banks) (struct device *);
++static int irq_first;
++static int irq_last;
++
+ /**
+  * struct ab8500_reg_range
+  * @first: the first address of the range
+@@ -354,6 +360,21 @@ static struct ab8500_prcmu_ranges debug_ranges[AB8500_NUM_BANKS] = {
+ 	},
  };
  
- int abx500_register_ops(struct device *core_dev, struct abx500_ops *ops);
++static irqreturn_t ab8500_debug_handler(int irq, void *data)
++{
++	char buf[16];
++	struct kobject *kobj = (struct kobject *)data;
++
++	/*
++	 * This makes it possible to use poll for events (POLLPRI | POLLERR)
++	 * from userspace on sysfs file named irq-<nr>
++	 */
++	sprintf(buf, "irq-%d", irq);
++	sysfs_notify(kobj, NULL, buf);
++
++	return IRQ_HANDLED;
++}
++
+ static int ab8500_registers_print(struct seq_file *s, void *p)
+ {
+ 	struct device *dev = s->private;
+@@ -519,6 +540,130 @@ static ssize_t ab8500_val_write(struct file *file,
+ 	return count;
+ }
+ 
++static int ab8500_subscribe_unsubscribe_print(struct seq_file *s, void *p)
++{
++	seq_printf(s, "%d\n", irq_first);
++
++	return 0;
++}
++
++static int ab8500_subscribe_unsubscribe_open(struct inode *inode,
++					     struct file *file)
++{
++	return single_open(file, ab8500_subscribe_unsubscribe_print,
++			   inode->i_private);
++}
++
++/*
++ * This function is used for all interrupts and will always print
++ * the same string. It is however this file sysfs_notify called on.
++ * Userspace should read this file and then poll. When an event occur
++ * the blocking poll will be released.
++ */
++static ssize_t show_irq(struct device *dev,
++			struct device_attribute *attr, char *buf)
++{
++	return sprintf(buf, "irq\n");
++}
++
++static struct device_attribute *dev_attr[AB8500_NR_IRQS];
++static char *event_name[AB8500_NR_IRQS];
++
++static ssize_t ab8500_subscribe_write(struct file *file,
++				      const char __user *user_buf,
++				      size_t count, loff_t *ppos)
++{
++	struct device *dev = ((struct seq_file *)(file->private_data))->private;
++	char buf[32];
++	int buf_size;
++	unsigned long user_val;
++	int err;
++
++	/* Get userspace string and assure termination */
++	buf_size = min(count, (sizeof(buf)-1));
++	if (copy_from_user(buf, user_buf, buf_size))
++		return -EFAULT;
++	buf[buf_size] = 0;
++
++	err = strict_strtoul(buf, 0, &user_val);
++	if (err)
++		return -EINVAL;
++	if (user_val < irq_first) {
++		dev_err(dev, "debugfs error input < %d\n", irq_first);
++		return -EINVAL;
++	}
++	if (user_val > irq_last) {
++		dev_err(dev, "debugfs error input > %d\n", irq_last);
++		return -EINVAL;
++	}
++
++	/*
++	 * This will create a sysfs file named irq-<nr> which userspace can
++	 * use to select or poll and get the AB8500 events
++	 */
++	dev_attr[user_val] = kmalloc(sizeof(struct device_attribute),
++				     GFP_KERNEL);
++	event_name[user_val] = kmalloc(buf_size, GFP_KERNEL);
++	sprintf(event_name[user_val], "irq-%lu", user_val);
++	dev_attr[user_val]->show = show_irq;
++	dev_attr[user_val]->store = NULL;
++	dev_attr[user_val]->attr.name = event_name[user_val];
++	dev_attr[user_val]->attr.mode = S_IRUGO;
++	err = sysfs_create_file(&dev->kobj, &dev_attr[user_val]->attr);
++	if (err < 0) {
++		printk(KERN_ERR "sysfs_create_file failed %d\n", err);
++		return err;
++	}
++
++	err = request_threaded_irq(user_val, NULL, ab8500_debug_handler,
++				   0, "ab8500-debug", &dev->kobj);
++	if (err < 0) {
++		printk(KERN_ERR "request_threaded_irq failed %d, %lu\n",
++                       err, user_val);
++		return err;
++	}
++
++	return buf_size;
++}
++
++static ssize_t ab8500_unsubscribe_write(struct file *file,
++					const char __user *user_buf,
++					size_t count, loff_t *ppos)
++{
++	struct device *dev = ((struct seq_file *)(file->private_data))->private;
++	char buf[32];
++	int buf_size;
++	unsigned long user_val;
++	int err;
++
++	/* Get userspace string and assure termination */
++	buf_size = min(count, (sizeof(buf)-1));
++	if (copy_from_user(buf, user_buf, buf_size))
++		return -EFAULT;
++	buf[buf_size] = 0;
++
++	err = strict_strtoul(buf, 0, &user_val);
++	if (err)
++		return -EINVAL;
++	if (user_val < irq_first) {
++		dev_err(dev, "debugfs error input < %d\n", irq_first);
++		return -EINVAL;
++	}
++	if (user_val > irq_last) {
++		dev_err(dev, "debugfs error input > %d\n", irq_last);
++		return -EINVAL;
++	}
++
++	free_irq(user_val, &dev->kobj);
++	kfree(event_name[user_val]);
++	kfree(dev_attr[user_val]);
++
++	if (dev_attr[user_val])
++		sysfs_remove_file(&dev->kobj, &dev_attr[user_val]->attr);
++
++	return buf_size;
++}
++
+ static const struct file_operations ab8500_bank_fops = {
+ 	.open = ab8500_bank_open,
+ 	.write = ab8500_bank_write,
+@@ -546,17 +691,51 @@ static const struct file_operations ab8500_val_fops = {
+ 	.owner = THIS_MODULE,
+ };
+ 
++static const struct file_operations ab8500_subscribe_fops = {
++	.open = ab8500_subscribe_unsubscribe_open,
++	.write = ab8500_subscribe_write,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++	.owner = THIS_MODULE,
++};
++
++static const struct file_operations ab8500_unsubscribe_fops = {
++	.open = ab8500_subscribe_unsubscribe_open,
++	.write = ab8500_unsubscribe_write,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++	.owner = THIS_MODULE,
++};
++
+ static struct dentry *ab8500_dir;
+ static struct dentry *ab8500_reg_file;
+ static struct dentry *ab8500_bank_file;
+ static struct dentry *ab8500_address_file;
+ static struct dentry *ab8500_val_file;
++static struct dentry *ab8500_subscribe_file;
++static struct dentry *ab8500_unsubscribe_file;
+ 
+ static int __devinit ab8500_debug_probe(struct platform_device *plf)
+ {
+ 	debug_bank = AB8500_MISC;
+ 	debug_address = AB8500_REV_REG & 0x00FF;
+ 
++	irq_first = platform_get_irq_byname(plf, "IRQ_FIRST");
++	if (irq_first < 0) {
++		dev_err(&plf->dev, "First irq not found, err %d\n",
++			irq_first);
++		return irq_first;
++	}
++
++	irq_last = platform_get_irq_byname(plf, "IRQ_LAST");
++	if (irq_last < 0) {
++		dev_err(&plf->dev, "Last irq not found, err %d\n",
++			irq_last);
++		return irq_last;
++	}
++
+ 	ab8500_dir = debugfs_create_dir(AB8500_NAME_STRING, NULL);
+ 	if (!ab8500_dir)
+ 		goto exit_no_debugfs;
+@@ -582,8 +761,26 @@ static int __devinit ab8500_debug_probe(struct platform_device *plf)
+ 	if (!ab8500_val_file)
+ 		goto exit_destroy_address;
+ 
++	ab8500_subscribe_file =
++		debugfs_create_file("irq-subscribe",
++				    (S_IRUGO | S_IWUGO), ab8500_dir, &plf->dev,
++				    &ab8500_subscribe_fops);
++	if (!ab8500_subscribe_file)
++		goto exit_destroy_val;
++
++	ab8500_unsubscribe_file =
++		debugfs_create_file("irq-unsubscribe",
++				    (S_IRUGO | S_IWUGO), ab8500_dir, &plf->dev,
++				    &ab8500_unsubscribe_fops);
++	if (!ab8500_unsubscribe_file)
++		goto exit_destroy_subscribe;
++
+ 	return 0;
+ 
++exit_destroy_subscribe:
++	debugfs_remove(ab8500_subscribe_file);
++exit_destroy_val:
++	debugfs_remove(ab8500_val_file);
+ exit_destroy_address:
+ 	debugfs_remove(ab8500_address_file);
+ exit_destroy_bank:
 -- 
 1.7.9.5
