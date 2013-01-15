@@ -1,150 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 15 Jan 2013 22:03:46 +0800
-Subject: [PATCH v5 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
- platform_device_id
-In-Reply-To: <1358216975-1404-2-git-send-email-peter.chen@freescale.com>
-References: <1358216975-1404-1-git-send-email-peter.chen@freescale.com>
- <1358216975-1404-2-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130115140344.GB6574@S2101-09.ap.freescale.net>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 15 Jan 2013 14:04:47 +0000
+Subject: [kvmarm] [PATCH v5 06/14] KVM: ARM: Inject IRQs and FIQs from
+ userspace
+In-Reply-To: <20130115125241.GK11529@redhat.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183917.46302.55603.stgit@ubuntu>
+ <20130115095622.GJ11529@redhat.com>
+ <CAFEAcA9wEtXu6B-4bUuezntvybhu8MCYfciKhdLK_Cs--qP8_w@mail.gmail.com>
+ <20130115125241.GK11529@redhat.com>
+Message-ID: <CAFEAcA8gzD4F4BPKR_dSDDD-iyv0ONt6H+yrj_nHifeCFBfpPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 10:29:33AM +0800, Peter Chen wrote:
-> As mach/hardware.h is deleted, we need to use platform_device_id to
-> differentiate SoCs. Besides, one cpu_is_mx35 is useless as it has
-> already used pdata to differentiate runtime
-> 
-> Meanwhile we update the platform code accordingly.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  arch/arm/mach-imx/devices/devices-common.h        |    1 +
->  arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c |   15 ++++---
->  drivers/usb/gadget/fsl_mxc_udc.c                  |   24 +++++-------
->  drivers/usb/gadget/fsl_udc_core.c                 |   42 +++++++++++++--------
->  4 files changed, 45 insertions(+), 37 deletions(-)
+On 15 January 2013 12:52, Gleb Natapov <gleb@redhat.com> wrote:
+> On Tue, Jan 15, 2013 at 12:15:01PM +0000, Peter Maydell wrote:
+>> On 15 January 2013 09:56, Gleb Natapov <gleb@redhat.com> wrote:
+>> >> ARM can signal an interrupt either at the CPU level, or at the in-kernel irqchip
+>> > CPU level interrupt should use KVM_INTERRUPT instead.
+>>
+>> No, that would be wrong. KVM_INTERRUPT is for interrupts which must be
+>> delivered synchronously to the CPU. KVM_IRQ_LINE is for interrupts which
+>> can be fed to the kernel asynchronously. It happens that on x86 "must be
+>> delivered synchronously" and "not going to in kernel irqchip" are the same, but
+>> this isn't true for other archs. For ARM all our interrupts can be fed
+>> to the kernel asynchronously, and so we use KVM_IRQ_LINE in all
+>> cases.
 
-Since we are splitting the original patch anyway, it's a bit strange
-to me that you are mixing arch/arm/mach-imx and drivers/usb/gadget
-in this patch.  I'm fine with it, since I assume all the patches to
-go via USB tree anyway.
+> I do no quite understand what you mean by synchronously and
+> asynchronously.
 
-> 
-> diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-> index 6277baf..9bd5777 100644
-> --- a/arch/arm/mach-imx/devices/devices-common.h
-> +++ b/arch/arm/mach-imx/devices/devices-common.h
-> @@ -63,6 +63,7 @@ struct platform_device *__init imx_add_flexcan(
->  
->  #include <linux/fsl_devices.h>
->  struct imx_fsl_usb2_udc_data {
-> +	const char *devid;
->  	resource_size_t iobase;
->  	resource_size_t irq;
->  };
-> diff --git a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
-> index 37e4439..fb527c7 100644
-> --- a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
-> +++ b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
-> @@ -11,35 +11,36 @@
->  #include "../hardware.h"
->  #include "devices-common.h"
->  
-> -#define imx_fsl_usb2_udc_data_entry_single(soc)				\
-> +#define imx_fsl_usb2_udc_data_entry_single(soc, _devid)			\
->  	{								\
-> +		.devid = _devid,					\
->  		.iobase = soc ## _USB_OTG_BASE_ADDR,			\
->  		.irq = soc ## _INT_USB_OTG,				\
->  	}
->  
->  #ifdef CONFIG_SOC_IMX25
->  const struct imx_fsl_usb2_udc_data imx25_fsl_usb2_udc_data __initconst =
-> -	imx_fsl_usb2_udc_data_entry_single(MX25);
-> +	imx_fsl_usb2_udc_data_entry_single(MX25, "imx-udc-mx25");
->  #endif /* ifdef CONFIG_SOC_IMX25 */
->  
->  #ifdef CONFIG_SOC_IMX27
->  const struct imx_fsl_usb2_udc_data imx27_fsl_usb2_udc_data __initconst =
-> -	imx_fsl_usb2_udc_data_entry_single(MX27);
-> +	imx_fsl_usb2_udc_data_entry_single(MX27, "imx-udc-mx27");
->  #endif /* ifdef CONFIG_SOC_IMX27 */
->  
->  #ifdef CONFIG_SOC_IMX31
->  const struct imx_fsl_usb2_udc_data imx31_fsl_usb2_udc_data __initconst =
-> -	imx_fsl_usb2_udc_data_entry_single(MX31);
-> +	imx_fsl_usb2_udc_data_entry_single(MX31, "imx-udc-mx31");
->  #endif /* ifdef CONFIG_SOC_IMX31 */
->  
->  #ifdef CONFIG_SOC_IMX35
->  const struct imx_fsl_usb2_udc_data imx35_fsl_usb2_udc_data __initconst =
-> -	imx_fsl_usb2_udc_data_entry_single(MX35);
-> +	imx_fsl_usb2_udc_data_entry_single(MX35, "imx-udc-mx35");
->  #endif /* ifdef CONFIG_SOC_IMX35 */
->  
->  #ifdef CONFIG_SOC_IMX51
->  const struct imx_fsl_usb2_udc_data imx51_fsl_usb2_udc_data __initconst =
-> -	imx_fsl_usb2_udc_data_entry_single(MX51);
-> +	imx_fsl_usb2_udc_data_entry_single(MX51, "imx-udc-mx51");
->  #endif
->  
->  struct platform_device *__init imx_add_fsl_usb2_udc(
-> @@ -57,7 +58,7 @@ struct platform_device *__init imx_add_fsl_usb2_udc(
->  			.flags = IORESOURCE_IRQ,
->  		},
->  	};
-> -	return imx_add_platform_device_dmamask("fsl-usb2-udc", -1,
-> +	return imx_add_platform_device_dmamask(data->devid, -1,
->  			res, ARRAY_SIZE(res),
->  			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
->  }
+Synchronously: the vcpu has to be stopped and userspace then
+feeds in the interrupt to be taken when the guest is resumed.
+Asynchronously: any old thread can tell the kernel there's an
+interrupt, and the guest vcpu then deals with it when needed
+(the vcpu thread may leave the guest but doesn't come out of
+the host kernel to qemu).
 
-<snip>
+> The difference between KVM_INTERRUPT and KVM_IRQ_LINE line
+> is that former is used when destination cpu is known to userspace later
+> is used when kernel code is involved in figuring out the destination.
 
-> +static const struct platform_device_id fsl_udc_devtype[] = {
-> +	{
-> +		.name = "imx-udc-mx25",
-> +	}, {
-> +		.name = "imx-udc-mx27",
-> +	}, {
-> +		.name = "imx-udc-mx31",
-> +	}, {
-> +		.name = "imx-udc-mx35",
-> +	}, {
-> +		.name = "imx-udc-mx51",
-> +	}
-> +};
+This doesn't match up with Avi's explanation at all.
 
->From what I understand balbi's comment, he dislikes this full list of
-device id.  Instead, he prefers to something like below.
+> The
+> injections themselves are currently synchronous for both of them on x86
+> and ARM. i.e vcpu is kicked out from guest mode when interrupt need to
+> be injected into a guest and vcpu state is changed to inject interrupt
+> during next guest entry. In the near feature x86 will be able to inject
+> interrupt without kicking vcpu out from the guest mode does ARM plan to
+> do the same? For GIC interrupts or for IRQ/FIQ or for both?
+>
+>> There was a big discussion thread about this on kvm and qemu-devel last
+>> July (and we cleaned up some of the QEMU code to not smoosh together
+>> all these different concepts under "do I have an irqchip or not?").
+> Do you have a pointer?
 
-static const struct platform_device_id fsl_udc_devtype[] = {
-	{
-		.name = "imx-udc-mx27",
-	}, {
-		.name = "imx-udc-mx51",
-	}
-};
+  http://lists.gnu.org/archive/html/qemu-devel/2012-07/msg02460.html
+and there was a later longer (but less clear) thread which included
+this mail from Avi:
+  http://lists.gnu.org/archive/html/qemu-devel/2012-07/msg02872.html
+basically explaining that the reason for the weird synchronous
+KVM_INTERRUPT API is that it's emulating a weird synchronous
+hardware interface which is specific to x86. ARM doesn't have
+a synchronous interface in the same way, so it's much more
+straightforward to use KVM_IRQ_LINE.
 
-It basically tells that we are handling two type of devices here, one
-is imx-udc-mx27 type and the other is imx-udc-mx51 type, with mx25/31/35
-completely compatible with mx27 type.  We choose mx27 instead of mx25
-to define the type because mx27 Si came out earlier than mx25.  That
-said, we generally choose the earlies SoC name to define a particular
-version of IP block, since hardware version is mostly unavailable or
-unreliable.
-
-But that also means in platform code which create the platform_device,
-you will need to use name "imx-udc-mx27" for even mx25/31/35.
-
-	imx_fsl_usb2_udc_data_entry_single(MX25, "imx-udc-mx27");
-	imx_fsl_usb2_udc_data_entry_single(MX31, "imx-udc-mx27");
-	imx_fsl_usb2_udc_data_entry_single(MX35, "imx-udc-mx27");
-
-Considering this is a piece of code we will not use for any new
-hardware, I'm fine with either way.
-
-So, balbi, it's all your call to accept the series as it is or ask for
-another iteration.
-
-Shawn
+-- PMM
