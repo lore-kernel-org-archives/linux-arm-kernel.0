@@ -1,86 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 15 Jan 2013 21:46:03 +0100
-Subject: [PATCH v3] clk: mvebu/clk-cpu.c: fix memory leakage
-In-Reply-To: <20130115184423.GC7211@gmail.com>
-References: <1358183892-28928-1-git-send-email-dinggnu@gmail.com>
- <50F563EC.3030804@free-electrons.com> <20130115152307.GA25615@gmail.com>
- <20130115153716.GF13433@titan.lakedaemon.net>
- <50F584F5.6030007@free-electrons.com> <20130115182629.GB7211@gmail.com>
- <50F5A1A9.2030803@free-electrons.com> <20130115184423.GC7211@gmail.com>
-Message-ID: <50F5C00B.10108@free-electrons.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Tue, 15 Jan 2013 13:53:02 -0700
+Subject: [PATCH] crypto: omap-sham - Fix compile errors when CONFIG_OF not
+ defined
+Message-ID: <1358283182-29392-1-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2013 07:44 PM, Cong Ding wrote:
-> the variable cpuclk and clk_name should be properly freed when error happens.
-Dear Cong Ding,
+From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Thanks for you efforts!
-I am happy with this patch and I tested it on the Armada XP DB board, so
-you can now add my:
+Fix the compile errors created by commit 2545e8d
+(crypto: omap-sham - Add Device Tree Support)
+when CONFIG_OF is not defined.  This includes
+changing omap_sham_get_res_dev() to omap_sham_get_res_of()
+and creating an empty version of omap_sham_of_match[].
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ drivers/crypto/omap-sham.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Mike,
-
-could you take this patch for 3.8-rc fixes?
-
-If you prefer, Jason agrees to take it, but you probably didn't notice it,
-because he uses your former(and no more valid) email when he wrote this.
-
-Thanks,
-
-Gregory
-
-> 
-> Signed-off-by: Cong Ding <dinggnu@gmail.com>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  drivers/clk/mvebu/clk-cpu.c |    9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-> index ff004578..9dd2551 100644
-> --- a/drivers/clk/mvebu/clk-cpu.c
-> +++ b/drivers/clk/mvebu/clk-cpu.c
-> @@ -124,7 +124,7 @@ void __init of_cpu_clk_setup(struct device_node *node)
->  
->  	clks = kzalloc(ncpus * sizeof(*clks), GFP_KERNEL);
->  	if (WARN_ON(!clks))
-> -		return;
-> +		goto clks_out;
->  
->  	for_each_node_by_type(dn, "cpu") {
->  		struct clk_init_data init;
-> @@ -134,11 +134,11 @@ void __init of_cpu_clk_setup(struct device_node *node)
->  		int cpu, err;
->  
->  		if (WARN_ON(!clk_name))
-> -			return;
-> +			goto bail_out;
->  
->  		err = of_property_read_u32(dn, "reg", &cpu);
->  		if (WARN_ON(err))
-> -			return;
-> +			goto bail_out;
->  
->  		sprintf(clk_name, "cpu%d", cpu);
->  		parent_clk = of_clk_get(node, 0);
-> @@ -167,6 +167,9 @@ void __init of_cpu_clk_setup(struct device_node *node)
->  	return;
->  bail_out:
->  	kfree(clks);
-> +	while(ncpus--)
-> +		kfree(cpuclk[ncpus].clk_name);
-> +clks_out:
->  	kfree(cpuclk);
->  }
->  
-> 
-
-
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index edff981..dc2d354 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -1607,7 +1607,11 @@ err:
+ 	return err;
+ }
+ #else
+-static int omap_sham_get_res_dev(struct omap_sham_dev *dd,
++static const struct of_device_id omap_sham_of_match[] = {
++	{},
++};
++
++static int omap_sham_get_res_of(struct omap_sham_dev *dd,
+ 		struct device *dev, struct resource *res)
+ {
+ 	return -EINVAL;
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.12
