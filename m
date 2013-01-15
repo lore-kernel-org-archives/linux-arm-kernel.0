@@ -1,65 +1,48 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 15 Jan 2013 09:49:35 +0900
-Subject: [PATCH 5/5] ARM: mach-shmobile: kzm9d: update defconfig
-In-Reply-To: <1358210975-26970-1-git-send-email-horms+renesas@verge.net.au>
-References: <1358210975-26970-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1358210975-26970-6-git-send-email-horms+renesas@verge.net.au>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 14 Jan 2013 17:04:10 -0800
+Subject: [PATCH] clk: max77686: Avoid double free at remove time
+In-Reply-To: <1357520719-3782-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1357520719-3782-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <20130115010410.23734.88154@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Do not disable SUSPEND
+Quoting Laurent Pinchart (2013-01-06 17:05:19)
+> The clk_lookup entry is dropped at remove time by a call to
+> clkdev_drop(). That function frees the entry, which is also freed by the
+> driver core as it has been allocated through devm_kzalloc(). This
+> results in a double free.
+> 
+> Use kzalloc() instead of devm_kzalloc() to fix this.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-  Suspend seems to work fine on the kzm9d.
+Hi Laurent,
 
-  This is part of an effort reduce differences between mach-shmobile
-  defconfigs with a view to using a common defconfig.
+Thanks for the fix.  Applied to clk-next.
 
-* Enable PM_RUNTIME
+Regards,
+Mike
 
-  This also seems to work fine on the kzm9d.
-
-  This is part of an effort reduce differences between mach-shmobile
-  defconfigs with a view to using a common defconfig.
-
-* Move kernel command line from defconfig to dts.
-
-  This brings us one small step closer to sharing defconfig
-  between kzm9d and other boards.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/emev2-kzm9d.dts |    2 +-
- arch/arm/configs/kzm9d_defconfig  |    4 +---
- 2 files changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index 297e3ba..b9b3241 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -21,6 +21,6 @@
- 	};
- 
- 	chosen {
--		bootargs = "console=ttyS1,115200n81";
-+		bootargs = "console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096";
- 	};
- };
-diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
-index 8c49df6..6c37f4a 100644
---- a/arch/arm/configs/kzm9d_defconfig
-+++ b/arch/arm/configs/kzm9d_defconfig
-@@ -32,11 +32,9 @@ CONFIG_FORCE_MAX_ZONEORDER=13
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
--CONFIG_CMDLINE="console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096"
--CONFIG_CMDLINE_FORCE=y
- CONFIG_VFP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--# CONFIG_SUSPEND is not set
-+CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
--- 
-1.7.10.4
+> ---
+>  drivers/clk/clk-max77686.c |    3 +--
+>  1 files changed, 1 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
+> index d098f72..6de05c5 100644
+> --- a/drivers/clk/clk-max77686.c
+> +++ b/drivers/clk/clk-max77686.c
+> @@ -130,8 +130,7 @@ static int max77686_clk_register(struct device *dev,
+>         if (IS_ERR(clk))
+>                 return -ENOMEM;
+>  
+> -       max77686->lookup = devm_kzalloc(dev, sizeof(struct clk_lookup),
+> -                                       GFP_KERNEL);
+> +       max77686->lookup = kzalloc(sizeof(struct clk_lookup), GFP_KERNEL);
+>         if (IS_ERR(max77686->lookup))
+>                 return -ENOMEM;
+>  
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
