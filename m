@@ -1,35 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Jan 2013 08:56:17 +0900
-Subject: [PATCH 2/5] ARM: mach-shmobile: fix memory size for
- kota2_defconfig
-In-Reply-To: <CAOesGMiUh-cb4xtizarm1ah06zvawu4r3zV1NOM9bwqXO3SwHg@mail.gmail.com>
-References: <1357888626-4946-1-git-send-email-horms+renesas@verge.net.au>
- <1357888626-4946-3-git-send-email-horms+renesas@verge.net.au>
- <CAOesGMiUh-cb4xtizarm1ah06zvawu4r3zV1NOM9bwqXO3SwHg@mail.gmail.com>
-Message-ID: <20130114235614.GA7185@verge.net.au>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Tue, 15 Jan 2013 01:13:10 +0100
+Subject: [PATCH v2] hardlockup: detect hard lockups without NMIs using
+ secondary cpus
+In-Reply-To: <1357941108-14138-1-git-send-email-ccross@android.com>
+References: <1357941108-14138-1-git-send-email-ccross@android.com>
+Message-ID: <CAFTL4hzYkPCmkfqBafkTA5E_snkLoC_y3p9xwumj=L1xWAWK0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 10:07:00AM -0800, Olof Johansson wrote:
-> On Thu, Jan 10, 2013 at 11:17 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > The CONFIG_MEMORY_SIZE value is interpreted as a 32 bit integer, which
-> > makes sense on a system without PAE. It appears that a trailing 0 was
-> > appended to the value and after some testing it appears that 0x1e000000 is
-> > the correct value.
-> >
-> > Without this patch, building kota2_defconfig results in:
-> >
-> > /home/arnd/linux-arm/arch/arm/kernel/setup.c:790:2: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-> >
-> > Reported-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> Or is this the only fix you have right now, so I should just apply it directly?
+2013/1/11 Colin Cross <ccross@android.com>:
+> Emulate NMIs on systems where they are not available by using timer
+> interrupts on other cpus.  Each cpu will use its softlockup hrtimer
+> to check that the next cpu is processing hrtimer interrupts by
+> verifying that a counter is increasing.
+>
+> This patch is useful on systems where the hardlockup detector is not
+> available due to a lack of NMIs, for example most ARM SoCs.
+> Without this patch any cpu stuck with interrupts disabled can
+> cause a hardware watchdog reset with no debugging information,
+> but with this patch the kernel can detect the lockup and panic,
+> which can result in useful debugging info.
+>
+> Signed-off-by: Colin Cross <ccross@android.com>
 
-As far as I know the change does not appear to have any affect
-at run-time, at least for the default config. So there is no particular rush.
-I'll include this as part of a pull request a little later today.
+I believe this is pretty much what the RCU stall detector does
+already: checks for other CPUs being responsive. The only difference
+is on how it checks that. For RCU it's about checking for CPUs
+reporting quiescent states when requested to do so. In your case it's
+about ensuring the hrtimer interrupt is well handled.
+
+One thing you can do is to enqueue an RCU callback (cal_rcu()) every
+minute so you can force other CPUs to report quiescent states
+periodically and thus check for lockups.
+
+Now you'll face the same problem in the end: if you don't have NMIs,
+you won't have a very useful report.
