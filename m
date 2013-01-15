@@ -1,77 +1,82 @@
-From: dinggnu@gmail.com (Cong Ding)
-Date: Tue, 15 Jan 2013 14:41:41 +0000
-Subject: [PATCH] clk: mvebu/clk-cpu.c: fix memory leakage
-In-Reply-To: <50F563EC.3030804@free-electrons.com>
-References: <1358183892-28928-1-git-send-email-dinggnu@gmail.com>
- <50F563EC.3030804@free-electrons.com>
-Message-ID: <20130115144140.GA1160@gmail.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Tue, 15 Jan 2013 09:42:25 -0500
+Subject: [PATCH v5 13/14] KVM: ARM: Handle I/O aborts
+In-Reply-To: <20130115142747.GP11529@redhat.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108184005.46302.38495.stgit@ubuntu>
+ <20130115131855.GL11529@redhat.com> <50F559C4.8080900@arm.com>
+ <20130115133455.GN11529@redhat.com> <50F55D9C.8070007@arm.com>
+ <20130115142747.GP11529@redhat.com>
+Message-ID: <CANM98qKAHzRFXhKotiBXggwa=9Ds8VoaBiVMyLv5u2G_vYfuPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 03:13:00PM +0100, Gregory CLEMENT wrote:
-> Dear Cong Ding,
-> 
-> On 01/14/2013 06:18 PM, Cong Ding wrote:
-> > the variable cpuclk and clk_name should be properly freed.
-> > 
-> 
-> Thanks for reporting this memory leak and for your patch but I think
-> we could do even better, see below:
-> 
-> > Signed-off-by: Cong Ding <dinggnu@gmail.com>
-> > ---
-> >  drivers/clk/mvebu/clk-cpu.c |    9 ++++++---
-> >  1 file changed, 6 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-> > index ff004578..1a0d84f 100644
-> > --- a/drivers/clk/mvebu/clk-cpu.c
-> > +++ b/drivers/clk/mvebu/clk-cpu.c
-> > @@ -124,7 +124,7 @@ void __init of_cpu_clk_setup(struct device_node *node)
-> >  
-> >  	clks = kzalloc(ncpus * sizeof(*clks), GFP_KERNEL);
-> >  	if (WARN_ON(!clks))
-> > -		return;
-> > +		goto clks_out;
-> >  
-> >  	for_each_node_by_type(dn, "cpu") {
-> >  		struct clk_init_data init;
-> > @@ -134,11 +134,11 @@ void __init of_cpu_clk_setup(struct device_node *node)
-> >  		int cpu, err;
-> >  
-> >  		if (WARN_ON(!clk_name))
-> > -			return;
-> > +			goto clk_name_out;
-> 
-> I agree
-> 
-> >  
-> >  		err = of_property_read_u32(dn, "reg", &cpu);
-> >  		if (WARN_ON(err))
-> > -			return;
-> > +			goto bail_out;
-> 
-> I agree
-> 
-> >  
-> >  		sprintf(clk_name, "cpu%d", cpu);
-> >  		parent_clk = of_clk_get(node, 0);
-> > @@ -166,7 +166,10 @@ void __init of_cpu_clk_setup(struct device_node *node)
-> >  
-> >  	return;
-> >  bail_out:
-> > +	kfree(clk_name);
-> 
-> Here you free only one clk_name whereas we could have previous clk_name which have
-> been already allocated during the for_each_node_by_type loop.
-> 
-> A more annoying thing is that you use clk_name whereas it is only valid in the
-> for_each_node_by_type statement and then this patch breaks the compilation:
-> 
-> drivers/clk/mvebu/clk-cpu.c: In function ?of_cpu_clk_setup?:
-> drivers/clk/mvebu/clk-cpu.c:169:8: error: ?clk_name? undeclared (first use in this function)
-> drivers/clk/mvebu/clk-cpu.c:169:8: note: each undeclared identifier is reported only once for each function it appears in
-sorry for the mistake, I am sending version 2.
+On Tue, Jan 15, 2013 at 9:27 AM, Gleb Natapov <gleb@redhat.com> wrote:
+> On Tue, Jan 15, 2013 at 01:46:04PM +0000, Marc Zyngier wrote:
+>> On 15/01/13 13:34, Gleb Natapov wrote:
+>> > On Tue, Jan 15, 2013 at 01:29:40PM +0000, Marc Zyngier wrote:
+>> >> On 15/01/13 13:18, Gleb Natapov wrote:
+>> >>> On Tue, Jan 08, 2013 at 01:40:05PM -0500, Christoffer Dall wrote:
+>> >>>> When the guest accesses I/O memory this will create data abort
+>> >>>> exceptions and they are handled by decoding the HSR information
+>> >>>> (physical address, read/write, length, register) and forwarding reads
+>> >>>> and writes to QEMU which performs the device emulation.
+>> >>>>
+>> >>>> Certain classes of load/store operations do not support the syndrome
+>> >>>> information provided in the HSR and we therefore must be able to fetch
+>> >>>> the offending instruction from guest memory and decode it manually.
+>> >>>>
+>> >>>> We only support instruction decoding for valid reasonable MMIO operations
+>> >>>> where trapping them do not provide sufficient information in the HSR (no
+>> >>>> 16-bit Thumb instructions provide register writeback that we care about).
+>> >>>>
+>> >>>> The following instruction types are NOT supported for MMIO operations
+>> >>>> despite the HSR not containing decode info:
+>> >>>>  - any Load/Store multiple
+>> >>>>  - any load/store exclusive
+>> >>>>  - any load/store dual
+>> >>>>  - anything with the PC as the dest register
+>> >>>>
+>> >>>> This requires changing the general flow somewhat since new calls to run
+>> >>>> the VCPU must check if there's a pending MMIO load and perform the write
+>> >>>> after userspace has made the data available.
+>> >>>>
+>> >>>> Rusty Russell fixed a horrible race pointed out by Ben Herrenschmidt:
+>> >>>> (1) Guest complicated mmio instruction traps.
+>> >>>> (2) The hardware doesn't tell us enough, so we need to read the actual
+>> >>>>     instruction which was being exectuted.
+>> >>>> (3) KVM maps the instruction virtual address to a physical address.
+>> >>>> (4) The guest (SMP) swaps out that page, and fills it with something else.
+>> >>>> (5) We read the physical address, but now that's the wrong thing.
+>> >>> How can this happen?! The guest cannot reuse physical page before it
+>> >>> flushes it from all vcpus tlb cache. For that it needs to send
+>> >>> synchronous IPI to all vcpus and IPI will not be processed by a vcpu
+>> >>> while it does emulation.
+>> >>
+>> >> I don't know how this works on x86, but a KVM/ARM guest can definitely
+>> >> handle an IPI.
+>> >>
+>> > How can a vcpu handle an IPI while it is not in a guest mode?
+>>
+>> I think there is some misunderstanding. A guest IPI is of course handled
+>> while running the guest. You completely lost me here.
+> You need IPI from one guest vcpu to another to invalidate its TLB on
+> x86. That prevents the race from happening there.
+>
+>>
+>> >> Furthermore, TLB invalidation doesn't require an IPI on ARMv7 (unless
+>> >> we're doing some set/way operation which is handled separately).
+>> >>
+>> > What prevents a page to be swapped out while code is fetched from it?
+>>
+>> Why would you prevent it? TLB invalidation is broadcast by the HW. If
+>> you swap a page out, you flag the entry as invalid and invalidate the
+>> corresponding TLB. If you hit it, you swap the page back in.
+>>
+> There is no IPI (or anything that requires response from cpu whose TLB
+> is invalidated) involved in invalidating remote TLB?
+>
+>
+no there's not, the hardware broadcasts the TLB invalidate operation.
 
-thanks,
-- cong
+-Christoffer
