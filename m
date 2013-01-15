@@ -1,59 +1,90 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 15 Jan 2013 13:56:19 +0100
-Subject: [PATCH 5/5] ARM: exynos: enable/disable cpuidle when cpu1 is
- down/up
-In-Reply-To: <CADGdYn4eRbkZt_Rshqg-a_CoAmF5LBobzT3=3h09syaH0z6uJA@mail.gmail.com>
-References: <1357318799-24378-1-git-send-email-daniel.lezcano@linaro.org>
- <1357318799-24378-5-git-send-email-daniel.lezcano@linaro.org>
- <CADGdYn7y_SSmLoEpeRjL8PDSZS-YJwC1QpRcUocSSnDyM8BRhQ@mail.gmail.com>
- <50EF3369.2060902@free.fr>
- <CADGdYn4eRbkZt_Rshqg-a_CoAmF5LBobzT3=3h09syaH0z6uJA@mail.gmail.com>
-Message-ID: <50F551F3.2060400@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 15 Jan 2013 12:55:41 +0000
+Subject: [PATCH 01/26] mfd: ab8500-sysctrl: Provide a platform specific
+ pm_power_off() call-back
+In-Reply-To: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
+References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1358254566-12419-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2013 11:33 PM, amit daniel kachhap wrote:
-> On Thu, Jan 10, 2013 at 1:32 PM, Daniel Lezcano <daniel.lezcano@free.fr> wrote:
->> On 01/10/2013 09:07 PM, amit daniel kachhap wrote:
->>> Hi Daniel,
->>
->> Hi Amit Daniel,
->>
->>> This hotplug noifiers looks fine. I suppose it should add extra state
->>> C1 in cpu0. If it is done like below than for normal cases(when all
->>> cpu's are online) there wont be any statistics for C0 state
->>
->> I guess you meant state 0 which is WFI, right ?
->> C0 state is the intel semantic for cpu fully turned on.
-> Yes I meant C0 as wfi
->>
->>> also which
->>> is required. Other patches look good.
->>
->> Ok, that makes sense to have statistics even if they are only doing WFI.
->>
->> Then the patch 4/5 is not ok, no ?
-> yes I suppose patch 4 and patch 5 are related and depends how you
-> frame patch 5. I think it is better to create C0/C1 sysfs and other
-> things in the beginning because it is a filesystem call and may
-> increase the cpu hotplug time which is not worth. May be if cpuidle
-> framework exposes some API to enable/disable states then it is better.
-> 
-> For patch 1,2 and 3,
-> Acked-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+The kernel allows us to specify a function call-back which will be
+invoked when a system power-off request has been received. Here we
+provide one which is to be used when shutting down AB8500 based
+platforms.
 
-Hi Kukjin,
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/ab8500-sysctrl.c      |   22 ++++++++++++++++++++++
+ include/linux/mfd/abx500/ab8500.h |    2 ++
+ 2 files changed, 24 insertions(+)
 
-is it possible to take these patches [1-3/5] ?
-
-The patches [3-4/5] could be ignored.
-
-Thanks
-  -- Daniel
-
+diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+index c28d4eb..799fb5e 100644
+--- a/drivers/mfd/ab8500-sysctrl.c
++++ b/drivers/mfd/ab8500-sysctrl.c
+@@ -7,12 +7,29 @@
+ #include <linux/err.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
++#include <linux/pm.h>
++#include <linux/signal.h>
+ #include <linux/mfd/abx500.h>
+ #include <linux/mfd/abx500/ab8500.h>
+ #include <linux/mfd/abx500/ab8500-sysctrl.h>
+ 
+ static struct device *sysctrl_dev;
+ 
++void ab8500_power_off(void)
++{
++	sigset_t old;
++	sigset_t all;
++
++	sigfillset(&all);
++
++	if (!sigprocmask(SIG_BLOCK, &all, &old)) {
++		(void)ab8500_sysctrl_set(AB8500_STW4500CTRL1,
++					 AB8500_STW4500CTRL1_SWOFF |
++					 AB8500_STW4500CTRL1_SWRESET4500N);
++		(void)sigprocmask(SIG_SETMASK, &old, NULL);
++	}
++}
++
+ static inline bool valid_bank(u8 bank)
+ {
+ 	return ((bank == AB8500_SYS_CTRL1_BLOCK) ||
+@@ -51,7 +68,12 @@ int ab8500_sysctrl_write(u16 reg, u8 mask, u8 value)
+ 
+ static int __devinit ab8500_sysctrl_probe(struct platform_device *pdev)
+ {
++	struct ab8500_platform_data *plat;
++
+ 	sysctrl_dev = &pdev->dev;
++	plat = dev_get_platdata(pdev->dev.parent);
++	if (plat->pm_power_off)
++		pm_power_off = ab8500_power_off;
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
+index 1491044..96840c4 100644
+--- a/include/linux/mfd/abx500/ab8500.h
++++ b/include/linux/mfd/abx500/ab8500.h
+@@ -274,6 +274,7 @@ struct ab8500_codec_platform_data;
+ /**
+  * struct ab8500_platform_data - AB8500 platform data
+  * @irq_base: start of AB8500 IRQs, AB8500_NR_IRQS will be used
++ * @pm_power_off: Should machine pm power off hook be registered or not
+  * @init: board-specific initialization after detection of ab8500
+  * @num_regulator_reg_init: number of regulator init registers
+  * @regulator_reg_init: regulator init registers
+@@ -282,6 +283,7 @@ struct ab8500_codec_platform_data;
+  */
+ struct ab8500_platform_data {
+ 	int irq_base;
++	bool pm_power_off;
+ 	void (*init) (struct ab8500 *);
+ 	int num_regulator_reg_init;
+ 	struct ab8500_regulator_reg_init *regulator_reg_init;
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
