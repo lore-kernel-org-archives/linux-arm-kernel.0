@@ -1,210 +1,92 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 15 Jan 2013 01:19:16 -0500
-Subject: [V3 PATCH 23/25] usb: gadget: mv_udc: add device tree support
-In-Reply-To: <1358230758-10176-1-git-send-email-chao.xie@marvell.com>
-References: <1358230758-10176-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1358230758-10176-24-git-send-email-chao.xie@marvell.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 15 Jan 2013 11:53:14 +0530
+Subject: [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
+ exit/setup and CCI
+In-Reply-To: <20130114122547.GA21142@e102568-lin.cambridge.arm.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-16-git-send-email-nicolas.pitre@linaro.org>
+ <50F059A4.4010107@ti.com> <alpine.LFD.2.02.1301111425020.6300@xanadu.home>
+ <50F10EF4.9070909@ti.com>
+ <20130114122547.GA21142@e102568-lin.cambridge.arm.com>
+Message-ID: <50F4F5D2.5000706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In original driver, we have callbacks in platform data, and some
-dynamically allocations variables in platform data.
-Now, these blocks are removed, the device tree support is easier
-now.
+On Monday 14 January 2013 05:55 PM, Lorenzo Pieralisi wrote:
+> On Sat, Jan 12, 2013 at 07:21:24AM +0000, Santosh Shilimkar wrote:
+>> On Saturday 12 January 2013 12:58 AM, Nicolas Pitre wrote:
+>>> On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
+>>>
+>>>> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
+>>>>> From: Dave Martin <dave.martin@linaro.org>
+>>>>>
+>>>>> +		/*
+>>>>> +		 * Flush the local CPU cache.
+>>>>> +		 *
+>>>>> +		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
+>>>>> +		 * a preliminary flush here for those CPUs.  At least, that's
+>>>>> +		 * the theory -- without the extra flush, Linux explodes on
+>>>>> +		 * RTSM (maybe not needed anymore, to be investigated).
+>>>>> +		 */
+>>>> This is expected if the entire code is not in one stack frame and the
+>>>> additional flush is needed to avoid possible stack corruption. This
+>>>> issue has been discussed in past on the list.
+>>>
+>>> I missed that.  Do you have a reference or pointer handy?
+>>>
+>>> What is strange is that this is 100% reproducible on RTSM while this
+>>> apparently is not an issue on real hardware so far.
+>>>
+>> I tried searching archives and realized the discussion was in private
+>> email thread. There are some bits and pieces on list but not all the
+>> information.
+>>
+>> The main issue RMK pointed out is- An additional L1 flush needed
+>> to avoid the effective change of view of memory when the C bit is
+>> turned off, and the cache is no longer searched for local CPU accesses.
+>>
+>> In your case dcscb_power_down() has updated the stack which can be hit
+>> in cache line and hence cache is dirty now. Then cpu_proc_fin() clears
+>> the C-bit and hence for sub sequent calls the L1 cache won't be
+>> searched. You then call flush_cache_all() which again updates the
+>> stack but avoids searching the L1 cache. So it overwrites previous
+>> saved stack frame. This seems to be an issue in your case as well.
+>
+> On A15/A7 even with the C bit cleared the D-cache is searched, the
+> situation above cannot happen and if it does we are facing a HW/model bug.
+> If this code is run on A9 then we have a problem since there, when the C bit
+> is cleared D-cache is not searched (and that's why the sequence above
+> should be written in assembly with no data access whatsoever), but on
+> A15/A7 we do not.
+>
+Good point. May be model has modeled A9 and not A15 but in either
+case, lets be consistent for all ARMv7 machines at least to avoid
+people debugging similar issues. Many machines share code for ARMv7
+processors so the best things is to stick to the sequence which works
+across all ARMv7 processors.
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- drivers/usb/gadget/mv_udc.h      |    5 +-
- drivers/usb/gadget/mv_udc_core.c |  105 ++++++++++++++++++++++++++++++--------
- 2 files changed, 85 insertions(+), 25 deletions(-)
+> I have been running this code on TC2 for hours on end with nary a problem.
+>
+Thanks for the additional information.
 
-diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
-index 50ae7c7..de84722 100644
---- a/drivers/usb/gadget/mv_udc.h
-+++ b/drivers/usb/gadget/mv_udc.h
-@@ -179,6 +179,7 @@ struct mv_udc {
- 	int				irq;
- 
- 	unsigned int			extern_attr;
-+	unsigned int			mode;
- 	struct notifier_block		notifier;
- 
- 	struct mv_cap_regs __iomem	*cap_regs;
-@@ -222,11 +223,9 @@ struct mv_udc {
- 	struct mv_usb2_phy	*phy;
- 	struct usb_phy		*transceiver;
- 
--	struct mv_usb_platform_data     *pdata;
--
- 	/* some SOC has mutiple clock sources for USB*/
- 	unsigned int    clknum;
--	struct clk      *clk[0];
-+	struct clk      **clk;
- };
- 
- /* endpoint data structure */
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index 4b50334..edac3ef 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -34,6 +34,7 @@
- #include <linux/irq.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
-+#include <linux/of.h>
- #include <linux/platform_data/mv_usb.h>
- #include <linux/usb/mv_usb2.h>
- #include <asm/unaligned.h>
-@@ -2153,21 +2154,57 @@ static int mv_udc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int mv_udc_parse_dt(struct platform_device *pdev,
-+				struct mv_udc *udc)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	unsigned int clks_num;
-+	int i, ret;
-+	const char *clk_name;
-+
-+	if (!np)
-+		return 1;
-+
-+	clks_num = of_property_count_strings(np, "clocks");
-+	if (clks_num < 0)
-+		return clks_num;
-+
-+	udc->clk = devm_kzalloc(&pdev->dev,
-+		sizeof(struct clk *) * clks_num, GFP_KERNEL);
-+	if (udc->clk == NULL)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < clks_num; i++) {
-+		ret = of_property_read_string_index(np, "clocks", i,
-+			&clk_name);
-+		if (ret)
-+			return ret;
-+		udc->clk[i] = devm_clk_get(&pdev->dev, clk_name);
-+		if (IS_ERR(udc->clk[i]))
-+			return PTR_ERR(udc->clk[i]);
-+	}
-+
-+	udc->clknum = clks_num;
-+
-+	ret = of_property_read_u32(np, "extern_attr", &udc->extern_attr);
-+	if (ret)
-+		return ret;
-+
-+	ret = of_property_read_u32(np, "mode", &udc->mode);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
- static int mv_udc_probe(struct platform_device *pdev)
- {
--	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
- 	struct mv_udc *udc;
- 	int retval = 0;
--	int clk_i = 0;
- 	struct resource *r;
- 	size_t size;
- 
--	if (pdata == NULL) {
--		dev_err(&pdev->dev, "missing platform_data\n");
--		return -ENODEV;
--	}
--
--	size = sizeof(*udc) + sizeof(struct clk *) * pdata->clknum;
-+	size = sizeof(*udc);
- 	udc = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
- 	if (udc == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate memory for udc\n");
-@@ -2175,14 +2212,43 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	}
- 
- 	udc->done = &release_done;
--	udc->extern_attr = pdata->extern_attr;
--	udc->pdata = pdev->dev.platform_data;
- 	spin_lock_init(&udc->lock);
- 
- 	udc->dev = pdev;
- 
-+	retval = mv_udc_parse_dt(pdev, udc);
-+	if (retval > 0) {
-+		/* no CONFIG_OF */
-+		struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
-+		int clk_i = 0;
-+
-+		if (pdata == NULL) {
-+			dev_err(&pdev->dev, "missing platform_data\n");
-+			return -ENODEV;
-+		}
-+		udc->extern_attr = pdata->extern_attr;
-+		udc->mode = pdata->mode;
-+		udc->clknum = pdata->clknum;
-+
-+		size = sizeof(struct clk *) * udc->clknum;
-+		udc->clk = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
-+		if (udc->clk == NULL)
-+			return -ENOMEM;
-+		for (clk_i = 0; clk_i < udc->clknum; clk_i++) {
-+			udc->clk[clk_i] = devm_clk_get(&pdev->dev,
-+						pdata->clkname[clk_i]);
-+			if (IS_ERR(udc->clk[clk_i])) {
-+				retval = PTR_ERR(udc->clk[clk_i]);
-+				return retval;
-+			}
-+		}
-+	} else if (retval < 0) {
-+		dev_err(&pdev->dev, "error parse dt\n");
-+		return retval;
-+	}
-+
- #ifdef CONFIG_USB_OTG_UTILS
--	if (pdata->mode == MV_USB_MODE_OTG) {
-+	if (udc->mode == MV_USB_MODE_OTG) {
- 		udc->transceiver = devm_usb_get_phy(&pdev->dev,
- 					USB_PHY_TYPE_USB2);
- 		if (IS_ERR_OR_NULL(udc->transceiver)) {
-@@ -2191,17 +2257,6 @@ static int mv_udc_probe(struct platform_device *pdev)
- 		}
- 	}
- #endif
--
--	udc->clknum = pdata->clknum;
--	for (clk_i = 0; clk_i < udc->clknum; clk_i++) {
--		udc->clk[clk_i] = devm_clk_get(&pdev->dev,
--					pdata->clkname[clk_i]);
--		if (IS_ERR(udc->clk[clk_i])) {
--			retval = PTR_ERR(udc->clk[clk_i]);
--			return retval;
--		}
--	}
--
- 	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
-@@ -2466,6 +2521,11 @@ static void mv_udc_shutdown(struct platform_device *pdev)
- 	mv_udc_disable(udc);
- }
- 
-+static struct of_device_id mv_udc_dt_ids[] = {
-+	{ .compatible = "mrvl,mv-udc" },
-+};
-+MODULE_DEVICE_TABLE(of, mv_udc_dt_ids);
-+
- static struct platform_driver udc_driver = {
- 	.probe		= mv_udc_probe,
- 	.remove		= mv_udc_remove,
-@@ -2476,6 +2536,7 @@ static struct platform_driver udc_driver = {
- #ifdef CONFIG_PM
- 		.pm	= &mv_udc_pm_ops,
- #endif
-+		.of_match_table = mv_udc_dt_ids,
- 	},
- };
- 
--- 
-1.7.4.1
+> The sequence:
+>
+> - clear C bit
+> - clean D-cache
+> - exit SMP
+>
+> must be written in assembly with no data access whatsoever to make it
+> portable across v7 implementations. I think I will write some docs and
+> add them to the kernel to avoid further discussion on this topic.
+>
+Best thing is to update the ARM Architecture Reference Manual because
+thats is what most of the time gets referred by many OS vendors.
+
+> FYI, the thread Santosh mentioned:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/099791.html
+>
+Yes. This is one of the relevant thread. Thanks.
+
+Regards,
+Santosh
