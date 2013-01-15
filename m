@@ -1,35 +1,84 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 15 Jan 2013 06:54:30 -0300
-Subject: [PATCH 6/6] arm: mvebu: Update defconfig to select USB support
-In-Reply-To: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1358243670-11935-6-git-send-email-ezequiel.garcia@free-electrons.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 15 Jan 2013 18:02:49 +0800
+Subject: [PATCH v2] arch/arm/mach-s5pv210: adding ifdef CONFIG_CPU_S5PV210
+ to fix compiling issue
+In-Reply-To: <50EAC016.6090707@asianux.com>
+References: <50EA972E.3040404@asianux.com> <50EAC016.6090707@asianux.com>
+Message-ID: <50F52949.6010808@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Lior Amsalem <alior@marvell.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+Hello kgene.kim
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index c3c6326..f8d0183 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -42,7 +42,10 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB_SUPPORT=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_ROOT_HUB_TT=y
- CONFIG_MMC=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_RTC_CLASS=y
+  when you have free time, please give a glance for this patch.
+
+  I sent it according to script/get_maintainter.pl.
+  if I sent to an incorrect member, please tell me, thanks.
+
+
+  Regards
+
+gchen.
+
+
+? 2013?01?07? 20:31, Chen Gang ??:
+> 
+>   if not define CONFIG_CPU_S5PV210
+> 
+>     it will define NULL in common.h for:
+>       s5pv210_map_io, s5pv210_init_clocks, s5pv210_init, s5pv210_init_uarts
+> 
+>     so need using #ifdef CONFIG_CPU_S5PV210 for them too, in common.c.
+>       or compiling issue will occur.
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/mach-s5pv210/common.c |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-s5pv210/common.c
+> index 9dfe93e..5c88f88 100644
+> --- a/arch/arm/mach-s5pv210/common.c
+> +++ b/arch/arm/mach-s5pv210/common.c
+> @@ -167,6 +167,8 @@ void __init s5pv210_init_io(struct map_desc *mach_desc, int size)
+>  	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+>  }
+>  
+> +#ifdef CONFIG_CPU_S5PV210
+> +
+>  void __init s5pv210_map_io(void)
+>  {
+>  	/* initialise device information early */
+> @@ -209,6 +211,9 @@ void __init s5pv210_init_clocks(int xtal)
+>  	s5pv210_setup_clocks();
+>  }
+>  
+> +#endif /* CONFIG_CPU_S5PV210 */
+> +
+> +
+>  void __init s5pv210_init_irq(void)
+>  {
+>  	u32 vic[4];	/* S5PV210 supports 4 VIC */
+> @@ -227,6 +232,8 @@ struct bus_type s5pv210_subsys = {
+>  	.dev_name	= "s5pv210-core",
+>  };
+>  
+> +#ifdef CONFIG_CPU_S5PV210
+> +
+>  static struct device s5pv210_dev = {
+>  	.bus	= &s5pv210_subsys,
+>  };
+> @@ -249,3 +256,5 @@ void __init s5pv210_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+>  {
+>  	s3c24xx_init_uartdevs("s5pv210-uart", s5p_uart_resources, cfg, no);
+>  }
+> +
+> +#endif /* CONFIG_CPU_S5PV210 */
+> 
+
+
 -- 
-1.7.8.6
+Chen Gang
+
+Asianux Corporation
