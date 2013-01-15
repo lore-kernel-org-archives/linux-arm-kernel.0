@@ -1,43 +1,39 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 15 Jan 2013 09:01:49 +0530
-Subject: [PATCH] ARM: EXYNOS: Remove wrong I2S0 clock from peril clock
-In-Reply-To: <003501cd9d65$9611d060$c2357120$@samsung.com>
-References: <003501cd9d65$9611d060$c2357120$@samsung.com>
-Message-ID: <50F4CDA5.3090904@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 14 Jan 2013 19:56:52 -0800
+Subject: [GIT PULL] irqchip init infrastructure and GIC/VIC move
+In-Reply-To: <50F19F3D.60502@gmail.com>
+References: <50F19F3D.60502@gmail.com>
+Message-ID: <CAOesGMgrAdvRqrnanfRD1gvJ-4O6pT1n2ZR+TCZADjD1ED_+UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2012 04:09 PM, Sangsu Park wrote:
-> Remove I2S0 clock from peril since peril doesn't have I2S0 clock for EXYNOS4.
-> Audio Subsystem block has I2S0 clk.
-> 
-> Signed-off-by: sangsu <sangsu@sangsu-P560.(none)>
-> ---
->  arch/arm/mach-exynos/clock-exynos4.c |    5 -----
->  1 file changed, 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/clock-exynos4.c
-> b/arch/arm/mach-exynos/clock-exynos4.c
-> index 6a45c9a..fa8a134 100644
-> --- a/arch/arm/mach-exynos/clock-exynos4.c
-> +++ b/arch/arm/mach-exynos/clock-exynos4.c
-> @@ -613,11 +613,6 @@ static struct clk exynos4_init_clocks_off[] = {
->  		.ctrlbit	= (1 << 18),
->  	}, {
->  		.name		= "iis",
-> -		.devname	= "samsung-i2s.0",
-> -		.enable		= exynos4_clk_ip_peril_ctrl,
-> -		.ctrlbit	= (1 << 19),
-> -	}, {
-> -		.name		= "iis",
->  		.devname	= "samsung-i2s.1",
->  		.enable		= exynos4_clk_ip_peril_ctrl,
->  		.ctrlbit	= (1 << 20),
-> 
+On Sat, Jan 12, 2013 at 9:37 AM, Rob Herring <robherring2@gmail.com> wrote:
+> Arnd, Olof,
+>
+> Please pull for 3.9. This is the initial infrastructure and conversion
+> of the GIC and VIC to use it. Several people are waiting for the irqchip
+> infrastructure to go in in order to convert other irqchip code over.
+>
+> I've left "static asmlinkage" in on the irq handlers. There's been no
+> more discussion, so I think we are in agreement. If asmlinkage defines
+> the procedure call convention for assembly calls, then it still makes
+> sense to have it on a static function called thru a function pointer.
+>
+> Rob
+>
+> The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+>
+>   Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
+>
+> are available in the git repository at:
+>
+>   git://sources.calxeda.com/kernel/linux.git tags/gic-vic-to-irqchip
 
-After this clock has been removed, I2S0 registration fails on EXYNOS4
-based boards (clk_get for iis clock fails). The alternate clock from
-Audio subsystem block is missing.
+Ugh. This conflicts heavily with the timer cleanup from Stephen, due
+to adjacent changes in the machine descriptors.
 
--- 
-Tushar Behera
+I fixed them up, but I would appreciate a second glance at them for
+sanity checking.
+
+
+-Olof
