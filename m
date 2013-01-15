@@ -1,55 +1,59 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 15 Jan 2013 16:53:30 +0400
-Subject: [RFC PATCH 2/7] ARM: OMAP: devices: create device for usb part
- of control module
-In-Reply-To: <1358239378-10030-3-git-send-email-kishon@ti.com>
-References: <1358239378-10030-1-git-send-email-kishon@ti.com>
- <1358239378-10030-3-git-send-email-kishon@ti.com>
-Message-ID: <50F5514A.2040207@mvista.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 15 Jan 2013 13:56:19 +0100
+Subject: [PATCH 5/5] ARM: exynos: enable/disable cpuidle when cpu1 is
+ down/up
+In-Reply-To: <CADGdYn4eRbkZt_Rshqg-a_CoAmF5LBobzT3=3h09syaH0z6uJA@mail.gmail.com>
+References: <1357318799-24378-1-git-send-email-daniel.lezcano@linaro.org>
+ <1357318799-24378-5-git-send-email-daniel.lezcano@linaro.org>
+ <CADGdYn7y_SSmLoEpeRjL8PDSZS-YJwC1QpRcUocSSnDyM8BRhQ@mail.gmail.com>
+ <50EF3369.2060902@free.fr>
+ <CADGdYn4eRbkZt_Rshqg-a_CoAmF5LBobzT3=3h09syaH0z6uJA@mail.gmail.com>
+Message-ID: <50F551F3.2060400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 01/10/2013 11:33 PM, amit daniel kachhap wrote:
+> On Thu, Jan 10, 2013 at 1:32 PM, Daniel Lezcano <daniel.lezcano@free.fr> wrote:
+>> On 01/10/2013 09:07 PM, amit daniel kachhap wrote:
+>>> Hi Daniel,
+>>
+>> Hi Amit Daniel,
+>>
+>>> This hotplug noifiers looks fine. I suppose it should add extra state
+>>> C1 in cpu0. If it is done like below than for normal cases(when all
+>>> cpu's are online) there wont be any statistics for C0 state
+>>
+>> I guess you meant state 0 which is WFI, right ?
+>> C0 state is the intel semantic for cpu fully turned on.
+> Yes I meant C0 as wfi
+>>
+>>> also which
+>>> is required. Other patches look good.
+>>
+>> Ok, that makes sense to have statistics even if they are only doing WFI.
+>>
+>> Then the patch 4/5 is not ok, no ?
+> yes I suppose patch 4 and patch 5 are related and depends how you
+> frame patch 5. I think it is better to create C0/C1 sysfs and other
+> things in the beginning because it is a filesystem call and may
+> increase the cpu hotplug time which is not worth. May be if cpuidle
+> framework exposes some API to enable/disable states then it is better.
+> 
+> For patch 1,2 and 3,
+> Acked-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 
-On 15-01-2013 12:42, Kishon Vijay Abraham I wrote:
+Hi Kukjin,
 
-> A seperate driver has been added to handle the usb part of control
-> module. A device for the above driver is created here, using the register
-> address information to be used by the driver for powering on the PHY and
-> for writing to the mailbox.
+is it possible to take these patches [1-3/5] ?
 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->   arch/arm/mach-omap2/devices.c |   50 +++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 50 insertions(+)
+The patches [3-4/5] could be ignored.
 
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index 5e304d0..a761faf4 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-[...]
-> @@ -254,6 +255,54 @@ static inline void omap_init_camera(void)
->   #endif
->   }
->
-> +#if (defined(CONFIG_OMAP_CONTROL_USB) || \
-> +				defined(CONFIG_OMAP_CONTROL_USB_MODULE))
+Thanks
+  -- Daniel
 
-    () around || not needed, and you're indenting the second line too much.
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-> +static inline void __init omap_init_control_usb(void)
-> +{
-> +	int ret = 0;
-
-    Initializer not needed.
-
-> +
-> +	if (cpu_is_omap44xx()) {
-> +		ret = platform_device_register(&omap4_control_usb);
-> +		if (ret)
-> +			pr_err("Error registering omap_control_usb device: %d\n"
-> +			    , ret);
-
-    Please leave the comma on the previous line.
-
-WBR, Sergei
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
