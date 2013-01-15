@@ -1,47 +1,70 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 15 Jan 2013 12:55:40 +0000
-Subject: [PATCH 00/26] AB8500 MFD overhaul
-Message-ID: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 15 Jan 2013 12:55:42 +0000
+Subject: [PATCH 02/26] mfd: ab8500-sysctrl: If a charger is present,
+ reboot instead
+In-Reply-To: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
+References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1358254566-12419-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sam,
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
-So, "what the hell is this?" I hear you cry. Well, my team and
-I are in the mists of an delta upstreaming torrent. As I'm sure
-you've heard, ST-Ericsson's kernel delta is getting pretty big
-now. There have been some excellent, interesting changes and
-one way or another we need to sync them with Mainline. There is
-also a big push to update the internal kernel with Mainline
-changes too.
+If a changer is attached on power off, reboot the system
+into charging mode instead of powering it off.
 
-There are ~125 patches in drivers/mfd (lucky you) which are
-currently held as delta. I'm hoping to whittle them down a
-little, but whichever way you look at it, it's a lot of code.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Reviewed-by: Karl KOMIEROWSKI <karl.komierowski@stericsson.com>
+---
+ drivers/mfd/ab8500-sysctrl.c |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-I'd really appreciate it if you'd allow a little leniency with
-regards to this and subsequent patch-sets. Some of the earlier
-patches introduce some small issues which are ironed out in
-latter patches. Some issues will still exist and the end of the
-push, but I have every intention of fixing those once everything
-is in. Please feel free to make comments on any
-issues that you see, but instead of fixing them up right away,
-I'd rather make a list of them and address them at the end, if
-they're still present.
-
-Thanks in advance.
-
-Kind regards,
-Lee
-
- drivers/mfd/ab8500-core.c                 |   12 +-
- drivers/mfd/ab8500-debugfs.c              | 1247 +++++++++++++++++++++++++++--
- drivers/mfd/ab8500-gpadc.c                |   90 ++-
- drivers/mfd/ab8500-sysctrl.c              |   93 +++
- drivers/mfd/abx500-core.c                 |   16 +
- drivers/misc/ab8500-pwm.c                 |  282 +++++++
- include/linux/mfd/ab8500/pwmleds.h        |   20 +
- include/linux/mfd/abx500.h                |    2 +
- include/linux/mfd/abx500/ab8500-sysctrl.h |    5 +
- include/linux/mfd/abx500/ab8500.h         |   14 +
- 10 files changed, 1697 insertions(+), 84 deletions(-)
+diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+index 799fb5e..01b0669 100644
+--- a/drivers/mfd/ab8500-sysctrl.c
++++ b/drivers/mfd/ab8500-sysctrl.c
+@@ -8,7 +8,9 @@
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm.h>
++#include <linux/reboot.h>
+ #include <linux/signal.h>
++#include <linux/power_supply.h>
+ #include <linux/mfd/abx500.h>
+ #include <linux/mfd/abx500/ab8500.h>
+ #include <linux/mfd/abx500/ab8500-sysctrl.h>
+@@ -19,6 +21,31 @@ void ab8500_power_off(void)
+ {
+ 	sigset_t old;
+ 	sigset_t all;
++	static char *pss[] = {"ab8500_ac", "ab8500_usb"};
++	int i;
++
++	/*
++	 * If we have a charger connected and we're powering off,
++	 * reboot into charge-only mode.
++	 */
++
++	for (i = 0; i < ARRAY_SIZE(pss); i++) {
++		union power_supply_propval val;
++		struct power_supply *psy;
++		int ret;
++
++		psy = power_supply_get_by_name(pss[i]);
++		if (!psy)
++			continue;
++		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
++
++		if (!ret && val.intval) {
++			printk(KERN_INFO
++			       "Charger \"%s\" is connected. Rebooting.\n",
++			       pss[i]);
++			machine_restart(NULL);
++		}
++	}
+ 
+ 	sigfillset(&all);
+ 
+-- 
+1.7.9.5
