@@ -1,84 +1,25 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 15 Jan 2013 18:02:49 +0800
-Subject: [PATCH v2] arch/arm/mach-s5pv210: adding ifdef CONFIG_CPU_S5PV210
- to fix compiling issue
-In-Reply-To: <50EAC016.6090707@asianux.com>
-References: <50EA972E.3040404@asianux.com> <50EAC016.6090707@asianux.com>
-Message-ID: <50F52949.6010808@asianux.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 15 Jan 2013 12:03:26 +0200
+Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <50F51E43.2090605@ti.com>
+References: <1357863807-380-1-git-send-email-rtivy@ti.com>
+ <1357863807-380-7-git-send-email-rtivy@ti.com>
+ <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
+ <50F51E43.2090605@ti.com>
+Message-ID: <CAK=WgbbShpqxS7zrDs97HkjpyWq0xzW3b9KHLBBs_V3YzdJKiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello kgene.kim
+On Tue, Jan 15, 2013 at 11:15 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> Right, and platform data is not the way to achieve this.
 
-  when you have free time, please give a glance for this patch.
+How do you suggest to handle platforms with multiple different remote
+processors (driven by the same driver) ?
 
-  I sent it according to script/get_maintainter.pl.
-  if I sent to an incorrect member, please tell me, thanks.
+Requiring the user to indicate the fw name for each processor is
+somewhat error prone/cumbersome.
 
-
-  Regards
-
-gchen.
-
-
-? 2013?01?07? 20:31, Chen Gang ??:
-> 
->   if not define CONFIG_CPU_S5PV210
-> 
->     it will define NULL in common.h for:
->       s5pv210_map_io, s5pv210_init_clocks, s5pv210_init, s5pv210_init_uarts
-> 
->     so need using #ifdef CONFIG_CPU_S5PV210 for them too, in common.c.
->       or compiling issue will occur.
-> 
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm/mach-s5pv210/common.c |    9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-s5pv210/common.c
-> index 9dfe93e..5c88f88 100644
-> --- a/arch/arm/mach-s5pv210/common.c
-> +++ b/arch/arm/mach-s5pv210/common.c
-> @@ -167,6 +167,8 @@ void __init s5pv210_init_io(struct map_desc *mach_desc, int size)
->  	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
->  }
->  
-> +#ifdef CONFIG_CPU_S5PV210
-> +
->  void __init s5pv210_map_io(void)
->  {
->  	/* initialise device information early */
-> @@ -209,6 +211,9 @@ void __init s5pv210_init_clocks(int xtal)
->  	s5pv210_setup_clocks();
->  }
->  
-> +#endif /* CONFIG_CPU_S5PV210 */
-> +
-> +
->  void __init s5pv210_init_irq(void)
->  {
->  	u32 vic[4];	/* S5PV210 supports 4 VIC */
-> @@ -227,6 +232,8 @@ struct bus_type s5pv210_subsys = {
->  	.dev_name	= "s5pv210-core",
->  };
->  
-> +#ifdef CONFIG_CPU_S5PV210
-> +
->  static struct device s5pv210_dev = {
->  	.bus	= &s5pv210_subsys,
->  };
-> @@ -249,3 +256,5 @@ void __init s5pv210_init_uarts(struct s3c2410_uartcfg *cfg, int no)
->  {
->  	s3c24xx_init_uartdevs("s5pv210-uart", s5p_uart_resources, cfg, no);
->  }
-> +
-> +#endif /* CONFIG_CPU_S5PV210 */
-> 
-
-
--- 
-Chen Gang
-
-Asianux Corporation
+Thanks,
+Ohad.
