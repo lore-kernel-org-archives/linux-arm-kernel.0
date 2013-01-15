@@ -1,78 +1,88 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 15 Jan 2013 22:32:04 +0800
-Subject: [GIT PULL] arch_decomp_wdog() cleanup for 3.9
-Message-ID: <20130115143203.GC6574@S2101-09.ap.freescale.net>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Tue, 15 Jan 2013 09:32:29 -0500
+Subject: [PATCH v5 2/4] ARM: KVM: arch_timers: Add guest timer core support
+In-Reply-To: <50F53868.4060208@arm.com>
+References: <20130108184259.46758.17939.stgit@ubuntu>
+ <20130108184320.46758.56628.stgit@ubuntu>
+ <20130114151837.GC18935@mudshark.cambridge.arm.com>
+ <CANM98qJZH0q-TU942pA363g4h-CENUPiA=b5D0hJyBwrHQ0g7A@mail.gmail.com>
+ <50F53868.4060208@arm.com>
+Message-ID: <CANM98q+5hLwJ463ZxdN6WKMYSvU8BvGVy0=EcP8MGY4UTtEzkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
-
-  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/cleanup-decompwdog-3.9
-
-for you to fetch changes up to 1ff5f55a8c7b011f818434923a93afc48de0b2ee:
-
-  ARM: samsung: remove unused arch_decomp_wdog() code (2013-01-11 13:55:35 +0800)
-
-----------------------------------------------------------------
-The series cleans up ARCH_HAS_DECOMP_WDOG and arch_decomp_wdog which
-are unused on ARM architecure.  Samsung has some code setting up wdog
-in arch_decomp_wdog().  But since CONFIG_S3C_BOOT_WATCHDOG is defined
-nowhere, it will not run.  Otherwise, system can not boot at all when
-wdog is set up but no one pats it.
-
-----------------------------------------------------------------
-Shawn Guo (3):
-      ARM: decompress: remove unused ARCH_HAS_DECOMP_WDOG
-      ARM: remove unused arch_decomp_wdog()
-      ARM: samsung: remove unused arch_decomp_wdog() code
-
- arch/arm/boot/compressed/decompress.c              |    2 --
- arch/arm/mach-at91/include/mach/uncompress.h       |    2 --
- arch/arm/mach-bcm2835/include/mach/uncompress.h    |    1 -
- arch/arm/mach-clps711x/include/mach/uncompress.h   |    2 --
- arch/arm/mach-cns3xxx/include/mach/uncompress.h    |    1 -
- arch/arm/mach-davinci/include/mach/uncompress.h    |    1 -
- arch/arm/mach-dove/include/mach/uncompress.h       |    1 -
- arch/arm/mach-ebsa110/include/mach/uncompress.h    |    1 -
- arch/arm/mach-ep93xx/include/mach/uncompress.h     |    2 --
- arch/arm/mach-footbridge/include/mach/uncompress.h |    1 -
- arch/arm/mach-gemini/include/mach/uncompress.h     |    2 --
- arch/arm/mach-h720x/include/mach/uncompress.h      |    1 -
- arch/arm/mach-integrator/include/mach/uncompress.h |    2 --
- arch/arm/mach-iop13xx/include/mach/uncompress.h    |    1 -
- arch/arm/mach-iop32x/include/mach/uncompress.h     |    1 -
- arch/arm/mach-iop33x/include/mach/uncompress.h     |    1 -
- arch/arm/mach-ixp4xx/include/mach/uncompress.h     |    2 --
- arch/arm/mach-kirkwood/include/mach/uncompress.h   |    1 -
- arch/arm/mach-ks8695/include/mach/uncompress.h     |    1 -
- arch/arm/mach-lpc32xx/include/mach/uncompress.h    |    1 -
- arch/arm/mach-mmp/include/mach/uncompress.h        |    6 -----
- arch/arm/mach-msm/include/mach/uncompress.h        |    4 ---
- arch/arm/mach-mv78xx0/include/mach/uncompress.h    |    1 -
- arch/arm/mach-mxs/include/mach/uncompress.h        |    1 -
- arch/arm/mach-netx/include/mach/uncompress.h       |    1 -
- arch/arm/mach-nomadik/include/mach/uncompress.h    |    2 --
- arch/arm/mach-omap1/include/mach/uncompress.h      |    5 ----
- arch/arm/mach-omap2/include/mach/uncompress.h      |    5 ----
- arch/arm/mach-orion5x/include/mach/uncompress.h    |    1 -
- arch/arm/mach-prima2/include/mach/uncompress.h     |    2 --
- arch/arm/mach-pxa/include/mach/uncompress.h        |    5 ----
- arch/arm/mach-realview/include/mach/uncompress.h   |    1 -
- arch/arm/mach-rpc/include/mach/uncompress.h        |    5 ----
- arch/arm/mach-s5p64x0/include/mach/uncompress.h    |   28 --------------------
- arch/arm/mach-sa1100/include/mach/uncompress.h     |    1 -
- arch/arm/mach-shark/include/mach/uncompress.h      |    1 -
- arch/arm/mach-shmobile/include/mach/uncompress.h   |    2 --
- arch/arm/mach-tegra/include/mach/uncompress.h      |    4 ---
- arch/arm/mach-u300/include/mach/uncompress.h       |    1 -
- arch/arm/mach-ux500/include/mach/uncompress.h      |    2 --
- arch/arm/mach-versatile/include/mach/uncompress.h  |    1 -
- arch/arm/mach-vt8500/include/mach/uncompress.h     |    1 -
- arch/arm/mach-w90x900/include/mach/uncompress.h    |    2 --
- arch/arm/plat-samsung/include/plat/uncompress.h    |   28 --------------------
- arch/arm/plat-spear/include/plat/uncompress.h      |    1 -
- 45 files changed, 138 deletions(-)
+On Tue, Jan 15, 2013 at 6:07 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 14/01/13 19:19, Christoffer Dall wrote:
+>> On Mon, Jan 14, 2013 at 10:18 AM, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Tue, Jan 08, 2013 at 06:43:20PM +0000, Christoffer Dall wrote:
+>>>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>>>
+>>>> Add some the architected timer related infrastructure, and support timer
+>>>> interrupt injection, which can happen as a resultof three possible
+>>>> events:
+>>>>
+>>>> - The virtual timer interrupt has fired while we were still
+>>>>   executing the guest
+>>>> - The timer interrupt hasn't fired, but it expired while we
+>>>>   were doing the world switch
+>>>> - A hrtimer we programmed earlier has fired
+>>>
+>>> [...]
+>>>
+>>>> +void kvm_timer_sync_to_cpu(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>>>> +
+>>>> +       /*
+>>>> +        * We're about to run this vcpu again, so there is no need to
+>>>> +        * keep the background timer running, as we're about to
+>>>> +        * populate the CPU timer again.
+>>>> +        */
+>>>> +       timer_disarm(timer);
+>>>> +}
+>>>> +
+>>>> +void kvm_timer_sync_from_cpu(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>>>> +       cycle_t cval, now;
+>>>> +       u64 ns;
+>>>> +
+>>>> +       /* Check if the timer is enabled and unmasked first */
+>>>> +       if ((timer->cntv_ctl & 3) != 1)
+>>>> +               return;
+>>>> +
+>>>> +       cval = timer->cntv_cval;
+>>>> +       now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+>>>> +
+>>>> +       BUG_ON(timer_is_armed(timer));
+>>>> +
+>>>> +       if (cval <= now) {
+>>>> +               /*
+>>>> +                * Timer has already expired while we were not
+>>>> +                * looking. Inject the interrupt and carry on.
+>>>> +                */
+>>>> +               kvm_timer_inject_irq(vcpu);
+>>>> +               return;
+>>>> +       }
+>>>> +
+>>>> +       ns = cyclecounter_cyc2ns(timecounter->cc, cval - now);
+>>>> +       timer_arm(timer, ns);
+>>>> +}
+>>>
+>>> Please use flush/sync terminology to match the rest of arch/arm/.
+>>>
+>> ok, the following fixes this for both timers and the vgic:
+>>
+>> commit 1b68f39459dbc797f6766c103edf2c1053984161
+>> Author: Christoffer Dall <c.dall@virtualopensystems.com>
+>> Date:   Mon Jan 14 14:16:31 2013 -0500
+>>
+>>     KVM: ARM: vgic: use sync/flush terminology
+>>
+>>     Use sync/flush for saving state to/from CPUs to be consistent with
+>>     other uses in arch/arm.
+>
+> Sync and flush on their own are pretty inexpressive. Consider changing
+> it to {flush,sync}_hwstate, so we're consistent with what VFP does.
+>
+sure
