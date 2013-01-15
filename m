@@ -1,194 +1,49 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 15 Jan 2013 01:19:18 -0500
-Subject: [V3 PATCH 25/25] usb: ehci: ehci-mv: add device tree support
+Date: Tue, 15 Jan 2013 01:19:04 -0500
+Subject: [V3 PATCH 11/25] arm: mmp2: change the defintion of usb devices
 In-Reply-To: <1358230758-10176-1-git-send-email-chao.xie@marvell.com>
 References: <1358230758-10176-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1358230758-10176-26-git-send-email-chao.xie@marvell.com>
+Message-ID: <1358230758-10176-12-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All blocks are removed. Add the device tree support for ehci.
+add the udc/otg/ehci devices for mmp2
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/host/ehci-mv.c |  104 +++++++++++++++++++++++++++++++++-----------
- 1 files changed, 79 insertions(+), 25 deletions(-)
+ arch/arm/mach-mmp/include/mach/mmp2.h |    4 ++++
+ arch/arm/mach-mmp/mmp2.c              |    4 ++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 171e145..0e99dac 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
-+#include <linux/of.h>
- #include <linux/err.h>
- #include <linux/usb/otg.h>
- #include <linux/usb/mv_usb2.h>
-@@ -32,11 +33,9 @@ struct ehci_hcd_mv {
+diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h b/arch/arm/mach-mmp/include/mach/mmp2.h
+index c4ca4d1..58e96b0 100644
+--- a/arch/arm/mach-mmp/include/mach/mmp2.h
++++ b/arch/arm/mach-mmp/include/mach/mmp2.h
+@@ -31,6 +31,10 @@ extern struct pxa_device_desc mmp2_device_sdh2;
+ extern struct pxa_device_desc mmp2_device_sdh3;
+ extern struct pxa_device_desc mmp2_device_asram;
+ extern struct pxa_device_desc mmp2_device_isram;
++extern struct pxa_device_desc mmp2_device_u2o;
++extern struct pxa_device_desc mmp2_device_u2ootg;
++extern struct pxa_device_desc mmp2_device_u2oehci;
++extern struct pxa_device_desc mmp2_device_u2ophy;
  
- 	struct usb_phy *otg;
+ extern struct platform_device mmp2_device_gpio;
  
--	struct mv_usb_platform_data *pdata;
--
- 	/* clock source and total clock number */
- 	unsigned int clknum;
--	struct clk *clk[0];
-+	struct clk **clk;
- };
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index 3a3768c..73edbfc 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -153,6 +153,10 @@ MMP2_DEVICE(sdh3, "sdhci-pxav3", 3, MMC4, 0xd4281800, 0x120);
+ MMP2_DEVICE(asram, "asram", -1, NONE, 0xe0000000, 0x4000);
+ /* 0xd1000000 ~ 0xd101ffff is reserved for secure processor */
+ MMP2_DEVICE(isram, "isram", -1, NONE, 0xd1020000, 0x18000);
++MMP2_DEVICE(u2ophy, "mmp2-usb-phy", -1, NONE, 0xd4207000, 0x1ff);
++MMP2_DEVICE(u2o, "mv-udc", -1, USB_OTG, 0xd4208100, 0x1ff);
++MMP2_DEVICE(u2ootg, "mv-otg", -1, USB_OTG, 0xd4208100, 0x1ff);
++MMP2_DEVICE(u2oehci, "mv-ehci", -1, USB_OTG, 0xd4208100, 0x1ff);
  
- static void ehci_clock_enable(struct ehci_hcd_mv *ehci_mv)
-@@ -138,22 +137,55 @@ static const struct hc_driver mv_ehci_hc_driver = {
- 	.bus_resume = ehci_bus_resume,
- };
- 
-+static int __devinit mv_ehci_parse_dt(struct platform_device *pdev,
-+				struct ehci_hcd_mv *ehci_mv)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	unsigned int clks_num;
-+	int i, ret;
-+	const char *clk_name;
-+
-+	if (!np)
-+		return 1;
-+
-+	clks_num = of_property_count_strings(np, "clocks");
-+	if (clks_num < 0)
-+		return clks_num;
-+
-+	ehci_mv->clk = devm_kzalloc(&pdev->dev,
-+		sizeof(struct clk *) * clks_num, GFP_KERNEL);
-+	if (ehci_mv->clk == NULL)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < clks_num; i++) {
-+		ret = of_property_read_string_index(np, "clocks", i,
-+			&clk_name);
-+		if (ret)
-+			return ret;
-+		ehci_mv->clk[i] = clk_get(NULL, clk_name);
-+		if (IS_ERR(ehci_mv->clk[i]))
-+			return PTR_ERR(ehci_mv->clk[i]);
-+	}
-+
-+	ehci_mv->clknum = clks_num;
-+
-+	ret = of_property_read_u32(np, "mode", &ehci_mv->mode);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
- static int mv_ehci_probe(struct platform_device *pdev)
- {
--	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
- 	struct usb_hcd *hcd;
- 	struct ehci_hcd *ehci;
- 	struct ehci_hcd_mv *ehci_mv;
- 	struct resource *r;
--	int clk_i, retval = -ENODEV;
-+	int retval = -ENODEV;
- 	u32 offset;
- 	size_t size;
- 
--	if (!pdata) {
--		dev_err(&pdev->dev, "missing platform_data\n");
--		return -ENODEV;
--	}
--
- 	if (usb_disabled())
- 		return -ENODEV;
- 
-@@ -161,7 +193,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	if (!hcd)
- 		return -ENOMEM;
- 
--	size = sizeof(*ehci_mv) + sizeof(struct clk *) * pdata->clknum;
-+	size = sizeof(*ehci_mv);
- 	ehci_mv = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
- 	if (ehci_mv == NULL) {
- 		dev_err(&pdev->dev, "cannot allocate ehci_hcd_mv\n");
-@@ -170,19 +202,36 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, ehci_mv);
--	ehci_mv->pdata = pdata;
- 	ehci_mv->hcd = hcd;
- 
--	ehci_mv->clknum = pdata->clknum;
--	for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
--		ehci_mv->clk[clk_i] =
--		    devm_clk_get(&pdev->dev, pdata->clkname[clk_i]);
--		if (IS_ERR(ehci_mv->clk[clk_i])) {
--			dev_err(&pdev->dev, "error get clck \"%s\"\n",
--				pdata->clkname[clk_i]);
--			retval = PTR_ERR(ehci_mv->clk[clk_i]);
--			goto err_clear_drvdata;
-+	retval = mv_ehci_parse_dt(pdev, ehci_mv);
-+	if (retval > 0) {
-+		struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
-+		int clk_i = 0;
-+
-+		/* no CONFIG_OF */
-+		if (pdata == NULL) {
-+			dev_err(&pdev->dev, "missing platform_data\n");
-+			return -ENODEV;
-+		}
-+		ehci_mv->mode = pdata->mode;
-+		ehci_mv->clknum = pdata->clknum;
-+
-+		size = sizeof(struct clk *) * ehci_mv->clknum;
-+		ehci_mv->clk = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
-+		if (ehci_mv->clk == NULL)
-+			return -ENOMEM;
-+		for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
-+			ehci_mv->clk[clk_i] = devm_clk_get(&pdev->dev,
-+						pdata->clkname[clk_i]);
-+			if (IS_ERR(ehci_mv->clk[clk_i])) {
-+				retval = PTR_ERR(ehci_mv->clk[clk_i]);
-+				return retval;
-+			}
- 		}
-+	} else if (retval < 0) {
-+		dev_err(&pdev->dev, "error parse dt\n");
-+		return retval;
- 	}
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -230,7 +279,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	ehci = hcd_to_ehci(hcd);
- 	ehci->caps = (struct ehci_caps *) ehci_mv->cap_regs;
- 
--	ehci_mv->mode = pdata->mode;
- 	if (ehci_mv->mode == MV_USB_MODE_OTG) {
- #ifdef CONFIG_USB_OTG_UTILS
- 		ehci_mv->otg = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
-@@ -334,13 +382,19 @@ static void mv_ehci_shutdown(struct platform_device *pdev)
- 		hcd->driver->shutdown(hcd);
- }
- 
-+static struct of_device_id mv_ehci_dt_ids[] = {
-+	{ .compatible = "mrvl,mv-ehci" },
-+};
-+MODULE_DEVICE_TABLE(of, mv_ehci_dt_ids);
-+
- static struct platform_driver ehci_mv_driver = {
- 	.probe = mv_ehci_probe,
- 	.remove = mv_ehci_remove,
- 	.shutdown = mv_ehci_shutdown,
- 	.driver = {
--		   .name = "mv-ehci",
--		   .bus = &platform_bus_type,
--		   },
-+		.name = "mv-ehci",
-+		.bus = &platform_bus_type,
-+		.of_match_table = mv_ehci_dt_ids,
-+	},
- 	.id_table = ehci_id_table,
- };
+ struct resource mmp2_resource_gpio[] = {
+ 	{
 -- 
 1.7.4.1
