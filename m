@@ -1,38 +1,33 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 15 Jan 2013 06:54:26 -0300
-Subject: [PATCH 2/6] arm: mvebu: Enable USB controllers on Armada 370
- evaluation board
-In-Reply-To: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1358243670-11935-2-git-send-email-ezequiel.garcia@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 15 Jan 2013 11:19:26 +0100
+Subject: [PATCHv3 0/7] Add pinctrl driver for Allwinner A1X SoCs
+In-Reply-To: <1357681398-23956-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1357681398-23956-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <50F52D2E.205@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Lior Amsalem <alior@marvell.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-db.dts |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+Hi Linus,
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 8e66a7c..3d93902 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -74,5 +74,13 @@
- 			status = "disabled";
- 			/* No CD or WP GPIOs */
- 		};
-+
-+		usb at d0050000 {
-+			status = "okay";
-+		};
-+
-+		usb at d0051000 {
-+			status = "okay";
-+		};
- 	};
- };
+On 08/01/2013 22:43, Maxime Ripard wrote:
+> Hi everyone,
+> 
+> This patch set adds a pinctrl driver for the IP found in the Allwinner A10
+> and A13, and the SoC-specific bits for the A13. It also adds the documentation
+> for the device tree bindings.
+> 
+> This patch set has been tested on a Olimex A13-Olinuxino.
+> 
+> Thanks,
+> Maxime
+
+Are you ok with this version or do you have additionnal comments ?
+
+Thanks,
+Maxime
+
 -- 
-1.7.8.6
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
