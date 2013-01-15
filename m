@@ -1,42 +1,37 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 15 Jan 2013 19:20:56 +0530
-Subject: [PATCH v2 3/5] ARM: dts: AM33XX: Add am335x-evm lcdc pincontrol info
+Date: Tue, 15 Jan 2013 19:21:10 +0530
+Subject: [PATCH v2 5/5] ARM: dts: AM33XX: Add am335x-evmsk lcdc pincontrol info
 In-Reply-To: <cover.1358252955.git.afzal@ti.com>
 References: <cover.1358252955.git.afzal@ti.com>
-Message-ID: <9294624b48887e118e2a421abc7ba7224e4a45fb.1358252955.git.afzal@ti.com>
+Message-ID: <b107ecb6ed8a1cb8650cf771499bf011b0d3074e.1358252955.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Manjunathappa, Prakash" <prakash.pm@ti.com>
+Update pin mux information for lcd panel on AM335X-EVMSK.
 
-Update pin mux information for lcd panel on AM335X-EVM
-
-[afzal at ti.com: comment specifying user understandable pinmux details]
-
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
 
-v2: correct authorship, add comment on pinmux
+v2: add comment on pinmux entries
 
- arch/arm/boot/dts/am335x-evm.dts |   35 ++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/am335x-evmsk.dts |   35 ++++++++++++++++++++++++++++++++++-
  1 file changed, 34 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index a4229aa..0527885 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -26,7 +26,7 @@
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index a7e017b..24dde1d 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -32,7 +32,7 @@
  
  	am33xx_pinmux: pinmux at 44e10800 {
  		pinctrl-names = "default";
--		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0>;
-+		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0 &lcd_pins_s0>;
+-		pinctrl-0 = <&user_leds_s0 &gpio_keys_s0>;
++		pinctrl-0 = <&user_leds_s0 &gpio_keys_s0 &lcd_pins_s0>;
  
- 		matrix_keypad_s0: matrix_keypad_s0 {
+ 		user_leds_s0: user_leds_s0 {
  			pinctrl-single,pins = <
-@@ -44,6 +44,39 @@
- 				0x154 0x27	/* spi0_d0.gpio0_3, INPUT | MODE7 */
+@@ -51,6 +51,39 @@
+ 				0x9c 0x27	/* gpmc_ben0_cle.gpio2_5, INPUT | MODE7 */
  			>;
  		};
 +
