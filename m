@@ -1,66 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 15 Jan 2013 09:49:33 +0900
-Subject: [PATCH 3/5] ARM: mach-shmobile: kzm9g: defconfig update
+Date: Tue, 15 Jan 2013 09:49:35 +0900
+Subject: [PATCH 5/5] ARM: mach-shmobile: kzm9d: update defconfig
 In-Reply-To: <1358210975-26970-1-git-send-email-horms+renesas@verge.net.au>
 References: <1358210975-26970-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1358210975-26970-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1358210975-26970-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Enable ARM_APPENDED_DTB
+* Do not disable SUSPEND
 
-  Typically the bootloader of a kzm9g board does not support DT
-  so this option is useful.
+  Suspend seems to work fine on the kzm9d.
 
-* Use voltage regulators by default
+  This is part of an effort reduce differences between mach-shmobile
+  defconfigs with a view to using a common defconfig.
 
-* Move command line to dts
+* Enable PM_RUNTIME
+
+  This also seems to work fine on the kzm9d.
+
+  This is part of an effort reduce differences between mach-shmobile
+  defconfigs with a view to using a common defconfig.
+
+* Move kernel command line from defconfig to dts.
 
   This brings us one small step closer to sharing defconfig
-  between kzm9g and other boards
+  between kzm9d and other boards.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g.dts |    4 ++++
- arch/arm/configs/kzm9g_defconfig   |    4 +++-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/emev2-kzm9d.dts |    2 +-
+ arch/arm/configs/kzm9d_defconfig  |    4 +---
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-index bcb9119..9a43879 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-@@ -15,6 +15,10 @@
- 	model = "KZM-A9-GT";
- 	compatible = "renesas,kzm9g", "renesas,sh73a0";
+diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+index 297e3ba..b9b3241 100644
+--- a/arch/arm/boot/dts/emev2-kzm9d.dts
++++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+@@ -21,6 +21,6 @@
+ 	};
  
-+	chosen {
-+		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200";
-+	};
-+
- 	memory {
- 		device_type = "memory";
- 		reg = <0x41000000 0x1e800000>;
-diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-index afbae28..670c3b6 100644
---- a/arch/arm/configs/kzm9g_defconfig
-+++ b/arch/arm/configs/kzm9g_defconfig
-@@ -39,7 +39,7 @@ CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
+ 	chosen {
+-		bootargs = "console=ttyS1,115200n81";
++		bootargs = "console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096";
+ 	};
+ };
+diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
+index 8c49df6..6c37f4a 100644
+--- a/arch/arm/configs/kzm9d_defconfig
++++ b/arch/arm/configs/kzm9d_defconfig
+@@ -32,11 +32,9 @@ CONFIG_FORCE_MAX_ZONEORDER=13
  CONFIG_ZBOOT_ROM_TEXT=0x0
  CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200"
-+CONFIG_ARM_APPENDED_DTB=y
- CONFIG_KEXEC=y
+ CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_CMDLINE="console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096"
+-CONFIG_CMDLINE_FORCE=y
  CONFIG_VFP=y
- CONFIG_NEON=y
-@@ -85,6 +85,8 @@ CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_SH_MOBILE=y
- CONFIG_GPIO_PCF857X=y
- # CONFIG_HWMON is not set
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_DUMMY=y
- CONFIG_FB=y
- CONFIG_FB_SH_MOBILE_LCDC=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-# CONFIG_SUSPEND is not set
++CONFIG_PM_RUNTIME=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
 -- 
 1.7.10.4
