@@ -1,54 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 15 Jan 2013 22:53:57 +0800
-Subject: [PATCH v3 1/2] cpufreq: add imx6q-cpufreq driver
-In-Reply-To: <50F427A7.7000203@boundarydevices.com>
-References: <1358175733-13475-1-git-send-email-shawn.guo@linaro.org>
- <1358175733-13475-2-git-send-email-shawn.guo@linaro.org>
- <50F427A7.7000203@boundarydevices.com>
-Message-ID: <20130115145356.GD6574@S2101-09.ap.freescale.net>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Tue, 15 Jan 2013 16:55:50 +0200
+Subject: [PATCH v2] mtd: vt8500: Add support for Wondermedia Serial
+ Flash Controller
+In-Reply-To: <1356901207-13536-1-git-send-email-linux@prisktech.co.nz>
+References: <1356901207-13536-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1358261750.2731.148.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Mon, 2012-12-31 at 10:00 +1300, Tony Prisk wrote:
+> This patch adds support for the Wondermedia serial flash controller
+> found on WM8505, WM8650 and WM8850 SoCs.
+> 
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+> v2: Whitespace tidyup
 
-On Mon, Jan 14, 2013 at 08:43:35AM -0700, Eric Nelson wrote:
-> >+	/* scaling up?  scale voltage before frequency */
-> >+	if (freqs.new > freqs.old) {
-> >+		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
-> >+		if (ret) {
-> >+			dev_err(cpu_dev, "failed to scale voltage up: %d\n", ret);
-> >+			return ret;
-> >+		}
-> >+
-> >+		/*
-> >+		 * Need to increase vddpu and vddsoc for safety
-> >+		 * if we are about to run at 1.2 GHz.
-> >+		 */
-> >+		if (freqs.new == FREQ_1P2_GHZ / 1000) {
-> >+			regulator_set_voltage_tol(pu_reg,
-> >+					PU_SOC_VOLTAGE_HIGH, 0);
-> >+			regulator_set_voltage_tol(soc_reg,
-> >+					PU_SOC_VOLTAGE_HIGH, 0);
-> >+		}
-> 
-> I believe you need a delay here to let the LDOs ramp before changing
-> the CPU frequency.
-> 
-> According to the i.MX6Q reference manual, with the factory default
-> step times in PMU_MISC2 and the maximum voltage swing is
-> 	1.25V (1.2GHz) - 0.95V (400MHz) == 0.325V
-> 
-> or 13 steps at 25mV.
-> 
-> The default step time is 0.000021333s (512 clocks at 24MHz), so
-> the worst case delay needed is ~280uS.
-> 
-> This could also be done in the regulator driver, but that may
-> require multiple delays if multiple rails are changed.
-> 
-I initially thought that regulator driver should take care of it.  But
-now I agree with you that we can do it here for the least latency.
+Hi, would you please take a look at these warings, identified by aiaiai:
 
-Will roll it into v4.  Thanks.
+Successfully built configuration "x86_64_defconfig,x86_64,", results:
 
-Shawn
+--- before_patching.log
++++ after_patching.log
+@@ @@
++drivers/mtd/devices/wmt_sflash.c: In function ?sf_read?:
++drivers/mtd/devices/wmt_sflash.c:425:9: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat]
++drivers/mtd/devices/wmt_sflash.c: In function ?sf_sector_write?:
++drivers/mtd/devices/wmt_sflash.c:442:16: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
++drivers/mtd/devices/wmt_sflash.c:442:24: warning: cast removes address space of expression [sparse]
++drivers/mtd/devices/wmt_sflash.c:458:16: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
++drivers/mtd/devices/wmt_sflash.c:458:31: warning: incorrect type in argument 1 (different address spaces) [sparse]
++drivers/mtd/devices/wmt_sflash.c:458:31:    expected void volatile [noderef] <asn:2>*dst [sparse]
++drivers/mtd/devices/wmt_sflash.c:458:31:    got unsigned char [usertype] *<noident> [sparse]
++drivers/mtd/devices/wmt_sflash.c:465:17: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
++drivers/mtd/devices/wmt_sflash.c:465:39: warning: incorrect type in argument 1 (different address spaces) [sparse]
++drivers/mtd/devices/wmt_sflash.c:465:39:    expected void volatile [noderef] <asn:2>*dst [sparse]
++drivers/mtd/devices/wmt_sflash.c:465:39:    got unsigned char [usertype] *<noident> [sparse]
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130115/b6b91162/attachment.sig>
