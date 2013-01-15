@@ -1,81 +1,121 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 15 Jan 2013 18:20:59 +0000
-Subject: [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
- exit/setup and CCI
-In-Reply-To: <50F4F5D2.5000706@ti.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-16-git-send-email-nicolas.pitre@linaro.org>
- <50F059A4.4010107@ti.com>
- <alpine.LFD.2.02.1301111425020.6300@xanadu.home>
- <50F10EF4.9070909@ti.com>
- <20130114122547.GA21142@e102568-lin.cambridge.arm.com>
- <50F4F5D2.5000706@ti.com>
-Message-ID: <20130115182059.GB1983@linaro.org>
+From: dinggnu@gmail.com (Cong Ding)
+Date: Tue, 15 Jan 2013 19:26:33 +0100
+Subject: [PATCH v2] clk: mvebu/clk-cpu.c: fix memory leakage
+In-Reply-To: <50F584F5.6030007@free-electrons.com>
+References: <1358183892-28928-1-git-send-email-dinggnu@gmail.com>
+ <50F563EC.3030804@free-electrons.com>
+ <20130115152307.GA25615@gmail.com>
+ <20130115153716.GF13433@titan.lakedaemon.net>
+ <50F584F5.6030007@free-electrons.com>
+Message-ID: <20130115182629.GB7211@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 11:53:14AM +0530, Santosh Shilimkar wrote:
-> On Monday 14 January 2013 05:55 PM, Lorenzo Pieralisi wrote:
-> >On Sat, Jan 12, 2013 at 07:21:24AM +0000, Santosh Shilimkar wrote:
-> >>On Saturday 12 January 2013 12:58 AM, Nicolas Pitre wrote:
-> >>>On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
-> >>>
-> >>>>On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
-> >>>>>From: Dave Martin <dave.martin@linaro.org>
-> >>>>>
-> >>>>>+		/*
-> >>>>>+		 * Flush the local CPU cache.
-> >>>>>+		 *
-> >>>>>+		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
-> >>>>>+		 * a preliminary flush here for those CPUs.  At least, that's
-> >>>>>+		 * the theory -- without the extra flush, Linux explodes on
-> >>>>>+		 * RTSM (maybe not needed anymore, to be investigated).
-> >>>>>+		 */
-> >>>>This is expected if the entire code is not in one stack frame and the
-> >>>>additional flush is needed to avoid possible stack corruption. This
-> >>>>issue has been discussed in past on the list.
-> >>>
-> >>>I missed that.  Do you have a reference or pointer handy?
-> >>>
-> >>>What is strange is that this is 100% reproducible on RTSM while this
-> >>>apparently is not an issue on real hardware so far.
-> >>>
-> >>I tried searching archives and realized the discussion was in private
-> >>email thread. There are some bits and pieces on list but not all the
-> >>information.
+On Tue, Jan 15, 2013 at 05:33:57PM +0100, Gregory CLEMENT wrote:
+> On 01/15/2013 04:37 PM, Jason Cooper wrote:
+> > Mike,
+> > 
+> > On Tue, Jan 15, 2013 at 03:23:08PM +0000, Cong Ding wrote:
+> >> From 75c73077905b822be6e8a32a09d6b0cdb5e61763 Mon Sep 17 00:00:00 2001
+> >> From: Cong Ding <dinggnu@gmail.com>
+> >> Date: Mon, 14 Jan 2013 18:06:26 +0100
+> >> Subject: [PATCH v2] clk: mvebu/clk-cpu.c: fix memory leakage
 > >>
-> >>The main issue RMK pointed out is- An additional L1 flush needed
-> >>to avoid the effective change of view of memory when the C bit is
-> >>turned off, and the cache is no longer searched for local CPU accesses.
+> >> the variable cpuclk and clk_name should be properly freed when error happens.
 > >>
-> >>In your case dcscb_power_down() has updated the stack which can be hit
-> >>in cache line and hence cache is dirty now. Then cpu_proc_fin() clears
-> >>the C-bit and hence for sub sequent calls the L1 cache won't be
-> >>searched. You then call flush_cache_all() which again updates the
-> >>stack but avoids searching the L1 cache. So it overwrites previous
-> >>saved stack frame. This seems to be an issue in your case as well.
-> >
-> >On A15/A7 even with the C bit cleared the D-cache is searched, the
-> >situation above cannot happen and if it does we are facing a HW/model bug.
-> >If this code is run on A9 then we have a problem since there, when the C bit
-> >is cleared D-cache is not searched (and that's why the sequence above
-> >should be written in assembly with no data access whatsoever), but on
-> >A15/A7 we do not.
-> >
-> Good point. May be model has modeled A9 and not A15 but in either
-> case, lets be consistent for all ARMv7 machines at least to avoid
-> people debugging similar issues. Many machines share code for ARMv7
-> processors so the best things is to stick to the sequence which works
-> across all ARMv7 processors.
+> >> Signed-off-by: Cong Ding <dinggnu@gmail.com>
+> >> ---
+> >>  drivers/clk/mvebu/clk-cpu.c |   15 ++++++++++-----
+> >>  1 file changed, 10 insertions(+), 5 deletions(-)
+> > 
+> > 
+> > Do you want to take this fix through the clock tree?  If so,
+> > 
+> > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > 
+> 
+> I also think it should go through the clock tree but before this
+> I'd like we fix the last issue.
+> 
+> Cong Ding,
+> 
+> you didn't take in account the case when the allocation of the 1st clocks
+> when the 2nd cpu clock failed. In this case there is still a memory leak with
+> the clock_name of the first cpu clock. See below for my proposal:
+> 
+> > Otherwise, just let me know.
+> > 
+> > thx,
+> > 
+> > Jason.
+> > 
+> >> diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
+> >> index ff004578..1066a43 100644
+> >> --- a/drivers/clk/mvebu/clk-cpu.c
+> >> +++ b/drivers/clk/mvebu/clk-cpu.c
+> >> @@ -124,7 +124,7 @@ void __init of_cpu_clk_setup(struct device_node *node)
+> >>  
+> >>  	clks = kzalloc(ncpus * sizeof(*clks), GFP_KERNEL);
+> >>  	if (WARN_ON(!clks))
+> >> -		return;
+> >> +		goto clks_out;
+> >>  
+> >>  	for_each_node_by_type(dn, "cpu") {
+> >>  		struct clk_init_data init;
+> >> @@ -134,11 +134,13 @@ void __init of_cpu_clk_setup(struct device_node *node)
+> >>  		int cpu, err;
+> >>  
+> >>  		if (WARN_ON(!clk_name))
+> >> -			return;
+> >> +			goto bail_out;
+> >>  
+> >>  		err = of_property_read_u32(dn, "reg", &cpu);
+> >> -		if (WARN_ON(err))
+> >> -			return;
+> >> +		if (WARN_ON(err)) {
+> 
+> >> +			kfree(clk_name);
+> we can free it later
+> 
+> >> +			goto bail_out;
+> >> +		}
+> >>  
+> >>  		sprintf(clk_name, "cpu%d", cpu);
+> >>  		parent_clk = of_clk_get(node, 0);
+> >> @@ -156,8 +158,10 @@ void __init of_cpu_clk_setup(struct device_node *node)
+> >>  		init.num_parents = 1;
+> >>  
+> >>  		clk = clk_register(NULL, &cpuclk[cpu].hw);
+> >> -		if (WARN_ON(IS_ERR(clk)))
+> >> +		if (WARN_ON(IS_ERR(clk))) {
+> 
+> >> +			kfree(clk_name);
+> we can free it later
+> 
+> >>  			goto bail_out;
+> >> +		}
+> >>  		clks[cpu] = clk;
+> >>  	}
+> >>  	clk_data.clk_num = MAX_CPU;
+> >> @@ -167,6 +171,7 @@ void __init of_cpu_clk_setup(struct device_node *node)
+> >>  	return;
+> >>  bail_out:
+> >>  	kfree(clks);
+> >> +clks_out:
+> 
+> as cpuclk is allocated with all its member set to 0, and kfree(0) is a valid call.
+> We can add the following lines:
+> while(ncpus--)
+> 	kfree(cpuclk[ncpus].clk_name);
+> 
+> >>  	kfree(cpuclk);
+> >>  }
+I agree the version 2 patch still includes memory leakage in terms of clk_name,
+but I am wondering whether it is safe to call kfree(cpuclk[ncpus].clkname)
+directly or not. It's true that kfree(0) is valid, but cpuclk[ncpus].clkname
+might not be 0 when it is allocated by kzalloc. kzalloc just allocates the
+memory while doesn't ensure the initial value in this memory area is 0. So I
+am thinking we should call memset after the alloction or use a counter to
+remember the number of clk_names allocated?
 
-Is it sufficient to clarify the comment to indicate that the code is
-not directly reusable for other CPU combinations?
-
-DCSCB is incredibly platform-specific, and we would not expect to
-see it in other platforms.
-
-Or do we consider the risk of people copying this code verbatim
-(including the "do not copy this code" comment) too high?
-
-Cheers
----Dave
+- cong
