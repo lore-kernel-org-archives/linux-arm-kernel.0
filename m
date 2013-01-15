@@ -1,25 +1,101 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Jan 2013 14:46:53 +0000
-Subject: [RFC PATCH 1/7] drivers: usb: phy: add a new driver for usb part
- of control module
-In-Reply-To: <50F56697.9060803@ti.com>
-References: <1358239378-10030-1-git-send-email-kishon@ti.com>
- <201301151336.47546.arnd@arndb.de> <50F56697.9060803@ti.com>
-Message-ID: <201301151446.53206.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Jan 2013 14:48:27 +0000
+Subject: [PATCH v5 13/14] KVM: ARM: Handle I/O aborts
+In-Reply-To: <20130115142747.GP11529@redhat.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108184005.46302.38495.stgit@ubuntu> <20130115131855.GL11529@redhat.com>
+ <50F559C4.8080900@arm.com> <20130115133455.GN11529@redhat.com>
+ <50F55D9C.8070007@arm.com> <20130115142747.GP11529@redhat.com>
+Message-ID: <50F56C3B.6040308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 January 2013, kishon wrote:
-> Good point :-). Currently, none of the OMAP platforms have multiple 
-> control modules and it doesn't seem to be in the future (AFAIK). While 
-> it might be simpler to support multiple control devices with phandle, it 
-> might face the same complications as faced by the USB PHY framework for 
-> non-dt boot.
-> 
+On 15/01/13 14:27, Gleb Natapov wrote:
+> On Tue, Jan 15, 2013 at 01:46:04PM +0000, Marc Zyngier wrote:
+>> On 15/01/13 13:34, Gleb Natapov wrote:
+>>> On Tue, Jan 15, 2013 at 01:29:40PM +0000, Marc Zyngier wrote:
+>>>> On 15/01/13 13:18, Gleb Natapov wrote:
+>>>>> On Tue, Jan 08, 2013 at 01:40:05PM -0500, Christoffer Dall wrote:
+>>>>>> When the guest accesses I/O memory this will create data abort
+>>>>>> exceptions and they are handled by decoding the HSR information
+>>>>>> (physical address, read/write, length, register) and forwarding reads
+>>>>>> and writes to QEMU which performs the device emulation.
+>>>>>>
+>>>>>> Certain classes of load/store operations do not support the syndrome
+>>>>>> information provided in the HSR and we therefore must be able to fetch
+>>>>>> the offending instruction from guest memory and decode it manually.
+>>>>>>
+>>>>>> We only support instruction decoding for valid reasonable MMIO operations
+>>>>>> where trapping them do not provide sufficient information in the HSR (no
+>>>>>> 16-bit Thumb instructions provide register writeback that we care about).
+>>>>>>
+>>>>>> The following instruction types are NOT supported for MMIO operations
+>>>>>> despite the HSR not containing decode info:
+>>>>>>  - any Load/Store multiple
+>>>>>>  - any load/store exclusive
+>>>>>>  - any load/store dual
+>>>>>>  - anything with the PC as the dest register
+>>>>>>
+>>>>>> This requires changing the general flow somewhat since new calls to run
+>>>>>> the VCPU must check if there's a pending MMIO load and perform the write
+>>>>>> after userspace has made the data available.
+>>>>>>
+>>>>>> Rusty Russell fixed a horrible race pointed out by Ben Herrenschmidt:
+>>>>>> (1) Guest complicated mmio instruction traps.
+>>>>>> (2) The hardware doesn't tell us enough, so we need to read the actual
+>>>>>>     instruction which was being exectuted.
+>>>>>> (3) KVM maps the instruction virtual address to a physical address.
+>>>>>> (4) The guest (SMP) swaps out that page, and fills it with something else.
+>>>>>> (5) We read the physical address, but now that's the wrong thing.
+>>>>> How can this happen?! The guest cannot reuse physical page before it
+>>>>> flushes it from all vcpus tlb cache. For that it needs to send
+>>>>> synchronous IPI to all vcpus and IPI will not be processed by a vcpu
+>>>>> while it does emulation.
+>>>>
+>>>> I don't know how this works on x86, but a KVM/ARM guest can definitely
+>>>> handle an IPI.
+>>>>
+>>> How can a vcpu handle an IPI while it is not in a guest mode?
+>>
+>> I think there is some misunderstanding. A guest IPI is of course handled
+>> while running the guest. You completely lost me here.
+> You need IPI from one guest vcpu to another to invalidate its TLB on
+> x86. That prevents the race from happening there.
 
-Maybe you can put the phandle into the binding then but don't use it
-until hardware actually requires it. If anything needs it, then we
-can always change the code later, but it's harder to change the
-binding.
+We don't need this on ARM (starting with v7, v6 is an entirely different
+story, and we do not support KVM on v6).
 
-	Arnd
+The TLB is propagated by the HW using the following (pseudocode) sequence:
+	tlb_invalidate VA
+	barrier
+
+Leaving the barrier guaranties that all TLB invalidations have been
+propagated.
+
+>>
+>>>> Furthermore, TLB invalidation doesn't require an IPI on ARMv7 (unless
+>>>> we're doing some set/way operation which is handled separately).
+>>>>
+>>> What prevents a page to be swapped out while code is fetched from it?
+>>
+>> Why would you prevent it? TLB invalidation is broadcast by the HW. If
+>> you swap a page out, you flag the entry as invalid and invalidate the
+>> corresponding TLB. If you hit it, you swap the page back in.
+>>
+> There is no IPI (or anything that requires response from cpu whose TLB
+> is invalidated) involved in invalidating remote TLB?
+
+No. The above sequence is all you have to do.
+
+This is why the above race is a bit hairy. A vcpu will happily
+invalidate TLBs, but as the faulting vcpu already performed the
+translation, we're screwed.
+
+Thankfully, this is a case that only matters when we have to emulate an
+MMIO operation that is not automatically decoded by the HW. They are
+rare (the Linux kernel doesn't use them). In this case, we stop the
+world (IPI).
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
