@@ -1,37 +1,148 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 15 Jan 2013 16:41:53 +0530
-Subject: [PATCH V2 3/3] ARM: davinci: da850: add NAND driver entries
-In-Reply-To: <F3DBB1B3EF102E4994C89758CFCA32412B96F9@DBDE01.ent.ti.com>
-References: <1357633220-29827-1-git-send-email-anilkumar.v@ti.com>
- <1357633220-29827-4-git-send-email-anilkumar.v@ti.com>
- <50ED66F2.8050006@ti.com>
- <F3DBB1B3EF102E4994C89758CFCA32412B80CA@DBDE01.ent.ti.com>
- <50EEB1C1.9060306@ti.com>
- <F3DBB1B3EF102E4994C89758CFCA32412B96F9@DBDE01.ent.ti.com>
-Message-ID: <50F53979.4050509@ti.com>
+From: achin.gupta@arm.com (Achin Gupta)
+Date: Tue, 15 Jan 2013 11:18:44 +0000
+Subject: [PATCH 06/16] ARM: b.L: generic SMP secondary bringup and hotplug
+ support
+In-Reply-To: <50F4F807.3010806@ti.com>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-7-git-send-email-nicolas.pitre@linaro.org>
+ <50F053BF.8090302@ti.com>
+ <CAMpgmWCxQMoncnMqy_bzB+mBU7eGO_L4fR+Q5uMaxdFn4mL5PA@mail.gmail.com>
+ <50F4F807.3010806@ti.com>
+Message-ID: <CAMpgmWCzCxwenDs7XPh7D+shEJcj_ObWcUGZG-xMtd15XL-3Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/15/2013 4:06 PM, Kumar, Anil wrote:
-> On Thu, Jan 10, 2013 at 17:49:13, Nori, Sekhar wrote:
->> On 1/10/2013 1:07 PM, Kumar, Anil wrote:
->>> On Wed, Jan 09, 2013 at 18:17:46, Nori, Sekhar wrote:
->>
->>> I do not think that it is good idea to move NAND pin mux information
->>> into da850.dtsi because this information is evm specific.
->>> if we will use this approach then we must use the same approach for
->>> other modules also as ASoC etc.   
->>
->> Why do you consider this EVM specific. IOW, which pins do you see
->> changing on another board? BTW, if there are additional pins needed than
->> what are listed, we can always add more pinux entries in the .dts files.
->> The pins present in dtsi file should the base case.
->  
-> Ok, we can use this approach for DaVinci as its SoC modules do not
-> have multiple pin configuration option. I will do the changes in 
-> next patch series.
+Hi Santosh,
 
-You could do this even if this was the case by defining multiple pin groups.
+On Tue, Jan 15, 2013 at 6:32 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On Monday 14 January 2013 11:35 PM, Achin Gupta wrote:
+>>
+>> Hi Santosh,
+>>
+>> On Fri, Jan 11, 2013 at 6:02 PM, Santosh Shilimkar
+>> <santosh.shilimkar@ti.com> wrote:
+>>>
+>>> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
+>>>>
+>>>>
+>>>> Now that the b.L power API is in place, we can use it for SMP secondary
+>>>> bringup and CPU hotplug in a generic fashion.
+>>>>
+>>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+>>>> ---
+>>>>    arch/arm/common/Makefile     |  2 +-
+>>>>    arch/arm/common/bL_platsmp.c | 79
+>>>> ++++++++++++++++++++++++++++++++++++++++++++
+>>>>    2 files changed, 80 insertions(+), 1 deletion(-)
+>>>>    create mode 100644 arch/arm/common/bL_platsmp.c
+>>>>
+>>>> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+>>>> index 894c2ddf9b..59b36db7cc 100644
+>>>> --- a/arch/arm/common/Makefile
+>>>> +++ b/arch/arm/common/Makefile
+>>>> @@ -15,4 +15,4 @@ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+>>>>    obj-$(CONFIG_ARM_TIMER_SP804) += timer-sp.o
+>>>>    obj-$(CONFIG_FIQ_GLUE)                += fiq_glue.o fiq_glue_setup.o
+>>>>    obj-$(CONFIG_FIQ_DEBUGGER)    += fiq_debugger.o
+>>>> -obj-$(CONFIG_BIG_LITTLE)       += bL_head.o bL_entry.o vlock.o
+>>>> +obj-$(CONFIG_BIG_LITTLE)       += bL_head.o bL_entry.o bL_platsmp.o
+>>>> vlock.o
+>>>> diff --git a/arch/arm/common/bL_platsmp.c b/arch/arm/common/bL_platsmp.c
+>>>> new file mode 100644
+>>>> index 0000000000..0acb9f4685
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/common/bL_platsmp.c
+>>>> @@ -0,0 +1,79 @@
+>>>> +/*
+>>>> + * linux/arch/arm/mach-vexpress/bL_platsmp.c
+>>>> + *
+>>>> + * Created by:  Nicolas Pitre, November 2012
+>>>> + * Copyright:   (C) 2012  Linaro Limited
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>> + * published by the Free Software Foundation.
+>>>> + *
+>>>> + * Code to handle secondary CPU bringup and hotplug for the bL power
+>>>> API.
+>>>> + */
+>>>> +
+>>>> +#include <linux/init.h>
+>>>> +#include <linux/smp.h>
+>>>> +
+>>>> +#include <asm/bL_entry.h>
+>>>> +#include <asm/smp_plat.h>
+>>>> +#include <asm/hardware/gic.h>
+>>>> +
+>>>> +static void __init simple_smp_init_cpus(void)
+>>>> +{
+>>>> +       set_smp_cross_call(gic_raise_softirq);
+>>>> +}
+>>>> +
+>>>> +static int __cpuinit bL_boot_secondary(unsigned int cpu, struct
+>>>> task_struct *idle)
+>>>> +{
+>>>> +       unsigned int pcpu, pcluster, ret;
+>>>> +       extern void secondary_startup(void);
+>>>> +
+>>>> +       pcpu = cpu_logical_map(cpu) & 0xff;
+>>>> +       pcluster = (cpu_logical_map(cpu) >> 8) & 0xff;
+>>>> +       pr_debug("%s: logical CPU %d is physical CPU %d cluster %d\n",
+>>>> +                __func__, cpu, pcpu, pcluster);
+>>>> +
+>>>> +       bL_set_entry_vector(pcpu, pcluster, NULL);
+>>>> +       ret = bL_cpu_power_up(pcpu, pcluster);
+>>>> +       if (ret)
+>>>> +               return ret;
+>>>> +       bL_set_entry_vector(pcpu, pcluster, secondary_startup);
+>>>> +       gic_raise_softirq(cpumask_of(cpu), 0);
+>>>> +       sev();
+>>>
+>>>
+>>> softirq() should be enough to break a CPU if it is in standby with
+>>> wfe state. Is that additional sev() needed here ?
+>>
+>>
+>> Not if the target cpu has its I & F bits disabled and that would be the
+>> case with a secondary waiting to be woken up
+>>
+> This is interesting since CPU is actually in standby state and this
+> was not my understanding so far. Your statement at least contradicts
+> the ARM ARM (B1.8.12 Wait For Interrupt)
+> -----------------------
+> The processor can remain in the WFI low-power state until it is reset, or it
+> detects one of the following WFI wake-up
+> events:
+> ? a physical IRQ interrupt, regardless of the value of the CPSR.I bit
+> ? a physical FIQ interrupt, regardless of the value of the CPSR.F bit
+> ----------------------------------
+>
+> Are you referring to some new behavior on latest ARMv7 CPUs ?
+
+You are abs right about the 'wfi' behaviour. I was talking about the effect
+of interrupts on a cpu thats in 'wfe'.
+
+The power up process takes place in two steps. The first step involves
+sending an ipi which will either:
+
+a. cause the power controller to bring the processor out of reset
+b. cause the processor to exit from wfi (most probably in the bootloader code)
+
+The cpu then enters Linux (bL_entry_point) and after doing any cluster setup
+waits in 'wfe' if its 'bL_entry_vector' has not been set as yet. The
+'sev' is meant
+to poke the cpu once this has been done.
+
+Its not required in this case as we have already set 'bL_entry_vector' , issued
+a barrier & flushed the cache line. So if the incoming cpu sees a 0 in
+its vector
+then that would be a symptom of a different problem.
 
 Thanks,
-Sekhar
+Achin
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
