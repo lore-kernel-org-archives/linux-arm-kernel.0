@@ -1,39 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Jan 2013 13:23:28 +0000
-Subject: [PATCH 04/18] power: ab8500_fg: Replace msleep() with
- usleep_range() for greater accuracy
-In-Reply-To: <20130115084821.GT12385@gmail.com>
-References: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
- <1358183857.19400.13.camel@joe-AO722> <20130115084821.GT12385@gmail.com>
-Message-ID: <201301151323.28879.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Jan 2013 13:29:40 +0000
+Subject: [PATCH v5 13/14] KVM: ARM: Handle I/O aborts
+In-Reply-To: <20130115131855.GL11529@redhat.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108184005.46302.38495.stgit@ubuntu> <20130115131855.GL11529@redhat.com>
+Message-ID: <50F559C4.8080900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 January 2013, Lee Jones wrote:
-> > > @@ -956,7 +956,7 @@ static int ab8500_fg_load_comp_volt_to_capacity(struct ab8500_fg *di)
-> > >     do {
-> > >             vbat += ab8500_fg_bat_voltage(di);
-> > >             i++;
-> > > -           msleep(5);
-> > > +           usleep_range(5000, 5001);
-> > 
-> > If you're going to give a range that small
-> > you might as well use usleep instead.
-> > 
-> > Otherwise, add some tolerance to allow any
-> > other coalesced wakeup to occur.
-> 
-> I can't increase the tolerance, as I don't know how that would
-> effect the running of the system, and the person who would know
-> is off on parental leave.
+On 15/01/13 13:18, Gleb Natapov wrote:
+> On Tue, Jan 08, 2013 at 01:40:05PM -0500, Christoffer Dall wrote:
+>> When the guest accesses I/O memory this will create data abort
+>> exceptions and they are handled by decoding the HSR information
+>> (physical address, read/write, length, register) and forwarding reads
+>> and writes to QEMU which performs the device emulation.
+>>
+>> Certain classes of load/store operations do not support the syndrome
+>> information provided in the HSR and we therefore must be able to fetch
+>> the offending instruction from guest memory and decode it manually.
+>>
+>> We only support instruction decoding for valid reasonable MMIO operations
+>> where trapping them do not provide sufficient information in the HSR (no
+>> 16-bit Thumb instructions provide register writeback that we care about).
+>>
+>> The following instruction types are NOT supported for MMIO operations
+>> despite the HSR not containing decode info:
+>>  - any Load/Store multiple
+>>  - any load/store exclusive
+>>  - any load/store dual
+>>  - anything with the PC as the dest register
+>>
+>> This requires changing the general flow somewhat since new calls to run
+>> the VCPU must check if there's a pending MMIO load and perform the write
+>> after userspace has made the data available.
+>>
+>> Rusty Russell fixed a horrible race pointed out by Ben Herrenschmidt:
+>> (1) Guest complicated mmio instruction traps.
+>> (2) The hardware doesn't tell us enough, so we need to read the actual
+>>     instruction which was being exectuted.
+>> (3) KVM maps the instruction virtual address to a physical address.
+>> (4) The guest (SMP) swaps out that page, and fills it with something else.
+>> (5) We read the physical address, but now that's the wrong thing.
+> How can this happen?! The guest cannot reuse physical page before it
+> flushes it from all vcpus tlb cache. For that it needs to send
+> synchronous IPI to all vcpus and IPI will not be processed by a vcpu
+> while it does emulation.
 
-The function only averages the voltage between a couple of readings.
-It won't change much if those register reads are slightly more
-uniformly timed. Note that the thread can still be preempted for
-a much longer time if anything else is running, and the entire
-interrupt handling in this driver looks so fragile that I would
-not rely on the interrupt actually happening at the right time
-anyway. I think it should first be debugged properly to remove
-the need for the enable_irq/disable_irq calls.
+I don't know how this works on x86, but a KVM/ARM guest can definitely
+handle an IPI.
 
-	Arnd
+Furthermore, TLB invalidation doesn't require an IPI on ARMv7 (unless
+we're doing some set/way operation which is handled separately).
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
