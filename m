@@ -1,24 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 Jan 2013 11:00:09 -0800
-Subject: [PATCH] timer: vt8500: Convert vt8500 to use CLKSRC_OF
-In-Reply-To: <1358232649-19964-1-git-send-email-linux@prisktech.co.nz>
-References: <1358232649-19964-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130115190009.GA28251@quad.lixom.net>
+Date: Tue, 15 Jan 2013 11:00:35 -0800
+Subject: [GIT PULL] imx fixes for 3.8, take 2
+In-Reply-To: <20130115134337.GA6574@S2101-09.ap.freescale.net>
+References: <20130115134337.GA6574@S2101-09.ap.freescale.net>
+Message-ID: <20130115190035.GB28251@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 07:50:49PM +1300, Tony Prisk wrote:
-> This patch converts arch-vt8500 to make use of CLKSRC_OF. Doing so
-> removes the need for include/linux/vt8500_timer.h as vt8500_timer_init
-> no longer needs to be visible outside vt8500_timer.c
+On Tue, Jan 15, 2013 at 09:43:38PM +0800, Shawn Guo wrote:
+> The following changes since commit e37f0d5b32c2a66677d0f2a21431a87e7e9ce22d:
 > 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
-> Hi Olof,
+>   ARM: mx5: Fix MX53 flexcan2 clock (2013-01-08 08:53:07 +0800)
 > 
-> Here is the fix as requested by Stephen Warren, based on vt8500/timer.
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.8-2
 
-Applied, thanks.
+Pulled into fixes, thanks.
 
 
 -Olof
