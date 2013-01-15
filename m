@@ -1,26 +1,60 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 16 Jan 2013 01:17:18 +0200
-Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
- OMAP-L138 DSP
-In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C14311FE9E0@DFLE08.ent.ti.com>
-References: <1357863807-380-1-git-send-email-rtivy@ti.com>
- <1357863807-380-7-git-send-email-rtivy@ti.com>
- <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
- <50F51E43.2090605@ti.com>
- <CAK=WgbbShpqxS7zrDs97HkjpyWq0xzW3b9KHLBBs_V3YzdJKiA@mail.gmail.com>
- <50F54B91.4030406@ti.com>
- <CAK=WgbYwM2WPWrTp9U+nk_96RY3YYumzo0KxFpV0fDwU6dR+aA@mail.gmail.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FE9E0@DFLE08.ent.ti.com>
-Message-ID: <CAK=WgbYZtg+B8EScHbqAH_pQzy5mzyT6xD++OmCNasAZPxy1rA@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 16 Jan 2013 12:30:41 +1300
+Subject: [PATCH v2] mtd: vt8500: Add support for Wondermedia Serial
+ Flash Controller
+In-Reply-To: <1358277072.1668.2.camel@kyv>
+References: <1356901207-13536-1-git-send-email-linux@prisktech.co.nz>
+ <1358261750.2731.148.camel@sauron.fi.intel.com>
+ <1358271907.31593.1.camel@gitbox> <1358277072.1668.2.camel@kyv>
+Message-ID: <1358292641.11794.1.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 1:06 AM, Tivy, Robert <rtivy@ti.com> wrote:
-> This sounds good, although it will introduce the need to handle dynamic storage for the generated name.  I think I can jam that storage on the end of the already-dynamically-sized 'struct rproc + sizeof(pdata)' allocation in rproc_alloc().
+On Tue, 2013-01-15 at 21:11 +0200, Artem Bityutskiy wrote:
+> On Wed, 2013-01-16 at 06:45 +1300, Tony Prisk wrote:
+> > On Tue, 2013-01-15 at 16:55 +0200, Artem Bityutskiy wrote:
+> > > On Mon, 2012-12-31 at 10:00 +1300, Tony Prisk wrote:
+> > > > This patch adds support for the Wondermedia serial flash controller
+> > > > found on WM8505, WM8650 and WM8850 SoCs.
+> > > > 
+> > > > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> > > > ---
+> > > > v2: Whitespace tidyup
+> > > 
+> > > Hi, would you please take a look at these warings, identified by aiaiai:
+> > > 
+> > > Successfully built configuration "x86_64_defconfig,x86_64,", results:
+> > > 
+> > > --- before_patching.log
+> > > +++ after_patching.log
+> > > @@ @@
+> > > +drivers/mtd/devices/wmt_sflash.c: In function ?sf_read?:
+> > > +drivers/mtd/devices/wmt_sflash.c:425:9: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat]
+> > > +drivers/mtd/devices/wmt_sflash.c: In function ?sf_sector_write?:
+> > > +drivers/mtd/devices/wmt_sflash.c:442:16: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+> > > +drivers/mtd/devices/wmt_sflash.c:442:24: warning: cast removes address space of expression [sparse]
+> > > +drivers/mtd/devices/wmt_sflash.c:458:16: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+> > > +drivers/mtd/devices/wmt_sflash.c:458:31: warning: incorrect type in argument 1 (different address spaces) [sparse]
+> > > +drivers/mtd/devices/wmt_sflash.c:458:31:    expected void volatile [noderef] <asn:2>*dst [sparse]
+> > > +drivers/mtd/devices/wmt_sflash.c:458:31:    got unsigned char [usertype] *<noident> [sparse]
+> > > +drivers/mtd/devices/wmt_sflash.c:465:17: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+> > > +drivers/mtd/devices/wmt_sflash.c:465:39: warning: incorrect type in argument 1 (different address spaces) [sparse]
+> > > +drivers/mtd/devices/wmt_sflash.c:465:39:    expected void volatile [noderef] <asn:2>*dst [sparse]
+> > > +drivers/mtd/devices/wmt_sflash.c:465:39:    got unsigned char [usertype] *<noident> [sparse]
+> > > 
+> > 
+> > Apologies - This driver shouldn't be selectable for x86_64.
+> > It is an ARM driver for an embedded device. Will fix.
+> 
+> Note, there are also warnings when it is compiled for other platforms,
+> not only x86_64. Take a look at them. Also note, than many warnings come
+> from sparse, you probably just did not run it.
+> 
 
-Or you can generate it when needed, without storing the result. This
-rarely happens and anyway is negligible.
+I posted the patch for this problem this morning. It should only be
+selectable on arch-vt8500 and the new patch fixes this problem.
 
-Thanks,
-Ohad.
+It incorrectly depended on MTD rather than ARCH_VT8500
+
+Regards
+Tony P
