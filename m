@@ -1,75 +1,77 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 15 Jan 2013 09:40:11 -0500
-Subject: [kvmarm] [PATCH v5 06/14] KVM: ARM: Inject IRQs and FIQs from
- userspace
-In-Reply-To: <CAFEAcA8gzD4F4BPKR_dSDDD-iyv0ONt6H+yrj_nHifeCFBfpPA@mail.gmail.com>
-References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108183917.46302.55603.stgit@ubuntu>
- <20130115095622.GJ11529@redhat.com>
- <CAFEAcA9wEtXu6B-4bUuezntvybhu8MCYfciKhdLK_Cs--qP8_w@mail.gmail.com>
- <20130115125241.GK11529@redhat.com>
- <CAFEAcA8gzD4F4BPKR_dSDDD-iyv0ONt6H+yrj_nHifeCFBfpPA@mail.gmail.com>
-Message-ID: <CANM98qKWA8W9poDxfJNBe3tG9rCigQb1YGmh2-YSTLr8PnnTVw@mail.gmail.com>
+From: dinggnu@gmail.com (Cong Ding)
+Date: Tue, 15 Jan 2013 14:41:41 +0000
+Subject: [PATCH] clk: mvebu/clk-cpu.c: fix memory leakage
+In-Reply-To: <50F563EC.3030804@free-electrons.com>
+References: <1358183892-28928-1-git-send-email-dinggnu@gmail.com>
+ <50F563EC.3030804@free-electrons.com>
+Message-ID: <20130115144140.GA1160@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 9:04 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 15 January 2013 12:52, Gleb Natapov <gleb@redhat.com> wrote:
->> On Tue, Jan 15, 2013 at 12:15:01PM +0000, Peter Maydell wrote:
->>> On 15 January 2013 09:56, Gleb Natapov <gleb@redhat.com> wrote:
->>> >> ARM can signal an interrupt either at the CPU level, or at the in-kernel irqchip
->>> > CPU level interrupt should use KVM_INTERRUPT instead.
->>>
->>> No, that would be wrong. KVM_INTERRUPT is for interrupts which must be
->>> delivered synchronously to the CPU. KVM_IRQ_LINE is for interrupts which
->>> can be fed to the kernel asynchronously. It happens that on x86 "must be
->>> delivered synchronously" and "not going to in kernel irqchip" are the same, but
->>> this isn't true for other archs. For ARM all our interrupts can be fed
->>> to the kernel asynchronously, and so we use KVM_IRQ_LINE in all
->>> cases.
->
->> I do no quite understand what you mean by synchronously and
->> asynchronously.
->
-> Synchronously: the vcpu has to be stopped and userspace then
-> feeds in the interrupt to be taken when the guest is resumed.
-> Asynchronously: any old thread can tell the kernel there's an
-> interrupt, and the guest vcpu then deals with it when needed
-> (the vcpu thread may leave the guest but doesn't come out of
-> the host kernel to qemu).
->
->> The difference between KVM_INTERRUPT and KVM_IRQ_LINE line
->> is that former is used when destination cpu is known to userspace later
->> is used when kernel code is involved in figuring out the destination.
->
-> This doesn't match up with Avi's explanation at all.
->
->> The
->> injections themselves are currently synchronous for both of them on x86
->> and ARM. i.e vcpu is kicked out from guest mode when interrupt need to
->> be injected into a guest and vcpu state is changed to inject interrupt
->> during next guest entry. In the near feature x86 will be able to inject
->> interrupt without kicking vcpu out from the guest mode does ARM plan to
->> do the same? For GIC interrupts or for IRQ/FIQ or for both?
->>
->>> There was a big discussion thread about this on kvm and qemu-devel last
->>> July (and we cleaned up some of the QEMU code to not smoosh together
->>> all these different concepts under "do I have an irqchip or not?").
->> Do you have a pointer?
->
->   http://lists.gnu.org/archive/html/qemu-devel/2012-07/msg02460.html
-> and there was a later longer (but less clear) thread which included
-> this mail from Avi:
->   http://lists.gnu.org/archive/html/qemu-devel/2012-07/msg02872.html
-> basically explaining that the reason for the weird synchronous
-> KVM_INTERRUPT API is that it's emulating a weird synchronous
-> hardware interface which is specific to x86. ARM doesn't have
-> a synchronous interface in the same way, so it's much more
-> straightforward to use KVM_IRQ_LINE.
->
-Also, this code has been reviewed numerous times by the KVM community
-and as Peter points out has also been discussed in detail.
+On Tue, Jan 15, 2013 at 03:13:00PM +0100, Gregory CLEMENT wrote:
+> Dear Cong Ding,
+> 
+> On 01/14/2013 06:18 PM, Cong Ding wrote:
+> > the variable cpuclk and clk_name should be properly freed.
+> > 
+> 
+> Thanks for reporting this memory leak and for your patch but I think
+> we could do even better, see below:
+> 
+> > Signed-off-by: Cong Ding <dinggnu@gmail.com>
+> > ---
+> >  drivers/clk/mvebu/clk-cpu.c |    9 ++++++---
+> >  1 file changed, 6 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
+> > index ff004578..1a0d84f 100644
+> > --- a/drivers/clk/mvebu/clk-cpu.c
+> > +++ b/drivers/clk/mvebu/clk-cpu.c
+> > @@ -124,7 +124,7 @@ void __init of_cpu_clk_setup(struct device_node *node)
+> >  
+> >  	clks = kzalloc(ncpus * sizeof(*clks), GFP_KERNEL);
+> >  	if (WARN_ON(!clks))
+> > -		return;
+> > +		goto clks_out;
+> >  
+> >  	for_each_node_by_type(dn, "cpu") {
+> >  		struct clk_init_data init;
+> > @@ -134,11 +134,11 @@ void __init of_cpu_clk_setup(struct device_node *node)
+> >  		int cpu, err;
+> >  
+> >  		if (WARN_ON(!clk_name))
+> > -			return;
+> > +			goto clk_name_out;
+> 
+> I agree
+> 
+> >  
+> >  		err = of_property_read_u32(dn, "reg", &cpu);
+> >  		if (WARN_ON(err))
+> > -			return;
+> > +			goto bail_out;
+> 
+> I agree
+> 
+> >  
+> >  		sprintf(clk_name, "cpu%d", cpu);
+> >  		parent_clk = of_clk_get(node, 0);
+> > @@ -166,7 +166,10 @@ void __init of_cpu_clk_setup(struct device_node *node)
+> >  
+> >  	return;
+> >  bail_out:
+> > +	kfree(clk_name);
+> 
+> Here you free only one clk_name whereas we could have previous clk_name which have
+> been already allocated during the for_each_node_by_type loop.
+> 
+> A more annoying thing is that you use clk_name whereas it is only valid in the
+> for_each_node_by_type statement and then this patch breaks the compilation:
+> 
+> drivers/clk/mvebu/clk-cpu.c: In function ?of_cpu_clk_setup?:
+> drivers/clk/mvebu/clk-cpu.c:169:8: error: ?clk_name? undeclared (first use in this function)
+> drivers/clk/mvebu/clk-cpu.c:169:8: note: each undeclared identifier is reported only once for each function it appears in
+sorry for the mistake, I am sending version 2.
 
-Could we please not change this API in the last second?
-
--Christoffer
+thanks,
+- cong
