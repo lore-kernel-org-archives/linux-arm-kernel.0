@@ -1,32 +1,70 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 15 Jan 2013 13:49:05 +0000
-Subject: [PATCH 12/26] mfd: ab8500-debugfs: Use NULL to initialise
- remaining NULL pointer
-In-Reply-To: <20130115130635.GH5701@opensource.wolfsonmicro.com>
-References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
- <1358254566-12419-13-git-send-email-lee.jones@linaro.org>
- <20130115130635.GH5701@opensource.wolfsonmicro.com>
-Message-ID: <20130115134905.GA9379@gmail.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Tue, 15 Jan 2013 19:20:35 +0530
+Subject: [PATCH v2 0/5] ARM: dts: AM33XX: lcdc support
+Message-ID: <cover.1358252955.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Jan 2013, Mark Brown wrote:
+Hi,
 
-> On Tue, Jan 15, 2013 at 12:55:52PM +0000, Lee Jones wrote:
-> > Partly for coding style reasons, but mostly because sparse warns on it.
-> > 
-> > This patch is a completion of a previous patch my Mark Brown.
-> 
-> Typo there :)
+This series add DT sources for AM335x SoC as well as AM335x based
+boards.
 
-Yes, it should say "patch by my Mark Brown". ;)
+As compared to previous version, in this version, comment has been
+added in dt source file about pinmux details so that user can easily
+correlate to that mentioned in TRM. Also author of one of the patch
+was actually "Manjunathappa, Prakash", here in this series, authorship
+has been made proper.
 
-> Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+As pinmux is an SoC specific detail rather than IP specific one,
+addition of pin control has been done in a separate patch from
+the one in which display timings are added. Also it may aid in
+debugging in case of any issues.
 
-Thanks. I'll fixup with the typo.
+This has been tested on AM335x based boards like AM335x EVM and
+AM335x EVM-SK.
+
+This series is based on v3.8-rc3.
+
+This series has a dependency on,
+1. Series v16 "of: add display helper" by,
+	Steffen Trumtrar <s.trumtrar@pengutronix.de>
+2. Series v3 "video: da8xx-fb: runtime timing configuration" by,
+	me (Afzal Mohammed <afzal@ti.com>)
+3. Series v2 "video: da8xx-fb: DT support" by,
+	me (Afzal Mohammed <afzal@ti.com>)
+
+To test on AM335x, in addition to the above, following changes,
+1. Patch "ARM: AM33XX: clock: SET_RATE_PARENT in lcd path" by,
+	me (Afzal Mohammed <afzal@ti.com>)
+2. Patch "da8xx: Allow use by am33xx based devices" by,
+	Pantelis Antoniou <panto@antoniou-consulting.com>
+3. Series "HWMOD fixes for AM33xx PWM submodules and device tree nodes" by,
+	Philip, Avinash <avinashphilip@ti.com>
+would be required
+
+All above dependencies along with those required for testing is available
+ @git://gitorious.org/x0148406-public/linux-kernel.git tags/da8xx-fb-dt-v3.8-rc3
+
+Regards
+Afzal
+
+v2: add pinmux comment in dtsi files, correct authorship of one of the
+    patch.
+
+Afzal Mohammed (4):
+  ARM: dts: AM33XX: Add lcdc node
+  ARM: dts: AM33XX: Add am335x-evm lcdc panel timings
+  ARM: dts: AM33XX: Add am335x-evmsk lcdc panel timings
+  ARM: dts: AM33XX: Add am335x-evmsk lcdc pincontrol info
+
+Manjunathappa, Prakash (1):
+  ARM: dts: AM33XX: Add am335x-evm lcdc pincontrol info
+
+ arch/arm/boot/dts/am335x-evm.dts   |   55 +++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/am335x-evmsk.dts |   55 +++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/am33xx.dtsi      |    8 ++++++
+ 3 files changed, 116 insertions(+), 2 deletions(-)
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
