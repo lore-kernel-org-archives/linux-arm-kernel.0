@@ -1,162 +1,78 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 15 Jan 2013 12:55:57 +0000
-Subject: [PATCH 17/26] mfd: ab8500-debugfs: add debugfs node to read all
- registers
+Date: Tue, 15 Jan 2013 12:55:58 +0000
+Subject: [PATCH 18/26] mfd: ab8500-core: Allow the possibility to dump all
+ AB8500 registers
 In-Reply-To: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
 References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1358254566-12419-18-git-send-email-lee.jones@linaro.org>
+Message-ID: <1358254566-12419-19-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mian Yousaf Kaukab <mian.yousaf.kaukab@stericsson.com>
 
-Update the ab8500_registers_print() to reuse it from multiple places.
+Implement an API so that a user may dump all AB8500 registers
+via debugfs file access.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Mian Yousaf Kaukab <mian.yousaf.kaukab@stericsson.com>
 Reviewed-by: Linus WALLEIJ <linus.walleij@stericsson.com>
 Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
 ---
- drivers/mfd/ab8500-debugfs.c |   95 +++++++++++++++++++++++++++++++++++-------
- 1 file changed, 81 insertions(+), 14 deletions(-)
+ drivers/mfd/ab8500-core.c         |    1 +
+ drivers/mfd/ab8500-debugfs.c      |   13 +++++++++++++
+ include/linux/mfd/abx500/ab8500.h |    6 ++++++
+ 3 files changed, 20 insertions(+)
 
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index 1667c77..0f84fc0 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -319,6 +319,7 @@ static struct abx500_ops ab8500_ops = {
+ 	.mask_and_set_register = ab8500_mask_and_set_register,
+ 	.event_registers_startup_state_get = NULL,
+ 	.startup_irq_enabled = NULL,
++	.dump_all_banks = ab8500_dump_all_banks,
+ };
+ 
+ static void ab8500_irq_lock(struct irq_data *data)
 diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index a231faf..a1ce55e 100644
+index a1ce55e..ec57e43 100644
 --- a/drivers/mfd/ab8500-debugfs.c
 +++ b/drivers/mfd/ab8500-debugfs.c
-@@ -495,15 +495,12 @@ static irqreturn_t ab8500_debug_handler(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
--static int ab8500_registers_print(struct seq_file *s, void *p)
-+/* Prints to seq_file or log_buf */
-+static int ab8500_registers_print(struct device *dev, u32 bank,
-+				struct seq_file *s)
- {
--	struct device *dev = s->private;
- 	unsigned int i;
--	u32 bank = debug_bank;
--
--	seq_printf(s, AB8500_NAME_STRING " register values:\n");
- 
--	seq_printf(s, " bank %u:\n", bank);
- 	for (i = 0; i < debug_ranges[bank].num_ranges; i++) {
- 		u32 reg;
- 
-@@ -520,22 +517,42 @@ static int ab8500_registers_print(struct seq_file *s, void *p)
- 				return err;
- 			}
- 
--			err = seq_printf(s, "  [%u/0x%02X]: 0x%02X\n", bank,
--				reg, value);
--			if (err < 0) {
--				dev_err(dev, "seq_printf overflow\n");
--				/* Error is not returned here since
--				 * the output is wanted in any case */
--				return 0;
-+			if (s) {
-+				err = seq_printf(s, "  [%u/0x%02X]: 0x%02X\n",
-+					bank, reg, value);
-+				if (err < 0) {
-+					dev_err(dev,
-+					"seq_printf overflow bank=%d reg=%d\n",
-+						bank, reg);
-+					/* Error is not returned here since
-+					 * the output is wanted in any case */
-+					return 0;
-+				}
-+			} else {
-+				printk(KERN_INFO" [%u/0x%02X]: 0x%02X\n", bank,
-+					reg, value);
- 			}
- 		}
- 	}
+@@ -581,6 +581,19 @@ static int ab8500_print_all_banks(struct seq_file *s, void *p)
  	return 0;
  }
  
-+static int ab8500_print_bank_registers(struct seq_file *s, void *p)
++/* Dump registers to kernel log */
++void ab8500_dump_all_banks(struct device *dev)
 +{
-+	struct device *dev = s->private;
-+	u32 bank = debug_bank;
-+
-+	seq_printf(s, AB8500_NAME_STRING " register values:\n");
-+
-+	seq_printf(s, " bank %u:\n", bank);
-+
-+	ab8500_registers_print(dev, bank, s);
-+	return 0;
-+}
-+
- static int ab8500_registers_open(struct inode *inode, struct file *file)
- {
--	return single_open(file, ab8500_registers_print, inode->i_private);
-+	return single_open(file, ab8500_print_bank_registers, inode->i_private);
- }
- 
- static const struct file_operations ab8500_registers_fops = {
-@@ -546,6 +563,51 @@ static const struct file_operations ab8500_registers_fops = {
- 	.owner = THIS_MODULE,
- };
- 
-+static int ab8500_print_all_banks(struct seq_file *s, void *p)
-+{
-+	struct device *dev = s->private;
 +	unsigned int i;
-+	int err;
 +
-+	seq_printf(s, AB8500_NAME_STRING " register values:\n");
++	printk(KERN_INFO"ab8500 register values:\n");
 +
 +	for (i = 1; i < AB8500_NUM_BANKS; i++) {
-+		err = seq_printf(s, " bank %u:\n", i);
-+		if (err < 0)
-+			dev_err(dev, "seq_printf overflow, bank=%d\n", i);
-+
-+		ab8500_registers_print(dev, i, s);
++		printk(KERN_INFO" bank %u:\n", i);
++		ab8500_registers_print(dev, i, NULL);
 +	}
-+	return 0;
 +}
 +
-+static int ab8500_all_banks_open(struct inode *inode, struct file *file)
-+{
-+	struct seq_file *s;
-+	int err;
-+
-+	err = single_open(file, ab8500_print_all_banks, inode->i_private);
-+	if (!err) {
-+		/* Default buf size in seq_read is not enough */
-+		s = (struct seq_file *)file->private_data;
-+		s->size = (PAGE_SIZE * 2);
-+		s->buf = kmalloc(s->size, GFP_KERNEL);
-+		if (!s->buf) {
-+			single_release(inode, file);
-+			err = -ENOMEM;
-+		}
-+	}
-+	return err;
-+}
-+
-+static const struct file_operations ab8500_all_banks_fops = {
-+	.open = ab8500_all_banks_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+	.owner = THIS_MODULE,
-+};
-+
- static int ab8500_bank_print(struct seq_file *s, void *p)
+ static int ab8500_all_banks_open(struct inode *inode, struct file *file)
  {
- 	return seq_printf(s, "%d\n", debug_bank);
-@@ -1475,6 +1537,11 @@ static int __devinit ab8500_debug_probe(struct platform_device *plf)
- 	if (!file)
- 		goto err;
+ 	struct seq_file *s;
+diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
+index 3f4e6d1..4c8d966 100644
+--- a/include/linux/mfd/abx500/ab8500.h
++++ b/include/linux/mfd/abx500/ab8500.h
+@@ -345,4 +345,10 @@ static inline int is_ab8500_2p0(struct ab8500 *ab)
+ 	return (is_ab8500(ab) && (ab->chip_id == AB8500_CUT2P0));
+ }
  
-+	file = debugfs_create_file("all-banks", S_IRUGO,
-+	    ab8500_dir, &plf->dev, &ab8500_all_banks_fops);
-+	if (!file)
-+		goto err;
++#ifdef CONFIG_AB8500_DEBUG
++void ab8500_dump_all_banks(struct device *dev);
++#else
++static inline void ab8500_dump_all_banks(struct device *dev) {}
++#endif
 +
- 	file = debugfs_create_file("register-bank", (S_IRUGO | S_IWUSR),
- 	    ab8500_dir, &plf->dev, &ab8500_bank_fops);
- 	if (!file)
+ #endif /* MFD_AB8500_H */
 -- 
 1.7.9.5
