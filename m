@@ -1,71 +1,53 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 15 Jan 2013 10:44:08 +0800
-Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
- management
-In-Reply-To: <alpine.LFD.2.02.1301140849020.6300@xanadu.home>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1358157392.19304.243.camel@jlo-ubuntu-64.nvidia.com>
- <alpine.LFD.2.02.1301140849020.6300@xanadu.home>
-Message-ID: <1358217848.8513.14.camel@jlo-ubuntu-64.nvidia.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Tue, 15 Jan 2013 03:48:23 +0100
+Subject: [PATCH v2] hardlockup: detect hard lockups without NMIs using
+ secondary cpus
+In-Reply-To: <CAMbhsRQiK=rChiNdwM5M6t=1v_iKwYLhUn=HLW5kSkBzQdso8g@mail.gmail.com>
+References: <1357941108-14138-1-git-send-email-ccross@android.com>
+ <CAFTL4hzYkPCmkfqBafkTA5E_snkLoC_y3p9xwumj=L1xWAWK0g@mail.gmail.com>
+ <CAMbhsRQv=ogNmkK=Np6JGM-iuG=aocqb_4aMBC6CW5mpkGvpmw@mail.gmail.com>
+ <CAFTL4hxnCn13PigcWjrcnSV9RAz5gSX-VtQk9J8HEbQco7jbbQ@mail.gmail.com>
+ <CAMbhsRQiK=rChiNdwM5M6t=1v_iKwYLhUn=HLW5kSkBzQdso8g@mail.gmail.com>
+Message-ID: <CAFTL4hxCNqCAbF6+Ny_-0jfL2G2ie8O6Be_7KtYymvJzyJGyCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-01-14 at 22:05 +0800, Nicolas Pitre wrote:
-> On Mon, 14 Jan 2013, Joseph Lo wrote:
-> 
-> > Hi Nicolas,
-> > 
-> > On Thu, 2013-01-10 at 08:20 +0800, Nicolas Pitre wrote:
-> > > This is the initial public posting of the initial support for big.LITTLE.
-> > > Included here is the code required to safely power up and down CPUs in a
-> > > b.L system, whether this is via CPU hotplug, a cpuidle driver or the
-> > > Linaro b.L in-kernel switcher[*] on top of this.  Only  SMP secondary
-> > > boot and CPU hotplug support is included at this time.  Getting to this
-> > > point already represents a significcant chunk of code as illustrated by
-> > > the diffstat below.
-> > > 
-> > > 
-> > 
-> > Thanks for introducing this series.
-> > I am taking a look at this series. It introduced an algorithm for
-> > syncing and avoid racing when syncing the power status of clusters and
-> > CPUs. Do you think these codes could have a chance to become a generic
-> > framework?
-> 
-> Yes.  As I mentioned before, the bL_ prefix is implied only by the fact 
-> that big.LITTLE was the motivation for creating this code.
-> 
-> > The Tegra chip series had a similar design for CPU clusters and it 
-> had
-> > limitation that the CPU0 always needs to be the last CPU to be shut down
-> > before cluster power down as well. I believe it can also get benefits of
-> > this works. We indeed need a similar algorithm to sync CPUs power status
-> > before cluster power down and switching.
-> > 
-> > The "bL_entry.c", "bL_entry.S", "bL_entry.h", "vlock.h" and "vlock.S"
-> > looks have a chance to be a common framework for ARM platform even if it
-> > just support one cluster. Because some systems had the limitations for
-> > cluster power down. That's why the coupled cpuidle been introduced. And
-> > this framework could be enabled automatically if platform dependent or
-> > by menuconfig.
-> 
-> Absolutely.
-> 
-So do you have a plan to make it become a generic framework in this
-series or later work?
+2013/1/15 Colin Cross <ccross@android.com>:
+> On Mon, Jan 14, 2013 at 4:25 PM, Frederic Weisbecker <fweisbec@gmail.com> wrote:
+>> 2013/1/15 Colin Cross <ccross@android.com>:
+>>> On Mon, Jan 14, 2013 at 4:13 PM, Frederic Weisbecker <fweisbec@gmail.com> wrote:
+>>>> I believe this is pretty much what the RCU stall detector does
+>>>> already: checks for other CPUs being responsive. The only difference
+>>>> is on how it checks that. For RCU it's about checking for CPUs
+>>>> reporting quiescent states when requested to do so. In your case it's
+>>>> about ensuring the hrtimer interrupt is well handled.
+>>>>
+>>>> One thing you can do is to enqueue an RCU callback (cal_rcu()) every
+>>>> minute so you can force other CPUs to report quiescent states
+>>>> periodically and thus check for lockups.
+>>>
+>>> That's a good point, I'll take a look at using that.  A minute is too
+>>> long, some SoCs have maximum HW watchdog periods of under 30 seconds,
+>>> but a call_rcu every 10-20 seconds might be sufficient.
+>>
+>> Sure. And you can tune CONFIG_RCU_CPU_STALL_TIMEOUT accordingly.
+>
+> After considering this, I think the hrtimer watchdog is more useful.
+> RCU stalls are not usually panic events, and I wouldn't want to add a
+> panic on every RCU stall.  The lack of stack traces on the affected
+> cpu makes a panic important.  I'm planning to add an ARM DBGPCSR panic
+> handler, which will be able to dump the PC of a stuck cpu even if it
+> is not responding to interrupts.  kexec or kgdb on panic might also
+> allow some inspection of the stack on stuck cpu.
+>
+> Failing to process interrupts is a much more serious event than an RCU
+> stall, and being able to detect them separately may be very valuable
+> for debugging.
 
-(And I will add some common power sync wrapper functions that based on
-this framework for all Tegra series.)
+RCU stalls can happen for different reasons: softlockup (failure to
+schedule another task), hardlockup (failure to process interrupts), or
+a bug in RCU itself. But if you have a hardlockup, it will report it.
 
-> 
-> > For ex,
-> > 	select CPUS_CLUSTERS_POWER_SYNC_FRAMEWORK if SMP && CPU_PM
-> > 
-> > How do you think of this suggestion?
-> 
-> I'd prefer a more concise name though.
-> 
-Sure. :-)
-
-Thanks,
-Joseph
+Now why do you need a panic in any case? I don't know DBGPCSR, is this
+a breakpoint register? How do you plan to use it remotely from the CPU
+that detects the lockup?
