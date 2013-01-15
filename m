@@ -1,40 +1,45 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 15 Jan 2013 06:59:57 -0300
-Subject: [PATCH 0/6] arm: mvebu: Add support for USB host controllers in Armada
- 370/XP
-Message-ID: <50F5289D.80903@free-electrons.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 15 Jan 2013 12:00:41 +0200
+Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
+References: <1357863807-380-1-git-send-email-rtivy@ti.com>
+ <1357863807-380-7-git-send-email-rtivy@ti.com>
+ <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
+Message-ID: <CAK=WgbbNygzphujf9df8_qj4e2ddKJ_1OkQzz7-a7e9QuP8idA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Rob,
 
-This small patch set enables USB support on Armada 370 and Armada XP platforms.
-It's based on Jason Cooper's mvebu/dt branch.
+On Sat, Jan 12, 2013 at 4:26 AM, Tivy, Robert <rtivy@ti.com> wrote:
+> Is FW_CONFIG above supposed to be FW_LOADER?
 
-Any comments or feedback are welcome.
+That FW_CONFIG is completely bogus of course. care to fix it in your series?
 
-Ezequiel Garcia (6):
- arm: mvebu: Add support for USB host controllers in Armada 370/XP
- arm: mvebu: Enable USB controllers on Armada 370 evaluation board
- arm: mvebu: Enable USB controllers on Armada 370 Mirabox board
- arm: mvebu: Enable USB controllers on Armada XP evaluation board
- arm: mvebu: Enable USB controllers on Armada XP OpenBlocks AX3-4 board
- arm: mvebu: Update defconfig to select USB support
+> We're currently handling the CHIPINT lines as "level"s, since they're completely controlled by SW.  The interruptor raises the line and the interruptee lowers (clears) it.  In a situation where every interrupt is considered to be a signal of new data arrival we need to make sure that the other side has "seen" the previous interrupt before we raise another one.
 
- arch/arm/boot/dts/armada-370-db.dts              |    8 ++++++++
- arch/arm/boot/dts/armada-370-mirabox.dts         |    8 ++++++++
- arch/arm/boot/dts/armada-370-xp.dtsi             |   15 +++++++++++++++
- arch/arm/boot/dts/armada-370.dtsi                |    9 +++++++++
- arch/arm/boot/dts/armada-xp-db.dts               |   12 ++++++++++++
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    9 +++++++++
- arch/arm/boot/dts/armada-xp.dtsi                 |   17 +++++++++++++++++
- arch/arm/configs/mvebu_defconfig                 |    5 ++++-
- arch/arm/mach-mvebu/Kconfig                      |    1 +
- 9 files changed, 83 insertions(+), 1 deletions(-)
- 
-Thanks!
+What if we don't ? Can the DSP side just go over the vrings until no
+new msg is left (similar to what you do on the Linux side) ?
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> Is this suggesting that there be separate platform device instances for each different potential fw, and that each platform device instance hardcodes the fw filename?
+
+In principle this same driver can drive many instances of remote
+processors you may have on your board. E.g. in OMAP the same driver
+controls both the M3s and the DSP. pdata is then used to hold
+information specific to the hw instance.
+
+I'm not sure if there's (or will be) any DaVinci platform with several
+remote processors but it's a better practice to write the code as if
+there is/will be - it's usually cleaner and will just work in case a
+platform with multiple rprocs does show up one day.
+
+> Sekhar asked that there not be a default fw name, so there's conflicting feedback on this point.  I prefer to have a default name plus the module parameter override (but don't have much opinion on whether it should be davinci-specific (and passed with davinci_remoteproc.ko) or general (and passed with remoteproc.ko), please advise).
+>
+> Since the fw file (i.e., DSP program) is typically paired with a particular Linux app, I like the ability to specify the fw filename at runtime, depending on the Linux app I need to run.
+
+Sure, no reason why not to allow users to override the default fw name.
+
+Thanks,
+Ohad.
