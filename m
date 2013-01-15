@@ -1,37 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 Jan 2013 22:48:15 -0800
-Subject: [GIT PULL] ste_dma40 updates for 3.9
-In-Reply-To: <20130114101542.GA5363@balto.lan>
-References: <20130114101542.GA5363@balto.lan>
-Message-ID: <CAOesGMg6FqsaqZiGeK14n4==dF-y=iMYSGRDBYSwkGWO0J69Yg@mail.gmail.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Tue, 15 Jan 2013 14:45:11 +0800
+Subject: [PATCH 1/2] ARM: 7114/1: cache-l2x0: add missed dummy outer_resume
+ entry
+Message-ID: <1358232311-20355-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Barry Song <Baohua.Song@csr.com>
 
-On Mon, Jan 14, 2013 at 2:15 AM, Fabio Baltieri
-<fabio.baltieri@linaro.org> wrote:
-> Hello Arnd, Olof,
->
-> This contains a series of updates and fixes for the ste_dma40 driver.
->
-> The driver is specific for the ux500, and the patches were acked by both Linus
-> Walleij, and Vinod Koul (dmaengine), who agreed to push this through arm-soc.
->
-> Can you please pull those in for -next?
+commit 91c2ebb90b1890a adds resume entry for l2 in secure mode,
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;h=91c2ebb
+but it misses the dummy entry when CONFIG_CACHE_L2X0 is not set.
 
-While I don't mind taking this through arm-soc, I don't see a strong
-reason to do so?
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/include/asm/outercache.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-This series of patches only modify the ste_dma40 driver, there are no
-corresponding changes under arch/arm that need to be coordinated or
-considered w.r.t. merge conflicts. I.e. they all seem nicely isolated
-to only the driver.
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 53426c6..12f71a1 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -92,6 +92,7 @@ static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
+ static inline void outer_flush_all(void) { }
+ static inline void outer_inv_all(void) { }
+ static inline void outer_disable(void) { }
++static inline void outer_resume(void) { }
+ 
+ #endif
+ 
+-- 
+1.7.5.4
 
-So is there a specific reason for why these shouldn't just go in
-through the dmaengine tree?
 
 
-Thanks,
-
--Olof
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
