@@ -1,70 +1,82 @@
 From: agraf@suse.de (Alexander Graf)
-Date: Tue, 15 Jan 2013 17:21:22 +0100
-Subject: [kvmarm] [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile
- KVM support
-In-Reply-To: <20130115153555.GF12489@redhat.com>
+Date: Tue, 15 Jan 2013 17:25:13 +0100
+Subject: [kvmarm] [PATCH v5 06/14] KVM: ARM: Inject IRQs and FIQs from
+ userspace
+In-Reply-To: <20130115151757.GD12489@redhat.com>
 References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108183855.46302.40539.stgit@ubuntu> <20130114184908.GB12489@redhat.com>
- <CANM98qJoOxG_g7Dz+65vfGmzi3MOXqE=AjbVBtimeqLL9TgV8w@mail.gmail.com>
- <20130115133207.GM11529@redhat.com>
- <FE4B72B9-F302-49BA-98D7-E674247BD093@suse.de>
- <20130115153555.GF12489@redhat.com>
-Message-ID: <50F58202.6010006@suse.de>
+ <20130108183917.46302.55603.stgit@ubuntu> <20130115095622.GJ11529@redhat.com>
+ <CAFEAcA9wEtXu6B-4bUuezntvybhu8MCYfciKhdLK_Cs--qP8_w@mail.gmail.com>
+ <20130115125241.GK11529@redhat.com>
+ <CAFEAcA8gzD4F4BPKR_dSDDD-iyv0ONt6H+yrj_nHifeCFBfpPA@mail.gmail.com>
+ <20130115151757.GD12489@redhat.com>
+Message-ID: <50F582E9.40402@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2013 04:35 PM, Gleb Natapov wrote:
-> On Tue, Jan 15, 2013 at 02:43:26PM +0100, Alexander Graf wrote:
->> On 15.01.2013, at 14:32, Gleb Natapov wrote:
+On 01/15/2013 04:17 PM, Gleb Natapov wrote:
+> On Tue, Jan 15, 2013 at 02:04:47PM +0000, Peter Maydell wrote:
+>> On 15 January 2013 12:52, Gleb Natapov<gleb@redhat.com>  wrote:
+>>> On Tue, Jan 15, 2013 at 12:15:01PM +0000, Peter Maydell wrote:
+>>>> On 15 January 2013 09:56, Gleb Natapov<gleb@redhat.com>  wrote:
+>>>>>> ARM can signal an interrupt either at the CPU level, or at the in-kernel irqchip
+>>>>> CPU level interrupt should use KVM_INTERRUPT instead.
+>>>> No, that would be wrong. KVM_INTERRUPT is for interrupts which must be
+>>>> delivered synchronously to the CPU. KVM_IRQ_LINE is for interrupts which
+>>>> can be fed to the kernel asynchronously. It happens that on x86 "must be
+>>>> delivered synchronously" and "not going to in kernel irqchip" are the same, but
+>>>> this isn't true for other archs. For ARM all our interrupts can be fed
+>>>> to the kernel asynchronously, and so we use KVM_IRQ_LINE in all
+>>>> cases.
+>>> I do no quite understand what you mean by synchronously and
+>>> asynchronously.
+>> Synchronously: the vcpu has to be stopped and userspace then
+>> feeds in the interrupt to be taken when the guest is resumed.
+>> Asynchronously: any old thread can tell the kernel there's an
+>> interrupt, and the guest vcpu then deals with it when needed
+>> (the vcpu thread may leave the guest but doesn't come out of
+>> the host kernel to qemu).
 >>
->>> On Mon, Jan 14, 2013 at 05:17:31PM -0500, Christoffer Dall wrote:
->>>> On Mon, Jan 14, 2013 at 1:49 PM, Gleb Natapov<gleb@redhat.com>  wrote:
->>>>> A couple of general question about ABI. If they were already answered
->>>>> just refer me to the previous discussion.
->>>>>
->>>>> On Tue, Jan 08, 2013 at 01:38:55PM -0500, Christoffer Dall wrote:
->>>>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->>>>>> index a4df553..4237c27 100644
->>>>>> --- a/Documentation/virtual/kvm/api.txt
->>>>>> +++ b/Documentation/virtual/kvm/api.txt
->>>>>> @@ -293,7 +293,7 @@ kvm_run' (see below).
->>>>>> 4.11 KVM_GET_REGS
->>>>>>
->>>>>> Capability: basic
->>>>>> -Architectures: all
->>>>>> +Architectures: all except ARM
->>>>>> Type: vcpu ioctl
->>>>>> Parameters: struct kvm_regs (out)
->>>>>> Returns: 0 on success, -1 on error
->>>>>> @@ -314,7 +314,7 @@ struct kvm_regs {
->>>>>> 4.12 KVM_SET_REGS
->>>>>>
->>>>>> Capability: basic
->>>>>> -Architectures: all
->>>>>> +Architectures: all except ARM
->>>>>> Type: vcpu ioctl
->>>>>> Parameters: struct kvm_regs (in)
->>>>>> Returns: 0 on success, -1 on error
->>>>>> @@ -600,7 +600,7 @@ struct kvm_fpu {
->>>>>> 4.24 KVM_CREATE_IRQCHIP
->>>>> Why KVM_GET_REGS/KVM_SET_REGS are not usable for arm?
->>>>>
->>>> We use the ONE_REG API instead and we don't want to support two
->>>> separate APIs to user space.
->>>>
->>> I suppose fetching all registers is not anywhere on a fast path in
->>> userspace :)
->> If it's ever going to be in a fast path, we will add MULTI_REG which will feature an array of ONE_REG structs to fetch multiple registers at once.
+>>> The difference between KVM_INTERRUPT and KVM_IRQ_LINE line
+>>> is that former is used when destination cpu is known to userspace later
+>>> is used when kernel code is involved in figuring out the destination.
+>> This doesn't match up with Avi's explanation at all.
 >>
-> And I hope it will not be. On x86 only the broken vmware PV
-> interface requires reading registers for emulation.
+>>> The
+>>> injections themselves are currently synchronous for both of them on x86
+>>> and ARM. i.e vcpu is kicked out from guest mode when interrupt need to
+>>> be injected into a guest and vcpu state is changed to inject interrupt
+>>> during next guest entry. In the near feature x86 will be able to inject
+>>> interrupt without kicking vcpu out from the guest mode does ARM plan to
+>>> do the same? For GIC interrupts or for IRQ/FIQ or for both?
+>>>
+>>>> There was a big discussion thread about this on kvm and qemu-devel last
+>>>> July (and we cleaned up some of the QEMU code to not smoosh together
+>>>> all these different concepts under "do I have an irqchip or not?").
+>>> Do you have a pointer?
+>>    http://lists.gnu.org/archive/html/qemu-devel/2012-07/msg02460.html
+>> and there was a later longer (but less clear) thread which included
+>> this mail from Avi:
+>>    http://lists.gnu.org/archive/html/qemu-devel/2012-07/msg02872.html
+>> basically explaining that the reason for the weird synchronous
+>> KVM_INTERRUPT API is that it's emulating a weird synchronous
+>> hardware interface which is specific to x86. ARM doesn't have
+>> a synchronous interface in the same way, so it's much more
+>> straightforward to use KVM_IRQ_LINE.
+>>
+> OK. I see. So basically Avi saw KVM_INTERRUPT as an oddball interface
+> required only for APIC emulation in userspace. It is used for PIC also,
+> where this is not strictly needed, but this is for historical reasons
+> (KVM_IRQ_LINE was introduces late and it is GSI centric on x86).
 >
-> This reminds me the question I wanted to ask you about ONE_REG
-> interface. Why architecture is encoded in register name? Is architecture
-> implied by HW the code is running on anyway?
+> Thank you for the pointer.
 
-It provides for nice sanity checks. Also, 64 bits are quite a lot, so we 
-can easily waste a few bits for redundancy.
+Yeah, please keep in mind that KVM_INTERRUPT is not a unified interface 
+either. In fact, it is asynchronous on PPC :). And it's called 
+KVM_S390_INTERRUPT on s390 and also asynchronous. X86 is the oddball here.
+
+But I don't care whether we call the ioctl to steer CPU interrupt pins 
+KVM_INTERRUPT, KVM_S390_INTERRUPT or KVM_IRQ_LINE, as long as the code 
+makes it obvious what is happening.
 
 
 Alex
