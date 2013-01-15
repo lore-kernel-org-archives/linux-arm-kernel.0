@@ -1,19 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 Jan 2013 22:06:36 +0900
-Subject: [PATCH 12/26] mfd: ab8500-debugfs: Use NULL to initialise
- remaining NULL pointer
-In-Reply-To: <1358254566-12419-13-git-send-email-lee.jones@linaro.org>
-References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
- <1358254566-12419-13-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130115130635.GH5701@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Jan 2013 13:07:26 +0000
+Subject: [PATCH 2/6] arm: mvebu: Enable USB controllers on Armada 370
+ evaluation board
+In-Reply-To: <1358243670-11935-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1358243670-11935-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <201301151307.26665.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 12:55:52PM +0000, Lee Jones wrote:
-> Partly for coding style reasons, but mostly because sparse warns on it.
-> 
-> This patch is a completion of a previous patch my Mark Brown.
+On Tuesday 15 January 2013, Ezequiel Garcia wrote:
+> Cc: Lior Amsalem <alior@marvell.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-Typo there :)
+The patches look good, but when you have four trivial patches
+doing the same thing in different files, and you decide that it's
+not worth writing a changelog for them, they should probably
+go into a single patch.
 
-Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+	Arnd
