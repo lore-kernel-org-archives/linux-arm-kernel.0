@@ -1,81 +1,140 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Wed, 16 Jan 2013 13:01:15 -0500
-Subject: [PATCH v6 09/13] ARM: KVM: vgic: retire queued, disabled interrupts
+Date: Wed, 16 Jan 2013 13:01:29 -0500
+Subject: [PATCH v6 11/13] ARM: KVM: VGIC control interface world switch
 In-Reply-To: <20130116180013.29393.49165.stgit@ubuntu>
 References: <20130116180013.29393.49165.stgit@ubuntu>
-Message-ID: <20130116180115.29393.20261.stgit@ubuntu>
+Message-ID: <20130116180129.29393.24683.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-An interrupt may have been disabled after being made pending on the
-CPU interface (the classic case is a timer running while we're
-rebooting the guest - the interrupt would kick as soon as the CPU
-interface gets enabled, with deadly consequences).
-
-The solution is to examine already active LRs, and check the
-interrupt is still enabled. If not, just retire it.
+Enable the VGIC control interface to be save-restored on world switch.
 
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
- arch/arm/kvm/vgic.c |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/kernel/asm-offsets.c  |   12 ++++++
+ arch/arm/kvm/interrupts_head.S |   74 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 86 insertions(+)
 
-diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-index 8f32702..2d5e29f 100644
---- a/arch/arm/kvm/vgic.c
-+++ b/arch/arm/kvm/vgic.c
-@@ -71,6 +71,7 @@
- #define ACCESS_WRITE_VALUE	(3 << 1)
- #define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index c8b3272..17cea2e 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -169,6 +169,18 @@ int main(void)
+   DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.hxfar));
+   DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.hpfar));
+   DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.hyp_pc));
++#ifdef CONFIG_KVM_ARM_VGIC
++  DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
++  DEFINE(VGIC_CPU_HCR,		offsetof(struct vgic_cpu, vgic_hcr));
++  DEFINE(VGIC_CPU_VMCR,		offsetof(struct vgic_cpu, vgic_vmcr));
++  DEFINE(VGIC_CPU_MISR,		offsetof(struct vgic_cpu, vgic_misr));
++  DEFINE(VGIC_CPU_EISR,		offsetof(struct vgic_cpu, vgic_eisr));
++  DEFINE(VGIC_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_elrsr));
++  DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
++  DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
++  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
++  DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
++#endif
+   DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
+ #endif
+   return 0; 
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 6a95d34..9e815a5 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -1,3 +1,5 @@
++#include <asm/hardware/gic.h>
++
+ #define VCPU_USR_REG(_reg_nr)	(VCPU_USR_REGS + (_reg_nr * 4))
+ #define VCPU_USR_SP		(VCPU_USR_REG(13))
+ #define VCPU_USR_LR		(VCPU_USR_REG(14))
+@@ -369,6 +371,49 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  * Assumes vcpu pointer in vcpu reg
+  */
+ .macro save_vgic_state
++#ifdef CONFIG_KVM_ARM_VGIC
++	/* Get VGIC VCTRL base into r2 */
++	ldr	r2, [vcpu, #VCPU_KVM]
++	ldr	r2, [r2, #KVM_VGIC_VCTRL]
++	cmp	r2, #0
++	beq	2f
++
++	/* Compute the address of struct vgic_cpu */
++	add	r11, vcpu, #VCPU_VGIC_CPU
++
++	/* Save all interesting registers */
++	ldr	r3, [r2, #GICH_HCR]
++	ldr	r4, [r2, #GICH_VMCR]
++	ldr	r5, [r2, #GICH_MISR]
++	ldr	r6, [r2, #GICH_EISR0]
++	ldr	r7, [r2, #GICH_EISR1]
++	ldr	r8, [r2, #GICH_ELRSR0]
++	ldr	r9, [r2, #GICH_ELRSR1]
++	ldr	r10, [r2, #GICH_APR]
++
++	str	r3, [r11, #VGIC_CPU_HCR]
++	str	r4, [r11, #VGIC_CPU_VMCR]
++	str	r5, [r11, #VGIC_CPU_MISR]
++	str	r6, [r11, #VGIC_CPU_EISR]
++	str	r7, [r11, #(VGIC_CPU_EISR + 4)]
++	str	r8, [r11, #VGIC_CPU_ELRSR]
++	str	r9, [r11, #(VGIC_CPU_ELRSR + 4)]
++	str	r10, [r11, #VGIC_CPU_APR]
++
++	/* Clear GICH_HCR */
++	mov	r5, #0
++	str	r5, [r2, #GICH_HCR]
++
++	/* Save list registers */
++	add	r2, r2, #GICH_LR0
++	add	r3, r11, #VGIC_CPU_LR
++	ldr	r4, [r11, #VGIC_CPU_NR_LR]
++1:	ldr	r6, [r2], #4
++	str	r6, [r3], #4
++	subs	r4, r4, #1
++	bne	1b
++2:
++#endif
+ .endm
  
-+static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
- static void vgic_update_state(struct kvm *kvm);
- static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
- 
-@@ -353,6 +354,7 @@ static bool handle_mmio_clear_enable_reg(struct kvm_vcpu *vcpu,
- 	if (mmio->is_write) {
- 		if (offset < 4) /* Force SGI enabled */
- 			*reg |= 0xffff;
-+		vgic_retire_disabled_irqs(vcpu);
- 		vgic_update_state(vcpu->kvm);
- 		return true;
- 	}
-@@ -804,6 +806,34 @@ static void vgic_update_state(struct kvm *kvm)
- 	(((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
- #define MK_LR_PEND(src, irq)	\
- 	(GICH_LR_PENDING_BIT | ((src) << GICH_LR_PHYSID_CPUID_SHIFT) | (irq))
-+
-+/*
-+ * An interrupt may have been disabled after being made pending on the
-+ * CPU interface (the classic case is a timer running while we're
-+ * rebooting the guest - the interrupt would kick as soon as the CPU
-+ * interface gets enabled, with deadly consequences).
-+ *
-+ * The solution is to examine already active LRs, and check the
-+ * interrupt is still enabled. If not, just retire it.
-+ */
-+static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	int lr;
-+
-+	for_each_set_bit(lr, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-+		int irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
-+
-+		if (!vgic_irq_is_enabled(vcpu, irq)) {
-+			vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
-+			clear_bit(lr, vgic_cpu->lr_used);
-+			vgic_cpu->vgic_lr[lr] &= ~GICH_LR_STATE;
-+			if (vgic_irq_is_active(vcpu, irq))
-+				vgic_irq_clear_active(vcpu, irq);
-+		}
-+	}
-+}
-+
  /*
-  * Queue an interrupt to a CPU virtual interface. Return true on success,
-  * or false if it wasn't possible to queue it.
+@@ -377,6 +422,35 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  * Assumes vcpu pointer in vcpu reg
+  */
+ .macro restore_vgic_state
++#ifdef CONFIG_KVM_ARM_VGIC
++	/* Get VGIC VCTRL base into r2 */
++	ldr	r2, [vcpu, #VCPU_KVM]
++	ldr	r2, [r2, #KVM_VGIC_VCTRL]
++	cmp	r2, #0
++	beq	2f
++
++	/* Compute the address of struct vgic_cpu */
++	add	r11, vcpu, #VCPU_VGIC_CPU
++
++	/* We only restore a minimal set of registers */
++	ldr	r3, [r11, #VGIC_CPU_HCR]
++	ldr	r4, [r11, #VGIC_CPU_VMCR]
++	ldr	r8, [r11, #VGIC_CPU_APR]
++
++	str	r3, [r2, #GICH_HCR]
++	str	r4, [r2, #GICH_VMCR]
++	str	r8, [r2, #GICH_APR]
++
++	/* Restore list registers */
++	add	r2, r2, #GICH_LR0
++	add	r3, r11, #VGIC_CPU_LR
++	ldr	r4, [r11, #VGIC_CPU_NR_LR]
++1:	ldr	r6, [r3], #4
++	str	r6, [r2], #4
++	subs	r4, r4, #1
++	bne	1b
++2:
++#endif
+ .endm
+ 
+ .equ vmentry,	0
