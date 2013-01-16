@@ -1,79 +1,57 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Wed, 16 Jan 2013 09:54:38 +0000
-Subject: [PATCH 3/3] can: c_can: Enable clock before first use
-In-Reply-To: <50F65ECF.6070802@st.com>
-References: <cover.1355996839.git.amit.virdi@st.com>
- <3ce526df6a4f9e71f8b05132689db7426bae6bbb.1355996839.git.amit.virdi@st.com>
- <50D31B96.8010501@pengutronix.de> <50F65ECF.6070802@st.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAED247@DBDE01.ent.ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 16 Jan 2013 09:59:09 +0000
+Subject: [PATCH 2/4] clk: ux500: Ensure the FMSC clock is obtainable
+In-Reply-To: <20130115235252.23734.21408@quantum>
+References: <1355937587-31730-1-git-send-email-lee.jones@linaro.org>
+ <1355937587-31730-2-git-send-email-lee.jones@linaro.org>
+ <20130115235252.23734.21408@quantum>
+Message-ID: <20130116095909.GH9379@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Rafael +arm list
+On Tue, 15 Jan 2013, Mike Turquette wrote:
 
-On Wed, Jan 16, 2013 at 13:33:27, Amit Virdi wrote:
-> On 12/20/2012 7:37 PM, Marc Kleine-Budde wrote:
-> > On 12/20/2012 11:05 AM, Amit Virdi wrote:
-> >> Current implementation assumes clock to be always enabled. Instead,
-> >> explicitly enable device clock before usage.
-> >>
-> >> Signed-off-by: Amit Virdi<amit.virdi@st.com>
-> >> Reviewed-by: Shiraz Hashim<shiraz.hashim@st.com>
-> >> ---
-> >>   drivers/net/can/c_can/c_can_platform.c | 8 ++++++++
-> >>   1 file changed, 8 insertions(+)
-> >>
-> >> diff --git a/drivers/net/can/c_can/c_can_platform.c b/drivers/net/can/c_can/c_can_platform.c
-> >> index 6e8dc56..d0bd6e6 100644
-> >> --- a/drivers/net/can/c_can/c_can_platform.c
-> >> +++ b/drivers/net/can/c_can/c_can_platform.c
-> >> @@ -194,6 +194,12 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
-> >>   		goto exit;
-> >>   	}
-> >>
-> >> +	ret = clk_prepare_enable(clk);
-> >> +	if (ret) {
-> >> +		dev_err(&pdev->dev, "could not prepare CAN clock\n");
-> >> +		goto exit_no_clk_en;
-> >> +	}
-> >> +
-> >>   	/* get the platform data */
-> >>   	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >>   	irq = platform_get_irq(pdev, 0);
-> >> @@ -295,6 +301,8 @@ exit_iounmap:
-> >>   exit_release_mem:
-> >>   	release_mem_region(mem->start, resource_size(mem));
-> >>   exit_free_clk:
-> >> +	clk_disable_unprepare(clk);
-> >> +exit_no_clk_en:
-> >>   	clk_put(clk);
-> >>   exit:
-> >>   	dev_err(&pdev->dev, "probe failed\n");
-> >
-> > Why do you have to enable the clock if the driver is loaded? What about
-> > disabling the clock on driver unload. The clock should be enabled on
-> > open and disabled on close if the network interface. If you need to
-> > access the registers of your hardware, you should enable the clock
-> > before accessing the regs and disable the clock when finished.
-> >
+> Quoting Lee Jones (2012-12-19 09:19:45)
+> > The FMSC clock is traditionally used for NAND flash devices when
+> > used on the ux500 series platforms. This patch makes it searchable
+> > during a clock-name search.
+> > 
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Okay, I would take care of it in V2.
+> Acked-by: Mike Turquette <mturquette@linaro.org>
+> 
+> Who do you want this series to go through?
 
-Hi Amit,
+To be honest I don't really mind. I can take them through the
+arm-soc tree with "[1/4] ARM ...", but I still need an Ack from
+the SMSC911x maintainer for "[4/4] ...", before I can do that.
 
-As Marc said clock enable/disable should be in sync with open/
-close functions. I think pm_runtime calls should take care of
-clock control. In your case you have to create a wrapper which
-exports runtime pm hooks, which should internally handle the
-clock enable/disable.
+Still waiting for that. :(
 
-If we add clock specific calls to the driver, then driver might
-break on the platforms which has runtime pm implemented because
-runtime pm support to the c_can driver is already added.
+> > ---
+> >  drivers/clk/ux500/u8500_clk.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+> > index 6b889a0..a601802 100644
+> > --- a/drivers/clk/ux500/u8500_clk.c
+> > +++ b/drivers/clk/ux500/u8500_clk.c
+> > @@ -324,7 +324,7 @@ void u8500_clk_init(void)
+> >  
+> >         clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", U8500_CLKRST3_BASE,
+> >                                 BIT(0), 0);
+> > -       clk_register_clkdev(clk, NULL, "fsmc");
+> > +       clk_register_clkdev(clk, "fsmc", NULL);
+> >  
+> >         clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", U8500_CLKRST3_BASE,
+> >                                 BIT(1), 0);
+> > -- 
+> > 1.7.9.5
 
-Rafael,
-
-Do you have any suggestions here? Am I missing anything here?
-
-Thanks & Regards
-AnilKumar
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
