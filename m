@@ -1,119 +1,28 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 16 Jan 2013 10:58:41 -0200
-Subject: [PATCH v4] video: imxfb: Do not crash on reboot
-Message-ID: <1358341121-19480-1-git-send-email-fabio.estevam@freescale.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 16 Jan 2013 18:36:11 +0530
+Subject: [PATCH 1/2] ARM: tegra: config: enable SERIAL_TEGRA
+Message-ID: <1358341572-8154-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Issuing a "reboot" command after the LCD times out causes the following
-warnings:
+Enable high speed serial driver for tegra platform.
 
-Requesting system reboot
-------------[ cut here ]------------
-WARNING: at drivers/clk/clk.c:471 clk_disable+0x24/0x50()
-Modules linked in:
-[<c001ad90>] (unwind_backtrace+0x0/0xf4) from [<c0025aac>] (warn_slowpath_common+0x48/0x60)
-[<c0025aac>] (warn_slowpath_common+0x48/0x60) from [<c0025ae0>] (warn_slowpath_null+0x1c/0x24)
-[<c0025ae0>] (warn_slowpath_null+0x1c/0x24) from [<c03960a0>] (clk_disable+0x24/0x50)
-[<c03960a0>] (clk_disable+0x24/0x50) from [<c02695a0>] (imxfb_disable_controller+0x48/0x7c)
-[<c02695a0>] (imxfb_disable_controller+0x48/0x7c) from [<c029d838>] (platform_drv_shutdown+0x18/0x1c)
-[<c029d838>] (platform_drv_shutdown+0x18/0x1c) from [<c02990fc>] (device_shutdown+0x48/0x14c)
-[<c02990fc>] (device_shutdown+0x48/0x14c) from [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c)
-[<c003d09c>] (kernel_restart_prepare+0x2c/0x3c) from [<c003d0e4>] (kernel_restart+0xc/0x48)
-[<c003d0e4>] (kernel_restart+0xc/0x48) from [<c003d1e8>] (sys_reboot+0xc0/0x1bc)
-[<c003d1e8>] (sys_reboot+0xc0/0x1bc) from [<c0014ca0>] (ret_fast_syscall+0x0/0x2c)
----[ end trace da6b502ca79c854f ]---
-------------[ cut here ]------------
-WARNING: at drivers/clk/clk.c:380 clk_unprepare+0x1c/0x2c()
-Modules linked in:
-[<c001ad90>] (unwind_backtrace+0x0/0xf4) from [<c0025aac>] (warn_slowpath_common+0x48/0x60)
-[<c0025aac>] (warn_slowpath_common+0x48/0x60) from [<c0025ae0>] (warn_slowpath_null+0x1c/0x24)
-[<c0025ae0>] (warn_slowpath_null+0x1c/0x24) from [<c0396338>] (clk_unprepare+0x1c/0x2c)
-[<c0396338>] (clk_unprepare+0x1c/0x2c) from [<c02695a8>] (imxfb_disable_controller+0x50/0x7c)
-[<c02695a8>] (imxfb_disable_controller+0x50/0x7c) from [<c029d838>] (platform_drv_shutdown+0x18/0x1c)
-[<c029d838>] (platform_drv_shutdown+0x18/0x1c) from [<c02990fc>] (device_shutdown+0x48/0x14c)
-[<c02990fc>] (device_shutdown+0x48/0x14c) from [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c)
-[<c003d09c>] (kernel_restart_prepare+0x2c/0x3c) from [<c003d0e4>] (kernel_restart+0xc/0x48)
-[<c003d0e4>] (kernel_restart+0xc/0x48) from [<c003d1e8>] (sys_reboot+0xc0/0x1bc)
-[<c003d1e8>] (sys_reboot+0xc0/0x1bc) from [<c0014ca0>] (ret_fast_syscall+0x0/0x2c)
----[ end trace da6b502ca79c8550 ]---
-------------[ cut here ]------------
-
-This happens because "reboot" triggers imxfb_shutdown(), which calls
-imxfb_disable_controller with the clocks already disabled.
-
-To prevent this, add a clock enabled status so that we can check if the clocks
-are enabled before disabling them. 
-
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
-Shawn,
+ arch/arm/configs/tegra_defconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Since you have taken a patch recently that touches this file and given the fact
-that we have zero response from the fb maintainer, can you please apply it via
-imx tree?
-
-Changes since v3:
-- Changed from 'clks_enabled' to 'enabled'
-- Use bool instead of int for 'enabled'
-Changes since v2:
-- Use a better naming for the clk enabled variable
-- Return immediately in imxfb_enable_controller/imxfb_disable_controller
-if the the clocks are already enabled/disabled.
-Changes since v1:
-- Protect the whole function instead of only the clocks
- drivers/video/imxfb.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index 8435c5d..609f4e9 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -139,6 +139,7 @@ struct imxfb_info {
- 	struct clk		*clk_ahb;
- 	struct clk		*clk_per;
- 	enum imxfb_type		devtype;
-+	bool			enabled;
- 
- 	/*
- 	 * These are the addresses we mapped
-@@ -536,6 +537,10 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
- 
- static void imxfb_enable_controller(struct imxfb_info *fbi)
- {
-+
-+	if (fbi->enabled)
-+		return;
-+
- 	pr_debug("Enabling LCD controller\n");
- 
- 	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
-@@ -556,6 +561,7 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
- 	clk_prepare_enable(fbi->clk_ipg);
- 	clk_prepare_enable(fbi->clk_ahb);
- 	clk_prepare_enable(fbi->clk_per);
-+	fbi->enabled = true;
- 
- 	if (fbi->backlight_power)
- 		fbi->backlight_power(1);
-@@ -565,6 +571,9 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
- 
- static void imxfb_disable_controller(struct imxfb_info *fbi)
- {
-+	if (!fbi->enabled)
-+		return;
-+
- 	pr_debug("Disabling LCD controller\n");
- 
- 	if (fbi->backlight_power)
-@@ -575,6 +584,7 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
- 	clk_disable_unprepare(fbi->clk_per);
- 	clk_disable_unprepare(fbi->clk_ipg);
- 	clk_disable_unprepare(fbi->clk_ahb);
-+	fbi->enabled = false;
- 
- 	writel(0, fbi->regs + LCDC_RMCR);
- }
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index a7827fd..4c5cc08 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -112,6 +112,7 @@ CONFIG_INPUT_MPU3050=y
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_TEGRA=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
 -- 
-1.7.9.5
+1.7.1.1
