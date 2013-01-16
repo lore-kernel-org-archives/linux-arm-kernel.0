@@ -1,36 +1,46 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 16 Jan 2013 08:48:34 +0000
-Subject: [PATCH 03/18] power: ab8500_charger: Detect charger removal
-In-Reply-To: <20130116013640.GA11105@lizard.fhda.edu>
+Date: Wed, 16 Jan 2013 08:50:30 +0000
+Subject: [PATCH 00/18] AB8500 battery management series upgrade
+In-Reply-To: <20130116014812.GA27065@lizard.fhda.edu>
 References: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
- <1357909986-9262-4-git-send-email-lee.jones@linaro.org>
- <20130116013640.GA11105@lizard.fhda.edu>
-Message-ID: <20130116084834.GF9379@gmail.com>
+ <20130116014812.GA27065@lizard.fhda.edu>
+Message-ID: <20130116085030.GG9379@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 15 Jan 2013, Anton Vorontsov wrote:
 
-> On Fri, Jan 11, 2013 at 01:12:51PM +0000, Lee Jones wrote:
-> > Add two new work queues to provide USB and AC charger disconnect
-> > detection.
+> On Fri, Jan 11, 2013 at 01:12:48PM +0000, Lee Jones wrote:
+> > Here we go again. This patches include your suggested fixups.
 > > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> [....]
-> > +		if ((statval & usbch)) != usbch)
+> > Please find the next instalment of the AB8500 Power drivers upgrade.
+> > A lot of work has taken place on the internal development track, but
+> > little effort has gone into mainlining it. At last count there were
+> > around 70+ patches which are in need of forward-porting, then
+> > upstreaming. This patch-set aims to make a good start. :)
 > 
->   CC      drivers/power/ab8500_charger.o
-> drivers/power/ab8500_charger.c: In function ?ab8500_charger_usb_attached_work?:
-> drivers/power/ab8500_charger.c:1812:26: error: expected expression before ?!=? token
-> drivers/power/ab8500_charger.c:1812:34: error: expected statement before ?)? token
-> drivers/power/ab8500_charger.c: In function ?ab8500_charger_ac_attached_work?:
-> drivers/power/ab8500_charger.c:1852:27: error: expected expression before ?!=? token
-> drivers/power/ab8500_charger.c:1852:36: error: expected statement before ?)? token
+> All except 14/18 applied, thanks!
 > 
-> I fixed it up...
+> Some general notes:
+> 
+> - No need for the power: prefix in the subject, unless it is a core
+>   change;
+> - Try be consistent on the capitalization (I tend to capitalize the first
+>   word, "driver: Fix something". But it's up to you, just be consistent).
+> - Try keep the patches compilable. :)
+> - ..and applicable to the battery tree.
+> 
+> Thanks!
+> 
+> Anton
+> 
+> p.s. I'll push out the battery tree a bit later (in a couple of hours), so
+> don't worry if the commits won't appear just now.
 
-You're a star.
+I'll keep 14/18 back until the next push and I'll try to be
+diligent in adhering to your requests.
+
+Very nice. Thanks Anton.
 
 -- 
 Lee Jones
