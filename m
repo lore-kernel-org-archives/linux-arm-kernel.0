@@ -1,110 +1,29 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Wed, 16 Jan 2013 17:52:12 +0200
-Subject: [PATCH v5 07/14] KVM: ARM: World-switch implementation
-In-Reply-To: <CANM98q+jpzVWfg8drE+azcbDF1Q1suphZyJrij04b+OB4ZX4Dw@mail.gmail.com>
-References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108183924.46302.65998.stgit@ubuntu>
- <20130115094312.GI11529@redhat.com>
- <CANM98q+qScaXniyYjrd9QEZzWKzj3PkCE0YNFUp2ijnCfS_v4w@mail.gmail.com>
- <20130116121238.GS11529@redhat.com>
- <CANM98q+jpzVWfg8drE+azcbDF1Q1suphZyJrij04b+OB4ZX4Dw@mail.gmail.com>
-Message-ID: <20130116155212.GX11529@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 Jan 2013 16:02:42 +0000
+Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
+ management
+In-Reply-To: <alpine.LFD.2.02.1301151140550.6300@xanadu.home>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1358157392.19304.243.camel@jlo-ubuntu-64.nvidia.com>
+ <alpine.LFD.2.02.1301140849020.6300@xanadu.home>
+ <1358217848.8513.14.camel@jlo-ubuntu-64.nvidia.com>
+ <alpine.LFD.2.02.1301151140550.6300@xanadu.home>
+Message-ID: <20130116160242.GB31318@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 10:42:02AM -0500, Christoffer Dall wrote:
-> [...]
+On Tue, Jan 15, 2013 at 04:44:23PM +0000, Nicolas Pitre wrote:
+> On Tue, 15 Jan 2013, Joseph Lo wrote:
+> > So do you have a plan to make it become a generic framework in this
+> > series or later work?
 > 
-> >
-> >> read side RCU protects against is the memslots data structure as far
-> >> as I can see, so the second patch pasted below fixes this for the code
-> >> that actually accesses this data structure.
-> > Many memory related functions that you call access memslots under the
-> > hood and assume that locking is done by the caller. From the quick look
-> > I found those that you've missed:
-> > kvm_is_visible_gfn()
-> > kvm_read_guest()
-> > gfn_to_hva()
-> > gfn_to_pfn_prot()
-> > kvm_memslots()
-> >
-> > May be there are more. Can you enable RCU debugging in your kernel config
-> > and check? This does not guaranty that it will catch all of the places,
-> > but better than nothing.
-> >
+> It is already generic, except for the name.  In other words, you could 
+> start using this code already.
 > 
-> yeah, I missed the call to is_visible_gfn and friends, this fixes it:
-> 
-Thank you. One more kvm_read_guest() in emulate.c.
+> I'm still debating a good substitute for the bL_ prefix in this series 
+> to give it the appearance of generic code.
 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index c806080..f30e131 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -591,7 +591,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu,
-> struct kvm_run *run)
->  	struct kvm_memory_slot *memslot;
->  	bool is_iabt;
->  	gfn_t gfn;
-> -	int ret;
-> +	int ret, idx;
-> 
->  	hsr_ec = vcpu->arch.hsr >> HSR_EC_SHIFT;
->  	is_iabt = (hsr_ec == HSR_EC_IABT);
-> @@ -608,33 +608,43 @@ int kvm_handle_guest_abort(struct kvm_vcpu
-> *vcpu, struct kvm_run *run)
->  		return -EFAULT;
->  	}
-> 
-> +	idx = srcu_read_lock(&vcpu->kvm->srcu);
-> +
->  	gfn = fault_ipa >> PAGE_SHIFT;
->  	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
->  		if (is_iabt) {
->  			/* Prefetch Abort on I/O address */
->  			kvm_inject_pabt(vcpu, vcpu->arch.hxfar);
-> -			return 1;
-> +			ret = 1;
-> +			goto out_unlock;
->  		}
-> 
->  		if (fault_status != FSC_FAULT) {
->  			kvm_err("Unsupported fault status on io memory: %#lx\n",
->  				fault_status);
-> -			return -EFAULT;
-> +			ret = -EFAULT;
-> +			goto out_unlock;
->  		}
-> 
->  		/* Adjust page offset */
->  		fault_ipa |= vcpu->arch.hxfar & ~PAGE_MASK;
-> -		return io_mem_abort(vcpu, run, fault_ipa);
-> +		ret = io_mem_abort(vcpu, run, fault_ipa);
-> +		goto out_unlock;
->  	}
-> 
->  	memslot = gfn_to_memslot(vcpu->kvm, gfn);
->  	if (!memslot->user_alloc) {
->  		kvm_err("non user-alloc memslots not supported\n");
-> -		return -EINVAL;
-> +		ret = -EINVAL;
-> +		goto out_unlock;
->  	}
-> 
->  	ret = user_mem_abort(vcpu, fault_ipa, gfn, memslot, fault_status);
-> -	return ret ? ret : 1;
-> +	if (ret == 0)
-> +		ret = 1;
-> +out_unlock:
-> +	srcu_read_unlock(&vcpu->kvm->srcu, idx);
-> +	return ret;
->  }
-> 
->  static void handle_hva_to_gpa(struct kvm *kvm,
-> --
-> 
-> Thanks,
-> -Christoffer
+mc_?
 
---
-			Gleb.
+-- 
+Catalin
