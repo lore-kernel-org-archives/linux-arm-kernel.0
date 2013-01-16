@@ -1,42 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 16 Jan 2013 15:02:21 +0900
-Subject: [GIT PULL v3] Renesas ARM-based SoC defconfig for v3.9
-Message-ID: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 16 Jan 2013 15:02:26 +0900
+Subject: [PATCH 5/5] ARM: mach-shmobile: kzm9d: update defconfig
+In-Reply-To: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
+References: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1358316146-12579-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+* Do not disable SUSPEND
 
-please consider the following defconfig enhancements for 3.9.
+  Suspend seems to work fine on the kzm9d.
 
-----------------------------------------------------------------
-The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+  This is part of an effort reduce differences between mach-shmobile
+  defconfigs with a view to using a common defconfig.
 
-  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+* Enable PM_RUNTIME
 
-are available in the git repository at:
+  This also seems to work fine on the kzm9d.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git defconfig
+  This is part of an effort reduce differences between mach-shmobile
+  defconfigs with a view to using a common defconfig.
 
-for you to fetch changes up to 8098df15c26b2bf16924df5a134d1a649692ab62:
+* Move kernel command line from defconfig to dts.
 
-  ARM: mach-shmobile: kzm9d: update defconfig (2013-01-15 08:57:09 +0900)
+  This brings us one small step closer to sharing defconfig
+  between kzm9d and other boards.
 
-----------------------------------------------------------------
-Simon Horman (5):
-      ARM: mach-shmobile: mackerel: update defconfig
-      ARM: mach-shmobile: fix memory size for kota2_defconfig
-      ARM: mach-shmobile: kzm9g: defconfig update
-      ARM: mach-shmobile: armadillo: update defconfig
-      ARM: mach-shmobile: kzm9d: update defconfig
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/emev2-kzm9d.dts |    2 +-
+ arch/arm/configs/kzm9d_defconfig  |    4 +---
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
- arch/arm/boot/dts/emev2-kzm9d.dts             |    2 +-
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    4 ++++
- arch/arm/boot/dts/sh7372-mackerel.dts         |    4 ++++
- arch/arm/boot/dts/sh73a0-kzm9g.dts            |    4 ++++
- arch/arm/configs/armadillo800eva_defconfig    |    5 ++---
- arch/arm/configs/kota2_defconfig              |    2 +-
- arch/arm/configs/kzm9d_defconfig              |    4 +---
- arch/arm/configs/kzm9g_defconfig              |    4 +++-
- arch/arm/configs/mackerel_defconfig           |    2 +-
- 9 files changed, 21 insertions(+), 10 deletions(-)
+diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+index 297e3ba..b9b3241 100644
+--- a/arch/arm/boot/dts/emev2-kzm9d.dts
++++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+@@ -21,6 +21,6 @@
+ 	};
+ 
+ 	chosen {
+-		bootargs = "console=ttyS1,115200n81";
++		bootargs = "console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096";
+ 	};
+ };
+diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
+index 8c49df6..6c37f4a 100644
+--- a/arch/arm/configs/kzm9d_defconfig
++++ b/arch/arm/configs/kzm9d_defconfig
+@@ -32,11 +32,9 @@ CONFIG_FORCE_MAX_ZONEORDER=13
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_CMDLINE="console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096"
+-CONFIG_CMDLINE_FORCE=y
+ CONFIG_VFP=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-# CONFIG_SUSPEND is not set
++CONFIG_PM_RUNTIME=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+-- 
+1.7.10.4
