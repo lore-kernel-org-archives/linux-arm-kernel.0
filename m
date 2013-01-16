@@ -1,27 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 16 Jan 2013 22:04:05 +0800
-Subject: [PATCH 4/4] ARM: uncompress: support uncompress debug for
- multiplatform build
-In-Reply-To: <20130115190401.GA28333@quad.lixom.net>
-References: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
- <1355319945-3199-5-git-send-email-shawn.guo@linaro.org>
- <20130111191116.GA999@quad.lixom.net>
- <20130112032934.GA14865@S2101-09.ap.freescale.net>
- <20130115190401.GA28333@quad.lixom.net>
-Message-ID: <20130116140403.GA25618@S2101-09.ap.freescale.net>
+From: zbr@ioremap.net (Evgeniy Polyakov)
+Date: Wed, 16 Jan 2013 18:17:54 +0400
+Subject: [PATCH  0/5] W1: Support onewire master on i.MX53
+In-Reply-To: <20130116094821.9660.18278.stgit@localhost>
+References: <20130116094821.9660.18278.stgit@localhost>
+Message-ID: <20130116141754.GB23638@ioremap.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 11:04:01AM -0800, Olof Johansson wrote:
-> Most functionality to deal with this already exist in the
-> include/debug/*.S files files, you just need to instantiate the macros
-> somewhere (compressed/head.S, or a separate file), and wrap the calls
-> to those instantiated assembly functions in a generic header file.
-> 
-> That way, every platform that has a DEBUG_LL implementation should be able to
-> reuse that, and no need to enable every platform one by one.
-> 
-Ok, got your point.  I'm working on a solution as what you suggest here.
-So please ignore that pull request I sent.
+Hi
 
-Shawn
+On Wed, Jan 16, 2013 at 10:48:21AM +0100, Martin Fuzzey (mfuzzey at parkeon.com) wrote:
+> W1: Support onewire master on i.MX53
+> 	* Add device tree and pinctrl support to the MXC master driver
+> 	* Add i.MX53 clocks
+> 	* Add i.MX53 device tree entries
+> 
+> The final patch converts the driver to use devm_
+
+Looks good to me, thank you
+Acked-by: Evgeniy Polyakov <zbr@ioremap.net>
+
+-- 
+	Evgeniy Polyakov
