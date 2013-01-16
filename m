@@ -1,45 +1,86 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 16 Jan 2013 14:51:42 -0800
-Subject: [PATCH V4 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle for
- powered-down mode
-In-Reply-To: <50F71C21.20904@wwwdotorg.org>
-References: <1358323873-30525-1-git-send-email-josephl@nvidia.com>
- <CAMbhsRTmGVrjnKa_z+zonGypU+U4r2iE=D-Zfvyoq8chY68QKQ@mail.gmail.com>
- <50F71C21.20904@wwwdotorg.org>
-Message-ID: <CAMbhsRTXOgKCJjuapdGFhM9JNi0+V-dWPormDSE3tQ4rO1i1yg@mail.gmail.com>
+From: smoch@web.de (Soeren Moch)
+Date: Thu, 17 Jan 2013 00:10:09 +0100
+Subject: [PATCH] ata: sata_mv: fix sg_tbl_pool alignment
+In-Reply-To: <20130116175203.GK25500@titan.lakedaemon.net>
+References: <20130115165642.GA25500@titan.lakedaemon.net>
+ <20130115175020.GA3764@kroah.com>
+ <20130115201617.GC25500@titan.lakedaemon.net>
+ <20130115215602.GF25500@titan.lakedaemon.net> <50F5F1B7.3040201@web.de>
+ <20130116024014.GH25500@titan.lakedaemon.net> <50F61D86.4020801@web.de>
+ <50F66B1B.40301@web.de> <20130116155045.GI25500@titan.lakedaemon.net>
+ <50F6DDF7.9080605@web.de> <20130116175203.GK25500@titan.lakedaemon.net>
+Message-ID: <50F73351.3050708@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 1:31 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 01/16/2013 11:55 AM, Colin Cross wrote:
->> On Wed, Jan 16, 2013 at 12:11 AM, Joseph Lo <josephl@nvidia.com> wrote:
->>> The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
->>> core to go into this mode before other core. The coupled cpuidle framework
->>> can help to sync the MPCore to coupled state then go into "powered-down"
->>> idle mode together. The driver can just assume the MPCore come into
->>> "powered-down" mode at the same time. No need to take care if the CPU_0
->>> goes into this mode along and only can put it into safe idle mode (WFI).
+On 16.01.2013 18:52, Jason Cooper wrote:
+> On Wed, Jan 16, 2013 at 06:05:59PM +0100, Soeren Moch wrote:
+>> On 16.01.2013 16:50, Jason Cooper wrote:
+>>> On Wed, Jan 16, 2013 at 09:55:55AM +0100, Soeren Moch wrote:
+>>>> On 16.01.2013 04:24, Soeren Moch wrote:
+>>>>> On 16.01.2013 03:40, Jason Cooper wrote:
+>>>>>> On Wed, Jan 16, 2013 at 01:17:59AM +0100, Soeren Moch wrote:
+>>>>>>> On 15.01.2013 22:56, Jason Cooper wrote:
+>>>>>>>> On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
 >>>
->>> The powered-down state of Tegra20 requires power gating both CPU cores.
->>> When the secondary CPU requests to enter powered-down state, it saves
->>> its own contexts and then enters WFI for waiting CPU0 in the same state.
->>> When the CPU0 requests powered-down state, it attempts to put the secondary
->>> CPU into reset to prevent it from waking up. Then power down both CPUs
->>> together and power off the cpu rail.
+>>>> OK, I could trigger the error
+>>>>    ERROR: 1024 KiB atomic DMA coherent pool is too small!
+>>>>    Please increase it with coherent_pool= kernel parameter!
+>>>> only with em28xx sticks and sata, dib0700 sticks removed.
 >>>
->>> Be aware of that, you may see the legacy power state "LP2" in the code
+>>> Did you test the reverse scenario?  ie dib0700 with sata_mv and no
+>>> em28xx.
+>>
+>> Maybe I can test this next night.
 >
-> Colin, since you only raised a few small issues on this series, does
-> that mean you're OK with it once those issues are fixed?
-
-I didn't review the Tegra-specific parts careful, but from the coupled
-cpuidle perspective, with the comments I pointed out,
-Acked-by: Colin Cross <ccross@android.com>
-
-> Joseph, we'll be merging Tegra114 in the near future. How will this
-> patch series affect Tegra114? Will the cpuidle driver simply fail to
-> register on Tegra114 (which would be fine until we explicitly add
-> support), or would we need to disable cpuidle in Kconfig to get a
-> working Tegra114 kernel. Does this patch series affect the answer to the
-> previous question? Thanks.
+> Please do, this will tell us if it is in the USB drivers or lower
+> (something in common).
 >
+>>>>>> What would be most helpful is if you could do a git bisect between
+>>>>>> v3.5.x (working) and the oldest version where you know it started
+>>>>>> failing (v3.7.1 or earlier if you know it).
+>>>>>>
+>>>>> I did not bisect it, but Marek mentioned earlier that commit
+>>>>> e9da6e9905e639b0f842a244bc770b48ad0523e9 in Linux v3.6-rc1 introduced
+>>>>> new code for dma allocations. This is probably the root cause for the
+>>>>> new (mis-)behavior (due to my tests 3.6.0 is not working anymore).
+>>>>
+>>>> I don't want to say that Mareks patch is wrong, probably it triggers a
+>>>> bug somewhere else! (in em28xx?)
+>>>
+>>> Of the four drivers you listed, none are using dma.  sata_mv is the only
+>>> one.
+>>
+>> usb_core is doing the actual DMA for the usb bridge drivers, I think.
+>
+> Yes, my mistake.  I'd like to attribute that statement to pre-coffee
+> rambling. :-)
+>
+>>> If one is to believe the comments in sata_mv.c:~151, then the alignment
+>>> is wrong for the sg_tbl_pool.
+>>>
+>>> Could you please try the following patch?
+>>
+>> OK, what should I test first, the setup from last night (em28xx, no
+>> dib0700) plus your patch, or the reverse setup (dib0700, no em28xx)
+>> without your patch, or my normal setting (all dvb sticks) plus your
+>> patch?
+>
+> if testing time is limited, please do the test I outlined at the top of
+> this email.  I've been digging more into the dma code and while I think
+> the patch is correct, I don't see where it would fix your problem (yet).
+
+Unfortunately test time is limited, and the test has to run about
+10 hours to trigger the error.
+
+I also think that sata is not causing the problem.
+Maybe your patch even goes in the wrong direction. Perhaps the dma
+memory pool is not too small, there might be enough memory available,
+but it is too much fragmented to satisfy larger block allocations. With 
+different drivers allocating totally different block sizes aligned to
+bytes or words, perhaps we end up with lots of very small free blocks
+in the dma pool after several hours of runtime?
+So maybe it would help to align all allocations in the dma pool to 256B?
+
+Regards,
+Soeren
