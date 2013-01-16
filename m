@@ -1,113 +1,23 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 16 Jan 2013 14:13:57 +0100
-Subject: [PATCH 2/5] mmc: mvsdio: use slot-gpio infrastructure for write
- protect gpio
-In-Reply-To: <1358342040-7130-1-git-send-email-andrew@lunn.ch>
-References: <1358342040-7130-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1358342040-7130-3-git-send-email-andrew@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Jan 2013 13:14:22 +0000
+Subject: [PATCH v5 07/14] KVM: ARM: World-switch implementation
+In-Reply-To: <20130116121238.GS11529@redhat.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183924.46302.65998.stgit@ubuntu> <20130115094312.GI11529@redhat.com>
+ <CANM98q+qScaXniyYjrd9QEZzWKzj3PkCE0YNFUp2ijnCfS_v4w@mail.gmail.com>
+ <20130116121238.GS11529@redhat.com>
+Message-ID: <20130116131422.GT23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+If you're going to bother commenting on a big long email, please
+_CHOP OUT_ content which is not relevant to your reply.  I paged down 5
+pages, hit end, paged up, found no comment from you, so I'm not going to
+bother reading anything further in this message.
 
-The MMC core subsystem provides in drivers/mmc/core/slot-gpio.c a nice
-set of helper functions to simplify the management of the write
-protect GPIO in MMC host drivers. This patch migrates the mvsdio
-driver to using those helpers, which will make the ->probe() code
-simpler, and therefore ease the process of adding a Device Tree
-binding for this driver.
+Help your readers to read your email.  Don't expect them to search a
+1600-line email message for a one line reply.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Stefan Peter <s.peter@mpl.ch>
-Tested-by: Florian Fainelli <florian@openwrt.org>
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
- drivers/mmc/host/mvsdio.c |   30 +++++-------------------------
- 1 file changed, 5 insertions(+), 25 deletions(-)
-
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index f8dd361..c6dc8fd 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -22,6 +22,7 @@
- #include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/mmc/host.h>
-+#include <linux/mmc/slot-gpio.h>
- 
- #include <asm/sizes.h>
- #include <asm/unaligned.h>
-@@ -52,7 +53,6 @@ struct mvsd_host {
- 	struct device *dev;
- 	struct clk *clk;
- 	int gpio_card_detect;
--	int gpio_write_protect;
- };
- 
- #define mvsd_write(offs, val)	writel(val, iobase + (offs))
-@@ -564,20 +564,6 @@ static void mvsd_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 	spin_unlock_irqrestore(&host->lock, flags);
- }
- 
--static int mvsd_get_ro(struct mmc_host *mmc)
--{
--	struct mvsd_host *host = mmc_priv(mmc);
--
--	if (host->gpio_write_protect)
--		return gpio_get_value(host->gpio_write_protect);
--
--	/*
--	 * Board doesn't support read only detection; let the mmc core
--	 * decide what to do.
--	 */
--	return -ENOSYS;
--}
--
- static void mvsd_power_up(struct mvsd_host *host)
- {
- 	void __iomem *iobase = host->base;
-@@ -674,7 +660,7 @@ static void mvsd_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 
- static const struct mmc_host_ops mvsd_ops = {
- 	.request		= mvsd_request,
--	.get_ro			= mvsd_get_ro,
-+	.get_ro			= mmc_gpio_get_ro,
- 	.set_ios		= mvsd_set_ios,
- 	.enable_sdio_irq	= mvsd_enable_sdio_irq,
- };
-@@ -793,15 +779,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	if (!host->gpio_card_detect)
- 		mmc->caps |= MMC_CAP_NEEDS_POLL;
- 
--	if (mvsd_data->gpio_write_protect) {
--		ret = devm_gpio_request_one(&pdev->dev,
--					    mvsd_data->gpio_write_protect,
--					    GPIOF_IN, DRIVER_NAME " wp");
--		if (ret == 0) {
--			host->gpio_write_protect =
--				mvsd_data->gpio_write_protect;
--		}
--	}
-+	mmc_gpio_request_ro(mmc, mvsd_data->gpio_write_protect);
- 
- 	setup_timer(&host->timer, mvsd_timeout_timer, (unsigned long)host);
- 	platform_set_drvdata(pdev, mmc);
-@@ -820,6 +798,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 
- out:
- 	if (mmc) {
-+		mmc_gpio_free_ro(mmc);
- 		if (!IS_ERR(host->clk))
- 			clk_disable_unprepare(host->clk);
- 		mmc_free_host(mmc);
-@@ -834,6 +813,7 @@ static int __exit mvsd_remove(struct platform_device *pdev)
- 
- 	struct mvsd_host *host = mmc_priv(mmc);
- 
-+	mmc_gpio_free_ro(mmc);
- 	mmc_remove_host(mmc);
- 	del_timer_sync(&host->timer);
- 	mvsd_power_down(host);
--- 
-1.7.10.4
+(This has been said many times over the history of the Internet.  There's
+etiquette documents on Internet mail stating it too.  Please, comply
+with it or you will find people will ignore your messages.)
