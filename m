@@ -1,56 +1,56 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 16 Jan 2013 08:27:54 -0800
-Subject: linux-next: manual merge of the tegra tree with the arm-soc tree
-In-Reply-To: <1358311923.537.3.camel@gitbox>
-References: <20130116141411.8fadedee54ed35dc0eddd288@canb.auug.org.au>
- <1358308153.32106.8.camel@gitbox> <50F62D69.8080100@nvidia.com>
- <1358311923.537.3.camel@gitbox>
-Message-ID: <CAOesGMgr_f-XGHOdMW3ugfXbVaUc4EALrbfJD=XeOKixxrY8PA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 16 Jan 2013 16:36:03 +0000
+Subject: [PATCH 1/5] W1: Add device tree support to MXC onewire master.
+In-Reply-To: <20130116094823.9660.2116.stgit@localhost>
+References: <20130116094821.9660.18278.stgit@localhost>
+ <20130116094823.9660.2116.stgit@localhost>
+Message-ID: <20130116163603.GA20855@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jan 15, 2013 at 8:52 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
-> On Tue, 2013-01-15 at 21:32 -0700, Stephen Warren wrote:
->> On 01/15/2013 08:49 PM, Tony Prisk wrote:
->> > On Wed, 2013-01-16 at 14:14 +1100, Stephen Rothwell wrote:
->> >> Hi all,
->> >>
->> >> Today's linux-next merge of the tegra tree got a conflict in
->> >> drivers/clocksource/Makefile between commit ff7ec345f0ec ("timer: vt8500:
->> >> Move timer code to drivers/clocksource") from the arm-soc tree and commit
->> >> ac0fd9eca3ba ("ARM: tegra: move timer.c to drivers/clocksource/") from
->> >> the tegra tree.
->> >>
->> >> I fixed it up (see below) and can carry the fix as necessary (no action
->> >> is required).
->> >>
->> >
->> > I don't know about everyone else, but I feel the preference should be to
->> > keep things alphabetized where possible to help avoid with merge
->> > conflicts later on. This is always a problem when we start tacking
->> > things on the end of lists.
->> >
->> > I realise this Kconfig is not alphabetized anyway, but it's never too
->> > early to start on the 'right' path.
->>
->> Sounds like a good idea, but the issue is: When to do the initial sort
->> so it doesn't conflict with all the adds in a kernel cycle... Post and
->> immediately commit a new patch near the end of the merge window?
->
-> Given that the maintainer can quite safely do the patch (sorry
-> maintainers), I don't see any reason why it couldn't be done at the
-> point where they stop accepting patches for the merge-window. Once the
-> patches are stopped, sort the list in one last patch.
->
-> It makes sense to get it done in this window if possible as the Kconfig
-> will only get bigger as time goes on, making sorting it more time
-> consuming.
+This looks nice and simple, I just have a couple of comment.
 
-Actually, Russell wen through and reordered these not long ago, if I
-remember correctly. The current ordering is the same as in the
-structure definition, and should be kept that way.
+On Wed, Jan 16, 2013 at 09:48:23AM +0000, Martin Fuzzey wrote:
+> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+> ---
+>  drivers/w1/masters/mxc_w1.c |    9 ++++++++-
+>  1 files changed, 8 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
+> index 708a25f..949e566 100644
+> --- a/drivers/w1/masters/mxc_w1.c
+> +++ b/drivers/w1/masters/mxc_w1.c
+> @@ -186,9 +186,16 @@ static int mxc_w1_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static struct of_device_id mxc_w1_dt_ids[] = {
+> +	{ .compatible = "fsl,imx21-owire" },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mxc_w1_dt_ids);
+> +
+>  static struct platform_driver mxc_w1_driver = {
+>  	.driver = {
+> -		   .name = "mxc_w1",
+> +		.name = "mxc_w1",
+> +		.of_match_table = mxc_w1_dt_ids,
+>  	},
+>  	.probe = mxc_w1_probe,
+>  	.remove = mxc_w1_remove,
+> 
 
+I see there's already a binding for gpio-based w1 -- "w1-gpio". Given this is
+already using the "w1" naming convention in a binding, I think it'd be worth
+using the compatible string "fsl,imx21-w1", for consistency (both with the
+other binding and the driver name).
 
--Olof
+It's also be worth documenting (in
+Documentation/devicetree/bindings/w1/fsl-imx21-w1, presumably).
+
+When adding bindings, it's also good to Cc devicetree-discuss.
+
+Thanks,
+Mark.
