@@ -1,114 +1,92 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 16 Jan 2013 14:13:58 +0100
-Subject: [PATCH 3/5] mmc: mvsdio: use slot-gpio for card detect gpio
-In-Reply-To: <1358342040-7130-1-git-send-email-andrew@lunn.ch>
-References: <1358342040-7130-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1358342040-7130-4-git-send-email-andrew@lunn.ch>
+Date: Wed, 16 Jan 2013 14:24:22 +0100
+Subject: [PATCH 3/4] Enable ecc-mode selection in the driver
+In-Reply-To: <50F6927D.3070303@mpl.ch>
+References: <cover.1358242644.git.s.peter@mpl.ch>
+ <2d08c4c072fd4922a6056362adb96a455307d583.1358242644.git.s.peter@mpl.ch>
+ <20130115125119.GH13482@lunn.ch> <50F6927D.3070303@mpl.ch>
+Message-ID: <20130116132422.GI17242@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Wed, Jan 16, 2013 at 12:43:57PM +0100, Stefan Peter wrote:
+> Hi Andrew
+> 
+> on 15.01.2013 13:51, Andrew Lunn wrote:
+> > On Tue, Jan 15, 2013 at 01:13:12PM +0100, Stefan Peter wrote:
+> >> In order to be able to use the ecc-mode, add the bch module to the default
+> >> settings for the kirwood boards and enable the activation in orin-nand.c
+> >>
+> >> Signed-off-by: Stefan Peter <s.peter@mpl.ch>
+> >> ---
+> >> diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
+> >> index 93f3794..4a9d3f7 100644
+> >> --- a/arch/arm/configs/kirkwood_defconfig
+> >> +++ b/arch/arm/configs/kirkwood_defconfig
+> >> @@ -84,6 +84,7 @@ CONFIG_MTD_CFI_STAA=y
+> >>  CONFIG_MTD_PHYSMAP=y
+> >>  CONFIG_MTD_M25P80=y
+> >>  CONFIG_MTD_NAND=y
+> >> +CONFIG_MTD_NAND_ECC_BCH=y
+> >>  CONFIG_MTD_NAND_ORION=y
+> >>  CONFIG_BLK_DEV_LOOP=y
+> >>  # CONFIG_SCSI_PROC_FS is not set
+> >> diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+> >> index cd72b92..1a35257 100644
+> >> --- a/drivers/mtd/nand/orion_nand.c
+> >> +++ b/drivers/mtd/nand/orion_nand.c
+> >> @@ -14,6 +14,7 @@
+> >>  #include <linux/module.h>
+> >>  #include <linux/platform_device.h>
+> >>  #include <linux/of.h>
+> >> +#include <linux/of_mtd.h>
+> >>  #include <linux/mtd/mtd.h>
+> >>  #include <linux/mtd/nand.h>
+> >>  #include <linux/mtd/partitions.h>
+> >> @@ -130,6 +131,7 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+> >>  		if (!of_property_read_u32(pdev->dev.of_node,
+> >>  						"chip-delay", &val))
+> >>  			board->chip_delay = (u8)val;
+> >> +		board->ecc_mode = of_get_nand_ecc_mode(pdev->dev.of_node);
+> > 
+> >>  	} else
+> >>  		board = pdev->dev.platform_data;
+> >>  
+> >> @@ -140,7 +142,8 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+> >>  	nc->IO_ADDR_R = nc->IO_ADDR_W = io_base;
+> >>  	nc->cmd_ctrl = orion_nand_cmd_ctrl;
+> >>  	nc->read_buf = orion_nand_read_buf;
+> >> -	nc->ecc.mode = NAND_ECC_SOFT;
+> >> +	nc->ecc.mode = board->ecc_mode == NAND_ECC_SOFT_BCH ?
+> >> +		NAND_ECC_SOFT_BCH : NAND_ECC_SOFT;
+> > 
+> > Hi Stefan
+> > 
+> > What about a user that wants one of the other valid values?
+> > NAND_ECC_OOB_FIRST, NAND_ECC_HW_SYNDROME, etc.
+> 
+> As far as I understand, NAND_ECC_NONE, NAND_ECC_SOFT and
+> NAND_ECC_SOFT_BCH are the only ECC modes that do not require
+> corresponding hardware support which is missing in the marvell
+> 88F6180/88F619x/88F628x. From my point of view, NAND_ECC_NONE does not
+> make sense, too, because MLC NAND Flash requires ECC to be usable.
+> 
+> > 
+> > Would:
+> > 
+> > 	if (IS_ERR(board->ecc_mode)) {
+> > 		nc->ecc.mode = NAND_ECC_SOFT;
+> > 		dev_info(&pdev->dev, "Defaulting to NAND_ECC_SOFT");
+> > 	} else
+> > 		nc->ecc.mode = board->ecc_mode
+> > 
+> > be better?
+> 
+> I feel safer by limiting the modes to what I could test.
 
-The MMC core subsystem provides in drivers/mmc/core/slot-gpio.c a nice
-set of helper functions to simplify the management of the card detect
-GPIO in MMC host drivers. This patch migrates the mvsdio driver to
-using those helpers, which will make the ->probe() code simpler, and
-therefore ease the process of adding a Device Tree binding for this
-driver.
+Hi Stefan
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Stefan Peter <s.peter@mpl.ch>
-Tested-by: Florian Fainelli <florian@openwrt.org>
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
- drivers/mmc/host/mvsdio.c |   39 +++++++++------------------------------
- 1 file changed, 9 insertions(+), 30 deletions(-)
+O.K, but i still think a warning message would be useful when
+board->ecc_mode is an error code.
 
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index c6dc8fd..704b7a3 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -52,7 +52,6 @@ struct mvsd_host {
- 	struct mmc_host *mmc;
- 	struct device *dev;
- 	struct clk *clk;
--	int gpio_card_detect;
- };
- 
- #define mvsd_write(offs, val)	writel(val, iobase + (offs))
-@@ -538,13 +537,6 @@ static void mvsd_timeout_timer(unsigned long data)
- 		mmc_request_done(host->mmc, mrq);
- }
- 
--static irqreturn_t mvsd_card_detect_irq(int irq, void *dev)
--{
--	struct mvsd_host *host = dev;
--	mmc_detect_change(host->mmc, msecs_to_jiffies(100));
--	return IRQ_HANDLED;
--}
--
- static void mvsd_enable_sdio_irq(struct mmc_host *mmc, int enable)
- {
- 	struct mvsd_host *host = mmc_priv(mmc);
-@@ -757,26 +749,11 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	if (!IS_ERR(host->clk))
- 		clk_prepare_enable(host->clk);
- 
--	if (mvsd_data->gpio_card_detect) {
--		ret = devm_gpio_request_one(&pdev->dev,
--					    mvsd_data->gpio_card_detect,
--					    GPIOF_IN, DRIVER_NAME " cd");
--		if (ret == 0) {
--			irq = gpio_to_irq(mvsd_data->gpio_card_detect);
--			ret = devm_request_irq(&pdev->dev, irq,
--					       mvsd_card_detect_irq,
--					       IRQ_TYPE_EDGE_RISING |
--					       IRQ_TYPE_EDGE_FALLING,
--					       DRIVER_NAME " cd", host);
--			if (ret == 0)
--				host->gpio_card_detect =
--					mvsd_data->gpio_card_detect;
--			else
--				devm_gpio_free(&pdev->dev,
--					       mvsd_data->gpio_card_detect);
--		}
--	}
--	if (!host->gpio_card_detect)
-+	if (gpio_is_valid(mvsd_data->gpio_card_detect)) {
-+		ret = mmc_gpio_request_cd(mmc, mvsd_data->gpio_card_detect);
-+		if (ret)
-+			goto out;
-+	} else
- 		mmc->caps |= MMC_CAP_NEEDS_POLL;
- 
- 	mmc_gpio_request_ro(mmc, mvsd_data->gpio_write_protect);
-@@ -789,15 +766,16 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 
- 	pr_notice("%s: %s driver initialized, ",
- 			   mmc_hostname(mmc), DRIVER_NAME);
--	if (host->gpio_card_detect)
-+	if (!(mmc->caps & MMC_CAP_NEEDS_POLL))
- 		printk("using GPIO %d for card detection\n",
--		       host->gpio_card_detect);
-+		       mvsd_data->gpio_card_detect);
- 	else
- 		printk("lacking card detect (fall back to polling)\n");
- 	return 0;
- 
- out:
- 	if (mmc) {
-+		mmc_gpio_free_cd(mmc);
- 		mmc_gpio_free_ro(mmc);
- 		if (!IS_ERR(host->clk))
- 			clk_disable_unprepare(host->clk);
-@@ -813,6 +791,7 @@ static int __exit mvsd_remove(struct platform_device *pdev)
- 
- 	struct mvsd_host *host = mmc_priv(mmc);
- 
-+	mmc_gpio_free_cd(mmc);
- 	mmc_gpio_free_ro(mmc);
- 	mmc_remove_host(mmc);
- 	del_timer_sync(&host->timer);
--- 
-1.7.10.4
+		Andrew
