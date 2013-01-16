@@ -1,45 +1,90 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 16 Jan 2013 16:28:44 +0800
-Subject: [PATCH 1/3] MTD: at91: atmel_nand: for PMECC, add code to choose
- the ecc bits and sector size according to the ONFI parameter ECC
- requirement.
-In-Reply-To: <1358252760.2731.133.camel@sauron.fi.intel.com>
-References: <1355912840-29501-1-git-send-email-josh.wu@atmel.com>
- <1355912840-29501-2-git-send-email-josh.wu@atmel.com>
- <1358252760.2731.133.camel@sauron.fi.intel.com>
-Message-ID: <50F664BC.7@atmel.com>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Wed, 16 Jan 2013 08:38:55 +0000
+Subject: [PATCH V4 1/3] ARM: davinci: da850: add pinctrl driver DT entries
+In-Reply-To: <1358308102-8169-2-git-send-email-anilkumar.v@ti.com>
+References: <1358308102-8169-1-git-send-email-anilkumar.v@ti.com>
+ <1358308102-8169-2-git-send-email-anilkumar.v@ti.com>
+Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412BACC2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Artem
+On Wed, Jan 16, 2013 at 09:18:20, Kumar, Anil wrote:
+> For DT, DaVinci platform can use pinctrl-single driver for handling
+> padconf registers.
+> 
+> Enable PINCTRL Kconfig for MACH_DA8XX_DT platform. Add required
+> pinctrl DT entries in da850 dts file.
+> 
+>  Test procedure
+>   1)Populate DT file with NAND node information.
+>   2)Populate board DT file with pinmux information for NAND.
+>   3)Boot and confirm NAND is detected by the kernel.
+>   4)cat /proc/mtd to show partitions.
+> 
+> Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
+> ---
+> :100644 100644 37dc5a3... c7609d0... M	arch/arm/boot/dts/da850-evm.dts
+> :100644 100644 fbada87... e9c6e82... M	arch/arm/boot/dts/da850.dtsi
+> :100644 100644 0153950... a075b3e... M	arch/arm/mach-davinci/Kconfig
+>  arch/arm/boot/dts/da850-evm.dts |    3 +++
+>  arch/arm/boot/dts/da850.dtsi    |   10 ++++++++++
+>  arch/arm/mach-davinci/Kconfig   |    1 +
+>  3 files changed, 14 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+> index 37dc5a3..c7609d0 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -15,6 +15,9 @@
+>  	model = "DA850/AM1808/OMAP-L138 EVM";
+>  
+>  	soc {
+> +		pmx_core:pinmux at 1c14120 {
 
-On 1/15/2013 8:26 PM, Artem Bityutskiy wrote:
-> I cannot compile this patch:
->
-> ERROR (phandle_references): Reference to non-existent node or label "pinctrl_ssc0_tx"
->
-> ERROR: Input tree has errors, aborting (use -f to force output)
-> make[2]: *** [arch/arm/boot/dts/at91sam9g20ek.dtb] Error 2
+I have found cosmetics issue here. I will correct it and send next version.
 
-As Bo Shen already mentioned, they are caused by ssc pinctrl patches. it 
-will be merged in next rc or late.
+> +			status = "okay";
+> +		};
+>  		serial0: serial at 1c42000 {
+>  			status = "okay";
+>  		};
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index fbada87..e9c6e82 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -29,6 +29,16 @@
+>  		#size-cells = <1>;
+>  		ranges = <0x0 0x01c00000 0x400000>;
+>  
+> +		pmx_core:pinmux at 1c14120 {
 
->
-> On Wed, 2012-12-19 at 18:27 +0800, Josh Wu wrote:
->> This patch will check NAND flash's ecc minimum requirement in ONFI parameter. If it is equal or smaller than pmecc-cap in dtsi, then use ecc_bits in ONFI. otherwise, return an error since pmecc-cap in dtsi don't meet the ecc minimum reqirement.
->>
->> This patch also check sector size (codeword) requirement in ONFI. If it is equal or bigger than sector_size in dtsi, then use the one of ONFI. otherwise return error.
->>
->> Currently we don't support to read the ECC parameter in ONFI extended parameter page. So in that case we just use the value specified in dts.
->>
->> For non-ONFI nand flash, we assume the minimum ecc requirement is 2bits in 512 bytes.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> Please, wrap the lines like kernel developers usually do.
+I have found cosmetics issue here. I will correct it and send next version.
 
-OK. I will resend the whole patch series with wrapped commit message. 
-thanks.
-
-Best Regards,
-Josh Wu
->
+> +			compatible = "pinctrl-single";
+> +			reg = <0x14120 0x50>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			pinctrl-single,bit-per-mux;
+> +			pinctrl-single,register-width = <32>;
+> +			pinctrl-single,function-mask = <0xffffffff>;
+> +			status = "disabled";
+> +		};
+>  		serial0: serial at 1c42000 {
+>  			compatible = "ns16550a";
+>  			reg = <0x42000 0x100>;
+> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+> index 0153950..a075b3e 100644
+> --- a/arch/arm/mach-davinci/Kconfig
+> +++ b/arch/arm/mach-davinci/Kconfig
+> @@ -62,6 +62,7 @@ config MACH_DA8XX_DT
+>  	bool "Support DA8XX platforms using device tree"
+>  	default y
+>  	depends on ARCH_DAVINCI_DA8XX
+> +	select PINCTRL
+>  	help
+>  	  Say y here to include support for TI DaVinci DA850 based using
+>  	  Flattened Device Tree. More information at Documentation/devicetree
+> -- 
+> 1.7.4.1
+> 
+> 
