@@ -1,41 +1,72 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 17 Jan 2013 08:05:40 +1300
-Subject: [PATCH 1/4 v3] serial: vt8500: Fix range-checking on vt8500_uart_ports
+Date: Thu, 17 Jan 2013 08:05:43 +1300
+Subject: [PATCH 4/4 v3] serial: tty: Cleanup code using devm_ function
 In-Reply-To: <1358363143-7154-1-git-send-email-linux@prisktech.co.nz>
 References: <1358363143-7154-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1358363143-7154-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1358363143-7154-5-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix two instances where the index to vt8500_uart_ports is tested
-against > VT8500_MAX_PORTS. Correct usage should be >= VT8500_MAX_PORTS.
+Convert the last memory allocation (vt8500_port) to use devm_kzalloc
+and remove the fail path cleanup code from vt8500_serial_probe.
+
+Reorder iomem mapping above clk_enable to simplify fail code. The
+clock is only enabled if all other resources are available.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- drivers/tty/serial/vt8500_serial.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/tty/serial/vt8500_serial.c |   13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
-index 8fd1814..4c4a58d 100644
+index 7f9e578..1fc6f3d 100644
 --- a/drivers/tty/serial/vt8500_serial.c
 +++ b/drivers/tty/serial/vt8500_serial.c
-@@ -569,7 +569,7 @@ static int vt8500_serial_probe(struct platform_device *pdev)
- 
- 	if (np)
- 		port = of_alias_get_id(np, "serial");
--		if (port > VT8500_MAX_PORTS)
-+		if (port >= VT8500_MAX_PORTS)
- 			port = -1;
- 	else
- 		port = -1;
-@@ -580,7 +580,7 @@ static int vt8500_serial_probe(struct platform_device *pdev)
- 					sizeof(vt8500_ports_in_use));
+@@ -589,7 +589,8 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+ 		return -EBUSY;
  	}
  
--	if (port > VT8500_MAX_PORTS)
-+	if (port >= VT8500_MAX_PORTS)
- 		return -ENODEV;
+-	vt8500_port = kzalloc(sizeof(struct vt8500_port), GFP_KERNEL);
++	vt8500_port = devm_kzalloc(&pdev->dev, sizeof(struct vt8500_port),
++				   GFP_KERNEL);
+ 	if (!vt8500_port)
+ 		return -ENOMEM;
  
- 	/* reserve the port id */
+@@ -600,14 +601,13 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+ 	vt8500_port->clk = of_clk_get(pdev->dev.of_node, 0);
+ 	if (IS_ERR(vt8500_port->clk)) {
+ 		dev_err(&pdev->dev, "failed to get clock\n");
+-		ret = -EINVAL;
+-		goto err;
++		return  -EINVAL;
+ 	}
+ 
+ 	ret = clk_prepare_enable(vt8500_port->clk);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to enable clock\n");
+- 		goto err;
++ 		return ret;
+  	}
+ 
+ 	vt8500_port->uart.type = PORT_VT8500;
+@@ -631,10 +631,6 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, vt8500_port);
+ 
+ 	return 0;
+-
+-err:
+-	kfree(vt8500_port);
+-	return ret;
+ }
+ 
+ static int vt8500_serial_remove(struct platform_device *pdev)
+@@ -644,7 +640,6 @@ static int vt8500_serial_remove(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, NULL);
+ 	clk_disable_unprepare(vt8500_port->clk);
+ 	uart_remove_one_port(&vt8500_uart_driver, &vt8500_port->uart);
+-	kfree(vt8500_port);
+ 
+ 	return 0;
+ }
 -- 
 1.7.9.5
