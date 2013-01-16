@@ -1,62 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Jan 2013 10:49:47 +0000
-Subject: [PATCH V3] mmc: mmci: Fixup and cleanup code for DMA handling
-In-Reply-To: <CAPDyKFrV8h+2ebfT6AK-ACfr716CE-f7+HGuh_+rOjbVnGOdfw@mail.gmail.com>
-References: <1357570707-28207-1-git-send-email-ulf.hansson@stericsson.com>
- <20130113192428.GU23505@n2100.arm.linux.org.uk>
- <CAPDyKFrV8h+2ebfT6AK-ACfr716CE-f7+HGuh_+rOjbVnGOdfw@mail.gmail.com>
-Message-ID: <20130116104947.GQ23505@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 16 Jan 2013 10:59:57 +0000
+Subject: [PATCH 5/6] ARM: dts: Add basic dts include files for Samsung
+ S3C64xx SoCs
+In-Reply-To: <20130114150531.GE21142@e102568-lin.cambridge.arm.com>
+References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
+ <1358039458-31960-6-git-send-email-tomasz.figa@gmail.com>
+ <20130114144841.GE7990@e106331-lin.cambridge.arm.com>
+ <20130114150531.GE21142@e102568-lin.cambridge.arm.com>
+Message-ID: <20130116105957.GA1963@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 11:23:57AM +0100, Ulf Hansson wrote:
-> On 13 January 2013 20:24, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Jan 07, 2013 at 03:58:27PM +0100, Ulf Hansson wrote:
-> >> @@ -374,19 +415,12 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
-> >>        * contiguous buffers.  On TX, we'll get a FIFO underrun error.
-> >>        */
-> >>       if (status & MCI_RXDATAAVLBLMASK) {
-> >> -             dmaengine_terminate_all(chan);
-> >> -             if (!data->error)
-> >> -                     data->error = -EIO;
-> >> -     }
-> >> -
-> >> -     if (data->flags & MMC_DATA_WRITE) {
-> >> -             dir = DMA_TO_DEVICE;
-> >> -     } else {
-> >> -             dir = DMA_FROM_DEVICE;
-> >> +             data->error = -EIO;
-> >> +             mmci_dma_data_error(host);
-> >
-> > Please explain the change of behaviour here.  Before your change, we _only_
-> > set data->error if the error is not set.  Here, we overwrite the error code
-> > no matter what.  What is the reasoning for that change?
-> >
-> > The reason the code is like it _was_ is so that any bytes remaining in the
-> > FIFO are _only_ reported as an error if there wasn't a preceding error.
-> > That is the behaviour I desired when I wrote this code.
+On Mon, Jan 14, 2013 at 03:05:32PM +0000, Lorenzo Pieralisi wrote:
+> On Mon, Jan 14, 2013 at 02:48:41PM +0000, Mark Rutland wrote:
+> > Hello,
+> > 
+> > This all looks good. I just have a couple of comments about the cpus node.
+> > 
+> > On Sun, Jan 13, 2013 at 01:10:57AM +0000, Tomasz Figa wrote:
+> > > This patch adds basic device tree definitions for Samsung S3C64xx SoCs.
+> > > 
+> > > Since all the SoCs in the series are very similar, the files are created
+> > > hierarchically - one file for the whole series and then separate files
+> > > for particular SoCs including the common one.
+> > > 
+> > > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > 
+> > [...]
+> > 
+> > > diff --git a/arch/arm/boot/dts/s3c64xx.dtsi b/arch/arm/boot/dts/s3c64xx.dtsi
+> > > new file mode 100644
+> > > index 0000000..55d6e08
+> > > --- /dev/null
+> > > +++ b/arch/arm/boot/dts/s3c64xx.dtsi
+> > > @@ -0,0 +1,97 @@
+> > > +/*
+> > > + * Samsung's S3C64xx SoC series common device tree source
+> > > + *
+> > > + * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
+> > > + *
+> > > + * Samsung's S3C64xx SoC series device nodes are listed in this file.
+> > > + * Particular SoCs from S3C64xx series can include this file and provide
+> > > + * values for SoCs specfic bindings.
+> > > + *
+> > > + * Note: This file does not include device nodes for all the controllers in
+> > > + * S3C64xx SoCs. As device tree coverage for S3C64xx increases, additional
+> > > + * nodes can be added to this file.
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License version 2 as
+> > > + * published by the Free Software Foundation.
+> > > + */
+> > > +
+> > > +/include/ "skeleton.dtsi"
+> > > +
+> > > +/ {
+> > > +	cpus {
+> > > +		cpu at 0 {
+> > > +			compatible = "arm,arm1176jzf-s";
+> > > +		};
+> > > +	};
+> > 
+> > You can drop the unit address from the cpu node - it's meant to be there to
+> > differentiate multiple nodes (and is supposed to match the reg property, which
+> > the 1176jzf-s can't have, as it doesn't have an MPIDR).
 > 
-> Since we need to do dmaengine_terminate_all(chan), that will mean
-> another request could potentially already be prepared and thus it
-> could also be terminated.
+> Well, this is a point that I should consider since the kernel docs I wrote are
+> misleading, they require the reg property that can not be there on UP.
+> True, MPIDR does not exist in this case, but I have to document this in the
+> bindings since it is unclear.
 > 
-> Then by always reporting an error the async request handling in the
-> mmc protocol layer, can do proper error handling and clean up the
-> previously prepared request.
+> > 
+> > Also, "arm,arm1176jzf-s" isn't listed in the binding doc. There was a question
+> > about how to maintain this list [1], but I can't seem to find a conclusion, if
+> > any were reached.  It might be worth appending "arm,arm1176" to the compatible
+> > list for the cpu node in case we want to enable something via dt for all 1176
+> > variations.
+> > 
+> > Dave, Lorenzo, any thoughts?
+> 
+> Eh, frankly I do not know how to handle this. Either we add a compatible
+> string to the bindings anytime a DT gets merged in the kernel but how
+> to maintain it, it has to be defined. Happy to hear some feedback on
+> this.
 
-Sigh, I don't think you understand what this code is doing at all then.
+Well, the number of CPU types does not grow rapidly.  It will be much
+less than one per SoC -- so keeping the list up to date shouldn't be
+that much effort.
 
-We will _always_ report _an_ error as the code originally stands if we
-encounter MCI_RXDATAAVLBLMASK being set.  The error that we report will
-be the _correct_ one - either the one which preceeds this condition
-occuring _or_ an IO error because not all data was read from the FIFO
-by the DMA engine.
+For ARM1176JZF-S, it could make sense for the comatible list to be
 
-If the DMA engine fails to read all the data from the FIFO, _and_ there
-was a preceeding error, we should _not_ overwrite the preceeding error.
-This is exactly what the original code does.
+	"arm,arm1176jzf-s", "arm,arm1176"
 
-Your version _always_ overwrites the previous error.  This could result
-in FIFO/CRC errors always being reported as an IO error rather than
-their proper error codes, and therefore _breaking_ error handling.
+...since the differences between 1176 variants are software probeable
+(i.e., whether there is an FPU or not).  AFAIK the J, Z apply to all
+ARM1176, and the -S (synthesisable RTL) is nothing to do with software.
+The kernel probably only really needs to know "arm,arm1176".
+
+Cheers
+---Dave
+
+> 
+> Lorenzo
+> 
