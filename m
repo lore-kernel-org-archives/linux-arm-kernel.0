@@ -1,93 +1,113 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Wed, 16 Jan 2013 11:13:08 -0500
-Subject: [PATCH v5 07/12] ARM: KVM: VGIC virtual CPU interface management
-In-Reply-To: <50F6D0A0.5010707@arm.com>
-References: <20130108184116.46558.3558.stgit@ubuntu>
- <20130108184211.46558.74646.stgit@ubuntu>
- <20130114154231.GG18935@mudshark.cambridge.arm.com>
- <CANM98qJ_Pb5bT0k7bAhv6i1YTj6GxvNE6vvY49OZrqsKpF3xOA@mail.gmail.com>
- <50F536DC.2060702@arm.com>
- <CANM98qJ0YRNA5R+qnRF9i0a7BRoL817Mq9D1SFPcxsSWgd2x0w@mail.gmail.com>
- <50F6D0A0.5010707@arm.com>
-Message-ID: <CANM98qL1Ln2GYhC-prLR3VHgb=b1YR608dW6o7CS4s3L6Xy84Q@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 16 Jan 2013 17:13:01 +0100
+Subject: [PATCH 1/7] dt: describe base reset signal binding
+In-Reply-To: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
+References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1358352787-15441-2-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 11:09 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 16/01/13 15:29, Christoffer Dall wrote:
->> [...]
->>
->>>> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
->>>> index 1ace491..f9d1977 100644
->>>> --- a/arch/arm/include/asm/kvm_vgic.h
->>>> +++ b/arch/arm/include/asm/kvm_vgic.h
->>>> @@ -33,6 +33,7 @@
->>>>  #define VGIC_NR_PRIVATE_IRQS (VGIC_NR_SGIS + VGIC_NR_PPIS)
->>>>  #define VGIC_NR_SHARED_IRQS  (VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
->>>>  #define VGIC_MAX_CPUS                KVM_MAX_VCPUS
->>>> +#define VGIC_MAX_LRS         64
->>>
->>> Consider this instead (for the reason below)
->>> #define VGIC_MAX_LRS    (1 << 7)
->>>
->>
->> so here you mean (1 << 6), right?
->
-> No. We have a 6 bit field that contains (NR_LRS - 1). So the maximum
-> value is (0b111111 + 1), which is (1 << 7).
->
+From: Stephen Warren <swarren@nvidia.com>
 
-eh, (1 << 7) is 128, and we have a maximum value of 63 (which plus the
-one is 64). You can verify this by thinking about having four bits, is
-a halfword, which we use hex numbers to deal with, so the number of
-values you can decode there is 16, then you have two more bits, which
-each doubles the number of values, so this becomes 64 values total,
-ie. from 0 through 63.  :)
+This binding is intended to represent the hardware reset signals present
+internally in most IC (SoC, FPGA, ...) designs.
 
+Such a binding would allow the creation of a "reset subsystem", which
+could replace APIs such as the following Tegra-specific API:
 
+void tegra_periph_reset_deassert(struct clk *c);
+void tegra_periph_reset_assert(struct clk *c);
 
+(Note that at present, Tegra couples reset assertion with the clock for
+the affected peripheral module. However, reset and clocking are two
+separate, yet admittedly related, concepts).
 
->>
->>>>  /* Sanity checks... */
->>>>  #if (VGIC_MAX_CPUS > 8)
->>>> @@ -120,7 +121,7 @@ struct vgic_cpu {
->>>>       DECLARE_BITMAP( pending_shared, VGIC_NR_SHARED_IRQS);
->>>>
->>>>       /* Bitmap of used/free list registers */
->>>> -     DECLARE_BITMAP( lr_used, 64);
->>>> +     DECLARE_BITMAP( lr_used, VGIC_MAX_LRS);
->>>>
->>>>       /* Number of list registers on this CPU */
->>>>       int             nr_lr;
->>>> @@ -132,7 +133,7 @@ struct vgic_cpu {
->>>>       u32             vgic_eisr[2];   /* Saved only */
->>>>       u32             vgic_elrsr[2];  /* Saved only */
->>>>       u32             vgic_apr;
->>>> -     u32             vgic_lr[64];    /* A15 has only 4... */
->>>> +     u32             vgic_lr[VGIC_MAX_LRS];
->>>>  #endif
->>>>  };
->>>>
->>>> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
->>>> index a0d283c..90a99fd 100644
->>>> --- a/arch/arm/kvm/vgic.c
->>>> +++ b/arch/arm/kvm/vgic.c
->>>> @@ -1345,6 +1345,8 @@ int kvm_vgic_hyp_init(void)
->>>>
->>>>       vgic_nr_lr = readl_relaxed(vgic_vctrl_base + GICH_VTR);
->>>>       vgic_nr_lr = (vgic_nr_lr & 0x1f) + 1;
->>>
->>> There is a bug here. It should be:
->>>         vgic_nr_lr = (vgic_nr_lr & 0x2f) + 1;
->>>
->>
->> and here you mean (vgic_nr_lr & 0x3f) + 1
->> right?
->
-> Neither. 0x2f is the right value. See the GIC spec, 5.3.2, GICH_VTR
-> register.
->
-I'm looking at it, and I don't understand why you don't want to
-consider bit[4] ?
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ Documentation/devicetree/bindings/reset/reset.txt |   75 +++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/reset.txt
 
--Christoffer
+diff --git a/Documentation/devicetree/bindings/reset/reset.txt b/Documentation/devicetree/bindings/reset/reset.txt
+new file mode 100644
+index 0000000..31db6ff
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/reset.txt
+@@ -0,0 +1,75 @@
++= Reset Signal Device Tree Bindings =
++
++This binding is intended to represent the hardware reset signals present
++internally in most IC (SoC, FPGA, ...) designs. Reset signals for whole
++standalone chips are most likely better represented as GPIOs, although there
++are likely to be exceptions to this rule.
++
++Hardware blocks typically receive a reset signal. This signal is generated by
++a reset provider (e.g. power management or clock module) and received by a
++reset consumer (the module being reset, or a module managing when a sub-
++ordinate module is reset). This binding exists to represent the provider and
++consumer, and provide a way to couple the two together.
++
++A reset signal is represented by the phandle of the provider, plus a reset
++specifier - a list of DT cells that represents the reset signal within the
++provider. The length (number of cells) and semantics of the reset specifier
++are dictated by the binding of the reset provider, although common schemes
++are described below.
++
++A word on where to place reset signal consumers in device tree: It is possible
++in hardware for a reset signal to affect multiple logically separate HW blocks
++at once. In this case, it would be unwise to represent this reset signal in
++the DT node of each affected HW block, since if activated, an unrelated block
++may be reset. Instead, reset signals should be represented in the DT node
++where it makes most sense to control it; this may be a bus node if all
++children of the bus are affected by the reset signal, or an individual HW
++block node for dedicated reset signals. The intent of this binding is to give
++appropriate software access to the reset signals in order to manage the HW,
++rather than to slavishly enumerate the reset signal that affects each HW
++block.
++
++= Reset providers =
++
++Required properties:
++#reset-cells:	Number of cells in a reset specifier; Typically 0 for nodes
++		with a single reset output and 1 for nodes with multiple
++		reset outputs.
++
++For example:
++
++	rst: reset-controller {
++		#reset-cells = <1>;
++	};
++
++= Reset consumers =
++
++Required properties:
++resets:		List of phandle and reset specifier pairs, one pair
++		for each reset signal that affects the device, or that the
++		device manages. Note: if the reset provider specifies '0' for
++		#reset-cells, then only the phandle portion of the pair will
++		appear.
++
++Optional properties:
++reset-names:	List of reset signal name strings sorted in the same order as
++		the resets property. Consumers drivers will use reset-names to
++		match reset signal names with reset specifiers.
++
++For example:
++
++	device {
++		resets = <&rst 20>;
++		reset-names = "reset";
++	};
++
++This represents a device with a single reset signal named "reset".
++
++	bus {
++		resets = <&rst 10> <&rst 11> <&rst 12> <&rst 11>;
++		reset-names = "i2s1", "i2s2", "dma", "mixer";
++	};
++
++This represents a bus that controls the reset signal of each of four sub-
++ordinate devices. Consider for example a bus that fails to operate unless no
++child device has reset asserted.
+-- 
+1.7.10.4
