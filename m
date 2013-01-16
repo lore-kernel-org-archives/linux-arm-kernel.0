@@ -1,41 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 16 Jan 2013 14:31:44 -0800
-Subject: [PATCH] [RFC] ARM: compile fix for DEBUG_LL=y && MMU=n
-In-Reply-To: <1358346726-27199-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1358346726-27199-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20130116223144.GA9071@quad.lixom.net>
+From: smoch@web.de (Soeren Moch)
+Date: Wed, 16 Jan 2013 23:36:35 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20130116174736.GJ25500@titan.lakedaemon.net>
+References: <50F3F289.3090402@web.de>
+ <20130115165642.GA25500@titan.lakedaemon.net>
+ <20130115175020.GA3764@kroah.com>
+ <20130115201617.GC25500@titan.lakedaemon.net>
+ <20130115215602.GF25500@titan.lakedaemon.net> <50F5F1B7.3040201@web.de>
+ <20130116024014.GH25500@titan.lakedaemon.net> <50F61D86.4020801@web.de>
+ <50F66B1B.40301@web.de> <50F6E419.5080007@web.de>
+ <20130116174736.GJ25500@titan.lakedaemon.net>
+Message-ID: <50F72B73.5070504@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 03:32:06PM +0100, Uwe Kleine-K?nig wrote:
-> debug_ll_addr is only used on machines with an MMU so it can be #ifdef'ed
-> out safely. This fixes:
-> 
-> arch/arm/kernel/debug.S: Assembler messages:
-> arch/arm/kernel/debug.S:104: Error: too many positional arguments
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> ---
-> The obvious alternative fix is to make addruart on !MMU take 3
-> arguments, too.
-> 
-> The problem was introduced in
-> 
-> 	e5c5f2a (ARM: implement debug_ll_io_init())
-> 
-> which appeared in v3.8-rc1.
+On 16.01.2013 18:47, Jason Cooper wrote:
+> On Wed, Jan 16, 2013 at 06:32:09PM +0100, Soeren Moch wrote:
+>> On 16.01.2013 09:55, Soeren Moch wrote:
+>>> On 16.01.2013 04:24, Soeren Moch wrote:
+>>>> I did not bisect it, but Marek mentioned earlier that commit
+>>>> e9da6e9905e639b0f842a244bc770b48ad0523e9 in Linux v3.6-rc1 introduced
+>>>> new code for dma allocations. This is probably the root cause for the
+>>>> new (mis-)behavior (due to my tests 3.6.0 is not working anymore).
+>>>
+>>> I don't want to say that Mareks patch is wrong, probably it triggers a
+>>> bug somewhere else! (in em28xx?)
+>>
+>> The em28xx sticks are using isochronous usb transfers. Is there a
+>> special handling for that?
+>
+> I'm looking at that now.  It looks like the em28xx wants (as a maximum)
+> 655040 bytes (em28xx-core.c:1088).  There are 5 transfer buffers, with
+> 64 max packets and 2047 max packet size (runtime reported max & 0x7ff).
+>
+> If it actually needs all of that, then the answer may be to just
+> increase coherent_pool= when using that driver.  I'll keep digging.
 
-Since we introduced the breakage in arm-soc, I've picked up the fix (I guess
-it could have gone through Russell's tree as well though).
+I already tested with 4M coherent pool size and could not see
+significant improvement. Would it make sense to further increase the
+buffer size?
 
-I've added the reference to the introducing commit, and the acks/review tags.
-
-Adding a defconfig for a !MMU platform seems like a good idea, since there's
-several of us who make sure that there is build coverage of the defconfigs and
-follow up on most of the breakage. Feel free to send one in for 3.9.
-
-
--Olof
+Regards,
+Soeren
