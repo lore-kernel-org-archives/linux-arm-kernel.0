@@ -1,52 +1,103 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Wed, 16 Jan 2013 10:40:37 -0500
+Date: Wed, 16 Jan 2013 10:42:02 -0500
 Subject: [PATCH v5 07/14] KVM: ARM: World-switch implementation
-In-Reply-To: <20130116125712.GT11529@redhat.com>
+In-Reply-To: <20130116121238.GS11529@redhat.com>
 References: <20130108183811.46302.58543.stgit@ubuntu>
  <20130108183924.46302.65998.stgit@ubuntu>
  <20130115094312.GI11529@redhat.com>
  <CANM98q+qScaXniyYjrd9QEZzWKzj3PkCE0YNFUp2ijnCfS_v4w@mail.gmail.com>
- <CANM98qJZcuF95-D=1Qu6cwXUkQrR4a12bZtrZOuP00U2HGkjMQ@mail.gmail.com>
- <20130116125712.GT11529@redhat.com>
-Message-ID: <CANM98qJ7O8RT_t0OinGDukdR5PNrObmU0rj6uFGEbT2hCvCjmA@mail.gmail.com>
+ <20130116121238.GS11529@redhat.com>
+Message-ID: <CANM98q+jpzVWfg8drE+azcbDF1Q1suphZyJrij04b+OB4ZX4Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 [...]
 
->>
 >
-> Agree. Lets merge it and change later. The vcpu run loop is simple
-> enough at this point. The question of using vcpu->requests is not
-> the question of "real benefit" though, of course you can introduce your
-> own mechanism to pass requests to vcpus instead of using whatever kvm
-> provides you. But from maintenance and code share point of view this
-> is wrong thing to do. Looks at this code for instance:
+>> read side RCU protects against is the memslots data structure as far
+>> as I can see, so the second patch pasted below fixes this for the code
+>> that actually accesses this data structure.
+> Many memory related functions that you call access memslots under the
+> hood and assume that locking is done by the caller. From the quick look
+> I found those that you've missed:
+> kvm_is_visible_gfn()
+> kvm_read_guest()
+> gfn_to_hva()
+> gfn_to_pfn_prot()
+> kvm_memslots()
 >
->         /* Kick out any which are still running. */
->         kvm_for_each_vcpu(i, v, vcpu->kvm) {
->                 /* Guest could exit now, making cpu wrong. That's OK. */
->                 if (kvm_vcpu_exiting_guest_mode(v) == IN_GUEST_MODE) {
->                         force_vm_exit(get_cpu_mask(v->cpu));
->                 }
->         }
+> May be there are more. Can you enable RCU debugging in your kernel config
+> and check? This does not guaranty that it will catch all of the places,
+> but better than nothing.
 >
-> Why not make_all_cpus_request(vcpu->kvm, KVM_REQ_PAUSE)?
 
-well for one, make_all_cpus_request is a static function in kvm_main.c
-and the semantics of that one is really tricky with respect to locking
-and requires (imho) a much clearer explanation with commenting (see
-separate e-mail to kvm list). And now is not the time to do this.
+yeah, I missed the call to is_visible_gfn and friends, this fixes it:
 
->
-> And I am not sure KVM_REQ_UNHALT is so useless to you in the first
-> place. kvm_vcpu_block() can return even when vcpu is not runnable (if
-> signal is pending). KVM_REQ_UNHALT is the way to check for that. Hmm
-> this is actually looks like a BUG in the current code.
->
-there's no guarantee that you won't be woken up from a WFI instruction
-for spurious interrupts on ARM, so we don't care about this, we simply
-return to the guest, and it must go back to sleep if that's what it
-wants to do.
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index c806080..f30e131 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -591,7 +591,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu,
+struct kvm_run *run)
+ 	struct kvm_memory_slot *memslot;
+ 	bool is_iabt;
+ 	gfn_t gfn;
+-	int ret;
++	int ret, idx;
 
+ 	hsr_ec = vcpu->arch.hsr >> HSR_EC_SHIFT;
+ 	is_iabt = (hsr_ec == HSR_EC_IABT);
+@@ -608,33 +608,43 @@ int kvm_handle_guest_abort(struct kvm_vcpu
+*vcpu, struct kvm_run *run)
+ 		return -EFAULT;
+ 	}
+
++	idx = srcu_read_lock(&vcpu->kvm->srcu);
++
+ 	gfn = fault_ipa >> PAGE_SHIFT;
+ 	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
+ 		if (is_iabt) {
+ 			/* Prefetch Abort on I/O address */
+ 			kvm_inject_pabt(vcpu, vcpu->arch.hxfar);
+-			return 1;
++			ret = 1;
++			goto out_unlock;
+ 		}
+
+ 		if (fault_status != FSC_FAULT) {
+ 			kvm_err("Unsupported fault status on io memory: %#lx\n",
+ 				fault_status);
+-			return -EFAULT;
++			ret = -EFAULT;
++			goto out_unlock;
+ 		}
+
+ 		/* Adjust page offset */
+ 		fault_ipa |= vcpu->arch.hxfar & ~PAGE_MASK;
+-		return io_mem_abort(vcpu, run, fault_ipa);
++		ret = io_mem_abort(vcpu, run, fault_ipa);
++		goto out_unlock;
+ 	}
+
+ 	memslot = gfn_to_memslot(vcpu->kvm, gfn);
+ 	if (!memslot->user_alloc) {
+ 		kvm_err("non user-alloc memslots not supported\n");
+-		return -EINVAL;
++		ret = -EINVAL;
++		goto out_unlock;
+ 	}
+
+ 	ret = user_mem_abort(vcpu, fault_ipa, gfn, memslot, fault_status);
+-	return ret ? ret : 1;
++	if (ret == 0)
++		ret = 1;
++out_unlock:
++	srcu_read_unlock(&vcpu->kvm->srcu, idx);
++	return ret;
+ }
+
+ static void handle_hva_to_gpa(struct kvm *kvm,
+--
+
+Thanks,
 -Christoffer
