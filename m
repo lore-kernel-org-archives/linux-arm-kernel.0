@@ -1,85 +1,101 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 15 Jan 2013 16:56:39 -0800
-Subject: [PATCH 1/1] clk-divider: fix is_power_of_two()
-In-Reply-To: <1358274665.2597.11.camel@joe-AO722>
-References: <1358245685-4392-1-git-send-email-james.hogan@imgtec.com>
- <1358274665.2597.11.camel@joe-AO722>
-Message-ID: <20130116005639.8920.45989@quantum>
+Date: Tue, 15 Jan 2013 17:01:43 -0800
+Subject: [PATCH v3] clk: mvebu/clk-cpu.c: fix memory leakage
+In-Reply-To: <50F5C00B.10108@free-electrons.com>
+References: <1358183892-28928-1-git-send-email-dinggnu@gmail.com>
+ <50F563EC.3030804@free-electrons.com> <20130115152307.GA25615@gmail.com>
+ <20130115153716.GF13433@titan.lakedaemon.net>
+ <50F584F5.6030007@free-electrons.com> <20130115182629.GB7211@gmail.com>
+ <50F5A1A9.2030803@free-electrons.com> <20130115184423.GC7211@gmail.com>
+ <50F5C00B.10108@free-electrons.com>
+Message-ID: <20130116010143.8920.90024@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Joe Perches (2013-01-15 10:31:05)
-> On Tue, 2013-01-15 at 10:28 +0000, James Hogan wrote:
-> > The macro is_power_of_two() in clk-divider.c was defined as !(i & ~i)
-> > which is always true. Correct it to !(i & (i - 1)).
-> []
-> > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> []
-> > @@ -29,8 +29,8 @@
-> []
-> > -#define div_mask(d)  ((1 << (d->width)) - 1)
-> > -#define is_power_of_two(i)   !(i & ~i)
-> > +#define div_mask(d)  ((1 << ((d)->width)) - 1)
-> > +#define is_power_of_two(i)   (!((i) & ((i) - 1)))
+Quoting Gregory CLEMENT (2013-01-15 12:46:03)
+> On 01/15/2013 07:44 PM, Cong Ding wrote:
+> > the variable cpuclk and clk_name should be properly freed when error happens.
+> Dear Cong Ding,
 > 
-> Use is_power_of_2 in log2.h instead?
+> Thanks for you efforts!
+> I am happy with this patch and I tested it on the Armada XP DB board, so
+> you can now add my:
+> 
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Mike,
+> 
+> could you take this patch for 3.8-rc fixes?
+> 
+> If you prefer, Jason agrees to take it, but you probably didn't notice it,
+> because he uses your former(and no more valid) email when he wrote this.
+> 
 
-Both are fine suggestions.  How about I apply the below patch?
+Acked-by: Mike Turquette <mturquette@linaro.org>
+
+I don't have an existing clk-fixes branch.  This patch is the first fix
+I've reviewed for this cycle.  I'm happy if you want to take it and
+submit as part of any other mvebu fixes you have.  Otherwise I can take
+it.
+
+Let me know what you decide.
 
 Thanks,
 Mike
 
-
-
->From 54c6c9e5f61693effbe6e4fb28ef9f2f9b3d7a23 Mon Sep 17 00:00:00 2001
-From: James Hogan <james.hogan@imgtec.com>
-Date: Tue, 15 Jan 2013 10:28:05 +0000
-Subject: [PATCH] clk-divider: fix macros
-
-The macro is_power_of_two() in clk-divider.c was defined as !(i & ~i)
-which is always true.  Instead use is_power_of_2() from log2.h.
-
-Also add brackets around the macro arguments in div_mask to avoid any
-future operator precedence problems.
-
-Signed-off-by: James Hogan <james.hogan@imgtec.com>
-Cc: Joe Perches <joe@perches.com>
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
-[mturquette at linaro.org: use log2.h per Joe Perches; update changelog]
----
- drivers/clk/clk-divider.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index a9204c6..68b4021 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -16,6 +16,7 @@
- #include <linux/io.h>
- #include <linux/err.h>
- #include <linux/string.h>
-+#include <linux/log2.h>
- 
- /*
-  * DOC: basic adjustable divider clock that cannot gate
-@@ -29,8 +30,7 @@
- 
- #define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
- 
--#define div_mask(d)	((1 << (d->width)) - 1)
--#define is_power_of_two(i)	!(i & ~i)
-+#define div_mask(d)	((1 << ((d)->width)) - 1)
- 
- static unsigned int _get_table_maxdiv(const struct clk_div_table *table)
- {
-@@ -137,7 +137,7 @@ static bool _is_valid_table_div(const struct clk_div_table *table,
- static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
- {
- 	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
--		return is_power_of_two(div);
-+		return is_power_of_2(div);
- 	if (divider->table)
- 		return _is_valid_table_div(divider->table, div);
- 	return true;
--- 
-1.7.10.4
+> Thanks,
+> 
+> Gregory
+> 
+> > 
+> > Signed-off-by: Cong Ding <dinggnu@gmail.com>
+> > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > ---
+> >  drivers/clk/mvebu/clk-cpu.c |    9 ++++++---
+> >  1 file changed, 6 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
+> > index ff004578..9dd2551 100644
+> > --- a/drivers/clk/mvebu/clk-cpu.c
+> > +++ b/drivers/clk/mvebu/clk-cpu.c
+> > @@ -124,7 +124,7 @@ void __init of_cpu_clk_setup(struct device_node *node)
+> >  
+> >       clks = kzalloc(ncpus * sizeof(*clks), GFP_KERNEL);
+> >       if (WARN_ON(!clks))
+> > -             return;
+> > +             goto clks_out;
+> >  
+> >       for_each_node_by_type(dn, "cpu") {
+> >               struct clk_init_data init;
+> > @@ -134,11 +134,11 @@ void __init of_cpu_clk_setup(struct device_node *node)
+> >               int cpu, err;
+> >  
+> >               if (WARN_ON(!clk_name))
+> > -                     return;
+> > +                     goto bail_out;
+> >  
+> >               err = of_property_read_u32(dn, "reg", &cpu);
+> >               if (WARN_ON(err))
+> > -                     return;
+> > +                     goto bail_out;
+> >  
+> >               sprintf(clk_name, "cpu%d", cpu);
+> >               parent_clk = of_clk_get(node, 0);
+> > @@ -167,6 +167,9 @@ void __init of_cpu_clk_setup(struct device_node *node)
+> >       return;
+> >  bail_out:
+> >       kfree(clks);
+> > +     while(ncpus--)
+> > +             kfree(cpuclk[ncpus].clk_name);
+> > +clks_out:
+> >       kfree(cpuclk);
+> >  }
+> >  
+> > 
+> 
+> 
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
