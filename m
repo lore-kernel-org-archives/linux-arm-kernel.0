@@ -1,49 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 16 Jan 2013 08:50:30 +0000
-Subject: [PATCH 00/18] AB8500 battery management series upgrade
-In-Reply-To: <20130116014812.GA27065@lizard.fhda.edu>
-References: <1357909986-9262-1-git-send-email-lee.jones@linaro.org>
- <20130116014812.GA27065@lizard.fhda.edu>
-Message-ID: <20130116085030.GG9379@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 16 Jan 2013 09:54:19 +0100
+Subject: [PATCH 0/3] clk: Provide option to unprepare unused clocks at
+ late init
+In-Reply-To: <CACRpkdbCuDxszPZ-VYxhbNUSvyGM=rGw4h5Uy8LfqDcY0V-Dyg@mail.gmail.com>
+References: <1355872583-20928-1-git-send-email-ulf.hansson@stericsson.com>
+ <CACRpkdbCuDxszPZ-VYxhbNUSvyGM=rGw4h5Uy8LfqDcY0V-Dyg@mail.gmail.com>
+Message-ID: <CAPDyKFq+xQPnyXX-N7Wnst-8YCtcVCLcz8Z0T4jGJKD2KmvTBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Jan 2013, Anton Vorontsov wrote:
+On 20 December 2012 20:17, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Dec 19, 2012 at 12:16 AM, Ulf Hansson
+> <ulf.hansson@stericsson.com> wrote:
+>
+>> The disable_unused sequence executed at late init, is already handling the
+>> fast unused ungated clocks to be gated. This patchset extends this sequence to
+>> include the slow unused prepared clocks to be unprepared.
+>>
+>> The default behavior will not change in this patchset. To unprepare unused
+>> clocks during the disable_unused sequence, the clk_hw needs to implement
+>> the new optional callback, is_prepared.
+>>
+>> The motivation for this patchset is to save power. Clocks that is from
+>> bootloaders prepared|enabled, but not used should be unprepared|disabled.
+>
+> This has a nice symmetrical touch to it and looks allright to me, so
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Yours,
+> Linus Walleij
 
-> On Fri, Jan 11, 2013 at 01:12:48PM +0000, Lee Jones wrote:
-> > Here we go again. This patches include your suggested fixups.
-> > 
-> > Please find the next instalment of the AB8500 Power drivers upgrade.
-> > A lot of work has taken place on the internal development track, but
-> > little effort has gone into mainlining it. At last count there were
-> > around 70+ patches which are in need of forward-porting, then
-> > upstreaming. This patch-set aims to make a good start. :)
-> 
-> All except 14/18 applied, thanks!
-> 
-> Some general notes:
-> 
-> - No need for the power: prefix in the subject, unless it is a core
->   change;
-> - Try be consistent on the capitalization (I tend to capitalize the first
->   word, "driver: Fix something". But it's up to you, just be consistent).
-> - Try keep the patches compilable. :)
-> - ..and applicable to the battery tree.
-> 
-> Thanks!
-> 
-> Anton
-> 
-> p.s. I'll push out the battery tree a bit later (in a couple of hours), so
-> don't worry if the commits won't appear just now.
+Hi Mike,
 
-I'll keep 14/18 back until the next push and I'll try to be
-diligent in adhering to your requests.
+Just a kind reminder on this, could this be merged for 3.9?
 
-Very nice. Thanks Anton.
+I have a patch for ux500 that make use of this new feature, so it is
+of course fully tested.
+My plan was to send this patch separately, but if you like to see a
+"proof of concept" I can include it into this patchset!?
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks!
+Ulf Hansson
