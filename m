@@ -1,36 +1,47 @@
 From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Wed, 16 Jan 2013 10:48:23 +0100
-Subject: [PATCH 1/5] W1: Add device tree support to MXC onewire master.
+Date: Wed, 16 Jan 2013 10:48:27 +0100
+Subject: [PATCH 3/5] DTS: Add device tree entry for onewire master on i.MX53
 In-Reply-To: <20130116094821.9660.18278.stgit@localhost>
 References: <20130116094821.9660.18278.stgit@localhost>
-Message-ID: <20130116094823.9660.2116.stgit@localhost>
+Message-ID: <20130116094827.9660.48488.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 ---
- drivers/w1/masters/mxc_w1.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/imx53.dtsi |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
-index 708a25f..949e566 100644
---- a/drivers/w1/masters/mxc_w1.c
-+++ b/drivers/w1/masters/mxc_w1.c
-@@ -186,9 +186,16 @@ static int mxc_w1_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index edc3f1e..00c957c 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -387,6 +387,14 @@
+ 					};
+ 				};
  
-+static struct of_device_id mxc_w1_dt_ids[] = {
-+	{ .compatible = "fsl,imx21-owire" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxc_w1_dt_ids);
++				owire {
++					pinctrl_owire_1: owiregrp-1 {
++						fsl,pins = <
++								1166 0x80000000 /* MX53_PAD_GPIO_18__OWIRE_LINE */
++						>;
++					};
++				};
 +
- static struct platform_driver mxc_w1_driver = {
- 	.driver = {
--		   .name = "mxc_w1",
-+		.name = "mxc_w1",
-+		.of_match_table = mxc_w1_dt_ids,
- 	},
- 	.probe = mxc_w1_probe,
- 	.remove = mxc_w1_remove,
+ 				uart1 {
+ 					pinctrl_uart1_1: uart1grp-1 {
+ 						fsl,pins = <
+@@ -570,6 +578,13 @@
+ 				status = "disabled";
+ 			};
+ 
++			owire: owire@63fa4000 {
++				compatible = "fsl,imx53-owire", "fsl,imx21-owire";
++				reg = <0x63fa4000 0x4000>;
++				clocks = <&clks 159>;
++				status = "disabled";
++			};
++
+ 			ecspi2: ecspi at 63fac000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
