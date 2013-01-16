@@ -1,69 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 16 Jan 2013 15:02:25 +0900
-Subject: [PATCH 4/5] ARM: mach-shmobile: armadillo: update defconfig
-In-Reply-To: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
-References: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1358316146-12579-5-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 16 Jan 2013 15:02:21 +0900
+Subject: [GIT PULL v3] Renesas ARM-based SoC defconfig for v3.9
+Message-ID: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Enable ARM_APPENDED_DTB
+Hi Olof, Hi Arnd,
 
-  Typically the bootloader of an armadillo board does not support DT
-  so this option is useful.
+please consider the following defconfig enhancements for 3.9.
 
-* Do not disable SUSPEND
+----------------------------------------------------------------
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 
-  Suspend seems to work fine on the armadillo
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
 
-* Enable PM_RUNTIME
+are available in the git repository at:
 
-  This also seems to work fine.
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git defconfig
 
-* Move command line to dts
+for you to fetch changes up to 8098df15c26b2bf16924df5a134d1a649692ab62:
 
-  This brings us one small step closer to sharing defconfig
-  between armadillo and other boards
+  ARM: mach-shmobile: kzm9d: update defconfig (2013-01-15 08:57:09 +0900)
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
+----------------------------------------------------------------
+Simon Horman (5):
+      ARM: mach-shmobile: mackerel: update defconfig
+      ARM: mach-shmobile: fix memory size for kota2_defconfig
+      ARM: mach-shmobile: kzm9g: defconfig update
+      ARM: mach-shmobile: armadillo: update defconfig
+      ARM: mach-shmobile: kzm9d: update defconfig
+
+ arch/arm/boot/dts/emev2-kzm9d.dts             |    2 +-
  arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    4 ++++
+ arch/arm/boot/dts/sh7372-mackerel.dts         |    4 ++++
+ arch/arm/boot/dts/sh73a0-kzm9g.dts            |    4 ++++
  arch/arm/configs/armadillo800eva_defconfig    |    5 ++---
- 2 files changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index a7505a9..52cfead 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -15,6 +15,10 @@
- 	model = "armadillo 800 eva";
- 	compatible = "renesas,armadillo800eva";
- 
-+	chosen {
-+		bootargs = "console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw";
-+	};
-+
- 	memory {
- 		device_type = "memory";
- 		reg = <0x40000000 0x20000000>;
-diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
-index 2e1a825..f9e2701 100644
---- a/arch/arm/configs/armadillo800eva_defconfig
-+++ b/arch/arm/configs/armadillo800eva_defconfig
-@@ -34,12 +34,11 @@ CONFIG_AEABI=y
- CONFIG_FORCE_MAX_ZONEORDER=13
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096 rw"
--CONFIG_CMDLINE_FORCE=y
-+CONFIG_ARM_APPENDED_DTB=y
- CONFIG_KEXEC=y
- CONFIG_VFP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--# CONFIG_SUSPEND is not set
-+CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
--- 
-1.7.10.4
+ arch/arm/configs/kota2_defconfig              |    2 +-
+ arch/arm/configs/kzm9d_defconfig              |    4 +---
+ arch/arm/configs/kzm9g_defconfig              |    4 +++-
+ arch/arm/configs/mackerel_defconfig           |    2 +-
+ 9 files changed, 21 insertions(+), 10 deletions(-)
