@@ -1,32 +1,52 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 16 Jan 2013 16:49:13 +1300
-Subject: linux-next: manual merge of the tegra tree with the arm-soc tree
-In-Reply-To: <20130116141411.8fadedee54ed35dc0eddd288@canb.auug.org.au>
-References: <20130116141411.8fadedee54ed35dc0eddd288@canb.auug.org.au>
-Message-ID: <1358308153.32106.8.camel@gitbox>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 16 Jan 2013 13:01:25 +0900
+Subject: [GIT PULL v2] Renesas ARM-based SoC defconfig for v3.9
+In-Reply-To: <1358210975-26970-1-git-send-email-horms+renesas@verge.net.au>
+References: <1358210975-26970-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130116040125.GA17542@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-16 at 14:14 +1100, Stephen Rothwell wrote:
-> Hi all,
+On Tue, Jan 15, 2013 at 09:49:30AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> Today's linux-next merge of the tegra tree got a conflict in
-> drivers/clocksource/Makefile between commit ff7ec345f0ec ("timer: vt8500:
-> Move timer code to drivers/clocksource") from the arm-soc tree and commit
-> ac0fd9eca3ba ("ARM: tegra: move timer.c to drivers/clocksource/") from
-> the tegra tree.
+> please consider the following defconfig enhancements for 3.9.
+
+Please ignore this, I will send an updated pull request.
+
+> ----------------------------------------------------------------
+> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 > 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+>   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
 > 
-
-I don't know about everyone else, but I feel the preference should be to
-keep things alphabetized where possible to help avoid with merge
-conflicts later on. This is always a problem when we start tacking
-things on the end of lists.
-
-I realise this Kconfig is not alphabetized anyway, but it's never too
-early to start on the 'right' path.
-
-Regards
-Tony P
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git 
+> 
+> for you to fetch changes up to 8098df15c26b2bf16924df5a134d1a649692ab62:
+> 
+>   ARM: mach-shmobile: kzm9d: update defconfig (2013-01-15 08:57:09 +0900)
+> 
+> ----------------------------------------------------------------
+> Simon Horman (5):
+>       ARM: mach-shmobile: mackerel: update defconfig
+>       ARM: mach-shmobile: fix memory size for kota2_defconfig
+>       ARM: mach-shmobile: kzm9g: defconfig update
+>       ARM: mach-shmobile: armadillo: update defconfig
+>       ARM: mach-shmobile: kzm9d: update defconfig
+> 
+>  arch/arm/boot/dts/emev2-kzm9d.dts             |    2 +-
+>  arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    4 ++++
+>  arch/arm/boot/dts/sh7372-mackerel.dts         |    4 ++++
+>  arch/arm/boot/dts/sh73a0-kzm9g.dts            |    4 ++++
+>  arch/arm/configs/armadillo800eva_defconfig    |    5 ++---
+>  arch/arm/configs/kota2_defconfig              |    2 +-
+>  arch/arm/configs/kzm9d_defconfig              |    4 +---
+>  arch/arm/configs/kzm9g_defconfig              |    4 +++-
+>  arch/arm/configs/mackerel_defconfig           |    2 +-
+>  9 files changed, 21 insertions(+), 10 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
