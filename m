@@ -1,81 +1,54 @@
 From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Wed, 16 Jan 2013 15:57:55 +0100
-Subject: [PATCH V2 3/5] W1: Convert MXC onewire master to devm_ functions.
+Date: Wed, 16 Jan 2013 15:57:53 +0100
+Subject: [PATCH V2 2/5] ARM: i.MX53: Add clocks for i.mx53 onewire master.
 In-Reply-To: <20130116145749.24249.678.stgit@localhost>
 References: <20130116145749.24249.678.stgit@localhost>
-Message-ID: <20130116145755.24249.67871.stgit@localhost>
+Message-ID: <20130116145753.24249.29571.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While doing this fix missing clk_disable_unprepare in error path.
-
 Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 ---
- drivers/w1/masters/mxc_w1.c |   26 ++++++--------------------
- 1 files changed, 6 insertions(+), 20 deletions(-)
+ .../devicetree/bindings/clock/imx5-clock.txt       |    1 +
+ arch/arm/mach-imx/clk-imx51-imx53.c                |    4 +++-
+ 2 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
-index 949e566..317b2bc 100644
---- a/drivers/w1/masters/mxc_w1.c
-+++ b/drivers/w1/masters/mxc_w1.c
-@@ -117,7 +117,7 @@ static int mxc_w1_probe(struct platform_device *pdev)
- 	if (!mdev)
- 		return -ENOMEM;
+diff --git a/Documentation/devicetree/bindings/clock/imx5-clock.txt b/Documentation/devicetree/bindings/clock/imx5-clock.txt
+index 04ad478..2a0c904 100644
+--- a/Documentation/devicetree/bindings/clock/imx5-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx5-clock.txt
+@@ -171,6 +171,7 @@ clocks and IDs.
+ 	can_sel			156
+ 	can1_serial_gate	157
+ 	can1_ipg_gate		158
++	owire_gate		159
  
--	mdev->clk = clk_get(&pdev->dev, NULL);
-+	mdev->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(mdev->clk)) {
- 		err = PTR_ERR(mdev->clk);
- 		goto failed_clk;
-@@ -125,17 +125,11 @@ static int mxc_w1_probe(struct platform_device *pdev)
+ Examples (for mx53):
  
- 	mdev->clkdiv = (clk_get_rate(mdev->clk) / 1000000) - 1;
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 579023f..7ff293b 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -83,6 +83,7 @@ enum imx5_clks {
+ 	ssi2_root_gate, ssi3_root_gate, ssi_ext1_gate, ssi_ext2_gate,
+ 	epit1_ipg_gate, epit1_hf_gate, epit2_ipg_gate, epit2_hf_gate,
+ 	can_sel, can1_serial_gate, can1_ipg_gate,
++	owire_gate,
+ 	clk_max
+ };
  
--	res = request_mem_region(res->start, resource_size(res),
--				"mxc_w1");
--	if (!res) {
--		err = -EBUSY;
--		goto failed_req;
--	}
--
--	mdev->regs = ioremap(res->start, resource_size(res));
-+	mdev->regs = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!mdev->regs) {
- 		dev_err(&pdev->dev, "Cannot map mxc_w1 registers\n");
--		goto failed_ioremap;
-+		err = -ENXIO;
-+		goto failed_req;
- 	}
+@@ -233,12 +234,13 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk[epit1_hf_gate] = imx_clk_gate2("epit1_hf_gate", "per_root", MXC_CCM_CCGR2, 4);
+ 	clk[epit2_ipg_gate] = imx_clk_gate2("epit2_ipg_gate", "ipg", MXC_CCM_CCGR2, 6);
+ 	clk[epit2_hf_gate] = imx_clk_gate2("epit2_hf_gate", "per_root", MXC_CCM_CCGR2, 8);
++	clk[owire_gate] = imx_clk_gate2("owire_gate", "per_root", MXC_CCM_CCGR2, 22);
  
- 	clk_prepare_enable(mdev->clk);
-@@ -154,11 +148,9 @@ static int mxc_w1_probe(struct platform_device *pdev)
- 	return 0;
- 
- failed_add:
--	iounmap(mdev->regs);
--failed_ioremap:
--	release_mem_region(res->start, resource_size(res));
-+	clk_disable_unprepare(mdev->clk);
+ 	for (i = 0; i < ARRAY_SIZE(clk); i++)
+ 		if (IS_ERR(clk[i]))
+ 			pr_err("i.MX5 clk %d: register failed with %ld\n",
+ 				i, PTR_ERR(clk[i]));
+-	
 +
- failed_req:
--	clk_put(mdev->clk);
- failed_clk:
- 	kfree(mdev);
- 	return err;
-@@ -170,16 +162,10 @@ failed_clk:
- static int mxc_w1_remove(struct platform_device *pdev)
- {
- 	struct mxc_w1_device *mdev = platform_get_drvdata(pdev);
--	struct resource *res;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 
- 	w1_remove_master_device(&mdev->bus_master);
- 
--	iounmap(mdev->regs);
--	release_mem_region(res->start, resource_size(res));
- 	clk_disable_unprepare(mdev->clk);
--	clk_put(mdev->clk);
- 
- 	platform_set_drvdata(pdev, NULL);
- 
+ 	clk_register_clkdev(clk[gpt_hf_gate], "per", "imx-gpt.0");
+ 	clk_register_clkdev(clk[gpt_ipg_gate], "ipg", "imx-gpt.0");
+ 	clk_register_clkdev(clk[uart1_per_gate], "per", "imx21-uart.0");
