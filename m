@@ -1,95 +1,56 @@
-From: smoch@web.de (Soeren Moch)
-Date: Wed, 16 Jan 2013 09:55:55 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <50F61D86.4020801@web.de>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
- <50F3F289.3090402@web.de> <20130115165642.GA25500@titan.lakedaemon.net>
- <20130115175020.GA3764@kroah.com>
- <20130115201617.GC25500@titan.lakedaemon.net>
- <20130115215602.GF25500@titan.lakedaemon.net> <50F5F1B7.3040201@web.de>
- <20130116024014.GH25500@titan.lakedaemon.net> <50F61D86.4020801@web.de>
-Message-ID: <50F66B1B.40301@web.de>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 16 Jan 2013 16:59:04 +0800
+Subject: [PATCH v3 2/3] usb: mxs-phy: add set_suspend API
+In-Reply-To: <1358326745-25018-1-git-send-email-peter.chen@freescale.com>
+References: <1358326745-25018-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1358326745-25018-2-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.01.2013 04:24, Soeren Moch wrote:
-> On 16.01.2013 03:40, Jason Cooper wrote:
->> Soeren,
->>
->> On Wed, Jan 16, 2013 at 01:17:59AM +0100, Soeren Moch wrote:
->>> On 15.01.2013 22:56, Jason Cooper wrote:
->>>> On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
->>>>> If my understanding is correct, one of the drivers (most likely one)
->>>>> either asks for too small of a dma buffer, or is not properly
->>>>> deallocating blocks from the per-device pool.  Either case leads to
->>>>> exhaustion, and falling back to the atomic pool.  Which subsequently
->>>>> gets wiped out as well.
->>>>
->>>> If my hunch is right, could you please try each of the three dvb
->>>> drivers
->>>> in turn and see which one (or more than one) causes the error?
->>>
->>> In fact I use only 2 types of DVB sticks: em28xx usb bridge plus drxk
->>> demodulator, and dib0700 usb bridge plus dib7000p demod.
->>>
->>> I would bet for em28xx causing the error, but this is not thoroughly
->>> tested. Unfortunately testing with removed sticks is not easy, because
->>> this is a production system and disabling some services for the long
->>> time we need to trigger this error will certainly result in unhappy
->>> users.
->>
-OK, I could trigger the error
-   ERROR: 1024 KiB atomic DMA coherent pool is too small!
-   Please increase it with coherent_pool= kernel parameter!
-only with em28xx sticks and sata, dib0700 sticks removed.
+It needs to call set_suspend during USB suspend/resume
 
->> Just out of curiosity, what board is it?
->
-> The kirkwood board? A modified Guruplug Server Plus.
-em28xx sticks: "TerraTec Cinergy HTC Stick HD" and "PCTV Quatro Stick"
-dib0700 sticks: "WinTV-NOVA-TD Stick"
->>
->>> I will see what I can do here. Is there an easy way to track the buffer
->>> usage without having to wait for complete exhaustion?
->>
->> DMA_API_DEBUG
->
-> OK, maybe I can try this.
->>
->>> In linux-3.5.x there is no such problem. Can we use all available memory
->>> for dma buffers here on armv5 architectures, in contrast to newer
->>> kernels?
->>
->> Were the loads exactly the same when you tested 3.5.x?
->
-> Exactly the same, yes.
->
->> I looked at the
->> changes from v3.5 to v3.7.1 for all four drivers you mentioned as well
->> as sata_mv.
->>
->> The biggest thing I see is that all of the media drivers got shuffled
->> around into their own subdirectories after v3.5.  'git show -M 0c0d06c'
->> shows it was a clean copy of all the files.
->>
->> What would be most helpful is if you could do a git bisect between
->> v3.5.x (working) and the oldest version where you know it started
->> failing (v3.7.1 or earlier if you know it).
->>
-> I did not bisect it, but Marek mentioned earlier that commit
-> e9da6e9905e639b0f842a244bc770b48ad0523e9 in Linux v3.6-rc1 introduced
-> new code for dma allocations. This is probably the root cause for the
-> new (mis-)behavior (due to my tests 3.6.0 is not working anymore).
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ drivers/usb/otg/mxs-phy.c |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
 
-I don't want to say that Mareks patch is wrong, probably it triggers a
-bug somewhere else! (in em28xx?)
-
-> I'm not very familiar with arm mm code, and from the patch itself I
-> cannot understand what's different. Maybe CONFIG_CMA is default
-> also for armv5 (not only v6) now? But I might be totally wrong here,
-> maybe someone of the mm experts can explain the difference?
->
-Regards,
-Soeren
+diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
+index 7630272..5158332 100644
+--- a/drivers/usb/otg/mxs-phy.c
++++ b/drivers/usb/otg/mxs-phy.c
+@@ -76,6 +76,25 @@ static void mxs_phy_shutdown(struct usb_phy *phy)
+ 	clk_disable_unprepare(mxs_phy->clk);
+ }
+ 
++static int mxs_phy_suspend(struct usb_phy *x, int suspend)
++{
++	struct mxs_phy *mxs_phy = to_mxs_phy(x);
++
++	if (suspend) {
++		writel_relaxed(0xffffffff, x->io_priv + HW_USBPHY_PWD);
++		writel_relaxed(BM_USBPHY_CTRL_CLKGATE,
++			x->io_priv + HW_USBPHY_CTRL_SET);
++		clk_disable_unprepare(mxs_phy->clk);
++	} else {
++		clk_prepare_enable(mxs_phy->clk);
++		writel_relaxed(BM_USBPHY_CTRL_CLKGATE,
++			x->io_priv + HW_USBPHY_CTRL_CLR);
++		writel_relaxed(0, x->io_priv + HW_USBPHY_PWD);
++	}
++
++	return 0;
++}
++
+ static int mxs_phy_on_connect(struct usb_phy *phy,
+ 		enum usb_device_speed speed)
+ {
+@@ -137,6 +156,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 	mxs_phy->phy.label		= DRIVER_NAME;
+ 	mxs_phy->phy.init		= mxs_phy_init;
+ 	mxs_phy->phy.shutdown		= mxs_phy_shutdown;
++	mxs_phy->phy.set_suspend	= mxs_phy_suspend;
+ 	mxs_phy->phy.notify_connect	= mxs_phy_on_connect;
+ 	mxs_phy->phy.notify_disconnect	= mxs_phy_on_disconnect;
+ 
+-- 
+1.7.0.4
