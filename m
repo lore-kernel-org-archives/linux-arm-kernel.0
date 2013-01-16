@@ -1,30 +1,36 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 16 Jan 2013 06:06:12 +0100
-Subject: [v3 6/9] ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
-In-Reply-To: <20130115172733.GS4118@tbergstrom-lnx.Nvidia.com>
-References: <1358237598-32413-7-git-send-email-hdoyu@nvidia.com><50F58A13.10301@wwwdotorg.org><20130115172733.GS4118@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20130116.070612.390154383947803922.hdoyu@nvidia.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 16 Jan 2013 10:46:56 +0530
+Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <CAK=WgbYwM2WPWrTp9U+nk_96RY3YYumzo0KxFpV0fDwU6dR+aA@mail.gmail.com>
+References: <1357863807-380-1-git-send-email-rtivy@ti.com>
+ <1357863807-380-7-git-send-email-rtivy@ti.com>
+ <CAK=WgbZVayi-USPCwB3KSbzRQ_oxatznt4d26A8_GpWmay2daA@mail.gmail.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FE538@DFLE08.ent.ti.com>
+ <50F51E43.2090605@ti.com>
+ <CAK=WgbbShpqxS7zrDs97HkjpyWq0xzW3b9KHLBBs_V3YzdJKiA@mail.gmail.com>
+ <50F54B91.4030406@ti.com>
+ <CAK=WgbYwM2WPWrTp9U+nk_96RY3YYumzo0KxFpV0fDwU6dR+aA@mail.gmail.com>
+Message-ID: <50F637C8.1050605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver <pdeschrijver@nvidia.com> wrote @ Tue, 15 Jan 2013 18:27:33 +0100:
-
-> On Tue, Jan 15, 2013 at 05:55:47PM +0100, Stephen Warren wrote:
-> > On 01/15/2013 01:13 AM, Hiroshi Doyu wrote:
-> > > Initial support for Tegra 114 SoC. This is expected to be included in
-> > > the board DTS files, Tegra 114 SoC based evaluation board family.
-> > 
-> > This series looks fine to me. Assuming no other comments, I'll apply
-> > once CCF is applied and you've done the rebase you mentioned for patch 2.
-> > 
-> > Note that I'll apply most patches to Tegra's for-3.9/soc branch (the
-> > code) but the 3 device tree patches to Tegra's for-3.9/dt branch, since
-> > it's fine for the DT files to appear later than the code supporting the
-> > SoC, since this is all new features.
-> > 
-> > One question: The .dts files don't include any clocks properties. I
-> > assume Peter will add these when he posts the Tegra114 CCF code?
+On 1/15/2013 6:19 PM, Ohad Ben-Cohen wrote:
+> On Tue, Jan 15, 2013 at 2:29 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> May be rproc_alloc() could auto-assign the firmware name to something
+>> like 'rproc%d-fw' if firmware name passed to it is NULL?
 > 
-> Yes. I will add those as part of the Tegra114 CCF series.
+> I prefer we use name-based filenames instead to make it easier for
+> users (and us developers).
+> 
+> We can probably do something like "rproc-%s-fw" with pdata->name
+> assuming we/you do maintain a meaningful name in the latter.
 
-Once Tegra114 CCF comes, the 2nd one can be dropped.
+Are you thinking of passing name of the remote processor (like m3, dsp0,
+dsp1 etc) in pdata->name? That sounds OK since the processor name is
+actually tied to the platform. BTW, the current driver seems to be
+written for OMAP-L138 rather tightly so you could as well hardcode the
+firmware name to 'rproc-dsp-fw'.
+
+Thanks,
+Sekhar
