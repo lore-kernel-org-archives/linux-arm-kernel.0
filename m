@@ -1,92 +1,32 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Wed, 16 Jan 2013 10:48:31 +0100
-Subject: [PATCH 5/5] W1: Convert MXC onewire master to devm_ functions.
-In-Reply-To: <20130116094821.9660.18278.stgit@localhost>
-References: <20130116094821.9660.18278.stgit@localhost>
-Message-ID: <20130116094831.9660.15981.stgit@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Jan 2013 09:44:44 +0000
+Subject: [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile KVM support
+In-Reply-To: <877gndzvi6.fsf@rustcorp.com.au>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183855.46302.40539.stgit@ubuntu>
+ <20130114162415.GF23505@n2100.arm.linux.org.uk>
+ <CANM98qLHao0dJU57MbAtopVpTJDOVdqNtw5JT-DXyQNa7iD_qw@mail.gmail.com>
+ <877gndzvi6.fsf@rustcorp.com.au>
+Message-ID: <20130116094444.GP23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
----
- drivers/w1/masters/mxc_w1.c |   35 ++++++++---------------------------
- 1 files changed, 8 insertions(+), 27 deletions(-)
+On Wed, Jan 16, 2013 at 01:26:01PM +1030, Rusty Russell wrote:
+> Christoffer Dall <c.dall@virtualopensystems.com> writes:
+> 
+> > On Mon, Jan 14, 2013 at 11:24 AM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> >> On Tue, Jan 08, 2013 at 01:38:55PM -0500, Christoffer Dall wrote:
+> >>> +     /* -ENOENT for unknown features, -EINVAL for invalid combinations. */
+> >>> +     for (i = 0; i < sizeof(init->features)*8; i++) {
+> >>> +             if (init->features[i / 32] & (1 << (i % 32))) {
+> >>
+> >> Isn't this an open-coded version of test_bit() ?
+> >
+> > indeed, nicely spotted:
+> 
+> BTW, I wrote it that was out of excessive paranoia: it's a userspace
+> API, and test_bit() won't be right on 64 bit BE systems.
 
-diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
-index 7454938..5b0c700 100644
---- a/drivers/w1/masters/mxc_w1.c
-+++ b/drivers/w1/masters/mxc_w1.c
-@@ -123,28 +123,22 @@ static int mxc_w1_probe(struct platform_device *pdev)
- 	if (IS_ERR(pinctrl)) {
- 		err = PTR_ERR(pinctrl);
- 		dev_err(&pdev->dev, "failed to get default pinctrl: %d\n", err);
--		goto failed_pin;
-+		goto failed;
- 	}
- 
--	mdev->clk = clk_get(&pdev->dev, NULL);
-+	mdev->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(mdev->clk)) {
- 		err = PTR_ERR(mdev->clk);
--		goto failed_clk;
-+		goto failed;
- 	}
- 
- 	mdev->clkdiv = (clk_get_rate(mdev->clk) / 1000000) - 1;
- 
--	res = request_mem_region(res->start, resource_size(res),
--				"mxc_w1");
--	if (!res) {
--		err = -EBUSY;
--		goto failed_req;
--	}
--
--	mdev->regs = ioremap(res->start, resource_size(res));
-+	mdev->regs = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!mdev->regs) {
- 		dev_err(&pdev->dev, "Cannot map mxc_w1 registers\n");
--		goto failed_ioremap;
-+		err = -ENXIO;
-+		goto failed;
- 	}
- 
- 	clk_prepare_enable(mdev->clk);
-@@ -157,19 +151,12 @@ static int mxc_w1_probe(struct platform_device *pdev)
- 	err = w1_add_master_device(&mdev->bus_master);
- 
- 	if (err)
--		goto failed_add;
-+		goto failed;
- 
- 	platform_set_drvdata(pdev, mdev);
- 	return 0;
- 
--failed_add:
--	iounmap(mdev->regs);
--failed_ioremap:
--	release_mem_region(res->start, resource_size(res));
--failed_req:
--	clk_put(mdev->clk);
--failed_pin:
--failed_clk:
-+failed:
- 	kfree(mdev);
- 	return err;
- }
-@@ -180,16 +167,10 @@ failed_clk:
- static int mxc_w1_remove(struct platform_device *pdev)
- {
- 	struct mxc_w1_device *mdev = platform_get_drvdata(pdev);
--	struct resource *res;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 
- 	w1_remove_master_device(&mdev->bus_master);
- 
--	iounmap(mdev->regs);
--	release_mem_region(res->start, resource_size(res));
- 	clk_disable_unprepare(mdev->clk);
--	clk_put(mdev->clk);
- 
- 	platform_set_drvdata(pdev, NULL);
- 
+So why is this a concern for 32-bit systems (which are, by definition,
+only in arch/arm) ?
