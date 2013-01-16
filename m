@@ -1,101 +1,97 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Wed, 16 Jan 2013 13:03:38 -0500
-Subject: [PATCH v6 4/4] ARM: KVM: arch_timers: Wire the init code and config
- option
-In-Reply-To: <20130116180307.29693.84098.stgit@ubuntu>
-References: <20130116180307.29693.84098.stgit@ubuntu>
-Message-ID: <20130116180338.29693.8952.stgit@ubuntu>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 16 Jan 2013 11:04:08 -0700
+Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
+In-Reply-To: <20130116.101906.399662310268585658.hdoyu@nvidia.com>
+References: <1357890387-23245-3-git-send-email-pgaikwad@nvidia.com><20130111.134820.1392079432650652356.hdoyu@nvidia.com><50F085A0.4090100@wwwdotorg.org>
+ <20130116.101906.399662310268585658.hdoyu@nvidia.com>
+Message-ID: <50F6EB98.5090607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On 01/16/2013 01:19 AM, Hiroshi Doyu wrote:
+> Stephen Warren <swarren@wwwdotorg.org> wrote @ Fri, 11 Jan 2013 22:35:28 +0100:
+> 
+>> On 01/11/2013 04:48 AM, Hiroshi Doyu wrote:
+>>> Hi Prahant,
+>>>
+>>> Some nit-pick/cosmetic comments inlined...
+>>
+>> FYI, Prashant is on vacation for the next week or two, so I'll take over
+>> this series to clean up any last review comments.
+>>
+>>> Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Fri, 11 Jan 2013 08:46:20 +0100:
+>>>
+>>>> Add tegra specific clocks, pll, pll_out, peripheral,
+>>>> frac_divider, super.
+>>
+>> (it's a good idea to quote as little text as possible; paging through
+>> the whole patch to find your comments was slightly painful).
+>>
+>>>> diff --git a/drivers/clk/tegra/clk-audio-sync.c b/drivers/clk/tegra/clk-audio-sync.c
+>>
+>>>> +struct clk *tegra_clk_sync_source(const char *name, unsigned long rate,
+>>>> +                                 unsigned long max_rate)
+>>>> +{
+>>>> +       struct tegra_clk_sync_source *sync;
+>>>> +       struct clk_init_data init;
+>>>> +       struct clk *clk;
+>>>> +
+>>>> +       sync = kzalloc(sizeof(struct tegra_clk_sync_source), GFP_KERNEL);
+>>>> +       if (!sync) {
+>>>> +               pr_err("%s: could not allocate sync source clk\n", __func__);
+>>>> +               return ERR_PTR(-ENOMEM);
+>>>> +       }
+>>>> +
+>>>> +       sync->rate = rate;
+>>>> +       sync->max_rate = max_rate;
+>>>> +
+>>>> +       init.ops = &tegra_clk_sync_source_ops;
+>>>> +       init.name = name;
+>>>> +       init.flags = CLK_IS_ROOT;
+>>>> +       init.parent_names = NULL;
+>>>> +       init.num_parents = 0;
+>>>> +
+>>>> +       sync->hw.init = &init;
+>>>> +
+>>>> +       clk = clk_register(NULL, &sync->hw);
+>>>
+>>> The above usage of "init" from stack may be a bit
+>>> unfamilier. I can guess that its content is copied in clk_register()
+>>> but it's originally defined in stack. So I just prefer to writing this
+>>> as below. It may be somewhat explict that we know init is from stack.
+>>
+>> The issue you mention is more about whether "init" is copied from the
+>> stack or not; simplying changing the initialization to:
+>>
+>>> struct clk *tegra_clk_sync_source(const char *name, unsigned long rate,
+>>>                                  unsigned long max_rate)
+>>> {
+>>>         struct tegra_clk_sync_source *sync;
+>>>         struct clk_init_data init = {
+>>>                 .ops = &tegra_clk_sync_source_ops;
+>>>                 .name = name;
+>>>                 .flags = CLK_IS_ROOT;
+>>>                 .parent_names = NULL;
+>>>                 .num_parents = 0;
+>>>         };
+> 
+> Also since "init" is allocated from stack, members are expected to be
+> initialized *zero*. The last 2 lines are not necessary in the above.
+> 
+>          struct clk_init_data init = {
+>                  .ops = &tegra_clk_sync_source_ops;
+>                  .name = name;
+>                  .flags = CLK_IS_ROOT;
+>          };
 
-It is now possible to select CONFIG_KVM_ARM_TIMER to enable the
-KVM architected timer support.
+Variables on the stack aren't initialized the zero without an explicit
+assignment.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
----
- arch/arm/kvm/Kconfig  |    8 ++++++++
- arch/arm/kvm/Makefile |    1 +
- arch/arm/kvm/arm.c    |   11 +++++++++++
- arch/arm/kvm/vgic.c   |    1 +
- 4 files changed, 21 insertions(+)
+The reason why those last two lines aren't strictly necessary, is
+because the whole of the "init" struct is being initialized due to
+assignment to the struct, and omitting an explicit value for any of the
+fields means that the field's value will be zero. The same would be true
+for a global struct initialization (as opposed to BSS).
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index d8126f2..49dd64e 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -59,6 +59,14 @@ config KVM_ARM_VGIC
- 	---help---
- 	  Adds support for a hardware assisted, in-kernel GIC emulation.
- 
-+config KVM_ARM_TIMER
-+	bool "KVM support for Architected Timers"
-+	depends on KVM_ARM_VGIC && ARM_ARCH_TIMER
-+	select HAVE_KVM_IRQCHIP
-+	default y
-+	---help---
-+	  Adds support for the Architected Timers in virtual machines
-+
- source drivers/virtio/Kconfig
- 
- endif # VIRTUALIZATION
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index dece8ed..fc96ce6 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -20,3 +20,4 @@ obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o guest.o mmu.o emulate.o reset.o
- obj-y += coproc.o coproc_a15.o mmio.o psci.o
- obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
-+obj-$(CONFIG_KVM_ARM_TIMER) += arch_timer.o
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 1a98b5c..2ab3552 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -289,6 +289,7 @@ int kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
- void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
- {
- 	kvm_mmu_free_memory_caches(vcpu);
-+	kvm_timer_vcpu_terminate(vcpu);
- 	kmem_cache_free(kvm_vcpu_cache, vcpu);
- }
- 
-@@ -330,6 +331,9 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
- 	if (ret)
- 		return ret;
- 
-+	/* Set up the timer */
-+	kvm_timer_vcpu_init(vcpu);
-+
- 	return 0;
- }
- 
-@@ -1096,6 +1100,13 @@ static int init_hyp_mode(void)
- 		vgic_present = true;
- #endif
- 
-+	/*
-+	 * Init HYP architected timer support
-+	 */
-+	err = kvm_timer_hyp_init();
-+	if (err)
-+		goto out_free_mappings;
-+
- 	kvm_info("Hyp mode initialized successfully\n");
- 	return 0;
- out_free_vfp:
-diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-index 519cde1..c451bf0 100644
---- a/arch/arm/kvm/vgic.c
-+++ b/arch/arm/kvm/vgic.c
-@@ -1417,6 +1417,7 @@ int kvm_vgic_init(struct kvm *kvm)
- 	for (i = VGIC_NR_PRIVATE_IRQS; i < VGIC_NR_IRQS; i += 4)
- 		vgic_set_target_reg(kvm, 0, i);
- 
-+	kvm_timer_init(kvm);
- 	kvm->arch.vgic.ready = true;
- out:
- 	mutex_unlock(&kvm->lock);
+Either way though, I'm inclined to leave the initialization in; there's
+little harm being explicit.
