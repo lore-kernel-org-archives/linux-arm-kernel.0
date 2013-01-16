@@ -1,100 +1,177 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 Jan 2013 13:11:24 -0700
-Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
-In-Reply-To: <20130116.171242.2189136612266237422.hdoyu@nvidia.com>
-References: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com><1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
- <20130116.171242.2189136612266237422.hdoyu@nvidia.com>
-Message-ID: <50F7096C.7020803@wwwdotorg.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 16 Jan 2013 21:15:47 +0100
+Subject: [PATCH 2/7] reset: Add reset controller API
+In-Reply-To: <1358352787-15441-3-git-send-email-p.zabel@pengutronix.de>
+References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
+ <1358352787-15441-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130116201547.GW1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2013 08:12 AM, Hiroshi Doyu wrote:
-> Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Fri, 11 Jan 2013 08:46:20 +0100:
+On Wed, Jan 16, 2013 at 05:13:02PM +0100, Philipp Zabel wrote:
+> This adds a simple API for devices to request being reset
+> by separate reset controller hardware and implements the
+> reset signal device tree binding.
 > 
-> ....
->> diff --git a/drivers/clk/tegra/clk-audio-sync.c b/drivers/clk/tegra/clk-audio-sync.c
-
->> +#define to_clk_sync_source(_hw)                                        \
->> +       container_of(_hw, struct tegra_clk_sync_source, hw)
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  drivers/Kconfig        |    2 +
+>  drivers/Makefile       |    2 +
+>  drivers/reset/Kconfig  |   10 ++
+>  drivers/reset/Makefile |    2 +
+>  drivers/reset/core.c   |  241 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 257 insertions(+)
+>  create mode 100644 drivers/reset/Kconfig
+>  create mode 100644 drivers/reset/Makefile
+>  create mode 100644 drivers/reset/core.c
 > 
-> Can we define "struct tegra_clk_sync_source" here if there's no need
-> to expose this structure out?
+> diff --git a/drivers/Kconfig b/drivers/Kconfig
+> index f5fb072..51f73ae 100644
+> --- a/drivers/Kconfig
+> +++ b/drivers/Kconfig
+> @@ -158,4 +158,6 @@ source "drivers/irqchip/Kconfig"
+>  
+>  source "drivers/ipack/Kconfig"
+>  
+> +source "drivers/reset/Kconfig"
+> +
+>  endmenu
+> diff --git a/drivers/Makefile b/drivers/Makefile
+> index 346ecc5..870bf7e 100644
+> --- a/drivers/Makefile
+> +++ b/drivers/Makefile
+> @@ -42,6 +42,8 @@ ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
+>  obj-y				+= clocksource/
+>  endif
+>  
+> +obj-$(CONFIG_RESET_CONTROLLER)	+= reset/
+> +
+>  # tty/ comes before char/ so that the VT console is the boot-time
+>  # default.
+>  obj-y				+= tty/
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> new file mode 100644
+> index 0000000..82dc89e
+> --- /dev/null
+> +++ b/drivers/reset/Kconfig
+> @@ -0,0 +1,10 @@
+> +menuconfig RESET_CONTROLLER
+> +	bool "Reset Controller Support"
+> +	help
+> +	  Generic Reset Controller support.
+> +
+> +	  This framework is designed to abstract reset handling of devices
+> +	  via GPIOs or SoC-internal reset controller modules.
+> +
+> +	  If unsure, say no.
+> +
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> new file mode 100644
+> index 0000000..9a7b6df
+> --- /dev/null
+> +++ b/drivers/reset/Makefile
+> @@ -0,0 +1,2 @@
+> +obj-$(CONFIG_RESET_CONTROLLER) += core.o
+> +
+> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+> new file mode 100644
+> index 0000000..f0ed61b
+> --- /dev/null
+> +++ b/drivers/reset/core.c
+> @@ -0,0 +1,241 @@
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/export.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/reset.h>
+> +#include <linux/reset-controller.h>
+> +#include <linux/slab.h>
+> +
+> +static DEFINE_MUTEX(reset_controller_list_mutex);
+> +static LIST_HEAD(reset_controller_list);
+> +
+> +/**
+> + * struct reset_control - a reset control
+> + *
+> + * @id: ID of the reset controller in the reset
+> + *      controller device
+> + */
+> +struct reset_control {
+> +	struct reset_controller_dev *rcdev;
+> +	unsigned int id;
+> +};
+> +
+> +/**
+> + * reset_controller_register - register a reset controller
+> + *
+> + * @ops: a pointer to struct reset_controller_ops callbacks
+> + *
+> + * Returns a struct reset_controller_dev or IS_ERR() condition
+> + * containing errno.
 
-In some cases, yes. However, some of the clock structs and ops variables
-are re-used by multiple clock types in different files. For example,
-struct tegra_clk_periph aggregates a struct tegra_clk_frac_div and a
-struct tegra_clk_periph_gate. That means that at least some of the types
-and ops variables must be declared in clk.h (or some header anyway). As
-such, I'd rather just have all the types and ops variables declared
-there for consistency.
+The comment seems wrong.
 
->> +static int clk_frac_div_set_rate(struct clk_hw *hw, unsigned long rate,
->> +                               unsigned long parent_rate)
->> +{
->> +       struct tegra_clk_frac_div *divider = to_clk_frac_div(hw);
->> +       int div;
->> +       unsigned long flags = 0;
-> 
-> nit, is "flags" not needed to initialize here?
+> + */
+> +int reset_controller_register(struct reset_controller_dev *rcdev)
+> +{
+> +	mutex_lock(&reset_controller_list_mutex);
+> +	list_add(&rcdev->list, &reset_controller_list);
+> +	mutex_unlock(&reset_controller_list_mutex);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * reset_control_reset - reset the controlled device
+> + * @rstc: reset controller
+> + */
+> +int reset_control_reset(struct reset_control *rstc)
+> +{
+> +	if (rstc->rcdev->ops->reset)
+> +		return rstc->rcdev->ops->reset(rstc->id);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(reset_control_reset);
+> +
+> +/**
+> + * reset_control_assert - asserts the reset line
+> + * @rstc: reset controller
+> + */
+> +int reset_control_assert(struct reset_control *rstc)
+> +{
+> +	if (rstc->rcdev->ops->assert)
+> +		return rstc->rcdev->ops->assert(rstc->id);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(reset_control_assert);
+> +
+> +/**
+> + * reset_control_deassert - deasserts the reset line
+> + * @rstc: reset controller
+> + */
+> +int reset_control_deassert(struct reset_control *rstc)
+> +{
+> +	if (rstc->rcdev->ops->deassert)
+> +		return rstc->rcdev->ops->deassert(rstc->id);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(reset_control_deassert);
+> +
+> +/**
+> + * reset_control_is_asserted - deasserts the reset line
 
-It avoids a compiler warning; the compiler doesn't that the if condition
-that guards the path that uses flags is the same condition as the path
-that initializes it. Or, it may be related to the fact that
-spin_lock_irqsave() writes to the value through a pointer parameter, and
-the compiler doesn't know it's an out-only parameter.
+copy-paste from the function above?
 
->> diff --git a/drivers/clk/tegra/clk-periph-gate.c b/drivers/clk/tegra/clk-periph-gate.c
+Sascha
 
->> diff --git a/drivers/clk/tegra/clk-periph-gate.c b/drivers/clk/tegra/clk-periph-gate.c
 
->> +#define to_clk_periph_gate(_hw)                                        \
->> +       container_of(_hw, struct tegra_clk_periph_gate, hw)
-> 
-> For consistency, put "to_clk_periph_gate(_hw)" in "clk.h", then this
-> can be used in clk-periph.c as well.
-
-Sure. I moved all "to_clk_*()" macros to clk.h for consistency, since
-the types are all there anyway.
-
->> +struct clk *tegra_clk_periph_gate(const char *name, const char *parent_name,
-...
->> +       gate = kzalloc(sizeof(struct tegra_clk_periph_gate), GFP_KERNEL);
-> 
->        gate = kzalloc(sizeof(*gate), GFP_KERNEL) ?
-
-I've already fixed all those up locally.
-
->> diff --git a/drivers/clk/tegra/clk-periph.c b/drivers/clk/tegra/clk-periph.c
-
->> +struct clk *tegra_clk_periph(const char *name, const char **parent_names,
->> +                            int num_parents, struct tegra_clk_periph *periph,
->> +                            void __iomem *clk_base, u32 offset)
->> +{
->> +       struct clk *clk;
->> +       struct clk_init_data init;
->> +
->> +       init.name = name;
->> +       init.ops = &tegra_clk_periph_ops;
->> +       init.flags = 0;
-> 
-> struct members in stack are expected to initialize 0.
-
-Stack variables aren't initialized in C. In this case, since the
-individual fields are being assigned via statements rather than an
-initializer, everything has to be done explicitly.
-
->> diff --git a/drivers/clk/tegra/clk-pll-out.c b/drivers/clk/tegra/clk-pll-out.c
-
->> +#define pll_out_enb(p) (BIT(p->enb_bit_idx))
->> +#define pll_out_rst(p) (BIT(p->rst_bit_idx))
-> 
-> I don't see much benefit from the above macros.
-
-Meh. Do you feel strongly about this? I'm not really inclined to got
-through and change these; there are a bunch of similar things in other
-files, and it feels like it'd just be churn.
-
-Anything I didn't explicitly say no to, I have implemented.
-
-A /lot/ more of the original patch was quoted that was really necessary
-to make your comments; it made wading through the email a little tiresome.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
