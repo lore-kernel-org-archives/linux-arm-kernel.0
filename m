@@ -1,58 +1,160 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 16 Jan 2013 09:48:57 +0800
-Subject: [PATCH v2 1/4] ARM i.MX6: use reserved bit for mxs phy clock gate
-In-Reply-To: <20130116011845.GB16514@nchen-desktop>
-References: <1358230117-19443-1-git-send-email-peter.chen@freescale.com>
- <20130115113313.GB32113@S2101-09.ap.freescale.net>
- <20130116011845.GB16514@nchen-desktop>
-Message-ID: <20130116014855.GA8118@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 16 Jan 2013 09:48:25 +0800
+Subject: [PATCH v5 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
+ platform_device_id
+In-Reply-To: <20130115140344.GB6574@S2101-09.ap.freescale.net>
+References: <1358216975-1404-1-git-send-email-peter.chen@freescale.com>
+ <1358216975-1404-2-git-send-email-peter.chen@freescale.com>
+ <20130115140344.GB6574@S2101-09.ap.freescale.net>
+Message-ID: <20130116014824.GD16514@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 09:18:46AM +0800, Peter Chen wrote:
-> On Tue, Jan 15, 2013 at 07:33:16PM +0800, Shawn Guo wrote:
-> > On Tue, Jan 15, 2013 at 02:08:34PM +0800, Peter Chen wrote:
-> > > For mxs-phy user i.mx6q, the PHY's clock is controlled by
-> > > hardware automatically, the software only needs to enable it
-> > > at probe, disable it at remove. During the runtime,
-> > > we don't need to control it. So for the usbphy clk policy:
-> > > 
-> > > - Keep refcount for usbphy as clk framework needs to know if
-> > > it is off or on.
+On Tue, Jan 15, 2013 at 10:03:46PM +0800, Shawn Guo wrote:
+> On Tue, Jan 15, 2013 at 10:29:33AM +0800, Peter Chen wrote:
+> > As mach/hardware.h is deleted, we need to use platform_device_id to
+> > differentiate SoCs. Besides, one cpu_is_mx35 is useless as it has
+> > already used pdata to differentiate runtime
 > > 
-> > Just checked the reference manual, it seems that not only bit 6
-> > (EN_USB_CLKS) but also bit 12 (POWER) are controlled by USB hardware.
-> > If this is true, I think that PLL3 and PLL7 are really designed for
-> > USB PHY use only.  Do you actually see other real users of these two
-> > PLLs on imx6q besides USB PHY?  If not, we can just provide a dummy
-> > clock to mxs-phy driver on imx6q, and keep real clocks usbphy1 and
-> > usbphy2 there for platform init function to enable them if USB support
-> > is built in.  Then, we can save all these dirty hacks.  Thoughts?
-> It was my v1 patch did.
+> > Meanwhile we update the platform code accordingly.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/devices/devices-common.h        |    1 +
+> >  arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c |   15 ++++---
+> >  drivers/usb/gadget/fsl_mxc_udc.c                  |   24 +++++-------
+> >  drivers/usb/gadget/fsl_udc_core.c                 |   42 +++++++++++++--------
+> >  4 files changed, 45 insertions(+), 37 deletions(-)
 > 
-I thought it might be okay to access anatop for enabling the clock in
-usb driver.  But I found it's just too ugly to do that when I look at
-the code a little bit closer.  I prefer to keep clock driver unchanged
-and just call clk_prepare_enable() at platform level to enable the
-clock.  I really dislike the code accessing anatop for enabling the
-clock.  That's the part different from you v1 patch.
+> Since we are splitting the original patch anyway, it's a bit strange
+> to me that you are mixing arch/arm/mach-imx and drivers/usb/gadget
+> in this patch.  I'm fine with it, since I assume all the patches to
+> go via USB tree anyway.
+> 
+> > 
+> > diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
+> > index 6277baf..9bd5777 100644
+> > --- a/arch/arm/mach-imx/devices/devices-common.h
+> > +++ b/arch/arm/mach-imx/devices/devices-common.h
+> > @@ -63,6 +63,7 @@ struct platform_device *__init imx_add_flexcan(
+> >  
+> >  #include <linux/fsl_devices.h>
+> >  struct imx_fsl_usb2_udc_data {
+> > +	const char *devid;
+> >  	resource_size_t iobase;
+> >  	resource_size_t irq;
+> >  };
+> > diff --git a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
+> > index 37e4439..fb527c7 100644
+> > --- a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
+> > +++ b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
+> > @@ -11,35 +11,36 @@
+> >  #include "../hardware.h"
+> >  #include "devices-common.h"
+> >  
+> > -#define imx_fsl_usb2_udc_data_entry_single(soc)				\
+> > +#define imx_fsl_usb2_udc_data_entry_single(soc, _devid)			\
+> >  	{								\
+> > +		.devid = _devid,					\
+> >  		.iobase = soc ## _USB_OTG_BASE_ADDR,			\
+> >  		.irq = soc ## _INT_USB_OTG,				\
+> >  	}
+> >  
+> >  #ifdef CONFIG_SOC_IMX25
+> >  const struct imx_fsl_usb2_udc_data imx25_fsl_usb2_udc_data __initconst =
+> > -	imx_fsl_usb2_udc_data_entry_single(MX25);
+> > +	imx_fsl_usb2_udc_data_entry_single(MX25, "imx-udc-mx25");
+> >  #endif /* ifdef CONFIG_SOC_IMX25 */
+> >  
+> >  #ifdef CONFIG_SOC_IMX27
+> >  const struct imx_fsl_usb2_udc_data imx27_fsl_usb2_udc_data __initconst =
+> > -	imx_fsl_usb2_udc_data_entry_single(MX27);
+> > +	imx_fsl_usb2_udc_data_entry_single(MX27, "imx-udc-mx27");
+> >  #endif /* ifdef CONFIG_SOC_IMX27 */
+> >  
+> >  #ifdef CONFIG_SOC_IMX31
+> >  const struct imx_fsl_usb2_udc_data imx31_fsl_usb2_udc_data __initconst =
+> > -	imx_fsl_usb2_udc_data_entry_single(MX31);
+> > +	imx_fsl_usb2_udc_data_entry_single(MX31, "imx-udc-mx31");
+> >  #endif /* ifdef CONFIG_SOC_IMX31 */
+> >  
+> >  #ifdef CONFIG_SOC_IMX35
+> >  const struct imx_fsl_usb2_udc_data imx35_fsl_usb2_udc_data __initconst =
+> > -	imx_fsl_usb2_udc_data_entry_single(MX35);
+> > +	imx_fsl_usb2_udc_data_entry_single(MX35, "imx-udc-mx35");
+> >  #endif /* ifdef CONFIG_SOC_IMX35 */
+> >  
+> >  #ifdef CONFIG_SOC_IMX51
+> >  const struct imx_fsl_usb2_udc_data imx51_fsl_usb2_udc_data __initconst =
+> > -	imx_fsl_usb2_udc_data_entry_single(MX51);
+> > +	imx_fsl_usb2_udc_data_entry_single(MX51, "imx-udc-mx51");
+> >  #endif
+> >  
+> >  struct platform_device *__init imx_add_fsl_usb2_udc(
+> > @@ -57,7 +58,7 @@ struct platform_device *__init imx_add_fsl_usb2_udc(
+> >  			.flags = IORESOURCE_IRQ,
+> >  		},
+> >  	};
+> > -	return imx_add_platform_device_dmamask("fsl-usb2-udc", -1,
+> > +	return imx_add_platform_device_dmamask(data->devid, -1,
+> >  			res, ARRAY_SIZE(res),
+> >  			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
+> >  }
+> 
+> <snip>
+> 
+> > +static const struct platform_device_id fsl_udc_devtype[] = {
+> > +	{
+> > +		.name = "imx-udc-mx25",
+> > +	}, {
+> > +		.name = "imx-udc-mx27",
+> > +	}, {
+> > +		.name = "imx-udc-mx31",
+> > +	}, {
+> > +		.name = "imx-udc-mx35",
+> > +	}, {
+> > +		.name = "imx-udc-mx51",
+> > +	}
+> > +};
+> 
+> From what I understand balbi's comment, he dislikes this full list of
+> device id.  Instead, he prefers to something like below.
+> 
+> static const struct platform_device_id fsl_udc_devtype[] = {
+> 	{
+> 		.name = "imx-udc-mx27",
+> 	}, {
+> 		.name = "imx-udc-mx51",
+> 	}
+> };
+> 
+> It basically tells that we are handling two type of devices here, one
+> is imx-udc-mx27 type and the other is imx-udc-mx51 type, with mx25/31/35
+> completely compatible with mx27 type.  We choose mx27 instead of mx25
+> to define the type because mx27 Si came out earlier than mx25.  That
+> said, we generally choose the earlies SoC name to define a particular
+> version of IP block, since hardware version is mostly unavailable or
+> unreliable.
+> 
+> But that also means in platform code which create the platform_device,
+> you will need to use name "imx-udc-mx27" for even mx25/31/35.
+> 
+> 	imx_fsl_usb2_udc_data_entry_single(MX25, "imx-udc-mx27");
+> 	imx_fsl_usb2_udc_data_entry_single(MX31, "imx-udc-mx27");
+> 	imx_fsl_usb2_udc_data_entry_single(MX35, "imx-udc-mx27");
+> 
+> Considering this is a piece of code we will not use for any new
+> hardware, I'm fine with either way.
+> 
+> So, balbi, it's all your call to accept the series as it is or ask for
+> another iteration.
+Thanks Shawn. Let's see Felipe's comment, nevertheless, I will send v6 patch
+due to a compile error at mx25
 
-> I send the v2 patch due to below reasons,
-> There are other PLL3 users, it is better keep refcount
-> to all its children, or the user will be confused when the
-> PLL3 goes to disable, but the usb otg part is still used
 > 
-This is the part I'm not sure how it works.  You said, the PLL will be
-managed by hardware during USB suspend/resume.  I assume that it means
-the PLL will be powered off when USB suspends and be powered on when
-USB resumes.  If that's the case, how other users of the PLL work when
-PLL is powered off by USB hardware.
+> Shawn
 
-Shawn
+-- 
 
-> For PLL7, we can do it, and let the PLL7 be out of clock framework
-> management.
-> 
-> But I still think keep usbphy as PLL child is better solution,
-> in that case, the clock maintainer can know the real clock usage.
-> 
+Best Regards,
+Peter Chen
