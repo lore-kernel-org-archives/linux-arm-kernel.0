@@ -1,32 +1,85 @@
-From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Wed, 16 Jan 2013 14:37:40 +0530
-Subject: [PATCH V5 2/3] ARM: davinci: da8xx defconfig: enable pinctrl config
- option
-In-Reply-To: <1358327261-9679-1-git-send-email-anilkumar.v@ti.com>
-References: <1358327261-9679-1-git-send-email-anilkumar.v@ti.com>
-Message-ID: <1358327261-9679-3-git-send-email-anilkumar.v@ti.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Wed, 16 Jan 2013 09:27:53 +0000
+Subject: [PATCH 1/1] clk-divider: fix is_power_of_two()
+In-Reply-To: <20130116005639.8920.45989@quantum>
+References: <1358245685-4392-1-git-send-email-james.hogan@imgtec.com>
+ <1358274665.2597.11.camel@joe-AO722> <20130116005639.8920.45989@quantum>
+Message-ID: <50F67299.4010102@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable pinctrl related config option in da8xx_omapl_defconfig
+On 16/01/13 00:56, Mike Turquette wrote:
+> Quoting Joe Perches (2013-01-15 10:31:05)
+>> On Tue, 2013-01-15 at 10:28 +0000, James Hogan wrote:
+>>> The macro is_power_of_two() in clk-divider.c was defined as !(i & ~i)
+>>> which is always true. Correct it to !(i & (i - 1)).
+>> []
+>>> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+>> []
+>>> @@ -29,8 +29,8 @@
+>> []
+>>> -#define div_mask(d)  ((1 << (d->width)) - 1)
+>>> -#define is_power_of_two(i)   !(i & ~i)
+>>> +#define div_mask(d)  ((1 << ((d)->width)) - 1)
+>>> +#define is_power_of_two(i)   (!((i) & ((i) - 1)))
+>>
+>> Use is_power_of_2 in log2.h instead?
+> 
+> Both are fine suggestions.  How about I apply the below patch?
 
-Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
----
-:100644 100644 f292239... 0892db4... M	arch/arm/configs/da8xx_omapl_defconfig
- arch/arm/configs/da8xx_omapl_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Looks good to me, thanks for taking care of the log.h change.
 
-diff --git a/arch/arm/configs/da8xx_omapl_defconfig b/arch/arm/configs/da8xx_omapl_defconfig
-index f292239..0892db4 100644
---- a/arch/arm/configs/da8xx_omapl_defconfig
-+++ b/arch/arm/configs/da8xx_omapl_defconfig
-@@ -81,6 +81,7 @@ CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_DAVINCI=y
-+CONFIG_PINCTRL_SINGLE=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_REGULATOR=y
--- 
-1.7.4.1
+Cheers
+James
+
+> From 54c6c9e5f61693effbe6e4fb28ef9f2f9b3d7a23 Mon Sep 17 00:00:00 2001
+> From: James Hogan <james.hogan@imgtec.com>
+> Date: Tue, 15 Jan 2013 10:28:05 +0000
+> Subject: [PATCH] clk-divider: fix macros
+> 
+> The macro is_power_of_two() in clk-divider.c was defined as !(i & ~i)
+> which is always true.  Instead use is_power_of_2() from log2.h.
+> 
+> Also add brackets around the macro arguments in div_mask to avoid any
+> future operator precedence problems.
+> 
+> Signed-off-by: James Hogan <james.hogan@imgtec.com>
+> Cc: Joe Perches <joe@perches.com>
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> [mturquette at linaro.org: use log2.h per Joe Perches; update changelog]
+> ---
+>  drivers/clk/clk-divider.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index a9204c6..68b4021 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/io.h>
+>  #include <linux/err.h>
+>  #include <linux/string.h>
+> +#include <linux/log2.h>
+>  
+>  /*
+>   * DOC: basic adjustable divider clock that cannot gate
+> @@ -29,8 +30,7 @@
+>  
+>  #define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
+>  
+> -#define div_mask(d)	((1 << (d->width)) - 1)
+> -#define is_power_of_two(i)	!(i & ~i)
+> +#define div_mask(d)	((1 << ((d)->width)) - 1)
+>  
+>  static unsigned int _get_table_maxdiv(const struct clk_div_table *table)
+>  {
+> @@ -137,7 +137,7 @@ static bool _is_valid_table_div(const struct clk_div_table *table,
+>  static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
+>  {
+>  	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
+> -		return is_power_of_two(div);
+> +		return is_power_of_2(div);
+>  	if (divider->table)
+>  		return _is_valid_table_div(divider->table, div);
+>  	return true;
+> 
