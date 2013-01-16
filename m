@@ -1,155 +1,36 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Thu, 17 Jan 2013 00:01:21 +0200
-Subject: [RFC] OMAP: 4430sdp: add shared trasport devices to the board file
-Message-ID: <1358373682-13536-1-git-send-email-coelho@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 16 Jan 2013 15:06:00 -0700
+Subject: [PATCH 1/7] dt: describe base reset signal binding
+In-Reply-To: <1358352787-15441-2-git-send-email-p.zabel@pengutronix.de>
+References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
+ <1358352787-15441-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <50F72448.8070807@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the btwilink, nfcwilink and shared transport devices to the board
-file, including functions to power things on and off.
+On 01/16/2013 09:13 AM, Philipp Zabel wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> This binding is intended to represent the hardware reset signals present
+> internally in most IC (SoC, FPGA, ...) designs.
+> 
+> Such a binding would allow the creation of a "reset subsystem", which
+> could replace APIs such as the following Tegra-specific API:
+> 
+> void tegra_periph_reset_deassert(struct clk *c);
+> void tegra_periph_reset_assert(struct clk *c);
+> 
+> (Note that at present, Tegra couples reset assertion with the clock for
+> the affected peripheral module. However, reset and clocking are two
+> separate, yet admittedly related, concepts).
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-Additionally, add the UART2 muxing data, so it's properly configured.
+You probably want to update the patch description; it was somewhat
+appropriate when I sent the patch as an RFC to see what people thought
+about the idea, but now you're actually providing the whole thing a more
+specific description would be better.
 
-Signed-off-by: Luciano Coelho <coelho@ti.com>
----
-
-This is pretty much the same as the patch I just sent for panda, but
-there were a few more things missing in the 4430sdp board file and I
-also included NFC support.
-
-I'm sending this as RFC because I'm not sure this is the right thing
-to do for 4430sdp.  This configuration works when the WiLink COM8
-module is installed.  The WLAN support is already hardcoded in this
-file, so adding shared transport (BT/NFC/FM/GPS) support at least
-won't make things much worse.
-
-Additionally, only WiLink8 has optional support for NFC and I'm not
-sure there is a way to figure that out at runtime.
-
- arch/arm/mach-omap2/board-4430sdp.c |   76 +++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 1cc6696..7cf273e 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -29,6 +29,8 @@
- #include <linux/platform_data/omap4-keypad.h>
- #include <linux/usb/musb.h>
- 
-+#include <linux/ti_wilink_st.h>
-+
- #include <asm/hardware/gic.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -53,6 +55,7 @@
- #define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
- #define OMAP4_SFH7741_ENABLE_GPIO		188
- 
-+#define GPIO_BT_EN		55
- #define GPIO_WIFI_PMENA		54
- #define GPIO_WIFI_IRQ		53
- 
-@@ -408,6 +411,66 @@ static struct platform_device sdp4430_abe_audio = {
- 	},
- };
- 
-+/* TI shared transport for Bluetooth and NFC */
-+static int plat_kim_chip_enable(struct kim_data_s *kim_data)
-+{
-+	gpio_set_value(GPIO_BT_EN, GPIO_LOW);
-+	mdelay(5);
-+	gpio_set_value(GPIO_BT_EN, GPIO_HIGH);
-+	mdelay(100);
-+
-+	return 0;
-+}
-+
-+static int plat_kim_chip_disable(struct kim_data_s *kim_data)
-+{
-+	gpio_set_value(GPIO_BT_EN, GPIO_LOW);
-+	mdelay(1);
-+	gpio_set_value(GPIO_BT_EN, GPIO_HIGH);
-+	mdelay(1);
-+	gpio_set_value(GPIO_BT_EN, GPIO_LOW);
-+
-+	return 0;
-+}
-+
-+static struct ti_st_plat_data wilink_pdata = {
-+	.dev_name	= "/dev/ttyO1",
-+	.flow_cntrl	= 1,
-+	.baud_rate	= 3000000,
-+	.chip_enable	= plat_kim_chip_enable,
-+	.chip_disable	= plat_kim_chip_disable,
-+};
-+
-+static int wilink_st_init(void)
-+{
-+	int status;
-+
-+	status = gpio_request_one(GPIO_BT_EN, GPIOF_OUT_INIT_LOW, "kim");
-+	if (status)
-+		pr_err("%s: failed to request gpio %d\n", __func__,
-+		       GPIO_BT_EN);
-+
-+	return status;
-+}
-+
-+static struct platform_device wl12xx_device = {
-+	.name		= "kim",
-+	.id		= -1,
-+	.dev = {
-+		.platform_data = &wilink_pdata,
-+	},
-+};
-+
-+static struct platform_device btwilink_device = {
-+	.name	= "btwilink",
-+	.id	= -1,
-+};
-+
-+static struct platform_device nfcwilink_device = {
-+	.name	= "nfcwilink",
-+	.id	= -1,
-+};
-+
- static struct platform_device *sdp4430_devices[] __initdata = {
- 	&sdp4430_gpio_keys_device,
- 	&sdp4430_leds_gpio,
-@@ -416,6 +479,9 @@ static struct platform_device *sdp4430_devices[] __initdata = {
- 	&sdp4430_dmic_codec,
- 	&sdp4430_abe_audio,
- 	&sdp4430_hdmi_audio_codec,
-+	&wl12xx_device,
-+	&btwilink_device,
-+	&nfcwilink_device,
- };
- 
- static struct omap_musb_board_data musb_board_data = {
-@@ -632,6 +698,12 @@ static struct omap_board_mux board_mux[] __initdata = {
- 		  OMAP_PULL_ENA),
- 	OMAP4_MUX(ABE_MCBSP2_FSX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
- 
-+	/* UART2 - BT/FM/GPS shared transport */
-+	OMAP4_MUX(UART2_CTS,	OMAP_PIN_INPUT	| OMAP_MUX_MODE0),
-+	OMAP4_MUX(UART2_RTS,	OMAP_PIN_OUTPUT	| OMAP_MUX_MODE0),
-+	OMAP4_MUX(UART2_RX,	OMAP_PIN_INPUT	| OMAP_MUX_MODE0),
-+	OMAP4_MUX(UART2_TX,	OMAP_PIN_OUTPUT	| OMAP_MUX_MODE0),
-+
- 	{ .reg_offset = OMAP_MUX_TERMINATOR },
- };
- 
-@@ -711,6 +783,10 @@ static void __init omap_4430sdp_init(void)
- 	if (status)
- 		pr_err("Keypad initialization failed: %d\n", status);
- 
-+	status = wilink_st_init();
-+	if (status)
-+		pr_err("WiLink shared transport init failed: %d\n", status);
-+
- 	omap_4430sdp_display_init();
- }
- 
--- 
-1.7.10.4
+Your S-o-b line should be present in all patches you send; add it after
+mine. See Documentation/SubmittingPatches section "Sign your work" item
+(c) (or perhaps (b) if you modified it).
