@@ -1,62 +1,43 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 Jan 2013 10:08:45 -0700
-Subject: linux-next: manual merge of the tegra tree with the arm-soc tree
-In-Reply-To: <CAOesGMgr_f-XGHOdMW3ugfXbVaUc4EALrbfJD=XeOKixxrY8PA@mail.gmail.com>
-References: <20130116141411.8fadedee54ed35dc0eddd288@canb.auug.org.au>
- <1358308153.32106.8.camel@gitbox> <50F62D69.8080100@nvidia.com>
- <1358311923.537.3.camel@gitbox>
- <CAOesGMgr_f-XGHOdMW3ugfXbVaUc4EALrbfJD=XeOKixxrY8PA@mail.gmail.com>
-Message-ID: <50F6DE9D.5080906@wwwdotorg.org>
+Date: Wed, 16 Jan 2013 10:28:15 -0700
+Subject: [PATCH v2 03/10] ARM: dt: tegra30: Add clock information
+In-Reply-To: <50F65E4B.8040409@nvidia.com>
+References: <1357891289-23500-1-git-send-email-pgaikwad@nvidia.com>
+ <1357891289-23500-3-git-send-email-pgaikwad@nvidia.com>
+ <50F65E4B.8040409@nvidia.com>
+Message-ID: <50F6E32F.80602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2013 09:27 AM, Olof Johansson wrote:
-> Hi,
+On 01/16/2013 01:01 AM, Terje Bergstr?m wrote:
+> On 11.01.2013 10:01, Prashant Gaikwad wrote:
+>> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+>> index 6765646..c3e129a 100644
+>> --- a/arch/arm/boot/dts/tegra30.dtsi
+>> +++ b/arch/arm/boot/dts/tegra30.dtsi
+>>  		gr3d {
+>>  			compatible = "nvidia,tegra30-gr3d";
+>>  			reg = <0x54180000 0x00040000>;
+>> +			clocks = <&tegra_car 24>;
+>>  		};
 > 
-> On Tue, Jan 15, 2013 at 8:52 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
->> On Tue, 2013-01-15 at 21:32 -0700, Stephen Warren wrote:
->>> On 01/15/2013 08:49 PM, Tony Prisk wrote:
->>>> On Wed, 2013-01-16 at 14:14 +1100, Stephen Rothwell wrote:
->>>>> Hi all,
->>>>>
->>>>> Today's linux-next merge of the tegra tree got a conflict in
->>>>> drivers/clocksource/Makefile between commit ff7ec345f0ec ("timer: vt8500:
->>>>> Move timer code to drivers/clocksource") from the arm-soc tree and commit
->>>>> ac0fd9eca3ba ("ARM: tegra: move timer.c to drivers/clocksource/") from
->>>>> the tegra tree.
->>>>>
->>>>> I fixed it up (see below) and can carry the fix as necessary (no action
->>>>> is required).
->>>>>
->>>>
->>>> I don't know about everyone else, but I feel the preference should be to
->>>> keep things alphabetized where possible to help avoid with merge
->>>> conflicts later on. This is always a problem when we start tacking
->>>> things on the end of lists.
->>>>
->>>> I realise this Kconfig is not alphabetized anyway, but it's never too
->>>> early to start on the 'right' path.
->>>
->>> Sounds like a good idea, but the issue is: When to do the initial sort
->>> so it doesn't conflict with all the adds in a kernel cycle... Post and
->>> immediately commit a new patch near the end of the merge window?
->>
->> Given that the maintainer can quite safely do the patch (sorry
->> maintainers), I don't see any reason why it couldn't be done at the
->> point where they stop accepting patches for the merge-window. Once the
->> patches are stopped, sort the list in one last patch.
+> In Tegra3, 3D has two clocks. I believe you'd need to add <&tegra_car
+> 98> here.
 
-That only works well if the one maintainer is the only person taking
-patches for the drivers/clocksource tree. It might be true that the "one
-maintainer" here ends up being arm-soc in this kernel cycle though?
+Thanks. I've squashed the following into the patch. Do those clock names
+make sense to you?
 
->> It makes sense to get it done in this window if possible as the Kconfig
->> will only get bigger as time goes on, making sorting it more time
->> consuming.
-> 
-> Actually, Russell wen through and reordered these not long ago, if I
-> remember correctly. The current ordering is the same as in the
-> structure definition, and should be kept that way.
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index b9709ae..c26d75b 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -54,7 +54,8 @@
+                gr3d {
+                        compatible = "nvidia,tegra30-gr3d";
+                        reg = <0x54180000 0x00040000>;
+-                       clocks = <&tegra_car 24>;
++                       clocks = <&tegra_car 24 &tegra_car 98>;
++                       clock-names = "3d", "3d2";
+                };
 
-I think this is talking about Makefile entries rather than struct
-definitions?
+                dc at 54200000 {
