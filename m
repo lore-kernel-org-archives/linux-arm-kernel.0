@@ -1,45 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 Jan 2013 11:44:35 -0700
-Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
-In-Reply-To: <20130116.143151.1531468192773974887.hdoyu@nvidia.com>
-References: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com><1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
- <20130116.143151.1531468192773974887.hdoyu@nvidia.com>
-Message-ID: <50F6F513.1030806@wwwdotorg.org>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 16 Jan 2013 19:46:32 +0100
+Subject: [RFC PATCH 0/5] Reset controller API to reset IP modules on i.MX5
+ and i.MX6
+In-Reply-To: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
+References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <201301161946.32926.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2013 05:31 AM, Hiroshi Doyu wrote:
-> Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Fri, 11 Jan 2013 08:46:20 +0100:
-> ...
->> +struct clk *tegra_clk_periph(const char *name, const char **parent_names,
->> +                            int num_parents, struct tegra_clk_periph *periph,
->> +                            void __iomem *clk_base, u32 offset)
-...
->> +struct clk *tegra_clk_periph_nodiv(const char *name, const char **parent_names,
->> +                             int num_parents, struct tegra_clk_periph *periph,
->> +                             void __iomem *clk_base, u32 offset)
-...
->
-> The above two functions are almost duplicate, can we take the common part from them?
+Dear Philipp Zabel,
 
-Sure, that looks reasonable.
+> The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
+> reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
+> 
+> The following patches add a simple API for devices to request being reset
+> by separate reset controller hardware. They implement the reset signal
+> device tree binding proposed by Stephen Warren. Contrary to Tegra hardware,
+> the i.MX SRC has self-deasserting reset bits, so I've included both
+> ops to manually assert/deassert a reset line, as well as a reset
+> operation that is supposed to assert the reset line and wait for it to
+> deassert.
+> 
+> The i.MX SRC is enhanced to provide a reset controller and the IPU driver
+> is made to request being reset by calling the device_reset(&pdev->dev)
+> convenience wrapper during probing.
+> 
+> regards
+> Philipp
 
-> struct clk *__tegra_clk_periph(const char *name, const char **parent_names,
-> 			    int num_parents, struct tegra_clk_periph *periph,
-> 			    void __iomem *clk_base, u32 offset, int div)
+I won't be able to test it before 23rd this month. Sorry!
 
->        periph->divider.reg = clk_base + offset;
-
-That will also need to be conditional.
-
->        periph->divider.hw.clk = div ? NULL : clk;
-
-And that test is inverted.
-
-> static inline struct clk *tegra_clk_periph(const char *name, const char **parent_names,
-> 			    int num_parents, struct tegra_clk_periph *periph,
-> 			    void __iomem *clk_base, u32 offset)
-
-I'd rather just make these regular functions in the .c file; otherwise
-they have to go into the header file, which means prototyping
-__tegra_clk_periph() there and it just gets messy.
+Best regards,
+Marek Vasut
