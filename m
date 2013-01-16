@@ -1,82 +1,32 @@
-From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Wed, 16 Jan 2013 09:18:22 +0530
-Subject: [PATCH V4 3/3] ARM: davinci: da850: add NAND driver DT entries
-In-Reply-To: <1358308102-8169-1-git-send-email-anilkumar.v@ti.com>
-References: <1358308102-8169-1-git-send-email-anilkumar.v@ti.com>
-Message-ID: <1358308102-8169-4-git-send-email-anilkumar.v@ti.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 16 Jan 2013 16:49:13 +1300
+Subject: linux-next: manual merge of the tegra tree with the arm-soc tree
+In-Reply-To: <20130116141411.8fadedee54ed35dc0eddd288@canb.auug.org.au>
+References: <20130116141411.8fadedee54ed35dc0eddd288@canb.auug.org.au>
+Message-ID: <1358308153.32106.8.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NAND driver DT node and related pinctrl DT data to export NAND
-functionality on da850 evm.
+On Wed, 2013-01-16 at 14:14 +1100, Stephen Rothwell wrote:
+> Hi all,
+> 
+> Today's linux-next merge of the tegra tree got a conflict in
+> drivers/clocksource/Makefile between commit ff7ec345f0ec ("timer: vt8500:
+> Move timer code to drivers/clocksource") from the arm-soc tree and commit
+> ac0fd9eca3ba ("ARM: tegra: move timer.c to drivers/clocksource/") from
+> the tegra tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+> 
 
-Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
----
-:100644 100644 c7609d0... 433027f... M	arch/arm/boot/dts/da850-evm.dts
-:100644 100644 e9c6e82... 59e6ea4... M	arch/arm/boot/dts/da850.dtsi
- arch/arm/boot/dts/da850-evm.dts |    5 +++++
- arch/arm/boot/dts/da850.dtsi    |   30 ++++++++++++++++++++++++++++++
- 2 files changed, 35 insertions(+), 0 deletions(-)
+I don't know about everyone else, but I feel the preference should be to
+keep things alphabetized where possible to help avoid with merge
+conflicts later on. This is always a problem when we start tacking
+things on the end of lists.
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index c7609d0..433027f 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -28,4 +28,9 @@
- 			status = "okay";
- 		};
- 	};
-+	nand_cs3 at 62000000 {
-+		status = "okay";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&nand_cs3_pins>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index e9c6e82..59e6ea4 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -38,6 +38,23 @@
- 			pinctrl-single,register-width = <32>;
- 			pinctrl-single,function-mask = <0xffffffff>;
- 			status = "disabled";
-+
-+			nand_cs3_pins: pinmux_nand_pins {
-+				pinctrl-single,bits = <
-+					/* EMA_OE, EMA_WE */
-+					0x1c 0x00110000  0x00ff0000
-+					/* EMA_CS[4],EMA_CS[3]*/
-+					0x1c 0x00000110  0x00000ff0
-+					/*
-+					 * EMA_D[0], EMA_D[1], EMA_D[2],
-+					 * EMA_D[3], EMA_D[4], EMA_D[5],
-+					 * EMA_D[6], EMA_D[7]
-+					 */
-+					0x24 0x11111111  0xffffffff
-+					/* EMA_A[1], EMA_A[2] */
-+					0x30 0x01100000  0x0ff00000
-+				>;
-+			};
- 		};
- 		serial0: serial at 1c42000 {
- 			compatible = "ns16550a";
-@@ -67,4 +84,17 @@
- 			status = "disabled";
- 		};
- 	};
-+	nand_cs3 at 62000000 {
-+		compatible = "ti,davinci-nand";
-+		reg = <0x62000000 0x807ff
-+			0x68000000 0x8000>;
-+		ti,davinci-chipselect = <1>;
-+		ti,davinci-mask-ale = <0>;
-+		ti,davinci-mask-cle = <0>;
-+		ti,davinci-mask-chipsel = <0>;
-+		ti,davinci-ecc-mode = "hw";
-+		ti,davinci-ecc-bits = <4>;
-+		ti,davinci-nand-use-bbt;
-+		status = "disabled";
-+	};
- };
--- 
-1.7.4.1
+I realise this Kconfig is not alphabetized anyway, but it's never too
+early to start on the 'right' path.
+
+Regards
+Tony P
