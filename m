@@ -1,121 +1,82 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 16 Jan 2013 16:59:05 +0800
-Subject: [PATCH v3 3/3] usb: chipidea: imx: Add system suspend/resume API
-In-Reply-To: <1358326745-25018-1-git-send-email-peter.chen@freescale.com>
-References: <1358326745-25018-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1358326745-25018-3-git-send-email-peter.chen@freescale.com>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Wed, 16 Jan 2013 14:37:39 +0530
+Subject: [PATCH V5 1/3] ARM: davinci: da850: add pinctrl driver DT entries
+In-Reply-To: <1358327261-9679-1-git-send-email-anilkumar.v@ti.com>
+References: <1358327261-9679-1-git-send-email-anilkumar.v@ti.com>
+Message-ID: <1358327261-9679-2-git-send-email-anilkumar.v@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the system suspend/resume procedure, the USB also
-needs to go suspend/resume procedure, this patch adds
-related APIs. It is tested at i.mx6q sabrelite. Meanwhile,
-it fixes the bug that the USB will out of work after
-system suspend/resume.
+For DT, DaVinci platform can use pinctrl-single driver for handling
+padconf registers.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Enable PINCTRL Kconfig for MACH_DA8XX_DT platform. Add required
+pinctrl DT entries in da850 dts file.
+
+ Test procedure
+  1)Populate DT file with NAND node information.
+  2)Populate board DT file with pinmux information for NAND.
+  3)Boot and confirm NAND is detected by the kernel.
+  4)cat /proc/mtd to show partitions.
+
+Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
 ---
- drivers/usb/chipidea/bits.h        |    1 +
- drivers/usb/chipidea/ci13xxx_imx.c |   61 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+), 0 deletions(-)
+Cosmetic changes for pmx_core: pinmux at 1c14120 DT node
 
-diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-index ba9c6ef..d1467bb 100644
---- a/drivers/usb/chipidea/bits.h
-+++ b/drivers/usb/chipidea/bits.h
-@@ -47,6 +47,7 @@
- #define PORTSC_FPR            BIT(6)
- #define PORTSC_SUSP           BIT(7)
- #define PORTSC_HSP            BIT(9)
-+#define PORTSC_PHCD           BIT(23) /* phy suspend mode */
- #define PORTSC_PTC            (0x0FUL << 16)
+:100644 100644 37dc5a3... 087ba28... M	arch/arm/boot/dts/da850-evm.dts
+:100644 100644 fbada87... 160ebac... M	arch/arm/boot/dts/da850.dtsi
+:100644 100644 0153950... a075b3e... M	arch/arm/mach-davinci/Kconfig
+ arch/arm/boot/dts/da850-evm.dts |    3 +++
+ arch/arm/boot/dts/da850.dtsi    |   10 ++++++++++
+ arch/arm/mach-davinci/Kconfig   |    1 +
+ 3 files changed, 14 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 37dc5a3..087ba28 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -15,6 +15,9 @@
+ 	model = "DA850/AM1808/OMAP-L138 EVM";
  
- /* DEVLC */
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 342eab0..dd257b1 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -25,6 +25,7 @@
- #include <linux/mfd/syscon.h>
+ 	soc {
++		pmx_core: pinmux at 1c14120 {
++			status = "okay";
++		};
+ 		serial0: serial at 1c42000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index fbada87..160ebac 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -29,6 +29,16 @@
+ 		#size-cells = <1>;
+ 		ranges = <0x0 0x01c00000 0x400000>;
  
- #include "ci.h"
-+#include "bits.h"
- #include "ci13xxx_imx.h"
- 
- #define pdev_to_phy(pdev) \
-@@ -321,6 +322,63 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int ci13xxx_imx_suspend(struct device *dev)
-+{
-+	struct ci13xxx_imx_data *data =
-+		platform_get_drvdata(to_platform_device(dev));
-+	struct platform_device *plat_ci;
-+	struct ci13xxx	*ci;
-+
-+	plat_ci = data->ci_pdev;
-+	ci = platform_get_drvdata(plat_ci);
-+
-+	hw_write(ci, OP_PORTSC, PORTSC_PHCD, 1);
-+
-+	if (data->phy)
-+		usb_phy_set_suspend(data->phy, 1);
-+
-+	clk_disable_unprepare(data->clk);
-+
-+	return 0;
-+}
-+
-+static int ci13xxx_imx_resume(struct device *dev)
-+{
-+	int ret;
-+	struct ci13xxx_imx_data *data =
-+		platform_get_drvdata(to_platform_device(dev));
-+	struct platform_device *plat_ci;
-+	struct ci13xxx	*ci;
-+
-+	plat_ci = data->ci_pdev;
-+	ci = platform_get_drvdata(plat_ci);
-+
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret) {
-+		dev_err(dev,
-+			"Failed to prepare or enable clock, err=%d\n", ret);
-+		return ret;
-+	}
-+
-+	if (hw_read(ci, OP_PORTSC, PORTSC_PHCD)) {
-+		hw_write(ci, OP_PORTSC, PORTSC_PHCD, 0);
-+		/* Some clks sync between Controller and USB PHY */
-+		mdelay(1);
-+	}
-+
-+	if (data->phy)
-+		usb_phy_set_suspend(data->phy, 0);
-+
-+	return ret;
-+}
-+
-+static const struct dev_pm_ops ci13xxx_imx_pm_ops = {
-+	.suspend	= ci13xxx_imx_suspend,
-+	.resume		= ci13xxx_imx_resume,
-+};
-+#endif
-+
- static const struct of_device_id ci13xxx_imx_dt_ids[] = {
- 	{ .compatible = "fsl,imx27-usb", },
- 	{ /* sentinel */ }
-@@ -334,6 +392,9 @@ static struct platform_driver ci13xxx_imx_driver = {
- 		.name = "imx_usb",
- 		.owner = THIS_MODULE,
- 		.of_match_table = ci13xxx_imx_dt_ids,
-+#ifdef CONFIG_PM
-+		.pm	= &ci13xxx_imx_pm_ops,
-+#endif
- 	 },
- };
- 
++		pmx_core: pinmux at 1c14120 {
++			compatible = "pinctrl-single";
++			reg = <0x14120 0x50>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			pinctrl-single,bit-per-mux;
++			pinctrl-single,register-width = <32>;
++			pinctrl-single,function-mask = <0xffffffff>;
++			status = "disabled";
++		};
+ 		serial0: serial at 1c42000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x42000 0x100>;
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index 0153950..a075b3e 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -62,6 +62,7 @@ config MACH_DA8XX_DT
+ 	bool "Support DA8XX platforms using device tree"
+ 	default y
+ 	depends on ARCH_DAVINCI_DA8XX
++	select PINCTRL
+ 	help
+ 	  Say y here to include support for TI DaVinci DA850 based using
+ 	  Flattened Device Tree. More information at Documentation/devicetree
 -- 
-1.7.0.4
+1.7.4.1
