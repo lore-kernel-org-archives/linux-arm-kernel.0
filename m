@@ -1,34 +1,38 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 16 Jan 2013 16:18:39 -0500 (EST)
-Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
- management
-In-Reply-To: <20130116160242.GB31318@arm.com>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1358157392.19304.243.camel@jlo-ubuntu-64.nvidia.com>
- <alpine.LFD.2.02.1301140849020.6300@xanadu.home>
- <1358217848.8513.14.camel@jlo-ubuntu-64.nvidia.com>
- <alpine.LFD.2.02.1301151140550.6300@xanadu.home>
- <20130116160242.GB31318@arm.com>
-Message-ID: <alpine.LFD.2.02.1301161614390.6300@xanadu.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 16 Jan 2013 14:31:13 -0700
+Subject: [PATCH V4 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle for
+ powered-down mode
+In-Reply-To: <CAMbhsRTmGVrjnKa_z+zonGypU+U4r2iE=D-Zfvyoq8chY68QKQ@mail.gmail.com>
+References: <1358323873-30525-1-git-send-email-josephl@nvidia.com>
+ <CAMbhsRTmGVrjnKa_z+zonGypU+U4r2iE=D-Zfvyoq8chY68QKQ@mail.gmail.com>
+Message-ID: <50F71C21.20904@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Jan 2013, Catalin Marinas wrote:
+On 01/16/2013 11:55 AM, Colin Cross wrote:
+> On Wed, Jan 16, 2013 at 12:11 AM, Joseph Lo <josephl@nvidia.com> wrote:
+>> The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
+>> core to go into this mode before other core. The coupled cpuidle framework
+>> can help to sync the MPCore to coupled state then go into "powered-down"
+>> idle mode together. The driver can just assume the MPCore come into
+>> "powered-down" mode at the same time. No need to take care if the CPU_0
+>> goes into this mode along and only can put it into safe idle mode (WFI).
+>>
+>> The powered-down state of Tegra20 requires power gating both CPU cores.
+>> When the secondary CPU requests to enter powered-down state, it saves
+>> its own contexts and then enters WFI for waiting CPU0 in the same state.
+>> When the CPU0 requests powered-down state, it attempts to put the secondary
+>> CPU into reset to prevent it from waking up. Then power down both CPUs
+>> together and power off the cpu rail.
+>>
+>> Be aware of that, you may see the legacy power state "LP2" in the code
 
-> On Tue, Jan 15, 2013 at 04:44:23PM +0000, Nicolas Pitre wrote:
-> > On Tue, 15 Jan 2013, Joseph Lo wrote:
-> > > So do you have a plan to make it become a generic framework in this
-> > > series or later work?
-> > 
-> > It is already generic, except for the name.  In other words, you could 
-> > start using this code already.
-> > 
-> > I'm still debating a good substitute for the bL_ prefix in this series 
-> > to give it the appearance of generic code.
-> 
-> mc_?
+Colin, since you only raised a few small issues on this series, does
+that mean you're OK with it once those issues are fixed?
 
-Bah.   :-/
-
-
-Nicolas
+Joseph, we'll be merging Tegra114 in the near future. How will this
+patch series affect Tegra114? Will the cpuidle driver simply fail to
+register on Tegra114 (which would be fine until we explicitly add
+support), or would we need to disable cpuidle in Kconfig to get a
+working Tegra114 kernel. Does this patch series affect the answer to the
+previous question? Thanks.
