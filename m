@@ -1,65 +1,66 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 16 Jan 2013 13:26:52 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the slave-dma tree
-Message-ID: <20130116132652.d740bb94b9aaf2a4b41aef6b@canb.auug.org.au>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 15 Jan 2013 21:40:14 -0500
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <50F5F1B7.3040201@web.de>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
+ <50F3F289.3090402@web.de>
+ <20130115165642.GA25500@titan.lakedaemon.net>
+ <20130115175020.GA3764@kroah.com>
+ <20130115201617.GC25500@titan.lakedaemon.net>
+ <20130115215602.GF25500@titan.lakedaemon.net>
+ <50F5F1B7.3040201@web.de>
+Message-ID: <20130116024014.GH25500@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Soeren,
 
-Today's linux-next merge of the arm-soc tree got conflicts in
-arch/arm/mach-spear3xx/spear3xx.c and arch/arm/mach-spear6xx/spear6xx.c
-between commit 3a95b9fbba89 ("pl080.h: moved from
-arm/include/asm/hardware to include/linux/amba/") from the slave-dma tree
-and commit e9c515589df7 ("ARM: spear: use common irqchip_init function")
-from the arm-soc tree.
+On Wed, Jan 16, 2013 at 01:17:59AM +0100, Soeren Moch wrote:
+> On 15.01.2013 22:56, Jason Cooper wrote:
+> >On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
+> >>If my understanding is correct, one of the drivers (most likely one)
+> >>either asks for too small of a dma buffer, or is not properly
+> >>deallocating blocks from the per-device pool.  Either case leads to
+> >>exhaustion, and falling back to the atomic pool.  Which subsequently
+> >>gets wiped out as well.
+> >
+> >If my hunch is right, could you please try each of the three dvb drivers
+> >in turn and see which one (or more than one) causes the error?
+> 
+> In fact I use only 2 types of DVB sticks: em28xx usb bridge plus drxk
+> demodulator, and dib0700 usb bridge plus dib7000p demod.
+> 
+> I would bet for em28xx causing the error, but this is not thoroughly
+> tested. Unfortunately testing with removed sticks is not easy, because
+> this is a production system and disabling some services for the long
+> time we need to trigger this error will certainly result in unhappy
+> users.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Just out of curiosity, what board is it?
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+> I will see what I can do here. Is there an easy way to track the buffer
+> usage without having to wait for complete exhaustion?
 
-diff --cc arch/arm/mach-spear3xx/spear3xx.c
-index 3d9b1b5,b2ba516..0000000
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@@ -15,10 -15,8 +15,7 @@@
-  
-  #include <linux/amba/pl022.h>
-  #include <linux/amba/pl08x.h>
-- #include <linux/irqchip/spear-shirq.h>
-- #include <linux/of_irq.h>
-  #include <linux/io.h>
-- #include <asm/hardware/vic.h>
- -#include <asm/hardware/pl080.h>
-  #include <plat/pl080.h>
-  #include <mach/generic.h>
-  #include <mach/spear.h>
-diff --cc arch/arm/mach-spear6xx/spear6xx.c
-index 8ce65a2,b8bd33c..0000000
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@@ -16,12 -16,11 +16,11 @@@
-  #include <linux/amba/pl08x.h>
-  #include <linux/clk.h>
-  #include <linux/err.h>
-+ #include <linux/irqchip.h>
-  #include <linux/of.h>
-  #include <linux/of_address.h>
-- #include <linux/of_irq.h>
-  #include <linux/of_platform.h>
- -#include <asm/hardware/pl080.h>
- +#include <linux/amba/pl080.h>
-- #include <asm/hardware/vic.h>
-  #include <asm/mach/arch.h>
-  #include <asm/mach/time.h>
-  #include <asm/mach/map.h>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130116/65300d55/attachment.sig>
+DMA_API_DEBUG
+
+> In linux-3.5.x there is no such problem. Can we use all available memory
+> for dma buffers here on armv5 architectures, in contrast to newer
+> kernels?
+
+Were the loads exactly the same when you tested 3.5.x?  I looked at the
+changes from v3.5 to v3.7.1 for all four drivers you mentioned as well
+as sata_mv.
+
+The biggest thing I see is that all of the media drivers got shuffled
+around into their own subdirectories after v3.5.  'git show -M 0c0d06c'
+shows it was a clean copy of all the files.
+
+What would be most helpful is if you could do a git bisect between
+v3.5.x (working) and the oldest version where you know it started
+failing (v3.7.1 or earlier if you know it).
+
+thx,
+
+Jason.
