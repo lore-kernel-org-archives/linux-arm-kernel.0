@@ -1,53 +1,85 @@
-From: sangsu4u.park@samsung.com (Sangsu Park)
-Date: Wed, 16 Jan 2013 10:08:06 +0900
-Subject: [PATCH] ARM: EXYNOS: Remove wrong I2S0 clock from peril clock
-In-Reply-To: <50F4CDA5.3090904@linaro.org>
-References: <003501cd9d65$9611d060$c2357120$@samsung.com>
- <50F4CDA5.3090904@linaro.org>
-Message-ID: <00fb01cdf385$f116dde0$d34499a0$@samsung.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 16 Jan 2013 09:18:46 +0800
+Subject: [PATCH v2 1/4] ARM i.MX6: use reserved bit for mxs phy clock gate
+In-Reply-To: <20130115113313.GB32113@S2101-09.ap.freescale.net>
+References: <1358230117-19443-1-git-send-email-peter.chen@freescale.com>
+ <20130115113313.GB32113@S2101-09.ap.freescale.net>
+Message-ID: <20130116011845.GB16514@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 15, 2013 at 07:33:16PM +0800, Shawn Guo wrote:
+> On Tue, Jan 15, 2013 at 02:08:34PM +0800, Peter Chen wrote:
+> > For mxs-phy user i.mx6q, the PHY's clock is controlled by
+> > hardware automatically, the software only needs to enable it
+> > at probe, disable it at remove. During the runtime,
+> > we don't need to control it. So for the usbphy clk policy:
+> > 
+> > - Keep refcount for usbphy as clk framework needs to know if
+> > it is off or on.
+> 
+> Just checked the reference manual, it seems that not only bit 6
+> (EN_USB_CLKS) but also bit 12 (POWER) are controlled by USB hardware.
+> If this is true, I think that PLL3 and PLL7 are really designed for
+> USB PHY use only.  Do you actually see other real users of these two
+> PLLs on imx6q besides USB PHY?  If not, we can just provide a dummy
+> clock to mxs-phy driver on imx6q, and keep real clocks usbphy1 and
+> usbphy2 there for platform init function to enable them if USB support
+> is built in.  Then, we can save all these dirty hacks.  Thoughts?
+It was my v1 patch did.
 
-On 1/15/2013 12:32 PM, Tushar Behera wrote: 
-> On 09/28/2012 04:09 PM, Sangsu Park wrote:
-> > Remove I2S0 clock from peril since peril doesn't have I2S0 clock for
-EXYNOS4.
-> > Audio Subsystem block has I2S0 clk.
-> >
-> > Signed-off-by: sangsu <sangsu@sangsu-P560.(none)>
+I send the v2 patch due to below reasons,
+There are other PLL3 users, it is better keep refcount
+to all its children, or the user will be confused when the
+PLL3 goes to disable, but the usb otg part is still used
+
+For PLL7, we can do it, and let the PLL7 be out of clock framework
+management.
+
+But I still think keep usbphy as PLL child is better solution,
+in that case, the clock maintainer can know the real clock usage.
+
+> 
+> Shawn
+> 
+> > - Use reserved bit, in that case, clk_enable/disable will
+> > only update refcount, but without any hardware effects.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > > ---
-> >  arch/arm/mach-exynos/clock-exynos4.c |    5 -----
-> >  1 file changed, 5 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/clock-exynos4.c
-> > b/arch/arm/mach-exynos/clock-exynos4.c
-> > index 6a45c9a..fa8a134 100644
-> > --- a/arch/arm/mach-exynos/clock-exynos4.c
-> > +++ b/arch/arm/mach-exynos/clock-exynos4.c
-> > @@ -613,11 +613,6 @@ static struct clk exynos4_init_clocks_off[] = {
-> >  		.ctrlbit	= (1 << 18),
-> >  	}, {
-> >  		.name		= "iis",
-> > -		.devname	= "samsung-i2s.0",
-> > -		.enable		= exynos4_clk_ip_peril_ctrl,
-> > -		.ctrlbit	= (1 << 19),
-> > -	}, {
-> > -		.name		= "iis",
-> >  		.devname	= "samsung-i2s.1",
-> >  		.enable		= exynos4_clk_ip_peril_ctrl,
-> >  		.ctrlbit	= (1 << 20),
-> >
-> 
-> After this clock has been removed, I2S0 registration fails on EXYNOS4
-> based boards (clk_get for iis clock fails). The alternate clock from
-> Audio subsystem block is missing.
-> 
-Yes, you're right.
-I2S0 clock doesn't belong to peril clock.
-Audio Subsystem has its own clock and also I2S0 clock.
-That work might be missed. I'll do that work soon.
+> > Changes for v2:
+> > - Use reserved bit for usb phy clk control
+> > 
+> >  arch/arm/mach-imx/clk-imx6q.c |   10 ++++++++--
+> >  1 files changed, 8 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > index 7f2c10c..85dcc89 100644
+> > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> > @@ -208,8 +208,14 @@ int __init mx6q_clocks_init(void)
+> >  	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x3);
+> >  	clk[pll8_mlb]      = imx_clk_pllv3(IMX_PLLV3_MLB,	"pll8_mlb",	"osc", base + 0xd0, 0x0);
+> >  
+> > -	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 6);
+> > -	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 6);
+> > +	/*
+> > +	 * Bit 20 is the reserved and read-only bit, we do this only for:
+> > +	 * - Do nothing for usbphy clk_enable/disable
+> > +	 * - Keep refcount when do usbphy clk_enable/disable, in that case,
+> > +	 * the clk framework can know the USB phy clk is on or off
+> > +	 */
+> > +	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 20);
+> > +	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 20);
+> >  
+> >  	clk[sata_ref] = imx_clk_fixed_factor("sata_ref", "pll6_enet", 1, 5);
+> >  	clk[pcie_ref] = imx_clk_fixed_factor("pcie_ref", "pll6_enet", 1, 4);
+> > -- 
+> > 1.7.0.4
+> > 
+> > 
 
-Thanks.
-> --
-> Tushar Behera
+-- 
+
+Best Regards,
+Peter Chen
