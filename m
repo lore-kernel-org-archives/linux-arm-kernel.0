@@ -1,82 +1,30 @@
-From: smoch@web.de (Soeren Moch)
-Date: Wed, 16 Jan 2013 04:24:54 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <20130116024014.GH25500@titan.lakedaemon.net>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
- <50F3F289.3090402@web.de> <20130115165642.GA25500@titan.lakedaemon.net>
- <20130115175020.GA3764@kroah.com>
- <20130115201617.GC25500@titan.lakedaemon.net>
- <20130115215602.GF25500@titan.lakedaemon.net> <50F5F1B7.3040201@web.de>
- <20130116024014.GH25500@titan.lakedaemon.net>
-Message-ID: <50F61D86.4020801@web.de>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Wed, 16 Jan 2013 13:26:01 +1030
+Subject: [PATCH v5 03/14] KVM: ARM: Initial skeleton to compile KVM support
+In-Reply-To: <CANM98qLHao0dJU57MbAtopVpTJDOVdqNtw5JT-DXyQNa7iD_qw@mail.gmail.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183855.46302.40539.stgit@ubuntu>
+ <20130114162415.GF23505@n2100.arm.linux.org.uk>
+ <CANM98qLHao0dJU57MbAtopVpTJDOVdqNtw5JT-DXyQNa7iD_qw@mail.gmail.com>
+Message-ID: <877gndzvi6.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.01.2013 03:40, Jason Cooper wrote:
-> Soeren,
->
-> On Wed, Jan 16, 2013 at 01:17:59AM +0100, Soeren Moch wrote:
->> On 15.01.2013 22:56, Jason Cooper wrote:
->>> On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
->>>> If my understanding is correct, one of the drivers (most likely one)
->>>> either asks for too small of a dma buffer, or is not properly
->>>> deallocating blocks from the per-device pool.  Either case leads to
->>>> exhaustion, and falling back to the atomic pool.  Which subsequently
->>>> gets wiped out as well.
->>>
->>> If my hunch is right, could you please try each of the three dvb drivers
->>> in turn and see which one (or more than one) causes the error?
+Christoffer Dall <c.dall@virtualopensystems.com> writes:
+
+> On Mon, Jan 14, 2013 at 11:24 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Jan 08, 2013 at 01:38:55PM -0500, Christoffer Dall wrote:
+>>> +     /* -ENOENT for unknown features, -EINVAL for invalid combinations. */
+>>> +     for (i = 0; i < sizeof(init->features)*8; i++) {
+>>> +             if (init->features[i / 32] & (1 << (i % 32))) {
 >>
->> In fact I use only 2 types of DVB sticks: em28xx usb bridge plus drxk
->> demodulator, and dib0700 usb bridge plus dib7000p demod.
->>
->> I would bet for em28xx causing the error, but this is not thoroughly
->> tested. Unfortunately testing with removed sticks is not easy, because
->> this is a production system and disabling some services for the long
->> time we need to trigger this error will certainly result in unhappy
->> users.
+>> Isn't this an open-coded version of test_bit() ?
 >
-> Just out of curiosity, what board is it?
+> indeed, nicely spotted:
 
-The kirkwood board? A modified Guruplug Server Plus.
->
->> I will see what I can do here. Is there an easy way to track the buffer
->> usage without having to wait for complete exhaustion?
->
-> DMA_API_DEBUG
+BTW, I wrote it that was out of excessive paranoia: it's a userspace
+API, and test_bit() won't be right on 64 bit BE systems.
 
-OK, maybe I can try this.
->
->> In linux-3.5.x there is no such problem. Can we use all available memory
->> for dma buffers here on armv5 architectures, in contrast to newer
->> kernels?
->
-> Were the loads exactly the same when you tested 3.5.x?
-
-Exactly the same, yes.
-
->I looked at the
-> changes from v3.5 to v3.7.1 for all four drivers you mentioned as well
-> as sata_mv.
->
-> The biggest thing I see is that all of the media drivers got shuffled
-> around into their own subdirectories after v3.5.  'git show -M 0c0d06c'
-> shows it was a clean copy of all the files.
->
-> What would be most helpful is if you could do a git bisect between
-> v3.5.x (working) and the oldest version where you know it started
-> failing (v3.7.1 or earlier if you know it).
->
-I did not bisect it, but Marek mentioned earlier that commit
-e9da6e9905e639b0f842a244bc770b48ad0523e9 in Linux v3.6-rc1 introduced
-new code for dma allocations. This is probably the root cause for the
-new (mis-)behavior (due to my tests 3.6.0 is not working anymore).
-I'm not very familiar with arm mm code, and from the patch itself I
-cannot understand what's different. Maybe CONFIG_CMA is default
-also for armv5 (not only v6) now? But I might be totally wrong here,
-maybe someone of the mm experts can explain the difference?
-
-Regards,
-Soeren
+Cheers,
+Rusty.
