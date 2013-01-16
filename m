@@ -1,43 +1,95 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 16 Jan 2013 09:54:19 +0100
-Subject: [PATCH 0/3] clk: Provide option to unprepare unused clocks at
- late init
-In-Reply-To: <CACRpkdbCuDxszPZ-VYxhbNUSvyGM=rGw4h5Uy8LfqDcY0V-Dyg@mail.gmail.com>
-References: <1355872583-20928-1-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdbCuDxszPZ-VYxhbNUSvyGM=rGw4h5Uy8LfqDcY0V-Dyg@mail.gmail.com>
-Message-ID: <CAPDyKFq+xQPnyXX-N7Wnst-8YCtcVCLcz8Z0T4jGJKD2KmvTBw@mail.gmail.com>
+From: smoch@web.de (Soeren Moch)
+Date: Wed, 16 Jan 2013 09:55:55 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <50F61D86.4020801@web.de>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
+ <50F3F289.3090402@web.de> <20130115165642.GA25500@titan.lakedaemon.net>
+ <20130115175020.GA3764@kroah.com>
+ <20130115201617.GC25500@titan.lakedaemon.net>
+ <20130115215602.GF25500@titan.lakedaemon.net> <50F5F1B7.3040201@web.de>
+ <20130116024014.GH25500@titan.lakedaemon.net> <50F61D86.4020801@web.de>
+Message-ID: <50F66B1B.40301@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 December 2012 20:17, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Dec 19, 2012 at 12:16 AM, Ulf Hansson
-> <ulf.hansson@stericsson.com> wrote:
->
->> The disable_unused sequence executed at late init, is already handling the
->> fast unused ungated clocks to be gated. This patchset extends this sequence to
->> include the slow unused prepared clocks to be unprepared.
+On 16.01.2013 04:24, Soeren Moch wrote:
+> On 16.01.2013 03:40, Jason Cooper wrote:
+>> Soeren,
 >>
->> The default behavior will not change in this patchset. To unprepare unused
->> clocks during the disable_unused sequence, the clk_hw needs to implement
->> the new optional callback, is_prepared.
+>> On Wed, Jan 16, 2013 at 01:17:59AM +0100, Soeren Moch wrote:
+>>> On 15.01.2013 22:56, Jason Cooper wrote:
+>>>> On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
+>>>>> If my understanding is correct, one of the drivers (most likely one)
+>>>>> either asks for too small of a dma buffer, or is not properly
+>>>>> deallocating blocks from the per-device pool.  Either case leads to
+>>>>> exhaustion, and falling back to the atomic pool.  Which subsequently
+>>>>> gets wiped out as well.
+>>>>
+>>>> If my hunch is right, could you please try each of the three dvb
+>>>> drivers
+>>>> in turn and see which one (or more than one) causes the error?
+>>>
+>>> In fact I use only 2 types of DVB sticks: em28xx usb bridge plus drxk
+>>> demodulator, and dib0700 usb bridge plus dib7000p demod.
+>>>
+>>> I would bet for em28xx causing the error, but this is not thoroughly
+>>> tested. Unfortunately testing with removed sticks is not easy, because
+>>> this is a production system and disabling some services for the long
+>>> time we need to trigger this error will certainly result in unhappy
+>>> users.
 >>
->> The motivation for this patchset is to save power. Clocks that is from
->> bootloaders prepared|enabled, but not used should be unprepared|disabled.
+OK, I could trigger the error
+   ERROR: 1024 KiB atomic DMA coherent pool is too small!
+   Please increase it with coherent_pool= kernel parameter!
+only with em28xx sticks and sata, dib0700 sticks removed.
+
+>> Just out of curiosity, what board is it?
 >
-> This has a nice symmetrical touch to it and looks allright to me, so
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> The kirkwood board? A modified Guruplug Server Plus.
+em28xx sticks: "TerraTec Cinergy HTC Stick HD" and "PCTV Quatro Stick"
+dib0700 sticks: "WinTV-NOVA-TD Stick"
+>>
+>>> I will see what I can do here. Is there an easy way to track the buffer
+>>> usage without having to wait for complete exhaustion?
+>>
+>> DMA_API_DEBUG
 >
-> Yours,
-> Linus Walleij
+> OK, maybe I can try this.
+>>
+>>> In linux-3.5.x there is no such problem. Can we use all available memory
+>>> for dma buffers here on armv5 architectures, in contrast to newer
+>>> kernels?
+>>
+>> Were the loads exactly the same when you tested 3.5.x?
+>
+> Exactly the same, yes.
+>
+>> I looked at the
+>> changes from v3.5 to v3.7.1 for all four drivers you mentioned as well
+>> as sata_mv.
+>>
+>> The biggest thing I see is that all of the media drivers got shuffled
+>> around into their own subdirectories after v3.5.  'git show -M 0c0d06c'
+>> shows it was a clean copy of all the files.
+>>
+>> What would be most helpful is if you could do a git bisect between
+>> v3.5.x (working) and the oldest version where you know it started
+>> failing (v3.7.1 or earlier if you know it).
+>>
+> I did not bisect it, but Marek mentioned earlier that commit
+> e9da6e9905e639b0f842a244bc770b48ad0523e9 in Linux v3.6-rc1 introduced
+> new code for dma allocations. This is probably the root cause for the
+> new (mis-)behavior (due to my tests 3.6.0 is not working anymore).
 
-Hi Mike,
+I don't want to say that Mareks patch is wrong, probably it triggers a
+bug somewhere else! (in em28xx?)
 
-Just a kind reminder on this, could this be merged for 3.9?
-
-I have a patch for ux500 that make use of this new feature, so it is
-of course fully tested.
-My plan was to send this patch separately, but if you like to see a
-"proof of concept" I can include it into this patchset!?
-
-Thanks!
-Ulf Hansson
+> I'm not very familiar with arm mm code, and from the patch itself I
+> cannot understand what's different. Maybe CONFIG_CMA is default
+> also for armv5 (not only v6) now? But I might be totally wrong here,
+> maybe someone of the mm experts can explain the difference?
+>
+Regards,
+Soeren
