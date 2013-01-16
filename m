@@ -1,45 +1,45 @@
-From: smoch@web.de (Soeren Moch)
-Date: Wed, 16 Jan 2013 23:36:35 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <20130116174736.GJ25500@titan.lakedaemon.net>
-References: <50F3F289.3090402@web.de>
- <20130115165642.GA25500@titan.lakedaemon.net>
- <20130115175020.GA3764@kroah.com>
- <20130115201617.GC25500@titan.lakedaemon.net>
- <20130115215602.GF25500@titan.lakedaemon.net> <50F5F1B7.3040201@web.de>
- <20130116024014.GH25500@titan.lakedaemon.net> <50F61D86.4020801@web.de>
- <50F66B1B.40301@web.de> <50F6E419.5080007@web.de>
- <20130116174736.GJ25500@titan.lakedaemon.net>
-Message-ID: <50F72B73.5070504@web.de>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 16 Jan 2013 14:51:42 -0800
+Subject: [PATCH V4 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle for
+ powered-down mode
+In-Reply-To: <50F71C21.20904@wwwdotorg.org>
+References: <1358323873-30525-1-git-send-email-josephl@nvidia.com>
+ <CAMbhsRTmGVrjnKa_z+zonGypU+U4r2iE=D-Zfvyoq8chY68QKQ@mail.gmail.com>
+ <50F71C21.20904@wwwdotorg.org>
+Message-ID: <CAMbhsRTXOgKCJjuapdGFhM9JNi0+V-dWPormDSE3tQ4rO1i1yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.01.2013 18:47, Jason Cooper wrote:
-> On Wed, Jan 16, 2013 at 06:32:09PM +0100, Soeren Moch wrote:
->> On 16.01.2013 09:55, Soeren Moch wrote:
->>> On 16.01.2013 04:24, Soeren Moch wrote:
->>>> I did not bisect it, but Marek mentioned earlier that commit
->>>> e9da6e9905e639b0f842a244bc770b48ad0523e9 in Linux v3.6-rc1 introduced
->>>> new code for dma allocations. This is probably the root cause for the
->>>> new (mis-)behavior (due to my tests 3.6.0 is not working anymore).
+On Wed, Jan 16, 2013 at 1:31 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 01/16/2013 11:55 AM, Colin Cross wrote:
+>> On Wed, Jan 16, 2013 at 12:11 AM, Joseph Lo <josephl@nvidia.com> wrote:
+>>> The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
+>>> core to go into this mode before other core. The coupled cpuidle framework
+>>> can help to sync the MPCore to coupled state then go into "powered-down"
+>>> idle mode together. The driver can just assume the MPCore come into
+>>> "powered-down" mode at the same time. No need to take care if the CPU_0
+>>> goes into this mode along and only can put it into safe idle mode (WFI).
 >>>
->>> I don't want to say that Mareks patch is wrong, probably it triggers a
->>> bug somewhere else! (in em28xx?)
->>
->> The em28xx sticks are using isochronous usb transfers. Is there a
->> special handling for that?
+>>> The powered-down state of Tegra20 requires power gating both CPU cores.
+>>> When the secondary CPU requests to enter powered-down state, it saves
+>>> its own contexts and then enters WFI for waiting CPU0 in the same state.
+>>> When the CPU0 requests powered-down state, it attempts to put the secondary
+>>> CPU into reset to prevent it from waking up. Then power down both CPUs
+>>> together and power off the cpu rail.
+>>>
+>>> Be aware of that, you may see the legacy power state "LP2" in the code
 >
-> I'm looking at that now.  It looks like the em28xx wants (as a maximum)
-> 655040 bytes (em28xx-core.c:1088).  There are 5 transfer buffers, with
-> 64 max packets and 2047 max packet size (runtime reported max & 0x7ff).
+> Colin, since you only raised a few small issues on this series, does
+> that mean you're OK with it once those issues are fixed?
+
+I didn't review the Tegra-specific parts careful, but from the coupled
+cpuidle perspective, with the comments I pointed out,
+Acked-by: Colin Cross <ccross@android.com>
+
+> Joseph, we'll be merging Tegra114 in the near future. How will this
+> patch series affect Tegra114? Will the cpuidle driver simply fail to
+> register on Tegra114 (which would be fine until we explicitly add
+> support), or would we need to disable cpuidle in Kconfig to get a
+> working Tegra114 kernel. Does this patch series affect the answer to the
+> previous question? Thanks.
 >
-> If it actually needs all of that, then the answer may be to just
-> increase coherent_pool= when using that driver.  I'll keep digging.
-
-I already tested with 4M coherent pool size and could not see
-significant improvement. Would it make sense to further increase the
-buffer size?
-
-Regards,
-Soeren
