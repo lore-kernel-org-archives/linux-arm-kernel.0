@@ -1,54 +1,51 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Wed, 16 Jan 2013 13:03:11 -0500
-Subject: [PATCH v6 0/4] KVM/ARM Architected Timers support
-Message-ID: <20130116180307.29693.84098.stgit@ubuntu>
+Date: Wed, 16 Jan 2013 13:03:17 -0500
+Subject: [PATCH v6 1/4] ARM: arch_timers: switch to physical timers if HYP
+ mode is available
+In-Reply-To: <20130116180307.29693.84098.stgit@ubuntu>
+References: <20130116180307.29693.84098.stgit@ubuntu>
+Message-ID: <20130116180317.29693.63214.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series implements support for the architected generic
-timers for KVM/ARM.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-This patch series can also be pulled from:
-    git://github.com/virtualopensystems/linux-kvm-arm.git
-            branch: kvm-arm-v16-vgic-timers
+If we're booted in HYP mode, it is possible that we'll run some
+kind of virtualized environment. In this case, it is a better to
+switch to the physical timers, and leave the virtual timers to
+guests.
 
-Changes since v5:
- - Renamed sync_{to,from} to {flush,sync}_hwstate
- - Removed ISB's in world-switch code
- - Avoid add/sub on vcpu pointer in world-switch
-
-Changes since v1-v4:
- - Get virtual IRQ number from DT
- - Simplify access to cntvoff and cntv_cval
- - Remove extraneous bit clearing
- - Abstract timer arming/disarming to improve code readability
- - Context switch CNTKCTL across world-switches
- - Add CPU hotplug notifier
-
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
+ arch/arm/kernel/arch_timer.c |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Marc Zyngier (4):
-      ARM: arch_timers: switch to physical timers if HYP mode is available
-      ARM: KVM: arch_timers: Add guest timer core support
-      ARM: KVM: arch_timers: Add timer world switch
-      ARM: KVM: arch_timers: Wire the init code and config option
-
-
- arch/arm/include/asm/kvm_arch_timer.h |   85 ++++++++++
- arch/arm/include/asm/kvm_asm.h        |    3 
- arch/arm/include/asm/kvm_host.h       |    5 +
- arch/arm/kernel/arch_timer.c          |    7 +
- arch/arm/kernel/asm-offsets.c         |    6 +
- arch/arm/kvm/Kconfig                  |    8 +
- arch/arm/kvm/Makefile                 |    1 
- arch/arm/kvm/arch_timer.c             |  271 +++++++++++++++++++++++++++++++++
- arch/arm/kvm/arm.c                    |   14 ++
- arch/arm/kvm/coproc.c                 |    4 
- arch/arm/kvm/interrupts.S             |    2 
- arch/arm/kvm/interrupts_head.S        |   90 +++++++++++
- arch/arm/kvm/vgic.c                   |    1 
- 13 files changed, 495 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/include/asm/kvm_arch_timer.h
- create mode 100644 arch/arm/kvm/arch_timer.c
-
--- 
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index c8ef207..8adcd04 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -26,6 +26,7 @@
+ #include <asm/arch_timer.h>
+ #include <asm/system_info.h>
+ #include <asm/sched_clock.h>
++#include <asm/virt.h>
+ 
+ static unsigned long arch_timer_rate;
+ 
+@@ -489,10 +490,14 @@ int __init arch_timer_of_register(void)
+ 		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+ 
+ 	/*
++	 * If HYP mode is available, we know that the physical timer
++	 * has been configured to be accessible from PL1. Use it, so
++	 * that a guest can use the virtual timer instead.
++	 *
+ 	 * If no interrupt provided for virtual timer, we'll have to
+ 	 * stick to the physical timer. It'd better be accessible...
+ 	 */
+-	if (!arch_timer_ppi[VIRT_PPI]) {
++	if (is_hyp_mode_available() || !arch_timer_ppi[VIRT_PPI]) {
+ 		arch_timer_use_virtual = false;
+ 
+ 		if (!arch_timer_ppi[PHYS_SECURE_PPI] ||
