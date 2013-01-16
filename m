@@ -1,35 +1,26 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 16 Jan 2013 20:19:22 +0530
-Subject: [PATCH] ARM: mm: Fix missing XN flag for for MT_MEMORY_SO
-Message-ID: <1358347762-14682-1-git-send-email-santosh.shilimkar@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Jan 2013 14:55:30 +0000
+Subject: [PATCH v6 04/22] mfd: omap-usb-tll: Clean up clock handling
+In-Reply-To: <1358347433-329-5-git-send-email-rogerq@ti.com>
+References: <1358347433-329-1-git-send-email-rogerq@ti.com>
+ <1358347433-329-5-git-send-email-rogerq@ti.com>
+Message-ID: <20130116145530.GU23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8fb54284ba6a {ARM: mm: Add strongly ordered descriptor support}
-added XN flag at section level but missed it at PTE level.
+On Wed, Jan 16, 2013 at 04:43:35PM +0200, Roger Quadros wrote:
+> +	spin_lock_irqsave(&tll->lock, flags);
+> +
+> +	for (i = 0; i < tll->nch; i++) {
+> +		char clkname[] = "usb_tll_hs_usb_chx_clk";
+> +		struct clk *fck;
+> +
+> +		snprintf(clkname, sizeof(clkname),
+> +					"usb_tll_hs_usb_ch%d_clk", i);
+> +		fck = clk_get(dev, clkname);
 
-Fix it by adding the L_PTE_XN to MT_MEMORY_SO PET descriptor.
+NAK.  Why are you doing this under a spinlock?
 
-Cc: Russell King <linux@arm.linux.org.uk>
-
-Reported-by: Richard Woodruff <r-woodruff2@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mm/mmu.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 9f06102..ce328c7 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -283,7 +283,7 @@ static struct mem_type mem_types[] = {
- 	},
- 	[MT_MEMORY_SO] = {
- 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
--				L_PTE_MT_UNCACHED,
-+				L_PTE_MT_UNCACHED | L_PTE_XN,
- 		.prot_l1   = PMD_TYPE_TABLE,
- 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_S |
- 				PMD_SECT_UNCACHED | PMD_SECT_XN,
--- 
-1.7.9.5
+clk_get() takes a mutex.  You must not be in an atomic region (iow, you
+must not be holding a spinlock, and you must not have IRQs disabled)
+when you call clk_get().
