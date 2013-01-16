@@ -1,43 +1,31 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 Jan 2013 10:28:15 -0700
-Subject: [PATCH v2 03/10] ARM: dt: tegra30: Add clock information
-In-Reply-To: <50F65E4B.8040409@nvidia.com>
-References: <1357891289-23500-1-git-send-email-pgaikwad@nvidia.com>
- <1357891289-23500-3-git-send-email-pgaikwad@nvidia.com>
- <50F65E4B.8040409@nvidia.com>
-Message-ID: <50F6E32F.80602@wwwdotorg.org>
+Date: Wed, 16 Jan 2013 10:30:35 -0700
+Subject: [PATCH v4 5/9] ARM: Tegra: Define Tegra30 CAR binding
+In-Reply-To: <20130116132856.2896df94f553f78273c4574c@nvidia.com>
+References: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com>
+ <1357890387-23245-6-git-send-email-pgaikwad@nvidia.com>
+ <20130116132856.2896df94f553f78273c4574c@nvidia.com>
+Message-ID: <50F6E3BB.5060007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2013 01:01 AM, Terje Bergstr?m wrote:
-> On 11.01.2013 10:01, Prashant Gaikwad wrote:
->> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
->> index 6765646..c3e129a 100644
->> --- a/arch/arm/boot/dts/tegra30.dtsi
->> +++ b/arch/arm/boot/dts/tegra30.dtsi
->>  		gr3d {
->>  			compatible = "nvidia,tegra30-gr3d";
->>  			reg = <0x54180000 0x00040000>;
->> +			clocks = <&tegra_car 24>;
->>  		};
+On 01/16/2013 04:28 AM, Hiroshi Doyu wrote:
+> On Fri, 11 Jan 2013 08:46:23 +0100
+> Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
 > 
-> In Tegra3, 3D has two clocks. I believe you'd need to add <&tegra_car
-> 98> here.
+>> The device tree binding models Tegra30 CAR (Clock And Reset)
+>> as a single monolithic clock provider.
 
-Thanks. I've squashed the following into the patch. Do those clock names
-make sense to you?
+>> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra30-car.txt
 
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index b9709ae..c26d75b 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -54,7 +54,8 @@
-                gr3d {
-                        compatible = "nvidia,tegra30-gr3d";
-                        reg = <0x54180000 0x00040000>;
--                       clocks = <&tegra_car 24>;
-+                       clocks = <&tegra_car 24 &tegra_car 98>;
-+                       clock-names = "3d", "3d2";
-                };
+>> +Example board file:
+>> +
+>> +/ {
+>> +       clocks {
+>> +               compatible = "simple-bug";
+> 
+> typo, 's/simple-bug/simple-bus/' ?
 
-                dc at 54200000 {
+It was rather accurate though; a simple bug:-)
+
+I've squashed the fix into the patch.
