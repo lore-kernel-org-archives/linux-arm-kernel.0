@@ -1,177 +1,110 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 16 Jan 2013 21:15:47 +0100
-Subject: [PATCH 2/7] reset: Add reset controller API
-In-Reply-To: <1358352787-15441-3-git-send-email-p.zabel@pengutronix.de>
-References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
- <1358352787-15441-3-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130116201547.GW1906@pengutronix.de>
+From: coelho@ti.com (Luciano Coelho)
+Date: Wed, 16 Jan 2013 22:34:55 +0200
+Subject: [PATCH] OMAP: omap4-panda: add WiLink shared transport power functions
+Message-ID: <1358368495-10499-1-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 05:13:02PM +0100, Philipp Zabel wrote:
-> This adds a simple API for devices to request being reset
-> by separate reset controller hardware and implements the
-> reset signal device tree binding.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  drivers/Kconfig        |    2 +
->  drivers/Makefile       |    2 +
->  drivers/reset/Kconfig  |   10 ++
->  drivers/reset/Makefile |    2 +
->  drivers/reset/core.c   |  241 ++++++++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 257 insertions(+)
->  create mode 100644 drivers/reset/Kconfig
->  create mode 100644 drivers/reset/Makefile
->  create mode 100644 drivers/reset/core.c
-> 
-> diff --git a/drivers/Kconfig b/drivers/Kconfig
-> index f5fb072..51f73ae 100644
-> --- a/drivers/Kconfig
-> +++ b/drivers/Kconfig
-> @@ -158,4 +158,6 @@ source "drivers/irqchip/Kconfig"
->  
->  source "drivers/ipack/Kconfig"
->  
-> +source "drivers/reset/Kconfig"
-> +
->  endmenu
-> diff --git a/drivers/Makefile b/drivers/Makefile
-> index 346ecc5..870bf7e 100644
-> --- a/drivers/Makefile
-> +++ b/drivers/Makefile
-> @@ -42,6 +42,8 @@ ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
->  obj-y				+= clocksource/
->  endif
->  
-> +obj-$(CONFIG_RESET_CONTROLLER)	+= reset/
-> +
->  # tty/ comes before char/ so that the VT console is the boot-time
->  # default.
->  obj-y				+= tty/
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> new file mode 100644
-> index 0000000..82dc89e
-> --- /dev/null
-> +++ b/drivers/reset/Kconfig
-> @@ -0,0 +1,10 @@
-> +menuconfig RESET_CONTROLLER
-> +	bool "Reset Controller Support"
-> +	help
-> +	  Generic Reset Controller support.
-> +
-> +	  This framework is designed to abstract reset handling of devices
-> +	  via GPIOs or SoC-internal reset controller modules.
-> +
-> +	  If unsure, say no.
-> +
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> new file mode 100644
-> index 0000000..9a7b6df
-> --- /dev/null
-> +++ b/drivers/reset/Makefile
-> @@ -0,0 +1,2 @@
-> +obj-$(CONFIG_RESET_CONTROLLER) += core.o
-> +
-> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-> new file mode 100644
-> index 0000000..f0ed61b
-> --- /dev/null
-> +++ b/drivers/reset/core.c
-> @@ -0,0 +1,241 @@
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/export.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/reset.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/slab.h>
-> +
-> +static DEFINE_MUTEX(reset_controller_list_mutex);
-> +static LIST_HEAD(reset_controller_list);
-> +
-> +/**
-> + * struct reset_control - a reset control
-> + *
-> + * @id: ID of the reset controller in the reset
-> + *      controller device
-> + */
-> +struct reset_control {
-> +	struct reset_controller_dev *rcdev;
-> +	unsigned int id;
-> +};
-> +
-> +/**
-> + * reset_controller_register - register a reset controller
-> + *
-> + * @ops: a pointer to struct reset_controller_ops callbacks
-> + *
-> + * Returns a struct reset_controller_dev or IS_ERR() condition
-> + * containing errno.
+The code to enable and disable the WiLink shared transport has been
+removed from the TI-ST driver, so it must be implemented in the board
+files instead.  Add the relevant operations to Panda's board file.
 
-The comment seems wrong.
+Additionally, add the UART2 muxing data, so it's properly configured.
 
-> + */
-> +int reset_controller_register(struct reset_controller_dev *rcdev)
-> +{
-> +	mutex_lock(&reset_controller_list_mutex);
-> +	list_add(&rcdev->list, &reset_controller_list);
-> +	mutex_unlock(&reset_controller_list_mutex);
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * reset_control_reset - reset the controlled device
-> + * @rstc: reset controller
-> + */
-> +int reset_control_reset(struct reset_control *rstc)
-> +{
-> +	if (rstc->rcdev->ops->reset)
-> +		return rstc->rcdev->ops->reset(rstc->id);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(reset_control_reset);
-> +
-> +/**
-> + * reset_control_assert - asserts the reset line
-> + * @rstc: reset controller
-> + */
-> +int reset_control_assert(struct reset_control *rstc)
-> +{
-> +	if (rstc->rcdev->ops->assert)
-> +		return rstc->rcdev->ops->assert(rstc->id);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(reset_control_assert);
-> +
-> +/**
-> + * reset_control_deassert - deasserts the reset line
-> + * @rstc: reset controller
-> + */
-> +int reset_control_deassert(struct reset_control *rstc)
-> +{
-> +	if (rstc->rcdev->ops->deassert)
-> +		return rstc->rcdev->ops->deassert(rstc->id);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(reset_control_deassert);
-> +
-> +/**
-> + * reset_control_is_asserted - deasserts the reset line
+Signed-off-by: Luciano Coelho <coelho@ti.com>
+---
+ arch/arm/mach-omap2/board-omap4panda.c |   57 +++++++++++++++++++++++++++++---
+ 1 file changed, 53 insertions(+), 4 deletions(-)
 
-copy-paste from the function above?
-
-Sascha
-
-
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index 5c8e9ce..97a274b 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -51,18 +51,57 @@
+ #define GPIO_HUB_NRESET		62
+ #define GPIO_WIFI_PMENA		43
+ #define GPIO_WIFI_IRQ		53
++#define GPIO_BT_EN		46
+ 
+ /* wl127x BT, FM, GPS connectivity chip */
++static int plat_kim_chip_enable(struct kim_data_s *kim_data)
++{
++	gpio_set_value(GPIO_BT_EN, GPIO_LOW);
++	mdelay(5);
++	gpio_set_value(GPIO_BT_EN, GPIO_HIGH);
++	mdelay(100);
++
++	return 0;
++}
++
++static int plat_kim_chip_disable(struct kim_data_s *kim_data)
++{
++	gpio_set_value(GPIO_BT_EN, GPIO_LOW);
++	mdelay(1);
++	gpio_set_value(GPIO_BT_EN, GPIO_HIGH);
++	mdelay(1);
++	gpio_set_value(GPIO_BT_EN, GPIO_LOW);
++
++	return 0;
++}
++
+ static struct ti_st_plat_data wilink_platform_data = {
+-	.nshutdown_gpio	= 46,
+ 	.dev_name	= "/dev/ttyO1",
+ 	.flow_cntrl	= 1,
+ 	.baud_rate	= 3000000,
+-	.chip_enable	= NULL,
+-	.suspend	= NULL,
+-	.resume		= NULL,
++	.chip_enable	= plat_kim_chip_enable,
++	.chip_disable	= plat_kim_chip_disable,
+ };
+ 
++static int wilink_st_init(void)
++{
++	int status;
++
++	status = gpio_request(GPIO_BT_EN, "kim");
++	if (status) {
++		pr_err("%s: failed to request gpio %d\n", __func__,
++		       GPIO_BT_EN);
++		return status;
++	}
++
++	status = gpio_direction_output(GPIO_BT_EN, 0);
++	if (status)
++		pr_err("%s: unable to configure gpio %d", __func__,
++		       GPIO_BT_EN);
++
++	return status;
++}
++
+ static struct platform_device wl1271_device = {
+ 	.name	= "kim",
+ 	.id	= -1,
+@@ -397,6 +436,12 @@ static struct omap_board_mux board_mux[] __initdata = {
+ 		  OMAP_PULL_ENA),
+ 	OMAP4_MUX(ABE_MCBSP1_FSX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+ 
++	/* UART2 - BT/FM/GPS shared transport */
++	OMAP4_MUX(UART2_CTS,	OMAP_PIN_INPUT	| OMAP_MUX_MODE0),
++	OMAP4_MUX(UART2_RTS,	OMAP_PIN_OUTPUT	| OMAP_MUX_MODE0),
++	OMAP4_MUX(UART2_RX,	OMAP_PIN_INPUT	| OMAP_MUX_MODE0),
++	OMAP4_MUX(UART2_TX,	OMAP_PIN_OUTPUT	| OMAP_MUX_MODE0),
++
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+ 
+@@ -433,6 +478,10 @@ static void __init omap4_panda_init(void)
+ 	if (ret)
+ 		pr_err("error setting wl12xx data: %d\n", ret);
+ 
++	ret = wilink_st_init();
++	if (ret)
++		pr_err("WiLink shared transport init failed: %d\n", ret);
++
+ 	omap4_panda_init_rev();
+ 	omap4_panda_i2c_init();
+ 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
