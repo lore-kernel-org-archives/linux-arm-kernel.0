@@ -1,23 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Jan 2013 14:00:26 +0000
-Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <20130115211441.GA13139@avionic-0098.adnet.avionic-design.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <20130115154038.GA11241@arm.com>
- <20130115211441.GA13139@avionic-0098.adnet.avionic-design.de>
-Message-ID: <201301161400.26587.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 16 Jan 2013 22:04:05 +0800
+Subject: [PATCH 4/4] ARM: uncompress: support uncompress debug for
+ multiplatform build
+In-Reply-To: <20130115190401.GA28333@quad.lixom.net>
+References: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
+ <1355319945-3199-5-git-send-email-shawn.guo@linaro.org>
+ <20130111191116.GA999@quad.lixom.net>
+ <20130112032934.GA14865@S2101-09.ap.freescale.net>
+ <20130115190401.GA28333@quad.lixom.net>
+Message-ID: <20130116140403.GA25618@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 January 2013, Thierry Reding wrote:
-> Is there actually hardware that supports this? I assumed that the MSI
-> controller would have to be tightly coupled to the PCI host bridge in
-> order to raise an interrupt when an MSI is received via PCI.
+On Tue, Jan 15, 2013 at 11:04:01AM -0800, Olof Johansson wrote:
+> Most functionality to deal with this already exist in the
+> include/debug/*.S files files, you just need to instantiate the macros
+> somewhere (compressed/head.S, or a separate file), and wrap the calls
+> to those instantiated assembly functions in a generic header file.
+> 
+> That way, every platform that has a DEBUG_LL implementation should be able to
+> reuse that, and no need to enable every platform one by one.
+> 
+Ok, got your point.  I'm working on a solution as what you suggest here.
+So please ignore that pull request I sent.
 
-No, as long as it's guaranteed that the MSI notification won't arrive
-at the CPU before any inbound DMA data before it, the MSI controller
-can be anywhere. Typically, the MSI controller is actually closer to
-the CPU core than to the PCI bridge. On X86, I believe the MSI address
-is on normally on the the "local APIC" on each CPU.
-
-	Arnd
+Shawn
