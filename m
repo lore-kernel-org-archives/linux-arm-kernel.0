@@ -1,26 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Jan 2013 14:55:30 +0000
-Subject: [PATCH v6 04/22] mfd: omap-usb-tll: Clean up clock handling
-In-Reply-To: <1358347433-329-5-git-send-email-rogerq@ti.com>
-References: <1358347433-329-1-git-send-email-rogerq@ti.com>
- <1358347433-329-5-git-send-email-rogerq@ti.com>
-Message-ID: <20130116145530.GU23505@n2100.arm.linux.org.uk>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Wed, 16 Jan 2013 15:57:55 +0100
+Subject: [PATCH V2 3/5] W1: Convert MXC onewire master to devm_ functions.
+In-Reply-To: <20130116145749.24249.678.stgit@localhost>
+References: <20130116145749.24249.678.stgit@localhost>
+Message-ID: <20130116145755.24249.67871.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 04:43:35PM +0200, Roger Quadros wrote:
-> +	spin_lock_irqsave(&tll->lock, flags);
-> +
-> +	for (i = 0; i < tll->nch; i++) {
-> +		char clkname[] = "usb_tll_hs_usb_chx_clk";
-> +		struct clk *fck;
-> +
-> +		snprintf(clkname, sizeof(clkname),
-> +					"usb_tll_hs_usb_ch%d_clk", i);
-> +		fck = clk_get(dev, clkname);
+While doing this fix missing clk_disable_unprepare in error path.
 
-NAK.  Why are you doing this under a spinlock?
+Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+---
+ drivers/w1/masters/mxc_w1.c |   26 ++++++--------------------
+ 1 files changed, 6 insertions(+), 20 deletions(-)
 
-clk_get() takes a mutex.  You must not be in an atomic region (iow, you
-must not be holding a spinlock, and you must not have IRQs disabled)
-when you call clk_get().
+diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
+index 949e566..317b2bc 100644
+--- a/drivers/w1/masters/mxc_w1.c
++++ b/drivers/w1/masters/mxc_w1.c
+@@ -117,7 +117,7 @@ static int mxc_w1_probe(struct platform_device *pdev)
+ 	if (!mdev)
+ 		return -ENOMEM;
+ 
+-	mdev->clk = clk_get(&pdev->dev, NULL);
++	mdev->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(mdev->clk)) {
+ 		err = PTR_ERR(mdev->clk);
+ 		goto failed_clk;
+@@ -125,17 +125,11 @@ static int mxc_w1_probe(struct platform_device *pdev)
+ 
+ 	mdev->clkdiv = (clk_get_rate(mdev->clk) / 1000000) - 1;
+ 
+-	res = request_mem_region(res->start, resource_size(res),
+-				"mxc_w1");
+-	if (!res) {
+-		err = -EBUSY;
+-		goto failed_req;
+-	}
+-
+-	mdev->regs = ioremap(res->start, resource_size(res));
++	mdev->regs = devm_request_and_ioremap(&pdev->dev, res);
+ 	if (!mdev->regs) {
+ 		dev_err(&pdev->dev, "Cannot map mxc_w1 registers\n");
+-		goto failed_ioremap;
++		err = -ENXIO;
++		goto failed_req;
+ 	}
+ 
+ 	clk_prepare_enable(mdev->clk);
+@@ -154,11 +148,9 @@ static int mxc_w1_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ failed_add:
+-	iounmap(mdev->regs);
+-failed_ioremap:
+-	release_mem_region(res->start, resource_size(res));
++	clk_disable_unprepare(mdev->clk);
++
+ failed_req:
+-	clk_put(mdev->clk);
+ failed_clk:
+ 	kfree(mdev);
+ 	return err;
+@@ -170,16 +162,10 @@ failed_clk:
+ static int mxc_w1_remove(struct platform_device *pdev)
+ {
+ 	struct mxc_w1_device *mdev = platform_get_drvdata(pdev);
+-	struct resource *res;
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 
+ 	w1_remove_master_device(&mdev->bus_master);
+ 
+-	iounmap(mdev->regs);
+-	release_mem_region(res->start, resource_size(res));
+ 	clk_disable_unprepare(mdev->clk);
+-	clk_put(mdev->clk);
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 
