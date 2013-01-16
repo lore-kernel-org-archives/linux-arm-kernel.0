@@ -1,20 +1,91 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Wed, 16 Jan 2013 15:57:49 +0100
-Subject: [PATCH V2  0/5] W1: Support onewire master on i.MX53
-Message-ID: <20130116145749.24249.678.stgit@localhost>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 16 Jan 2013 20:31:00 +0530
+Subject: [RFC PATCH 4/6] ARM: dts: OMAP: Add phandle to bind PHY with USB
+ controller
+In-Reply-To: <1358348462-27693-1-git-send-email-kishon@ti.com>
+References: <1358348462-27693-1-git-send-email-kishon@ti.com>
+Message-ID: <1358348462-27693-5-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W1: Support onewire master on i.MX53
-	* Add device tree and pinctrl support to the MXC master driver
-	* Convert to use devm_
-	* Add i.MX53 clocks
-	* Add i.MX53 device tree entries
+Added a phandle in the dt node for usb_otg to bind the PHY with the USB
+controller and also updated the documentation with the binding information.
 
-Changes since V1
-* Applied comments from Sascha Hauer:
-	* Move patch converting driver to devm_ before the one adding devm_ based pinctrl
-	* Fix existing unbalanced clk_prepare_enable/clk_disable_unprepare
-	in probe error path
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+I'll add this patch in this series "usb: musb: add driver for control module"
+which contains the dt data to get MUSB working in dt boot in OMAP platforms.
+ Documentation/devicetree/bindings/usb/omap-usb.txt |    2 ++
+ arch/arm/boot/dts/omap3.dtsi                       |    1 +
+ arch/arm/boot/dts/omap4.dtsi                       |    3 ++-
+ arch/arm/boot/dts/twl4030.dtsi                     |    2 +-
+ 4 files changed, 6 insertions(+), 2 deletions(-)
 
-* Place DT patch last since it includes pinctrls for driver.
+diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
+index 3f0152b..591c4fc 100644
+--- a/Documentation/devicetree/bindings/usb/omap-usb.txt
++++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+@@ -18,6 +18,7 @@ OMAP MUSB GLUE
+    represents PERIPHERAL.
+  - power : Should be "50". This signifies the controller can supply upto
+    100mA when operating in host mode.
++ - usb_phy : the phandle for the PHY device
+ 
+ SOC specific device node entry
+ usb_otg_hs: usb_otg_hs at 4a0ab000 {
+@@ -27,6 +28,7 @@ usb_otg_hs: usb_otg_hs at 4a0ab000 {
+ 	multipoint = <1>;
+ 	num_eps = <16>;
+ 	ram_bits = <12>;
++	usb_phy = <&phy>;
+ };
+ 
+ Board specific device node entry
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 8d03736..ebbf596 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -404,6 +404,7 @@
+ 			interrupts = <0 92 0x4>, <0 93 0x4>;
+ 			interrupt-names = "mc", "dma";
+ 			ti,hwmods = "usb_otg_hs";
++			usb_phy = <&phy>;
+ 			multipoint = <1>;
+ 			num_eps = <16>;
+ 			ram_bits = <12>;
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 5d770be..531cb2d 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -438,7 +438,7 @@
+ 			#size-cells = <1>;
+ 			ranges;
+ 			ti,hwmods = "ocp2scp_usb_phy";
+-			usb2phy at 4a0ad080 {
++			phy: usb2phy at 4a0ad080 {
+ 				compatible = "ti,omap-usb2";
+ 				reg = <0x4a0ad080 0x58>;
+ 			};
+@@ -540,6 +540,7 @@
+ 			interrupts = <0 92 0x4>, <0 93 0x4>;
+ 			interrupt-names = "mc", "dma";
+ 			ti,hwmods = "usb_otg_hs";
++			usb_phy = <&phy>;
+ 			multipoint = <1>;
+ 			num_eps = <16>;
+ 			ram_bits = <12>;
+diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+index ed0bc95..80f7c2b 100644
+--- a/arch/arm/boot/dts/twl4030.dtsi
++++ b/arch/arm/boot/dts/twl4030.dtsi
+@@ -67,7 +67,7 @@
+ 		#interrupt-cells = <1>;
+ 	};
+ 
+-	twl4030-usb {
++	phy: twl4030-usb {
+ 		compatible = "ti,twl4030-usb";
+ 		interrupts = <10>, <4>;
+ 		usb1v5-supply = <&vusb1v5>;
+-- 
+1.7.9.5
