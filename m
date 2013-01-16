@@ -1,97 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 Jan 2013 11:04:08 -0700
-Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
-In-Reply-To: <20130116.101906.399662310268585658.hdoyu@nvidia.com>
-References: <1357890387-23245-3-git-send-email-pgaikwad@nvidia.com><20130111.134820.1392079432650652356.hdoyu@nvidia.com><50F085A0.4090100@wwwdotorg.org>
- <20130116.101906.399662310268585658.hdoyu@nvidia.com>
-Message-ID: <50F6EB98.5090607@wwwdotorg.org>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Wed, 16 Jan 2013 19:11:21 +0100
+Subject: [PATCH 1/5] W1: Add device tree support to MXC onewire master.
+In-Reply-To: <20130116163603.GA20855@e106331-lin.cambridge.arm.com>
+References: <20130116094821.9660.18278.stgit@localhost>
+ <20130116094823.9660.2116.stgit@localhost>
+ <20130116163603.GA20855@e106331-lin.cambridge.arm.com>
+Message-ID: <50F6ED49.9080306@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2013 01:19 AM, Hiroshi Doyu wrote:
-> Stephen Warren <swarren@wwwdotorg.org> wrote @ Fri, 11 Jan 2013 22:35:28 +0100:
-> 
->> On 01/11/2013 04:48 AM, Hiroshi Doyu wrote:
->>> Hi Prahant,
->>>
->>> Some nit-pick/cosmetic comments inlined...
+On 16/01/13 17:36, Mark Rutland wrote:
+> Hi,
+>
+> This looks nice and simple, I just have a couple of comment.
+Thank you
+> On Wed, Jan 16, 2013 at 09:48:23AM +0000, Martin Fuzzey wrote:
+>> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+>> ---
+>>   drivers/w1/masters/mxc_w1.c |    9 ++++++++-
+>>   1 files changed, 8 insertions(+), 1 deletions(-)
 >>
->> FYI, Prashant is on vacation for the next week or two, so I'll take over
->> this series to clean up any last review comments.
+>> diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
+>> index 708a25f..949e566 100644
+>> --- a/drivers/w1/masters/mxc_w1.c
+>> +++ b/drivers/w1/masters/mxc_w1.c
+>> @@ -186,9 +186,16 @@ static int mxc_w1_remove(struct platform_device *pdev)
+>>   	return 0;
+>>   }
+>>   
+>> +static struct of_device_id mxc_w1_dt_ids[] = {
+>> +	{ .compatible = "fsl,imx21-owire" },
+>> +	{ /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, mxc_w1_dt_ids);
+>> +
+>>   static struct platform_driver mxc_w1_driver = {
+>>   	.driver = {
+>> -		   .name = "mxc_w1",
+>> +		.name = "mxc_w1",
+>> +		.of_match_table = mxc_w1_dt_ids,
+>>   	},
+>>   	.probe = mxc_w1_probe,
+>>   	.remove = mxc_w1_remove,
 >>
->>> Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Fri, 11 Jan 2013 08:46:20 +0100:
->>>
->>>> Add tegra specific clocks, pll, pll_out, peripheral,
->>>> frac_divider, super.
->>
->> (it's a good idea to quote as little text as possible; paging through
->> the whole patch to find your comments was slightly painful).
->>
->>>> diff --git a/drivers/clk/tegra/clk-audio-sync.c b/drivers/clk/tegra/clk-audio-sync.c
->>
->>>> +struct clk *tegra_clk_sync_source(const char *name, unsigned long rate,
->>>> +                                 unsigned long max_rate)
->>>> +{
->>>> +       struct tegra_clk_sync_source *sync;
->>>> +       struct clk_init_data init;
->>>> +       struct clk *clk;
->>>> +
->>>> +       sync = kzalloc(sizeof(struct tegra_clk_sync_source), GFP_KERNEL);
->>>> +       if (!sync) {
->>>> +               pr_err("%s: could not allocate sync source clk\n", __func__);
->>>> +               return ERR_PTR(-ENOMEM);
->>>> +       }
->>>> +
->>>> +       sync->rate = rate;
->>>> +       sync->max_rate = max_rate;
->>>> +
->>>> +       init.ops = &tegra_clk_sync_source_ops;
->>>> +       init.name = name;
->>>> +       init.flags = CLK_IS_ROOT;
->>>> +       init.parent_names = NULL;
->>>> +       init.num_parents = 0;
->>>> +
->>>> +       sync->hw.init = &init;
->>>> +
->>>> +       clk = clk_register(NULL, &sync->hw);
->>>
->>> The above usage of "init" from stack may be a bit
->>> unfamilier. I can guess that its content is copied in clk_register()
->>> but it's originally defined in stack. So I just prefer to writing this
->>> as below. It may be somewhat explict that we know init is from stack.
->>
->> The issue you mention is more about whether "init" is copied from the
->> stack or not; simplying changing the initialization to:
->>
->>> struct clk *tegra_clk_sync_source(const char *name, unsigned long rate,
->>>                                  unsigned long max_rate)
->>> {
->>>         struct tegra_clk_sync_source *sync;
->>>         struct clk_init_data init = {
->>>                 .ops = &tegra_clk_sync_source_ops;
->>>                 .name = name;
->>>                 .flags = CLK_IS_ROOT;
->>>                 .parent_names = NULL;
->>>                 .num_parents = 0;
->>>         };
-> 
-> Also since "init" is allocated from stack, members are expected to be
-> initialized *zero*. The last 2 lines are not necessary in the above.
-> 
->          struct clk_init_data init = {
->                  .ops = &tegra_clk_sync_source_ops;
->                  .name = name;
->                  .flags = CLK_IS_ROOT;
->          };
+> I see there's already a binding for gpio-based w1 -- "w1-gpio". Given this is
+> already using the "w1" naming convention in a binding, I think it'd be worth
+> using the compatible string "fsl,imx21-w1", for consistency (both with the
+> other binding and the driver name).
+I don't have any strong opinions on this but the other imx53 bindings
+use the names used by Freescale in the hardware documentation hence
+the "owire" rather than "w1".
 
-Variables on the stack aren't initialized the zero without an explicit
-assignment.
+I'm happy to change it if that is the consensus though.
 
-The reason why those last two lines aren't strictly necessary, is
-because the whole of the "init" struct is being initialized due to
-assignment to the struct, and omitting an explicit value for any of the
-fields means that the field's value will be zero. The same would be true
-for a global struct initialization (as opposed to BSS).
+> It's also be worth documenting (in
+> Documentation/devicetree/bindings/w1/fsl-imx21-w1, presumably).
+Ok, I thought that as the driver doesn't define any properties itself that
+this wasn't required. However l see some other drivers do document in this
+case.
 
-Either way though, I'm inclined to leave the initialization in; there's
-little harm being explicit.
+So I will add a Documentation file.
+> When adding bindings, it's also good to Cc devicetree-discuss.
+Ok, added to -Cc
+
+Martin
