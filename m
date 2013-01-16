@@ -1,115 +1,110 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 16 Jan 2013 10:50:45 -0500
-Subject: [PATCH] ata: sata_mv: fix sg_tbl_pool alignment
-In-Reply-To: <50F66B1B.40301@web.de>
-References: <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
- <50F3F289.3090402@web.de>
- <20130115165642.GA25500@titan.lakedaemon.net>
- <20130115175020.GA3764@kroah.com>
- <20130115201617.GC25500@titan.lakedaemon.net>
- <20130115215602.GF25500@titan.lakedaemon.net>
- <50F5F1B7.3040201@web.de>
- <20130116024014.GH25500@titan.lakedaemon.net>
- <50F61D86.4020801@web.de> <50F66B1B.40301@web.de>
-Message-ID: <20130116155045.GI25500@titan.lakedaemon.net>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Wed, 16 Jan 2013 17:52:12 +0200
+Subject: [PATCH v5 07/14] KVM: ARM: World-switch implementation
+In-Reply-To: <CANM98q+jpzVWfg8drE+azcbDF1Q1suphZyJrij04b+OB4ZX4Dw@mail.gmail.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183924.46302.65998.stgit@ubuntu>
+ <20130115094312.GI11529@redhat.com>
+ <CANM98q+qScaXniyYjrd9QEZzWKzj3PkCE0YNFUp2ijnCfS_v4w@mail.gmail.com>
+ <20130116121238.GS11529@redhat.com>
+ <CANM98q+jpzVWfg8drE+azcbDF1Q1suphZyJrij04b+OB4ZX4Dw@mail.gmail.com>
+Message-ID: <20130116155212.GX11529@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 09:55:55AM +0100, Soeren Moch wrote:
-> On 16.01.2013 04:24, Soeren Moch wrote:
-> >On 16.01.2013 03:40, Jason Cooper wrote:
-> >>On Wed, Jan 16, 2013 at 01:17:59AM +0100, Soeren Moch wrote:
-> >>>On 15.01.2013 22:56, Jason Cooper wrote:
-> >>>>On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
-
-> OK, I could trigger the error
->   ERROR: 1024 KiB atomic DMA coherent pool is too small!
->   Please increase it with coherent_pool= kernel parameter!
-> only with em28xx sticks and sata, dib0700 sticks removed.
-
-Did you test the reverse scenario?  ie dib0700 with sata_mv and no
-em28xx.
-
-What kind of throughput are you pushing to the sata disk?
-
-> >>What would be most helpful is if you could do a git bisect between
-> >>v3.5.x (working) and the oldest version where you know it started
-> >>failing (v3.7.1 or earlier if you know it).
-> >>
-> >I did not bisect it, but Marek mentioned earlier that commit
-> >e9da6e9905e639b0f842a244bc770b48ad0523e9 in Linux v3.6-rc1 introduced
-> >new code for dma allocations. This is probably the root cause for the
-> >new (mis-)behavior (due to my tests 3.6.0 is not working anymore).
+On Wed, Jan 16, 2013 at 10:42:02AM -0500, Christoffer Dall wrote:
+> [...]
 > 
-> I don't want to say that Mareks patch is wrong, probably it triggers a
-> bug somewhere else! (in em28xx?)
+> >
+> >> read side RCU protects against is the memslots data structure as far
+> >> as I can see, so the second patch pasted below fixes this for the code
+> >> that actually accesses this data structure.
+> > Many memory related functions that you call access memslots under the
+> > hood and assume that locking is done by the caller. From the quick look
+> > I found those that you've missed:
+> > kvm_is_visible_gfn()
+> > kvm_read_guest()
+> > gfn_to_hva()
+> > gfn_to_pfn_prot()
+> > kvm_memslots()
+> >
+> > May be there are more. Can you enable RCU debugging in your kernel config
+> > and check? This does not guaranty that it will catch all of the places,
+> > but better than nothing.
+> >
+> 
+> yeah, I missed the call to is_visible_gfn and friends, this fixes it:
+> 
+Thank you. One more kvm_read_guest() in emulate.c.
 
-Of the four drivers you listed, none are using dma.  sata_mv is the only
-one.
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index c806080..f30e131 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -591,7 +591,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu,
+> struct kvm_run *run)
+>  	struct kvm_memory_slot *memslot;
+>  	bool is_iabt;
+>  	gfn_t gfn;
+> -	int ret;
+> +	int ret, idx;
+> 
+>  	hsr_ec = vcpu->arch.hsr >> HSR_EC_SHIFT;
+>  	is_iabt = (hsr_ec == HSR_EC_IABT);
+> @@ -608,33 +608,43 @@ int kvm_handle_guest_abort(struct kvm_vcpu
+> *vcpu, struct kvm_run *run)
+>  		return -EFAULT;
+>  	}
+> 
+> +	idx = srcu_read_lock(&vcpu->kvm->srcu);
+> +
+>  	gfn = fault_ipa >> PAGE_SHIFT;
+>  	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
+>  		if (is_iabt) {
+>  			/* Prefetch Abort on I/O address */
+>  			kvm_inject_pabt(vcpu, vcpu->arch.hxfar);
+> -			return 1;
+> +			ret = 1;
+> +			goto out_unlock;
+>  		}
+> 
+>  		if (fault_status != FSC_FAULT) {
+>  			kvm_err("Unsupported fault status on io memory: %#lx\n",
+>  				fault_status);
+> -			return -EFAULT;
+> +			ret = -EFAULT;
+> +			goto out_unlock;
+>  		}
+> 
+>  		/* Adjust page offset */
+>  		fault_ipa |= vcpu->arch.hxfar & ~PAGE_MASK;
+> -		return io_mem_abort(vcpu, run, fault_ipa);
+> +		ret = io_mem_abort(vcpu, run, fault_ipa);
+> +		goto out_unlock;
+>  	}
+> 
+>  	memslot = gfn_to_memslot(vcpu->kvm, gfn);
+>  	if (!memslot->user_alloc) {
+>  		kvm_err("non user-alloc memslots not supported\n");
+> -		return -EINVAL;
+> +		ret = -EINVAL;
+> +		goto out_unlock;
+>  	}
+> 
+>  	ret = user_mem_abort(vcpu, fault_ipa, gfn, memslot, fault_status);
+> -	return ret ? ret : 1;
+> +	if (ret == 0)
+> +		ret = 1;
+> +out_unlock:
+> +	srcu_read_unlock(&vcpu->kvm->srcu, idx);
+> +	return ret;
+>  }
+> 
+>  static void handle_hva_to_gpa(struct kvm *kvm,
+> --
+> 
+> Thanks,
+> -Christoffer
 
-If one is to believe the comments in sata_mv.c:~151, then the alignment
-is wrong for the sg_tbl_pool.
-
-Could you please try the following patch?
-
-thx,
-
-Jason.
-
----8<----------
->From 566c7e30285e4c31d76724ea4811b016b753f24f Mon Sep 17 00:00:00 2001
-From: Jason Cooper <jason@lakedaemon.net>
-Date: Wed, 16 Jan 2013 15:43:37 +0000
-Subject: [PATCH] ata: sata_mv: fix sg_tbl_pool alignment
-
-If the comment is to be believed, the alignment should be 16B, and the
-size 4K.  The current code sets both to 4K.  On some arm boards
-(kirkwood), this causes:
-
-   ERROR: 1024 KiB atomic DMA coherent pool is too small!
-   Please increase it with coherent_pool= kernel parameter!
-
-Set alignment to 16B to prevent exhausting the atomic_pool.
-
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
- drivers/ata/sata_mv.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-index 68f4fb5..e2e5a8a 100644
---- a/drivers/ata/sata_mv.c
-+++ b/drivers/ata/sata_mv.c
-@@ -148,6 +148,9 @@ enum {
- 	 * CRPB needs alignment on a 256B boundary. Size == 256B
- 	 * ePRD (SG) entries need alignment on a 16B boundary. Size == 16B
- 	 */
-+	MV_CRQB_Q_ALIGN		= 1024,
-+	MV_CRPB_Q_ALIGN		= 256,
-+	MV_SG_TBL_ALIGN		= 16,
- 	MV_CRQB_Q_SZ		= (32 * MV_MAX_Q_DEPTH),
- 	MV_CRPB_Q_SZ		= (8 * MV_MAX_Q_DEPTH),
- 	MV_MAX_SG_CT		= 256,
-@@ -3975,17 +3978,17 @@ done:
- static int mv_create_dma_pools(struct mv_host_priv *hpriv, struct device *dev)
- {
- 	hpriv->crqb_pool   = dmam_pool_create("crqb_q", dev, MV_CRQB_Q_SZ,
--							     MV_CRQB_Q_SZ, 0);
-+							MV_CRQB_Q_ALIGN, 0);
- 	if (!hpriv->crqb_pool)
- 		return -ENOMEM;
- 
- 	hpriv->crpb_pool   = dmam_pool_create("crpb_q", dev, MV_CRPB_Q_SZ,
--							     MV_CRPB_Q_SZ, 0);
-+							MV_CRPB_Q_ALIGN, 0);
- 	if (!hpriv->crpb_pool)
- 		return -ENOMEM;
- 
- 	hpriv->sg_tbl_pool = dmam_pool_create("sg_tbl", dev, MV_SG_TBL_SZ,
--							     MV_SG_TBL_SZ, 0);
-+							MV_SG_TBL_ALIGN, 0);
- 	if (!hpriv->sg_tbl_pool)
- 		return -ENOMEM;
- 
--- 
-1.8.1.1
+--
+			Gleb.
