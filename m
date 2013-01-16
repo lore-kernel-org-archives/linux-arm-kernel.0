@@ -1,42 +1,25 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Jan 2013 01:17:06 -0600
-Subject: [GIT PULL] irqchip init infrastructure and GIC/VIC move
-In-Reply-To: <CAOesGMgrAdvRqrnanfRD1gvJ-4O6pT1n2ZR+TCZADjD1ED_+UA@mail.gmail.com>
-References: <50F19F3D.60502@gmail.com>
- <CAOesGMgrAdvRqrnanfRD1gvJ-4O6pT1n2ZR+TCZADjD1ED_+UA@mail.gmail.com>
-Message-ID: <50F653F2.90903@gmail.com>
+From: tbergstrom@nvidia.com (=?ISO-8859-1?Q?Terje_Bergstr=F6m?=)
+Date: Wed, 16 Jan 2013 10:01:15 +0200
+Subject: [PATCH v2 03/10] ARM: dt: tegra30: Add clock information
+In-Reply-To: <1357891289-23500-3-git-send-email-pgaikwad@nvidia.com>
+References: <1357891289-23500-1-git-send-email-pgaikwad@nvidia.com>
+ <1357891289-23500-3-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <50F65E4B.8040409@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2013 09:56 PM, Olof Johansson wrote:
-> On Sat, Jan 12, 2013 at 9:37 AM, Rob Herring <robherring2@gmail.com> wrote:
->> Arnd, Olof,
->>
->> Please pull for 3.9. This is the initial infrastructure and conversion
->> of the GIC and VIC to use it. Several people are waiting for the irqchip
->> infrastructure to go in in order to convert other irqchip code over.
->>
->> I've left "static asmlinkage" in on the irq handlers. There's been no
->> more discussion, so I think we are in agreement. If asmlinkage defines
->> the procedure call convention for assembly calls, then it still makes
->> sense to have it on a static function called thru a function pointer.
->>
->> Rob
->>
->> The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
->>
->>   Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
->>
->> are available in the git repository at:
->>
->>   git://sources.calxeda.com/kernel/linux.git tags/gic-vic-to-irqchip
-> 
-> Ugh. This conflicts heavily with the timer cleanup from Stephen, due
-> to adjacent changes in the machine descriptors.
-> 
-> I fixed them up, but I would appreciate a second glance at them for
-> sanity checking.
+On 11.01.2013 10:01, Prashant Gaikwad wrote:
+> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+> index 6765646..c3e129a 100644
+> --- a/arch/arm/boot/dts/tegra30.dtsi
+> +++ b/arch/arm/boot/dts/tegra30.dtsi
+>  		gr3d {
+>  			compatible = "nvidia,tegra30-gr3d";
+>  			reg = <0x54180000 0x00040000>;
+> +			clocks = <&tegra_car 24>;
+>  		};
 
-Sorry about that. It all looks correct to me.
+In Tegra3, 3D has two clocks. I believe you'd need to add <&tegra_car
+98> here.
 
-Rob
+Terje
