@@ -1,127 +1,86 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Jan 2013 20:30:57 +0530
-Subject: [RFC PATCH 1/6] usb: otg: Add an API to bind the USB controller and
- PHY
-In-Reply-To: <1358348462-27693-1-git-send-email-kishon@ti.com>
-References: <1358348462-27693-1-git-send-email-kishon@ti.com>
-Message-ID: <1358348462-27693-2-git-send-email-kishon@ti.com>
+Date: Wed, 16 Jan 2013 20:30:56 +0530
+Subject: [RFC PATCH 0/6] USB: Add multiple PHYs of same type
+Message-ID: <1358348462-27693-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New platforms are added which has multiple PHY's (of same type) and
+New platforms are being added which has multiple PHY's (of same type) and
 which has multiple USB controllers. The binding information has to be
 present in the PHY library (otg.c) in order for it to return the
 appropriate PHY whenever the USB controller request for the PHY. So
 added a new API to pass the binding information. This API should be
 called by platform specific initialization code.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/usb/otg/otg.c   |   37 +++++++++++++++++++++++++++++++++++++
- include/linux/usb/phy.h |   22 ++++++++++++++++++++++
- 2 files changed, 59 insertions(+)
+So the binding should be done something like
+usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto"); specifying the USB
+controller device name, index, and the PHY device name.
+I have done this binding for OMAP platforms, but it should be done for
+all the platforms.
 
-diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
-index a30c041..492ba2f 100644
---- a/drivers/usb/otg/otg.c
-+++ b/drivers/usb/otg/otg.c
-@@ -18,6 +18,7 @@
- #include <linux/usb/otg.h>
- 
- static LIST_HEAD(phy_list);
-+static LIST_HEAD(phy_bind_list);
- static DEFINE_SPINLOCK(phy_lock);
- 
- static struct usb_phy *__usb_find_phy(struct list_head *list,
-@@ -201,6 +202,42 @@ void usb_remove_phy(struct usb_phy *x)
- }
- EXPORT_SYMBOL(usb_remove_phy);
- 
-+/**
-+ * usb_bind_phy - bind the phy and the controller that uses the phy
-+ * @dev_name: the device name of the device that will bind to the phy
-+ * @index: index to specify the port number
-+ * @phy_dev_name: the device name of the phy
-+ *
-+ * Fills the phy_bind structure with the dev_name and phy_dev_name. This will
-+ * be used when the phy driver registers the phy and when the controller
-+ * requests this phy.
-+ *
-+ * To be used by platform specific initialization code.
-+ */
-+struct usb_phy_bind __init *usb_bind_phy(const char *dev_name, u8 index,
-+				const char *phy_dev_name)
-+{
-+	struct usb_phy_bind *phy_bind;
-+	unsigned long flags;
-+
-+	phy_bind = kzalloc(sizeof(*phy_bind), GFP_KERNEL);
-+	if (!phy_bind) {
-+		pr_err("phy_bind(): No memory for phy_bind");
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	phy_bind->dev_name = dev_name;
-+	phy_bind->phy_dev_name = phy_dev_name;
-+	phy_bind->index = index;
-+
-+	spin_lock_irqsave(&phy_lock, flags);
-+	list_add_tail(&phy_bind->list, &phy_bind_list);
-+	spin_unlock_irqrestore(&phy_lock, flags);
-+
-+	return phy_bind;
-+}
-+EXPORT_SYMBOL_GPL(usb_bind_phy);
-+
- const char *otg_state_string(enum usb_otg_state state)
- {
- 	switch (state) {
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index a29ae1e..fbeab1a 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -106,6 +106,21 @@ struct usb_phy {
- 			enum usb_device_speed speed);
- };
- 
-+/**
-+ * struct usb_phy_bind - represent the binding for the phy
-+ * @dev_name: the device name of the device that will bind to the phy
-+ * @phy_dev_name: the device name of the phy
-+ * @index: used if a single controller uses multiple phys
-+ * @phy: reference to the phy
-+ * @list: to maintain a linked list of the binding information
-+ */
-+struct usb_phy_bind {
-+	const char	*dev_name;
-+	const char	*phy_dev_name;
-+	u8		index;
-+	struct usb_phy	*phy;
-+	struct list_head list;
-+};
- 
- /* for board-specific init logic */
- extern int usb_add_phy(struct usb_phy *, enum usb_phy_type type);
-@@ -151,6 +166,8 @@ extern struct usb_phy *devm_usb_get_phy(struct device *dev,
- 	enum usb_phy_type type);
- extern void usb_put_phy(struct usb_phy *);
- extern void devm_usb_put_phy(struct device *dev, struct usb_phy *x);
-+extern struct usb_phy_bind *usb_bind_phy(const char *dev_name, u8 index,
-+				const char *phy_dev_name);
- #else
- static inline struct usb_phy *usb_get_phy(enum usb_phy_type type)
- {
-@@ -171,6 +188,11 @@ static inline void devm_usb_put_phy(struct device *dev, struct usb_phy *x)
- {
- }
- 
-+static inline struct usb_phy_bind *usb_bind_phy(const char *dev_name, u8 index,
-+				const char *phy_dev_name)
-+{
-+	return NULL;
-+}
- #endif
- 
- static inline int
+After this design, the phy can be got by passing the USB controller device
+pointer and the index.
+
+Developed this patch series on
+git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
+after applying "usb: musb: add driver for control module" patch series.
+
+Did basic enumeration testing in omap4 panda, omap4 sdp and omap3 beagle.
+
+Kishon Vijay Abraham I (6):
+  usb: otg: Add an API to bind the USB controller and PHY
+  ARM: OMAP: USB: Add phy binding information
+  usb: otg: utils: change the phy lib to support multiple PHYs of same
+    type
+  ARM: dts: OMAP: Add phandle to bind PHY with USB controller
+  usb: otg: add device tree support to otg library
+  USB: MUSB: OMAP: get PHY by phandle for dt boot
+
+ Documentation/devicetree/bindings/usb/omap-usb.txt |    2 +
+ arch/arm/boot/dts/omap3.dtsi                       |    1 +
+ arch/arm/boot/dts/omap4.dtsi                       |    3 +-
+ arch/arm/boot/dts/twl4030.dtsi                     |    2 +-
+ arch/arm/mach-omap2/usb-musb.c                     |    7 +-
+ arch/arm/mach-shmobile/board-marzen.c              |    2 +-
+ drivers/power/ab8500_charger.c                     |    2 +-
+ drivers/power/isp1704_charger.c                    |    2 +-
+ drivers/power/pda_power.c                          |    2 +-
+ drivers/power/twl4030_charger.c                    |    2 +-
+ drivers/usb/chipidea/udc.c                         |    2 +-
+ drivers/usb/dwc3/core.c                            |    4 +-
+ drivers/usb/gadget/fsl_udc_core.c                  |    2 +-
+ drivers/usb/gadget/mv_udc_core.c                   |    2 +-
+ drivers/usb/gadget/omap_udc.c                      |    2 +-
+ drivers/usb/gadget/pxa25x_udc.c                    |    2 +-
+ drivers/usb/gadget/pxa27x_udc.c                    |    2 +-
+ drivers/usb/gadget/s3c-hsudc.c                     |    2 +-
+ drivers/usb/host/ehci-fsl.c                        |    2 +-
+ drivers/usb/host/ehci-msm.c                        |    2 +-
+ drivers/usb/host/ehci-mv.c                         |    2 +-
+ drivers/usb/host/ehci-tegra.c                      |    2 +-
+ drivers/usb/host/ohci-omap.c                       |    2 +-
+ drivers/usb/musb/am35x.c                           |    2 +-
+ drivers/usb/musb/blackfin.c                        |    2 +-
+ drivers/usb/musb/da8xx.c                           |    2 +-
+ drivers/usb/musb/davinci.c                         |    2 +-
+ drivers/usb/musb/musb_dsps.c                       |    2 +-
+ drivers/usb/musb/omap2430.c                        |    7 +-
+ drivers/usb/musb/tusb6010.c                        |    2 +-
+ drivers/usb/musb/ux500.c                           |    2 +-
+ drivers/usb/otg/ab8500-usb.c                       |    3 +-
+ drivers/usb/otg/fsl_otg.c                          |    5 +-
+ drivers/usb/otg/gpio_vbus.c                        |    3 +-
+ drivers/usb/otg/isp1301_omap.c                     |    3 +-
+ drivers/usb/otg/msm_otg.c                          |    3 +-
+ drivers/usb/otg/mv_otg.c                           |    3 +-
+ drivers/usb/otg/nop-usb-xceiv.c                    |    3 +-
+ drivers/usb/otg/otg.c                              |  175 ++++++++++++++++----
+ drivers/usb/otg/twl4030-usb.c                      |    3 +-
+ drivers/usb/phy/mv_u3d_phy.c                       |    3 +-
+ drivers/usb/phy/omap-usb2.c                        |   11 +-
+ drivers/usb/phy/rcar-phy.c                         |    3 +-
+ include/linux/usb/phy.h                            |   42 ++++-
+ 44 files changed, 245 insertions(+), 89 deletions(-)
+
 -- 
 1.7.9.5
