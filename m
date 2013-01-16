@@ -1,84 +1,121 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 16 Jan 2013 16:59:03 +0800
-Subject: [PATCH v3 1/3] ARM i.MX6: change mxs usbphy clock usage
-Message-ID: <1358326745-25018-1-git-send-email-peter.chen@freescale.com>
+Date: Wed, 16 Jan 2013 16:59:05 +0800
+Subject: [PATCH v3 3/3] usb: chipidea: imx: Add system suspend/resume API
+In-Reply-To: <1358326745-25018-1-git-send-email-peter.chen@freescale.com>
+References: <1358326745-25018-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1358326745-25018-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This mxs usbphy is only needs to be on after system boots
-up, and software never needs to control it anymore.
-Meanwhile, usbphy's parent needs to be notified if usb
-is suspend or not. So we design below mxs usbphy usage:
-
-- usbphy1_gate and usbphy2_gate:
-Their parents are dummy clock, we only needs to enable
-it after system boots up.
-- usbphy1 and usbphy2
-Usage reserved bit for this clock, in that case, the refcount
-will be updated, but without hardware changing.
+During the system suspend/resume procedure, the USB also
+needs to go suspend/resume procedure, this patch adds
+related APIs. It is tested at i.mx6q sabrelite. Meanwhile,
+it fixes the bug that the USB will out of work after
+system suspend/resume.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
-Changes for v3:
-- Add new clk for usbphy clk gate which is only used 
-at system boots up process.
+ drivers/usb/chipidea/bits.h        |    1 +
+ drivers/usb/chipidea/ci13xxx_imx.c |   61 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 62 insertions(+), 0 deletions(-)
 
-Changes for v2:
-- Use reserved bit for usb phy clk control
-
- arch/arm/mach-imx/clk-imx6q.c |   26 ++++++++++++++++++++++----
- 1 files changed, 22 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 7f2c10c..ccb24cf 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -154,8 +154,8 @@ enum mx6q_clks {
- 	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
- 	pll4_audio, pll5_video, pll8_mlb, pll7_usb_host, pll6_enet, ssi1_ipg,
- 	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
--	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref,
--	clk_max
-+	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
-+	usbphy2_gate, clk_max
- };
+diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+index ba9c6ef..d1467bb 100644
+--- a/drivers/usb/chipidea/bits.h
++++ b/drivers/usb/chipidea/bits.h
+@@ -47,6 +47,7 @@
+ #define PORTSC_FPR            BIT(6)
+ #define PORTSC_SUSP           BIT(7)
+ #define PORTSC_HSP            BIT(9)
++#define PORTSC_PHCD           BIT(23) /* phy suspend mode */
+ #define PORTSC_PTC            (0x0FUL << 16)
  
- static struct clk *clk[clk_max];
-@@ -208,8 +208,21 @@ int __init mx6q_clocks_init(void)
- 	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x3);
- 	clk[pll8_mlb]      = imx_clk_pllv3(IMX_PLLV3_MLB,	"pll8_mlb",	"osc", base + 0xd0, 0x0);
+ /* DEVLC */
+diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+index 342eab0..dd257b1 100644
+--- a/drivers/usb/chipidea/ci13xxx_imx.c
++++ b/drivers/usb/chipidea/ci13xxx_imx.c
+@@ -25,6 +25,7 @@
+ #include <linux/mfd/syscon.h>
  
--	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 6);
--	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 6);
-+	/*
-+	 * Bit 20 is the reserved and read-only bit, we do this only for:
-+	 * - Do nothing for usbphy clk_enable/disable
-+	 * - Keep refcount when do usbphy clk_enable/disable, in that case,
-+	 * the clk framework may need to enable/disable usbphy's parent
-+	 */
-+	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 20);
-+	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 20);
+ #include "ci.h"
++#include "bits.h"
+ #include "ci13xxx_imx.h"
+ 
+ #define pdev_to_phy(pdev) \
+@@ -321,6 +322,63 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int ci13xxx_imx_suspend(struct device *dev)
++{
++	struct ci13xxx_imx_data *data =
++		platform_get_drvdata(to_platform_device(dev));
++	struct platform_device *plat_ci;
++	struct ci13xxx	*ci;
 +
-+	/*
-+	 * usbphy*_gate needs to be on after system boots up, and software
-+	 * never needs to control it anymore.
-+	 */
-+	clk[usbphy1_gate] = imx_clk_gate("usbphy1_gate", "dummy", base + 0x10, 6);
-+	clk[usbphy2_gate] = imx_clk_gate("usbphy2_gate", "dummy", base + 0x20, 6);
- 
- 	clk[sata_ref] = imx_clk_fixed_factor("sata_ref", "pll6_enet", 1, 5);
- 	clk[pcie_ref] = imx_clk_fixed_factor("pcie_ref", "pll6_enet", 1, 4);
-@@ -436,6 +449,11 @@ int __init mx6q_clocks_init(void)
- 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
- 		clk_prepare_enable(clk[clks_init_on[i]]);
- 
-+	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
-+		clk_prepare_enable(clk[usbphy1_gate]);
-+		clk_prepare_enable(clk[usbphy2_gate]);
++	plat_ci = data->ci_pdev;
++	ci = platform_get_drvdata(plat_ci);
++
++	hw_write(ci, OP_PORTSC, PORTSC_PHCD, 1);
++
++	if (data->phy)
++		usb_phy_set_suspend(data->phy, 1);
++
++	clk_disable_unprepare(data->clk);
++
++	return 0;
++}
++
++static int ci13xxx_imx_resume(struct device *dev)
++{
++	int ret;
++	struct ci13xxx_imx_data *data =
++		platform_get_drvdata(to_platform_device(dev));
++	struct platform_device *plat_ci;
++	struct ci13xxx	*ci;
++
++	plat_ci = data->ci_pdev;
++	ci = platform_get_drvdata(plat_ci);
++
++	ret = clk_prepare_enable(data->clk);
++	if (ret) {
++		dev_err(dev,
++			"Failed to prepare or enable clock, err=%d\n", ret);
++		return ret;
 +	}
 +
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt");
- 	base = of_iomap(np, 0);
- 	WARN_ON(!base);
++	if (hw_read(ci, OP_PORTSC, PORTSC_PHCD)) {
++		hw_write(ci, OP_PORTSC, PORTSC_PHCD, 0);
++		/* Some clks sync between Controller and USB PHY */
++		mdelay(1);
++	}
++
++	if (data->phy)
++		usb_phy_set_suspend(data->phy, 0);
++
++	return ret;
++}
++
++static const struct dev_pm_ops ci13xxx_imx_pm_ops = {
++	.suspend	= ci13xxx_imx_suspend,
++	.resume		= ci13xxx_imx_resume,
++};
++#endif
++
+ static const struct of_device_id ci13xxx_imx_dt_ids[] = {
+ 	{ .compatible = "fsl,imx27-usb", },
+ 	{ /* sentinel */ }
+@@ -334,6 +392,9 @@ static struct platform_driver ci13xxx_imx_driver = {
+ 		.name = "imx_usb",
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = ci13xxx_imx_dt_ids,
++#ifdef CONFIG_PM
++		.pm	= &ci13xxx_imx_pm_ops,
++#endif
+ 	 },
+ };
+ 
 -- 
 1.7.0.4
