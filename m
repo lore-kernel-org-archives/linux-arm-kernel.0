@@ -1,66 +1,100 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 16 Jan 2013 20:37:13 +0100
-Subject: [PATCH 5/6] arm: mvebu: Enable USB controllers on Armada XP
- OpenBlocks AX3-4 board
-In-Reply-To: <CALF0-+XKGk+ru3VZ6815KTu_Aj_daYafr+Y5WJ9dXUoFqbTHOQ@mail.gmail.com>
-References: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1358243670-11935-5-git-send-email-ezequiel.garcia@free-electrons.com>
- <CABMQnVLD+VKj53dfQC24AwCboed3EGt+gqTKt-B9q8nhEx3Ytg@mail.gmail.com>
- <CALF0-+XKGk+ru3VZ6815KTu_Aj_daYafr+Y5WJ9dXUoFqbTHOQ@mail.gmail.com>
-Message-ID: <20130116203713.7b396070@skate>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 16 Jan 2013 13:11:24 -0700
+Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
+In-Reply-To: <20130116.171242.2189136612266237422.hdoyu@nvidia.com>
+References: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com><1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
+ <20130116.171242.2189136612266237422.hdoyu@nvidia.com>
+Message-ID: <50F7096C.7020803@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
-
-On Wed, 16 Jan 2013 16:16:59 -0300, Ezequiel Garcia wrote:
-
-> >> +               usb at d0050000 {
-> >> +                       status = "okay";
-> >> +               };
-> >> +               usb at d0051000 {
-> >> +                       status = "okay";
-> >> +               };
-> >> +               usb at d0052000 {
-> >> +                       status = "okay";
-> >> +               };
-> > USB2 of openblocks-ax3-4 is used as Mini-PCIE.
-> > I think this is unnecessary.
+On 01/16/2013 08:12 AM, Hiroshi Doyu wrote:
+> Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Fri, 11 Jan 2013 08:46:20 +0100:
 > 
-> Mmm... could you explain this with some more detail.
-> Unfortunately, I don't have access to an Openblocks board to check on
-> this, so I'd appreciate any clarification.
+> ....
+>> diff --git a/drivers/clk/tegra/clk-audio-sync.c b/drivers/clk/tegra/clk-audio-sync.c
+
+>> +#define to_clk_sync_source(_hw)                                        \
+>> +       container_of(_hw, struct tegra_clk_sync_source, hw)
 > 
-> Is there any Openblocks datasheet or hardware schematics publicly
-> available for me to look at?
+> Can we define "struct tegra_clk_sync_source" here if there's no need
+> to expose this structure out?
 
-As far as I know, there is no public document. I've been given access
-to a PDF, in Japanese, that gives some details about the hardware.
+In some cases, yes. However, some of the clock structs and ops variables
+are re-used by multiple clock types in different files. For example,
+struct tegra_clk_periph aggregates a struct tegra_clk_frac_div and a
+struct tegra_clk_periph_gate. That means that at least some of the types
+and ops variables must be declared in clk.h (or some header anyway). As
+such, I'd rather just have all the types and ops variables declared
+there for consistency.
 
->From what I can read, only 2 USB ports are used from the internal
-Marvell EHCI controller.
+>> +static int clk_frac_div_set_rate(struct clk_hw *hw, unsigned long rate,
+>> +                               unsigned long parent_rate)
+>> +{
+>> +       struct tegra_clk_frac_div *divider = to_clk_frac_div(hw);
+>> +       int div;
+>> +       unsigned long flags = 0;
+> 
+> nit, is "flags" not needed to initialize here?
 
-Another USB port is available, but it is connected to a USB controller
-that sits on the PCIe bus. And the PCIe interface on which this USB
-controller is connected is not enabled in the default U-Boot shipped
-with AX3-4 (at least not with the generation I have). I've been given
-an U-Boot version that is supposed to enable this PCIe interface, but I
-haven't tested yet.
+It avoids a compiler warning; the compiler doesn't that the if condition
+that guards the path that uses flags is the same condition as the path
+that initializes it. Or, it may be related to the fact that
+spin_lock_irqsave() writes to the value through a pointer parameter, and
+the compiler doesn't know it's an out-only parameter.
 
-Anyway, from a Marvell EHCI controller perspective, only two ports are
-used, as Nobuhiro said. I am not sure which ports, but it seems like
-the first two ones were used. One of the two physical ports is a
-combined USB / eSATA port, but I don't think this makes any difference
-at the software level.
+>> diff --git a/drivers/clk/tegra/clk-periph-gate.c b/drivers/clk/tegra/clk-periph-gate.c
 
-I don't have the OpenBlocks AX3-4 with me right now, but I could
-probably make a test on Friday.
+>> diff --git a/drivers/clk/tegra/clk-periph-gate.c b/drivers/clk/tegra/clk-periph-gate.c
 
-Best regards,
+>> +#define to_clk_periph_gate(_hw)                                        \
+>> +       container_of(_hw, struct tegra_clk_periph_gate, hw)
+> 
+> For consistency, put "to_clk_periph_gate(_hw)" in "clk.h", then this
+> can be used in clk-periph.c as well.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Sure. I moved all "to_clk_*()" macros to clk.h for consistency, since
+the types are all there anyway.
+
+>> +struct clk *tegra_clk_periph_gate(const char *name, const char *parent_name,
+...
+>> +       gate = kzalloc(sizeof(struct tegra_clk_periph_gate), GFP_KERNEL);
+> 
+>        gate = kzalloc(sizeof(*gate), GFP_KERNEL) ?
+
+I've already fixed all those up locally.
+
+>> diff --git a/drivers/clk/tegra/clk-periph.c b/drivers/clk/tegra/clk-periph.c
+
+>> +struct clk *tegra_clk_periph(const char *name, const char **parent_names,
+>> +                            int num_parents, struct tegra_clk_periph *periph,
+>> +                            void __iomem *clk_base, u32 offset)
+>> +{
+>> +       struct clk *clk;
+>> +       struct clk_init_data init;
+>> +
+>> +       init.name = name;
+>> +       init.ops = &tegra_clk_periph_ops;
+>> +       init.flags = 0;
+> 
+> struct members in stack are expected to initialize 0.
+
+Stack variables aren't initialized in C. In this case, since the
+individual fields are being assigned via statements rather than an
+initializer, everything has to be done explicitly.
+
+>> diff --git a/drivers/clk/tegra/clk-pll-out.c b/drivers/clk/tegra/clk-pll-out.c
+
+>> +#define pll_out_enb(p) (BIT(p->enb_bit_idx))
+>> +#define pll_out_rst(p) (BIT(p->rst_bit_idx))
+> 
+> I don't see much benefit from the above macros.
+
+Meh. Do you feel strongly about this? I'm not really inclined to got
+through and change these; there are a bunch of similar things in other
+files, and it feels like it'd just be churn.
+
+Anything I didn't explicitly say no to, I have implemented.
+
+A /lot/ more of the original patch was quoted that was really necessary
+to make your comments; it made wading through the email a little tiresome.
