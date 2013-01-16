@@ -1,82 +1,82 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 16 Jan 2013 11:17:17 +0800
-Subject: [PATCH V2 2/6] ARM: tegra20: cpuidle: add powered-down state
- for secondary CPU
-In-Reply-To: <20130115113427.GC26424@e102568-lin.cambridge.arm.com>
-References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
- <1354701715-24150-3-git-send-email-josephl@nvidia.com>
- <20121205105010.GA12999@e102568-lin.cambridge.arm.com>
- <1357888829.2034.39.camel@jlo-ubuntu-64.nvidia.com>
- <20130111122417.GE30538@e102568-lin.cambridge.arm.com>
- <1358218844.8513.30.camel@jlo-ubuntu-64.nvidia.com>
- <20130115113427.GC26424@e102568-lin.cambridge.arm.com>
-Message-ID: <1358306237.8826.7.camel@jlo-ubuntu-64.nvidia.com>
+From: smoch@web.de (Soeren Moch)
+Date: Wed, 16 Jan 2013 04:24:54 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20130116024014.GH25500@titan.lakedaemon.net>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
+ <50F3F289.3090402@web.de> <20130115165642.GA25500@titan.lakedaemon.net>
+ <20130115175020.GA3764@kroah.com>
+ <20130115201617.GC25500@titan.lakedaemon.net>
+ <20130115215602.GF25500@titan.lakedaemon.net> <50F5F1B7.3040201@web.de>
+ <20130116024014.GH25500@titan.lakedaemon.net>
+Message-ID: <50F61D86.4020801@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-15 at 19:34 +0800, Lorenzo Pieralisi wrote:
-> On Tue, Jan 15, 2013 at 03:00:44AM +0000, Joseph Lo wrote:
-> > On Fri, 2013-01-11 at 20:24 +0800, Lorenzo Pieralisi wrote:
-> > > On Fri, Jan 11, 2013 at 07:20:29AM +0000, Joseph Lo wrote:
-> > > > On Wed, 2012-12-05 at 18:50 +0800, Lorenzo Pieralisi wrote:
-> > > > > On Wed, Dec 05, 2012 at 10:01:49AM +0000, Joseph Lo wrote:
-> > > > You did mention there is an ARM generic locking scheme for MMU/coherency
-> > > > off case before. Do you mean the patch below?
-> > > > 
-> > > > https://patchwork.kernel.org/patch/1957911/
-> > > > https://patchwork.kernel.org/patch/1957901/
-> > > 
-> > > Those are used for first-man election when multiple CPUs come out of
-> > > idle at once.
-> > > 
-> > > You should have a look at the entire series and in particular:
-> > > 
-> > > https://patchwork.kernel.org/patch/1957891/
-> > > https://patchwork.kernel.org/patch/1957951/
-> > > 
-> > > > I gave it a review today. Looks it can't fit our usage for CPU idle
-> > > > powered-down mode on Tegra20.
-> > > > 
-> > > > The generic mechanism only can be used when CPUs in non coherent world.
-> > > > But our usage needs the mechanism could be used in both coherent and non
-> > > > coherent case. OK. The case is we need to sync the status about the CPU1
-> > > > was ready to power down. In this case, the CPU0 is still in coherent
-> > > > world but the CPU1 isn't. So we need the locking scheme could be still
-> > > > safe in this situation.
-> > > 
-> > > I know, I implemented something of that sort for an A9 based development
-> > > platform, that's why I pointed you to this new patchset.
-> > > 
-> > > Have a look at the series, it should do what you want.
-> > > 
-> > Hi Lorenzo,
-> > 
-> > May I upstream this stuff first? I can promise to you I will re-work a
-> > common CPUs and cluster power sync wrappers (platform_power_ops) for all
-> > Tegra series that based on the generic framework. Because we didn't have
-> > this work in Tegra tree yet and we indeed need it for supporting cluster
-> > power down and switching.
-> > 
-> > But it need lots of time for re-work, testing and verification. And I
-> > have lots of patches that need the function of cpu suspend that be
-> > introduced in this patch series to support platform suspend for Tegra.
-> > 
-> > So I am asking the permission here for upstream this series first and I
-> > will continue the job to come out a common CPUs and cluster power sync
-> > wrappers for Tegra that we indeed need it to support cluster power down
-> > and switching.
-> 
-> I understand that and you should not ask me permission :-) since I am
-> not a maintainer. I just wanted to save you some effort, you will end
-> up rewriting the whole thing anyway IMHO and I think the power API would
-> have saved you time if it were there before.
-> 
-I think we are always taking care the comments from the community. And
-it's really worth for us to reconsider the code design and re-use the
-common framework to reduce the effort.
-> 
-> If you need help to integrate the power API please do ask questions.
-> 
-Thanks again.
+On 16.01.2013 03:40, Jason Cooper wrote:
+> Soeren,
+>
+> On Wed, Jan 16, 2013 at 01:17:59AM +0100, Soeren Moch wrote:
+>> On 15.01.2013 22:56, Jason Cooper wrote:
+>>> On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
+>>>> If my understanding is correct, one of the drivers (most likely one)
+>>>> either asks for too small of a dma buffer, or is not properly
+>>>> deallocating blocks from the per-device pool.  Either case leads to
+>>>> exhaustion, and falling back to the atomic pool.  Which subsequently
+>>>> gets wiped out as well.
+>>>
+>>> If my hunch is right, could you please try each of the three dvb drivers
+>>> in turn and see which one (or more than one) causes the error?
+>>
+>> In fact I use only 2 types of DVB sticks: em28xx usb bridge plus drxk
+>> demodulator, and dib0700 usb bridge plus dib7000p demod.
+>>
+>> I would bet for em28xx causing the error, but this is not thoroughly
+>> tested. Unfortunately testing with removed sticks is not easy, because
+>> this is a production system and disabling some services for the long
+>> time we need to trigger this error will certainly result in unhappy
+>> users.
+>
+> Just out of curiosity, what board is it?
 
-Joseph
+The kirkwood board? A modified Guruplug Server Plus.
+>
+>> I will see what I can do here. Is there an easy way to track the buffer
+>> usage without having to wait for complete exhaustion?
+>
+> DMA_API_DEBUG
+
+OK, maybe I can try this.
+>
+>> In linux-3.5.x there is no such problem. Can we use all available memory
+>> for dma buffers here on armv5 architectures, in contrast to newer
+>> kernels?
+>
+> Were the loads exactly the same when you tested 3.5.x?
+
+Exactly the same, yes.
+
+>I looked at the
+> changes from v3.5 to v3.7.1 for all four drivers you mentioned as well
+> as sata_mv.
+>
+> The biggest thing I see is that all of the media drivers got shuffled
+> around into their own subdirectories after v3.5.  'git show -M 0c0d06c'
+> shows it was a clean copy of all the files.
+>
+> What would be most helpful is if you could do a git bisect between
+> v3.5.x (working) and the oldest version where you know it started
+> failing (v3.7.1 or earlier if you know it).
+>
+I did not bisect it, but Marek mentioned earlier that commit
+e9da6e9905e639b0f842a244bc770b48ad0523e9 in Linux v3.6-rc1 introduced
+new code for dma allocations. This is probably the root cause for the
+new (mis-)behavior (due to my tests 3.6.0 is not working anymore).
+I'm not very familiar with arm mm code, and from the patch itself I
+cannot understand what's different. Maybe CONFIG_CMA is default
+also for armv5 (not only v6) now? But I might be totally wrong here,
+maybe someone of the mm experts can explain the difference?
+
+Regards,
+Soeren
