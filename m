@@ -1,494 +1,200 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Wed, 16 Jan 2013 13:03:23 -0500
-Subject: [PATCH v6 2/4] ARM: KVM: arch_timers: Add guest timer core support
+Date: Wed, 16 Jan 2013 13:03:30 -0500
+Subject: [PATCH v6 3/4] ARM: KVM: arch_timers: Add timer world switch
 In-Reply-To: <20130116180307.29693.84098.stgit@ubuntu>
 References: <20130116180307.29693.84098.stgit@ubuntu>
-Message-ID: <20130116180323.29693.59177.stgit@ubuntu>
+Message-ID: <20130116180330.29693.23684.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Add some the architected timer related infrastructure, and support timer
-interrupt injection, which can happen as a resultof three possible
-events:
-
-- The virtual timer interrupt has fired while we were still
-  executing the guest
-- The timer interrupt hasn't fired, but it expired while we
-  were doing the world switch
-- A hrtimer we programmed earlier has fired
+Do the necessary save/restore dance for the timers in the world
+switch code. In the process, allow the guest to read the physical
+counter, which is useful for its own clock_event_device.
 
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
- arch/arm/include/asm/kvm_arch_timer.h |   85 ++++++++++
- arch/arm/include/asm/kvm_host.h       |    5 +
- arch/arm/kvm/arch_timer.c             |  271 +++++++++++++++++++++++++++++++++
- arch/arm/kvm/interrupts.S             |    2 
- arch/arm/kvm/interrupts_head.S        |   31 ++++
- 5 files changed, 394 insertions(+)
- create mode 100644 arch/arm/include/asm/kvm_arch_timer.h
- create mode 100644 arch/arm/kvm/arch_timer.c
+ arch/arm/include/asm/kvm_asm.h |    3 +-
+ arch/arm/kernel/asm-offsets.c  |    6 ++++
+ arch/arm/kvm/arm.c             |    3 ++
+ arch/arm/kvm/coproc.c          |    4 +++
+ arch/arm/kvm/interrupts_head.S |   59 ++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 74 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/kvm_arch_timer.h b/arch/arm/include/asm/kvm_arch_timer.h
-new file mode 100644
-index 0000000..68cb9e1
---- /dev/null
-+++ b/arch/arm/include/asm/kvm_arch_timer.h
-@@ -0,0 +1,85 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+#ifndef __ASM_ARM_KVM_ARCH_TIMER_H
-+#define __ASM_ARM_KVM_ARCH_TIMER_H
-+
-+#include <linux/clocksource.h>
-+#include <linux/hrtimer.h>
-+#include <linux/workqueue.h>
-+
-+struct arch_timer_kvm {
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 58d787b..8a60ed8 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -45,7 +45,8 @@
+ #define c13_TID_URW	23	/* Thread ID, User R/W */
+ #define c13_TID_URO	24	/* Thread ID, User R/O */
+ #define c13_TID_PRIV	25	/* Thread ID, Privileged */
+-#define NR_CP15_REGS	26	/* Number of regs (incl. invalid) */
++#define c14_CNTKCTL	26	/* Timer Control Register (PL1) */
++#define NR_CP15_REGS	27	/* Number of regs (incl. invalid) */
+ 
+ #define ARM_EXCEPTION_RESET	  0
+ #define ARM_EXCEPTION_UNDEFINED   1
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 17cea2e..5ce738b 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -179,6 +179,12 @@ int main(void)
+   DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
+   DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
+   DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
 +#ifdef CONFIG_KVM_ARM_TIMER
-+	/* Is the timer enabled */
-+	bool			enabled;
-+
-+	/* Virtual offset */
-+	cycle_t			cntvoff;
++  DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
++  DEFINE(VCPU_TIMER_CNTV_CVAL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval));
++  DEFINE(KVM_TIMER_CNTVOFF,	offsetof(struct kvm, arch.timer.cntvoff));
++  DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
 +#endif
-+};
-+
-+struct arch_timer_cpu {
-+#ifdef CONFIG_KVM_ARM_TIMER
-+	/* Registers: control register, timer value */
-+	u32				cntv_ctl;	/* Saved/restored */
-+	cycle_t				cntv_cval;	/* Saved/restored */
-+
-+	/*
-+	 * Anything that is not used directly from assembly code goes
-+	 * here.
-+	 */
-+
-+	/* Background timer used when the guest is not running */
-+	struct hrtimer			timer;
-+
-+	/* Work queued with the above timer expires */
-+	struct work_struct		expired;
-+
-+	/* Background timer active */
-+	bool				armed;
-+
-+	/* Timer IRQ */
-+	const struct kvm_irq_level	*irq;
-+#endif
-+};
-+
-+#ifdef CONFIG_KVM_ARM_TIMER
-+int kvm_timer_hyp_init(void);
-+int kvm_timer_init(struct kvm *kvm);
-+void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
-+void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
-+void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
-+void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
-+#else
-+static inline int kvm_timer_hyp_init(void)
-+{
-+	return 0;
-+};
-+
-+static inline int kvm_timer_init(struct kvm *kvm)
-+{
-+	return 0;
-+}
-+
-+static inline void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu) {}
-+#endif
-+
-+#endif
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index feac7f4..e58fd93 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -23,6 +23,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
- #include <asm/fpstate.h>
-+#include <asm/kvm_arch_timer.h>
+   DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
+ #endif
+   DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 68cb2b550..1a98b5c 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -707,6 +707,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		update_vttbr(vcpu->kvm);
  
- #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
- #define KVM_MEMORY_SLOTS 32
-@@ -49,6 +50,9 @@ struct kvm_arch {
- 	/* VTTBR value associated with below pgd and vmid */
- 	u64    vttbr;
+ 		kvm_vgic_flush_hwstate(vcpu);
++		kvm_timer_flush_hwstate(vcpu);
  
-+	/* Timer */
-+	struct arch_timer_kvm	timer;
-+
- 	/*
- 	 * Anything that is not used directly from assembly code goes
- 	 * here.
-@@ -99,6 +103,7 @@ struct kvm_vcpu_arch {
+ 		local_irq_disable();
  
- 	/* VGIC state */
- 	struct vgic_cpu vgic_cpu;
-+	struct arch_timer_cpu timer_cpu;
+@@ -720,6 +721,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
  
- 	/*
- 	 * Anything that is not used directly from assembly code goes
-diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
-new file mode 100644
-index 0000000..6ac938d
---- /dev/null
-+++ b/arch/arm/kvm/arch_timer.c
-@@ -0,0 +1,271 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/of_irq.h>
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+#include <linux/interrupt.h>
-+
-+#include <asm/arch_timer.h>
-+
-+#include <asm/kvm_vgic.h>
-+#include <asm/kvm_arch_timer.h>
-+
-+static struct timecounter *timecounter;
-+static struct workqueue_struct *wqueue;
-+static struct kvm_irq_level timer_irq = {
-+	.level	= 1,
-+};
-+
-+static cycle_t kvm_phys_timer_read(void)
-+{
-+	return timecounter->cc->read(timecounter->cc);
-+}
-+
-+static bool timer_is_armed(struct arch_timer_cpu *timer)
-+{
-+	return timer->armed;
-+}
-+
-+/* timer_arm: as in "arm the timer", not as in ARM the company */
-+static void timer_arm(struct arch_timer_cpu *timer, u64 ns)
-+{
-+	timer->armed = true;
-+	hrtimer_start(&timer->timer, ktime_add_ns(ktime_get(), ns),
-+		      HRTIMER_MODE_ABS);
-+}
-+
-+static void timer_disarm(struct arch_timer_cpu *timer)
-+{
-+	if (timer_is_armed(timer)) {
-+		hrtimer_cancel(&timer->timer);
-+		cancel_work_sync(&timer->expired);
-+		timer->armed = false;
-+	}
-+}
-+
-+static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+
-+	timer->cntv_ctl |= 1 << 1; /* Mask the interrupt in the guest */
-+	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-+			    vcpu->arch.timer_cpu.irq->irq,
-+			    vcpu->arch.timer_cpu.irq->level);
-+}
-+
-+static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
-+{
-+	struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
-+
-+	/*
-+	 * We disable the timer in the world switch and let it be
-+	 * handled by kvm_timer_sync_hwstate(). Getting a timer
-+	 * interrupt at this point is a sure sign of some major
-+	 * breakage.
-+	 */
-+	pr_warn("Unexpected interrupt %d on vcpu %p\n", irq, vcpu);
-+	return IRQ_HANDLED;
-+}
-+
-+static void kvm_timer_inject_irq_work(struct work_struct *work)
-+{
-+	struct kvm_vcpu *vcpu;
-+
-+	vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
-+	vcpu->arch.timer_cpu.armed = false;
-+	kvm_timer_inject_irq(vcpu);
-+}
-+
-+static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
-+{
-+	struct arch_timer_cpu *timer;
-+	timer = container_of(hrt, struct arch_timer_cpu, timer);
-+	queue_work(wqueue, &timer->expired);
-+	return HRTIMER_NORESTART;
-+}
-+
-+/**
-+ * kvm_timer_flush_hwstate - prepare to move the virt timer to the cpu
-+ * @vcpu: The vcpu pointer
-+ *
-+ * Disarm any pending soft timers, since the world-switch code will write the
-+ * virtual timer state back to the physical CPU.
-+ */
-+void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+
-+	/*
-+	 * We're about to run this vcpu again, so there is no need to
-+	 * keep the background timer running, as we're about to
-+	 * populate the CPU timer again.
-+	 */
-+	timer_disarm(timer);
-+}
-+
-+/**
-+ * kvm_timer_sync_hwstate - sync timer state from cpu
-+ * @vcpu: The vcpu pointer
-+ *
-+ * Check if the virtual timer was armed and either schedule a corresponding
-+ * soft timer or inject directly if already expired.
-+ */
-+void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+	cycle_t cval, now;
-+	u64 ns;
-+
-+	/* Check if the timer is enabled and unmasked first */
-+	if ((timer->cntv_ctl & 3) != 1)
-+		return;
-+
-+	cval = timer->cntv_cval;
-+	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-+
-+	BUG_ON(timer_is_armed(timer));
-+
-+	if (cval <= now) {
-+		/*
-+		 * Timer has already expired while we were not
-+		 * looking. Inject the interrupt and carry on.
-+		 */
-+		kvm_timer_inject_irq(vcpu);
-+		return;
-+	}
-+
-+	ns = cyclecounter_cyc2ns(timecounter->cc, cval - now);
-+	timer_arm(timer, ns);
-+}
-+
-+void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+
-+	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
-+	hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
-+	timer->timer.function = kvm_timer_expire;
-+	timer->irq = &timer_irq;
-+}
-+
-+static void kvm_timer_init_interrupt(void *info)
-+{
-+	enable_percpu_irq(timer_irq.irq, 0);
-+}
-+
-+
-+static int kvm_timer_cpu_notify(struct notifier_block *self,
-+				unsigned long action, void *cpu)
-+{
-+	switch (action) {
-+	case CPU_STARTING:
-+	case CPU_STARTING_FROZEN:
-+		kvm_timer_init_interrupt(NULL);
-+		break;
-+	case CPU_DYING:
-+	case CPU_DYING_FROZEN:
-+		disable_percpu_irq(timer_irq.irq);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block kvm_timer_cpu_nb = {
-+	.notifier_call = kvm_timer_cpu_notify,
-+};
-+
-+static const struct of_device_id arch_timer_of_match[] = {
-+	{ .compatible	= "arm,armv7-timer",	},
-+	{},
-+};
-+
-+int kvm_timer_hyp_init(void)
-+{
-+	struct device_node *np;
-+	unsigned int ppi;
-+	int err;
-+
-+	timecounter = arch_timer_get_timecounter();
-+	if (!timecounter)
-+		return -ENODEV;
-+
-+	np = of_find_matching_node(NULL, arch_timer_of_match);
-+	if (!np) {
-+		kvm_err("kvm_arch_timer: can't find DT node\n");
-+		return -ENODEV;
-+	}
-+
-+	ppi = irq_of_parse_and_map(np, 2);
-+	if (!ppi) {
-+		kvm_err("kvm_arch_timer: no virtual timer interrupt\n");
-+		err = -EINVAL;
-+		goto out;
-+	}
-+
-+	err = request_percpu_irq(ppi, kvm_arch_timer_handler,
-+				 "kvm guest timer", kvm_get_running_vcpus());
-+	if (err) {
-+		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
-+			ppi, err);
-+		goto out;
-+	}
-+
-+	timer_irq.irq = ppi;
-+
-+	err = register_cpu_notifier(&kvm_timer_cpu_nb);
-+	if (err) {
-+		kvm_err("Cannot register timer CPU notifier\n");
-+		goto out_free;
-+	}
-+
-+	wqueue = create_singlethread_workqueue("kvm_arch_timer");
-+	if (!wqueue) {
-+		err = -ENOMEM;
-+		goto out_free;
-+	}
-+
-+	kvm_info("%s IRQ%d\n", np->name, ppi);
-+	on_each_cpu(kvm_timer_init_interrupt, NULL, 1);
-+
-+	goto out;
-+out_free:
-+	free_percpu_irq(ppi, kvm_get_running_vcpus());
-+out:
-+	of_node_put(np);
-+	return err;
-+}
-+
-+void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+
-+	timer_disarm(timer);
-+}
-+
-+int kvm_timer_init(struct kvm *kvm)
-+{
-+	if (timecounter && wqueue) {
-+		kvm->arch.timer.cntvoff = kvm_phys_timer_read();
-+		kvm->arch.timer.enabled = 1;
-+	}
-+
-+	return 0;
-+}
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index b19ee80..8b264fd 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -95,6 +95,7 @@ ENTRY(__kvm_vcpu_run)
- 	save_host_regs
+ 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
+ 			local_irq_enable();
++			kvm_timer_sync_hwstate(vcpu);
+ 			kvm_vgic_sync_hwstate(vcpu);
+ 			continue;
+ 		}
+@@ -759,6 +761,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * Back from guest
+ 		 *************************************************************/
  
- 	restore_vgic_state
-+	restore_timer_state
++		kvm_timer_sync_hwstate(vcpu);
+ 		kvm_vgic_sync_hwstate(vcpu);
  
- 	@ Store hardware CP15 state and load guest state
- 	read_cp15_state store_to_vcpu = 0
-@@ -189,6 +190,7 @@ after_vfp_restore:
- 	read_cp15_state store_to_vcpu = 1
- 	write_cp15_state read_from_vcpu = 0
+ 		ret = handle_exit(vcpu, run, ret);
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index d782638..4ea9a98 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -222,6 +222,10 @@ static const struct coproc_reg cp15_regs[] = {
+ 			NULL, reset_unknown, c13_TID_URO },
+ 	{ CRn(13), CRm( 0), Op1( 0), Op2( 4), is32,
+ 			NULL, reset_unknown, c13_TID_PRIV },
++
++	/* CNTKCTL: swapped by interrupt.S. */
++	{ CRn(14), CRm( 1), Op1( 0), Op2( 0), is32,
++			NULL, reset_val, c14_CNTKCTL, 0x00000000 },
+ };
  
-+	save_timer_state
- 	save_vgic_state
- 
- 	restore_host_regs
+ /* Target specific emulation tables */
 diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index 9e815a5..dea987e 100644
+index dea987e..d2442f9 100644
 --- a/arch/arm/kvm/interrupts_head.S
 +++ b/arch/arm/kvm/interrupts_head.S
-@@ -453,6 +453,37 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- #endif
+@@ -300,6 +300,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	str	r11, [vcpu, #CP15_OFFSET(c6_IFAR)]
+ 	str	r12, [vcpu, #CP15_OFFSET(c12_VBAR)]
+ 	.endif
++
++	mrc	p15, 0, r2, c14, c1, 0	@ CNTKCTL
++
++	.if \store_to_vcpu == 0
++	push	{r2}
++	.else
++	str	r2, [vcpu, #CP15_OFFSET(c14_CNTKCTL)]
++	.endif
  .endm
  
-+#define CNTHCTL_PL1PCTEN	(1 << 0)
-+#define CNTHCTL_PL1PCEN		(1 << 1)
+ /*
+@@ -311,6 +319,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  */
+ .macro write_cp15_state read_from_vcpu
+ 	.if \read_from_vcpu == 0
++	pop	{r2}
++	.else
++	ldr	r2, [vcpu, #CP15_OFFSET(c14_CNTKCTL)]
++	.endif
 +
-+/*
-+ * Save the timer state onto the VCPU and allow physical timer/counter access
-+ * for the host.
-+ *
-+ * Assumes vcpu pointer in vcpu reg
-+ */
-+.macro save_timer_state
-+	@ Allow physical timer/counter access for the host
-+	mrc	p15, 4, r2, c14, c1, 0	@ CNTHCTL
-+	orr	r2, r2, #(CNTHCTL_PL1PCEN | CNTHCTL_PL1PCTEN)
-+	mcr	p15, 4, r2, c14, c1, 0	@ CNTHCTL
-+.endm
++	mcr	p15, 0, r2, c14, c1, 0	@ CNTKCTL
 +
-+/*
-+ * Load the timer state from the VCPU and deny physical timer/counter access
-+ * for the host.
-+ *
-+ * Assumes vcpu pointer in vcpu reg
-+ */
-+.macro restore_timer_state
-+	@ Disallow physical timer access for the guest
-+	@ Physical counter access is allowed
-+	mrc	p15, 4, r2, c14, c1, 0	@ CNTHCTL
-+	orr	r2, r2, #CNTHCTL_PL1PCTEN
-+	bic	r2, r2, #CNTHCTL_PL1PCEN
-+	mcr	p15, 4, r2, c14, c1, 0	@ CNTHCTL
-+.endm
++	.if \read_from_vcpu == 0
+ 	pop	{r2-r12}
+ 	.else
+ 	ldr	r2, [vcpu, #CP15_OFFSET(c13_CID)]
+@@ -461,8 +477,28 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  * for the host.
+  *
+  * Assumes vcpu pointer in vcpu reg
++ * Clobbers r2-r5
+  */
+ .macro save_timer_state
++#ifdef CONFIG_KVM_ARM_TIMER
++	ldr	r4, [vcpu, #VCPU_KVM]
++	ldr	r2, [r4, #KVM_TIMER_ENABLED]
++	cmp	r2, #0
++	beq	1f
 +
- .equ vmentry,	0
- .equ vmexit,	1
++	mrc	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
++	str	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
++	bic	r2, #1			@ Clear ENABLE
++	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
++	isb
++
++	mrrc	p15, 3, r2, r3, c14	@ CNTV_CVAL
++	ldr	r4, =VCPU_TIMER_CNTV_CVAL
++	add	r5, vcpu, r4
++	strd	r2, r3, [r5]
++
++1:
++#endif
+ 	@ Allow physical timer/counter access for the host
+ 	mrc	p15, 4, r2, c14, c1, 0	@ CNTHCTL
+ 	orr	r2, r2, #(CNTHCTL_PL1PCEN | CNTHCTL_PL1PCTEN)
+@@ -474,6 +510,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+  * for the host.
+  *
+  * Assumes vcpu pointer in vcpu reg
++ * Clobbers r2-r5
+  */
+ .macro restore_timer_state
+ 	@ Disallow physical timer access for the guest
+@@ -482,6 +519,28 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	orr	r2, r2, #CNTHCTL_PL1PCTEN
+ 	bic	r2, r2, #CNTHCTL_PL1PCEN
+ 	mcr	p15, 4, r2, c14, c1, 0	@ CNTHCTL
++
++#ifdef CONFIG_KVM_ARM_TIMER
++	ldr	r4, [vcpu, #VCPU_KVM]
++	ldr	r2, [r4, #KVM_TIMER_ENABLED]
++	cmp	r2, #0
++	beq	1f
++
++	ldr	r2, [r4, #KVM_TIMER_CNTVOFF]
++	ldr	r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
++	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
++
++	ldr	r4, =VCPU_TIMER_CNTV_CVAL
++	add	r5, vcpu, r4
++	ldrd	r2, r3, [r5]
++	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
++	isb
++
++	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
++	and	r2, r2, #3
++	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
++1:
++#endif
+ .endm
  
+ .equ vmentry,	0
