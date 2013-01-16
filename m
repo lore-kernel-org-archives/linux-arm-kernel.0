@@ -1,76 +1,141 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Wed, 16 Jan 2013 12:22:01 +0000
-Subject: [PATCH v4 0/3] mtd: nand: OMAP: ELM error correction support
- for BCH ecc
-In-Reply-To: <1357286211-5012-1-git-send-email-avinashphilip@ti.com>
-References: <1357286211-5012-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA5DFA9@DBDE01.ent.ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 16 Jan 2013 13:31:51 +0100
+Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
+In-Reply-To: <1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
+References: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com><1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20130116.143151.1531468192773974887.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem,
+Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Fri, 11 Jan 2013 08:46:20 +0100:
+...
+> +const struct clk_ops tegra_clk_periph_ops = {
+> +       .get_parent = clk_periph_get_parent,
+> +       .set_parent = clk_periph_set_parent,
+> +       .recalc_rate = clk_periph_recalc_rate,
+> +       .round_rate = clk_periph_round_rate,
+> +       .set_rate = clk_periph_set_rate,
+> +       .is_enabled = clk_periph_is_enabled,
+> +       .enable = clk_periph_enable,
+> +       .disable = clk_periph_disable,
+> +};
+> +
+> +const struct clk_ops tegra_clk_periph_nodiv_ops = {
+> +       .get_parent = clk_periph_get_parent,
+> +       .set_parent = clk_periph_set_parent,
+> +       .is_enabled = clk_periph_is_enabled,
+> +       .enable = clk_periph_enable,
+> +       .disable = clk_periph_disable,
+> +};
+> +
+> +struct clk *tegra_clk_periph(const char *name, const char **parent_names,
+> +                            int num_parents, struct tegra_clk_periph *periph,
+> +                            void __iomem *clk_base, u32 offset)
+> +{
+> +       struct clk *clk;
+> +       struct clk_init_data init;
+> +
+> +       init.name = name;
+> +       init.ops = &tegra_clk_periph_ops;
+> +       init.flags = 0;
+> +       init.parent_names = parent_names;
+> +       init.num_parents = num_parents;
+> +
+> +       periph->hw.init = &init;
+> +       periph->magic = TEGRA_CLK_PERIPH_MAGIC;
+> +       periph->mux.reg = clk_base + offset;
+> +       periph->divider.reg = clk_base + offset;
+> +       periph->gate.clk_base = clk_base;
+> +
+> +       clk = clk_register(NULL, &periph->hw);
+> +       if (IS_ERR(clk))
+> +               return clk;
+> +
+> +       periph->mux.hw.clk = clk;
+> +       periph->divider.hw.clk = clk;
+> +       periph->gate.hw.clk = clk;
+> +
+> +       return clk;
+> +}
+> +
+> +struct clk *tegra_clk_periph_nodiv(const char *name, const char **parent_names,
+> +                             int num_parents, struct tegra_clk_periph *periph,
+> +                             void __iomem *clk_base, u32 offset)
+> +{
+> +       struct clk *clk;
+> +       struct clk_init_data init;
+> +
+> +       init.name = name;
+> +       init.ops = &tegra_clk_periph_nodiv_ops;
+> +       init.flags = CLK_SET_RATE_PARENT;
+> +       init.parent_names = parent_names;
+> +       init.num_parents = num_parents;
+> +
+> +       periph->hw.init = &init;
+> +       periph->magic = TEGRA_CLK_PERIPH_MAGIC;
+> +       periph->mux.reg = clk_base + offset;
+> +       periph->gate.clk_base = clk_base;
+> +
+> +       clk = clk_register(NULL, &periph->hw);
+> +       if (IS_ERR(clk))
+> +               return clk;
+> +
+> +       periph->mux.hw.clk = clk;
+> +       periph->gate.hw.clk = clk;
+> +
+> +       return clk;
+> +}
 
-On Fri, Jan 04, 2013 at 13:26:48, Philip, Avinash wrote:
-> Support to use ELM as BCH 4 & 8 bit error correction module. Also performance
-> enhancement by adding single shot read_page and write_page functions for the
-> nand flashes with page size less than 4 KB.
-> 
-> ELM module can be used to correct errors reported by BCH 4, 8 & 16 bit
-> ECC scheme. For now only 4 & 8 bit support is added.
-> 
-> BCH 4 & 8 bit error detection support is already available in mainline
-> kernel and works with software error correction.
-> 
-> This series is based on linux 3.8-rc2 and tested with [1].
-> Also this patch series depend on [1] for NAND flash device
-> tree data and gpmc nand device tree binding documentation updates.
-> 
-> 1. [PATCH v7 0/5] OMAP GPMC DT bindings
-> http://www.spinics.net/lists/linux-omap/msg83505.html
-> 
-> Tested on am335x-evm for BCH 4 and 8 bit error correction.
+The above two functions are almost duplicate, can we take the common part from them?
 
-Can you apply this patch series on l2-mtd tree as it will help RBL compatibility
-ecc layout for NAND flash in am335x-platforms and hardware based BCH error
-correction.
+const struct clk_ops tegra_clk_periph_nodiv_ops = {
+       .get_parent = clk_periph_get_parent,
+       .set_parent = clk_periph_set_parent,
+       .is_enabled = clk_periph_is_enabled,
+       .enable = clk_periph_enable,
+       .disable = clk_periph_disable,
+};
 
-Thanks
-Avinash
+struct clk *__tegra_clk_periph(const char *name, const char **parent_names,
+			    int num_parents, struct tegra_clk_periph *periph,
+			    void __iomem *clk_base, u32 offset, int div)
+{
+       struct clk *clk;
+       struct clk_init_data init;
 
-> 
-> Changes since v1:
-> 	- Erased page is identified by checking byte [13/7] in read
-> 	  ecc. To filter out bit flips in OOB area, check 0 bits in
-> 	  the byte greater than 4.
-> 	- GPMC ecc engine configuration moves to omap2.c NAND driver.
-> 
-> Changes since v2:
-> 	- Added runtime detection of elm module, instead of depending
-> 	  on platform data.
-> 	- Added bit flip correction in OOB ecc data if bit flip happen
-> 	  OOB data.
-> 
-> Changes since v3:
-> 	- Availability and usability of ELM module is detected from device
-> 	  tree nodes by checking availability of ELM node in device tree.
-> 
-> Philip Avinash (3):
->   mtd: nand: omap2: Update nerrors using ecc.strength
->   mtd: devices: elm: Add support for ELM error correction
->   mtd: nand: omap2: Support for hardware BCH error correction.
-> 
->  Documentation/devicetree/bindings/mtd/elm.txt      |   16 +
->  .../devicetree/bindings/mtd/gpmc-nand.txt          |    4 +
->  drivers/mtd/devices/Makefile                       |    4 +-
->  drivers/mtd/devices/elm.c                          |  405 ++++++++++++++
->  drivers/mtd/nand/omap2.c                           |  583 ++++++++++++++++++--
->  include/linux/platform_data/elm.h                  |   54 ++
->  6 files changed, 1023 insertions(+), 43 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/elm.txt
->  create mode 100644 drivers/mtd/devices/elm.c
->  create mode 100644 include/linux/platform_data/elm.h
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
+       init.name = name;
+       init.parent_names = parent_names;
+       init.num_parents = num_parents;
+       init.ops = div ? &tegra_clk_periph_ops : &tegra_clk_periph_nodiv_ops
+       init.flags = div ? 0 :?CLK_SET_RATE_PARENT;
+
+       periph->hw.init = &init;
+       periph->magic = TEGRA_CLK_PERIPH_MAGIC;
+       periph->mux.reg = clk_base + offset;
+       periph->divider.reg = clk_base + offset;
+       periph->gate.clk_base = clk_base;
+
+       clk = clk_register(NULL, &periph->hw);
+       if (IS_ERR(clk))
+	       return clk;
+
+       periph->mux.hw.clk = clk;
+       periph->divider.hw.clk = div ? NULL : clk;
+       periph->gate.hw.clk = clk;
+
+       return clk;
+}
+
+static inline struct clk *tegra_clk_periph(const char *name, const char **parent_names,
+			    int num_parents, struct tegra_clk_periph *periph,
+			    void __iomem *clk_base, u32 offset)
+{
+	return __tegra_clk_periph(name, parent_names, num_parents, periph, clk_base, offset, 1);
+}
+
+static inline struct clk *tegra_clk_periph_nodiv(const char *name, const char **parent_names,
+			     int num_parents, struct tegra_clk_periph *periph,
+			     void __iomem *clk_base, u32 offset, )
+{
+	return __tegra_clk_periph(name, parent_names, num_parents, periph, clk_base, offset, 0);
+}
