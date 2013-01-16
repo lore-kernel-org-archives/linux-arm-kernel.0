@@ -1,108 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Jan 2013 17:17:33 +0100
-Subject: [kvmarm] [PATCH v5 07/12] ARM: KVM: VGIC virtual CPU interface
- management
-In-Reply-To: <CANM98qL1Ln2GYhC-prLR3VHgb=b1YR608dW6o7CS4s3L6Xy84Q@mail.gmail.com>
-References: <20130108184116.46558.3558.stgit@ubuntu>
- <20130108184211.46558.74646.stgit@ubuntu>
- <20130114154231.GG18935@mudshark.cambridge.arm.com>
- <CANM98qJ_Pb5bT0k7bAhv6i1YTj6GxvNE6vvY49OZrqsKpF3xOA@mail.gmail.com>
- <50F536DC.2060702@arm.com>
- <CANM98qJ0YRNA5R+qnRF9i0a7BRoL817Mq9D1SFPcxsSWgd2x0w@mail.gmail.com>
- <50F6D0A0.5010707@arm.com>
- <CANM98qL1Ln2GYhC-prLR3VHgb=b1YR608dW6o7CS4s3L6Xy84Q@mail.gmail.com>
-Message-ID: <4351345aa9083044719ac8fde1fc9757@localhost>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Wed, 16 Jan 2013 18:17:48 +0200
+Subject: [PATCH v5 07/14] KVM: ARM: World-switch implementation
+In-Reply-To: <CANM98qJ7O8RT_t0OinGDukdR5PNrObmU0rj6uFGEbT2hCvCjmA@mail.gmail.com>
+References: <20130108183811.46302.58543.stgit@ubuntu>
+ <20130108183924.46302.65998.stgit@ubuntu>
+ <20130115094312.GI11529@redhat.com>
+ <CANM98q+qScaXniyYjrd9QEZzWKzj3PkCE0YNFUp2ijnCfS_v4w@mail.gmail.com>
+ <CANM98qJZcuF95-D=1Qu6cwXUkQrR4a12bZtrZOuP00U2HGkjMQ@mail.gmail.com>
+ <20130116125712.GT11529@redhat.com>
+ <CANM98qJ7O8RT_t0OinGDukdR5PNrObmU0rj6uFGEbT2hCvCjmA@mail.gmail.com>
+Message-ID: <20130116161748.GY11529@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Jan 2013 11:13:08 -0500, Christoffer Dall
-<c.dall@virtualopensystems.com> wrote:
-> On Wed, Jan 16, 2013 at 11:09 AM, Marc Zyngier <marc.zyngier@arm.com>
-> wrote:
->> On 16/01/13 15:29, Christoffer Dall wrote:
->>> [...]
->>>
->>>>> diff --git a/arch/arm/include/asm/kvm_vgic.h
->>>>> b/arch/arm/include/asm/kvm_vgic.h
->>>>> index 1ace491..f9d1977 100644
->>>>> --- a/arch/arm/include/asm/kvm_vgic.h
->>>>> +++ b/arch/arm/include/asm/kvm_vgic.h
->>>>> @@ -33,6 +33,7 @@
->>>>>  #define VGIC_NR_PRIVATE_IRQS (VGIC_NR_SGIS + VGIC_NR_PPIS)
->>>>>  #define VGIC_NR_SHARED_IRQS  (VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
->>>>>  #define VGIC_MAX_CPUS                KVM_MAX_VCPUS
->>>>> +#define VGIC_MAX_LRS         64
->>>>
->>>> Consider this instead (for the reason below)
->>>> #define VGIC_MAX_LRS    (1 << 7)
->>>>
->>>
->>> so here you mean (1 << 6), right?
->>
->> No. We have a 6 bit field that contains (NR_LRS - 1). So the maximum
->> value is (0b111111 + 1), which is (1 << 7).
->>
+On Wed, Jan 16, 2013 at 10:40:37AM -0500, Christoffer Dall wrote:
+> [...]
 > 
-> eh, (1 << 7) is 128, and we have a maximum value of 63 (which plus the
-> one is 64). You can verify this by thinking about having four bits, is
-> a halfword, which we use hex numbers to deal with, so the number of
-> values you can decode there is 16, then you have two more bits, which
-> each doubles the number of values, so this becomes 64 values total,
-> ie. from 0 through 63.  :)
+> >>
+> >
+> > Agree. Lets merge it and change later. The vcpu run loop is simple
+> > enough at this point. The question of using vcpu->requests is not
+> > the question of "real benefit" though, of course you can introduce your
+> > own mechanism to pass requests to vcpus instead of using whatever kvm
+> > provides you. But from maintenance and code share point of view this
+> > is wrong thing to do. Looks at this code for instance:
+> >
+> >         /* Kick out any which are still running. */
+> >         kvm_for_each_vcpu(i, v, vcpu->kvm) {
+> >                 /* Guest could exit now, making cpu wrong. That's OK. */
+> >                 if (kvm_vcpu_exiting_guest_mode(v) == IN_GUEST_MODE) {
+> >                         force_vm_exit(get_cpu_mask(v->cpu));
+> >                 }
+> >         }
+> >
+> > Why not make_all_cpus_request(vcpu->kvm, KVM_REQ_PAUSE)?
 > 
-
-Blah. Ignore me, I'm being stupid.
-
+> well for one, make_all_cpus_request is a static function in kvm_main.c
+> and the semantics of that one is really tricky with respect to locking
+> and requires (imho) a much clearer explanation with commenting (see
+> separate e-mail to kvm list). And now is not the time to do this.
 > 
+All current users add exported function that calls
+make_all_cpus_request(). But this is very valid question why just not
+export it directly. Patch is welcome :)
+
+> >
+> > And I am not sure KVM_REQ_UNHALT is so useless to you in the first
+> > place. kvm_vcpu_block() can return even when vcpu is not runnable (if
+> > signal is pending). KVM_REQ_UNHALT is the way to check for that. Hmm
+> > this is actually looks like a BUG in the current code.
+> >
+> there's no guarantee that you won't be woken up from a WFI instruction
+> for spurious interrupts on ARM, so we don't care about this, we simply
+> return to the guest, and it must go back to sleep if that's what it
+> wants to do.
 > 
->>>
->>>>>  /* Sanity checks... */
->>>>>  #if (VGIC_MAX_CPUS > 8)
->>>>> @@ -120,7 +121,7 @@ struct vgic_cpu {
->>>>>       DECLARE_BITMAP( pending_shared, VGIC_NR_SHARED_IRQS);
->>>>>
->>>>>       /* Bitmap of used/free list registers */
->>>>> -     DECLARE_BITMAP( lr_used, 64);
->>>>> +     DECLARE_BITMAP( lr_used, VGIC_MAX_LRS);
->>>>>
->>>>>       /* Number of list registers on this CPU */
->>>>>       int             nr_lr;
->>>>> @@ -132,7 +133,7 @@ struct vgic_cpu {
->>>>>       u32             vgic_eisr[2];   /* Saved only */
->>>>>       u32             vgic_elrsr[2];  /* Saved only */
->>>>>       u32             vgic_apr;
->>>>> -     u32             vgic_lr[64];    /* A15 has only 4... */
->>>>> +     u32             vgic_lr[VGIC_MAX_LRS];
->>>>>  #endif
->>>>>  };
->>>>>
->>>>> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
->>>>> index a0d283c..90a99fd 100644
->>>>> --- a/arch/arm/kvm/vgic.c
->>>>> +++ b/arch/arm/kvm/vgic.c
->>>>> @@ -1345,6 +1345,8 @@ int kvm_vgic_hyp_init(void)
->>>>>
->>>>>       vgic_nr_lr = readl_relaxed(vgic_vctrl_base + GICH_VTR);
->>>>>       vgic_nr_lr = (vgic_nr_lr & 0x1f) + 1;
->>>>
->>>> There is a bug here. It should be:
->>>>         vgic_nr_lr = (vgic_nr_lr & 0x2f) + 1;
->>>>
->>>
->>> and here you mean (vgic_nr_lr & 0x3f) + 1
->>> right?
->>
->> Neither. 0x2f is the right value. See the GIC spec, 5.3.2, GICH_VTR
->> register.
->>
-> I'm looking at it, and I don't understand why you don't want to
-> consider bit[4] ?
+If guest can handle it then we can ignore it (at least for now), but still
+it's strange that signal unhalts vcpu.
 
-Because it's not a prime number? ;-)
-
-I think I should stay away from patches these days, I'm clearly not
-thinking straight. Thanks for coping with my lack of brain.
-
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+--
+			Gleb.
