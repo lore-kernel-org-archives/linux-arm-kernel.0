@@ -1,108 +1,86 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 16 Jan 2013 17:13:06 +0100
-Subject: [PATCH 6/7] ARM i.MX5: Add System Reset Controller (SRC) support for
- i.MX51 and i.MX53
+Date: Wed, 16 Jan 2013 17:13:05 +0100
+Subject: [PATCH 5/7] staging: drm/imx: Use SRC to reset IPU
 In-Reply-To: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
 References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1358352787-15441-7-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1358352787-15441-6-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SRC in i.MX51 and i.MX53 is similar to the one in i.MX6q minus
-the IPU2 reset line and multi core CPU reset/enable bits.
+Request the System Reset Controller to reset the IPU if
+specified via device tree phandle.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/mach-imx/Kconfig      |    1 +
- arch/arm/mach-imx/common.h     |    3 ++-
- arch/arm/mach-imx/mach-imx6q.c |    2 +-
- arch/arm/mach-imx/mm-imx5.c    |    2 ++
- arch/arm/mach-imx/src.c        |   14 +++++++++++++-
- 5 files changed, 19 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt    |    3 +++
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c                |   12 +++++++++---
+ 2 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 3e628fd..d7924e5 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -829,6 +829,7 @@ config	SOC_IMX53
- 	select ARCH_MX53
- 	select HAVE_CAN_FLEXCAN if CAN
- 	select IMX_HAVE_PLATFORM_IMX2_WDT
-+	select HAVE_IMX_SRC
- 	select PINCTRL
- 	select PINCTRL_IMX53
- 	select SOC_IMX5
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 7191ab4..f36be3c 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -133,7 +133,8 @@ static inline void imx_smp_prepare(void) {}
- #endif
- extern void imx_enable_cpu(int cpu, bool enable);
- extern void imx_set_cpu_jump(int cpu, void *jump_addr);
--extern void imx_src_init(void);
-+extern void imx5_src_init(void);
-+extern void imx6q_src_init(void);
- extern void imx_src_prepare_restart(void);
- extern void imx_gpc_init(void);
- extern void imx_gpc_pre_suspend(void);
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index cd277a0..b1e076c 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -229,7 +229,7 @@ static const struct of_device_id imx6q_irq_match[] __initconst = {
- static void __init imx6q_init_irq(void)
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+index 07654f0..f769857 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -8,6 +8,8 @@ Required properties:
+ - interrupts: Should contain sync interrupt and error interrupt,
+   in this order.
+ - #crtc-cells: 1, See below
++- resets: phandle pointing to the system reset controller and
++          reset line index, see reset/fsl,imx-src.txt for details
+ 
+ example:
+ 
+@@ -16,6 +18,7 @@ ipu: ipu at 18000000 {
+ 	compatible = "fsl,imx53-ipu";
+ 	reg = <0x18000000 0x080000000>;
+ 	interrupts = <11 10>;
++	resets = <&src 2>;
+ };
+ 
+ Parallel display support
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-common.c b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+index f7059cd..6a6211d 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-common.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+@@ -16,6 +16,7 @@
+ #include <linux/export.h>
+ #include <linux/types.h>
+ #include <linux/init.h>
++#include <linux/reset.h>
+ #include <linux/platform_device.h>
+ #include <linux/err.h>
+ #include <linux/spinlock.h>
+@@ -660,7 +661,7 @@ int ipu_idmac_disable_channel(struct ipuv3_channel *channel)
+ }
+ EXPORT_SYMBOL_GPL(ipu_idmac_disable_channel);
+ 
+-static int ipu_reset(struct ipu_soc *ipu)
++static int ipu_memory_reset(struct ipu_soc *ipu)
  {
- 	l2x0_of_init(0, ~0UL);
--	imx_src_init();
-+	imx6q_src_init();
- 	imx_gpc_init();
- 	of_irq_init(imx6q_irq_match);
- }
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index 79d71cf..53f87be 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -106,6 +106,7 @@ void __init imx51_init_early(void)
- 	mxc_set_cpu_type(MXC_CPU_MX51);
- 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
-+	imx5_src_init();
- }
+ 	unsigned long timeout;
  
- void __init imx53_init_early(void)
-@@ -113,6 +114,7 @@ void __init imx53_init_early(void)
- 	mxc_set_cpu_type(MXC_CPU_MX53);
- 	mxc_iomux_v3_init(MX53_IO_ADDRESS(MX53_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX53_IO_ADDRESS(MX53_WDOG1_BASE_ADDR));
-+	imx5_src_init();
- }
+@@ -1104,7 +1105,12 @@ static int ipu_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto out_failed_irq;
  
- void __init mx50_init_irq(void)
-diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-index 41687c6..e350250 100644
---- a/arch/arm/mach-imx/src.c
-+++ b/arch/arm/mach-imx/src.c
-@@ -125,7 +125,19 @@ void imx_src_prepare_restart(void)
- 	writel_relaxed(0, src_base + SRC_GPR1);
- }
+-	ret = ipu_reset(ipu);
++	ret = device_reset(&pdev->dev);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to reset: %d\n", ret);
++		goto out_failed_reset;
++	}
++	ret = ipu_memory_reset(ipu);
+ 	if (ret)
+ 		goto out_failed_reset;
  
--void __init imx_src_init(void)
-+void __init imx5_src_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx5-src");
-+	src_base = of_iomap(np, 0);
-+	WARN_ON(!src_base);
-+
-+	imx_reset_controller.of_node = np;
-+	reset_controller_register(&imx_reset_controller);
-+}
-+
-+void __init imx6q_src_init(void)
- {
- 	struct device_node *np;
- 	u32 val;
+@@ -1130,8 +1136,8 @@ static int ipu_probe(struct platform_device *pdev)
+ failed_add_clients:
+ 	ipu_submodules_exit(ipu);
+ failed_submodules_init:
+-	ipu_irq_exit(ipu);
+ out_failed_reset:
++	ipu_irq_exit(ipu);
+ out_failed_irq:
+ 	clk_disable_unprepare(ipu->clk);
+ failed_clk_get:
 -- 
 1.7.10.4
