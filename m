@@ -1,67 +1,55 @@
-From: smoch@web.de (Soeren Moch)
-Date: Wed, 16 Jan 2013 18:05:59 +0100
-Subject: [PATCH] ata: sata_mv: fix sg_tbl_pool alignment
-In-Reply-To: <20130116155045.GI25500@titan.lakedaemon.net>
-References: <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
- <50F3F289.3090402@web.de> <20130115165642.GA25500@titan.lakedaemon.net>
- <20130115175020.GA3764@kroah.com>
- <20130115201617.GC25500@titan.lakedaemon.net>
- <20130115215602.GF25500@titan.lakedaemon.net> <50F5F1B7.3040201@web.de>
- <20130116024014.GH25500@titan.lakedaemon.net> <50F61D86.4020801@web.de>
- <50F66B1B.40301@web.de> <20130116155045.GI25500@titan.lakedaemon.net>
-Message-ID: <50F6DDF7.9080605@web.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 16 Jan 2013 18:08:09 +0100
+Subject: [PATCH 0/8] ARM: shmobile: pinctrl and DT extensions
+Message-ID: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.01.2013 16:50, Jason Cooper wrote:
-> On Wed, Jan 16, 2013 at 09:55:55AM +0100, Soeren Moch wrote:
->> On 16.01.2013 04:24, Soeren Moch wrote:
->>> On 16.01.2013 03:40, Jason Cooper wrote:
->>>> On Wed, Jan 16, 2013 at 01:17:59AM +0100, Soeren Moch wrote:
->>>>> On 15.01.2013 22:56, Jason Cooper wrote:
->>>>>> On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
->
->> OK, I could trigger the error
->>    ERROR: 1024 KiB atomic DMA coherent pool is too small!
->>    Please increase it with coherent_pool= kernel parameter!
->> only with em28xx sticks and sata, dib0700 sticks removed.
->
-> Did you test the reverse scenario?  ie dib0700 with sata_mv and no
-> em28xx.
+These patches extend sh7372 and r8a7740 pinctrl support and use it to add 
+SDHI and MMCIF to armadillo800eva and mackerel reference DT 
+implementations. GPIO-based pin configuration is removed from board files. 
+Additionally, MMC interfaces on armadillo800eva support run-time 
+power-switching, which is also supported in DT with these patches.
 
-Maybe I can test this next night.
+This series is based on recent work by Laurent and Simon. sh7372 and 
+r8a7740 pinctrl support seems to be stable and, probably, won't change, 
+so, also the base for these patches seems solid. Since the current pinctrl 
+implementation for sh73a0 is likely to change, support for kzm9g isn't 
+included in this series.
 
-> What kind of throughput are you pushing to the sata disk?
+Guennadi Liakhovetski (8):
+  pinctrl: add SDHI and MMCIF pin groups to r8a7740
+  pinctrl: add SDHI and MMCIF pin groups to sh7372
+  ARM: shmobile: simplify armadillo800eva and kzm9g Kconfig
+    dependencies
+  ARM: shmobile: add MMCIF and SDHI DT clock aliases to sh73a0 and
+    r8a7740
+  ARM: shmobile: add a GPIO controller DT node for sh7372
+  ARM: shmobile: use GPIO SD-card detection on armadillo800eva
+  ARM: shmobile: completely switch MMC interfaces on mackerel-reference
+    to DT
+  ARM: shmobile: completely switch MMC interfaces on
+    armadillo800eva-reference to DT
 
-Close to nothing. In the last test I had the root filesystem running
-on the sata disk plus a few 10 megabytes per hour.
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts |  101 ++++++++++
+ arch/arm/boot/dts/sh7372-mackerel-reference.dts    |   42 +++-
+ arch/arm/boot/dts/sh7372.dtsi                      |    8 +
+ arch/arm/mach-shmobile/Kconfig                     |   12 +-
+ .../board-armadillo800eva-reference.c              |    5 +-
+ arch/arm/mach-shmobile/board-armadillo800eva.c     |   10 +-
+ arch/arm/mach-shmobile/board-mackerel-reference.c  |   46 -----
+ arch/arm/mach-shmobile/clock-r8a7740.c             |    4 +
+ arch/arm/mach-shmobile/clock-sh73a0.c              |    3 +
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c               |  180 +++++++++++++++++
+ drivers/pinctrl/sh-pfc/pfc-sh7372.c                |  205 ++++++++++++++++++++
+ 11 files changed, 552 insertions(+), 64 deletions(-)
 
->>>> What would be most helpful is if you could do a git bisect between
->>>> v3.5.x (working) and the oldest version where you know it started
->>>> failing (v3.7.1 or earlier if you know it).
->>>>
->>> I did not bisect it, but Marek mentioned earlier that commit
->>> e9da6e9905e639b0f842a244bc770b48ad0523e9 in Linux v3.6-rc1 introduced
->>> new code for dma allocations. This is probably the root cause for the
->>> new (mis-)behavior (due to my tests 3.6.0 is not working anymore).
->>
->> I don't want to say that Mareks patch is wrong, probably it triggers a
->> bug somewhere else! (in em28xx?)
->
-> Of the four drivers you listed, none are using dma.  sata_mv is the only
-> one.
+-- 
+1.7.2.5
 
-usb_core is doing the actual DMA for the usb bridge drivers, I think.
-
-> If one is to believe the comments in sata_mv.c:~151, then the alignment
-> is wrong for the sg_tbl_pool.
->
-> Could you please try the following patch?
-
-OK, what should I test first, the setup from last night (em28xx, no
-dib0700) plus your patch, or the reverse setup (dib0700, no em28xx)
-without your patch, or my normal setting (all dvb sticks) plus your
-patch?
-
-Regards,
-Soeren
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
