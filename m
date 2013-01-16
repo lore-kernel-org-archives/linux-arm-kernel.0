@@ -1,60 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Jan 2013 13:17:20 -0600
-Subject: [PATCH] [RFC] ARM: compile fix for DEBUG_LL=y && MMU=n
-In-Reply-To: <1358346726-27199-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1358346726-27199-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <50F6FCC0.6040204@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 16 Jan 2013 14:27:45 -0800
+Subject: [GIT PULL] sunxi fixes for 3.8
+In-Reply-To: <50F6F028.6060009@free-electrons.com>
+References: <50F6F028.6060009@free-electrons.com>
+Message-ID: <20130116222745.GA9035@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2013 08:32 AM, Uwe Kleine-K?nig wrote:
-> debug_ll_addr is only used on machines with an MMU so it can be #ifdef'ed
-> out safely. This fixes:
+On Wed, Jan 16, 2013 at 07:23:36PM +0100, Maxime Ripard wrote:
+> Hi Olof, Arnd,
 > 
-> arch/arm/kernel/debug.S: Assembler messages:
-> arch/arm/kernel/debug.S:104: Error: too many positional arguments
+> Please consider pulling the following patch for 3.8.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> ---
-> The obvious alternative fix is to make addruart on !MMU take 3
-> arguments, too.
+> The sunxi UARTs are actually not a regular 8250 but rather uses a
+> Synopsys DPB compatible UART.
+> 
+> This patch fixes that.
+> 
+> Thanks,
+> Maxime
+> 
+> The following changes since commit 43880f709dc59840849e31b01735ac587195ef8a:
+> 
+>   sunxi: Change the machine compatible string. (2012-12-23 18:20:15 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/mripard/linux.git tags/sunxi-fixes-for-3.8-rc4
+> 
+> for you to fetch changes up to 1bea07f16da0d77689cda7abe73939dd1dfdea22:
+> 
+>   ARM: sunxi: Use the Synosys APB UART instead of ns8250 (2013-01-16 19:13:18 +0100)
 
-We never envision a need to get the uart address from C code on !MMU?
+Pulled, thanks.
 
-Either way:
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-> 
-> The problem was introduced in
-> 
-> 	e5c5f2a (ARM: implement debug_ll_io_init())
-> 
-> which appeared in v3.8-rc1.
-> ---
->  arch/arm/kernel/debug.S |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-> index 6809200..14f7c3b 100644
-> --- a/arch/arm/kernel/debug.S
-> +++ b/arch/arm/kernel/debug.S
-> @@ -100,12 +100,14 @@ ENTRY(printch)
->  		b	1b
->  ENDPROC(printch)
->  
-> +#ifdef CONFIG_MMU
->  ENTRY(debug_ll_addr)
->  		addruart r2, r3, ip
->  		str	r2, [r0]
->  		str	r3, [r1]
->  		mov	pc, lr
->  ENDPROC(debug_ll_addr)
-> +#endif
->  
->  #else
->  
-> 
+-Olof
