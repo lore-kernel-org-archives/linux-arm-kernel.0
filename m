@@ -1,103 +1,90 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Wed, 16 Jan 2013 10:42:02 -0500
-Subject: [PATCH v5 07/14] KVM: ARM: World-switch implementation
-In-Reply-To: <20130116121238.GS11529@redhat.com>
-References: <20130108183811.46302.58543.stgit@ubuntu>
- <20130108183924.46302.65998.stgit@ubuntu>
- <20130115094312.GI11529@redhat.com>
- <CANM98q+qScaXniyYjrd9QEZzWKzj3PkCE0YNFUp2ijnCfS_v4w@mail.gmail.com>
- <20130116121238.GS11529@redhat.com>
-Message-ID: <CANM98q+jpzVWfg8drE+azcbDF1Q1suphZyJrij04b+OB4ZX4Dw@mail.gmail.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Wed, 16 Jan 2013 15:50:18 +0000
+Subject: ARM DMA: Fix in dma_cache_maint_page
+In-Reply-To: <20130116130838.GS23505@n2100.arm.linux.org.uk>
+References: <50F69F72.4030807@codeaurora.org> <50F6A14C.6040206@codeaurora.org>
+ <1358340715.2384.23.camel@dabdike.int.hansenpartnership.com>
+ <20130116130838.GS23505@n2100.arm.linux.org.uk>
+Message-ID: <1358351418.2384.37.camel@dabdike.int.hansenpartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Wed, 2013-01-16 at 13:08 +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 16, 2013 at 12:51:55PM +0000, James Bottomley wrote:
+> > On Wed, 2013-01-16 at 18:17 +0530, Subhash Jadavani wrote:
+> > > Is it possible to pick up James patch below? Thread here: 
+> > > http://comments.gmane.org/gmane.linux.kernel.mmc/18670, have the details 
+> > > on the motivation behind this fix.
+> > 
+> > Someone should also audit the arm kernel code for more of these linear
+> > page array assumptions.  I'm guessing that when sparsemem was added to
+> > arm over a year ago, whoever did it either didn't audit or missed a few.
+> 
+> No, that's a bad assumption.  We've had discontigmem for years - maybe
+> something like 12 years.
 
->
->> read side RCU protects against is the memslots data structure as far
->> as I can see, so the second patch pasted below fixes this for the code
->> that actually accesses this data structure.
-> Many memory related functions that you call access memslots under the
-> hood and assume that locking is done by the caller. From the quick look
-> I found those that you've missed:
-> kvm_is_visible_gfn()
-> kvm_read_guest()
-> gfn_to_hva()
-> gfn_to_pfn_prot()
-> kvm_memslots()
->
-> May be there are more. Can you enable RCU debugging in your kernel config
-> and check? This does not guaranty that it will catch all of the places,
-> but better than nothing.
->
+Discontigmem doesn't suffer from this particular problem: The breaks in
+the page arrays in a discontigmem environment represent real breaks in
+the physical memory map, so there can never arise a situation where
+page++ wouldn't get you the next valid page, provided there's still a
+real contiguous page of physical memory present in the system, of
+course.
 
-yeah, I missed the call to is_visible_gfn and friends, this fixes it:
+Sparsemem tried to be cleverer and it broke that assumption.  I'm
+starting to wonder if there are other places in the kernel which make it
+and get broken by sparsemem.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index c806080..f30e131 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -591,7 +591,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu,
-struct kvm_run *run)
- 	struct kvm_memory_slot *memslot;
- 	bool is_iabt;
- 	gfn_t gfn;
--	int ret;
-+	int ret, idx;
+I have patches for parisc to switch it over to sparsemem from
+discontigmem ... I haven't pushed them yet, fortunately, and I certainly
+didn't check our underlying assumptions for this problem.
 
- 	hsr_ec = vcpu->arch.hsr >> HSR_EC_SHIFT;
- 	is_iabt = (hsr_ec == HSR_EC_IABT);
-@@ -608,33 +608,43 @@ int kvm_handle_guest_abort(struct kvm_vcpu
-*vcpu, struct kvm_run *run)
- 		return -EFAULT;
- 	}
+>   I switched everything over to sparsemem, and
+> sparsemem has been used on ARM for years too:
+> 
+> 	commit 05944d74bc28fffbcce159cb915d0acff82f30a1
+> 	Author: Russell King <rmk@dyn-67.arm.linux.org.uk>
+> 	Date:   Thu Nov 30 20:43:51 2006 +0000
+> 
+> 	    [ARM] Add initial sparsemem support
+> 
+> 	    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> However, there's a big problem with this: very few of the lead people
+> have machines which suffer from this disability, so there's very little
+> testing of it - and there's very little testing of new code with it.
 
-+	idx = srcu_read_lock(&vcpu->kvm->srcu);
-+
- 	gfn = fault_ipa >> PAGE_SHIFT;
- 	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
- 		if (is_iabt) {
- 			/* Prefetch Abort on I/O address */
- 			kvm_inject_pabt(vcpu, vcpu->arch.hxfar);
--			return 1;
-+			ret = 1;
-+			goto out_unlock;
- 		}
+Anyone can test this just by enabling sparsemem with an artificially
+small SECTION_SIZE_BITS (that makes it much more likely you'll hit a
+boundary).
 
- 		if (fault_status != FSC_FAULT) {
- 			kvm_err("Unsupported fault status on io memory: %#lx\n",
- 				fault_status);
--			return -EFAULT;
-+			ret = -EFAULT;
-+			goto out_unlock;
- 		}
+> The patch which originally introduced this code which your patch
+> touches was part of adding highmem support to ARM:
+> 
+> 	commit 43377453af83b8ff8c1c731da1508bd6b84ebfea
+> 	Author: Nicolas Pitre <nico@cam.org>
+> 	Date:   Thu Mar 12 22:52:09 2009 -0400
+> 
+> 	    [ARM] introduce dma_cache_maint_page()
+> 
+> 	    This is a helper to be used by the DMA mapping API to handle cache
+> 	    maintenance for memory identified by a page structure instead of a
+> 	    virtual address.  Those pages may or may not be highmem pages, and
+> 	    when they're highmem pages, they may or may not be virtually mapped.
+> 	    When they're not mapped then there is no L1 cache to worry about. But
+> 	    even in that case the L2 cache must be processed since unmapped highmem
+> 	    pages can still be L2 cached.
+> 
+> 	    Signed-off-by: Nicolas Pitre <nico@marvell.com>
+> 
+> some three years later, and has been through a number of revisions since.
+> 
+> I'd really like to get rid of sparsemem so it's one less failure case, but
+> alas there's a relatively small bunch of folk who rely upon it.  That
+> means it's always going to be more buggy.
 
- 		/* Adjust page offset */
- 		fault_ipa |= vcpu->arch.hxfar & ~PAGE_MASK;
--		return io_mem_abort(vcpu, run, fault_ipa);
-+		ret = io_mem_abort(vcpu, run, fault_ipa);
-+		goto out_unlock;
- 	}
+Heh, I'd like to do that too on parisc; the problem is that the memory
+holes in our platform are just to big to use a linear array on.  And now
+that the slub people want DISCONTIGMEM deprecated, there's not much
+choice.
 
- 	memslot = gfn_to_memslot(vcpu->kvm, gfn);
- 	if (!memslot->user_alloc) {
- 		kvm_err("non user-alloc memslots not supported\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto out_unlock;
- 	}
-
- 	ret = user_mem_abort(vcpu, fault_ipa, gfn, memslot, fault_status);
--	return ret ? ret : 1;
-+	if (ret == 0)
-+		ret = 1;
-+out_unlock:
-+	srcu_read_unlock(&vcpu->kvm->srcu, idx);
-+	return ret;
- }
-
- static void handle_hva_to_gpa(struct kvm *kvm,
---
-
-Thanks,
--Christoffer
+James
