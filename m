@@ -1,157 +1,62 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 16 Jan 2013 18:08:17 +0100
-Subject: [PATCH 8/8] ARM: shmobile: completely switch MMC interfaces on
- armadillo800eva-reference to DT
-In-Reply-To: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
-References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <1358356097-26180-9-git-send-email-g.liakhovetski@gmx.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 16 Jan 2013 10:08:45 -0700
+Subject: linux-next: manual merge of the tegra tree with the arm-soc tree
+In-Reply-To: <CAOesGMgr_f-XGHOdMW3ugfXbVaUc4EALrbfJD=XeOKixxrY8PA@mail.gmail.com>
+References: <20130116141411.8fadedee54ed35dc0eddd288@canb.auug.org.au>
+ <1358308153.32106.8.camel@gitbox> <50F62D69.8080100@nvidia.com>
+ <1358311923.537.3.camel@gitbox>
+ <CAOesGMgr_f-XGHOdMW3ugfXbVaUc4EALrbfJD=XeOKixxrY8PA@mail.gmail.com>
+Message-ID: <50F6DE9D.5080906@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch MMCIF, SDHI0 and SDHI1 to complete DT initialisation: use DT
-bindings to configure regulators, interface pins, card-detect GPIOs,
-various interface configuration parameters.
+On 01/16/2013 09:27 AM, Olof Johansson wrote:
+> Hi,
+> 
+> On Tue, Jan 15, 2013 at 8:52 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+>> On Tue, 2013-01-15 at 21:32 -0700, Stephen Warren wrote:
+>>> On 01/15/2013 08:49 PM, Tony Prisk wrote:
+>>>> On Wed, 2013-01-16 at 14:14 +1100, Stephen Rothwell wrote:
+>>>>> Hi all,
+>>>>>
+>>>>> Today's linux-next merge of the tegra tree got a conflict in
+>>>>> drivers/clocksource/Makefile between commit ff7ec345f0ec ("timer: vt8500:
+>>>>> Move timer code to drivers/clocksource") from the arm-soc tree and commit
+>>>>> ac0fd9eca3ba ("ARM: tegra: move timer.c to drivers/clocksource/") from
+>>>>> the tegra tree.
+>>>>>
+>>>>> I fixed it up (see below) and can carry the fix as necessary (no action
+>>>>> is required).
+>>>>>
+>>>>
+>>>> I don't know about everyone else, but I feel the preference should be to
+>>>> keep things alphabetized where possible to help avoid with merge
+>>>> conflicts later on. This is always a problem when we start tacking
+>>>> things on the end of lists.
+>>>>
+>>>> I realise this Kconfig is not alphabetized anyway, but it's never too
+>>>> early to start on the 'right' path.
+>>>
+>>> Sounds like a good idea, but the issue is: When to do the initial sort
+>>> so it doesn't conflict with all the adds in a kernel cycle... Post and
+>>> immediately commit a new patch near the end of the merge window?
+>>
+>> Given that the maintainer can quite safely do the patch (sorry
+>> maintainers), I don't see any reason why it couldn't be done at the
+>> point where they stop accepting patches for the merge-window. Once the
+>> patches are stopped, sort the list in one last patch.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
- .../boot/dts/r8a7740-armadillo800eva-reference.dts |  101 ++++++++++++++++++++
- .../board-armadillo800eva-reference.c              |    5 +-
- 2 files changed, 103 insertions(+), 3 deletions(-)
+That only works well if the one maintainer is the only person taking
+patches for the drivers/clocksource tree. It might be true that the "one
+maintainer" here ends up being arm-soc in this kernel cycle though?
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 319af9b..27774eb 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -30,4 +30,105 @@
- 		sh-eth,register-type = "gigabit";
- 		sh-eth,phy-id = <0>;
- 	};
-+
-+	reg_3p3v: regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	mmcif0: mmcif at 0xe6bd0000 {
-+		compatible = "renesas,sh-mmcif", "renesas,sh7372-mmcif";
-+		reg = <0xe6bd0000 0x100>;
-+		interrupt-parent = <&intca>;
-+		interrupts = <0x1ac0 0x1ae0>;
-+		vmmc-supply = <&reg_3p3v>;
-+		bus-width = <8>;
-+		non-removable;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&mmc0_pins>;
-+	};
-+
-+	vcc_sdhi0: regulator at 1 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "vcc-sdhi0";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio 75 0>;
-+		enable-active-high;
-+	};
-+
-+	vcc_sdhi1: regulator at 2 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "vcc-sdhi1";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio 16 0>;
-+		enable-active-high;
-+	};
-+
-+	vccq_sdhi0: gpio-regulator at 0 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "vccq-sdhi0";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+		vin-supply = <&vcc_sdhi0>;
-+
-+		enable-gpio = <&gpio 74 0>;
-+		gpios = <&gpio 17 0>;
-+		states = <3300000 0
-+			  1800000 1>;
-+
-+		enable-active-high;
-+	};
-+
-+	sdhi0: sdhi at 0xe6850000 {
-+		compatible = "renesas,shmobile-sdhi";
-+		reg = <0xe6850000 0x100>;
-+		interrupt-parent = <&intca>;
-+		interrupts = <0xe20 0xe40>;
-+		vmmc-supply = <&vcc_sdhi0>;
-+		vqmmc-supply = <&vccq_sdhi0>;
-+		bus-width = <4>;
-+		cd-gpios = <&gpio 167 1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdhi0_pins>;
-+		toshiba,mmc-has-idle-wait;
-+		toshiba,mmc-cap-sdio-irq;
-+	};
-+
-+	sdhi1: sdhi at 0xe6860000 {
-+		compatible = "renesas,shmobile-sdhi";
-+		reg = <0xe6860000 0x100>;
-+		interrupt-parent = <&intca>;
-+		interrupts = <0xea0 0xec0>;
-+		vmmc-supply = <&vcc_sdhi1>;
-+		bus-width = <4>;
-+		cd-gpios = <&gpio 72 1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdhi1_pins>;
-+		toshiba,mmc-has-idle-wait;
-+		toshiba,mmc-cap-sdio-irq;
-+	};
-+};
-+
-+&gpio {
-+	sdhi0_pins: pfc_sdhi0_pins {
-+		renesas,pins = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_wp";
-+		renesas,function = "sdhi0";
-+	};
-+	sdhi1_pins: pfc_sdhi1_pins {
-+		renesas,pins = "sdhi1_data4", "sdhi1_ctrl", "sdhi1_wp";
-+		renesas,function = "sdhi1";
-+	};
-+	mmc0_pins: pfc_mmc0_pins {
-+		renesas,pins = "mmc0_data8_1", "mmc0_ctrl_1";
-+		renesas,function = "mmc0";
-+	};
- };
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-index c206612..f929931 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-@@ -107,9 +107,10 @@
-  */
- static void __init eva_init(void)
- {
--	r8a7740_pinmux_init();
- 	r8a7740_meram_workaround();
- 
-+	r8a7740_add_standard_devices_dt();
-+
- 	/* SCIFA1 */
- 	gpio_request(GPIO_FN_SCIFA1_RXD, NULL);
- 	gpio_request(GPIO_FN_SCIFA1_TXD, NULL);
-@@ -142,8 +143,6 @@ static void __init eva_init(void)
- 	/* Early BRESP enable, Shared attribute override enable, 32K*8way */
- 	l2x0_init(IOMEM(0xf0002000), 0x40440000, 0x82000fff);
- #endif
--
--	r8a7740_add_standard_devices_dt();
- }
- 
- #define RESCNT2 IOMEM(0xe6188020)
--- 
-1.7.2.5
+>> It makes sense to get it done in this window if possible as the Kconfig
+>> will only get bigger as time goes on, making sorting it more time
+>> consuming.
+> 
+> Actually, Russell wen through and reordered these not long ago, if I
+> remember correctly. The current ordering is the same as in the
+> structure definition, and should be kept that way.
+
+I think this is talking about Makefile entries rather than struct
+definitions?
