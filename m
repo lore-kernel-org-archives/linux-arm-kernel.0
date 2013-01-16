@@ -1,62 +1,51 @@
 From: gleb@redhat.com (Gleb Natapov)
-Date: Wed, 16 Jan 2013 18:17:48 +0200
+Date: Wed, 16 Jan 2013 18:21:40 +0200
 Subject: [PATCH v5 07/14] KVM: ARM: World-switch implementation
-In-Reply-To: <CANM98qJ7O8RT_t0OinGDukdR5PNrObmU0rj6uFGEbT2hCvCjmA@mail.gmail.com>
+In-Reply-To: <CANM98qLtf0i1LA3KT3xT0ivS3U9ioA_HkKQHwe6ZzXHNuYOONw@mail.gmail.com>
 References: <20130108183811.46302.58543.stgit@ubuntu>
  <20130108183924.46302.65998.stgit@ubuntu>
  <20130115094312.GI11529@redhat.com>
  <CANM98q+qScaXniyYjrd9QEZzWKzj3PkCE0YNFUp2ijnCfS_v4w@mail.gmail.com>
- <CANM98qJZcuF95-D=1Qu6cwXUkQrR4a12bZtrZOuP00U2HGkjMQ@mail.gmail.com>
- <20130116125712.GT11529@redhat.com>
- <CANM98qJ7O8RT_t0OinGDukdR5PNrObmU0rj6uFGEbT2hCvCjmA@mail.gmail.com>
-Message-ID: <20130116161748.GY11529@redhat.com>
+ <20130116121238.GS11529@redhat.com>
+ <CANM98q+jpzVWfg8drE+azcbDF1Q1suphZyJrij04b+OB4ZX4Dw@mail.gmail.com>
+ <20130116155212.GX11529@redhat.com>
+ <CANM98qLtf0i1LA3KT3xT0ivS3U9ioA_HkKQHwe6ZzXHNuYOONw@mail.gmail.com>
+Message-ID: <20130116162140.GZ11529@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 10:40:37AM -0500, Christoffer Dall wrote:
-> [...]
-> 
+On Wed, Jan 16, 2013 at 11:17:06AM -0500, Christoffer Dall wrote:
+> On Wed, Jan 16, 2013 at 10:52 AM, Gleb Natapov <gleb@redhat.com> wrote:
+> > On Wed, Jan 16, 2013 at 10:42:02AM -0500, Christoffer Dall wrote:
+> >> [...]
 > >>
+> >> >
+> >> >> read side RCU protects against is the memslots data structure as far
+> >> >> as I can see, so the second patch pasted below fixes this for the code
+> >> >> that actually accesses this data structure.
+> >> > Many memory related functions that you call access memslots under the
+> >> > hood and assume that locking is done by the caller. From the quick look
+> >> > I found those that you've missed:
+> >> > kvm_is_visible_gfn()
+> >> > kvm_read_guest()
+> >> > gfn_to_hva()
+> >> > gfn_to_pfn_prot()
+> >> > kvm_memslots()
+> >> >
+> >> > May be there are more. Can you enable RCU debugging in your kernel config
+> >> > and check? This does not guaranty that it will catch all of the places,
+> >> > but better than nothing.
+> >> >
+> >>
+> >> yeah, I missed the call to is_visible_gfn and friends, this fixes it:
+> >>
+> > Thank you. One more kvm_read_guest() in emulate.c.
 > >
-> > Agree. Lets merge it and change later. The vcpu run loop is simple
-> > enough at this point. The question of using vcpu->requests is not
-> > the question of "real benefit" though, of course you can introduce your
-> > own mechanism to pass requests to vcpus instead of using whatever kvm
-> > provides you. But from maintenance and code share point of view this
-> > is wrong thing to do. Looks at this code for instance:
-> >
-> >         /* Kick out any which are still running. */
-> >         kvm_for_each_vcpu(i, v, vcpu->kvm) {
-> >                 /* Guest could exit now, making cpu wrong. That's OK. */
-> >                 if (kvm_vcpu_exiting_guest_mode(v) == IN_GUEST_MODE) {
-> >                         force_vm_exit(get_cpu_mask(v->cpu));
-> >                 }
-> >         }
-> >
-> > Why not make_all_cpus_request(vcpu->kvm, KVM_REQ_PAUSE)?
 > 
-> well for one, make_all_cpus_request is a static function in kvm_main.c
-> and the semantics of that one is really tricky with respect to locking
-> and requires (imho) a much clearer explanation with commenting (see
-> separate e-mail to kvm list). And now is not the time to do this.
+> this one is going out for now (see the i/o discussion).
 > 
-All current users add exported function that calls
-make_all_cpus_request(). But this is very valid question why just not
-export it directly. Patch is welcome :)
-
-> >
-> > And I am not sure KVM_REQ_UNHALT is so useless to you in the first
-> > place. kvm_vcpu_block() can return even when vcpu is not runnable (if
-> > signal is pending). KVM_REQ_UNHALT is the way to check for that. Hmm
-> > this is actually looks like a BUG in the current code.
-> >
-> there's no guarantee that you won't be woken up from a WFI instruction
-> for spurious interrupts on ARM, so we don't care about this, we simply
-> return to the guest, and it must go back to sleep if that's what it
-> wants to do.
-> 
-If guest can handle it then we can ignore it (at least for now), but still
-it's strange that signal unhalts vcpu.
+I thought there wasn't resolution yet. Guess I missed something. If
+kvm_read_guest() is removed from emulator then the patch looks good to me.
 
 --
 			Gleb.
