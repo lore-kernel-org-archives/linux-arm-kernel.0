@@ -1,118 +1,85 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Wed, 16 Jan 2013 13:56:22 +0800
-Subject: [PATCH v2 7/9] ARM: PRIMA2: irq: make prima2 irq can work even we
- enable GIC for Marco
+Date: Wed, 16 Jan 2013 13:56:24 +0800
+Subject: [PATCH v2 9/9] ARM: PRIMA2: provide two DEBUG_LL ports for prima2 and
+ marco
 In-Reply-To: <1358315784-25104-1-git-send-email-Barry.Song@csr.com>
 References: <1358315784-25104-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1358315784-25104-3-git-send-email-Barry.Song@csr.com>
+Message-ID: <1358315784-25104-5-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Barry Song <Baohua.Song@csr.com>
 
-in Marco, we will use GIC. this patch prepares the handle_irq for prima2
-to avoid the compiling errors since we want only one defconfig and zImage
-for both prima2 and marco that means we will need handle_irq for both.
+prima2 and marco has different memory base, the old code will
+fail if we enable DEBUG_LL in marco.
+this patch adds two debuf port, while debugging, we select one
+of PRIMA2 and MARCO debug ports, in the products, we disable
+DEBUG_LL.
 
-Signed-off-by: Baohua Song <Baohua.Song@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-prima2/common.c            |    3 +++
- arch/arm/mach-prima2/common.h            |    2 ++
- arch/arm/mach-prima2/include/mach/irqs.h |    4 ++--
- arch/arm/mach-prima2/irq.c               |   16 ++++++++++++++--
- 4 files changed, 21 insertions(+), 4 deletions(-)
+ arch/arm/Kconfig.debug                         |   14 ++++++++++++++
+ arch/arm/mach-prima2/include/mach/uart.h       |    6 ++++++
+ arch/arm/mach-prima2/include/mach/uncompress.h |    3 +++
+ 3 files changed, 23 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 8e6f668..99f9c7e 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -41,6 +41,9 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
- 	.map_io         = sirfsoc_map_lluart,
- 	.init_irq	= sirfsoc_of_irq_init,
- 	.init_time	= sirfsoc_prima2_timer_init,
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	.handle_irq     = sirfsoc_handle_irq,
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 661030d..00ad1f8 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -386,6 +386,20 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on Tegra based platforms.
+ 
++	config DEBUG_SIRFPRIMA2_UART1
++		bool "Kernel low-level debugging messages via SiRFprimaII UART1"
++		depends on ARCH_PRIMA2
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the uart1 port on SiRFprimaII devices.
++
++	config DEBUG_SIRFMARCO_UART1
++		bool "Kernel low-level debugging messages via SiRFmarco UART1"
++		depends on ARCH_MARCO
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the uart1 port on SiRFmarco devices.
++
+ 	config DEBUG_VEXPRESS_UART0_DETECT
+ 		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+ 		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+diff --git a/arch/arm/mach-prima2/include/mach/uart.h b/arch/arm/mach-prima2/include/mach/uart.h
+index c98b4d5..c10510d 100644
+--- a/arch/arm/mach-prima2/include/mach/uart.h
++++ b/arch/arm/mach-prima2/include/mach/uart.h
+@@ -10,7 +10,13 @@
+ #define __MACH_PRIMA2_SIRFSOC_UART_H
+ 
+ /* UART-1: used as serial debug port */
++#if defined(CONFIG_DEBUG_SIRFPRIMA2_UART1)
+ #define SIRFSOC_UART1_PA_BASE          0xb0060000
++#elif defined(CONFIG_DEBUG_SIRFMARCO_UART1)
++#define SIRFSOC_UART1_PA_BASE          0xcc060000
++#else
++#define SIRFSOC_UART1_PA_BASE          0
 +#endif
- 	.dma_zone_size	= SZ_256M,
- 	.init_machine	= sirfsoc_mach_init,
- 	.init_late	= sirfsoc_init_late,
-diff --git a/arch/arm/mach-prima2/common.h b/arch/arm/mach-prima2/common.h
-index d6890b6..a4f91a6 100644
---- a/arch/arm/mach-prima2/common.h
-+++ b/arch/arm/mach-prima2/common.h
-@@ -11,12 +11,14 @@
+ #define SIRFSOC_UART1_VA_BASE          SIRFSOC_VA(0x060000)
+ #define SIRFSOC_UART1_SIZE		SZ_4K
  
- #include <linux/init.h>
- #include <asm/mach/time.h>
-+#include <asm/exception.h>
- 
- extern void sirfsoc_prima2_timer_init(void);
- 
- extern void __init sirfsoc_of_irq_init(void);
- extern void __init sirfsoc_of_clk_init(void);
- extern void sirfsoc_restart(char, const char *);
-+extern asmlinkage void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs);
- 
- #ifndef CONFIG_DEBUG_LL
- static inline void sirfsoc_map_lluart(void)  {}
-diff --git a/arch/arm/mach-prima2/include/mach/irqs.h b/arch/arm/mach-prima2/include/mach/irqs.h
-index f6014a0..b778a0f 100644
---- a/arch/arm/mach-prima2/include/mach/irqs.h
-+++ b/arch/arm/mach-prima2/include/mach/irqs.h
-@@ -10,8 +10,8 @@
- #define __ASM_ARCH_IRQS_H
- 
- #define SIRFSOC_INTENAL_IRQ_START  0
--#define SIRFSOC_INTENAL_IRQ_END    59
-+#define SIRFSOC_INTENAL_IRQ_END    127
- #define SIRFSOC_GPIO_IRQ_START     (SIRFSOC_INTENAL_IRQ_END + 1)
--#define NR_IRQS	220
-+#define NR_IRQS	288
- 
- #endif
-diff --git a/arch/arm/mach-prima2/irq.c b/arch/arm/mach-prima2/irq.c
-index 7dee917..6c0f3e9 100644
---- a/arch/arm/mach-prima2/irq.c
-+++ b/arch/arm/mach-prima2/irq.c
-@@ -9,17 +9,19 @@
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/irq.h>
--#include <mach/hardware.h>
--#include <asm/mach/irq.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/irqdomain.h>
- #include <linux/syscore_ops.h>
-+#include <asm/mach/irq.h>
-+#include <asm/exception.h>
-+#include <mach/hardware.h>
- 
- #define SIRFSOC_INT_RISC_MASK0          0x0018
- #define SIRFSOC_INT_RISC_MASK1          0x001C
- #define SIRFSOC_INT_RISC_LEVEL0         0x0020
- #define SIRFSOC_INT_RISC_LEVEL1         0x0024
-+#define SIRFSOC_INIT_IRQ_ID		0x0038
- 
- void __iomem *sirfsoc_intc_base;
- 
-@@ -52,6 +54,16 @@ static __init void sirfsoc_irq_init(void)
- 	writel_relaxed(0, sirfsoc_intc_base + SIRFSOC_INT_RISC_MASK1);
- }
- 
-+asmlinkage void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
-+{
-+	u32 irqstat, irqnr;
+diff --git a/arch/arm/mach-prima2/include/mach/uncompress.h b/arch/arm/mach-prima2/include/mach/uncompress.h
+index 0c898fc..15f3edc 100644
+--- a/arch/arm/mach-prima2/include/mach/uncompress.h
++++ b/arch/arm/mach-prima2/include/mach/uncompress.h
+@@ -25,6 +25,9 @@ static __inline__ void putc(char c)
+ 	 * during kernel decompression, all mappings are flat:
+ 	 *  virt_addr == phys_addr
+ 	 */
++	if (!SIRFSOC_UART1_PA_BASE)
++		return;
 +
-+	irqstat = readl_relaxed(sirfsoc_intc_base + SIRFSOC_INIT_IRQ_ID);
-+	irqnr = irqstat & 0xff;
-+
-+	handle_IRQ(irqnr, regs);
-+}
-+
- static struct of_device_id intc_ids[]  = {
- 	{ .compatible = "sirf,prima2-intc" },
- 	{},
+ 	while (__raw_readl((void __iomem *)SIRFSOC_UART1_PA_BASE + SIRFSOC_UART_TXFIFO_STATUS)
+ 		& SIRFSOC_UART1_TXFIFO_FULL)
+ 		barrier();
 -- 
 1.7.5.4
 
