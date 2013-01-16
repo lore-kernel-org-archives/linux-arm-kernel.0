@@ -1,47 +1,55 @@
-From: smoch@web.de (Soeren Moch)
-Date: Wed, 16 Jan 2013 01:17:59 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <20130115215602.GF25500@titan.lakedaemon.net>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
- <50F3F289.3090402@web.de> <20130115165642.GA25500@titan.lakedaemon.net>
- <20130115175020.GA3764@kroah.com>
- <20130115201617.GC25500@titan.lakedaemon.net>
- <20130115215602.GF25500@titan.lakedaemon.net>
-Message-ID: <50F5F1B7.3040201@web.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 15 Jan 2013 16:32:39 -0800
+Subject: [PATCH] clk: prima2: enable dt-binding clkdev mapping
+In-Reply-To: <CAGsJ_4wMsFk2EKuXtH5=+PJUSJrcg-tPJFU2bvbYvH_J8BEHJQ@mail.gmail.com>
+References: <1355993491-21233-1-git-send-email-Barry.Song@csr.com>
+ <20130114215259.23734.68185@quantum>
+ <CAGsJ_4wMsFk2EKuXtH5=+PJUSJrcg-tPJFU2bvbYvH_J8BEHJQ@mail.gmail.com>
+Message-ID: <20130116003239.8920.65687@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.01.2013 22:56, Jason Cooper wrote:
-> Soeren,
->
-> On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
->> If my understanding is correct, one of the drivers (most likely one)
->> either asks for too small of a dma buffer, or is not properly
->> deallocating blocks from the per-device pool.  Either case leads to
->> exhaustion, and falling back to the atomic pool.  Which subsequently
->> gets wiped out as well.
->
-> If my hunch is right, could you please try each of the three dvb drivers
-> in turn and see which one (or more than one) causes the error?
->
+Quoting Barry Song (2013-01-14 17:43:45)
+> Hi Mike,
+> 
+> 2013/1/15 Mike Turquette <mturquette@linaro.org>:
+> > Quoting Barry Song (2012-12-20 00:51:31)
+> >> From: Barry Song <Baohua.Song@csr.com>
+> >>
+> >> this patche deletes hard code that registers clkdev by things like:
+> >> clk_register_clkdev(clk, NULL, "b0030000.nand");
+> >> clk_register_clkdev(clk, NULL, "b0040000.audio");
+> >> clk_register_clkdev(clk, NULL, "b0080000.usp");
+> >> prima2 clock controller becomes a clock provider and  every dt node
+> >> just declares its clock sources by dt prop.
+> >>
+> >> it also makes us easier to extend this driver to support both prima2
+> >> and marco as marco has different address mapping with prima2.
+> >>
+> >> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> >
+> > Barry,
+> >
+> > The changes to clk-prima2.c look OK to me.  Did you want me to take this
+> > patch through clk-next?
+> 
+> yes. since it has no conflict with what i am handling in my machine codes.
+> 
 
-In fact I use only 2 types of DVB sticks: em28xx usb bridge plus drxk
-demodulator, and dib0700 usb bridge plus dib7000p demod.
+Taken into clk-next.
 
-I would bet for em28xx causing the error, but this is not thoroughly
-tested. Unfortunately testing with removed sticks is not easy, because
-this is a production system and disabling some services for the long
-time we need to trigger this error will certainly result in unhappy
-users.
+Thanks,
+Mike
 
-I will see what I can do here. Is there an easy way to track the buffer
-usage without having to wait for complete exhaustion?
-
-In linux-3.5.x there is no such problem. Can we use all available memory
-for dma buffers here on armv5 architectures, in contrast to newer
-kernels?
-
-Regards,
-Soeren
+> >
+> > Thanks,
+> > Mike
+> >
+> >> ---
+> >>  .../devicetree/bindings/clock/prima2-clock.txt     |   73 +++++++
+> >>  arch/arm/boot/dts/prima2.dtsi                      |   31 +++-
+> >>  drivers/clk/clk-prima2.c                           |  205 ++++++++------------
+> >>  3 files changed, 183 insertions(+), 126 deletions(-)
+> >>  create mode 100644 Documentation/devicetree/bindings/clock/prima2-clock.txt
+> 
+> -barry
