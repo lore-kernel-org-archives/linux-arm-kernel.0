@@ -1,103 +1,87 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Wed, 16 Jan 2013 13:53:30 +0800
-Subject: [PATCH v2 4/9] ARM: PRIMA2: mv timer to timer-prima2 as we will add
- timer-marco
-In-Reply-To: <1358315610-25001-1-git-send-email-Barry.Song@csr.com>
-References: <1358315610-25001-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1358315610-25001-4-git-send-email-Barry.Song@csr.com>
+Date: Wed, 16 Jan 2013 13:56:20 +0800
+Subject: [PATCH v2 5/9] ARM: PRIMA2: rstc: enable the support for Marco
+Message-ID: <1358315784-25104-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Barry Song <Baohua.Song@csr.com>
 
-Marco timer has different timer IP with prima2, so rename the current timer
-to timer-prima2 so that we can add timer-marco.
-
-at the same time, if we don't find prima2 timer node in dt, don't panic the
-system as we will make prima2 and marco use same kernel image.
+marco has SET/CLEAR registers pair for rstc to avoid read-modify-write,
+this patch detects the mach typer and access registers based on SoC.
 
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-prima2/Makefile                    |    2 +-
- arch/arm/mach-prima2/common.c                    |    2 +-
- arch/arm/mach-prima2/common.h                    |    2 +-
- arch/arm/mach-prima2/{timer.c => timer-prima2.c} |    6 +++---
- 4 files changed, 6 insertions(+), 6 deletions(-)
- rename arch/arm/mach-prima2/{timer.c => timer-prima2.c} (98%)
+ arch/arm/mach-prima2/rstc.c |   45 ++++++++++++++++++++++++++----------------
+ 1 files changed, 28 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
-index fc9ce22..0007a6e 100644
---- a/arch/arm/mach-prima2/Makefile
-+++ b/arch/arm/mach-prima2/Makefile
-@@ -1,4 +1,3 @@
--obj-y := timer.o
- obj-y += rstc.o
- obj-y += common.o
- obj-y += rtciobrg.o
-@@ -6,3 +5,4 @@ obj-$(CONFIG_DEBUG_LL) += lluart.o
- obj-$(CONFIG_CACHE_L2X0) += l2x0.o
- obj-$(CONFIG_SUSPEND) += pm.o sleep.o
- obj-$(CONFIG_SIRF_IRQ) += irq.o
-+obj-$(CONFIG_ARCH_PRIMA2) += timer-prima2.o
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index ed3570e..8e6f668 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -40,7 +40,7 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
- 	.map_io         = sirfsoc_map_lluart,
- 	.init_irq	= sirfsoc_of_irq_init,
--	.init_time	= sirfsoc_timer_init,
-+	.init_time	= sirfsoc_prima2_timer_init,
- 	.dma_zone_size	= SZ_256M,
- 	.init_machine	= sirfsoc_mach_init,
- 	.init_late	= sirfsoc_init_late,
-diff --git a/arch/arm/mach-prima2/common.h b/arch/arm/mach-prima2/common.h
-index 9c75f12..d6890b6 100644
---- a/arch/arm/mach-prima2/common.h
-+++ b/arch/arm/mach-prima2/common.h
-@@ -12,7 +12,7 @@
- #include <linux/init.h>
- #include <asm/mach/time.h>
+diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
+index 762adb7..435019c 100644
+--- a/arch/arm/mach-prima2/rstc.c
++++ b/arch/arm/mach-prima2/rstc.c
+@@ -19,6 +19,7 @@ static DEFINE_MUTEX(rstc_lock);
  
--extern void sirfsoc_timer_init(void);
-+extern void sirfsoc_prima2_timer_init(void);
- 
- extern void __init sirfsoc_of_irq_init(void);
- extern void __init sirfsoc_of_clk_init(void);
-diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer-prima2.c
-similarity index 98%
-rename from arch/arm/mach-prima2/timer.c
-rename to arch/arm/mach-prima2/timer-prima2.c
-index 8c732a5..309e724 100644
---- a/arch/arm/mach-prima2/timer.c
-+++ b/arch/arm/mach-prima2/timer-prima2.c
-@@ -187,7 +187,7 @@ static void __init sirfsoc_clockevent_init(void)
- }
- 
- /* initialize the kernel jiffy timer source */
--void __init sirfsoc_timer_init(void)
-+void __init sirfsoc_prima2_timer_init(void)
- {
- 	unsigned long rate;
- 	struct clk *clk;
-@@ -226,14 +226,14 @@ static struct of_device_id timer_ids[] = {
+ static struct of_device_id rstc_ids[]  = {
+ 	{ .compatible = "sirf,prima2-rstc" },
++	{ .compatible = "sirf,marco-rstc" },
  	{},
  };
  
--void __init sirfsoc_of_timer_map(void)
-+static void __init sirfsoc_of_timer_map(void)
- {
- 	struct device_node *np;
- 	const unsigned int *intspec;
+@@ -42,27 +43,37 @@ early_initcall(sirfsoc_of_rstc_init);
  
- 	np = of_find_matching_node(NULL, timer_ids);
- 	if (!np)
--		panic("unable to find compatible timer node in dtb\n");
-+		return;
- 	sirfsoc_timer_base = of_iomap(np, 0);
- 	if (!sirfsoc_timer_base)
- 		panic("unable to map timer cpu registers\n");
+ int sirfsoc_reset_device(struct device *dev)
+ {
+-	const unsigned int *prop = of_get_property(dev->of_node, "reset-bit", NULL);
+-	unsigned int reset_bit;
++	u32 reset_bit;
+ 
+-	if (!prop)
+-		return -ENODEV;
+-
+-	reset_bit = be32_to_cpup(prop);
++	if (of_property_read_u32(dev->of_node, "reset-bit", &reset_bit))
++		return -EINVAL;
+ 
+ 	mutex_lock(&rstc_lock);
+ 
+-	/*
+-	 * Writing 1 to this bit resets corresponding block. Writing 0 to this
+-	 * bit de-asserts reset signal of the corresponding block.
+-	 * datasheet doesn't require explicit delay between the set and clear
+-	 * of reset bit. it could be shorter if tests pass.
+-	 */
+-	writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) | reset_bit,
+-		sirfsoc_rstc_base + (reset_bit / 32) * 4);
+-	msleep(10);
+-	writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) & ~reset_bit,
+-		sirfsoc_rstc_base + (reset_bit / 32) * 4);
++	if (of_device_is_compatible(dev->of_node, "sirf,prima2-rstc")) {
++		/*
++		 * Writing 1 to this bit resets corresponding block. Writing 0 to this
++		 * bit de-asserts reset signal of the corresponding block.
++		 * datasheet doesn't require explicit delay between the set and clear
++		 * of reset bit. it could be shorter if tests pass.
++		 */
++		writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) | reset_bit,
++			sirfsoc_rstc_base + (reset_bit / 32) * 4);
++		msleep(10);
++		writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) & ~reset_bit,
++			sirfsoc_rstc_base + (reset_bit / 32) * 4);
++	} else {
++		/*
++		 * For MARCO and POLO
++		 * Writing 1 to SET register resets corresponding block. Writing 1 to CLEAR
++		 * register de-asserts reset signal of the corresponding block.
++		 * datasheet doesn't require explicit delay between the set and clear
++		 * of reset bit. it could be shorter if tests pass.
++		 */
++		writel(reset_bit, sirfsoc_rstc_base + (reset_bit / 32) * 8);
++		msleep(10);
++		writel(reset_bit, sirfsoc_rstc_base + (reset_bit / 32) * 8 + 4);
++	}
+ 
+ 	mutex_unlock(&rstc_lock);
+ 
 -- 
 1.7.5.4
 
