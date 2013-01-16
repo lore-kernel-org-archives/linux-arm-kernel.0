@@ -1,118 +1,47 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 16 Jan 2013 16:43:47 +0200
-Subject: [PATCH v6 16/22] mfd: omap-usb-host: Get rid of unnecessary spinlock
+Date: Wed, 16 Jan 2013 16:43:49 +0200
+Subject: [PATCH v6 18/22] USB: ehci-omap: Don't free gpios that we didn't
+ request
 In-Reply-To: <1358347433-329-1-git-send-email-rogerq@ti.com>
 References: <1358347433-329-1-git-send-email-rogerq@ti.com>
-Message-ID: <1358347433-329-17-git-send-email-rogerq@ti.com>
+Message-ID: <1358347433-329-19-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver does not have an interrupt handler and
-we don't really need a spinlock, so get rid of it.
+This driver does not request any gpios so don't free them.
+Fixes L3 bus error on multiple modprobe/rmmod of ehci_hcd
+with ehci-omap in use.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/mfd/omap-usb-host.c |   16 ----------------
- 1 files changed, 0 insertions(+), 16 deletions(-)
+ drivers/usb/host/ehci-omap.c |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 2925d57..844d1b2 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -23,7 +23,6 @@
- #include <linux/delay.h>
- #include <linux/clk.h>
- #include <linux/dma-mapping.h>
--#include <linux/spinlock.h>
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/platform_data/usb-omap.h>
-@@ -108,7 +107,6 @@ struct usbhs_hcd_omap {
- 	struct usbhs_omap_platform_data	*pdata;
- 
- 	u32				usbhs_rev;
--	spinlock_t			lock;
- };
- /*-------------------------------------------------------------------------*/
- 
-@@ -276,13 +274,11 @@ static int usbhs_runtime_resume(struct device *dev)
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index 134c789..b96a4bf 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -288,7 +288,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
  {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
- 	struct usbhs_omap_platform_data	*pdata = omap->pdata;
--	unsigned long			flags;
- 	int i, r;
+ 	struct device *dev				= &pdev->dev;
+ 	struct usb_hcd *hcd				= dev_get_drvdata(dev);
+-	struct usbhs_omap_platform_data *pdata		= dev->platform_data;
  
- 	dev_dbg(dev, "usbhs_runtime_resume\n");
+ 	usb_remove_hcd(hcd);
+ 	disable_put_regulator(dev->platform_data);
+@@ -298,13 +297,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ 	pm_runtime_put_sync(dev);
+ 	pm_runtime_disable(dev);
  
- 	omap_tll_enable();
--	spin_lock_irqsave(&omap->lock, flags);
- 
- 	if (omap->ehci_logic_fck && !IS_ERR(omap->ehci_logic_fck))
- 		clk_enable(omap->ehci_logic_fck);
-@@ -324,8 +320,6 @@ static int usbhs_runtime_resume(struct device *dev)
- 		}
- 	}
- 
--	spin_unlock_irqrestore(&omap->lock, flags);
+-	if (pdata->phy_reset) {
+-		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+-			gpio_free(pdata->reset_gpio_port[0]);
 -
+-		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+-			gpio_free(pdata->reset_gpio_port[1]);
+-	}
  	return 0;
  }
  
-@@ -333,13 +327,10 @@ static int usbhs_runtime_suspend(struct device *dev)
- {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
- 	struct usbhs_omap_platform_data	*pdata = omap->pdata;
--	unsigned long			flags;
- 	int i;
- 
- 	dev_dbg(dev, "usbhs_runtime_suspend\n");
- 
--	spin_lock_irqsave(&omap->lock, flags);
--
- 	for (i = 0; i < omap->nports; i++) {
- 		switch (pdata->port_mode[i]) {
- 		case OMAP_EHCI_PORT_MODE_HSIC:
-@@ -362,7 +353,6 @@ static int usbhs_runtime_suspend(struct device *dev)
- 	if (omap->ehci_logic_fck && !IS_ERR(omap->ehci_logic_fck))
- 		clk_disable(omap->ehci_logic_fck);
- 
--	spin_unlock_irqrestore(&omap->lock, flags);
- 	omap_tll_disable();
- 
- 	return 0;
-@@ -372,7 +362,6 @@ static void omap_usbhs_init(struct device *dev)
- {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
- 	struct usbhs_omap_platform_data	*pdata = omap->pdata;
--	unsigned long			flags;
- 	unsigned			reg;
- 
- 	dev_dbg(dev, "starting TI HSUSB Controller\n");
-@@ -391,7 +380,6 @@ static void omap_usbhs_init(struct device *dev)
- 	}
- 
- 	pm_runtime_get_sync(dev);
--	spin_lock_irqsave(&omap->lock, flags);
- 
- 	reg = usbhs_read(omap->uhh_base, OMAP_UHH_HOSTCONFIG);
- 	/* setup ULPI bypass and burst configurations */
-@@ -454,8 +442,6 @@ static void omap_usbhs_init(struct device *dev)
- 	usbhs_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
- 	dev_dbg(dev, "UHH setup done, uhh_hostconfig=%x\n", reg);
- 
--	spin_unlock_irqrestore(&omap->lock, flags);
--
- 	pm_runtime_put_sync(dev);
- 	if (pdata->phy_reset) {
- 		/* Hold the PHY in RESET for enough time till
-@@ -521,8 +507,6 @@ static int usbhs_omap_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	spin_lock_init(&omap->lock);
--
- 	omap->pdata = pdata;
- 
- 	pm_runtime_enable(dev);
 -- 
 1.7.4.1
