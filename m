@@ -1,110 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 16 Jan 2013 12:03:18 +0000
-Subject: [PATCH v2 3/9] ARM: PRIMA2: initialize l2x0 according to mach
- from DT
-In-Reply-To: <1358315610-25001-3-git-send-email-Barry.Song@csr.com>
-References: <1358315610-25001-1-git-send-email-Barry.Song@csr.com>
- <1358315610-25001-3-git-send-email-Barry.Song@csr.com>
-Message-ID: <20130116120318.GD10218@e106331-lin.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 16 Jan 2013 13:03:29 +0100
+Subject: [PATCH v7 1/3] ARM: make cr_alignment read-only #ifndef
+ CONFIG_CPU_CP15
+In-Reply-To: <50F554C4.3020903@arm.com>
+References: <1350462872-16805-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1350462872-16805-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <50F554C4.3020903@arm.com>
+Message-ID: <20130116120329.GX14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 05:53:29AM +0000, Barry Song wrote:
-> From: Barry Song <Baohua.Song@csr.com>
+Hello Jonny,
+
+On Tue, Jan 15, 2013 at 01:08:20PM +0000, Jonathan Austin wrote:
+> On 17/10/12 09:34, Uwe Kleine-K?nig wrote:
+> >This makes cr_alignment a constant 0 to break code that tries to modify
+> >the value as it's likely that it's built on wrong assumption when
+> >CONFIG_CPU_CP15 isn't defined. For code that is only reading the value 0
+> >is more or less a fine value to report.
+> >
 > 
-> prima2 and marco have diffetent l2 cache configuration, so
-> we initialize l2x0 cache based on dtb given to kernel.
+> Without the context of some of the discussion that was had on the
+> list about how/why to do this, this description is a bit
+> confusing...
 > 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm/mach-prima2/l2x0.c |   29 ++++++++++++++++++++++++-----
->  1 files changed, 24 insertions(+), 5 deletions(-)
+> I found myself asking "Why do we not #ifdef out uses of cr_alignment
+> based on CONFIG_CPU_CP15" - a question which it seems is answered by
+> you and Nicolas here:
 > 
-> diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
-> index c998377..e41ecd2 100644
-> --- a/arch/arm/mach-prima2/l2x0.c
-> +++ b/arch/arm/mach-prima2/l2x0.c
-> @@ -11,19 +11,38 @@
->  #include <linux/of.h>
->  #include <asm/hardware/cache-l2x0.h>
->  
-> -static struct of_device_id prima2_l2x0_ids[]  = {
-> -	{ .compatible = "sirf,prima2-pl310-cache" },
-> +struct l2x0_aux
-> +{
-> +	u32 val;
-> +	u32 mask;
-> +};
-> +
-> +static struct l2x0_aux prima2_l2x0_aux __initconst = {
-> +	0x40000,
-> +	0,
-> +};
-
-That 0x40000 is a bit opaque. Now would be a good time to make it a bit more
-legible. Am I right in saying that's (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) ?
-
-It'd also be nice if you used designated initializers:
-
-static struct l2x0_aux prima2_l2x0_aux __initconst = {
-	.val	= (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT),
-	.mask	= 0,
-};
-
-> +
-> +static struct l2x0_aux marco_l2x0_aux __initconst = {
-> +	(2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
-> +		(1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT),
-> +	L2X0_AUX_CTRL_MASK,
-> +};
-
-And here too:
-
-static struct l2x0_aux marco_l2x0_aux __initconst = {
-	.val	= (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
-			(1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT),
-	.mask	= L2X0_AUX_CTRL_MASK,
-};
-
-> +
-> +static struct of_device_id sirf_l2x0_ids[] __initconst = {
-> +	{ .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
-> +	{ .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
->  	{},
->  };
-
-I took a look at of_match_node, and it seems that the first match found in an
-of_match_table will be returned first, rather than finding the match earliest
-in a device node's compatible list. This is somewhat counter-intuitive.
-
-Therefore, the marco variant should be listed first, or it will get initialised
-with the prima2 configuration values.
-
->  
->  static int __init sirfsoc_l2x0_init(void)
->  {
->  	struct device_node *np;
-> +	const struct l2x0_aux *aux;
->  
-> -	np = of_find_matching_node(NULL, prima2_l2x0_ids);
-> +	np = of_find_matching_node(NULL, sirf_l2x0_ids);
->  	if (np) {
-> -		pr_info("Initializing prima2 L2 cache\n");
-> -		return l2x0_of_init(0x40000, 0);
-> +		aux = of_match_node(sirf_l2x0_ids, np)->data;
-> +		return l2x0_of_init(aux->val, aux->mask);
->  	}
->  
->  	return 0;
-> -- 
-> 1.7.5.4
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/089968.html
 > 
+> So, perhaps it would help to have a little bit more context in this
+> commit message?
 > 
+> I know that the cr_alignment stuff is currently tied up with
+> CONFIG_CPU_15, but I wonder if you looked at using the
+> CCR.UNALIGN_TRP bit and wiring that in to alignment trapping code?
+> Is it something you think would make sense for the work you're
+> doing?
+I didn't, because I focus on getting the machine up and add bells and
+whistles later.
 
-With those changes:
+> >+#ifdef CONFIG_CPU_CP15
+> >  	.long	cr_alignment			@ r7
+> >+#else
+> >+	.long	0
+> 
+> This value still gets loaded in to r7, so it might be worth keeping
+> the comments going... They certainly help when reading the code.
+ok
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> >--- a/arch/arm/mm/mmu.c
+> >+++ b/arch/arm/mm/mmu.c
+> >@@ -97,6 +97,7 @@ static struct cachepolicy cache_policies[] __initdata = {
+> >  	}
+> >  };
+> >
+> >+#ifdef CONFIG_CPU_CP15
+> >  /*
+> >   * These are useful for identifying cache coherency
+> >   * problems by allowing the cache or the cache and
+> >@@ -195,6 +196,22 @@ void adjust_cr(unsigned long mask, unsigned long set)
+> >  }
+> >  #endif
+> >
+> >+#else
+> 
+> When you read this file in its complete form there's a lot of code
+> (including more preprocessor stuff) between the #ifdef and the
+> #else.
+> 
+> Could you add
+> 
+> #else /* ifdef CONFIG_CPU_CP15 */
+> 
+> like you have in the other cases?
+also ok.
 
-Thanks,
-Mark.
+Will fix up after lunch.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
