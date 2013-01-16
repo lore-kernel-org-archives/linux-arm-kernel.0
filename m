@@ -1,72 +1,47 @@
-From: pratikp@codeaurora.org (Pratik Patel)
-Date: Tue, 15 Jan 2013 16:14:59 -0800
-Subject: CoreSight framework and drivers
-In-Reply-To: <20130107115836.GB13542@mudshark.cambridge.arm.com>
-References: <20121219112314.GA26329@mudshark.cambridge.arm.com>
- <50D1F37E.6000804@ti.com>
- <20121219212431.GC23594@pratikp-linux.qualcomm.com>
- <50D34EE5.8090407@ti.com>
- <20121220195127.GA14877@pratikp-linux.qualcomm.com>
- <50D3972E.4030607@ti.com>
- <20121221221828.GA2658@pratikp-linux.qualcomm.com>
- <20121223113239.GG16237@mudshark.cambridge.arm.com>
- <20130103180643.GA30277@pratikp-linux.qualcomm.com>
- <20130107115836.GB13542@mudshark.cambridge.arm.com>
-Message-ID: <20130116001458.GB7013@pratikp-linux.qualcomm.com>
+From: smoch@web.de (Soeren Moch)
+Date: Wed, 16 Jan 2013 01:17:59 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20130115215602.GF25500@titan.lakedaemon.net>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
+ <50F3F289.3090402@web.de> <20130115165642.GA25500@titan.lakedaemon.net>
+ <20130115175020.GA3764@kroah.com>
+ <20130115201617.GC25500@titan.lakedaemon.net>
+ <20130115215602.GF25500@titan.lakedaemon.net>
+Message-ID: <50F5F1B7.3040201@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 07, 2013 at 11:58:36AM +0000, Will Deacon wrote:
-> On Thu, Jan 03, 2013 at 06:06:43PM +0000, Pratik Patel wrote:
-> > On Sun, Dec 23, 2012 at 11:32:39AM +0000, Will Deacon wrote:
-> > > On Fri, Dec 21, 2012 at 10:18:28PM +0000, Pratik Patel wrote:
-> > > > What user interface do you plan to provide for the CTI? Maybe
-> > > > something consistent with other CoreSight components in sysfs to
-> > > > allow users to enable, disable, map and unmap ???
-> > > > 
-> > > > Please let me know your thoughts.
-> > > 
-> > > Rather than have your current approach of dev nodes + sysfs config files for
-> > > each coresight device, I think it might be better to follow something closer
-> > > to ftrace and stick per-device directories under debugfs/coresight/. Then you
-> > > can have a pipe file and some config files in the same directory for each
-> > > component. You also don't need to do any mapping operations with this (just
-> > > post-process the stream directly).
-> > > 
-> > 
-> > Thanks for the suggestion. I had initially debated between debugfs
-> > and sysfs but chose sysfs + dev nodes since using device attributes
-> > relieves the drivers from manually managing directories and files,
-> > its taken care of by the device and sysfs layers. Moreover, since
-> > these are physical devices, device attributes made sense at the
-> > time.
-> > 
-> > The map and unmap I was referring to was for the CTI trigger
-> > mappings. Dev nodes are currently intended to provide the raw
-> > data collected in the sinks.
-> > 
-> > Whats the advantage in using debugfs here?
-> 
-> The main things I like about debugfs are (a) it's a text-driven interface
-> and easy to script with and (b) it matches what we do for ftrace.
-> 
-> Furthermore, it means that subtle differences between devices can be hidden
-> in the driver and not require different vendor tools for parsing the trace
-> data.
-> 
-Sorry for the delay and maybe I am missing something but it seems
-we can take care of such protocol or parsing/decoding differences
-even with device nodes since that seems independent of the
-interface used - per device debugfs attributes or per device
-device nodes.
+On 15.01.2013 22:56, Jason Cooper wrote:
+> Soeren,
+>
+> On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
+>> If my understanding is correct, one of the drivers (most likely one)
+>> either asks for too small of a dma buffer, or is not properly
+>> deallocating blocks from the per-device pool.  Either case leads to
+>> exhaustion, and falling back to the atomic pool.  Which subsequently
+>> gets wiped out as well.
+>
+> If my hunch is right, could you please try each of the three dvb drivers
+> in turn and see which one (or more than one) causes the error?
+>
 
-CoreSight trace solution is typically a SoC wide solution and
-hence can get used by non-Linux processors or hardware. Using
-debugfs would imply compiling it and exposing all the debug
-knobs even if the use case was to use the CoreSight solution for
-something that didn't need all that.
+In fact I use only 2 types of DVB sticks: em28xx usb bridge plus drxk
+demodulator, and dib0700 usb bridge plus dib7000p demod.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I would bet for em28xx causing the error, but this is not thoroughly
+tested. Unfortunately testing with removed sticks is not easy, because
+this is a production system and disabling some services for the long
+time we need to trigger this error will certainly result in unhappy
+users.
+
+I will see what I can do here. Is there an easy way to track the buffer
+usage without having to wait for complete exhaustion?
+
+In linux-3.5.x there is no such problem. Can we use all available memory
+for dma buffers here on armv5 architectures, in contrast to newer
+kernels?
+
+Regards,
+Soeren
