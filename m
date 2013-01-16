@@ -1,38 +1,41 @@
-From: dinggnu@gmail.com (Cong Ding)
-Date: Wed, 16 Jan 2013 23:25:03 +0100
-Subject: [PATCH] tty: serial/vt8500_serial.c: fix bug caused by missing "{}"
-Message-ID: <1358375103-11703-1-git-send-email-dinggnu@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 16 Jan 2013 14:31:44 -0800
+Subject: [PATCH] [RFC] ARM: compile fix for DEBUG_LL=y && MMU=n
+In-Reply-To: <1358346726-27199-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1358346726-27199-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20130116223144.GA9071@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is obviously here should be braced by "{}" in the "if" branch (more than 1
-line in the "if" branch), and by the
-coding style document of the kernel I also add "{}" to the else branch.
+On Wed, Jan 16, 2013 at 03:32:06PM +0100, Uwe Kleine-K?nig wrote:
+> debug_ll_addr is only used on machines with an MMU so it can be #ifdef'ed
+> out safely. This fixes:
+> 
+> arch/arm/kernel/debug.S: Assembler messages:
+> arch/arm/kernel/debug.S:104: Error: too many positional arguments
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> ---
+> The obvious alternative fix is to make addruart on !MMU take 3
+> arguments, too.
+> 
+> The problem was introduced in
+> 
+> 	e5c5f2a (ARM: implement debug_ll_io_init())
+> 
+> which appeared in v3.8-rc1.
 
-Signed-off-by: Cong Ding <dinggnu@gmail.com>
----
- drivers/tty/serial/vt8500_serial.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Since we introduced the breakage in arm-soc, I've picked up the fix (I guess
+it could have gone through Russell's tree as well though).
 
-diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
-index 8fd1814..ac46a6e 100644
---- a/drivers/tty/serial/vt8500_serial.c
-+++ b/drivers/tty/serial/vt8500_serial.c
-@@ -567,12 +567,13 @@ static int vt8500_serial_probe(struct platform_device *pdev)
- 	if (!mmres || !irqres)
- 		return -ENODEV;
- 
--	if (np)
-+	if (np) {
- 		port = of_alias_get_id(np, "serial");
- 		if (port > VT8500_MAX_PORTS)
- 			port = -1;
--	else
-+	} else {
- 		port = -1;
-+	}
- 
- 	if (port < 0) {
- 		/* calculate the port id */
--- 
-1.7.10.4
+I've added the reference to the introducing commit, and the acks/review tags.
+
+Adding a defconfig for a !MMU platform seems like a good idea, since there's
+several of us who make sure that there is build coverage of the defconfigs and
+follow up on most of the breakage. Feel free to send one in for 3.9.
+
+
+-Olof
