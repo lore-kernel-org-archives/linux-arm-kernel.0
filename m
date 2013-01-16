@@ -1,37 +1,157 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 16 Jan 2013 18:08:14 +0100
-Subject: [PATCH 5/8] ARM: shmobile: add a GPIO controller DT node for sh7372
+Date: Wed, 16 Jan 2013 18:08:17 +0100
+Subject: [PATCH 8/8] ARM: shmobile: completely switch MMC interfaces on
+ armadillo800eva-reference to DT
 In-Reply-To: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
 References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <1358356097-26180-6-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <1358356097-26180-9-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a missing GPIO controller node to sh7372.
+Switch MMCIF, SDHI0 and SDHI1 to complete DT initialisation: use DT
+bindings to configure regulators, interface pins, card-detect GPIOs,
+various interface configuration parameters.
 
 Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 ---
- arch/arm/boot/dts/sh7372.dtsi |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts |  101 ++++++++++++++++++++
+ .../board-armadillo800eva-reference.c              |    5 +-
+ 2 files changed, 103 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh7372.dtsi b/arch/arm/boot/dts/sh7372.dtsi
-index 582fdec..7ca9322 100644
---- a/arch/arm/boot/dts/sh7372.dtsi
-+++ b/arch/arm/boot/dts/sh7372.dtsi
-@@ -19,6 +19,14 @@
- 		};
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+index 319af9b..27774eb 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+@@ -30,4 +30,105 @@
+ 		sh-eth,register-type = "gigabit";
+ 		sh-eth,phy-id = <0>;
  	};
- 
-+	gpio: pfc at e6050000 {
-+		compatible = "renesas,pfc-sh7372";
-+		reg = <0xe6050000 0x8000>,
-+		      <0xe605800c 0x20>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
++
++	reg_3p3v: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
 +	};
 +
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
++	mmcif0: mmcif at 0xe6bd0000 {
++		compatible = "renesas,sh-mmcif", "renesas,sh7372-mmcif";
++		reg = <0xe6bd0000 0x100>;
++		interrupt-parent = <&intca>;
++		interrupts = <0x1ac0 0x1ae0>;
++		vmmc-supply = <&reg_3p3v>;
++		bus-width = <8>;
++		non-removable;
++		pinctrl-names = "default";
++		pinctrl-0 = <&mmc0_pins>;
++	};
++
++	vcc_sdhi0: regulator at 1 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "vcc-sdhi0";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio 75 0>;
++		enable-active-high;
++	};
++
++	vcc_sdhi1: regulator at 2 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "vcc-sdhi1";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio 16 0>;
++		enable-active-high;
++	};
++
++	vccq_sdhi0: gpio-regulator at 0 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "vccq-sdhi0";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&vcc_sdhi0>;
++
++		enable-gpio = <&gpio 74 0>;
++		gpios = <&gpio 17 0>;
++		states = <3300000 0
++			  1800000 1>;
++
++		enable-active-high;
++	};
++
++	sdhi0: sdhi at 0xe6850000 {
++		compatible = "renesas,shmobile-sdhi";
++		reg = <0xe6850000 0x100>;
++		interrupt-parent = <&intca>;
++		interrupts = <0xe20 0xe40>;
++		vmmc-supply = <&vcc_sdhi0>;
++		vqmmc-supply = <&vccq_sdhi0>;
++		bus-width = <4>;
++		cd-gpios = <&gpio 167 1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sdhi0_pins>;
++		toshiba,mmc-has-idle-wait;
++		toshiba,mmc-cap-sdio-irq;
++	};
++
++	sdhi1: sdhi at 0xe6860000 {
++		compatible = "renesas,shmobile-sdhi";
++		reg = <0xe6860000 0x100>;
++		interrupt-parent = <&intca>;
++		interrupts = <0xea0 0xec0>;
++		vmmc-supply = <&vcc_sdhi1>;
++		bus-width = <4>;
++		cd-gpios = <&gpio 72 1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sdhi1_pins>;
++		toshiba,mmc-has-idle-wait;
++		toshiba,mmc-cap-sdio-irq;
++	};
++};
++
++&gpio {
++	sdhi0_pins: pfc_sdhi0_pins {
++		renesas,pins = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_wp";
++		renesas,function = "sdhi0";
++	};
++	sdhi1_pins: pfc_sdhi1_pins {
++		renesas,pins = "sdhi1_data4", "sdhi1_ctrl", "sdhi1_wp";
++		renesas,function = "sdhi1";
++	};
++	mmc0_pins: pfc_mmc0_pins {
++		renesas,pins = "mmc0_data8_1", "mmc0_ctrl_1";
++		renesas,function = "mmc0";
++	};
+ };
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+index c206612..f929931 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+@@ -107,9 +107,10 @@
+  */
+ static void __init eva_init(void)
+ {
+-	r8a7740_pinmux_init();
+ 	r8a7740_meram_workaround();
+ 
++	r8a7740_add_standard_devices_dt();
++
+ 	/* SCIFA1 */
+ 	gpio_request(GPIO_FN_SCIFA1_RXD, NULL);
+ 	gpio_request(GPIO_FN_SCIFA1_TXD, NULL);
+@@ -142,8 +143,6 @@ static void __init eva_init(void)
+ 	/* Early BRESP enable, Shared attribute override enable, 32K*8way */
+ 	l2x0_init(IOMEM(0xf0002000), 0x40440000, 0x82000fff);
+ #endif
+-
+-	r8a7740_add_standard_devices_dt();
+ }
+ 
+ #define RESCNT2 IOMEM(0xe6188020)
 -- 
 1.7.2.5
