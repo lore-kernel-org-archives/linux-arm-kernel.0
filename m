@@ -1,57 +1,60 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 16 Jan 2013 18:36:12 +0530
-Subject: [PATCH 2/2] ARM: tegra: DTS: cardhu: register UARTC
-In-Reply-To: <1358341572-8154-1-git-send-email-ldewangan@nvidia.com>
-References: <1358341572-8154-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1358341572-8154-2-git-send-email-ldewangan@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Jan 2013 13:08:38 +0000
+Subject: ARM DMA: Fix in dma_cache_maint_page
+In-Reply-To: <1358340715.2384.23.camel@dabdike.int.hansenpartnership.com>
+References: <50F69F72.4030807@codeaurora.org> <50F6A14C.6040206@codeaurora.org>
+ <1358340715.2384.23.camel@dabdike.int.hansenpartnership.com>
+Message-ID: <20130116130838.GS23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UARTC is used for the interfacing with bluetooth device.
-Register this UART channel as high speed serial channel
-so that it can use the APB DMA for data transfer.
+On Wed, Jan 16, 2013 at 12:51:55PM +0000, James Bottomley wrote:
+> On Wed, 2013-01-16 at 18:17 +0530, Subhash Jadavani wrote:
+> > Is it possible to pick up James patch below? Thread here: 
+> > http://comments.gmane.org/gmane.linux.kernel.mmc/18670, have the details 
+> > on the motivation behind this fix.
+> 
+> Someone should also audit the arm kernel code for more of these linear
+> page array assumptions.  I'm guessing that when sparsemem was added to
+> arm over a year ago, whoever did it either didn't audit or missed a few.
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
-The driver file got applied in Greg KH's tty tree.
-Tested in linux-next 20121229 with some more changes as
-linux-next-20130116 is crashing in pincontrol.
+No, that's a bad assumption.  We've had discontigmem for years - maybe
+something like 12 years.  I switched everything over to sparsemem, and
+sparsemem has been used on ARM for years too:
 
- arch/arm/boot/dts/tegra30-cardhu.dtsi |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+	commit 05944d74bc28fffbcce159cb915d0acff82f30a1
+	Author: Russell King <rmk@dyn-67.arm.linux.org.uk>
+	Date:   Thu Nov 30 20:43:51 2006 +0000
 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index bdb2a66..ff6b68f 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -106,6 +106,15 @@
- 				nvidia,slew-rate-rising = <1>;
- 				nvidia,slew-rate-falling = <1>;
- 			};
-+			uart3_txd_pw6 {
-+				nvidia,pins =	"uart3_txd_pw6",
-+						"uart3_cts_n_pa1",
-+						"uart3_rts_n_pc0",
-+						"uart3_rxd_pw7";
-+				nvidia,function = "uartc";
-+				nvidia,pull = <0>;
-+				nvidia,tristate = <0>;
-+			};
- 		};
- 	};
- 
-@@ -114,6 +123,12 @@
- 		clock-frequency = <408000000>;
- 	};
- 
-+	serial at 70006200 {
-+		compatible = "nvidia,tegra30-hsuart";
-+		status = "okay";
-+		clock-frequency = <408000000>;
-+	};
-+
- 	i2c at 7000c000 {
- 		status = "okay";
- 		clock-frequency = <100000>;
--- 
-1.7.1.1
+	    [ARM] Add initial sparsemem support
+
+	    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+However, there's a big problem with this: very few of the lead people
+have machines which suffer from this disability, so there's very little
+testing of it - and there's very little testing of new code with it.
+
+The patch which originally introduced this code which your patch
+touches was part of adding highmem support to ARM:
+
+	commit 43377453af83b8ff8c1c731da1508bd6b84ebfea
+	Author: Nicolas Pitre <nico@cam.org>
+	Date:   Thu Mar 12 22:52:09 2009 -0400
+
+	    [ARM] introduce dma_cache_maint_page()
+
+	    This is a helper to be used by the DMA mapping API to handle cache
+	    maintenance for memory identified by a page structure instead of a
+	    virtual address.  Those pages may or may not be highmem pages, and
+	    when they're highmem pages, they may or may not be virtually mapped.
+	    When they're not mapped then there is no L1 cache to worry about. But
+	    even in that case the L2 cache must be processed since unmapped highmem
+	    pages can still be L2 cached.
+
+	    Signed-off-by: Nicolas Pitre <nico@marvell.com>
+
+some three years later, and has been through a number of revisions since.
+
+I'd really like to get rid of sparsemem so it's one less failure case, but
+alas there's a relatively small bunch of folk who rely upon it.  That
+means it's always going to be more buggy.
