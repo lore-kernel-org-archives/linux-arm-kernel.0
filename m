@@ -1,55 +1,227 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 16 Jan 2013 18:08:09 +0100
-Subject: [PATCH 0/8] ARM: shmobile: pinctrl and DT extensions
-Message-ID: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
+Date: Wed, 16 Jan 2013 18:08:10 +0100
+Subject: [PATCH 1/8] pinctrl: add SDHI and MMCIF pin groups to r8a7740
+In-Reply-To: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
+References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <1358356097-26180-2-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches extend sh7372 and r8a7740 pinctrl support and use it to add 
-SDHI and MMCIF to armadillo800eva and mackerel reference DT 
-implementations. GPIO-based pin configuration is removed from board files. 
-Additionally, MMC interfaces on armadillo800eva support run-time 
-power-switching, which is also supported in DT with these patches.
+Add pin groups for the first two SDHI interfaces and two alternative pin
+groups for the MMCIF interface on the r8a7740 SoC.
 
-This series is based on recent work by Laurent and Simon. sh7372 and 
-r8a7740 pinctrl support seems to be stable and, probably, won't change, 
-so, also the base for these patches seems solid. Since the current pinctrl 
-implementation for sh73a0 is likely to change, support for kzm9g isn't 
-included in this series.
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c |  180 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 180 insertions(+), 0 deletions(-)
 
-Guennadi Liakhovetski (8):
-  pinctrl: add SDHI and MMCIF pin groups to r8a7740
-  pinctrl: add SDHI and MMCIF pin groups to sh7372
-  ARM: shmobile: simplify armadillo800eva and kzm9g Kconfig
-    dependencies
-  ARM: shmobile: add MMCIF and SDHI DT clock aliases to sh73a0 and
-    r8a7740
-  ARM: shmobile: add a GPIO controller DT node for sh7372
-  ARM: shmobile: use GPIO SD-card detection on armadillo800eva
-  ARM: shmobile: completely switch MMC interfaces on mackerel-reference
-    to DT
-  ARM: shmobile: completely switch MMC interfaces on
-    armadillo800eva-reference to DT
-
- .../boot/dts/r8a7740-armadillo800eva-reference.dts |  101 ++++++++++
- arch/arm/boot/dts/sh7372-mackerel-reference.dts    |   42 +++-
- arch/arm/boot/dts/sh7372.dtsi                      |    8 +
- arch/arm/mach-shmobile/Kconfig                     |   12 +-
- .../board-armadillo800eva-reference.c              |    5 +-
- arch/arm/mach-shmobile/board-armadillo800eva.c     |   10 +-
- arch/arm/mach-shmobile/board-mackerel-reference.c  |   46 -----
- arch/arm/mach-shmobile/clock-r8a7740.c             |    4 +
- arch/arm/mach-shmobile/clock-sh73a0.c              |    3 +
- drivers/pinctrl/sh-pfc/pfc-r8a7740.c               |  180 +++++++++++++++++
- drivers/pinctrl/sh-pfc/pfc-sh7372.c                |  205 ++++++++++++++++++++
- 11 files changed, 552 insertions(+), 64 deletions(-)
-
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+index d0b7165..5e9a671 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+@@ -1870,6 +1870,138 @@ static const unsigned int lcd1_sys_mux[] = {
+ 	LCD1_CS_MARK, LCD1_WR_MARK, LCD1_RD_MARK, LCD1_RS_MARK,
+ };
+ 
++static const unsigned int sdhi0_data1_pins[] = {
++	/* D0 */
++	77,
++};
++static const unsigned int sdhi0_data1_mux[] = {
++	SDHI0_D0_MARK,
++};
++static const unsigned int sdhi0_data4_pins[] = {
++	/* D[0:3] */
++	77, 78, 79, 80,
++};
++static const unsigned int sdhi0_data4_mux[] = {
++	SDHI0_D0_MARK, SDHI0_D1_MARK, SDHI0_D2_MARK, SDHI0_D3_MARK,
++};
++static const unsigned int sdhi0_ctrl_pins[] = {
++	/* CMD, CLK */
++	76, 82,
++};
++static const unsigned int sdhi0_ctrl_mux[] = {
++	SDHI0_CMD_MARK, SDHI0_CLK_MARK,
++};
++static const unsigned int sdhi0_cd_pins[] = {
++	/* CD */
++	81,
++};
++static const unsigned int sdhi0_cd_mux[] = {
++	SDHI0_CD_MARK,
++};
++static const unsigned int sdhi0_wp_pins[] = {
++	/* WP */
++	83,
++};
++static const unsigned int sdhi0_wp_mux[] = {
++	SDHI0_WP_MARK,
++};
++
++static const unsigned int sdhi1_data1_pins[] = {
++	/* D0 */
++	68,
++};
++static const unsigned int sdhi1_data1_mux[] = {
++	SDHI1_D0_MARK,
++};
++static const unsigned int sdhi1_data4_pins[] = {
++	/* D[0:3] */
++	68, 69, 70, 71,
++};
++static const unsigned int sdhi1_data4_mux[] = {
++	SDHI1_D0_MARK, SDHI1_D1_MARK, SDHI1_D2_MARK, SDHI1_D3_MARK,
++};
++static const unsigned int sdhi1_ctrl_pins[] = {
++	/* CMD, CLK */
++	67, 66,
++};
++static const unsigned int sdhi1_ctrl_mux[] = {
++	SDHI1_CMD_MARK, SDHI1_CLK_MARK,
++};
++static const unsigned int sdhi1_cd_pins[] = {
++	/* CD */
++	72,
++};
++static const unsigned int sdhi1_cd_mux[] = {
++	SDHI1_CD_MARK,
++};
++static const unsigned int sdhi1_wp_pins[] = {
++	/* WP */
++	73,
++};
++static const unsigned int sdhi1_wp_mux[] = {
++	SDHI1_WP_MARK,
++};
++
++static const unsigned int mmc0_data1_0_pins[] = {
++	/* D[0] */
++	68,
++};
++static const unsigned int mmc0_data1_0_mux[] = {
++	MMC0_D0_PORT68_MARK,
++};
++static const unsigned int mmc0_data4_0_pins[] = {
++	/* D[0:3] */
++	68, 69, 70, 71,
++};
++static const unsigned int mmc0_data4_0_mux[] = {
++	MMC0_D0_PORT68_MARK, MMC0_D1_PORT69_MARK, MMC0_D2_PORT70_MARK, MMC0_D3_PORT71_MARK,
++};
++static const unsigned int mmc0_data8_0_pins[] = {
++	/* D[0:7] */
++	68, 69, 70, 71, 72, 73, 74, 75,
++};
++static const unsigned int mmc0_data8_0_mux[] = {
++	MMC0_D0_PORT68_MARK, MMC0_D1_PORT69_MARK, MMC0_D2_PORT70_MARK, MMC0_D3_PORT71_MARK,
++	MMC0_D4_PORT72_MARK, MMC0_D5_PORT73_MARK, MMC0_D6_PORT74_MARK, MMC0_D7_PORT75_MARK,
++};
++static const unsigned int mmc0_ctrl_0_pins[] = {
++	/* CMD, CLK */
++	66, 67,
++};
++static const unsigned int mmc0_ctrl_0_mux[] = {
++	MMC0_CMD_PORT67_MARK, MMC0_CLK_PORT66_MARK,
++};
++
++static const unsigned int mmc0_data1_1_pins[] = {
++	/* D[0] */
++	149,
++};
++static const unsigned int mmc0_data1_1_mux[] = {
++	MMC1_D0_PORT149_MARK,
++};
++static const unsigned int mmc0_data4_1_pins[] = {
++	/* D[0:3] */
++	149, 148, 147, 146,
++};
++static const unsigned int mmc0_data4_1_mux[] = {
++	MMC1_D0_PORT149_MARK, MMC1_D1_PORT148_MARK, MMC1_D2_PORT147_MARK, MMC1_D3_PORT146_MARK,
++};
++static const unsigned int mmc0_data8_1_pins[] = {
++	/* D[0:7] */
++	149, 148, 147, 146, 145, 144, 143, 142,
++};
++static const unsigned int mmc0_data8_1_mux[] = {
++	MMC1_D0_PORT149_MARK, MMC1_D1_PORT148_MARK, MMC1_D2_PORT147_MARK, MMC1_D3_PORT146_MARK,
++	MMC1_D4_PORT145_MARK, MMC1_D5_PORT144_MARK, MMC1_D6_PORT143_MARK, MMC1_D7_PORT142_MARK,
++};
++static const unsigned int mmc0_ctrl_1_pins[] = {
++	/* CMD, CLK */
++	104, 103,
++};
++static const unsigned int mmc0_ctrl_1_mux[] = {
++	MMC1_CMD_PORT104_MARK, MMC1_CLK_PORT103_MARK,
++};
++
+ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(lcd0_data8),
+ 	SH_PFC_PIN_GROUP(lcd0_data9),
+@@ -1893,6 +2025,24 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(lcd1_lclk),
+ 	SH_PFC_PIN_GROUP(lcd1_sync),
+ 	SH_PFC_PIN_GROUP(lcd1_sys),
++	SH_PFC_PIN_GROUP(sdhi0_data1),
++	SH_PFC_PIN_GROUP(sdhi0_data4),
++	SH_PFC_PIN_GROUP(sdhi0_ctrl),
++	SH_PFC_PIN_GROUP(sdhi0_cd),
++	SH_PFC_PIN_GROUP(sdhi0_wp),
++	SH_PFC_PIN_GROUP(sdhi1_data1),
++	SH_PFC_PIN_GROUP(sdhi1_data4),
++	SH_PFC_PIN_GROUP(sdhi1_ctrl),
++	SH_PFC_PIN_GROUP(sdhi1_cd),
++	SH_PFC_PIN_GROUP(sdhi1_wp),
++	SH_PFC_PIN_GROUP(mmc0_data1_0),
++	SH_PFC_PIN_GROUP(mmc0_data4_0),
++	SH_PFC_PIN_GROUP(mmc0_data8_0),
++	SH_PFC_PIN_GROUP(mmc0_ctrl_0),
++	SH_PFC_PIN_GROUP(mmc0_data1_1),
++	SH_PFC_PIN_GROUP(mmc0_data4_1),
++	SH_PFC_PIN_GROUP(mmc0_data8_1),
++	SH_PFC_PIN_GROUP(mmc0_ctrl_1),
+ };
+ 
+ static const char * const lcd0_groups[] = {
+@@ -1923,9 +2073,39 @@ static const char * const lcd1_groups[] = {
+ 	"lcd1_sys",
+ };
+ 
++static const char * const sdhi0_groups[] = {
++	"sdhi0_data1",
++	"sdhi0_data4",
++	"sdhi0_ctrl",
++	"sdhi0_cd",
++	"sdhi0_wp",
++};
++
++static const char * const sdhi1_groups[] = {
++	"sdhi1_data1",
++	"sdhi1_data4",
++	"sdhi1_ctrl",
++	"sdhi1_cd",
++	"sdhi1_wp",
++};
++
++static const char * const mmc0_groups[] = {
++	"mmc0_data1_0",
++	"mmc0_data4_0",
++	"mmc0_data8_0",
++	"mmc0_ctrl_0",
++	"mmc0_data1_1",
++	"mmc0_data4_1",
++	"mmc0_data8_1",
++	"mmc0_ctrl_1",
++};
++
+ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(lcd0),
+ 	SH_PFC_FUNCTION(lcd1),
++	SH_PFC_FUNCTION(sdhi0),
++	SH_PFC_FUNCTION(sdhi1),
++	SH_PFC_FUNCTION(mmc0),
+ };
+ 
+ #define PINMUX_FN_BASE	ARRAY_SIZE(pinmux_pins)
 -- 
 1.7.2.5
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
