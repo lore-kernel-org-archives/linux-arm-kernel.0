@@ -1,322 +1,193 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 16 Jan 2013 17:13:02 +0100
-Subject: [PATCH 2/7] reset: Add reset controller API
+Date: Wed, 16 Jan 2013 17:13:03 +0100
+Subject: [PATCH 3/7] ARM i.MX6q: Add GPU, VPU, IPU,
+ and OpenVG resets to System Reset Controller (SRC)
 In-Reply-To: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
 References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1358352787-15441-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1358352787-15441-4-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a simple API for devices to request being reset
-by separate reset controller hardware and implements the
-reset signal device tree binding.
+The SRC has auto-deasserting reset bits that control reset lines to
+the GPU, VPU, IPU, and OpenVG IP modules. This patch adds a reset
+controller that can be controlled by those devices using the
+reset controller API.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/Kconfig        |    2 +
- drivers/Makefile       |    2 +
- drivers/reset/Kconfig  |   10 ++
- drivers/reset/Makefile |    2 +
- drivers/reset/core.c   |  241 ++++++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 257 insertions(+)
- create mode 100644 drivers/reset/Kconfig
- create mode 100644 drivers/reset/Makefile
- create mode 100644 drivers/reset/core.c
+ .../devicetree/bindings/reset/fsl,imx-src.txt      |   49 +++++++++++++
+ arch/arm/mach-imx/src.c                            |   72 ++++++++++++++++++++
+ include/linux/imx-src.h                            |    6 ++
+ 3 files changed, 127 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx-src.txt
+ create mode 100644 include/linux/imx-src.h
 
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index f5fb072..51f73ae 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -158,4 +158,6 @@ source "drivers/irqchip/Kconfig"
- 
- source "drivers/ipack/Kconfig"
- 
-+source "drivers/reset/Kconfig"
-+
- endmenu
-diff --git a/drivers/Makefile b/drivers/Makefile
-index 346ecc5..870bf7e 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -42,6 +42,8 @@ ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
- obj-y				+= clocksource/
- endif
- 
-+obj-$(CONFIG_RESET_CONTROLLER)	+= reset/
-+
- # tty/ comes before char/ so that the VT console is the boot-time
- # default.
- obj-y				+= tty/
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+diff --git a/Documentation/devicetree/bindings/reset/fsl,imx-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx-src.txt
 new file mode 100644
-index 0000000..82dc89e
+index 0000000..1330177
 --- /dev/null
-+++ b/drivers/reset/Kconfig
-@@ -0,0 +1,10 @@
-+menuconfig RESET_CONTROLLER
-+	bool "Reset Controller Support"
-+	help
-+	  Generic Reset Controller support.
++++ b/Documentation/devicetree/bindings/reset/fsl,imx-src.txt
+@@ -0,0 +1,49 @@
++Freescale i.MX System Reset Controller
++======================================
 +
-+	  This framework is designed to abstract reset handling of devices
-+	  via GPIOs or SoC-internal reset controller modules.
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
 +
-+	  If unsure, say no.
++Required properties:
++- compatible: Should be "fsl,<chip>-src"
++- reg: should be register base and length as documented in the
++  datasheet
++- interrupts: Should contain SRC interrupt and CPU WDOG interrupt,
++  in this order.
++- #reset-cells: 1, see below
 +
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-new file mode 100644
-index 0000000..9a7b6df
---- /dev/null
-+++ b/drivers/reset/Makefile
-@@ -0,0 +1,2 @@
-+obj-$(CONFIG_RESET_CONTROLLER) += core.o
++example:
 +
-diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-new file mode 100644
-index 0000000..f0ed61b
---- /dev/null
-+++ b/drivers/reset/core.c
-@@ -0,0 +1,241 @@
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/export.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/reset.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+
-+static DEFINE_MUTEX(reset_controller_list_mutex);
-+static LIST_HEAD(reset_controller_list);
-+
-+/**
-+ * struct reset_control - a reset control
-+ *
-+ * @id: ID of the reset controller in the reset
-+ *      controller device
-+ */
-+struct reset_control {
-+	struct reset_controller_dev *rcdev;
-+	unsigned int id;
++src: src at 020d8000 {
++        compatible = "fsl,imx6q-src";
++        reg = <0x020d8000 0x4000>;
++        interrupts = <0 91 0x04 0 96 0x04>;
++        #reset-cells = <1>;
 +};
 +
-+/**
-+ * reset_controller_register - register a reset controller
-+ *
-+ * @ops: a pointer to struct reset_controller_ops callbacks
-+ *
-+ * Returns a struct reset_controller_dev or IS_ERR() condition
-+ * containing errno.
-+ */
-+int reset_controller_register(struct reset_controller_dev *rcdev)
++Specifying reset lines connected to IP modules
++==============================================
++
++The system reset controller can be used to reset the GPU, VPU,
++IPU, and OpenVG IP modules on i.MX5 and i.MX6 ICs. Those device
++nodes should specify the reset line on the SRC in their resets
++property, containing a phandle to the SRC device node and a
++RESET_INDEX specifying which module to reset, as described in
++reset.txt
++
++example:
++
++        ipu1: ipu at 02400000 {
++                resets = <&src 2>;
++        };
++        ipu2: ipu at 02800000 {
++                resets = <&src 4>;
++        };
++
++The following RESET_INDEX values are valid for i.MX5:
++GPU_RESET     0
++VPU_RESET     1
++IPU1_RESET    2
++OPEN_VG_RESET 3
++The following additional RESET_INDEX value is valid for i.MX6:
++IPU2_RESET    4
+diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+index e15f155..41687c6 100644
+--- a/arch/arm/mach-imx/src.c
++++ b/arch/arm/mach-imx/src.c
+@@ -15,16 +15,85 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/smp.h>
++#include <linux/reset-controller.h>
+ #include <asm/smp_plat.h>
+ 
+ #define SRC_SCR				0x000
+ #define SRC_GPR1			0x020
+ #define BP_SRC_SCR_WARM_RESET_ENABLE	0
++#define BP_SRC_SCR_SW_GPU_RST		1
++#define BP_SRC_SCR_SW_VPU_RST		2
++#define BP_SRC_SCR_SW_IPU1_RST		3
++#define BP_SRC_SCR_SW_OPEN_VG_RST	4
++#define BP_SRC_SCR_SW_IPU2_RST		12
+ #define BP_SRC_SCR_CORE1_RST		14
+ #define BP_SRC_SCR_CORE1_ENABLE		22
+ 
+ static void __iomem *src_base;
+ 
++static int sw_reset_bits[5] = {
++	BP_SRC_SCR_SW_GPU_RST,
++	BP_SRC_SCR_SW_VPU_RST,
++	BP_SRC_SCR_SW_IPU1_RST,
++	BP_SRC_SCR_SW_OPEN_VG_RST,
++	BP_SRC_SCR_SW_IPU2_RST
++};
++
++static int imx_src_reset(unsigned long sw_reset_idx)
 +{
-+	mutex_lock(&reset_controller_list_mutex);
-+	list_add(&rcdev->list, &reset_controller_list);
-+	mutex_unlock(&reset_controller_list_mutex);
++	unsigned long timeout;
++	int bit;
++	u32 val;
 +
-+	return 0;
-+}
++	if (!src_base)
++		return -ENODEV;
 +
-+/**
-+ * reset_control_reset - reset the controlled device
-+ * @rstc: reset controller
-+ */
-+int reset_control_reset(struct reset_control *rstc)
-+{
-+	if (rstc->rcdev->ops->reset)
-+		return rstc->rcdev->ops->reset(rstc->id);
++	if (sw_reset_idx >= ARRAY_SIZE(sw_reset_bits))
++		return -EINVAL;
 +
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(reset_control_reset);
++	bit = 1 << sw_reset_bits[sw_reset_idx];
 +
-+/**
-+ * reset_control_assert - asserts the reset line
-+ * @rstc: reset controller
-+ */
-+int reset_control_assert(struct reset_control *rstc)
-+{
-+	if (rstc->rcdev->ops->assert)
-+		return rstc->rcdev->ops->assert(rstc->id);
++	val = readl_relaxed(src_base + SRC_SCR);
++	val |= bit;
++	writel_relaxed(val, src_base + SRC_SCR);
 +
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(reset_control_assert);
-+
-+/**
-+ * reset_control_deassert - deasserts the reset line
-+ * @rstc: reset controller
-+ */
-+int reset_control_deassert(struct reset_control *rstc)
-+{
-+	if (rstc->rcdev->ops->deassert)
-+		return rstc->rcdev->ops->deassert(rstc->id);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(reset_control_deassert);
-+
-+/**
-+ * reset_control_is_asserted - deasserts the reset line
-+ * @rstc: reset controller
-+ */
-+int reset_control_is_asserted(struct reset_control *rstc)
-+{
-+	if (rstc->rcdev->ops->is_asserted)
-+		return rstc->rcdev->ops->is_asserted(rstc->id);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(reset_control_is_asserted);
-+
-+/**
-+ * reset_control_get - Lookup and obtain a reference to a reset controller.
-+ * @dev: device to be reset by the controller
-+ * @id: reset line name
-+ *
-+ * Returns a struct reset_control or IS_ERR() condition containing errno.
-+ *
-+ * Use of id names is optional.
-+ */
-+struct reset_control *reset_control_get(struct device *dev, const char *id)
-+{
-+	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
-+	struct reset_controller_dev *r, *rcdev;
-+	struct device_node *rcdev_node;
-+	struct of_phandle_args args;
-+	int rcdev_index;
-+	int ret;
-+	int i;
-+
-+	if (!dev)
-+		return ERR_PTR(-EINVAL);
-+
-+	rcdev_node = NULL;
-+	for (i = 0; rcdev_node == NULL; i++) {
-+		ret = of_parse_phandle_with_args(dev->of_node, "resets",
-+						 "#reset-cells", i, &args);
-+		if (ret)
-+			return ERR_PTR(ret);
-+		of_node_put(args.np);
-+		if (args.args_count <= 0)
-+			return ERR_PTR(-EINVAL);
-+
-+		if (id) {
-+			const char *reset_name;
-+			ret = of_property_read_string_index(dev->of_node,
-+							    "reset-names", i,
-+							    &reset_name);
-+			if (ret)
-+				return ERR_PTR(ret);
-+			if (strcmp(id, reset_name) != 0)
-+				continue;
-+		}
-+
-+		rcdev_node = args.np;
-+		rcdev_index = args.args[0];
++	timeout = jiffies + msecs_to_jiffies(1000);
++	while (readl(src_base + SRC_SCR) & bit) {
++		if (time_after(jiffies, timeout))
++			return -ETIME;
++		cpu_relax();
 +	}
 +
-+	mutex_lock(&reset_controller_list_mutex);
-+	rcdev = NULL;
-+	list_for_each_entry(r, &reset_controller_list, list) {
-+		if (rcdev_node == r->of_node) {
-+			rcdev = r;
-+			break;
-+		}
-+	}
-+	mutex_unlock(&reset_controller_list_mutex);
-+
-+	if (!rcdev)
-+		return ERR_PTR(-ENODEV);
-+
-+	try_module_get(rcdev->owner);
-+
-+	rstc = kzalloc(sizeof(*rstc), GFP_KERNEL);
-+	if (!rstc)
-+		return ERR_PTR(-ENOMEM);
-+
-+	rstc->rcdev = rcdev;
-+	rstc->id = rcdev_index;
-+
-+	return rstc;
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(reset_control_get);
 +
-+/**
-+ * reset_control_put - free the reset controller
-+ * @reset: reset controller
-+ */
-+
-+void reset_control_put(struct reset_control *rstc)
++static int imx_src_is_asserted(unsigned long sw_reset_idx)
 +{
-+	if (rstc == NULL || IS_ERR(rstc))
-+		return;
++	int bit;
++	u32 val;
 +
-+	kfree(rstc);
-+	module_put(rstc->rcdev->owner);
++	if (!src_base)
++		return -ENODEV;
++
++	if (sw_reset_idx >= ARRAY_SIZE(sw_reset_bits))
++		return -EINVAL;
++
++	bit = 1 << sw_reset_bits[sw_reset_idx];
++
++	val = readl_relaxed(src_base + SRC_SCR);
++
++	return (val & bit) ? 1 : 0;
 +}
-+EXPORT_SYMBOL_GPL(reset_control_put);
 +
-+static void devm_reset_control_release(struct device *dev, void *res)
-+{
-+	reset_control_put(*(struct reset_control **)res);
-+}
++static struct reset_control_ops imx_src_ops = {
++	.reset = imx_src_reset,
++	.is_asserted = imx_src_is_asserted,
++};
 +
-+/**
-+ * devm_reset_control_get - resource managed reset_control_get()
-+ * @dev: device to be reset by the controller
-+ * @id: reset line name
-+ *
-+ * Managed reset_control_get(). For reset controllers returned from this
-+ * function, reset_control_put() is called automatically on driver detach.
-+ * See reset_control_get() for more information.
-+ */
-+struct reset_control *devm_reset_control_get(struct device *dev, const char *id)
-+{
-+	struct reset_control **ptr, *rstc;
++static struct reset_controller_dev imx_reset_controller = {
++	.ops = &imx_src_ops,
++};
 +
-+	ptr = devres_alloc(devm_reset_control_release, sizeof(*ptr),
-+			   GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
+ void imx_enable_cpu(int cpu, bool enable)
+ {
+ 	u32 mask, val;
+@@ -65,6 +134,9 @@ void __init imx_src_init(void)
+ 	src_base = of_iomap(np, 0);
+ 	WARN_ON(!src_base);
+ 
++	imx_reset_controller.of_node = np;
++	reset_controller_register(&imx_reset_controller);
 +
-+	rstc = reset_control_get(dev, id);
-+	if (!IS_ERR(rstc)) {
-+		*ptr = rstc;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
+ 	/*
+ 	 * force warm reset sources to generate cold reset
+ 	 * for a more reliable restart
+diff --git a/include/linux/imx-src.h b/include/linux/imx-src.h
+new file mode 100644
+index 0000000..b93ed96
+--- /dev/null
++++ b/include/linux/imx-src.h
+@@ -0,0 +1,6 @@
++#ifndef __IMX_SRC_H__
++#define __IMX_SRC_H__
 +
-+	return rstc;
-+}
-+EXPORT_SYMBOL_GPL(devm_reset_control_get);
++extern int imx_src_reset(int sw_reset_idx);
 +
-+/**
-+ * device_reset - find reset controller associated with the device
-+ *                and perform reset
-+ * @dev: device to be reset by the controller
-+ *
-+ * Convenience wrapper for reset_control_get() and reset_control_reset().
-+ * This is useful for the common case of devices with single, dedicated reset
-+ * lines.
-+ */
-+int device_reset(struct device *dev)
-+{
-+	struct reset_control *rstc;
-+	int ret;
-+
-+	rstc = reset_control_get(dev, NULL);
-+	if (IS_ERR(rstc))
-+		return PTR_ERR(rstc);
-+
-+	ret = reset_control_reset(rstc);
-+
-+	kfree(rstc);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(device_reset);
++#endif /* __IMX_SRC_H__ */
 -- 
 1.7.10.4
