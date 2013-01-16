@@ -1,34 +1,35 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 16 Jan 2013 16:43:53 +0200
-Subject: [PATCH v6 22/22] mdf: omap-usb-host: get rid of build warning
-In-Reply-To: <1358347433-329-1-git-send-email-rogerq@ti.com>
-References: <1358347433-329-1-git-send-email-rogerq@ti.com>
-Message-ID: <1358347433-329-23-git-send-email-rogerq@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 16 Jan 2013 20:19:22 +0530
+Subject: [PATCH] ARM: mm: Fix missing XN flag for for MT_MEMORY_SO
+Message-ID: <1358347762-14682-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the below build warning when driver is built-in.
+Commit 8fb54284ba6a {ARM: mm: Add strongly ordered descriptor support}
+added XN flag at section level but missed it at PTE level.
 
-drivers/mfd/omap-usb-host.c:750:12: warning:
-?usbhs_omap_remove? defined but not used [-Wunused-function]
+Fix it by adding the L_PTE_XN to MT_MEMORY_SO PET descriptor.
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+
+Reported-by: Richard Woodruff <r-woodruff2@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/mfd/omap-usb-host.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mm/mmu.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 56b6f69..151034f 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -778,7 +778,7 @@ static struct platform_driver usbhs_omap_driver = {
- 		.owner		= THIS_MODULE,
- 		.pm		= &usbhsomap_dev_pm_ops,
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 9f06102..ce328c7 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -283,7 +283,7 @@ static struct mem_type mem_types[] = {
  	},
--	.remove		= __exit_p(usbhs_omap_remove),
-+	.remove		= usbhs_omap_remove,
- };
- 
- MODULE_AUTHOR("Keshava Munegowda <keshava_mgowda@ti.com>");
+ 	[MT_MEMORY_SO] = {
+ 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+-				L_PTE_MT_UNCACHED,
++				L_PTE_MT_UNCACHED | L_PTE_XN,
+ 		.prot_l1   = PMD_TYPE_TABLE,
+ 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_S |
+ 				PMD_SECT_UNCACHED | PMD_SECT_XN,
 -- 
-1.7.4.1
+1.7.9.5
