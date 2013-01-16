@@ -1,61 +1,50 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Wed, 16 Jan 2013 16:16:59 -0300
-Subject: [PATCH 5/6] arm: mvebu: Enable USB controllers on Armada XP
- OpenBlocks AX3-4 board
-In-Reply-To: <CABMQnVLD+VKj53dfQC24AwCboed3EGt+gqTKt-B9q8nhEx3Ytg@mail.gmail.com>
-References: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1358243670-11935-5-git-send-email-ezequiel.garcia@free-electrons.com>
- <CABMQnVLD+VKj53dfQC24AwCboed3EGt+gqTKt-B9q8nhEx3Ytg@mail.gmail.com>
-Message-ID: <CALF0-+XKGk+ru3VZ6815KTu_Aj_daYafr+Y5WJ9dXUoFqbTHOQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 16 Jan 2013 20:26:48 +0100
+Subject: [PATCH] [RFC] ARM: compile fix for DEBUG_LL=y && MMU=n
+In-Reply-To: <50F6E6C4.1050409@wwwdotorg.org>
+References: <1358346726-27199-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <50F6E6C4.1050409@wwwdotorg.org>
+Message-ID: <20130116192648.GZ14860@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nobuhiro,
+On Wed, Jan 16, 2013 at 10:43:32AM -0700, Stephen Warren wrote:
+> On 01/16/2013 07:32 AM, Uwe Kleine-K?nig wrote:
+> > debug_ll_addr is only used on machines with an MMU so it can be #ifdef'ed
+> > out safely. This fixes:
+> > 
+> > arch/arm/kernel/debug.S: Assembler messages:
+> > arch/arm/kernel/debug.S:104: Error: too many positional arguments
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Stephen Warren <swarren@nvidia.com>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > ---
+> > The obvious alternative fix is to make addruart on !MMU take 3
+> > arguments, too.
+> > 
+> > The problem was introduced in
+> > 
+> > 	e5c5f2a (ARM: implement debug_ll_io_init())
+> 
+> It may be useful to mention that in the commit message.
+right.
 
-On Tue, Jan 15, 2013 at 9:01 PM, Nobuhiro Iwamatsu <iwamatsu@nigauri.org> wrote:
-> Hi,
->
->
->
-> On Tue, Jan 15, 2013 at 6:54 PM, Ezequiel Garcia
-> <ezequiel.garcia@free-electrons.com> wrote:
->> Cc: Lior Amsalem <alior@marvell.com>
->> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->> ---
->>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    9 +++++++++
->>  1 files changed, 9 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
->> index b24644f..55f5b6f 100644
->> --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
->> +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
->> @@ -127,5 +127,14 @@
->>                         nr-ports = <2>;
->>                         status = "okay";
->>                 };
->> +               usb at d0050000 {
->> +                       status = "okay";
->> +               };
->> +               usb at d0051000 {
->> +                       status = "okay";
->> +               };
->> +               usb at d0052000 {
->> +                       status = "okay";
->> +               };
-> USB2 of openblocks-ax3-4 is used as Mini-PCIE.
-> I think this is unnecessary.
->
+> Sorry for the breakage. Are there any ARM defconfigs for !MMU?
+I'm not aware of anything in mainline.
+ 
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+thanks
 
-Mmm... could you explain this with some more detail.
-Unfortunately, I don't have access to an Openblocks board to check on this,
-so I'd appreciate any clarification.
+> (although should the second copy of debug_ll_addr at the end of the file
+> be ifdef'd away too; the one for CONFIG_DEBUG_SEMIHOSTING)?
+In contrast to the !CONFIG_DEBUG_SEMIHOSTING implementation this one
+doesn't call addruart and should compile just fine. I don't care much.
 
-Is there any Openblocks datasheet or hardware schematics publicly
-available for me to look at?
-
-Thanks a lot,
+Best regards
+Uwe
 
 -- 
-    Ezequiel
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
