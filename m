@@ -1,65 +1,93 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 16 Jan 2013 15:02:26 +0900
-Subject: [PATCH 5/5] ARM: mach-shmobile: kzm9d: update defconfig
-In-Reply-To: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
-References: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1358316146-12579-6-git-send-email-horms+renesas@verge.net.au>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 16 Jan 2013 12:03:40 +0530
+Subject: [PATCH 15/16] ARM: vexpress/dcscb: handle platform coherency
+ exit/setup and CCI
+In-Reply-To: <20130115182059.GB1983@linaro.org>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <1357777251-13541-16-git-send-email-nicolas.pitre@linaro.org>
+ <50F059A4.4010107@ti.com> <alpine.LFD.2.02.1301111425020.6300@xanadu.home>
+ <50F10EF4.9070909@ti.com>
+ <20130114122547.GA21142@e102568-lin.cambridge.arm.com>
+ <50F4F5D2.5000706@ti.com> <20130115182059.GB1983@linaro.org>
+Message-ID: <50F649C4.70400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Do not disable SUSPEND
+On Tuesday 15 January 2013 11:50 PM, Dave Martin wrote:
+> On Tue, Jan 15, 2013 at 11:53:14AM +0530, Santosh Shilimkar wrote:
+>> On Monday 14 January 2013 05:55 PM, Lorenzo Pieralisi wrote:
+>>> On Sat, Jan 12, 2013 at 07:21:24AM +0000, Santosh Shilimkar wrote:
+>>>> On Saturday 12 January 2013 12:58 AM, Nicolas Pitre wrote:
+>>>>> On Fri, 11 Jan 2013, Santosh Shilimkar wrote:
+>>>>>
+>>>>>> On Thursday 10 January 2013 05:50 AM, Nicolas Pitre wrote:
+>>>>>>> From: Dave Martin <dave.martin@linaro.org>
+>>>>>>>
+>>>>>>> +		/*
+>>>>>>> +		 * Flush the local CPU cache.
+>>>>>>> +		 *
+>>>>>>> +		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
+>>>>>>> +		 * a preliminary flush here for those CPUs.  At least, that's
+>>>>>>> +		 * the theory -- without the extra flush, Linux explodes on
+>>>>>>> +		 * RTSM (maybe not needed anymore, to be investigated).
+>>>>>>> +		 */
+>>>>>> This is expected if the entire code is not in one stack frame and the
+>>>>>> additional flush is needed to avoid possible stack corruption. This
+>>>>>> issue has been discussed in past on the list.
+>>>>>
+>>>>> I missed that.  Do you have a reference or pointer handy?
+>>>>>
+>>>>> What is strange is that this is 100% reproducible on RTSM while this
+>>>>> apparently is not an issue on real hardware so far.
+>>>>>
+>>>> I tried searching archives and realized the discussion was in private
+>>>> email thread. There are some bits and pieces on list but not all the
+>>>> information.
+>>>>
+>>>> The main issue RMK pointed out is- An additional L1 flush needed
+>>>> to avoid the effective change of view of memory when the C bit is
+>>>> turned off, and the cache is no longer searched for local CPU accesses.
+>>>>
+>>>> In your case dcscb_power_down() has updated the stack which can be hit
+>>>> in cache line and hence cache is dirty now. Then cpu_proc_fin() clears
+>>>> the C-bit and hence for sub sequent calls the L1 cache won't be
+>>>> searched. You then call flush_cache_all() which again updates the
+>>>> stack but avoids searching the L1 cache. So it overwrites previous
+>>>> saved stack frame. This seems to be an issue in your case as well.
+>>>
+>>> On A15/A7 even with the C bit cleared the D-cache is searched, the
+>>> situation above cannot happen and if it does we are facing a HW/model bug.
+>>> If this code is run on A9 then we have a problem since there, when the C bit
+>>> is cleared D-cache is not searched (and that's why the sequence above
+>>> should be written in assembly with no data access whatsoever), but on
+>>> A15/A7 we do not.
+>>>
+>> Good point. May be model has modeled A9 and not A15 but in either
+>> case, lets be consistent for all ARMv7 machines at least to avoid
+>> people debugging similar issues. Many machines share code for ARMv7
+>> processors so the best things is to stick to the sequence which works
+>> across all ARMv7 processors.
+>
+> Is it sufficient to clarify the comment to indicate that the code is
+> not directly reusable for other CPU combinations?
+>
+Thats not what I mean. CPU power down sequence is as per the
+ARM specs so there shouldn't be an issue in case people
+find it useful for other purposes. Thats other topc though.
 
-  Suspend seems to work fine on the kzm9d.
+> DCSCB is incredibly platform-specific, and we would not expect to
+> see it in other platforms.
+>
+> Or do we consider the risk of people copying this code verbatim
+> (including the "do not copy this code" comment) too high?
+>
+I am not sure what exactly you mean. We are discussing the sequence
+here on the basis of additional L1 cache flush. As mentioned
+clearly the documentation is the ARM ARM(which is generic for
+all ARMv7) missing to capture the need of the power
+down code and stack usage which at least creates an issue on
+A9. Documenting that in code and mainly in ARM specs would avoid
+any further confusions.
 
-  This is part of an effort reduce differences between mach-shmobile
-  defconfigs with a view to using a common defconfig.
-
-* Enable PM_RUNTIME
-
-  This also seems to work fine on the kzm9d.
-
-  This is part of an effort reduce differences between mach-shmobile
-  defconfigs with a view to using a common defconfig.
-
-* Move kernel command line from defconfig to dts.
-
-  This brings us one small step closer to sharing defconfig
-  between kzm9d and other boards.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/emev2-kzm9d.dts |    2 +-
- arch/arm/configs/kzm9d_defconfig  |    4 +---
- 2 files changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index 297e3ba..b9b3241 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -21,6 +21,6 @@
- 	};
- 
- 	chosen {
--		bootargs = "console=ttyS1,115200n81";
-+		bootargs = "console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096";
- 	};
- };
-diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
-index 8c49df6..6c37f4a 100644
---- a/arch/arm/configs/kzm9d_defconfig
-+++ b/arch/arm/configs/kzm9d_defconfig
-@@ -32,11 +32,9 @@ CONFIG_FORCE_MAX_ZONEORDER=13
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
--CONFIG_CMDLINE="console=tty0 console=ttyS1,115200n81 earlyprintk=serial8250-em.1,115200n81 mem=128M at 0x40000000 ignore_loglevel root=/dev/nfs ip=dhcp nfsroot=,rsize=4096,wsize=4096"
--CONFIG_CMDLINE_FORCE=y
- CONFIG_VFP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--# CONFIG_SUSPEND is not set
-+CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
--- 
-1.7.10.4
+Regards,
+Santosh
