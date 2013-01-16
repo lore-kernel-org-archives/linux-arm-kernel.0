@@ -1,48 +1,30 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 16 Jan 2013 17:52:03 +1300
-Subject: linux-next: manual merge of the tegra tree with the arm-soc tree
-In-Reply-To: <50F62D69.8080100@nvidia.com>
-References: <20130116141411.8fadedee54ed35dc0eddd288@canb.auug.org.au>
- <1358308153.32106.8.camel@gitbox> <50F62D69.8080100@nvidia.com>
-Message-ID: <1358311923.537.3.camel@gitbox>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 16 Jan 2013 06:06:12 +0100
+Subject: [v3 6/9] ARM: dt: tegra114: Add new SoC base, Tegra 114 SoC
+In-Reply-To: <20130115172733.GS4118@tbergstrom-lnx.Nvidia.com>
+References: <1358237598-32413-7-git-send-email-hdoyu@nvidia.com><50F58A13.10301@wwwdotorg.org><20130115172733.GS4118@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20130116.070612.390154383947803922.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-15 at 21:32 -0700, Stephen Warren wrote:
-> On 01/15/2013 08:49 PM, Tony Prisk wrote:
-> > On Wed, 2013-01-16 at 14:14 +1100, Stephen Rothwell wrote:
-> >> Hi all,
-> >>
-> >> Today's linux-next merge of the tegra tree got a conflict in
-> >> drivers/clocksource/Makefile between commit ff7ec345f0ec ("timer: vt8500:
-> >> Move timer code to drivers/clocksource") from the arm-soc tree and commit
-> >> ac0fd9eca3ba ("ARM: tegra: move timer.c to drivers/clocksource/") from
-> >> the tegra tree.
-> >>
-> >> I fixed it up (see below) and can carry the fix as necessary (no action
-> >> is required).
-> >>
+Peter De Schrijver <pdeschrijver@nvidia.com> wrote @ Tue, 15 Jan 2013 18:27:33 +0100:
+
+> On Tue, Jan 15, 2013 at 05:55:47PM +0100, Stephen Warren wrote:
+> > On 01/15/2013 01:13 AM, Hiroshi Doyu wrote:
+> > > Initial support for Tegra 114 SoC. This is expected to be included in
+> > > the board DTS files, Tegra 114 SoC based evaluation board family.
 > > 
-> > I don't know about everyone else, but I feel the preference should be to
-> > keep things alphabetized where possible to help avoid with merge
-> > conflicts later on. This is always a problem when we start tacking
-> > things on the end of lists.
+> > This series looks fine to me. Assuming no other comments, I'll apply
+> > once CCF is applied and you've done the rebase you mentioned for patch 2.
 > > 
-> > I realise this Kconfig is not alphabetized anyway, but it's never too
-> > early to start on the 'right' path.
+> > Note that I'll apply most patches to Tegra's for-3.9/soc branch (the
+> > code) but the 3 device tree patches to Tegra's for-3.9/dt branch, since
+> > it's fine for the DT files to appear later than the code supporting the
+> > SoC, since this is all new features.
+> > 
+> > One question: The .dts files don't include any clocks properties. I
+> > assume Peter will add these when he posts the Tegra114 CCF code?
 > 
-> Sounds like a good idea, but the issue is: When to do the initial sort
-> so it doesn't conflict with all the adds in a kernel cycle... Post and
-> immediately commit a new patch near the end of the merge window?
+> Yes. I will add those as part of the Tegra114 CCF series.
 
-Given that the maintainer can quite safely do the patch (sorry
-maintainers), I don't see any reason why it couldn't be done at the
-point where they stop accepting patches for the merge-window. Once the
-patches are stopped, sort the list in one last patch.
-
-It makes sense to get it done in this window if possible as the Kconfig
-will only get bigger as time goes on, making sorting it more time
-consuming.
-
-Regards
-Tony P
+Once Tegra114 CCF comes, the 2nd one can be dropped.
