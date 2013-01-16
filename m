@@ -1,66 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Jan 2013 16:06:54 +0000
-Subject: [PATCH 07/16] ARM: bL_platsmp.c: close the kernel entry gate
- before hot-unplugging a CPU
-In-Reply-To: <20130115184037.GE1983@linaro.org>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1357777251-13541-8-git-send-email-nicolas.pitre@linaro.org>
- <20130114163755.GB31341@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1301141151510.6300@xanadu.home>
- <20130114170028.GD31341@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1301141207360.6300@xanadu.home>
- <20130114182604.GL23505@n2100.arm.linux.org.uk>
- <20130115184037.GE1983@linaro.org>
-Message-ID: <20130116160654.GC31318@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Jan 2013 16:09:04 +0000
+Subject: [PATCH v5 07/12] ARM: KVM: VGIC virtual CPU interface management
+In-Reply-To: <CANM98qJ0YRNA5R+qnRF9i0a7BRoL817Mq9D1SFPcxsSWgd2x0w@mail.gmail.com>
+References: <20130108184116.46558.3558.stgit@ubuntu>
+ <20130108184211.46558.74646.stgit@ubuntu>
+ <20130114154231.GG18935@mudshark.cambridge.arm.com>
+ <CANM98qJ_Pb5bT0k7bAhv6i1YTj6GxvNE6vvY49OZrqsKpF3xOA@mail.gmail.com>
+ <50F536DC.2060702@arm.com>
+ <CANM98qJ0YRNA5R+qnRF9i0a7BRoL817Mq9D1SFPcxsSWgd2x0w@mail.gmail.com>
+Message-ID: <50F6D0A0.5010707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 06:40:37PM +0000, Dave Martin wrote:
-> On Mon, Jan 14, 2013 at 06:26:04PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Jan 14, 2013 at 12:15:07PM -0500, Nicolas Pitre wrote:
-> > > The same could be said about the outer cache ops.  If a DSB is needed 
-> > > for their intent to be valid, then why isn't this DSB always implied by 
-> > > the corresponding cache op calls?
-> > 
-> > Hmm, just been thinking about this.
-> > 
-> > The L2x0 calls do contain a DSB but it's not obvious.  They hold a
-> > raw spinlock, and when that spinlock is dropped, we issue a dsb and
-> > sev instruction.
-> > 
-> > Whether the other L2 implementations do this or not I'm not sure -
-> > but the above is a requirement of the spinlock implementation, and
-> > it just happens to provide the right behaviour for L2x0.
-> > 
-> > But... we _probably_ don't want to impose that down at the L2 cache
-> > level of things - at least not for DMA ops, particular for the sanity
-> > of the scatter-list operating operations.  We really want to avoid
-> > doing one DSB per scatterlist entry, doing one DSB per scatterlist
-> > operation instead.
-> > 
-> > That does affect how the L2 cache API gets used - maybe we want to
-> > separate out the DMA stuff from the other users so that we can have
-> > dsbs in that path for non-DMA users.
-> > 
-> > Thoughts?
+On 16/01/13 15:29, Christoffer Dall wrote:
+> [...]
 > 
-> Perhaps the existing functions could be renamed to things like:
+>>> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
+>>> index 1ace491..f9d1977 100644
+>>> --- a/arch/arm/include/asm/kvm_vgic.h
+>>> +++ b/arch/arm/include/asm/kvm_vgic.h
+>>> @@ -33,6 +33,7 @@
+>>>  #define VGIC_NR_PRIVATE_IRQS (VGIC_NR_SGIS + VGIC_NR_PPIS)
+>>>  #define VGIC_NR_SHARED_IRQS  (VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
+>>>  #define VGIC_MAX_CPUS                KVM_MAX_VCPUS
+>>> +#define VGIC_MAX_LRS         64
+>>
+>> Consider this instead (for the reason below)
+>> #define VGIC_MAX_LRS    (1 << 7)
+>>
 > 
-> outer_XXX_flush_range()
-> outer_XXX_sync()
+> so here you mean (1 << 6), right?
+
+No. We have a 6 bit field that contains (NR_LRS - 1). So the maximum
+value is (0b111111 + 1), which is (1 << 7).
+
 > 
-> Where XXX is something like "batch" or "background".  Optionally these
-> could be declared somewhere separate to discourage non-DMA code from
-> using them.  Other code could still want to do batches of outer cache
-> operations efficiently, but I guess DMA is the main user.
+>>>  /* Sanity checks... */
+>>>  #if (VGIC_MAX_CPUS > 8)
+>>> @@ -120,7 +121,7 @@ struct vgic_cpu {
+>>>       DECLARE_BITMAP( pending_shared, VGIC_NR_SHARED_IRQS);
+>>>
+>>>       /* Bitmap of used/free list registers */
+>>> -     DECLARE_BITMAP( lr_used, 64);
+>>> +     DECLARE_BITMAP( lr_used, VGIC_MAX_LRS);
+>>>
+>>>       /* Number of list registers on this CPU */
+>>>       int             nr_lr;
+>>> @@ -132,7 +133,7 @@ struct vgic_cpu {
+>>>       u32             vgic_eisr[2];   /* Saved only */
+>>>       u32             vgic_elrsr[2];  /* Saved only */
+>>>       u32             vgic_apr;
+>>> -     u32             vgic_lr[64];    /* A15 has only 4... */
+>>> +     u32             vgic_lr[VGIC_MAX_LRS];
+>>>  #endif
+>>>  };
+>>>
+>>> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
+>>> index a0d283c..90a99fd 100644
+>>> --- a/arch/arm/kvm/vgic.c
+>>> +++ b/arch/arm/kvm/vgic.c
+>>> @@ -1345,6 +1345,8 @@ int kvm_vgic_hyp_init(void)
+>>>
+>>>       vgic_nr_lr = readl_relaxed(vgic_vctrl_base + GICH_VTR);
+>>>       vgic_nr_lr = (vgic_nr_lr & 0x1f) + 1;
+>>
+>> There is a bug here. It should be:
+>>         vgic_nr_lr = (vgic_nr_lr & 0x2f) + 1;
+>>
+> 
+> and here you mean (vgic_nr_lr & 0x3f) + 1
+> right?
 
-There can be some confusion with using 'background' name because both
-PL310 and L2X0 have background operations (the former only for the
-set/way ops). But in software you need to ensure the completion of such
-operations otherwise the L2 controller behaviour can be unpredictable.
+Neither. 0x2f is the right value. See the GIC spec, 5.3.2, GICH_VTR
+register.
 
-So you just want to drop the barriers (outer_sync and dsb), maybe could
-use the 'relaxed' suffix which matches the I/O accessors.
-
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
