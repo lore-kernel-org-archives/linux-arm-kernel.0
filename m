@@ -1,87 +1,139 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 16 Jan 2013 13:03:29 +0100
-Subject: [PATCH v7 1/3] ARM: make cr_alignment read-only #ifndef
- CONFIG_CPU_CP15
-In-Reply-To: <50F554C4.3020903@arm.com>
-References: <1350462872-16805-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1350462872-16805-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <50F554C4.3020903@arm.com>
-Message-ID: <20130116120329.GX14860@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 16 Jan 2013 17:41:00 +0530
+Subject: [RFC PATCH 3/4] ARM: bL_entry: Match memory barriers to
+ architectural requirements
+In-Reply-To: <20130116114912.GB1963@linaro.org>
+References: <1358268498-8086-1-git-send-email-dave.martin@linaro.org>
+ <1358268498-8086-4-git-send-email-dave.martin@linaro.org>
+ <50F64DC7.6040707@ti.com> <20130116114912.GB1963@linaro.org>
+Message-ID: <50F698D4.2050702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jonny,
+On Wednesday 16 January 2013 05:19 PM, Dave Martin wrote:
+> On Wed, Jan 16, 2013 at 12:20:47PM +0530, Santosh Shilimkar wrote:
+>> + Catalin, RMK
+>>
+>> Dave,
+>>
+>> On Tuesday 15 January 2013 10:18 PM, Dave Martin wrote:
+>>> For architectural correctness even Strongly-Ordered memory accesses
+>>> require barriers in order to guarantee that multiple CPUs have a
+>>> coherent view of the ordering of memory accesses.
+>>>
+>>> Virtually everything done by this early code is done via explicit
+>>> memory access only, so DSBs are seldom required.  Existing barriers
+>>> are demoted to DMB, except where a DSB is needed to synchronise
+>>> non-memory signalling (i.e., before a SEV).  If a particular
+>>> platform performs cache maintenance in its power_up_setup function,
+>>> it should force it to complete explicitly including a DSB, instead
+>>> of relying on the bL_head framework code to do it.
+>>>
+>>> Some additional DMBs are added to ensure all the memory ordering
+>>> properties required by the race avoidance algorithm.  DMBs are also
+>>> moved out of loops, and for clarity some are moved so that most
+>>> directly follow the memory operation which needs to be
+>>> synchronised.
+>>>
+>>> The setting of a CPU's bL_entry_vectors[] entry is also required to
+>>> act as a synchronisation point, so a DMB is added after checking
+>>> that entry to ensure that other CPUs do not observe gated
+>>> operations leaking across the opening of the gate.
+>>>
+>>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>>> ---
+>>
+>> Sorry to pick on this again but I am not able to understand why
+>> the strongly ordered access needs barriers. At least from the
+>> ARM point of view, a strongly ordered write will be more of blocking
+>> write and the further interconnect also is suppose to respect that
+>
+> This is what I originally assumed (hence the absence of barriers in
+> the initial patch).
+>
+>> rule. SO read writes are like adding barrier after every load store
+>
+> This assumption turns out to be wrong, unfortunately, although in
+> a uniprocessor scenario is makes no difference.  A SO memory access
+> does block the CPU making the access, but explicitly does not
+> block the interconnect.
+>
+I suspected the interconnect part when you described the barrier
+need for SO memory region.
 
-On Tue, Jan 15, 2013 at 01:08:20PM +0000, Jonathan Austin wrote:
-> On 17/10/12 09:34, Uwe Kleine-K?nig wrote:
-> >This makes cr_alignment a constant 0 to break code that tries to modify
-> >the value as it's likely that it's built on wrong assumption when
-> >CONFIG_CPU_CP15 isn't defined. For code that is only reading the value 0
-> >is more or less a fine value to report.
-> >
-> 
-> Without the context of some of the discussion that was had on the
-> list about how/why to do this, this description is a bit
-> confusing...
-> 
-> I found myself asking "Why do we not #ifdef out uses of cr_alignment
-> based on CONFIG_CPU_CP15" - a question which it seems is answered by
-> you and Nicolas here:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/089968.html
-> 
-> So, perhaps it would help to have a little bit more context in this
-> commit message?
-> 
-> I know that the cr_alignment stuff is currently tied up with
-> CONFIG_CPU_15, but I wonder if you looked at using the
-> CCR.UNALIGN_TRP bit and wiring that in to alignment trapping code?
-> Is it something you think would make sense for the work you're
-> doing?
-I didn't, because I focus on getting the machine up and add bells and
-whistles later.
+> In a typical boot scenario for example, all secondary CPUs are
+> quiescent or powered down, so there's no problem.  But we can't make
+> the same assumptions when we're trying to coordinate between
+> multiple active CPUs.
+>
+>> so adding explicit barriers doesn't make sense. Is this a side
+>> effect of some "write early response" kind of optimizations at
+>> interconnect level ?
+>
+> Strongly-Ordered accesses are always non-shareable, so there is
+> no explicit guarantee of coherency between multiple masters.
+>
+This is where probably issue then. My understanding is exactly
+opposite here and hence I wasn't worried about multi-master
+CPU scenario since sharable attributes would be taking care of it
+considering the same page tables being used in SMP system.
 
-> >+#ifdef CONFIG_CPU_CP15
-> >  	.long	cr_alignment			@ r7
-> >+#else
-> >+	.long	0
-> 
-> This value still gets loaded in to r7, so it might be worth keeping
-> the comments going... They certainly help when reading the code.
-ok
+ARM documentation says -
+------------
+Shareability and the S bit, with TEX remap
+The memory type of a region, as indicated in the Memory type column of 
+Table B3-12 on page B3-1350, provides
+the first level of control of whether the region is shareable:
+? If the memory type is Strongly-ordered then the region is Shareable
+------------------------------------------------------------
 
-> >--- a/arch/arm/mm/mmu.c
-> >+++ b/arch/arm/mm/mmu.c
-> >@@ -97,6 +97,7 @@ static struct cachepolicy cache_policies[] __initdata = {
-> >  	}
-> >  };
-> >
-> >+#ifdef CONFIG_CPU_CP15
-> >  /*
-> >   * These are useful for identifying cache coherency
-> >   * problems by allowing the cache or the cache and
-> >@@ -195,6 +196,22 @@ void adjust_cr(unsigned long mask, unsigned long set)
-> >  }
-> >  #endif
-> >
-> >+#else
-> 
-> When you read this file in its complete form there's a lot of code
-> (including more preprocessor stuff) between the #ifdef and the
-> #else.
-> 
-> Could you add
-> 
-> #else /* ifdef CONFIG_CPU_CP15 */
-> 
-> like you have in the other cases?
-also ok.
+> If there is only one master, it makes no difference, but if there
+> are multiple masters, there is no guarantee that they are conntected
+> to a slave device (DRAM controller in this case) via a single
+> slave port.
+>
+See above. We are talking about multiple CPUs here and not
+the DSP or other co-processors. In either case we are discussing
+code which is getting execute on ARM CPUs so we can safely limit
+it to the multi-master ARM CPU.
 
-Will fix up after lunch.
+> The architecture only guarantees global serialisation when there is a
+> single slave device, but provides no way to know whether two accesses
+> from different masters will reach the same slave port.  This is in the
+> realms of "implementation defined."
+>
+> Unfortunately, a high-performance component like a DRAM controller
+> is exactly the kind of component which may implement multiple
+> master ports, so you can't guarantee that accesses are serialised
+> in the same order from the perspective of all masters.  There may
+> be some pipelining and caching between each master port and the actual
+> memory, for example.  This is allowed, because there is no requirement
+> for the DMC to look like a single slave device from the perspective
+> of multiple masters.
+>
+> A multi-ported slave might provide transparent coherency between master
+> ports, but it is only required to guarantee this when the accesses
+> are shareable (SO is always non-shared), or when explicit barriers
+> are used to force synchronisation between the device's master ports.
+>
+> Of course, a given platform may have a DMC with only one slave
+> port, in which case the barriers should not be needed.  But I wanted
+> this code to be generic enough to be reusable -- hence the
+> addition of the barriers.  The CPU does not need to wait for a DMB
+> to "complete" in any sense, so this does not necessarily have a
+> meaningful impact on performance.
+>
+> This is my understanding anyway.
+>
+>> Will you be able to point to specs or documents which puts
+>> this requirement ?
+>
+> Unfortunately, this is one of this things which we require not because
+> there is a statement in the ARM ARM to say that we need it -- rather,
+> there is no statement in the ARM ARM to say that we don't.
+>
+Thanks a lot for elaborate answer. It helps to understand the rationale
+at least.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards
+Santosh
