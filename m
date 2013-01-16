@@ -1,11 +1,11 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 16 Jan 2013 22:34:31 +0300
-Subject: [PATCH v6 11/22] mfd: omap-usb-host: Use devm_kzalloc() and
- devm_request_and_ioremap()
-In-Reply-To: <1358347433-329-12-git-send-email-rogerq@ti.com>
+Date: Wed, 16 Jan 2013 22:37:08 +0300
+Subject: [PATCH v6 03/22] mfd: omap-usb-tll: Use devm_kzalloc/ioremap
+ and clean up error path
+In-Reply-To: <1358347433-329-4-git-send-email-rogerq@ti.com>
 References: <1358347433-329-1-git-send-email-rogerq@ti.com>
- <1358347433-329-12-git-send-email-rogerq@ti.com>
-Message-ID: <50F700C7.2020101@mvista.com>
+ <1358347433-329-4-git-send-email-rogerq@ti.com>
+Message-ID: <50F70164.3080105@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,24 +13,29 @@ Hello.
 
 On 01/16/2013 05:43 PM, Roger Quadros wrote:
 
-> Use devm_ variants of kzalloc and ioremap. Also clean up error path.
+> Use devm_ variants of kzalloc() and ioremap(). Simplify the error path.
 
 > Signed-off-by: Roger Quadros <rogerq@ti.com>
-[...]
+> ---
+>  drivers/mfd/omap-usb-tll.c |   36 +++++++++++-------------------------
+>  1 files changed, 11 insertions(+), 25 deletions(-)
 
-> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-> index 061366d..0f190b6 100644
-> --- a/drivers/mfd/omap-usb-host.c
-> +++ b/drivers/mfd/omap-usb-host.c
-> @@ -461,15 +461,20 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+> diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
+> index 9658e18..53ed10b 100644
+> --- a/drivers/mfd/omap-usb-tll.c
+> +++ b/drivers/mfd/omap-usb-tll.c
 [...]
-> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "uhh");
-> +	omap->uhh_base = devm_request_and_ioremap(dev, res);
-> +	if (!omap->uhh_base) {
-> +		dev_err(dev, "Resource request/ioremap failed\n");
-> +		return -ENOMEM;
+> -	base = ioremap(res->start, resource_size(res));
+> +	base = devm_request_and_ioremap(dev, res);
+>  	if (!base) {
+> -		dev_err(dev, "TLL ioremap failed\n");
+>  		ret = -ENOMEM;
 
-   Should be -EADDRNOTAVAIL according to the comment to
-devm_request_and_ioremap()...
+   -EADDRNOTAVAIL as the comment to devm_request_and_ioremap() suggests.
+
+> -		goto err_usbtll_p2_fck;
+> +		dev_err(dev, "Resource request/ioremap failed:%d\n", ret);
+> +		goto err_res;
+>  	}
 
 WBR, Sergei
