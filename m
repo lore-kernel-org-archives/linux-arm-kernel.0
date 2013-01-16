@@ -1,244 +1,56 @@
 From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Wed, 16 Jan 2013 08:53:56 +0900
-Subject: [PATCH] ARM: Kirkwood: Bundle the common pinctrl of 88f6281 and
- 88f6282
-In-Reply-To: <50E5AA3A.8000503@keymile.com>
-References: <1356230149-15437-1-git-send-email-iwamatsu@nigauri.org>
- <20121227170524.GX21694@titan.lakedaemon.net> <20121227194048.GH17242@lunn.ch>
- <50E5AA3A.8000503@keymile.com>
-Message-ID: <CABMQnVJzDXF6VPjxnP0+b-b1gZtE7MfHypKJ6h0WaQ1gie-3EQ@mail.gmail.com>
+Date: Wed, 16 Jan 2013 09:01:01 +0900
+Subject: [PATCH 5/6] arm: mvebu: Enable USB controllers on Armada XP
+ OpenBlocks AX3-4 board
+In-Reply-To: <1358243670-11935-5-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1358243670-11935-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1358243670-11935-5-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <CABMQnVLD+VKj53dfQC24AwCboed3EGt+gqTKt-B9q8nhEx3Ytg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all.
+Hi,
 
-Thank you for your comments.
-I will check and update these.
 
-Thanks.
+
+On Tue, Jan 15, 2013 at 6:54 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> Cc: Lior Amsalem <alior@marvell.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> index b24644f..55f5b6f 100644
+> --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> @@ -127,5 +127,14 @@
+>                         nr-ports = <2>;
+>                         status = "okay";
+>                 };
+> +               usb at d0050000 {
+> +                       status = "okay";
+> +               };
+> +               usb at d0051000 {
+> +                       status = "okay";
+> +               };
+> +               usb at d0052000 {
+> +                       status = "okay";
+> +               };
+USB2 of openblocks-ax3-4 is used as Mini-PCIE.
+I think this is unnecessary.
+
+>         };
+>  };
+> --
+> 1.7.8.6
+>
+
+Best regards,
   Nobuhiro
-
-On Fri, Jan 4, 2013 at 12:56 AM, Valentin Longchamp
-<valentin.longchamp@keymile.com> wrote:
-> On 12/27/2012 08:40 PM, Andrew Lunn wrote:
->> On Thu, Dec 27, 2012 at 12:05:24PM -0500, Jason Cooper wrote:
->>> On Sun, Dec 23, 2012 at 11:35:49AM +0900, Nobuhiro Iwamatsu wrote:
->>>> 88f6281 and 88f6282 has common pinctrl.
->>>> This buldles the common pincrtl of these to kirkwood-628x-base.dtsi.
->>>>
->>>> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->>>> ---
->>>>  arch/arm/boot/dts/kirkwood-6281.dtsi      |   38 ++------------------------
->>>>  arch/arm/boot/dts/kirkwood-6282.dtsi      |   35 ++----------------------
->>>>  arch/arm/boot/dts/kirkwood-628x-base.dtsi |   41 +++++++++++++++++++++++++++++
->>>
->>> Is there a reason we can't move the contents of the proposed
->>> kirkwood-628x-base.dtsi into kirkwood.dtsi ?
->>
->> Hi Jason
->>
->> It might cause problems for kirkwood-98DX4122. I'm assuming this
->> kirkwood embedded inside a Marvell switch will require a different
->> pinctrl. I've no idea what pins it actually has, so i cannot really
->> say.
->>
->>> Also, please don't forget to CC Andrew Lunn and myself for kirkwood
->>> patches.  I've added him.
->>
->> I added Valentin Longchamp to CC: who might be able to tell us if any
->> of common pinctrl below is also common to 98DX4122.
->
-> Hi Andrew,
->
-> There are common pins on the kirkwood-98DX4122:
-> - nand
-> - spi
-> - twsi0
-> - uart0
-> - uart1
->
-> However, these are not present:
->
-> - sata0
-> - sata1
-> - sdio
->
-> One solution would then be to have the first five in a kirkwood-xyz-base.dtsi
-> that could be included in all the 3 kirkwood-[6281|6282|98dx4122].dtsi files
-> (that would then contain the remaining 3 for both the 6281 6282).
->
-> Valentin
->
->>
->>    Andrew
->>
->>
->>>>  3 files changed, 45 insertions(+), 69 deletions(-)
->>>>  create mode 100644 arch/arm/boot/dts/kirkwood-628x-base.dtsi
->>>>
->>>> diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
->>>> index d6c9d65..c8fe885 100644
->>>> --- a/arch/arm/boot/dts/kirkwood-6281.dtsi
->>>> +++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
->>>> @@ -1,44 +1,10 @@
->>>> +/include/ "kirkwood-628x-base.dtsi"
->>>> +
->>>>  / {
->>>>     ocp at f1000000 {
->>>>             pinctrl: pinctrl at 10000 {
->>>>                     compatible = "marvell,88f6281-pinctrl";
->>>>                     reg = <0x10000 0x20>;
->>>> -
->>>> -                   pmx_nand: pmx-nand {
->>>> -                           marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
->>>> -                                          "mpp4", "mpp5", "mpp18",
->>>> -                                          "mpp19";
->>>> -                           marvell,function = "nand";
->>>> -                   };
->>>> -                   pmx_sata0: pmx-sata0 {
->>>> -                           marvell,pins = "mpp5", "mpp21", "mpp23";
->>>> -                           marvell,function = "sata0";
->>>> -                   };
->>>> -                   pmx_sata1: pmx-sata1 {
->>>> -                           marvell,pins = "mpp4", "mpp20", "mpp22";
->>>> -                           marvell,function = "sata1";
->>>> -                   };
->>>> -                   pmx_spi: pmx-spi {
->>>> -                           marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
->>>> -                           marvell,function = "spi";
->>>> -                   };
->>>> -                   pmx_twsi0: pmx-twsi0 {
->>>> -                           marvell,pins = "mpp8", "mpp9";
->>>> -                           marvell,function = "twsi0";
->>>> -                   };
->>>> -                   pmx_uart0: pmx-uart0 {
->>>> -                           marvell,pins = "mpp10", "mpp11";
->>>> -                           marvell,function = "uart0";
->>>> -                   };
->>>> -                   pmx_uart1: pmx-uart1 {
->>>> -                           marvell,pins = "mpp13", "mpp14";
->>>> -                           marvell,function = "uart1";
->>>> -                   };
->>>> -                   pmx_sdio: pmx-sdio {
->>>> -                           marvell,pins = "mpp12", "mpp13", "mpp14",
->>>> -                                          "mpp15", "mpp16", "mpp17";
->>>> -                           marvell,function = "sdio";
->>>> -                   };
->>>>             };
->>>>     };
->>>>  };
->>>> diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
->>>> index e0a779c..7ce9614 100644
->>>> --- a/arch/arm/boot/dts/kirkwood-6282.dtsi
->>>> +++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
->>>> @@ -1,3 +1,5 @@
->>>> +/include/ "kirkwood-628x-base.dtsi"
->>>> +
->>>>  / {
->>>>     ocp at f1000000 {
->>>>
->>>> @@ -5,43 +7,10 @@
->>>>                     compatible = "marvell,88f6282-pinctrl";
->>>>                     reg = <0x10000 0x20>;
->>>>
->>>> -                   pmx_nand: pmx-nand {
->>>> -                           marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
->>>> -                                                   "mpp4", "mpp5", "mpp18", "mpp19";
->>>> -                           marvell,function = "nand";
->>>> -                   };
->>>> -
->>>> -                   pmx_sata0: pmx-sata0 {
->>>> -                           marvell,pins = "mpp5", "mpp21", "mpp23";
->>>> -                           marvell,function = "sata0";
->>>> -                   };
->>>> -                   pmx_sata1: pmx-sata1 {
->>>> -                           marvell,pins = "mpp4", "mpp20", "mpp22";
->>>> -                           marvell,function = "sata1";
->>>> -                   };
->>>> -                   pmx_spi: pmx-spi {
->>>> -                           marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
->>>> -                           marvell,function = "spi";
->>>> -                   };
->>>> -                   pmx_twsi0: pmx-twsi0 {
->>>> -                           marvell,pins = "mpp8", "mpp9";
->>>> -                           marvell,function = "twsi0";
->>>> -                   };
->>>> -
->>>>                     pmx_twsi1: pmx-twsi1 {
->>>>                             marvell,pins = "mpp36", "mpp37";
->>>>                             marvell,function = "twsi1";
->>>>                     };
->>>> -
->>>> -                   pmx_uart0: pmx-uart0 {
->>>> -                           marvell,pins = "mpp10", "mpp11";
->>>> -                           marvell,function = "uart0";
->>>> -                   };
->>>> -
->>>> -                   pmx_uart1: pmx-uart1 {
->>>> -                           marvell,pins = "mpp13", "mpp14";
->>>> -                           marvell,function = "uart1";
->>>> -                   };
->>>>             };
->>>>
->>>>             i2c at 11100 {
->>>> diff --git a/arch/arm/boot/dts/kirkwood-628x-base.dtsi b/arch/arm/boot/dts/kirkwood-628x-base.dtsi
->>>> new file mode 100644
->>>> index 0000000..c8103b6
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/kirkwood-628x-base.dtsi
->>>> @@ -0,0 +1,41 @@
->>>> +/ {
->>>> +   ocp at f1000000 {
->>>> +           pinctrl: pinctrl at 10000 {
->>>> +                   pmx_nand: pmx-nand {
->>>> +                           marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
->>>> +                                          "mpp4", "mpp5", "mpp18",
->>>> +                                          "mpp19";
->>>> +                           marvell,function = "nand";
->>>> +                   };
->>>> +                   pmx_sata0: pmx-sata0 {
->>>> +                           marvell,pins = "mpp5", "mpp21", "mpp23";
->>>> +                           marvell,function = "sata0";
->>>> +                   };
->>>> +                   pmx_sata1: pmx-sata1 {
->>>> +                           marvell,pins = "mpp4", "mpp20", "mpp22";
->>>> +                           marvell,function = "sata1";
->>>> +                   };
->>>> +                   pmx_spi: pmx-spi {
->>>> +                           marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
->>>> +                           marvell,function = "spi";
->>>> +                   };
->>>> +                   pmx_twsi0: pmx-twsi0 {
->>>> +                           marvell,pins = "mpp8", "mpp9";
->>>> +                           marvell,function = "twsi0";
->>>> +                   };
->>>> +                   pmx_uart0: pmx-uart0 {
->>>> +                           marvell,pins = "mpp10", "mpp11";
->>>> +                           marvell,function = "uart0";
->>>> +                   };
->>>> +                   pmx_uart1: pmx-uart1 {
->>>> +                           marvell,pins = "mpp13", "mpp14";
->>>> +                           marvell,function = "uart1";
->>>> +                   };
->>>> +                   pmx_sdio: pmx-sdio {
->>>> +                           marvell,pins = "mpp12", "mpp13", "mpp14",
->>>> +                                          "mpp15", "mpp16", "mpp17";
->>>> +                           marvell,function = "sdio";
->>>> +                   };
->>>> +           };
->>>> +   };
->>>> +};
->>>> --
->>>> 1.7.10.4
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
 
 -- 
 Nobuhiro Iwamatsu
