@@ -1,26 +1,23 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 16 Jan 2013 19:25:20 +0530
-Subject: [PATCH v5 1/9] ARM: davinci: da850 board: change pr_warning()
- to pr_warn()
-In-Reply-To: <1357863807-380-2-git-send-email-rtivy@ti.com>
-References: <1357863807-380-1-git-send-email-rtivy@ti.com>
- <1357863807-380-2-git-send-email-rtivy@ti.com>
-Message-ID: <50F6B148.4040300@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Jan 2013 14:00:26 +0000
+Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
+In-Reply-To: <20130115211441.GA13139@avionic-0098.adnet.avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130115154038.GA11241@arm.com>
+ <20130115211441.GA13139@avionic-0098.adnet.avionic-design.de>
+Message-ID: <201301161400.26587.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/11/2013 5:53 AM, Robert Tivy wrote:
-> Changed all pr_warning() calls to pr_warn(), as advised by checkpatch.pl.
-> 
-> Also, while modifying those pr_warning() calls I changed hardcoded
-> function names to use '"%s:", __func__' instead, and converted acronym
-> usage to upper case
-> 
-> Signed-off-by: Robert Tivy <rtivy@ti.com>
+On Tuesday 15 January 2013, Thierry Reding wrote:
+> Is there actually hardware that supports this? I assumed that the MSI
+> controller would have to be tightly coupled to the PCI host bridge in
+> order to raise an interrupt when an MSI is received via PCI.
 
-Applying this patch for v3.9. While committing I updated the commit
-message to change past tense to present and also removed the first
-person reference.
+No, as long as it's guaranteed that the MSI notification won't arrive
+at the CPU before any inbound DMA data before it, the MSI controller
+can be anywhere. Typically, the MSI controller is actually closer to
+the CPU core than to the PCI bridge. On X86, I believe the MSI address
+is on normally on the the "local APIC" on each CPU.
 
-Thanks,
-Sekhar
+	Arnd
