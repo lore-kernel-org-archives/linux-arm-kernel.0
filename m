@@ -1,41 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Jan 2013 10:53:27 +0000
-Subject: [PATCH v6 00/12] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <003301cde30b$c584c2d0$508e4870$%cho@samsung.com>
-References: <003301cde30b$c584c2d0$508e4870$%cho@samsung.com>
-Message-ID: <20130116105327.GA16543@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Jan 2013 10:49:47 +0000
+Subject: [PATCH V3] mmc: mmci: Fixup and cleanup code for DMA handling
+In-Reply-To: <CAPDyKFrV8h+2ebfT6AK-ACfr716CE-f7+HGuh_+rOjbVnGOdfw@mail.gmail.com>
+References: <1357570707-28207-1-git-send-email-ulf.hansson@stericsson.com>
+ <20130113192428.GU23505@n2100.arm.linux.org.uk>
+ <CAPDyKFrV8h+2ebfT6AK-ACfr716CE-f7+HGuh_+rOjbVnGOdfw@mail.gmail.com>
+Message-ID: <20130116104947.GQ23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 26, 2012 at 01:53:15AM +0000, Cho KyongHo wrote:
-> notice: v6 patch-set is rebased on next/iommu-exynos branch of
-> linux-samsung.git.  This patch-set does not include 2 patches (05 and 06
-> patches in v5 patch-se) because they alread exist already in the branch.
-
-Given that devicetree-discuss has been notably absent from discussion
-surrounding the proposed binding, I think that including that patch in
-linux-samsung.git and dropping it from this series is rather premature.
-
-I have comments on the binding, so I'll dig up the version you posted in v5
-and add devicetree-discuss to CC.
-
-> The current exynos-iommu(System MMU) driver does not work autonomously
-> since it is lack of support for power management of peripheral blocks.
-> For example, MFC device driver must ensure that its System MMU is disabled
-> before MFC block is power-down not to invalidate IOTLB in the System MMU
-> when I/O memory mapping is changed. Because A System MMU is resides in the
-> same H/W block, access to control registers of System MMU while the H/W
-> block is turned off must be prohibited.
+On Wed, Jan 16, 2013 at 11:23:57AM +0100, Ulf Hansson wrote:
+> On 13 January 2013 20:24, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Jan 07, 2013 at 03:58:27PM +0100, Ulf Hansson wrote:
+> >> @@ -374,19 +415,12 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
+> >>        * contiguous buffers.  On TX, we'll get a FIFO underrun error.
+> >>        */
+> >>       if (status & MCI_RXDATAAVLBLMASK) {
+> >> -             dmaengine_terminate_all(chan);
+> >> -             if (!data->error)
+> >> -                     data->error = -EIO;
+> >> -     }
+> >> -
+> >> -     if (data->flags & MMC_DATA_WRITE) {
+> >> -             dir = DMA_TO_DEVICE;
+> >> -     } else {
+> >> -             dir = DMA_FROM_DEVICE;
+> >> +             data->error = -EIO;
+> >> +             mmci_dma_data_error(host);
+> >
+> > Please explain the change of behaviour here.  Before your change, we _only_
+> > set data->error if the error is not set.  Here, we overwrite the error code
+> > no matter what.  What is the reasoning for that change?
+> >
+> > The reason the code is like it _was_ is so that any bytes remaining in the
+> > FIFO are _only_ reported as an error if there wasn't a preceding error.
+> > That is the behaviour I desired when I wrote this code.
 > 
-> This set of changes solves the above problem with setting each System MMUs
-> as the parent of the device which owns the System MMU to recieve the
-> information when the device is turned off or turned on.
+> Since we need to do dmaengine_terminate_all(chan), that will mean
+> another request could potentially already be prepared and thus it
+> could also be terminated.
 > 
-> Another big change to the driver is the support for devicetree.
-> The bindings for System MMU is described in
-> Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
+> Then by always reporting an error the async request handling in the
+> mmc protocol layer, can do proper error handling and clean up the
+> previously prepared request.
 
-This should probably be Documentation/devicetree/bindings/iommu/ no?
+Sigh, I don't think you understand what this code is doing at all then.
 
-Will
+We will _always_ report _an_ error as the code originally stands if we
+encounter MCI_RXDATAAVLBLMASK being set.  The error that we report will
+be the _correct_ one - either the one which preceeds this condition
+occuring _or_ an IO error because not all data was read from the FIFO
+by the DMA engine.
+
+If the DMA engine fails to read all the data from the FIFO, _and_ there
+was a preceeding error, we should _not_ overwrite the preceeding error.
+This is exactly what the original code does.
+
+Your version _always_ overwrites the previous error.  This could result
+in FIFO/CRC errors always being reported as an IO error rather than
+their proper error codes, and therefore _breaking_ error handling.
