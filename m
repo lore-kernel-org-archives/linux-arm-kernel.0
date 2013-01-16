@@ -1,60 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Jan 2013 23:14:01 +0000
-Subject: [PATCH v2 1/1] block: blk-merge: don't merge the pages with
- non-contiguous descriptors
-In-Reply-To: <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
-References: <1358265681-25671-1-git-send-email-subhashj@codeaurora.org>
- <1358266794.10591.8.camel@dabdike.int.hansenpartnership.com>
- <50F64AC1.3040304@codeaurora.org>
- <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
-Message-ID: <20130116231401.GV23505@n2100.arm.linux.org.uk>
+Date: Wed, 16 Jan 2013 23:16:31 +0000
+Subject: [PATCH] ARM: mm: Fix missing XN flag for for MT_MEMORY_SO
+In-Reply-To: <1358347762-14682-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1358347762-14682-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130116231631.GW23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 10:32:35AM +0000, James Bottomley wrote:
-> On Wed, 2013-01-16 at 12:07 +0530, Subhash Jadavani wrote:
+On Wed, Jan 16, 2013 at 08:19:22PM +0530, Santosh Shilimkar wrote:
+> Commit 8fb54284ba6a {ARM: mm: Add strongly ordered descriptor support}
+> added XN flag at section level but missed it at PTE level.
 > 
-> > Now consider this call stack from MMC block driver (this is on the ARmv7 
-> > based board):
-> >      [   98.918174] [<c001b50c>] (v7_dma_inv_range+0x30/0x48) from 
-> > [<c0017b8c>] (dma_cache_maint_page+0x1c4/0x24c)
-> >      [   98.927819] [<c0017b8c>] (dma_cache_maint_page+0x1c4/0x24c) from 
-> > [<c0017c28>] (___dma_page_cpu_to_dev+0x14/0x1c)
-> >      [   98.937982] [<c0017c28>] (___dma_page_cpu_to_dev+0x14/0x1c) from 
-> > [<c0017ff8>] (dma_map_sg+0x3c/0x114)
+> Fix it by adding the L_PTE_XN to MT_MEMORY_SO PET descriptor.
 > 
-> OK, so this is showing that ARM itself is making the assumption that the
-> pages are contiguous in the page offset map.
+> Cc: Russell King <linux@arm.linux.org.uk>
 > 
-> Fix this by doing the increment via the pfn, which will do the right
-> thing whatever the memory model.
-> 
-> Signed-off-by: James Bottomley <JBottomley@Parallels.com>
-
-Ok.  What would you like the patch summary line for this to be -
-the existing one seems to be a little wrong given the content of
-this patch...
-
-> 
+> Reported-by: Richard Woodruff <r-woodruff2@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
+
+Hmm, yes. => patch system please.
+
+>  arch/arm/mm/mmu.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 6b2fb87..ab88c5b 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -809,7 +809,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
->  			op(vaddr, len, dir);
->  		}
->  		offset = 0;
-> -		page++;
-> +		page = pfn_to_page(page_to_pfn(page) + 1);
->  		left -= len;
->  	} while (left);
->  }
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 9f06102..ce328c7 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -283,7 +283,7 @@ static struct mem_type mem_types[] = {
+>  	},
+>  	[MT_MEMORY_SO] = {
+>  		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+> -				L_PTE_MT_UNCACHED,
+> +				L_PTE_MT_UNCACHED | L_PTE_XN,
+>  		.prot_l1   = PMD_TYPE_TABLE,
+>  		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_S |
+>  				PMD_SECT_UNCACHED | PMD_SECT_XN,
+> -- 
+> 1.7.9.5
 > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
