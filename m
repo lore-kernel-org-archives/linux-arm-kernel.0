@@ -1,141 +1,62 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 16 Jan 2013 13:31:51 +0100
-Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
-In-Reply-To: <1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
-References: <1357890387-23245-1-git-send-email-pgaikwad@nvidia.com><1357890387-23245-3-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <20130116.143151.1531468192773974887.hdoyu@nvidia.com>
+From: subhashj@codeaurora.org (Subhash Jadavani)
+Date: Wed, 16 Jan 2013 18:09:14 +0530
+Subject: [PATCH v2 1/1] block: blk-merge: don't merge the pages with
+ non-contiguous descriptors
+In-Reply-To: <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
+References: <1358265681-25671-1-git-send-email-subhashj@codeaurora.org>
+ <1358266794.10591.8.camel@dabdike.int.hansenpartnership.com>
+ <50F64AC1.3040304@codeaurora.org>
+ <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
+Message-ID: <50F69F72.4030807@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Fri, 11 Jan 2013 08:46:20 +0100:
-...
-> +const struct clk_ops tegra_clk_periph_ops = {
-> +       .get_parent = clk_periph_get_parent,
-> +       .set_parent = clk_periph_set_parent,
-> +       .recalc_rate = clk_periph_recalc_rate,
-> +       .round_rate = clk_periph_round_rate,
-> +       .set_rate = clk_periph_set_rate,
-> +       .is_enabled = clk_periph_is_enabled,
-> +       .enable = clk_periph_enable,
-> +       .disable = clk_periph_disable,
-> +};
-> +
-> +const struct clk_ops tegra_clk_periph_nodiv_ops = {
-> +       .get_parent = clk_periph_get_parent,
-> +       .set_parent = clk_periph_set_parent,
-> +       .is_enabled = clk_periph_is_enabled,
-> +       .enable = clk_periph_enable,
-> +       .disable = clk_periph_disable,
-> +};
-> +
-> +struct clk *tegra_clk_periph(const char *name, const char **parent_names,
-> +                            int num_parents, struct tegra_clk_periph *periph,
-> +                            void __iomem *clk_base, u32 offset)
-> +{
-> +       struct clk *clk;
-> +       struct clk_init_data init;
-> +
-> +       init.name = name;
-> +       init.ops = &tegra_clk_periph_ops;
-> +       init.flags = 0;
-> +       init.parent_names = parent_names;
-> +       init.num_parents = num_parents;
-> +
-> +       periph->hw.init = &init;
-> +       periph->magic = TEGRA_CLK_PERIPH_MAGIC;
-> +       periph->mux.reg = clk_base + offset;
-> +       periph->divider.reg = clk_base + offset;
-> +       periph->gate.clk_base = clk_base;
-> +
-> +       clk = clk_register(NULL, &periph->hw);
-> +       if (IS_ERR(clk))
-> +               return clk;
-> +
-> +       periph->mux.hw.clk = clk;
-> +       periph->divider.hw.clk = clk;
-> +       periph->gate.hw.clk = clk;
-> +
-> +       return clk;
-> +}
-> +
-> +struct clk *tegra_clk_periph_nodiv(const char *name, const char **parent_names,
-> +                             int num_parents, struct tegra_clk_periph *periph,
-> +                             void __iomem *clk_base, u32 offset)
-> +{
-> +       struct clk *clk;
-> +       struct clk_init_data init;
-> +
-> +       init.name = name;
-> +       init.ops = &tegra_clk_periph_nodiv_ops;
-> +       init.flags = CLK_SET_RATE_PARENT;
-> +       init.parent_names = parent_names;
-> +       init.num_parents = num_parents;
-> +
-> +       periph->hw.init = &init;
-> +       periph->magic = TEGRA_CLK_PERIPH_MAGIC;
-> +       periph->mux.reg = clk_base + offset;
-> +       periph->gate.clk_base = clk_base;
-> +
-> +       clk = clk_register(NULL, &periph->hw);
-> +       if (IS_ERR(clk))
-> +               return clk;
-> +
-> +       periph->mux.hw.clk = clk;
-> +       periph->gate.hw.clk = clk;
-> +
-> +       return clk;
-> +}
+On 1/16/2013 4:02 PM, James Bottomley wrote:
+> On Wed, 2013-01-16 at 12:07 +0530, Subhash Jadavani wrote:
+>
+>> Now consider this call stack from MMC block driver (this is on the ARmv7
+>> based board):
+>>       [   98.918174] [<c001b50c>] (v7_dma_inv_range+0x30/0x48) from
+>> [<c0017b8c>] (dma_cache_maint_page+0x1c4/0x24c)
+>>       [   98.927819] [<c0017b8c>] (dma_cache_maint_page+0x1c4/0x24c) from
+>> [<c0017c28>] (___dma_page_cpu_to_dev+0x14/0x1c)
+>>       [   98.937982] [<c0017c28>] (___dma_page_cpu_to_dev+0x14/0x1c) from
+>> [<c0017ff8>] (dma_map_sg+0x3c/0x114)
+> OK, so this is showing that ARM itself is making the assumption that the
+> pages are contiguous in the page offset map.
+>
+> Fix this by doing the increment via the pfn, which will do the right
+> thing whatever the memory model.
+>
+> Signed-off-by: James Bottomley <JBottomley@Parallels.com>
 
-The above two functions are almost duplicate, can we take the common part from them?
+Thanks James. Yes, it make sense to fix the ARM code itself if it is the 
+only one giving this trouble.
+I have tried your change below and it also fixes this issue (without 
+having my blk-merge patch). I will forward your change to Russel King to 
+see what he thinks about it.
 
-const struct clk_ops tegra_clk_periph_nodiv_ops = {
-       .get_parent = clk_periph_get_parent,
-       .set_parent = clk_periph_set_parent,
-       .is_enabled = clk_periph_is_enabled,
-       .enable = clk_periph_enable,
-       .disable = clk_periph_disable,
-};
-
-struct clk *__tegra_clk_periph(const char *name, const char **parent_names,
-			    int num_parents, struct tegra_clk_periph *periph,
-			    void __iomem *clk_base, u32 offset, int div)
-{
-       struct clk *clk;
-       struct clk_init_data init;
-
-       init.name = name;
-       init.parent_names = parent_names;
-       init.num_parents = num_parents;
-       init.ops = div ? &tegra_clk_periph_ops : &tegra_clk_periph_nodiv_ops
-       init.flags = div ? 0 :?CLK_SET_RATE_PARENT;
-
-       periph->hw.init = &init;
-       periph->magic = TEGRA_CLK_PERIPH_MAGIC;
-       periph->mux.reg = clk_base + offset;
-       periph->divider.reg = clk_base + offset;
-       periph->gate.clk_base = clk_base;
-
-       clk = clk_register(NULL, &periph->hw);
-       if (IS_ERR(clk))
-	       return clk;
-
-       periph->mux.hw.clk = clk;
-       periph->divider.hw.clk = div ? NULL : clk;
-       periph->gate.hw.clk = clk;
-
-       return clk;
-}
-
-static inline struct clk *tegra_clk_periph(const char *name, const char **parent_names,
-			    int num_parents, struct tegra_clk_periph *periph,
-			    void __iomem *clk_base, u32 offset)
-{
-	return __tegra_clk_periph(name, parent_names, num_parents, periph, clk_base, offset, 1);
-}
-
-static inline struct clk *tegra_clk_periph_nodiv(const char *name, const char **parent_names,
-			     int num_parents, struct tegra_clk_periph *periph,
-			     void __iomem *clk_base, u32 offset, )
-{
-	return __tegra_clk_periph(name, parent_names, num_parents, periph, clk_base, offset, 0);
-}
+Regards,
+Subhash
+>
+> ---
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 6b2fb87..ab88c5b 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -809,7 +809,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+>   			op(vaddr, len, dir);
+>   		}
+>   		offset = 0;
+> -		page++;
+> +		page = pfn_to_page(page_to_pfn(page) + 1);
+>   		left -= len;
+>   	} while (left);
+>   }
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
