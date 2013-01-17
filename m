@@ -1,77 +1,48 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 17 Jan 2013 18:07:57 +0200
-Subject: [RFC PATCH 3/6] usb: otg: utils: change the phy lib to support
- multiple PHYs of same type
-In-Reply-To: <1358348462-27693-4-git-send-email-kishon@ti.com>
-References: <1358348462-27693-1-git-send-email-kishon@ti.com>
- <1358348462-27693-4-git-send-email-kishon@ti.com>
-Message-ID: <50F821DD.1040609@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 17 Jan 2013 17:14:33 +0100
+Subject: [PATCH] [RFC] ARM: compile fix for DEBUG_LL=y && MMU=n
+In-Reply-To: <20130116223144.GA9071@quad.lixom.net>
+References: <1358346726-27199-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130116223144.GA9071@quad.lixom.net>
+Message-ID: <20130117161433.GL8668@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2013 05:00 PM, Kishon Vijay Abraham I wrote:
-> In order to add support for multipe PHY's of the same type, the API's
-> for adding PHY and getting PHY has been changed. Now the binding
-> information of the PHY and controller should be done in platform file
-> using usb_bind_phy API. And for getting a PHY, the device pointer of the
-> USB controller and an index should be passed. Based on the binding
-> information that is added in the platform file, get_phy will return the
-> approappropriate PHY.
+On Wed, Jan 16, 2013 at 02:31:44PM -0800, Olof Johansson wrote:
+> On Wed, Jan 16, 2013 at 03:32:06PM +0100, Uwe Kleine-K?nig wrote:
+> > debug_ll_addr is only used on machines with an MMU so it can be #ifdef'ed
+> > out safely. This fixes:
+> > 
+> > arch/arm/kernel/debug.S: Assembler messages:
+> > arch/arm/kernel/debug.S:104: Error: too many positional arguments
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Stephen Warren <swarren@nvidia.com>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > ---
+> > The obvious alternative fix is to make addruart on !MMU take 3
+> > arguments, too.
+> > 
+> > The problem was introduced in
+> > 
+> > 	e5c5f2a (ARM: implement debug_ll_io_init())
+> > 
+> > which appeared in v3.8-rc1.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/mach-shmobile/board-marzen.c |    2 +-
->  drivers/power/ab8500_charger.c        |    2 +-
->  drivers/power/isp1704_charger.c       |    2 +-
->  drivers/power/pda_power.c             |    2 +-
->  drivers/power/twl4030_charger.c       |    2 +-
->  drivers/usb/chipidea/udc.c            |    2 +-
->  drivers/usb/dwc3/core.c               |    4 +-
->  drivers/usb/gadget/fsl_udc_core.c     |    2 +-
->  drivers/usb/gadget/mv_udc_core.c      |    2 +-
->  drivers/usb/gadget/omap_udc.c         |    2 +-
->  drivers/usb/gadget/pxa25x_udc.c       |    2 +-
->  drivers/usb/gadget/pxa27x_udc.c       |    2 +-
->  drivers/usb/gadget/s3c-hsudc.c        |    2 +-
->  drivers/usb/host/ehci-fsl.c           |    2 +-
->  drivers/usb/host/ehci-msm.c           |    2 +-
->  drivers/usb/host/ehci-mv.c            |    2 +-
->  drivers/usb/host/ehci-tegra.c         |    2 +-
->  drivers/usb/host/ohci-omap.c          |    2 +-
->  drivers/usb/musb/am35x.c              |    2 +-
->  drivers/usb/musb/blackfin.c           |    2 +-
->  drivers/usb/musb/da8xx.c              |    2 +-
->  drivers/usb/musb/davinci.c            |    2 +-
->  drivers/usb/musb/musb_dsps.c          |    2 +-
->  drivers/usb/musb/omap2430.c           |    2 +-
->  drivers/usb/musb/tusb6010.c           |    2 +-
->  drivers/usb/musb/ux500.c              |    2 +-
->  drivers/usb/otg/ab8500-usb.c          |    3 +-
->  drivers/usb/otg/fsl_otg.c             |    5 ++-
->  drivers/usb/otg/gpio_vbus.c           |    3 +-
->  drivers/usb/otg/isp1301_omap.c        |    3 +-
->  drivers/usb/otg/msm_otg.c             |    3 +-
->  drivers/usb/otg/mv_otg.c              |    3 +-
->  drivers/usb/otg/nop-usb-xceiv.c       |    3 +-
->  drivers/usb/otg/otg.c                 |   67 +++++++++++++++------------------
->  drivers/usb/otg/twl4030-usb.c         |    3 +-
->  drivers/usb/phy/mv_u3d_phy.c          |    3 +-
->  drivers/usb/phy/omap-usb2.c           |   11 ++----
->  drivers/usb/phy/rcar-phy.c            |    3 +-
->  include/linux/usb/phy.h               |   12 +++---
->  39 files changed, 87 insertions(+), 89 deletions(-)
+> Since we introduced the breakage in arm-soc, I've picked up the fix (I guess
+> it could have gone through Russell's tree as well though).
+> 
+> I've added the reference to the introducing commit, and the acks/review tags.
+> 
+> Adding a defconfig for a !MMU platform seems like a good idea, since there's
+> several of us who make sure that there is build coverage of the defconfigs and
+> follow up on most of the breakage. Feel free to send one in for 3.9.
+Jonny just pointed out in irc that there is at91x40_defconfig.
 
-I think it better to leave the existing add/get APIs as they are add add
-new APIs that support multiple PHYs. You could probably mark the old
-ones as deprecated.
+Best regards
+Uwe
 
-That way you don't need to wait till all users are converted and tested.
-
-e.g. you could name the new APIs as
-
-usb_add_phy_dev(struct usb_phy *phy);
-usb_get_phy_dev(struct device *dev, int index);
-
---
-cheers,
--roger
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
