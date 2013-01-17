@@ -1,28 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Jan 2013 12:15:24 +0100
-Subject: [PATCH 0/4] gpio: introduce descriptor-based interface
-In-Reply-To: <201301101008.45091.arnd@arndb.de>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
- <201301091046.13020.arnd@arndb.de> <2270940.DTxEYMZtED@percival>
- <201301101008.45091.arnd@arndb.de>
-Message-ID: <CACRpkda6dqAj+DzrMCnKET7Z9PtuW0+k9ea3YDL8Z1D=oFVRpQ@mail.gmail.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Thu, 17 Jan 2013 11:19:21 +0000
+Subject: [PATCH v2 1/1] block: blk-merge: don't merge the pages with
+ non-contiguous descriptors
+In-Reply-To: <20130117110438.GZ23505@n2100.arm.linux.org.uk>
+References: <1358265681-25671-1-git-send-email-subhashj@codeaurora.org>
+ <1358266794.10591.8.camel@dabdike.int.hansenpartnership.com>
+ <50F64AC1.3040304@codeaurora.org>
+ <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
+ <20130116231857.GU2668@htj.dyndns.org>
+ <1358413880.2394.7.camel@dabdike.int.hansenpartnership.com>
+ <20130117103742.GX23505@n2100.arm.linux.org.uk>
+ <20130117104741.GY23505@n2100.arm.linux.org.uk>
+ <1358420507.2394.19.camel@dabdike.int.hansenpartnership.com>
+ <20130117110438.GZ23505@n2100.arm.linux.org.uk>
+Message-ID: <1358421561.2394.27.camel@dabdike.int.hansenpartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 11:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, 2013-01-17 at 11:04 +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 17, 2013 at 11:01:47AM +0000, James Bottomley wrote:
+> > On Thu, 2013-01-17 at 10:47 +0000, Russell King - ARM Linux wrote:
+> > > Also, couldn't the addition of the scatterlist offset to the page also
+> > > be buggy too?
+> > 
+> > No, fortunately, offset must be within the first page from the point of
+> > view of block generated sg lists.  As long as nothing within arm
+> > violates this, it should be a safe assumption ... although the code
+> > seems to assume otherwise.
+> 
+> Are you absolutely sure about that?  I believe I have seen cases where
+> that has been violated in the past, though it was many years ago.
 
-> I've tried to find platforms that don't yet use GPIOLIB and fortunately
-> there are very few left:
->
-> I found two that provide the generic gpio interfaces when gpiolib
-> is disabled, but use gpiolib otherwise for the same hardware,
-> arch/m68k/include/asm/mcfgpio.h and arch/blackfin/include/asm/gpio.h.
-> I would assume that we can simply remove the non-gpiolib shortcut
-> here at cost of a small overhead.
+>From the point of view of the block layer, absolutely: the scatterlist
+is generated from an array of bio_vecs.  Each bio_vec is a page, offset
+and length element and obeys the rule that offset must be within the
+page and offset + length cannot stray over the page.
 
-Geert/Greg: interested in looking into this issue?
+>From the point of view of other arm stuff, I don't know.
 
-The GPIO maintainers want to get rid of non-gpiolib platforms.
-
-Yours,
-Linus Walleij
+James
