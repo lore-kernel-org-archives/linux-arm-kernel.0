@@ -1,47 +1,42 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 17 Jan 2013 17:37:35 +0000
-Subject: [kvmarm] [PATCH v6 02/13] KVM: ARM: Introduce
- KVM_SET_DEVICE_ADDRESS ioctl
-In-Reply-To: <20130116180028.29393.62418.stgit@ubuntu>
-References: <20130116180013.29393.49165.stgit@ubuntu>
- <20130116180028.29393.62418.stgit@ubuntu>
-Message-ID: <CAFEAcA9rQABRT7ybfn_BSsykMO+OhoPt6y7RhNkdXyUSr4fhtA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Jan 2013 09:45:29 -0800
+Subject: [PATCH] am33xx: cpsw: default to ethernet hwaddr from efuse if
+ not defined in dt
+In-Reply-To: <87a9s7lq09.fsf@dell.be.48ers.dk>
+References: <1358370073-32545-1-git-send-email-jacmet@sunsite.dk>
+ <loom.20130117T105358-639@post.gmane.org>
+ <87a9s7lq09.fsf@dell.be.48ers.dk>
+Message-ID: <20130117174528.GM14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 January 2013 18:00, Christoffer Dall
-<c.dall@virtualopensystems.com> wrote:
-> KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+* Peter Korsgaard <jacmet@sunsite.dk> [130117 08:46]:
+> >>>>> "Michal" == Michal Bachraty <michal.bachraty@gmail.com> writes:
+> 
+> Hi Michael,
+> 
+>  Michal> I made changes to cpsw driver two weeks ago, which add support
+>  Michal> for reading MAC address from CPU and also I posted it to
+>  Michal> review.  You can find patch here :
+>  Michal> https://patchwork.kernel.org/patch/1966481/ I will create
+>  Michal> updated patch next week, depended on reactions. Can you try
+>  Michal> that patch? I'll be glad to hear your opinion.
+> 
+> Thanks, I missed that patch. Functionality wise the patches do the same,
+> but I must say I find my patch cleaner, as it doesn't involve any new dt
+> bindings or access to the am33xx specific control module registers from
+> the cpsw driver.
+> 
+> The way I've handled it is similar to how it is done on atleast one
+> other arm subarchicture, see
+> arch/arm/mach-mxs/mach-mxs.c::update_fec_mac_prop()
 
-Patch subject needs updating with new name of this ioctl
-(KVM_ARM_SET_DEVICE_ADDR)...
+Cool this seems like the cleanest way to deal with it so far. Can
+you please resend with also linux-net and DT list Cc:d too?
 
-> On ARM (and possibly other architectures) some bits are specific to the
-> model being emulated for the guest and user space needs a way to tell
-> the kernel about those bits.  An example is mmio device base addresses,
-> where KVM must know the base address for a given device to properly
-> emulate mmio accesses within a certain address range or directly map a
-> device with virtualiation extensions into the guest address space.
+Also the arch_initcall should be omap_arch_initcall in linux next
+for consistency if we ever have SoC specific sections for those.
 
-"virtualization", while I'm here.
+Regards,
 
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -65,6 +65,19 @@ struct kvm_regs {
->  #define KVM_ARM_TARGET_CORTEX_A15      0
->  #define KVM_ARM_NUM_TARGETS            1
->
-> +/* KVM_SET_DEVICE_ADDRESS ioctl id encoding */
-> +#define KVM_DEVICE_TYPE_SHIFT          0
-> +#define KVM_DEVICE_TYPE_MASK           (0xffff << KVM_DEVICE_TYPE_SHIFT)
-> +#define KVM_DEVICE_ID_SHIFT            16
-> +#define KVM_DEVICE_ID_MASK             (0xffff << KVM_DEVICE_ID_SHIFT)
-
-...and this comment and I guess these constant names presumably
-should have "ARM" in them?
-
-> +/* Available with KVM_CAP_SET_DEVICE_ADDR */
-
-KVM_CAP_ARM_SET_DEVICE_ADDR.
-
--- PMM
+Tony
