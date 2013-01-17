@@ -1,29 +1,28 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 17 Jan 2013 15:30:07 +0200
-Subject: [PATCH v7 22/22] mdf: omap-usb-host: get rid of build warning
-In-Reply-To: <20130117115046.GI18978@arwen.pp.htv.fi>
-References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
- <1358422231-24736-23-git-send-email-rogerq@ti.com>
- <20130117115046.GI18978@arwen.pp.htv.fi>
-Message-ID: <50F7FCDF.7040808@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Jan 2013 14:31:06 +0100
+Subject: [PATCH 2/2] gpio: devm_gpio_* support should not depend on GPIOLIB
+In-Reply-To: <1358239056-703-3-git-send-email-shawn.guo@linaro.org>
+References: <1358239056-703-1-git-send-email-shawn.guo@linaro.org>
+ <1358239056-703-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdZ+L6GN_1_wSkckZY553jsG3wTEdwM27dp+cyCAjH5tpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2013 01:50 PM, Felipe Balbi wrote:
-> On Thu, Jan 17, 2013 at 01:30:31PM +0200, Roger Quadros wrote:
->> Fixes the below build warning when driver is built-in.
->>
->> drivers/mfd/omap-usb-host.c:750:12: warning:
->> ?usbhs_omap_remove? defined but not used [-Wunused-function]
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> 
-> should this go to stable too ?
-> 
-> (though it's not really a bug, so doesn't really matter, I guess).
-> 
-not a bug so let's not send this to stable.
+On Tue, Jan 15, 2013 at 9:37 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
---
-cheers,
--roger
+> Some architectures (e.g. blackfin) provide gpio API without requiring
+> GPIOLIB support (ARCH_WANT_OPTIONAL_GPIOLIB).  devm_gpio_* functions
+> should also work for these architectures, since they do not really
+> depend on GPIOLIB.
+>
+> Add a new option GPIO_DEVRES (enabled by default) to control the build
+> of devres.c, and move devm_gpio_* function declarations out from #ifdef
+> CONFIG_GPIOLIB in include/asm-generic/gpio.h, so that they can be
+> available to client drivers without unnecessary dependency on GPIOLIB.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+
+Fair enough, but I need the first patch in an applicable for first...
+
+Yours,
+Linus Walleij
