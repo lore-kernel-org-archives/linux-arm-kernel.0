@@ -1,44 +1,22 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Jan 2013 13:00:23 +0200
-Subject: [V3 PATCH 11/25] arm: mmp2: change the defintion of usb devices
-In-Reply-To: <CAN1soZzH8OPR=KLS+c5M_Ttme4XNhW6Pzz-gbPngSwo6+jXwMA@mail.gmail.com>
-References: <1358230758-10176-1-git-send-email-chao.xie@marvell.com>
- <1358230758-10176-12-git-send-email-chao.xie@marvell.com>
- <20130117090902.GE10814@arwen.pp.htv.fi>
- <CAN1soZzH8OPR=KLS+c5M_Ttme4XNhW6Pzz-gbPngSwo6+jXwMA@mail.gmail.com>
-Message-ID: <20130117110023.GQ10814@arwen.pp.htv.fi>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 17 Jan 2013 19:01:05 +0800
+Subject: [PATCH v6 3/3] ARM: i.MX clock: Change the connection-id for
+ fsl-usb2-udc
+In-Reply-To: <20130117105833.GP10814@arwen.pp.htv.fi>
+References: <1358416997-29099-1-git-send-email-peter.chen@freescale.com>
+ <1358416997-29099-4-git-send-email-peter.chen@freescale.com>
+ <20130117105833.GP10814@arwen.pp.htv.fi>
+Message-ID: <20130117110104.GO26179@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jan 17, 2013 at 05:59:20PM +0800, Haojian Zhuang wrote:
-> On Thu, Jan 17, 2013 at 5:12 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > On Tue, Jan 15, 2013 at 01:19:04AM -0500, Chao Xie wrote:
-> >> add the udc/otg/ehci devices for mmp2
-> >>
-> >> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> >
-> > Haojian, can I get an Acked-by for this patch or will you carry it
-> > yourself ?
-> >
-> > Likewise for all other arch/arm/* patches in this series
-> >
-> > --
-> > balbi
+On Thu, Jan 17, 2013 at 12:58:33PM +0200, Felipe Balbi wrote:
+> On Thu, Jan 17, 2013 at 06:03:17PM +0800, Peter Chen wrote:
+> > As we use platform_device_id for fsl-usb2-udc driver, it needs to
+> > change clk connection-id, or the related devm_clk_get will be failed.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > 
-> Sure. You can apply these patches.
-> 
-> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> do I get Acked-by for this one ?
 
-Thank you
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/95701620/attachment-0001.sig>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
