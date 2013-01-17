@@ -1,36 +1,78 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Jan 2013 08:59:44 -0800
-Subject: [PATCH v7 01/22] mfd: omap-usb-host: Consolidate OMAP USB-HS
- platform data
-In-Reply-To: <Pine.LNX.4.44L0.1301171016090.1339-100000@iolanthe.rowland.org>
-References: <1358422231-24736-2-git-send-email-rogerq@ti.com>
- <Pine.LNX.4.44L0.1301171016090.1339-100000@iolanthe.rowland.org>
-Message-ID: <20130117165943.GI14149@atomide.com>
+Date: Thu, 17 Jan 2013 09:03:22 -0800
+Subject: [PATCH v7 19/22] ARM: OMAP3: clock data: get rid of unused USB
+ host clock aliases and dummies
+In-Reply-To: <1358422231-24736-20-git-send-email-rogerq@ti.com>
+References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
+ <1358422231-24736-20-git-send-email-rogerq@ti.com>
+Message-ID: <20130117170321.GJ14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alan Stern <stern@rowland.harvard.edu> [130117 07:19]:
-> On Thu, 17 Jan 2013, Roger Quadros wrote:
-> 
-> > Let's have a single platform data structure for the OMAP's High-Speed
-> > USB host subsystem instead of having 3 separate ones i.e. one for
-> > board data, one for USB Host (UHH) module and one for USB-TLL module.
-> > 
-> > This makes the code much simpler and avoids creating multiple copies of
-> > platform data.
-> > 
-> > CC: Alan Stern <stern@rowland.harvard.edu>
-> > 
-> > Signed-off-by: Roger Quadros <rogerq@ti.com>
-> 
-> For the ehci-omap.c part:
-> 
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+* Roger Quadros <rogerq@ti.com> [130117 03:34]:
+> We don't need multiple aliases for the OMAP USB host clocks and neither
+> the dummy clocks so remove them.
 
-If Samuel acks this patch, I can apply just this patch alone on v3.8-rc3
-into an immutable branch omap-for-v3.9/board-usb so we all merge it in
-as needed.
+It's best that Paul queues this and the next patch as these clock alias
+clean-up patches can be done separately. That way the dependency between
+arch/arm/*omap* code is cut away as these files should be moved to live
+under drivers/clk/omap.
 
 Regards,
 
 Tony
+ 
+> CC: Paul Walmsley <paul@pwsan.com>
+> CC: Rajendra Nayak <rnayak@ti.com>
+> CC: Benoit Cousson <b-cousson@ti.com>
+> CC: Mike Turquette <mturquette@linaro.com>
+> 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Acked-by: Paul Walmsley <paul@pwsan.com>
+> ---
+>  arch/arm/mach-omap2/cclock3xxx_data.c |   11 -----------
+>  1 files changed, 0 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
+> index 6ef8758..b58ec96 100644
+> --- a/arch/arm/mach-omap2/cclock3xxx_data.c
+> +++ b/arch/arm/mach-omap2/cclock3xxx_data.c
+> @@ -3291,8 +3291,6 @@ static struct omap_clk omap3xxx_clks[] = {
+>  	CLK(NULL,	"cpefuse_fck",	&cpefuse_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+>  	CLK(NULL,	"ts_fck",	&ts_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+>  	CLK(NULL,	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+> -	CLK("usbhs_omap",	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+> -	CLK("usbhs_tll",	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+>  	CLK(NULL,	"core_96m_fck",	&core_96m_fck,	CK_3XXX),
+>  	CLK(NULL,	"mmchs3_fck",	&mmchs3_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+>  	CLK(NULL,	"mmchs2_fck",	&mmchs2_fck,	CK_3XXX),
+> @@ -3329,8 +3327,6 @@ static struct omap_clk omap3xxx_clks[] = {
+>  	CLK(NULL,	"pka_ick",	&pka_ick,	CK_34XX | CK_36XX),
+>  	CLK(NULL,	"core_l4_ick",	&core_l4_ick,	CK_3XXX),
+>  	CLK(NULL,	"usbtll_ick",	&usbtll_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+> -	CLK("usbhs_omap",	"usbtll_ick",	&usbtll_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+> -	CLK("usbhs_tll",	"usbtll_ick",	&usbtll_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+>  	CLK("omap_hsmmc.2",	"ick",	&mmchs3_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+>  	CLK(NULL,	"mmchs3_ick",	&mmchs3_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+>  	CLK(NULL,	"icr_ick",	&icr_ick,	CK_34XX | CK_36XX),
+> @@ -3393,17 +3389,10 @@ static struct omap_clk omap3xxx_clks[] = {
+>  	CLK(NULL,	"usbhost_120m_fck", &usbhost_120m_fck, CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+>  	CLK(NULL,	"usbhost_48m_fck", &usbhost_48m_fck, CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+>  	CLK(NULL,	"usbhost_ick",	&usbhost_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+> -	CLK("usbhs_omap",	"usbhost_ick",	&usbhost_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+>  	CLK(NULL,	"utmi_p1_gfclk",	&dummy_ck,	CK_3XXX),
+>  	CLK(NULL,	"utmi_p2_gfclk",	&dummy_ck,	CK_3XXX),
+>  	CLK(NULL,	"xclk60mhsp1_ck",	&dummy_ck,	CK_3XXX),
+>  	CLK(NULL,	"xclk60mhsp2_ck",	&dummy_ck,	CK_3XXX),
+> -	CLK(NULL,	"usb_host_hs_utmi_p1_clk",	&dummy_ck,	CK_3XXX),
+> -	CLK(NULL,	"usb_host_hs_utmi_p2_clk",	&dummy_ck,	CK_3XXX),
+> -	CLK("usbhs_omap",	"usb_tll_hs_usb_ch0_clk",	&dummy_ck,	CK_3XXX),
+> -	CLK("usbhs_omap",	"usb_tll_hs_usb_ch1_clk",	&dummy_ck,	CK_3XXX),
+> -	CLK("usbhs_tll",	"usb_tll_hs_usb_ch0_clk",	&dummy_ck,	CK_3XXX),
+> -	CLK("usbhs_tll",	"usb_tll_hs_usb_ch1_clk",	&dummy_ck,	CK_3XXX),
+>  	CLK(NULL,	"init_60m_fclk",	&dummy_ck,	CK_3XXX),
+>  	CLK(NULL,	"usim_fck",	&usim_fck,	CK_3430ES2PLUS | CK_36XX),
+>  	CLK(NULL,	"gpt1_fck",	&gpt1_fck,	CK_3XXX),
+> -- 
+> 1.7.4.1
+> 
