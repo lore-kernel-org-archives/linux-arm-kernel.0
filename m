@@ -1,71 +1,302 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Jan 2013 20:53:23 -0600
-Subject: [PATCH 1/3] ARM: introduce common set_auxcr/get_auxcr functions
-Message-ID: <1358391205-23943-1-git-send-email-robherring2@gmail.com>
+Date: Wed, 16 Jan 2013 20:53:24 -0600
+Subject: [PATCH 2/3] ARM: convert platform hotplug inline assembly to C
+In-Reply-To: <1358391205-23943-1-git-send-email-robherring2@gmail.com>
+References: <1358391205-23943-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1358391205-23943-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move the private set_auxcr/get_auxcr functions from
-drivers/cpuidle/cpuidle-calxeda.c so they can be used across platforms.
+With the addition of set_auxcr/get_auxcr, all the hotplug inline assembly
+code for exynos, imx, realview, spear13xx and vexpress can be converted to
+C code.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: Shiraz Hashim <shiraz.hashim@st.com>
 ---
- arch/arm/include/asm/cp15.h       |   14 ++++++++++++++
- drivers/cpuidle/cpuidle-calxeda.c |   14 --------------
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ arch/arm/mach-exynos/hotplug.c    |   57 ++++++-------------------------------
+ arch/arm/mach-imx/hotplug.c       |   19 ++++---------
+ arch/arm/mach-realview/hotplug.c  |   32 +++++----------------
+ arch/arm/mach-spear13xx/hotplug.c |   32 +++++----------------
+ arch/arm/mach-vexpress/hotplug.c  |   33 +++++----------------
+ 5 files changed, 35 insertions(+), 138 deletions(-)
 
-diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-index 5ef4d80..ef0094a 100644
---- a/arch/arm/include/asm/cp15.h
-+++ b/arch/arm/include/asm/cp15.h
-@@ -59,6 +59,20 @@ static inline void set_cr(unsigned int val)
- 	isb();
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index c3f825b..5548fa3 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -26,69 +26,30 @@
+ 
+ static inline void cpu_enter_lowpower_a9(void)
+ {
+-	unsigned int v;
+-
+ 	flush_cache_all();
+-	asm volatile(
+-	"	mcr	p15, 0, %1, c7, c5, 0\n"
+-	"	mcr	p15, 0, %1, c7, c10, 4\n"
++	__flush_icache_all();
++	dsb();
++
+ 	/*
+ 	 * Turn off coherency
+ 	 */
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	bic	%0, %0, %3\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	"	mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	bic	%0, %0, %2\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	  : "=&r" (v)
+-	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+-	  : "cc");
++	set_auxcr(get_auxcr() & ~0x40);
++	set_cr(get_cr() & ~CR_C);
  }
  
-+static inline unsigned int get_auxcr(void)
-+{
-+	unsigned int val;
-+	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
-+	return val;
-+}
-+
-+static inline void set_auxcr(unsigned int val)
-+{
-+	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
-+	  : : "r" (val) : "cc");
-+	isb();
-+}
-+
- #ifndef CONFIG_SMP
- extern void adjust_cr(unsigned long mask, unsigned long set);
- #endif
-diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-index e1aab38..ece83d6 100644
---- a/drivers/cpuidle/cpuidle-calxeda.c
-+++ b/drivers/cpuidle/cpuidle-calxeda.c
-@@ -37,20 +37,6 @@ extern void *scu_base_addr;
- 
- static struct cpuidle_device __percpu *calxeda_idle_cpuidle_devices;
- 
--static inline unsigned int get_auxcr(void)
--{
--	unsigned int val;
--	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
--	return val;
--}
--
--static inline void set_auxcr(unsigned int val)
--{
--	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
--	  : : "r" (val) : "cc");
--	isb();
--}
--
- static noinline void calxeda_idle_restore(void)
+ static inline void cpu_enter_lowpower_a15(void)
  {
- 	set_cr(get_cr() | CR_C);
+-	unsigned int v;
+-
+-	asm volatile(
+-	"	mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	bic	%0, %0, %1\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	  : "=&r" (v)
+-	  : "Ir" (CR_C)
+-	  : "cc");
+-
++	set_cr(get_cr() & ~CR_C);
+ 	flush_cache_louis();
++	set_auxcr(get_auxcr() & ~0x40);
+ 
+-	asm volatile(
+-	/*
+-	* Turn off coherency
+-	*/
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	bic	%0, %0, %1\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	: "=&r" (v)
+-	: "Ir" (0x40)
+-	: "cc");
+-
+-	isb();
+ 	dsb();
+ }
+ 
+ static inline void cpu_leave_lowpower(void)
+ {
+-	unsigned int v;
+-
+-	asm volatile(
+-	"mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	orr	%0, %0, %1\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	orr	%0, %0, %2\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	  : "=&r" (v)
+-	  : "Ir" (CR_C), "Ir" (0x40)
+-	  : "cc");
++	set_cr(get_cr() | CR_C);
++	set_auxcr(get_auxcr() | 0x40);
+ }
+ 
+ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+index 3dec962..1470c75 100644
+--- a/arch/arm/mach-imx/hotplug.c
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -18,24 +18,15 @@
+ 
+ static inline void cpu_enter_lowpower(void)
+ {
+-	unsigned int v;
+-
+ 	flush_cache_all();
+-	asm volatile(
+-		"mcr	p15, 0, %1, c7, c5, 0\n"
+-	"	mcr	p15, 0, %1, c7, c10, 4\n"
++	__flush_icache_all();
++	dsb();
++
+ 	/*
+ 	 * Turn off coherency
+ 	 */
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	bic	%0, %0, %3\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	"	mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	bic	%0, %0, %2\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	  : "=&r" (v)
+-	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+-	  : "cc");
++	set_auxcr(get_auxcr() & ~0x40);
++	set_cr(get_cr() & ~CR_C);
+ }
+ 
+ /*
+diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+index 53818e5..c17c8c0 100644
+--- a/arch/arm/mach-realview/hotplug.c
++++ b/arch/arm/mach-realview/hotplug.c
+@@ -18,39 +18,21 @@
+ 
+ static inline void cpu_enter_lowpower(void)
+ {
+-	unsigned int v;
+-
+ 	flush_cache_all();
+-	asm volatile(
+-	"	mcr	p15, 0, %1, c7, c5, 0\n"
+-	"	mcr	p15, 0, %1, c7, c10, 4\n"
++	__flush_icache_all();
++	dsb();
++
+ 	/*
+ 	 * Turn off coherency
+ 	 */
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	bic	%0, %0, #0x20\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	"	mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	bic	%0, %0, %2\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	  : "=&r" (v)
+-	  : "r" (0), "Ir" (CR_C)
+-	  : "cc");
++	set_auxcr(get_auxcr() & ~0x40);
++	set_cr(get_cr() & ~CR_C);
+ }
+ 
+ static inline void cpu_leave_lowpower(void)
+ {
+-	unsigned int v;
+-
+-	asm volatile(	"mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	orr	%0, %0, %1\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	orr	%0, %0, #0x20\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	  : "=&r" (v)
+-	  : "Ir" (CR_C)
+-	  : "cc");
++	set_cr(get_cr() | CR_C);
++	set_auxcr(get_auxcr() | 0x40);
+ }
+ 
+ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+diff --git a/arch/arm/mach-spear13xx/hotplug.c b/arch/arm/mach-spear13xx/hotplug.c
+index a7d2dd1..a38a087 100644
+--- a/arch/arm/mach-spear13xx/hotplug.c
++++ b/arch/arm/mach-spear13xx/hotplug.c
+@@ -19,39 +19,21 @@
+ 
+ static inline void cpu_enter_lowpower(void)
+ {
+-	unsigned int v;
+-
+ 	flush_cache_all();
+-	asm volatile(
+-	"	mcr	p15, 0, %1, c7, c5, 0\n"
+-	"	dsb\n"
++	__flush_icache_all();
++	dsb();
++
+ 	/*
+ 	 * Turn off coherency
+ 	 */
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	bic	%0, %0, #0x20\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	"	mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	bic	%0, %0, %2\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	: "=&r" (v)
+-	: "r" (0), "Ir" (CR_C)
+-	: "cc", "memory");
++	set_auxcr(get_auxcr() & ~0x40);
++	set_cr(get_cr() & ~CR_C);
+ }
+ 
+ static inline void cpu_leave_lowpower(void)
+ {
+-	unsigned int v;
+-
+-	asm volatile("mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	orr	%0, %0, %1\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	orr	%0, %0, #0x20\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	: "=&r" (v)
+-	: "Ir" (CR_C)
+-	: "cc");
++	set_cr(get_cr() | CR_C);
++	set_auxcr(get_auxcr() | 0x40);
+ }
+ 
+ static inline void spear13xx_do_lowpower(unsigned int cpu, int *spurious)
+diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
+index a141b98..74a9eb5 100644
+--- a/arch/arm/mach-vexpress/hotplug.c
++++ b/arch/arm/mach-vexpress/hotplug.c
+@@ -18,40 +18,21 @@
+ 
+ static inline void cpu_enter_lowpower(void)
+ {
+-	unsigned int v;
+-
+ 	flush_cache_all();
+-	asm volatile(
+-		"mcr	p15, 0, %1, c7, c5, 0\n"
+-	"	mcr	p15, 0, %1, c7, c10, 4\n"
++	__flush_icache_all();
++	dsb();
++
+ 	/*
+ 	 * Turn off coherency
+ 	 */
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	bic	%0, %0, %3\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	"	mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	bic	%0, %0, %2\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	  : "=&r" (v)
+-	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+-	  : "cc");
++	set_auxcr(get_auxcr() & ~0x40);
++	set_cr(get_cr() & ~CR_C);
+ }
+ 
+ static inline void cpu_leave_lowpower(void)
+ {
+-	unsigned int v;
+-
+-	asm volatile(
+-		"mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	orr	%0, %0, %1\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	orr	%0, %0, %2\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	  : "=&r" (v)
+-	  : "Ir" (CR_C), "Ir" (0x40)
+-	  : "cc");
++	set_cr(get_cr() | CR_C);
++	set_auxcr(get_auxcr() | 0x40);
+ }
+ 
+ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
 -- 
 1.7.10.4
