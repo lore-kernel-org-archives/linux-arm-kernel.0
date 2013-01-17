@@ -1,52 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Jan 2013 14:48:32 +0200
-Subject: [PATCH v7 15/22] mfd: omap-usb-host: Manage HSIC clocks for HSIC
- mode
-In-Reply-To: <50F7F25C.3060909@ti.com>
-References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
- <1358422231-24736-16-git-send-email-rogerq@ti.com>
- <20130117114522.GF18978@arwen.pp.htv.fi> <50F7EA2A.2080705@ti.com>
- <20130117122757.GO18978@arwen.pp.htv.fi> <50F7F25C.3060909@ti.com>
-Message-ID: <20130117124832.GQ18978@arwen.pp.htv.fi>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Thu, 17 Jan 2013 13:57:02 +0100
+Subject: [PATCH] usb: musb: ux500: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <20130117105104.GN10814@arwen.pp.htv.fi>
+References: <1357577261-31536-1-git-send-email-fabio.baltieri@linaro.org>
+ <CACRpkdZD1i_tvDf6XFyk5muYjtDziQaMNGK6vvihhFJVztXUjw@mail.gmail.com>
+ <20130110133818.GA22710@balto.lan>
+ <CACRpkdbmgQ0xDfkbgqc=zDqMDUK0O6uQOf3kX9v1+=+N5s42bw@mail.gmail.com>
+ <20130117105104.GN10814@arwen.pp.htv.fi>
+Message-ID: <20130117125702.GA5007@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 02:45:16PM +0200, Roger Quadros wrote:
-> On 01/17/2013 02:27 PM, Felipe Balbi wrote:
-> > On Thu, Jan 17, 2013 at 02:10:18PM +0200, Roger Quadros wrote:
-> >> On 01/17/2013 01:45 PM, Felipe Balbi wrote:
-> >>> Hi,
-> >>>
-> >>> On Thu, Jan 17, 2013 at 01:30:24PM +0200, Roger Quadros wrote:
-> >>>> @@ -598,6 +639,24 @@ static int usbhs_omap_probe(struct platform_device *pdev)
-> >>>>  				clkname, PTR_ERR(pclk));
-> >>>>  		else
-> >>>>  			omap->utmi_clk[i] = pclk;
-> >>>> +
-> >>>> +		snprintf(clkname, sizeof(clkname),
-> >>>> +				"usb_host_hs_hsic480m_p%d_clk", i + 1);
-> >>>
-> >>> do we really need to know the exact clock node name ?
-> >>>
-> >> I think so. Do you have a better suggestion?
+On Thu, Jan 17, 2013 at 12:51:04PM +0200, Felipe Balbi wrote:
+> > > Thanks for the ACK.  This bug was here unnoticed since 3.6 merge window,
 > > 
-> > update CLKDEV entries ? I mean, what if we have a new OMAP or AMxxxx
-> > device with a different clock name ? That will be a big bummer.
-> > 
+> > Then it should have Cc: stable at kernel.org..
 > 
-> In that case we simply need to add the relevant CLKDEV entries/aliases
-> for the new platform. I don't think anything needs to be changed in the
-> driver. We are still using clk_get(dev, clk_name), so the CLKDEV
-> framework will return the best matching clock for the device.
+> just added to my tree.
 
-fair enough ;-)
+Hi Felipe, thanks for adding the stable tag to the patch, but I actually
+made a bit of confusion with the versions, so I double checked and it
+turns out this is really needed on v3.7 stable, not v3.6.
+
+Will you be so kind to remove v3.6 from the stable tag from this
+patch?
+
+Thanks and sorry for the added noise!
+Fabio
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/16e1b126/attachment.sig>
+Fabio Baltieri
