@@ -1,123 +1,75 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Jan 2013 16:39:48 +0800
-Subject: [PATCH] ARM: imx: use debug_ll_io_init() for imx6q
-Message-ID: <1358411988-8542-1-git-send-email-shawn.guo@linaro.org>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Thu, 17 Jan 2013 08:54:47 +0000
+Subject: [PATCH v2 1/1] block: blk-merge: don't merge the pages with
+ non-contiguous descriptors
+In-Reply-To: <20130116231401.GV23505@n2100.arm.linux.org.uk>
+References: <1358265681-25671-1-git-send-email-subhashj@codeaurora.org>
+ <1358266794.10591.8.camel@dabdike.int.hansenpartnership.com>
+ <50F64AC1.3040304@codeaurora.org>
+ <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
+ <20130116231401.GV23505@n2100.arm.linux.org.uk>
+Message-ID: <1358412887.2394.0.camel@dabdike.int.hansenpartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use debug_ll_io_init() to map low level debug port for imx6q, so that
-arch/arm/mach-imx/lluart.c can be removed.
+On Wed, 2013-01-16 at 23:14 +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 16, 2013 at 10:32:35AM +0000, James Bottomley wrote:
+> > On Wed, 2013-01-16 at 12:07 +0530, Subhash Jadavani wrote:
+> > 
+> > > Now consider this call stack from MMC block driver (this is on the ARmv7 
+> > > based board):
+> > >      [   98.918174] [<c001b50c>] (v7_dma_inv_range+0x30/0x48) from 
+> > > [<c0017b8c>] (dma_cache_maint_page+0x1c4/0x24c)
+> > >      [   98.927819] [<c0017b8c>] (dma_cache_maint_page+0x1c4/0x24c) from 
+> > > [<c0017c28>] (___dma_page_cpu_to_dev+0x14/0x1c)
+> > >      [   98.937982] [<c0017c28>] (___dma_page_cpu_to_dev+0x14/0x1c) from 
+> > > [<c0017ff8>] (dma_map_sg+0x3c/0x114)
+> > 
+> > OK, so this is showing that ARM itself is making the assumption that the
+> > pages are contiguous in the page offset map.
+> > 
+> > Fix this by doing the increment via the pfn, which will do the right
+> > thing whatever the memory model.
+> > 
+> > Signed-off-by: James Bottomley <JBottomley@Parallels.com>
+> 
+> Ok.  What would you like the patch summary line for this to be -
+> the existing one seems to be a little wrong given the content of
+> this patch...
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/Makefile     |    1 -
- arch/arm/mach-imx/common.h     |    5 -----
- arch/arm/mach-imx/lluart.c     |   47 ----------------------------------------
- arch/arm/mach-imx/mach-imx6q.c |    3 ++-
- 4 files changed, 2 insertions(+), 54 deletions(-)
- delete mode 100644 arch/arm/mach-imx/lluart.c
+how about
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 0634b31..f35eb39 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -88,7 +88,6 @@ obj-$(CONFIG_MACH_EUKREA_CPUIMX35SD) += mach-cpuimx35.o
- obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD) += eukrea_mbimxsd35-baseboard.o
- obj-$(CONFIG_MACH_VPR200) += mach-vpr200.o
- 
--obj-$(CONFIG_DEBUG_LL) += lluart.o
- obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
- obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
- obj-$(CONFIG_HAVE_IMX_SRC) += src.o
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 7eb3bb2..d672640 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -116,11 +116,6 @@ void tzic_handle_irq(struct pt_regs *);
- 
- extern void imx_enable_cpu(int cpu, bool enable);
- extern void imx_set_cpu_jump(int cpu, void *jump_addr);
--#ifdef CONFIG_DEBUG_LL
--extern void imx_lluart_map_io(void);
--#else
--static inline void imx_lluart_map_io(void) {}
--#endif
- extern void v7_cpu_resume(void);
- extern u32 *pl310_get_save_ptr(void);
- #ifdef CONFIG_SMP
-diff --git a/arch/arm/mach-imx/lluart.c b/arch/arm/mach-imx/lluart.c
-deleted file mode 100644
-index 2fdc9bf..0000000
---- a/arch/arm/mach-imx/lluart.c
-+++ /dev/null
-@@ -1,47 +0,0 @@
--/*
-- * Copyright 2011 Freescale Semiconductor, Inc.
-- * Copyright 2011 Linaro Ltd.
-- *
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--
--#include <linux/init.h>
--#include <asm/page.h>
--#include <asm/sizes.h>
--#include <asm/mach/map.h>
--
--#include "hardware.h"
--
--#define IMX6Q_UART1_BASE_ADDR	0x02020000
--#define IMX6Q_UART2_BASE_ADDR	0x021e8000
--#define IMX6Q_UART3_BASE_ADDR	0x021ec000
--#define IMX6Q_UART4_BASE_ADDR	0x021f0000
--#define IMX6Q_UART5_BASE_ADDR	0x021f4000
--
--/*
-- * IMX6Q_UART_BASE_ADDR is put in the middle to force the expansion
-- * of IMX6Q_UART##n##_BASE_ADDR.
-- */
--#define IMX6Q_UART_BASE_ADDR(n)	IMX6Q_UART##n##_BASE_ADDR
--#define IMX6Q_UART_BASE(n)	IMX6Q_UART_BASE_ADDR(n)
--#define IMX6Q_DEBUG_UART_BASE	IMX6Q_UART_BASE(CONFIG_DEBUG_IMX6Q_UART_PORT)
--
--static struct map_desc imx_lluart_desc = {
--#ifdef CONFIG_DEBUG_IMX6Q_UART
--	.virtual	= IMX_IO_P2V(IMX6Q_DEBUG_UART_BASE),
--	.pfn		= __phys_to_pfn(IMX6Q_DEBUG_UART_BASE),
--	.length		= 0x4000,
--	.type		= MT_DEVICE,
--#endif
--};
--
--void __init imx_lluart_map_io(void)
--{
--	if (imx_lluart_desc.virtual)
--		iotable_init(&imx_lluart_desc, 1);
--}
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index a009df7..ce7476d 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -31,6 +31,7 @@
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/hardware/gic.h>
- #include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <asm/system_misc.h>
- 
-@@ -216,7 +217,7 @@ static void __init imx6q_init_late(void)
- 
- static void __init imx6q_map_io(void)
- {
--	imx_lluart_map_io();
-+	debug_ll_io_init();
- 	imx_scu_map_io();
- }
- 
--- 
-1.7.9.5
+arm: fix struct page iterator in dma_cache_maint() to work with
+sparsemem
+
+?
+
+James
+
+> > 
+> > ---
+> > 
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index 6b2fb87..ab88c5b 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -809,7 +809,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+> >  			op(vaddr, len, dir);
+> >  		}
+> >  		offset = 0;
+> > -		page++;
+> > +		page = pfn_to_page(page_to_pfn(page) + 1);
+> >  		left -= len;
+> >  	} while (left);
+> >  }
+> > 
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
