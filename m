@@ -1,29 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Jan 2013 09:07:39 -0800
-Subject: [PATCH 3/3] ARM: omap2: use get_auxcr for aux ctrl register read
-In-Reply-To: <50F7B6C0.5090102@ti.com>
-References: <1358391205-23943-1-git-send-email-robherring2@gmail.com>
- <1358391205-23943-3-git-send-email-robherring2@gmail.com>
- <50F7B6C0.5090102@ti.com>
-Message-ID: <20130117170738.GK14149@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 17 Jan 2013 17:29:17 +0000
+Subject: [GIT PULL] clockevents: decouple broadcast mechanism from drivers
+Message-ID: <20130117172910.GA10070@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [130117 00:33]:
-> On Thursday 17 January 2013 08:23 AM, Rob Herring wrote:
-> >From: Rob Herring <rob.herring@calxeda.com>
-> >
-> >Use get_auxcr instead of inline assembly to read the CP15 aux ctrl
-> >register.
-> >
-> >Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> >Cc: Kevin Hilman <khilman@ti.com>
-> >Cc: Tony Lindgren <tony@atomide.com>
-> >---
-> This patch and the rest of the series looks fine to me.
-> 
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Hi Thomas,
 
-The series looks good to me too:
+These are the generic timer patches I posted a few days ago [1], with
+the fixes you requested previously.
 
-Acked-by: Tony Lindgren <tony@atomide.com> 
+Please could you pull these into your tree, and create a public branch
+for me to base my other patches on?
+
+Thanks,
+Mark.
+
+[1] https://lkml.org/lkml/2013/1/14/276
+
+The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+
+  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
+
+are available in the git repository at:
+
+  git://linux-arm.org/linux-mr.git for-tglx/timer-broadcast
+
+for you to fetch changes up to a9a71292273e2a9ca694ca37aad4b61a3a1fcdee:
+
+  clockevents: Add generic timer broadcast function (2013-01-14 16:55:01 +0000)
+
+----------------------------------------------------------------
+Mark Rutland (2):
+      clockevents: Add generic timer broadcast receiver
+      clockevents: Add generic timer broadcast function
+
+ include/linux/clockchips.h   |  9 +++++++++
+ kernel/time/Kconfig          |  4 ++++
+ kernel/time/tick-broadcast.c | 28 ++++++++++++++++++++++++++++
+ 3 files changed, 41 insertions(+)
