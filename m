@@ -1,38 +1,44 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 17 Jan 2013 09:11:20 +0000
-Subject: [PATCH v2 1/1] block: blk-merge: don't merge the pages with
- non-contiguous descriptors
-In-Reply-To: <20130116231857.GU2668@htj.dyndns.org>
-References: <1358265681-25671-1-git-send-email-subhashj@codeaurora.org>
- <1358266794.10591.8.camel@dabdike.int.hansenpartnership.com>
- <50F64AC1.3040304@codeaurora.org>
- <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
- <20130116231857.GU2668@htj.dyndns.org>
-Message-ID: <1358413880.2394.7.camel@dabdike.int.hansenpartnership.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 17 Jan 2013 11:12:20 +0200
+Subject: [PATCH v6 03/22] mfd: omap-usb-tll: Use devm_kzalloc/ioremap
+ and clean up error path
+In-Reply-To: <50F70164.3080105@mvista.com>
+References: <1358347433-329-1-git-send-email-rogerq@ti.com>
+ <1358347433-329-4-git-send-email-rogerq@ti.com> <50F70164.3080105@mvista.com>
+Message-ID: <50F7C074.5070803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-16 at 15:18 -0800, Tejun Heo wrote:
-> On Wed, Jan 16, 2013 at 10:32:35AM +0000, James Bottomley wrote:
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index 6b2fb87..ab88c5b 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -809,7 +809,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
-> >  			op(vaddr, len, dir);
-> >  		}
-> >  		offset = 0;
-> > -		page++;
-> > +		page = pfn_to_page(page_to_pfn(page) + 1);
+On 01/16/2013 09:37 PM, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Probably page = nth_page(page, 1) is the better form.
+> On 01/16/2013 05:43 PM, Roger Quadros wrote:
+> 
+>> Use devm_ variants of kzalloc() and ioremap(). Simplify the error path.
+> 
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  drivers/mfd/omap-usb-tll.c |   36 +++++++++++-------------------------
+>>  1 files changed, 11 insertions(+), 25 deletions(-)
+> 
+>> diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
+>> index 9658e18..53ed10b 100644
+>> --- a/drivers/mfd/omap-usb-tll.c
+>> +++ b/drivers/mfd/omap-usb-tll.c
+> [...]
+>> -	base = ioremap(res->start, resource_size(res));
+>> +	base = devm_request_and_ioremap(dev, res);
+>>  	if (!base) {
+>> -		dev_err(dev, "TLL ioremap failed\n");
+>>  		ret = -ENOMEM;
+> 
+>    -EADDRNOTAVAIL as the comment to devm_request_and_ioremap() suggests.
+> 
 
-It's the same thing.
+I changed it deliberately to ENOMEM, as I could not find EADDRNOTAVAIL
+defined in all architectures.
 
-I'd actually prefer page = pfn_to_page(page_to_pfn(page) + 1); because
-it makes the code look like the hack it is.  The preferred form for all
-iterators like this should be to iterate over the pfn instead of a
-pointer into the page arrays, because that will always work correctly no
-matter how many weird and wonderful memory schemes we come up with.
+ENOMEM shouldn't harm.
 
-James
+cheers,
+-roger
