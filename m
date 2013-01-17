@@ -1,37 +1,30 @@
-From: tbergstrom@nvidia.com (=?ISO-8859-1?Q?Terje_Bergstr=F6m?=)
-Date: Thu, 17 Jan 2013 08:33:41 +0200
-Subject: [PATCH v2 03/10] ARM: dt: tegra30: Add clock information
-In-Reply-To: <50F6E32F.80602@wwwdotorg.org>
-References: <1357891289-23500-1-git-send-email-pgaikwad@nvidia.com>
- <1357891289-23500-3-git-send-email-pgaikwad@nvidia.com>
- <50F65E4B.8040409@nvidia.com> <50F6E32F.80602@wwwdotorg.org>
-Message-ID: <50F79B45.4070105@nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 17 Jan 2013 14:37:24 +0800
+Subject: [PATCH 7/7] ARM i.MX5: Add system reset controller (SRC) to
+ i.MX51 and i.MX53 device tree
+In-Reply-To: <50F72780.8040208@wwwdotorg.org>
+References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
+ <1358352787-15441-8-git-send-email-p.zabel@pengutronix.de>
+ <50F72780.8040208@wwwdotorg.org>
+Message-ID: <20130117063722.GL26179@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.01.2013 19:28, Stephen Warren wrote:
-> On 01/16/2013 01:01 AM, Terje Bergstr?m wrote:
->> In Tegra3, 3D has two clocks. I believe you'd need to add <&tegra_car
->> 98> here.
+On Wed, Jan 16, 2013 at 03:19:44PM -0700, Stephen Warren wrote:
+> On 01/16/2013 09:13 AM, Philipp Zabel wrote:
+> > Also, link SRC to IPU via phandle.
 > 
-> Thanks. I've squashed the following into the patch. Do those clock names
-> make sense to you?
+> Aside from the comments I already made, the series,
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
 > 
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> index b9709ae..c26d75b 100644
-> --- a/arch/arm/boot/dts/tegra30.dtsi
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -54,7 +54,8 @@
->                 gr3d {
->                         compatible = "nvidia,tegra30-gr3d";
->                         reg = <0x54180000 0x00040000>;
-> -                       clocks = <&tegra_car 24>;
-> +                       clocks = <&tegra_car 24 &tegra_car 98>;
-> +                       clock-names = "3d", "3d2";
->                 };
+> although I'm not 100% sure if the ordering of patches maintains a
+> working i.MX build all the time? Does "git bisect" work across the series?
 > 
->                 dc at 54200000 {
+> Who would merge these patches?
 
-Yep, this looks right.
+I would assume IMX --> arm-soc --> mainline?
 
-Terje
+Philipp, please copy arm-soc folks (Arnd and Olof) on the next post,
+so that they can get a chance to review this tiny reset subsystem.
+
+Shawn
