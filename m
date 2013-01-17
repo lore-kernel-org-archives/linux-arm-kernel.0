@@ -1,35 +1,48 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 17 Jan 2013 17:12:52 +0400
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Jan 2013 15:15:10 +0200
 Subject: [PATCH] usb: musb: ux500: use clk_prepare_enable and
  clk_disable_unprepare
-In-Reply-To: <CACRpkdbmgQ0xDfkbgqc=zDqMDUK0O6uQOf3kX9v1+=+N5s42bw@mail.gmail.com>
+In-Reply-To: <20130117125702.GA5007@balto.lan>
 References: <1357577261-31536-1-git-send-email-fabio.baltieri@linaro.org>
  <CACRpkdZD1i_tvDf6XFyk5muYjtDziQaMNGK6vvihhFJVztXUjw@mail.gmail.com>
  <20130110133818.GA22710@balto.lan>
  <CACRpkdbmgQ0xDfkbgqc=zDqMDUK0O6uQOf3kX9v1+=+N5s42bw@mail.gmail.com>
-Message-ID: <50F7F8D4.90207@mvista.com>
+ <20130117105104.GN10814@arwen.pp.htv.fi>
+ <20130117125702.GA5007@balto.lan>
+Message-ID: <20130117131510.GS18978@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-On 17-01-2013 14:46, Linus Walleij wrote:
+On Thu, Jan 17, 2013 at 01:57:02PM +0100, Fabio Baltieri wrote:
+> On Thu, Jan 17, 2013 at 12:51:04PM +0200, Felipe Balbi wrote:
+> > > > Thanks for the ACK.  This bug was here unnoticed since 3.6 merge window,
+> > > 
+> > > Then it should have Cc: stable at kernel.org..
+> > 
+> > just added to my tree.
+> 
+> Hi Felipe, thanks for adding the stable tag to the patch, but I actually
+> made a bit of confusion with the versions, so I double checked and it
+> turns out this is really needed on v3.7 stable, not v3.6.
+> 
+> Will you be so kind to remove v3.6 from the stable tag from this
+> patch?
 
->>> <fabio.baltieri@linaro.org> wrote:
+rebasing a "stable" branch is the most annoying you can ask me to do, I
+will do it this time and hope I don't break anyone tracking my branches.
 
->>>> This patch converts the module to use clk_prepare_enable and
->>>> clk_disable_unprepare variants as required by common clock framework.
+Next time, please be more careful.
 
->>>> Without this the system crash during probe function.
+cheers
 
->>>> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-
->>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
->> Thanks for the ACK.  This bug was here unnoticed since 3.6 merge window,
-
-> Then it should have Cc: stable at kernel.org..
-
-    The new address is stable at vger.kernel.org.
-
-WBR, Sergei
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/71363da5/attachment.sig>
