@@ -1,75 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Jan 2013 15:16:08 -0800
-Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport
- power functions
-In-Reply-To: <1358445456.6252.64.camel@cumari.coelho.fi>
-References: <1358372702-13102-1-git-send-email-coelho@ti.com>
- <50F7C4A7.5060202@ti.com> <20130117093417.GH10814@arwen.pp.htv.fi>
- <50F7CA82.4050509@ti.com> <20130117100510.GI10814@arwen.pp.htv.fi>
- <20130117100919.GJ10814@arwen.pp.htv.fi>
- <1358418917.6252.31.camel@cumari.coelho.fi>
- <50F7D535.6030205@ti.com> <20130117173131.GL14149@atomide.com>
- <1358445456.6252.64.camel@cumari.coelho.fi>
-Message-ID: <20130117231608.GP14149@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 17 Jan 2013 23:24:47 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2: Fix missing omap2xxx_clkt_vps_xxx function
+ calls
+In-Reply-To: <alpine.DEB.2.00.1301172230250.14118@utopia.booyaka.com>
+References: <1357851209-5332-1-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1301171848490.14118@utopia.booyaka.com>
+ <50F85087.3060507@ti.com>
+ <alpine.DEB.2.00.1301172230250.14118@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1301172320460.14118@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Luciano Coelho <coelho@ti.com> [130117 10:04]:
-> Hi Tony,
-> 
-> On Thu, 2013-01-17 at 09:31 -0800, Tony Lindgren wrote:
-> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [130117 02:44]:
-> > > On 01/17/2013 11:35 AM, Luciano Coelho wrote:
-> > > > This out-of-tree code doesn't explain why we need to do the
-> > > > enable/disable in the board file.  We just need to do things a bit
-> > > > differently in the driver.  I'll start cleaning all this stuff up for
-> > > > -next pretty soon.
-> > > > 
-> > > > For now, ie. 3.7 (stable) and 3.8, do we agree in taking this patch so
-> > > > that TI-ST at least works on Panda? Simply reverting the gpio removal
-> > > > patch doesn't help, because we also need to handle the UART2 muxing
-> > > > (which my patch does as well).
-> > > 
-> > > I don't see better way to fix this either. In any case, I give you my:
-> > > 
-> > > Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > 
-> > So what is actually broken? The horrible bluetooth muxing over serial
-> > port? If so, let's rather fix it properly than even attempt to fix
-> > it as it seems that it's been broken for two merge windows now.
-> 
-> Yes, it is the horrible Bluetooth muxing over serial that is broken.  It
-> has been broken for two merge windows, because nobody seemed to care
-> until I started looking into it and tried to figure out how to get it to
-> work. :)
 
-Heh I see.
+Here's the updated version (at the bottom of this message). Seems to work 
+based on a quick test on 2430SDP.
+
+# shutdown -r -n now
+shutdown: sending all processes the TERM signal...
+shutdown: sending all processes the KILL signal.
+shutdown: turning off swap
+shutdown: unmounting all file systems
+umount: /debug: not mounted
+umount: /run/shm: not mounted
+umount: /dev: not mounted
+umount: /tmp: not mounted
+umount: /run/lock: not mounted
+umount: /run: not mounted
+umount: /lib/init/rw: not found
+Please stand by while rebooting the system.
+[   79.635925] Disabling non-boot CPUs ...
+[   79.640197] Restarting system.
+
+
+U-Boot 1.1.4 (Mar 18 2007 - 12:22:00)
+
+OMAP2430C-GP revision 3, PRCM #5A
+TI 2430SDP 1.1 Version + mDDR (Boot NOR)
+DRAM:  128 MB
+Flash: 192 MB
+NAND:64 MB
+In:    serial
+Out:   serial
+Err:   serial
+Hit any key to stop autoboot:  0 
+
+
+... etc. ...
+
+
+- Paul
+
+
+From: Jon Hunter <jon-hunter@ti.com>
+Date: Thu, 10 Jan 2013 14:53:29 -0600
+Subject: [PATCH] ARM: OMAP2: Fix missing omap2xxx_clkt_vps_late_init function
+ calls
+
+During the migration to the common clock framework, calls to the
+functions omap2xxx_clkt_vps_late_init() were not preserved for
+OMAP2420 and OMAP2430. This causes the variables "sys_ck_rate" and
+"curr_prcm_set" to be uninitialised on boot. On reboot, this causes the
+following error message to be displayed because the appropriate MPU
+clock frequency (derived from sys_ck_rate) cannot be found.
+
+"Could not set MPU rate to 4294MHz"
+
+Fix this by adding back calls to omap2xxx_clkt_vps_late_init() in the
+OMAP2420 and OMAP2430 clock initialisation code.
+
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+[paul at pwsan.com: dropped the duplicated call to
+ omap2xxx_clkt_vps_check_bootloader_rates() after consultation with Jon;
+ updated patch description]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/cclock2420_data.c |    2 ++
+ arch/arm/mach-omap2/cclock2430_data.c |    2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/cclock2420_data.c b/arch/arm/mach-omap2/cclock2420_data.c
+index 7e5febe..ab7e952 100644
+--- a/arch/arm/mach-omap2/cclock2420_data.c
++++ b/arch/arm/mach-omap2/cclock2420_data.c
+@@ -1935,6 +1935,8 @@ int __init omap2420_clk_init(void)
+ 			omap2_init_clk_hw_omap_clocks(c->lk.clk);
+ 	}
  
-> The implementation is really weak and there are loads of things I want
-> to start fixing/cleaning up.  This patch was just my intention to start
-> with a relatively clean table (ie. horrible or not, at least working).
-> 
-> 
-> > Also, let's just do absolutely minimal board-*.c file fixes now.
-> > This thing should be just moved to use DT so we can flip over omap4
-> > to be DT only and drop estimated 5k LOC from mach-omap2.
-> 
-> I totally agree, I'll start looking into that next.
-> 
-> But this patch is pretty small and simple, so why not include it to at
-> least fix the breakage in 3.7 and 3.8? Whether you take it or not now
-> won't make any difference in the 5k LOC in these kernel versions.
-
-Well we are planning to drop the non-DT support for omap4 as soon as it's
-usable with DT. For omap4 we are only carrying SDP and panda support to
-make this transition easier. The only bindings missing AFAIK are wl12xx and
-USB.
-
-If we add this, then it implies we're somehow supporting it, which is not
-the way to go IMHO as we need to get rid of these platform callbacks instead.
-
-What's your estimate of having minimal wl12xx WLAN DT binding available?
-
-Regards,
-
-Tony
++	omap2xxx_clkt_vps_late_init();
++
+ 	omap2_clk_disable_autoidle_all();
+ 
+ 	omap2_clk_enable_init_clocks(enable_init_clks,
+diff --git a/arch/arm/mach-omap2/cclock2430_data.c b/arch/arm/mach-omap2/cclock2430_data.c
+index eda079b..eb3dab6 100644
+--- a/arch/arm/mach-omap2/cclock2430_data.c
++++ b/arch/arm/mach-omap2/cclock2430_data.c
+@@ -2050,6 +2050,8 @@ int __init omap2430_clk_init(void)
+ 			omap2_init_clk_hw_omap_clocks(c->lk.clk);
+ 	}
+ 
++	omap2xxx_clkt_vps_late_init();
++
+ 	omap2_clk_disable_autoidle_all();
+ 
+ 	omap2_clk_enable_init_clocks(enable_init_clks,
+-- 
+1.7.10.4
