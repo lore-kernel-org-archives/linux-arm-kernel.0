@@ -1,110 +1,35 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Thu, 17 Jan 2013 18:41:04 +0530
-Subject: [RFC PATCH 2/6] ARM: OMAP: USB: Add phy binding information
-In-Reply-To: <50F7EF23.8080903@ti.com>
-References: <1358348462-27693-1-git-send-email-kishon@ti.com>
- <1358348462-27693-3-git-send-email-kishon@ti.com>
- <CAFp+6iGEC9KgfuQz6nqnAY5JrmtPG=HkGw5yjKw7-1=8AG_=dg@mail.gmail.com>
- <50F7EF23.8080903@ti.com>
-Message-ID: <CAFp+6iH3kxtx2fM9m50Skcb6aqJOhL4d+Vg6W3mo7uUoAp0F1Q@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 17 Jan 2013 17:12:52 +0400
+Subject: [PATCH] usb: musb: ux500: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <CACRpkdbmgQ0xDfkbgqc=zDqMDUK0O6uQOf3kX9v1+=+N5s42bw@mail.gmail.com>
+References: <1357577261-31536-1-git-send-email-fabio.baltieri@linaro.org>
+ <CACRpkdZD1i_tvDf6XFyk5muYjtDziQaMNGK6vvihhFJVztXUjw@mail.gmail.com>
+ <20130110133818.GA22710@balto.lan>
+ <CACRpkdbmgQ0xDfkbgqc=zDqMDUK0O6uQOf3kX9v1+=+N5s42bw@mail.gmail.com>
+Message-ID: <50F7F8D4.90207@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Hello.
 
+On 17-01-2013 14:46, Linus Walleij wrote:
 
-Thanks for the explanation.
+>>> <fabio.baltieri@linaro.org> wrote:
 
-On Thu, Jan 17, 2013 at 6:01 PM, kishon <kishon@ti.com> wrote:
-> Hi,
->
->
-> On Thursday 17 January 2013 05:41 PM, Vivek Gautam wrote:
->>
->> Hi Kishon,
->>
->>
->> On Wed, Jan 16, 2013 at 8:30 PM, Kishon Vijay Abraham I <kishon@ti.com>
->> wrote:
->>>
->>> This is in preparation for the changes in PHY library to support adding
->>> and getting multiple PHYs of the same type. In the new design, the
->>> binding information between the PHY and the USB controller should be
->>> specified in the platform specific initialization code. So it's been
->>> done for OMAP platforms here.
->>>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>> This kind-of binding should be done in all the platforms (I've done only
->>> for OMAP platform).
->>>   arch/arm/mach-omap2/usb-musb.c |    7 ++++++-
->>>   1 file changed, 6 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/usb-musb.c
->>> b/arch/arm/mach-omap2/usb-musb.c
->>> index 9d27e3f..bbe2fa5 100644
->>> --- a/arch/arm/mach-omap2/usb-musb.c
->>> +++ b/arch/arm/mach-omap2/usb-musb.c
->>> @@ -24,6 +24,7 @@
->>>   #include <linux/dma-mapping.h>
->>>   #include <linux/io.h>
->>>   #include <linux/usb/musb.h>
->>> +#include <linux/usb/phy.h>
->>>
->>>   #include "omap_device.h"
->>>   #include "soc.h"
->>> @@ -85,8 +86,12 @@ void __init usb_musb_init(struct omap_musb_board_data
->>> *musb_board_data)
->>>          musb_plat.mode = board_data->mode;
->>>          musb_plat.extvbus = board_data->extvbus;
->>>
->>> -       if (cpu_is_omap44xx())
->>> +       if (cpu_is_omap44xx()) {
->>>                  musb_plat.has_mailbox = true;
->>> +               usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
->>> +       } else if (cpu_is_omap34xx()) {
->>> +               usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
->>> +       }
->>
->>
->> Just trying to understand things here.
->> Is the device name we are using here the platform device name (pdev->name)
->> ?
->
->
-> it's pdev->dev.name.
->
->> If i am not wrong then for devices added through device tree
->> the device name would actually include the device address in the string,
->
->
-> Ideally for device tree, devm_usb_get_phy_by_phandle() introduced in the 5th
-> patch of this series should be used.
+>>>> This patch converts the module to use clk_prepare_enable and
+>>>> clk_disable_unprepare variants as required by common clock framework.
 
-Ok.
-> usb_bind_phy should be called from platform specific initialization files
-> (like your board file), which won't get executed in dt boot.
->
-Right.
+>>>> Without this the system crash during probe function.
 
->> wouldn't that make things somewhat weird, since we will have to add
->> such bindings
->> using this address string.
->>
->> one more doubt please :)
->> is it possible to bind phy in the controllers' driver somehow ?
->
-> Thats not going to be good. Why do you need to do that?
->
-I was certainly missing something while understanding your patches.
-That's why got some doubt on this. :)
+>>>> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 
+>>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> Thanks
-> Kishon
+>> Thanks for the ACK.  This bug was here unnoticed since 3.6 merge window,
 
+> Then it should have Cc: stable at kernel.org..
 
+    The new address is stable at vger.kernel.org.
 
--- 
-Thanks & Regards
-Vivek
+WBR, Sergei
