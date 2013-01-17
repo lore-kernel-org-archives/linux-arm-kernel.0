@@ -1,215 +1,31 @@
-From: Frank.Li@freescale.com (Frank Li)
-Date: Thu, 17 Jan 2013 10:55:58 +0800
-Subject: [PATCH v3 1/1 net-next] net: fec: enable pause frame to improve rx
- prefomance for 1G network
-Message-ID: <1358391358-27977-1-git-send-email-Frank.Li@freescale.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 17 Jan 2013 14:53:24 +1100
+Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
+In-Reply-To: <20130111153206.e075edb9b1e4a38d90f23ab6@canb.auug.org.au>
+References: <20130111153206.e075edb9b1e4a38d90f23ab6@canb.auug.org.au>
+Message-ID: <20130117145324.3f1f27fb5902b5a03135bf06@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The limition of imx6 internal bus cause fec can't achieve 1G perfomance.
-There will be many packages lost because FIFO over run.
+Hi Kukjin,
 
-This patch enable pause frame flow control.
+On Fri, 11 Jan 2013 15:32:06 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>
+> Today's linux-next merge of the samsung tree got conflicts in
+> many files with the arm-soc tree.
+> 
+> I just dropped the samsung tree for today.  Please have a look and try to
+> fix this mess up, thanks.
 
-Before this patch
-iperf -s -i 1
-TCP window size: 85.3 KByte (default)
-------------------------------------------------------------
-[  4] local 10.192.242.153 port 5001 connected with 10.192.242.94 port 49773
-[ ID] Interval       Transfer     Bandwidth
-[  4]  0.0- 1.0 sec  6.35 MBytes  53.3 Mbits/sec
-[  4]  1.0- 2.0 sec  3.39 MBytes  28.5 Mbits/sec
-[  4]  2.0- 3.0 sec  2.63 MBytes  22.1 Mbits/sec
-[  4]  3.0- 4.0 sec  1.10 MBytes  9.23 Mbits/sec
+Ping?
 
-ifconfig
-   RX packets:46195 errors:1859 dropped:1 overruns:1859 frame:1859
-
-After this patch
-iperf -s -i 1
-
-[  4] local 10.192.242.153 port 5001 connected with 10.192.242.94 port 49757
-[ ID] Interval       Transfer     Bandwidth
-[  4]  0.0- 1.0 sec  49.8 MBytes   418 Mbits/sec
-[  4]  1.0- 2.0 sec  50.1 MBytes   420 Mbits/sec
-[  4]  2.0- 3.0 sec  47.5 MBytes   399 Mbits/sec
-[  4]  3.0- 4.0 sec  45.9 MBytes   385 Mbits/sec
-[  4]  4.0- 5.0 sec  44.8 MBytes   376 Mbits/sec
-
-ifconfig
-   RX packets:2348454 errors:0 dropped:16 overruns:0 frame:0
-
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
-Signed-off-by: Fugang Duan <B38611@freescale.com>
----
-Change from v2 to v3
- * Fix code style problem reviewed by David
-
-Change from V1 to V2
- * using pause_setparam to enable/disable pause frame
- * default enable pause frame auto negotiation
-
- drivers/net/ethernet/freescale/fec.c |   87 +++++++++++++++++++++++++++++++++-
- drivers/net/ethernet/freescale/fec.h |    5 ++
- 2 files changed, 91 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 6dc2094..8336157 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -68,6 +68,14 @@
- 
- #define DRIVER_NAME	"fec"
- 
-+/* Pause frame feild and FIFO threshold */
-+#define FEC_ENET_FCE	(1 << 5)
-+#define FEC_ENET_RSEM_V	0x84
-+#define FEC_ENET_RSFL_V	16
-+#define FEC_ENET_RAEM_V	0x8
-+#define FEC_ENET_RAFL_V	0x8
-+#define FEC_ENET_OPD_V	0xFFF0
-+
- /* Controller is ENET-MAC */
- #define FEC_QUIRK_ENET_MAC		(1 << 0)
- /* Controller needs driver to swap frame */
-@@ -193,6 +201,9 @@ MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
- /* Transmitter timeout */
- #define TX_TIMEOUT (2 * HZ)
- 
-+#define FEC_PAUSE_FLAG_AUTONEG	0x1
-+#define FEC_PAUSE_FLAG_ENABLE	0x2
-+
- static int mii_cnt;
- 
- static struct bufdesc *fec_enet_get_nextdesc(struct bufdesc *bdp, int is_ex)
-@@ -470,6 +481,25 @@ fec_restart(struct net_device *ndev, int duplex)
- 		}
- #endif
- 	}
-+
-+	/* enable pause frame*/
-+	if ((fep->pause_flag & FEC_PAUSE_FLAG_ENABLE) ||
-+	    ((fep->pause_flag & FEC_PAUSE_FLAG_AUTONEG) &&
-+	     fep->phy_dev && fep->phy_dev->pause)) {
-+		rcntl |= FEC_ENET_FCE;
-+
-+		/* set FIFO thresh hold parameter to reduce overrun */
-+		writel(FEC_ENET_RSEM_V, fep->hwp + FEC_R_FIFO_RSEM);
-+		writel(FEC_ENET_RSFL_V, fep->hwp + FEC_R_FIFO_RSFL);
-+		writel(FEC_ENET_RAEM_V, fep->hwp + FEC_R_FIFO_RAEM);
-+		writel(FEC_ENET_RAFL_V, fep->hwp + FEC_R_FIFO_RAFL);
-+
-+		/* OPD */
-+		writel(FEC_ENET_OPD_V, fep->hwp + FEC_OPD);
-+	} else {
-+		rcntl &= ~FEC_ENET_FCE;
-+	}
-+
- 	writel(rcntl, fep->hwp + FEC_R_CNTRL);
- 
- 	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
-@@ -1016,8 +1046,10 @@ static int fec_enet_mii_probe(struct net_device *ndev)
- 	}
- 
- 	/* mask with MAC supported features */
--	if (id_entry->driver_data & FEC_QUIRK_HAS_GBIT)
-+	if (id_entry->driver_data & FEC_QUIRK_HAS_GBIT) {
- 		phy_dev->supported &= PHY_GBIT_FEATURES;
-+		phy_dev->supported |= SUPPORTED_Pause;
-+	}
- 	else
- 		phy_dev->supported &= PHY_BASIC_FEATURES;
- 
-@@ -1203,7 +1235,55 @@ static int fec_enet_get_ts_info(struct net_device *ndev,
- 	}
- }
- 
-+static void fec_enet_get_pauseparam(struct net_device *ndev,
-+				    struct ethtool_pauseparam *pause)
-+{
-+	struct fec_enet_private *fep = netdev_priv(ndev);
-+
-+	pause->autoneg = (fep->pause_flag & FEC_PAUSE_FLAG_AUTONEG) != 0;
-+	pause->tx_pause = (fep->pause_flag & FEC_PAUSE_FLAG_ENABLE) != 0;
-+	pause->rx_pause = pause->tx_pause;
-+}
-+
-+static int fec_enet_set_pauseparam(struct net_device *ndev,
-+				   struct ethtool_pauseparam *pause)
-+{
-+	struct fec_enet_private *fep = netdev_priv(ndev);
-+
-+	if (pause->tx_pause != pause->rx_pause) {
-+		netdev_info(ndev,
-+			"hardware only support enable/disable both tx and rx");
-+		return -EINVAL;
-+	}
-+
-+	fep->pause_flag = 0;
-+
-+	/* tx pause must be same as rx pause */
-+	fep->pause_flag |= pause->rx_pause ? FEC_PAUSE_FLAG_ENABLE : 0;
-+	fep->pause_flag |= pause->autoneg ? FEC_PAUSE_FLAG_AUTONEG : 0;
-+
-+	if (pause->rx_pause || pause->autoneg) {
-+		fep->phy_dev->supported |= ADVERTISED_Pause;
-+		fep->phy_dev->advertising |= ADVERTISED_Pause;
-+	} else {
-+		fep->phy_dev->supported &= ~ADVERTISED_Pause;
-+		fep->phy_dev->advertising &= ~ADVERTISED_Pause;
-+	}
-+
-+	if (pause->autoneg) {
-+		if (netif_running(ndev))
-+			fec_stop(ndev);
-+		phy_start_aneg(fep->phy_dev);
-+	}
-+	if (netif_running(ndev))
-+		fec_restart(ndev, 0);
-+
-+	return 0;
-+}
-+
- static const struct ethtool_ops fec_enet_ethtool_ops = {
-+	.get_pauseparam		= fec_enet_get_pauseparam,
-+	.set_pauseparam		= fec_enet_set_pauseparam,
- 	.get_settings		= fec_enet_get_settings,
- 	.set_settings		= fec_enet_set_settings,
- 	.get_drvinfo		= fec_enet_get_drvinfo,
-@@ -1643,6 +1723,11 @@ fec_probe(struct platform_device *pdev)
- 	/* setup board info structure */
- 	fep = netdev_priv(ndev);
- 
-+	/* default enable pause frame auto negotiation */
-+	if (pdev->id_entry &&
-+	    (pdev->id_entry->driver_data & FEC_QUIRK_HAS_GBIT))
-+		fep->pause_flag |= FEC_PAUSE_FLAG_AUTONEG;
-+
- 	fep->hwp = ioremap(r->start, resource_size(r));
- 	fep->pdev = pdev;
- 	fep->dev_id = dev_id++;
-diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index 4862394..2ebedaf 100644
---- a/drivers/net/ethernet/freescale/fec.h
-+++ b/drivers/net/ethernet/freescale/fec.h
-@@ -48,6 +48,10 @@
- #define FEC_R_DES_START		0x180 /* Receive descriptor ring */
- #define FEC_X_DES_START		0x184 /* Transmit descriptor ring */
- #define FEC_R_BUFF_SIZE		0x188 /* Maximum receive buff size */
-+#define FEC_R_FIFO_RSFL		0x190 /* Receive FIFO section full threshold */
-+#define FEC_R_FIFO_RSEM		0x194 /* Receive FIFO section empty threshold */
-+#define FEC_R_FIFO_RAEM		0x198 /* Receive FIFO almost empty threshold */
-+#define FEC_R_FIFO_RAFL		0x19c /* Receive FIFO almost full threshold */
- #define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
- #define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
- 
-@@ -243,6 +247,7 @@ struct fec_enet_private {
- 	struct	completion mdio_done;
- 	int	irq[FEC_IRQ_NUM];
- 	int	bufdesc_ex;
-+	int	pause_flag;
- 
- 	struct ptp_clock *ptp_clock;
- 	struct ptp_clock_info ptp_caps;
 -- 
-1.7.1
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/da28bbdf/attachment.sig>
