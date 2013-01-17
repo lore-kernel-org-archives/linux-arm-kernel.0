@@ -1,33 +1,22 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Jan 2013 21:50:31 +0800
-Subject: [PATCH] sdma-imx: Add SDMA firmware for Freescale i.MX SOCs
-In-Reply-To: <1358424987-22312-1-git-send-email-fabio.estevam@freescale.com>
-References: <1358424987-22312-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130117135028.GA29285@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Jan 2013 14:54:30 +0100
+Subject: [PATCH 1/8] pinctrl: add SDHI and MMCIF pin groups to r8a7740
+In-Reply-To: <1358356097-26180-2-git-send-email-g.liakhovetski@gmx.de>
+References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
+ <1358356097-26180-2-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <CACRpkdaZZFq8jfQ8YsphjhWEnGuntiTX0BT40H-vpxgpBPqG5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Wed, Jan 16, 2013 at 6:08 PM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
 
-On Thu, Jan 17, 2013 at 10:16:27AM -0200, Fabio Estevam wrote:
-> Add SDMA firmware for Freescale i.MX SOCs.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  LICENCE.fsl_firmware        |  140 +++++++++++++++++++++++++++++++++++++++++++
->  WHENCE                      |   13 ++++
->  imx/sdma/sdma-imx25-to1.bin |  Bin 0 -> 694 bytes
->  imx/sdma/sdma-imx31-to2.bin |  Bin 0 -> 3762 bytes
->  imx/sdma/sdma-imx35-to2.bin |  Bin 0 -> 1746 bytes
->  imx/sdma/sdma-imx51.bin     |  Bin 0 -> 1894 bytes
->  imx/sdma/sdma-imx53.bin     |  Bin 0 -> 1406 bytes
->  imx/sdma/sdma-imx6q-to1.bin |  Bin 0 -> 1838 bytes
+> Add pin groups for the first two SDHI interfaces and two alternative pin
+> groups for the MMCIF interface on the r8a7740 SoC.
+>
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Can we have a consistent name schema?  If we want to have a "tox"
-suffix, we should give one for imx51 and imx53 too.  Or we remove
-the suffix for everyone else based on the fact that we will only
-upload the firmware for production revision.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I'm fine with either way.  Just want to see them be named consistently.
-
-Shawn
+Yours,
+Linus Walleij
