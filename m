@@ -1,68 +1,52 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 17 Jan 2013 15:15:25 +0000
-Subject: [PATCH] mmc_select_voltage only if host->ocr_avail_mmc
-Message-ID: <alpine.DEB.2.02.1301171456380.4978@kaball.uk.xensource.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 17 Jan 2013 10:15:51 -0500 (EST)
+Subject: [PATCH v7 18/22] USB: ehci-omap: Don't free gpios that we didn't
+ request
+In-Reply-To: <1358422231-24736-19-git-send-email-rogerq@ti.com>
+Message-ID: <Pine.LNX.4.44L0.1301171015340.1339-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On my platform (ARM Versatile Express Cortex A15 emulator)
-host->ocr_avail_mmc is 0.
-mmc_attach_mmc knows that it could be 0, in fact at the beginning of the
-function it checks if host->ocr_avail_mmc is not 0 before setting
-host->ocr_avail.
-However later on, is going to call mmc_select_voltage regardeless of its
-value. If host->ocr_avail_mmc is 0, host->ocr ends up being 0 too, and
-we error out.
+On Thu, 17 Jan 2013, Roger Quadros wrote:
 
-I admit that I am not terribly familiar with this code, but it seems to
-me that we should only call mmc_select_voltage and check the return
-value if host->ocr_avail_mmc.
+> This driver does not request any gpios so don't free them.
+> Fixes L3 bus error on multiple modprobe/rmmod of ehci_hcd
+> with ehci-omap in use.
+> 
+> CC: Alan Stern <stern@rowland.harvard.edu>
+> 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
-If that is not the right fix please advise.
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
-
----
-
-mmc_attach_mmc: only call mmc_select_voltage if host->ocr_avail_mmc
-
-host->ocr_avail_mmc can be 0, in fact mmc_attach_mmc checks if
-host->ocr_avail_mmc is not 0 before setting host->ocr_avail.
-
-However later on, is going to call mmc_select_voltage regardeless of its
-value. If host->ocr_avail_mmc is 0, host->ocr ends up being 0 too, and
-mmc_select_voltage errors out.
-
-This patch fixes that by only calling mmc_select_voltage iff
-host->ocr_avail_mmc != 0.
-
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index e6e3911..0edd33b 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -1529,14 +1529,15 @@ int mmc_attach_mmc(struct mmc_host *host)
- 		ocr &= ~0x7F;
- 	}
- 
--	host->ocr = mmc_select_voltage(host, ocr);
--
--	/*
--	 * Can we support the voltage of the card?
--	 */
--	if (!host->ocr) {
--		err = -EINVAL;
--		goto err;
-+	if (host->ocr_avail_mmc) {
-+		host->ocr = mmc_select_voltage(host, ocr);
-+		/*
-+		 * Can we support the voltage of the card?
-+		 */
-+		if (!host->ocr) {
-+			err = -EINVAL;
-+			goto err;
-+		}
- 	}
- 
- 	/*
+> ---
+>  drivers/usb/host/ehci-omap.c |    8 --------
+>  1 files changed, 0 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+> index 134c789..b96a4bf 100644
+> --- a/drivers/usb/host/ehci-omap.c
+> +++ b/drivers/usb/host/ehci-omap.c
+> @@ -288,7 +288,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+>  {
+>  	struct device *dev				= &pdev->dev;
+>  	struct usb_hcd *hcd				= dev_get_drvdata(dev);
+> -	struct usbhs_omap_platform_data *pdata		= dev->platform_data;
+>  
+>  	usb_remove_hcd(hcd);
+>  	disable_put_regulator(dev->platform_data);
+> @@ -298,13 +297,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+>  	pm_runtime_put_sync(dev);
+>  	pm_runtime_disable(dev);
+>  
+> -	if (pdata->phy_reset) {
+> -		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+> -			gpio_free(pdata->reset_gpio_port[0]);
+> -
+> -		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+> -			gpio_free(pdata->reset_gpio_port[1]);
+> -	}
+>  	return 0;
+>  }
+>  
+> 
