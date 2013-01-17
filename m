@@ -1,51 +1,54 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 16 Jan 2013 22:10:21 -0500 (EST)
-Subject: [PATCH v2 1/1 net-next] net: fec: enable pause frame to
- improve rx prefomance for 1G network
-In-Reply-To: <CAHrpEqRV7PonDpqAvGkDf7QqSeUj+mVbnF2rA-Zjb9xfWh-_2g@mail.gmail.com>
-References: <1358153387-19275-1-git-send-email-Frank.Li@freescale.com>
- <CAHrpEqRV7PonDpqAvGkDf7QqSeUj+mVbnF2rA-Zjb9xfWh-_2g@mail.gmail.com>
-Message-ID: <20130116.221021.1688403542986325196.davem@davemloft.net>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 17 Jan 2013 11:24:31 +0800
+Subject: [PATCH v2 2/3] at91: 9x5: add DT parameters to enable PMECC
+In-Reply-To: <1358393072-14794-1-git-send-email-josh.wu@atmel.com>
+References: <1358393072-14794-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1358393072-14794-3-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <lznuaa@gmail.com>
-Date: Thu, 17 Jan 2013 10:50:36 +0800
+Default ecc correctable setting is 2bits in 512 bytes.
 
-> Any feedback about this patch?
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+change log:
+   v2: rebase to v3.8-rc3
 
-Well it's full of stylistic problems.
+ arch/arm/boot/dts/at91sam9x5.dtsi   |    4 ++++
+ arch/arm/boot/dts/at91sam9x5cm.dtsi |    5 ++++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
->> +       /* enable pause frame*/
->> +       if ((fep->pause_flag & FEC_PAUSE_FLAG_ENABLE) ||
->> +               ((fep->pause_flag & FEC_PAUSE_FLAG_AUTONEG) &&
->> +                       fep->phy_dev && fep->phy_dev->pause)) {
-
-This is mis-idented.
-
->> +
->> +               rcntl |= FEC_ENET_FCE;
-
-That empty line before this assignment is spurious.
-
->> +       pause->rx_pause = pause->tx_pause;
->> +
->> +}
-
-That empty line is unnecessary, remove it.
-
->> +       /* default enable pause frame auto negotiation */
->> +       if (pdev->id_entry &&
->> +                       (pdev->id_entry->driver_data & FEC_QUIRK_HAS_GBIT))
-
-You can't possibly tell me that this indentation looks right
-to you.
-
-You must style things like this:
-
-	if (condition1 &&
-	    condition2)
-
-That is, you must line up the first character on the second and
-subsequent lines at the first column after the openning parenthesis of
-the first line.
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 40ac3a4..eedc191 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -480,7 +480,11 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			reg = <0x40000000 0x10000000
++			       0xffffe000 0x600		/* PMECC Registers */
++			       0xffffe600 0x200		/* PMECC Error Location Registers */
++			       0x00100000 0x100000	/* ROM code */
+ 			      >;
++			atmel,pmecc-lookup-table-offset = <0x8000 0x10000>;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
+ 			pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9x5cm.dtsi b/arch/arm/boot/dts/at91sam9x5cm.dtsi
+index 31e7be2..4027ac7 100644
+--- a/arch/arm/boot/dts/at91sam9x5cm.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5cm.dtsi
+@@ -26,7 +26,10 @@
+ 	ahb {
+ 		nand0: nand at 40000000 {
+ 			nand-bus-width = <8>;
+-			nand-ecc-mode = "soft";
++			nand-ecc-mode = "hw";
++			atmel,has-pmecc;	/* Enable PMECC */
++			atmel,pmecc-cap = <2>;
++			atmel,pmecc-sector-size = <512>;
+ 			nand-on-flash-bbt;
+ 			status = "okay";
+ 
+-- 
+1.7.9.5
