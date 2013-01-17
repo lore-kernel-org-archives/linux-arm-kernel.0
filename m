@@ -1,50 +1,29 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 17 Jan 2013 11:24:32 +0800
-Subject: [PATCH v2 3/3] at91: at91sam9n12: add DT parameters to enable PMECC
-In-Reply-To: <1358393072-14794-1-git-send-email-josh.wu@atmel.com>
-References: <1358393072-14794-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1358393072-14794-4-git-send-email-josh.wu@atmel.com>
+Date: Thu, 17 Jan 2013 11:24:29 +0800
+Subject: [PATCH v2 0/3] at91: PMECC: enable PMECC in dt for at91sam9x5ek,
+ at91sam9n12ek
+Message-ID: <1358393072-14794-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Default ecc correctable setting is 2bits in 512 bytes.
+Those patches will enable PMECC in dt parameters for at91sam9x5ek, at91sam9n12ek.
+The driver will check minimum required ecc on ONFI parameter from NAND flash. 
+If pmecc-cap in dts doesn't meet the requirement then driver reports a error.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
-change log:
-   v2: rebase to v3.8-rc3
+v2: rebase to v3.8-rc3. And wrapped the commit message.
+
+Josh Wu (3):
+  MTD: at91: atmel_nand: for PMECC, add code to choose the ecc bits and
+    sector size according to the ONFI parameter ECC requirement.
+  at91: 9x5: add DT parameters to enable PMECC
+  at91: at91sam9n12: add DT parameters to enable PMECC
 
  arch/arm/boot/dts/at91sam9n12.dtsi  |    1 +
- arch/arm/boot/dts/at91sam9n12ek.dts |    5 ++++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/at91sam9n12ek.dts |    5 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi   |    4 ++
+ arch/arm/boot/dts/at91sam9x5cm.dtsi |    5 +-
+ drivers/mtd/nand/atmel_nand.c       |   89 +++++++++++++++++++++++++++++++++++
+ 5 files changed, 102 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index e9efb34..eb9f12e 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -366,6 +366,7 @@
- 				0xffffe600 0x00000200
- 				0x00100000 0x00100000
- 			       >;
-+			atmel,pmecc-lookup-table-offset = <0x8000 0x10000>;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
- 			pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index 0376bf4..d400f8d 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -71,7 +71,10 @@
- 
- 		nand0: nand at 40000000 {
- 			nand-bus-width = <8>;
--			nand-ecc-mode = "soft";
-+			nand-ecc-mode = "hw";
-+			atmel,has-pmecc;
-+			atmel,pmecc-cap = <2>;
-+			atmel,pmecc-sector-size = <512>;
- 			nand-on-flash-bbt;
- 			status = "okay";
- 		};
 -- 
 1.7.9.5
