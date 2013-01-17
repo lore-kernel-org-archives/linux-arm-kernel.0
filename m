@@ -1,21 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Jan 2013 10:19:38 +0800
-Subject: [PATCH] ARM: mxs_defconfig: Select CONFIG_DEVTMPFS_MOUNT
-In-Reply-To: <1358386324-23995-1-git-send-email-festevam@gmail.com>
-References: <1358386324-23995-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130117021937.GF26179@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 17 Jan 2013 00:27:10 -0200
+Subject: [PATCH v4] video: imxfb: Do not crash on reboot
+In-Reply-To: <20130117021708.GE26179@S2101-09.ap.freescale.net>
+References: <1358341121-19480-1-git-send-email-fabio.estevam@freescale.com>
+ <20130117021708.GE26179@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5B-wT-Hm0oFnvVhGif3aornpecsqrF-wFG_CLwkF6YabA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 11:32:04PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Newer versions of udev (such as 182) requires CONFIG_DEVTMPFS_MOUNT to be 
-> selected, otherwise we get a stuck console:
-> 
-> Starting udev
-> Starting Bootlog daemon: bootlogd: cannot deduce real console device
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, Jan 17, 2013 at 12:17 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Jan 16, 2013 at 10:58:41AM -0200, Fabio Estevam wrote:
+>> Shawn,
+>>
+>> Since you have taken a patch recently that touches this file and given the fact
+>> that we have zero response from the fb maintainer, can you please apply it via
+>> imx tree?
+>
+> Ok, I will queue it as the 3rd batch of fixes to be sent next week.
+>
+> Is it a material for stable tree?
 
-Applied, thanks.
+It could be sent to stable, but this patch does not apply to stable
+because stable tree does not have your commit:
+
+commit e69dc9a91eeb0387e08d8e1d0e576c88b28902fc
+Author: Shawn Guo <shawn.guo@linaro.org>
+Date:   Sun Sep 16 19:59:53 2012 +0800
+
+    video: imxfb: remove cpu_is_xxx by using platform_device_id
