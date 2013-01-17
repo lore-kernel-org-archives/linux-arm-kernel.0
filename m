@@ -1,29 +1,27 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 17 Jan 2013 12:43:23 -0200
-Subject: [PATCH v6 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
- platform_device_id
-In-Reply-To: <20727.57269.347099.324284@ipc1.ka-ro>
-References: <1358416874-27011-1-git-send-email-peter.chen@freescale.com>
- <1358416874-27011-2-git-send-email-peter.chen@freescale.com>
- <CAOMZO5Chu0bcXPqn+wWHwAqLu+27DvLx1=Bzaffpd-bA2ahaAQ@mail.gmail.com>
- <20727.57269.347099.324284@ipc1.ka-ro>
-Message-ID: <CAOMZO5DNVMAG3btGR7DeukgWaEaPe2zqm=EKAHQ5ovawq+BiWw@mail.gmail.com>
+Date: Thu, 17 Jan 2013 12:58:41 -0200
+Subject: [PATCH] sdma-imx: Add SDMA firmware for Freescale i.MX SOCs
+In-Reply-To: <20130117143856.GI8668@pengutronix.de>
+References: <1358424987-22312-1-git-send-email-fabio.estevam@freescale.com>
+ <20130117143856.GI8668@pengutronix.de>
+Message-ID: <CAOMZO5DOEeiRyH6CfpR+q1pnYTOv4JSWgoUoO2x1LCS1UE5SJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 9:25 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+Hi Uwe,
 
-> The equivalent of !cpu_is_mx51() would be
-> strcmp(pdev->id_entry->name, "imx-udc-mx51") (without the '!') meaning
-> id_entry->name is different from "imx-udc-mx51".
+On Thu, Jan 17, 2013 at 12:38 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-Yes, agree.
+>> +LICENSE GRANT.? Freescale grants to you, free of charge, the
+> What is this '?' about?
 
-strcmp(pdev->id_entry->name, "imx-udc-mx51") is also better than
-!strcmp(pdev->id_entry->name, "imx-udc-mx27"))
+Thanks for reviewing it.
 
-because in the case of another soc entry gets added, let's say
-"imx-udc-mxyy" then
+I don't see this '?' on my original patch.
 
-!strcmp(pdev->id_entry->name, "imx-udc-mx27")) will not correspond to
-!cpu_is_mx51() anymore.
+Could this be a mail issue at your side?
+
+Regards,
+
+Fabio Estevam
