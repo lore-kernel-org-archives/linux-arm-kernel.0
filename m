@@ -1,160 +1,59 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 17 Jan 2013 13:30:26 +0200
-Subject: [PATCH v7 17/22] mfd: omap-usb-host: clean up omap_usbhs_init()
-In-Reply-To: <1358422231-24736-1-git-send-email-rogerq@ti.com>
-References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
-Message-ID: <1358422231-24736-18-git-send-email-rogerq@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 17 Jan 2013 17:03:16 +0530
+Subject: [PATCH v5 5/9] ARM: davinci: New reset functionality/API provided
+ for Davinci DSP
+In-Reply-To: <1357863807-380-6-git-send-email-rtivy@ti.com>
+References: <1357863807-380-1-git-send-email-rtivy@ti.com>
+ <1357863807-380-6-git-send-email-rtivy@ti.com>
+Message-ID: <50F7E17C.1040607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We split initializing revision 1 and revision 2 into different
-functions. Initialization is now done dynamically so that only
-the number of ports available on the system are initialized.
+On 1/11/2013 5:53 AM, Robert Tivy wrote:
+> Since there is no general "reset" support for SoC devices, and since the
+> remoteproc driver needs explicit control of the DSP's reset line, a new
+> Davinci-specific API is added.
+> 
+> This private API will disappear with DT migration.  Some discussion
+> regarding a proposed DT "reset" binding is here:
+> https://patchwork.kernel.org/patch/1635051/
+> 
+> Modified davinci_clk_init() to set clk "reset" function for clocks
+> that indicate PSC_LRST support.  Also fixed indentation issue with
+> function opening curly brace.
+> 
+> Signed-off-by: Robert Tivy <rtivy@ti.com>
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- drivers/mfd/omap-usb-host.c |  122 +++++++++++++++++++++++++-----------------
- 1 files changed, 73 insertions(+), 49 deletions(-)
+I applied this patch for v3.9. The subject seemed too long with repeated
+references to davinci so I shortened it to:
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index fcace6f..ecde38d 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -358,6 +358,75 @@ static int usbhs_runtime_suspend(struct device *dev)
- 	return 0;
- }
- 
-+static unsigned omap_usbhs_rev1_hostconfig(struct usbhs_hcd_omap *omap,
-+						unsigned reg)
-+{
-+	struct usbhs_omap_platform_data	*pdata = omap->pdata;
-+	int i;
-+
-+	for (i = 0; i < omap->nports; i++) {
-+		switch (pdata->port_mode[i]) {
-+		case OMAP_USBHS_PORT_MODE_UNUSED:
-+			reg &= ~(OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS << i);
-+			break;
-+		case OMAP_EHCI_PORT_MODE_PHY:
-+			if (pdata->single_ulpi_bypass)
-+				break;
-+
-+			if (i == 0)
-+				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
-+			else
-+				reg &= ~(OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS
-+								<< (i-1));
-+			break;
-+		default:
-+			if (pdata->single_ulpi_bypass)
-+				break;
-+
-+			if (i == 0)
-+				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
-+			else
-+				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS
-+								<< (i-1);
-+			break;
-+		}
-+	}
-+
-+	if (pdata->single_ulpi_bypass) {
-+		/* bypass ULPI only if none of the ports use PHY mode */
-+		reg |= OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
-+
-+		for (i = 0; i < omap->nports; i++) {
-+			if (is_ehci_phy_mode(pdata->port_mode[i])) {
-+				reg &= OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
-+				break;
-+			}
-+		}
-+	}
-+
-+	return reg;
-+}
-+
-+static unsigned omap_usbhs_rev2_hostconfig(struct usbhs_hcd_omap *omap,
-+						unsigned reg)
-+{
-+	struct usbhs_omap_platform_data	*pdata = omap->pdata;
-+	int i;
-+
-+	for (i = 0; i < omap->nports; i++) {
-+		/* Clear port mode fields for PHY mode */
-+		reg &= ~(OMAP4_P1_MODE_CLEAR << 2 * i);
-+
-+		if (is_ehci_tll_mode(pdata->port_mode[i]) ||
-+				(is_ohci_port(pdata->port_mode[i])))
-+			reg |= OMAP4_P1_MODE_TLL << 2 * i;
-+		else if (is_ehci_hsic_mode(pdata->port_mode[i]))
-+			reg |= OMAP4_P1_MODE_HSIC << 2 * i;
-+	}
-+
-+	return reg;
-+}
-+
- static void omap_usbhs_init(struct device *dev)
- {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
-@@ -389,55 +458,10 @@ static void omap_usbhs_init(struct device *dev)
- 	reg |= OMAP4_UHH_HOSTCONFIG_APP_START_CLK;
- 	reg &= ~OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN;
- 
--	if (is_omap_usbhs_rev1(omap)) {
--		if (pdata->port_mode[0] == OMAP_USBHS_PORT_MODE_UNUSED)
--			reg &= ~OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS;
--		if (pdata->port_mode[1] == OMAP_USBHS_PORT_MODE_UNUSED)
--			reg &= ~OMAP_UHH_HOSTCONFIG_P2_CONNECT_STATUS;
--		if (pdata->port_mode[2] == OMAP_USBHS_PORT_MODE_UNUSED)
--			reg &= ~OMAP_UHH_HOSTCONFIG_P3_CONNECT_STATUS;
--
--		/* Bypass the TLL module for PHY mode operation */
--		if (pdata->single_ulpi_bypass) {
--			dev_dbg(dev, "OMAP3 ES version <= ES2.1\n");
--			if (is_ehci_phy_mode(pdata->port_mode[0]) ||
--				is_ehci_phy_mode(pdata->port_mode[1]) ||
--					is_ehci_phy_mode(pdata->port_mode[2]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
--		} else {
--			dev_dbg(dev, "OMAP3 ES version > ES2.1\n");
--			if (is_ehci_phy_mode(pdata->port_mode[0]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
--			if (is_ehci_phy_mode(pdata->port_mode[1]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS;
--			if (is_ehci_phy_mode(pdata->port_mode[2]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P3_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P3_BYPASS;
--		}
--	} else if (is_omap_usbhs_rev2(omap)) {
--		/* Clear port mode fields for PHY mode*/
--		reg &= ~OMAP4_P1_MODE_CLEAR;
--		reg &= ~OMAP4_P2_MODE_CLEAR;
--
--		if (is_ehci_tll_mode(pdata->port_mode[0]) ||
--			(is_ohci_port(pdata->port_mode[0])))
--			reg |= OMAP4_P1_MODE_TLL;
--		else if (is_ehci_hsic_mode(pdata->port_mode[0]))
--			reg |= OMAP4_P1_MODE_HSIC;
--
--		if (is_ehci_tll_mode(pdata->port_mode[1]) ||
--			(is_ohci_port(pdata->port_mode[1])))
--			reg |= OMAP4_P2_MODE_TLL;
--		else if (is_ehci_hsic_mode(pdata->port_mode[1]))
--			reg |= OMAP4_P2_MODE_HSIC;
--	}
-+	if (is_omap_usbhs_rev1(omap))
-+		reg = omap_usbhs_rev1_hostconfig(omap, reg);
-+	else if (is_omap_usbhs_rev2(omap))
-+		reg = omap_usbhs_rev2_hostconfig(omap, reg);
- 
- 	usbhs_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
- 	dev_dbg(dev, "UHH setup done, uhh_hostconfig=%x\n", reg);
--- 
-1.7.4.1
+ARM: davinci: psc: introduce reset API
+
+> --- a/arch/arm/mach-davinci/include/mach/psc.h
+> +++ b/arch/arm/mach-davinci/include/mach/psc.h
+> @@ -246,6 +246,7 @@
+>  
+>  #define MDSTAT_STATE_MASK	0x3f
+>  #define PDSTAT_STATE_MASK	0x1f
+> +#define MDCTL_LRST		BIT(8)
+>  #define MDCTL_FORCE		BIT(31)
+>  #define PDCTL_NEXT		BIT(0)
+>  #define PDCTL_EPCGOOD		BIT(8)
+> @@ -253,6 +254,8 @@
+>  #ifndef __ASSEMBLER__
+>  
+>  extern int davinci_psc_is_clk_active(unsigned int ctlr, unsigned int id);
+> +extern void davinci_psc_reset_config(unsigned int ctlr, unsigned int id,
+> +		bool reset);
+
+I felt the word 'config' in the name is not really required since the
+functionality is fixed (as opposed to the davinci_psc_config() function
+which could do multiple configurations)
+
+I updated the function name to davinci_psc_reset() when I committed the
+patch locally.
+
+Hope that's okay with you.
+
+Thanks,
+Sekhar
