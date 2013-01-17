@@ -1,57 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Jan 2013 23:33:06 +0800
-Subject: [PATCH 2/2] ARM: use DEBUG_LL infrastructural for multiplatform
- uncompress debug
-In-Reply-To: <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
-References: <1358436119-30808-1-git-send-email-shawn.guo@linaro.org>
- <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130117153303.GE29285@S2101-09.ap.freescale.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 17 Jan 2013 10:42:32 -0500 (EST)
+Subject: [PATCH 2/3] ARM: convert platform hotplug inline assembly to C
+In-Reply-To: <50F8082F.1050906@gmail.com>
+References: <1358391205-23943-1-git-send-email-robherring2@gmail.com>
+ <1358391205-23943-2-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1301162338420.6300@xanadu.home> <50F8082F.1050906@gmail.com>
+Message-ID: <alpine.LFD.2.02.1301171038590.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Thu, 17 Jan 2013, Rob Herring wrote:
 
-On Thu, Jan 17, 2013 at 11:21:59PM +0800, Shawn Guo wrote:
->  arch/arm/boot/compressed/Makefile   |    3 +++
->  arch/arm/boot/compressed/debug.S    |    3 +++
->  arch/arm/include/debug/highbank.S   |    3 +++
->  arch/arm/include/debug/imx.S        |    3 +++
->  arch/arm/include/debug/mvebu.S      |    3 +++
->  arch/arm/include/debug/picoxcell.S  |    3 +++
->  arch/arm/include/debug/socfpga.S    |    3 +++
->  arch/arm/include/debug/sunxi.S      |    3 +++
->  arch/arm/include/debug/tegra.S      |    3 +++
->  arch/arm/include/debug/uncompress.h |    8 +++++++-
->  arch/arm/include/debug/vexpress.S   |    3 +++
->  arch/arm/include/debug/zynq.S       |    3 +++
->  12 files changed, 40 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/compressed/debug.S
+> On 01/16/2013 10:40 PM, Nicolas Pitre wrote:
+> > On Wed, 16 Jan 2013, Rob Herring wrote:
+> > 
+> >> From: Rob Herring <rob.herring@calxeda.com>
+> >>
+> >> With the addition of set_auxcr/get_auxcr, all the hotplug inline assembly
+> >> code for exynos, imx, realview, spear13xx and vexpress can be converted to
+> >> C code.
+> > 
+> > That might not be all safe.  Please see
+> > http://article.gmane.org/gmane.linux.ports.arm.kernel/209584
 > 
-...
-> diff --git a/arch/arm/boot/compressed/debug.S b/arch/arm/boot/compressed/debug.S
-> new file mode 100644
-> index 0000000..7283d5c
-> --- /dev/null
-> +++ b/arch/arm/boot/compressed/debug.S
-> @@ -0,0 +1,3 @@
-> +#define UNCOMPRESS_DEBUG
-> +
-> +#include "../../kernel/debug.S"
-> diff --git a/arch/arm/include/debug/highbank.S b/arch/arm/include/debug/highbank.S
-> index 8cad432..13056cf 100644
-> --- a/arch/arm/include/debug/highbank.S
-> +++ b/arch/arm/include/debug/highbank.S
-> @@ -12,6 +12,9 @@
->  		.macro	addruart,rp,rv,tmp
->  		ldr	\rv, =0xfee36000
->  		ldr	\rp, =0xfff36000
-> +#ifdef UNCOMPRESS_DEBUG
-> +		mov	\rv, \rp
-> +#endif
->  		.endm
->  
-Are you fine with patching arch/arm/kernel/debug.S to have
-UNCOMPRESS_DEBUG checked, so that we can avoid patching addruart
-for all those platforms?
+> Other than the OR/AND operations, it's all just inline assembly
+> functions that are called, so it gets compiled to the same code. Perhaps
+> I should put noinline on the functions so they stay of limited
+> complexity. If you don't think doing this in C is okay, then there is
+> probably no point in having the set_auxcr/get_auxcr functions.
 
-Shawn
+I think set_auxcr/get_auxcr is fine.
+
+But your patch goes beyond simply converting those.  You also converted 
+the cache flush and disable from assembly to C, which on a Cortex A9 
+might be unsafe if the stack is modified in the sequence according to 
+the discussion I referenced.
+
+
+Nicolas
