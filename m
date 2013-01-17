@@ -1,19 +1,60 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 17 Jan 2013 14:36:51 -0500 (EST)
-Subject: [PATCH 4/4 v3] net/smsc911x: Provide common clock functionality
-In-Reply-To: <20130117104744.GP20091@gmail.com>
-References: <20130109085555.GA31678@gmail.com>
- <CACRpkdY+C8jNT7LsJvBkauN4+x4k4gGJKSe0ynY_HLTpmpgFPA@mail.gmail.com>
- <20130117104744.GP20091@gmail.com>
-Message-ID: <20130117.143651.2148254783638381638.davem@davemloft.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 17 Jan 2013 20:36:40 +0100
+Subject: [PATCH v2 3/3] at91: at91sam9n12: add DT parameters to enable
+ PMECC
+In-Reply-To: <1358393072-14794-4-git-send-email-josh.wu@atmel.com>
+References: <1358393072-14794-1-git-send-email-josh.wu@atmel.com>
+ <1358393072-14794-4-git-send-email-josh.wu@atmel.com>
+Message-ID: <20130117193640.GG7360@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Thu, 17 Jan 2013 10:47:44 +0000
+On 11:24 Thu 17 Jan     , Josh Wu wrote:
+> Default ecc correctable setting is 2bits in 512 bytes.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+this must go via at91 tree
 
-> https://patchwork.kernel.org/patch/1926971/
+so we can manage other mergie issue on dts
 
-I'm fine with this:
-
-Acked-by: David S. Miller <davem@davemloft.net>
+Best Regards,
+J.
+> ---
+> change log:
+>    v2: rebase to v3.8-rc3
+> 
+>  arch/arm/boot/dts/at91sam9n12.dtsi  |    1 +
+>  arch/arm/boot/dts/at91sam9n12ek.dts |    5 ++++-
+>  2 files changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> index e9efb34..eb9f12e 100644
+> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> @@ -366,6 +366,7 @@
+>  				0xffffe600 0x00000200
+>  				0x00100000 0x00100000
+>  			       >;
+> +			atmel,pmecc-lookup-table-offset = <0x8000 0x10000>;
+>  			atmel,nand-addr-offset = <21>;
+>  			atmel,nand-cmd-offset = <22>;
+>  			pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+> index 0376bf4..d400f8d 100644
+> --- a/arch/arm/boot/dts/at91sam9n12ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+> @@ -71,7 +71,10 @@
+>  
+>  		nand0: nand at 40000000 {
+>  			nand-bus-width = <8>;
+> -			nand-ecc-mode = "soft";
+> +			nand-ecc-mode = "hw";
+> +			atmel,has-pmecc;
+> +			atmel,pmecc-cap = <2>;
+> +			atmel,pmecc-sector-size = <512>;
+>  			nand-on-flash-bbt;
+>  			status = "okay";
+>  		};
+> -- 
+> 1.7.9.5
+> 
