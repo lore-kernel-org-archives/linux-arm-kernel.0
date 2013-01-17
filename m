@@ -1,37 +1,31 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 17 Jan 2013 22:31:20 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2: Fix missing omap2xxx_clkt_vps_xxx function
- calls
-In-Reply-To: <50F85087.3060507@ti.com>
-References: <1357851209-5332-1-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1301171848490.14118@utopia.booyaka.com>
- <50F85087.3060507@ti.com>
-Message-ID: <alpine.DEB.2.00.1301172230250.14118@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Jan 2013 14:31:39 -0800
+Subject: [PATCH v7 19/22] ARM: OMAP3: clock data: get rid of unused USB
+ host clock aliases and dummies
+In-Reply-To: <alpine.DEB.2.00.1301172228140.14118@utopia.booyaka.com>
+References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
+ <1358422231-24736-20-git-send-email-rogerq@ti.com>
+ <20130117170321.GJ14149@atomide.com>
+ <alpine.DEB.2.00.1301171854280.14118@utopia.booyaka.com>
+ <20130117210034.GA27671@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1301172228140.14118@utopia.booyaka.com>
+Message-ID: <20130117223138.GN14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Thu, 17 Jan 2013, Jon Hunter wrote:
-
-> Yes I still see it. You don't see it on reboot?
-
-Ah that's probably explains the discrepancy - I missed the part about the 
-reboot.
-
-> The reason why there is such a large number is because
-> omap2_round_to_table_rate() is returning the value -EINVAL. You could
-> add a print to omap2_round_to_table_rate() to see what it returns on
-> reboot. Or we could add a WARN to the function is sys_ck_rate is 0 for
-> testing.
+* Paul Walmsley <paul@pwsan.com> [130117 14:33]:
+> On Thu, 17 Jan 2013, Felipe Balbi wrote:
 > 
-> > Also, there's already a call to omap2xxx_clkt_vps_check_bootloader_rates() 
-> > -- is it necessary to add another one?
+> > do you mean v3.9 ?
 > 
-> Thanks. I see that now and so that is not needed then.
+> It sounds like the other patches need to be merged first before these 
+> cleanups can be merged.  So rather than adding a merge order dependency 
+> during 3.9, it seems best to queue the non-essential clock cleanup side 
+> for 3.10.
 
-OK, I'll queue your patch for 3.8-rc fixes, dropping the 
-omap2xxx_clkt_vps_check_bootloader_rates() calls.
+How about let's do it in a late cleanup branch towards the end of the
+v3.9 merge window?
 
+Regards,
 
-- Paul
+Tony
