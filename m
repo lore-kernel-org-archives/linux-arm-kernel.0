@@ -1,28 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Jan 2013 14:31:06 +0100
-Subject: [PATCH 2/2] gpio: devm_gpio_* support should not depend on GPIOLIB
-In-Reply-To: <1358239056-703-3-git-send-email-shawn.guo@linaro.org>
-References: <1358239056-703-1-git-send-email-shawn.guo@linaro.org>
- <1358239056-703-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkdZ+L6GN_1_wSkckZY553jsG3wTEdwM27dp+cyCAjH5tpA@mail.gmail.com>
+Date: Thu, 17 Jan 2013 14:31:58 +0100
+Subject: [PATCHv3 0/7] Add pinctrl driver for Allwinner A1X SoCs
+In-Reply-To: <50F52D2E.205@free-electrons.com>
+References: <1357681398-23956-1-git-send-email-maxime.ripard@free-electrons.com>
+ <50F52D2E.205@free-electrons.com>
+Message-ID: <CACRpkdaTFMuN1EteHLTgO7TM8BLr9P_YjuKrwuDGoPtQ57duDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 9:37 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-
-> Some architectures (e.g. blackfin) provide gpio API without requiring
-> GPIOLIB support (ARCH_WANT_OPTIONAL_GPIOLIB).  devm_gpio_* functions
-> should also work for these architectures, since they do not really
-> depend on GPIOLIB.
+On Tue, Jan 15, 2013 at 11:19 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On 08/01/2013 22:43, Maxime Ripard wrote:
+>> Hi everyone,
+>>
+>> This patch set adds a pinctrl driver for the IP found in the Allwinner A10
+>> and A13, and the SoC-specific bits for the A13. It also adds the documentation
+>> for the device tree bindings.
+>>
+>> This patch set has been tested on a Olimex A13-Olinuxino.
+>>
+>> Thanks,
+>> Maxime
 >
-> Add a new option GPIO_DEVRES (enabled by default) to control the build
-> of devres.c, and move devm_gpio_* function declarations out from #ifdef
-> CONFIG_GPIOLIB in include/asm-generic/gpio.h, so that they can be
-> available to client drivers without unnecessary dependency on GPIOLIB.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Are you ok with this version or do you have additionnal comments ?
 
-Fair enough, but I need the first patch in an applicable for first...
+I'm probably OK with it, I've only just now reached this point in my
+mail backlog.
 
 Yours,
 Linus Walleij
