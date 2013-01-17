@@ -1,25 +1,41 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 17 Jan 2013 10:16:43 -0500 (EST)
-Subject: [PATCH v7 01/22] mfd: omap-usb-host: Consolidate OMAP USB-HS
- platform data
-In-Reply-To: <1358422231-24736-2-git-send-email-rogerq@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1301171016090.1339-100000@iolanthe.rowland.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 17 Jan 2013 16:16:44 +0100
+Subject: [PATCH] sdma-imx: Add SDMA firmware for Freescale i.MX SOCs
+In-Reply-To: <CAOMZO5DOEeiRyH6CfpR+q1pnYTOv4JSWgoUoO2x1LCS1UE5SJQ@mail.gmail.com>
+References: <1358424987-22312-1-git-send-email-fabio.estevam@freescale.com>
+ <20130117143856.GI8668@pengutronix.de>
+ <CAOMZO5DOEeiRyH6CfpR+q1pnYTOv4JSWgoUoO2x1LCS1UE5SJQ@mail.gmail.com>
+Message-ID: <20130117151644.GK8668@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Jan 2013, Roger Quadros wrote:
-
-> Let's have a single platform data structure for the OMAP's High-Speed
-> USB host subsystem instead of having 3 separate ones i.e. one for
-> board data, one for USB Host (UHH) module and one for USB-TLL module.
+On Thu, Jan 17, 2013 at 12:58:41PM -0200, Fabio Estevam wrote:
+> Hi Uwe,
 > 
-> This makes the code much simpler and avoids creating multiple copies of
-> platform data.
+> On Thu, Jan 17, 2013 at 12:38 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
 > 
-> CC: Alan Stern <stern@rowland.harvard.edu>
+> >> +LICENSE GRANT.? Freescale grants to you, free of charge, the
+> > What is this '?' about?
 > 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Thanks for reviewing it.
+> 
+> I don't see this '?' on my original patch.
+looking more closely it's not a literal '?', but:
+	0000790: 6565 6d65 6e74 2e0a 2b0a 2b4c 4943 454e  eement..+.+LICEN
+	00007a0: 5345 2047 5241 4e54 2ea0 2046 7265 6573  SE GRANT.. Frees
+                                       ^
+here ----------------------------------' you have a '\xa0' which is what
+my Mutt chose to display as ?. Note in the line above there are also
+some '\x0a' which look wrong.
+ 
+> Could this be a mail issue at your side?
+http://article.gmane.org/gmane.linux.ports.arm.kernel/210613 shows it,
+too. (At least for me and my browser.)
 
-For the ehci-omap.c part:
+Best regards
+Uwe
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
