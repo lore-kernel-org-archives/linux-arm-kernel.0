@@ -1,46 +1,114 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 17 Jan 2013 12:25:41 +0100
-Subject: [PATCH v6 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
- platform_device_id
-In-Reply-To: <CAOMZO5Chu0bcXPqn+wWHwAqLu+27DvLx1=Bzaffpd-bA2ahaAQ@mail.gmail.com>
-References: <1358416874-27011-1-git-send-email-peter.chen@freescale.com>
- <1358416874-27011-2-git-send-email-peter.chen@freescale.com>
- <CAOMZO5Chu0bcXPqn+wWHwAqLu+27DvLx1=Bzaffpd-bA2ahaAQ@mail.gmail.com>
-Message-ID: <20727.57269.347099.324284@ipc1.ka-ro>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 17 Jan 2013 13:30:09 +0200
+Subject: [PATCH v7 00/22] OMAP USB Host cleanup
+Message-ID: <1358422231-24736-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Fabio Estevam writes:
-> On Thu, Jan 17, 2013 at 8:01 AM, Peter Chen <peter.chen@freescale.com> wrote:
-> 
-> >         /* make sure USB_CLK is running at 60 MHz +/- 1000 Hz */
-> > -       if (!cpu_is_mx51()) {
-> > +       if (!strcmp(pdev->id_entry->name, "imx-udc-mx27")) {]]
-> 
-> Shouldn't this be:
->  if (!strcmp(pdev->id_entry->name, "imx-udc-mx51"))
->
-The equivalent of !cpu_is_mx51() would be
-strcmp(pdev->id_entry->name, "imx-udc-mx51") (without the '!') meaning
-id_entry->name is different from "imx-udc-mx51".
+This patchset addresses the following
 
-I personally hate the '!strcmp()' notation and prefer 'strcmp() == 0'
-though they are technically equivalent. Using '==' makes it much
-clearer to the reader what is intended.
-!strcmp() lets one assume that it is true when the comparison fails,
-though actually the opposite is true.
+- Consolidate USB Host platform data.
+- Avoid addressing clocks one by one by name and use a for loop + bunch
+  of cleanups.
+- Get number of channels/ports dynamically either from revision register
+  or from platform data. Avoids getting clocks that are not present.
+- Add OMAP5 and HSIC mode (Not tested).
+
+v7:
+- Updated patch 4 to not hold a spinlock when using clk_get().
+- Updated patches 3 and 11 to return -EADDRNOTAVAIL on failure of
+  demv_request_and_ioremap().
+
+v6:
+- Added USB Host platform data consolidation patch as the first patch.
+  based on request from Tony.
+- Rebased on v3.8-rc3.
+
+v5:
+- Rebased on top of todays arm-soc/for-next.
+- Removed the clock merging patch from the list.
+- Updated patches 14, 19 and 20 to accomodate the above change.
+- Added patch 22 to fix a build warning.
+
+v4:
+- Added appropriate maintainers in to/cc.
+- minor print message fix in patch 23 to maintain consistency.
+
+v3:
+- Rebased on arm-soc/for-next commit f979306c4d38d213c6977aaf3b1115e8ded71e3a.
+- Rearranged patch that get rids of cpu_is_omap..() macros.
+- Coding style fixes.
+
+v2:
+- Clocks are allocated dynamically based on number of ports available
+  on the platform.
+- Reduced console spam if non critical clocks are not found on the platform.
+- Get rid of cpu_is_.. macros from USB host driver.
+
+cheers,
+-roger
+
+The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+
+  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
+
+are available in the git repository at:
+  git at github.com:rogerq/linux.git linux-usbhost12-part
 
 
-Lothar Wa?mann
+Roger Quadros (22):
+  mfd: omap-usb-host: Consolidate OMAP USB-HS platform data
+  mfd: omap-usb-tll: Fix channel count detection
+  mfd: omap-usb-tll: Use devm_kzalloc/ioremap and clean up error path
+  mfd: omap-usb-tll: Clean up clock handling
+  mfd: omap-usb-tll: introduce and use mode_needs_tll()
+  mfd: omap-usb-tll: Check for missing platform data in probe
+  mfd: omap-usb-tll: Fix error message
+  mfd: omap-usb-tll: serialize access to TLL device
+  mfd: omap-usb-tll: Add OMAP5 revision and HSIC support
+  mfd: omap_usb_host: Avoid missing platform data checks in
+    suspend/resume
+  mfd: omap-usb-host: Use devm_kzalloc() and devm_request_and_ioremap()
+  mfd: omap-usb-host: know about number of ports from revision register
+  mfd: omap-usb-host: override number of ports from platform data
+  mfd: omap-usb-host: cleanup clock management code
+  mfd: omap-usb-host: Manage HSIC clocks for HSIC mode
+  mfd: omap-usb-host: Get rid of unnecessary spinlock
+  mfd: omap-usb-host: clean up omap_usbhs_init()
+  USB: ehci-omap: Don't free gpios that we didn't request
+  ARM: OMAP3: clock data: get rid of unused USB host clock aliases and
+    dummies
+  ARM: OMAP4: clock data: get rid of unused USB host clock aliases
+  mfd: omap-usb-host: Don't spam console on clk_set_parent failure
+  mdf: omap-usb-host: get rid of build warning
+
+ arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
+ arch/arm/mach-omap2/board-3630sdp.c        |    2 +-
+ arch/arm/mach-omap2/board-am3517crane.c    |    2 +-
+ arch/arm/mach-omap2/board-am3517evm.c      |    2 +-
+ arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
+ arch/arm/mach-omap2/board-cm-t3517.c       |    2 +-
+ arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
+ arch/arm/mach-omap2/board-igep0020.c       |    4 +-
+ arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
+ arch/arm/mach-omap2/board-omap3evm.c       |    2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
+ arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
+ arch/arm/mach-omap2/board-omap4panda.c     |    2 +-
+ arch/arm/mach-omap2/board-overo.c          |    2 +-
+ arch/arm/mach-omap2/board-zoom.c           |    2 +-
+ arch/arm/mach-omap2/cclock3xxx_data.c      |   11 -
+ arch/arm/mach-omap2/cclock44xx_data.c      |    7 -
+ arch/arm/mach-omap2/usb-host.c             |   29 +--
+ arch/arm/mach-omap2/usb.h                  |   20 +-
+ drivers/mfd/omap-usb-host.c                |  543 ++++++++++++++++------------
+ drivers/mfd/omap-usb-tll.c                 |  245 +++++++------
+ drivers/usb/host/ehci-omap.c               |   14 +-
+ include/linux/platform_data/usb-omap.h     |   24 +-
+ 24 files changed, 485 insertions(+), 442 deletions(-)
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.4.1
