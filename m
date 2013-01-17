@@ -1,75 +1,141 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 17 Jan 2013 08:54:47 +0000
-Subject: [PATCH v2 1/1] block: blk-merge: don't merge the pages with
- non-contiguous descriptors
-In-Reply-To: <20130116231401.GV23505@n2100.arm.linux.org.uk>
-References: <1358265681-25671-1-git-send-email-subhashj@codeaurora.org>
- <1358266794.10591.8.camel@dabdike.int.hansenpartnership.com>
- <50F64AC1.3040304@codeaurora.org>
- <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
- <20130116231401.GV23505@n2100.arm.linux.org.uk>
-Message-ID: <1358412887.2394.0.camel@dabdike.int.hansenpartnership.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 17 Jan 2013 09:59:54 +0100
+Subject: [PATCH v8 1/3] ARM: make cr_alignment read-only #ifndef
+ CONFIG_CPU_CP15
+In-Reply-To: <1358413196-5609-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1358413196-5609-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1358413196-5609-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-16 at 23:14 +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 16, 2013 at 10:32:35AM +0000, James Bottomley wrote:
-> > On Wed, 2013-01-16 at 12:07 +0530, Subhash Jadavani wrote:
-> > 
-> > > Now consider this call stack from MMC block driver (this is on the ARmv7 
-> > > based board):
-> > >      [   98.918174] [<c001b50c>] (v7_dma_inv_range+0x30/0x48) from 
-> > > [<c0017b8c>] (dma_cache_maint_page+0x1c4/0x24c)
-> > >      [   98.927819] [<c0017b8c>] (dma_cache_maint_page+0x1c4/0x24c) from 
-> > > [<c0017c28>] (___dma_page_cpu_to_dev+0x14/0x1c)
-> > >      [   98.937982] [<c0017c28>] (___dma_page_cpu_to_dev+0x14/0x1c) from 
-> > > [<c0017ff8>] (dma_map_sg+0x3c/0x114)
-> > 
-> > OK, so this is showing that ARM itself is making the assumption that the
-> > pages are contiguous in the page offset map.
-> > 
-> > Fix this by doing the increment via the pfn, which will do the right
-> > thing whatever the memory model.
-> > 
-> > Signed-off-by: James Bottomley <JBottomley@Parallels.com>
-> 
-> Ok.  What would you like the patch summary line for this to be -
-> the existing one seems to be a little wrong given the content of
-> this patch...
+This makes cr_alignment a constant 0 to break code that tries to modify
+the value as it's likely that it's built on wrong assumption when
+CONFIG_CPU_CP15 isn't defined. For code that is only reading the value 0
+is more or less a fine value to report. As suggested by Nicolas this is
+cleaner than to #ifdef out all uses.
 
-how about
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/include/asm/cp15.h   |   16 +++++++++++++++-
+ arch/arm/kernel/head-common.S |    9 +++++++--
+ arch/arm/mm/alignment.c       |    2 ++
+ arch/arm/mm/mmu.c             |   17 +++++++++++++++++
+ 4 files changed, 41 insertions(+), 3 deletions(-)
 
-arm: fix struct page iterator in dma_cache_maint() to work with
-sparsemem
-
-?
-
-James
-
-> > 
-> > ---
-> > 
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index 6b2fb87..ab88c5b 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -809,7 +809,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
-> >  			op(vaddr, len, dir);
-> >  		}
-> >  		offset = 0;
-> > -		page++;
-> > +		page = pfn_to_page(page_to_pfn(page) + 1);
-> >  		left -= len;
-> >  	} while (left);
-> >  }
-> > 
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+index 5ef4d80..1f3262e 100644
+--- a/arch/arm/include/asm/cp15.h
++++ b/arch/arm/include/asm/cp15.h
+@@ -42,6 +42,8 @@
+ #define vectors_high()	(0)
+ #endif
+ 
++#ifdef CONFIG_CPU_CP15
++
+ extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
+ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+ 
+@@ -82,6 +84,18 @@ static inline void set_copro_access(unsigned int val)
+ 	isb();
+ }
+ 
+-#endif
++#else /* ifdef CONFIG_CPU_CP15 */
++
++/*
++ * cr_alignment and cr_no_alignment are tightly coupled to cp15 (at least in the
++ * minds of the developers). Yielding 0 for machines without a cp15 (and making
++ * it read-only) is fine for most cases and saves quite some #ifdeffery.
++ */
++#define cr_no_alignment	UL(0)
++#define cr_alignment	UL(0)
++
++#endif /* ifdef CONFIG_CPU_CP15 / else */
++
++#endif /* ifndef __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 854bd22..5b391a6 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -98,8 +98,9 @@ __mmap_switched:
+ 	str	r9, [r4]			@ Save processor ID
+ 	str	r1, [r5]			@ Save machine type
+ 	str	r2, [r6]			@ Save atags pointer
+-	bic	r4, r0, #CR_A			@ Clear 'A' bit
+-	stmia	r7, {r0, r4}			@ Save control register values
++	cmp	r7, #0
++	bicne	r4, r0, #CR_A			@ Clear 'A' bit
++	stmneia	r7, {r0, r4}			@ Save control register values
+ 	b	start_kernel
+ ENDPROC(__mmap_switched)
+ 
+@@ -113,7 +114,11 @@ __mmap_switched_data:
+ 	.long	processor_id			@ r4
+ 	.long	__machine_arch_type		@ r5
+ 	.long	__atags_pointer			@ r6
++#ifdef CONFIG_CPU_CP15
+ 	.long	cr_alignment			@ r7
++#else
++	.long	0				@ r7
++#endif
+ 	.long	init_thread_union + THREAD_START_SP @ sp
+ 	.size	__mmap_switched_data, . - __mmap_switched_data
+ 
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index b9f60eb..5748094 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -962,12 +962,14 @@ static int __init alignment_init(void)
+ 		return -ENOMEM;
+ #endif
+ 
++#ifdef CONFIG_CPU_CP15
+ 	if (cpu_is_v6_unaligned()) {
+ 		cr_alignment &= ~CR_A;
+ 		cr_no_alignment &= ~CR_A;
+ 		set_cr(cr_alignment);
+ 		ai_usermode = safe_usermode(ai_usermode, false);
+ 	}
++#endif
+ 
+ 	hook_fault_code(FAULT_CODE_ALIGNMENT, do_alignment, SIGBUS, BUS_ADRALN,
+ 			"alignment exception");
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 941dfb9..92abdb8 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -97,6 +97,7 @@ static struct cachepolicy cache_policies[] __initdata = {
+ 	}
+ };
+ 
++#ifdef CONFIG_CPU_CP15
+ /*
+  * These are useful for identifying cache coherency
+  * problems by allowing the cache or the cache and
+@@ -195,6 +196,22 @@ void adjust_cr(unsigned long mask, unsigned long set)
+ }
+ #endif
+ 
++#else /* ifdef CONFIG_CPU_CP15 */
++
++static int __init early_cachepolicy(char *p)
++{
++	pr_warning("cachepolicy kernel parameter not supported without cp15\n");
++}
++early_param("cachepolicy", early_cachepolicy);
++
++static int __init noalign_setup(char *__unused)
++{
++	pr_warning("noalign kernel parameter not supported without cp15\n");
++}
++__setup("noalign", noalign_setup);
++
++#endif /* ifdef CONFIG_CPU_CP15 / else */
++
+ #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
+ #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+ 
+-- 
+1.7.10.4
