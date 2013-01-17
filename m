@@ -1,39 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Jan 2013 11:46:30 +0100
-Subject: [PATCH] usb: musb: ux500: use clk_prepare_enable and
- clk_disable_unprepare
-In-Reply-To: <20130110133818.GA22710@balto.lan>
-References: <1357577261-31536-1-git-send-email-fabio.baltieri@linaro.org>
- <CACRpkdZD1i_tvDf6XFyk5muYjtDziQaMNGK6vvihhFJVztXUjw@mail.gmail.com>
- <20130110133818.GA22710@balto.lan>
-Message-ID: <CACRpkdbmgQ0xDfkbgqc=zDqMDUK0O6uQOf3kX9v1+=+N5s42bw@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 17 Jan 2013 12:48:03 +0200
+Subject: [PATCH] ARM: imx: select HAVE_IMX_SRC when SMP is enabled
+In-Reply-To: <1350977942-15964-1-git-send-email-shawn.guo@linaro.org>
+References: <1350977942-15964-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1358419683.2731.220.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 2:38 PM, Fabio Baltieri
-<fabio.baltieri@linaro.org> wrote:
-> On Thu, Jan 10, 2013 at 12:23:32PM +0100, Linus Walleij wrote:
->> On Mon, Jan 7, 2013 at 5:47 PM, Fabio Baltieri
->> <fabio.baltieri@linaro.org> wrote:
->>
->> > This patch converts the module to use clk_prepare_enable and
->> > clk_disable_unprepare variants as required by common clock framework.
->> >
->> > Without this the system crash during probe function.
->> >
->> > Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Thanks for the ACK.  This bug was here unnoticed since 3.6 merge window,
+On Tue, 2012-10-23 at 15:39 +0800, Shawn Guo wrote:
+> With being part of multi-platform support, SMP can be enabled by other
+> platform even when SOC_IMX6Q is deselected.  It leads to a situation
+> that arch/arm/mach-imx/platsmp.c is built without HAVE_IMX_SRC selection
+> which will cause build error.  For example, the following link errors
+> will be seen when building imx5 with other v7 platforms.
+> 
+>  arch/arm/mach-imx/built-in.o: In function `imx_cpu_die':
+>  platform-ahci-imx.c:(.text+0x219c): undefined reference to `imx_enable_cpu'
+>  arch/arm/mach-imx/built-in.o: In function `imx_boot_secondary':
+>  platform-ahci-imx.c:(.cpuinit.text+0x14): undefined reference to `imx_set_cpu_jump'
+>  platform-ahci-imx.c:(.cpuinit.text+0x20): undefined reference to `imx_enable_cpu'
+> 
+> Select HAVE_IMX_SRC as long as SMP is enabled to fix the problem.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Then it should have Cc: stable at kernel.org..
+The build is still broken in Linus' tree...
 
-> do you think it may make sense to add this driver to u8500_defconfig?  I
-> can send a patch if you say so...
-
-Yes, can you make a patch updating the defconfig and also enabling
-a few other things like charging maybe? Sync with Lee.
-
-Yours,
-Linus Walleij
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/91f7f5e2/attachment.sig>
