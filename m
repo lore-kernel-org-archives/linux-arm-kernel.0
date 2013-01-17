@@ -1,41 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Jan 2013 17:29:17 +0000
-Subject: [GIT PULL] clockevents: decouple broadcast mechanism from drivers
-Message-ID: <20130117172910.GA10070@e106331-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Jan 2013 09:31:31 -0800
+Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport
+ power functions
+In-Reply-To: <50F7D535.6030205@ti.com>
+References: <1358372702-13102-1-git-send-email-coelho@ti.com>
+ <50F7C4A7.5060202@ti.com> <20130117093417.GH10814@arwen.pp.htv.fi>
+ <50F7CA82.4050509@ti.com> <20130117100510.GI10814@arwen.pp.htv.fi>
+ <20130117100919.GJ10814@arwen.pp.htv.fi>
+ <1358418917.6252.31.camel@cumari.coelho.fi>
+ <50F7D535.6030205@ti.com>
+Message-ID: <20130117173131.GL14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [130117 02:44]:
+> On 01/17/2013 11:35 AM, Luciano Coelho wrote:
+> > This out-of-tree code doesn't explain why we need to do the
+> > enable/disable in the board file.  We just need to do things a bit
+> > differently in the driver.  I'll start cleaning all this stuff up for
+> > -next pretty soon.
+> > 
+> > For now, ie. 3.7 (stable) and 3.8, do we agree in taking this patch so
+> > that TI-ST at least works on Panda? Simply reverting the gpio removal
+> > patch doesn't help, because we also need to handle the UART2 muxing
+> > (which my patch does as well).
+> 
+> I don't see better way to fix this either. In any case, I give you my:
+> 
+> Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-These are the generic timer patches I posted a few days ago [1], with
-the fixes you requested previously.
+So what is actually broken? The horrible bluetooth muxing over serial
+port? If so, let's rather fix it properly than even attempt to fix
+it as it seems that it's been broken for two merge windows now.
 
-Please could you pull these into your tree, and create a public branch
-for me to base my other patches on?
+Also, let's just do absolutely minimal board-*.c file fixes now.
+This thing should be just moved to use DT so we can flip over omap4
+to be DT only and drop estimated 5k LOC from mach-omap2.
 
-Thanks,
-Mark.
+Regards,
 
-[1] https://lkml.org/lkml/2013/1/14/276
-
-The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
-
-  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-mr.git for-tglx/timer-broadcast
-
-for you to fetch changes up to a9a71292273e2a9ca694ca37aad4b61a3a1fcdee:
-
-  clockevents: Add generic timer broadcast function (2013-01-14 16:55:01 +0000)
-
-----------------------------------------------------------------
-Mark Rutland (2):
-      clockevents: Add generic timer broadcast receiver
-      clockevents: Add generic timer broadcast function
-
- include/linux/clockchips.h   |  9 +++++++++
- kernel/time/Kconfig          |  4 ++++
- kernel/time/tick-broadcast.c | 28 ++++++++++++++++++++++++++++
- 3 files changed, 41 insertions(+)
+Tony 
