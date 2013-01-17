@@ -1,36 +1,325 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Jan 2013 22:18:13 +0800
-Subject: [PATCH] ARM: remove unnecessary 'select GENERIC_GPIO'
-In-Reply-To: <CACRpkdYw6V_GGjBsj_bzzkmFVTamuMq2oMwYDKhjMrXeS5j+fQ@mail.gmail.com>
-References: <1358255616-3171-1-git-send-email-shawn.guo@linaro.org>
- <CACRpkdYw6V_GGjBsj_bzzkmFVTamuMq2oMwYDKhjMrXeS5j+fQ@mail.gmail.com>
-Message-ID: <20130117141810.GC29285@S2101-09.ap.freescale.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 17 Jan 2013 08:18:23 -0600
+Subject: [PATCH 2/3] ARM: convert platform hotplug inline assembly to
+ C
+In-Reply-To: <alpine.LFD.2.02.1301162338420.6300@xanadu.home>
+References: <1358391205-23943-1-git-send-email-robherring2@gmail.com>
+ <1358391205-23943-2-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1301162338420.6300@xanadu.home>
+Message-ID: <50F8082F.1050906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 02:36:00PM +0100, Linus Walleij wrote:
-> On Tue, Jan 15, 2013 at 2:13 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On 01/16/2013 10:40 PM, Nicolas Pitre wrote:
+> On Wed, 16 Jan 2013, Rob Herring wrote:
 > 
-> > The only use of GENERIC_GPIO (defined by architecture) in GPIO subsystem
-> > is being selected by GPIOLIB.  Also there are no any use of the option
-> > at architecture level. Only two sub-architectures shmobile and orion
-> > really use the option as below.
-> >
-> >   arch/arm/mach-shmobile/Makefile:obj-$(CONFIG_GENERIC_GPIO)      += $(pfc-y)
-> >   arch/arm/plat-orion/Makefile:orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
-> >
-> > Remove all those unnecessary sub-architecture level selection of
-> > GENERIC_GPIO, which are there only for confusing people.
-> >
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> With the addition of set_auxcr/get_auxcr, all the hotplug inline assembly
+>> code for exynos, imx, realview, spear13xx and vexpress can be converted to
+>> C code.
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> That might not be all safe.  Please see
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/209584
+
+Other than the OR/AND operations, it's all just inline assembly
+functions that are called, so it gets compiled to the same code. Perhaps
+I should put noinline on the functions so they stay of limited
+complexity. If you don't think doing this in C is okay, then there is
+probably no point in having the set_auxcr/get_auxcr functions.
+
+Alternatively, we could create common enter/exit coherency functions.
+
+Rob
+
 > 
-Thanks, Linus.
-
-Arnd, Olof,
-
-Can you please take a look at the patch, and apply it as a cleanup
-if it looks good to you?
-
-Shawn
+> 
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>> Cc: Viresh Kumar <viresh.linux@gmail.com>
+>> Cc: Shiraz Hashim <shiraz.hashim@st.com>
+>> ---
+>>  arch/arm/mach-exynos/hotplug.c    |   57 ++++++-------------------------------
+>>  arch/arm/mach-imx/hotplug.c       |   19 ++++---------
+>>  arch/arm/mach-realview/hotplug.c  |   32 +++++----------------
+>>  arch/arm/mach-spear13xx/hotplug.c |   32 +++++----------------
+>>  arch/arm/mach-vexpress/hotplug.c  |   33 +++++----------------
+>>  5 files changed, 35 insertions(+), 138 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+>> index c3f825b..5548fa3 100644
+>> --- a/arch/arm/mach-exynos/hotplug.c
+>> +++ b/arch/arm/mach-exynos/hotplug.c
+>> @@ -26,69 +26,30 @@
+>>  
+>>  static inline void cpu_enter_lowpower_a9(void)
+>>  {
+>> -	unsigned int v;
+>> -
+>>  	flush_cache_all();
+>> -	asm volatile(
+>> -	"	mcr	p15, 0, %1, c7, c5, 0\n"
+>> -	"	mcr	p15, 0, %1, c7, c10, 4\n"
+>> +	__flush_icache_all();
+>> +	dsb();
+>> +
+>>  	/*
+>>  	 * Turn off coherency
+>>  	 */
+>> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>> -	"	bic	%0, %0, %3\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
+>> -	"	bic	%0, %0, %2\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>> -	  : "=&r" (v)
+>> -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+>> -	  : "cc");
+>> +	set_auxcr(get_auxcr() & ~0x40);
+>> +	set_cr(get_cr() & ~CR_C);
+>>  }
+>>  
+>>  static inline void cpu_enter_lowpower_a15(void)
+>>  {
+>> -	unsigned int v;
+>> -
+>> -	asm volatile(
+>> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
+>> -	"	bic	%0, %0, %1\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>> -	  : "=&r" (v)
+>> -	  : "Ir" (CR_C)
+>> -	  : "cc");
+>> -
+>> +	set_cr(get_cr() & ~CR_C);
+>>  	flush_cache_louis();
+>> +	set_auxcr(get_auxcr() & ~0x40);
+>>  
+>> -	asm volatile(
+>> -	/*
+>> -	* Turn off coherency
+>> -	*/
+>> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>> -	"	bic	%0, %0, %1\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>> -	: "=&r" (v)
+>> -	: "Ir" (0x40)
+>> -	: "cc");
+>> -
+>> -	isb();
+>>  	dsb();
+>>  }
+>>  
+>>  static inline void cpu_leave_lowpower(void)
+>>  {
+>> -	unsigned int v;
+>> -
+>> -	asm volatile(
+>> -	"mrc	p15, 0, %0, c1, c0, 0\n"
+>> -	"	orr	%0, %0, %1\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>> -	"	orr	%0, %0, %2\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>> -	  : "=&r" (v)
+>> -	  : "Ir" (CR_C), "Ir" (0x40)
+>> -	  : "cc");
+>> +	set_cr(get_cr() | CR_C);
+>> +	set_auxcr(get_auxcr() | 0x40);
+>>  }
+>>  
+>>  static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>> diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+>> index 3dec962..1470c75 100644
+>> --- a/arch/arm/mach-imx/hotplug.c
+>> +++ b/arch/arm/mach-imx/hotplug.c
+>> @@ -18,24 +18,15 @@
+>>  
+>>  static inline void cpu_enter_lowpower(void)
+>>  {
+>> -	unsigned int v;
+>> -
+>>  	flush_cache_all();
+>> -	asm volatile(
+>> -		"mcr	p15, 0, %1, c7, c5, 0\n"
+>> -	"	mcr	p15, 0, %1, c7, c10, 4\n"
+>> +	__flush_icache_all();
+>> +	dsb();
+>> +
+>>  	/*
+>>  	 * Turn off coherency
+>>  	 */
+>> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>> -	"	bic	%0, %0, %3\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
+>> -	"	bic	%0, %0, %2\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>> -	  : "=&r" (v)
+>> -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+>> -	  : "cc");
+>> +	set_auxcr(get_auxcr() & ~0x40);
+>> +	set_cr(get_cr() & ~CR_C);
+>>  }
+>>  
+>>  /*
+>> diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+>> index 53818e5..c17c8c0 100644
+>> --- a/arch/arm/mach-realview/hotplug.c
+>> +++ b/arch/arm/mach-realview/hotplug.c
+>> @@ -18,39 +18,21 @@
+>>  
+>>  static inline void cpu_enter_lowpower(void)
+>>  {
+>> -	unsigned int v;
+>> -
+>>  	flush_cache_all();
+>> -	asm volatile(
+>> -	"	mcr	p15, 0, %1, c7, c5, 0\n"
+>> -	"	mcr	p15, 0, %1, c7, c10, 4\n"
+>> +	__flush_icache_all();
+>> +	dsb();
+>> +
+>>  	/*
+>>  	 * Turn off coherency
+>>  	 */
+>> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>> -	"	bic	%0, %0, #0x20\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
+>> -	"	bic	%0, %0, %2\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>> -	  : "=&r" (v)
+>> -	  : "r" (0), "Ir" (CR_C)
+>> -	  : "cc");
+>> +	set_auxcr(get_auxcr() & ~0x40);
+>> +	set_cr(get_cr() & ~CR_C);
+>>  }
+>>  
+>>  static inline void cpu_leave_lowpower(void)
+>>  {
+>> -	unsigned int v;
+>> -
+>> -	asm volatile(	"mrc	p15, 0, %0, c1, c0, 0\n"
+>> -	"	orr	%0, %0, %1\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>> -	"	orr	%0, %0, #0x20\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>> -	  : "=&r" (v)
+>> -	  : "Ir" (CR_C)
+>> -	  : "cc");
+>> +	set_cr(get_cr() | CR_C);
+>> +	set_auxcr(get_auxcr() | 0x40);
+>>  }
+>>  
+>>  static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>> diff --git a/arch/arm/mach-spear13xx/hotplug.c b/arch/arm/mach-spear13xx/hotplug.c
+>> index a7d2dd1..a38a087 100644
+>> --- a/arch/arm/mach-spear13xx/hotplug.c
+>> +++ b/arch/arm/mach-spear13xx/hotplug.c
+>> @@ -19,39 +19,21 @@
+>>  
+>>  static inline void cpu_enter_lowpower(void)
+>>  {
+>> -	unsigned int v;
+>> -
+>>  	flush_cache_all();
+>> -	asm volatile(
+>> -	"	mcr	p15, 0, %1, c7, c5, 0\n"
+>> -	"	dsb\n"
+>> +	__flush_icache_all();
+>> +	dsb();
+>> +
+>>  	/*
+>>  	 * Turn off coherency
+>>  	 */
+>> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>> -	"	bic	%0, %0, #0x20\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
+>> -	"	bic	%0, %0, %2\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>> -	: "=&r" (v)
+>> -	: "r" (0), "Ir" (CR_C)
+>> -	: "cc", "memory");
+>> +	set_auxcr(get_auxcr() & ~0x40);
+>> +	set_cr(get_cr() & ~CR_C);
+>>  }
+>>  
+>>  static inline void cpu_leave_lowpower(void)
+>>  {
+>> -	unsigned int v;
+>> -
+>> -	asm volatile("mrc	p15, 0, %0, c1, c0, 0\n"
+>> -	"	orr	%0, %0, %1\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>> -	"	orr	%0, %0, #0x20\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>> -	: "=&r" (v)
+>> -	: "Ir" (CR_C)
+>> -	: "cc");
+>> +	set_cr(get_cr() | CR_C);
+>> +	set_auxcr(get_auxcr() | 0x40);
+>>  }
+>>  
+>>  static inline void spear13xx_do_lowpower(unsigned int cpu, int *spurious)
+>> diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
+>> index a141b98..74a9eb5 100644
+>> --- a/arch/arm/mach-vexpress/hotplug.c
+>> +++ b/arch/arm/mach-vexpress/hotplug.c
+>> @@ -18,40 +18,21 @@
+>>  
+>>  static inline void cpu_enter_lowpower(void)
+>>  {
+>> -	unsigned int v;
+>> -
+>>  	flush_cache_all();
+>> -	asm volatile(
+>> -		"mcr	p15, 0, %1, c7, c5, 0\n"
+>> -	"	mcr	p15, 0, %1, c7, c10, 4\n"
+>> +	__flush_icache_all();
+>> +	dsb();
+>> +
+>>  	/*
+>>  	 * Turn off coherency
+>>  	 */
+>> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>> -	"	bic	%0, %0, %3\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
+>> -	"	bic	%0, %0, %2\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>> -	  : "=&r" (v)
+>> -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+>> -	  : "cc");
+>> +	set_auxcr(get_auxcr() & ~0x40);
+>> +	set_cr(get_cr() & ~CR_C);
+>>  }
+>>  
+>>  static inline void cpu_leave_lowpower(void)
+>>  {
+>> -	unsigned int v;
+>> -
+>> -	asm volatile(
+>> -		"mrc	p15, 0, %0, c1, c0, 0\n"
+>> -	"	orr	%0, %0, %1\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>> -	"	orr	%0, %0, %2\n"
+>> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>> -	  : "=&r" (v)
+>> -	  : "Ir" (CR_C), "Ir" (0x40)
+>> -	  : "cc");
+>> +	set_cr(get_cr() | CR_C);
+>> +	set_auxcr(get_auxcr() | 0x40);
+>>  }
+>>  
+>>  static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>> -- 
+>> 1.7.10.4
+>>
