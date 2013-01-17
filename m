@@ -1,31 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Jan 2013 14:31:58 +0100
-Subject: [PATCHv3 0/7] Add pinctrl driver for Allwinner A1X SoCs
-In-Reply-To: <50F52D2E.205@free-electrons.com>
-References: <1357681398-23956-1-git-send-email-maxime.ripard@free-electrons.com>
- <50F52D2E.205@free-electrons.com>
-Message-ID: <CACRpkdaTFMuN1EteHLTgO7TM8BLr9P_YjuKrwuDGoPtQ57duDw@mail.gmail.com>
+Date: Thu, 17 Jan 2013 14:36:00 +0100
+Subject: [PATCH] ARM: remove unnecessary 'select GENERIC_GPIO'
+In-Reply-To: <1358255616-3171-1-git-send-email-shawn.guo@linaro.org>
+References: <1358255616-3171-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdYw6V_GGjBsj_bzzkmFVTamuMq2oMwYDKhjMrXeS5j+fQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 11:19 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On 08/01/2013 22:43, Maxime Ripard wrote:
->> Hi everyone,
->>
->> This patch set adds a pinctrl driver for the IP found in the Allwinner A10
->> and A13, and the SoC-specific bits for the A13. It also adds the documentation
->> for the device tree bindings.
->>
->> This patch set has been tested on a Olimex A13-Olinuxino.
->>
->> Thanks,
->> Maxime
->
-> Are you ok with this version or do you have additionnal comments ?
+On Tue, Jan 15, 2013 at 2:13 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-I'm probably OK with it, I've only just now reached this point in my
-mail backlog.
+> The only use of GENERIC_GPIO (defined by architecture) in GPIO subsystem
+> is being selected by GPIOLIB.  Also there are no any use of the option
+> at architecture level. Only two sub-architectures shmobile and orion
+> really use the option as below.
+>
+>   arch/arm/mach-shmobile/Makefile:obj-$(CONFIG_GENERIC_GPIO)      += $(pfc-y)
+>   arch/arm/plat-orion/Makefile:orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
+>
+> Remove all those unnecessary sub-architecture level selection of
+> GENERIC_GPIO, which are there only for confusing people.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
