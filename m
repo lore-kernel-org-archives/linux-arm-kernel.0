@@ -1,109 +1,299 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 17 Jan 2013 18:03:17 +0800
-Subject: [PATCH v6 3/3] ARM: i.MX clock: Change the connection-id for
- fsl-usb2-udc
-In-Reply-To: <1358416997-29099-1-git-send-email-peter.chen@freescale.com>
-References: <1358416997-29099-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1358416997-29099-4-git-send-email-peter.chen@freescale.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 17 Jan 2013 11:04:26 +0100 (CET)
+Subject: [PATCH v2 1/8] pinctrl: add SDHI and MMCIF pin groups to r8a7740
+In-Reply-To: <1358356097-26180-2-git-send-email-g.liakhovetski@gmx.de>
+References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
+ <1358356097-26180-2-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <Pine.LNX.4.64.1301171103020.30897@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we use platform_device_id for fsl-usb2-udc driver, it needs to
-change clk connection-id, or the related devm_clk_get will be failed.
+Add pin groups for all three SDHI interfaces and two alternative pin 
+groups for the MMCIF interface on the r8a7740 SoC.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 ---
- arch/arm/mach-imx/clk-imx25.c       |    6 +++---
- arch/arm/mach-imx/clk-imx27.c       |    6 +++---
- arch/arm/mach-imx/clk-imx31.c       |    6 +++---
- arch/arm/mach-imx/clk-imx35.c       |    6 +++---
- arch/arm/mach-imx/clk-imx51-imx53.c |    6 +++---
- 5 files changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index b197aa7..2c570cd 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -254,9 +254,9 @@ int __init mx25_clocks_init(void)
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usbotg_ahb], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usbotg_ahb], "ahb", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
- 	clk_register_clkdev(clk[nfc_ipg_per], NULL, "imx25-nand.0");
- 	/* i.mx25 has the i.mx35 type cspi */
- 	clk_register_clkdev(clk[cspi1_ipg], NULL, "imx35-cspi.0");
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 4c1d1e4..1ffe3b5 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -236,9 +236,9 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
- 	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "imx27-camera.0");
- 	clk_register_clkdev(clk[per4_gate], "per", "imx27-camera.0");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "imx-udc-mx27");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "mxc-ehci.0");
-diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-index 8be64e0..16ccbd4 100644
---- a/arch/arm/mach-imx/clk-imx31.c
-+++ b/arch/arm/mach-imx/clk-imx31.c
-@@ -139,9 +139,9 @@ int __init mx31_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[usb_div_post], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usb_gate], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div_post], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_gate], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div_post], "per", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_gate], "ahb", "imx-udc-mx27");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx27");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
- 	/* i.mx31 has the i.mx21 type uart */
- 	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index 66f3d65..f0727e8 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -251,9 +251,9 @@ int __init mx35_clocks_init()
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usbotg_gate], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usbotg_gate], "ahb", "imx-udc-mx27");
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
- 	clk_register_clkdev(clk[nfc_div], NULL, "imx25-nand.0");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 579023f..fb7cb84 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -269,9 +269,9 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[usboh3_per_gate], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usboh3_gate], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usboh3_gate], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usboh3_per_gate], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usboh3_gate], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usboh3_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usboh3_per_gate], "per", "imx-udc-mx51");
-+	clk_register_clkdev(clk[usboh3_gate], "ipg", "imx-udc-mx51");
-+	clk_register_clkdev(clk[usboh3_gate], "ahb", "imx-udc-mx51");
- 	clk_register_clkdev(clk[nfc_gate], NULL, "imx51-nand");
- 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
+v2: add SDHI2 pins
+
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c |  248 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 248 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+index d0b7165..57d9e25 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+@@ -1870,6 +1870,188 @@ static const unsigned int lcd1_sys_mux[] = {
+ 	LCD1_CS_MARK, LCD1_WR_MARK, LCD1_RD_MARK, LCD1_RS_MARK,
+ };
+ 
++static const unsigned int sdhi0_data1_pins[] = {
++	/* D0 */
++	77,
++};
++static const unsigned int sdhi0_data1_mux[] = {
++	SDHI0_D0_MARK,
++};
++static const unsigned int sdhi0_data4_pins[] = {
++	/* D[0:3] */
++	77, 78, 79, 80,
++};
++static const unsigned int sdhi0_data4_mux[] = {
++	SDHI0_D0_MARK, SDHI0_D1_MARK, SDHI0_D2_MARK, SDHI0_D3_MARK,
++};
++static const unsigned int sdhi0_ctrl_pins[] = {
++	/* CMD, CLK */
++	76, 82,
++};
++static const unsigned int sdhi0_ctrl_mux[] = {
++	SDHI0_CMD_MARK, SDHI0_CLK_MARK,
++};
++static const unsigned int sdhi0_cd_pins[] = {
++	/* CD */
++	81,
++};
++static const unsigned int sdhi0_cd_mux[] = {
++	SDHI0_CD_MARK,
++};
++static const unsigned int sdhi0_wp_pins[] = {
++	/* WP */
++	83,
++};
++static const unsigned int sdhi0_wp_mux[] = {
++	SDHI0_WP_MARK,
++};
++
++static const unsigned int sdhi1_data1_pins[] = {
++	/* D0 */
++	68,
++};
++static const unsigned int sdhi1_data1_mux[] = {
++	SDHI1_D0_MARK,
++};
++static const unsigned int sdhi1_data4_pins[] = {
++	/* D[0:3] */
++	68, 69, 70, 71,
++};
++static const unsigned int sdhi1_data4_mux[] = {
++	SDHI1_D0_MARK, SDHI1_D1_MARK, SDHI1_D2_MARK, SDHI1_D3_MARK,
++};
++static const unsigned int sdhi1_ctrl_pins[] = {
++	/* CMD, CLK */
++	67, 66,
++};
++static const unsigned int sdhi1_ctrl_mux[] = {
++	SDHI1_CMD_MARK, SDHI1_CLK_MARK,
++};
++static const unsigned int sdhi1_cd_pins[] = {
++	/* CD */
++	72,
++};
++static const unsigned int sdhi1_cd_mux[] = {
++	SDHI1_CD_MARK,
++};
++static const unsigned int sdhi1_wp_pins[] = {
++	/* WP */
++	73,
++};
++static const unsigned int sdhi1_wp_mux[] = {
++	SDHI1_WP_MARK,
++};
++
++static const unsigned int sdhi2_data1_pins[] = {
++	/* D0 */
++	205,
++};
++static const unsigned int sdhi2_data1_mux[] = {
++	SDHI2_D0_MARK,
++};
++static const unsigned int sdhi2_data4_pins[] = {
++	/* D[0:3] */
++	205, 206, 207, 208,
++};
++static const unsigned int sdhi2_data4_mux[] = {
++	SDHI2_D0_MARK, SDHI2_D1_MARK, SDHI2_D2_MARK, SDHI2_D3_MARK,
++};
++static const unsigned int sdhi2_ctrl_pins[] = {
++	/* CMD, CLK */
++	204, 203,
++};
++static const unsigned int sdhi2_ctrl_mux[] = {
++	SDHI2_CMD_MARK, SDHI2_CLK_MARK,
++};
++static const unsigned int sdhi2_cd_0_pins[] = {
++	/* CD */
++	202,
++};
++static const unsigned int sdhi2_cd_0_mux[] = {
++	SDHI2_CD_PORT202_MARK,
++};
++static const unsigned int sdhi2_wp_0_pins[] = {
++	/* WP */
++	177,
++};
++static const unsigned int sdhi2_wp_0_mux[] = {
++	SDHI2_WP_PORT177_MARK,
++};
++static const unsigned int sdhi2_cd_1_pins[] = {
++	/* CD */
++	24,
++};
++static const unsigned int sdhi2_cd_1_mux[] = {
++	SDHI2_CD_PORT24_MARK,
++};
++static const unsigned int sdhi2_wp_1_pins[] = {
++	/* WP */
++	25,
++};
++static const unsigned int sdhi2_wp_1_mux[] = {
++	SDHI2_WP_PORT25_MARK,
++};
++
++static const unsigned int mmc0_data1_0_pins[] = {
++	/* D[0] */
++	68,
++};
++static const unsigned int mmc0_data1_0_mux[] = {
++	MMC0_D0_PORT68_MARK,
++};
++static const unsigned int mmc0_data4_0_pins[] = {
++	/* D[0:3] */
++	68, 69, 70, 71,
++};
++static const unsigned int mmc0_data4_0_mux[] = {
++	MMC0_D0_PORT68_MARK, MMC0_D1_PORT69_MARK, MMC0_D2_PORT70_MARK, MMC0_D3_PORT71_MARK,
++};
++static const unsigned int mmc0_data8_0_pins[] = {
++	/* D[0:7] */
++	68, 69, 70, 71, 72, 73, 74, 75,
++};
++static const unsigned int mmc0_data8_0_mux[] = {
++	MMC0_D0_PORT68_MARK, MMC0_D1_PORT69_MARK, MMC0_D2_PORT70_MARK, MMC0_D3_PORT71_MARK,
++	MMC0_D4_PORT72_MARK, MMC0_D5_PORT73_MARK, MMC0_D6_PORT74_MARK, MMC0_D7_PORT75_MARK,
++};
++static const unsigned int mmc0_ctrl_0_pins[] = {
++	/* CMD, CLK */
++	66, 67,
++};
++static const unsigned int mmc0_ctrl_0_mux[] = {
++	MMC0_CMD_PORT67_MARK, MMC0_CLK_PORT66_MARK,
++};
++
++static const unsigned int mmc0_data1_1_pins[] = {
++	/* D[0] */
++	149,
++};
++static const unsigned int mmc0_data1_1_mux[] = {
++	MMC1_D0_PORT149_MARK,
++};
++static const unsigned int mmc0_data4_1_pins[] = {
++	/* D[0:3] */
++	149, 148, 147, 146,
++};
++static const unsigned int mmc0_data4_1_mux[] = {
++	MMC1_D0_PORT149_MARK, MMC1_D1_PORT148_MARK, MMC1_D2_PORT147_MARK, MMC1_D3_PORT146_MARK,
++};
++static const unsigned int mmc0_data8_1_pins[] = {
++	/* D[0:7] */
++	149, 148, 147, 146, 145, 144, 143, 142,
++};
++static const unsigned int mmc0_data8_1_mux[] = {
++	MMC1_D0_PORT149_MARK, MMC1_D1_PORT148_MARK, MMC1_D2_PORT147_MARK, MMC1_D3_PORT146_MARK,
++	MMC1_D4_PORT145_MARK, MMC1_D5_PORT144_MARK, MMC1_D6_PORT143_MARK, MMC1_D7_PORT142_MARK,
++};
++static const unsigned int mmc0_ctrl_1_pins[] = {
++	/* CMD, CLK */
++	104, 103,
++};
++static const unsigned int mmc0_ctrl_1_mux[] = {
++	MMC1_CMD_PORT104_MARK, MMC1_CLK_PORT103_MARK,
++};
++
+ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(lcd0_data8),
+ 	SH_PFC_PIN_GROUP(lcd0_data9),
+@@ -1893,6 +2075,31 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(lcd1_lclk),
+ 	SH_PFC_PIN_GROUP(lcd1_sync),
+ 	SH_PFC_PIN_GROUP(lcd1_sys),
++	SH_PFC_PIN_GROUP(sdhi0_data1),
++	SH_PFC_PIN_GROUP(sdhi0_data4),
++	SH_PFC_PIN_GROUP(sdhi0_ctrl),
++	SH_PFC_PIN_GROUP(sdhi0_cd),
++	SH_PFC_PIN_GROUP(sdhi0_wp),
++	SH_PFC_PIN_GROUP(sdhi1_data1),
++	SH_PFC_PIN_GROUP(sdhi1_data4),
++	SH_PFC_PIN_GROUP(sdhi1_ctrl),
++	SH_PFC_PIN_GROUP(sdhi1_cd),
++	SH_PFC_PIN_GROUP(sdhi1_wp),
++	SH_PFC_PIN_GROUP(sdhi2_data1),
++	SH_PFC_PIN_GROUP(sdhi2_data4),
++	SH_PFC_PIN_GROUP(sdhi2_ctrl),
++	SH_PFC_PIN_GROUP(sdhi2_cd_0),
++	SH_PFC_PIN_GROUP(sdhi2_wp_0),
++	SH_PFC_PIN_GROUP(sdhi2_cd_1),
++	SH_PFC_PIN_GROUP(sdhi2_wp_1),
++	SH_PFC_PIN_GROUP(mmc0_data1_0),
++	SH_PFC_PIN_GROUP(mmc0_data4_0),
++	SH_PFC_PIN_GROUP(mmc0_data8_0),
++	SH_PFC_PIN_GROUP(mmc0_ctrl_0),
++	SH_PFC_PIN_GROUP(mmc0_data1_1),
++	SH_PFC_PIN_GROUP(mmc0_data4_1),
++	SH_PFC_PIN_GROUP(mmc0_data8_1),
++	SH_PFC_PIN_GROUP(mmc0_ctrl_1),
+ };
+ 
+ static const char * const lcd0_groups[] = {
+@@ -1923,9 +2130,50 @@ static const char * const lcd1_groups[] = {
+ 	"lcd1_sys",
+ };
+ 
++static const char * const sdhi0_groups[] = {
++	"sdhi0_data1",
++	"sdhi0_data4",
++	"sdhi0_ctrl",
++	"sdhi0_cd",
++	"sdhi0_wp",
++};
++
++static const char * const sdhi1_groups[] = {
++	"sdhi1_data1",
++	"sdhi1_data4",
++	"sdhi1_ctrl",
++	"sdhi1_cd",
++	"sdhi1_wp",
++};
++
++static const char * const sdhi2_groups[] = {
++	"sdhi2_data1",
++	"sdhi2_data4",
++	"sdhi2_ctrl",
++	"sdhi2_cd_0",
++	"sdhi2_wp_0",
++	"sdhi2_cd_1",
++	"sdhi2_wp_1",
++};
++
++static const char * const mmc0_groups[] = {
++	"mmc0_data1_0",
++	"mmc0_data4_0",
++	"mmc0_data8_0",
++	"mmc0_ctrl_0",
++	"mmc0_data1_1",
++	"mmc0_data4_1",
++	"mmc0_data8_1",
++	"mmc0_ctrl_1",
++};
++
+ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(lcd0),
+ 	SH_PFC_FUNCTION(lcd1),
++	SH_PFC_FUNCTION(sdhi0),
++	SH_PFC_FUNCTION(sdhi1),
++	SH_PFC_FUNCTION(sdhi2),
++	SH_PFC_FUNCTION(mmc0),
+ };
+ 
+ #define PINMUX_FN_BASE	ARRAY_SIZE(pinmux_pins)
 -- 
-1.7.0.4
+1.7.2.5
