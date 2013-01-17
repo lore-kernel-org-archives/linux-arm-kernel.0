@@ -1,26 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Jan 2013 18:56:32 +0800
-Subject: [PATCH] ARM: imx: select HAVE_IMX_SRC when SMP is enabled
-In-Reply-To: <1358419936.2731.221.camel@sauron.fi.intel.com>
-References: <1350977942-15964-1-git-send-email-shawn.guo@linaro.org>
- <1358419936.2731.221.camel@sauron.fi.intel.com>
-Message-ID: <20130117105631.GM26179@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Jan 2013 11:57:41 +0100
+Subject: [PATCH] ARM: ux500: Include the PRCMU's Secure Registers in
+ DB8500's DT
+In-Reply-To: <1357901029-9073-1-git-send-email-lee.jones@linaro.org>
+References: <1357901029-9073-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZhRESXHNVFPzUx7H0ppZ+KSfPOJ2bPS+-CQyv6+8=oZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 12:52:16PM +0200, Artem Bityutskiy wrote:
-> Err, sorry, the issue I get is a bit different, but similar:
-> 
-> arch/arm/mach-imx/built-in.o: In function `imx6q_restart':
-> platform-spi_imx.c:(.text+0x2220): undefined reference to `imx_src_prepare_restart'
-> arch/arm/mach-imx/built-in.o: In function `imx6q_pm_enter':
-> platform-spi_imx.c:(.text+0x22e4): undefined reference to `imx_set_cpu_jump'
-> arch/arm/mach-imx/built-in.o: In function `imx6q_init_irq':
-> platform-spi_imx.c:(.init.text+0x7280): undefined reference to `imx_src_init'
-> make[1]: *** [vmlinux] Error 1
-> 
-The fix [1] is on the way to mainline.
+On Fri, Jan 11, 2013 at 11:43 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Shawn
+> Currently we only include the PRCMU's primary registers when
+> referencing the register count in the 'reg' property. This patch
+> expands that count to include the secure registers also.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/209206
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Will you push this to ARM SoC or shall I queue it?
+
+Yours,
+Linus Walleij
