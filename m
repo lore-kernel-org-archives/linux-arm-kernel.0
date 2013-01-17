@@ -1,40 +1,39 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 17 Jan 2013 10:42:32 -0500 (EST)
-Subject: [PATCH 2/3] ARM: convert platform hotplug inline assembly to C
-In-Reply-To: <50F8082F.1050906@gmail.com>
-References: <1358391205-23943-1-git-send-email-robherring2@gmail.com>
- <1358391205-23943-2-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1301162338420.6300@xanadu.home> <50F8082F.1050906@gmail.com>
-Message-ID: <alpine.LFD.2.02.1301171038590.6300@xanadu.home>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 17 Jan 2013 15:42:36 +0000
+Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
+In-Reply-To: <20130116183101.GA28660@avionic-0098.adnet.avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130115154038.GA11241@arm.com>
+ <20130115211441.GA13139@avionic-0098.adnet.avionic-design.de>
+ <201301161400.26587.arnd@arndb.de> <20130116161716.GA10630@arm.com>
+ <20130116183101.GA28660@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20130117154236.GA25943@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Jan 2013, Rob Herring wrote:
-
-> On 01/16/2013 10:40 PM, Nicolas Pitre wrote:
-> > On Wed, 16 Jan 2013, Rob Herring wrote:
-> > 
-> >> From: Rob Herring <rob.herring@calxeda.com>
-> >>
-> >> With the addition of set_auxcr/get_auxcr, all the hotplug inline assembly
-> >> code for exynos, imx, realview, spear13xx and vexpress can be converted to
-> >> C code.
-> > 
-> > That might not be all safe.  Please see
-> > http://article.gmane.org/gmane.linux.ports.arm.kernel/209584
+On Wed, Jan 16, 2013 at 06:31:01PM +0000, Thierry Reding wrote:
+> Alright, putting the functions into pci_ops doesn't sound like a very
+> good idea then. Or perhaps it would make sense for hardware where the
+> root complex and the MSI controller are handled by the same driver.
+> Basically it could be done as a shortcut and if those are not filled
+> in, the drivers could still opt to look up an MSI controller from a
+> phandle specified in DT.
 > 
-> Other than the OR/AND operations, it's all just inline assembly
-> functions that are called, so it gets compiled to the same code. Perhaps
-> I should put noinline on the functions so they stay of limited
-> complexity. If you don't think doing this in C is okay, then there is
-> probably no point in having the set_auxcr/get_auxcr functions.
+> Even another alternative would be to keep the functions within the
+> struct pci_ops and use generic ones if an external MSI controller is
+> used. Just tossing around ideas.
 
-I think set_auxcr/get_auxcr is fine.
+I think an ideal solution would be for additional logic in drivers/msi.c
+(e.g. in functions like msi_capability_init) to determine (based on the
+passed in pci_dev) which MSI controller ops to use. I'm not sure the best
+way to implement an association between an MSI controller and PCI busses
+(I believe arch/sparc does something like this - perhaps there will be
+inspiration there).
 
-But your patch goes beyond simply converting those.  You also converted 
-the cache flush and disable from assembly to C, which on a Cortex A9 
-might be unsafe if the stack is modified in the sequence according to 
-the discussion I referenced.
+As you've pointed out, most RCs will have their own MSI controllers - so
+it should be easy to register and associate both together.
 
+I've submitted my previous work on MSI controller registration, but it
+doesn't quite solve this problem - perhaps it can be a starting point?
 
-Nicolas
+Andrew Murray
