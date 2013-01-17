@@ -1,28 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Jan 2013 19:22:13 +0000
-Subject: [PATCH 0/4] gpio: introduce descriptor-based interface
-In-Reply-To: <201301170850.43655.sfking@fdwdc.com>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
- <50F7E83E.8000105@uclinux.org> <201301170850.43655.sfking@fdwdc.com>
-Message-ID: <201301171922.13432.arnd@arndb.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 17 Jan 2013 13:27:03 -0600
+Subject: [PATCH] ARM: OMAP2: Fix missing omap2xxx_clkt_vps_xxx function
+ calls
+In-Reply-To: <alpine.DEB.2.00.1301171848490.14118@utopia.booyaka.com>
+References: <1357851209-5332-1-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1301171848490.14118@utopia.booyaka.com>
+Message-ID: <50F85087.3060507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 January 2013, Steven King wrote:
-> I haven't been keeping up with the kernel list of late, can someone point me 
-> to what''s being discussed so I can see what were talking about here?
+Hi Paul,
 
-We are discussion about changes to the GPIO API, in particular about
-adding a descriptor (i.e. pointer to struct) based interface to
-replace integers as the primary key.
+On 01/17/2013 12:51 PM, Paul Walmsley wrote:
+> Hi Jon
+> 
+> On Thu, 10 Jan 2013, Jon Hunter wrote:
+> 
+>> During the migration to the common clock framework, calls to the
+>> functions omap2xxx_clkt_vps_late_init() and
+>> omap2xxx_clkt_vps_check_bootloader_rates() were not preserved for
+>> OMAP2420 and OMAP2430. This causes the variables "sys_ck_rate" and
+>> "curr_prcm_set" to be uninitialised on boot. On reboot, this causes the
+>> following error message to be displayed because the appropriate MPU
+>> clock frequency (derived from sys_ck_rate) cannot be found.
+>>
+>> "Could not set MPU rate to 4294MHz"
+> 
+> I don't see this message on 2430sdp or n800 with v3.8-rc3, but maybe 
+> that's due to sys_clk differences.  Do you still see this on v3.8-rc3 
+> with H4?
 
-Any kind of change on this level is currently problematic because it
-is basically impossible to tell which files are implementing the
-current interface and would need to get changed along with changing
-gpiolib. If everything goes through gpiolib, it's much easier
-to make compatible extensions in one place.
+Yes I still see it. You don't see it on reboot?
 
-Do you have any numbers about how much of a difference for your
-platforms we are talking about at most?
+The reason why there is such a large number is because
+omap2_round_to_table_rate() is returning the value -EINVAL. You could
+add a print to omap2_round_to_table_rate() to see what it returns on
+reboot. Or we could add a WARN to the function is sys_ck_rate is 0 for
+testing.
 
-	Arnd
+> Also, there's already a call to omap2xxx_clkt_vps_check_bootloader_rates() 
+> -- is it necessary to add another one?
+
+Thanks. I see that now and so that is not needed then.
+
+Cheers
+Jon
