@@ -1,62 +1,86 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 17 Jan 2013 11:39:19 +0200
-Subject: [RFC PATCH 2/6] ARM: OMAP: USB: Add phy binding information
-In-Reply-To: <1358348462-27693-3-git-send-email-kishon@ti.com>
-References: <1358348462-27693-1-git-send-email-kishon@ti.com>
- <1358348462-27693-3-git-send-email-kishon@ti.com>
-Message-ID: <50F7C6C7.3030400@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 17 Jan 2013 11:45:53 +0200
+Subject: [PATCH V5 1/3] clk: tegra: add Tegra specific clocks
+In-Reply-To: <1358369575-7325-1-git-send-email-swarren@wwwdotorg.org>
+References: <1358369575-7325-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130117094553.GD4118@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2013 05:00 PM, Kishon Vijay Abraham I wrote:
-> This is in preparation for the changes in PHY library to support adding
-> and getting multiple PHYs of the same type. In the new design, the
-> binding information between the PHY and the USB controller should be
-> specified in the platform specific initialization code. So it's been
-> done for OMAP platforms here.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
-> This kind-of binding should be done in all the platforms (I've done only
-> for OMAP platform). 
->  arch/arm/mach-omap2/usb-musb.c |    7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-> index 9d27e3f..bbe2fa5 100644
-> --- a/arch/arm/mach-omap2/usb-musb.c
-> +++ b/arch/arm/mach-omap2/usb-musb.c
-> @@ -24,6 +24,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/io.h>
->  #include <linux/usb/musb.h>
-> +#include <linux/usb/phy.h>
->  
->  #include "omap_device.h"
->  #include "soc.h"
-> @@ -85,8 +86,12 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
->  	musb_plat.mode = board_data->mode;
->  	musb_plat.extvbus = board_data->extvbus;
->  
-> -	if (cpu_is_omap44xx())
-> +	if (cpu_is_omap44xx()) {
->  		musb_plat.has_mailbox = true;
-> +		usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
-> +	} else if (cpu_is_omap34xx()) {
-> +		usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-> +	}
+> +static struct clk *_tegra_clk_register_pll(const char *name,
+> +               const char *parent_name, void __iomem *clk_base,
+> +               void __iomem *pmc, unsigned long flags,
+> +               unsigned long fixed_rate,
+> +               struct tegra_clk_pll_params *pll_params, u8 pll_flags,
+> +               struct tegra_clk_pll_freq_table *freq_table, spinlock_t *lock,
+> +               bool plle)
+> +{
+> +       struct tegra_clk_pll *pll;
+> +       struct clk *clk;
+> +       struct clk_init_data init;
+> +
+> +       pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> +       if (!pll)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       init.name = name;
+> +       init.ops = plle ? &tegra_clk_plle_ops : &tegra_clk_pll_ops;
+> +       init.flags = flags;
+> +       init.parent_names = (parent_name ? &parent_name : NULL);
+> +       init.num_parents = (parent_name ? 1 : 0);
+> +
+> +       pll->clk_base = clk_base;
+> +       pll->pmc = pmc;
+> +
+> +       pll->freq_table = freq_table;
+> +       pll->params = pll_params;
+> +       pll->fixed_rate = fixed_rate;
+> +       pll->flags = pll_flags;
+> +       pll->lock = lock;
+> +
+> +       pll->divp_shift = PLL_BASE_DIVP_SHIFT;
+> +       pll->divp_width = PLL_BASE_DIVP_WIDTH;
+> +       pll->divn_shift = PLL_BASE_DIVN_SHIFT;
+> +       pll->divn_width = PLL_BASE_DIVN_WIDTH;
+> +       pll->divm_shift = PLL_BASE_DIVM_SHIFT;
+> +       pll->divm_width = PLL_BASE_DIVM_WIDTH;
+> +
+> +       /* Data in .init is copied by clk_register(), so stack variable OK */
+> +       pll->hw.init = &init;
+> +
+> +       clk = clk_register(NULL, &pll->hw);
+> +       if (IS_ERR(clk))
+> +               kfree(pll);
+> +
+> +       return clk;
+> +}
+> +
+> +struct clk *tegra_clk_register_pll(const char *name, const char *parent_name,
+> +               void __iomem *clk_base, void __iomem *pmc,
+> +               unsigned long flags, unsigned long fixed_rate,
+> +               struct tegra_clk_pll_params *pll_params, u8 pll_flags,
+> +               struct tegra_clk_pll_freq_table *freq_table, spinlock_t *lock)
+> +{
+> +       return _tegra_clk_register_pll(name, parent_name, clk_base, pmc,
+> +                       flags, fixed_rate, pll_params, pll_flags, freq_table,
+> +                       lock, false);
+> +}
+> +
+> +struct clk *tegra_clk_register_plle(const char *name, const char *parent_name,
+> +               void __iomem *clk_base, void __iomem *pmc,
+> +               unsigned long flags, unsigned long fixed_rate,
+> +               struct tegra_clk_pll_params *pll_params, u8 pll_flags,
+> +               struct tegra_clk_pll_freq_table *freq_table, spinlock_t *lock)
+> +{
+> +       return _tegra_clk_register_pll(name, parent_name, clk_base, pmc,
+> +                       flags, fixed_rate, pll_params, pll_flags, freq_table,
+> +                       lock, true);
+> +}
 
-Are you sure than these OMAP platforms cannot be wired in any other way
-to the PHY?
+For Tegra114 I will need to introduce more new PLL types. So instead of using
+a boolean plle, maybe just pass a pointer to the relevant struct clk_ops? This
+will make extension for Tegra114 easier.
 
-If they can be then this association must come from the board files or
-device tree.
+Cheers,
 
->  
->  	if (soc_is_am35xx()) {
->  		oh_name = "am35x_otg_hs";
-> 
-
---
-cheers,
--roger
+Peter.
