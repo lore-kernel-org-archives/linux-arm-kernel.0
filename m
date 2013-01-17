@@ -1,33 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Jan 2013 11:50:53 +0100
-Subject: [PATCH 01/26] gpio: samsung: remove inclusion <mach/regs-clock.h>
-In-Reply-To: <027701cdef62$12363bb0$36a2b310$@samsung.com>
-References: <1357165443-3716-1-git-send-email-kgene.kim@samsung.com>
- <1357165443-3716-2-git-send-email-kgene.kim@samsung.com>
- <CACRpkdYhNHwqK3YkEKQedFvYDc6kuwesY4gmMroipnnhrLP6pA@mail.gmail.com>
- <027701cdef62$12363bb0$36a2b310$@samsung.com>
-Message-ID: <CACRpkdYDa_vJhUZDJaO9N59ZscymcjD833pVC2rCz0tF9DmQ-A@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Jan 2013 12:51:04 +0200
+Subject: [PATCH] usb: musb: ux500: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <CACRpkdbmgQ0xDfkbgqc=zDqMDUK0O6uQOf3kX9v1+=+N5s42bw@mail.gmail.com>
+References: <1357577261-31536-1-git-send-email-fabio.baltieri@linaro.org>
+ <CACRpkdZD1i_tvDf6XFyk5muYjtDziQaMNGK6vvihhFJVztXUjw@mail.gmail.com>
+ <20130110133818.GA22710@balto.lan>
+ <CACRpkdbmgQ0xDfkbgqc=zDqMDUK0O6uQOf3kX9v1+=+N5s42bw@mail.gmail.com>
+Message-ID: <20130117105104.GN10814@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 7:41 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+On Thu, Jan 17, 2013 at 11:46:30AM +0100, Linus Walleij wrote:
+> On Thu, Jan 10, 2013 at 2:38 PM, Fabio Baltieri
+> <fabio.baltieri@linaro.org> wrote:
+> > On Thu, Jan 10, 2013 at 12:23:32PM +0100, Linus Walleij wrote:
+> >> On Mon, Jan 7, 2013 at 5:47 PM, Fabio Baltieri
+> >> <fabio.baltieri@linaro.org> wrote:
+> >>
+> >> > This patch converts the module to use clk_prepare_enable and
+> >> > clk_disable_unprepare variants as required by common clock framework.
+> >> >
+> >> > Without this the system crash during probe function.
+> >> >
+> >> > Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> >>
+> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > Thanks for the ACK.  This bug was here unnoticed since 3.6 merge window,
+> 
+> Then it should have Cc: stable at kernel.org..
 
-> BTW, do you have any comments on following patches?
->
-> [PATCH] gpio: samsung: silent build warning for EXYNOS5
-> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14443.html
+just added to my tree.
 
-Merged to fixes.
-
-> [PATCH] gpio: samsung: fix pinctrl condition for exynos and exynos5440
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/14758
-
-Merged to fixes.
-
-> [PATCH] gpio: samsung: skip gpio lib registration for EXYNOS5440
-> http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/14673
-
-I'll check it out, may have missed it.
-
-Yours,
-Linus Walleij
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/c7c4d190/attachment.sig>
