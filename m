@@ -1,393 +1,144 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 17 Jan 2013 09:59:56 +0100
-Subject: [PATCH v8 3/3] Cortex-M3: Add support for exception handling
-In-Reply-To: <1358413196-5609-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1358413196-5609-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1358413196-5609-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Thu, 17 Jan 2013 09:59:53 +0100
+Subject: [PATCH v8 0/3] Cortex-M3 series once more
+Message-ID: <1358413196-5609-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the exception handling for the ARMv7-M
-architecture (pretty different from the A or R profiles).
+Based on Jonny's comments I changed a few more details. The diff to v7
+can be found below after the diffstat. These are:
 
-It bases on work done earlier by Catalin for 2.6.33 but was nearly
-completely rewritten to use a pt_regs layout compatible to the A
-profile.
+ - describe why a #define for cr_alignment is OK in both the
+   commit log and a comment in the header file
+ - a work around for errata 752419 that newer gcc warns about
+ - add a few more comments for better readability
+ - a whitespace fix
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/kernel/entry-common.S |    4 ++
- arch/arm/kernel/entry-header.S |  148 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/entry-v7m.S    |  134 ++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/process.c      |    4 ++
- arch/arm/kernel/ptrace.c       |    3 +
- 5 files changed, 293 insertions(+)
+I think the updates are minor enough to still allow the patches to go
+into v3.9-rc1. Russell, what do you think? You can pull them from
+
+	git://git.pengutronix.de/git/ukl/linux.git for-next
+
+still based on v3.7-rc1 + your commit "ARM: fix oops on initial entry to
+userspace with Thumb2 kernels".
+
+Catalin Marinas (1):
+  Cortex-M3: Add base support for Cortex-M3
+
+Uwe Kleine-K?nig (2):
+  ARM: make cr_alignment read-only #ifndef CONFIG_CPU_CP15
+  Cortex-M3: Add support for exception handling
+
+ arch/arm/include/asm/assembler.h   |   13 ++-
+ arch/arm/include/asm/cp15.h        |   16 +++-
+ arch/arm/include/asm/cputype.h     |    3 +
+ arch/arm/include/asm/glue-cache.h  |   25 ++++++
+ arch/arm/include/asm/glue-df.h     |    8 ++
+ arch/arm/include/asm/glue-proc.h   |    9 ++
+ arch/arm/include/asm/irqflags.h    |   22 +++--
+ arch/arm/include/asm/processor.h   |    7 ++
+ arch/arm/include/asm/ptrace.h      |    8 ++
+ arch/arm/include/asm/system_info.h |    1 +
+ arch/arm/include/uapi/asm/ptrace.h |   36 ++++++--
+ arch/arm/kernel/asm-offsets.c      |    3 +
+ arch/arm/kernel/entry-common.S     |    4 +
+ arch/arm/kernel/entry-header.S     |  148 +++++++++++++++++++++++++++++++++
+ arch/arm/kernel/entry-v7m.S        |  134 ++++++++++++++++++++++++++++++
+ arch/arm/kernel/head-common.S      |    9 +-
+ arch/arm/kernel/head-nommu.S       |    9 +-
+ arch/arm/kernel/process.c          |    4 +
+ arch/arm/kernel/ptrace.c           |    3 +
+ arch/arm/kernel/setup.c            |   13 ++-
+ arch/arm/kernel/traps.c            |    2 +
+ arch/arm/mm/alignment.c            |    2 +
+ arch/arm/mm/mmu.c                  |   17 ++++
+ arch/arm/mm/nommu.c                |    2 +
+ arch/arm/mm/proc-v7m.S             |  161 ++++++++++++++++++++++++++++++++++++
+ 25 files changed, 637 insertions(+), 22 deletions(-)
  create mode 100644 arch/arm/kernel/entry-v7m.S
+ create mode 100644 arch/arm/mm/proc-v7m.S
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 3471175..48d8dc0 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -339,6 +339,9 @@ ENDPROC(ftrace_stub)
+The incremental changes since v7 are:
+
+diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+index d814435..1f3262e 100644
+--- a/arch/arm/include/asm/cp15.h
++++ b/arch/arm/include/asm/cp15.h
+@@ -86,6 +86,11 @@ static inline void set_copro_access(unsigned int val)
  
- 	.align	5
- ENTRY(vector_swi)
-+#ifdef CONFIG_CPU_V7M
-+	v7m_exception_entry
-+#else
- 	sub	sp, sp, #S_FRAME_SIZE
- 	stmia	sp, {r0 - r12}			@ Calling r0 - r12
-  ARM(	add	r8, sp, #S_PC		)
-@@ -349,6 +352,7 @@ ENTRY(vector_swi)
- 	str	lr, [sp, #S_PC]			@ Save calling PC
- 	str	r8, [sp, #S_PSR]		@ Save CPSR
- 	str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
-+#endif
- 	zero_fp
+ #else /* ifdef CONFIG_CPU_CP15 */
  
- 	/*
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 9a8531e..33d9900 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -44,6 +44,145 @@
- #endif
- 	.endm
- 
-+#ifdef CONFIG_CPU_V7M
 +/*
-+ * ARMv7-M exception entry/exit macros.
-+ *
-+ * xPSR, ReturnAddress(), LR (R14), R12, R3, R2, R1, and R0 are
-+ * automatically saved on the current stack (32 words) before
-+ * switching to the exception stack (SP_main).
-+ *
-+ * If exception is taken while in user mode, SP_main is
-+ * empty. Otherwise, SP_main is aligned to 64 bit automatically
-+ * (CCR.STKALIGN set).
-+ *
-+ * Linux assumes that the interrupts are disabled when entering an
-+ * exception handler and it may BUG if this is not the case. Interrupts
-+ * are disabled during entry and reenabled in the exit macro.
-+ *
-+ * v7m_exception_fast_exit is used when returning from interrupts.
-+ *
-+ * v7m_exception_slow_exit is used when returning from SVC or PendSV.
-+ * When returning to kernel mode, we don't return from exception.
++ * cr_alignment and cr_no_alignment are tightly coupled to cp15 (at least in the
++ * minds of the developers). Yielding 0 for machines without a cp15 (and making
++ * it read-only) is fine for most cases and saves quite some #ifdeffery.
 + */
-+	.macro	v7m_exception_entry
-+	@ determine the location of the registers saved by the core during
-+	@ exception entry. Depending on the mode the cpu was in when the
-+	@ exception happend that is either on the main or the process stack.
-+	@ Bit 2 of EXC_RETURN stored in the lr register specifies which stack
-+	@ was used.
-+	tst	lr, #0x4
-+	mrsne	r12, psp
-+	moveq	r12, sp
-+
-+	@ we cannot rely on r0-r3 and r12 matching the value saved in the
-+	@ exception frame because of tail-chaining. So these have to be
-+	@ reloaded.
-+	ldmia	r12!, {r0-r3}
-+
-+	@ Linux expects to have irqs off. Do it here before taking stack space
-+	cpsid	i
-+
-+	sub	sp, #S_FRAME_SIZE-S_IP
-+	stmdb	sp!, {r0-r11}
-+
-+	@ load saved r12, lr, return address and xPSR.
-+	@ r0-r7 are used for signals and never touched from now on. Clobbering
-+	@ r8-r12 is OK.
-+	mov	r9, r12
-+	ldmia	r9!, {r8, r10-r12}
-+
-+	@ calculate the original stack pointer value.
-+	@ r9 currently points to the memory location just above the auto saved
-+	@ xPSR. If the FP extension is implemented and bit 4 of EXC_RETURN is 0
-+	@ then space was allocated for FP state. That is space for 18 32-bit
-+	@ values. (If FP extension is unimplemented, bit 4 is 1.)
-+	@ Additionally the cpu might automatically 8-byte align the stack. Bit 9
-+	@ of the saved xPSR specifies if stack aligning took place. In this case
-+	@ another 32-bit value is included in the stack.
-+
-+	tst	lr, #0x10
-+	addeq	r9, r9, #576
-+
-+	tst	r12, 0x100
-+	addne	r9, r9, #4
-+
-+	@ store saved r12 using str to have a register to hold the base for stm
-+	str	r8, [sp, #S_IP]
-+	add	r8, sp, #S_SP
-+	@ store r13-r15, xPSR
-+	stmia	r8!, {r9-r12}
-+	@ store r0 once more and EXC_RETURN
-+	stmia	r8, {r0, lr}
-+	.endm
-+
-+	.macro	v7m_exception_fast_exit
-+	@ registers r0-r3 and r12 are automatically restored on exception
-+	@ return. r4-r7 were not clobbered in v7m_exception_entry so for
-+	@ correctness they don't need to be restored. So only r8-r11 must be
-+	@ restored here. The easiest way to do so is to restore r0-r7, too.
-+	ldmia	sp!, {r0-r11}
-+	add	sp, #S_FRAME_SIZE-S_IP
-+	cpsie	i
-+	bx	lr
-+	.endm
-+
-+	.macro	v7m_exception_slow_exit ret_r0
-+	cpsid	i
-+	ldr	lr, [sp, #S_EXC_RET]	@ read exception LR
-+	tst     lr, #0x8
-+	bne	1f			@ go to thread mode using exception return
-+
-+	/*
-+	 * return to kernel thread
-+	 * sp is already set up (and might be unset in pt_regs), so only
-+	 * restore r0-r12 and pc
-+	 */
-+	ldmia	sp, {r0-r12}
-+	ldr	lr, [sp, #S_PC]
-+	add	sp, sp, #S_FRAME_SIZE
-+	cpsie	i
-+	bx	lr
-+
-+1:	/*
-+	 * return to userspace
-+	 */
-+
-+	@ read original r12, sp, lr, pc and xPSR
-+	add	r12, sp, #S_IP
-+	ldmia	r12, {r1-r5}
-+
-+	@ handle stack aligning
-+	tst	r5, #0x100
-+	subne	r2, r2, #4
-+
-+	@ skip over stack space for fp saving
-+	tst	lr, #0x10
-+	subeq	r2, r2, #576
-+
-+	@ write basic exception frame
-+	stmdb	r2!, {r1, r3-r5}
-+	ldmia	sp, {r1, r3-r5}
-+	.if	\ret_r0
-+	stmdb	r2!, {r0, r3-r5}
-+	.else
-+	stmdb	r2!, {r1, r3-r5}
-+	.endif
-+
-+	@ restore process sp
-+	msr	psp, r2
-+
-+	@ restore original r4-r11
-+	ldmia	sp!, {r0-r11}
-+
-+	@ restore main sp
-+	add	sp, sp, #S_FRAME_SIZE-S_IP
-+
-+	cpsie	i
-+	bx	lr
-+	.endm
-+#endif	/* CONFIG_CPU_V7M */
-+
- 	@
- 	@ Store/load the USER SP and LR registers by switching to the SYS
- 	@ mode. Useful in Thumb-2 mode where "stm/ldm rd, {sp, lr}^" is not
-@@ -131,6 +270,14 @@
- 	rfeia	sp!
- 	.endm
+ #define cr_no_alignment	UL(0)
+ #define cr_alignment	UL(0)
  
-+#ifdef CONFIG_CPU_V7M
-+	.macro	restore_user_regs, fast = 0, offset = 0
-+	.if	\offset
-+	add	sp, #\offset
-+	.endif
-+	v7m_exception_slow_exit ret_r0 = \fast
-+	.endm
-+#else	/* !CONFIG_CPU_V7M */
- 	.macro	restore_user_regs, fast = 0, offset = 0
- 	clrex					@ clear the exclusive monitor
- 	mov	r2, sp
-@@ -147,6 +294,7 @@
- 	add	sp, sp, #S_FRAME_SIZE - S_SP
- 	movs	pc, lr				@ return & move spsr_svc into cpsr
- 	.endm
-+#endif	/* CONFIG_CPU_V7M */
+diff --git a/arch/arm/include/uapi/asm/ptrace.h b/arch/arm/include/uapi/asm/ptrace.h
+index 2ae7d1b..d3be66e 100644
+--- a/arch/arm/include/uapi/asm/ptrace.h
++++ b/arch/arm/include/uapi/asm/ptrace.h
+@@ -144,7 +144,7 @@ struct pt_regs {
+ #define ARM_r1		uregs[1]
+ #define ARM_r0		uregs[0]
+ #define ARM_ORIG_r0	uregs[17]
+-#define ARM_EXC_RET    uregs[18]
++#define ARM_EXC_RET	uregs[18]
  
- 	.macro	get_thread_info, rd
- 	mov	\rd, sp
+ /*
+  * The size of the user-visible VFP state as seen by PTRACE_GET/SETVFPREGS
 diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-new file mode 100644
-index 0000000..842394c
---- /dev/null
+index a0991dc..842394c 100644
+--- a/arch/arm/kernel/entry-v7m.S
 +++ b/arch/arm/kernel/entry-v7m.S
-@@ -0,0 +1,134 @@
-+/*
-+ * linux/arch/arm/kernel/entry-v7m.S
-+ *
-+ * Copyright (C) 2008 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Low-level vector interface routines for the ARMv7-M architecture
-+ */
-+#include <asm/memory.h>
-+#include <asm/glue.h>
-+#include <asm/thread_notify.h>
-+
-+#include <mach/entry-macro.S>
-+
-+#include "entry-header.S"
-+
-+#ifdef CONFIG_PREEMPT
-+#error "CONFIG_PREEMPT not supported on the current ARMv7M implementation"
-+#endif
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+#error "CONFIG_TRACE_IRQFLAGS not supported on the current ARMv7M implementation"
-+#endif
-+
-+__invalid_entry:
-+	v7m_exception_entry
-+	adr	r0, strerr
-+	mrs	r1, ipsr
-+	mov	r2, lr
-+	bl	printk
-+	mov	r0, sp
-+	bl	show_regs
-+1:	b	1b
-+ENDPROC(__invalid_entry)
-+
-+strerr:	.asciz	"\nUnhandled exception: IPSR = %08lx LR = %08lx\n"
-+
-+	.align	2
-+__irq_entry:
-+	v7m_exception_entry
-+
-+	@
-+	@ Invoke the IRQ handler
-+	@
-+	mrs	r0, ipsr
-+	and	r0, #0xff
-+	sub	r0, #16			@ IRQ number
-+	mov	r1, sp
-+	@ routine called with r0 = irq number, r1 = struct pt_regs *
-+	bl	asm_do_IRQ
-+
-+	@
-+	@ Check for any pending work if returning to user
-+	@
-+	ldr	lr, [sp, #S_EXC_RET]
-+	tst	lr, #0x8		@ check the return stack
-+	beq	2f			@ returning to handler mode
-+	get_thread_info tsk
-+	ldr	r1, [tsk, #TI_FLAGS]
-+	tst	r1, #_TIF_WORK_MASK
-+	beq	2f			@ no work pending
-+	ldr	r1, =0xe000ed04		@ ICSR
-+	mov	r0, #1 << 28		@ ICSR.PENDSVSET
-+	str	r0, [r1]		@ raise PendSV
-+
-+2:
-+	v7m_exception_fast_exit
-+ENDPROC(__irq_entry)
-+
-+__pendsv_entry:
-+	v7m_exception_entry
-+
-+	ldr	r1, =0xe000ed04		@ ICSR
-+	mov	r0, #1 << 27		@ ICSR.PENDSVCLR
-+	str	r0, [r1]		@ clear PendSV
-+
-+	@ execute the pending work, including reschedule
-+	get_thread_info tsk
-+	mov	why, #0
-+	b	ret_to_user
-+ENDPROC(__pendsv_entry)
-+
-+/*
-+ * Register switch for ARMv7-M processors.
-+ * r0 = previous task_struct, r1 = previous thread_info, r2 = next thread_info
-+ * previous and next are guaranteed not to be the same.
-+ */
-+ENTRY(__switch_to)
-+	.fnstart
-+	.cantunwind
-+	add	ip, r1, #TI_CPU_SAVE
-+	stmia	ip!, {r4 - r11}		@ Store most regs on stack
-+	str	sp, [ip], #4
-+	str	lr, [ip], #4
-+	mov	r5, r0
-+	add	r4, r2, #TI_CPU_SAVE
-+	ldr	r0, =thread_notify_head
-+	mov	r1, #THREAD_NOTIFY_SWITCH
-+	bl	atomic_notifier_call_chain
-+	mov	ip, r4
-+	mov	r0, r5
-+	ldmia	ip!, {r4 - r11}		@ Load all regs saved previously
+@@ -102,8 +102,8 @@ ENTRY(__switch_to)
+ 	mov	ip, r4
+ 	mov	r0, r5
+ 	ldmia	ip!, {r4 - r11}		@ Load all regs saved previously
+-	ldr	sp, [ip], #4
+-	ldr	pc, [ip]
 +	ldr	sp, [ip]
 +	ldr	pc, [ip, #4]!
-+	.fnend
-+ENDPROC(__switch_to)
-+
-+	.data
-+	.align	8
-+/*
-+ * Vector table (64 words => 256 bytes natural alignment)
-+ */
-+ENTRY(vector_table)
-+	.long	0			@ 0 - Reset stack pointer
-+	.long	__invalid_entry		@ 1 - Reset
-+	.long	__invalid_entry		@ 2 - NMI
-+	.long	__invalid_entry		@ 3 - HardFault
-+	.long	__invalid_entry		@ 4 - MemManage
-+	.long	__invalid_entry		@ 5 - BusFault
-+	.long	__invalid_entry		@ 6 - UsageFault
-+	.long	__invalid_entry		@ 7 - Reserved
-+	.long	__invalid_entry		@ 8 - Reserved
-+	.long	__invalid_entry		@ 9 - Reserved
-+	.long	__invalid_entry		@ 10 - Reserved
-+	.long	vector_swi		@ 11 - SVCall
-+	.long	__invalid_entry		@ 12 - Debug Monitor
-+	.long	__invalid_entry		@ 13 - Reserved
-+	.long	__pendsv_entry		@ 14 - PendSV
-+	.long	__invalid_entry		@ 15 - SysTick
-+	.rept	64 - 16
-+	.long	__irq_entry		@ 16..64 - External Interrupts
-+	.endr
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 90084a6..3d745d4 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -387,6 +387,10 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 		*childregs = *regs;
- 		childregs->ARM_r0 = 0;
- 		childregs->ARM_sp = stack_start;
-+#if defined CONFIG_CPU_V7M
-+		/* Return to Thread mode with Process stack */
-+		childregs->ARM_EXC_RET = 0xfffffffdUL;
-+#endif
- 	} else {
- 		memset(childregs, 0, sizeof(struct pt_regs));
- 		thread->cpu_context.r4 = stk_sz;
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 739db3a..55df1d5 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -87,6 +87,9 @@ static const struct pt_regs_offset regoffset_table[] = {
- 	REG_OFFSET_NAME(pc),
- 	REG_OFFSET_NAME(cpsr),
- 	REG_OFFSET_NAME(ORIG_r0),
-+#ifdef CONFIG_CPU_V7M
-+	REG_OFFSET_NAME(EXC_RET),
-+#endif
- 	REG_OFFSET_END,
- };
+ 	.fnend
+ ENDPROC(__switch_to)
  
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 2f560c5..5b391a6 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -117,7 +117,7 @@ __mmap_switched_data:
+ #ifdef CONFIG_CPU_CP15
+ 	.long	cr_alignment			@ r7
+ #else
+-	.long	0
++	.long	0				@ r7
+ #endif
+ 	.long	init_thread_union + THREAD_START_SP @ sp
+ 	.size	__mmap_switched_data, . - __mmap_switched_data
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index b675918..92abdb8 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -196,7 +196,7 @@ void adjust_cr(unsigned long mask, unsigned long set)
+ }
+ #endif
+ 
+-#else
++#else /* ifdef CONFIG_CPU_CP15 */
+ 
+ static int __init early_cachepolicy(char *p)
+ {
+@@ -210,7 +210,7 @@ static int __init noalign_setup(char *__unused)
+ }
+ __setup("noalign", noalign_setup);
+ 
+-#endif
++#endif /* ifdef CONFIG_CPU_CP15 / else */
+ 
+ #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
+ #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+
 -- 
 1.7.10.4
