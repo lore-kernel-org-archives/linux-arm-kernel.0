@@ -1,83 +1,62 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 Jan 2013 13:55:15 -0700
-Subject: [PATCH 1/2] ARM: DT: tegra: Add Colibri T20 512MB COM
-In-Reply-To: <1358423961-24318-1-git-send-email-dev@lynxeye.de>
+Date: Thu, 17 Jan 2013 13:57:32 -0700
+Subject: [PATCH 2/2] ARM: DT: tegra: Add Toradex Iris carrier board with
+ T20 512MB COM
+In-Reply-To: <1358423961-24318-2-git-send-email-dev@lynxeye.de>
 References: <1358423961-24318-1-git-send-email-dev@lynxeye.de>
-Message-ID: <50F86533.9010000@wwwdotorg.org>
+ <1358423961-24318-2-git-send-email-dev@lynxeye.de>
+Message-ID: <50F865BC.5050900@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 01/17/2013 04:59 AM, Lucas Stach wrote:
-> This adds the device tree include file for the Toradex Colibri T20
-> Computer on Module (COM). It's only valid for the 512MB RAM version of
-> the module, as the 256MB version needs different EMC tables and flash
-> configuration. To make this clear the suffix -512 was added to the board
-> compatible string.
-> 
-> The Colibri T20 uses a Tegra2 SoC and has onboard USB Ethernet and AC97
-> sound.
-> 
-> Still some things like onboard NAND support missing, but should be a
-> good base for further development.
+> This adds the device tree for the Toradex Iris carrier board used
+> together with a Colibri T20 512MB COM.
 
-> diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+> diff --git a/arch/arm/boot/dts/tegra20-iris-512.dts b/arch/arm/boot/dts/tegra20-iris-512.dts
 
-> +		temperature-sensor at 4c {
-> +			compatible = "national,lm95245";
+> +	board_regulators {
 
-You should probably add that compatible value to
-Documentation/devicetree/bindings/i2c/trivial-devices.txt.
+Similarly, name that node just regulators
 
-> +	i2c at 7000c000 {
-> +		clock-frequency = <400000>;
-> +	};
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+
+Those properties will then already exist, so no need to duplicate them here.
+
+> +		usb_host_vbus {
+
+That would be regulator at 3
+
+> +			compatible = "regulator-fixed";
+> +			reg = <0>;
+
+That reg = <3>;
+
+(or start numbering the board entries at say 100 to leave room for
+changes in the COM include file)
+
+> +			regulator-name = "usb_host_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			regulator-boot-on;
+> +			regulator-always-on;
+> +			gpio = <&gpio 178 0>;
+> +		};
 > +
-> +	i2c_ddc: i2c at 7000c400 {
-> +		clock-frequency = <100000>;
+> +		vcc_sd_reg: regulator at 3 {
+> +			compatible = "regulator-fixed";
+> +			reg = <1>;
+
+And the node name and reg property here would be 4.
+
+> +			regulator-name = "vcc_sd";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +		};
 > +	};
-> +
-> +	i2c at 7000c500 {
-> +		clock-frequency = <400000>;
-> +	};
+> +};
 
-> +	serial at 70006000 {
-> +		clock-frequency = <216000000>;
-> +	};
-> +
-> +	serial at 70006300 {
-> +		clock-frequency = <216000000>;
-> +	};
-> +
-> +	usb at c5000000 {
-> +		dr_mode = "otg";
-> +	};
-> +
-> +	usb at c5004000 {
-> +		status = "okay";
-> +		nvidia,phy-reset-gpio = <&gpio 169 0>; /* gpio PV1 */
-> +	};
-> +
-> +	sdhci at c8000600 {
-> +		cd-gpios = <&gpio 23 0>; /* gpio PC7 */
-> +		vmmc-supply = <&ldo5_reg>;
-> +		vqmmc-supply = <&vcc_sd_reg>;
-> +	};
-
-I assume that all of those nodes are meant to have status="okay"?
-
-Oh, I see those are in the top-level board .dts file. You may as well
-put all the properties there; stuff like the GPIOs and regulators at
-least would be purely specific to the individual board, and not the COM.
-
-I guess we should really move the serial node's clock-frequency property
-in the SoC .dtsi files.
-
-> +	com_regulators {
-
-I think just call that "regulators"; the final board .dts file can
-easily add more sub-nodes to this node, so there's no need to try and
-avoid any naming conflict here. See Cardhu as an example.
-
-> +		vdd_5v0_reg: com_reg0 {
-
-Those should be named regulator at 0, regulator at 1, etc.
+Oh and in patch 1, I noticed spaces after < or before >; could you
+remove those while you're at it. Thanks.
