@@ -1,29 +1,24 @@
-From: smoch@web.de (Soeren Moch)
-Date: Thu, 17 Jan 2013 14:47:23 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <201301171049.30415.arnd@arndb.de>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <20130116024014.GH25500@titan.lakedaemon.net> <50F61D86.4020801@web.de>
- <201301171049.30415.arnd@arndb.de>
-Message-ID: <50F800EB.6040104@web.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Jan 2013 14:49:16 +0100
+Subject: [PATCH 2/8] pinctrl: add SDHI and MMCIF pin groups to sh7372
+In-Reply-To: <1358356097-26180-3-git-send-email-g.liakhovetski@gmx.de>
+References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
+ <1358356097-26180-3-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <CACRpkdbBcKttwoibRF9e2rXMN7CcxHkUgSmWCD5DjHEXyv9gGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.01.2013 11:49, Arnd Bergmann wrote:
-> On Wednesday 16 January 2013, Soeren Moch wrote:
->>>> I will see what I can do here. Is there an easy way to track the buffer
->>>> usage without having to wait for complete exhaustion?
->>>
->>> DMA_API_DEBUG
->>
->> OK, maybe I can try this.
->>>
+On Wed, Jan 16, 2013 at 6:08 PM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+
+> Add pin groups for all three SDHI interfaces and two alternative pin
+> groups for the MMCIF interface on the sh7372 SoC.
 >
-> Any success with this? It should at least tell you if there is a
-> memory leak in one of the drivers.
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Not yet, sorry. I have to do all the tests in my limited spare time.
-Can you tell me what to search for in the debug output?
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Soeren
+I guess this needs to go on top of Laurent's patch set?
+
+Yours,
+Linus Walleij
