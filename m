@@ -1,34 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Jan 2013 11:28:04 +0100
-Subject: [PATCH] Proposed removal of IS_ERR_OR_NULL() (was: Re: [PATCH
- 1/4] gpiolib: introduce descriptor-based GPIO interface)
-In-Reply-To: <20130109150427.GL3931@n2100.arm.linux.org.uk>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
- <201301081259.29839.arnd@arndb.de>
- <CAAVeFu+4VbCbj9TaeMm+NMDJ9_M4-j4O0ONF7Yh_un63wS38+Q@mail.gmail.com>
- <201301091035.23206.arnd@arndb.de>
- <20130109104414.GF3931@n2100.arm.linux.org.uk>
- <20130109111055.GG3931@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301090932400.6300@xanadu.home>
- <20130109150427.GL3931@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYgD67OA-gmxdwZJXhtjwk1sRnntCzh4Q2RHbhoQ6TUhw@mail.gmail.com>
+Date: Thu, 17 Jan 2013 11:30:48 +0100
+Subject: [PATCH V2 3/3] ARM: davinci: da850: add NAND driver entries
+In-Reply-To: <50ED66F2.8050006@ti.com>
+References: <1357633220-29827-1-git-send-email-anilkumar.v@ti.com>
+ <1357633220-29827-4-git-send-email-anilkumar.v@ti.com>
+ <50ED66F2.8050006@ti.com>
+Message-ID: <CACRpkdajc7e00EdgnYD_7ucOMDFhqx53EvN3uEzJ1pQhHazr9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 9, 2013 at 4:04 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Wed, Jan 9, 2013 at 1:47 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 1/8/2013 1:50 PM, Kumar, Anil wrote:
 
-> So, it seems there's some concensus building here, and it seems that
-> I've become the chosen victi^wvolunteer for this.  So, here's a patch.
-> It's missing a Guns-supplied-by: tag though.
+>> +&pmx_core{
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <
+>> +             &nand_cs3_pins
+>> +     >;
 >
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> Subject: Mark IS_ERR_OR_NULL() deprecated
+> This means that the NAND pins are configured even if NAND is not
+> probed. Right? This can be moved into the nand_cs3 node to avoid that.
+> And then when used with Linus Walleij's patch "drivers/pinctrl: grab
+> default handles from device core" which should be accepted soon, the
+> pins will be automatically setup when the NAND gets probed.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Following the tradition of computer science an alternate title of
-the patch could be "IS_ERR_OR_NULL() considered harmful".
+That is correct, I am waiting for Greg's ACK on the core grab patch
+(maybe it's higher up in my mailbox) and some indication from Stephen
+Warren that it doesn't break the Tegra, and I'll put it into linux-next.
 
 Yours,
 Linus Walleij
