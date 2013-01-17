@@ -1,41 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Jan 2013 16:25:42 +0000
-Subject: [PATCH 2/2] ARM: use DEBUG_LL infrastructural for multiplatform
- uncompress debug
-In-Reply-To: <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
-References: <1358436119-30808-1-git-send-email-shawn.guo@linaro.org>
- <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201301171625.42456.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jan 2013 16:26:32 +0000
+Subject: [PATCH v6 15/15] KVM: ARM: Add maintainer entry for KVM/ARM
+In-Reply-To: <20130116175925.29147.40357.stgit@ubuntu>
+References: <20130116175716.29147.15348.stgit@ubuntu>
+ <20130116175925.29147.40357.stgit@ubuntu>
+Message-ID: <20130117162632.GK3699@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 January 2013, Shawn Guo wrote:
-> However, there is a problem with above approach.  DEBUG_LL routines
-> will check MMU enable bit to decide whether physical or virtual address
-> should be used to access debug port.  In case virtual address needs
-> to be used, the address returned by addruart will not work for
-> decompressor who uses a different mapping from what kernel uses.
-> Fortunately, decompressor uses a flat mapping (same physical and virtual
-> addresses).  So we can easily work it around by asking platform addruart
-> return physical address as virtual address when it runs in decompressor.
-> The macro UNCOMPRESS_DEBUG is defined for this use.
+On Wed, Jan 16, 2013 at 05:59:25PM +0000, Christoffer Dall wrote:
+> Add an entry in the MAINTAINERS file for KVM/ARM.
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+> ---
+>  MAINTAINERS |    8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 915564e..70e5a10 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -4474,6 +4474,14 @@ F:	arch/s390/include/asm/kvm*
+>  F:	arch/s390/kvm/
+>  F:	drivers/s390/kvm/
+>  
+> +KERNEL VIRTUAL MACHINE (KVM) FOR ARM
+> +M:	Christoffer Dall <christofferdall@gmail.com>
+> +L:	kvmarm at lists.cs.columbia.edu
+> +W:	http://http://systems.cs.columbia.edu/projects/kvm-arm
 
-Can't you just create a new copy of kernel/debug.S in boot/compressed/
-that provides only a putc() function and uses the physical address
-unconditionally?
+Oops, I missed that this URL has two http:// prefixes.
 
-For all I can tell, that should be little more than just
+> +S:	Supported
 
-#include CONFIG_DEBUG_LL_INCLUDE
-ENTRY(putc)
-	addruart r1, r2, r3
-	waituart r3, r1
-	senduart r0, r1
-	busyuart r3, r1
-	mov pc,lr
-ENDPROC(putc)
+This means that you're paid to look after KVM. If so, using a gmail address
+seems a little odd...
 
-(I'm not sure about the actual semantics of the above, take that
-as an approximation)
+> +F:	arch/arm/include/asm/kvm*
 
-	Arnd
+uapi?
+
+> +F:	arch/arm/kvm/
+
+Will
