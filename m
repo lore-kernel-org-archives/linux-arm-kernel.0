@@ -1,38 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Jan 2013 15:10:15 +0100
-Subject: [PATCH 1/2 RESEND] gpio: fix warning of 'struct gpio_chip'
- declaration
-In-Reply-To: <1358431402-29701-1-git-send-email-shawn.guo@linaro.org>
-References: <1358239056-703-2-git-send-email-shawn.guo@linaro.org>
- <1358431402-29701-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkdbwokgBh55nFcDMc50CYmyuGd6AQF88Md=Le-UxJ=p6rg@mail.gmail.com>
+Date: Thu, 17 Jan 2013 15:11:28 +0100
+Subject: [PATCH 2/2] gpio: devm_gpio_* support should not depend on GPIOLIB
+In-Reply-To: <1358239056-703-3-git-send-email-shawn.guo@linaro.org>
+References: <1358239056-703-1-git-send-email-shawn.guo@linaro.org>
+ <1358239056-703-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdYChO_YxXj=QcN6nDQebxuHGTZnX29P=t7F=X72Er=onw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 3:03 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Tue, Jan 15, 2013 at 9:37 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-> The struct gpio_chip is only defined inside #ifdef CONFIG_GPIOLIB,
-> but it's referenced by gpiochip_add_pin_range() and
-> gpiochip_remove_pin_ranges() which are outside #ifdef CONFIG_GPIOLIB.
-> Thus, we see the following warning when building blackfin image, where
-> GPIOLIB is not required.
+> Some architectures (e.g. blackfin) provide gpio API without requiring
+> GPIOLIB support (ARCH_WANT_OPTIONAL_GPIOLIB).  devm_gpio_* functions
+> should also work for these architectures, since they do not really
+> depend on GPIOLIB.
 >
->   CC      arch/blackfin/kernel/bfin_gpio.o
->   CC      init/version.o
-> In file included from arch/blackfin/include/asm/gpio.h:321,
->                  from arch/blackfin/kernel/bfin_gpio.c:15:
-> include/asm-generic/gpio.h:298: warning: 'struct gpio_chip' declared inside parameter list
-> include/asm-generic/gpio.h:298: warning: its scope is only this definition or declaration, which is probably not what you want
-> include/asm-generic/gpio.h:304: warning: 'struct gpio_chip' declared inside parameter list
->
-> Move pinctrl trunk into #ifdef CONFIG_GPIOLIB to fix the warning,
-> since it appears that pinctrl gpio range support depends on GPIOLIB.
+> Add a new option GPIO_DEVRES (enabled by default) to control the build
+> of devres.c, and move devm_gpio_* function declarations out from #ifdef
+> CONFIG_GPIOLIB in include/asm-generic/gpio.h, so that they can be
+> available to client drivers without unnecessary dependency on GPIOLIB.
 >
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Thanks, patch applied to devel (for-next)
-
-Let's see if something explodes!
+Patch applied, thanks!
 
 Yours,
 Linus Walleij
