@@ -1,84 +1,38 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 17 Jan 2013 13:00:13 +0100
-Subject: [PATCH] ARM: shmobile: sh73a0: Use generic irqchip_init()
-Message-ID: <1358424013-31306-1-git-send-email-thierry.reding@avionic-design.de>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Thu, 17 Jan 2013 22:02:06 +1000
+Subject: [PATCH 0/4] gpio: introduce descriptor-based interface
+In-Reply-To: <CACRpkda6dqAj+DzrMCnKET7Z9PtuW0+k9ea3YDL8Z1D=oFVRpQ@mail.gmail.com>
+References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
+ <201301091046.13020.arnd@arndb.de> <2270940.DTxEYMZtED@percival>
+ <201301101008.45091.arnd@arndb.de>
+ <CACRpkda6dqAj+DzrMCnKET7Z9PtuW0+k9ea3YDL8Z1D=oFVRpQ@mail.gmail.com>
+Message-ID: <50F7E83E.8000105@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The asm/hardware/gic.h header does no longer exist and the corresponding
-functionality was moved to linux/irqchip.h and linux/irqchip/arm-gic.h
-respectively. gic_handle_irq() and of_irq_init() are no longer available
-either and have been replaced by irqchip_init().
+Hi Linus,
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
----
- arch/arm/mach-shmobile/board-kzm9g-reference.c | 1 -
- arch/arm/mach-shmobile/intc-sh73a0.c           | 9 ++-------
- arch/arm/mach-shmobile/setup-sh73a0.c          | 2 --
- 3 files changed, 2 insertions(+), 10 deletions(-)
+(My gerg at snapgear.com email no longer gets to me, gerg at uclinux.org is
+the best direct email for me now).
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index 04e9ae5..08c95dd 100644
---- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -90,7 +90,6 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
- 	.init_early	= sh73a0_add_early_devices_dt,
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= sh73a0_init_irq_dt,
--	.handle_irq	= gic_handle_irq,
- 	.init_machine	= kzm_init,
- 	.init_late	= shmobile_init_late,
- 	.init_time	= shmobile_timer_init,
-diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
-index fc7c8da..91faba6 100644
---- a/arch/arm/mach-shmobile/intc-sh73a0.c
-+++ b/arch/arm/mach-shmobile/intc-sh73a0.c
-@@ -21,9 +21,9 @@
- #include <linux/interrupt.h>
- #include <linux/module.h>
- #include <linux/irq.h>
--#include <linux/of_irq.h>
- #include <linux/io.h>
- #include <linux/sh_intc.h>
-+#include <linux/irqchip.h>
- #include <linux/irqchip/arm-gic.h>
- #include <mach/intc.h>
- #include <mach/irqs.h>
-@@ -462,14 +462,9 @@ void __init sh73a0_init_irq(void)
- }
- 
- #ifdef CONFIG_OF
--static const struct of_device_id irq_of_match[] __initconst = {
--	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
--	{ },
--};
--
- void __init sh73a0_init_irq_dt(void)
- {
--	of_irq_init(irq_of_match);
-+	irqchip_init();
- 	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
- }
- #endif
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index abf1eb0..2ecd668 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -36,7 +36,6 @@
- #include <mach/irqs.h>
- #include <mach/sh73a0.h>
- #include <mach/common.h>
--#include <asm/hardware/gic.h>
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
-@@ -892,7 +891,6 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
- 	.init_early	= sh73a0_add_early_devices_dt,
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= sh73a0_init_irq_dt,
--	.handle_irq	= gic_handle_irq,
- 	.init_machine	= sh73a0_add_standard_devices_dt,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= sh73a0_boards_compat_dt,
--- 
-1.8.1.1
+On 01/17/2013 09:15 PM, Linus Walleij wrote:
+> On Thu, Jan 10, 2013 at 11:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+>> I've tried to find platforms that don't yet use GPIOLIB and fortunately
+>> there are very few left:
+>>
+>> I found two that provide the generic gpio interfaces when gpiolib
+>> is disabled, but use gpiolib otherwise for the same hardware,
+>> arch/m68k/include/asm/mcfgpio.h and arch/blackfin/include/asm/gpio.h.
+>> I would assume that we can simply remove the non-gpiolib shortcut
+>> here at cost of a small overhead.
+> 
+> Geert/Greg: interested in looking into this issue?
+> 
+> The GPIO maintainers want to get rid of non-gpiolib platforms.
+
+Steven King did most of the ColdFire GPIO work (CC'ed on this).
+Steven: are you happy to drop the non-gpiolib support?
+
+Regards
+Greg
