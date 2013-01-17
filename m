@@ -1,26 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 16 Jan 2013 16:36:51 -0800
-Subject: [GIT PULL] Samsung fixes-3 for v3.8
-In-Reply-To: <0c1201cdf44a$8e44c040$aace40c0$@samsung.com>
-References: <0c0301cdf447$109e7d50$31db77f0$@samsung.com>
- <CAOesGMiRSUbsnP2cCC=Ur9zL1CG9HGT0AQZ_fMktL+QAUmiDzA@mail.gmail.com>
- <0c1201cdf44a$8e44c040$aace40c0$@samsung.com>
-Message-ID: <CAOesGMh=r8T+EUts0n3t+SgYob=9MrXHbJWSmexrOzGq0OpUSw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Jan 2013 01:59:52 +0100
+Subject: [PATCH v2] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <50F6E811.2040606@wwwdotorg.org>
+References: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
+ <50EF27B4.60608@wwwdotorg.org>
+ <CACRpkdZ0b=ZohgaBH3qPH_O5TiWmXJXs6872D+YPVA9g4BssYg@mail.gmail.com>
+ <9702060.jEbHySsCv0@avalon>
+ <CACRpkdbFH6RCEEnXO=A9FVa0B5rtE9RkjXz9Hhy+w7NvwcBCgg@mail.gmail.com>
+ <50F6E811.2040606@wwwdotorg.org>
+Message-ID: <CACRpkdbnyzppd-iom4PL3N3-YkuK+BRNzR577qVc6cPoTKxhTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 4:35 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > Sachin Kamat (2):
->> >       ARM: S3C24XX: Fix warnings in irq-s3c2416.c
->> >       ARM: S3C24XX: Make 'clk_msysclk' static
->>
->> Those two are sparse fixes, please queue for 3.9 instead.
->>
-> Agreed, it's not critical. I did. Can you pull same branch?
+On Wed, Jan 16, 2013 at 6:49 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+
+> Hmm. It's causing a lot of engineers here a lot of trouble, since they
+> all see linux-next won't boot, and haven't been paying enough attention
+> to know which commit to revert:-(. Lots of lost productivity:-(
 >
-> If you want new branch for this, let me know.
+> Simon, the offending commit:
+>
+> 6d3ef6b drivers/pinctrl: grab default handles from device core
+>
+> is still in next-20130116. Can you please remove it?
 
-Same branch is fine, will pull tonight.
+Not that this should be in the SH tree, but I have merged your fix
+to the pinctrl tree and it should be in -next, does it fix the problem?
 
+Mainly asking because once Greg ACKs that patch I want to
+put it into the pinctrl tree...
 
--Olof
+Yours,
+Linus Walleij
