@@ -1,30 +1,78 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 17 Jan 2013 14:12:25 +0200
-Subject: [PATCH v2 0/3] at91: PMECC: enable PMECC in dt for
- at91sam9x5ek, at91sam9n12ek
-In-Reply-To: <1358393072-14794-1-git-send-email-josh.wu@atmel.com>
-References: <1358393072-14794-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1358424745.2731.238.camel@sauron.fi.intel.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Thu, 17 Jan 2013 17:41:53 +0530
+Subject: [RFC PATCH 2/6] ARM: OMAP: USB: Add phy binding information
+In-Reply-To: <1358348462-27693-3-git-send-email-kishon@ti.com>
+References: <1358348462-27693-1-git-send-email-kishon@ti.com>
+ <1358348462-27693-3-git-send-email-kishon@ti.com>
+Message-ID: <CAFp+6iGEC9KgfuQz6nqnAY5JrmtPG=HkGw5yjKw7-1=8AG_=dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-01-17 at 11:24 +0800, Josh Wu wrote:
-> Those patches will enable PMECC in dt parameters for at91sam9x5ek, at91sam9n12ek.
-> The driver will check minimum required ecc on ONFI parameter from NAND flash. 
-> If pmecc-cap in dts doesn't meet the requirement then driver reports a error.
-> 
-> v2: rebase to v3.8-rc3. And wrapped the commit message.
+Hi Kishon,
 
-Please, whenever you know your patch-set depends on something which is
-not yet in Linuse's tree, _always_ explicitly say about this.
+
+On Wed, Jan 16, 2013 at 8:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> This is in preparation for the changes in PHY library to support adding
+> and getting multiple PHYs of the same type. In the new design, the
+> binding information between the PHY and the USB controller should be
+> specified in the platform specific initialization code. So it's been
+> done for OMAP platforms here.
+>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+> This kind-of binding should be done in all the platforms (I've done only
+> for OMAP platform).
+>  arch/arm/mach-omap2/usb-musb.c |    7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+> index 9d27e3f..bbe2fa5 100644
+> --- a/arch/arm/mach-omap2/usb-musb.c
+> +++ b/arch/arm/mach-omap2/usb-musb.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/io.h>
+>  #include <linux/usb/musb.h>
+> +#include <linux/usb/phy.h>
+>
+>  #include "omap_device.h"
+>  #include "soc.h"
+> @@ -85,8 +86,12 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
+>         musb_plat.mode = board_data->mode;
+>         musb_plat.extvbus = board_data->extvbus;
+>
+> -       if (cpu_is_omap44xx())
+> +       if (cpu_is_omap44xx()) {
+>                 musb_plat.has_mailbox = true;
+> +               usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
+> +       } else if (cpu_is_omap34xx()) {
+> +               usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> +       }
+
+Just trying to understand things here.
+Is the device name we are using here the platform device name (pdev->name) ?
+If i am not wrong then for devices added through device tree
+the device name would actually include the device address in the string,
+wouldn't that make things somewhat weird, since we will have to add
+such bindings
+using this address string.
+
+one more doubt please :)
+is it possible to bind phy in the controllers' driver somehow ?
+
+>
+>         if (soc_is_am35xx()) {
+>                 oh_name = "am35x_otg_hs";
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
 
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/92f99152/attachment.sig>
+Thanks & Regards
+Vivek
