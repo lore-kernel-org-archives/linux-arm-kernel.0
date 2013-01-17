@@ -1,31 +1,36 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 17 Jan 2013 12:13:25 -0200
-Subject: [PATCH] ARM: dts: imx6q: Remove silicon version from SDMA firmware
-Message-ID: <1358432005-17990-1-git-send-email-fabio.estevam@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 17 Jan 2013 22:18:13 +0800
+Subject: [PATCH] ARM: remove unnecessary 'select GENERIC_GPIO'
+In-Reply-To: <CACRpkdYw6V_GGjBsj_bzzkmFVTamuMq2oMwYDKhjMrXeS5j+fQ@mail.gmail.com>
+References: <1358255616-3171-1-git-send-email-shawn.guo@linaro.org>
+ <CACRpkdYw6V_GGjBsj_bzzkmFVTamuMq2oMwYDKhjMrXeS5j+fQ@mail.gmail.com>
+Message-ID: <20130117141810.GC29285@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove silicon version from SDMA firmware.
+On Thu, Jan 17, 2013 at 02:36:00PM +0100, Linus Walleij wrote:
+> On Tue, Jan 15, 2013 at 2:13 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> 
+> > The only use of GENERIC_GPIO (defined by architecture) in GPIO subsystem
+> > is being selected by GPIOLIB.  Also there are no any use of the option
+> > at architecture level. Only two sub-architectures shmobile and orion
+> > really use the option as below.
+> >
+> >   arch/arm/mach-shmobile/Makefile:obj-$(CONFIG_GENERIC_GPIO)      += $(pfc-y)
+> >   arch/arm/plat-orion/Makefile:orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
+> >
+> > Remove all those unnecessary sub-architecture level selection of
+> > GENERIC_GPIO, which are there only for confusing people.
+> >
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+Thanks, Linus.
 
-This makes it consistent with other i.MX SoCs firmware names.
+Arnd, Olof,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6q.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Can you please take a look at the patch, and apply it as a cleanup
+if it looks good to you?
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index d6265ca..1acf41a 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -797,7 +797,7 @@
- 				interrupts = <0 2 0x04>;
- 				clocks = <&clks 155>, <&clks 155>;
- 				clock-names = "ipg", "ahb";
--				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q-to1.bin";
-+				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
- 			};
- 		};
- 
--- 
-1.7.9.5
+Shawn
