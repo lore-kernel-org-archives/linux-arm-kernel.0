@@ -1,41 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Jan 2013 22:13:59 +0800
-Subject: [PATCH 1/2] gpio: fix warning of 'struct gpio_chip' declaration
-In-Reply-To: <CACRpkdaKhLcS9p9JOhViCkUcMVH1ByBR3v5A4+wOJnQUcuQrVg@mail.gmail.com>
-References: <1358239056-703-1-git-send-email-shawn.guo@linaro.org>
- <1358239056-703-2-git-send-email-shawn.guo@linaro.org>
- <CACRpkdaKhLcS9p9JOhViCkUcMVH1ByBR3v5A4+wOJnQUcuQrVg@mail.gmail.com>
-Message-ID: <20130117141355.GB29285@S2101-09.ap.freescale.net>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 17 Jan 2013 12:13:25 -0200
+Subject: [PATCH] ARM: dts: imx6q: Remove silicon version from SDMA firmware
+Message-ID: <1358432005-17990-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 02:30:01PM +0100, Linus Walleij wrote:
-> Shawn can you please try to repost this with something that does not
-> turn into quoted-printable? Look:
-> 
-Sorry for that.  Just resent it.
+Remove silicon version from SDMA firmware.
 
-> MIME-Version: 1.0
-> Content-Type: text/plain; charset="UTF-8"
-> Content-Transfer-Encoding: quoted-printable
-> (...)
-> @@ -212,6 +212,43 @@ extern void gpio_unexport(unsigned gpio);
-> =20
->  #endif	/* CONFIG_GPIO_SYSFS */
-> =20
-> +#ifdef CONFIG_PINCTRL
-> 
-> I can't apply that.
-> 
-> Second: if this is not an immediate regression I'd prefer to put it
-> for-next now, as touching this file always brings down something.
-> 
-> OK?
-> 
-The warning the first patch tries to fix seems new to v3.8-rc, while
-the second patch is definitely fine for -next.
+This makes it consistent with other i.MX SoCs firmware names.
 
-Since I do not care much about the warning seen on blackfin, I'm fine
-with both of them being for -next.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6q.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Shawn
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index d6265ca..1acf41a 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -797,7 +797,7 @@
+ 				interrupts = <0 2 0x04>;
+ 				clocks = <&clks 155>, <&clks 155>;
+ 				clock-names = "ipg", "ahb";
+-				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q-to1.bin";
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
+ 			};
+ 		};
+ 
+-- 
+1.7.9.5
