@@ -1,49 +1,49 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 17 Jan 2013 13:30:19 +0200
-Subject: [PATCH v7 10/22] mfd: omap_usb_host: Avoid missing platform data
- checks in suspend/resume
+Date: Thu, 17 Jan 2013 13:30:27 +0200
+Subject: [PATCH v7 18/22] USB: ehci-omap: Don't free gpios that we didn't
+ request
 In-Reply-To: <1358422231-24736-1-git-send-email-rogerq@ti.com>
 References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
-Message-ID: <1358422231-24736-11-git-send-email-rogerq@ti.com>
+Message-ID: <1358422231-24736-19-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of the unnecessary missing platform data checks
-in runtime_suspend/resume. We are already checking for missing
-platform data in probe.
+This driver does not request any gpios so don't free them.
+Fixes L3 bus error on multiple modprobe/rmmod of ehci_hcd
+with ehci-omap in use.
+
+CC: Alan Stern <stern@rowland.harvard.edu>
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/mfd/omap-usb-host.c |   10 ----------
- 1 files changed, 0 insertions(+), 10 deletions(-)
+ drivers/usb/host/ehci-omap.c |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index d6e6b8c..061366d 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -277,11 +277,6 @@ static int usbhs_runtime_resume(struct device *dev)
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index 134c789..b96a4bf 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -288,7 +288,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ {
+ 	struct device *dev				= &pdev->dev;
+ 	struct usb_hcd *hcd				= dev_get_drvdata(dev);
+-	struct usbhs_omap_platform_data *pdata		= dev->platform_data;
  
- 	dev_dbg(dev, "usbhs_runtime_resume\n");
+ 	usb_remove_hcd(hcd);
+ 	disable_put_regulator(dev->platform_data);
+@@ -298,13 +297,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ 	pm_runtime_put_sync(dev);
+ 	pm_runtime_disable(dev);
  
--	if (!pdata) {
--		dev_dbg(dev, "missing platform_data\n");
--		return  -ENODEV;
--	}
+-	if (pdata->phy_reset) {
+-		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+-			gpio_free(pdata->reset_gpio_port[0]);
 -
- 	omap_tll_enable();
- 	spin_lock_irqsave(&omap->lock, flags);
- 
-@@ -309,11 +304,6 @@ static int usbhs_runtime_suspend(struct device *dev)
- 
- 	dev_dbg(dev, "usbhs_runtime_suspend\n");
- 
--	if (!pdata) {
--		dev_dbg(dev, "missing platform_data\n");
--		return  -ENODEV;
+-		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+-			gpio_free(pdata->reset_gpio_port[1]);
 -	}
--
- 	spin_lock_irqsave(&omap->lock, flags);
+ 	return 0;
+ }
  
- 	if (is_ehci_tll_mode(pdata->port_mode[0]))
 -- 
 1.7.4.1
