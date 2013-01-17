@@ -1,62 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 Jan 2013 13:57:32 -0700
-Subject: [PATCH 2/2] ARM: DT: tegra: Add Toradex Iris carrier board with
- T20 512MB COM
-In-Reply-To: <1358423961-24318-2-git-send-email-dev@lynxeye.de>
-References: <1358423961-24318-1-git-send-email-dev@lynxeye.de>
- <1358423961-24318-2-git-send-email-dev@lynxeye.de>
-Message-ID: <50F865BC.5050900@wwwdotorg.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Jan 2013 23:00:34 +0200
+Subject: [PATCH v7 19/22] ARM: OMAP3: clock data: get rid of unused USB
+ host clock aliases and dummies
+In-Reply-To: <alpine.DEB.2.00.1301171854280.14118@utopia.booyaka.com>
+References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
+ <1358422231-24736-20-git-send-email-rogerq@ti.com>
+ <20130117170321.GJ14149@atomide.com>
+ <alpine.DEB.2.00.1301171854280.14118@utopia.booyaka.com>
+Message-ID: <20130117210034.GA27671@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2013 04:59 AM, Lucas Stach wrote:
-> This adds the device tree for the Toradex Iris carrier board used
-> together with a Colibri T20 512MB COM.
+Hi,
 
-> diff --git a/arch/arm/boot/dts/tegra20-iris-512.dts b/arch/arm/boot/dts/tegra20-iris-512.dts
+On Thu, Jan 17, 2013 at 07:00:00PM +0000, Paul Walmsley wrote:
+> Hi Roger,
+> 
+> On Thu, 17 Jan 2013, Tony Lindgren wrote:
+> 
+> > * Roger Quadros <rogerq@ti.com> [130117 03:34]:
+> > > We don't need multiple aliases for the OMAP USB host clocks and neither
+> > > the dummy clocks so remove them.
+> > 
+> > It's best that Paul queues this and the next patch as these clock alias
+> > clean-up patches can be done separately. That way the dependency between
+> > arch/arm/*omap* code is cut away as these files should be moved to live
+> > under drivers/clk/omap.
+> 
+> Per Tony's request, I'll queue these two cleanup patches for 3.10 -- or 
+> whatever Linus will call it.
 
-> +	board_regulators {
+do you mean v3.9 ?
 
-Similarly, name that node just regulators
-
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-
-Those properties will then already exist, so no need to duplicate them here.
-
-> +		usb_host_vbus {
-
-That would be regulator at 3
-
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-
-That reg = <3>;
-
-(or start numbering the board entries at say 100 to leave room for
-changes in the COM include file)
-
-> +			regulator-name = "usb_host_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +			gpio = <&gpio 178 0>;
-> +		};
-> +
-> +		vcc_sd_reg: regulator at 3 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-
-And the node name and reg property here would be 4.
-
-> +			regulator-name = "vcc_sd";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +		};
-> +	};
-> +};
-
-Oh and in patch 1, I noticed spaces after < or before >; could you
-remove those while you're at it. Thanks.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/6f1fd568/attachment.sig>
