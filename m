@@ -1,83 +1,25 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Thu, 17 Jan 2013 23:28:41 +0100
-Subject: [PATCH 1/2] ARM: DT: tegra: Add Colibri T20 512MB COM
-In-Reply-To: <50F877A3.5030107@wwwdotorg.org>
-References: <1358423961-24318-1-git-send-email-dev@lynxeye.de>
- <50F86533.9010000@wwwdotorg.org> <1358458144.18489.14.camel@tellur>
- <50F877A3.5030107@wwwdotorg.org>
-Message-ID: <1358461721.18489.23.camel@tellur>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 17 Jan 2013 22:29:52 +0000 (UTC)
+Subject: [PATCH v7 19/22] ARM: OMAP3: clock data: get rid of unused USB
+ host clock aliases and dummies
+In-Reply-To: <20130117210034.GA27671@arwen.pp.htv.fi>
+References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
+ <1358422231-24736-20-git-send-email-rogerq@ti.com>
+ <20130117170321.GJ14149@atomide.com>
+ <alpine.DEB.2.00.1301171854280.14118@utopia.booyaka.com>
+ <20130117210034.GA27671@arwen.pp.htv.fi>
+Message-ID: <alpine.DEB.2.00.1301172228140.14118@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 17.01.2013, 15:13 -0700 schrieb Stephen Warren:
-> On 01/17/2013 02:29 PM, Lucas Stach wrote:
-> > Am Donnerstag, den 17.01.2013, 13:55 -0700 schrieb Stephen Warren:
-> >> On 01/17/2013 04:59 AM, Lucas Stach wrote:
-> >>> This adds the device tree include file for the Toradex Colibri T20
-> >>> Computer on Module (COM). It's only valid for the 512MB RAM version of
-> >>> the module, as the 256MB version needs different EMC tables and flash
-> >>> configuration. To make this clear the suffix -512 was added to the board
-> >>> compatible string.
-> >>>
-> >>> The Colibri T20 uses a Tegra2 SoC and has onboard USB Ethernet and AC97
-> >>> sound.
-> >>>
-> >>> Still some things like onboard NAND support missing, but should be a
-> >>> good base for further development.
-> >>> +
-> >>> +	sdhci at c8000600 {
-> >>> +		cd-gpios = <&gpio 23 0>; /* gpio PC7 */
-> >>> +		vmmc-supply = <&ldo5_reg>;
-> >>> +		vqmmc-supply = <&vcc_sd_reg>;
-> >>> +	};
-> >>
-> >> I assume that all of those nodes are meant to have status="okay"?
-> >>
-> >> Oh, I see those are in the top-level board .dts file. You may as well
-> >> put all the properties there; stuff like the GPIOs and regulators at
-> >> least would be purely specific to the individual board, and not the COM.
-> >
-> > I would like to keep everything that is defined by the COM to reside in
-> > the COM dtsi. You are right that the regulator in this case is board
-> > specific and should be moved to the board file, I missed this while
-> > splitting things out. But at least the GPIO is defined by the fixed COM
-> > pinout.
-> 
-> If these are really defined by the COM itself, it does indeed make sense
-> for the COM .dtsi file to define those properties. But, I have a hard
-> time understanding how the COM design can force the carrier module into
-> using a particular GPIO for the SD controller CD functionality; couldn't
-> the carrier use any GPIO passed through the COM<->carrier connector for
-> any purpose?
-> 
-It's not a GPIO anymore as soon as it hits the COM<->carrier connector.
-The connector pin assignment is strictly specified. There are a lot of
-freely assignable GPIOs on the connector, everything related to a
-specific function is not part of this.
+On Thu, 17 Jan 2013, Felipe Balbi wrote:
 
-The Colibri specification dictates which pin to use if you want to
-realize a SDcard CD. This is done so that modules and carrier boards are
-interchangeable. In fact you can just as well run a new Colibri T30
-module on a years old carrier designed for the ColibriPXA series of
-modules.
+> do you mean v3.9 ?
 
-> >>> +	com_regulators {
-> >>
-> >> I think just call that "regulators"; the final board .dts file can
-> >> easily add more sub-nodes to this node, so there's no need to try and
-> >> avoid any naming conflict here. See Cardhu as an example.
-> >
-> > I don't really see the benefit of merging those nodes. They are separate
-> > regulators, some are located on the COM, others on the carrier board. So
-> > I would like to keep them in separate nodes, unless you have strong
-> > feelings to change this.
-> 
-> The issue here is that if we don't do this, we end up with wierd node
-> names; plain "regulators" is a fairly canonical name for what the name
-> contains, and purely indicates the type of the node. "com_regulators" is
-> unusual, and starts to encode identity into the node name itself, which
-> is something not usually done in the node name (differentiation between
-> identities is usually done using the unit address; "@nnn"),
+It sounds like the other patches need to be merged first before these 
+cleanups can be merged.  So rather than adding a merge order dependency 
+during 3.9, it seems best to queue the non-essential clock cleanup side 
+for 3.10.
 
-Hm, ok. Keeping some space in between module and carrier regulator
-addresses should do as well.
+
+- Paul
