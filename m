@@ -1,42 +1,80 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Jan 2013 09:45:29 -0800
-Subject: [PATCH] am33xx: cpsw: default to ethernet hwaddr from efuse if
- not defined in dt
-In-Reply-To: <87a9s7lq09.fsf@dell.be.48ers.dk>
-References: <1358370073-32545-1-git-send-email-jacmet@sunsite.dk>
- <loom.20130117T105358-639@post.gmane.org>
- <87a9s7lq09.fsf@dell.be.48ers.dk>
-Message-ID: <20130117174528.GM14149@atomide.com>
+From: rtivy@ti.com (Tivy, Robert)
+Date: Thu, 17 Jan 2013 17:46:45 +0000
+Subject: [PATCH v5 5/9] ARM: davinci: New reset functionality/API
+ provided for Davinci DSP
+In-Reply-To: <50F7E17C.1040607@ti.com>
+References: <1357863807-380-1-git-send-email-rtivy@ti.com>
+ <1357863807-380-6-git-send-email-rtivy@ti.com> <50F7E17C.1040607@ti.com>
+Message-ID: <13514BD7FAEBA745BBD7D8A672905C1431205783@DFLE08.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Korsgaard <jacmet@sunsite.dk> [130117 08:46]:
-> >>>>> "Michal" == Michal Bachraty <michal.bachraty@gmail.com> writes:
-> 
-> Hi Michael,
-> 
->  Michal> I made changes to cpsw driver two weeks ago, which add support
->  Michal> for reading MAC address from CPU and also I posted it to
->  Michal> review.  You can find patch here :
->  Michal> https://patchwork.kernel.org/patch/1966481/ I will create
->  Michal> updated patch next week, depended on reactions. Can you try
->  Michal> that patch? I'll be glad to hear your opinion.
-> 
-> Thanks, I missed that patch. Functionality wise the patches do the same,
-> but I must say I find my patch cleaner, as it doesn't involve any new dt
-> bindings or access to the am33xx specific control module registers from
-> the cpsw driver.
-> 
-> The way I've handled it is similar to how it is done on atleast one
-> other arm subarchicture, see
-> arch/arm/mach-mxs/mach-mxs.c::update_fec_mac_prop()
-
-Cool this seems like the cleanest way to deal with it so far. Can
-you please resend with also linux-net and DT list Cc:d too?
-
-Also the arch_initcall should be omap_arch_initcall in linux next
-for consistency if we ever have SoC specific sections for those.
+Thankyou for all your help Sekhar.  I'm fine with your fixups (both commentary and code naming).
 
 Regards,
 
-Tony
+- Rob
+
+> -----Original Message-----
+> From: Nori, Sekhar
+> Sent: Thursday, January 17, 2013 3:33 AM
+> To: Tivy, Robert
+> Cc: davinci-linux-open-source at linux.davincidsp.com; linux-arm-
+> kernel at lists.infradead.org; Ring, Chris; Grosen, Mark; ohad at wizery.com;
+> rob at landley.net; linux-doc at vger.kernel.org
+> Subject: Re: [PATCH v5 5/9] ARM: davinci: New reset functionality/API
+> provided for Davinci DSP
+> 
+> On 1/11/2013 5:53 AM, Robert Tivy wrote:
+> > Since there is no general "reset" support for SoC devices, and since
+> the
+> > remoteproc driver needs explicit control of the DSP's reset line, a
+> new
+> > Davinci-specific API is added.
+> >
+> > This private API will disappear with DT migration.  Some discussion
+> > regarding a proposed DT "reset" binding is here:
+> > https://patchwork.kernel.org/patch/1635051/
+> >
+> > Modified davinci_clk_init() to set clk "reset" function for clocks
+> > that indicate PSC_LRST support.  Also fixed indentation issue with
+> > function opening curly brace.
+> >
+> > Signed-off-by: Robert Tivy <rtivy@ti.com>
+> 
+> I applied this patch for v3.9. The subject seemed too long with
+> repeated
+> references to davinci so I shortened it to:
+> 
+> ARM: davinci: psc: introduce reset API
+> 
+> > --- a/arch/arm/mach-davinci/include/mach/psc.h
+> > +++ b/arch/arm/mach-davinci/include/mach/psc.h
+> > @@ -246,6 +246,7 @@
+> >
+> >  #define MDSTAT_STATE_MASK	0x3f
+> >  #define PDSTAT_STATE_MASK	0x1f
+> > +#define MDCTL_LRST		BIT(8)
+> >  #define MDCTL_FORCE		BIT(31)
+> >  #define PDCTL_NEXT		BIT(0)
+> >  #define PDCTL_EPCGOOD		BIT(8)
+> > @@ -253,6 +254,8 @@
+> >  #ifndef __ASSEMBLER__
+> >
+> >  extern int davinci_psc_is_clk_active(unsigned int ctlr, unsigned int
+> id);
+> > +extern void davinci_psc_reset_config(unsigned int ctlr, unsigned int
+> id,
+> > +		bool reset);
+> 
+> I felt the word 'config' in the name is not really required since the
+> functionality is fixed (as opposed to the davinci_psc_config() function
+> which could do multiple configurations)
+> 
+> I updated the function name to davinci_psc_reset() when I committed the
+> patch locally.
+> 
+> Hope that's okay with you.
+> 
+> Thanks,
+> Sekhar
