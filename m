@@ -1,39 +1,62 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Jan 2013 17:55:31 +0000
-Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
- management
-In-Reply-To: <alpine.LFD.2.02.1301161614390.6300@xanadu.home>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <1358157392.19304.243.camel@jlo-ubuntu-64.nvidia.com>
- <alpine.LFD.2.02.1301140849020.6300@xanadu.home>
- <1358217848.8513.14.camel@jlo-ubuntu-64.nvidia.com>
- <alpine.LFD.2.02.1301151140550.6300@xanadu.home>
- <20130116160242.GB31318@arm.com>
- <alpine.LFD.2.02.1301161614390.6300@xanadu.home>
-Message-ID: <20130117175531.GD5737@arm.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Thu, 17 Jan 2013 19:57:36 +0200
+Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport
+ power functions
+In-Reply-To: <20130117173131.GL14149@atomide.com>
+References: <1358372702-13102-1-git-send-email-coelho@ti.com>
+ <50F7C4A7.5060202@ti.com> <20130117093417.GH10814@arwen.pp.htv.fi>
+ <50F7CA82.4050509@ti.com> <20130117100510.GI10814@arwen.pp.htv.fi>
+ <20130117100919.GJ10814@arwen.pp.htv.fi>
+ <1358418917.6252.31.camel@cumari.coelho.fi> <50F7D535.6030205@ti.com>
+ <20130117173131.GL14149@atomide.com>
+Message-ID: <1358445456.6252.64.camel@cumari.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 09:18:39PM +0000, Nicolas Pitre wrote:
-> On Wed, 16 Jan 2013, Catalin Marinas wrote:
-> 
-> > On Tue, Jan 15, 2013 at 04:44:23PM +0000, Nicolas Pitre wrote:
-> > > On Tue, 15 Jan 2013, Joseph Lo wrote:
-> > > > So do you have a plan to make it become a generic framework in this
-> > > > series or later work?
+Hi Tony,
+
+On Thu, 2013-01-17 at 09:31 -0800, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [130117 02:44]:
+> > On 01/17/2013 11:35 AM, Luciano Coelho wrote:
+> > > This out-of-tree code doesn't explain why we need to do the
+> > > enable/disable in the board file.  We just need to do things a bit
+> > > differently in the driver.  I'll start cleaning all this stuff up for
+> > > -next pretty soon.
 > > > 
-> > > It is already generic, except for the name.  In other words, you could 
-> > > start using this code already.
-> > > 
-> > > I'm still debating a good substitute for the bL_ prefix in this series 
-> > > to give it the appearance of generic code.
+> > > For now, ie. 3.7 (stable) and 3.8, do we agree in taking this patch so
+> > > that TI-ST at least works on Panda? Simply reverting the gpio removal
+> > > patch doesn't help, because we also need to handle the UART2 muxing
+> > > (which my patch does as well).
 > > 
-> > mc_?
+> > I don't see better way to fix this either. In any case, I give you my:
+> > 
+> > Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > 
-> Bah.   :-/
+> So what is actually broken? The horrible bluetooth muxing over serial
+> port? If so, let's rather fix it properly than even attempt to fix
+> it as it seems that it's been broken for two merge windows now.
 
-Like in multi-cluster (not "Hammer time" ;). But if they are not even
-cluster dependent, a simple mp_ would also do.
+Yes, it is the horrible Bluetooth muxing over serial that is broken.  It
+has been broken for two merge windows, because nobody seemed to care
+until I started looking into it and tried to figure out how to get it to
+work. :)
 
--- 
-Catalin
+The implementation is really weak and there are loads of things I want
+to start fixing/cleaning up.  This patch was just my intention to start
+with a relatively clean table (ie. horrible or not, at least working).
+
+
+> Also, let's just do absolutely minimal board-*.c file fixes now.
+> This thing should be just moved to use DT so we can flip over omap4
+> to be DT only and drop estimated 5k LOC from mach-omap2.
+
+I totally agree, I'll start looking into that next.
+
+But this patch is pretty small and simple, so why not include it to at
+least fix the breakage in 3.7 and 3.8? Whether you take it or not now
+won't make any difference in the 5k LOC in these kernel versions.
+
+
+--
+Cheers,
+Luca.
