@@ -1,33 +1,29 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Jan 2013 13:45:22 +0200
-Subject: [PATCH v7 15/22] mfd: omap-usb-host: Manage HSIC clocks for HSIC
- mode
-In-Reply-To: <1358422231-24736-16-git-send-email-rogerq@ti.com>
-References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
- <1358422231-24736-16-git-send-email-rogerq@ti.com>
-Message-ID: <20130117114522.GF18978@arwen.pp.htv.fi>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 17 Jan 2013 13:47:28 +0200
+Subject: [PATCH 1/3] mtd: omap-onenand: pass device_node in platform data
+In-Reply-To: <CALF0-+Xpvn45ZXOawyFzkqMt5t7--CLZYhkr6RwRX7WWnqdnqw@mail.gmail.com>
+References: <1356307280-8323-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <CALF0-+Xpvn45ZXOawyFzkqMt5t7--CLZYhkr6RwRX7WWnqdnqw@mail.gmail.com>
+Message-ID: <1358423248.2731.230.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 2013-01-15 at 19:48 -0300, Ezequiel Garcia wrote:
+> I saw you have acked the gpmc patch on nand.
+> Can I add your Acked-by on this one, when I send the rebased patch set?
 
-On Thu, Jan 17, 2013 at 01:30:24PM +0200, Roger Quadros wrote:
-> @@ -598,6 +639,24 @@ static int usbhs_omap_probe(struct platform_device *pdev)
->  				clkname, PTR_ERR(pclk));
->  		else
->  			omap->utmi_clk[i] = pclk;
-> +
-> +		snprintf(clkname, sizeof(clkname),
-> +				"usb_host_hs_hsic480m_p%d_clk", i + 1);
+Yes, I saw this series which depends on Daniel Mack's work. It looks
+good. You can add
 
-do we really need to know the exact clock node name ?
+Acked-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
 
 -- 
-balbi
+Best Regards,
+Artem Bityutskiy
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/921dd41d/attachment.sig>
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/37845a66/attachment.sig>
