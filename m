@@ -1,28 +1,40 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 17 Jan 2013 11:40:53 +0100
-Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport power
- functions
-In-Reply-To: <1358418917.6252.31.camel@cumari.coelho.fi>
-References: <1358372702-13102-1-git-send-email-coelho@ti.com>
- <50F7C4A7.5060202@ti.com> <20130117093417.GH10814@arwen.pp.htv.fi>
- <50F7CA82.4050509@ti.com> <20130117100510.GI10814@arwen.pp.htv.fi>
- <20130117100919.GJ10814@arwen.pp.htv.fi>
- <1358418917.6252.31.camel@cumari.coelho.fi>
-Message-ID: <50F7D535.6030205@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Jan 2013 10:37:42 +0000
+Subject: [PATCH v2 1/1] block: blk-merge: don't merge the pages with
+ non-contiguous descriptors
+In-Reply-To: <1358413880.2394.7.camel@dabdike.int.hansenpartnership.com>
+References: <1358265681-25671-1-git-send-email-subhashj@codeaurora.org>
+ <1358266794.10591.8.camel@dabdike.int.hansenpartnership.com>
+ <50F64AC1.3040304@codeaurora.org>
+ <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
+ <20130116231857.GU2668@htj.dyndns.org>
+ <1358413880.2394.7.camel@dabdike.int.hansenpartnership.com>
+Message-ID: <20130117103742.GX23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2013 11:35 AM, Luciano Coelho wrote:
-> This out-of-tree code doesn't explain why we need to do the
-> enable/disable in the board file.  We just need to do things a bit
-> differently in the driver.  I'll start cleaning all this stuff up for
-> -next pretty soon.
+On Thu, Jan 17, 2013 at 09:11:20AM +0000, James Bottomley wrote:
+> On Wed, 2013-01-16 at 15:18 -0800, Tejun Heo wrote:
+> > On Wed, Jan 16, 2013 at 10:32:35AM +0000, James Bottomley wrote:
+> > > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > > index 6b2fb87..ab88c5b 100644
+> > > --- a/arch/arm/mm/dma-mapping.c
+> > > +++ b/arch/arm/mm/dma-mapping.c
+> > > @@ -809,7 +809,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+> > >  			op(vaddr, len, dir);
+> > >  		}
+> > >  		offset = 0;
+> > > -		page++;
+> > > +		page = pfn_to_page(page_to_pfn(page) + 1);
+> > 
+> > Probably page = nth_page(page, 1) is the better form.
 > 
-> For now, ie. 3.7 (stable) and 3.8, do we agree in taking this patch so
-> that TI-ST at least works on Panda? Simply reverting the gpio removal
-> patch doesn't help, because we also need to handle the UART2 muxing
-> (which my patch does as well).
+> It's the same thing.
+> 
+> I'd actually prefer page = pfn_to_page(page_to_pfn(page) + 1); because
+> it makes the code look like the hack it is.  The preferred form for all
+> iterators like this should be to iterate over the pfn instead of a
+> pointer into the page arrays, because that will always work correctly no
+> matter how many weird and wonderful memory schemes we come up with.
 
-I don't see better way to fix this either. In any case, I give you my:
-
-Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+So, why don't we update the code to do that then?
