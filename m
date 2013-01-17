@@ -1,28 +1,56 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 17 Jan 2013 09:29:11 +0100
-Subject: [PATCH] ARM: spear3xx: Fix pl080-related build failure
-Message-ID: <1358411351-18506-1-git-send-email-thierry.reding@avionic-design.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 17 Jan 2013 16:29:51 +0800
+Subject: [PATCH] ARM: imx: remove unused imx6q_clock_map_io()
+Message-ID: <1358411391-2725-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include linux/amba/pl08x.h to pull in the various PL080_* macros.
+imx6q_clock_map_io() becomes an empty function since imx6q clock driver
+is moved to common clock framework.  It's used nowhere now.  Remove it.
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-spear3xx/spear3xx.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-imx/clk-imx6q.c  |    2 --
+ arch/arm/mach-imx/common.h     |    1 -
+ arch/arm/mach-imx/mach-imx6q.c |    1 -
+ 3 files changed, 4 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index f9d754f..7c218d9 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -14,6 +14,7 @@
- #define pr_fmt(fmt) "SPEAr3xx: " fmt
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 7f2c10c..c7e429b 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -56,8 +56,6 @@
  
- #include <linux/amba/pl022.h>
-+#include <linux/amba/pl080.h>
- #include <linux/amba/pl08x.h>
- #include <linux/io.h>
- #include <plat/pl080.h>
+ static void __iomem *ccm_base;
+ 
+-void __init imx6q_clock_map_io(void) { }
+-
+ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+ {
+ 	u32 val = readl_relaxed(ccm_base + CLPCR);
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 7191ab4..7eb3bb2 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -139,7 +139,6 @@ extern void imx_gpc_init(void);
+ extern void imx_gpc_pre_suspend(void);
+ extern void imx_gpc_post_resume(void);
+ extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+-extern void imx6q_clock_map_io(void);
+ 
+ extern void imx_cpu_die(unsigned int cpu);
+ 
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 4eb1b3a..a009df7 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -218,7 +218,6 @@ static void __init imx6q_map_io(void)
+ {
+ 	imx_lluart_map_io();
+ 	imx_scu_map_io();
+-	imx6q_clock_map_io();
+ }
+ 
+ static const struct of_device_id imx6q_irq_match[] __initconst = {
 -- 
-1.8.1.1
+1.7.9.5
