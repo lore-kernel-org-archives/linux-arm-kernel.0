@@ -1,37 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Jan 2013 11:44:31 +0100
-Subject: [PATCH 2/3] gpio: pca953x: add support for pca9505
-In-Reply-To: <50EEC2C6.9070109@free-electrons.com>
-References: <1357493688-25061-1-git-send-email-gregory.clement@free-electrons.com>
- <1357493688-25061-3-git-send-email-gregory.clement@free-electrons.com>
- <CACRpkdYu63TZDpHrGkg0cdqFCrVH1PiNFX8FcrxB9S_Vk9r=kg@mail.gmail.com>
- <50EEC2C6.9070109@free-electrons.com>
-Message-ID: <CACRpkdZv615BfG5Ai76UdigKonwAv6fisNL0Eiu3=sK-vJx9UQ@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 17 Jan 2013 11:45:21 +0100
+Subject: [PATCH 7/7] ARM i.MX5: Add system reset controller (SRC) to
+ i.MX51 and i.MX53 device tree
+In-Reply-To: <50F72780.8040208@wwwdotorg.org>
+References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
+ <1358352787-15441-8-git-send-email-p.zabel@pengutronix.de>
+ <50F72780.8040208@wwwdotorg.org>
+Message-ID: <1358419521.2411.125.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 10, 2013 at 2:31 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
+Am Mittwoch, den 16.01.2013, 15:19 -0700 schrieb Stephen Warren:
+> On 01/16/2013 09:13 AM, Philipp Zabel wrote:
+> > Also, link SRC to IPU via phandle.
+> 
+> Aside from the comments I already made, the series,
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
 
-> On 01/10/2013 12:15 PM, Linus Walleij wrote:
->> On Sun, Jan 6, 2013 at 6:34 PM, Gregory CLEMENT
->> <gregory.clement@free-electrons.com> wrote:
->>
->>> Now that pca953x driver can handle GPIO expanders with more than 32
->>> bits this patch adds the support for the pca9505 which cam with 40
->>> GPIOs.
->>>
->>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>
->> Applied, thanks.
->>
-> Hello Linus,
->
-> I think it is a little too early to apply this patch because the 1st
-> one still have bug and is not yet applied.
+Thank you.
 
-OK pulled it out. Could have been an issue with Grant's and my synchronized
-trees but we were lucky this time.
+> although I'm not 100% sure if the ordering of patches maintains a
+> working i.MX build all the time? Does "git bisect" work across the series?
 
-Yours,
-Linus Walleij
+Since IPU probing doesn't succeed if device_reset() fails, the IPU patch
+needs to be ordered after the i.MX5 patches.
+
+On the other hand, should device_reset() fail at all if no reset
+controller was specified in the device tree?
+
+regards
+Philipp
