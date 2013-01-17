@@ -1,38 +1,41 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Thu, 17 Jan 2013 22:02:06 +1000
-Subject: [PATCH 0/4] gpio: introduce descriptor-based interface
-In-Reply-To: <CACRpkda6dqAj+DzrMCnKET7Z9PtuW0+k9ea3YDL8Z1D=oFVRpQ@mail.gmail.com>
-References: <1357629535-26033-1-git-send-email-acourbot@nvidia.com>
- <201301091046.13020.arnd@arndb.de> <2270940.DTxEYMZtED@percival>
- <201301101008.45091.arnd@arndb.de>
- <CACRpkda6dqAj+DzrMCnKET7Z9PtuW0+k9ea3YDL8Z1D=oFVRpQ@mail.gmail.com>
-Message-ID: <50F7E83E.8000105@uclinux.org>
+From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
+Date: Thu, 17 Jan 2013 14:06:15 +0200
+Subject: [PATCH v4 0/3] mtd: nand: OMAP: ELM error correction support
+ for BCH ecc
+In-Reply-To: <518397C60809E147AF5323E0420B992E3EA5DFA9@DBDE01.ent.ti.com>
+References: <1357286211-5012-1-git-send-email-avinashphilip@ti.com>
+ <518397C60809E147AF5323E0420B992E3EA5DFA9@DBDE01.ent.ti.com>
+Message-ID: <1358424375.2731.234.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-(My gerg at snapgear.com email no longer gets to me, gerg at uclinux.org is
-the best direct email for me now).
-
-On 01/17/2013 09:15 PM, Linus Walleij wrote:
-> On Thu, Jan 10, 2013 at 11:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wed, 2013-01-16 at 12:22 +0000, Philip, Avinash wrote:
+> > This series is based on linux 3.8-rc2 and tested with [1].
+> > Also this patch series depend on [1] for NAND flash device
+> > tree data and gpmc nand device tree binding documentation updates.
+> > 
+> > 1. [PATCH v7 0/5] OMAP GPMC DT bindings
+> > http://www.spinics.net/lists/linux-omap/msg83505.html
+> > 
+> > Tested on am335x-evm for BCH 4 and 8 bit error correction.
 > 
->> I've tried to find platforms that don't yet use GPIOLIB and fortunately
->> there are very few left:
->>
->> I found two that provide the generic gpio interfaces when gpiolib
->> is disabled, but use gpiolib otherwise for the same hardware,
->> arch/m68k/include/asm/mcfgpio.h and arch/blackfin/include/asm/gpio.h.
->> I would assume that we can simply remove the non-gpiolib shortcut
->> here at cost of a small overhead.
-> 
-> Geert/Greg: interested in looking into this issue?
-> 
-> The GPIO maintainers want to get rid of non-gpiolib platforms.
+> Can you apply this patch series on l2-mtd tree as it will help RBL compatibility
+> ecc layout for NAND flash in am335x-platforms and hardware based BCH error
+> correction.
 
-Steven King did most of the ColdFire GPIO work (CC'ed on this).
-Steven: are you happy to drop the non-gpiolib support?
+OK, I've applied them. I dropped the part that updates the
+documentation. Please, handle it separately when Daniel's patches are
+in.
 
-Regards
-Greg
+Pushed to l2-mtd.git, thanks!
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/e8aaab3f/attachment.sig>
