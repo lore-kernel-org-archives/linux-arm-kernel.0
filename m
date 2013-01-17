@@ -1,62 +1,101 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 17 Jan 2013 10:30:15 +0800
-Subject: [PATCH V4 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle
- for powered-down mode
-In-Reply-To: <50F71C21.20904@wwwdotorg.org>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 16 Jan 2013 18:32:24 -0800
+Subject: [PATCH V4 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle for
+ powered-down mode
+In-Reply-To: <1358388332.1667.7.camel@jlo-ubuntu-64.nvidia.com>
 References: <1358323873-30525-1-git-send-email-josephl@nvidia.com>
  <CAMbhsRTmGVrjnKa_z+zonGypU+U4r2iE=D-Zfvyoq8chY68QKQ@mail.gmail.com>
- <50F71C21.20904@wwwdotorg.org>
-Message-ID: <1358389815.1667.32.camel@jlo-ubuntu-64.nvidia.com>
+ <1358388332.1667.7.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <CAMbhsRQpEE_bkLTZCKno_kDAHh5ggXm6qBSJ91K+ezqwoCsY5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-01-17 at 05:31 +0800, Stephen Warren wrote:
-> On 01/16/2013 11:55 AM, Colin Cross wrote:
-> > On Wed, Jan 16, 2013 at 12:11 AM, Joseph Lo <josephl@nvidia.com> wrote:
-> >> The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
-> >> core to go into this mode before other core. The coupled cpuidle framework
-> >> can help to sync the MPCore to coupled state then go into "powered-down"
-> >> idle mode together. The driver can just assume the MPCore come into
-> >> "powered-down" mode at the same time. No need to take care if the CPU_0
-> >> goes into this mode along and only can put it into safe idle mode (WFI).
-> >>
-> >> The powered-down state of Tegra20 requires power gating both CPU cores.
-> >> When the secondary CPU requests to enter powered-down state, it saves
-> >> its own contexts and then enters WFI for waiting CPU0 in the same state.
-> >> When the CPU0 requests powered-down state, it attempts to put the secondary
-> >> CPU into reset to prevent it from waking up. Then power down both CPUs
-> >> together and power off the cpu rail.
-> >>
-> >> Be aware of that, you may see the legacy power state "LP2" in the code
-> 
-> Colin, since you only raised a few small issues on this series, does
-> that mean you're OK with it once those issues are fixed?
-> 
-> Joseph, we'll be merging Tegra114 in the near future. How will this
-> patch series affect Tegra114? Will the cpuidle driver simply fail to
-> register on Tegra114 (which would be fine until we explicitly add
-> support), or would we need to disable cpuidle in Kconfig to get a
-> working Tegra114 kernel. Does this patch series affect the answer to the
-> previous question? Thanks.
-> 
-Stephen,
+On Wed, Jan 16, 2013 at 6:05 PM, Joseph Lo <josephl@nvidia.com> wrote:
+> On Thu, 2013-01-17 at 02:55 +0800, Colin Cross wrote:
+>> On Wed, Jan 16, 2013 at 12:11 AM, Joseph Lo <josephl@nvidia.com> wrote:
+>> > The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
+>> > core to go into this mode before other core. The coupled cpuidle framework
+>> > can help to sync the MPCore to coupled state then go into "powered-down"
+>> > idle mode together. The driver can just assume the MPCore come into
+>> > "powered-down" mode at the same time. No need to take care if the CPU_0
+>> > goes into this mode along and only can put it into safe idle mode (WFI).
+>> >
+>> > The powered-down state of Tegra20 requires power gating both CPU cores.
+>> > When the secondary CPU requests to enter powered-down state, it saves
+>> > its own contexts and then enters WFI for waiting CPU0 in the same state.
+>> > When the CPU0 requests powered-down state, it attempts to put the secondary
+>> > CPU into reset to prevent it from waking up. Then power down both CPUs
+>> > together and power off the cpu rail.
+>> >
+>> > Be aware of that, you may see the legacy power state "LP2" in the code
+>> > which is exactly the same meaning of "CPU power down".
+>> >
+>> > Based on the work by:
+>> > Colin Cross <ccross@android.com>
+>> > Gary King <gking@nvidia.com>
+>> >
+>> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> > ---
+>> > V4:
+>> > * rename the function to "tegra20_wake_cpu1_from_reset"
+>> > * make the coupled cpuidle can be disabled if SMP is disabled
+>> > V3:
+>> > * sqash last two patch in previous version to support coupled cpuidle
+>> >   directly
+>> > V2:
+>> > * refine the cpu control function that dedicate for CPU_1
+>> > * rename "tegra_cpu_pllp" to "tegra_switch_cpu_to_pllp"
+>> > ---
+>>
+>> <snip>
+>>
+>> > diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+>> > index 50f984d..63ab9c2 100644
+>> > --- a/arch/arm/mach-tegra/cpuidle-tegra20.c
+>> > +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+>>
+>> <snip>
+>>
+>> > @@ -87,20 +176,31 @@ static inline bool tegra20_idle_enter_lp2_cpu_1(struct cpuidle_device *dev,
+>> >  }
+>> >  #endif
+>> >
+>> > -static int tegra20_idle_lp2(struct cpuidle_device *dev,
+>> > -                           struct cpuidle_driver *drv,
+>> > -                           int index)
+>> > +static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
+>> > +                                   struct cpuidle_driver *drv,
+>> > +                                   int index)
+>> >  {
+>> >         u32 cpu = is_smp() ? cpu_logical_map(dev->cpu) : dev->cpu;
+>> >         bool entered_lp2 = false;
+>> >
+>> > +       if (tegra_pending_sgi())
+>> > +               atomic_inc(&abort_flag);
+>> Minor nit, this doesn't need to be atomic.  You could just use
+>> abort_flag = true, or ACCESS_ONCE(abort_flag) = true.  Each cpu will
+>> either not touch this variable or write 1 to it, so there is no
+>> read/modify/write race.
+>>
+> Thanks for your remind. There is a reason I don't use a boolean flag
+> here. The SGI register was per CPU register. Different CPU may get
+> different content of the register depend on there is a SGI pending or
+> not. That's why I don't use a boolean flag that may be overwritten by
+> the other CPU here.
+>
+> So I think I can just modify as follows and remove atomic operation.
+>
+>         if (tegra_pending_sgi())
+>                 abort_flag++;
+>
+>         if (abort_flag > 0)
+>                 abort coupled cpuidle;
 
-This patch series won't affect Tegra114. I think I need to add a simple
-cpuidle driver for Tegra114 to support just WFI state first.
+abort_flag++ is a bad idea, it will do a read-modify-write on the
+variable, and two concurrent read-modify-writes will not result in the
+correct value.
 
-And I am going do some re-works about CPUs and cluster power status sync
-functions that be introduced recently[1] for CPU hotplug, idle and
-secondary booting in Tegra tree. I hope I can hide all the power related
-function behind that and make the CPU idle driver be more generic for
-all Tegra series.
-
-Before that re-works, I will still keep upstream the platform suspend
-function for Tegra.
-(If I am not in the right direction, please pull me back.)
-
-Thanks,
-Joseph
-
-[1]: https://patchwork.kernel.org/patch/1957891/
-     https://patchwork.kernel.org/patch/1957951/
-     (pretty good job by Nicolas and Dave)
+In this case you don't care about counting how many cpus have sgis,
+you just care if any cpu does.  ACCESS_ONCE(abort_flag) = true will
+work fine, because cpus that do not have a pending sgi will not set
+the variable to false.
