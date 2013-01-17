@@ -1,46 +1,29 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 16 Jan 2013 21:02:37 -0800
-Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
-References: <20130111153206.e075edb9b1e4a38d90f23ab6@canb.auug.org.au>
- <20130117145324.3f1f27fb5902b5a03135bf06@canb.auug.org.au>
-Message-ID: <0c9001cdf46f$e0a4db20$a1ee9160$@samsung.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 17 Jan 2013 06:03:27 +0100
+Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
+In-Reply-To: <50F7096C.7020803@wwwdotorg.org>
+References: <1357890387-23245-3-git-send-email-pgaikwad@nvidia.com><20130116.171242.2189136612266237422.hdoyu@nvidia.com><50F7096C.7020803@wwwdotorg.org>
+Message-ID: <20130117.070327.1625310713330263780.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Stephen Rothwell wrote:
-> >
-> > Hi Kukjin,
-> >
-> Hi,
-> 
-> > On Fri, 11 Jan 2013 15:32:06 +1100 Stephen Rothwell
-> <sfr@canb.auug.org.au>
-> > wrote:
-> > >
-> > > Today's linux-next merge of the samsung tree got conflicts in
-> > > many files with the arm-soc tree.
-> > >
-> > > I just dropped the samsung tree for today.  Please have a look and try
-to
-> > > fix this mess up, thanks.
-> >
-> > Ping?
-> 
-> Oops, I missed above e-mail. Anyway, really?
-> 
-> Let me look at it soon and I will fix.
-> 
-> Thanks for your information.
-> 
-Hmm, updating timer patches in Samsung tree cause the merge conflicts with
-arm-soc, so for now I dropped them in my tree just now.
-And note that regarding topic branch which are including it will be
-re-worked soon :-)
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 16 Jan 2013 21:11:24 +0100:
 
-Now to merge Samsung tree for linux-next should be fine.
+> >> +static int clk_frac_div_set_rate(struct clk_hw *hw, unsigned long rate,
+> >> +                               unsigned long parent_rate)
+> >> +{
+> >> +       struct tegra_clk_frac_div *divider = to_clk_frac_div(hw);
+> >> +       int div;
+> >> +       unsigned long flags = 0;
+> > 
+> > nit, is "flags" not needed to initialize here?
+> 
+> It avoids a compiler warning; the compiler doesn't that the if condition
+> that guards the path that uses flags is the same condition as the path
+> that initializes it. Or, it may be related to the fact that
+> spin_lock_irqsave() writes to the value through a pointer parameter, and
+> the compiler doesn't know it's an out-only parameter.
 
-Thanks again.
+It might be better to append the special comment /* GCC */[1] on that line.
 
-- Kukjin
+[1] https://lwn.net/Articles/529954/
