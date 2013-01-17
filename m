@@ -1,90 +1,83 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Thu, 17 Jan 2013 15:27:28 -0700
-Subject: [PATCH 00/15] OMAP SHAM & AES Crypto Updates
-In-Reply-To: <alpine.DEB.2.00.1301171904070.14118@utopia.booyaka.com>
-References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1212230836160.16045@utopia.booyaka.com>
- <20130108203853.GB1876@animalcreek.com>
- <alpine.DEB.2.00.1301171904070.14118@utopia.booyaka.com>
-Message-ID: <20130117222728.GA32446@animalcreek.com>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Thu, 17 Jan 2013 23:28:41 +0100
+Subject: [PATCH 1/2] ARM: DT: tegra: Add Colibri T20 512MB COM
+In-Reply-To: <50F877A3.5030107@wwwdotorg.org>
+References: <1358423961-24318-1-git-send-email-dev@lynxeye.de>
+ <50F86533.9010000@wwwdotorg.org> <1358458144.18489.14.camel@tellur>
+ <50F877A3.5030107@wwwdotorg.org>
+Message-ID: <1358461721.18489.23.camel@tellur>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 07:13:36PM +0000, Paul Walmsley wrote:
-> Hi Mark,
-
-Hi Paul.
-
-> I regret the delay,
-> 
-> On Tue, 8 Jan 2013, Mark A. Greer wrote:
-> 
-> > On Sun, Dec 23, 2012 at 08:40:43AM +0000, Paul Walmsley wrote:
+Am Donnerstag, den 17.01.2013, 15:13 -0700 schrieb Stephen Warren:
+> On 01/17/2013 02:29 PM, Lucas Stach wrote:
+> > Am Donnerstag, den 17.01.2013, 13:55 -0700 schrieb Stephen Warren:
+> >> On 01/17/2013 04:59 AM, Lucas Stach wrote:
+> >>> This adds the device tree include file for the Toradex Colibri T20
+> >>> Computer on Module (COM). It's only valid for the 512MB RAM version of
+> >>> the module, as the 256MB version needs different EMC tables and flash
+> >>> configuration. To make this clear the suffix -512 was added to the board
+> >>> compatible string.
+> >>>
+> >>> The Colibri T20 uses a Tegra2 SoC and has onboard USB Ethernet and AC97
+> >>> sound.
+> >>>
+> >>> Still some things like onboard NAND support missing, but should be a
+> >>> good base for further development.
+> >>> +
+> >>> +	sdhci at c8000600 {
+> >>> +		cd-gpios = <&gpio 23 0>; /* gpio PC7 */
+> >>> +		vmmc-supply = <&ldo5_reg>;
+> >>> +		vqmmc-supply = <&vcc_sd_reg>;
+> >>> +	};
+> >>
+> >> I assume that all of those nodes are meant to have status="okay"?
+> >>
+> >> Oh, I see those are in the top-level board .dts file. You may as well
+> >> put all the properties there; stuff like the GPIOs and regulators at
+> >> least would be purely specific to the individual board, and not the COM.
 > >
-> > > - The patch series causes AM3517/3505 to crash.  I'd guess this is due to 
-> > > the SHAM/AES modules being initialized on those chips, but they probably 
-> > > don't exist there.  Can you change the initialization for those on OMAP3 
-> > > to only take place on OMAP34xx/36xx GP?  I guess you'd need to create new 
-> > > lists for those in the hwmod init.
-> > 
-> > All am35xx GPs have the SHAM and AES modules except some very old ones.
-> > I've been told that there should be very few of the "old" ones around
-> > (I don't know how to differentiate them).  We're likely safe since the
-> > SHAM & AES modules are not enabled in omap2plus_defconfig so nobody
-> > should be enabling them on an am35xx unless they know that they have
-> > the modules.  Do you agree?
+> > I would like to keep everything that is defined by the COM to reside in
+> > the COM dtsi. You are right that the regulator in this case is board
+> > specific and should be moved to the board file, I missed this while
+> > splitting things out. But at least the GPIO is defined by the fixed COM
+> > pinout.
 > 
-> Those will presumably only enable or disable the device drivers.  The 
-> hwmod code will probably still try to write to those IP blocks if they are 
-> listed as present in the hwmod data, during the initial reset-and-idle 
-> phase.
-
-Um, yeah, good point. :)
-
-> What do you think about adding an am35xx_es11plus_hwmod_ocp_ifs[] array to 
-> omap_hwmod_3xxx_data.c for these secure hwmods?  That carries the implicit 
-> and possibly wrong assumption that it's likely to be ES1.0 devices that 
-> are missing the SHAM/AES, but it seems unlikely that TI would have 
-> multiple silicon revs running around claiming to be ES1.1?  Or maybe I'm 
-> just being na?ve.
-
-Something like that makes sense to me.  I'll re-read my email, etc. and
-see if I can find something to help us figure it out.
-
-> > The issue that you're likely running into is that 'CK_AM35XX' needs to be
-> > added for aes2_ick & sha12_ick in cclock3xxx_data.c.   The following
-> > patch should fix it (applies to my submitted/crypto/hwmod branch):
-> > 
-> > diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
-> > index 582b055..aa5bdf6 100644
-> > --- a/arch/arm/mach-omap2/cclock3xxx_data.c
-> > +++ b/arch/arm/mach-omap2/cclock3xxx_data.c
-> > @@ -3332,10 +3332,10 @@ static struct omap_clk omap3xxx_clks[] = {
-> >  	CLK("omap_hsmmc.2",	"ick",	&mmchs3_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
-> >  	CLK(NULL,	"mmchs3_ick",	&mmchs3_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
-> >  	CLK(NULL,	"icr_ick",	&icr_ick,	CK_34XX | CK_36XX),
-> > -	CLK("omap-aes",	"ick",		&aes2_ick,	CK_34XX | CK_36XX),
-> > -	CLK(NULL,	"aes2_ick",	&aes2_ick,	CK_34XX | CK_36XX),
-> > -	CLK("omap-sham",	"ick",	&sha12_ick,	CK_34XX | CK_36XX),
-> > -	CLK(NULL,	"sha12_ick",	&sha12_ick,	CK_34XX | CK_36XX),
-> > +	CLK("omap-aes",	"ick",		&aes2_ick,	CK_34XX | CK_AM35XX | CK_36XX),
-> > +	CLK(NULL,	"aes2_ick",	&aes2_ick,	CK_34XX | CK_AM35XX | CK_36XX),
-> > +	CLK("omap-sham",	"ick",	&sha12_ick,	CK_34XX | CK_AM35XX | CK_36XX),
-> > +	CLK(NULL,	"sha12_ick",	&sha12_ick,	CK_34XX | CK_AM35XX | CK_36XX),
-> >  	CLK(NULL,	"des2_ick",	&des2_ick,	CK_34XX | CK_36XX),
-> >  	CLK("omap_hsmmc.1",	"ick",	&mmchs2_ick,	CK_3XXX),
-> >  	CLK("omap_hsmmc.0",	"ick",	&mmchs1_ick,	CK_3XXX),
-> > 
-> > 
-> > Please let me know if this patch works for you and, if it does, I'll respin
-> > my patches to add those changes.
+> If these are really defined by the COM itself, it does indeed make sense
+> for the COM .dtsi file to define those properties. But, I have a hard
+> time understanding how the COM design can force the carrier module into
+> using a particular GPIO for the SD controller CD functionality; couldn't
+> the carrier use any GPIO passed through the COM<->carrier connector for
+> any purpose?
 > 
-> If those clocks are referenced by the hwmods, that that patch makes sense 
-> to me.  Haven't had the chance to test it yet but maybe tomorrow.  On the 
-> other hand it looks 'obviously correct' so maybe just add that change to 
-> your patches and repost that one?
+It's not a GPIO anymore as soon as it hits the COM<->carrier connector.
+The connector pin assignment is strictly specified. There are a lot of
+freely assignable GPIOs on the connector, everything related to a
+specific function is not part of this.
 
-Will do.
+The Colibri specification dictates which pin to use if you want to
+realize a SDcard CD. This is done so that modules and carrier boards are
+interchangeable. In fact you can just as well run a new Colibri T30
+module on a years old carrier designed for the ColibriPXA series of
+modules.
 
-Mark
---
+> >>> +	com_regulators {
+> >>
+> >> I think just call that "regulators"; the final board .dts file can
+> >> easily add more sub-nodes to this node, so there's no need to try and
+> >> avoid any naming conflict here. See Cardhu as an example.
+> >
+> > I don't really see the benefit of merging those nodes. They are separate
+> > regulators, some are located on the COM, others on the carrier board. So
+> > I would like to keep them in separate nodes, unless you have strong
+> > feelings to change this.
+> 
+> The issue here is that if we don't do this, we end up with wierd node
+> names; plain "regulators" is a fairly canonical name for what the name
+> contains, and purely indicates the type of the node. "com_regulators" is
+> unusual, and starts to encode identity into the node name itself, which
+> is something not usually done in the node name (differentiation between
+> identities is usually done using the unit address; "@nnn"),
+
+Hm, ok. Keeping some space in between module and carrier regulator
+addresses should do as well.
