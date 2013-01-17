@@ -1,47 +1,38 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 17 Jan 2013 10:09:48 +0100
-Subject: [PATCH] ARM: spear3xx: Fix pl080-related build failure
-In-Reply-To: <CAOh2x=mnHtqGD17fF8TVU4uX3ceHD8dDRv_k9NwWqk=FDJg=nQ@mail.gmail.com>
-References: <1358411351-18506-1-git-send-email-thierry.reding@avionic-design.de>
- <CAOh2x=mnHtqGD17fF8TVU4uX3ceHD8dDRv_k9NwWqk=FDJg=nQ@mail.gmail.com>
-Message-ID: <20130117090948.GA21428@avionic-0098.adnet.avionic-design.de>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Thu, 17 Jan 2013 09:11:20 +0000
+Subject: [PATCH v2 1/1] block: blk-merge: don't merge the pages with
+ non-contiguous descriptors
+In-Reply-To: <20130116231857.GU2668@htj.dyndns.org>
+References: <1358265681-25671-1-git-send-email-subhashj@codeaurora.org>
+ <1358266794.10591.8.camel@dabdike.int.hansenpartnership.com>
+ <50F64AC1.3040304@codeaurora.org>
+ <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
+ <20130116231857.GU2668@htj.dyndns.org>
+Message-ID: <1358413880.2394.7.camel@dabdike.int.hansenpartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 02:05:58PM +0530, Viresh Kumar wrote:
-> On Thu, Jan 17, 2013 at 1:59 PM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
-> > Include linux/amba/pl08x.h to pull in the various PL080_* macros.
-> >
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > ---
-> >  arch/arm/mach-spear3xx/spear3xx.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-> > index f9d754f..7c218d9 100644
-> > --- a/arch/arm/mach-spear3xx/spear3xx.c
-> > +++ b/arch/arm/mach-spear3xx/spear3xx.c
-> > @@ -14,6 +14,7 @@
-> >  #define pr_fmt(fmt) "SPEAr3xx: " fmt
-> >
-> >  #include <linux/amba/pl022.h>
-> > +#include <linux/amba/pl080.h>
-> >  #include <linux/amba/pl08x.h>
-> >  #include <linux/io.h>
-> >  #include <plat/pl080.h>
+On Wed, 2013-01-16 at 15:18 -0800, Tejun Heo wrote:
+> On Wed, Jan 16, 2013 at 10:32:35AM +0000, James Bottomley wrote:
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index 6b2fb87..ab88c5b 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -809,7 +809,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+> >  			op(vaddr, len, dir);
+> >  		}
+> >  		offset = 0;
+> > -		page++;
+> > +		page = pfn_to_page(page_to_pfn(page) + 1);
 > 
-> Hi Thierry,
-> 
-> Thanks for fixing it up. Though the log doesn't match the change well.
+> Probably page = nth_page(page, 1) is the better form.
 
-Yes, you're right. I've sent an updated patch.
+It's the same thing.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/1cac57d8/attachment.sig>
+I'd actually prefer page = pfn_to_page(page_to_pfn(page) + 1); because
+it makes the code look like the hack it is.  The preferred form for all
+iterators like this should be to iterate over the pfn instead of a
+pointer into the page arrays, because that will always work correctly no
+matter how many weird and wonderful memory schemes we come up with.
+
+James
