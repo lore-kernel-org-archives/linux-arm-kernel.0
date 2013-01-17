@@ -1,123 +1,76 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 17 Jan 2013 10:30:15 +0100
-Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport power
- functions
-In-Reply-To: <1358372702-13102-1-git-send-email-coelho@ti.com>
-References: <1358372702-13102-1-git-send-email-coelho@ti.com>
-Message-ID: <50F7C4A7.5060202@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Jan 2013 11:32:07 +0200
+Subject: [PATCH v5 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
+ platform_device_id
+In-Reply-To: <20130117092829.GA8251@nchen-desktop>
+References: <1358216975-1404-1-git-send-email-peter.chen@freescale.com>
+ <1358216975-1404-2-git-send-email-peter.chen@freescale.com>
+ <20130115140344.GB6574@S2101-09.ap.freescale.net>
+ <20130116014824.GD16514@nchen-desktop>
+ <20130117091422.GF10814@arwen.pp.htv.fi>
+ <20130117092829.GA8251@nchen-desktop>
+Message-ID: <20130117093207.GG10814@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Luca,
+Hi,
 
-On 01/16/2013 10:45 PM, Luciano Coelho wrote:
-> The code to enable and disable the WiLink shared transport has been
-> removed from the TI-ST driver, so it must be implemented in the board
-> files instead.  Add the relevant operations to Panda's board file.
-> 
-> Additionally, add the UART2 muxing data, so it's properly configured.
-> 
-> Cc: stable <stable@vger.kernel.org> [3.7]
-> Signed-off-by: Luciano Coelho <coelho@ti.com>
-> ---
-> 
-> In v2: use gpio_request_one() instead of gpio_request() and
-> gpio_direction_output(). (Thanks Fabio!)
-> 
->  arch/arm/mach-omap2/board-omap4panda.c |   50 +++++++++++++++++++++++++++++---
->  1 file changed, 46 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-> index 5c8e9ce..f44fccf 100644
-> --- a/arch/arm/mach-omap2/board-omap4panda.c
-> +++ b/arch/arm/mach-omap2/board-omap4panda.c
-> @@ -51,18 +51,50 @@
->  #define GPIO_HUB_NRESET		62
->  #define GPIO_WIFI_PMENA		43
->  #define GPIO_WIFI_IRQ		53
-> +#define GPIO_BT_EN		46
->  
->  /* wl127x BT, FM, GPS connectivity chip */
-> +static int plat_kim_chip_enable(struct kim_data_s *kim_data)
-> +{
-> +	gpio_set_value(GPIO_BT_EN, GPIO_LOW);
-> +	mdelay(5);
-> +	gpio_set_value(GPIO_BT_EN, GPIO_HIGH);
-> +	mdelay(100);
-> +
-> +	return 0;
-> +}
-> +
-> +static int plat_kim_chip_disable(struct kim_data_s *kim_data)
-> +{
-> +	gpio_set_value(GPIO_BT_EN, GPIO_LOW);
-> +	mdelay(1);
-> +	gpio_set_value(GPIO_BT_EN, GPIO_HIGH);
-> +	mdelay(1);
-> +	gpio_set_value(GPIO_BT_EN, GPIO_LOW);
-> +
-> +	return 0;
-> +}
-> +
->  static struct ti_st_plat_data wilink_platform_data = {
-> -	.nshutdown_gpio	= 46,
->  	.dev_name	= "/dev/ttyO1",
->  	.flow_cntrl	= 1,
->  	.baud_rate	= 3000000,
-> -	.chip_enable	= NULL,
-> -	.suspend	= NULL,
-> -	.resume		= NULL,
-> +	.chip_enable	= plat_kim_chip_enable,
-> +	.chip_disable	= plat_kim_chip_disable,
+On Thu, Jan 17, 2013 at 05:28:30PM +0800, Peter Chen wrote:
 
-I just wonder how this is going to work with DT... You are not going to have
-the ability to use callback in this form.
-I think the GPIO handling should be done in the driver itself rather than in
-the board file.
+<trimming>
 
->  };
->  
-> +static int wilink_st_init(void)
-> +{
-> +	int status;
-> +
-> +	status = gpio_request_one(GPIO_BT_EN, GPIOF_OUT_INIT_LOW, "kim");
-> +	if (status)
-> +		pr_err("%s: failed to request gpio %d\n", __func__,
-> +		       GPIO_BT_EN);
-> +
-> +	return status;
-> +}
-> +
->  static struct platform_device wl1271_device = {
->  	.name	= "kim",
->  	.id	= -1,
-> @@ -397,6 +429,12 @@ static struct omap_board_mux board_mux[] __initdata = {
->  		  OMAP_PULL_ENA),
->  	OMAP4_MUX(ABE_MCBSP1_FSX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
->  
-> +	/* UART2 - BT/FM/GPS shared transport */
-> +	OMAP4_MUX(UART2_CTS,	OMAP_PIN_INPUT	| OMAP_MUX_MODE0),
-> +	OMAP4_MUX(UART2_RTS,	OMAP_PIN_OUTPUT	| OMAP_MUX_MODE0),
-> +	OMAP4_MUX(UART2_RX,	OMAP_PIN_INPUT	| OMAP_MUX_MODE0),
-> +	OMAP4_MUX(UART2_TX,	OMAP_PIN_OUTPUT	| OMAP_MUX_MODE0),
-> +
->  	{ .reg_offset = OMAP_MUX_TERMINATOR },
->  };
->  
-> @@ -433,6 +471,10 @@ static void __init omap4_panda_init(void)
->  	if (ret)
->  		pr_err("error setting wl12xx data: %d\n", ret);
->  
-> +	ret = wilink_st_init();
-> +	if (ret)
-> +		pr_err("WiLink shared transport init failed: %d\n", ret);
-> +
->  	omap4_panda_init_rev();
->  	omap4_panda_i2c_init();
->  	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
+> > > > From what I understand balbi's comment, he dislikes this full list of
+> > > > device id.  Instead, he prefers to something like below.
+> > > > 
+> > > > static const struct platform_device_id fsl_udc_devtype[] = {
+> > > > 	{
+> > > > 		.name = "imx-udc-mx27",
+> > > > 	}, {
+> > > > 		.name = "imx-udc-mx51",
+> > > > 	}
+> > > > };
+> > > > 
+> > > > It basically tells that we are handling two type of devices here, one
+> > > > is imx-udc-mx27 type and the other is imx-udc-mx51 type, with mx25/31/35
+> > > > completely compatible with mx27 type.  We choose mx27 instead of mx25
+> > > > to define the type because mx27 Si came out earlier than mx25.  That
+> > > > said, we generally choose the earlies SoC name to define a particular
+> > > > version of IP block, since hardware version is mostly unavailable or
+> > > > unreliable.
+> > > > 
+> > > > But that also means in platform code which create the platform_device,
+> > > > you will need to use name "imx-udc-mx27" for even mx25/31/35.
+> > > > 
+> > > > 	imx_fsl_usb2_udc_data_entry_single(MX25, "imx-udc-mx27");
+> > > > 	imx_fsl_usb2_udc_data_entry_single(MX31, "imx-udc-mx27");
+> > > > 	imx_fsl_usb2_udc_data_entry_single(MX35, "imx-udc-mx27");
+> > > > 
+> > > > Considering this is a piece of code we will not use for any new
+> > > > hardware, I'm fine with either way.
+> > > > 
+> > > > So, balbi, it's all your call to accept the series as it is or ask for
+> > > > another iteration.
+> > 
+> > right :-)
+> > 
+> > > Thanks Shawn. Let's see Felipe's comment, nevertheless, I will send v6 patch
+> > > due to a compile error at mx25
+> > 
+> > Shawn is right.
 > 
+> In fact, this driver is just the temp solution, we will use chipidea
+> in future, so just take all i.mx usb as two kinds of ip are ok.
+> 
+> Do you want me to change like Shawn said, or current version is ok?
 
+yes, please resend with changes.
 
 -- 
-P?ter
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/fb5dea96/attachment.sig>
