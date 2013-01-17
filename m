@@ -1,62 +1,77 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 17 Jan 2013 17:05:02 +0100
-Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <20130117154236.GA25943@arm.com>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <20130115154038.GA11241@arm.com>
- <20130115211441.GA13139@avionic-0098.adnet.avionic-design.de>
- <201301161400.26587.arnd@arndb.de> <20130116161716.GA10630@arm.com>
- <20130116183101.GA28660@avionic-0098.adnet.avionic-design.de>
- <20130117154236.GA25943@arm.com>
-Message-ID: <20130117160501.GC2186@avionic-0098.adnet.avionic-design.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 17 Jan 2013 18:07:57 +0200
+Subject: [RFC PATCH 3/6] usb: otg: utils: change the phy lib to support
+ multiple PHYs of same type
+In-Reply-To: <1358348462-27693-4-git-send-email-kishon@ti.com>
+References: <1358348462-27693-1-git-send-email-kishon@ti.com>
+ <1358348462-27693-4-git-send-email-kishon@ti.com>
+Message-ID: <50F821DD.1040609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 03:42:36PM +0000, Andrew Murray wrote:
-> On Wed, Jan 16, 2013 at 06:31:01PM +0000, Thierry Reding wrote:
-> > Alright, putting the functions into pci_ops doesn't sound like a very
-> > good idea then. Or perhaps it would make sense for hardware where the
-> > root complex and the MSI controller are handled by the same driver.
-> > Basically it could be done as a shortcut and if those are not filled
-> > in, the drivers could still opt to look up an MSI controller from a
-> > phandle specified in DT.
-> > 
-> > Even another alternative would be to keep the functions within the
-> > struct pci_ops and use generic ones if an external MSI controller is
-> > used. Just tossing around ideas.
+On 01/16/2013 05:00 PM, Kishon Vijay Abraham I wrote:
+> In order to add support for multipe PHY's of the same type, the API's
+> for adding PHY and getting PHY has been changed. Now the binding
+> information of the PHY and controller should be done in platform file
+> using usb_bind_phy API. And for getting a PHY, the device pointer of the
+> USB controller and an index should be passed. Based on the binding
+> information that is added in the platform file, get_phy will return the
+> approappropriate PHY.
 > 
-> I think an ideal solution would be for additional logic in drivers/msi.c
-> (e.g. in functions like msi_capability_init) to determine (based on the
-> passed in pci_dev) which MSI controller ops to use. I'm not sure the best
-> way to implement an association between an MSI controller and PCI busses
-> (I believe arch/sparc does something like this - perhaps there will be
-> inspiration there).
-> 
-> As you've pointed out, most RCs will have their own MSI controllers - so
-> it should be easy to register and associate both together.
-> 
-> I've submitted my previous work on MSI controller registration, but it
-> doesn't quite solve this problem - perhaps it can be a starting point?
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm/mach-shmobile/board-marzen.c |    2 +-
+>  drivers/power/ab8500_charger.c        |    2 +-
+>  drivers/power/isp1704_charger.c       |    2 +-
+>  drivers/power/pda_power.c             |    2 +-
+>  drivers/power/twl4030_charger.c       |    2 +-
+>  drivers/usb/chipidea/udc.c            |    2 +-
+>  drivers/usb/dwc3/core.c               |    4 +-
+>  drivers/usb/gadget/fsl_udc_core.c     |    2 +-
+>  drivers/usb/gadget/mv_udc_core.c      |    2 +-
+>  drivers/usb/gadget/omap_udc.c         |    2 +-
+>  drivers/usb/gadget/pxa25x_udc.c       |    2 +-
+>  drivers/usb/gadget/pxa27x_udc.c       |    2 +-
+>  drivers/usb/gadget/s3c-hsudc.c        |    2 +-
+>  drivers/usb/host/ehci-fsl.c           |    2 +-
+>  drivers/usb/host/ehci-msm.c           |    2 +-
+>  drivers/usb/host/ehci-mv.c            |    2 +-
+>  drivers/usb/host/ehci-tegra.c         |    2 +-
+>  drivers/usb/host/ohci-omap.c          |    2 +-
+>  drivers/usb/musb/am35x.c              |    2 +-
+>  drivers/usb/musb/blackfin.c           |    2 +-
+>  drivers/usb/musb/da8xx.c              |    2 +-
+>  drivers/usb/musb/davinci.c            |    2 +-
+>  drivers/usb/musb/musb_dsps.c          |    2 +-
+>  drivers/usb/musb/omap2430.c           |    2 +-
+>  drivers/usb/musb/tusb6010.c           |    2 +-
+>  drivers/usb/musb/ux500.c              |    2 +-
+>  drivers/usb/otg/ab8500-usb.c          |    3 +-
+>  drivers/usb/otg/fsl_otg.c             |    5 ++-
+>  drivers/usb/otg/gpio_vbus.c           |    3 +-
+>  drivers/usb/otg/isp1301_omap.c        |    3 +-
+>  drivers/usb/otg/msm_otg.c             |    3 +-
+>  drivers/usb/otg/mv_otg.c              |    3 +-
+>  drivers/usb/otg/nop-usb-xceiv.c       |    3 +-
+>  drivers/usb/otg/otg.c                 |   67 +++++++++++++++------------------
+>  drivers/usb/otg/twl4030-usb.c         |    3 +-
+>  drivers/usb/phy/mv_u3d_phy.c          |    3 +-
+>  drivers/usb/phy/omap-usb2.c           |   11 ++----
+>  drivers/usb/phy/rcar-phy.c            |    3 +-
+>  include/linux/usb/phy.h               |   12 +++---
+>  39 files changed, 87 insertions(+), 89 deletions(-)
 
-We basically have two cases:
+I think it better to leave the existing add/get APIs as they are add add
+new APIs that support multiple PHYs. You could probably mark the old
+ones as deprecated.
 
-  - The PCI host bridge contains registers for MSI support. In that case
-    it makes little sense to uncouple the MSI implementation from the
-    host bridge driver.
+That way you don't need to wait till all users are converted and tested.
 
-  - An MSI controller exists outside of the PCI host bridge. The PCI
-    host bridge would in that case have to lookup an MSI controller (via
-    DT phandle or some other method).
+e.g. you could name the new APIs as
 
-In either of those cases, does it make sense to use the MSI support
-outside the scope of the PCI infrastructure? That is, would devices
-other than PCI devices be able to generate an MSI?
+usb_add_phy_dev(struct usb_phy *phy);
+usb_get_phy_dev(struct device *dev, int index);
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/4b916113/attachment.sig>
+--
+cheers,
+-roger
