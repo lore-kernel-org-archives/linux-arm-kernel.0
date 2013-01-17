@@ -1,35 +1,75 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 17 Jan 2013 22:38:04 +0000 (UTC)
-Subject: [PATCH v7 19/22] ARM: OMAP3: clock data: get rid of unused USB
- host clock aliases and dummies
-In-Reply-To: <20130117223138.GN14149@atomide.com>
-References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
- <1358422231-24736-20-git-send-email-rogerq@ti.com>
- <20130117170321.GJ14149@atomide.com>
- <alpine.DEB.2.00.1301171854280.14118@utopia.booyaka.com>
- <20130117210034.GA27671@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1301172228140.14118@utopia.booyaka.com>
- <20130117223138.GN14149@atomide.com>
-Message-ID: <alpine.DEB.2.00.1301172237500.14118@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Jan 2013 15:16:08 -0800
+Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport
+ power functions
+In-Reply-To: <1358445456.6252.64.camel@cumari.coelho.fi>
+References: <1358372702-13102-1-git-send-email-coelho@ti.com>
+ <50F7C4A7.5060202@ti.com> <20130117093417.GH10814@arwen.pp.htv.fi>
+ <50F7CA82.4050509@ti.com> <20130117100510.GI10814@arwen.pp.htv.fi>
+ <20130117100919.GJ10814@arwen.pp.htv.fi>
+ <1358418917.6252.31.camel@cumari.coelho.fi>
+ <50F7D535.6030205@ti.com> <20130117173131.GL14149@atomide.com>
+ <1358445456.6252.64.camel@cumari.coelho.fi>
+Message-ID: <20130117231608.GP14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Jan 2013, Tony Lindgren wrote:
-
-> * Paul Walmsley <paul@pwsan.com> [130117 14:33]:
-> > On Thu, 17 Jan 2013, Felipe Balbi wrote:
-> > 
-> > > do you mean v3.9 ?
-> > 
-> > It sounds like the other patches need to be merged first before these 
-> > cleanups can be merged.  So rather than adding a merge order dependency 
-> > during 3.9, it seems best to queue the non-essential clock cleanup side 
-> > for 3.10.
+* Luciano Coelho <coelho@ti.com> [130117 10:04]:
+> Hi Tony,
 > 
-> How about let's do it in a late cleanup branch towards the end of the
-> v3.9 merge window?
+> On Thu, 2013-01-17 at 09:31 -0800, Tony Lindgren wrote:
+> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [130117 02:44]:
+> > > On 01/17/2013 11:35 AM, Luciano Coelho wrote:
+> > > > This out-of-tree code doesn't explain why we need to do the
+> > > > enable/disable in the board file.  We just need to do things a bit
+> > > > differently in the driver.  I'll start cleaning all this stuff up for
+> > > > -next pretty soon.
+> > > > 
+> > > > For now, ie. 3.7 (stable) and 3.8, do we agree in taking this patch so
+> > > > that TI-ST at least works on Panda? Simply reverting the gpio removal
+> > > > patch doesn't help, because we also need to handle the UART2 muxing
+> > > > (which my patch does as well).
+> > > 
+> > > I don't see better way to fix this either. In any case, I give you my:
+> > > 
+> > > Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > 
+> > So what is actually broken? The horrible bluetooth muxing over serial
+> > port? If so, let's rather fix it properly than even attempt to fix
+> > it as it seems that it's been broken for two merge windows now.
+> 
+> Yes, it is the horrible Bluetooth muxing over serial that is broken.  It
+> has been broken for two merge windows, because nobody seemed to care
+> until I started looking into it and tried to figure out how to get it to
+> work. :)
 
-That's fine with me too if the arm-soc folks are willing.
+Heh I see.
+ 
+> The implementation is really weak and there are loads of things I want
+> to start fixing/cleaning up.  This patch was just my intention to start
+> with a relatively clean table (ie. horrible or not, at least working).
+> 
+> 
+> > Also, let's just do absolutely minimal board-*.c file fixes now.
+> > This thing should be just moved to use DT so we can flip over omap4
+> > to be DT only and drop estimated 5k LOC from mach-omap2.
+> 
+> I totally agree, I'll start looking into that next.
+> 
+> But this patch is pretty small and simple, so why not include it to at
+> least fix the breakage in 3.7 and 3.8? Whether you take it or not now
+> won't make any difference in the 5k LOC in these kernel versions.
 
+Well we are planning to drop the non-DT support for omap4 as soon as it's
+usable with DT. For omap4 we are only carrying SDP and panda support to
+make this transition easier. The only bindings missing AFAIK are wl12xx and
+USB.
 
-- Paul
+If we add this, then it implies we're somehow supporting it, which is not
+the way to go IMHO as we need to get rid of these platform callbacks instead.
+
+What's your estimate of having minimal wl12xx WLAN DT binding available?
+
+Regards,
+
+Tony
