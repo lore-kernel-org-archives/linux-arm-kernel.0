@@ -1,22 +1,106 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Jan 2013 19:01:05 +0800
-Subject: [PATCH v6 3/3] ARM: i.MX clock: Change the connection-id for
- fsl-usb2-udc
-In-Reply-To: <20130117105833.GP10814@arwen.pp.htv.fi>
-References: <1358416997-29099-1-git-send-email-peter.chen@freescale.com>
- <1358416997-29099-4-git-send-email-peter.chen@freescale.com>
- <20130117105833.GP10814@arwen.pp.htv.fi>
-Message-ID: <20130117110104.GO26179@S2101-09.ap.freescale.net>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Thu, 17 Jan 2013 11:01:47 +0000
+Subject: [PATCH v2 1/1] block: blk-merge: don't merge the pages with
+ non-contiguous descriptors
+In-Reply-To: <20130117104741.GY23505@n2100.arm.linux.org.uk>
+References: <1358265681-25671-1-git-send-email-subhashj@codeaurora.org>
+ <1358266794.10591.8.camel@dabdike.int.hansenpartnership.com>
+ <50F64AC1.3040304@codeaurora.org>
+ <1358332355.2384.11.camel@dabdike.int.hansenpartnership.com>
+ <20130116231857.GU2668@htj.dyndns.org>
+ <1358413880.2394.7.camel@dabdike.int.hansenpartnership.com>
+ <20130117103742.GX23505@n2100.arm.linux.org.uk>
+ <20130117104741.GY23505@n2100.arm.linux.org.uk>
+Message-ID: <1358420507.2394.19.camel@dabdike.int.hansenpartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 12:58:33PM +0200, Felipe Balbi wrote:
-> On Thu, Jan 17, 2013 at 06:03:17PM +0800, Peter Chen wrote:
-> > As we use platform_device_id for fsl-usb2-udc driver, it needs to
-> > change clk connection-id, or the related devm_clk_get will be failed.
+On Thu, 2013-01-17 at 10:47 +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 17, 2013 at 10:37:42AM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Jan 17, 2013 at 09:11:20AM +0000, James Bottomley wrote:
+> > > I'd actually prefer page = pfn_to_page(page_to_pfn(page) + 1); because
+> > > it makes the code look like the hack it is.  The preferred form for all
+> > > iterators like this should be to iterate over the pfn instead of a
+> > > pointer into the page arrays, because that will always work correctly no
+> > > matter how many weird and wonderful memory schemes we come up with.
 > > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> 
-> do I get Acked-by for this one ?
+> > So, why don't we update the code to do that then?
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+We can, but it involves quite a rewrite within the arm dma-mapping code
+to use pfn instead of page.  It looks like it would make the code
+cleaner because there are a lot of page_to_pfn transformations in there.
+However, the current patch is the simplest one for stable and I don't
+actually have any arm build and test environments.
+
+> Also, couldn't the addition of the scatterlist offset to the page also
+> be buggy too?
+
+No, fortunately, offset must be within the first page from the point of
+view of block generated sg lists.  As long as nothing within arm
+violates this, it should be a safe assumption ... although the code
+seems to assume otherwise.
+
+James
+
+> So, what about this patch which addresses both additions by keeping our
+> iterator as a pfn as you suggest.  It also simplifies some of the code
+> in the loop too.
+> 
+> Can the original folk with the problem test this patch?
+> 
+>  arch/arm/mm/dma-mapping.c |   18 ++++++++++--------
+>  1 files changed, 10 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 6b2fb87..076c26d 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -774,25 +774,27 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+>  	size_t size, enum dma_data_direction dir,
+>  	void (*op)(const void *, size_t, int))
+>  {
+> +	unsigned long pfn;
+> +	size_t left = size;
+> +
+> +	pfn = page_to_pfn(page) + offset / PAGE_SIZE;
+> +	offset %= PAGE_SIZE;
+> +
+>  	/*
+>  	 * A single sg entry may refer to multiple physically contiguous
+>  	 * pages.  But we still need to process highmem pages individually.
+>  	 * If highmem is not configured then the bulk of this loop gets
+>  	 * optimized out.
+>  	 */
+> -	size_t left = size;
+>  	do {
+>  		size_t len = left;
+>  		void *vaddr;
+>  
+> +		page = pfn_to_page(pfn);
+> +
+>  		if (PageHighMem(page)) {
+> -			if (len + offset > PAGE_SIZE) {
+> -				if (offset >= PAGE_SIZE) {
+> -					page += offset / PAGE_SIZE;
+> -					offset %= PAGE_SIZE;
+> -				}
+> +			if (len + offset > PAGE_SIZE)
+>  				len = PAGE_SIZE - offset;
+> -			}
+>  			vaddr = kmap_high_get(page);
+>  			if (vaddr) {
+>  				vaddr += offset;
+> @@ -809,7 +811,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+>  			op(vaddr, len, dir);
+>  		}
+>  		offset = 0;
+> -		page++;
+> +		pfn++;
+>  		left -= len;
+>  	} while (left);
+>  }
+
+Looks reasonable modulo all the simplification we could do if we can
+assume offset < PAGE_SIZE
+
+James
