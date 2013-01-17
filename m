@@ -1,28 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Jan 2013 14:36:00 +0100
-Subject: [PATCH] ARM: remove unnecessary 'select GENERIC_GPIO'
-In-Reply-To: <1358255616-3171-1-git-send-email-shawn.guo@linaro.org>
-References: <1358255616-3171-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkdYw6V_GGjBsj_bzzkmFVTamuMq2oMwYDKhjMrXeS5j+fQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 17 Jan 2013 13:39:21 +0000
+Subject: [PATCH] ARM: ux500: Include the PRCMU's Secure Registers in
+ DB8500's DT
+In-Reply-To: <CACRpkdZhRESXHNVFPzUx7H0ppZ+KSfPOJ2bPS+-CQyv6+8=oZQ@mail.gmail.com>
+References: <1357901029-9073-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZhRESXHNVFPzUx7H0ppZ+KSfPOJ2bPS+-CQyv6+8=oZQ@mail.gmail.com>
+Message-ID: <20130117133921.GQ20091@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 2:13 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Thu, 17 Jan 2013, Linus Walleij wrote:
 
-> The only use of GENERIC_GPIO (defined by architecture) in GPIO subsystem
-> is being selected by GPIOLIB.  Also there are no any use of the option
-> at architecture level. Only two sub-architectures shmobile and orion
-> really use the option as below.
->
->   arch/arm/mach-shmobile/Makefile:obj-$(CONFIG_GENERIC_GPIO)      += $(pfc-y)
->   arch/arm/plat-orion/Makefile:orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
->
-> Remove all those unnecessary sub-architecture level selection of
-> GENERIC_GPIO, which are there only for confusing people.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> On Fri, Jan 11, 2013 at 11:43 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > Currently we only include the PRCMU's primary registers when
+> > referencing the register count in the 'reg' property. This patch
+> > expands that count to include the secure registers also.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Will you push this to ARM SoC or shall I queue it?
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I'll take it.
 
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
