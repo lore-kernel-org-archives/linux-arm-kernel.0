@@ -1,37 +1,28 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 17 Jan 2013 10:59:12 +0100
-Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport power
- functions
-In-Reply-To: <1358415316.6252.20.camel@cumari.coelho.fi>
-References: <1358372702-13102-1-git-send-email-coelho@ti.com>
- <50F7C4A7.5060202@ti.com> <1358415316.6252.20.camel@cumari.coelho.fi>
-Message-ID: <50F7CB70.5010003@ti.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 17 Jan 2013 17:59:20 +0800
+Subject: [V3 PATCH 11/25] arm: mmp2: change the defintion of usb devices
+In-Reply-To: <20130117090902.GE10814@arwen.pp.htv.fi>
+References: <1358230758-10176-1-git-send-email-chao.xie@marvell.com>
+ <1358230758-10176-12-git-send-email-chao.xie@marvell.com>
+ <20130117090902.GE10814@arwen.pp.htv.fi>
+Message-ID: <CAN1soZzH8OPR=KLS+c5M_Ttme4XNhW6Pzz-gbPngSwo6+jXwMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Luca,
+On Thu, Jan 17, 2013 at 5:12 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Tue, Jan 15, 2013 at 01:19:04AM -0500, Chao Xie wrote:
+>> add the udc/otg/ehci devices for mmp2
+>>
+>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>
+> Haojian, can I get an Acked-by for this patch or will you carry it
+> yourself ?
+>
+> Likewise for all other arch/arm/* patches in this series
+>
+> --
+> balbi
 
-On 01/17/2013 10:35 AM, Luciano Coelho wrote:
->> I just wonder how this is going to work with DT... You are not going to have
->> the ability to use callback in this form.
->> I think the GPIO handling should be done in the driver itself rather than in
->> the board file.
-> 
-> I agree.  The problem is that it used to be in the ti-st driver itself,
-> but it has been removed in a patch that says "different platforms have
-> begun to have their own ways to power-up/down the chip." (eccf2979
-> drivers/misc/ti-st: remove gpio handling).
+Sure. You can apply these patches.
 
-Hrm, this is a strange patch for sure. Coming at times when we all suppose to
-move to DT and get rid of such callbacks for drivers.
-
-> This needs to be clarified first.  I think we could use this for now and
-> later fix this properly (hopefully move it back to the ti-st driver).
-
-Can the offending patch be reverted?
-As I said to Felipe, I don't have any objections against this patch. It fits
-the purpose. But with the DT support (and removing callbacks to platform code)
-you are going to have fair amount work.
-
--- 
-P?ter
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
