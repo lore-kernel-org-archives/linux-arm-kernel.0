@@ -1,87 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Jan 2013 16:37:00 +0000
-Subject: [PATCH v6 13/15] KVM: ARM: Handle I/O aborts
-In-Reply-To: <20130116175911.29147.40578.stgit@ubuntu>
-References: <20130116175716.29147.15348.stgit@ubuntu>
- <20130116175911.29147.40578.stgit@ubuntu>
-Message-ID: <50F828AC.2050307@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jan 2013 16:39:41 +0000
+Subject: [PATCH v5 06/14] ARM: EXYNOS: add System MMU definition to DT
+In-Reply-To: <20130116.184321.179736289870581833.hdoyu@nvidia.com>
+References: <003601cdd790$082a1310$187e3930$%cho@samsung.com>
+ <20130116115114.GB16543@mudshark.cambridge.arm.com>
+ <20130116.184321.179736289870581833.hdoyu@nvidia.com>
+Message-ID: <20130117163941.GL3699@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/13 17:59, Christoffer Dall wrote:
-> When the guest accesses I/O memory this will create data abort
-> exceptions and they are handled by decoding the HSR information
-> (physical address, read/write, length, register) and forwarding reads
-> and writes to QEMU which performs the device emulation.
+Hi Hiroshi,
+
+On Wed, Jan 16, 2013 at 04:43:21PM +0000, Hiroshi Doyu wrote:
+> Will Deacon <will.deacon@arm.com> wrote @ Wed, 16 Jan 2013 12:51:14 +0100:
+> > Given that this information is not discoverable, it needs to be encoded
+> > in the device tree, but where? I can see two approaches:
+> > 
+> >   1. For each IOMMU node, list phandles to the devices connected to it
+> >      and have a corresponding list of StreamIDs.
+> > 
+> > or
+> > 
+> >   2. For each device wishing to use an IOMMU, have a phandle to the
+> >      IOMMU node and a separate StreamID property. The IOMMU would then
+> >      parse this information when the device is added to the bus.
+> > 
+> > Although I prefer the second approach, it has the downside of affecting
+> > all device bindings that wish to use an IOMMU, so I'm open to any other
+> > ideas.
 > 
-> Certain classes of load/store operations do not support the syndrome
-> information provided in the HSR.  We don't support decoding these (patches
-> are available elsewhere), so we report an error to user space in this case.
+> Actually the above summarize tegra SMMU situation well too. For
+> example, each IOMMU'able device has IOVA constraint that some of the
+> address area isn't available because of its MMIO. This info needs to
+> be described in DT. If <IOMMU phandle> + some parametes are embedded
+> in a device node, that info could be dealt at a bus notifier(*1).
 > 
-> This requires changing the general flow somewhat since new calls to run
-> the VCPU must check if there's a pending MMIO load and perform the write
-> after userspace has made the data available.
-> 
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
-> Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+> *1: http://lists.linuxfoundation.org/pipermail/iommu/2012-November/004934.html
 
-[...]
+I've been thinking about this a bit more and, unfortunately, my conclusion
+is that method (2) above is problematic, so we do need something similar to
+(1).
 
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 04a9705..702743e 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -192,6 +192,44 @@ after_vfp_restore:
->         mov     r0, r1                  @ Return the return code
->         bx      lr                      @ return to IOCTL
-> 
-> +
-> +/********************************************************************
-> + * Translate VA to PA
-> + *
-> + * u64 __kvm_va_to_pa(struct kvm_vcpu *vcpu, u32 va, bool priv)
-> + *
-> + * Arguments:
-> + *  r0: pointer to vcpu struct
-> + *  r1: virtual address to map (rounded to page)
-> + *  r2: 1 = P1 (read) mapping, 0 = P0 (read) mapping.
-> + * Returns 64 bit PAR value.
-> + */
-> +ENTRY(__kvm_va_to_pa)
-> +       push    {r4-r12}
-> +
-> +       @ Fold flag into r1, easier than using stack.
-> +       cmp     r2, #0
-> +       movne   r2, #1
-> +       orr     r1, r1, r2
-> +
-> +       @ This swaps too many registers, but we're in the slow path anyway.
-> +       read_cp15_state store_to_vcpu = 0
-> +       write_cp15_state read_from_vcpu = 1
-> +
-> +       ands    r2, r1, #1
-> +       bic     r1, r1, r2
-> +       mcrne   p15, 0, r1, c7, c8, 0   @ VA to PA, ATS1CPR
-> +       mcreq   p15, 0, r1, c7, c8, 2   @ VA to PA, ATS1CUR
-> +       isb
-> +
-> +       @ Restore host state.
-> +       read_cp15_state store_to_vcpu = 1
-> +       write_cp15_state read_from_vcpu = 0
-> +
-> +       mrrc    p15, 0, r0, r1, c7      @ PAR
-> +       pop     {r4-r12}
-> +       bx      lr
-> +
+The reason for this comes about when dealing with chained IOMMUs. In this
+case, each IOMMU in the chain needs to know about all of the masters hanging
+beneath it (potentially behind other IOMMUs) but may also need to supplement
+each device with additional data relevant to that point in the IOMMU chain.
+In the case of the ARM System MMU, this could be StreamID information (as
+the StreamID for a device can change as the transaction stream passes
+through an SMMU) and for your case it could be that the DMA window is
+widened along the chain.
 
-Do we still need this function? Now that the MMIO emulation is gone,
-there should be no need to perform a manual translation.
+So, extending the mmu-master property described in this thread to be
+"mmu-masters : a list of phandles to device nodes representing bus masters
+for which the IOMMU can provide a translation" is probably a good start.
 
-I can't even find a caller for it either.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
