@@ -1,47 +1,169 @@
-From: smoch@web.de (Soeren Moch)
-Date: Thu, 17 Jan 2013 10:11:09 +0100
-Subject: [PATCH] ata: sata_mv: fix sg_tbl_pool alignment
-In-Reply-To: <20130116175203.GK25500@titan.lakedaemon.net>
-References: <20130115165642.GA25500@titan.lakedaemon.net>
- <20130115175020.GA3764@kroah.com>
- <20130115201617.GC25500@titan.lakedaemon.net>
- <20130115215602.GF25500@titan.lakedaemon.net> <50F5F1B7.3040201@web.de>
- <20130116024014.GH25500@titan.lakedaemon.net> <50F61D86.4020801@web.de>
- <50F66B1B.40301@web.de> <20130116155045.GI25500@titan.lakedaemon.net>
- <50F6DDF7.9080605@web.de> <20130116175203.GK25500@titan.lakedaemon.net>
-Message-ID: <50F7C02D.60305@web.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Jan 2013 11:14:22 +0200
+Subject: [PATCH v5 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
+ platform_device_id
+In-Reply-To: <20130116014824.GD16514@nchen-desktop>
+References: <1358216975-1404-1-git-send-email-peter.chen@freescale.com>
+ <1358216975-1404-2-git-send-email-peter.chen@freescale.com>
+ <20130115140344.GB6574@S2101-09.ap.freescale.net>
+ <20130116014824.GD16514@nchen-desktop>
+Message-ID: <20130117091422.GF10814@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.01.2013 18:52, Jason Cooper wrote:
-> On Wed, Jan 16, 2013 at 06:05:59PM +0100, Soeren Moch wrote:
->> On 16.01.2013 16:50, Jason Cooper wrote:
->>> On Wed, Jan 16, 2013 at 09:55:55AM +0100, Soeren Moch wrote:
->>>> On 16.01.2013 04:24, Soeren Moch wrote:
->>>>> On 16.01.2013 03:40, Jason Cooper wrote:
->>>>>> On Wed, Jan 16, 2013 at 01:17:59AM +0100, Soeren Moch wrote:
->>>>>>> On 15.01.2013 22:56, Jason Cooper wrote:
->>>>>>>> On Tue, Jan 15, 2013 at 03:16:17PM -0500, Jason Cooper wrote:
->>>
->>>> OK, I could trigger the error
->>>>    ERROR: 1024 KiB atomic DMA coherent pool is too small!
->>>>    Please increase it with coherent_pool= kernel parameter!
->>>> only with em28xx sticks and sata, dib0700 sticks removed.
->>>
->>> Did you test the reverse scenario?  ie dib0700 with sata_mv and no
->>> em28xx.
->>
->> Maybe I can test this next night.
->
-> Please do, this will tell us if it is in the USB drivers or lower
-> (something in common).
+On Wed, Jan 16, 2013 at 09:48:25AM +0800, Peter Chen wrote:
+> On Tue, Jan 15, 2013 at 10:03:46PM +0800, Shawn Guo wrote:
+> > On Tue, Jan 15, 2013 at 10:29:33AM +0800, Peter Chen wrote:
+> > > As mach/hardware.h is deleted, we need to use platform_device_id to
+> > > differentiate SoCs. Besides, one cpu_is_mx35 is useless as it has
+> > > already used pdata to differentiate runtime
+> > > 
+> > > Meanwhile we update the platform code accordingly.
+> > > 
+> > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > ---
+> > >  arch/arm/mach-imx/devices/devices-common.h        |    1 +
+> > >  arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c |   15 ++++---
+> > >  drivers/usb/gadget/fsl_mxc_udc.c                  |   24 +++++-------
+> > >  drivers/usb/gadget/fsl_udc_core.c                 |   42 +++++++++++++--------
+> > >  4 files changed, 45 insertions(+), 37 deletions(-)
+> > 
+> > Since we are splitting the original patch anyway, it's a bit strange
+> > to me that you are mixing arch/arm/mach-imx and drivers/usb/gadget
+> > in this patch.  I'm fine with it, since I assume all the patches to
+> > go via USB tree anyway.
+> > 
+> > > 
+> > > diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
+> > > index 6277baf..9bd5777 100644
+> > > --- a/arch/arm/mach-imx/devices/devices-common.h
+> > > +++ b/arch/arm/mach-imx/devices/devices-common.h
+> > > @@ -63,6 +63,7 @@ struct platform_device *__init imx_add_flexcan(
+> > >  
+> > >  #include <linux/fsl_devices.h>
+> > >  struct imx_fsl_usb2_udc_data {
+> > > +	const char *devid;
+> > >  	resource_size_t iobase;
+> > >  	resource_size_t irq;
+> > >  };
+> > > diff --git a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
+> > > index 37e4439..fb527c7 100644
+> > > --- a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
+> > > +++ b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
+> > > @@ -11,35 +11,36 @@
+> > >  #include "../hardware.h"
+> > >  #include "devices-common.h"
+> > >  
+> > > -#define imx_fsl_usb2_udc_data_entry_single(soc)				\
+> > > +#define imx_fsl_usb2_udc_data_entry_single(soc, _devid)			\
+> > >  	{								\
+> > > +		.devid = _devid,					\
+> > >  		.iobase = soc ## _USB_OTG_BASE_ADDR,			\
+> > >  		.irq = soc ## _INT_USB_OTG,				\
+> > >  	}
+> > >  
+> > >  #ifdef CONFIG_SOC_IMX25
+> > >  const struct imx_fsl_usb2_udc_data imx25_fsl_usb2_udc_data __initconst =
+> > > -	imx_fsl_usb2_udc_data_entry_single(MX25);
+> > > +	imx_fsl_usb2_udc_data_entry_single(MX25, "imx-udc-mx25");
+> > >  #endif /* ifdef CONFIG_SOC_IMX25 */
+> > >  
+> > >  #ifdef CONFIG_SOC_IMX27
+> > >  const struct imx_fsl_usb2_udc_data imx27_fsl_usb2_udc_data __initconst =
+> > > -	imx_fsl_usb2_udc_data_entry_single(MX27);
+> > > +	imx_fsl_usb2_udc_data_entry_single(MX27, "imx-udc-mx27");
+> > >  #endif /* ifdef CONFIG_SOC_IMX27 */
+> > >  
+> > >  #ifdef CONFIG_SOC_IMX31
+> > >  const struct imx_fsl_usb2_udc_data imx31_fsl_usb2_udc_data __initconst =
+> > > -	imx_fsl_usb2_udc_data_entry_single(MX31);
+> > > +	imx_fsl_usb2_udc_data_entry_single(MX31, "imx-udc-mx31");
+> > >  #endif /* ifdef CONFIG_SOC_IMX31 */
+> > >  
+> > >  #ifdef CONFIG_SOC_IMX35
+> > >  const struct imx_fsl_usb2_udc_data imx35_fsl_usb2_udc_data __initconst =
+> > > -	imx_fsl_usb2_udc_data_entry_single(MX35);
+> > > +	imx_fsl_usb2_udc_data_entry_single(MX35, "imx-udc-mx35");
+> > >  #endif /* ifdef CONFIG_SOC_IMX35 */
+> > >  
+> > >  #ifdef CONFIG_SOC_IMX51
+> > >  const struct imx_fsl_usb2_udc_data imx51_fsl_usb2_udc_data __initconst =
+> > > -	imx_fsl_usb2_udc_data_entry_single(MX51);
+> > > +	imx_fsl_usb2_udc_data_entry_single(MX51, "imx-udc-mx51");
+> > >  #endif
+> > >  
+> > >  struct platform_device *__init imx_add_fsl_usb2_udc(
+> > > @@ -57,7 +58,7 @@ struct platform_device *__init imx_add_fsl_usb2_udc(
+> > >  			.flags = IORESOURCE_IRQ,
+> > >  		},
+> > >  	};
+> > > -	return imx_add_platform_device_dmamask("fsl-usb2-udc", -1,
+> > > +	return imx_add_platform_device_dmamask(data->devid, -1,
+> > >  			res, ARRAY_SIZE(res),
+> > >  			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
+> > >  }
+> > 
+> > <snip>
+> > 
+> > > +static const struct platform_device_id fsl_udc_devtype[] = {
+> > > +	{
+> > > +		.name = "imx-udc-mx25",
+> > > +	}, {
+> > > +		.name = "imx-udc-mx27",
+> > > +	}, {
+> > > +		.name = "imx-udc-mx31",
+> > > +	}, {
+> > > +		.name = "imx-udc-mx35",
+> > > +	}, {
+> > > +		.name = "imx-udc-mx51",
+> > > +	}
+> > > +};
+> > 
+> > From what I understand balbi's comment, he dislikes this full list of
+> > device id.  Instead, he prefers to something like below.
+> > 
+> > static const struct platform_device_id fsl_udc_devtype[] = {
+> > 	{
+> > 		.name = "imx-udc-mx27",
+> > 	}, {
+> > 		.name = "imx-udc-mx51",
+> > 	}
+> > };
+> > 
+> > It basically tells that we are handling two type of devices here, one
+> > is imx-udc-mx27 type and the other is imx-udc-mx51 type, with mx25/31/35
+> > completely compatible with mx27 type.  We choose mx27 instead of mx25
+> > to define the type because mx27 Si came out earlier than mx25.  That
+> > said, we generally choose the earlies SoC name to define a particular
+> > version of IP block, since hardware version is mostly unavailable or
+> > unreliable.
+> > 
+> > But that also means in platform code which create the platform_device,
+> > you will need to use name "imx-udc-mx27" for even mx25/31/35.
+> > 
+> > 	imx_fsl_usb2_udc_data_entry_single(MX25, "imx-udc-mx27");
+> > 	imx_fsl_usb2_udc_data_entry_single(MX31, "imx-udc-mx27");
+> > 	imx_fsl_usb2_udc_data_entry_single(MX35, "imx-udc-mx27");
+> > 
+> > Considering this is a piece of code we will not use for any new
+> > hardware, I'm fine with either way.
+> > 
+> > So, balbi, it's all your call to accept the series as it is or ask for
+> > another iteration.
 
-Until now there is no error with dib0700 + sata, without em28xx.
+right :-)
 
-But to be sure that there is absolutely no problem with this setting
-we probably need additional testing hours.
-BTW, these dib0700 sticks use usb bulk transfers (and maybe smaller
-dma buffers?).
+> Thanks Shawn. Let's see Felipe's comment, nevertheless, I will send v6 patch
+> due to a compile error at mx25
 
-Regards,
-Soeren
+Shawn is right.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/7b038d76/attachment.sig>
