@@ -1,22 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 17 Jan 2013 13:25:19 +0530
-Subject: [PATCH v5 4/9] ARM: davinci: da850: added pll0_sysclk1 for DSP
- usage
-In-Reply-To: <1357863807-380-5-git-send-email-rtivy@ti.com>
-References: <1357863807-380-1-git-send-email-rtivy@ti.com>
- <1357863807-380-5-git-send-email-rtivy@ti.com>
-Message-ID: <50F7AE67.9090108@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 17 Jan 2013 09:12:33 +0100
+Subject: [PATCH] [RFC] ARM: compile fix for DEBUG_LL=y && MMU=n
+In-Reply-To: <50F6FCC0.6040204@gmail.com>
+References: <1358346726-27199-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <50F6FCC0.6040204@gmail.com>
+Message-ID: <20130117081233.GC8668@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 1/11/2013 5:53 AM, Robert Tivy wrote:
-> Added pll0_sysclk1 to allow clocking control for DSP
+On Wed, Jan 16, 2013 at 01:17:20PM -0600, Rob Herring wrote:
+> On 01/16/2013 08:32 AM, Uwe Kleine-K?nig wrote:
+> > debug_ll_addr is only used on machines with an MMU so it can be #ifdef'ed
+> > out safely. This fixes:
+> > 
+> > arch/arm/kernel/debug.S: Assembler messages:
+> > arch/arm/kernel/debug.S:104: Error: too many positional arguments
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Stephen Warren <swarren@nvidia.com>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > ---
+> > The obvious alternative fix is to make addruart on !MMU take 3
+> > arguments, too.
 > 
-> Signed-off-by: Robert Tivy <rtivy@ti.com>
+> We never envision a need to get the uart address from C code on !MMU?
+On MMU addruart takes 3 arguments: physical address output, virtual
+address output and a tmp. On !MMU physical == virtual, so only one
+register for the address is needed.
 
-Applied patches 3 and 4 as well.
+(BTW, it was commit 639da5e (ARM: add an extra temp register to the low
+level debugging addruart macro) that only changed the MMU variants of
+addruart.)
+ 
+Best regards
+Uwe
 
-Thanks,
-Sekhar
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
