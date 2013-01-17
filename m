@@ -1,33 +1,30 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 17 Jan 2013 18:51:08 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2: Fix missing omap2xxx_clkt_vps_xxx function
- calls
-In-Reply-To: <1357851209-5332-1-git-send-email-jon-hunter@ti.com>
-References: <1357851209-5332-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1301171848490.14118@utopia.booyaka.com>
+Date: Thu, 17 Jan 2013 19:00:00 +0000 (UTC)
+Subject: [PATCH v7 19/22] ARM: OMAP3: clock data: get rid of unused USB
+ host clock aliases and dummies
+In-Reply-To: <20130117170321.GJ14149@atomide.com>
+References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
+ <1358422231-24736-20-git-send-email-rogerq@ti.com>
+ <20130117170321.GJ14149@atomide.com>
+Message-ID: <alpine.DEB.2.00.1301171854280.14118@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon
+Hi Roger,
 
-On Thu, 10 Jan 2013, Jon Hunter wrote:
+On Thu, 17 Jan 2013, Tony Lindgren wrote:
 
-> During the migration to the common clock framework, calls to the
-> functions omap2xxx_clkt_vps_late_init() and
-> omap2xxx_clkt_vps_check_bootloader_rates() were not preserved for
-> OMAP2420 and OMAP2430. This causes the variables "sys_ck_rate" and
-> "curr_prcm_set" to be uninitialised on boot. On reboot, this causes the
-> following error message to be displayed because the appropriate MPU
-> clock frequency (derived from sys_ck_rate) cannot be found.
+> * Roger Quadros <rogerq@ti.com> [130117 03:34]:
+> > We don't need multiple aliases for the OMAP USB host clocks and neither
+> > the dummy clocks so remove them.
 > 
-> "Could not set MPU rate to 4294MHz"
+> It's best that Paul queues this and the next patch as these clock alias
+> clean-up patches can be done separately. That way the dependency between
+> arch/arm/*omap* code is cut away as these files should be moved to live
+> under drivers/clk/omap.
 
-I don't see this message on 2430sdp or n800 with v3.8-rc3, but maybe 
-that's due to sys_clk differences.  Do you still see this on v3.8-rc3 
-with H4?
+Per Tony's request, I'll queue these two cleanup patches for 3.10 -- or 
+whatever Linus will call it.
 
-Also, there's already a call to omap2xxx_clkt_vps_check_bootloader_rates() 
--- is it necessary to add another one?
 
-	
 - Paul
