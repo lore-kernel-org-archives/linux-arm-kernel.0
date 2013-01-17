@@ -1,56 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Jan 2013 16:29:51 +0800
-Subject: [PATCH] ARM: imx: remove unused imx6q_clock_map_io()
-Message-ID: <1358411391-2725-1-git-send-email-shawn.guo@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 17 Jan 2013 14:00:56 +0530
+Subject: [PATCH 3/3] ARM: omap2: use get_auxcr for aux ctrl register read
+In-Reply-To: <1358391205-23943-3-git-send-email-robherring2@gmail.com>
+References: <1358391205-23943-1-git-send-email-robherring2@gmail.com>
+ <1358391205-23943-3-git-send-email-robherring2@gmail.com>
+Message-ID: <50F7B6C0.5090102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx6q_clock_map_io() becomes an empty function since imx6q clock driver
-is moved to common clock framework.  It's used nowhere now.  Remove it.
+On Thursday 17 January 2013 08:23 AM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> Use get_auxcr instead of inline assembly to read the CP15 aux ctrl
+> register.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> ---
+This patch and the rest of the series looks fine to me.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/clk-imx6q.c  |    2 --
- arch/arm/mach-imx/common.h     |    1 -
- arch/arm/mach-imx/mach-imx6q.c |    1 -
- 3 files changed, 4 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 7f2c10c..c7e429b 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -56,8 +56,6 @@
- 
- static void __iomem *ccm_base;
- 
--void __init imx6q_clock_map_io(void) { }
--
- int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- {
- 	u32 val = readl_relaxed(ccm_base + CLPCR);
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 7191ab4..7eb3bb2 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -139,7 +139,6 @@ extern void imx_gpc_init(void);
- extern void imx_gpc_pre_suspend(void);
- extern void imx_gpc_post_resume(void);
- extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
--extern void imx6q_clock_map_io(void);
- 
- extern void imx_cpu_die(unsigned int cpu);
- 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 4eb1b3a..a009df7 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -218,7 +218,6 @@ static void __init imx6q_map_io(void)
- {
- 	imx_lluart_map_io();
- 	imx_scu_map_io();
--	imx6q_clock_map_io();
- }
- 
- static const struct of_device_id imx6q_irq_match[] __initconst = {
--- 
-1.7.9.5
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
