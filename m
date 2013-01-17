@@ -1,19 +1,21 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Jan 2013 10:12:42 +0800
-Subject: [PATCH] arm: mxs: Update mxs_defconfig
-In-Reply-To: <201301170222.51048.marex@denx.de>
-References: <1356055651-27145-1-git-send-email-marex@denx.de>
- <CAOMZO5Bxk44dug4XajZLHS2e==cBcLuUcSaGCrOrjPMpkDZ1VA@mail.gmail.com>
- <20130117012010.GA26179@S2101-09.ap.freescale.net>
- <201301170222.51048.marex@denx.de>
-Message-ID: <20130117021240.GD26179@S2101-09.ap.freescale.net>
+Date: Thu, 17 Jan 2013 10:17:10 +0800
+Subject: [PATCH v4] video: imxfb: Do not crash on reboot
+In-Reply-To: <1358341121-19480-1-git-send-email-fabio.estevam@freescale.com>
+References: <1358341121-19480-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130117021708.GE26179@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 02:22:50AM +0100, Marek Vasut wrote:
-> Do you think this can be made a stable matter for 3.7 ? It's a defconfig update 
-> afterall and it help a great deal.
+On Wed, Jan 16, 2013 at 10:58:41AM -0200, Fabio Estevam wrote:
+> Shawn,
 > 
-No, I don't think so.  Sorry.
+> Since you have taken a patch recently that touches this file and given the fact
+> that we have zero response from the fb maintainer, can you please apply it via
+> imx tree?
+
+Ok, I will queue it as the 3rd batch of fixes to be sent next week.
+
+Is it a material for stable tree?
 
 Shawn
