@@ -1,35 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 16 Jan 2013 20:10:39 -0800
-Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
-In-Reply-To: <20130117145324.3f1f27fb5902b5a03135bf06@canb.auug.org.au>
-References: <20130111153206.e075edb9b1e4a38d90f23ab6@canb.auug.org.au>
- <20130117145324.3f1f27fb5902b5a03135bf06@canb.auug.org.au>
-Message-ID: <0c8401cdf468$9e920c00$dbb62400$@samsung.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 17 Jan 2013 10:08:08 +0530
+Subject: [PATCH 1/2] ARM: tegra: config: enable SERIAL_TEGRA
+In-Reply-To: <50F6EA0A.4080904@wwwdotorg.org>
+References: <1358341572-8154-1-git-send-email-ldewangan@nvidia.com>
+ <50F6EA0A.4080904@wwwdotorg.org>
+Message-ID: <50F78030.6080305@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Rothwell wrote:
-> 
-> Hi Kukjin,
-> 
-Hi,
+On Wednesday 16 January 2013 11:27 PM, Stephen Warren wrote:
+> On 01/16/2013 06:06 AM, Laxman Dewangan wrote:
+>> Enable high speed serial driver for tegra platform.
+> Thanks, I've applied patch 1 to Tegra's for-3.9/defconfig branch and
+> patch 2 to Tegra's for-3.9/dt branch.
+>
+> Just as an FYI, the dt branch is merged into my for-next branch, and
+> sent upstream, before the defconfig branch, so your patch order was
+> reversed relative to that, but it's not an issue here.
 
-> On Fri, 11 Jan 2013 15:32:06 +1100 Stephen Rothwell <sfr@canb.auug.org.au>
-> wrote:
-> >
-> > Today's linux-next merge of the samsung tree got conflicts in
-> > many files with the arm-soc tree.
-> >
-> > I just dropped the samsung tree for today.  Please have a look and try
-to
-> > fix this mess up, thanks.
-> 
-> Ping?
+Thanks for applying it. There is no issue on the reversing the sequence.
 
-Oops, I missed above e-mail. Anyway, really?
 
-Let me look at it soon and I will fix.
+> Question: How do I test this; do I just fire up bluez(?) and point it at
+> the UARTC serial port, or is there more to it?
 
-Thanks for your information.
+I tested this in may pieces, not with the bluez.
+I tested this in downstream with linux-next dma, this new serial driver, 
+some hacks in the board files with bluetooth.
 
-- Kukjin
+Then I tested this again on linux-next with some hacks in board-dt filew 
+with invoking  the driver from cardhu dts file. In this I tested driver 
+registration, basic write is wokring or not with some register 
+dump/interrupt, Not checked data integrity as not connected the serial 
+sniffer. The idea is that nothing should be crash in linux-next. The 
+basic driver code is already tested with bluetooth.
