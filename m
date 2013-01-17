@@ -1,31 +1,30 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 17 Jan 2013 14:10:18 +0200
-Subject: [PATCH v7 15/22] mfd: omap-usb-host: Manage HSIC clocks for HSIC
- mode
-In-Reply-To: <20130117114522.GF18978@arwen.pp.htv.fi>
-References: <1358422231-24736-1-git-send-email-rogerq@ti.com>
- <1358422231-24736-16-git-send-email-rogerq@ti.com>
- <20130117114522.GF18978@arwen.pp.htv.fi>
-Message-ID: <50F7EA2A.2080705@ti.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 17 Jan 2013 14:12:25 +0200
+Subject: [PATCH v2 0/3] at91: PMECC: enable PMECC in dt for
+ at91sam9x5ek, at91sam9n12ek
+In-Reply-To: <1358393072-14794-1-git-send-email-josh.wu@atmel.com>
+References: <1358393072-14794-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1358424745.2731.238.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2013 01:45 PM, Felipe Balbi wrote:
-> Hi,
+On Thu, 2013-01-17 at 11:24 +0800, Josh Wu wrote:
+> Those patches will enable PMECC in dt parameters for at91sam9x5ek, at91sam9n12ek.
+> The driver will check minimum required ecc on ONFI parameter from NAND flash. 
+> If pmecc-cap in dts doesn't meet the requirement then driver reports a error.
 > 
-> On Thu, Jan 17, 2013 at 01:30:24PM +0200, Roger Quadros wrote:
->> @@ -598,6 +639,24 @@ static int usbhs_omap_probe(struct platform_device *pdev)
->>  				clkname, PTR_ERR(pclk));
->>  		else
->>  			omap->utmi_clk[i] = pclk;
->> +
->> +		snprintf(clkname, sizeof(clkname),
->> +				"usb_host_hs_hsic480m_p%d_clk", i + 1);
-> 
-> do we really need to know the exact clock node name ?
-> 
-I think so. Do you have a better suggestion?
+> v2: rebase to v3.8-rc3. And wrapped the commit message.
 
---
-cheers,
--roger
+Please, whenever you know your patch-set depends on something which is
+not yet in Linuse's tree, _always_ explicitly say about this.
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130117/92f99152/attachment.sig>
