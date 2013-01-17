@@ -1,42 +1,34 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 Jan 2013 09:31:01 -0700
-Subject: [PATCH v2] drivers/pinctrl: grab default handles from device core
-In-Reply-To: <20130117060214.GC1197@verge.net.au>
-References: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
- <50EF27B4.60608@wwwdotorg.org>
- <CACRpkdZ0b=ZohgaBH3qPH_O5TiWmXJXs6872D+YPVA9g4BssYg@mail.gmail.com>
- <9702060.jEbHySsCv0@avalon>
- <CACRpkdbFH6RCEEnXO=A9FVa0B5rtE9RkjXz9Hhy+w7NvwcBCgg@mail.gmail.com>
- <50F6E811.2040606@wwwdotorg.org> <20130117060214.GC1197@verge.net.au>
-Message-ID: <50F82745.6050507@wwwdotorg.org>
+Date: Thu, 17 Jan 2013 09:35:18 -0700
+Subject: [PATCH v4 2/9] clk: tegra: Add tegra specific clocks
+In-Reply-To: <20130117.070327.1625310713330263780.hdoyu@nvidia.com>
+References: <1357890387-23245-3-git-send-email-pgaikwad@nvidia.com><20130116.171242.2189136612266237422.hdoyu@nvidia.com><50F7096C.7020803@wwwdotorg.org>
+ <20130117.070327.1625310713330263780.hdoyu@nvidia.com>
+Message-ID: <50F82846.2030008@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2013 11:02 PM, Simon Horman wrote:
-> On Wed, Jan 16, 2013 at 10:49:05AM -0700, Stephen Warren wrote:
->> On 01/11/2013 01:45 PM, Linus Walleij wrote:
->>> On Fri, Jan 11, 2013 at 9:36 PM, Laurent Pinchart
->>> <laurent.pinchart@ideasonboard.com> wrote:
->>>
->>>> I've sent several patch series for the SH PFC (Pin Function Controller) to the
->>>> linux-sh mailing list. One of the series included pinctrl core patches for
->>>> easier testing, but I made it clear that they should *not* be pushed to
->>>> mainline through the SH tree.
->>>
->>> No big deal, what fun is linux-next if we don't break it ;-)
->>
->> Hmm. It's causing a lot of engineers here a lot of trouble, since they
->> all see linux-next won't boot, and haven't been paying enough attention
->> to know which commit to revert:-(. Lots of lost productivity:-(
->>
->> Simon, the offending commit:
->>
->> 6d3ef6b drivers/pinctrl: grab default handles from device core
->>
->> is still in next-20130116. Can you please remove it?
+On 01/16/2013 10:03 PM, Hiroshi Doyu wrote:
+> Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 16 Jan 2013 21:11:24 +0100:
 > 
-> I removed the commit yesterday.
-> Please let me know if it seems to be lingering.
+>>>> +static int clk_frac_div_set_rate(struct clk_hw *hw, unsigned long rate,
+>>>> +                               unsigned long parent_rate)
+>>>> +{
+>>>> +       struct tegra_clk_frac_div *divider = to_clk_frac_div(hw);
+>>>> +       int div;
+>>>> +       unsigned long flags = 0;
+>>>
+>>> nit, is "flags" not needed to initialize here?
+>>
+>> It avoids a compiler warning; the compiler doesn't that the if condition
+>> that guards the path that uses flags is the same condition as the path
+>> that initializes it. Or, it may be related to the fact that
+>> spin_lock_irqsave() writes to the value through a pointer parameter, and
+>> the compiler doesn't know it's an out-only parameter.
+> 
+> It might be better to append the special comment /* GCC */[1] on that line.
+> 
+> [1] https://lwn.net/Articles/529954/
 
-Thanks. I believe it's gone from next-20130117, judging by a quick
-search through "git log" at least.
+I note that patch hasn't actually been merged though, so I think I'll
+avoid doing that for now.
