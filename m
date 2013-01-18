@@ -1,78 +1,77 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 18 Jan 2013 20:46:19 +0200
-Subject: [RESEND PATCH v9 0/2] usb: phy: samsung: Introducing usb phy
- driver for samsung SoCs
-In-Reply-To: <1358499623-13901-1-git-send-email-p.paneri@samsung.com>
-References: <1358499623-13901-1-git-send-email-p.paneri@samsung.com>
-Message-ID: <20130118184619.GA1991@arwen.pp.htv.fi>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 19 Jan 2013 00:21:22 +0530
+Subject: [PATCH 5/5] ARM: dts: OMAP5: Specify nonsecure PPI IRQ for arch
+ timer
+In-Reply-To: <50F98176.6070703@arm.com>
+References: <1358523141-12295-1-git-send-email-santosh.shilimkar@ti.com>
+ <1358523141-12295-6-git-send-email-santosh.shilimkar@ti.com>
+ <50F97207.1030706@arm.com> <50F97FA4.9010608@ti.com>
+ <50F98176.6070703@arm.com>
+Message-ID: <50F999AA.2020901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 18 January 2013 10:38 PM, Marc Zyngier wrote:
+> On 18/01/13 17:00, Santosh Shilimkar wrote:
+>> On Friday 18 January 2013 09:32 PM, Marc Zyngier wrote:
+>>> On 18/01/13 15:32, Santosh Shilimkar wrote:
+>>>> From: Rajendra Nayak <rnayak@ti.com>
+>>>>
+>>>> Specify both secure as well as nonsecure PPI IRQ for arch
+>>>> timer. This fixes the following errors seen on DT OMAP5 boot..
+>>>>
+>>>> [    0.000000] arch_timer: No interrupt available, giving up
+>>>>
+>>>> Cc: Benoit Cousson <b-cousson@ti.com>
+>>>>
+>>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++----
+>>>>    1 file changed, 12 insertions(+), 4 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>>>> index 790bb2a..7a78d1b 100644
+>>>> --- a/arch/arm/boot/dts/omap5.dtsi
+>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>>>> @@ -35,8 +35,12 @@
+>>>>    			compatible = "arm,cortex-a15";
+>>>>    			timer {
+>>>>    				compatible = "arm,armv7-timer";
+>>>> -				/* 14th PPI IRQ, active low level-sensitive */
+>>>> -				interrupts = <1 14 0x308>;
+>>>> +				/*
+>>>> +				 * PPI secure/nonsecure IRQ,
+>>>> +				 * active low level-sensitive
+>>>> +				 */
+>>>> +				interrupts = <1 13 0x308>,
+>>>> +					     <1 14 0x308>;
+>>>
+>>> Care to add the virtual and HYP timer interrupts? So KVM can get a
+>>> chance to run on this HW...
+>>>
+>> Thanks Marc for spotting it. Will take care of it.
+>
+> I just realised something silly... You have one timer node *per cpu*,
+> and this is not really expected.
+>
+This was discussed on the list here [1]
+Benoit suggested to add per CPU node since arch timer is per
+CPU and DT should describe the hw the way it is. Did we miss
+something ?
 
-On Fri, Jan 18, 2013 at 02:30:21PM +0530, Praveen Paneri wrote:
-> Changes from v8:
-> Resending this patch series after rebasing to the latest usb-next branch.
-> Rewording inline comments for better readability.
-> Removed IS_ENABLED(CONFIG_OF) as pdev->dev.of_node is enough to check for dt support.
-> Using of_match_ptr to add of_match_table to platform_driver structure.
-> Removed unnecessary variables.
-> 
-> Changes from v7:
-> Rebased to the latest usb-next branch.
-> Separating arch patches from these driver patches.
-> 
-> Changes from v6:
-> Modified register definitions according to the existing ones.
-> Changed default PHY clk selection for SoCs.
-> Improved binding text and rebased to the latest usb-next.
-> 
-> Changes from v5:
-> Moved clk_get() to driver's probe function. Now reference clock frequency
-> selection value is stored in samsung_usbphy structure for later use. Used
-> IS_ENABLED() instead of #ifdef in samsung_usbphy_get_driver_data().
-> 
-> Changes from v4:
-> Moved header file contents to driver's source file
-> Removed unnecessary print message from driver's probe function
-> Dropped the Free Software Foundation address from the header
-> 
-> Changes from v3:
-> Replaced susbsys_initcall()/module_exit() by module_platform_driver().
-> Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
-> is registered
-> Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
-> 
-> Changes from v2:
-> Changed the driver filenames to samsung-usbphy
-> Rectified coding style related errors
-> 
-> Changes from v1:
-> Rebased patches to latest usb-next branch
-> Changed the name 'sec_usbphy' to 'samsung_usbphy'
-> 
-> This patch set introduces a phy driver for samsung SoCs. It uses the existing
-> transceiver infrastructure to provide phy control functions. Use of this driver
-> can be extended for usb host phy as well. Over the period of time all the phy
-> related code for most of the samsung SoCs can be integrated here.
-> Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
-> when they start supporting this phy driver. 
-> This driver is tested with smdk6410 and Exynos4210(with DT).
-> 
-> Praveen Paneri (2):
->   usb: phy: samsung: Introducing usb phy driver for hsotg
->   usb: s3c-hsotg: Adding phy driver support
+> The driver really wants one single node. See
+> arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts for an example.
+>
+I remember adding only one node based on above file and then
+updating the patch based on the comment.
 
-Can you check on my xceiv branch if this is applied correctly ?
+> Oh, and your GIC node could do with some updating too (no VGIC regs or
+> interrupt).
+>
+Will have a look at that as well.
 
-thanks
+Regards
+Santosh,
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130118/2bfd8ea3/attachment.sig>
+[1] https://patchwork.kernel.org/patch/1312061/
