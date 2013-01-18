@@ -1,165 +1,43 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 18 Jan 2013 11:09:50 +0100
-Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <20130118095620.GA7552@arm.com>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <1357764194-12677-11-git-send-email-thierry.reding@avionic-design.de>
- <20130118095620.GA7552@arm.com>
-Message-ID: <20130118100950.GA7596@avionic-0098.adnet.avionic-design.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 18 Jan 2013 11:11:46 +0100
+Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport power
+ functions
+In-Reply-To: <20130117231608.GP14149@atomide.com>
+References: <1358372702-13102-1-git-send-email-coelho@ti.com>
+ <50F7C4A7.5060202@ti.com> <20130117093417.GH10814@arwen.pp.htv.fi>
+ <50F7CA82.4050509@ti.com> <20130117100510.GI10814@arwen.pp.htv.fi>
+ <20130117100919.GJ10814@arwen.pp.htv.fi>
+ <1358418917.6252.31.camel@cumari.coelho.fi> <50F7D535.6030205@ti.com>
+ <20130117173131.GL14149@atomide.com>
+ <1358445456.6252.64.camel@cumari.coelho.fi>
+ <20130117231608.GP14149@atomide.com>
+Message-ID: <50F91FE2.3020402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 09:56:20AM +0000, Andrew Murray wrote:
-> On Wed, Jan 09, 2013 at 08:43:10PM +0000, Thierry Reding wrote:
-> > Move the PCIe driver from arch/arm/mach-tegra into the drivers/pci/host
-> > directory. The motivation is to collect various host controller drivers
-> > in the same location in order to facilitate refactoring.
-> > 
-> > The Tegra PCIe driver has been largely rewritten, both in order to turn
-> > it into a proper platform driver and to add MSI (based on code by
-> > Krishna Kishore <kthota@nvidia.com>) as well as device tree support.
-> > 
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> 
-> [snip]
-> 
-> > +static int tegra_pcie_enable(struct tegra_pcie *pcie)
-> > +{
-> > +       struct hw_pci hw;
-> > +
-> > +       memset(&hw, 0, sizeof(hw));
-> > +
-> > +       hw.nr_controllers = 1;
-> > +       hw.private_data = (void **)&pcie;
-> > +       hw.setup = tegra_pcie_setup;
-> > +       hw.scan = tegra_pcie_scan_bus;
-> > +       hw.map_irq = tegra_pcie_map_irq;
-> > +
-> > +       pci_common_init(&hw);
-> > +
-> > +       return 0;
-> > +}
-> 
-> [snip]
-> 
-> > +static int tegra_pcie_probe(struct platform_device *pdev)
-> > +{
-> > +       struct device_node *port;
-> > +       struct tegra_pcie *pcie;
-> > +       int err;
-> > +
-> > +       pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
-> > +       if (!pcie)
-> > +               return -ENOMEM;
-> > +
-> > +       INIT_LIST_HEAD(&pcie->ports);
-> > +       pcie->dev = &pdev->dev;
-> > +
-> > +       err = tegra_pcie_parse_dt(pcie);
-> > +       if (err < 0)
-> > +               return err;
-> > +
-> > +       pcibios_min_mem = 0;
-> > +
-> > +       err = tegra_pcie_get_resources(pcie);
-> > +       if (err < 0) {
-> > +               dev_err(&pdev->dev, "failed to request resources: %d\n", err);
-> > +               return err;
-> > +       }
-> > +
-> > +       err = tegra_pcie_enable_controller(pcie);
-> > +       if (err)
-> > +               goto put_resources;
-> > +
-> > +       /* probe root ports */
-> > +       for_each_child_of_node(pdev->dev.of_node, port) {
-> > +               if (!of_device_is_available(port))
-> > +                       continue;
-> > +
-> > +               err = tegra_pcie_add_port(pcie, port);
-> > +               if (err < 0) {
-> > +                       dev_err(&pdev->dev, "failed to add port %s: %d\n",
-> > +                               port->name, err);
-> > +               }
-> > +       }
-> > +
-> > +       /* setup the AFI address translations */
-> > +       tegra_pcie_setup_translations(pcie);
-> > +
-> > +       if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> > +               err = tegra_pcie_enable_msi(pcie);
-> > +               if (err < 0) {
-> > +                       dev_err(&pdev->dev,
-> > +                               "failed to enable MSI support: %d\n",
-> > +                               err);
-> > +                       goto put_resources;
-> > +               }
-> > +       }
-> > +
-> > +       err = tegra_pcie_enable(pcie);
-> > +       if (err < 0) {
-> > +               dev_err(&pdev->dev, "failed to enable PCIe ports: %d\n", err);
-> > +               goto disable_msi;
-> > +       }
-> > +
-> > +       platform_set_drvdata(pdev, pcie);
-> > +       return 0;
-> > +
-> > +disable_msi:
-> > +       if (IS_ENABLED(CONFIG_PCI_MSI))
-> > +               tegra_pcie_disable_msi(pcie);
-> > +put_resources:
-> > +       tegra_pcie_put_resources(pcie);
-> > +       return err;
-> > +}
-> > +
-> 
-> [snip]
-> 
-> > +
-> > +static const struct of_device_id tegra_pcie_of_match[] = {
-> > +       { .compatible = "nvidia,tegra20-pcie", },
-> > +       { },
-> > +};
-> > +
-> > +static struct platform_driver tegra_pcie_driver = {
-> > +       .driver = {
-> > +               .name = "tegra-pcie",
-> > +               .owner = THIS_MODULE,
-> > +               .of_match_table = tegra_pcie_of_match,
-> > +       },
-> > +       .probe = tegra_pcie_probe,
-> > +       .remove = tegra_pcie_remove,
-> > +};
-> > +module_platform_driver(tegra_pcie_driver);
-> 
-> If you have multiple 'nvidia,tegra20-pcie's in your DT then you will end up
-> with multiple calls to tegra_pcie_probe/tegra_pcie_enable/pci_common_init.
-> 
-> However pci_common_init/pcibios_init_hw assumes it will only ever be called
-> once, and will thus result in trying to create multiple busses with the same
-> bus number. (The first root bus it creates is always zero provided you haven't
-> implemented hw->scan).
+Hi Tony,
 
-Right, I hadn't noticed. There's currently no hardware that actually has
-two PCIe host bridges but I wanted to keep the driver properly prepared
-in case this ever happened.
+On 01/18/2013 12:16 AM, Tony Lindgren wrote:
+> Well we are planning to drop the non-DT support for omap4 as soon as it's
+> usable with DT.
 
-Actually I've reimplemented hw->scan, but it still forwards the bus
-number setup by pcibios_init_hw() (sys->busnr) to pci_create_root_bus()
-so it will still break. I wonder, though, if a better approach would be
-to take this number from the bus-range property in DT instead.
+Exactly, but right now we do have legacy and legacy should work in order to
+help for example Luca to make the final push which allows us to move to DT
+only for OMAP4.
 
-> I have a patch for this if you want to fold it into your series? (I see you've
-> made changes to bios32 for per-controller data).
+> For omap4 we are only carrying SDP and panda support to
+> make this transition easier. The only bindings missing AFAIK are wl12xx and
+> USB.
+>
+> If we add this, then it implies we're somehow supporting it, which is not
+> the way to go IMHO as we need to get rid of these platform callbacks instead.
 
-I would certainly like to take a look at it.
+IMHO we should keep these boards working as long as we have the legacy board
+support for them.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130118/041e6779/attachment.sig>
+So what is the policy now regarding to 'old' legacy but still used OMAP4 board
+files? I think we should still maintain them, but the effort to get rid of
+them should be the highest priority.
+
+-- 
+P?ter
