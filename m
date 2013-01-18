@@ -1,49 +1,30 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 18 Jan 2013 12:59:15 +0200
-Subject: [PATCH 1/1] ARM: Add API to detect SCU base address from CP15
-Message-ID: <1358506755-13705-1-git-send-email-hdoyu@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Jan 2013 10:59:02 +0000
+Subject: [PATCH 2/2] usb: chipidea: imx: Add system suspend/resume API
+In-Reply-To: <1358477428-2605-2-git-send-email-peter.chen@freescale.com>
+References: <1358477428-2605-1-git-send-email-peter.chen@freescale.com>
+ <1358477428-2605-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130118105901.GC23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add API to detect SCU base address from CP15.
+On Fri, Jan 18, 2013 at 10:50:28AM +0800, Peter Chen wrote:
+> +#ifdef CONFIG_PM
+> +static int ci13xxx_imx_suspend(struct device *dev)
+> +{
+> +	struct ci13xxx_imx_data *data =
+> +		platform_get_drvdata(to_platform_device(dev));
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
-NOTE:
-This wasn't delivered to linux-arm-kernel at lists.infradead.org, resending....
+Is there a reason not to use dev_get_drvdata() here?  Hint:
 
-For usage: http://patchwork.ozlabs.org/patch/212013/
----
- arch/arm/include/asm/smp_scu.h |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+#define to_platform_device(x) container_of((x), struct platform_device, dev)
 
-diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
-index 4eb6d00..f619eef 100644
---- a/arch/arm/include/asm/smp_scu.h
-+++ b/arch/arm/include/asm/smp_scu.h
-@@ -6,6 +6,23 @@
- #define SCU_PM_POWEROFF	3
- 
- #ifndef __ASSEMBLER__
-+
-+#include <asm/cputype.h>
-+
-+static inline phys_addr_t scu_get_base(void)
-+{
-+	phys_addr_t pa;
-+	unsigned long part_number = read_cpuid_part_number();
-+
-+	switch (part_number) {
-+	case ARM_CPU_PART_CORTEX_A9:
-+		/* Get SCU physical base */
-+		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
-+		return pa;
-+	default:
-+		return 0;
-+	}
-+}
- unsigned int scu_get_core_count(void __iomem *);
- void scu_enable(void __iomem *);
- int scu_power_mode(void __iomem *, unsigned int);
--- 
-1.7.9.5
+static inline void *platform_get_drvdata(const struct platform_device *pdev)
+{
+        return dev_get_drvdata(&pdev->dev);
+}
+
+So, you're going from a dev => platform device => the same dev again.
+
+It's perfectly valid to use dev_get_drvdata() here because we're not going
+to separate these two (it makes absolutely no sense to.)
