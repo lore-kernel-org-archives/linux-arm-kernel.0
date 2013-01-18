@@ -1,64 +1,80 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 18 Jan 2013 15:31:16 +0800
-Subject: [PATCH v7 12/15] pinctrl: generic: dump pin configuration
+Date: Fri, 18 Jan 2013 15:31:17 +0800
+Subject: [PATCH v7 13/15] pinctrl: single: set function mask as optional
 In-Reply-To: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1358494279-16503-13-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1358494279-16503-14-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the support of dumping pin configuration.
+Since Hisilicon's pin controller is divided into two parts. One is the
+function mux, and the other is pin configuration. These two parts are
+in the different memory regions. So make pinctrl-single,function-mask
+as optional property. Then we can define pingroups without valid
+function mux that is only used for pin configuration.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/pinctrl/pinconf-generic.c |   12 ++++++++++++
- drivers/pinctrl/pinconf.h         |    8 ++++++++
- 2 files changed, 20 insertions(+)
+ drivers/pinctrl/pinctrl-single.c |   26 ++++++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
-index 678db63..9bb6d47 100644
---- a/drivers/pinctrl/pinconf-generic.c
-+++ b/drivers/pinctrl/pinconf-generic.c
-@@ -119,4 +119,16 @@ void pinconf_generic_dump_group(struct pinctrl_dev *pctldev,
- 	}
- }
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index 8b9dd95..fe8f321 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -350,6 +350,9 @@ static int pcs_enable(struct pinctrl_dev *pctldev, unsigned fselector,
+ 	int i;
  
-+void pinconf_generic_dump_config(struct pinctrl_dev *pctldev,
-+				 struct seq_file *s, unsigned long config)
-+{
-+	int i;
+ 	pcs = pinctrl_dev_get_drvdata(pctldev);
++	/* If function mask is null, needn't enable it. */
++	if (!pcs->fmask)
++		return 0;
+ 	func = radix_tree_lookup(&pcs->ftree, fselector);
+ 	if (!func)
+ 		return -EINVAL;
+@@ -384,6 +387,10 @@ static void pcs_disable(struct pinctrl_dev *pctldev, unsigned fselector,
+ 	int i;
+ 
+ 	pcs = pinctrl_dev_get_drvdata(pctldev);
++	/* If function mask is null, needn't disable it. */
++	if (!pcs->fmask)
++		return;
 +
-+	for(i = 0; i < ARRAY_SIZE(conf_items); i++) {
-+		if (pinconf_to_config_param(config) != conf_items[i].param)
-+			continue;
-+		seq_printf(s, "%s: 0x%x", conf_items[i].display,
-+			   pinconf_to_config_argument(config));
+ 	func = radix_tree_lookup(&pcs->ftree, fselector);
+ 	if (!func) {
+ 		dev_err(pcs->dev, "%s could not find function%i\n",
+@@ -427,6 +434,10 @@ static int pcs_request_gpio(struct pinctrl_dev *pctldev,
+ 	int mux_bytes = 0;
+ 	unsigned data;
+ 
++	/* If function mask is null, return directly. */
++	if (!pcs->fmask)
++		return -ENOTSUPP;
++
+ 	list_for_each_safe(pos, tmp, &pcs->gpiofuncs) {
+ 		frange = list_entry(pos, struct pcs_gpiofunc_range, node);
+ 		if (pin >= frange->offset + frange->npins
+@@ -969,10 +980,17 @@ static int pcs_probe(struct platform_device *pdev)
+ 	PCS_GET_PROP_U32("pinctrl-single,register-width", &pcs->width,
+ 			 "register width not specified\n");
+ 
+-	PCS_GET_PROP_U32("pinctrl-single,function-mask", &pcs->fmask,
+-			 "function register mask not specified\n");
+-	pcs->fshift = ffs(pcs->fmask) - 1;
+-	pcs->fmax = pcs->fmask >> pcs->fshift;
++	ret = of_property_read_u32(np, "pinctrl-single,function-mask",
++				   &pcs->fmask);
++	if (!ret) {
++		pcs->fshift = ffs(pcs->fmask) - 1;
++		pcs->fmax = pcs->fmask >> pcs->fshift;
++	} else {
++		/* If mask property doesn't exist, function mux is invalid. */
++		pcs->fmask = 0;
++		pcs->fshift = 0;
++		pcs->fmax = 0;
 +	}
-+}
- #endif
-diff --git a/drivers/pinctrl/pinconf.h b/drivers/pinctrl/pinconf.h
-index e3ed8cb..8023421 100644
---- a/drivers/pinctrl/pinconf.h
-+++ b/drivers/pinctrl/pinconf.h
-@@ -98,6 +98,8 @@ void pinconf_generic_dump_pin(struct pinctrl_dev *pctldev,
- void pinconf_generic_dump_group(struct pinctrl_dev *pctldev,
- 			      struct seq_file *s, const char *gname);
  
-+void pinconf_generic_dump_config(struct pinctrl_dev *pctldev,
-+				 struct seq_file *s, unsigned long config);
- #else
- 
- static inline void pinconf_generic_dump_pin(struct pinctrl_dev *pctldev,
-@@ -114,4 +116,10 @@ static inline void pinconf_generic_dump_group(struct pinctrl_dev *pctldev,
- 	return;
- }
- 
-+static void pinconf_generic_dump_config(struct pinctrl_dev *pctldev,
-+					struct seq_file *s,
-+					unsigned long config)
-+{
-+	return;
-+}
- #endif
+ 	ret = of_property_read_u32(np, "pinctrl-single,function-off",
+ 					&pcs->foff);
 -- 
 1.7.10.4
