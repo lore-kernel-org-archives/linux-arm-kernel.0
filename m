@@ -1,24 +1,83 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 18 Jan 2013 11:46:42 +0100
-Subject: OMAP baseline test results for v3.8-rc3
-In-Reply-To: <alpine.DEB.2.00.1301171841350.14118@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1301141756460.20390@utopia.booyaka.com>
- <50F51067.5090008@ti.com>
- <alpine.DEB.2.00.1301171841350.14118@utopia.booyaka.com>
-Message-ID: <50F92812.3080406@ti.com>
+From: rachna@ti.com (Patil, Rachna)
+Date: Fri, 18 Jan 2013 16:17:41 +0530
+Subject: [PATCH v3 1/8] input: ti_am335x_tsc: Step enable bits made
+ configurable
+In-Reply-To: <cover.1358502134.git.rachna@ti.com>
+References: <cover.1358502134.git.rachna@ti.com>
+Message-ID: <c7c319bc186fd98b35fb834e770561572bfb81b5.1358502134.git.rachna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+From: "Patil, Rachna" <rachna@ti.com>
 
-On 01/17/2013 07:43 PM, Paul Walmsley wrote:
->> The following patch fixes these:
->> https://lkml.org/lkml/2012/12/24/3
-> 
-> Thanks, I've added that info in the v3.8-rc3 test summary, and moved the
-> paragraph to the 'resolved by posted patches' section.
+Current code has hard coded value written to
+step enable bits. Now the bits are updated based
+on how many steps are needed to be configured got
+from platform data.
 
-FYI: the patch is now in mainline (3.8-rc4)
+The user needs to take care not to exceed
+the count more than 16. While using ADC and TSC
+one should take care to set this parameter correctly.
 
+Signed-off-by: Patil, Rachna <rachna@ti.com>
+---
+ drivers/input/touchscreen/ti_am335x_tsc.c |   10 ++++++++--
+ include/linux/mfd/ti_am335x_tscadc.h      |    1 -
+ 2 files changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
+index 51e7b87..da652e0 100644
+--- a/drivers/input/touchscreen/ti_am335x_tsc.c
++++ b/drivers/input/touchscreen/ti_am335x_tsc.c
+@@ -39,6 +39,7 @@ struct titsc {
+ 	unsigned int		irq;
+ 	unsigned int		wires;
+ 	unsigned int		x_plate_resistance;
++	unsigned int		enable_bits;
+ 	bool			pen_down;
+ 	int			steps_to_configure;
+ };
+@@ -57,6 +58,7 @@ static void titsc_writel(struct titsc *tsc, unsigned int reg,
+ static void titsc_step_config(struct titsc *ts_dev)
+ {
+ 	unsigned int	config;
++	unsigned int	stepenable = 0;
+ 	int i, total_steps;
+ 
+ 	/* Configure the Step registers */
+@@ -128,7 +130,11 @@ static void titsc_step_config(struct titsc *ts_dev)
+ 	titsc_writel(ts_dev, REG_STEPDELAY(total_steps + 2),
+ 			STEPCONFIG_OPENDLY);
+ 
+-	titsc_writel(ts_dev, REG_SE, STPENB_STEPENB_TC);
++	for (i = 0; i <= (total_steps + 2); i++)
++		stepenable |= 1 << i;
++	ts_dev->enable_bits = stepenable;
++
++	titsc_writel(ts_dev, REG_SE, ts_dev->enable_bits);
+ }
+ 
+ static void titsc_read_coordinates(struct titsc *ts_dev,
+@@ -250,7 +256,7 @@ static irqreturn_t titsc_irq(int irq, void *dev)
+ 
+ 	titsc_writel(ts_dev, REG_IRQSTATUS, irqclr);
+ 
+-	titsc_writel(ts_dev, REG_SE, STPENB_STEPENB_TC);
++	titsc_writel(ts_dev, REG_SE, ts_dev->enable_bits);
+ 	return IRQ_HANDLED;
+ }
+ 
+diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+index c79ad5d..23e4f33 100644
+--- a/include/linux/mfd/ti_am335x_tscadc.h
++++ b/include/linux/mfd/ti_am335x_tscadc.h
+@@ -47,7 +47,6 @@
+ #define STEPENB_MASK		(0x1FFFF << 0)
+ #define STEPENB(val)		((val) << 0)
+ #define STPENB_STEPENB		STEPENB(0x1FFFF)
+-#define STPENB_STEPENB_TC	STEPENB(0x1FFF)
+ 
+ /* IRQ enable */
+ #define IRQENB_HW_PEN		BIT(0)
 -- 
-P?ter
+1.7.9.5
