@@ -1,40 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Jan 2013 21:08:59 +0000
-Subject: Compilation problem with drivers/staging/zsmalloc when !SMP on ARM
-In-Reply-To: <CAKGA1b=ACTQHo9=B7EAG5nrFCO9u-J+sy7dXtYk3Rk6OUcW3cQ@mail.gmail.com>
-References: <CAKGA1b=ACTQHo9=B7EAG5nrFCO9u-J+sy7dXtYk3Rk6OUcW3cQ@mail.gmail.com>
-Message-ID: <20130118210859.GH23505@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 18 Jan 2013 22:22:17 +0100
+Subject: [PATCHv3 0/7] Add pinctrl driver for Allwinner A1X SoCs
+In-Reply-To: <CACRpkdZPu33J2+rRkON_wih-VQgC9tg82ks=UPz3DZVqH=LCGw@mail.gmail.com>
+References: <1357681398-23956-1-git-send-email-maxime.ripard@free-electrons.com>
+ <50F52D2E.205@free-electrons.com>
+ <CACRpkdaTFMuN1EteHLTgO7TM8BLr9P_YjuKrwuDGoPtQ57duDw@mail.gmail.com>
+ <CACRpkdZPu33J2+rRkON_wih-VQgC9tg82ks=UPz3DZVqH=LCGw@mail.gmail.com>
+Message-ID: <50F9BD09.1030107@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 02:24:15PM -0600, Matt Sealey wrote:
-> Hello all,
+Hi Linus,
+
+Thanks for your review.
+
+On 18/01/2013 20:24, Linus Walleij wrote:
+> On Thu, Jan 17, 2013 at 2:31 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Tue, Jan 15, 2013 at 11:19 AM, Maxime Ripard
 > 
-> I wonder if anyone can shed some light on this linking problem I have
-> right now. If I configure my kernel without SMP support (it is a very
-> lean config for i.MX51 with device tree support only) I hit this error
-> on linking:
+>>> Are you ok with this version or do you have additionnal comments ?
+>>
+>> I'm probably OK with it, I've only just now reached this point in my
+>> mail backlog.
+> 
+> As noted I had more comments, they should be quick to address.
+> 
+> When finished, shall this be applied to the pinctrl tree or some other
+> subtree, like ARM SoC?
 
-Yes, I looked at this, and I've decided that I will _not_ fix this export,
-neither will I accept a patch to add an export.
+Maybe the easiest thing to do would be to push the pinctrl driver in
+itself through your tree, and the dt additions through the arm-soc one?
 
-As far as I can see, this code is buggy in a SMP environment.  There's
-apparantly no guarantee that:
-
-1. the mapping will be created on a particular CPU.
-2. the mapping will then be used only on this specific CPU.
-3. no guarantee that another CPU won't speculatively prefetch from this
-   region.
-4. when the mapping is torn down, no guarantee that it's the same CPU that
-   used the happing.
-
-So, the use of the local TLB flush leaves all the other CPUs potentially
-containing TLB entries for this mapping.
-
-Finally, there is no TODO file for this driver, which I believe is a
-requirement for anything to be in stable.  So as far as I can see, it
-should be deleted or a TODO file added.  I'm not sure why Greg decided
-to add it without a TODO file.
-
-(If there was such a file, I'd have added the above to it.  As it is,
-I've just decided to disable the thing in my randconfig builds.)
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
