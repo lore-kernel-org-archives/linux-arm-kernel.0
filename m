@@ -1,47 +1,54 @@
-From: prasannapadubidri@gmail.com (Prasanna Kumar)
-Date: Tue, 15 Jan 2013 10:47:49 -0000
-Subject: [PATCH 0/2] ARM: Exynos5 : Add Power domain device tree support
- for MFC and GSC
-In-Reply-To: <1357733733-18769-1-git-send-email-prasanna.ps@samsung.com>
-References: <1357733733-18769-1-git-send-email-prasanna.ps@samsung.com>
-Message-ID: <CAPmaG0vQHJbp5tkHTPxEM3Oy1GASbN4asN-x+gtxb77jwpOK0g@mail.gmail.com>
+From: michal.bachraty@gmail.com (Michal Bachraty)
+Date: Fri, 18 Jan 2013 09:23:14 +0100
+Subject: [PATCH] am33xx: cpsw: default to ethernet hwaddr from efuse if
+ not defined in dt
+In-Reply-To: <871udjlafn.fsf@dell.be.48ers.dk>
+References: <1358370073-32545-1-git-send-email-jacmet@sunsite.dk>
+ <loom.20130117T105358-639@post.gmane.org>
+ <87a9s7lq09.fsf@dell.be.48ers.dk>
+ <20130117174528.GM14149@atomide.com>
+ <871udjlafn.fsf@dell.be.48ers.dk>
+Message-ID: <CAAfrEwaDd5CU5fd2TbSD-8dMdOrCeC8f5LxPUGfqUsRs69BV+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+On Thu, Jan 17, 2013 at 11:19 PM, Peter Korsgaard <jacmet@sunsite.dk> wrote:
 
-Any comments for this patch set ?
-
-On Wed, Jan 9, 2013 at 5:45 PM, Prasanna Kumar <prasanna.ps@samsung.com>wrote:
-
-> Hello all,
+> >>>>> "Tony" == Tony Lindgren <tony@atomide.com> writes:
 >
-> This patch set adds device tree support for power domains (Gscaler and
-> MFC) of exynos5
+> Hi,
 >
-> Prasanna Kumar (2):
->   arm: exynos5: Enable PM generic domain support in Kconfig
->   ARM: dts: exynos5: Set up power domain for  MFC and G-scaler
+>  >> The way I've handled it is similar to how it is done on atleast one
+>  >> other arm subarchicture, see
+>  >> arch/arm/mach-mxs/mach-mxs.c::update_fec_mac_prop()
 >
->  arch/arm/boot/dts/exynos5250.dtsi |   15 +++++++++++++++
->  arch/arm/mach-exynos/Kconfig      |    1 +
->  2 files changed, 16 insertions(+), 0 deletions(-)
+>  Tony> Cool this seems like the cleanest way to deal with it so far. Can
+>  Tony> you please resend with also linux-net and DT list Cc:d too?
 >
-> --
-> 1.7.5.4
+>  Tony> Also the arch_initcall should be omap_arch_initcall in linux next
+>  Tony> for consistency if we ever have SoC specific sections for those.
+>
+> Sure, resent with the initcall change and netdev/devicetree-discuss added.
 >
 > --
-> To unsubscribe from this list: send the line "unsubscribe
-> linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Bye, Peter Korsgaard
 >
 
+Thanks,
+I added DT option mac-address-source because there is still possiblility to
+have mac address set by the u-boot in the future. Beaglebone have special
+eeprom on board, were you can have stored user MAC and u-boot can read
+eeprom
+data. Maybe some users will want this feature.  Also in cpsw dt binding
+documentation, there is mention  /* Filled in by U-Boot */.  For that
+purpose,
+code I proposed can easily deal with any driver exteds.
 
+Reading CPU mac address registers with (my approach) or without (your
+approach) DT should be more discussed. Also your way seems to be fine.
 
--- 
-Thanks
-Prasanna Kumar
+Regards
+Michal
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130115/95ecf67f/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130118/6d8983db/attachment-0001.html>
