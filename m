@@ -1,40 +1,93 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 18 Jan 2013 17:38:43 +0100
-Subject: [PATCH] Documentation at91-pinctrl: fix typo and add some details
-Message-ID: <1358527123-22751-1-git-send-email-richard.genoud@gmail.com>
+Date: Fri, 18 Jan 2013 17:41:21 +0100
+Subject: [PATCH] at91sam9x5 DTS: correct wrong PIO BANK values on u(s)arts
+Message-ID: <1358527281-23991-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The relation between PIN_BANK numbers and pio letters wasn't made very
-clear.
+The PIN_BANK 3 is for PDxx pins, not PCxx pins.
+And PIN_BANK 1 is for PBxx, not PIN_BANK 0.
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- .../bindings/pinctrl/atmel,at91-pinctrl.txt        |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/at91sam9x5.dtsi |   24 ++++++++++++------------
+ 1 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-index 3a26812..bc50899 100644
---- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-@@ -81,7 +81,8 @@ PA31	TXD4
- Required properties for pin configuration node:
- - atmel,pins: 4 integers array, represents a group of pins mux and config
-   setting. The format is atmel,pins = <PIN_BANK PIN_BANK_NUM PERIPH CONFIG>.
--  The PERIPH 0 means gpio.
-+  The PERIPH 0 means gpio, PERIPH 1 is periph A, PERIPH 2 is periph B...
-+  PIN_BANK 0 is pioA, PIN_BANK 1 is pioB...
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 8148bd9..80cd9ad 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -159,12 +159,12 @@
  
- Bits used for CONFIG:
- PULL_UP		(1 << 0): indicate this pin need a pull up.
-@@ -126,7 +127,7 @@ pinctrl@fffff400 {
- 		pinctrl_dbgu: dbgu-0 {
- 			atmel,pins =
- 				<1 14 0x1 0x0	/* PB14 periph A */
--				 1 15 0x1 0x1>;	/* PB15 periph with pullup */
-+				 1 15 0x1 0x1>;	/* PB15 periph A with pullup */
- 		};
- 	};
- };
+ 					pinctrl_usart1_rts: usart1_rts-0 {
+ 						atmel,pins =
+-							<3 27 0x3 0x0>;	/* PC27 periph C */
++							<2 27 0x3 0x0>;	/* PC27 periph C */
+ 					};
+ 
+ 					pinctrl_usart1_cts: usart1_cts-0 {
+ 						atmel,pins =
+-							<3 28 0x3 0x0>;	/* PC28 periph C */
++							<2 28 0x3 0x0>;	/* PC28 periph C */
+ 					};
+ 				};
+ 
+@@ -177,46 +177,46 @@
+ 
+ 					pinctrl_uart2_rts: uart2_rts-0 {
+ 						atmel,pins =
+-							<0 0 0x2 0x0>;	/* PB0 periph B */
++							<1 0 0x2 0x0>;	/* PB0 periph B */
+ 					};
+ 
+ 					pinctrl_uart2_cts: uart2_cts-0 {
+ 						atmel,pins =
+-							<0 1 0x2 0x0>;	/* PB1 periph B */
++							<1 1 0x2 0x0>;	/* PB1 periph B */
+ 					};
+ 				};
+ 
+ 				usart3 {
+ 					pinctrl_uart3: usart3-0 {
+ 						atmel,pins =
+-							<3 23 0x2 0x1	/* PC22 periph B with pullup */
+-							 3 23 0x2 0x0>;	/* PC23 periph B */
++							<2 23 0x2 0x1	/* PC22 periph B with pullup */
++							 2 23 0x2 0x0>;	/* PC23 periph B */
+ 					};
+ 
+ 					pinctrl_usart3_rts: usart3_rts-0 {
+ 						atmel,pins =
+-							<3 24 0x2 0x0>;	/* PC24 periph B */
++							<2 24 0x2 0x0>;	/* PC24 periph B */
+ 					};
+ 
+ 					pinctrl_usart3_cts: usart3_cts-0 {
+ 						atmel,pins =
+-							<3 25 0x2 0x0>;	/* PC25 periph B */
++							<2 25 0x2 0x0>;	/* PC25 periph B */
+ 					};
+ 				};
+ 
+ 				uart0 {
+ 					pinctrl_uart0: uart0-0 {
+ 						atmel,pins =
+-							<3 8 0x3 0x0	/* PC8 periph C */
+-							 3 9 0x3 0x1>;	/* PC9 periph C with pullup */
++							<2 8 0x3 0x0	/* PC8 periph C */
++							 2 9 0x3 0x1>;	/* PC9 periph C with pullup */
+ 					};
+ 				};
+ 
+ 				uart1 {
+ 					pinctrl_uart1: uart1-0 {
+ 						atmel,pins =
+-							<3 16 0x3 0x0	/* PC16 periph C */
+-							 3 17 0x3 0x1>;	/* PC17 periph C with pullup */
++							<2 16 0x3 0x0	/* PC16 periph C */
++							 2 17 0x3 0x1>;	/* PC17 periph C with pullup */
+ 					};
+ 				};
+ 
 -- 
 1.7.2.5
