@@ -1,34 +1,66 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Fri, 18 Jan 2013 08:46:22 +0100
-Subject: [PATCH 3/3] dma: mv_xor: get rid of a DMA-API sanity check warning
-In-Reply-To: <1358495154.28503.5.camel@unicorn>
-References: <1358495154.28503.5.camel@unicorn>
-Message-ID: <1358495182-30964-3-git-send-email-lkundrak@v3.sk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 18 Jan 2013 09:18:37 +0100
+Subject: [PATCH 5/5] ARM: exynos: enable/disable cpuidle when cpu1 is
+ down/up
+In-Reply-To: <00be01cdf52f$1bc907c0$535b1740$@samsung.com>
+References: <1357318799-24378-1-git-send-email-daniel.lezcano@linaro.org>
+ <1357318799-24378-5-git-send-email-daniel.lezcano@linaro.org>
+ <CADGdYn7y_SSmLoEpeRjL8PDSZS-YJwC1QpRcUocSSnDyM8BRhQ@mail.gmail.com>
+ <50EF3369.2060902@free.fr>
+ <CADGdYn4eRbkZt_Rshqg-a_CoAmF5LBobzT3=3h09syaH0z6uJA@mail.gmail.com>
+ <50F551F3.2060400@linaro.org> <00be01cdf52f$1bc907c0$535b1740$@samsung.com>
+Message-ID: <50F9055D.8090708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mv_xor mv_xor.0: DMA-API: device driver frees DMA memory with different direction [device address=0x000000001dea4000] [size=4096 bytes] [mapped with DMA_FROM_DEVICE] [unmapped with DMA_BIDIRECTIONAL]
+On 01/18/2013 04:51 AM, Kukjin Kim wrote:
+> Daniel Lezcano wrote:
+>> On 01/10/2013 11:33 PM, amit daniel kachhap wrote:
+>>> On Thu, Jan 10, 2013 at 1:32 PM, Daniel Lezcano <daniel.lezcano@free.fr>
+>> wrote:
+>>>> On 01/10/2013 09:07 PM, amit daniel kachhap wrote:
+>>>>> Hi Daniel,
+>>>> Hi Amit Daniel,
+>>>>
+>>>>> This hotplug noifiers looks fine. I suppose it should add extra state
+>>>>> C1 in cpu0. If it is done like below than for normal cases(when all
+>>>>> cpu's are online) there wont be any statistics for C0 state
+>>>> I guess you meant state 0 which is WFI, right ?
+>>>> C0 state is the intel semantic for cpu fully turned on.
+>>> Yes I meant C0 as wfi
+>>>>> also which
+>>>>> is required. Other patches look good.
+>>>> Ok, that makes sense to have statistics even if they are only doing WFI.
+>>>>
+>>>> Then the patch 4/5 is not ok, no ?
+>>> yes I suppose patch 4 and patch 5 are related and depends how you
+>>> frame patch 5. I think it is better to create C0/C1 sysfs and other
+>>> things in the beginning because it is a filesystem call and may
+>>> increase the cpu hotplug time which is not worth. May be if cpuidle
+>>> framework exposes some API to enable/disable states then it is better.
+>>>
+>>> For patch 1,2 and 3,
+>>> Acked-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> Hi Kukjin,
+>>
+>> is it possible to take these patches [1-3/5] ?
+>>
+> Looks OK to me, I will apply with Amit's ack.
 
-Change xor self test destination buffer allocation direction to bidirectional,
-as it's what mv_xor_run_tx_complete_actions() frees for multiple sources.
+Cool Thanks !
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
----
- drivers/dma/mv_xor.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+>> The patches [3-4/5] could be ignored.
+>>
+> Probably, you mean [4-5/5] :-)
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index d00a834..1e90f5d 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -1042,7 +1042,7 @@ mv_xor_xor_self_test(struct mv_xor_chan *mv_chan)
- 
- 	/* test xor */
- 	dest_dma = dma_map_page(dma_chan->device->dev, dest, 0, PAGE_SIZE,
--				DMA_FROM_DEVICE);
-+				DMA_BIDIRECTIONAL);
- 	if (dma_mapping_error(dma_chan->device->dev, dest_dma)) {
- 		dev_err(dma_chan->device->dev,
- 			"Could not map destination page, disabling\n");
+Oh, yes. Right ! :)
+
+-- Daniel
+
+
 -- 
-1.7.1
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
