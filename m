@@ -1,66 +1,70 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Jan 2013 09:18:37 +0100
-Subject: [PATCH 5/5] ARM: exynos: enable/disable cpuidle when cpu1 is
- down/up
-In-Reply-To: <00be01cdf52f$1bc907c0$535b1740$@samsung.com>
-References: <1357318799-24378-1-git-send-email-daniel.lezcano@linaro.org>
- <1357318799-24378-5-git-send-email-daniel.lezcano@linaro.org>
- <CADGdYn7y_SSmLoEpeRjL8PDSZS-YJwC1QpRcUocSSnDyM8BRhQ@mail.gmail.com>
- <50EF3369.2060902@free.fr>
- <CADGdYn4eRbkZt_Rshqg-a_CoAmF5LBobzT3=3h09syaH0z6uJA@mail.gmail.com>
- <50F551F3.2060400@linaro.org> <00be01cdf52f$1bc907c0$535b1740$@samsung.com>
-Message-ID: <50F9055D.8090708@linaro.org>
+From: p.paneri@samsung.com (Praveen Paneri)
+Date: Fri, 18 Jan 2013 14:30:21 +0530
+Subject: [RESEND PATCH v9 0/2] usb: phy: samsung: Introducing usb phy driver
+ for samsung SoCs
+Message-ID: <1358499623-13901-1-git-send-email-p.paneri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2013 04:51 AM, Kukjin Kim wrote:
-> Daniel Lezcano wrote:
->> On 01/10/2013 11:33 PM, amit daniel kachhap wrote:
->>> On Thu, Jan 10, 2013 at 1:32 PM, Daniel Lezcano <daniel.lezcano@free.fr>
->> wrote:
->>>> On 01/10/2013 09:07 PM, amit daniel kachhap wrote:
->>>>> Hi Daniel,
->>>> Hi Amit Daniel,
->>>>
->>>>> This hotplug noifiers looks fine. I suppose it should add extra state
->>>>> C1 in cpu0. If it is done like below than for normal cases(when all
->>>>> cpu's are online) there wont be any statistics for C0 state
->>>> I guess you meant state 0 which is WFI, right ?
->>>> C0 state is the intel semantic for cpu fully turned on.
->>> Yes I meant C0 as wfi
->>>>> also which
->>>>> is required. Other patches look good.
->>>> Ok, that makes sense to have statistics even if they are only doing WFI.
->>>>
->>>> Then the patch 4/5 is not ok, no ?
->>> yes I suppose patch 4 and patch 5 are related and depends how you
->>> frame patch 5. I think it is better to create C0/C1 sysfs and other
->>> things in the beginning because it is a filesystem call and may
->>> increase the cpu hotplug time which is not worth. May be if cpuidle
->>> framework exposes some API to enable/disable states then it is better.
->>>
->>> For patch 1,2 and 3,
->>> Acked-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Hi Kukjin,
->>
->> is it possible to take these patches [1-3/5] ?
->>
-> Looks OK to me, I will apply with Amit's ack.
+Changes from v8:
+Resending this patch series after rebasing to the latest usb-next branch.
+Rewording inline comments for better readability.
+Removed IS_ENABLED(CONFIG_OF) as pdev->dev.of_node is enough to check for dt support.
+Using of_match_ptr to add of_match_table to platform_driver structure.
+Removed unnecessary variables.
 
-Cool Thanks !
+Changes from v7:
+Rebased to the latest usb-next branch.
+Separating arch patches from these driver patches.
 
->> The patches [3-4/5] could be ignored.
->>
-> Probably, you mean [4-5/5] :-)
+Changes from v6:
+Modified register definitions according to the existing ones.
+Changed default PHY clk selection for SoCs.
+Improved binding text and rebased to the latest usb-next.
 
-Oh, yes. Right ! :)
+Changes from v5:
+Moved clk_get() to driver's probe function. Now reference clock frequency
+selection value is stored in samsung_usbphy structure for later use. Used
+IS_ENABLED() instead of #ifdef in samsung_usbphy_get_driver_data().
 
--- Daniel
+Changes from v4:
+Moved header file contents to driver's source file
+Removed unnecessary print message from driver's probe function
+Dropped the Free Software Foundation address from the header
 
+Changes from v3:
+Replaced susbsys_initcall()/module_exit() by module_platform_driver().
+Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
+is registered
+Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Changes from v2:
+Changed the driver filenames to samsung-usbphy
+Rectified coding style related errors
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Changes from v1:
+Rebased patches to latest usb-next branch
+Changed the name 'sec_usbphy' to 'samsung_usbphy'
+
+This patch set introduces a phy driver for samsung SoCs. It uses the existing
+transceiver infrastructure to provide phy control functions. Use of this driver
+can be extended for usb host phy as well. Over the period of time all the phy
+related code for most of the samsung SoCs can be integrated here.
+Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
+when they start supporting this phy driver. 
+This driver is tested with smdk6410 and Exynos4210(with DT).
+
+Praveen Paneri (2):
+  usb: phy: samsung: Introducing usb phy driver for hsotg
+  usb: s3c-hsotg: Adding phy driver support
+
+ .../devicetree/bindings/usb/samsung-usbphy.txt     |   11 +
+ drivers/usb/gadget/s3c-hsotg.c                     |   37 ++-
+ drivers/usb/phy/Kconfig                            |    8 +
+ drivers/usb/phy/Makefile                           |    1 +
+ drivers/usb/phy/samsung-usbphy.c                   |  354 ++++++++++++++++++++
+ include/linux/platform_data/samsung-usbphy.h       |   27 ++
+ 6 files changed, 428 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+ create mode 100644 drivers/usb/phy/samsung-usbphy.c
+ create mode 100644 include/linux/platform_data/samsung-usbphy.h
