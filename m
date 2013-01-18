@@ -1,39 +1,49 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 18 Jan 2013 21:47:01 +0800
-Subject: [PATCH v2] arch/arm/mach-s5pv210: adding ifdef
- CONFIG_CPU_S5PV210to fix compiling issue
-In-Reply-To: <009801cdf52c$99adc200$cd094600$@samsung.com>
-References: <001c01cdf510$c89c9800$59d5c800$@samsung.com>
- <20130118011846.3CEE21840258@intranet.asianux.com>
- <009801cdf52c$99adc200$cd094600$@samsung.com>
-Message-ID: <50F95255.5090107@asianux.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Fri, 18 Jan 2013 11:28:43 +0530
+Subject: [PATCH] ARM: tegra: DTS: whistler: enable keyboard
+Message-ID: <1358488723-23184-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2013 11:33 AM, Kukjin Kim wrote:
-> Chen,Gang( ??) wrote:
->>   thank you, I should notice it next time.
->>     an incorrect subject is not easy to get maintainer's notice
->>     maybe it is the reason why you can not reply in time, since you can not notice it.
->>
->>   :-)
->>
-> Just I was busy ;-) sorry for late my reply.
-> 
+Enable tegra based keyboard controller and populate the key mapping
+for whistler.
 
-  not mind, most of us are often busy, I will have more patience, next time.
+With this patch, HOME, BACK, POWER and MENU keys will work.
+Still other keys which are in ROW3 and ROW4 will not work as it
+conflicts with KBC pins on SDIO2 pinmux.
 
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+Stephen,
+Not tested the change but I reviewed all possible configuration like pinmux and
+the parameter as per the downstream.
+Request you to give a try.
 
+ arch/arm/boot/dts/tegra20-whistler.dts |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-> Anyway Gang, don't post with html typed e-mail, probably, you got some kind of error that your previous reply wasn't accepted from mailing list mail server. Please make sure that your e-mail is plain text type for mailing list.
-> 
-> [...]
-
-  thank you, I should notice, next time.
-
-
---
-
- Chen Gang
-
- Asianux Corporation
+diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
+index 5836ad6..b8e0ee1 100644
+--- a/arch/arm/boot/dts/tegra20-whistler.dts
++++ b/arch/arm/boot/dts/tegra20-whistler.dts
+@@ -520,6 +520,18 @@
+ 		bus-width = <8>;
+ 	};
+ 
++	kbc {
++		status = "okay";
++		nvidia,debounce-delay-ms = <20>;
++		nvidia,repeat-delay-ms = <160>;
++		nvidia,kbc-row-pins = <0 1 2>;
++		nvidia,kbc-col-pins = <16 17>;
++		linux,keymap = <0x00000074	/* KEY_POWER */
++				0x01000066	/* KEY_HOME */
++				0x0101009E	/* KEY_BACK */
++				0x0201008B>;	/* KEY_MENU */
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+-- 
+1.7.1.1
