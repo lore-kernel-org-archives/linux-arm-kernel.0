@@ -1,64 +1,26 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 18 Jan 2013 23:02:26 +0800
-Subject: [PATCH v7 05/15] gpio: fix wrong checking condition for gpio range
-In-Reply-To: <50F93DA0.1060708@mvista.com>
-References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
- <1358494279-16503-6-git-send-email-haojian.zhuang@linaro.org>
- <50F93DA0.1060708@mvista.com>
-Message-ID: <CAD6h2NQOY5DPS-y3rpTFrEu3LNTnPFgX2ivfNYqcoqoRGZH5mA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Jan 2013 15:02:42 +0000
+Subject: [PATCH v8 06/22] mfd: omap-usb-tll: introduce and use
+ mode_needs_tll()
+In-Reply-To: <1358511445-26656-7-git-send-email-rogerq@ti.com>
+References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
+ <1358511445-26656-7-git-send-email-rogerq@ti.com>
+Message-ID: <20130118150242.GF23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 January 2013 20:18, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> Hello.
->
->
-> On 18-01-2013 11:31, Haojian Zhuang wrote:
->
->> Since index++ calculates from 0, the checking condition of "while
->> (index++)" is always fake. So replace it by unconditional loop.
->
->
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->> ---
->>   drivers/gpio/gpiolib-of.c |    6 +++---
->>   1 file changed, 3 insertions(+), 3 deletions(-)
->
->
->> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
->> index b1f0682..011e1e98 100644
->> --- a/drivers/gpio/gpiolib-of.c
->> +++ b/drivers/gpio/gpiolib-of.c
->> @@ -228,7 +228,7 @@ static void of_gpiochip_add_pin_range(struct gpio_chip
->> *chip)
->>         if (!np)
->>                 return;
->>
->> -       do {
->> +       for (;;) {
->
->
->    Why not:
->
->         for (;; index++) {
->
-OK. I'll update it.
+On Fri, Jan 18, 2013 at 02:17:09PM +0200, Roger Quadros wrote:
+> +/* only PHY and UNUSED modes don't need TLL */
+> +#define omap_usb_mode_needs_tll(x)	((x != OMAP_USBHS_PORT_MODE_UNUSED) &&\
+> +					 (x != OMAP_EHCI_PORT_MODE_PHY))
 
->
->>                 ret = of_parse_phandle_with_args(np, "gpio-ranges",
->>                                 "#gpio-range-cells", index, &pinspec);
->>                 if (ret)
->> @@ -254,8 +254,8 @@ static void of_gpiochip_add_pin_range(struct gpio_chip
->> *chip)
->>
->>                 if (ret)
->>                         break;
->> -
->> -       } while (index++);
->> +               index++;
->> +       }
->>   }
->
->
-> WBR, Sergei
->
+Growl.
+
+These parens do not make anything safer at all - they just obfuscate.  The
+safe version of the above macro would have been:
+
+#define omap_usb_mode_needs_tll(x)	((x) != OMAP_USBHS_PORT_MODE_UNUSED &&\
+					 (x) != OMAP_EHCI_PORT_MODE_PHY)
+
+If you're going to use a macro argument in an expression, it needs parens.
+Simple expressions like a != b && c != d do _not_ need parens.
