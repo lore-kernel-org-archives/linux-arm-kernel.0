@@ -1,103 +1,92 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 18 Jan 2013 09:05:17 +0900
-Subject: [PATCH] ARM: shmobile: sh73a0: Use generic irqchip_init()
-In-Reply-To: <1358424013-31306-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1358424013-31306-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20130118000517.GI16740@verge.net.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 17 Jan 2013 16:14:27 -0800
+Subject: [PATCH v2] arch/arm/mach-s5pv210: adding ifdef CONFIG_CPU_S5PV210
+ to fix compiling issue
+In-Reply-To: <50EAC016.6090707@asianux.com>
+References: <50EA972E.3040404@asianux.com> <50EAC016.6090707@asianux.com>
+Message-ID: <001c01cdf510$c89c9800$59d5c800$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 01:00:13PM +0100, Thierry Reding wrote:
-> The asm/hardware/gic.h header does no longer exist and the corresponding
-> functionality was moved to linux/irqchip.h and linux/irqchip/arm-gic.h
-> respectively. gic_handle_irq() and of_irq_init() are no longer available
-> either and have been replaced by irqchip_init().
+Chen Gang wrote:
 > 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Firstly, thanks for your posting.
+
+But there are some comments.
+
+For subject:
+Please see the git log before your commit, it should be helpful to you.
+In this case, 'ARM: S5PV210: ...' is used.
+
+> 
+>   if not define CONFIG_CPU_S5PV210
+> 
+>     it will define NULL in common.h for:
+>       s5pv210_map_io, s5pv210_init_clocks, s5pv210_init,
+s5pv210_init_uarts
+> 
+>     so need using #ifdef CONFIG_CPU_S5PV210 for them too, in common.c.
+>       or compiling issue will occur.
+> 
+I don't think so, because common.c in mach-s5pv210 should be built with
+selecting CONFIG_CPU_S5PV210, actually it depends on CONFIG_ARCH_S5PV210
+though.
+
+Any concerns, please let me know.
+
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/mach-s5pv210/common.c |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-
+> s5pv210/common.c
+> index 9dfe93e..5c88f88 100644
+> --- a/arch/arm/mach-s5pv210/common.c
+> +++ b/arch/arm/mach-s5pv210/common.c
+> @@ -167,6 +167,8 @@ void __init s5pv210_init_io(struct map_desc
+> *mach_desc, int size)
+>  	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+>  }
+> 
+> +#ifdef CONFIG_CPU_S5PV210
+> +
+>  void __init s5pv210_map_io(void)
+>  {
+>  	/* initialise device information early */
+> @@ -209,6 +211,9 @@ void __init s5pv210_init_clocks(int xtal)
+>  	s5pv210_setup_clocks();
+>  }
+> 
+> +#endif /* CONFIG_CPU_S5PV210 */
+> +
+> +
+
+Generally, no need double empty lines here.
+
+>  void __init s5pv210_init_irq(void)
+>  {
+>  	u32 vic[4];	/* S5PV210 supports 4 VIC */
+> @@ -227,6 +232,8 @@ struct bus_type s5pv210_subsys = {
+>  	.dev_name	= "s5pv210-core",
+>  };
+> 
+> +#ifdef CONFIG_CPU_S5PV210
+> +
+>  static struct device s5pv210_dev = {
+>  	.bus	= &s5pv210_subsys,
+>  };
+> @@ -249,3 +256,5 @@ void __init s5pv210_init_uarts(struct s3c2410_uartcfg
+> *cfg, int no)
+>  {
+>  	s3c24xx_init_uartdevs("s5pv210-uart", s5p_uart_resources, cfg, no);
+>  }
+> +
+> +#endif /* CONFIG_CPU_S5PV210 */
+> --
+> 1.7.10.4
 
 Thanks.
 
-Due to the hairy upstream requirements of the arm-soc tree
-I believe this patch needs to be split in two. A 'board' patch
-for board-kzm9g-reference.c. And an 'soc' patch for the
-remaining portions.
-
-I'm happy to split the patch myself or for you to do so.
-
-> ---
->  arch/arm/mach-shmobile/board-kzm9g-reference.c | 1 -
->  arch/arm/mach-shmobile/intc-sh73a0.c           | 9 ++-------
->  arch/arm/mach-shmobile/setup-sh73a0.c          | 2 --
->  3 files changed, 2 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-> index 04e9ae5..08c95dd 100644
-> --- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-> +++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-> @@ -90,7 +90,6 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
->  	.init_early	= sh73a0_add_early_devices_dt,
->  	.nr_irqs	= NR_IRQS_LEGACY,
->  	.init_irq	= sh73a0_init_irq_dt,
-> -	.handle_irq	= gic_handle_irq,
->  	.init_machine	= kzm_init,
->  	.init_late	= shmobile_init_late,
->  	.init_time	= shmobile_timer_init,
-> diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
-> index fc7c8da..91faba6 100644
-> --- a/arch/arm/mach-shmobile/intc-sh73a0.c
-> +++ b/arch/arm/mach-shmobile/intc-sh73a0.c
-> @@ -21,9 +21,9 @@
->  #include <linux/interrupt.h>
->  #include <linux/module.h>
->  #include <linux/irq.h>
-> -#include <linux/of_irq.h>
->  #include <linux/io.h>
->  #include <linux/sh_intc.h>
-> +#include <linux/irqchip.h>
->  #include <linux/irqchip/arm-gic.h>
->  #include <mach/intc.h>
->  #include <mach/irqs.h>
-> @@ -462,14 +462,9 @@ void __init sh73a0_init_irq(void)
->  }
->  
->  #ifdef CONFIG_OF
-> -static const struct of_device_id irq_of_match[] __initconst = {
-> -	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-> -	{ },
-> -};
-> -
->  void __init sh73a0_init_irq_dt(void)
->  {
-> -	of_irq_init(irq_of_match);
-> +	irqchip_init();
->  	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
->  }
->  #endif
-> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-> index abf1eb0..2ecd668 100644
-> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
-> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-> @@ -36,7 +36,6 @@
->  #include <mach/irqs.h>
->  #include <mach/sh73a0.h>
->  #include <mach/common.h>
-> -#include <asm/hardware/gic.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/map.h>
->  #include <asm/mach/arch.h>
-> @@ -892,7 +891,6 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
->  	.init_early	= sh73a0_add_early_devices_dt,
->  	.nr_irqs	= NR_IRQS_LEGACY,
->  	.init_irq	= sh73a0_init_irq_dt,
-> -	.handle_irq	= gic_handle_irq,
->  	.init_machine	= sh73a0_add_standard_devices_dt,
->  	.init_time	= shmobile_timer_init,
->  	.dt_compat	= sh73a0_boards_compat_dt,
-> -- 
-> 1.8.1.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+- Kukjin
