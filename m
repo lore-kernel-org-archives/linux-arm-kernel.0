@@ -1,18 +1,25 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 18 Jan 2013 09:44:38 -0700
-Subject: [PATCH] ARM: tegra: DTS: whistler: enable keyboard
-In-Reply-To: <1358488723-23184-1-git-send-email-ldewangan@nvidia.com>
-References: <1358488723-23184-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <50F97BF6.6020705@wwwdotorg.org>
+Date: Fri, 18 Jan 2013 09:53:45 -0700
+Subject: [PATCH 1/1] ARM: Add API to detect SCU base address from CP15
+In-Reply-To: <1358506755-13705-1-git-send-email-hdoyu@nvidia.com>
+References: <1358506755-13705-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <50F97E19.8070607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2013 10:58 PM, Laxman Dewangan wrote:
-> Enable tegra based keyboard controller and populate the key mapping
-> for whistler.
-> 
-> With this patch, HOME, BACK, POWER and MENU keys will work.
-> Still other keys which are in ROW3 and ROW4 will not work as it
-> conflicts with KBC pins on SDIO2 pinmux.
+On 01/18/2013 03:59 AM, Hiroshi Doyu wrote:
+> Add API to detect SCU base address from CP15.
 
-Thanks, applied to Tegra's for-3.9/dt branch.
+So this patch appears to be a dependency for the Tegra114 series from
+Hiroshi. As such, I need to get it into the Tegra tree somehow.
+
+What I'd like to propose is that I put this one patch in a topic branch
+based on v3.8-rcN, send a pull request to arm-soc containing that
+branch, and then merge the branch into the Tegra tree. This will allow
+anyone else to use the patch in code destined for 3.9.
+
+Or, if nobody else wants to use this function, I could just apply it
+directly to the Tegra tree.
+
+But either way, I'd need an ack from a core ARM maintainer in order to
+apply this (well, v2 once it's posted).
