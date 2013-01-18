@@ -1,168 +1,67 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 18 Jan 2013 14:17:21 +0200
-Subject: [PATCH v8 18/22] mfd: omap-usb-host: clean up omap_usbhs_init()
+Date: Fri, 18 Jan 2013 14:17:22 +0200
+Subject: [PATCH v8 19/22] ARM: OMAP3: clock data: get rid of unused USB host
+ clock aliases and dummies
 In-Reply-To: <1358511445-26656-1-git-send-email-rogerq@ti.com>
 References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
-Message-ID: <1358511445-26656-19-git-send-email-rogerq@ti.com>
+Message-ID: <1358511445-26656-20-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We split initializing revision 1 and revision 2 into different
-functions. Initialization is now done dynamically so that only
-the number of ports available on the system are initialized.
+We don't need multiple aliases for the OMAP USB host clocks and neither
+the dummy clocks so remove them.
+
+CC: Paul Walmsley <paul@pwsan.com>
+CC: Rajendra Nayak <rnayak@ti.com>
+CC: Benoit Cousson <b-cousson@ti.com>
+CC: Mike Turquette <mturquette@linaro.com>
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 Reviewed-by: Felipe Balbi <balbi@ti.com>
+Acked-by: Paul Walmsley <paul@pwsan.com>
 ---
- drivers/mfd/omap-usb-host.c |  129 +++++++++++++++++++++++++++----------------
- 1 files changed, 81 insertions(+), 48 deletions(-)
+ arch/arm/mach-omap2/cclock3xxx_data.c |   11 -----------
+ 1 files changed, 0 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index fcace6f..9dea92c 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -358,6 +358,75 @@ static int usbhs_runtime_suspend(struct device *dev)
- 	return 0;
- }
- 
-+static unsigned omap_usbhs_rev1_hostconfig(struct usbhs_hcd_omap *omap,
-+						unsigned reg)
-+{
-+	struct usbhs_omap_platform_data	*pdata = omap->pdata;
-+	int i;
-+
-+	for (i = 0; i < omap->nports; i++) {
-+		switch (pdata->port_mode[i]) {
-+		case OMAP_USBHS_PORT_MODE_UNUSED:
-+			reg &= ~(OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS << i);
-+			break;
-+		case OMAP_EHCI_PORT_MODE_PHY:
-+			if (pdata->single_ulpi_bypass)
-+				break;
-+
-+			if (i == 0)
-+				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
-+			else
-+				reg &= ~(OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS
-+								<< (i-1));
-+			break;
-+		default:
-+			if (pdata->single_ulpi_bypass)
-+				break;
-+
-+			if (i == 0)
-+				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
-+			else
-+				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS
-+								<< (i-1);
-+			break;
-+		}
-+	}
-+
-+	if (pdata->single_ulpi_bypass) {
-+		/* bypass ULPI only if none of the ports use PHY mode */
-+		reg |= OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
-+
-+		for (i = 0; i < omap->nports; i++) {
-+			if (is_ehci_phy_mode(pdata->port_mode[i])) {
-+				reg &= OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
-+				break;
-+			}
-+		}
-+	}
-+
-+	return reg;
-+}
-+
-+static unsigned omap_usbhs_rev2_hostconfig(struct usbhs_hcd_omap *omap,
-+						unsigned reg)
-+{
-+	struct usbhs_omap_platform_data	*pdata = omap->pdata;
-+	int i;
-+
-+	for (i = 0; i < omap->nports; i++) {
-+		/* Clear port mode fields for PHY mode */
-+		reg &= ~(OMAP4_P1_MODE_CLEAR << 2 * i);
-+
-+		if (is_ehci_tll_mode(pdata->port_mode[i]) ||
-+				(is_ohci_port(pdata->port_mode[i])))
-+			reg |= OMAP4_P1_MODE_TLL << 2 * i;
-+		else if (is_ehci_hsic_mode(pdata->port_mode[i]))
-+			reg |= OMAP4_P1_MODE_HSIC << 2 * i;
-+	}
-+
-+	return reg;
-+}
-+
- static void omap_usbhs_init(struct device *dev)
- {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
-@@ -389,54 +458,18 @@ static void omap_usbhs_init(struct device *dev)
- 	reg |= OMAP4_UHH_HOSTCONFIG_APP_START_CLK;
- 	reg &= ~OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN;
- 
--	if (is_omap_usbhs_rev1(omap)) {
--		if (pdata->port_mode[0] == OMAP_USBHS_PORT_MODE_UNUSED)
--			reg &= ~OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS;
--		if (pdata->port_mode[1] == OMAP_USBHS_PORT_MODE_UNUSED)
--			reg &= ~OMAP_UHH_HOSTCONFIG_P2_CONNECT_STATUS;
--		if (pdata->port_mode[2] == OMAP_USBHS_PORT_MODE_UNUSED)
--			reg &= ~OMAP_UHH_HOSTCONFIG_P3_CONNECT_STATUS;
--
--		/* Bypass the TLL module for PHY mode operation */
--		if (pdata->single_ulpi_bypass) {
--			dev_dbg(dev, "OMAP3 ES version <= ES2.1\n");
--			if (is_ehci_phy_mode(pdata->port_mode[0]) ||
--				is_ehci_phy_mode(pdata->port_mode[1]) ||
--					is_ehci_phy_mode(pdata->port_mode[2]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
--		} else {
--			dev_dbg(dev, "OMAP3 ES version > ES2.1\n");
--			if (is_ehci_phy_mode(pdata->port_mode[0]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
--			if (is_ehci_phy_mode(pdata->port_mode[1]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS;
--			if (is_ehci_phy_mode(pdata->port_mode[2]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P3_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P3_BYPASS;
--		}
--	} else if (is_omap_usbhs_rev2(omap)) {
--		/* Clear port mode fields for PHY mode*/
--		reg &= ~OMAP4_P1_MODE_CLEAR;
--		reg &= ~OMAP4_P2_MODE_CLEAR;
--
--		if (is_ehci_tll_mode(pdata->port_mode[0]) ||
--			(is_ohci_port(pdata->port_mode[0])))
--			reg |= OMAP4_P1_MODE_TLL;
--		else if (is_ehci_hsic_mode(pdata->port_mode[0]))
--			reg |= OMAP4_P1_MODE_HSIC;
--
--		if (is_ehci_tll_mode(pdata->port_mode[1]) ||
--			(is_ohci_port(pdata->port_mode[1])))
--			reg |= OMAP4_P2_MODE_TLL;
--		else if (is_ehci_hsic_mode(pdata->port_mode[1]))
--			reg |= OMAP4_P2_MODE_HSIC;
-+	switch (omap->usbhs_rev) {
-+	case OMAP_USBHS_REV1:
-+		omap_usbhs_rev1_hostconfig(omap, reg);
-+		break;
-+
-+	case OMAP_USBHS_REV2:
-+		omap_usbhs_rev2_hostconfig(omap, reg);
-+		break;
-+
-+	default:	/* newer revisions */
-+		omap_usbhs_rev2_hostconfig(omap, reg);
-+		break;
- 	}
- 
- 	usbhs_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
+diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
+index 6ef8758..b58ec96 100644
+--- a/arch/arm/mach-omap2/cclock3xxx_data.c
++++ b/arch/arm/mach-omap2/cclock3xxx_data.c
+@@ -3291,8 +3291,6 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK(NULL,	"cpefuse_fck",	&cpefuse_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"ts_fck",	&ts_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+-	CLK("usbhs_omap",	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+-	CLK("usbhs_tll",	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"core_96m_fck",	&core_96m_fck,	CK_3XXX),
+ 	CLK(NULL,	"mmchs3_fck",	&mmchs3_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"mmchs2_fck",	&mmchs2_fck,	CK_3XXX),
+@@ -3329,8 +3327,6 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK(NULL,	"pka_ick",	&pka_ick,	CK_34XX | CK_36XX),
+ 	CLK(NULL,	"core_l4_ick",	&core_l4_ick,	CK_3XXX),
+ 	CLK(NULL,	"usbtll_ick",	&usbtll_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+-	CLK("usbhs_omap",	"usbtll_ick",	&usbtll_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+-	CLK("usbhs_tll",	"usbtll_ick",	&usbtll_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK("omap_hsmmc.2",	"ick",	&mmchs3_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"mmchs3_ick",	&mmchs3_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"icr_ick",	&icr_ick,	CK_34XX | CK_36XX),
+@@ -3393,17 +3389,10 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK(NULL,	"usbhost_120m_fck", &usbhost_120m_fck, CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"usbhost_48m_fck", &usbhost_48m_fck, CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"usbhost_ick",	&usbhost_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+-	CLK("usbhs_omap",	"usbhost_ick",	&usbhost_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"utmi_p1_gfclk",	&dummy_ck,	CK_3XXX),
+ 	CLK(NULL,	"utmi_p2_gfclk",	&dummy_ck,	CK_3XXX),
+ 	CLK(NULL,	"xclk60mhsp1_ck",	&dummy_ck,	CK_3XXX),
+ 	CLK(NULL,	"xclk60mhsp2_ck",	&dummy_ck,	CK_3XXX),
+-	CLK(NULL,	"usb_host_hs_utmi_p1_clk",	&dummy_ck,	CK_3XXX),
+-	CLK(NULL,	"usb_host_hs_utmi_p2_clk",	&dummy_ck,	CK_3XXX),
+-	CLK("usbhs_omap",	"usb_tll_hs_usb_ch0_clk",	&dummy_ck,	CK_3XXX),
+-	CLK("usbhs_omap",	"usb_tll_hs_usb_ch1_clk",	&dummy_ck,	CK_3XXX),
+-	CLK("usbhs_tll",	"usb_tll_hs_usb_ch0_clk",	&dummy_ck,	CK_3XXX),
+-	CLK("usbhs_tll",	"usb_tll_hs_usb_ch1_clk",	&dummy_ck,	CK_3XXX),
+ 	CLK(NULL,	"init_60m_fclk",	&dummy_ck,	CK_3XXX),
+ 	CLK(NULL,	"usim_fck",	&usim_fck,	CK_3430ES2PLUS | CK_36XX),
+ 	CLK(NULL,	"gpt1_fck",	&gpt1_fck,	CK_3XXX),
 -- 
 1.7.4.1
