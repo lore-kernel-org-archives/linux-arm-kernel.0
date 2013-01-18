@@ -1,109 +1,28 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 18 Jan 2013 10:15:49 +0800
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 18 Jan 2013 10:23:39 +0800
 Subject: [PATCH v7 3/3] ARM: i.MX clock: Change the connection-id for
  fsl-usb2-udc
-In-Reply-To: <1358475349-27710-1-git-send-email-peter.chen@freescale.com>
+In-Reply-To: <1358475349-27710-4-git-send-email-peter.chen@freescale.com>
 References: <1358475349-27710-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1358475349-27710-4-git-send-email-peter.chen@freescale.com>
+ <1358475349-27710-4-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130118022337.GA29282@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we use platform_device_id for fsl-usb2-udc driver, it needs to
-change clk connection-id, or the related devm_clk_get will be failed.
+Peter,
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/mach-imx/clk-imx25.c       |    6 +++---
- arch/arm/mach-imx/clk-imx27.c       |    6 +++---
- arch/arm/mach-imx/clk-imx31.c       |    6 +++---
- arch/arm/mach-imx/clk-imx35.c       |    6 +++---
- arch/arm/mach-imx/clk-imx51-imx53.c |    6 +++---
- 5 files changed, 15 insertions(+), 15 deletions(-)
+On Fri, Jan 18, 2013 at 10:15:49AM +0800, Peter Chen wrote:
+> As we use platform_device_id for fsl-usb2-udc driver, it needs to
+> change clk connection-id, or the related devm_clk_get will be failed.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index b197aa7..2c570cd 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -254,9 +254,9 @@ int __init mx25_clocks_init(void)
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usbotg_ahb], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usbotg_ahb], "ahb", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
- 	clk_register_clkdev(clk[nfc_ipg_per], NULL, "imx25-nand.0");
- 	/* i.mx25 has the i.mx35 type cspi */
- 	clk_register_clkdev(clk[cspi1_ipg], NULL, "imx35-cspi.0");
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 4c1d1e4..1ffe3b5 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -236,9 +236,9 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
- 	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "imx27-camera.0");
- 	clk_register_clkdev(clk[per4_gate], "per", "imx27-camera.0");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "imx-udc-mx27");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "mxc-ehci.0");
-diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-index 8be64e0..16ccbd4 100644
---- a/arch/arm/mach-imx/clk-imx31.c
-+++ b/arch/arm/mach-imx/clk-imx31.c
-@@ -139,9 +139,9 @@ int __init mx31_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[usb_div_post], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usb_gate], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div_post], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usb_gate], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div_post], "per", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usb_gate], "ahb", "imx-udc-mx27");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx27");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
- 	/* i.mx31 has the i.mx21 type uart */
- 	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index 66f3d65..f0727e8 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -251,9 +251,9 @@ int __init mx35_clocks_init()
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usbotg_gate], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
-+	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx27");
-+	clk_register_clkdev(clk[usbotg_gate], "ahb", "imx-udc-mx27");
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
- 	clk_register_clkdev(clk[nfc_div], NULL, "imx25-nand.0");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 579023f..fb7cb84 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -269,9 +269,9 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[usboh3_per_gate], "per", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usboh3_gate], "ipg", "mxc-ehci.2");
- 	clk_register_clkdev(clk[usboh3_gate], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usboh3_per_gate], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usboh3_gate], "ipg", "fsl-usb2-udc");
--	clk_register_clkdev(clk[usboh3_gate], "ahb", "fsl-usb2-udc");
-+	clk_register_clkdev(clk[usboh3_per_gate], "per", "imx-udc-mx51");
-+	clk_register_clkdev(clk[usboh3_gate], "ipg", "imx-udc-mx51");
-+	clk_register_clkdev(clk[usboh3_gate], "ahb", "imx-udc-mx51");
- 	clk_register_clkdev(clk[nfc_gate], NULL, "imx51-nand");
- 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
--- 
-1.7.0.4
+You should have my ACK put after your SoB, since I have provided it
+on v6 of this patch.  It will make balbi's life a little bit easier
+when he applies the patch.
+
+So again,
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+Shawn
