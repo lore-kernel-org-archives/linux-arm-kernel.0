@@ -1,100 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Jan 2013 14:59:06 +0000
-Subject: [PATCH v8 05/22] mfd: omap-usb-tll: Clean up clock handling
-In-Reply-To: <1358511445-26656-6-git-send-email-rogerq@ti.com>
-References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
- <1358511445-26656-6-git-send-email-rogerq@ti.com>
-Message-ID: <20130118145906.GE23505@n2100.arm.linux.org.uk>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 18 Jan 2013 23:02:26 +0800
+Subject: [PATCH v7 05/15] gpio: fix wrong checking condition for gpio range
+In-Reply-To: <50F93DA0.1060708@mvista.com>
+References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358494279-16503-6-git-send-email-haojian.zhuang@linaro.org>
+ <50F93DA0.1060708@mvista.com>
+Message-ID: <CAD6h2NQOY5DPS-y3rpTFrEu3LNTnPFgX2ivfNYqcoqoRGZH5mA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 02:17:08PM +0200, Roger Quadros wrote:
-> +	tll->ch_clk = devm_kzalloc(dev, sizeof(struct clk * [tll->nch]),
-> +						GFP_KERNEL);
-> +	if (!tll->ch_clk) {
-> +		ret = -ENOMEM;
-> +		dev_err(dev, "Couldn't allocate memory for channel clocks\n");
-> +		goto err_clk_alloc;
-> +	}
-> +
-> +	for (i = 0; i < tll->nch; i++) {
-> +		char clkname[] = "usb_tll_hs_usb_chx_clk";
-> +		struct clk *fck;
-> +
-> +		snprintf(clkname, sizeof(clkname),
-> +					"usb_tll_hs_usb_ch%d_clk", i);
-> +		fck = clk_get(dev, clkname);
-> +
-> +		if (IS_ERR(fck))
-> +			dev_dbg(dev, "can't get clock : %s\n", clkname);
-> +		else
-> +			tll->ch_clk[i] = fck;
+On 18 January 2013 20:18, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Hello.
+>
+>
+> On 18-01-2013 11:31, Haojian Zhuang wrote:
+>
+>> Since index++ calculates from 0, the checking condition of "while
+>> (index++)" is always fake. So replace it by unconditional loop.
+>
+>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> ---
+>>   drivers/gpio/gpiolib-of.c |    6 +++---
+>>   1 file changed, 3 insertions(+), 3 deletions(-)
+>
+>
+>> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+>> index b1f0682..011e1e98 100644
+>> --- a/drivers/gpio/gpiolib-of.c
+>> +++ b/drivers/gpio/gpiolib-of.c
+>> @@ -228,7 +228,7 @@ static void of_gpiochip_add_pin_range(struct gpio_chip
+>> *chip)
+>>         if (!np)
+>>                 return;
+>>
+>> -       do {
+>> +       for (;;) {
+>
+>
+>    Why not:
+>
+>         for (;; index++) {
+>
+OK. I'll update it.
 
-Hmm.  I'd actually suggest that this becomes:
-
-		tll->ch_clk[i] = fck;
-		if (IS_ERR(fck)
-			dev_dbg(dev, "can't get clock: %s\n", clkname);
-
-so that tll->ch_clk is always written to.
-
->  static int usbtll_omap_remove(struct platform_device *pdev)
->  {
->  	struct usbtll_omap *tll = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	for (i = 0; i < tll->nch; i++)
-> +		clk_put(tll->ch_clk[i]);
-
-And change this to:
-
-	for (i = 0; i < tll->nch; i++)
-		if (!IS_ERR(tll->ch_clk[i]))
-			clk_put(tll->ch_clk[i]);
-
-so that you're not passing a NULL pointer in.
-
-> +	for (i = 0; i < tll->nch; i++) {
-> +		if (is_ehci_tll_mode(pdata->port_mode[i])) {
-> +			int r;
->  
-> -	if (is_ehci_tll_mode(pdata->port_mode[1]))
-> -		clk_enable(tll->usbtll_p2_fck);
-> +			if (!tll->ch_clk[i])
-
-			if (IS_ERR(tll->ch_clk[i]))
-
-> +				continue;
-> +
-> +			r = clk_enable(tll->ch_clk[i]);
-> +			if (r) {
-> +				dev_err(dev,
-> +				 "Error enabling ch %d clock: %d\n", i, r);
-> +			}
-> +		}
-> +	}
-
-> @@ -387,11 +409,12 @@ static int usbtll_runtime_suspend(struct device *dev)
->  
->  	spin_lock_irqsave(&tll->lock, flags);
->  
-> -	if (is_ehci_tll_mode(pdata->port_mode[0]))
-> -		clk_disable(tll->usbtll_p1_fck);
-> -
-> -	if (is_ehci_tll_mode(pdata->port_mode[1]))
-> -		clk_disable(tll->usbtll_p2_fck);
-> +	for (i = 0; i < tll->nch; i++) {
-> +		if (is_ehci_tll_mode(pdata->port_mode[i])) {
-> +			if (tll->ch_clk[i])
-
-			if (!IS_ERR(tll->ch_clk[i]))
-
-> +				clk_disable(tll->ch_clk[i]);
-> +		}
-> +	}
->  
->  	spin_unlock_irqrestore(&tll->lock, flags);
->  
-> -- 
-> 1.7.4.1
-> 
+>
+>>                 ret = of_parse_phandle_with_args(np, "gpio-ranges",
+>>                                 "#gpio-range-cells", index, &pinspec);
+>>                 if (ret)
+>> @@ -254,8 +254,8 @@ static void of_gpiochip_add_pin_range(struct gpio_chip
+>> *chip)
+>>
+>>                 if (ret)
+>>                         break;
+>> -
+>> -       } while (index++);
+>> +               index++;
+>> +       }
+>>   }
+>
+>
+> WBR, Sergei
+>
