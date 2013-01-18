@@ -1,41 +1,48 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 18 Jan 2013 16:28:49 +0400
-Subject: [PATCH 4/9] ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod with
- the right flags
-In-Reply-To: <1358493569-17142-5-git-send-email-vaibhav.bedia@ti.com>
+Date: Fri, 18 Jan 2013 16:31:01 +0400
+Subject: [PATCH 1/9] ARM: OMAP2+: AM33XX: CM: Get rid of unncessary header
+ inclusions
+In-Reply-To: <1358493569-17142-2-git-send-email-vaibhav.bedia@ti.com>
 References: <1358493569-17142-1-git-send-email-vaibhav.bedia@ti.com>
- <1358493569-17142-5-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <50F94001.5050703@mvista.com>
+ <1358493569-17142-2-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <50F94085.3030704@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
 On 18-01-2013 11:19, Vaibhav Bedia wrote:
 
-> Third Party Transfer Controller (TPTC0) needs to be idled and
-> put to standby under SW control. Add the appropriate flags in
-> the TPTC0 hwmod entry.
+> Some of the included header files are not needed so
+> remove them.
 
 > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
 > Change from RFC version:
-> 	Clarify TPTC in the changelog
+> 	No change
 
->   arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    1 +
->   1 files changed, 1 insertions(+), 0 deletions(-)
+>   arch/arm/mach-omap2/cm33xx.h |    7 +------
+>   1 files changed, 1 insertions(+), 6 deletions(-)
 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> index 8280f11..f2f408c 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> @@ -1823,6 +1823,7 @@ static struct omap_hwmod am33xx_tptc0_hwmod = {
->   	.class		= &am33xx_tptc_hwmod_class,
->   	.clkdm_name	= "l3_clkdm",
->   	.mpu_irqs	= am33xx_tptc0_irqs,
-> +	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
+> diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
+> index 5fa0b62..8009e13 100644
+> --- a/arch/arm/mach-omap2/cm33xx.h
+> +++ b/arch/arm/mach-omap2/cm33xx.h
+> @@ -17,16 +17,11 @@
+>   #ifndef __ARCH_ARM_MACH_OMAP2_CM_33XX_H
+>   #define __ARCH_ARM_MACH_OMAP2_CM_33XX_H
+>
+> -#include <linux/delay.h>
+> -#include <linux/errno.h>
+> -#include <linux/err.h>
+> -#include <linux/io.h>
+> -
+>   #include "common.h"
+>
+>   #include "cm.h"
+>   #include "cm-regbits-33xx.h"
+> -#include "cm33xx.h"
+> +#include "iomap.h"
 
-    Parens not needed here.
+    You don't comment on this addition in the changelog...
 
 WBR, Sergei
