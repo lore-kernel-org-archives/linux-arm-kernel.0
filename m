@@ -1,70 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Jan 2013 09:15:01 -0800
-Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
- hwmod data
-In-Reply-To: <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
-References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
- <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130118171500.GC15361@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 18 Jan 2013 17:15:46 +0000
+Subject: [GIT PULL] clockevents: decouple broadcast mechanism from drivers
+In-Reply-To: <20130117172910.GA10070@e106331-lin.cambridge.arm.com>
+References: <20130117172910.GA10070@e106331-lin.cambridge.arm.com>
+Message-ID: <20130118171545.GB15707@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [130118 07:30]:
-> From: Benoit Cousson <b-cousson@ti.com>
-> 
-> Adding the hwmod data for OMAP54xx platforms.
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> +/* bb2d */
-> +static struct omap_hwmod_irq_info omap54xx_bb2d_irqs[] = {
-> +	{ .irq = 125 + OMAP54XX_IRQ_GIC_START },
-> +	{ .irq = -1 }
-> +};
-...
+As has been pointed out elsewhere, in my haste to fix this up I made a
+typo in the first patch, preventing it from building.
 
-> +/* c2c */
-> +static struct omap_hwmod_irq_info omap54xx_c2c_irqs[] = {
-> +	{ .irq = 88 + OMAP54XX_IRQ_GIC_START },
-> +	{ .irq = -1 }
-> +};
-...
+Apologies for the confusion. I've created a new branch with a corrected
+and tested version. Please see the pull request below.
 
+Thanks,
+Mark.
 
-> +static struct omap_hwmod_dma_info omap54xx_c2c_sdma_reqs[] = {
-> +	{ .dma_req = 68 + OMAP54XX_DMA_REQ_START },
-> +	{ .dma_req = -1 }
-> +};
+The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
 
+  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
 
+are available in the git repository at:
 
-> +static struct omap_hwmod_addr_space omap54xx_elm_addrs[] = {
-> +	{
-> +		.pa_start	= 0x48078000,
-> +		.pa_end		= 0x48078fff,
-> +		.flags		= ADDR_TYPE_RT
-> +	},
-> +	{ }
-> +};
-...
+  git://linux-arm.org/linux-mr.git for-tglx/timer-broadcast-v2
 
-> +static struct omap_hwmod_addr_space omap54xx_emif1_addrs[] = {
-> +	{
-> +		.pa_start	= 0x4c000000,
-> +		.pa_end		= 0x4c0003ff,
-> +		.flags		= ADDR_TYPE_RT
-> +	},
-> +	{ }
-> +};
+for you to fetch changes up to 041d14f475c4436d9fb9a7c94842154c42fd1b65:
 
-As discussed earlier on this list, let's not duplicate the standard
-resources here as they already are supposed to come from device tree.
+  clockevents: Add generic timer broadcast function (2013-01-18 17:07:36 +0000)
 
-Whatever issues prevent us from dropping the duplicate data here need
-to be fixed. I believe Benoit already had some scripts/patches for
-that and was just waiting for the DMA binding to get merged?
+----------------------------------------------------------------
+Mark Rutland (2):
+      clockevents: Add generic timer broadcast receiver
+      clockevents: Add generic timer broadcast function
 
-Regards,
-
-Tony
+ include/linux/clockchips.h   |  9 +++++++++
+ kernel/time/Kconfig          |  4 ++++
+ kernel/time/tick-broadcast.c | 28 ++++++++++++++++++++++++++++
+ 3 files changed, 41 insertions(+)
