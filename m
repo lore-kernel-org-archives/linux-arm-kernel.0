@@ -1,32 +1,49 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 18 Jan 2013 17:53:50 +0530
-Subject: [PATCH] ARM: arch_timer: Don't expect both secure and nonsecure PPI
- IRQ info
-Message-ID: <1358511830-7909-1-git-send-email-rnayak@ti.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 18 Jan 2013 16:21:58 +0400
+Subject: [PATCH v7 05/15] gpio: fix wrong checking condition for gpio range
+In-Reply-To: <1358494279-16503-6-git-send-email-haojian.zhuang@linaro.org>
+References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358494279-16503-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <50F93E66.7060503@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current logic expects platforms to pass information about *both*
-secure and nonsecure PPI IRQ. Make arch_timer work even when either one
-of those are provided instead.
+On 18-01-2013 11:31, Haojian Zhuang wrote:
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/kernel/arch_timer.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Since index++ calculates from 0, the checking condition of "while
+> (index++)" is always fake.
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index c8ef207..59e1e26 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -495,7 +495,7 @@ int __init arch_timer_of_register(void)
- 	if (!arch_timer_ppi[VIRT_PPI]) {
- 		arch_timer_use_virtual = false;
- 
--		if (!arch_timer_ppi[PHYS_SECURE_PPI] ||
-+		if (!arch_timer_ppi[PHYS_SECURE_PPI] &&
- 		    !arch_timer_ppi[PHYS_NONSECURE_PPI]) {
- 			pr_warn("arch_timer: No interrupt available, giving up\n");
- 			return -EINVAL;
--- 
-1.7.9.5
+    You meanbt "false"?  Actually if 'index' starts from 0, the loop will end 
+after the first iteration.
+
+> So replace it by unconditional loop.
+
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>   drivers/gpio/gpiolib-of.c |    6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+> index b1f0682..011e1e98 100644
+> --- a/drivers/gpio/gpiolib-of.c
+> +++ b/drivers/gpio/gpiolib-of.c
+> @@ -228,7 +228,7 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
+>   	if (!np)
+>   		return;
+>
+> -	do {
+> +	for (;;) {
+>   		ret = of_parse_phandle_with_args(np, "gpio-ranges",
+>   				"#gpio-range-cells", index, &pinspec);
+>   		if (ret)
+> @@ -254,8 +254,8 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
+>
+>   		if (ret)
+>   			break;
+> -
+> -	} while (index++);
+> +		index++;
+> +	}
+>   }
+
+WBR, Sergei
