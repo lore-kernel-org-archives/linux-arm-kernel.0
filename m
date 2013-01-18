@@ -1,63 +1,37 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 18 Jan 2013 09:58:27 -0800
-Subject: [PATCH 7/7] clk: vexpress: Use common of_clk_init() function
-In-Reply-To: <1357282858-2112-7-git-send-email-pgaikwad@nvidia.com>
-References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
- <1357282858-2112-7-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <20130118175827.3982.65450@quantum>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 18 Jan 2013 10:03:57 -0800
+Subject: [PATCH v2 2/2] ARM: uncompress debug support for multiplatform
+ build
+In-Reply-To: <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
+References: <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
+ <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAOesGMhRu14UMafi_q7wmFsZ-m0q-25jDmUKfkNWjztter0Z=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Prashant Gaikwad (2013-01-03 23:00:58)
-> Use common of_clk_init() function for clock initialization.
-> 
-> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+On Thu, Jan 17, 2013 at 6:45 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Instead of giving zero support of uncompress debug for multiplatform
+> build, the patch turns uncompress debug into one part of DEBUG_LL
+> support.  When DEBUG_LL is turned on for a particular platform,
+> uncompress debug works too for that platform.
+>
+> It reuses the platform DEBUG_LL macros by creating a simple
+> arch/arm/boot/compressed/debug.S with CONFIG_DEBUG_LL_INCLUDE
+> included there, and implements a generic putc() using those macros.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Pawel or Linus,
+This looks great, and it's even cleaner than I was hoping it'd be
+based on my suggestion. Nice! :)
 
-Can I get a Tested-by before I take this series into clk-next?
+Russell, do you want to apply this or should we? If the former, for
+the patch tracker:
 
-Thanks,
-Mike
+Acked-by: Olof Johansson <olof@lixom.net>
 
-> ---
->  drivers/clk/versatile/clk-vexpress-osc.c |    1 +
->  drivers/clk/versatile/clk-vexpress.c     |    8 +-------
->  2 files changed, 2 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
-> index dcb6ae0..256c8be 100644
-> --- a/drivers/clk/versatile/clk-vexpress-osc.c
-> +++ b/drivers/clk/versatile/clk-vexpress-osc.c
-> @@ -144,3 +144,4 @@ error:
->                 vexpress_config_func_put(osc->func);
->         kfree(osc);
->  }
-> +CLK_OF_DECLARE(vexpress_soc, "arm,vexpress-osc", vexpress_osc_of_setup);
-> diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
-> index c742ac7..f889f2f 100644
-> --- a/drivers/clk/versatile/clk-vexpress.c
-> +++ b/drivers/clk/versatile/clk-vexpress.c
-> @@ -99,19 +99,13 @@ struct clk *vexpress_sp810_of_get(struct of_phandle_args *clkspec, void *data)
->         return vexpress_sp810_timerclken[clkspec->args[0]];
->  }
->  
-> -static const __initconst struct of_device_id vexpress_fixed_clk_match[] = {
-> -       { .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
-> -       { .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
-> -       {}
-> -};
-> -
->  void __init vexpress_clk_of_init(void)
->  {
->         struct device_node *node;
->         struct clk *clk;
->         struct clk *refclk, *timclk;
->  
-> -       of_clk_init(vexpress_fixed_clk_match);
-> +       of_clk_init(NULL);
->  
->         node = of_find_compatible_node(NULL, NULL, "arm,sp810");
->         vexpress_sp810_init(of_iomap(node, 0));
-> -- 
-> 1.7.4.1
+If the latter, let me know and I'll pick it up.
+
+
+Thanks!
+
+-Olof
