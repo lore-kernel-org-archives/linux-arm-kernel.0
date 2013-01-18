@@ -1,38 +1,36 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 18 Jan 2013 07:56:45 +0100
-Subject: [PATCH] ARM: shmobile: sh73a0: Use generic irqchip_init()
-In-Reply-To: <20130118000517.GI16740@verge.net.au>
-References: <1358424013-31306-1-git-send-email-thierry.reding@avionic-design.de>
- <20130118000517.GI16740@verge.net.au>
-Message-ID: <20130118065645.GC17790@avionic-0098.adnet.avionic-design.de>
+Date: Fri, 18 Jan 2013 08:16:13 +0100
+Subject: [PATCH v2 2/2] ARM: shmobile: kzm9g: Don't use gic_handle_irq()
+In-Reply-To: <1358493373-28722-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1358493373-28722-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1358493373-28722-2-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 09:05:17AM +0900, Simon Horman wrote:
-> On Thu, Jan 17, 2013 at 01:00:13PM +0100, Thierry Reding wrote:
-> > The asm/hardware/gic.h header does no longer exist and the corresponding
-> > functionality was moved to linux/irqchip.h and linux/irqchip/arm-gic.h
-> > respectively. gic_handle_irq() and of_irq_init() are no longer available
-> > either and have been replaced by irqchip_init().
-> > 
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> 
-> Thanks.
-> 
-> Due to the hairy upstream requirements of the arm-soc tree
-> I believe this patch needs to be split in two. A 'board' patch
-> for board-kzm9g-reference.c. And an 'soc' patch for the
-> remaining portions.
-> 
-> I'm happy to split the patch myself or for you to do so.
+This function is no longer publicly available. However, the sh73a0 setup
+code now uses the generic irqchip infrastructure which will implicitly
+set the IRQ handler, so it's fine to drop its initialization from the
+machine definition.
 
-I'll resend a split patch shortly.
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+---
+Changes in v2:
+- new patch with kzm9g board changes
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130118/1080fbf2/attachment.sig>
+ arch/arm/mach-shmobile/board-kzm9g-reference.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+index 04e9ae5..08c95dd 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
++++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+@@ -90,7 +90,6 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
+ 	.init_early	= sh73a0_add_early_devices_dt,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= sh73a0_init_irq_dt,
+-	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= kzm_init,
+ 	.init_late	= shmobile_init_late,
+ 	.init_time	= shmobile_timer_init,
+-- 
+1.8.1.1
