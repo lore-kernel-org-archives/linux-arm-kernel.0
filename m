@@ -1,52 +1,24 @@
-From: rachna@ti.com (Patil, Rachna)
-Date: Fri, 18 Jan 2013 16:14:57 +0530
-Subject: [PATCH v3 0/8] MFD: ti_am335x_tscadc: DT support and TSC features
- addition
-Message-ID: <cover.1358502134.git.rachna@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 18 Jan 2013 11:46:42 +0100
+Subject: OMAP baseline test results for v3.8-rc3
+In-Reply-To: <alpine.DEB.2.00.1301171841350.14118@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1301141756460.20390@utopia.booyaka.com>
+ <50F51067.5090008@ti.com>
+ <alpine.DEB.2.00.1301171841350.14118@utopia.booyaka.com>
+Message-ID: <50F92812.3080406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Patil, Rachna" <rachna@ti.com>
+Hi Paul,
 
-This patch set is a cumulative set of [1] and [2] sent earlier.
+On 01/17/2013 07:43 PM, Paul Walmsley wrote:
+>> The following patch fixes these:
+>> https://lkml.org/lkml/2012/12/24/3
+> 
+> Thanks, I've added that info in the v3.8-rc3 test summary, and moved the
+> paragraph to the 'resolved by posted patches' section.
 
-Note that there are no code changes in either of the patch set,
-only rebased on top of Linus's v3.8-rc3 tag to make sure that
-all the patches apply without any conflicts.
-
-This patch set has been tested on AM335x EVM.
-
-[1] http://www.spinics.net/lists/linux-input/msg23060.html
-[2] http://www.spinics.net/lists/linux-input/msg23090.html
-
-Changes in v3:
-	No code change.
-
-Changes in v2:
-	Patch "input: ti_am335x_tsc: Add variance filter"
-	from v1 has been dropped.
-	Add MFD device DT node in AM335x EVM.
-
-Patil, Rachna (8):
-  input: ti_am335x_tsc: Step enable bits made configurable
-  input: ti_am335x_tsc: Order of TSC wires, made configurable
-  input: touchscreen: ti_tsc: remove unwanted fifo flush
-  MFD: ti_am335x_tscadc: add device tree binding information
-  MFD: ti_am335x_tscadc: Add DT support
-  input: ti_am335x_tsc: Add DT support
-  IIO: ti_am335x_adc: Add DT support
-  arm/dts: AM335x-evm: Add TSC/ADC MFD device support
-
- .../devicetree/bindings/mfd/ti_am335x_tscadc.txt   |   35 +++
- arch/arm/boot/dts/am335x-evm.dts                   |   13 +
- arch/arm/boot/dts/am33xx.dtsi                      |    8 +
- drivers/iio/adc/ti_am335x_adc.c                    |   26 +-
- drivers/input/touchscreen/ti_am335x_tsc.c          |  266 +++++++++++++++++---
- drivers/mfd/ti_am335x_tscadc.c                     |   28 ++-
- include/linux/input/ti_am335x_tsc.h                |   12 +
- include/linux/mfd/ti_am335x_tscadc.h               |   11 +-
- 8 files changed, 347 insertions(+), 52 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
+FYI: the patch is now in mainline (3.8-rc4)
 
 -- 
-1.7.9.5
+P?ter
