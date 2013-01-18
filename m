@@ -1,37 +1,61 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Jan 2013 10:03:57 -0800
-Subject: [PATCH v2 2/2] ARM: uncompress debug support for multiplatform
- build
-In-Reply-To: <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
-References: <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
- <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAOesGMhRu14UMafi_q7wmFsZ-m0q-25jDmUKfkNWjztter0Z=Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Jan 2013 10:05:49 -0800
+Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport
+ power functions
+In-Reply-To: <20130118175408.GC1035@arwen.pp.htv.fi>
+References: <20130117100510.GI10814@arwen.pp.htv.fi>
+ <20130117100919.GJ10814@arwen.pp.htv.fi>
+ <1358418917.6252.31.camel@cumari.coelho.fi>
+ <50F7D535.6030205@ti.com> <20130117173131.GL14149@atomide.com>
+ <1358445456.6252.64.camel@cumari.coelho.fi>
+ <20130117231608.GP14149@atomide.com>
+ <1358499533.6252.80.camel@cumari.coelho.fi>
+ <20130118173635.GE15361@atomide.com>
+ <20130118175408.GC1035@arwen.pp.htv.fi>
+Message-ID: <20130118180548.GR14149@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 6:45 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Instead of giving zero support of uncompress debug for multiplatform
-> build, the patch turns uncompress debug into one part of DEBUG_LL
-> support.  When DEBUG_LL is turned on for a particular platform,
-> uncompress debug works too for that platform.
->
-> It reuses the platform DEBUG_LL macros by creating a simple
-> arch/arm/boot/compressed/debug.S with CONFIG_DEBUG_LL_INCLUDE
-> included there, and implements a generic putc() using those macros.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+* Felipe Balbi <balbi@ti.com> [130118 09:57]:
+> Hi,
+> 
+> On Fri, Jan 18, 2013 at 09:36:35AM -0800, Tony Lindgren wrote:
+> > * Luciano Coelho <coelho@ti.com> [130118 01:03]:
+> > > On Thu, 2013-01-17 at 15:16 -0800, Tony Lindgren wrote:
+> > > > * Luciano Coelho <coelho@ti.com> [130117 10:04]:
+> > > > > But this patch is pretty small and simple, so why not include it to at
+> > > > > least fix the breakage in 3.7 and 3.8? Whether you take it or not now
+> > > > > won't make any difference in the 5k LOC in these kernel versions.
+> > > > 
+> > > > Well we are planning to drop the non-DT support for omap4 as soon as it's
+> > > > usable with DT. For omap4 we are only carrying SDP and panda support to
+> > > > make this transition easier. The only bindings missing AFAIK are wl12xx and
+> > > > USB.
+> > > 
+> > > In my view this is a regression and it should be fixed with as simple a
+> > > patch as possible.  The alternative to my solution is to revert the
+> > > patch that removed the enable/disable from the ti-st driver *and* fix
+> > > u-boot, because if it doesn't mux the UART2 pins properly (and it
+> > > doesn't) the shared transport still won't work.
+> > 
+> > Fixing the muxing here makes sense naturally as we cannot do that in the driver
+> > until we've flipped things over to use DT.
+> > 
+> > But I don't think we should fix the driver regression by adding more platform
+> > callbacks as we are getting rid of them anyways.
+> 
+> it's not adding more callbacks, solely implementing them as it should
+> have been done on Pavan's original patch.
 
-This looks great, and it's even cleaner than I was hoping it'd be
-based on my suggestion. Nice! :)
+It certainly is adding new callback functions to board-*.c files looking
+at the diffstat :)
 
-Russell, do you want to apply this or should we? If the former, for
-the patch tracker:
+IMHO the right fix is to revert eccf2979 that caused the regression and then
+adding the muxing to the board-*.c file(s).
 
-Acked-by: Olof Johansson <olof@lixom.net>
+It's OK for the driver to call the standard GPIO functions, and those will
+be needed in the driver for the DT case anyways.
 
-If the latter, let me know and I'll pick it up.
+Regards,
 
-
-Thanks!
-
--Olof
+Tony
