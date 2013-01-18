@@ -1,41 +1,72 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 18 Jan 2013 09:51:41 +0800
-Subject: [PATCH v6 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
- platform_device_id
-In-Reply-To: <CAOMZO5DNVMAG3btGR7DeukgWaEaPe2zqm=EKAHQ5ovawq+BiWw@mail.gmail.com>
-References: <1358416874-27011-1-git-send-email-peter.chen@freescale.com>
- <1358416874-27011-2-git-send-email-peter.chen@freescale.com>
- <CAOMZO5Chu0bcXPqn+wWHwAqLu+27DvLx1=Bzaffpd-bA2ahaAQ@mail.gmail.com>
- <20727.57269.347099.324284@ipc1.ka-ro>
- <CAOMZO5DNVMAG3btGR7DeukgWaEaPe2zqm=EKAHQ5ovawq+BiWw@mail.gmail.com>
-Message-ID: <20130118015139.GA17155@nchen-desktop>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 18 Jan 2013 15:05:32 +1300
+Subject: [PATCH 4/4 v4] serial: tty: Cleanup code using devm_ function
+In-Reply-To: <1358474732-5422-1-git-send-email-linux@prisktech.co.nz>
+References: <1358474732-5422-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1358474732-5422-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 12:43:23PM -0200, Fabio Estevam wrote:
-> On Thu, Jan 17, 2013 at 9:25 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> 
-> > The equivalent of !cpu_is_mx51() would be
-> > strcmp(pdev->id_entry->name, "imx-udc-mx51") (without the '!') meaning
-> > id_entry->name is different from "imx-udc-mx51".
+Convert the last memory allocation (vt8500_port) to use devm_kzalloc
+and remove the fail path cleanup code from vt8500_serial_probe.
 
-Thanks, Lothar and Fabio, I will change, and send v7.
-> 
-> Yes, agree.
-> 
-> strcmp(pdev->id_entry->name, "imx-udc-mx51") is also better than
-> !strcmp(pdev->id_entry->name, "imx-udc-mx27"))
+Reorder iomem mapping above clk_enable to simplify fail code. The
+clock is only enabled if all other resources are available.
 
-We just think this feature only belongs to imx-udc-mx27 type udc
-> 
-> because in the case of another soc entry gets added, let's say
-> "imx-udc-mxyy" then
-> 
-> !strcmp(pdev->id_entry->name, "imx-udc-mx27")) will not correspond to
-> !cpu_is_mx51() anymore.
-> 
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ drivers/tty/serial/vt8500_serial.c |   13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
 
+diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
+index 1061e57..b834d99 100644
+--- a/drivers/tty/serial/vt8500_serial.c
++++ b/drivers/tty/serial/vt8500_serial.c
+@@ -589,7 +589,8 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+ 		return -EBUSY;
+ 	}
+ 
+-	vt8500_port = kzalloc(sizeof(struct vt8500_port), GFP_KERNEL);
++	vt8500_port = devm_kzalloc(&pdev->dev, sizeof(struct vt8500_port),
++				   GFP_KERNEL);
+ 	if (!vt8500_port)
+ 		return -ENOMEM;
+ 
+@@ -600,14 +601,13 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+ 	vt8500_port->clk = of_clk_get(pdev->dev.of_node, 0);
+ 	if (IS_ERR(vt8500_port->clk)) {
+ 		dev_err(&pdev->dev, "failed to get clock\n");
+-		ret = -EINVAL;
+-		goto err;
++		return  -EINVAL;
+ 	}
+ 
+ 	ret = clk_prepare_enable(vt8500_port->clk);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to enable clock\n");
+-		goto err;
++		return ret;
+ 	}
+ 
+ 	vt8500_port->uart.type = PORT_VT8500;
+@@ -631,10 +631,6 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, vt8500_port);
+ 
+ 	return 0;
+-
+-err:
+-	kfree(vt8500_port);
+-	return ret;
+ }
+ 
+ static int vt8500_serial_remove(struct platform_device *pdev)
+@@ -644,7 +640,6 @@ static int vt8500_serial_remove(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, NULL);
+ 	clk_disable_unprepare(vt8500_port->clk);
+ 	uart_remove_one_port(&vt8500_uart_driver, &vt8500_port->uart);
+-	kfree(vt8500_port);
+ 
+ 	return 0;
+ }
 -- 
-
-Best Regards,
-Peter Chen
+1.7.9.5
