@@ -1,26 +1,111 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Jan 2013 15:02:42 +0000
-Subject: [PATCH v8 06/22] mfd: omap-usb-tll: introduce and use
- mode_needs_tll()
-In-Reply-To: <1358511445-26656-7-git-send-email-rogerq@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 18 Jan 2013 17:04:53 +0200
+Subject: [PATCH v8 05/22] mfd: omap-usb-tll: Clean up clock handling
+In-Reply-To: <20130118145906.GE23505@n2100.arm.linux.org.uk>
 References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
- <1358511445-26656-7-git-send-email-rogerq@ti.com>
-Message-ID: <20130118150242.GF23505@n2100.arm.linux.org.uk>
+ <1358511445-26656-6-git-send-email-rogerq@ti.com>
+ <20130118145906.GE23505@n2100.arm.linux.org.uk>
+Message-ID: <50F96495.6070502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 02:17:09PM +0200, Roger Quadros wrote:
-> +/* only PHY and UNUSED modes don't need TLL */
-> +#define omap_usb_mode_needs_tll(x)	((x != OMAP_USBHS_PORT_MODE_UNUSED) &&\
-> +					 (x != OMAP_EHCI_PORT_MODE_PHY))
+On 01/18/2013 04:59 PM, Russell King - ARM Linux wrote:
+> On Fri, Jan 18, 2013 at 02:17:08PM +0200, Roger Quadros wrote:
+>> +	tll->ch_clk = devm_kzalloc(dev, sizeof(struct clk * [tll->nch]),
+>> +						GFP_KERNEL);
+>> +	if (!tll->ch_clk) {
+>> +		ret = -ENOMEM;
+>> +		dev_err(dev, "Couldn't allocate memory for channel clocks\n");
+>> +		goto err_clk_alloc;
+>> +	}
+>> +
+>> +	for (i = 0; i < tll->nch; i++) {
+>> +		char clkname[] = "usb_tll_hs_usb_chx_clk";
+>> +		struct clk *fck;
+>> +
+>> +		snprintf(clkname, sizeof(clkname),
+>> +					"usb_tll_hs_usb_ch%d_clk", i);
+>> +		fck = clk_get(dev, clkname);
+>> +
+>> +		if (IS_ERR(fck))
+>> +			dev_dbg(dev, "can't get clock : %s\n", clkname);
+>> +		else
+>> +			tll->ch_clk[i] = fck;
+> 
+> Hmm.  I'd actually suggest that this becomes:
+> 
+> 		tll->ch_clk[i] = fck;
+> 		if (IS_ERR(fck)
+> 			dev_dbg(dev, "can't get clock: %s\n", clkname);
+> 
+> so that tll->ch_clk is always written to.
 
-Growl.
+Yes, I'll fix this.
 
-These parens do not make anything safer at all - they just obfuscate.  The
-safe version of the above macro would have been:
+> 
+>>  static int usbtll_omap_remove(struct platform_device *pdev)
+>>  {
+>>  	struct usbtll_omap *tll = platform_get_drvdata(pdev);
+>> +	int i;
+>> +
+>> +	for (i = 0; i < tll->nch; i++)
+>> +		clk_put(tll->ch_clk[i]);
+> 
+> And change this to:
+> 
+> 	for (i = 0; i < tll->nch; i++)
+> 		if (!IS_ERR(tll->ch_clk[i]))
+> 			clk_put(tll->ch_clk[i]);
+> 
+> so that you're not passing a NULL pointer in.
+>
+ok.
 
-#define omap_usb_mode_needs_tll(x)	((x) != OMAP_USBHS_PORT_MODE_UNUSED &&\
-					 (x) != OMAP_EHCI_PORT_MODE_PHY)
+>> +	for (i = 0; i < tll->nch; i++) {
+>> +		if (is_ehci_tll_mode(pdata->port_mode[i])) {
+>> +			int r;
+>>  
+>> -	if (is_ehci_tll_mode(pdata->port_mode[1]))
+>> -		clk_enable(tll->usbtll_p2_fck);
+>> +			if (!tll->ch_clk[i])
+> 
+> 			if (IS_ERR(tll->ch_clk[i]))
+ok.
+> 
+>> +				continue;
+>> +
+>> +			r = clk_enable(tll->ch_clk[i]);
+>> +			if (r) {
+>> +				dev_err(dev,
+>> +				 "Error enabling ch %d clock: %d\n", i, r);
+>> +			}
+>> +		}
+>> +	}
+> 
+>> @@ -387,11 +409,12 @@ static int usbtll_runtime_suspend(struct device *dev)
+>>  
+>>  	spin_lock_irqsave(&tll->lock, flags);
+>>  
+>> -	if (is_ehci_tll_mode(pdata->port_mode[0]))
+>> -		clk_disable(tll->usbtll_p1_fck);
+>> -
+>> -	if (is_ehci_tll_mode(pdata->port_mode[1]))
+>> -		clk_disable(tll->usbtll_p2_fck);
+>> +	for (i = 0; i < tll->nch; i++) {
+>> +		if (is_ehci_tll_mode(pdata->port_mode[i])) {
+>> +			if (tll->ch_clk[i])
+> 
+> 			if (!IS_ERR(tll->ch_clk[i]))
+ok.
 
-If you're going to use a macro argument in an expression, it needs parens.
-Simple expressions like a != b && c != d do _not_ need parens.
+> 
+>> +				clk_disable(tll->ch_clk[i]);
+>> +		}
+>> +	}
+>>  
+>>  	spin_unlock_irqrestore(&tll->lock, flags);
+>>  
+
+--
+cheers,
+-roger
