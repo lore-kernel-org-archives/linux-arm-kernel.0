@@ -1,24 +1,24 @@
 From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Fri, 18 Jan 2013 18:40:40 +0530
+Date: Fri, 18 Jan 2013 18:40:57 +0530
 Subject: [PATCH] ARM: SAMSUNG: Gracefully exit on suspend failure
-In-Reply-To: <CAH9JG2WxW=+8PwhZ6r7akmwq2B2Qf=MqB4sB6DQypS0hEmAdvQ@mail.gmail.com>
+In-Reply-To: <00ab01cdeeca$02a75e60$07f61b20$@samsung.com>
 References: <1357729952-14881-1-git-send-email-a.kesavan@samsung.com>
- <CAH9JG2WxW=+8PwhZ6r7akmwq2B2Qf=MqB4sB6DQypS0hEmAdvQ@mail.gmail.com>
-Message-ID: <CAM4voanVpYL3xXqa7nAtioHh6Q5VMHuZ1z+VQmQGNvv=bcLtFA@mail.gmail.com>
+ <00ab01cdeeca$02a75e60$07f61b20$@samsung.com>
+Message-ID: <CAM4voanPGUdNKTGuTppVP8fF8+Ydt-ahjyHhqDF2tmxWKbB9Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Jan 10, 2013 at 1:16 AM, Kyungmin Park <kmpark@infradead.org> wrote:
-> Hi,
-> I wodner do you see the real case it's happened?
-> It it's occured, does it better to find out the root cause?
+>> -     panic("sleep resumed to originator?");
+>> +     pr_err("Failed to suspend the system\n");
+>> +     return -EBUSY;
 >
-We have seen infrequent suspend failures on the Exynos5. This patch
-helps us obtain
-failure statistics over a period of time and continue debugging the issue.
-> Thank you,
-> Kyungmin Park
+> This can be happened under non-error situation, so this should be:
+>
+> +       pr_info("sleep resumed to originator?");
+> +       return 1; /* abort suspend */
+>
+Will re-post with suggested changes.
 
 Abhilash
