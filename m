@@ -1,31 +1,35 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 18 Jan 2013 21:02:19 +0530
-Subject: [PATCH 3/5] ARM: OMAP: prm: Allow prm init to success on OMAP5 SOCs
+Date: Fri, 18 Jan 2013 21:02:20 +0530
+Subject: [PATCH 4/5] ARM: dts: omap5-evm: Update available memory to 2032 MB
 In-Reply-To: <1358523141-12295-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1358523141-12295-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1358523141-12295-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1358523141-12295-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow prm init to success on OMAP5 SOCs.
+On OMAP5 to detect invalid/bad memory accesses, 16MB of DDR is used as a trap.
+Hence available memory for linux OS is 2032 MB on boards popullated with 2 GB
+memory.
+
+Cc: Benoit Cousson <b-cousson@ti.com>
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/prm44xx.c |    2 +-
+ arch/arm/boot/dts/omap5-evm.dts |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index c05a343..1aae198 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -650,7 +650,7 @@ static struct prm_ll_data omap44xx_prm_ll_data = {
+diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
+index 8722c15..b0e218a 100644
+--- a/arch/arm/boot/dts/omap5-evm.dts
++++ b/arch/arm/boot/dts/omap5-evm.dts
+@@ -16,7 +16,7 @@
  
- int __init omap44xx_prm_init(void)
- {
--	if (!cpu_is_omap44xx())
-+	if (!cpu_is_omap44xx() && !soc_is_omap54xx())
- 		return 0;
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0x80000000 0x80000000>; /* 2 GB */
++		reg = <0x80000000 0x7F000000>; /* 2032 MB */
+ 	};
  
- 	return prm_register(&omap44xx_prm_ll_data);
+ 	vmmcsd_fixed: fixedregulator-mmcsd {
 -- 
 1.7.9.5
