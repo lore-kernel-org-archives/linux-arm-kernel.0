@@ -1,32 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 18 Jan 2013 10:49:01 +0800
-Subject: [PATCH 2/2] ARM: use DEBUG_LL infrastructural for multiplatform
- uncompress debug
-In-Reply-To: <201301171625.42456.arnd@arndb.de>
-References: <1358436119-30808-1-git-send-email-shawn.guo@linaro.org>
- <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
- <201301171625.42456.arnd@arndb.de>
-Message-ID: <20130118024858.GA31381@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 18 Jan 2013 10:50:27 +0800
+Subject: [PATCH 1/2] usb: mxs-phy: add set_suspend API
+Message-ID: <1358477428-2605-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 04:25:42PM +0000, Arnd Bergmann wrote:
-> On Thursday 17 January 2013, Shawn Guo wrote:
-> > However, there is a problem with above approach.  DEBUG_LL routines
-> > will check MMU enable bit to decide whether physical or virtual address
-> > should be used to access debug port.  In case virtual address needs
-> > to be used, the address returned by addruart will not work for
-> > decompressor who uses a different mapping from what kernel uses.
-> > Fortunately, decompressor uses a flat mapping (same physical and virtual
-> > addresses).  So we can easily work it around by asking platform addruart
-> > return physical address as virtual address when it runs in decompressor.
-> > The macro UNCOMPRESS_DEBUG is defined for this use.
-> 
-> Can't you just create a new copy of kernel/debug.S in boot/compressed/
-> that provides only a putc() function and uses the physical address
-> unconditionally?
-> 
-Why did I not think of this?  The approach is obviously simpler.
-Please check the updated version I just sent out.  Thanks.
+It needs to call set_suspend during USB suspend/resume
 
-Shawn
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ drivers/usb/otg/mxs-phy.c |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
+index 7630272..5158332 100644
+--- a/drivers/usb/otg/mxs-phy.c
++++ b/drivers/usb/otg/mxs-phy.c
+@@ -76,6 +76,25 @@ static void mxs_phy_shutdown(struct usb_phy *phy)
+ 	clk_disable_unprepare(mxs_phy->clk);
+ }
+ 
++static int mxs_phy_suspend(struct usb_phy *x, int suspend)
++{
++	struct mxs_phy *mxs_phy = to_mxs_phy(x);
++
++	if (suspend) {
++		writel_relaxed(0xffffffff, x->io_priv + HW_USBPHY_PWD);
++		writel_relaxed(BM_USBPHY_CTRL_CLKGATE,
++			x->io_priv + HW_USBPHY_CTRL_SET);
++		clk_disable_unprepare(mxs_phy->clk);
++	} else {
++		clk_prepare_enable(mxs_phy->clk);
++		writel_relaxed(BM_USBPHY_CTRL_CLKGATE,
++			x->io_priv + HW_USBPHY_CTRL_CLR);
++		writel_relaxed(0, x->io_priv + HW_USBPHY_PWD);
++	}
++
++	return 0;
++}
++
+ static int mxs_phy_on_connect(struct usb_phy *phy,
+ 		enum usb_device_speed speed)
+ {
+@@ -137,6 +156,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 	mxs_phy->phy.label		= DRIVER_NAME;
+ 	mxs_phy->phy.init		= mxs_phy_init;
+ 	mxs_phy->phy.shutdown		= mxs_phy_shutdown;
++	mxs_phy->phy.set_suspend	= mxs_phy_suspend;
+ 	mxs_phy->phy.notify_connect	= mxs_phy_on_connect;
+ 	mxs_phy->phy.notify_disconnect	= mxs_phy_on_disconnect;
+ 
+-- 
+1.7.0.4
