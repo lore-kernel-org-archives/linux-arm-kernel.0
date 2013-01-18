@@ -1,31 +1,59 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 18 Jan 2013 10:54:23 +0000
-Subject: [PATCH] ARM: remove unnecessary 'select GENERIC_GPIO'
-In-Reply-To: <CACRpkdYw6V_GGjBsj_bzzkmFVTamuMq2oMwYDKhjMrXeS5j+fQ@mail.gmail.com>
-References: <1358255616-3171-1-git-send-email-shawn.guo@linaro.org>
- <CACRpkdYw6V_GGjBsj_bzzkmFVTamuMq2oMwYDKhjMrXeS5j+fQ@mail.gmail.com>
-Message-ID: <20130118105423.81C693E0962@localhost>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 18 Jan 2013 18:24:34 +0530
+Subject: [PATCH 1/1] ARM: Add API to detect SCU base address from CP15
+In-Reply-To: <1358506755-13705-1-git-send-email-hdoyu@nvidia.com>
+References: <1358506755-13705-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <50F9460A.6010600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Jan 2013 14:36:00 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Jan 15, 2013 at 2:13 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > The only use of GENERIC_GPIO (defined by architecture) in GPIO subsystem
-> > is being selected by GPIOLIB.  Also there are no any use of the option
-> > at architecture level. Only two sub-architectures shmobile and orion
-> > really use the option as below.
-> >
-> >   arch/arm/mach-shmobile/Makefile:obj-$(CONFIG_GENERIC_GPIO)      += $(pfc-y)
-> >   arch/arm/plat-orion/Makefile:orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
-> >
-> > Remove all those unnecessary sub-architecture level selection of
-> > GENERIC_GPIO, which are there only for confusing people.
-> >
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+On Friday 18 January 2013 04:29 PM, Hiroshi Doyu wrote:
+> Add API to detect SCU base address from CP15.
+>
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+> NOTE:
+> This wasn't delivered to linux-arm-kernel at lists.infradead.org, resending....
+>
+> For usage: http://patchwork.ozlabs.org/patch/212013/
+> ---
+>   arch/arm/include/asm/smp_scu.h |   17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+> index 4eb6d00..f619eef 100644
+> --- a/arch/arm/include/asm/smp_scu.h
+> +++ b/arch/arm/include/asm/smp_scu.h
+> @@ -6,6 +6,23 @@
+>   #define SCU_PM_POWEROFF	3
+>
+>   #ifndef __ASSEMBLER__
+> +
+> +#include <asm/cputype.h>
+> +
+> +static inline phys_addr_t scu_get_base(void)
+> +{
+> +	phys_addr_t pa;
+> +	unsigned long part_number = read_cpuid_part_number();
+> +
+> +	switch (part_number) {
+> +	case ARM_CPU_PART_CORTEX_A9:
+> +		/* Get SCU physical base */
+> +		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
+> +		return pa;
+> +	default:
+> +		return 0;
+> +	}
+> +}
+You may not need the switch case considering peripheral SCU is
+specific to A9 SOCs. Would just if like below is better ?
 
-Looks good to me also.
+phys_addr_t pa = 0;
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+if (ARM_CPU_PART_CORTEX_A9 == read_cpuid_part_number())
+	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
+return pa;
+
+Regards,
+Santosh
+	
