@@ -1,43 +1,44 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Fri, 18 Jan 2013 14:17:43 +0100
-Subject: [PATCH 2/3] ARM: dts: AM33XX: Add GPMC node
-In-Reply-To: <1358491295-4022-3-git-send-email-avinashphilip@ti.com>
-References: <1358491295-4022-1-git-send-email-avinashphilip@ti.com>
- <1358491295-4022-3-git-send-email-avinashphilip@ti.com>
-Message-ID: <1358515063.3873.31.camel@coredoba.hi.pengutronix.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 18 Jan 2013 14:18:23 +0100
+Subject: [PATCH RESEND 1/6 v13] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <CAOY=C6EE1yxjxUR6XvxW5tbY8FPBeO2Nqo6wMeD5R3zAVYD+Ag@mail.gmail.com>
+References: <1358250716-21986-1-git-send-email-stigge@antcom.de>
+ <1358250716-21986-2-git-send-email-stigge@antcom.de>
+ <CAOY=C6EE1yxjxUR6XvxW5tbY8FPBeO2Nqo6wMeD5R3zAVYD+Ag@mail.gmail.com>
+Message-ID: <50F94B9F.7020908@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-01-18 at 12:11 +0530, Philip Avinash wrote:
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index eaef5e7..f4209d8 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -393,5 +393,17 @@
->  			ti,hwmods = "elm";
->  			status = "disabled";
->  		};
-> +
-> +		gpmc: gpmc at 50000000 {
-> +			compatible = "ti,am3352-gpmc";
-> +			ti,hwmods = "gpmc";
-> +			reg = <0x50000000 0x2000>;
-> +			interrupts = <100>;
-> +			num-cs = <8>;
+Hi Stijn,
 
-According to the AM335x TRM (SPRUH73G) page 254 we have GPMC_CSn[6:0],
-so num-cs should probably be <7>.
+On 01/18/2013 01:13 PM, Stijn Devriendt wrote:
+> Hi Roland,
+> 
+> This mail has been long overdue due to issues with some internal
+> permission-tool.
+> Just to be clear, this is not a competing implementation, it's what we
+> currently use as-is. I'm just posting this as a reference to see if
+> perhaps more concepts could be reused. It's based on a 2.6.32 kernel.
+> 
+> It includes:
+> - labels in sysfs (to provide useful names to userspace)
+> - gpio group support
+> - exporting individual/groups of gpios dictated by platform-data or device-tree
+> - open-drain support (different from mainline)
+> - examplary support for multi-gpio to pcf8575 driver
+> - gpio_direction_output_keep() function that prevents toggling when
+> changing direction
+> 
+> Provided-as-is-by: Stijn Devriendt <sdevrien@cisco.com>
 
-> +			num-waitpins = <2>;
-> +			#address-cells = <2>;
-> +			#size-cells = <1>;
-> +			status = "disabled";
-> +		};
->  	};
->  };
+Thanks for posting.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Except for open-drain support, everything in the above list is supported
+in the last posted version of block GPIO.
+
+So please tell if there are certain details you would like to discuss
+about or need an alternative implementation.
+
+Thanks in advance,
+
+Roland
