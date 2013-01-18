@@ -1,35 +1,62 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 18 Jan 2013 22:27:26 +0800
-Subject: kernel/time/tick-broadcast.c:136:10: error: 'struct
- clock_event_device' has no member named 'evt_handler'
-Message-ID: <50f95bce.nUS84hQLN1KYn1xE%fengguang.wu@intel.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 18 Jan 2013 16:29:58 +0200
+Subject: [PATCH 1/1] ARM: Add API to detect SCU base address from CP15
+In-Reply-To: <50F9460A.6010600@ti.com>
+References: <1358506755-13705-1-git-send-email-hdoyu@nvidia.com>
+ <50F9460A.6010600@ti.com>
+Message-ID: <20130118162958.8e7491cb4c0487c86ccd0071@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/kvm-prereq-merged
-head:   0a9423ee25cf2f3122d7d65d0fc4652eceda3bdb
-commit: 0dd9fbd5c510a51ed3d68aa4594a18ebd3a8547d clockevents: Add generic timer broadcast receiver
-date:   4 days ago
-config: make ARCH=x86_64 allyesconfig
+On Fri, 18 Jan 2013 13:54:34 +0100
+Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 
-All error/warnings:
+> On Friday 18 January 2013 04:29 PM, Hiroshi Doyu wrote:
+> > Add API to detect SCU base address from CP15.
+> >
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> > NOTE:
+> > This wasn't delivered to linux-arm-kernel at lists.infradead.org, resending....
+> >
+> > For usage: http://patchwork.ozlabs.org/patch/212013/
+> > ---
+> >   arch/arm/include/asm/smp_scu.h |   17 +++++++++++++++++
+> >   1 file changed, 17 insertions(+)
+> >
+> > diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+> > index 4eb6d00..f619eef 100644
+> > --- a/arch/arm/include/asm/smp_scu.h
+> > +++ b/arch/arm/include/asm/smp_scu.h
+> > @@ -6,6 +6,23 @@
+> >   #define SCU_PM_POWEROFF	3
+> >
+> >   #ifndef __ASSEMBLER__
+> > +
+> > +#include <asm/cputype.h>
+> > +
+> > +static inline phys_addr_t scu_get_base(void)
+> > +{
+> > +	phys_addr_t pa;
+> > +	unsigned long part_number = read_cpuid_part_number();
+> > +
+> > +	switch (part_number) {
+> > +	case ARM_CPU_PART_CORTEX_A9:
+> > +		/* Get SCU physical base */
+> > +		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
+> > +		return pa;
+> > +	default:
+> > +		return 0;
+> > +	}
+> > +}
+> You may not need the switch case considering peripheral SCU is
+> specific to A9 SOCs. Would just if like below is better ?
+> 
+> phys_addr_t pa = 0;
+> 
+> if (ARM_CPU_PART_CORTEX_A9 == read_cpuid_part_number())
+> 	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
+> return pa;
 
-   kernel/time/tick-broadcast.c: In function 'tick_receive_broadcast':
->> kernel/time/tick-broadcast.c:136:10: error: 'struct clock_event_device' has no member named 'evt_handler'
-
-vim +136 kernel/time/tick-broadcast.c
-
-   130		struct tick_device *td = this_cpu_ptr(&tick_cpu_device);
-   131		struct clock_event_device *evt = td->evtdev;
-   132	
-   133		if (!evt)
-   134			return -ENODEV;
-   135	
- > 136		if (!evt->evt_handler)
-   137			return -EINVAL;
-   138	
-   139		evt->event_handler(evt);
-
----
-0-DAY kernel build testing backend              Open Source Technology Center
-http://lists.01.org/mailman/listinfo/kbuild                 Intel Corporation
+I just considered the case if there will be another A?, which is SCU
+detectable, added later. If no possibility, yours would be enough.
