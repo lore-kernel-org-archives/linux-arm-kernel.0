@@ -1,69 +1,105 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 18 Jan 2013 19:54:08 +0200
-Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport
- power functions
-In-Reply-To: <20130118173635.GE15361@atomide.com>
-References: <50F7CA82.4050509@ti.com> <20130117100510.GI10814@arwen.pp.htv.fi>
- <20130117100919.GJ10814@arwen.pp.htv.fi>
- <1358418917.6252.31.camel@cumari.coelho.fi>
- <50F7D535.6030205@ti.com> <20130117173131.GL14149@atomide.com>
- <1358445456.6252.64.camel@cumari.coelho.fi>
- <20130117231608.GP14149@atomide.com>
- <1358499533.6252.80.camel@cumari.coelho.fi>
- <20130118173635.GE15361@atomide.com>
-Message-ID: <20130118175408.GC1035@arwen.pp.htv.fi>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 18 Jan 2013 09:55:02 -0800
+Subject: [PATCH 4/7] clk: highbank: Use common of_clk_init() function
+In-Reply-To: <1357282858-2112-4-git-send-email-pgaikwad@nvidia.com>
+References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
+ <1357282858-2112-4-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20130118175502.3982.82180@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jan 18, 2013 at 09:36:35AM -0800, Tony Lindgren wrote:
-> * Luciano Coelho <coelho@ti.com> [130118 01:03]:
-> > On Thu, 2013-01-17 at 15:16 -0800, Tony Lindgren wrote:
-> > > * Luciano Coelho <coelho@ti.com> [130117 10:04]:
-> > > > But this patch is pretty small and simple, so why not include it to at
-> > > > least fix the breakage in 3.7 and 3.8? Whether you take it or not now
-> > > > won't make any difference in the 5k LOC in these kernel versions.
-> > > 
-> > > Well we are planning to drop the non-DT support for omap4 as soon as it's
-> > > usable with DT. For omap4 we are only carrying SDP and panda support to
-> > > make this transition easier. The only bindings missing AFAIK are wl12xx and
-> > > USB.
-> > 
-> > In my view this is a regression and it should be fixed with as simple a
-> > patch as possible.  The alternative to my solution is to revert the
-> > patch that removed the enable/disable from the ti-st driver *and* fix
-> > u-boot, because if it doesn't mux the UART2 pins properly (and it
-> > doesn't) the shared transport still won't work.
+Quoting Prashant Gaikwad (2013-01-03 23:00:55)
+> Use common of_clk_init() function for clocks initialization.
 > 
-> Fixing the muxing here makes sense naturally as we cannot do that in the driver
-> until we've flipped things over to use DT.
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+
+Rob,
+
+Can I get a Tested-by from you before I take this?
+
+Thanks,
+Mike
+
+> ---
+>  arch/arm/mach-highbank/core.h     |    1 -
+>  arch/arm/mach-highbank/highbank.c |    3 ++-
+>  drivers/clk/clk-highbank.c        |   18 ++++--------------
+>  3 files changed, 6 insertions(+), 16 deletions(-)
 > 
-> But I don't think we should fix the driver regression by adding more platform
-> callbacks as we are getting rid of them anyways.
-
-it's not adding more callbacks, solely implementing them as it should
-have been done on Pavan's original patch.
-
-> > > What's your estimate of having minimal wl12xx WLAN DT binding available?
-> > 
-> > To tell you the truth, I haven't even started looking into DT for wl12xx
-> > myself.  So I have no idea when it will be ready.  Benoit has been
-> > looking into it, but I don't know how far he is.
-> 
-> If it's going to take long we should just init the platform data for
-> it temporarily even in the DT boot case until the binding is available.
-
-which will boil down to having those platform_data callbacks to have it
-at least functional. How will Luca test DT conversion if ti-st isn't
-even functional ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130118/5dbd12a2/attachment-0001.sig>
+> diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+> index 80235b4..3f65206 100644
+> --- a/arch/arm/mach-highbank/core.h
+> +++ b/arch/arm/mach-highbank/core.h
+> @@ -2,7 +2,6 @@
+>  #define __HIGHBANK_CORE_H
+>  
+>  extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+> -extern void highbank_clocks_init(void);
+>  extern void highbank_restart(char, const char *);
+>  extern void __iomem *scu_base_addr;
+>  
+> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+> index f6ca285..fb148da 100644
+> --- a/arch/arm/mach-highbank/highbank.c
+> +++ b/arch/arm/mach-highbank/highbank.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/of_address.h>
+>  #include <linux/smp.h>
+>  #include <linux/amba/bus.h>
+> +#include <linux/clk-provider.h>
+>  
+>  #include <asm/arch_timer.h>
+>  #include <asm/cacheflush.h>
+> @@ -116,7 +117,7 @@ static void __init highbank_timer_init(void)
+>         WARN_ON(!timer_base);
+>         irq = irq_of_parse_and_map(np, 0);
+>  
+> -       highbank_clocks_init();
+> +       of_clk_init(NULL);
+>         lookup.clk = of_clk_get(np, 0);
+>         clkdev_add(&lookup);
+>  
+> diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
+> index 52fecad..5d1de2e 100644
+> --- a/drivers/clk/clk-highbank.c
+> +++ b/drivers/clk/clk-highbank.c
+> @@ -314,33 +314,23 @@ static void __init hb_pll_init(struct device_node *node)
+>  {
+>         hb_clk_init(node, &clk_pll_ops);
+>  }
+> +CLK_OF_DECLARE(hb_pll, "calxeda,hb-pll-clock", hb_pll_init);
+>  
+>  static void __init hb_a9periph_init(struct device_node *node)
+>  {
+>         hb_clk_init(node, &a9periphclk_ops);
+>  }
+> +CLK_OF_DECLARE(hb_a9periph, "calxeda,hb-a9periph-clock", hb_a9periph_init);
+>  
+>  static void __init hb_a9bus_init(struct device_node *node)
+>  {
+>         struct clk *clk = hb_clk_init(node, &a9bclk_ops);
+>         clk_prepare_enable(clk);
+>  }
+> +CLK_OF_DECLARE(hb_a9bus, "calxeda,hb-a9bus-clock", hb_a9bus_init);
+>  
+>  static void __init hb_emmc_init(struct device_node *node)
+>  {
+>         hb_clk_init(node, &periclk_ops);
+>  }
+> -
+> -static const __initconst struct of_device_id clk_match[] = {
+> -       { .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+> -       { .compatible = "calxeda,hb-pll-clock", .data = hb_pll_init, },
+> -       { .compatible = "calxeda,hb-a9periph-clock", .data = hb_a9periph_init, },
+> -       { .compatible = "calxeda,hb-a9bus-clock", .data = hb_a9bus_init, },
+> -       { .compatible = "calxeda,hb-emmc-clock", .data = hb_emmc_init, },
+> -       {}
+> -};
+> -
+> -void __init highbank_clocks_init(void)
+> -{
+> -       of_clk_init(clk_match);
+> -}
+> +CLK_OF_DECLARE(hb_emmc, "calxeda,hb-emmc-clock", hb_emmc_init);
+> -- 
+> 1.7.4.1
