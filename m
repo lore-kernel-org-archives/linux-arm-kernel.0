@@ -1,70 +1,102 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Fri, 18 Jan 2013 14:30:21 +0530
-Subject: [RESEND PATCH v9 0/2] usb: phy: samsung: Introducing usb phy driver
- for samsung SoCs
-Message-ID: <1358499623-13901-1-git-send-email-p.paneri@samsung.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 18 Jan 2013 09:46:07 +0100
+Subject: [v4 PATCH 00/12] atmel spi controller with dmaengine and device
+ tree support
+In-Reply-To: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
+References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <CACQ1gAit5KvhNqQsw4MznW4zyGPq5WD9BKHm5KhmcXjOmVjEcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes from v8:
-Resending this patch series after rebasing to the latest usb-next branch.
-Rewording inline comments for better readability.
-Removed IS_ENABLED(CONFIG_OF) as pdev->dev.of_node is enough to check for dt support.
-Using of_match_ptr to add of_match_table to platform_driver structure.
-Removed unnecessary variables.
+2013/1/14 Wenyou Yang <wenyou.yang@atmel.com>:
+> Hi All,
+>
+> This set of patches is to add dmaengine and device tree support for atmel spi.
+> The work is based on Nicolas and Richard's work.
+> It is tested on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and at91sam9g20ek.
+>
+> It is based on v3.8-rc3.
+Hi,
+You should rebase it on rc4 because __devinit macros are gone in rc4.
+(cf 54b956b903607f8f8878754dd4352da6a54a1da2 )
+So the patches 05 and 06 will break compilation.
 
-Changes from v7:
-Rebased to the latest usb-next branch.
-Separating arch patches from these driver patches.
+>
+> Changelog:
+> v4:
+>         1./ Take Joe Perches's advance, rewrite atmel_spi_is_v2(struct atmel_spi *as)
+>              and atmel_spi_use_dma(struct atmel_spi *as),
+>              and remove atmel_spi_use_pdc(struct atmel_spi *as).
+>
+>         2./ Rebase on v3.8-rc3.
+>
+> V3:
+>         1./ Rebase on v3.8-rc2.
+>
+>         2./ Remove some Jean-Christophe's patches which has been
+>             applied on v3.8-rc2.
+>
+>         3./ Remove spi property "cs-gpios" from the SoC dtsi files
+>             to the board dts files to avoid some useless pin conflicts.
+>
+> v2:
+>         1./ Remove the patch :PATCH]mtd: m25p80: change the m25p80_read to reading page to page
+>             which purpose to fix the BUG: when run "flashcp /bin/busybox /dev/mtdX" in
+>             the at91sam9g25ek with DMA mode, it arises a OOPS.
+>             Now fix it in this patch:
+>             [PATHC] spi/atmel_spi: add dmaengine support changing to fix the [BUG].
+>
+>         2./ Remove two patches:
+>             which purpose to read dts property to select SPI IP version and DMA mode
+>             Now they will be gat from device tree different compatile.
+>
+>         3./ Fix DMA: when enable both spi0 AND spi1, the spi0 doesn't work BUG.
+>
+>         4./ Rebase v3.7-rc8.
+>
+> Best Regards,
+> Wenyou Yang.
+>
+> Nicolas Ferre (5):
+>   spi/atmel_spi: add physical base address
+>   spi/atmel_spi: call unmapping on transfers buffers
+>   spi/atmel_spi: status information passed through controller data
+>   spi/atmel_spi: add flag to controller data for lock operations
+>   spi/atmel_spi: add dmaengine support
+>
+> Richard Genoud (6):
+>   spi/atmel_spi: fix spi-atmel driver to adapt to slave_config changes
+>   spi/atmel_spi: correct 16 bits transfers using PIO
+>   spi/atmel_spi: correct 16 bits transfer with DMA
+>   ARM: at91: add clocks for spi dt entries
+>   ARM: dts: add spi nodes for atmel SoC
+>   ARM: dts: add spi nodes for the atmel boards
+>
+> Wenyou Yang (1):
+>   spi/atmel_spi: update the dt support
+>
+>  arch/arm/boot/dts/at91sam9260.dtsi          |   18 +
+>  arch/arm/boot/dts/at91sam9263.dtsi          |   18 +
+>  arch/arm/boot/dts/at91sam9263ek.dts         |   14 +
+>  arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   14 +
+>  arch/arm/boot/dts/at91sam9g45.dtsi          |   18 +
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts      |   14 +
+>  arch/arm/boot/dts/at91sam9n12.dtsi          |   18 +
+>  arch/arm/boot/dts/at91sam9n12ek.dts         |   14 +
+>  arch/arm/boot/dts/at91sam9x5.dtsi           |   18 +
+>  arch/arm/boot/dts/at91sam9x5ek.dtsi         |   14 +
+>  arch/arm/mach-at91/at91sam9260.c            |    2 +
+>  arch/arm/mach-at91/at91sam9g45.c            |    2 +
+>  arch/arm/mach-at91/at91sam9n12.c            |    2 +
+>  arch/arm/mach-at91/at91sam9x5.c             |    2 +
+>  drivers/spi/spi-atmel.c                     |  809 ++++++++++++++++++++++++---
+>  15 files changed, 908 insertions(+), 69 deletions(-)
+>
+> --
+> 1.7.9.5
+>
 
-Changes from v6:
-Modified register definitions according to the existing ones.
-Changed default PHY clk selection for SoCs.
-Improved binding text and rebased to the latest usb-next.
 
-Changes from v5:
-Moved clk_get() to driver's probe function. Now reference clock frequency
-selection value is stored in samsung_usbphy structure for later use. Used
-IS_ENABLED() instead of #ifdef in samsung_usbphy_get_driver_data().
 
-Changes from v4:
-Moved header file contents to driver's source file
-Removed unnecessary print message from driver's probe function
-Dropped the Free Software Foundation address from the header
-
-Changes from v3:
-Replaced susbsys_initcall()/module_exit() by module_platform_driver().
-Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
-is registered
-Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
-
-Changes from v2:
-Changed the driver filenames to samsung-usbphy
-Rectified coding style related errors
-
-Changes from v1:
-Rebased patches to latest usb-next branch
-Changed the name 'sec_usbphy' to 'samsung_usbphy'
-
-This patch set introduces a phy driver for samsung SoCs. It uses the existing
-transceiver infrastructure to provide phy control functions. Use of this driver
-can be extended for usb host phy as well. Over the period of time all the phy
-related code for most of the samsung SoCs can be integrated here.
-Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
-when they start supporting this phy driver. 
-This driver is tested with smdk6410 and Exynos4210(with DT).
-
-Praveen Paneri (2):
-  usb: phy: samsung: Introducing usb phy driver for hsotg
-  usb: s3c-hsotg: Adding phy driver support
-
- .../devicetree/bindings/usb/samsung-usbphy.txt     |   11 +
- drivers/usb/gadget/s3c-hsotg.c                     |   37 ++-
- drivers/usb/phy/Kconfig                            |    8 +
- drivers/usb/phy/Makefile                           |    1 +
- drivers/usb/phy/samsung-usbphy.c                   |  354 ++++++++++++++++++++
- include/linux/platform_data/samsung-usbphy.h       |   27 ++
- 6 files changed, 428 insertions(+), 10 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/samsung-usbphy.txt
- create mode 100644 drivers/usb/phy/samsung-usbphy.c
- create mode 100644 include/linux/platform_data/samsung-usbphy.h
+-- 
+for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
