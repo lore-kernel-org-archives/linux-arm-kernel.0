@@ -1,24 +1,32 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Fri, 18 Jan 2013 18:40:57 +0530
-Subject: [PATCH] ARM: SAMSUNG: Gracefully exit on suspend failure
-In-Reply-To: <00ab01cdeeca$02a75e60$07f61b20$@samsung.com>
-References: <1357729952-14881-1-git-send-email-a.kesavan@samsung.com>
- <00ab01cdeeca$02a75e60$07f61b20$@samsung.com>
-Message-ID: <CAM4voanPGUdNKTGuTppVP8fF8+Ydt-ahjyHhqDF2tmxWKbB9Lw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Jan 2013 13:13:44 +0000
+Subject: [PATCH] ARM: arch_timer: Don't expect both secure and nonsecure
+ PPI IRQ info
+In-Reply-To: <1358511830-7909-1-git-send-email-rnayak@ti.com>
+References: <1358511830-7909-1-git-send-email-rnayak@ti.com>
+Message-ID: <50F94A88.1070209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 18/01/13 12:23, Rajendra Nayak wrote:
 
->> -     panic("sleep resumed to originator?");
->> +     pr_err("Failed to suspend the system\n");
->> +     return -EBUSY;
->
-> This can be happened under non-error situation, so this should be:
->
-> +       pr_info("sleep resumed to originator?");
-> +       return 1; /* abort suspend */
->
-Will re-post with suggested changes.
+Hi Rajendra,
 
-Abhilash
+> The current logic expects platforms to pass information about *both*
+> secure and nonsecure PPI IRQ. Make arch_timer work even when either one
+> of those are provided instead.
+
+I'm afraid this patch doesn't really solve the problem. The DT binding
+cannot express having only the virtual interrupt, or only the non-secure
+physical interrupt. This patch only works in the case where you only
+have the secure physical interrupt.
+
+I think the real fix should be to make all the interrupts mandatory in
+the DT (they do exist in the HW), and make the code less tolerant of
+broken DTs.
+
+Cheers,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
