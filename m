@@ -1,42 +1,36 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 18 Jan 2013 11:45:35 +0200
-Subject: [PATCH v7 01/22] mfd: omap-usb-host: Consolidate OMAP USB-HS
- platform data
-In-Reply-To: <20130117165943.GI14149@atomide.com>
-References: <1358422231-24736-2-git-send-email-rogerq@ti.com>
- <Pine.LNX.4.44L0.1301171016090.1339-100000@iolanthe.rowland.org>
- <20130117165943.GI14149@atomide.com>
-Message-ID: <50F919BF.9050109@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 18 Jan 2013 15:21:15 +0530
+Subject: [PATCH 2/3] ARM: dts: omap: Add omap-usb2 dt data
+In-Reply-To: <1358502676-27193-1-git-send-email-kishon@ti.com>
+References: <1358502676-27193-1-git-send-email-kishon@ti.com>
+Message-ID: <1358502676-27193-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2013 06:59 PM, Tony Lindgren wrote:
-> * Alan Stern <stern@rowland.harvard.edu> [130117 07:19]:
->> On Thu, 17 Jan 2013, Roger Quadros wrote:
->>
->>> Let's have a single platform data structure for the OMAP's High-Speed
->>> USB host subsystem instead of having 3 separate ones i.e. one for
->>> board data, one for USB Host (UHH) module and one for USB-TLL module.
->>>
->>> This makes the code much simpler and avoids creating multiple copies of
->>> platform data.
->>>
->>> CC: Alan Stern <stern@rowland.harvard.edu>
->>>
->>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>
->> For the ehci-omap.c part:
->>
->> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> 
-> If Samuel acks this patch, I can apply just this patch alone on v3.8-rc3
-> into an immutable branch omap-for-v3.9/board-usb so we all merge it in
-> as needed.
-> 
+Add omap-usb2 data node in omap4 device tree file. Since omap-usb2 is
+connected to ocp2scp, omap-usb2 dt data is added as a child node
+of ocp2scp.
 
-I'll be sending a v8 of this series with one stable patch candidate
-before this patch and Felipe's comments addressed.
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap4.dtsi |    4 ++++
+ 1 file changed, 4 insertions(+)
 
---
-cheers,
--roger
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index ad837e6..d69d6f2 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -438,6 +438,10 @@
+ 			#size-cells = <1>;
+ 			ranges;
+ 			ti,hwmods = "ocp2scp_usb_phy";
++			usb2_phy: usb2phy at 4a0ad080 {
++				compatible = "ti,omap-usb2";
++				reg = <0x4a0ad080 0x58>;
++			};
+ 		};
+ 
+ 		timer1: timer at 4a318000 {
+-- 
+1.7.9.5
