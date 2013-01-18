@@ -1,74 +1,37 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 18 Jan 2013 08:16:12 +0100
-Subject: [PATCH v2 1/2] ARM: shmobile: sh73a0: Use generic irqchip_init()
-Message-ID: <1358493373-28722-1-git-send-email-thierry.reding@avionic-design.de>
+From: vaibhav.bedia@ti.com (Vaibhav Bedia)
+Date: Fri, 18 Jan 2013 12:49:24 +0530
+Subject: [PATCH 4/9] ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod with the
+ right flags
+In-Reply-To: <1358493569-17142-1-git-send-email-vaibhav.bedia@ti.com>
+References: <1358493569-17142-1-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1358493569-17142-5-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The asm/hardware/gic.h header does no longer exist and the corresponding
-functionality was moved to linux/irqchip.h and linux/irqchip/arm-gic.h
-respectively. gic_handle_irq() and of_irq_init() are no longer available
-either and have been replaced by irqchip_init().
+Third Party Transfer Controller (TPTC0) needs to be idled and
+put to standby under SW control. Add the appropriate flags in
+the TPTC0 hwmod entry.
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
-Changes in v2:
-- split off kzm9g board changes into a separate patch
+Change from RFC version:
+	Clarify TPTC in the changelog
 
- arch/arm/mach-shmobile/intc-sh73a0.c  | 9 ++-------
- arch/arm/mach-shmobile/setup-sh73a0.c | 2 --
- 2 files changed, 2 insertions(+), 9 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
-index fc7c8da..91faba6 100644
---- a/arch/arm/mach-shmobile/intc-sh73a0.c
-+++ b/arch/arm/mach-shmobile/intc-sh73a0.c
-@@ -21,9 +21,9 @@
- #include <linux/interrupt.h>
- #include <linux/module.h>
- #include <linux/irq.h>
--#include <linux/of_irq.h>
- #include <linux/io.h>
- #include <linux/sh_intc.h>
-+#include <linux/irqchip.h>
- #include <linux/irqchip/arm-gic.h>
- #include <mach/intc.h>
- #include <mach/irqs.h>
-@@ -462,14 +462,9 @@ void __init sh73a0_init_irq(void)
- }
- 
- #ifdef CONFIG_OF
--static const struct of_device_id irq_of_match[] __initconst = {
--	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
--	{ },
--};
--
- void __init sh73a0_init_irq_dt(void)
- {
--	of_irq_init(irq_of_match);
-+	irqchip_init();
- 	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
- }
- #endif
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index abf1eb0..2ecd668 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -36,7 +36,6 @@
- #include <mach/irqs.h>
- #include <mach/sh73a0.h>
- #include <mach/common.h>
--#include <asm/hardware/gic.h>
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
-@@ -892,7 +891,6 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
- 	.init_early	= sh73a0_add_early_devices_dt,
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= sh73a0_init_irq_dt,
--	.handle_irq	= gic_handle_irq,
- 	.init_machine	= sh73a0_add_standard_devices_dt,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= sh73a0_boards_compat_dt,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 8280f11..f2f408c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -1823,6 +1823,7 @@ static struct omap_hwmod am33xx_tptc0_hwmod = {
+ 	.class		= &am33xx_tptc_hwmod_class,
+ 	.clkdm_name	= "l3_clkdm",
+ 	.mpu_irqs	= am33xx_tptc0_irqs,
++	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
+ 	.main_clk	= "l3_gclk",
+ 	.prcm		= {
+ 		.omap4	= {
 -- 
-1.8.1.1
+1.7.0.4
