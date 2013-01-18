@@ -1,62 +1,33 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 18 Jan 2013 16:29:58 +0200
-Subject: [PATCH 1/1] ARM: Add API to detect SCU base address from CP15
-In-Reply-To: <50F9460A.6010600@ti.com>
-References: <1358506755-13705-1-git-send-email-hdoyu@nvidia.com>
- <50F9460A.6010600@ti.com>
-Message-ID: <20130118162958.8e7491cb4c0487c86ccd0071@nvidia.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 18 Jan 2013 15:31:49 +0100
+Subject: [PATCH v2 1/8] ARM: OMAP: 3430sdp: Enable extmute functionality for
+ audio
+In-Reply-To: <1358519516-13165-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1358519516-13165-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1358519516-13165-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Jan 2013 13:54:34 +0100
-Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+Enable the use of extmute on the HS path.
 
-> On Friday 18 January 2013 04:29 PM, Hiroshi Doyu wrote:
-> > Add API to detect SCU base address from CP15.
-> >
-> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > ---
-> > NOTE:
-> > This wasn't delivered to linux-arm-kernel at lists.infradead.org, resending....
-> >
-> > For usage: http://patchwork.ozlabs.org/patch/212013/
-> > ---
-> >   arch/arm/include/asm/smp_scu.h |   17 +++++++++++++++++
-> >   1 file changed, 17 insertions(+)
-> >
-> > diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
-> > index 4eb6d00..f619eef 100644
-> > --- a/arch/arm/include/asm/smp_scu.h
-> > +++ b/arch/arm/include/asm/smp_scu.h
-> > @@ -6,6 +6,23 @@
-> >   #define SCU_PM_POWEROFF	3
-> >
-> >   #ifndef __ASSEMBLER__
-> > +
-> > +#include <asm/cputype.h>
-> > +
-> > +static inline phys_addr_t scu_get_base(void)
-> > +{
-> > +	phys_addr_t pa;
-> > +	unsigned long part_number = read_cpuid_part_number();
-> > +
-> > +	switch (part_number) {
-> > +	case ARM_CPU_PART_CORTEX_A9:
-> > +		/* Get SCU physical base */
-> > +		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
-> > +		return pa;
-> > +	default:
-> > +		return 0;
-> > +	}
-> > +}
-> You may not need the switch case considering peripheral SCU is
-> specific to A9 SOCs. Would just if like below is better ?
-> 
-> phys_addr_t pa = 0;
-> 
-> if (ARM_CPU_PART_CORTEX_A9 == read_cpuid_part_number())
-> 	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
-> return pa;
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/mach-omap2/board-3430sdp.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-I just considered the case if there will be another A?, which is SCU
-detectable, added later. If no possibility, yours would be enough.
+diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+index bb73afc..40c22a7 100644
+--- a/arch/arm/mach-omap2/board-3430sdp.c
++++ b/arch/arm/mach-omap2/board-3430sdp.c
+@@ -382,6 +382,9 @@ static int __init omap3430_i2c_init(void)
+ 	sdp3430_twldata.vpll2->constraints.apply_uV = true;
+ 	sdp3430_twldata.vpll2->constraints.name = "VDVI";
+ 
++	sdp3430_twldata.audio->codec->hs_extmute = 1;
++	sdp3430_twldata.audio->codec->hs_extmute_gpio = -EINVAL;
++
+ 	omap3_pmic_init("twl4030", &sdp3430_twldata);
+ 
+ 	/* i2c2 on camera connector (for sensor control) and optional isp1301 */
+-- 
+1.8.1
