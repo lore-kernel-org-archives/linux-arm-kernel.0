@@ -1,61 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 17 Jan 2013 19:51:31 -0800
-Subject: [PATCH 5/5] ARM: exynos: enable/disable cpuidle when cpu1 is
- down/up
-In-Reply-To: <50F551F3.2060400@linaro.org>
-References: <1357318799-24378-1-git-send-email-daniel.lezcano@linaro.org>
- <1357318799-24378-5-git-send-email-daniel.lezcano@linaro.org>
- <CADGdYn7y_SSmLoEpeRjL8PDSZS-YJwC1QpRcUocSSnDyM8BRhQ@mail.gmail.com>
- <50EF3369.2060902@free.fr>
- <CADGdYn4eRbkZt_Rshqg-a_CoAmF5LBobzT3=3h09syaH0z6uJA@mail.gmail.com>
- <50F551F3.2060400@linaro.org>
-Message-ID: <00be01cdf52f$1bc907c0$535b1740$@samsung.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Fri, 18 Jan 2013 03:54:51 +0000
+Subject: [PATCH v4 0/3] mtd: nand: OMAP: ELM error correction support
+ for BCH ecc
+In-Reply-To: <1358424375.2731.234.camel@sauron.fi.intel.com>
+References: <1357286211-5012-1-git-send-email-avinashphilip@ti.com>
+ <518397C60809E147AF5323E0420B992E3EA5DFA9@DBDE01.ent.ti.com>
+ <1358424375.2731.234.camel@sauron.fi.intel.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA5F353@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano wrote:
+On Thu, Jan 17, 2013 at 17:36:15, Artem Bityutskiy wrote:
+> On Wed, 2013-01-16 at 12:22 +0000, Philip, Avinash wrote:
+> > > This series is based on linux 3.8-rc2 and tested with [1].
+> > > Also this patch series depend on [1] for NAND flash device
+> > > tree data and gpmc nand device tree binding documentation updates.
+> > > 
+> > > 1. [PATCH v7 0/5] OMAP GPMC DT bindings
+> > > http://www.spinics.net/lists/linux-omap/msg83505.html
+> > > 
+> > > Tested on am335x-evm for BCH 4 and 8 bit error correction.
+> > 
+> > Can you apply this patch series on l2-mtd tree as it will help RBL compatibility
+> > ecc layout for NAND flash in am335x-platforms and hardware based BCH error
+> > correction.
 > 
-> On 01/10/2013 11:33 PM, amit daniel kachhap wrote:
-> > On Thu, Jan 10, 2013 at 1:32 PM, Daniel Lezcano <daniel.lezcano@free.fr>
-> wrote:
-> >> On 01/10/2013 09:07 PM, amit daniel kachhap wrote:
-> >>> Hi Daniel,
-> >>
-> >> Hi Amit Daniel,
-> >>
-> >>> This hotplug noifiers looks fine. I suppose it should add extra state
-> >>> C1 in cpu0. If it is done like below than for normal cases(when all
-> >>> cpu's are online) there wont be any statistics for C0 state
-> >>
-> >> I guess you meant state 0 which is WFI, right ?
-> >> C0 state is the intel semantic for cpu fully turned on.
-> > Yes I meant C0 as wfi
-> >>
-> >>> also which
-> >>> is required. Other patches look good.
-> >>
-> >> Ok, that makes sense to have statistics even if they are only doing WFI.
-> >>
-> >> Then the patch 4/5 is not ok, no ?
-> > yes I suppose patch 4 and patch 5 are related and depends how you
-> > frame patch 5. I think it is better to create C0/C1 sysfs and other
-> > things in the beginning because it is a filesystem call and may
-> > increase the cpu hotplug time which is not worth. May be if cpuidle
-> > framework exposes some API to enable/disable states then it is better.
-> >
-> > For patch 1,2 and 3,
-> > Acked-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> OK, I've applied them. I dropped the part that updates the
+> documentation. Please, handle it separately when Daniel's patches are
+> in.
 > 
-> Hi Kukjin,
-> 
-> is it possible to take these patches [1-3/5] ?
-> 
-Looks OK to me, I will apply with Amit's ack.
+> Pushed to l2-mtd.git, thanks!
 
-> The patches [3-4/5] could be ignored.
+Thanks for applying this patch series.
+I will update gpmc-nand documentation part in a separate patch.
+
+Thanks,
+Avinash
+
 > 
-Probably, you mean [4-5/5] :-)
-
-Thanks.
-
-- Kukjin
+> -- 
+> Best Regards,
+> Artem Bityutskiy
+> 
