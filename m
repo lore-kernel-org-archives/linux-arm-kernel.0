@@ -1,25 +1,43 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 17 Jan 2013 22:28:46 -0800 (PST)
-Subject: [PATCH] ARM: shmobile: armadillo800eva: set clock rates before
- timer init
-In-Reply-To: <1358485325-19673-1-git-send-email-hdk@igel.co.jp>
-References: <1358485325-19673-1-git-send-email-hdk@igel.co.jp>
-Message-ID: <87r4lj9f8l.wl%kuninori.morimoto.gx@renesas.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Fri, 18 Jan 2013 12:04:55 +0530
+Subject: [PATCH v7] usb: phy: samsung: Add support to set pmu isolation
+In-Reply-To: <003001cdf519$6d21c690$476553b0$@samsung.com>
+References: <CAFp+6iE7zEJ7E_pRCOYz5mQqbk-MFE6Hwr02pRRT1yP+X3z7kQ@mail.gmail.com>
+ <1358230225-2770-1-git-send-email-gautam.vivek@samsung.com>
+ <003001cdf519$6d21c690$476553b0$@samsung.com>
+Message-ID: <CAFp+6iEmPg4G1hQfM1EKUBbXHKupF4mNh5v48jQWS5TyLV_Mow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+HI Kukjin,
 
-> Previously clock rates were set after initialization of timer.
-> Therefore the timer used the default extal1 clock rate (25MHz)
-> instead of the correct rate for this board (24MHz).
-> 
-> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
-> ---
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+On Fri, Jan 18, 2013 at 6:46 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Vivek Gautam wrote:
+>>
+>> Adding support to parse device node data in order to get
+>> required properties to set pmu isolation for usb-phy.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Reviewed-by: Doug Anderson <dianders@chromium.org>
+>
+> This looks good to me,
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>
+Thanks
 
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Vivek, could you please re-send following in one series?
+> - [PATCH v9 1/2] usb: phy: samsung: Introducing usb phy driver for hsotg
+> - [PATCH v8 2/2] usb: s3c-hsotg: Adding phy driver support
+>
 
-Best regards
----
-Kuninori Morimoto
+Praveen will re-send this patch-series asap.
+
+> As I know, this should be applied on top of above patches.
+>
+
+
+
+-- 
+Thanks & Regards
+Vivek
