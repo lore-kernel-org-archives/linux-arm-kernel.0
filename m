@@ -1,38 +1,62 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Jan 2013 22:22:17 +0100
-Subject: [PATCHv3 0/7] Add pinctrl driver for Allwinner A1X SoCs
-In-Reply-To: <CACRpkdZPu33J2+rRkON_wih-VQgC9tg82ks=UPz3DZVqH=LCGw@mail.gmail.com>
-References: <1357681398-23956-1-git-send-email-maxime.ripard@free-electrons.com>
- <50F52D2E.205@free-electrons.com>
- <CACRpkdaTFMuN1EteHLTgO7TM8BLr9P_YjuKrwuDGoPtQ57duDw@mail.gmail.com>
- <CACRpkdZPu33J2+rRkON_wih-VQgC9tg82ks=UPz3DZVqH=LCGw@mail.gmail.com>
-Message-ID: <50F9BD09.1030107@free-electrons.com>
+Date: Fri, 18 Jan 2013 22:30:32 +0100
+Subject: [PATCHv4 0/7] Add pinctrl driver for Allwinner A1X SoCs
+Message-ID: <1358544639-14761-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi everyone,
 
-Thanks for your review.
+This patch set adds a pinctrl driver for the IP found in the Allwinner A10
+and A13, and the SoC-specific bits for the A13. It also adds the documentation
+for the device tree bindings.
 
-On 18/01/2013 20:24, Linus Walleij wrote:
-> On Thu, Jan 17, 2013 at 2:31 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Tue, Jan 15, 2013 at 11:19 AM, Maxime Ripard
-> 
->>> Are you ok with this version or do you have additionnal comments ?
->>
->> I'm probably OK with it, I've only just now reached this point in my
->> mail backlog.
-> 
-> As noted I had more comments, they should be quick to address.
-> 
-> When finished, shall this be applied to the pinctrl tree or some other
-> subtree, like ARM SoC?
+This patch set has been tested on a Olimex A13-Olinuxino.
 
-Maybe the easiest thing to do would be to push the pinctrl driver in
-itself through your tree, and the dt additions through the arm-soc one?
+Thanks,
+Maxime
+
+Changes from v3:
+  - Replaced the bitmasks computation by a define
+  - Removed the __devinit
+  - Added boundary check on drive levels
+
+Changes from v2:
+  - Rebased on top of 3.8-rc2
+  - Changed the name of the pinconf argument, split the change to
+    pinconf-generic.h to a separate patch, and documented the argument
+
+Changes from v1:
+  - Uses the pinconf-generic mechanism
+  - Changed the dt interface to remove the direct bitstuffing to a more
+    readable format
+  - Replaced the register accessor macros by inline functions and documented
+    them
+
+
+Maxime Ripard (7):
+  pinctrl: pinconf-generic: add drive strength parameter
+  ARM: sunxi: Add pinctrl driver for Allwinner SoCs
+  ARM: pinctrl: sunxi: Add the pinctrl pin set for sun5i
+  ARM: sunxi: Add pinctrl node to the device tree
+  ARM: sunxi: Add uart1 pinctrl groups
+  tty: of_serial: Add pinctrl support
+  ARM: sunxi: olinuxino: Add muxing for the uart
+
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   60 ++
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |    2 +
+ arch/arm/boot/dts/sun5i-a13.dtsi                   |   23 +
+ arch/arm/mach-sunxi/Kconfig                        |    1 +
+ drivers/pinctrl/Kconfig                            |    5 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/pinctrl-sunxi.c                    |  801 ++++++++++++++++++++
+ drivers/pinctrl/pinctrl-sunxi.h                    |  387 ++++++++++
+ drivers/tty/serial/of_serial.c                     |    7 +
+ include/linux/pinctrl/pinconf-generic.h            |    3 +
+ 10 files changed, 1290 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-sunxi.c
+ create mode 100644 drivers/pinctrl/pinctrl-sunxi.h
 
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
