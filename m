@@ -1,73 +1,31 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 18 Jan 2013 14:36:44 +0200
-Subject: [PATCH v8 01/22] USB: ehci-omap: Don't free gpios that we didn't
- request
-Message-ID: <1358512604-27649-1-git-send-email-rogerq@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 18 Jan 2013 10:54:23 +0000
+Subject: [PATCH] ARM: remove unnecessary 'select GENERIC_GPIO'
+In-Reply-To: <CACRpkdYw6V_GGjBsj_bzzkmFVTamuMq2oMwYDKhjMrXeS5j+fQ@mail.gmail.com>
+References: <1358255616-3171-1-git-send-email-shawn.guo@linaro.org>
+ <CACRpkdYw6V_GGjBsj_bzzkmFVTamuMq2oMwYDKhjMrXeS5j+fQ@mail.gmail.com>
+Message-ID: <20130118105423.81C693E0962@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver does not request any gpios so don't free them.
-Fixes L3 bus error on multiple modprobe/rmmod of ehci_hcd
-with ehci-omap in use.
+On Thu, 17 Jan 2013 14:36:00 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Jan 15, 2013 at 2:13 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> 
+> > The only use of GENERIC_GPIO (defined by architecture) in GPIO subsystem
+> > is being selected by GPIOLIB.  Also there are no any use of the option
+> > at architecture level. Only two sub-architectures shmobile and orion
+> > really use the option as below.
+> >
+> >   arch/arm/mach-shmobile/Makefile:obj-$(CONFIG_GENERIC_GPIO)      += $(pfc-y)
+> >   arch/arm/plat-orion/Makefile:orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
+> >
+> > Remove all those unnecessary sub-architecture level selection of
+> > GENERIC_GPIO, which are there only for confusing people.
+> >
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Without this patch, EHCI will break on repeated insmod/rmmod
-of ehci_hcd for all OMAP2+ platforms that use EHCI and
-set 'phy_reset = true' in usbhs_omap_board_data.
-i.e.
+Looks good to me also.
 
-board-3430sdp.c:	.phy_reset  = true,
-board-3630sdp.c:	.phy_reset  = true,
-board-am3517crane.c:	.phy_reset  = true,
-board-am3517evm.c:	.phy_reset  = true,
-board-cm-t3517.c:	.phy_reset  = true,
-board-cm-t35.c:	.phy_reset  = true,
-board-devkit8000.c:	.phy_reset  = true,
-board-igep0020.c:	.phy_reset = true,
-board-igep0020.c:	.phy_reset = true,
-board-omap3beagle.c:	.phy_reset  = true,
-board-omap3evm.c:	.phy_reset  = true,
-board-omap3pandora.c:	.phy_reset  = true,
-board-omap3stalker.c:	.phy_reset = true,
-board-omap3touchbook.c:	.phy_reset  = true,
-board-omap4panda.c:	.phy_reset  = false,
-board-overo.c:	.phy_reset  = true,
-board-zoom.c:	.phy_reset		= true,
-
-CC: Alan Stern <stern@rowland.harvard.edu>
-Cc: stable at vger.kernel.org
-
-Signed-off-by: Roger Quadros <rogerq@ti.com>
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
- drivers/usb/host/ehci-omap.c |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index ac17a7c..e9d9b09 100644
---- a/drivers/usb/host/ehci-omap.c
-+++ b/drivers/usb/host/ehci-omap.c
-@@ -288,7 +288,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
- {
- 	struct device *dev				= &pdev->dev;
- 	struct usb_hcd *hcd				= dev_get_drvdata(dev);
--	struct ehci_hcd_omap_platform_data *pdata	= dev->platform_data;
- 
- 	usb_remove_hcd(hcd);
- 	disable_put_regulator(dev->platform_data);
-@@ -298,13 +297,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
- 	pm_runtime_put_sync(dev);
- 	pm_runtime_disable(dev);
- 
--	if (pdata->phy_reset) {
--		if (gpio_is_valid(pdata->reset_gpio_port[0]))
--			gpio_free(pdata->reset_gpio_port[0]);
--
--		if (gpio_is_valid(pdata->reset_gpio_port[1]))
--			gpio_free(pdata->reset_gpio_port[1]);
--	}
- 	return 0;
- }
- 
--- 
-1.7.4.1
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
