@@ -1,48 +1,52 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 18 Jan 2013 16:31:01 +0400
-Subject: [PATCH 1/9] ARM: OMAP2+: AM33XX: CM: Get rid of unncessary header
- inclusions
-In-Reply-To: <1358493569-17142-2-git-send-email-vaibhav.bedia@ti.com>
-References: <1358493569-17142-1-git-send-email-vaibhav.bedia@ti.com>
- <1358493569-17142-2-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <50F94085.3030704@mvista.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 18 Jan 2013 14:36:27 +0200
+Subject: [PATCH v8 01/22] USB: ehci-omap: Don't free gpios that we didn't
+ request
+In-Reply-To: <1358511445-26656-2-git-send-email-rogerq@ti.com>
+References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
+ <1358511445-26656-2-git-send-email-rogerq@ti.com>
+Message-ID: <50F941CB.1080808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-01-2013 11:19, Vaibhav Bedia wrote:
+On 01/18/2013 02:17 PM, Roger Quadros wrote:
+> This driver does not request any gpios so don't free them.
+> Fixes L3 bus error on multiple modprobe/rmmod of ehci_hcd
+> with ehci-omap in use.
+> 
+> Without this patch, EHCI will break on repeated insmod/rmmod
+> of ehci_hcd for all OMAP2+ platforms that use EHCI and
+> set 'phy_reset = true' in usbhs_omap_board_data.
+> i.e.
+> 
+> board-3430sdp.c:	.phy_reset  = true,
+> board-3630sdp.c:	.phy_reset  = true,
+> board-am3517crane.c:	.phy_reset  = true,
+> board-am3517evm.c:	.phy_reset  = true,
+> board-cm-t3517.c:	.phy_reset  = true,
+> board-cm-t35.c:	.phy_reset  = true,
+> board-devkit8000.c:	.phy_reset  = true,
+> board-igep0020.c:	.phy_reset = true,
+> board-igep0020.c:	.phy_reset = true,
+> board-omap3beagle.c:	.phy_reset  = true,
+> board-omap3evm.c:	.phy_reset  = true,
+> board-omap3pandora.c:	.phy_reset  = true,
+> board-omap3stalker.c:	.phy_reset = true,
+> board-omap3touchbook.c:	.phy_reset  = true,
+> board-omap4panda.c:	.phy_reset  = false,
+> board-overo.c:	.phy_reset  = true,
+> board-zoom.c:	.phy_reset		= true,
+> 
+> CC: Alan Stern <stern@rowland.harvard.edu>
+> Cc: stable at kernel.org
 
-> Some of the included header files are not needed so
-> remove them.
+I messed up with the stable list id, so will resend just this one
+and update the git repo.
 
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> Change from RFC version:
-> 	No change
+> 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
->   arch/arm/mach-omap2/cm33xx.h |    7 +------
->   1 files changed, 1 insertions(+), 6 deletions(-)
-
-> diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
-> index 5fa0b62..8009e13 100644
-> --- a/arch/arm/mach-omap2/cm33xx.h
-> +++ b/arch/arm/mach-omap2/cm33xx.h
-> @@ -17,16 +17,11 @@
->   #ifndef __ARCH_ARM_MACH_OMAP2_CM_33XX_H
->   #define __ARCH_ARM_MACH_OMAP2_CM_33XX_H
->
-> -#include <linux/delay.h>
-> -#include <linux/errno.h>
-> -#include <linux/err.h>
-> -#include <linux/io.h>
-> -
->   #include "common.h"
->
->   #include "cm.h"
->   #include "cm-regbits-33xx.h"
-> -#include "cm33xx.h"
-> +#include "iomap.h"
-
-    You don't comment on this addition in the changelog...
-
-WBR, Sergei
+cheers,
+-roger
