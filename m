@@ -1,110 +1,48 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Fri, 18 Jan 2013 13:57:43 -0600
-Subject: [PATCH 3/7] ARM i.MX6q: Add GPU, VPU, IPU, and OpenVG resets to
- System Reset Controller (SRC)
-In-Reply-To: <1358352787-15441-4-git-send-email-p.zabel@pengutronix.de>
-References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
- <1358352787-15441-4-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <CAKGA1bmjKQcX3RzSjbnuYqoJqbzXYGa_Whv7QQkNyAhBDzZWdw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 18 Jan 2013 20:59:31 +0100
+Subject: [PATCH 2/2] pinctrl: nomadik: Allow prcm_base to be extracted
+ from Device Tree
+In-Reply-To: <1357919129-1928-2-git-send-email-lee.jones@linaro.org>
+References: <1357919129-1928-1-git-send-email-lee.jones@linaro.org>
+ <1357919129-1928-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbRosdAOeGo7W=05kC5H4OLbxNUjZydcpLc0OZVcZj+Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 10:13 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> The SRC has auto-deasserting reset bits that control reset lines to
-> the GPU, VPU, IPU, and OpenVG IP modules. This patch adds a reset
-> controller that can be controlled by those devices using the
-> reset controller API.
+On Fri, Jan 11, 2013 at 4:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
+
+> The Nomadik Pinctrl driver requires access to some PRCMU registers
+> in order to run with full functionality. When Device Tree is
+> disabled the required PRCMU base address is passed in via platform
+> data, so in order for Device Tree booting to be as functional, we
+> need a similar mechanism to fetch it from Device Tree.
 >
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> The new semantics goes like this: Parse the Device Tree and look
+> for the PRCMU node using a provided Phandle. Obtain the ioremaped
+> address from that node. If one was supplied via platform data
+> over-write it with anything found in Device Tree. Fail if either
+> the prcm_base can't be found if we're running on anything other
+> than an STN8815 ASIC.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Hi Philipp,
+Applied as well, notice I had to add this hunk to the first
+patch to have things working:
 
-I'm so glad someone actually sat down and coded this :)
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 05d97f6..96f518b 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -192,6 +192,7 @@
+                prcmu: prcmu at 80157000 {
+                        compatible = "stericsson,db8500-prcmu";
+                        reg = <0x80157000 0x1000>;
++                       reg-names = "prcmu";
+                        interrupts = <0 47 0x4>;
+                        #address-cells = <1>;
+                        #size-cells = <1>;
 
-+
-+static int imx_src_reset(unsigned long sw_reset_idx)
-+{
+Lest the code won't find the prcmu registers.
 
-Having a name like imx_src_reset seems needlessly generic and
-confusing. Surely we are performing a reset on an SoC unit and not
-having the SRC itself reset, even if it is clearer when we look at the
-argument?
-
-+       timeout = jiffies + msecs_to_jiffies(1000);
-+       while (readl(src_base + SRC_SCR) & bit) {
-+               if (time_after(jiffies, timeout))
-+                       return -ETIME;
-+               cpu_relax();
-
-... I do wonder though, all versions of the very-similar i.MX SRC
-(i.MX51, i.MX53, i.MX6) implementing these bits actually have an
-interrupt (with the same status-bit positions as the reset-enable
-register) which fires when the unit actually resets.
-
-Rather than poll with a timeout shouldn't we be waiting for the
-interrupt and doing some completion event? It seems a little overly
-involved to me to poll and cpu_relax() when we can just let the kernel
-do whatever it likes while the hardware does the job.
-
-It is technically impossible for the unit to "never reset" without
-there being something hideously wrong elsewhere (i.e. if you ask the
-VPU to reset, and it never fires the interrupt, you have far, far more
-problems than just a locked VPU), but we actually should have no idea
-without some empirical data (under every scenario at least) how long
-it would actually take so having a timeout seems rather odd. Having a
-timeout of a full second also *seems* to be far too long under the
-same circumstances but I don't think anyone can predict what the real
-values might be.
-
-I looked at writing this exact same kind of code a long while back
-including support for i.MX51 and i.MX53 as a cleanup for the older
-version of Sascha's IPU driver, and simply never got it nice enough to
-submit upstream (it is currently stuffed away in a huge backup disk
-and I have no idea where the kernel tree is), but the way I handled it
-was something like registering a real interrupt handler in the src
-initialization function and then simply setting the bit and letting
-the completion event do the work. I also did have a timeout for 5000ms
-which basically would still capture any reset oddities - if we passed
-5 seconds, and the unit did not reset, to start executing WARN_ON or
-something to give the kernel developer (or user) a real indication
-that something is *actually* hideously wrong with their board
-implementation or the stability of their SoC, power rails, heatsink
-etc.. or million other possibilities (any warning is at least better
-than none).
-
-I could never get the warning code to ever execute except in a
-contrived test scenario (I set a reserved bit and faked that it never
-fired an interrupt) but in my opinion, ANY warning on this kind of
-failure to reset is better than just returning -ETIME to the reset
-consumer and hoping the consumer reports a reasonable error to the
-kernel log - if the SRC fails to reset a unit then this is not an
-error condition so low in seriousness that telling the consumer
-something timed out is adequate (based on the intended and functional
-implementation of the SRC controller itself). As I said, what I
-decided on was that I would return -ETIMEDOUT (the wrong code, but
-bear with me, I was hacking) but before return, pr_err the problem
-unit, and then WARN_ON inside the SRC driver itself, so that
-everything would carry on (no system lockups or panics), but the
-driver was not responsible for reporting the problem and the
-seriousness was implicated in something a little more noticable than a
-single line in a log.
-
-I understand that waiting on an interrupt or completion event is not
-available infrastructure in the current reset-controller code... but
-maybe it should be a little more advanced than polling implementation
-:D
-
-I am not not-acking the code, and I would be overjoyed for it to go in
-as-is (maybe with a function rename as above), but I would appreciate
-the consideration that a reset-controller with some way of reporting a
-successful reset other than polling is something that might come in
-handy for other people (and i.MX SRC would be a highly desirable use
-case) and at the very least in the case of the i.MX SRC, "this unit
-did not reset after [possibly more than] a whole second of waiting" is
-not encompassed within if (ret) pr_err("unit did not reset") in the
-driver.. nor would this be an immediate and serious indication to the
-driver or end-user.
-
---
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+Yours,
+Linus Walleij
