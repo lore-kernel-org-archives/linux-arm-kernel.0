@@ -1,43 +1,55 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 18 Jan 2013 15:31:09 +0800
-Subject: [PATCH v7 05/15] gpio: fix wrong checking condition for gpio range
+Date: Fri, 18 Jan 2013 15:31:10 +0800
+Subject: [PATCH v7 06/15] gpio: find gpio base by ascend order
 In-Reply-To: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1358494279-16503-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1358494279-16503-7-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since index++ calculates from 0, the checking condition of "while
-(index++)" is always fake. So replace it by unconditional loop.
+gpiochip_find_base() always tries to find valid gpio with descend order.
+It's inconvient if gpio information is passing from DTS. Now try to find
+valid gpio with ascend order.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/gpio/gpiolib-of.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/gpio/gpiolib.c |   19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index b1f0682..011e1e98 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -228,7 +228,7 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
- 	if (!np)
- 		return;
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 199fca1..8af57e7 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -128,20 +128,21 @@ static int gpiochip_find_base(int ngpio)
+ 	int spare = 0;
+ 	int base = -ENOSPC;
  
--	do {
-+	for (;;) {
- 		ret = of_parse_phandle_with_args(np, "gpio-ranges",
- 				"#gpio-range-cells", index, &pinspec);
- 		if (ret)
-@@ -254,8 +254,8 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
+-	for (i = ARCH_NR_GPIOS - 1; i >= 0 ; i--) {
++	for (i = 0, base = 0; i < ARCH_NR_GPIOS; i++) {
+ 		struct gpio_desc *desc = &gpio_desc[i];
+ 		struct gpio_chip *chip = desc->chip;
  
- 		if (ret)
- 			break;
--
--	} while (index++);
-+		index++;
-+	}
- }
+-		if (!chip && !test_bit(FLAG_RESERVED, &desc->flags)) {
++		if (chip) {
++			spare = 0;
++			i += chip->ngpio - 1;
++			base = i + 1;
++		} else if (test_bit(FLAG_RESERVED, &desc->flags)) {
++			spare = 0;
++			base = i + 1;
++		} else {
+ 			spare++;
+-			if (spare == ngpio) {
+-				base = i;
++			if (spare == ngpio)
+ 				break;
+-			}
+-		} else {
+-			spare = 0;
+-			if (chip)
+-				i -= chip->ngpio - 1;
+ 		}
+ 	}
  
- #else
 -- 
 1.7.10.4
