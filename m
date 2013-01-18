@@ -1,323 +1,217 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 18 Jan 2013 15:05:31 +1300
-Subject: [PATCH 3/4 v4] serial: vt8500: UART uses gated clock rather than
- 24Mhz reference
-In-Reply-To: <1358474732-5422-1-git-send-email-linux@prisktech.co.nz>
-References: <1358474732-5422-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1358474732-5422-2-git-send-email-linux@prisktech.co.nz>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 18 Jan 2013 10:15:47 +0800
+Subject: [PATCH v7 1/3] usb: fsl-mxc-udc: replace cpu_is_xxx() with
+ platform_device_id
+In-Reply-To: <1358475349-27710-1-git-send-email-peter.chen@freescale.com>
+References: <1358475349-27710-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1358475349-27710-2-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UART modules on Wondermedia SoCs are connected via a gated clock
-source, rather than directly to the 24Mhz reference clock. While
-uboot enables UART0 for debugging, other UART ports are unavailable
-until the clock is enabled.
+As mach/hardware.h is deleted, we need to use platform_device_id to
+differentiate SoCs. Besides, one cpu_is_mx35 is useless as it has
+already used pdata to differentiate runtime
 
-This patch checks that a valid clock is actually passed from devicetree,
-enables the clock in probe. This change removes the fallback when a
-clock was not specified as it doesn't apply any longer (and would only
-work if the UART clock was already enabled).
+Meanwhile we update the platform code accordingly.
 
-DTSI files are updated for VT8500, WM8505 and WM8650.
-
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- arch/arm/boot/dts/vt8500.dtsi      |   40 +++++++++++++++++++++---
- arch/arm/boot/dts/wm8505.dtsi      |   60 ++++++++++++++++++++++++++++++++----
- arch/arm/boot/dts/wm8650.dtsi      |   20 ++++++++++--
- drivers/tty/serial/vt8500_serial.c |   34 +++++++++++---------
- 4 files changed, 127 insertions(+), 27 deletions(-)
+ arch/arm/mach-imx/devices/devices-common.h        |    1 +
+ arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c |   15 ++++----
+ drivers/usb/gadget/fsl_mxc_udc.c                  |   30 ++++++++--------
+ drivers/usb/gadget/fsl_udc_core.c                 |   38 ++++++++++++---------
+ 4 files changed, 46 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vt8500.dtsi b/arch/arm/boot/dts/vt8500.dtsi
-index d8645e9..cf31ced 100644
---- a/arch/arm/boot/dts/vt8500.dtsi
-+++ b/arch/arm/boot/dts/vt8500.dtsi
-@@ -45,6 +45,38 @@
- 					compatible = "fixed-clock";
- 					clock-frequency = <24000000>;
- 				};
-+
-+				clkuart0: uart0 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <1>;
-+				};
-+
-+				clkuart1: uart1 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <2>;
-+				};
-+
-+				clkuart2: uart2 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <3>;
-+				};
-+
-+				clkuart3: uart3 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <4>;
-+				};
- 			};
- 		};
+diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
+index 6277baf..9bd5777 100644
+--- a/arch/arm/mach-imx/devices/devices-common.h
++++ b/arch/arm/mach-imx/devices/devices-common.h
+@@ -63,6 +63,7 @@ struct platform_device *__init imx_add_flexcan(
  
-@@ -83,28 +115,28 @@
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd8200000 0x1040>;
- 			interrupts = <32>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart0>;
- 		};
+ #include <linux/fsl_devices.h>
+ struct imx_fsl_usb2_udc_data {
++	const char *devid;
+ 	resource_size_t iobase;
+ 	resource_size_t irq;
+ };
+diff --git a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
+index 37e4439..3c06bd9 100644
+--- a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
++++ b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
+@@ -11,35 +11,36 @@
+ #include "../hardware.h"
+ #include "devices-common.h"
  
- 		uart at d82b0000 {
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd82b0000 0x1040>;
- 			interrupts = <33>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart1>;
- 		};
+-#define imx_fsl_usb2_udc_data_entry_single(soc)				\
++#define imx_fsl_usb2_udc_data_entry_single(soc, _devid)			\
+ 	{								\
++		.devid = _devid,					\
+ 		.iobase = soc ## _USB_OTG_BASE_ADDR,			\
+ 		.irq = soc ## _INT_USB_OTG,				\
+ 	}
  
- 		uart at d8210000 {
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd8210000 0x1040>;
- 			interrupts = <47>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart2>;
- 		};
+ #ifdef CONFIG_SOC_IMX25
+ const struct imx_fsl_usb2_udc_data imx25_fsl_usb2_udc_data __initconst =
+-	imx_fsl_usb2_udc_data_entry_single(MX25);
++	imx_fsl_usb2_udc_data_entry_single(MX25, "imx-udc-mx27");
+ #endif /* ifdef CONFIG_SOC_IMX25 */
  
- 		uart at d82c0000 {
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd82c0000 0x1040>;
- 			interrupts = <50>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart3>;
- 		};
+ #ifdef CONFIG_SOC_IMX27
+ const struct imx_fsl_usb2_udc_data imx27_fsl_usb2_udc_data __initconst =
+-	imx_fsl_usb2_udc_data_entry_single(MX27);
++	imx_fsl_usb2_udc_data_entry_single(MX27, "imx-udc-mx27");
+ #endif /* ifdef CONFIG_SOC_IMX27 */
  
- 		rtc at d8100000 {
-diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
-index 330f833..e74a1c0 100644
---- a/arch/arm/boot/dts/wm8505.dtsi
-+++ b/arch/arm/boot/dts/wm8505.dtsi
-@@ -59,6 +59,54 @@
- 					compatible = "fixed-clock";
- 					clock-frequency = <24000000>;
- 				};
-+
-+				clkuart0: uart0 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <1>;
-+				};
-+
-+				clkuart1: uart1 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <2>;
-+				};
-+
-+				clkuart2: uart2 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <3>;
-+				};
-+
-+				clkuart3: uart3 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <4>;
-+				};
-+
-+				clkuart4: uart4 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <22>;
-+				};
-+
-+				clkuart5: uart5 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <23>;
-+				};
- 			};
- 		};
+ #ifdef CONFIG_SOC_IMX31
+ const struct imx_fsl_usb2_udc_data imx31_fsl_usb2_udc_data __initconst =
+-	imx_fsl_usb2_udc_data_entry_single(MX31);
++	imx_fsl_usb2_udc_data_entry_single(MX31, "imx-udc-mx27");
+ #endif /* ifdef CONFIG_SOC_IMX31 */
  
-@@ -96,42 +144,42 @@
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd8200000 0x1040>;
- 			interrupts = <32>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart0>;
- 		};
+ #ifdef CONFIG_SOC_IMX35
+ const struct imx_fsl_usb2_udc_data imx35_fsl_usb2_udc_data __initconst =
+-	imx_fsl_usb2_udc_data_entry_single(MX35);
++	imx_fsl_usb2_udc_data_entry_single(MX35, "imx-udc-mx27");
+ #endif /* ifdef CONFIG_SOC_IMX35 */
  
- 		uart at d82b0000 {
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd82b0000 0x1040>;
- 			interrupts = <33>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart1>;
- 		};
+ #ifdef CONFIG_SOC_IMX51
+ const struct imx_fsl_usb2_udc_data imx51_fsl_usb2_udc_data __initconst =
+-	imx_fsl_usb2_udc_data_entry_single(MX51);
++	imx_fsl_usb2_udc_data_entry_single(MX51, "imx-udc-mx51");
+ #endif
  
- 		uart at d8210000 {
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd8210000 0x1040>;
- 			interrupts = <47>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart2>;
- 		};
+ struct platform_device *__init imx_add_fsl_usb2_udc(
+@@ -57,7 +58,7 @@ struct platform_device *__init imx_add_fsl_usb2_udc(
+ 			.flags = IORESOURCE_IRQ,
+ 		},
+ 	};
+-	return imx_add_platform_device_dmamask("fsl-usb2-udc", -1,
++	return imx_add_platform_device_dmamask(data->devid, -1,
+ 			res, ARRAY_SIZE(res),
+ 			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
+ }
+diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
+index 1b0f086..aa81ac5 100644
+--- a/drivers/usb/gadget/fsl_mxc_udc.c
++++ b/drivers/usb/gadget/fsl_mxc_udc.c
+@@ -18,8 +18,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
  
- 		uart at d82c0000 {
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd82c0000 0x1040>;
- 			interrupts = <50>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart3>;
- 		};
- 
- 		uart at d8370000 {
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd8370000 0x1040>;
- 			interrupts = <31>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart4>;
- 		};
- 
- 		uart at d8380000 {
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd8380000 0x1040>;
- 			interrupts = <30>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart5>;
- 		};
- 
- 		rtc at d8100000 {
-diff --git a/arch/arm/boot/dts/wm8650.dtsi b/arch/arm/boot/dts/wm8650.dtsi
-index 83b9467..db3c0a1 100644
---- a/arch/arm/boot/dts/wm8650.dtsi
-+++ b/arch/arm/boot/dts/wm8650.dtsi
-@@ -75,6 +75,22 @@
- 					reg = <0x204>;
- 				};
- 
-+				clkuart0: uart0 {
-+ 					#clock-cells = <0>;
-+ 					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <1>;
-+ 				};
-+
-+				clkuart1: uart1 {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&ref24>;
-+					enable-reg = <0x250>;
-+					enable-bit = <2>;
-+				};
-+
- 				arm: arm {
- 					#clock-cells = <0>;
- 					compatible = "via,vt8500-device-clock";
-@@ -128,14 +144,14 @@
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd8200000 0x1040>;
- 			interrupts = <32>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart0>;
- 		};
- 
- 		uart at d82b0000 {
- 			compatible = "via,vt8500-uart";
- 			reg = <0xd82b0000 0x1040>;
- 			interrupts = <33>;
--			clocks = <&ref24>;
-+			clocks = <&clkuart1>;
- 		};
- 
- 		rtc at d8100000 {
-diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
-index 3e76dff..1061e57 100644
---- a/drivers/tty/serial/vt8500_serial.c
-+++ b/drivers/tty/serial/vt8500_serial.c
-@@ -593,6 +593,23 @@ static int vt8500_serial_probe(struct platform_device *pdev)
- 	if (!vt8500_port)
- 		return -ENOMEM;
- 
-+	vt8500_port->uart.membase = devm_request_and_ioremap(&pdev->dev, mmres);
-+	if (!vt8500_port->uart.membase)
-+		return -EADDRNOTAVAIL;
-+
-+	vt8500_port->clk = of_clk_get(pdev->dev.of_node, 0);
-+	if (IS_ERR(vt8500_port->clk)) {
-+		dev_err(&pdev->dev, "failed to get clock\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	ret = clk_prepare_enable(vt8500_port->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to enable clock\n");
-+		goto err;
-+	}
-+
- 	vt8500_port->uart.type = PORT_VT8500;
- 	vt8500_port->uart.iotype = UPIO_MEM;
- 	vt8500_port->uart.mapbase = mmres->start;
-@@ -602,25 +619,11 @@ static int vt8500_serial_probe(struct platform_device *pdev)
- 	vt8500_port->uart.line = port;
- 	vt8500_port->uart.dev = &pdev->dev;
- 	vt8500_port->uart.flags = UPF_IOREMAP | UPF_BOOT_AUTOCONF;
+-#include <mach/hardware.h>
 -
--	vt8500_port->clk = of_clk_get(pdev->dev.of_node, 0);
--	if (vt8500_port->clk) {
--		vt8500_port->uart.uartclk = clk_get_rate(vt8500_port->clk);
--	} else {
--		/* use the default of 24Mhz if not specified and warn */
--		pr_warn("%s: serial clock source not specified\n", __func__);
--		vt8500_port->uart.uartclk = 24000000;
--	}
-+	vt8500_port->uart.uartclk = clk_get_rate(vt8500_port->clk);
+ static struct clk *mxc_ahb_clk;
+ static struct clk *mxc_per_clk;
+ static struct clk *mxc_ipg_clk;
+@@ -58,8 +56,12 @@ int fsl_udc_clk_init(struct platform_device *pdev)
+ 	clk_prepare_enable(mxc_ahb_clk);
+ 	clk_prepare_enable(mxc_per_clk);
  
- 	snprintf(vt8500_port->name, sizeof(vt8500_port->name),
- 		 "VT8500 UART%d", pdev->id);
+-	/* make sure USB_CLK is running at 60 MHz +/- 1000 Hz */
+-	if (!cpu_is_mx51()) {
++	/*
++	 * Make sure USB_CLK is running at 60 MHz +/- 1000 Hz
++	 * Only two types of udc currently, imx-udc-mx27 and
++	 * imx-udc-mx51 (mx51 & mx53)
++	 */
++	if (strcmp(pdev->id_entry->name, "imx-udc-mx27") == 0) {
+ 		freq = clk_get_rate(mxc_per_clk);
+ 		if (pdata->phy_mode != FSL_USB2_PHY_ULPI &&
+ 		    (freq < 59999000 || freq > 60001000)) {
+@@ -82,17 +84,15 @@ eclkrate:
+ void fsl_udc_clk_finalize(struct platform_device *pdev)
+ {
+ 	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+-	if (cpu_is_mx35()) {
+-		unsigned int v;
+-
+-		/* workaround ENGcm09152 for i.MX35 */
+-		if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
+-			v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+-					USBPHYCTRL_OTGBASE_OFFSET));
+-			writel(v | USBPHYCTRL_EVDO,
+-				MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+-					USBPHYCTRL_OTGBASE_OFFSET));
+-		}
++	unsigned int v;
++
++	/* workaround ENGcm09152 for i.MX35 */
++	if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
++		v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
++				USBPHYCTRL_OTGBASE_OFFSET));
++		writel(v | USBPHYCTRL_EVDO,
++			MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
++				USBPHYCTRL_OTGBASE_OFFSET));
+ 	}
  
--	vt8500_port->uart.membase = devm_request_and_ioremap(&pdev->dev, mmres);
--	if (!vt8500_port->uart.membase) {
--		ret = -EADDRNOTAVAIL;
--		goto err;
+ 	/* ULPI transceivers don't need usbpll */
+diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
+index c19f7f1..5fc1d72 100644
+--- a/drivers/usb/gadget/fsl_udc_core.c
++++ b/drivers/usb/gadget/fsl_udc_core.c
+@@ -41,6 +41,7 @@
+ #include <linux/fsl_devices.h>
+ #include <linux/dmapool.h>
+ #include <linux/delay.h>
++#include <linux/of_device.h>
+ 
+ #include <asm/byteorder.h>
+ #include <asm/io.h>
+@@ -2438,11 +2439,6 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
+ 	unsigned int i;
+ 	u32 dccparams;
+ 
+-	if (strcmp(pdev->name, driver_name)) {
+-		VDBG("Wrong device");
+-		return -ENODEV;
 -	}
 -
- 	vt8500_uart_ports[port] = vt8500_port;
+ 	udc_controller = kzalloc(sizeof(struct fsl_udc), GFP_KERNEL);
+ 	if (udc_controller == NULL) {
+ 		ERR("malloc udc failed\n");
+@@ -2756,22 +2752,32 @@ static int fsl_udc_otg_resume(struct device *dev)
  
- 	uart_add_one_port(&vt8500_uart_driver, &vt8500_port->uart);
-@@ -639,6 +642,7 @@ static int vt8500_serial_remove(struct platform_device *pdev)
- 	struct vt8500_port *vt8500_port = platform_get_drvdata(pdev);
- 
- 	platform_set_drvdata(pdev, NULL);
-+	clk_disable_unprepare(vt8500_port->clk);
- 	uart_remove_one_port(&vt8500_uart_driver, &vt8500_port->uart);
- 	kfree(vt8500_port);
+ 	return fsl_udc_resume(NULL);
+ }
+-
+ /*-------------------------------------------------------------------------
+ 	Register entry point for the peripheral controller driver
+ --------------------------------------------------------------------------*/
+-
++static const struct platform_device_id fsl_udc_devtype[] = {
++	{
++		.name = "imx-udc-mx27",
++	}, {
++		.name = "imx-udc-mx51",
++	}, {
++		/* sentinel */
++	}
++};
++MODULE_DEVICE_TABLE(platform, fsl_udc_devtype);
+ static struct platform_driver udc_driver = {
+-	.remove  = __exit_p(fsl_udc_remove),
++	.remove		= __exit_p(fsl_udc_remove),
++	/* Just for FSL i.mx SoC currently */
++	.id_table	= fsl_udc_devtype,
+ 	/* these suspend and resume are not usb suspend and resume */
+-	.suspend = fsl_udc_suspend,
+-	.resume  = fsl_udc_resume,
+-	.driver  = {
+-		.name = (char *)driver_name,
+-		.owner = THIS_MODULE,
+-		/* udc suspend/resume called from OTG driver */
+-		.suspend = fsl_udc_otg_suspend,
+-		.resume  = fsl_udc_otg_resume,
++	.suspend	= fsl_udc_suspend,
++	.resume		= fsl_udc_resume,
++	.driver		= {
++			.name = (char *)driver_name,
++			.owner = THIS_MODULE,
++			/* udc suspend/resume called from OTG driver */
++			.suspend = fsl_udc_otg_suspend,
++			.resume  = fsl_udc_otg_resume,
+ 	},
+ };
  
 -- 
-1.7.9.5
+1.7.0.4
