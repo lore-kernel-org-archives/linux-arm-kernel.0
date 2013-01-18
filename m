@@ -1,48 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 18 Jan 2013 20:59:31 +0100
-Subject: [PATCH 2/2] pinctrl: nomadik: Allow prcm_base to be extracted
- from Device Tree
-In-Reply-To: <1357919129-1928-2-git-send-email-lee.jones@linaro.org>
-References: <1357919129-1928-1-git-send-email-lee.jones@linaro.org>
- <1357919129-1928-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbRosdAOeGo7W=05kC5H4OLbxNUjZydcpLc0OZVcZj+Dg@mail.gmail.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Fri, 18 Jan 2013 14:24:15 -0600
+Subject: Compilation problem with drivers/staging/zsmalloc when !SMP on ARM
+Message-ID: <CAKGA1b=ACTQHo9=B7EAG5nrFCO9u-J+sy7dXtYk3Rk6OUcW3cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 4:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hello all,
 
-> The Nomadik Pinctrl driver requires access to some PRCMU registers
-> in order to run with full functionality. When Device Tree is
-> disabled the required PRCMU base address is passed in via platform
-> data, so in order for Device Tree booting to be as functional, we
-> need a similar mechanism to fetch it from Device Tree.
->
-> The new semantics goes like this: Parse the Device Tree and look
-> for the PRCMU node using a provided Phandle. Obtain the ioremaped
-> address from that node. If one was supplied via platform data
-> over-write it with anything found in Device Tree. Fail if either
-> the prcm_base can't be found if we're running on anything other
-> than an STN8815 ASIC.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+I wonder if anyone can shed some light on this linking problem I have
+right now. If I configure my kernel without SMP support (it is a very
+lean config for i.MX51 with device tree support only) I hit this error
+on linking:
 
-Applied as well, notice I had to add this hunk to the first
-patch to have things working:
+  MODPOST 216 modules
+  LZMA    arch/arm/boot/compressed/piggy.lzma
+  AS      arch/arm/boot/compressed/lib1funcs.o
+ERROR: "v7wbi_flush_kern_tlb_range"
+[drivers/staging/zsmalloc/zsmalloc.ko] undefined!
+make[1]: *** [__modpost] Error 1
+make: *** [modules] Error 2
+make: *** Waiting for unfinished jobs....
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 05d97f6..96f518b 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -192,6 +192,7 @@
-                prcmu: prcmu at 80157000 {
-                        compatible = "stericsson,db8500-prcmu";
-                        reg = <0x80157000 0x1000>;
-+                       reg-names = "prcmu";
-                        interrupts = <0 47 0x4>;
-                        #address-cells = <1>;
-                        #size-cells = <1>;
+I am wondering if someone who is far better versed in the mm code can
+tell me exactly what would end up calling this function and why it
+would only be in the kernel at all if SMP was enabled - all I can see
+right now is that it is PROBABLY something resulting from this code
+and comment inside the zsmalloc driver:
 
-Lest the code won't find the prcmu registers.
+/*
+ * By default, zsmalloc uses a copy-based object mapping method to access
+ * allocations that span two pages. However, if a particular architecture
+ * 1) Implements local_flush_tlb_kernel_range() and 2) Performs VM mapping
+ * faster than copying, then it should be added here so that
+ * USE_PGTABLE_MAPPING is defined. This causes zsmalloc to use page table
+ * mapping rather than copying
+ * for object mapping.
+*/
+#if defined(CONFIG_ARM)
+#define USE_PGTABLE_MAPPING
+#endif
 
-Yours,
-Linus Walleij
+And of course, once USE_PGTABLE_MAPPING is enabled,
+local_flush_tlb_kernel_range being used is the actual culprit here.
+
+But the question is, for the ARM guys, shouldn't
+local_flush_tlb_kernel_range actually be defined in the kernel build,
+even without SMP, even if it would be architecturally a no-op on UP
+systems, and then CONFIG_SMP_ON_UP would catch this case?
+
+If not, then the fix is obvious, the check inside zsmalloc for
+CONFIG_ARM should be fixed to check specifically for
+local_flush_tlb_kernel_range definition as well, or for CONFIG_SMP as
+well, or the non-presence of CONFIG_SMP_ON_UP or something?
+
+The build cases I have tested are basically CONFIG_SMP +
+CONFIG_SMP_ON_UP (since it's a single-core Cortex-A8) and without
+CONFIG_SMP (since it's a Cortex-A8..) using imx_v7_defconfig and
+imx_v6_v7_defconfig alike and making the appropriate adjustments.
+Trying to compile it with CONFIG_SMP without CONFIG_SMP_ON_UP makes no
+sense on my target system - but essentially it only links with
+CONFIG_SMP.
+
+I got no clue what I am looking at in arch/arm/mm and related, so I am
+unsure precisely how I should proceed in patching it with the intent
+it goes upstream.. or what the real implication of this kind of memory
+management actually is on SMP vs. UP systems, but the intended
+functionality of local_flush_tlb_kernel_range seems like it should
+exist even on UP, to me.
+
+--
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
