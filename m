@@ -1,42 +1,75 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Fri, 18 Jan 2013 15:39:56 +0100
-Subject: [PATCH 1/3] cpufreq: kirkwood: Add a cpufreq driver for Marvell
- Kirkwood SoCs
-In-Reply-To: <1358518846-16251-2-git-send-email-andrew@lunn.ch> (Andrew Lunn's
- message of "Fri, 18 Jan 2013 15:20:44 +0100")
-References: <1358518846-16251-1-git-send-email-andrew@lunn.ch>
- <1358518846-16251-2-git-send-email-andrew@lunn.ch>
-Message-ID: <8738xyimgz.fsf@dell.be.48ers.dk>
+From: s-guiriec@ti.com (Sebastien Guiriec)
+Date: Fri, 18 Jan 2013 15:47:38 +0100
+Subject: [PATCH v2 0/5] ARM: OMAP4: Enable AESS IP.
+In-Reply-To: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
+References: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
+Message-ID: <50F9608A.8060102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Andrew" == Andrew Lunn <andrew@lunn.ch> writes:
+Paul, Benoit,
 
- Andrew> The Marvell Kirkwood SoCs have simple cpufreq support in hardware. The
- Andrew> CPU can either use the a high speed cpu clock, or the slower DDR
- Andrew> clock. Add a driver to swap between these two clock sources.
+Any comments before I resend the serie with the minor comment for Felipe?
 
- Andrew> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
- Andrew> ---
- Andrew>  drivers/clk/mvebu/clk-gating-ctrl.c |    1 +
- Andrew>  drivers/cpufreq/Kconfig.arm         |    6 +
- Andrew>  drivers/cpufreq/Makefile            |    1 +
- Andrew>  drivers/cpufreq/kirkwood-cpufreq.c  |  273 +++++++++++++++++++++++++++++++++++
- Andrew>  4 files changed, 281 insertions(+)
- Andrew>  create mode 100644 drivers/cpufreq/kirkwood-cpufreq.c
+Sebastien
 
- Andrew> +++ b/drivers/cpufreq/Kconfig.arm
- Andrew> @@ -77,6 +77,12 @@ config ARM_EXYNOS5250_CPUFREQ
- Andrew>  	  This adds the CPUFreq driver for Samsung EXYNOS5250
- Andrew>  	  SoC.
- 
- Andrew> +config ARM_KIRKWOOD_CPUFREQ
- Andrew> +        def_bool ARCH_KIRKWOOD && OF
- Andrew> +	help
-
-The def_bool should be indented with a <tab>
-
-Otherwise looks good.
-
--- 
-Bye, Peter Korsgaard
+On 01/09/2013 04:03 PM, Sebastien Guiriec wrote:
+> v2:
+> - Add missing AESS memory banks.
+> - Update the serie base on comments related earlier serie:
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69853.html
+>
+> The location of the callback has been updated in order to fit with AESS.
+> Some call of PM runtime can be done by ASoC core when AESS is in RET so
+> we need to ensure that the additional callback is call on enable
+> also in order to have clock correctly stop.
+>
+> v1:
+> ARM: OMAP4: Enable AESS IP.
+>
+> This patch serie extends the the hwmod HWMOD_EXT_OPT_MAIN_CLK flag for the
+> AESS IP. This IP has additional register for Auto Gatting configuration. As
+> it is used only for Audio the driver is not always loaded. We can reuse the
+> same flag as McPDM to work around the HW problem due to bad reset value of
+> AESS Auto gatting configuration register.
+>
+> If we try to setup and reset AESS during boot time without this serie the
+> next clocks will still remain enable.
+>
+> omapconf abe cfg:
+> |--------------------------------------------------------------|
+> | ABE        Clock Domain Configuration                        |
+> |--------------------------------|-----------------------------|
+> | Clock State Transition control | HW-Auto                     |
+> | Clock State                    |                             |
+> |   ABE_24M_FCLK                 | GATED                       |
+> |   ABE_ALWON_32K_CLK            | GATED                       |
+> |   ABE_SYSCLK                   | GATED                       |
+> |   24M_FCLK                     | GATED                       |
+> |   ABE_ICLK2                    | RUNNING                     |
+> |   DPLL_ABE_X2_CLK              | RUNNING                     |
+> |   PAD_CLKS                     | GATED                       |
+> |   SLIMBUS_CLK                  | GATED                       |
+> | OPP Divider                    | ABE_CLK = DPLL_ABE_X2_CLK/1 |
+> |--------------------------------------------------------------|
+>
+> Paul Walmsley (3):
+>    ARM: OMAP2+: hwmod: add enable_preprogram hook
+>    ASoC: TI AESS: add autogating-enable function, callable from
+>      architecture code
+>    ARM: OMAP4+: AESS: enable internal auto-gating during initial setup
+>
+> Sebastien Guiriec (2):
+>    OMAP4: hwmod data: Enable AESS hwmod device
+>    OMAP4: hwmod data: Update AESS data with memory bank area
+>
+>   arch/arm/mach-omap2/Makefile               |    2 +-
+>   arch/arm/mach-omap2/omap_hwmod.c           |   18 ++++++++++
+>   arch/arm/mach-omap2/omap_hwmod.h           |    8 +++++
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   49 +++++++++++++++++++++++--
+>   arch/arm/mach-omap2/omap_hwmod_reset.c     |   52 +++++++++++++++++++++++++++
+>   include/sound/aess.h                       |   53 ++++++++++++++++++++++++++++
+>   6 files changed, 178 insertions(+), 4 deletions(-)
+>   create mode 100644 arch/arm/mach-omap2/omap_hwmod_reset.c
+>   create mode 100644 include/sound/aess.h
+>
