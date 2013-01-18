@@ -1,59 +1,24 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 18 Jan 2013 18:24:34 +0530
-Subject: [PATCH 1/1] ARM: Add API to detect SCU base address from CP15
-In-Reply-To: <1358506755-13705-1-git-send-email-hdoyu@nvidia.com>
-References: <1358506755-13705-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <50F9460A.6010600@ti.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 18 Jan 2013 18:40:40 +0530
+Subject: [PATCH] ARM: SAMSUNG: Gracefully exit on suspend failure
+In-Reply-To: <CAH9JG2WxW=+8PwhZ6r7akmwq2B2Qf=MqB4sB6DQypS0hEmAdvQ@mail.gmail.com>
+References: <1357729952-14881-1-git-send-email-a.kesavan@samsung.com>
+ <CAH9JG2WxW=+8PwhZ6r7akmwq2B2Qf=MqB4sB6DQypS0hEmAdvQ@mail.gmail.com>
+Message-ID: <CAM4voanVpYL3xXqa7nAtioHh6Q5VMHuZ1z+VQmQGNvv=bcLtFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 January 2013 04:29 PM, Hiroshi Doyu wrote:
-> Add API to detect SCU base address from CP15.
->
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
-> NOTE:
-> This wasn't delivered to linux-arm-kernel at lists.infradead.org, resending....
->
-> For usage: http://patchwork.ozlabs.org/patch/212013/
-> ---
->   arch/arm/include/asm/smp_scu.h |   17 +++++++++++++++++
->   1 file changed, 17 insertions(+)
->
-> diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
-> index 4eb6d00..f619eef 100644
-> --- a/arch/arm/include/asm/smp_scu.h
-> +++ b/arch/arm/include/asm/smp_scu.h
-> @@ -6,6 +6,23 @@
->   #define SCU_PM_POWEROFF	3
->
->   #ifndef __ASSEMBLER__
-> +
-> +#include <asm/cputype.h>
-> +
-> +static inline phys_addr_t scu_get_base(void)
-> +{
-> +	phys_addr_t pa;
-> +	unsigned long part_number = read_cpuid_part_number();
-> +
-> +	switch (part_number) {
-> +	case ARM_CPU_PART_CORTEX_A9:
-> +		/* Get SCU physical base */
-> +		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
-> +		return pa;
-> +	default:
-> +		return 0;
-> +	}
-> +}
-You may not need the switch case considering peripheral SCU is
-specific to A9 SOCs. Would just if like below is better ?
+Hi,
 
-phys_addr_t pa = 0;
+On Thu, Jan 10, 2013 at 1:16 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+> Hi,
+> I wodner do you see the real case it's happened?
+> It it's occured, does it better to find out the root cause?
+>
+We have seen infrequent suspend failures on the Exynos5. This patch
+helps us obtain
+failure statistics over a period of time and continue debugging the issue.
+> Thank you,
+> Kyungmin Park
 
-if (ARM_CPU_PART_CORTEX_A9 == read_cpuid_part_number())
-	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
-return pa;
-
-Regards,
-Santosh
-	
+Abhilash
