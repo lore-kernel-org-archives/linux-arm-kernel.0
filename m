@@ -1,63 +1,67 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 18 Jan 2013 15:31:11 +0800
-Subject: [PATCH v7 07/15] gpio: pl061: allocate irq dynamically
+Date: Fri, 18 Jan 2013 15:31:12 +0800
+Subject: [PATCH v7 08/15] gpio: pl061: bind pinctrl by gpio request
 In-Reply-To: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1358494279-16503-8-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1358494279-16503-9-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In original implementation, irq base is always specified in platform
-data. If it's not specified, pl061 gpio driver can't pass the probe()
-function since irq base is missing. While moving to device tree, everything
-should be parsed from DTS file. So allocate irq dynamically for irq
-base.
+Add the pl061_gpio_request() to request pinctrl. Create the logic
+between pl061 gpio driver and pinctrl (pinctrl-single) driver.
+
+While a gpio pin is requested, it will request pinctrl driver to
+set that pin with gpio function mode. So pinctrl driver should
+append .gpio_request_enable() in pinmux_ops.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/gpio/gpio-pl061.c |   15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ drivers/gpio/gpio-pl061.c |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index c1720de..8336719 100644
+index 8336719..8cfdf60 100644
 --- a/drivers/gpio/gpio-pl061.c
 +++ b/drivers/gpio/gpio-pl061.c
-@@ -15,6 +15,7 @@
- #include <linux/io.h>
- #include <linux/ioport.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/bitops.h>
- #include <linux/workqueue.h>
- #include <linux/gpio.h>
-@@ -211,6 +212,10 @@ static void __init pl061_init_gc(struct pl061_gpio *chip, int irq_base)
- 			       IRQ_GC_INIT_NESTED_LOCK, IRQ_NOREQUEST, 0);
- }
+@@ -23,6 +23,7 @@
+ #include <linux/amba/bus.h>
+ #include <linux/amba/pl061.h>
+ #include <linux/slab.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/pm.h>
+ #include <asm/mach/irq.h>
  
-+static const struct irq_domain_ops pl061_domain_ops = {
-+	.xlate	= irq_domain_xlate_twocell,
-+};
+@@ -61,6 +62,23 @@ struct pl061_gpio {
+ #endif
+ };
+ 
++static int pl061_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	/*
++	 * Map back to global GPIO space and request muxing, the direction
++	 * parameter does not matter for this controller.
++	 */
++	int gpio = chip->base + offset;
 +
- static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
++	/*
++	 * Do NOT check the return value at here. Since sometimes the gpio
++	 * pin needn't to be configured in pinmux controller. So it's
++	 * impossible to find the matched gpio range.
++	 */
++	pinctrl_request_gpio(gpio);
++	return 0;
++}
++
+ static int pl061_direction_input(struct gpio_chip *gc, unsigned offset)
  {
- 	struct device *dev = &adev->dev;
-@@ -225,10 +230,14 @@ static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (pdata) {
- 		chip->gc.base = pdata->gpio_base;
- 		chip->irq_base = pdata->irq_base;
--	} else if (adev->dev.of_node) {
-+	} else {
- 		chip->gc.base = -1;
--		chip->irq_base = 0;
--	} else
-+		chip->irq_base = irq_alloc_descs(-1, 0, PL061_GPIO_NR, 0);
-+		if (chip->irq_base < 0)
-+			return chip->irq_base;
-+	}
-+	if (!irq_domain_add_legacy(adev->dev.of_node, PL061_GPIO_NR,
-+				   chip->irq_base, 0, &pl061_domain_ops, chip))
- 		return -ENODEV;
+ 	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+@@ -251,6 +269,7 @@ static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
  
- 	if (!devm_request_mem_region(dev, adev->res.start,
+ 	spin_lock_init(&chip->lock);
+ 
++	chip->gc.request = pl061_gpio_request;
+ 	chip->gc.direction_input = pl061_direction_input;
+ 	chip->gc.direction_output = pl061_direction_output;
+ 	chip->gc.get = pl061_get_value;
 -- 
 1.7.10.4
