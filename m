@@ -1,43 +1,52 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 18 Jan 2013 11:11:46 +0100
-Subject: [[PATCH v2]] OMAP: omap4-panda: add WiLink shared transport power
- functions
-In-Reply-To: <20130117231608.GP14149@atomide.com>
-References: <1358372702-13102-1-git-send-email-coelho@ti.com>
- <50F7C4A7.5060202@ti.com> <20130117093417.GH10814@arwen.pp.htv.fi>
- <50F7CA82.4050509@ti.com> <20130117100510.GI10814@arwen.pp.htv.fi>
- <20130117100919.GJ10814@arwen.pp.htv.fi>
- <1358418917.6252.31.camel@cumari.coelho.fi> <50F7D535.6030205@ti.com>
- <20130117173131.GL14149@atomide.com>
- <1358445456.6252.64.camel@cumari.coelho.fi>
- <20130117231608.GP14149@atomide.com>
-Message-ID: <50F91FE2.3020402@ti.com>
+From: rachna@ti.com (Patil, Rachna)
+Date: Fri, 18 Jan 2013 16:14:57 +0530
+Subject: [PATCH v3 0/8] MFD: ti_am335x_tscadc: DT support and TSC features
+ addition
+Message-ID: <cover.1358502134.git.rachna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+From: "Patil, Rachna" <rachna@ti.com>
 
-On 01/18/2013 12:16 AM, Tony Lindgren wrote:
-> Well we are planning to drop the non-DT support for omap4 as soon as it's
-> usable with DT.
+This patch set is a cumulative set of [1] and [2] sent earlier.
 
-Exactly, but right now we do have legacy and legacy should work in order to
-help for example Luca to make the final push which allows us to move to DT
-only for OMAP4.
+Note that there are no code changes in either of the patch set,
+only rebased on top of Linus's v3.8-rc3 tag to make sure that
+all the patches apply without any conflicts.
 
-> For omap4 we are only carrying SDP and panda support to
-> make this transition easier. The only bindings missing AFAIK are wl12xx and
-> USB.
->
-> If we add this, then it implies we're somehow supporting it, which is not
-> the way to go IMHO as we need to get rid of these platform callbacks instead.
+This patch set has been tested on AM335x EVM.
 
-IMHO we should keep these boards working as long as we have the legacy board
-support for them.
+[1] http://www.spinics.net/lists/linux-input/msg23060.html
+[2] http://www.spinics.net/lists/linux-input/msg23090.html
 
-So what is the policy now regarding to 'old' legacy but still used OMAP4 board
-files? I think we should still maintain them, but the effort to get rid of
-them should be the highest priority.
+Changes in v3:
+	No code change.
+
+Changes in v2:
+	Patch "input: ti_am335x_tsc: Add variance filter"
+	from v1 has been dropped.
+	Add MFD device DT node in AM335x EVM.
+
+Patil, Rachna (8):
+  input: ti_am335x_tsc: Step enable bits made configurable
+  input: ti_am335x_tsc: Order of TSC wires, made configurable
+  input: touchscreen: ti_tsc: remove unwanted fifo flush
+  MFD: ti_am335x_tscadc: add device tree binding information
+  MFD: ti_am335x_tscadc: Add DT support
+  input: ti_am335x_tsc: Add DT support
+  IIO: ti_am335x_adc: Add DT support
+  arm/dts: AM335x-evm: Add TSC/ADC MFD device support
+
+ .../devicetree/bindings/mfd/ti_am335x_tscadc.txt   |   35 +++
+ arch/arm/boot/dts/am335x-evm.dts                   |   13 +
+ arch/arm/boot/dts/am33xx.dtsi                      |    8 +
+ drivers/iio/adc/ti_am335x_adc.c                    |   26 +-
+ drivers/input/touchscreen/ti_am335x_tsc.c          |  266 +++++++++++++++++---
+ drivers/mfd/ti_am335x_tscadc.c                     |   28 ++-
+ include/linux/input/ti_am335x_tsc.h                |   12 +
+ include/linux/mfd/ti_am335x_tscadc.h               |   11 +-
+ 8 files changed, 347 insertions(+), 52 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
 
 -- 
-P?ter
+1.7.9.5
