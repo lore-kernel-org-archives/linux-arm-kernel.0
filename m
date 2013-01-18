@@ -1,88 +1,208 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 18 Jan 2013 14:00:22 +0200
-Subject: [PATCH 2/4] ARM: OMAP: devices: create device for usb part of
- control module
-In-Reply-To: <1358502045-27008-3-git-send-email-kishon@ti.com>
+Date: Fri, 18 Jan 2013 14:02:56 +0200
+Subject: [PATCH 4/4] drivers: usb: start using the control module driver
+In-Reply-To: <1358502045-27008-5-git-send-email-kishon@ti.com>
 References: <1358502045-27008-1-git-send-email-kishon@ti.com>
- <1358502045-27008-3-git-send-email-kishon@ti.com>
-Message-ID: <20130118120022.GB4672@arwen.pp.htv.fi>
+ <1358502045-27008-5-git-send-email-kishon@ti.com>
+Message-ID: <20130118120256.GC4672@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 03:10:43PM +0530, Kishon Vijay Abraham I wrote:
-> A seperate driver has been added to handle the usb part of control
-> module. A device for the above driver is created here, using the register
-> address information to be used by the driver for powering on the PHY and
-> for writing to the mailbox.
+Hi,
+
+On Fri, Jan 18, 2013 at 03:10:45PM +0530, Kishon Vijay Abraham I wrote:
+> Start using the control module driver for powering on the PHY and for
+> writing to the mailbox instead of writing to the control module
+> registers on their own.
 > 
 > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->  arch/arm/mach-omap2/devices.c |   48 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 48 insertions(+)
+>  Documentation/devicetree/bindings/usb/omap-usb.txt |    4 ++
+>  Documentation/devicetree/bindings/usb/usb-phy.txt  |    7 +--
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   13 ----
+>  drivers/usb/musb/Kconfig                           |    1 +
+>  drivers/usb/musb/omap2430.c                        |   64 ++++++++------------
+>  drivers/usb/musb/omap2430.h                        |    9 ---
+>  drivers/usb/phy/Kconfig                            |    1 +
+>  drivers/usb/phy/omap-usb2.c                        |   38 +++---------
+>  include/linux/usb/omap_usb.h                       |    4 +-
+>  9 files changed, 42 insertions(+), 99 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index 5e304d0..a58b0ce 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -20,6 +20,7 @@
->  #include <linux/pinctrl/machine.h>
->  #include <linux/platform_data/omap4-keypad.h>
->  #include <linux/platform_data/omap_ocp2scp.h>
+> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
+> index ead6ba9..8bedbba 100644
+> --- a/Documentation/devicetree/bindings/usb/omap-usb.txt
+> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+> @@ -3,6 +3,9 @@ OMAP GLUE AND OTHER OMAP SPECIFIC COMPONENTS
+>  OMAP MUSB GLUE
+>   - compatible : Should be "ti,omap4-musb" or "ti,omap3-musb"
+>   - ti,hwmods : must be "usb_otg_hs"
+> + - ti,has_mailbox : to specify that omap uses an external mailbox
+> +   (in control module) to communicate with the musb core during device connect
+> +   and disconnect.
+>   - multipoint : Should be "1" indicating the musb controller supports
+>     multipoint. This is a MUSB configuration-specific setting.
+>   - num_eps : Specifies the number of endpoints. This is also a
+> @@ -24,6 +27,7 @@ SOC specific device node entry
+>  usb_otg_hs: usb_otg_hs at 4a0ab000 {
+>  	compatible = "ti,omap4-musb";
+>  	ti,hwmods = "usb_otg_hs";
+> +	ti,has_mailbox;
+>  	multipoint = <1>;
+>  	num_eps = <16>;
+>  	ram_bits = <12>;
+> diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
+> index 2466b6f..48761a2 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
+> @@ -4,9 +4,7 @@ OMAP USB2 PHY
+>  
+>  Required properties:
+>   - compatible: Should be "ti,omap-usb2"
+> - - reg : Address and length of the register set for the device. Also
+> -add the address of control module dev conf register until a driver for
+> -control module is added
+> + - reg : Address and length of the register set for the device.
+>  
+>  Optional properties:
+>   - ctrl_module : phandle of the control module used by PHY driver to power on
+> @@ -16,7 +14,6 @@ This is usually a subnode of ocp2scp to which it is connected.
+>  
+>  usb2phy at 4a0ad080 {
+>  	compatible = "ti,omap-usb2";
+> -	reg = <0x4a0ad080 0x58>,
+> -	      <0x4a002300 0x4>;
+> +	reg = <0x4a0ad080 0x58>;
+>  	ctrl_module = <&omap_control_usb>;
+>  };
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index 129d508..103f4ba 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -2698,13 +2698,6 @@ static struct resource omap44xx_usb_phy_and_pll_addrs[] = {
+>  		.end		= 0x4a0ae000,
+>  		.flags		= IORESOURCE_MEM,
+>  	},
+> -	{
+> -		/* XXX: Remove this once control module driver is in place */
+> -		.name		= "ctrl_dev",
+> -		.start		= 0x4a002300,
+> -		.end		= 0x4a002303,
+> -		.flags		= IORESOURCE_MEM,
+> -	},
+>  	{ }
+>  };
+>  
+> @@ -6152,12 +6145,6 @@ static struct omap_hwmod_addr_space omap44xx_usb_otg_hs_addrs[] = {
+>  		.pa_end		= 0x4a0ab7ff,
+>  		.flags		= ADDR_TYPE_RT
+>  	},
+> -	{
+> -		/* XXX: Remove this once control module driver is in place */
+> -		.pa_start	= 0x4a00233c,
+> -		.pa_end		= 0x4a00233f,
+> -		.flags		= ADDR_TYPE_RT
+> -	},
+>  	{ }
+>  };
+>  
+> diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+> index 23a0b7f..de6e5ce 100644
+> --- a/drivers/usb/musb/Kconfig
+> +++ b/drivers/usb/musb/Kconfig
+> @@ -11,6 +11,7 @@ config USB_MUSB_HDRC
+>  	select NOP_USB_XCEIV if (SOC_TI81XX || SOC_AM33XX)
+>  	select TWL4030_USB if MACH_OMAP_3430SDP
+>  	select TWL6030_USB if MACH_OMAP_4430SDP || MACH_OMAP4_PANDA
+> +	select OMAP_CONTROL_USB if MACH_OMAP_4430SDP || MACH_OMAP4_PANDA
+>  	select USB_OTG_UTILS
+>  	help
+>  	  Say Y here if your system has a dual role high speed USB
+> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+> index da00af4..3e7ceef 100644
+> --- a/drivers/usb/musb/omap2430.c
+> +++ b/drivers/usb/musb/omap2430.c
+> @@ -37,6 +37,7 @@
+>  #include <linux/err.h>
+>  #include <linux/delay.h>
+>  #include <linux/usb/musb-omap.h>
 > +#include <linux/usb/omap_control_usb.h>
 >  
->  #include <asm/mach-types.h>
->  #include <asm/mach/map.h>
-> @@ -254,6 +255,52 @@ static inline void omap_init_camera(void)
->  #endif
->  }
+>  #include "musb_core.h"
+>  #include "omap2430.h"
+> @@ -46,7 +47,7 @@ struct omap2430_glue {
+>  	struct platform_device	*musb;
+>  	enum omap_musb_vbus_id_status status;
+>  	struct work_struct	omap_musb_mailbox_work;
+> -	u32 __iomem		*control_otghs;
+> +	struct device		*control_otghs;
+>  };
+>  #define glue_to_musb(g)		platform_get_drvdata(g->musb)
 >  
-> +#if IS_ENABLED(CONFIG_OMAP_CONTROL_USB)
-> +static struct omap_control_usb_platform_data omap4_control_usb_pdata = {
-> +	.has_mailbox = true,
-> +};
-> +
-> +struct resource omap4_control_usb_res[] = {
-> +	{
-> +		.name	= "control_dev_conf",
-> +		.start	= 0x4a002300,
-> +		.end	= 0x4a002303,
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.name	= "otghs_control",
-> +		.start	= 0x4a00233c,
-> +		.end	= 0x4a00233f,
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +};
-> +
-> +static struct platform_device omap4_control_usb = {
-> +	.name		= "omap-control-usb",
-> +	.id		= -1,
-> +	.dev = {
-> +		.platform_data = &omap4_control_usb_pdata,
-> +	},
-> +	.num_resources = 2,
-> +	.resource = omap4_control_usb_res,
-> +};
-> +
-> +static inline void __init omap_init_control_usb(void)
-> +{
-> +	int ret = 0;
-> +
-> +	if (cpu_is_omap44xx()) {
-> +		ret = platform_device_register(&omap4_control_usb);
-> +		if (ret)
-> +			pr_err("Error registering omap_control_usb device:%d\n",
-> +			    ret);
-> +	}
+> @@ -54,26 +55,6 @@ struct omap2430_glue		*_glue;
+>  
+>  static struct timer_list musb_idle_timer;
+>  
+> -/**
+> - * omap4_usb_phy_mailbox - write to usb otg mailbox
+> - * @glue: struct omap2430_glue *
+> - * @val: the value to be written to the mailbox
+> - *
+> - * On detection of a device (ID pin is grounded), this API should be called
+> - * to set AVALID, VBUSVALID and ID pin is grounded.
+> - *
+> - * When OMAP is connected to a host (OMAP in device mode), this API
+> - * is called to set AVALID, VBUSVALID and ID pin in high impedance.
+> - *
+> - * XXX: This function will be removed once we have a seperate driver for
+> - * control module
+> - */
+> -static void omap4_usb_phy_mailbox(struct omap2430_glue *glue, u32 val)
+> -{
+> -	if (glue->control_otghs)
+> -		writel(val, glue->control_otghs);
+> -}
+> -
+>  static void musb_do_idle(unsigned long _musb)
+>  {
+>  	struct musb	*musb = (void *)_musb;
+> @@ -269,7 +250,6 @@ EXPORT_SYMBOL_GPL(omap_musb_mailbox);
+>  
+>  static void omap_musb_set_mailbox(struct omap2430_glue *glue)
+>  {
+> -	u32 val;
+>  	struct musb *musb = glue_to_musb(glue);
+>  	struct device *dev = musb->controller;
+>  	struct musb_hdrc_platform_data *pdata = dev->platform_data;
+> @@ -285,8 +265,8 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
+>  		musb->xceiv->last_event = USB_EVENT_ID;
+>  		if (musb->gadget_driver) {
+>  			pm_runtime_get_sync(dev);
+> -			val = AVALID | VBUSVALID;
+> -			omap4_usb_phy_mailbox(glue, val);
+> +			if (!IS_ERR(glue->control_otghs))
+> +				omap_control_usb_host_mode(glue->control_otghs);
 
-you can decrease indentation if you invert the check:
+you could introduce a helper to do the checks for you. something like:
 
-if (!cpu_is_omap44xx())
-	return;
+static inline void omap_control_set_mode(*ctrl, int mode)
+{
+	if (IS_ERR(glue->control_otghs))
+		return;
 
-if (platform_device_register(.....)
+	switch (mode) {
+	case HOST:
+		omap_control_usb_host_mode(ctrl);
+		break;
+	case DEVICE:
+		omap_control_usb_device(ctrl)
+		break;
+	default:
+		meh();
+	}
+}
+
+likewise for power() method
+
 -- 
 balbi
 -------------- next part --------------
@@ -91,4 +211,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130118/5be607ef/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130118/18b3d6d3/attachment.sig>
