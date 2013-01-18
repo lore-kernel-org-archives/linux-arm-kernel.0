@@ -1,42 +1,42 @@
 From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Fri, 18 Jan 2013 12:40:10 +0100
-Subject: [PATCH 0/4] add ux500_wdt support
-Message-ID: <1358509214-22407-1-git-send-email-fabio.baltieri@linaro.org>
+Date: Fri, 18 Jan 2013 12:40:11 +0100
+Subject: [PATCH 1/4] mfd: dbx500-prcmu: add watchdog ID definitions
+In-Reply-To: <1358509214-22407-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1358509214-22407-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <1358509214-22407-2-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Add definition of watchdog IDs to be used by ux500_wdt driver.
 
-this set adds support for the ux500_wdt timer, implemented in the PRCMU
-unit of ST-Ericsson ux500 architecture.
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+---
+ include/linux/mfd/dbx500-prcmu.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-The first two patches add the necessary definitions and function export
-to the PRCMU driver currently in mainline, while the third an fourth
-patches add the actual watchdog driver and mfd_cell definition to make
-it probe when PRCMU is compiled in.
-
-As the patches touches files in both mfd and watchdog subsystems, what do
-you think is the best way to handle this set?
-
-Thanks,
-Fabio
-
-
-Fabio Baltieri (4):
-  mfd: dbx500-prcmu: add watchdog ID definitions
-  mfd: dbx500-prcmu: export a9wdog functions
-  watchdog: add support for ux500_wdt watchdog
-  mfd: db8500-prcmu: add ux500_wdt mfd_cell
-
- drivers/mfd/db8500-prcmu.c              |  17 ++++
- drivers/watchdog/Kconfig                |  12 +++
- drivers/watchdog/Makefile               |   1 +
- drivers/watchdog/ux500_wdt.c            | 171 ++++++++++++++++++++++++++++++++
- include/linux/mfd/dbx500-prcmu.h        |  12 +++
- include/linux/platform_data/ux500_wdt.h |  19 ++++
- 6 files changed, 232 insertions(+)
- create mode 100644 drivers/watchdog/ux500_wdt.c
- create mode 100644 include/linux/platform_data/ux500_wdt.h
-
+diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
+index c202d6c..c6e0608 100644
+--- a/include/linux/mfd/dbx500-prcmu.h
++++ b/include/linux/mfd/dbx500-prcmu.h
+@@ -147,6 +147,18 @@ enum prcmu_clock {
+ };
+ 
+ /**
++ * enum prcmu_wdog_id - PRCMU watchdog IDs
++ * @PRCMU_WDOG_ALL: use all timers
++ * @PRCMU_WDOG_CPU1: use first CPU timer only
++ * @PRCMU_WDOG_CPU2: use second CPU timer conly
++ */
++enum prcmu_wdog_id {
++	PRCMU_WDOG_ALL = 0x00,
++	PRCMU_WDOG_CPU1 = 0x01,
++	PRCMU_WDOG_CPU2 = 0x02,
++};
++
++/**
+  * enum ape_opp - APE OPP states definition
+  * @APE_OPP_INIT:
+  * @APE_NO_CHANGE: The APE operating point is unchanged
 -- 
 1.7.12.1
