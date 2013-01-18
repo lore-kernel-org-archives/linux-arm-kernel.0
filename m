@@ -1,71 +1,32 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 18 Jan 2013 20:03:12 +0530
-Subject: [PATCH 1/1] ARM: Add API to detect SCU base address from CP15
-In-Reply-To: <20130118162958.8e7491cb4c0487c86ccd0071@nvidia.com>
-References: <1358506755-13705-1-git-send-email-hdoyu@nvidia.com>
- <50F9460A.6010600@ti.com>
- <20130118162958.8e7491cb4c0487c86ccd0071@nvidia.com>
-Message-ID: <50F95D28.8030601@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 18 Jan 2013 15:36:29 +0100
+Subject: [PATCH 0/5] ARM: dts: OMAP3+: PWM support for TWL and selected boards
+Message-ID: <1358519794-13214-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 January 2013 07:59 PM, Hiroshi Doyu wrote:
-> On Fri, 18 Jan 2013 13:54:34 +0100
-> Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
->
->> On Friday 18 January 2013 04:29 PM, Hiroshi Doyu wrote:
->>> Add API to detect SCU base address from CP15.
->>>
->>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->>> ---
->>> NOTE:
->>> This wasn't delivered to linux-arm-kernel at lists.infradead.org, resending....
->>>
->>> For usage: http://patchwork.ozlabs.org/patch/212013/
->>> ---
->>>    arch/arm/include/asm/smp_scu.h |   17 +++++++++++++++++
->>>    1 file changed, 17 insertions(+)
->>>
->>> diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
->>> index 4eb6d00..f619eef 100644
->>> --- a/arch/arm/include/asm/smp_scu.h
->>> +++ b/arch/arm/include/asm/smp_scu.h
->>> @@ -6,6 +6,23 @@
->>>    #define SCU_PM_POWEROFF	3
->>>
->>>    #ifndef __ASSEMBLER__
->>> +
->>> +#include <asm/cputype.h>
->>> +
->>> +static inline phys_addr_t scu_get_base(void)
->>> +{
->>> +	phys_addr_t pa;
->>> +	unsigned long part_number = read_cpuid_part_number();
->>> +
->>> +	switch (part_number) {
->>> +	case ARM_CPU_PART_CORTEX_A9:
->>> +		/* Get SCU physical base */
->>> +		asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
->>> +		return pa;
->>> +	default:
->>> +		return 0;
->>> +	}
->>> +}
->> You may not need the switch case considering peripheral SCU is
->> specific to A9 SOCs. Would just if like below is better ?
->>
->> phys_addr_t pa = 0;
->>
->> if (ARM_CPU_PART_CORTEX_A9 == read_cpuid_part_number())
->> 	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (pa));
->> return pa;
->
-> I just considered the case if there will be another A?, which is SCU
-> detectable, added later. If no possibility, yours would be enough.
->
-We can convert if into switch case if we need that in
-future :-) For now if() should be just fine. Feel
-free add my ack on updated patch.
+Hi,
+
+Add the needed DT sections for twl4030 and twl6030 for the PWM childs.
+Update the omap4-sdp to have working backlight and keypad/charging LED support.
+Use the pwm-leds driver on BeagleBoard for the pmu_stat LED instead of the hacky
+twl403-gpio mapped PWM.
 
 Regards,
-Santosh
+Peter
+---
+Peter Ujfalusi (5):
+  ARM: dts: twl4030: Add PWM support
+  ARM: dts: twl6030: Add PWM support
+  ARM: dts: omap3-beagle-xm: Use pwm-leds for pmu_stat LED
+  ARM: dts: omap4-sdp: Add support for pwm-leds (keypad and charging LED)
+  ARM: dts: omap4-sdp: Add support for pwm-backlight
+
+ arch/arm/boot/dts/omap3-beagle-xm.dts | 14 ++++++++++----
+ arch/arm/boot/dts/omap4-sdp.dts       | 26 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/twl4030.dtsi        | 10 ++++++++++
+ arch/arm/boot/dts/twl6030.dtsi        | 12 ++++++++++++
+ 4 files changed, 58 insertions(+), 4 deletions(-)
+
+-- 
+1.8.1
