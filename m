@@ -1,75 +1,100 @@
-From: s-guiriec@ti.com (Sebastien Guiriec)
-Date: Fri, 18 Jan 2013 15:47:38 +0100
-Subject: [PATCH v2 0/5] ARM: OMAP4: Enable AESS IP.
-In-Reply-To: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
-References: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
-Message-ID: <50F9608A.8060102@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Jan 2013 14:59:06 +0000
+Subject: [PATCH v8 05/22] mfd: omap-usb-tll: Clean up clock handling
+In-Reply-To: <1358511445-26656-6-git-send-email-rogerq@ti.com>
+References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
+ <1358511445-26656-6-git-send-email-rogerq@ti.com>
+Message-ID: <20130118145906.GE23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul, Benoit,
+On Fri, Jan 18, 2013 at 02:17:08PM +0200, Roger Quadros wrote:
+> +	tll->ch_clk = devm_kzalloc(dev, sizeof(struct clk * [tll->nch]),
+> +						GFP_KERNEL);
+> +	if (!tll->ch_clk) {
+> +		ret = -ENOMEM;
+> +		dev_err(dev, "Couldn't allocate memory for channel clocks\n");
+> +		goto err_clk_alloc;
+> +	}
+> +
+> +	for (i = 0; i < tll->nch; i++) {
+> +		char clkname[] = "usb_tll_hs_usb_chx_clk";
+> +		struct clk *fck;
+> +
+> +		snprintf(clkname, sizeof(clkname),
+> +					"usb_tll_hs_usb_ch%d_clk", i);
+> +		fck = clk_get(dev, clkname);
+> +
+> +		if (IS_ERR(fck))
+> +			dev_dbg(dev, "can't get clock : %s\n", clkname);
+> +		else
+> +			tll->ch_clk[i] = fck;
 
-Any comments before I resend the serie with the minor comment for Felipe?
+Hmm.  I'd actually suggest that this becomes:
 
-Sebastien
+		tll->ch_clk[i] = fck;
+		if (IS_ERR(fck)
+			dev_dbg(dev, "can't get clock: %s\n", clkname);
 
-On 01/09/2013 04:03 PM, Sebastien Guiriec wrote:
-> v2:
-> - Add missing AESS memory banks.
-> - Update the serie base on comments related earlier serie:
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69853.html
->
-> The location of the callback has been updated in order to fit with AESS.
-> Some call of PM runtime can be done by ASoC core when AESS is in RET so
-> we need to ensure that the additional callback is call on enable
-> also in order to have clock correctly stop.
->
-> v1:
-> ARM: OMAP4: Enable AESS IP.
->
-> This patch serie extends the the hwmod HWMOD_EXT_OPT_MAIN_CLK flag for the
-> AESS IP. This IP has additional register for Auto Gatting configuration. As
-> it is used only for Audio the driver is not always loaded. We can reuse the
-> same flag as McPDM to work around the HW problem due to bad reset value of
-> AESS Auto gatting configuration register.
->
-> If we try to setup and reset AESS during boot time without this serie the
-> next clocks will still remain enable.
->
-> omapconf abe cfg:
-> |--------------------------------------------------------------|
-> | ABE        Clock Domain Configuration                        |
-> |--------------------------------|-----------------------------|
-> | Clock State Transition control | HW-Auto                     |
-> | Clock State                    |                             |
-> |   ABE_24M_FCLK                 | GATED                       |
-> |   ABE_ALWON_32K_CLK            | GATED                       |
-> |   ABE_SYSCLK                   | GATED                       |
-> |   24M_FCLK                     | GATED                       |
-> |   ABE_ICLK2                    | RUNNING                     |
-> |   DPLL_ABE_X2_CLK              | RUNNING                     |
-> |   PAD_CLKS                     | GATED                       |
-> |   SLIMBUS_CLK                  | GATED                       |
-> | OPP Divider                    | ABE_CLK = DPLL_ABE_X2_CLK/1 |
-> |--------------------------------------------------------------|
->
-> Paul Walmsley (3):
->    ARM: OMAP2+: hwmod: add enable_preprogram hook
->    ASoC: TI AESS: add autogating-enable function, callable from
->      architecture code
->    ARM: OMAP4+: AESS: enable internal auto-gating during initial setup
->
-> Sebastien Guiriec (2):
->    OMAP4: hwmod data: Enable AESS hwmod device
->    OMAP4: hwmod data: Update AESS data with memory bank area
->
->   arch/arm/mach-omap2/Makefile               |    2 +-
->   arch/arm/mach-omap2/omap_hwmod.c           |   18 ++++++++++
->   arch/arm/mach-omap2/omap_hwmod.h           |    8 +++++
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   49 +++++++++++++++++++++++--
->   arch/arm/mach-omap2/omap_hwmod_reset.c     |   52 +++++++++++++++++++++++++++
->   include/sound/aess.h                       |   53 ++++++++++++++++++++++++++++
->   6 files changed, 178 insertions(+), 4 deletions(-)
->   create mode 100644 arch/arm/mach-omap2/omap_hwmod_reset.c
->   create mode 100644 include/sound/aess.h
->
+so that tll->ch_clk is always written to.
+
+>  static int usbtll_omap_remove(struct platform_device *pdev)
+>  {
+>  	struct usbtll_omap *tll = platform_get_drvdata(pdev);
+> +	int i;
+> +
+> +	for (i = 0; i < tll->nch; i++)
+> +		clk_put(tll->ch_clk[i]);
+
+And change this to:
+
+	for (i = 0; i < tll->nch; i++)
+		if (!IS_ERR(tll->ch_clk[i]))
+			clk_put(tll->ch_clk[i]);
+
+so that you're not passing a NULL pointer in.
+
+> +	for (i = 0; i < tll->nch; i++) {
+> +		if (is_ehci_tll_mode(pdata->port_mode[i])) {
+> +			int r;
+>  
+> -	if (is_ehci_tll_mode(pdata->port_mode[1]))
+> -		clk_enable(tll->usbtll_p2_fck);
+> +			if (!tll->ch_clk[i])
+
+			if (IS_ERR(tll->ch_clk[i]))
+
+> +				continue;
+> +
+> +			r = clk_enable(tll->ch_clk[i]);
+> +			if (r) {
+> +				dev_err(dev,
+> +				 "Error enabling ch %d clock: %d\n", i, r);
+> +			}
+> +		}
+> +	}
+
+> @@ -387,11 +409,12 @@ static int usbtll_runtime_suspend(struct device *dev)
+>  
+>  	spin_lock_irqsave(&tll->lock, flags);
+>  
+> -	if (is_ehci_tll_mode(pdata->port_mode[0]))
+> -		clk_disable(tll->usbtll_p1_fck);
+> -
+> -	if (is_ehci_tll_mode(pdata->port_mode[1]))
+> -		clk_disable(tll->usbtll_p2_fck);
+> +	for (i = 0; i < tll->nch; i++) {
+> +		if (is_ehci_tll_mode(pdata->port_mode[i])) {
+> +			if (tll->ch_clk[i])
+
+			if (!IS_ERR(tll->ch_clk[i]))
+
+> +				clk_disable(tll->ch_clk[i]);
+> +		}
+> +	}
+>  
+>  	spin_unlock_irqrestore(&tll->lock, flags);
+>  
+> -- 
+> 1.7.4.1
+> 
