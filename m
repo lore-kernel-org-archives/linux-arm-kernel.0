@@ -1,59 +1,24 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Fri, 18 Jan 2013 12:40:14 +0100
-Subject: [PATCH 4/4] mfd: db8500-prcmu: add ux500_wdt mfd_cell
-In-Reply-To: <1358509214-22407-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1358509214-22407-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <1358509214-22407-5-git-send-email-fabio.baltieri@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Jan 2013 11:43:40 +0000
+Subject: [PATCH RFC 2/2] Improve bios32 support for DT PCI host bridge
+ controllers
+In-Reply-To: <20130118114019.GA9034@arm.com>
+References: <20130118114019.GA9034@arm.com>
+Message-ID: <20130118114340.GD23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the necessary structures to use the watchdog
-functionality of PRCMU.
+On Fri, Jan 18, 2013 at 11:40:19AM +0000, Andrew Murray wrote:
+>  static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+>  {
+>  	struct pci_sys_data *sys = NULL;
+> +	static int busnr;
+>  	int ret;
+> -	int nr, busnr;
+> -
+> -	for (nr = busnr = 0; nr < hw->nr_controllers; nr++) {
+> +	int nr;
+> +	for (nr = 0; nr < hw->nr_controllers; nr++) {
 
-The watchdog driver is named ux500_wdt.
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
- drivers/mfd/db8500-prcmu.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 7a63fa8..e42a417 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -32,6 +32,7 @@
- #include <linux/regulator/db8500-prcmu.h>
- #include <linux/regulator/machine.h>
- #include <linux/cpufreq.h>
-+#include <linux/platform_data/ux500_wdt.h>
- #include <asm/hardware/gic.h>
- #include <mach/hardware.h>
- #include <mach/irqs.h>
-@@ -3074,6 +3075,11 @@ static struct resource ab8500_resources[] = {
- 	}
- };
- 
-+static struct ux500_wdt_data db8500_wdt_pdata = {
-+	.timeout = 600, /* 10 minutes */
-+	.has_28_bits_resolution = true,
-+};
-+
- static struct mfd_cell db8500_prcmu_devs[] = {
- 	{
- 		.name = "db8500-prcmu-regulators",
-@@ -3088,6 +3094,12 @@ static struct mfd_cell db8500_prcmu_devs[] = {
- 		.pdata_size = sizeof(db8500_cpufreq_table),
- 	},
- 	{
-+		.name = "ux500_wdt",
-+		.platform_data = &db8500_wdt_pdata,
-+		.pdata_size = sizeof(db8500_wdt_pdata),
-+		.id = -1,
-+	},
-+	{
- 		.name = "ab8500-core",
- 		.of_compatible = "stericsson,ab8500",
- 		.num_resources = ARRAY_SIZE(ab8500_resources),
--- 
-1.7.12.1
+Please try to retain the originally formatting.  There should be a blank
+line between "int nr;" and "for...".
