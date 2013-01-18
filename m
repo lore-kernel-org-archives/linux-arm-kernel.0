@@ -1,122 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 18 Jan 2013 15:20:45 +0100
-Subject: [PATCH 2/3] arm: kirkwood: Instantiate cpufreq driver
-In-Reply-To: <1358518846-16251-1-git-send-email-andrew@lunn.ch>
-References: <1358518846-16251-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1358518846-16251-3-git-send-email-andrew@lunn.ch>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 18 Jan 2013 22:27:26 +0800
+Subject: kernel/time/tick-broadcast.c:136:10: error: 'struct
+ clock_event_device' has no member named 'evt_handler'
+Message-ID: <50f95bce.nUS84hQLN1KYn1xE%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register a platform driver structure for the cpufreq driver.
+tree:   git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/kvm-prereq-merged
+head:   0a9423ee25cf2f3122d7d65d0fc4652eceda3bdb
+commit: 0dd9fbd5c510a51ed3d68aa4594a18ebd3a8547d clockevents: Add generic timer broadcast receiver
+date:   4 days ago
+config: make ARCH=x86_64 allyesconfig
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+All error/warnings:
+
+   kernel/time/tick-broadcast.c: In function 'tick_receive_broadcast':
+>> kernel/time/tick-broadcast.c:136:10: error: 'struct clock_event_device' has no member named 'evt_handler'
+
+vim +136 kernel/time/tick-broadcast.c
+
+   130		struct tick_device *td = this_cpu_ptr(&tick_cpu_device);
+   131		struct clock_event_device *evt = td->evtdev;
+   132	
+   133		if (!evt)
+   134			return -ENODEV;
+   135	
+ > 136		if (!evt->evt_handler)
+   137			return -EINVAL;
+   138	
+   139		evt->event_handler(evt);
+
 ---
- arch/arm/Kconfig                                  |    1 +
- arch/arm/mach-kirkwood/board-dt.c                 |    3 ++-
- arch/arm/mach-kirkwood/common.c                   |   23 +++++++++++++++++++++
- arch/arm/mach-kirkwood/common.h                   |    2 ++
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    2 ++
- 5 files changed, 30 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 67874b8..830975b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -543,6 +543,7 @@ config ARCH_DOVE
- 
- config ARCH_KIRKWOOD
- 	bool "Marvell Kirkwood"
-+	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CPU_FEROCEON
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index de4fd2b..fab541d 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -70,7 +70,6 @@ static void __init kirkwood_legacy_clk_init(void)
- 	clkspec.args[0] = CGC_BIT_SDIO;
- 	orion_clkdev_add(NULL, "mvsdio",
- 			 of_clk_get_from_provider(&clkspec));
--
- }
- 
- static void __init kirkwood_of_clk_init(void)
-@@ -95,6 +94,8 @@ static void __init kirkwood_dt_init(void)
- 
- 	kirkwood_l2_init();
- 
-+	kirkwood_cpufreq_init();
-+
- 	/* Setup root of clk tree */
- 	kirkwood_of_clk_init();
- 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index bac21a5..a3dc21c 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -584,6 +584,29 @@ void __init kirkwood_audio_init(void)
- }
- 
- /*****************************************************************************
-+ * CPU Frequency
-+ ****************************************************************************/
-+static struct resource kirkwood_cpufreq_resources[] = {
-+	[0] = {
-+		.start  = CPU_CONTROL_PHYS,
-+		.end    = CPU_CONTROL_PHYS + 3,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device kirkwood_cpufreq_device = {
-+	.name		= "kirkwood-cpufreq",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(kirkwood_cpufreq_resources),
-+	.resource	= kirkwood_cpufreq_resources,
-+};
-+
-+void __init kirkwood_cpufreq_init(void)
-+{
-+	platform_device_register(&kirkwood_cpufreq_device);
-+}
-+
-+/*****************************************************************************
-  * General
-  ****************************************************************************/
- /*
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 5ffa57f..9ede04b 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -50,6 +50,8 @@ void kirkwood_nand_init(struct mtd_partition *parts, int nr_parts, int delay);
- void kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts,
- 			    int (*dev_ready)(struct mtd_info *));
- void kirkwood_audio_init(void);
-+void kirkwood_cpufreq_init(void);
-+
- void kirkwood_restart(char, const char *);
- void kirkwood_clk_init(void);
- 
-diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-index 5c82b7d..d4cbe5e 100644
---- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-+++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-@@ -17,6 +17,7 @@
- #define CPU_CONFIG_ERROR_PROP	0x00000004
- 
- #define CPU_CONTROL		(BRIDGE_VIRT_BASE + 0x0104)
-+#define CPU_CONTROL_PHYS	(BRIDGE_PHYS_BASE + 0x0104)
- #define CPU_RESET		0x00000002
- 
- #define RSTOUTn_MASK		(BRIDGE_VIRT_BASE + 0x0108)
-@@ -69,6 +70,7 @@
- #define CGC_RUNIT		(1 << 7)
- #define CGC_XOR0		(1 << 8)
- #define CGC_AUDIO		(1 << 9)
-+#define CGC_POWERSAVE           (1 << 11)
- #define CGC_SATA0		(1 << 14)
- #define CGC_SATA1		(1 << 15)
- #define CGC_XOR1		(1 << 16)
--- 
-1.7.10.4
+0-DAY kernel build testing backend              Open Source Technology Center
+http://lists.01.org/mailman/listinfo/kbuild                 Intel Corporation
