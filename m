@@ -1,136 +1,42 @@
-From: Andrew.Murray@arm.com (Andrew Murray)
-Date: Fri, 18 Jan 2013 11:40:19 +0000
-Subject: [PATCH RFC 2/2] Improve bios32 support for DT PCI host bridge
- controllers
-Message-ID: <20130118114019.GA9034@arm.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Fri, 18 Jan 2013 12:40:10 +0100
+Subject: [PATCH 0/4] add ux500_wdt support
+Message-ID: <1358509214-22407-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Continuing from discussion with Thierry (lkml.org/lkml/2013/1/18/107) perhaps
-this will be useful to fold into your patchset - you may wish to remove the
-overlap. 
----
-This patch attempts to overcome two difficulities when providing DT PCI host
-bridge controllers:
+Hi all,
 
-At present PCI controllers are registered via the pci_common_init call, this
-results in callbacks (arch/arm/include/asm/mach/pci.h) which are used to setup
-the controller. However there is no trivial way to pass a device_node to the
-callbacks which is known at the time of calling pci_common_init. This is
-required in order to add pci resources (pci_add_resource_offset) based on
-information obtained from the device tree. This patch updates the hw_pci and
-pci_sys_data structures such that drivers can provide a device_node to
-pci_common_init and access it through the pci_sys_data argument of the
-callbacks.
+this set adds support for the ux500_wdt timer, implemented in the PRCMU
+unit of ST-Ericsson ux500 architecture.
 
-Additionally bios32 makes an assumption that all host controllers are
-registered at the same time and handled by the same driver. This patch provides
-support for calling pci_common_init multiple times to allow for one at a time
-registration of PCI host controllers.
+The first two patches add the necessary definitions and function export
+to the PRCMU driver currently in mainline, while the third an fourth
+patches add the actual watchdog driver and mfd_cell definition to make
+it probe when PRCMU is compiled in.
 
-It also adds support for setting up of PCIe MPS and MRRS.
+As the patches touches files in both mfd and watchdog subsystems, what do
+you think is the best way to handle this set?
 
-Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- arch/arm/include/asm/mach/pci.h |    2 ++
- arch/arm/kernel/bios32.c        |   29 ++++++++++++++++++++++++-----
- 2 files changed, 26 insertions(+), 5 deletions(-)
+Thanks,
+Fabio
 
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 26c511f..845a6b7 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -27,6 +27,7 @@ struct hw_pci {
- 	void		(*postinit)(void);
- 	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
- 	int		(*map_irq)(const struct pci_dev *dev, u8 slot, u8 pin);
-+	struct device_node *of_node;
- };
- 
- /*
-@@ -47,6 +48,7 @@ struct pci_sys_data {
- 					/* IRQ mapping				*/
- 	int		(*map_irq)(const struct pci_dev *, u8, u8);
- 	void		*private_data;	/* platform controller private data	*/
-+	struct device_node *of_node;	/* device tree node			*/
- };
- 
- /*
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 2b2f25e..bde4630 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -11,6 +11,7 @@
- #include <linux/slab.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/pci.h>
-@@ -426,10 +427,10 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
- {
- 	struct pci_sys_data *sys = NULL;
-+	static int busnr;
- 	int ret;
--	int nr, busnr;
--
--	for (nr = busnr = 0; nr < hw->nr_controllers; nr++) {
-+	int nr;
-+	for (nr = 0; nr < hw->nr_controllers; nr++) {
- 		sys = kzalloc(sizeof(struct pci_sys_data), GFP_KERNEL);
- 		if (!sys)
- 			panic("PCI: unable to allocate sys data!");
-@@ -440,6 +441,7 @@ static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
- 		sys->busnr   = busnr;
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
-+		sys->of_node = hw->of_node;
- 		INIT_LIST_HEAD(&sys->resources);
- 
- 		ret = hw->setup(nr, sys);
-@@ -484,10 +486,11 @@ void __init pci_common_init(struct hw_pci *hw)
- 	if (hw->postinit)
- 		hw->postinit();
- 
--	pci_fixup_irqs(pcibios_swizzle, pcibios_map_irq);
--
- 	list_for_each_entry(sys, &head, node) {
- 		struct pci_bus *bus = sys->bus;
-+		struct pci_bus *child;
-+
-+		pci_bus_fixup_irqs(bus, pcibios_swizzle, pcibios_map_irq);
- 
- 		if (!pci_has_flag(PCI_PROBE_ONLY)) {
- 			/*
-@@ -504,6 +507,16 @@ void __init pci_common_init(struct hw_pci *hw)
- 			 * Enable bridges
- 			 */
- 			pci_enable_bridges(bus);
-+
-+			/*
-+			 * Configure children (MPS, MRRS)
-+			 */
-+			list_for_each_entry(child, &bus->children, node) {
-+				struct pci_dev *self = child->self;
-+				if (!self)
-+					continue;
-+				pcie_bus_configure_settings(child, self->pcie_mpss);
-+			}
- 		}
- 
- 		/*
-@@ -627,3 +640,9 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
- 
- 	return 0;
- }
-+
-+struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
-+{
-+	struct pci_sys_data *sys = bus->sysdata;
-+	return of_node_get(sys->of_node);
-+}
+
+Fabio Baltieri (4):
+  mfd: dbx500-prcmu: add watchdog ID definitions
+  mfd: dbx500-prcmu: export a9wdog functions
+  watchdog: add support for ux500_wdt watchdog
+  mfd: db8500-prcmu: add ux500_wdt mfd_cell
+
+ drivers/mfd/db8500-prcmu.c              |  17 ++++
+ drivers/watchdog/Kconfig                |  12 +++
+ drivers/watchdog/Makefile               |   1 +
+ drivers/watchdog/ux500_wdt.c            | 171 ++++++++++++++++++++++++++++++++
+ include/linux/mfd/dbx500-prcmu.h        |  12 +++
+ include/linux/platform_data/ux500_wdt.h |  19 ++++
+ 6 files changed, 232 insertions(+)
+ create mode 100644 drivers/watchdog/ux500_wdt.c
+ create mode 100644 include/linux/platform_data/ux500_wdt.h
+
 -- 
-1.7.0.4
+1.7.12.1
