@@ -1,44 +1,42 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Fri, 18 Jan 2013 12:49:20 +0530
-Subject: [PATCH 0/9] ARM: OMAP2+: AM33XX: Misc fixes/updates
-Message-ID: <1358493569-17142-1-git-send-email-vaibhav.bedia@ti.com>
+Date: Fri, 18 Jan 2013 12:49:25 +0530
+Subject: [PATCH 5/9] ARM: OMAP2+: AM33XX: hwmod: Fixup cpgmac0 hwmod entry
+In-Reply-To: <1358493569-17142-1-git-send-email-vaibhav.bedia@ti.com>
+References: <1358493569-17142-1-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1358493569-17142-6-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The current HWMOD code expects the memory region with
+the IP's SYSCONFIG register to be marked with ADDR_TYPE_RT
+flag.
 
-The following patches were earlier posted as part the AM33XX
-suspend-resume support series [1]. Based on the suggestion
-from Santosh Shilimkar <santosh.shilimkar@ti.com> i have split
-out the changes which update the various data files related
-to AM33XX support.
+CPGMAC0 hwmod entry specifies two memory regions and marks
+both with the flag ADDR_TYPE_RT although only the 2nd region
+has the SYSCONFIG register. This leads to the HWMOD code
+accessing the wrong memory address for idle and standby
+operations. Fix this by removing the ADDR_TYPE_RT flag from
+the 1st memory region in CPGMAC0 hwmod entry.
 
-These patches apply on top of v3.8-rc3
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+---
+Change from RFC version:
+	No change
 
-Regards,
-Vaibhav
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-[1] http://marc.info/?l=linux-arm-kernel&m=135698501821074&w=2
-
-Vaibhav Bedia (9):
-  ARM: OMAP2+: AM33XX: CM: Get rid of unncessary header inclusions
-  ARM: OMAP2+: AM33XX: CM/PRM: Use __ASSEMBLER__ macros in header files
-  ARM: OMAP2+: AM33XX: hwmod: Register OCMC RAM hwmod
-  ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod with the right flags
-  ARM: OMAP2+: AM33XX: hwmod: Fixup cpgmac0 hwmod entry
-  ARM: OMAP2+: AM33XX: hwmod: Update the WKUP-M3 hwmod with reset
-    status bit
-  ARM: OMAP2+: AM33XX: Update the hardreset API
-  ARM: DTS: AM33XX: Add nodes for OCMC RAM and WKUP-M3
-  ARM: OMAP2+: AM33XX: control: Add some control module registers and
-    APIs
-
- arch/arm/boot/dts/am33xx.dtsi              |   11 ++++++
- arch/arm/mach-omap2/cm33xx.h               |    9 ++---
- arch/arm/mach-omap2/control.c              |   20 +++++++++++
- arch/arm/mach-omap2/control.h              |   41 +++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod.c           |    5 +--
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   50 ++++++++++++++++------------
- arch/arm/mach-omap2/prm33xx.c              |   11 ++++--
- arch/arm/mach-omap2/prm33xx.h              |    4 ++-
- 8 files changed, 115 insertions(+), 36 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index f2f408c..34a67e4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -2496,7 +2496,6 @@ static struct omap_hwmod_addr_space am33xx_cpgmac0_addr_space[] = {
+ 	{
+ 		.pa_start	= 0x4a100000,
+ 		.pa_end		= 0x4a100000 + SZ_2K - 1,
+-		.flags		= ADDR_TYPE_RT,
+ 	},
+ 	/* cpsw wr */
+ 	{
+-- 
+1.7.0.4
