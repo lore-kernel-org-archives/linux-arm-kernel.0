@@ -1,105 +1,98 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 17 Jan 2013 21:34:45 -0600
-Subject: [PATCH 2/3] ARM: convert platform hotplug inline assembly to
- C
-In-Reply-To: <alpine.LFD.2.02.1301171038590.6300@xanadu.home>
-References: <1358391205-23943-1-git-send-email-robherring2@gmail.com>
- <1358391205-23943-2-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1301162338420.6300@xanadu.home> <50F8082F.1050906@gmail.com>
- <alpine.LFD.2.02.1301171038590.6300@xanadu.home>
-Message-ID: <50F8C2D5.4070405@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 18 Jan 2013 11:35:44 +0800
+Subject: [PATCH 2/2] usb: chipidea: imx: Add system suspend/resume API
+In-Reply-To: <1358477428-2605-2-git-send-email-peter.chen@freescale.com>
+References: <1358477428-2605-1-git-send-email-peter.chen@freescale.com>
+ <1358477428-2605-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130118033543.GB29282@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2013 09:42 AM, Nicolas Pitre wrote:
-> On Thu, 17 Jan 2013, Rob Herring wrote:
+On Fri, Jan 18, 2013 at 10:50:28AM +0800, Peter Chen wrote:
+> During the system suspend/resume procedure, the USB also
+> needs to go suspend/resume procedure, this patch adds
+> related APIs. It is tested at i.mx6q sabrelite. Meanwhile,
+> it fixes the bug that the USB will out of work after
+> system suspend/resume.
 > 
->> On 01/16/2013 10:40 PM, Nicolas Pitre wrote:
->>> On Wed, 16 Jan 2013, Rob Herring wrote:
->>>
->>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> With the addition of set_auxcr/get_auxcr, all the hotplug inline assembly
->>>> code for exynos, imx, realview, spear13xx and vexpress can be converted to
->>>> C code.
->>>
->>> That might not be all safe.  Please see
->>> http://article.gmane.org/gmane.linux.ports.arm.kernel/209584
->>
->> Other than the OR/AND operations, it's all just inline assembly
->> functions that are called, so it gets compiled to the same code. Perhaps
->> I should put noinline on the functions so they stay of limited
->> complexity. If you don't think doing this in C is okay, then there is
->> probably no point in having the set_auxcr/get_auxcr functions.
-> 
-> I think set_auxcr/get_auxcr is fine.
-> 
-> But your patch goes beyond simply converting those.  You also converted 
-> the cache flush and disable from assembly to C, which on a Cortex A9 
-> might be unsafe if the stack is modified in the sequence according to 
-> the discussion I referenced.
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-The referenced discussion is mainly for the A15, not the A9, right? It seems
-the sequences are a bit different. So this is the code for A9 (spear13xx):
+Haven't reviewed the patches, but I've seen the series fix an imx6q
+USB issue - the USB will be broken after system suspend/resume
+operation as below.  So for both patches,
 
-	flush_cache_all();
-	__flush_icache_all();
-	dsb();
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
 
-	/*
-	 * Turn off coherency
-	 */
-	set_auxcr(get_auxcr() & ~0x40);
-	set_cr(get_cr() & ~CR_C);
+Shawn
 
-which generates this:
-
-c027f36c:       ebf648d2        bl      c00116bc <v7_flush_kern_cache_all>
-c027f370:       e3a03000        mov     r3, #0
-c027f374:       ee073f11        mcr     15, 0, r3, cr7, cr1, {0}
-c027f378:       f57ff04f        dsb     sy
-c027f37c:       ee113f30        mrc     15, 0, r3, cr1, cr0, {1}
-c027f380:       e3c33040        bic     r3, r3, #64     ; 0x40
-c027f384:       ee013f30        mcr     15, 0, r3, cr1, cr0, {1}
-c027f388:       f57ff06f        isb     sy
-c027f38c:       ee113f10        mrc     15, 0, r3, cr1, cr0, {0}
-c027f390:       e3c33004        bic     r3, r3, #4
-c027f394:       ee013f10        mcr     15, 0, r3, cr1, cr0, {0}
-c027f398:       f57ff06f        isb     sy
-c027f39c:       e320f003        wfi
-
-v7_flush_kern_cache_all will generate stack accesses, but I didn't change that
-fact. The I cache invalidate changed from invalidate all to invalidate
-inner-shareable. I believe that should be equivalent. And the mcr version of
-dsb changed to a dsb instruction. Some isb's are inserted as well.
-
-So I don't follow your concern. You can't guarantee that the compiler wouldn't
-insert a data access in the middle, but then you could not guarantee that here
-either (exynos A15):
-
-        asm volatile(
-        "       mrc     p15, 0, %0, c1, c0, 0\n"
-        "       bic     %0, %0, %1\n"
-        "       mcr     p15, 0, %0, c1, c0, 0\n"
-          : "=&r" (v)
-          : "Ir" (CR_C)
-          : "cc");
-
-        flush_cache_louis();
-
-        asm volatile(
-        /*
-        * Turn off coherency
-        */
-        "       mrc     p15, 0, %0, c1, c0, 1\n"
-        "       bic     %0, %0, %1\n"
-        "       mcr     p15, 0, %0, c1, c0, 1\n"
-        : "=&r" (v)
-        : "Ir" (0x40)
-        : "cc");
-
-The only thing that guarantees this code works is flush_cache_louis does not
-touch the stack and you rely that compiler doesn't do anything like register
-save/restore around the function call.
-
-Rob
+$ echo mem > /sys/power/state
+PM: Syncing filesystems ... done.
+PM: Preparing system for mem sleep
+mmc0: card a8a5 removed
+mmc1: card b368 removed
+Freezing user space processes ... (elapsed 0.01 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
+PM: Entering mem sleep
+fec_stop : Graceful transmit stop did not complete !
+PM: suspend of devices complete after 14.490 msecs
+PM: suspend devices took 0.020 seconds
+PM: late suspend of devices complete after 1.645 msecs
+PM: noirq suspend of devices complete after 2.432 msecs
+Disabling non-boot CPUs ...
+CPU1: shutdown
+CPU2: shutdown
+CPU3: shutdown
+Enabling non-boot CPUs ...
+CPU1: Booted secondary processor
+CPU1 is up
+CPU2: Booted secondary processor
+CPU2 is up
+CPU3: Booted secondary processor
+CPU3 is up
+PM: noirq resume of devices complete after 1.217 msecs
+PM: early resume of devices complete after 1.590 msecs
+hub 2-1:1.0: hub_port_status failed (err = -71)
+hub 2-1:1.0: hub_port_status failed (err = -71)
+hub 2-1:1.0: hub_port_status failed (err = -71)
+PM: resume of devices complete after 70.677 msecs
+PM: resume devices took 0.080 seconds
+PM: Finishing wakeup.
+Restarting tasks ... done.
+mmc0: new high speed SDHC card at address a8a5
+mmcblk0: mmc0:a8a5 SD04G 3.69 GiB
+ mmcblk0: p1 p2 p3
+mmc1: SD Status: Invalid Allocation Unit size.
+mmc1: card lacks mandatory switch function, performance might suffer.
+mmc1: new SD card at address b368
+mmcblk1: mmc1:b368 MS    121 MiB
+ mmcblk1: p1
+root at freescale ~$ ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+hub 2-0:1.0: Cannot enable port 1.  Maybe the USB cable is bad?
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+hub 2-0:1.0: Cannot enable port 1.  Maybe the USB cable is bad?
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+hub 2-0:1.0: Cannot enable port 1.  Maybe the USB cable is bad?
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+ci_hdrc ci_hdrc.1: port 1 reset error -110
+hub 2-0:1.0: Cannot enable port 1.  Maybe the USB cable is bad?
+hub 2-1:1.0: hub_port_status failed (err = -19)
+hub 2-1:1.0: hub_port_status failed (err = -19)
+hub 2-1:1.0: hub_port_status failed (err = -19)
+hub 2-1:1.0: activate --> -19
+usb 2-1: USB disconnect, device number 2
+...
