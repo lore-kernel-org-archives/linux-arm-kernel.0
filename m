@@ -1,123 +1,48 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 18 Jan 2013 09:31:29 +0000
-Subject: [v4 PATCH 00/12] atmel spi controller with dmaengine and device
- tree support
-In-Reply-To: <CACQ1gAit5KvhNqQsw4MznW4zyGPq5WD9BKHm5KhmcXjOmVjEcg@mail.gmail.com>
-References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
- <CACQ1gAit5KvhNqQsw4MznW4zyGPq5WD9BKHm5KhmcXjOmVjEcg@mail.gmail.com>
-Message-ID: <B256D81BAE5131468A838E5D7A2436413A05E91C@penmbx02>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 18 Jan 2013 15:10:44 +0530
+Subject: [PATCH 3/4] ARM: OMAP2: MUSB: Specify omap4 has mailbox
+In-Reply-To: <1358502045-27008-1-git-send-email-kishon@ti.com>
+References: <1358502045-27008-1-git-send-email-kishon@ti.com>
+Message-ID: <1358502045-27008-4-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Added has_mailbox to the musb platform data to specify that omap uses
+an external mailbox (in control module) to communicate with the musb
+core during device connect and disconnect.
 
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/mach-omap2/usb-musb.c |    3 +++
+ include/linux/usb/musb.h       |    2 ++
+ 2 files changed, 5 insertions(+)
 
-> -----Original Message-----
-> From: Richard Genoud [mailto:richard.genoud at gmail.com]
-> Sent: 2013?1?18? 16:46
-> To: Yang, Wenyou
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Ferre,
-> Nicolas; plagnioj at jcrosoft.com; Lin, JM
-> Subject: Re: [v4 PATCH 00/12] atmel spi controller with dmaengine and device
-> tree support
-> 
-> 2013/1/14 Wenyou Yang <wenyou.yang@atmel.com>:
-> > Hi All,
-> >
-> > This set of patches is to add dmaengine and device tree support for atmel spi.
-> > The work is based on Nicolas and Richard's work.
-> > It is tested on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and
-> at91sam9g20ek.
-> >
-> > It is based on v3.8-rc3.
-> Hi,
-> You should rebase it on rc4 because __devinit macros are gone in rc4.
-> (cf 54b956b903607f8f8878754dd4352da6a54a1da2 )
-> So the patches 05 and 06 will break compilation.
-thanks
-> 
-> >
-> > Changelog:
-> > v4:
-> >         1./ Take Joe Perches's advance, rewrite atmel_spi_is_v2(struct
-> atmel_spi *as)
-> >              and atmel_spi_use_dma(struct atmel_spi *as),
-> >              and remove atmel_spi_use_pdc(struct atmel_spi *as).
-> >
-> >         2./ Rebase on v3.8-rc3.
-> >
-> > V3:
-> >         1./ Rebase on v3.8-rc2.
-> >
-> >         2./ Remove some Jean-Christophe's patches which has been
-> >             applied on v3.8-rc2.
-> >
-> >         3./ Remove spi property "cs-gpios" from the SoC dtsi files
-> >             to the board dts files to avoid some useless pin conflicts.
-> >
-> > v2:
-> >         1./ Remove the patch :PATCH]mtd: m25p80: change the
-> m25p80_read to reading page to page
-> >             which purpose to fix the BUG: when run "flashcp /bin/busybox
-> /dev/mtdX" in
-> >             the at91sam9g25ek with DMA mode, it arises a OOPS.
-> >             Now fix it in this patch:
-> >             [PATHC] spi/atmel_spi: add dmaengine support changing to fix
-> the [BUG].
-> >
-> >         2./ Remove two patches:
-> >             which purpose to read dts property to select SPI IP version
-> and DMA mode
-> >             Now they will be gat from device tree different compatile.
-> >
-> >         3./ Fix DMA: when enable both spi0 AND spi1, the spi0 doesn't
-> work BUG.
-> >
-> >         4./ Rebase v3.7-rc8.
-> >
-> > Best Regards,
-> > Wenyou Yang.
-> >
-> > Nicolas Ferre (5):
-> >   spi/atmel_spi: add physical base address
-> >   spi/atmel_spi: call unmapping on transfers buffers
-> >   spi/atmel_spi: status information passed through controller data
-> >   spi/atmel_spi: add flag to controller data for lock operations
-> >   spi/atmel_spi: add dmaengine support
-> >
-> > Richard Genoud (6):
-> >   spi/atmel_spi: fix spi-atmel driver to adapt to slave_config changes
-> >   spi/atmel_spi: correct 16 bits transfers using PIO
-> >   spi/atmel_spi: correct 16 bits transfer with DMA
-> >   ARM: at91: add clocks for spi dt entries
-> >   ARM: dts: add spi nodes for atmel SoC
-> >   ARM: dts: add spi nodes for the atmel boards
-> >
-> > Wenyou Yang (1):
-> >   spi/atmel_spi: update the dt support
-> >
-> >  arch/arm/boot/dts/at91sam9260.dtsi          |   18 +
-> >  arch/arm/boot/dts/at91sam9263.dtsi          |   18 +
-> >  arch/arm/boot/dts/at91sam9263ek.dts         |   14 +
-> >  arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   14 +
-> >  arch/arm/boot/dts/at91sam9g45.dtsi          |   18 +
-> >  arch/arm/boot/dts/at91sam9m10g45ek.dts      |   14 +
-> >  arch/arm/boot/dts/at91sam9n12.dtsi          |   18 +
-> >  arch/arm/boot/dts/at91sam9n12ek.dts         |   14 +
-> >  arch/arm/boot/dts/at91sam9x5.dtsi           |   18 +
-> >  arch/arm/boot/dts/at91sam9x5ek.dtsi         |   14 +
-> >  arch/arm/mach-at91/at91sam9260.c            |    2 +
-> >  arch/arm/mach-at91/at91sam9g45.c            |    2 +
-> >  arch/arm/mach-at91/at91sam9n12.c            |    2 +
-> >  arch/arm/mach-at91/at91sam9x5.c             |    2 +
-> >  drivers/spi/spi-atmel.c                     |  809
-> ++++++++++++++++++++++++---
-> >  15 files changed, 908 insertions(+), 69 deletions(-)
-> >
-> > --
-> > 1.7.9.5
-> >
-> 
-> 
-> 
-> --
-> for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
+diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+index 7b33b37..9d27e3f 100644
+--- a/arch/arm/mach-omap2/usb-musb.c
++++ b/arch/arm/mach-omap2/usb-musb.c
+@@ -85,6 +85,9 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
+ 	musb_plat.mode = board_data->mode;
+ 	musb_plat.extvbus = board_data->extvbus;
+ 
++	if (cpu_is_omap44xx())
++		musb_plat.has_mailbox = true;
++
+ 	if (soc_is_am35xx()) {
+ 		oh_name = "am35x_otg_hs";
+ 		name = "musb-am35x";
+diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
+index eb50525..053c268 100644
+--- a/include/linux/usb/musb.h
++++ b/include/linux/usb/musb.h
+@@ -99,6 +99,8 @@ struct musb_hdrc_platform_data {
+ 	/* MUSB_HOST, MUSB_PERIPHERAL, or MUSB_OTG */
+ 	u8		mode;
+ 
++	u8		has_mailbox:1;
++
+ 	/* for clk_get() */
+ 	const char	*clock;
+ 
+-- 
+1.7.9.5
