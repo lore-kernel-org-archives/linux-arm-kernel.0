@@ -1,51 +1,45 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 18 Jan 2013 15:36:32 +0100
-Subject: [PATCH 3/5] ARM: dts: omap3-beagle-xm: Use pwm-leds for pmu_stat LED
+Date: Fri, 18 Jan 2013 15:36:33 +0100
+Subject: [PATCH 4/5] ARM: dts: omap4-sdp: Add support for pwm-leds (keypad and
+ charging LED)
 In-Reply-To: <1358519794-13214-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1358519794-13214-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1358519794-13214-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1358519794-13214-5-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have proper driver stack to handle the pmu_stat LED which is connected
-PWMB of twl4030.
+Sections to describe the pwm-leds in the system.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/omap3-beagle-xm.dts | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/omap4-sdp.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 3705a81..1c85e0f 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -20,10 +20,6 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
--		pmu_stat {
--			label = "beagleboard::pmu_stat";
--			gpios = <&twl_gpio 19 0>; /* LEDB */
--		};
- 
- 		heartbeat {
- 			label = "beagleboard::usr0";
-@@ -38,6 +34,16 @@
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index 43e5258..8101a94 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -80,6 +80,21 @@
  		};
  	};
  
 +	pwmleds {
 +		compatible = "pwm-leds";
-+
-+		pmu_stat {
-+			label = "beagleboard::pmu_stat";
-+			pwms = <&twl_pwmled 1 7812500>;
++		kpad {
++			label = "omap4::keypad";
++			pwms = <&twl_pwm 0 7812500>;
 +			max-brightness = <127>;
++		};
++
++		charging {
++			label = "omap4:green:chrg";
++			pwms = <&twl_pwmled 0 7812500>;
++			max-brightness = <255>;
 +		};
 +	};
 +
  	sound {
- 		compatible = "ti,omap-twl4030";
- 		ti,model = "omap3beagle";
+ 		compatible = "ti,abe-twl6040";
+ 		ti,model = "SDP4430";
 -- 
 1.8.1
