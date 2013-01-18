@@ -1,111 +1,64 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 18 Jan 2013 17:04:53 +0200
-Subject: [PATCH v8 05/22] mfd: omap-usb-tll: Clean up clock handling
-In-Reply-To: <20130118145906.GE23505@n2100.arm.linux.org.uk>
-References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
- <1358511445-26656-6-git-send-email-rogerq@ti.com>
- <20130118145906.GE23505@n2100.arm.linux.org.uk>
-Message-ID: <50F96495.6070502@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 18 Jan 2013 16:05:27 +0100
+Subject: [PATCH v2] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <50EF27B4.60608@wwwdotorg.org>
+References: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
+ <50EF27B4.60608@wwwdotorg.org>
+Message-ID: <CACRpkdYK9r9XvQ7t+WOpDOi+RnFb9DGJiFNx5VFGkuuJf=VmgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2013 04:59 PM, Russell King - ARM Linux wrote:
-> On Fri, Jan 18, 2013 at 02:17:08PM +0200, Roger Quadros wrote:
->> +	tll->ch_clk = devm_kzalloc(dev, sizeof(struct clk * [tll->nch]),
->> +						GFP_KERNEL);
->> +	if (!tll->ch_clk) {
->> +		ret = -ENOMEM;
->> +		dev_err(dev, "Couldn't allocate memory for channel clocks\n");
->> +		goto err_clk_alloc;
->> +	}
->> +
->> +	for (i = 0; i < tll->nch; i++) {
->> +		char clkname[] = "usb_tll_hs_usb_chx_clk";
->> +		struct clk *fck;
->> +
->> +		snprintf(clkname, sizeof(clkname),
->> +					"usb_tll_hs_usb_ch%d_clk", i);
->> +		fck = clk_get(dev, clkname);
->> +
->> +		if (IS_ERR(fck))
->> +			dev_dbg(dev, "can't get clock : %s\n", clkname);
->> +		else
->> +			tll->ch_clk[i] = fck;
-> 
-> Hmm.  I'd actually suggest that this becomes:
-> 
-> 		tll->ch_clk[i] = fck;
-> 		if (IS_ERR(fck)
-> 			dev_dbg(dev, "can't get clock: %s\n", clkname);
-> 
-> so that tll->ch_clk is always written to.
+On Thu, Jan 10, 2013 at 9:42 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-Yes, I'll fix this.
-
-> 
->>  static int usbtll_omap_remove(struct platform_device *pdev)
->>  {
->>  	struct usbtll_omap *tll = platform_get_drvdata(pdev);
->> +	int i;
->> +
->> +	for (i = 0; i < tll->nch; i++)
->> +		clk_put(tll->ch_clk[i]);
-> 
-> And change this to:
-> 
-> 	for (i = 0; i < tll->nch; i++)
-> 		if (!IS_ERR(tll->ch_clk[i]))
-> 			clk_put(tll->ch_clk[i]);
-> 
-> so that you're not passing a NULL pointer in.
+>> +     /* Allocate a pin state container on-the-fly */
+>> +     if (!dev->pins) {
+>> +             dpi = devm_kzalloc(dev, sizeof(*dpi), GFP_KERNEL);
 >
-ok.
+> This is allocated using a devm_ function. If -EPROBE_DEFER is returned
+> below after the assignment to dev->pins or if the driver's own probe()
+> returns -EPROBE_DEFER, this allocation will be freed by the driver core.
+> This can leave dev->pins pointing to something non-NULL, yet invalid.
 
->> +	for (i = 0; i < tll->nch; i++) {
->> +		if (is_ehci_tll_mode(pdata->port_mode[i])) {
->> +			int r;
->>  
->> -	if (is_ehci_tll_mode(pdata->port_mode[1]))
->> -		clk_enable(tll->usbtll_p2_fck);
->> +			if (!tll->ch_clk[i])
-> 
-> 			if (IS_ERR(tll->ch_clk[i]))
-ok.
-> 
->> +				continue;
->> +
->> +			r = clk_enable(tll->ch_clk[i]);
->> +			if (r) {
->> +				dev_err(dev,
->> +				 "Error enabling ch %d clock: %d\n", i, r);
->> +			}
->> +		}
->> +	}
-> 
->> @@ -387,11 +409,12 @@ static int usbtll_runtime_suspend(struct device *dev)
->>  
->>  	spin_lock_irqsave(&tll->lock, flags);
->>  
->> -	if (is_ehci_tll_mode(pdata->port_mode[0]))
->> -		clk_disable(tll->usbtll_p1_fck);
->> -
->> -	if (is_ehci_tll_mode(pdata->port_mode[1]))
->> -		clk_disable(tll->usbtll_p2_fck);
->> +	for (i = 0; i < tll->nch; i++) {
->> +		if (is_ehci_tll_mode(pdata->port_mode[i])) {
->> +			if (tll->ch_clk[i])
-> 
-> 			if (!IS_ERR(tll->ch_clk[i]))
-ok.
+OK I (think I) fixed it like this:
 
-> 
->> +				clk_disable(tll->ch_clk[i]);
->> +		}
->> +	}
->>  
->>  	spin_unlock_irqrestore(&tll->lock, flags);
->>  
+For the second deferral, set dev->pins to NULL.
 
---
-cheers,
--roger
+I did some other fixes here to explicitly devm_kfree() the container
+if no pinctrl handle was found. No point in keeping it around.
+
+>> +     if (!dpi->p) {
+>> +             dpi->p = devm_pinctrl_get(dev);
+>
+> That won't succeed for a pinctrl device that has a default state in
+> order to implement hogs. This will then cause the pin controller device
+> to always defer probe and never activate. This will leave HW
+> unconfigured and/or prevent other devices from successfully calling
+> pinctrl_get().
+
+Fixed by your suggested patch, thanks.
+
+>> +     /*
+>> +      * See if somebody else (such as the device core) has already
+>> +      * obtained a handle to the pinctrl for this device. In that case,
+>> +      * return another pointer to it.
+>> +      */
+>>       p = find_pinctrl(dev);
+>> -     if (p != NULL)
+>> -             return ERR_PTR(-EBUSY);
+>
+> I deliberately returned an error here, because there's no reference
+> counting on the struct pinctrl objects. If a driver calls pinctrl_get(),
+> with the new code below, it will retrieve the same struct. If it later
+> calls pinctrl_put(), the put will immediately free the structure. This
+> will invalidate the pointers that reference it in struct device's pins
+> field.
+>
+> This issue will probably trigger on Tegra, since we at least have a
+> pinctrl-based I2C mux that calls pinctrl_get().
+
+OK I just introduced a reference counter using <linux/kref.h>.
+
+I've retested on U300 and U8500.
+
+Yours,
+Linus Walleij
