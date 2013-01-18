@@ -1,75 +1,112 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 18 Jan 2013 14:17:04 +0200
-Subject: [PATCH v8 01/22] USB: ehci-omap: Don't free gpios that we didn't
- request
+Date: Fri, 18 Jan 2013 14:17:15 +0200
+Subject: [PATCH v8 12/22] mfd: omap-usb-host: Use devm_kzalloc() and
+ devm_request_and_ioremap()
 In-Reply-To: <1358511445-26656-1-git-send-email-rogerq@ti.com>
 References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
-Message-ID: <1358511445-26656-2-git-send-email-rogerq@ti.com>
+Message-ID: <1358511445-26656-13-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver does not request any gpios so don't free them.
-Fixes L3 bus error on multiple modprobe/rmmod of ehci_hcd
-with ehci-omap in use.
-
-Without this patch, EHCI will break on repeated insmod/rmmod
-of ehci_hcd for all OMAP2+ platforms that use EHCI and
-set 'phy_reset = true' in usbhs_omap_board_data.
-i.e.
-
-board-3430sdp.c:	.phy_reset  = true,
-board-3630sdp.c:	.phy_reset  = true,
-board-am3517crane.c:	.phy_reset  = true,
-board-am3517evm.c:	.phy_reset  = true,
-board-cm-t3517.c:	.phy_reset  = true,
-board-cm-t35.c:	.phy_reset  = true,
-board-devkit8000.c:	.phy_reset  = true,
-board-igep0020.c:	.phy_reset = true,
-board-igep0020.c:	.phy_reset = true,
-board-omap3beagle.c:	.phy_reset  = true,
-board-omap3evm.c:	.phy_reset  = true,
-board-omap3pandora.c:	.phy_reset  = true,
-board-omap3stalker.c:	.phy_reset = true,
-board-omap3touchbook.c:	.phy_reset  = true,
-board-omap4panda.c:	.phy_reset  = false,
-board-overo.c:	.phy_reset  = true,
-board-zoom.c:	.phy_reset		= true,
-
-CC: Alan Stern <stern@rowland.harvard.edu>
-Cc: stable at kernel.org
+Use devm_ variants of kzalloc and ioremap. Also clean up error path.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 Reviewed-by: Felipe Balbi <balbi@ti.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/host/ehci-omap.c |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
+ drivers/mfd/omap-usb-host.c |   38 +++++++++++---------------------------
+ 1 files changed, 11 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index ac17a7c..e9d9b09 100644
---- a/drivers/usb/host/ehci-omap.c
-+++ b/drivers/usb/host/ehci-omap.c
-@@ -288,7 +288,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
- {
- 	struct device *dev				= &pdev->dev;
- 	struct usb_hcd *hcd				= dev_get_drvdata(dev);
--	struct ehci_hcd_omap_platform_data *pdata	= dev->platform_data;
+diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+index 061366d..310aaa9 100644
+--- a/drivers/mfd/omap-usb-host.c
++++ b/drivers/mfd/omap-usb-host.c
+@@ -461,15 +461,20 @@ static int usbhs_omap_probe(struct platform_device *pdev)
  
- 	usb_remove_hcd(hcd);
- 	disable_put_regulator(dev->platform_data);
-@@ -298,13 +297,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
- 	pm_runtime_put_sync(dev);
- 	pm_runtime_disable(dev);
+ 	if (!pdata) {
+ 		dev_err(dev, "Missing platform data\n");
+-		ret = -ENOMEM;
+-		goto end_probe;
++		return -ENODEV;
+ 	}
  
--	if (pdata->phy_reset) {
--		if (gpio_is_valid(pdata->reset_gpio_port[0]))
--			gpio_free(pdata->reset_gpio_port[0]);
--
--		if (gpio_is_valid(pdata->reset_gpio_port[1]))
--			gpio_free(pdata->reset_gpio_port[1]);
+-	omap = kzalloc(sizeof(*omap), GFP_KERNEL);
++	omap = devm_kzalloc(dev, sizeof(*omap), GFP_KERNEL);
+ 	if (!omap) {
+ 		dev_err(dev, "Memory allocation failed\n");
+-		ret = -ENOMEM;
+-		goto end_probe;
++		return -ENOMEM;
++	}
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "uhh");
++	omap->uhh_base = devm_request_and_ioremap(dev, res);
++	if (!omap->uhh_base) {
++		dev_err(dev, "Resource request/ioremap failed\n");
++		return -EADDRNOTAVAIL;
+ 	}
+ 
+ 	spin_lock_init(&omap->lock);
+@@ -568,20 +573,6 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+ 				"failed error:%d\n", ret);
+ 	}
+ 
+-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "uhh");
+-	if (!res) {
+-		dev_err(dev, "UHH EHCI get resource failed\n");
+-		ret = -ENODEV;
+-		goto err_init_60m_fclk;
 -	}
- 	return 0;
+-
+-	omap->uhh_base = ioremap(res->start, resource_size(res));
+-	if (!omap->uhh_base) {
+-		dev_err(dev, "UHH ioremap failed\n");
+-		ret = -ENOMEM;
+-		goto err_init_60m_fclk;
+-	}
+-
+ 	platform_set_drvdata(pdev, omap);
+ 
+ 	omap_usbhs_init(dev);
+@@ -591,13 +582,10 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+ 		goto err_alloc;
+ 	}
+ 
+-	goto end_probe;
++	return 0;
+ 
+ err_alloc:
+ 	omap_usbhs_deinit(&pdev->dev);
+-	iounmap(omap->uhh_base);
+-
+-err_init_60m_fclk:
+ 	clk_put(omap->init_60m_fclk);
+ 
+ err_usbhost_p2_fck:
+@@ -621,9 +609,7 @@ err_utmi_p1_fck:
+ err_end:
+ 	clk_put(omap->ehci_logic_fck);
+ 	pm_runtime_disable(dev);
+-	kfree(omap);
+ 
+-end_probe:
+ 	return ret;
  }
  
+@@ -638,7 +624,6 @@ static int usbhs_omap_remove(struct platform_device *pdev)
+ 	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
+ 
+ 	omap_usbhs_deinit(&pdev->dev);
+-	iounmap(omap->uhh_base);
+ 	clk_put(omap->init_60m_fclk);
+ 	clk_put(omap->usbhost_p2_fck);
+ 	clk_put(omap->usbhost_p1_fck);
+@@ -648,7 +633,6 @@ static int usbhs_omap_remove(struct platform_device *pdev)
+ 	clk_put(omap->utmi_p1_fck);
+ 	clk_put(omap->ehci_logic_fck);
+ 	pm_runtime_disable(&pdev->dev);
+-	kfree(omap);
+ 
+ 	return 0;
+ }
 -- 
 1.7.4.1
