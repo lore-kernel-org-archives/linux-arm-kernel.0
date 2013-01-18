@@ -1,61 +1,86 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 18 Jan 2013 14:17:10 +0200
-Subject: [PATCH v8 07/22] mfd: omap-usb-tll: Check for missing platform data
- in probe
+Date: Fri, 18 Jan 2013 14:17:11 +0200
+Subject: [PATCH v8 08/22] mfd: omap-usb-tll: Fix error message
 In-Reply-To: <1358511445-26656-1-git-send-email-rogerq@ti.com>
 References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
-Message-ID: <1358511445-26656-8-git-send-email-rogerq@ti.com>
+Message-ID: <1358511445-26656-9-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need to check for missing platform data in runtime_suspend/resume
-as it makes more sense to do it in the probe function.
+omap_enable/disable_tll() can fail if TLL device is not
+initialized. It could be due to multiple reasons and not only
+due to missing platform data.
+
+Also make local variables static and use 'struct device *'
+instead of 'struct platform_device *' for global reference.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 Reviewed-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/mfd/omap-usb-tll.c |   15 +++++----------
- 1 files changed, 5 insertions(+), 10 deletions(-)
+ drivers/mfd/omap-usb-tll.c |   21 ++++++++++++---------
+ 1 files changed, 12 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
-index 6a43391..0e68c8a 100644
+index 0e68c8a..81d2cac 100644
 --- a/drivers/mfd/omap-usb-tll.c
 +++ b/drivers/mfd/omap-usb-tll.c
-@@ -225,6 +225,11 @@ static int usbtll_omap_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
+@@ -109,8 +109,8 @@ struct usbtll_omap {
  
-+	if (!pdata) {
-+		dev_err(dev, "Platform data missing\n");
-+		return -ENODEV;
-+	}
+ /*-------------------------------------------------------------------------*/
+ 
+-const char usbtll_driver_name[] = USBTLL_DRIVER_NAME;
+-struct platform_device	*tll_pdev;
++static const char usbtll_driver_name[] = USBTLL_DRIVER_NAME;
++static struct device	*tll_dev;
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+@@ -337,7 +337,8 @@ static int usbtll_omap_probe(struct platform_device *pdev)
+ 
+ 	spin_unlock_irqrestore(&tll->lock, flags);
+ 	pm_runtime_put_sync(dev);
+-	tll_pdev = pdev;
++	/* only after this can omap_tll_enable/disable work */
++	tll_dev = dev;
+ 
+ 	return 0;
+ 
+@@ -359,6 +360,8 @@ static int usbtll_omap_remove(struct platform_device *pdev)
+ 	struct usbtll_omap *tll = platform_get_drvdata(pdev);
+ 	int i;
+ 
++	tll_dev = NULL;
 +
- 	spin_lock_init(&tll->lock);
+ 	for (i = 0; i < tll->nch; i++)
+ 		clk_put(tll->ch_clk[i]);
  
- 	tll->pdata = pdata;
-@@ -370,11 +375,6 @@ static int usbtll_runtime_resume(struct device *dev)
+@@ -438,21 +441,21 @@ static struct platform_driver usbtll_omap_driver = {
  
- 	dev_dbg(dev, "usbtll_runtime_resume\n");
+ int omap_tll_enable(void)
+ {
+-	if (!tll_pdev) {
+-		pr_err("missing omap usbhs tll platform_data\n");
++	if (!tll_dev) {
++		pr_err("%s: OMAP USB TLL not initialized\n", __func__);
+ 		return  -ENODEV;
+ 	}
+-	return pm_runtime_get_sync(&tll_pdev->dev);
++	return pm_runtime_get_sync(tll_dev);
+ }
+ EXPORT_SYMBOL_GPL(omap_tll_enable);
  
--	if (!pdata) {
--		dev_dbg(dev, "missing platform_data\n");
--		return  -ENODEV;
--	}
--
- 	spin_lock_irqsave(&tll->lock, flags);
+ int omap_tll_disable(void)
+ {
+-	if (!tll_pdev) {
+-		pr_err("missing omap usbhs tll platform_data\n");
++	if (!tll_dev) {
++		pr_err("%s: OMAP USB TLL not initialized\n", __func__);
+ 		return  -ENODEV;
+ 	}
+-	return pm_runtime_put_sync(&tll_pdev->dev);
++	return pm_runtime_put_sync(tll_dev);
+ }
+ EXPORT_SYMBOL_GPL(omap_tll_disable);
  
- 	for (i = 0; i < tll->nch; i++) {
-@@ -406,11 +406,6 @@ static int usbtll_runtime_suspend(struct device *dev)
- 
- 	dev_dbg(dev, "usbtll_runtime_suspend\n");
- 
--	if (!pdata) {
--		dev_dbg(dev, "missing platform_data\n");
--		return  -ENODEV;
--	}
--
- 	spin_lock_irqsave(&tll->lock, flags);
- 
- 	for (i = 0; i < tll->nch; i++) {
 -- 
 1.7.4.1
