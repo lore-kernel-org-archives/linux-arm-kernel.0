@@ -1,31 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 18 Jan 2013 20:26:23 +0100
-Subject: [PATCH 3/7] ARM: pinctrl: sunxi: Add the pinctrl pin set for sun5i
-In-Reply-To: <1357681398-23956-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1357681398-23956-1-git-send-email-maxime.ripard@free-electrons.com>
- <1357681398-23956-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdZAXeMU=HXf36C6+737+8+fYkfcxSZqYc=Wp095aboOUA@mail.gmail.com>
+Date: Fri, 18 Jan 2013 20:30:33 +0100
+Subject: [PATCH] pinctrl: mvebu: fix MPP6 value for kirkwood driver
+In-Reply-To: <1357681024-4686-1-git-send-email-simon.guinot@sequanux.org>
+References: <1357681024-4686-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <CACRpkdZC9-YkYs40h=PHO4Q6ZoQ9aZgm0oOwNGF=YaNc5w9T_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 8, 2013 at 10:43 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Tue, Jan 8, 2013 at 10:37 PM, Simon Guinot <simon.guinot@sequanux.org> wrote:
 
-> Since the Allwinner SoCs variants don't have the same set of pins to
-> handle, we need to declare the pin ranges available.
+> Note that I am not sure about the MPP value for the PTP functionality.
+> It seems that the PTP references have been removed from the Marvell
+> hardware specifications available to me.
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-(...)
->  static struct of_device_id sunxi_pinctrl_match[] __devinitconst = {
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
 
-I think __devinitconst is also deprecated.
+Applied with Jason's and Andrew's ACKs!
 
-> +       { .compatible = "allwinner,sun5i-a13-pinctrl", .data = (void *)&sun5i_a13_pinctrl_data },
->         {}
->  };
->  MODULE_DEVICE_TABLE(of, sunxi_pinctrl_match);
-
-Aha so the match table is in the subdrivers, hm.... OK.
-
-Yours,
+Thanks!
 Linus Walleij
