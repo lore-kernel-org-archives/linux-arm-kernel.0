@@ -1,49 +1,25 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Fri, 18 Jan 2013 11:28:43 +0530
-Subject: [PATCH] ARM: tegra: DTS: whistler: enable keyboard
-Message-ID: <1358488723-23184-1-git-send-email-ldewangan@nvidia.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 17 Jan 2013 22:28:46 -0800 (PST)
+Subject: [PATCH] ARM: shmobile: armadillo800eva: set clock rates before
+ timer init
+In-Reply-To: <1358485325-19673-1-git-send-email-hdk@igel.co.jp>
+References: <1358485325-19673-1-git-send-email-hdk@igel.co.jp>
+Message-ID: <87r4lj9f8l.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable tegra based keyboard controller and populate the key mapping
-for whistler.
 
-With this patch, HOME, BACK, POWER and MENU keys will work.
-Still other keys which are in ROW3 and ROW4 will not work as it
-conflicts with KBC pins on SDIO2 pinmux.
+> Previously clock rates were set after initialization of timer.
+> Therefore the timer used the default extal1 clock rate (25MHz)
+> instead of the correct rate for this board (24MHz).
+> 
+> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
+> ---
+>  arch/arm/mach-shmobile/board-armadillo800eva.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+Best regards
 ---
-Stephen,
-Not tested the change but I reviewed all possible configuration like pinmux and
-the parameter as per the downstream.
-Request you to give a try.
-
- arch/arm/boot/dts/tegra20-whistler.dts |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
-index 5836ad6..b8e0ee1 100644
---- a/arch/arm/boot/dts/tegra20-whistler.dts
-+++ b/arch/arm/boot/dts/tegra20-whistler.dts
-@@ -520,6 +520,18 @@
- 		bus-width = <8>;
- 	};
- 
-+	kbc {
-+		status = "okay";
-+		nvidia,debounce-delay-ms = <20>;
-+		nvidia,repeat-delay-ms = <160>;
-+		nvidia,kbc-row-pins = <0 1 2>;
-+		nvidia,kbc-col-pins = <16 17>;
-+		linux,keymap = <0x00000074	/* KEY_POWER */
-+				0x01000066	/* KEY_HOME */
-+				0x0101009E	/* KEY_BACK */
-+				0x0201008B>;	/* KEY_MENU */
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
--- 
-1.7.1.1
+Kuninori Morimoto
