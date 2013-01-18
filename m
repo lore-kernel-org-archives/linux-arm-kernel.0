@@ -1,41 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Jan 2013 22:30:37 +0100
-Subject: [PATCH 5/7] ARM: sunxi: Add uart1 pinctrl groups
+Date: Fri, 18 Jan 2013 22:30:38 +0100
+Subject: [PATCH 6/7] tty: of_serial: Add pinctrl support
 In-Reply-To: <1358544639-14761-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1358544639-14761-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1358544639-14761-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1358544639-14761-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use pinctrl to configure the SoCs pins directly from the driver.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a13.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/tty/serial/of_serial.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 707bef5..e112189 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -24,6 +24,20 @@
- 			reg = <0x01c20800 0x400>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+index e7cae1c..e9f3289 100644
+--- a/drivers/tty/serial/of_serial.c
++++ b/drivers/tty/serial/of_serial.c
+@@ -13,6 +13,7 @@
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/delay.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/serial_core.h>
+ #include <linux/serial_8250.h>
+ #include <linux/serial_reg.h>
+@@ -57,6 +58,7 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
+ 			struct of_serial_info *info)
+ {
+ 	struct resource resource;
++	struct pinctrl *pinctrl;
+ 	struct device_node *np = ofdev->dev.of_node;
+ 	u32 clk, spd, prop;
+ 	int ret;
+@@ -85,6 +87,11 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
+ 		goto out;
+ 	}
+ 
++	pinctrl = devm_pinctrl_get_select_default(&ofdev->dev);
++	if (IS_ERR(pinctrl))
++		dev_warn(&ofdev->dev,
++			"pins are not configured from the driver\n");
 +
-+			uart1_pins_a: uart1 at 0 {
-+				allwinner,pins = "PE10", "PE11";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			uart1_pins_b: uart1 at 1 {
-+				allwinner,pins = "PG3", "PG4";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
- 		};
- 	};
- };
+ 	spin_lock_init(&port->lock);
+ 	port->mapbase = resource.start;
+ 
 -- 
 1.7.10.4
