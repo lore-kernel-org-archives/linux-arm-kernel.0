@@ -1,17 +1,32 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 18 Jan 2013 18:58:54 +0530
-Subject: [PATCH] ARM: arch_timer: Don't expect both secure and nonsecure
- PPI IRQ info
-In-Reply-To: <50F94A88.1070209@arm.com>
-References: <1358511830-7909-1-git-send-email-rnayak@ti.com>
- <50F94A88.1070209@arm.com>
-Message-ID: <50F94E16.5080808@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 18 Jan 2013 15:20:43 +0100
+Subject: [PATCH 0/3] Kirkwoode cpufreq driver
+Message-ID: <1358518846-16251-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 January 2013 06:43 PM, Marc Zyngier wrote:
-> I think the real fix should be to make all the interrupts mandatory in
-> the DT (they do exist in the HW), and make the code less tolerant of
-> broken DTs.
+This patchset adds a cpufreq driver for Marvell Kirkwood SoCs.
 
-Got it, thanks Mark. Time for me to go fix the OMAP5 broken DT then.
+The changes to kirkwood_defconfig enable it and set the default
+governor to ondemand.
+
+Andrew Lunn (3):
+  cpufreq: kirkwood: Add a cpufreq driver for Marvell Kirkwood SoCs
+  arm: kirkwood: Instantiate cpufreq driver
+  arm: kirkwood: Enable cpufreq and ondemand on kirkwood_defconfig
+
+ arch/arm/Kconfig                                  |    1 +
+ arch/arm/configs/kirkwood_defconfig               |    3 +
+ arch/arm/mach-kirkwood/board-dt.c                 |    3 +-
+ arch/arm/mach-kirkwood/common.c                   |   23 ++
+ arch/arm/mach-kirkwood/common.h                   |    2 +
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    2 +
+ drivers/clk/mvebu/clk-gating-ctrl.c               |    1 +
+ drivers/cpufreq/Kconfig.arm                       |    6 +
+ drivers/cpufreq/Makefile                          |    1 +
+ drivers/cpufreq/kirkwood-cpufreq.c                |  273 +++++++++++++++++++++
+ 10 files changed, 314 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/cpufreq/kirkwood-cpufreq.c
+
+-- 
+1.7.10.4
