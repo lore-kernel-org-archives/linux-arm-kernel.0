@@ -1,48 +1,105 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 17 Jan 2013 19:33:34 -0800
-Subject: [PATCH v2] arch/arm/mach-s5pv210: adding ifdef
- CONFIG_CPU_S5PV210to fix compiling issue
-In-Reply-To: <20130118011846.3CEE21840258@intranet.asianux.com>
-References: <001c01cdf510$c89c9800$59d5c800$@samsung.com>
- <20130118011846.3CEE21840258@intranet.asianux.com>
-Message-ID: <009801cdf52c$99adc200$cd094600$@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 17 Jan 2013 21:34:45 -0600
+Subject: [PATCH 2/3] ARM: convert platform hotplug inline assembly to
+ C
+In-Reply-To: <alpine.LFD.2.02.1301171038590.6300@xanadu.home>
+References: <1358391205-23943-1-git-send-email-robherring2@gmail.com>
+ <1358391205-23943-2-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1301162338420.6300@xanadu.home> <50F8082F.1050906@gmail.com>
+ <alpine.LFD.2.02.1301171038590.6300@xanadu.home>
+Message-ID: <50F8C2D5.4070405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chen,Gang( ??) wrote:
+On 01/17/2013 09:42 AM, Nicolas Pitre wrote:
+> On Thu, 17 Jan 2013, Rob Herring wrote:
 > 
+>> On 01/16/2013 10:40 PM, Nicolas Pitre wrote:
+>>> On Wed, 16 Jan 2013, Rob Herring wrote:
+>>>
+>>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>>
+>>>> With the addition of set_auxcr/get_auxcr, all the hotplug inline assembly
+>>>> code for exynos, imx, realview, spear13xx and vexpress can be converted to
+>>>> C code.
+>>>
+>>> That might not be all safe.  Please see
+>>> http://article.gmane.org/gmane.linux.ports.arm.kernel/209584
+>>
+>> Other than the OR/AND operations, it's all just inline assembly
+>> functions that are called, so it gets compiled to the same code. Perhaps
+>> I should put noinline on the functions so they stay of limited
+>> complexity. If you don't think doing this in C is okay, then there is
+>> probably no point in having the set_auxcr/get_auxcr functions.
 > 
-> > For subject:
-> > Please see the git log before your commit, it should be helpful to you.
-> > In this case, 'ARM: S5PV210: ...' is used.
+> I think set_auxcr/get_auxcr is fine.
 > 
->   thank you, I should notice it next time.
->     an incorrect subject is not easy to get maintainer's notice
->     maybe it is the reason why you can not reply in time, since you can not notice it.
-> 
->   :-)
-> 
-Just I was busy ;-) sorry for late my reply.
+> But your patch goes beyond simply converting those.  You also converted 
+> the cache flush and disable from assembly to C, which on a Cortex A9 
+> might be unsafe if the stack is modified in the sequence according to 
+> the discussion I referenced.
 
-Anyway Gang, don't post with html typed e-mail, probably, you got some kind of error that your previous reply wasn't accepted from mailing list mail server. Please make sure that your e-mail is plain text type for mailing list.
+The referenced discussion is mainly for the A15, not the A9, right? It seems
+the sequences are a bit different. So this is the code for A9 (spear13xx):
 
-[...]
+	flush_cache_all();
+	__flush_icache_all();
+	dsb();
 
-> > I don't think so, because common.c in mach-s5pv210 should be built with
-> > selecting CONFIG_CPU_S5PV210, actually it depends on CONFIG_ARCH_S5PV210
-> > though.
-> > 
-> > Any concerns, please let me know.
-> 
->   ok, thank you.
->   and
->     is it suitable to delete the reletive code of  " define NULL in common.h for s5pv210_* "  ?
->     it seems they are wast.
-> 
-Yes, right. We don't need more that.  I missed it when I introduced common.[ch] local at the commit 3fa754c2. Thanks for pointing out and I will sort out.
+	/*
+	 * Turn off coherency
+	 */
+	set_auxcr(get_auxcr() & ~0x40);
+	set_cr(get_cr() & ~CR_C);
 
-[...]
+which generates this:
 
-Thanks.
+c027f36c:       ebf648d2        bl      c00116bc <v7_flush_kern_cache_all>
+c027f370:       e3a03000        mov     r3, #0
+c027f374:       ee073f11        mcr     15, 0, r3, cr7, cr1, {0}
+c027f378:       f57ff04f        dsb     sy
+c027f37c:       ee113f30        mrc     15, 0, r3, cr1, cr0, {1}
+c027f380:       e3c33040        bic     r3, r3, #64     ; 0x40
+c027f384:       ee013f30        mcr     15, 0, r3, cr1, cr0, {1}
+c027f388:       f57ff06f        isb     sy
+c027f38c:       ee113f10        mrc     15, 0, r3, cr1, cr0, {0}
+c027f390:       e3c33004        bic     r3, r3, #4
+c027f394:       ee013f10        mcr     15, 0, r3, cr1, cr0, {0}
+c027f398:       f57ff06f        isb     sy
+c027f39c:       e320f003        wfi
 
-- Kukjin
+v7_flush_kern_cache_all will generate stack accesses, but I didn't change that
+fact. The I cache invalidate changed from invalidate all to invalidate
+inner-shareable. I believe that should be equivalent. And the mcr version of
+dsb changed to a dsb instruction. Some isb's are inserted as well.
+
+So I don't follow your concern. You can't guarantee that the compiler wouldn't
+insert a data access in the middle, but then you could not guarantee that here
+either (exynos A15):
+
+        asm volatile(
+        "       mrc     p15, 0, %0, c1, c0, 0\n"
+        "       bic     %0, %0, %1\n"
+        "       mcr     p15, 0, %0, c1, c0, 0\n"
+          : "=&r" (v)
+          : "Ir" (CR_C)
+          : "cc");
+
+        flush_cache_louis();
+
+        asm volatile(
+        /*
+        * Turn off coherency
+        */
+        "       mrc     p15, 0, %0, c1, c0, 1\n"
+        "       bic     %0, %0, %1\n"
+        "       mcr     p15, 0, %0, c1, c0, 1\n"
+        : "=&r" (v)
+        : "Ir" (0x40)
+        : "cc");
+
+The only thing that guarantees this code works is flush_cache_louis does not
+touch the stack and you rely that compiler doesn't do anything like register
+save/restore around the function call.
+
+Rob
