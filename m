@@ -1,98 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 18 Jan 2013 11:35:44 +0800
-Subject: [PATCH 2/2] usb: chipidea: imx: Add system suspend/resume API
-In-Reply-To: <1358477428-2605-2-git-send-email-peter.chen@freescale.com>
-References: <1358477428-2605-1-git-send-email-peter.chen@freescale.com>
- <1358477428-2605-2-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130118033543.GB29282@S2101-09.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 17 Jan 2013 19:51:31 -0800
+Subject: [PATCH 5/5] ARM: exynos: enable/disable cpuidle when cpu1 is
+ down/up
+In-Reply-To: <50F551F3.2060400@linaro.org>
+References: <1357318799-24378-1-git-send-email-daniel.lezcano@linaro.org>
+ <1357318799-24378-5-git-send-email-daniel.lezcano@linaro.org>
+ <CADGdYn7y_SSmLoEpeRjL8PDSZS-YJwC1QpRcUocSSnDyM8BRhQ@mail.gmail.com>
+ <50EF3369.2060902@free.fr>
+ <CADGdYn4eRbkZt_Rshqg-a_CoAmF5LBobzT3=3h09syaH0z6uJA@mail.gmail.com>
+ <50F551F3.2060400@linaro.org>
+Message-ID: <00be01cdf52f$1bc907c0$535b1740$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 10:50:28AM +0800, Peter Chen wrote:
-> During the system suspend/resume procedure, the USB also
-> needs to go suspend/resume procedure, this patch adds
-> related APIs. It is tested at i.mx6q sabrelite. Meanwhile,
-> it fixes the bug that the USB will out of work after
-> system suspend/resume.
+Daniel Lezcano wrote:
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> On 01/10/2013 11:33 PM, amit daniel kachhap wrote:
+> > On Thu, Jan 10, 2013 at 1:32 PM, Daniel Lezcano <daniel.lezcano@free.fr>
+> wrote:
+> >> On 01/10/2013 09:07 PM, amit daniel kachhap wrote:
+> >>> Hi Daniel,
+> >>
+> >> Hi Amit Daniel,
+> >>
+> >>> This hotplug noifiers looks fine. I suppose it should add extra state
+> >>> C1 in cpu0. If it is done like below than for normal cases(when all
+> >>> cpu's are online) there wont be any statistics for C0 state
+> >>
+> >> I guess you meant state 0 which is WFI, right ?
+> >> C0 state is the intel semantic for cpu fully turned on.
+> > Yes I meant C0 as wfi
+> >>
+> >>> also which
+> >>> is required. Other patches look good.
+> >>
+> >> Ok, that makes sense to have statistics even if they are only doing WFI.
+> >>
+> >> Then the patch 4/5 is not ok, no ?
+> > yes I suppose patch 4 and patch 5 are related and depends how you
+> > frame patch 5. I think it is better to create C0/C1 sysfs and other
+> > things in the beginning because it is a filesystem call and may
+> > increase the cpu hotplug time which is not worth. May be if cpuidle
+> > framework exposes some API to enable/disable states then it is better.
+> >
+> > For patch 1,2 and 3,
+> > Acked-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> 
+> Hi Kukjin,
+> 
+> is it possible to take these patches [1-3/5] ?
+> 
+Looks OK to me, I will apply with Amit's ack.
 
-Haven't reviewed the patches, but I've seen the series fix an imx6q
-USB issue - the USB will be broken after system suspend/resume
-operation as below.  So for both patches,
+> The patches [3-4/5] could be ignored.
+> 
+Probably, you mean [4-5/5] :-)
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+Thanks.
 
-Shawn
-
-$ echo mem > /sys/power/state
-PM: Syncing filesystems ... done.
-PM: Preparing system for mem sleep
-mmc0: card a8a5 removed
-mmc1: card b368 removed
-Freezing user space processes ... (elapsed 0.01 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
-PM: Entering mem sleep
-fec_stop : Graceful transmit stop did not complete !
-PM: suspend of devices complete after 14.490 msecs
-PM: suspend devices took 0.020 seconds
-PM: late suspend of devices complete after 1.645 msecs
-PM: noirq suspend of devices complete after 2.432 msecs
-Disabling non-boot CPUs ...
-CPU1: shutdown
-CPU2: shutdown
-CPU3: shutdown
-Enabling non-boot CPUs ...
-CPU1: Booted secondary processor
-CPU1 is up
-CPU2: Booted secondary processor
-CPU2 is up
-CPU3: Booted secondary processor
-CPU3 is up
-PM: noirq resume of devices complete after 1.217 msecs
-PM: early resume of devices complete after 1.590 msecs
-hub 2-1:1.0: hub_port_status failed (err = -71)
-hub 2-1:1.0: hub_port_status failed (err = -71)
-hub 2-1:1.0: hub_port_status failed (err = -71)
-PM: resume of devices complete after 70.677 msecs
-PM: resume devices took 0.080 seconds
-PM: Finishing wakeup.
-Restarting tasks ... done.
-mmc0: new high speed SDHC card at address a8a5
-mmcblk0: mmc0:a8a5 SD04G 3.69 GiB
- mmcblk0: p1 p2 p3
-mmc1: SD Status: Invalid Allocation Unit size.
-mmc1: card lacks mandatory switch function, performance might suffer.
-mmc1: new SD card at address b368
-mmcblk1: mmc1:b368 MS    121 MiB
- mmcblk1: p1
-root at freescale ~$ ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-hub 2-0:1.0: Cannot enable port 1.  Maybe the USB cable is bad?
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-hub 2-0:1.0: Cannot enable port 1.  Maybe the USB cable is bad?
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-hub 2-0:1.0: Cannot enable port 1.  Maybe the USB cable is bad?
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-ci_hdrc ci_hdrc.1: port 1 reset error -110
-hub 2-0:1.0: Cannot enable port 1.  Maybe the USB cable is bad?
-hub 2-1:1.0: hub_port_status failed (err = -19)
-hub 2-1:1.0: hub_port_status failed (err = -19)
-hub 2-1:1.0: hub_port_status failed (err = -19)
-hub 2-1:1.0: activate --> -19
-usb 2-1: USB disconnect, device number 2
-...
+- Kukjin
