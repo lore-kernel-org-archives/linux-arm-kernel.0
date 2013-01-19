@@ -1,87 +1,52 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 19 Jan 2013 19:02:56 +1300
-Subject: [PATCH 3/4] video: vt8500: Remove unused
- platform_data/video-vt8500lcdfb.h
+Date: Sat, 19 Jan 2013 19:02:57 +1300
+Subject: [PATCH 4/4] video: vt8500: Update descriptions in video/Kconfig
 In-Reply-To: <1358575377-26364-1-git-send-email-linux@prisktech.co.nz>
 References: <1358575377-26364-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1358575377-26364-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1358575377-26364-5-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the conversion to devicetree only for arch-vt8500, this
-header is no longer required. This patch removes the #include
-from the two framebuffer drivers that used it, and the header file.
+This patch updates the descriptions for the VIA VT8500 and
+Wondermedia WM8xxx-series framebuffer drivers to correctly reflect
+which hardware they support.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- drivers/video/vt8500lcdfb.c                     |    2 --
- drivers/video/wm8505fb.c                        |    2 --
- include/linux/platform_data/video-vt8500lcdfb.h |   31 -----------------------
- 3 files changed, 35 deletions(-)
- delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
+ drivers/video/Kconfig |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
-index d8cc1f6..1c34821 100644
---- a/drivers/video/vt8500lcdfb.c
-+++ b/drivers/video/vt8500lcdfb.c
-@@ -30,8 +30,6 @@
- #include <linux/platform_device.h>
- #include <linux/wait.h>
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 6678daf..3bbb3c1 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -1767,7 +1767,7 @@ config FB_AU1200
+ 	  option au1200fb:panel=<name>.
  
--#include <linux/platform_data/video-vt8500lcdfb.h>
--
- #include "vt8500lcdfb.h"
+ config FB_VT8500
+-	bool "VT8500 LCD Driver"
++	bool "VIA VT8500 Framebuffer Driver"
+ 	depends on (FB = y) && ARM && ARCH_VT8500
+ 	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
+@@ -1777,14 +1777,15 @@ config FB_VT8500
+ 	  controller.
  
- #ifdef CONFIG_FB_WMT_GE_ROPS
-diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
-index dd28c26..8c8c129 100644
---- a/drivers/video/wm8505fb.c
-+++ b/drivers/video/wm8505fb.c
-@@ -32,8 +32,6 @@
- #include <linux/of_fdt.h>
- #include <linux/memblock.h>
+ config FB_WM8505
+-	bool "WM8505 frame buffer support"
++	bool "Wondermedia WM8xxx-series framebuffer support"
+ 	depends on (FB = y) && ARM && ARCH_VT8500
+ 	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_IMAGEBLIT
+ 	help
+-	  This is the framebuffer driver for WonderMedia WM8505/WM8650
+-	  integrated LCD controller.
++	  This is the framebuffer driver for WonderMedia WM8xxx-series
++	  integrated LCD controller. This driver covers the WM8505, WM8650
++	  and WM8850 SoCs.
  
--#include <linux/platform_data/video-vt8500lcdfb.h>
--
- #include "wm8505fb_regs.h"
- 
- #ifdef CONFIG_FB_WMT_GE_ROPS
-diff --git a/include/linux/platform_data/video-vt8500lcdfb.h b/include/linux/platform_data/video-vt8500lcdfb.h
-deleted file mode 100644
-index 7f399c3..0000000
---- a/include/linux/platform_data/video-vt8500lcdfb.h
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/*
-- *  VT8500/WM8505 Frame Buffer platform data definitions
-- *
-- *  Copyright (C) 2010 Ed Spiridonov <edo.rus@gmail.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#ifndef _VT8500FB_H
--#define _VT8500FB_H
--
--#include <linux/fb.h>
--
--struct vt8500fb_platform_data {
--	struct fb_videomode	mode;
--	u32			xres_virtual;
--	u32			yres_virtual;
--	u32			bpp;
--	unsigned long		video_mem_phys;
--	void			*video_mem_virt;
--	unsigned long		video_mem_len;
--};
--
--#endif /* _VT8500FB_H */
+ config FB_WMT_GE_ROPS
+ 	bool "VT8500/WM8xxx accelerated raster ops support"
 -- 
 1.7.9.5
