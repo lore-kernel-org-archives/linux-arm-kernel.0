@@ -1,127 +1,58 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 19 Jan 2013 12:21:47 +0800
-Subject: [PATCH v2 3/9] ARM: PRIMA2: initialize l2x0 according to mach
- from DT
-In-Reply-To: <20130116120318.GD10218@e106331-lin.cambridge.arm.com>
-References: <1358315610-25001-1-git-send-email-Barry.Song@csr.com>
- <1358315610-25001-3-git-send-email-Barry.Song@csr.com>
- <20130116120318.GD10218@e106331-lin.cambridge.arm.com>
-Message-ID: <CAGsJ_4wXRsaX99NQNYPAqAc-9TpzXNpDB0X6y9D18ka4szPMAw@mail.gmail.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 18 Jan 2013 23:37:25 -0500
+Subject: Compilation problem with drivers/staging/zsmalloc when !SMP on ARM
+In-Reply-To: <20130118214527.GA913@kroah.com>
+References: <CAKGA1b=ACTQHo9=B7EAG5nrFCO9u-J+sy7dXtYk3Rk6OUcW3cQ@mail.gmail.com>
+ <20130118210859.GH23505@n2100.arm.linux.org.uk>
+ <20130118214527.GA913@kroah.com>
+Message-ID: <20130119043725.GB5391@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Fri, Jan 18, 2013 at 01:45:27PM -0800, Greg Kroah-Hartman wrote:
+> On Fri, Jan 18, 2013 at 09:08:59PM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Jan 18, 2013 at 02:24:15PM -0600, Matt Sealey wrote:
+> > > Hello all,
+> > > 
+> > > I wonder if anyone can shed some light on this linking problem I have
+> > > right now. If I configure my kernel without SMP support (it is a very
+> > > lean config for i.MX51 with device tree support only) I hit this error
+> > > on linking:
+> > 
+> > Yes, I looked at this, and I've decided that I will _not_ fix this export,
+> > neither will I accept a patch to add an export.
+> > 
+> > As far as I can see, this code is buggy in a SMP environment.  There's
+> > apparantly no guarantee that:
+> > 
+> > 1. the mapping will be created on a particular CPU.
+> > 2. the mapping will then be used only on this specific CPU.
+> > 3. no guarantee that another CPU won't speculatively prefetch from this
+> >    region.
 
-2013/1/16 Mark Rutland <mark.rutland@arm.com>:
-> On Wed, Jan 16, 2013 at 05:53:29AM +0000, Barry Song wrote:
->> From: Barry Song <Baohua.Song@csr.com>
->>
->> prima2 and marco have diffetent l2 cache configuration, so
->> we initialize l2x0 cache based on dtb given to kernel.
->>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> ---
->>  arch/arm/mach-prima2/l2x0.c |   29 ++++++++++++++++++++++++-----
->>  1 files changed, 24 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
->> index c998377..e41ecd2 100644
->> --- a/arch/arm/mach-prima2/l2x0.c
->> +++ b/arch/arm/mach-prima2/l2x0.c
->> @@ -11,19 +11,38 @@
->>  #include <linux/of.h>
->>  #include <asm/hardware/cache-l2x0.h>
->>
->> -static struct of_device_id prima2_l2x0_ids[]  = {
->> -     { .compatible = "sirf,prima2-pl310-cache" },
->> +struct l2x0_aux
->> +{
->> +     u32 val;
->> +     u32 mask;
->> +};
->> +
->> +static struct l2x0_aux prima2_l2x0_aux __initconst = {
->> +     0x40000,
->> +     0,
->> +};
->
-> That 0x40000 is a bit opaque. Now would be a good time to make it a bit more
-> legible. Am I right in saying that's (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) ?
->
-> It'd also be nice if you used designated initializers:
->
-> static struct l2x0_aux prima2_l2x0_aux __initconst = {
->         .val    = (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT),
->         .mask   = 0,
-> };
+I thought the code had per_cpu for it - so that you wouldn't do that unless
+you really went out the way to do it.
 
-good. and make prima2 have consistent style with marco.
+> > 4. when the mapping is torn down, no guarantee that it's the same CPU that
+> >    used the happing.
 
->
->> +
->> +static struct l2x0_aux marco_l2x0_aux __initconst = {
->> +     (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
->> +             (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT),
->> +     L2X0_AUX_CTRL_MASK,
->> +};
->
-> And here too:
->
-> static struct l2x0_aux marco_l2x0_aux __initconst = {
->         .val    = (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
->                         (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT),
->         .mask   = L2X0_AUX_CTRL_MASK,
-> };
->
->> +
->> +static struct of_device_id sirf_l2x0_ids[] __initconst = {
->> +     { .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
->> +     { .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
->>       {},
->>  };
->
-> I took a look at of_match_node, and it seems that the first match found in an
-> of_match_table will be returned first, rather than finding the match earliest
-> in a device node's compatible list. This is somewhat counter-intuitive.
->
-> Therefore, the marco variant should be listed first, or it will get initialised
-> with the prima2 configuration values.
+With per_cpu that actually would be the case.
+> > 
+> > So, the use of the local TLB flush leaves all the other CPUs potentially
+> > containing TLB entries for this mapping.
 
-sorry. i don't get it.  do you mean .data(prima2_l2x0_aux) will be
-returned for marco?
+Right. That is the point of a local TLB flush.
+> > 
+> > Finally, there is no TODO file for this driver, which I believe is a
+> > requirement for anything to be in stable.  So as far as I can see, it
+> > should be deleted or a TODO file added.  I'm not sure why Greg decided
+> > to add it without a TODO file.
 
-here l2 node in matco.dts  without "sirf,prima2-pl310-cache"  will
-only have "sirf,marco-pl310-cache" and l2 node in prima2.dts without
-"sirf,marco-pl310-cache" will only have "sirf,prima2-pl310-cache"
+A TODO file can certainly be added and it is welcome.
+> 
+> I don't know, I'm cursing the day I took the whole zsmalloc, zcache,
+> zram mess that we have in the staging tree now.  People are working to
+> get them out of staging, which is good, but the churn involved is
+> driving me crazy.
 
->
->>
->>  static int __init sirfsoc_l2x0_init(void)
->>  {
->>       struct device_node *np;
->> +     const struct l2x0_aux *aux;
->>
->> -     np = of_find_matching_node(NULL, prima2_l2x0_ids);
->> +     np = of_find_matching_node(NULL, sirf_l2x0_ids);
->>       if (np) {
->> -             pr_info("Initializing prima2 L2 cache\n");
->> -             return l2x0_of_init(0x40000, 0);
->> +             aux = of_match_node(sirf_l2x0_ids, np)->data;
->> +             return l2x0_of_init(aux->val, aux->mask);
->>       }
->>
->>       return 0;
->> --
->> 1.7.5.4
->>
->>
->
-> With those changes:
->
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
->
-> Thanks,
-> Mark.
-
--barry
+Oh oh.
