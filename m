@@ -1,29 +1,43 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Sat, 19 Jan 2013 15:07:44 +0530
-Subject: [PATCH] ARM: tegra: DTS: seaboard: remove unnecessarily text
-Message-ID: <1358588264-1860-1-git-send-email-ldewangan@nvidia.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 19 Jan 2013 08:15:37 -0200
+Subject: [PATCH v2] video: Kconfig: Specify the SoCs that make use of FB_IMX
+Message-ID: <1358590537-5013-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is unnecessarily text in the keymap table. Removing this.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+FB_IMX is the framebuffer driver used by MX1, MX21, MX25 and MX27 processors.
+
+Pass this information to the Kconfig text to make it clear.
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/tegra20-seaboard.dts |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Shawn,
 
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index 2e87330..d4e4ff2 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -705,7 +705,7 @@
- 				0x0E030010	/* KEY_Q */
- 				0x0E04003E	/* KEY_F4 */
- 				0x0E05003D	/* KEY_F3 */
--				0x0E060002	/* KEY_1 */1
-+				0x0E060002	/* KEY_1 */
- 				0x0E070041	/* KEY_F7 */
+Could you get this one also via your tree?
+
+No response from the fb maintainer for months on this one.
+
+Changes since v1:
+- Add mx1/21 to the list.
+
+ drivers/video/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 0cff083..f0c53b2 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -364,7 +364,7 @@ config FB_SA1100
+ 	  Y here.
  
- 				0x0F000001	/* KEY_ESC */
+ config FB_IMX
+-	tristate "Freescale i.MX LCD support"
++	tristate "Freescale i.MX1/21/25/27 LCD support"
+ 	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
 -- 
-1.7.1.1
+1.7.9.5
