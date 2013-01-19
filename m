@@ -1,94 +1,46 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 19 Jan 2013 22:56:55 +0530
-Subject: [PATCH 5/5] ARM: dts: OMAP5: Specify nonsecure PPI IRQ for arch
- timer
-In-Reply-To: <e76a7048f02560a90f1e9cdc0181fd43@localhost>
-References: <1358523141-12295-1-git-send-email-santosh.shilimkar@ti.com>
- <1358523141-12295-6-git-send-email-santosh.shilimkar@ti.com>
- <50F97207.1030706@arm.com> <50F97FA4.9010608@ti.com>
- <50F98176.6070703@arm.com> <50F999AA.2020901@ti.com>
- <e76a7048f02560a90f1e9cdc0181fd43@localhost>
-Message-ID: <50FAD75F.9080205@ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sat, 19 Jan 2013 10:20:42 -0800
+Subject: [PATCH] of: fix incorrect return value of
+ of_find_matching_node_and_match()
+Message-ID: <1358619642-23607-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 19 January 2013 08:16 PM, Marc Zyngier wrote:
-> On Sat, 19 Jan 2013 00:21:22 +0530, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->> On Friday 18 January 2013 10:38 PM, Marc Zyngier wrote:
->>> On 18/01/13 17:00, Santosh Shilimkar wrote:
->>>> On Friday 18 January 2013 09:32 PM, Marc Zyngier wrote:
->>>>> On 18/01/13 15:32, Santosh Shilimkar wrote:
->>>>>> From: Rajendra Nayak <rnayak@ti.com>
->>>>>>
->>>>>> Specify both secure as well as nonsecure PPI IRQ for arch
->>>>>> timer. This fixes the following errors seen on DT OMAP5 boot..
->>>>>>
->>>>>> [    0.000000] arch_timer: No interrupt available, giving up
->>>>>>
->>>>>> Cc: Benoit Cousson <b-cousson@ti.com>
->>>>>>
->>>>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>> ---
->>>>>>     arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++----
->>>>>>     1 file changed, 12 insertions(+), 4 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/omap5.dtsi
->>>>>> b/arch/arm/boot/dts/omap5.dtsi
->>>>>> index 790bb2a..7a78d1b 100644
->>>>>> --- a/arch/arm/boot/dts/omap5.dtsi
->>>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
->>>>>> @@ -35,8 +35,12 @@
->>>>>>     			compatible = "arm,cortex-a15";
->>>>>>     			timer {
->>>>>>     				compatible = "arm,armv7-timer";
->>>>>> -				/* 14th PPI IRQ, active low level-sensitive */
->>>>>> -				interrupts = <1 14 0x308>;
->>>>>> +				/*
->>>>>> +				 * PPI secure/nonsecure IRQ,
->>>>>> +				 * active low level-sensitive
->>>>>> +				 */
->>>>>> +				interrupts = <1 13 0x308>,
->>>>>> +					     <1 14 0x308>;
->>>>>
->>>>> Care to add the virtual and HYP timer interrupts? So KVM can get a
->>>>> chance to run on this HW...
->>>>>
->>>> Thanks Marc for spotting it. Will take care of it.
->>>
->>> I just realised something silly... You have one timer node *per cpu*,
->>> and this is not really expected.
->>>
->> This was discussed on the list here [1]
->> Benoit suggested to add per CPU node since arch timer is per
->> CPU and DT should describe the hw the way it is. Did we miss
->> something ?
->
-> The current approach is not to duplicate banked resources. We do not have
-> duplicated twd-timer nodes on Cortex A9, we do not expose multiple CPU
-> interfaces for the GIC...
->
-Yes, I have observed that. The arch/twd timer DT extraction code doesn't
-expect per CPU DT node and on that basis only, initial patch was
-adding single timer node outside cpu node. Benoit comment was that
-the DT should describe the way hardware is and probably the DT
-extraction code should be updated accordingly.
+The of_find_matching_node_and_match() function incorrectly sets the matched
+entry to 'matches' when the compatible value of a node matches one of the
+possible values. This results in incorrectly selecting the the first entry in
+the 'matches' list as the matched entry. Fix this by noting down the result of
+the call to of_match_node() and setting that as the matched entry.
 
-> And speaking of the GIC: how do you interpret the CPU mask in the
-> interrupt field of the timer? The value 0x3xx in the third field is there
-> to indicate that CPU0 and CPU1 are getting interrupted by the timer. What
-> does it mean when you duplicate it?>          M.
->
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ drivers/of/base.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
->
-Here too I have to keep mask for both CPUs because of the current DT
-extraction code. I some how forgot to bring that discussion to your
-notice. I can update the DT files to go back to the single timer
-node if the plan is not to duplicate the per CPU resources.
-
-Benoit,
-Whats your take on it ?
-
-Regards
-Santosh
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 2390ddb..960ae5b 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -612,6 +612,7 @@ struct device_node *of_find_matching_node_and_match(struct device_node *from,
+ 					const struct of_device_id **match)
+ {
+ 	struct device_node *np;
++	const struct of_device_id *m;
+ 
+ 	if (match)
+ 		*match = NULL;
+@@ -619,9 +620,10 @@ struct device_node *of_find_matching_node_and_match(struct device_node *from,
+ 	read_lock(&devtree_lock);
+ 	np = from ? from->allnext : of_allnodes;
+ 	for (; np; np = np->allnext) {
+-		if (of_match_node(matches, np) && of_node_get(np)) {
++		m = of_match_node(matches, np);
++		if (m && of_node_get(np)) {
+ 			if (match)
+-				*match = matches;
++				*match = m;
+ 			break;
+ 		}
+ 	}
+-- 
+1.7.5.4
