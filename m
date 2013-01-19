@@ -1,59 +1,94 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 19 Jan 2013 17:24:29 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <201301172026.45514.arnd@arndb.de>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <201301171049.30415.arnd@arndb.de> <50F800EB.6040104@web.de>
- <201301172026.45514.arnd@arndb.de>
-Message-ID: <20130119162429.GB27825@lunn.ch>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 19 Jan 2013 22:56:55 +0530
+Subject: [PATCH 5/5] ARM: dts: OMAP5: Specify nonsecure PPI IRQ for arch
+ timer
+In-Reply-To: <e76a7048f02560a90f1e9cdc0181fd43@localhost>
+References: <1358523141-12295-1-git-send-email-santosh.shilimkar@ti.com>
+ <1358523141-12295-6-git-send-email-santosh.shilimkar@ti.com>
+ <50F97207.1030706@arm.com> <50F97FA4.9010608@ti.com>
+ <50F98176.6070703@arm.com> <50F999AA.2020901@ti.com>
+ <e76a7048f02560a90f1e9cdc0181fd43@localhost>
+Message-ID: <50FAD75F.9080205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 08:26:45PM +0000, Arnd Bergmann wrote:
-> On Thursday 17 January 2013, Soeren Moch wrote:
-> > On 17.01.2013 11:49, Arnd Bergmann wrote:
-> > > On Wednesday 16 January 2013, Soeren Moch wrote:
-> > >>>> I will see what I can do here. Is there an easy way to track the buffer
-> > >>>> usage without having to wait for complete exhaustion?
-> > >>>
-> > >>> DMA_API_DEBUG
-> > >>
-> > >> OK, maybe I can try this.
+On Saturday 19 January 2013 08:16 PM, Marc Zyngier wrote:
+> On Sat, 19 Jan 2013 00:21:22 +0530, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> On Friday 18 January 2013 10:38 PM, Marc Zyngier wrote:
+>>> On 18/01/13 17:00, Santosh Shilimkar wrote:
+>>>> On Friday 18 January 2013 09:32 PM, Marc Zyngier wrote:
+>>>>> On 18/01/13 15:32, Santosh Shilimkar wrote:
+>>>>>> From: Rajendra Nayak <rnayak@ti.com>
+>>>>>>
+>>>>>> Specify both secure as well as nonsecure PPI IRQ for arch
+>>>>>> timer. This fixes the following errors seen on DT OMAP5 boot..
+>>>>>>
+>>>>>> [    0.000000] arch_timer: No interrupt available, giving up
+>>>>>>
+>>>>>> Cc: Benoit Cousson <b-cousson@ti.com>
+>>>>>>
+>>>>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>>> ---
+>>>>>>     arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++----
+>>>>>>     1 file changed, 12 insertions(+), 4 deletions(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/omap5.dtsi
+>>>>>> b/arch/arm/boot/dts/omap5.dtsi
+>>>>>> index 790bb2a..7a78d1b 100644
+>>>>>> --- a/arch/arm/boot/dts/omap5.dtsi
+>>>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>>>>>> @@ -35,8 +35,12 @@
+>>>>>>     			compatible = "arm,cortex-a15";
+>>>>>>     			timer {
+>>>>>>     				compatible = "arm,armv7-timer";
+>>>>>> -				/* 14th PPI IRQ, active low level-sensitive */
+>>>>>> -				interrupts = <1 14 0x308>;
+>>>>>> +				/*
+>>>>>> +				 * PPI secure/nonsecure IRQ,
+>>>>>> +				 * active low level-sensitive
+>>>>>> +				 */
+>>>>>> +				interrupts = <1 13 0x308>,
+>>>>>> +					     <1 14 0x308>;
+>>>>>
+>>>>> Care to add the virtual and HYP timer interrupts? So KVM can get a
+>>>>> chance to run on this HW...
+>>>>>
+>>>> Thanks Marc for spotting it. Will take care of it.
+>>>
+>>> I just realised something silly... You have one timer node *per cpu*,
+>>> and this is not really expected.
+>>>
+>> This was discussed on the list here [1]
+>> Benoit suggested to add per CPU node since arch timer is per
+>> CPU and DT should describe the hw the way it is. Did we miss
+>> something ?
+>
+> The current approach is not to duplicate banked resources. We do not have
+> duplicated twd-timer nodes on Cortex A9, we do not expose multiple CPU
+> interfaces for the GIC...
+>
+Yes, I have observed that. The arch/twd timer DT extraction code doesn't
+expect per CPU DT node and on that basis only, initial patch was
+adding single timer node outside cpu node. Benoit comment was that
+the DT should describe the way hardware is and probably the DT
+extraction code should be updated accordingly.
 
-I tried this. Not what i expected. We have at least one problem with
-the ethernet driver:
+> And speaking of the GIC: how do you interpret the CPU mask in the
+> interrupt field of the timer? The value 0x3xx in the third field is there
+> to indicate that CPU0 and CPU1 are getting interrupted by the timer. What
+> does it mean when you duplicate it?>          M.
+>
 
-WARNING: at lib/dma-debug.c:933 check_unmap+0x4b8/0x8a8()
-mv643xx_eth_port mv643xx_eth_port.0: DMA-API: device driver failed to check map error[device address=0x000000001f22be00] [size=1536 bytes] [mapped as single]
-Modules linked in:
-[<c000db10>] (unwind_backtrace+0x0/0xf4) from [<c0016c44>] (warn_slowpath_common+0x4c/0x64)
-[<c0016c44>] (warn_slowpath_common+0x4c/0x64) from [<c0016cf0>] (warn_slowpath_fmt+0x30/0x40)
-[<c0016cf0>] (warn_slowpath_fmt+0x30/0x40) from [<c01ab540>] (check_unmap+0x4b8/0x8a8)
-[<c01ab540>] (check_unmap+0x4b8/0x8a8) from [<c01abbb8>] (debug_dma_unmap_page+0x8c/0x98)
-[<c01abbb8>] (debug_dma_unmap_page+0x8c/0x98) from [<c025cb1c>] (mv643xx_eth_poll+0x630/0x800)
-[<c025cb1c>] (mv643xx_eth_poll+0x630/0x800) from [<c0331d9c>] (net_rx_action+0xcc/0x1d4)
-[<c0331d9c>] (net_rx_action+0xcc/0x1d4) from [<c001e1b0>] (__do_softirq+0xa8/0x170)
-[<c001e1b0>] (__do_softirq+0xa8/0x170) from [<c001e3e8>] (do_softirq+0x5c/0x6c)
-[<c001e3e8>] (do_softirq+0x5c/0x6c) from [<c001e610>] (local_bh_enable+0xcc/0xdc)
-[<c001e610>] (local_bh_enable+0xcc/0xdc) from [<c0359c74>] (ip_finish_output+0x1c8/0x39c)
-[<c0359c74>] (ip_finish_output+0x1c8/0x39c) from [<c03571a4>] (ip_local_out+0x28/0x2c)
-[<c03571a4>] (ip_local_out+0x28/0x2c) from [<c0359564>] (ip_queue_xmit+0x118/0x338)
-[<c0359564>] (ip_queue_xmit+0x118/0x338) from [<c036e58c>] (tcp_transmit_skb+0x3fc/0x8e4)
-[<c036e58c>] (tcp_transmit_skb+0x3fc/0x8e4) from [<c0371218>] (tcp_write_xmit+0x228/0xb08)
-[<c0371218>] (tcp_write_xmit+0x228/0xb08) from [<c0371b6c>] (__tcp_push_pending_frames+0x30/0x9c)
-[<c0371b6c>] (__tcp_push_pending_frames+0x30/0x9c) from [<c0362940>] (tcp_sendmsg+0x158/0xdc4)
-[<c0362940>] (tcp_sendmsg+0x158/0xdc4) from [<c0386620>] (inet_sendmsg+0x38/0x74)
-[<c0386620>] (inet_sendmsg+0x38/0x74) from [<c031f370>] (sock_aio_write+0x12c/0x138)
-[<c031f370>] (sock_aio_write+0x12c/0x138) from [<c00a62f4>] (do_sync_write+0xa0/0xd0)
-[<c00a62f4>] (do_sync_write+0xa0/0xd0) from [<c00a6f18>] (vfs_write+0x13c/0x144)
-[<c00a6f18>] (vfs_write+0x13c/0x144) from [<c00a6ff0>] (sys_write+0x44/0x70)
-[<c00a6ff0>] (sys_write+0x44/0x70) from [<c0008ce0>] (ret_fast_syscall+0x0/0x2c)
----[ end trace b75faa8779652e63 ]---
+>
+Here too I have to keep mask for both CPUs because of the current DT
+extraction code. I some how forgot to bring that discussion to your
+notice. I can update the DT files to go back to the single timer
+node if the plan is not to duplicate the per CPU resources.
 
-I'm getting about 4 errors reported a second from the ethernet driver.
+Benoit,
+Whats your take on it ?
 
-Before i look at issues with em28xx i will first try to get the noise
-from the ethernet driver sorted out.
-
-     Andrew
+Regards
+Santosh
