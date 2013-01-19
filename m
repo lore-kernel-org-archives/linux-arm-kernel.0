@@ -1,53 +1,35 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 19 Jan 2013 10:27:01 -0800
-Subject: [PATCH] of: fix incorrect return value of
- of_find_matching_node_and_match()
-In-Reply-To: <1358619642-23607-1-git-send-email-thomas.abraham@linaro.org>
-References: <1358619642-23607-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAJuYYwT7Y_mey=swjzNUAUz4y8eKEgt4-Ji6NFJXdbZQNR9+AA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 19 Jan 2013 19:59:07 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <50FABBED.1020905@web.de>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <201301171049.30415.arnd@arndb.de> <50F800EB.6040104@web.de>
+ <201301172026.45514.arnd@arndb.de> <50FABBED.1020905@web.de>
+Message-ID: <20130119185907.GA20719@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 January 2013 10:20, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> The of_find_matching_node_and_match() function incorrectly sets the matched
-> entry to 'matches' when the compatible value of a node matches one of the
-> possible values. This results in incorrectly selecting the the first entry in
-> the 'matches' list as the matched entry. Fix this by noting down the result of
-> the call to of_match_node() and setting that as the matched entry.
->
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  drivers/of/base.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
+> Please find attached a debug log generated with your patch.
+> 
+> I used the sata disk and two em28xx dvb sticks, no other usb devices,
+> no ethernet cable connected, tuners on saa716x-based card not used.
+> 
+> What I can see in the log: a lot of coherent mappings from sata_mv
+> and orion_ehci, a few from mv643xx_eth, no other coherent mappings.
+> All coherent mappings are page aligned, some of them (from orion_ehci)
+> are not really small (as claimed in __alloc_from_pool).
+> 
+> I don't believe in a memory leak. When I restart vdr (the application
+> utilizing the dvb sticks) then there is enough dma memory available
+> again.
 
-[Adding devicetree-discuss at lists.ozlabs.org to the cc list]
+Hi Soeren
 
->
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 2390ddb..960ae5b 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -612,6 +612,7 @@ struct device_node *of_find_matching_node_and_match(struct device_node *from,
->                                         const struct of_device_id **match)
->  {
->         struct device_node *np;
-> +       const struct of_device_id *m;
->
->         if (match)
->                 *match = NULL;
-> @@ -619,9 +620,10 @@ struct device_node *of_find_matching_node_and_match(struct device_node *from,
->         read_lock(&devtree_lock);
->         np = from ? from->allnext : of_allnodes;
->         for (; np; np = np->allnext) {
-> -               if (of_match_node(matches, np) && of_node_get(np)) {
-> +               m = of_match_node(matches, np);
-> +               if (m && of_node_get(np)) {
->                         if (match)
-> -                               *match = matches;
-> +                               *match = m;
->                         break;
->                 }
->         }
-> --
-> 1.7.5.4
->
+We should be able to rule out a leak. Mount debugfg and then:
+
+while [ /bin/true ] ; do cat /debug/dma-api/num_free_entries ; sleep 60 ; done
+
+while you are capturing. See if the number goes down.
+
+      Andrew
