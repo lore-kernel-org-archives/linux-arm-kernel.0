@@ -1,52 +1,50 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 19 Jan 2013 19:02:57 +1300
-Subject: [PATCH 4/4] video: vt8500: Update descriptions in video/Kconfig
-In-Reply-To: <1358575377-26364-1-git-send-email-linux@prisktech.co.nz>
-References: <1358575377-26364-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1358575377-26364-5-git-send-email-linux@prisktech.co.nz>
+Date: Sat, 19 Jan 2013 19:02:53 +1300
+Subject: [GIT PULL] video: vt8500: Cleanup for 3.9
+Message-ID: <1358575377-26364-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the descriptions for the VIA VT8500 and
-Wondermedia WM8xxx-series framebuffer drivers to correctly reflect
-which hardware they support.
+Hi Florian,
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- drivers/video/Kconfig |    9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+This is a series of patches for the vt8500 framebuffer driver. Mostly
+cleanup stuff.
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 6678daf..3bbb3c1 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -1767,7 +1767,7 @@ config FB_AU1200
- 	  option au1200fb:panel=<name>.
- 
- config FB_VT8500
--	bool "VT8500 LCD Driver"
-+	bool "VIA VT8500 Framebuffer Driver"
- 	depends on (FB = y) && ARM && ARCH_VT8500
- 	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
- 	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
-@@ -1777,14 +1777,15 @@ config FB_VT8500
- 	  controller.
- 
- config FB_WM8505
--	bool "WM8505 frame buffer support"
-+	bool "Wondermedia WM8xxx-series framebuffer support"
- 	depends on (FB = y) && ARM && ARCH_VT8500
- 	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
- 	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
- 	select FB_SYS_IMAGEBLIT
- 	help
--	  This is the framebuffer driver for WonderMedia WM8505/WM8650
--	  integrated LCD controller.
-+	  This is the framebuffer driver for WonderMedia WM8xxx-series
-+	  integrated LCD controller. This driver covers the WM8505, WM8650
-+	  and WM8850 SoCs.
- 
- config FB_WMT_GE_ROPS
- 	bool "VT8500/WM8xxx accelerated raster ops support"
--- 
-1.7.9.5
+Non-cleanup:
+video: vt8500: Make wmt_ge_rops optional - This patch makes hardware accelerated
+raster ops optional as it doesn't work on the newly added WM8850 (yet).
+
+Regards
+Tony Prisk
+
+
+The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
+
+  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+
+are available in the git repository at:
+
+  git://server.prisktech.co.nz/git/linuxwmt.git tags/vt8500/video-3.9
+
+for you to fetch changes up to 9167fe967de331a9457e1b4d4fc211857ba3b6ab:
+
+  video: vt8500: Update descriptions in video/Kconfig (2013-01-19 18:52:28 +1300)
+
+----------------------------------------------------------------
+video: vt8500: Cleanup for 3.9
+
+----------------------------------------------------------------
+Julia Lawall (1):
+      drivers/video/wm8505fb.c: use devm_ functions
+
+Tony Prisk (3):
+      video: vt8500: Make wmt_ge_rops optional
+      video: vt8500: Remove unused platform_data/video-vt8500lcdfb.h
+      video: vt8500: Update descriptions in video/Kconfig
+
+ drivers/video/Kconfig                           |   32 ++++----
+ drivers/video/vt8500lcdfb.c                     |   17 +++-
+ drivers/video/wm8505fb.c                        |   95 ++++++++---------------
+ include/linux/platform_data/video-vt8500lcdfb.h |   31 --------
+ 4 files changed, 67 insertions(+), 108 deletions(-)
+ delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
