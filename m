@@ -1,154 +1,219 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 19 Jan 2013 19:02:55 +1300
-Subject: [PATCH 2/4] video: vt8500: Make wmt_ge_rops optional
+Date: Sat, 19 Jan 2013 19:02:54 +1300
+Subject: [PATCH 1/4] drivers/video/wm8505fb.c: use devm_ functions
 In-Reply-To: <1358575377-26364-1-git-send-email-linux@prisktech.co.nz>
 References: <1358575377-26364-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1358575377-26364-3-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1358575377-26364-2-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment, accelerated raster ops are always enabled on VT8500
-and WM8xxx series SoCs. This patch makes them optional.
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
+The various devm_ functions allocate memory that is released when a driver
+detaches.  This patch uses these functions for data that is allocated in
+the probe function of a platform device and is only freed in the remove
+function.
+
+The patch makes some other cleanups.  First, the original code used
+devm_kzalloc, but kfree.  This would lead to a double free.  The problem
+was found using the following semantic match (http://coccinelle.lip6.fr/):
+
+// <smpl>
+@@
+expression x,e;
+@@
+x = devm_kzalloc(...)
+... when != x = e
+?-kfree(x,...);
+// </smpl>
+
+The error-handing code of devm_request_and_ioremap does not print any
+warning message, because devm_request_and_ioremap does this.
+
+The call to dma_alloc_coherent is converted to its devm equivalent,
+dmam_alloc_coherent.  This implicitly introduces a call to
+dmam_free_coherent, which was completly missing in the original code.
+
+A semicolon is removed at the end of the error-handling code for the call
+to dma_alloc_coherent.
+
+The block of code calling fb_alloc_cmap is moved below the block of code
+calling wm8505fb_set_par, so that the error-handing code of the call to
+wm8505fb_set_par can just return ret.  This way there is only one block of
+error-handling code that needs to call fb_dealloc_cmap, and so this is
+moved up to the place where it is needed, eliminating the need for all
+gotos and labels in the function.  This was suggested by Tony Prisk.
+
+The initializations of fbi and ret at the beginning of the function are not
+necessary and are removed.  The call platform_set_drvdata(pdev, NULL); at
+the end of the function is also removed.
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- drivers/video/Kconfig       |   23 +++++++++++++----------
- drivers/video/vt8500lcdfb.c |   15 +++++++++++++++
- drivers/video/wm8505fb.c    |   15 +++++++++++++++
- 3 files changed, 43 insertions(+), 10 deletions(-)
+ drivers/video/wm8505fb.c |   78 +++++++++++-----------------------------------
+ 1 file changed, 19 insertions(+), 59 deletions(-)
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index e7068c5..6678daf 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -190,14 +190,6 @@ config FB_SYS_FOPS
-        depends on FB
-        default n
- 
--config FB_WMT_GE_ROPS
--	tristate
--	depends on FB
--	default n
--	---help---
--	  Include functions for accelerated rectangle filling and area
--	  copying using WonderMedia Graphics Engine operations.
--
- config FB_DEFERRED_IO
- 	bool
- 	depends on FB
-@@ -1777,7 +1769,8 @@ config FB_AU1200
- config FB_VT8500
- 	bool "VT8500 LCD Driver"
- 	depends on (FB = y) && ARM && ARCH_VT8500
--	select FB_WMT_GE_ROPS
-+	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
-+	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
- 	select FB_SYS_IMAGEBLIT
- 	help
- 	  This is the framebuffer driver for VIA VT8500 integrated LCD
-@@ -1786,12 +1779,22 @@ config FB_VT8500
- config FB_WM8505
- 	bool "WM8505 frame buffer support"
- 	depends on (FB = y) && ARM && ARCH_VT8500
--	select FB_WMT_GE_ROPS
-+	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
-+	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
- 	select FB_SYS_IMAGEBLIT
- 	help
- 	  This is the framebuffer driver for WonderMedia WM8505/WM8650
- 	  integrated LCD controller.
- 
-+config FB_WMT_GE_ROPS
-+	bool "VT8500/WM8xxx accelerated raster ops support"
-+	depends on (FB = y) && (FB_VT8500 || FB_WM8505)
-+	default n
-+	help
-+	  This adds support for accelerated raster operations on the
-+	  VIA VT8500 and Wondermedia 8xxx series SoCs.
-+
-+
- source "drivers/video/geode/Kconfig"
- 
- config FB_HIT
-diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
-index aa2579c..d8cc1f6 100644
---- a/drivers/video/vt8500lcdfb.c
-+++ b/drivers/video/vt8500lcdfb.c
-@@ -33,7 +33,10 @@
- #include <linux/platform_data/video-vt8500lcdfb.h>
- 
- #include "vt8500lcdfb.h"
-+
-+#ifdef CONFIG_FB_WMT_GE_ROPS
- #include "wmt_ge_rops.h"
-+#endif
- 
- #ifdef CONFIG_OF
- #include <linux/of.h>
-@@ -249,12 +252,24 @@ static int vt8500lcd_blank(int blank, struct fb_info *info)
- 	return 0;
- }
- 
-+#ifndef CONFIG_FB_WMT_GE_ROPS
-+static int wmt_ge_sync(struct fb_info *p)
-+{
-+	return 0;
-+}
-+#endif
-+
- static struct fb_ops vt8500lcd_ops = {
- 	.owner		= THIS_MODULE,
- 	.fb_set_par	= vt8500lcd_set_par,
- 	.fb_setcolreg	= vt8500lcd_setcolreg,
-+#ifdef CONFIG_FB_WMT_GE_ROPS
- 	.fb_fillrect	= wmt_ge_fillrect,
- 	.fb_copyarea	= wmt_ge_copyarea,
-+#else
-+	.fb_fillrect	= sys_fillrect,
-+	.fb_copyarea	= sys_copyarea,
-+#endif
- 	.fb_imageblit	= sys_imageblit,
- 	.fb_sync	= wmt_ge_sync,
- 	.fb_ioctl	= vt8500lcd_ioctl,
 diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
-index ddf78fc..dd28c26 100644
+index 4dd0580..ddf78fc 100644
 --- a/drivers/video/wm8505fb.c
 +++ b/drivers/video/wm8505fb.c
-@@ -35,7 +35,10 @@
- #include <linux/platform_data/video-vt8500lcdfb.h>
+@@ -274,15 +274,11 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	unsigned long fb_mem_len;
+ 	void *fb_mem_virt;
  
- #include "wm8505fb_regs.h"
+-	ret = -ENOMEM;
+-	fbi = NULL;
+-
+ 	fbi = devm_kzalloc(&pdev->dev, sizeof(struct wm8505fb_info) +
+ 			sizeof(u32) * 16, GFP_KERNEL);
+ 	if (!fbi) {
+ 		dev_err(&pdev->dev, "Failed to initialize framebuffer device\n");
+-		ret = -ENOMEM;
+-		goto failed;
++		return -ENOMEM;
+ 	}
+ 
+ 	strcpy(fbi->fb.fix.id, DRIVER_NAME);
+@@ -308,31 +304,15 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	fbi->fb.pseudo_palette	= addr;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (res == NULL) {
+-		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+-		ret = -ENODEV;
+-		goto failed_fbi;
+-	}
+-
+-	res = request_mem_region(res->start, resource_size(res), DRIVER_NAME);
+-	if (res == NULL) {
+-		dev_err(&pdev->dev, "failed to request I/O memory\n");
+-		ret = -EBUSY;
+-		goto failed_fbi;
+-	}
+ 
+-	fbi->regbase = ioremap(res->start, resource_size(res));
+-	if (fbi->regbase == NULL) {
+-		dev_err(&pdev->dev, "failed to map I/O memory\n");
+-		ret = -EBUSY;
+-		goto failed_free_res;
+-	}
++	fbi->regbase = devm_request_and_ioremap(&pdev->dev, res);
++	if (fbi->regbase == NULL)
++		return -EBUSY;
+ 
+ 	np = of_parse_phandle(pdev->dev.of_node, "default-mode", 0);
+ 	if (!np) {
+ 		pr_err("%s: No display description in Device Tree\n", __func__);
+-		ret = -EINVAL;
+-		goto failed_free_res;
++		return -EINVAL;
+ 	}
+ 
+ 	/*
+@@ -351,7 +331,7 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	ret |= of_property_read_u32(np, "bpp", &bpp);
+ 	if (ret) {
+ 		pr_err("%s: Unable to read display properties\n", __func__);
+-		goto failed_free_res;
++		return ret;
+ 	}
+ 
+ 	of_mode.vmode = FB_VMODE_NONINTERLACED;
+@@ -365,12 +345,12 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 
+ 	/* try allocating the framebuffer */
+ 	fb_mem_len = of_mode.xres * of_mode.yres * 2 * (bpp / 8);
+-	fb_mem_virt = dma_alloc_coherent(&pdev->dev, fb_mem_len, &fb_mem_phys,
++	fb_mem_virt = dmam_alloc_coherent(&pdev->dev, fb_mem_len, &fb_mem_phys,
+ 				GFP_KERNEL);
+ 	if (!fb_mem_virt) {
+ 		pr_err("%s: Failed to allocate framebuffer\n", __func__);
+ 		return -ENOMEM;
+-	};
++	}
+ 
+ 	fbi->fb.var.xres_virtual	= of_mode.xres;
+ 	fbi->fb.var.yres_virtual	= of_mode.yres * 2;
+@@ -381,28 +361,29 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	fbi->fb.screen_base		= fb_mem_virt;
+ 	fbi->fb.screen_size		= fb_mem_len;
+ 
+-	if (fb_alloc_cmap(&fbi->fb.cmap, 256, 0) < 0) {
+-		dev_err(&pdev->dev, "Failed to allocate color map\n");
+-		ret = -ENOMEM;
+-		goto failed_free_io;
+-	}
+-
+-	wm8505fb_init_hw(&fbi->fb);
+-
+ 	fbi->contrast = 0x80;
+ 	ret = wm8505fb_set_par(&fbi->fb);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to set parameters\n");
+-		goto failed_free_cmap;
++		return ret;
+ 	}
+ 
++	if (fb_alloc_cmap(&fbi->fb.cmap, 256, 0) < 0) {
++		dev_err(&pdev->dev, "Failed to allocate color map\n");
++		return -ENOMEM;
++	}
 +
-+#ifdef CONFIG_FB_WMT_GE_ROPS
- #include "wmt_ge_rops.h"
-+#endif
++	wm8505fb_init_hw(&fbi->fb);
++
+ 	platform_set_drvdata(pdev, fbi);
  
- #define DRIVER_NAME "wm8505-fb"
+ 	ret = register_framebuffer(&fbi->fb);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev,
+ 			"Failed to register framebuffer device: %d\n", ret);
+-		goto failed_free_cmap;
++		if (fbi->fb.cmap.len)
++			fb_dealloc_cmap(&fbi->fb.cmap);
++		return ret;
+ 	}
  
-@@ -248,12 +251,24 @@ static int wm8505fb_blank(int blank, struct fb_info *info)
+ 	ret = device_create_file(&pdev->dev, &dev_attr_contrast);
+@@ -416,25 +397,11 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	       fbi->fb.fix.smem_start + fbi->fb.fix.smem_len - 1);
+ 
+ 	return 0;
+-
+-failed_free_cmap:
+-	if (fbi->fb.cmap.len)
+-		fb_dealloc_cmap(&fbi->fb.cmap);
+-failed_free_io:
+-	iounmap(fbi->regbase);
+-failed_free_res:
+-	release_mem_region(res->start, resource_size(res));
+-failed_fbi:
+-	platform_set_drvdata(pdev, NULL);
+-	kfree(fbi);
+-failed:
+-	return ret;
+ }
+ 
+ static int wm8505fb_remove(struct platform_device *pdev)
+ {
+ 	struct wm8505fb_info *fbi = platform_get_drvdata(pdev);
+-	struct resource *res;
+ 
+ 	device_remove_file(&pdev->dev, &dev_attr_contrast);
+ 
+@@ -445,13 +412,6 @@ static int wm8505fb_remove(struct platform_device *pdev)
+ 	if (fbi->fb.cmap.len)
+ 		fb_dealloc_cmap(&fbi->fb.cmap);
+ 
+-	iounmap(fbi->regbase);
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(res->start, resource_size(res));
+-
+-	kfree(fbi);
+-
  	return 0;
  }
  
-+#ifndef CONFIG_FB_WMT_GE_ROPS
-+static int wmt_ge_sync(struct fb_info *p)
-+{
-+	return 0;
-+}
-+#endif
-+
- static struct fb_ops wm8505fb_ops = {
- 	.owner		= THIS_MODULE,
- 	.fb_set_par	= wm8505fb_set_par,
- 	.fb_setcolreg	= wm8505fb_setcolreg,
-+#ifdef CONFIG_FB_WMT_GE_ROPS
- 	.fb_fillrect	= wmt_ge_fillrect,
- 	.fb_copyarea	= wmt_ge_copyarea,
-+#else
-+	.fb_fillrect	= sys_fillrect,
-+	.fb_copyarea	= sys_copyarea,
-+#endif
- 	.fb_imageblit	= sys_imageblit,
- 	.fb_sync	= wmt_ge_sync,
- 	.fb_pan_display	= wm8505fb_pan_display,
 -- 
 1.7.9.5
