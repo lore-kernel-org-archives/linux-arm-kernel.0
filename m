@@ -1,69 +1,58 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Sat, 19 Jan 2013 23:28:14 +0100
-Subject: [PATCH v3 4/8] MFD: ti_am335x_tscadc: add device tree binding
- information
-In-Reply-To: <daf18b4779ac3c6b69b1e7e2d1a4abd18b13fee5.1358502134.git.rachna@ti.com>
-References: <cover.1358502134.git.rachna@ti.com>
- <daf18b4779ac3c6b69b1e7e2d1a4abd18b13fee5.1358502134.git.rachna@ti.com>
-Message-ID: <50FB1DFE.6090805@metafoo.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 19 Jan 2013 19:27:55 -0300
+Subject: [PATCH v2 1/3] mtd: omap-onenand: pass device_node in platform data
+Message-ID: <1358634477-25868-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Pass an optional device_node pointer in the platform data,
+which in turn will be put into a mtd_part_parser_data.
+This way, code that sets up the platform devices can pass
+along the node from DT so that the partitions can be parsed.
 
-On 01/18/2013 11:48 AM, Patil, Rachna wrote:
-> From: "Patil, Rachna" <rachna@ti.com>
-> 
-> Signed-off-by: Patil, Rachna <rachna@ti.com>
-> ---
->  .../devicetree/bindings/mfd/ti_am335x_tscadc.txt   |   35 ++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt b/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
-> new file mode 100644
-> index 0000000..c13c492
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
-> @@ -0,0 +1,35 @@
-> +Texas Instruments - TSC / ADC multi-functional device
-> +
-> +ti_tscadc is a multi-function device with touchscreen and ADC on chip.
-> +This document describes the binding for mfd device.
-> +
-> +Required properties:
-> +- compatible: "ti,ti-tscadc"
-> +- reg: Specifies the address of MFD block
-> +- interrupts: IRQ line connected to the main SoC
-> +- interrupt-parent: The parent interrupt controller
+For non-DT boards, this change has no effect.
 
-The subnodes and their properties also need documentation.
+Acked-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/mtd/onenand/omap2.c                     |    4 +++-
+ include/linux/platform_data/mtd-onenand-omap2.h |    3 +++
+ 2 files changed, 6 insertions(+), 1 deletions(-)
 
-> +
-> +Optional properties:
-> +- ti,hwmods: Hardware information related to TSC/ADC MFD device
-> +
-> +Example:
-> +
-> +	tscadc: tscadc at 44e0d000 {
-> +		compatible = "ti,ti-tscadc";
-> +		reg = <0x44e0d000 0x1000>;
-> +
-> +		interrupt-parent = <&intc>;
-> +		interrupts = <16>;
-> +		ti,hwmods = "adc_tsc";
-> +
-> +		tsc {
-> +			wires = <4>;
-> +			x-plate-resistance = <200>;
-> +			steps-to-configure = <5>;
-> +			wire-config = <0x00 0x11 0x22 0x33>;
-
-Non-standard properties should have a vendor prefix.
-
-> +		};
-> +
-> +		adc {
-> +			adc-channels = <4>;
-> +		};
-> +	};
+diff --git a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
+index 065f3fe..eec2aed 100644
+--- a/drivers/mtd/onenand/omap2.c
++++ b/drivers/mtd/onenand/omap2.c
+@@ -637,6 +637,7 @@ static int omap2_onenand_probe(struct platform_device *pdev)
+ 	struct onenand_chip *this;
+ 	int r;
+ 	struct resource *res;
++	struct mtd_part_parser_data ppdata = {};
+ 
+ 	pdata = pdev->dev.platform_data;
+ 	if (pdata == NULL) {
+@@ -767,7 +768,8 @@ static int omap2_onenand_probe(struct platform_device *pdev)
+ 	if ((r = onenand_scan(&c->mtd, 1)) < 0)
+ 		goto err_release_regulator;
+ 
+-	r = mtd_device_parse_register(&c->mtd, NULL, NULL,
++	ppdata.of_node = pdata->of_node;
++	r = mtd_device_parse_register(&c->mtd, NULL, &ppdata,
+ 				      pdata ? pdata->parts : NULL,
+ 				      pdata ? pdata->nr_parts : 0);
+ 	if (r)
+diff --git a/include/linux/platform_data/mtd-onenand-omap2.h b/include/linux/platform_data/mtd-onenand-omap2.h
+index 685af7e..e9a9fb1 100644
+--- a/include/linux/platform_data/mtd-onenand-omap2.h
++++ b/include/linux/platform_data/mtd-onenand-omap2.h
+@@ -29,5 +29,8 @@ struct omap_onenand_platform_data {
+ 	u8			flags;
+ 	u8			regulator_can_sleep;
+ 	u8			skip_initial_unlocking;
++
++	/* for passing the partitions */
++	struct device_node	*of_node;
+ };
+ #endif
+-- 
+1.7.8.6
