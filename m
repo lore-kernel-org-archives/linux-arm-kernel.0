@@ -1,169 +1,327 @@
-From: zhanzhenbo@gmail.com (Steve zhan)
-Date: Sat, 19 Jan 2013 14:33:58 +0800
-Subject: ARM: ux500:mach-ux500/cpuidle.c spinlock dis-matching
-Message-ID: <20130119063358.GA27760@android11.spreadtrum.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sat, 19 Jan 2013 19:44:28 +1300
+Subject: [PATCH] dts: vt8500: Add initial dts support for WM8850
+Message-ID: <1358577868-29042-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,Linus Walleij.
-	Using MUTT resubmit this for 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/139893.html
+This patch adds a soc dtsi for the Wondermedia WM8850.
 
+A board dts file is also included for the W70v2 tablet, with support
+for all the drivers currently in mainline.
+
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
-Steve
+Hi Olof,
 
-commit 99d0a05d163bd070eba7caab7e772206edbcbbc9
-Author: steve zhan <zhanzhenbo@gmail.com>
-Date:   Mon Jan 7 18:19:14 2013 +0800
+Sorry this is a bit late.
 
-    ARM: ux500: add spin_unlock(&master_lock).
-    
-    Add the missing spin_unlock statement to unlock
-    master_lock when prcmu_gic_decouple() return TRUE
-    
-    Signed-off-by: steve zhan <zhanzhenbo@gmail.com>
+Regards
+Tony P
 
-diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
-index b54884bd..ce91493 100644
---- a/arch/arm/mach-ux500/cpuidle.c
-+++ b/arch/arm/mach-ux500/cpuidle.c
-@@ -40,8 +40,10 @@ static inline int ux500_enter_idle(struct cpuidle_device *dev,
- 			goto wfi;
+ arch/arm/boot/dts/Makefile         |    3 +-
+ arch/arm/boot/dts/wm8850-w70v2.dts |   47 ++++++++
+ arch/arm/boot/dts/wm8850.dtsi      |  224 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 273 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/wm8850-w70v2.dts
+ create mode 100644 arch/arm/boot/dts/wm8850.dtsi
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 5ebb44f..8a75991 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -151,7 +151,8 @@ dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
+ 	xenvm-4.2.dtb
+ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+ 	wm8505-ref.dtb \
+-	wm8650-mid.dtb
++	wm8650-mid.dtb \
++	wm8850-w70v2.dtb
+ dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
  
- 		/* decouple the gic from the A9 cores */
--		if (prcmu_gic_decouple())
-+		if (prcmu_gic_decouple()) {
-+			spin_unlock(&master_lock);
- 			goto out;
-+		}
- 
- 		/* If an error occur, we will have to recouple the gic
- 		 * manually */
-
-
-
-
-2013/1/7 Daniel Lezcano <daniel.lezcano@linaro.org>:
-> On 01/07/2013 06:50 AM, steve.zhan wrote:
->> Hi Daniel,
->>
->>     Happy new year, Thank you for reply.
->> Sorry for that i have refer the old patch email.
->> I have updated the patch, Pls check the URL:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138939.html
->> Now i am using gmail GUI tools to send mail, i will switch email tool
->> to MUTT to commit the other patchs in the future.
->
-> Ok.
->
-> Please do not introduce a new variable which is at the end pointless and
-> add more complexity.
->
-> You can simply remove the if statement for prcmu_gic_decouple(), or
-> unlock if it fails.
->
-> Thanks
->   -- Daniel
->
->> --------------
->> steve.zhan
->>
->> 2013/1/7, Daniel Lezcano <daniel.lezcano@linaro.org>:
->>> On 12/28/2012 08:06 AM, steve.zhan wrote:
->>>> Hi Daniel,
->>>
->>> Hi Steve,
->>>
->>> sorry I missed your email.
->>>
->>>>
->>>>        I think we must unlock the master spinlock even
->>>> prcmu_gic_decouple function now always return 0.
->>>>        Could you give some infos about this?
->>>
->>> I agree, that would be cleaner.
->>>
->>> AFAICS, your patch does not solve the problem because 'recouple' will be
->>> false if prcmu_gic_decouple fails, so the lock will never be release.
->>>
->>> That will be simpler to do:
->>>
->>> if (prcmu_gic_decouple()) {
->>>      spin_unlock(&master);
->>>      goto out;
->>> }
->>>
->>> no ?
->>>
->>>> Thanks.
->>>>
->>>> diff --git a/arch/arm/mach-ux500/cpuidle.c
->>>> b/arch/arm/mach-ux500/cpuidle.c
->>>> index b54884bd..b0759ce 100644
->>>> --- a/arch/arm/mach-ux500/cpuidle.c
->>>> +++ b/arch/arm/mach-ux500/cpuidle.c
->>>> @@ -29,6 +29,7 @@ static inline int ux500_enter_idle(struct cpuidle_device
->>>> *dev,
->>>>  {
->>>>         int this_cpu = smp_processor_id();
->>>>         bool recouple = false;
->>>> +       bool locked = false;
->>>>
->>>>         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &this_cpu);
->>>>
->>>> @@ -39,6 +40,8 @@ static inline int ux500_enter_idle(struct cpuidle_device
->>>> *dev,
->>>>                 if (!spin_trylock(&master_lock))
->>>>                         goto wfi;
->>>>
->>>> +               locked = true;
->>>> +
->>>>                 /* decouple the gic from the A9 cores */
->>>>                 if (prcmu_gic_decouple())
->>>>                         goto out;
->>>> @@ -76,7 +79,7 @@ static inline int ux500_enter_idle(struct cpuidle_device
->>>> *dev,
->>>>                 /* When we switch to retention, the prcmu is in charge
->>>>                  * of recoupling the gic automatically */
->>>>                 recouple = false;
->>>> -
->>>> +               locked = false;
->>>>                 spin_unlock(&master_lock);
->>>>         }
->>>>  wfi:
->>>> @@ -86,7 +89,8 @@ out:
->>>>
->>>>         if (recouple) {
->>>>                 prcmu_gic_recouple();
->>>> -               spin_unlock(&master_lock);
->>>> +               if (locked)
->>>> +                       spin_unlock(&master_lock);
->>>>         }
->>>>
->>>>         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &this_cpu);
->>>>
->>>>
->>>>
->>>> Steve Zhan
->>>>
->>>
->>>
->>> --
->>>  <http://www.linaro.org/> Linaro.org ?? Open source software for ARM SoCs
->>>
->>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->>> <http://twitter.com/#!/linaroorg> Twitter |
->>> <http://www.linaro.org/linaro-blog/> Blog
->>>
->>>
->>
->>
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ?? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
+ targets += dtbs
+diff --git a/arch/arm/boot/dts/wm8850-w70v2.dts b/arch/arm/boot/dts/wm8850-w70v2.dts
+new file mode 100644
+index 0000000..fcc660c
+--- /dev/null
++++ b/arch/arm/boot/dts/wm8850-w70v2.dts
+@@ -0,0 +1,47 @@
++/*
++ * wm8850-w70v2.dts
++ *  - Device tree file for Wondermedia WM8850 Tablet
++ *  - 'W70-V2' mainboard
++ *  - HongLianYing 'HLY070ML268-21A' 7" LCD panel
++ *
++ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
++ *
++ * Licensed under GPLv2 or later
++ */
++
++/dts-v1/;
++/include/ "wm8850.dtsi"
++
++/ {
++	model = "Wondermedia WM8850-W70v2 Tablet";
++
++	/*
++	 * Display node is based on Sascha Hauer's patch on dri-devel.
++	 * Added a bpp property to calculate the size of the framebuffer
++	 * until the binding is formalized.
++	 */
++	display: display at 0 {
++		modes {
++			mode0: mode at 0 {
++				hactive = <800>;
++				vactive = <480>;
++				hback-porch = <88>;
++				hfront-porch = <40>;
++				hsync-len = <0>;
++				vback-porch = <32>;
++				vfront-porch = <11>;
++				vsync-len = <1>;
++				clock = <0>;	/* unused but required */
++				bpp = <16>;	/* non-standard but required */
++			};
++		};
++	};
++
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm 0 50000 1>;	/* duty inverted */
++
++		brightness-levels = <0 40 60 80 100 130 190 255>;
++		default-brightness-level = <5>;
++	};
++};
+diff --git a/arch/arm/boot/dts/wm8850.dtsi b/arch/arm/boot/dts/wm8850.dtsi
+new file mode 100644
+index 0000000..2dbc39c
+--- /dev/null
++++ b/arch/arm/boot/dts/wm8850.dtsi
+@@ -0,0 +1,224 @@
++/*
++ * wm8850.dtsi - Device tree file for Wondermedia WM8850 SoC
++ *
++ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
++ *
++ * Licensed under GPLv2 or later
++ */
++
++/include/ "skeleton.dtsi"
++
++/ {
++	compatible = "wm,wm8850";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		ranges;
++		interrupt-parent = <&intc0>;
++
++		intc0: interrupt-controller at d8140000 {
++			compatible = "via,vt8500-intc";
++			interrupt-controller;
++			reg = <0xd8140000 0x10000>;
++			#interrupt-cells = <1>;
++		};
++
++		/* Secondary IC cascaded to intc0 */
++		intc1: interrupt-controller at d8150000 {
++			compatible = "via,vt8500-intc";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			reg = <0xD8150000 0x10000>;
++			interrupts = <56 57 58 59 60 61 62 63>;
++		};
++
++		gpio: gpio-controller at d8110000 {
++			compatible = "wm,wm8650-gpio";
++			gpio-controller;
++			reg = <0xd8110000 0x10000>;
++			#gpio-cells = <3>;
++		};
++
++		pmc at d8130000 {
++			compatible = "via,vt8500-pmc";
++			reg = <0xd8130000 0x1000>;
++
++			clocks {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				ref25: ref25M {
++					#clock-cells = <0>;
++					compatible = "fixed-clock";
++					clock-frequency = <25000000>;
++				};
++
++				ref24: ref24M {
++					#clock-cells = <0>;
++					compatible = "fixed-clock";
++					clock-frequency = <24000000>;
++				};
++
++				plla: plla {
++					#clock-cells = <0>;
++					compatible = "wm,wm8750-pll-clock";
++					clocks = <&ref25>;
++					reg = <0x200>;
++				};
++
++				pllb: pllb {
++					#clock-cells = <0>;
++					compatible = "wm,wm8750-pll-clock";
++					clocks = <&ref25>;
++					reg = <0x204>;
++				};
++
++				clkuart0: uart0 {
++					#clock-cells = <0>;
++					compatible = "via,vt8500-device-clock";
++					clocks = <&ref24>;
++					enable-reg = <0x254>;
++					enable-bit = <24>;
++				};
++
++				clkuart1: uart1 {
++					#clock-cells = <0>;
++					compatible = "via,vt8500-device-clock";
++					clocks = <&ref24>;
++					enable-reg = <0x254>;
++					enable-bit = <25>;
++				};
++
++                                clkuart2: uart2 {
++                                        #clock-cells = <0>;
++                                        compatible = "via,vt8500-device-clock";
++                                        clocks = <&ref24>;
++                                        enable-reg = <0x254>;
++                                        enable-bit = <26>;
++                                };
++
++                                clkuart3: uart3 {
++                                        #clock-cells = <0>;
++                                        compatible = "via,vt8500-device-clock";
++                                        clocks = <&ref24>;
++                                        enable-reg = <0x254>;
++                                        enable-bit = <27>;
++                                };
++
++				clkpwm: pwm {
++ 					#clock-cells = <0>;
++ 					compatible = "via,vt8500-device-clock";
++					clocks = <&pllb>;
++					divisor-reg = <0x350>;
++					enable-reg = <0x250>;
++					enable-bit = <17>;
++ 				};
++
++				clksdhc: sdhc {
++					#clock-cells = <0>;
++					compatible = "via,vt8500-device-clock";
++					clocks = <&pllb>;
++					divisor-reg = <0x330>;
++					divisor-mask = <0x3f>;
++					enable-reg = <0x250>;
++					enable-bit = <0>;
++				};
++			};
++		};
++
++		fb at d8051700 {
++			compatible = "wm,wm8505-fb";
++			reg = <0xd8051700 0x200>;
++			display = <&display>;
++			default-mode = <&mode0>;
++		};
++
++		ge_rops at d8050400 {
++			compatible = "wm,prizm-ge-rops";
++			reg = <0xd8050400 0x100>;
++		};
++
++		pwm: pwm at d8220000 {
++			#pwm-cells = <3>;
++			compatible = "via,vt8500-pwm";
++			reg = <0xd8220000 0x100>;
++			clocks = <&clkpwm>;
++		};
++
++		timer at d8130100 {
++			compatible = "via,vt8500-timer";
++			reg = <0xd8130100 0x28>;
++			interrupts = <36>;
++		};
++
++		ehci at d8007900 {
++			compatible = "via,vt8500-ehci";
++			reg = <0xd8007900 0x200>;
++			interrupts = <26>;
++		};
++
++		uhci at d8007b00 {
++			compatible = "platform-uhci";
++			reg = <0xd8007b00 0x200>;
++			interrupts = <26>;
++		};
++
++		uhci at d8008d00 {
++			compatible = "platform-uhci";
++			reg = <0xd8008d00 0x200>;
++			interrupts = <26>;
++		};
++
++		uart0: uart at d8200000 {
++			compatible = "via,vt8500-uart";
++			reg = <0xd8200000 0x1040>;
++			interrupts = <32>;
++			clocks = <&clkuart0>;
++		};
++
++		uart1: uart at d82b0000 {
++			compatible = "via,vt8500-uart";
++			reg = <0xd82b0000 0x1040>;
++			interrupts = <33>;
++			clocks = <&clkuart1>;
++		};
++
++                uart2: uart at d8210000 {
++                        compatible = "via,vt8500-uart";
++                        reg = <0xd8210000 0x1040>;
++                        interrupts = <47>;
++                        clocks = <&clkuart2>;
++                };
++
++                uart3: uart at d82c0000 {
++                        compatible = "via,vt8500-uart";
++                        reg = <0xd82c0000 0x1040>;
++                        interrupts = <50>;
++                        clocks = <&clkuart3>;
++                };
++
++		rtc at d8100000 {
++			compatible = "via,vt8500-rtc";
++			reg = <0xd8100000 0x10000>;
++			interrupts = <48>;
++		};
++
++		sdhc at d800a000 {
++			compatible = "wm,wm8505-sdhc";
++			reg = <0xd800a000 0x1000>;
++			interrupts = <20 21>;
++			clocks = <&clksdhc>;
++			bus-width = <4>;
++			sdon-inverted;
++		};
++	};
++};
+-- 
+1.7.9.5
