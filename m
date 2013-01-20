@@ -1,53 +1,139 @@
-From: anton@enomsg.org (Anton Vorontsov)
-Date: Sun, 20 Jan 2013 12:47:29 -0800
-Subject: [PATCH] power: reset: qnap-poweroff: Fix License String
-In-Reply-To: <20130120201336.GO8668@pengutronix.de>
-References: <20130106215509.GD26928@lizard.sbx05280.losalca.wayport.net>
- <1357668926-20598-1-git-send-email-andrew@lunn.ch>
- <20130120201336.GO8668@pengutronix.de>
-Message-ID: <20130120204728.GA16339@lizard.gateway.2wire.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 20 Jan 2013 21:38:21 +0000 (UTC)
+Subject: OMAP baseline test results for v3.8-rc4
+Message-ID: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 20, 2013 at 09:13:36PM +0100, Uwe Kleine-K?nig wrote:
-> On Tue, Jan 08, 2013 at 07:15:26PM +0100, Andrew Lunn wrote:
-> > GPLv2+ is not a valid license string. Replace it with one that is.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> >  drivers/power/reset/qnap-poweroff.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
-> > index ca0b476..8af772b 100644
-> > --- a/drivers/power/reset/qnap-poweroff.c
-> > +++ b/drivers/power/reset/qnap-poweroff.c
-> > @@ -121,4 +121,4 @@ module_platform_driver(qnap_power_off_driver);
-> >  
-> >  MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
-> >  MODULE_DESCRIPTION("QNAP Power off driver");
-> > -MODULE_LICENSE("GPLv2+");
-> > +MODULE_LICENSE("GPL v2");
-> This change is wrong.
-> 
-> According to include/linux/module.h "GPL v2" means exactly that: version
-> 2. As the file specifies v2 or later in the header you have to use "GPL"
-> which means v2 or later.
 
-Does it even make sense to have the two separate things ("GPL v2" and
-"GPL")?
+Here are some basic OMAP test results for Linux v3.8-rc4.
+Logs and other details at:
 
-Suppose there is a global change that modifies a bunch of drivers, some of
-them are GPLv2+. Now, the author of the global change is submitting it
-under "GPL v2 only" license, which, by definition, turns any GPLv2+ code
-into "GPL v2 only", right?
+    http://www.pwsan.com/omap/testlogs/test_v3.8-rc4/20130120122039/
 
-So, changing from GPLv2+ to "GPL v2 only" is OK, but not the other way
-around.
 
-IANAL, tho.
+Test summary
+------------
 
-Anton
+Boot to userspace:
+    Pass ( 9/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
+  	   	  3730beaglexm, 37xxevm, 4430es2panda, 5912osk,
+		  4460pandaes
+    FAIL ( 2/11): am335xbone, cmt3517 
+  
+PM ret/off, suspend + dynamic idle:
+    Pass (3/3): 3530es3beagle, 3730beaglexm, 37xxevm
 
-p.s. Yes, in this particular driver it also makes sense to remove "or
-later" words from the header, just to be consistent.
+PM ret, suspend + dynamic idle:
+    Pass (1/2): 4460pandaes
+    FAIL (1/2): 4430es2panda
+
+PM ret, dynamic idle:
+    FAIL (1/1): 2430sdp
+
+
+Failing tests: fixed by posted patches
+--------------------------------------
+
+Other:
+
+* 2420N800: powers down 30 seconds after boot
+  - Presumably due to missing CBUS patches for watchdog control
+  - http://lkml.org/lkml/2012/9/3/265
+  - http://marc.info/?l=linux-omap&m=135274739624125&w=2
+  - http://marc.info/?l=linux-omap&m=135664195831104&w=2
+
+
+Failing tests: needing investigation
+------------------------------------
+
+Boot tests:
+
+* am335xbone: hangs after "Starting kernel"
+  - Cause unknown
+  - http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82297.html
+
+* 3517EVM & CM-T3517: boot hangs with NFS root
+  - Likely some Kconfig, board file, and PM issues with EMAC
+  - Longstanding bug
+
+* CM-T3517: boot hangs with MMC root
+  - Due to missing MMC setup in board file
+  - http://www.spinics.net/lists/arm-kernel/msg211471.html
+
+Boot warnings:
+
+* 3530es3beagle, 3730beaglexm, 37xxevm: nand_scan_ident() warning
+  - "at drivers/mtd/nand/nand_base.c:2861 nand_scan_ident+0xdb4/0xf90()"
+  - http://marc.info/?l=linux-omap&m=135630897110185&w=2
+
+* CM-T3517: L3 in-band error with IPSS during boot
+  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
+  - Longstanding issue; does not occur on the 3517EVM
+
+PM tests:
+
+* 2430sdp: pwrdm state mismatch(dsp_pwrdm) 0 != 3
+  - need to doublecheck wakeup dependencies
+
+* 2430sdp: power domains not entering retention
+  - Cause unknown
+
+* 4430es2panda, 4460pandaes: pwrdm state mismatch on CAM, DSS, ABE
+
+* 4460pandaes: pwrdm state mismatch on IVAHD, TESLA 
+
+* 4430es2panda: CORE, TESLA, IVAHD, L3INIT didn't enter target state
+  - Probably due to lack of reset code for M3, DSP, SL2IF, FSUSB
+    per discussion with Tero Kristo
+  - Likely dependent on the bootloader version
+    - fails with 2012.07-00136-g755de79
+
+* 3730 Beagle XM: does not serial wake from off-idle suspend when console
+  UART doesn't clock gate ("debug ignore_loglevel")
+  - Cause unknown
+  - Not yet part of the automated test suite
+  - Re-tested at v3.7; still failing:
+    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
+
+Other:
+
+* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
+  - Unknown cause; could be due to the lack of hierarchical enable/disable
+    in hwmod code
+  - Jon Hunter reports this does not appear with the same X-loader/bootloader
+    on his 4430ES2.3 Panda, so could be ES-level dependent
+
+
+Failing tests: needing local investigation (may be due to testbed issues)
+-------------------------------------------------------------------------
+
+Boot tests:
+
+* AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+  - May be fixed now, pending retest:
+    - http://marc.info/?l=linux-omap&m=135082257727502&w=2
+  - Not yet part of the automated test suite
+  - Nishanth Menon & Vaibhav Hiremath report that it works for them
+  * May be due to an old U-boot with FDT support problems used here?
+    Pending local investigation and re-test
+
+
+Problems reported by others
+---------------------------
+
+* I2C intermittent failures on N900; can break boot
+  - "omap_i2c omap_i2c.1: timeout waiting for bus ready"
+  - Reported by Aaro Koskinen
+  - http://www.spinics.net/lists/arm-kernel/msg216859.html
+
+* 2420H4: reports "Could not set MPU rate to 4294MHz" on reboot
+  - Reported and fixed by Jon Hunter
+  - http://www.spinics.net/lists/arm-kernel/msg216121.html
+
+
+--------------------------------------------------------------
+Branch: test_v3.8-rc4
+Test-Serial: 20130120122039
+Commit-ID: 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619
+Test-Target-Board-Count: 11
