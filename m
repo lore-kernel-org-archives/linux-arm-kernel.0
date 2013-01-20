@@ -1,63 +1,73 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 20 Jan 2013 13:56:34 -0800
-Subject: [PATCH] of: fix incorrect return value of
- of_find_matching_node_and_match()
-In-Reply-To: <50FC66BA.9030503@gmail.com>
-References: <1358619642-23607-1-git-send-email-thomas.abraham@linaro.org>
- <50FC66BA.9030503@gmail.com>
-Message-ID: <CAJuYYwT++66UUT5wdZh=B=VC7s2=T4w0qO6G7CEG6eCHT5WBCg@mail.gmail.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Sun, 20 Jan 2013 17:57:19 -0500
+Subject: [PATCH v6 15/15] KVM: ARM: Add maintainer entry for KVM/ARM
+In-Reply-To: <20130117162632.GK3699@mudshark.cambridge.arm.com>
+References: <20130116175716.29147.15348.stgit@ubuntu>
+ <20130116175925.29147.40357.stgit@ubuntu>
+ <20130117162632.GK3699@mudshark.cambridge.arm.com>
+Message-ID: <CANM98qJr9Lfa1+rzu_U-DByBoyFV3KscL2z5HAiDtJcpv9UbjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 January 2013 13:50, Rob Herring <robherring2@gmail.com> wrote:
-> On 01/19/2013 12:20 PM, Thomas Abraham wrote:
->> The of_find_matching_node_and_match() function incorrectly sets the matched
->> entry to 'matches' when the compatible value of a node matches one of the
->> possible values. This results in incorrectly selecting the the first entry in
->> the 'matches' list as the matched entry. Fix this by noting down the result of
->> the call to of_match_node() and setting that as the matched entry.
->
-> Looks fine, but is this breaking something in 3.8 or can it wait for 3.9?
-
-Yes, it can wait for 3.9. I am using this function while adding device
-tree support for timers on exynos platform which will probably merged
-in 3.9.
-
-Thanks,
-Thomas.
-
->
-> Rob
->
+On Thu, Jan 17, 2013 at 11:26 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jan 16, 2013 at 05:59:25PM +0000, Christoffer Dall wrote:
+>> Add an entry in the MAINTAINERS file for KVM/ARM.
 >>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Reviewed-by: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 >> ---
->>  drivers/of/base.c |    6 ++++--
->>  1 files changed, 4 insertions(+), 2 deletions(-)
+>>  MAINTAINERS |    8 ++++++++
+>>  1 file changed, 8 insertions(+)
 >>
->> diff --git a/drivers/of/base.c b/drivers/of/base.c
->> index 2390ddb..960ae5b 100644
->> --- a/drivers/of/base.c
->> +++ b/drivers/of/base.c
->> @@ -612,6 +612,7 @@ struct device_node *of_find_matching_node_and_match(struct device_node *from,
->>                                       const struct of_device_id **match)
->>  {
->>       struct device_node *np;
->> +     const struct of_device_id *m;
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 915564e..70e5a10 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -4474,6 +4474,14 @@ F:     arch/s390/include/asm/kvm*
+>>  F:   arch/s390/kvm/
+>>  F:   drivers/s390/kvm/
 >>
->>       if (match)
->>               *match = NULL;
->> @@ -619,9 +620,10 @@ struct device_node *of_find_matching_node_and_match(struct device_node *from,
->>       read_lock(&devtree_lock);
->>       np = from ? from->allnext : of_allnodes;
->>       for (; np; np = np->allnext) {
->> -             if (of_match_node(matches, np) && of_node_get(np)) {
->> +             m = of_match_node(matches, np);
->> +             if (m && of_node_get(np)) {
->>                       if (match)
->> -                             *match = matches;
->> +                             *match = m;
->>                       break;
->>               }
->>       }
->>
+>> +KERNEL VIRTUAL MACHINE (KVM) FOR ARM
+>> +M:   Christoffer Dall <christofferdall@gmail.com>
+>> +L:   kvmarm at lists.cs.columbia.edu
+>> +W:   http://http://systems.cs.columbia.edu/projects/kvm-arm
+>
+> Oops, I missed that this URL has two http:// prefixes.
+>
+>> +S:   Supported
+>
+> This means that you're paid to look after KVM. If so, using a gmail address
+> seems a little odd...
+>
+>> +F:   arch/arm/include/asm/kvm*
+>
+> uapi?
+>
+>> +F:   arch/arm/kvm/
+>
+
+This was obviously flawed.
+
+This is the fix, thanks:
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 70e5a10..7a6b9fe 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4475,10 +4475,11 @@ F:	arch/s390/kvm/
+ F:	drivers/s390/kvm/
+
+ KERNEL VIRTUAL MACHINE (KVM) FOR ARM
+-M:	Christoffer Dall <christofferdall@gmail.com>
++M:	Christoffer Dall <cdall@cs.columbia.edu>
+ L:	kvmarm at lists.cs.columbia.edu
+-W:	http://http://systems.cs.columbia.edu/projects/kvm-arm
+-S:	Supported
++W:	http://systems.cs.columbia.edu/projects/kvm-arm
++S:	Maintained
++F:	arch/arm/include/uapi/asm/kvm*
+ F:	arch/arm/include/asm/kvm*
+ F:	arch/arm/kvm/
+
+--
