@@ -1,90 +1,156 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 20 Jan 2013 16:03:47 +0100
-Subject: Mirabox tree
-In-Reply-To: <CAD7Jr4=E9qqzfaLi2RMTrX5ODLH16gUHQ2sk6t9tOc7L2Z=Gew@mail.gmail.com>
-References: <CAD7Jr4mveEe0rbDBuBsPmBpx3m4Bat5yipB=KQV9uaG8N+KuJQ@mail.gmail.com>
- <CAD7Jr4mAeXnYfgbs61_jcpT+iVSv1YXLb0h0VxD0SwUDbgfKAA@mail.gmail.com>
- <20130119092637.1f08f752@skate>
- <CAD7Jr4m489bfQQuSNP2s_7E2nfGUMk+Tj11hfQrU+egfjbFX8g@mail.gmail.com>
- <20130119132315.73f18ba3@skate>
- <CAD7Jr4=E9qqzfaLi2RMTrX5ODLH16gUHQ2sk6t9tOc7L2Z=Gew@mail.gmail.com>
-Message-ID: <20130120160347.03553c4e@skate>
+From: pintu_agarwal@yahoo.com (PINTU KUMAR)
+Date: Sun, 20 Jan 2013 08:03:53 -0800 (PST)
+Subject: Introducing Aggressive Low Memory Booster [1]
+In-Reply-To: <1358091177.96940.YahooMailNeo@web160103.mail.bf1.yahoo.com>
+References: <1334483226.20721.YahooMailNeo@web162003.mail.bf1.yahoo.com>
+ <CAFLxGvwJCMoiXFn3OgwiX+B50FTzGZmo6eG3xQ1KaPsEVZVA1g@mail.gmail.com>
+ <1334490429.67558.YahooMailNeo@web162006.mail.bf1.yahoo.com>
+ <CAFLxGvz5tmEi-39CZbJN+0zNd3ZpHXzZcNSFUpUWS_aMDJ4t6Q@mail.gmail.com>
+ <20120418211032.47b243da@pyramind.ukuu.org.uk>
+ <1334842941.92324.YahooMailNeo@web162006.mail.bf1.yahoo.com>
+ <1358091177.96940.YahooMailNeo@web160103.mail.bf1.yahoo.com>
+Message-ID: <1358697833.56285.YahooMailNeo@web160102.mail.bf1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Michael Lawson,
+Hi,
 
-On Sat, 19 Jan 2013 19:21:12 +0100, Michael Lawson wrote:
+Can anybody provide any inputs/suggestions/improvements on the following.
 
-> Feel free to tell me to go away. But I am quite keen to get this sd card
-> working, so did not snooping around.
-> To the mirabox dts file, I added (This I found in a patch somewhere from
-> quite recent)
+According to my experiments these proved to be a useful utility during low memory condition on the embedded devices.
+Is there something wrong I am doing?
+
+Please provide your suggestions.
+
+Thanks,
+Pintu
+
+
+
+>________________________________
+> From: PINTU KUMAR <pintu_agarwal@yahoo.com>
+>To: "linux-mm at kvack.org" <linux-mm@kvack.org>; "linux-kernel at vger.kernel.org" <linux-kernel@vger.kernel.org> 
+>Cc: "linux-arm-kernel at lists.infradead.org" <linux-arm-kernel@lists.infradead.org>; "pintu.k at samsung.com" <pintu.k@samsung.com>; Anton Vorontsov <anton.vorontsov@linaro.org>; Alan Cox <alan@lxorguk.ukuu.org.uk>; richard -rw- weinberger <richard.weinberger@gmail.com>; "patches at linaro.org" <patches@linaro.org>; Mel Gorman <mgorman@suse.de>; Wanpeng Li <liwanp@linux.vnet.ibm.com> 
+>Sent: Sunday, 13 January 2013 9:02 PM
+>Subject: Introducing Aggressive Low Memory Booster [1]
 > 
->                 usb at d0050000 {
->                         status = "okay";
->                 };
-> 
->                 usb at d0051000 {
->                         status = "okay";
->                 };
-
-This is not sufficient. The nodes must also be added in the
-corresponding .dtsi file. You should rather take 3.8-rcX and apply the
-Armada 370/XP USB series posted by Ezequiel Garcia on January 15th.
-
-> and then support for ehci in the .config file. This made no difference to
-> being able to mount the drive.
-
-Before attempting to mount anything, you should rather have a look at
-the output of "lsusb" to see if at least devices are detected. Until
-they are detected, it doesn't make sense to go further.
-
-> What I found was that the sd card reader is a pretty standard device,
-> root at mirabox-debian:~# lsusb
-> Bus 002 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-> Bus 001 Device 003: ID 05e3:0723 Genesys Logic, Inc. GL827L SD/MMC/MS Flash
-> Card Reader
-> Bus 001 Device 004: ID 05e3:0723 Genesys Logic, Inc. GL827L SD/MMC/MS Flash
-> Card Reader
-> Bus 001 Device 002: ID 1a40:0101 TERMINUS TECHNOLOGY INC. USB-2.0 4-Port HUB
-> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-> 
-> root at ubuntu:~/mainline-public-marvell-pcie-v1# grep -i -R  -l 05e3 drivers/
-> drivers/media/usb/uvc/uvc_driver.c
-> drivers/media/usb/gspca/gl860/gl860.c
-> drivers/usb/storage/usb-storage.mod.c
-> drivers/usb/storage/unusual_devs.h
-> drivers/usb/storage/usb-storage.mod.o
-
-I remember we had some discussion with other developers of the Marvell
-kernel community, and I think the conclusion was that there wasn't a
-kernel driver for the Genesys Logic controller. But I haven't checked
-again (and being at the moment in the train with a clumsy Internet
-connection makes even a basic Google search impractical).
-
-> It would appear the drivers are included in my kernel. This is where I am
-> bit confused, if the usb devices are properly mapped in the dts file, and
-> the kernel modules for the flash card reader, and usb_storage are also
-> loaded, what is preventing this guy from working.
-> 
-> How do you guys actually determine the bus addresses to use in the dts
-> files? Is this something provided by the hardware supplier, or via another
-> way? I have tried hunting for these numbers in U-Boot and the other kernel,
-> but cant see much.
-
-You need the Armada 370 datasheet, which for now, is only available
-under NDA to selected companies and developers, if I'm correct.
-However, as far as USB support on Armada 370 is concerned, the patch
-series for Ezequiel Garcia that I mentioned earlier is sufficient.
-Then, it is a matter of finding or writing a device driver for the
-Genesys Logic USB device.
-
-Hope this helps,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>
+>Hi,
+>
+>
+>Here I am trying to introduce a new feature in kernel called "Aggressive Low Memory Booster".
+>The main advantage of this will be to boost the available free memory of the system to "certain level" during extremely low memory condition.
+>
+>
+>Please provide your comments to improve further.
+>Can it be used along with vmpressure_fd ???
+>
+>
+>
+>It can be invoked as follows:
+>??? a) Automatically by kernel memory management when the memory threshold falls below 10MB.
+>??? b) From user space program/scripts by passing the "required amount of memory to be reclaimed".
+>??? Example: echo 100 > /dev/shrinkmem
+>??? c) using sys interface - /sys/kernel/debug/shrinkallmem
+>??? d) using an ioctl call and returning number of pages reclaimed.
+>??? e) using a new system call - shrinkallmem(&nrpages);
+>??? f) During CMA to reclaim and shrink a specific CMA regions.
+>
+>
+>
+>I have developed a kernel module to verify the (b) part.
+>
+>
+>Here is the snapshot of the write call:
+>+static ssize_t shrinkmem_write(struct file *file, const char *buff,
+>+??????????????????????????????? size_t length, loff_t *pos)
+>+{
+>+??????? int ret = -1;
+>+??????? unsigned long memsize = 0;
+>+??????? unsigned long nr_reclaim = 0;
+>+??????? unsigned long pages = 0;
+>+??????? ret = kstrtoul_from_user(buff, length, 0, &memsize);
+>+??????? if (ret < 0) {
+>+??????????????? printk(KERN_ERR "[SHRINKMEM]: kstrtoul_from_user: Failed !\n");
+>+??????????????? return
+-1;
+>+??????? }
+>+??????? printk(KERN_INFO "[SHRINKMEM]: memsize(in MB) = %ld\n",
+>+??????????????????????????????? (unsigned long)memsize);
+>+??????? memsize = memsize*(1024UL*1024UL);
+>+??????? nr_reclaim = memsize / PAGE_SIZE;
+>+??????? pages = shrink_all_memory(nr_reclaim);
+>+??????? printk(KERN_INFO "<SHRINKMEM>: Number of Pages Freed: %lu\n", pages);
+>+??????? return pages;
+>+}
+>Please note: This requires CONFIG_HIBERNATION to be permanently enabled in the kernel.
+>
+>
+>Several experiments have been performed on Ubuntu(kernel 3.3) to verify it under low memory conditions.
+>
+>
+>Following are some results obtained:
+>-------------------------------------
+>
+>Node 0, zone????? DMA??? 290??? 115????? 0????? 0????? 0????? 0????? 0????? 0????? 0????? 0????? 0
+>Node 0, zone?? Normal??? 304??? 540??? 116???? 13????? 2????? 2????? 0????? 0????? 0????? 0????? 0
+>=========================
+>???????????? total??????
+used?????? free???? shared??? buffers???? cached
+>Mem:?????????? 497??????? 487???????? 10????????? 0???????? 63??????? 303
+>-/+ buffers/cache:??????? 120??????? 376
+>Swap:???????? 1458???????? 34?????? 1424
+>Total:??????? 1956??????? 522?????? 1434
+>=========================
+>Total Memory Freed: 342 MB
+>Total Memory Freed: 53 MB
+>Total
+Memory Freed: 23 MB
+>Total Memory Freed: 10 MB
+>Total Memory Freed: 15 MB
+>Total Memory Freed: -1 MB
+>Node 0, zone????? DMA????? 6????? 6????? 7????? 8???? 10????? 9????? 7????? 4????? 1????? 0????? 0
+>Node 0, zone?? Normal?? 2129?? 2612?? 2166?? 1723?? 1260??? 759??? 359??? 108???? 10????? 0????? 0
+>=========================
+>???????????? total??????
+used?????? free???? shared??? buffers???? cached
+>Mem:?????????? 497???????? 47??????? 449????????? 0????????? 0????????? 5
+>-/+ buffers/cache:???????? 41??????? 455
+>Swap:???????? 1458???????? 97?????? 1361
+>Total:??????? 1956??????? 145?????? 1811
+>=========================
+>
+>
+>It was verified using a sample shell script "reclaim_memory.sh" which keeps recovering memory by doing "echo 500 > /dev/shrinkmem" until no further reclaim is possible.
+>
+>
+>The experiments were performed with various scenarios as follows:
+>a) Just after the boot up - (could recover around 150MB with 512MB RAM)
+>b) After running many applications include youtube videos, large tar files download - 
+>
+>?? [until free mem becomes < 10MB]
+>?? [Could recover around 300MB in one shot]
+>c) Run reclaim, while download is in progress and video still playing - (Not applications killed)
+>
+>d) revoke all background applications again, after running reclaim - (No impact, normal behavior)
+>?? [Just it took little extra time to launch, as if it was launched for first time]
+>
+>
+>
+>
+>Please see more discussions on this in the last year mailing list:
+>
+>https://lkml.org/lkml/2012/4/15/35
+>
+>
+>
+>Thank You!
+>With regards,
+>Pintu Kumar
+>Samsung - India
+>
+>
+>
+>
+>
+>
