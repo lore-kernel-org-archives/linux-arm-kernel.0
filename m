@@ -1,26 +1,33 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sun, 20 Jan 2013 11:13:27 +1100
-Subject: [PATCH] crypto: omap-sham - Fix compile errors when CONFIG_OF
- not defined
-In-Reply-To: <1358283182-29392-1-git-send-email-mgreer@animalcreek.com>
-References: <1358283182-29392-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <20130120001327.GE26742@gondor.apana.org.au>
+From: anton@enomsg.org (Anton Vorontsov)
+Date: Sat, 19 Jan 2013 18:05:14 -0800
+Subject: [PATCH] power: reset: qnap-poweroff: Fix License String
+In-Reply-To: <1357668926-20598-1-git-send-email-andrew@lunn.ch>
+References: <20130106215509.GD26928@lizard.sbx05280.losalca.wayport.net>
+ <1357668926-20598-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20130120020514.GB13085@lizard.sbx05663.mountca.wayport.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 15, 2013 at 01:53:02PM -0700, Mark A. Greer wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+On Tue, Jan 08, 2013 at 07:15:26PM +0100, Andrew Lunn wrote:
+> GPLv2+ is not a valid license string. Replace it with one that is.
 > 
-> Fix the compile errors created by commit 2545e8d
-> (crypto: omap-sham - Add Device Tree Support)
-> when CONFIG_OF is not defined.  This includes
-> changing omap_sham_get_res_dev() to omap_sham_get_res_of()
-> and creating an empty version of omap_sham_of_match[].
-> 
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
 
-Also applied.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Applied, thanks a lot!
+
+>  drivers/power/reset/qnap-poweroff.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
+> index ca0b476..8af772b 100644
+> --- a/drivers/power/reset/qnap-poweroff.c
+> +++ b/drivers/power/reset/qnap-poweroff.c
+> @@ -121,4 +121,4 @@ module_platform_driver(qnap_power_off_driver);
+>  
+>  MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
+>  MODULE_DESCRIPTION("QNAP Power off driver");
+> -MODULE_LICENSE("GPLv2+");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 1.7.10.4
