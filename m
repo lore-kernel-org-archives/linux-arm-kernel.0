@@ -1,142 +1,68 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 19 Jan 2013 19:27:57 -0300
-Subject: [PATCH v2 3/3] arm: omap2: gpmc: add DT bindings for OneNAND
-In-Reply-To: <1358634477-25868-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1358634477-25868-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1358634477-25868-3-git-send-email-ezequiel.garcia@free-electrons.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sun, 20 Jan 2013 11:12:51 +1100
+Subject: [PATCH v2 00/10] crypto: omap-aes - Updates & New Functionality
+In-Reply-To: <1357671467-32363-1-git-send-email-mgreer@animalcreek.com>
+References: <1357671467-32363-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <20130120001251.GB26742@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree bindings for OMAP OneNAND devices.
-Tested on an OMAP3 3430 IGEPv2 board.
+On Tue, Jan 08, 2013 at 11:57:37AM -0700, Mark A. Greer wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> 
+> Changes from v1:
+>  - Addressed comments by Russ Dill by defining omap_aes_of_match[] to
+>    contain an empty entry (end of list indicator) and defining 
+>    omap_aes_get_res_of() instead of incorrectly defining
+>    omap_aes_get_res_dev() when CONFIG_OF is not defined.
+> 
+> This patch series does several things to the omap-aes crypto
+> driver including:
+>  - converting to use pm_runtime
+>  - adding suspend/resume support
+>  - converting to use dmaengine API
+>  - adding device tree support
+>  - adding OMAP4/AM33XX support
+>  - adding CTR support
+>  - some misc. cleanups
+> 
+> The patches are based on the current k.o. 54e37b8 (Merge tag
+> 'vfio-for-v3.8-v2' of git://github.com/awilliam/linux-vfio), plus:
+>  - the ARM hwmod, etc patches from 
+>    "[PATCH 00/15] OMAP SHAM & AES Crypto Updates"
+>    (http://marc.info/?l=linux-omap&m=135610732120447&w=2)
+>  - the EDMA dmaengine patches submitted by Matt Porter
+>    "[RFC PATCH v3 00/16] DMA Engine support for AM33XX]"
+>    (https://lkml.org/lkml/2012/10/18/256)
+>  - some misc patches required by the EDMA patches
+>  - a hack to fix the compilation error that the current k.o. kernel has
+> 
+> A working examle is here:
+> 
+> 	git at github.com:mgreeraz/linux-mag.git submitted/crypto/aes
+> 
+> This patch series does several things to the omap-aes crypto
+> driver including:
+>  - converting to use pm_runtime
+>  - adding suspend/resume support
+>  - converting to use dmaengine API
+>  - adding device tree support
+>  - adding OMAP4/AM33XX support
+>  - adding CTR support
+>  - some misc. cleanups
+> 
+> The patches are based on the current k.o. kernel, plus:
+>  - the ARM hwmod, etc patches from 
+>    "[PATCH 00/15] OMAP SHAM & AES Crypto Updates"
+>    (http://marc.info/?l=linux-omap&m=135610732120447&w=2)
+>  - the EDMA dmaengine patches submitted by Matt Porter
+>    "[RFC PATCH v3 00/16] DMA Engine support for AM33XX]"
+>    (https://lkml.org/lkml/2012/10/18/256)
+>  - some misc patches required by the EDMA patches
+>  - a hack to fix the compilation error that the current k.o. kernel has
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
-Changes from v1:
- * Fix typo in Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-
- .../devicetree/bindings/mtd/gpmc-onenand.txt       |   43 +++++++++++++++++++
- arch/arm/mach-omap2/gpmc.c                         |   44 ++++++++++++++++++++
- 2 files changed, 87 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-
-diff --git a/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt b/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-new file mode 100644
-index 0000000..deec9da
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-@@ -0,0 +1,43 @@
-+Device tree bindings for GPMC connected OneNANDs
-+
-+GPMC connected OneNAND (found on OMAP boards) are represented as child nodes of
-+the GPMC controller with a name of "onenand".
-+
-+All timing relevant properties as well as generic gpmc child properties are
-+explained in a separate documents - please refer to
-+Documentation/devicetree/bindings/bus/ti-gpmc.txt
-+
-+Required properties:
-+
-+ - reg:			The CS line the peripheral is connected to
-+
-+Optional properties:
-+
-+ - dma-channel:		DMA Channel index
-+
-+For inline partiton table parsing (optional):
-+
-+ - #address-cells: should be set to 1
-+ - #size-cells: should be set to 1
-+
-+Example for an OMAP3430 board:
-+
-+	gpmc: gpmc at 6e000000 {
-+		compatible = "ti,omap3430-gpmc";
-+		ti,hwmods = "gpmc";
-+		reg = <0x6e000000 0x1000000>;
-+		interrupts = <20>;
-+		gpmc,num-cs = <8>;
-+		gpmc,num-waitpins = <4>;
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+
-+		onenand at 0 {
-+			reg = <0 0 0>; /* CS0, offset 0 */
-+
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			/* partitions go here */
-+		};
-+	};
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 01ce462..f7de9eb 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -39,6 +39,7 @@
- #include "omap_device.h"
- #include "gpmc.h"
- #include "gpmc-nand.h"
-+#include "gpmc-onenand.h"
- 
- #define	DEVICE_NAME		"omap-gpmc"
- 
-@@ -1259,6 +1260,43 @@ static int gpmc_probe_nand_child(struct platform_device *pdev,
- }
- #endif
- 
-+#ifdef CONFIG_MTD_ONENAND
-+static int gpmc_probe_onenand_child(struct platform_device *pdev,
-+				 struct device_node *child)
-+{
-+	u32 val;
-+	struct omap_onenand_platform_data *gpmc_onenand_data;
-+
-+	if (of_property_read_u32(child, "reg", &val) < 0) {
-+		dev_err(&pdev->dev, "%s has no 'reg' property\n",
-+			child->full_name);
-+		return -ENODEV;
-+	}
-+
-+	gpmc_onenand_data = devm_kzalloc(&pdev->dev, sizeof(*gpmc_onenand_data),
-+					 GFP_KERNEL);
-+	if (!gpmc_onenand_data)
-+		return -ENOMEM;
-+
-+	gpmc_onenand_data->cs = val;
-+	gpmc_onenand_data->of_node = child;
-+	gpmc_onenand_data->dma_channel = -1;
-+
-+	if (!of_property_read_u32(child, "dma-channel", &val))
-+		gpmc_onenand_data->dma_channel = val;
-+
-+	gpmc_onenand_init(gpmc_onenand_data);
-+
-+	return 0;
-+}
-+#else
-+static int gpmc_probe_onenand_child(struct platform_device *pdev,
-+				    struct device_node *child)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int gpmc_probe_dt(struct platform_device *pdev)
- {
- 	int ret;
-@@ -1276,6 +1314,12 @@ static int gpmc_probe_dt(struct platform_device *pdev)
- 			return ret;
- 	}
- 
-+	for_each_node_by_name(child, "onenand") {
-+		ret = gpmc_probe_onenand_child(pdev, child);
-+		of_node_put(child);
-+		if (ret < 0)
-+			return ret;
-+	}
- 	return 0;
- }
- #else
+All applied.  Thanks!
 -- 
-1.7.8.6
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
