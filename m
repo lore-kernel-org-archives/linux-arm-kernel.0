@@ -1,46 +1,40 @@
-From: protectools2@qq.com (Diamond segments Supply)
-Date: Sun, 20 Jan 2013 16:47:28 +0000
-Subject: =?GB2312?B?RGlhbW9uZCBzZWdtZW50cyBTdXBwbHnT68T6ubLP7cHL1dXGrA==?=
-Message-ID: <20cf303bf71697c8c004d3bb1915@google.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 20 Jan 2013 21:13:36 +0100
+Subject: [PATCH] power: reset: qnap-poweroff: Fix License String
+In-Reply-To: <1357668926-20598-1-git-send-email-andrew@lunn.ch>
+References: <20130106215509.GD26928@lizard.sbx05280.losalca.wayport.net>
+ <1357668926-20598-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20130120201336.GO8668@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sir,
+On Tue, Jan 08, 2013 at 07:15:26PM +0100, Andrew Lunn wrote:
+> GPLv2+ is not a valid license string. Replace it with one that is.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/power/reset/qnap-poweroff.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
+> index ca0b476..8af772b 100644
+> --- a/drivers/power/reset/qnap-poweroff.c
+> +++ b/drivers/power/reset/qnap-poweroff.c
+> @@ -121,4 +121,4 @@ module_platform_driver(qnap_power_off_driver);
+>  
+>  MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
+>  MODULE_DESCRIPTION("QNAP Power off driver");
+> -MODULE_LICENSE("GPLv2+");
+> +MODULE_LICENSE("GPL v2");
+This change is wrong.
 
-Now we are very gald to inform you that we have a promotion for our Diamond  
-Segments with attractive price and good cutting speed with long life.
-We can supply different grit of : 20# to 300# , and soft to hard bond for  
-different purpose.
-These segments are used for HTC PAD, HUSQVARNA PAD and other type of  
-Grinding cup wheel .
+According to include/linux/module.h "GPL v2" means exactly that: version
+2. As the file specifies v2 or later in the header you have to use "GPL"
+which means v2 or later.
 
-Please check the ATTACHED PICTURE.If you need any diamond segments in other  
-size,please kindly send us the Length,Width and Height for your diamond  
-segments,we will make the good quotation for you soon!
+Best regards
+Uwe
 
-If you have any other inquiry for diamond tools,please kindly send us,we  
-will give you competitive price to support you!
-
-I am looking forward to seeing your early reply,thanks for your time!
-
-Have a good day!
-
-Best Regards!
-
-selina wang
-PROTEC TOOLS CO.,LTD
-Add: No24 Lane 99 Xinzhe east road,Fengxian,Shanghai,China 201424
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: QQ??20130109212555.jpg
-Type: image/jpeg
-Size: 21893 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130120/84f37a67/attachment-0002.jpg>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 2.jpg
-Type: image/jpeg
-Size: 38739 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130120/84f37a67/attachment-0003.jpg>
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
