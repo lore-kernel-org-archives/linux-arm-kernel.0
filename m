@@ -1,67 +1,80 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Mon, 21 Jan 2013 11:59:18 +0530
-Subject: [PATCH 1/2] ARM: davinci: da850: add DT node for eth0.
-In-Reply-To: <1358749759-20517-1-git-send-email-prabhakar.lad@ti.com>
-References: <1358749759-20517-1-git-send-email-prabhakar.lad@ti.com>
-Message-ID: <1358749759-20517-2-git-send-email-prabhakar.lad@ti.com>
+From: p.paneri@samsung.com (Praveen Paneri)
+Date: Mon, 21 Jan 2013 12:13:10 +0530
+Subject: [RESEND PATCH v9 0/2] usb: phy: samsung: Introducing usb phy
+ driver for samsung SoCs
+In-Reply-To: <20130118184619.GA1991@arwen.pp.htv.fi>
+References: <1358499623-13901-1-git-send-email-p.paneri@samsung.com>
+ <20130118184619.GA1991@arwen.pp.htv.fi>
+Message-ID: <CAD6zSYOA0mDMPyu163br87eZ7V+3HawHATW_QHidzsRw_E3q4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.lad@ti.com>
+Hi Felipe,
 
-Add eth0 device tree node information to da850 by
-providing interrupt details and local mac address of eth0.
+On Sat, Jan 19, 2013 at 12:16 AM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Fri, Jan 18, 2013 at 02:30:21PM +0530, Praveen Paneri wrote:
+>> Changes from v8:
+>> Resending this patch series after rebasing to the latest usb-next branch.
+>> Rewording inline comments for better readability.
+>> Removed IS_ENABLED(CONFIG_OF) as pdev->dev.of_node is enough to check for dt support.
+>> Using of_match_ptr to add of_match_table to platform_driver structure.
+>> Removed unnecessary variables.
+>>
+>> Changes from v7:
+>> Rebased to the latest usb-next branch.
+>> Separating arch patches from these driver patches.
+>>
+>> Changes from v6:
+>> Modified register definitions according to the existing ones.
+>> Changed default PHY clk selection for SoCs.
+>> Improved binding text and rebased to the latest usb-next.
+>>
+>> Changes from v5:
+>> Moved clk_get() to driver's probe function. Now reference clock frequency
+>> selection value is stored in samsung_usbphy structure for later use. Used
+>> IS_ENABLED() instead of #ifdef in samsung_usbphy_get_driver_data().
+>>
+>> Changes from v4:
+>> Moved header file contents to driver's source file
+>> Removed unnecessary print message from driver's probe function
+>> Dropped the Free Software Foundation address from the header
+>>
+>> Changes from v3:
+>> Replaced susbsys_initcall()/module_exit() by module_platform_driver().
+>> Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
+>> is registered
+>> Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
+>>
+>> Changes from v2:
+>> Changed the driver filenames to samsung-usbphy
+>> Rectified coding style related errors
+>>
+>> Changes from v1:
+>> Rebased patches to latest usb-next branch
+>> Changed the name 'sec_usbphy' to 'samsung_usbphy'
+>>
+>> This patch set introduces a phy driver for samsung SoCs. It uses the existing
+>> transceiver infrastructure to provide phy control functions. Use of this driver
+>> can be extended for usb host phy as well. Over the period of time all the phy
+>> related code for most of the samsung SoCs can be integrated here.
+>> Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
+>> when they start supporting this phy driver.
+>> This driver is tested with smdk6410 and Exynos4210(with DT).
+>>
+>> Praveen Paneri (2):
+>>   usb: phy: samsung: Introducing usb phy driver for hsotg
+>>   usb: s3c-hsotg: Adding phy driver support
+>
+> Can you check on my xceiv branch if this is applied correctly ?
+Yes! It is applied fine.
 
-Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: netdev at vger.kernel.org
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Heiko Schocher <hs@denx.de>
----
- arch/arm/boot/dts/da850-evm.dts |    3 +++
- arch/arm/boot/dts/da850.dtsi    |   15 +++++++++++++++
- 2 files changed, 18 insertions(+), 0 deletions(-)
+Thanks :)
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 37dc5a3..a1d6e3e 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -24,5 +24,8 @@
- 		serial2: serial at 1d0d000 {
- 			status = "okay";
- 		};
-+		eth0: emac at 1e20000 {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 640ab75..309cc99 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -56,5 +56,20 @@
- 			interrupt-parent = <&intc>;
- 			status = "disabled";
- 		};
-+		eth0: emac at 1e20000 {
-+			compatible = "ti,davinci-dm6467-emac";
-+			reg = <0x220000 0x4000>;
-+			ti,davinci-ctrl-reg-offset = <0x3000>;
-+			ti,davinci-ctrl-mod-reg-offset = <0x2000>;
-+			ti,davinci-ctrl-ram-offset = <0>;
-+			ti,davinci-ctrl-ram-size = <0x2000>;
-+			local-mac-address = [ 00 00 00 00 00 00 ];
-+			interrupts = <33
-+					34
-+					35
-+					36
-+					>;
-+			interrupt-parent = <&intc>;
-+		};
- 	};
- };
--- 
-1.7.4.1
+Praveen
+>
+> thanks
+>
+> --
+> balbi
