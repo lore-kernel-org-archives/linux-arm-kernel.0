@@ -1,110 +1,82 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 21 Jan 2013 10:00:17 -0600
-Subject: Compilation problem with drivers/staging/zsmalloc when !SMP on ARM
-In-Reply-To: <20130121055541.GD3666@blaptop>
-References: <CAKGA1b=ACTQHo9=B7EAG5nrFCO9u-J+sy7dXtYk3Rk6OUcW3cQ@mail.gmail.com>
- <20130118210859.GH23505@n2100.arm.linux.org.uk>
- <CAKGA1bmJ6c4LC=NAD4MU_rBZ2hZjf6qH=C+dqMCf0eP+2vSFdA@mail.gmail.com>
- <20130119044602.GC5391@phenom.dumpdata.com> <20130121055541.GD3666@blaptop>
-Message-ID: <CAKGA1bk3xdD5sTnn8DR9HQ4ae1sUsEnC1ENcwa3jfjDQgGp6QA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 21 Jan 2013 16:01:19 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP: some clock/hwmod fixes for v3.8-rc
+Message-ID: <alpine.DEB.2.00.1301211557530.8450@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Minchan,
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-On Sun, Jan 20, 2013 at 11:55 PM, Minchan Kim <minchan@kernel.org> wrote:
-> On Fri, Jan 18, 2013 at 11:46:02PM -0500, Konrad Rzeszutek Wilk wrote:
->> On Fri, Jan 18, 2013 at 07:11:32PM -0600, Matt Sealey wrote:
->> >
->> > diff --git a/drivers/staging/zsmalloc/zsmalloc-main.c
->> > b/drivers/staging/zsmalloc/zsmalloc-main.c
->> > index 09a9d35..ecf75fb 100644
->>       > --- a/drivers/staging/zsmalloc/zsmalloc-main.c
->> > +++ b/drivers/staging/zsmalloc/zsmalloc-main.c
->> > @@ -228,7 +228,7 @@ struct zs_pool {
->> >   * mapping rather than copying
->> >   * for object mapping.
->> >  */
->> > -#if defined(CONFIG_ARM)
->> > +#if defined(CONFIG_ARM) && defined(CONFIG_SMP)
->> >  #define USE_PGTABLE_MAPPING
->
-> I don't get it. How to prevent the problem Russel described?
-> The problem is that other CPU can prefetch _speculatively_ under us.
+Hi Tony,
 
-It prevents no problems, but if that isn't there, kernels build
-without SMP support (i.e. specifically uniprocessor kernels) will fail
-at the linker stage.
+The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
 
-That's not desirable.
+  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
 
-We have 3 problems here, this solves the first of them, and creates
-the third. The second is constant regardless..
+are available in the git repository at:
 
-1) zsmalloc will not build on ARM without CONFIG_SMP because on UP
-local_tlb_flush_kern_range uses a function which uses an export which
-isn't required on SMP
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-v3.8-rc
 
-Basically, with CONFIG_SMP (and CONFIG_UP_ON_SMP),
-local_tlb_flush_kern_range is calling functions by dereference from
-the per-cpu global cpu_tlb structure.
+for you to fetch changes up to bdcc61275232db897ba831f87a16df98ab248571:
 
-On UP (!CONFIG_SMP), it is calling functions directly (in my case,
-v7wbi_local_tlb_flush_kern_range or whatever, but on v6, v5, v4 ARM
-processor kernel builds it may be different) which need to be exported
-outside of the MM core.
+  ARM: OMAP2: Fix missing omap2xxx_clkt_vps_late_init function calls (2013-01-18 16:48:16 -0700)
 
-If this difference is going to stick around - Russell is refusing here
-to export that/those direct functions - then the optimized vm mapping
-code simply should never be allowed to run on non-SMP systems to keep
-it building for everyone.
+- ----------------------------------------------------------------
+A few OMAP integration fixes for v3.8-rc, for OMAP4 audio and OMAP2 reboot.
 
-The patch above is simply a build fix for !CONFIG_SMP in this case to
-force it to use the slow path for systems where the above missing
-export problem will cause the linker failure.
+Basic test logs are available here:
 
-2) the optimized vm mapping isn't per-cpu aware as per Russell's
-arguments. I'll let you guys discuss that as I have no idea what the
-real implications are for SMP systems (and my current testing is only
-on a non-SMP CPU, I will have to go grab a couple boards from the lab
-for SMP)
+    http://www.pwsan.com/omap/testlogs/prcm_fixes_c_v3.8-rc/20130121073904/
 
-3) it somewhat defeats the purpose of the optimization if UP systems
-(which tend to have less memory and might benefit from things like
-zsmalloc/zram more) cannot use it, but SMP systems which tend to have
-more memory (unless we're talking about a frugal configuration of a
-virtual machine, perhaps). Given the myriad use cases of zram that is
-not a pervasive or persuasive argument, I know, but it does seem
-slightly backwards.
+- ----------------------------------------------------------------
 
-> If I don't miss something, we could have 2 choice.
->
-> 1) use flush_tlb_kernel_range instead of local_flush_tlb_kernel_range
-> Or
-> 2) use only memory copy
->
-> I guess everybody want 2 because it makes code very simple and maintainable.
-> Even, rencently Joonsoo sent optimize patch.
-> Look at https://lkml.org/lkml/2013/1/16/68 so zram/zcache effect caused by 2
-> would be minimized.
->
-> But please give me the time and I will borrow quad-core embedded target board
-> and test 1 on the phone with Seth's benchmark.
+vmlinux object size
+(delta in bytes from test_v3.8-rc4 (7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619)):
+   text     data      bss    total  kernel
+      0        0        0        0  am33xx_only
+     +8      +24        0      +32  n800_multi_omap2xxx
+     +4       -8        0       -4  n800_only_a
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+     -8       +8        0        0  omap2plus_defconfig
+     +4      +24        0      +28  omap2plus_defconfig_2430sdp_only
+     -8       +8        0        0  omap2plus_defconfig_cpupm
+     -8       +8        0        0  omap2plus_defconfig_no_pm
+     -8       +8        0        0  omap2plus_defconfig_omap2_4_only
+    -16      +16        0        0  omap2plus_defconfig_omap3_4_only
+     -8       +8        0        0  rmk_omap3430_ldp_allnoconfig
+      0        0        0        0  rmk_omap3430_ldp_oldconfig
+     -8       +8        0        0  rmk_omap4430_sdp_allnoconfig
+    -16      +16        0        0  rmk_omap4430_sdp_oldconfig
 
-In the meantime please take into account building a non-SMP kernel for
-this board and testing that; if there is a way to do the flush without
-using the particular function which uses the particular export that
-Russell will not export, then that would be better. Maybe for
-!CONFIG_SMP using flush_tlb_kernel_range is doing the exact same job
-and the real patch is not to disable the optimization with
-!CONFIG_SMP, but to additionally #if defined(CONFIG_SMP) around
-local_flush_tlb_kernel_range and alternatively for UP use
-flush_tlb_kernel_range which.. probably.. doesn't use that contentious
-export?
+Jon Hunter (1):
+      ARM: OMAP2: Fix missing omap2xxx_clkt_vps_late_init function calls
 
-This is far beyond the level I want to be digging around in the Linux
-kernel so I am not comfortable even trying that to find out.
+Peter Ujfalusi (2):
+      ARM: OMAP4: clock data: Lock ABE DPLL on all revisions
+      ARM: OMAP4: hwmod_data: Correct IDLEMODE for McPDM
 
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+ arch/arm/mach-omap2/cclock2420_data.c      |    2 ++
+ arch/arm/mach-omap2/cclock2430_data.c      |    2 ++
+ arch/arm/mach-omap2/cclock44xx_data.c      |   13 ++++++-------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    6 +++++-
+ 4 files changed, 15 insertions(+), 8 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJQ/WYEAAoJEMePsQ0LvSpLjwcP/3ZgPMHcwk+/rdSOtCF9BR4V
+BFc9GSyUnj5jJMmVo2yixHgM6hnf0nqP9lEHW6wYaqFF7wb6swo5mKCsK3VErgF/
+xJXL1j9DmdnnF+uUeoRmKlNkQ2y2+zkbHCBY8A6zxzKQMYW6xSwkhM1Jdmw55Vxn
+ROgPXuzjOnXUsTtodYsVkW/3hGNKCxoP8/hH7M+GcQVql9Iebh2E/efW67pSFTvp
+ChisfYiHWJWzDso8FfKkLwYHSZfK5qq3KNFgRq2n0xuxEsJMGqM5rKaQypJ6LMK/
+ExvPgFAhgHnsSvtESNWAKsAXDtVvr2z/HYPIsoCVYUy7C33P857uQpbIXuD4gS4w
+CLon1M9k4Wpuzd4Da/WY6O8L6goCrTuL7Cx1ayWBmvZNDpwNAUVQi8k1Ei9vcFiv
+N3vxutc/QrYQ11x7uNe2A8XWp8fsVvwQ6+XiVk96ZXgKe+Fc1COOz17lMyxhJqdo
+PhAXvnvo5avzDueiu4AluFkIwsNl5vDqphkxqhOdlDzcuZHN4dzguoN/fKIbSXfy
+fKS6GXDwU1vTTpvzbefdDUiVU+rEi9HIbXv8tkXp5FPnAs0YLD0vdbC6bIeUFO1K
+S7AW075XkmB04VYPZeUh6vBCBjoWXYClMyIzeEEVvAxOTEHMi3+nZn7jIel7uVMa
+l0wEGhU+lY3MHfbHdmh2
+=1k3b
+-----END PGP SIGNATURE-----
