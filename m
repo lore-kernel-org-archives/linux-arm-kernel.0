@@ -1,84 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jan 2013 23:13:18 +0000
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Jan 2013 15:23:22 -0800
 Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <CAKGA1bmtTH1N8nx79MGiMighdQROpNtpvAZXhHKT+mT3kcazBQ@mail.gmail.com>
+In-Reply-To: <20130121210341.GW23505@n2100.arm.linux.org.uk>
 References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <201301212041.17951.arnd@arndb.de> <50FDAC5F.4040605@linaro.org>
- <CAKGA1b=D5CNikijoOAk5xP6TC-nB_gEGtS05ncrPR68sQTMrxw@mail.gmail.com>
- <50FDC2DD.7090406@linaro.org>
- <CAKGA1bmtTH1N8nx79MGiMighdQROpNtpvAZXhHKT+mT3kcazBQ@mail.gmail.com>
-Message-ID: <20130121231318.GC23505@n2100.arm.linux.org.uk>
+ <201301212041.17951.arnd@arndb.de>
+ <20130121210341.GW23505@n2100.arm.linux.org.uk>
+Message-ID: <20130121232322.GK15361@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 04:54:31PM -0600, Matt Sealey wrote:
-> Hmm, I think it might be appreciated for people looking at this stuff
-> (same as I stumbled into it) for a little comment on WHY the default
-> is 200. That way you don't wonder even if you know why EBSA110 has a
-> HZ=200 default, why Exynos is lumped in there too (to reduce the
-> number of interrupts firing?
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [130121 13:07]:
+> 
+> As for Samsung and the rest I can't comment.  The original reason OMAP
+> used this though was because the 32768Hz counter can't produce 100Hz
+> without a .1% error - too much error under pre-clocksource
+> implementations for timekeeping.  Whether that's changed with the
+> clocksource/clockevent support needs to be checked.
 
-Err, _reduce_ ?
+Yes that's why HZ was originally set to 128. That value (or some multiple)
+still makes sense when the 32 KiHZ clock source is being used. Of course
+we should rely on the local timer when running for the SoCs that have
+them.
 
-Can you please explain why changing HZ from 100 to 200 is a reduction?
+Regards,
 
-> Maybe the Exynos timer interrupt is kind
-> of a horrid core NMI kind of thing and it's desirable for it not to be
-> every millisecond,
-
-Huh?  HZ=100 is centisecond intervals...
-
-> or maybe it has the same restrictions as EBSA110,
-> but where would anyone go to find out this information?)
-
-Maybe the mailing list archives.  No, not these ones.  The full ones
-on lists.arm.linux.org.uk.  The lurker archives contain every email
-that has been on these mailing lists stretching back into the late
-1990s.  They are the only _full_ archives (give or take a few problems
-with connectivity between lists.arm.linux.org.uk and lists.infradead.org
-throwing the archiver subscription off.)
-
-> I think then the default 100 at the end of the arch/arm/Kconfig is
-> saying "you are not allowed to know that such a thing as rope even
-> exists," when in fact what we should be doing is just making sure they
-> can't swing it over the rafters.. am I taking the analogy too far? :)
-
-I think you're understanding is just waaaayyyyy off.  That default is
-there because that is the _architecture_ _default_ and there _has_ to
-be a default.  No, including kernel/Kconfig.hz won't give us any kind
-of non-specified default because, as I've already said in one of my
-other mails, you can't supplement Kconfig symbol definitions by
-declaring it multiple times.
-
-> I know where the 60Hz clocksource might come from, the old Amiga
-> platforms have one based on the PSU frequency (50Hz in Europe, 60Hz
-> US/Japan). Even a 60Hz clocksource is useful though (on the Amiga, at
-> least, it is precisely the vsync clock for synchronizing your display
-> output on TV-out, which makes it completely useful for the framebuffer
-> driver), but.. you just won't expect to assign it as sched_clock or
-> your delay timer. And if anyone does I'd expect they'd know full well
-> it'd not run so well.
-
-Except in the UK where it'd be 50Hz for the TV out.  (Lengthy irrelevant
-explanation why this is so for UK cut.)
-
-> >From that description, we are booting with standard HZ on ARM, and the
-> core sched_clock (as in we can call setup_sched_clock)
-> and/or/both/optionally using a real delay_timer switch to HRT mode if
-> we have the right equipment available in the kernel and at runtime on
-> the SoC.. but the process scheduler isn't compiled with the means to
-> actually take advantage of us being in HRT mode?
-
-Don't mix sched_clock() into this; it has nothing to do with HZ at all.
-You're confusing your apples with your oranges.
-
-> A simple BUILD_BUG_ON and a BUG_ON right after each other in the
-> appropriate clocksource driver solves that.. if there's an insistence
-> on having at least some rope, we can put them in a field and tell them
-> they have to use the moon to actually hang themselves...
-
-No it doesn't - it introduces a whole load of new ways to make the
-kernel build or boot fail for pointless reasons - more failures, more
-regressions.
-
-No thank you.
+Tony
