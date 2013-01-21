@@ -1,77 +1,71 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 21 Jan 2013 13:00:15 -0800
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <201301212041.17951.arnd@arndb.de>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <201301212041.17951.arnd@arndb.de>
-Message-ID: <50FDAC5F.4040605@linaro.org>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 21 Jan 2013 22:00:36 +0100
+Subject: [PATCH 1/2] iio: mxs: Add MX23 support into the IIO driver
+In-Reply-To: <CAHXqBFLQUY6g6p988MVkk=sRu44B5tEzDMH2UbU2n2UDda0Q-A@mail.gmail.com>
+References: <1358798722-25102-1-git-send-email-marex@denx.de>
+ <CAHXqBFLQUY6g6p988MVkk=sRu44B5tEzDMH2UbU2n2UDda0Q-A@mail.gmail.com>
+Message-ID: <201301212200.36917.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2013 12:41 PM, Arnd Bergmann wrote:
-> On Monday 21 January 2013, Matt Sealey wrote:
->> config HZ
->>          int
->>          default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
->>                  ARCH_S5PV210 || ARCH_EXYNOS4
->>          default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
->>          default AT91_TIMER_HZ if ARCH_AT91
->>          default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
->>          default 100
->>
->> There is a patch floating around ("ARM: OMAP2+: timer: remove
->> CONFIG_OMAP_32K_TIMER")
->> which modifies the OMAP line, so I'll ignore that for my below
->> example, and I saw a patch for adding Exynos5 processors to the top
->> default somewhere around here.
->>
->> So, based on those getting in, in my case here, I can see a situation where;
->>
->> * I build multiplatform for i.MX6 and Exynos4/5 ARCH_MULTIPLATFORM, I
->> will get CONFIG_HZ=200.
->>
->> * If I built for just i.MX6, I will get CONFIG_HZ=100.
->>
->> Either way, if I boot a kernel on i.MX6, CONFIG_HZ depends on the
->> other ARM platforms I also want to boot on it.. this is not exactly
->> multiplatform compliant, right?
-> Right. It's pretty clear that the above logic does not work
-> with multiplatform.  Maybe we should just make ARCH_MULTIPLATFORM
-> select NO_HZ to make the question much less interesting.
+Dear Micha? Miros?aw,
 
-Although, even with NO_HZ, we still have some sense of HZ.
+> 2013/1/21 Marek Vasut <marex@denx.de>:
+> > This patch adds support for i.MX23 into the LRADC driver. The LRADC
+> > block on MX23 is not much different from the one on MX28, thus this
+> > is only a few changes fixing the parts that are specific to MX23.
+> 
+> [...]
+> 
+> > +struct mxs_lradc_of_config {
+> > +       const int               irq_count;
+> > +       const char * const      *irq_name;
+> > +};
+> > +
+> > +static const struct mxs_lradc_of_config const mxs_lradc_of_config[] = {
+> > +       [IMX23_LRADC] = {
+> > +               .irq_count      = ARRAY_SIZE(mx23_lradc_irq_names),
+> > +               .irq_name       = mx23_lradc_irq_names,
+> > +       },
+> > +       [IMX28_LRADC] = {
+> > +               .irq_count      = ARRAY_SIZE(mx28_lradc_irq_names),
+> > +               .irq_name       = mx28_lradc_irq_names,
+> > +       },
+> > +};
+> > +
+> > 
+> >  enum mxs_lradc_ts {
+> >  
+> >         MXS_LRADC_TOUCHSCREEN_NONE = 0,
+> >         MXS_LRADC_TOUCHSCREEN_4WIRE,
+> > 
+> > @@ -857,8 +890,19 @@ static void mxs_lradc_hw_stop(struct mxs_lradc
+> > *lradc)
+> > 
+> >                 writel(0, lradc->base + LRADC_DELAY(i));
+> >  
+> >  }
+> > 
+> > +static const struct of_device_id mxs_lradc_dt_ids[] = {
+> > +       { .compatible = "fsl,imx23-lradc", .data = (void *)IMX23_LRADC,
+> > }, +       { .compatible = "fsl,imx28-lradc", .data = (void
+> > *)IMX28_LRADC, }, +       { /* sentinel */ }
+> > +};
+> > +MODULE_DEVICE_TABLE(of, mxs_lradc_dt_ids);
+> > +
+> 
+> Why not s/(void \*)\(IMX.._LRADC\)/\&mxs_lradc_of_config[\1]/ ?
 
-> Regarding the defaults, I would suggest putting them into all the
-> defaults into the defconfig files and removing the other hardcoding
-> otherwise. Ben Dooks and Russell are probably the best to know
-> what triggered the 200 HZ for s3c24xx and for ebsa110. My guess
-> is that the other samsung ones are the result of cargo cult
-> programming.
->
-> at91 and omap set the HZ value to something that is derived
-> from their hardware timer, but we have also forever had logic
-> to calculate the exact time when that does not match. This code
-> has very recently been moved into the new register_refined_jiffies()
-> function. John can probably tell is if this solves all the problems
-> for these platforms.
+Check the register layout, it differs between MX23 and MX28, that's one reason, 
+since were we to access differently placed registers, we can do it easily as in 
+the SSP/I2C drivers.
 
-Yea, as far as timekeeping is concerned, we shouldn't be HZ dependent 
-(and the register_refined_jiffies is really only necessary if you're not 
-expecting a proper clocksource to eventually be registered), assuming 
-the hardware can do something close to the HZ value requested.
+Moreover, there are some features on the MX28 that are not on the MX23 (like 
+voltage treshold triggers and touchbuttons), with this setup, we can easily 
+check what we're running at at runtime and determine to disallow these.
 
-So I'd probably want to hear about what history caused the specific 200 
-HZ selections, as I suspect there's actual hardware limitations there. 
-So if you can not get actual timer ticks any faster then 200 HZ on that 
-hardware, setting HZ higher could cause some jiffies related timer 
-trouble (ie: if the kernel thinks HZ is 1000 but the hardware can only 
-do 200, that's a different problem then if the hardware actually can 
-only do 999.8 HZ). So things like timer-wheel timeouts may not happen 
-when they should.
+>From my point of view, using the number (IMX23_LRADC / IMX28_LRADC) is much more 
+convenient in the long run.
 
-I suspect the best approach for multi-arch in those cases may be to 
-select HZ=100 and use HRT to allow more modern systems to have 
-finer-grained timers.
-
-thanks
--john
+Best regards,
+Marek Vasut
