@@ -1,140 +1,116 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Jan 2013 12:03:38 +0000
-Subject: [PATCH 02/24] ab8500-charger: AB workaround for invalid charger
+Date: Mon, 21 Jan 2013 12:03:50 +0000
+Subject: [PATCH 14/24] ab8500-charger: Add support for autopower on AB8505 and
+ AB9540
 In-Reply-To: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
 References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1358769840-4763-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1358769840-4763-15-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Henrik S?lver <henrik.solver@stericsson.com>
+From: Nicolas Guion <nicolas.guion@stericsson.com>
 
-AB8500 refuses to start charging when some types of non standard
-chargers are connected. This change force the AB to start charging.
+Accessing autopower register fails on the AB8505 and ab9540 as
+the fallback software control register has moved.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Henrik S?lver <henrik.solver@stericsson.com>
-Reviewed-by: Yvan FILLION <yvan.fillion@stericsson.com>
+Signed-off-by: Marcus Cooper <marcus.xm.cooper@stericsson.com>
+Reviewed-by: Mattias WALLIN <mattias.wallin@stericsson.com>
+Reviewed-by: Nicolas GUION <nicolas.guion@stericsson.com>
 Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
-Tested-by: Yvan FILLION <yvan.fillion@stericsson.com>
+Tested-by: Jonas ABERG <jonas.aberg@stericsson.com>
 ---
- drivers/power/ab8500_charger.c |   59 +++++++++++++++++++++++++++++++++++++---
- 1 file changed, 55 insertions(+), 4 deletions(-)
+ drivers/power/ab8500_charger.c |   52 +++++++++++++++++++++++++++-------------
+ 1 file changed, 35 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-index 43ec82b..4c66172 100644
+index d834566..da965ee 100644
 --- a/drivers/power/ab8500_charger.c
 +++ b/drivers/power/ab8500_charger.c
-@@ -207,6 +207,7 @@ struct ab8500_charger_usb_state {
-  * @usb_device_is_unrecognised	USB device is unrecognised by the hardware
-  * @autopower		Indicate if we should have automatic pwron after pwrloss
-  * @autopower_cfg	platform specific power config support for "pwron after pwrloss"
-+ * @invalid_charger_detect_state State when forcing AB to use invalid charger
-  * @parent:		Pointer to the struct ab8500
-  * @gpadc:		Pointer to the struct gpadc
-  * @bm:           	Platform specific battery management information
-@@ -251,6 +252,7 @@ struct ab8500_charger {
- 	bool usb_device_is_unrecognised;
- 	bool autopower;
- 	bool autopower_cfg;
-+	int invalid_charger_detect_state;
- 	struct ab8500 *parent;
- 	struct ab8500_gpadc *gpadc;
- 	struct abx500_bm_data *bm;
-@@ -659,7 +661,6 @@ static int ab8500_charger_max_usb_curr(struct ab8500_charger *di,
- 			break;
- 		}
- 	case USB_STAT_HM_IDGND:
--	case USB_STAT_NOT_VALID_LINK:
- 		dev_err(di->dev, "USB Type - Charging not allowed\n");
- 		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P05;
- 		ret = -ENXIO;
-@@ -688,6 +689,9 @@ static int ab8500_charger_max_usb_curr(struct ab8500_charger *di,
- 		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P5;
- 		dev_dbg(di->dev, "USB Type - 0x%02x MaxCurr: %d", link_status,
- 				di->max_usb_in_curr);
-+	case USB_STAT_NOT_VALID_LINK:
-+		dev_err(di->dev, "USB Type invalid - try charging anyway\n");
-+		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P5;
- 		break;
+@@ -95,6 +95,8 @@
  
- 	default:
-@@ -1957,7 +1961,9 @@ static void ab8500_charger_usb_link_attach_work(struct work_struct *work)
-  */
- static void ab8500_charger_usb_link_status_work(struct work_struct *work)
+ #define CHG_WD_INTERVAL			(60 * HZ)
+ 
++#define AB8500_SW_CONTROL_FALLBACK	0x03
++
+ /* UsbLineStatus register - usb types */
+ enum ab8500_charger_link_status {
+ 	USB_STAT_NOT_CONFIGURED,
+@@ -312,42 +314,58 @@ static enum power_supply_property ab8500_charger_usb_props[] = {
+ static void ab8500_enable_disable_sw_fallback(struct ab8500_charger *di,
+ 		bool fallback)
  {
-+	int detected_chargers;
- 	int ret;
 +	u8 val;
+ 	u8 reg;
++	u8 bank;
++	u8 bit;
+ 	int ret;
  
- 	struct ab8500_charger *di = container_of(work,
- 		struct ab8500_charger, usb_link_status_work);
-@@ -1967,11 +1973,55 @@ static void ab8500_charger_usb_link_status_work(struct work_struct *work)
- 	 * synchronously, we have the check if  is
- 	 * connected by reading the status register
- 	 */
--	ret = ab8500_charger_detect_chargers(di);
--	if (ret < 0)
-+	detected_chargers = ab8500_charger_detect_chargers(di);
-+	if (detected_chargers < 0)
- 		return;
+ 	dev_dbg(di->dev, "SW Fallback: %d\n", fallback);
  
--	if (!(ret & USB_PW_CONN)) {
-+	/*
-+	 * Some chargers that breaks the USB spec is
-+	 * identified as invalid by AB8500 and it refuse
-+	 * to start the charging process. but by jumping
-+	 * thru a few hoops it can be forced to start.
-+	 */
-+	ret = abx500_get_register_interruptible(di->dev, AB8500_USB,
-+			AB8500_USB_LINE_STAT_REG, &val);
-+	if (ret >= 0)
-+		dev_dbg(di->dev, "UsbLineStatus register = 0x%02x\n", val);
-+	else
-+		dev_dbg(di->dev, "Error reading USB link status\n");
-+
-+	if (detected_chargers & USB_PW_CONN) {
-+		if (((val & AB8500_USB_LINK_STATUS) >> 3) == USB_STAT_NOT_VALID_LINK &&
-+				di->invalid_charger_detect_state == 0) {
-+			dev_dbg(di->dev, "Invalid charger detected, state= 0\n");
-+			/*Enable charger*/
-+			abx500_mask_and_set_register_interruptible(di->dev,
-+					AB8500_CHARGER, AB8500_USBCH_CTRL1_REG, 0x01, 0x01);
-+			/*Enable charger detection*/
-+			abx500_mask_and_set_register_interruptible(di->dev, AB8500_USB,
-+					AB8500_MCH_IPT_CURLVL_REG, 0x01, 0x01);
-+			di->invalid_charger_detect_state = 1;
-+			/*exit and wait for new link status interrupt.*/
-+			return;
-+
-+		}
-+		if (di->invalid_charger_detect_state == 1) {
-+			dev_dbg(di->dev, "Invalid charger detected, state= 1\n");
-+			/*Stop charger detection*/
-+			abx500_mask_and_set_register_interruptible(di->dev, AB8500_USB,
-+					AB8500_MCH_IPT_CURLVL_REG, 0x01, 0x00);
-+			/*Check link status*/
-+			ret = abx500_get_register_interruptible(di->dev, AB8500_USB,
-+					AB8500_USB_LINE_STAT_REG, &val);
-+			dev_dbg(di->dev, "USB link status= 0x%02x\n",
-+					(val & AB8500_USB_LINK_STATUS) >> 3);
-+			di->invalid_charger_detect_state = 2;
-+		}
++	if (is_ab8500(di->parent)) {
++		bank = 0x15;
++		reg = 0x0;
++		bit = 3;
 +	} else {
-+		di->invalid_charger_detect_state = 0;
++		bank = AB8500_SYS_CTRL1_BLOCK;
++		reg = AB8500_SW_CONTROL_FALLBACK;
++		bit = 0;
 +	}
 +
-+	if (!(detected_chargers & USB_PW_CONN)) {
- 		di->vbus_detected = 0;
- 		ab8500_charger_set_usb_connected(di, false);
- 		ab8500_power_supply_changed(di, &di->usb_chg.psy);
-@@ -2884,6 +2934,7 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 	spin_lock_init(&di->usb_state.usb_lock);
+ 	/* read the register containing fallback bit */
+-	ret = abx500_get_register_interruptible(di->dev, 0x15, 0x00, &reg);
+-	if (ret) {
+-		dev_err(di->dev, "%d write failed\n", __LINE__);
++	ret = abx500_get_register_interruptible(di->dev, bank, reg, &val);
++	if (ret < 0) {
++		dev_err(di->dev, "%d read failed\n", __LINE__);
+ 		return;
+ 	}
  
- 	di->autopower = false;
-+	di->invalid_charger_detect_state = 0;
+-	/* enable the OPT emulation registers */
+-	ret = abx500_set_register_interruptible(di->dev, 0x11, 0x00, 0x2);
+-	if (ret) {
+-		dev_err(di->dev, "%d write failed\n", __LINE__);
+-		return;
++	if (is_ab8500(di->parent)) {
++		/* enable the OPT emulation registers */
++		ret = abx500_set_register_interruptible(di->dev, 0x11, 0x00, 0x2);
++		if (ret) {
++			dev_err(di->dev, "%d write failed\n", __LINE__);
++			goto disable_otp;
++		}
+ 	}
  
- 	/* AC supply */
- 	/* power_supply base class */
+ 	if (fallback)
+-		reg |= 0x8;
++		val |= (1 << bit);
+ 	else
+-		reg &= ~0x8;
++		val &= ~(1 << bit);
+ 
+ 	/* write back the changed fallback bit value to register */
+-	ret = abx500_set_register_interruptible(di->dev, 0x15, 0x00, reg);
++	ret = abx500_set_register_interruptible(di->dev, bank, reg, val);
+ 	if (ret) {
+ 		dev_err(di->dev, "%d write failed\n", __LINE__);
+-		return;
+ 	}
+ 
+-	/* disable the set OTP registers again */
+-	ret = abx500_set_register_interruptible(di->dev, 0x11, 0x00, 0x0);
+-	if (ret) {
+-		dev_err(di->dev, "%d write failed\n", __LINE__);
+-		return;
++disable_otp:
++	if (is_ab8500(di->parent)) {
++		/* disable the set OTP registers again */
++		ret = abx500_set_register_interruptible(di->dev, 0x11, 0x00, 0x0);
++		if (ret) {
++			dev_err(di->dev, "%d write failed\n", __LINE__);
++		}
+ 	}
+ }
+ 
 -- 
 1.7.9.5
