@@ -1,51 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Jan 2013 19:27:00 +0100
-Subject: [PATCH 1/2] net: fec: refactor dt probing
-In-Reply-To: <20130121174824.GA27956@sapphire.tkos.co.il>
-References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
- <1358757475-21035-2-git-send-email-s.hauer@pengutronix.de>
- <20130121174824.GA27956@sapphire.tkos.co.il>
-Message-ID: <20130121182700.GD1906@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Jan 2013 10:27:53 -0800
+Subject: [GIT PULL] ARM: OMAP: some clock/hwmod fixes for v3.8-rc
+In-Reply-To: <alpine.DEB.2.00.1301211557530.8450@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1301211557530.8450@utopia.booyaka.com>
+Message-ID: <20130121182753.GG22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 07:48:26PM +0200, Baruch Siach wrote:
-> Hi Sascha,
+* Paul Walmsley <paul@pwsan.com> [130121 08:04]:
+> Hi Tony,
 > 
-> On Mon, Jan 21, 2013 at 09:37:54AM +0100, Sascha Hauer wrote:
-> > For devicetree parsing only the fec_get_phy_mode_dt() is
-> > available. Rename it to fec_probe_dt() to be able to add more devicetree
-> > parsing to it.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
+> The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
 > 
-> [...]
+>   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
 > 
-> > -static int fec_get_phy_mode_dt(struct platform_device *pdev)
-> > +static int fec_probe_dt(struct fec_enet_private *fep)
-> >  {
-> > -	struct device_node *np = pdev->dev.of_node;
-> > +	struct device_node *np = fep->pdev->dev.of_node;
-> >  
-> > -	if (np)
-> > -		return of_get_phy_mode(np);
-> > +	if (!np)
-> > +		return -ENODEV;
-> > +
-> > +	fep->phy_interface = of_get_phy_mode(np);
-> >  
-> >  	return -ENODEV;
+> are available in the git repository at:
 > 
-> Maybe return fep->phy_interface?
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-v3.8-rc
+> 
+> for you to fetch changes up to bdcc61275232db897ba831f87a16df98ab248571:
+> 
+>   ARM: OMAP2: Fix missing omap2xxx_clkt_vps_late_init function calls (2013-01-18 16:48:16 -0700)
+> 
+> ----------------------------------------------------------------
+> A few OMAP integration fixes for v3.8-rc, for OMAP4 audio and OMAP2 reboot.
+> 
+> Basic test logs are available here:
+> 
+>     http://www.pwsan.com/omap/testlogs/prcm_fixes_c_v3.8-rc/20130121073904/
 
-No, but indeed this should return successfully. I will rework this after
-it's clear how we want to proceed with this.
+Thanks pulling into omap-for-v3.8-rc4/fixes.
 
-Sascha
+Regards,
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tony
