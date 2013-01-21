@@ -1,167 +1,249 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 21 Jan 2013 05:07:37 -0500
-Subject: [V4 PATCH 19/26] usb: gadget: mv_udc: add extern chip support
+Date: Mon, 21 Jan 2013 05:07:36 -0500
+Subject: [V4 PATCH 18/26] usb: phy: mv_usb2_phy: add externel chip support
 In-Reply-To: <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
 References: <xiechao.mail@gmail.com>
  <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1358762864-9249-20-git-send-email-chao.xie@marvell.com>
+Message-ID: <1358762864-9249-19-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because arch-mmp will make use of irq domain for irq
-allocation, the irqs allocated for PMIC is dynamical.
-The vbus/idpin irqs from PMIC can not be passed by platform data.
-Using the extern chip APIs provides by PHY driver can solve this
-problem.
-Marvell usb PHY driver provides a middle layer.
-The PMIC usb drivers will help to register the callbacks in the
-marvell usb PHY driver.
-udc/otg/ehci driver will call the callbacks.
-Then we do not need pass the information in platform data. It will
-remove another block in the way of enabling device tree for usb.
+For the vbus and idpin detection. It may be completed by some
+external chip, for example the pmic chip 88pm860x in driver/mfd
+can do it.
+Although the usb controller can detect the vbus and id pin, but
+it need clock on and PHY enabled to detect the
+vbus/idpin. It will increase the power.
+Using the external chip to detect vbus/idpin can save the power.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/gadget/mv_udc.h      |    3 ++
- drivers/usb/gadget/mv_udc_core.c |   45 ++++++++++++++++++++++---------------
- 2 files changed, 30 insertions(+), 18 deletions(-)
+ drivers/usb/phy/mv_usb2_phy.c        |   54 +++++++++++++++++++++
+ include/linux/platform_data/mv_usb.h |   15 ++----
+ include/linux/usb/mv_usb2.h          |   85 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 144 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
-index 4851b2b..50ae7c7 100644
---- a/drivers/usb/gadget/mv_udc.h
-+++ b/drivers/usb/gadget/mv_udc.h
-@@ -178,6 +178,9 @@ struct mv_udc {
- 	struct platform_device		*dev;
- 	int				irq;
- 
-+	unsigned int			extern_attr;
-+	struct notifier_block		notifier;
-+
- 	struct mv_cap_regs __iomem	*cap_regs;
- 	struct mv_op_regs __iomem	*op_regs;
- 	unsigned int			max_eps;
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index 76fcfc7..4b50334 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -2077,15 +2077,16 @@ static irqreturn_t mv_udc_irq(int irq, void *dev)
- 	return IRQ_HANDLED;
+diff --git a/drivers/usb/phy/mv_usb2_phy.c b/drivers/usb/phy/mv_usb2_phy.c
+index c2bccae..0bea901 100644
+--- a/drivers/usb/phy/mv_usb2_phy.c
++++ b/drivers/usb/phy/mv_usb2_phy.c
+@@ -136,6 +136,53 @@ struct mv_usb2_phy *mv_usb2_get_phy(void)
  }
+ EXPORT_SYMBOL(mv_usb2_get_phy);
  
--static irqreturn_t mv_udc_vbus_irq(int irq, void *dev)
-+static int mv_udc_vbus_notifier_call(struct notifier_block *nb,
-+				unsigned long val, void *v)
- {
--	struct mv_udc *udc = (struct mv_udc *)dev;
-+	struct mv_udc *udc = container_of(nb, struct mv_udc, notifier);
- 
- 	/* polling VBUS and init phy may cause too much time*/
--	if (udc->qwork)
-+	if (udc->qwork && val == EVENT_VBUS)
- 		queue_work(udc->qwork, &udc->vbus_work);
- 
--	return IRQ_HANDLED;
++int mv_usb2_register_notifier(struct mv_usb2_phy *phy,
++		struct notifier_block *nb)
++{
++	int ret;
++
++	if (!phy)
++		return -ENODEV;
++
++	ret = atomic_notifier_chain_register(phy->extern_chip.head, nb);
++	if (ret)
++		return ret;
++
 +	return 0;
- }
- 
- static void mv_udc_vbus_work(struct work_struct *work)
-@@ -2094,10 +2095,12 @@ static void mv_udc_vbus_work(struct work_struct *work)
- 	unsigned int vbus;
- 
- 	udc = container_of(work, struct mv_udc, vbus_work);
--	if (!udc->pdata->vbus)
-+	if (!(udc->extern_attr & MV_USB_HAS_VBUS_DETECTION))
-+		return;
++}
++EXPORT_SYMBOL(mv_usb2_register_notifier);
 +
-+	if (mv_usb2_extern_call(udc->phy, vbus, get_vbus, &vbus))
- 		return;
- 
--	vbus = udc->pdata->vbus->poll();
- 	dev_info(&udc->dev->dev, "vbus is %d\n", vbus);
- 
- 	if (vbus == VBUS_HIGH)
-@@ -2124,6 +2127,9 @@ static int mv_udc_remove(struct platform_device *pdev)
- 
- 	usb_del_gadget_udc(&udc->gadget);
- 
-+	if (udc->extern_attr & MV_USB_HAS_VBUS_DETECTION)
-+		mv_usb2_unregister_notifier(udc->phy, &udc->notifier);
++int mv_usb2_unregister_notifier(struct mv_usb2_phy *phy,
++		struct notifier_block *nb)
++{
++	int ret;
 +
- 	if (udc->qwork) {
- 		flush_workqueue(udc->qwork);
- 		destroy_workqueue(udc->qwork);
-@@ -2169,6 +2175,7 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	}
- 
- 	udc->done = &release_done;
-+	udc->extern_attr = pdata->extern_attr;
- 	udc->pdata = pdev->dev.platform_data;
- 	spin_lock_init(&udc->lock);
- 
-@@ -2319,17 +2326,8 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	/* VBUS detect: we can disable/enable clock on demand.*/
- 	if (udc->transceiver)
- 		udc->clock_gating = 1;
--	else if (pdata->vbus) {
-+	else if (udc->extern_attr & MV_USB_HAS_VBUS_DETECTION) {
- 		udc->clock_gating = 1;
--		retval = devm_request_threaded_irq(&pdev->dev,
--				pdata->vbus->irq, NULL,
--				mv_udc_vbus_irq, IRQF_ONESHOT, "vbus", udc);
--		if (retval) {
--			dev_info(&pdev->dev,
--				"Can not request irq for VBUS, "
--				"disable clock gating\n");
--			udc->clock_gating = 0;
--		}
- 
- 		udc->qwork = create_singlethread_workqueue("mv_udc_queue");
- 		if (!udc->qwork) {
-@@ -2339,6 +2337,8 @@ static int mv_udc_probe(struct platform_device *pdev)
- 		}
- 
- 		INIT_WORK(&udc->vbus_work, mv_udc_vbus_work);
-+		udc->notifier.notifier_call = mv_udc_vbus_notifier_call;
-+		mv_usb2_register_notifier(udc->phy, &udc->notifier);
- 	}
- 
- 	/*
-@@ -2362,6 +2362,9 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_create_workqueue:
-+	if (!udc->transceiver
-+		&& (udc->extern_attr & MV_USB_HAS_VBUS_DETECTION))
-+		mv_usb2_unregister_notifier(udc->phy, &udc->notifier);
- 	destroy_workqueue(udc->qwork);
- err_unregister:
- 	device_unregister(&udc->gadget.dev);
-@@ -2380,6 +2383,7 @@ err_disable_clock:
- static int mv_udc_suspend(struct device *dev)
++	if (!phy)
++		return -ENODEV;
++
++	ret = atomic_notifier_chain_unregister(phy->extern_chip.head, nb);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++EXPORT_SYMBOL(mv_usb2_unregister_notifier);
++
++int mv_usb2_notify(struct mv_usb2_phy *phy, unsigned long val, void *v)
++{
++	int ret;
++
++	if (!phy)
++		return -ENODEV;
++
++	ret = atomic_notifier_call_chain(phy->extern_chip.head, val, v);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++EXPORT_SYMBOL(mv_usb2_notify);
++
+ static unsigned int u2o_get(void __iomem *base, unsigned int offset)
  {
- 	struct mv_udc *udc;
-+	unsigned int vbus;
+ 	return readl(base + offset);
+@@ -414,6 +461,13 @@ static int usb_phy_probe(struct platform_device *pdev)
+ 	mv_phy->init = usb_phy_init;
+ 	mv_phy->shutdown = usb_phy_shutdown;
  
- 	udc = dev_get_drvdata(dev);
- 
-@@ -2387,11 +2391,16 @@ static int mv_udc_suspend(struct device *dev)
- 	if (udc->transceiver)
- 		return 0;
- 
--	if (udc->pdata->vbus && udc->pdata->vbus->poll)
--		if (udc->pdata->vbus->poll() == VBUS_HIGH) {
-+	if ((udc->extern_attr & MV_USB_HAS_VBUS_DETECTION) &&
-+		mv_usb2_has_extern_call(udc->phy, vbus, get_vbus)) {
-+		if (mv_usb2_extern_call(udc->phy, vbus, get_vbus, &vbus))
-+			return -EAGAIN;
++	mv_phy->extern_chip.head = devm_kzalloc(&pdev->dev,
++					sizeof(*mv_phy->extern_chip.head),
++					GFP_KERNEL);
++	if (mv_phy->extern_chip.head == NULL)
++		return -ENOMEM;
++	ATOMIC_INIT_NOTIFIER_HEAD(mv_phy->extern_chip.head);
 +
-+		if (vbus == VBUS_HIGH) {
- 			dev_info(&udc->dev->dev, "USB cable is connected!\n");
- 			return -EAGAIN;
- 		}
-+	}
+ 	platform_set_drvdata(pdev, mv_phy);
  
- 	/*
- 	 * only cable is unplugged, udc can suspend.
+ 	the_phy = mv_phy;
+diff --git a/include/linux/platform_data/mv_usb.h b/include/linux/platform_data/mv_usb.h
+index fd3d1b4..dc25d60 100644
+--- a/include/linux/platform_data/mv_usb.h
++++ b/include/linux/platform_data/mv_usb.h
+@@ -28,16 +28,13 @@ enum {
+ 	VBUS_HIGH	= 1 << 0,
+ };
+ 
+-struct mv_usb_addon_irq {
+-	unsigned int	irq;
+-	int		(*poll)(void);
+-};
+-
++#define MV_USB_HAS_VBUS_DETECTION	(1 << 0)
++#define MV_USB_HAS_IDPIN_DETECTION	(1 << 1)
+ struct mv_usb_platform_data {
+ 	unsigned int		clknum;
+ 	char			**clkname;
+-	struct mv_usb_addon_irq	*id;	/* Only valid for OTG. ID pin change*/
+-	struct mv_usb_addon_irq	*vbus;	/* valid for OTG/UDC. VBUS change*/
++
++	unsigned int		extern_attr;
+ 
+ 	/* only valid for HCD. OTG or Host only*/
+ 	unsigned int		mode;
+@@ -45,9 +42,7 @@ struct mv_usb_platform_data {
+ 	/* This flag is used for that needs id pin checked by otg */
+ 	unsigned int    disable_otg_clock_gating:1;
+ 	/* Force a_bus_req to be asserted */
+-	 unsigned int    otg_force_a_bus_req:1;
+-
+-	int	(*set_vbus)(unsigned int vbus);
++	unsigned int    otg_force_a_bus_req:1;
+ };
+ 
+ struct mv_usb_phy_platform_data {
+diff --git a/include/linux/usb/mv_usb2.h b/include/linux/usb/mv_usb2.h
+index 9744a97..e0246d9 100644
+--- a/include/linux/usb/mv_usb2.h
++++ b/include/linux/usb/mv_usb2.h
+@@ -17,6 +17,33 @@
+ 
+ #include <linux/clk.h>
+ 
++enum {
++	EVENT_VBUS,
++	EVENT_ID,
++};
++
++struct pxa_usb_vbus_ops {
++	int (*get_vbus)(unsigned int *level);
++	int (*set_vbus)(unsigned int level);
++	int (*init)(void);
++};
++
++struct pxa_usb_idpin_ops {
++	int (*get_idpin)(unsigned int *level);
++	int (*init)(void);
++};
++
++struct pxa_usb_extern_ops {
++	struct pxa_usb_vbus_ops		vbus;
++	struct pxa_usb_idpin_ops	idpin;
++};
++
++struct mv_usb2_extern_chip {
++	unsigned int id;
++	struct pxa_usb_extern_ops ops;
++	struct atomic_notifier_head *head;
++};
++
+ struct mv_usb2_phy {
+ 	struct platform_device	*pdev;
+ 	struct mutex		phy_lock;
+@@ -26,6 +53,8 @@ struct mv_usb2_phy {
+ 	struct clk		**clks;
+ 	unsigned int		clks_num;
+ 
++	struct mv_usb2_extern_chip extern_chip;
++
+ 	int	(*init)(struct mv_usb2_phy *mv_phy);
+ 	void	(*shutdown)(struct mv_usb2_phy *mv_phy);
+ };
+@@ -34,10 +63,66 @@ struct mv_usb2_phy {
+ 
+ extern struct mv_usb2_phy *mv_usb2_get_phy(void);
+ 
++#define mv_usb2_has_extern_call(phy, o, f, arg...)( \
++{ \
++	int ret;					\
++	ret = (!phy ? 0 : ((phy->extern_chip.ops.o.f) ?	\
++		1 : 0));				\
++	ret;						\
++} \
++)
++
++#define mv_usb2_extern_call(phy, o, f, args...)( \
++{ \
++	int ret;						\
++	ret = (!phy ? -ENODEV : ((phy->extern_chip.ops.o.f) ?	\
++		phy->extern_chip.ops.o.f(args) : -ENOIOCTLCMD));\
++	ret;							\
++} \
++)
++
++#define mv_usb2_set_extern_call(phy, o, f, p)( \
++{ \
++	int ret;							\
++	ret = !phy ? -ENODEV : ((phy->extern_chip.ops.o.f) ?		\
++		-EINVAL : ({phy->extern_chip.ops.o.f = p; 0; }));	\
++	ret;								\
++} \
++)
++
++extern int mv_usb2_register_notifier(struct mv_usb2_phy *phy,
++					struct notifier_block *nb);
++extern int mv_usb2_unregister_notifier(struct mv_usb2_phy *phy,
++					struct notifier_block *nb);
++extern int mv_usb2_notify(struct mv_usb2_phy *phy, unsigned long val, void *v);
++
+ #else
+ 
+ struct mv_usb2_phy *mv_usb2_get_phy(void) { return NULL; }
+ 
++#define mv_usb2_has_extern_call(phy, o, f, arg...)(0)
++
++#define mv_usb2_extern_call(phy, o, f, args...)(0)
++
++#define mv_usb2_set_extern_call(phy, o, f, p)(0)
++
++int mv_usb2_register_notifier(struct mv_usb2_phy *phy,
++					struct notifier_block *nb)
++{
++	return -EINVAL;
++}
++
++int mv_usb2_unregister_notifier(struct mv_usb2_phy *phy,
++					struct notifier_block *nb)
++{
++	return -EINVAL;
++}
++
++int mv_usb2_notify(struct mv_usb2_phy *phy, unsigned long val, void *v)
++{
++	return 0;
++}
++
+ #endif
+ 
+ #endif
 -- 
 1.7.4.1
