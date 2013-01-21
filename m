@@ -1,47 +1,78 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jan 2013 10:21:59 -0800
-Subject: [PATCH] OMAP: omap4-panda: add UART2 muxing for WiLink shared
- transport
-In-Reply-To: <1358766852-24503-1-git-send-email-coelho@ti.com>
-References: <1358766852-24503-1-git-send-email-coelho@ti.com>
-Message-ID: <20130121182158.GD22517@atomide.com>
+Date: Mon, 21 Jan 2013 10:22:37 -0800
+Subject: [PATCH 3/4] ARM: mach-omap2: apply the errata at run time rather
+In-Reply-To: <20130121131613.GA29876@bnru10>
+References: <20130121131613.GA29876@bnru10>
+Message-ID: <20130121182236.GE22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Luciano Coelho <coelho@ti.com> [130121 03:18]:
-> Add the UART2 muxing data to the board file (this used to be,
-> erroneously, done in the bootloader).
-> 
-> Cc: stable <stable@vger.kernel.org> [3.7]
-> Signed-off-by: Luciano Coelho <coelho@ti.com>
+* srinidhi kasagar <srinidhi.kasagar@stericsson.com> [130121 05:19]:
 
-Thanks applying into omap-for-v3.8-rc4/fixes.
+Forgot to complete the subject and add the description?
 
 Regards,
 
 Tony
 
+> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 > ---
->  arch/arm/mach-omap2/board-omap4panda.c |    6 ++++++
->  1 file changed, 6 insertions(+)
+>  arch/arm/mach-omap2/sleep44xx.S |   25 +++++++++++++++++++++----
+>  1 files changed, 21 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-> index 5c8e9ce..769c1fe 100644
-> --- a/arch/arm/mach-omap2/board-omap4panda.c
-> +++ b/arch/arm/mach-omap2/board-omap4panda.c
-> @@ -397,6 +397,12 @@ static struct omap_board_mux board_mux[] __initdata = {
->  		  OMAP_PULL_ENA),
->  	OMAP4_MUX(ABE_MCBSP1_FSX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
->  
-> +	/* UART2 - BT/FM/GPS shared transport */
-> +	OMAP4_MUX(UART2_CTS,	OMAP_PIN_INPUT	| OMAP_MUX_MODE0),
-> +	OMAP4_MUX(UART2_RTS,	OMAP_PIN_OUTPUT	| OMAP_MUX_MODE0),
-> +	OMAP4_MUX(UART2_RX,	OMAP_PIN_INPUT	| OMAP_MUX_MODE0),
-> +	OMAP4_MUX(UART2_TX,	OMAP_PIN_OUTPUT	| OMAP_MUX_MODE0),
+> diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
+> index 88ff83a..071ca1f 100644
+> --- a/arch/arm/mach-omap2/sleep44xx.S
+> +++ b/arch/arm/mach-omap2/sleep44xx.S
+> @@ -157,11 +157,19 @@ skip_scu_gp_set:
+>  	ldrne	r0, [r8, #L2X0_SAVE_OFFSET1]	@ memory.
+>  	cmp	r0, #3
+>  	bne	do_WFI
+> -#ifdef CONFIG_PL310_ERRATA_727915
+> +	/* Check for PL310_ERRATA_727915 */
+> +	bl	l2x0_get_rtl_release
+> +	cmp	r0, #0x4
+> +	beq	dosmc
+> +	cmp	r0, #0x5
+> +	beq	dosmc
+> +	b	nosmc
+> +dosmc:
+>  	mov	r0, #0x03
+>  	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
+>  	DO_SMC
+> -#endif
 > +
->  	{ .reg_offset = OMAP_MUX_TERMINATOR },
->  };
->  
+> +nosmc:
+>  	bl	omap4_get_l2cache_base
+>  	mov	r2, r0
+>  	ldr	r0, =0xffff
+> @@ -171,11 +179,20 @@ wait:
+>  	ldr	r1, =0xffff
+>  	ands	r0, r0, r1
+>  	bne	wait
+> -#ifdef CONFIG_PL310_ERRATA_727915
+> +
+> +	/* Check for PL310_ERRATA_727915 */
+> +	bl	l2x0_get_rtl_release
+> +	cmp	r0, #0x4
+> +	beq	dosmc2
+> +	cmp	r0, #0x5
+> +	beq	dosmc2
+> +	b	nosmc2
+> +dosmc2:
+>  	mov	r0, #0x00
+>  	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
+>  	DO_SMC
+> -#endif
+> +
+> +nosmc2:
+>  l2x_sync:
+>  	bl	omap4_get_l2cache_base
+>  	mov	r2, r0
 > -- 
-> 1.7.10.4
+> 1.7.2.dirty
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
