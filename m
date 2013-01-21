@@ -1,160 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 Jan 2013 20:36:59 +0530
-Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
- hwmod data
-In-Reply-To: <50FCF838.6000105@ti.com>
-References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
- <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
- <20130118171500.GC15361@atomide.com> <50FCF838.6000105@ti.com>
-Message-ID: <50FD5993.5010008@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Jan 2013 15:24:40 +0000
+Subject: Compilation problem with drivers/staging/zsmalloc when !SMP on ARM
+In-Reply-To: <20130119043725.GB5391@phenom.dumpdata.com>
+References: <CAKGA1b=ACTQHo9=B7EAG5nrFCO9u-J+sy7dXtYk3Rk6OUcW3cQ@mail.gmail.com>
+ <20130118210859.GH23505@n2100.arm.linux.org.uk>
+ <20130118214527.GA913@kroah.com> <20130119043725.GB5391@phenom.dumpdata.com>
+Message-ID: <20130121152440.GJ23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 January 2013 01:41 PM, Santosh Shilimkar wrote:
-> On Friday 18 January 2013 10:45 PM, Tony Lindgren wrote:
->> Hi,
->>
->> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130118 07:30]:
->>> From: Benoit Cousson <b-cousson@ti.com>
->>>
->>> Adding the hwmod data for OMAP54xx platforms.
->>> --- /dev/null
->>> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
->>> +/* bb2d */
->>> +static struct omap_hwmod_irq_info omap54xx_bb2d_irqs[] = {
->>> +    { .irq = 125 + OMAP54XX_IRQ_GIC_START },
->>> +    { .irq = -1 }
->>> +};
->> ...
->>
->>> +/* c2c */
->>> +static struct omap_hwmod_irq_info omap54xx_c2c_irqs[] = {
->>> +    { .irq = 88 + OMAP54XX_IRQ_GIC_START },
->>> +    { .irq = -1 }
->>> +};
->> ...
->>
->>
->>> +static struct omap_hwmod_dma_info omap54xx_c2c_sdma_reqs[] = {
->>> +    { .dma_req = 68 + OMAP54XX_DMA_REQ_START },
->>> +    { .dma_req = -1 }
->>> +};
->>
->>
->>
->>> +static struct omap_hwmod_addr_space omap54xx_elm_addrs[] = {
->>> +    {
->>> +        .pa_start    = 0x48078000,
->>> +        .pa_end        = 0x48078fff,
->>> +        .flags        = ADDR_TYPE_RT
->>> +    },
->>> +    { }
->>> +};
->> ...
->>
->>> +static struct omap_hwmod_addr_space omap54xx_emif1_addrs[] = {
->>> +    {
->>> +        .pa_start    = 0x4c000000,
->>> +        .pa_end        = 0x4c0003ff,
->>> +        .flags        = ADDR_TYPE_RT
->>> +    },
->>> +    { }
->>> +};
->>
->> As discussed earlier on this list, let's not duplicate the standard
->> resources here as they already are supposed to come from device tree.
->>
->> Whatever issues prevent us from dropping the duplicate data here need
->> to be fixed. I believe Benoit already had some scripts/patches for
->> that and was just waiting for the DMA binding to get merged?
->>
-> Will have a loot at it. DMA binding pull request narrowly missed
-> 3.8 but should get into 3.9.
->
-So I looked at this one with help of Rajendra. We can get rid of the
-IRQ and DMA data(needs DMA biding updates) easily. The address
-space though is needed since hwmod code uses it to setup the
-sysconfig registers.
+On Fri, Jan 18, 2013 at 11:37:25PM -0500, Konrad Rzeszutek Wilk wrote:
+> On Fri, Jan 18, 2013 at 01:45:27PM -0800, Greg Kroah-Hartman wrote:
+> > On Fri, Jan 18, 2013 at 09:08:59PM +0000, Russell King - ARM Linux wrote:
+> > > On Fri, Jan 18, 2013 at 02:24:15PM -0600, Matt Sealey wrote:
+> > > > Hello all,
+> > > > 
+> > > > I wonder if anyone can shed some light on this linking problem I have
+> > > > right now. If I configure my kernel without SMP support (it is a very
+> > > > lean config for i.MX51 with device tree support only) I hit this error
+> > > > on linking:
+> > > 
+> > > Yes, I looked at this, and I've decided that I will _not_ fix this export,
+> > > neither will I accept a patch to add an export.
+> > > 
+> > > As far as I can see, this code is buggy in a SMP environment.  There's
+> > > apparantly no guarantee that:
+> > > 
+> > > 1. the mapping will be created on a particular CPU.
+> > > 2. the mapping will then be used only on this specific CPU.
+> > > 3. no guarantee that another CPU won't speculatively prefetch from this
+> > >    region.
+> 
+> I thought the code had per_cpu for it - so that you wouldn't do that unless
+> you really went out the way to do it.
 
-Extracting that from DT code seems to be really expensive and
-ugly [1]. I am yet to try out DMA lines removal but that seems
-to be doable by pulling Vinod'd DMA engine branch and updating
-DT file.
+Actually, yes, you're right - that negates point (4) and possibly (2),
+but (3) is still a concern.  (3) shouldn't be that much of an issue
+_provided_ that the virtual addresses aren't explicitly made use of by
+other CPUs.  Is that guaranteed by the zsmalloc code?  (IOW, does it
+own the virtual region it places these mappings in?)
 
-Whats your suggestion on address space part ?
+What is the performance difference between having and not having this
+optimization?  Can you provide some measurements please?
 
-Regards,
-Santosh
-
-[1] HACK address extraction with DT.
-
----
-  arch/arm/mach-omap2/omap_hwmod.c |   31 +++++++++++++++++++++++++++----
-  1 file changed, 27 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c 
-b/arch/arm/mach-omap2/omap_hwmod.c
-index 4653efb..f54b9d4 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -138,6 +138,7 @@
-  #include <linux/spinlock.h>
-  #include <linux/slab.h>
-  #include <linux/bootmem.h>
-+#include <linux/of.h>
-
-  #include "clock.h"
-  #include "omap_hwmod.h"
-@@ -2335,7 +2336,12 @@ static int _shutdown(struct omap_hwmod *oh)
-  static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data)
-  {
-  	struct omap_hwmod_addr_space *mem;
--	void __iomem *va_start;
-+	void __iomem *va_start = NULL;
-+	struct device_node *np;
-+	unsigned long start = 0, size = 0;
-+	const void *reg_prop;
-+	const char *p;
-+
-
-  	if (!oh)
-  		return;
-@@ -2349,15 +2355,32 @@ static void __init _init_mpu_rt_base(struct 
-omap_hwmod *oh, void *data)
-  	if (!mem) {
-  		pr_debug("omap_hwmod: %s: no MPU register target found\n",
-  			 oh->name);
--		return;
-+		/*Check in Device Tree blob*/
-+		for_each_child_of_node(of_find_node_by_name(NULL, "ocp"), np) {
-+			printk("np-name=%s\n", np->name);
-+			if(of_find_property(np, "ti,hwmods", NULL)) {
-+				p = of_get_property(np, "ti,hwmods", NULL);
-+				if (!strcmp(p, oh->name)) {
-+				reg_prop = of_get_property(np, "reg", NULL);
-+				start = of_read_number(reg_prop, 1);
-+				size = of_read_number(reg_prop + 4, 1);
-+				}
-+			}
-+		}
-+	} else {
-+		start = mem->pa_start;
-+		size = mem->pa_end - mem->pa_start;
-  	}
-
--	va_start = ioremap(mem->pa_start, mem->pa_end - mem->pa_start);
-+	if (!start)
-+		return;
-+
-+	va_start = ioremap(start, size);
-  	if (!va_start) {
-  		pr_err("omap_hwmod: %s: Could not ioremap\n", oh->name);
-  		return;
-  	}
--
-+	
-  	pr_debug("omap_hwmod: %s: MPU register target at va %p\n",
-  		 oh->name, va_start);
-
--- 
-1.7.9.5
+Lastly, as you hold per_cpu stuff across this, that means preemption
+is disabled - and any kind of scheduling is also a bug.  Is there
+any reason the kmap stuff can't be used?  Has this been tried?  How
+does it compare numerically with the existing solutions?
