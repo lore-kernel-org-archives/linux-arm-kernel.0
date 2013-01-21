@@ -1,98 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Jan 2013 12:56:53 +0100
-Subject: [PATCH] net: fec: Add support for multiple phys on mdiobus
-In-Reply-To: <50FD22B4.5070307@openwrt.org>
-References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
- <50FD02B8.8080401@grandegger.com>
- <20130121100701.GX1906@pengutronix.de>
- <50FD2172.2020608@grandegger.com> <50FD22B4.5070307@openwrt.org>
-Message-ID: <20130121115653.GY1906@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 21 Jan 2013 12:03:41 +0000
+Subject: [PATCH 05/24] ab8500-charger: Kick watchdog
+In-Reply-To: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
+References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1358769840-4763-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 12:12:52PM +0100, Florian Fainelli wrote:
-> On 01/21/2013 12:07 PM, Wolfgang Grandegger wrote:
-> >On 01/21/2013 11:07 AM, Sascha Hauer wrote:
-> >>On Mon, Jan 21, 2013 at 09:56:24AM +0100, Wolfgang Grandegger wrote:
-> >>>On 01/21/2013 09:37 AM, Sascha Hauer wrote:
-> >>>>There may be multiple phys on an mdio bus. This series adds support
-> >>>>for this to the fec driver. I recently had a board which has a switch
-> >>>>connected to the fec's mdio bus, so I had to pick the correct phy.
-> >>>
-> >>>Pick one PHY from a switch port? Well, does a PHY-less (or fixed-link)
-> >>>configuration for a switch not make more sense?
-> >>
-> >>Yes, you're probably right.
-> >>
-> >>>Various ARM Ethernet
-> >>>contoller drivers do not support it. I recently needed a hack for an
-> >>>AT91 board.
-> >>
-> >>I wonder how we want to proceed. Should there be a devicetree property
-> >>'fixed-link' like done for fs_enet (and not recommended for new code,
-> >>stated in the comment above of_phy_connect_fixed_link)?
-> >
-> >Also the gianfar and ucc_geth drivers use this interface (via fixed
-> >link phy). I tried to use it for the AT91 macb driver but stopped
-> >quickly because the usage was not straight forward (too much code)...
-> >even if the idea of using a fake fixed-link phy is not bad.
-> >
-> >>Currently I have a property 'phy' in the fec binding which has a phandle
-> >>to a phy provided by the fec's mdio bus, but this could equally well
-> >
-> >But than the cable must be connected to the associated switch port.
-> >
-> >>point to a fixed dummy phy:
-> >>
-> >>	phy = &fixed-phy;
-> >
-> >The link speed, full/half duplex and maybe some mroe parameter should
-> >be configurable via device tree.
-> >
-> >>Currently there seems to be no common convention for the devicetree how
-> >>to handle such situations, or am I missing something?
-> >
-> >That's also may impression. There seem to be a few more related hacks:
-> >
-> >$ find . -name '*.c'| xargs grep -i "phy-less"
-> >./ethernet/amd/au1000_eth.c:			netdev_info(dev, "using PHY-less setup\n");
-> >./ethernet/amd/au1000_eth.c:	} else { /* PHY-less op, assume full-duplex */
-> >./ethernet/ibm/emac/core.c:	/* PHY-less configuration.
-> >./ethernet/ibm/emac/core.c:		/* PHY-less configuration.
-> >
-> >I would prefer to handle the "fixed-link" property of the ethernet dt
-> >node directly in the driver with a generic helper function.
-> 
-> Is not what of_phy_connect_fixed_link() offer? I am not sure there
-> can be much done by an helper than that.
+Kicks the watchdog so charging will not stop.
 
-The comment above this function states:
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/power/abx500_chargalg.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-/**
- * of_phy_connect_fixed_link - Parse fixed-link property and return a dummy phy
- * @dev: pointer to net_device claiming the phy
- * @hndlr: Link state callback for the network device
- * @iface: PHY data interface type
- *
- * This function is a temporary stop-gap and will be removed soon.  It is
- * only to support the fs_enet, ucc_geth and gianfar Ethernet drivers.  Do
- * not call this function from new drivers.
- */
-
-And the commit introducing it has:
-
-    Note: the dummy phy handling in arch/powerpc is a bit of a hack and
-    needs to be reworked.  This function is being added now to solve the
-    regression in the Ethernet drivers, but it should be considered a
-    temporary measure until the fixed link handling can be reworked.
-
-
-The 'temporary measure' exists for 3 1/2 years now ;)
-
-Sascha
-
+diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
+index 78b6235..830b2dd 100644
+--- a/drivers/power/abx500_chargalg.c
++++ b/drivers/power/abx500_chargalg.c
+@@ -603,6 +603,8 @@ static void abx500_chargalg_hold_charging(struct abx500_chargalg *di)
+ static void abx500_chargalg_start_charging(struct abx500_chargalg *di,
+ 	int vset, int iset)
+ {
++	bool start_chargalg_wd = true;
++
+ 	switch (di->chg_info.charger_type) {
+ 	case AC_CHG:
+ 		dev_dbg(di->dev,
+@@ -620,8 +622,12 @@ static void abx500_chargalg_start_charging(struct abx500_chargalg *di,
+ 
+ 	default:
+ 		dev_err(di->dev, "Unknown charger to charge from\n");
++		start_chargalg_wd = false;
+ 		break;
+ 	}
++
++	if (start_chargalg_wd && !delayed_work_pending(&di->chargalg_wd_work))
++		queue_delayed_work(di->chargalg_wq, &di->chargalg_wd_work, 0);
+ }
+ 
+ /**
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
