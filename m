@@ -1,46 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 18:31:45 +0000
-Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
- Armada 370/XP
-In-Reply-To: <1358790842-2986-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
- <1358790842-2986-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <201301211831.45947.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Jan 2013 10:32:20 -0800
+Subject: [PATCH] ARM: board-zoom: Do not request LCD panel enable GPIO
+ from twl4030
+In-Reply-To: <1358774834-32463-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1358774834-32463-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20130121183220.GH22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 January 2013, Gregory CLEMENT wrote:
-> @@ -1624,7 +1624,7 @@ config LOCAL_TIMERS
->         bool "Use local timer interrupts"
->         depends on SMP
->         default y
-> -       select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
-> +       select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARMADA_370_XP_TIMER)
->         
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [130121 05:30]:
+> The pin in question is muxed between GPIO7 and PWM1. For backlight control
+> there is a custom code in board-zoom-display to control the backlight.
+> No need to request the GPIO7 - which was failing since the way it is
+> requested no longer valid: twl's gpio range is allocated dynamically.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+> Hi Tony,
+> 
+> This patch is generated on top of my previous series for audio/pwm support:
+> http://www.spinics.net/lists/linux-omap/msg85085.html
 
-Your change is fine, but I just noticed that this line is asking for trouble
-when we enable multipleform support for MSM and/or EXYNOS.
+Can you do a pull request for me for all the arch/arm/*omap* parts
+against v3.8-rc4 for the v3.9 merge window?
 
-Also, I wonder if we should change this somehow in 3.8, because it seems
-that for a multiplatform kernel including armadaxp and e.g. versatile express,
-you have no ARM_TWD support in the kernel, which seems wrong. Is there any
-reason we can't enable the ARM_TWD code to be built-in on platforms that
-don't use it?
+That way you can also merge the same branch into ASoC tree if needed
+as long as you keep your arch/arm/*omap* branch immutable.
 
-Maybe it can be written as
+Regards,
 
-config LOCAL_TIMERS
-	bool "Use local timer interrupts"
-	depends on SMP
-	default y
-
-config HAVE_ARM_TWD
-	depends on LOCAL_TIMERS
-	default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
-	default y
-
-This will still be slightly wrong (generating extra code) on a multiplatform
-kernel that has no platform other than MSM or EXYNOS, but the other alternative
-would be that each platform with TWD support has to select HAVE_ARM_TWD itself.
-
-	Arnd
+Tony
