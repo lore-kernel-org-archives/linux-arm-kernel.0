@@ -1,35 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 17:23:07 +0000
-Subject: [PATCH 02/33] ARM: Convert to devm_ioremap_resource()
-In-Reply-To: <20130121161611.GS23505@n2100.arm.linux.org.uk>
-References: <1358762966-20791-1-git-send-email-thierry.reding@avionic-design.de>
- <20130121160547.GA10790@avionic-0098.adnet.avionic-design.de>
- <20130121161611.GS23505@n2100.arm.linux.org.uk>
-Message-ID: <201301211723.07248.arnd@arndb.de>
+From: rob@ti.com (Rob Clark)
+Date: Mon, 21 Jan 2013 11:26:55 -0600
+Subject: [PATCH 15/15] staging/omapdrm: don't build on multiplatform
+In-Reply-To: <1358788568-11137-16-git-send-email-arnd@arndb.de>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+ <1358788568-11137-16-git-send-email-arnd@arndb.de>
+Message-ID: <50FD7A5F.9020702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 January 2013, Russell King - ARM Linux wrote:
-> On Mon, Jan 21, 2013 at 05:05:47PM +0100, Thierry Reding wrote:
-> > On Mon, Jan 21, 2013 at 03:58:46PM +0000, Russell King - ARM Linux wrote:
-> > > On Mon, Jan 21, 2013 at 11:08:55AM +0100, Thierry Reding wrote:
-> > > > Convert all uses of devm_request_and_ioremap() to the newly introduced
-> > > > devm_ioremap_resource() which provides more consistent error handling.
-> > > 
-> > > Does this include the resource part of the handling too?
-> > 
-> > I'm not sure I understand your question. devm_ioremap_resource() does a
-> > devm_request_mem_region() internally if that's what you were asking.
-> 
-> Ah, that's fine then.  The function name is a little misleading, and as
-> it doesn't exist in mainline at present, it is not something I know about.
+On 01/21/2013 11:16 AM, Arnd Bergmann wrote:
+> The omapdrm driver is incorrectly flagged to allow building
+> on non-omap platforms, when ARCH_MULTIPLATFORM is set.
+>
+> This does not work, because it unconditionally selects
+> the OMAP2_DSS symbol that only works on OMAP.
+> The problem was introduced in 5e3b087499 "staging:
+> drm/omap: add support for ARCH_MULTIPLATFORM", which this
+> patch partly reverts.
 
-The usual problem with long patch series like this: The introductory mail
-PATCH 0/xx explains this nicely, but it's not possible to put everyone
-on Cc because then it gets rejected by vger for overly long mail headers.
+Are you sure OMAP2_DSS requires ARCH_OMAP2PLUS?  I don't see this, and 
+it at least used to not depend on ARCH_OMAP2PLUS.  If it does now, I 
+think the correct fix would be to remove the dependency in OMAP2_DSS.  I 
+don't think removing ARCH_MULTIPLATFORM support in omapdrm is the 
+correct solution.
 
-We had a discussion about the function name earlier, but could not come
-up with one that isn't too bulky but still carries the same meaning
-as devm_request_and_ioremap() with a different symbol.
 
-	Arnd
+> Without this patch, building allyesconfig results in:
+>
+> warning: (VIDEO_OMAP2_VOUT && DRM_OMAP) selects OMAP2_DSS which has unmet direct dependencies (HAS_IOMEM && ARCH_OMAP2PLUS)
+> warning: (VIDEO_OMAP2_VOUT && DRM_OMAP) selects OMAP2_DSS which has unmet direct dependencies (HAS_IOMEM && ARCH_OMAP2PLUS)
+> drivers/video/omap2/dss/dss.c: In function 'dss_calc_clock_div':
+> drivers/video/omap2/dss/dss.c:572:20: error: 'CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK' undeclared (first use in this function)
+> drivers/video/omap2/dss/dss.c:572:20: note: each undeclared identifier is reported only once for each function it appears in
+> drivers/staging/omapdrm/omap_connector.c: In function 'omap_connector_dpms':
+> drivers/staging/omapdrm/omap_connector.c:116:8: error: 'OMAP_DSS_DISPLAY_SUSPENDED' undeclared (first use in this function)
+> drivers/staging/omapdrm/omap_connector.c:116:8: note: each undeclared identifier is reported only once for each function it appears in
+
+
+This was an unrelated build break which should be fixed in latest master 
+after 'staging: drm/omap: use omapdss low level API'
+
+BR,
+-R
+
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Rob Clark <rob@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> ---
+>   drivers/staging/omapdrm/Kconfig |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/staging/omapdrm/Kconfig b/drivers/staging/omapdrm/Kconfig
+> index b724a41..81a7cba 100644
+> --- a/drivers/staging/omapdrm/Kconfig
+> +++ b/drivers/staging/omapdrm/Kconfig
+> @@ -2,7 +2,7 @@
+>   config DRM_OMAP
+>   	tristate "OMAP DRM"
+>   	depends on DRM && !CONFIG_FB_OMAP2
+> -	depends on ARCH_OMAP2PLUS || ARCH_MULTIPLATFORM
+> +	depends on ARCH_OMAP2PLUS
+>   	select DRM_KMS_HELPER
+>   	select OMAP2_DSS
+>   	select FB_SYS_FILLRECT
