@@ -1,66 +1,57 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 21 Jan 2013 14:27:14 +0100
-Subject: [PATCH] ARM: board-zoom: Do not request LCD panel enable GPIO from
- twl4030
-Message-ID: <1358774834-32463-1-git-send-email-peter.ujfalusi@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 21 Jan 2013 13:35:23 +0000
+Subject: [PATCH 1/1] ARM: ux500: Enable Snowball's GPIO controlled Ethernet
+ regulator in DT
+Message-ID: <1358775323-8155-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pin in question is muxed between GPIO7 and PWM1. For backlight control
-there is a custom code in board-zoom-display to control the backlight.
-No need to request the GPIO7 - which was failing since the way it is
-requested no longer valid: twl's gpio range is allocated dynamically.
+The Snowball Board's Ethernet chip is configured in a slightly
+non-standard way. Its SoC has an address space usually reserved
+for a NOR-flash device. However, on the Snowball, that external
+bus is populated by the SMSC9115 Ethernet chip. So, to power on
+the Ethernet chip, we have to enable the GPIO controlled
+regulator which usually controls the NOR-flash. In this patch
+we inform the Snowball's Device Tree which GPIO is used to
+operate it.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
-Hi Tony,
+ arch/arm/boot/dts/snowball.dts |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-This patch is generated on top of my previous series for audio/pwm support:
-http://www.spinics.net/lists/linux-omap/msg85085.html
-
-Regards,
-Peter
-
- arch/arm/mach-omap2/board-zoom-peripherals.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index f4ea926..0745bd9 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -38,8 +38,6 @@
- #define OMAP_ZOOM_TSC2004_IRQ_GPIO	(153)
- #define OMAP_ZOOM_WLAN_IRQ_GPIO		(162)
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index 27f31a5..4733a96 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -134,6 +134,7 @@
+ 				reg = <0 0x10000>;
+ 				interrupts = <12 0x1>;
+ 				interrupt-parent = <&gpio4>;
++
+ 				vdd33a-supply = <&en_3v3_reg>;
+ 				vddvario-supply = <&db8500_vape_reg>;
  
--#define LCD_PANEL_ENABLE_GPIO		(7 + OMAP_MAX_GPIO_LINES)
--
- /* Zoom2 has Qwerty keyboard*/
- static uint32_t board_keymap[] = {
- 	KEY(0, 0, KEY_E),
-@@ -243,23 +241,15 @@ static struct omap_tw4030_pdata omap_twl4030_audio_data = {
- static int zoom_twl_gpio_setup(struct device *dev,
- 		unsigned gpio, unsigned ngpio)
- {
--	int ret;
--
- 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
- 	mmc[0].gpio_cd = gpio + 0;
- 	omap_hsmmc_late_init(mmc);
+@@ -153,6 +154,7 @@
+ 			bus-width = <4>;
+ 			mmc-cap-mmc-highspeed;
+ 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
++			vqmmc-supply = <&vmmci>;
  
--	ret = gpio_request_one(LCD_PANEL_ENABLE_GPIO, GPIOF_OUT_INIT_LOW,
--			       "lcd enable");
--	if (ret)
--		pr_err("Failed to get LCD_PANEL_ENABLE_GPIO (gpio%d).\n",
--				LCD_PANEL_ENABLE_GPIO);
--
- 	/* Audio setup */
- 	omap_twl4030_audio_data.jack_detect = gpio + 2;
- 	omap_twl4030_audio_init("Zoom2", &omap_twl4030_audio_data);
- 
--	return ret;
-+	return 0;
- }
- 
- static struct twl4030_gpio_platform_data zoom_gpio_data = {
+ 			cd-gpios  = <&gpio6 26 0x4>; // 218
+ 			cd-inverted;
+@@ -346,5 +348,12 @@
+ 				};
+ 			};
+ 		};
++
++		vmmci: regulator-gpio {
++			gpios = <&gpio7 4 0x4>;        // 228
++			enable-gpio = <&gpio6 25 0x4>; // 217
++
++			status = "okay";
++		};
+ 	};
+ };
 -- 
-1.8.1.1
+1.7.9.5
