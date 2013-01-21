@@ -1,21 +1,15 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jan 2013 15:51:56 +0000
-Subject: [V4 PATCH 18/26] usb: phy: mv_usb2_phy: add externel chip support
-In-Reply-To: <1358762864-9249-19-git-send-email-chao.xie@marvell.com>
-References: <xiechao.mail@gmail.com>
- <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
- <1358762864-9249-19-git-send-email-chao.xie@marvell.com>
-Message-ID: <20130121155156.GM23505@n2100.arm.linux.org.uk>
+Date: Mon, 21 Jan 2013 15:58:46 +0000
+Subject: [PATCH 02/33] ARM: Convert to devm_ioremap_resource()
+In-Reply-To: <1358762966-20791-3-git-send-email-thierry.reding@avionic-design.de>
+References: <1358762966-20791-1-git-send-email-thierry.reding@avionic-design.de>
+ <1358762966-20791-3-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20130121155846.GN23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 05:07:36AM -0500, Chao Xie wrote:
-> +	mv_phy->extern_chip.head = devm_kzalloc(&pdev->dev,
-> +					sizeof(*mv_phy->extern_chip.head),
-> +					GFP_KERNEL);
-> +	if (mv_phy->extern_chip.head == NULL)
-> +		return -ENOMEM;
-> +	ATOMIC_INIT_NOTIFIER_HEAD(mv_phy->extern_chip.head);
+On Mon, Jan 21, 2013 at 11:08:55AM +0100, Thierry Reding wrote:
+> Convert all uses of devm_request_and_ioremap() to the newly introduced
+> devm_ioremap_resource() which provides more consistent error handling.
 
-Why do you need to allocate an atomic notifier list head as an entirely
-separate data structure?
+Does this include the resource part of the handling too?
