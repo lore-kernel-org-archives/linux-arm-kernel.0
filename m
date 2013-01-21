@@ -1,98 +1,56 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 17:16:06 +0000
-Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
+Date: Mon, 21 Jan 2013 17:16:01 +0000
+Subject: [PATCH 08/15] drm/exynos: fimd and ipp are broken on multiplatform
 In-Reply-To: <1358788568-11137-1-git-send-email-arnd@arndb.de>
 References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
-Message-ID: <1358788568-11137-14-git-send-email-arnd@arndb.de>
+Message-ID: <1358788568-11137-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In linux-3.8-rc1 it became possible to build the imx and
-mvebu platforms together in a single kernel, which clashes
-in the ehci driver.
-
-Manjunath Goudar is already working on a patch to convert
-both the imx and the mvebu glue drivers (along with all
-the other ARM specific ones) to the new probing method,
-but that will be too late to fix v3.8. This patch instead
-adds yet another hack like the existing ones to allow
-the ehci driver to load both back-ends.
+While the exynos DRM support in principle can work on
+multiplatform, the FIMD and IPP sections of it both
+include the plat/map-base.h header file, which is
+not available on multiplatform. Rather than disabling
+the entire driver, we can just conditionally build
+these two parts.
 
 Without this patch, building allyesconfig results in:
 
-drivers/usb/host/ehci-hcd.c:1285:0: error: "PLATFORM_DRIVER" redefined
-drivers/usb/host/ehci-hcd.c:1255:0: note: this is the location of the previous definition
-In file included from drivers/usb/host/ehci-hcd.c:1254:0:
-drivers/usb/host/ehci-mxc.c:280:31: warning: 'ehci_mxc_driver' defined but not used
+drivers/gpu/drm/exynos/exynos_drm_fimc.c:19:27: fatal error: plat/map-base.h: No such file or directory
+drivers/gpu/drm/exynos/exynos_drm_ipp.c:20:27: fatal error: plat/map-base.h: No such file or directory
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-usb at vger.kernel.org
-Cc: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+Cc: Inki Dae <inki.dae@samsung.com>
+Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: David Airlie <airlied@linux.ie>
+Cc: dri-devel at lists.freedesktop.org
 ---
- drivers/usb/host/ehci-hcd.c |   16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/exynos/Kconfig |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index c97503b..92e7180 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1282,7 +1282,7 @@ MODULE_LICENSE ("GPL");
+diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
+index 1d1f1e5..046bcda 100644
+--- a/drivers/gpu/drm/exynos/Kconfig
++++ b/drivers/gpu/drm/exynos/Kconfig
+@@ -24,7 +24,7 @@ config DRM_EXYNOS_DMABUF
  
- #ifdef CONFIG_PLAT_ORION
- #include "ehci-orion.c"
--#define	PLATFORM_DRIVER		ehci_orion_driver
-+#define	ORION_PLATFORM_DRIVER		ehci_orion_driver
- #endif
+ config DRM_EXYNOS_FIMD
+ 	bool "Exynos DRM FIMD"
+-	depends on DRM_EXYNOS && !FB_S3C
++	depends on DRM_EXYNOS && !FB_S3C && !ARCH_MULTIPLATFORM
+ 	help
+ 	  Choose this option if you want to use Exynos FIMD for DRM.
  
- #ifdef CONFIG_USB_W90X900_EHCI
-@@ -1353,6 +1353,7 @@ MODULE_LICENSE ("GPL");
- #if !IS_ENABLED(CONFIG_USB_EHCI_PCI) && \
- 	!IS_ENABLED(CONFIG_USB_EHCI_HCD_PLATFORM) && \
- 	!defined(CONFIG_USB_CHIPIDEA_HOST) && \
-+	!defined(ORION_PLATFORM_DRIVER) && \
- 	!defined(PLATFORM_DRIVER) && \
- 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
- 	!defined(OF_PLATFORM_DRIVER) && \
-@@ -1393,6 +1394,12 @@ static int __init ehci_hcd_init(void)
- 		goto clean0;
- #endif
+@@ -48,7 +48,7 @@ config DRM_EXYNOS_G2D
  
-+#ifdef ORION_PLATFORM_DRIVER
-+	retval = platform_driver_register(&ORION_PLATFORM_DRIVER);
-+	if (retval < 0)
-+		goto clean1;
-+#endif
-+
- #ifdef PS3_SYSTEM_BUS_DRIVER
- 	retval = ps3_ehci_driver_register(&PS3_SYSTEM_BUS_DRIVER);
- 	if (retval < 0)
-@@ -1424,6 +1431,10 @@ clean3:
- 	ps3_ehci_driver_unregister(&PS3_SYSTEM_BUS_DRIVER);
- clean2:
- #endif
-+#ifdef ORION_PLATFORM_DRIVER
-+	platform_driver_unregister(&ORION_PLATFORM_DRIVER);
-+clean1:
-+#endif
- #ifdef PLATFORM_DRIVER
- 	platform_driver_unregister(&PLATFORM_DRIVER);
- clean0:
-@@ -1446,6 +1457,9 @@ static void __exit ehci_hcd_cleanup(void)
- #ifdef OF_PLATFORM_DRIVER
- 	platform_driver_unregister(&OF_PLATFORM_DRIVER);
- #endif
-+#ifdef ORION_PLATFORM_DRIVER
-+	platform_driver_unregister(&ORION_PLATFORM_DRIVER);
-+#endif
- #ifdef PLATFORM_DRIVER
- 	platform_driver_unregister(&PLATFORM_DRIVER);
- #endif
+ config DRM_EXYNOS_IPP
+ 	bool "Exynos DRM IPP"
+-	depends on DRM_EXYNOS
++	depends on DRM_EXYNOS && !ARCH_MULTIPLATFORM
+ 	help
+ 	  Choose this option if you want to use IPP feature for DRM.
+ 
 -- 
 1.7.10.4
