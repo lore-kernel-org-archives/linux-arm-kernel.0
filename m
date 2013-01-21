@@ -1,33 +1,35 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 21 Jan 2013 18:53:59 +0100
-Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
- Armada 370/XP
+Date: Mon, 21 Jan 2013 18:54:01 +0100
+Subject: [PATCH 5/6] arm: mvebu: update DT to support local timers
 In-Reply-To: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1358790842-2986-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1358790842-2986-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 and Armada XP SoCs don't use the TWD timers, so don't
-select it by default if CONFIG_LOCAL_TIMERS is selected
+Now that the time-armada-370-xp support local timers, updated the
+device tree to take it into account.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-370-xp.dtsi |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 67874b8..4c4d010 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1624,7 +1624,7 @@ config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP
- 	default y
--	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
-+	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARMADA_370_XP_TIMER)
- 	help
- 	  Enable support for local timers on SMP platforms, rather then the
- 	  legacy IPI broadcast method.  Local timers allows the system
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 4c0abe8..aa6a187 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -68,8 +68,9 @@
+ 
+ 		timer at d0020300 {
+ 			       compatible = "marvell,armada-370-xp-timer";
+-			       reg = <0xd0020300 0x30>;
+-			       interrupts = <37>, <38>, <39>, <40>;
++			       reg = <0xd0020300 0x30>,
++			       <0xd0021040 0x30>;
++			       interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+ 			       clocks = <&coreclk 2>;
+ 		};
+ 
 -- 
 1.7.9.5
