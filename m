@@ -1,80 +1,138 @@
 From: hdk@igel.co.jp (Hideki EIRAKU)
-Date: Mon, 21 Jan 2013 19:54:29 +0900
-Subject: [PATCH v6 4/4] ARM: mach-shmobile: r8a7740: Add IPMMU device
-In-Reply-To: <1358765669-14567-1-git-send-email-hdk@igel.co.jp>
-References: <1358765669-14567-1-git-send-email-hdk@igel.co.jp>
-Message-ID: <1358765669-14567-5-git-send-email-hdk@igel.co.jp>
+Date: Mon, 21 Jan 2013 19:54:25 +0900
+Subject: [PATCH v6 0/4] Renesas IPMMU driver for sh7372, sh73a0 and r8a7740
+Message-ID: <1358765669-14567-1-git-send-email-hdk@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an IPMMU device and notifies the IPMMU driver which
-devices are connected via the IPMMU module.  All devices connected to the main
-memory bus via the IPMMU module MUST be registered when SHMOBILE_IPMMU and
-SHMOBILE_IOMMU are enabled because physical address cannot be used
-while the IPMMU module's MMU function is enabled.
+This is the Renesas IPMMU driver, IOMMU API implementation and IPMMU
+device support for sh7372 (AP4EVB and Mackerel), sh73a0 and r8a7740.
 
-Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
----
- arch/arm/mach-shmobile/setup-r8a7740.c | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+The IPMMU module supports the MMU function and the PMB function.  The
+MMU function provides address translation by pagetable compatible with
+ARMv6.  The PMB function provides address translation including
+tile-linear translation.  This is implementation of the MMU function.
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 0952224..b85bea5 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -28,6 +28,7 @@
- #include <linux/sh_dma.h>
- #include <linux/sh_timer.h>
- #include <linux/dma-mapping.h>
-+#include <linux/platform_data/sh_ipmmu.h>
- #include <mach/dma-register.h>
- #include <mach/r8a7740.h>
- #include <mach/pm-rmobile.h>
-@@ -262,6 +263,37 @@ static struct platform_device cmt10_device = {
- 	.num_resources	= ARRAY_SIZE(cmt10_resources),
- };
- 
-+/* IPMMUI (an IPMMU module for ICB/LMB) */
-+static struct resource ipmmu_resources[] = {
-+	[0] = {
-+		.name	= "IPMMUI",
-+		.start	= 0xfe951000,
-+		.end	= 0xfe9510ff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static const char * const ipmmu_dev_names[] = {
-+	"sh_mobile_lcdc_fb.0",
-+	"sh_mobile_lcdc_fb.1",
-+	"sh_mobile_ceu.0",
-+};
-+
-+static struct shmobile_ipmmu_platform_data ipmmu_platform_data = {
-+	.dev_names = ipmmu_dev_names,
-+	.num_dev_names = ARRAY_SIZE(ipmmu_dev_names),
-+};
-+
-+static struct platform_device ipmmu_device = {
-+	.name           = "ipmmu",
-+	.id             = -1,
-+	.dev = {
-+		.platform_data = &ipmmu_platform_data,
-+	},
-+	.resource       = ipmmu_resources,
-+	.num_resources  = ARRAY_SIZE(ipmmu_resources),
-+};
-+
- static struct platform_device *r8a7740_early_devices[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
-@@ -273,6 +305,7 @@ static struct platform_device *r8a7740_early_devices[] __initdata = {
- 	&scif7_device,
- 	&scifb_device,
- 	&cmt10_device,
-+	&ipmmu_device,
- };
- 
- /* DMA */
+Note: The IPMMU module translates DMA memory address from all of the
+IP blocks on the ICB.  The IOMMU API has iommu_attach_device() which
+attaches one device to one domain, but the IPMMU module cannot attach
+only one device.  The IPMMU module only can attach all devices to one
+domain.
+
+Tested on:
+- armadillo800eva
+- kzma9
+- mackerel (I could not make it boot the v3.8-rc4 with Device Tree, so
+  I tested a kernel without Device Tree support, reverting
+  3b7b70552afe351a8bd8fff1eb2d60aab2206576 and
+  0ce53cdc5c7e28f378e480363a0b0c2ed7e7eaf9)
+
+How to test:
+1. Boot a kernel built with CONFIG_SHMOBILE_IOMMU=y.
+2. Check whether a display on the board shows console normally.
+3. Check whether the IMCTR1 register is 1 which means the MMU function enabled.
+   To read the IMCTR1 register:
+   # peekpoke 0xfe951000
+4. Change the IMCTR1 to 0 to disable the MMU function.
+   To change the IMCTR1 register to 0:
+   # peekpoke 0xfe951000 0
+5. Check whether the display shows broken data.
+6. Change the IMCTR1 to 1 to enable the MMU function.
+   To change the IMCTR1 register to 1:
+   # peekpoke 0xfe951000 1
+7. Check whether a display on the board shows console normally.
+8. Capture and check the framebuffer contents via memory mapped by mmap().
+   To capture the framebuffer contents and save the image to a file "filename":
+   # fbcat /dev/fb0 > filename
+   To look at the contents saved by fbcat on a PC:
+   $ display filename
+- fbcat can be downloaded from https://code.google.com/p/fbcat/.
+- display is one of the ImageMagick tools.
+- peekpoke is:
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <err.h>
+int main(int argc,char**argv){
+  uint32_t*p,addr;
+  int fd=open("/dev/mem",O_RDWR);
+  if(fd<0)err(1,"open");
+  addr=strtoul(argv[1],NULL,0);
+  p=mmap(NULL,0x1000,PROT_READ|PROT_WRITE,MAP_SHARED,fd,addr&~0xfff);
+  if(p==MAP_FAILED)err(1,"mmap");
+  if(argc<=2)printf("0x%08x\n",p[addr/4&0x3ff]);
+  else printf("wrote 0x%08x\n",p[addr/4&0x3ff]=strtoul(argv[2],NULL,0));
+}
+
+TODO:
+- Multiple IPMMU device initialization support.
+  The ipmmu_iommu_init function and the shmobile_iommu_add_device
+  function currently do not support multiple IPMMU instances.
+- Device Tree support.
+
+Changelog:
+v6:
+- Rebased on 3.8-rc4.
+- Use cached memory for IPMMU page tables.
+- Use macros defined in linux/sizes.h.
+- Fix a memory leak of page tables when the domain is not attached.
+- Use GFP_ATOMIC for allocating page tables.
+v5:
+- Rebased on 3.8-rc1.
+- Add sh73a0 and r8a7740 support.
+- CONFIG_SHMOBILE_IOMMU is now selectable only for arm shmobile
+  architecture.
+- Fix "defined but not used" warnings when CONFIG_SHMOBILE_IOMMU is
+  not set.
+- Add help text of CONFIG_SHMOBILE_IOMMU.
+- Apply some of Laurent Pinchart's rework patches: Move the driver to
+  drivers/iommu/.
+- Use platform_data to specify attaching devices instead of
+  ipmmu_add_device() API.
+v4:
+- Rebased on 3.7-rc1.
+- Use address space size instead of page table size in config.
+- Use Kconfig default value instead of #ifdef-#define-#endif.
+v3:
+- Rebased on 3.6-rc5.
+- Simplify configs.  SHMOBILE_IPMMU is now selected by setting
+  SHMOBILE_IOMMU.
+- Remove weak symbols.
+- Use drvdata to store private driver data.
+- Make a function for writing to a register of IPMMU.
+- Add a lock to accessing the tlb_enabled member.
+- Make unmap work correctly with size larger than map size.
+- Free L2 page table when 1MiB page is mapped or unmapped.
+- Add VEU devices as IP blocks on the ICB.
+v2:
+- Rebased on v3.6-rc1.
+- Make variable names clear.
+- Page table size can now be selected by config.
+
+Hideki EIRAKU (4):
+  iommu/shmobile: Add iommu driver for Renesas IPMMU modules
+  ARM: mach-shmobile: sh7372: Add IPMMU device
+  ARM: mach-shmobile: sh73a0: Add IPMMU device
+  ARM: mach-shmobile: r8a7740: Add IPMMU device
+
+ arch/arm/mach-shmobile/setup-r8a7740.c |  33 +++
+ arch/arm/mach-shmobile/setup-sh7372.c  |  39 ++++
+ arch/arm/mach-shmobile/setup-sh73a0.c  |  31 +++
+ drivers/iommu/Kconfig                  |  74 ++++++
+ drivers/iommu/Makefile                 |   2 +
+ drivers/iommu/shmobile-iommu.c         | 395 +++++++++++++++++++++++++++++++++
+ drivers/iommu/shmobile-ipmmu.c         | 136 ++++++++++++
+ drivers/iommu/shmobile-ipmmu.h         |  34 +++
+ include/linux/platform_data/sh_ipmmu.h |  18 ++
+ 9 files changed, 762 insertions(+)
+ create mode 100644 drivers/iommu/shmobile-iommu.c
+ create mode 100644 drivers/iommu/shmobile-ipmmu.c
+ create mode 100644 drivers/iommu/shmobile-ipmmu.h
+ create mode 100644 include/linux/platform_data/sh_ipmmu.h
+
 -- 
 1.8.0
