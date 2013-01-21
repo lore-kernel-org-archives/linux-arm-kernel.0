@@ -1,54 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jan 2013 09:14:36 -0800
-Subject: [PATCH v7 14/15] pinctrl: single: support generic pinconf
-In-Reply-To: <1358494279-16503-15-git-send-email-haojian.zhuang@linaro.org>
-References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
- <1358494279-16503-15-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20130121171436.GI15361@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jan 2013 17:15:57 +0000
+Subject: [PATCH 04/15] ARM: w90x900: fix legacy assembly syntax
+In-Reply-To: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+Message-ID: <1358788568-11137-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+New ARM binutils don't allow extraneous whitespace inside
+of brackets, which causes this error on all mach-w90x900
+defconfigs:
 
-* Haojian Zhuang <haojian.zhuang@linaro.org> [130117 23:35]:
-> +static int pcs_parse_pinconf(struct pcs_device *pcs, struct device_node *np,
-> +			     struct pcs_function *func,
-> +			     struct pinctrl_map **map)
-> +
-> +{
-> +	struct pinctrl_map *m = *map;
-> +	int i = 0, nconfs = 0;
-> +	unsigned long *settings = NULL, *s = NULL;
-> +	struct pcs_conf_vals *conf = NULL;
-> +	struct pcs_conf_type prop2[] = {
-> +		{ "pinctrl-single,power-source", PIN_CONFIG_POWER_SOURCE, },
-> +		{ "pinctrl-single,slew-rate", PIN_CONFIG_SLEW_RATE, },
-> +		{ "pinctrl-single,input-schmitt", PIN_CONFIG_INPUT_SCHMITT, },
-> +	};
+arch/arm/kernel/entry-armv.S: Assembler messages:
+arch/arm/kernel/entry-armv.S:214: Error: ARM register expected -- `ldr r0,[ r6,#(0x10C)]'
+arch/arm/kernel/entry-armv.S:214: Error: ARM register expected -- `ldr r0,[ r6,#(0x110)]'
+arch/arm/kernel/entry-armv.S:430: Error: ARM register expected -- `ldr r0,[ r6,#(0x10C)]'
+arch/arm/kernel/entry-armv.S:430: Error: ARM register expected -- `ldr r0,[ r6,#(0x110)]'
 
-The PIN_CONFIG_POWER_SOURCE should be split to PIN_CONFIG_POWER_ENABLE
-and PIN_CONFIG_POWER_SOURCE. If you only have one bit for it, I guess then
-you can just use PIN_CONFIG_POWER_ENABLE and make PIN_CONFIG_POWER_SOURCE
-a NOP.
+This removes the whitespace in order to build the kernel
+again.
 
-I also suggest we standardize on PIN_CONFIG_*_ENABLE on the naming instead
-of PIN_CONFIG_*_DISABLE. Many of these features enable some input logic,
-and by default they should be off to save power.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Wan ZongShun <mcuos.com@gmail.com>
+---
+ arch/arm/mach-w90x900/include/mach/entry-macro.S |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> +	struct pcs_conf_type prop3[] = {
-> +		{ "pinctrl-single,bias-disable", PIN_CONFIG_BIAS_DISABLE, },
-> +		{ "pinctrl-single,bias-pullup", PIN_CONFIG_BIAS_PULL_UP, },
-> +		{ "pinctrl-single,bias-pulldown", PIN_CONFIG_BIAS_PULL_DOWN, },
-> +		{ "pinctrl-single,input-schmitt-disable",
-> +			PIN_CONFIG_INPUT_SCHMITT_DISABLE, },
-> +	};
-
-I'm not aware of cases where we need both INPUT_SCHMITT and INPUT_SCHMITT_DISABLE,
-so we may just want to have INPUT_SCHMITT_ENABLE if that works for you.
-
-Other than that, looks good to me. I'll update my patches here and do
-some tests against my pinctrl-single,bits testcase.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-w90x900/include/mach/entry-macro.S b/arch/arm/mach-w90x900/include/mach/entry-macro.S
+index e286dac..0ff612a 100644
+--- a/arch/arm/mach-w90x900/include/mach/entry-macro.S
++++ b/arch/arm/mach-w90x900/include/mach/entry-macro.S
+@@ -19,8 +19,8 @@
+ 
+ 		mov	\base, #AIC_BA
+ 
+-		ldr	\irqnr, [ \base, #AIC_IPER]
+-		ldr	\irqnr, [ \base, #AIC_ISNR]
++		ldr	\irqnr, [\base, #AIC_IPER]
++		ldr	\irqnr, [\base, #AIC_ISNR]
+ 		cmp	\irqnr, #0
+ 
+ 	.endm
+-- 
+1.7.10.4
