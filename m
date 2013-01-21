@@ -1,42 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 17:15:59 +0000
-Subject: [PATCH 06/15] clk: export __clk_get_name
+Date: Mon, 21 Jan 2013 17:16:05 +0000
+Subject: [PATCH 12/15] USB: gadget/freescale: disable non-multiplatform drivers
 In-Reply-To: <1358788568-11137-1-git-send-email-arnd@arndb.de>
 References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
-Message-ID: <1358788568-11137-7-git-send-email-arnd@arndb.de>
+Message-ID: <1358788568-11137-13-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __clk_get_name is used by drivers that provide their
-own clocks, which have traditionally all been built-in.
-The new imx drm driver however provides clocks but can
-be built as a module, so we need to export __clk_get_name.
+Both the fsl_mxc gadget and the imx_udc gadget drivers fail to build
+without the mach/hardware.h file that is not available when building
+for multiplatform. Let's disable these drivers for v3.8 in combination
+with CONFIG_ARCH_MULTIPLATFORM, and fix them properly in v3.9 unless
+someone has an better solution.
 
-While this is only a staging driver, it's likely that
-there will be others like it in the future.
+Without this patch, building allyesconfig results in:
 
-Without this patch, building ARM allmodconfig results in:
-
-ERROR: "__clk_get_name" [drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.ko] undefined!
+drivers/usb/gadget/fsl_mxc_udc.c:21:27: fatal error: mach/hardware.h: No such file or directory
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-usb at vger.kernel.org
 ---
- drivers/clk/clk.c |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/usb/gadget/Kconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 251e45d..13b793e 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -263,6 +263,7 @@ inline const char *__clk_get_name(struct clk *clk)
- {
- 	return !clk ? NULL : clk->name;
- }
-+EXPORT_SYMBOL_GPL(__clk_get_name);
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 14625fd..ca57a6d 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -173,6 +173,7 @@ config USB_BCM63XX_UDC
+ config USB_FSL_USB2
+ 	tristate "Freescale Highspeed USB DR Peripheral Controller"
+ 	depends on FSL_SOC || ARCH_MXC
++	depends on !ARCH_MULTIPLATFORM
+ 	select USB_FSL_MPH_DR_OF if OF
+ 	help
+ 	   Some of Freescale PowerPC and i.MX processors have a High Speed
+@@ -280,7 +281,7 @@ config USB_S3C_HSOTG
  
- inline struct clk_hw *__clk_get_hw(struct clk *clk)
- {
+ config USB_IMX
+ 	tristate "Freescale i.MX1 USB Peripheral Controller"
+-	depends on ARCH_MXC
++	depends on ARCH_MXC && !ARCH_MULTIPLATFORM
+ 	help
+ 	   Freescale's i.MX1 includes an integrated full speed
+ 	   USB 1.1 device controller.
 -- 
 1.7.10.4
