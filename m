@@ -1,33 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 18:22:53 +0000
-Subject: [PATCH 6/6] clocksource: update and move armada-370-xp-timer
- documentation to timer directory
-In-Reply-To: <1358790842-2986-7-git-send-email-gregory.clement@free-electrons.com>
-References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
- <1358790842-2986-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <201301211822.54129.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 21 Jan 2013 19:23:59 +0100
+Subject: IMX not ready for multiplatform?
+In-Reply-To: <20130121133835.GI23505@n2100.arm.linux.org.uk>
+References: <20130121133835.GI23505@n2100.arm.linux.org.uk>
+Message-ID: <20130121182359.GC1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 January 2013, Gregory CLEMENT wrote:
-> +
-> +Required properties:
-> +- compatible: Should be "marvell,armada-370-xp-timer"
-> +- interrupts: Should contain the list of Global Timer interrupts and
-> +  then local timer interrupts
-> +- reg: Should contain location and length for timers register. First
-> +  pair for the Global Timer registers, second pair for the
-> +  local/private timers.
-> +- clocks: clock driving the timer hardware
-> +
-> +Optional properties:
-> +- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
-> +  Mhz fixed mode (available on Armada XP and not on Armada 370)
+On Mon, Jan 21, 2013 at 01:38:35PM +0000, Russell King - ARM Linux wrote:
+> drivers/usb/gadget/imx_udc.c:39:27: fatal error: mach/hardware.h: No such file or directory
+> drivers/usb/gadget/fsl_mxc_udc.c:21:27: fatal error: mach/hardware.h: No such file or directory
+> 
+> is rather suggestive in my OMAP4 randconfig build.
+> 
+> Might like to have this fixed before the next merge window, so we don't
+> cause regressions.
 
-This works fine, but I would consider it slightly cleaner to kill
-the marvell,timer-25Mhz property and instead have separate 
-marvell,armada-370-timer and marvell,armada-xp-timer compatible
-strings, since the two timers are actually different, rather than wired
-differently.
+This is being worked on by Peter Chen (CCed), see
 
-	Arnd
+[PATCH v7 0/3] Fix the Build error for fsl_mxc_udc.c
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
