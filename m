@@ -1,54 +1,57 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 21 Jan 2013 19:34:51 +0100
-Subject: OMAP baseline test results for v3.8-rc4
-In-Reply-To: <20130121182419.GE10020@beef>
-References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
- <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
- <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
- <20130121182419.GE10020@beef>
-Message-ID: <20130121183451.GD2342@netboy.at.omicron.at>
+From: rob@ti.com (Rob Clark)
+Date: Mon, 21 Jan 2013 12:39:31 -0600
+Subject: [PATCH 15/15] staging/omapdrm: don't build on multiplatform
+In-Reply-To: <201301211741.11875.arnd@arndb.de>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+ <1358788568-11137-16-git-send-email-arnd@arndb.de> <50FD7A5F.9020702@ti.com>
+ <201301211741.11875.arnd@arndb.de>
+Message-ID: <50FD8B63.1060506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 01:24:19PM -0500, Matt Porter wrote:
-> On Mon, Jan 21, 2013 at 06:20:03PM +0000, Richard Cochran wrote:
-> > On Mon, Jan 21, 2013 at 10:45:10AM -0600, Nishanth Menon wrote:
-> > > for MMC filesystem - we need the edma series. for a ramdisk, I am able
-> > > to boot up to shell with 3.8-rc4 tag
-> > 
-> > Yep, I also could boot 3.8-rc3 using ramfs, no problem.
-> 
-> Do you use appended dtb? The only different that jumped out at me first
-> Paul's reported hang is he uses appended dtb and I boot my boards with a
-> single uImage and multiple dtbs the traditional DT way.
+On 01/21/2013 11:41 AM, Arnd Bergmann wrote:
+> On Monday 21 January 2013, Rob Clark wrote:
+>> Are you sure OMAP2_DSS requires ARCH_OMAP2PLUS?  I don't see this, and
+>> it at least used to not depend on ARCH_OMAP2PLUS.  If it does now, I
+>> think the correct fix would be to remove the dependency in OMAP2_DSS.  I
+>> don't think removing ARCH_MULTIPLATFORM support in omapdrm is the
+>> correct solution.
+> At least it says so in drivers/video/omap2/Kconfig, which contains
+>
+> if ARCH_OMAP2PLUS
+> source drivers/video/omap2/dss/Kconfig
+> endif
 
-No, not appended. I have a u-boot that supports dtb:
+ahh, ok, I see.. the if ARCH_OMAP2PLUS bit looks like it came in 
+recently (770b6cb)
 
-  U-Boot SPL 2012.10-rc1-00148-g4668a08 (Sep 30 2012 - 09:35:20)
-  U-Boot 2012.10-rc1-00148-g4668a08 (Sep 30 2012 - 09:35:20)
+what about changing this to 'if ARCH_OMAP2PLUS || ARCH_MULTIPLATFORM'?
 
-and using the omap2plus_defconfig, with a minicom script like the one
-below, and it works just fine.
+BR,
+-R
 
-HTH,
-Richard
-
-
-verbose on
-send setenv ipaddr 192.168.1.77
-send setenv serverip 192.168.1.12
-send setenv netmask 255.255.255.0
-send setenv bootargs console=ttyO0,115200n8 mem=256M root=/dev/ram rw initrd=0x82000000,16MB ramdisk_size=16384 earlyprintk=serial
-send tftp 81000000 uImage
-expect {
-	"U-Boot# "
-}
-send tftp 82000000 beaglebone-initrd.gz
-expect {
-	"U-Boot# "
-}
-send tftp 80000000 am335x-bone.dtb
-expect {
-	"U-Boot# "
-}
-send bootm 81000000 - 80000000
+> We can probably change this, but until we do, we should not select
+> OMAP2_DSS from something that doesn't also depend on ARCH_OMAP2PLUS.
+>   
+>>> drivers/video/omap2/dss/dss.c: In function 'dss_calc_clock_div':
+>>> drivers/video/omap2/dss/dss.c:572:20: error: 'CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK' undeclared (first use in this function)
+>>> drivers/video/omap2/dss/dss.c:572:20: note: each undeclared identifier is reported only once for each function it appears in
+>>> drivers/staging/omapdrm/omap_connector.c: In function 'omap_connector_dpms':
+>>> drivers/staging/omapdrm/omap_connector.c:116:8: error: 'OMAP_DSS_DISPLAY_SUSPENDED' undeclared (first use in this function)
+>>> drivers/staging/omapdrm/omap_connector.c:116:8: note: each undeclared identifier is reported only once for each function it appears in
+>>
+>> This was an unrelated build break which should be fixed in latest master
+>> after 'staging: drm/omap: use omapdss low level API'
+> Ok, it seems the message is stale then, I created the patch some time ago, but
+> only today wrote rest of the explanation for the changeset text.
+>
+> With all the other patches from my series applied, allyesconfig still gives me
+>
+> drivers/video/omap2/dss/dss.c:572:20: error: 'CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK' undeclared
+>
+> because that symbol is only defined when OMAP2_DSS is enabled rather than
+> selected. Changing drivers/video/omap2/Kconfig to not depend on OMAP seems
+> to work as well, but that seems a little intrusive for v3.8, because it would
+> let a lot of people build that code that have no use for it.
+>
+> 	Arnd
