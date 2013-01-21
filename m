@@ -1,50 +1,105 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Mon, 21 Jan 2013 01:51:13 +0000
-Subject: [PATCH v4] sdma-imx: Add SDMA firmware for Freescale i.MX SOCs
-In-Reply-To: <1358536921-29348-1-git-send-email-festevam@gmail.com>
-References: <1358536921-29348-1-git-send-email-festevam@gmail.com>
-Message-ID: <1358733073.24121.250.camel@deadeye.wl.decadent.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 21 Jan 2013 01:54:17 +0000 (UTC)
+Subject: [PATCH v2 0/5] ARM: OMAP4: Enable AESS IP.
+In-Reply-To: <50F9608A.8060102@ti.com>
+References: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
+ <50F9608A.8060102@ti.com>
+Message-ID: <alpine.DEB.2.00.1301210152220.31667@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-01-18 at 17:22 -0200, Fabio Estevam wrote:
-[...]
-> +CHOICE OF LAW; VENUE; LIMITATIONS.	You agree that the statutes and
-> +laws of the United States and the State of Texas, USA, without regard
-> +to conflicts of laws principles, will apply to all matters relating to
-> +this Agreement or the Software, and you agree that any litigation will
-> +be subject to the exclusive jurisdiction of the state or federal courts
-> +in Texas, USA. You agree that regardless of any statute or law to the
-> +contrary, any claim or cause of action arising out of or related to
-> +this Agreement or the Software must be filed within one (1) year after
-> +such claim or cause of action arose or be forever barred.
-[...]
+On Fri, 18 Jan 2013, Sebastien Guiriec wrote:
 
-I also have no intention of going to Texas if Freescale thinks I did
-something wrong with this firmware.  Can you ask their legal department
-to have a look at some of the licences currently in linux-firmware.git,
-because no-one else has insisted on stuff like this.
+> Paul, Benoit,
+> 
+> Any comments before I resend the serie with the minor comment for Felipe?
 
-Most of the licences say that the firmware may be used and redistributed
-for use with $vendor's products, with some or all of the restrictions:
+Not from me.  The series has been queued for 3.9 with Felipe's comment 
+fix; thanks Felipe.
 
-- No modifications allowed
-- No reverse-engineering
-- No right to use $vendor's name for promotion
 
-Plus the usual warranty disclaimer and requirement to keep the copyright
-notice and licence text.
+- Paul
 
-Ben.
+From: Paul Walmsley <paul@pwsan.com>
+Date: Sun, 20 Jan 2013 18:52:09 -0700
+Subject: [PATCH] ARM: OMAP2+: hwmod: add enable_preprogram hook
 
+After setup/enable, some IP blocks need some additional setting to
+indicate the PRCM that they are inactive until they are configured.
+Some examples on OMAP4 include the AESS and FSUSB IP blocks.
+
+To fix this cleanly, this patch adds another optional function
+pointer, enable_preprogram, to the IP block's hwmod data.  The function
+that is pointed to is called by the hwmod code immediately after the
+IP block is reset.
+
+This version of the patch includes a patch description fix from Felipe.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   18 ++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.h |    2 ++
+ 2 files changed, 20 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 4653efb..f37d22c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2053,6 +2053,23 @@ static int _omap4_get_context_lost(struct omap_hwmod *oh)
+ }
+ 
+ /**
++ * _enable_preprogram - Pre-program an IP block during the _enable() process
++ * @oh: struct omap_hwmod *
++ *
++ * Some IP blocks (such as AESS) require some additional programming
++ * after enable before they can enter idle.  If a function pointer to
++ * do so is present in the hwmod data, then call it and pass along the
++ * return value; otherwise, return 0.
++ */
++static int __init _enable_preprogram(struct omap_hwmod *oh)
++{
++	if (!oh->class->enable_preprogram)
++		return 0;
++
++	return oh->class->enable_preprogram(oh);
++}
++
++/**
+  * _enable - enable an omap_hwmod
+  * @oh: struct omap_hwmod *
+  *
+@@ -2156,6 +2173,7 @@ static int _enable(struct omap_hwmod *oh)
+ 				_update_sysc_cache(oh);
+ 			_enable_sysc(oh);
+ 		}
++		r = _enable_preprogram(oh);
+ 	} else {
+ 		if (soc_ops.disable_module)
+ 			soc_ops.disable_module(oh);
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+index 3ae852a..41066b4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -501,6 +501,7 @@ struct omap_hwmod_omap4_prcm {
+  * @rev: revision of the IP class
+  * @pre_shutdown: ptr to fn to be executed immediately prior to device shutdown
+  * @reset: ptr to fn to be executed in place of the standard hwmod reset fn
++ * @enable_preprogram:  ptr to fn to be executed during device enable
+  *
+  * Represent the class of a OMAP hardware "modules" (e.g. timer,
+  * smartreflex, gpio, uart...)
+@@ -524,6 +525,7 @@ struct omap_hwmod_class {
+ 	u32					rev;
+ 	int					(*pre_shutdown)(struct omap_hwmod *oh);
+ 	int					(*reset)(struct omap_hwmod *oh);
++	int					(*enable_preprogram)(struct omap_hwmod *oh);
+ };
+ 
+ /**
 -- 
-Ben Hutchings
-Q.  Which is the greater problem in the world today, ignorance or apathy?
-A.  I don't know and I couldn't care less.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130121/c2be6108/attachment.sig>
+1.7.10.4
