@@ -1,74 +1,67 @@
-From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Mon, 21 Jan 2013 10:56:31 +0100
-Subject: [PATCH] slab : allow SLAB_RED_ZONE and SLAB_STORE_USER to work on arm
-Message-ID: <1358762191-13839-1-git-send-email-matthieu.castet@parrot.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 21 Jan 2013 02:02:15 -0800
+Subject: [PATCH v4 0/7] ARM: Exynos: Enable device tree support for MCT
+ controller
+Message-ID: <1358762542-19008-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current slab code only allow to put redzone( and user store) info if "buffer
-alignment(ralign) <= __alignof__(unsigned long long)". This was done because we
-want to keep the buffer aligned for user even after adding redzone@the
-beginning of the buffer (the user store is stored after user buffer) [1]
+Changes since v3:
+- Based on Stephen Warren's CONFIG_CLKSRC_OF patches (merged from arm-soc
+  'timer/cleanup' branch).
+- Moved the mct driver from mach-exynos to drivers/clocksource
 
-But instead of disabling this feature when "ralign > __alignof__(unsigned long
-long)", we can force the alignment by allocating ralign before user buffer.
+Changes since v2:
+- Rebased to linux 3.8-rc1
 
-This is done by setting ralign in obj_offset when "ralign > __alignof__(unsigned
-long long)" and keeping the old behavior when  "ralign <= __alignof__(unsigned
-long long)" (we set sizeof(unsigned long long)).
+Changes since v1:
+- Includes changes suggested by Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
 
-The 5c5e3b33b7cb959a401f823707bee006caadd76e commit wasn't handling "ralign <=
-__alignof__(unsigned long long)", that's why it broked some configuration.
+This patch series adds device tree support for Exynos4/5 MCT controller and
+moves the MCT driver from mach-exynos to drivers/clocksource. These patches
+are based on Stephen Warren's CONFIG_CLKSRC_OF patches which were merged from
+the 'timer/cleanup' branch of the arm-soc tree. It also depends on the
+following two patches.
 
-This was tested on omap3 (ralign is 64 and __alignof__(unsigned long long) is 8)
+- http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/143084.html
+- http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/143119.html
 
-[1]
-/*
- * memory layout of objects:
- * 0        : objp
- * 0 .. cachep->obj_offset - BYTES_PER_WORD - 1: padding. This ensures that
- *      the end of an object is aligned with the end of the real
- *      allocation. Catches writes behind the end of the allocation.
- * cachep->obj_offset - BYTES_PER_WORD .. cachep->obj_offset - 1:
- *      redzone word.
- * cachep->obj_offset: The real object.
- * cachep->buffer_size - 2* BYTES_PER_WORD: redzone word [BYTES_PER_WORD long]
- * cachep->buffer_size - 1* BYTES_PER_WORD: last caller address
- *                  [BYTES_PER_WORD long]
- */
+This patch series has been tested on Exynos4210 based Origen board, Exynos4412
+based Origen board and Exynos5250 based SMDK board.
 
-Signed-off-by: Matthieu Castet <matthieu.castet@parrot.com>
-CC: Russell King <rmk@arm.linux.org.uk>
-CC: Pekka Enberg <penberg@cs.helsinki.fi>
----
- mm/slab.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+Thomas Abraham (7):
+  ARM: Exynos: add a register base address variable in mct controller driver
+  ARM: Exynos: prepare an array of MCT interrupt numbers and use it
+  ARM: Exynos: add device tree support for MCT controller driver
+  ARM: Exynos: allow dt based discovery of mct controller using clocksource_of_init
+  ARM: dts: add mct device tree node for all supported Exynos SoC's
+  ARM: Exynos: remove static io-remapping of mct registers for Exynos5
+  ARM: Exynos: move mct driver to drivers/clocksource
 
-diff --git a/mm/slab.c b/mm/slab.c
-index e7667a3..d2380d9 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -2392,9 +2392,6 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
- 	if (ralign < cachep->align) {
- 		ralign = cachep->align;
- 	}
--	/* disable debug if necessary */
--	if (ralign > __alignof__(unsigned long long))
--		flags &= ~(SLAB_RED_ZONE | SLAB_STORE_USER);
- 	/*
- 	 * 4) Store it.
- 	 */
-@@ -2414,8 +2411,9 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
- 	 */
- 	if (flags & SLAB_RED_ZONE) {
- 		/* add space for red zone words */
--		cachep->obj_offset += sizeof(unsigned long long);
--		size += 2 * sizeof(unsigned long long);
-+		int offset = max(ralign, sizeof(unsigned long long));
-+		cachep->obj_offset += offset;
-+		size += offset + sizeof(unsigned long long);
- 	}
- 	if (flags & SLAB_STORE_USER) {
- 		/* user store requires one word storage behind the end of
--- 
-1.7.10.4
+ .../bindings/timer/samsung,exynos4210-mct.txt      |   68 +++++++
+ arch/arm/Kconfig                                   |    2 +-
+ arch/arm/boot/dts/exynos4210.dtsi                  |    7 +
+ arch/arm/boot/dts/exynos4212.dtsi                  |    9 +
+ arch/arm/boot/dts/exynos4412.dtsi                  |    7 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   20 ++
+ arch/arm/mach-exynos/Kconfig                       |    8 +-
+ arch/arm/mach-exynos/Makefile                      |    2 -
+ arch/arm/mach-exynos/common.c                      |    5 -
+ arch/arm/mach-exynos/common.h                      |    2 +-
+ arch/arm/mach-exynos/include/mach/irqs.h           |    6 -
+ arch/arm/mach-exynos/include/mach/map.h            |    1 -
+ arch/arm/mach-exynos/include/mach/regs-mct.h       |   53 ------
+ arch/arm/mach-exynos/mach-armlex4210.c             |    2 +-
+ arch/arm/mach-exynos/mach-exynos4-dt.c             |    3 +-
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    3 +-
+ arch/arm/mach-exynos/mach-nuri.c                   |    2 +-
+ arch/arm/mach-exynos/mach-origen.c                 |    2 +-
+ arch/arm/mach-exynos/mach-smdk4x12.c               |    4 +-
+ arch/arm/mach-exynos/mach-smdkv310.c               |    4 +-
+ drivers/clocksource/Kconfig                        |    5 +
+ drivers/clocksource/Makefile                       |    1 +
+ .../mct.c => drivers/clocksource/exynos_mct.c      |  197 +++++++++++++-------
+ 23 files changed, 264 insertions(+), 149 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/samsung,exynos4210-mct.txt
+ delete mode 100644 arch/arm/mach-exynos/include/mach/regs-mct.h
+ rename arch/arm/mach-exynos/mct.c => drivers/clocksource/exynos_mct.c (67%)
