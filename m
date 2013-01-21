@@ -1,50 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 21 Jan 2013 21:00:14 +0200
-Subject: [PATCH 12/15] USB: gadget/freescale: disable non-multiplatform
- drivers
-In-Reply-To: <20130121185716.GA26754@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Jan 2013 11:03:03 -0800
+Subject: [PATCH 02/15] ARM: mvebu: build coherency_ll.S for arch=armv7-a
+In-Reply-To: <1358788568-11137-3-git-send-email-arnd@arndb.de>
 References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <1358788568-11137-13-git-send-email-arnd@arndb.de>
- <20130121184138.GB10106@arwen.pp.htv.fi>
- <20130121185716.GA26754@kroah.com>
-Message-ID: <20130121190014.GA11827@arwen.pp.htv.fi>
+ <1358788568-11137-3-git-send-email-arnd@arndb.de>
+Message-ID: <20130121190302.GN22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 10:57:16AM -0800, Greg Kroah-Hartman wrote:
-> On Mon, Jan 21, 2013 at 08:41:38PM +0200, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Mon, Jan 21, 2013 at 05:16:05PM +0000, Arnd Bergmann wrote:
-> > > Both the fsl_mxc gadget and the imx_udc gadget drivers fail to build
-> > > without the mach/hardware.h file that is not available when building
-> > > for multiplatform. Let's disable these drivers for v3.8 in combination
-> > > with CONFIG_ARCH_MULTIPLATFORM, and fix them properly in v3.9 unless
-> > > someone has an better solution.
-> > > 
-> > > Without this patch, building allyesconfig results in:
-> > > 
-> > > drivers/usb/gadget/fsl_mxc_udc.c:21:27: fatal error: mach/hardware.h: No such file or directory
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Felipe Balbi <balbi@ti.com>
-> > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > > Cc: linux-usb at vger.kernel.org
-> > 
-> > NAK, I prefer to see a real fix for the problem (which in fact is
-> > already in my fixes branch).
+* Arnd Bergmann <arnd@arndb.de> [130121 09:23]:
+> In a multiplatform kernel, one can enable mach-mvebu
+> together with one or more ARMv6 platforms, which leads
+> to all files being built for v6. The coherency_ll.S
+> uses the "dsb" instruction that is only available for
+> v7, causing a build error in this case. Since the
+> file is only used on v7 based machines, it is safe
+> to build it using an ".arch armv7-a" statement.
 > 
-> I'll pull that branch now, sorry for the delay.
+> Without this patch, building allyesconfig results in:
+> 
+> arch/arm/mach-mvebu/coherency_ll.S: Assembler messages:
+> arch/arm/mach-mvebu/coherency_ll.S:45: Error: selected processor does not support ARM mode `dsb'
 
-no problem ;-)
+This should be already fixed by 72533b (arm: mvebu: Fix compile for
+multiplatform when ARMv6 is selected) in arm-soc fixes branch.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130121/351a1fcb/attachment.sig>
+Regards,
+
+Tony
+ 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/coherency_ll.S |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+> index 53e8391..7648bda 100644
+> --- a/arch/arm/mach-mvebu/coherency_ll.S
+> +++ b/arch/arm/mach-mvebu/coherency_ll.S
+> @@ -25,6 +25,7 @@
+>   * r0: Coherency fabric base register address
+>   * r1: HW CPU id
+>   */
+> +	.arch armv7-a
+>  ENTRY(ll_set_cpu_coherent)
+>  	/* Create bit by cpu index */
+>  	mov	r3, #(1 << 24)
+> -- 
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
