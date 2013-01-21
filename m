@@ -1,101 +1,37 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 21 Jan 2013 21:25:51 +0100
-Subject: [PATCH 1/8] mmc: mmci: Move ios_handler functionality into the
- driver
-In-Reply-To: <20130121140626.GB6857@gmail.com>
-References: <1355404930-5691-1-git-send-email-lee.jones@linaro.org>
- <1355404930-5691-2-git-send-email-lee.jones@linaro.org>
- <20130121140626.GB6857@gmail.com>
-Message-ID: <CAPDyKFoNXNj=9mG0sR7=g12MJ1xLuRMLqReY7mCEVSBYGvRPhQ@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 21 Jan 2013 15:35:54 -0500 (EST)
+Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
+In-Reply-To: <201301212014.20678.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1301211533580.24224-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 January 2013 15:06, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 13 Dec 2012, Lee Jones wrote:
->
->> There are currently two instances of the ios_handler being used.
->> Both of which mearly toy with some regulator settings. Now there
->> is a GPIO regulator API, we can use that instead, and lessen the
->> per platform burden. By doing this, we also become more Device
->> Tree compatible.
->>
->> Cc: Chris Ball <cjb@laptop.org>
->> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
->> Acked-by: Ulf Hansson <ulf.hansson@stericsson.com>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->
-> Any more news on this one?
+On Mon, 21 Jan 2013, Arnd Bergmann wrote:
 
-Not exactly this version of the patch, but another one has has been
-merged through Russell's patch tracker. Available for 3.9.
+> On Monday 21 January 2013, Felipe Balbi wrote:
+> > On Mon, Jan 21, 2013 at 05:16:06PM +0000, Arnd Bergmann wrote:
+> > > Manjunath Goudar is already working on a patch to convert
+> > > both the imx and the mvebu glue drivers (along with all
+> > > the other ARM specific ones) to the new probing method,
+> > > but that will be too late to fix v3.8. This patch instead
+> > > adds yet another hack like the existing ones to allow
+> > > the ehci driver to load both back-ends.
+> > 
+> > NAK, should be converted to the new usage of ehci library driver. Alan
+> > Stern already implemented for a few drivers, help is very welcome.
+> 
+> As I explained above, Manjunath already has a patch [1] for that, but I
+> think it's too late to include that in v3.8 given the regression
+> potential and size of the patch. Once he submits that patch for 3.9,
+> my change would get taken out anyway, but it lets us build important
+> configurations (including allyesconfig build tests) on 3.8.
+> 
+> 	Arnd
+> 
+> [1] http://git.linaro.org/gitweb?p=people/manjunathgoudar/usb-refactoring.git;a=commitdiff;h=d9f28dba727212d022605c955796a3a83b3978ae
 
->
->>  drivers/mmc/host/mmci.c |   22 ++++++++++++++++++++++
->>  drivers/mmc/host/mmci.h |    1 +
->>  2 files changed, 23 insertions(+)
->>
->> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->> index edc3e9b..d45c931 100644
->> --- a/drivers/mmc/host/mmci.c
->> +++ b/drivers/mmc/host/mmci.c
->> @@ -1091,6 +1091,16 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>       case MMC_POWER_OFF:
->>               if (host->vcc)
->>                       ret = mmc_regulator_set_ocr(mmc, host->vcc, 0);
->> +
->> +             if (host->vqmmc) {
->> +                     if (regulator_is_enabled(host->vqmmc)) {
->> +                             ret = regulator_disable(host->vqmmc);
->> +                             if (ret < 0)
->> +                                     dev_warn(mmc_dev(mmc),
->> +                                              "unable to disable vmmc-ios\n");
->> +                     }
->> +             }
->> +
->>               break;
->>       case MMC_POWER_UP:
->>               if (host->vcc) {
->> @@ -1115,6 +1125,14 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>
->>               break;
->>       case MMC_POWER_ON:
->> +             if (host->vqmmc)
->> +                     if (!regulator_is_enabled(host->vqmmc)) {
->> +                             ret = regulator_enable(host->vqmmc);
->> +                             if (ret < 0)
->> +                                     dev_warn(mmc_dev(mmc),
->> +                                              "unable to enable vmmc-ios\n");
->> +                     }
->> +
->>               pwr |= MCI_PWR_ON;
->>               break;
->>       }
->> @@ -1379,6 +1397,10 @@ static int __devinit mmci_probe(struct amba_device *dev,
->>                                "(using regulator instead)\n");
->>               }
->>       }
->> +
->> +     host->vqmmc = regulator_get(&dev->dev, "vqmmc");
->> +     if (IS_ERR(host->vqmmc))
->> +             host->vqmmc = NULL;
->>  #endif
->>       /* Fall back to platform data if no regulator is found */
->>       if (host->vcc == NULL)
->> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
->> index d437ccf..b87d9e2 100644
->> --- a/drivers/mmc/host/mmci.h
->> +++ b/drivers/mmc/host/mmci.h
->> @@ -194,6 +194,7 @@ struct mmci_host {
->>       struct sg_mapping_iter  sg_miter;
->>       unsigned int            size;
->>       struct regulator        *vcc;
->> +     struct regulator        *vqmmc;
->>
->>  #ifdef CONFIG_DMA_ENGINE
->>       /* DMA stuff */
->
-> --
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Is Manjunath aware of the first patch attached to this email message?
+
+	http://marc.info/?l=linux-usb&m=135843902916416&w=2
+
+Alan Stern
