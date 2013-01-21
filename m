@@ -1,45 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 17:15:57 +0000
-Subject: [PATCH 04/15] ARM: w90x900: fix legacy assembly syntax
+Date: Mon, 21 Jan 2013 17:16:02 +0000
+Subject: [PATCH 09/15] media: coda: don't build on multiplatform
 In-Reply-To: <1358788568-11137-1-git-send-email-arnd@arndb.de>
 References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
-Message-ID: <1358788568-11137-5-git-send-email-arnd@arndb.de>
+Message-ID: <1358788568-11137-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New ARM binutils don't allow extraneous whitespace inside
-of brackets, which causes this error on all mach-w90x900
-defconfigs:
+The coda video codec driver depends on a mach-imx or mach-mxs specific
+header file "mach/iram.h". This is not available when building for
+multiplatform, so let us disable this driver for v3.8 when building
+multiplatform, and hopefully find a proper fix for v3.9.
 
-arch/arm/kernel/entry-armv.S: Assembler messages:
-arch/arm/kernel/entry-armv.S:214: Error: ARM register expected -- `ldr r0,[ r6,#(0x10C)]'
-arch/arm/kernel/entry-armv.S:214: Error: ARM register expected -- `ldr r0,[ r6,#(0x110)]'
-arch/arm/kernel/entry-armv.S:430: Error: ARM register expected -- `ldr r0,[ r6,#(0x10C)]'
-arch/arm/kernel/entry-armv.S:430: Error: ARM register expected -- `ldr r0,[ r6,#(0x110)]'
-
-This removes the whitespace in order to build the kernel
-again.
+drivers/media/platform/coda.c:27:23: fatal error: mach/iram.h: No such file or directory
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Wan ZongShun <mcuos.com@gmail.com>
+Cc: Javier Martin <javier.martin@vista-silicon.com>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: linux-media at vger.kernel.org
 ---
- arch/arm/mach-w90x900/include/mach/entry-macro.S |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/media/platform/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-w90x900/include/mach/entry-macro.S b/arch/arm/mach-w90x900/include/mach/entry-macro.S
-index e286dac..0ff612a 100644
---- a/arch/arm/mach-w90x900/include/mach/entry-macro.S
-+++ b/arch/arm/mach-w90x900/include/mach/entry-macro.S
-@@ -19,8 +19,8 @@
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index 3dcfea6..049d2b2 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -142,7 +142,7 @@ if V4L_MEM2MEM_DRIVERS
  
- 		mov	\base, #AIC_BA
- 
--		ldr	\irqnr, [ \base, #AIC_IPER]
--		ldr	\irqnr, [ \base, #AIC_ISNR]
-+		ldr	\irqnr, [\base, #AIC_IPER]
-+		ldr	\irqnr, [\base, #AIC_ISNR]
- 		cmp	\irqnr, #0
- 
- 	.endm
+ config VIDEO_CODA
+ 	tristate "Chips&Media Coda multi-standard codec IP"
+-	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC
++	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC && !ARCH_MULTIPLATFORM
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select V4L2_MEM2MEM_DEV
+ 	select IRAM_ALLOC if SOC_IMX53
 -- 
 1.7.10.4
