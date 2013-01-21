@@ -1,26 +1,52 @@
 From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Mon, 21 Jan 2013 11:59:17 +0530
-Subject: [PATCH 0/2] ARM: davinci: da850: add ethernet driver DT support
-Message-ID: <1358749759-20517-1-git-send-email-prabhakar.lad@ti.com>
+Date: Mon, 21 Jan 2013 11:59:19 +0530
+Subject: [PATCH 2/2] ARM: davinci: da850: add OF_DEV_AUXDATA entry for eth0.
+In-Reply-To: <1358749759-20517-1-git-send-email-prabhakar.lad@ti.com>
+References: <1358749759-20517-1-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <1358749759-20517-3-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lad, Prabhakar <prabhakar.lad@ti.com>
 
-This patch set enables Ethernet support through device tree model.
+Add OF_DEV_AUXDATA for eth0  driver in da850 board dt
+file to use emac clock.
 
-Patches are available on [1] for testing.
-
-[1] http://git.linuxtv.org/mhadli/v4l-dvb-davinci_devices.git/shortlog/refs/heads/da850_dt
-
-Lad, Prabhakar (2):
-  ARM: davinci: da850: add DT node for eth0.
-  ARM: davinci: da850: add OF_DEV_AUXDATA entry for eth0.
-
- arch/arm/boot/dts/da850-evm.dts  |    3 +++
- arch/arm/boot/dts/da850.dtsi     |   15 +++++++++++++++
+Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: davinci-linux-open-source at linux.davincidsp.com
+Cc: netdev at vger.kernel.org
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Heiko Schocher <hs@denx.de>
+---
  arch/arm/mach-davinci/da8xx-dt.c |    9 ++++++++-
- 3 files changed, 26 insertions(+), 1 deletions(-)
+ 1 files changed, 8 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 37c27af..d548a38 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -37,11 +37,18 @@ static void __init da8xx_init_irq(void)
+ 	of_irq_init(da8xx_irq_match);
+ }
+ 
++struct of_dev_auxdata da850_evm_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
++		       NULL),
++	{}
++};
++
+ #ifdef CONFIG_ARCH_DAVINCI_DA850
+ 
+ static void __init da850_init_machine(void)
+ {
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table,
++			     da850_evm_auxdata_lookup, NULL);
+ 
+ 	da8xx_uart_clk_enable();
+ }
 -- 
 1.7.4.1
