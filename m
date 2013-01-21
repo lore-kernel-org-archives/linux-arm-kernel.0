@@ -1,52 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 21 Jan 2013 23:07:10 +0100
-Subject: [PATCH 1/6] arm: mvebu: Add support for local interrupt
-In-Reply-To: <20130121191744.0a04b941@skate>
-References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
- <1358790842-2986-2-git-send-email-gregory.clement@free-electrons.com>
- <20130121191744.0a04b941@skate>
-Message-ID: <50FDBC0E.1030706@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 21 Jan 2013 23:09:07 +0100
+Subject: [PATCH 2/7] ARM: sunxi: Add pinctrl driver for Allwinner SoCs
+In-Reply-To: <1358544639-14761-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1358544639-14761-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1358544639-14761-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdb8xLeP+RB+JfuEQu=MQ0yO6tVFasVrMsOE4FSfJHrOiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2013 07:17 PM, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
-> 
-> Just some minor nitpicks below.
+On Fri, Jan 18, 2013 at 10:30 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The Allwinner SoCs have an IP module that handle both the muxing and the
+> GPIOs.
+>
+> This IP has 8 banks of 32 bits, with a number of pins actually useful
+> for each of these banks varying from one to another, and depending on
+> the SoC used on the board.
+>
+> This driver only implements the pinctrl part, the gpio part will come
+> eventually.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-OK I will take them into account for the V2.
+Patch title says "ARM: " but all changed except one line is to the pinctrl
+tree so I have applied it to the pinctrl tree on a separate allwinner
+branch for now (will merge it to devel when deemde stable).
 
-Thanks
+ARM SoC boys: can I have an ACK on this oneliner?
 
-> 
-> On Mon, 21 Jan 2013 18:53:57 +0100, Gregory CLEMENT wrote:
-> 
->> +	if (hw < ARMADA_370_XP_MAX_PER_CPU_IRQS) {
->> +
-> 
-> Unneeded empty line.
-> 
->> +		irq_set_percpu_devid(virq);
->> +		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
->> +					handle_percpu_devid_irq);
->> +
->> +	} else {
->> +		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
->> +					handle_level_irq);
->> +	}
-> 
-> Braces useless since there is only one statement in the else.
-> 
->> +		set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
-> 
-> Incorrect indentation for this line.
-> 
-> Thomas
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yours,
+Linus Walleij
