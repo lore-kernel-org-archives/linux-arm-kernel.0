@@ -1,13 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 21 Jan 2013 10:11:41 -0700
-Subject: [PATCH] ARM: tegra: DTS: seaboard: remove unnecessarily text
-In-Reply-To: <1358588264-1860-1-git-send-email-ldewangan@nvidia.com>
-References: <1358588264-1860-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <50FD76CD.2020400@wwwdotorg.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 21 Jan 2013 18:14:18 +0100
+Subject: [GIT PULL] arm-soc: Xilinx zynq timer changes for v3.9
+Message-ID: <CAHTX3dJ1JdqH9NKYxOYdOE=5x4fMO2JSNMbcq7dkvPNJkC0VAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2013 02:37 AM, Laxman Dewangan wrote:
-> There is unnecessarily text in the keymap table. Removing this.
+Hi Arnd and Olof,
 
-Thanks, I just squashed this into your original patch.
+please pull these timer changes to your arm-soc tree.
+I am aware about any dependency.
+
+Please let me know if you have any problem with this patchset.
+
+Thanks,
+Michal
+
+The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
+  Linus Torvalds (1):
+        Linux 3.8-rc4
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git zynq/timer
+
+Soren Brinkmann (7):
+      arm: zynq: timer: Replace PSS through PS
+      arm: zynq: timer: Remove unnecessary register write
+      arm: zynq: timer: Remove unused #defines
+      arm: zynq: timer: Align columns
+      arm: zynq: timer: Remove redundant #includes
+      arm: zynq: timer: Fix comment style
+      arm: zynq: timer: Set clock_event cpumask
+
+ arch/arm/mach-zynq/common.c |    6 +-
+ arch/arm/mach-zynq/common.h |    2 +-
+ arch/arm/mach-zynq/timer.c  |  150 ++++++++++++++++++++----------------------
+ 3 files changed, 75 insertions(+), 83 deletions(-)
