@@ -1,50 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 17:41:11 +0000
-Subject: [PATCH 15/15] staging/omapdrm: don't build on multiplatform
-In-Reply-To: <50FD7A5F.9020702@ti.com>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <1358788568-11137-16-git-send-email-arnd@arndb.de> <50FD7A5F.9020702@ti.com>
-Message-ID: <201301211741.11875.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 21 Jan 2013 18:43:17 +0100
+Subject: [kvmarm] [PATCH v6 14/15] KVM: ARM: Power State Coordination
+ Interface implementation
+In-Reply-To: <CANM98q+6wd6YmK--Xb7=rKm7AyHE94pBnC_XsP+6UmuP31CziQ@mail.gmail.com>
+References: <20130116175716.29147.15348.stgit@ubuntu>
+ <20130116175918.29147.318.stgit@ubuntu> <50F81EF4.4020507@arm.com>
+ <CANM98q+z2tj72qFtjDF1ZpKMGs876=hRLpKTEwYKnpCMzdpErg@mail.gmail.com>
+ <75f43582106716efe7c8f1360e58732e@localhost>
+ <CANM98q+6wd6YmK--Xb7=rKm7AyHE94pBnC_XsP+6UmuP31CziQ@mail.gmail.com>
+Message-ID: <832da358616729fd6a5d6522682b022f@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 January 2013, Rob Clark wrote:
-> Are you sure OMAP2_DSS requires ARCH_OMAP2PLUS?  I don't see this, and 
-> it at least used to not depend on ARCH_OMAP2PLUS.  If it does now, I 
-> think the correct fix would be to remove the dependency in OMAP2_DSS.  I 
-> don't think removing ARCH_MULTIPLATFORM support in omapdrm is the 
-> correct solution.
+On Mon, 21 Jan 2013 09:50:18 -0500, Christoffer Dall
+<c.dall@virtualopensystems.com> wrote:
+> On Mon, Jan 21, 2013 at 5:04 AM, Marc Zyngier <marc.zyngier@arm.com>
+wrote:
+>> On Sun, 20 Jan 2013 18:35:51 -0500, Christoffer Dall
+>> <c.dall@virtualopensystems.com> wrote:
+>>> On Thu, Jan 17, 2013 at 10:55 AM, Marc Zyngier <marc.zyngier@arm.com>
+>>> wrote:
+>>>> On 16/01/13 17:59, Christoffer Dall wrote:
+>>>>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>
+>>>>> Implement the PSCI specification (ARM DEN 0022A) to control
+>>>>> virtual CPUs being "powered" on or off.
+>>>>>
+>>>>> PSCI/KVM is detected using the KVM_CAP_ARM_PSCI capability.
+>>>>>
+>>>>> A virtual CPU can now be initialized in a "powered off" state,
+>>>>> using the KVM_ARM_VCPU_POWER_OFF feature flag.
+>>>>>
+>>>>> The guest can use either SMC or HVC to execute a PSCI function.
+>>>>>
+>>>>> Reviewed-by: Will Deacon <will.deacon@arm.com>
+>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>>>>
+>>>> A few bits went wrong when you reworked this patch. See below.
+>>
+>> [...]
+>>
+>>>>> @@ -443,13 +445,17 @@ static int handle_hvc(struct kvm_vcpu *vcpu,
+>>>>> struct kvm_run *run)
+>>>>>       trace_kvm_hvc(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
+>>>>>                     vcpu->arch.hsr & HSR_HVC_IMM_MASK);
+>>>>>
+>>>>> +     if (kvm_psci_call(vcpu))
+>>>>> +             return 1;
+>>>>> +
+>>>>>       return 1;
+>>>>
+>>>> No undef injection if there is no PSCI match?
+>>
+>> You haven't addressed this issue in you patch.
+>>
+> right, well, it's actually quite nice not having it give you an
+> undefined exception when it logs the trace event. The psci protocol
+> relies on a confirmation in form of a return value anyhow, so it was
+> actually on purpose to remove it, so you can do things like easily
+> measure exit times or probe places in the guest.
 
-At least it says so in drivers/video/omap2/Kconfig, which contains
+If that's for tracing purpose, why don't you allocate another hypercall?
+Returning to the guest without signalling that nothing was executed seems
+very wrong to me.
 
-if ARCH_OMAP2PLUS
-source drivers/video/omap2/dss/Kconfig
-endif
+        M.
 
-We can probably change this, but until we do, we should not select
-OMAP2_DSS from something that doesn't also depend on ARCH_OMAP2PLUS.
- 
-> > drivers/video/omap2/dss/dss.c: In function 'dss_calc_clock_div':
-> > drivers/video/omap2/dss/dss.c:572:20: error: 'CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK' undeclared (first use in this function)
-> > drivers/video/omap2/dss/dss.c:572:20: note: each undeclared identifier is reported only once for each function it appears in
-> > drivers/staging/omapdrm/omap_connector.c: In function 'omap_connector_dpms':
-> > drivers/staging/omapdrm/omap_connector.c:116:8: error: 'OMAP_DSS_DISPLAY_SUSPENDED' undeclared (first use in this function)
-> > drivers/staging/omapdrm/omap_connector.c:116:8: note: each undeclared identifier is reported only once for each function it appears in
-> 
-> 
-> This was an unrelated build break which should be fixed in latest master 
-> after 'staging: drm/omap: use omapdss low level API'
-
-Ok, it seems the message is stale then, I created the patch some time ago, but
-only today wrote rest of the explanation for the changeset text.
-
-With all the other patches from my series applied, allyesconfig still gives me
-
-drivers/video/omap2/dss/dss.c:572:20: error: 'CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK' undeclared
-
-because that symbol is only defined when OMAP2_DSS is enabled rather than
-selected. Changing drivers/video/omap2/Kconfig to not depend on OMAP seems
-to work as well, but that seems a little intrusive for v3.8, because it would
-let a lot of people build that code that have no use for it.
-
-	Arnd
+-- 
+Fast, cheap, reliable. Pick two.
