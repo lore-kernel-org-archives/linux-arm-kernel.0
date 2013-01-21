@@ -1,41 +1,52 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 21 Jan 2013 21:47:38 +0100
-Subject: [PATCH 1/3] ARM: dts: AM33XX: Add ELM node
-In-Reply-To: <1358491295-4022-2-git-send-email-avinashphilip@ti.com> (Philip
- Avinash's message of "Fri, 18 Jan 2013 12:11:33 +0530")
-References: <1358491295-4022-1-git-send-email-avinashphilip@ti.com>
- <1358491295-4022-2-git-send-email-avinashphilip@ti.com>
-Message-ID: <877gn69sb9.fsf@dell.be.48ers.dk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 21 Jan 2013 21:51:26 +0100
+Subject: [PATCH 06/15] clk: export __clk_get_name
+In-Reply-To: <1358788568-11137-7-git-send-email-arnd@arndb.de>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+ <1358788568-11137-7-git-send-email-arnd@arndb.de>
+Message-ID: <CAPDyKFp-N29V0sj7PfswE__p00JAAO_16+WwxLtBU3QJXe5gyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Philip" == Philip Avinash <avinashphilip@ti.com> writes:
+On 21 January 2013 18:15, Arnd Bergmann <arnd@arndb.de> wrote:
+> The __clk_get_name is used by drivers that provide their
+> own clocks, which have traditionally all been built-in.
+> The new imx drm driver however provides clocks but can
+> be built as a module, so we need to export __clk_get_name.
+>
+> While this is only a staging driver, it's likely that
+> there will be others like it in the future.
+>
+> Without this patch, building ARM allmodconfig results in:
+>
+> ERROR: "__clk_get_name" [drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.ko] undefined!
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> ---
+>  drivers/clk/clk.c |    1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 251e45d..13b793e 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -263,6 +263,7 @@ inline const char *__clk_get_name(struct clk *clk)
+>  {
+>         return !clk ? NULL : clk->name;
+>  }
+> +EXPORT_SYMBOL_GPL(__clk_get_name);
+>
+>  inline struct clk_hw *__clk_get_hw(struct clk *clk)
+>  {
+> --
+> 1.7.10.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
- Philip> From: "Philip, Avinash" <avinashphilip@ti.com>
- Philip> Add ELM data node to AM33XX device tree file.
-
- Philip> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
- Philip> ---
- Philip>  arch/arm/boot/dts/am33xx.dtsi |    8 ++++++++
- Philip>  1 file changed, 8 insertions(+)
-
- Philip> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
- Philip> index c2f14e8..eaef5e7 100644
- Philip> --- a/arch/arm/boot/dts/am33xx.dtsi
- Philip> +++ b/arch/arm/boot/dts/am33xx.dtsi
- Philip> @@ -385,5 +385,13 @@
- Philip>  				mac-address = [ 00 00 00 00 00 00 ];
- Philip>  			};
- Philip>  		};
- Philip> +
- Philip> +		elm: elm at 48080000 {
- Philip> +			compatible	= "ti,am33xx-elm";
-
-Please drop the <tab> after compatible.
-
-Other than that it looks goood.
-
-Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
-
--- 
-Bye, Peter Korsgaard
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
