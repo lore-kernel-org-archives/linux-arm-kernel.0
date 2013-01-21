@@ -1,119 +1,127 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jan 2013 10:33:48 -0800
-Subject: [PATCH v2 3/3] arm: omap2: gpmc: add DT bindings for OneNAND
-In-Reply-To: <CALF0-+VOxtsfQLZCGujvjMrsGacbfVTMytRUX=CfKa3+FgnU1w@mail.gmail.com>
-References: <1358634477-25868-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1358634477-25868-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130121123020.GI15707@e106331-lin.cambridge.arm.com>
- <CALF0-+VOxtsfQLZCGujvjMrsGacbfVTMytRUX=CfKa3+FgnU1w@mail.gmail.com>
-Message-ID: <20130121183348.GI22517@atomide.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 21 Jan 2013 10:34:01 -0800
+Subject: [PATCH v4 3/7] ARM: Exynos: add device tree support for MCT
+ controller driver
+In-Reply-To: <20130121134610.GJ15707@e106331-lin.cambridge.arm.com>
+References: <1358762542-19008-1-git-send-email-thomas.abraham@linaro.org>
+ <1358762542-19008-4-git-send-email-thomas.abraham@linaro.org>
+ <20130121134610.GJ15707@e106331-lin.cambridge.arm.com>
+Message-ID: <CAJuYYwQTSOBtJ_7YQs9FpkU=vpKRR=YG0MXmX10OkiBsHmNUSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ezequiel Garcia <elezegarcia@gmail.com> [130121 09:00]:
-> Hi Mark,
-> 
-> On Mon, Jan 21, 2013 at 9:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > [...]
-> >
-> >> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> >> index 01ce462..f7de9eb 100644
-> >> --- a/arch/arm/mach-omap2/gpmc.c
-> >> +++ b/arch/arm/mach-omap2/gpmc.c
-> >> @@ -39,6 +39,7 @@
-> >>  #include "omap_device.h"
-> >>  #include "gpmc.h"
-> >>  #include "gpmc-nand.h"
-> >> +#include "gpmc-onenand.h"
-> >>
-> >>  #define      DEVICE_NAME             "omap-gpmc"
-> >>
-> >> @@ -1259,6 +1260,43 @@ static int gpmc_probe_nand_child(struct platform_device *pdev,
-> >>  }
-> >>  #endif
-> >>
-> >> +#ifdef CONFIG_MTD_ONENAND
-> >> +static int gpmc_probe_onenand_child(struct platform_device *pdev,
-> >> +                              struct device_node *child)
-> >> +{
-> >> +     u32 val;
-> >> +     struct omap_onenand_platform_data *gpmc_onenand_data;
-> >> +
-> >> +     if (of_property_read_u32(child, "reg", &val) < 0) {
-> >> +             dev_err(&pdev->dev, "%s has no 'reg' property\n",
-> >> +                     child->full_name);
-> >> +             return -ENODEV;
-> >> +     }
-> >> +
-> >> +     gpmc_onenand_data = devm_kzalloc(&pdev->dev, sizeof(*gpmc_onenand_data),
-> >> +                                      GFP_KERNEL);
-> >> +     if (!gpmc_onenand_data)
-> >> +             return -ENOMEM;
-> >> +
-> >> +     gpmc_onenand_data->cs = val;
-> >> +     gpmc_onenand_data->of_node = child;
-> >> +     gpmc_onenand_data->dma_channel = -1;
-> >> +
-> >> +     if (!of_property_read_u32(child, "dma-channel", &val))
-> >> +             gpmc_onenand_data->dma_channel = val;
-> >> +
-> >> +     gpmc_onenand_init(gpmc_onenand_data);
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +#else
-> >> +static int gpmc_probe_onenand_child(struct platform_device *pdev,
-> >> +                                 struct device_node *child)
-> >> +{
-> >> +     return 0;
-> >> +}
-> >> +#endif
-> >> +
-> >>  static int gpmc_probe_dt(struct platform_device *pdev)
-> >>  {
-> >>       int ret;
-> >> @@ -1276,6 +1314,12 @@ static int gpmc_probe_dt(struct platform_device *pdev)
-> >>                       return ret;
-> >>       }
-> >>
-> >
-> > This doesn't look right to me:
-> >
-> >> +     for_each_node_by_name(child, "onenand") {
-> >> +             ret = gpmc_probe_onenand_child(pdev, child);
-> >> +             of_node_put(child);
-> >> +             if (ret < 0)
-> >> +                     return ret;
-> >> +     }
-> >
-> > for_each_node_by_name automatically calls of_node_put on each node once passed,
-> > and as far as I can tell, gpmc_probe_onenand_child doesn't do anything that'd
-> > increment a node's refcount.
-> >
-> > As far as I can see, you only need the of_node_put in the error case:
-> >
-> > for_each_node_by_name(child, "onenand") {
-> >         ret = gpmc_probe_onenand_child(pdev, child);
-> >         if (ret < 0) {
-> >                 of_node_put(child);
-> >                 return ret;
-> >         }
-> > }
-> >
-> > Have I missed something here?
-> >
-> 
-> Mmm... perhaps I've overlooked that code.
-> 
-> After some digging through source and reading for_each_node_by_name()
-> it seems to me you're right.
-> 
-> @Daniel: It seems this would also apply to the NAND binding.
-> What do you think?
+Hi Marc,
 
-Would prefer this done as a fix against the omap-for-v3.9/gpmc
-branch before we apply Ezequiel's patches.
+On 21 January 2013 05:46, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Jan 21, 2013 at 10:02:18AM +0000, Thomas Abraham wrote:
+>> Allow the MCT controller base address and interrupts to be obtained from
+>> device tree and remove unused static definitions of these. The non-dt support
+>> for Exynos5250 is removed but retained for Exynos4210 based platforms.
+>>
+>> Cc: Changhwan Youn <chaos.youn@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>>  .../bindings/timer/samsung,exynos4210-mct.txt      |   68 ++++++++++++++++++++
+>>  arch/arm/mach-exynos/include/mach/irqs.h           |    6 --
+>>  arch/arm/mach-exynos/mct.c                         |   49 +++++++++++----
+>>  3 files changed, 105 insertions(+), 18 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/timer/samsung,exynos4210-mct.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/timer/samsung,exynos4210-mct.txt b/Documentation/devicetree/bindings/timer/samsung,exynos4210-mct.txt
+>> new file mode 100644
+>> index 0000000..cb47bfb
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/timer/samsung,exynos4210-mct.txt
+>> @@ -0,0 +1,68 @@
+>> +Samsung's Multi Core Timer (MCT)
+>> +
+>> +The Samsung's Multi Core Timer (MCT) module includes two main blocks, the
+>> +global timer and CPU local timers. The global timer is a 64-bit free running
+>> +up-counter and can generate 4 interrupts when the counter reaches one of the
+>> +four preset counter values. The CPU local timers are 32-bit free running
+>> +down-counters and generate an interrupt when the counter expires. There is
+>> +one CPU local timer instantiated in MCT for every CPU in the system.
+>> +
+>> +Required properties:
+>> +
+>> +- compatible: should be "samsung,exynos4210-mct".
+>> +  (a) "samsung,exynos4210-mct", for mct compatible with Exynos4210 mct.
+>> +  (b) "samsung,exynos4412-mct", for mct compatible with Exynos4412 mct.
+>> +
+>> +- reg: base address of the mct controller and length of the address space
+>> +  it occupies.
+>> +
+>> +- interrupts: the list of interrupts generated by the controller. The following
+>> +  should be the order of the interrupts specified. The local timer interrupts
+>> +  should be specified after the four global timer interrupts have been
+>> +  specified.
+>> +
+>> +     0: Global Timer Interrupt 0
+>> +     1: Global Timer Interrupt 1
+>> +     2: Global Timer Interrupt 2
+>> +     3: Global Timer Interrupt 3
+>> +     4: Local Timer Interrupt 0
+>> +     5: Local Timer Interrupt 1
+>> +     6: ..
+>> +     7: ..
+>> +     i: Local Timer Interrupt n
+>> +
+>> +Example 1: In this example, the system uses only the first global timer
+>> +        interrupt generated by MCT and the remaining three global timer
+>> +        interrupts are unused. Two local timer interrupts have been
+>> +        specified.
+>> +
+>> +     mct at 10050000 {
+>> +             compatible = "samsung,exynos4210-mct";
+>> +             reg = <0x10050000 0x800>;
+>> +             interrupts = <0 57 0>, <0 0 0>, <0 0 0>, <0 0 0>,
+>> +                          <0 42 0>, <0 48 0>;
+>
+> Rather than padding the interrupts list with nonexistent interrupts, could you
+> not use something like a #global-interrupts property?
+>
+> That way you don't have to list fake interrupts, you know exactly how many
+> global interrupts to expect (so you can sanity-check the list without any
+> special knowledge of the interrupt controller), and it's easier to support
+> future revisions which could have more interrupts, in a backwards-compatible
+> fashion.
 
-Regards,
+Yes, you are right. I will do this change in the next version. Thanks
+for your suggestion.
 
-Tony
+Thanks,
+Thomas.
+
+>
+>> +     };
+>> +
+>> +Example 2: In this example, the MCT global and local timer interrupts are
+>> +        connected to two seperate interrupt controllers. Hence, an
+>> +        interrupt-map is created to map the interrupts to the respective
+>> +        interrupt controllers.
+>> +
+>> +     mct at 101C0000 {
+>> +             compatible = "samsung,exynos4210-mct";
+>> +             reg = <0x101C0000 0x800>;
+>> +             interrupt-controller;
+>> +             #interrups-cells = <2>;
+>> +             interrupt-parent = <&mct_map>;
+>> +             interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+>> +                          <4 0>, <5 0>;
+>> +
+>> +             mct_map: mct-map {
+>> +                     #interrupt-cells = <2>;
+>> +                     #address-cells = <0>;
+>> +                     #size-cells = <0>;
+>> +                     interrupt-map = <0x0 0 &combiner 23 3>,
+>> +                                     <0x4 0 &gic 0 120 0>,
+>> +                                     <0x5 0 &gic 0 121 0>;
+>> +             };
+>> +     };
+>
+>
+> [...]
+>
+> Thanks,
+> Mark.
+>
