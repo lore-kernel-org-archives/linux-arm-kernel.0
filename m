@@ -1,32 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 21 Jan 2013 23:09:07 +0100
-Subject: [PATCH 2/7] ARM: sunxi: Add pinctrl driver for Allwinner SoCs
-In-Reply-To: <1358544639-14761-3-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 21 Jan 2013 23:15:32 +0100
+Subject: [PATCH 7/7] ARM: sunxi: olinuxino: Add muxing for the uart
+In-Reply-To: <1358544639-14761-8-git-send-email-maxime.ripard@free-electrons.com>
 References: <1358544639-14761-1-git-send-email-maxime.ripard@free-electrons.com>
- <1358544639-14761-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdb8xLeP+RB+JfuEQu=MQ0yO6tVFasVrMsOE4FSfJHrOiw@mail.gmail.com>
+ <1358544639-14761-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdbUbD-VnkdSAKp=GyRiqub8iZf90nwPHPFtWZHwSMZiAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Jan 18, 2013 at 10:30 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> The Allwinner SoCs have an IP module that handle both the muxing and the
-> GPIOs.
->
-> This IP has 8 banks of 32 bits, with a number of pins actually useful
-> for each of these banks varying from one to another, and depending on
-> the SoC used on the board.
->
-> This driver only implements the pinctrl part, the gpio part will come
-> eventually.
->
+
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Patch title says "ARM: " but all changed except one line is to the pinctrl
-tree so I have applied it to the pinctrl tree on a separate allwinner
-branch for now (will merge it to devel when deemde stable).
-
-ARM SoC boys: can I have an ACK on this oneliner?
+All pinctrl and device tree patches applied to my allwinner branch in the
+pinctrl tree. Hope the ARM SoC can accept me poking around in your
+device trees.
 
 Yours,
 Linus Walleij
