@@ -1,30 +1,23 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Jan 2013 19:23:59 +0100
-Subject: IMX not ready for multiplatform?
-In-Reply-To: <20130121133835.GI23505@n2100.arm.linux.org.uk>
-References: <20130121133835.GI23505@n2100.arm.linux.org.uk>
-Message-ID: <20130121182359.GC1906@pengutronix.de>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 21 Jan 2013 13:24:19 -0500
+Subject: OMAP baseline test results for v3.8-rc4
+In-Reply-To: <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
+References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
+ <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
+ <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
+Message-ID: <20130121182419.GE10020@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 01:38:35PM +0000, Russell King - ARM Linux wrote:
-> drivers/usb/gadget/imx_udc.c:39:27: fatal error: mach/hardware.h: No such file or directory
-> drivers/usb/gadget/fsl_mxc_udc.c:21:27: fatal error: mach/hardware.h: No such file or directory
+On Mon, Jan 21, 2013 at 06:20:03PM +0000, Richard Cochran wrote:
+> On Mon, Jan 21, 2013 at 10:45:10AM -0600, Nishanth Menon wrote:
+> > for MMC filesystem - we need the edma series. for a ramdisk, I am able
+> > to boot up to shell with 3.8-rc4 tag
 > 
-> is rather suggestive in my OMAP4 randconfig build.
-> 
-> Might like to have this fixed before the next merge window, so we don't
-> cause regressions.
+> Yep, I also could boot 3.8-rc3 using ramfs, no problem.
 
-This is being worked on by Peter Chen (CCed), see
+Do you use appended dtb? The only different that jumped out at me first
+Paul's reported hang is he uses appended dtb and I boot my boards with a
+single uImage and multiple dtbs the traditional DT way.
 
-[PATCH v7 0/3] Fix the Build error for fsl_mxc_udc.c
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-Matt
