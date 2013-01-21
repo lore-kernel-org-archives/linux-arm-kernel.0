@@ -1,80 +1,39 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Mon, 21 Jan 2013 12:13:10 +0530
-Subject: [RESEND PATCH v9 0/2] usb: phy: samsung: Introducing usb phy
- driver for samsung SoCs
-In-Reply-To: <20130118184619.GA1991@arwen.pp.htv.fi>
-References: <1358499623-13901-1-git-send-email-p.paneri@samsung.com>
- <20130118184619.GA1991@arwen.pp.htv.fi>
-Message-ID: <CAD6zSYOA0mDMPyu163br87eZ7V+3HawHATW_QHidzsRw_E3q4g@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 21 Jan 2013 08:03:01 +0100
+Subject: [PATCH v2 1/2] ARM: shmobile: sh73a0: Use generic irqchip_init()
+In-Reply-To: <20130121005439.GF19062@verge.net.au>
+References: <1358493373-28722-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130121005439.GF19062@verge.net.au>
+Message-ID: <20130121070301.GB15508@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Mon, Jan 21, 2013 at 09:54:39AM +0900, Simon Horman wrote:
+> On Fri, Jan 18, 2013 at 08:16:12AM +0100, Thierry Reding wrote:
+> > The asm/hardware/gic.h header does no longer exist and the corresponding
+> > functionality was moved to linux/irqchip.h and linux/irqchip/arm-gic.h
+> > respectively. gic_handle_irq() and of_irq_init() are no longer available
+> > either and have been replaced by irqchip_init().
+> 
+> asm/hardware/gic.h Seems to still exist in Linus's tree.
+> Could you let me know which tree of which branch I should depend on
+> in order to apply this change?
 
-On Sat, Jan 19, 2013 at 12:16 AM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Fri, Jan 18, 2013 at 02:30:21PM +0530, Praveen Paneri wrote:
->> Changes from v8:
->> Resending this patch series after rebasing to the latest usb-next branch.
->> Rewording inline comments for better readability.
->> Removed IS_ENABLED(CONFIG_OF) as pdev->dev.of_node is enough to check for dt support.
->> Using of_match_ptr to add of_match_table to platform_driver structure.
->> Removed unnecessary variables.
->>
->> Changes from v7:
->> Rebased to the latest usb-next branch.
->> Separating arch patches from these driver patches.
->>
->> Changes from v6:
->> Modified register definitions according to the existing ones.
->> Changed default PHY clk selection for SoCs.
->> Improved binding text and rebased to the latest usb-next.
->>
->> Changes from v5:
->> Moved clk_get() to driver's probe function. Now reference clock frequency
->> selection value is stored in samsung_usbphy structure for later use. Used
->> IS_ENABLED() instead of #ifdef in samsung_usbphy_get_driver_data().
->>
->> Changes from v4:
->> Moved header file contents to driver's source file
->> Removed unnecessary print message from driver's probe function
->> Dropped the Free Software Foundation address from the header
->>
->> Changes from v3:
->> Replaced susbsys_initcall()/module_exit() by module_platform_driver().
->> Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
->> is registered
->> Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
->>
->> Changes from v2:
->> Changed the driver filenames to samsung-usbphy
->> Rectified coding style related errors
->>
->> Changes from v1:
->> Rebased patches to latest usb-next branch
->> Changed the name 'sec_usbphy' to 'samsung_usbphy'
->>
->> This patch set introduces a phy driver for samsung SoCs. It uses the existing
->> transceiver infrastructure to provide phy control functions. Use of this driver
->> can be extended for usb host phy as well. Over the period of time all the phy
->> related code for most of the samsung SoCs can be integrated here.
->> Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
->> when they start supporting this phy driver.
->> This driver is tested with smdk6410 and Exynos4210(with DT).
->>
->> Praveen Paneri (2):
->>   usb: phy: samsung: Introducing usb phy driver for hsotg
->>   usb: s3c-hsotg: Adding phy driver support
->
-> Can you check on my xceiv branch if this is applied correctly ?
-Yes! It is applied fine.
+I found this when doing an automated build over all ARM defconfigs on
+linux-next.
 
-Thanks :)
+Commit 520f7bd73354f003a9a59937b28e4903d985c420 "irqchip: Move ARM gic.h
+to include/linux/irqchip/arm-gic.h" moved the file and was merged
+through Olof Johansson's next/cleanup and for-next branches.
 
-Praveen
->
-> thanks
->
-> --
-> balbi
+Adding Olof on Cc since I'm not quite sure myself about how this is
+handled.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130121/440d8211/attachment.sig>
