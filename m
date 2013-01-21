@@ -1,43 +1,84 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 21 Jan 2013 17:01:30 -0600
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Jan 2013 23:13:18 +0000
 Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <20130121224526.GA23505@n2100.arm.linux.org.uk>
+In-Reply-To: <CAKGA1bmtTH1N8nx79MGiMighdQROpNtpvAZXhHKT+mT3kcazBQ@mail.gmail.com>
 References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <201301212041.17951.arnd@arndb.de>
- <CAKGA1bn0-83d+BFRMGZDZ9MZ2nnx8e8wh-VS3XoG5UQJDC0npg@mail.gmail.com>
- <201301212230.07393.arnd@arndb.de>
- <20130121224526.GA23505@n2100.arm.linux.org.uk>
-Message-ID: <CAKGA1b=R+KJEJx1KmBy4oshy23QVJ1=Q9qXDyrzmdMAj3bN_uw@mail.gmail.com>
+ <201301212041.17951.arnd@arndb.de> <50FDAC5F.4040605@linaro.org>
+ <CAKGA1b=D5CNikijoOAk5xP6TC-nB_gEGtS05ncrPR68sQTMrxw@mail.gmail.com>
+ <50FDC2DD.7090406@linaro.org>
+ <CAKGA1bmtTH1N8nx79MGiMighdQROpNtpvAZXhHKT+mT3kcazBQ@mail.gmail.com>
+Message-ID: <20130121231318.GC23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 4:45 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 21, 2013 at 10:30:07PM +0000, Arnd Bergmann wrote:
->> On Monday 21 January 2013, Matt Sealey wrote:
->> > So is that a bug in that it is not available to ARM right now, a bug
->> > in that it would be impossible for anyone on ARM to have ever tested
->> > this code, or a bug in that it should NEVER be enabled for ARM for
->> > some reason? John? Ingo? :)
->> >
->>
->> I think it's a bug that it's not available. That does not look intentional.
->
-> What's a bug?  kernel/Kconfig.hz not being available?  No, it's
-> intentional.  (See my replies).
+On Mon, Jan 21, 2013 at 04:54:31PM -0600, Matt Sealey wrote:
+> Hmm, I think it might be appreciated for people looking at this stuff
+> (same as I stumbled into it) for a little comment on WHY the default
+> is 200. That way you don't wonder even if you know why EBSA110 has a
+> HZ=200 default, why Exynos is lumped in there too (to reduce the
+> number of interrupts firing?
 
-The bug I saw as real is that CONFIG_SCHED_HRTICK is defined only in
-kernel/Kconfig.hz (and used in kernel/sched only) - so if we want that
-functionality enabled we will also have to opencode it in
-arch/arm/Kconfig. Everyone else, by virtue of using kernel/Kconfig.hz,
-gets this config item enabled for free if they have hrtimers or
-generic smp helpers.. if I understood what John just said, this means
-on ARM, since we don't use kernel/Kconfig.hz and we don't also define
-an item for CONFIG_SCHED_HRTICK, the process scheduler is completely
-oblivious that we're running in HRT mode?
+Err, _reduce_ ?
 
-The thing I don't know is real is if that really matters one bit..
+Can you please explain why changing HZ from 100 to 200 is a reduction?
 
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+> Maybe the Exynos timer interrupt is kind
+> of a horrid core NMI kind of thing and it's desirable for it not to be
+> every millisecond,
+
+Huh?  HZ=100 is centisecond intervals...
+
+> or maybe it has the same restrictions as EBSA110,
+> but where would anyone go to find out this information?)
+
+Maybe the mailing list archives.  No, not these ones.  The full ones
+on lists.arm.linux.org.uk.  The lurker archives contain every email
+that has been on these mailing lists stretching back into the late
+1990s.  They are the only _full_ archives (give or take a few problems
+with connectivity between lists.arm.linux.org.uk and lists.infradead.org
+throwing the archiver subscription off.)
+
+> I think then the default 100 at the end of the arch/arm/Kconfig is
+> saying "you are not allowed to know that such a thing as rope even
+> exists," when in fact what we should be doing is just making sure they
+> can't swing it over the rafters.. am I taking the analogy too far? :)
+
+I think you're understanding is just waaaayyyyy off.  That default is
+there because that is the _architecture_ _default_ and there _has_ to
+be a default.  No, including kernel/Kconfig.hz won't give us any kind
+of non-specified default because, as I've already said in one of my
+other mails, you can't supplement Kconfig symbol definitions by
+declaring it multiple times.
+
+> I know where the 60Hz clocksource might come from, the old Amiga
+> platforms have one based on the PSU frequency (50Hz in Europe, 60Hz
+> US/Japan). Even a 60Hz clocksource is useful though (on the Amiga, at
+> least, it is precisely the vsync clock for synchronizing your display
+> output on TV-out, which makes it completely useful for the framebuffer
+> driver), but.. you just won't expect to assign it as sched_clock or
+> your delay timer. And if anyone does I'd expect they'd know full well
+> it'd not run so well.
+
+Except in the UK where it'd be 50Hz for the TV out.  (Lengthy irrelevant
+explanation why this is so for UK cut.)
+
+> >From that description, we are booting with standard HZ on ARM, and the
+> core sched_clock (as in we can call setup_sched_clock)
+> and/or/both/optionally using a real delay_timer switch to HRT mode if
+> we have the right equipment available in the kernel and at runtime on
+> the SoC.. but the process scheduler isn't compiled with the means to
+> actually take advantage of us being in HRT mode?
+
+Don't mix sched_clock() into this; it has nothing to do with HZ at all.
+You're confusing your apples with your oranges.
+
+> A simple BUILD_BUG_ON and a BUG_ON right after each other in the
+> appropriate clocksource driver solves that.. if there's an insistence
+> on having at least some rope, we can put them in a field and tell them
+> they have to use the moon to actually hang themselves...
+
+No it doesn't - it introduces a whole load of new ways to make the
+kernel build or boot fail for pointless reasons - more failures, more
+regressions.
+
+No thank you.
