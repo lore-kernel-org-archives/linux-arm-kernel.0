@@ -1,23 +1,47 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 21 Jan 2013 15:15:02 +0100
-Subject: [PATCH v7 02/15] pinctrl: core: get devname from pinctrl_dev
-In-Reply-To: <1358494279-16503-3-git-send-email-haojian.zhuang@linaro.org>
+Date: Mon, 21 Jan 2013 15:20:54 +0100
+Subject: [PATCH v7 03/15] gpio: use pinctrl device name for add range
+In-Reply-To: <1358494279-16503-4-git-send-email-haojian.zhuang@linaro.org>
 References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
- <1358494279-16503-3-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdYBDL9fmmREQt5-=FTA9PL678xQkXF0Mr48433jxt=mEA@mail.gmail.com>
+ <1358494279-16503-4-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdZoW0Pa9nMJin8_V+0_XVND4-hU=_SLkVEpskSfiYcyvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Jan 18, 2013 at 8:31 AM, Haojian Zhuang
 <haojian.zhuang@linaro.org> wrote:
 
-> Add new function to get devname from pinctrl_dev. pinctrl_dev_get_name()
-> can only get pinctrl description name. If we want to use gpio driver to
-> find pinctrl device node, we need to fetch the pinctrl device name.
+> gpiochip_add_pin_range() needs pinctrl device name as parameter.
+> Currently the parameter is pinctrl description name. So fix it.
 >
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  drivers/gpio/gpiolib-of.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+> index d542a14..25b1dbe 100644
+> --- a/drivers/gpio/gpiolib-of.c
+> +++ b/drivers/gpio/gpiolib-of.c
+> @@ -250,7 +250,7 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
+>                  * on the same GPIO chip.
+>                  */
+>                 ret = gpiochip_add_pin_range(chip,
+> -                                            pinctrl_dev_get_name(pctldev),
+> +                                            pinctrl_dev_get_devname(pctldev),
+>                                              0, /* offset in gpiochip */
+>                                              pinspec.args[0],
+>                                              pinspec.args[1]);
 
-Looks helpful in its own right, patch applied!
+Hm looks like the right thing to do!
+
+Patch applied.
+
+It must be such that everyone using this so far has just
+set the name to be identical to the device name.
+
+Maybe we should just drop the name in the descriptor
+if it's causing problems like this?
 
 Yours,
 Linus Walleij
