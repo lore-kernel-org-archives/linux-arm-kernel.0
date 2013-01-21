@@ -1,137 +1,118 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 21 Jan 2013 11:07:20 -0800
-Subject: [PATCH v5 00/12] clk: exynos4: migrate to common clock framework
-In-Reply-To: <2433961.3Qz5gqDyvb@amdc1227>
-References: <1356827621-27617-1-git-send-email-thomas.abraham@linaro.org>
- <50FD50BC.4020902@samsung.com> <2433961.3Qz5gqDyvb@amdc1227>
-Message-ID: <20130121190720.3982.81903@quantum>
+From: anton@enomsg.org (Anton Vorontsov)
+Date: Mon, 21 Jan 2013 11:13:26 -0800
+Subject: [PATCH 23/24] ab8500-bm: Fix minor niggles experienced during
+ testing
+In-Reply-To: <1358769840-4763-24-git-send-email-lee.jones@linaro.org>
+References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
+ <1358769840-4763-24-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130121191324.GA15037@lizard.mcd01528.sjc.wayport.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2013-01-21 08:22:39)
-> Hi Thomas, Sylwester,
-> 
-> On Monday 21 of January 2013 15:29:16 Sylwester Nawrocki wrote:
-> > On 12/30/2012 01:33 AM, Thomas Abraham wrote:
-> > > Changes since v4:
-> > > - Rebased to linux-3.8-rc1.
-> > > 
-> > > Changes since v3:
-> > > - Includes changes suggested by Tomasz Figa <tomasz.figa@gmail.com>
-> > > 
-> > > This patch series migrates the Samsung Exynos4 SoC clock code to adopt
-> > > the common clock framework. The use of Samsung specific clock
-> > > structures has been removed and all board support code has been
-> > > updated. imx-style of clock registration and lookup has been adopted
-> > > for device tree based exynos4 platforms.
-> > > 
-> > > This patch series depends on this series:
-> > > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14471
-> > > .html and this patch
-> > > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14472
-> > > .html> 
-> > > Thomas Abraham (12):
-> > >   clk: samsung: add common clock framework helper functions for
-> > >   Samsung platforms clk: samsung: add pll clock registration helper
-> > >   functions
-> > >   clk: exynos4: register clocks using common clock framework
-> > >   ARM: Exynos: Rework timer initialization sequence
-> > >   ARM: Exynos4: Migrate clock support to common clock framework
-> > >   ARM: dts: add exynos4 clock controller nodes
-> > >   ARM: dts: add xxti and xusbxti fixed rate clock nodes for exynos4
-> > >   based platforms ARM: Exynos4: allow legacy board support to specify
-> > >   xxti and xusbxti clock speed ARM: dts: add clock provider
-> > >   information for all controllers in Exynos4 SoC ARM: Exynos4: remove
-> > >   auxdata table from machine file
-> > >   ARM: Exynos: use fin_pll clock as the tick clock source for mct
-> > >   ARM: Exynos: add support for mct clock setup
-> > >  
-> > >  .../devicetree/bindings/clock/exynos4-clock.txt    |  215 +++++++
-> > >  arch/arm/boot/dts/exynos4.dtsi                     |   50 ++
-> > >  arch/arm/boot/dts/exynos4210-origen.dts            |   12 +
-> > >  arch/arm/boot/dts/exynos4210-smdkv310.dts          |   12 +
-> > >  arch/arm/boot/dts/exynos4210.dtsi                  |    6 +
-> > >  arch/arm/boot/dts/exynos4412-origen.dts            |   12 +
-> > >  arch/arm/boot/dts/exynos4412-smdk4412.dts          |   12 +
-> > >  arch/arm/boot/dts/exynos4x12.dtsi                  |    6 +
-> > >  arch/arm/mach-exynos/Kconfig                       |    1 +
-> > >  arch/arm/mach-exynos/Makefile                      |    3 -
-> > >  arch/arm/mach-exynos/clock-exynos4.h               |   35 -
-> > >  arch/arm/mach-exynos/clock-exynos4210.c            |  188 ------
-> > >  arch/arm/mach-exynos/clock-exynos4212.c            |  192 ------
-> > >  arch/arm/mach-exynos/common.c                      |   57 ++-
-> > >  arch/arm/mach-exynos/common.h                      |   21 +-
-> > >  arch/arm/mach-exynos/mach-armlex4210.c             |    3 +-
-> > >  arch/arm/mach-exynos/mach-exynos4-dt.c             |   72 +--
-> > >  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +-
-> > >  arch/arm/mach-exynos/mach-nuri.c                   |    5 +-
-> > >  arch/arm/mach-exynos/mach-origen.c                 |    5 +-
-> > >  arch/arm/mach-exynos/mach-smdk4x12.c               |    5 +-
-> > >  arch/arm/mach-exynos/mach-smdkv310.c               |    7 +-
-> > >  arch/arm/mach-exynos/mach-universal_c210.c         |    3 +-
-> > >  arch/arm/mach-exynos/mct.c                         |   32 +-
-> > >  arch/arm/plat-samsung/Kconfig                      |    4 +-
-> > >  drivers/clk/Makefile                               |    1 +
-> > >  drivers/clk/samsung/Makefile                       |    6 +
-> > >  drivers/clk/samsung/clk-exynos4.c                  |  655
-> > >  ++++++++++++++++++++ drivers/clk/samsung/clk-pll.c                  
-> > >     |  400 ++++++++++++ drivers/clk/samsung/clk-pll.h                
-> > >       |   38 ++
-> > >  drivers/clk/samsung/clk.c                          |  180 ++++++
-> > >  drivers/clk/samsung/clk.h                          |  216 +++++++
-> > >  32 files changed, 1919 insertions(+), 537 deletions(-)
-> > >  create mode 100644
-> > >  Documentation/devicetree/bindings/clock/exynos4-clock.txt delete
-> > >  mode 100644 arch/arm/mach-exynos/clock-exynos4.h
-> > >  delete mode 100644 arch/arm/mach-exynos/clock-exynos4210.c
-> > >  delete mode 100644 arch/arm/mach-exynos/clock-exynos4212.c
-> > >  create mode 100644 drivers/clk/samsung/Makefile
-> > >  create mode 100644 drivers/clk/samsung/clk-exynos4.c
-> > >  create mode 100644 drivers/clk/samsung/clk-pll.c
-> > >  create mode 100644 drivers/clk/samsung/clk-pll.h
-> > >  create mode 100644 drivers/clk/samsung/clk.c
-> > >  create mode 100644 drivers/clk/samsung/clk.h
-> > 
-> > Thanks Thomas! The patch series generally looks good to me, I've tested
-> > it on an Exynos4412 based board. I have applied couple fixes that Tomasz
-> > Figa has sent you off the mailing list. And to make a MIPI-CSI2 camera
-> > working a small fixup patch as below.
-> > 
-> > I have just one remark, but this could possibly be done as a follow up
-> > patch. Namely it may make sense to rename various sclk_* clocks to just
-> > "sclk", so for instance we don't have "fimd", "sclk_fimd", "fimc",
-> > "sclk_fimc" but e.g. "bus" or "gate" and "sclk" for each device. Such
-> > naming might be better for handling devices at core subsystems level,
-> > e.g. Runtime PM or devfreq.
-> > 
-> > Please feel free to add:
-> > 
-> > Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> 
-> I fully agree with Sylwester. After adding mentioned fixup patches, feel 
-> free to add my Reviewed-by and Tested-by as well.
-> 
-> > 
-> > I would be great to have this patch set merged for 3.9, so people can
-> > switch earlier to the common clock API, rather than modifying files
-> > that will be removed soon.
-> 
-> Yes, it would be great to have this series merged earlier, because it's 
-> very important for further development of Device Tree support on Samsung 
-> platforms. Possibly for 3.9 it could be merged as an alternative to the 
-> legacy clock code and after enough testing legacy code could be dropped in 
-> next kernel release.
-> 
+On Mon, Jan 21, 2013 at 12:03:59PM +0000, Lee Jones wrote:
+> When compile testing the new AB8500 Battery Management changes
+> due for inclusion into upstream, there were a few minor niggles
+> which required repairing, or adapting for use against the
+> Mainline kernel. This patch is a collection of them all.
 
-I thought that the Exynos4 and Exynos5 ports to the common clk framework
-were going to be merged.  Is that still the plan?
+No. This is the third time I'm saying it: the last time I checked, this is
+not how we do development in the mainline.
 
-Regards,
-Mike
+1. One logical change at a time;
+2. Every patch in a sequence must be bisectable, compilable;
+3. The patches must not "break things temporary" 'because it is easier to
+   do development that way'. If you introduce a new feature, make all
+   possible to not introduce regressions.
 
-> Best regards
-> -- 
-> Tomasz Figa
-> Samsung Poland R&D Center
-> SW Solution Development, Linux Platform
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/power/ab8500_fg.h       |    6 ++++--
+>  drivers/power/abx500_chargalg.c |    4 ++--
+>  drivers/power/pm2301_charger.c  |    4 ++--
+>  3 files changed, 8 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/power/ab8500_fg.h b/drivers/power/ab8500_fg.h
+> index 946840b..bb78dc9 100644
+> --- a/drivers/power/ab8500_fg.h
+> +++ b/drivers/power/ab8500_fg.h
+> @@ -182,6 +182,7 @@ struct ab8500_fg_test {
+>   * @fg_check_hw_failure_work:	Work for checking HW state
+>   * @cc_lock:		Mutex for locking the CC
+>   * @fg_kobject:		Structure of type kobject
+> + * @test:		Structure of type ab8500_fg_test for test purpose
+>   */
+>  struct ab8500_fg {
+>  	struct device *dev;
+> @@ -224,6 +225,7 @@ struct ab8500_fg {
+>  	struct delayed_work fg_check_hw_failure_work;
+>  	struct mutex cc_lock;
+>  	struct kobject fg_kobject;
+> +	struct ab8500_fg_test test;
+
+You are introducing it, but I don't see any users.
+
+>  };
+>  
+>  extern char *discharge_state[];
+> @@ -232,8 +234,8 @@ extern char *charge_state[];
+>  int ab8500_fg_coulomb_counter(struct ab8500_fg *di, bool enable);
+>  void ab8500_fg_charge_state_to(struct ab8500_fg *di,
+>  		enum ab8500_fg_charge_state new_state);
+> -void ab8500_fg_discharge_state_to(struct ab8500_fg *di,
+> -		enum ab8500_fg_charge_state new_state);
+> +static void ab8500_fg_discharge_state_to(struct ab8500_fg *di,
+> +		enum ab8500_fg_discharge_state new_state);
+>  /* test initialization */
+>  #ifdef CONFIG_AB8500_BM_DEEP_DEBUG
+>  void ab8500_fg_test_init(struct ab8500_fg *di);
+> diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
+> index 694f592..cacf512 100644
+> --- a/drivers/power/abx500_chargalg.c
+> +++ b/drivers/power/abx500_chargalg.c
+> @@ -1664,8 +1664,8 @@ static int abx500_chargalg_get_property(struct power_supply *psy,
+>  static ssize_t ab8500_chargalg_sysfs_show(struct kobject *kobj,
+>  					  struct attribute *attr, char *buf)
+>  {
+> -	struct ab8500_chargalg *di = container_of(kobj,
+> -               struct ab8500_chargalg, chargalg_kobject);
+> +	struct abx500_chargalg *di = container_of(kobj,
+> +               struct abx500_chargalg, chargalg_kobject);
+
+Spaces.
+
+>  
+>  	return sprintf(buf, "%d\n",
+>  		       di->susp_status.ac_suspended &&
+> diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
+> index 14e37b2..5ebae88 100644
+> --- a/drivers/power/pm2301_charger.c
+> +++ b/drivers/power/pm2301_charger.c
+> @@ -22,8 +22,8 @@
+>  #include <linux/i2c.h>
+>  #include <linux/workqueue.h>
+>  #include <linux/kobject.h>
+> -#include <linux/mfd/ab8500.h>
+>  #include <linux/mfd/abx500.h>
+> +#include <linux/mfd/abx500/ab8500.h>
+>  #include <linux/mfd/abx500/ab8500-bm.h>
+>  #include <linux/mfd/abx500/ab8500-gpadc.h>
+>  #include <linux/mfd/abx500/ux500_chargalg.h>
+> @@ -867,7 +867,7 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
+>  
+>  	/* get parent data */
+>  	pm2->dev = &i2c_client->dev;
+> -	pm2->gpadc = ab8500_gpadc_get();
+> +	pm2->gpadc = ab8500_gpadc_get("ab8500-gpadc.0");
+
+Was the driver even compilable before? You've just introduced the new
+driver in this exact series. :-/
+
+Since pm2301 is a new driver, please merge all pm2301 stuff into one
+patch.
+
+Or, if you want to preserve the development history of the new driver,
+this is also fine, but then I'd prefer to take it via a pull-request with
+only this driver.
+
+Thanks,
+Anton
