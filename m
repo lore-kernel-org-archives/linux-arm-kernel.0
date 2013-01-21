@@ -1,196 +1,91 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 21 Jan 2013 05:07:44 -0500
-Subject: [V4 PATCH 26/26] usb: ehci: ehci-mv: add device tree support
+Date: Mon, 21 Jan 2013 05:07:33 -0500
+Subject: [V4 PATCH 15/26] arm: ttc_dkb: add usb support
 In-Reply-To: <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
 References: <xiechao.mail@gmail.com>
  <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1358762864-9249-27-git-send-email-chao.xie@marvell.com>
+Message-ID: <1358762864-9249-16-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All blocks are removed. Add the device tree support for ehci.
+for ttc_dkb board, add udc/otg/ehci support
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/host/ehci-mv.c |  105 +++++++++++++++++++++++++++++++++----------
- 1 files changed, 80 insertions(+), 25 deletions(-)
+ arch/arm/mach-mmp/ttc_dkb.c |   30 +++++++++++++++++++-----------
+ 1 files changed, 19 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 171e145..79eca0c 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
-+#include <linux/of.h>
- #include <linux/err.h>
- #include <linux/usb/otg.h>
- #include <linux/usb/mv_usb2.h>
-@@ -32,11 +33,9 @@ struct ehci_hcd_mv {
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index ce55fd8..0962791 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -27,7 +27,6 @@
+ #include <mach/mfp-pxa910.h>
+ #include <mach/pxa910.h>
+ #include <mach/irqs.h>
+-#include <mach/regs-usb.h>
  
- 	struct usb_phy *otg;
+ #include "common.h"
  
--	struct mv_usb_platform_data *pdata;
--
- 	/* clock source and total clock number */
- 	unsigned int clknum;
--	struct clk *clk[0];
-+	struct clk **clk;
+@@ -158,20 +157,24 @@ static struct i2c_board_info ttc_dkb_i2c_info[] = {
  };
  
- static void ehci_clock_enable(struct ehci_hcd_mv *ehci_mv)
-@@ -138,22 +137,55 @@ static const struct hc_driver mv_ehci_hc_driver = {
- 	.bus_resume = ehci_bus_resume,
+ #ifdef CONFIG_USB_SUPPORT
+-#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
+ 
+ static char *pxa910_usb_clock_name[] = {
+-	[0] = "U2OCLK",
++	[0] = "usb_clk",
++};
++
++static struct mv_usb_phy_platform_data ttc_usb_phy_pdata = {
++	.clknum		= 1,
++	.clkname	= pxa910_usb_clock_name,
  };
  
-+static int mv_ehci_parse_dt(struct platform_device *pdev,
-+				struct ehci_hcd_mv *ehci_mv)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	unsigned int clks_num;
-+	int i, ret;
-+	const char *clk_name;
++#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
 +
-+	if (!np)
-+		return 1;
-+
-+	clks_num = of_property_count_strings(np, "clocks");
-+	if (clks_num < 0)
-+		return clks_num;
-+
-+	ehci_mv->clk = devm_kzalloc(&pdev->dev,
-+		sizeof(struct clk *) * clks_num, GFP_KERNEL);
-+	if (ehci_mv->clk == NULL)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < clks_num; i++) {
-+		ret = of_property_read_string_index(np, "clocks", i,
-+			&clk_name);
-+		if (ret)
-+			return ret;
-+		ehci_mv->clk[i] = clk_get(NULL, clk_name);
-+		if (IS_ERR(ehci_mv->clk[i]))
-+			return PTR_ERR(ehci_mv->clk[i]);
-+	}
-+
-+	ehci_mv->clknum = clks_num;
-+
-+	ret = of_property_read_u32(np, "mode", &ehci_mv->mode);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
- static int mv_ehci_probe(struct platform_device *pdev)
- {
--	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
- 	struct usb_hcd *hcd;
- 	struct ehci_hcd *ehci;
- 	struct ehci_hcd_mv *ehci_mv;
- 	struct resource *r;
--	int clk_i, retval = -ENODEV;
-+	int retval = -ENODEV;
- 	u32 offset;
- 	size_t size;
+ static struct mv_usb_platform_data ttc_usb_pdata = {
+ 	.clknum		= 1,
+ 	.clkname	= pxa910_usb_clock_name,
+ 	.vbus		= NULL,
+ 	.mode		= MV_USB_MODE_OTG,
+ 	.otg_force_a_bus_req = 1,
+-	.phy_init	= pxa_usb_phy_init,
+-	.phy_deinit	= pxa_usb_phy_deinit,
+ 	.set_vbus	= NULL,
+ };
+ #endif
+@@ -198,19 +201,24 @@ static void __init ttc_dkb_init(void)
+ 	pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
+ 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
  
--	if (!pdata) {
--		dev_err(&pdev->dev, "missing platform_data\n");
--		return -ENODEV;
--	}
--
- 	if (usb_disabled())
- 		return -ENODEV;
- 
-@@ -161,7 +193,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	if (!hcd)
- 		return -ENOMEM;
- 
--	size = sizeof(*ehci_mv) + sizeof(struct clk *) * pdata->clknum;
-+	size = sizeof(*ehci_mv);
- 	ehci_mv = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
- 	if (ehci_mv == NULL) {
- 		dev_err(&pdev->dev, "cannot allocate ehci_hcd_mv\n");
-@@ -170,19 +202,36 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, ehci_mv);
--	ehci_mv->pdata = pdata;
- 	ehci_mv->hcd = hcd;
- 
--	ehci_mv->clknum = pdata->clknum;
--	for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
--		ehci_mv->clk[clk_i] =
--		    devm_clk_get(&pdev->dev, pdata->clkname[clk_i]);
--		if (IS_ERR(ehci_mv->clk[clk_i])) {
--			dev_err(&pdev->dev, "error get clck \"%s\"\n",
--				pdata->clkname[clk_i]);
--			retval = PTR_ERR(ehci_mv->clk[clk_i]);
--			goto err_clear_drvdata;
-+	retval = mv_ehci_parse_dt(pdev, ehci_mv);
-+	if (retval > 0) {
-+		struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
-+		int clk_i = 0;
++#ifdef CONFIG_USB_SUPPORT
++	pxa_register_device(&pxa910_device_u2ophy, &ttc_usb_phy_pdata,
++				sizeof(ttc_usb_phy_pdata));
++#endif
 +
-+		/* no CONFIG_OF */
-+		if (pdata == NULL) {
-+			dev_err(&pdev->dev, "missing platform_data\n");
-+			return -ENODEV;
-+		}
-+		ehci_mv->mode = pdata->mode;
-+		ehci_mv->clknum = pdata->clknum;
-+
-+		size = sizeof(struct clk *) * ehci_mv->clknum;
-+		ehci_mv->clk = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
-+		if (ehci_mv->clk == NULL)
-+			return -ENOMEM;
-+		for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
-+			ehci_mv->clk[clk_i] = devm_clk_get(&pdev->dev,
-+						pdata->clkname[clk_i]);
-+			if (IS_ERR(ehci_mv->clk[clk_i])) {
-+				retval = PTR_ERR(ehci_mv->clk[clk_i]);
-+				return retval;
-+			}
- 		}
-+	} else if (retval < 0) {
-+		dev_err(&pdev->dev, "error parse dt\n");
-+		return retval;
- 	}
+ #ifdef CONFIG_USB_MV_UDC
+-	pxa168_device_u2o.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2o);
++	pxa_register_device(&pxa910_device_u2o, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
  
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -230,7 +279,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	ehci = hcd_to_ehci(hcd);
- 	ehci->caps = (struct ehci_caps *) ehci_mv->cap_regs;
+ #ifdef CONFIG_USB_EHCI_MV_U2O
+-	pxa168_device_u2oehci.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2oehci);
++	pxa_register_device(&pxa910_device_u2oehci, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
  
--	ehci_mv->mode = pdata->mode;
- 	if (ehci_mv->mode == MV_USB_MODE_OTG) {
- #ifdef CONFIG_USB_OTG_UTILS
- 		ehci_mv->otg = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
-@@ -334,13 +382,20 @@ static void mv_ehci_shutdown(struct platform_device *pdev)
- 		hcd->driver->shutdown(hcd);
+ #ifdef CONFIG_USB_MV_OTG
+-	pxa168_device_u2ootg.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2ootg);
++	pxa_register_device(&pxa910_device_u2ootg, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
  }
  
-+static struct of_device_id mv_ehci_dt_ids[] = {
-+	{ .compatible = "mrvl,mv-ehci" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mv_ehci_dt_ids);
-+
- static struct platform_driver ehci_mv_driver = {
- 	.probe = mv_ehci_probe,
- 	.remove = mv_ehci_remove,
- 	.shutdown = mv_ehci_shutdown,
- 	.driver = {
--		   .name = "mv-ehci",
--		   .bus = &platform_bus_type,
--		   },
-+		.name = "mv-ehci",
-+		.bus = &platform_bus_type,
-+		.of_match_table = mv_ehci_dt_ids,
-+	},
- 	.id_table = ehci_id_table,
- };
 -- 
 1.7.4.1
