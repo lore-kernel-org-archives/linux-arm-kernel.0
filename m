@@ -1,181 +1,36 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 21 Jan 2013 13:11:50 +0200
-Subject: [PATCH v9 16/22] mfd: omap-usb-host: Manage HSIC clocks for HSIC mode
-In-Reply-To: <1358511445-26656-18-git-send-email-rogerq@ti.com>
-References: <1358511445-26656-18-git-send-email-rogerq@ti.com>
-Message-ID: <1358766710-5694-1-git-send-email-rogerq@ti.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Mon, 21 Jan 2013 13:14:12 +0200
+Subject: [PATCH] OMAP: omap4-panda: add UART2 muxing for WiLink shared
+ transport
+Message-ID: <1358766852-24503-1-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the optional HSIC clocks (60MHz and 480MHz) for the ports
-that are configured in HSIC mode.
+Add the UART2 muxing data to the board file (this used to be,
+erroneously, done in the bootloader).
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+Cc: stable <stable@vger.kernel.org> [3.7]
+Signed-off-by: Luciano Coelho <coelho@ti.com>
 ---
- drivers/mfd/omap-usb-host.c |   97 ++++++++++++++++++++++++++++++++++++------
- 1 files changed, 83 insertions(+), 14 deletions(-)
+ arch/arm/mach-omap2/board-omap4panda.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 9fa0215..bdfc8b7 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -93,6 +93,8 @@
- struct usbhs_hcd_omap {
- 	int				nports;
- 	struct clk			**utmi_clk;
-+	struct clk			**hsic60m_clk;
-+	struct clk			**hsic480m_clk;
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index 5c8e9ce..769c1fe 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -397,6 +397,12 @@ static struct omap_board_mux board_mux[] __initdata = {
+ 		  OMAP_PULL_ENA),
+ 	OMAP4_MUX(ABE_MCBSP1_FSX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
  
- 	struct clk			*xclk60mhsp1_ck;
- 	struct clk			*xclk60mhsp2_ck;
-@@ -286,13 +288,40 @@ static int usbhs_runtime_resume(struct device *dev)
- 		clk_enable(omap->ehci_logic_fck);
- 
- 	for (i = 0; i < omap->nports; i++) {
--		if (!is_ehci_tll_mode(pdata->port_mode[i]) ||
--				IS_ERR(omap->utmi_clk[i]))
--			continue;
--
--		r = clk_enable(omap->utmi_clk[i]);
--		if (r)
--			dev_err(dev, "Can't enable port %d clk : %d\n", i, r);
-+		switch (pdata->port_mode[i]) {
-+		case OMAP_EHCI_PORT_MODE_HSIC:
-+			if (!IS_ERR(omap->hsic60m_clk[i])) {
-+				r = clk_enable(omap->hsic60m_clk[i]);
-+				if (r) {
-+					dev_err(dev,
-+					 "Can't enable port %d hsic60m clk:%d\n",
-+					 i, r);
-+				}
-+			}
++	/* UART2 - BT/FM/GPS shared transport */
++	OMAP4_MUX(UART2_CTS,	OMAP_PIN_INPUT	| OMAP_MUX_MODE0),
++	OMAP4_MUX(UART2_RTS,	OMAP_PIN_OUTPUT	| OMAP_MUX_MODE0),
++	OMAP4_MUX(UART2_RX,	OMAP_PIN_INPUT	| OMAP_MUX_MODE0),
++	OMAP4_MUX(UART2_TX,	OMAP_PIN_OUTPUT	| OMAP_MUX_MODE0),
 +
-+			if (!IS_ERR(omap->hsic480m_clk[i])) {
-+				r = clk_enable(omap->hsic480m_clk[i]);
-+				if (r) {
-+					dev_err(dev,
-+					 "Can't enable port %d hsic480m clk:%d\n",
-+					 i, r);
-+				}
-+			}
-+		/* Fall through as HSIC mode needs utmi_clk */
-+
-+		case OMAP_EHCI_PORT_MODE_TLL:
-+			if (!IS_ERR(omap->utmi_clk[i])) {
-+				r = clk_enable(omap->utmi_clk[i]);
-+				if (r) {
-+					dev_err(dev,
-+					 "Can't enable port %d clk : %d\n",
-+					 i, r);
-+				}
-+			}
-+			break;
-+		default:
-+			break;
-+		}
- 	}
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
  
- 	spin_unlock_irqrestore(&omap->lock, flags);
-@@ -312,9 +341,22 @@ static int usbhs_runtime_suspend(struct device *dev)
- 	spin_lock_irqsave(&omap->lock, flags);
- 
- 	for (i = 0; i < omap->nports; i++) {
--		if (is_ehci_tll_mode(pdata->port_mode[i]) &&
--				!IS_ERR(omap->utmi_clk[i]))
--			clk_disable(omap->utmi_clk[i]);
-+		switch (pdata->port_mode[i]) {
-+		case OMAP_EHCI_PORT_MODE_HSIC:
-+			if (!IS_ERR(omap->hsic60m_clk[i]))
-+				clk_disable(omap->hsic60m_clk[i]);
-+
-+			if (!IS_ERR(omap->hsic480m_clk[i]))
-+				clk_disable(omap->hsic480m_clk[i]);
-+		/* Fall through as utmi_clks were used in HSIC mode */
-+
-+		case OMAP_EHCI_PORT_MODE_TLL:
-+			if (!IS_ERR(omap->utmi_clk[i]))
-+				clk_disable(omap->utmi_clk[i]);
-+			break;
-+		default:
-+			break;
-+		}
- 	}
- 
- 	if (!IS_ERR(omap->ehci_logic_fck))
-@@ -520,7 +562,10 @@ static int usbhs_omap_probe(struct platform_device *pdev)
- 
- 	i = sizeof(struct clk *) * omap->nports;
- 	omap->utmi_clk = devm_kzalloc(dev, i, GFP_KERNEL);
--	if (!omap->utmi_clk) {
-+	omap->hsic480m_clk = devm_kzalloc(dev, i, GFP_KERNEL);
-+	omap->hsic60m_clk = devm_kzalloc(dev, i, GFP_KERNEL);
-+
-+	if (!omap->utmi_clk || !omap->hsic480m_clk || !omap->hsic60m_clk) {
- 		dev_err(dev, "Memory allocation failed\n");
- 		ret = -ENOMEM;
- 		goto err_mem;
-@@ -578,7 +623,7 @@ static int usbhs_omap_probe(struct platform_device *pdev)
- 	}
- 
- 	for (i = 0; i < omap->nports; i++) {
--		char clkname[] = "usb_host_hs_utmi_px_clk";
-+		char clkname[30];
- 
- 		/* clock names are indexed from 1*/
- 		snprintf(clkname, sizeof(clkname),
-@@ -592,6 +637,20 @@ static int usbhs_omap_probe(struct platform_device *pdev)
- 		if (IS_ERR(omap->utmi_clk[i]))
- 			dev_dbg(dev, "Failed to get clock : %s : %ld\n",
- 				clkname, PTR_ERR(omap->utmi_clk[i]));
-+
-+		snprintf(clkname, sizeof(clkname),
-+				"usb_host_hs_hsic480m_p%d_clk", i + 1);
-+		omap->hsic480m_clk[i] = clk_get(dev, clkname);
-+		if (IS_ERR(omap->hsic480m_clk[i]))
-+			dev_dbg(dev, "Failed to get clock : %s : %ld\n",
-+				clkname, PTR_ERR(omap->hsic480m_clk[i]));
-+
-+		snprintf(clkname, sizeof(clkname),
-+				"usb_host_hs_hsic60m_p%d_clk", i + 1);
-+		omap->hsic60m_clk[i] = clk_get(dev, clkname);
-+		if (IS_ERR(omap->hsic60m_clk[i]))
-+			dev_dbg(dev, "Failed to get clock : %s : %ld\n",
-+				clkname, PTR_ERR(omap->hsic60m_clk[i]));
- 	}
- 
- 	if (is_ehci_phy_mode(pdata->port_mode[0])) {
-@@ -635,9 +694,14 @@ static int usbhs_omap_probe(struct platform_device *pdev)
- err_alloc:
- 	omap_usbhs_deinit(&pdev->dev);
- 
--	for (i = 0; i < omap->nports; i++)
-+	for (i = 0; i < omap->nports; i++) {
- 		if (!IS_ERR(omap->utmi_clk[i]))
- 			clk_put(omap->utmi_clk[i]);
-+		if (!IS_ERR(omap->hsic60m_clk[i]))
-+			clk_put(omap->hsic60m_clk[i]);
-+		if (!IS_ERR(omap->hsic480m_clk[i]))
-+			clk_put(omap->hsic480m_clk[i]);
-+	}
- 
- 	clk_put(omap->init_60m_fclk);
- 
-@@ -676,9 +740,14 @@ static int usbhs_omap_remove(struct platform_device *pdev)
- 
- 	omap_usbhs_deinit(&pdev->dev);
- 
--	for (i = 0; i < omap->nports; i++)
-+	for (i = 0; i < omap->nports; i++) {
- 		if (!IS_ERR(omap->utmi_clk[i]))
- 			clk_put(omap->utmi_clk[i]);
-+		if (!IS_ERR(omap->hsic60m_clk[i]))
-+			clk_put(omap->hsic60m_clk[i]);
-+		if (!IS_ERR(omap->hsic480m_clk[i]))
-+			clk_put(omap->hsic480m_clk[i]);
-+	}
- 
- 	clk_put(omap->init_60m_fclk);
- 	clk_put(omap->utmi_p1_gfclk);
 -- 
-1.7.4.1
+1.7.10.4
