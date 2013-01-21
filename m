@@ -1,38 +1,77 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 21 Jan 2013 10:57:16 -0800
-Subject: [PATCH 12/15] USB: gadget/freescale: disable non-multiplatform
- drivers
-In-Reply-To: <20130121184138.GB10106@arwen.pp.htv.fi>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <1358788568-11137-13-git-send-email-arnd@arndb.de>
- <20130121184138.GB10106@arwen.pp.htv.fi>
-Message-ID: <20130121185716.GA26754@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jan 2013 18:55:25 +0000
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <50FD5844.1010201@web.de>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <201301192005.20093.arnd@arndb.de> <50FD5844.1010201@web.de>
+Message-ID: <201301211855.25455.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 08:41:38PM +0200, Felipe Balbi wrote:
-> Hi,
-> 
-> On Mon, Jan 21, 2013 at 05:16:05PM +0000, Arnd Bergmann wrote:
-> > Both the fsl_mxc gadget and the imx_udc gadget drivers fail to build
-> > without the mach/hardware.h file that is not available when building
-> > for multiplatform. Let's disable these drivers for v3.8 in combination
-> > with CONFIG_ARCH_MULTIPLATFORM, and fix them properly in v3.9 unless
-> > someone has an better solution.
-> > 
-> > Without this patch, building allyesconfig results in:
-> > 
-> > drivers/usb/gadget/fsl_mxc_udc.c:21:27: fatal error: mach/hardware.h: No such file or directory
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: linux-usb at vger.kernel.org
-> 
-> NAK, I prefer to see a real fix for the problem (which in fact is
-> already in my fixes branch).
+On Monday 21 January 2013, Soeren Moch wrote:
+> On 01/19/13 21:05, Arnd Bergmann wrote:
+> > from the distribution of the numbers, it seems that there is exactly 1 MB
+> > of data allocated between bus addresses 0x1f90000 and 0x1f9ffff, allocated
+> > in individual pages. This matches the size of your pool, so it's definitely
+> > something coming from USB, and no single other allocation, but it does not
+> > directly point to a specific line of code.
+> Very interesting, so this is no fragmentation problem nor something 
+> caused by sata or ethernet.
 
-I'll pull that branch now, sorry for the delay.
+Right.
 
-greg k-h
+> > One thing I found was that the ARM dma-mapping code seems buggy in the way
+> > that it does a bitwise and between the gfp mask and GFP_ATOMIC, which does
+> > not work because GFP_ATOMIC is defined by the absence of __GFP_WAIT.
+> >
+> > I believe we need the patch below, but it is not clear to me if that issue
+> > is related to your problem or now.
+> Out of curiosity I checked include/linux/gfp.h. GFP_ATOMIC is defined as 
+> __GFP_HIGH (which means 'use emergency pool', and no wait), so this 
+> patch should not make any difference for "normal" (GPF_ATOMIC / 
+> GFP_KERNEL) allocations, only for gfp_flags accidentally set to zero. 
+
+Yes, or one of the rare cases where someone intentionally does something like
+(GFP_ATOMIC & !__GFP_HIGH) or (GFP_KERNEL || __GFP_HIGH), which are both
+wrong.
+
+> So, can a new test with this patch help to debug the pool exhaustion?
+
+Yes, but I would not expect this to change much. It's a bug, but not likely
+the one you are hitting.
+
+> > So even for a GFP_KERNEL passed into usb_submit_urb, the ehci driver
+> > causes the low-level allocation to be GFP_ATOMIC, because
+> > qh_append_tds() is called under a spinlock. If we have hundreds
+> > of URBs in flight, that will exhaust the pool rather quickly.
+> >
+> Maybe there are hundreds of URBs in flight in my application, I have no 
+> idea how to check this.
+
+I don't know a lot about USB, but I always assumed that this was not
+a normal condition and that there are only a couple of URBs per endpoint
+used at a time. Maybe Greg or someone else with a USB background can
+shed some light on this.
+
+> It seems to me that bad reception conditions 
+> (lost lock / regained lock messages for some dvb channels) accelerate 
+> the buffer exhaustion. But even with a 4MB coherent pool I see the 
+> error. Is there any chance to fix this in the usb or dvb subsystem (or 
+> wherever)? Should I try to further increase the pool size, or what else 
+> can I do besides using an older kernel?
+
+There are two things that I think can be done if hundreds of URBs is
+indeed the normal working condition for this driver:
+
+* change the locking in your driver so it can actually call usb_submit_urb
+using GFP_KERNEL rather than GFP_ATOMIC
+* after that is done, rework the ehci_hcd driver so it can do the
+allocation inside of the submit_urb path to use the mem_flags rather
+than unconditional GFP_ATOMIC.
+
+Note that the problem you are seeing does not just exist in the case of
+the atomic coherent pool getting exhausted, but also on any platform
+that runs into an out-of-memory condition.
+
+	Arnd
