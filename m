@@ -1,74 +1,69 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 Jan 2013 13:41:36 +0530
-Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
- hwmod data
-In-Reply-To: <20130118171500.GC15361@atomide.com>
-References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
- <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
- <20130118171500.GC15361@atomide.com>
-Message-ID: <50FCF838.6000105@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 21 Jan 2013 09:11:29 +0100
+Subject: [PATCH] power: reset: qnap-poweroff: Fix License String
+In-Reply-To: <20130120204728.GA16339@lizard.gateway.2wire.net>
+References: <20130106215509.GD26928@lizard.sbx05280.losalca.wayport.net>
+ <1357668926-20598-1-git-send-email-andrew@lunn.ch>
+ <20130120201336.GO8668@pengutronix.de>
+ <20130120204728.GA16339@lizard.gateway.2wire.net>
+Message-ID: <20130121081129.GP8668@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 January 2013 10:45 PM, Tony Lindgren wrote:
-> Hi,
->
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130118 07:30]:
->> From: Benoit Cousson <b-cousson@ti.com>
->>
->> Adding the hwmod data for OMAP54xx platforms.
->> --- /dev/null
->> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
->> +/* bb2d */
->> +static struct omap_hwmod_irq_info omap54xx_bb2d_irqs[] = {
->> +	{ .irq = 125 + OMAP54XX_IRQ_GIC_START },
->> +	{ .irq = -1 }
->> +};
-> ...
->
->> +/* c2c */
->> +static struct omap_hwmod_irq_info omap54xx_c2c_irqs[] = {
->> +	{ .irq = 88 + OMAP54XX_IRQ_GIC_START },
->> +	{ .irq = -1 }
->> +};
-> ...
->
->
->> +static struct omap_hwmod_dma_info omap54xx_c2c_sdma_reqs[] = {
->> +	{ .dma_req = 68 + OMAP54XX_DMA_REQ_START },
->> +	{ .dma_req = -1 }
->> +};
->
->
->
->> +static struct omap_hwmod_addr_space omap54xx_elm_addrs[] = {
->> +	{
->> +		.pa_start	= 0x48078000,
->> +		.pa_end		= 0x48078fff,
->> +		.flags		= ADDR_TYPE_RT
->> +	},
->> +	{ }
->> +};
-> ...
->
->> +static struct omap_hwmod_addr_space omap54xx_emif1_addrs[] = {
->> +	{
->> +		.pa_start	= 0x4c000000,
->> +		.pa_end		= 0x4c0003ff,
->> +		.flags		= ADDR_TYPE_RT
->> +	},
->> +	{ }
->> +};
->
-> As discussed earlier on this list, let's not duplicate the standard
-> resources here as they already are supposed to come from device tree.
->
-> Whatever issues prevent us from dropping the duplicate data here need
-> to be fixed. I believe Benoit already had some scripts/patches for
-> that and was just waiting for the DMA binding to get merged?
->
-Will have a loot at it. DMA binding pull request narrowly missed
-3.8 but should get into 3.9.
+Hello Anton,
 
-Regards
-santosh
+On Sun, Jan 20, 2013 at 12:47:29PM -0800, Anton Vorontsov wrote:
+> On Sun, Jan 20, 2013 at 09:13:36PM +0100, Uwe Kleine-K?nig wrote:
+> > On Tue, Jan 08, 2013 at 07:15:26PM +0100, Andrew Lunn wrote:
+> > > GPLv2+ is not a valid license string. Replace it with one that is.
+> > > 
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > > ---
+> > >  drivers/power/reset/qnap-poweroff.c |    2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
+> > > index ca0b476..8af772b 100644
+> > > --- a/drivers/power/reset/qnap-poweroff.c
+> > > +++ b/drivers/power/reset/qnap-poweroff.c
+> > > @@ -121,4 +121,4 @@ module_platform_driver(qnap_power_off_driver);
+> > >  
+> > >  MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
+> > >  MODULE_DESCRIPTION("QNAP Power off driver");
+> > > -MODULE_LICENSE("GPLv2+");
+> > > +MODULE_LICENSE("GPL v2");
+> > This change is wrong.
+> > 
+> > According to include/linux/module.h "GPL v2" means exactly that: version
+> > 2. As the file specifies v2 or later in the header you have to use "GPL"
+> > which means v2 or later.
+> 
+> Does it even make sense to have the two separate things ("GPL v2" and
+> "GPL")?
+Yeah. If you had another OS project that uses GPL-4 you can just copy
+over a GPL-2+ driver to it, not an GPL-2 driver. So assuming the kernel
+will stay at GPL-2 forever it doesn't make any difference for the
+kernel. But other projects might benefit. (And if in the future someone
+might want to change the kernel to GPL-4, she only needs to contact the
+GPL-2 authors and can legally change GPL-2+ to GPL-4+.)
+
+> Suppose there is a global change that modifies a bunch of drivers, some of
+> them are GPLv2+. Now, the author of the global change is submitting it
+> under "GPL v2 only" license, which, by definition, turns any GPLv2+ code
+> into "GPL v2 only", right?
+See http://yarchive.net/comp/linux/dual_license_bsd_gpl.html for Linus'
+POV. It's an old mail, but I think it still applies.
+
+> So, changing from GPLv2+ to "GPL v2 only" is OK, but not the other way
+> around.
+OK as in (probably) legal. OK as in fair is questionable.
+
+> IANAL, tho.
+ditto.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
