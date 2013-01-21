@@ -1,52 +1,77 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 21 Jan 2013 21:51:26 +0100
-Subject: [PATCH 06/15] clk: export __clk_get_name
-In-Reply-To: <1358788568-11137-7-git-send-email-arnd@arndb.de>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <1358788568-11137-7-git-send-email-arnd@arndb.de>
-Message-ID: <CAPDyKFp-N29V0sj7PfswE__p00JAAO_16+WwxLtBU3QJXe5gyw@mail.gmail.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 21 Jan 2013 13:00:15 -0800
+Subject: One of these things (CONFIG_HZ) is not like the others..
+In-Reply-To: <201301212041.17951.arnd@arndb.de>
+References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
+ <201301212041.17951.arnd@arndb.de>
+Message-ID: <50FDAC5F.4040605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 January 2013 18:15, Arnd Bergmann <arnd@arndb.de> wrote:
-> The __clk_get_name is used by drivers that provide their
-> own clocks, which have traditionally all been built-in.
-> The new imx drm driver however provides clocks but can
-> be built as a module, so we need to export __clk_get_name.
->
-> While this is only a staging driver, it's likely that
-> there will be others like it in the future.
->
-> Without this patch, building ARM allmodconfig results in:
->
-> ERROR: "__clk_get_name" [drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.ko] undefined!
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> ---
->  drivers/clk/clk.c |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 251e45d..13b793e 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -263,6 +263,7 @@ inline const char *__clk_get_name(struct clk *clk)
->  {
->         return !clk ? NULL : clk->name;
->  }
-> +EXPORT_SYMBOL_GPL(__clk_get_name);
->
->  inline struct clk_hw *__clk_get_hw(struct clk *clk)
->  {
-> --
-> 1.7.10.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+On 01/21/2013 12:41 PM, Arnd Bergmann wrote:
+> On Monday 21 January 2013, Matt Sealey wrote:
+>> config HZ
+>>          int
+>>          default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
+>>                  ARCH_S5PV210 || ARCH_EXYNOS4
+>>          default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
+>>          default AT91_TIMER_HZ if ARCH_AT91
+>>          default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
+>>          default 100
+>>
+>> There is a patch floating around ("ARM: OMAP2+: timer: remove
+>> CONFIG_OMAP_32K_TIMER")
+>> which modifies the OMAP line, so I'll ignore that for my below
+>> example, and I saw a patch for adding Exynos5 processors to the top
+>> default somewhere around here.
+>>
+>> So, based on those getting in, in my case here, I can see a situation where;
+>>
+>> * I build multiplatform for i.MX6 and Exynos4/5 ARCH_MULTIPLATFORM, I
+>> will get CONFIG_HZ=200.
+>>
+>> * If I built for just i.MX6, I will get CONFIG_HZ=100.
+>>
+>> Either way, if I boot a kernel on i.MX6, CONFIG_HZ depends on the
+>> other ARM platforms I also want to boot on it.. this is not exactly
+>> multiplatform compliant, right?
+> Right. It's pretty clear that the above logic does not work
+> with multiplatform.  Maybe we should just make ARCH_MULTIPLATFORM
+> select NO_HZ to make the question much less interesting.
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Although, even with NO_HZ, we still have some sense of HZ.
+
+> Regarding the defaults, I would suggest putting them into all the
+> defaults into the defconfig files and removing the other hardcoding
+> otherwise. Ben Dooks and Russell are probably the best to know
+> what triggered the 200 HZ for s3c24xx and for ebsa110. My guess
+> is that the other samsung ones are the result of cargo cult
+> programming.
+>
+> at91 and omap set the HZ value to something that is derived
+> from their hardware timer, but we have also forever had logic
+> to calculate the exact time when that does not match. This code
+> has very recently been moved into the new register_refined_jiffies()
+> function. John can probably tell is if this solves all the problems
+> for these platforms.
+
+Yea, as far as timekeeping is concerned, we shouldn't be HZ dependent 
+(and the register_refined_jiffies is really only necessary if you're not 
+expecting a proper clocksource to eventually be registered), assuming 
+the hardware can do something close to the HZ value requested.
+
+So I'd probably want to hear about what history caused the specific 200 
+HZ selections, as I suspect there's actual hardware limitations there. 
+So if you can not get actual timer ticks any faster then 200 HZ on that 
+hardware, setting HZ higher could cause some jiffies related timer 
+trouble (ie: if the kernel thinks HZ is 1000 but the hardware can only 
+do 200, that's a different problem then if the hardware actually can 
+only do 999.8 HZ). So things like timer-wheel timeouts may not happen 
+when they should.
+
+I suspect the best approach for multi-arch in those cases may be to 
+select HZ=100 and use HRT to allow more modern systems to have 
+finer-grained timers.
+
+thanks
+-john
