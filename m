@@ -1,49 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jan 2013 15:24:40 +0000
-Subject: Compilation problem with drivers/staging/zsmalloc when !SMP on ARM
-In-Reply-To: <20130119043725.GB5391@phenom.dumpdata.com>
-References: <CAKGA1b=ACTQHo9=B7EAG5nrFCO9u-J+sy7dXtYk3Rk6OUcW3cQ@mail.gmail.com>
- <20130118210859.GH23505@n2100.arm.linux.org.uk>
- <20130118214527.GA913@kroah.com> <20130119043725.GB5391@phenom.dumpdata.com>
-Message-ID: <20130121152440.GJ23505@n2100.arm.linux.org.uk>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 21 Jan 2013 23:24:11 +0800
+Subject: [PATCH v7 03/15] gpio: use pinctrl device name for add range
+In-Reply-To: <CACRpkdZoW0Pa9nMJin8_V+0_XVND4-hU=_SLkVEpskSfiYcyvg@mail.gmail.com>
+References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358494279-16503-4-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdZoW0Pa9nMJin8_V+0_XVND4-hU=_SLkVEpskSfiYcyvg@mail.gmail.com>
+Message-ID: <CAD6h2NRx160MHWn8zK06ZNxZZf9uvq6fZMQ-RtceB29TBteUUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 11:37:25PM -0500, Konrad Rzeszutek Wilk wrote:
-> On Fri, Jan 18, 2013 at 01:45:27PM -0800, Greg Kroah-Hartman wrote:
-> > On Fri, Jan 18, 2013 at 09:08:59PM +0000, Russell King - ARM Linux wrote:
-> > > On Fri, Jan 18, 2013 at 02:24:15PM -0600, Matt Sealey wrote:
-> > > > Hello all,
-> > > > 
-> > > > I wonder if anyone can shed some light on this linking problem I have
-> > > > right now. If I configure my kernel without SMP support (it is a very
-> > > > lean config for i.MX51 with device tree support only) I hit this error
-> > > > on linking:
-> > > 
-> > > Yes, I looked at this, and I've decided that I will _not_ fix this export,
-> > > neither will I accept a patch to add an export.
-> > > 
-> > > As far as I can see, this code is buggy in a SMP environment.  There's
-> > > apparantly no guarantee that:
-> > > 
-> > > 1. the mapping will be created on a particular CPU.
-> > > 2. the mapping will then be used only on this specific CPU.
-> > > 3. no guarantee that another CPU won't speculatively prefetch from this
-> > >    region.
-> 
-> I thought the code had per_cpu for it - so that you wouldn't do that unless
-> you really went out the way to do it.
+On 21 January 2013 22:20, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Jan 18, 2013 at 8:31 AM, Haojian Zhuang
+> <haojian.zhuang@linaro.org> wrote:
+>
+>> gpiochip_add_pin_range() needs pinctrl device name as parameter.
+>> Currently the parameter is pinctrl description name. So fix it.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> ---
+>>  drivers/gpio/gpiolib-of.c |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+>> index d542a14..25b1dbe 100644
+>> --- a/drivers/gpio/gpiolib-of.c
+>> +++ b/drivers/gpio/gpiolib-of.c
+>> @@ -250,7 +250,7 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
+>>                  * on the same GPIO chip.
+>>                  */
+>>                 ret = gpiochip_add_pin_range(chip,
+>> -                                            pinctrl_dev_get_name(pctldev),
+>> +                                            pinctrl_dev_get_devname(pctldev),
+>>                                              0, /* offset in gpiochip */
+>>                                              pinspec.args[0],
+>>                                              pinspec.args[1]);
+>
+> Hm looks like the right thing to do!
+>
+> Patch applied.
+>
+> It must be such that everyone using this so far has just
+> set the name to be identical to the device name.
+>
+> Maybe we should just drop the name in the descriptor
+> if it's causing problems like this?
+>
+> Yours,
+> Linus Walleij
 
-Actually, yes, you're right - that negates point (4) and possibly (2),
-but (3) is still a concern.  (3) shouldn't be that much of an issue
-_provided_ that the virtual addresses aren't explicitly made use of by
-other CPUs.  Is that guaranteed by the zsmalloc code?  (IOW, does it
-own the virtual region it places these mappings in?)
+It seems that dropping the name won't impact any problem.
+I'll try to drop it in new patches.
 
-What is the performance difference between having and not having this
-optimization?  Can you provide some measurements please?
-
-Lastly, as you hold per_cpu stuff across this, that means preemption
-is disabled - and any kind of scheduling is also a bug.  Is there
-any reason the kmap stuff can't be used?  Has this been tried?  How
-does it compare numerically with the existing solutions?
+Regards
+Haojian
