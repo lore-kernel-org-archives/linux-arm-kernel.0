@@ -1,60 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 17:16:07 +0000
-Subject: [PATCH 14/15] samples/seccomp: be less stupid about cross compiling
+Date: Mon, 21 Jan 2013 17:16:00 +0000
+Subject: [PATCH 07/15] drm/exynos: don't include plat/gpio-cfg.h
 In-Reply-To: <1358788568-11137-1-git-send-email-arnd@arndb.de>
 References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
-Message-ID: <1358788568-11137-15-git-send-email-arnd@arndb.de>
+Message-ID: <1358788568-11137-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The seccomp filters are currently built for the build
-host, not for the machine that they are going to run
-on, but they are also built for with the -m32 flag
-if the kernel is built for a 32 bit machine, both
-of which seems rather odd.
+Patch  9eb3e9e6f3 "drm/exynos: add support for ARCH_MULTIPLATFORM"
+allowed building the exynos hdmi driver on non-samsung platforms,
+which unfortunately broke compilation in combination with 22c4f42897
+"drm: exynos: hdmi: add support for exynos5 hdmi", which added
+an inclusion of the samsung-specific plat/gpio-cfg.h header file.
 
-It broke allyesconfig on my machine, which is x86-64, but
-building for 32 bit ARM, with this error message:
+Fortunately, that header file is not required any more here, so
+we can simply revert the inclusion in order to build the ARM
+allyesconfig again without getting this error:
 
-In file included from /usr/include/stdio.h:28:0,
-                 from samples/seccomp/bpf-fancy.c:15:
-/usr/include/features.h:324:26: fatal error: bits/predefs.h: No such file or directory
-
-because there are no 32 bit libc headers installed on
-this machine. We should really be building all the
-samples for the target machine rather than the build
-host, but since the infrastructure for that appears
-to be missing right now, let's be a little bit smarter
-and not pass the '-m32' flag to the HOSTCC when cross-
-compiling.
+drivers/gpu/drm/exynos/exynos_hdmi.c:37:27: fatal error: plat/gpio-cfg.h: No such file or directory
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: James Morris <james.l.morris@oracle.com>
+Cc: Rob Clark <rob@ti.com>
+Cc: Inki Dae <inki.dae@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Rahul Sharma <rahul.sharma@samsung.com>
 ---
- samples/seccomp/Makefile |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpu/drm/exynos/exynos_hdmi.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/samples/seccomp/Makefile b/samples/seccomp/Makefile
-index bbbd276..7203e66 100644
---- a/samples/seccomp/Makefile
-+++ b/samples/seccomp/Makefile
-@@ -19,6 +19,7 @@ bpf-direct-objs := bpf-direct.o
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index 41ff79d..b5f5119 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -34,7 +34,6 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/io.h>
+ #include <linux/of_gpio.h>
+-#include <plat/gpio-cfg.h>
  
- # Try to match the kernel target.
- ifndef CONFIG_64BIT
-+ifndef CROSS_COMPILE
+ #include <drm/exynos_drm.h>
  
- # s390 has -m31 flag to build 31 bit binaries
- ifndef CONFIG_S390
-@@ -35,6 +36,7 @@ HOSTLOADLIBES_bpf-direct += $(MFLAG)
- HOSTLOADLIBES_bpf-fancy += $(MFLAG)
- HOSTLOADLIBES_dropper += $(MFLAG)
- endif
-+endif
- 
- # Tell kbuild to always build the programs
- always := $(hostprogs-y)
 -- 
 1.7.10.4
