@@ -1,113 +1,50 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 21 Jan 2013 05:07:29 -0500
-Subject: [V4 PATCH 11/26] usb: otg: mv_otg: use PHY driver for otg
+Date: Mon, 21 Jan 2013 05:07:30 -0500
+Subject: [V4 PATCH 12/26] arm: mmp2: change the defintion of usb devices
 In-Reply-To: <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
 References: <xiechao.mail@gmail.com>
  <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1358762864-9249-12-git-send-email-chao.xie@marvell.com>
+Message-ID: <1358762864-9249-13-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originaly, otg driver will call the callbacks in platform data
-for PHY initialization and shut down.
-With PHY driver, it will call the APIs provided by PHY driver
-for PHY initialization and shut down. It removes the callbacks
-in platform data, and at same time it removes one block in the
-way of enabling device tree for otg driver.
+add the udc/otg/ehci devices for mmp2
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/otg/mv_otg.c |   33 ++++++++++++---------------------
- drivers/usb/otg/mv_otg.h |    2 +-
- 2 files changed, 13 insertions(+), 22 deletions(-)
+ arch/arm/mach-mmp/include/mach/mmp2.h |    4 ++++
+ arch/arm/mach-mmp/mmp2.c              |    4 ++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
-index da2d60c..cc45ef2 100644
---- a/drivers/usb/otg/mv_otg.c
-+++ b/drivers/usb/otg/mv_otg.c
-@@ -25,6 +25,7 @@
- #include <linux/usb/otg.h>
- #include <linux/usb/gadget.h>
- #include <linux/usb/hcd.h>
-+#include <linux/usb/mv_usb2.h>
- #include <linux/platform_data/mv_usb.h>
+diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h b/arch/arm/mach-mmp/include/mach/mmp2.h
+index c4ca4d1..58e96b0 100644
+--- a/arch/arm/mach-mmp/include/mach/mmp2.h
++++ b/arch/arm/mach-mmp/include/mach/mmp2.h
+@@ -31,6 +31,10 @@ extern struct pxa_device_desc mmp2_device_sdh2;
+ extern struct pxa_device_desc mmp2_device_sdh3;
+ extern struct pxa_device_desc mmp2_device_asram;
+ extern struct pxa_device_desc mmp2_device_isram;
++extern struct pxa_device_desc mmp2_device_u2o;
++extern struct pxa_device_desc mmp2_device_u2ootg;
++extern struct pxa_device_desc mmp2_device_u2oehci;
++extern struct pxa_device_desc mmp2_device_u2ophy;
  
- #include "mv_otg.h"
-@@ -261,8 +262,8 @@ static int mv_otg_enable_internal(struct mv_otg *mvotg)
- 	dev_dbg(&mvotg->pdev->dev, "otg enabled\n");
+ extern struct platform_device mmp2_device_gpio;
  
- 	otg_clock_enable(mvotg);
--	if (mvotg->pdata->phy_init) {
--		retval = mvotg->pdata->phy_init(mvotg->phy_regs);
-+	if (mvotg->mvphy->init) {
-+		retval = mvotg->mvphy->init(mvotg->mvphy);
- 		if (retval) {
- 			dev_err(&mvotg->pdev->dev,
- 				"init phy error %d\n", retval);
-@@ -288,8 +289,8 @@ static void mv_otg_disable_internal(struct mv_otg *mvotg)
- {
- 	if (mvotg->active) {
- 		dev_dbg(&mvotg->pdev->dev, "otg disabled\n");
--		if (mvotg->pdata->phy_deinit)
--			mvotg->pdata->phy_deinit(mvotg->phy_regs);
-+		if (mvotg->mvphy->shutdown)
-+			mvotg->mvphy->shutdown(mvotg->mvphy);
- 		otg_clock_disable(mvotg);
- 		mvotg->active = 0;
- 	}
-@@ -741,23 +742,8 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	for (i = 0; i < OTG_TIMER_NUM; i++)
- 		init_timer(&mvotg->otg_ctrl.timer[i]);
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index 3a3768c..73edbfc 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -153,6 +153,10 @@ MMP2_DEVICE(sdh3, "sdhci-pxav3", 3, MMC4, 0xd4281800, 0x120);
+ MMP2_DEVICE(asram, "asram", -1, NONE, 0xe0000000, 0x4000);
+ /* 0xd1000000 ~ 0xd101ffff is reserved for secure processor */
+ MMP2_DEVICE(isram, "isram", -1, NONE, 0xd1020000, 0x18000);
++MMP2_DEVICE(u2ophy, "mmp2-usb-phy", -1, NONE, 0xd4207000, 0x1ff);
++MMP2_DEVICE(u2o, "mv-udc", -1, USB_OTG, 0xd4208100, 0x1ff);
++MMP2_DEVICE(u2ootg, "mv-otg", -1, USB_OTG, 0xd4208100, 0x1ff);
++MMP2_DEVICE(u2oehci, "mv-ehci", -1, USB_OTG, 0xd4208100, 0x1ff);
  
--	r = platform_get_resource_byname(mvotg->pdev,
--					 IORESOURCE_MEM, "phyregs");
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
--		retval = -ENODEV;
--		goto err_destroy_workqueue;
--	}
--
--	mvotg->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
--	if (mvotg->phy_regs == NULL) {
--		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		retval = -EFAULT;
--		goto err_destroy_workqueue;
--	}
--
--	r = platform_get_resource_byname(mvotg->pdev,
--					 IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(mvotg->pdev,
-+					 IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		retval = -ENODEV;
-@@ -770,6 +756,11 @@ static int mv_otg_probe(struct platform_device *pdev)
- 		retval = -EFAULT;
- 		goto err_destroy_workqueue;
- 	}
-+	mvotg->mvphy = mv_usb2_get_phy();
-+	if (mvotg->mvphy == NULL) {
-+		retval = -ENODEV;
-+		goto err_destroy_workqueue;
-+	}
- 
- 	/* we will acces controller register, so enable the udc controller */
- 	retval = mv_otg_enable_internal(mvotg);
-diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
-index 8a9e351..7b9629a 100644
---- a/drivers/usb/otg/mv_otg.h
-+++ b/drivers/usb/otg/mv_otg.h
-@@ -137,10 +137,10 @@ struct mv_otg_regs {
- 
- struct mv_otg {
- 	struct usb_phy phy;
-+	struct mv_usb2_phy *mvphy;
- 	struct mv_otg_ctrl otg_ctrl;
- 
- 	/* base address */
--	void __iomem *phy_regs;
- 	void __iomem *cap_regs;
- 	struct mv_otg_regs __iomem *op_regs;
- 
+ struct resource mmp2_resource_gpio[] = {
+ 	{
 -- 
 1.7.4.1
