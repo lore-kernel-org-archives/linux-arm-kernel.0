@@ -1,23 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 21 Jan 2013 10:21:08 -0700
-Subject: [PATCH] ARM: architected timers: allow dt based discovery using
- clocksource_of_init
-In-Reply-To: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
-References: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <50FD7904.1070201@wwwdotorg.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 21 Jan 2013 17:23:08 +0000
+Subject: [PATCH 10/15] mfd/vexpress: export vexpress_config_func_{put,get}
+In-Reply-To: <1358788568-11137-11-git-send-email-arnd@arndb.de>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+ <1358788568-11137-11-git-send-email-arnd@arndb.de>
+Message-ID: <1358788988.6590.50.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2013 06:22 PM, Thomas Abraham wrote:
-> Add an entry in __clksrc_of_table so that ARMv7 architected timer is
-> discoverable using call to clocksource_of_init.
+On Mon, 2013-01-21 at 17:16 +0000, Arnd Bergmann wrote:
+> The newly introduced vexpress mfd driver in linux-3.8-rc
+> provides access to configuration functions, but the
+> interfaces are not exported to modules, which breaks
+> when the vexpress regulator driver tries to use them.
+> 
+> Without this patch, building allmodconfig results in:
+> 
+> ERROR: "__vexpress_config_func_get" [drivers/regulator/vexpress.ko] undefined!
+> ERROR: "vexpress_config_func_put" [drivers/regulator/vexpress.ko] undefined!
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+You are the third person noticing that. My bad :-(
 
-> +#ifdef CONFIG_CLKSRC_OF
-> +CLOCKSOURCE_OF_DECLARE(armv7_timer, "arm,armv7-timer", arch_timer_of_register)
-> +#endif
+In fact some other ones, like the *_bridge_register could do with
+exporting as well... I'll get all the patches merged in my fixes branch
+and send a pull request this week.
 
-I wonder if we shouldn't enhance include/linux/clocksource.h to define
-CLOCKSOURCE_OF_DECLARE even when !CONFIG_CLKSRC_OF; that way, drivers
-wouldn't need that ifdef.
+Thanks!
+
+Pawe?
