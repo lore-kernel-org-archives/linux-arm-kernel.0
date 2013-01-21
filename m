@@ -1,56 +1,27 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 21 Jan 2013 13:23:10 +0100
-Subject: [PATCH 5/8] ARM: shmobile: add a GPIO controller DT node for
- sh7372
-In-Reply-To: <1358356097-26180-6-git-send-email-g.liakhovetski@gmx.de>
-References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
- <1358356097-26180-6-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <4209290.uCBdrcvT3q@avalon>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Mon, 21 Jan 2013 13:22:03 +0100
+Subject: [PATCH 1/2] clocksource: dbx500-prcmu: use relaxed readl variant
+In-Reply-To: <1358770172-30125-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1358770172-30125-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <20130121122203.GA30289@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
-
-Thanks for the patch.
-
-On Wednesday 16 January 2013 18:08:14 Guennadi Liakhovetski wrote:
-> Add a missing GPIO controller node to sh7372.
+On Mon, Jan 21, 2013 at 01:09:31PM +0100, Fabio Baltieri wrote:
+> From: Rabin Vincent <rabin.vincent@stericsson.com>
 > 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
->  arch/arm/boot/dts/sh7372.dtsi |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sh7372.dtsi b/arch/arm/boot/dts/sh7372.dtsi
-> index 582fdec..7ca9322 100644
-> --- a/arch/arm/boot/dts/sh7372.dtsi
-> +++ b/arch/arm/boot/dts/sh7372.dtsi
-> @@ -19,6 +19,14 @@
->  		};
->  	};
-> 
-> +	gpio: pfc at e6050000 {
-> +		compatible = "renesas,pfc-sh7372";
-> +		reg = <0xe6050000 0x8000>,
-> +		      <0xe605800c 0x20>;
+> Modify clksrc_dbx500_prcmu_read to replace readl() with readl_relaxed().
+> This speeds up calls to the function by about 40%.
 
-Shouldn't the second one be
+Hello John,
 
-		      <0xe605800c 0x1c>;
+these two patches may go in the existing ux500 clksrc branch
+together with the nomadik-mtu's patches queued up some time ago.
 
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +	};
-> +
+Can I have your Acked-by for that?
 
-I haven't checked the board files, have you made sure that the PFC device 
-won't be instantiated twice, once from DT and once from board code ?
-
->  	soc {
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
+Thanks,
+Fabio
 
 -- 
-Regards,
-
-Laurent Pinchart
+Fabio Baltieri
