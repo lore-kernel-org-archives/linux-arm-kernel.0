@@ -1,30 +1,49 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 21 Jan 2013 21:36:32 +0100
-Subject: OMAP baseline test results for v3.8-rc4
-In-Reply-To: <20130121182419.GE10020@beef> (Matt Porter's message of "Mon, 21
- Jan 2013 13:24:19 -0500")
-References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
- <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
- <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
- <20130121182419.GE10020@beef>
-Message-ID: <87boci9str.fsf@dell.be.48ers.dk>
+From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Mon, 21 Jan 2013 21:36:26 +0100
+Subject: [PATCH 1/2] iio: mxs: Add MX23 support into the IIO driver
+In-Reply-To: <1358798722-25102-1-git-send-email-marex@denx.de>
+References: <1358798722-25102-1-git-send-email-marex@denx.de>
+Message-ID: <CAHXqBFLQUY6g6p988MVkk=sRu44B5tEzDMH2UbU2n2UDda0Q-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Matt" == Matt Porter <mporter@ti.com> writes:
+2013/1/21 Marek Vasut <marex@denx.de>:
+> This patch adds support for i.MX23 into the LRADC driver. The LRADC
+> block on MX23 is not much different from the one on MX28, thus this
+> is only a few changes fixing the parts that are specific to MX23.
+[...]
+> +struct mxs_lradc_of_config {
+> +       const int               irq_count;
+> +       const char * const      *irq_name;
+> +};
+> +
+> +static const struct mxs_lradc_of_config const mxs_lradc_of_config[] = {
+> +       [IMX23_LRADC] = {
+> +               .irq_count      = ARRAY_SIZE(mx23_lradc_irq_names),
+> +               .irq_name       = mx23_lradc_irq_names,
+> +       },
+> +       [IMX28_LRADC] = {
+> +               .irq_count      = ARRAY_SIZE(mx28_lradc_irq_names),
+> +               .irq_name       = mx28_lradc_irq_names,
+> +       },
+> +};
+> +
+>  enum mxs_lradc_ts {
+>         MXS_LRADC_TOUCHSCREEN_NONE = 0,
+>         MXS_LRADC_TOUCHSCREEN_4WIRE,
+> @@ -857,8 +890,19 @@ static void mxs_lradc_hw_stop(struct mxs_lradc *lradc)
+>                 writel(0, lradc->base + LRADC_DELAY(i));
+>  }
+>
+> +static const struct of_device_id mxs_lradc_dt_ids[] = {
+> +       { .compatible = "fsl,imx23-lradc", .data = (void *)IMX23_LRADC, },
+> +       { .compatible = "fsl,imx28-lradc", .data = (void *)IMX28_LRADC, },
+> +       { /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mxs_lradc_dt_ids);
+> +
 
- Matt> On Mon, Jan 21, 2013 at 06:20:03PM +0000, Richard Cochran wrote:
- >> On Mon, Jan 21, 2013 at 10:45:10AM -0600, Nishanth Menon wrote:
- >> > for MMC filesystem - we need the edma series. for a ramdisk, I am able
- >> > to boot up to shell with 3.8-rc4 tag
- >> 
- >> Yep, I also could boot 3.8-rc3 using ramfs, no problem.
+Why not s/(void \*)\(IMX.._LRADC\)/\&mxs_lradc_of_config[\1]/ ?
 
- Matt> Do you use appended dtb? The only different that jumped out at me first
- Matt> Paul's reported hang is he uses appended dtb and I boot my boards with a
- Matt> single uImage and multiple dtbs the traditional DT way.
-
-It works for me with appended dtb as well.
-
--- 
-Bye, Peter Korsgaard
+Best Regards,
+Micha? Miros?aw
