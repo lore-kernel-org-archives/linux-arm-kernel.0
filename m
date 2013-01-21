@@ -1,36 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Jan 2013 14:02:41 +0000
-Subject: [PATCH 1/1] ARM: ux500: Disable Power Supply and Battery
- Management by default
-In-Reply-To: <CACRpkdYydqJ+BVsh7P411zCod+83f2pVV5tPsKfoWPYUnOVpDQ@mail.gmail.com>
-References: <1358175470-5041-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdYydqJ+BVsh7P411zCod+83f2pVV5tPsKfoWPYUnOVpDQ@mail.gmail.com>
-Message-ID: <20130121140241.GA6857@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Jan 2013 14:03:44 +0000
+Subject: [PATCH 1/4] ARM: cache-l2x0: Manage the errata at run time
+In-Reply-To: <20130121131451.GA29855@bnru10>
+References: <20130121131451.GA29855@bnru10>
+Message-ID: <20130121140344.GG18005@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The AB8500 Battery Management collection of drivers are more than a
-> > little bit broken. There is lots of work still on-going in that area
-> > and it's improving day by day; however, it's not ready to be enabled
-> > by default just yet.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Mon, Jan 21, 2013 at 01:14:53PM +0000, srinidhi kasagar wrote:
+> Make it possible to manage the errata by its own by using the
+> l2x0 ID register. This relieves the platforms from choosing the
+> Errata's at compile time
 > 
-> Is this going for fixes (v3.8?)
+> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> ---
+>  arch/arm/include/asm/hardware/cache-l2x0.h |    2 +
+>  arch/arm/mm/cache-l2x0.c                   |   77 +++++++++++++++-------------
+>  2 files changed, 43 insertions(+), 36 deletions(-)
 > 
-> For v3.9 I think you've submitted a whole lot of patches
-> actually fixing it up?
+> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+> index 3b2c40b..d5994ac 100644
+> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
+> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+> @@ -117,6 +117,8 @@ static inline int l2x0_of_init(u32 aux_val, u32 aux_mask)
+>  }
+>  #endif
+>  
+> +asmlinkage u32 l2x0_get_rtl_release(void);
+> +
+>  struct l2x0_regs {
+>  	unsigned long phy_base;
+>  	unsigned long aux_ctrl;
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index c2f3739..49058ac 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -49,6 +49,16 @@ struct l2x0_of_data {
+>  
+>  static bool of_init = false;
+>  
+> +/*
+> + * Identify ther RTL releases of l2x0 - This might help in applying
+> + * the l2x0 errata's dynamically rather compile time options
+> + */
+> +asmlinkage u32 l2x0_get_rtl_release(void)
+> +{
+> +	return readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
+> +			L2X0_CACHE_ID_RTL_MASK;
+> +}
 
-I did submit a bunch of fixes, but more are required.
+You're calling this function all over the place, including from the flush
+code. Can you read the RTL release during probe and stash it somewhere
+instead please?
 
-> Anyway: Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> since you certainly know the status of this driver better than
-> me.
-
-Thanks.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
