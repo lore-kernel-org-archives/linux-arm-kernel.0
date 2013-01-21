@@ -1,53 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 21 Jan 2013 12:13:53 +0000
-Subject: [PATCH] ARM: architected timers: allow dt based discovery
- using clocksource_of_init
-In-Reply-To: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
-References: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20130121121353.GH15707@e106331-lin.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 21 Jan 2013 13:17:36 +0100
+Subject: [PATCH 2/8] pinctrl: add SDHI and MMCIF pin groups to sh7372
+In-Reply-To: <1358356097-26180-3-git-send-email-g.liakhovetski@gmx.de>
+References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
+ <1358356097-26180-3-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <2003703.ytJOxU5lq9@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Guennadi,
 
-This looks really useful, and it's going to conflict with my arch_timer /
-arm_generic driver unification series [1].
+Thanks for the patch.
 
-I'm happy to take this as part of my series if that's ok with you?
-
-On Mon, Jan 21, 2013 at 01:22:06AM +0000, Thomas Abraham wrote:
-> Add an entry in __clksrc_of_table so that ARMv7 architected timer is
-> discoverable using call to clocksource_of_init.
+On Wednesday 16 January 2013 18:08:11 Guennadi Liakhovetski wrote:
+> Add pin groups for all three SDHI interfaces and two alternative pin
+> groups for the MMCIF interface on the sh7372 SoC.
 > 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 > ---
->  arch/arm/kernel/arch_timer.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
+>  drivers/pinctrl/sh-pfc/pfc-sh7372.c |  205 ++++++++++++++++++++++++++++++++
+>  1 files changed, 205 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-> index c8ef207..d21aada 100644
-> --- a/arch/arm/kernel/arch_timer.c
-> +++ b/arch/arm/kernel/arch_timer.c
-> @@ -504,6 +504,9 @@ int __init arch_timer_of_register(void)
->  
->  	return arch_timer_register();
->  }
-> +#ifdef CONFIG_CLKSRC_OF
-> +CLOCKSOURCE_OF_DECLARE(armv7_timer, "arm,armv7-timer", arch_timer_of_register)
-> +#endif
->  
->  int __init arch_timer_sched_clock_init(void)
->  {
-> -- 
-> 1.7.5.4
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+> diff --git a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+> b/drivers/pinctrl/sh-pfc/pfc-sh7372.c index 847e0cd..78444a0 100644
+> --- a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+> +++ b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
 
-Thanks,
-Mark.
+[snip]
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/142070.html
+> @@ -1644,6 +1844,11 @@ struct sh_pfc_soc_info sh7372_pinmux_info = {
+> 
+>  	.pins = pinmux_pins,
+>  	.nr_pins = ARRAY_SIZE(pinmux_pins),
+> +	.groups		= pinmux_groups,
+> +	.nr_groups	= ARRAY_SIZE(pinmux_groups),
+> +	.functions	= pinmux_functions,
+> +	.nr_functions	= ARRAY_SIZE(pinmux_functions),
+> +
+
+Just a little bit of nitpicking here. I don't have a strong preference on 
+whether the = signs should be aligned. Both options were used in the PFC code, 
+so I've tried to keep whatever was there. It might be better to do so here as 
+well.
+
+>  	.func_gpios = pinmux_func_gpios,
+>  	.nr_func_gpios = ARRAY_SIZE(pinmux_func_gpios),
+-- 
+Regards,
+
+Laurent Pinchart
