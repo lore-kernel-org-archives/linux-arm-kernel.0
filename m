@@ -1,30 +1,46 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 21 Jan 2013 19:04:45 +0100
-Subject: [PATCH 2/6] clocksource: time-armada-370-xp: add local timer
- support
-In-Reply-To: <20130121175927.GV23505@n2100.arm.linux.org.uk>
-References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
- <1358790842-2986-3-git-send-email-gregory.clement@free-electrons.com>
- <20130121175927.GV23505@n2100.arm.linux.org.uk>
-Message-ID: <50FD833D.5040604@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Jan 2013 10:08:20 -0800
+Subject: [PATCH 07/10] ARM: OMAP5: clock data: Add OMAP54XX full clock
+ tree and headers
+In-Reply-To: <50FCF8D7.1010609@ti.com>
+References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
+ <1358522856-12180-8-git-send-email-santosh.shilimkar@ti.com>
+ <20130118171912.GD15361@atomide.com> <50FCF8D7.1010609@ti.com>
+Message-ID: <20130121180820.GB22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2013 06:59 PM, Russell King - ARM Linux wrote:
-> On Mon, Jan 21, 2013 at 06:53:58PM +0100, Gregory CLEMENT wrote:
->> +struct clock_event_device __percpu **percpu_armada_370_xp_evt;
->> +
-> 
-> Have you run this through checkpatch?  Should the above be static?
-> 
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130121 00:16]:
+> On Friday 18 January 2013 10:49 PM, Tony Lindgren wrote:
+> >* Santosh Shilimkar <santosh.shilimkar@ti.com> [130118 07:30]:
+> >>From: Rajendra Nayak <rnayak@ti.com>
+> >>
+> >>Add the clock tree related data for OMAP54xx platforms.
+> >>
+> >>Cc: Paul Walmsley <paul@pwsan.com>
+> >>
+> >>Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> >>Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> >>[santosh.shilimkar at ti.com: Generated es2.0 data]
+> >>Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>---
+> >>As mentioned in the summary, this patch will be updated once the
+> >>movement of clock data to drivers/clock is clear.
+> >
+> >Yes let's first fix up the issues prevent us from moving all the
+> >cclock*_data.c files to live under drivers/clock/omap.
+> >
+> >It seems that fixing this issue boils down to rearranging some
+> >clock related headers in arch/arm/mach-omap2, and then populating
+> >some of the clock data dynamically. Or am I missing something?
+> >
+> Am not sure of all the dependencies.  Since clock data is using the low
+> level prm/cm APIs, all those needs to be exported some how to move
+> the data. Paul can comment better on it.
 
-Yes (and it didn't complain) and yes it should be static, I will fix
-this in the V2.
+It seems that we should be able to export some omap specific
+functions from drivers/clk/omap for that.
 
-Thanks
+Regards,
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tony
