@@ -1,39 +1,23 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 21 Jan 2013 18:19:03 +0100
-Subject: [GIT PULL] arm-soc: Xilinx zynq serial changes for v3.9
-Message-ID: <CAHTX3dJGHK7nO2tx_kUWLwhpgNsCwtnjXAJnRFUOHVx2uE589Q@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 21 Jan 2013 10:21:08 -0700
+Subject: [PATCH] ARM: architected timers: allow dt based discovery using
+ clocksource_of_init
+In-Reply-To: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
+References: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <50FD7904.1070201@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof and Greg,
+On 01/20/2013 06:22 PM, Thomas Abraham wrote:
+> Add an entry in __clksrc_of_table so that ARMv7 architected timer is
+> discoverable using call to clocksource_of_init.
 
-I have two patches for xilinx uartps serial driver (the second one fix
-one issue in the first one).
-These patches has been sent to arm mailing list and also to
-device-tree mailing list.
+> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
 
-There is a change in zynq dtsi that's why I think it can go through
-arm-soc tree.
-Please let me know if this should go through Greg serial tree.
+> +#ifdef CONFIG_CLKSRC_OF
+> +CLOCKSOURCE_OF_DECLARE(armv7_timer, "arm,armv7-timer", arch_timer_of_register)
+> +#endif
 
-Thanks,
-Michal
-
-
-The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
-  Linus Torvalds (1):
-        Linux 3.8-rc4
-
-are available in the git repository at:
-
-  git://git.xilinx.com/linux-xlnx.git zynq/serial
-
-Josh Cartwright (1):
-      serial: xilinx_uartps: get clock rate info from dts
-
-Wei Yongjun (1):
-      serial: xilinx_uartps: fix return value check in xuartps_probe()
-
- arch/arm/boot/dts/zynq-7000.dtsi   |    4 ++--
- drivers/tty/serial/xilinx_uartps.c |   34 +++++++++++++++++++---------------
- 2 files changed, 21 insertions(+), 17 deletions(-)
+I wonder if we shouldn't enhance include/linux/clocksource.h to define
+CLOCKSOURCE_OF_DECLARE even when !CONFIG_CLKSRC_OF; that way, drivers
+wouldn't need that ifdef.
