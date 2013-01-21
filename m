@@ -1,24 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jan 2013 16:01:33 +0000
-Subject: [PATCH v9 05/22] mfd: omap-usb-tll: Clean up clock handling
-In-Reply-To: <1358766286-5425-1-git-send-email-rogerq@ti.com>
-References: <20130118145906.GE23505@n2100.arm.linux.org.uk>
- <1358766286-5425-1-git-send-email-rogerq@ti.com>
-Message-ID: <20130121160133.GP23505@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 21 Jan 2013 16:03:32 +0000
+Subject: [PATCH 7/7] clk: vexpress: Use common of_clk_init() function
+In-Reply-To: <20130118175827.3982.65450@quantum>
+References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
+ <1357282858-2112-7-git-send-email-pgaikwad@nvidia.com>
+ <20130118175827.3982.65450@quantum>
+Message-ID: <1358784212.6590.30.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 01:04:46PM +0200, Roger Quadros wrote:
-> Every channel has a functional clock that is similarly named.
-> It makes sense to use a for loop to manage these clocks as OMAPs
-> can come with up to 3 channels.
+On Fri, 2013-01-18 at 17:58 +0000, Mike Turquette wrote:
+> Quoting Prashant Gaikwad (2013-01-03 23:00:58)
+> > Use common of_clk_init() function for clock initialization.
+> > 
+> > Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 > 
-> Dynamically allocate and get channel clocks depending on the
-> number of clocks avaiable on the platform.
+> Pawel or Linus,
 > 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Can I get a Tested-by before I take this series into clk-next?
 
-Much better from the clk API usage, thanks.
+I'll just got back to work and will test it soon, most likely tomorrow.
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cheers!
+
+Pawel
