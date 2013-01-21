@@ -1,138 +1,187 @@
-From: hdk@igel.co.jp (Hideki EIRAKU)
-Date: Mon, 21 Jan 2013 19:54:25 +0900
-Subject: [PATCH v6 0/4] Renesas IPMMU driver for sh7372, sh73a0 and r8a7740
-Message-ID: <1358765669-14567-1-git-send-email-hdk@igel.co.jp>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 21 Jan 2013 13:04:46 +0200
+Subject: [PATCH v9 05/22] mfd: omap-usb-tll: Clean up clock handling
+In-Reply-To: <20130118145906.GE23505@n2100.arm.linux.org.uk>
+References: <20130118145906.GE23505@n2100.arm.linux.org.uk>
+Message-ID: <1358766286-5425-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the Renesas IPMMU driver, IOMMU API implementation and IPMMU
-device support for sh7372 (AP4EVB and Mackerel), sh73a0 and r8a7740.
+Every channel has a functional clock that is similarly named.
+It makes sense to use a for loop to manage these clocks as OMAPs
+can come with up to 3 channels.
 
-The IPMMU module supports the MMU function and the PMB function.  The
-MMU function provides address translation by pagetable compatible with
-ARMv6.  The PMB function provides address translation including
-tile-linear translation.  This is implementation of the MMU function.
+Dynamically allocate and get channel clocks depending on the
+number of clocks avaiable on the platform.
 
-Note: The IPMMU module translates DMA memory address from all of the
-IP blocks on the ICB.  The IOMMU API has iommu_attach_device() which
-attaches one device to one domain, but the IPMMU module cannot attach
-only one device.  The IPMMU module only can attach all devices to one
-domain.
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/mfd/omap-usb-tll.c |   87 +++++++++++++++++++++++++++-----------------
+ 1 files changed, 54 insertions(+), 33 deletions(-)
 
-Tested on:
-- armadillo800eva
-- kzma9
-- mackerel (I could not make it boot the v3.8-rc4 with Device Tree, so
-  I tested a kernel without Device Tree support, reverting
-  3b7b70552afe351a8bd8fff1eb2d60aab2206576 and
-  0ce53cdc5c7e28f378e480363a0b0c2ed7e7eaf9)
-
-How to test:
-1. Boot a kernel built with CONFIG_SHMOBILE_IOMMU=y.
-2. Check whether a display on the board shows console normally.
-3. Check whether the IMCTR1 register is 1 which means the MMU function enabled.
-   To read the IMCTR1 register:
-   # peekpoke 0xfe951000
-4. Change the IMCTR1 to 0 to disable the MMU function.
-   To change the IMCTR1 register to 0:
-   # peekpoke 0xfe951000 0
-5. Check whether the display shows broken data.
-6. Change the IMCTR1 to 1 to enable the MMU function.
-   To change the IMCTR1 register to 1:
-   # peekpoke 0xfe951000 1
-7. Check whether a display on the board shows console normally.
-8. Capture and check the framebuffer contents via memory mapped by mmap().
-   To capture the framebuffer contents and save the image to a file "filename":
-   # fbcat /dev/fb0 > filename
-   To look at the contents saved by fbcat on a PC:
-   $ display filename
-- fbcat can be downloaded from https://code.google.com/p/fbcat/.
-- display is one of the ImageMagick tools.
-- peekpoke is:
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <err.h>
-int main(int argc,char**argv){
-  uint32_t*p,addr;
-  int fd=open("/dev/mem",O_RDWR);
-  if(fd<0)err(1,"open");
-  addr=strtoul(argv[1],NULL,0);
-  p=mmap(NULL,0x1000,PROT_READ|PROT_WRITE,MAP_SHARED,fd,addr&~0xfff);
-  if(p==MAP_FAILED)err(1,"mmap");
-  if(argc<=2)printf("0x%08x\n",p[addr/4&0x3ff]);
-  else printf("wrote 0x%08x\n",p[addr/4&0x3ff]=strtoul(argv[2],NULL,0));
-}
-
-TODO:
-- Multiple IPMMU device initialization support.
-  The ipmmu_iommu_init function and the shmobile_iommu_add_device
-  function currently do not support multiple IPMMU instances.
-- Device Tree support.
-
-Changelog:
-v6:
-- Rebased on 3.8-rc4.
-- Use cached memory for IPMMU page tables.
-- Use macros defined in linux/sizes.h.
-- Fix a memory leak of page tables when the domain is not attached.
-- Use GFP_ATOMIC for allocating page tables.
-v5:
-- Rebased on 3.8-rc1.
-- Add sh73a0 and r8a7740 support.
-- CONFIG_SHMOBILE_IOMMU is now selectable only for arm shmobile
-  architecture.
-- Fix "defined but not used" warnings when CONFIG_SHMOBILE_IOMMU is
-  not set.
-- Add help text of CONFIG_SHMOBILE_IOMMU.
-- Apply some of Laurent Pinchart's rework patches: Move the driver to
-  drivers/iommu/.
-- Use platform_data to specify attaching devices instead of
-  ipmmu_add_device() API.
-v4:
-- Rebased on 3.7-rc1.
-- Use address space size instead of page table size in config.
-- Use Kconfig default value instead of #ifdef-#define-#endif.
-v3:
-- Rebased on 3.6-rc5.
-- Simplify configs.  SHMOBILE_IPMMU is now selected by setting
-  SHMOBILE_IOMMU.
-- Remove weak symbols.
-- Use drvdata to store private driver data.
-- Make a function for writing to a register of IPMMU.
-- Add a lock to accessing the tlb_enabled member.
-- Make unmap work correctly with size larger than map size.
-- Free L2 page table when 1MiB page is mapped or unmapped.
-- Add VEU devices as IP blocks on the ICB.
-v2:
-- Rebased on v3.6-rc1.
-- Make variable names clear.
-- Page table size can now be selected by config.
-
-Hideki EIRAKU (4):
-  iommu/shmobile: Add iommu driver for Renesas IPMMU modules
-  ARM: mach-shmobile: sh7372: Add IPMMU device
-  ARM: mach-shmobile: sh73a0: Add IPMMU device
-  ARM: mach-shmobile: r8a7740: Add IPMMU device
-
- arch/arm/mach-shmobile/setup-r8a7740.c |  33 +++
- arch/arm/mach-shmobile/setup-sh7372.c  |  39 ++++
- arch/arm/mach-shmobile/setup-sh73a0.c  |  31 +++
- drivers/iommu/Kconfig                  |  74 ++++++
- drivers/iommu/Makefile                 |   2 +
- drivers/iommu/shmobile-iommu.c         | 395 +++++++++++++++++++++++++++++++++
- drivers/iommu/shmobile-ipmmu.c         | 136 ++++++++++++
- drivers/iommu/shmobile-ipmmu.h         |  34 +++
- include/linux/platform_data/sh_ipmmu.h |  18 ++
- 9 files changed, 762 insertions(+)
- create mode 100644 drivers/iommu/shmobile-iommu.c
- create mode 100644 drivers/iommu/shmobile-ipmmu.c
- create mode 100644 drivers/iommu/shmobile-ipmmu.h
- create mode 100644 include/linux/platform_data/sh_ipmmu.h
-
+diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
+index 9a19cc7..bf7355e 100644
+--- a/drivers/mfd/omap-usb-tll.c
++++ b/drivers/mfd/omap-usb-tll.c
+@@ -96,10 +96,9 @@
+ #define is_ehci_tll_mode(x)	(x == OMAP_EHCI_PORT_MODE_TLL)
+ 
+ struct usbtll_omap {
+-	struct clk				*usbtll_p1_fck;
+-	struct clk				*usbtll_p2_fck;
+ 	int					nch;	/* num. of channels */
+ 	struct usbhs_omap_platform_data		*pdata;
++	struct clk				**ch_clk;
+ 	/* secure the register updates */
+ 	spinlock_t				lock;
+ };
+@@ -225,26 +224,12 @@ static int usbtll_omap_probe(struct platform_device *pdev)
+ 
+ 	tll->pdata = pdata;
+ 
+-	tll->usbtll_p1_fck = clk_get(dev, "usb_tll_hs_usb_ch0_clk");
+-	if (IS_ERR(tll->usbtll_p1_fck)) {
+-		ret = PTR_ERR(tll->usbtll_p1_fck);
+-		dev_err(dev, "usbtll_p1_fck failed error:%d\n", ret);
+-		return ret;
+-	}
+-
+-	tll->usbtll_p2_fck = clk_get(dev, "usb_tll_hs_usb_ch1_clk");
+-	if (IS_ERR(tll->usbtll_p2_fck)) {
+-		ret = PTR_ERR(tll->usbtll_p2_fck);
+-		dev_err(dev, "usbtll_p2_fck failed error:%d\n", ret);
+-		goto err_p2_fck;
+-	}
+-
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	base = devm_request_and_ioremap(dev, res);
+ 	if (!base) {
+ 		ret = -EADDRNOTAVAIL;
+ 		dev_err(dev, "Resource request/ioremap failed:%d\n", ret);
+-		goto err_res;
++		return ret;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, tll);
+@@ -270,6 +255,29 @@ static int usbtll_omap_probe(struct platform_device *pdev)
+ 		break;
+ 	}
+ 
++	spin_unlock_irqrestore(&tll->lock, flags);
++
++	tll->ch_clk = devm_kzalloc(dev, sizeof(struct clk * [tll->nch]),
++						GFP_KERNEL);
++	if (!tll->ch_clk) {
++		ret = -ENOMEM;
++		dev_err(dev, "Couldn't allocate memory for channel clocks\n");
++		goto err_clk_alloc;
++	}
++
++	for (i = 0; i < tll->nch; i++) {
++		char clkname[] = "usb_tll_hs_usb_chx_clk";
++
++		snprintf(clkname, sizeof(clkname),
++					"usb_tll_hs_usb_ch%d_clk", i);
++		tll->ch_clk[i] = clk_get(dev, clkname);
++
++		if (IS_ERR(tll->ch_clk[i]))
++			dev_dbg(dev, "can't get clock : %s\n", clkname);
++	}
++
++	spin_lock_irqsave(&tll->lock, flags);
++
+ 	if (is_ehci_tll_mode(pdata->port_mode[0]) ||
+ 	    is_ehci_tll_mode(pdata->port_mode[1]) ||
+ 	    is_ehci_tll_mode(pdata->port_mode[2]) ||
+@@ -321,11 +329,9 @@ static int usbtll_omap_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
+-err_res:
+-	clk_put(tll->usbtll_p2_fck);
+-
+-err_p2_fck:
+-	clk_put(tll->usbtll_p1_fck);
++err_clk_alloc:
++	pm_runtime_put_sync(dev);
++	pm_runtime_disable(dev);
+ 
+ 	return ret;
+ }
+@@ -339,9 +345,12 @@ err_p2_fck:
+ static int usbtll_omap_remove(struct platform_device *pdev)
+ {
+ 	struct usbtll_omap *tll = platform_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < tll->nch; i++)
++		if (!IS_ERR(tll->ch_clk[i]))
++			clk_put(tll->ch_clk[i]);
+ 
+-	clk_put(tll->usbtll_p2_fck);
+-	clk_put(tll->usbtll_p1_fck);
+ 	pm_runtime_disable(&pdev->dev);
+ 	return 0;
+ }
+@@ -351,6 +360,7 @@ static int usbtll_runtime_resume(struct device *dev)
+ 	struct usbtll_omap			*tll = dev_get_drvdata(dev);
+ 	struct usbhs_omap_platform_data		*pdata = tll->pdata;
+ 	unsigned long				flags;
++	int i;
+ 
+ 	dev_dbg(dev, "usbtll_runtime_resume\n");
+ 
+@@ -361,11 +371,20 @@ static int usbtll_runtime_resume(struct device *dev)
+ 
+ 	spin_lock_irqsave(&tll->lock, flags);
+ 
+-	if (is_ehci_tll_mode(pdata->port_mode[0]))
+-		clk_enable(tll->usbtll_p1_fck);
++	for (i = 0; i < tll->nch; i++) {
++		if (is_ehci_tll_mode(pdata->port_mode[i])) {
++			int r;
+ 
+-	if (is_ehci_tll_mode(pdata->port_mode[1]))
+-		clk_enable(tll->usbtll_p2_fck);
++			if (IS_ERR(tll->ch_clk[i]))
++				continue;
++
++			r = clk_enable(tll->ch_clk[i]);
++			if (r) {
++				dev_err(dev,
++				 "Error enabling ch %d clock: %d\n", i, r);
++			}
++		}
++	}
+ 
+ 	spin_unlock_irqrestore(&tll->lock, flags);
+ 
+@@ -377,6 +396,7 @@ static int usbtll_runtime_suspend(struct device *dev)
+ 	struct usbtll_omap			*tll = dev_get_drvdata(dev);
+ 	struct usbhs_omap_platform_data		*pdata = tll->pdata;
+ 	unsigned long				flags;
++	int i;
+ 
+ 	dev_dbg(dev, "usbtll_runtime_suspend\n");
+ 
+@@ -387,11 +407,12 @@ static int usbtll_runtime_suspend(struct device *dev)
+ 
+ 	spin_lock_irqsave(&tll->lock, flags);
+ 
+-	if (is_ehci_tll_mode(pdata->port_mode[0]))
+-		clk_disable(tll->usbtll_p1_fck);
+-
+-	if (is_ehci_tll_mode(pdata->port_mode[1]))
+-		clk_disable(tll->usbtll_p2_fck);
++	for (i = 0; i < tll->nch; i++) {
++		if (is_ehci_tll_mode(pdata->port_mode[i])) {
++			if (!IS_ERR(tll->ch_clk[i]))
++				clk_disable(tll->ch_clk[i]);
++		}
++	}
+ 
+ 	spin_unlock_irqrestore(&tll->lock, flags);
+ 
 -- 
-1.8.0
+1.7.4.1
