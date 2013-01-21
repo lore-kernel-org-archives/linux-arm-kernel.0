@@ -1,20 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 21 Jan 2013 13:52:52 +0800
-Subject: [PATCH] ARM: imx: Remove mach-mx51_3ds board
-In-Reply-To: <1358525079-26429-1-git-send-email-festevam@gmail.com>
-References: <1358525079-26429-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130121055249.GB2272@S2100-06.ap.freescale.net>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Mon, 21 Jan 2013 05:27:16 +0000
+Subject: [PATCH 4/9] ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod with
+ the right flags
+In-Reply-To: <50F94001.5050703@mvista.com>
+References: <1358493569-17142-1-git-send-email-vaibhav.bedia@ti.com>
+ <1358493569-17142-5-git-send-email-vaibhav.bedia@ti.com>
+ <50F94001.5050703@mvista.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECF09D6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 02:04:39PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Jan 18, 2013 at 17:58:49, Sergei Shtylyov wrote:
+> Hello.
 > 
-> mach-mx51_3ds only supports old silicon version of MX51 and was replaced
-> with mx51 babbage, which is the official MX51 development board.
+> On 18-01-2013 11:19, Vaibhav Bedia wrote:
 > 
-> No need to maintain it anymore.
+> > Third Party Transfer Controller (TPTC0) needs to be idled and
+> > put to standby under SW control. Add the appropriate flags in
+> > the TPTC0 hwmod entry.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > ---
+> > Change from RFC version:
+> > 	Clarify TPTC in the changelog
+> 
+> >   arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    1 +
+> >   1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> > index 8280f11..f2f408c 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> > @@ -1823,6 +1823,7 @@ static struct omap_hwmod am33xx_tptc0_hwmod = {
+> >   	.class		= &am33xx_tptc_hwmod_class,
+> >   	.clkdm_name	= "l3_clkdm",
+> >   	.mpu_irqs	= am33xx_tptc0_irqs,
+> > +	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
+> 
+>     Parens not needed here.
+> 
 
-Applied, thanks.
+Will drop it in v2.
+
+Regards,
+Vaibhav 
