@@ -1,34 +1,46 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 21 Jan 2013 10:30:47 -0800
-Subject: [PATCH] ARM: architected timers: allow dt based discovery using
- clocksource_of_init
-In-Reply-To: <50FD7904.1070201@wwwdotorg.org>
-References: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
- <50FD7904.1070201@wwwdotorg.org>
-Message-ID: <CAJuYYwSfH8jTterd6aNc_Aw81PBschfCUf=REKB35=Y4a=i_7A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jan 2013 18:31:45 +0000
+Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
+ Armada 370/XP
+In-Reply-To: <1358790842-2986-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
+ <1358790842-2986-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <201301211831.45947.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Monday 21 January 2013, Gregory CLEMENT wrote:
+> @@ -1624,7 +1624,7 @@ config LOCAL_TIMERS
+>         bool "Use local timer interrupts"
+>         depends on SMP
+>         default y
+> -       select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+> +       select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARMADA_370_XP_TIMER)
+>         
 
-On 21 January 2013 09:21, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 01/20/2013 06:22 PM, Thomas Abraham wrote:
->> Add an entry in __clksrc_of_table so that ARMv7 architected timer is
->> discoverable using call to clocksource_of_init.
->
->> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
->
->> +#ifdef CONFIG_CLKSRC_OF
->> +CLOCKSOURCE_OF_DECLARE(armv7_timer, "arm,armv7-timer", arch_timer_of_register)
->> +#endif
->
-> I wonder if we shouldn't enhance include/linux/clocksource.h to define
-> CLOCKSOURCE_OF_DECLARE even when !CONFIG_CLKSRC_OF; that way, drivers
-> wouldn't need that ifdef.
+Your change is fine, but I just noticed that this line is asking for trouble
+when we enable multipleform support for MSM and/or EXYNOS.
 
-Yes, it will be helpful to have a !CONFIG_CLKSRC_OF version of
-CLOCKSOURCE_OF_DECLARE. And can CONFIG_CLKSRC_OF be enabled by default
-for all ARM platforms?
+Also, I wonder if we should change this somehow in 3.8, because it seems
+that for a multiplatform kernel including armadaxp and e.g. versatile express,
+you have no ARM_TWD support in the kernel, which seems wrong. Is there any
+reason we can't enable the ARM_TWD code to be built-in on platforms that
+don't use it?
 
-Thanks,
-Thomas.
+Maybe it can be written as
+
+config LOCAL_TIMERS
+	bool "Use local timer interrupts"
+	depends on SMP
+	default y
+
+config HAVE_ARM_TWD
+	depends on LOCAL_TIMERS
+	default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+	default y
+
+This will still be slightly wrong (generating extra code) on a multiplatform
+kernel that has no platform other than MSM or EXYNOS, but the other alternative
+would be that each platform with TWD support has to select HAVE_ARM_TWD itself.
+
+	Arnd
