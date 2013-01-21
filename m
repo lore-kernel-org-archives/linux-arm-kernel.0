@@ -1,28 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 21 Jan 2013 10:30:29 -0800
-Subject: [GIT PULL] arm-soc: Xilinx zynq serial changes for v3.9
-In-Reply-To: <CAHTX3dJGHK7nO2tx_kUWLwhpgNsCwtnjXAJnRFUOHVx2uE589Q@mail.gmail.com>
-References: <CAHTX3dJGHK7nO2tx_kUWLwhpgNsCwtnjXAJnRFUOHVx2uE589Q@mail.gmail.com>
-Message-ID: <20130121183029.GA21326@kroah.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 21 Jan 2013 10:30:47 -0800
+Subject: [PATCH] ARM: architected timers: allow dt based discovery using
+ clocksource_of_init
+In-Reply-To: <50FD7904.1070201@wwwdotorg.org>
+References: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
+ <50FD7904.1070201@wwwdotorg.org>
+Message-ID: <CAJuYYwSfH8jTterd6aNc_Aw81PBschfCUf=REKB35=Y4a=i_7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 06:19:03PM +0100, Michal Simek wrote:
-> Hi Arnd, Olof and Greg,
-> 
-> I have two patches for xilinx uartps serial driver (the second one fix
-> one issue in the first one).
-> These patches has been sent to arm mailing list and also to
-> device-tree mailing list.
-> 
-> There is a change in zynq dtsi that's why I think it can go through
-> arm-soc tree.
-> Please let me know if this should go through Greg serial tree.
+Hi Stephen,
 
-If they fix serial driver issues, I have no problem taking them through
-my serial tree, just send them on as patches and I will be glad to queue
-them up.
+On 21 January 2013 09:21, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 01/20/2013 06:22 PM, Thomas Abraham wrote:
+>> Add an entry in __clksrc_of_table so that ARMv7 architected timer is
+>> discoverable using call to clocksource_of_init.
+>
+>> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+>
+>> +#ifdef CONFIG_CLKSRC_OF
+>> +CLOCKSOURCE_OF_DECLARE(armv7_timer, "arm,armv7-timer", arch_timer_of_register)
+>> +#endif
+>
+> I wonder if we shouldn't enhance include/linux/clocksource.h to define
+> CLOCKSOURCE_OF_DECLARE even when !CONFIG_CLKSRC_OF; that way, drivers
+> wouldn't need that ifdef.
 
-thanks,
+Yes, it will be helpful to have a !CONFIG_CLKSRC_OF version of
+CLOCKSOURCE_OF_DECLARE. And can CONFIG_CLKSRC_OF be enabled by default
+for all ARM platforms?
 
-greg k-h
+Thanks,
+Thomas.
