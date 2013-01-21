@@ -1,117 +1,22 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 21 Jan 2013 07:22:33 +0000
-Subject: [RFC v2 12/18] ARM: OMAP2+: timer: Add suspend-resume callbacks
- for clockevent device
-In-Reply-To: <50F8DCD7.707@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-13-git-send-email-vaibhav.bedia@ti.com>
- <50EC37FE.705@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433ECE0D51@DBDE01.ent.ti.com>
- <50F846D7.8060509@ti.com> <50F8DCD7.707@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECF0B60@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 21 Jan 2013 15:56:56 +0800
+Subject: [PATCH V4] Add apf51 basic support
+In-Reply-To: <1358722529-19982-1-git-send-email-laurent.cans@gmail.com>
+References: <1358722529-19982-1-git-send-email-laurent.cans@gmail.com>
+Message-ID: <20130121075653.GE2272@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 10:55:43, Shilimkar, Santosh wrote:
-> On Friday 18 January 2013 12:15 AM, Jon Hunter wrote:
-> >
-> > On 01/10/2013 10:37 PM, Bedia, Vaibhav wrote:
-> >> On Tue, Jan 08, 2013 at 20:45:10, Shilimkar, Santosh wrote:
-> >>> On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
-> >>>> The current OMAP timer code registers two timers -
-> >>>> one as clocksource and one as clockevent.
-> >>>> AM33XX has only one usable timer in the WKUP domain
-> >>>> so one of the timers needs suspend-resume support
-> >>>> to restore the configuration to pre-suspend state.
-> >>>>
-> >>>> commit adc78e6 (timekeeping: Add suspend and resume
-> >>>> of clock event devices) introduced .suspend and .resume
-> >>>> callbacks for clock event devices. Leverages these
-> >>>> callbacks to have AM33XX clockevent timer which is
-> >>>> in not in WKUP domain to behave properly across system
-> >>>> suspend.
-> >>>>
-> >>>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> >>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>>> Cc: Benoit Cousson <b-cousson@ti.com>
-> >>>> Cc: Paul Walmsley <paul@pwsan.com>
-> >>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> >>>> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-> >>>> Cc: Jon Hunter <jon-hunter@ti.com>
-> >>>> ---
-> >>>> v1->v2:
-> >>>> 	Get rid of harcoded timer id.
-> >>>> 	Note: since a platform device is not created for these timer
-> >>>> 	instances and because there's very minimal change needed for
-> >>>> 	restarting the timer a full blown context save and restore
-> >>>> 	has been skipped.
-> >>>>
-> >>>>    arch/arm/mach-omap2/timer.c |   33 +++++++++++++++++++++++++++++++++
-> >>>>    1 files changed, 33 insertions(+), 0 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> >>>> index 691aa67..38f9cbc 100644
-> >>>> --- a/arch/arm/mach-omap2/timer.c
-> >>>> +++ b/arch/arm/mach-omap2/timer.c
-> >>>> @@ -128,6 +128,36 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
-> >>>>    	}
-> >>>>    }
-> >>>>
-> >>>> +static void omap_clkevt_suspend(struct clock_event_device *unused)
-> >>>> +{
-> >>>> +	char name[10];
-> >>>> +	struct omap_hwmod *oh;
-> >>>> +
-> >>>> +	sprintf(name, "timer%d", clkev.id);
-> >>>> +	oh = omap_hwmod_lookup(name);
-> >>>> +	if (!oh)
-> >>>> +		return;
-> >>>> +
-> >>>> +	__omap_dm_timer_stop(&clkev, 1, clkev.rate);
-> >>>> +	omap_hwmod_idle(oh);
-> >>>> +}
-> >>>> +
-> >>>> +static void omap_clkevt_resume(struct clock_event_device *unused)
-> >>>> +{
-> >>>> +	char name[10];
-> >>>> +	struct omap_hwmod *oh;
-> >>>> +
-> >>>> +	sprintf(name, "timer%d", clkev.id);
-> >>>> +	oh = omap_hwmod_lookup(name);
-> >>>> +	if (!oh)
-> >>>> +		return;
-> >>>> +
-> >>>> +	omap_hwmod_enable(oh);
-> >>>> +	__omap_dm_timer_load_start(&clkev,
-> >>>> +			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
-> >>>> +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
-> >>>> +}
-> >>>> +
-> >>> Am still bit uncomfortable with direct hwmod usage in the suspend/resmue
-> >>> hooks.
-> >>>
-> >>> Jon, Any alternatives you can think of ?
-> >>>
-> >>
-> >> Jon,
-> >>
-> >> Any suggestions here?
-> >
-> > Sorry completed this missed this!
-> >
-> > Unfortunately, I don't have any good suggestions here. However, I am
-> > wondering if the suspend/resume handlers can just be calls to
-> > omap_hwmod_idle/enable and we can remove these __omap_dm_timer_xxxx
-> > calls (I don't think they are needed). Furthermore, my understanding is
-> > this is only needed for AM335x (per the changelog), and so we should not
-> > add suspend/resume handlers for all OMAP2+ based devices.
-> >
-> I agree with the direction.
-> 
+On Sun, Jan 20, 2013 at 11:55:29PM +0100, Laurent Cans wrote:
+> Signed-off-by: Laurent Cans <laurent.cans@gmail.com>
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> ---
+> Differences between v3 and v4
+> - introduce new file in Documentation directory
+> - remove useless property in clock node
 
-I need to retain the call to enable the interrupt but the others can be dropped.
-Will take care of this and the comment on invoking the suspend/resume handlers
-only for AM335x in the next version.
+Added the prefix "ARM: dts: " for subject and applied the patch.
 
-Regards,
-Vaibhav
+BTW, empty commit log is nice.  Please avoid in the future.
+
+Shawn
