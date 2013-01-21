@@ -1,185 +1,34 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 21 Jan 2013 09:56:58 +0800
-Subject: [RESEND PATCH v5 7/7] usb: chipidea: imx: add internal vbus regulator
- control
-In-Reply-To: <1358733418-17969-1-git-send-email-peter.chen@freescale.com>
-References: <1358733418-17969-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1358733418-17969-8-git-send-email-peter.chen@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 20 Jan 2013 18:17:39 -0800
+Subject: [GIT PULL] Renesas ARM-based SoC v3.9
+In-Reply-To: <20130121003237.GA2639@verge.net.au>
+References: <1357781039-14003-1-git-send-email-horms+renesas@verge.net.au>
+ <20130116063750.GA11765@verge.net.au>
+ <20130121003237.GA2639@verge.net.au>
+Message-ID: <CAOesGMhTkZFWx6YdCc9KSTpd=0uBA7sWtnJgNJWwWHogLKxt3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- For host, the vbus should always be on.
-- For otg, the vbus is off defaultly, the vbus needs to be
-turned on/off when usb role switches.
+On Sun, Jan 20, 2013 at 4:32 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Jan 16, 2013 at 03:37:53PM +0900, Simon Horman wrote:
+>> Hi Olof, Hi Arnd,
+>>
+>> I have some complex dependencies for mach-shmobile for v3.9
+>> and as such I am sending this email outline the dependencies
+>> of branches on each other. I have also included the multiple
+>> pull requests below though I am happy to post them
+>> individually including the patches they comprise if you
+>> have no objections to the way the branch dependencies are arranged.
+>>
+>> I would also be happy to supply a single branch with all changes
+>> with or without merge commits.
+>>
+>> All branches are present in the renesas tree
+>> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
+>
+> Ping.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/chipidea/ci.h          |    2 +
- drivers/usb/chipidea/ci13xxx_imx.c |   80 ++++++++++++++++++++++++++++--------
- 2 files changed, 64 insertions(+), 18 deletions(-)
+I replied 4 days ago, did you not get that?
 
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index 00939e6..342b430 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -135,6 +135,7 @@ struct hw_bank {
-  * @hcd: pointer to usb_hcd for ehci host driver
-  * @otg: for otg support
-  * @events: events for otg, and handled at ci_role_work
-+ * @reg_vbus: used to control internal vbus regulator
-  */
- struct ci13xxx {
- 	struct device			*dev;
-@@ -174,6 +175,7 @@ struct ci13xxx {
- 	struct usb_otg      		otg;
- 	bool				id_event;
- 	bool				b_sess_valid_event;
-+	struct regulator		*reg_vbus;
- };
- 
- static inline struct ci_role_driver *ci_role(struct ci13xxx *ci)
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 3b91ff4..4c9df98 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -88,14 +88,47 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
- static struct ci13xxx_platform_data ci13xxx_imx_platdata  = {
- 	.name			= "ci13xxx_imx",
- 	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
--				  CI13XXX_DISABLE_STREAMING,
-+				  CI13XXX_DISABLE_STREAMING |
-+				  CI13XXX_REGS_SHARED,
- 	.capoffset		= DEF_CAPOFFSET,
- };
- 
-+static int ci13xxx_otg_set_vbus(struct usb_otg *otg, bool enabled)
-+{
-+	struct ci13xxx	*ci = container_of(otg, struct ci13xxx, otg);
-+	struct regulator *reg_vbus = ci->reg_vbus;
-+	int ret;
-+
-+	WARN_ON(!reg_vbus);
-+
-+	if (reg_vbus) {
-+		if (enabled) {
-+			ret = regulator_enable(reg_vbus);
-+			if (ret) {
-+				dev_err(ci->dev,
-+				"Failed to enable vbus regulator, ret=%d\n",
-+				ret);
-+				return ret;
-+			}
-+		} else {
-+			ret = regulator_disable(reg_vbus);
-+			if (ret) {
-+				dev_err(ci->dev,
-+				"Failed to disable vbus regulator, ret=%d\n",
-+				ret);
-+				return ret;
-+			}
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- static int ci13xxx_imx_probe(struct platform_device *pdev)
- {
- 	struct ci13xxx_imx_data *data;
- 	struct platform_device *plat_ci, *phy_pdev;
-+	struct ci13xxx	*ci;
- 	struct device_node *phy_np;
- 	struct resource *res;
- 	struct regulator *reg_vbus;
-@@ -152,20 +185,11 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	/* we only support host now, so enable vbus here */
- 	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
--	if (!IS_ERR(reg_vbus)) {
--		ret = regulator_enable(reg_vbus);
--		if (ret) {
--			dev_err(&pdev->dev,
--				"Failed to enable vbus regulator, err=%d\n",
--				ret);
--			goto put_np;
--		}
-+	if (!IS_ERR(reg_vbus))
- 		data->reg_vbus = reg_vbus;
--	} else {
-+	else
- 		reg_vbus = NULL;
--	}
- 
- 	ci13xxx_imx_platdata.phy = data->phy;
- 
-@@ -175,7 +199,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		if (!pdev->dev.dma_mask) {
- 			ret = -ENOMEM;
- 			dev_err(&pdev->dev, "Failed to alloc dma_mask!\n");
--			goto err;
-+			goto put_np;
- 		}
- 		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
- 		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
-@@ -186,7 +210,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		if (ret) {
- 			dev_err(&pdev->dev,
- 				"usbmisc init failed, ret=%d\n", ret);
--			goto err;
-+			goto put_np;
- 		}
- 	}
- 
-@@ -198,24 +222,44 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev,
- 			"Can't register ci_hdrc platform device, err=%d\n",
- 			ret);
--		goto err;
-+		goto put_np;
- 	}
- 
- 	data->ci_pdev = plat_ci;
- 	platform_set_drvdata(pdev, data);
- 
-+	ci = platform_get_drvdata(plat_ci);
-+	/*
-+	 * Internal vbus on/off policy
-+	 * - Always on for host only function
-+	 * - Always off for gadget only function
-+	 * - call otg.set_vbus to control on/off according usb role
-+	 */
-+
-+	if (ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]
-+			&& reg_vbus) {
-+		ret = regulator_enable(reg_vbus);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"Failed to enable vbus regulator, ret=%d\n",
-+				ret);
-+			goto put_np;
-+		}
-+	} else if (ci->is_otg) {
-+		ci->otg.set_vbus = ci13xxx_otg_set_vbus;
-+		ci->reg_vbus = data->reg_vbus;
-+	}
-+
- 	pm_runtime_no_callbacks(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
- 
- 	return 0;
- 
--err:
--	if (reg_vbus)
--		regulator_disable(reg_vbus);
- put_np:
- 	if (phy_np)
- 		of_node_put(phy_np);
- 	clk_disable_unprepare(data->clk);
-+
- 	return ret;
- }
- 
--- 
-1.7.0.4
+
+-Olof
