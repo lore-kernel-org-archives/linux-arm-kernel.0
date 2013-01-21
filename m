@@ -1,83 +1,56 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 21 Jan 2013 12:54:22 -0500
-Subject: [kvmarm] [PATCH v6 14/15] KVM: ARM: Power State Coordination
- Interface implementation
-In-Reply-To: <832da358616729fd6a5d6522682b022f@localhost>
-References: <20130116175716.29147.15348.stgit@ubuntu>
- <20130116175918.29147.318.stgit@ubuntu> <50F81EF4.4020507@arm.com>
- <CANM98q+z2tj72qFtjDF1ZpKMGs876=hRLpKTEwYKnpCMzdpErg@mail.gmail.com>
- <75f43582106716efe7c8f1360e58732e@localhost>
- <CANM98q+6wd6YmK--Xb7=rKm7AyHE94pBnC_XsP+6UmuP31CziQ@mail.gmail.com>
- <832da358616729fd6a5d6522682b022f@localhost>
-Message-ID: <CANM98qKDQrfSZC8knciajyeZWcX0CGObuYPrFA_RTEpUzBhBow@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 21 Jan 2013 18:53:57 +0100
+Subject: [PATCH 1/6] arm: mvebu: Add support for local interrupt
+In-Reply-To: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1358790842-2986-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 12:43 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Mon, 21 Jan 2013 09:50:18 -0500, Christoffer Dall
-> <c.dall@virtualopensystems.com> wrote:
->> On Mon, Jan 21, 2013 at 5:04 AM, Marc Zyngier <marc.zyngier@arm.com>
-> wrote:
->>> On Sun, 20 Jan 2013 18:35:51 -0500, Christoffer Dall
->>> <c.dall@virtualopensystems.com> wrote:
->>>> On Thu, Jan 17, 2013 at 10:55 AM, Marc Zyngier <marc.zyngier@arm.com>
->>>> wrote:
->>>>> On 16/01/13 17:59, Christoffer Dall wrote:
->>>>>> From: Marc Zyngier <marc.zyngier@arm.com>
->>>>>>
->>>>>> Implement the PSCI specification (ARM DEN 0022A) to control
->>>>>> virtual CPUs being "powered" on or off.
->>>>>>
->>>>>> PSCI/KVM is detected using the KVM_CAP_ARM_PSCI capability.
->>>>>>
->>>>>> A virtual CPU can now be initialized in a "powered off" state,
->>>>>> using the KVM_ARM_VCPU_POWER_OFF feature flag.
->>>>>>
->>>>>> The guest can use either SMC or HVC to execute a PSCI function.
->>>>>>
->>>>>> Reviewed-by: Will Deacon <will.deacon@arm.com>
->>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
->>>>>
->>>>> A few bits went wrong when you reworked this patch. See below.
->>>
->>> [...]
->>>
->>>>>> @@ -443,13 +445,17 @@ static int handle_hvc(struct kvm_vcpu *vcpu,
->>>>>> struct kvm_run *run)
->>>>>>       trace_kvm_hvc(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
->>>>>>                     vcpu->arch.hsr & HSR_HVC_IMM_MASK);
->>>>>>
->>>>>> +     if (kvm_psci_call(vcpu))
->>>>>> +             return 1;
->>>>>> +
->>>>>>       return 1;
->>>>>
->>>>> No undef injection if there is no PSCI match?
->>>
->>> You haven't addressed this issue in you patch.
->>>
->> right, well, it's actually quite nice not having it give you an
->> undefined exception when it logs the trace event. The psci protocol
->> relies on a confirmation in form of a return value anyhow, so it was
->> actually on purpose to remove it, so you can do things like easily
->> measure exit times or probe places in the guest.
->
-> If that's for tracing purpose, why don't you allocate another hypercall?
-> Returning to the guest without signalling that nothing was executed seems
-> very wrong to me.
->
-hmm, yeah, maybe you're right.
+MPIC allows the use of private interrupt for each CPUs. The 28th first
+interrupts are per-cpu. This patch adds support to use them.
 
-I was just debating with myself whether an undefined isn't too rough.
-It made sense when we didn't have any kind of handling of hvc, but now
-an hvc isn't really an undefined instruction, and if we assume that we
-have a series of hypercalls, multiplexed by a number in r0, but you
-don't really know what's available on your VM host, it also seems very
-wrong to have an ABI that says, try it, and if it's not implemented
-handle the undefined exception.... Know what I mean? perhaps we should
-return -1 in r0 instead or something.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/irq-armada-370-xp.c |   18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
 
-We can of course argue that we should have an HVC discovery API or
-that everything should be set in device tree, but the latter doesn't
-really fit well with the way we do things now with qemu at least.
+diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+index f99a4a2..c007fdc 100644
+--- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
++++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+@@ -145,11 +145,19 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+ {
+ 	armada_370_xp_irq_mask(irq_get_irq_data(virq));
+ 	writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
+-
+-	irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
+-				 handle_level_irq);
+ 	irq_set_status_flags(virq, IRQ_LEVEL);
+-	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
++
++	if (hw < ARMADA_370_XP_MAX_PER_CPU_IRQS) {
++
++		irq_set_percpu_devid(virq);
++		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
++					handle_percpu_devid_irq);
++
++	} else {
++		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
++					handle_level_irq);
++	}
++		set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
+ 
+ 	return 0;
+ }
+@@ -245,7 +253,7 @@ asmlinkage void __exception_irq_entry armada_370_xp_handle_irq(struct pt_regs
+ 		if (irqnr > 1022)
+ 			break;
+ 
+-		if (irqnr >= 8) {
++		if (irqnr > 0) {
+ 			irqnr =	irq_find_mapping(armada_370_xp_mpic_domain,
+ 					irqnr);
+ 			handle_IRQ(irqnr, regs);
+-- 
+1.7.9.5
