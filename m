@@ -1,105 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 21 Jan 2013 01:54:17 +0000 (UTC)
-Subject: [PATCH v2 0/5] ARM: OMAP4: Enable AESS IP.
-In-Reply-To: <50F9608A.8060102@ti.com>
-References: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
- <50F9608A.8060102@ti.com>
-Message-ID: <alpine.DEB.2.00.1301210152220.31667@utopia.booyaka.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 21 Jan 2013 09:56:51 +0800
+Subject: [RESEND PATCH v5 0/7] Add fully tested id switch and vbus connect
+ detect support for Chipidea
+Message-ID: <1358733418-17969-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Jan 2013, Sebastien Guiriec wrote:
+Only one typo suggestion from Marek Vasut (change "d" to "D") is added.
+At this v5 version.
+Anyone who have tested this patchset, please give a tested-by, thanks.
 
-> Paul, Benoit,
-> 
-> Any comments before I resend the serie with the minor comment for Felipe?
+This patchset adds fully tested otg id switch function and
+vbus connect/disconnect detection for chipidea driver.
+The mainly design of id/vbus handling follows msm otg driver.
+I hope the msm usb maintainer can have a look of this patchset,
+and give some comments, and move the whole msm usb driver to
+chipidea framework if possible in the future.
 
-Not from me.  The series has been queued for 3.9 with Felipe's comment 
-fix; thanks Felipe.
+This patchset is fully tested at i.mx6Q saberlite board.
 
+There is github repo for my chipdiea work:
+https://github.com/hzpeterchen/linux-usb.git
+branch: master
 
-- Paul
+Peter Chen (7):
+  Revert "USB: chipidea: add vbus detect for udc"
+  usb: chipidea: add otg file
+  usb: chipidea: add otg id switch and vbus connect/disconnect detect
+  usb: chipidea: consolidate ci_role_driver's API for both roles
+  usb: chipidea: udc: add pullup/pulldown dp at hw_device_state
+  usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
+  usb: chipidea: imx: add internal vbus regulator control
 
-From: Paul Walmsley <paul@pwsan.com>
-Date: Sun, 20 Jan 2013 18:52:09 -0700
-Subject: [PATCH] ARM: OMAP2+: hwmod: add enable_preprogram hook
-
-After setup/enable, some IP blocks need some additional setting to
-indicate the PRCM that they are inactive until they are configured.
-Some examples on OMAP4 include the AESS and FSUSB IP blocks.
-
-To fix this cleanly, this patch adds another optional function
-pointer, enable_preprogram, to the IP block's hwmod data.  The function
-that is pointed to is called by the hwmod code immediately after the
-IP block is reset.
-
-This version of the patch includes a patch description fix from Felipe.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   18 ++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod.h |    2 ++
- 2 files changed, 20 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 4653efb..f37d22c 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2053,6 +2053,23 @@ static int _omap4_get_context_lost(struct omap_hwmod *oh)
- }
- 
- /**
-+ * _enable_preprogram - Pre-program an IP block during the _enable() process
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Some IP blocks (such as AESS) require some additional programming
-+ * after enable before they can enter idle.  If a function pointer to
-+ * do so is present in the hwmod data, then call it and pass along the
-+ * return value; otherwise, return 0.
-+ */
-+static int __init _enable_preprogram(struct omap_hwmod *oh)
-+{
-+	if (!oh->class->enable_preprogram)
-+		return 0;
-+
-+	return oh->class->enable_preprogram(oh);
-+}
-+
-+/**
-  * _enable - enable an omap_hwmod
-  * @oh: struct omap_hwmod *
-  *
-@@ -2156,6 +2173,7 @@ static int _enable(struct omap_hwmod *oh)
- 				_update_sysc_cache(oh);
- 			_enable_sysc(oh);
- 		}
-+		r = _enable_preprogram(oh);
- 	} else {
- 		if (soc_ops.disable_module)
- 			soc_ops.disable_module(oh);
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index 3ae852a..41066b4 100644
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -501,6 +501,7 @@ struct omap_hwmod_omap4_prcm {
-  * @rev: revision of the IP class
-  * @pre_shutdown: ptr to fn to be executed immediately prior to device shutdown
-  * @reset: ptr to fn to be executed in place of the standard hwmod reset fn
-+ * @enable_preprogram:  ptr to fn to be executed during device enable
-  *
-  * Represent the class of a OMAP hardware "modules" (e.g. timer,
-  * smartreflex, gpio, uart...)
-@@ -524,6 +525,7 @@ struct omap_hwmod_class {
- 	u32					rev;
- 	int					(*pre_shutdown)(struct omap_hwmod *oh);
- 	int					(*reset)(struct omap_hwmod *oh);
-+	int					(*enable_preprogram)(struct omap_hwmod *oh);
- };
- 
- /**
--- 
-1.7.10.4
+ drivers/usb/chipidea/Makefile      |    2 +-
+ drivers/usb/chipidea/bits.h        |   10 ++
+ drivers/usb/chipidea/ci.h          |   30 ++++++-
+ drivers/usb/chipidea/ci13xxx_imx.c |   81 +++++++++++++----
+ drivers/usb/chipidea/ci13xxx_msm.c |    1 -
+ drivers/usb/chipidea/core.c        |  178 +++++++++++++++++++++++++++++++-----
+ drivers/usb/chipidea/host.c        |    2 +
+ drivers/usb/chipidea/otg.c         |   68 ++++++++++++++
+ drivers/usb/chipidea/otg.h         |    9 ++
+ drivers/usb/chipidea/udc.c         |  101 ++++++++++-----------
+ include/linux/usb/chipidea.h       |    1 -
+ 11 files changed, 382 insertions(+), 101 deletions(-)
+ create mode 100644 drivers/usb/chipidea/otg.c
+ create mode 100644 drivers/usb/chipidea/otg.h
