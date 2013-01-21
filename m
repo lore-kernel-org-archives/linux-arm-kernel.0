@@ -1,36 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jan 2013 10:27:53 -0800
-Subject: [GIT PULL] ARM: OMAP: some clock/hwmod fixes for v3.8-rc
-In-Reply-To: <alpine.DEB.2.00.1301211557530.8450@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1301211557530.8450@utopia.booyaka.com>
-Message-ID: <20130121182753.GG22517@atomide.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 21 Jan 2013 10:30:29 -0800
+Subject: [GIT PULL] arm-soc: Xilinx zynq serial changes for v3.9
+In-Reply-To: <CAHTX3dJGHK7nO2tx_kUWLwhpgNsCwtnjXAJnRFUOHVx2uE589Q@mail.gmail.com>
+References: <CAHTX3dJGHK7nO2tx_kUWLwhpgNsCwtnjXAJnRFUOHVx2uE589Q@mail.gmail.com>
+Message-ID: <20130121183029.GA21326@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130121 08:04]:
-> Hi Tony,
+On Mon, Jan 21, 2013 at 06:19:03PM +0100, Michal Simek wrote:
+> Hi Arnd, Olof and Greg,
 > 
-> The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
+> I have two patches for xilinx uartps serial driver (the second one fix
+> one issue in the first one).
+> These patches has been sent to arm mailing list and also to
+> device-tree mailing list.
 > 
->   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-v3.8-rc
-> 
-> for you to fetch changes up to bdcc61275232db897ba831f87a16df98ab248571:
-> 
->   ARM: OMAP2: Fix missing omap2xxx_clkt_vps_late_init function calls (2013-01-18 16:48:16 -0700)
-> 
-> ----------------------------------------------------------------
-> A few OMAP integration fixes for v3.8-rc, for OMAP4 audio and OMAP2 reboot.
-> 
-> Basic test logs are available here:
-> 
->     http://www.pwsan.com/omap/testlogs/prcm_fixes_c_v3.8-rc/20130121073904/
+> There is a change in zynq dtsi that's why I think it can go through
+> arm-soc tree.
+> Please let me know if this should go through Greg serial tree.
 
-Thanks pulling into omap-for-v3.8-rc4/fixes.
+If they fix serial driver issues, I have no problem taking them through
+my serial tree, just send them on as patches and I will be glad to queue
+them up.
 
-Regards,
+thanks,
 
-Tony
+greg k-h
