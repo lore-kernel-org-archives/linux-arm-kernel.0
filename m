@@ -1,120 +1,62 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 21 Jan 2013 14:36:13 -0800
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <CAKGA1b=D5CNikijoOAk5xP6TC-nB_gEGtS05ncrPR68sQTMrxw@mail.gmail.com>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <201301212041.17951.arnd@arndb.de> <50FDAC5F.4040605@linaro.org>
- <CAKGA1b=D5CNikijoOAk5xP6TC-nB_gEGtS05ncrPR68sQTMrxw@mail.gmail.com>
-Message-ID: <50FDC2DD.7090406@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 21 Jan 2013 23:37:22 +0100
+Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
+ Armada 370/XP
+In-Reply-To: <201301211831.45947.arnd@arndb.de>
+References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
+ <1358790842-2986-4-git-send-email-gregory.clement@free-electrons.com>
+ <201301211831.45947.arnd@arndb.de>
+Message-ID: <50FDC322.2040107@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2013 01:14 PM, Matt Sealey wrote:
-> On Mon, Jan 21, 2013 at 3:00 PM, John Stultz <john.stultz@linaro.org> wrote:
->> On 01/21/2013 12:41 PM, Arnd Bergmann wrote:
->>> Right. It's pretty clear that the above logic does not work
->>> with multiplatform.  Maybe we should just make ARCH_MULTIPLATFORM
->>> select NO_HZ to make the question much less interesting.
->> Although, even with NO_HZ, we still have some sense of HZ.
-> I wonder if you can confirm my understanding of this by the way? The
-> way I think this works is;
->
-> CONFIG_HZ on it's own defines the rate at which the kernel wakes up
-> from sleeping on the job, and checks for current or expired timer
-> events such that it can do things like schedule_work (as in
-> workqueues) or perform scheduler (as in processes/tasks) operations.
+On 01/21/2013 07:31 PM, Arnd Bergmann wrote:
+> On Monday 21 January 2013, Gregory CLEMENT wrote:
+>> @@ -1624,7 +1624,7 @@ config LOCAL_TIMERS
+>>         bool "Use local timer interrupts"
+>>         depends on SMP
+>>         default y
+>> -       select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+>> +       select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARMADA_370_XP_TIMER)
+>>         
+> 
+> Your change is fine, but I just noticed that this line is asking for trouble
+> when we enable multipleform support for MSM and/or EXYNOS.
+> 
+> Also, I wonder if we should change this somehow in 3.8, because it seems
+> that for a multiplatform kernel including armadaxp and e.g. versatile express,
+> you have no ARM_TWD support in the kernel, which seems wrong. Is there any
+> reason we can't enable the ARM_TWD code to be built-in on platforms that
+> don't use it?
 
-CONFIG_HZ defines the length of a jiffy.
+I don't see a strong reason to not enable it if we don't use it. My concern
+was that I don't need it so I didn't want to include it and generating extra
+code for nothing. Then just after having sent this patch set, I received your
+patch set about build regression in 3.8 and especially the part about
+CONFIG_MULTIPLATFORM made me realized that it could be a problem.
 
-In the absence of NOHZ and HRT, HZ defines how frequently the 
-timer/scheduler tick will fire.
+> 
+> Maybe it can be written as
+> 
+> config LOCAL_TIMERS
+> 	bool "Use local timer interrupts"
+> 	depends on SMP
+> 	default y
+> 
+> config HAVE_ARM_TWD
+> 	depends on LOCAL_TIMERS
+> 	default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
 
-> CONFIG_NO_HZ turns on logic which effectively only wakes up at a
-> *maximum* of CONFIG_HZ times per second, but otherwise will go to
-> sleep and stay that way if no events actually happened (so, we rely on
-> a timer interrupt popping up).
+So in this case why not written something like this:
+ 	default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARMADA_370_XP_TIMER)
 
-NOHZ adds logic which basically allows us to skip ticks if the cpu is idle.
+> 	default y
+I am not a kconfig expert, but won't this line set HAVE_ARM_TWD to 'y' whatever
+the result of the previous line?
 
-And HRT adds logic which allows us to fire timers more frequently then HZ.
+> 
+> This will still be slightly wrong (generating extra code) on a multiplatform
+> kernel that has no platform other than MSM or EXYNOS, but the other alternative
+> would be that each platform with TWD support has to select HAVE_ARM_TWD itself.
 
-> In this case, no matter whether CONFIG_HZ=1000 or CONFIG_HZ=250 (for
-> example) combined with CONFIG_NO_HZ and less than e.g. 250 things
-> happening per second will wake up "exactly" the same number of times?
-Ideally, if both systems are completely idle, they may see similar 
-number of actual interrupts.
-
-But when the cpus are running processes, the HZ=1000 system will see 
-more frequent interrupts, since the timer/scheduler interrupt will jump 
-in 4 times more frequently.
-
-
-> CONFIG_HZ=1000 with CONFIG_NO_HZ would be an effective, all-round
-> solution here, then, and CONFIG_HZ=100 should be a reasonable default
-> (as it is anyway with an otherwise-unconfigured kernel on any other
-> platform) for !CONFIG_NO_HZ.
-
-Eeehhh... I'm not sure this is follows.
-
->>
->> Yea, as far as timekeeping is concerned, we shouldn't be HZ dependent (and
->> the register_refined_jiffies is really only necessary if you're not
->> expecting a proper clocksource to eventually be registered), assuming the
->> hardware can do something close to the HZ value requested.
->>
->> So I'd probably want to hear about what history caused the specific 200 HZ
->> selections, as I suspect there's actual hardware limitations there. So if
->> you can not get actual timer ticks any faster then 200 HZ on that hardware,
->> setting HZ higher could cause some jiffies related timer trouble (ie: if the
->> kernel thinks HZ is 1000 but the hardware can only do 200, that's a
->> different problem then if the hardware actually can only do 999.8 HZ). So
->> things like timer-wheel timeouts may not happen when they should.
->>
->> I suspect the best approach for multi-arch in those cases may be to select
->> HZ=100
-> As above, or "not select anything at all" since HZ=100 if you don't
-> touch anything, right?
-
-Well, Russell brought up a case that doesn't handle this. If a system 
-*can't* do HZ=100, but can do HZ=200.
-
-Though there are hacks, of course, that might get around this (skip 
-every other interrupt at 200HZ).
-
-> If someone picks HZ=1000 and their platform can't support it, then
-> that's their own damn problem (don't touch things you don't
-> understand, right? ;)
-Well, ideally with kconfig we try to add proper dependencies so 
-impossible options aren't left to the user.
-HZ is a common enough knob to turn on most systems, I don't know if 
-leaving the user rope to hang himself is a great idea.
-
->
->> and use HRT to allow more modern systems to have finer-grained
->> timers.
-> My question really has to be is CONFIG_SCHED_HRTICK useful, what
-> exactly is it going to do on ARM here since nobody can ever have
-> enabled it? Is it going to keel over and explode if nobody registers a
-> non-jiffies sched_clock (since the jiffies clock is technically
-> reporting itself as a ridiculously high resolution clocksource..)?
-??? Not following this at all.  jiffies is the *MOST* coarse resolution 
-clocksource there is (at least that I'm aware of.. I recall someone 
-wanting to do a 60Hz clocksource, but I don't think that ever happened).
-
-> Or is this one of those things that if your platform doesn't have a
-> real high resolution timer, you shouldn't enable HRTIMERS and
-> therefore not enable SCHED_HRTICK as a result? That affects
-> ARCH_MULTIPLATFORM here. Is the solution as simple as
-> ARCH_MULTIPLATFORM compliant platforms kind of have to have a high
-> resolution timer? Documentation to that effect?
-
-SO HRITMERS was designed to be be build time enabled, while still giving 
-you a functioning system if it was booted on a system that didn't 
-support clockevents.  We boot with standard HZ, and only switch over to 
-HRT mode if we have a proper clocksource and clockevent driver.
-
-However, HRTIMERS or NOHZ doesn't fix the case of having a system boot 
-with HZ=1000 or HZ=100 if the system can *only* do HZ=200.
-
-thanks
--john
+Gregory
