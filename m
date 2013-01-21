@@ -1,42 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 17:16:02 +0000
-Subject: [PATCH 09/15] media: coda: don't build on multiplatform
+Date: Mon, 21 Jan 2013 17:16:03 +0000
+Subject: [PATCH 10/15] mfd/vexpress: export vexpress_config_func_{put,get}
 In-Reply-To: <1358788568-11137-1-git-send-email-arnd@arndb.de>
 References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
-Message-ID: <1358788568-11137-10-git-send-email-arnd@arndb.de>
+Message-ID: <1358788568-11137-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The coda video codec driver depends on a mach-imx or mach-mxs specific
-header file "mach/iram.h". This is not available when building for
-multiplatform, so let us disable this driver for v3.8 when building
-multiplatform, and hopefully find a proper fix for v3.9.
+The newly introduced vexpress mfd driver in linux-3.8-rc
+provides access to configuration functions, but the
+interfaces are not exported to modules, which breaks
+when the vexpress regulator driver tries to use them.
 
-drivers/media/platform/coda.c:27:23: fatal error: mach/iram.h: No such file or directory
+Without this patch, building allmodconfig results in:
+
+ERROR: "__vexpress_config_func_get" [drivers/regulator/vexpress.ko] undefined!
+ERROR: "vexpress_config_func_put" [drivers/regulator/vexpress.ko] undefined!
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Javier Martin <javier.martin@vista-silicon.com>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: linux-media at vger.kernel.org
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- drivers/media/platform/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mfd/vexpress-config.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-index 3dcfea6..049d2b2 100644
---- a/drivers/media/platform/Kconfig
-+++ b/drivers/media/platform/Kconfig
-@@ -142,7 +142,7 @@ if V4L_MEM2MEM_DRIVERS
+diff --git a/drivers/mfd/vexpress-config.c b/drivers/mfd/vexpress-config.c
+index fae15d8..3cb34aa 100644
+--- a/drivers/mfd/vexpress-config.c
++++ b/drivers/mfd/vexpress-config.c
+@@ -142,6 +142,7 @@ struct vexpress_config_func *__vexpress_config_func_get(struct device *dev,
  
- config VIDEO_CODA
- 	tristate "Chips&Media Coda multi-standard codec IP"
--	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC
-+	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC && !ARCH_MULTIPLATFORM
- 	select VIDEOBUF2_DMA_CONTIG
- 	select V4L2_MEM2MEM_DEV
- 	select IRAM_ALLOC if SOC_IMX53
+ 	return func;
+ }
++EXPORT_SYMBOL_GPL(__vexpress_config_func_get);
+ 
+ void vexpress_config_func_put(struct vexpress_config_func *func)
+ {
+@@ -149,7 +150,7 @@ void vexpress_config_func_put(struct vexpress_config_func *func)
+ 	of_node_put(func->bridge->node);
+ 	kfree(func);
+ }
+-
++EXPORT_SYMBOL_GPL(vexpress_config_func_put);
+ 
+ struct vexpress_config_trans {
+ 	struct vexpress_config_func *func;
 -- 
 1.7.10.4
