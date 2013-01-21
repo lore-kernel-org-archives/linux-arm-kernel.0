@@ -1,35 +1,30 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 21 Jan 2013 18:54:01 +0100
-Subject: [PATCH 5/6] arm: mvebu: update DT to support local timers
+Date: Mon, 21 Jan 2013 18:54:00 +0100
+Subject: [PATCH 4/6] arm: mvebu: update defconfig with local timer support
 In-Reply-To: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1358790842-2986-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1358790842-2986-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the time-armada-370-xp support local timers, updated the
-device tree to take it into account.
+Now that we have support for local timers, enable it by default
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/configs/mvebu_defconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 4c0abe8..aa6a187 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -68,8 +68,9 @@
- 
- 		timer at d0020300 {
- 			       compatible = "marvell,armada-370-xp-timer";
--			       reg = <0xd0020300 0x30>;
--			       interrupts = <37>, <38>, <39>, <40>;
-+			       reg = <0xd0020300 0x30>,
-+			       <0xd0021040 0x30>;
-+			       interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
- 			       clocks = <&coreclk 2>;
- 		};
- 
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index b5bc96c..28c1e38 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -14,7 +14,6 @@ CONFIG_MACH_ARMADA_XP=y
+ # CONFIG_CACHE_L2X0 is not set
+ # CONFIG_SWP_EMULATE is not set
+ CONFIG_SMP=y
+-# CONFIG_LOCAL_TIMERS is not set
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ # CONFIG_COMPACTION is not set
 -- 
 1.7.9.5
