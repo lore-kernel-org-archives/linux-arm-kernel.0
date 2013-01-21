@@ -1,38 +1,68 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 21 Jan 2013 10:03:20 +0100
-Subject: [PATCH 0/9] ARM: OMAP2+: AM33XX: Misc fixes/updates
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ECF09E0@DBDE01.ent.ti.com>
- (Vaibhav Bedia's message of "Mon, 21 Jan 2013 05:27:16 +0000")
-References: <1358493569-17142-1-git-send-email-vaibhav.bedia@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433ECF09E0@DBDE01.ent.ti.com>
-Message-ID: <87zk02aox3.fsf@dell.be.48ers.dk>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Mon, 21 Jan 2013 18:10:06 +0900
+Subject: [PATCH] ARM: sched: correct update_sched_clock()
+Message-ID: <1358759406-9835-1-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "V" == Bedia, Vaibhav <vaibhav.bedia@ti.com> writes:
+If we want load epoch_cyc and epoch_ns atomically,
+we should update epoch_cyc_copy first of all.
+This notify reader that updating is in progress.
 
-Hi,
+If we update epoch_cyc first like as current implementation,
+there is subtle error case.
+Look at the below example.
 
- >> Vaibhav Bedia (9):
- >> ARM: OMAP2+: AM33XX: CM: Get rid of unncessary header inclusions
- >> ARM: OMAP2+: AM33XX: CM/PRM: Use __ASSEMBLER__ macros in header files
- >> ARM: OMAP2+: AM33XX: hwmod: Register OCMC RAM hwmod
- >> ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod with the right flags
- >> ARM: OMAP2+: AM33XX: hwmod: Fixup cpgmac0 hwmod entry
- >> ARM: OMAP2+: AM33XX: hwmod: Update the WKUP-M3 hwmod with reset
- >> status bit
- >> ARM: OMAP2+: AM33XX: Update the hardreset API
- >> ARM: DTS: AM33XX: Add nodes for OCMC RAM and WKUP-M3
- >> ARM: OMAP2+: AM33XX: control: Add some control module registers and
- >> APIs
- >> 
+<Initial Condition>
+cyc = 9
+ns = 900
+cyc_copy = 9
 
- V> Any comments on these before I resend addressing the comments from Sergei?
+== CASE 1 ==
+<CPU A = reader>           <CPU B = updater>
+                           write cyc = 10
+read cyc = 10
+read ns = 900
+                           write ns = 1000
+                           write cyc_copy = 10
+read cyc_copy = 10
 
-Wouldn't the ocmram/wkup dt nodes need a reg property to define their
-size as I indirectly mentioned here:
+output = (10, 900)
 
-http://thread.gmane.org/gmane.linux.ports.arm.omap/91405/focus=92061
+== CASE 2 ==
+<CPU A = reader>           <CPU B = updater>
+read cyc = 9
+                           write cyc = 10
+                           write ns = 1000
+read ns = 1000
+read cyc_copy = 9
+                           write cyc_copy = 10
+output = (9, 1000)
 
+If atomic read is ensured, output should be (9, 900) or (10, 1000).
+But, output in example case are not.
+
+So, change updating sequence in order to correct this problem.
+
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+index fc6692e..bd6f56b 100644
+--- a/arch/arm/kernel/sched_clock.c
++++ b/arch/arm/kernel/sched_clock.c
+@@ -93,11 +93,11 @@ static void notrace update_sched_clock(void)
+ 	 * detectable in cyc_to_fixed_sched_clock().
+ 	 */
+ 	raw_local_irq_save(flags);
+-	cd.epoch_cyc = cyc;
++	cd.epoch_cyc_copy = cyc;
+ 	smp_wmb();
+ 	cd.epoch_ns = ns;
+ 	smp_wmb();
+-	cd.epoch_cyc_copy = cyc;
++	cd.epoch_cyc = cyc;
+ 	raw_local_irq_restore(flags);
+ }
+ 
 -- 
-Bye, Peter Korsgaard
+1.7.9.5
