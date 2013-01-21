@@ -1,49 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jan 2013 21:03:41 +0000
+Date: Mon, 21 Jan 2013 21:12:18 +0000
 Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <201301212041.17951.arnd@arndb.de>
+In-Reply-To: <50FDAC5F.4040605@linaro.org>
 References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <201301212041.17951.arnd@arndb.de>
-Message-ID: <20130121210341.GW23505@n2100.arm.linux.org.uk>
+ <201301212041.17951.arnd@arndb.de> <50FDAC5F.4040605@linaro.org>
+Message-ID: <20130121211218.GX23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 08:41:17PM +0000, Arnd Bergmann wrote:
-> On Monday 21 January 2013, Matt Sealey wrote:
-> > 
-> > ARM seems to be the only "major" platform not using the
-> > kernel/Kconfig.hz definitions, instead rolling it's own and setting
-> > what could be described as both reasonable and unreasonable defaults
-> > for platforms.
+On Mon, Jan 21, 2013 at 01:00:15PM -0800, John Stultz wrote:
+> So if you can not get actual timer ticks any faster then 200 HZ on that  
+> hardware, setting HZ higher could cause some jiffies related timer  
+> trouble
 
-No, you've got this totally wrong.
+Err, no John.  It's the other way around - especially on some platforms
+which are incapable of being converted to the clock source support.
 
-They're not defaults.  And I object to your use of "unreasonable" too.
-I've no idea where you get that from.
+EBSA110 has _one_ counter.  It counts down at a certain rate, and when
+it rolls over from 0 to FFFF, it produces an interrupt and continues
+counting down from FFFF.
 
-There's a reason why we have different HZ rates - some platforms just
-can't do the standard 100Hz tick rate.  No way - their timers can't
-divide down to that interrupt rate.  Sorry to spoil your ivory tower
-with a few facts, but your statement is just rediculous.
+To produce anything close to a reasonable regular tick rate from that,
+the only way to do it is - with interrupts disabled - read the current
+value to find out how far the timer has rolled over, and set it so that
+the next event will expire as close as possible to the desired HZ rate.
 
-The reason we don't use kernel/Kconfig.hz is precisely because of that;
-we _HAVE_ to have different HZ definitions on different platforms, and
-you'll notice that kernel/Kconfig.hz makes _no_ prevision for this.
+So, none of the clcokevent stuff can be used; and we rely _purely_ on
+counting interrupts in jiffy based increments to provide any reference
+of time.
 
-Now, while things have moved forwards and we have clocksource/clockevent
-support, not every platform can support this timekeeping structure;
-ebsa110 certainly can't.  There's one timer and one timer only which
-is usable, which even needs to be manually reloaded by the CPU.  No
-other independent counter to act as a clock source.
-
-As for Samsung and the rest I can't comment.  The original reason OMAP
-used this though was because the 32768Hz counter can't produce 100Hz
-without a .1% error - too much error under pre-clocksource
-implementations for timekeeping.  Whether that's changed with the
-clocksource/clockevent support needs to be checked.
-
-It's entirely possible with the modern clocksource/clockevent support
-that many of these platforms can have their alternative HZ tick rates
-removed - but there will continue to be a subset which can't, and all
-the time that we have such a subset, kernel/Kconfig.hz can't be used
-without modification.
+Moreover, because the counter is only 16-bit, and it's clocked from
+something around 7MHz, well, maths will tell you why 200Hz had to be
+chosen rather than 100Hz.
