@@ -1,130 +1,125 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 21 Jan 2013 17:49:06 +0800
-Subject: [PATCH] ARM: tegra114: cpuidle: add ARM_CPUIDLE_WFI_STATE support
-Message-ID: <1358761746-13118-1-git-send-email-josephl@nvidia.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 21 Jan 2013 10:52:10 +0100
+Subject: [PATCH 3/7] ARM i.MX6q: Add GPU, VPU, IPU, and OpenVG resets
+ to System Reset Controller (SRC)
+In-Reply-To: <CAKGA1bmjKQcX3RzSjbnuYqoJqbzXYGa_Whv7QQkNyAhBDzZWdw@mail.gmail.com>
+References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
+ <1358352787-15441-4-git-send-email-p.zabel@pengutronix.de>
+ <CAKGA1bmjKQcX3RzSjbnuYqoJqbzXYGa_Whv7QQkNyAhBDzZWdw@mail.gmail.com>
+Message-ID: <1358761930.2522.54.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the generic ARM_CPUIDLE_WFI_STATE support for Tegra114.
+Hi Matt,
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/Makefile           |  3 ++
- arch/arm/mach-tegra/cpuidle-tegra114.c | 61 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/cpuidle.c          |  3 ++
- arch/arm/mach-tegra/cpuidle.h          |  6 ++++
- 4 files changed, 73 insertions(+)
- create mode 100644 arch/arm/mach-tegra/cpuidle-tegra114.c
+thank you for your comments.
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 219c2ed..1335aac 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -34,6 +34,9 @@ obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-dt-tegra20.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= board-dt-tegra114.o
-+ifeq ($(CONFIG_CPU_IDLE),y)
-+obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= cpuidle-tegra114.o
-+endif
- 
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-harmony-pcie.o
- 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
-new file mode 100644
-index 0000000..0f4e8c4
---- /dev/null
-+++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
-@@ -0,0 +1,61 @@
-+/*
-+ * Copyright (c) 2013, NVIDIA Corporation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/cpuidle.h>
-+
-+#include <asm/cpuidle.h>
-+
-+static struct cpuidle_driver tegra_idle_driver = {
-+	.name = "tegra_idle",
-+	.owner = THIS_MODULE,
-+	.en_core_tk_irqen = 1,
-+	.state_count = 1,
-+	.states = {
-+		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
-+	},
-+};
-+
-+static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
-+
-+int __init tegra114_cpuidle_init(void)
-+{
-+	int ret;
-+	unsigned int cpu;
-+	struct cpuidle_device *dev;
-+	struct cpuidle_driver *drv = &tegra_idle_driver;
-+
-+	ret = cpuidle_register_driver(&tegra_idle_driver);
-+	if (ret) {
-+		pr_err("CPUidle driver registration failed\n");
-+		return ret;
-+	}
-+
-+	for_each_possible_cpu(cpu) {
-+		dev = &per_cpu(tegra_idle_device, cpu);
-+		dev->cpu = cpu;
-+
-+		dev->state_count = drv->state_count;
-+		ret = cpuidle_register_device(dev);
-+		if (ret) {
-+			pr_err("CPU%u: CPUidle device registration failed\n",
-+				cpu);
-+			return ret;
-+		}
-+	}
-+	return 0;
-+}
-diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
-index d065139..4b744c4 100644
---- a/arch/arm/mach-tegra/cpuidle.c
-+++ b/arch/arm/mach-tegra/cpuidle.c
-@@ -38,6 +38,9 @@ static int __init tegra_cpuidle_init(void)
- 	case TEGRA30:
- 		ret = tegra30_cpuidle_init();
- 		break;
-+	case TEGRA114:
-+		ret = tegra114_cpuidle_init();
-+		break;
- 	default:
- 		ret = -ENODEV;
- 		break;
-diff --git a/arch/arm/mach-tegra/cpuidle.h b/arch/arm/mach-tegra/cpuidle.h
-index 496204d..d733f75 100644
---- a/arch/arm/mach-tegra/cpuidle.h
-+++ b/arch/arm/mach-tegra/cpuidle.h
-@@ -29,4 +29,10 @@ int tegra30_cpuidle_init(void);
- static inline int tegra30_cpuidle_init(void) { return -ENODEV; }
- #endif
- 
-+#ifdef CONFIG_ARCH_TEGRA_114_SOC
-+int tegra114_cpuidle_init(void);
-+#else
-+static inline int tegra114_cpuidle_init(void) { return -ENODEV; }
-+#endif
-+
- #endif
--- 
-1.8.0.3
+Am Freitag, den 18.01.2013, 13:57 -0600 schrieb Matt Sealey:
+> On Wed, Jan 16, 2013 at 10:13 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> > The SRC has auto-deasserting reset bits that control reset lines to
+> > the GPU, VPU, IPU, and OpenVG IP modules. This patch adds a reset
+> > controller that can be controlled by those devices using the
+> > reset controller API.
+> >
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> Hi Philipp,
+> 
+> I'm so glad someone actually sat down and coded this :)
+> 
+> +
+> +static int imx_src_reset(unsigned long sw_reset_idx)
+> +{
+> 
+> Having a name like imx_src_reset seems needlessly generic and
+> confusing. Surely we are performing a reset on an SoC unit and not
+> having the SRC itself reset, even if it is clearer when we look at the
+> argument?
+
+imx_src_reset_module, then? Also, I'll add the struct
+reset_controller_dev pointer as an argument next time:
+
+static int imx_src_reset_module(struct reset_controller_dev *rcdev,
+                unsigned long sw_reset_idx)
+
+> +       timeout = jiffies + msecs_to_jiffies(1000);
+> +       while (readl(src_base + SRC_SCR) & bit) {
+> +               if (time_after(jiffies, timeout))
+> +                       return -ETIME;
+> +               cpu_relax();
+> 
+> ... I do wonder though, all versions of the very-similar i.MX SRC
+> (i.MX51, i.MX53, i.MX6) implementing these bits actually have an
+> interrupt (with the same status-bit positions as the reset-enable
+> register) which fires when the unit actually resets.
+> 
+> Rather than poll with a timeout shouldn't we be waiting for the
+> interrupt and doing some completion event? It seems a little overly
+> involved to me to poll and cpu_relax() when we can just let the kernel
+> do whatever it likes while the hardware does the job.
+> 
+> It is technically impossible for the unit to "never reset" without
+> there being something hideously wrong elsewhere (i.e. if you ask the
+> VPU to reset, and it never fires the interrupt, you have far, far more
+> problems than just a locked VPU), but we actually should have no idea
+> without some empirical data (under every scenario at least) how long
+> it would actually take so having a timeout seems rather odd. Having a
+> timeout of a full second also *seems* to be far too long under the
+> same circumstances but I don't think anyone can predict what the real
+> values might be.
+> 
+> I looked at writing this exact same kind of code a long while back
+> including support for i.MX51 and i.MX53 as a cleanup for the older
+> version of Sascha's IPU driver, and simply never got it nice enough to
+> submit upstream (it is currently stuffed away in a huge backup disk
+> and I have no idea where the kernel tree is), but the way I handled it
+> was something like registering a real interrupt handler in the src
+> initialization function and then simply setting the bit and letting
+> the completion event do the work. I also did have a timeout for 5000ms
+> which basically would still capture any reset oddities - if we passed
+> 5 seconds, and the unit did not reset, to start executing WARN_ON or
+> something to give the kernel developer (or user) a real indication
+> that something is *actually* hideously wrong with their board
+> implementation or the stability of their SoC, power rails, heatsink
+> etc.. or million other possibilities (any warning is at least better
+> than none).
+> 
+> I could never get the warning code to ever execute except in a
+> contrived test scenario (I set a reserved bit and faked that it never
+> fired an interrupt) but in my opinion, ANY warning on this kind of
+> failure to reset is better than just returning -ETIME to the reset
+> consumer and hoping the consumer reports a reasonable error to the
+> kernel log - if the SRC fails to reset a unit then this is not an
+> error condition so low in seriousness that telling the consumer
+> something timed out is adequate (based on the intended and functional
+> implementation of the SRC controller itself). As I said, what I
+> decided on was that I would return -ETIMEDOUT (the wrong code, but
+> bear with me, I was hacking) but before return, pr_err the problem
+> unit, and then WARN_ON inside the SRC driver itself, so that
+> everything would carry on (no system lockups or panics), but the
+> driver was not responsible for reporting the problem and the
+> seriousness was implicated in something a little more noticable than a
+> single line in a log.
+> 
+> I understand that waiting on an interrupt or completion event is not
+> available infrastructure in the current reset-controller code... but
+> maybe it should be a little more advanced than polling implementation
+> :D
+
+Yes, maybe the module reset part of the SRC should be implemented as a
+proper device driver in drivers/reset. Then we could use the interrupt
+functionality and WARN_ON(timeout), as you suggest.
+
+> I am not not-acking the code, and I would be overjoyed for it to go in
+> as-is (maybe with a function rename as above), but I would appreciate
+> the consideration that a reset-controller with some way of reporting a
+> successful reset other than polling is something that might come in
+> handy for other people (and i.MX SRC would be a highly desirable use
+> case) and at the very least in the case of the i.MX SRC, "this unit
+> did not reset after [possibly more than] a whole second of waiting" is
+> not encompassed within if (ret) pr_err("unit did not reset") in the
+> driver.. nor would this be an immediate and serious indication to the
+> driver or end-user.
+
+regards
+Philipp
