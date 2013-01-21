@@ -1,25 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 20:16:13 +0000
-Subject: [PATCH 02/15] ARM: mvebu: build coherency_ll.S for arch=armv7-a
-In-Reply-To: <20130121190302.GN22517@atomide.com>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <1358788568-11137-3-git-send-email-arnd@arndb.de>
- <20130121190302.GN22517@atomide.com>
-Message-ID: <201301212016.13727.arnd@arndb.de>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Mon, 21 Jan 2013 14:20:06 -0600
+Subject: [PATCH v7 09/15] gpio: pl061: set initcall level to module init
+In-Reply-To: <1358785488.6590.33.camel@hornet>
+References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358494279-16503-10-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdb=vf5s-XmfYYn5W-BjeNaf9vw6-sDSH6VDC41PBX0rdQ@mail.gmail.com>
+ <1358785488.6590.33.camel@hornet>
+Message-ID: <1358799606.3592.14.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 January 2013, Tony Lindgren wrote:
+Hi Linus,
+
+On Mon, 2013-01-21 at 16:24 +0000, Pawel Moll wrote:
+> On Mon, 2013-01-21 at 14:41 +0000, Linus Walleij wrote:
+> > On Fri, Jan 18, 2013 at 8:31 AM, Haojian Zhuang
+> > <haojian.zhuang@linaro.org> wrote:
 > > 
-> > arch/arm/mach-mvebu/coherency_ll.S: Assembler messages:
-> > arch/arm/mach-mvebu/coherency_ll.S:45: Error: selected processor does not support ARM mode `dsb'
+> > > Replace subsys initcall by module initcall level. Since pinctrl
+> > > driver is already launched before gpio driver. It's unnecessary
+> > > to set gpio driver in subsys init call level.
+> > >
+> > > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> > 
+> > On you platform maybe it works, but have you made sure that nobody
+> > else will be affected?
+> > 
+> > SPEAr of course, then these:
+> > 
+> > arch/arm/mach-realview/core.c:           * GPIO on PL061 is active,
+> > which is the proper
+> > arch/arm/mach-socfpga/Kconfig:  select GPIO_PL061 if GPIOLIB
+> > 
+> > Pawel, Dinh: are you OK with this change?
+
+Still works ok on mach-socfpga.
+
+Dinh
 > 
-> This should be already fixed by 72533b (arm: mvebu: Fix compile for
-> multiplatform when ARMv6 is selected) in arm-soc fixes branch.
+> Hm. Doesn't this make the MMCI probing depending on the module_init
+> order? As in: wouldn't it make the mmci probe completely fail (not even
+> defer it) if it was called before the pl061? In that case even your,
+> Linus, hack with inverting the CD status wouldn't work...
 > 
-
-Ok, silly me, I forgot to check my own tree :)
-
-Thanks for looking into it!
-
-	Arnd
+> Pawel
+> 
+> 
+> 
+> 
