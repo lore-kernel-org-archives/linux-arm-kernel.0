@@ -1,45 +1,14 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 21 Jan 2013 19:48:26 +0200
-Subject: [PATCH 1/2] net: fec: refactor dt probing
-In-Reply-To: <1358757475-21035-2-git-send-email-s.hauer@pengutronix.de>
-References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
- <1358757475-21035-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130121174824.GA27956@sapphire.tkos.co.il>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 21 Jan 2013 10:50:06 -0700
+Subject: [PATCH] ARM: tegra: DTS: harmony: enable keyboard
+In-Reply-To: <1358790245-21724-1-git-send-email-ldewangan@nvidia.com>
+References: <1358790245-21724-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <50FD7FCE.4010606@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On 01/21/2013 10:44 AM, Laxman Dewangan wrote:
+> Enable Tegra based keyboard interfacing for keys and provide
+> all key mapping through DTS file.
 
-On Mon, Jan 21, 2013 at 09:37:54AM +0100, Sascha Hauer wrote:
-> For devicetree parsing only the fec_get_phy_mode_dt() is
-> available. Rename it to fec_probe_dt() to be able to add more devicetree
-> parsing to it.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
-
-[...]
-
-> -static int fec_get_phy_mode_dt(struct platform_device *pdev)
-> +static int fec_probe_dt(struct fec_enet_private *fep)
->  {
-> -	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *np = fep->pdev->dev.of_node;
->  
-> -	if (np)
-> -		return of_get_phy_mode(np);
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	fep->phy_interface = of_get_phy_mode(np);
->  
->  	return -ENODEV;
-
-Maybe return fep->phy_interface?
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Applied to Tegra's for-3.9/dt branch.
