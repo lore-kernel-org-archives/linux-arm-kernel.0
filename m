@@ -1,44 +1,73 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Jan 2013 12:03:56 +0000
-Subject: [PATCH 20/24] ab8500-fg: Use correct battery charge full design
-In-Reply-To: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
-References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1358769840-4763-21-git-send-email-lee.jones@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 21 Jan 2013 13:06:02 +0100
+Subject: [PATCH] net: fec: Add support for multiple phys on mdiobus
+In-Reply-To: <50FD2172.2020608@grandegger.com>
+References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
+ <50FD02B8.8080401@grandegger.com>
+ <20130121100701.GX1906@pengutronix.de>
+ <50FD2172.2020608@grandegger.com>
+Message-ID: <20130121120602.GZ1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajkumar Kasirajan <rajkumar.kasirajan@stericsson.com>
+On Mon, Jan 21, 2013 at 12:07:30PM +0100, Wolfgang Grandegger wrote:
+> On 01/21/2013 11:07 AM, Sascha Hauer wrote:
+> > On Mon, Jan 21, 2013 at 09:56:24AM +0100, Wolfgang Grandegger wrote:
+> >> On 01/21/2013 09:37 AM, Sascha Hauer wrote:
+> >>> There may be multiple phys on an mdio bus. This series adds support
+> >>> for this to the fec driver. I recently had a board which has a switch
+> >>> connected to the fec's mdio bus, so I had to pick the correct phy.
+> >>
+> >> Pick one PHY from a switch port? Well, does a PHY-less (or fixed-link)
+> >> configuration for a switch not make more sense?
+> > 
+> > Yes, you're probably right.
+> > 
+> >> Various ARM Ethernet
+> >> contoller drivers do not support it. I recently needed a hack for an
+> >> AT91 board.
+> > 
+> > I wonder how we want to proceed. Should there be a devicetree property
+> > 'fixed-link' like done for fs_enet (and not recommended for new code,
+> > stated in the comment above of_phy_connect_fixed_link)?
+> 
+> Also the gianfar and ucc_geth drivers use this interface (via fixed
+> link phy). I tried to use it for the AT91 macb driver but stopped
+> quickly because the usage was not straight forward (too much code)...
+> even if the idea of using a fake fixed-link phy is not bad.
+> 
+> > Currently I have a property 'phy' in the fec binding which has a phandle
+> > to a phy provided by the fec's mdio bus, but this could equally well
+> 
+> But than the cable must be connected to the associated switch port.
+> 
+> > point to a fixed dummy phy:
+> > 
+> > 	phy = &fixed-phy;
+> 
+> The link speed, full/half duplex and maybe some mroe parameter should
+> be configurable via device tree.
 
-If battery is not identified while fg probe, mah_max_design gets
-initialized with unknown battery's charge full design. Reinitialize
-mah_max_design if battery is identified after fg probe.
+Well this could be done when the fixed phy driver could be registered
+with the devicetree, maybe like this:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Rajkumar Kasirajan <rajkumar.kasirajan@stericsson.com>
-Reviewed-by: Vijaya Kumar K-1 <vijay.kilari@stericsson.com>
-Reviewed-by: Marcus COOPER <marcus.xm.cooper@stericsson.com>
-Reviewed-by: Olivier CLERGEAUD <olivier.clergeaud@stericsson.com>
-Reviewed-by: Arun MURTHY <arun.murthy@stericsson.com>
-Reviewed-by: Rabin VINCENT <rabin.vincent@stericsson.com>
-Tested-by: Rupesh KUMAR <rupesh.kumar@stericsson.com>
-Tested-by: Jonas ABERG <jonas.aberg@stericsson.com>
----
- drivers/power/ab8500_fg.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+	fixed-phy: mdiophy {
+		compatible = "mdio-fixed-phy";
+		link = "100FD";
+	};
 
-diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
-index 1a78116..0780b60 100644
---- a/drivers/power/ab8500_fg.c
-+++ b/drivers/power/ab8500_fg.c
-@@ -2090,7 +2090,8 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
- 		case POWER_SUPPLY_PROP_TECHNOLOGY:
- 			switch (ext->type) {
- 			case POWER_SUPPLY_TYPE_BATTERY:
--				if (!di->flags.batt_id_received) {
-+				if (!di->flags.batt_id_received &&
-+				    di->bm->batt_id != BATTERY_UNKNOWN) {
- 					const struct abx500_battery_type *b;
- 
- 					b = &(di->bm->bat_type[di->bm->batt_id]);
+The good thing about this would be that every ethernet driver could just
+use such a fixed phy, any external mdio phy (like on Marvell Armada) or
+just a phy connected to the internal mdio interface provided by the ethernet
+core.
+
+I probably should write a RFC to devicetree-discuss.
+
+Sascha
+
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
