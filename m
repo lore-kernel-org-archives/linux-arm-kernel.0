@@ -1,229 +1,118 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 21 Jan 2013 05:07:22 -0500
-Subject: [V4 PATCH 04/26] usb: otg: mv_otg: use devm_xxx for probe
+Date: Mon, 21 Jan 2013 05:07:28 -0500
+Subject: [V4 PATCH 10/26] usb: ehci: ehci-mv: use PHY driver for ehci
 In-Reply-To: <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
 References: <xiechao.mail@gmail.com>
  <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1358762864-9249-5-git-send-email-chao.xie@marvell.com>
+Message-ID: <1358762864-9249-11-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use devm_xxx for otg driver probe. So we do need care about
-the resources release in driver remove or failure handling
-in driver probe.
+Originaly, ehci driver will call the callbacks in platform data
+for PHY initialization and shut down.
+With PHY driver, it will call the APIs provided by PHY driver
+for PHY initialization and shut down. It removes the callbacks
+in platform data, and at same time it removes one block in the
+way of enabling device tree for ehci driver.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/otg/mv_otg.c |   82 ++++++++++++---------------------------------
- 1 files changed, 22 insertions(+), 60 deletions(-)
+ drivers/usb/host/ehci-mv.c |   37 +++++++++++++------------------------
+ 1 files changed, 13 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
-index eace975..da2d60c 100644
---- a/drivers/usb/otg/mv_otg.c
-+++ b/drivers/usb/otg/mv_otg.c
-@@ -662,18 +662,9 @@ static struct attribute_group inputs_attr_group = {
- int mv_otg_remove(struct platform_device *pdev)
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index 3065809..be504fd 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -15,17 +15,18 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/usb/otg.h>
++#include <linux/usb/mv_usb2.h>
+ #include <linux/platform_data/mv_usb.h>
+ 
+ #define CAPLENGTH_MASK         (0xff)
+ 
+ struct ehci_hcd_mv {
+ 	struct usb_hcd *hcd;
++	struct mv_usb2_phy *mvphy;
+ 
+ 	/* Which mode does this ehci running OTG/Host ? */
+ 	int mode;
+ 
+-	void __iomem *phy_regs;
+ 	void __iomem *cap_regs;
+ 	void __iomem *op_regs;
+ 
+@@ -59,8 +60,8 @@ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
+ 	int retval;
+ 
+ 	ehci_clock_enable(ehci_mv);
+-	if (ehci_mv->pdata->phy_init) {
+-		retval = ehci_mv->pdata->phy_init(ehci_mv->phy_regs);
++	if (ehci_mv->mvphy->init) {
++		retval = ehci_mv->mvphy->init(ehci_mv->mvphy);
+ 		if (retval)
+ 			return retval;
+ 	}
+@@ -70,8 +71,8 @@ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
+ 
+ static void mv_ehci_disable(struct ehci_hcd_mv *ehci_mv)
  {
- 	struct mv_otg *mvotg = platform_get_drvdata(pdev);
--	int clk_i;
- 
- 	sysfs_remove_group(&mvotg->pdev->dev.kobj, &inputs_attr_group);
- 
--	if (mvotg->irq)
--		free_irq(mvotg->irq, mvotg);
--
--	if (mvotg->pdata->vbus)
--		free_irq(mvotg->pdata->vbus->irq, mvotg);
--	if (mvotg->pdata->id)
--		free_irq(mvotg->pdata->id->irq, mvotg);
--
- 	if (mvotg->qwork) {
- 		flush_workqueue(mvotg->qwork);
- 		destroy_workqueue(mvotg->qwork);
-@@ -681,21 +672,9 @@ int mv_otg_remove(struct platform_device *pdev)
- 
- 	mv_otg_disable(mvotg);
- 
--	if (mvotg->cap_regs)
--		iounmap(mvotg->cap_regs);
--
--	if (mvotg->phy_regs)
--		iounmap(mvotg->phy_regs);
--
--	for (clk_i = 0; clk_i <= mvotg->clknum; clk_i++)
--		clk_put(mvotg->clk[clk_i]);
--
- 	usb_remove_phy(&mvotg->phy);
- 	platform_set_drvdata(pdev, NULL);
- 
--	kfree(mvotg->phy.otg);
--	kfree(mvotg);
--
- 	return 0;
+-	if (ehci_mv->pdata->phy_deinit)
+-		ehci_mv->pdata->phy_deinit(ehci_mv->phy_regs);
++	if (ehci_mv->mvphy->shutdown)
++		ehci_mv->mvphy->shutdown(ehci_mv->mvphy);
+ 	ehci_clock_disable(ehci_mv);
  }
  
-@@ -714,17 +693,15 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	}
- 
- 	size = sizeof(*mvotg) + sizeof(struct clk *) * pdata->clknum;
--	mvotg = kzalloc(size, GFP_KERNEL);
-+	mvotg = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
- 	if (!mvotg) {
- 		dev_err(&pdev->dev, "failed to allocate memory!\n");
- 		return -ENOMEM;
- 	}
- 
--	otg = kzalloc(sizeof *otg, GFP_KERNEL);
--	if (!otg) {
--		kfree(mvotg);
-+	otg = devm_kzalloc(&pdev->dev, sizeof(*otg), GFP_KERNEL);
-+	if (!otg)
- 		return -ENOMEM;
--	}
- 
- 	platform_set_drvdata(pdev, mvotg);
- 
-@@ -733,18 +710,18 @@ static int mv_otg_probe(struct platform_device *pdev)
- 
- 	mvotg->clknum = pdata->clknum;
- 	for (clk_i = 0; clk_i < mvotg->clknum; clk_i++) {
--		mvotg->clk[clk_i] = clk_get(&pdev->dev, pdata->clkname[clk_i]);
-+		mvotg->clk[clk_i] = devm_clk_get(&pdev->dev,
-+						pdata->clkname[clk_i]);
- 		if (IS_ERR(mvotg->clk[clk_i])) {
- 			retval = PTR_ERR(mvotg->clk[clk_i]);
--			goto err_put_clk;
-+			return retval;
+@@ -184,22 +185,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
  		}
  	}
  
- 	mvotg->qwork = create_singlethread_workqueue("mv_otg_queue");
- 	if (!mvotg->qwork) {
- 		dev_dbg(&pdev->dev, "cannot create workqueue for OTG\n");
--		retval = -ENOMEM;
--		goto err_put_clk;
-+		return -ENOMEM;
- 	}
- 
- 	INIT_DELAYED_WORK(&mvotg->work, mv_otg_work);
-@@ -772,7 +749,7 @@ static int mv_otg_probe(struct platform_device *pdev)
- 		goto err_destroy_workqueue;
- 	}
- 
--	mvotg->phy_regs = ioremap(r->start, resource_size(r));
-+	mvotg->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
- 	if (mvotg->phy_regs == NULL) {
- 		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
- 		retval = -EFAULT;
-@@ -784,21 +761,21 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	if (r == NULL) {
+-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
+-		retval = -ENODEV;
+-		goto err_clear_drvdata;
+-	}
+-
+-	ehci_mv->phy_regs = devm_ioremap(&pdev->dev, r->start,
+-					 resource_size(r));
+-	if (ehci_mv->phy_regs == 0) {
+-		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
+-		retval = -EFAULT;
+-		goto err_clear_drvdata;
+-	}
+-
+-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "capregs");
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!r) {
  		dev_err(&pdev->dev, "no I/O memory resource defined\n");
  		retval = -ENODEV;
--		goto err_unmap_phyreg;
-+		goto err_destroy_workqueue;
+@@ -214,6 +200,12 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		goto err_clear_drvdata;
  	}
  
--	mvotg->cap_regs = ioremap(r->start, resource_size(r));
-+	mvotg->cap_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
- 	if (mvotg->cap_regs == NULL) {
- 		dev_err(&pdev->dev, "failed to map I/O memory\n");
- 		retval = -EFAULT;
--		goto err_unmap_phyreg;
-+		goto err_destroy_workqueue;
- 	}
- 
- 	/* we will acces controller register, so enable the udc controller */
- 	retval = mv_otg_enable_internal(mvotg);
++	ehci_mv->mvphy = mv_usb2_get_phy();
++	if (ehci_mv->mvphy == NULL) {
++		retval = -ENODEV;
++		goto err_clear_drvdata;
++	}
++
+ 	retval = mv_ehci_enable(ehci_mv);
  	if (retval) {
- 		dev_err(&pdev->dev, "mv otg enable error %d\n", retval);
--		goto err_unmap_capreg;
-+		goto err_destroy_workqueue;
+ 		dev_err(&pdev->dev, "init phy error %d\n", retval);
+@@ -275,9 +267,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		}
  	}
  
- 	mvotg->op_regs =
-@@ -806,9 +783,9 @@ static int mv_otg_probe(struct platform_device *pdev)
- 			+ (readl(mvotg->cap_regs) & CAPLENGTH_MASK));
- 
- 	if (pdata->id) {
--		retval = request_threaded_irq(pdata->id->irq, NULL,
--					      mv_otg_inputs_irq,
--					      IRQF_ONESHOT, "id", mvotg);
-+		retval = devm_request_threaded_irq(&pdev->dev, pdata->id->irq,
-+						NULL, mv_otg_inputs_irq,
-+						IRQF_ONESHOT, "id", mvotg);
- 		if (retval) {
- 			dev_info(&pdev->dev,
- 				 "Failed to request irq for ID\n");
-@@ -818,9 +795,9 @@ static int mv_otg_probe(struct platform_device *pdev)
- 
- 	if (pdata->vbus) {
- 		mvotg->clock_gating = 1;
--		retval = request_threaded_irq(pdata->vbus->irq, NULL,
--					      mv_otg_inputs_irq,
--					      IRQF_ONESHOT, "vbus", mvotg);
-+		retval = devm_request_threaded_irq(&pdev->dev, pdata->vbus->irq,
-+						NULL, mv_otg_inputs_irq,
-+						IRQF_ONESHOT, "vbus", mvotg);
- 		if (retval) {
- 			dev_info(&pdev->dev,
- 				 "Failed to request irq for VBUS, "
-@@ -844,7 +821,7 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	}
- 
- 	mvotg->irq = r->start;
--	if (request_irq(mvotg->irq, mv_otg_irq, IRQF_SHARED,
-+	if (devm_request_irq(&pdev->dev, mvotg->irq, mv_otg_irq, IRQF_SHARED,
- 			driver_name, mvotg)) {
- 		dev_err(&pdev->dev, "Request irq %d for OTG failed\n",
- 			mvotg->irq);
-@@ -857,14 +834,14 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	if (retval < 0) {
- 		dev_err(&pdev->dev, "can't register transceiver, %d\n",
- 			retval);
--		goto err_free_irq;
-+		goto err_disable_clk;
- 	}
- 
- 	retval = sysfs_create_group(&pdev->dev.kobj, &inputs_attr_group);
- 	if (retval < 0) {
- 		dev_dbg(&pdev->dev,
- 			"Can't register sysfs attr group: %d\n", retval);
--		goto err_set_transceiver;
-+		goto err_remove_phy;
- 	}
- 
- 	spin_lock_init(&mvotg->wq_lock);
-@@ -879,30 +856,15 @@ static int mv_otg_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--err_set_transceiver:
-+err_remove_phy:
- 	usb_remove_phy(&mvotg->phy);
--err_free_irq:
--	free_irq(mvotg->irq, mvotg);
- err_disable_clk:
--	if (pdata->vbus)
--		free_irq(pdata->vbus->irq, mvotg);
--	if (pdata->id)
--		free_irq(pdata->id->irq, mvotg);
- 	mv_otg_disable_internal(mvotg);
--err_unmap_capreg:
--	iounmap(mvotg->cap_regs);
--err_unmap_phyreg:
--	iounmap(mvotg->phy_regs);
- err_destroy_workqueue:
- 	flush_workqueue(mvotg->qwork);
- 	destroy_workqueue(mvotg->qwork);
--err_put_clk:
--	for (clk_i--; clk_i >= 0; clk_i--)
--		clk_put(mvotg->clk[clk_i]);
- 
- 	platform_set_drvdata(pdev, NULL);
--	kfree(otg);
--	kfree(mvotg);
- 
- 	return retval;
- }
+-	if (pdata->private_init)
+-		pdata->private_init(ehci_mv->op_regs, ehci_mv->phy_regs);
+-
+ 	dev_info(&pdev->dev,
+ 		 "successful find EHCI device with regs 0x%p irq %d"
+ 		 " working in %s mode\n", hcd->regs, hcd->irq,
 -- 
 1.7.4.1
