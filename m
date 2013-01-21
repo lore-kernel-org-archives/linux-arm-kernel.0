@@ -1,45 +1,32 @@
 From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Mon, 21 Jan 2013 13:09:31 +0100
-Subject: [PATCH 1/2] clocksource: dbx500-prcmu: use relaxed readl variant
-Message-ID: <1358770172-30125-1-git-send-email-fabio.baltieri@linaro.org>
+Date: Mon, 21 Jan 2013 13:09:32 +0100
+Subject: [PATCH 2/2] clocksource: dbx500-prcmu: comment cleanup
+In-Reply-To: <1358770172-30125-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1358770172-30125-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <1358770172-30125-2-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabin.vincent@stericsson.com>
+Remove references to the deprecated DB5500 platform.
 
-Modify clksrc_dbx500_prcmu_read to replace readl() with readl_relaxed().
-This speeds up calls to the function by about 40%.
-
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 ---
- drivers/clocksource/clksrc-dbx500-prcmu.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ drivers/clocksource/clksrc-dbx500-prcmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
-index c26c369..159f54a 100644
+index 159f54a..6879a74 100644
 --- a/drivers/clocksource/clksrc-dbx500-prcmu.c
 +++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
-@@ -33,15 +33,14 @@
- 
- static void __iomem *clksrc_dbx500_timer_base;
- 
--static cycle_t clksrc_dbx500_prcmu_read(struct clocksource *cs)
-+static cycle_t notrace clksrc_dbx500_prcmu_read(struct clocksource *cs)
- {
-+	void __iomem *base = clksrc_dbx500_timer_base;
- 	u32 count, count2;
- 
- 	do {
--		count = readl(clksrc_dbx500_timer_base +
--			      PRCMU_TIMER_DOWNCOUNT);
--		count2 = readl(clksrc_dbx500_timer_base +
--			       PRCMU_TIMER_DOWNCOUNT);
-+		count = readl_relaxed(base + PRCMU_TIMER_DOWNCOUNT);
-+		count2 = readl_relaxed(base + PRCMU_TIMER_DOWNCOUNT);
- 	} while (count2 != count);
- 
- 	/* Negate because the timer is a decrementing counter */
+@@ -10,7 +10,7 @@
+  * DBx500-PRCMU Timer
+  * The PRCMU has 5 timers which are available in a always-on
+  * power domain.  We use the Timer 4 for our always-on clock
+- * source on DB8500 and Timer 3 on DB5500.
++ * source on DB8500.
+  */
+ #include <linux/clockchips.h>
+ #include <linux/clksrc-dbx500-prcmu.h>
 -- 
 1.7.12.1
