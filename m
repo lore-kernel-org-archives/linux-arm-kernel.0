@@ -1,96 +1,151 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 21 Jan 2013 02:02:22 -0800
-Subject: [PATCH v4 7/7] ARM: Exynos: move mct driver to drivers/clocksource
+Date: Mon, 21 Jan 2013 02:02:17 -0800
+Subject: [PATCH v4 2/7] ARM: Exynos: prepare an array of MCT interrupt numbers
+ and use it
 In-Reply-To: <1358762542-19008-1-git-send-email-thomas.abraham@linaro.org>
 References: <1358762542-19008-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1358762542-19008-8-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1358762542-19008-3-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the multi core timer (mct) driver from mach-exynos to
-drivers/clocksource and update the Kconfig and makefiles.
+Instead of using soc_is_xxx macro at more than one place in the MCT
+controller driver to decide the MCT interrpt number to be setup, populate
+a table of known MCT global and local timer interrupts and use the values
+in table to setup the MCT interrupts.
 
+This also helps in adding device tree support for MCT controller driver by
+allowing the driver to retrieve interrupt numbers from device tree and
+populating them into this table, thereby supporting both legacy and dt
+functionality to co-exist.
+
+Cc: Changhwan Youn <chaos.youn@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/Kconfig                                   |    2 +-
- arch/arm/mach-exynos/Kconfig                       |    6 ------
- arch/arm/mach-exynos/Makefile                      |    2 --
- drivers/clocksource/Kconfig                        |    5 +++++
- drivers/clocksource/Makefile                       |    1 +
- .../mct.c => drivers/clocksource/exynos_mct.c      |    0
- 6 files changed, 7 insertions(+), 9 deletions(-)
- rename arch/arm/mach-exynos/mct.c => drivers/clocksource/exynos_mct.c (100%)
+ arch/arm/mach-exynos/mct.c |   57 +++++++++++++++++++++++++++----------------
+ 1 files changed, 36 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 67874b8..10676e9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1624,7 +1624,7 @@ config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP
- 	default y
--	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
-+	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !CLKSRC_EXYNOS_MCT)
- 	help
- 	  Enable support for local timers on SMP platforms, rather then the
- 	  legacy IPI broadcast method.  Local timers allows the system
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 8bdeaa5..ef06ef5 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -79,12 +79,6 @@ config SOC_EXYNOS5440
- 	help
- 	  Enable EXYNOS5440 SoC support
+diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+index 6ceb1dd..3c91511 100644
+--- a/arch/arm/mach-exynos/mct.c
++++ b/arch/arm/mach-exynos/mct.c
+@@ -66,9 +66,22 @@ enum {
+ 	MCT_INT_PPI
+ };
  
--config EXYNOS4_MCT
--	bool
--	default y
--	help
--	  Use MCT (Multi Core Timer) as kernel timers
--
- config EXYNOS_DEV_DMA
- 	bool
- 	help
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 7e53a3a..5141963 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -26,8 +26,6 @@ obj-$(CONFIG_ARCH_EXYNOS)	+= pmu.o
- 
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
- 
--obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
--
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- 
- obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-smc.o
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index a32b7a9..84bf4de 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -61,3 +61,8 @@ config CLKSRC_ARM_GENERIC
- 	def_bool y if ARM64
- 	help
- 	  This option enables support for the ARM generic timer.
++enum {
++	MCT_G0_IRQ,
++	MCT_G1_IRQ,
++	MCT_G2_IRQ,
++	MCT_G3_IRQ,
++	MCT_L0_IRQ,
++	MCT_L1_IRQ,
++	MCT_L2_IRQ,
++	MCT_L3_IRQ,
++	MCT_NR_IRQS,
++};
 +
-+config CLKSRC_EXYNOS_MCT
-+	def_bool y if ARCH_EXYNOS
-+	help
-+	  Support for Multi Core Timer controller on Exynos SoCs.
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index a33f792..248a856 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -17,5 +17,6 @@ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
- obj-$(CONFIG_SUNXI_TIMER)	+= sunxi_timer.o
-+obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
+ static void __iomem *reg_base;
+ static unsigned long clk_rate;
+ static unsigned int mct_int_type;
++static int mct_irqs[MCT_NR_IRQS];
  
- obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
-diff --git a/arch/arm/mach-exynos/mct.c b/drivers/clocksource/exynos_mct.c
-similarity index 100%
-rename from arch/arm/mach-exynos/mct.c
-rename to drivers/clocksource/exynos_mct.c
+ struct mct_clock_event_device {
+ 	struct clock_event_device *evt;
+@@ -287,11 +300,7 @@ static void exynos4_clockevent_init(void)
+ 		clockevent_delta2ns(0xf, &mct_comp_device);
+ 	mct_comp_device.cpumask = cpumask_of(0);
+ 	clockevents_register_device(&mct_comp_device);
+-
+-	if (soc_is_exynos5250())
+-		setup_irq(EXYNOS5_IRQ_MCT_G0, &mct_comp_event_irq);
+-	else
+-		setup_irq(EXYNOS4_IRQ_MCT_G0, &mct_comp_event_irq);
++	setup_irq(mct_irqs[MCT_G0_IRQ], &mct_comp_event_irq);
+ }
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+@@ -415,7 +424,6 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+ {
+ 	struct mct_clock_event_device *mevt;
+ 	unsigned int cpu = smp_processor_id();
+-	int mct_lx_irq;
+ 
+ 	mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	mevt->evt = evt;
+@@ -442,21 +450,17 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+ 
+ 	if (mct_int_type == MCT_INT_SPI) {
+ 		if (cpu == 0) {
+-			mct_lx_irq = soc_is_exynos4210() ? EXYNOS4_IRQ_MCT_L0 :
+-						EXYNOS5_IRQ_MCT_L0;
+ 			mct_tick0_event_irq.dev_id = mevt;
+-			evt->irq = mct_lx_irq;
+-			setup_irq(mct_lx_irq, &mct_tick0_event_irq);
++			evt->irq = mct_irqs[MCT_L0_IRQ];
++			setup_irq(evt->irq, &mct_tick0_event_irq);
+ 		} else {
+-			mct_lx_irq = soc_is_exynos4210() ? EXYNOS4_IRQ_MCT_L1 :
+-						EXYNOS5_IRQ_MCT_L1;
+ 			mct_tick1_event_irq.dev_id = mevt;
+-			evt->irq = mct_lx_irq;
+-			setup_irq(mct_lx_irq, &mct_tick1_event_irq);
+-			irq_set_affinity(mct_lx_irq, cpumask_of(1));
++			evt->irq = mct_irqs[MCT_L1_IRQ];
++			setup_irq(evt->irq, &mct_tick1_event_irq);
++			irq_set_affinity(evt->irq, cpumask_of(1));
+ 		}
+ 	} else {
+-		enable_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER, 0);
++		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
+ 
+ 	return 0;
+@@ -472,7 +476,7 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ 		else
+ 			remove_irq(evt->irq, &mct_tick1_event_irq);
+ 	else
+-		disable_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER);
++		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+ }
+ 
+ static struct local_timer_ops exynos4_mct_tick_ops __cpuinitdata = {
+@@ -494,11 +498,11 @@ static void __init exynos4_timer_resources(void)
+ 	if (mct_int_type == MCT_INT_PPI) {
+ 		int err;
+ 
+-		err = request_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER,
++		err = request_percpu_irq(mct_irqs[MCT_L0_IRQ],
+ 					 exynos4_mct_tick_isr, "MCT",
+ 					 &percpu_mct_tick);
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+-		     EXYNOS_IRQ_MCT_LOCALTIMER, err);
++		     mct_irqs[MCT_L0_IRQ], err);
+ 	}
+ 
+ 	local_timer_register(&exynos4_mct_tick_ops);
+@@ -512,10 +516,21 @@ void __init exynos4_timer_init(void)
+ 		return;
+ 	}
+ 
+-	if ((soc_is_exynos4210()) || (soc_is_exynos5250()))
++	if (soc_is_exynos4210()) {
++		mct_irqs[MCT_G0_IRQ] = EXYNOS4_IRQ_MCT_G0;
++		mct_irqs[MCT_L0_IRQ] = EXYNOS4_IRQ_MCT_L0;
++		mct_irqs[MCT_L1_IRQ] = EXYNOS4_IRQ_MCT_L1;
+ 		mct_int_type = MCT_INT_SPI;
+-	else
++	} else if (soc_is_exynos5250()) {
++		mct_irqs[MCT_G0_IRQ] = EXYNOS5_IRQ_MCT_G0;
++		mct_irqs[MCT_L0_IRQ] = EXYNOS5_IRQ_MCT_L0;
++		mct_irqs[MCT_L1_IRQ] = EXYNOS5_IRQ_MCT_L1;
++		mct_int_type = MCT_INT_SPI;
++	} else {
++		mct_irqs[MCT_G0_IRQ] = EXYNOS4_IRQ_MCT_G0;
++		mct_irqs[MCT_L0_IRQ] = EXYNOS_IRQ_MCT_LOCALTIMER;
+ 		mct_int_type = MCT_INT_PPI;
++	}
+ 
+ 	exynos4_timer_resources();
+ 	exynos4_clocksource_init();
 -- 
 1.7.5.4
