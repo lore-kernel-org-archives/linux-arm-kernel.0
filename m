@@ -1,42 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jan 2013 16:29:41 +0000
-Subject: Compilation problem with drivers/staging/zsmalloc when !SMP on ARM
-In-Reply-To: <CAKGA1b=whdh9=ke0efUXnJdT-op=7G1uVh82=3OxT5GoHhWvdA@mail.gmail.com>
-References: <CAKGA1b=ACTQHo9=B7EAG5nrFCO9u-J+sy7dXtYk3Rk6OUcW3cQ@mail.gmail.com>
- <20130118210859.GH23505@n2100.arm.linux.org.uk>
- <CAKGA1bmJ6c4LC=NAD4MU_rBZ2hZjf6qH=C+dqMCf0eP+2vSFdA@mail.gmail.com>
- <20130119044602.GC5391@phenom.dumpdata.com>
- <CAKGA1b=whdh9=ke0efUXnJdT-op=7G1uVh82=3OxT5GoHhWvdA@mail.gmail.com>
-Message-ID: <20130121162941.GT23505@n2100.arm.linux.org.uk>
+From: mpfj-list@mimc.co.uk (Mark Jackson)
+Date: Mon, 21 Jan 2013 16:32:13 +0000
+Subject: OMAP baseline test results for v3.8-rc4
+In-Reply-To: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
+Message-ID: <50FD6D8D.6030106@mimc.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 10:20:38AM -0600, Matt Sealey wrote:
-> See previous mail to Minchan; local_tlb_flush_kernel_range calls
-> cpu_tlb.flush_kernel_range on SMP, but a direct function call
-> ("glue(_TLB, flush_kernel_range)" which resolves to
-> v7wbi_flush_kernel_range etc. etc.) without CONFIG_SMP.
+Vaibhav / Matt
 
-Actually, that's wrong - it's got nothing to do with SMP vs non-SMP.
+On 20/01/13 21:38, Paul Walmsley wrote:
+> 
+> Here are some basic OMAP test results for Linux v3.8-rc4.
+> Logs and other details at:
+> 
+>     http://www.pwsan.com/omap/testlogs/test_v3.8-rc4/20130120122039/
 
-It's more to do with which CPUs are being supported.  If they all use one
-single cache maintanence implementation, then direct calls are used as an
-optimization.  If they require more than one cache maintanence
-implementation, they are indirect calls.  SMP really doesn't come into
-that decision.
+<snip>
 
-So:
+> Failing tests: needing investigation
+> ------------------------------------
+> 
+> Boot tests:
+> 
+> * am335xbone: hangs after "Starting kernel"
+>   - Cause unknown
+>   - http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82297.html
 
-> >> diff --git a/drivers/staging/zsmalloc/zsmalloc-main.c
-> >> b/drivers/staging/zsmalloc/zsmalloc-main.c
-> >> index 09a9d35..ecf75fb 100644
-> >         > --- a/drivers/staging/zsmalloc/zsmalloc-main.c
-> >> +++ b/drivers/staging/zsmalloc/zsmalloc-main.c
-> >> @@ -228,7 +228,7 @@ struct zs_pool {
-> >>   * mapping rather than copying
-> >>   * for object mapping.
-> >>  */
-> >> -#if defined(CONFIG_ARM)
-> >> +#if defined(CONFIG_ARM) && defined(CONFIG_SMP)
+<snip>
 
-Would be wrong.
+> Failing tests: needing local investigation (may be due to testbed issues)
+> -------------------------------------------------------------------------
+> 
+> Boot tests:
+> 
+> * AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+>   - May be fixed now, pending retest:
+>     - http://marc.info/?l=linux-omap&m=135082257727502&w=2
+>   - Not yet part of the automated test suite
+>   - Nishanth Menon & Vaibhav Hiremath report that it works for them
+>   * May be due to an old U-boot with FDT support problems used here?
+>     Pending local investigation and re-test
+
+Does anyone know when the BeagleBone support is going to be fixed in mainline ?
+
+I've just tried the latest linux-next git, and no joy.
+
+However, Matt's edma-dmaengine-am33xx-v5 branch on github seems to be working:-
+
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 3.8.0-rc3-61978-g108da76-dirty (mpfj at mpfj-nanobone) (gcc version 4.5.4
+(Buildroot 2012.11-git-00497-ge48bf89) ) #7 SMP Mon Jan 21 15:52:14 GMT 2013
+[    0.000000] CPU: ARMv7 Processor [413fc082] revision 2 (ARMv7), cr=10c53c7d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+[    0.000000] Machine: Generic AM33XX (Flattened Device Tree), model: TI AM335x BeagleBone
+
+Are we just waiting for Matt's DMA stuff to be accepted ?
+
+Cheers
+Mark J.
