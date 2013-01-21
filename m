@@ -1,39 +1,36 @@
-From: ben@fluff.org (Ben Dooks)
-Date: Mon, 21 Jan 2013 13:56:26 +0000
-Subject: [PATCH] ARM: plat-samsung: using vsnprintf instead of vsprintf
- for the limit buffer length 256
-In-Reply-To: <50FD178E.9090105@asianux.com>
-References: <50FD178E.9090105@asianux.com>
-Message-ID: <20130121135626.GP1095@trinity.fluff.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 21 Jan 2013 14:02:41 +0000
+Subject: [PATCH 1/1] ARM: ux500: Disable Power Supply and Battery
+ Management by default
+In-Reply-To: <CACRpkdYydqJ+BVsh7P411zCod+83f2pVV5tPsKfoWPYUnOVpDQ@mail.gmail.com>
+References: <1358175470-5041-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYydqJ+BVsh7P411zCod+83f2pVV5tPsKfoWPYUnOVpDQ@mail.gmail.com>
+Message-ID: <20130121140241.GA6857@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 06:25:18PM +0800, Chen Gang wrote:
+> > The AB8500 Battery Management collection of drivers are more than a
+> > little bit broken. There is lots of work still on-going in that area
+> > and it's improving day by day; however, it's not ready to be enabled
+> > by default just yet.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
->   the buff size is 256, so need use vsnprintf instead of vsprintf.
+> Is this going for fixes (v3.8?)
 > 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm/plat-samsung/pm.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-> index 1507028..8d07b45 100644
-> --- a/arch/arm/plat-samsung/pm.c
-> +++ b/arch/arm/plat-samsung/pm.c
-> @@ -51,7 +51,7 @@ void s3c_pm_dbg(const char *fmt, ...)
->  	char buff[256];
->  
->  	va_start(va, fmt);
-> -	vsprintf(buff, fmt, va);
-> +	vsnprintf(buff, 256, fmt, va);
+> For v3.9 I think you've submitted a whole lot of patches
+> actually fixing it up?
 
-How about: vsnprintf(buff, sizeof(buff), fmt, va);
+I did submit a bunch of fixes, but more are required.
 
-It means we do not end up assuming the size of 'buff' and will be correct
-if the code is changed to declare 'buff' to be a different size.
+> Anyway: Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> since you certainly know the status of this driver better than
+> me.
+
+Thanks.
 
 -- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
