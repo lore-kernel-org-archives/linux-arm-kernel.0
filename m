@@ -1,77 +1,57 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 21 Jan 2013 05:07:35 -0500
-Subject: [V4 PATCH 17/26] arm: mmp: remove usb devices from pxa168
+Date: Mon, 21 Jan 2013 05:07:38 -0500
+Subject: [V4 PATCH 20/26] usb: ehci: ehci-mv: add extern chip support
 In-Reply-To: <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
 References: <xiechao.mail@gmail.com>
  <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1358762864-9249-18-git-send-email-chao.xie@marvell.com>
+Message-ID: <1358762864-9249-21-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/mach-mmp/pxa168.c |   42 ------------------------------------------
- 1 files changed, 0 insertions(+), 42 deletions(-)
+It does the similar things as what we do for udc driver.
 
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index b7f074f..dd3a68b 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -28,7 +28,6 @@
- #include <mach/mfp.h>
- #include <linux/dma-mapping.h>
- #include <mach/pxa168.h>
--#include <mach/regs-usb.h>
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+---
+ drivers/usb/host/ehci-mv.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index be504fd..171e145 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -256,8 +256,8 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		goto err_disable_clk;
+ #endif
+ 	} else {
+-		if (pdata->set_vbus)
+-			pdata->set_vbus(1);
++		if (mv_usb2_has_extern_call(ehci_mv->mvphy, vbus, set_vbus))
++			mv_usb2_extern_call(ehci_mv->mvphy, vbus, set_vbus, 1);
  
- #include "common.h"
- #include "clock.h"
-@@ -135,47 +134,6 @@ struct platform_device pxa168_device_gpio = {
- 	.resource	= pxa168_resource_gpio,
- };
+ 		retval = usb_add_hcd(hcd, hcd->irq, IRQF_SHARED);
+ 		if (retval) {
+@@ -275,8 +275,8 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	return 0;
  
--struct resource pxa168_usb_host_resources[] = {
--	/* USB Host conroller register base */
--	[0] = {
--		.start	= PXA168_U2H_REGBASE + U2x_CAPREGS_OFFSET,
--		.end	= PXA168_U2H_REGBASE + USB_REG_RANGE,
--		.flags	= IORESOURCE_MEM,
--		.name	= "capregs",
--	},
--	/* USB PHY register base */
--	[1] = {
--		.start	= PXA168_U2H_PHYBASE,
--		.end	= PXA168_U2H_PHYBASE + USB_PHY_RANGE,
--		.flags	= IORESOURCE_MEM,
--		.name	= "phyregs",
--	},
--	[2] = {
--		.start	= IRQ_PXA168_USB2,
--		.end	= IRQ_PXA168_USB2,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static u64 pxa168_usb_host_dmamask = DMA_BIT_MASK(32);
--struct platform_device pxa168_device_usb_host = {
--	.name = "pxa-sph",
--	.id   = -1,
--	.dev  = {
--		.dma_mask = &pxa168_usb_host_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--	},
--
--	.num_resources = ARRAY_SIZE(pxa168_usb_host_resources),
--	.resource      = pxa168_usb_host_resources,
--};
--
--int __init pxa168_add_usb_host(struct mv_usb_platform_data *pdata)
--{
--	pxa168_device_usb_host.dev.platform_data = pdata;
--	return platform_device_register(&pxa168_device_usb_host);
--}
--
- void pxa168_restart(char mode, const char *cmd)
- {
- 	soft_restart(0xffff0000);
+ err_set_vbus:
+-	if (pdata->set_vbus)
+-		pdata->set_vbus(0);
++	if (mv_usb2_has_extern_call(ehci_mv->mvphy, vbus, set_vbus))
++		mv_usb2_extern_call(ehci_mv->mvphy, vbus, set_vbus, 0);
+ err_disable_clk:
+ 	mv_ehci_disable(ehci_mv);
+ err_clear_drvdata:
+@@ -299,8 +299,8 @@ static int mv_ehci_remove(struct platform_device *pdev)
+ 		otg_set_host(ehci_mv->otg->otg, NULL);
+ 
+ 	if (ehci_mv->mode == MV_USB_MODE_HOST) {
+-		if (ehci_mv->pdata->set_vbus)
+-			ehci_mv->pdata->set_vbus(0);
++		if (mv_usb2_has_extern_call(ehci_mv->mvphy, vbus, set_vbus))
++			mv_usb2_extern_call(ehci_mv->mvphy, vbus, set_vbus, 1);
+ 
+ 		mv_ehci_disable(ehci_mv);
+ 	}
 -- 
 1.7.4.1
