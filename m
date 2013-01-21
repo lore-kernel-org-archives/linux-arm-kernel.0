@@ -1,93 +1,267 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jan 2013 17:15:53 +0000
-Subject: [PATCH 00/15] ARM build regressions in v3.8
-Message-ID: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+Date: Mon, 21 Jan 2013 17:15:56 +0000
+Subject: [PATCH 03/15] ARM: samsung: fix assembly syntax for new gas
+In-Reply-To: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+Message-ID: <1358788568-11137-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I know this comes late, but we have a number of broken
-configurations in ARM in v3.8 that were still building
-in v3.7, and I'd like to get them all fixed in the
-final 3.8 release.
+Recent assembler versions complain about extraneous
+whitespace inside [] brackets. This fixes all of
+these instances for the samsung platforms. We should
+backport this to all kernels that might need to
+be built with new binutils.
 
-It would be nice if the respective maintainers could
-have a look at these patches and apply them directly
-when they are happy with them.
+arch/arm/kernel/entry-armv.S: Assembler messages:
+arch/arm/kernel/entry-armv.S:214: Error: ARM register expected -- `ldr r2,[ r6,#(0x10)]'
+arch/arm/kernel/entry-armv.S:214: Error: ARM register expected -- `ldr r0,[ r6,#(0x14)]'
+arch/arm/kernel/entry-armv.S:430: Error: ARM register expected -- `ldr r2,[ r6,#(0x10)]'
+arch/arm/kernel/entry-armv.S:430: Error: ARM register expected -- `ldr r0,[ r6,#(0x14)]'
+arch/arm/mach-s3c24xx/sleep-s3c2410.S: Assembler messages:
+arch/arm/mach-s3c24xx/sleep-s3c2410.S:48: Error: ARM register expected -- `ldr r7,[ r4 ]'
+arch/arm/mach-s3c24xx/sleep-s3c2410.S:49: Error: ARM register expected -- `ldr r8,[ r5 ]'
+arch/arm/mach-s3c24xx/sleep-s3c2410.S:50: Error: ARM register expected -- `ldr r9,[ r6 ]'
+arch/arm/mach-s3c24xx/sleep-s3c2410.S:64: Error: ARM register expected -- `streq r7,[ r4 ]'
+arch/arm/mach-s3c24xx/sleep-s3c2410.S:65: Error: ARM register expected -- `streq r8,[ r5 ]'
+arch/arm/mach-s3c24xx/sleep-s3c2410.S:66: Error: ARM register expected -- `streq r9,[ r6 ]'
+arch/arm/kernel/debug.S: Assembler messages:
+arch/arm/kernel/debug.S:83: Error: ARM register expected -- `ldr r2,[ r2,#((0x0B0)+(((0x56000000)-(0x50000000))+(0xF6000000+(0x01000000))))-((0)+(((0x56000000)-(0x50000000))+(0xF6000000+(0x01000000))))]'
+arch/arm/kernel/debug.S:83: Error: ARM register expected -- `ldr r2,[ r3,#(0x18)]'
+arch/arm/kernel/debug.S:85: Error: ARM register expected -- `ldr r2,[ r2,#((0x0B0)+(((0x56000000)-(0x50000000))+(0xF6000000+(0x01000000))))-((0)+(((0x56000000)-(0x50000000))+(0xF6000000+(0x01000000))))]'
+arch/arm/kernel/debug.S:85: Error: ARM register expected -- `ldr r2,[ r3,#(0x18)]'
+arch/arm/mach-s3c24xx/pm-h1940.S: Assembler messages:
+arch/arm/mach-s3c24xx/pm-h1940.S:33: Error: ARM register expected -- `ldr pc,[ r0,#((0x0B8)+(((0x56000000)-(0x50000000))+(0xF6000000+(0x01000000))))-(((0x56000000)-(0x50000000))+(0xF6000000+(0x01000000)))]'
+arch/arm/mach-s3c24xx/sleep-s3c2412.S: Assembler messages:
+arch/arm/mach-s3c24xx/sleep-s3c2412.S:60: Error: ARM register expected -- `ldrne r9,[ r1 ]'
+arch/arm/mach-s3c24xx/sleep-s3c2412.S:61: Error: ARM register expected -- `strne r9,[ r1 ]'
+arch/arm/mach-s3c24xx/sleep-s3c2412.S:62: Error: ARM register expected -- `ldrne r9,[ r2 ]'
+arch/arm/mach-s3c24xx/sleep-s3c2412.S:63: Error: ARM register expected -- `strne r9,[ r2 ]'
+arch/arm/mach-s3c24xx/sleep-s3c2412.S:64: Error: ARM register expected -- `ldrne r9,[ r3 ]'
+arch/arm/mach-s3c24xx/sleep-s3c2412.S:65: Error: ARM register expected -- `strne r9,[ r3 ]'
+arch/arm/kernel/debug.S:83: Error: ARM register expected -- `ldr r2,[ r3,#(0x08)]'
+arch/arm/kernel/debug.S:83: Error: ARM register expected -- `ldr r2,[ r3,#(0x18)]'
+arch/arm/kernel/debug.S:83: Error: ARM register expected -- `ldr r2,[ r3,#(0x10)]'
+arch/arm/kernel/debug.S:85: Error: ARM register expected -- `ldr r2,[ r3,#(0x08)]'
+arch/arm/kernel/debug.S:85: Error: ARM register expected -- `ldr r2,[ r3,#(0x18)]'
+arch/arm/kernel/debug.S:85: Error: ARM register expected -- `ldr r2,[ r3,#(0x10)]'
 
-The first patch in the series is strictly speaking
-not a build error but just a warning, but it is a
-particularly annoying one that came in through the
-latest binutils release rather than a kernel change.
-
-The same binutils update also broke the samsung
-and w90x900 platforms.
-
-A few of the other changes are the result of the
-imx multiplatform conversion. I'm not really fixing
-those here, just picking up the pieces. It would
-be much nicer if we could actually get those drivers
-to work again with CONFIG_MULTIPLATFORM enabled
-rather than just disabling them, but it may be
-much too late for that. At least the drivers don't
-seem to be too essential, as they are only built
-in allyesconfig but not in any of the defconfigs.
-
-	Arnd
-
-Arnd Bergmann (15):
-  ARM: compressed/head.S: work around new binutils warning
-  ARM: mvebu: build coherency_ll.S for arch=armv7-a
-  ARM: samsung: fix assembly syntax for new gas
-  ARM: w90x900: fix legacy assembly syntax
-  ASoC: fsl: fiq and dma cannot both be modules
-  clk: export __clk_get_name
-  drm/exynos: don't include plat/gpio-cfg.h
-  drm/exynos: fimd and ipp are broken on multiplatform
-  media: coda: don't build on multiplatform
-  mfd/vexpress: export vexpress_config_func_{put,get}
-  mtd: davinci_nand: fix OF support
-  USB: gadget/freescale: disable non-multiplatform drivers
-  USB: ehci: make orion and mxc bus glues coexist
-  samples/seccomp: be less stupid about cross compiling
-  staging/omapdrm: don't build on multiplatform
-
- arch/arm/boot/compressed/Makefile                |    2 +-
- arch/arm/boot/compressed/head.S                  |   12 ++++++++++++
- arch/arm/mach-mvebu/coherency_ll.S               |    1 +
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: stable at vger.kernel.org
+---
  arch/arm/mach-s3c24xx/include/mach/debug-macro.S |   12 ++++++------
  arch/arm/mach-s3c24xx/include/mach/entry-macro.S |    4 ++--
  arch/arm/mach-s3c24xx/pm-h1940.S                 |    2 +-
  arch/arm/mach-s3c24xx/sleep-s3c2410.S            |   12 ++++++------
  arch/arm/mach-s3c24xx/sleep-s3c2412.S            |   12 ++++++------
- arch/arm/mach-w90x900/include/mach/entry-macro.S |    4 ++--
  arch/arm/plat-samsung/include/plat/debug-macro.S |   18 +++++++++---------
- drivers/clk/clk.c                                |    1 +
- drivers/gpu/drm/exynos/Kconfig                   |    4 ++--
- drivers/gpu/drm/exynos/exynos_hdmi.c             |    1 -
- drivers/media/platform/Kconfig                   |    2 +-
- drivers/mfd/vexpress-config.c                    |    3 ++-
- drivers/mtd/nand/davinci_nand.c                  |    2 +-
- drivers/staging/omapdrm/Kconfig                  |    2 +-
- drivers/usb/gadget/Kconfig                       |    3 ++-
- drivers/usb/host/ehci-hcd.c                      |   16 +++++++++++++++-
- samples/seccomp/Makefile                         |    2 ++
- sound/soc/fsl/Kconfig                            |    3 +++
- 21 files changed, 76 insertions(+), 42 deletions(-)
+ 6 files changed, 30 insertions(+), 30 deletions(-)
 
+diff --git a/arch/arm/mach-s3c24xx/include/mach/debug-macro.S b/arch/arm/mach-s3c24xx/include/mach/debug-macro.S
+index 4135de8..13ed33c 100644
+--- a/arch/arm/mach-s3c24xx/include/mach/debug-macro.S
++++ b/arch/arm/mach-s3c24xx/include/mach/debug-macro.S
+@@ -40,17 +40,17 @@
+ 		addeq	\rd, \rx, #(S3C24XX_PA_GPIO - S3C24XX_PA_UART)
+ 		addne	\rd, \rx, #(S3C24XX_VA_GPIO - S3C24XX_VA_UART)
+ 		bic	\rd, \rd, #0xff000
+-		ldr	\rd, [ \rd, # S3C2410_GSTATUS1 - S3C2410_GPIOREG(0) ]
++		ldr	\rd, [\rd, # S3C2410_GSTATUS1 - S3C2410_GPIOREG(0)]
+ 		and	\rd, \rd, #0x00ff0000
+ 		teq	\rd, #0x00440000		@ is it 2440?
+ 1004:
+-		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
++		ldr	\rd, [\rx, # S3C2410_UFSTAT]
+ 		moveq	\rd, \rd, lsr #SHIFT_2440TXF
+ 		tst	\rd, #S3C2410_UFSTAT_TXFULL
+ 	.endm
+ 
+ 	.macro  fifo_full_s3c2410 rd, rx
+-		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
++		ldr	\rd, [\rx, # S3C2410_UFSTAT]
+ 		tst	\rd, #S3C2410_UFSTAT_TXFULL
+ 	.endm
+ 
+@@ -68,18 +68,18 @@
+ 		addeq	\rd, \rx, #(S3C24XX_PA_GPIO - S3C24XX_PA_UART)
+ 		addne	\rd, \rx, #(S3C24XX_VA_GPIO - S3C24XX_VA_UART)
+ 		bic	\rd, \rd, #0xff000
+-		ldr	\rd, [ \rd, # S3C2410_GSTATUS1 - S3C2410_GPIOREG(0) ]
++		ldr	\rd, [\rd, # S3C2410_GSTATUS1 - S3C2410_GPIOREG(0)]
+ 		and	\rd, \rd, #0x00ff0000
+ 		teq	\rd, #0x00440000		@ is it 2440?
+ 
+ 10000:
+-		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
++		ldr	\rd, [\rx, # S3C2410_UFSTAT]
+ 		andne	\rd, \rd, #S3C2410_UFSTAT_TXMASK
+ 		andeq	\rd, \rd, #S3C2440_UFSTAT_TXMASK
+ 	.endm
+ 
+ 	.macro fifo_level_s3c2410 rd, rx
+-		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
++		ldr	\rd, [\rx, # S3C2410_UFSTAT]
+ 		and	\rd, \rd, #S3C2410_UFSTAT_TXMASK
+ 	.endm
+ 
+diff --git a/arch/arm/mach-s3c24xx/include/mach/entry-macro.S b/arch/arm/mach-s3c24xx/include/mach/entry-macro.S
+index 7615a14..6a21bee 100644
+--- a/arch/arm/mach-s3c24xx/include/mach/entry-macro.S
++++ b/arch/arm/mach-s3c24xx/include/mach/entry-macro.S
+@@ -31,10 +31,10 @@
+ 
+ 		@@ try the interrupt offset register, since it is there
+ 
+-		ldr	\irqstat, [ \base, #INTPND ]
++		ldr	\irqstat, [\base, #INTPND ]
+ 		teq	\irqstat, #0
+ 		beq	1002f
+-		ldr	\irqnr, [ \base, #INTOFFSET ]
++		ldr	\irqnr, [\base, #INTOFFSET ]
+ 		mov	\tmp, #1
+ 		tst	\irqstat, \tmp, lsl \irqnr
+ 		bne	1001f
+diff --git a/arch/arm/mach-s3c24xx/pm-h1940.S b/arch/arm/mach-s3c24xx/pm-h1940.S
+index c93bf2d..6183a68 100644
+--- a/arch/arm/mach-s3c24xx/pm-h1940.S
++++ b/arch/arm/mach-s3c24xx/pm-h1940.S
+@@ -30,4 +30,4 @@
+ 
+ h1940_pm_return:
+ 	mov	r0, #S3C2410_PA_GPIO
+-	ldr	pc, [ r0, #S3C2410_GSTATUS3 - S3C24XX_VA_GPIO ]
++	ldr	pc, [r0, #S3C2410_GSTATUS3 - S3C24XX_VA_GPIO]
+diff --git a/arch/arm/mach-s3c24xx/sleep-s3c2410.S b/arch/arm/mach-s3c24xx/sleep-s3c2410.S
+index dd5b638..65200ae 100644
+--- a/arch/arm/mach-s3c24xx/sleep-s3c2410.S
++++ b/arch/arm/mach-s3c24xx/sleep-s3c2410.S
+@@ -45,9 +45,9 @@ ENTRY(s3c2410_cpu_suspend)
+ 	ldr	r4, =S3C2410_REFRESH
+ 	ldr	r5, =S3C24XX_MISCCR
+ 	ldr	r6, =S3C2410_CLKCON
+-	ldr	r7, [ r4 ]		@ get REFRESH (and ensure in TLB)
+-	ldr	r8, [ r5 ]		@ get MISCCR (and ensure in TLB)
+-	ldr	r9, [ r6 ]		@ get CLKCON (and ensure in TLB)
++	ldr	r7, [r4]		@ get REFRESH (and ensure in TLB)
++	ldr	r8, [r5]		@ get MISCCR (and ensure in TLB)
++	ldr	r9, [r6]		@ get CLKCON (and ensure in TLB)
+ 
+ 	orr	r7, r7, #S3C2410_REFRESH_SELF	@ SDRAM sleep command
+ 	orr	r8, r8, #S3C2410_MISCCR_SDSLEEP @ SDRAM power-down signals
+@@ -61,8 +61,8 @@ ENTRY(s3c2410_cpu_suspend)
+ 	@@ align next bit of code to cache line
+ 	.align	5
+ s3c2410_do_sleep:
+-	streq	r7, [ r4 ]			@ SDRAM sleep command
+-	streq	r8, [ r5 ]			@ SDRAM power-down config
+-	streq	r9, [ r6 ]			@ CPU sleep
++	streq	r7, [r4]			@ SDRAM sleep command
++	streq	r8, [r5]			@ SDRAM power-down config
++	streq	r9, [r6]			@ CPU sleep
+ 1:	beq	1b
+ 	mov	pc, r14
+diff --git a/arch/arm/mach-s3c24xx/sleep-s3c2412.S b/arch/arm/mach-s3c24xx/sleep-s3c2412.S
+index c82418e..5adaceb 100644
+--- a/arch/arm/mach-s3c24xx/sleep-s3c2412.S
++++ b/arch/arm/mach-s3c24xx/sleep-s3c2412.S
+@@ -57,12 +57,12 @@ s3c2412_sleep_enter1:
+ 	 * retry, as simply returning causes the system to lock.
+ 	*/
+ 
+-	ldrne	r9, [ r1 ]
+-	strne	r9, [ r1 ]
+-	ldrne	r9, [ r2 ]
+-	strne	r9, [ r2 ]
+-	ldrne	r9, [ r3 ]
+-	strne	r9, [ r3 ]
++	ldrne	r9, [r1]
++	strne	r9, [r1]
++	ldrne	r9, [r2]
++	strne	r9, [r2]
++	ldrne	r9, [r3]
++	strne	r9, [r3]
+ 	bne	s3c2412_sleep_enter1
+ 
+ 	mov	pc, r14
+diff --git a/arch/arm/plat-samsung/include/plat/debug-macro.S b/arch/arm/plat-samsung/include/plat/debug-macro.S
+index 207e275..f3a9cff 100644
+--- a/arch/arm/plat-samsung/include/plat/debug-macro.S
++++ b/arch/arm/plat-samsung/include/plat/debug-macro.S
+@@ -14,12 +14,12 @@
+ /* The S5PV210/S5PC110 implementations are as belows. */
+ 
+ 	.macro fifo_level_s5pv210 rd, rx
+-		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
++		ldr	\rd, [\rx, # S3C2410_UFSTAT]
+ 		and	\rd, \rd, #S5PV210_UFSTAT_TXMASK
+ 	.endm
+ 
+ 	.macro  fifo_full_s5pv210 rd, rx
+-		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
++		ldr	\rd, [\rx, # S3C2410_UFSTAT]
+ 		tst	\rd, #S5PV210_UFSTAT_TXFULL
+ 	.endm
+ 
+@@ -27,7 +27,7 @@
+  * most widely re-used */
+ 
+ 	.macro fifo_level_s3c2440 rd, rx
+-		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
++		ldr	\rd, [\rx, # S3C2410_UFSTAT]
+ 		and	\rd, \rd, #S3C2440_UFSTAT_TXMASK
+ 	.endm
+ 
+@@ -36,7 +36,7 @@
+ #endif
+ 
+ 	.macro  fifo_full_s3c2440 rd, rx
+-		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
++		ldr	\rd, [\rx, # S3C2410_UFSTAT]
+ 		tst	\rd, #S3C2440_UFSTAT_TXFULL
+ 	.endm
+ 
+@@ -45,11 +45,11 @@
+ #endif
+ 
+ 	.macro	senduart,rd,rx
+-		strb 	\rd, [\rx, # S3C2410_UTXH ]
++		strb 	\rd, [\rx, # S3C2410_UTXH]
+ 	.endm
+ 
+ 	.macro	busyuart, rd, rx
+-		ldr	\rd, [ \rx, # S3C2410_UFCON ]
++		ldr	\rd, [\rx, # S3C2410_UFCON]
+ 		tst	\rd, #S3C2410_UFCON_FIFOMODE	@ fifo enabled?
+ 		beq	1001f				@
+ 		@ FIFO enabled...
+@@ -60,7 +60,7 @@
+ 
+ 1001:
+ 		@ busy waiting for non fifo
+-		ldr	\rd, [ \rx, # S3C2410_UTRSTAT ]
++		ldr	\rd, [\rx, # S3C2410_UTRSTAT]
+ 		tst	\rd, #S3C2410_UTRSTAT_TXFE
+ 		beq	1001b
+ 
+@@ -68,7 +68,7 @@
+ 	.endm
+ 
+ 	.macro	waituart,rd,rx
+-		ldr	\rd, [ \rx, # S3C2410_UFCON ]
++		ldr	\rd, [\rx, # S3C2410_UFCON]
+ 		tst	\rd, #S3C2410_UFCON_FIFOMODE	@ fifo enabled?
+ 		beq	1001f				@
+ 		@ FIFO enabled...
+@@ -79,7 +79,7 @@
+ 		b	1002f
+ 1001:
+ 		@ idle waiting for non fifo
+-		ldr	\rd, [ \rx, # S3C2410_UTRSTAT ]
++		ldr	\rd, [\rx, # S3C2410_UTRSTAT]
+ 		tst	\rd, #S3C2410_UTRSTAT_TXFE
+ 		beq	1001b
+ 
 -- 
 1.7.10.4
-Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: James Morris <james.l.morris@oracle.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Rob Clark <rob@ti.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: alsa-devel at alsa-project.org
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-media at vger.kernel.org
-Cc: linux-usb at vger.kernel.org
