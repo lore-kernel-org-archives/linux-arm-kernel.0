@@ -1,38 +1,64 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 21 Jan 2013 11:17:10 -0800
-Subject: [PATCH 10/24] ab8500-chargalg: Only root should have write
- permission on sysfs file
-In-Reply-To: <1358769840-4763-11-git-send-email-lee.jones@linaro.org>
-References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
- <1358769840-4763-11-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130121191710.GB15037@lizard.mcd01528.sjc.wayport.net>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 21 Jan 2013 13:29:37 -0600
+Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
+ Armada 370/XP
+In-Reply-To: <201301211831.45947.arnd@arndb.de>
+References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
+ <1358790842-2986-4-git-send-email-gregory.clement@free-electrons.com>
+ <201301211831.45947.arnd@arndb.de>
+Message-ID: <CAKGA1b=9WQNwHOz=k13XVc=MyZT1UrcaYj8muF2A5B4eJA5+MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 12:03:46PM +0000, Lee Jones wrote:
-> Only root should have write permission on sysfs file ab8500_chargalg/chargalg.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Mon, Jan 21, 2013 at 12:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 21 January 2013, Gregory CLEMENT wrote:
+>> @@ -1624,7 +1624,7 @@ config LOCAL_TIMERS
+>>         bool "Use local timer interrupts"
+>>         depends on SMP
+>>         default y
+>> -       select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+>> +       select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARMADA_370_XP_TIMER)
+>>
+>
+> Maybe it can be written as
+>
+> config LOCAL_TIMERS
+>         bool "Use local timer interrupts"
+>         depends on SMP
+>         default y
+>
+> config HAVE_ARM_TWD
+>         depends on LOCAL_TIMERS
+>         default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+>         default y
+>
+> This will still be slightly wrong (generating extra code) on a multiplatform
+> kernel that has no platform other than MSM or EXYNOS, but the other alternative
+> would be that each platform with TWD support has to select HAVE_ARM_TWD itself.
 
-I guess it is a candidate for -stable?
+Why would having each platform with TWD support select HAVE_ARM_TWD be
+a problem?
 
-> ---
->  drivers/power/abx500_chargalg.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
-> index 2463fa0..f59bc02 100644
-> --- a/drivers/power/abx500_chargalg.c
-> +++ b/drivers/power/abx500_chargalg.c
-> @@ -1711,7 +1711,7 @@ static ssize_t abx500_chargalg_sysfs_charger(struct kobject *kobj,
->  static struct attribute abx500_chargalg_en_charger = \
->  {
->  	.name = "chargalg",
-> -	.mode = S_IWUGO,
-> +	.mode = S_IWUSR,
->  };
->  
->  static struct attribute *abx500_chargalg_chg[] = {
-> -- 
-> 1.7.9.5
-> 
+If we look at it logically, this is the most efficient solution in
+terms of brevity of the (already huge) Kconfig.
+
+On multiplatform kernels where at least one arch has TWD support, it
+will be included, and where not, it will not.
+
+It doesn't seem logical for a feature descriptor (HAVE_ARM_TWD) to
+rely on greater knowledge of what platforms may or may not support it.
+If we had to include every platform in that list it would be unwieldy.
+
+Which leads me to this; I wonder if there should be a policy document
+that basically describes what HAVE_* really is meant for, and how
+dependencies on ARCH_* (or MACH_* in the world of multiplatform)
+should be handled for architectural features? That way there's a
+little more fixed definition of how Kconfigs should be written to
+effectively support multiplatform kernels and allow people to identify
+misuses and get rid of them for multiplatform, if only just to get the
+information out of the heads of maintainers and into a file somewhere
+that we can reference... maybe it exists already but I am missing it?
+
+--
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
