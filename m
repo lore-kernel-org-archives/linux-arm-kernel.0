@@ -1,71 +1,66 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 Jan 2013 22:00:36 +0100
-Subject: [PATCH 1/2] iio: mxs: Add MX23 support into the IIO driver
-In-Reply-To: <CAHXqBFLQUY6g6p988MVkk=sRu44B5tEzDMH2UbU2n2UDda0Q-A@mail.gmail.com>
-References: <1358798722-25102-1-git-send-email-marex@denx.de>
- <CAHXqBFLQUY6g6p988MVkk=sRu44B5tEzDMH2UbU2n2UDda0Q-A@mail.gmail.com>
-Message-ID: <201301212200.36917.marex@denx.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 21 Jan 2013 13:01:50 -0800
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <201301211855.25455.arnd@arndb.de>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <201301192005.20093.arnd@arndb.de> <50FD5844.1010201@web.de>
+ <201301211855.25455.arnd@arndb.de>
+Message-ID: <20130121210150.GA9184@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Micha? Miros?aw,
-
-> 2013/1/21 Marek Vasut <marex@denx.de>:
-> > This patch adds support for i.MX23 into the LRADC driver. The LRADC
-> > block on MX23 is not much different from the one on MX28, thus this
-> > is only a few changes fixing the parts that are specific to MX23.
+On Mon, Jan 21, 2013 at 06:55:25PM +0000, Arnd Bergmann wrote:
+> On Monday 21 January 2013, Soeren Moch wrote:
+> > On 01/19/13 21:05, Arnd Bergmann wrote:
+> > > from the distribution of the numbers, it seems that there is exactly 1 MB
+> > > of data allocated between bus addresses 0x1f90000 and 0x1f9ffff, allocated
+> > > in individual pages. This matches the size of your pool, so it's definitely
+> > > something coming from USB, and no single other allocation, but it does not
+> > > directly point to a specific line of code.
+> > Very interesting, so this is no fragmentation problem nor something 
+> > caused by sata or ethernet.
 > 
-> [...]
+> Right.
 > 
-> > +struct mxs_lradc_of_config {
-> > +       const int               irq_count;
-> > +       const char * const      *irq_name;
-> > +};
-> > +
-> > +static const struct mxs_lradc_of_config const mxs_lradc_of_config[] = {
-> > +       [IMX23_LRADC] = {
-> > +               .irq_count      = ARRAY_SIZE(mx23_lradc_irq_names),
-> > +               .irq_name       = mx23_lradc_irq_names,
-> > +       },
-> > +       [IMX28_LRADC] = {
-> > +               .irq_count      = ARRAY_SIZE(mx28_lradc_irq_names),
-> > +               .irq_name       = mx28_lradc_irq_names,
-> > +       },
-> > +};
-> > +
-> > 
-> >  enum mxs_lradc_ts {
-> >  
-> >         MXS_LRADC_TOUCHSCREEN_NONE = 0,
-> >         MXS_LRADC_TOUCHSCREEN_4WIRE,
-> > 
-> > @@ -857,8 +890,19 @@ static void mxs_lradc_hw_stop(struct mxs_lradc
-> > *lradc)
-> > 
-> >                 writel(0, lradc->base + LRADC_DELAY(i));
-> >  
-> >  }
-> > 
-> > +static const struct of_device_id mxs_lradc_dt_ids[] = {
-> > +       { .compatible = "fsl,imx23-lradc", .data = (void *)IMX23_LRADC,
-> > }, +       { .compatible = "fsl,imx28-lradc", .data = (void
-> > *)IMX28_LRADC, }, +       { /* sentinel */ }
-> > +};
-> > +MODULE_DEVICE_TABLE(of, mxs_lradc_dt_ids);
-> > +
+> > > One thing I found was that the ARM dma-mapping code seems buggy in the way
+> > > that it does a bitwise and between the gfp mask and GFP_ATOMIC, which does
+> > > not work because GFP_ATOMIC is defined by the absence of __GFP_WAIT.
+> > >
+> > > I believe we need the patch below, but it is not clear to me if that issue
+> > > is related to your problem or now.
+> > Out of curiosity I checked include/linux/gfp.h. GFP_ATOMIC is defined as 
+> > __GFP_HIGH (which means 'use emergency pool', and no wait), so this 
+> > patch should not make any difference for "normal" (GPF_ATOMIC / 
+> > GFP_KERNEL) allocations, only for gfp_flags accidentally set to zero. 
 > 
-> Why not s/(void \*)\(IMX.._LRADC\)/\&mxs_lradc_of_config[\1]/ ?
+> Yes, or one of the rare cases where someone intentionally does something like
+> (GFP_ATOMIC & !__GFP_HIGH) or (GFP_KERNEL || __GFP_HIGH), which are both
+> wrong.
+> 
+> > So, can a new test with this patch help to debug the pool exhaustion?
+> 
+> Yes, but I would not expect this to change much. It's a bug, but not likely
+> the one you are hitting.
+> 
+> > > So even for a GFP_KERNEL passed into usb_submit_urb, the ehci driver
+> > > causes the low-level allocation to be GFP_ATOMIC, because
+> > > qh_append_tds() is called under a spinlock. If we have hundreds
+> > > of URBs in flight, that will exhaust the pool rather quickly.
+> > >
+> > Maybe there are hundreds of URBs in flight in my application, I have no 
+> > idea how to check this.
+> 
+> I don't know a lot about USB, but I always assumed that this was not
+> a normal condition and that there are only a couple of URBs per endpoint
+> used at a time. Maybe Greg or someone else with a USB background can
+> shed some light on this.
 
-Check the register layout, it differs between MX23 and MX28, that's one reason, 
-since were we to access differently placed registers, we can do it easily as in 
-the SSP/I2C drivers.
+There's no restriction on how many URBs a driver can have outstanding at
+once, and if you have a system with a lot of USB devices running at the
+same time, there could be lots of URBs in flight depending on the number
+of host controllers and devices and drivers being used.
 
-Moreover, there are some features on the MX28 that are not on the MX23 (like 
-voltage treshold triggers and touchbuttons), with this setup, we can easily 
-check what we're running at at runtime and determine to disallow these.
+Sorry,
 
->From my point of view, using the number (IMX23_LRADC / IMX28_LRADC) is much more 
-convenient in the long run.
-
-Best regards,
-Marek Vasut
+greg k-h
