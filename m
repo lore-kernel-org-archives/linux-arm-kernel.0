@@ -1,935 +1,598 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Jan 2013 12:04:00 +0000
-Subject: [PATCH 24/24] u8500-charger: Delay for USB enumeration
-In-Reply-To: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
-References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1358769840-4763-25-git-send-email-lee.jones@linaro.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 21 Jan 2013 14:01:58 +0100
+Subject: [PATCH 4/4 v2] pinctrl/abx500: add AB8500 pinctrl driver
+Message-ID: <1358773318-11369-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paer-Olof Haakansson <par-olof.hakansson@stericsson.com>
+From: Patrice Chotard <patrice.chotard@st.com>
 
-If charging is started before USB enumeration of an Accessory
-Charger Adapter has finished, the AB8500 will generate a
-VBUS_ERROR. This in turn results in timeouts and delays the
-enumeration with around 15 seconds. This patch delays the
-charging and then ramps currents slowly to avoid VBUS errors.
-The delay allows the enumeration to have finished before
-charging is turned on.
+This adds a subdriver for the AB8500 pinctrl portions.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Martin Sjoblom <martin.w.sjoblom@stericsson.com>
-Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
-Tested-by: Jonas ABERG <jonas.aberg@stericsson.com>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mfd/ab8500-core.c      |    6 +
- drivers/power/ab8500_charger.c |  444 ++++++++++++++++++++++++++++++----------
- 2 files changed, 343 insertions(+), 107 deletions(-)
+ChangeLog v1->v2:
+- Move definition of init functions over to this patch from
+  the core patch so we don't have unimplemented functions defined
+  in the kernel.
+- Drop a few "_ranges_" substrings wher unappropriate.
+---
+ arch/arm/mach-ux500/Kconfig      |   1 +
+ drivers/pinctrl/Kconfig          |   4 +
+ drivers/pinctrl/Makefile         |   1 +
+ drivers/pinctrl/pinctrl-ab8500.c | 485 +++++++++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-abx500.c |   3 +
+ drivers/pinctrl/pinctrl-abx500.h |  13 ++
+ 6 files changed, 507 insertions(+)
+ create mode 100644 drivers/pinctrl/pinctrl-ab8500.c
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 30b9265..4c4aa19 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -749,6 +749,12 @@ static struct resource ab8500_charger_resources[] = {
- 		.end = AB8500_INT_CH_WD_EXP,
- 		.flags = IORESOURCE_IRQ,
- 	},
-+	{
-+		.name = "VBUS_CH_DROP_END",
-+		.start = AB8500_INT_VBUS_CH_DROP_END,
-+		.end = AB8500_INT_VBUS_CH_DROP_END,
-+		.flags = IORESOURCE_IRQ,
-+	},
- };
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index 2c090d7..31f1b5a 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -19,6 +19,7 @@ config UX500_SOC_DB8500
+ 	select CPU_FREQ_TABLE if CPU_FREQ
+ 	select MFD_DB8500_PRCMU
+ 	select PINCTRL_DB8500
++	select PINCTRL_AB8500
+ 	select REGULATOR
+ 	select REGULATOR_DB8500_PRCMU
  
- static struct resource ab8500_btemp_resources[] = {
-diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-index 432f6bc..000c8cf 100644
---- a/drivers/power/ab8500_charger.c
-+++ b/drivers/power/ab8500_charger.c
-@@ -55,6 +55,7 @@
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index ba3038c..367556f 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -33,6 +33,10 @@ config PINCTRL_ABX500
+ 	help
+ 	  Select this to enable the ABx500 family IC GPIO driver
  
- #define MAIN_CH_INPUT_CURR_SHIFT	4
- #define VBUS_IN_CURR_LIM_SHIFT		4
-+#define AUTO_VBUS_IN_CURR_LIM_SHIFT	4
- 
- #define LED_INDICATOR_PWM_ENA		0x01
- #define LED_INDICATOR_PWM_DIS		0x00
-@@ -88,14 +89,13 @@
- /* Step up/down delay in us */
- #define STEP_UDELAY			1000
- 
--/* Wait for enumeration before charging in ms */
--#define WAIT_FOR_USB_ENUMERATION	5 * 1000
--
- #define CHARGER_STATUS_POLL 10 /* in ms */
- 
- #define CHG_WD_INTERVAL			(60 * HZ)
- 
- #define AB8500_SW_CONTROL_FALLBACK	0x03
-+/* Wait for enumeration before charing in us */
-+#define WAIT_ACA_RID_ENUMERATION	(5 * 1000)
- 
- /* UsbLineStatus register - usb types */
- enum ab8500_charger_link_status {
-@@ -185,12 +185,14 @@ struct ab8500_charger_event_flags {
- 	bool usbchargernotok;
- 	bool chgwdexp;
- 	bool vbus_collapse;
-+	bool vbus_drop_end;
- };
- 
- struct ab8500_charger_usb_state {
--	bool usb_changed;
- 	int usb_current;
-+	int usb_current_tmp;
- 	enum ab8500_usb_state state;
-+	enum ab8500_usb_state state_tmp;
- 	spinlock_t usb_lock;
- };
- 
-@@ -212,6 +214,10 @@ struct ab8500_charger_usb_state {
-  * @autopower		Indicate if we should have automatic pwron after pwrloss
-  * @autopower_cfg	platform specific power config support for "pwron after pwrloss"
-  * @invalid_charger_detect_state State when forcing AB to use invalid charger
-+ * @is_usb_host:	Indicate if last detected USB type is host
-+ * @is_aca_rid:		Incicate if accessory is ACA type
-+ * @current_stepping_sessions:
-+ *			Counter for current stepping sessions
-  * @parent:		Pointer to the struct ab8500
-  * @gpadc:		Pointer to the struct gpadc
-  * @bm:           	Platform specific battery management information
-@@ -223,12 +229,13 @@ struct ab8500_charger_usb_state {
-  * @usb:		Structure that holds the USB charger properties
-  * @regu:		Pointer to the struct regulator
-  * @charger_wq:		Work queue for the IRQs and checking HW state
-+ * @usb_ipt_crnt_lock:	Lock to protect VBUS input current setting from mutuals
-+ * @pm_lock:		Lock to prevent system to suspend
-  * @check_vbat_work	Work for checking vbat threshold to adjust vbus current
-  * @check_hw_failure_work:	Work for checking HW state
-  * @check_usbchgnotok_work:	Work for checking USB charger not ok status
-  * @kick_wd_work:		Work for kicking the charger watchdog in case
-  *				of ABB rev 1.* due to the watchog logic bug
-- * @attach_work:		Work for checking the usb enumeration
-  * @ac_charger_attached_work:	Work for checking if AC charger is still
-  *				connected
-  * @usb_charger_attached_work:	Work for checking if USB charger is still
-@@ -237,6 +244,8 @@ struct ab8500_charger_usb_state {
-  * @detect_usb_type_work:	Work for detecting the USB type connected
-  * @usb_link_status_work:	Work for checking the new USB link status
-  * @usb_state_changed_work:	Work for checking USB state
-+ * @attach_work:		Work for detecting USB type
-+ * @vbus_drop_end_work:		Work for detecting VBUS drop end
-  * @check_main_thermal_prot_work:
-  *				Work for checking Main thermal status
-  * @check_usb_thermal_prot_work:
-@@ -257,6 +266,9 @@ struct ab8500_charger {
- 	bool autopower;
- 	bool autopower_cfg;
- 	int invalid_charger_detect_state;
-+	bool is_usb_host;
-+	int is_aca_rid;
-+	atomic_t current_stepping_sessions;
- 	struct ab8500 *parent;
- 	struct ab8500_gpadc *gpadc;
- 	struct abx500_bm_data *bm;
-@@ -268,17 +280,20 @@ struct ab8500_charger {
- 	struct ab8500_charger_info usb;
- 	struct regulator *regu;
- 	struct workqueue_struct *charger_wq;
-+	struct mutex usb_ipt_crnt_lock;
-+	struct wake_lock pm_lock;
- 	struct delayed_work check_vbat_work;
- 	struct delayed_work check_hw_failure_work;
- 	struct delayed_work check_usbchgnotok_work;
- 	struct delayed_work kick_wd_work;
-+	struct delayed_work usb_state_changed_work;
- 	struct delayed_work attach_work;
- 	struct delayed_work ac_charger_attached_work;
- 	struct delayed_work usb_charger_attached_work;
-+	struct delayed_work vbus_drop_end_work;
- 	struct work_struct ac_work;
- 	struct work_struct detect_usb_type_work;
- 	struct work_struct usb_link_status_work;
--	struct work_struct usb_state_changed_work;
- 	struct work_struct check_main_thermal_prot_work;
- 	struct work_struct check_usb_thermal_prot_work;
- 	struct usb_phy *usb_phy;
-@@ -568,6 +583,7 @@ static int ab8500_charger_usb_cv(struct ab8500_charger *di)
- /**
-  * ab8500_charger_detect_chargers() - Detect the connected chargers
-  * @di:		pointer to the ab8500_charger structure
-+ * @probe:	if probe, don't delay and wait for HW
-  *
-  * Returns the type of charger connected.
-  * For USB it will not mean we can actually charge from it
-@@ -581,7 +597,7 @@ static int ab8500_charger_usb_cv(struct ab8500_charger *di)
-  * USB_PW_CONN  if the USB power supply is connected
-  * AC_PW_CONN + USB_PW_CONN if USB and AC power supplies are both connected
-  */
--static int ab8500_charger_detect_chargers(struct ab8500_charger *di)
-+static int ab8500_charger_detect_chargers(struct ab8500_charger *di, bool probe)
- {
- 	int result = NO_PW_CONN;
- 	int ret;
-@@ -599,13 +615,25 @@ static int ab8500_charger_detect_chargers(struct ab8500_charger *di)
- 		result = AC_PW_CONN;
- 
- 	/* Check for USB charger */
++config PINCTRL_AB8500
++	bool "AB8500 pin controller driver"
++	depends on PINCTRL_ABX500 && ARCH_U8500
 +
-+	if (!probe) {
-+		/*
-+		 * AB8500 says VBUS_DET_DBNC1 & VBUS_DET_DBNC100
-+		 * when disconnecting ACA even though no
-+		 * charger was connected. Try waiting a little
-+		 * longer than the 100 ms of VBUS_DET_DBNC100...
-+		 */
-+		msleep(110);
-+	}
- 	ret = abx500_get_register_interruptible(di->dev, AB8500_CHARGER,
- 		AB8500_CH_USBCH_STAT1_REG, &val);
- 	if (ret < 0) {
- 		dev_err(di->dev, "%s ab8500 read failed\n", __func__);
- 		return ret;
- 	}
--
-+	dev_dbg(di->dev,
-+		"%s AB8500_CH_USBCH_STAT1_REG %x\n", __func__,
-+		val);
- 	if ((val & VBUS_DET_DBNC1) && (val & VBUS_DET_DBNC100))
- 		result |= USB_PW_CONN;
- 
-@@ -628,33 +656,47 @@ static int ab8500_charger_max_usb_curr(struct ab8500_charger *di,
- 
- 	di->usb_device_is_unrecognised = false;
- 
-+	/*
-+	 * Platform only supports USB 2.0.
-+	 * This means that charging current from USB source
-+	 * is maximum 500 mA. Every occurence of USB_STAT_*_HOST_*
-+	 * should set USB_CH_IP_CUR_LVL_0P5.
-+	 */
-+
- 	switch (link_status) {
- 	case USB_STAT_STD_HOST_NC:
- 	case USB_STAT_STD_HOST_C_NS:
- 	case USB_STAT_STD_HOST_C_S:
- 		dev_dbg(di->dev, "USB Type - Standard host is "
--				"detected through USB driver\n");
--		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P09;
-+			"detected through USB driver\n");
-+		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P5;
-+		di->is_usb_host = true;
-+		di->is_aca_rid = 0;
- 		break;
- 	case USB_STAT_HOST_CHG_HS_CHIRP:
- 		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P5;
--		dev_dbg(di->dev, "USB Type - 0x%02x MaxCurr: %d", link_status,
--				di->max_usb_in_curr);
-+		di->is_usb_host = true;
-+		di->is_aca_rid = 0;
- 		break;
- 	case USB_STAT_HOST_CHG_HS:
-+		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P5;
-+		di->is_usb_host = true;
-+		di->is_aca_rid = 0;
-+		break;
- 	case USB_STAT_ACA_RID_C_HS:
- 		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P9;
--		dev_dbg(di->dev, "USB Type - 0x%02x MaxCurr: %d", link_status,
--				di->max_usb_in_curr);
-+		di->is_usb_host = false;
-+		di->is_aca_rid = 0;
- 		break;
- 	case USB_STAT_ACA_RID_A:
- 		/*
- 		 * Dedicated charger level minus maximum current accessory
--		 * can consume (300mA). Closest level is 1100mA
-+		 * can consume (900mA). Closest level is 500mA
- 		 */
--		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_1P1;
--		dev_dbg(di->dev, "USB Type - 0x%02x MaxCurr: %d", link_status,
--				di->max_usb_in_curr);
-+		dev_dbg(di->dev, "USB_STAT_ACA_RID_A detected\n");
-+		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P5;
-+		di->is_usb_host = false;
-+		di->is_aca_rid = 1;
- 		break;
- 	case USB_STAT_ACA_RID_B:
- 		/*
-@@ -664,14 +706,24 @@ static int ab8500_charger_max_usb_curr(struct ab8500_charger *di,
- 		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_1P3;
- 		dev_dbg(di->dev, "USB Type - 0x%02x MaxCurr: %d", link_status,
- 				di->max_usb_in_curr);
-+		di->is_usb_host = false;
-+		di->is_aca_rid = 1;
- 		break;
- 	case USB_STAT_HOST_CHG_NM:
-+		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_0P5;
-+		di->is_usb_host = true;
-+		di->is_aca_rid = 0;
-+		break;
- 	case USB_STAT_DEDICATED_CHG:
--	case USB_STAT_ACA_RID_C_NM:
-+		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_1P5;
-+		di->is_usb_host = false;
-+		di->is_aca_rid = 0;
-+		break;
- 	case USB_STAT_ACA_RID_C_HS_CHIRP:
-+	case USB_STAT_ACA_RID_C_NM:
- 		di->max_usb_in_curr = USB_CH_IP_CUR_LVL_1P5;
--		dev_dbg(di->dev, "USB Type - 0x%02x MaxCurr: %d", link_status,
--				di->max_usb_in_curr);
-+		di->is_usb_host = false;
-+		di->is_aca_rid = 1;
- 		break;
- 	case USB_STAT_NOT_CONFIGURED:
- 		if (di->vbus_detected) {
-@@ -788,6 +840,8 @@ static int ab8500_charger_detect_usb_type(struct ab8500_charger *di)
- 		ret = abx500_get_register_interruptible(di->dev,
- 			AB8500_INTERRUPT, AB8500_IT_SOURCE21_REG,
- 			&val);
-+		dev_dbg(di->dev, "%s AB8500_IT_SOURCE21_REG %x\n",
-+			__func__, val);
- 		if (ret < 0) {
- 			dev_err(di->dev, "%s ab8500 read failed\n", __func__);
- 			return ret;
-@@ -803,6 +857,8 @@ static int ab8500_charger_detect_usb_type(struct ab8500_charger *di)
- 			dev_err(di->dev, "%s ab8500 read failed\n", __func__);
- 			return ret;
- 		}
-+		dev_dbg(di->dev, "%s AB8500_USB_LINE_STAT_REG %x\n", __func__,
-+			val);
- 		/*
- 		 * Until the IT source register is read the UsbLineStatus
- 		 * register is not updated, hence doing the same
-@@ -1062,69 +1118,125 @@ static int ab8500_charger_get_usb_cur(struct ab8500_charger *di)
- static int ab8500_charger_set_current(struct ab8500_charger *di,
- 	int ich, int reg)
- {
--	int ret, i;
--	int curr_index, prev_curr_index, shift_value;
-+	int ret = 0;
-+	int auto_curr_index, curr_index, prev_curr_index, shift_value, i;
- 	u8 reg_value;
-+	u32 step_udelay;
-+	bool no_stepping = false;
-+
-+	atomic_inc(&di->current_stepping_sessions);
-+
-+	ret = abx500_get_register_interruptible(di->dev, AB8500_CHARGER,
-+		reg, &reg_value);
-+	if (ret < 0) {
-+		dev_err(di->dev, "%s read failed\n", __func__);
-+		goto exit_set_current;
-+	}
- 
- 	switch (reg) {
- 	case AB8500_MCH_IPT_CURLVL_REG:
- 		shift_value = MAIN_CH_INPUT_CURR_SHIFT;
-+		prev_curr_index = (reg_value >> shift_value);
- 		curr_index = ab8500_current_to_regval(ich);
-+		step_udelay = STEP_UDELAY;
-+		if (!di->ac.charger_connected)
-+			no_stepping = true;
- 		break;
- 	case AB8500_USBCH_IPT_CRNTLVL_REG:
- 		shift_value = VBUS_IN_CURR_LIM_SHIFT;
-+		prev_curr_index = (reg_value >> shift_value);
- 		curr_index = ab8500_vbus_in_curr_to_regval(ich);
-+		step_udelay = STEP_UDELAY * 100;
-+
-+		ret = abx500_get_register_interruptible(di->dev, AB8500_CHARGER,
-+					AB8500_CH_USBCH_STAT2_REG, &reg_value);
-+		if (ret < 0) {
-+			dev_err(di->dev, "%s read failed\n", __func__);
-+			goto exit_set_current;
-+		}
-+		auto_curr_index =
-+			reg_value >> AUTO_VBUS_IN_CURR_LIM_SHIFT;
-+
-+		dev_dbg(di->dev, "%s Auto VBUS curr is %d mA\n",
-+			__func__,
-+			ab8500_charger_vbus_in_curr_map[auto_curr_index]);
-+
-+		prev_curr_index = min(prev_curr_index, auto_curr_index);
-+
-+		if (!di->usb.charger_connected)
-+			no_stepping = true;
- 		break;
- 	case AB8500_CH_OPT_CRNTLVL_REG:
- 		shift_value = 0;
-+		prev_curr_index = (reg_value >> shift_value);
- 		curr_index = ab8500_current_to_regval(ich);
-+		step_udelay = STEP_UDELAY;
-+		if (curr_index && (curr_index - prev_curr_index) > 1)
-+			step_udelay *= 100;
-+
-+		if (!di->usb.charger_connected && !di->ac.charger_connected)
-+			no_stepping = true;
-+
- 		break;
- 	default:
- 		dev_err(di->dev, "%s current register not valid\n", __func__);
--		return -ENXIO;
-+		ret = -ENXIO;
-+		goto exit_set_current;
- 	}
- 
- 	if (curr_index < 0) {
- 		dev_err(di->dev, "requested current limit out-of-range\n");
--		return -ENXIO;
--	}
--
--	ret = abx500_get_register_interruptible(di->dev, AB8500_CHARGER,
--		reg, &reg_value);
--	if (ret < 0) {
--		dev_err(di->dev, "%s read failed\n", __func__);
--		return ret;
-+		ret = -ENXIO;
-+		goto exit_set_current;
- 	}
--	prev_curr_index = (reg_value >> shift_value);
- 
- 	/* only update current if it's been changed */
--	if (prev_curr_index == curr_index)
--		return 0;
-+	if (prev_curr_index == curr_index) {
-+		dev_dbg(di->dev, "%s current not changed for reg: 0x%02x\n",
-+			__func__, reg);
-+		ret = 0;
-+		goto exit_set_current;
-+	}
- 
- 	dev_dbg(di->dev, "%s set charger current: %d mA for reg: 0x%02x\n",
- 		__func__, ich, reg);
- 
--	if (prev_curr_index > curr_index) {
-+	if (no_stepping) {
-+		ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER,
-+					reg, (u8)curr_index << shift_value);
-+		if (ret)
-+			dev_err(di->dev, "%s write failed\n", __func__);
-+	} else if (prev_curr_index > curr_index) {
- 		for (i = prev_curr_index - 1; i >= curr_index; i--) {
-+			dev_dbg(di->dev, "curr change_1 to: %x for 0x%02x\n",
-+				(u8) i << shift_value, reg);
- 			ret = abx500_set_register_interruptible(di->dev,
--				AB8500_CHARGER, reg, (u8) i << shift_value);
-+				AB8500_CHARGER, reg, (u8)i << shift_value);
- 			if (ret) {
- 				dev_err(di->dev, "%s write failed\n", __func__);
--				return ret;
-+				goto exit_set_current;
- 			}
--			usleep_range(STEP_UDELAY, STEP_UDELAY * 2);
-+			if (i != curr_index)
-+				usleep_range(step_udelay, step_udelay * 2);
- 		}
- 	} else {
- 		for (i = prev_curr_index + 1; i <= curr_index; i++) {
-+			dev_dbg(di->dev, "curr change_2 to: %x for 0x%02x\n",
-+				(u8)i << shift_value, reg);
- 			ret = abx500_set_register_interruptible(di->dev,
--				AB8500_CHARGER, reg, (u8) i << shift_value);
-+				AB8500_CHARGER, reg, (u8)i << shift_value);
- 			if (ret) {
- 				dev_err(di->dev, "%s write failed\n", __func__);
--				return ret;
-+				goto exit_set_current;
- 			}
--			usleep_range(STEP_UDELAY, STEP_UDELAY * 2);
-+			if (i != curr_index)
-+				usleep_range(step_udelay, step_udelay * 2);
- 		}
- 	}
-+
-+exit_set_current:
-+	atomic_dec(&di->current_stepping_sessions);
-+
- 	return ret;
- }
- 
-@@ -1140,6 +1252,7 @@ static int ab8500_charger_set_vbus_in_curr(struct ab8500_charger *di,
- 		int ich_in)
- {
- 	int min_value;
-+	int ret;
- 
- 	/* We should always use to lowest current limit */
- 	min_value = min(di->bm->chg_params->usb_curr_max, ich_in);
-@@ -1157,8 +1270,14 @@ static int ab8500_charger_set_vbus_in_curr(struct ab8500_charger *di,
- 		break;
- 	}
- 
--	return ab8500_charger_set_current(di, min_value,
-+	dev_info(di->dev, "VBUS input current limit set to %d mA\n", min_value);
-+
-+	mutex_lock(&di->usb_ipt_crnt_lock);
-+	ret = ab8500_charger_set_current(di, min_value,
- 		AB8500_USBCH_IPT_CRNTLVL_REG);
-+	mutex_unlock(&di->usb_ipt_crnt_lock);
-+
-+	return ret;
- }
- 
- /**
-@@ -1469,25 +1588,13 @@ static int ab8500_charger_usb_en(struct ux500_charger *charger,
- 			dev_err(di->dev, "%s write failed\n", __func__);
- 			return ret;
- 		}
--		/* USBChInputCurr: current that can be drawn from the usb */
--		ret = ab8500_charger_set_vbus_in_curr(di, di->max_usb_in_curr);
--		if (ret) {
--			dev_err(di->dev, "setting USBChInputCurr failed\n");
--			return ret;
--		}
--		/* ChOutputCurentLevel: protected output current */
--		ret = ab8500_charger_set_output_curr(di, ich_out);
--		if (ret) {
--			dev_err(di->dev, "%s "
--				"Failed to set ChOutputCurentLevel\n",
--				__func__);
--			return ret;
--		}
- 		/* Check if VBAT overshoot control should be enabled */
- 		if (!di->bm->enable_overshoot)
- 			overshoot = USB_CHG_NO_OVERSHOOT_ENA_N;
- 
- 		/* Enable USB Charger */
-+		dev_dbg(di->dev,
-+			"Enabling USB with write to AB8500_USBCH_CTRL1_REG\n");
- 		ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER,
- 			AB8500_USBCH_CTRL1_REG, USB_CH_ENA | overshoot);
- 		if (ret) {
-@@ -1500,11 +1607,29 @@ static int ab8500_charger_usb_en(struct ux500_charger *charger,
- 		if (ret < 0)
- 			dev_err(di->dev, "failed to enable LED\n");
- 
-+		di->usb.charger_online = 1;
-+
-+		/* USBChInputCurr: current that can be drawn from the usb */
-+		ret = ab8500_charger_set_vbus_in_curr(di, di->max_usb_in_curr);
-+		if (ret) {
-+			dev_err(di->dev, "setting USBChInputCurr failed\n");
-+			return ret;
-+		}
-+
-+		/* ChOutputCurentLevel: protected output current */
-+		ret = ab8500_charger_set_output_curr(di, ich_out);
-+		if (ret) {
-+			dev_err(di->dev, "%s "
-+				"Failed to set ChOutputCurentLevel\n",
-+				__func__);
-+			return ret;
-+		}
-+
- 		queue_delayed_work(di->charger_wq, &di->check_vbat_work, HZ);
- 
--		di->usb.charger_online = 1;
- 	} else {
- 		/* Disable USB charging */
-+		dev_dbg(di->dev, "%s Disabled USB charging\n", __func__);
- 		ret = abx500_set_register_interruptible(di->dev,
- 			AB8500_CHARGER,
- 			AB8500_USBCH_CTRL1_REG, 0);
-@@ -1517,7 +1642,21 @@ static int ab8500_charger_usb_en(struct ux500_charger *charger,
- 		ret = ab8500_charger_led_en(di, false);
- 		if (ret < 0)
- 			dev_err(di->dev, "failed to disable LED\n");
-+		/* USBChInputCurr: current that can be drawn from the usb */
-+		ret = ab8500_charger_set_vbus_in_curr(di, 0);
-+		if (ret) {
-+			dev_err(di->dev, "setting USBChInputCurr failed\n");
-+			return ret;
-+		}
- 
-+		/* ChOutputCurentLevel: protected output current */
-+		ret = ab8500_charger_set_output_curr(di, 0);
-+		if (ret) {
-+			dev_err(di->dev, "%s "
-+				"Failed to reset ChOutputCurentLevel\n",
-+				__func__);
-+			return ret;
-+		}
- 		di->usb.charger_online = 0;
- 		di->usb.wd_expired = false;
- 
-@@ -1800,7 +1939,7 @@ static void ab8500_charger_ac_work(struct work_struct *work)
- 	 * synchronously, we have the check if the main charger is
- 	 * connected by reading the status register
- 	 */
--	ret = ab8500_charger_detect_chargers(di);
-+	ret = ab8500_charger_detect_chargers(di, false);
- 	if (ret < 0)
- 		return;
- 
-@@ -1911,16 +2050,18 @@ static void ab8500_charger_detect_usb_type_work(struct work_struct *work)
- 	 * synchronously, we have the check if is
- 	 * connected by reading the status register
- 	 */
--	ret = ab8500_charger_detect_chargers(di);
-+	ret = ab8500_charger_detect_chargers(di, false);
- 	if (ret < 0)
- 		return;
- 
- 	if (!(ret & USB_PW_CONN)) {
--		di->vbus_detected = 0;
-+		dev_dbg(di->dev, "%s di->vbus_detected = false\n", __func__);
-+		di->vbus_detected = false;
- 		ab8500_charger_set_usb_connected(di, false);
- 		ab8500_power_supply_changed(di, &di->usb_chg.psy);
- 	} else {
--		di->vbus_detected = 1;
-+		dev_dbg(di->dev, "%s di->vbus_detected = true\n", __func__);
-+		di->vbus_detected = true;
- 
- 		if (is_ab8500_1p1_or_earlier(di->parent)) {
- 			ret = ab8500_charger_detect_usb_type(di);
-@@ -1930,7 +2071,8 @@ static void ab8500_charger_detect_usb_type_work(struct work_struct *work)
- 							    &di->usb_chg.psy);
- 			}
- 		} else {
--			/* For ABB cut2.0 and onwards we have an IRQ,
-+			/*
-+			 * For ABB cut2.0 and onwards we have an IRQ,
- 			 * USB_LINK_STATUS that will be triggered when the USB
- 			 * link status changes. The exception is USB connected
- 			 * during startup. Then we don't get a
-@@ -1951,7 +2093,7 @@ static void ab8500_charger_detect_usb_type_work(struct work_struct *work)
- }
- 
- /**
-- * ab8500_charger_usb_link_attach_work() - delayd work to detect USB type
-+ * ab8500_charger_usb_link_attach_work() - work to detect USB type
-  * @work:	pointer to the work_struct structure
-  *
-  * Detect the type of USB plugged
-@@ -1993,7 +2135,7 @@ static void ab8500_charger_usb_link_status_work(struct work_struct *work)
- 	 * synchronously, we have the check if  is
- 	 * connected by reading the status register
- 	 */
--	detected_chargers = ab8500_charger_detect_chargers(di);
-+	detected_chargers = ab8500_charger_detect_chargers(di, false);
- 	if (detected_chargers < 0)
- 		return;
- 
-@@ -2042,32 +2184,46 @@ static void ab8500_charger_usb_link_status_work(struct work_struct *work)
- 	}
- 
- 	if (!(detected_chargers & USB_PW_CONN)) {
--		di->vbus_detected = 0;
-+		di->vbus_detected = false;
- 		ab8500_charger_set_usb_connected(di, false);
- 		ab8500_power_supply_changed(di, &di->usb_chg.psy);
- 		return;
- 	}
- 
--	di->vbus_detected = 1;
-+	dev_dbg(di->dev,"%s di->vbus_detected = true\n",__func__);
-+	di->vbus_detected = true;
- 	ret = ab8500_charger_read_usb_type(di);
--	if (!ret) {
--		if (di->usb_device_is_unrecognised) {
--			dev_dbg(di->dev,
--				"Potential Legacy Charger device. "
--				"Delay work for %d msec for USB enum "
--				"to finish",
--				WAIT_FOR_USB_ENUMERATION);
--			queue_delayed_work(di->charger_wq,
--					   &di->attach_work,
--					   msecs_to_jiffies(WAIT_FOR_USB_ENUMERATION));
--		} else {
--			queue_delayed_work(di->charger_wq,
--					   &di->attach_work, 0);
-+	if (ret) {
-+		if (ret == -ENXIO) {
-+			/* No valid charger type detected */
-+			ab8500_charger_set_usb_connected(di, false);
-+			ab8500_power_supply_changed(di, &di->usb_chg.psy);
- 		}
--	} else if (ret == -ENXIO) {
--		/* No valid charger type detected */
--		ab8500_charger_set_usb_connected(di, false);
--		ab8500_power_supply_changed(di, &di->usb_chg.psy);
-+		return;
-+	}
-+
-+	if (di->usb_device_is_unrecognised) {
-+		dev_dbg(di->dev,
-+			"Potential Legacy Charger device. "
-+			"Delay work for %d msec for USB enum "
-+			"to finish",
-+			WAIT_ACA_RID_ENUMERATION);
-+		queue_delayed_work(di->charger_wq,
-+				   &di->attach_work,
-+				   msecs_to_jiffies(WAIT_ACA_RID_ENUMERATION));
-+	} else if (di->is_aca_rid == 1) {
-+		/* Only wait once */
-+		di->is_aca_rid++;
-+		dev_dbg(di->dev,
-+			"%s Wait %d msec for USB enum to finish",
-+			__func__, WAIT_ACA_RID_ENUMERATION);
-+		queue_delayed_work(di->charger_wq,
-+				   &di->attach_work,
-+				   msecs_to_jiffies(WAIT_ACA_RID_ENUMERATION));
-+	} else {
-+		queue_delayed_work(di->charger_wq,
-+				   &di->attach_work,
-+				   0);
- 	}
- }
- 
-@@ -2077,24 +2233,20 @@ static void ab8500_charger_usb_state_changed_work(struct work_struct *work)
- 	unsigned long flags;
- 
- 	struct ab8500_charger *di = container_of(work,
--		struct ab8500_charger, usb_state_changed_work);
-+		struct ab8500_charger, usb_state_changed_work.work);
- 
--	if (!di->vbus_detected)
-+	if (!di->vbus_detected)	{
-+		dev_dbg(di->dev,
-+			"%s !di->vbus_detected\n",
-+			__func__);
- 		return;
-+	}
- 
- 	spin_lock_irqsave(&di->usb_state.usb_lock, flags);
--	di->usb_state.usb_changed = false;
-+	di->usb_state.state = di->usb_state.state_tmp;
-+	di->usb_state.usb_current = di->usb_state.usb_current_tmp;
- 	spin_unlock_irqrestore(&di->usb_state.usb_lock, flags);
- 
--	/*
--	 * wait for some time until you get updates from the usb stack
--	 * and negotiations are completed
--	 */
--	msleep(250);
--
--	if (di->usb_state.usb_changed)
--		return;
--
- 	dev_dbg(di->dev, "%s USB state: 0x%02x mA: %d\n",
- 		__func__, di->usb_state.state, di->usb_state.usb_current);
- 
-@@ -2336,6 +2488,21 @@ static irqreturn_t ab8500_charger_mainchthprotf_handler(int irq, void *_di)
- 	return IRQ_HANDLED;
- }
- 
-+static void ab8500_charger_vbus_drop_end_work(struct work_struct *work)
-+{
-+	struct ab8500_charger *di = container_of(work,
-+		struct ab8500_charger, vbus_drop_end_work.work);
-+
-+	di->flags.vbus_drop_end = false;
-+
-+	/* Reset the drop counter */
-+	abx500_set_register_interruptible(di->dev,
-+				  AB8500_CHARGER, AB8500_CHARGER_CTRL, 0x01);
-+
-+	if (di->usb.charger_connected)
-+		ab8500_charger_set_vbus_in_curr(di, di->max_usb_in_curr);
-+}
-+
- /**
-  * ab8500_charger_vbusdetf_handler() - VBUS falling detected
-  * @irq:       interrupt number
-@@ -2347,6 +2514,7 @@ static irqreturn_t ab8500_charger_vbusdetf_handler(int irq, void *_di)
- {
- 	struct ab8500_charger *di = _di;
- 
-+	di->vbus_detected = false;
- 	dev_dbg(di->dev, "VBUS falling detected\n");
- 	queue_work(di->charger_wq, &di->detect_usb_type_work);
- 
-@@ -2366,6 +2534,16 @@ static irqreturn_t ab8500_charger_vbusdetr_handler(int irq, void *_di)
- 
- 	di->vbus_detected = true;
- 	dev_dbg(di->dev, "VBUS rising detected\n");
-+
-+	/*
-+	 * When already called suspend handler we can not guarantee that
-+	 * USB detect type work is able to run complete.
-+	 * Need to wake lock with timeout to make sure work is starting to
-+	 * execute. Upon suspend and work is not complete it will be handled
-+	 * by flushing the work.
-+	 */
-+	wake_lock_timeout(&di->pm_lock, HZ / 2);
-+
- 	queue_work(di->charger_wq, &di->detect_usb_type_work);
- 
- 	return IRQ_HANDLED;
-@@ -2474,6 +2652,25 @@ static irqreturn_t ab8500_charger_chwdexp_handler(int irq, void *_di)
- }
- 
- /**
-+ * ab8500_charger_vbuschdropend_handler() - VBUS drop removed
-+ * @irq:       interrupt number
-+ * @_di:       pointer to the ab8500_charger structure
+ config PINCTRL_AT91
+ 	bool "AT91 pinctrl driver"
+ 	depends on OF
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index ead4fa7..aad5c93 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_PINCTRL)		+= devicetree.o
+ endif
+ obj-$(CONFIG_GENERIC_PINCONF)	+= pinconf-generic.o
+ obj-$(CONFIG_PINCTRL_ABX500)	+= pinctrl-abx500.o
++obj-$(CONFIG_PINCTRL_AB8500)	+= pinctrl-ab8500.o
+ obj-$(CONFIG_PINCTRL_AT91)	+= pinctrl-at91.o
+ obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
+ obj-$(CONFIG_PINCTRL_IMX)	+= pinctrl-imx.o
+diff --git a/drivers/pinctrl/pinctrl-ab8500.c b/drivers/pinctrl/pinctrl-ab8500.c
+new file mode 100644
+index 0000000..c4a40a8
+--- /dev/null
++++ b/drivers/pinctrl/pinctrl-ab8500.c
+@@ -0,0 +1,485 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2012
 + *
-+ * Returns IRQ status(IRQ_HANDLED)
++ * Author: Patrice Chotard <patrice.chotard@stericsson.com> for ST-Ericsson.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+static irqreturn_t ab8500_charger_vbuschdropend_handler(int irq, void *_di)
++
++#include <linux/kernel.h>
++#include <linux/gpio.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/mfd/abx500/ab8500.h>
++#include "pinctrl-abx500.h"
++
++/* All the pins that can be used for GPIO and some other functions */
++#define ABX500_GPIO(offset)		(offset)
++
++#define AB8500_PIN_T10		ABX500_GPIO(1)
++#define AB8500_PIN_T9		ABX500_GPIO(2)
++#define AB8500_PIN_U9		ABX500_GPIO(3)
++#define AB8500_PIN_W2		ABX500_GPIO(4)
++/* hole */
++#define AB8500_PIN_Y18		ABX500_GPIO(6)
++#define AB8500_PIN_AA20		ABX500_GPIO(7)
++#define AB8500_PIN_W18		ABX500_GPIO(8)
++#define AB8500_PIN_AA19		ABX500_GPIO(9)
++#define AB8500_PIN_U17		ABX500_GPIO(10)
++#define AB8500_PIN_AA18		ABX500_GPIO(11)
++#define AB8500_PIN_U16		ABX500_GPIO(12)
++#define AB8500_PIN_W17		ABX500_GPIO(13)
++#define AB8500_PIN_F14		ABX500_GPIO(14)
++#define AB8500_PIN_B17		ABX500_GPIO(15)
++#define AB8500_PIN_F15		ABX500_GPIO(16)
++#define AB8500_PIN_P5		ABX500_GPIO(17)
++#define AB8500_PIN_R5		ABX500_GPIO(18)
++#define AB8500_PIN_U5		ABX500_GPIO(19)
++#define AB8500_PIN_T5		ABX500_GPIO(20)
++#define AB8500_PIN_H19		ABX500_GPIO(21)
++#define AB8500_PIN_G20		ABX500_GPIO(22)
++#define AB8500_PIN_G19		ABX500_GPIO(23)
++#define AB8500_PIN_T14		ABX500_GPIO(24)
++#define AB8500_PIN_R16		ABX500_GPIO(25)
++#define AB8500_PIN_M16		ABX500_GPIO(26)
++#define AB8500_PIN_J6		ABX500_GPIO(27)
++#define AB8500_PIN_K6		ABX500_GPIO(28)
++#define AB8500_PIN_G6		ABX500_GPIO(29)
++#define AB8500_PIN_H6		ABX500_GPIO(30)
++#define AB8500_PIN_F5		ABX500_GPIO(31)
++#define AB8500_PIN_G5		ABX500_GPIO(32)
++/* hole */
++#define AB8500_PIN_R17		ABX500_GPIO(34)
++#define AB8500_PIN_W15		ABX500_GPIO(35)
++#define AB8500_PIN_A17		ABX500_GPIO(36)
++#define AB8500_PIN_E15		ABX500_GPIO(37)
++#define AB8500_PIN_C17		ABX500_GPIO(38)
++#define AB8500_PIN_E16		ABX500_GPIO(39)
++#define AB8500_PIN_T19		ABX500_GPIO(40)
++#define AB8500_PIN_U19		ABX500_GPIO(41)
++#define AB8500_PIN_U2		ABX500_GPIO(42)
++
++/* indicates the highest GPIO number */
++#define AB8500_GPIO_MAX_NUMBER	42
++
++/*
++ * The names of the pins are denoted by GPIO number and ball name, even
++ * though they can be used for other things than GPIO, this is the first
++ * column in the table of the data sheet and often used on schematics and
++ * such.
++ */
++static const struct pinctrl_pin_desc ab8500_ranges_pins[] = {
++	PINCTRL_PIN(AB8500_PIN_T10, "GPIO1_T10"),
++	PINCTRL_PIN(AB8500_PIN_T9, "GPIO2_T9"),
++	PINCTRL_PIN(AB8500_PIN_U9, "GPIO3_U9"),
++	PINCTRL_PIN(AB8500_PIN_W2, "GPIO4_W2"),
++	/* hole */
++	PINCTRL_PIN(AB8500_PIN_Y18, "GPIO6_Y18"),
++	PINCTRL_PIN(AB8500_PIN_AA20, "GPIO7_AA20"),
++	PINCTRL_PIN(AB8500_PIN_W18, "GPIO8_W18"),
++	PINCTRL_PIN(AB8500_PIN_AA19, "GPIO9_AA19"),
++	PINCTRL_PIN(AB8500_PIN_U17, "GPIO10_U17"),
++	PINCTRL_PIN(AB8500_PIN_AA18, "GPIO11_AA18"),
++	PINCTRL_PIN(AB8500_PIN_U16, "GPIO12_U16"),
++	PINCTRL_PIN(AB8500_PIN_W17, "GPIO13_W17"),
++	PINCTRL_PIN(AB8500_PIN_F14, "GPIO14_F14"),
++	PINCTRL_PIN(AB8500_PIN_B17, "GPIO15_B17"),
++	PINCTRL_PIN(AB8500_PIN_F15, "GPIO16_F15"),
++	PINCTRL_PIN(AB8500_PIN_P5, "GPIO17_P5"),
++	PINCTRL_PIN(AB8500_PIN_R5, "GPIO18_R5"),
++	PINCTRL_PIN(AB8500_PIN_U5, "GPIO19_U5"),
++	PINCTRL_PIN(AB8500_PIN_T5, "GPIO20_T5"),
++	PINCTRL_PIN(AB8500_PIN_H19, "GPIO21_H19"),
++	PINCTRL_PIN(AB8500_PIN_G20, "GPIO22_G20"),
++	PINCTRL_PIN(AB8500_PIN_G19, "GPIO23_G19"),
++	PINCTRL_PIN(AB8500_PIN_T14, "GPIO24_T14"),
++	PINCTRL_PIN(AB8500_PIN_R16, "GPIO25_R16"),
++	PINCTRL_PIN(AB8500_PIN_M16, "GPIO26_M16"),
++	PINCTRL_PIN(AB8500_PIN_J6, "GPIO27_J6"),
++	PINCTRL_PIN(AB8500_PIN_K6, "GPIO28_K6"),
++	PINCTRL_PIN(AB8500_PIN_G6, "GPIO29_G6"),
++	PINCTRL_PIN(AB8500_PIN_H6, "GPIO30_H6"),
++	PINCTRL_PIN(AB8500_PIN_F5, "GPIO31_F5"),
++	PINCTRL_PIN(AB8500_PIN_G5, "GPIO32_G5"),
++	/* hole */
++	PINCTRL_PIN(AB8500_PIN_R17, "GPIO34_R17"),
++	PINCTRL_PIN(AB8500_PIN_W15, "GPIO35_W15"),
++	PINCTRL_PIN(AB8500_PIN_A17, "GPIO36_A17"),
++	PINCTRL_PIN(AB8500_PIN_E15, "GPIO37_E15"),
++	PINCTRL_PIN(AB8500_PIN_C17, "GPIO38_C17"),
++	PINCTRL_PIN(AB8500_PIN_E16, "GPIO39_E16"),
++	PINCTRL_PIN(AB8500_PIN_T19, "GPIO40_T19"),
++	PINCTRL_PIN(AB8500_PIN_U19, "GPIO41_U19"),
++	PINCTRL_PIN(AB8500_PIN_U2, "GPIO42_U2"),
++};
++
++/*
++ * Maps local GPIO offsets to local pin numbers
++ */
++static const struct abx500_pinrange ab8500_pinranges[] = {
++	ABX500_PINRANGE(1, 4, ABX500_ALT_A),
++	ABX500_PINRANGE(6, 4, ABX500_ALT_A),
++	ABX500_PINRANGE(10, 4, ABX500_DEFAULT),
++	ABX500_PINRANGE(14, 12, ABX500_ALT_A),
++	ABX500_PINRANGE(26, 1, ABX500_DEFAULT),
++	ABX500_PINRANGE(27, 6, ABX500_ALT_A),
++	ABX500_PINRANGE(34, 1, ABX500_ALT_A),
++	ABX500_PINRANGE(35, 1, ABX500_DEFAULT),
++	ABX500_PINRANGE(36, 7, ABX500_ALT_A),
++};
++
++/*
++ * Read the pin group names like this:
++ * sysclkreq2_d_1 = first groups of pins for sysclkreq2 on default function
++ *
++ * The groups are arranged as sets per altfunction column, so we can
++ * mux in one group at a time by selecting the same altfunction for them
++ * all. When functions require pins on different altfunctions, you need
++ * to combine several groups.
++ */
++
++/* default column */
++static const unsigned sysclkreq2_d_1_pins[] = { AB8500_PIN_T10 };
++static const unsigned sysclkreq3_d_1_pins[] = { AB8500_PIN_T9 };
++static const unsigned sysclkreq4_d_1_pins[] = { AB8500_PIN_U9 };
++static const unsigned sysclkreq6_d_1_pins[] = { AB8500_PIN_W2 };
++static const unsigned ycbcr0123_d_1_pins[] = { AB8500_PIN_Y18, AB8500_PIN_AA20,
++					AB8500_PIN_W18, AB8500_PIN_AA19};
++static const unsigned gpio10_d_1_pins[] = { AB8500_PIN_U17 };
++static const unsigned gpio11_d_1_pins[] = { AB8500_PIN_AA18 };
++static const unsigned gpio12_d_1_pins[] = { AB8500_PIN_U16 };
++static const unsigned gpio13_d_1_pins[] = { AB8500_PIN_W17 };
++static const unsigned pwmout1_d_1_pins[] = { AB8500_PIN_F14 };
++static const unsigned pwmout2_d_1_pins[] = { AB8500_PIN_B17 };
++static const unsigned pwmout3_d_1_pins[] = { AB8500_PIN_F15 };
++
++/* audio data interface 1*/
++static const unsigned adi1_d_1_pins[] = { AB8500_PIN_P5, AB8500_PIN_R5,
++					AB8500_PIN_U5, AB8500_PIN_T5 };
++/* USBUICC */
++static const unsigned usbuicc_d_1_pins[] = { AB8500_PIN_H19, AB8500_PIN_G20,
++					AB8500_PIN_G19 };
++static const unsigned sysclkreq7_d_1_pins[] = { AB8500_PIN_T14 };
++static const unsigned sysclkreq8_d_1_pins[] = { AB8500_PIN_R16 };
++static const unsigned gpio26_d_1_pins[] = { AB8500_PIN_M16 };
++/* Digital microphone 1 and 2 */
++static const unsigned dmic12_d_1_pins[] = { AB8500_PIN_J6, AB8500_PIN_K6 };
++/* Digital microphone 3 and 4 */
++static const unsigned dmic34_d_1_pins[] = { AB8500_PIN_G6, AB8500_PIN_H6 };
++/* Digital microphone 5 and 6 */
++static const unsigned dmic56_d_1_pins[] = { AB8500_PIN_F5, AB8500_PIN_G5 };
++static const unsigned extcpena_d_1_pins[] = { AB8500_PIN_R17 };
++static const unsigned gpio35_d_1_pins[] = { AB8500_PIN_W15 };
++/* APE SPI */
++static const unsigned apespi_d_1_pins[] = { AB8500_PIN_A17, AB8500_PIN_E15,
++					AB8500_PIN_C17, AB8500_PIN_E16};
++/* modem SDA/SCL */
++static const unsigned modsclsda_d_1_pins[] = { AB8500_PIN_T19, AB8500_PIN_U19 };
++static const unsigned sysclkreq5_d_1_pins[] = { AB8500_PIN_U2 };
++
++/* Altfunction A column */
++static const unsigned gpio1_a_1_pins[] = { AB8500_PIN_T10 };
++static const unsigned gpio2_a_1_pins[] = { AB8500_PIN_T9 };
++static const unsigned gpio3_a_1_pins[] = { AB8500_PIN_U9 };
++static const unsigned gpio4_a_1_pins[] = { AB8500_PIN_W2 };
++static const unsigned gpio6_a_1_pins[] = { AB8500_PIN_Y18 };
++static const unsigned gpio7_a_1_pins[] = { AB8500_PIN_AA20 };
++static const unsigned gpio8_a_1_pins[] = { AB8500_PIN_W18 };
++static const unsigned gpio9_a_1_pins[] = { AB8500_PIN_AA19 };
++/* YCbCr4 YCbCr5 YCbCr6 YCbCr7*/
++static const unsigned ycbcr4567_a_1_pins[] = { AB8500_PIN_U17, AB8500_PIN_AA18,
++					AB8500_PIN_U16, AB8500_PIN_W17};
++static const unsigned gpio14_a_1_pins[] = { AB8500_PIN_F14 };
++static const unsigned gpio15_a_1_pins[] = { AB8500_PIN_B17 };
++static const unsigned gpio16_a_1_pins[] = { AB8500_PIN_F15 };
++static const unsigned gpio17_a_1_pins[] = { AB8500_PIN_P5 };
++static const unsigned gpio18_a_1_pins[] = { AB8500_PIN_R5 };
++static const unsigned gpio19_a_1_pins[] = { AB8500_PIN_U5 };
++static const unsigned gpio20_a_1_pins[] = { AB8500_PIN_T5 };
++static const unsigned gpio21_a_1_pins[] = { AB8500_PIN_H19 };
++static const unsigned gpio22_a_1_pins[] = { AB8500_PIN_G20 };
++static const unsigned gpio23_a_1_pins[] = { AB8500_PIN_G19 };
++static const unsigned gpio24_a_1_pins[] = { AB8500_PIN_T14 };
++static const unsigned gpio25_a_1_pins[] = { AB8500_PIN_R16 };
++static const unsigned gpio27_a_1_pins[] = { AB8500_PIN_J6 };
++static const unsigned gpio28_a_1_pins[] = { AB8500_PIN_K6 };
++static const unsigned gpio29_a_1_pins[] = { AB8500_PIN_G6 };
++static const unsigned gpio30_a_1_pins[] = { AB8500_PIN_H6 };
++static const unsigned gpio31_a_1_pins[] = { AB8500_PIN_F5 };
++static const unsigned gpio32_a_1_pins[] = { AB8500_PIN_G5 };
++static const unsigned gpio34_a_1_pins[] = { AB8500_PIN_R17 };
++static const unsigned gpio36_a_1_pins[] = { AB8500_PIN_A17 };
++static const unsigned gpio37_a_1_pins[] = { AB8500_PIN_E15 };
++static const unsigned gpio38_a_1_pins[] = { AB8500_PIN_C17 };
++static const unsigned gpio39_a_1_pins[] = { AB8500_PIN_E16 };
++static const unsigned gpio40_a_1_pins[] = { AB8500_PIN_T19 };
++static const unsigned gpio41_a_1_pins[] = { AB8500_PIN_U19 };
++static const unsigned gpio42_a_1_pins[] = { AB8500_PIN_U2 };
++
++/* Altfunction B colum */
++static const unsigned hiqclkena_b_1_pins[] = { AB8500_PIN_U17 };
++static const unsigned usbuiccpd_b_1_pins[] = { AB8500_PIN_AA18 };
++static const unsigned i2ctrig1_b_1_pins[] = { AB8500_PIN_U16 };
++static const unsigned i2ctrig2_b_1_pins[] = { AB8500_PIN_W17 };
++
++/* Altfunction C column */
++static const unsigned usbvdat_c_1_pins[] = { AB8500_PIN_W17 };
++
++
++#define AB8500_PIN_GROUP(a, b) { .name = #a, .pins = a##_pins,		\
++			.npins = ARRAY_SIZE(a##_pins), .altsetting = b }
++
++static const struct abx500_pingroup ab8500_ranges_groups[] = {
++	/* default column */
++	AB8500_PIN_GROUP(sysclkreq2_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(sysclkreq3_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(sysclkreq4_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(sysclkreq6_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(ycbcr0123_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(gpio10_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(gpio11_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(gpio12_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(gpio13_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(pwmout1_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(pwmout2_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(pwmout3_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(adi1_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(usbuicc_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(sysclkreq7_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(sysclkreq8_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(gpio26_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(dmic12_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(dmic34_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(dmic56_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(extcpena_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(gpio35_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(apespi_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(modsclsda_d_1, ABX500_DEFAULT),
++	AB8500_PIN_GROUP(sysclkreq5_d_1, ABX500_DEFAULT),
++	/* Altfunction A column */
++	AB8500_PIN_GROUP(gpio1_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio2_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio3_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio4_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio6_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio7_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio8_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio9_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(ycbcr4567_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio14_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio15_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio16_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio17_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio18_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio19_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio20_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio21_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio22_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio23_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio24_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio25_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio27_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio28_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio29_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio30_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio31_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio32_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio34_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio36_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio37_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio38_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio39_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio40_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio41_a_1, ABX500_ALT_A),
++	AB8500_PIN_GROUP(gpio42_a_1, ABX500_ALT_A),
++	/* Altfunction B column */
++	AB8500_PIN_GROUP(hiqclkena_b_1, ABX500_ALT_B),
++	AB8500_PIN_GROUP(usbuiccpd_b_1, ABX500_ALT_B),
++	AB8500_PIN_GROUP(i2ctrig1_b_1, ABX500_ALT_B),
++	AB8500_PIN_GROUP(i2ctrig2_b_1, ABX500_ALT_B),
++	/* Altfunction C column */
++	AB8500_PIN_GROUP(usbvdat_c_1, ABX500_ALT_C),
++};
++
++/* We use this macro to define the groups applicable to a function */
++#define AB8500_FUNC_GROUPS(a, b...)	   \
++static const char * const a##_groups[] = { b };
++
++AB8500_FUNC_GROUPS(sysclkreq, "sysclkreq2_d_1", "sysclkreq3_d_1",
++		"sysclkreq4_d_1", "sysclkreq5_d_1", "sysclkreq6_d_1",
++		"sysclkreq7_d_1", "sysclkreq8_d_1");
++AB8500_FUNC_GROUPS(ycbcr, "ycbcr0123_d_1", "ycbcr4567_a_1");
++AB8500_FUNC_GROUPS(gpio, "gpio1_a_1", "gpio2_a_1", "gpio3_a_1", "gpio4_a_1",
++		"gpio6_a_1", "gpio7_a_1", "gpio8_a_1", "gpio9_a_1",
++		"gpio10_d_1", "gpio11_d_1", "gpio12_d_1", "gpio13_d_1",
++		"gpio14_a_1", "gpio15_a_1", "gpio16_a_1", "gpio17_a_1",
++		"gpio18_a_1", "gpio19_a_1", "gpio20_a_1", "gpio21_a_1",
++		"gpio22_a_1", "gpio23_a_1", "gpio24_a_1", "gpio25_a_1",
++		"gpio26_d_1", "gpio27_a_1", "gpio28_a_1", "gpio29_a_1",
++		"gpio30_a_1", "gpio31_a_1", "gpio32_a_1", "gpio34_a_1",
++		"gpio35_d_1", "gpio36_a_1", "gpio37_a_1", "gpio38_a_1",
++		"gpio39_a_1", "gpio40_a_1", "gpio41_a_1", "gpio42_a_1");
++AB8500_FUNC_GROUPS(pwmout, "pwmout1_d_1", "pwmout2_d_1", "pwmout3_d_1");
++AB8500_FUNC_GROUPS(adi1, "adi1_d_1");
++AB8500_FUNC_GROUPS(usbuicc, "usbuicc_d_1", "usbuiccpd_b_1");
++AB8500_FUNC_GROUPS(dmic, "dmic12_d_1", "dmic34_d_1", "dmic56_d_1");
++AB8500_FUNC_GROUPS(extcpena, "extcpena_d_1");
++AB8500_FUNC_GROUPS(apespi, "apespi_d_1");
++AB8500_FUNC_GROUPS(modsclsda, "modsclsda_d_1");
++AB8500_FUNC_GROUPS(hiqclkena, "hiqclkena_b_1");
++AB8500_FUNC_GROUPS(i2ctrig, "i2ctrig1_b_1", "i2ctrig2_b_1");
++AB8500_FUNC_GROUPS(usbvdat, "usbvdat_c_1");
++
++#define FUNCTION(fname)					\
++	{						\
++		.name = #fname,				\
++		.groups = fname##_groups,		\
++		.ngroups = ARRAY_SIZE(fname##_groups),	\
++	}
++
++static const struct abx500_function ab8500_ranges_functions[] = {
++	FUNCTION(sysclkreq),
++	FUNCTION(ycbcr),
++	FUNCTION(gpio),
++	FUNCTION(pwmout),
++	FUNCTION(adi1),
++	FUNCTION(usbuicc),
++	FUNCTION(dmic),
++	FUNCTION(extcpena),
++	FUNCTION(apespi),
++	FUNCTION(modsclsda),
++	FUNCTION(hiqclkena),
++	FUNCTION(i2ctrig),
++	FUNCTION(usbvdat),
++};
++
++/*
++ * this table translates what's is in the AB8500 specification regarding the
++ * balls alternate functions (as for DB, default, ALT_A, ALT_B and ALT_C).
++ * ALTERNATE_FUNCTIONS(GPIO_NUMBER, GPIOSEL bit, ALTERNATFUNC bit1,
++ * ALTERNATEFUNC bit2, ALTA val, ALTB val, ALTC val),
++ *
++ * example :
++ *
++ *	ALTERNATE_FUNCTIONS(13,     4,      3,      4, 0, 1 ,2),
++ *	means that pin AB8500_PIN_W17 (pin 13) supports 4 mux (default/ALT_A,
++ *	ALT_B and ALT_C), so GPIOSEL and ALTERNATFUNC registers are used to
++ *	select the mux.  ALTA, ALTB and ALTC val indicates values to write in
++ *	ALTERNATFUNC register. We need to specifies these values as SOC
++ *	designers didn't apply the same logic on how to select mux in the
++ *	ABx500 family.
++ *
++ *	As this pins supports at least ALT_B mux, default mux is
++ *	selected by writing 1 in GPIOSEL bit :
++ *
++ *		| GPIOSEL bit=4 | alternatfunc bit2=4 | alternatfunc bit1=3
++ *	default	|       1       |          0          |          0
++ *	alt_A	|       0       |          0          |          0
++ *	alt_B	|       0       |          0          |          1
++ *	alt_C	|       0       |          1          |          0
++ *
++ *	ALTERNATE_FUNCTIONS(8,      7, UNUSED, UNUSED),
++ *	means that pin AB8500_PIN_W18 (pin 8) supports 2 mux, so only GPIOSEL
++ *	register is used to select the mux. As this pins doesn't support at
++ *	least ALT_B mux, default mux is by writing 0 in GPIOSEL bit :
++ *
++ *		| GPIOSEL bit=7 | alternatfunc bit2=  | alternatfunc bit1=
++ *	default	|       0       |          0          |          0
++ *	alt_A	|       1       |          0          |          0
++ */
++
++struct alternate_functions ab8500_alternate_functions[AB8500_GPIO_MAX_NUMBER + 1] = {
++	ALTERNATE_FUNCTIONS(0, UNUSED, UNUSED, UNUSED, 0, 0, 0), /* no GPIO0 */
++	ALTERNATE_FUNCTIONS(1,	    0, UNUSED, UNUSED, 0, 0, 0), /* GPIO1, altA controlled by bit 0 */
++	ALTERNATE_FUNCTIONS(2,      1, UNUSED, UNUSED, 0, 0, 0), /* GPIO2, altA controlled by bit 1 */
++	ALTERNATE_FUNCTIONS(3,      2, UNUSED, UNUSED, 0, 0, 0), /* GPIO3, altA controlled by bit 2*/
++	ALTERNATE_FUNCTIONS(4,      3, UNUSED, UNUSED, 0, 0, 0), /* GPIO4, altA controlled by bit 3*/
++	/* bit 4 reserved */
++	ALTERNATE_FUNCTIONS(5, UNUSED, UNUSED, UNUSED, 0, 0, 0), /* no GPIO5 */
++	ALTERNATE_FUNCTIONS(6,      5, UNUSED, UNUSED, 0, 0, 0), /* GPIO6, altA controlled by bit 5*/
++	ALTERNATE_FUNCTIONS(7,      6, UNUSED, UNUSED, 0, 0, 0), /* GPIO7, altA controlled by bit 6*/
++	ALTERNATE_FUNCTIONS(8,      7, UNUSED, UNUSED, 0, 0, 0), /* GPIO8, altA controlled by bit 7*/
++
++	ALTERNATE_FUNCTIONS(9,      0, UNUSED, UNUSED, 0, 0, 0), /* GPIO9, altA controlled by bit 0*/
++	ALTERNATE_FUNCTIONS(10,     1,      0, UNUSED, 0, 1, 0), /* GPIO10, altA and altB controlled by bit 0 */
++	ALTERNATE_FUNCTIONS(11,     2,      1, UNUSED, 0, 1, 0), /* GPIO11, altA and altB controlled by bit 1 */
++	ALTERNATE_FUNCTIONS(12,     3,      2, UNUSED, 0, 1, 0), /* GPIO12, altA and altB controlled by bit 2 */
++	ALTERNATE_FUNCTIONS(13,     4,      3,      4, 0, 1, 2), /* GPIO13, altA altB and altC controlled by bit 3 and 4 */
++	ALTERNATE_FUNCTIONS(14,     5, UNUSED, UNUSED, 0, 0, 0), /* GPIO14, altA controlled by bit 5 */
++	ALTERNATE_FUNCTIONS(15,     6, UNUSED, UNUSED, 0, 0, 0), /* GPIO15, altA controlled by bit 6 */
++	ALTERNATE_FUNCTIONS(16,     7, UNUSED, UNUSED, 0, 0, 0), /* GPIO16, altA controlled by bit 7 */
++	/*
++	 * pins 17 to 20 are special case, only bit 0 is used to select
++	 * alternate function for these 4 pins.
++	 * bits 1 to 3 are reserved
++	 */
++	ALTERNATE_FUNCTIONS(17,      0, UNUSED, UNUSED, 0, 0, 0), /* GPIO17, altA controlled by bit 0 */
++	ALTERNATE_FUNCTIONS(18,      0, UNUSED, UNUSED, 0, 0, 0), /* GPIO18, altA controlled by bit 0 */
++	ALTERNATE_FUNCTIONS(19,      0, UNUSED, UNUSED, 0, 0, 0), /* GPIO19, altA controlled by bit 0 */
++	ALTERNATE_FUNCTIONS(20,      0, UNUSED, UNUSED, 0, 0, 0), /* GPIO20, altA controlled by bit 0 */
++	ALTERNATE_FUNCTIONS(21,      4, UNUSED, UNUSED, 0, 0, 0), /* GPIO21, altA controlled by bit 4 */
++	ALTERNATE_FUNCTIONS(22,      5, UNUSED, UNUSED, 0, 0, 0), /* GPIO22, altA controlled by bit 5 */
++	ALTERNATE_FUNCTIONS(23,      6, UNUSED, UNUSED, 0, 0, 0), /* GPIO23, altA controlled by bit 6 */
++	ALTERNATE_FUNCTIONS(24,      7, UNUSED, UNUSED, 0, 0, 0), /* GPIO24, altA controlled by bit 7 */
++
++	ALTERNATE_FUNCTIONS(25,      0, UNUSED, UNUSED, 0, 0, 0), /* GPIO25, altA controlled by bit 0 */
++	/* pin 26 special case, no alternate function, bit 1 reserved */
++	ALTERNATE_FUNCTIONS(26, UNUSED, UNUSED, UNUSED, 0, 0, 0), /* GPIO26 */
++	ALTERNATE_FUNCTIONS(27,      2, UNUSED, UNUSED, 0, 0, 0), /* GPIO27, altA controlled by bit 2 */
++	ALTERNATE_FUNCTIONS(28,      3, UNUSED, UNUSED, 0, 0, 0), /* GPIO28, altA controlled by bit 3 */
++	ALTERNATE_FUNCTIONS(29,      4, UNUSED, UNUSED, 0, 0, 0), /* GPIO29, altA controlled by bit 4 */
++	ALTERNATE_FUNCTIONS(30,      5, UNUSED, UNUSED, 0, 0, 0), /* GPIO30, altA controlled by bit 5 */
++	ALTERNATE_FUNCTIONS(31,      6, UNUSED, UNUSED, 0, 0, 0), /* GPIO31, altA controlled by bit 6 */
++	ALTERNATE_FUNCTIONS(32,      7, UNUSED, UNUSED, 0, 0, 0), /* GPIO32, altA controlled by bit 7 */
++
++	ALTERNATE_FUNCTIONS(33, UNUSED, UNUSED, UNUSED, 0, 0, 0), /* no GPIO33 */
++	ALTERNATE_FUNCTIONS(34,      1, UNUSED, UNUSED, 0, 0, 0), /* GPIO34, altA controlled by bit 1 */
++	/* pin 35 special case, no alternate function, bit 2 reserved */
++	ALTERNATE_FUNCTIONS(35, UNUSED, UNUSED, UNUSED, 0, 0, 0), /* GPIO35 */
++	ALTERNATE_FUNCTIONS(36,      3, UNUSED, UNUSED, 0, 0, 0), /* GPIO36, altA controlled by bit 3 */
++	ALTERNATE_FUNCTIONS(37,      4, UNUSED, UNUSED, 0, 0, 0), /* GPIO37, altA controlled by bit 4 */
++	ALTERNATE_FUNCTIONS(38,      5, UNUSED, UNUSED, 0, 0, 0), /* GPIO38, altA controlled by bit 5 */
++	ALTERNATE_FUNCTIONS(39,      6, UNUSED, UNUSED, 0, 0, 0), /* GPIO39, altA controlled by bit 6 */
++	ALTERNATE_FUNCTIONS(40,      7, UNUSED, UNUSED, 0, 0, 0), /* GPIO40, altA controlled by bit 7 */
++
++	ALTERNATE_FUNCTIONS(41,      0, UNUSED, UNUSED, 0, 0, 0), /* GPIO41, altA controlled by bit 0 */
++	ALTERNATE_FUNCTIONS(42,      1, UNUSED, UNUSED, 0, 0, 0), /* GPIO42, altA controlled by bit 1 */
++};
++
++/*
++ * Only some GPIOs are interrupt capable, and they are
++ * organized in discontiguous clusters:
++ *
++ *	GPIO6 to GPIO13
++ *	GPIO24 and GPIO25
++ *	GPIO36 to GPIO41
++ */
++struct abx500_gpio_irq_cluster ab8500_gpio_irq_cluster[] = {
++	GPIO_IRQ_CLUSTER(5, 12, 0), /* GPIO numbers start from 1 */
++	GPIO_IRQ_CLUSTER(23, 24, 0),
++	GPIO_IRQ_CLUSTER(35, 40, 0),
++};
++
++static struct abx500_pinctrl_soc_data ab8500_ranges_soc = {
++	.gpio_ranges = ab8500_pinranges,
++	.gpio_num_ranges = ARRAY_SIZE(ab8500_pinranges),
++	.pins = ab8500_ranges_pins,
++	.npins = ARRAY_SIZE(ab8500_ranges_pins),
++	.functions = ab8500_ranges_functions,
++	.nfunctions = ARRAY_SIZE(ab8500_ranges_functions),
++	.groups = ab8500_ranges_groups,
++	.ngroups = ARRAY_SIZE(ab8500_ranges_groups),
++	.alternate_functions = ab8500_alternate_functions,
++	.gpio_irq_cluster = ab8500_gpio_irq_cluster,
++	.ngpio_irq_cluster = ARRAY_SIZE(ab8500_gpio_irq_cluster),
++	.irq_gpio_rising_offset = AB8500_INT_GPIO6R,
++	.irq_gpio_falling_offset = AB8500_INT_GPIO6F,
++	.irq_gpio_factor = 1,
++};
++
++void __devinit
++abx500_pinctrl_ab8500_init(struct abx500_pinctrl_soc_data **soc)
 +{
-+	struct ab8500_charger *di = _di;
-+
-+	dev_dbg(di->dev, "VBUS charger drop ended\n");
-+	di->flags.vbus_drop_end = true;
-+	queue_delayed_work(di->charger_wq, &di->vbus_drop_end_work,
-+			   round_jiffies(30 * HZ));
-+
-+	return IRQ_HANDLED;
++	*soc = &ab8500_ranges_soc;
 +}
-+
-+/**
-  * ab8500_charger_vbusovv_handler() - VBUS overvoltage detected
-  * @irq:       interrupt number
-  * @_di:       pointer to the ab8500_charger structure
-@@ -2743,6 +2940,20 @@ static int ab8500_charger_init_hw_registers(struct ab8500_charger *di)
- 		goto out;
- 	}
+diff --git a/drivers/pinctrl/pinctrl-abx500.c b/drivers/pinctrl/pinctrl-abx500.c
+index 26abfd8..13ae68f 100644
+--- a/drivers/pinctrl/pinctrl-abx500.c
++++ b/drivers/pinctrl/pinctrl-abx500.c
+@@ -1116,6 +1116,9 @@ static int __devinit abx500_gpio_probe(struct platform_device *pdev)
  
-+	/* Set charger watchdog timeout */
-+	ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER,
-+		AB8500_CH_WD_TIMER_REG, WD_TIMER);
-+	if (ret) {
-+		dev_err(di->dev, "failed to set charger watchdog timeout\n");
-+		goto out;
-+	}
-+
-+	ret = ab8500_charger_led_en(di, false);
-+	if (ret < 0) {
-+		dev_err(di->dev, "failed to disable LED\n");
-+		goto out;
-+	}
-+
- 	/* Backup battery voltage and current */
- 	ret = abx500_set_register_interruptible(di->dev,
- 		AB8500_RTC,
-@@ -2782,6 +2993,7 @@ static struct ab8500_charger_interrupts ab8500_charger_irq[] = {
- 	{"USB_CHARGER_NOT_OKR", ab8500_charger_usbchargernotokr_handler},
- 	{"VBUS_OVV", ab8500_charger_vbusovv_handler},
- 	{"CH_WD_EXP", ab8500_charger_chwdexp_handler},
-+	{"VBUS_CH_DROP_END", ab8500_charger_vbuschdropend_handler},
+ 	/* Poke in other ASIC variants here */
+ 	switch (platid->driver_data) {
++	case PINCTRL_AB8500:
++		abx500_pinctrl_ab8500_init(&pct->soc);
++		break;
+ 	default:
+ 		dev_err(&pdev->dev, "Unsupported pinctrl sub driver (%d)\n",
+ 				(int) platid->driver_data);
+diff --git a/drivers/pinctrl/pinctrl-abx500.h b/drivers/pinctrl/pinctrl-abx500.h
+index 436ace3..a6c9332 100644
+--- a/drivers/pinctrl/pinctrl-abx500.h
++++ b/drivers/pinctrl/pinctrl-abx500.h
+@@ -177,4 +177,17 @@ struct abx500_pinctrl_soc_data {
+ 	int irq_gpio_factor;
  };
  
- static int ab8500_charger_usb_notifier_call(struct notifier_block *nb,
-@@ -2818,13 +3030,15 @@ static int ab8500_charger_usb_notifier_call(struct notifier_block *nb,
- 		__func__, bm_usb_state, mA);
- 
- 	spin_lock(&di->usb_state.usb_lock);
--	di->usb_state.usb_changed = true;
-+	di->usb_state.state_tmp = bm_usb_state;
-+	di->usb_state.usb_current_tmp = mA;
- 	spin_unlock(&di->usb_state.usb_lock);
- 
--	di->usb_state.state = bm_usb_state;
--	di->usb_state.usb_current = mA;
--
--	queue_work(di->charger_wq, &di->usb_state_changed_work);
-+	/*
-+	 * wait for some time until you get updates from the usb stack
-+	 * and negotiations are completed
-+	 */
-+	queue_delayed_work(di->charger_wq, &di->usb_state_changed_work, HZ/2);
- 
- 	return NOTIFY_OK;
- }
-@@ -2864,6 +3078,9 @@ static int ab8500_charger_resume(struct platform_device *pdev)
- 			&di->check_hw_failure_work, 0);
- 	}
- 
-+	if (di->flags.vbus_drop_end)
-+		queue_delayed_work(di->charger_wq, &di->vbus_drop_end_work, 0);
++#ifdef CONFIG_PINCTRL_AB8500
 +
- 	return 0;
- }
- 
-@@ -2876,6 +3093,9 @@ static int ab8500_charger_suspend(struct platform_device *pdev,
- 	if (delayed_work_pending(&di->check_hw_failure_work))
- 		cancel_delayed_work(&di->check_hw_failure_work);
- 
-+	if (delayed_work_pending(&di->vbus_drop_end_work))
-+		cancel_delayed_work(&di->vbus_drop_end_work);
++void abx500_pinctrl_ab8500_init(struct abx500_pinctrl_soc_data **soc);
 +
- 	flush_delayed_work(&di->attach_work);
- 	flush_delayed_work(&di->usb_charger_attached_work);
- 	flush_delayed_work(&di->ac_charger_attached_work);
-@@ -2887,6 +3107,9 @@ static int ab8500_charger_suspend(struct platform_device *pdev,
- 	flush_work(&di->ac_work);
- 	flush_work(&di->detect_usb_type_work);
- 
-+	if (atomic_read(&di->current_stepping_sessions))
-+		return -EAGAIN;
++#else
 +
- 	return 0;
- }
- #else
-@@ -2924,11 +3147,13 @@ static int ab8500_charger_remove(struct platform_device *pdev)
- 	destroy_workqueue(di->charger_wq);
- 
- 	flush_scheduled_work();
-+	wake_lock_destroy(&di->pm_lock);
- 	if(di->usb_chg.enabled)
- 		power_supply_unregister(&di->usb_chg.psy);
-+#if !defined(CONFIG_CHARGER_PM2301)
- 	if(di->ac_chg.enabled)
- 		power_supply_unregister(&di->ac_chg.psy);
--
++static inline void
++abx500_pinctrl_ab8500_init(struct abx500_pinctrl_soc_data **soc)
++{
++}
++
 +#endif
- 	platform_set_drvdata(pdev, NULL);
- 
- 	return 0;
-@@ -2976,6 +3201,8 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 
- 	/* initialize lock */
- 	spin_lock_init(&di->usb_state.usb_lock);
-+	mutex_init(&di->usb_ipt_crnt_lock);
-+	wake_lock_init(&di->pm_lock, WAKE_LOCK_SUSPEND, "ab8500-charger");
- 
- 	di->autopower = false;
- 	di->invalid_charger_detect_state = 0;
-@@ -3061,6 +3288,12 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 	INIT_DELAYED_WORK(&di->attach_work,
- 		ab8500_charger_usb_link_attach_work);
- 
-+	INIT_DELAYED_WORK(&di->usb_state_changed_work,
-+		ab8500_charger_usb_state_changed_work);
 +
-+	INIT_DELAYED_WORK(&di->vbus_drop_end_work,
-+		ab8500_charger_vbus_drop_end_work);
-+
- 	/* Init work for charger detection */
- 	INIT_WORK(&di->usb_link_status_work,
- 		ab8500_charger_usb_link_status_work);
-@@ -3068,9 +3301,6 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 	INIT_WORK(&di->detect_usb_type_work,
- 		ab8500_charger_detect_usb_type_work);
- 
--	INIT_WORK(&di->usb_state_changed_work,
--		ab8500_charger_usb_state_changed_work);
--
- 	/* Init work for checking HW status */
- 	INIT_WORK(&di->check_main_thermal_prot_work,
- 		ab8500_charger_check_main_thermal_prot_work);
-@@ -3129,7 +3359,7 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Identify the connected charger types during startup */
--	charger_status = ab8500_charger_detect_chargers(di);
-+	charger_status = ab8500_charger_detect_chargers(di, true);
- 	if (charger_status & AC_PW_CONN) {
- 		di->ac.charger_connected = 1;
- 		di->ac_conn = true;
-@@ -3164,7 +3394,7 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 
- 	mutex_lock(&di->charger_attached_mutex);
- 
--	ch_stat = ab8500_charger_detect_chargers(di);
-+	ch_stat = ab8500_charger_detect_chargers(di, false);
- 
- 	if ((ch_stat & AC_PW_CONN) == AC_PW_CONN) {
- 		queue_delayed_work(di->charger_wq,
+ #endif /* PINCTRL_PINCTRL_ABx500_H */
 -- 
-1.7.9.5
+1.7.11.3
