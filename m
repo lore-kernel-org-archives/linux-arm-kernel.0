@@ -1,94 +1,38 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 Jan 2013 22:49:10 +0100
-Subject: [PATCH 1/2] iio: mxs: Add MX23 support into the IIO driver
-In-Reply-To: <50FDB517.700@metafoo.de>
-References: <1358798722-25102-1-git-send-email-marex@denx.de>
- <201301212232.52161.marex@denx.de> <50FDB517.700@metafoo.de>
-Message-ID: <201301212249.11173.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jan 2013 21:49:14 +0000
+Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
+In-Reply-To: <Pine.LNX.4.44L0.1301211533580.24224-100000@netrider.rowland.org>
+References: <Pine.LNX.4.44L0.1301211533580.24224-100000@netrider.rowland.org>
+Message-ID: <201301212149.15139.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lars-Peter Clausen,
-
-> On 01/21/2013 10:32 PM, Marek Vasut wrote:
-> > Dear Micha? Miros?aw,
-> > 
-> >> 2013/1/21 Marek Vasut <marex@denx.de>:
-> >>> Dear Micha? Miros?aw,
-> >>> 
-> >>>> 2013/1/21 Marek Vasut <marex@denx.de>:
-> >>>>> This patch adds support for i.MX23 into the LRADC driver. The LRADC
-> >>>>> block on MX23 is not much different from the one on MX28, thus this
-> >>>>> is only a few changes fixing the parts that are specific to MX23.
-> >>>> 
-> >>>> [...]
-> >>>> 
-> >>>>> +struct mxs_lradc_of_config {
-> >>>>> +       const int               irq_count;
-> >>>>> +       const char * const      *irq_name;
-> >>>>> +};
-> >>>>> +
-> >>>>> +static const struct mxs_lradc_of_config const mxs_lradc_of_config[]
-> >>>>> = { +       [IMX23_LRADC] = {
-> >>>>> +               .irq_count      = ARRAY_SIZE(mx23_lradc_irq_names),
-> >>>>> +               .irq_name       = mx23_lradc_irq_names,
-> >>>>> +       },
-> >>>>> +       [IMX28_LRADC] = {
-> >>>>> +               .irq_count      = ARRAY_SIZE(mx28_lradc_irq_names),
-> >>>>> +               .irq_name       = mx28_lradc_irq_names,
-> >>>>> +       },
-> >>>>> +};
-> >>>>> +
-> >>>>> 
-> >>>>>  enum mxs_lradc_ts {
-> >>>>>  
-> >>>>>         MXS_LRADC_TOUCHSCREEN_NONE = 0,
-> >>>>>         MXS_LRADC_TOUCHSCREEN_4WIRE,
-> >>>>> 
-> >>>>> @@ -857,8 +890,19 @@ static void mxs_lradc_hw_stop(struct mxs_lradc
-> >>>>> *lradc)
-> >>>>> 
-> >>>>>                 writel(0, lradc->base + LRADC_DELAY(i));
-> >>>>>  
-> >>>>>  }
-> >>>>> 
-> >>>>> +static const struct of_device_id mxs_lradc_dt_ids[] = {
-> >>>>> +       { .compatible = "fsl,imx23-lradc", .data = (void
-> >>>>> *)IMX23_LRADC, }, +       { .compatible = "fsl,imx28-lradc", .data =
-> >>>>> (void
-> >>>>> *)IMX28_LRADC, }, +       { /* sentinel */ }
-> >>>>> +};
-> >>>>> +MODULE_DEVICE_TABLE(of, mxs_lradc_dt_ids);
-> >>>>> +
-> >>>> 
-> >>>> Why not s/(void \*)\(IMX.._LRADC\)/\&mxs_lradc_of_config[\1]/ ?
-> >>> 
-> >>> Check the register layout, it differs between MX23 and MX28, that's one
-> >>> reason, since were we to access differently placed registers, we can do
-> >>> it easily as in the SSP/I2C drivers.
-> >>> 
-> >>> Moreover, there are some features on the MX28 that are not on the MX23
-> >>> (like voltage treshold triggers and touchbuttons), with this setup, we
-> >>> can easily check what we're running at at runtime and determine to
-> >>> disallow these.
-> >>> 
-> >>> From my point of view, using the number (IMX23_LRADC / IMX28_LRADC) is
-> >>> much more convenient in the long run.
-> >> 
-> >> I'm asking, because you don't use this number anywhere other than in
-> >> mxs_lradc_probe()
-> >> and there only to dereference the irq-names table. After that the
-> >> structure and number
-> >> are forgotten.
-> > 
-> > Certainly, so far it's used only this way. But please see my argument
-> > about register layout, that's why I went down this road of abstraction.
+On Monday 21 January 2013, Alan Stern wrote:
+> Is Manjunath aware of the first patch attached to this email message?
 > 
-> You'll probably be better of by putting these differences into the
-> mxs_lradc_of_config struct as well, instead of adding switch statements
-> here and there throughout the code.
+>         http://marc.info/?l=linux-usb&amp;m=135843902916416&amp;w=2
+> 
 
-Certainly. All that is needed is in place now.
+I would not expect so. Manjunath is still learning about the open
+source processes, but he has also done a similar patch in his tree,
+and one for most of the other ARM based platforms.
 
-Best regards,
-Marek Vasut
+Manjunath: following up on the discussions we've had, I would suggest
+you take a look at that patch, and do a comparison with your version
+(apply it on the same base, then use git-diff to show the differences
+between the version) and thing about whether your they are significant
+or not.  Since Alan posted his version on the mailing list first, that's
+the one that should get merged, but there might be something in it that
+you can learn from it and that I did not see.
+
+Alan, one comment about your version: You keep maintaining the
+'#if IS_ENABLED' list in the main driver, which I think can actually
+get removed now. Since the base driver can be built independent of
+the presence of platform glue drivers, there is no need to forbid
+it any more, and the #if block will cause merge conflicts for each
+patch that converts or adds another platform. I think we can actually
+get the same results by turning the Kconfig logic around and making
+the platform glue drivers 'select USB_EHCI_HCD' than depending on
+it.
+
+	Arnd
