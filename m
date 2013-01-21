@@ -1,24 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jan 2013 22:45:26 +0000
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <201301212230.07393.arnd@arndb.de>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <201301212041.17951.arnd@arndb.de>
- <CAKGA1bn0-83d+BFRMGZDZ9MZ2nnx8e8wh-VS3XoG5UQJDC0npg@mail.gmail.com>
- <201301212230.07393.arnd@arndb.de>
-Message-ID: <20130121224526.GA23505@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 21 Jan 2013 17:46:48 -0500 (EST)
+Subject: [PATCH] crypto: fix FTBFS with ARM SHA1-asm and THUMB2_KERNEL
+In-Reply-To: <1358787763-1226-1-git-send-email-matt@genesi-usa.com>
+References: <1358787763-1226-1-git-send-email-matt@genesi-usa.com>
+Message-ID: <alpine.LFD.2.02.1301211739470.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 10:30:07PM +0000, Arnd Bergmann wrote:
-> On Monday 21 January 2013, Matt Sealey wrote:
-> > So is that a bug in that it is not available to ARM right now, a bug
-> > in that it would be impossible for anyone on ARM to have ever tested
-> > this code, or a bug in that it should NEVER be enabled for ARM for
-> > some reason? John? Ingo? :)
-> > 
-> 
-> I think it's a bug that it's not available. That does not look intentional.
+On Mon, 21 Jan 2013, Matt Sealey wrote:
 
-What's a bug?  kernel/Kconfig.hz not being available?  No, it's
-intentional.  (See my replies).
+> The optimized assembler SHA1 code for ARM does not conform to Thumb2
+> register usage requirements, so it cannot be built when the kernel is
+> configured with THUMB2_KERNEL.
+> 
+> Fix the FTBFS for now by preventing misconfigurations of the kernel.
+> 
+> Signed-off-by: Matt Sealey <matt@genesi-usa.com>
+
+A .arm directive at the top of the assembly code would be a better 
+"fix", as that wouldn't reduce functionality.
+
+Yet, I'd invite you to have a look at commit 638591cd7b in linux-next.
+
+
+Nicolas
