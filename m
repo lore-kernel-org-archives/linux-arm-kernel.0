@@ -1,69 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 21 Jan 2013 09:11:29 +0100
-Subject: [PATCH] power: reset: qnap-poweroff: Fix License String
-In-Reply-To: <20130120204728.GA16339@lizard.gateway.2wire.net>
-References: <20130106215509.GD26928@lizard.sbx05280.losalca.wayport.net>
- <1357668926-20598-1-git-send-email-andrew@lunn.ch>
- <20130120201336.GO8668@pengutronix.de>
- <20130120204728.GA16339@lizard.gateway.2wire.net>
-Message-ID: <20130121081129.GP8668@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 21 Jan 2013 13:44:15 +0530
+Subject: [PATCH 07/10] ARM: OMAP5: clock data: Add OMAP54XX full clock
+ tree and headers
+In-Reply-To: <20130118171912.GD15361@atomide.com>
+References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
+ <1358522856-12180-8-git-send-email-santosh.shilimkar@ti.com>
+ <20130118171912.GD15361@atomide.com>
+Message-ID: <50FCF8D7.1010609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Anton,
+On Friday 18 January 2013 10:49 PM, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130118 07:30]:
+>> From: Rajendra Nayak <rnayak@ti.com>
+>>
+>> Add the clock tree related data for OMAP54xx platforms.
+>>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+>> [santosh.shilimkar at ti.com: Generated es2.0 data]
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>> As mentioned in the summary, this patch will be updated once the
+>> movement of clock data to drivers/clock is clear.
+>
+> Yes let's first fix up the issues prevent us from moving all the
+> cclock*_data.c files to live under drivers/clock/omap.
+>
+> It seems that fixing this issue boils down to rearranging some
+> clock related headers in arch/arm/mach-omap2, and then populating
+> some of the clock data dynamically. Or am I missing something?
+>
+Am not sure of all the dependencies.  Since clock data is using the low
+level prm/cm APIs, all those needs to be exported some how to move
+the data. Paul can comment better on it.
 
-On Sun, Jan 20, 2013 at 12:47:29PM -0800, Anton Vorontsov wrote:
-> On Sun, Jan 20, 2013 at 09:13:36PM +0100, Uwe Kleine-K?nig wrote:
-> > On Tue, Jan 08, 2013 at 07:15:26PM +0100, Andrew Lunn wrote:
-> > > GPLv2+ is not a valid license string. Replace it with one that is.
-> > > 
-> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > > ---
-> > >  drivers/power/reset/qnap-poweroff.c |    2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
-> > > index ca0b476..8af772b 100644
-> > > --- a/drivers/power/reset/qnap-poweroff.c
-> > > +++ b/drivers/power/reset/qnap-poweroff.c
-> > > @@ -121,4 +121,4 @@ module_platform_driver(qnap_power_off_driver);
-> > >  
-> > >  MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
-> > >  MODULE_DESCRIPTION("QNAP Power off driver");
-> > > -MODULE_LICENSE("GPLv2+");
-> > > +MODULE_LICENSE("GPL v2");
-> > This change is wrong.
-> > 
-> > According to include/linux/module.h "GPL v2" means exactly that: version
-> > 2. As the file specifies v2 or later in the header you have to use "GPL"
-> > which means v2 or later.
-> 
-> Does it even make sense to have the two separate things ("GPL v2" and
-> "GPL")?
-Yeah. If you had another OS project that uses GPL-4 you can just copy
-over a GPL-2+ driver to it, not an GPL-2 driver. So assuming the kernel
-will stay at GPL-2 forever it doesn't make any difference for the
-kernel. But other projects might benefit. (And if in the future someone
-might want to change the kernel to GPL-4, she only needs to contact the
-GPL-2 authors and can legally change GPL-2+ to GPL-4+.)
-
-> Suppose there is a global change that modifies a bunch of drivers, some of
-> them are GPLv2+. Now, the author of the global change is submitting it
-> under "GPL v2 only" license, which, by definition, turns any GPLv2+ code
-> into "GPL v2 only", right?
-See http://yarchive.net/comp/linux/dual_license_bsd_gpl.html for Linus'
-POV. It's an old mail, but I think it still applies.
-
-> So, changing from GPLv2+ to "GPL v2 only" is OK, but not the other way
-> around.
-OK as in (probably) legal. OK as in fair is questionable.
-
-> IANAL, tho.
-ditto.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Santosh
