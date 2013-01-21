@@ -1,149 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 21 Jan 2013 11:04:08 +0100
-Subject: [kvmarm] [PATCH v6 14/15] KVM: ARM: Power State Coordination
- Interface implementation
-In-Reply-To: <CANM98q+z2tj72qFtjDF1ZpKMGs876=hRLpKTEwYKnpCMzdpErg@mail.gmail.com>
-References: <20130116175716.29147.15348.stgit@ubuntu>
- <20130116175918.29147.318.stgit@ubuntu> <50F81EF4.4020507@arm.com>
- <CANM98q+z2tj72qFtjDF1ZpKMGs876=hRLpKTEwYKnpCMzdpErg@mail.gmail.com>
-Message-ID: <75f43582106716efe7c8f1360e58732e@localhost>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 21 Jan 2013 11:07:01 +0100
+Subject: [PATCH] net: fec: Add support for multiple phys on mdiobus
+In-Reply-To: <50FD02B8.8080401@grandegger.com>
+References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
+ <50FD02B8.8080401@grandegger.com>
+Message-ID: <20130121100701.GX1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 20 Jan 2013 18:35:51 -0500, Christoffer Dall
-<c.dall@virtualopensystems.com> wrote:
-> On Thu, Jan 17, 2013 at 10:55 AM, Marc Zyngier <marc.zyngier@arm.com>
-> wrote:
->> On 16/01/13 17:59, Christoffer Dall wrote:
->>> From: Marc Zyngier <marc.zyngier@arm.com>
->>>
->>> Implement the PSCI specification (ARM DEN 0022A) to control
->>> virtual CPUs being "powered" on or off.
->>>
->>> PSCI/KVM is detected using the KVM_CAP_ARM_PSCI capability.
->>>
->>> A virtual CPU can now be initialized in a "powered off" state,
->>> using the KVM_ARM_VCPU_POWER_OFF feature flag.
->>>
->>> The guest can use either SMC or HVC to execute a PSCI function.
->>>
->>> Reviewed-by: Will Deacon <will.deacon@arm.com>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
->>
->> A few bits went wrong when you reworked this patch. See below.
+On Mon, Jan 21, 2013 at 09:56:24AM +0100, Wolfgang Grandegger wrote:
+> On 01/21/2013 09:37 AM, Sascha Hauer wrote:
+> > There may be multiple phys on an mdio bus. This series adds support
+> > for this to the fec driver. I recently had a board which has a switch
+> > connected to the fec's mdio bus, so I had to pick the correct phy.
+> 
+> Pick one PHY from a switch port? Well, does a PHY-less (or fixed-link)
+> configuration for a switch not make more sense?
 
-[...]
+Yes, you're probably right.
 
->>> @@ -443,13 +445,17 @@ static int handle_hvc(struct kvm_vcpu *vcpu,
->>> struct kvm_run *run)
->>>       trace_kvm_hvc(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
->>>                     vcpu->arch.hsr & HSR_HVC_IMM_MASK);
->>>
->>> +     if (kvm_psci_call(vcpu))
->>> +             return 1;
->>> +
->>>       return 1;
->>
->> No undef injection if there is no PSCI match?
+> Various ARM Ethernet
+> contoller drivers do not support it. I recently needed a hack for an
+> AT91 board.
 
-You haven't addressed this issue in you patch.
+I wonder how we want to proceed. Should there be a devicetree property
+'fixed-link' like done for fs_enet (and not recommended for new code,
+stated in the comment above of_phy_connect_fixed_link)?
 
-[...]
+Currently I have a property 'phy' in the fec binding which has a phandle
+to a phy provided by the fec's mdio bus, but this could equally well
+point to a fixed dummy phy:
 
-> Thanks, see this patch:
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h
-> b/arch/arm/include/asm/kvm_host.h
-> index 751aa86..d1736a5 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -113,7 +113,7 @@ struct kvm_vcpu_arch {
->  	int last_pcpu;
->  	cpumask_t require_dcache_flush;
-> 
-> -	/* Don't run the guest: see copy_current_insn() */
-> +	/* Don't run the guest on this vcpu */
->  	bool pause;
-> 
->  	/* IO related fields */
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index a67392a..2819575 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -502,7 +502,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu,
-> struct kvm_run *run)
-> 
->  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
-> -	if (!kvm_psci_call(vcpu))
-> +	if (kvm_psci_call(vcpu))
->  		return 1;
-> 
->  	kvm_inject_undefined(vcpu);
-> @@ -667,6 +667,13 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu
-> *vcpu)
->  	return 0;
->  }
-> 
-> +static void vcpu_pause(struct kvm_vcpu *vcpu)
-> +{
-> +	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
-> +
-> +	wait_event_interruptible(*wq, !vcpu->arch.pause);
-> +}
-> +
->  /**
->   * kvm_arch_vcpu_ioctl_run - the main VCPU run function to execute
-guest
->   code
->   * @vcpu:	The VCPU pointer
-> @@ -710,6 +717,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu,
-> struct kvm_run *run)
-> 
->  		update_vttbr(vcpu->kvm);
-> 
-> +		if (vcpu->arch.pause)
-> +			vcpu_pause(vcpu);
-> +
->  		kvm_vgic_flush_hwstate(vcpu);
->  		kvm_timer_flush_hwstate(vcpu);
-> 
-> @@ -737,13 +747,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu
-> *vcpu, struct kvm_run *run)
->  		kvm_guest_enter();
->  		vcpu->mode = IN_GUEST_MODE;
-> 
-> -		smp_mb(); /* set mode before reading vcpu->arch.pause */
-> -		if (unlikely(vcpu->arch.pause)) {
-> -			/* This means ignore, try again. */
-> -			ret = ARM_EXCEPTION_IRQ;
-> -		} else {
-> -			ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
-> -		}
-> +		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
-> 
->  		vcpu->mode = OUTSIDE_GUEST_MODE;
->  		vcpu->arch.last_pcpu = smp_processor_id();
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index 6be3687..d833604 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -28,11 +28,7 @@
-> 
->  static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
->  {
-> -	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
-> -
->  	vcpu->arch.pause = true;
-> -
-> -	wait_event_interruptible(*wq, !vcpu->arch.pause);
->  }
-> 
->  static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+	phy = &fixed-phy;
 
-Assuming you fix the above, it looks OK to me.
+Currently there seems to be no common convention for the devicetree how
+to handle such situations, or am I missing something?
 
-        M.
+Sascha
+
 -- 
-Fast, cheap, reliable. Pick two.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
