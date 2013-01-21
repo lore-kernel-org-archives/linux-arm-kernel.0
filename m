@@ -1,73 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Jan 2013 13:06:02 +0100
-Subject: [PATCH] net: fec: Add support for multiple phys on mdiobus
-In-Reply-To: <50FD2172.2020608@grandegger.com>
-References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
- <50FD02B8.8080401@grandegger.com>
- <20130121100701.GX1906@pengutronix.de>
- <50FD2172.2020608@grandegger.com>
-Message-ID: <20130121120602.GZ1906@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 21 Jan 2013 13:09:40 +0100
+Subject: [PATCH v2 1/8] pinctrl: add SDHI and MMCIF pin groups to r8a7740
+In-Reply-To: <Pine.LNX.4.64.1301171103020.30897@axis700.grange>
+References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
+ <1358356097-26180-2-git-send-email-g.liakhovetski@gmx.de>
+ <Pine.LNX.4.64.1301171103020.30897@axis700.grange>
+Message-ID: <1415012.Vse2oGtvn2@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 12:07:30PM +0100, Wolfgang Grandegger wrote:
-> On 01/21/2013 11:07 AM, Sascha Hauer wrote:
-> > On Mon, Jan 21, 2013 at 09:56:24AM +0100, Wolfgang Grandegger wrote:
-> >> On 01/21/2013 09:37 AM, Sascha Hauer wrote:
-> >>> There may be multiple phys on an mdio bus. This series adds support
-> >>> for this to the fec driver. I recently had a board which has a switch
-> >>> connected to the fec's mdio bus, so I had to pick the correct phy.
-> >>
-> >> Pick one PHY from a switch port? Well, does a PHY-less (or fixed-link)
-> >> configuration for a switch not make more sense?
-> > 
-> > Yes, you're probably right.
-> > 
-> >> Various ARM Ethernet
-> >> contoller drivers do not support it. I recently needed a hack for an
-> >> AT91 board.
-> > 
-> > I wonder how we want to proceed. Should there be a devicetree property
-> > 'fixed-link' like done for fs_enet (and not recommended for new code,
-> > stated in the comment above of_phy_connect_fixed_link)?
+Hi Guennadi,
+
+Thanks for the patch.
+
+On Thursday 17 January 2013 11:04:26 Guennadi Liakhovetski wrote:
+> Add pin groups for all three SDHI interfaces and two alternative pin
+> groups for the MMCIF interface on the r8a7740 SoC.
 > 
-> Also the gianfar and ucc_geth drivers use this interface (via fixed
-> link phy). I tried to use it for the AT91 macb driver but stopped
-> quickly because the usage was not straight forward (too much code)...
-> even if the idea of using a fake fixed-link phy is not bad.
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
 > 
-> > Currently I have a property 'phy' in the fec binding which has a phandle
-> > to a phy provided by the fec's mdio bus, but this could equally well
+> v2: add SDHI2 pins
 > 
-> But than the cable must be connected to the associated switch port.
+>  drivers/pinctrl/sh-pfc/pfc-r8a7740.c |  248 +++++++++++++++++++++++++++++++
+>  1 files changed, 248 insertions(+), 0 deletions(-)
 > 
-> > point to a fixed dummy phy:
-> > 
-> > 	phy = &fixed-phy;
-> 
-> The link speed, full/half duplex and maybe some mroe parameter should
-> be configurable via device tree.
+> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+> b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c index d0b7165..57d9e25 100644
+> --- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+> @@ -1870,6 +1870,188 @@ static const unsigned int lcd1_sys_mux[] = {
 
-Well this could be done when the fixed phy driver could be registered
-with the devicetree, maybe like this:
+[snip]
 
-	fixed-phy: mdiophy {
-		compatible = "mdio-fixed-phy";
-		link = "100FD";
-	};
+> +static const unsigned int mmc0_ctrl_0_pins[] = {
+> +	/* CMD, CLK */
+> +	66, 67,
 
-The good thing about this would be that every ethernet driver could just
-use such a fixed phy, any external mdio phy (like on Marvell Armada) or
-just a phy connected to the internal mdio interface provided by the ethernet
-core.
+Shouldn't this be 67, 66 ?
 
-I probably should write a RFC to devicetree-discuss.
-
-Sascha
-
+> +};
+> +static const unsigned int mmc0_ctrl_0_mux[] = {
+> +	MMC0_CMD_PORT67_MARK, MMC0_CLK_PORT66_MARK,
+> +};
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+
+Laurent Pinchart
