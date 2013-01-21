@@ -1,37 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jan 2013 10:48:20 -0800
-Subject: [PATCH] ARM: board-zoom: Do not request LCD panel enable GPIO
- from twl4030
-In-Reply-To: <20130121183220.GH22517@atomide.com>
-References: <1358774834-32463-1-git-send-email-peter.ujfalusi@ti.com>
- <20130121183220.GH22517@atomide.com>
-Message-ID: <20130121184819.GM22517@atomide.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 21 Jan 2013 19:53:39 +0100
+Subject: [GIT PULL] arm-soc: Xilinx zynq serial changes for v3.9
+In-Reply-To: <201301211834.49512.arnd@arndb.de>
+References: <CAHTX3dJGHK7nO2tx_kUWLwhpgNsCwtnjXAJnRFUOHVx2uE589Q@mail.gmail.com>
+ <201301211834.49512.arnd@arndb.de>
+Message-ID: <CAHTX3dL4ii9ry2d+fNXYBWoiRC6cJWJDvk8Mo1vDv4gAWNP+sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130121 10:35]:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [130121 05:30]:
-> > The pin in question is muxed between GPIO7 and PWM1. For backlight control
-> > there is a custom code in board-zoom-display to control the backlight.
-> > No need to request the GPIO7 - which was failing since the way it is
-> > requested no longer valid: twl's gpio range is allocated dynamically.
-> > 
-> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > ---
-> > Hi Tony,
-> > 
-> > This patch is generated on top of my previous series for audio/pwm support:
-> > http://www.spinics.net/lists/linux-omap/msg85085.html
-> 
-> Can you do a pull request for me for all the arch/arm/*omap* parts
-> against v3.8-rc4 for the v3.9 merge window?
-> 
-> That way you can also merge the same branch into ASoC tree if needed
-> as long as you keep your arch/arm/*omap* branch immutable.
+2013/1/21 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 21 January 2013, Michal Simek wrote:
+>>   git://git.xilinx.com/linux-xlnx.git zynq/serial
+>>
+>> Josh Cartwright (1):
+>>       serial: xilinx_uartps: get clock rate info from dts
+>>
+>> Wei Yongjun (1):
+>>       serial: xilinx_uartps: fix return value check in xuartps_probe()
+>>
+>>  arch/arm/boot/dts/zynq-7000.dtsi   |    4 ++--
+>>  drivers/tty/serial/xilinx_uartps.c |   34 +++++++++++++++++++---------------
+>>  2 files changed, 21 insertions(+), 17 deletions(-)
+>
+> The patches look good, and they should get merged through Greg's tree.
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Probably needs to be several branches though, at least the .dts
-changes should be separate for Benoit.
+ok.
 
-Regards,
+Thanks,
+M
 
-Tony
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian
