@@ -1,25 +1,69 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Jan 2013 09:37:53 +0100
-Subject: [PATCH] net: fec: Add support for multiple phys on mdiobus
-Message-ID: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
+Date: Mon, 21 Jan 2013 09:37:54 +0100
+Subject: [PATCH 1/2] net: fec: refactor dt probing
+In-Reply-To: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
+References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1358757475-21035-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There may be multiple phys on an mdio bus. This series adds support
-for this to the fec driver. I recently had a board which has a switch
-connected to the fec's mdio bus, so I had to pick the correct phy.
+For devicetree parsing only the fec_get_phy_mode_dt() is
+available. Rename it to fec_probe_dt() to be able to add more devicetree
+parsing to it.
 
-This series should be in line with other network drivers supporting
-this (Marvell Armada for example)
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/net/ethernet/freescale/fec.c |   16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-Sascha
-
-----------------------------------------------------------------
-Sascha Hauer (2):
-      net: fec: refactor dt probing
-      net: fec: Add support for phys from devicetree
-
- Documentation/devicetree/bindings/net/fsl-fec.txt |   20 ++++++
- drivers/net/ethernet/freescale/fec.c              |   77 ++++++++++++---------
- drivers/net/ethernet/freescale/fec.h              |    1 +
- 3 files changed, 67 insertions(+), 31 deletions(-)
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 0704bca..2f86557 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -1484,12 +1484,14 @@ static int fec_enet_init(struct net_device *ndev)
+ }
+ 
+ #ifdef CONFIG_OF
+-static int fec_get_phy_mode_dt(struct platform_device *pdev)
++static int fec_probe_dt(struct fec_enet_private *fep)
+ {
+-	struct device_node *np = pdev->dev.of_node;
++	struct device_node *np = fep->pdev->dev.of_node;
+ 
+-	if (np)
+-		return of_get_phy_mode(np);
++	if (!np)
++		return -ENODEV;
++
++	fep->phy_interface = of_get_phy_mode(np);
+ 
+ 	return -ENODEV;
+ }
+@@ -1519,7 +1521,7 @@ static void fec_reset_phy(struct platform_device *pdev)
+ 	gpio_set_value(phy_reset, 1);
+ }
+ #else /* CONFIG_OF */
+-static inline int fec_get_phy_mode_dt(struct platform_device *pdev)
++static inline int fec_probe_dt(struct fec_enet_private *fep)
+ {
+ 	return -ENODEV;
+ }
+@@ -1581,15 +1583,13 @@ fec_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, ndev);
+ 
+-	ret = fec_get_phy_mode_dt(pdev);
++	ret = fec_probe_dt(fep);
+ 	if (ret < 0) {
+ 		pdata = pdev->dev.platform_data;
+ 		if (pdata)
+ 			fep->phy_interface = pdata->phy;
+ 		else
+ 			fep->phy_interface = PHY_INTERFACE_MODE_MII;
+-	} else {
+-		fep->phy_interface = ret;
+ 	}
+ 
+ 	for (i = 0; i < FEC_IRQ_NUM; i++) {
+-- 
+1.7.10.4
