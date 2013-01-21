@@ -1,51 +1,96 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 21 Jan 2013 02:02:21 -0800
-Subject: [PATCH v4 6/7] ARM: Exynos: remove static io-remapping of mct
- registers for Exynos5
+Date: Mon, 21 Jan 2013 02:02:22 -0800
+Subject: [PATCH v4 7/7] ARM: Exynos: move mct driver to drivers/clocksource
 In-Reply-To: <1358762542-19008-1-git-send-email-thomas.abraham@linaro.org>
 References: <1358762542-19008-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1358762542-19008-7-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1358762542-19008-8-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device tree support enabled for MCT controller, the staticio-remapping
-of the MCT controller address space is removed for Exynos5 platforms (which
-supports only device tree based boot).
+Move the multi core timer (mct) driver from mach-exynos to
+drivers/clocksource and update the Kconfig and makefiles.
 
-Cc: Changhwan Youn <chaos.youn@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos/common.c           |    5 -----
- arch/arm/mach-exynos/include/mach/map.h |    1 -
- 2 files changed, 0 insertions(+), 6 deletions(-)
+ arch/arm/Kconfig                                   |    2 +-
+ arch/arm/mach-exynos/Kconfig                       |    6 ------
+ arch/arm/mach-exynos/Makefile                      |    2 --
+ drivers/clocksource/Kconfig                        |    5 +++++
+ drivers/clocksource/Makefile                       |    1 +
+ .../mct.c => drivers/clocksource/exynos_mct.c      |    0
+ 6 files changed, 7 insertions(+), 9 deletions(-)
+ rename arch/arm/mach-exynos/mct.c => drivers/clocksource/exynos_mct.c (100%)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index cdaa55f..ffc72c4 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -283,11 +283,6 @@ static struct map_desc exynos5_iodesc[] __initdata = {
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
- 	}, {
--		.virtual	= (unsigned long)S5P_VA_SYSTIMER,
--		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSTIMER),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= (unsigned long)S5P_VA_SYSRAM,
- 		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSRAM),
- 		.length		= SZ_4K,
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index b8ea67e..99e0a79 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -68,7 +68,6 @@
- #define EXYNOS5_PA_CMU			0x10010000
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 67874b8..10676e9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1624,7 +1624,7 @@ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+ 	depends on SMP
+ 	default y
+-	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
++	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !CLKSRC_EXYNOS_MCT)
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 8bdeaa5..ef06ef5 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -79,12 +79,6 @@ config SOC_EXYNOS5440
+ 	help
+ 	  Enable EXYNOS5440 SoC support
  
- #define EXYNOS4_PA_SYSTIMER		0x10050000
--#define EXYNOS5_PA_SYSTIMER		0x101C0000
+-config EXYNOS4_MCT
+-	bool
+-	default y
+-	help
+-	  Use MCT (Multi Core Timer) as kernel timers
+-
+ config EXYNOS_DEV_DMA
+ 	bool
+ 	help
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 7e53a3a..5141963 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -26,8 +26,6 @@ obj-$(CONFIG_ARCH_EXYNOS)	+= pmu.o
  
- #define EXYNOS4_PA_WATCHDOG		0x10060000
- #define EXYNOS5_PA_WATCHDOG		0x101D0000
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ 
+-obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
+-
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ 
+ obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-smc.o
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index a32b7a9..84bf4de 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -61,3 +61,8 @@ config CLKSRC_ARM_GENERIC
+ 	def_bool y if ARM64
+ 	help
+ 	  This option enables support for the ARM generic timer.
++
++config CLKSRC_EXYNOS_MCT
++	def_bool y if ARCH_EXYNOS
++	help
++	  Support for Multi Core Timer controller on Exynos SoCs.
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index a33f792..248a856 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -17,5 +17,6 @@ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+ obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
+ obj-$(CONFIG_SUNXI_TIMER)	+= sunxi_timer.o
++obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
+ 
+ obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
+diff --git a/arch/arm/mach-exynos/mct.c b/drivers/clocksource/exynos_mct.c
+similarity index 100%
+rename from arch/arm/mach-exynos/mct.c
+rename to drivers/clocksource/exynos_mct.c
 -- 
 1.7.5.4
