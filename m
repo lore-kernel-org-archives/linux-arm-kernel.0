@@ -1,58 +1,45 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 21 Jan 2013 11:47:12 -0600
-Subject: [PATCH 3/7] ARM i.MX6q: Add GPU, VPU, IPU, and OpenVG resets to
- System Reset Controller (SRC)
-In-Reply-To: <1358761930.2522.54.camel@pizza.hi.pengutronix.de>
-References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
- <1358352787-15441-4-git-send-email-p.zabel@pengutronix.de>
- <CAKGA1bmjKQcX3RzSjbnuYqoJqbzXYGa_Whv7QQkNyAhBDzZWdw@mail.gmail.com>
- <1358761930.2522.54.camel@pizza.hi.pengutronix.de>
-Message-ID: <CAKGA1bmkyU_LEJt17SvUwUUh0wXG-2o_5nOGaW8RWDV45g3bVg@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 21 Jan 2013 19:48:26 +0200
+Subject: [PATCH 1/2] net: fec: refactor dt probing
+In-Reply-To: <1358757475-21035-2-git-send-email-s.hauer@pengutronix.de>
+References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
+ <1358757475-21035-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130121174824.GA27956@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 3:52 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Hi Matt,
->
-> thank you for your comments.
->
-> Am Freitag, den 18.01.2013, 13:57 -0600 schrieb Matt Sealey:
->> On Wed, Jan 16, 2013 at 10:13 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
->>
->> +
->> +static int imx_src_reset(unsigned long sw_reset_idx)
->> +{
->>
->> Having a name like imx_src_reset seems needlessly generic and
->> confusing. Surely we are performing a reset on an SoC unit and not
->> having the SRC itself reset, even if it is clearer when we look at the
->> argument?
->
-> imx_src_reset_module, then? Also, I'll add the struct
-> reset_controller_dev pointer as an argument next time:
->
-> static int imx_src_reset_module(struct reset_controller_dev *rcdev,
->                 unsigned long sw_reset_idx)
+Hi Sascha,
 
-Yes, sure.
+On Mon, Jan 21, 2013 at 09:37:54AM +0100, Sascha Hauer wrote:
+> For devicetree parsing only the fec_get_phy_mode_dt() is
+> available. Rename it to fec_probe_dt() to be able to add more devicetree
+> parsing to it.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
 
-> Yes, maybe the module reset part of the SRC should be implemented as a
-> proper device driver in drivers/reset. Then we could use the interrupt
-> functionality and WARN_ON(timeout), as you suggest.
+[...]
 
-That would be ideal. Maybe Shawn or Fabio can bug a hardware guy to
-shed some light on what a reasonable timeout might actually be for a
-module to cause such a warning. I think it should definitely cause
-one.. as I said, I was using 5 seconds, you used 1 second, I don't
-think a shorter delay would be unreasonable, but maybe it could take
-up to 10 seconds, or maybe I am wrong - maybe it is in fact impossible
-in hardware for a reset to "fail" at least visibly because the
-interrupt will always fire making the warning a never-traveled path.
-It is certainly not something that would be documented, so without a
-view of the RTL logic here, we wouldn't know.
+> -static int fec_get_phy_mode_dt(struct platform_device *pdev)
+> +static int fec_probe_dt(struct fec_enet_private *fep)
+>  {
+> -	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *np = fep->pdev->dev.of_node;
+>  
+> -	if (np)
+> -		return of_get_phy_mode(np);
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	fep->phy_interface = of_get_phy_mode(np);
+>  
+>  	return -ENODEV;
 
-Shawn, Fabio?
+Maybe return fep->phy_interface?
+
+baruch
 
 -- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
