@@ -1,65 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jan 2013 16:41:26 +0000
-Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
- OMAP-L138 DSP
-In-Reply-To: <50FCD463.5000006@ti.com>
-References: <1357863807-380-1-git-send-email-rtivy@ti.com>
- <1357863807-380-7-git-send-email-rtivy@ti.com> <50FCD463.5000006@ti.com>
-Message-ID: <20130121164125.GU23505@n2100.arm.linux.org.uk>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 21 Jan 2013 17:45:01 +0100
+Subject: [PATCH] MAINTAINERS: Add ARM/Zynq architecture entry
+Message-ID: <1358786701-28414-1-git-send-email-michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 11:08:43AM +0530, Sekhar Nori wrote:
-> > +	if (IS_ERR_OR_NULL(r)) {
-> > +		dev_err(dev, "platform_get_resource() error: %ld\n",
-> > +			PTR_ERR(r));
-> > +
-> > +		return PTR_ERR(r);
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
+ MAINTAINERS |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-Sigh.  Bug.
-
-> > +	}
-> > +	host1cfg_physaddr = (unsigned long)r->start;
-> > +
-> > +	irq = platform_get_irq(pdev, 0);
-> > +	if (irq < 0) {
-> > +		dev_err(dev, "platform_get_irq(pdev, 0) error: %d\n", irq);
-> > +
-> > +		return irq;
-> > +	}
-> > +
-> > +	irq_data = irq_get_irq_data(irq);
-> > +	if (IS_ERR_OR_NULL(irq_data)) {
-> > +		dev_err(dev, "irq_get_irq_data(%d) error: %ld\n",
-> > +			irq, PTR_ERR(irq_data));
-> > +
-> > +		return PTR_ERR(irq_data);
-
-Bug.
-
-> > +	}
-> > +	ack_fxn = irq_data->chip->irq_ack;
-> > +
-> > +	ret = request_threaded_irq(irq, davinci_rproc_callback, handle_event,
-> > +		0, "davinci-remoteproc", drproc);
-> > +	if (ret) {
-> > +		dev_err(dev, "request_threaded_irq error: %d\n", ret);
-> > +
-> > +		return ret;
-> > +	}
-> > +
-> > +	syscfg0_base = ioremap(host1cfg_physaddr & PAGE_MASK, SZ_4K);
-> > +	host1cfg_offset = offset_in_page(host1cfg_physaddr);
-> > +	writel(rproc->bootaddr, syscfg0_base + host1cfg_offset);
-> > +
-> > +	dsp_clk = clk_get(dev, NULL);
-> 
-> devm_clk_get() here.
-> 
-> > +	if (IS_ERR_OR_NULL(dsp_clk)) {
-> > +		dev_err(dev, "clk_get error: %ld\n", PTR_ERR(dsp_clk));
-> > +		ret = PTR_ERR(dsp_clk);
-
-Bug.
-
-See, yet again... almost every use of IS_ERR_OR_NULL() is a bug.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4e2a1f6..61bf074 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1264,6 +1264,14 @@ S:	Maintained
+ F:	arch/arm/mach-pxa/z2.c
+ F:	arch/arm/mach-pxa/include/mach/z2.h
+ 
++ARM/ZYNQ ARCHITECTURE
++M:	Michal Simek <michal.simek@xilinx.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++W:	http://wiki.xilinx.com
++T:	git git://git.xilinx.com/linux-xlnx.git
++S:	Supported
++F:	arch/arm/mach-zynq/
++
+ ARM64 PORT (AARCH64 ARCHITECTURE)
+ M:	Catalin Marinas <catalin.marinas@arm.com>
+ M:	Will Deacon <will.deacon@arm.com>
+-- 
+1.7.0.4
