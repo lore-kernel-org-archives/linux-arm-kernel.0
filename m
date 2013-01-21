@@ -1,64 +1,49 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jan 2013 16:08:34 +0000
-Subject: [PATCH 1/4] ARM: cache-l2x0: Manage the errata at run time
-In-Reply-To: <20130121131451.GA29855@bnru10>
-References: <20130121131451.GA29855@bnru10>
-Message-ID: <20130121160833.GQ23505@n2100.arm.linux.org.uk>
+Date: Mon, 21 Jan 2013 16:12:02 +0000
+Subject: [PATCH 4/4] ARM: apply the l2x0 Errata 769419 at run time
+In-Reply-To: <20130121131709.GA29927@bnru10>
+References: <20130121131709.GA29927@bnru10>
+Message-ID: <20130121161202.GR23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 06:44:53PM +0530, srinidhi kasagar wrote:
-> +/*
-> + * Identify ther RTL releases of l2x0 - This might help in applying
-> + * the l2x0 errata's dynamically rather compile time options
-> + */
-> +asmlinkage u32 l2x0_get_rtl_release(void)
-
-Why asmlinkage?
-
-> +{
-> +	return readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
-> +			L2X0_CACHE_ID_RTL_MASK;
-> +}
-> +
->  static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
->  {
->  	/* wait for cache operation by line or way to complete */
-> @@ -87,46 +97,41 @@ static inline void l2x0_inv_line(unsigned long addr)
->  	writel_relaxed(addr, base + L2X0_INV_LINE_PA);
->  }
+On Mon, Jan 21, 2013 at 06:47:12PM +0530, srinidhi kasagar wrote:
+> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> ---
+>  arch/arm/kernel/process.c |    9 ++++++---
+>  1 files changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index c6dec5f..c94d84f 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -39,6 +39,7 @@
+>  #include <asm/thread_notify.h>
+>  #include <asm/stacktrace.h>
+>  #include <asm/mach/time.h>
+> +#include <asm/hardware/cache-l2x0.h>
 >  
-> -#if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
-> -static inline void debug_writel(unsigned long val)
-> +static void debug_writel(unsigned long val)
->  {
-> -	if (outer_cache.set_debug)
-> -		outer_cache.set_debug(val);
-> +	u32 l2x0_revision = l2x0_get_rtl_release();
+>  #ifdef CONFIG_CC_STACKPROTECTOR
+>  #include <linux/stackprotector.h>
+> @@ -201,9 +202,11 @@ void cpu_idle(void)
+>  			 * to ensure we don't miss a wakeup call.
+>  			 */
+>  			local_irq_disable();
+> -#ifdef CONFIG_PL310_ERRATA_769419
+> -			wmb();
+> -#endif
 > +
-> +	if (l2x0_revision == L2X0_CACHE_ID_RTL_R3P0 ||
-> +		l2x0_revision == L2X0_CACHE_ID_RTL_R2P0 ||
-> +		l2x0_revision == L2X0_CACHE_ID_RTL_R1P0 ||
-> +		l2x0_revision == L2X0_CACHE_ID_RTL_R0P0)
-> +			if (outer_cache.set_debug)
-> +				outer_cache.set_debug(val);
+> +			/* Check for PL310 ERRATA 769419 */
+> +			if (l2x0_get_rtl_release() == L2X0_CACHE_ID_RTL_R3P0)
+> +				wmb();
 
-This needs comments from the TI folk.  Also, change this around - if
-there's no setting for 'set_debug' there's no point reading the rtl
-release and checking it against a set of values.  Added Santosh.
+You have to be joking if you think that is suitable... two reasons:
 
->  static inline void l2x0_flush_line(unsigned long addr)
->  {
->  	void __iomem *base = l2x0_base;
-> -	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
-> -	writel_relaxed(addr, base + L2X0_CLEAN_INV_LINE_PA);
-> +	u32 l2x0_revision = l2x0_get_rtl_release();
-> +
-> +	if (l2x0_revision == L2X0_CACHE_ID_RTL_R0P0 ||
-> +		l2x0_revision == L2X0_CACHE_ID_RTL_R1P0)
-> +	{
+1. It's a horrid layering violation.
+2. l2x0_get_rtl_release() unconditionally reads from a register in the L2
+   controller.  What if you don't have a L2 controller?
 
-Coding standards.
-
-	if (l2x0_revision == L2X0_CACHE_ID_RTL_R0P0 ||
-	    l2x0_revision == L2X0_CACHE_ID_RTL_R1P0) {
+Is it really worth this hastle, or would it just be better to keep the
+ifdef there, using the configuration symbol as a way to indicate whether
+we want this work-around included in the kernel, and always have the
+wmb() there if the symbol is enabled?
