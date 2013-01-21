@@ -1,51 +1,86 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 21 Jan 2013 13:17:36 +0100
-Subject: [PATCH 2/8] pinctrl: add SDHI and MMCIF pin groups to sh7372
-In-Reply-To: <1358356097-26180-3-git-send-email-g.liakhovetski@gmx.de>
-References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
- <1358356097-26180-3-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <2003703.ytJOxU5lq9@avalon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 21 Jan 2013 12:03:57 +0000
+Subject: [PATCH 21/24] ab8500-charger: Do not touch VBUSOVV bits
+In-Reply-To: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
+References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1358769840-4763-22-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
-Thanks for the patch.
+Do not touch the VBUSOVV in USBCHTRL2 when running on AB8505.
 
-On Wednesday 16 January 2013 18:08:11 Guennadi Liakhovetski wrote:
-> Add pin groups for all three SDHI interfaces and two alternative pin
-> groups for the MMCIF interface on the sh7372 SoC.
-> 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
->  drivers/pinctrl/sh-pfc/pfc-sh7372.c |  205 ++++++++++++++++++++++++++++++++
->  1 files changed, 205 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
-> b/drivers/pinctrl/sh-pfc/pfc-sh7372.c index 847e0cd..78444a0 100644
-> --- a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
-> +++ b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Reviewed-by: Marcus COOPER <marcus.xm.cooper@stericsson.com>
+Tested-by: Mian Yousaf KAUKAB <mian.yousaf.kaukab@stericsson.com>
+---
+ drivers/power/ab8500_charger.c    |   22 ++++++++++++++++------
+ include/linux/mfd/abx500/ab8500.h |   19 +++++++++++++++++++
+ 2 files changed, 35 insertions(+), 6 deletions(-)
 
-[snip]
-
-> @@ -1644,6 +1844,11 @@ struct sh_pfc_soc_info sh7372_pinmux_info = {
-> 
->  	.pins = pinmux_pins,
->  	.nr_pins = ARRAY_SIZE(pinmux_pins),
-> +	.groups		= pinmux_groups,
-> +	.nr_groups	= ARRAY_SIZE(pinmux_groups),
-> +	.functions	= pinmux_functions,
-> +	.nr_functions	= ARRAY_SIZE(pinmux_functions),
-> +
-
-Just a little bit of nitpicking here. I don't have a strong preference on 
-whether the = signs should be aligned. Both options were used in the PFC code, 
-so I've tried to keep whatever was there. It might be better to do so here as 
-well.
-
->  	.func_gpios = pinmux_func_gpios,
->  	.nr_func_gpios = ARRAY_SIZE(pinmux_func_gpios),
+diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
+index a632b94..871bf5a 100644
+--- a/drivers/power/ab8500_charger.c
++++ b/drivers/power/ab8500_charger.c
+@@ -2671,13 +2671,23 @@ static int ab8500_charger_init_hw_registers(struct ab8500_charger *di)
+ 		}
+ 	}
+ 
+-	/* VBUS OVV set to 6.3V and enable automatic current limitiation */
+-	ret = abx500_set_register_interruptible(di->dev,
+-		AB8500_CHARGER,
+-		AB8500_USBCH_CTRL2_REG,
+-		VBUS_OVV_SELECT_6P3V | VBUS_AUTO_IN_CURR_LIM_ENA);
++	if (is_ab9540_2p0(di->parent) || is_ab8505_2p0(di->parent))
++		ret = abx500_mask_and_set_register_interruptible(di->dev,
++			AB8500_CHARGER,
++			AB8500_USBCH_CTRL2_REG,
++			VBUS_AUTO_IN_CURR_LIM_ENA,
++			VBUS_AUTO_IN_CURR_LIM_ENA);
++	else
++		/*
++		 * VBUS OVV set to 6.3V and enable automatic current limitation
++		 */
++		ret = abx500_set_register_interruptible(di->dev,
++			AB8500_CHARGER,
++			AB8500_USBCH_CTRL2_REG,
++			VBUS_OVV_SELECT_6P3V | VBUS_AUTO_IN_CURR_LIM_ENA);
+ 	if (ret) {
+-		dev_err(di->dev, "failed to set VBUS OVV\n");
++		dev_err(di->dev,
++			"failed to set automatic current limitation\n");
+ 		goto out;
+ 	}
+ 
+diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
+index 9dd9b99..b9a6a84 100644
+--- a/include/linux/mfd/abx500/ab8500.h
++++ b/include/linux/mfd/abx500/ab8500.h
+@@ -346,4 +346,23 @@ static inline int is_ab8500_2p0(struct ab8500 *ab)
+ 	return (is_ab8500(ab) && (ab->chip_id == AB8500_CUT2P0));
+ }
+ 
++static inline int is_ab8505_1p0_or_earlier(struct ab8500 *ab)
++{
++	return (is_ab8505(ab) && (ab->chip_id <= AB8500_CUT1P0));
++}
++
++static inline int is_ab8505_2p0(struct ab8500 *ab)
++{
++	return (is_ab8505(ab) && (ab->chip_id == AB8500_CUT2P0));
++}
++
++static inline int is_ab9540_1p0_or_earlier(struct ab8500 *ab)
++{
++	return (is_ab9540(ab) && (ab->chip_id <= AB8500_CUT1P0));
++}
++
++static inline int is_ab9540_2p0(struct ab8500 *ab)
++{
++	return (is_ab9540(ab) && (ab->chip_id == AB8500_CUT2P0));
++}
+ #endif /* MFD_AB8500_H */
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
