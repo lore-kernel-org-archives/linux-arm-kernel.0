@@ -1,49 +1,30 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 21 Jan 2013 14:18:20 -0800
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <20130121211218.GX23505@n2100.arm.linux.org.uk>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <201301212041.17951.arnd@arndb.de> <50FDAC5F.4040605@linaro.org>
- <20130121211218.GX23505@n2100.arm.linux.org.uk>
-Message-ID: <50FDBEAC.2050606@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 21 Jan 2013 23:13:55 +0100
+Subject: [PATCH 6/7] tty: of_serial: Add pinctrl support
+In-Reply-To: <1358544639-14761-7-git-send-email-maxime.ripard@free-electrons.com>
+References: <1358544639-14761-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1358544639-14761-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdYNOTcTVNMqD-q8sJ50nuwoXZLUJZpMXWa=mrZGnGY9+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2013 01:12 PM, Russell King - ARM Linux wrote:
-> On Mon, Jan 21, 2013 at 01:00:15PM -0800, John Stultz wrote:
->> So if you can not get actual timer ticks any faster then 200 HZ on that
->> hardware, setting HZ higher could cause some jiffies related timer
->> trouble
-> Err, no John.  It's the other way around - especially on some platforms
-> which are incapable of being converted to the clock source support.
+On Fri, Jan 18, 2013 at 10:30 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+
+> Use pinctrl to configure the SoCs pins directly from the driver.
 >
-> EBSA110 has _one_ counter.  It counts down at a certain rate, and when
-> it rolls over from 0 to FFFF, it produces an interrupt and continues
-> counting down from FFFF.
->
-> To produce anything close to a reasonable regular tick rate from that,
-> the only way to do it is - with interrupts disabled - read the current
-> value to find out how far the timer has rolled over, and set it so that
-> the next event will expire as close as possible to the desired HZ rate.
->
-> So, none of the clcokevent stuff can be used; and we rely _purely_ on
-> counting interrupts in jiffy based increments to provide any reference
-> of time.
-> Moreover, because the counter is only 16-bit, and it's clocked from
-> something around 7MHz, well, maths will tell you why 200Hz had to be
-> chosen rather than 100Hz.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Ah, so the counter can't do anything *lower* then ~107HZ, right? (7MHZ/2^16)
+You can poke Greg about this which is fun because it does become
+superfluous with the patch titled
+"[PATCH v4] drivers/pinctrl: grab default handles from device core"
+http://marc.info/?l=linux-kernel&m=135879594515932&w=2
 
-So we used to have the ACTHZ code to handle error from the HZ rate 
-requested and the HZ rate possible given the underlying hardware. That's 
-been moved to the register_refined_jiffies(), but do you have a sense if 
-there a reason it couldn't be used? I don't quite recall the bounds at 
-this second, so ~7% error might very well be too large.
+Which will auto-grab the default state on any device.
 
-So yes, I suspect these sorts of platforms, where there are no modern 
-clocksource/clockevent driver, as well as further constraints (like 
-specific HZ) are likely not good candidates for a multi-arch build.
+Greg, can I have your ACK on that device core grab patch
+so you don't have to merge this patch but can point out that
+it solves the boilerplate problem?
 
-thanks
--john
+Yours,
+Linus Walleij
