@@ -1,1700 +1,1672 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Jan 2013 12:03:37 +0000
-Subject: [PATCH 01/24] pm2301: Provide u9540 support for the pm2301 charger
+Date: Mon, 21 Jan 2013 12:03:48 +0000
+Subject: [PATCH 12/24] ab8500-fg: Add test interface for u9540
 In-Reply-To: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
 References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1358769840-4763-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1358769840-4763-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Michel JAOUEN <michel.jaouen@stericsson.com>
 
-AC charger driver for the DB9540 based platforms.
+Add dedicated test functions for HATS framework. This patch
+allows validating fuel gauge HW IP in all possible modes
+supported by HW. Services are accessible through DebugFS
+interface.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Rajkumar Kasirajan <rajkumar.kasirajan@stericsson.com>
 Signed-off-by: Loic Pallardy <loic.pallardy@stericsson.com>
 Reviewed-by: Michel JAOUEN <michel.jaouen@stericsson.com>
+Reviewed-by: Marcus COOPER <marcus.xm.cooper@stericsson.com>
+Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
 Tested-by: Michel JAOUEN <michel.jaouen@stericsson.com>
+Tested-by: Jonas ABERG <jonas.aberg@stericsson.com>
 ---
- drivers/power/Kconfig                     |    7 +
- drivers/power/Makefile                    |    1 +
- drivers/power/ab8500_charger.c            |   36 +-
- drivers/power/pm2301_charger.c            | 1455 +++++++++++++++++++++++++++++
- include/linux/mfd/abx500/ab8500-bm.h      |    2 +
- include/linux/mfd/abx500/ux500_chargalg.h |    2 +
- include/linux/pm2301_charger.h            |   60 ++
- 7 files changed, 1550 insertions(+), 13 deletions(-)
- create mode 100644 drivers/power/pm2301_charger.c
- create mode 100644 include/linux/pm2301_charger.h
+ drivers/power/Kconfig                |   10 +
+ drivers/power/Makefile               |    1 +
+ drivers/power/ab8500_fg.c            |  271 +++--------
+ drivers/power/ab8500_fg.h            |  242 ++++++++++
+ drivers/power/ab8500_fg_deepdebug.c  |  823 ++++++++++++++++++++++++++++++++++
+ include/linux/mfd/abx500/ab8500-bm.h |  164 +++++++
+ 6 files changed, 1297 insertions(+), 214 deletions(-)
+ create mode 100644 drivers/power/ab8500_fg.h
+ create mode 100644 drivers/power/ab8500_fg_deepdebug.c
 
 diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
-index 9f45e2f7..4811b59 100644
+index b9de00d..16b4869 100644
 --- a/drivers/power/Kconfig
 +++ b/drivers/power/Kconfig
-@@ -346,6 +346,13 @@ config AB8500_BM
+@@ -346,6 +346,15 @@ config AB8500_BM
  	help
  	  Say Y to include support for AB8500 battery management.
  
-+config CHARGER_PM2301
-+	bool "PM2301 Battery Charger Driver"
-+	depends on AB8500_BM
++config AB8500_BM_DEEP_DEBUG
++	bool "AB8500 Battery Management Deep Debug"
++	depends on (AB8500_BM && DEEP_DEBUG)
++	default y
 +	help
-+	  Say Y to include support for PM2301 charger driver.
-+	  Depends on AB8500 battery management core.
++	  Say Y to include support for Deep Debug interface
++	  for battery management.
++	  If unsure, say N.
 +
- source "drivers/power/reset/Kconfig"
- 
- endif # POWER_SUPPLY
+ config CHARGER_PM2301
+ 	bool "PM2301 Battery Charger Driver"
+ 	depends on AB8500_BM
+@@ -356,6 +365,7 @@ config CHARGER_PM2301
+ config PM2XXX_DEEP_DEBUG
+ 	bool "PM2XXX Deep Debug"
+ 	depends on DEEP_DEBUG && CHARGER_PM2301
++	default n
+ 	help
+ 	  Deep Debug interface provides an access to all registers.
+ 	  It allows to read or write directly a register.
 diff --git a/drivers/power/Makefile b/drivers/power/Makefile
-index b11e0c7..aa966e8 100644
+index ef1e79c..476668d 100644
 --- a/drivers/power/Makefile
 +++ b/drivers/power/Makefile
-@@ -46,6 +46,7 @@ obj-$(CONFIG_CHARGER_LP8727)	+= lp8727_charger.o
- obj-$(CONFIG_CHARGER_LP8788)	+= lp8788-charger.o
- obj-$(CONFIG_CHARGER_GPIO)	+= gpio-charger.o
- obj-$(CONFIG_CHARGER_MANAGER)	+= charger-manager.o
-+obj-$(CONFIG_CHARGER_PM2301)	+= pm2301_charger.o
- obj-$(CONFIG_CHARGER_MAX8997)	+= max8997_charger.o
- obj-$(CONFIG_CHARGER_MAX8998)	+= max8998_charger.o
- obj-$(CONFIG_CHARGER_BQ2415X)	+= bq2415x_charger.o
-diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-index d5a8bda..43ec82b 100644
---- a/drivers/power/ab8500_charger.c
-+++ b/drivers/power/ab8500_charger.c
-@@ -2830,8 +2830,11 @@ static int ab8500_charger_remove(struct platform_device *pdev)
- 	destroy_workqueue(di->charger_wq);
+@@ -39,6 +39,7 @@ obj-$(CONFIG_BATTERY_JZ4740)	+= jz4740-battery.o
+ obj-$(CONFIG_BATTERY_INTEL_MID)	+= intel_mid_battery.o
+ obj-$(CONFIG_BATTERY_RX51)	+= rx51_battery.o
+ obj-$(CONFIG_AB8500_BM)		+= ab8500_bmdata.o ab8500_charger.o ab8500_fg.o ab8500_btemp.o abx500_chargalg.o
++obj-$(CONFIG_AB8500_BM_DEEP_DEBUG) += ab8500_fg_deepdebug.o
+ obj-$(CONFIG_CHARGER_ISP1704)	+= isp1704_charger.o
+ obj-$(CONFIG_CHARGER_MAX8903)	+= max8903_charger.o
+ obj-$(CONFIG_CHARGER_TWL4030)	+= twl4030_charger.o
+diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
+index a0cbbd3..238eeee 100644
+--- a/drivers/power/ab8500_fg.c
++++ b/drivers/power/ab8500_fg.c
+@@ -33,25 +33,12 @@
+ #include <linux/mfd/abx500/ab8500-bm.h>
+ #include <linux/mfd/abx500/ab8500-gpadc.h>
+ #include <linux/kernel.h>
++#include "ab8500_fg.h"
  
- 	flush_scheduled_work();
--	power_supply_unregister(&di->usb_chg.psy);
--	power_supply_unregister(&di->ac_chg.psy);
-+	if(di->usb_chg.enabled)
-+		power_supply_unregister(&di->usb_chg.psy);
-+	if(di->ac_chg.enabled)
-+		power_supply_unregister(&di->ac_chg.psy);
-+
- 	platform_set_drvdata(pdev, NULL);
- 
- 	return 0;
-@@ -2899,6 +2902,7 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 		ARRAY_SIZE(ab8500_charger_voltage_map) - 1];
- 	di->ac_chg.max_out_curr = ab8500_charger_current_map[
- 		ARRAY_SIZE(ab8500_charger_current_map) - 1];
-+	di->ac_chg.enabled = di->pdata->ac_enabled;
- 
- 	/* USB supply */
- 	/* power_supply base class */
-@@ -2917,7 +2921,7 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 		ARRAY_SIZE(ab8500_charger_voltage_map) - 1];
- 	di->usb_chg.max_out_curr = ab8500_charger_current_map[
- 		ARRAY_SIZE(ab8500_charger_current_map) - 1];
+-#define MILLI_TO_MICRO			1000
+-#define FG_LSB_IN_MA			1627
+-#define QLSB_NANO_AMP_HOURS_X10		1129
+-#define INS_CURR_TIMEOUT		(3 * HZ)
 -
-+	di->usb_chg.enabled = di->pdata->usb_enabled;
+-#define SEC_TO_SAMPLE(S)		(S * 4)
+-
+-#define NBR_AVG_SAMPLES			20
+-
+-#define LOW_BAT_CHECK_INTERVAL		(HZ / 16) /* 62.5 ms */
+-
+-#define VALID_CAPACITY_SEC		(45 * 60) /* 45 minutes */
+-#define BATT_OK_MIN			2360 /* mV */
+-#define BATT_OK_INCREMENT		50 /* mV */
+-#define BATT_OK_MAX_NR_INCREMENTS	0xE
+-
+-/* FG constants */
+-#define BATT_OVV			0x01
++char *charge_state[] = {
++	"CHARGE_INIT",
++	"CHARGE_READOUT",
++};
  
- 	/* Create a work queue for the charger */
- 	di->charger_wq =
-@@ -2995,17 +2999,21 @@ static int ab8500_charger_probe(struct platform_device *pdev)
+ #define interpolate(x, x1, y1, x2, y2) \
+ 	((y1) + ((((y2) - (y1)) * ((x) - (x1))) / ((x2) - (x1))));
+@@ -59,186 +46,6 @@
+ #define to_ab8500_fg_device_info(x) container_of((x), \
+ 	struct ab8500_fg, fg_psy);
+ 
+-/**
+- * struct ab8500_fg_interrupts - ab8500 fg interupts
+- * @name:	name of the interrupt
+- * @isr		function pointer to the isr
+- */
+-struct ab8500_fg_interrupts {
+-	char *name;
+-	irqreturn_t (*isr)(int irq, void *data);
+-};
+-
+-enum ab8500_fg_discharge_state {
+-	AB8500_FG_DISCHARGE_INIT,
+-	AB8500_FG_DISCHARGE_INITMEASURING,
+-	AB8500_FG_DISCHARGE_INIT_RECOVERY,
+-	AB8500_FG_DISCHARGE_RECOVERY,
+-	AB8500_FG_DISCHARGE_READOUT_INIT,
+-	AB8500_FG_DISCHARGE_READOUT,
+-	AB8500_FG_DISCHARGE_WAKEUP,
+-};
+-
+-static char *discharge_state[] = {
+-	"DISCHARGE_INIT",
+-	"DISCHARGE_INITMEASURING",
+-	"DISCHARGE_INIT_RECOVERY",
+-	"DISCHARGE_RECOVERY",
+-	"DISCHARGE_READOUT_INIT",
+-	"DISCHARGE_READOUT",
+-	"DISCHARGE_WAKEUP",
+-};
+-
+-enum ab8500_fg_charge_state {
+-	AB8500_FG_CHARGE_INIT,
+-	AB8500_FG_CHARGE_READOUT,
+-};
+-
+-static char *charge_state[] = {
+-	"CHARGE_INIT",
+-	"CHARGE_READOUT",
+-};
+-
+-enum ab8500_fg_calibration_state {
+-	AB8500_FG_CALIB_INIT,
+-	AB8500_FG_CALIB_WAIT,
+-	AB8500_FG_CALIB_END,
+-};
+-
+-struct ab8500_fg_avg_cap {
+-	int avg;
+-	int samples[NBR_AVG_SAMPLES];
+-	__kernel_time_t time_stamps[NBR_AVG_SAMPLES];
+-	int pos;
+-	int nbr_samples;
+-	int sum;
+-};
+-
+-struct ab8500_fg_cap_scaling {
+-	bool enable;
+-	int cap_to_scale[2];
+-	int disable_cap_level;
+-	int scaled_cap;
+-};
+-
+-struct ab8500_fg_battery_capacity {
+-	int max_mah_design;
+-	int max_mah;
+-	int mah;
+-	int permille;
+-	int level;
+-	int prev_mah;
+-	int prev_percent;
+-	int prev_level;
+-	int user_mah;
+-	struct ab8500_fg_cap_scaling cap_scale;
+-};
+-
+-struct ab8500_fg_flags {
+-	bool fg_enabled;
+-	bool conv_done;
+-	bool charging;
+-	bool fully_charged;
+-	bool force_full;
+-	bool low_bat_delay;
+-	bool low_bat;
+-	bool bat_ovv;
+-	bool batt_unknown;
+-	bool calibrate;
+-	bool user_cap;
+-	bool batt_id_received;
+-};
+-
+-struct inst_curr_result_list {
+-	struct list_head list;
+-	int *result;
+-};
+-
+-/**
+- * struct ab8500_fg - ab8500 FG device information
+- * @dev:		Pointer to the structure device
+- * @node:		a list of AB8500 FGs, hence prepared for reentrance
+- * @irq			holds the CCEOC interrupt number
+- * @vbat:		Battery voltage in mV
+- * @vbat_nom:		Nominal battery voltage in mV
+- * @inst_curr:		Instantenous battery current in mA
+- * @avg_curr:		Average battery current in mA
+- * @bat_temp		battery temperature
+- * @fg_samples:		Number of samples used in the FG accumulation
+- * @accu_charge:	Accumulated charge from the last conversion
+- * @recovery_cnt:	Counter for recovery mode
+- * @high_curr_cnt:	Counter for high current mode
+- * @init_cnt:		Counter for init mode
+- * @low_bat_cnt		Counter for number of consecutive low battery measures
+- * @nbr_cceoc_irq_cnt	Counter for number of CCEOC irqs received since enabled
+- * @recovery_needed:	Indicate if recovery is needed
+- * @high_curr_mode:	Indicate if we're in high current mode
+- * @init_capacity:	Indicate if initial capacity measuring should be done
+- * @turn_off_fg:	True if fg was off before current measurement
+- * @calib_state		State during offset calibration
+- * @discharge_state:	Current discharge state
+- * @charge_state:	Current charge state
+- * @ab8500_fg_started	Completion struct used for the instant current start
+- * @ab8500_fg_complete	Completion struct used for the instant current reading
+- * @flags:		Structure for information about events triggered
+- * @bat_cap:		Structure for battery capacity specific parameters
+- * @avg_cap:		Average capacity filter
+- * @parent:		Pointer to the struct ab8500
+- * @gpadc:		Pointer to the struct gpadc
+- * @bm:           	Platform specific battery management information
+- * @fg_psy:		Structure that holds the FG specific battery properties
+- * @fg_wq:		Work queue for running the FG algorithm
+- * @fg_periodic_work:	Work to run the FG algorithm periodically
+- * @fg_low_bat_work:	Work to check low bat condition
+- * @fg_reinit_work	Work used to reset and reinitialise the FG algorithm
+- * @fg_work:		Work to run the FG algorithm instantly
+- * @fg_acc_cur_work:	Work to read the FG accumulator
+- * @fg_check_hw_failure_work:	Work for checking HW state
+- * @cc_lock:		Mutex for locking the CC
+- * @fg_kobject:		Structure of type kobject
+- */
+-struct ab8500_fg {
+-	struct device *dev;
+-	struct list_head node;
+-	int irq;
+-	int vbat;
+-	int vbat_nom;
+-	int inst_curr;
+-	int avg_curr;
+-	int bat_temp;
+-	int fg_samples;
+-	int accu_charge;
+-	int recovery_cnt;
+-	int high_curr_cnt;
+-	int init_cnt;
+-	int low_bat_cnt;
+-	int nbr_cceoc_irq_cnt;
+-	bool recovery_needed;
+-	bool high_curr_mode;
+-	bool init_capacity;
+-	bool turn_off_fg;
+-	enum ab8500_fg_calibration_state calib_state;
+-	enum ab8500_fg_discharge_state discharge_state;
+-	enum ab8500_fg_charge_state charge_state;
+-	struct completion ab8500_fg_started;
+-	struct completion ab8500_fg_complete;
+-	struct ab8500_fg_flags flags;
+-	struct ab8500_fg_battery_capacity bat_cap;
+-	struct ab8500_fg_avg_cap avg_cap;
+-	struct ab8500 *parent;
+-	struct ab8500_gpadc *gpadc;
+-	struct abx500_bm_data *bm;
+-	struct power_supply fg_psy;
+-	struct workqueue_struct *fg_wq;
+-	struct delayed_work fg_periodic_work;
+-	struct delayed_work fg_low_bat_work;
+-	struct delayed_work fg_reinit_work;
+-	struct work_struct fg_work;
+-	struct work_struct fg_acc_cur_work;
+-	struct delayed_work fg_check_hw_failure_work;
+-	struct mutex cc_lock;
+-	struct kobject fg_kobject;
+-};
+ static LIST_HEAD(ab8500_fg_list);
+ 
+ /**
+@@ -470,7 +277,7 @@ static void ab8500_fg_fill_cap_sample(struct ab8500_fg *di, int sample)
+  * Enable/Disable coulomb counter.
+  * On failure returns negative value.
+  */
+-static int ab8500_fg_coulomb_counter(struct ab8500_fg *di, bool enable)
++int ab8500_fg_coulomb_counter(struct ab8500_fg *di, bool enable)
+ {
+ 	int ret = 0;
+ 	mutex_lock(&di->cc_lock);
+@@ -483,11 +290,13 @@ static int ab8500_fg_coulomb_counter(struct ab8500_fg *di, bool enable)
+ 			goto cc_err;
+ 
+ 		/* Program the samples */
+-		ret = abx500_set_register_interruptible(di->dev,
+-			AB8500_GAS_GAUGE, AB8500_GASG_CC_NCOV_ACCU,
+-			di->fg_samples);
+-		if (ret)
+-			goto cc_err;
++		if (!di->test.enable) {
++			ret = abx500_set_register_interruptible(di->dev,
++				AB8500_GAS_GAUGE, AB8500_GASG_CC_NCOV_ACCU,
++				di->fg_samples);
++			if (ret)
++				goto cc_err;
++		}
+ 
+ 		/* Start the CC */
+ 		ret = abx500_set_register_interruptible(di->dev, AB8500_RTC,
+@@ -1403,7 +1212,7 @@ static void ab8500_fg_check_capacity_limits(struct ab8500_fg *di, bool init)
  	}
+ }
  
- 	/* Register AC charger class */
--	ret = power_supply_register(di->dev, &di->ac_chg.psy);
--	if (ret) {
--		dev_err(di->dev, "failed to register AC charger\n");
--		goto free_charger_wq;
-+	if(di->ac_chg.enabled) {
-+		ret = power_supply_register(di->dev, &di->ac_chg.psy);
-+		if (ret) {
-+			dev_err(di->dev, "failed to register AC charger\n");
-+			goto free_charger_wq;
+-static void ab8500_fg_charge_state_to(struct ab8500_fg *di,
++void ab8500_fg_charge_state_to(struct ab8500_fg *di,
+ 	enum ab8500_fg_charge_state new_state)
+ {
+ 	dev_dbg(di->dev, "Charge state from %d [%s] to %d [%s]\n",
+@@ -1991,12 +1800,17 @@ static void ab8500_fg_instant_work(struct work_struct *work)
+ static irqreturn_t ab8500_fg_cc_data_end_handler(int irq, void *_di)
+ {
+ 	struct ab8500_fg *di = _di;
+-	if (!di->nbr_cceoc_irq_cnt) {
+-		di->nbr_cceoc_irq_cnt++;
+-		complete(&di->ab8500_fg_started);
+-	} else {
+-		di->nbr_cceoc_irq_cnt = 0;
+-		complete(&di->ab8500_fg_complete);
++
++	if (di->test.enable)
++		complete(&di->test.cceoc_complete);
++	else {
++		if (!di->nbr_cceoc_irq_cnt) {
++			di->nbr_cceoc_irq_cnt++;
++			complete(&di->ab8500_fg_started);
++		} else {
++			di->nbr_cceoc_irq_cnt = 0;
++			complete(&di->ab8500_fg_complete);
 +		}
  	}
- 
- 	/* Register USB charger class */
--	ret = power_supply_register(di->dev, &di->usb_chg.psy);
--	if (ret) {
--		dev_err(di->dev, "failed to register USB charger\n");
--		goto free_ac;
-+	if(di->usb_chg.enabled) {
-+		ret = power_supply_register(di->dev, &di->usb_chg.psy);
-+		if (ret) {
-+			dev_err(di->dev, "failed to register USB charger\n");
-+			goto free_ac;
-+		}
- 	}
- 
- 	di->usb_phy = usb_get_phy(USB_PHY_TYPE_USB2);
-@@ -3085,9 +3093,11 @@ free_irq:
- put_usb_phy:
- 	usb_put_phy(di->usb_phy);
- free_usb:
--	power_supply_unregister(&di->usb_chg.psy);
-+	if(di->usb_chg.enabled)
-+		power_supply_unregister(&di->usb_chg.psy);
- free_ac:
--	power_supply_unregister(&di->ac_chg.psy);
-+	if(di->ac_chg.enabled)
-+		power_supply_unregister(&di->ac_chg.psy);
- free_charger_wq:
- 	destroy_workqueue(di->charger_wq);
- 	return ret;
-diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
-new file mode 100644
-index 0000000..c470066
---- /dev/null
-+++ b/drivers/power/pm2301_charger.c
-@@ -0,0 +1,1455 @@
-+/*
-+ * Power supply driver for ST Ericsson pm2xxx_charger charger
+ 	return IRQ_HANDLED;
+ }
+@@ -2011,8 +1825,31 @@ static irqreturn_t ab8500_fg_cc_data_end_handler(int irq, void *_di)
+ static irqreturn_t ab8500_fg_cc_int_calib_handler(int irq, void *_di)
+ {
+ 	struct ab8500_fg *di = _di;
+-	di->calib_state = AB8500_FG_CALIB_END;
+-	queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
++
++	if (di->test.enable) {
++		complete(&di->test.cc_int_calib_complete);
++	} else {
++		di->calib_state = AB8500_FG_CALIB_END;
++		queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
++	}
++	return IRQ_HANDLED;
++}
++
++/**
++ * ab8500_fg_cceoc_handler() - end of conversion isr.
++ * @irq:       interrupt number
++ * @_di:       pointer to the ab8500_fg structure
 + *
-+ * Copyright 2012 ST Ericsson.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Returns IRQ status(IRQ_HANDLED)
 + */
 +
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/device.h>
-+#include <linux/interrupt.h>
-+#include <linux/delay.h>
-+#include <linux/slab.h>
-+#include <linux/platform_device.h>
-+#include <linux/power_supply.h>
-+#include <linux/completion.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/err.h>
-+#include <linux/i2c.h>
-+#include <linux/workqueue.h>
-+#include <linux/kobject.h>
-+#include <linux/mfd/ab8500.h>
-+#include <linux/mfd/abx500.h>
-+#include <linux/mfd/abx500/ab8500-bm.h>
-+#include <linux/mfd/abx500/ab8500-gpadc.h>
-+#include <linux/mfd/abx500/ux500_chargalg.h>
-+#include <linux/pm2301_charger.h>
-+
-+#define MAIN_WDOG_ENA			0x01
-+#define MAIN_WDOG_KICK			0x02
-+#define MAIN_WDOG_DIS			0x00
-+#define CHARG_WD_KICK			0x01
-+#define MAIN_CH_ENA			0x01
-+#define MAIN_CH_NO_OVERSHOOT_ENA_N	0x02
-+#define MAIN_CH_DET			0x01
-+#define MAIN_CH_CV_ON			0x04
-+#define OTP_ENABLE_WD			0x01
-+
-+#define MAIN_CH_INPUT_CURR_SHIFT	4
-+
-+#define LED_INDICATOR_PWM_ENA		0x01
-+#define LED_INDICATOR_PWM_DIS		0x00
-+#define LED_IND_CUR_5MA			0x04
-+#define LED_INDICATOR_PWM_DUTY_252_256	0xBF
-+
-+/* HW failure constants */
-+#define MAIN_CH_TH_PROT			0x02
-+#define MAIN_CH_NOK			0x01
-+
-+/* Watchdog timeout constant */
-+#define WD_TIMER			0x30 /* 4min */
-+#define WD_KICK_INTERVAL		(60 * HZ)
-+
-+/* Constant voltage/current */
-+#define PM2XXX_CONST_CURR		0x0
-+#define PM2XXX_CONST_VOLT		0x1
-+
-+/* Lowest charger voltage is 3.39V -> 0x4E */
-+#define LOW_VOLT_REG			0x4E
-+
-+#define PM2XXX_BATT_CTRL_REG1		0x00
-+#define PM2XXX_BATT_CTRL_REG2		0x01
-+#define PM2XXX_BATT_CTRL_REG3		0x02
-+#define PM2XXX_BATT_CTRL_REG4		0x03
-+#define PM2XXX_BATT_CTRL_REG5		0x04
-+#define PM2XXX_BATT_CTRL_REG6		0x05
-+#define PM2XXX_BATT_CTRL_REG7		0x06
-+#define PM2XXX_BATT_CTRL_REG8		0x07
-+#define PM2XXX_NTC_CTRL_REG1		0x08
-+#define PM2XXX_NTC_CTRL_REG2		0x09
-+#define PM2XXX_BATT_CTRL_REG9		0x0A
-+#define PM2XXX_BATT_STAT_REG1		0x0B
-+#define PM2XXX_INP_VOLT_VPWR2		0x11
-+#define PM2XXX_INP_DROP_VPWR2		0x13
-+#define PM2XXX_INP_VOLT_VPWR1		0x15
-+#define PM2XXX_INP_DROP_VPWR1		0x17
-+#define PM2XXX_INP_MODE_VPWR		0x18
-+#define PM2XXX_BATT_WD_KICK		0x70
-+#define PM2XXX_DEV_VER_STAT		0x0C
-+#define PM2XXX_THERM_WARN_CTRL_REG	0x20
-+#define PM2XXX_BATT_DISC_REG		0x21
-+#define PM2XXX_BATT_LOW_LEV_COMP_REG	0x22
-+#define PM2XXX_BATT_LOW_LEV_VAL_REG	0x23
-+#define PM2XXX_I2C_PAD_CTRL_REG		0x24
-+#define PM2XXX_SW_CTRL_REG		0x26
-+#define PM2XXX_LED_CTRL_REG		0x28
-+
-+#define PM2XXX_REG_INT1		0x40
-+#define PM2XXX_MASK_REG_INT1	0x50
-+#define PM2XXX_SRCE_REG_INT1	0x60
-+#define PM2XXX_REG_INT2		0x41
-+#define PM2XXX_MASK_REG_INT2	0x51
-+#define PM2XXX_SRCE_REG_INT2	0x61
-+#define PM2XXX_REG_INT3		0x42
-+#define PM2XXX_MASK_REG_INT3	0x52
-+#define PM2XXX_SRCE_REG_INT3	0x62
-+#define PM2XXX_REG_INT4		0x43
-+#define PM2XXX_MASK_REG_INT4	0x53
-+#define PM2XXX_SRCE_REG_INT4	0x63
-+#define PM2XXX_REG_INT5		0x44
-+#define PM2XXX_MASK_REG_INT5	0x54
-+#define PM2XXX_SRCE_REG_INT5	0x64
-+#define PM2XXX_REG_INT6		0x45
-+#define PM2XXX_MASK_REG_INT6	0x55
-+#define PM2XXX_SRCE_REG_INT6	0x65
-+
-+#define VPWR_OVV 0x0
-+#define VSYSTEM_OVV 0x1
-+
-+/* control Reg 1 */
-+#define PM2XXX_CH_RESUME_EN	     0x1
-+#define PM2XXX_CH_RESUME_DIS		0x0
-+
-+/* control Reg 2 */
-+#define PM2XXX_CH_AUTO_RESUME_EN	0X2
-+#define PM2XXX_CH_AUTO_RESUME_DIS	0X0
-+#define PM2XXX_CHARGER_ENA		0x4
-+#define PM2XXX_CHARGER_DIS		0x0
-+
-+/* control Reg 3 */
-+#define PM2XXX_CH_WD_CC_PHASE_OFF	0x0
-+#define PM2XXX_CH_WD_CC_PHASE_5MIN	0x1
-+#define PM2XXX_CH_WD_CC_PHASE_10MIN	0x2
-+#define PM2XXX_CH_WD_CC_PHASE_30MIN	0x3
-+#define PM2XXX_CH_WD_CC_PHASE_60MIN	0x4
-+#define PM2XXX_CH_WD_CC_PHASE_120MIN	0x5
-+#define PM2XXX_CH_WD_CC_PHASE_240MIN	0x6
-+#define PM2XXX_CH_WD_CC_PHASE_360MIN	0x7
-+
-+#define PM2XXX_CH_WD_CV_PHASE_OFF	(0x0<<3)
-+#define PM2XXX_CH_WD_CV_PHASE_5MIN	(0x1<<3)
-+#define PM2XXX_CH_WD_CV_PHASE_10MIN	(0x2<<3)
-+#define PM2XXX_CH_WD_CV_PHASE_30MIN	(0x3<<3)
-+#define PM2XXX_CH_WD_CV_PHASE_60MIN	(0x4<<3)
-+#define PM2XXX_CH_WD_CV_PHASE_120MIN	(0x5<<3)
-+#define PM2XXX_CH_WD_CV_PHASE_240MIN	(0x6<<3)
-+#define PM2XXX_CH_WD_CV_PHASE_360MIN	(0x7<<3)
-+
-+/* control Reg 4 */
-+#define PM2XXX_CH_WD_PRECH_PHASE_OFF	0x0
-+#define PM2XXX_CH_WD_PRECH_PHASE_1MIN	0x1
-+#define PM2XXX_CH_WD_PRECH_PHASE_5MIN	0x2
-+#define PM2XXX_CH_WD_PRECH_PHASE_10MIN	0x3
-+#define PM2XXX_CH_WD_PRECH_PHASE_30MIN	0x4
-+#define PM2XXX_CH_WD_PRECH_PHASE_60MIN	0x5
-+#define PM2XXX_CH_WD_PRECH_PHASE_120MIN	0x6
-+#define PM2XXX_CH_WD_PRECH_PHASE_240MIN	0x7
-+
-+/* control Reg 5 */
-+#define PM2XXX_CH_WD_AUTO_TIMEOUT_NONE	0x0
-+#define PM2XXX_CH_WD_AUTO_TIMEOUT_20MIN	0x1
-+
-+/* control Reg 6 */
-+#define PM2XXX_DIR_CH_CC_CURRENT_MASK	0x0F
-+#define PM2XXX_DIR_CH_CC_CURRENT_200MA	0x0
-+#define PM2XXX_DIR_CH_CC_CURRENT_400MA	0x2
-+#define PM2XXX_DIR_CH_CC_CURRENT_600MA	0x3
-+#define PM2XXX_DIR_CH_CC_CURRENT_800MA	0x4
-+#define PM2XXX_DIR_CH_CC_CURRENT_1000MA	0x5
-+#define PM2XXX_DIR_CH_CC_CURRENT_1200MA	0x6
-+#define PM2XXX_DIR_CH_CC_CURRENT_1400MA	0x7
-+#define PM2XXX_DIR_CH_CC_CURRENT_1600MA	0x8
-+#define PM2XXX_DIR_CH_CC_CURRENT_1800MA	0x9
-+#define PM2XXX_DIR_CH_CC_CURRENT_2000MA	0xA
-+#define PM2XXX_DIR_CH_CC_CURRENT_2200MA	0xB
-+#define PM2XXX_DIR_CH_CC_CURRENT_2400MA	0xC
-+#define PM2XXX_DIR_CH_CC_CURRENT_2600MA	0xD
-+#define PM2XXX_DIR_CH_CC_CURRENT_2800MA	0xE
-+#define PM2XXX_DIR_CH_CC_CURRENT_3000MA	0xF
-+
-+#define PM2XXX_CH_PRECH_CURRENT_MASK	0x30
-+#define PM2XXX_CH_PRECH_CURRENT_25MA	(0x0<<4)
-+#define PM2XXX_CH_PRECH_CURRENT_50MA	(0x1<<4)
-+#define PM2XXX_CH_PRECH_CURRENT_75MA	(0x2<<4)
-+#define PM2XXX_CH_PRECH_CURRENT_100MA	(0x3<<4)
-+
-+#define PM2XXX_CH_EOC_CURRENT_MASK	0xC0
-+#define PM2XXX_CH_EOC_CURRENT_100MA	(0x0<<6)
-+#define PM2XXX_CH_EOC_CURRENT_150MA	(0x1<<6)
-+#define PM2XXX_CH_EOC_CURRENT_300MA	(0x2<<6)
-+#define PM2XXX_CH_EOC_CURRENT_400MA	(0x3<<6)
-+
-+/* control Reg 7 */
-+#define PM2XXX_CH_PRECH_VOL_2_5		0x0
-+#define PM2XXX_CH_PRECH_VOL_2_7		0x1
-+#define PM2XXX_CH_PRECH_VOL_2_9		0x2
-+#define PM2XXX_CH_PRECH_VOL_3_1		0x3
-+
-+#define PM2XXX_CH_VRESUME_VOL_3_2	(0x0<<2)
-+#define PM2XXX_CH_VRESUME_VOL_3_4	(0x1<<2)
-+#define PM2XXX_CH_VRESUME_VOL_3_6	(0x2<<2)
-+#define PM2XXX_CH_VRESUME_VOL_3_8	(0x3<<2)
-+
-+/* control Reg 8 */
-+#define PM2XXX_CH_VOLT_MASK		0x3F
-+#define PM2XXX_CH_VOLT_3_5		0x0
-+#define PM2XXX_CH_VOLT_3_5225		0x1
-+#define PM2XXX_CH_VOLT_3_6		0x4
-+#define PM2XXX_CH_VOLT_3_7		0x8
-+#define PM2XXX_CH_VOLT_4_0		0x14
-+#define PM2XXX_CH_VOLT_4_175		0x1B
-+#define PM2XXX_CH_VOLT_4_2		0x1C
-+#define PM2XXX_CH_VOLT_4_275		0x1F
-+#define PM2XXX_CH_VOLT_4_3		0x20
-+
-+/*NTC control register 1*/
-+#define PM2XXX_BTEMP_HIGH_TH_45		0x0
-+#define PM2XXX_BTEMP_HIGH_TH_50		0x1
-+#define PM2XXX_BTEMP_HIGH_TH_55		0x2
-+#define PM2XXX_BTEMP_HIGH_TH_60		0x3
-+#define PM2XXX_BTEMP_HIGH_TH_65		0x4
-+
-+#define PM2XXX_BTEMP_LOW_TH_N5		(0x0<<3)
-+#define PM2XXX_BTEMP_LOW_TH_0		(0x1<<3)
-+#define PM2XXX_BTEMP_LOW_TH_5		(0x2<<3)
-+#define PM2XXX_BTEMP_LOW_TH_10		(0x3<<3)
-+
-+/*NTC control register 2*/
-+#define PM2XXX_NTC_BETA_COEFF_3477	0x0
-+#define PM2XXX_NTC_BETA_COEFF_3964	0x1
-+
-+#define PM2XXX_NTC_RES_10K		(0x0<<2)
-+#define PM2XXX_NTC_RES_47K		(0x1<<2)
-+#define PM2XXX_NTC_RES_100K		(0x2<<2)
-+#define PM2XXX_NTC_RES_NO_NTC		(0x3<<2)
-+
-+/* control Reg 9 */
-+#define PM2XXX_CH_CC_MODEDROP_EN	1
-+#define PM2XXX_CH_CC_MODEDROP_DIS	0
-+
-+#define PM2XXX_CH_CC_REDUCED_CURRENT_100MA	(0x0<<1)
-+#define PM2XXX_CH_CC_REDUCED_CURRENT_200MA	(0x1<<1)
-+#define PM2XXX_CH_CC_REDUCED_CURRENT_400MA	(0x2<<1)
-+#define PM2XXX_CH_CC_REDUCED_CURRENT_IDENT	(0x3<<1)
-+
-+#define PM2XXX_CHARCHING_INFO_DIS	(0<<3)
-+#define PM2XXX_CHARCHING_INFO_EN	(1<<3)
-+
-+#define PM2XXX_CH_150MV_DROP_300MV	(0<<4)
-+#define PM2XXX_CH_150MV_DROP_150MV	(1<<4)
-+
-+
-+/* charger status register */
-+#define PM2XXX_CHG_STATUS_OFF		0x0
-+#define PM2XXX_CHG_STATUS_ON		0x1
-+#define PM2XXX_CHG_STATUS_FULL		0x2
-+#define PM2XXX_CHG_STATUS_ERR		0x3
-+#define PM2XXX_CHG_STATUS_WAIT		0x4
-+#define PM2XXX_CHG_STATUS_NOBAT		0x5
-+
-+/* Input charger voltage VPWR2 */
-+#define PM2XXX_VPWR2_OVV_6_0		0x0
-+#define PM2XXX_VPWR2_OVV_6_3		0x1
-+#define PM2XXX_VPWR2_OVV_10		0x2
-+#define PM2XXX_VPWR2_OVV_NONE		0x3
-+
-+/* Input charger voltage VPWR1 */
-+#define PM2XXX_VPWR1_OVV_6_0		0x0
-+#define PM2XXX_VPWR1_OVV_6_3		0x1
-+#define PM2XXX_VPWR1_OVV_10		0x2
-+#define PM2XXX_VPWR1_OVV_NONE		0x3
-+
-+/* Battery low level comparator control register */
-+#define PM2XXX_VBAT_LOW_MONITORING_DIS	0x0
-+#define PM2XXX_VBAT_LOW_MONITORING_ENA	0x1
-+
-+/* Battery low level value control register */
-+#define PM2XXX_VBAT_LOW_LEVEL_2_3	0x0
-+#define PM2XXX_VBAT_LOW_LEVEL_2_4	0x1
-+#define PM2XXX_VBAT_LOW_LEVEL_2_5	0x2
-+#define PM2XXX_VBAT_LOW_LEVEL_2_6	0x3
-+#define PM2XXX_VBAT_LOW_LEVEL_2_7	0x4
-+#define PM2XXX_VBAT_LOW_LEVEL_2_8	0x5
-+#define PM2XXX_VBAT_LOW_LEVEL_2_9	0x6
-+#define PM2XXX_VBAT_LOW_LEVEL_3_0	0x7
-+#define PM2XXX_VBAT_LOW_LEVEL_3_1	0x8
-+#define PM2XXX_VBAT_LOW_LEVEL_3_2	0x9
-+#define PM2XXX_VBAT_LOW_LEVEL_3_3	0xA
-+#define PM2XXX_VBAT_LOW_LEVEL_3_4	0xB
-+#define PM2XXX_VBAT_LOW_LEVEL_3_5	0xC
-+#define PM2XXX_VBAT_LOW_LEVEL_3_6	0xD
-+#define PM2XXX_VBAT_LOW_LEVEL_3_7	0xE
-+#define PM2XXX_VBAT_LOW_LEVEL_3_8	0xF
-+#define PM2XXX_VBAT_LOW_LEVEL_3_9	0x10
-+#define PM2XXX_VBAT_LOW_LEVEL_4_0	0x11
-+#define PM2XXX_VBAT_LOW_LEVEL_4_1	0x12
-+#define PM2XXX_VBAT_LOW_LEVEL_4_2	0x13
-+
-+/* SW CTRL */
-+#define PM2XXX_SWCTRL_HW		0x0
-+#define PM2XXX_SWCTRL_SW		0x1
-+
-+
-+/* LED Driver Control */
-+#define PM2XXX_LED_CURRENT_MASK		0x0C
-+#define PM2XXX_LED_CURRENT_2_5MA	(0X0<<2)
-+#define PM2XXX_LED_CURRENT_1MA		(0X1<<2)
-+#define PM2XXX_LED_CURRENT_5MA		(0X2<<2)
-+#define PM2XXX_LED_CURRENT_10MA		(0X3<<2)
-+
-+#define PM2XXX_LED_SELECT_MASK		0x02
-+#define PM2XXX_LED_SELECT_EN		(0X0<<1)
-+#define PM2XXX_LED_SELECT_DIS		(0X1<<1)
-+
-+#define PM2XXX_ANTI_OVERSHOOT_MASK	0x01
-+#define PM2XXX_ANTI_OVERSHOOT_DIS	0X0
-+#define PM2XXX_ANTI_OVERSHOOT_EN	0X1
-+
-+#define to_pm2xxx_charger_ac_device_info(x) container_of((x), \
-+		struct pm2xxx_charger, ac_chg)
-+
-+static int pm2xxx_interrupt_registers[] = {
-+	PM2XXX_REG_INT1,
-+	PM2XXX_REG_INT2,
-+	PM2XXX_REG_INT3,
-+	PM2XXX_REG_INT4,
-+	PM2XXX_REG_INT5,
-+	PM2XXX_REG_INT6,
-+};
-+
-+enum pm2xxx_reg_int1 {
-+	PM2XXX_INT1_ITVBATDISCONNECT	= 0x02,
-+	PM2XXX_INT1_ITVBATLOWR		= 0x04,
-+	PM2XXX_INT1_ITVBATLOWF		= 0x08,
-+};
-+
-+enum pm2xxx_mask_reg_int1 {
-+	PM2XXX_INT1_M_ITVBATDISCONNECT	= 0x02,
-+	PM2XXX_INT1_M_ITVBATLOWR	= 0x04,
-+	PM2XXX_INT1_M_ITVBATLOWF	= 0x08,
-+};
-+
-+enum pm2xxx_source_reg_int1 {
-+	PM2XXX_INT1_S_ITVBATDISCONNECT	= 0x02,
-+	PM2XXX_INT1_S_ITVBATLOWR	= 0x04,
-+	PM2XXX_INT1_S_ITVBATLOWF	= 0x08,
-+};
-+
-+enum pm2xxx_reg_int2 {
-+	PM2XXX_INT2_ITVPWR2PLUG		= 0x01,
-+	PM2XXX_INT2_ITVPWR2UNPLUG	= 0x02,
-+	PM2XXX_INT2_ITVPWR1PLUG		= 0x04,
-+	PM2XXX_INT2_ITVPWR1UNPLUG	= 0x08,
-+};
-+
-+enum pm2xxx_mask_reg_int2 {
-+	PM2XXX_INT2_M_ITVPWR2PLUG	= 0x01,
-+	PM2XXX_INT2_M_ITVPWR2UNPLUG	= 0x02,
-+	PM2XXX_INT2_M_ITVPWR1PLUG	= 0x04,
-+	PM2XXX_INT2_M_ITVPWR1UNPLUG	= 0x08,
-+};
-+
-+enum pm2xxx_source_reg_int2 {
-+	PM2XXX_INT2_S_ITVPWR2PLUG	= 0x03,
-+	PM2XXX_INT2_S_ITVPWR1PLUG	= 0x0c,
-+};
-+
-+enum pm2xxx_reg_int3 {
-+	PM2XXX_INT3_ITCHPRECHARGEWD	= 0x01,
-+	PM2XXX_INT3_ITCHCCWD		= 0x02,
-+	PM2XXX_INT3_ITCHCVWD		= 0x04,
-+	PM2XXX_INT3_ITAUTOTIMEOUTWD	= 0x08,
-+};
-+
-+enum pm2xxx_mask_reg_int3 {
-+	PM2XXX_INT3_M_ITCHPRECHARGEWD	= 0x01,
-+	PM2XXX_INT3_M_ITCHCCWD		= 0x02,
-+	PM2XXX_INT3_M_ITCHCVWD		= 0x04,
-+	PM2XXX_INT3_M_ITAUTOTIMEOUTWD	= 0x08,
-+};
-+
-+enum pm2xxx_source_reg_int3 {
-+	PM2XXX_INT3_S_ITCHPRECHARGEWD	= 0x01,
-+	PM2XXX_INT3_S_ITCHCCWD		= 0x02,
-+	PM2XXX_INT3_S_ITCHCVWD		= 0x04,
-+	PM2XXX_INT3_S_ITAUTOTIMEOUTWD	= 0x08,
-+};
-+
-+enum pm2xxx_reg_int4 {
-+	PM2XXX_INT4_ITBATTEMPCOLD	= 0x01,
-+	PM2XXX_INT4_ITBATTEMPHOT	= 0x02,
-+	PM2XXX_INT4_ITVPWR2OVV		= 0x04,
-+	PM2XXX_INT4_ITVPWR1OVV		= 0x08,
-+	PM2XXX_INT4_ITCHARGINGON	= 0x10,
-+	PM2XXX_INT4_ITVRESUME		= 0x20,
-+	PM2XXX_INT4_ITBATTFULL		= 0x40,
-+	PM2XXX_INT4_ITCVPHASE		= 0x80,
-+};
-+
-+enum pm2xxx_mask_reg_int4 {
-+	PM2XXX_INT4_M_ITBATTEMPCOLD	= 0x01,
-+	PM2XXX_INT4_M_ITBATTEMPHOT	= 0x02,
-+	PM2XXX_INT4_M_ITVPWR2OVV	= 0x04,
-+	PM2XXX_INT4_M_ITVPWR1OVV	= 0x08,
-+	PM2XXX_INT4_M_ITCHARGINGON	= 0x10,
-+	PM2XXX_INT4_M_ITVRESUME		= 0x20,
-+	PM2XXX_INT4_M_ITBATTFULL	= 0x40,
-+	PM2XXX_INT4_M_ITCVPHASE		= 0x80,
-+};
-+
-+enum pm2xxx_source_reg_int4 {
-+	PM2XXX_INT4_S_ITBATTEMPCOLD	= 0x01,
-+	PM2XXX_INT4_S_ITBATTEMPHOT	= 0x02,
-+	PM2XXX_INT4_S_ITVPWR2OVV	= 0x04,
-+	PM2XXX_INT4_S_ITVPWR1OVV	= 0x08,
-+	PM2XXX_INT4_S_ITCHARGINGON	= 0x10,
-+	PM2XXX_INT4_S_ITVRESUME		= 0x20,
-+	PM2XXX_INT4_S_ITBATTFULL	= 0x40,
-+	PM2XXX_INT4_S_ITCVPHASE		= 0x80,
-+};
-+
-+enum pm2xxx_reg_int5 {
-+	PM2XXX_INT5_ITTHERMALSHUTDOWNRISE	= 0x01,
-+	PM2XXX_INT5_ITTHERMALSHUTDOWNFALL	= 0x02,
-+	PM2XXX_INT5_ITTHERMALWARNINGRISE	= 0x04,
-+	PM2XXX_INT5_ITTHERMALWARNINGFALL	= 0x08,
-+	PM2XXX_INT5_ITVSYSTEMOVV		= 0x10,
-+};
-+
-+enum pm2xxx_mask_reg_int5 {
-+	PM2XXX_INT5_M_ITTHERMALSHUTDOWNRISE	= 0x01,
-+	PM2XXX_INT5_M_ITTHERMALSHUTDOWNFALL	= 0x02,
-+	PM2XXX_INT5_M_ITTHERMALWARNINGRISE	= 0x04,
-+	PM2XXX_INT5_M_ITTHERMALWARNINGFALL	= 0x08,
-+	PM2XXX_INT5_M_ITVSYSTEMOVV		= 0x10,
-+};
-+
-+enum pm2xxx_source_reg_int5 {
-+	PM2XXX_INT5_S_ITTHERMALSHUTDOWNRISE	= 0x01,
-+	PM2XXX_INT5_S_ITTHERMALSHUTDOWNFALL	= 0x02,
-+	PM2XXX_INT5_S_ITTHERMALWARNINGRISE	= 0x04,
-+	PM2XXX_INT5_S_ITTHERMALWARNINGFALL	= 0x08,
-+	PM2XXX_INT5_S_ITVSYSTEMOVV		= 0x10,
-+};
-+
-+enum pm2xxx_reg_int6 {
-+	PM2XXX_INT6_ITVPWR2DROP		= 0x01,
-+	PM2XXX_INT6_ITVPWR1DROP		= 0x02,
-+	PM2XXX_INT6_ITVPWR2VALIDRISE	= 0x04,
-+	PM2XXX_INT6_ITVPWR2VALIDFALL	= 0x08,
-+	PM2XXX_INT6_ITVPWR1VALIDRISE	= 0x10,
-+	PM2XXX_INT6_ITVPWR1VALIDFALL	= 0x20,
-+};
-+
-+enum pm2xxx_mask_reg_int6 {
-+	PM2XXX_INT6_M_ITVPWR2DROP	= 0x01,
-+	PM2XXX_INT6_M_ITVPWR1DROP	= 0x02,
-+	PM2XXX_INT6_M_ITVPWR2VALIDRISE	= 0x04,
-+	PM2XXX_INT6_M_ITVPWR2VALIDFALL	= 0x08,
-+	PM2XXX_INT6_M_ITVPWR1VALIDRISE	= 0x10,
-+	PM2XXX_INT6_M_ITVPWR1VALIDFALL	= 0x20,
-+};
-+
-+enum pm2xxx_source_reg_int6 {
-+	PM2XXX_INT6_S_ITVPWR2DROP	= 0x01,
-+	PM2XXX_INT6_S_ITVPWR1DROP	= 0x02,
-+	PM2XXX_INT6_S_ITVPWR2VALIDRISE	= 0x04,
-+	PM2XXX_INT6_S_ITVPWR2VALIDFALL	= 0x08,
-+	PM2XXX_INT6_S_ITVPWR1VALIDRISE	= 0x10,
-+	PM2XXX_INT6_S_ITVPWR1VALIDFALL	= 0x20,
-+};
-+
-+static enum power_supply_property pm2xxx_charger_ac_props[] = {
-+	POWER_SUPPLY_PROP_HEALTH,
-+	POWER_SUPPLY_PROP_PRESENT,
-+	POWER_SUPPLY_PROP_ONLINE,
-+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-+	POWER_SUPPLY_PROP_VOLTAGE_AVG,
-+	POWER_SUPPLY_PROP_CURRENT_NOW,
-+};
-+
-+static int pm2xxx_charger_voltage_map[] = {
-+	3500,
-+	3525,
-+	3550,
-+	3575,
-+	3600,
-+	3625,
-+	3650,
-+	3675,
-+	3700,
-+	3725,
-+	3750,
-+	3775,
-+	3800,
-+	3825,
-+	3850,
-+	3875,
-+	3900,
-+	3925,
-+	3950,
-+	3975,
-+	4000,
-+	4025,
-+	4050,
-+	4075,
-+	4100,
-+	4125,
-+	4150,
-+	4175,
-+	4200,
-+	4225,
-+	4250,
-+	4275,
-+	4300,
-+};
-+
-+static int pm2xxx_charger_current_map[] = {
-+	200,
-+	200,
-+	400,
-+	600,
-+	800,
-+	1000,
-+	1200,
-+	1400,
-+	1600,
-+	1800,
-+	2000,
-+	2200,
-+	2400,
-+	2600,
-+	2800,
-+	3000,
-+};
-+
-+struct pm2xxx_irq {
++static irqreturn_t ab8500_fg_cceoc_handler(int irq, void *_di)
++{
++	struct ab8500_fg *di = _di;
++
++	if (di->test.enable)
++		complete(&di->test.cceoc_complete);
++
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -2027,7 +1864,10 @@ static irqreturn_t ab8500_fg_cc_convend_handler(int irq, void *_di)
+ {
+ 	struct ab8500_fg *di = _di;
+ 
+-	queue_work(di->fg_wq, &di->fg_acc_cur_work);
++	if (di->test.enable)
++		complete(&di->test.nconv_accu_complete);
++	else
++		queue_work(di->fg_wq, &di->fg_acc_cur_work);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -2613,6 +2453,7 @@ static struct ab8500_fg_interrupts ab8500_fg_irq[] = {
+ 	{"LOW_BAT_F", ab8500_fg_lowbatf_handler},
+ 	{"CC_INT_CALIB", ab8500_fg_cc_int_calib_handler},
+ 	{"CCEOC", ab8500_fg_cc_data_end_handler},
++	{"CCEOC", ab8500_fg_cceoc_handler},
+ };
+ 
+ static char *supply_interface[] = {
+@@ -2676,6 +2517,8 @@ static int ab8500_fg_probe(struct platform_device *pdev)
+ 	ab8500_fg_charge_state_to(di, AB8500_FG_CHARGE_INIT);
+ 	ab8500_fg_discharge_state_to(di, AB8500_FG_DISCHARGE_INIT);
+ 
++	ab8500_fg_test_init(di);
++
+ 	/* Create a work queue for running the FG algorithm */
+ 	di->fg_wq = create_singlethread_workqueue("ab8500_fg_wq");
+ 	if (di->fg_wq == NULL) {
+diff --git a/drivers/power/ab8500_fg.h b/drivers/power/ab8500_fg.h
+new file mode 100644
+index 0000000..946840b
+--- /dev/null
++++ b/drivers/power/ab8500_fg.h
+@@ -0,0 +1,242 @@
++/*
++ * Copyright (C) ST-Ericsson AB 2012
++ *
++ * Main and Back-up battery management driver.
++ *
++ * Note: Backup battery management is required in case of Li-Ion battery and not
++ * for capacitive battery. HREF boards have capacitive battery and hence backup
++ * battery management is not used and the supported code is available in this
++ * driver.
++ *
++ * License Terms: GNU General Public License v2
++ * Author: Johan Palsson <johan.palsson@stericsson.com>
++ * Author: Karl Komierowski <karl.komierowski@stericsson.com>
++ */
++
++#define MILLI_TO_MICRO			1000
++#define FG_LSB_IN_MA			1627
++#define QLSB_NANO_AMP_HOURS_X10		1129
++#define INS_CURR_TIMEOUT		(3 * HZ)
++
++#define SEC_TO_SAMPLE(S)		(S * 4)
++
++#define NBR_AVG_SAMPLES			20
++
++#define LOW_BAT_CHECK_INTERVAL		(HZ / 16) /* 62.5 ms */
++
++#define VALID_CAPACITY_SEC		(45 * 60) /* 45 minutes */
++#define BATT_OK_MIN			2360 /* mV */
++#define BATT_OK_INCREMENT		50 /* mV */
++#define BATT_OK_MAX_NR_INCREMENTS	0xE
++
++/* FG constants */
++#define BATT_OVV			0x01
++
++/**
++ * struct ab8500_fg_interrupts - ab8500 fg interupts
++ * @name:	name of the interrupt
++ * @isr		function pointer to the isr
++ */
++struct ab8500_fg_interrupts {
 +	char *name;
 +	irqreturn_t (*isr)(int irq, void *data);
 +};
 +
-+struct pm2xxx_charger_info {
-+	int charger_connected;
-+	int charger_online;
-+	int charger_voltage;
-+	int cv_active;
-+	bool wd_expired;
++enum ab8500_fg_discharge_state {
++	AB8500_FG_DISCHARGE_INIT,
++	AB8500_FG_DISCHARGE_INITMEASURING,
++	AB8500_FG_DISCHARGE_INIT_RECOVERY,
++	AB8500_FG_DISCHARGE_RECOVERY,
++	AB8500_FG_DISCHARGE_READOUT_INIT,
++	AB8500_FG_DISCHARGE_READOUT,
++	AB8500_FG_DISCHARGE_WAKEUP,
 +};
 +
-+struct pm2xxx_charger_event_flags {
-+	bool mainextchnotok;
-+	bool main_thermal_prot;
-+	bool ovv;
-+	bool chgwdexp;
++enum ab8500_fg_charge_state {
++	AB8500_FG_CHARGE_INIT,
++	AB8500_FG_CHARGE_READOUT,
 +};
 +
-+struct pm2xxx_config {
-+	struct i2c_client *pm2xxx_i2c;
-+	struct i2c_device_id *pm2xxx_id;
++enum ab8500_fg_calibration_state {
++	AB8500_FG_CALIB_INIT,
++	AB8500_FG_CALIB_WAIT,
++	AB8500_FG_CALIB_END,
 +};
 +
-+struct pm2xxx_charger {
-+	struct device *dev;
-+	u8 chip_id;
-+	bool vddadc_en_ac;
-+	struct pm2xxx_config config;
-+	bool ac_conn;
-+	unsigned int gpio_irq;
-+	int vbat;
-+	int old_vbat;
-+	int failure_case;
-+	int failure_input_ovv;
-+	u8 pm2_int[6];
-+	struct ab8500_gpadc *gpadc;
-+	struct regulator *regu;
-+	struct pm2xxx_bm_data *bat;
++struct ab8500_fg_avg_cap {
++	int avg;
++	int samples[NBR_AVG_SAMPLES];
++	__kernel_time_t time_stamps[NBR_AVG_SAMPLES];
++	int pos;
++	int nbr_samples;
++	int sum;
++};
++
++struct ab8500_fg_cap_scaling {
++	bool enable;
++	int cap_to_scale[2];
++	int disable_cap_level;
++	int scaled_cap;
++};
++
++struct ab8500_fg_battery_capacity {
++	int max_mah_design;
++	int max_mah;
++	int mah;
++	int permille;
++	int level;
++	int prev_mah;
++	int prev_percent;
++	int prev_level;
++	int user_mah;
++	struct ab8500_fg_cap_scaling cap_scale;
++};
++
++struct ab8500_fg_flags {
++	bool fg_enabled;
++	bool conv_done;
++	bool charging;
++	bool fully_charged;
++	bool force_full;
++	bool low_bat_delay;
++	bool low_bat;
++	bool bat_ovv;
++	bool batt_unknown;
++	bool calibrate;
++	bool user_cap;
++	bool batt_id_received;
++};
++
++struct inst_curr_result_list {
++	struct list_head list;
++	int *result;
++};
++
++/**
++ * struct ab8500_fg_test - ab8500 FG device information in test mode
++ * @enable:			true if fg in test mode else false
++ * @cc_int_offset:		offset for internal calibration
++ * @cc_soft_offset:		offset for software calibration
++ * @cc_sample_conv:		sample read
++ * @cc_sample_conv_calib_uA:	sample converted in uA
++ * @cceoc_complete:		pointer to the struct completion, to indicate
++ *				the completion of internal calibration and
++ *				one sample reading
++ * @nconv_accu_complete:	pointer to the struct completion, to indicate
++ *				the completion of sample to accumulate
++ * @cc_int_calib_complete:	pointer to the struct completion, to indicate
++ *				the completion of internal calibration
++ * @lock:			Mutex for locking the CC
++ */
++struct ab8500_fg_test {
++	bool enable;
++	u8 cc_int_offset;
++	u8 cc_soft_offset;
++	u16 cc_sample_conv;
++	int cc_sample_conv_calib_uA;
++	struct completion cceoc_complete;
++	struct completion nconv_accu_complete;
++	struct completion cc_int_calib_complete;
 +	struct mutex lock;
++};
++
++/**
++ * struct ab8500_fg - ab8500 FG device information
++ * @dev:		Pointer to the structure device
++ * @node:		a list of AB8500 FGs, hence prepared for reentrance
++ * @irq			holds the CCEOC interrupt number
++ * @vbat:		Battery voltage in mV
++ * @vbat_nom:		Nominal battery voltage in mV
++ * @inst_curr:		Instantenous battery current in mA
++ * @avg_curr:		Average battery current in mA
++ * @bat_temp		battery temperature
++ * @fg_samples:		Number of samples used in the FG accumulation
++ * @accu_charge:	Accumulated charge from the last conversion
++ * @recovery_cnt:	Counter for recovery mode
++ * @high_curr_cnt:	Counter for high current mode
++ * @init_cnt:		Counter for init mode
++ * @low_bat_cnt		Counter for number of consecutive low battery measures
++ * @nbr_cceoc_irq_cnt	Counter for number of CCEOC irqs received since enabled
++ * @recovery_needed:	Indicate if recovery is needed
++ * @high_curr_mode:	Indicate if we're in high current mode
++ * @init_capacity:	Indicate if initial capacity measuring should be done
++ * @turn_off_fg:	True if fg was off before current measurement
++ * @calib_state		State during offset calibration
++ * @discharge_state:	Current discharge state
++ * @charge_state:	Current charge state
++ * @ab8500_fg_started	Completion struct used for the instant current start
++ * @ab8500_fg_complete	Completion struct used for the instant current reading
++ * @flags:		Structure for information about events triggered
++ * @bat_cap:		Structure for battery capacity specific parameters
++ * @avg_cap:		Average capacity filter
++ * @parent:		Pointer to the struct ab8500
++ * @gpadc:		Pointer to the struct gpadc
++ * @bm:           	Platform specific battery management information
++ * @fg_psy:		Structure that holds the FG specific battery properties
++ * @fg_wq:		Work queue for running the FG algorithm
++ * @fg_periodic_work:	Work to run the FG algorithm periodically
++ * @fg_low_bat_work:	Work to check low bat condition
++ * @fg_reinit_work	Work used to reset and reinitialise the FG algorithm
++ * @fg_work:		Work to run the FG algorithm instantly
++ * @fg_acc_cur_work:	Work to read the FG accumulator
++ * @fg_check_hw_failure_work:	Work for checking HW state
++ * @cc_lock:		Mutex for locking the CC
++ * @fg_kobject:		Structure of type kobject
++ */
++struct ab8500_fg {
++	struct device *dev;
++	struct list_head node;
++	int irq;
++	int vbat;
++	int vbat_nom;
++	int inst_curr;
++	int avg_curr;
++	int bat_temp;
++	int fg_samples;
++	int accu_charge;
++	int recovery_cnt;
++	int high_curr_cnt;
++	int init_cnt;
++	int low_bat_cnt;
++	int nbr_cceoc_irq_cnt;
++	bool recovery_needed;
++	bool high_curr_mode;
++	bool init_capacity;
++	bool turn_off_fg;
++	enum ab8500_fg_calibration_state calib_state;
++	enum ab8500_fg_discharge_state discharge_state;
++	enum ab8500_fg_charge_state charge_state;
++	struct completion ab8500_fg_started;
++	struct completion ab8500_fg_complete;
++	struct ab8500_fg_flags flags;
++	struct ab8500_fg_battery_capacity bat_cap;
++	struct ab8500_fg_avg_cap avg_cap;
 +	struct ab8500 *parent;
-+	struct pm2xxx_charger_info ac;
-+	struct pm2xxx_charger_platform_data *pdata;
-+	struct workqueue_struct *charger_wq;
-+	struct delayed_work check_vbat_work;
-+	struct work_struct ac_work;
-+	struct work_struct check_main_thermal_prot_work;
-+	struct ux500_charger ac_chg;
-+	struct pm2xxx_charger_event_flags flags;
++	struct ab8500_gpadc *gpadc;
++	struct abx500_bm_data *bm;
++	struct power_supply fg_psy;
++	struct workqueue_struct *fg_wq;
++	struct delayed_work fg_periodic_work;
++	struct delayed_work fg_low_bat_work;
++	struct delayed_work fg_reinit_work;
++	struct work_struct fg_work;
++	struct work_struct fg_acc_cur_work;
++	struct delayed_work fg_check_hw_failure_work;
++	struct mutex cc_lock;
++	struct kobject fg_kobject;
 +};
 +
-+static const struct i2c_device_id pm2xxx_ident[] = {
-+	{ "pm2301", 0 },
-+	{ }
-+};
++extern char *discharge_state[];
++extern char *charge_state[];
 +
-+static int pm2xxx_reg_read(struct pm2xxx_charger *pm2, int reg, u8 *val)
-+{
-+	int ret;
++int ab8500_fg_coulomb_counter(struct ab8500_fg *di, bool enable);
++void ab8500_fg_charge_state_to(struct ab8500_fg *di,
++		enum ab8500_fg_charge_state new_state);
++void ab8500_fg_discharge_state_to(struct ab8500_fg *di,
++		enum ab8500_fg_charge_state new_state);
++/* test initialization */
++#ifdef CONFIG_AB8500_BM_DEEP_DEBUG
++void ab8500_fg_test_init(struct ab8500_fg *di);
++#else
++void ab8500_fg_test_init(struct ab8500_fg *di) {return; }
++#endif
+diff --git a/drivers/power/ab8500_fg_deepdebug.c b/drivers/power/ab8500_fg_deepdebug.c
+new file mode 100644
+index 0000000..8845de6
+--- /dev/null
++++ b/drivers/power/ab8500_fg_deepdebug.c
+@@ -0,0 +1,823 @@
++/*
++ * Copyright (C) ST-Ericsson AB 2012
++ *
++ * Battery Management Deep debug support
++ *
++ * Note: Deep debug features are needed to perform the
++ * HW validation of the platform
++ *
++ * License Terms: GNU General Public License v2
++ * Author: Cedric Madianga <cedric.madianga@stericsson.com>
++ */
 +
-+	ret = i2c_smbus_read_i2c_block_data(pm2->config.pm2xxx_i2c, reg,
-+				1, val);
-+	if (ret < 0)
-+		dev_err(pm2->dev, "Error reading register at 0x%x\n", reg);
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/power_supply.h>
++#include <linux/mfd/ab8500.h>
++#include <linux/mfd/abx500.h>
++#include <linux/mfd/abx500/ab8500-bm.h>
++#include <linux/delay.h>
++#include <linux/time.h>
 +
-+	return ret;
-+}
++#include "ab8500_fg.h"
 +
-+static int pm2xxx_reg_write(struct pm2xxx_charger *pm2, int reg, u8 val)
-+{
-+	int ret;
++/* Exposure to the debugfs interface for test purpose only */
 +
-+	ret = i2c_smbus_write_i2c_block_data(pm2->config.pm2xxx_i2c, reg,
-+				1, &val);
-+	if (ret < 0)
-+		dev_err(pm2->dev, "Error writing register at 0x%x\n", reg);
-+
-+	return ret;
-+}
-+
-+static int pm2xxx_charging_enable_mngt(struct pm2xxx_charger *pm2)
-+{
-+	int ret;
-+
-+	/* Enable charging */
-+	ret = pm2xxx_reg_write(pm2, PM2XXX_BATT_CTRL_REG2,
-+			(PM2XXX_CH_AUTO_RESUME_EN | PM2XXX_CHARGER_ENA));
-+
-+	return ret;
-+}
-+
-+static int pm2xxx_charging_disable_mngt(struct pm2xxx_charger *pm2)
-+{
-+	int ret;
-+
-+	/* Disable charging */
-+	ret = pm2xxx_reg_write(pm2, PM2XXX_BATT_CTRL_REG2,
-+			(PM2XXX_CH_AUTO_RESUME_DIS | PM2XXX_CHARGER_DIS));
-+
-+	return ret;
-+}
-+
-+static int pm2xxx_charger_batt_therm_mngt(struct pm2xxx_charger *pm2, int val)
-+{
-+	queue_work(pm2->charger_wq, &pm2->check_main_thermal_prot_work);
-+
-+	return 0;
-+}
-+
-+
-+int pm2xxx_charger_die_therm_mngt(struct pm2xxx_charger *pm2, int val)
-+{
-+	queue_work(pm2->charger_wq, &pm2->check_main_thermal_prot_work);
-+
-+	return 0;
-+}
-+
-+static int pm2xxx_charger_ovv_mngt(struct pm2xxx_charger *pm2, int val)
++/**
++ * ab8500_fg_test_algorithm_en() - enable or disable gas gauge test mode
++ * @di:		pointer to the ab8500_fg structure
++ * @enable:	enable/disable gas gaude test mode
++ *
++ * Return 0 or error code
++ * Only used for test purpose
++ */
++int ab8500_fg_test_algorithm_en(struct ab8500_fg *di, bool enable)
 +{
 +	int ret = 0;
-+
-+	pm2->failure_input_ovv++;
-+	if (pm2->failure_input_ovv < 4) {
-+		ret = pm2xxx_charging_enable_mngt(pm2);
-+		goto out;
-+	} else {
-+		pm2->failure_input_ovv = 0;
-+		dev_err(pm2->dev, "Overvoltage detected\n");
-+		pm2->flags.ovv = true;
-+		power_supply_changed(&pm2->ac_chg.psy);
-+	}
-+
-+out:
-+	return ret;
-+}
-+
-+static int pm2xxx_charger_wd_exp_mngt(struct pm2xxx_charger *pm2, int val)
-+{
-+	dev_dbg(pm2->dev , "20 minutes watchdog occured\n");
-+
-+	pm2->ac.wd_expired = true;
-+	power_supply_changed(&pm2->ac_chg.psy);
-+
-+	return 0;
-+}
-+
-+static int pm2xxx_charger_vbat_lsig_mngt(struct pm2xxx_charger *pm2, int val)
-+{
-+	switch (val) {
-+	case PM2XXX_INT1_ITVBATLOWR:
-+		dev_dbg(pm2->dev, "VBAT grows above VBAT_LOW level\n");
-+		break;
-+
-+	case PM2XXX_INT1_ITVBATLOWF:
-+		dev_dbg(pm2->dev, "VBAT drops below VBAT_LOW level\n");
-+		break;
-+
-+	default:
-+		dev_err(pm2->dev, "Unknown VBAT level\n");
-+	}
-+
-+	return 0;
-+}
-+
-+static int pm2xxx_charger_bat_disc_mngt(struct pm2xxx_charger *pm2, int val)
-+{
-+	dev_dbg(pm2->dev, "battery disconnected\n");
-+
-+	return (pm2xxx_charging_disable_mngt(pm2));
-+}
-+
-+static int pm2xxx_charger_detection(struct pm2xxx_charger *pm2, u8 *val)
-+{
-+	int ret = 0;
-+
-+	ret = pm2xxx_reg_read(pm2, PM2XXX_SRCE_REG_INT2, val);
-+
-+	if (ret < 0) {
-+		dev_err(pm2->dev, "Charger detection failed\n");
-+		goto out;
-+	}
-+
-+	*val &= (PM2XXX_INT2_S_ITVPWR1PLUG | PM2XXX_INT2_S_ITVPWR2PLUG);
-+out:
-+	return ret;
-+}
-+
-+static int pm2xxx_charger_itv_pwr_plug_mngt(struct pm2xxx_charger *pm2, int val)
-+{
-+
-+	int ret;
-+	u8 read_val;
-+
-+	/*
-+	 * Since we can't be sure that the events are received
-+	 * synchronously, we have the check if the main charger is
-+	 * connected by reading the interrupt source register.
-+	 */
-+	ret = pm2xxx_charger_detection(pm2, &read_val);
-+
-+	if ((ret == 0) && read_val) {
-+		pm2->ac.charger_connected = 1;
-+		pm2->ac_conn = true;
-+		queue_work(pm2->charger_wq, &pm2->ac_work);
-+	}
-+
-+
-+	return ret;
-+}
-+
-+static int pm2xxx_charger_itv_pwr_unplug_mngt(struct pm2xxx_charger *pm2,
-+								int val)
-+{
-+	pm2->ac.charger_connected = 0;
-+	queue_work(pm2->charger_wq, &pm2->ac_work);
-+
-+	return 0;
-+}
-+
-+static int pm2_int_reg0(struct pm2xxx_charger *pm2)
-+{
-+	int ret = 0;
-+
-+	if (pm2->pm2_int[0] &
-+			(PM2XXX_INT1_ITVBATLOWR | PM2XXX_INT1_ITVBATLOWF)) {
-+		ret = pm2xxx_charger_vbat_lsig_mngt(pm2, pm2->pm2_int[0] &
-+			(PM2XXX_INT1_ITVBATLOWR | PM2XXX_INT1_ITVBATLOWF));
-+	}
-+
-+	if (pm2->pm2_int[0] & PM2XXX_INT1_ITVBATDISCONNECT) {
-+		ret = pm2xxx_charger_bat_disc_mngt(pm2,
-+				PM2XXX_INT1_ITVBATDISCONNECT);
-+	}
-+
-+	return ret;
-+}
-+
-+static int pm2_int_reg1(struct pm2xxx_charger *pm2)
-+{
-+	int ret = 0;
-+
-+	if (pm2->pm2_int[1] &
-+		(PM2XXX_INT2_ITVPWR1PLUG | PM2XXX_INT2_ITVPWR2PLUG)) {
-+		dev_dbg(pm2->dev , "Main charger plugged\n");
-+		ret = pm2xxx_charger_itv_pwr_plug_mngt(pm2, pm2->pm2_int[1] &
-+			(PM2XXX_INT2_ITVPWR1PLUG | PM2XXX_INT2_ITVPWR2PLUG));
-+	}
-+
-+	if (pm2->pm2_int[1] &
-+		(PM2XXX_INT2_ITVPWR1UNPLUG | PM2XXX_INT2_ITVPWR2UNPLUG)) {
-+		dev_dbg(pm2->dev , "Main charger unplugged\n");
-+		ret = pm2xxx_charger_itv_pwr_unplug_mngt(pm2, pm2->pm2_int[1] &
-+						(PM2XXX_INT2_ITVPWR1UNPLUG |
-+						PM2XXX_INT2_ITVPWR2UNPLUG));
-+	}
-+
-+	return ret;
-+}
-+
-+static int pm2_int_reg2(struct pm2xxx_charger *pm2)
-+{
-+	int ret = 0;
-+
-+	if (pm2->pm2_int[2] & PM2XXX_INT3_ITAUTOTIMEOUTWD)
-+		ret = pm2xxx_charger_wd_exp_mngt(pm2, pm2->pm2_int[2]);
-+
-+	if (pm2->pm2_int[2] & (PM2XXX_INT3_ITCHPRECHARGEWD |
-+				PM2XXX_INT3_ITCHCCWD | PM2XXX_INT3_ITCHCVWD)) {
-+		dev_dbg(pm2->dev,
-+			"Watchdog occured for precharge, CC and CV charge\n");
-+	}
-+
-+	return ret;
-+}
-+
-+static int pm2_int_reg3(struct pm2xxx_charger *pm2)
-+{
-+	int ret = 0;
-+
-+	if (pm2->pm2_int[3] & (PM2XXX_INT4_ITCHARGINGON)) {
-+		dev_dbg(pm2->dev ,
-+			"chargind operation has started\n");
-+	}
-+
-+	if (pm2->pm2_int[3] & (PM2XXX_INT4_ITVRESUME)) {
-+		dev_dbg(pm2->dev,
-+			"battery discharged down to VResume threshold\n");
-+	}
-+
-+	if (pm2->pm2_int[3] & (PM2XXX_INT4_ITBATTFULL)) {
-+		dev_dbg(pm2->dev , "battery fully detected\n");
-+	}
-+
-+	if (pm2->pm2_int[3] & (PM2XXX_INT4_ITCVPHASE)) {
-+		dev_dbg(pm2->dev, "CV phase enter with 0.5C charging\n");
-+	}
-+
-+	if (pm2->pm2_int[3] &
-+			(PM2XXX_INT4_ITVPWR2OVV | PM2XXX_INT4_ITVPWR1OVV)) {
-+		pm2->failure_case = VPWR_OVV;
-+		ret = pm2xxx_charger_ovv_mngt(pm2, pm2->pm2_int[3] &
-+			(PM2XXX_INT4_ITVPWR2OVV | PM2XXX_INT4_ITVPWR1OVV));
-+		dev_dbg(pm2->dev, "VPWR/VSYSTEM overvoltage detected\n");
-+	}
-+
-+	if (pm2->pm2_int[3] & (PM2XXX_INT4_S_ITBATTEMPCOLD |
-+				PM2XXX_INT4_S_ITBATTEMPHOT)) {
-+		ret = pm2xxx_charger_batt_therm_mngt(pm2,
-+			pm2->pm2_int[3] & (PM2XXX_INT4_S_ITBATTEMPCOLD |
-+					PM2XXX_INT4_S_ITBATTEMPHOT));
-+		dev_dbg(pm2->dev, "BTEMP is too Low/High\n");
-+	}
-+
-+	return ret;
-+}
-+
-+static int pm2_int_reg4(struct pm2xxx_charger *pm2)
-+{
-+	int ret = 0;
-+
-+	if (pm2->pm2_int[4] & PM2XXX_INT5_ITVSYSTEMOVV) {
-+		pm2->failure_case = VSYSTEM_OVV;
-+		ret = pm2xxx_charger_ovv_mngt(pm2, pm2->pm2_int[4] &
-+						PM2XXX_INT5_ITVSYSTEMOVV);
-+		dev_dbg(pm2->dev, "VSYSTEM overvoltage detected\n");
-+	}
-+
-+	if (pm2->pm2_int[4] & (PM2XXX_INT5_ITTHERMALWARNINGFALL |
-+				PM2XXX_INT5_ITTHERMALWARNINGRISE |
-+				PM2XXX_INT5_ITTHERMALSHUTDOWNFALL |
-+				PM2XXX_INT5_ITTHERMALSHUTDOWNRISE)) {
-+		dev_dbg(pm2->dev, "BTEMP die temperature is too Low/High\n");
-+		ret = pm2xxx_charger_die_therm_mngt(pm2, pm2->pm2_int[4] &
-+			(PM2XXX_INT5_ITTHERMALWARNINGFALL |
-+			PM2XXX_INT5_ITTHERMALWARNINGRISE |
-+			PM2XXX_INT5_ITTHERMALSHUTDOWNFALL |
-+			PM2XXX_INT5_ITTHERMALSHUTDOWNRISE));
-+	}
-+
-+	return ret;
-+}
-+
-+static int pm2_int_reg5(struct pm2xxx_charger *pm2)
-+{
-+
-+	if (pm2->pm2_int[5]
-+		& (PM2XXX_INT6_ITVPWR2DROP | PM2XXX_INT6_ITVPWR1DROP)) {
-+		dev_dbg(pm2->dev, "VMPWR drop to VBAT level\n");
-+	}
-+
-+	if (pm2->pm2_int[5] & (PM2XXX_INT6_ITVPWR2VALIDRISE |
-+				PM2XXX_INT6_ITVPWR1VALIDRISE |
-+				PM2XXX_INT6_ITVPWR2VALIDFALL |
-+				PM2XXX_INT6_ITVPWR1VALIDFALL)) {
-+		dev_dbg(pm2->dev, "Falling/Rising edge on WPWR1/2\n");
-+	}
-+
-+	return 0;
-+}
-+
-+static irqreturn_t  pm2xxx_irq_int(int irq, void *data)
-+{
-+	struct pm2xxx_charger *pm2 = data;
-+	int ret, i;
-+
-+	for (i = 0; i < ARRAY_SIZE(pm2->pm2_int); i++) {
-+		ret = pm2xxx_reg_read(pm2, pm2xxx_interrupt_registers[i],
-+				&(pm2->pm2_int[i]));
-+	}
-+
-+	pm2_int_reg0(pm2);
-+	pm2_int_reg1(pm2);
-+	pm2_int_reg2(pm2);
-+	pm2_int_reg3(pm2);
-+	pm2_int_reg4(pm2);
-+	pm2_int_reg5(pm2);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int pm2xxx_charger_get_ac_voltage(struct pm2xxx_charger *pm2)
-+{
-+	int vch = 0;
-+
-+	if (pm2->ac.charger_connected) {
-+		vch = ab8500_gpadc_convert(pm2->gpadc, MAIN_CHARGER_V);
-+		if (vch < 0)
-+			dev_err(pm2->dev, "%s gpadc conv failed,\n", __func__);
-+	}
-+
-+	return vch;
-+}
-+
-+static int pm2xxx_charger_get_ac_cv(struct pm2xxx_charger *pm2)
-+{
-+	int ret = 0;
-+	u8 val;
-+
-+	if (pm2->ac.charger_connected && pm2->ac.charger_online) {
-+
-+		ret = pm2xxx_reg_read(pm2, PM2XXX_SRCE_REG_INT4, &val);
-+		if (ret < 0) {
-+			dev_err(pm2->dev, "%s pm2xxx read failed\n", __func__);
-+			goto out;
-+		}
-+
-+		if (val & PM2XXX_INT4_S_ITCVPHASE)
-+			ret = PM2XXX_CONST_VOLT;
-+		else
-+			ret = PM2XXX_CONST_CURR;
-+	}
-+out:
-+	return ret;
-+}
-+
-+static int pm2xxx_charger_get_ac_current(struct pm2xxx_charger *pm2)
-+{
-+	int ich = 0;
-+
-+	if (pm2->ac.charger_online) {
-+		ich = ab8500_gpadc_convert(pm2->gpadc, MAIN_CHARGER_C);
-+		if (ich < 0)
-+			dev_err(pm2->dev, "%s gpadc conv failed\n", __func__);
-+	}
-+
-+	return ich;
-+}
-+
-+static int pm2xxx_current_to_regval(int curr)
-+{
-+	int i;
-+
-+	if (curr < pm2xxx_charger_current_map[0])
-+		return 0;
-+
-+	for (i = 1; i < ARRAY_SIZE(pm2xxx_charger_current_map); i++) {
-+		if (curr < pm2xxx_charger_current_map[i])
-+			return (i - 1);
-+	}
-+
-+	i = ARRAY_SIZE(pm2xxx_charger_current_map) - 1;
-+	if (curr == pm2xxx_charger_current_map[i])
-+		return i;
-+	else
-+		return -EINVAL;
-+}
-+
-+static int pm2xxx_voltage_to_regval(int curr)
-+{
-+	int i;
-+
-+	if (curr < pm2xxx_charger_voltage_map[0])
-+		return 0;
-+
-+	for (i = 1; i < ARRAY_SIZE(pm2xxx_charger_voltage_map); i++) {
-+		if (curr < pm2xxx_charger_voltage_map[i])
-+			return i - 1;
-+	}
-+
-+	i = ARRAY_SIZE(pm2xxx_charger_voltage_map) - 1;
-+	if (curr == pm2xxx_charger_voltage_map[i])
-+		return i;
-+	else
-+		return -EINVAL;
-+}
-+
-+static int pm2xxx_charger_update_charger_current(struct ux500_charger *charger,
-+		int ich_out)
-+{
-+	int ret;
-+	int curr_index;
-+	struct pm2xxx_charger *pm2;
-+	u8 val;
-+
-+	if (charger->psy.type == POWER_SUPPLY_TYPE_MAINS)
-+		pm2 = to_pm2xxx_charger_ac_device_info(charger);
-+	else
-+		return -ENXIO;
-+
-+	curr_index = pm2xxx_current_to_regval(ich_out);
-+	if (curr_index < 0) {
-+		dev_err(pm2->dev,
-+			"Charger current too high: charging not started\n");
-+		return -ENXIO;
-+	}
-+
-+	ret = pm2xxx_reg_read(pm2, PM2XXX_BATT_CTRL_REG6, &val);
-+	if (ret >= 0) {
-+		val &= ~PM2XXX_DIR_CH_CC_CURRENT_MASK;
-+		val |= curr_index;
-+		ret = pm2xxx_reg_write(pm2, PM2XXX_BATT_CTRL_REG6, val);
-+		if (ret < 0) {
-+			dev_err(pm2->dev,
-+				"%s write failed\n", __func__);
-+		}
-+	}
-+	else
-+		dev_err(pm2->dev, "%s read failed\n", __func__);
-+
-+	return ret;
-+}
-+
-+static int pm2xxx_charger_ac_get_property(struct power_supply *psy,
-+	enum power_supply_property psp,
-+	union power_supply_propval *val)
-+{
-+	struct pm2xxx_charger *pm2;
-+
-+	pm2 = to_pm2xxx_charger_ac_device_info(psy_to_ux500_charger(psy));
-+
-+	switch (psp) {
-+	case POWER_SUPPLY_PROP_HEALTH:
-+		if (pm2->flags.mainextchnotok)
-+			val->intval = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
-+		else if (pm2->ac.wd_expired)
-+			val->intval = POWER_SUPPLY_HEALTH_DEAD;
-+		else if (pm2->flags.main_thermal_prot)
-+			val->intval = POWER_SUPPLY_HEALTH_OVERHEAT;
-+		else
-+			val->intval = POWER_SUPPLY_HEALTH_GOOD;
-+		break;
-+	case POWER_SUPPLY_PROP_ONLINE:
-+		val->intval = pm2->ac.charger_online;
-+		break;
-+	case POWER_SUPPLY_PROP_PRESENT:
-+		val->intval = pm2->ac.charger_connected;
-+		break;
-+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-+		pm2->ac.charger_voltage = pm2xxx_charger_get_ac_voltage(pm2);
-+		val->intval = pm2->ac.charger_voltage * 1000;
-+		break;
-+	case POWER_SUPPLY_PROP_VOLTAGE_AVG:
-+		pm2->ac.cv_active = pm2xxx_charger_get_ac_cv(pm2);
-+		val->intval = pm2->ac.cv_active;
-+		break;
-+	case POWER_SUPPLY_PROP_CURRENT_NOW:
-+		val->intval = pm2xxx_charger_get_ac_current(pm2) * 1000;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+static int pm2xxx_charging_init(struct pm2xxx_charger *pm2)
-+{
-+	int ret = 0;
-+
-+	/* enable CC and CV watchdog */
-+	ret = pm2xxx_reg_write(pm2, PM2XXX_BATT_CTRL_REG3,
-+		(PM2XXX_CH_WD_CV_PHASE_60MIN | PM2XXX_CH_WD_CC_PHASE_60MIN));
-+	if( ret < 0)
-+		return ret;
-+
-+	/* enable precharge watchdog */
-+	ret = pm2xxx_reg_write(pm2, PM2XXX_BATT_CTRL_REG4,
-+					PM2XXX_CH_WD_PRECH_PHASE_60MIN);
-+
-+	return ret;
-+}
-+
-+static int pm2xxx_charger_ac_en(struct ux500_charger *charger,
-+	int enable, int vset, int iset)
-+{
-+	int ret;
-+	int volt_index;
-+	int curr_index;
-+	u8 val;
-+
-+	struct pm2xxx_charger *pm2 = to_pm2xxx_charger_ac_device_info(charger);
 +
 +	if (enable) {
-+		if (!pm2->ac.charger_connected) {
-+			dev_dbg(pm2->dev, "AC charger not connected\n");
-+			return -ENXIO;
++		/* Set coulomb counter in test mode. */
++		dev_dbg(di->dev, "Try to put gas gauge in test mode\n");
++		cancel_delayed_work_sync(&di->fg_periodic_work);
++		if (di->flags.fg_enabled) {
++			ret = ab8500_fg_coulomb_counter(di, false);
++			if (ret)
++				return ret;
 +		}
-+
-+		dev_dbg(pm2->dev, "Enable AC: %dmV %dmA\n", vset, iset);
-+		if (!pm2->vddadc_en_ac) {
-+			regulator_enable(pm2->regu);
-+			pm2->vddadc_en_ac = true;
-+		}
-+
-+		ret = pm2xxx_charging_init(pm2);
-+		if (ret < 0) {
-+			dev_err(pm2->dev, "%s charging init failed\n",
-+					__func__);
-+			goto error_occured;
-+		}
-+
-+		volt_index = pm2xxx_voltage_to_regval(vset);
-+		curr_index = pm2xxx_current_to_regval(iset);
-+
-+		if (volt_index < 0 || curr_index < 0) {
-+			dev_err(pm2->dev,
-+				"Charger voltage or current too high, "
-+				"charging not started\n");
-+			return -ENXIO;
-+		}
-+
-+		ret = pm2xxx_reg_read(pm2, PM2XXX_BATT_CTRL_REG8, &val);
-+		if (ret >= 0) {
-+			val &= ~PM2XXX_CH_VOLT_MASK;
-+			val |= volt_index;
-+			ret = pm2xxx_reg_write(pm2, PM2XXX_BATT_CTRL_REG8, val);
-+
-+			if (ret < 0) {
-+				dev_err(pm2->dev,
-+					"%s write failed\n", __func__);
-+				goto error_occured;
-+			}
-+		else
-+			dev_err(pm2->dev, "%s read failed\n", __func__);
-+		}
-+
-+		ret = pm2xxx_reg_read(pm2, PM2XXX_BATT_CTRL_REG6, &val);
-+		if (ret >= 0) {
-+			val &= ~PM2XXX_DIR_CH_CC_CURRENT_MASK;
-+			val |= curr_index;
-+			ret = pm2xxx_reg_write(pm2, PM2XXX_BATT_CTRL_REG6, val);
-+			if (ret < 0) {
-+				dev_err(pm2->dev,
-+					"%s write failed\n", __func__);
-+				goto error_occured;
-+			}
-+		else
-+			dev_err(pm2->dev, "%s read failed\n", __func__);
-+		}
-+
-+		if (!pm2->bat->enable_overshoot) {
-+			ret = pm2xxx_reg_read(pm2, PM2XXX_LED_CTRL_REG, &val);
-+			if (ret >= 0) {
-+				val |= PM2XXX_ANTI_OVERSHOOT_EN;
-+				ret = pm2xxx_reg_write(pm2, PM2XXX_LED_CTRL_REG,
-+							val);
-+				if (ret < 0){
-+					dev_err(pm2->dev, "%s write failed\n",
-+							__func__);
-+					goto error_occured;
-+				}
-+			}
-+		else
-+			dev_err(pm2->dev, "%s read failed\n", __func__);
-+		}
-+
-+		ret = pm2xxx_charging_enable_mngt(pm2);
-+		if (ret) {
-+			dev_err(pm2->dev, "%s write failed\n", __func__);
-+			goto error_occured;
-+		}
-+
-+		pm2->ac.charger_online = 1;
++		di->test.enable = true;
++		dev_dbg(di->dev, "Gas gauge in test mode\n");
 +	} else {
-+		pm2->ac.charger_online = 0;
-+		pm2->ac.wd_expired = false;
-+
-+		/* Disable regulator if enabled */
-+		if (pm2->vddadc_en_ac) {
-+			regulator_disable(pm2->regu);
-+			pm2->vddadc_en_ac = false;
++		/* Set coulomb counter in normal mode. */
++		dev_dbg(di->dev, "Try to put gas gauge in normal mode\n");
++		if (di->flags.fg_enabled) {
++			ret = ab8500_fg_coulomb_counter(di, false);
++			if (ret)
++				return ret;
 +		}
 +
-+		ret = pm2xxx_charging_disable_mngt(pm2);
-+		if (ret) {
-+			dev_err(pm2->dev, "%s write failed\n", __func__);
-+			return ret;
-+		}
++		di->init_capacity = true;
++		ab8500_fg_charge_state_to(di, AB8500_FG_CHARGE_INIT);
++		ab8500_fg_discharge_state_to(di, AB8500_FG_DISCHARGE_INIT);
 +
-+		dev_dbg(pm2->dev, "PM2301: " "Disabled AC charging\n");
++		di->flags.batt_unknown = true;
++		di->flags.batt_id_received = false;
++
++		di->test.enable = false;
++		ab8500_fg_coulomb_counter(di, true);
++
++		di->flags.calibrate = true;
++		di->calib_state = AB8500_FG_CALIB_INIT;
++		dev_dbg(di->dev, "Gas gauge in normal mode\n");
 +	}
-+	power_supply_changed(&pm2->ac_chg.psy);
 +
-+error_occured:
 +	return ret;
 +}
 +
-+static int pm2xxx_charger_watchdog_kick(struct ux500_charger *charger)
++/**
++ * ab8500_fg_is_test_is_algorithm_en() -
++ * Return 1 if fg algorithm is enable 0 else
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Only used for test purpose
++ */
++bool ab8500_fg_test_is_algorithm_en(struct ab8500_fg *di)
++{
++	return di->test.enable;
++}
++
++/**
++ * ab8500_fg_test_en() - enable coulomb counter
++ * @di:		pointer to the ab8500_fg structure
++ * @enable:	enable/disable
++ *
++ * Return 0 or error code on failure
++ * Only used for test purpose
++ */
++
++int ab8500_fg_test_en(struct ab8500_fg *di, bool enable)
++{
++	return ab8500_fg_coulomb_counter(di, enable);
++}
++
++/**
++ * ab8500_fg_test_is_en() - Return 1 if fg is enabled 0 else
++ * @di:		pointer to the ab8500_fg structure
++ *
++ *  Only used for test purpose
++ */
++bool ab8500_fg_test_is_en(struct ab8500_fg *di)
++{
++	return di->flags.fg_enabled;
++}
++
++/**
++ * ab8500_fg_test_set_cc_int_n_avg() - set number of conversion to average for
++ * internal calibration
++ * @di:		pointer to the ab8500_fg structure
++ * @val:	number of conversion to average
++ *
++ * Return 0 or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_set_cc_int_n_avg(struct ab8500_fg *di, u8 val)
 +{
 +	int ret;
-+	struct pm2xxx_charger *pm2;
++	u8 cc_int_n_avg = 0;
 +
-+	if (charger->psy.type == POWER_SUPPLY_TYPE_MAINS)
-+		pm2 = to_pm2xxx_charger_ac_device_info(charger);
-+	else
-+		return -ENXIO;
++	switch (val) {
++	case 4:
++		cc_int_n_avg = CC_INT_CAL_SAMPLES_4;
++		break;
++	case 8:
++		cc_int_n_avg = CC_INT_CAL_SAMPLES_8;
++		break;
++	case 16:
++		cc_int_n_avg = CC_INT_CAL_SAMPLES_16;
++		break;
++	default:
++		dev_err(di->dev,
++				"incorrect sample values\n"
++				"correct sample values should be 4, 8 or 16\n");
++	}
 +
-+	ret = pm2xxx_reg_write(pm2, PM2XXX_BATT_WD_KICK, WD_TIMER);
-+	if (ret)
-+		dev_err(pm2->dev, "Failed to kick WD!\n");
++	ret = abx500_mask_and_set_register_interruptible(di->dev,
++			AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
++			CC_INT_CAL_N_AVG_MASK, cc_int_n_avg);
++	if (ret < 0)
++		dev_err(di->dev,
++				"set number of conversion to average failed\n");
 +
 +	return ret;
 +}
 +
-+static void pm2xxx_charger_ac_work(struct work_struct *work)
++/**
++ * ab8500_fg_test_get_cc_int_n_avg() - get number of conversion to average for
++ * internal calibration
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Return number of conversion to average or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_get_cc_int_n_avg(struct ab8500_fg *di)
 +{
-+	struct pm2xxx_charger *pm2 = container_of(work,
-+		struct pm2xxx_charger, ac_work);
++	int ret;
++	u8 val = 0;
 +
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_CTRL_REG,  &val);
++	if (ret < 0) {
++		dev_err(di->dev,
++			"get number of conversion to average failed\n");
++		return ret;
++	}
 +
-+	power_supply_changed(&pm2->ac_chg.psy);
-+	sysfs_notify(&pm2->ac_chg.psy.dev->kobj, NULL, "present");
-+};
++	switch (val & CC_INT_CAL_N_AVG_MASK) {
++	case CC_INT_CAL_SAMPLES_4:
++		ret = 4;
++		break;
++	case CC_INT_CAL_SAMPLES_8:
++		ret = 8;
++		break;
++	case CC_INT_CAL_SAMPLES_16:
++		ret = 16;
++		break;
++	case CC_INT_CAL_N_AVG_MASK:
++		ret = 16;
++		break;
++	default:
++		dev_err(di->dev,
++			"incorrect val read in AB8500_GASG_CC_CTRL_REG");
++		ret = -EINVAL;
++		break;
++	}
 +
-+static void pm2xxx_charger_check_main_thermal_prot_work(
-+	struct work_struct *work)
-+{
-+};
-+
-+static struct pm2xxx_irq pm2xxx_charger_irq[] = {
-+	{"PM2XXX_IRQ_INT", pm2xxx_irq_int},
-+};
-+
-+static int pm2xxx_wall_charger_resume(struct i2c_client *i2c_client)
-+{
-+	return 0;
++	return ret;
 +}
 +
-+static int pm2xxx_wall_charger_suspend(struct i2c_client *i2c_client,
-+	pm_message_t state)
++/**
++ * ab8500_fg_test_int_calib() - launch internal calibration
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Return result of calibration or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_int_calib(struct ab8500_fg *di)
 +{
-+	return 0;
-+}
-+
-+static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
-+		const struct i2c_device_id *id)
-+{
-+	struct pm2xxx_platform_data *pl_data = i2c_client->dev.platform_data;
-+	struct pm2xxx_charger *pm2;
-+	int ret = 0;
++	int ret;
 +	u8 val;
 +
-+	pm2 = kzalloc(sizeof(struct pm2xxx_charger), GFP_KERNEL);
-+	if (!pm2) {
-+		dev_err(pm2->dev, "pm2xxx_charger allocation failed\n");
-+		return -ENOMEM;
++	mutex_lock(&di->test.lock);
++	dev_dbg(di->dev, "Internal calibration ongoing...\n");
++
++	ret = abx500_mask_and_set_register_interruptible(di->dev,
++		AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
++		CC_INTAVGOFFSET_ENA, CC_INTAVGOFFSET_ENA);
++	if (ret < 0) {
++		dev_err(di->dev,
++			"enabling offset average computation failed\n");
++		goto err;
 +	}
 +
-+	/* get parent data */
-+	pm2->dev = &i2c_client->dev;
-+	pm2->gpadc = ab8500_gpadc_get();
-+
-+	/* get charger spcific platform data */
-+	if (!pl_data->wall_charger) {
-+		dev_err(pm2->dev, "no charger platform data supplied\n");
++	/* wait for completion of calibration */
++	if (!wait_for_completion_timeout(&di->test.cc_int_calib_complete,
++				5*HZ)) {
++		dev_err(di->dev,
++			"timeout: didn't receive CCIntCalib interrupt\n");
 +		ret = -EINVAL;
-+		goto free_device_info;
++		goto err;
 +	}
 +
-+	pm2->pdata = pl_data->wall_charger;
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_CNTR_AVGOFF_REG,  &val);
++	if (ret < 0)
++		goto err;
 +
-+	/* get battery specific platform data */
-+	if (!pl_data->battery) {
-+		dev_err(pm2->dev, "no battery platform data supplied\n");
-+		ret = -EINVAL;
-+		goto free_device_info;
-+	}
++	di->test.cc_int_offset = val;
++	dev_dbg(di->dev, "Internal Calibration done...\n");
++	mutex_unlock(&di->test.lock);
 +
-+	pm2->bat = pl_data->battery;
++	return di->test.cc_int_offset;
 +
-+	if (!i2c_check_functionality(i2c_client->adapter,
-+			I2C_FUNC_SMBUS_BYTE_DATA |
-+			I2C_FUNC_SMBUS_READ_WORD_DATA)) {
-+		ret = -ENODEV;
-+		dev_info(pm2->dev, "pm2301 i2c_check_functionality failed\n");
-+		goto free_device_info;
-+	}
-+
-+	pm2->config.pm2xxx_i2c = i2c_client;
-+	pm2->config.pm2xxx_id = (struct i2c_device_id *) id;
-+	i2c_set_clientdata(i2c_client, pm2);
-+
-+	/* AC supply */
-+	/* power_supply base class */
-+	pm2->ac_chg.psy.name = pm2->pdata->label;
-+	pm2->ac_chg.psy.type = POWER_SUPPLY_TYPE_MAINS;
-+	pm2->ac_chg.psy.properties = pm2xxx_charger_ac_props;
-+	pm2->ac_chg.psy.num_properties = ARRAY_SIZE(pm2xxx_charger_ac_props);
-+	pm2->ac_chg.psy.get_property = pm2xxx_charger_ac_get_property;
-+	pm2->ac_chg.psy.supplied_to = pm2->pdata->supplied_to;
-+	pm2->ac_chg.psy.num_supplicants = pm2->pdata->num_supplicants;
-+	/* pm2xxx_charger sub-class */
-+	pm2->ac_chg.ops.enable = &pm2xxx_charger_ac_en;
-+	pm2->ac_chg.ops.kick_wd = &pm2xxx_charger_watchdog_kick;
-+	pm2->ac_chg.ops.update_curr = &pm2xxx_charger_update_charger_current;
-+	pm2->ac_chg.max_out_volt = pm2xxx_charger_voltage_map[
-+		ARRAY_SIZE(pm2xxx_charger_voltage_map) - 1];
-+	pm2->ac_chg.max_out_curr = pm2xxx_charger_current_map[
-+		ARRAY_SIZE(pm2xxx_charger_current_map) - 1];
-+
-+	/* Create a work queue for the charger */
-+	pm2->charger_wq =
-+		create_singlethread_workqueue("pm2xxx_charger_wq");
-+	if (pm2->charger_wq == NULL) {
-+		dev_err(pm2->dev, "failed to create work queue\n");
-+		goto free_device_info;
-+	}
-+
-+	/* Init work for charger detection */
-+	INIT_WORK(&pm2->ac_work, pm2xxx_charger_ac_work);
-+
-+	/* Init work for checking HW status */
-+	INIT_WORK(&pm2->check_main_thermal_prot_work,
-+		pm2xxx_charger_check_main_thermal_prot_work);
-+
-+	/*
-+	 * VDD ADC supply needs to be enabled from this driver when there
-+	 * is a charger connected to avoid erroneous BTEMP_HIGH/LOW
-+	 * interrupts during charging
-+	 */
-+	pm2->regu = regulator_get(pm2->dev, "vddadc");
-+	if (IS_ERR(pm2->regu)) {
-+		ret = PTR_ERR(pm2->regu);
-+		dev_err(pm2->dev, "failed to get vddadc regulator\n");
-+		goto free_charger_wq;
-+	}
-+
-+	/* Register AC charger class */
-+	ret = power_supply_register(pm2->dev, &pm2->ac_chg.psy);
-+	if (ret) {
-+		dev_err(pm2->dev, "failed to register AC charger\n");
-+		goto free_regulator;
-+	}
-+
-+	/* Register interrupts */
-+	ret = request_threaded_irq(pm2->pdata->irq_number, NULL,
-+				pm2xxx_charger_irq[0].isr,
-+				pm2->pdata->irq_type,
-+				pm2xxx_charger_irq[0].name, pm2);
-+
-+	if (ret != 0) {
-+		dev_err(pm2->dev, "failed to request %s IRQ %d: %d\n",
-+		pm2xxx_charger_irq[0].name, pm2->pdata->irq_number, ret);
-+		goto unregister_pm2xxx_charger;
-+	}
-+
-+	/*
-+	 * I2C Read/Write will fail, if AC adaptor is not connected.
-+	 * fix the charger detection mechanism.
-+	 */
-+	ret = pm2xxx_charger_detection(pm2, &val);
-+
-+	if ((ret == 0) && val) {
-+		pm2->ac.charger_connected = 1;
-+		pm2->ac_conn = true;
-+		power_supply_changed(&pm2->ac_chg.psy);
-+		sysfs_notify(&pm2->ac_chg.psy.dev->kobj, NULL, "present");
-+	}
-+
-+	return 0;
-+
-+unregister_pm2xxx_charger:
-+	/* unregister power supply */
-+	power_supply_unregister(&pm2->ac_chg.psy);
-+free_regulator:
-+	/* disable the regulator */
-+	regulator_put(pm2->regu);
-+free_charger_wq:
-+	destroy_workqueue(pm2->charger_wq);
-+free_device_info:
-+	kfree(pm2);
++err:
++	mutex_unlock(&di->test.lock);
++	dev_err(di->dev, "Internal calibration failure\n");
 +	return ret;
 +}
 +
-+static int __devexit pm2xxx_wall_charger_remove(struct i2c_client *i2c_client)
++/**
++ * ab8500_fg_test_soft_calib() - launch software calibration
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Return result of calibration or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_soft_calib(struct ab8500_fg *di)
 +{
-+	struct pm2xxx_charger *pm2 = i2c_get_clientdata(i2c_client);
++	int ret;
++	u8 low_data, high_data;
 +
-+	/* Disable AC charging */
-+	pm2xxx_charger_ac_en(&pm2->ac_chg, false, 0, 0);
++	mutex_lock(&di->test.lock);
++	dev_dbg(di->dev, "Software calibration ongoing...\n");
 +
-+	/* Disable interrupts */
-+	free_irq(pm2->pdata->irq_number, pm2);
++	/* Set ADconverter in calibration mode */
++	ret = abx500_mask_and_set_register_interruptible(di->dev,
++		AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
++		CC_CALIB, CC_CALIB);
++	if (ret < 0) {
++		dev_err(di->dev,
++			"set ADconverter in calibration mode failed\n");
++		goto err;
++	}
 +
-+	/* Delete the work queue */
-+	destroy_workqueue(pm2->charger_wq);
++	/* wait for completion of calibration */
++	if (!wait_for_completion_timeout(&di->test.cceoc_complete, 1*HZ)) {
++		dev_err(di->dev,
++			"timeout: didn't receive CCEOC interrupt\n");
++		ret = -EINVAL;
++		goto err;
++	}
 +
-+	flush_scheduled_work();
++	if (!wait_for_completion_timeout(&di->test.cceoc_complete, 1*HZ)) {
++		dev_err(di->dev,
++			"timeout: didn't receive CCEOC interrupt\n");
++		ret = -EINVAL;
++		goto err;
++	}
 +
-+	/* disable the regulator */
-+	regulator_put(pm2->regu);
++	/* Don't set ADConverter in calibration mode */
++	ret = abx500_mask_and_set_register_interruptible(di->dev,
++		AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
++		CC_CALIB, 0x00);
++	if (ret < 0) {
++		dev_err(di->dev, "stopping calibration mode failed\n");
++		goto err;
++	}
 +
-+	power_supply_unregister(&pm2->ac_chg.psy);
++	/* Transfer sample and accumulator values */
++	ret = abx500_mask_and_set_register_interruptible(di->dev,
++		AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
++		READ_REQ, READ_REQ);
++	if (ret < 0) {
++		dev_err(di->dev, "transfer accumulator data failed\n");
++		goto err;
++	}
 +
-+	kfree(pm2);
++	/* Retrieve sample conversion */
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_SMPL_CNVL_REG, &low_data);
++	if (ret < 0) {
++		dev_err(di->dev, "read low byte sample conversion failed\n");
++		goto err;
++	}
 +
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_SMPL_CNVH_REG, &high_data);
++	if (ret < 0) {
++		dev_err(di->dev, "read high byte sample conversion failed\n");
++		goto err;
++	}
++
++	di->test.cc_soft_offset = (high_data << 8) | low_data;
++	dev_dbg(di->dev, "Software Calibration done...\n");
++	mutex_unlock(&di->test.lock);
++
++	return di->test.cc_soft_offset;
++
++err:
++	mutex_unlock(&di->test.lock);
++	dev_err(di->dev, "Software calibration failure\n");
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_set_cc_soft_offset() - set software offset into register
++ * @di:		pointer to the ab8500_fg structure
++ * @enable:	manual offset to be stored
++ *
++ * Return 0 or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_set_cc_soft_offset(struct ab8500_fg *di, u8 val)
++{
++	int ret;
++
++	ret = abx500_set_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++			AB8500_GASG_CC_OFFSET_REG, val);
++	if (ret < 0)
++		dev_err(di->dev,
++				"set software offset failed\n");
++	else
++		di->test.cc_soft_offset = val;
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_get_cc_soft_offset() - get software offset into register
++ * @di:		pointer to the ab8500_fg structure
++ * @enable:	manual offset to be stored
++ *
++ * Return software offset or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_get_cc_soft_offset(struct ab8500_fg *di, u8 *val)
++{
++	int ret;
++
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++			AB8500_GASG_CC_OFFSET_REG,  val);
++	if (ret < 0)
++		dev_err(di->dev,
++				"get software offset failed\n");
++	else
++		di->test.cc_soft_offset = *val;
++
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_set_rst_accu_sample_counter() - set reset accumulator
++ * sample counter bit
++ * @di:		pointer to the ab8500_fg structure
++ * @enable:	enable/disable reset acc
++ *
++ * Return 0 or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_set_rst_accu_sample_counter(struct ab8500_fg *di,
++		bool enable)
++{
++	int ret;
++	u8 val = 0;
++
++	if (enable)
++		val = RESET_ACCU;
++	ret = abx500_mask_and_set_register_interruptible(di->dev,
++			AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
++			RESET_ACCU, val);
++	if (ret < 0)
++		dev_err(di->dev,
++			"set accumulator sample counter reset bit failed\n");
++
++
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_get_rst_accu_sample_counter() - get reset accumulator
++ * sample counter bit
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Return reset accumulator sample counter bit or error code
++ * Only used for test purpose
++ */
++int ab8500_fg_test_get_rst_accu_sample_counter(struct ab8500_fg *di)
++{
++	u8 val = 0;
++	int ret;
++
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_CTRL_REG,  &val);
++	if (ret < 0) {
++		dev_err(di->dev,
++			"get accumulator sample counter reset bit failed\n");
++		return ret;
++	}
++
++	if (val & RESET_ACCU)
++		ret = 1;
++	else
++		ret = 0;
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_set_cc_mux_offset() - set coumlomb counter offset
++ * @di:		pointer to the ab8500_fg structure
++ * @enable:	enable/disable offset
++ *
++ * Return 0 or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_set_cc_mux_offset(struct ab8500_fg *di, bool enable)
++{
++	int ret;
++	u8 val = 0;
++
++	if (enable)
++		val = CC_MUXOFFSET;
++	ret = abx500_mask_and_set_register_interruptible(di->dev,
++		AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
++		CC_MUXOFFSET, val);
++	if (ret < 0)
++		dev_err(di->dev,
++			"set mux offset failed\n");
++
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_get_cc_mux_offset() - get coulomb counter mux offset
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Get mux offset or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_get_cc_mux_offset(struct ab8500_fg *di)
++{
++	u8 val = 0;
++	int ret;
++
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_CTRL_REG,  &val);
++	if (ret < 0) {
++		dev_err(di->dev,
++			"get mux offset failed\n");
++		return ret;
++	}
++
++	if (val & CC_MUXOFFSET)
++		ret = 1;
++	else
++		ret = 0;
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_read_sample() - read one sample
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Return sample or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_read_sample(struct ab8500_fg *di)
++{
++	int ret;
++	u8 low_data, high_data;
++
++	mutex_lock(&di->test.lock);
++	dev_dbg(di->dev, "Sample reading ongoing...\n");
++
++	/* wait for completion of calibration */
++	if (!wait_for_completion_timeout(&di->test.cceoc_complete, 1*HZ)) {
++		dev_err(di->dev,
++			"timeout: didn't receive CCEOC interrupt\n");
++		ret = -EINVAL;
++		goto err;
++	}
++
++	if (!wait_for_completion_timeout(&di->test.cceoc_complete, 1*HZ)) {
++		dev_err(di->dev,
++			"timeout: didn't receive CCEOC interrupt\n");
++		ret = -EINVAL;
++		goto err;
++	}
++
++	/* Transfer sample and accumulator values */
++	ret = abx500_mask_and_set_register_interruptible(di->dev,
++		AB8500_GAS_GAUGE, AB8500_GASG_CC_CTRL_REG,
++		READ_REQ, READ_REQ);
++	if (ret < 0) {
++		dev_err(di->dev, "transfer accumulator data failed\n");
++		goto err;
++	}
++
++	/* Retrieve sample conversion */
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_SMPL_CNVL_REG, &low_data);
++	if (ret < 0) {
++		dev_err(di->dev, "read low byte sample conversion failed\n");
++		goto err;
++	}
++
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_SMPL_CNVH_REG, &high_data);
++	if (ret < 0) {
++		dev_err(di->dev, "read high byte sample conversion failed\n");
++		goto err;
++	}
++
++	di->test.cc_sample_conv = (high_data << 8) | low_data;
++
++	dev_dbg(di->dev, "Sample reading done...\n");
++	mutex_unlock(&di->test.lock);
++
++	return di->test.cc_sample_conv;
++
++err:
++	mutex_unlock(&di->test.lock);
++	dev_err(di->dev, "Sample reading failure\n");
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_sample_calibrate() - compute sample calibrated data
++ * @di:		pointer to the ab8500_fg structure
++ * @val:	raw sample
++ *
++ * Return sample calibrated value
++ * Only used for test purpose
++ */
++int ab8500_fg_test_sample_calibrate(struct ab8500_fg *di, int val)
++{
++	int ret;
++
++	ret = ab8500_fg_test_get_cc_mux_offset(di);
++	if (ret < 0)
++		return ret;
++
++	if (ret)
++		return val - di->test.cc_int_offset;
++	else
++		return val - di->test.cc_soft_offset;
++}
++
++/**
++ * ab8500_fg_test_sample_calibrate_to_uA() -  convert sample calibrated data
++ * to nuAH
++ * @di:		pointer to the ab8500_fg structure
++ * @val:	calibrate sample
++ *
++ * Return sample calibrated value
++ * Only used for test purpose
++ */
++int ab8500_fg_test_sample_calibrate_to_uA(struct ab8500_fg *di, int val)
++{
++	di->test.cc_sample_conv_calib_uA = val * QLSB_NANO_AMP_HOURS_X10;
++	return di->test.cc_sample_conv_calib_uA;
++}
++
++/**
++ * ab8500_fg_test_get_nconv_accu() - get number of conversion accumulated
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Return umber of conversion accumulated or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_get_nconv_accu(struct ab8500_fg *di, u8 *val)
++{
++	int ret;
++
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_NCOV_ACCU, val);
++	if (ret < 0)
++		dev_err(di->dev,
++			"get nb samples to be accumulated failed\n");
++
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_get_nconv_accu_to_uA() - get number of conversion accumulated
++ * in uA
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Return umber of conversion accumulated or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_get_nconv_accu_to_uA(struct ab8500_fg *di, int val)
++{
++	return val * di->test.cc_sample_conv_calib_uA;
++}
++
++/**
++ * ab8500_fg_test_set_rst_nconv_accu() -  allows to reset the 21bits accumulator data
++ * @di:		pointer to the ab8500_fg structure
++ * @enable:	enable/disable to reset the 21bits accumulator data
++ *
++ * Return 0 or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_set_rst_nconv_accu(struct ab8500_fg *di,
++		bool enable)
++{
++	int ret;
++	u8 val = 0;
++
++	if (enable)
++		val = RESET_ACCU;
++	ret = abx500_mask_and_set_register_interruptible(di->dev,
++		AB8500_GAS_GAUGE, AB8500_GASG_CC_NCOV_ACCU_CTRL,
++		RESET_ACCU, val);
++	if (ret < 0)
++		dev_err(di->dev,
++			"set accumulator reset bit failed\n");
++
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_get_rst_nconv_accu() - get staus of ResetNconvAccu bit
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Return accumulator reset bit or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_get_rst_nconv_accu(struct ab8500_fg *di)
++{
++	u8 val = 0;
++	int ret;
++
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_NCOV_ACCU_CTRL,  &val);
++	if (ret < 0) {
++		dev_err(di->dev,
++			"get accumulator reset bit failedd\n");
++		goto out;
++	}
++
++	if (val & RESET_ACCU)
++		ret = 1;
++	else
++		ret = 0;
++out:
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_set_nconv_accu_nb_sample() - set number of sample conversion
++ * to be accumulated in 21bits accumulator
++ * @di:		pointer to the ab8500_fg structure
++ * @nb_sample:	number of samples
++ *
++ * Return 0 or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_set_nconv_accu_nb_sample(struct ab8500_fg *di, u8 val)
++{
++	int ret;
++
++	ret = abx500_set_register_interruptible(di->dev,
++		AB8500_GAS_GAUGE, AB8500_GASG_CC_NCOV_ACCU, val);
++	if (ret < 0)
++		dev_err(di->dev,
++			"set number of samples to accumulated failed\n");
++
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_get_nconv_accu_nb_sample() - get number of sample conversion
++ * to be accumulated in 21bits accumulator
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Return number of samples to be accumulated or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_get_nconv_accu_nb_sample(struct ab8500_fg *di, u8 *val)
++{
++	int ret;
++
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_NCOV_ACCU,  val);
++	if (ret < 0)
++		dev_err(di->dev,
++			"get number of samples to accumulated failed\n");
++
++	return ret;
++}
++
++/**
++ * ab8500_fg_test_read_nconv_accu_sample() - read of accumulator after N samples
++ * @di:		pointer to the ab8500_fg structure
++ *
++ * Return sample or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_read_nconv_accu_sample(struct ab8500_fg *di)
++{
++	int ret;
++	int nb_sample;
++	u8 low_data, med_data, high_data;
++
++	/* Get nb sample to average */
++	ret = ab8500_fg_test_get_nconv_accu_nb_sample(di, &nb_sample);
++	if (ret < 0)
++		goto out;
++
++	mutex_lock(&di->test.lock);
++	dev_dbg(di->dev, "N Samples reading ongoing...\n");
++
++	/* Launch measure */
++	ret = abx500_mask_and_set_register_interruptible(di->dev,
++		AB8500_GAS_GAUGE, AB8500_GASG_CC_NCOV_ACCU_CTRL,
++		RD_NCONV_ACCU_REQ, RD_NCONV_ACCU_REQ);
++	if (ret < 0) {
++		dev_err(di->dev,
++			"launch measure failed\n");
++		goto err;
++	}
++
++	/* wait for completion of measure */
++	if (!wait_for_completion_timeout(&di->test.nconv_accu_complete,
++				nb_sample*(HZ/4))) {
++		dev_err(di->dev,
++			"timeout: didn't receive NCONV_ACCU interrupt\n");
++		ret = -EINVAL;
++		goto err;
++	}
++
++	/* Retrieve samples */
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_NCOV_ACCU_LOW,  &low_data);
++	if (ret < 0) {
++		dev_err(di->dev,
++			"read low data failed\n");
++		goto err;
++	}
++
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_NCOV_ACCU_MED,  &med_data);
++	if (ret < 0) {
++		dev_err(di->dev,
++			"read med data failed\n");
++		goto err;
++	}
++
++	ret = abx500_get_register_interruptible(di->dev, AB8500_GAS_GAUGE,
++		AB8500_GASG_CC_NCOV_ACCU_HIGH, &high_data);
++	if (ret < 0) {
++		dev_err(di->dev,
++			"read high data failed\n");
++		goto err;
++	}
++
++	dev_dbg(di->dev, "N Samples reading done...\n");
++	mutex_unlock(&di->test.lock);
++
++	return (high_data << 16) | (med_data << 8) | low_data;
++
++err:
++	mutex_unlock(&di->test.lock);
++	dev_err(di->dev, "Sample reading failure\n");
++out:
++	return ret;
++
++}
++
++/**
++ * ab8500_fg_test_read_nconv_accu_sample_to_uA - convert accu read in uA
++ * @di:		pointer to the ab8500_fg structure
++ * @val:	accu read
++ *
++ * Return sample or error code on failure
++ * Only used for test purpose
++ */
++int ab8500_fg_test_read_nconv_accu_sample_to_uA(struct ab8500_fg *di, int val)
++{
++	return val * QLSB_NANO_AMP_HOURS_X10;
++}
++
++void __devinit ab8500_fg_test_init(struct ab8500_fg *di)
++{
++	/* Initialize objects need for test purpose. */
++	di->test.enable = false;
++	di->test.cc_int_offset = 0;
++	di->test.cc_soft_offset = 0;
++	di->test.cc_sample_conv = 0;
++	di->test.cc_sample_conv_calib_uA = 0;
++	init_completion(&di->test.cceoc_complete);
++	init_completion(&di->test.nconv_accu_complete);
++	init_completion(&di->test.cc_int_calib_complete);
++	mutex_init(&di->test.lock);
++}
++
+diff --git a/include/linux/mfd/abx500/ab8500-bm.h b/include/linux/mfd/abx500/ab8500-bm.h
+index ec796c7..b800332 100644
+--- a/include/linux/mfd/abx500/ab8500-bm.h
++++ b/include/linux/mfd/abx500/ab8500-bm.h
+@@ -485,4 +485,168 @@ static inline int ab8500_fg_inst_curr_finalize(struct ab8500_fg *di, int *res)
+ }
+ 
+ #endif
++
++#ifdef CONFIG_AB8500_BM_DEEP_DEBUG
++int ab8500_fg_test_algorithm_en(struct ab8500_fg *di, bool enable);
++bool ab8500_fg_test_is_algorithm_en(struct ab8500_fg *di);
++int ab8500_fg_test_en(struct ab8500_fg *di, bool enable);
++bool ab8500_fg_test_is_en(struct ab8500_fg *di);
++int ab8500_fg_test_set_cc_int_n_avg(struct ab8500_fg *di, u8 val);
++int ab8500_fg_test_get_cc_int_n_avg(struct ab8500_fg *di);
++int ab8500_fg_test_int_calib(struct ab8500_fg *di);
++int ab8500_fg_test_soft_calib(struct ab8500_fg *di);
++int ab8500_fg_test_set_cc_soft_offset(struct ab8500_fg *di, u8 val);
++int ab8500_fg_test_get_cc_soft_offset(struct ab8500_fg *di, u8 *val);
++int ab8500_fg_test_set_rst_accu_sample_counter(struct ab8500_fg *di,
++		bool enable);
++int ab8500_fg_test_get_rst_accu_sample_counter(struct ab8500_fg *di);
++int ab8500_fg_test_set_cc_mux_offset(struct ab8500_fg *di, bool enable);
++int ab8500_fg_test_get_cc_mux_offset(struct ab8500_fg *di);
++int ab8500_fg_test_read_sample(struct ab8500_fg *di);
++int ab8500_fg_test_sample_calibrate(struct ab8500_fg *di, int val);
++int ab8500_fg_test_sample_calibrate_to_uA(struct ab8500_fg *di, int val);
++int ab8500_fg_test_get_nconv_accu(struct ab8500_fg *di, u8 *val);
++int ab8500_fg_test_get_nconv_accu_to_uA(struct ab8500_fg *di, int val);
++int ab8500_fg_test_set_rst_nconv_accu(struct ab8500_fg *di,
++		bool enable);
++int ab8500_fg_test_get_rst_nconv_accu(struct ab8500_fg *di);
++int ab8500_fg_test_set_nconv_accu_nb_sample(struct ab8500_fg *di, u8 val);
++int ab8500_fg_test_get_nconv_accu_nb_sample(struct ab8500_fg *di, u8 *val);
++int ab8500_fg_test_read_nconv_accu_sample(struct ab8500_fg *di);
++int ab8500_fg_test_read_nconv_accu_sample_to_uA(struct ab8500_fg *di, int val);
++#else
++static inline int ab8500_fg_test_algorithm_en(struct ab8500_fg *di, bool enable)
++{
++	return -ENODEV;
++}
++
++static inline bool ab8500_fg_test_is_algorithm_en(struct ab8500_fg *di)
++{
++	return false;
++}
++
++static inline int ab8500_fg_test_en(struct ab8500_fg *di, bool enable)
++{
++	return -ENODEV;
++}
++
++static inline bool ab8500_fg_test_is_en(struct ab8500_fg *di)
++{
++	return false;
++}
++
++static inline int ab8500_fg_test_set_cc_int_n_avg(struct ab8500_fg *di, u8 val)
++{
 +	return 0;
 +}
 +
-+static const struct i2c_device_id pm2xxx_id[] = {
-+	{ "pm2301", 0 },
-+	{ }
-+};
-+
-+MODULE_DEVICE_TABLE(i2c, pm2xxx_id);
-+
-+static struct i2c_driver pm2xxx_charger_driver = {
-+	.probe = pm2xxx_wall_charger_probe,
-+	.remove = __devexit_p(pm2xxx_wall_charger_remove),
-+	.suspend = pm2xxx_wall_charger_suspend,
-+	.resume = pm2xxx_wall_charger_resume,
-+	.driver = {
-+		.name = "pm2xxx-wall_charger",
-+		.owner = THIS_MODULE,
-+	},
-+	.id_table = pm2xxx_id,
-+};
-+
-+static int __init pm2xxx_charger_init(void)
++static inline int ab8500_fg_test_get_cc_int_n_avg(struct ab8500_fg *di)
 +{
-+	return i2c_add_driver(&pm2xxx_charger_driver);
++	return 0;
 +}
 +
-+static void __exit pm2xxx_charger_exit(void)
++static inline int ab8500_fg_test_int_calib(struct ab8500_fg *di)
 +{
-+	i2c_del_driver(&pm2xxx_charger_driver);
++	return -ENODEV;
 +}
 +
-+subsys_initcall_sync(pm2xxx_charger_init);
-+module_exit(pm2xxx_charger_exit);
++static inline int ab8500_fg_test_soft_calib(struct ab8500_fg *di)
++{
++	return -ENODEV;
++}
 +
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Rajkumar kasirajan, Olivier Launay");
-+MODULE_ALIAS("platform:pm2xxx-charger");
-+MODULE_DESCRIPTION("PM2xxx charger management driver");
++static inline int ab8500_fg_test_set_cc_soft_offset(struct ab8500_fg *di,
++		u8 val)
++{
++	return 0;
++}
++static inline int ab8500_fg_test_get_cc_soft_offset(struct ab8500_fg *di)
++{
++	return 0;
++}
 +
-diff --git a/include/linux/mfd/abx500/ab8500-bm.h b/include/linux/mfd/abx500/ab8500-bm.h
-index e2a1e6d..a03d4fd 100644
---- a/include/linux/mfd/abx500/ab8500-bm.h
-+++ b/include/linux/mfd/abx500/ab8500-bm.h
-@@ -406,6 +406,8 @@ struct ab8500_charger_platform_data {
- 	char **supplied_to;
- 	size_t num_supplicants;
- 	bool autopower_cfg;
-+	bool ac_enabled;
-+	bool usb_enabled;
- };
- 
- struct ab8500_btemp_platform_data {
-diff --git a/include/linux/mfd/abx500/ux500_chargalg.h b/include/linux/mfd/abx500/ux500_chargalg.h
-index 9b07725..5b77a61 100644
---- a/include/linux/mfd/abx500/ux500_chargalg.h
-+++ b/include/linux/mfd/abx500/ux500_chargalg.h
-@@ -27,12 +27,14 @@ struct ux500_charger_ops {
-  * @ops			ux500 charger operations
-  * @max_out_volt	maximum output charger voltage in mV
-  * @max_out_curr	maximum output charger current in mA
-+ * @enabled		indicates if this charger is used or not
-  */
- struct ux500_charger {
- 	struct power_supply psy;
- 	struct ux500_charger_ops ops;
- 	int max_out_volt;
- 	int max_out_curr;
-+	bool enabled;
- };
- 
- #endif
-diff --git a/include/linux/pm2301_charger.h b/include/linux/pm2301_charger.h
-new file mode 100644
-index 0000000..16bb1d3
---- /dev/null
-+++ b/include/linux/pm2301_charger.h
-@@ -0,0 +1,60 @@
-+/*
-+ * PM2301 charger driver.
-+ *
-+ * Copyright (C) 2012 ST Ericsson Corporation
-+ *
-+ * Contact: Olivier LAUNAY (olivier.launay at stericsson.com
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-+ * 02110-1301 USA
-+ */
++static inline int ab8500_fg_test_set_rst_accu_sample_counter(struct ab8500_fg
++		*di, bool enable)
++{
++	return 0;
++}
 +
-+#ifndef __LINUX_PM2301_H
-+#define __LINUX_PM2301_H
++static inline int ab8500_fg_test_get_rst_accu_sample_counter(struct ab8500_fg
++		*di)
++{
++	return 0;
++}
 +
-+/**
-+ * struct pm2xxx_bm_charger_parameters - Charger specific parameters
-+ * @ac_volt_max:	maximum allowed AC charger voltage in mV
-+ * @ac_curr_max:	maximum allowed AC charger current in mA
-+ */
-+struct pm2xxx_bm_charger_parameters {
-+	int ac_volt_max;
-+	int ac_curr_max;
-+};
++static inline int ab8500_fg_test_set_cc_mux_offset(struct ab8500_fg *di,
++		bool enable)
++{
++	return 0;
++}
 +
-+/**
-+ * struct pm2xxx_bm_data - pm2xxx battery management data
-+ * @enable_overshoot    flag to enable VBAT overshoot control
-+ * @chg_params	  charger parameters
-+ */
-+struct pm2xxx_bm_data {
-+	bool enable_overshoot;
-+	const struct pm2xxx_bm_charger_parameters *chg_params;
-+};
++static inline int ab8500_fg_test_get_cc_mux_offset(struct ab8500_fg *di)
++{
++	return 0;
++}
 +
-+struct pm2xxx_charger_platform_data {
-+	char **supplied_to;
-+	size_t num_supplicants;
-+	int i2c_bus;
-+	const char *label;
-+	int irq_number;
-+	int irq_type;
-+};
++static inline int ab8500_fg_test_read_sample(struct ab8500_fg *di)
++{
++	return -ENODEV;
++}
 +
-+struct pm2xxx_platform_data {
-+	struct pm2xxx_charger_platform_data *wall_charger;
-+	struct pm2xxx_bm_data *battery;
-+};
++static inline int ab8500_fg_test_sample_calibrate(struct ab8500_fg *di, int val)
++{
++	return 0;
++}
 +
-+#endif /* __LINUX_PM2301_H */
++static inline int ab8500_fg_test_sample_calibrate_to_uA(struct ab8500_fg *di,
++		int val)
++{
++	return 0;
++}
++
++static inline int ab8500_fg_test_get_nconv_accu(struct ab8500_fg *di)
++{
++	return 0;
++}
++
++static inline int ab8500_fg_test_get_nconv_accu_to_uA(struct ab8500_fg *di,
++		int val)
++{
++	return 0;
++}
++
++static inline int ab8500_fg_test_set_rst_nconv_accu(struct ab8500_fg *di,
++		bool enable)
++{
++	return 0;
++}
++
++static inline int ab8500_fg_test_get_rst_nconv_accu(struct ab8500_fg *di)
++{
++	return 0;
++}
++
++static inline int ab8500_fg_test_set_nconv_accu_nb_sample(struct ab8500_fg *di,
++		u8 val)
++{
++	return 0;
++}
++
++static inline int ab8500_fg_test_get_nconv_accu_nb_sample(struct ab8500_fg *di)
++{
++	return 0;
++}
++
++static inline int ab8500_fg_test_read_nconv_accu_sample(struct ab8500_fg *di)
++{
++	return -ENODEV;
++}
++
++static inline int ab8500_fg_test_read_nconv_accu_sample_to_uA(struct ab8500_fg
++		*di, int val)
++{
++	return 0;
++}
++
++#endif
+ #endif /* _AB8500_BM_H */
 -- 
 1.7.9.5
