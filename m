@@ -1,77 +1,48 @@
-From: rachna@ti.com (Patil, Rachna)
-Date: Tue, 22 Jan 2013 09:31:02 +0000
-Subject: [PATCH v3 4/8] MFD: ti_am335x_tscadc: add device tree binding
- information
-In-Reply-To: <50FB1DFE.6090805@metafoo.de>
-References: <cover.1358502134.git.rachna@ti.com>
- <daf18b4779ac3c6b69b1e7e2d1a4abd18b13fee5.1358502134.git.rachna@ti.com>
- <50FB1DFE.6090805@metafoo.de>
-Message-ID: <4CE347531D4CA947960AF71FF095B9323E9AFB02@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jan 2013 09:31:24 +0000
+Subject: One of these things (CONFIG_HZ) is not like the others..
+In-Reply-To: <50FE307F.9000701@ti.com>
+References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
+ <20130121232322.GK15361@atomide.com> <50FE307F.9000701@ti.com>
+Message-ID: <201301220931.24570.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 22 January 2013, Santosh Shilimkar wrote:
+> On Tuesday 22 January 2013 04:53 AM, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [130121 13:07]:
+> >>
+> >> As for Samsung and the rest I can't comment.  The original reason OMAP
+> >> used this though was because the 32768Hz counter can't produce 100Hz
+> >> without a .1% error - too much error under pre-clocksource
+> >> implementations for timekeeping.  Whether that's changed with the
+> >> clocksource/clockevent support needs to be checked.
+> >
+> > Yes that's why HZ was originally set to 128. That value (or some multiple)
+> > still makes sense when the 32 KiHZ clock source is being used. Of course
+> > we should rely on the local timer when running for the SoCs that have
+> > them.
+> >
+> This is right. It was only because of the drift associated when clocked
+> with 32KHz. Even on SOCs where local timers are available for power
+> management reasons we need to switch to 32KHz clocked device in
+> low power states. Hence the HZ value should be multiple of 32 on
+> OMAP.
 
-On Sun, Jan 20, 2013 at 03:58:14, Lars-Peter Clausen wrote:
-> Hi,
-> 
-> On 01/18/2013 11:48 AM, Patil, Rachna wrote:
-> > From: "Patil, Rachna" <rachna@ti.com>
-> > 
-> > Signed-off-by: Patil, Rachna <rachna@ti.com>
-> > ---
-> >  .../devicetree/bindings/mfd/ti_am335x_tscadc.txt   |   35 ++++++++++++++++++++
-> >  1 file changed, 35 insertions(+)
-> >  create mode 100644 
-> > Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
-> > 
-> > diff --git 
-> > a/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt 
-> > b/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
-> > new file mode 100644
-> > index 0000000..c13c492
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
-> > @@ -0,0 +1,35 @@
-> > +Texas Instruments - TSC / ADC multi-functional device
-> > +
-> > +ti_tscadc is a multi-function device with touchscreen and ADC on chip.
-> > +This document describes the binding for mfd device.
-> > +
-> > +Required properties:
-> > +- compatible: "ti,ti-tscadc"
-> > +- reg: Specifies the address of MFD block
-> > +- interrupts: IRQ line connected to the main SoC
-> > +- interrupt-parent: The parent interrupt controller
-> 
-> The subnodes and their properties also need documentation.
+I need some help understanding what the two of you are saying, because
+it sounds to me that you imply we cannot have a multiplatform kernel
+that includes OMAP and another platform that needs (or wants) a different
+HZ value.
 
-Ok. I Will add this.
+However, I also thought that when using a proper clocksource driver,
+the HZ setting has absolutely no impact on the drift of the wall clock,
+because those two are decoupled.
 
-> 
-> > +
-> > +Optional properties:
-> > +- ti,hwmods: Hardware information related to TSC/ADC MFD device
-> > +
-> > +Example:
-> > +
-> > +	tscadc: tscadc at 44e0d000 {
-> > +		compatible = "ti,ti-tscadc";
-> > +		reg = <0x44e0d000 0x1000>;
-> > +
-> > +		interrupt-parent = <&intc>;
-> > +		interrupts = <16>;
-> > +		ti,hwmods = "adc_tsc";
-> > +
-> > +		tsc {
-> > +			wires = <4>;
-> > +			x-plate-resistance = <200>;
-> > +			steps-to-configure = <5>;
-> > +			wire-config = <0x00 0x11 0x22 0x33>;
-> 
-> Non-standard properties should have a vendor prefix.
+Even when using the HZ based clocksource (for whatever reason you
+would want to do that), I thought there should be no drift as long
+as the CLOCK_TICK_RATE (in older kernels) or the register_refined_jiffies()
+(in older kernels) setting matches the hardware timer frequency.
 
-Ok. I will fix this in the next version of the patch set.
+What am I missing?
 
-Regards,
-Rachna
+	Arnd
