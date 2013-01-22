@@ -1,30 +1,48 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Tue, 22 Jan 2013 13:43:54 -0600
-Subject: [PATCH] crypto: fix FTBFS with ARM SHA1-asm and THUMB2_KERNEL
-In-Reply-To: <20130122095021.89432qdbeu32a4sg@www.dalek.fi>
-References: <1358787763-1226-1-git-send-email-matt@genesi-usa.com>
- <alpine.LFD.2.02.1301211739470.6300@xanadu.home>
- <CAKGA1bkQ9e8gmSPz_4csJWjEOKj3ZVqSLijSTRWxgDSaZoYqCA@mail.gmail.com>
- <20130122094614.79031aq5ddrgr2zo@www.dalek.fi>
- <20130122095021.89432qdbeu32a4sg@www.dalek.fi>
-Message-ID: <CAKGA1bmJwb94h0SVNW7WZkSYAPWeAUpm86D+SsvnOJ5NSNbe_g@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 22 Jan 2013 20:46:33 +0100
+Subject: [PATCH] ARM: kirkwood: fix missing #interrupt-cells property
+Message-ID: <1358883993-17280-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 1:50 AM, Jussi Kivilinna
-<jussi.kivilinna@mbnet.fi> wrote:
->
->> There is 'tcrypt' module in crypto/ for quick benchmarking. 'modprobe
->> tcrypt mode=500 sec=1' tests AES in various cipher-modes, using different
->> buffer sizes and outputs results to kernel log.
->>
->
-> Actually mode=200 might be better, as mode=500 is for asynchronous
-> implementations and might use hardware crypto if such device/module is
-> available.
+The gpio controller on kirkwood can provide interrupts but is missing
+the #interrupt-cells property. This patch just adds it to both gpio
+controllers.
 
-Okeydokey I'll start running some tests..
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Jamie Lentin <jm@lentin.co.uk>
+Cc: Jean-Francois Moine <moinejf@free.fr>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/kirkwood.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 110d6cb..d6ab442 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -36,6 +36,7 @@
+ 			reg = <0x10100 0x40>;
+ 			ngpios = <32>;
+ 			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			interrupts = <35>, <36>, <37>, <38>;
+ 		};
+ 
+@@ -46,6 +47,7 @@
+ 			reg = <0x10140 0x40>;
+ 			ngpios = <18>;
+ 			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			interrupts = <39>, <40>, <41>;
+ 		};
+ 
 -- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+1.7.10.4
