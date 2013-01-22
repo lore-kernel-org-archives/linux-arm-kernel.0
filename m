@@ -1,55 +1,21 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 22 Jan 2013 16:17:00 +0200
-Subject: [PATCH v1 6/6] USB: MUSB: OMAP: get PHY by phandle for dt boot
-In-Reply-To: <1358848694-20145-7-git-send-email-kishon@ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <1358848694-20145-7-git-send-email-kishon@ti.com>
-Message-ID: <50FE9F5C.2010501@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 22 Jan 2013 22:26:01 +0800
+Subject: [PATCH] ARM: imx: Remove mx508 support
+In-Reply-To: <1358858455-9600-1-git-send-email-fabio.estevam@freescale.com>
+References: <1358858455-9600-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130122142559.GB4920@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 11:58 AM, Kishon Vijay Abraham I wrote:
-> The OMAP glue has been modified to get PHY by phandle for dt boot.
+On Tue, Jan 22, 2013 at 10:40:55AM -0200, Fabio Estevam wrote:
+> Only mx508 based board is mach-mx50_rdp and it has been marked as BROKEN
+> for several releases.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/usb/musb/omap2430.c |    7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+> mx508 currently lacks clock support.
 > 
-> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-> index 1a8cf6d..e43faeb 100644
-> --- a/drivers/usb/musb/omap2430.c
-> +++ b/drivers/usb/musb/omap2430.c
-> @@ -345,7 +345,12 @@ static int omap2430_musb_init(struct musb *musb)
->  	 * up through ULPI.  TWL4030-family PMICs include one,
->  	 * which needs a driver, drivers aren't always needed.
->  	 */
-> -	musb->xceiv = devm_usb_get_phy_dev(dev, 0);
-> +	if (dev->parent->of_node)
-> +		musb->xceiv = devm_usb_get_phy_by_phandle(dev->parent,
-> +		    "usb_phy", 0);
-> +	else
-> +		musb->xceiv = devm_usb_get_phy_dev(dev, 0);
-> +
->  	if (IS_ERR_OR_NULL(musb->xceiv)) {
->  		pr_err("HS USB OTG: no transceiver configured\n");
->  		return -ENODEV;
+> In case someone needs to add mx508 support back, then the recommended approach 
+> is to use device tree.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-This will not work with PHY driver as a module. You need to use deferred probing mechanism here
-after you have addressed my comment in patch 2 and also devm_usb_get_phy_by_phandle()
-
-e.g.
-
-if (IS_ERR(musb->xceiv)) {
-	int ret = PTR_ERR(musb->xveiv);
-
-	if (ret == -ENODEV)
-		pr_err("HS USB OTG: no transceiver configured\n");
-
-	return ret;
-}
-
---
-cheers,
--roger
- 
+Applied, thanks.
