@@ -1,69 +1,71 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 22 Jan 2013 11:11:46 +0100
-Subject: [PATCH 0/5] ARM: dts: OMAP3+: PWM support for TWL and selected
- boards
-In-Reply-To: <1358519794-13214-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1358519794-13214-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <50FE65E2.9020301@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 22 Jan 2013 15:44:03 +0530
+Subject: One of these things (CONFIG_HZ) is not like the others..
+In-Reply-To: <201301220931.24570.arnd@arndb.de>
+References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
+ <20130121232322.GK15361@atomide.com> <50FE307F.9000701@ti.com>
+ <201301220931.24570.arnd@arndb.de>
+Message-ID: <50FE666B.10902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Tuesday 22 January 2013 03:01 PM, Arnd Bergmann wrote:
+> On Tuesday 22 January 2013, Santosh Shilimkar wrote:
+>> On Tuesday 22 January 2013 04:53 AM, Tony Lindgren wrote:
+>>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [130121 13:07]:
+>>>>
+>>>> As for Samsung and the rest I can't comment.  The original reason OMAP
+>>>> used this though was because the 32768Hz counter can't produce 100Hz
+>>>> without a .1% error - too much error under pre-clocksource
+>>>> implementations for timekeeping.  Whether that's changed with the
+>>>> clocksource/clockevent support needs to be checked.
+>>>
+>>> Yes that's why HZ was originally set to 128. That value (or some multiple)
+>>> still makes sense when the 32 KiHZ clock source is being used. Of course
+>>> we should rely on the local timer when running for the SoCs that have
+>>> them.
+>>>
+>> This is right. It was only because of the drift associated when clocked
+>> with 32KHz. Even on SOCs where local timers are available for power
+>> management reasons we need to switch to 32KHz clocked device in
+>> low power states. Hence the HZ value should be multiple of 32 on
+>> OMAP.
+>
+> I need some help understanding what the two of you are saying, because
+> it sounds to me that you imply we cannot have a multiplatform kernel
+> that includes OMAP and another platform that needs (or wants) a different
+> HZ value.
+>
+Sorry for not being clear enough. On OMAP, 32KHz is the only clock which
+is always running(even during low power states) and hence the clock
+source and clock event have been clocked using 32KHz clock. As mentioned
+by RMK, with 32768 Hz clock and HZ = 100, there will be always an
+error of 0.1 %. This accuracy also impacts the timer tick interval.
+This was the reason, OMAP has been using the HZ = 128.
 
-I have prepared for you a branch from where you can pull this set on top of
-mainline v3.8-rc4:
+There is a hardware feature to implement 1 ms correction on the timer
+to overcome such an issue but it was not supported on OMAP2 devices.
+OMAP3/4/5 does support it. Though one attempt [1] was made to support
+it in kernel. This will ofcourse will address the tick interval
+corrections.
+
+> However, I also thought that when using a proper clocksource driver,
+> the HZ setting has absolutely no impact on the drift of the wall clock,
+> because those two are decoupled.
+>
+I am not too sure about this. I was under impression that tick (clock
+event) ticking accuracy does impact the kernel time keeping as well.
+
+> Even when using the HZ based clocksource (for whatever reason you
+> would want to do that), I thought there should be no drift as long
+> as the CLOCK_TICK_RATE (in older kernels) or the register_refined_jiffies()
+> (in older kernels) setting matches the hardware timer frequency.
+>
+> What am I missing?
+>
+The issue is with hardware timer frequency itself since with HZ = 100 or
+200, the timer tick will not be accurate. Hope this gives bit more info.
 
 Regards,
-P?ter
-
----
-The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
-
-  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
-
-are available in the git repository at:
-
-  git://gitorious.org/omap-audio/linux-audio.git peter/for-benoit
-
-for you to fetch changes up to b6230ae20bc018d042d703d0667ba9e7ac027ccb:
-
-  ARM: dts: omap4-sdp: Add support for pwm-backlight (2013-01-22 11:08:37 +0100)
-
-----------------------------------------------------------------
-Peter Ujfalusi (5):
-      ARM: dts: twl4030: Add PWM support
-      ARM: dts: twl6030: Add PWM support
-      ARM: dts: omap3-beagle-xm: Use pwm-leds for pmu_stat LED
-      ARM: dts: omap4-sdp: Add support for pwm-leds (keypad and charging LED)
-      ARM: dts: omap4-sdp: Add support for pwm-backlight
-
- arch/arm/boot/dts/omap3-beagle-xm.dts | 14 ++++++++++----
- arch/arm/boot/dts/omap4-sdp.dts       | 26 ++++++++++++++++++++++++++
- arch/arm/boot/dts/twl4030.dtsi        | 10 ++++++++++
- arch/arm/boot/dts/twl6030.dtsi        | 12 ++++++++++++
- 4 files changed, 58 insertions(+), 4 deletions(-)
-
-On 01/18/2013 03:36 PM, Peter Ujfalusi wrote:
-> Hi,
-> 
-> Add the needed DT sections for twl4030 and twl6030 for the PWM childs.
-> Update the omap4-sdp to have working backlight and keypad/charging LED support.
-> Use the pwm-leds driver on BeagleBoard for the pmu_stat LED instead of the hacky
-> twl403-gpio mapped PWM.
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (5):
->   ARM: dts: twl4030: Add PWM support
->   ARM: dts: twl6030: Add PWM support
->   ARM: dts: omap3-beagle-xm: Use pwm-leds for pmu_stat LED
->   ARM: dts: omap4-sdp: Add support for pwm-leds (keypad and charging LED)
->   ARM: dts: omap4-sdp: Add support for pwm-backlight
-> 
->  arch/arm/boot/dts/omap3-beagle-xm.dts | 14 ++++++++++----
->  arch/arm/boot/dts/omap4-sdp.dts       | 26 ++++++++++++++++++++++++++
->  arch/arm/boot/dts/twl4030.dtsi        | 10 ++++++++++
->  arch/arm/boot/dts/twl6030.dtsi        | 12 ++++++++++++
->  4 files changed, 58 insertions(+), 4 deletions(-)
-> 
+Santosh
+[1] https://patchwork.kernel.org/patch/107364/
