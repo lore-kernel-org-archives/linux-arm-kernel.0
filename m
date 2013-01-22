@@ -1,29 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Jan 2013 23:17:57 -0800
-Subject: [PATCH 7/7] ARM: sunxi: olinuxino: Add muxing for the uart
-In-Reply-To: <CACRpkdbUbD-VnkdSAKp=GyRiqub8iZf90nwPHPFtWZHwSMZiAA@mail.gmail.com>
-References: <1358544639-14761-1-git-send-email-maxime.ripard@free-electrons.com>
- <1358544639-14761-8-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdbUbD-VnkdSAKp=GyRiqub8iZf90nwPHPFtWZHwSMZiAA@mail.gmail.com>
-Message-ID: <20130122071757.GB25783@quad.lixom.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 22 Jan 2013 15:50:05 +0800
+Subject: [PATCH 3/7] ARM i.MX6q: Add GPU, VPU, IPU, and OpenVG resets to
+ System Reset Controller (SRC)
+In-Reply-To: <CAKGA1bmkyU_LEJt17SvUwUUh0wXG-2o_5nOGaW8RWDV45g3bVg@mail.gmail.com>
+References: <1358352787-15441-1-git-send-email-p.zabel@pengutronix.de>
+ <1358352787-15441-4-git-send-email-p.zabel@pengutronix.de>
+ <CAKGA1bmjKQcX3RzSjbnuYqoJqbzXYGa_Whv7QQkNyAhBDzZWdw@mail.gmail.com>
+ <1358761930.2522.54.camel@pizza.hi.pengutronix.de>
+ <CAKGA1bmkyU_LEJt17SvUwUUh0wXG-2o_5nOGaW8RWDV45g3bVg@mail.gmail.com>
+Message-ID: <20130122075003.GF2272@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 11:15:32PM +0100, Linus Walleij wrote:
-> On Fri, Jan 18, 2013 at 10:30 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
+On Mon, Jan 21, 2013 at 11:47:12AM -0600, Matt Sealey wrote:
+> > Yes, maybe the module reset part of the SRC should be implemented as a
+> > proper device driver in drivers/reset. Then we could use the interrupt
+> > functionality and WARN_ON(timeout), as you suggest.
 > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> That would be ideal. Maybe Shawn or Fabio can bug a hardware guy to
+> shed some light on what a reasonable timeout might actually be for a
+> module to cause such a warning. I think it should definitely cause
+> one.. as I said, I was using 5 seconds, you used 1 second, I don't
+> think a shorter delay would be unreasonable, but maybe it could take
+> up to 10 seconds, or maybe I am wrong - maybe it is in fact impossible
+> in hardware for a reset to "fail" at least visibly because the
+> interrupt will always fire making the warning a never-traveled path.
+> It is certainly not something that would be documented, so without a
+> view of the RTL logic here, we wouldn't know.
 > 
-> All pinctrl and device tree patches applied to my allwinner branch in the
-> pinctrl tree. Hope the ARM SoC can accept me poking around in your
-> device trees.
+> Shawn, Fabio?
+> 
+Just talked to hardware people, the reset should finish in a few
+clock cycles, so even 1 millisecond should be enough.
 
-Ah, my just-now sent reply was to an older version of this thread.
-
-Sure, it's not a big deal that you're picking up the DT changes, but there
-might end up being add/add conflicts if they are adding more stuff to the same
-files. Not a huge deal, ideally we want to avoid them but a couple are ok.
-
-
--Olof
+Shawn
