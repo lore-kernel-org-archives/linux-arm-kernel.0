@@ -1,41 +1,35 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Tue, 22 Jan 2013 20:20:39 +0800
-Subject: [PATCH v3 2/9] ARM: PRIMA2: enable AUTO_ZRELADDR for SIRF in Kconfig
-In-Reply-To: <1358857241-10052-1-git-send-email-Barry.Song@csr.com>
-References: <1358857241-10052-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1358857241-10052-2-git-send-email-Barry.Song@csr.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Tue, 22 Jan 2013 13:21:21 +0100
+Subject: OMAP baseline test results for v3.8-rc4
+In-Reply-To: <50FE66AC.2090306@mimc.co.uk> (Mark Jackson's message of "Tue, 22
+ Jan 2013 10:15:08 +0000")
+References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
+ <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
+ <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
+ <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
+ <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+ <50FE66AC.2090306@mimc.co.uk>
+Message-ID: <874ni95ry6.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+>>>>> "Mark" == Mark Jackson <mpfj-list@mimc.co.uk> writes:
 
-prima2 and marco have different memory base address. prima2
-begins from 0 and marco begins from 0x40000000.
-This patch enables AUTO_ZRELADDR so that kernel can detect
-the physical address automatically.
+Hi,
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
-CC: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ Mark> Bytes transferred = 3963919 (3c7c0f hex)
+ Mark> ## Booting kernel from Legacy Image at 80000000 ...
+ Mark>    Image Name:   Linux
+ Mark>    Image Type:   ARM Linux Kernel Image (uncompressed)
+ Mark>    Data Size:    3963855 Bytes = 3.8 MiB
+ Mark>    Load Address: 80008000
+ Mark>    Entry Point:  80008000
+ Mark>    Verifying Checksum ... OK
+ Mark>    Loading Kernel Image ... OK
+ Mark> OK
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f95ba14..13f89a2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -394,6 +394,7 @@ config ARCH_GEMINI
- config ARCH_SIRF
- 	bool "CSR SiRF"
- 	select ARCH_REQUIRE_GPIOLIB
-+	select AUTO_ZRELADDR
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_IRQ_CHIP
+I haven't tried a recent -next build, but what is your kernel command
+line and did you try without EARLY_PRINTK?
+
 -- 
-1.7.5.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Bye, Peter Korsgaard
