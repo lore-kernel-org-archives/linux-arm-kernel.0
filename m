@@ -1,24 +1,44 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Jan 2013 21:26:34 +0530
-Subject: [PATCH v5 00/14] DMA Engine support for AM33XX
-In-Reply-To: <1358281974-8411-1-git-send-email-mporter@ti.com>
-References: <1358281974-8411-1-git-send-email-mporter@ti.com>
-Message-ID: <50FEB6B2.5020303@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jan 2013 15:57:02 +0000
+Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
+ Armada 370/XP
+In-Reply-To: <50FDC322.2040107@free-electrons.com>
+References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
+ <201301211831.45947.arnd@arndb.de> <50FDC322.2040107@free-electrons.com>
+Message-ID: <201301221557.02976.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Monday 21 January 2013, Gregory CLEMENT wrote:
+> I don't see a strong reason to not enable it if we don't use it. My concern
+> was that I don't need it so I didn't want to include it and generating extra
+> code for nothing. Then just after having sent this patch set, I received your
+> patch set about build regression in 3.8 and especially the part about
+> CONFIG_MULTIPLATFORM made me realized that it could be a problem.
 
-On 1/16/2013 2:02 AM, Matt Porter wrote:
+Ok.
 
-> This series adds DMA Engine support for AM33xx, which uses
-> an EDMA DMAC. The EDMA DMAC has been previously supported by only
-> a private API implementation (much like the situation with OMAP
-> DMA) found on the DaVinci family of SoCs.
+> > Maybe it can be written as
+> > 
+> > config LOCAL_TIMERS
+> >       bool "Use local timer interrupts"
+> >       depends on SMP
+> >       default y
+> > 
+> > config HAVE_ARM_TWD
+> >       depends on LOCAL_TIMERS
+> >       default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+> 
+> So in this case why not written something like this:
+>         default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARMADA_370_XP_TIMER)
 
-Will you take this series through the OMAP tree? Only 1/14 touches
-mach-davinci and I am mostly okay with it except some changes I just
-requested Matt to make in another thread.
+That does not change anything, because ARMADA_370_XP_TIMER is only ever enabled
+when ARCH_MULTIPLATFORM is enabled as well.
 
-Thanks,
-Sekhar
+> >       default y
+> I am not a kconfig expert, but won't this line set HAVE_ARM_TWD to 'y' whatever
+> the result of the previous line?
+
+Yes, that was a mistake on my side.
+
+	Arnd
