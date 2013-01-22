@@ -1,217 +1,47 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 21 Jan 2013 17:12:11 -0800
-Subject: [PATCH 6/6] ARM: S3C24XX: Move mach-s3c2440/ pll into mach-s3c24xx/
-In-Reply-To: <1358817131-27169-1-git-send-email-kgene.kim@samsung.com>
-References: <1358817131-27169-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1358817131-27169-7-git-send-email-kgene.kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Jan 2013 01:18:08 +0000
+Subject: One of these things (CONFIG_HZ) is not like the others..
+In-Reply-To: <CAKGA1bkXx2qn+c6sKqXsty-aFe1r-W79uyem0O8p6JNeeq6zxQ@mail.gmail.com>
+References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
+ <201301212041.17951.arnd@arndb.de> <50FDAC5F.4040605@linaro.org>
+ <CAKGA1b=D5CNikijoOAk5xP6TC-nB_gEGtS05ncrPR68sQTMrxw@mail.gmail.com>
+ <50FDC2DD.7090406@linaro.org>
+ <CAKGA1bmtTH1N8nx79MGiMighdQROpNtpvAZXhHKT+mT3kcazBQ@mail.gmail.com>
+ <50FDE2AE.8030608@linaro.org>
+ <CAKGA1bkXx2qn+c6sKqXsty-aFe1r-W79uyem0O8p6JNeeq6zxQ@mail.gmail.com>
+Message-ID: <20130122011808.GF23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves mach-s3c2440/pll into mach-s3c24xx/
-and removes arch/arm/mach-s3c2440/ directory in kernel.
+On Mon, Jan 21, 2013 at 07:06:59PM -0600, Matt Sealey wrote:
+> On Mon, Jan 21, 2013 at 6:51 PM, John Stultz <john.stultz@linaro.org> wrote:
+> > On 01/21/2013 02:54 PM, Matt Sealey wrote:
+> >>
+> >> On Mon, Jan 21, 2013 at 4:36 PM, John Stultz <john.stultz@linaro.org>
+> >> wrote:
+> >>>
+> >>> On 01/21/2013 01:14 PM, Matt Sealey wrote:
+> >
+> > As far as jiffies rating, from jiffies.c:
+> >     .rating        = 1, /* lowest valid rating*/
+> >
+> > So I'm not sure what you mean by "the debug on the kernel log is telling me
+> > it has a higher resolution".
+> 
+> Oh, it is just if I actually don't run setup_sched_clock on my
+> platform, it gives a little message (with #define DEBUG 1 in
+> sched_clock.c)
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/Kconfig                                   |    3 --
- arch/arm/Makefile                                  |    2 +-
- arch/arm/mach-s3c2440/Kconfig                      |   29 --------------------
- arch/arm/mach-s3c2440/Makefile                     |   13 ---------
- arch/arm/mach-s3c24xx/Kconfig                      |   26 ++++++++++++++++++
- arch/arm/mach-s3c24xx/Makefile                     |    2 ++
- .../pll-s3c2440-12000000.c}                        |    5 +---
- .../pll-s3c2440-16934400.c}                        |    5 +---
- 8 files changed, 31 insertions(+), 54 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2440/Kconfig
- delete mode 100644 arch/arm/mach-s3c2440/Makefile
- rename arch/arm/{mach-s3c2440/s3c2440-pll-12000000.c => mach-s3c24xx/pll-s3c2440-12000000.c} (98%)
- rename arch/arm/{mach-s3c2440/s3c2440-pll-16934400.c => mach-s3c24xx/pll-s3c2440-16934400.c} (99%)
+sched_clock() has nothing to do with time keeping, and that
+HZ/NO_HZ/HRTIMERS don't affect it (when it isn't being derived from
+jiffies).
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5d566bf..f22c510 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1094,9 +1094,6 @@ source "arch/arm/mach-socfpga/Kconfig"
- source "arch/arm/plat-spear/Kconfig"
- 
- source "arch/arm/mach-s3c24xx/Kconfig"
--if ARCH_S3C24XX
--source "arch/arm/mach-s3c2440/Kconfig"
--endif
- 
- if ARCH_S3C64XX
- source "arch/arm/mach-s3c64xx/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 29e8fae..0935dac 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -173,7 +173,7 @@ machine-$(CONFIG_ARCH_PRIMA2)		+= prima2
- machine-$(CONFIG_ARCH_PXA)		+= pxa
- machine-$(CONFIG_ARCH_REALVIEW)		+= realview
- machine-$(CONFIG_ARCH_RPC)		+= rpc
--machine-$(CONFIG_ARCH_S3C24XX)		+= s3c24xx s3c2440
-+machine-$(CONFIG_ARCH_S3C24XX)		+= s3c24xx
- machine-$(CONFIG_ARCH_S3C64XX)		+= s3c64xx
- machine-$(CONFIG_ARCH_S5P64X0)		+= s5p64x0
- machine-$(CONFIG_ARCH_S5PC100)		+= s5pc100
-diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
-deleted file mode 100644
-index ad06fa2..0000000
---- a/arch/arm/mach-s3c2440/Kconfig
-+++ /dev/null
-@@ -1,29 +0,0 @@
--# Copyright 2007 Simtec Electronics
--#
--# Licensed under GPLv2
--
--config S3C2440_XTAL_12000000
--	bool
--	help
--	  Indicate that the build needs to support 12MHz system
--	  crystal.
--
--config S3C2440_XTAL_16934400
--	bool
--	help
--	  Indicate that the build needs to support 16.9344MHz system
--	  crystal.
--
--config S3C2440_PLL_12000000
--	bool
--	depends on S3C2440_CPUFREQ && S3C2440_XTAL_12000000
--	default y if CPU_FREQ_S3C24XX_PLL
--	help
--	  PLL tables for S3C2440 or S3C2442 CPUs with 12MHz crystals.
--
--config S3C2440_PLL_16934400
--	bool
--	depends on S3C2440_CPUFREQ && S3C2440_XTAL_16934400
--	default y if CPU_FREQ_S3C24XX_PLL
--	help
--	  PLL tables for S3C2440 or S3C2442 CPUs with 16.934MHz crystals.
-diff --git a/arch/arm/mach-s3c2440/Makefile b/arch/arm/mach-s3c2440/Makefile
-deleted file mode 100644
-index d76e4b9..0000000
---- a/arch/arm/mach-s3c2440/Makefile
-+++ /dev/null
-@@ -1,13 +0,0 @@
--# arch/arm/mach-s3c2440/Makefile
--#
--# Copyright 2007 Simtec Electronics
--#
--# Licensed under GPLv2
--
--obj-y				:=
--obj-m				:=
--obj-n				:=
--obj-				:=
--
--obj-$(CONFIG_S3C2440_PLL_12000000) += s3c2440-pll-12000000.o
--obj-$(CONFIG_S3C2440_PLL_16934400) += s3c2440-pll-16934400.o
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index edf6549..67df58b 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -400,6 +400,32 @@ config S3C2440_DMA
- 	help
- 	  Support for S3C2440 specific DMA code5A
- 
-+config S3C2440_XTAL_12000000
-+	bool
-+	help
-+	  Indicate that the build needs to support 12MHz system
-+	  crystal.
-+
-+config S3C2440_XTAL_16934400
-+	bool
-+	help
-+	  Indicate that the build needs to support 16.9344MHz system
-+	  crystal.
-+
-+config S3C2440_PLL_12000000
-+	bool
-+	depends on S3C2440_CPUFREQ && S3C2440_XTAL_12000000
-+	default y if CPU_FREQ_S3C24XX_PLL
-+	help
-+	  PLL tables for S3C2440 or S3C2442 CPUs with 12MHz crystals.
-+
-+config S3C2440_PLL_16934400
-+	bool
-+	depends on S3C2440_CPUFREQ && S3C2440_XTAL_16934400
-+	default y if CPU_FREQ_S3C24XX_PLL
-+	help
-+	  PLL tables for S3C2440 or S3C2442 CPUs with 16.934MHz crystals.
-+
- comment "S3C2440 Boards"
- 
- #
-diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
-index 6d4b9ad..08b87cd 100644
---- a/arch/arm/mach-s3c24xx/Makefile
-+++ b/arch/arm/mach-s3c24xx/Makefile
-@@ -36,6 +36,8 @@ obj-$(CONFIG_CPU_S3C2442)	+= s3c2442.o
- obj-$(CONFIG_CPU_S3C244X)	+= s3c244x.o irq-s3c244x.o clock-s3c244x.o
- obj-$(CONFIG_S3C2440_CPUFREQ)	+= cpufreq-s3c2440.o
- obj-$(CONFIG_S3C2440_DMA)	+= dma-s3c2440.o
-+obj-$(CONFIG_S3C2440_PLL_12000000) += pll-s3c2440-12000000.o
-+obj-$(CONFIG_S3C2440_PLL_16934400) += pll-s3c2440-16934400.o
- 
- obj-$(CONFIG_CPU_S3C2443)	+= s3c2443.o irq-s3c2443.o clock-s3c2443.o
- 
-diff --git a/arch/arm/mach-s3c2440/s3c2440-pll-12000000.c b/arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c
-similarity index 98%
-rename from arch/arm/mach-s3c2440/s3c2440-pll-12000000.c
-rename to arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c
-index 551fb43..6737817 100644
---- a/arch/arm/mach-s3c2440/s3c2440-pll-12000000.c
-+++ b/arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c
-@@ -1,5 +1,4 @@
--/* arch/arm/mach-s3c2440/s3c2440-pll-12000000.c
-- *
-+/*
-  * Copyright (c) 2006-2007 Simtec Electronics
-  *	http://armlinux.simtec.co.uk/
-  *	Ben Dooks <ben@simtec.co.uk>
-@@ -83,7 +82,6 @@ static int __init s3c2440_pll_12mhz(void)
- 	return subsys_interface_register(&s3c2440_plls12_interface);
- 
- }
--
- arch_initcall(s3c2440_pll_12mhz);
- 
- static struct subsys_interface s3c2442_plls12_interface = {
-@@ -97,5 +95,4 @@ static int __init s3c2442_pll_12mhz(void)
- 	return subsys_interface_register(&s3c2442_plls12_interface);
- 
- }
--
- arch_initcall(s3c2442_pll_12mhz);
-diff --git a/arch/arm/mach-s3c2440/s3c2440-pll-16934400.c b/arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c
-similarity index 99%
-rename from arch/arm/mach-s3c2440/s3c2440-pll-16934400.c
-rename to arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c
-index 3f15bcf..debfa10 100644
---- a/arch/arm/mach-s3c2440/s3c2440-pll-16934400.c
-+++ b/arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c
-@@ -1,5 +1,4 @@
--/* arch/arm/mach-s3c2440/s3c2440-pll-16934400.c
-- *
-+/*
-  * Copyright (c) 2006-2008 Simtec Electronics
-  *	http://armlinux.simtec.co.uk/
-  *	Ben Dooks <ben@simtec.co.uk>
-@@ -111,7 +110,6 @@ static int __init s3c2440_pll_16934400(void)
- {
- 	return subsys_interface_register(&s3c2440_plls169344_interface);
- }
--
- arch_initcall(s3c2440_pll_16934400);
- 
- static struct subsys_interface s3c2442_plls169344_interface = {
-@@ -124,5 +122,4 @@ static int __init s3c2442_pll_16934400(void)
- {
- 	return subsys_interface_register(&s3c2442_plls169344_interface);
- }
--
- arch_initcall(s3c2442_pll_16934400);
--- 
-1.7.10.4
+Now, sched_clock() is there to give the scheduler a _fast_ to access,
+higher resolution clock than is available from other sources, so that
+there's ways of accurately measuring the amount of time processes run
+for, and other such measurements - and it uses that to determine how
+to schedule a particular task and when to preempt it.
+
+Not providing it means you get those measurements at HZ-based resolution,
+which is suboptimal for tasks which run often for sub-HZ periods (which
+can end up accumulating zero run time.)
