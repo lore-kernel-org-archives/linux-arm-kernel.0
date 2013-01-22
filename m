@@ -1,27 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Jan 2013 23:56:31 -0800
-Subject: [GIT PULL v3] Renesas ARM-based SoC defconfig for v3.9
-In-Reply-To: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
-References: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130122075631.GA27044@quad.lixom.net>
+Date: Tue, 22 Jan 2013 00:02:12 -0800
+Subject: [PATCH v2] ARM: remove redundant 'select GENERIC_GPIO'
+In-Reply-To: <1358499506-9790-1-git-send-email-shawn.guo@linaro.org>
+References: <1358499506-9790-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130122080212.GA27384@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 03:02:21PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+On Fri, Jan 18, 2013 at 04:58:26PM +0800, Shawn Guo wrote:
+> In drivers/gpio/Kcong, ARCH_REQUIRE_GPIOLIB selects GPIOLIB which in
+> turn selects GENERIC_GPIO.  So GENERIC_GPIO will be selected
+> automatically for those platforms that select ARCH_REQUIRE_GPIOLIB.
 > 
-> please consider the following defconfig enhancements for 3.9.
+> Remove the redundant 'select GENERIC_GPIO' for platforms that already
+> select ARCH_REQUIRE_GPIOLIB at either mach or plat level.
 > 
-> ----------------------------------------------------------------
-> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
-> 
->   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git defconfig
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Changes since v1:
+>  - Update commit log to better explain why the select is unncessary
 
-Thanks, pulled as renesas/defconfig and included in next/boards.
-
+Applied to next/cleanup. Thanks!
 
 -Olof
