@@ -1,44 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Jan 2013 15:57:02 +0000
-Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
- Armada 370/XP
-In-Reply-To: <50FDC322.2040107@free-electrons.com>
-References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
- <201301211831.45947.arnd@arndb.de> <50FDC322.2040107@free-electrons.com>
-Message-ID: <201301221557.02976.arnd@arndb.de>
+From: kishon@ti.com (kishon)
+Date: Tue, 22 Jan 2013 21:46:33 +0530
+Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
+In-Reply-To: <50FEB3FD.3050001@ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
+ <50FEB3FD.3050001@ti.com>
+Message-ID: <50FEBB61.9000707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 January 2013, Gregory CLEMENT wrote:
-> I don't see a strong reason to not enable it if we don't use it. My concern
-> was that I don't need it so I didn't want to include it and generating extra
-> code for nothing. Then just after having sent this patch set, I received your
-> patch set about build regression in 3.8 and especially the part about
-> CONFIG_MULTIPLATFORM made me realized that it could be a problem.
+Hi,
 
-Ok.
+On Tuesday 22 January 2013 09:15 PM, kishon wrote:
+> On Tuesday 22 January 2013 09:11 PM, Koen Kooi wrote:
+>>
+>> Op 22 jan. 2013, om 10:58 heeft Kishon Vijay Abraham I <kishon@ti.com>
+>> het volgende geschreven:
+>>
+>>> This patch series adds support for adding multiple PHY's (of same type).
+>>> The binding information has to be present in the PHY library (otg.c) in
+>>> order for it to return the appropriate PHY whenever the USB controller
+>>> request for the PHY. So added a new API usb_bind_phy() to pass the
+>>> binding
+>>> information. This API should be called by platform specific
+>>> initialization
+>>> code.
+>>>
+>>> So the binding should be done something like
+>>> usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto"); specifying
+>>> the USB
+>>> controller device name, index, and the PHY device name.
+>>> I have done this binding for OMAP platforms, but it should be done for
+>>> all the platforms.
+>>>
+>>> After this design, the phy can be got by passing the USB controller
+>>> device
+>>> pointer and the index.
+>>>
+>>> Developed this patch series on
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
+>>> after applying "usb: musb: add driver for control module" patch series
+>>> and "ARM: dts: omap: add dt data for MUSB"
+>>>
+>>> Did basic enumeration testing in omap4 panda and omap3 beagle.
+>>
+>> With this patchset USB completely breaks on am33xx beaglebone, is that
+>> intended?
+> Not really.
+> Does am33xx makes use of omap2430.c? Which PHY does am33xx uses?
 
-> > Maybe it can be written as
-> > 
-> > config LOCAL_TIMERS
-> >       bool "Use local timer interrupts"
-> >       depends on SMP
-> >       default y
-> > 
-> > config HAVE_ARM_TWD
-> >       depends on LOCAL_TIMERS
-> >       default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
-> 
-> So in this case why not written something like this:
->         default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARMADA_370_XP_TIMER)
+I figured out it uses drivers/usb/musb/musb_dsps.c (So it doesn't use 
+omap2430.c). I think it uses TWL4030_USB (TPS659x0) as PHY.
 
-That does not change anything, because ARMADA_370_XP_TIMER is only ever enabled
-when ARCH_MULTIPLATFORM is enabled as well.
+Then we need to adapt am33xx to use devm_usb_get_phy_by_phandle.
+I'll see how to do it.
 
-> >       default y
-> I am not a kconfig expert, but won't this line set HAVE_ARM_TWD to 'y' whatever
-> the result of the previous line?
+Thank you for testing and reporting it :-)
 
-Yes, that was a mistake on my side.
-
-	Arnd
+Thanks
+Kishon
