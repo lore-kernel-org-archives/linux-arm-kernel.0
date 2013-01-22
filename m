@@ -1,59 +1,67 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 21 Jan 2013 16:51:58 -0800
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <CAKGA1bmtTH1N8nx79MGiMighdQROpNtpvAZXhHKT+mT3kcazBQ@mail.gmail.com>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <201301212041.17951.arnd@arndb.de> <50FDAC5F.4040605@linaro.org>
- <CAKGA1b=D5CNikijoOAk5xP6TC-nB_gEGtS05ncrPR68sQTMrxw@mail.gmail.com>
- <50FDC2DD.7090406@linaro.org>
- <CAKGA1bmtTH1N8nx79MGiMighdQROpNtpvAZXhHKT+mT3kcazBQ@mail.gmail.com>
-Message-ID: <50FDE2AE.8030608@linaro.org>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 21 Jan 2013 18:54:12 -0600
+Subject: [PATCH] crypto: fix FTBFS with ARM SHA1-asm and THUMB2_KERNEL
+In-Reply-To: <alpine.LFD.2.02.1301211739470.6300@xanadu.home>
+References: <1358787763-1226-1-git-send-email-matt@genesi-usa.com>
+ <alpine.LFD.2.02.1301211739470.6300@xanadu.home>
+Message-ID: <CAKGA1bkQ9e8gmSPz_4csJWjEOKj3ZVqSLijSTRWxgDSaZoYqCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2013 02:54 PM, Matt Sealey wrote:
-> On Mon, Jan 21, 2013 at 4:36 PM, John Stultz <john.stultz@linaro.org> wrote:
->> On 01/21/2013 01:14 PM, Matt Sealey wrote:
->>> My question really has to be is CONFIG_SCHED_HRTICK useful, what
->>> exactly is it going to do on ARM here since nobody can ever have
->>> enabled it? Is it going to keel over and explode if nobody registers a
->>> non-jiffies sched_clock (since the jiffies clock is technically
->>> reporting itself as a ridiculously high resolution clocksource..)?
->> ??? Not following this at all.  jiffies is the *MOST* coarse resolution
->> clocksource there is (at least that I'm aware of.. I recall someone wanting
->> to do a 60Hz clocksource, but I don't think that ever happened).
-> Is that based on it's clocksource rating (probably worse than a real
-> hrtimer) or it's reported resolution? Because on i.MX51 if I force it
-> to use the jiffies clock the debug on the kernel log is telling me it
-> has a higher resolution (it TELLS me that it ticks "as fast" as the
-> CPU frequency and wraps less than my real timer).
-So the clocksource rating is supposed to be defined by the clocksource 
-driver writer, and just provides a way for the clocksource core to 
-select the best clocksource given a set of clocksources. It is not 
-defined as any sort of calculated mapping to any property of the 
-clocksource itself (although some driver writers might compute a ratings 
-value in that way, but I feel the static ranking is much simpler). The 
-comment above struct clocksource in clocksource.h tries to explain this.
+On Mon, Jan 21, 2013 at 4:46 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Mon, 21 Jan 2013, Matt Sealey wrote:
+>
+>> The optimized assembler SHA1 code for ARM does not conform to Thumb2
+>> register usage requirements, so it cannot be built when the kernel is
+>> configured with THUMB2_KERNEL.
+>>
+>> Fix the FTBFS for now by preventing misconfigurations of the kernel.
+>>
+>> Signed-off-by: Matt Sealey <matt@genesi-usa.com>
+>
+> A .arm directive at the top of the assembly code would be a better
+> "fix", as that wouldn't reduce functionality.
 
-As far as jiffies rating, from jiffies.c:
-     .rating        = 1, /* lowest valid rating*/
+If I recall, doing that last time for ssi-fiq.S was the wrong solution
+and it was suggesed proper configuration (on top of possibly rewriting
+the assembly) was better than hacking around in the assembly..
 
-So I'm not sure what you mean by "the debug on the kernel log is telling 
-me it has a higher resolution".
+> Yet, I'd invite you to have a look at commit 638591cd7b in linux-next.
 
+I took a peek, and invite you to ignore my patch. I only tracked the
+top of Linus' tree..
 
+That said, it seems nobody benchmarked this on something different
+than IXP425 or KS8695 to see if it's markedly faster than the
+(moderately recently updated) C-code implementation outside of the
+mentioned in the logs for initial commit? It seems like rather a
+specific optimization for a rather specific use case for rather
+specific processors (and therefore a small test base) probably meant
+for a very specific product line somewhere. Whether you get any
+benefit in enabling this config item or not for any other ARM platform
+is up for debate, isn't it?
 
-> I know where the 60Hz clocksource might come from, the old Amiga
-> platforms have one based on the PSU frequency (50Hz in Europe, 60Hz
-> US/Japan). Even a 60Hz clocksource is useful though (on the Amiga, at
-> least, it is precisely the vsync clock for synchronizing your display
-> output on TV-out, which makes it completely useful for the framebuffer
-> driver), but.. you just won't expect to assign it as sched_clock or
-> your delay timer. And if anyone does I'd expect they'd know full well
-> it'd not run so well.
+If it *is* in fact much faster everywhere, and it works in any ARM or
+THUMB2 configuration, there's a case to be built for it being the
+default ARM implementation for AES and SHA1..
 
-Yes, in the case I was remembering, the 60HZ was driven by the 
-electrical line.
+This question is to the implementor/committer (Dave McCullough), how
+exactly did you measure the benchmark and can we reproduce it on some
+other ARM box?
 
-thanks
--john
+If it's long and laborious and not so important to test the IPsec
+tunnel use-case, what would be the simplest possible benchmark to see
+if the C vs. assembly version is faster for a particular ARM device? I
+can get hold of pretty much any Cortex-A8 or Cortex-A9 that matters, I
+have access to a Chromebook for A15, and maybe an i.MX27 or i.MX35 and
+a couple Marvell boards (ARMv6) if I set my mind to it... that much
+testing implies we find a pretty concise benchmark though with a
+fairly common kernel version we can spread around (i.MX, OMAP and the
+Chromebook, I can handle, the rest I'm a little wary of bothering to
+spend too much time on). I think that could cover a good swath of
+not-ARMv5 use cases from lower speeds to quad core monsters.. but I
+might stick to i.MX to start with..
+
+--
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
