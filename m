@@ -1,31 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 22 Jan 2013 11:26:05 -0700
-Subject: [PATCH] clk: tegra: add KBC clock for Tegra20
-In-Reply-To: <20130122182340.24671.64241@quantum>
-References: <1357946262-25823-1-git-send-email-swarren@wwwdotorg.org>
- <20130122182340.24671.64241@quantum>
-Message-ID: <50FED9BD.5060907@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Jan 2013 10:27:49 -0800
+Subject: [PATCH v2 3/3] arm: omap2: gpmc: add DT bindings for OneNAND
+In-Reply-To: <CALF0-+WvfyygnV5A=E8UGc=zp9pab79FzJRe1KywjPw-B4UGZA@mail.gmail.com>
+References: <1358634477-25868-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1358634477-25868-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130121123020.GI15707@e106331-lin.cambridge.arm.com>
+ <CALF0-+VOxtsfQLZCGujvjMrsGacbfVTMytRUX=CfKa3+FgnU1w@mail.gmail.com>
+ <20130121183348.GI22517@atomide.com>
+ <af696cd0-8a7f-4839-9600-87d5b9172585@email.android.com>
+ <CALF0-+WvfyygnV5A=E8UGc=zp9pab79FzJRe1KywjPw-B4UGZA@mail.gmail.com>
+Message-ID: <20130122182749.GM15361@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 11:23 AM, Mike Turquette wrote:
-> Quoting Stephen Warren (2013-01-11 15:17:42)
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> This clock has been missing from all our upstream clock drivers. Add it
->> by copying the tegra_clk_periph_gate() call from Tegra30; the data
->> matches what's in the ChromeOS kernel for this clock.
->>
->> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
->> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> Mike, I'd need to apply this to the Tegra tree as part of the common
->> clock framework conversion.
->>
+* Ezequiel Garcia <elezegarcia@gmail.com> [130122 10:17]:
+> On Mon, Jan 21, 2013 at 10:32 PM, Daniel Mack <zonque@gmail.com> wrote:
+> >
+> > I'm currently far away from my computer and can't prepare a patch for this, sorry. But I think you are right, so please just submit a patch for that, anyone :-)
+> >
 > 
-> Is this patch going to be rolled into patch 6/9 of the larger tegra ccf
-> series?
+> Ok, I'll try to submit a patch as soon as possible. If anyone wants to
+> do it instead, fine by me.
 
-In the latest Tegra CCF series that I posted, I've rolled all these
-small fixes in already.
+No please go ahead as it seems that you can easily test it too.
+
+Regards,
+
+Tony
