@@ -1,36 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Jan 2013 00:09:20 -0800
-Subject: [PATCH 2/7] ARM: sunxi: Add pinctrl driver for Allwinner SoCs
-In-Reply-To: <CACRpkdb8xLeP+RB+JfuEQu=MQ0yO6tVFasVrMsOE4FSfJHrOiw@mail.gmail.com>
-References: <1358544639-14761-1-git-send-email-maxime.ripard@free-electrons.com>
- <1358544639-14761-3-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdb8xLeP+RB+JfuEQu=MQ0yO6tVFasVrMsOE4FSfJHrOiw@mail.gmail.com>
-Message-ID: <20130122080920.GB27384@quad.lixom.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 22 Jan 2013 09:16:57 +0100
+Subject: [GIT PULL] i.MX fixes for -rc
+Message-ID: <20130122081656.GI1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 11:09:07PM +0100, Linus Walleij wrote:
-> On Fri, Jan 18, 2013 at 10:30 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The Allwinner SoCs have an IP module that handle both the muxing and the
-> > GPIOs.
-> >
-> > This IP has 8 banks of 32 bits, with a number of pins actually useful
-> > for each of these banks varying from one to another, and depending on
-> > the SoC used on the board.
-> >
-> > This driver only implements the pinctrl part, the gpio part will come
-> > eventually.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Patch title says "ARM: " but all changed except one line is to the pinctrl
-> tree so I have applied it to the pinctrl tree on a separate allwinner
-> branch for now (will merge it to devel when deemde stable).
-> 
-> ARM SoC boys: can I have an ACK on this oneliner?
+Hi Arnd, Olof,
 
-Acked-by: Olof Johansson <olof@lixom.net>
+Please pull the following fix for -rc.
 
+Sascha
 
--Olof
+The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+
+  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes-rc
+
+for you to fetch changes up to e909c682d04e55e77a3c9d158e7dc36027195493:
+
+  [media] coda: Fix build due to iram.h rename (2013-01-08 09:44:06 +0100)
+
+----------------------------------------------------------------
+ARM i.MX fixes for -rc.
+
+This contains a single compilation fix for the CODA driver.
+
+----------------------------------------------------------------
+Sascha Hauer (1):
+      [media] coda: Fix build due to iram.h rename
+
+ arch/arm/mach-imx/iram_alloc.c                                     |    3 +--
+ drivers/media/platform/coda.c                                      |    2 +-
+ arch/arm/mach-imx/iram.h => include/linux/platform_data/imx-iram.h |    0
+ 3 files changed, 2 insertions(+), 3 deletions(-)
+ rename arch/arm/mach-imx/iram.h => include/linux/platform_data/imx-iram.h (100%)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
