@@ -1,39 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 22 Jan 2013 18:50:45 +0100
-Subject: [PATCH 5/6] ARM: at91: rm9200: remake the BGA as default version
-In-Reply-To: <cover.1358876553.git.nicolas.ferre@atmel.com>
-References: <cover.1358876553.git.nicolas.ferre@atmel.com>
-Message-ID: <548fb19ed30c1c0515a9b5604c3b3ffcdde14ed7.1358876553.git.nicolas.ferre@atmel.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 22 Jan 2013 09:55:52 -0800
+Subject: [PATCH] clk: Add axi-clkgen driver
+In-Reply-To: <1357755120-32735-1-git-send-email-lars@metafoo.de>
+References: <1357755120-32735-1-git-send-email-lars@metafoo.de>
+Message-ID: <20130122175552.24671.27893@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Quoting Lars-Peter Clausen (2013-01-09 10:12:00)
+<snip>
+> +static void axi_clkgen_write(struct axi_clkgen *axi_clkgen,
+> +       unsigned int reg, unsigned int val)
+> +{
+> +       iowrite32(val, axi_clkgen->base + reg);
 
-Make BGA as the default version as we are supposed to just have
-to specify when we use the PQFP version.
+Silly question: any reason to use this over readl()?  This is more for
+my understanding than a real criticism.
 
-Issue was existing since commit:
-3e90772 (ARM: at91: fix at91rm9200 soc subtype handling).
+> +}
+> +
+> +static void axi_clkgen_read(struct axi_clkgen *axi_clkgen,
+> +       unsigned int reg, unsigned int *val)
+> +{
+> +       *val = ioread32(axi_clkgen->base + reg);
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable <stable@vger.kernel.org> [v3.3]
----
- arch/arm/mach-at91/setup.c | 2 ++
- 1 file changed, 2 insertions(+)
+Same as above, any reason to use this over writel?
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 9ee866c..4b67847 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -105,6 +105,8 @@ static void __init soc_detect(u32 dbgu_base)
- 	switch (socid) {
- 	case ARCH_ID_AT91RM9200:
- 		at91_soc_initdata.type = AT91_SOC_RM9200;
-+		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_NONE)
-+			at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
- 		at91_boot_soc = at91rm9200_soc;
- 		break;
- 
--- 
-1.8.0
+<snip>
+> +static unsigned long axi_clkgen_recalc_rate(struct clk_hw *clk_hw,
+> +       unsigned long parent_rate)
+> +{
+> +       struct axi_clkgen *axi_clkgen = clk_hw_to_axi_clkgen(clk_hw);
+> +       unsigned int d, m, dout;
+> +       unsigned int reg;
+> +
+> +       axi_clkgen_read(axi_clkgen, AXI_CLKGEN_REG_CLK_OUT1, &reg);
+> +       dout = (reg & 0x3f) + ((reg >> 6) & 0x3f);
+> +       axi_clkgen_read(axi_clkgen, AXI_CLKGEN_REG_CLK_DIV, &reg);
+> +       d = (reg & 0x3f) + ((reg >> 6) & 0x3f);
+> +       axi_clkgen_read(axi_clkgen, AXI_CLKGEN_REG_CLK_FB1, &reg);
+> +       m = (reg & 0x3f) + ((reg >> 6) & 0x3f);
+> +
+> +       if (d == 0 || dout == 0)
+> +               return 0;
+> +
+> +       return parent_rate / d * m / dout;
+
+Any chance of overflow here?  Maybe do_div should be used?
+
+Regards,
+Mike
