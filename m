@@ -1,43 +1,36 @@
-From: pistol@cs.duke.edu (Valentin Pistol)
-Date: Tue, 22 Jan 2013 12:11:11 -0500
-Subject: ARM: hw_breakpoint mismatch breakpoint behaves unexpectedly like
- a match breakpoint on ARM_DEBUG_ARCH_V7_ECP14
-In-Reply-To: <20130122093102.GC12295@mudshark.cambridge.arm.com>
-References: <CAPfQmKJaYf6M4iHKuNcHgYZi5R8M7fXdXta34Q=1C0cHKimkyQ@mail.gmail.com>
- <20130122093102.GC12295@mudshark.cambridge.arm.com>
-Message-ID: <CAPfQmK+mwx39J5yWiLCTWbiFL=yL-rw=XZXRkOwGU_byQsDyQA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Jan 2013 17:12:41 +0000
+Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer
+ for Armada 370/XP
+In-Reply-To: <201301212044.41865.arnd@arndb.de>
+References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
+ <201301211831.45947.arnd@arndb.de>
+ <CAKGA1b=9WQNwHOz=k13XVc=MyZT1UrcaYj8muF2A5B4eJA5+MA@mail.gmail.com>
+ <201301212044.41865.arnd@arndb.de>
+Message-ID: <20130122171241.GL23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The ptrace interface doesn't support mismatch breakpoints, and ignores those
-> bits in the user request, hence why you see a normal breakpoint being
-> created. Note that mismatch breakpoints are used internally for stepping
-> over breakpoints set by perf.
->
-> If you wanted to add single-step using mismatch breakpoints, I think we'd be
-> better off re-introducing the SINGLESTEP ptrace request for ARM to use
-> hw_breakpoints.
+On Mon, Jan 21, 2013 at 08:44:41PM +0000, Arnd Bergmann wrote:
+> Documentation is generally considered a good thing, but few people
+> can be bothered to write it, and few of the other people that should
+> read it actually do.
 
-I noticed your old Feb 2011 post on SINGLESTEP being removed:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/041408.html
+Actually _that_ is just one of the problems with documentation.  The
+whole thing is full of problems:
 
-So it was managing its own breakpoints and instruction decoding (like
-gdb would) but didn't take advantage of either mismatch support or
-hw_breakpoints?
+1. People don't write documentation.
 
-Such support seems really useful and yet much more simple if mismatch
-is supported.
-I definitely would like to use the ptrace and hw-breakpoints interface
-instead of avoiding and writing it from scratch, as it takes care of a
-lot of details, for instance SMP and context switches, uninstalling
-and installing the breakpoints as required.
+2. People don't bother to update correct documentation when the code
+   changes in a way that the documentation should be updated for.
 
-I'm wondering how pervasive the required changes are to support
-SINGLESTEP with mismatch breakpoints.
-If you think it's a good idea I'm very willing to try and add-in such support.
-Please let me know if there's some obvious issues about going forward
-with this that you may be aware of.
+3. People don't bother to read documentation which is provided.
 
-Thanks so much!
+(2) is about as bad as it gets - because the small percentage of people
+who do read the documentation rather than the code now are lead down
+paths which are no longer true.
 
-Valentin
+And (2) educates people to behave like (3).  And (3) educates people to
+behave like (1) - why should they bother if they're just going to have
+to waste time in an email explaining it time and time again (even when
+documentation does exist.)
