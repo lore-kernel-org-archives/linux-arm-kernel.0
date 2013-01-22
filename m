@@ -1,32 +1,20 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 22 Jan 2013 22:00:27 +0100
-Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
-In-Reply-To: <201301221538.55975.arnd@arndb.de>
-References: <Pine.LNX.4.44L0.1301221011190.1510-100000@iolanthe.rowland.org>
- <201301221538.55975.arnd@arndb.de>
-Message-ID: <20130122210027.GN1906@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jan 2013 21:07:55 +0000
+Subject: [PATCH 15/15] staging/omapdrm: don't build on multiplatform
+In-Reply-To: <50FED76B.10801@ti.com>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+ <201301221747.24618.arnd@arndb.de> <50FED76B.10801@ti.com>
+Message-ID: <201301222107.55437.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 03:38:55PM +0000, Arnd Bergmann wrote:
-> On Tuesday 22 January 2013, Alan Stern wrote:
-> > In order to prevent this, you have to make sure that each glue driver
-> > depends on USB_ARCH_HAS_EHCI.  A simple way to do this is to surround
-> > the Kconfig entries for those drivers with "if USB && 
-> > USB_ARCH_HAS_EHCI" ... "endif".
+On Tuesday 22 January 2013, Rob Clark wrote:
+> I think it should be safe.. or at least it built fine for multi-plat in 
+> the recent past and shouldn't really do anything if there is no omapdss 
+> platform device.
 > 
-> I was actually thinking we could remove the use of USB_ARCH_HAS_EHCI
-> as well once we have inverted the logic for selecting USB_EHCI_HCD,
-> but there is another problem with that, because then we still need
-> something to select USB_ARCH_HAS_HCD, or kill that symbol as well.
+> Do you want me to make a patch or are you already doing this?
 
-+1 for killing it. Such symbols get more and more meaningless anyway
-with multiarch kernels-
+Please make one. Feel free to reuse my changeset description if needed.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
