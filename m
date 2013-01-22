@@ -1,39 +1,31 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 22 Jan 2013 10:54:32 -0800
-Subject: [PATCH] clk: tegra: add KBC clock for Tegra20
-In-Reply-To: <50FED9BD.5060907@wwwdotorg.org>
-References: <1357946262-25823-1-git-send-email-swarren@wwwdotorg.org>
- <20130122182340.24671.64241@quantum> <50FED9BD.5060907@wwwdotorg.org>
-Message-ID: <20130122185432.24671.78856@quantum>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 22 Jan 2013 18:58:33 +0000
+Subject: [PATCH] ARM: Versatile Express: extend the MPIDR range used for
+ pen release check
+In-Reply-To: <alpine.LFD.2.02.1301221324220.6300@xanadu.home>
+References: <1358852200-4581-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <alpine.LFD.2.02.1301221324220.6300@xanadu.home>
+Message-ID: <20130122185833.GE3959@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Warren (2013-01-22 10:26:05)
-> On 01/22/2013 11:23 AM, Mike Turquette wrote:
-> > Quoting Stephen Warren (2013-01-11 15:17:42)
-> >> From: Stephen Warren <swarren@nvidia.com>
-> >>
-> >> This clock has been missing from all our upstream clock drivers. Add it
-> >> by copying the tegra_clk_periph_gate() call from Tegra30; the data
-> >> matches what's in the ChromeOS kernel for this clock.
-> >>
-> >> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
-> >> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
-> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> >> ---
-> >> Mike, I'd need to apply this to the Tegra tree as part of the common
-> >> clock framework conversion.
-> >>
-> > 
-> > Is this patch going to be rolled into patch 6/9 of the larger tegra ccf
-> > series?
+On Tue, Jan 22, 2013 at 06:25:20PM +0000, Nicolas Pitre wrote:
+> On Tue, 22 Jan 2013, Lorenzo Pieralisi wrote:
 > 
-> In the latest Tegra CCF series that I posted, I've rolled all these
-> small fixes in already.
+> > In ARM multi-cluster systems the MPIDR affinity level 0 cannot be used as a
+> > single cpu identifier, affinity levels 1 and 2 must be taken into account as
+> > well.
+> > This patch extends the MPIDR usage to affinity levels 1 and 2 in versatile
+> > secondary cores start up code in order to compare the passed pen_release
+> > value with the full-blown affinity mask.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> 
+> Note that my b.L series makes this patch obsolete.
 
-Right, I just realized that there is a V6 but it has only the three
-patches affecting drivers/clk/* instead of the larger nine patch series.
-Scanning my inbox I mistakenly thought those were unrelated series.
+This is needed to boot TC2 in the mainline. Agreed, when the power API
+BSP support for TC2 is merged this can be removed, but waiting for that to
+happen we should fix the current code to enable TC2 in its current state.
 
-Regards,
-Mike
+Lorenzo
