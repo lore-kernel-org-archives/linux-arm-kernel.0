@@ -1,36 +1,25 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Tue, 22 Jan 2013 16:41:18 +0100
-Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
-In-Reply-To: <1358848694-20145-1-git-send-email-kishon@ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
-Message-ID: <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jan 2013 15:41:05 +0000
+Subject: [PATCH 09/15] media: coda: don't build on multiplatform
+In-Reply-To: <20130122082158.GC9414@pengutronix.de>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+ <1358788568-11137-10-git-send-email-arnd@arndb.de>
+ <20130122082158.GC9414@pengutronix.de>
+Message-ID: <201301221541.05636.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 22 January 2013, Sascha Hauer wrote:
+> On Mon, Jan 21, 2013 at 05:16:02PM +0000, Arnd Bergmann wrote:
+> > The coda video codec driver depends on a mach-imx or mach-mxs specific
+> > header file "mach/iram.h". This is not available when building for
+> > multiplatform, so let us disable this driver for v3.8 when building
+> > multiplatform, and hopefully find a proper fix for v3.9.
+> > 
+> > drivers/media/platform/coda.c:27:23: fatal error: mach/iram.h: No such file or directory
+> 
+> I just sent a pull request for this with a proper fix.
 
-Op 22 jan. 2013, om 10:58 heeft Kishon Vijay Abraham I <kishon@ti.com> het volgende geschreven:
+Ok, even better. Thanks for taking care of it!
 
-> This patch series adds support for adding multiple PHY's (of same type).
-> The binding information has to be present in the PHY library (otg.c) in
-> order for it to return the appropriate PHY whenever the USB controller
-> request for the PHY. So added a new API usb_bind_phy() to pass the binding
-> information. This API should be called by platform specific initialization
-> code.
-> 
-> So the binding should be done something like
-> usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto"); specifying the USB
-> controller device name, index, and the PHY device name.
-> I have done this binding for OMAP platforms, but it should be done for
-> all the platforms.
-> 
-> After this design, the phy can be got by passing the USB controller device
-> pointer and the index.
-> 
-> Developed this patch series on
-> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
-> after applying "usb: musb: add driver for control module" patch series
-> and "ARM: dts: omap: add dt data for MUSB"
-> 
-> Did basic enumeration testing in omap4 panda and omap3 beagle.
-
-With this patchset USB completely breaks on am33xx beaglebone, is that intended?
+	Arnd
