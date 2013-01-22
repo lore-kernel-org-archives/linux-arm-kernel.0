@@ -1,379 +1,130 @@
-From: rtivy@ti.com (Tivy, Robert)
-Date: Tue, 22 Jan 2013 02:09:41 +0000
-Subject: [PATCH v5 6/9] ARM: davinci: Remoteproc driver support for
- OMAP-L138 DSP
-In-Reply-To: <50FCD463.5000006@ti.com>
-References: <1357863807-380-1-git-send-email-rtivy@ti.com>
- <1357863807-380-7-git-send-email-rtivy@ti.com> <50FCD463.5000006@ti.com>
-Message-ID: <13514BD7FAEBA745BBD7D8A672905C1431205DCF@DFLE08.ent.ti.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 21 Jan 2013 20:10:48 -0600
+Subject: One of these things (CONFIG_HZ) is not like the others..
+In-Reply-To: <50FDEBF8.3090902@linaro.org>
+References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
+ <201301212041.17951.arnd@arndb.de> <50FDAC5F.4040605@linaro.org>
+ <CAKGA1b=D5CNikijoOAk5xP6TC-nB_gEGtS05ncrPR68sQTMrxw@mail.gmail.com>
+ <50FDC2DD.7090406@linaro.org>
+ <CAKGA1bmtTH1N8nx79MGiMighdQROpNtpvAZXhHKT+mT3kcazBQ@mail.gmail.com>
+ <50FDE2AE.8030608@linaro.org>
+ <CAKGA1bkXx2qn+c6sKqXsty-aFe1r-W79uyem0O8p6JNeeq6zxQ@mail.gmail.com>
+ <50FDEBF8.3090902@linaro.org>
+Message-ID: <CAKGA1bmpL-PyyMENmwgH9WNmdQ=+1oXrtDo+0OLffdvTChpLFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Nori, Sekhar
-> Sent: Sunday, January 20, 2013 9:39 PM
->  
-> On 1/11/2013 5:53 AM, Robert Tivy wrote:
-> > Adding a remoteproc driver implementation for OMAP-L138 DSP
-> >
-> > Signed-off-by: Robert Tivy <rtivy@ti.com>
-> > ---
-> >  drivers/remoteproc/Kconfig                     |   23 ++
-> >  drivers/remoteproc/Makefile                    |    1 +
-> >  drivers/remoteproc/davinci_remoteproc.c        |  307
-> ++++++++++++++++++++++++
-> >  include/linux/platform_data/da8xx-remoteproc.h |   33 +++
-> 
-> naming the driver davinci_remoteproc.c and platform data as
-> da8xx-remoteproc.h is odd. The driver looks really specific to omap-
-> l138
-> so may be call the driver da8xx-remoteproc.c?
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
 
-At first when I started working on this stuff we intended to unify this naming, to either "davinci"-based or "da8xx"-based, but after looking at it for a while we realized that it is already so hopelessly mixed in many areas that it wasn't worth the effort.
 
-But for new stuff that's directly tied to omap-l138 we should be consistent, so I agree.  I'll change it to da8xx-remoteproc.c, at the same time changing all the code/data names to be prefixed with "da8xx_".
+On Mon, Jan 21, 2013 at 7:31 PM, John Stultz <john.stultz@linaro.org> wrote:
+> On 01/21/2013 05:06 PM, Matt Sealey wrote:
+>>
+>> On Mon, Jan 21, 2013 at 6:51 PM, John Stultz <john.stultz@linaro.org>
+>> wrote:
+>>>
+>>> On 01/21/2013 02:54 PM, Matt Sealey wrote:
+>>>>
+>>>> On Mon, Jan 21, 2013 at 4:36 PM, John Stultz <john.stultz@linaro.org>
+>>>> wrote:
+>>>>>
+>>>>> On 01/21/2013 01:14 PM, Matt Sealey wrote:
+>>>
+>>> As far as jiffies rating, from jiffies.c:
+>>>      .rating        = 1, /* lowest valid rating*/
+>>>
+>>> So I'm not sure what you mean by "the debug on the kernel log is telling
+>>> me
+>>> it has a higher resolution".
+>>
+>> Oh, it is just if I actually don't run setup_sched_clock on my
+>> platform, it gives a little message (with #define DEBUG 1 in
+>> sched_clock.c) about who setup the last sched_clock. Since you only
+>> get one chance, and I was fiddling with setup_sched_clock being probed
+>> from multiple possible timers from device tree (i.MX3 has a crapload
+>> of valid timers, which one you use right now is basically forced by
+>> the not-quite-fully-DT-only code and some funky iomap tricks).
+>>
+>> And what I got was, if I use the real hardware timer, it runs at 66MHz
+>> and says it has 15ns resolution and wraps every 500 seconds or so. The
+>> jiffies timer says it's 750MHz, with a 2ns resoluton.. you get the
+>> drift. The generic reporting of how "good" the sched_clock source is
+>> kind of glosses over the quality rating of the clock source and at
+>> first glance (if you're not paying that much attention), it is a
+>> little bit misleading..
+>
+>
+> I've got no clue on this. sched_clock is arch specific, and while ARM does
+> use clocksources for sched_clock, what you're seeing is a detail of the ARM
+> implementation and not the clocksource code (one complication is that
+> clocksources rating values are for the requirements of timekeeping, which
+> are different then the requirements for sched_clock - so the confusion is
+> understandable).
+>
+>
+>
+>>> Yes, in the case I was remembering, the 60HZ was driven by the electrical
+>>> line.
+>>
+>> While I have your attention, what would be the minimum "good" speed to
+>> run the sched_clock or delay timer implementation from? My rudimentary
+>> scribblings in my notebook give me a value of "don't bother" with less
+>> than 10KHz based on HZ=100, so I'm wondering if a direct 32.768KHz
+>> clock would do (i.MX osc clock input if I can supply it to one of the
+>> above myriad timers) since this would be low-power compared to a 66MHz
+>> one (by a couple mA anyway). I also have a bunch of questions about
+>> the delay timer requirements.. I might mail you personally.. or would
+>> you prefer on-list?
+>
+> So there are probably other folks who could better comment on sched_clock()
+> or the delay timer (I'm guessing the delay() implementation is what you mean
+> by that) design trade-offs.
 
-> 
-> > diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-> > index 96ce101..7d3a5e0 100644
-> > --- a/drivers/remoteproc/Kconfig
-> > +++ b/drivers/remoteproc/Kconfig
-> > @@ -41,4 +41,27 @@ config STE_MODEM_RPROC
-> >  	  This can be either built-in or a loadable module.
-> >  	  If unsure say N.
-> >
-> > +config DAVINCI_REMOTEPROC
-> > +	tristate "DaVinci DA850/OMAPL138 remoteproc support
-> (EXPERIMENTAL)"
-> > +	depends on ARCH_DAVINCI_DA850
-> > +	select REMOTEPROC
-> > +	select RPMSG
-> > +	select FW_LOADER
-> > +	select CMA
-> > +	default n
-> > +	help
-> > +	  Say y here to support DaVinci DA850/OMAPL138 remote processors
-> > +	  via the remote processor framework.
-> > +
-> > +	  You want to say y here in order to enable AMP
-> > +	  use-cases to run on your platform (multimedia codecs are
-> > +	  offloaded to remote DSP processors using this framework).
-> > +
-> > +	  It's safe to say n here if you're not interested in multimedia
-> > +	  offloading or just want a bare minimum kernel.
-> 
-> > +	  This feature is considered EXPERIMENTAL, due to it not having
-> > +	  any previous exposure to the general public and therefore
-> > +	  limited developer-based testing.
-> 
-> This is probably true in general for remoteproc (I am being warned a
-> lot
-> by the framework when using it) so may be you can drop this specific
-> reference.
+I'm specifically talking about if I do
 
-OK, we'll let the overlying REMOTEPROC EXPERIMENTAL status preside.
+static struct delay_timer imx_gpt_delay_timer = {
+        .read_current_timer = imx_gpt_read_current_timer,
+};
 
-> 
-> > diff --git a/drivers/remoteproc/davinci_remoteproc.c
-> b/drivers/remoteproc/davinci_remoteproc.c
-> > new file mode 100644
-> > index 0000000..fc6fd72
-> > --- /dev/null
-> > +++ b/drivers/remoteproc/davinci_remoteproc.c
-> > @@ -0,0 +1,307 @@
-> > +/*
-> > + * Remote processor machine-specific module for Davinci
-> > + *
-> > + * Copyright (C) 2011-2012 Texas Instruments, Inc.
-> 
-> 2013?
+and then something like:
 
-Yep.
+imx_gpt_delay_timer.freq = clk_get_rate(clk_per);
+register_current_timer_delay(&imx_gpt_delay_timer);
 
-> 
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License
-> > + * version 2 as published by the Free Software Foundation.
-> > + */
-> > +
-> > +#define pr_fmt(fmt)    "%s: " fmt, __func__
-> 
-> You dont seem to be using this anywhere.
+In the sense that now (as of kernel 3.7 iirc), I have an ability to
+have the delay implementation use this awesome fast accessor (which is
+nothing to do with a 'clocksource' as in the subsystem..) to get to my
+(here at least) 66.5MHz counter (up or down, i.MX has both, but I
+dunno if you can use a down counter for delay_timer, or if that's
+preferred, or what.. there are no examples of it.. but it seems to
+work.. that said I can't imagine what would be an immediately visible
+and not totally random effect of doing it "wrong", maybe that delays
+are instantly returned, that could be very hard or impossible to ever
+notice compared to not being able to browse the internet on the target
+device.. it might pop up on some randomly-not-resetting platform
+device or so, though..)
 
-Will remove.
+And I can also put sched_clock on a completely different timer. Does
+that make any sense at all? I wouldn't know, it's not documented.
 
-> 
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/err.h>
-> > +#include <linux/printk.h>
-> > +#include <linux/bitops.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/remoteproc.h>
-> > +#include <linux/platform_data/da8xx-remoteproc.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/io.h>
-> > +#include <linux/module.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/irq.h>
-> 
-> It will be nice to keep this sorted. It avoids duplicate includes
-> later.
+And if I wanted to I could register 8 more timers. That seems rather
+excessive, but the ability to use those extra 8 as clock outputs from
+the SoC or otherwise directly use comparators is useful to some
+people, does Linux in general really give a damn about having 8 timers
+of the same quality being available when most systems barely have two
+clocksources anyway (on x86, tsc and hpet - on ARM I guess twd and
+some SoC-specific timer). I dunno how many people might actually want
+to define in a device tree, but I figure every single one is not a bad
+thing and which ones end up as sched_clock, delay_timer or just plain
+registered clocksources, or not registered as a clocksource and
+accessed as some kind of comparator through some kooky ioctl API, is
+something you would also configure...
 
-OK
+> But again, someone more familiar with the scheduler and driver requirements
+> would probably be more informational.
 
-> 
-> > +static char *fw_name;
-> > +module_param(fw_name, charp, S_IRUGO);
-> > +MODULE_PARM_DESC(fw_name, "\n\t\tName of DSP firmware file in
-> /lib/firmware");
-> > +
-> > +/*
-> > + * OMAP-L138 Technical References:
-> > + * http://www.ti.com/product/omap-l138
-> > + */
-> > +#define SYSCFG_CHIPSIG_OFFSET 0x174
-> > +#define SYSCFG_CHIPSIG_CLR_OFFSET 0x178
-> > +#define SYSCFG_CHIPINT0 (1 << 0)
-> > +#define SYSCFG_CHIPINT1 (1 << 1)
-> > +#define SYSCFG_CHIPINT2 (1 << 2)
-> > +#define SYSCFG_CHIPINT3 (1 << 3)
-> 
-> You can use BIT(x) here.
+Okay. I assume that's a combination of Russell and Thomas..
 
-Will do.
-
-> 
-> > +
-> > +/**
-> > + * struct davinci_rproc - davinci remote processor state
-> > + * @rproc: rproc handle
-> > + */
-> > +struct davinci_rproc {
-> > +	struct rproc *rproc;
-> > +	struct clk *dsp_clk;
-> > +};
-> > +
-> > +static void __iomem *syscfg0_base;
-> > +static struct platform_device *remoteprocdev;
-> > +static struct irq_data *irq_data;
-> > +static void (*ack_fxn)(struct irq_data *data);
-> > +static int irq;
-> > +
-> > +/**
-> > + * handle_event() - inbound virtqueue message workqueue function
-> > + *
-> > + * This funciton is registered as a kernel thread and is scheduled
-> by the
-> > + * kernel handler.
-> > + */
-> > +static irqreturn_t handle_event(int irq, void *p)
-> > +{
-> > +	struct rproc *rproc = platform_get_drvdata(remoteprocdev);
-> > +
-> > +	/* Process incoming buffers on our vring */
-> > +	while (IRQ_HANDLED == rproc_vq_interrupt(rproc, 0))
-> > +		;
-> > +
-> > +	/* Must allow wakeup of potenitally blocking senders: */
-> > +	rproc_vq_interrupt(rproc, 1);
-> > +
-> > +	return IRQ_HANDLED;
-> > +}
-> > +
-> > +/**
-> > + * davinci_rproc_callback() - inbound virtqueue message handler
-> > + *
-> > + * This handler is invoked directly by the kernel whenever the
-> remote
-> > + * core (DSP) has modified the state of a virtqueue.  There is no
-> > + * "payload" message indicating the virtqueue index as is the case
-> with
-> > + * mailbox-based implementations on OMAP4.  As such, this handler
-> "polls"
-> > + * each known virtqueue index for every invocation.
-> > + */
-> > +static irqreturn_t davinci_rproc_callback(int irq, void *p)
-> > +{
-> > +	if (readl(syscfg0_base + SYSCFG_CHIPSIG_OFFSET) &
-> SYSCFG_CHIPINT0) {
-> 
-> personally I think using a variable to read the register and then
-> testing its value inside if() is more readable.
-
-Agreed.
-
-> 
-> > +		/* Clear interrupt level source */
-> > +		writel(SYSCFG_CHIPINT0,
-> > +			syscfg0_base + SYSCFG_CHIPSIG_CLR_OFFSET);
-> > +
-> > +		/*
-> > +		 * ACK intr to AINTC.
-> > +		 *
-> > +		 * It has already been ack'ed by the kernel before calling
-> > +		 * this function, but since the ARM<->DSP interrupts in the
-> > +		 * CHIPSIG register are "level" instead of "pulse" variety,
-> > +		 * we need to ack it after taking down the level else we'll
-> > +		 * be called again immediately after returning.
-> > +		 */
-> > +		ack_fxn(irq_data);
-> 
-> Don't really like interrupt controller functions being invoked like
-> this
-> but I don't understand the underlying issue well enough to suggest an
-> alternate.
-
-I've looked for an alternative with no success, but will start a discussion in earnest after tackling this initial commit.
-
-> 
-> > +
-> > +		return IRQ_WAKE_THREAD;
-> > +	}
-> > +
-> > +	return IRQ_HANDLED;
-> > +}
-> > +
-> > +static int davinci_rproc_start(struct rproc *rproc)
-> > +{
-> > +	struct platform_device *pdev = to_platform_device(rproc-
-> >dev.parent);
-> > +	struct device *dev = rproc->dev.parent;
-> > +	struct davinci_rproc *drproc = rproc->priv;
-> > +	struct clk *dsp_clk;
-> > +	struct resource *r;
-> > +	unsigned long host1cfg_physaddr;
-> > +	unsigned int host1cfg_offset;
-> > +	int ret;
-> > +
-> > +	remoteprocdev = pdev;
-> > +
-> > +	/* hw requires the start (boot) address be on 1KB boundary */
-> > +	if (rproc->bootaddr & 0x3ff) {
-> > +		dev_err(dev, "invalid boot address: must be aligned to
-> 1KB\n");
-> > +
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> 
-> Along with moving this to probe as Ohad requested, you can use
-> devm_request_and_ioremap() to simplify the error paths here. Have a
-> look
-> at: Documentation/driver-model/devres.txt
-
-So it seems that I should also use devm_request_threaded_irq()?
-
-In general, should I always use the "devm_*" APIs when available?
-
-> 
-> > +	if (IS_ERR_OR_NULL(r)) {
-> > +		dev_err(dev, "platform_get_resource() error: %ld\n",
-> > +			PTR_ERR(r));
-> > +
-> > +		return PTR_ERR(r);
-> > +	}
-> > +	host1cfg_physaddr = (unsigned long)r->start;
-> > +
-> > +	irq = platform_get_irq(pdev, 0);
-> > +	if (irq < 0) {
-> > +		dev_err(dev, "platform_get_irq(pdev, 0) error: %d\n", irq);
-> > +
-> > +		return irq;
-> > +	}
-> > +
-> > +	irq_data = irq_get_irq_data(irq);
-> > +	if (IS_ERR_OR_NULL(irq_data)) {
-> > +		dev_err(dev, "irq_get_irq_data(%d) error: %ld\n",
-> > +			irq, PTR_ERR(irq_data));
-> > +
-> > +		return PTR_ERR(irq_data);
-> > +	}
-> > +	ack_fxn = irq_data->chip->irq_ack;
-> > +
-> > +	ret = request_threaded_irq(irq, davinci_rproc_callback,
-> handle_event,
-> > +		0, "davinci-remoteproc", drproc);
-> > +	if (ret) {
-> > +		dev_err(dev, "request_threaded_irq error: %d\n", ret);
-> > +
-> > +		return ret;
-> > +	}
-> > +
-> > +	syscfg0_base = ioremap(host1cfg_physaddr & PAGE_MASK, SZ_4K);
-> > +	host1cfg_offset = offset_in_page(host1cfg_physaddr);
-> > +	writel(rproc->bootaddr, syscfg0_base + host1cfg_offset);
-> > +
-> > +	dsp_clk = clk_get(dev, NULL);
-> 
-> devm_clk_get() here.
-
-OK.
-
-> 
-> > +	if (IS_ERR_OR_NULL(dsp_clk)) {
-> > +		dev_err(dev, "clk_get error: %ld\n", PTR_ERR(dsp_clk));
-> > +		ret = PTR_ERR(dsp_clk);
-> > +		goto fail;
-> > +	}
-> > +	clk_enable(dsp_clk);
-> > +	davinci_clk_reset_deassert(dsp_clk);
-> > +
-> > +	drproc->dsp_clk = dsp_clk;
-> > +
-> > +	return 0;
-> > +fail:
-> > +	free_irq(irq, drproc);
-> > +	iounmap(syscfg0_base);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int davinci_rproc_stop(struct rproc *rproc)
-> > +{
-> > +	struct davinci_rproc *drproc = rproc->priv;
-> > +	struct clk *dsp_clk = drproc->dsp_clk;
-> > +
-> > +	clk_disable(dsp_clk);
-> > +	clk_put(dsp_clk);
-> > +	iounmap(syscfg0_base);
-> > +	free_irq(irq, drproc);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +/* kick a virtqueue */
-> > +static void davinci_rproc_kick(struct rproc *rproc, int vqid)
-> > +{
-> > +	int timed_out;
-> > +	unsigned long timeout;
-> > +
-> > +	timed_out = 0;
-> > +	timeout = jiffies + HZ/100;
-> > +
-> > +	/* Poll for ack from other side first */
-> > +	while (readl(syscfg0_base + SYSCFG_CHIPSIG_OFFSET) &
-> > +		SYSCFG_CHIPINT2)
-> 
-> If there is a context switch here long enough ..
-> 
-> > +		if (time_after(jiffies, timeout)) {
-> 
-> 
-> .. then time_after() might return true and you will erroneously report
-> a
-> timeout even though hardware is working perfectly fine.
-
-I will probably drop the whole check completely.
-
-Otherwise I'll add another check after detecting timeout.
-
-Thanks & Regards,
-
-- Rob
-
-> 
-> Thanks,
-> Sekhar
+-- 
+Matt Sealey
