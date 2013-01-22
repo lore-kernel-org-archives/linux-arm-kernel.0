@@ -1,131 +1,64 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 22 Jan 2013 10:59:01 -0800
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <20130122145113.GK23505@n2100.arm.linux.org.uk>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <20130121232322.GK15361@atomide.com> <50FE307F.9000701@ti.com>
- <201301220931.24570.arnd@arndb.de> <50FE666B.10902@ti.com>
- <20130122145113.GK23505@n2100.arm.linux.org.uk>
-Message-ID: <50FEE175.90504@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Jan 2013 11:18:02 -0800
+Subject: [GIT PULL] omap fixes for v3.8-rc4
+Message-ID: <20130122191801.GQ22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 06:51 AM, Russell King - ARM Linux wrote:
-> On Tue, Jan 22, 2013 at 03:44:03PM +0530, Santosh Shilimkar wrote:
->> Sorry for not being clear enough. On OMAP, 32KHz is the only clock which
->> is always running(even during low power states) and hence the clock
->> source and clock event have been clocked using 32KHz clock. As mentioned
->> by RMK, with 32768 Hz clock and HZ = 100, there will be always an
->> error of 0.1 %. This accuracy also impacts the timer tick interval.
->> This was the reason, OMAP has been using the HZ = 128.
-> Ok.  Let's look at this.  As far as time-of-day is concerned, this
-> shouldn't really matter with the clocksource/clockevent based system
-> that we now have (where *important point* platforms have been converted
-> over.)
->
-> Any platform providing a clocksource will override the jiffy-based
-> clocksource.  The measurement of time-of-day passing is now based on
-> the difference in values read from the clocksource, not from the actual
-> tick rate.
->
-> Anything _not_ providing a clock source will be reliant on jiffies
-> incrementing, which in turn _requires_ one timer interrupt per jiffies
-> at a known rate (which is HZ).
+The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
 
-Correct. As long as we have a fine-grained hardware clocksource 
-installed, HZ error should not affect timekeeping in any major way.
+  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
 
+are available in the git repository at:
 
-> Now, that's the time of day, what about jiffies?  Well, jiffies is
-> incremented based on a certain number of nsec having passed since the
-> last jiffy update.  That means the code copes with dropped ticks and
-> the like.
->
-> However, if your actual interrupt rate is close to the desired HZ, then
-> it can lead to some interesting effects (and noise):
->
-> - if the interrupt rate is slightly faster than HZ, then you can end up
->    with updates being delayed by 2x interrupt rate.
-> - if the interrupt rate is slightly slower than HZ, you can occasionally
->    end up with jiffies incrementing by two.
-> - if your interrupt rate is dead on HZ, then other system noise can come
->    into effect and you may get maybe zero, one or two jiffy increments per
->    interrupt.
->
-> (You have to think about time passing in NS, where jiffy updates should
-> be vs where the timer interrupts happen.)  See tick_do_update_jiffies64()
-> for the details.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8-rc4/fixes-signed
 
-Correct, with HRT, we actually trigger the HZ-frequency timer tick from 
-an hrtimer (which expires based on the system time driven by the 
-clocksource). Thus even if there is a theoretical error between the 
-ideal HZ and what the hardware can do, that error will not propagate 
-forward.
+for you to fetch changes up to 7662a9c60fee25d7234da4be6d8eab2b2ac88448:
 
-Instead, you may only see timer jitter on the order of how fine-grained 
-the timer hardware can be triggered. If that is relatively fine, it 
-shouldn't be an issue, if its relatively coarse (closer to HZ), then 
-there may be the noise effects you list above. Although that should be 
-mostly ok since jiffy timers will always have a few jiffys of jitter due 
-to the granularity (ie: when setting a jiffies timer, you don't how how 
-far into the current jiffy you are).
+  ARM: OMAP2+: omap4-panda: add UART2 muxing for WiLink shared transport (2013-01-21 10:39:53 -0800)
 
-In the case where we don't have HRT, and the timers are triggered by the 
-HZ periodic interrupt, then there is a mix of possibilities, for 
-hrtimers you'll still see the behavior you list above (since they are 
-still time based), but for jiffies timers, the rules are mostly inverted 
-(if the interrupt rate is fast, jiffies timers will trigger sooner, if 
-the rate is slow, jiffies timers will trigger later).
+----------------------------------------------------------------
+Minimal omap fixes for the -rc series:
 
-And if you are using jiffies for time (and not using the 
-register_refined_jiffies code), then everything will follow the 
-interrupt freq. So if interrupts are faster then HZ, time will move 
-faster, timers will expire early, etc.
+- A build fix for recently merged omap DRM changes
 
+- Regression fixes from the common clock framework conversion
+  for omap4 audio and omap2 reboot
 
-> The timer infrastructure is jiffy based - which includes scheduling where
-> the scheduler does not use hrtimers.  That means a slight discrepency
-> between HZ and the actual interrupt rate can cause around 1/HZ jitter.
-> That's a matter of fact due to how the code works.
->
-> So, actually, I think the accuracy of HZ has much overall effect _provided_
-> a platform provides a clocksource to the accuracy of jiffy based timers
-> nor timekeeping.  For those which don't, the accuracy of the timer
-> interrupt to HZ is very important.
+- Regression fix for pandaboard WLAN control UART muxing caused by
+  u-boot only muxing essential pins nowadays
 
-I think you're right, but I suspect there are some typos in the above. 
-So to clarify:
+- Timer iteration fix for CONFIG_OF_DYNAMIC
 
-The accuracy of HZ shouldn't have much affect on timekeeping on systems 
-that use fine-grained clocksources. Though for systems that use 
-jiffies/arch_gettimeoffset() HZ accuracy is more important. However, the 
-register_refined_jiffies() call should allow for smaller error on those 
-systems to be corrected.
+- A section mismatch fix for ocp2scp init
 
-The accuracy of HZ may have some affect on systems that do not have a 
-clockevent driver and do not use hrt mode. It should be relatively bounded
+----------------------------------------------------------------
+Jon Hunter (1):
+      ARM: OMAP2: Fix missing omap2xxx_clkt_vps_late_init function calls
 
+Luciano Coelho (1):
+      ARM: OMAP2+: omap4-panda: add UART2 muxing for WiLink shared transport
 
-> (This is just based on reading some code and not on practical
-> experiments - I'd suggest some research of this is done, trying HZ=100
-> on OMAP's 32kHz timers, checking whether there's any drift, checking
-> how accurately a single task can be woken from various select/poll/epoll
-> delays, and checking whether NTP works.)
+Pantelis Antoniou (1):
+      ARM: OMAP2+: DT node Timer iteration fix
 
-Yea, for omap and other more "modern" systems with clocksources and 
-clockevents, HZ=100 should be ok. Although I'd still like to see the 
-experiments run, since as always, there may be bugs (I'd be interested 
-in hearing about).
+Peter Ujfalusi (2):
+      ARM: OMAP4: clock data: Lock ABE DPLL on all revisions
+      ARM: OMAP4: hwmod_data: Correct IDLEMODE for McPDM
 
-Even on systems w/o clocksources and clockevents, small HZ error should 
-be able to be managed via the register_refined_jiffies() and I'd like to 
-hear if folks have issues with that (there may be bounds limits I've not 
-run into - so I'd like to get that fixed if so).
+Rob Clark (1):
+      ARM: OMAP2+: fix build break for omapdrm
 
-The only really problematic cases are systems where there aren't 
-clocksources nor clockevents, and the hardware has specific limits on 
-what HZ ranges it can do (ie the EBSA110), but I think we're all ok with 
-those not being able to be compiled into a multi-platform kernel.
+Tony Lindgren (2):
+      Merge tag 'omap-fixes-b-for-v3.8-rc' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.8-rc4/fixes
+      ARM: OMAP2+: Fix section warning for omap_init_ocp2scp()
 
-thanks
--john
+ arch/arm/mach-omap2/board-omap4panda.c     |  6 ++++++
+ arch/arm/mach-omap2/cclock2420_data.c      |  2 ++
+ arch/arm/mach-omap2/cclock2430_data.c      |  2 ++
+ arch/arm/mach-omap2/cclock44xx_data.c      | 13 ++++++-------
+ arch/arm/mach-omap2/devices.c              |  2 +-
+ arch/arm/mach-omap2/drm.c                  |  3 ++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  6 +++++-
+ arch/arm/mach-omap2/timer.c                |  8 ++------
+ 8 files changed, 26 insertions(+), 16 deletions(-)
