@@ -1,91 +1,40 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 22 Jan 2013 16:09:42 +0200
-Subject: [PATCH v1 4/6] drivers: usb: musb: omap: make use of the new
- PHY lib APIs
-In-Reply-To: <1358848694-20145-5-git-send-email-kishon@ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <1358848694-20145-5-git-send-email-kishon@ti.com>
-Message-ID: <50FE9DA6.4030507@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 22 Jan 2013 22:09:44 +0800
+Subject: [PATCH V2  0/5] W1: Support onewire master on i.MX53
+In-Reply-To: <20130122082712.GJ1906@pengutronix.de>
+References: <20130116145749.24249.678.stgit@localhost>
+ <20130122082712.GJ1906@pengutronix.de>
+Message-ID: <20130122140941.GA4920@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 11:58 AM, Kishon Vijay Abraham I wrote:
-> New PHY lib APIs like usb_add_phy_dev() and devm_usb_get_phy_dev() are
-> used in MUSB (OMAP), in order to make use of the binding information
-> provided in the board file (of OMAP platforms).
-> All the platforms should be modified similar to this to add and get the
-> PHY.
+On Tue, Jan 22, 2013 at 09:27:12AM +0100, Sascha Hauer wrote:
+> On Wed, Jan 16, 2013 at 03:57:49PM +0100, Martin Fuzzey wrote:
+> > W1: Support onewire master on i.MX53
+> > 	* Add device tree and pinctrl support to the MXC master driver
+> > 	* Convert to use devm_
+> > 	* Add i.MX53 clocks
+> > 	* Add i.MX53 device tree entries
+> > 
+> > Changes since V1
+> > * Applied comments from Sascha Hauer:
+> > 	* Move patch converting driver to devm_ before the one adding devm_ based pinctrl
+> > 	* Fix existing unbalanced clk_prepare_enable/clk_disable_unprepare
+> > 	in probe error path
+> > 
+> > * Place DT patch last since it includes pinctrls for driver.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/usb/musb/omap2430.c   |    2 +-
->  drivers/usb/otg/twl4030-usb.c |    3 ++-
->  drivers/usb/phy/omap-usb2.c   |    3 ++-
->  3 files changed, 5 insertions(+), 3 deletions(-)
+> This looks good now.
 > 
-> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-> index bf6cfe0..1a8cf6d 100644
-> --- a/drivers/usb/musb/omap2430.c
-> +++ b/drivers/usb/musb/omap2430.c
-> @@ -345,7 +345,7 @@ static int omap2430_musb_init(struct musb *musb)
->  	 * up through ULPI.  TWL4030-family PMICs include one,
->  	 * which needs a driver, drivers aren't always needed.
->  	 */
-> -	musb->xceiv = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-> +	musb->xceiv = devm_usb_get_phy_dev(dev, 0);
->  	if (IS_ERR_OR_NULL(musb->xceiv)) {
->  		pr_err("HS USB OTG: no transceiver configured\n");
->  		return -ENODEV;
-> diff --git a/drivers/usb/otg/twl4030-usb.c b/drivers/usb/otg/twl4030-usb.c
-> index 0a70193..a994715 100644
-> --- a/drivers/usb/otg/twl4030-usb.c
-> +++ b/drivers/usb/otg/twl4030-usb.c
-> @@ -610,6 +610,7 @@ static int twl4030_usb_probe(struct platform_device *pdev)
->  	twl->phy.dev		= twl->dev;
->  	twl->phy.label		= "twl4030";
->  	twl->phy.otg		= otg;
-> +	twl->phy.type		= USB_PHY_TYPE_USB2;
-
-What is the need to set phy.type? I think this should be deprecated along with the old API.
-
->  	twl->phy.set_suspend	= twl4030_set_suspend;
->  
->  	otg->phy		= &twl->phy;
-> @@ -624,7 +625,7 @@ static int twl4030_usb_probe(struct platform_device *pdev)
->  		dev_err(&pdev->dev, "ldo init failed\n");
->  		return err;
->  	}
-> -	usb_add_phy(&twl->phy, USB_PHY_TYPE_USB2);
-> +	usb_add_phy_dev(&twl->phy);
->  
->  	platform_set_drvdata(pdev, twl);
->  	if (device_create_file(&pdev->dev, &dev_attr_vbus))
-> diff --git a/drivers/usb/phy/omap-usb2.c b/drivers/usb/phy/omap-usb2.c
-> index 4b59b39..b5c759c 100644
-> --- a/drivers/usb/phy/omap-usb2.c
-> +++ b/drivers/usb/phy/omap-usb2.c
-> @@ -143,6 +143,7 @@ static int omap_usb2_probe(struct platform_device *pdev)
->  	phy->phy.label		= "omap-usb2";
->  	phy->phy.set_suspend	= omap_usb2_suspend;
->  	phy->phy.otg		= otg;
-> +	phy->phy.type		= USB_PHY_TYPE_USB2;
-
-same here.
-
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
->  
-> @@ -168,7 +169,7 @@ static int omap_usb2_probe(struct platform_device *pdev)
->  	}
->  	clk_prepare(phy->wkupclk);
->  
-> -	usb_add_phy(&phy->phy, USB_PHY_TYPE_USB2);
-> +	usb_add_phy_dev(&phy->phy);
->  
->  	platform_set_drvdata(pdev, phy);
->  
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 > 
+> You might have to send this again in two series, one for the w1
+> maintainer and one for arm-soc. Both series should be sufficiently
+> orthogonal.
+> 
+Evgeniy has already ACK-ed the v1 series, so maybe he does not see any
+problem with the whole series going through one tree.  In that case,
+we may just have it go via arm-soc tree?  Otherwise, please let us
+know, Evgeniy.
 
---
-cheers,
--roger
+Shawn
