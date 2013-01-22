@@ -1,70 +1,21 @@
-From: kishon@ti.com (kishon)
-Date: Tue, 22 Jan 2013 21:07:44 +0530
-Subject: [PATCH v1 5/6] usb: otg: add device tree support to otg library
-In-Reply-To: <20130122103650.GB18876@e106331-lin.cambridge.arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 22 Jan 2013 16:38:29 +0100
+Subject: [PATCH v1 6/6] USB: MUSB: OMAP: get PHY by phandle for dt boot
+In-Reply-To: <50FEAE96.30706@ti.com>
 References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <1358848694-20145-6-git-send-email-kishon@ti.com>
- <20130122103650.GB18876@e106331-lin.cambridge.arm.com>
-Message-ID: <50FEB248.5090701@ti.com>
+ <1358848694-20145-7-git-send-email-kishon@ti.com> <50FE9F5C.2010501@ti.com>
+ <50FEA447.1090701@ti.com> <50FEA696.8000506@ti.com> <50FEAE96.30706@ti.com>
+Message-ID: <50FEB275.80504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/22/2013 04:21 PM, kishon wrote:
+> But it's better to check if deferred probing
+> takes place whenever a new driver is bound to a device as you just mentioned.
 
-On Tuesday 22 January 2013 04:06 PM, Mark Rutland wrote:
->> +struct usb_phy *devm_usb_get_phy_by_phandle(struct device *dev,
->> +	const char *phandle, u8 index)
->> +{
->> +	struct usb_phy	*phy = NULL, **ptr;
->> +	unsigned long	flags;
->> +	struct device_node *node;
->> +
->> +	if (!dev->of_node) {
->> +		dev_dbg(dev, "device does not have a device node entry\n");
->> +		return ERR_PTR(-EINVAL);
->> +	}
->> +
->> +	node = of_parse_phandle(dev->of_node, phandle, index);
->> +	if (!node) {
->> +		dev_dbg(dev, "failed to get %s phandle in %s node\n", phandle,
->> +			dev->of_node->full_name);
->> +		return ERR_PTR(-ENODEV);
->> +	}
->
-> At any point past this, node's refcount is incremented (done automatically by
-> of_parse_phandle => of_find_node_by_phandle).
->
->> +
->> +	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
->> +	if (!ptr) {
->> +		dev_dbg(dev, "failed to allocate memory for devres\n");
->> +		return ERR_PTR(-ENOMEM);
->> +	}
->> +
->> +	spin_lock_irqsave(&phy_lock, flags);
->> +
->> +	phy = __of_usb_find_phy(node);
->> +	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
->> +		phy = ERR_PTR(-EPROBE_DEFER);
->> +		devres_free(ptr);
->> +		goto err0;
->> +	}
->> +
->> +	*ptr = phy;
->> +	devres_add(dev, ptr);
->> +
->> +	get_device(phy->dev);
->> +
->> +err0:
->> +	spin_unlock_irqrestore(&phy_lock, flags);
->> +
->> +	return phy;
->> +}
->
-> This means that on all of the exit paths, node's refcount is left incremented
-> incorrectly. You'll need an of_node_put(node) on each exit path.
+Whenever you load (might be also when you unload) a driver the deferred
+modules will try to probe again. This is to check back if the dependency of
+the deferred modules has been fulfilled by the new driver or not.
 
-Ok. Will fix it.
-
-Thanks
-Kishon
+-- 
+P?ter
