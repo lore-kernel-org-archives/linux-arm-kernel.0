@@ -1,53 +1,43 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 22 Jan 2013 11:28:37 +0200
-Subject: [PATCH v8 19/22] ARM: OMAP3: clock data: get rid of unused USB
- host clock aliases and dummies
-In-Reply-To: <alpine.DEB.2.00.1301211502190.8450@utopia.booyaka.com>
-References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
- <1358511445-26656-20-git-send-email-rogerq@ti.com>
- <alpine.DEB.2.00.1301182027040.19470@utopia.booyaka.com>
- <50FD0BEF.9000007@ti.com>
- <alpine.DEB.2.00.1301211502190.8450@utopia.booyaka.com>
-Message-ID: <50FE5BC5.1020906@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Jan 2013 09:31:02 +0000
+Subject: ARM: hw_breakpoint mismatch breakpoint behaves unexpectedly like
+ a match breakpoint on ARM_DEBUG_ARCH_V7_ECP14
+In-Reply-To: <CAPfQmKJaYf6M4iHKuNcHgYZi5R8M7fXdXta34Q=1C0cHKimkyQ@mail.gmail.com>
+References: <CAPfQmKJaYf6M4iHKuNcHgYZi5R8M7fXdXta34Q=1C0cHKimkyQ@mail.gmail.com>
+Message-ID: <20130122093102.GC12295@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2013 05:03 PM, Paul Walmsley wrote:
-> Hi
-> 
-> On Mon, 21 Jan 2013, Roger Quadros wrote:
-> 
->> On 01/18/2013 10:27 PM, Paul Walmsley wrote:
->>> On Fri, 18 Jan 2013, Roger Quadros wrote:
->>>
->>>> We don't need multiple aliases for the OMAP USB host clocks and neither
->>>> the dummy clocks so remove them.
->>>>
->>>> CC: Paul Walmsley <paul@pwsan.com>
->>>> CC: Rajendra Nayak <rnayak@ti.com>
->>>> CC: Benoit Cousson <b-cousson@ti.com>
->>>> CC: Mike Turquette <mturquette@linaro.com>
->>>>
->>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>>> Reviewed-by: Felipe Balbi <balbi@ti.com>
->>>> Acked-by: Paul Walmsley <paul@pwsan.com>
->>>
->>> Per Tony's earlier request, you can drop this patch and patch 20 from your 
->>> series now.  I've got them queued for 3.10 or late 3.9 merge window.
->>>
->>
->> Should have mentioned it earlier, but just this patch without the rest
->> of the cleanup patches will break USB Host on OMAP3, as the old driver
->> bails out if optional clock nodes are missing.
->>
->> Including patch 20 doesn't seem to cause a problem with OMAP4 though.
-> 
-> I've got these two patches queued for merging after your other patches go 
-> upstream -- e.g., probably 3.10.  Do you foresee any problems with that?
-> 
+On Tue, Jan 22, 2013 at 04:28:35AM +0000, Valentin Pistol wrote:
+> Hi Will,
 
-That should be fine. Thanks :).
+Hi Valentin,
 
---
-cheers,
--roger
+> I am trying to single-step each instruction in a target process by
+> using the hardware breakpoints with the mismatch set (bit 22) and I am
+> experiencing unexpected behavior: with mismatch set it behaves as a
+> match breakpoint.
+> I checked that my Debug Arch ARM_DEBUG_ARCH_V7_ECP14 has mismatch
+> breakpoint support.
+> The BCR (0x4001e5) value and DSCR (0x3070002) seem to be correct
+> according to the manual, so I am confused what is causing the odd
+> behavior.
+
+[...]
+
+> I should note that I am able to set a match breakpoint using the
+> ptrace interface, have it trigger a SIGTRAP and capture it in my own
+> user space handler. When attempting to use mismatch instead, the
+> behavior appears to be same as a match breakpoint: breaks on the
+> specified PC value.
+
+The ptrace interface doesn't support mismatch breakpoints, and ignores those
+bits in the user request, hence why you see a normal breakpoint being
+created. Note that mismatch breakpoints are used internally for stepping
+over breakpoints set by perf.
+
+If you wanted to add single-step using mismatch breakpoints, I think we'd be
+better off re-introducing the SINGLESTEP ptrace request for ARM to use
+hw_breakpoints.
+
+Will
