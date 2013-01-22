@@ -1,19 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 Jan 2013 20:41:45 +0800
-Subject: [PATCH 2/2] ARM: mxs: Add OF props for MX23 LRADC
-In-Reply-To: <50FE80D3.1020104@kernel.org>
-References: <1358798722-25102-1-git-send-email-marex@denx.de>
- <1358798722-25102-2-git-send-email-marex@denx.de>
- <50FE80D3.1020104@kernel.org>
-Message-ID: <20130122124144.GA2812@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Jan 2013 13:42:57 +0100
+Subject: [PATCH v4] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <20130121234158.GA9322@kroah.com>
+References: <1358795855-21064-1-git-send-email-linus.walleij@stericsson.com>
+ <20130121234158.GA9322@kroah.com>
+Message-ID: <CACRpkdY2LF4Kg0LsZGThKpQfv=TPfK9NfX0O71OHeT+Jqh++hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 12:06:43PM +0000, Jonathan Cameron wrote:
-> On 01/21/2013 08:05 PM, Marek Vasut wrote:
-> > Add interrupt mapping and compatible string for MX23 LRADC.
-> 
-> Series looks fine to me, but obviously I'd like an ACK for this one
-> from Shawn before taking it.
+On Tue, Jan 22, 2013 at 12:41 AM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Mon, Jan 21, 2013 at 08:17:35PM +0100, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This makes the device core auto-grab the pinctrl handle and set
+>> the "default" (PINCTRL_STATE_DEFAULT) state for every device
+>> that is present in the device model right before probe. This will
+>> account for the lion's share of embedded silicon devcies.
+(...)
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>
+> Feel free to take this through your tree.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Thanks Greg!
+
+Stephen W, are you OK with me pushing this version of the patch
+now?
+
+I have your fix and hopefully the other required fixes in the patch
+so as not to break Tegra, but prefer to have it solidly tested
+if possible.
+
+Yours,
+Linus Walleij
