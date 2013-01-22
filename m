@@ -1,54 +1,110 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Tue, 22 Jan 2013 03:12:53 -0300
-Subject: [PATCH 0/3] clock driver for sunxi
-Message-ID: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+Date: Tue, 22 Jan 2013 03:12:55 -0300
+Subject: [PATCH 2/3] arm: sunxi: Add clock definitions for the new clock driver
+In-Reply-To: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1358835176-7197-3-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+This introduces proper clock definitions on sunxi.dtsi, to be used
+with the new clock driver for sunxi.
 
-This patchset adds basic clock support for sunxi devices. Currently, it
-implements support for the two oscillators, the main PLL, the CPU mux,
-and its three divisor clocks. With this in place, it is possible to
-write a cpufreq driver and have it work.
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ arch/arm/boot/dts/sunxi.dtsi | 55 +++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 49 insertions(+), 6 deletions(-)
 
-I have tested this driver successfully on a Cubieboard (A10, sun4i)
-using the cpufreq driver from the linux-sunxi tree after minor
-modifications (the clock names are not the same).
-
-Any feedback will be highly appreciated
-
-Thanks,
-
---
-Emilio
-
-Emilio L?pez (3):
-  clk: arm: sunxi: Add a new clock driver for sunxi SOCs
-  arm: sunxi: Add clock definitions for the new clock driver
-  arm: sunxi: Add useful information about sunxi clocks
-
- Documentation/arm/sunxi/clocks.txt                |  56 +++++
- Documentation/devicetree/bindings/clock/sunxi.txt |  47 ++++
- arch/arm/boot/dts/sunxi.dtsi                      |  55 ++++-
- drivers/clk/Makefile                              |   2 +-
- drivers/clk/clk-sunxi.c                           |  30 ---
- drivers/clk/sunxi/Makefile                        |   5 +
- drivers/clk/sunxi/clk-factors.c                   | 175 ++++++++++++++
- drivers/clk/sunxi/clk-factors.h                   |  25 ++
- drivers/clk/sunxi/clk-fixed-gate.c                | 152 +++++++++++++
- drivers/clk/sunxi/clk-fixed-gate.h                |  13 ++
- drivers/clk/sunxi/clk-sunxi.c                     | 265 ++++++++++++++++++++++
- 11 files changed, 788 insertions(+), 37 deletions(-)
- create mode 100644 Documentation/arm/sunxi/clocks.txt
- create mode 100644 Documentation/devicetree/bindings/clock/sunxi.txt
- delete mode 100644 drivers/clk/clk-sunxi.c
- create mode 100644 drivers/clk/sunxi/Makefile
- create mode 100644 drivers/clk/sunxi/clk-factors.c
- create mode 100644 drivers/clk/sunxi/clk-factors.h
- create mode 100644 drivers/clk/sunxi/clk-fixed-gate.c
- create mode 100644 drivers/clk/sunxi/clk-fixed-gate.h
- create mode 100644 drivers/clk/sunxi/clk-sunxi.c
-
+diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+index 8bbc2bf..e2cef13 100644
+--- a/arch/arm/boot/dts/sunxi.dtsi
++++ b/arch/arm/boot/dts/sunxi.dtsi
+@@ -24,13 +24,56 @@
+ 
+ 	clocks {
+ 		#address-cells = <1>;
+-		#size-cells = <0>;
++		#size-cells = <1>;
++		ranges;
+ 
+-		osc: oscillator {
++		osc24M: osc24M at 01c20050 {
+ 			#clock-cells = <0>;
+-			compatible = "fixed-clock";
++			compatible = "allwinner,sunxi-osc-clk";
++			reg = <0x01c20050 0x4>;
+ 			clock-frequency = <24000000>;
+ 		};
++
++		osc32k: osc32k {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++		};
++
++		pll1: pll1 at 01c20000 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sunxi-pll1-clk";
++			reg = <0x01c20000 0x4>;
++			clocks = <&osc24M>;
++		};
++
++		cpu: cpu at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sunxi-cpu-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&osc32k>, <&osc24M>, <&pll1>;
++		};
++
++		axi: axi at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sunxi-axi-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&cpu>;
++		};
++
++		ahb: ahb at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sunxi-ahb-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&axi>;
++		};
++
++		apb0: apb0 at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sunxi-apb0-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&ahb>;
++		};
+ 	};
+ 
+ 	soc {
+@@ -44,7 +87,7 @@
+ 			compatible = "allwinner,sunxi-timer";
+ 			reg = <0x01c20c00 0x90>;
+ 			interrupts = <22>;
+-			clocks = <&osc>;
++			clocks = <&osc24M>;
+ 		};
+ 
+ 		wdt: watchdog at 01c20c90 {
+@@ -64,7 +107,7 @@
+ 			reg = <0x01c28000 0x400>;
+ 			interrupts = <1>;
+ 			reg-shift = <2>;
+-			clock-frequency = <24000000>;
++			clocks = <&osc24M>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -73,7 +116,7 @@
+ 			reg = <0x01c28400 0x400>;
+ 			interrupts = <2>;
+ 			reg-shift = <2>;
+-			clock-frequency = <24000000>;
++			clocks = <&osc24M>;
+ 			status = "disabled";
+ 		};
+ 	};
 -- 
 1.8.1.1
