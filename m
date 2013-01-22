@@ -1,71 +1,103 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Tue, 22 Jan 2013 20:20:40 +0800
-Subject: [PATCH v3 3/9] ARM: PRIMA2: initialize l2x0 according to mach from DT
+Date: Tue, 22 Jan 2013 20:20:41 +0800
+Subject: [PATCH v3 4/9] ARM: PRIMA2: mv timer to timer-prima2 as we will add
+ timer-marco
 In-Reply-To: <1358857241-10052-1-git-send-email-Barry.Song@csr.com>
 References: <1358857241-10052-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1358857241-10052-3-git-send-email-Barry.Song@csr.com>
+Message-ID: <1358857241-10052-4-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Barry Song <Baohua.Song@csr.com>
 
-prima2 and marco have diffetent l2 cache configuration, so
-we initialize l2x0 cache based on dtb given to kernel.
+Marco timer has different timer IP with prima2, so rename the current timer
+to timer-prima2 so that we can add timer-marco.
+
+at the same time, if we don't find prima2 timer node in dt, don't panic the
+system as we will make prima2 and marco use same kernel image.
 
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm/mach-prima2/l2x0.c |   29 ++++++++++++++++++++++++-----
- 1 files changed, 24 insertions(+), 5 deletions(-)
+ arch/arm/mach-prima2/Makefile                    |    2 +-
+ arch/arm/mach-prima2/common.c                    |    2 +-
+ arch/arm/mach-prima2/common.h                    |    2 +-
+ arch/arm/mach-prima2/{timer.c => timer-prima2.c} |    6 +++---
+ 4 files changed, 6 insertions(+), 6 deletions(-)
+ rename arch/arm/mach-prima2/{timer.c => timer-prima2.c} (98%)
 
-diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
-index c998377..cbcbe9c 100644
---- a/arch/arm/mach-prima2/l2x0.c
-+++ b/arch/arm/mach-prima2/l2x0.c
-@@ -11,19 +11,38 @@
- #include <linux/of.h>
- #include <asm/hardware/cache-l2x0.h>
+diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
+index fc9ce22..0007a6e 100644
+--- a/arch/arm/mach-prima2/Makefile
++++ b/arch/arm/mach-prima2/Makefile
+@@ -1,4 +1,3 @@
+-obj-y := timer.o
+ obj-y += rstc.o
+ obj-y += common.o
+ obj-y += rtciobrg.o
+@@ -6,3 +5,4 @@ obj-$(CONFIG_DEBUG_LL) += lluart.o
+ obj-$(CONFIG_CACHE_L2X0) += l2x0.o
+ obj-$(CONFIG_SUSPEND) += pm.o sleep.o
+ obj-$(CONFIG_SIRF_IRQ) += irq.o
++obj-$(CONFIG_ARCH_PRIMA2) += timer-prima2.o
+diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
+index ed3570e..8e6f668 100644
+--- a/arch/arm/mach-prima2/common.c
++++ b/arch/arm/mach-prima2/common.c
+@@ -40,7 +40,7 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
+ 	/* Maintainer: Barry Song <baohua.song@csr.com> */
+ 	.map_io         = sirfsoc_map_lluart,
+ 	.init_irq	= sirfsoc_of_irq_init,
+-	.init_time	= sirfsoc_timer_init,
++	.init_time	= sirfsoc_prima2_timer_init,
+ 	.dma_zone_size	= SZ_256M,
+ 	.init_machine	= sirfsoc_mach_init,
+ 	.init_late	= sirfsoc_init_late,
+diff --git a/arch/arm/mach-prima2/common.h b/arch/arm/mach-prima2/common.h
+index 9c75f12..d6890b6 100644
+--- a/arch/arm/mach-prima2/common.h
++++ b/arch/arm/mach-prima2/common.h
+@@ -12,7 +12,7 @@
+ #include <linux/init.h>
+ #include <asm/mach/time.h>
  
--static struct of_device_id prima2_l2x0_ids[]  = {
--	{ .compatible = "sirf,prima2-pl310-cache" },
-+struct l2x0_aux
-+{
-+	u32 val;
-+	u32 mask;
-+};
-+
-+static struct l2x0_aux prima2_l2x0_aux __initconst = {
-+	.val = 2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT,
-+	.mask =	0,
-+};
-+
-+static struct l2x0_aux marco_l2x0_aux __initconst = {
-+	.val = (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
-+		(1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT),
-+	.mask = L2X0_AUX_CTRL_MASK,
-+};
-+
-+static struct of_device_id sirf_l2x0_ids[] __initconst = {
-+	{ .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
-+	{ .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
+-extern void sirfsoc_timer_init(void);
++extern void sirfsoc_prima2_timer_init(void);
+ 
+ extern void __init sirfsoc_of_irq_init(void);
+ extern void __init sirfsoc_of_clk_init(void);
+diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer-prima2.c
+similarity index 98%
+rename from arch/arm/mach-prima2/timer.c
+rename to arch/arm/mach-prima2/timer-prima2.c
+index 8c732a5..309e724 100644
+--- a/arch/arm/mach-prima2/timer.c
++++ b/arch/arm/mach-prima2/timer-prima2.c
+@@ -187,7 +187,7 @@ static void __init sirfsoc_clockevent_init(void)
+ }
+ 
+ /* initialize the kernel jiffy timer source */
+-void __init sirfsoc_timer_init(void)
++void __init sirfsoc_prima2_timer_init(void)
+ {
+ 	unsigned long rate;
+ 	struct clk *clk;
+@@ -226,14 +226,14 @@ static struct of_device_id timer_ids[] = {
  	{},
  };
  
- static int __init sirfsoc_l2x0_init(void)
+-void __init sirfsoc_of_timer_map(void)
++static void __init sirfsoc_of_timer_map(void)
  {
  	struct device_node *np;
-+	const struct l2x0_aux *aux;
+ 	const unsigned int *intspec;
  
--	np = of_find_matching_node(NULL, prima2_l2x0_ids);
-+	np = of_find_matching_node(NULL, sirf_l2x0_ids);
- 	if (np) {
--		pr_info("Initializing prima2 L2 cache\n");
--		return l2x0_of_init(0x40000, 0);
-+		aux = of_match_node(sirf_l2x0_ids, np)->data;
-+		return l2x0_of_init(aux->val, aux->mask);
- 	}
- 
- 	return 0;
+ 	np = of_find_matching_node(NULL, timer_ids);
+ 	if (!np)
+-		panic("unable to find compatible timer node in dtb\n");
++		return;
+ 	sirfsoc_timer_base = of_iomap(np, 0);
+ 	if (!sirfsoc_timer_base)
+ 		panic("unable to map timer cpu registers\n");
 -- 
 1.7.5.4
 
