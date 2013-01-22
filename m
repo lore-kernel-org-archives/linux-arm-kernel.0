@@ -1,67 +1,128 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 22 Jan 2013 17:34:30 +0100
-Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
- Armada 370/XP
-In-Reply-To: <201301221557.02976.arnd@arndb.de>
-References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
- <201301211831.45947.arnd@arndb.de> <50FDC322.2040107@free-electrons.com>
- <201301221557.02976.arnd@arndb.de>
-Message-ID: <50FEBF96.6020001@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Jan 2013 17:35:51 +0100
+Subject: [PATCH] ARM: mxs: dt: Add Crystalfontz CFA-10037 device tree support
+Message-ID: <1358872551-14490-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 04:57 PM, Arnd Bergmann wrote:
-> On Monday 21 January 2013, Gregory CLEMENT wrote:
->> I don't see a strong reason to not enable it if we don't use it. My concern
->> was that I don't need it so I didn't want to include it and generating extra
->> code for nothing. Then just after having sent this patch set, I received your
->> patch set about build regression in 3.8 and especially the part about
->> CONFIG_MULTIPLATFORM made me realized that it could be a problem.
-> 
-> Ok.
-> 
->>> Maybe it can be written as
->>>
->>> config LOCAL_TIMERS
->>>       bool "Use local timer interrupts"
->>>       depends on SMP
->>>       default y
->>>
->>> config HAVE_ARM_TWD
->>>       depends on LOCAL_TIMERS
->>>       default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
->>
->> So in this case why not written something like this:
->>         default ARCH_MULTIPLATFORM || (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARMADA_370_XP_TIMER)
-> 
-> That does not change anything, because ARMADA_370_XP_TIMER is only ever enabled
-> when ARCH_MULTIPLATFORM is enabled as well.
+The CFA-10037 is another expansion board for the CFA-10036 module, with
+only a USB Host, a Ethernet device and a lot of gpios.
 
-Yes you're right.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/imx28-cfa10037.dts |   77 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/mach-mxs.c         |    8 ++++
+ 2 files changed, 85 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx28-cfa10037.dts
 
-So I remove this patch of my series as I don't need it anymore for supporting local
-timer on Armada XP/370.
-
-And I will submit this patch as a standalone one.
-
-> 
->>>       default y
->> I am not a kconfig expert, but won't this line set HAVE_ARM_TWD to 'y' whatever
->> the result of the previous line?
-> 
-> Yes, that was a mistake on my side.
-> 
-> 	Arnd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-
+diff --git a/arch/arm/boot/dts/imx28-cfa10037.dts b/arch/arm/boot/dts/imx28-cfa10037.dts
+new file mode 100644
+index 0000000..c2ef3a3
+--- /dev/null
++++ b/arch/arm/boot/dts/imx28-cfa10037.dts
+@@ -0,0 +1,77 @@
++/*
++ * Copyright 2012 Free Electrons
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/*
++ * The CFA-10049 is an expansion board for the CFA-10036 module, thus we
++ * need to include the CFA-10036 DTS.
++ */
++/include/ "imx28-cfa10036.dts"
++
++/ {
++	model = "Crystalfontz CFA-10037 Board";
++	compatible = "crystalfontz,cfa10037", "crystalfontz,cfa10036", "fsl,imx28";
++
++	apb at 80000000 {
++		apbh at 80000000 {
++			pinctrl at 80018000 {
++				pinctrl-names = "default", "default";
++				pinctrl-1 = <&hog_pins_cfa10037>;
++
++				hog_pins_cfa10037: hog-10037 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x0073 /* MX28_PAD_GPMI_D7__GPIO_0_7 */
++						0x2153 /* MX28_PAD_SSP2_D5__GPIO_2_21 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++			};
++		};
++
++		apbx at 80040000 {
++			usbphy1: usbphy at 8007e000 {
++				status = "okay";
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		usb1: usb at 80090000 {
++			vbus-supply = <&reg_usb1_vbus>;
++			pinctrl-0 = <&usbphy1_pins_a>;
++			pinctrl-names = "default";
++			status = "okay";
++		};
++
++		mac0: ethernet at 800f0000 {
++			phy-mode = "rmii";
++			pinctrl-names = "default";
++			pinctrl-0 = <&mac0_pins_a>;
++			phy-reset-gpios = <&gpio2 21 0>;
++			phy-reset-duration = <100>;
++			status = "okay";
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++
++		reg_usb1_vbus: usb1_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio0 7 1>;
++		};
++	};
++};
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 4668cf7..622c45a 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -417,6 +417,12 @@ static void __init cfa10049_init(void)
+ 	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
+ }
+ 
++static void __init cfa10037_init(void)
++{
++	enable_clk_enet_out();
++	update_fec_mac_prop(OUI_CRYSTALFONTZ);
++}
++
+ static void __init apf28_init(void)
+ {
+ 	enable_clk_enet_out();
+@@ -437,6 +443,8 @@ static void __init mxs_machine_init(void)
+ 		m28evk_init();
+ 	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
+ 		apx4devkit_init();
++	else if (of_machine_is_compatible("crystalfontz,cfa10037"))
++		cfa10037_init();
+ 	else if (of_machine_is_compatible("crystalfontz,cfa10049"))
+ 		cfa10049_init();
+ 	else if (of_machine_is_compatible("armadeus,imx28-apf28"))
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
