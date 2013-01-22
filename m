@@ -1,36 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 22 Jan 2013 08:53:30 -0800
-Subject: [PATCH 15/15] staging/omapdrm: don't build on multiplatform
-In-Reply-To: <50FD8B63.1060506@ti.com>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <1358788568-11137-16-git-send-email-arnd@arndb.de>
- <50FD7A5F.9020702@ti.com> <201301211741.11875.arnd@arndb.de>
- <50FD8B63.1060506@ti.com>
-Message-ID: <20130122165330.GA28152@kroah.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 22 Jan 2013 09:57:39 -0700
+Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex
+ A9
+In-Reply-To: <50FE2CA8.20100@ti.com>
+References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
+ <1358833924-24535-2-git-send-email-hdoyu@nvidia.com> <50FE2CA8.20100@ti.com>
+Message-ID: <50FEC503.2080602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 12:39:31PM -0600, Rob Clark wrote:
-> On 01/21/2013 11:41 AM, Arnd Bergmann wrote:
-> >On Monday 21 January 2013, Rob Clark wrote:
-> >>Are you sure OMAP2_DSS requires ARCH_OMAP2PLUS?  I don't see this, and
-> >>it at least used to not depend on ARCH_OMAP2PLUS.  If it does now, I
-> >>think the correct fix would be to remove the dependency in OMAP2_DSS.  I
-> >>don't think removing ARCH_MULTIPLATFORM support in omapdrm is the
-> >>correct solution.
-> >At least it says so in drivers/video/omap2/Kconfig, which contains
-> >
-> >if ARCH_OMAP2PLUS
-> >source drivers/video/omap2/dss/Kconfig
-> >endif
-> 
-> ahh, ok, I see.. the if ARCH_OMAP2PLUS bit looks like it came in
-> recently (770b6cb)
-> 
-> what about changing this to 'if ARCH_OMAP2PLUS || ARCH_MULTIPLATFORM'?
+On 01/21/2013 11:07 PM, Santosh Shilimkar wrote:
+> On Tuesday 22 January 2013 11:22 AM, Hiroshi Doyu wrote:
+>> Skip scu_enable(scu_base) if CPU is not Cortex A9 with SCU.
+>>
+>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+>> ---
+> Looks fine. I will also update OMAP code with the new
+> interface. Thanks.
 
-That's what Arnd's patch did.
+OK, so patch 1/2 at least needs to get into a stable arm-soc branch
+then. Unless there are violent objections, I'll forward patch 1/2 to
+arm-soc and request it be added into a branch so that Tegra and OMAP can
+both merge it into their branches as a dependency. I guess patch 2/2
+could also be included; I don't think it has any complex dependencies
+that'd prevent that, and would help to show how patch 1/2 gets used.
 
-totally confused,
+Hiroshi, is this series the only dependency you need for your Tegra114
+series? So, I could merge your Tegra114 series once this series is applied?
 
-greg k-h
+> For the patch,
+> Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+
+Thanks.
