@@ -1,63 +1,216 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 22 Jan 2013 17:55:15 +0800
-Subject: [PATCH v7 08/15] gpio: pl061: bind pinctrl by gpio request
-In-Reply-To: <CACRpkdbgRY9CcdRAVVaVAq57hF1cTf7LMOqneNwcz+VtpFDcUg@mail.gmail.com>
-References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
- <1358494279-16503-9-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdZo6mVSaHBr6PJt8QCkiKp-Vs7mWup8n=4zyacRwf8V3g@mail.gmail.com>
- <CAD6h2NQm+VoUv9tDSoHv3Xs8RtuCt5A+_DCBx6bh-d3WP3PK=w@mail.gmail.com>
- <CACRpkdbgRY9CcdRAVVaVAq57hF1cTf7LMOqneNwcz+VtpFDcUg@mail.gmail.com>
-Message-ID: <CAD6h2NQM6=wZ5k7p9yhF3oWGQGBcsn+gt3J0+JVxx7wKYaKEJg@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 22 Jan 2013 15:28:10 +0530
+Subject: [PATCH v1 2/6] usb: otg: utils: add facilities in phy lib to support
+ multiple PHYs of same type
+In-Reply-To: <1358848694-20145-1-git-send-email-kishon@ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+Message-ID: <1358848694-20145-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 January 2013 17:10, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Jan 21, 2013 at 4:45 PM, Haojian Zhuang
-> <haojian.zhuang@linaro.org> wrote:
->
->>> > +       pinctrl_request_gpio(gpio);
->>>
->>> Handling of error code?
->>>
->>> (Maybe I should add a __must_check on this function.)
->>>
->> My case is a little special. I don't want to check return value because some
->> gpio pins don't have pinmux registers in Hisilicon SoC.
->> So pinctrl_request_gpio() will always return error for these special pins in
->> Hisilicon SoC.
->>
->> If we must check the return value, maybe we need append a dummy pinctrl driver
->> for those special gpio pins. How do you think about it? Of course, I
->> need to evaluate
->> whether it's possible to implement.
->
-> Hm. A dummy pinctrl back-end is not very elegant.
->
-> It's better if the GPIO driver (gpio-pl061) keep track of the ranges that
-> are connected to the pinctrl.
->
-> If the ranges are encoded in the device tree (as I guess you want to do
-> in this case) then the GPIO driver need to check these ranges to see if
-> it uses a pinctrl backend. Magic behind-the-scenes is very hard to
-> understand for people reading this code later.
->
-> What about this:
->
-> In gpiolib.c, function gpiochip_add_pin_range(), we save a copy of
-> each range in &chip->pin_ranges.
->
-> Add a function to gpiolib.c to check if a certain gpio is in the range
-> of the current chip.
->
-> Then use that:
->
-> if (gpio_in_pinrange(gpio))
->     pinctrl_request_gpio(gpio);
->
-> Yours,
-> Linus Walleij
+In order to add support for multipe PHY's of the same type, new API's
+for adding PHY and getting PHY has been added. Now the binding
+information for the PHY and controller should be done in platform file
+using usb_bind_phy API. And for getting a PHY, the device pointer of the
+USB controller and an index should be passed. Based on the binding
+information that is added in the platform file, usb_get_phy_dev will return the
+appropriate PHY.
+Already existing API's to add and get phy by type is not removed. These
+API's are deprecated and will be removed once all the platforms start to
+use the new API.
 
-It seems better. I'll update it.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/usb/otg/otg.c   |  114 ++++++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/usb/phy.h |   13 ++++++
+ 2 files changed, 126 insertions(+), 1 deletion(-)
 
-Regards
-Haojian
+diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
+index 492ba2f..1f30b22 100644
+--- a/drivers/usb/otg/otg.c
++++ b/drivers/usb/otg/otg.c
+@@ -36,6 +36,20 @@ static struct usb_phy *__usb_find_phy(struct list_head *list,
+ 	return ERR_PTR(-ENODEV);
+ }
+ 
++static struct usb_phy *__usb_find_phy_dev(struct device *dev,
++	struct list_head *list, u8 index)
++{
++	struct usb_phy_bind *phy_bind = NULL;
++
++	list_for_each_entry(phy_bind, list, list) {
++		if (!(strcmp(phy_bind->dev_name, dev_name(dev))) &&
++				phy_bind->index == index)
++			return phy_bind->phy;
++	}
++
++	return ERR_PTR(-ENODEV);
++}
++
+ static void devm_usb_phy_release(struct device *dev, void *res)
+ {
+ 	struct usb_phy *phy = *(struct usb_phy **)res;
+@@ -112,6 +126,69 @@ err0:
+ EXPORT_SYMBOL(usb_get_phy);
+ 
+ /**
++ * usb_get_phy_dev - find the USB PHY
++ * @dev - device that requests this phy
++ * @index - the index of the phy
++ *
++ * Returns the phy driver, after getting a refcount to it; or
++ * -ENODEV if there is no such phy.  The caller is responsible for
++ * calling usb_put_phy() to release that count.
++ *
++ * For use by USB host and peripheral drivers.
++ */
++struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index)
++{
++	struct usb_phy	*phy = NULL;
++	unsigned long	flags;
++
++	spin_lock_irqsave(&phy_lock, flags);
++
++	phy = __usb_find_phy_dev(dev, &phy_bind_list, index);
++	if (IS_ERR(phy)) {
++		pr_err("unable to find transceiver\n");
++		goto err0;
++	}
++
++	get_device(phy->dev);
++
++err0:
++	spin_unlock_irqrestore(&phy_lock, flags);
++
++	return phy;
++}
++EXPORT_SYMBOL(usb_get_phy_dev);
++
++/**
++ * devm_usb_get_phy_dev - find the USB PHY using device ptr and index
++ * @dev - device that requests this phy
++ * @index - the index of the phy
++ *
++ * Gets the phy using usb_get_phy_dev(), and associates a device with it using
++ * devres. On driver detach, release function is invoked on the devres data,
++ * then, devres data is freed.
++ *
++ * For use by USB host and peripheral drivers.
++ */
++struct usb_phy *devm_usb_get_phy_dev(struct device *dev, u8 index)
++{
++	struct usb_phy **ptr, *phy;
++
++	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return NULL;
++
++	phy = usb_get_phy_dev(dev, index);
++	if (!IS_ERR(phy)) {
++		*ptr = phy;
++		devres_add(dev, ptr);
++	} else
++		devres_free(ptr);
++
++	return phy;
++}
++EXPORT_SYMBOL(devm_usb_get_phy_dev);
++
++/**
+  * devm_usb_put_phy - release the USB PHY
+  * @dev - device that wants to release this phy
+  * @phy - the phy returned by devm_usb_get_phy()
+@@ -186,6 +263,36 @@ out:
+ EXPORT_SYMBOL(usb_add_phy);
+ 
+ /**
++ * usb_add_phy_dev - declare the USB PHY
++ * @x: the USB phy to be used; or NULL
++ *
++ * This call is exclusively for use by phy drivers, which
++ * coordinate the activities of drivers for host and peripheral
++ * controllers, and in some cases for VBUS current regulation.
++ */
++int usb_add_phy_dev(struct usb_phy *x)
++{
++	struct usb_phy_bind *phy_bind;
++	unsigned long flags;
++
++	if (!x->dev) {
++		dev_err(x->dev, "no device provided for PHY\n");
++		return -EINVAL;
++	}
++
++	spin_lock_irqsave(&phy_lock, flags);
++	list_for_each_entry(phy_bind, &phy_bind_list, list)
++		if (!(strcmp(phy_bind->phy_dev_name, dev_name(x->dev))))
++			phy_bind->phy = x;
++
++	list_add_tail(&x->head, &phy_list);
++
++	spin_unlock_irqrestore(&phy_lock, flags);
++	return 0;
++}
++EXPORT_SYMBOL(usb_add_phy_dev);
++
++/**
+  * usb_remove_phy - remove the OTG PHY
+  * @x: the USB OTG PHY to be removed;
+  *
+@@ -194,10 +301,15 @@ EXPORT_SYMBOL(usb_add_phy);
+ void usb_remove_phy(struct usb_phy *x)
+ {
+ 	unsigned long	flags;
++	struct usb_phy_bind *phy_bind;
+ 
+ 	spin_lock_irqsave(&phy_lock, flags);
+-	if (x)
++	if (x) {
++		list_for_each_entry(phy_bind, &phy_bind_list, list)
++			if (phy_bind->phy == x)
++				phy_bind->phy = NULL;
+ 		list_del(&x->head);
++	}
+ 	spin_unlock_irqrestore(&phy_lock, flags);
+ }
+ EXPORT_SYMBOL(usb_remove_phy);
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index fbeab1a..3a9ae3e 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -124,6 +124,7 @@ struct usb_phy_bind {
+ 
+ /* for board-specific init logic */
+ extern int usb_add_phy(struct usb_phy *, enum usb_phy_type type);
++extern int usb_add_phy_dev(struct usb_phy *);
+ extern void usb_remove_phy(struct usb_phy *);
+ 
+ /* helpers for direct access thru low-level io interface */
+@@ -164,6 +165,8 @@ usb_phy_shutdown(struct usb_phy *x)
+ extern struct usb_phy *usb_get_phy(enum usb_phy_type type);
+ extern struct usb_phy *devm_usb_get_phy(struct device *dev,
+ 	enum usb_phy_type type);
++extern struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index);
++extern struct usb_phy *devm_usb_get_phy_dev(struct device *dev, u8 index);
+ extern void usb_put_phy(struct usb_phy *);
+ extern void devm_usb_put_phy(struct device *dev, struct usb_phy *x);
+ extern struct usb_phy_bind *usb_bind_phy(const char *dev_name, u8 index,
+@@ -180,6 +183,16 @@ static inline struct usb_phy *devm_usb_get_phy(struct device *dev,
+ 	return NULL;
+ }
+ 
++static inline struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index)
++{
++	return NULL;
++}
++
++static inline struct usb_phy *devm_usb_get_phy_dev(struct device *dev, u8 index)
++{
++	return NULL;
++}
++
+ static inline void usb_put_phy(struct usb_phy *x)
+ {
+ }
+-- 
+1.7.9.5
