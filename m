@@ -1,33 +1,29 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 22 Jan 2013 04:26:11 +0100
-Subject: [PATCH 1/3] mfd: Fix compile errors and warnings when
- !CONFIG_AB8500_BM
-In-Reply-To: <1357725965-27342-1-git-send-email-lee.jones@linaro.org>
-References: <1357725965-27342-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130122032611.GK7409@sortiz-mobl>
+Date: Tue, 22 Jan 2013 04:26:34 +0100
+Subject: [PATCH 3/4] pinctrl: add abx500 pinctrl driver core
+In-Reply-To: <1358242984-5160-1-git-send-email-linus.walleij@stericsson.com>
+References: <1358242984-5160-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130122032634.GM7409@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Linus,
 
-On Wed, Jan 09, 2013 at 10:06:03AM +0000, Lee Jones wrote:
-> drivers/mfd/ab8500-core.c:1015:21: error: ?ab8500_bm_data? undeclared here
+On Tue, Jan 15, 2013 at 10:43:04AM +0100, Linus Walleij wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
 > 
-> include/linux/mfd/abx500/ab8500-bm.h:445:13: warning: ?ab8500_fg_reinit? defined but not used
-> include/linux/mfd/abx500/ab8500-bm.h:448:13: warning: ?ab8500_charger_usb_state_changed? defined but not used
-> include/linux/mfd/abx500/ab8500-bm.h:451:29: warning: ?ab8500_btemp_get? defined but not used
-> include/linux/mfd/abx500/ab8500-bm.h:455:12: warning: ?ab8500_btemp_get_batctrl_temp? defined but not used
-> include/linux/mfd/abx500/ab8500-bm.h:463:12: warning: ?ab8500_fg_inst_curr_blocking? defined but not used
-> include/linux/mfd/abx500/ab8500-bm.h:442:12: warning: ?ab8500_fg_inst_curr_done? defined but not used
-> include/linux/mfd/abx500/ab8500-bm.h:447:26: warning: ?ab8500_fg_get? defined but not used
+> This adds the AB8500 core driver, which will be utilized by
+> the follow-on drivers for different ABx500 variants.
+> Sselect the driver from the DBX500_SOC, as this chip is
+> powering and clocking that SoC.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/mfd/ab8500-core.c            |    1 +
->  include/linux/mfd/abx500.h           |    2 --
->  include/linux/mfd/abx500/ab8500-bm.h |   29 ++++-------------------------
->  3 files changed, 5 insertions(+), 27 deletions(-)
-Applied to my for-linus branch, thanks.
+> Hi Sam, it'd be great if you could ACK this so we could proceed
+> with rewriting the GPIO driver.
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 
 Cheers,
 Samuel.
