@@ -1,43 +1,31 @@
-From: kishon@ti.com (kishon)
-Date: Tue, 22 Jan 2013 21:15:01 +0530
-Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
-In-Reply-To: <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
-Message-ID: <50FEB3FD.3050001@ti.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 22 Jan 2013 09:47:02 -0600
+Subject: [PATCH v7 09/15] gpio: pl061: set initcall level to module init
+In-Reply-To: <CACRpkdbTZGEMScK34vCE8qw8Kwug1SNQv_G8-hCjTRjZFvVNZw@mail.gmail.com>
+References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358494279-16503-10-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdb=vf5s-XmfYYn5W-BjeNaf9vw6-sDSH6VDC41PBX0rdQ@mail.gmail.com>
+ <1358785488.6590.33.camel@hornet> <1358799606.3592.14.camel@linux-builds1>
+ <CACRpkdbTZGEMScK34vCE8qw8Kwug1SNQv_G8-hCjTRjZFvVNZw@mail.gmail.com>
+Message-ID: <1358869622.11845.0.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 January 2013 09:11 PM, Koen Kooi wrote:
->
-> Op 22 jan. 2013, om 10:58 heeft Kishon Vijay Abraham I <kishon@ti.com> het volgende geschreven:
->
->> This patch series adds support for adding multiple PHY's (of same type).
->> The binding information has to be present in the PHY library (otg.c) in
->> order for it to return the appropriate PHY whenever the USB controller
->> request for the PHY. So added a new API usb_bind_phy() to pass the binding
->> information. This API should be called by platform specific initialization
->> code.
->>
->> So the binding should be done something like
->> usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto"); specifying the USB
->> controller device name, index, and the PHY device name.
->> I have done this binding for OMAP platforms, but it should be done for
->> all the platforms.
->>
->> After this design, the phy can be got by passing the USB controller device
->> pointer and the index.
->>
->> Developed this patch series on
->> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
->> after applying "usb: musb: add driver for control module" patch series
->> and "ARM: dts: omap: add dt data for MUSB"
->>
->> Did basic enumeration testing in omap4 panda and omap3 beagle.
->
-> With this patchset USB completely breaks on am33xx beaglebone, is that intended?
-Not really.
-Does am33xx makes use of omap2430.c? Which PHY does am33xx uses?
+Hi Linus,
 
-Thanks
-Kishon
+On Tue, 2013-01-22 at 10:44 +0100, Linus Walleij wrote:
+> On Mon, Jan 21, 2013 at 9:20 PM, Dinh Nguyen <dinguyen@altera.com> wrote:
+> 
+> >> > Pawel, Dinh: are you OK with this change?
+> >
+> > Still works ok on mach-socfpga.
+> 
+> Thanks! Adding your Tested-by tag, OK?
+
+Yep, thanks.
+
+Dinh
+> 
+> Yours,
+> Linus Walleij
+> 
