@@ -1,43 +1,66 @@
-From: mpfj-list@mimc.co.uk (Mark Jackson)
-Date: Tue, 22 Jan 2013 13:45:55 +0000
-Subject: OMAP baseline test results for v3.8-rc4
-In-Reply-To: <874ni95ry6.fsf@dell.be.48ers.dk>
-References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
- <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
- <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
- <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
- <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
- <50FE66AC.2090306@mimc.co.uk> <874ni95ry6.fsf@dell.be.48ers.dk>
-Message-ID: <50FE9813.8060207@mimc.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Jan 2013 14:59:58 +0100
+Subject: [GIT PULL] U300-related COH901318 cleanup
+Message-ID: <CACRpkdZtWwHwvfNrSjZiY0Dn7qnk34R9ZSpLfH_VRhGzVEWpKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/01/13 12:21, Peter Korsgaard wrote:
->>>>>> "Mark" == Mark Jackson <mpfj-list@mimc.co.uk> writes:
-> 
-> Hi,
-> 
->  Mark> Bytes transferred = 3963919 (3c7c0f hex)
->  Mark> ## Booting kernel from Legacy Image at 80000000 ...
->  Mark>    Image Name:   Linux
->  Mark>    Image Type:   ARM Linux Kernel Image (uncompressed)
->  Mark>    Data Size:    3963855 Bytes = 3.8 MiB
->  Mark>    Load Address: 80008000
->  Mark>    Entry Point:  80008000
->  Mark>    Verifying Checksum ... OK
->  Mark>    Loading Kernel Image ... OK
->  Mark> OK
-> 
-> I haven't tried a recent -next build, but what is your kernel command
-> line and did you try without EARLY_PRINTK?
-> 
+Hi ARM SoC guys,
 
-Kernel command line: console=ttyO0,115200n8 earlyprintk debug root=/dev/mmcblk0p2 ro rootfstype=ext2
-rootwait
+This pushes the platform data for the COH901318 DMA controller down
+into the driver so it is self-contained as a cleanup for the U300 machine.
 
-I understand that MMC is not in the mainline.
+Since roughly 50% of this patch affects arch/arm/mach* and we may want
+to build additional cleanups on top, we need to take this into the ARM
+SoC tree.
 
-Aha ... I tried without EARLY_PRINTK and it now boots up to the point of rootfs access.
+All patches are ACKed by the DMA subsystem maintainer.
 
-Cheers
-Mark J.
+Please pull it into ARM SoC!
+
+Yours,
+Linus Walleij
+
+The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+
+  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
+
+are available in the git repository at:
+
+  http://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/coh901318-for-arm-soc
+
+for you to fetch changes up to 73b31eaee7f02946dbb0bfabbee72ab6f0117bfb:
+
+  dma: coh901318: cut down on platform data abstraction (2013-01-07
+17:36:41 +0100)
+
+----------------------------------------------------------------
+This pushes the platform data for the U300 COH901318
+DMA controller down into the driver and cleans up in
+the <mach/*> namespace for the U300 platform.
+
+----------------------------------------------------------------
+Linus Walleij (8):
+      dma: coh901318: create a proper platform data file
+      dma: coh901318: push platform data into driver
+      dma: coh901318: remove hardcoded target addresses
+      dma: coh901318: skip hard-coded addresses
+      dma: coh901318: push header down into the DMA subsystem
+      dma: coh901318: push definitions into driver
+      dma: coh901318: merge header files
+      dma: coh901318: cut down on platform data abstraction
+
+ arch/arm/mach-u300/core.c                    | 1087 +--------------------
+ arch/arm/mach-u300/dma_channels.h            |   60 --
+ arch/arm/mach-u300/include/mach/coh901318.h  |  267 ------
+ arch/arm/mach-u300/spi.c                     |    3 +-
+ drivers/dma/coh901318.c                      | 1302 +++++++++++++++++++++++++-
+ drivers/dma/{coh901318_lli.h => coh901318.h} |   35 +-
+ drivers/dma/coh901318_lli.c                  |    4 +-
+ include/linux/platform_data/dma-coh901318.h  |   72 ++
+ 8 files changed, 1354 insertions(+), 1476 deletions(-)
+ delete mode 100644 arch/arm/mach-u300/dma_channels.h
+ delete mode 100644 arch/arm/mach-u300/include/mach/coh901318.h
+ rename drivers/dma/{coh901318_lli.h => coh901318.h} (81%)
+ create mode 100644 include/linux/platform_data/dma-coh901318.h
