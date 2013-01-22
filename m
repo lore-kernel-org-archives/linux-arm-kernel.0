@@ -1,128 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jan 2013 09:27:17 +0000
-Subject: [PATCH 23/24] ab8500-bm: Fix minor niggles experienced during
- testing
-In-Reply-To: <20130121191324.GA15037@lizard.mcd01528.sjc.wayport.net>
-References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
- <1358769840-4763-24-git-send-email-lee.jones@linaro.org>
- <20130121191324.GA15037@lizard.mcd01528.sjc.wayport.net>
-Message-ID: <20130122092717.GI6857@gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 22 Jan 2013 11:28:37 +0200
+Subject: [PATCH v8 19/22] ARM: OMAP3: clock data: get rid of unused USB
+ host clock aliases and dummies
+In-Reply-To: <alpine.DEB.2.00.1301211502190.8450@utopia.booyaka.com>
+References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
+ <1358511445-26656-20-git-send-email-rogerq@ti.com>
+ <alpine.DEB.2.00.1301182027040.19470@utopia.booyaka.com>
+ <50FD0BEF.9000007@ti.com>
+ <alpine.DEB.2.00.1301211502190.8450@utopia.booyaka.com>
+Message-ID: <50FE5BC5.1020906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Jan 2013, Anton Vorontsov wrote:
+On 01/21/2013 05:03 PM, Paul Walmsley wrote:
+> Hi
+> 
+> On Mon, 21 Jan 2013, Roger Quadros wrote:
+> 
+>> On 01/18/2013 10:27 PM, Paul Walmsley wrote:
+>>> On Fri, 18 Jan 2013, Roger Quadros wrote:
+>>>
+>>>> We don't need multiple aliases for the OMAP USB host clocks and neither
+>>>> the dummy clocks so remove them.
+>>>>
+>>>> CC: Paul Walmsley <paul@pwsan.com>
+>>>> CC: Rajendra Nayak <rnayak@ti.com>
+>>>> CC: Benoit Cousson <b-cousson@ti.com>
+>>>> CC: Mike Turquette <mturquette@linaro.com>
+>>>>
+>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>> Reviewed-by: Felipe Balbi <balbi@ti.com>
+>>>> Acked-by: Paul Walmsley <paul@pwsan.com>
+>>>
+>>> Per Tony's earlier request, you can drop this patch and patch 20 from your 
+>>> series now.  I've got them queued for 3.10 or late 3.9 merge window.
+>>>
+>>
+>> Should have mentioned it earlier, but just this patch without the rest
+>> of the cleanup patches will break USB Host on OMAP3, as the old driver
+>> bails out if optional clock nodes are missing.
+>>
+>> Including patch 20 doesn't seem to cause a problem with OMAP4 though.
+> 
+> I've got these two patches queued for merging after your other patches go 
+> upstream -- e.g., probably 3.10.  Do you foresee any problems with that?
+> 
 
-> On Mon, Jan 21, 2013 at 12:03:59PM +0000, Lee Jones wrote:
-> > When compile testing the new AB8500 Battery Management changes
-> > due for inclusion into upstream, there were a few minor niggles
-> > which required repairing, or adapting for use against the
-> > Mainline kernel. This patch is a collection of them all.
-> 
-> No. This is the third time I'm saying it: the last time I checked, this is
-> not how we do development in the mainline.
+That should be fine. Thanks :).
 
-Okay, all of these changes have now been fixed-up into the patches
-which caused the issues. I have also added Stable to the patch you
-requested it on.
-
-How would you like to proceed? Do you want a pull-request, or for me
-to send the patches to the list again?
-
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/power/ab8500_fg.h       |    6 ++++--
-> >  drivers/power/abx500_chargalg.c |    4 ++--
-> >  drivers/power/pm2301_charger.c  |    4 ++--
-> >  3 files changed, 8 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/power/ab8500_fg.h b/drivers/power/ab8500_fg.h
-> > index 946840b..bb78dc9 100644
-> > --- a/drivers/power/ab8500_fg.h
-> > +++ b/drivers/power/ab8500_fg.h
-> > @@ -182,6 +182,7 @@ struct ab8500_fg_test {
-> >   * @fg_check_hw_failure_work:	Work for checking HW state
-> >   * @cc_lock:		Mutex for locking the CC
-> >   * @fg_kobject:		Structure of type kobject
-> > + * @test:		Structure of type ab8500_fg_test for test purpose
-> >   */
-> >  struct ab8500_fg {
-> >  	struct device *dev;
-> > @@ -224,6 +225,7 @@ struct ab8500_fg {
-> >  	struct delayed_work fg_check_hw_failure_work;
-> >  	struct mutex cc_lock;
-> >  	struct kobject fg_kobject;
-> > +	struct ab8500_fg_test test;
-> 
-> You are introducing it, but I don't see any users.
-> 
-> >  };
-> >  
-> >  extern char *discharge_state[];
-> > @@ -232,8 +234,8 @@ extern char *charge_state[];
-> >  int ab8500_fg_coulomb_counter(struct ab8500_fg *di, bool enable);
-> >  void ab8500_fg_charge_state_to(struct ab8500_fg *di,
-> >  		enum ab8500_fg_charge_state new_state);
-> > -void ab8500_fg_discharge_state_to(struct ab8500_fg *di,
-> > -		enum ab8500_fg_charge_state new_state);
-> > +static void ab8500_fg_discharge_state_to(struct ab8500_fg *di,
-> > +		enum ab8500_fg_discharge_state new_state);
-> >  /* test initialization */
-> >  #ifdef CONFIG_AB8500_BM_DEEP_DEBUG
-> >  void ab8500_fg_test_init(struct ab8500_fg *di);
-> > diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
-> > index 694f592..cacf512 100644
-> > --- a/drivers/power/abx500_chargalg.c
-> > +++ b/drivers/power/abx500_chargalg.c
-> > @@ -1664,8 +1664,8 @@ static int abx500_chargalg_get_property(struct power_supply *psy,
-> >  static ssize_t ab8500_chargalg_sysfs_show(struct kobject *kobj,
-> >  					  struct attribute *attr, char *buf)
-> >  {
-> > -	struct ab8500_chargalg *di = container_of(kobj,
-> > -               struct ab8500_chargalg, chargalg_kobject);
-> > +	struct abx500_chargalg *di = container_of(kobj,
-> > +               struct abx500_chargalg, chargalg_kobject);
-> 
-> Spaces.
-> 
-> >  
-> >  	return sprintf(buf, "%d\n",
-> >  		       di->susp_status.ac_suspended &&
-> > diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
-> > index 14e37b2..5ebae88 100644
-> > --- a/drivers/power/pm2301_charger.c
-> > +++ b/drivers/power/pm2301_charger.c
-> > @@ -22,8 +22,8 @@
-> >  #include <linux/i2c.h>
-> >  #include <linux/workqueue.h>
-> >  #include <linux/kobject.h>
-> > -#include <linux/mfd/ab8500.h>
-> >  #include <linux/mfd/abx500.h>
-> > +#include <linux/mfd/abx500/ab8500.h>
-> >  #include <linux/mfd/abx500/ab8500-bm.h>
-> >  #include <linux/mfd/abx500/ab8500-gpadc.h>
-> >  #include <linux/mfd/abx500/ux500_chargalg.h>
-> > @@ -867,7 +867,7 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
-> >  
-> >  	/* get parent data */
-> >  	pm2->dev = &i2c_client->dev;
-> > -	pm2->gpadc = ab8500_gpadc_get();
-> > +	pm2->gpadc = ab8500_gpadc_get("ab8500-gpadc.0");
-> 
-> Was the driver even compilable before? You've just introduced the new
-> driver in this exact series. :-/
-> 
-> Since pm2301 is a new driver, please merge all pm2301 stuff into one
-> patch.
-> 
-> Or, if you want to preserve the development history of the new driver,
-> this is also fine, but then I'd prefer to take it via a pull-request with
-> only this driver.
-> 
-> Thanks,
-> Anton
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+--
+cheers,
+-roger
