@@ -1,29 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Jan 2013 10:42:11 +0100
-Subject: [PATCH v7 09/15] gpio: pl061: set initcall level to module init
-In-Reply-To: <1358785488.6590.33.camel@hornet>
-References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
- <1358494279-16503-10-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdb=vf5s-XmfYYn5W-BjeNaf9vw6-sDSH6VDC41PBX0rdQ@mail.gmail.com>
- <1358785488.6590.33.camel@hornet>
-Message-ID: <CACRpkdY4MHLjs1Lnj+8Ts6oZOjG14pDssCQ09PX-a_5nGRs1sg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Jan 2013 09:43:30 +0000
+Subject: [PATCH 4/4] ARM: apply the l2x0 Errata 769419 at run time
+In-Reply-To: <20130122055916.GA22429@bnru10>
+References: <20130121131709.GA29927@bnru10>
+ <20130121161202.GR23505@n2100.arm.linux.org.uk>
+ <20130122055916.GA22429@bnru10>
+Message-ID: <20130122094330.GG23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 5:24 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+On Tue, Jan 22, 2013 at 11:29:17AM +0530, Srinidhi Kasagar wrote:
+> On Mon, Jan 21, 2013 at 17:12:02 +0100, Russell King - ARM Linux wrote:
+> > Is it really worth this hastle, or would it just be better to keep the
+> > ifdef there, using the configuration symbol as a way to indicate whether
+> > we want this work-around included in the kernel, and always have the
+> > wmb() there if the symbol is enabled?
+> We can keep the ifdef there, my idea was to completely eliminate these
+> CONFIG_PL310_ERRATA_*. The problem comes when you have a single defconfig
+> for two platforms (ex, ST-E's 8500 and 8540) where one platform needs
+> this and the other don't.
 
-> Hm. Doesn't this make the MMCI probing depending on the module_init
-> order? As in: wouldn't it make the mmci probe completely fail (not even
-> defer it) if it was called before the pl061? In that case even your,
-> Linus, hack with inverting the CD status wouldn't work...
-
-According to Haojian it works, but for sure the MMCI driver *should*
-(on the eternal list of SHOULDDO) bail out and return any
--EPROBE_DEFER up to the AMBA bus core properly so it
-will be tried again later if this happens.
-
-AFAICT gpio_request() will return -EPROBE_DEFER if the GPIO
-cannot be located.
-
-Yours,
-Linus Walleij
+And the answer is... if you don't need it at all in the kernel, because
+none of your platforms need it, you can eliminate it.  If one of your
+platforms needs it, it's probably best to compile it in and make it
+unconditional there.
