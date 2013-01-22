@@ -1,76 +1,43 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Tue, 22 Jan 2013 08:22:31 +0100
-Subject: [PATCH] net: fec: Add support for multiple phys on mdiobus
-In-Reply-To: <20130121120602.GZ1906@pengutronix.de>
-References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
- <50FD02B8.8080401@grandegger.com> <20130121100701.GX1906@pengutronix.de>
- <50FD2172.2020608@grandegger.com> <20130121120602.GZ1906@pengutronix.de>
-Message-ID: <50FE3E37.4010004@grandegger.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 21 Jan 2013 23:29:12 -0800
+Subject: [PATCH v2 1/2] ARM: shmobile: sh73a0: Use generic irqchip_init()
+In-Reply-To: <20130121070301.GB15508@avionic-0098.adnet.avionic-design.de>
+References: <1358493373-28722-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130121005439.GF19062@verge.net.au>
+ <20130121070301.GB15508@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20130122072912.GD25783@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2013 01:06 PM, Sascha Hauer wrote:
-> On Mon, Jan 21, 2013 at 12:07:30PM +0100, Wolfgang Grandegger wrote:
->> On 01/21/2013 11:07 AM, Sascha Hauer wrote:
->>> On Mon, Jan 21, 2013 at 09:56:24AM +0100, Wolfgang Grandegger wrote:
->>>> On 01/21/2013 09:37 AM, Sascha Hauer wrote:
->>>>> There may be multiple phys on an mdio bus. This series adds support
->>>>> for this to the fec driver. I recently had a board which has a switch
->>>>> connected to the fec's mdio bus, so I had to pick the correct phy.
->>>>
->>>> Pick one PHY from a switch port? Well, does a PHY-less (or fixed-link)
->>>> configuration for a switch not make more sense?
->>>
->>> Yes, you're probably right.
->>>
->>>> Various ARM Ethernet
->>>> contoller drivers do not support it. I recently needed a hack for an
->>>> AT91 board.
->>>
->>> I wonder how we want to proceed. Should there be a devicetree property
->>> 'fixed-link' like done for fs_enet (and not recommended for new code,
->>> stated in the comment above of_phy_connect_fixed_link)?
->>
->> Also the gianfar and ucc_geth drivers use this interface (via fixed
->> link phy). I tried to use it for the AT91 macb driver but stopped
->> quickly because the usage was not straight forward (too much code)...
->> even if the idea of using a fake fixed-link phy is not bad.
->>
->>> Currently I have a property 'phy' in the fec binding which has a phandle
->>> to a phy provided by the fec's mdio bus, but this could equally well
->>
->> But than the cable must be connected to the associated switch port.
->>
->>> point to a fixed dummy phy:
->>>
->>> 	phy = &fixed-phy;
->>
->> The link speed, full/half duplex and maybe some mroe parameter should
->> be configurable via device tree.
+On Mon, Jan 21, 2013 at 08:03:01AM +0100, Thierry Reding wrote:
+> On Mon, Jan 21, 2013 at 09:54:39AM +0900, Simon Horman wrote:
+> > On Fri, Jan 18, 2013 at 08:16:12AM +0100, Thierry Reding wrote:
+> > > The asm/hardware/gic.h header does no longer exist and the corresponding
+> > > functionality was moved to linux/irqchip.h and linux/irqchip/arm-gic.h
+> > > respectively. gic_handle_irq() and of_irq_init() are no longer available
+> > > either and have been replaced by irqchip_init().
+> > 
+> > asm/hardware/gic.h Seems to still exist in Linus's tree.
+> > Could you let me know which tree of which branch I should depend on
+> > in order to apply this change?
 > 
-> Well this could be done when the fixed phy driver could be registered
-> with the devicetree, maybe like this:
+> I found this when doing an automated build over all ARM defconfigs on
+> linux-next.
 > 
-> 	fixed-phy: mdiophy {
-> 		compatible = "mdio-fixed-phy";
-> 		link = "100FD";
-> 	};
+> Commit 520f7bd73354f003a9a59937b28e4903d985c420 "irqchip: Move ARM gic.h
+> to include/linux/irqchip/arm-gic.h" moved the file and was merged
+> through Olof Johansson's next/cleanup and for-next branches.
+> 
+> Adding Olof on Cc since I'm not quite sure myself about how this is
+> handled.
 
-I find that confusing. There is *no* phy but just a fixed link to the
-switch...
+The way to handle this is to base the branch you are adding new shmobile code
+in, on top of the cleanup branches that changes the underlying infrastructure.
+This is why we merge it early during the release, so that new code for various
+platforms can be based on it to avoid a bunch of conflicts in the end.
 
-> The good thing about this would be that every ethernet driver could just
-> use such a fixed phy, any external mdio phy (like on Marvell Armada) or
-> just a phy connected to the internal mdio interface provided by the ethernet
-> core.
+In this case, you might need to base your branch onto a merge of both
+the irqchip/gic-vic-move and timer/cleanup branches from arm-soc.
 
-What is wrong with the existing "fixed-link" property of the *ethernet*
-node. The fixed-link handling should/could be done in the phy layer, and
-not in the driver as it currently is implemented. Maybe that's the
-reason why the current code is regarded as hack!
 
-> I probably should write a RFC to devicetree-discuss.
-
-Yep,
-
-Wolfgang.
+-Olof
