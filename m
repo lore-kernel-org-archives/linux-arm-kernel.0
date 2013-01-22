@@ -1,66 +1,104 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Jan 2013 14:59:58 +0100
-Subject: [GIT PULL] U300-related COH901318 cleanup
-Message-ID: <CACRpkdZtWwHwvfNrSjZiY0Dn7qnk34R9ZSpLfH_VRhGzVEWpKQ@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 22 Jan 2013 16:07:26 +0200
+Subject: [PATCH v1 2/6] usb: otg: utils: add facilities in phy lib to
+ support multiple PHYs of same type
+In-Reply-To: <1358848694-20145-3-git-send-email-kishon@ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <1358848694-20145-3-git-send-email-kishon@ti.com>
+Message-ID: <50FE9D1E.3010800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+On 01/22/2013 11:58 AM, Kishon Vijay Abraham I wrote:
+> In order to add support for multipe PHY's of the same type, new API's
+> for adding PHY and getting PHY has been added. Now the binding
+> information for the PHY and controller should be done in platform file
+> using usb_bind_phy API. And for getting a PHY, the device pointer of the
+> USB controller and an index should be passed. Based on the binding
+> information that is added in the platform file, usb_get_phy_dev will return the
+> appropriate PHY.
+> Already existing API's to add and get phy by type is not removed. These
+> API's are deprecated and will be removed once all the platforms start to
+> use the new API.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/usb/otg/otg.c   |  114 ++++++++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/usb/phy.h |   13 ++++++
+>  2 files changed, 126 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
+> index 492ba2f..1f30b22 100644
+> --- a/drivers/usb/otg/otg.c
+> +++ b/drivers/usb/otg/otg.c
+> @@ -36,6 +36,20 @@ static struct usb_phy *__usb_find_phy(struct list_head *list,
+>  	return ERR_PTR(-ENODEV);
+>  }
+>  
+> +static struct usb_phy *__usb_find_phy_dev(struct device *dev,
+> +	struct list_head *list, u8 index)
+> +{
+> +	struct usb_phy_bind *phy_bind = NULL;
+> +
+> +	list_for_each_entry(phy_bind, list, list) {
+> +		if (!(strcmp(phy_bind->dev_name, dev_name(dev))) &&
+> +				phy_bind->index == index)
+> +			return phy_bind->phy;
 
-This pushes the platform data for the COH901318 DMA controller down
-into the driver so it is self-contained as a cleanup for the U300 machine.
+If the PHY driver has not yet called usb_add_phy_dev() (e.g. driver not yet loaeded)
+then this will return NULL.
 
-Since roughly 50% of this patch affects arch/arm/mach* and we may want
-to build additional cleanups on top, we need to take this into the ARM
-SoC tree.
+> +	}
+> +
+> +	return ERR_PTR(-ENODEV);
+> +}
+> +
+>  static void devm_usb_phy_release(struct device *dev, void *res)
+>  {
+>  	struct usb_phy *phy = *(struct usb_phy **)res;
+> @@ -112,6 +126,69 @@ err0:
+>  EXPORT_SYMBOL(usb_get_phy);
+>  
+>  /**
+> + * usb_get_phy_dev - find the USB PHY
+> + * @dev - device that requests this phy
+> + * @index - the index of the phy
+> + *
+> + * Returns the phy driver, after getting a refcount to it; or
+> + * -ENODEV if there is no such phy.  The caller is responsible for
+> + * calling usb_put_phy() to release that count.
+> + *
+> + * For use by USB host and peripheral drivers.
+> + */
+> +struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index)
+> +{
+> +	struct usb_phy	*phy = NULL;
+> +	unsigned long	flags;
+> +
+> +	spin_lock_irqsave(&phy_lock, flags);
+> +
+> +	phy = __usb_find_phy_dev(dev, &phy_bind_list, index);
+> +	if (IS_ERR(phy)) {
+> +		pr_err("unable to find transceiver\n");
+> +		goto err0;
+> +	}
 
-All patches are ACKed by the DMA subsystem maintainer.
+Since NULL is not IS_ERR(), you will do a NULL pointer reference below.
 
-Please pull it into ARM SoC!
+In such cases we would want to use the deferred probe mechanism. So should we return
+-EPROBE_DEFER?
 
-Yours,
-Linus Walleij
+> +
+> +	get_device(phy->dev);
+> +
+> +err0:
+> +	spin_unlock_irqrestore(&phy_lock, flags);
+> +
+> +	return phy;
+> +}
+> +EXPORT_SYMBOL(usb_get_phy_dev);
+> +
 
-The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
-
-  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
-
-are available in the git repository at:
-
-  http://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/coh901318-for-arm-soc
-
-for you to fetch changes up to 73b31eaee7f02946dbb0bfabbee72ab6f0117bfb:
-
-  dma: coh901318: cut down on platform data abstraction (2013-01-07
-17:36:41 +0100)
-
-----------------------------------------------------------------
-This pushes the platform data for the U300 COH901318
-DMA controller down into the driver and cleans up in
-the <mach/*> namespace for the U300 platform.
-
-----------------------------------------------------------------
-Linus Walleij (8):
-      dma: coh901318: create a proper platform data file
-      dma: coh901318: push platform data into driver
-      dma: coh901318: remove hardcoded target addresses
-      dma: coh901318: skip hard-coded addresses
-      dma: coh901318: push header down into the DMA subsystem
-      dma: coh901318: push definitions into driver
-      dma: coh901318: merge header files
-      dma: coh901318: cut down on platform data abstraction
-
- arch/arm/mach-u300/core.c                    | 1087 +--------------------
- arch/arm/mach-u300/dma_channels.h            |   60 --
- arch/arm/mach-u300/include/mach/coh901318.h  |  267 ------
- arch/arm/mach-u300/spi.c                     |    3 +-
- drivers/dma/coh901318.c                      | 1302 +++++++++++++++++++++++++-
- drivers/dma/{coh901318_lli.h => coh901318.h} |   35 +-
- drivers/dma/coh901318_lli.c                  |    4 +-
- include/linux/platform_data/dma-coh901318.h  |   72 ++
- 8 files changed, 1354 insertions(+), 1476 deletions(-)
- delete mode 100644 arch/arm/mach-u300/dma_channels.h
- delete mode 100644 arch/arm/mach-u300/include/mach/coh901318.h
- rename drivers/dma/{coh901318_lli.h => coh901318.h} (81%)
- create mode 100644 include/linux/platform_data/dma-coh901318.h
+--
+cheers,
+-roger
