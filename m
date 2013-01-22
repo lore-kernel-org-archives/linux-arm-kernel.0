@@ -1,61 +1,39 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Wed, 23 Jan 2013 01:28:21 +0530
-Subject: [PATCH v5 01/45] percpu_rwlock: Introduce the global reader-writer
- lock backend
-In-Reply-To: <1358883152.21576.55.camel@gandalf.local.home>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073315.13822.27093.stgit@srivatsabhat.in.ibm.com>
- <1358883152.21576.55.camel@gandalf.local.home>
-Message-ID: <50FEEF5D.6080302@linux.vnet.ibm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 22 Jan 2013 15:27:00 -0500 (EST)
+Subject: [PATCH] ARM: Versatile Express: extend the MPIDR range used for
+ pen release check
+In-Reply-To: <20130122185833.GE3959@e102568-lin.cambridge.arm.com>
+References: <1358852200-4581-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <alpine.LFD.2.02.1301221324220.6300@xanadu.home>
+ <20130122185833.GE3959@e102568-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1301221525270.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2013 01:02 AM, Steven Rostedt wrote:
-> On Tue, 2013-01-22 at 13:03 +0530, Srivatsa S. Bhat wrote:
->> A straight-forward (and obvious) algorithm to implement Per-CPU Reader-Writer
->> locks can also lead to too many deadlock possibilities which can make it very
->> hard/impossible to use. This is explained in the example below, which helps
->> justify the need for a different algorithm to implement flexible Per-CPU
->> Reader-Writer locks.
->>
->> We can use global rwlocks as shown below safely, without fear of deadlocks:
->>
->> Readers:
->>
->>          CPU 0                                CPU 1
->>          ------                               ------
->>
->> 1.    spin_lock(&random_lock);             read_lock(&my_rwlock);
->>
->>
->> 2.    read_lock(&my_rwlock);               spin_lock(&random_lock);
->>
->>
->> Writer:
->>
->>          CPU 2:
->>          ------
->>
->>        write_lock(&my_rwlock);
->>
+On Tue, 22 Jan 2013, Lorenzo Pieralisi wrote:
+
+> On Tue, Jan 22, 2013 at 06:25:20PM +0000, Nicolas Pitre wrote:
+> > On Tue, 22 Jan 2013, Lorenzo Pieralisi wrote:
+> > 
+> > > In ARM multi-cluster systems the MPIDR affinity level 0 cannot be used as a
+> > > single cpu identifier, affinity levels 1 and 2 must be taken into account as
+> > > well.
+> > > This patch extends the MPIDR usage to affinity levels 1 and 2 in versatile
+> > > secondary cores start up code in order to compare the passed pen_release
+> > > value with the full-blown affinity mask.
+> > > 
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > 
+> > Note that my b.L series makes this patch obsolete.
 > 
-> I thought global locks are now fair. That is, a reader will block if a
-> writer is waiting. Hence, the above should deadlock on the current
-> rwlock_t types.
-> 
+> This is needed to boot TC2 in the mainline. Agreed, when the power API
+> BSP support for TC2 is merged this can be removed, but waiting for that to
+> happen we should fix the current code to enable TC2 in its current state.
 
-Oh is it? Last I checked, lockdep didn't complain about this ABBA scenario!
+Sensible.
 
-> We need to fix those locations (or better yet, remove all rwlocks ;-)
-> 
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-:-)
 
-The challenge with stop_machine() removal is that the replacement on the
-reader side must have the (locking) flexibility comparable to preempt_disable().
-Otherwise, that solution most likely won't be viable because we'll hit way
-too many locking problems and go crazy by the time we convert them over..(if
-we can, that is!)
-
-Regards,
-Srivatsa S. Bhat
+Nicolas
