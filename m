@@ -1,46 +1,53 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 22 Jan 2013 14:32:32 -0500
-Subject: [PATCH v5 01/45] percpu_rwlock: Introduce the global
- reader-writer lock backend
-In-Reply-To: <20130122073315.13822.27093.stgit@srivatsabhat.in.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073315.13822.27093.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <1358883152.21576.55.camel@gandalf.local.home>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 22 Jan 2013 20:40:24 +0100
+Subject: [PATCH] Dove: activate GPIO interrupts in DT
+In-Reply-To: <20130122112845.4f7c0f38@armhf>
+References: <20130122112845.4f7c0f38@armhf>
+Message-ID: <50FEEB28.8020000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-22 at 13:03 +0530, Srivatsa S. Bhat wrote:
-> A straight-forward (and obvious) algorithm to implement Per-CPU Reader-Writer
-> locks can also lead to too many deadlock possibilities which can make it very
-> hard/impossible to use. This is explained in the example below, which helps
-> justify the need for a different algorithm to implement flexible Per-CPU
-> Reader-Writer locks.
-> 
-> We can use global rwlocks as shown below safely, without fear of deadlocks:
-> 
-> Readers:
-> 
->          CPU 0                                CPU 1
->          ------                               ------
-> 
-> 1.    spin_lock(&random_lock);             read_lock(&my_rwlock);
-> 
-> 
-> 2.    read_lock(&my_rwlock);               spin_lock(&random_lock);
-> 
-> 
-> Writer:
-> 
->          CPU 2:
->          ------
-> 
->        write_lock(&my_rwlock);
-> 
+On 01/22/2013 11:28 AM, Jean-Francois Moine wrote:
+> In a DT, the interrupts of an interrupt-controller are not usable when
+> #interrupt-cells is missing.
+>
+> This patch activates the interrupts of the GPIOs 0 and 1 for the Marvell
+> Dove SoC.
+>
+> Signed-off-by: Jean-Fran?ois Moine<moinejf@free.fr>
+>
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index 42eac1f..287fb12 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -93,6 +93,7 @@
+>   			reg =<0xd0400 0x20>;
+>   			ngpios =<32>;
+>   			interrupt-controller;
+> +			#interrupt-cells =<1>;
+>   			interrupts =<12>,<13>,<14>,<60>;
+>   		};
+>
+> @@ -103,6 +104,7 @@
+>   			reg =<0xd0420 0x20>;
+>   			ngpios =<32>;
+>   			interrupt-controller;
+> +			#interrupt-cells =<1>;
+>   			interrupts =<61>;
+>   		};
+>
 
-I thought global locks are now fair. That is, a reader will block if a
-writer is waiting. Hence, the above should deadlock on the current
-rwlock_t types.
+Jean-Francois,
 
-We need to fix those locations (or better yet, remove all rwlocks ;-)
+first thanks for sending the patch!
 
--- Steve
+I checked Documentation/devicetree/bindings/gpio/gpio-mvebu.txt and there
+#interrupt-cells is specified to be set to two. Further, I checked kirkwood.dtsi
+and it is also missing the #interrupt-cells.
+
+Can you please update your patch to have #interrupt-cells set to two? When you
+resend v2 of the patch please Cc at least all I added.
+
+I will send another patch fixing kirkwood.dtsi.
+
+Sebastian
