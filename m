@@ -1,40 +1,32 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Tue, 22 Jan 2013 18:19:25 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC v3.9
-In-Reply-To: <20130122082123.GA28100@quad.lixom.net>
-References: <1357781039-14003-1-git-send-email-horms+renesas@verge.net.au>
- <20130116063750.GA11765@verge.net.au>
- <20130116234310.GA411@quad.lixom.net> <2682612.QaV0caZ3tv@avalon>
- <20130122082123.GA28100@quad.lixom.net>
-Message-ID: <20130122091924.GB11708@linux-sh.org>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Tue, 22 Jan 2013 10:24:26 +0100
+Subject: OMAP baseline test results for v3.8-rc4
+In-Reply-To: <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
+ <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
+ <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
+ <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
+ <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+Message-ID: <1358846666.3996.3.camel@coredoba.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 12:21:23AM -0800, Olof Johansson wrote:
-> On Mon, Jan 21, 2013 at 04:31:43PM +0100, Laurent Pinchart wrote:
-> > Sure, we could push 1-6 through the ARM tree, wait until it reaches mainline, 
-> > then push 7 through the pinctrl tree, wait until it reaches mainline, push 8 
-> > through the SH tree and 9 through the ARM tree, wait until they reach 
-> > mainline, and finally push 10 through the pinctrl tree again. We could even 
-> > push each branch through the tree it belongs to, but I doubt we'll be able to 
-> > push everything during a single merge window.
-> 
-> Ah, ok -- you're suggesting bringing it _all_ in through arm-soc. We
-> can do so, I was of the initial impression from Simon's cover letter
-> that the arch/sh branches would also go through the SH tree.
-> 
-> This seems to be a particularly hairy conversion, given that it touches two
-> architectures that need to be updated in lockstep. I guess we might be just as
-> well off pulling it in as-is (with below exceptions) to get it in.
-> 
-> If you need the same contents in the SH tree due to dependencies and
-> later development, let me know and we can agree on a stable branch that
-> we both pick up in either tree that has all contents.
-> 
-There isn't anything at the moment pending for the SH tree that cares
-about or conflicts with any of this work, so it's ok with me if this all
-goes through arm-soc. If there is any fallout we can take care of it
-later on in the merge window. This would seem to be a saner option than
-attempting to merge half a dozen branches with dependencies on each other
-in precise order, which doesn't leave a lot of time for fixing up
-any residual merge window damage.
+On Tue, 2013-01-22 at 02:24 +0000, Paul Walmsley wrote:
+> Regarding the AM33xx test failures with appended DTBs, it would be very 
+> helpful if especially the TI people could try reproducing the problem.
+> Otherwise it's going to cause problems with merging any new AM33xx 
+> patches, since I won't be able to test them without additional work.  
+> Plus, this is something that used to work up until d01e4afd, so something 
+> isn't right.
+
+Just a guess, but there can be problems when the appended DTB crosses an
+1MB boundary. See this mail for details and a patch:
+http://www.spinics.net/lists/arm-kernel/msg216898.html
+
+Regards,
+Jan
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
