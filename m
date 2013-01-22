@@ -1,63 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Jan 2013 10:32:14 -0800
-Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
- hwmod data
-In-Reply-To: <50FE8C5C.2030409@ti.com>
-References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
- <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
- <20130118171500.GC15361@atomide.com> <50FCF838.6000105@ti.com>
- <50FD5993.5010008@ti.com> <20130121180113.GA22517@atomide.com>
- <50FE8C5C.2030409@ti.com>
-Message-ID: <20130122183213.GN15361@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 22 Jan 2013 11:35:55 -0700
+Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex
+ A9
+In-Reply-To: <1358833924-24535-2-git-send-email-hdoyu@nvidia.com>
+References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
+ <1358833924-24535-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <50FEDC0B.7050604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [130122 04:59]:
-> Hi Tony,
-> 
-> On 01/21/2013 07:01 PM, Tony Lindgren wrote:
-> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [130121 07:09]:
-> >>>
-> >> So I looked at this one with help of Rajendra. We can get rid of the
-> >> IRQ and DMA data(needs DMA biding updates) easily. The address
-> >> space though is needed since hwmod code uses it to setup the
-> >> sysconfig registers.
-> > 
-> > OK great. The address space tinkering in hwmod code should be
-> > moved to be done in the drivers.
-> > 
-> > As discussed earlier, there should be a driver specific reset
-> > function driver_xyz_reset() in the driver header file so the
-> > hwmod code can call it too in a late_initcall if no driver is
-> > loaded.
-> > 
-> >> Extracting that from DT code seems to be really expensive and
-> >> ugly [1]. I am yet to try out DMA lines removal but that seems
-> >> to be doable by pulling Vinod'd DMA engine branch and updating
-> >> DT file.
-> > 
-> > The overhead here does not matter as it should only happen in a
-> > late_initcall and only for some of the drivers. For that to
-> > happen we just need to go through the list of modules not yet
-> > probed. We also need to have some locking in the driver specific
-> > reset function to avoid races with the loadable modules.
-> 
-> Mmm, not really, that address is used by *every* hwmod for sysconfig
-> access. So iterating over every DT nodes for every hwmods seems pretty
-> ugly and un-optimized.
+On 01/21/2013 10:52 PM, Hiroshi Doyu wrote:
+> Skip scu_enable(scu_base) if CPU is not Cortex A9 with SCU.
 
-I think you missed one point. Iterating over all the modules should
-only happen for the unused modules. With sysconfig access moved to the
-drivers getting the ioaddress is done in the standard way in the driver
-probe instead of iterating over all of them.
- 
-> That being said, it might worth checking the overhead. That will not
-> make the fix nicer anyway, but at least it will allow a smooth
-> transition toward a real clean solution. Assuming someone will work on
-> that later, which might never happen.
+Will, is your for-next/perf branch stable; can I pull it into a branch
+destined for arm-soc? Background below:
 
-Right, so who is going to do all the work needed?
+Uggh.
 
-Regards,
+This patch (2/2) depends on "ARM: tegra: Use DT /cpu node to detect
+number of CPU core" from your Tegra114 series, since that patch removes
+the other use of scu_base, thus allowing this patch to remove that variable.
 
-Tony
+Then, that patch depends on "ARM: Define CPU part numbers and
+implementors" from Will Deacon's ARM perf tree at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-next/perf
+
+That means that in order to put this series into arm-soc, we would have
+to pull in Will's perf branch first, then the following Tegra patches,
+the latter two of which are already in Tegra's for-next, so I'd have to
+pull them out:
+
+0bb7bd9 ARM: tegra: Use DT /cpu node to detect number of CPU core
+a8f5f25 ARM: tegra: Add CPU nodes to Tegra30 device tree
+9975516 ARM: tegra: Add CPU nodes to Tegra20 device tree
+
+Hiroshi, it would be extremely useful if you could explicitly specify
+the dependencies of your series when posting them; it took me a long
+time and a lot of searching to track all the dependencies down. :-(
