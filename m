@@ -1,32 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 22 Jan 2013 11:49:59 -0700
-Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex
- A9
-In-Reply-To: <20130122184633.GI2153@mudshark.cambridge.arm.com>
-References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
- <1358833924-24535-2-git-send-email-hdoyu@nvidia.com>
- <50FEDC0B.7050604@wwwdotorg.org>
- <20130122184633.GI2153@mudshark.cambridge.arm.com>
-Message-ID: <50FEDF57.1060204@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 22 Jan 2013 10:54:32 -0800
+Subject: [PATCH] clk: tegra: add KBC clock for Tegra20
+In-Reply-To: <50FED9BD.5060907@wwwdotorg.org>
+References: <1357946262-25823-1-git-send-email-swarren@wwwdotorg.org>
+ <20130122182340.24671.64241@quantum> <50FED9BD.5060907@wwwdotorg.org>
+Message-ID: <20130122185432.24671.78856@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 11:46 AM, Will Deacon wrote:
-> Hi Stephan,
+Quoting Stephen Warren (2013-01-22 10:26:05)
+> On 01/22/2013 11:23 AM, Mike Turquette wrote:
+> > Quoting Stephen Warren (2013-01-11 15:17:42)
+> >> From: Stephen Warren <swarren@nvidia.com>
+> >>
+> >> This clock has been missing from all our upstream clock drivers. Add it
+> >> by copying the tegra_clk_periph_gate() call from Tegra30; the data
+> >> matches what's in the ChromeOS kernel for this clock.
+> >>
+> >> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
+> >> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >> ---
+> >> Mike, I'd need to apply this to the Tegra tree as part of the common
+> >> clock framework conversion.
+> >>
+> > 
+> > Is this patch going to be rolled into patch 6/9 of the larger tegra ccf
+> > series?
 > 
-> On Tue, Jan 22, 2013 at 06:35:55PM +0000, Stephen Warren wrote:
->> On 01/21/2013 10:52 PM, Hiroshi Doyu wrote:
->>> Skip scu_enable(scu_base) if CPU is not Cortex A9 with SCU.
->>
->> Will, is your for-next/perf branch stable; can I pull it into a branch
->> destined for arm-soc? Background below:
-> 
-> I'm going to send a pull request to Russell tomorrow using my for-rmk/perf
-> branch, so *that* is stable. You might, however, want to wait for Russell to
-> push that out because it's also needed for kvm and, as such, will need to
-> be published anyway.
-> 
-> Sound ok?
+> In the latest Tegra CCF series that I posted, I've rolled all these
+> small fixes in already.
 
-I'm assuming rmk's branch will be a stable base, so that sounds great,
-thanks.
+Right, I just realized that there is a V6 but it has only the three
+patches affecting drivers/clk/* instead of the larger nine patch series.
+Scanning my inbox I mistakenly thought those were unrelated series.
+
+Regards,
+Mike
