@@ -1,34 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Jan 2013 17:55:11 +0100
-Subject: [PATCH 1/6] arm: mvebu: Add support for local interrupt
-In-Reply-To: <50FE572F.4090402@free-electrons.com>
-References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
- <1358790842-2986-2-git-send-email-gregory.clement@free-electrons.com>
- <20130121191744.0a04b941@skate>
- <50FDBC0E.1030706@free-electrons.com>
- <20130121232637.GA3412@localhost>
- <50FE572F.4090402@free-electrons.com>
-Message-ID: <20130122175511.59edb8b4@skate>
+From: pistol@cs.duke.edu (Valentin Pistol)
+Date: Tue, 22 Jan 2013 12:11:11 -0500
+Subject: ARM: hw_breakpoint mismatch breakpoint behaves unexpectedly like
+ a match breakpoint on ARM_DEBUG_ARCH_V7_ECP14
+In-Reply-To: <20130122093102.GC12295@mudshark.cambridge.arm.com>
+References: <CAPfQmKJaYf6M4iHKuNcHgYZi5R8M7fXdXta34Q=1C0cHKimkyQ@mail.gmail.com>
+ <20130122093102.GC12295@mudshark.cambridge.arm.com>
+Message-ID: <CAPfQmK+mwx39J5yWiLCTWbiFL=yL-rw=XZXRkOwGU_byQsDyQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+> The ptrace interface doesn't support mismatch breakpoints, and ignores those
+> bits in the user request, hence why you see a normal breakpoint being
+> created. Note that mismatch breakpoints are used internally for stepping
+> over breakpoints set by perf.
+>
+> If you wanted to add single-step using mismatch breakpoints, I think we'd be
+> better off re-introducing the SINGLESTEP ptrace request for ARM to use
+> hw_breakpoints.
 
-On Tue, 22 Jan 2013 10:09:03 +0100, Gregory CLEMENT wrote:
+I noticed your old Feb 2011 post on SINGLESTEP being removed:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/041408.html
 
-> You're right!
-> I would have liked to say I have done it on purpose, but in fact these
-> braces are here only because during development I had had multiples lines
-> inside the else.
-> However, as you pointed it, I will keep it.
+So it was managing its own breakpoints and instruction decoding (like
+gdb would) but didn't take advantage of either mismatch support or
+hw_breakpoints?
 
-ACK, fine. Didn't know about this specific point of the CodingStyle.
+Such support seems really useful and yet much more simple if mismatch
+is supported.
+I definitely would like to use the ptrace and hw-breakpoints interface
+instead of avoiding and writing it from scratch, as it takes care of a
+lot of details, for instance SMP and context switches, uninstalling
+and installing the breakpoints as required.
 
-Best regards,
+I'm wondering how pervasive the required changes are to support
+SINGLESTEP with mismatch breakpoints.
+If you think it's a good idea I'm very willing to try and add-in such support.
+Please let me know if there's some obvious issues about going forward
+with this that you may be aware of.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks so much!
+
+Valentin
