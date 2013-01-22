@@ -1,36 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Jan 2013 10:53:42 +0100
-Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into the
- driver
-In-Reply-To: <20130122090000.GH6857@gmail.com>
-References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
- <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
- <20130122090000.GH6857@gmail.com>
-Message-ID: <CACRpkdatTagYaMqvpe-a8zj_kO3Twjn1r4SqPty8DosNmcxJcQ@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 22 Jan 2013 17:55:15 +0800
+Subject: [PATCH v7 08/15] gpio: pl061: bind pinctrl by gpio request
+In-Reply-To: <CACRpkdbgRY9CcdRAVVaVAq57hF1cTf7LMOqneNwcz+VtpFDcUg@mail.gmail.com>
+References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358494279-16503-9-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdZo6mVSaHBr6PJt8QCkiKp-Vs7mWup8n=4zyacRwf8V3g@mail.gmail.com>
+ <CAD6h2NQm+VoUv9tDSoHv3Xs8RtuCt5A+_DCBx6bh-d3WP3PK=w@mail.gmail.com>
+ <CACRpkdbgRY9CcdRAVVaVAq57hF1cTf7LMOqneNwcz+VtpFDcUg@mail.gmail.com>
+Message-ID: <CAD6h2NQM6=wZ5k7p9yhF3oWGQGBcsn+gt3J0+JVxx7wKYaKEJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 10:00 AM, Lee Jones <lee.jones@linaro.org> wrote:
-
->> From: Lee Jones <lee.jones@linaro.org>
+On 22 January 2013 17:10, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Jan 21, 2013 at 4:45 PM, Haojian Zhuang
+> <haojian.zhuang@linaro.org> wrote:
+>
+>>> > +       pinctrl_request_gpio(gpio);
+>>>
+>>> Handling of error code?
+>>>
+>>> (Maybe I should add a __must_check on this function.)
+>>>
+>> My case is a little special. I don't want to check return value because some
+>> gpio pins don't have pinmux registers in Hisilicon SoC.
+>> So pinctrl_request_gpio() will always return error for these special pins in
+>> Hisilicon SoC.
 >>
->> There are currently two instances of the ios_handler being used.
->> Both of which mearly toy with some regulator settings. Now there
->> is a GPIO regulator API, we can use that instead, and lessen the
->> per platform burden. By doing this, we also become more Device
->> Tree compatible.
+>> If we must check the return value, maybe we need append a dummy pinctrl driver
+>> for those special gpio pins. How do you think about it? Of course, I
+>> need to evaluate
+>> whether it's possible to implement.
 >
-> Russell,
+> Hm. A dummy pinctrl back-end is not very elegant.
 >
-> Why is this patch in your tree with Ulf as the Author?
+> It's better if the GPIO driver (gpio-pl061) keep track of the ranges that
+> are connected to the pinctrl.
+>
+> If the ranges are encoded in the device tree (as I guess you want to do
+> in this case) then the GPIO driver need to check these ranges to see if
+> it uses a pinctrl backend. Magic behind-the-scenes is very hard to
+> understand for people reading this code later.
+>
+> What about this:
+>
+> In gpiolib.c, function gpiochip_add_pin_range(), we save a copy of
+> each range in &chip->pin_ranges.
+>
+> Add a function to gpiolib.c to check if a certain gpio is in the range
+> of the current chip.
+>
+> Then use that:
+>
+> if (gpio_in_pinrange(gpio))
+>     pinctrl_request_gpio(gpio);
+>
+> Yours,
+> Linus Walleij
 
-This is because of the way Russell's patch tracker works, it sets
-Author: to the name of the person using the patch tracker and
-discards the From: field in the beginning of the patch which
-git am will conversely respect.
+It seems better. I'll update it.
 
-If you need authorship preserved each author need to submit the
-patch to the patch tracker individually, as author.
-
-Yours,
-Linus Walleij
+Regards
+Haojian
