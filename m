@@ -1,32 +1,41 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Tue, 22 Jan 2013 13:50:15 +0100
-Subject: [RFC v2 16/18] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ECF118E@DBDE01.ent.ti.com>
- (Vaibhav Bedia's message of "Mon, 21 Jan 2013 10:37:06 +0000")
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-17-git-send-email-vaibhav.bedia@ti.com>
- <87ip6vlwaf.fsf@dell.be.48ers.dk>
- <B5906170F1614E41A8A28DE3B8D121433ECF118E@DBDE01.ent.ti.com>
-Message-ID: <87sj5t4c1k.fsf@dell.be.48ers.dk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Jan 2013 13:55:33 +0100
+Subject: [PATCH v7 09/15] gpio: pl061: set initcall level to module init
+In-Reply-To: <20130122104107.GJ23505@n2100.arm.linux.org.uk>
+References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358494279-16503-10-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdb=vf5s-XmfYYn5W-BjeNaf9vw6-sDSH6VDC41PBX0rdQ@mail.gmail.com>
+ <1358785488.6590.33.camel@hornet>
+ <CACRpkdY4MHLjs1Lnj+8Ts6oZOjG14pDssCQ09PX-a_5nGRs1sg@mail.gmail.com>
+ <20130122104107.GJ23505@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZfntdciJfNjX2vYPsNQTm+nxOPpSv4tvu=HMAYE74NvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "V" == Bedia, Vaibhav <vaibhav.bedia@ti.com> writes:
+On Tue, Jan 22, 2013 at 11:41 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 22, 2013 at 10:42:11AM +0100, Linus Walleij wrote:
+>> On Mon, Jan 21, 2013 at 5:24 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+>>
+>> > Hm. Doesn't this make the MMCI probing depending on the module_init
+>> > order? As in: wouldn't it make the mmci probe completely fail (not even
+>> > defer it) if it was called before the pl061? In that case even your,
+>> > Linus, hack with inverting the CD status wouldn't work...
+>>
+>> According to Haojian it works, but for sure the MMCI driver *should*
+>> (on the eternal list of SHOULDDO) bail out and return any
+>
+> Rather than talking about what should and should not, why not look at
+> the code - it only takes a few moments to check what the behaviour
+> would be.  And it is correct - errors are correctly propagated out of
+> the probe function.
 
-Hi,
+OK good!
 
- V> +	memcpy((void *)wkup_m3_context->code, fw->data, fw->size);
- >> 
- >> A size check would be good. I don't know much about the finer details
- >> about the m3 and how it is connected, but don't you need to ensure data
- >> is flushed before resetting the m3?
- >> 
+> That's hardly surprising given who's supposed to be the maintainer of
+> that driver.
 
- V> Will add the reg property in the next version. The wkup-m3 memory is
- V> coming via ioremap() so AFAIK it should be ok. I realized that I do
- V> need to replace the memcpy() with memcpy_toio() here.
+Aouh that hurt! ;-)
 
-Ok, thanks.
-
--- 
-Bye, Peter Korsgaard
+Thanks Russell,
+Linus Walleij
