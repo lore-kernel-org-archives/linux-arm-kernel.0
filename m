@@ -1,31 +1,47 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Jan 2013 10:41:07 +0000
-Subject: [PATCH v7 09/15] gpio: pl061: set initcall level to module init
-In-Reply-To: <CACRpkdY4MHLjs1Lnj+8Ts6oZOjG14pDssCQ09PX-a_5nGRs1sg@mail.gmail.com>
-References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
- <1358494279-16503-10-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdb=vf5s-XmfYYn5W-BjeNaf9vw6-sDSH6VDC41PBX0rdQ@mail.gmail.com>
- <1358785488.6590.33.camel@hornet>
- <CACRpkdY4MHLjs1Lnj+8Ts6oZOjG14pDssCQ09PX-a_5nGRs1sg@mail.gmail.com>
-Message-ID: <20130122104107.GJ23505@n2100.arm.linux.org.uk>
+Date: Tue, 22 Jan 2013 10:37:23 +0000
+Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into
+ the driver
+In-Reply-To: <20130122102010.GL6857@gmail.com>
+References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
+ <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
+ <20130122090000.GH6857@gmail.com>
+ <CACRpkdatTagYaMqvpe-a8zj_kO3Twjn1r4SqPty8DosNmcxJcQ@mail.gmail.com>
+ <20130122100607.GH23505@n2100.arm.linux.org.uk>
+ <20130122102010.GL6857@gmail.com>
+Message-ID: <20130122103723.GI23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 10:42:11AM +0100, Linus Walleij wrote:
-> On Mon, Jan 21, 2013 at 5:24 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+On Tue, Jan 22, 2013 at 10:20:10AM +0000, Lee Jones wrote:
+> On Tue, 22 Jan 2013, Russell King - ARM Linux wrote:
 > 
-> > Hm. Doesn't this make the MMCI probing depending on the module_init
-> > order? As in: wouldn't it make the mmci probe completely fail (not even
-> > defer it) if it was called before the pl061? In that case even your,
-> > Linus, hack with inverting the CD status wouldn't work...
+> > On Tue, Jan 22, 2013 at 10:53:42AM +0100, Linus Walleij wrote:
+> > > On Tue, Jan 22, 2013 at 10:00 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > > 
+> > > >> From: Lee Jones <lee.jones@linaro.org>
+> > > >>
+> > > >> There are currently two instances of the ios_handler being used.
+> > > >> Both of which mearly toy with some regulator settings. Now there
+> > > >> is a GPIO regulator API, we can use that instead, and lessen the
+> > > >> per platform burden. By doing this, we also become more Device
+> > > >> Tree compatible.
+> > > >
+> > > > Russell,
+> > > >
+> > > > Why is this patch in your tree with Ulf as the Author?
+> > > 
+> > > This is because of the way Russell's patch tracker works, it sets
+> > > Author: to the name of the person using the patch tracker and
+> > > discards the From: field in the beginning of the patch which
+> > > git am will conversely respect.
+> > 
+> > Actually, the reverse.  It does now respect the From: line, but the
+> > From: line will be ignored for all notifications about the patch
+> > because the patch system was never built to parse the actual comments
+> > when sending out the email notifications.
 > 
-> According to Haojian it works, but for sure the MMCI driver *should*
-> (on the eternal list of SHOULDDO) bail out and return any
+> So what do I have to do to reaffirm myself as the author?
 
-Rather than talking about what should and should not, why not look at
-the code - it only takes a few moments to check what the behaviour
-would be.  And it is correct - errors are correctly propagated out of
-the probe function.
-
-That's hardly surprising given who's supposed to be the maintainer of
-that driver.
+I'd need to recommit the patch with the right information, which isn't
+that easy to do.
