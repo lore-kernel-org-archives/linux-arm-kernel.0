@@ -1,80 +1,52 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Jan 2013 17:31:04 +0530
-Subject: [PATCH] ARM: davinci: da850 evm: pass platform data for adv7343
- encoder
-In-Reply-To: <CA+V-a8t26rMT+Prz-p5627AYiv2Nndr57mxE4E6F9UJ3CkRzng@mail.gmail.com>
-References: <1358237081-2584-1-git-send-email-prabhakar.lad@ti.com>
- <CA+V-a8t26rMT+Prz-p5627AYiv2Nndr57mxE4E6F9UJ3CkRzng@mail.gmail.com>
-Message-ID: <50FE7F80.4060202@ti.com>
+Date: Tue, 22 Jan 2013 17:33:58 +0530
+Subject: [PATCH v5 9/9] ARM: davinci: da850: Added dsp clock definition
+In-Reply-To: <1357863807-380-10-git-send-email-rtivy@ti.com>
+References: <1357863807-380-1-git-send-email-rtivy@ti.com>
+ <1357863807-380-10-git-send-email-rtivy@ti.com>
+Message-ID: <50FE802E.2020306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/22/2013 5:27 PM, Prabhakar Lad wrote:
-> Sekhar,
+Rob,
+
+On 1/11/2013 5:53 AM, Robert Tivy wrote:
+> Added dsp clock definition, keyed to "davinci-rproc.0".
 > 
-> On Tue, Jan 15, 2013 at 1:34 PM, Lad, Prabhakar
-> <prabhakar.csengg@gmail.com> wrote:
->> Without this patch the adv7343 encoder was being set to default
->> configuration which caused display not to work on this board.
->> This patch passes the necessary platform data required for adv7343
->> encoder to work on da850 evm.
->>
->> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
->> ---
->>  This patch is dependent on http://patchwork.linuxtv.org/patch/16272/
->>
-> Since this patch depends on media [1] , I would like to get this patch
-> through media tree as fix for 3.8. Could you review and ACK it ?
+> Signed-off-by: Robert Tivy <rtivy@ti.com>
+> ---
+>  arch/arm/mach-davinci/da850.c |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 097fcb2..50107c5 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -375,6 +375,14 @@ static struct clk sata_clk = {
+>  	.flags		= PSC_FORCE,
+>  };
+>  
+> +static struct clk dsp_clk = {
+> +	.name		= "dsp",
+> +	.parent		= &pll0_sysclk1,
+> +	.domain		= DAVINCI_GPSC_DSPDOMAIN,
+> +	.lpsc		= DA8XX_LPSC0_GEM,
+> +	.flags		= PSC_LRST,
+> +};
+> +
+>  static struct clk_lookup da850_clks[] = {
+>  	CLK(NULL,		"ref",		&ref_clk),
+>  	CLK(NULL,		"pll0",		&pll0_clk),
+> @@ -421,6 +429,7 @@ static struct clk_lookup da850_clks[] = {
+>  	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+>  	CLK("vpif",		NULL,		&vpif_clk),
+>  	CLK("ahci",		NULL,		&sata_clk),
+> +	CLK("davinci-rproc.0",	NULL,		&dsp_clk),
 
-The patch looks good to me. Feel free to add my
-
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-
-and merge through the media tree to ease the dependencies.
+Adding this clock node without the having the driver probed leads to
+kernel hang while booting. With CONFIG_DAVINCI_RESET_CLOCKS=n, the
+kernel boot fine. It looks like there is some trouble disabling the
+clock if it is not used. Can you please check this issue?
 
 Thanks,
 Sekhar
-
-> 
-> [1] http://patchwork.linuxtv.org/patch/16391/
-> 
-> Regards,
-> --Prabhakar
-> 
->>  arch/arm/mach-davinci/board-da850-evm.c |   13 +++++++++++++
->>  1 files changed, 13 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
->> index 0299915..d0e3ec3 100644
->> --- a/arch/arm/mach-davinci/board-da850-evm.c
->> +++ b/arch/arm/mach-davinci/board-da850-evm.c
->> @@ -1256,11 +1256,24 @@ static struct vpif_capture_config da850_vpif_capture_config = {
->>  };
->>
->>  /* VPIF display configuration */
->> +
->> +static struct adv7343_platform_data adv7343_pdata = {
->> +       .mode_config = {
->> +               .dac_3 = 1,
->> +               .dac_2 = 1,
->> +               .dac_1 = 1,
->> +       },
->> +       .sd_config = {
->> +               .sd_dac_out1 = 1,
->> +       },
->> +};
->> +
->>  static struct vpif_subdev_info da850_vpif_subdev[] = {
->>         {
->>                 .name = "adv7343",
->>                 .board_info = {
->>                         I2C_BOARD_INFO("adv7343", 0x2a),
->> +                       .platform_data = &adv7343_pdata,
->>                 },
->>         },
->>  };
->> --
->> 1.7.4.1
->>
-> 
-> 
