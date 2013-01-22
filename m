@@ -1,47 +1,79 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 22 Jan 2013 14:08:12 +0100
-Subject: [GIT PULL v2] arm-soc: Xilinx zynq timer changes for v3.9
-Message-ID: <CAHTX3d+qeKPT3YYG3=YgWYN5YTS1oT9HoTEpVwC4GZAYve5uYw@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 22 Jan 2013 18:44:03 +0530
+Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
+ hwmod data
+In-Reply-To: <20130121180113.GA22517@atomide.com>
+References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
+ <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
+ <20130118171500.GC15361@atomide.com> <50FCF838.6000105@ti.com>
+ <50FD5993.5010008@ti.com> <20130121180113.GA22517@atomide.com>
+Message-ID: <50FE909B.1020001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Hi Tony,
 
-please pull these timer changes to your arm-soc tree.
-As Arnd suggested this branch v2 is based on timer/cleanup and
-clocksource/cleanup arm-soc branches.
-There was one conflict with arch/arm/mach-pxa/time.c which I have resolved
-like Olof in the patch "Merge branch 'clocksource/cleanup' into next/cleanup"
-(sha1: 8d84981e395850aab31c3f2ca7e2738e03f671d7).
-(Also changed indentation in the pxa timer driver as Olof has done)
+>> So I looked at this one with help of Rajendra. We can get rid of the
+>> IRQ and DMA data(needs DMA biding updates) easily. The address
+>> space though is needed since hwmod code uses it to setup the
+>> sysconfig registers.
+>
+> OK great. The address space tinkering in hwmod code should be
+> moved to be done in the drivers.
+>
+> As discussed earlier, there should be a driver specific reset
+> function driver_xyz_reset() in the driver header file so the
+> hwmod code can call it too in a late_initcall if no driver is
+> loaded.
 
-Arnd also mentioned to move this timer driver to drivers/clocksource
-(+ use the new infrastructure introduced there) but this
-need to be a separate patch which must be reviewed first.
+I am a little confused with what you are saying. The hwmod doing
+reset of modules (and not relying on drivers doing it) was
+mainly for modules which do not have drivers built in (and hence
+run a risk of gating system sleep in case the bootloaders left
+them in a bad state).
+But if the drivers aren't built in (or are built as modules) *then*
+hwmod still needs to be able to do reset (maybe in a late_initcall) of
+these modules on its own (because there is no driver code to do it).
 
-Please let me know if I miss something.
+The other big reason why hwmod would need the address space
+tinkering is because it also controls the various OCP master/slave
+modes of these modules. Quite often these modes are broken and
+need tinkering every time the module is enable/idled and also
+need to be restored back to sane values (smart_idle/smart_standby)
+post reset. All of this is today handled as part of hwmod and
+would defeat the whole purpose of the framework if all this is
+moved into drivers.
 
-Thanks,
-Michal
+So completely getting rid of all address space tinkering in hwmod
+looks really difficult.
 
-The following changes since commit 05ed8a3e5c3a48b5b63305920f88da94d9272b36:
-  Michal Simek (1):
-        Merge branch 'clocksource/cleanup' into zynq/timer
+regards,
+Rajendra
 
-are available in the git repository at:
-
-  git://git.xilinx.com/linux-xlnx.git zynq/timer
-
-Soren Brinkmann (7):
-      arm: zynq: timer: Replace PSS through PS
-      arm: zynq: timer: Remove unnecessary register write
-      arm: zynq: timer: Remove unused #defines
-      arm: zynq: timer: Align columns
-      arm: zynq: timer: Remove redundant #includes
-      arm: zynq: timer: Fix comment style
-      arm: zynq: timer: Set clock_event cpumask
-
- arch/arm/mach-zynq/common.c |    2 +-
- arch/arm/mach-zynq/common.h |    2 +-
- arch/arm/mach-zynq/timer.c  |  150 ++++++++++++++++++++----------------------
- 3 files changed, 73 insertions(+), 81 deletions(-)
+>
+>> Extracting that from DT code seems to be really expensive and
+>> ugly [1]. I am yet to try out DMA lines removal but that seems
+>> to be doable by pulling Vinod'd DMA engine branch and updating
+>> DT file.
+>
+> The overhead here does not matter as it should only happen in a
+> late_initcall and only for some of the drivers. For that to
+> happen we just need to go through the list of modules not yet
+> probed. We also need to have some locking in the driver specific
+> reset function to avoid races with the loadable modules.
+>
+>> Whats your suggestion on address space part ?
+>
+> Let's add the code to hwmod to extract it from DT so hwmod code
+> can call the driver specific reset function defined in the driver
+> header. That way we can start moving the driver code out of hwmod
+> one driver at a time.
+>
+> Note that the ioremapping should be done in the driver specific
+> reset function, not in hwmod code. We just need to pass the
+> iorange in a struct resource to the driver specific reset function.
+>
+> Regards,
+>
+> Tony
+>
