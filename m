@@ -1,63 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Jan 2013 12:40:54 -0800
-Subject: [PATCH v2 3/3] arm: omap2: gpmc: add DT bindings for OneNAND
-In-Reply-To: <CALF0-+XdsKvJJpmxZEYXyhTZksgKRoAJ4TcyPV+G9WUbb7Dt_g@mail.gmail.com>
-References: <1358634477-25868-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1358634477-25868-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130121123020.GI15707@e106331-lin.cambridge.arm.com>
- <CALF0-+VOxtsfQLZCGujvjMrsGacbfVTMytRUX=CfKa3+FgnU1w@mail.gmail.com>
- <20130121183348.GI22517@atomide.com>
- <af696cd0-8a7f-4839-9600-87d5b9172585@email.android.com>
- <CALF0-+WvfyygnV5A=E8UGc=zp9pab79FzJRe1KywjPw-B4UGZA@mail.gmail.com>
- <20130122182749.GM15361@atomide.com>
- <CALF0-+XdsKvJJpmxZEYXyhTZksgKRoAJ4TcyPV+G9WUbb7Dt_g@mail.gmail.com>
-Message-ID: <20130122204053.GT22517@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Jan 2013 14:46:49 -0600
+Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
+ Armada 370/XP
+In-Reply-To: <201301212044.41865.arnd@arndb.de>
+References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
+ <201301211831.45947.arnd@arndb.de>
+ <CAKGA1b=9WQNwHOz=k13XVc=MyZT1UrcaYj8muF2A5B4eJA5+MA@mail.gmail.com>
+ <201301212044.41865.arnd@arndb.de>
+Message-ID: <50FEFAB9.4030503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ezequiel Garcia <elezegarcia@gmail.com> [130122 11:46]:
-> On Tue, Jan 22, 2013 at 3:27 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Ezequiel Garcia <elezegarcia@gmail.com> [130122 10:17]:
-> >> On Mon, Jan 21, 2013 at 10:32 PM, Daniel Mack <zonque@gmail.com> wrote:
-> >> >
-> >> > I'm currently far away from my computer and can't prepare a patch for this, sorry. But I think you are right, so please just submit a patch for that, anyone :-)
-> >> >
-> >>
-> >> Ok, I'll try to submit a patch as soon as possible. If anyone wants to
-> >> do it instead, fine by me.
-> >
-> > No please go ahead as it seems that you can easily test it too.
-> >
-> 
-> No problem.
-> 
-> I now wonder if it's okey to exit upon probe failure.
-> In particular, the for_each should be like this:
-> 
->         for_each_node_by_name(child, "nand") {
->                 ret = gpmc_probe_nand_child(pdev, child);
->                 if (ret < 0) {
->                         of_node_put(child);
->                         return ret;
->                 }
->         }
-> 
-> or like this:
-> 
->         for_each_node_by_name(child, "nand") {
->                 ret = gpmc_probe_nand_child(pdev, child);
->                 WARN_ON(ret < 0);
->         }
-> 
-> Ideas?
+On 01/21/2013 02:44 PM, Arnd Bergmann wrote:
 
-Well I would return and make sure the resources are freed.
+>> On multiplatform kernels where at least one arch has TWD support, it
+>> will be included, and where not, it will not.
+>>
+>> It doesn't seem logical for a feature descriptor (HAVE_ARM_TWD) to
+>> rely on greater knowledge of what platforms may or may not support it.
+>> If we had to include every platform in that list it would be unwieldy.
+> 
+> I would expect that all future platforms have ARM_TWD, so the list
+> of the platforms that don't is not going to grow much, but the list
+> of platforms that do will keep growing.
 
-However, if this relates to using bootloader configured values
-for the few cases where we don't have the timing information
-for calculations available, then just doing a warning is
-the way to go.
+No, I expect all future platforms will have architected timers. TWD is
+pretty much A9 and A5 only I believe. Same with SCU. I've probably
+missed some in my list.
 
-Regards,
-
-Tony
+Rob
