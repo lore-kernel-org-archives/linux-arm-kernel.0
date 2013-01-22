@@ -1,43 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 22 Jan 2013 22:10:25 +0100
-Subject: [PATCH v3 3/3] arm: mvebu: enable gpio expander over i2c on Mirabox
- platform
-In-Reply-To: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1358889025-8530-4-git-send-email-gregory.clement@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jan 2013 21:19:23 +0000
+Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
+ Armada 370/XP
+In-Reply-To: <50FEFAB9.4030503@gmail.com>
+References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
+ <201301212044.41865.arnd@arndb.de> <50FEFAB9.4030503@gmail.com>
+Message-ID: <201301222119.23750.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Globalscale Mirabox platform can be connected to the JTAG/GPIO box
-through the Multi-IO port. The GPIO box use the NXP PCA9505 I/O port
-expansion IC to provide 40-bit parallel input/output GPIOs. This patch
-enable the use of this expander on the Mirabox.
+On Tuesday 22 January 2013, Rob Herring wrote:
+> No, I expect all future platforms will have architected timers. TWD is
+> pretty much A9 and A5 only I believe. Same with SCU. I've probably
+> missed some in my list.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/armada-370-mirabox.dts |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+Ah, I was incorrectly assuming that TWD was referring to the architected
+timers, sorry about that.
 
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index 3b40713..d9b32d3 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -52,5 +52,15 @@
- 			phy = <&phy1>;
- 			phy-mode = "rgmii-id";
- 		};
-+		i2c at d0011000 {
-+			status = "okay";
-+			clock-frequency = <100000>;
-+			pca9505: pca9505 at 25 {
-+				compatible = "nxp,pca9505";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x25>;
-+			};
-+		};
- 	};
- };
--- 
-1.7.9.5
+Maybe we should do this differently then and do the more logical
+
+config LOCAL_TIMERS
+	bool
+
+config ARM_TWD
+	bool "ARM TWD local timer"
+	depends on SMP && CPU_V7
+	select LOCAL_TIMERS
+
+config EXYNOS4_MCT
+	bool "Samsung Exynos4 MCT Timer"
+	depends on SMP && ARCH_EXYNOS
+	select LOCAL_TIMERS
+
+config MSM_LOCAL_TIMER
+	bool "Qualcomm MSM Local Timer"
+	depends on SMP && ARCH_MSM
+	select LOCAL_TIMERS
+
+That way we have no implicit assumptions. Everything will still work if you
+disable local timers, but of course we will enable them in the defconfigs.
+
+	Arnd
