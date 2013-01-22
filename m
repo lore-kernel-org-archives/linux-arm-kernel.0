@@ -1,26 +1,32 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 22 Jan 2013 15:54:21 -0500
-Subject: [PATCH v5 01/45] percpu_rwlock: Introduce the global
- reader-writer lock backend
-In-Reply-To: <50FEEF5D.6080302@linux.vnet.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073315.13822.27093.stgit@srivatsabhat.in.ibm.com>
- <1358883152.21576.55.camel@gandalf.local.home>
- <50FEEF5D.6080302@linux.vnet.ibm.com>
-Message-ID: <1358888061.21576.57.camel@gandalf.local.home>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 22 Jan 2013 22:00:27 +0100
+Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
+In-Reply-To: <201301221538.55975.arnd@arndb.de>
+References: <Pine.LNX.4.44L0.1301221011190.1510-100000@iolanthe.rowland.org>
+ <201301221538.55975.arnd@arndb.de>
+Message-ID: <20130122210027.GN1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-23 at 01:28 +0530, Srivatsa S. Bhat wrote:
-
-> > I thought global locks are now fair. That is, a reader will block if a
-> > writer is waiting. Hence, the above should deadlock on the current
-> > rwlock_t types.
-> > 
+On Tue, Jan 22, 2013 at 03:38:55PM +0000, Arnd Bergmann wrote:
+> On Tuesday 22 January 2013, Alan Stern wrote:
+> > In order to prevent this, you have to make sure that each glue driver
+> > depends on USB_ARCH_HAS_EHCI.  A simple way to do this is to surround
+> > the Kconfig entries for those drivers with "if USB && 
+> > USB_ARCH_HAS_EHCI" ... "endif".
 > 
-> Oh is it? Last I checked, lockdep didn't complain about this ABBA scenario!
+> I was actually thinking we could remove the use of USB_ARCH_HAS_EHCI
+> as well once we have inverted the logic for selecting USB_EHCI_HCD,
+> but there is another problem with that, because then we still need
+> something to select USB_ARCH_HAS_HCD, or kill that symbol as well.
 
-It doesn't and Peter Zijlstra said we need to fix that ;-)  It only
-recently became an issue with the new "fair" locking of rwlocks.
++1 for killing it. Such symbols get more and more meaningless anyway
+with multiarch kernels-
 
--- Steve
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
