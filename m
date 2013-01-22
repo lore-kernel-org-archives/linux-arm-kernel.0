@@ -1,35 +1,49 @@
-From: jussi.kivilinna@mbnet.fi (Jussi Kivilinna)
-Date: Tue, 22 Jan 2013 09:46:14 +0200
-Subject: [PATCH] crypto: fix FTBFS with ARM SHA1-asm and THUMB2_KERNEL
-In-Reply-To: <CAKGA1bkQ9e8gmSPz_4csJWjEOKj3ZVqSLijSTRWxgDSaZoYqCA@mail.gmail.com>
-References: <1358787763-1226-1-git-send-email-matt@genesi-usa.com>
- <alpine.LFD.2.02.1301211739470.6300@xanadu.home>
- <CAKGA1bkQ9e8gmSPz_4csJWjEOKj3ZVqSLijSTRWxgDSaZoYqCA@mail.gmail.com>
-Message-ID: <20130122094614.79031aq5ddrgr2zo@www.dalek.fi>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Tue, 22 Jan 2013 13:14:35 +0530
+Subject: [PATCH v5 42/45] tile: Use get/put_online_cpus_atomic() to prevent
+ CPU offline
+In-Reply-To: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20130122074430.13822.27480.stgit@srivatsabhat.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Matt Sealey <matt@genesi-usa.com>:
+Once stop_machine() is gone from the CPU offline path, we won't be able to
+depend on preempt_disable() or local_irq_disable() to prevent CPUs from
+going offline from under us.
 
-> This question is to the implementor/committer (Dave McCullough), how
-> exactly did you measure the benchmark and can we reproduce it on some
-> other ARM box?
->
-> If it's long and laborious and not so important to test the IPsec
-> tunnel use-case, what would be the simplest possible benchmark to see
-> if the C vs. assembly version is faster for a particular ARM device? I
-> can get hold of pretty much any Cortex-A8 or Cortex-A9 that matters, I
-> have access to a Chromebook for A15, and maybe an i.MX27 or i.MX35 and
-> a couple Marvell boards (ARMv6) if I set my mind to it... that much
-> testing implies we find a pretty concise benchmark though with a
-> fairly common kernel version we can spread around (i.MX, OMAP and the
-> Chromebook, I can handle, the rest I'm a little wary of bothering to
-> spend too much time on). I think that could cover a good swath of
-> not-ARMv5 use cases from lower speeds to quad core monsters.. but I
-> might stick to i.MX to start with..
+Use the get/put_online_cpus_atomic() APIs to prevent CPUs from going offline,
+while invoking from atomic context.
 
-There is 'tcrypt' module in crypto/ for quick benchmarking. 'modprobe  
-tcrypt mode=500 sec=1' tests AES in various cipher-modes, using  
-different buffer sizes and outputs results to kernel log.
+Cc: Chris Metcalf <cmetcalf@tilera.com>
+Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+---
 
--Jussi
+ arch/tile/kernel/smp.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/tile/kernel/smp.c b/arch/tile/kernel/smp.c
+index cbc73a8..fb30624 100644
+--- a/arch/tile/kernel/smp.c
++++ b/arch/tile/kernel/smp.c
+@@ -15,6 +15,7 @@
+  */
+ 
+ #include <linux/smp.h>
++#include <linux/cpu.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
+@@ -82,9 +83,12 @@ void send_IPI_many(const struct cpumask *mask, int tag)
+ void send_IPI_allbutself(int tag)
+ {
+ 	struct cpumask mask;
++
++	get_online_cpus_atomic();
+ 	cpumask_copy(&mask, cpu_online_mask);
+ 	cpumask_clear_cpu(smp_processor_id(), &mask);
+ 	send_IPI_many(&mask, tag);
++	put_online_cpus_atomic();
+ }
+ 
+ /*
