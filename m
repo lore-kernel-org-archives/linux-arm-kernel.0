@@ -1,29 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 Jan 2013 22:44:01 +0800
-Subject: [GIT PULL] imx fixes for 3.8, take 3
-Message-ID: <20130122144358.GC2812@S2101-09.ap.freescale.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 22 Jan 2013 16:47:50 +0200
+Subject: [PATCH v1 6/6] USB: MUSB: OMAP: get PHY by phandle for dt boot
+In-Reply-To: <50FEA447.1090701@ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <1358848694-20145-7-git-send-email-kishon@ti.com> <50FE9F5C.2010501@ti.com>
+ <50FEA447.1090701@ti.com>
+Message-ID: <50FEA696.8000506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 83ae20981ae924c37d02a42c829155fc3851260c:
+On 01/22/2013 04:37 PM, kishon wrote:
+> On Tuesday 22 January 2013 07:47 PM, Roger Quadros wrote:
+>> On 01/22/2013 11:58 AM, Kishon Vijay Abraham I wrote:
+>>> The OMAP glue has been modified to get PHY by phandle for dt boot.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>   drivers/usb/musb/omap2430.c |    7 ++++++-
+>>>   1 file changed, 6 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+>>> index 1a8cf6d..e43faeb 100644
+>>> --- a/drivers/usb/musb/omap2430.c
+>>> +++ b/drivers/usb/musb/omap2430.c
+>>> @@ -345,7 +345,12 @@ static int omap2430_musb_init(struct musb *musb)
+>>>        * up through ULPI.  TWL4030-family PMICs include one,
+>>>        * which needs a driver, drivers aren't always needed.
+>>>        */
+>>> -    musb->xceiv = devm_usb_get_phy_dev(dev, 0);
+>>> +    if (dev->parent->of_node)
+>>> +        musb->xceiv = devm_usb_get_phy_by_phandle(dev->parent,
+>>> +            "usb_phy", 0);
+>>> +    else
+>>> +        musb->xceiv = devm_usb_get_phy_dev(dev, 0);
+>>> +
+>>>       if (IS_ERR_OR_NULL(musb->xceiv)) {
+>>>           pr_err("HS USB OTG: no transceiver configured\n");
+>>>           return -ENODEV;
+>>
+>> This will not work with PHY driver as a module. You need to use deferred probing mechanism here
+>> after you have addressed my comment in patch 2 and also devm_usb_get_phy_by_phandle()
+> 
+> IIUC, even using -EPROBE_DEFER might not help if we are making the PHY driver as module, since the kernel will try to probe only till the prompt comes.
+> 
+Oh really? I thought deferred probing takes place whenever a new driver is bound to a device. What does "prompt comes" have to do with it?
 
-  ARM: imx: correct low-power mode setting (2013-01-14 22:19:48 +0800)
 
-are available in the git repository at:
+> And having -EPROBE_DEFER instead of -ENODEV might also not help since, the gadget driver wont be able to bind to UDC (usb_gadget_probe_driver will fail).
+> 
+> A lot of things need to be changed before we change to -EPROBE_DEFER IMO.
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.8-3
+OK.
 
-for you to fetch changes up to e6b267ce14f61d9da0151b97ee26ab4d38055567:
-
-  video: imxfb: Do not crash on reboot (2013-01-17 16:14:29 +0800)
-
-----------------------------------------------------------------
-This is yet another critical imxfb fixes held off by absence of FB
-maintainer for some time.
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      video: imxfb: Do not crash on reboot
-
- drivers/video/imxfb.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+--
+cheers,
+-roger
