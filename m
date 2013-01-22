@@ -1,64 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jan 2013 09:00:00 +0000
-Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into
- the driver
-In-Reply-To: <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
-References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
- <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20130122090000.GH6857@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 22 Jan 2013 10:09:03 +0100
+Subject: [PATCH 1/6] arm: mvebu: Add support for local interrupt
+In-Reply-To: <20130121232637.GA3412@localhost>
+References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
+ <1358790842-2986-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130121191744.0a04b941@skate> <50FDBC0E.1030706@free-electrons.com>
+ <20130121232637.GA3412@localhost>
+Message-ID: <50FE572F.4090402@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Lee Jones <lee.jones@linaro.org>
+On 01/22/2013 12:26 AM, Ezequiel Garcia wrote:
+> Hi Thomas and Gregory,
 > 
-> There are currently two instances of the ios_handler being used.
-> Both of which mearly toy with some regulator settings. Now there
-> is a GPIO regulator API, we can use that instead, and lessen the
-> per platform burden. By doing this, we also become more Device
-> Tree compatible.
-
-Russell,
-
-Why is this patch in your tree with Ulf as the Author?
-
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/mmc/host/mmci.c |    9 +++++++++
->  1 file changed, 9 insertions(+)
+> On Mon, Jan 21, 2013 at 11:07:10PM +0100, Gregory CLEMENT wrote:
+>> On 01/21/2013 07:17 PM, Thomas Petazzoni wrote:
+>>>> +		irq_set_percpu_devid(virq);
+>>>> +		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
+>>>> +					handle_percpu_devid_irq);
+>>>> +
+>>>> +	} else {
+>>>> +		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
+>>>> +					handle_level_irq);
+>>>> +	}
+>>>
+>>> Braces useless since there is only one statement in the else.
+>>>
 > 
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 9da5f24..e56655a 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -1097,6 +1097,11 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  	case MMC_POWER_OFF:
->  		if (!IS_ERR(mmc->supply.vmmc))
->  			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-> +
-> +		if (!IS_ERR(mmc->supply.vqmmc) &&
-> +		    regulator_is_enabled(mmc->supply.vqmmc))
-> +			regulator_disable(mmc->supply.vqmmc);
-> +
->  		break;
->  	case MMC_POWER_UP:
->  		if (!IS_ERR(mmc->supply.vmmc))
-> @@ -1111,6 +1116,10 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  
->  		break;
->  	case MMC_POWER_ON:
-> +		if (!IS_ERR(mmc->supply.vqmmc) &&
-> +		    !regulator_is_enabled(mmc->supply.vqmmc))
-> +			regulator_enable(mmc->supply.vqmmc);
-> +
->  		pwr |= MCI_PWR_ON;
->  		break;
->  	}
+> IMHO, this is an exception to the rule.
+> Since the first block is more than one line,
+> we usually put braces on the single line block too.
+> (or at least that's what Documentation/CodingStyle says).
+> 
+
+You're right!
+I would have liked to say I have done it on purpose, but in fact these
+braces are here only because during development I had had multiples lines
+inside the else.
+However, as you pointed it, I will keep it.
+
+> Regards,
+> 
+
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
