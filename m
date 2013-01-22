@@ -1,44 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 22 Jan 2013 11:04:56 +0000
-Subject: [PATCH] ARM: architected timers: allow dt based discovery
- using clocksource_of_init
-In-Reply-To: <CAJuYYwSfH8jTterd6aNc_Aw81PBschfCUf=REKB35=Y4a=i_7A@mail.gmail.com>
-References: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
- <50FD7904.1070201@wwwdotorg.org>
- <CAJuYYwSfH8jTterd6aNc_Aw81PBschfCUf=REKB35=Y4a=i_7A@mail.gmail.com>
-Message-ID: <20130122110456.GC18876@e106331-lin.cambridge.arm.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Tue, 22 Jan 2013 17:27:51 +0530
+Subject: [PATCH] ARM: davinci: da850 evm: pass platform data for adv7343
+ encoder
+In-Reply-To: <1358237081-2584-1-git-send-email-prabhakar.lad@ti.com>
+References: <1358237081-2584-1-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <CA+V-a8t26rMT+Prz-p5627AYiv2Nndr57mxE4E6F9UJ3CkRzng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 06:30:47PM +0000, Thomas Abraham wrote:
-> Hi Stephen,
-> 
-> On 21 January 2013 09:21, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> > On 01/20/2013 06:22 PM, Thomas Abraham wrote:
-> >> Add an entry in __clksrc_of_table so that ARMv7 architected timer is
-> >> discoverable using call to clocksource_of_init.
-> >
-> >> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-> >
-> >> +#ifdef CONFIG_CLKSRC_OF
-> >> +CLOCKSOURCE_OF_DECLARE(armv7_timer, "arm,armv7-timer", arch_timer_of_register)
-> >> +#endif
-> >
-> > I wonder if we shouldn't enhance include/linux/clocksource.h to define
-> > CLOCKSOURCE_OF_DECLARE even when !CONFIG_CLKSRC_OF; that way, drivers
-> > wouldn't need that ifdef.
-> 
-> Yes, it will be helpful to have a !CONFIG_CLKSRC_OF version of
-> CLOCKSOURCE_OF_DECLARE. And can CONFIG_CLKSRC_OF be enabled by default
-> for all ARM platforms?
-> 
-> Thanks,
-> Thomas.
+Sekhar,
 
-Thomas,
+On Tue, Jan 15, 2013 at 1:34 PM, Lad, Prabhakar
+<prabhakar.csengg@gmail.com> wrote:
+> Without this patch the adv7343 encoder was being set to default
+> configuration which caused display not to work on this board.
+> This patch passes the necessary platform data required for adv7343
+> encoder to work on da850 evm.
+>
+> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+> ---
+>  This patch is dependent on http://patchwork.linuxtv.org/patch/16272/
+>
+Since this patch depends on media [1] , I would like to get this patch
+through media tree as fix for 3.8. Could you review and ACK it ?
 
-Once the above is worked out, could you send me the updated patch with a
-pointer to whichever {branch,patch}(es) I need for CLKSRC_OF?
+[1] http://patchwork.linuxtv.org/patch/16391/
 
-Thanks,
-Mark.
+Regards,
+--Prabhakar
+
+>  arch/arm/mach-davinci/board-da850-evm.c |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 0299915..d0e3ec3 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -1256,11 +1256,24 @@ static struct vpif_capture_config da850_vpif_capture_config = {
+>  };
+>
+>  /* VPIF display configuration */
+> +
+> +static struct adv7343_platform_data adv7343_pdata = {
+> +       .mode_config = {
+> +               .dac_3 = 1,
+> +               .dac_2 = 1,
+> +               .dac_1 = 1,
+> +       },
+> +       .sd_config = {
+> +               .sd_dac_out1 = 1,
+> +       },
+> +};
+> +
+>  static struct vpif_subdev_info da850_vpif_subdev[] = {
+>         {
+>                 .name = "adv7343",
+>                 .board_info = {
+>                         I2C_BOARD_INFO("adv7343", 0x2a),
+> +                       .platform_data = &adv7343_pdata,
+>                 },
+>         },
+>  };
+> --
+> 1.7.4.1
+>
