@@ -1,41 +1,74 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 22 Jan 2013 15:16:34 -0700
-Subject: [PATCH V5 1/3] clk: tegra: add Tegra specific clocks
-In-Reply-To: <20130122212448.24671.89455@quantum>
-References: <1358369575-7325-1-git-send-email-swarren@wwwdotorg.org>
- <20130122212448.24671.89455@quantum>
-Message-ID: <50FF0FC2.6020908@wwwdotorg.org>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 22 Jan 2013 16:36:21 -0600
+Subject: [PATCH 0/4] TI LCDC DRM driver
+Message-ID: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 02:24 PM, Mike Turquette wrote:
-> Quoting Stephen Warren (2013-01-16 12:52:53)
->> From: Prashant Gaikwad <pgaikwad@nvidia.com>
->>
->> Add Tegra specific clocks, pll, pll_out, peripheral, frac_divider, super.
->>
->> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
->> [swarren: alloc sizeof(*foo) not sizeof(struct foo), add comments re:
->> storing pointers to stack variables, make a timeout loop more idiomatic,
->> use _clk_pll_disable() not clk_disable_pll() from _program_pll() to
->> avoid redundant lock operations, unified tegra_clk_periph() and
->> tegra_clk_periph_nodiv(), unified tegra_clk_pll{,e}, rename all clock
->> registration functions so they don't have the same name as the clock
->> structs.]
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> V5: Implemented all changes marked [swarren] in the commit descriptions.
->>
->> Mike, These patches depend on a couple patches in the Tegra tree, and
->> various other Tegra patches depend on them. I'd like to take these through
->> the Tegra tree. Can you please ack or otherwise OK this? Thanks.
->>
-> 
-> For the series, including the updated v6 patch 2/3:
-> 
-> Acked-by: Mike Turquette <mturquette@linaro.org>
+I think this driver is ready to go, so I've removed the 'RFC' tag.  Prove
+me wrong by reviewing the patches and sending comments ;-)
 
-Thanks very much for the review.
+The first patch adds the basic driver and TFP410 DVI output.
 
-I'm working on applying these patches and the other related ARM-side
-patches to the Tegra for-3.9/soc branch as we speak.
+The second patch adds support for NXP TDA998x family of i2c connected
+HDMI encoders.  It is split out into an i2c encoder-slave in case someone
+else has hw with the same HDMI encoder.
+
+The final patch adds support for LCD panels, with timings and panel info
+coming from device-tree.
+
+The patch set has dependencies on the following patches that I have sent
+earlier (which have not changed since then so I am not resending):
+
+ * drm/cma: add debugfs helpers
+ * drm: i2c encoder helper wrappers
+
+In addition, the LCD panel patch also depends on Steffen Trumtrar's OF
+display helper series. I've moved this patch to last so it can be merged
+later if needed.  Although I really see no reason not to merge the OF
+display helper series for 3.9.
+
+These patches and their dependencies can also be found here:
+
+  git://people.freedesktop.org/~robclark/linux tilcdc-next
+  http://cgit.freedesktop.org/~robclark/linux/log/?h=tilcdc-next
+
+Rob Clark (4):
+  drm/tilcdc: add TI LCD Controller DRM driver (v3)
+  drm/i2c: nxp-tda998x (v2)
+  drm/tilcdc: add encoder slave
+  drm/tilcdc: add support for LCD panels (v4)
+
+ drivers/gpu/drm/Kconfig                |   2 +
+ drivers/gpu/drm/Makefile               |   1 +
+ drivers/gpu/drm/i2c/Makefile           |   3 +
+ drivers/gpu/drm/i2c/tda998x_drv.c      | 908 +++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/tilcdc/Kconfig         |  25 +
+ drivers/gpu/drm/tilcdc/Makefile        |  10 +
+ drivers/gpu/drm/tilcdc/tilcdc_crtc.c   | 597 ++++++++++++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_drv.c    | 611 ++++++++++++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_drv.h    | 159 ++++++
+ drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 443 ++++++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_panel.h  |  26 +
+ drivers/gpu/drm/tilcdc/tilcdc_regs.h   | 154 ++++++
+ drivers/gpu/drm/tilcdc/tilcdc_slave.c  | 380 ++++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_slave.h  |  26 +
+ drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 423 +++++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_tfp410.h |  26 +
+ 16 files changed, 3794 insertions(+)
+ create mode 100644 drivers/gpu/drm/i2c/tda998x_drv.c
+ create mode 100644 drivers/gpu/drm/tilcdc/Kconfig
+ create mode 100644 drivers/gpu/drm/tilcdc/Makefile
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_drv.c
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_drv.h
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_panel.c
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_panel.h
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_regs.h
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_slave.c
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_slave.h
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_tfp410.h
+
+-- 
+1.8.1
