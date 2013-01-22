@@ -1,61 +1,32 @@
-From: kishon@ti.com (kishon)
-Date: Tue, 22 Jan 2013 21:46:33 +0530
-Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
-In-Reply-To: <50FEB3FD.3050001@ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
- <50FEB3FD.3050001@ti.com>
-Message-ID: <50FEBB61.9000707@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Jan 2013 17:23:08 +0100
+Subject: [PATCH 0/3] Add framebuffer support to the CFA-10049
+Message-ID: <1358871791-14214-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The CFA-10049 embeds a LCD screen that is using a Himax HX-8357B
+that needs to be initialized through SPI before being able to use
+its RGB interface.
 
-On Tuesday 22 January 2013 09:15 PM, kishon wrote:
-> On Tuesday 22 January 2013 09:11 PM, Koen Kooi wrote:
->>
->> Op 22 jan. 2013, om 10:58 heeft Kishon Vijay Abraham I <kishon@ti.com>
->> het volgende geschreven:
->>
->>> This patch series adds support for adding multiple PHY's (of same type).
->>> The binding information has to be present in the PHY library (otg.c) in
->>> order for it to return the appropriate PHY whenever the USB controller
->>> request for the PHY. So added a new API usb_bind_phy() to pass the
->>> binding
->>> information. This API should be called by platform specific
->>> initialization
->>> code.
->>>
->>> So the binding should be done something like
->>> usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto"); specifying
->>> the USB
->>> controller device name, index, and the PHY device name.
->>> I have done this binding for OMAP platforms, but it should be done for
->>> all the platforms.
->>>
->>> After this design, the phy can be got by passing the USB controller
->>> device
->>> pointer and the index.
->>>
->>> Developed this patch series on
->>> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
->>> after applying "usb: musb: add driver for control module" patch series
->>> and "ARM: dts: omap: add dt data for MUSB"
->>>
->>> Did basic enumeration testing in omap4 panda and omap3 beagle.
->>
->> With this patchset USB completely breaks on am33xx beaglebone, is that
->> intended?
-> Not really.
-> Does am33xx makes use of omap2430.c? Which PHY does am33xx uses?
+This patchset adds a driver for this controller, and the needed
+pieces in the 10049 device tree to enable it.
 
-I figured out it uses drivers/usb/musb/musb_dsps.c (So it doesn't use 
-omap2430.c). I think it uses TWL4030_USB (TPS659x0) as PHY.
+Maxime
 
-Then we need to adapt am33xx to use devm_usb_get_phy_by_phandle.
-I'll see how to do it.
+Maxime Ripard (3):
+  fb: backlight: Add the Himax HX-8357B LCD controller
+  ARM: dts: mxs: Add muxing options for the third PWM
+  ARM: dts: mxs: Add the LCD to the 10049 board
 
-Thank you for testing and reporting it :-)
+ arch/arm/boot/dts/imx28-cfa10049.dts |   99 +++++++
+ arch/arm/boot/dts/imx28.dtsi         |   10 +
+ arch/arm/mach-mxs/mach-mxs.c         |   22 ++
+ drivers/video/backlight/Kconfig      |    7 +
+ drivers/video/backlight/Makefile     |    1 +
+ drivers/video/backlight/hx8357.c     |  482 ++++++++++++++++++++++++++++++++++
+ 6 files changed, 621 insertions(+)
+ create mode 100644 drivers/video/backlight/hx8357.c
 
-Thanks
-Kishon
+-- 
+1.7.10.4
