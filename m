@@ -1,39 +1,23 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 22 Jan 2013 09:27:12 +0100
-Subject: [PATCH V2  0/5] W1: Support onewire master on i.MX53
-In-Reply-To: <20130116145749.24249.678.stgit@localhost>
-References: <20130116145749.24249.678.stgit@localhost>
-Message-ID: <20130122082712.GJ1906@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jan 2013 08:27:54 +0000
+Subject: One of these things (CONFIG_HZ) is not like the others..
+In-Reply-To: <20130121224449.GZ23505@n2100.arm.linux.org.uk>
+References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
+ <50FDBEAC.2050606@linaro.org> <20130121224449.GZ23505@n2100.arm.linux.org.uk>
+Message-ID: <201301220827.55209.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 03:57:49PM +0100, Martin Fuzzey wrote:
-> W1: Support onewire master on i.MX53
-> 	* Add device tree and pinctrl support to the MXC master driver
-> 	* Convert to use devm_
-> 	* Add i.MX53 clocks
-> 	* Add i.MX53 device tree entries
+On Monday 21 January 2013, Russell King - ARM Linux wrote:
+> In this particular case, EBSA110 is not a candidate for multi-arch
+> build anyway, because it's ARMv4 and we're only really bothering with
+> ARMv6 and better.
 > 
-> Changes since V1
-> * Applied comments from Sascha Hauer:
-> 	* Move patch converting driver to devm_ before the one adding devm_ based pinctrl
-> 	* Fix existing unbalanced clk_prepare_enable/clk_disable_unprepare
-> 	in probe error path
-> 
-> * Place DT patch last since it includes pinctrls for driver.
+> Not only that, but the IO stuff on it is sufficiently obscure and
+> non-standard...
 
-This looks good now.
+Right, no point worrying about EBSA110. We need to work out OMAP and
+Exynos/S5P though: As long as OMAP needs 128HZ and Exynos needs 200HZ,
+we can never have them in the same kernel.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-You might have to send this again in two series, one for the w1
-maintainer and one for arm-soc. Both series should be sufficiently
-orthogonal.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
