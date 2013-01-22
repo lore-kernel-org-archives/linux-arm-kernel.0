@@ -1,44 +1,29 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 22 Jan 2013 09:21:58 +0100
-Subject: [PATCH 09/15] media: coda: don't build on multiplatform
-In-Reply-To: <1358788568-11137-10-git-send-email-arnd@arndb.de>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <1358788568-11137-10-git-send-email-arnd@arndb.de>
-Message-ID: <20130122082158.GC9414@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 22 Jan 2013 00:22:58 -0800
+Subject: [GIT PULL] i.MX fixes for -rc
+In-Reply-To: <20130122081656.GI1906@pengutronix.de>
+References: <20130122081656.GI1906@pengutronix.de>
+Message-ID: <CAOesGMi7DUgGCFmdgM4cq1CcBrQ-Pjip0KtPpZdQyR=goHcV9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 05:16:02PM +0000, Arnd Bergmann wrote:
-> The coda video codec driver depends on a mach-imx or mach-mxs specific
-> header file "mach/iram.h". This is not available when building for
-> multiplatform, so let us disable this driver for v3.8 when building
-> multiplatform, and hopefully find a proper fix for v3.9.
-> 
-> drivers/media/platform/coda.c:27:23: fatal error: mach/iram.h: No such file or directory
-
-I just sent a pull request for this with a proper fix.
-
-> 
-> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-> index 3dcfea6..049d2b2 100644
-> --- a/drivers/media/platform/Kconfig
-> +++ b/drivers/media/platform/Kconfig
-> @@ -142,7 +142,7 @@ if V4L_MEM2MEM_DRIVERS
->  
->  config VIDEO_CODA
->  	tristate "Chips&Media Coda multi-standard codec IP"
-> -	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC
-> +	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC && !ARCH_MULTIPLATFORM
-
-This breakage is not multiplatform related at all, it won't compile
-without multiplatform support either. So depends on BROKEN would be
-more appropriate if you want to go this way.
-
-Sascha
+On Tue, Jan 22, 2013 at 12:16 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Arnd, Olof,
+>
+> Please pull the following fix for -rc.
+>
+> Sascha
+>
+> The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+>
+>   Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes-rc
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Pulled, thanks.
+
+
+-Olof
