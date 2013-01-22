@@ -1,82 +1,34 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Tue, 22 Jan 2013 03:12:56 -0300
-Subject: [PATCH 3/3] arm: sunxi: Add useful information about sunxi clocks
-In-Reply-To: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
-References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1358835176-7197-4-git-send-email-emilio@elopez.com.ar>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 22 Jan 2013 11:53:59 +0530
+Subject: One of these things (CONFIG_HZ) is not like the others..
+In-Reply-To: <20130121232322.GK15361@atomide.com>
+References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
+ <201301212041.17951.arnd@arndb.de>
+ <20130121210341.GW23505@n2100.arm.linux.org.uk>
+ <20130121232322.GK15361@atomide.com>
+Message-ID: <50FE307F.9000701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch contains useful bits of information about the sunxi clocks
-that may help and/or be interesting for current and future developers.
+On Tuesday 22 January 2013 04:53 AM, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [130121 13:07]:
+>>
+>> As for Samsung and the rest I can't comment.  The original reason OMAP
+>> used this though was because the 32768Hz counter can't produce 100Hz
+>> without a .1% error - too much error under pre-clocksource
+>> implementations for timekeeping.  Whether that's changed with the
+>> clocksource/clockevent support needs to be checked.
+>
+> Yes that's why HZ was originally set to 128. That value (or some multiple)
+> still makes sense when the 32 KiHZ clock source is being used. Of course
+> we should rely on the local timer when running for the SoCs that have
+> them.
+>
+This is right. It was only because of the drift associated when clocked
+with 32KHz. Even on SOCs where local timers are available for power
+management reasons we need to switch to 32KHz clocked device in
+low power states. Hence the HZ value should be multiple of 32 on
+OMAP.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
- Documentation/arm/sunxi/clocks.txt | 56 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
- create mode 100644 Documentation/arm/sunxi/clocks.txt
-
-diff --git a/Documentation/arm/sunxi/clocks.txt b/Documentation/arm/sunxi/clocks.txt
-new file mode 100644
-index 0000000..e09a88a
---- /dev/null
-+++ b/Documentation/arm/sunxi/clocks.txt
-@@ -0,0 +1,56 @@
-+Frequently asked questions about the sunxi clock system
-+=======================================================
-+
-+This document contains useful bits of information that people tend to ask
-+about the sunxi clock system, as well as accompanying ASCII art when adequate.
-+
-+Q: Why is the main 24MHz oscillator gatable? Wouldn't that break the
-+   system?
-+
-+A: The 24MHz oscillator allows gating to save power. Indeed, if gated
-+   carelessly the system would stop functioning, but with the right
-+   steps, one can gate it and keep the system running. Consider this
-+   simplified suspend example:
-+
-+   While the system is operational, you would see something like
-+
-+      24MHz         32kHz
-+       |
-+      PLL1
-+       \
-+        \_ CPU Mux
-+             |
-+           [CPU]
-+
-+   When you are about to suspend, you switch the CPU Mux to the 32kHz
-+   oscillator:
-+
-+      24Mhz         32kHz
-+       |              |
-+      PLL1            |
-+                     /
-+           CPU Mux _/
-+             |
-+           [CPU]
-+
-+    Finally you can gate the main oscillator
-+
-+                    32kHz
-+                      |
-+                      |
-+                     /
-+           CPU Mux _/
-+             |
-+           [CPU]
-+
-+Q: Were can I learn more about the sunxi clocks?
-+
-+A: The linux-sunxi wiki contains a page documenting the clock registers,
-+   you can find it at
-+
-+        http://linux-sunxi.org/A10/CCM
-+
-+   The authoritative source for information at this time is the ccmu driver
-+   released by Allwinner, you can find it at
-+
-+        https://github.com/linux-sunxi/linux-sunxi/tree/sunxi-3.0/arch/arm/mach-sun4i/clock/ccmu
--- 
-1.8.1.1
+Regards
+Santosh
