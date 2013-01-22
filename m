@@ -1,39 +1,70 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 22 Jan 2013 10:30:10 -0500 (EST)
-Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
-In-Reply-To: <20130122061116.GD29677@S2100-06.ap.freescale.net>
-Message-ID: <Pine.LNX.4.44L0.1301221028580.1510-100000@iolanthe.rowland.org>
+From: kishon@ti.com (kishon)
+Date: Tue, 22 Jan 2013 21:07:44 +0530
+Subject: [PATCH v1 5/6] usb: otg: add device tree support to otg library
+In-Reply-To: <20130122103650.GB18876@e106331-lin.cambridge.arm.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <1358848694-20145-6-git-send-email-kishon@ti.com>
+ <20130122103650.GB18876@e106331-lin.cambridge.arm.com>
+Message-ID: <50FEB248.5090701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jan 2013, Shawn Guo wrote:
+Hi,
 
-> On Mon, Jan 21, 2013 at 09:37:42PM +0000, Arnd Bergmann wrote:
-> > > Arnd, please take a look at
-> > > 
-> > >         http://marc.info/?l=linux-usb&amp;m=135843716515529&amp;w=2
-> > > 
-> > > I can't test it easily, not being set up for cross compilation.  I'm 
-> > > waiting to hear from anybody whether it works before submitting it.
-> > > (There's also a report of memory corruption involving a similar patch 
-> > > for ehci-omap; it hasn't been tracked down yet.)
-> > 
-> > Your patch looks good to me, but it also seems to do some other
-> > changes that are not required to fix the problem but could wait
-> > for 3.9 instead. You definitely have my Ack if you are willing
-> > to take it for 3.8 though.
+On Tuesday 22 January 2013 04:06 PM, Mark Rutland wrote:
+>> +struct usb_phy *devm_usb_get_phy_by_phandle(struct device *dev,
+>> +	const char *phandle, u8 index)
+>> +{
+>> +	struct usb_phy	*phy = NULL, **ptr;
+>> +	unsigned long	flags;
+>> +	struct device_node *node;
+>> +
+>> +	if (!dev->of_node) {
+>> +		dev_dbg(dev, "device does not have a device node entry\n");
+>> +		return ERR_PTR(-EINVAL);
+>> +	}
+>> +
+>> +	node = of_parse_phandle(dev->of_node, phandle, index);
+>> +	if (!node) {
+>> +		dev_dbg(dev, "failed to get %s phandle in %s node\n", phandle,
+>> +			dev->of_node->full_name);
+>> +		return ERR_PTR(-ENODEV);
+>> +	}
+>
+> At any point past this, node's refcount is incremented (done automatically by
+> of_parse_phandle => of_find_node_by_phandle).
+>
+>> +
+>> +	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
+>> +	if (!ptr) {
+>> +		dev_dbg(dev, "failed to allocate memory for devres\n");
+>> +		return ERR_PTR(-ENOMEM);
+>> +	}
+>> +
+>> +	spin_lock_irqsave(&phy_lock, flags);
+>> +
+>> +	phy = __of_usb_find_phy(node);
+>> +	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
+>> +		phy = ERR_PTR(-EPROBE_DEFER);
+>> +		devres_free(ptr);
+>> +		goto err0;
+>> +	}
+>> +
+>> +	*ptr = phy;
+>> +	devres_add(dev, ptr);
+>> +
+>> +	get_device(phy->dev);
+>> +
+>> +err0:
+>> +	spin_unlock_irqrestore(&phy_lock, flags);
+>> +
+>> +	return phy;
+>> +}
+>
+> This means that on all of the exit paths, node's refcount is left incremented
+> incorrectly. You'll need an of_node_put(node) on each exit path.
 
-I think it's not too late to submit this for 3.8.  Thanks for the Ack.
+Ok. Will fix it.
 
-> > Shawn or Sascha should be able to test it.
-> > 
-> Alan,
-> 
-> Thanks for the patch.  I just gave it try.  The USB Host port still
-> works for me with a couple of fixes on your changes integrated (one
-> for compiling and the other for probing).  So you have my ACK with
-> the changes below rolled into your patch.
-
-Right, I have merged your changes into the patch.  Will submit shortly.
-
-Alan Stern
+Thanks
+Kishon
