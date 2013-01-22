@@ -1,43 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Jan 2013 21:19:23 +0000
-Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
- Armada 370/XP
-In-Reply-To: <50FEFAB9.4030503@gmail.com>
-References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
- <201301212044.41865.arnd@arndb.de> <50FEFAB9.4030503@gmail.com>
-Message-ID: <201301222119.23750.arnd@arndb.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 22 Jan 2013 13:20:12 -0800
+Subject: [PATCH 14/15] samples/seccomp: be less stupid about cross
+ compiling
+In-Reply-To: <1358788568-11137-15-git-send-email-arnd@arndb.de>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+ <1358788568-11137-15-git-send-email-arnd@arndb.de>
+Message-ID: <CAGXu5j+mXCj-cy0Kww4DdeGKOW9qkrL1X92nVJ82Z5q2P8tGpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 January 2013, Rob Herring wrote:
-> No, I expect all future platforms will have architected timers. TWD is
-> pretty much A9 and A5 only I believe. Same with SCU. I've probably
-> missed some in my list.
+On Mon, Jan 21, 2013 at 9:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The seccomp filters are currently built for the build
+> host, not for the machine that they are going to run
+> on, but they are also built for with the -m32 flag
+> if the kernel is built for a 32 bit machine, both
+> of which seems rather odd.
+>
+> It broke allyesconfig on my machine, which is x86-64, but
+> building for 32 bit ARM, with this error message:
+>
+> In file included from /usr/include/stdio.h:28:0,
+>                  from samples/seccomp/bpf-fancy.c:15:
+> /usr/include/features.h:324:26: fatal error: bits/predefs.h: No such file or directory
+>
+> because there are no 32 bit libc headers installed on
+> this machine. We should really be building all the
+> samples for the target machine rather than the build
+> host, but since the infrastructure for that appears
+> to be missing right now, let's be a little bit smarter
+> and not pass the '-m32' flag to the HOSTCC when cross-
+> compiling.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: James Morris <james.l.morris@oracle.com>
 
-Ah, I was incorrectly assuming that TWD was referring to the architected
-timers, sorry about that.
+I'm fine with this. Thanks!
 
-Maybe we should do this differently then and do the more logical
+Acked-by: Kees Cook <keescook@chromium.org>
 
-config LOCAL_TIMERS
-	bool
+-Kees
 
-config ARM_TWD
-	bool "ARM TWD local timer"
-	depends on SMP && CPU_V7
-	select LOCAL_TIMERS
+> ---
+>  samples/seccomp/Makefile |    2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/samples/seccomp/Makefile b/samples/seccomp/Makefile
+> index bbbd276..7203e66 100644
+> --- a/samples/seccomp/Makefile
+> +++ b/samples/seccomp/Makefile
+> @@ -19,6 +19,7 @@ bpf-direct-objs := bpf-direct.o
+>
+>  # Try to match the kernel target.
+>  ifndef CONFIG_64BIT
+> +ifndef CROSS_COMPILE
+>
+>  # s390 has -m31 flag to build 31 bit binaries
+>  ifndef CONFIG_S390
+> @@ -35,6 +36,7 @@ HOSTLOADLIBES_bpf-direct += $(MFLAG)
+>  HOSTLOADLIBES_bpf-fancy += $(MFLAG)
+>  HOSTLOADLIBES_dropper += $(MFLAG)
+>  endif
+> +endif
+>
+>  # Tell kbuild to always build the programs
+>  always := $(hostprogs-y)
+> --
+> 1.7.10.4
+>
 
-config EXYNOS4_MCT
-	bool "Samsung Exynos4 MCT Timer"
-	depends on SMP && ARCH_EXYNOS
-	select LOCAL_TIMERS
 
-config MSM_LOCAL_TIMER
-	bool "Qualcomm MSM Local Timer"
-	depends on SMP && ARCH_MSM
-	select LOCAL_TIMERS
 
-That way we have no implicit assumptions. Everything will still work if you
-disable local timers, but of course we will enable them in the defconfigs.
-
-	Arnd
+--
+Kees Cook
+Chrome OS Security
