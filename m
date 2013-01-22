@@ -1,40 +1,43 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 22 Jan 2013 22:10:24 +0100
-Subject: [PATCH v3 2/3] gpio: pca953x: add support for pca9505
+Date: Tue, 22 Jan 2013 22:10:25 +0100
+Subject: [PATCH v3 3/3] arm: mvebu: enable gpio expander over i2c on Mirabox
+ platform
 In-Reply-To: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1358889025-8530-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1358889025-8530-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that pca953x driver can handle GPIO expanders with more than 32
-bits this patch adds the support for the pca9505 which cam with 40
-GPIOs.
+The Globalscale Mirabox platform can be connected to the JTAG/GPIO box
+through the Multi-IO port. The GPIO box use the NXP PCA9505 I/O port
+expansion IC to provide 40-bit parallel input/output GPIOs. This patch
+enable the use of this expander on the Mirabox.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/gpio-pca953x.c |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/armada-370-mirabox.dts |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
-index b35ba06..3a68aed 100644
---- a/drivers/gpio/gpio-pca953x.c
-+++ b/drivers/gpio/gpio-pca953x.c
-@@ -46,6 +46,7 @@
- #define PCA957X_TYPE		0x2000
- 
- static const struct i2c_device_id pca953x_id[] = {
-+	{ "pca9505", 40 | PCA953X_TYPE | PCA_INT, },
- 	{ "pca9534", 8  | PCA953X_TYPE | PCA_INT, },
- 	{ "pca9535", 16 | PCA953X_TYPE | PCA_INT, },
- 	{ "pca9536", 4  | PCA953X_TYPE, },
-@@ -835,6 +836,7 @@ static int pca953x_remove(struct i2c_client *client)
- }
- 
- static const struct of_device_id pca953x_dt_ids[] = {
-+	{ .compatible = "nxp,pca9505", },
- 	{ .compatible = "nxp,pca9534", },
- 	{ .compatible = "nxp,pca9535", },
- 	{ .compatible = "nxp,pca9536", },
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index 3b40713..d9b32d3 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -52,5 +52,15 @@
+ 			phy = <&phy1>;
+ 			phy-mode = "rgmii-id";
+ 		};
++		i2c at d0011000 {
++			status = "okay";
++			clock-frequency = <100000>;
++			pca9505: pca9505 at 25 {
++				compatible = "nxp,pca9505";
++				gpio-controller;
++				#gpio-cells = <2>;
++				reg = <0x25>;
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.5
