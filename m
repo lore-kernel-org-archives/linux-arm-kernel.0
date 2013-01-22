@@ -1,47 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Jan 2013 10:37:23 +0000
-Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into
- the driver
-In-Reply-To: <20130122102010.GL6857@gmail.com>
-References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
- <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
- <20130122090000.GH6857@gmail.com>
- <CACRpkdatTagYaMqvpe-a8zj_kO3Twjn1r4SqPty8DosNmcxJcQ@mail.gmail.com>
- <20130122100607.GH23505@n2100.arm.linux.org.uk>
- <20130122102010.GL6857@gmail.com>
-Message-ID: <20130122103723.GI23505@n2100.arm.linux.org.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 22 Jan 2013 11:49:27 +0100
+Subject: [PATCH 2/5] ARM: dts: twl6030: Add PWM support
+In-Reply-To: <50FE6C5E.50802@ti.com>
+References: <1358519794-13214-1-git-send-email-peter.ujfalusi@ti.com>
+ <1358519794-13214-3-git-send-email-peter.ujfalusi@ti.com>
+ <50FE6C5E.50802@ti.com>
+Message-ID: <50FE6EB7.8070605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 10:20:10AM +0000, Lee Jones wrote:
-> On Tue, 22 Jan 2013, Russell King - ARM Linux wrote:
-> 
-> > On Tue, Jan 22, 2013 at 10:53:42AM +0100, Linus Walleij wrote:
-> > > On Tue, Jan 22, 2013 at 10:00 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > > 
-> > > >> From: Lee Jones <lee.jones@linaro.org>
-> > > >>
-> > > >> There are currently two instances of the ios_handler being used.
-> > > >> Both of which mearly toy with some regulator settings. Now there
-> > > >> is a GPIO regulator API, we can use that instead, and lessen the
-> > > >> per platform burden. By doing this, we also become more Device
-> > > >> Tree compatible.
-> > > >
-> > > > Russell,
-> > > >
-> > > > Why is this patch in your tree with Ulf as the Author?
-> > > 
-> > > This is because of the way Russell's patch tracker works, it sets
-> > > Author: to the name of the person using the patch tracker and
-> > > discards the From: field in the beginning of the patch which
-> > > git am will conversely respect.
-> > 
-> > Actually, the reverse.  It does now respect the From: line, but the
-> > From: line will be ignored for all notifications about the patch
-> > because the patch system was never built to parse the actual comments
-> > when sending out the email notifications.
-> 
-> So what do I have to do to reaffirm myself as the author?
+HI Benoit,
 
-I'd need to recommit the patch with the right information, which isn't
-that easy to do.
+On 01/22/2013 11:39 AM, Benoit Cousson wrote:
+>> +
+>> +	twl_pwm: pwm {
+>> +		/* provides two PWMs (id 0, 1 for PWM1 and PWM2) */
+>> +		compatible = "ti,twl6030-pwm";
+>> +		#pwm-cells = <2>;
+>> +	};
+>> +
+>> +	twl_pwmled: pwmled {
+>> +		/* provides one PWM (id 0 for Charing indicator LED) */
+> 
+> typo: charging.
+
+Aargh. Corrected in the branch.
+
+Thanks,
+P?ter
