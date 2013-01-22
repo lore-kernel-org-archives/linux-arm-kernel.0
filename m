@@ -1,31 +1,20 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 22 Jan 2013 04:27:45 +0100
-Subject: [PATCH 3/4] watchdog: add support for ux500_wdt watchdog
-In-Reply-To: <1358509214-22407-4-git-send-email-fabio.baltieri@linaro.org>
-References: <1358509214-22407-1-git-send-email-fabio.baltieri@linaro.org>
- <1358509214-22407-4-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <20130122032745.GP7409@sortiz-mobl>
+Date: Tue, 22 Jan 2013 04:28:52 +0100
+Subject: [PATCH 08/14] mfd: omap-usb-host: Remove PHY reset handling code
+In-Reply-To: <1357836694-30788-9-git-send-email-rogerq@ti.com>
+References: <1357836694-30788-1-git-send-email-rogerq@ti.com>
+ <1357836694-30788-9-git-send-email-rogerq@ti.com>
+Message-ID: <20130122032852.GR7409@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio, Wim,
+HI Roger,
 
-On Fri, Jan 18, 2013 at 12:40:13PM +0100, Fabio Baltieri wrote:
-> This patch adds support for the ux500_wdt watchdog that is found in
-> ST-Ericsson Ux500 platform.  The driver is based on PRCMU APIs.
+On Thu, Jan 10, 2013 at 06:51:28PM +0200, Roger Quadros wrote:
+> PHY reset GPIO handling will be done in the PHY driver
 > 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-> ---
->  drivers/watchdog/Kconfig                |  12 +++
->  drivers/watchdog/Makefile               |   1 +
->  drivers/watchdog/ux500_wdt.c            | 171 ++++++++++++++++++++++++++++++++
->  include/linux/platform_data/ux500_wdt.h |  19 ++++
->  4 files changed, 203 insertions(+)
->  create mode 100644 drivers/watchdog/ux500_wdt.c
->  create mode 100644 include/linux/platform_data/ux500_wdt.h
-There is a dependency between this one an the first patch.
-Wim, would you like me to carry this patch through the MFD tree ?
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 
 Cheers,
 Samuel.
