@@ -1,45 +1,17 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Tue, 22 Jan 2013 10:34:51 -0200
-Subject: [PATCH 09/15] media: coda: don't build on multiplatform
-In-Reply-To: <20130122103222.27b615d7@redhat.com>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <1358788568-11137-10-git-send-email-arnd@arndb.de>
- <20130122035402.GC29677@S2100-06.ap.freescale.net>
- <20130122103222.27b615d7@redhat.com>
-Message-ID: <20130122103451.16522151@redhat.com>
+From: tstdenis@elliptictech.com (Tom St Denis)
+Date: Tue, 22 Jan 2013 07:36:13 -0500 (EST)
+Subject: ARM DMA Zones (coherent memory pool)
+In-Reply-To: <1706190290.100315.1358858042869.JavaMail.root@elliptictech.com>
+Message-ID: <644316582.100321.1358858173237.JavaMail.root@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, 22 Jan 2013 10:32:22 -0200
-Mauro Carvalho Chehab <mchehab@redhat.com> escreveu:
+Hi all,
 
-> Em Tue, 22 Jan 2013 11:54:04 +0800
-> Shawn Guo <shawn.guo@linaro.org> escreveu:
-> 
-> > On Mon, Jan 21, 2013 at 05:16:02PM +0000, Arnd Bergmann wrote:
-> > > The coda video codec driver depends on a mach-imx or mach-mxs specific
-> > > header file "mach/iram.h". This is not available when building for
-> > > multiplatform, so let us disable this driver for v3.8 when building
-> > > multiplatform, and hopefully find a proper fix for v3.9.
-> > > 
-> > > drivers/media/platform/coda.c:27:23: fatal error: mach/iram.h: No such file or directory
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Javier Martin <javier.martin@vista-silicon.com>
-> > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > 
-> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> > 
-> > > Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-> 
-> Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+I was wondering if there was a proper way of instructing the init code (atomic_pool_init) for the DMA coherent subsystem to point to a fixed location instead of using alloc_pages()?
 
-Err... actually, as Sascha has a proper fix for it, it should be used,
-instead. So:
+I ask because on our system (Zynq702/706 boards) DDR has a high latency (~25-30 cycles) whereas FPGA memory can be much quicker.  What I'd like to do is create a 256Kbyte memory in FPGA BRAMs and then have the CPU point at it for the DMA zone.
 
-Nacked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+Is that at all possible through a simple kernel cmdline or patch?
 
-Regards,
-Mauro
+Tom
