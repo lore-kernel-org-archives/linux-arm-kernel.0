@@ -1,39 +1,94 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 22 Jan 2013 15:27:00 -0500 (EST)
-Subject: [PATCH] ARM: Versatile Express: extend the MPIDR range used for
- pen release check
-In-Reply-To: <20130122185833.GE3959@e102568-lin.cambridge.arm.com>
-References: <1358852200-4581-1-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.02.1301221324220.6300@xanadu.home>
- <20130122185833.GE3959@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1301221525270.6300@xanadu.home>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 22 Jan 2013 15:34:50 -0500
+Subject: Compilation problem with drivers/staging/zsmalloc when !SMP on ARM
+In-Reply-To: <20130121055541.GD3666@blaptop>
+References: <CAKGA1b=ACTQHo9=B7EAG5nrFCO9u-J+sy7dXtYk3Rk6OUcW3cQ@mail.gmail.com>
+ <20130118210859.GH23505@n2100.arm.linux.org.uk>
+ <CAKGA1bmJ6c4LC=NAD4MU_rBZ2hZjf6qH=C+dqMCf0eP+2vSFdA@mail.gmail.com>
+ <20130119044602.GC5391@phenom.dumpdata.com>
+ <20130121055541.GD3666@blaptop>
+Message-ID: <20130122203450.GD12371@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jan 2013, Lorenzo Pieralisi wrote:
-
-> On Tue, Jan 22, 2013 at 06:25:20PM +0000, Nicolas Pitre wrote:
-> > On Tue, 22 Jan 2013, Lorenzo Pieralisi wrote:
-> > 
-> > > In ARM multi-cluster systems the MPIDR affinity level 0 cannot be used as a
-> > > single cpu identifier, affinity levels 1 and 2 must be taken into account as
-> > > well.
-> > > This patch extends the MPIDR usage to affinity levels 1 and 2 in versatile
-> > > secondary cores start up code in order to compare the passed pen_release
-> > > value with the full-blown affinity mask.
-> > > 
-> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > 
-> > Note that my b.L series makes this patch obsolete.
+> > The initial patch were done on x86. Then Seth did the work to make sure
+> > it worked on PPC. Munchin looked on ARM and that is it.
 > 
-> This is needed to boot TC2 in the mainline. Agreed, when the power API
-> BSP support for TC2 is merged this can be removed, but waiting for that to
-> happen we should fix the current code to enable TC2 in its current state.
+> s/Munchin/Minchan
 
-Sensible.
+Thank you. I am sorry for butchering your name.
+> 
+> > 
+> > If you have an ARM server that you would be willing to part with I would
+> > be thrilled to look at it.
+> > 
+> > > 
+> > > diff --git a/drivers/staging/zsmalloc/zsmalloc-main.c
+> > > b/drivers/staging/zsmalloc/zsmalloc-main.c
+> > > index 09a9d35..ecf75fb 100644
+> > 	> --- a/drivers/staging/zsmalloc/zsmalloc-main.c
+> > > +++ b/drivers/staging/zsmalloc/zsmalloc-main.c
+> > > @@ -228,7 +228,7 @@ struct zs_pool {
+> > >   * mapping rather than copying
+> > >   * for object mapping.
+> > >  */
+> > > -#if defined(CONFIG_ARM)
+> > > +#if defined(CONFIG_ARM) && defined(CONFIG_SMP)
+> > >  #define USE_PGTABLE_MAPPING
+> 
+> I don't get it. How to prevent the problem Russel described?
+> The problem is that other CPU can prefetch _speculatively_ under us.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-Nicolas
+<nods> Not sure either.
+> 
+> > >  #endif
+> > > 
+> > > .. such that it even compiles in both "guess" configurations, the
+> > > slower Cortex-A8 600MHz single core system gets to use the slow copy
+> > > path and the dual-core 1GHz+ Cortex-A9 (with twice the RAM..) gets to
+> > > use the fast mapping path. Essentially all the patch does is "improve
+> > > performance" on the fastest, best-configured, large-amounts-of-RAM,
+> > > lots-of-CPU-performance ARM systems (OMAP4+, Snapdragon, Exynos4+,
+> > > marvell armada, i.MX6..) while introducing the problems Russell
+> > > describes, and leave performance exactly the same and potentially far
+> > > more stable on the slower, memory-limited ARM machines.
+> > 
+> > Any ideas on how to detect that?
+> > > 
+> > > Given the purpose of zsmalloc, zram, zcache etc. this somewhat defies
+> > > logic. If it's not making the memory-limited, slow ARM systems run
+> > > better, what's the point?
+> > > 
+> > > So in summary I suggest "we" (Greg? or is it Seth's responsibility?)
+> > > should just back out that whole USE_PGTABLE_MAPPING chunk of code
+> > > introduced with f553646. Then Russell can carry on randconfiging and I
+> > > can build for SMP and UP and get the same code.. with less bugs.
+> > 
+> > I get that you want to have this fixed right now. I think having it
+> > fixed the right way is a better choice. Lets discuss that first
+> > before we start tossing patches to disable parts of it.
+> 
+> If I don't miss something, we could have 2 choice.
+> 
+> 1) use flush_tlb_kernel_range instead of local_flush_tlb_kernel_range
+> Or
+> 2) use only memory copy
+> 
+> I guess everybody want 2 because it makes code very simple and maintainable.
+> Even, rencently Joonsoo sent optimize patch.
+> Look at https://lkml.org/lkml/2013/1/16/68 so zram/zcache effect caused by 2
+> would be minimized.
+> 
+> But please give me the time and I will borrow quad-core embedded target board
+> and test 1 on the phone with Seth's benchmark.
+> 
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> -- 
+> Kind regards,
+> Minchan Kim
