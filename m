@@ -1,57 +1,90 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 22 Jan 2013 16:47:50 +0200
-Subject: [PATCH v1 6/6] USB: MUSB: OMAP: get PHY by phandle for dt boot
-In-Reply-To: <50FEA447.1090701@ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <1358848694-20145-7-git-send-email-kishon@ti.com> <50FE9F5C.2010501@ti.com>
- <50FEA447.1090701@ti.com>
-Message-ID: <50FEA696.8000506@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 22 Jan 2013 22:48:15 +0800
+Subject: [GIT PULL] imx cleanup for 3.9
+Message-ID: <20130122144813.GD2812@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 04:37 PM, kishon wrote:
-> On Tuesday 22 January 2013 07:47 PM, Roger Quadros wrote:
->> On 01/22/2013 11:58 AM, Kishon Vijay Abraham I wrote:
->>> The OMAP glue has been modified to get PHY by phandle for dt boot.
->>>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>>   drivers/usb/musb/omap2430.c |    7 ++++++-
->>>   1 file changed, 6 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
->>> index 1a8cf6d..e43faeb 100644
->>> --- a/drivers/usb/musb/omap2430.c
->>> +++ b/drivers/usb/musb/omap2430.c
->>> @@ -345,7 +345,12 @@ static int omap2430_musb_init(struct musb *musb)
->>>        * up through ULPI.  TWL4030-family PMICs include one,
->>>        * which needs a driver, drivers aren't always needed.
->>>        */
->>> -    musb->xceiv = devm_usb_get_phy_dev(dev, 0);
->>> +    if (dev->parent->of_node)
->>> +        musb->xceiv = devm_usb_get_phy_by_phandle(dev->parent,
->>> +            "usb_phy", 0);
->>> +    else
->>> +        musb->xceiv = devm_usb_get_phy_dev(dev, 0);
->>> +
->>>       if (IS_ERR_OR_NULL(musb->xceiv)) {
->>>           pr_err("HS USB OTG: no transceiver configured\n");
->>>           return -ENODEV;
->>
->> This will not work with PHY driver as a module. You need to use deferred probing mechanism here
->> after you have addressed my comment in patch 2 and also devm_usb_get_phy_by_phandle()
-> 
-> IIUC, even using -EPROBE_DEFER might not help if we are making the PHY driver as module, since the kernel will try to probe only till the prompt comes.
-> 
-Oh really? I thought deferred probing takes place whenever a new driver is bound to a device. What does "prompt comes" have to do with it?
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
 
-> And having -EPROBE_DEFER instead of -ENODEV might also not help since, the gadget driver wont be able to bind to UDC (usb_gadget_probe_driver will fail).
-> 
-> A lot of things need to be changed before we change to -EPROBE_DEFER IMO.
+are available in the git repository at:
 
-OK.
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-cleanup-3.9
 
---
-cheers,
--roger
+for you to fetch changes up to 6faa0b731160d2b0e49796191ad124f564b021f0:
+
+  ARM: imx: Remove mx508 support (2013-01-22 22:26:44 +0800)
+
+----------------------------------------------------------------
+IMX cleanup for 3.9:
+ * Board level dts shuffling to use node label
+ * Remove lluart.c by using debug_ll_io_init()
+ * Remove mach-mx51_3ds board support
+ * Remove imx50 support which has been BROKEN for cycles
+ * Other trival cleanups
+
+----------------------------------------------------------------
+Fabio Estevam (5):
+      ARM: mach-imx: Kconfig: Do not select Babbage for MACH_IMX51_DT
+      ARM: dts: imx27-3ds: Rename it to imx27-pdk
+      ARM: boot: dts: Add an entry for imx27-pdk.dtb
+      ARM: imx: Remove mach-mx51_3ds board
+      ARM: imx: Remove mx508 support
+
+Shawn Guo (4):
+      ARM: dts: add missing imx dtb targets
+      ARM: dts: imx: use nodes label in board dts
+      ARM: imx: remove unused imx6q_clock_map_io()
+      ARM: imx: use debug_ll_io_init() for imx6q
+
+ Documentation/devicetree/bindings/arm/fsl.txt      |    4 +
+ arch/arm/Kconfig.debug                             |   10 +-
+ arch/arm/boot/dts/Makefile                         |    7 +-
+ arch/arm/boot/dts/imx25-karo-tx25.dts              |   30 +-
+ arch/arm/boot/dts/imx25.dtsi                       |    2 +-
+ arch/arm/boot/dts/imx27-apf27.dts                  |   82 +-
+ arch/arm/boot/dts/{imx27-3ds.dts => imx27-pdk.dts} |   24 +-
+ arch/arm/boot/dts/imx31-bug.dts                    |   12 +-
+ arch/arm/boot/dts/imx51-babbage.dts                |  456 +++++----
+ arch/arm/boot/dts/imx53-ard.dts                    |  126 ++-
+ arch/arm/boot/dts/imx53-evk.dts                    |  194 ++--
+ arch/arm/boot/dts/imx53-qsb.dts                    |  380 ++++----
+ arch/arm/boot/dts/imx53-smd.dts                    |  294 +++---
+ arch/arm/boot/dts/imx6q-arm2.dts                   |  124 ++-
+ arch/arm/boot/dts/imx6q-sabreauto.dts              |   64 +-
+ arch/arm/boot/dts/imx6q-sabrelite.dts              |  216 +++--
+ arch/arm/boot/dts/imx6q-sabresd.dts                |  102 +-
+ arch/arm/boot/dts/imx6q.dtsi                       |    2 +-
+ arch/arm/configs/imx_v6_v7_defconfig               |    1 -
+ arch/arm/include/debug/imx.S                       |    2 +-
+ arch/arm/mach-imx/Kconfig                          |   36 -
+ arch/arm/mach-imx/Makefile                         |    3 -
+ arch/arm/mach-imx/Makefile.boot                    |    4 -
+ arch/arm/mach-imx/clk-imx6q.c                      |    2 -
+ arch/arm/mach-imx/common.h                         |   11 -
+ arch/arm/mach-imx/cpu-imx5.c                       |   39 -
+ arch/arm/mach-imx/devices-imx50.h                  |   33 -
+ arch/arm/mach-imx/devices/Kconfig                  |    2 +-
+ arch/arm/mach-imx/devices/platform-fec.c           |    6 -
+ arch/arm/mach-imx/devices/platform-imx-i2c.c       |   10 -
+ arch/arm/mach-imx/devices/platform-imx-uart.c      |   12 -
+ arch/arm/mach-imx/hardware.h                       |    6 -
+ arch/arm/mach-imx/iomux-mx50.h                     |  977 --------------------
+ arch/arm/mach-imx/lluart.c                         |   47 -
+ arch/arm/mach-imx/mach-imx6q.c                     |    4 +-
+ arch/arm/mach-imx/mach-mx50_rdp.c                  |  225 -----
+ arch/arm/mach-imx/mach-mx51_3ds.c                  |  178 ----
+ arch/arm/mach-imx/mm-imx5.c                        |   48 -
+ arch/arm/mach-imx/mx50.h                           |  290 ------
+ arch/arm/mach-imx/mxc.h                            |   13 -
+ arch/arm/mach-imx/pm-imx5.c                        |    7 +-
+ 41 files changed, 1031 insertions(+), 3054 deletions(-)
+ rename arch/arm/boot/dts/{imx27-3ds.dts => imx27-pdk.dts} (59%)
+ delete mode 100644 arch/arm/mach-imx/devices-imx50.h
+ delete mode 100644 arch/arm/mach-imx/iomux-mx50.h
+ delete mode 100644 arch/arm/mach-imx/lluart.c
+ delete mode 100644 arch/arm/mach-imx/mach-mx50_rdp.c
+ delete mode 100644 arch/arm/mach-imx/mach-mx51_3ds.c
+ delete mode 100644 arch/arm/mach-imx/mx50.h
