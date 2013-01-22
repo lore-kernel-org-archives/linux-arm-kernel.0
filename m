@@ -1,171 +1,204 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 22 Jan 2013 13:06:43 +0100
-Subject: [PATCH 5/6 v14] gpio: Add device tree support to block GPIO API
+Date: Tue, 22 Jan 2013 13:06:42 +0100
+Subject: [PATCH 4/6 v14] gpiolib: Fix default attributes for class
 In-Reply-To: <1358856404-8975-1-git-send-email-stigge@antcom.de>
 References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
-Message-ID: <1358856404-8975-6-git-send-email-stigge@antcom.de>
+Message-ID: <1358856404-8975-5-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support to the block GPIO API.
+There is a race condition between creating a gpio or gpiochip device and adding
+default attributes. This patch fixes this by defining the default attributes as
+dev_attrs of the class. For this, it was necessary to create a separate
+gpiochip_class besides gpio_class.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-
 ---
- Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 ++++++
- drivers/gpio/Makefile                                 |    1 
- drivers/gpio/gpioblock-of.c                           |  100 ++++++++++++++++++
- 3 files changed, 137 insertions(+)
+ Documentation/ABI/testing/sysfs-gpio |   11 ++++
+ drivers/gpio/gpiolib.c               |   78 ++++++++++++++---------------------
+ 2 files changed, 44 insertions(+), 45 deletions(-)
 
---- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio-block.txt
-@@ -0,0 +1,36 @@
-+Block GPIO definition
-+=====================
+--- linux-2.6.orig/Documentation/ABI/testing/sysfs-gpio
++++ linux-2.6/Documentation/ABI/testing/sysfs-gpio
+@@ -20,6 +20,17 @@ Description:
+ 	    /value ... always readable, writes fail for input GPIOs
+ 	    /direction ... r/w as: in, out (default low); write: high, low
+ 	    /edge ... r/w as: none, falling, rising, both
 +
-+This binding specifies arbitrary blocks of gpios, combining gpios from one or
-+more GPIO controllers together, to form a word for r/w access.
++What:		/sys/class/gpiochip/
++Date:		October 2012
++KernelVersion:	3.7
++Contact:	Roland Stigge <stigge@antcom.de>
++Description:
 +
-+Required property:
-+- compatible: must be "linux,gpio-block"
++  Each gpiochip is represented by a separate device having the following
++  attributes:
 +
-+Required subnodes:
-+- the name will be the registered name of the block
-+- property "gpios" is a list of gpios for the respective block
-+
-+Example:
-+
-+        blockgpio {
-+                compatible = "linux,gpio-block";
-+
-+                block0 {
-+                        gpios = <&gpio 3 0 0>,
-+                                <&gpio 3 1 0>;
-+                };
-+                block1 {
-+                        gpios = <&gpio 4 1 0>,
-+                                <&gpio 4 3 0>,
-+                                <&gpio 4 2 0>,
-+                                <&gpio 4 4 0>,
-+                                <&gpio 4 5 0>,
-+                                <&gpio 4 6 0>,
-+                                <&gpio 4 7 0>,
-+                                <&gpio 4 8 0>,
-+                                <&gpio 4 9 0>,
-+                                <&gpio 4 10 0>,
-+                                <&gpio 4 19 0>;
-+                };
-+        };
---- linux-2.6.orig/drivers/gpio/Makefile
-+++ linux-2.6/drivers/gpio/Makefile
-@@ -5,6 +5,7 @@ ccflags-$(CONFIG_DEBUG_GPIO)	+= -DDEBUG
- obj-$(CONFIG_GPIOLIB)		+= gpiolib.o devres.o
- obj-$(CONFIG_OF_GPIO)		+= gpiolib-of.o
- obj-$(CONFIG_GPIO_ACPI)		+= gpiolib-acpi.o
-+obj-$(CONFIG_OF_GPIO)		+= gpioblock-of.o
++    /sys/class/gpiochip
+ 	/gpiochipN ... for each gpiochip; #N is its first GPIO
+ 	    /base ... (r/o) same as N
+ 	    /label ... (r/o) descriptive, not necessarily unique
+--- linux-2.6.orig/drivers/gpio/gpiolib.c
++++ linux-2.6/drivers/gpio/gpiolib.c
+@@ -362,9 +362,6 @@ static ssize_t gpio_value_store(struct d
+ 	return status;
+ }
  
- # Device drivers. Generally keep list sorted alphabetically
- obj-$(CONFIG_GPIO_GENERIC)	+= gpio-generic.o
---- /dev/null
-+++ linux-2.6/drivers/gpio/gpioblock-of.c
-@@ -0,0 +1,100 @@
-+/*
-+ * OF implementation for Block GPIO
-+ *
-+ * Copyright (C) 2012 Roland Stigge <stigge@antcom.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+
-+static int gpioblock_of_probe(struct platform_device *pdev)
-+{
-+	struct device_node *block;
-+	unsigned *gpios;
-+	int ngpio;
-+	int ret;
-+	struct gpio_block *gb;
-+
-+	for_each_available_child_of_node(pdev->dev.of_node, block) {
-+		int i;
-+
-+		ngpio = of_gpio_count(block);
-+		if (ngpio < 1) {
-+			ret = -ENODEV;
-+			goto err1;
-+		}
-+
-+		gpios = kzalloc(ngpio * sizeof(*gpios), GFP_KERNEL);
-+		if (!gpios) {
-+			ret = -ENOMEM;
-+			goto err1;
-+		}
-+
-+		for (i = 0; i < ngpio; i++) {
-+			ret = of_get_gpio(block, i);
-+			if (ret < 0)
-+				goto err2; /* expect -EPROBE_DEFER */
-+			gpios[i] = ret;
-+		}
-+		gb = gpio_block_create(gpios, ngpio, block->name);
-+		if (IS_ERR(gb)) {
-+			dev_err(&pdev->dev,
-+				"Error creating GPIO block from device tree\n");
-+			ret = PTR_ERR(gb);
-+			goto err2;
-+		}
-+		ret = gpio_block_register(gb);
-+		if (ret < 0)
-+			goto err3;
-+
-+		kfree(gpios);
-+		dev_info(&pdev->dev, "Registered gpio block %s: %d gpios\n",
-+			 block->name, ngpio);
-+	}
-+	return 0;
-+
-+err3:
-+	gpio_block_free(gb);
-+err2:
-+	kfree(gpios);
-+err1:
-+	of_node_put(block);
-+	return ret;
-+}
-+
-+#ifdef CONFIG_OF
-+static struct of_device_id gpioblock_of_match[] = {
-+	{ .compatible = "linux,gpio-block", },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, gpioblock_of_match);
-+#endif
-+
-+static struct platform_driver gpioblock_of_driver = {
-+	.driver	= {
-+		.name = "gpio-block",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(gpioblock_of_match),
-+
-+	},
-+	.probe	= gpioblock_of_probe,
+-static const DEVICE_ATTR(value, 0644,
+-		gpio_value_show, gpio_value_store);
+-
+ static irqreturn_t gpio_sysfs_irq(int irq, void *priv)
+ {
+ 	struct sysfs_dirent	*value_sd = priv;
+@@ -585,19 +582,6 @@ static ssize_t gpio_active_low_store(str
+ 	return status ? : size;
+ }
+ 
+-static const DEVICE_ATTR(active_low, 0644,
+-		gpio_active_low_show, gpio_active_low_store);
+-
+-static const struct attribute *gpio_attrs[] = {
+-	&dev_attr_value.attr,
+-	&dev_attr_active_low.attr,
+-	NULL,
+-};
+-
+-static const struct attribute_group gpio_attr_group = {
+-	.attrs = (struct attribute **) gpio_attrs,
+-};
+-
+ /*
+  * /sys/class/gpio/gpiochipN/
+  *   /base ... matching gpio_chip.base (N)
+@@ -612,7 +596,6 @@ static ssize_t chip_base_show(struct dev
+ 
+ 	return sprintf(buf, "%d\n", chip->base);
+ }
+-static DEVICE_ATTR(base, 0444, chip_base_show, NULL);
+ 
+ static ssize_t chip_label_show(struct device *dev,
+ 			       struct device_attribute *attr, char *buf)
+@@ -621,7 +604,6 @@ static ssize_t chip_label_show(struct de
+ 
+ 	return sprintf(buf, "%s\n", chip->label ? : "");
+ }
+-static DEVICE_ATTR(label, 0444, chip_label_show, NULL);
+ 
+ static ssize_t chip_ngpio_show(struct device *dev,
+ 			       struct device_attribute *attr, char *buf)
+@@ -630,18 +612,6 @@ static ssize_t chip_ngpio_show(struct de
+ 
+ 	return sprintf(buf, "%u\n", chip->ngpio);
+ }
+-static DEVICE_ATTR(ngpio, 0444, chip_ngpio_show, NULL);
+-
+-static const struct attribute *gpiochip_attrs[] = {
+-	&dev_attr_base.attr,
+-	&dev_attr_label.attr,
+-	&dev_attr_ngpio.attr,
+-	NULL,
+-};
+-
+-static const struct attribute_group gpiochip_attr_group = {
+-	.attrs = (struct attribute **) gpiochip_attrs,
+-};
+ 
+ /*
+  * /sys/class/gpio/export ... write-only
+@@ -720,11 +690,32 @@ static struct class_attribute gpio_class
+ 	__ATTR_NULL,
+ };
+ 
++static struct device_attribute gpio_attrs[] = {
++	__ATTR(active_low, 0644, gpio_active_low_show, gpio_active_low_store),
++	__ATTR(value, 0644, gpio_value_show, gpio_value_store),
++	__ATTR_NULL,
 +};
 +
-+module_platform_driver(gpioblock_of_driver);
+ static struct class gpio_class = {
+ 	.name =		"gpio",
+ 	.owner =	THIS_MODULE,
+ 
+-	.class_attrs =	gpio_class_attrs,
++	.class_attrs = gpio_class_attrs,
++	.dev_attrs = gpio_attrs,
++};
 +
-+MODULE_DESCRIPTION("GPIO Block driver");
-+MODULE_AUTHOR("Roland Stigge <stigge@antcom.de>");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:gpioblock-of");
++static struct device_attribute gpiochip_attrs[] = {
++	__ATTR(label, 0444, chip_label_show, NULL),
++	__ATTR(base, 0444, chip_base_show, NULL),
++	__ATTR(ngpio, 0444, chip_ngpio_show, NULL),
++	__ATTR_NULL,
++};
++
++static struct class gpiochip_class = {
++	.name =		"gpiochip",
++	.owner =	THIS_MODULE,
++
++	.dev_attrs =	gpiochip_attrs,
+ };
+ 
+ 
+@@ -791,10 +782,6 @@ int gpio_export(unsigned gpio, bool dire
+ 		goto fail_unlock;
+ 	}
+ 
+-	status = sysfs_create_group(&dev->kobj, &gpio_attr_group);
+-	if (status)
+-		goto fail_unregister_device;
+-
+ 	if (direction_may_change) {
+ 		status = device_create_file(dev, &dev_attr_direction);
+ 		if (status)
+@@ -962,25 +949,22 @@ EXPORT_SYMBOL_GPL(gpio_unexport);
+ 
+ static int gpiochip_export(struct gpio_chip *chip)
+ {
+-	int		status;
++	int		status = 0;
+ 	struct device	*dev;
+ 
+ 	/* Many systems register gpio chips for SOC support very early,
+ 	 * before driver model support is available.  In those cases we
+ 	 * export this later, in gpiolib_sysfs_init() ... here we just
+-	 * verify that _some_ field of gpio_class got initialized.
++	 * verify that _some_ field of gpiochip_class got initialized.
+ 	 */
+-	if (!gpio_class.p)
++	if (!gpiochip_class.p)
+ 		return 0;
+ 
+ 	/* use chip->base for the ID; it's already known to be unique */
+ 	mutex_lock(&sysfs_lock);
+-	dev = device_create(&gpio_class, chip->dev, MKDEV(0, 0), chip,
+-				"gpiochip%d", chip->base);
+-	if (!IS_ERR(dev)) {
+-		status = sysfs_create_group(&dev->kobj,
+-				&gpiochip_attr_group);
+-	} else
++	dev = device_create(&gpiochip_class, chip->dev, MKDEV(0, 0), chip,
++			    "gpiochip%d", chip->base);
++	if (IS_ERR(dev))
+ 		status = PTR_ERR(dev);
+ 	chip->exported = (status == 0);
+ 	mutex_unlock(&sysfs_lock);
+@@ -1008,7 +992,7 @@ static void gpiochip_unexport(struct gpi
+ 	struct device		*dev;
+ 
+ 	mutex_lock(&sysfs_lock);
+-	dev = class_find_device(&gpio_class, NULL, chip, match_export);
++	dev = class_find_device(&gpiochip_class, NULL, chip, match_export);
+ 	if (dev) {
+ 		put_device(dev);
+ 		device_unregister(dev);
+@@ -1267,6 +1251,10 @@ static int __init gpiolib_sysfs_init(voi
+ 	if (status < 0)
+ 		return status;
+ 
++	status = class_register(&gpiochip_class);
++	if (status < 0)
++		return status;
++
+ 	status = class_register(&gpio_block_class);
+ 	if (status < 0)
+ 		return status;
