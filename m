@@ -1,17 +1,19 @@
-From: tstdenis@elliptictech.com (Tom St Denis)
-Date: Tue, 22 Jan 2013 07:36:13 -0500 (EST)
-Subject: ARM DMA Zones (coherent memory pool)
-In-Reply-To: <1706190290.100315.1358858042869.JavaMail.root@elliptictech.com>
-Message-ID: <644316582.100321.1358858173237.JavaMail.root@elliptictech.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 22 Jan 2013 20:41:45 +0800
+Subject: [PATCH 2/2] ARM: mxs: Add OF props for MX23 LRADC
+In-Reply-To: <50FE80D3.1020104@kernel.org>
+References: <1358798722-25102-1-git-send-email-marex@denx.de>
+ <1358798722-25102-2-git-send-email-marex@denx.de>
+ <50FE80D3.1020104@kernel.org>
+Message-ID: <20130122124144.GA2812@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Jan 22, 2013 at 12:06:43PM +0000, Jonathan Cameron wrote:
+> On 01/21/2013 08:05 PM, Marek Vasut wrote:
+> > Add interrupt mapping and compatible string for MX23 LRADC.
+> 
+> Series looks fine to me, but obviously I'd like an ACK for this one
+> from Shawn before taking it.
 
-I was wondering if there was a proper way of instructing the init code (atomic_pool_init) for the DMA coherent subsystem to point to a fixed location instead of using alloc_pages()?
-
-I ask because on our system (Zynq702/706 boards) DDR has a high latency (~25-30 cycles) whereas FPGA memory can be much quicker.  What I'd like to do is create a 256Kbyte memory in FPGA BRAMs and then have the CPU point at it for the DMA zone.
-
-Is that at all possible through a simple kernel cmdline or patch?
-
-Tom
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
