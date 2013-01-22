@@ -1,59 +1,38 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 22 Jan 2013 11:07:24 +0100
-Subject: [GIT PULL] ARM: OMAP: Audio support via omap-twl4030 and pwm support
-Message-ID: <50FE64DC.2030808@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Jan 2013 11:10:08 +0100
+Subject: [PATCH v7 08/15] gpio: pl061: bind pinctrl by gpio request
+In-Reply-To: <CAD6h2NQM6=wZ5k7p9yhF3oWGQGBcsn+gt3J0+JVxx7wKYaKEJg@mail.gmail.com>
+References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358494279-16503-9-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdZo6mVSaHBr6PJt8QCkiKp-Vs7mWup8n=4zyacRwf8V3g@mail.gmail.com>
+ <CAD6h2NQm+VoUv9tDSoHv3Xs8RtuCt5A+_DCBx6bh-d3WP3PK=w@mail.gmail.com>
+ <CACRpkdbgRY9CcdRAVVaVAq57hF1cTf7LMOqneNwcz+VtpFDcUg@mail.gmail.com>
+ <CAD6h2NQM6=wZ5k7p9yhF3oWGQGBcsn+gt3J0+JVxx7wKYaKEJg@mail.gmail.com>
+Message-ID: <CACRpkdZSKH=7a5Kf-NM964YNW0UynDv0ih6=iEqX7pXBSQ5xCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Tue, Jan 22, 2013 at 10:55 AM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-The content of this pull:
+>> Add a function to gpiolib.c to check if a certain gpio is in the range
+>> of the current chip.
+>>
+>> Then use that:
+>>
+>> if (gpio_in_pinrange(gpio))
+>>     pinctrl_request_gpio(gpio);
+>>
+>> Yours,
+>> Linus Walleij
+>
+> It seems better. I'll update it.
 
-update for audio support via omap-twl4030 and pwm updates in board level:
-http://www.spinics.net/lists/linux-omap/msg85085.html
+Hm the function above will need to pass the chip as parameter as
+well, so a bit simplified.
 
-and zoom-peripherals update to not request the TWL GPIO7:
-http://www.spinics.net/lists/linux-omap/msg85187.html
+Maybe it's better to add a function like gpio_check_pinctrl_backend(chip, gpio);
+that does the above two statements?
 
-All is on top of mainline v3.8-rc4 tag.
-
-Regards,
-P?ter
-
----
-The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
-
-  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
-
-are available in the git repository at:
-
-  git://gitorious.org/omap-audio/linux-audio.git peter/for-tony
-
-for you to fetch changes up to e4f4e8bfa47431b91fbb21dd9b86d9bc2c15cbd7:
-
-  ARM: board-zoom: Do not request LCD panel enable GPIO from twl4030 (2013-01-22 10:35:16 +0100)
-
-----------------------------------------------------------------
-Peter Ujfalusi (9):
-      ARM: OMAP: 3430sdp: Enable extmute functionality for audio
-      ARM: OMAP: zoom: Zoom2 does not have extmute functionality
-      ARM: OMAP2+: twl-common: Add default twl4030 audio configuration
-      ARM: OMAP2+: twl-common: Allow boards to customize the twl4030 audio setup
-      ARM: OMAP: zoom: Audio support via the common omap-twl4030 machine driver
-      ARM: OMAP: sdp3430: Audio support via the common omap-twl4030 machine driver
-      ARM: OMAP: board-4430sdp: Proper support for TWL6030 PWM LED/Backlight
-      ARM: OMAP: omap3beagle: Use the pwm_leds driver to control the PMU_STAT led
-      ARM: board-zoom: Do not request LCD panel enable GPIO from twl4030
-
- arch/arm/mach-omap2/board-3430sdp.c          | 20 ++++++++++++++++++++
- arch/arm/mach-omap2/board-4430sdp.c          | 30 +++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/board-cm-t35.c           |  2 +-
- arch/arm/mach-omap2/board-devkit8000.c       |  2 +-
- arch/arm/mach-omap2/board-igep0020.c         |  2 +-
- arch/arm/mach-omap2/board-omap3beagle.c      | 41 ++++++++++++++++++++++++++++++++---------
- arch/arm/mach-omap2/board-omap3evm.c         |  2 +-
- arch/arm/mach-omap2/board-overo.c            |  2 +-
- arch/arm/mach-omap2/board-zoom-peripherals.c | 39 +++++++++++++++++++++------------------
- arch/arm/mach-omap2/twl-common.c             | 17 +++++++++++------
- arch/arm/mach-omap2/twl-common.h             |  3 ++-
- 11 files changed, 120 insertions(+), 40 deletions(-)
+Yours,
+Linus Walleij
