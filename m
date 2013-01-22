@@ -1,107 +1,108 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Tue, 22 Jan 2013 20:20:41 +0800
-Subject: [PATCH v3 4/9] ARM: PRIMA2: mv timer to timer-prima2 as we will add
- timer-marco
-In-Reply-To: <1358857241-10052-1-git-send-email-Barry.Song@csr.com>
-References: <1358857241-10052-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1358857241-10052-4-git-send-email-Barry.Song@csr.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 22 Jan 2013 14:21:46 +0200
+Subject: [PATCH v2] ARM: OMAP3: cm-t3517: add MMC support
+In-Reply-To: <50E3DEDA.7020807@compulab.co.il>
+References: <1354795206-12048-1-git-send-email-grinberg@compulab.co.il>
+ <1354871155-32528-1-git-send-email-grinberg@compulab.co.il>
+ <50E3DEDA.7020807@compulab.co.il>
+Message-ID: <50FE845A.8090309@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+ping!
 
-Marco timer has different timer IP with prima2, so rename the current timer
-to timer-prima2 so that we can add timer-marco.
+It has been 1.5 month and we are at rc4 already...
 
-at the same time, if we don't find prima2 timer node in dt, don't panic the
-system as we will make prima2 and marco use same kernel image.
+On 01/02/13 09:16, Igor Grinberg wrote:
+> ping
+> 
+> Hi Tony,
+> 
+> This is a really small addition to improve Paul's tests coverage.
+> Can this go into 3.9?
+> 
+> Thanks
+> 
+> On 12/07/12 11:05, Igor Grinberg wrote:
+>> cm-t3517 uses two MMC interfaces. Add support for both.
+>>
+>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+>> ---
+>> v2: Use CONFIG_MMC_OMAP_HS instead of plain CONFIG_MMC, so it will be stubbed
+>>     out with the same defines as omap_hsmmc_init() function.
+>>     Fix the !CONFIG_MMC_OMAP_HS case.
+>>
+>>  arch/arm/mach-omap2/board-cm-t3517.c |   27 +++++++++++++++++++++++++++
+>>  1 files changed, 27 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+>> index ebbc2ad..792d684 100644
+>> --- a/arch/arm/mach-omap2/board-cm-t3517.c
+>> +++ b/arch/arm/mach-omap2/board-cm-t3517.c
+>> @@ -32,6 +32,7 @@
+>>  #include <linux/mtd/mtd.h>
+>>  #include <linux/mtd/nand.h>
+>>  #include <linux/mtd/partitions.h>
+>> +#include <linux/mmc/host.h>
+>>  #include <linux/can/platform/ti_hecc.h>
+>>  
+>>  #include <asm/mach-types.h>
+>> @@ -46,6 +47,7 @@
+>>  
+>>  #include "mux.h"
+>>  #include "control.h"
+>> +#include "hsmmc.h"
+>>  #include "common-board-devices.h"
+>>  #include "am35xx-emac.h"
+>>  #include "gpmc-nand.h"
+>> @@ -121,6 +123,26 @@ static void cm_t3517_init_hecc(void)
+>>  static inline void cm_t3517_init_hecc(void) {}
+>>  #endif
+>>  
+>> +#if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
+>> +static struct omap2_hsmmc_info cm_t3517_mmc[] = {
+>> +	{
+>> +		.mmc		= 1,
+>> +		.caps		= MMC_CAP_4_BIT_DATA,
+>> +		.gpio_cd	= 144,
+>> +		.gpio_wp	= 59,
+>> +	},
+>> +	{
+>> +		.mmc		= 2,
+>> +		.caps		= MMC_CAP_4_BIT_DATA,
+>> +		.gpio_cd	= -EINVAL,
+>> +		.gpio_wp	= -EINVAL,
+>> +	},
+>> +	{}	/* Terminator */
+>> +};
+>> +#else
+>> +#define cm_t3517_mmc NULL
+>> +#endif
+>> +
+>>  #if defined(CONFIG_RTC_DRV_V3020) || defined(CONFIG_RTC_DRV_V3020_MODULE)
+>>  #define RTC_IO_GPIO		(153)
+>>  #define RTC_WR_GPIO		(154)
+>> @@ -271,6 +293,10 @@ static struct omap_board_mux board_mux[] __initdata = {
+>>  	/* CM-T3517 USB HUB nRESET */
+>>  	OMAP3_MUX(MCBSP4_CLKX, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+>>  
+>> +	/* CD - GPIO144 and WP - GPIO59 for MMC1 - SB-T35 */
+>> +	OMAP3_MUX(UART2_CTS, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
+>> +	OMAP3_MUX(GPMC_CLK, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
+>> +
+>>  	{ .reg_offset = OMAP_MUX_TERMINATOR },
+>>  };
+>>  #endif
+>> @@ -286,6 +312,7 @@ static void __init cm_t3517_init(void)
+>>  	cm_t3517_init_usbh();
+>>  	cm_t3517_init_hecc();
+>>  	am35xx_emac_init(AM35XX_DEFAULT_MDIO_FREQUENCY, 1);
+>> +	omap_hsmmc_init(cm_t3517_mmc);
+>>  }
+>>  
+>>  MACHINE_START(CM_T3517, "Compulab CM-T3517")
+> 
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/Makefile                    |    2 +-
- arch/arm/mach-prima2/common.c                    |    2 +-
- arch/arm/mach-prima2/common.h                    |    2 +-
- arch/arm/mach-prima2/{timer.c => timer-prima2.c} |    6 +++---
- 4 files changed, 6 insertions(+), 6 deletions(-)
- rename arch/arm/mach-prima2/{timer.c => timer-prima2.c} (98%)
-
-diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
-index fc9ce22..0007a6e 100644
---- a/arch/arm/mach-prima2/Makefile
-+++ b/arch/arm/mach-prima2/Makefile
-@@ -1,4 +1,3 @@
--obj-y := timer.o
- obj-y += rstc.o
- obj-y += common.o
- obj-y += rtciobrg.o
-@@ -6,3 +5,4 @@ obj-$(CONFIG_DEBUG_LL) += lluart.o
- obj-$(CONFIG_CACHE_L2X0) += l2x0.o
- obj-$(CONFIG_SUSPEND) += pm.o sleep.o
- obj-$(CONFIG_SIRF_IRQ) += irq.o
-+obj-$(CONFIG_ARCH_PRIMA2) += timer-prima2.o
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index ed3570e..8e6f668 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -40,7 +40,7 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
- 	.map_io         = sirfsoc_map_lluart,
- 	.init_irq	= sirfsoc_of_irq_init,
--	.init_time	= sirfsoc_timer_init,
-+	.init_time	= sirfsoc_prima2_timer_init,
- 	.dma_zone_size	= SZ_256M,
- 	.init_machine	= sirfsoc_mach_init,
- 	.init_late	= sirfsoc_init_late,
-diff --git a/arch/arm/mach-prima2/common.h b/arch/arm/mach-prima2/common.h
-index 9c75f12..d6890b6 100644
---- a/arch/arm/mach-prima2/common.h
-+++ b/arch/arm/mach-prima2/common.h
-@@ -12,7 +12,7 @@
- #include <linux/init.h>
- #include <asm/mach/time.h>
- 
--extern void sirfsoc_timer_init(void);
-+extern void sirfsoc_prima2_timer_init(void);
- 
- extern void __init sirfsoc_of_irq_init(void);
- extern void __init sirfsoc_of_clk_init(void);
-diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer-prima2.c
-similarity index 98%
-rename from arch/arm/mach-prima2/timer.c
-rename to arch/arm/mach-prima2/timer-prima2.c
-index 8c732a5..309e724 100644
---- a/arch/arm/mach-prima2/timer.c
-+++ b/arch/arm/mach-prima2/timer-prima2.c
-@@ -187,7 +187,7 @@ static void __init sirfsoc_clockevent_init(void)
- }
- 
- /* initialize the kernel jiffy timer source */
--void __init sirfsoc_timer_init(void)
-+void __init sirfsoc_prima2_timer_init(void)
- {
- 	unsigned long rate;
- 	struct clk *clk;
-@@ -226,14 +226,14 @@ static struct of_device_id timer_ids[] = {
- 	{},
- };
- 
--void __init sirfsoc_of_timer_map(void)
-+static void __init sirfsoc_of_timer_map(void)
- {
- 	struct device_node *np;
- 	const unsigned int *intspec;
- 
- 	np = of_find_matching_node(NULL, timer_ids);
- 	if (!np)
--		panic("unable to find compatible timer node in dtb\n");
-+		return;
- 	sirfsoc_timer_base = of_iomap(np, 0);
- 	if (!sirfsoc_timer_base)
- 		panic("unable to map timer cpu registers\n");
 -- 
-1.7.5.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Regards,
+Igor.
