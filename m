@@ -1,21 +1,21 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 22 Jan 2013 16:38:29 +0100
-Subject: [PATCH v1 6/6] USB: MUSB: OMAP: get PHY by phandle for dt boot
-In-Reply-To: <50FEAE96.30706@ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <1358848694-20145-7-git-send-email-kishon@ti.com> <50FE9F5C.2010501@ti.com>
- <50FEA447.1090701@ti.com> <50FEA696.8000506@ti.com> <50FEAE96.30706@ti.com>
-Message-ID: <50FEB275.80504@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jan 2013 15:38:55 +0000
+Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
+In-Reply-To: <Pine.LNX.4.44L0.1301221011190.1510-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1301221011190.1510-100000@iolanthe.rowland.org>
+Message-ID: <201301221538.55975.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 04:21 PM, kishon wrote:
-> But it's better to check if deferred probing
-> takes place whenever a new driver is bound to a device as you just mentioned.
+On Tuesday 22 January 2013, Alan Stern wrote:
+> In order to prevent this, you have to make sure that each glue driver
+> depends on USB_ARCH_HAS_EHCI.  A simple way to do this is to surround
+> the Kconfig entries for those drivers with "if USB && 
+> USB_ARCH_HAS_EHCI" ... "endif".
 
-Whenever you load (might be also when you unload) a driver the deferred
-modules will try to probe again. This is to check back if the dependency of
-the deferred modules has been fulfilled by the new driver or not.
+I was actually thinking we could remove the use of USB_ARCH_HAS_EHCI
+as well once we have inverted the logic for selecting USB_EHCI_HCD,
+but there is another problem with that, because then we still need
+something to select USB_ARCH_HAS_HCD, or kill that symbol as well.
 
--- 
-P?ter
+	Arnd
