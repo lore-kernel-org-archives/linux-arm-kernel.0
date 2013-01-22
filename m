@@ -1,31 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 22 Jan 2013 14:46:49 -0600
-Subject: [PATCH 3/6] arm: kconfig: don't select TWD with local timer for
- Armada 370/XP
-In-Reply-To: <201301212044.41865.arnd@arndb.de>
-References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
- <201301211831.45947.arnd@arndb.de>
- <CAKGA1b=9WQNwHOz=k13XVc=MyZT1UrcaYj8muF2A5B4eJA5+MA@mail.gmail.com>
- <201301212044.41865.arnd@arndb.de>
-Message-ID: <50FEFAB9.4030503@gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 22 Jan 2013 15:54:21 -0500
+Subject: [PATCH v5 01/45] percpu_rwlock: Introduce the global
+ reader-writer lock backend
+In-Reply-To: <50FEEF5D.6080302@linux.vnet.ibm.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122073315.13822.27093.stgit@srivatsabhat.in.ibm.com>
+ <1358883152.21576.55.camel@gandalf.local.home>
+ <50FEEF5D.6080302@linux.vnet.ibm.com>
+Message-ID: <1358888061.21576.57.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2013 02:44 PM, Arnd Bergmann wrote:
+On Wed, 2013-01-23 at 01:28 +0530, Srivatsa S. Bhat wrote:
 
->> On multiplatform kernels where at least one arch has TWD support, it
->> will be included, and where not, it will not.
->>
->> It doesn't seem logical for a feature descriptor (HAVE_ARM_TWD) to
->> rely on greater knowledge of what platforms may or may not support it.
->> If we had to include every platform in that list it would be unwieldy.
+> > I thought global locks are now fair. That is, a reader will block if a
+> > writer is waiting. Hence, the above should deadlock on the current
+> > rwlock_t types.
+> > 
 > 
-> I would expect that all future platforms have ARM_TWD, so the list
-> of the platforms that don't is not going to grow much, but the list
-> of platforms that do will keep growing.
+> Oh is it? Last I checked, lockdep didn't complain about this ABBA scenario!
 
-No, I expect all future platforms will have architected timers. TWD is
-pretty much A9 and A5 only I believe. Same with SCU. I've probably
-missed some in my list.
+It doesn't and Peter Zijlstra said we need to fix that ;-)  It only
+recently became an issue with the new "fair" locking of rwlocks.
 
-Rob
+-- Steve
