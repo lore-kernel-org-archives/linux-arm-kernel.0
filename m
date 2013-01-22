@@ -1,164 +1,542 @@
 From: dev@lynxeye.de (Lucas Stach)
-Date: Tue, 22 Jan 2013 22:46:07 +0100
-Subject: [PATCH v2 1/3] ARM: DT: tegra: move serial clock-frequency attr into
- the SoC dtsi
-In-Reply-To: <1358423961-24318-1-git-send-email-dev@lynxeye.de>
+Date: Tue, 22 Jan 2013 22:46:08 +0100
+Subject: [PATCH v2 2/3] ARM: DT: tegra: Add Colibri T20 512MB COM
+In-Reply-To: <1358891169-5939-1-git-send-email-dev@lynxeye.de>
 References: <1358423961-24318-1-git-send-email-dev@lynxeye.de>
-Message-ID: <1358891169-5939-1-git-send-email-dev@lynxeye.de>
+ <1358891169-5939-1-git-send-email-dev@lynxeye.de>
+Message-ID: <1358891169-5939-2-git-send-email-dev@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No Tegra Platform is running PLL_P at another rate than 216MHz, nor is
-any using an other PLL as UART source clock. Move attribute into SoC
-level dtsi file to slim down board DT files.
+This adds the device tree include file for the Toradex Colibri T20
+Computer on Module (COM). It's only valid for the 512MB RAM version of
+the module, as the 256MB version needs different EMC tables and flash
+configuration. To make this clear the suffix -512 was added to the board
+compatible string.
+
+The Colibri T20 uses a Tegra2 SoC and has onboard USB Ethernet and AC97
+sound.
+
+Still some things like onboard NAND support missing, but should be a
+good base for further development.
 
 Signed-off-by: Lucas Stach <dev@lynxeye.de>
 ---
 v2:
-- initial revision
+- remove some whitespace
+- remove nodes that don't carry any additional info
+- unify regulator node between module and carrier board
 ---
- arch/arm/boot/dts/tegra20-harmony.dts   | 1 -
- arch/arm/boot/dts/tegra20-paz00.dts     | 2 --
- arch/arm/boot/dts/tegra20-seaboard.dts  | 1 -
- arch/arm/boot/dts/tegra20-tamonten.dtsi | 1 -
- arch/arm/boot/dts/tegra20-trimslice.dts | 1 -
- arch/arm/boot/dts/tegra20-ventana.dts   | 1 -
- arch/arm/boot/dts/tegra20-whistler.dts  | 1 -
- arch/arm/boot/dts/tegra20.dtsi          | 5 +++++
- 8 files changed, 5 insertions(+), 8 deletions(-)
+ Documentation/devicetree/bindings/arm/tegra.txt |   1 +
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi      | 491 ++++++++++++++++++++++++
+ 2 files changed, 492 insertions(+)
+ create mode 100644 arch/arm/boot/dts/tegra20-colibri-512.dtsi
 
-diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
-index 54295e3..96f4ccd 100644
---- a/arch/arm/boot/dts/tegra20-harmony.dts
-+++ b/arch/arm/boot/dts/tegra20-harmony.dts
-@@ -252,7 +252,6 @@
- 
- 	serial at 70006300 {
- 		status = "okay";
--		clock-frequency = <216000000>;
- 	};
- 
- 	i2c at 7000c000 {
-diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
-index 80d9635..7744c8b 100644
---- a/arch/arm/boot/dts/tegra20-paz00.dts
-+++ b/arch/arm/boot/dts/tegra20-paz00.dts
-@@ -244,12 +244,10 @@
- 
- 	serial at 70006000 {
- 		status = "okay";
--		clock-frequency = <216000000>;
- 	};
- 
- 	serial at 70006200 {
- 		status = "okay";
--		clock-frequency = <216000000>;
- 	};
- 
- 	i2c at 7000c000 {
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index d4e4ff2..0b48359 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -303,7 +303,6 @@
- 
- 	serial at 70006300 {
- 		status = "okay";
--		clock-frequency = <216000000>;
- 	};
- 
- 	i2c at 7000c000 {
-diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-index a239ccd..4766aba 100644
---- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
-+++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-@@ -276,7 +276,6 @@
- 	};
- 
- 	serial at 70006300 {
--		clock-frequency = <216000000>;
- 		status = "okay";
- 	};
- 
-diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-index 4b6c486..adf6024 100644
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@ -263,7 +263,6 @@
- 
- 	serial at 70006000 {
- 		status = "okay";
--		clock-frequency = <216000000>;
- 	};
- 
- 	dvi_ddc: i2c at 7000c000 {
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index e3d3b29..5b15c30 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -300,7 +300,6 @@
- 
- 	serial at 70006300 {
- 		status = "okay";
--		clock-frequency = <216000000>;
- 	};
- 
- 	i2c at 7000c000 {
-diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
-index b8e0ee1..ea57c0f 100644
---- a/arch/arm/boot/dts/tegra20-whistler.dts
-+++ b/arch/arm/boot/dts/tegra20-whistler.dts
-@@ -255,7 +255,6 @@
- 
- 	serial at 70006000 {
- 		status = "okay";
--		clock-frequency = <216000000>;
- 	};
- 
- 	hdmi_ddc: i2c at 7000c400 {
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 9c4870f..8324ef4 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -223,6 +223,7 @@
- 		reg = <0x70006000 0x40>;
- 		reg-shift = <2>;
- 		interrupts = <0 36 0x04>;
-+		clock-frequency = <216000000>;
- 		nvidia,dma-request-selector = <&apbdma 8>;
- 		status = "disabled";
- 	};
-@@ -232,6 +233,7 @@
- 		reg = <0x70006040 0x40>;
- 		reg-shift = <2>;
- 		interrupts = <0 37 0x04>;
-+		clock-frequency = <216000000>;
- 		nvidia,dma-request-selector = <&apbdma 9>;
- 		status = "disabled";
- 	};
-@@ -241,6 +243,7 @@
- 		reg = <0x70006200 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 46 0x04>;
-+		clock-frequency = <216000000>;
- 		nvidia,dma-request-selector = <&apbdma 10>;
- 		status = "disabled";
- 	};
-@@ -250,6 +253,7 @@
- 		reg = <0x70006300 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 90 0x04>;
-+		clock-frequency = <216000000>;
- 		nvidia,dma-request-selector = <&apbdma 19>;
- 		status = "disabled";
- 	};
-@@ -259,6 +263,7 @@
- 		reg = <0x70006400 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 91 0x04>;
-+		clock-frequency = <216000000>;
- 		nvidia,dma-request-selector = <&apbdma 20>;
- 		status = "disabled";
- 	};
+diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
+index a5d3353..ccd4ef4 100644
+--- a/Documentation/devicetree/bindings/arm/tegra.txt
++++ b/Documentation/devicetree/bindings/arm/tegra.txt
+@@ -30,3 +30,4 @@ board-specific compatible values:
+   nvidia,seaboard
+   nvidia,ventana
+   nvidia,whistler
++  toradex,colibri_t20-512
+diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+new file mode 100644
+index 0000000..4441620
+--- /dev/null
++++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+@@ -0,0 +1,491 @@
++/include/ "tegra20.dtsi"
++
++/ {
++	model = "Toradex Colibri T20 512MB";
++	compatible = "toradex,colibri_t20-512", "nvidia,tegra20";
++
++	memory {
++		reg = <0x00000000 0x20000000>;
++	};
++
++	host1x {
++		hdmi {
++			vdd-supply = <&hdmi_vdd_reg>;
++			pll-supply = <&hdmi_pll_reg>;
++
++			nvidia,ddc-i2c-bus = <&i2c_ddc>;
++			nvidia,hpd-gpio = <&gpio 111 0>; /* PN7 */
++		};
++	};
++
++	pinmux {
++		pinctrl-names = "default";
++		pinctrl-0 = <&state_default>;
++
++		state_default: pinmux {
++			audio_refclk {
++				nvidia,pins = "cdev1";
++				nvidia,function = "plla_out";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			crt {
++				nvidia,pins = "crtp";
++				nvidia,function = "crt";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			dap3 {
++				nvidia,pins = "dap3";
++				nvidia,function = "dap3";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			displaya {
++				nvidia,pins = "ld0", "ld1", "ld2", "ld3",
++					"ld4", "ld5", "ld6", "ld7", "ld8",
++					"ld9", "ld10", "ld11", "ld12", "ld13",
++					"ld14", "ld15", "ld16", "ld17",
++					"lhs", "lpw0", "lpw2", "lsc0",
++					"lsc1", "lsck", "lsda", "lspi", "lvs";
++				nvidia,function = "displaya";
++				nvidia,tristate = <1>;
++			};
++			gpio_dte {
++				nvidia,pins = "dte";
++				nvidia,function = "rsvd1";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			gpio_gmi {
++				nvidia,pins = "ata", "atc", "atd", "ate",
++					"dap1", "dap2", "dap4", "gpu", "irrx",
++					"irtx", "spia", "spib", "spic";
++				nvidia,function = "gmi";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			gpio_pta {
++				nvidia,pins = "pta";
++				nvidia,function = "rsvd4";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			gpio_uac {
++				nvidia,pins = "uac";
++				nvidia,function = "rsvd2";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			hdint {
++				nvidia,pins = "hdint";
++				nvidia,function = "hdmi";
++				nvidia,tristate = <1>;
++			};
++			i2c1 {
++				nvidia,pins = "rm";
++				nvidia,function = "i2c1";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			i2c3 {
++				nvidia,pins = "dtf";
++				nvidia,function = "i2c3";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			i2cddc {
++				nvidia,pins = "ddc";
++				nvidia,function = "i2c2";
++				nvidia,pull = <2>;
++				nvidia,tristate = <1>;
++			};
++			i2cp {
++				nvidia,pins = "i2cp";
++				nvidia,function = "i2cp";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			irda {
++				nvidia,pins = "uad";
++				nvidia,function = "irda";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			nand {
++				nvidia,pins = "kbca", "kbcc", "kbcd",
++					"kbce", "kbcf";
++				nvidia,function = "nand";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			owc {
++				nvidia,pins = "owc";
++				nvidia,function = "owr";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			pmc {
++				nvidia,pins = "pmc";
++				nvidia,function = "pwr_on";
++				nvidia,tristate = <0>;
++			};
++			pwm {
++				nvidia,pins = "sdb", "sdc", "sdd";
++				nvidia,function = "pwm";
++				nvidia,tristate = <1>;
++			};
++			sdio4 {
++				nvidia,pins = "atb", "gma", "gme";
++				nvidia,function = "sdio4";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			spi1 {
++				nvidia,pins = "spid", "spie", "spif";
++				nvidia,function = "spi1";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			spi4 {
++				nvidia,pins = "slxa", "slxc", "slxd", "slxk";
++				nvidia,function = "spi4";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			uarta {
++				nvidia,pins = "sdio1";
++				nvidia,function = "uarta";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			uartd {
++				nvidia,pins = "gmc";
++				nvidia,function = "uartd";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			ulpi {
++				nvidia,pins = "uaa", "uab", "uda";
++				nvidia,function = "ulpi";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			ulpi_refclk {
++				nvidia,pins = "cdev2";
++				nvidia,function = "pllp_out4";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			usb_gpio {
++				nvidia,pins = "spig", "spih";
++				nvidia,function = "spi2_alt";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			vi {
++				nvidia,pins = "dta", "dtb", "dtc", "dtd";
++				nvidia,function = "vi";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			vi_sc {
++				nvidia,pins = "csus";
++				nvidia,function = "vi_sensor_clk";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++		};
++	};
++
++	i2c at 7000c000 {
++		clock-frequency = <400000>;
++	};
++
++	i2c_ddc: i2c at 7000c400 {
++		clock-frequency = <100000>;
++	};
++
++	i2c at 7000c500 {
++		clock-frequency = <400000>;
++	};
++
++	i2c at 7000d000 {
++		status = "okay";
++		clock-frequency = <400000>;
++
++		pmic: tps6586x at 34 {
++			compatible = "ti,tps6586x";
++			reg = <0x34>;
++			interrupts = <0 86 0x4>;
++
++			ti,system-power-controller;
++
++			#gpio-cells = <2>;
++			gpio-controller;
++
++			sys-supply = <&vdd_5v0_reg>;
++			vin-sm0-supply = <&sys_reg>;
++			vin-sm1-supply = <&sys_reg>;
++			vin-sm2-supply = <&sys_reg>;
++			vinldo01-supply = <&sm2_reg>;
++			vinldo23-supply = <&sm2_reg>;
++			vinldo4-supply = <&sm2_reg>;
++			vinldo678-supply = <&sm2_reg>;
++			vinldo9-supply = <&sm2_reg>;
++
++			regulators {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				sys_reg: regulator at 0 {
++					reg = <0>;
++					regulator-compatible = "sys";
++					regulator-name = "vdd_sys";
++					regulator-always-on;
++				};
++
++				regulator at 1 {
++					reg = <1>;
++					regulator-compatible = "sm0";
++					regulator-name = "vdd_sm0,vdd_core";
++					regulator-min-microvolt = <1275000>;
++					regulator-max-microvolt = <1275000>;
++					regulator-always-on;
++				};
++
++				regulator at 2 {
++					reg = <2>;
++					regulator-compatible = "sm1";
++					regulator-name = "vdd_sm1,vdd_cpu";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-always-on;
++				};
++
++				sm2_reg: regulator at 3 {
++					reg = <3>;
++					regulator-compatible = "sm2";
++					regulator-name = "vdd_sm2,vin_ldo*";
++					regulator-min-microvolt = <3700000>;
++					regulator-max-microvolt = <3700000>;
++					regulator-always-on;
++				};
++
++				/* LDO0 is not connected to anything */
++
++				regulator at 5 {
++					reg = <5>;
++					regulator-compatible = "ldo1";
++					regulator-name = "vdd_ldo1,avdd_pll*";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-always-on;
++				};
++
++				regulator at 6 {
++					reg = <6>;
++					regulator-compatible = "ldo2";
++					regulator-name = "vdd_ldo2,vdd_rtc";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++				};
++
++				/* LDO3 is not connected to anything */
++
++				regulator at 8 {
++					reg = <8>;
++					regulator-compatible = "ldo4";
++					regulator-name = "vdd_ldo4,avdd_osc,vddio_sys";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo5_reg: regulator at 9 {
++					reg = <9>;
++					regulator-compatible = "ldo5";
++					regulator-name = "vdd_ldo5,vdd_fuse";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++				};
++
++				regulator at 10 {
++					reg = <10>;
++					regulator-compatible = "ldo6";
++					regulator-name = "vdd_ldo6,avdd_vdac,vddio_vi,vddio_cam";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				hdmi_vdd_reg: regulator at 11 {
++					reg = <11>;
++					regulator-compatible = "ldo7";
++					regulator-name = "vdd_ldo7,avdd_hdmi";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				hdmi_pll_reg: regulator at 12 {
++					reg = <12>;
++					regulator-compatible = "ldo8";
++					regulator-name = "vdd_ldo8,avdd_hdmi_pll";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				regulator at 13 {
++					reg = <13>;
++					regulator-compatible = "ldo9";
++					regulator-name = "vdd_ldo9,avdd_2v85,vdd_ddr_rx";
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					regulator-always-on;
++				};
++
++				regulator at 14 {
++					reg = <14>;
++					regulator-compatible = "ldo_rtc";
++					regulator-name = "vdd_rtc_out,vdd_cell";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++				};
++			};
++		};
++
++		temperature-sensor at 4c {
++			compatible = "national,lm95245";
++			reg = <0x4c>;
++		};
++	};
++
++	memory-controller at 7000f400 {
++		emc-table at 83250 {
++			reg = <83250>;
++			compatible = "nvidia,tegra20-emc-table";
++			clock-frequency = <83250>;
++			nvidia,emc-registers =   <0x00000005 0x00000011
++				0x00000004 0x00000002 0x00000004 0x00000004
++				0x00000001 0x0000000a 0x00000002 0x00000002
++				0x00000001 0x00000001 0x00000003 0x00000004
++				0x00000003 0x00000009 0x0000000c 0x0000025f
++				0x00000000 0x00000003 0x00000003 0x00000002
++				0x00000002 0x00000001 0x00000008 0x000000c8
++				0x00000003 0x00000005 0x00000003 0x0000000c
++				0x00000002 0x00000000 0x00000000 0x00000002
++				0x00000000 0x00000000 0x00000083 0x00520006
++				0x00000010 0x00000008 0x00000000 0x00000000
++				0x00000000 0x00000000 0x00000000 0x00000000>;
++		};
++		emc-table at 133200 {
++			reg = <133200>;
++			compatible = "nvidia,tegra20-emc-table";
++			clock-frequency = <133200>;
++			nvidia,emc-registers =   <0x00000008 0x00000019
++				0x00000006 0x00000002 0x00000004 0x00000004
++				0x00000001 0x0000000a 0x00000002 0x00000002
++				0x00000002 0x00000001 0x00000003 0x00000004
++				0x00000003 0x00000009 0x0000000c 0x0000039f
++				0x00000000 0x00000003 0x00000003 0x00000002
++				0x00000002 0x00000001 0x00000008 0x000000c8
++				0x00000003 0x00000007 0x00000003 0x0000000c
++				0x00000002 0x00000000 0x00000000 0x00000002
++				0x00000000 0x00000000 0x00000083 0x00510006
++				0x00000010 0x00000008 0x00000000 0x00000000
++				0x00000000 0x00000000 0x00000000 0x00000000>;
++		};
++		emc-table at 166500 {
++			reg = <166500>;
++			compatible = "nvidia,tegra20-emc-table";
++			clock-frequency = <166500>;
++			nvidia,emc-registers =   <0x0000000a 0x00000021
++				0x00000008 0x00000003 0x00000004 0x00000004
++				0x00000002 0x0000000a 0x00000003 0x00000003
++				0x00000002 0x00000001 0x00000003 0x00000004
++				0x00000003 0x00000009 0x0000000c 0x000004df
++				0x00000000 0x00000003 0x00000003 0x00000003
++				0x00000003 0x00000001 0x00000009 0x000000c8
++				0x00000003 0x00000009 0x00000004 0x0000000c
++				0x00000002 0x00000000 0x00000000 0x00000002
++				0x00000000 0x00000000 0x00000083 0x004f0006
++				0x00000010 0x00000008 0x00000000 0x00000000
++				0x00000000 0x00000000 0x00000000 0x00000000>;
++		};
++		emc-table at 333000 {
++			reg = <333000>;
++			compatible = "nvidia,tegra20-emc-table";
++			clock-frequency = <333000>;
++			nvidia,emc-registers =   <0x00000014 0x00000041
++				0x0000000f 0x00000005 0x00000004 0x00000005
++				0x00000003 0x0000000a 0x00000005 0x00000005
++				0x00000004 0x00000001 0x00000003 0x00000004
++				0x00000003 0x00000009 0x0000000c 0x000009ff
++				0x00000000 0x00000003 0x00000003 0x00000005
++				0x00000005 0x00000001 0x0000000e 0x000000c8
++				0x00000003 0x00000011 0x00000006 0x0000000c
++				0x00000002 0x00000000 0x00000000 0x00000002
++				0x00000000 0x00000000 0x00000083 0x00380006
++				0x00000010 0x00000008 0x00000000 0x00000000
++				0x00000000 0x00000000 0x00000000 0x00000000>;
++		};
++	};
++
++	ac97: ac97 {
++		status = "okay";
++		nvidia,codec-reset-gpio = <&gpio 168 0>; /* gpio PV0 */
++		nvidia,codec-sync-gpio = <&gpio 120 0>; /* gpio PP0 */
++	};
++
++	usb at c5004000 {
++		status = "okay";
++		nvidia,phy-reset-gpio = <&gpio 169 0>; /* gpio PV1 */
++	};
++
++	sdhci at c8000600 {
++		cd-gpios = <&gpio 23 0>; /* gpio PC7 */
++	};
++
++	sound {
++		compatible = "nvidia,tegra-audio-wm9712-colibri_t20",
++			         "nvidia,tegra-audio-wm9712";
++		nvidia,model = "Colibri T20 AC97 Audio";
++
++		nvidia,audio-routing =
++			"Headphone", "HPOUTL",
++			"Headphone", "HPOUTR",
++			"LineIn", "LINEINL",
++			"LineIn", "LINEINR",
++			"Mic", "MIC1";
++
++		nvidia,ac97-controller = <&ac97>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vdd_5v0_reg: regulator at 100 {
++			compatible = "regulator-fixed";
++			reg = <100>;
++			regulator-name = "vdd_5v0";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++		};
++
++		regulator at 101 {
++			compatible = "regulator-fixed";
++			reg = <101>;
++			regulator-name = "internal_usb";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-boot-on;
++			regulator-always-on;
++			gpio = <&gpio 217 0>;
++		};
++	};
++};
 -- 
 1.8.0.2
