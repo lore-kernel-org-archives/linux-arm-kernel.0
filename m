@@ -1,40 +1,97 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 Jan 2013 22:09:44 +0800
-Subject: [PATCH V2  0/5] W1: Support onewire master on i.MX53
-In-Reply-To: <20130122082712.GJ1906@pengutronix.de>
-References: <20130116145749.24249.678.stgit@localhost>
- <20130122082712.GJ1906@pengutronix.de>
-Message-ID: <20130122140941.GA4920@S2101-09.ap.freescale.net>
+From: kishon@ti.com (kishon)
+Date: Tue, 22 Jan 2013 19:43:44 +0530
+Subject: [PATCH v1 2/6] usb: otg: utils: add facilities in phy lib to
+ support multiple PHYs of same type
+In-Reply-To: <50FE9D1E.3010800@ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <1358848694-20145-3-git-send-email-kishon@ti.com> <50FE9D1E.3010800@ti.com>
+Message-ID: <50FE9E98.3080905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 09:27:12AM +0100, Sascha Hauer wrote:
-> On Wed, Jan 16, 2013 at 03:57:49PM +0100, Martin Fuzzey wrote:
-> > W1: Support onewire master on i.MX53
-> > 	* Add device tree and pinctrl support to the MXC master driver
-> > 	* Convert to use devm_
-> > 	* Add i.MX53 clocks
-> > 	* Add i.MX53 device tree entries
-> > 
-> > Changes since V1
-> > * Applied comments from Sascha Hauer:
-> > 	* Move patch converting driver to devm_ before the one adding devm_ based pinctrl
-> > 	* Fix existing unbalanced clk_prepare_enable/clk_disable_unprepare
-> > 	in probe error path
-> > 
-> > * Place DT patch last since it includes pinctrls for driver.
-> 
-> This looks good now.
-> 
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> You might have to send this again in two series, one for the w1
-> maintainer and one for arm-soc. Both series should be sufficiently
-> orthogonal.
-> 
-Evgeniy has already ACK-ed the v1 series, so maybe he does not see any
-problem with the whole series going through one tree.  In that case,
-we may just have it go via arm-soc tree?  Otherwise, please let us
-know, Evgeniy.
+Hi,
 
-Shawn
+On Tuesday 22 January 2013 07:37 PM, Roger Quadros wrote:
+> On 01/22/2013 11:58 AM, Kishon Vijay Abraham I wrote:
+>> In order to add support for multipe PHY's of the same type, new API's
+>> for adding PHY and getting PHY has been added. Now the binding
+>> information for the PHY and controller should be done in platform file
+>> using usb_bind_phy API. And for getting a PHY, the device pointer of the
+>> USB controller and an index should be passed. Based on the binding
+>> information that is added in the platform file, usb_get_phy_dev will return the
+>> appropriate PHY.
+>> Already existing API's to add and get phy by type is not removed. These
+>> API's are deprecated and will be removed once all the platforms start to
+>> use the new API.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>   drivers/usb/otg/otg.c   |  114 ++++++++++++++++++++++++++++++++++++++++++++++-
+>>   include/linux/usb/phy.h |   13 ++++++
+>>   2 files changed, 126 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
+>> index 492ba2f..1f30b22 100644
+>> --- a/drivers/usb/otg/otg.c
+>> +++ b/drivers/usb/otg/otg.c
+>> @@ -36,6 +36,20 @@ static struct usb_phy *__usb_find_phy(struct list_head *list,
+>>   	return ERR_PTR(-ENODEV);
+>>   }
+>>
+>> +static struct usb_phy *__usb_find_phy_dev(struct device *dev,
+>> +	struct list_head *list, u8 index)
+>> +{
+>> +	struct usb_phy_bind *phy_bind = NULL;
+>> +
+>> +	list_for_each_entry(phy_bind, list, list) {
+>> +		if (!(strcmp(phy_bind->dev_name, dev_name(dev))) &&
+>> +				phy_bind->index == index)
+>> +			return phy_bind->phy;
+>
+> If the PHY driver has not yet called usb_add_phy_dev() (e.g. driver not yet loaeded)
+> then this will return NULL.
+>
+>> +	}
+>> +
+>> +	return ERR_PTR(-ENODEV);
+>> +}
+>> +
+>>   static void devm_usb_phy_release(struct device *dev, void *res)
+>>   {
+>>   	struct usb_phy *phy = *(struct usb_phy **)res;
+>> @@ -112,6 +126,69 @@ err0:
+>>   EXPORT_SYMBOL(usb_get_phy);
+>>
+>>   /**
+>> + * usb_get_phy_dev - find the USB PHY
+>> + * @dev - device that requests this phy
+>> + * @index - the index of the phy
+>> + *
+>> + * Returns the phy driver, after getting a refcount to it; or
+>> + * -ENODEV if there is no such phy.  The caller is responsible for
+>> + * calling usb_put_phy() to release that count.
+>> + *
+>> + * For use by USB host and peripheral drivers.
+>> + */
+>> +struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index)
+>> +{
+>> +	struct usb_phy	*phy = NULL;
+>> +	unsigned long	flags;
+>> +
+>> +	spin_lock_irqsave(&phy_lock, flags);
+>> +
+>> +	phy = __usb_find_phy_dev(dev, &phy_bind_list, index);
+>> +	if (IS_ERR(phy)) {
+>> +		pr_err("unable to find transceiver\n");
+>> +		goto err0;
+>> +	}
+>
+> Since NULL is not IS_ERR(), you will do a NULL pointer reference below.
+>
+> In such cases we would want to use the deferred probe mechanism. So should we return
+> -EPROBE_DEFER?
+
+Good catch. I'll update the patch.
+
+Thanks
+Kishon
