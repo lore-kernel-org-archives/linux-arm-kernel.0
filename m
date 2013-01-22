@@ -1,72 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Jan 2013 14:51:13 +0000
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <50FE666B.10902@ti.com>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <20130121232322.GK15361@atomide.com> <50FE307F.9000701@ti.com>
- <201301220931.24570.arnd@arndb.de> <50FE666B.10902@ti.com>
-Message-ID: <20130122145113.GK23505@n2100.arm.linux.org.uk>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Tue, 22 Jan 2013 16:03:04 +0100
+Subject: [PATCH] net: fec: Add support for multiple phys on mdiobus
+In-Reply-To: <50FEA691.4050904@openwrt.org>
+References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
+ <50FD02B8.8080401@grandegger.com> <20130121100701.GX1906@pengutronix.de>
+ <50FD2172.2020608@grandegger.com> <20130121120602.GZ1906@pengutronix.de>
+ <50FE3E37.4010004@grandegger.com> <50FEA691.4050904@openwrt.org>
+Message-ID: <50FEAA28.1070003@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 03:44:03PM +0530, Santosh Shilimkar wrote:
-> Sorry for not being clear enough. On OMAP, 32KHz is the only clock which
-> is always running(even during low power states) and hence the clock
-> source and clock event have been clocked using 32KHz clock. As mentioned
-> by RMK, with 32768 Hz clock and HZ = 100, there will be always an
-> error of 0.1 %. This accuracy also impacts the timer tick interval.
-> This was the reason, OMAP has been using the HZ = 128.
+On 01/22/2013 03:47 PM, Florian Fainelli wrote:
+> On 01/22/2013 08:22 AM, Wolfgang Grandegger wrote:
+>>> Well this could be done when the fixed phy driver could be registered
+>>> with the devicetree, maybe like this:
+>>>
+>>>     fixed-phy: mdiophy {
+>>>         compatible = "mdio-fixed-phy";
+>>>         link = "100FD";
+>>>     };
+>>
+>> I find that confusing. There is *no* phy but just a fixed link to the
+>> switch...
+>>
+>>> The good thing about this would be that every ethernet driver could just
+>>> use such a fixed phy, any external mdio phy (like on Marvell Armada) or
+>>> just a phy connected to the internal mdio interface provided by the
+>>> ethernet
+>>> core.
+>>
+>> What is wrong with the existing "fixed-link" property of the *ethernet*
+>> node. The fixed-link handling should/could be done in the phy layer, and
+>> not in the driver as it currently is implemented. Maybe that's the
+>> reason why the current code is regarded as hack!
+> 
+> As far as I have used it with the CPMAC driver, the fixed PHY is a
+> specific PHY device and there is no specific handling to be done by the
+> Ethernet MAC driver but eventually changing its MII bus id so that it is
+> named "fixed-0" to allow the fixed PHY driver to bind. Put differently,
 
-Ok.  Let's look at this.  As far as time-of-day is concerned, this
-shouldn't really matter with the clocksource/clockevent based system
-that we now have (where *important point* platforms have been converted
-over.)
+There is special handling for the fixed link, e.g. here:
 
-Any platform providing a clocksource will override the jiffy-based
-clocksource.  The measurement of time-of-day passing is now based on
-the difference in values read from the clocksource, not from the actual
-tick rate.
+http://lxr.linux.no/#linux+v3.7.4/drivers/net/ethernet/freescale/gianfar.c#L1462
 
-Anything _not_ providing a clock source will be reliant on jiffies
-incrementing, which in turn _requires_ one timer interrupt per jiffies
-at a known rate (which is HZ).
+This could be hidden in the PHY layer allowing all ethernet drivers
+using the "fixed-link" property.
 
-Now, that's the time of day, what about jiffies?  Well, jiffies is
-incremented based on a certain number of nsec having passed since the
-last jiffy update.  That means the code copes with dropped ticks and
-the like.
+> using the fixed PHY driver is a kind of "last" resort thing to cope with
+> situations like:
+> 
+> - switch not providing a consistent PHY-like interface on the MDC/MDIO bus
+> - switches not connected to the MDC/MDIO bus of the Ethernet MAC they
+> forward to
+> 
+> What exactly do you mean by "as it currently is implemented"? that you
+> do not like?
 
-However, if your actual interrupt rate is close to the desired HZ, then
-it can lead to some interesting effects (and noise):
+As Sascha pointed out, the implementation is labeled as "hack", which
+should be fixed sooner than later. It's just not clear why ;).
 
-- if the interrupt rate is slightly faster than HZ, then you can end up
-  with updates being delayed by 2x interrupt rate.
-- if the interrupt rate is slightly slower than HZ, you can occasionally
-  end up with jiffies incrementing by two.
-- if your interrupt rate is dead on HZ, then other system noise can come
-  into effect and you may get maybe zero, one or two jiffy increments per
-  interrupt.
-
-(You have to think about time passing in NS, where jiffy updates should
-be vs where the timer interrupts happen.)  See tick_do_update_jiffies64()
-for the details.
-
-The timer infrastructure is jiffy based - which includes scheduling where
-the scheduler does not use hrtimers.  That means a slight discrepency
-between HZ and the actual interrupt rate can cause around 1/HZ jitter.
-That's a matter of fact due to how the code works.
-
-So, actually, I think the accuracy of HZ has much overall effect _provided_
-a platform provides a clocksource to the accuracy of jiffy based timers
-nor timekeeping.  For those which don't, the accuracy of the timer
-interrupt to HZ is very important.
-
-(This is just based on reading some code and not on practical
-experiments - I'd suggest some research of this is done, trying HZ=100
-on OMAP's 32kHz timers, checking whether there's any drift, checking
-how accurately a single task can be woken from various select/poll/epoll
-delays, and checking whether NTP works.)
-
-And I think further discussion is pointless until such research has been
-done (or someone who _really_ knows the time keeping/timer/sched code
-inside out comments.)
+Wolfgang.
