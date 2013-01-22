@@ -1,47 +1,66 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 22 Jan 2013 02:24:44 +0000 (UTC)
-Subject: OMAP baseline test results for v3.8-rc4
-In-Reply-To: <87boci9str.fsf@dell.be.48ers.dk>
-References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
- <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
- <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
- <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
-Message-ID: <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+From: dhobsong@igel.co.jp (Damian Hobson-Garcia)
+Date: Tue, 22 Jan 2013 11:31:51 +0900
+Subject: [PATCH] ARM: shmobile: ipmmu: Add basic PMB support
+In-Reply-To: <1788080.QuLk5ExqBm@avalon>
+References: <1358490910-30716-1-git-send-email-dhobsong@igel.co.jp>
+ <1788080.QuLk5ExqBm@avalon>
+Message-ID: <50FDFA17.5050107@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laurent,
 
-Hi guys,
+Thanks for your comments.
+On 2013/01/21 22:12, Laurent Pinchart wrote:
+> Hi Damian,
+>
+> Thank you for the patch.
+>
+> On Friday 18 January 2013 15:35:10 Damian Hobson-Garcia wrote:
+>> The PMB can be used to remap 16, 64, 128 or 512 MiB pages from
+>> the 0x80000000-0xffffffff address range to anywhere in the
+>> 0x00000000-0x7fffffff range.
+>
+> Isn't it 0x80000000 - 0xbfffffff to 0x00000000 - 0xffffffff ?
+Yes, looking again at the spec, your values are the correct ones.
+>
+>> It also has the ability to perform tiled-linear address translation,
+>> which can be used to access a memory buffer as a series of n x m tiles,
+>> useful for image encoding/decoding.
+>> Currently only the userspace API via character device is supported.
+>
+> If I understand this correctly, you're allowing userspace to remap a virtual
+> address block to a physical address block without performing any sanity check.
+> Isn't that a major security issue ?
+No, not really. The PMB will only remap physical addresses, not virtual 
+addresses.  Moreover, the remapped address is only accessible from the 
+IP blocks which are on the ICB bus, not the CPU.  I will update the 
+comment to mention this.  These IP blocks already have access to the 
+entire physical memory address space, so I don't think that adding the 
+the PMB into mix introduces any new security issues.
 
-Regarding the AM33xx test failures with appended DTBs, it would be very 
-helpful if especially the TI people could try reproducing the problem.
-Otherwise it's going to cause problems with merging any new AM33xx 
-patches, since I won't be able to test them without additional work.  
-Plus, this is something that used to work up until d01e4afd, so something 
-isn't right.
+...
 
-You'll need to use the bootloader that TI originally shipped with the 
-BeagleBones:
+>
+>> +
+>> +#define PMB_DEVICE_NAME "pmb"
+>> +
+>> +#define PMB_NR 16
+>> +/* the smallest size that can be reserverd in the pmb */
+>> +#define PMB_GRANULARITY (16 << 20)
+>> +#define PMB_START_ADDR	0x80000000
+>> +#define PMB_SIZE	0x40000000
+>> +#define NUM_BITS(x)	((x) / PMB_GRANULARITY)
+>> +#define NR_BITMAPS	((NUM_BITS(PMB_SIZE) + BITS_PER_LONG - 1) \
+>> +				>> ilog2(BITS_PER_LONG))
+>
+> Does ilog2(BITS_PER_LONG) resolve to a compile-time constant ?
+Yes it does.
 
-U-Boot 2011.09-00009-gcf6e04d (Mar 08 2012 - 17:15:43)
+Thanks for your other comments too.  I'll look into making those changes.
 
-This is because many folks don't replace their bootloader.  I do plan to 
-add a test with a recent version of u-boot, but the kernel should not be 
-dependent on the bootloader in any way to work correctly.  If it is, then 
-we need to document what u-boot version the kernel started to work with.
-
-The Kconfig that I use is here:
-
-http://www.pwsan.com/omap/testlogs/test_v3.8-rc4/20130120122039/build/am33xx_only/am33xx_only
-
-It's possible that there's something wrong with the Kconfig.  It's 
-basically just omap2plus_defconfig, but with all OMAP support for 
-non-AM33xx turned off, and with the appended DTB and ATAG compatibility 
-options turned on.
-
-Let's try to do this ASAP.  That way, if it's some bootloader dependency 
-or bug in the kernel, some fix can be merged during the v3.8-rc series, 
-which is rapidly drawing to a close.
-
-
-- Paul
+Damian
+-- 
+Damian Hobson-Garcia
+IGEL Co.,Ltd
+http://www.igel.co.jp
