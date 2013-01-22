@@ -1,26 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Jan 2013 00:02:12 -0800
-Subject: [PATCH v2] ARM: remove redundant 'select GENERIC_GPIO'
-In-Reply-To: <1358499506-9790-1-git-send-email-shawn.guo@linaro.org>
-References: <1358499506-9790-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130122080212.GA27384@quad.lixom.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 22 Jan 2013 17:07:17 +0900
+Subject: [PATCH v2 1/2] ARM: shmobile: sh73a0: Use generic irqchip_init()
+In-Reply-To: <20130122072912.GD25783@quad.lixom.net>
+References: <1358493373-28722-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130121005439.GF19062@verge.net.au>
+ <20130121070301.GB15508@avionic-0098.adnet.avionic-design.de>
+ <20130122072912.GD25783@quad.lixom.net>
+Message-ID: <20130122080713.GA5569@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 04:58:26PM +0800, Shawn Guo wrote:
-> In drivers/gpio/Kcong, ARCH_REQUIRE_GPIOLIB selects GPIOLIB which in
-> turn selects GENERIC_GPIO.  So GENERIC_GPIO will be selected
-> automatically for those platforms that select ARCH_REQUIRE_GPIOLIB.
+On Mon, Jan 21, 2013 at 11:29:12PM -0800, Olof Johansson wrote:
+> On Mon, Jan 21, 2013 at 08:03:01AM +0100, Thierry Reding wrote:
+> > On Mon, Jan 21, 2013 at 09:54:39AM +0900, Simon Horman wrote:
+> > > On Fri, Jan 18, 2013 at 08:16:12AM +0100, Thierry Reding wrote:
+> > > > The asm/hardware/gic.h header does no longer exist and the corresponding
+> > > > functionality was moved to linux/irqchip.h and linux/irqchip/arm-gic.h
+> > > > respectively. gic_handle_irq() and of_irq_init() are no longer available
+> > > > either and have been replaced by irqchip_init().
+> > > 
+> > > asm/hardware/gic.h Seems to still exist in Linus's tree.
+> > > Could you let me know which tree of which branch I should depend on
+> > > in order to apply this change?
+> > 
+> > I found this when doing an automated build over all ARM defconfigs on
+> > linux-next.
+> > 
+> > Commit 520f7bd73354f003a9a59937b28e4903d985c420 "irqchip: Move ARM gic.h
+> > to include/linux/irqchip/arm-gic.h" moved the file and was merged
+> > through Olof Johansson's next/cleanup and for-next branches.
+> > 
+> > Adding Olof on Cc since I'm not quite sure myself about how this is
+> > handled.
 > 
-> Remove the redundant 'select GENERIC_GPIO' for platforms that already
-> select ARCH_REQUIRE_GPIOLIB at either mach or plat level.
+> The way to handle this is to base the branch you are adding new shmobile code
+> in, on top of the cleanup branches that changes the underlying infrastructure.
+> This is why we merge it early during the release, so that new code for various
+> platforms can be based on it to avoid a bunch of conflicts in the end.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Changes since v1:
->  - Update commit log to better explain why the select is unncessary
+> In this case, you might need to base your branch onto a merge of both
+> the irqchip/gic-vic-move and timer/cleanup branches from arm-soc.
 
-Applied to next/cleanup. Thanks!
-
--Olof
+Thanks, I'll take a look at rebasing accordingly.
