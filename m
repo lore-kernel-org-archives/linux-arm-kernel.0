@@ -1,45 +1,61 @@
-From: rob@ti.com (Rob Clark)
-Date: Tue, 22 Jan 2013 10:57:44 -0600
-Subject: [PATCH 15/15] staging/omapdrm: don't build on multiplatform
-In-Reply-To: <20130122165330.GA28152@kroah.com>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <1358788568-11137-16-git-send-email-arnd@arndb.de> <50FD7A5F.9020702@ti.com>
- <201301211741.11875.arnd@arndb.de> <50FD8B63.1060506@ti.com>
- <20130122165330.GA28152@kroah.com>
-Message-ID: <50FEC508.50004@ti.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Tue, 22 Jan 2013 18:02:56 +0100
+Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
+In-Reply-To: <50FEBB61.9000707@ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
+ <50FEB3FD.3050001@ti.com> <50FEBB61.9000707@ti.com>
+Message-ID: <B9531499-0746-44DA-BDBB-999D4CA31E63@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 10:53 AM, Greg Kroah-Hartman wrote:
-> On Mon, Jan 21, 2013 at 12:39:31PM -0600, Rob Clark wrote:
->> On 01/21/2013 11:41 AM, Arnd Bergmann wrote:
->>> On Monday 21 January 2013, Rob Clark wrote:
->>>> Are you sure OMAP2_DSS requires ARCH_OMAP2PLUS?  I don't see this, and
->>>> it at least used to not depend on ARCH_OMAP2PLUS.  If it does now, I
->>>> think the correct fix would be to remove the dependency in OMAP2_DSS.  I
->>>> don't think removing ARCH_MULTIPLATFORM support in omapdrm is the
->>>> correct solution.
->>> At least it says so in drivers/video/omap2/Kconfig, which contains
->>>
->>> if ARCH_OMAP2PLUS
->>> source drivers/video/omap2/dss/Kconfig
->>> endif
->> ahh, ok, I see.. the if ARCH_OMAP2PLUS bit looks like it came in
->> recently (770b6cb)
->>
->> what about changing this to 'if ARCH_OMAP2PLUS || ARCH_MULTIPLATFORM'?
-> That's what Arnd's patch did.
 
-sorry, I was talking about in drivers/video/omap2/Kconfig
+Op 22 jan. 2013, om 17:16 heeft kishon <kishon@ti.com> het volgende geschreven:
 
-Ie. I'd prefer to re-enable omapdss on multi-plat rather than disabling 
-omapdrm.  With changes in drm core, it is a bit of a pain to compile 
-test all the arm drivers by doing N different builds, so we've been 
-trying to get to the point of all arm drm drivers supporting multi-plat
+> Hi,
+> 
+> On Tuesday 22 January 2013 09:15 PM, kishon wrote:
+>> On Tuesday 22 January 2013 09:11 PM, Koen Kooi wrote:
+>>> 
+>>> Op 22 jan. 2013, om 10:58 heeft Kishon Vijay Abraham I <kishon@ti.com>
+>>> het volgende geschreven:
+>>> 
+>>>> This patch series adds support for adding multiple PHY's (of same type).
+>>>> The binding information has to be present in the PHY library (otg.c) in
+>>>> order for it to return the appropriate PHY whenever the USB controller
+>>>> request for the PHY. So added a new API usb_bind_phy() to pass the
+>>>> binding
+>>>> information. This API should be called by platform specific
+>>>> initialization
+>>>> code.
+>>>> 
+>>>> So the binding should be done something like
+>>>> usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto"); specifying
+>>>> the USB
+>>>> controller device name, index, and the PHY device name.
+>>>> I have done this binding for OMAP platforms, but it should be done for
+>>>> all the platforms.
+>>>> 
+>>>> After this design, the phy can be got by passing the USB controller
+>>>> device
+>>>> pointer and the index.
+>>>> 
+>>>> Developed this patch series on
+>>>> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
+>>>> after applying "usb: musb: add driver for control module" patch series
+>>>> and "ARM: dts: omap: add dt data for MUSB"
+>>>> 
+>>>> Did basic enumeration testing in omap4 panda and omap3 beagle.
+>>> 
+>>> With this patchset USB completely breaks on am33xx beaglebone, is that
+>>> intended?
+>> Not really.
+>> Does am33xx makes use of omap2430.c? Which PHY does am33xx uses?
+> 
+> I figured out it uses drivers/usb/musb/musb_dsps.c (So it doesn't use omap2430.c). I think it uses TWL4030_USB (TPS659x0) as PHY.
 
-BR,
--R
+Actually it uses nop-phy as a phy, which is missing from arch/arm/boot/dts/am33xx.dtsi, so mainline is already broken. But adding the nop-phy to the DT is easy enough to patch in locally.
 
-> totally confused,
->
-> greg k-h
+regards,
+
+Koen
