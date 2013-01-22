@@ -1,50 +1,56 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 22 Jan 2013 10:09:03 +0100
-Subject: [PATCH 1/6] arm: mvebu: Add support for local interrupt
-In-Reply-To: <20130121232637.GA3412@localhost>
-References: <1358790842-2986-1-git-send-email-gregory.clement@free-electrons.com>
- <1358790842-2986-2-git-send-email-gregory.clement@free-electrons.com>
- <20130121191744.0a04b941@skate> <50FDBC0E.1030706@free-electrons.com>
- <20130121232637.GA3412@localhost>
-Message-ID: <50FE572F.4090402@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Jan 2013 10:10:21 +0100
+Subject: [PATCH v7 08/15] gpio: pl061: bind pinctrl by gpio request
+In-Reply-To: <CAD6h2NQm+VoUv9tDSoHv3Xs8RtuCt5A+_DCBx6bh-d3WP3PK=w@mail.gmail.com>
+References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358494279-16503-9-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdZo6mVSaHBr6PJt8QCkiKp-Vs7mWup8n=4zyacRwf8V3g@mail.gmail.com>
+ <CAD6h2NQm+VoUv9tDSoHv3Xs8RtuCt5A+_DCBx6bh-d3WP3PK=w@mail.gmail.com>
+Message-ID: <CACRpkdbgRY9CcdRAVVaVAq57hF1cTf7LMOqneNwcz+VtpFDcUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 12:26 AM, Ezequiel Garcia wrote:
-> Hi Thomas and Gregory,
-> 
-> On Mon, Jan 21, 2013 at 11:07:10PM +0100, Gregory CLEMENT wrote:
->> On 01/21/2013 07:17 PM, Thomas Petazzoni wrote:
->>>> +		irq_set_percpu_devid(virq);
->>>> +		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
->>>> +					handle_percpu_devid_irq);
->>>> +
->>>> +	} else {
->>>> +		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
->>>> +					handle_level_irq);
->>>> +	}
->>>
->>> Braces useless since there is only one statement in the else.
->>>
-> 
-> IMHO, this is an exception to the rule.
-> Since the first block is more than one line,
-> we usually put braces on the single line block too.
-> (or at least that's what Documentation/CodingStyle says).
-> 
+On Mon, Jan 21, 2013 at 4:45 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-You're right!
-I would have liked to say I have done it on purpose, but in fact these
-braces are here only because during development I had had multiples lines
-inside the else.
-However, as you pointed it, I will keep it.
+>> > +       pinctrl_request_gpio(gpio);
+>>
+>> Handling of error code?
+>>
+>> (Maybe I should add a __must_check on this function.)
+>>
+> My case is a little special. I don't want to check return value because some
+> gpio pins don't have pinmux registers in Hisilicon SoC.
+> So pinctrl_request_gpio() will always return error for these special pins in
+> Hisilicon SoC.
+>
+> If we must check the return value, maybe we need append a dummy pinctrl driver
+> for those special gpio pins. How do you think about it? Of course, I
+> need to evaluate
+> whether it's possible to implement.
 
-> Regards,
-> 
+Hm. A dummy pinctrl back-end is not very elegant.
 
+It's better if the GPIO driver (gpio-pl061) keep track of the ranges that
+are connected to the pinctrl.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+If the ranges are encoded in the device tree (as I guess you want to do
+in this case) then the GPIO driver need to check these ranges to see if
+it uses a pinctrl backend. Magic behind-the-scenes is very hard to
+understand for people reading this code later.
+
+What about this:
+
+In gpiolib.c, function gpiochip_add_pin_range(), we save a copy of
+each range in &chip->pin_ranges.
+
+Add a function to gpiolib.c to check if a certain gpio is in the range
+of the current chip.
+
+Then use that:
+
+if (gpio_in_pinrange(gpio))
+    pinctrl_request_gpio(gpio);
+
+Yours,
+Linus Walleij
