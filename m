@@ -1,159 +1,164 @@
 From: dev@lynxeye.de (Lucas Stach)
-Date: Tue, 22 Jan 2013 22:46:09 +0100
-Subject: [PATCH v2 3/3] ARM: DT: tegra: Add Toradex Iris carrier board with
- T20 512MB COM
-In-Reply-To: <1358891169-5939-1-git-send-email-dev@lynxeye.de>
+Date: Tue, 22 Jan 2013 22:46:07 +0100
+Subject: [PATCH v2 1/3] ARM: DT: tegra: move serial clock-frequency attr into
+ the SoC dtsi
+In-Reply-To: <1358423961-24318-1-git-send-email-dev@lynxeye.de>
 References: <1358423961-24318-1-git-send-email-dev@lynxeye.de>
- <1358891169-5939-1-git-send-email-dev@lynxeye.de>
-Message-ID: <1358891169-5939-3-git-send-email-dev@lynxeye.de>
+Message-ID: <1358891169-5939-1-git-send-email-dev@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the device tree for the Toradex Iris carrier board used
-together with a Colibri T20 512MB COM.
-
-The Iris has the following features, in brackets the current status:
-- DVI and VGA output through DVI-I connector (DVI-D enabled and tested)
-- LVDS output
-- 1 USB host port (enabled and tested)
-- 1 USB OTG port (enabled)
-- 100 MBit Ethernet (enabled and tested)
-- 5 UART ports  (2 on 10way headers enabled and tested)
-- 1 MicroSD Slot (enabled and tested)
-- Audio connectors (enabled, only HP out and Line-in tested)
-- i2c RTC
-- GPIO connector (enabled, only sparsely tested)
-- external i2c bus
-- 4 PWM out
-- analog in
+No Tegra Platform is running PLL_P at another rate than 216MHz, nor is
+any using an other PLL as UART source clock. Move attribute into SoC
+level dtsi file to slim down board DT files.
 
 Signed-off-by: Lucas Stach <dev@lynxeye.de>
 ---
 v2:
-- unify regulator node between module and carrier
-- use correct regulator for sdhci
+- initial revision
 ---
- Documentation/devicetree/bindings/arm/tegra.txt |  1 +
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/tegra20-iris-512.dts          | 89 +++++++++++++++++++++++++
- 3 files changed, 91 insertions(+)
- create mode 100644 arch/arm/boot/dts/tegra20-iris-512.dts
+ arch/arm/boot/dts/tegra20-harmony.dts   | 1 -
+ arch/arm/boot/dts/tegra20-paz00.dts     | 2 --
+ arch/arm/boot/dts/tegra20-seaboard.dts  | 1 -
+ arch/arm/boot/dts/tegra20-tamonten.dtsi | 1 -
+ arch/arm/boot/dts/tegra20-trimslice.dts | 1 -
+ arch/arm/boot/dts/tegra20-ventana.dts   | 1 -
+ arch/arm/boot/dts/tegra20-whistler.dts  | 1 -
+ arch/arm/boot/dts/tegra20.dtsi          | 5 +++++
+ 8 files changed, 5 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
-index ccd4ef4..ed9c853 100644
---- a/Documentation/devicetree/bindings/arm/tegra.txt
-+++ b/Documentation/devicetree/bindings/arm/tegra.txt
-@@ -31,3 +31,4 @@ board-specific compatible values:
-   nvidia,ventana
-   nvidia,whistler
-   toradex,colibri_t20-512
-+  toradex,iris
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5c13de2..b756c51 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -134,6 +134,7 @@ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun4i-a10-cubieboard.dtb \
- 	sun5i-a13-olinuxino.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
-+	tegra20-iris-512.dtb \
- 	tegra20-medcom-wide.dtb \
- 	tegra20-paz00.dtb \
- 	tegra20-plutux.dtb \
-diff --git a/arch/arm/boot/dts/tegra20-iris-512.dts b/arch/arm/boot/dts/tegra20-iris-512.dts
-new file mode 100644
-index 0000000..52f1103
---- /dev/null
-+++ b/arch/arm/boot/dts/tegra20-iris-512.dts
-@@ -0,0 +1,89 @@
-+/dts-v1/;
-+
-+/include/ "tegra20-colibri-512.dtsi"
-+
-+/ {
-+	model = "Toradex Colibri T20 512MB on Iris";
-+	compatible = "toradex,iris", "toradex,colibri_t20-512", "nvidia,tegra20";
-+
-+	host1x {
-+		hdmi {
-+			status = "okay";
-+		};
-+	};
-+
-+	pinmux {
-+		state_default: pinmux {
-+			hdint {
-+				nvidia,tristate = <0>;
-+			};
-+
-+			i2cddc {
-+				nvidia,tristate = <0>;
-+			};
-+
-+			sdio4 {
-+				nvidia,tristate = <0>;
-+			};
-+
-+			uarta {
-+				nvidia,tristate = <0>;
-+			};
-+
-+			uartd {
-+				nvidia,tristate = <0>;
-+			};
-+		};
-+	};
-+
-+	usb at c5000000 {
-+		status = "okay";
-+		dr_mode = "otg";
-+	};
-+
-+	usb at c5008000 {
-+		status = "okay";
-+	};
-+
-+	serial at 70006000 {
-+		status = "okay";
-+	};
-+
-+	serial at 70006300 {
-+		status = "okay";
-+	};
-+
-+	i2c_ddc: i2c at 7000c400 {
-+		status = "okay";
-+	};
-+
-+	sdhci at c8000600 {
-+		status = "okay";
-+		bus-width = <4>;
-+		vmmc-supply = <&vcc_sd_reg>;
-+		vqmmc-supply = <&vcc_sd_reg>;
-+	};
-+
-+	regulators {
-+		regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "usb_host_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+			gpio = <&gpio 178 0>;
-+		};
-+
-+		vcc_sd_reg: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "vcc_sd";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+	};
-+};
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index 54295e3..96f4ccd 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -252,7 +252,6 @@
+ 
+ 	serial at 70006300 {
+ 		status = "okay";
+-		clock-frequency = <216000000>;
+ 	};
+ 
+ 	i2c at 7000c000 {
+diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
+index 80d9635..7744c8b 100644
+--- a/arch/arm/boot/dts/tegra20-paz00.dts
++++ b/arch/arm/boot/dts/tegra20-paz00.dts
+@@ -244,12 +244,10 @@
+ 
+ 	serial at 70006000 {
+ 		status = "okay";
+-		clock-frequency = <216000000>;
+ 	};
+ 
+ 	serial at 70006200 {
+ 		status = "okay";
+-		clock-frequency = <216000000>;
+ 	};
+ 
+ 	i2c at 7000c000 {
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index d4e4ff2..0b48359 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -303,7 +303,6 @@
+ 
+ 	serial at 70006300 {
+ 		status = "okay";
+-		clock-frequency = <216000000>;
+ 	};
+ 
+ 	i2c at 7000c000 {
+diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+index a239ccd..4766aba 100644
+--- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
++++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+@@ -276,7 +276,6 @@
+ 	};
+ 
+ 	serial at 70006300 {
+-		clock-frequency = <216000000>;
+ 		status = "okay";
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+index 4b6c486..adf6024 100644
+--- a/arch/arm/boot/dts/tegra20-trimslice.dts
++++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+@@ -263,7 +263,6 @@
+ 
+ 	serial at 70006000 {
+ 		status = "okay";
+-		clock-frequency = <216000000>;
+ 	};
+ 
+ 	dvi_ddc: i2c at 7000c000 {
+diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
+index e3d3b29..5b15c30 100644
+--- a/arch/arm/boot/dts/tegra20-ventana.dts
++++ b/arch/arm/boot/dts/tegra20-ventana.dts
+@@ -300,7 +300,6 @@
+ 
+ 	serial at 70006300 {
+ 		status = "okay";
+-		clock-frequency = <216000000>;
+ 	};
+ 
+ 	i2c at 7000c000 {
+diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
+index b8e0ee1..ea57c0f 100644
+--- a/arch/arm/boot/dts/tegra20-whistler.dts
++++ b/arch/arm/boot/dts/tegra20-whistler.dts
+@@ -255,7 +255,6 @@
+ 
+ 	serial at 70006000 {
+ 		status = "okay";
+-		clock-frequency = <216000000>;
+ 	};
+ 
+ 	hdmi_ddc: i2c at 7000c400 {
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 9c4870f..8324ef4 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -223,6 +223,7 @@
+ 		reg = <0x70006000 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 36 0x04>;
++		clock-frequency = <216000000>;
+ 		nvidia,dma-request-selector = <&apbdma 8>;
+ 		status = "disabled";
+ 	};
+@@ -232,6 +233,7 @@
+ 		reg = <0x70006040 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 37 0x04>;
++		clock-frequency = <216000000>;
+ 		nvidia,dma-request-selector = <&apbdma 9>;
+ 		status = "disabled";
+ 	};
+@@ -241,6 +243,7 @@
+ 		reg = <0x70006200 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 46 0x04>;
++		clock-frequency = <216000000>;
+ 		nvidia,dma-request-selector = <&apbdma 10>;
+ 		status = "disabled";
+ 	};
+@@ -250,6 +253,7 @@
+ 		reg = <0x70006300 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 90 0x04>;
++		clock-frequency = <216000000>;
+ 		nvidia,dma-request-selector = <&apbdma 19>;
+ 		status = "disabled";
+ 	};
+@@ -259,6 +263,7 @@
+ 		reg = <0x70006400 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 91 0x04>;
++		clock-frequency = <216000000>;
+ 		nvidia,dma-request-selector = <&apbdma 20>;
+ 		status = "disabled";
+ 	};
 -- 
 1.8.0.2
