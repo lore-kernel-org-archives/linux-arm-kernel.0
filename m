@@ -1,61 +1,41 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Tue, 22 Jan 2013 18:02:56 +0100
-Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
-In-Reply-To: <50FEBB61.9000707@ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
- <50FEB3FD.3050001@ti.com> <50FEBB61.9000707@ti.com>
-Message-ID: <B9531499-0746-44DA-BDBB-999D4CA31E63@dominion.thruhere.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 22 Jan 2013 09:04:46 -0800
+Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
+In-Reply-To: <50FEC503.2080602@wwwdotorg.org>
+References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
+ <1358833924-24535-2-git-send-email-hdoyu@nvidia.com>
+ <50FE2CA8.20100@ti.com> <50FEC503.2080602@wwwdotorg.org>
+Message-ID: <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 22, 2013 at 8:57 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 01/21/2013 11:07 PM, Santosh Shilimkar wrote:
+>> On Tuesday 22 January 2013 11:22 AM, Hiroshi Doyu wrote:
+>>> Skip scu_enable(scu_base) if CPU is not Cortex A9 with SCU.
+>>>
+>>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+>>> ---
+>> Looks fine. I will also update OMAP code with the new
+>> interface. Thanks.
+>
+> OK, so patch 1/2 at least needs to get into a stable arm-soc branch
+> then. Unless there are violent objections, I'll forward patch 1/2 to
+> arm-soc and request it be added into a branch so that Tegra and OMAP can
+> both merge it into their branches as a dependency. I guess patch 2/2
+> could also be included; I don't think it has any complex dependencies
+> that'd prevent that, and would help to show how patch 1/2 gets used.
+>
+> Hiroshi, is this series the only dependency you need for your Tegra114
+> series? So, I could merge your Tegra114 series once this series is applied?
 
-Op 22 jan. 2013, om 17:16 heeft kishon <kishon@ti.com> het volgende geschreven:
+For something like this, it might make more sense for us to just apply
+the patches for OMAP on top, i.e. we'll pull the short branch from
+you, and then we can just apply patches (with maintainer acks) on top,
+instead of doing a bunch of single-patch pulls.
 
-> Hi,
-> 
-> On Tuesday 22 January 2013 09:15 PM, kishon wrote:
->> On Tuesday 22 January 2013 09:11 PM, Koen Kooi wrote:
->>> 
->>> Op 22 jan. 2013, om 10:58 heeft Kishon Vijay Abraham I <kishon@ti.com>
->>> het volgende geschreven:
->>> 
->>>> This patch series adds support for adding multiple PHY's (of same type).
->>>> The binding information has to be present in the PHY library (otg.c) in
->>>> order for it to return the appropriate PHY whenever the USB controller
->>>> request for the PHY. So added a new API usb_bind_phy() to pass the
->>>> binding
->>>> information. This API should be called by platform specific
->>>> initialization
->>>> code.
->>>> 
->>>> So the binding should be done something like
->>>> usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto"); specifying
->>>> the USB
->>>> controller device name, index, and the PHY device name.
->>>> I have done this binding for OMAP platforms, but it should be done for
->>>> all the platforms.
->>>> 
->>>> After this design, the phy can be got by passing the USB controller
->>>> device
->>>> pointer and the index.
->>>> 
->>>> Developed this patch series on
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
->>>> after applying "usb: musb: add driver for control module" patch series
->>>> and "ARM: dts: omap: add dt data for MUSB"
->>>> 
->>>> Did basic enumeration testing in omap4 panda and omap3 beagle.
->>> 
->>> With this patchset USB completely breaks on am33xx beaglebone, is that
->>> intended?
->> Not really.
->> Does am33xx makes use of omap2430.c? Which PHY does am33xx uses?
-> 
-> I figured out it uses drivers/usb/musb/musb_dsps.c (So it doesn't use omap2430.c). I think it uses TWL4030_USB (TPS659x0) as PHY.
+Since Russell had comments on it earlier, I'd like him to give a nod
+that he's happy with it too.
 
-Actually it uses nop-phy as a phy, which is missing from arch/arm/boot/dts/am33xx.dtsi, so mainline is already broken. But adding the nop-phy to the DT is easy enough to patch in locally.
 
-regards,
-
-Koen
+-Olof
