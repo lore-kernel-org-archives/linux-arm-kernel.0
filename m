@@ -1,126 +1,103 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jan 2013 08:44:36 +0000
-Subject: [PATCH 23/24] ab8500-bm: Fix minor niggles experienced during
- testing
-In-Reply-To: <20130121191324.GA15037@lizard.mcd01528.sjc.wayport.net>
-References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
- <1358769840-4763-24-git-send-email-lee.jones@linaro.org>
- <20130121191324.GA15037@lizard.mcd01528.sjc.wayport.net>
-Message-ID: <20130122084436.GE6857@gmail.com>
+Date: Tue, 22 Jan 2013 08:46:11 +0000
+Subject: [PATCH 1/8] mmc: mmci: Move ios_handler functionality into the
+ driver
+In-Reply-To: <CAPDyKFoNXNj=9mG0sR7=g12MJ1xLuRMLqReY7mCEVSBYGvRPhQ@mail.gmail.com>
+References: <1355404930-5691-1-git-send-email-lee.jones@linaro.org>
+ <1355404930-5691-2-git-send-email-lee.jones@linaro.org>
+ <20130121140626.GB6857@gmail.com>
+ <CAPDyKFoNXNj=9mG0sR7=g12MJ1xLuRMLqReY7mCEVSBYGvRPhQ@mail.gmail.com>
+Message-ID: <20130122084611.GF6857@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Jan 2013, Anton Vorontsov wrote:
+On Mon, 21 Jan 2013, Ulf Hansson wrote:
 
-> On Mon, Jan 21, 2013 at 12:03:59PM +0000, Lee Jones wrote:
-> > When compile testing the new AB8500 Battery Management changes
-> > due for inclusion into upstream, there were a few minor niggles
-> > which required repairing, or adapting for use against the
-> > Mainline kernel. This patch is a collection of them all.
+> On 21 January 2013 15:06, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 13 Dec 2012, Lee Jones wrote:
+> >
+> >> There are currently two instances of the ios_handler being used.
+> >> Both of which mearly toy with some regulator settings. Now there
+> >> is a GPIO regulator API, we can use that instead, and lessen the
+> >> per platform burden. By doing this, we also become more Device
+> >> Tree compatible.
+> >>
+> >> Cc: Chris Ball <cjb@laptop.org>
+> >> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> >> Acked-by: Ulf Hansson <ulf.hansson@stericsson.com>
+> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >
+> > Any more news on this one?
 > 
-> No. This is the third time I'm saying it: the last time I checked, this is
-> not how we do development in the mainline.
-> 
-> 1. One logical change at a time;
-> 2. Every patch in a sequence must be bisectable, compilable;
-> 3. The patches must not "break things temporary" 'because it is easier to
->    do development that way'. If you introduce a new feature, make all
->    possible to not introduce regressions.
+> Not exactly this version of the patch, but another one has has been
+> merged through Russell's patch tracker. Available for 3.9.
 
-Okay, I'll fix them up instead.
+Nice. Thanks for the update.
 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/power/ab8500_fg.h       |    6 ++++--
-> >  drivers/power/abx500_chargalg.c |    4 ++--
-> >  drivers/power/pm2301_charger.c  |    4 ++--
-> >  3 files changed, 8 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/power/ab8500_fg.h b/drivers/power/ab8500_fg.h
-> > index 946840b..bb78dc9 100644
-> > --- a/drivers/power/ab8500_fg.h
-> > +++ b/drivers/power/ab8500_fg.h
-> > @@ -182,6 +182,7 @@ struct ab8500_fg_test {
-> >   * @fg_check_hw_failure_work:	Work for checking HW state
-> >   * @cc_lock:		Mutex for locking the CC
-> >   * @fg_kobject:		Structure of type kobject
-> > + * @test:		Structure of type ab8500_fg_test for test purpose
-> >   */
-> >  struct ab8500_fg {
-> >  	struct device *dev;
-> > @@ -224,6 +225,7 @@ struct ab8500_fg {
-> >  	struct delayed_work fg_check_hw_failure_work;
-> >  	struct mutex cc_lock;
-> >  	struct kobject fg_kobject;
-> > +	struct ab8500_fg_test test;
-> 
-> You are introducing it, but I don't see any users.
-> 
-> >  };
-> >  
-> >  extern char *discharge_state[];
-> > @@ -232,8 +234,8 @@ extern char *charge_state[];
-> >  int ab8500_fg_coulomb_counter(struct ab8500_fg *di, bool enable);
-> >  void ab8500_fg_charge_state_to(struct ab8500_fg *di,
-> >  		enum ab8500_fg_charge_state new_state);
-> > -void ab8500_fg_discharge_state_to(struct ab8500_fg *di,
-> > -		enum ab8500_fg_charge_state new_state);
-> > +static void ab8500_fg_discharge_state_to(struct ab8500_fg *di,
-> > +		enum ab8500_fg_discharge_state new_state);
-> >  /* test initialization */
-> >  #ifdef CONFIG_AB8500_BM_DEEP_DEBUG
-> >  void ab8500_fg_test_init(struct ab8500_fg *di);
-> > diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
-> > index 694f592..cacf512 100644
-> > --- a/drivers/power/abx500_chargalg.c
-> > +++ b/drivers/power/abx500_chargalg.c
-> > @@ -1664,8 +1664,8 @@ static int abx500_chargalg_get_property(struct power_supply *psy,
-> >  static ssize_t ab8500_chargalg_sysfs_show(struct kobject *kobj,
-> >  					  struct attribute *attr, char *buf)
-> >  {
-> > -	struct ab8500_chargalg *di = container_of(kobj,
-> > -               struct ab8500_chargalg, chargalg_kobject);
-> > +	struct abx500_chargalg *di = container_of(kobj,
-> > +               struct abx500_chargalg, chargalg_kobject);
-> 
-> Spaces.
-> 
-> >  
-> >  	return sprintf(buf, "%d\n",
-> >  		       di->susp_status.ac_suspended &&
-> > diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
-> > index 14e37b2..5ebae88 100644
-> > --- a/drivers/power/pm2301_charger.c
-> > +++ b/drivers/power/pm2301_charger.c
-> > @@ -22,8 +22,8 @@
-> >  #include <linux/i2c.h>
-> >  #include <linux/workqueue.h>
-> >  #include <linux/kobject.h>
-> > -#include <linux/mfd/ab8500.h>
-> >  #include <linux/mfd/abx500.h>
-> > +#include <linux/mfd/abx500/ab8500.h>
-> >  #include <linux/mfd/abx500/ab8500-bm.h>
-> >  #include <linux/mfd/abx500/ab8500-gpadc.h>
-> >  #include <linux/mfd/abx500/ux500_chargalg.h>
-> > @@ -867,7 +867,7 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
-> >  
-> >  	/* get parent data */
-> >  	pm2->dev = &i2c_client->dev;
-> > -	pm2->gpadc = ab8500_gpadc_get();
-> > +	pm2->gpadc = ab8500_gpadc_get("ab8500-gpadc.0");
-> 
-> Was the driver even compilable before? You've just introduced the new
-> driver in this exact series. :-/
-> 
-> Since pm2301 is a new driver, please merge all pm2301 stuff into one
-> patch.
-> 
-> Or, if you want to preserve the development history of the new driver,
-> this is also fine, but then I'd prefer to take it via a pull-request with
-> only this driver.
-> 
-> Thanks,
-> Anton
+> >>  drivers/mmc/host/mmci.c |   22 ++++++++++++++++++++++
+> >>  drivers/mmc/host/mmci.h |    1 +
+> >>  2 files changed, 23 insertions(+)
+> >>
+> >> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> >> index edc3e9b..d45c931 100644
+> >> --- a/drivers/mmc/host/mmci.c
+> >> +++ b/drivers/mmc/host/mmci.c
+> >> @@ -1091,6 +1091,16 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> >>       case MMC_POWER_OFF:
+> >>               if (host->vcc)
+> >>                       ret = mmc_regulator_set_ocr(mmc, host->vcc, 0);
+> >> +
+> >> +             if (host->vqmmc) {
+> >> +                     if (regulator_is_enabled(host->vqmmc)) {
+> >> +                             ret = regulator_disable(host->vqmmc);
+> >> +                             if (ret < 0)
+> >> +                                     dev_warn(mmc_dev(mmc),
+> >> +                                              "unable to disable vmmc-ios\n");
+> >> +                     }
+> >> +             }
+> >> +
+> >>               break;
+> >>       case MMC_POWER_UP:
+> >>               if (host->vcc) {
+> >> @@ -1115,6 +1125,14 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> >>
+> >>               break;
+> >>       case MMC_POWER_ON:
+> >> +             if (host->vqmmc)
+> >> +                     if (!regulator_is_enabled(host->vqmmc)) {
+> >> +                             ret = regulator_enable(host->vqmmc);
+> >> +                             if (ret < 0)
+> >> +                                     dev_warn(mmc_dev(mmc),
+> >> +                                              "unable to enable vmmc-ios\n");
+> >> +                     }
+> >> +
+> >>               pwr |= MCI_PWR_ON;
+> >>               break;
+> >>       }
+> >> @@ -1379,6 +1397,10 @@ static int __devinit mmci_probe(struct amba_device *dev,
+> >>                                "(using regulator instead)\n");
+> >>               }
+> >>       }
+> >> +
+> >> +     host->vqmmc = regulator_get(&dev->dev, "vqmmc");
+> >> +     if (IS_ERR(host->vqmmc))
+> >> +             host->vqmmc = NULL;
+> >>  #endif
+> >>       /* Fall back to platform data if no regulator is found */
+> >>       if (host->vcc == NULL)
+> >> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+> >> index d437ccf..b87d9e2 100644
+> >> --- a/drivers/mmc/host/mmci.h
+> >> +++ b/drivers/mmc/host/mmci.h
+> >> @@ -194,6 +194,7 @@ struct mmci_host {
+> >>       struct sg_mapping_iter  sg_miter;
+> >>       unsigned int            size;
+> >>       struct regulator        *vcc;
+> >> +     struct regulator        *vqmmc;
+> >>
+> >>  #ifdef CONFIG_DMA_ENGINE
+> >>       /* DMA stuff */
+> >
 
 -- 
 Lee Jones
