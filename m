@@ -1,57 +1,73 @@
-From: kishon@ti.com (kishon)
-Date: Tue, 22 Jan 2013 20:51:58 +0530
-Subject: [PATCH v1 6/6] USB: MUSB: OMAP: get PHY by phandle for dt boot
-In-Reply-To: <50FEA696.8000506@ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <1358848694-20145-7-git-send-email-kishon@ti.com> <50FE9F5C.2010501@ti.com>
- <50FEA447.1090701@ti.com> <50FEA696.8000506@ti.com>
-Message-ID: <50FEAE96.30706@ti.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Tue, 22 Jan 2013 16:19:46 +0100
+Subject: [PATCH] net: fec: Add support for multiple phys on mdiobus
+In-Reply-To: <50FEAA28.1070003@grandegger.com>
+References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
+ <50FD02B8.8080401@grandegger.com> <20130121100701.GX1906@pengutronix.de>
+ <50FD2172.2020608@grandegger.com> <20130121120602.GZ1906@pengutronix.de>
+ <50FE3E37.4010004@grandegger.com> <50FEA691.4050904@openwrt.org>
+ <50FEAA28.1070003@grandegger.com>
+Message-ID: <50FEAE12.7090307@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 January 2013 08:17 PM, Roger Quadros wrote:
-> On 01/22/2013 04:37 PM, kishon wrote:
->> On Tuesday 22 January 2013 07:47 PM, Roger Quadros wrote:
->>> On 01/22/2013 11:58 AM, Kishon Vijay Abraham I wrote:
->>>> The OMAP glue has been modified to get PHY by phandle for dt boot.
+On 01/22/2013 04:03 PM, Wolfgang Grandegger wrote:
+> On 01/22/2013 03:47 PM, Florian Fainelli wrote:
+>> On 01/22/2013 08:22 AM, Wolfgang Grandegger wrote:
+>>>> Well this could be done when the fixed phy driver could be registered
+>>>> with the devicetree, maybe like this:
 >>>>
->>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>> ---
->>>>    drivers/usb/musb/omap2430.c |    7 ++++++-
->>>>    1 file changed, 6 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
->>>> index 1a8cf6d..e43faeb 100644
->>>> --- a/drivers/usb/musb/omap2430.c
->>>> +++ b/drivers/usb/musb/omap2430.c
->>>> @@ -345,7 +345,12 @@ static int omap2430_musb_init(struct musb *musb)
->>>>         * up through ULPI.  TWL4030-family PMICs include one,
->>>>         * which needs a driver, drivers aren't always needed.
->>>>         */
->>>> -    musb->xceiv = devm_usb_get_phy_dev(dev, 0);
->>>> +    if (dev->parent->of_node)
->>>> +        musb->xceiv = devm_usb_get_phy_by_phandle(dev->parent,
->>>> +            "usb_phy", 0);
->>>> +    else
->>>> +        musb->xceiv = devm_usb_get_phy_dev(dev, 0);
->>>> +
->>>>        if (IS_ERR_OR_NULL(musb->xceiv)) {
->>>>            pr_err("HS USB OTG: no transceiver configured\n");
->>>>            return -ENODEV;
+>>>>      fixed-phy: mdiophy {
+>>>>          compatible = "mdio-fixed-phy";
+>>>>          link = "100FD";
+>>>>      };
+>>> I find that confusing. There is *no* phy but just a fixed link to the
+>>> switch...
 >>>
->>> This will not work with PHY driver as a module. You need to use deferred probing mechanism here
->>> after you have addressed my comment in patch 2 and also devm_usb_get_phy_by_phandle()
+>>>> The good thing about this would be that every ethernet driver could just
+>>>> use such a fixed phy, any external mdio phy (like on Marvell Armada) or
+>>>> just a phy connected to the internal mdio interface provided by the
+>>>> ethernet
+>>>> core.
+>>> What is wrong with the existing "fixed-link" property of the *ethernet*
+>>> node. The fixed-link handling should/could be done in the phy layer, and
+>>> not in the driver as it currently is implemented. Maybe that's the
+>>> reason why the current code is regarded as hack!
+>> As far as I have used it with the CPMAC driver, the fixed PHY is a
+>> specific PHY device and there is no specific handling to be done by the
+>> Ethernet MAC driver but eventually changing its MII bus id so that it is
+>> named "fixed-0" to allow the fixed PHY driver to bind. Put differently,
+> There is special handling for the fixed link, e.g. here:
+>
+> http://lxr.linux.no/#linux+v3.7.4/drivers/net/ethernet/freescale/gianfar.c#L1462
+>
+> This could be hidden in the PHY layer allowing all ethernet drivers
+> using the "fixed-link" property.
+
+Ok, so in the end you could have potentially an ethernet PHY node 
+containing the following properties:
+- fixed-link
+- fixed-speed
+- fixed-duplex
+
+and treat it as a fixed-phy. If so, this would be pretty handy.
+
+>
+>> using the fixed PHY driver is a kind of "last" resort thing to cope with
+>> situations like:
 >>
->> IIUC, even using -EPROBE_DEFER might not help if we are making the PHY driver as module, since the kernel will try to probe only till the prompt comes.
+>> - switch not providing a consistent PHY-like interface on the MDC/MDIO bus
+>> - switches not connected to the MDC/MDIO bus of the Ethernet MAC they
+>> forward to
 >>
-> Oh really? I thought deferred probing takes place whenever a new driver is bound to a device.
-You might also be right. I'm not so sure.
-
-What does "prompt comes" have to do with it?
-
-I just meant end of boot process. But it's better to check if deferred 
-probing takes place whenever a new driver is bound to a device as you 
-just mentioned.
-
-Thanks
-Kishon
+>> What exactly do you mean by "as it currently is implemented"? that you
+>> do not like?
+> As Sascha pointed out, the implementation is labeled as "hack", which
+> should be fixed sooner than later. It's just not clear why ;).
+>
+> Wolfgang.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
