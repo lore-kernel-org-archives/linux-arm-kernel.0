@@ -1,80 +1,53 @@
-From: smoch@web.de (Soeren Moch)
-Date: Sat, 19 Jan 2013 16:29:49 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <201301172026.45514.arnd@arndb.de>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <201301171049.30415.arnd@arndb.de> <50F800EB.6040104@web.de>
- <201301172026.45514.arnd@arndb.de>
-Message-ID: <50FABBED.1020905@web.de>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Tue, 22 Jan 2013 09:43:03 +0530
+Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
+In-Reply-To: <Pine.LNX.4.44L0.1301212227020.32663-100000@netrider.rowland.org>
+References: <201301212149.15139.arnd@arndb.de>
+ <Pine.LNX.4.44L0.1301212227020.32663-100000@netrider.rowland.org>
+Message-ID: <CAJFYCKFb8F1k5Y6+Q4x5WgTsLO_xh1AFB1mgyRc0xK5m1ABbwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.01.2013 21:26, Arnd Bergmann wrote:
-> On Thursday 17 January 2013, Soeren Moch wrote:
->> On 17.01.2013 11:49, Arnd Bergmann wrote:
->>> On Wednesday 16 January 2013, Soeren Moch wrote:
->>>>>> I will see what I can do here. Is there an easy way to track the buffer
->>>>>> usage without having to wait for complete exhaustion?
->>>>>
->>>>> DMA_API_DEBUG
->>>>
->>>> OK, maybe I can try this.
->>>>>
->>>
->>> Any success with this? It should at least tell you if there is a
->>> memory leak in one of the drivers.
->>
->> Not yet, sorry. I have to do all the tests in my limited spare time.
->> Can you tell me what to search for in the debug output?
+On 22 January 2013 09:09, Alan Stern <stern@rowland.harvard.edu> wrote:
+
+> On Mon, 21 Jan 2013, Arnd Bergmann wrote:
 >
-> Actually now that I've looked closer, you can't immediately see
-> all the mappings as I thought.
+> > Alan, one comment about your version: You keep maintaining the
+> > '#if IS_ENABLED' list in the main driver, which I think can actually
+> > get removed now.
 >
-> But please try enabling DMA_API_DEBUG in combination with this
-> one-line patch:
+> I considered doing that.  The benefit of keeping it is that it warns
+> about configs where the main driver is built but can never be used.
 >
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 6b2fb87..3df74ac 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -497,6 +497,7 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
->   		pr_err_once("ERROR: %u KiB atomic DMA coherent pool is too small!\n"
->   			    "Please increase it with coherent_pool= kernel parameter!\n",
->   			    (unsigned)pool->size / 1024);
-> +		debug_dma_dump_mappings(NULL);
->   	}
->   	spin_unlock_irqrestore(&pool->lock, flags);
+> Still, you're right that its purpose is becoming less important.  I had
+> planned to remove it when all the glue driver had been converted, but
+> in fact it could be removed at any time.
 >
-> That will show every single allocation that is currently active. This lets
-> you see where all the memory went, and if there is a possible leak or
-> excessive fragmentation.
+> >  Since the base driver can be built independent of
+> > the presence of platform glue drivers, there is no need to forbid
+> > it any more, and the #if block will cause merge conflicts for each
+> > patch that converts or adds another platform.
 >
-> 	Arnd
+> If the patches are done independently.  There are likely to be some
+> context conflicts anyway.
 >
+> >  I think we can actually
+> > get the same results by turning the Kconfig logic around and making
+> > the platform glue drivers 'select USB_EHCI_HCD' than depending on
+> > it.
+>
+> That's a good idea.  The Kconfig changes would have to be done
+> carefully to make sure that the dependency on USB_ARCH_HAS_EHCI still
+> applies to all the platform drivers.
+>
+> Manjunath, would you like to send a patch to do this?
+>
+> Alan Stern
+>
+> Ya sure,could you explain little bit  briefly about the Kconfig changes.
 
-Please find attached a debug log generated with your patch.
-
-I used the sata disk and two em28xx dvb sticks, no other usb devices,
-no ethernet cable connected, tuners on saa716x-based card not used.
-
-What I can see in the log: a lot of coherent mappings from sata_mv and 
-orion_ehci, a few from mv643xx_eth, no other coherent mappings.
-All coherent mappings are page aligned, some of them (from orion_ehci)
-are not really small (as claimed in __alloc_from_pool).
-
-I don't believe in a memory leak. When I restart vdr (the application
-utilizing the dvb sticks) then there is enough dma memory available
-again.
-
-Regards,
-Soeren
-
-
+Thanks
+MAnjunath Goudar
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: dma_debug.log
-Type: text/x-log
-Size: 215198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130119/365a3ec2/attachment-0001.bin>
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130122/18a62ca8/attachment-0001.html>
