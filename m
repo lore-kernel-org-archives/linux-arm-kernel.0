@@ -1,53 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 Jan 2013 11:54:04 +0800
-Subject: [PATCH 09/15] media: coda: don't build on multiplatform
-In-Reply-To: <1358788568-11137-10-git-send-email-arnd@arndb.de>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <1358788568-11137-10-git-send-email-arnd@arndb.de>
-Message-ID: <20130122035402.GC29677@S2100-06.ap.freescale.net>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 22 Jan 2013 04:25:58 +0100
+Subject: [PATCH] ARM: ux500: de-globalize <mach/id.h>
+In-Reply-To: <1357546827-10154-1-git-send-email-linus.walleij@stericsson.com>
+References: <1357546827-10154-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130122032558.GJ7409@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 05:16:02PM +0000, Arnd Bergmann wrote:
-> The coda video codec driver depends on a mach-imx or mach-mxs specific
-> header file "mach/iram.h". This is not available when building for
-> multiplatform, so let us disable this driver for v3.8 when building
-> multiplatform, and hopefully find a proper fix for v3.9.
-> 
-> drivers/media/platform/coda.c:27:23: fatal error: mach/iram.h: No such file or directory
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Javier Martin <javier.martin@vista-silicon.com>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+Hi Linus,
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-> Cc: linux-media at vger.kernel.org
+On Mon, Jan 07, 2013 at 09:20:27AM +0100, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This removes the file <mach/id.h> from the global kernel include
+> scope, making it a pure mach-ux500 detail. All ASIC specifics
+> needed by drivers shall henceforth be passed from either platform
+> data or the device tree.
+> 
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/media/platform/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> I'm sending this as a preview, collecting ACKs for the next
+> merge window.
 > 
-> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-> index 3dcfea6..049d2b2 100644
-> --- a/drivers/media/platform/Kconfig
-> +++ b/drivers/media/platform/Kconfig
-> @@ -142,7 +142,7 @@ if V4L_MEM2MEM_DRIVERS
->  
->  config VIDEO_CODA
->  	tristate "Chips&Media Coda multi-standard codec IP"
-> -	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC
-> +	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC && !ARCH_MULTIPLATFORM
->  	select VIDEOBUF2_DMA_CONTIG
->  	select V4L2_MEM2MEM_DEV
->  	select IRAM_ALLOC if SOC_IMX53
-> -- 
-> 1.7.10.4
+> Sam, Rafael, could you ACK this?
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Linus Walleij
+> ---
+>  arch/arm/mach-ux500/board-mop500-uib.c      |   1 +
+>  arch/arm/mach-ux500/cache-l2x0.c            |   3 +-
+>  arch/arm/mach-ux500/cpu-db8500.c            |   2 +
+>  arch/arm/mach-ux500/cpu.c                   |   1 +
+>  arch/arm/mach-ux500/id.c                    |   2 +
+>  arch/arm/mach-ux500/id.h                    | 144 ++++++++++++++++++++++++++++
+>  arch/arm/mach-ux500/include/mach/hardware.h |   1 -
+>  arch/arm/mach-ux500/include/mach/id.h       | 144 ----------------------------
+>  arch/arm/mach-ux500/platsmp.c               |   3 +
+>  arch/arm/mach-ux500/timer.c                 |   2 +
+>  drivers/cpufreq/db8500-cpufreq.c            |   3 -
+>  drivers/mfd/db8500-prcmu.c                  |  17 ++--
+>  include/linux/mfd/dbx500-prcmu.h            |   2 -
+For the MFD bits:
+
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
