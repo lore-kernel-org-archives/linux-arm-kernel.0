@@ -1,65 +1,125 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 22 Jan 2013 15:28:08 +0530
-Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
-Message-ID: <1358848694-20145-1-git-send-email-kishon@ti.com>
+Date: Tue, 22 Jan 2013 15:28:09 +0530
+Subject: [PATCH v1 1/6] usb: otg: Add an API to bind the USB controller and PHY
+In-Reply-To: <1358848694-20145-1-git-send-email-kishon@ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+Message-ID: <1358848694-20145-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for adding multiple PHY's (of same type).
-The binding information has to be present in the PHY library (otg.c) in
-order for it to return the appropriate PHY whenever the USB controller
-request for the PHY. So added a new API usb_bind_phy() to pass the binding
-information. This API should be called by platform specific initialization
-code.
+In order to support platforms which has multiple PHY's (of same type) and
+which has multiple USB controllers, a new design is adopted wherin the binding
+information (between the PHY and the USB controller) should be passed to the
+PHY library from platform specific file (board file). 
+So added a new API to pass the binding information.
 
-So the binding should be done something like
-usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto"); specifying the USB
-controller device name, index, and the PHY device name.
-I have done this binding for OMAP platforms, but it should be done for
-all the platforms.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/usb/otg/otg.c   |   37 +++++++++++++++++++++++++++++++++++++
+ include/linux/usb/phy.h |   22 ++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
 
-After this design, the phy can be got by passing the USB controller device
-pointer and the index.
-
-Developed this patch series on
-git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
-after applying "usb: musb: add driver for control module" patch series
-and "ARM: dts: omap: add dt data for MUSB"
-
-Did basic enumeration testing in omap4 panda and omap3 beagle.
-
-Kishon Vijay Abraham I (6):
-  usb: otg: Add an API to bind the USB controller and PHY
-  usb: otg: utils: add facilities in phy lib to support multiple PHYs
-    of same type
-  ARM: OMAP: USB: Add phy binding information
-  drivers: usb: musb: omap: make use of the new PHY lib APIs
-  usb: otg: add device tree support to otg library
-  USB: MUSB: OMAP: get PHY by phandle for dt boot
-
- arch/arm/mach-omap2/board-2430sdp.c          |    2 +
- arch/arm/mach-omap2/board-3430sdp.c          |    2 +
- arch/arm/mach-omap2/board-4430sdp.c          |    2 +
- arch/arm/mach-omap2/board-cm-t35.c           |    2 +
- arch/arm/mach-omap2/board-devkit8000.c       |    2 +
- arch/arm/mach-omap2/board-igep0020.c         |    2 +
- arch/arm/mach-omap2/board-ldp.c              |    2 +
- arch/arm/mach-omap2/board-omap3beagle.c      |    2 +
- arch/arm/mach-omap2/board-omap3evm.c         |    2 +
- arch/arm/mach-omap2/board-omap3logic.c       |    2 +
- arch/arm/mach-omap2/board-omap3pandora.c     |    2 +
- arch/arm/mach-omap2/board-omap3stalker.c     |    2 +
- arch/arm/mach-omap2/board-omap3touchbook.c   |    2 +
- arch/arm/mach-omap2/board-omap4panda.c       |    2 +
- arch/arm/mach-omap2/board-overo.c            |    2 +
- arch/arm/mach-omap2/board-rm680.c            |    2 +
- arch/arm/mach-omap2/board-zoom-peripherals.c |    2 +
- drivers/usb/musb/omap2430.c                  |    7 +-
- drivers/usb/otg/otg.c                        |  228 +++++++++++++++++++++++++-
- drivers/usb/otg/twl4030-usb.c                |    3 +-
- drivers/usb/phy/omap-usb2.c                  |    3 +-
- include/linux/usb/phy.h                      |   43 +++++
- 22 files changed, 314 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
+index a30c041..492ba2f 100644
+--- a/drivers/usb/otg/otg.c
++++ b/drivers/usb/otg/otg.c
+@@ -18,6 +18,7 @@
+ #include <linux/usb/otg.h>
+ 
+ static LIST_HEAD(phy_list);
++static LIST_HEAD(phy_bind_list);
+ static DEFINE_SPINLOCK(phy_lock);
+ 
+ static struct usb_phy *__usb_find_phy(struct list_head *list,
+@@ -201,6 +202,42 @@ void usb_remove_phy(struct usb_phy *x)
+ }
+ EXPORT_SYMBOL(usb_remove_phy);
+ 
++/**
++ * usb_bind_phy - bind the phy and the controller that uses the phy
++ * @dev_name: the device name of the device that will bind to the phy
++ * @index: index to specify the port number
++ * @phy_dev_name: the device name of the phy
++ *
++ * Fills the phy_bind structure with the dev_name and phy_dev_name. This will
++ * be used when the phy driver registers the phy and when the controller
++ * requests this phy.
++ *
++ * To be used by platform specific initialization code.
++ */
++struct usb_phy_bind __init *usb_bind_phy(const char *dev_name, u8 index,
++				const char *phy_dev_name)
++{
++	struct usb_phy_bind *phy_bind;
++	unsigned long flags;
++
++	phy_bind = kzalloc(sizeof(*phy_bind), GFP_KERNEL);
++	if (!phy_bind) {
++		pr_err("phy_bind(): No memory for phy_bind");
++		return ERR_PTR(-ENOMEM);
++	}
++
++	phy_bind->dev_name = dev_name;
++	phy_bind->phy_dev_name = phy_dev_name;
++	phy_bind->index = index;
++
++	spin_lock_irqsave(&phy_lock, flags);
++	list_add_tail(&phy_bind->list, &phy_bind_list);
++	spin_unlock_irqrestore(&phy_lock, flags);
++
++	return phy_bind;
++}
++EXPORT_SYMBOL_GPL(usb_bind_phy);
++
+ const char *otg_state_string(enum usb_otg_state state)
+ {
+ 	switch (state) {
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index a29ae1e..fbeab1a 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -106,6 +106,21 @@ struct usb_phy {
+ 			enum usb_device_speed speed);
+ };
+ 
++/**
++ * struct usb_phy_bind - represent the binding for the phy
++ * @dev_name: the device name of the device that will bind to the phy
++ * @phy_dev_name: the device name of the phy
++ * @index: used if a single controller uses multiple phys
++ * @phy: reference to the phy
++ * @list: to maintain a linked list of the binding information
++ */
++struct usb_phy_bind {
++	const char	*dev_name;
++	const char	*phy_dev_name;
++	u8		index;
++	struct usb_phy	*phy;
++	struct list_head list;
++};
+ 
+ /* for board-specific init logic */
+ extern int usb_add_phy(struct usb_phy *, enum usb_phy_type type);
+@@ -151,6 +166,8 @@ extern struct usb_phy *devm_usb_get_phy(struct device *dev,
+ 	enum usb_phy_type type);
+ extern void usb_put_phy(struct usb_phy *);
+ extern void devm_usb_put_phy(struct device *dev, struct usb_phy *x);
++extern struct usb_phy_bind *usb_bind_phy(const char *dev_name, u8 index,
++				const char *phy_dev_name);
+ #else
+ static inline struct usb_phy *usb_get_phy(enum usb_phy_type type)
+ {
+@@ -171,6 +188,11 @@ static inline void devm_usb_put_phy(struct device *dev, struct usb_phy *x)
+ {
+ }
+ 
++static inline struct usb_phy_bind *usb_bind_phy(const char *dev_name, u8 index,
++				const char *phy_dev_name)
++{
++	return NULL;
++}
+ #endif
+ 
+ static inline int
 -- 
 1.7.9.5
