@@ -1,62 +1,36 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 22 Jan 2013 22:14:29 +0530
-Subject: [PATCH 4/4] ARM: AM33XX: clock: SET_RATE_PARENT in lcd path
-In-Reply-To: <cover.1358871018.git.afzal@ti.com>
-References: <cover.1358871018.git.afzal@ti.com>
-Message-ID: <24c9e4241b2988e66abd053508991d96cac964b7.1358871018.git.afzal@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 22 Jan 2013 08:53:30 -0800
+Subject: [PATCH 15/15] staging/omapdrm: don't build on multiplatform
+In-Reply-To: <50FD8B63.1060506@ti.com>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+ <1358788568-11137-16-git-send-email-arnd@arndb.de>
+ <50FD7A5F.9020702@ti.com> <201301211741.11875.arnd@arndb.de>
+ <50FD8B63.1060506@ti.com>
+Message-ID: <20130122165330.GA28152@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LCDC clock node is a one that does not have set rate capability. It
-just passes on the rate that is sent downstream by it's parent. While
-lcdc clock parent and it's grand parent - dpll_disp_m2_ck and
-dpll_disp_ck has the capability to configure rate.
+On Mon, Jan 21, 2013 at 12:39:31PM -0600, Rob Clark wrote:
+> On 01/21/2013 11:41 AM, Arnd Bergmann wrote:
+> >On Monday 21 January 2013, Rob Clark wrote:
+> >>Are you sure OMAP2_DSS requires ARCH_OMAP2PLUS?  I don't see this, and
+> >>it at least used to not depend on ARCH_OMAP2PLUS.  If it does now, I
+> >>think the correct fix would be to remove the dependency in OMAP2_DSS.  I
+> >>don't think removing ARCH_MULTIPLATFORM support in omapdrm is the
+> >>correct solution.
+> >At least it says so in drivers/video/omap2/Kconfig, which contains
+> >
+> >if ARCH_OMAP2PLUS
+> >source drivers/video/omap2/dss/Kconfig
+> >endif
+> 
+> ahh, ok, I see.. the if ARCH_OMAP2PLUS bit looks like it came in
+> recently (770b6cb)
+> 
+> what about changing this to 'if ARCH_OMAP2PLUS || ARCH_MULTIPLATFORM'?
 
-And the default rates provided by LCDC clock's ancestors are not
-sufficient to obtain pixel clock for current LCDC use cases, hence
-currently display would not work on AM335x SoC's (with driver
-modifications in platfrom independent way).
+That's what Arnd's patch did.
 
-Hence inform clock framework to propogate set rate for LCDC clock as
-well as it's parent - dpll_disp_m2_ck. With this change, set rate on
-LCDC clock would get propogated till dpll_disp_ck via dpll_disp_m2_ck,
-hence allowing the driver (same driver is used in DaVinci too) to set
-rates using LCDC clock without worrying about platform dependent clock
-details.
+totally confused,
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/cclock33xx_data.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
-index 8f7c60d..0519e91 100644
---- a/arch/arm/mach-omap2/cclock33xx_data.c
-+++ b/arch/arm/mach-omap2/cclock33xx_data.c
-@@ -286,10 +286,10 @@ DEFINE_STRUCT_CLK(dpll_disp_ck, dpll_core_ck_parents, dpll_ddr_ck_ops);
-  * TODO: Add clksel here (sys_clkin, CORE_CLKOUTM6, PER_CLKOUTM2
-  * and ALT_CLK1/2)
-  */
--DEFINE_CLK_DIVIDER(dpll_disp_m2_ck, "dpll_disp_ck", &dpll_disp_ck, 0x0,
--		   AM33XX_CM_DIV_M2_DPLL_DISP, AM33XX_DPLL_CLKOUT_DIV_SHIFT,
--		   AM33XX_DPLL_CLKOUT_DIV_WIDTH, CLK_DIVIDER_MIN_DIV_DEFAULT,
--		   CLK_DIVIDER_ONE_BASED, NULL);
-+DEFINE_CLK_DIVIDER(dpll_disp_m2_ck, "dpll_disp_ck", &dpll_disp_ck,
-+		   CLK_SET_RATE_PARENT, AM33XX_CM_DIV_M2_DPLL_DISP,
-+		   AM33XX_DPLL_CLKOUT_DIV_SHIFT, AM33XX_DPLL_CLKOUT_DIV_WIDTH,
-+		   CLK_DIVIDER_MIN_DIV_DEFAULT, CLK_DIVIDER_ONE_BASED, NULL);
- 
- /* DPLL_PER */
- static struct dpll_data dpll_per_dd = {
-@@ -726,7 +726,8 @@ static struct clk_hw_omap lcd_gclk_hw = {
- 	.clksel_mask	= AM33XX_CLKSEL_0_1_MASK,
- };
- 
--DEFINE_STRUCT_CLK(lcd_gclk, lcd_ck_parents, gpio_fck_ops);
-+DEFINE_STRUCT_CLK_FLAGS(lcd_gclk, lcd_ck_parents,
-+			gpio_fck_ops, CLK_SET_RATE_PARENT);
- 
- DEFINE_CLK_FIXED_FACTOR(mmc_clk, "dpll_per_m2_ck", &dpll_per_m2_ck, 0x0, 1, 2);
- 
--- 
-1.7.12
+greg k-h
