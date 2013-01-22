@@ -1,34 +1,42 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 22 Jan 2013 22:14:17 +0530
-Subject: [PATCH 2/4] ARM: OMAP2+: dpll: am335x - avoid freqsel
+Date: Tue, 22 Jan 2013 22:14:23 +0530
+Subject: [PATCH 3/4] ARM: OMAP2+: clock: DEFINE_STRUCT_CLK_FLAGS helper
 In-Reply-To: <cover.1358871018.git.afzal@ti.com>
 References: <cover.1358871018.git.afzal@ti.com>
-Message-ID: <b0be0227b6b07a8c16b13a06fe500694c751827c.1358871018.git.afzal@ti.com>
+Message-ID: <abe7aceb564b97ab00b88b13a9aac487363e01c1.1358871018.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-am335x does not have freqsel, avoid it.
+DEFINE_STRUCT_CLK does not have the capability to set flags, define
+DEFINE_STRUCT_CLK_FLAGS to handle flags. This is needed to add
+SET_RATE_PARENT flag in statically defined lcd clock in am335x.
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/dpll3xxx.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/clock.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index 0a02aab5..3aed4b0 100644
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -500,8 +500,9 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
- 		if (dd->last_rounded_rate == 0)
- 			return -EINVAL;
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index b402048..60ddd86 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -65,6 +65,17 @@ struct clockdomain;
+ 		.ops = &_clkops_name,				\
+ 	};
  
--		/* No freqsel on OMAP4 and OMAP3630 */
--		if (!cpu_is_omap44xx() && !cpu_is_omap3630()) {
-+		/* No freqsel on AM335x, OMAP4 and OMAP3630 */
-+		if (!soc_is_am33xx() && !cpu_is_omap44xx() &&
-+		    !cpu_is_omap3630()) {
- 			freqsel = _omap3_dpll_compute_freqsel(clk,
- 						dd->last_rounded_n);
- 			WARN_ON(!freqsel);
++#define DEFINE_STRUCT_CLK_FLAGS(_name, _parent_array_name,	\
++				_clkops_name, _flags)		\
++	static struct clk _name = {				\
++		.name = #_name,					\
++		.hw = &_name##_hw.hw,				\
++		.parent_names = _parent_array_name,		\
++		.num_parents = ARRAY_SIZE(_parent_array_name),	\
++		.ops = &_clkops_name,				\
++		.flags = _flags,				\
++	};
++
+ #define DEFINE_STRUCT_CLK_HW_OMAP(_name, _clkdm_name)		\
+ 	static struct clk_hw_omap _name##_hw = {		\
+ 		.hw = {						\
 -- 
 1.7.12
