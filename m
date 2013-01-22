@@ -1,64 +1,39 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Tue, 22 Jan 2013 16:26:10 +0100
-Subject: [PATCH] net: fec: Add support for multiple phys on mdiobus
-In-Reply-To: <50FEAE12.7090307@openwrt.org>
-References: <1358757475-21035-1-git-send-email-s.hauer@pengutronix.de>
- <50FD02B8.8080401@grandegger.com> <20130121100701.GX1906@pengutronix.de>
- <50FD2172.2020608@grandegger.com> <20130121120602.GZ1906@pengutronix.de>
- <50FE3E37.4010004@grandegger.com> <50FEA691.4050904@openwrt.org>
- <50FEAA28.1070003@grandegger.com> <50FEAE12.7090307@openwrt.org>
-Message-ID: <50FEAF92.1090604@grandegger.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 22 Jan 2013 10:30:10 -0500 (EST)
+Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
+In-Reply-To: <20130122061116.GD29677@S2100-06.ap.freescale.net>
+Message-ID: <Pine.LNX.4.44L0.1301221028580.1510-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 04:19 PM, Florian Fainelli wrote:
-> On 01/22/2013 04:03 PM, Wolfgang Grandegger wrote:
->> On 01/22/2013 03:47 PM, Florian Fainelli wrote:
->>> On 01/22/2013 08:22 AM, Wolfgang Grandegger wrote:
->>>>> Well this could be done when the fixed phy driver could be registered
->>>>> with the devicetree, maybe like this:
->>>>>
->>>>>      fixed-phy: mdiophy {
->>>>>          compatible = "mdio-fixed-phy";
->>>>>          link = "100FD";
->>>>>      };
->>>> I find that confusing. There is *no* phy but just a fixed link to the
->>>> switch...
->>>>
->>>>> The good thing about this would be that every ethernet driver could
->>>>> just
->>>>> use such a fixed phy, any external mdio phy (like on Marvell
->>>>> Armada) or
->>>>> just a phy connected to the internal mdio interface provided by the
->>>>> ethernet
->>>>> core.
->>>> What is wrong with the existing "fixed-link" property of the *ethernet*
->>>> node. The fixed-link handling should/could be done in the phy layer,
->>>> and
->>>> not in the driver as it currently is implemented. Maybe that's the
->>>> reason why the current code is regarded as hack!
->>> As far as I have used it with the CPMAC driver, the fixed PHY is a
->>> specific PHY device and there is no specific handling to be done by the
->>> Ethernet MAC driver but eventually changing its MII bus id so that it is
->>> named "fixed-0" to allow the fixed PHY driver to bind. Put differently,
->> There is special handling for the fixed link, e.g. here:
->>
->> http://lxr.linux.no/#linux+v3.7.4/drivers/net/ethernet/freescale/gianfar.c#L1462
->>
->>
->> This could be hidden in the PHY layer allowing all ethernet drivers
->> using the "fixed-link" property.
+On Tue, 22 Jan 2013, Shawn Guo wrote:
+
+> On Mon, Jan 21, 2013 at 09:37:42PM +0000, Arnd Bergmann wrote:
+> > > Arnd, please take a look at
+> > > 
+> > >         http://marc.info/?l=linux-usb&amp;m=135843716515529&amp;w=2
+> > > 
+> > > I can't test it easily, not being set up for cross compilation.  I'm 
+> > > waiting to hear from anybody whether it works before submitting it.
+> > > (There's also a report of memory corruption involving a similar patch 
+> > > for ehci-omap; it hasn't been tracked down yet.)
+> > 
+> > Your patch looks good to me, but it also seems to do some other
+> > changes that are not required to fix the problem but could wait
+> > for 3.9 instead. You definitely have my Ack if you are willing
+> > to take it for 3.8 though.
+
+I think it's not too late to submit this for 3.8.  Thanks for the Ack.
+
+> > Shawn or Sascha should be able to test it.
+> > 
+> Alan,
 > 
-> Ok, so in the end you could have potentially an ethernet PHY node
-> containing the following properties:
-> - fixed-link
-> - fixed-speed
-> - fixed-duplex
-> 
-> and treat it as a fixed-phy. If so, this would be pretty handy.
+> Thanks for the patch.  I just gave it try.  The USB Host port still
+> works for me with a couple of fixes on your changes integrated (one
+> for compiling and the other for probing).  So you have my ACK with
+> the changes below rolled into your patch.
 
-The "fixed-link" property already allows to specify speed, duplex, etc.:
+Right, I have merged your changes into the patch.  Will submit shortly.
 
-http://lxr.linux.no/#linux+v3.7.4/Documentation/devicetree/bindings/net/fsl-tsec-phy.txt#L48
-
-Wolfgang.
+Alan Stern
