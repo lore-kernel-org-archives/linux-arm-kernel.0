@@ -1,41 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Jan 2013 09:04:46 -0800
-Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
-In-Reply-To: <50FEC503.2080602@wwwdotorg.org>
-References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
- <1358833924-24535-2-git-send-email-hdoyu@nvidia.com>
- <50FE2CA8.20100@ti.com> <50FEC503.2080602@wwwdotorg.org>
-Message-ID: <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Jan 2013 17:05:01 +0000
+Subject: [PATCH 1/4] ARM: cache-l2x0: Manage the errata at run time
+In-Reply-To: <20130122054227.GA5594@bnru10>
+References: <20130121131451.GA29855@bnru10>
+ <20130121140344.GG18005@mudshark.cambridge.arm.com>
+ <20130122054227.GA5594@bnru10>
+Message-ID: <20130122170500.GG2153@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 8:57 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 01/21/2013 11:07 PM, Santosh Shilimkar wrote:
->> On Tuesday 22 January 2013 11:22 AM, Hiroshi Doyu wrote:
->>> Skip scu_enable(scu_base) if CPU is not Cortex A9 with SCU.
->>>
->>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->>> ---
->> Looks fine. I will also update OMAP code with the new
->> interface. Thanks.
->
-> OK, so patch 1/2 at least needs to get into a stable arm-soc branch
-> then. Unless there are violent objections, I'll forward patch 1/2 to
-> arm-soc and request it be added into a branch so that Tegra and OMAP can
-> both merge it into their branches as a dependency. I guess patch 2/2
-> could also be included; I don't think it has any complex dependencies
-> that'd prevent that, and would help to show how patch 1/2 gets used.
->
-> Hiroshi, is this series the only dependency you need for your Tegra114
-> series? So, I could merge your Tegra114 series once this series is applied?
+On Tue, Jan 22, 2013 at 05:42:29AM +0000, Srinidhi Kasagar wrote:
+> On Mon, Jan 21, 2013 at 15:03:44 +0100, Will Deacon wrote:
+> > On Mon, Jan 21, 2013 at 01:14:53PM +0000, srinidhi kasagar wrote:
+> > > +asmlinkage u32 l2x0_get_rtl_release(void)
+> > > +{
+> > > +	return readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
+> > > +			L2X0_CACHE_ID_RTL_MASK;
+> > > +}
+> > 
+> > You're calling this function all over the place, including from the flush
+> > code. Can you read the RTL release during probe and stash it somewhere
+> > instead please?
+> 
+> I thought of doing that, however TI omap's suspend is the only one which needs
+> this API as well, So, I had to make it global. Refer my patch 3/4. I can
+> duplicate this for omap if you think so..
 
-For something like this, it might make more sense for us to just apply
-the patches for OMAP on top, i.e. we'll pull the short branch from
-you, and then we can just apply patches (with maintainer acks) on top,
-instead of doing a bunch of single-patch pulls.
+Just make the get_rtl_release_function return the stashed value if it's been
+probed and get the driver to use the stashed value directly.
 
-Since Russell had comments on it earlier, I'd like him to give a nod
-that he's happy with it too.
-
-
--Olof
+Will
