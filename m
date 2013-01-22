@@ -1,23 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Jan 2013 08:27:54 +0000
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <20130121224449.GZ23505@n2100.arm.linux.org.uk>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <50FDBEAC.2050606@linaro.org> <20130121224449.GZ23505@n2100.arm.linux.org.uk>
-Message-ID: <201301220827.55209.arnd@arndb.de>
+From: archit@ti.com (Archit Taneja)
+Date: Tue, 22 Jan 2013 13:58:47 +0530
+Subject: [PATCH] arm: omap: Fix build break in drm.c
+Message-ID: <1358843328-8178-1-git-send-email-archit@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 January 2013, Russell King - ARM Linux wrote:
-> In this particular case, EBSA110 is not a candidate for multi-arch
-> build anyway, because it's ARMv4 and we're only really bothering with
-> ARMv6 and better.
-> 
-> Not only that, but the IO stuff on it is sufficiently obscure and
-> non-standard...
+Building omapdrm leads to a build break because of a missing include needed
+for the macro GET_OMAP_REVISION(). Add the missing inlclude.
 
-Right, no point worrying about EBSA110. We need to work out OMAP and
-Exynos/S5P though: As long as OMAP needs 128HZ and Exynos needs 200HZ,
-we can never have them in the same kernel.
+Signed-off-by: Archit Taneja <archit@ti.com>
+---
+ arch/arm/mach-omap2/drm.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-	Arnd
+diff --git a/arch/arm/mach-omap2/drm.c b/arch/arm/mach-omap2/drm.c
+index 4c7566c..6b1a8df 100644
+--- a/arch/arm/mach-omap2/drm.c
++++ b/arch/arm/mach-omap2/drm.c
+@@ -25,6 +25,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/platform_data/omap_drm.h>
+ 
++#include "soc.h"
+ #include "omap_device.h"
+ #include "omap_hwmod.h"
+ 
+-- 
+1.7.9.5
