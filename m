@@ -1,71 +1,106 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 22 Jan 2013 15:44:03 +0530
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <201301220931.24570.arnd@arndb.de>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <20130121232322.GK15361@atomide.com> <50FE307F.9000701@ti.com>
- <201301220931.24570.arnd@arndb.de>
-Message-ID: <50FE666B.10902@ti.com>
+From: mpfj-list@mimc.co.uk (Mark Jackson)
+Date: Tue, 22 Jan 2013 10:15:08 +0000
+Subject: OMAP baseline test results for v3.8-rc4
+In-Reply-To: <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
+ <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
+ <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
+ <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
+ <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+Message-ID: <50FE66AC.2090306@mimc.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 January 2013 03:01 PM, Arnd Bergmann wrote:
-> On Tuesday 22 January 2013, Santosh Shilimkar wrote:
->> On Tuesday 22 January 2013 04:53 AM, Tony Lindgren wrote:
->>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [130121 13:07]:
->>>>
->>>> As for Samsung and the rest I can't comment.  The original reason OMAP
->>>> used this though was because the 32768Hz counter can't produce 100Hz
->>>> without a .1% error - too much error under pre-clocksource
->>>> implementations for timekeeping.  Whether that's changed with the
->>>> clocksource/clockevent support needs to be checked.
->>>
->>> Yes that's why HZ was originally set to 128. That value (or some multiple)
->>> still makes sense when the 32 KiHZ clock source is being used. Of course
->>> we should rely on the local timer when running for the SoCs that have
->>> them.
->>>
->> This is right. It was only because of the drift associated when clocked
->> with 32KHz. Even on SOCs where local timers are available for power
->> management reasons we need to switch to 32KHz clocked device in
->> low power states. Hence the HZ value should be multiple of 32 on
->> OMAP.
->
-> I need some help understanding what the two of you are saying, because
-> it sounds to me that you imply we cannot have a multiplatform kernel
-> that includes OMAP and another platform that needs (or wants) a different
-> HZ value.
->
-Sorry for not being clear enough. On OMAP, 32KHz is the only clock which
-is always running(even during low power states) and hence the clock
-source and clock event have been clocked using 32KHz clock. As mentioned
-by RMK, with 32768 Hz clock and HZ = 100, there will be always an
-error of 0.1 %. This accuracy also impacts the timer tick interval.
-This was the reason, OMAP has been using the HZ = 128.
+On 22/01/13 02:24, Paul Walmsley wrote:
+> 
+> Hi guys,
+> 
+> Regarding the AM33xx test failures with appended DTBs, it would be very 
+> helpful if especially the TI people could try reproducing the problem.
 
-There is a hardware feature to implement 1 ms correction on the timer
-to overcome such an issue but it was not supported on OMAP2 devices.
-OMAP3/4/5 does support it. Though one attempt [1] was made to support
-it in kernel. This will ofcourse will address the tick interval
-corrections.
+My non-working setup (I'm using a recent U-Boot) is as follows ...
 
-> However, I also thought that when using a proper clocksource driver,
-> the HZ setting has absolutely no impact on the drift of the wall clock,
-> because those two are decoupled.
->
-I am not too sure about this. I was under impression that tick (clock
-event) ticking accuracy does impact the kernel time keeping as well.
+[Note that the DTB patch mentioned elsewhere in this thread seems to be *already* applied to -next]
 
-> Even when using the HZ based clocksource (for whatever reason you
-> would want to do that), I thought there should be no drift as long
-> as the CLOCK_TICK_RATE (in older kernels) or the register_refined_jiffies()
-> (in older kernels) setting matches the hardware timer frequency.
->
-> What am I missing?
->
-The issue is with hardware timer frequency itself since with HZ = 100 or
-200, the timer tick will not be accurate. Hope this gives bit more info.
+$ git describe
+next-20130121
+$ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- omap2plus_defconfig
+$ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- menuconfig
+CONFIG_ARM_APPENDED_DTB=y
+CONFIG_ARM_ATAG_DTB_COMPAT=y
+CONFIG_EARLY_PRINTK=y
+$ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux-
+$ cat arch/arm/boot/zImage arch/arm/boot/dtb/am335x-bone.dtb > arch/arm/boot/zImage-dtb.am335x-bone
+$ scripts/mkuboot.sh -A arm -O linux -C none -T kernel -a 0?80008000 -e 0?80008000 -n ?Linux? -d
+arch/arm/boot/zImage-dtb.am335x-bone arch/arm/boot/uImage-dtb.am335x-bone
+$ cp arch/arm/boot/uImage-dtb.am335x-bone /tftpboot/nanobone/uImage-dtb
 
-Regards,
-Santosh
-[1] https://patchwork.kernel.org/patch/107364/
+And when I boot:-
+
+U-Boot SPL 2013.01 (Jan 16 2013 - 15:20:58)
+OMAP SD/MMC: 0
+reading u-boot.img
+reading u-boot.img
+
+
+U-Boot 2013.01 (Jan 16 2013 - 15:20:58)
+
+I2C:   ready
+DRAM:  256 MiB
+WARNING: Caches not enabled
+NAND:  No NAND device found!!!
+0 MiB
+MMC:   OMAP SD/MMC: 0, OMAP SD/MMC: 1
+*** Warning - readenv() failed, using default environment
+
+musb-hdrc: ConfigData=0xde (UTMI-8, dyn FIFOs, bulk combine, bulk split, HB-ISO Rx, HB-ISO Tx, SoftConn)
+musb-hdrc: MHDRC RTL version 2.0
+musb-hdrc: setup fifo_mode 4
+musb-hdrc: 28/31 max ep, 16384/16384 memory
+USB Peripheral mode controller at 47401000 using PIO, IRQ 0
+musb-hdrc: ConfigData=0xde (UTMI-8, dyn FIFOs, bulk combine, bulk split, HB-ISO Rx, HB-ISO Tx, SoftConn)
+musb-hdrc: MHDRC RTL version 2.0
+musb-hdrc: setup fifo_mode 4
+musb-hdrc: 28/31 max ep, 16384/16384 memory
+USB Host mode controller at 47401800 using PIO, IRQ 0
+Net:   cpsw, usb_ether
+Hit any key to stop autoboot:  0
+mmc0 is current device
+SD/MMC found on device 0
+reading uEnv.txt
+167 bytes read in 3 ms (53.7 KiB/s)
+Loaded environment from uEnv.txt
+Importing environment from mmc ...
+Running uenvcmd ...
+cpsw Waiting for PHY auto negotiation to complete. done
+link up on port 0, speed 100, full duplex
+BOOTP broadcast 1
+BOOTP broadcast 2
+*** Unhandled DHCP Option in OFFER/ACK: 44
+*** Unhandled DHCP Option in OFFER/ACK: 46
+*** Unhandled DHCP Option in OFFER/ACK: 44
+*** Unhandled DHCP Option in OFFER/ACK: 46
+DHCP client bound to address 10.0.0.112
+Using cpsw device
+TFTP from server 10.0.0.100; our IP address is 10.0.0.112
+Filename '/nanobone/uImage-dtb'.
+Load address: 0x80000000
+Loading: #################################################################
+         #################################################################
+         #################################################################
+         #################################################################
+         ###########
+         627.9 KiB/s
+done
+Bytes transferred = 3963919 (3c7c0f hex)
+## Booting kernel from Legacy Image at 80000000 ...
+   Image Name:   Linux
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3963855 Bytes = 3.8 MiB
+   Load Address: 80008000
+   Entry Point:  80008000
+   Verifying Checksum ... OK
+   Loading Kernel Image ... OK
+OK
+
+Starting kernel ...
