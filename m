@@ -1,26 +1,36 @@
-From: kishon@ti.com (kishon)
-Date: Tue, 22 Jan 2013 21:10:57 +0530
-Subject: [PATCH v1 6/6] USB: MUSB: OMAP: get PHY by phandle for dt boot
-In-Reply-To: <50FEB275.80504@ti.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Tue, 22 Jan 2013 16:41:18 +0100
+Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
+In-Reply-To: <1358848694-20145-1-git-send-email-kishon@ti.com>
 References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <1358848694-20145-7-git-send-email-kishon@ti.com> <50FE9F5C.2010501@ti.com>
- <50FEA447.1090701@ti.com> <50FEA696.8000506@ti.com> <50FEAE96.30706@ti.com>
- <50FEB275.80504@ti.com>
-Message-ID: <50FEB309.9040709@ti.com>
+Message-ID: <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tuesday 22 January 2013 09:08 PM, Peter Ujfalusi wrote:
-> On 01/22/2013 04:21 PM, kishon wrote:
->> But it's better to check if deferred probing
->> takes place whenever a new driver is bound to a device as you just mentioned.
->
-> Whenever you load (might be also when you unload) a driver the deferred
-> modules will try to probe again. This is to check back if the dependency of
-> the deferred modules has been fulfilled by the new driver or not.
+Op 22 jan. 2013, om 10:58 heeft Kishon Vijay Abraham I <kishon@ti.com> het volgende geschreven:
 
-Thanks Peter.
+> This patch series adds support for adding multiple PHY's (of same type).
+> The binding information has to be present in the PHY library (otg.c) in
+> order for it to return the appropriate PHY whenever the USB controller
+> request for the PHY. So added a new API usb_bind_phy() to pass the binding
+> information. This API should be called by platform specific initialization
+> code.
+> 
+> So the binding should be done something like
+> usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto"); specifying the USB
+> controller device name, index, and the PHY device name.
+> I have done this binding for OMAP platforms, but it should be done for
+> all the platforms.
+> 
+> After this design, the phy can be got by passing the USB controller device
+> pointer and the index.
+> 
+> Developed this patch series on
+> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
+> after applying "usb: musb: add driver for control module" patch series
+> and "ARM: dts: omap: add dt data for MUSB"
+> 
+> Did basic enumeration testing in omap4 panda and omap3 beagle.
 
--Kishon
+With this patchset USB completely breaks on am33xx beaglebone, is that intended?
