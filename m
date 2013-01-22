@@ -1,91 +1,126 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jan 2013 08:43:34 +0000
-Subject: [PATCH 16/24] ab8500-bm: Flush all work queues before suspending
-In-Reply-To: <20130121191411.GA16177@lizard.mcd01528.sjc.wayport.net>
+Date: Tue, 22 Jan 2013 08:44:36 +0000
+Subject: [PATCH 23/24] ab8500-bm: Fix minor niggles experienced during
+ testing
+In-Reply-To: <20130121191324.GA15037@lizard.mcd01528.sjc.wayport.net>
 References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
- <1358769840-4763-17-git-send-email-lee.jones@linaro.org>
- <20130121191411.GA16177@lizard.mcd01528.sjc.wayport.net>
-Message-ID: <20130122084334.GD6857@gmail.com>
+ <1358769840-4763-24-git-send-email-lee.jones@linaro.org>
+ <20130121191324.GA15037@lizard.mcd01528.sjc.wayport.net>
+Message-ID: <20130122084436.GE6857@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 21 Jan 2013, Anton Vorontsov wrote:
 
-> On Mon, Jan 21, 2013 at 12:03:52PM +0000, Lee Jones wrote:
-> > From: Jonas Aaberg <jonas.aberg@stericsson.com>
-> > 
-> > Flush all workqueues at suspend time to avoid suspending during work.
-> > 
+> On Mon, Jan 21, 2013 at 12:03:59PM +0000, Lee Jones wrote:
+> > When compile testing the new AB8500 Battery Management changes
+> > due for inclusion into upstream, there were a few minor niggles
+> > which required repairing, or adapting for use against the
+> > Mainline kernel. This patch is a collection of them all.
+> 
+> No. This is the third time I'm saying it: the last time I checked, this is
+> not how we do development in the mainline.
+> 
+> 1. One logical change at a time;
+> 2. Every patch in a sequence must be bisectable, compilable;
+> 3. The patches must not "break things temporary" 'because it is easier to
+>    do development that way'. If you introduce a new feature, make all
+>    possible to not introduce regressions.
+
+Okay, I'll fix them up instead.
+
 > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-> > Reviewed-by: Marcus COOPER <marcus.xm.cooper@stericsson.com>
-> > Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/61915
-> 
-> I do remeber I was commenting on that patch, and I was asking to merge the
-> changes into the patches that introduce the workqueues (aka problems).
-> 
-> Now I see that "ab8500_charger: Detect charger removal" commit already in
-> the mainline, i.e. I merged the patch with the *known* possible
-> regression. The issue was known to me during the first review cycle, and I
-> pointed you to my review comments. But the patch sneaked in anyway...
-
-I assure you I didn't _sneak_ any patch in. I'm working on small, simplified
-patch-sets for your convenience. I didn't look at the review comments
-for this patch until I placed it in this patch-set. By the time I did
-look, the offending patch was already in -next. To solve this type of
-situation, I can either send you the whole lot in one go with
-everything fixed-up and squashed, or we can continue dealing with more
-manageable patch-sets where situations like this are bound to happen
-occasionally.
-
-Even when working directly with Mainline, we still have patches which
-fixup issues which were introduced earlier in the development
-cycle. I'm not sure on your view of it exactly, but I don't think it's
-the end of the world?
-
 > > ---
-> >  drivers/power/ab8500_charger.c |   11 +++++++++++
-> >  drivers/power/ab8500_fg.c      |    5 +++++
-> >  2 files changed, 16 insertions(+)
+> >  drivers/power/ab8500_fg.h       |    6 ++++--
+> >  drivers/power/abx500_chargalg.c |    4 ++--
+> >  drivers/power/pm2301_charger.c  |    4 ++--
+> >  3 files changed, 8 insertions(+), 6 deletions(-)
 > > 
-> > diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-> > index da965ee..a632b94 100644
-> > --- a/drivers/power/ab8500_charger.c
-> > +++ b/drivers/power/ab8500_charger.c
-> > @@ -2866,6 +2866,17 @@ static int ab8500_charger_suspend(struct platform_device *pdev,
-> >  	if (delayed_work_pending(&di->check_hw_failure_work))
-> >  		cancel_delayed_work(&di->check_hw_failure_work);
+> > diff --git a/drivers/power/ab8500_fg.h b/drivers/power/ab8500_fg.h
+> > index 946840b..bb78dc9 100644
+> > --- a/drivers/power/ab8500_fg.h
+> > +++ b/drivers/power/ab8500_fg.h
+> > @@ -182,6 +182,7 @@ struct ab8500_fg_test {
+> >   * @fg_check_hw_failure_work:	Work for checking HW state
+> >   * @cc_lock:		Mutex for locking the CC
+> >   * @fg_kobject:		Structure of type kobject
+> > + * @test:		Structure of type ab8500_fg_test for test purpose
+> >   */
+> >  struct ab8500_fg {
+> >  	struct device *dev;
+> > @@ -224,6 +225,7 @@ struct ab8500_fg {
+> >  	struct delayed_work fg_check_hw_failure_work;
+> >  	struct mutex cc_lock;
+> >  	struct kobject fg_kobject;
+> > +	struct ab8500_fg_test test;
+> 
+> You are introducing it, but I don't see any users.
+> 
+> >  };
 > >  
-> > +	flush_delayed_work(&di->attach_work);
-> > +	flush_delayed_work(&di->usb_charger_attached_work);
-> > +	flush_delayed_work(&di->ac_charger_attached_work);
-> > +	flush_delayed_work(&di->check_usbchgnotok_work);
-> > +	flush_delayed_work(&di->check_vbat_work);
-> > +	flush_delayed_work(&di->kick_wd_work);
-> > +
-> > +	flush_work(&di->usb_link_status_work);
-> > +	flush_work(&di->ac_work);
-> > +	flush_work(&di->detect_usb_type_work);
-> > +
-> >  	return 0;
-> >  }
-> >  #else
-> > diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
-> > index 0378aab..1a78116 100644
-> > --- a/drivers/power/ab8500_fg.c
-> > +++ b/drivers/power/ab8500_fg.c
-> > @@ -2410,6 +2410,11 @@ static int ab8500_fg_suspend(struct platform_device *pdev,
-> >  	struct ab8500_fg *di = platform_get_drvdata(pdev);
+> >  extern char *discharge_state[];
+> > @@ -232,8 +234,8 @@ extern char *charge_state[];
+> >  int ab8500_fg_coulomb_counter(struct ab8500_fg *di, bool enable);
+> >  void ab8500_fg_charge_state_to(struct ab8500_fg *di,
+> >  		enum ab8500_fg_charge_state new_state);
+> > -void ab8500_fg_discharge_state_to(struct ab8500_fg *di,
+> > -		enum ab8500_fg_charge_state new_state);
+> > +static void ab8500_fg_discharge_state_to(struct ab8500_fg *di,
+> > +		enum ab8500_fg_discharge_state new_state);
+> >  /* test initialization */
+> >  #ifdef CONFIG_AB8500_BM_DEEP_DEBUG
+> >  void ab8500_fg_test_init(struct ab8500_fg *di);
+> > diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
+> > index 694f592..cacf512 100644
+> > --- a/drivers/power/abx500_chargalg.c
+> > +++ b/drivers/power/abx500_chargalg.c
+> > @@ -1664,8 +1664,8 @@ static int abx500_chargalg_get_property(struct power_supply *psy,
+> >  static ssize_t ab8500_chargalg_sysfs_show(struct kobject *kobj,
+> >  					  struct attribute *attr, char *buf)
+> >  {
+> > -	struct ab8500_chargalg *di = container_of(kobj,
+> > -               struct ab8500_chargalg, chargalg_kobject);
+> > +	struct abx500_chargalg *di = container_of(kobj,
+> > +               struct abx500_chargalg, chargalg_kobject);
+> 
+> Spaces.
+> 
 > >  
-> >  	flush_delayed_work(&di->fg_periodic_work);
-> > +	flush_work(&di->fg_work);
-> > +	flush_work(&di->fg_acc_cur_work);
-> > +	flush_delayed_work(&di->fg_reinit_work);
-> > +	flush_delayed_work(&di->fg_low_bat_work);
-> > +	flush_delayed_work(&di->fg_check_hw_failure_work);
+> >  	return sprintf(buf, "%d\n",
+> >  		       di->susp_status.ac_suspended &&
+> > diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
+> > index 14e37b2..5ebae88 100644
+> > --- a/drivers/power/pm2301_charger.c
+> > +++ b/drivers/power/pm2301_charger.c
+> > @@ -22,8 +22,8 @@
+> >  #include <linux/i2c.h>
+> >  #include <linux/workqueue.h>
+> >  #include <linux/kobject.h>
+> > -#include <linux/mfd/ab8500.h>
+> >  #include <linux/mfd/abx500.h>
+> > +#include <linux/mfd/abx500/ab8500.h>
+> >  #include <linux/mfd/abx500/ab8500-bm.h>
+> >  #include <linux/mfd/abx500/ab8500-gpadc.h>
+> >  #include <linux/mfd/abx500/ux500_chargalg.h>
+> > @@ -867,7 +867,7 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
 > >  
-> >  	/*
-> >  	 * If the FG is enabled we will disable it before going to suspend
+> >  	/* get parent data */
+> >  	pm2->dev = &i2c_client->dev;
+> > -	pm2->gpadc = ab8500_gpadc_get();
+> > +	pm2->gpadc = ab8500_gpadc_get("ab8500-gpadc.0");
+> 
+> Was the driver even compilable before? You've just introduced the new
+> driver in this exact series. :-/
+> 
+> Since pm2301 is a new driver, please merge all pm2301 stuff into one
+> patch.
+> 
+> Or, if you want to preserve the development history of the new driver,
+> this is also fine, but then I'd prefer to take it via a pull-request with
+> only this driver.
+> 
+> Thanks,
+> Anton
 
 -- 
 Lee Jones
