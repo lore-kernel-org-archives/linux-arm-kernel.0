@@ -1,120 +1,143 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 22 Jan 2013 02:42:14 +0000 (UTC)
-Subject: OMAP4 PM bootloader dependency problems
-Message-ID: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
+From: yizhang@marvell.com (Yi Zhang)
+Date: Tue, 22 Jan 2013 10:43:45 +0800
+Subject: [PATCH] mfd: remove redundant devm_* for 88pm80x PMIC
+Message-ID: <1358822625-5948-1-git-send-email-yizhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+devm_* functions are device managed and make error handling
+and code simpler; it also fix error exit paths
 
-Hi Tero, Rajendra, Santosh,
+Signed-off-by: Yi Zhang <yizhang@marvell.com>
+---
+ drivers/mfd/88pm800.c       |   10 +++-------
+ drivers/mfd/88pm805.c       |    4 ++--
+ drivers/mfd/88pm80x.c       |   22 ++++------------------
+ include/linux/mfd/88pm80x.h |    2 +-
+ 4 files changed, 10 insertions(+), 28 deletions(-)
 
-As we've discussed, there are known bootloader dependencies with the OMAP4 
-PM retention idle code, introduced in v3.8.  Boards booted with u-boot 
-versions even as recent as 2011 won't enter retention idle correctly; for 
-example:
-
-    http://www.pwsan.com/omap/testlogs/test_v3.8-rc4/20130120122039/pm/4430es2panda/4430es2panda_log.txt
-
-The right thing for you all to do is what was done for OMAP3: to add code 
-to correctly reset and initialize these on-chip devices.  However, since 
-it's already late in the v3.8-rc cycle, this seems unlikely to happen in 
-time for the v3.8 release -- and that's assuming that you guys are working 
-on this, which I'm unsure of.
-
-Barring that, what I'd like to see is a patch for v3.8-rc fixes that adds 
-a warning, printed to the kernel console, during boot.  The warning should 
-state that the OMAP4 PM code only works with certain bootloaders, and 
-should identify the minimum u-boot release needed for OMAP4 full-chip 
-retention idle to work.
-
-Could you guys please put that together ASAP so we can get it merged 
-during the v3.8-rc cycle?  Otherwise we're going to frustrate users when 
-people expect PM to work correctly with their existing bootloaders.  The 
-least we can do for them is warn them that problems exist.
-
-This should take priority over any new features.
-
-
-- Paul
-
----------- Forwarded message ----------
-Date: Mon, 7 Jan 2013 18:40:02 +0000 (UTC)
-From: Paul Walmsley <paul@pwsan.com>
-To: Madhusudhan.Gowda at elektrobit.com
-Cc: linux-omap at vger.kernel.org, t-kristo at ti.com, rnayak at ti.com
-Subject: RE: Querry on UART wakeup on Linux 3.8-rc1
-
-Hi,
-
-On Sun, 6 Jan 2013, Madhusudhan.Gowda at elektrobit.com wrote:
-
-> Could  someone point me if it has been working in any of the releases ?
-
-Serial wakeup from retention suspend seems to work on the OMAP4460 
-Panda-ES here as of v3.8-rc1, with a really recent U-boot[*]:
-
-http://www.pwsan.com/omap/testlogs/test_v3.8-rc1/20121228031713/pm/4460pandaes/4460pandaes_log.txt
-
-http://www.pwsan.com/omap/testlogs/test_v3.8-rc1/20121228031713/README.txt
-
-(There are some warnings present from the power state debugging 
-code, so there's probably something that could use a closer look.)
-
-The problem is, you need a really recent bootloader for this to work.  
-This is because the mainline kernel is missing code to idle several 
-on-chip devices (IVAHD, DSP, etc.).  This can be seen with the OMAP4430 
-boot logs:
-
-http://www.pwsan.com/omap/testlogs/test_v3.8-rc1/20121228031713/pm/4430es2panda/4430es2panda_log.txt
-
-That board is running an "older" bootloader - from July 2012!
-
-The hope is that some of the folks still working for TI can post the 
-appropriate reset and idle code for these devices.  Or at least, we'd 
-better add a console warning to the OMAP44xx PM init code that warns about 
-the bootloader dependencies.  Any comments from the TI folks here?
-
-
-- Paul
-
-> 
-> Thanks,
-> Gowda
-> 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org
-> [mailto:linux-omap-owner at vger.kernel.org] 
-> Sent: 01. tammikuuta 2013 22:08
-> To: linux-omap at vger.kernel.org
-> Subject: Querry on UART wakeup on Linux 3.8-rc1
-> 
-> Hi,
-> 
-> I tried to wakeup OMAP430 ES2.1 Panda from static suspend retention
-> using console uart2, it doesn't wakeup.
-> But could configure GPIO_121 button to wake up from retention fine.
-> 
-> On the serial uart side I have manually enabled wakeup by echo enabled >
-> /sys/devices/platform/omap_uart.2/tty/ttyO2/power/wakeup
-> 
-> I could see the wakeup enable bit (1<<14)  of  uart irrx pad register is
-> being set properly before it does static suspend fine.
-> 
-> Should I need to do any more thing to get it work?
-> 
-> Thanks,
-> Gowda
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org More majordomo info
-> at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
---
-To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-the body of a message to majordomo at vger.kernel.org
-More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+index 391e23e..582bda5 100644
+--- a/drivers/mfd/88pm800.c
++++ b/drivers/mfd/88pm800.c
+@@ -531,7 +531,7 @@ static int pm800_probe(struct i2c_client *client,
+ 	ret = device_800_init(chip, pdata);
+ 	if (ret) {
+ 		dev_err(chip->dev, "%s id 0x%x failed!\n", __func__, chip->id);
+-		goto err_800_init;
++		goto err_subchip_alloc;
+ 	}
+ 
+ 	ret = pm800_pages_init(chip);
+@@ -546,10 +546,8 @@ static int pm800_probe(struct i2c_client *client,
+ err_page_init:
+ 	mfd_remove_devices(chip->dev);
+ 	device_irq_exit_800(chip);
+-err_800_init:
+-	devm_kfree(&client->dev, subchip);
+ err_subchip_alloc:
+-	pm80x_deinit(client);
++	pm80x_deinit();
+ out_init:
+ 	return ret;
+ }
+@@ -562,9 +560,7 @@ static int pm800_remove(struct i2c_client *client)
+ 	device_irq_exit_800(chip);
+ 
+ 	pm800_pages_exit(chip);
+-	devm_kfree(&client->dev, chip->subchip);
+-
+-	pm80x_deinit(client);
++	pm80x_deinit();
+ 
+ 	return 0;
+ }
+diff --git a/drivers/mfd/88pm805.c b/drivers/mfd/88pm805.c
+index e671230..65d7ac0 100644
+--- a/drivers/mfd/88pm805.c
++++ b/drivers/mfd/88pm805.c
+@@ -257,7 +257,7 @@ static int pm805_probe(struct i2c_client *client,
+ 		pdata->plat_config(chip, pdata);
+ 
+ err_805_init:
+-	pm80x_deinit(client);
++	pm80x_deinit();
+ out_init:
+ 	return ret;
+ }
+@@ -269,7 +269,7 @@ static int pm805_remove(struct i2c_client *client)
+ 	mfd_remove_devices(chip->dev);
+ 	device_irq_exit_805(chip);
+ 
+-	pm80x_deinit(client);
++	pm80x_deinit();
+ 
+ 	return 0;
+ }
+diff --git a/drivers/mfd/88pm80x.c b/drivers/mfd/88pm80x.c
+index 1adb355..f736a46 100644
+--- a/drivers/mfd/88pm80x.c
++++ b/drivers/mfd/88pm80x.c
+@@ -48,14 +48,12 @@ int pm80x_init(struct i2c_client *client,
+ 		ret = PTR_ERR(map);
+ 		dev_err(&client->dev, "Failed to allocate register map: %d\n",
+ 			ret);
+-		goto err_regmap_init;
++		return ret;
+ 	}
+ 
+ 	chip->id = id->driver_data;
+-	if (chip->id < CHIP_PM800 || chip->id > CHIP_PM805) {
+-		ret = -EINVAL;
+-		goto err_chip_id;
+-	}
++	if (chip->id < CHIP_PM800 || chip->id > CHIP_PM805)
++		return -EINVAL;
+ 
+ 	chip->client = client;
+ 	chip->regmap = map;
+@@ -82,19 +80,11 @@ int pm80x_init(struct i2c_client *client,
+ 	}
+ 
+ 	return 0;
+-
+-err_chip_id:
+-	regmap_exit(map);
+-err_regmap_init:
+-	devm_kfree(&client->dev, chip);
+-	return ret;
+ }
+ EXPORT_SYMBOL_GPL(pm80x_init);
+ 
+-int pm80x_deinit(struct i2c_client *client)
++int pm80x_deinit(void)
+ {
+-	struct pm80x_chip *chip = i2c_get_clientdata(client);
+-
+ 	/*
+ 	 * workaround: clear the dependency between pm800 and pm805.
+ 	 * would remove it after HW chip fixes the issue.
+@@ -103,10 +93,6 @@ int pm80x_deinit(struct i2c_client *client)
+ 		g_pm80x_chip->companion = NULL;
+ 	else
+ 		g_pm80x_chip = NULL;
+-
+-	regmap_exit(chip->regmap);
+-	devm_kfree(&client->dev, chip);
+-
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(pm80x_deinit);
+diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+index 478672e..e94537b 100644
+--- a/include/linux/mfd/88pm80x.h
++++ b/include/linux/mfd/88pm80x.h
+@@ -365,5 +365,5 @@ static inline int pm80x_dev_resume(struct device *dev)
+ 
+ extern int pm80x_init(struct i2c_client *client,
+ 		      const struct i2c_device_id *id);
+-extern int pm80x_deinit(struct i2c_client *client);
++extern int pm80x_deinit(void);
+ #endif /* __LINUX_MFD_88PM80X_H */
+-- 
+1.7.0.4
