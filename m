@@ -1,42 +1,57 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 22 Jan 2013 10:19:06 -0500 (EST)
-Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
-In-Reply-To: <CAJFYCKFb8F1k5Y6+Q4x5WgTsLO_xh1AFB1mgyRc0xK5m1ABbwA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1301221011190.1510-100000@iolanthe.rowland.org>
+From: kishon@ti.com (kishon)
+Date: Tue, 22 Jan 2013 20:51:58 +0530
+Subject: [PATCH v1 6/6] USB: MUSB: OMAP: get PHY by phandle for dt boot
+In-Reply-To: <50FEA696.8000506@ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <1358848694-20145-7-git-send-email-kishon@ti.com> <50FE9F5C.2010501@ti.com>
+ <50FEA447.1090701@ti.com> <50FEA696.8000506@ti.com>
+Message-ID: <50FEAE96.30706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jan 2013, Manjunath Goudar wrote:
+On Tuesday 22 January 2013 08:17 PM, Roger Quadros wrote:
+> On 01/22/2013 04:37 PM, kishon wrote:
+>> On Tuesday 22 January 2013 07:47 PM, Roger Quadros wrote:
+>>> On 01/22/2013 11:58 AM, Kishon Vijay Abraham I wrote:
+>>>> The OMAP glue has been modified to get PHY by phandle for dt boot.
+>>>>
+>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>> ---
+>>>>    drivers/usb/musb/omap2430.c |    7 ++++++-
+>>>>    1 file changed, 6 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+>>>> index 1a8cf6d..e43faeb 100644
+>>>> --- a/drivers/usb/musb/omap2430.c
+>>>> +++ b/drivers/usb/musb/omap2430.c
+>>>> @@ -345,7 +345,12 @@ static int omap2430_musb_init(struct musb *musb)
+>>>>         * up through ULPI.  TWL4030-family PMICs include one,
+>>>>         * which needs a driver, drivers aren't always needed.
+>>>>         */
+>>>> -    musb->xceiv = devm_usb_get_phy_dev(dev, 0);
+>>>> +    if (dev->parent->of_node)
+>>>> +        musb->xceiv = devm_usb_get_phy_by_phandle(dev->parent,
+>>>> +            "usb_phy", 0);
+>>>> +    else
+>>>> +        musb->xceiv = devm_usb_get_phy_dev(dev, 0);
+>>>> +
+>>>>        if (IS_ERR_OR_NULL(musb->xceiv)) {
+>>>>            pr_err("HS USB OTG: no transceiver configured\n");
+>>>>            return -ENODEV;
+>>>
+>>> This will not work with PHY driver as a module. You need to use deferred probing mechanism here
+>>> after you have addressed my comment in patch 2 and also devm_usb_get_phy_by_phandle()
+>>
+>> IIUC, even using -EPROBE_DEFER might not help if we are making the PHY driver as module, since the kernel will try to probe only till the prompt comes.
+>>
+> Oh really? I thought deferred probing takes place whenever a new driver is bound to a device.
+You might also be right. I'm not so sure.
 
-> > >  I think we can actually
-> > > get the same results by turning the Kconfig logic around and making
-> > > the platform glue drivers 'select USB_EHCI_HCD' than depending on
-> > > it.
-> >
-> > That's a good idea.  The Kconfig changes would have to be done
-> > carefully to make sure that the dependency on USB_ARCH_HAS_EHCI still
-> > applies to all the platform drivers.
-> >
-> > Manjunath, would you like to send a patch to do this?
-> >
-> > Alan Stern
-> >
-> > Ya sure,could you explain little bit  briefly about the Kconfig changes.
+What does "prompt comes" have to do with it?
 
-Suppose you do exactly what Arnd proposed: add "select USB_EHCI_HCD" to
-the Kconfig entries for each of the platform glue drivers.  Then
-consider what would happen in a build where USB_ARCH_HAS_EHCI is "n"
-but one of those glue drivers is enabled.  There would be conflicting
-requirements on USB_EHCI_HCD: The new "select" would force it to be on,
-but the existing "depends on USB && USB_ARCH_HAS_EHCI" would force it
-to be off.  The build would fail.
+I just meant end of boot process. But it's better to check if deferred 
+probing takes place whenever a new driver is bound to a device as you 
+just mentioned.
 
-In order to prevent this, you have to make sure that each glue driver
-depends on USB_ARCH_HAS_EHCI.  A simple way to do this is to surround
-the Kconfig entries for those drivers with "if USB && 
-USB_ARCH_HAS_EHCI" ... "endif".
-
-Come to think of it, the "if USB" part really should protect the entire 
-file.
-
-Alan Stern
+Thanks
+Kishon
