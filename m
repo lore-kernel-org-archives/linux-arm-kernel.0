@@ -1,36 +1,39 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 22 Jan 2013 18:50:46 +0100
-Subject: [PATCH 6/6] ARM: at91/dts: add macb mii pinctrl config for kizbox
+Date: Tue, 22 Jan 2013 18:50:45 +0100
+Subject: [PATCH 5/6] ARM: at91: rm9200: remake the BGA as default version
 In-Reply-To: <cover.1358876553.git.nicolas.ferre@atmel.com>
 References: <cover.1358876553.git.nicolas.ferre@atmel.com>
-Message-ID: <8d600dfd82031ca9c9bde5e11ac89c66b1f87787.1358876553.git.nicolas.ferre@atmel.com>
+Message-ID: <548fb19ed30c1c0515a9b5604c3b3ffcdde14ed7.1358876553.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <linux-arm@overkiz.com>
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-This patch overrides default macb pinctrl config defined in
-at91sam9260.dtsi (pinctrl_macb_rmii) with kizbox board config
-(pinctrl_macb_rmii + pinctrl_macb_rmii_mii_alt).
+Make BGA as the default version as we are supposed to just have
+to specify when we use the PQFP version.
 
-Signed-off-by: Boris BREZILLON <linux-arm@overkiz.com>
+Issue was existing since commit:
+3e90772 (ARM: at91: fix at91rm9200 soc subtype handling).
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: stable <stable@vger.kernel.org> [v3.3]
 ---
- arch/arm/boot/dts/kizbox.dts | 2 ++
+ arch/arm/mach-at91/setup.c | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/kizbox.dts b/arch/arm/boot/dts/kizbox.dts
-index e8814fe..b4dc3ed 100644
---- a/arch/arm/boot/dts/kizbox.dts
-+++ b/arch/arm/boot/dts/kizbox.dts
-@@ -48,6 +48,8 @@
- 
- 			macb0: ethernet at fffc4000 {
- 				phy-mode = "mii";
-+				pinctrl-0 = <&pinctrl_macb_rmii
-+				             &pinctrl_macb_rmii_mii_alt>;
- 				status = "okay";
- 			};
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 9ee866c..4b67847 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -105,6 +105,8 @@ static void __init soc_detect(u32 dbgu_base)
+ 	switch (socid) {
+ 	case ARCH_ID_AT91RM9200:
+ 		at91_soc_initdata.type = AT91_SOC_RM9200;
++		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_NONE)
++			at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+ 		at91_boot_soc = at91rm9200_soc;
+ 		break;
  
 -- 
 1.8.0
