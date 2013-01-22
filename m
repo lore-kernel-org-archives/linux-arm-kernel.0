@@ -1,27 +1,17 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Jan 2013 13:52:57 -0800
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <50FEE175.90504@linaro.org>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <20130121232322.GK15361@atomide.com> <50FE307F.9000701@ti.com>
- <201301220931.24570.arnd@arndb.de> <50FE666B.10902@ti.com>
- <20130122145113.GK23505@n2100.arm.linux.org.uk>
- <50FEE175.90504@linaro.org>
-Message-ID: <20130122215257.GU22517@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jan 2013 21:53:19 +0000
+Subject: [PATCH] OMAPDSS: enable omapdss for ARCH_MULTIPLATFORM
+In-Reply-To: <1358891160-9534-1-git-send-email-robdclark@gmail.com>
+References: <1358891160-9534-1-git-send-email-robdclark@gmail.com>
+Message-ID: <201301222153.19580.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* John Stultz <john.stultz@linaro.org> [130122 11:02]:
+On Tuesday 22 January 2013, Rob Clark wrote:
+> At least core omapdss does not have any build dependencies on
+> ARCH_OMAP2PLUS, and adding this dependency in the Kconfig breaks omapdrm
+> for ARCH_MULTIPLATFORM builds.
 > 
-> Correct, with HRT, we actually trigger the HZ-frequency timer tick
-> from an hrtimer (which expires based on the system time driven by
-> the clocksource). Thus even if there is a theoretical error between
-> the ideal HZ and what the hardware can do, that error will not
-> propagate forward.
+> Signed-off-by: Rob Clark <robdclark@gmail.com>
 
-If there's no cumulative error, sounds like the way to go is to select
-HRT for ARM multiplatform builds and set the HZ to 100 then.
-
-Regards,
-
-Tony
+Acked-by: Arnd Bergmann <arnd@arndb.de>
