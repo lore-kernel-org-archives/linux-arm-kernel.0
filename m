@@ -1,43 +1,27 @@
-From: jussi.kivilinna@mbnet.fi (Jussi Kivilinna)
-Date: Tue, 22 Jan 2013 09:50:21 +0200
-Subject: [PATCH] crypto: fix FTBFS with ARM SHA1-asm and THUMB2_KERNEL
-In-Reply-To: <20130122094614.79031aq5ddrgr2zo@www.dalek.fi>
-References: <1358787763-1226-1-git-send-email-matt@genesi-usa.com>
- <alpine.LFD.2.02.1301211739470.6300@xanadu.home>
- <CAKGA1bkQ9e8gmSPz_4csJWjEOKj3ZVqSLijSTRWxgDSaZoYqCA@mail.gmail.com>
- <20130122094614.79031aq5ddrgr2zo@www.dalek.fi>
-Message-ID: <20130122095021.89432qdbeu32a4sg@www.dalek.fi>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 21 Jan 2013 23:56:31 -0800
+Subject: [GIT PULL v3] Renesas ARM-based SoC defconfig for v3.9
+In-Reply-To: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
+References: <1358316146-12579-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130122075631.GA27044@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jussi Kivilinna <jussi.kivilinna@mbnet.fi>:
+On Wed, Jan 16, 2013 at 03:02:21PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
+> 
+> please consider the following defconfig enhancements for 3.9.
+> 
+> ----------------------------------------------------------------
+> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+> 
+>   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git defconfig
 
-> Quoting Matt Sealey <matt@genesi-usa.com>:
->
->> This question is to the implementor/committer (Dave McCullough), how
->> exactly did you measure the benchmark and can we reproduce it on some
->> other ARM box?
->>
->> If it's long and laborious and not so important to test the IPsec
->> tunnel use-case, what would be the simplest possible benchmark to see
->> if the C vs. assembly version is faster for a particular ARM device? I
->> can get hold of pretty much any Cortex-A8 or Cortex-A9 that matters, I
->> have access to a Chromebook for A15, and maybe an i.MX27 or i.MX35 and
->> a couple Marvell boards (ARMv6) if I set my mind to it... that much
->> testing implies we find a pretty concise benchmark though with a
->> fairly common kernel version we can spread around (i.MX, OMAP and the
->> Chromebook, I can handle, the rest I'm a little wary of bothering to
->> spend too much time on). I think that could cover a good swath of
->> not-ARMv5 use cases from lower speeds to quad core monsters.. but I
->> might stick to i.MX to start with..
->
-> There is 'tcrypt' module in crypto/ for quick benchmarking.  
-> 'modprobe tcrypt mode=500 sec=1' tests AES in various cipher-modes,  
-> using different buffer sizes and outputs results to kernel log.
->
+Thanks, pulled as renesas/defconfig and included in next/boards.
 
-Actually mode=200 might be better, as mode=500 is for asynchronous  
-implementations and might use hardware crypto if such device/module is  
-available.
 
--Jussi
+-Olof
