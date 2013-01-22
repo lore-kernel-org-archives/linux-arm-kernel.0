@@ -1,49 +1,45 @@
 From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Tue, 22 Jan 2013 13:08:42 +0530
-Subject: [PATCH v5 20/45] block: Use get/put_online_cpus_atomic() to prevent
- CPU offline
+Date: Tue, 22 Jan 2013 13:08:52 +0530
+Subject: [PATCH v5 21/45] crypto: pcrypt - Protect access to cpu_online_mask
+ with get/put_online_cpus()
 In-Reply-To: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
 References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20130122073838.13822.28777.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20130122073848.13822.35451.stgit@srivatsabhat.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once stop_machine() is gone from the CPU offline path, we won't be able to
-depend on preempt_disable() or local_irq_disable() to prevent CPUs from
-going offline from under us.
+The pcrypt_aead_init_tfm() function access the cpu_online_mask without
+disabling CPU hotplug. And it looks like it can afford to sleep, so use
+the get/put_online_cpus() APIs to protect against CPU hotplug.
 
-Use the get/put_online_cpus_atomic() APIs to prevent CPUs from going offline,
-while invoking from atomic context.
-
-Cc: Jens Axboe <axboe@kernel.dk>
+Cc: Steffen Klassert <steffen.klassert@secunet.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: linux-crypto at vger.kernel.org
 Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 ---
 
- block/blk-softirq.c |    4 ++++
+ crypto/pcrypt.c |    4 ++++
  1 file changed, 4 insertions(+)
 
-diff --git a/block/blk-softirq.c b/block/blk-softirq.c
-index 467c8de..448f9a9 100644
---- a/block/blk-softirq.c
-+++ b/block/blk-softirq.c
-@@ -58,6 +58,8 @@ static void trigger_softirq(void *data)
-  */
- static int raise_blk_irq(int cpu, struct request *rq)
- {
-+	get_online_cpus_atomic();
+diff --git a/crypto/pcrypt.c b/crypto/pcrypt.c
+index b2c99dc..10f64e2 100644
+--- a/crypto/pcrypt.c
++++ b/crypto/pcrypt.c
+@@ -280,12 +280,16 @@ static int pcrypt_aead_init_tfm(struct crypto_tfm *tfm)
+ 
+ 	ictx->tfm_count++;
+ 
++	get_online_cpus();
 +
- 	if (cpu_online(cpu)) {
- 		struct call_single_data *data = &rq->csd;
+ 	cpu_index = ictx->tfm_count % cpumask_weight(cpu_online_mask);
  
-@@ -66,9 +68,11 @@ static int raise_blk_irq(int cpu, struct request *rq)
- 		data->flags = 0;
+ 	ctx->cb_cpu = cpumask_first(cpu_online_mask);
+ 	for (cpu = 0; cpu < cpu_index; cpu++)
+ 		ctx->cb_cpu = cpumask_next(ctx->cb_cpu, cpu_online_mask);
  
- 		__smp_call_function_single(cpu, data, 0);
-+		put_online_cpus_atomic();
- 		return 0;
- 	}
++	put_online_cpus();
++
+ 	cipher = crypto_spawn_aead(crypto_instance_ctx(inst));
  
-+	put_online_cpus_atomic();
- 	return 1;
- }
- #else /* CONFIG_SMP && CONFIG_USE_GENERIC_SMP_HELPERS */
+ 	if (IS_ERR(cipher))
