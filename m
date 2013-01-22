@@ -1,64 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 22 Jan 2013 10:36:50 +0000
-Subject: [PATCH v1 5/6] usb: otg: add device tree support to otg library
-In-Reply-To: <1358848694-20145-6-git-send-email-kishon@ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <1358848694-20145-6-git-send-email-kishon@ti.com>
-Message-ID: <20130122103650.GB18876@e106331-lin.cambridge.arm.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 22 Jan 2013 11:39:26 +0100
+Subject: [PATCH 2/5] ARM: dts: twl6030: Add PWM support
+In-Reply-To: <1358519794-13214-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1358519794-13214-1-git-send-email-peter.ujfalusi@ti.com>
+ <1358519794-13214-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <50FE6C5E.50802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +struct usb_phy *devm_usb_get_phy_by_phandle(struct device *dev,
-> +	const char *phandle, u8 index)
-> +{
-> +	struct usb_phy	*phy = NULL, **ptr;
-> +	unsigned long	flags;
-> +	struct device_node *node;
-> +
-> +	if (!dev->of_node) {
-> +		dev_dbg(dev, "device does not have a device node entry\n");
-> +		return ERR_PTR(-EINVAL);
-> +	}
-> +
-> +	node = of_parse_phandle(dev->of_node, phandle, index);
-> +	if (!node) {
-> +		dev_dbg(dev, "failed to get %s phandle in %s node\n", phandle,
-> +			dev->of_node->full_name);
-> +		return ERR_PTR(-ENODEV);
-> +	}
+Hi Peter,
 
-At any point past this, node's refcount is incremented (done automatically by
-of_parse_phandle => of_find_node_by_phandle).
+Just one minor typo here.
 
+On 01/18/2013 03:36 PM, Peter Ujfalusi wrote:
+> Enable support for the PWMs and LED as PWM drivers.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  arch/arm/boot/dts/twl6030.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
+> index 9996cfc..d9b8b21 100644
+> --- a/arch/arm/boot/dts/twl6030.dtsi
+> +++ b/arch/arm/boot/dts/twl6030.dtsi
+> @@ -91,4 +91,16 @@
+>  		compatible = "ti,twl6030-usb";
+>  		interrupts = <4>, <10>;
+>  	};
 > +
-> +	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
-> +	if (!ptr) {
-> +		dev_dbg(dev, "failed to allocate memory for devres\n");
-> +		return ERR_PTR(-ENOMEM);
-> +	}
+> +	twl_pwm: pwm {
+> +		/* provides two PWMs (id 0, 1 for PWM1 and PWM2) */
+> +		compatible = "ti,twl6030-pwm";
+> +		#pwm-cells = <2>;
+> +	};
 > +
-> +	spin_lock_irqsave(&phy_lock, flags);
-> +
-> +	phy = __of_usb_find_phy(node);
-> +	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
-> +		phy = ERR_PTR(-EPROBE_DEFER);
-> +		devres_free(ptr);
-> +		goto err0;
-> +	}
-> +
-> +	*ptr = phy;
-> +	devres_add(dev, ptr);
-> +
-> +	get_device(phy->dev);
-> +
-> +err0:
-> +	spin_unlock_irqrestore(&phy_lock, flags);
-> +
-> +	return phy;
-> +}
+> +	twl_pwmled: pwmled {
+> +		/* provides one PWM (id 0 for Charing indicator LED) */
 
-This means that on all of the exit paths, node's refcount is left incremented
-incorrectly. You'll need an of_node_put(node) on each exit path.
+typo: charging.
 
-Thanks,
-Mark.
+Regards,
+Benoit
+
+> +		compatible = "ti,twl6030-pwmled";
+> +		#pwm-cells = <2>;
+> +	};
+>  };
+> 
