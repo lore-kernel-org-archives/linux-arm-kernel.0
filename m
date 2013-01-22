@@ -1,53 +1,53 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 22 Jan 2013 20:40:24 +0100
-Subject: [PATCH] Dove: activate GPIO interrupts in DT
-In-Reply-To: <20130122112845.4f7c0f38@armhf>
-References: <20130122112845.4f7c0f38@armhf>
-Message-ID: <50FEEB28.8020000@gmail.com>
+From: elezegarcia@gmail.com (Ezequiel Garcia)
+Date: Tue, 22 Jan 2013 16:43:43 -0300
+Subject: [PATCH v2 3/3] arm: omap2: gpmc: add DT bindings for OneNAND
+In-Reply-To: <20130122182749.GM15361@atomide.com>
+References: <1358634477-25868-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1358634477-25868-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130121123020.GI15707@e106331-lin.cambridge.arm.com>
+ <CALF0-+VOxtsfQLZCGujvjMrsGacbfVTMytRUX=CfKa3+FgnU1w@mail.gmail.com>
+ <20130121183348.GI22517@atomide.com>
+ <af696cd0-8a7f-4839-9600-87d5b9172585@email.android.com>
+ <CALF0-+WvfyygnV5A=E8UGc=zp9pab79FzJRe1KywjPw-B4UGZA@mail.gmail.com>
+ <20130122182749.GM15361@atomide.com>
+Message-ID: <CALF0-+XdsKvJJpmxZEYXyhTZksgKRoAJ4TcyPV+G9WUbb7Dt_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 11:28 AM, Jean-Francois Moine wrote:
-> In a DT, the interrupts of an interrupt-controller are not usable when
-> #interrupt-cells is missing.
+On Tue, Jan 22, 2013 at 3:27 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Ezequiel Garcia <elezegarcia@gmail.com> [130122 10:17]:
+>> On Mon, Jan 21, 2013 at 10:32 PM, Daniel Mack <zonque@gmail.com> wrote:
+>> >
+>> > I'm currently far away from my computer and can't prepare a patch for this, sorry. But I think you are right, so please just submit a patch for that, anyone :-)
+>> >
+>>
+>> Ok, I'll try to submit a patch as soon as possible. If anyone wants to
+>> do it instead, fine by me.
 >
-> This patch activates the interrupts of the GPIOs 0 and 1 for the Marvell
-> Dove SoC.
->
-> Signed-off-by: Jean-Fran?ois Moine<moinejf@free.fr>
->
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 42eac1f..287fb12 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -93,6 +93,7 @@
->   			reg =<0xd0400 0x20>;
->   			ngpios =<32>;
->   			interrupt-controller;
-> +			#interrupt-cells =<1>;
->   			interrupts =<12>,<13>,<14>,<60>;
->   		};
->
-> @@ -103,6 +104,7 @@
->   			reg =<0xd0420 0x20>;
->   			ngpios =<32>;
->   			interrupt-controller;
-> +			#interrupt-cells =<1>;
->   			interrupts =<61>;
->   		};
+> No please go ahead as it seems that you can easily test it too.
 >
 
-Jean-Francois,
+No problem.
 
-first thanks for sending the patch!
+I now wonder if it's okey to exit upon probe failure.
+In particular, the for_each should be like this:
 
-I checked Documentation/devicetree/bindings/gpio/gpio-mvebu.txt and there
-#interrupt-cells is specified to be set to two. Further, I checked kirkwood.dtsi
-and it is also missing the #interrupt-cells.
+        for_each_node_by_name(child, "nand") {
+                ret = gpmc_probe_nand_child(pdev, child);
+                if (ret < 0) {
+                        of_node_put(child);
+                        return ret;
+                }
+        }
 
-Can you please update your patch to have #interrupt-cells set to two? When you
-resend v2 of the patch please Cc at least all I added.
+or like this:
 
-I will send another patch fixing kirkwood.dtsi.
+        for_each_node_by_name(child, "nand") {
+                ret = gpmc_probe_nand_child(pdev, child);
+                WARN_ON(ret < 0);
+        }
 
-Sebastian
+Ideas?
+
+-- 
+    Ezequiel
