@@ -1,35 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Jan 2013 13:42:57 +0100
-Subject: [PATCH v4] drivers/pinctrl: grab default handles from device core
-In-Reply-To: <20130121234158.GA9322@kroah.com>
-References: <1358795855-21064-1-git-send-email-linus.walleij@stericsson.com>
- <20130121234158.GA9322@kroah.com>
-Message-ID: <CACRpkdY2LF4Kg0LsZGThKpQfv=TPfK9NfX0O71OHeT+Jqh++hg@mail.gmail.com>
+Date: Tue, 22 Jan 2013 13:49:08 +0100
+Subject: [PATCH v7 01/15] Revert "pinctrl: single: support gpio request
+ and free"
+In-Reply-To: <1358494279-16503-2-git-send-email-haojian.zhuang@linaro.org>
+References: <1358494279-16503-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358494279-16503-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdaskFSEdH1Uke3c=x9BkaE-+tLHtvYRUwL4148KOwh84A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 12:41 AM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Mon, Jan 21, 2013 at 08:17:35PM +0100, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This makes the device core auto-grab the pinctrl handle and set
->> the "default" (PINCTRL_STATE_DEFAULT) state for every device
->> that is present in the device model right before probe. This will
->> account for the lion's share of embedded silicon devcies.
-(...)
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+On Fri, Jan 18, 2013 at 8:31 AM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
+
+> This reverts commit 2e8b2eab94c35d83bb7da71c63b4695f32ddca88.
 >
-> Feel free to take this through your tree.
+> Conflicts:
+>         drivers/pinctrl/pinctrl-single.c
+>
+> ERROR: "__aeabi_uldivmod" [drivers/pinctrl/pinctrl-single.ko]
+> undefined!]
 
-Thanks Greg!
+Applied to fixes with Tony's ACK.
 
-Stephen W, are you OK with me pushing this version of the patch
-now?
-
-I have your fix and hopefully the other required fixes in the patch
-so as not to break Tegra, but prefer to have it solidly tested
-if possible.
+I also took the liberty to add your Signed-off-by.
 
 Yours,
 Linus Walleij
