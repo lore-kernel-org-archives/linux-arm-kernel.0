@@ -1,59 +1,43 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Tue, 22 Jan 2013 13:15:48 +0530
-Subject: [PATCH v5 45/45] Documentation/cpu-hotplug: Remove references to
- stop_machine()
-In-Reply-To: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20130122074543.13822.44724.stgit@srivatsabhat.in.ibm.com>
+From: jussi.kivilinna@mbnet.fi (Jussi Kivilinna)
+Date: Tue, 22 Jan 2013 09:50:21 +0200
+Subject: [PATCH] crypto: fix FTBFS with ARM SHA1-asm and THUMB2_KERNEL
+In-Reply-To: <20130122094614.79031aq5ddrgr2zo@www.dalek.fi>
+References: <1358787763-1226-1-git-send-email-matt@genesi-usa.com>
+ <alpine.LFD.2.02.1301211739470.6300@xanadu.home>
+ <CAKGA1bkQ9e8gmSPz_4csJWjEOKj3ZVqSLijSTRWxgDSaZoYqCA@mail.gmail.com>
+ <20130122094614.79031aq5ddrgr2zo@www.dalek.fi>
+Message-ID: <20130122095021.89432qdbeu32a4sg@www.dalek.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since stop_machine() is no longer used in the CPU offline path, we cannot
-disable CPU hotplug using preempt_disable()/local_irq_disable() etc. We
-need to use the newly introduced get/put_online_cpus_atomic() APIs.
-Reflect this in the documentation.
+Quoting Jussi Kivilinna <jussi.kivilinna@mbnet.fi>:
 
-Cc: Rob Landley <rob@landley.net>
-Cc: linux-doc at vger.kernel.org
-Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
----
+> Quoting Matt Sealey <matt@genesi-usa.com>:
+>
+>> This question is to the implementor/committer (Dave McCullough), how
+>> exactly did you measure the benchmark and can we reproduce it on some
+>> other ARM box?
+>>
+>> If it's long and laborious and not so important to test the IPsec
+>> tunnel use-case, what would be the simplest possible benchmark to see
+>> if the C vs. assembly version is faster for a particular ARM device? I
+>> can get hold of pretty much any Cortex-A8 or Cortex-A9 that matters, I
+>> have access to a Chromebook for A15, and maybe an i.MX27 or i.MX35 and
+>> a couple Marvell boards (ARMv6) if I set my mind to it... that much
+>> testing implies we find a pretty concise benchmark though with a
+>> fairly common kernel version we can spread around (i.MX, OMAP and the
+>> Chromebook, I can handle, the rest I'm a little wary of bothering to
+>> spend too much time on). I think that could cover a good swath of
+>> not-ARMv5 use cases from lower speeds to quad core monsters.. but I
+>> might stick to i.MX to start with..
+>
+> There is 'tcrypt' module in crypto/ for quick benchmarking.  
+> 'modprobe tcrypt mode=500 sec=1' tests AES in various cipher-modes,  
+> using different buffer sizes and outputs results to kernel log.
+>
 
- Documentation/cpu-hotplug.txt |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+Actually mode=200 might be better, as mode=500 is for asynchronous  
+implementations and might use hardware crypto if such device/module is  
+available.
 
-diff --git a/Documentation/cpu-hotplug.txt b/Documentation/cpu-hotplug.txt
-index 9f40135..7f907ec 100644
---- a/Documentation/cpu-hotplug.txt
-+++ b/Documentation/cpu-hotplug.txt
-@@ -113,13 +113,15 @@ Never use anything other than cpumask_t to represent bitmap of CPUs.
- 	#include <linux/cpu.h>
- 	get_online_cpus() and put_online_cpus():
- 
--The above calls are used to inhibit cpu hotplug operations. While the
-+The above calls are used to inhibit cpu hotplug operations, when invoked from
-+non-atomic context (because the above functions can sleep). While the
- cpu_hotplug.refcount is non zero, the cpu_online_mask will not change.
--If you merely need to avoid cpus going away, you could also use
--preempt_disable() and preempt_enable() for those sections.
--Just remember the critical section cannot call any
--function that can sleep or schedule this process away. The preempt_disable()
--will work as long as stop_machine_run() is used to take a cpu down.
-+
-+However, if you are executing in atomic context (ie., you can't afford to
-+sleep), and you merely need to avoid cpus going offline, you can use
-+get_online_cpus_atomic() and put_online_cpus_atomic() for those sections.
-+Just remember the critical section cannot call any function that can sleep or
-+schedule this process away.
- 
- CPU Hotplug - Frequently Asked Questions.
- 
-@@ -360,6 +362,9 @@ A: There are two ways.  If your code can be run in interrupt context, use
- 		return err;
- 	}
- 
-+   If my_func_on_cpu() itself cannot block, use get/put_online_cpus_atomic()
-+   instead of get/put_online_cpus() to prevent CPUs from going offline.
-+
- Q: How do we determine how many CPUs are available for hotplug.
- A: There is no clear spec defined way from ACPI that can give us that
-    information today. Based on some input from Natalie of Unisys,
+-Jussi
