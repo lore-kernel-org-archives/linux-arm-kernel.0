@@ -1,81 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Jan 2013 10:19:16 +0100
-Subject: [GIT PULL] Nomadik devicetree and cleanups
-Message-ID: <CACRpkdZM8+6QaGrRtCCMWoZQO23uej7JDr1xz2zG7TtwQ7Ngqw@mail.gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 22 Jan 2013 18:19:25 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC v3.9
+In-Reply-To: <20130122082123.GA28100@quad.lixom.net>
+References: <1357781039-14003-1-git-send-email-horms+renesas@verge.net.au>
+ <20130116063750.GA11765@verge.net.au>
+ <20130116234310.GA411@quad.lixom.net> <2682612.QaV0caZ3tv@avalon>
+ <20130122082123.GA28100@quad.lixom.net>
+Message-ID: <20130122091924.GB11708@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
-
-This patch series converts the Nomadik to use Device Tree.
-
-Changes outside of the subsystem are constrained to pinctrl (my subsystem
-and thus OK:ed) and a oneline in drivers/mtd/nand/fsmc_nand.c adding
-a new compatible value.
-
-The MTD maintainers have had time enough to ACK that oneliner and it
-shouldn't be a big issue, so:
-
-Please pull this into your tree.
-
-Yours,
-Linus Walleij
-
-
-The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
-
-  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nomadik-devicetree
-
-for you to fetch changes up to bf82c67edcc8751903bdd7e45626c47cd2cc7834:
-
-  ARM: nomadik: get rid of <mach/hardware.h> (2013-01-22 08:45:36 +0100)
-
-----------------------------------------------------------------
-This patch set converts the Nomadik (mach-nomadik) to
-Device Tree and delete the old board files, paving the
-road for single zImage.
-
-----------------------------------------------------------------
-Linus Walleij (11):
-      ARM: nomadik: move last custom calls to pinctrl
-      ARM: nomadik: initial devicetree support
-      ARM: nomadik: move pin maps to cpu file
-      ARM: nomadik: move remaining PrimeCells to device tree
-      ARM: nomadik: add FSMC NAND
-      ARM: nomadik: move GPIO and pinctrl to device tree
-      ARM: nomadik: convert SMSC91x ethernet to device tree
-      ARM: nomadik: migrate MMC/SD card support to device tree
-      ARM: nomadik: add I2C devices to the device tree
-      ARM: nomadik: delete old board files
-      ARM: nomadik: get rid of <mach/hardware.h>
-
- .../devicetree/bindings/arm/ste-nomadik.txt        |  27 ++
- .../devicetree/bindings/mtd/fsmc-nand.txt          |   2 +-
- arch/arm/Kconfig                                   |   2 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/ste-nomadik-s8815.dts            |  30 ++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 256 ++++++++++++++
- arch/arm/mach-nomadik/Kconfig                      |  10 +-
- arch/arm/mach-nomadik/Makefile                     |   6 -
- arch/arm/mach-nomadik/board-nhk8815.c              | 359 --------------------
- arch/arm/mach-nomadik/cpu-8815.c                   | 370 +++++++++++++++------
- arch/arm/mach-nomadik/cpu-8815.h                   |   4 -
- arch/arm/mach-nomadik/i2c-8815nhk.c                |  88 -----
- arch/arm/mach-nomadik/include/mach/hardware.h      |  90 -----
- arch/arm/mach-nomadik/include/mach/irqs.h          |   2 -
- arch/arm/mach-nomadik/include/mach/uncompress.h    |   1 -
- drivers/mtd/nand/fsmc_nand.c                       |   1 +
- drivers/pinctrl/pinctrl-nomadik.c                  |   4 +
- 17 files changed, 601 insertions(+), 652 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/ste-nomadik.txt
- create mode 100644 arch/arm/boot/dts/ste-nomadik-s8815.dts
- create mode 100644 arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
- delete mode 100644 arch/arm/mach-nomadik/board-nhk8815.c
- delete mode 100644 arch/arm/mach-nomadik/cpu-8815.h
- delete mode 100644 arch/arm/mach-nomadik/i2c-8815nhk.c
- delete mode 100644 arch/arm/mach-nomadik/include/mach/hardware.h
+On Tue, Jan 22, 2013 at 12:21:23AM -0800, Olof Johansson wrote:
+> On Mon, Jan 21, 2013 at 04:31:43PM +0100, Laurent Pinchart wrote:
+> > Sure, we could push 1-6 through the ARM tree, wait until it reaches mainline, 
+> > then push 7 through the pinctrl tree, wait until it reaches mainline, push 8 
+> > through the SH tree and 9 through the ARM tree, wait until they reach 
+> > mainline, and finally push 10 through the pinctrl tree again. We could even 
+> > push each branch through the tree it belongs to, but I doubt we'll be able to 
+> > push everything during a single merge window.
+> 
+> Ah, ok -- you're suggesting bringing it _all_ in through arm-soc. We
+> can do so, I was of the initial impression from Simon's cover letter
+> that the arch/sh branches would also go through the SH tree.
+> 
+> This seems to be a particularly hairy conversion, given that it touches two
+> architectures that need to be updated in lockstep. I guess we might be just as
+> well off pulling it in as-is (with below exceptions) to get it in.
+> 
+> If you need the same contents in the SH tree due to dependencies and
+> later development, let me know and we can agree on a stable branch that
+> we both pick up in either tree that has all contents.
+> 
+There isn't anything at the moment pending for the SH tree that cares
+about or conflicts with any of this work, so it's ok with me if this all
+goes through arm-soc. If there is any fallout we can take care of it
+later on in the merge window. This would seem to be a saner option than
+attempting to merge half a dozen branches with dependencies on each other
+in precise order, which doesn't leave a lot of time for fixing up
+any residual merge window damage.
