@@ -1,38 +1,64 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 22 Jan 2013 11:28:45 +0100
-Subject: [PATCH] Dove: activate GPIO interrupts in DT
-Message-ID: <20130122112845.4f7c0f38@armhf>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 22 Jan 2013 10:36:50 +0000
+Subject: [PATCH v1 5/6] usb: otg: add device tree support to otg library
+In-Reply-To: <1358848694-20145-6-git-send-email-kishon@ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <1358848694-20145-6-git-send-email-kishon@ti.com>
+Message-ID: <20130122103650.GB18876@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a DT, the interrupts of an interrupt-controller are not usable when
-#interrupt-cells is missing.
+> +struct usb_phy *devm_usb_get_phy_by_phandle(struct device *dev,
+> +	const char *phandle, u8 index)
+> +{
+> +	struct usb_phy	*phy = NULL, **ptr;
+> +	unsigned long	flags;
+> +	struct device_node *node;
+> +
+> +	if (!dev->of_node) {
+> +		dev_dbg(dev, "device does not have a device node entry\n");
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	node = of_parse_phandle(dev->of_node, phandle, index);
+> +	if (!node) {
+> +		dev_dbg(dev, "failed to get %s phandle in %s node\n", phandle,
+> +			dev->of_node->full_name);
+> +		return ERR_PTR(-ENODEV);
+> +	}
 
-This patch activates the interrupts of the GPIOs 0 and 1 for the Marvell
-Dove SoC.
+At any point past this, node's refcount is incremented (done automatically by
+of_parse_phandle => of_find_node_by_phandle).
 
-Signed-off-by: Jean-Fran?ois Moine <moinejf@free.fr>
+> +
+> +	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
+> +	if (!ptr) {
+> +		dev_dbg(dev, "failed to allocate memory for devres\n");
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	spin_lock_irqsave(&phy_lock, flags);
+> +
+> +	phy = __of_usb_find_phy(node);
+> +	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
+> +		phy = ERR_PTR(-EPROBE_DEFER);
+> +		devres_free(ptr);
+> +		goto err0;
+> +	}
+> +
+> +	*ptr = phy;
+> +	devres_add(dev, ptr);
+> +
+> +	get_device(phy->dev);
+> +
+> +err0:
+> +	spin_unlock_irqrestore(&phy_lock, flags);
+> +
+> +	return phy;
+> +}
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 42eac1f..287fb12 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -93,6 +93,7 @@
- 			reg = <0xd0400 0x20>;
- 			ngpios = <32>;
- 			interrupt-controller;
-+			#interrupt-cells = <1>;
- 			interrupts = <12>, <13>, <14>, <60>;
- 		};
- 
-@@ -103,6 +104,7 @@
- 			reg = <0xd0420 0x20>;
- 			ngpios = <32>;
- 			interrupt-controller;
-+			#interrupt-cells = <1>;
- 			interrupts = <61>;
- 		};
- 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+This means that on all of the exit paths, node's refcount is left incremented
+incorrectly. You'll need an of_node_put(node) on each exit path.
+
+Thanks,
+Mark.
