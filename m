@@ -1,139 +1,79 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Tue, 22 Jan 2013 15:13:45 -0300
-Subject: [PATCH v2 3/3] arm: omap2: gpmc: add DT bindings for OneNAND
-In-Reply-To: <af696cd0-8a7f-4839-9600-87d5b9172585@email.android.com>
-References: <1358634477-25868-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1358634477-25868-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130121123020.GI15707@e106331-lin.cambridge.arm.com>
- <CALF0-+VOxtsfQLZCGujvjMrsGacbfVTMytRUX=CfKa3+FgnU1w@mail.gmail.com>
- <20130121183348.GI22517@atomide.com>
- <af696cd0-8a7f-4839-9600-87d5b9172585@email.android.com>
-Message-ID: <CALF0-+WvfyygnV5A=E8UGc=zp9pab79FzJRe1KywjPw-B4UGZA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jan 2013 18:13:57 +0000
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20130121210150.GA9184@kroah.com>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <201301211855.25455.arnd@arndb.de> <20130121210150.GA9184@kroah.com>
+Message-ID: <201301221813.57741.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 10:32 PM, Daniel Mack <zonque@gmail.com> wrote:
-> Hi Tony, Mark, Ezequiel,
->
-> Tony Lindgren <tony@atomide.com> wrote:
->
->>* Ezequiel Garcia <elezegarcia@gmail.com> [130121 09:00]:
->>> Hi Mark,
->>>
->>> On Mon, Jan 21, 2013 at 9:30 AM, Mark Rutland <mark.rutland@arm.com>
->>wrote:
->>> > [...]
->>> >
->>> >> diff --git a/arch/arm/mach-omap2/gpmc.c
->>b/arch/arm/mach-omap2/gpmc.c
->>> >> index 01ce462..f7de9eb 100644
->>> >> --- a/arch/arm/mach-omap2/gpmc.c
->>> >> +++ b/arch/arm/mach-omap2/gpmc.c
->>> >> @@ -39,6 +39,7 @@
->>> >>  #include "omap_device.h"
->>> >>  #include "gpmc.h"
->>> >>  #include "gpmc-nand.h"
->>> >> +#include "gpmc-onenand.h"
->>> >>
->>> >>  #define      DEVICE_NAME             "omap-gpmc"
->>> >>
->>> >> @@ -1259,6 +1260,43 @@ static int gpmc_probe_nand_child(struct
->>platform_device *pdev,
->>> >>  }
->>> >>  #endif
->>> >>
->>> >> +#ifdef CONFIG_MTD_ONENAND
->>> >> +static int gpmc_probe_onenand_child(struct platform_device *pdev,
->>> >> +                              struct device_node *child)
->>> >> +{
->>> >> +     u32 val;
->>> >> +     struct omap_onenand_platform_data *gpmc_onenand_data;
->>> >> +
->>> >> +     if (of_property_read_u32(child, "reg", &val) < 0) {
->>> >> +             dev_err(&pdev->dev, "%s has no 'reg' property\n",
->>> >> +                     child->full_name);
->>> >> +             return -ENODEV;
->>> >> +     }
->>> >> +
->>> >> +     gpmc_onenand_data = devm_kzalloc(&pdev->dev,
->>sizeof(*gpmc_onenand_data),
->>> >> +                                      GFP_KERNEL);
->>> >> +     if (!gpmc_onenand_data)
->>> >> +             return -ENOMEM;
->>> >> +
->>> >> +     gpmc_onenand_data->cs = val;
->>> >> +     gpmc_onenand_data->of_node = child;
->>> >> +     gpmc_onenand_data->dma_channel = -1;
->>> >> +
->>> >> +     if (!of_property_read_u32(child, "dma-channel", &val))
->>> >> +             gpmc_onenand_data->dma_channel = val;
->>> >> +
->>> >> +     gpmc_onenand_init(gpmc_onenand_data);
->>> >> +
->>> >> +     return 0;
->>> >> +}
->>> >> +#else
->>> >> +static int gpmc_probe_onenand_child(struct platform_device *pdev,
->>> >> +                                 struct device_node *child)
->>> >> +{
->>> >> +     return 0;
->>> >> +}
->>> >> +#endif
->>> >> +
->>> >>  static int gpmc_probe_dt(struct platform_device *pdev)
->>> >>  {
->>> >>       int ret;
->>> >> @@ -1276,6 +1314,12 @@ static int gpmc_probe_dt(struct
->>platform_device *pdev)
->>> >>                       return ret;
->>> >>       }
->>> >>
->>> >
->>> > This doesn't look right to me:
->>> >
->>> >> +     for_each_node_by_name(child, "onenand") {
->>> >> +             ret = gpmc_probe_onenand_child(pdev, child);
->>> >> +             of_node_put(child);
->>> >> +             if (ret < 0)
->>> >> +                     return ret;
->>> >> +     }
->>> >
->>> > for_each_node_by_name automatically calls of_node_put on each node
->>once passed,
->>> > and as far as I can tell, gpmc_probe_onenand_child doesn't do
->>anything that'd
->>> > increment a node's refcount.
->>> >
->>> > As far as I can see, you only need the of_node_put in the error
->>case:
->>> >
->>> > for_each_node_by_name(child, "onenand") {
->>> >         ret = gpmc_probe_onenand_child(pdev, child);
->>> >         if (ret < 0) {
->>> >                 of_node_put(child);
->>> >                 return ret;
->>> >         }
->>> > }
->>> >
->>> > Have I missed something here?
->>> >
->>>
->>> Mmm... perhaps I've overlooked that code.
->>>
->>> After some digging through source and reading for_each_node_by_name()
->>> it seems to me you're right.
->>>
->>> @Daniel: It seems this would also apply to the NAND binding.
->>> What do you think?
->>
->>Would prefer this done as a fix against the omap-for-v3.9/gpmc
->>branch before we apply Ezequiel's patches.
->
-> I'm currently far away from my computer and can't prepare a patch for this, sorry. But I think you are right, so please just submit a patch for that, anyone :-)
->
+On Monday 21 January 2013, Greg KH wrote:
+> > 
+> > I don't know a lot about USB, but I always assumed that this was not
+> > a normal condition and that there are only a couple of URBs per endpoint
+> > used at a time. Maybe Greg or someone else with a USB background can
+> > shed some light on this.
+> 
+> There's no restriction on how many URBs a driver can have outstanding at
+> once, and if you have a system with a lot of USB devices running at the
+> same time, there could be lots of URBs in flight depending on the number
+> of host controllers and devices and drivers being used.
 
-Ok, I'll try to submit a patch as soon as possible. If anyone wants to
-do it instead, fine by me.
+Ok, thanks for clarifying that. I read some more of the em28xx driver,
+and while it does have a bunch of URBs in flight, there are only five
+audio and five video URBs that I see simultaneously being submitted,
+and then resubmitted from their completion handlers. I think this
+means that there should be 10 URBs active at any given time in this
+driver, which does not explain why we get 256 allocations.
 
--- 
-    Ezequiel
+I also noticed that the initial submissions are all atomic but don't
+need to, so it may be worth trying the patch below, which should also
+help in low-memory situations. We could also try moving the resubmission
+into a workqueue in order to let those be GFP_KERNEL, but I don't think
+that will help.
+
+	Arnd
+
+diff --git a/drivers/media/usb/em28xx/em28xx-audio.c b/drivers/media/usb/em28xx/em28xx-audio.c
+index 2fdb66e..8b789f4 100644
+--- a/drivers/media/usb/em28xx/em28xx-audio.c
++++ b/drivers/media/usb/em28xx/em28xx-audio.c
+@@ -177,12 +177,12 @@ static int em28xx_init_audio_isoc(struct em28xx *dev)
+ 		struct urb *urb;
+ 		int j, k;
+ 
+-		dev->adev.transfer_buffer[i] = kmalloc(sb_size, GFP_ATOMIC);
++		dev->adev.transfer_buffer[i] = kmalloc(sb_size, GFP_KERNEL);
+ 		if (!dev->adev.transfer_buffer[i])
+ 			return -ENOMEM;
+ 
+ 		memset(dev->adev.transfer_buffer[i], 0x80, sb_size);
+-		urb = usb_alloc_urb(EM28XX_NUM_AUDIO_PACKETS, GFP_ATOMIC);
++		urb = usb_alloc_urb(EM28XX_NUM_AUDIO_PACKETS, GFP_KERNEL);
+ 		if (!urb) {
+ 			em28xx_errdev("usb_alloc_urb failed!\n");
+ 			for (j = 0; j < i; j++) {
+@@ -212,7 +212,7 @@ static int em28xx_init_audio_isoc(struct em28xx *dev)
+ 	}
+ 
+ 	for (i = 0; i < EM28XX_AUDIO_BUFS; i++) {
+-		errCode = usb_submit_urb(dev->adev.urb[i], GFP_ATOMIC);
++		errCode = usb_submit_urb(dev->adev.urb[i], GFP_KERNEL);
+ 		if (errCode) {
+ 			em28xx_errdev("submit of audio urb failed\n");
+ 			em28xx_deinit_isoc_audio(dev);
+diff --git a/drivers/media/usb/em28xx/em28xx-core.c b/drivers/media/usb/em28xx/em28xx-core.c
+index bed07a6..c5a2c4b 100644
+--- a/drivers/media/usb/em28xx/em28xx-core.c
++++ b/drivers/media/usb/em28xx/em28xx-core.c
+@@ -1166,7 +1166,7 @@ int em28xx_init_isoc(struct em28xx *dev, enum em28xx_mode mode,
+ 
+ 	/* submit urbs and enables IRQ */
+ 	for (i = 0; i < isoc_bufs->num_bufs; i++) {
+-		rc = usb_submit_urb(isoc_bufs->urb[i], GFP_ATOMIC);
++		rc = usb_submit_urb(isoc_bufs->urb[i], GFP_KERNEL);
+ 		if (rc) {
+ 			em28xx_err("submit of urb %i failed (error=%i)\n", i,
+ 				   rc);
