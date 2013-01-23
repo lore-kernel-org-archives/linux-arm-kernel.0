@@ -1,64 +1,51 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jan 2013 23:34:19 +0000
-Subject: [RFC PATCH 1/6] ARM: kirkwood: topkick: init mvsdio via DT
-In-Reply-To: <cover.1358983578.git.jason@lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
-Message-ID: <7795593940395f036bc46208ccc69dcb6092dd9d.1358983578.git.jason@lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 23 Jan 2013 15:36:17 -0800
+Subject: [PATCH v9 20/20] mdf: omap-usb-host: get rid of build warning
+In-Reply-To: <1358937492-8129-21-git-send-email-rogerq@ti.com>
+References: <1358937492-8129-1-git-send-email-rogerq@ti.com>
+ <1358937492-8129-21-git-send-email-rogerq@ti.com>
+Message-ID: <20130123233617.9205.88295@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
- arch/arm/boot/dts/kirkwood-topkick.dts     | 7 +++++++
- arch/arm/mach-kirkwood/board-usi_topkick.c | 6 ------
- 2 files changed, 7 insertions(+), 6 deletions(-)
+Quoting Roger Quadros (2013-01-23 02:38:12)
+> Fixes the below build warning when driver is built-in.
+> 
+> drivers/mfd/omap-usb-host.c:750:12: warning:
+> ?usbhs_omap_remove? defined but not used [-Wunused-function]
+> 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-index cd15452..23c2ddc 100644
---- a/arch/arm/boot/dts/kirkwood-topkick.dts
-+++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-@@ -54,6 +54,13 @@
- 			status = "okay";
- 			nr-ports = <1>;
- 		};
-+
-+		mvsdio at 90000 {
-+			pinctrl-0 = <&pmx_sdio>;
-+			pinctrl-names = "default";
-+			status = "okay";
-+			/* No CD or WP GPIOs */
-+		};
- 	};
- 
- 	gpio-leds {
-diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
-index 23d2dd1..95f0711 100644
---- a/arch/arm/mach-kirkwood/board-usi_topkick.c
-+++ b/arch/arm/mach-kirkwood/board-usi_topkick.c
-@@ -14,7 +14,6 @@
- #include <linux/init.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
--#include <linux/platform_data/mmc-mvsdio.h>
- #include "common.h"
- #include "mpp.h"
- 
-@@ -22,10 +21,6 @@ static struct mv643xx_eth_platform_data topkick_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
- };
- 
--static struct mvsdio_platform_data topkick_mvsdio_data = {
--	/* unfortunately the CD signal has not been connected */
--};
--
- /*
-  * GPIO LED layout
-  *
-@@ -73,5 +68,4 @@ void __init usi_topkick_init(void)
- 
- 
- 	kirkwood_ge00_init(&topkick_ge00_data);
--	kirkwood_sdio_init(&topkick_mvsdio_data);
- }
--- 
-1.8.1.1
+Hi Roger,
+
+I just noticed that $SUBJECT says "mdf" instead of "mfd" ;)
+
+Regards,
+Mike
+
+> ---
+>  drivers/mfd/omap-usb-host.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+> index b21ca76..6b5edf6 100644
+> --- a/drivers/mfd/omap-usb-host.c
+> +++ b/drivers/mfd/omap-usb-host.c
+> @@ -791,7 +791,7 @@ static struct platform_driver usbhs_omap_driver = {
+>                 .owner          = THIS_MODULE,
+>                 .pm             = &usbhsomap_dev_pm_ops,
+>         },
+> -       .remove         = __exit_p(usbhs_omap_remove),
+> +       .remove         = usbhs_omap_remove,
+>  };
+>  
+>  MODULE_AUTHOR("Keshava Munegowda <keshava_mgowda@ti.com>");
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
