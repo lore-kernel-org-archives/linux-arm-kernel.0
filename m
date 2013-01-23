@@ -1,40 +1,66 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 23 Jan 2013 10:58:13 +0100
-Subject: [PATCH REBASE 0/6] i2c: omap: misc changes
-In-Reply-To: <20130114191628.GB9402@arwen.pp.htv.fi>
-References: <1355502849-9289-1-git-send-email-balbi@ti.com>
- <20130114191628.GB9402@arwen.pp.htv.fi>
-Message-ID: <20130123095813.GG3767@nekote.pengutronix.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 23 Jan 2013 11:00:56 +0100
+Subject: [PATCH] clk: Add axi-clkgen driver
+In-Reply-To: <20130122175552.24671.27893@quantum>
+References: <1357755120-32735-1-git-send-email-lars@metafoo.de>
+ <20130122175552.24671.27893@quantum>
+Message-ID: <50FFB4D8.5060801@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 09:16:28PM +0200, Felipe Balbi wrote:
-> Hi,
+On 01/22/2013 06:55 PM, Mike Turquette wrote:
+> Quoting Lars-Peter Clausen (2013-01-09 10:12:00)
+> <snip>
+>> +static void axi_clkgen_write(struct axi_clkgen *axi_clkgen,
+>> +       unsigned int reg, unsigned int val)
+>> +{
+>> +       iowrite32(val, axi_clkgen->base + reg);
 > 
-> On Fri, Dec 14, 2012 at 06:34:03PM +0200, Felipe Balbi wrote:
-> > this is just a rebase of the previous series adding support
-> > for amount of bytes transferred upon NACK.
-> > 
-> > Well, actually the patches implementing transferred bytes
-> > reporting aren't here because we need to discuss how to move
-> > forward.
-> > 
-> > This series is just a preparation for that, but it also
-> > contains a at least one bugfix.
-> > 
-> > Each and every patch has been tested with pandaboard, it
-> > would be nice to get Tested-bys from other folks on other
-> > platforms before pushing this for v3.9 (there's more than
-> > enough time for that).
-> > 
-> > Note that we're also dropping b_hw flag since that becomes
-> > useless since we'll never set STT and STP together anymore.
-> > 
-> > Give it a good round of test, please.
-> 
-> Wolfram, I have these patches rebased on top of v3.8-rc3 if you wish.
-> Let me know if I should resend them (again).
+> Silly question: any reason to use this over readl()?  This is more for
+> my understanding than a real criticism.
 
-Yes, please rebase on top of Aaro's patches (probably in v3.8-rc5).
-Patches look mostly good, have to think more about what Patch 5 is
-wanting to achieve at the end of the day.
+I think I read somewhere at some point that ioread{8,16,32} is preferred
+over write{b,h,l} in new code.
+
+> 
+>> +}
+>> +
+>> +static void axi_clkgen_read(struct axi_clkgen *axi_clkgen,
+>> +       unsigned int reg, unsigned int *val)
+>> +{
+>> +       *val = ioread32(axi_clkgen->base + reg);
+> 
+> Same as above, any reason to use this over writel?
+
+Same answer.
+
+> 
+> <snip>
+>> +static unsigned long axi_clkgen_recalc_rate(struct clk_hw *clk_hw,
+>> +       unsigned long parent_rate)
+>> +{
+>> +       struct axi_clkgen *axi_clkgen = clk_hw_to_axi_clkgen(clk_hw);
+>> +       unsigned int d, m, dout;
+>> +       unsigned int reg;
+>> +
+>> +       axi_clkgen_read(axi_clkgen, AXI_CLKGEN_REG_CLK_OUT1, &reg);
+>> +       dout = (reg & 0x3f) + ((reg >> 6) & 0x3f);
+>> +       axi_clkgen_read(axi_clkgen, AXI_CLKGEN_REG_CLK_DIV, &reg);
+>> +       d = (reg & 0x3f) + ((reg >> 6) & 0x3f);
+>> +       axi_clkgen_read(axi_clkgen, AXI_CLKGEN_REG_CLK_FB1, &reg);
+>> +       m = (reg & 0x3f) + ((reg >> 6) & 0x3f);
+>> +
+>> +       if (d == 0 || dout == 0)
+>> +               return 0;
+>> +
+>> +       return parent_rate / d * m / dout;
+> 
+> Any chance of overflow here?  Maybe do_div should be used?
+
+Not if all the parameters are within spec. But since this is on a slowpath I
+guess it does not hurt to use do_div.
+
+Will send a v2.
+
+Thanks for the review,
+- Lars
