@@ -1,33 +1,52 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jan 2013 09:38:55 -0500
-Subject: [PATCH] arm: plat-orion: fix printing of "MPP config
- unavailable on this hardware"
-In-Reply-To: <50FFF489.5070506@keymile.com>
-References: <1358949059-10803-1-git-send-email-gerlando.falauto@keymile.com>
- <20130123142510.GN1758@titan.lakedaemon.net>
- <50FFF489.5070506@keymile.com>
-Message-ID: <20130123143855.GP1758@titan.lakedaemon.net>
+From: smoch@web.de (Soeren Moch)
+Date: Wed, 23 Jan 2013 15:37:52 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <201301221813.57741.arnd@arndb.de>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <201301211855.25455.arnd@arndb.de> <20130121210150.GA9184@kroah.com>
+ <201301221813.57741.arnd@arndb.de>
+Message-ID: <50FFF5C0.60000@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 03:32:41PM +0100, Gerlando Falauto wrote:
-> On 01/23/2013 03:25 PM, Jason Cooper wrote:
-> >On Wed, Jan 23, 2013 at 02:50:59PM +0100, Gerlando Falauto wrote:
-> >>Commit 3cff484d4b264ff467a3b45c544cbbbab69f0bf8
-> >>ARM: dove: Consolidate mpp code with platform mpp.
-> >>
-> >>refactored printing of the kernel warning
-> >>"orion_mpp_conf: requested MPP%u config unavailable on this hardware\n"
-> >>which is not to be printed in case of variant_mask = 0 (unknown variant).
-> >>This check should be performed using a logical AND (&&) as opposed
-> >>to a bitwise AND (&).
-> >>Otherwise, test would fail (and message would be printed) if variant_mask != 1
-> 
-> Whooops, what I meant was "and message would NOT be printed"... sorry. :-(
-> Shouldn't really matter anyway.
+On 22.01.2013 19:13, Arnd Bergmann wrote:
+> On Monday 21 January 2013, Greg KH wrote:
+>>>
+>>> I don't know a lot about USB, but I always assumed that this was not
+>>> a normal condition and that there are only a couple of URBs per endpoint
+>>> used at a time. Maybe Greg or someone else with a USB background can
+>>> shed some light on this.
+>>
+>> There's no restriction on how many URBs a driver can have outstanding at
+>> once, and if you have a system with a lot of USB devices running at the
+>> same time, there could be lots of URBs in flight depending on the number
+>> of host controllers and devices and drivers being used.
 
-fixed in mvebu/fixes.
+I only use one host controller and (in this test) two usb devices with
+the same driver.
 
-thx,
+> Ok, thanks for clarifying that. I read some more of the em28xx driver,
+> and while it does have a bunch of URBs in flight, there are only five
+> audio and five video URBs that I see simultaneously being submitted,
+> and then resubmitted from their completion handlers. I think this
+> means that there should be 10 URBs active at any given time in this
+> driver, which does not explain why we get 256 allocations.
 
-Jason.
+I think the audio part of the em28xx bridge is not used in my DVB tests.
+
+Are there other allocations from orion-ehci directly? Maybe something
+special for isochronous transfers (since there is no problem with my 
+other dvb sticks using bulk transfers)?
+
+> I also noticed that the initial submissions are all atomic but don't
+> need to, so it may be worth trying the patch below, which should also
+> help in low-memory situations. We could also try moving the resubmission
+> into a workqueue in order to let those be GFP_KERNEL, but I don't think
+> that will help.
+
+I built a linux-3.7.4 with the em28xx patch and both of your dma-mapping.c
+patches. I still see the
+   ERROR: 1024 KiB atomic DMA coherent pool is too small!
+
+Soeren
