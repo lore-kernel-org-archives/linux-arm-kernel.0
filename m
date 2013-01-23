@@ -1,96 +1,123 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 23 Jan 2013 10:36:14 +0000
-Subject: [PATCH] ARM: dts: specify all the per-cpu interrupts of arch
- timer for exynos5440
-In-Reply-To: <063f01cdf8ec$926cda30$b7468e90$@samsung.com>
-References: <1358818887-16870-1-git-send-email-kgene.kim@samsung.com>
- <20130122101554.GA18876@e106331-lin.cambridge.arm.com>
- <063f01cdf8ec$926cda30$b7468e90$@samsung.com>
-Message-ID: <20130123103614.GD32237@e106331-lin.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 23 Jan 2013 12:37:52 +0200
+Subject: [PATCH v9 00/20] OMAP USB Host cleanup
+Message-ID: <1358937492-8129-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 10:05:18PM +0000, Kukjin Kim wrote:
-> Mark Rutland wrote:
-> >
-> + devicetree-discuss, Grant Likely, Rob Herring and Tony Lindgren
->  
-> > On Tue, Jan 22, 2013 at 01:41:27AM +0000, Kukjin Kim wrote:
-> > > From: Thomas Abraham <thomas.ab@samsung.com>
-> > >
-> > > Need to be changed requirements in the 'cpus' node for exynos5440
-> > > to specify all the per-cpu interrupts of arch timer.
-> > 
-> > The node(s) for the arch timer should not be in the cpus/cpu at N nodes.
-> > Instead, there should be one node (in the root of the tree).
-> > 
-> Well, I don't think so. As per my understanding, the local timers are
-> attached to every ARM cores (cpus) and it generates certain interrupt to the
-> GIC. So the correct representation for this in device tree is to include the
-> interrupts in the cpu nodes in dts file. Your comments  refer to a
-> limitation in the Linux kernel implementation of the arch_timer and it
-> should not result in representing the hardware details incorrectly in the
-> dts file.
+Hi Samuel,
 
-I disagree. The "correct representation" is whatever the devicetree binding
-documentation describes. It does not describe placing timer nodes in the cpu
-nodes.
+I think this series is in a pretty good shape to pull now :). I've added
+Reviewed-by and Acked-by tags. You can please pull from below.
 
-> 
-> > If this works currently it's only because the driver picks up one of the
-> nodes,
-> > and luckily it's the same as the others. This is not guaranteed to work in
-> > future, and will likely break.
-> > 
-> It is up to the Linux kernel implementation of arch_timer to handle the
-> hardware details in dts file accordingly.
+NOTE: the first patch is a stable fix so Greg KH might want to pick it up for 3.8-rc.
 
-The binding specification does not specify that there should be multiple timer
-nodes, nor does it specify that they should be under cpu nodes. The timers,
-being a banked resource, can be described with one node.
+The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
 
-It is not up to the Linux kernel to handle undocumented variations of bindings.
+  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
 
-> 
-> > >
-> > > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > > ---
-> > >  arch/arm/boot/dts/exynos5440.dtsi |   20 ++++++++++++++++----
-> > >  1 file changed, 16 insertions(+), 4 deletions(-)
-> > >
-> > > diff --git a/arch/arm/boot/dts/exynos5440.dtsi
-> > b/arch/arm/boot/dts/exynos5440.dtsi
-> > > index 5406689..c5bd8ed 100644
-> > > --- a/arch/arm/boot/dts/exynos5440.dtsi
-> > > +++ b/arch/arm/boot/dts/exynos5440.dtsi
-> > > @@ -28,7 +28,10 @@
-> > >  			compatible = "arm,cortex-a15";
-> > >  			timer {
-> > >  				compatible = "arm,armv7-timer";
-> > > -				interrupts = <1 13 0xf08>;
-> > > +				interrupts = <1 13 0xf08>,
-> > > +					     <1 14 0xf08>,
-> > > +					     <1 11 0xf08>,
-> > > +					     <1 10 0xf08>;
-> > 
-> > Also, this interrupts list is updated differently to all the other nodes.
-> Typo?
-> > 
-> Hmm, I think this should be fine. If any concerns, please let me know in
-> detail.
+are available in the git repository at:
+  git://github.com/rogerq/linux.git linux-usbhost14-part
 
-Sorry, I misread the diff. Your patch in fact corrects them to be consistent
-where they weren't previously.
+This patchset addresses the following
 
-> 
-> [...]
-> 
-> Thanks.
-> 
-> - Kukjin
-> 
-> 
+- Consolidate USB Host platform data.
+- Avoid addressing clocks one by one by name and use a for loop + bunch
+  of cleanups.
+- Get number of channels/ports dynamically either from revision register
+  or from platform data. Avoids getting clocks that are not present.
+- Add OMAP5 and HSIC mode (Not tested).
 
-Thanks,
-Mark.
+v9:
+- Addressed clock framework related comments from Russell King.
+- Removed 2 clock data patches from the series as they will be taken care
+  of by Paul Walmsey.
+
+v8:
+- Re-arranged patch "USB-ehci-omap-Don-t-free-gpios-that-we-didn-t-reques.patch"
+  to be the first since it is a candidate for stable.
+- Fixed issues raised by Felipe, i.e. indentation and use of switch ()
+
+v7:
+- Updated patch 4 to not hold a spinlock when using clk_get().
+- Updated patches 3 and 11 to return -EADDRNOTAVAIL on failure of
+  demv_request_and_ioremap().
+
+v6:
+- Added USB Host platform data consolidation patch as the first patch.
+  based on request from Tony.
+- Rebased on v3.8-rc3.
+
+v5:
+- Rebased on top of todays arm-soc/for-next.
+- Removed the clock merging patch from the list.
+- Updated patches 14, 19 and 20 to accomodate the above change.
+- Added patch 22 to fix a build warning.
+
+v4:
+- Added appropriate maintainers in to/cc.
+- minor print message fix in patch 23 to maintain consistency.
+
+v3:
+- Rebased on arm-soc/for-next commit f979306c4d38d213c6977aaf3b1115e8ded71e3a.
+- Rearranged patch that get rids of cpu_is_omap..() macros.
+- Coding style fixes.
+
+v2:
+- Clocks are allocated dynamically based on number of ports available
+  on the platform.
+- Reduced console spam if non critical clocks are not found on the platform.
+- Get rid of cpu_is_.. macros from USB host driver.
+
+cheers,
+-roger
+
+---
+Roger Quadros (20):
+      USB: ehci-omap: Don't free gpios that we didn't request
+      mfd: omap-usb-host: Consolidate OMAP USB-HS platform data
+      mfd: omap-usb-tll: Fix channel count detection
+      mfd: omap-usb-tll: Use devm_kzalloc/ioremap and clean up error path
+      mfd: omap-usb-tll: Clean up clock handling
+      mfd: omap-usb-tll: introduce and use mode_needs_tll()
+      mfd: omap-usb-tll: Check for missing platform data in probe
+      mfd: omap-usb-tll: Fix error message
+      mfd: omap-usb-tll: serialize access to TLL device
+      mfd: omap-usb-tll: Add OMAP5 revision and HSIC support
+      mfd: omap_usb_host: Avoid missing platform data checks in suspend/resume
+      mfd: omap-usb-host: Use devm_kzalloc() and devm_request_and_ioremap()
+      mfd: omap-usb-host: know about number of ports from revision register
+      mfd: omap-usb-host: override number of ports from platform data
+      mfd: omap-usb-host: cleanup clock management code
+      mfd: omap-usb-host: Manage HSIC clocks for HSIC mode
+      mfd: omap-usb-host: Get rid of unnecessary spinlock
+      mfd: omap-usb-host: clean up omap_usbhs_init()
+      mfd: omap-usb-host: Don't spam console on clk_set_parent failure
+      mdf: omap-usb-host: get rid of build warning
+
+ arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
+ arch/arm/mach-omap2/board-3630sdp.c        |    2 +-
+ arch/arm/mach-omap2/board-am3517crane.c    |    2 +-
+ arch/arm/mach-omap2/board-am3517evm.c      |    2 +-
+ arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
+ arch/arm/mach-omap2/board-cm-t3517.c       |    2 +-
+ arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
+ arch/arm/mach-omap2/board-igep0020.c       |    4 +-
+ arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
+ arch/arm/mach-omap2/board-omap3evm.c       |    2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
+ arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
+ arch/arm/mach-omap2/board-omap4panda.c     |    2 +-
+ arch/arm/mach-omap2/board-overo.c          |    2 +-
+ arch/arm/mach-omap2/board-zoom.c           |    2 +-
+ arch/arm/mach-omap2/usb-host.c             |   29 +--
+ arch/arm/mach-omap2/usb.h                  |   20 +-
+ drivers/mfd/omap-usb-host.c                |  558 +++++++++++++++++-----------
+ drivers/mfd/omap-usb-tll.c                 |  243 +++++++------
+ drivers/usb/host/ehci-omap.c               |   14 +-
+ include/linux/platform_data/usb-omap.h     |   24 +-
+ 22 files changed, 497 insertions(+), 425 deletions(-)
+
+-- 
+1.7.4.1
