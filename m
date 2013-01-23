@@ -1,42 +1,49 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Wed, 23 Jan 2013 17:12:05 +0530
-Subject: [PATCH v2 3/4] ARM: OMAP2+: clock: DEFINE_STRUCT_CLK_FLAGS helper
-In-Reply-To: <cover.1358937533.git.afzal@ti.com>
-References: <cover.1358937533.git.afzal@ti.com>
-Message-ID: <26ae4f6265be65543b891442396d81b389ca5f32.1358937533.git.afzal@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 23 Jan 2013 13:47:25 +0200
+Subject: [V4 PATCH 18/26] usb: phy: mv_usb2_phy: add externel chip support
+In-Reply-To: <CADApbeghH7EdQaz7PP-pPK4huhxJ0OrLDEGTHBg4s0+3SQbRoA@mail.gmail.com>
+References: <xiechao.mail@gmail.com>
+ <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
+ <1358762864-9249-19-git-send-email-chao.xie@marvell.com>
+ <20130121155156.GM23505@n2100.arm.linux.org.uk>
+ <CADApbeghH7EdQaz7PP-pPK4huhxJ0OrLDEGTHBg4s0+3SQbRoA@mail.gmail.com>
+Message-ID: <20130123114725.GH29258@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DEFINE_STRUCT_CLK does not have the capability to set flags, define
-DEFINE_STRUCT_CLK_FLAGS to handle flags. This is needed to add
-SET_RATE_PARENT flag in statically defined lcd clock in am335x.
+Hi,
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/clock.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+On Tue, Jan 22, 2013 at 10:51:32AM +0800, Chao Xie wrote:
+> On Mon, Jan 21, 2013 at 11:51 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Jan 21, 2013 at 05:07:36AM -0500, Chao Xie wrote:
+> >> +     mv_phy->extern_chip.head = devm_kzalloc(&pdev->dev,
+> >> +                                     sizeof(*mv_phy->extern_chip.head),
+> >> +                                     GFP_KERNEL);
+> >> +     if (mv_phy->extern_chip.head == NULL)
+> >> +             return -ENOMEM;
+> >> +     ATOMIC_INIT_NOTIFIER_HEAD(mv_phy->extern_chip.head);
+> >
+> > Why do you need to allocate an atomic notifier list head as an entirely
+> > separate data structure?
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Th reason is that the original code seperate the extern_chip and phy
+> support. So it depends
+> on the ->head to detect whether extern_chip is initialized or not.
+> Now it is combined with phy, the ->phy pointer can do the job.
 
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index b402048..60ddd86 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -65,6 +65,17 @@ struct clockdomain;
- 		.ops = &_clkops_name,				\
- 	};
- 
-+#define DEFINE_STRUCT_CLK_FLAGS(_name, _parent_array_name,	\
-+				_clkops_name, _flags)		\
-+	static struct clk _name = {				\
-+		.name = #_name,					\
-+		.hw = &_name##_hw.hw,				\
-+		.parent_names = _parent_array_name,		\
-+		.num_parents = ARRAY_SIZE(_parent_array_name),	\
-+		.ops = &_clkops_name,				\
-+		.flags = _flags,				\
-+	};
-+
- #define DEFINE_STRUCT_CLK_HW_OMAP(_name, _clkdm_name)		\
- 	static struct clk_hw_omap _name##_hw = {		\
- 		.hw = {						\
+does that need to be dynamically allocated ?
+
 -- 
-1.7.12
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130123/36addcdc/attachment.sig>
