@@ -1,37 +1,24 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 23 Jan 2013 10:22:48 -0500 (EST)
-Subject: [PATCH 13/15] USB: ehci: make orion and mxc bus glues coexist
-In-Reply-To: <20130122210027.GN1906@pengutronix.de>
-Message-ID: <Pine.LNX.4.44L0.1301231018390.2045-100000@iolanthe.rowland.org>
+Date: Wed, 23 Jan 2013 10:23:13 -0500 (EST)
+Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
+In-Reply-To: <1358900903-27654-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <Pine.LNX.4.44L0.1301231022560.2045-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jan 2013, Sascha Hauer wrote:
+On Tue, 22 Jan 2013, Stephen Warren wrote:
 
-> On Tue, Jan 22, 2013 at 03:38:55PM +0000, Arnd Bergmann wrote:
-> > On Tuesday 22 January 2013, Alan Stern wrote:
-> > > In order to prevent this, you have to make sure that each glue driver
-> > > depends on USB_ARCH_HAS_EHCI.  A simple way to do this is to surround
-> > > the Kconfig entries for those drivers with "if USB && 
-> > > USB_ARCH_HAS_EHCI" ... "endif".
-> > 
-> > I was actually thinking we could remove the use of USB_ARCH_HAS_EHCI
-> > as well once we have inverted the logic for selecting USB_EHCI_HCD,
-> > but there is another problem with that, because then we still need
-> > something to select USB_ARCH_HAS_HCD, or kill that symbol as well.
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> +1 for killing it. Such symbols get more and more meaningless anyway
-> with multiarch kernels-
+> Clock "emc" is for the External Memory Controller. The USB driver has no
+> business touching this clock directly. Remove the code that does so.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Greg, Alan, I'd like to take this patch through the Tegra tree to avoid
+> any merge conflicts with the Tegra USB changes that have  recently
+> happened there.
 
-I tend to agree.  Anyway, the symbols are named badly.  _Any_
-architecture with HAS_IOMEM can in theory aupport host-side USB.  
-Maybe some of the platforms don't, but that has nothing to do with the
-CPU's architecture.
+It's okay with me.
 
-Furthermore, even platforms that don't support USB host controllers 
-can use things like dummy-hcd and usbip, which provide virtual host 
-controllers.
-
-Anybody think these symbols should be retained?
-
-Alan Stern
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
