@@ -1,32 +1,44 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 23 Jan 2013 13:24:22 +0200
-Subject: [PATCH v2 2/4] ARM: OMAP: devices: create device for usb part of
- control module
-In-Reply-To: <1358777308-2409-3-git-send-email-kishon@ti.com>
-References: <1358777308-2409-1-git-send-email-kishon@ti.com>
- <1358777308-2409-3-git-send-email-kishon@ti.com>
-Message-ID: <20130123112422.GF29258@arwen.pp.htv.fi>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 23 Jan 2013 11:27:46 +0000
+Subject: [PATCH 8/8] ARM: ux500: Remove traces of the ios_handler from
+ platform code
+In-Reply-To: <CACRpkdZnDi8F7Zu646CPEt9SAx5gA=v0CJ-Rq1eJqKS_s2EHvw@mail.gmail.com>
+References: <1355404930-5691-1-git-send-email-lee.jones@linaro.org>
+ <1355404930-5691-9-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbwQAEQxWpXHoEieou5rShcZvsGSddKLaOjwGeG-2o=wg@mail.gmail.com>
+ <CACRpkdZnDi8F7Zu646CPEt9SAx5gA=v0CJ-Rq1eJqKS_s2EHvw@mail.gmail.com>
+Message-ID: <20130123112746.GJ15873@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 23 Jan 2013, Linus Walleij wrote:
 
-On Mon, Jan 21, 2013 at 07:38:26PM +0530, Kishon Vijay Abraham I wrote:
-> A seperate driver has been added to handle the usb part of control
-> module. A device for the above driver is created here, using the register
-> address information to be used by the driver for powering on the PHY and
-> for writing to the mailbox.
+> On Wed, Jan 23, 2013 at 11:04 AM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+> > On Thu, Dec 13, 2012 at 2:22 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >
+> >> Now MMCI on/off functionality is using the regulator framework
+> >> from the MMCI driver, there is no need to keep the ios_handler
+> >> laying around, duplicating functionality. So we're removing it.
+> >>
+> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >
+> > Applied to my ux500-cleanups branch.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Or no, wait, that is dependent or Russell's tree so will not
+> be bisectable.
+> 
+> Either submit sequel patches to [1/8] through Russell's
+> patch tracker (based on his tree I guess) or wait for these
+> to hit mainline and push them after that.
+> 
+> Acked-by anway, on all of the cleanups following [1/8].
 
-Tony ? Without this we won't have the control module driver.
+I have this queued already, with the MMCI patch in as a dependency.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130123/e5736514/attachment.sig>
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
