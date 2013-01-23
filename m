@@ -1,42 +1,25 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 23 Jan 2013 16:19:18 +0530
-Subject: [PATCH v5 00/14] DMA Engine support for AM33XX
-In-Reply-To: <20130123022133.GA5727@opensource.wolfsonmicro.com>
-References: <1358281974-8411-1-git-send-email-mporter@ti.com>
- <50FEB6B2.5020303@ti.com> <20130123022133.GA5727@opensource.wolfsonmicro.com>
-Message-ID: <50FFC02E.5090703@ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 23 Jan 2013 10:54:11 +0000
+Subject: [PATCH 7/7] clk: vexpress: Use common of_clk_init() function
+In-Reply-To: <1357282858-2112-7-git-send-email-pgaikwad@nvidia.com>
+References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
+ <1357282858-2112-7-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <1358938451.26878.1.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 1/23/2013 7:51 AM, Mark Brown wrote:
-> On Tue, Jan 22, 2013 at 09:26:34PM +0530, Sekhar Nori wrote:
->> On 1/16/2013 2:02 AM, Matt Porter wrote:
+On Fri, 2013-01-04 at 07:00 +0000, Prashant Gaikwad wrote:
+> Use common of_clk_init() function for clock initialization.
 > 
->>> This series adds DMA Engine support for AM33xx, which uses
->>> an EDMA DMAC. The EDMA DMAC has been previously supported by only
->>> a private API implementation (much like the situation with OMAP
->>> DMA) found on the DaVinci family of SoCs.
-> 
->> Will you take this series through the OMAP tree? Only 1/14 touches
->> mach-davinci and I am mostly okay with it except some changes I just
->> requested Matt to make in another thread.
-> 
-> Is this series somewhere near actually getting merged then? It seemed
-> like there was lots of stuff going on.
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 
-I don't think there is a lot of churn on this now. 5 of the patches have
-already been acked by Tony. I had a look at the first two patches (from
-davinci perspective) and they mostly look good to me.
+Just tested on VE, looks good to me.
 
-That said, I was not intending to suggest the entire series was ready
-for merging. Since the series touches multiple areas of the kernel, I
-wanted to make sure we have one person shepherding the series towards
-mainline.
+So for this patch and the "[1/7] clk: add common of_clk_init() function"
+one:
 
-Patch 1/14 has some changes in sound/ can you please take a look and ack
-them?
+Tested-by: Pawel Moll <pawel.moll@arm.com>
 
-Thanks,
-Sekhar
+Cheers!
+
+Pawel
