@@ -1,41 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Jan 2013 17:58:31 +0000
-Subject: [GIT PULL] hw_breakpoint updates for 3.9
-Message-ID: <20130123175831.GE26811@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 23 Jan 2013 17:59:30 +0000
+Subject: [PATCH 0/4] Preparatory GIC patches for arm64 support
+Message-ID: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-Please pull these hw_breakpoint updates for 3.9. Nothing major here but
-some basic support for debug powerdown with recent CPUs.
+These patches are primarily aimed at reducing the irq-gic.c dependency
+on arch/arm and allow it to be used with arch/arm64. The last patch
+removes the explicit gic_secondary_init() call from the ARM platform
+code.
 
-Cheers,
+We still have a non-generic asm/smp_plat.h include for cpu_logical_map()
+but I couldn't find a better place to move it (asm/cpu.h isn't generic
+either, though more widely used than smp_plat.h).
 
-Will
+The patches are based on linux-next as they require Rob's GIC irqhip
+move.
 
---->8
+Catalin
 
-The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
 
-  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
+Catalin Marinas (4):
+  arm: Move the set_handle_irq and handle_arch_irq declarations to
+    asm/irq.h
+  arm: Move chained_irq_(enter|exit) to a generic file
+  irqchip: gic: Call handle_bad_irq() directly
+  irqchip: gic: Perform the gic_secondary_init() call via CPU notifier
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/hw-breakpoint
-
-for you to fetch changes up to 9a6eb310eaa5336b89a27a0bbb78da4bba35f6f1:
-
-  ARM: hw_breakpoint: Debug powerdown support for self-hosted debug (2013-01-10 21:13:07 +0000)
-
-----------------------------------------------------------------
-Dietmar Eggemann (3):
-      ARM: coresight: common definition for (OS) Lock Access Register key value
-      ARM: hw_breakpoint: Check function for OS Save and Restore mechanism
-      ARM: hw_breakpoint: Debug powerdown support for self-hosted debug
-
- arch/arm/include/asm/cti.h                | 10 +++-------
- arch/arm/include/asm/hardware/coresight.h |  6 +++---
- arch/arm/include/asm/hw_breakpoint.h      |  3 +++
- arch/arm/kernel/hw_breakpoint.c           | 61 +++++++++++++++++++++++++++++++++++++++++++++++++++++--------
- 4 files changed, 62 insertions(+), 18 deletions(-)
+ arch/arm/include/asm/irq.h              |  5 ++++
+ arch/arm/include/asm/mach/irq.h         | 36 -----------------------
+ arch/arm/mach-at91/gpio.c               |  3 +-
+ arch/arm/mach-exynos/common.c           |  1 +
+ arch/arm/mach-exynos/platsmp.c          |  8 -----
+ arch/arm/mach-highbank/platsmp.c        |  7 -----
+ arch/arm/mach-imx/platsmp.c             | 12 --------
+ arch/arm/mach-msm/platsmp.c             |  8 -----
+ arch/arm/mach-omap2/omap-smp.c          |  7 -----
+ arch/arm/mach-shmobile/smp-emev2.c      |  7 -----
+ arch/arm/mach-shmobile/smp-r8a7779.c    |  7 -----
+ arch/arm/mach-shmobile/smp-sh73a0.c     |  7 -----
+ arch/arm/mach-socfpga/platsmp.c         | 12 --------
+ arch/arm/mach-spear13xx/platsmp.c       |  8 -----
+ arch/arm/mach-tegra/platsmp.c           |  8 -----
+ arch/arm/mach-ux500/platsmp.c           |  8 -----
+ arch/arm/plat-samsung/irq-vic-timer.c   |  3 +-
+ arch/arm/plat-samsung/s5p-irq-gpioint.c |  3 +-
+ arch/arm/plat-versatile/platsmp.c       |  8 -----
+ drivers/irqchip/irq-gic.c               | 32 ++++++++++++++------
+ drivers/irqchip/irq-vic.c               |  2 +-
+ include/linux/irqchip/arm-gic.h         |  1 -
+ include/linux/irqchip/chained_irq.h     | 52 +++++++++++++++++++++++++++++++++
+ 23 files changed, 85 insertions(+), 160 deletions(-)
+ create mode 100644 include/linux/irqchip/chained_irq.h
