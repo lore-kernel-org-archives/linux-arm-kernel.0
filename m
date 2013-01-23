@@ -1,64 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Jan 2013 16:39:11 +0100
-Subject: [PATCH] ARM: sunxi: gpio: Add Allwinner SoCs GPIO drivers
-In-Reply-To: <1358933646-12681-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1358933646-12681-1-git-send-email-maxime.ripard@free-electrons.com>
- <1358933646-12681-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkda97_m2XxhCCFeH410=HQA+0G=UmY8BDk1d+o1Mo+ZfLA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 23 Jan 2013 23:48:12 +0800
+Subject: [alsa-devel] [PATCH V2 2/2] ASoC: Davinci: machine: Add device
+ tree binding
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EB50DCF@DBDE01.ent.ti.com>
+References: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
+ <1357293277-25543-3-git-send-email-gururaja.hebbar@ti.com>
+ <20130104122612.GM4627@opensource.wolfsonmicro.com>
+ <1BAFE6F6C881BF42822005164F1491C33EB50DCF@DBDE01.ent.ti.com>
+Message-ID: <20130123154804.GB4565@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 10:34 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Wed, Jan 23, 2013 at 12:39:35PM +0000, Hebbar, Gururaja wrote:
+> On Fri, Jan 04, 2013 at 17:56:12, Mark Brown wrote:
 
-> The IP responsible for the muxing on the Allwinner SoCs are also
-> handling the GPIOs on the system. This patch adds the needed driver that
-> relies on the pinctrl driver for most of its operations.
->
-> The number of pins available for GPIOs operations are already declared
-> in the pinctrl driver, we only need to probe a generic driver to handle
-> the banks available for each SoC.
->
-> This driver has been tested on a A13-Olinuxino.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > The CODEC driver biases should be changed over to be supplies, this
+> > makes the above much more natural - the routing there is a hack for
+> > older versions of ASoc.  Otherwise this looks fine.
 
-Overall this is VERY NICE!
+> ON TLV320AIC3x Codec, MIC Bias power on/off share the same register bits
+> with Bias voltage output.
 
-> +       char *func, *pin_name;
-(...)
-> +       pin_name = kzalloc(5, GFP_KERNEL);
-> +       if (!pin_name)
-> +               return -ENOMEM;
-> +
-> +       ret = sprintf(pin_name, "P%c%d", 'A' + bank, pin);
-> +       if (!ret)
-> +               goto error;
-(...)
-> +error:
-> +       kfree(pin_name);
+So you need to use an event to write the actual enable bit.
 
-Isn't this a bit awkward?
+> SGTL5000 --> Single register for MIC BIAS enable & output impedance of MIC
+> Bias. The driver uses SND_SOC_DAPM_POST_PMU & SND_SOC_DAPM_PRE_PMD macro to
+> handle the MIC Bias enable & disable event.
 
-Can't you either use something like a local
-static char foo[MAX_SIZE]; or atleast try to use
-one of the static string print functions from <linux/kernel.h>:
-
-/* lib/printf utilities */
-
-extern __printf(2, 3) int sprintf(char *buf, const char * fmt, ...);
-extern __printf(2, 0) int vsprintf(char *buf, const char *, va_list);
-extern __printf(3, 4)
-int snprintf(char *buf, size_t size, const char *fmt, ...);
-extern __printf(3, 0)
-int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
-extern __printf(3, 4)
-int scnprintf(char *buf, size_t size, const char *fmt, ...);
-extern __printf(3, 0)
-int vscnprintf(char *buf, size_t size, const char *fmt, va_list args);
-extern __printf(2, 3)
-char *kasprintf(gfp_t gfp, const char *fmt, ...);
-extern char *kvasprintf(gfp_t gfp, const char *fmt, va_list args);
-
-Yours,
-Linus Walleij
+This is the way these things should be handled.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130123/8e8582a0/attachment.sig>
