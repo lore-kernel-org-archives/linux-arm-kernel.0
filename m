@@ -1,52 +1,48 @@
-From: smoch@web.de (Soeren Moch)
-Date: Wed, 23 Jan 2013 15:37:52 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <201301221813.57741.arnd@arndb.de>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <201301211855.25455.arnd@arndb.de> <20130121210150.GA9184@kroah.com>
- <201301221813.57741.arnd@arndb.de>
-Message-ID: <50FFF5C0.60000@web.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Jan 2013 09:40:37 -0500
+Subject: [PATCH v3] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
+In-Reply-To: <20130123142933.GO1758@titan.lakedaemon.net>
+References: <3816648.2TVsTiMOWx@bender>
+ <1358174852-19752-1-git-send-email-florian@openwrt.org>
+ <20130123142933.GO1758@titan.lakedaemon.net>
+Message-ID: <20130123144037.GQ1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.01.2013 19:13, Arnd Bergmann wrote:
-> On Monday 21 January 2013, Greg KH wrote:
->>>
->>> I don't know a lot about USB, but I always assumed that this was not
->>> a normal condition and that there are only a couple of URBs per endpoint
->>> used at a time. Maybe Greg or someone else with a USB background can
->>> shed some light on this.
->>
->> There's no restriction on how many URBs a driver can have outstanding at
->> once, and if you have a system with a lot of USB devices running at the
->> same time, there could be lots of URBs in flight depending on the number
->> of host controllers and devices and drivers being used.
+On Wed, Jan 23, 2013 at 09:29:33AM -0500, Jason Cooper wrote:
+> On Mon, Jan 14, 2013 at 03:47:32PM +0100, Florian Fainelli wrote:
+> > This patch adds the DTS file to support the Marvell RD-A370-A1
+> > (Reference Design board) also known as RD-88F6710 board. It is almost
+> > entirely similar to the DB-A370 except on the following points:
+> > 
+> > - second Ethernet MAC is connected to a switch using RGMII
+> > - it only has 512MB of physical RAM
+> > - SDIO interface is enabled and working by default (no need for jumpers)
+> > 
+> > Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> > ---
+> > Jason,
+> > 
+> > This is rebased against your mvebu/for-next branch, can you please drop v2 of
+> > the previous patch and take this one instead? Thanks!
+> > 
+> > Changes since v2:
+> > - rebased against Jason's mvebu/for-next
+> > - added SDIO bindings
+> > - changed commit message a bit
+> > 
+> > Changes since v1:
+> > - added missing entry in arch/arm/boot/dts/Makefile to actually build the DTB
+> > 
+> >  arch/arm/boot/dts/Makefile          |    1 +
+> >  arch/arm/boot/dts/armada-370-rd.dts |   68 +++++++++++++++++++++++++++++++++++
+> >  2 files changed, 69 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/armada-370-rd.dts
+> 
+> Applied to mvebu/dt
 
-I only use one host controller and (in this test) two usb devices with
-the same driver.
+oops, I meant mvebu/boards.
 
-> Ok, thanks for clarifying that. I read some more of the em28xx driver,
-> and while it does have a bunch of URBs in flight, there are only five
-> audio and five video URBs that I see simultaneously being submitted,
-> and then resubmitted from their completion handlers. I think this
-> means that there should be 10 URBs active at any given time in this
-> driver, which does not explain why we get 256 allocations.
+thx,
 
-I think the audio part of the em28xx bridge is not used in my DVB tests.
-
-Are there other allocations from orion-ehci directly? Maybe something
-special for isochronous transfers (since there is no problem with my 
-other dvb sticks using bulk transfers)?
-
-> I also noticed that the initial submissions are all atomic but don't
-> need to, so it may be worth trying the patch below, which should also
-> help in low-memory situations. We could also try moving the resubmission
-> into a workqueue in order to let those be GFP_KERNEL, but I don't think
-> that will help.
-
-I built a linux-3.7.4 with the em28xx patch and both of your dma-mapping.c
-patches. I still see the
-   ERROR: 1024 KiB atomic DMA coherent pool is too small!
-
-Soeren
+Jason.
