@@ -1,64 +1,55 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 23 Jan 2013 11:57:40 -0800
-Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <51003B20.2060506@linux.vnet.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
- <20130123185522.GG2373@mtj.dyndns.org>
- <51003B20.2060506@linux.vnet.ibm.com>
-Message-ID: <20130123195740.GI2373@mtj.dyndns.org>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Wed, 23 Jan 2013 20:39:44 +0000
+Subject: [PATCH v3 1/1 net-next] net: fec: enable pause frame to improve
+ rx prefomance for 1G network
+In-Reply-To: <1358391358-27977-1-git-send-email-Frank.Li@freescale.com>
+References: <1358391358-27977-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1358973584.2658.14.camel@bwh-desktop.uk.solarflarecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Srivatsa.
-
-On Thu, Jan 24, 2013 at 01:03:52AM +0530, Srivatsa S. Bhat wrote:
-> Hmm.. I split it up into steps to help explain the reasoning behind
-> the code sufficiently, rather than spring all of the intricacies at
-> one go (which would make it very hard to write the changelog/comments
-> also). The split made it easier for me to document it well in the
-> changelog, because I could deal with reasonable chunks of code/complexity
-> at a time. IMHO that helps people reading it for the first time to
-> understand the logic easily.
-
-I don't know.  It's a judgement call I guess.  I personally would much
-prefer having ample documentation as comments in the source itself or
-as a separate Documentation/ file as that's what most people are gonna
-be looking at to figure out what's going on.  Maybe just compact it a
-bit and add more in-line documentation instead?
-
-> > The only two options are either punishing writers or identifying and
-> > updating all such possible deadlocks.  percpu_rwsem does the former,
-> > right?  I don't know how feasible the latter would be.
+On Thu, 2013-01-17 at 10:55 +0800, Frank Li wrote:
+> The limition of imx6 internal bus cause fec can't achieve 1G perfomance.
+> There will be many packages lost because FIFO over run.
 > 
-> I don't think we can avoid looking into all the possible deadlocks,
-> as long as we use rwlocks inside get/put_online_cpus_atomic() (assuming
-> rwlocks are fair). Even with Oleg's idea of using synchronize_sched()
-> at the writer, we still need to take care of locking rules, because the
-> synchronize_sched() only helps avoid the memory barriers at the reader,
-> and doesn't help get rid of the rwlocks themselves.
+> This patch enable pause frame flow control.
+[...]
+> --- a/drivers/net/ethernet/freescale/fec.c
+> +++ b/drivers/net/ethernet/freescale/fec.c
+[...]
+> +static int fec_enet_set_pauseparam(struct net_device *ndev,
+> +				   struct ethtool_pauseparam *pause)
+> +{
+> +	struct fec_enet_private *fep = netdev_priv(ndev);
+> +
+> +	if (pause->tx_pause != pause->rx_pause) {
+> +		netdev_info(ndev,
+> +			"hardware only support enable/disable both tx and rx");
+> +		return -EINVAL;
+> +	}
+> +
+> +	fep->pause_flag = 0;
+> +
+> +	/* tx pause must be same as rx pause */
+> +	fep->pause_flag |= pause->rx_pause ? FEC_PAUSE_FLAG_ENABLE : 0;
+> +	fep->pause_flag |= pause->autoneg ? FEC_PAUSE_FLAG_AUTONEG : 0;
+> +
+> +	if (pause->rx_pause || pause->autoneg) {
+> +		fep->phy_dev->supported |= ADVERTISED_Pause;
+> +		fep->phy_dev->advertising |= ADVERTISED_Pause;
+> +	} else {
+> +		fep->phy_dev->supported &= ~ADVERTISED_Pause;
+> +		fep->phy_dev->advertising &= ~ADVERTISED_Pause;
+> +	}
+[...]
 
-Well, percpu_rwlock don't have to use rwlock for the slow path.  It
-can implement its own writer starving locking scheme.  It's not like
-implementing slow path global rwlock logic is difficult.
+Why is this changing the supported flags, i.e. device capabilities?  You
+need to leave those flags alone and reject an attempt to enable pause
+frames on a device that doesn't support them.
 
-> CPU 0                          CPU 1
-> 
-> read_lock(&rwlock)
-> 
->                               write_lock(&rwlock) //spins, because CPU 0
->                               //has acquired the lock for read
-> 
-> read_lock(&rwlock)
->    ^^^^^
-> What happens here? Does CPU 0 start spinning (and hence deadlock) or will
-> it continue realizing that it already holds the rwlock for read?
-
-I don't think rwlock allows nesting write lock inside read lock.
-read_lock(); write_lock() will always deadlock.
-
-Thanks.
+Ben.
 
 -- 
-tejun
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
