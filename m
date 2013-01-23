@@ -1,48 +1,102 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jan 2013 09:40:37 -0500
-Subject: [PATCH v3] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
-In-Reply-To: <20130123142933.GO1758@titan.lakedaemon.net>
-References: <3816648.2TVsTiMOWx@bender>
- <1358174852-19752-1-git-send-email-florian@openwrt.org>
- <20130123142933.GO1758@titan.lakedaemon.net>
-Message-ID: <20130123144037.GQ1758@titan.lakedaemon.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 23 Jan 2013 14:44:41 +0000
+Subject: [GIT PULL] power: ab8500-bm: Latest Mainline<->STE delta
+ reduction patch-set
+In-Reply-To: <20130123113854.GK15873@gmail.com>
+References: <20130123113854.GK15873@gmail.com>
+Message-ID: <20130123144441.GN15873@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 09:29:33AM -0500, Jason Cooper wrote:
-> On Mon, Jan 14, 2013 at 03:47:32PM +0100, Florian Fainelli wrote:
-> > This patch adds the DTS file to support the Marvell RD-A370-A1
-> > (Reference Design board) also known as RD-88F6710 board. It is almost
-> > entirely similar to the DB-A370 except on the following points:
-> > 
-> > - second Ethernet MAC is connected to a switch using RGMII
-> > - it only has 512MB of physical RAM
-> > - SDIO interface is enabled and working by default (no need for jumpers)
-> > 
-> > Signed-off-by: Florian Fainelli <florian@openwrt.org>
-> > ---
-> > Jason,
-> > 
-> > This is rebased against your mvebu/for-next branch, can you please drop v2 of
-> > the previous patch and take this one instead? Thanks!
-> > 
-> > Changes since v2:
-> > - rebased against Jason's mvebu/for-next
-> > - added SDIO bindings
-> > - changed commit message a bit
-> > 
-> > Changes since v1:
-> > - added missing entry in arch/arm/boot/dts/Makefile to actually build the DTB
-> > 
-> >  arch/arm/boot/dts/Makefile          |    1 +
-> >  arch/arm/boot/dts/armada-370-rd.dts |   68 +++++++++++++++++++++++++++++++++++
-> >  2 files changed, 69 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/armada-370-rd.dts
-> 
-> Applied to mvebu/dt
+Okay, after Linus Walleij's diligent observaions, I have removed all
+new functionallity related to Deep Debug and will continue to
+investigate what I need to do in that regard.
 
-oops, I meant mvebu/boards.
+In the mean-time, here's the fresh deep-debug:less pull-request:
 
-thx,
+----------------------------------------------------------------
 
-Jason.
+The following changes since commit 8fd526fd18233887ba652079a369f4eee0de9d9d:
+
+  qnap-poweroff: Fix license string (2013-01-19 18:04:04 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ljones/linux-3.0-ux500.git tb-power-2
+
+for you to fetch changes up to 34c11a709e928090cf34ecd706f7d3170f4e5026:
+
+  u8500-charger: Delay for USB enumeration (2013-01-23 14:39:22 +0000)
+
+----------------------------------------------------------------
+Hakan Berg (1):
+      ab8500-fg: Adjust for RF bursts voltage drops
+
+Henrik S?lver (1):
+      ab8500-charger: AB workaround for invalid charger
+
+Jonas Aaberg (2):
+      ab8500-bm: Flush all work queues before suspending
+      ab8500-charger: Do not touch VBUSOVV bits
+
+Lee Jones (7):
+      ab8500-charger: Kick watchdog
+      ab8500-chargalg: Update battery health on safety timer exp
+      pm2301: Move all configuration and emum structs out to a header
+      file
+      ab8500-chargalg: Only root should have write permission on sysfs
+      file
+      abx500-chargalg: Add new sysfs interface to get current charge
+      status
+      pm2301: LPN mode control support
+      ab8500-bm: Remove individual [charger|btemp|fg|chargalg] pdata
+      structures
+
+Loic Pallardy (2):
+      pm2301: Remove volt_now & curr_now properties
+      pm2301: Update watchdog for pm2xxx support
+
+Martin Bergstr?m (1):
+      ab8500-fg: Go to INIT_RECOVERY when charger removed
+
+Michel JAOUEN (2):
+      pm2301: Provide u9540 support for the pm2301 charger
+      ab8500-btemp: Adaptation to AB8505 and AB9540 platforms
+
+Nicolas Guion (1):
+      ab8500-charger: Add support for autopower on AB8505 and AB9540
+
+Olivier Clergeaud (1):
+      pm2301: Clean-up PM2301 interrupt management
+
+Paer-Olof Haakansson (1):
+      u8500-charger: Delay for USB enumeration
+
+Rajkumar Kasirajan (2):
+      pm2301: Enable vbat low monitoring
+      ab8500-fg: Use correct battery charge full design
+
+ drivers/mfd/ab8500-core.c                 |    6 +
+ drivers/power/Kconfig                     |    7 +
+ drivers/power/Makefile                    |    1 +
+ drivers/power/ab8500_btemp.c              |   67 +-
+ drivers/power/ab8500_charger.c            |  617 ++++++++++++----
+ drivers/power/ab8500_fg.c                 |   51 +-
+ drivers/power/abx500_chargalg.c           |   43 +-
+ drivers/power/pm2301_charger.c            | 1088 +++++++++++++++++++++++++++++
+ drivers/power/pm2301_charger.h            |  513 ++++++++++++++
+ include/linux/mfd/abx500.h                |    3 +
+ include/linux/mfd/abx500/ab8500-bm.h      |   22 +-
+ include/linux/mfd/abx500/ab8500.h         |   19 +
+ include/linux/mfd/abx500/ux500_chargalg.h |    5 +
+ include/linux/pm2301_charger.h            |   61 ++
+ 14 files changed, 2306 insertions(+), 197 deletions(-)
+ create mode 100644 drivers/power/pm2301_charger.c
+ create mode 100644 drivers/power/pm2301_charger.h
+ create mode 100644 include/linux/pm2301_charger.h
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
