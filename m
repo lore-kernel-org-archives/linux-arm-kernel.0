@@ -1,18 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Jan 2013 09:15:37 +0000
-Subject: arm: Kernel failures when several memory banks are used with
- starting address above 128MB
-In-Reply-To: <CAHTX3dJZxuoz_0Eaa7QcoK9bF4LdLuWcDcwK3OUKc6qY_0PeuQ@mail.gmail.com>
-References: <CAHTX3dJZxuoz_0Eaa7QcoK9bF4LdLuWcDcwK3OUKc6qY_0PeuQ@mail.gmail.com>
-Message-ID: <20130123091537.GN23505@n2100.arm.linux.org.uk>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Wed, 23 Jan 2013 14:56:12 +0530
+Subject: [PATCH 0/4] LOW power sleep support for OMAP nand driver
+Message-ID: <1358933176-12409-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 08:18:13PM +0100, Michal Simek wrote:
-> I have a question regarding to the case where DTS specify one memory bank
-> for example <0x0 0x40000000> with CONFIG_ARM_PATCH_PHYS_VIRT=y
-> where the kernel can be loaded at a 16MB boundary.
+This patch series adds low power transition support for OMAP NAND driver.
+This includes low power transition support of
+- GPMC module
+- ELM module
+- OMAP2 NAND driver
 
-That's where you're going wrong.  We assume that the kernel is loaded
-within the 16MB of memory _always_.  Can't get around this on a
-multiplatform kernel.
+Low power transition support tested on am335x-evm with NAND flash support.
+This patch series based on [1] and depends on [2] and is available [2]
+
+1. ARM: OMAP2+: AM33XX: Add suspend-resume support
+   http://comments.gmane.org/gmane.linux.ports.arm.omap/91405
+2. https://github.com/avinashphilip/am335x_linux/commits/NAND_supend_resume_support
+
+Philip Avinash (4):
+  arch: arm: gpmc: gpmc migration support
+  mtd: devices: elm: Low power transition support
+  arm: gpmc: Low power transition support
+  mtd: nand: omap2: Low power transition support
+
+ arch/arm/mach-omap2/gpmc.c   |   22 ++++++++++++++++++++--
+ arch/arm/mach-omap2/pm34xx.c |    5 -----
+ drivers/mtd/devices/elm.c    |   40 ++++++++++++++++++++++++++++++++++++++++
+ drivers/mtd/nand/omap2.c     |   19 +++++++++++++++++++
+ 4 files changed, 79 insertions(+), 7 deletions(-)
+
+-- 
+1.7.9.5
