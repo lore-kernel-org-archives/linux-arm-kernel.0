@@ -1,72 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 23 Jan 2013 10:13:49 +0000
-Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into
- the driver
-In-Reply-To: <20130122105608.GP6857@gmail.com>
-References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
- <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
- <20130122090000.GH6857@gmail.com>
- <CACRpkdatTagYaMqvpe-a8zj_kO3Twjn1r4SqPty8DosNmcxJcQ@mail.gmail.com>
- <20130122100607.GH23505@n2100.arm.linux.org.uk>
- <20130122102010.GL6857@gmail.com>
- <20130122103723.GI23505@n2100.arm.linux.org.uk>
- <20130122105608.GP6857@gmail.com>
-Message-ID: <20130123101349.GH15873@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Jan 2013 11:16:19 +0100
+Subject: [PATCH 1/2] clocksource: dbx500-prcmu: use relaxed readl variant
+In-Reply-To: <20130121122203.GA30289@balto.lan>
+References: <1358770172-30125-1-git-send-email-fabio.baltieri@linaro.org>
+ <20130121122203.GA30289@balto.lan>
+Message-ID: <CACRpkdacW89oq+yyjayY2674UGPdnnHS5veQsn2DaZ4-nao1Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jan 2013, Lee Jones wrote:
+On Mon, Jan 21, 2013 at 1:22 PM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
+> On Mon, Jan 21, 2013 at 01:09:31PM +0100, Fabio Baltieri wrote:
+>> From: Rabin Vincent <rabin.vincent@stericsson.com>
+>>
+>> Modify clksrc_dbx500_prcmu_read to replace readl() with readl_relaxed().
+>> This speeds up calls to the function by about 40%.
+>
+> Hello John,
+>
+> these two patches may go in the existing ux500 clksrc branch
+> together with the nomadik-mtu's patches queued up some time ago.
+>
+> Can I have your Acked-by for that?
 
-> On Tue, 22 Jan 2013, Russell King - ARM Linux wrote:
-> 
-> > On Tue, Jan 22, 2013 at 10:20:10AM +0000, Lee Jones wrote:
-> > > On Tue, 22 Jan 2013, Russell King - ARM Linux wrote:
-> > > 
-> > > > On Tue, Jan 22, 2013 at 10:53:42AM +0100, Linus Walleij wrote:
-> > > > > On Tue, Jan 22, 2013 at 10:00 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > > > > 
-> > > > > >> From: Lee Jones <lee.jones@linaro.org>
-> > > > > >>
-> > > > > >> There are currently two instances of the ios_handler being used.
-> > > > > >> Both of which mearly toy with some regulator settings. Now there
-> > > > > >> is a GPIO regulator API, we can use that instead, and lessen the
-> > > > > >> per platform burden. By doing this, we also become more Device
-> > > > > >> Tree compatible.
-> > > > > >
-> > > > > > Russell,
-> > > > > >
-> > > > > > Why is this patch in your tree with Ulf as the Author?
-> > > > > 
-> > > > > This is because of the way Russell's patch tracker works, it sets
-> > > > > Author: to the name of the person using the patch tracker and
-> > > > > discards the From: field in the beginning of the patch which
-> > > > > git am will conversely respect.
-> > > > 
-> > > > Actually, the reverse.  It does now respect the From: line, but the
-> > > > From: line will be ignored for all notifications about the patch
-> > > > because the patch system was never built to parse the actual comments
-> > > > when sending out the email notifications.
-> > > 
-> > > So what do I have to do to reaffirm myself as the author?
-> > 
-> > I'd need to recommit the patch with the right information, which isn't
-> > that easy to do.
-> 
-> Are you saying that you won't do it? :)
-> 
-> Is there anything I can do to make the process easier?
+Actually now when I look at it these changes are fully orthogonal
+to the other stuff, so these two should just go in through John's
+timer tree as usual.
 
-Thinking about this a little more. Is it easier to remove it from your
-tree altogether? Only I have a small "ARM: ux500: " patch-set which
-directly relies on this patch. I could take it in via ARM-SoC without
-any fear of ordering issues.
+John?
 
-The alternative is for me to wait until this hits Mainline, or for you
-to take in the remainder of the patch-set via your patch tracker. The
-first option would be my preference.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
