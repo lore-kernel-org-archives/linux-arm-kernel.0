@@ -1,49 +1,117 @@
 From: vbyravarasu@nvidia.com (Venu Byravarasu)
-Date: Wed, 23 Jan 2013 12:13:29 +0530
-Subject: [PATCH 2/2] ARM: tegra: add clocks properties to USB PHY nodes
-In-Reply-To: <50FF2FD0.2090003@wwwdotorg.org>
+Date: Wed, 23 Jan 2013 12:25:11 +0530
+Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
+In-Reply-To: <1358900903-27654-1-git-send-email-swarren@wwwdotorg.org>
 References: <1358900903-27654-1-git-send-email-swarren@wwwdotorg.org>
- <1358900903-27654-2-git-send-email-swarren@wwwdotorg.org>
- <50FF2FD0.2090003@wwwdotorg.org>
-Message-ID: <D958900912E20642BCBC71664EFECE3E6E1B13B847@BGMAIL02.nvidia.com>
+Message-ID: <D958900912E20642BCBC71664EFECE3E6E1B13B855@BGMAIL02.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
-> From: Stephen Warren [mailto:swarren at wwwdotorg.org]
-> Sent: Wednesday, January 23, 2013 6:03 AM
-> To: Venu Byravarasu
-> Cc: Alan Stern; Greg Kroah-Hartman; linux-tegra at vger.kernel.org; linux-arm-
+> From: linux-tegra-owner at vger.kernel.org [mailto:linux-tegra-
+> owner at vger.kernel.org] On Behalf Of Stephen Warren
+> Sent: Wednesday, January 23, 2013 5:58 AM
+> To: Alan Stern; Greg Kroah-Hartman; Stephen Warren
+> Cc: Venu Byravarasu; linux-tegra at vger.kernel.org; linux-arm-
 > kernel at lists.infradead.org; linux-usb at vger.kernel.org; Stephen Warren
-> Subject: Re: [PATCH 2/2] ARM: tegra: add clocks properties to USB PHY nodes
+> Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
 > 
-> On 01/22/2013 05:28 PM, Stephen Warren wrote:
-> > The patch to add USB PHY nodes to device tree was written before Tegra
-> > supported the clocks property in device tree. Now that it does, add the
-> > required clocks properties to these nodes.
-> >
-> > This will allow all clk_get_sys() calls in tegra_usb_phy.c to be replaced
-> > by clk_get(phy->dev, clock_name), as part of converting the PHY driver to
-> > a platform driver.
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> > diff --git a/arch/arm/boot/dts/tegra20.dtsi
-> b/arch/arm/boot/dts/tegra20.dtsi
-> 
-> > +		clocks = <&tegra_car 22>, <&tegra_car 127>;
-> > +		clock-names = "utmi", "pll_u";
-> ...
-> > +		clocks = <&tegra_car 94>, <&tegra_car 127>;
-> > +		clock-names = "ulpi", "pll_u";
-> 
-> Hmmm. Thinking about that first clock more, if we name it just "phy" in
-> both the UTMI and ULPI PHY nodes, we could make tegra_phy_init() perform
-> the clk_get() for all PHY types, and use the same clock name everywhere,
-> and hence remove the type-specific clk_get()s from tegra_phy_init() and
-> utmip_pad_open().
-> 
-> Venu, will this work for other chips such as Tegra30/Tegra114 and so on
-> into the future, or do chips after Tegra20 introduce any new clocks, and
-> hence break this scheme?
+> Clock "emc" is for the External Memory Controller. The USB driver has no
+> business touching this clock directly. Remove the code that does so.
+
+Stephen,
+This was primarily done to make sure that EMC is set to a minimum
+frequency, below which data errors may occur during USB transfers.
+If we plan to remove this, how should we make sure that the EMC
+is programmed for the required frequency during USB transfers?
  
-Should be fine, as same clocks are used across all chips.
-Acked-by: Venu Byravarasu <vbyravarasu@nvidia.com>
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Greg, Alan, I'd like to take this patch through the Tegra tree to avoid
+> any merge conflicts with the Tegra USB changes that have  recently
+> happened there.
+> 
+> Venu, When creating your patch to convert the Tegra USB PHY driver to a
+> platform driver, can you assume these patches are applied first? Thanks.
+> I assume that these patches make sense to you; could you ack them if so.
+> ---
+>  drivers/usb/host/ehci-tegra.c |   17 -----------------
+>  1 file changed, 17 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
+> index 1f596fb..b02622a 100644
+> --- a/drivers/usb/host/ehci-tegra.c
+> +++ b/drivers/usb/host/ehci-tegra.c
+> @@ -44,7 +44,6 @@ struct tegra_ehci_hcd {
+>  	struct ehci_hcd *ehci;
+>  	struct tegra_usb_phy *phy;
+>  	struct clk *clk;
+> -	struct clk *emc_clk;
+>  	struct usb_phy *transceiver;
+>  	int host_resumed;
+>  	int port_resuming;
+> @@ -56,7 +55,6 @@ static void tegra_ehci_power_up(struct usb_hcd *hcd)
+>  {
+>  	struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
+> 
+> -	clk_prepare_enable(tegra->emc_clk);
+>  	clk_prepare_enable(tegra->clk);
+>  	usb_phy_set_suspend(&tegra->phy->u_phy, 0);
+>  	tegra->host_resumed = 1;
+> @@ -69,7 +67,6 @@ static void tegra_ehci_power_down(struct usb_hcd
+> *hcd)
+>  	tegra->host_resumed = 0;
+>  	usb_phy_set_suspend(&tegra->phy->u_phy, 1);
+>  	clk_disable_unprepare(tegra->clk);
+> -	clk_disable_unprepare(tegra->emc_clk);
+>  }
+> 
+>  static int tegra_ehci_internal_port_reset(
+> @@ -694,16 +691,6 @@ static int tegra_ehci_probe(struct platform_device
+> *pdev)
+>  	if (err)
+>  		goto fail_clk;
+> 
+> -	tegra->emc_clk = devm_clk_get(&pdev->dev, "emc");
+> -	if (IS_ERR(tegra->emc_clk)) {
+> -		dev_err(&pdev->dev, "Can't get emc clock\n");
+> -		err = PTR_ERR(tegra->emc_clk);
+> -		goto fail_emc_clk;
+> -	}
+> -
+> -	clk_prepare_enable(tegra->emc_clk);
+> -	clk_set_rate(tegra->emc_clk, 400000000);
+> -
+>  	tegra->needs_double_reset = of_property_read_bool(pdev-
+> >dev.of_node,
+>  		"nvidia,needs-double-reset");
+> 
+> @@ -813,8 +800,6 @@ fail:
+>  #endif
+>  	usb_phy_shutdown(&tegra->phy->u_phy);
+>  fail_io:
+> -	clk_disable_unprepare(tegra->emc_clk);
+> -fail_emc_clk:
+>  	clk_disable_unprepare(tegra->clk);
+>  fail_clk:
+>  	usb_put_hcd(hcd);
+> @@ -842,8 +827,6 @@ static int tegra_ehci_remove(struct platform_device
+> *pdev)
+> 
+>  	clk_disable_unprepare(tegra->clk);
+> 
+> -	clk_disable_unprepare(tegra->emc_clk);
+> -
+>  	return 0;
+>  }
+> 
+> --
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
