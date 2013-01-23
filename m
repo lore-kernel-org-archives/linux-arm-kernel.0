@@ -1,64 +1,37 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Wed, 23 Jan 2013 15:37:43 +0800
-Subject: [PATCH 1/2 net-next] net: fec: add napi support to improve
- proformance
-In-Reply-To: <1358922071.12374.743.camel@edumazet-glaptop>
-References: <1358914330-3768-1-git-send-email-Frank.Li@freescale.com>
- <1358922071.12374.743.camel@edumazet-glaptop>
-Message-ID: <CAHrpEqTqSfBCpoMZ9S81VoXWgVK1iOR+e2OasARgbTD8m_RRvw@mail.gmail.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Wed, 23 Jan 2013 08:43:41 +0100
+Subject: [PATCH 1/4] drm/tilcdc: add TI LCD Controller DRM driver (v3)
+In-Reply-To: <1358894185-21617-2-git-send-email-robdclark@gmail.com>
+References: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
+ <1358894185-21617-2-git-send-email-robdclark@gmail.com>
+Message-ID: <9D3F79D4-17D5-4DEA-BA4C-1C200B4187E2@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/23 Eric Dumazet <eric.dumazet@gmail.com>:
-> On Wed, 2013-01-23 at 12:12 +0800, Frank Li wrote:
->> Add napi support
->>
->> Before this patch
->>
->>  iperf -s -i 1
->>  ------------------------------------------------------------
->>  Server listening on TCP port 5001
->>  TCP window size: 85.3 KByte (default)
->>  ------------------------------------------------------------
->>  [  4] local 10.192.242.153 port 5001 connected with 10.192.242.138 port 50004
->>  [ ID] Interval       Transfer     Bandwidth
->>  [  4]  0.0- 1.0 sec  41.2 MBytes   345 Mbits/sec
->>  [  4]  1.0- 2.0 sec  43.7 MBytes   367 Mbits/sec
->>  [  4]  2.0- 3.0 sec  42.8 MBytes   359 Mbits/sec
->>  [  4]  3.0- 4.0 sec  43.7 MBytes   367 Mbits/sec
->>  [  4]  4.0- 5.0 sec  42.7 MBytes   359 Mbits/sec
->>  [  4]  5.0- 6.0 sec  43.8 MBytes   367 Mbits/sec
->>  [  4]  6.0- 7.0 sec  43.0 MBytes   361 Mbits/sec
->>
->> After this patch
->>  [  4]  2.0- 3.0 sec  51.6 MBytes   433 Mbits/sec
->>  [  4]  3.0- 4.0 sec  51.8 MBytes   435 Mbits/sec
->>  [  4]  4.0- 5.0 sec  52.2 MBytes   438 Mbits/sec
->>  [  4]  5.0- 6.0 sec  52.1 MBytes   437 Mbits/sec
->>  [  4]  6.0- 7.0 sec  52.1 MBytes   437 Mbits/sec
->>  [  4]  7.0- 8.0 sec  52.3 MBytes   439 Mbits/sec
->
-> Strange, as you still call netif_rx()
->
-> NAPI should call netif_receive_skb() instead
->
 
-Thank you point out.
-After re-test, I found performance is almost no change if use netif_receive_skb.
-I am not sure if it is my NAPI implement problem.
+Op 22 jan. 2013, om 23:36 heeft Rob Clark <robdclark@gmail.com> het volgende geschreven:
 
-napi_gro_received is better than netif_receive_skb, but worse than netif_rx.
+> A simple DRM/KMS driver for the TI LCD Controller found in various
+> smaller TI parts (AM33xx, OMAPL138, etc).  This driver uses the
+> CMA helpers.  Currently only the TFP410 DVI encoder is supported
+> (tested with beaglebone + DVI cape).  There are also various LCD
+> displays, for which support can be added (as I get hw to test on),
+> and an external i2c HDMI encoder found on some boards.
+> 
+> The display controller supports a single CRTC.  And the encoder+
+> connector are split out into sub-devices.  Depending on which LCD
+> or external encoder is actually present, the appropriate output
+> module(s) will be loaded.
+> 
+> v1: original
+> v2: fix fb refcnting and few other cleanups
+> v3: get +/- vsync/hsync from timings rather than panel-info, add
+>    option DT max-bandwidth field so driver doesn't attempt to
+>    pick a display mode with too high memory bandwidth, and other
+>    small cleanups
+> 
+> Signed-off-by: Rob Clark <robdclark@gmail.com>
 
->From performance point view,
+Tested on a beaglebone and beaglebone-black:
 
-netif_rx                    --- fastest
-napi_gro_received   --- middle, near to netif_rx
-netif_receive_skb    --- slowest, almost the same as original no-napi version.
-
-Do you have any idea about this phenomena?
-
-best regards
-Frank Li
-
->
->
+Tested-by: Koen Kooi <koen@dominion.thruhere.net>
