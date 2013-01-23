@@ -1,43 +1,84 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed, 23 Jan 2013 16:37:36 -0500
-Subject: [PATCH v5 00/14] DMA Engine support for AM33XX
-In-Reply-To: <20130123022133.GA5727@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Jan 2013 22:28:46 +0000
+Subject: [PATCH v5 07/14] dmaengine: add dma_request_slave_channel_compat()
+In-Reply-To: <1358281974-8411-8-git-send-email-mporter@ti.com>
 References: <1358281974-8411-1-git-send-email-mporter@ti.com>
- <50FEB6B2.5020303@ti.com>
- <20130123022133.GA5727@opensource.wolfsonmicro.com>
-Message-ID: <20130123213736.GC5256@beef>
+ <1358281974-8411-8-git-send-email-mporter@ti.com>
+Message-ID: <201301232228.46716.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 10:21:42AM +0800, Mark Brown wrote:
-> On Tue, Jan 22, 2013 at 09:26:34PM +0530, Sekhar Nori wrote:
-> > On 1/16/2013 2:02 AM, Matt Porter wrote:
+On Tuesday 15 January 2013, Matt Porter wrote:
+> Adds a dma_request_slave_channel_compat() wrapper which accepts
+> both the arguments from dma_request_channel() and
+> dma_request_slave_channel(). Based on whether the driver is
+> instantiated via DT, the appropriate channel request call will be
+> made.
 > 
-> > > This series adds DMA Engine support for AM33xx, which uses
-> > > an EDMA DMAC. The EDMA DMAC has been previously supported by only
-> > > a private API implementation (much like the situation with OMAP
-> > > DMA) found on the DaVinci family of SoCs.
-> 
-> > Will you take this series through the OMAP tree? Only 1/14 touches
-> > mach-davinci and I am mostly okay with it except some changes I just
-> > requested Matt to make in another thread.
-> 
-> Is this series somewhere near actually getting merged then? It seemed
-> like there was lots of stuff going on.
+> This allows for a much cleaner migration of drivers to the
+> dmaengine DT API as platforms continue to be mixed between those
+> that boot using DT and those that do not.
 
-The issues raised by Sekhar and Santosh were reasonably minor and will
-be addressed. My major concern is that the dependency on some api to
-fetch dmaengine driver SG limitations is not resolved. That's being
-discussed in https://lkml.org/lkml/2013/1/10/432
+I noticed today some drivers in linux-next that rely on this patch,
+but the patch itself still missing from -next.
 
-If I don't get confirmation from Vinod soon, I'll just take a stab at
-implementing the callbacks he mentioned in that thread. Static
-per-channel caps don't provide the information needed by a client driver
-the uses the EDMA DMAC.
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -1047,6 +1047,16 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
+>  struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
+>  struct dma_chan *net_dma_find_channel(void);
+>  #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
+> +static inline struct dma_chan
+> +*dma_request_slave_channel_compat(dma_cap_mask_t mask, dma_filter_fn fn,
+> +                                 void *fn_param, struct device *dev,
+> +                                 char *name)
+> +{
+> +       if (dev->of_node)
+> +               return dma_request_slave_channel(dev, name);
+> +       else
+> +               return dma_request_channel(mask, fn, fn_param);
+> +}
 
-Alternatively, we can go back to the hack that looks at the edma
-phandle and hardcodes the mmc SG limits to magic values, but that's just
-plain ugly. I could live with it temporarily if we can't get the
-dmaengine api resolved until 3.10...dunno if others can though. ;)
+Hmm, dma_request_channel is actually a macro that passes mask by reference,
+presumably because it can get modified by the filter function. Also, there
+may be cases where we do have an of_node but don't use the dma binding
+yet, or where dma_request_slave_channel doesn't actually use DT information
+but rather one of the other methods that Vinod was talking about adding.
 
--Matt
+I think what it should look like instead is the below.
+
+	Arnd
+
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index bfcdecb..b6ffd7d 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -993,6 +993,19 @@ static inline void dma_release_channel(struct dma_chan *chan)
+ }
+ #endif
+ 
++static inline struct dma_chan *__dma_request_slave_channel_compat(dma_cap_mask_t *mask,
++				dma_filter_fn fn, void *fn_param, struct device *dev,
++				 char *name)
++{
++	struct dma_chan *chan;
++
++	chan = dma_request_slave_channel(dev, name);
++	if (chan)
++		return chan;
++
++	return __dma_request_channel(mask, fn, fn_param);
++}
++
+ /* --- DMA device --- */
+ 
+ int dma_async_device_register(struct dma_device *device);
+@@ -1001,6 +1014,8 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
+ struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
+ struct dma_chan *net_dma_find_channel(void);
+ #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
++#define dma_request_slave_channel_compat(mask, x, y, dev, name) \
++	 __dma_request_slave_channel_compat(&(mask), x, y, dev, name)
+ 
+ /* --- Helper iov-locking functions --- */
+ 
