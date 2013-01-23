@@ -1,51 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 23 Jan 2013 17:25:15 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <5100022D.9050106@web.de>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <201301171049.30415.arnd@arndb.de> <50F800EB.6040104@web.de>
- <201301172026.45514.arnd@arndb.de> <50FABBED.1020905@web.de>
- <20130119185907.GA20719@lunn.ch> <5100022D.9050106@web.de>
-Message-ID: <20130123162515.GK13482@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 23 Jan 2013 09:33:23 -0700
+Subject: [PATCH 2/2] ARM: tegra: add clocks properties to USB PHY nodes
+In-Reply-To: <D958900912E20642BCBC71664EFECE3E6E1B13B847@BGMAIL02.nvidia.com>
+References: <1358900903-27654-1-git-send-email-swarren@wwwdotorg.org>
+ <1358900903-27654-2-git-send-email-swarren@wwwdotorg.org>
+ <50FF2FD0.2090003@wwwdotorg.org>
+ <D958900912E20642BCBC71664EFECE3E6E1B13B847@BGMAIL02.nvidia.com>
+Message-ID: <510010D3.7070501@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 04:30:53PM +0100, Soeren Moch wrote:
-> On 19.01.2013 19:59, Andrew Lunn wrote:
-> >>Please find attached a debug log generated with your patch.
-> >>
-> >>I used the sata disk and two em28xx dvb sticks, no other usb devices,
-> >>no ethernet cable connected, tuners on saa716x-based card not used.
-> >>
-> >>What I can see in the log: a lot of coherent mappings from sata_mv
-> >>and orion_ehci, a few from mv643xx_eth, no other coherent mappings.
-> >>All coherent mappings are page aligned, some of them (from orion_ehci)
-> >>are not really small (as claimed in __alloc_from_pool).
-> >>
-> >>I don't believe in a memory leak. When I restart vdr (the application
-> >>utilizing the dvb sticks) then there is enough dma memory available
-> >>again.
-> >
-> >Hi Soeren
-> >
-> >We should be able to rule out a leak. Mount debugfg and then:
-> >
-> >while [ /bin/true ] ; do cat /debug/dma-api/num_free_entries ; sleep 60 ; done
-> >
-> >while you are capturing. See if the number goes down.
-> >
-> >       Andrew
-> 
-> Now I built a kernel with debugfs enabled.
-> It is not clear to me what I can see from the
-> dma-api/num_free_entries output. After reboot (vdr running) I see
-> decreasing numbers (3453 3452 3445 3430...), min_free_entries is
-> lower (3390). Sometimes the output is constant for several minutes (
-> 3396 3396 3396 3396 3396,...)
+On 01/22/2013 11:43 PM, Venu Byravarasu wrote:
+> Stephen Warren wrote at Wednesday, January 23, 2013 6:03 AM:
+>> On 01/22/2013 05:28 PM, Stephen Warren wrote:
+>>> The patch to add USB PHY nodes to device tree was written before Tegra
+>>> supported the clocks property in device tree. Now that it does, add the
+>>> required clocks properties to these nodes.
+>>>
+>>> This will allow all clk_get_sys() calls in tegra_usb_phy.c to be replaced
+>>> by clk_get(phy->dev, clock_name), as part of converting the PHY driver to
+>>> a platform driver.
+>>
+>>> diff --git a/arch/arm/boot/dts/tegra20.dtsi
+>> b/arch/arm/boot/dts/tegra20.dtsi
+>>
+>>> +		clocks = <&tegra_car 22>, <&tegra_car 127>;
+>>> +		clock-names = "utmi", "pll_u";
+>> ...
+>>> +		clocks = <&tegra_car 94>, <&tegra_car 127>;
+>>> +		clock-names = "ulpi", "pll_u";
+>>
+>> Hmmm. Thinking about that first clock more, if we name it just "phy" in
+>> both the UTMI and ULPI PHY nodes, we could make tegra_phy_init() perform
+>> the clk_get() for all PHY types, and use the same clock name everywhere,
+>> and hence remove the type-specific clk_get()s from tegra_phy_init() and
+>> utmip_pad_open().
+>>
+>> Venu, will this work for other chips such as Tegra30/Tegra114 and so on
+>> into the future, or do chips after Tegra20 introduce any new clocks, and
+>> hence break this scheme?
+>  
+> Should be fine, as same clocks are used across all chips.
+> Acked-by: Venu Byravarasu <vbyravarasu@nvidia.com>
 
-We are interesting in the long term behavior. Does it gradually go
-down? Or is it stable? If it goes down over time, its clearly a leak
-somewhere.
-
-	Andrew
+Thanks. I've applied both patches to Tegra's for-3.9/soc branch, with
+patch 2/2 modified to name the first clock "phy" rather than "utmi" or
+"ulpi".
