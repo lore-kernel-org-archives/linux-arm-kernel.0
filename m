@@ -1,32 +1,127 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Jan 2013 10:17:48 +0000
-Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into
- the driver
-In-Reply-To: <20130123101349.GH15873@gmail.com>
-References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
- <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
- <20130122090000.GH6857@gmail.com>
- <CACRpkdatTagYaMqvpe-a8zj_kO3Twjn1r4SqPty8DosNmcxJcQ@mail.gmail.com>
- <20130122100607.GH23505@n2100.arm.linux.org.uk>
- <20130122102010.GL6857@gmail.com>
- <20130122103723.GI23505@n2100.arm.linux.org.uk>
- <20130122105608.GP6857@gmail.com> <20130123101349.GH15873@gmail.com>
-Message-ID: <20130123101748.GO23505@n2100.arm.linux.org.uk>
+From: mpfj-list@mimc.co.uk (Mark Jackson)
+Date: Wed, 23 Jan 2013 10:18:15 +0000
+Subject: OMAP baseline test results for v3.8-rc4
+In-Reply-To: <20130122182331.GO22517@atomide.com>
+References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
+ <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
+ <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
+ <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
+ <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+ <50FE66AC.2090306@mimc.co.uk>
+ <B5906170F1614E41A8A28DE3B8D121433ECF3DD3@DBDE01.ent.ti.com>
+ <50FE9692.2090001@mimc.co.uk> <20130122182331.GO22517@atomide.com>
+Message-ID: <50FFB8E7.8070607@mimc.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 10:13:49AM +0000, Lee Jones wrote:
-> On Tue, 22 Jan 2013, Lee Jones wrote:
-> > Are you saying that you won't do it? :)
-> > 
-> > Is there anything I can do to make the process easier?
+On 22/01/13 18:23, Tony Lindgren wrote:
+> * Mark Jackson <mpfj-list@mimc.co.uk> [130122 05:46]:
+>> On 22/01/13 13:32, Bedia, Vaibhav wrote:
+>>
+>> <snip>
+>>
+>>> Following works for me:
+>>>
+>>> Kernel
+>>> ===
+>>> git checkout next-20130122
+>>> make distclean
+>>> make omap2plus_defconfig
+>>> <Enable the appended DTB related options via menuconfig>
+>>> make -j7
+>>> cat arch/arm/boot/zImage arch/arm/boot/dts/am335x-bone.dtb > arch/arm/boot/zImage-dtb.am335x-bone
+>>> mkimage -A arm -O linux -C none -T kernel -a 0x80008000 -e 0x80008000 -n 'Linux' -d arch/arm/boot/zImage-dtb.am335x-bone arch/arm/boot/uImage-dtb.am335x-bone
+>>>
+>>> U-Boot
+>>> ===
+>>> Built from v2013.01
+>>
+>> <snip>
+>>
+>>> A dumb question... in your case what's the bootargs set? Note that the mainline
+>>> kernel for AM335x doesn't have MMC support yet and the default bootargs is set to
+>>> rootfs on MMC.
+>>
+>> Yes ... I'm trying to boot from a rootfs on MMC:-
+>>
+>> Kernel command line: console=ttyO0,115200n8 earlyprintk debug root=/dev/mmcblk0p2 ro rootfstype=ext2
+>> rootwait
+>>
+>> But I should get *something* from the kernel before it starts trying to access the rootfs ?
 > 
-> Thinking about this a little more. Is it easier to remove it from your
-> tree altogether? Only I have a small "ARM: ux500: " patch-set which
-> directly relies on this patch. I could take it in via ARM-SoC without
-> any fear of ordering issues.
+> Here's something Kevin fixed but did not send it out before going to
+> a vacation. Can you give it a try with earlyprintk enabled?
+> 
+> Note that this does not help with no output early on, that sounds
+> like a bug configuring the DEBUG_LL port somewhere.
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+> 
+> From: Kevin Hilman <khilman@deeprootsystems.com>
+> Date: Tue, 15 Jan 2013 14:12:24 -0800
+> Subject: [PATCH] Fix omap_serial as module with debug_ll and earlyprintk
+> 
+> Otherwise we can race with the earlyconsole getting turned off
+> which can cause a non-booting system with earlyprintk enabled.
+> 
+> [tony at atomide.com: updated description]
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> ---
+> 
+> Kevin, can I add your Signed-off-by to this one?
+> 
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -1298,4 +1298,4 @@ static int __init omap_device_late_init(void)
+>  	bus_for_each_dev(&platform_bus_type, NULL, NULL, omap_device_late_idle);
+>  	return 0;
+>  }
+> -omap_late_initcall(omap_device_late_init);
+> +late_initcall_sync(omap_device_late_init);
+> 
 
-Thankfully, the patch doesn't conflict with any of the others I have, so
-we can do that (and it's actually easier to do that.)
+Sorry ... still no joy:-
 
-Done.
+U-Boot# askenv bootargs
+Please enter 'bootargs':ttyO0,115200n8 earlyprintk root=/dev/mmcblk0p2 ro rootfstype=ext2 rootwait
+U-Boot# dhcp 80000000 10.0.0.100:/nanobone/uImage-dtb;bootm 80000000
+link up on port 0, speed 100, full duplex
+BOOTP broadcast 1
+*** Unhandled DHCP Option in OFFER/ACK: 44
+*** Unhandled DHCP Option in OFFER/ACK: 46
+*** Unhandled DHCP Option in OFFER/ACK: 44
+*** Unhandled DHCP Option in OFFER/ACK: 46
+DHCP client bound to address 10.0.0.112
+Using cpsw device
+TFTP from server 10.0.0.100; our IP address is 10.0.0.112
+Filename '/nanobone/uImage-dtb'.
+Load address: 0x80000000
+Loading: #################################################################
+         #################################################################
+         #################################################################
+         #################################################################
+         ###########
+         625 KiB/s
+done
+Bytes transferred = 3972199 (3c9c67 hex)
+## Booting kernel from Legacy Image at 80000000 ...
+   Image Name:   Linux 3.8.0-rc3-12154-gac00f0e-d
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3972135 Bytes = 3.8 MiB
+   Load Address: 80008000
+   Entry Point:  80008000
+   Verifying Checksum ... OK
+   Loading Kernel Image ... OK
+OK
+
+Starting kernel ...
+
+My .config can be found at http://pastebin.com/rj5ptt7W
+
+Cheers
+Mark J.
