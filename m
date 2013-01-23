@@ -1,84 +1,64 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 23 Jan 2013 08:30:59 +0100
-Subject: [PATCH 2/2] ARM: dts: imx51-babbage: Add at24c512b eeprom support
-In-Reply-To: <1358922764-31654-2-git-send-email-Ying.Liu@freescale.com>
-References: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
- <1358922764-31654-2-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20130123073059.GP1906@pengutronix.de>
+From: lznuaa@gmail.com (Frank Li)
+Date: Wed, 23 Jan 2013 15:37:43 +0800
+Subject: [PATCH 1/2 net-next] net: fec: add napi support to improve
+ proformance
+In-Reply-To: <1358922071.12374.743.camel@edumazet-glaptop>
+References: <1358914330-3768-1-git-send-email-Frank.Li@freescale.com>
+ <1358922071.12374.743.camel@edumazet-glaptop>
+Message-ID: <CAHrpEqTqSfBCpoMZ9S81VoXWgVK1iOR+e2OasARgbTD8m_RRvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 02:32:44PM +0800, Liu Ying wrote:
-> This patch adds at24c512b i2c device to the device tree
-> along with the necessary i2c device node and pinctrl
-> settings for i2c bus.
-> The eeprom chip is populated on the accessory board of
-> the imx51-babbage board.
+2013/1/23 Eric Dumazet <eric.dumazet@gmail.com>:
+> On Wed, 2013-01-23 at 12:12 +0800, Frank Li wrote:
+>> Add napi support
+>>
+>> Before this patch
+>>
+>>  iperf -s -i 1
+>>  ------------------------------------------------------------
+>>  Server listening on TCP port 5001
+>>  TCP window size: 85.3 KByte (default)
+>>  ------------------------------------------------------------
+>>  [  4] local 10.192.242.153 port 5001 connected with 10.192.242.138 port 50004
+>>  [ ID] Interval       Transfer     Bandwidth
+>>  [  4]  0.0- 1.0 sec  41.2 MBytes   345 Mbits/sec
+>>  [  4]  1.0- 2.0 sec  43.7 MBytes   367 Mbits/sec
+>>  [  4]  2.0- 3.0 sec  42.8 MBytes   359 Mbits/sec
+>>  [  4]  3.0- 4.0 sec  43.7 MBytes   367 Mbits/sec
+>>  [  4]  4.0- 5.0 sec  42.7 MBytes   359 Mbits/sec
+>>  [  4]  5.0- 6.0 sec  43.8 MBytes   367 Mbits/sec
+>>  [  4]  6.0- 7.0 sec  43.0 MBytes   361 Mbits/sec
+>>
+>> After this patch
+>>  [  4]  2.0- 3.0 sec  51.6 MBytes   433 Mbits/sec
+>>  [  4]  3.0- 4.0 sec  51.8 MBytes   435 Mbits/sec
+>>  [  4]  4.0- 5.0 sec  52.2 MBytes   438 Mbits/sec
+>>  [  4]  5.0- 6.0 sec  52.1 MBytes   437 Mbits/sec
+>>  [  4]  6.0- 7.0 sec  52.1 MBytes   437 Mbits/sec
+>>  [  4]  7.0- 8.0 sec  52.3 MBytes   439 Mbits/sec
+>
+> Strange, as you still call netif_rx()
+>
+> NAPI should call netif_receive_skb() instead
+>
 
-Given that it's optional should the binding be here anyway? I don't have
-this accessory board and this may conflict with the boards other people
-have connected on this port.
+Thank you point out.
+After re-test, I found performance is almost no change if use netif_receive_skb.
+I am not sure if it is my NAPI implement problem.
 
-Sascha
+napi_gro_received is better than netif_receive_skb, but worse than netif_rx.
 
-> 
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-> ---
->  arch/arm/boot/dts/imx51-babbage.dts |   12 ++++++++++++
->  arch/arm/boot/dts/imx51.dtsi        |    9 +++++++++
->  2 files changed, 21 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index 567e7ee..4f0fc75 100644
-> --- a/arch/arm/boot/dts/imx51-babbage.dts
-> +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -241,6 +241,18 @@
->  				};
->  			};
->  
-> +			i2c at 83fc8000 { /* I2C1 */
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_i2c1_1>;
-> +				status = "okay";
-> +
-> +				at24 at 50 {
-> +					compatible = "at24,24c512b";
-> +					pagesize = <128>;
-> +					reg = <0x50>;
-> +				};
-> +			};
-> +
->  			audmux at 83fd0000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_audmux_1>;
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index 1f5d45e..6495c69 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -311,6 +311,15 @@
->  					};
->  				};
->  
-> +				i2c1 {
-> +					pinctrl_i2c1_1: i2c1grp-1 {
-> +						fsl,pins = <
-> +							4  0x400001ed	/* MX51_PAD_EIM_D16__I2C1_SDA */
-> +							23 0x400001ed	/* MX51_PAD_EIM_D19__I2C1_SCL */
-> +						>;
-> +					};
-> +				};
-> +
->  				i2c2 {
->  					pinctrl_i2c2_1: i2c2grp-1 {
->  						fsl,pins = <
-> -- 
-> 1.7.1
-> 
-> 
-> 
+>From performance point view,
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+netif_rx                    --- fastest
+napi_gro_received   --- middle, near to netif_rx
+netif_receive_skb    --- slowest, almost the same as original no-napi version.
+
+Do you have any idea about this phenomena?
+
+best regards
+Frank Li
+
+>
+>
