@@ -1,53 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Jan 2013 18:03:47 +0000
-Subject: [GIT PULL] perf updates for 3.9
-Message-ID: <20130123180347.GG26811@mudshark.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 23 Jan 2013 19:03:52 +0100
+Subject: [PATCH v2 2/3] arm: mvebu: Enable USB controllers on Armada
+ 370/XP boards
+In-Reply-To: <CALF0-+XJEXJ2B3NLu5DvyxaDuuMNP=zk+z8QUd4GTQULW3BpyA@mail.gmail.com>
+References: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1358954792-16160-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <CALF0-+XJEXJ2B3NLu5DvyxaDuuMNP=zk+z8QUd4GTQULW3BpyA@mail.gmail.com>
+Message-ID: <20130123190352.2d001218@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Arnd, Olof,
+Dear Ezequiel Garcia,
 
-Please can you pull these perf updates for 3.9? They should go via both
-rmk and arm-soc as they are a dependency for kvm and some Tegra SCU
-stuff. I'll keep this branch stable, so others can base against it if
-they like.
+On Wed, 23 Jan 2013 14:04:42 -0300, Ezequiel Garcia wrote:
 
-Cheers,
+> from the OpenBlocks AX3-4 board dts file, since you mentioned this
+> board uses that USB
+> port for a PCIe connector -- if I understood correctly.
 
-Will
+No. The OpenBlocks has a different USB controller that sits on the PCIe
+bus. There is nothing like a PCIe port that uses a USB port, that
+doesn't make sense.
 
---->8
+> So, IMHO, if OpenBlocks uses third USB port to connect some PCIe
+> controller, we should activate it in the dts file.
+> 
+> What do you think?
 
-The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+No, see above.
 
-  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/perf
-
-for you to fetch changes up to 9dcbf466559f6f2f55d60eb5a1bbebc8e694b52a:
-
-  ARM: perf: simplify __hw_perf_event_init err handling (2013-01-18 16:54:30 +0000)
-
-----------------------------------------------------------------
-Christoffer Dall (2):
-      ARM: Define CPU part numbers and implementors
-      ARM: Use implementor and part defines from cputype.h
-
-Mark Rutland (3):
-      ARM: perf: handle armpmu_register failing
-      ARM: perf: remove unnecessary checks for idx < 0
-      ARM: perf: simplify __hw_perf_event_init err handling
-
-Will Deacon (2):
-      ARM: perf: remove redundant NULL check on cpu_pmu
-      ARM: perf: don't pretend to support counting of L1I writes
-
- arch/arm/include/asm/cputype.h      | 33 +++++++++++++++++++++++++++++++++
- arch/arm/kernel/perf_event.c        | 16 +++-------------
- arch/arm/kernel/perf_event_cpu.c    | 51 +++++++++++++++++++++++++++------------------------
- arch/arm/kernel/perf_event_v6.c     |  4 ++--
- arch/arm/kernel/perf_event_v7.c     | 18 +++++++++---------
- arch/arm/kernel/perf_event_xscale.c |  2 +-
- 6 files changed, 75 insertions(+), 49 deletions(-)
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
