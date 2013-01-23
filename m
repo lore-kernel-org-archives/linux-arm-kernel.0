@@ -1,74 +1,35 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 23 Jan 2013 10:48:50 +0100
-Subject: [PATCH 3/9] ARM: at91/at91sam9x5 DTS: add SCK USART pins
+Date: Wed, 23 Jan 2013 10:48:51 +0100
+Subject: [PATCH 4/9] ARM: at91: fix gpios on i2c-gpio for RM9200 DT
 In-Reply-To: <cover.1358934163.git.nicolas.ferre@atmel.com>
 References: <cover.1358934163.git.nicolas.ferre@atmel.com>
-Message-ID: <1bab02ec1b9353ac928b8fe57d8e26012930c8b2.1358934163.git.nicolas.ferre@atmel.com>
+Message-ID: <334c9e8d6d05be132792a855dcc637773d44cad3.1358934163.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Genoud <richard.genoud@gmail.com>
+From: Joachim Eastwood <manabian@gmail.com>
 
-The SCK pins where missing in usarts pinctrl.
-
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/at91sam9x5.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/at91rm9200.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index e9c4290..cb711a5 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -143,6 +143,11 @@
- 						atmel,pins =
- 							<0 3 0x1 0x0>;	/* PA3 periph A */
- 					};
-+
-+					pinctrl_usart0_sck: usart0_sck-0 {
-+						atmel,pins =
-+							<0 4 0x1 0x0>;	/* PA4 periph A */
-+					};
- 				};
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+index e154f24..222047f 100644
+--- a/arch/arm/boot/dts/at91rm9200.dtsi
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -336,8 +336,8 @@
  
- 				usart1 {
-@@ -161,6 +166,11 @@
- 						atmel,pins =
- 							<2 28 0x3 0x0>;	/* PC28 periph C */
- 					};
-+
-+					pinctrl_usart1_sck: usart1_sck-0 {
-+						atmel,pins =
-+							<2 28 0x3 0x0>;	/* PC29 periph C */
-+					};
- 				};
- 
- 				usart2 {
-@@ -179,6 +189,11 @@
- 						atmel,pins =
- 							<1 1 0x2 0x0>;	/* PB1 periph B */
- 					};
-+
-+					pinctrl_usart2_sck: usart2_sck-0 {
-+						atmel,pins =
-+							<1 2 0x2 0x0>;	/* PB2 periph B */
-+					};
- 				};
- 
- 				usart3 {
-@@ -197,6 +212,11 @@
- 						atmel,pins =
- 							<2 25 0x2 0x0>;	/* PC25 periph B */
- 					};
-+
-+					pinctrl_usart3_sck: usart3_sck-0 {
-+						atmel,pins =
-+							<2 26 0x2 0x0>;	/* PC26 periph B */
-+					};
- 				};
- 
- 				uart0 {
+ 	i2c at 0 {
+ 		compatible = "i2c-gpio";
+-		gpios = <&pioA 23 0 /* sda */
+-			 &pioA 24 0 /* scl */
++		gpios = <&pioA 25 0 /* sda */
++			 &pioA 26 0 /* scl */
+ 			>;
+ 		i2c-gpio,sda-open-drain;
+ 		i2c-gpio,scl-open-drain;
 -- 
 1.8.0
