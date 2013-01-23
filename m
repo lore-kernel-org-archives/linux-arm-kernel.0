@@ -1,122 +1,40 @@
-From: avinashphilip@ti.com (Philip Avinash)
-Date: Wed, 23 Jan 2013 15:15:44 +0530
-Subject: [PATCH 2/4] mtd: devices: elm: Low power transition support
-In-Reply-To: <1358933176-12409-1-git-send-email-avinashphilip@ti.com>
-References: <1358933176-12409-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1358934346-16822-3-git-send-email-avinashphilip@ti.com>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Wed, 23 Jan 2013 10:45:26 +0100
+Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
+In-Reply-To: <D958900912E20642BCBC71664EFECE3E6E1B13B855@BGMAIL02.nvidia.com>
+References: <1358900903-27654-1-git-send-email-swarren@wwwdotorg.org>
+ <D958900912E20642BCBC71664EFECE3E6E1B13B855@BGMAIL02.nvidia.com>
+Message-ID: <1358934326.1540.32.camel@tellur>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In low power modes of AM335X platforms, peripherals power is cut off.
-This patch supports low power sleep transition support for ELM driver.
+Am Mittwoch, den 23.01.2013, 12:25 +0530 schrieb Venu Byravarasu:
+> > -----Original Message-----
+> > From: linux-tegra-owner at vger.kernel.org [mailto:linux-tegra-
+> > owner at vger.kernel.org] On Behalf Of Stephen Warren
+> > Sent: Wednesday, January 23, 2013 5:58 AM
+> > To: Alan Stern; Greg Kroah-Hartman; Stephen Warren
+> > Cc: Venu Byravarasu; linux-tegra at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; linux-usb at vger.kernel.org; Stephen Warren
+> > Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
+> > 
+> > From: Stephen Warren <swarren@nvidia.com>
+> > 
+> > Clock "emc" is for the External Memory Controller. The USB driver has no
+> > business touching this clock directly. Remove the code that does so.
+> 
+> Stephen,
+> This was primarily done to make sure that EMC is set to a minimum
+> frequency, below which data errors may occur during USB transfers.
+> If we plan to remove this, how should we make sure that the EMC
+> is programmed for the required frequency during USB transfers?
+>  
+You could use something like the API I added in "ARM: tegra: add EMC
+clock scaling API". This needs some rework and I looked into integrating
+this with the DEVFREQ framework, but I don't think it fits too well.
 
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
----
- drivers/mtd/devices/elm.c |   40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+Bandwidth requirements should always be communicated to the EMC driver
+and not described by clock rates.
 
-diff --git a/drivers/mtd/devices/elm.c b/drivers/mtd/devices/elm.c
-index f78f43f..4793cb0 100644
---- a/drivers/mtd/devices/elm.c
-+++ b/drivers/mtd/devices/elm.c
-@@ -20,6 +20,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/sched.h>
- #include <linux/pm_runtime.h>
- #include <linux/platform_data/elm.h>
- 
-@@ -62,6 +63,7 @@ struct elm_info {
- 	struct completion elm_completion;
- 	struct list_head list;
- 	enum bch_ecc bch_type;
-+	bool idle;
- };
- 
- static LIST_HEAD(elm_devices);
-@@ -86,9 +88,11 @@ void elm_config(struct device *dev, enum bch_ecc bch_type)
- 	u32 reg_val;
- 	struct elm_info *info = dev_get_drvdata(dev);
- 
-+	info->idle = true;
- 	reg_val = (bch_type & ECC_BCH_LEVEL_MASK) | (ELM_ECC_SIZE << 16);
- 	elm_write_reg(info, ELM_LOCATION_CONFIG, reg_val);
- 	info->bch_type = bch_type;
-+	info->idle = false;
- }
- EXPORT_SYMBOL(elm_config);
- 
-@@ -280,6 +284,7 @@ void elm_decode_bch_error_page(struct device *dev, u8 *ecc_calc,
- 	struct elm_info *info = dev_get_drvdata(dev);
- 	u32 reg_val;
- 
-+	info->idle = true;
- 	/* Enable page mode interrupt */
- 	reg_val = elm_read_reg(info, ELM_IRQSTATUS);
- 	elm_write_reg(info, ELM_IRQSTATUS, reg_val & INTR_STATUS_PAGE_VALID);
-@@ -298,6 +303,7 @@ void elm_decode_bch_error_page(struct device *dev, u8 *ecc_calc,
- 	reg_val = elm_read_reg(info, ELM_IRQENABLE);
- 	elm_write_reg(info, ELM_IRQENABLE, reg_val & ~INTR_EN_PAGE_MASK);
- 	elm_error_correction(info, err_vec);
-+	info->idle = false;
- }
- EXPORT_SYMBOL(elm_decode_bch_error_page);
- 
-@@ -368,6 +374,7 @@ static int elm_probe(struct platform_device *pdev)
- 	INIT_LIST_HEAD(&info->list);
- 	list_add(&info->list, &elm_devices);
- 	platform_set_drvdata(pdev, info);
-+	info->idle = false;
- 	return ret;
- }
- 
-@@ -379,6 +386,38 @@ static int elm_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int elm_suspend(struct device *dev)
-+{
-+	struct elm_info *info = dev_get_drvdata(dev);
-+	wait_queue_head_t wq;
-+	DECLARE_WAITQUEUE(wait, current);
-+
-+	init_waitqueue_head(&wq);
-+	while (1) {
-+		/* Make sure that ELM not running */
-+		if (info->idle) {
-+			add_wait_queue(&wq, &wait);
-+			schedule();
-+			remove_wait_queue(&wq, &wait);
-+		} else {
-+			break;
-+		}
-+	}
-+	pm_runtime_put_sync(dev);
-+	return 0;
-+}
-+
-+static int elm_resume(struct device *dev)
-+{
-+	struct elm_info *info = dev_get_drvdata(dev);
-+
-+	pm_runtime_get_sync(dev);
-+	elm_config(dev, info->bch_type);
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(elm_pm_ops, elm_suspend, elm_resume);
-+
- #ifdef CONFIG_OF
- static const struct of_device_id elm_of_match[] = {
- 	{ .compatible = "ti,am33xx-elm" },
-@@ -392,6 +431,7 @@ static struct platform_driver elm_driver = {
- 		.name	= "elm",
- 		.owner	= THIS_MODULE,
- 		.of_match_table = of_match_ptr(elm_of_match),
-+		.pm	= &elm_pm_ops,
- 	},
- 	.probe	= elm_probe,
- 	.remove	= elm_remove,
--- 
-1.7.9.5
+Regards,
+Lucas
