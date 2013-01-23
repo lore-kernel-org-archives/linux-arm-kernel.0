@@ -1,27 +1,24 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 24 Jan 2013 07:28:50 +1300
-Subject: [PATCH v3 1/2] mtd: Add a common JEDEC flash device table
-In-Reply-To: <50FFA692.2060907@parrot.com>
-References: <1358928068-12417-1-git-send-email-linux@prisktech.co.nz>
- <1358928068-12417-2-git-send-email-linux@prisktech.co.nz>
- <50FFA692.2060907@parrot.com>
-Message-ID: <1358965730.13715.0.camel@gitbox>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 23 Jan 2013 19:47:50 +0100
+Subject: [PATCH 3/6 v14] gpio: Add userland device interface to block GPIO
+In-Reply-To: <20130122180349.068f2c6a@lwn.net>
+References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
+ <1358856404-8975-4-git-send-email-stigge@antcom.de>
+ <20130122180349.068f2c6a@lwn.net>
+Message-ID: <51003056.9080605@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-23 at 10:00 +0100, Matthieu CASTET wrote:
-> Tony Prisk a ?crit :
-> > This patch adds a common JEDEC flash device table which can be
-> > expanded on as more features are required.
-> > 
-> > A simple match function is also included to query the table for
-> > a match based on the JEDEC id.
+On 23/01/13 02:03, Jonathan Corbet wrote:
+> On Tue, 22 Jan 2013 13:06:41 +0100
+> Roland Stigge <stigge@antcom.de> wrote:
 > 
-> Why don't you use id from include/linux/mtd/cfi.h that is used by flash driver
-> like drivers/mtd/devices/m25p80.c ?
+>> This patch adds a character device interface to the block GPIO system.
 > 
+> So I was looking at this, and a couple of things caught my eye...
 
-Thanks - have changed for v4.
+Good points you mentioned. Will address them on a subsequent update.
 
-Regards
-Tony P
+Thanks,
+
+Roland
