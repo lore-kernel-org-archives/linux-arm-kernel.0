@@ -1,45 +1,66 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 23 Jan 2013 14:32:43 +0800
-Subject: [PATCH 1/2] misc/at24: Add at24c512b eeprom support
-Message-ID: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
+Date: Wed, 23 Jan 2013 14:32:44 +0800
+Subject: [PATCH 2/2] ARM: dts: imx51-babbage: Add at24c512b eeprom support
+In-Reply-To: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
+References: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1358922764-31654-2-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds at24c512b eeprom support.
-The datasheet of at24c512b can be found at:
-http://www.alldatasheet.com/datasheet-pdf/pdf/
-256958/ATMEL/AT24C512B-TH-B.html
+This patch adds at24c512b i2c device to the device tree
+along with the necessary i2c device node and pinctrl
+settings for i2c bus.
+The eeprom chip is populated on the accessory board of
+the imx51-babbage board.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
- Documentation/devicetree/bindings/eeprom.txt |    2 +-
- drivers/misc/eeprom/at24.c                   |    1 +
- 2 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/imx51-babbage.dts |   12 ++++++++++++
+ arch/arm/boot/dts/imx51.dtsi        |    9 +++++++++
+ 2 files changed, 21 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/eeprom.txt b/Documentation/devicetree/bindings/eeprom.txt
-index 4342c10..fcea214 100644
---- a/Documentation/devicetree/bindings/eeprom.txt
-+++ b/Documentation/devicetree/bindings/eeprom.txt
-@@ -6,7 +6,7 @@ Required properties:
- 		 If there is no specific driver for <manufacturer>, a generic
- 		 driver based on <type> is selected. Possible types are:
- 		 24c00, 24c01, 24c02, 24c04, 24c08, 24c16, 24c32, 24c64,
--		 24c128, 24c256, 24c512, 24c1024, spd
-+		 24c128, 24c256, 24c512, 24c512b, 24c1024, spd
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 567e7ee..4f0fc75 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -241,6 +241,18 @@
+ 				};
+ 			};
  
-   - reg : the I2C address of the EEPROM
++			i2c at 83fc8000 { /* I2C1 */
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c1_1>;
++				status = "okay";
++
++				at24 at 50 {
++					compatible = "at24,24c512b";
++					pagesize = <128>;
++					reg = <0x50>;
++				};
++			};
++
+ 			audmux at 83fd0000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_audmux_1>;
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 1f5d45e..6495c69 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -311,6 +311,15 @@
+ 					};
+ 				};
  
-diff --git a/drivers/misc/eeprom/at24.c b/drivers/misc/eeprom/at24.c
-index 2baeec5..0df4cb0 100644
---- a/drivers/misc/eeprom/at24.c
-+++ b/drivers/misc/eeprom/at24.c
-@@ -124,6 +124,7 @@ static const struct i2c_device_id at24_ids[] = {
- 	{ "24c128", AT24_DEVICE_MAGIC(131072 / 8, AT24_FLAG_ADDR16) },
- 	{ "24c256", AT24_DEVICE_MAGIC(262144 / 8, AT24_FLAG_ADDR16) },
- 	{ "24c512", AT24_DEVICE_MAGIC(524288 / 8, AT24_FLAG_ADDR16) },
-+	{ "24c512b", AT24_DEVICE_MAGIC(524288 / 8, AT24_FLAG_ADDR16) },
- 	{ "24c1024", AT24_DEVICE_MAGIC(1048576 / 8, AT24_FLAG_ADDR16) },
- 	{ "at24", 0 },
- 	{ /* END OF LIST */ }
++				i2c1 {
++					pinctrl_i2c1_1: i2c1grp-1 {
++						fsl,pins = <
++							4  0x400001ed	/* MX51_PAD_EIM_D16__I2C1_SDA */
++							23 0x400001ed	/* MX51_PAD_EIM_D19__I2C1_SCL */
++						>;
++					};
++				};
++
+ 				i2c2 {
+ 					pinctrl_i2c2_1: i2c2grp-1 {
+ 						fsl,pins = <
 -- 
 1.7.1
