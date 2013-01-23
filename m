@@ -1,51 +1,40 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 23 Jan 2013 17:37:46 +0100
-Subject: [PATCH v3 3/8] ARM: shmobile: simplify armadillo800eva and kzm9g
- Kconfig dependencies
+Date: Wed, 23 Jan 2013 17:37:48 +0100
+Subject: [PATCH v3 5/8] ARM: shmobile: add a GPIO controller DT node for sh7372
 In-Reply-To: <1358959071-2873-1-git-send-email-g.liakhovetski@gmx.de>
 References: <1358959071-2873-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <1358959071-2873-4-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <1358959071-2873-6-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reference kernel configurations for armadillo800eva and kzm9g boards do not
-have to depend on their respective "legacy" configurations, doing device
-instantiation in .c, they can be configured and built independently.
+Add a missing GPIO controller node to sh7372.
 
 Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 ---
- arch/arm/mach-shmobile/Kconfig |   12 ++++++++++--
- 1 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 5f61e8f..927eecc 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -106,7 +106,11 @@ config MACH_ARMADILLO800EVA
+v3: fix second memory area size.
+
+ arch/arm/boot/dts/sh7372.dtsi |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sh7372.dtsi b/arch/arm/boot/dts/sh7372.dtsi
+index 582fdec..3598e57 100644
+--- a/arch/arm/boot/dts/sh7372.dtsi
++++ b/arch/arm/boot/dts/sh7372.dtsi
+@@ -19,6 +19,14 @@
+ 		};
+ 	};
  
- config MACH_ARMADILLO800EVA_REFERENCE
- 	bool "Armadillo-800 EVA board - Reference Device Tree Implementation"
--	depends on MACH_ARMADILLO800EVA
-+	depends on ARCH_R8A7740
-+	select ARCH_REQUIRE_GPIOLIB
-+	select REGULATOR_FIXED_VOLTAGE if REGULATOR
-+	select SND_SOC_WM8978 if SND_SIMPLE_CARD
-+	select USE_OF
- 	---help---
- 	  Use reference implementation of Aramdillo800 EVA board support
- 	  which makes a greater use of device tree at the expense
-@@ -136,7 +140,11 @@ config MACH_KZM9G
- 
- config MACH_KZM9G_REFERENCE
- 	bool "KZM-A9-GT board - Reference Device Tree Implementation"
--	depends on MACH_KZM9G
-+	depends on ARCH_SH73A0
-+	select ARCH_REQUIRE_GPIOLIB
-+	select REGULATOR_FIXED_VOLTAGE if REGULATOR
-+	select SND_SOC_AK4642 if SND_SIMPLE_CARD
-+	select USE_OF
- 	---help---
- 	   Use reference implementation of KZM-A9-GT board support
- 	   which makes as greater use of device tree at the expense
++	gpio: pfc at e6050000 {
++		compatible = "renesas,pfc-sh7372";
++		reg = <0xe6050000 0x8000>,
++		      <0xe605800c 0x1c>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
 1.7.2.5
