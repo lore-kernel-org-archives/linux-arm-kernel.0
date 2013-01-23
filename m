@@ -1,37 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Jan 2013 23:48:12 +0800
-Subject: [alsa-devel] [PATCH V2 2/2] ASoC: Davinci: machine: Add device
- tree binding
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EB50DCF@DBDE01.ent.ti.com>
-References: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
- <1357293277-25543-3-git-send-email-gururaja.hebbar@ti.com>
- <20130104122612.GM4627@opensource.wolfsonmicro.com>
- <1BAFE6F6C881BF42822005164F1491C33EB50DCF@DBDE01.ent.ti.com>
-Message-ID: <20130123154804.GB4565@opensource.wolfsonmicro.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 23 Jan 2013 09:17:14 -0700
+Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
+In-Reply-To: <1358934326.1540.32.camel@tellur>
+References: <1358900903-27654-1-git-send-email-swarren@wwwdotorg.org>
+ <D958900912E20642BCBC71664EFECE3E6E1B13B855@BGMAIL02.nvidia.com>
+ <1358934326.1540.32.camel@tellur>
+Message-ID: <51000D0A.4010007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 12:39:35PM +0000, Hebbar, Gururaja wrote:
-> On Fri, Jan 04, 2013 at 17:56:12, Mark Brown wrote:
+On 01/23/2013 02:45 AM, Lucas Stach wrote:
+> Am Mittwoch, den 23.01.2013, 12:25 +0530 schrieb Venu Byravarasu:
+>>> -----Original Message-----
+>>> From: linux-tegra-owner at vger.kernel.org [mailto:linux-tegra-
+>>> owner at vger.kernel.org] On Behalf Of Stephen Warren
+>>> Sent: Wednesday, January 23, 2013 5:58 AM
+>>> To: Alan Stern; Greg Kroah-Hartman; Stephen Warren
+>>> Cc: Venu Byravarasu; linux-tegra at vger.kernel.org; linux-arm-
+>>> kernel at lists.infradead.org; linux-usb at vger.kernel.org; Stephen Warren
+>>> Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
+>>>
+>>> From: Stephen Warren <swarren@nvidia.com>
+>>>
+>>> Clock "emc" is for the External Memory Controller. The USB driver has no
+>>> business touching this clock directly. Remove the code that does so.
+>>
+>> Stephen,
+>> This was primarily done to make sure that EMC is set to a minimum
+>> frequency, below which data errors may occur during USB transfers.
+>> If we plan to remove this, how should we make sure that the EMC
+>> is programmed for the required frequency during USB transfers?
+>
+> You could use something like the API I added in "ARM: tegra: add EMC
+> clock scaling API". This needs some rework and I looked into integrating
+> this with the DEVFREQ framework, but I don't think it fits too well.
+> 
+> Bandwidth requirements should always be communicated to the EMC driver
+> and not described by clock rates.
 
-> > The CODEC driver biases should be changed over to be supplies, this
-> > makes the above much more natural - the routing there is a hack for
-> > older versions of ASoc.  Otherwise this looks fine.
+I agree.
 
-> ON TLV320AIC3x Codec, MIC Bias power on/off share the same register bits
-> with Bias voltage output.
-
-So you need to use an event to write the actual enable bit.
-
-> SGTL5000 --> Single register for MIC BIAS enable & output impedance of MIC
-> Bias. The driver uses SND_SOC_DAPM_POST_PMU & SND_SOC_DAPM_PRE_PMD macro to
-> handle the MIC Bias enable & disable event.
-
-This is the way these things should be handled.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130123/8e8582a0/attachment.sig>
+Besides, on some boards there's an EMC scaling table defined already, so
+the EMC driver is simply overriding the value the USB driver selects anyway.
