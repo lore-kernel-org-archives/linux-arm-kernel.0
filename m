@@ -1,78 +1,239 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 23 Jan 2013 21:46:59 +0100
-Subject: [PATCH V2] ARM: imx27: add a clock gate to activate SPLL clock
-In-Reply-To: <1358086501-44408-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1358086501-44408-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20130123204659.GD13025@pengutronix.de>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 23 Jan 2013 15:49:18 -0500
+Subject: [PATCH v5 00/14] DMA Engine support for AM33XX
+In-Reply-To: <50FFC48B.80902@ti.com>
+References: <1358281974-8411-1-git-send-email-mporter@ti.com>
+ <50FFC48B.80902@ti.com>
+Message-ID: <20130123204917.GA5256@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 13, 2013 at 03:15:01PM +0100, Gwenhael Goavec-Merou wrote:
-> A clock gate is mandatory to activate SPLL clock needed, at least, for usb.
+On Wed, Jan 23, 2013 at 04:37:55PM +0530, Santosh Shilimkar wrote:
+> Matt,
 > 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> On Wednesday 16 January 2013 02:02 AM, Matt Porter wrote:
+> 
+> [..]
+> 
+> >This series adds DMA Engine support for AM33xx, which uses
+> >an EDMA DMAC. The EDMA DMAC has been previously supported by only
+> >a private API implementation (much like the situation with OMAP
+> >DMA) found on the DaVinci family of SoCs.
+> >
+> >The series applies on top of 3.8-rc3 and the following patches:
+> >
+> >	- TPS65910 REGMAP_IRQ build fix:
+> >	  https://patchwork.kernel.org/patch/1857701/
+> >	- dmaengine DT support from Vinod's dmaengine_dt branch in
+> >	  git://git.infradead.org/users/vkoul/slave-dma.git since
+> >	  027478851791df751176398be02a3b1c5f6aa824
+> >	- edma dmaengine driver fix:
+> >	  https://patchwork.kernel.org/patch/1961521/
+> >	- dmaengine dma_get_channel_caps v2:
+> >	  https://patchwork.kernel.org/patch/1961601/
+> >	- dmaengine edma driver channel caps support v2:
+> >	  https://patchwork.kernel.org/patch/1961591/
+> >
+> >The approach taken is similar to how OMAP DMA is being converted to
+> >DMA Engine support. With the functional EDMA private API already
+> >existing in mach-davinci/dma.c, we first move that to an ARM common
+> >area so it can be shared. Adding DT and runtime PM support to the
+> >private EDMA API implementation allows it to run on AM33xx. AM33xx
+> >*only* boots using DT so we leverage Jon's generic DT DMA helpers to
+> >register EDMA DMAC with the of_dma framework and then add support
+> >for calling the dma_request_slave_channel() API to both the mmc
+> >and spi drivers.
+> >
+> >With this series both BeagleBone and the AM335x EVM have working
+> >MMC and SPI support.
+> >
+> >This is tested on BeagleBone with a SPI framebuffer driver and MMC
+> >rootfs. A trivial gpio DMA event misc driver was used to test the
+> >crossbar DMA event support. It is also tested on the AM335x EVM
+> >with the onboard SPI flash and MMC rootfs. The branch at
+> >https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-v4
+> >has the complete series, dependencies, and some test
+> >drivers/defconfigs.
+> >
+> >Regression testing was done on AM180x-EVM (which also makes use
+> >of the EDMA dmaengine driver and the EDMA private API) using SD,
+> >SPI flash, and the onboard audio supported by the ASoC Davinci
+> >driver. Regression testing was also done on a BeagleBoard xM
+> >booting from the legacy board file using MMC rootfs.
+> >
+> >Matt Porter (14):
+> >   ARM: davinci: move private EDMA API to arm/common
+> >   ARM: edma: remove unused transfer controller handlers
+> >   ARM: edma: add AM33XX support to the private EDMA API
+> >   dmaengine: edma: enable build for AM33XX
+> >   dmaengine: edma: Add TI EDMA device tree binding
+> >   ARM: dts: add AM33XX EDMA support
+> >   dmaengine: add dma_request_slave_channel_compat()
+> >   mmc: omap_hsmmc: convert to dma_request_slave_channel_compat()
+> >   mmc: omap_hsmmc: set max_segs based on dma engine limitations
+> >   mmc: omap_hsmmc: add generic DMA request support to the DT binding
+> >   ARM: dts: add AM33XX MMC support
+> >   spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
+> >   spi: omap2-mcspi: add generic DMA request support to the DT binding
+> >   ARM: dts: add AM33XX SPI DMA support
+> >
+> While going through the series and testing it out, I observed an issue
+> with MMC driver. You need patch in the end of the email to avoid the
+> issue. Same is attached in case mailer damages it. Can you please
+> add it with your series if you agree ?
 
-Applied, thanks
+Yes, by inspection this makes sense. As you noticed, we've been relying
+on the fact that DMA resources still don't come from DT, we only use our
+DT data in conjunction with the DMA OF helpers to do channel filtering.
+I was figuring we would address that separately later, but I see how
+even omap4 has this issue with DMA resources named with "tx1", for
+example. A good followup once this series is taken will be to only
+use hwmod resources on a !populated-dt platform like we do for other
+resources now. Baby steps. :)
 
-Sascha
+Thanks for the catch, I'll add this in with your tested line as well for
+the series. 
 
+-Matt
+
+> 
+> Overall the series looks good to my eyes.
+> Acked-tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> Regards,
+> Santosh
+> 
+> From 2dcc90b7a4b2dcdb52ddd052ca7f3e88a78e83e4 Mon Sep 17 00:00:00 2001
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Wed, 23 Jan 2013 16:04:32 +0530
+> Subject: [PATCH] mmc: omap_hsmmc: Skip platform_get_resource_byname() for dt
+>  case
+> 
+> MMC driver probe will abort for DT case because of failed
+> platform_get_resource_byname() lookup. Fix it by skipping resource
+> byname lookup for device tree build.
+> 
+> Issue is hidden because hwmod popullates the IO resources which
+> helps to succeed platform_get_resource_byname() and probe.
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
-> V2: - Suppress patch about ehci-mxc.c. 
+>  drivers/mmc/host/omap_hsmmc.c |   28 +++++++++++++++-------------
+>  1 file changed, 15 insertions(+), 13 deletions(-)
 > 
->  arch/arm/mach-imx/clk-imx27.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index f74bd69..d4655e7 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1897,21 +1897,23 @@ static int omap_hsmmc_probe(struct
+> platform_device *pdev)
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index 4c1d1e4..4f066d13 100644
-> --- a/arch/arm/mach-imx/clk-imx27.c
-> +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -62,7 +62,7 @@ static const char *clko_sel_clks[] = {
->  	"32k", "usb_div", "dptc",
->  };
->  
-> -static const char *ssi_sel_clks[] = { "spll", "mpll", };
-> +static const char *ssi_sel_clks[] = { "spll_gate", "mpll", };
->  
->  enum mx27_clks {
->  	dummy, ckih, ckil, mpll, spll, mpll_main2, ahb, ipg, nfc_div, per1_div,
-> @@ -82,7 +82,7 @@ enum mx27_clks {
->  	csi_ahb_gate, brom_ahb_gate, ata_ahb_gate, wdog_ipg_gate, usb_ipg_gate,
->  	uart6_ipg_gate, uart5_ipg_gate, uart4_ipg_gate, uart3_ipg_gate,
->  	uart2_ipg_gate, uart1_ipg_gate, ckih_div1p5, fpm, mpll_osc_sel,
-> -	mpll_sel, clk_max
-> +	mpll_sel, spll_gate, clk_max
->  };
->  
->  static struct clk *clk[clk_max];
-> @@ -104,6 +104,7 @@ int __init mx27_clocks_init(unsigned long fref)
->  			ARRAY_SIZE(mpll_sel_clks));
->  	clk[mpll] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
->  	clk[spll] = imx_clk_pllv1("spll", "ckih", CCM_SPCTL0);
-> +	clk[spll_gate] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
->  	clk[mpll_main2] = imx_clk_fixed_factor("mpll_main2", "mpll", 2, 3);
->  
->  	if (mx27_revision() >= IMX_CHIP_REVISION_2_0) {
-> @@ -121,7 +122,7 @@ int __init mx27_clocks_init(unsigned long fref)
->  	clk[per4_div] = imx_clk_divider("per4_div", "mpll_main2", CCM_PCDR1, 24, 6);
->  	clk[vpu_sel] = imx_clk_mux("vpu_sel", CCM_CSCR, 21, 1, vpu_sel_clks, ARRAY_SIZE(vpu_sel_clks));
->  	clk[vpu_div] = imx_clk_divider("vpu_div", "vpu_sel", CCM_PCDR0, 10, 6);
-> -	clk[usb_div] = imx_clk_divider("usb_div", "spll", CCM_CSCR, 28, 3);
-> +	clk[usb_div] = imx_clk_divider("usb_div", "spll_gate", CCM_CSCR, 28, 3);
->  	clk[cpu_sel] = imx_clk_mux("cpu_sel", CCM_CSCR, 15, 1, cpu_sel_clks, ARRAY_SIZE(cpu_sel_clks));
->  	clk[clko_sel] = imx_clk_mux("clko_sel", CCM_CCSR, 0, 5, clko_sel_clks, ARRAY_SIZE(clko_sel_clks));
->  	if (mx27_revision() >= IMX_CHIP_REVISION_2_0)
+>  	omap_hsmmc_conf_bus_power(host);
+> 
+> -	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
+> -	if (!res) {
+> -		dev_err(mmc_dev(host->mmc), "cannot get DMA TX channel\n");
+> -		ret = -ENXIO;
+> -		goto err_irq;
+> -	}
+> -	tx_req = res->start;
+> +	if (!pdev->dev.of_node) {
+> +		res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
+> +		if (!res) {
+> +			dev_err(mmc_dev(host->mmc), "cannot get DMA TX channel\n");
+> +			ret = -ENXIO;
+> +			goto err_irq;
+> +		}
+> +		tx_req = res->start;
+> 
+> -	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
+> -	if (!res) {
+> -		dev_err(mmc_dev(host->mmc), "cannot get DMA RX channel\n");
+> -		ret = -ENXIO;
+> -		goto err_irq;
+> +		res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
+> +		if (!res) {
+> +			dev_err(mmc_dev(host->mmc), "cannot get DMA RX channel\n");
+> +			ret = -ENXIO;
+> +			goto err_irq;
+> +		}
+> +		rx_req = res->start;
+>  	}
+> -	rx_req = res->start;
+> 
+>  	dma_cap_zero(mask);
+>  	dma_cap_set(DMA_SLAVE, mask);
 > -- 
-> 1.7.12.4
+> 1.7.9.5
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 > 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> >From 2dcc90b7a4b2dcdb52ddd052ca7f3e88a78e83e4 Mon Sep 17 00:00:00 2001
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Wed, 23 Jan 2013 16:04:32 +0530
+> Subject: [PATCH] mmc: omap_hsmmc: Skip platform_get_resource_byname() for dt
+>  case
+> 
+> MMC driver probe will abort for DT case because of failed
+> platform_get_resource_byname() lookup. Fix it by skipping resource
+> byname lookup for device tree build.
+> 
+> Issue is hidden because hwmod popullates the IO resources which
+> helps to succeed platform_get_resource_byname() and probe.
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  drivers/mmc/host/omap_hsmmc.c |   28 +++++++++++++++-------------
+>  1 file changed, 15 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index f74bd69..d4655e7 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1897,21 +1897,23 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+>  
+>  	omap_hsmmc_conf_bus_power(host);
+>  
+> -	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
+> -	if (!res) {
+> -		dev_err(mmc_dev(host->mmc), "cannot get DMA TX channel\n");
+> -		ret = -ENXIO;
+> -		goto err_irq;
+> -	}
+> -	tx_req = res->start;
+> +	if (!pdev->dev.of_node) {
+> +		res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
+> +		if (!res) {
+> +			dev_err(mmc_dev(host->mmc), "cannot get DMA TX channel\n");
+> +			ret = -ENXIO;
+> +			goto err_irq;
+> +		}
+> +		tx_req = res->start;
+>  
+> -	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
+> -	if (!res) {
+> -		dev_err(mmc_dev(host->mmc), "cannot get DMA RX channel\n");
+> -		ret = -ENXIO;
+> -		goto err_irq;
+> +		res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
+> +		if (!res) {
+> +			dev_err(mmc_dev(host->mmc), "cannot get DMA RX channel\n");
+> +			ret = -ENXIO;
+> +			goto err_irq;
+> +		}
+> +		rx_req = res->start;
+>  	}
+> -	rx_req = res->start;
+>  
+>  	dma_cap_zero(mask);
+>  	dma_cap_set(DMA_SLAVE, mask);
+> -- 
+> 1.7.9.5
+> 
+
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
