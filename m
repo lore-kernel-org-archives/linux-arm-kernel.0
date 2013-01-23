@@ -1,45 +1,50 @@
-From: anton@enomsg.org (Anton Vorontsov)
-Date: Tue, 22 Jan 2013 22:25:06 -0800
-Subject: [PATCH 23/24] ab8500-bm: Fix minor niggles experienced during
- testing
-In-Reply-To: <20130122092717.GI6857@gmail.com>
-References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
- <1358769840-4763-24-git-send-email-lee.jones@linaro.org>
- <20130121191324.GA15037@lizard.mcd01528.sjc.wayport.net>
- <20130122092717.GI6857@gmail.com>
-Message-ID: <20130123062506.GA20858@lizard.gateway.2wire.net>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Wed, 23 Jan 2013 06:32:15 +0000
+Subject: [PATCH 1/3] ARM: dts: AM33XX: Add ELM node
+In-Reply-To: <877gn69sb9.fsf@dell.be.48ers.dk>
+References: <1358491295-4022-1-git-send-email-avinashphilip@ti.com>
+ <1358491295-4022-2-git-send-email-avinashphilip@ti.com>
+ <877gn69sb9.fsf@dell.be.48ers.dk>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA62B2D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 09:27:17AM +0000, Lee Jones wrote:
-> On Mon, 21 Jan 2013, Anton Vorontsov wrote:
+On Tue, Jan 22, 2013 at 02:17:38, Peter Korsgaard wrote:
+> >>>>> "Philip" == Philip Avinash <avinashphilip@ti.com> writes:
 > 
-> > On Mon, Jan 21, 2013 at 12:03:59PM +0000, Lee Jones wrote:
-> > > When compile testing the new AB8500 Battery Management changes
-> > > due for inclusion into upstream, there were a few minor niggles
-> > > which required repairing, or adapting for use against the
-> > > Mainline kernel. This patch is a collection of them all.
-> > 
-> > No. This is the third time I'm saying it: the last time I checked, this is
-> > not how we do development in the mainline.
+>  Philip> From: "Philip, Avinash" <avinashphilip@ti.com>
+>  Philip> Add ELM data node to AM33XX device tree file.
 > 
-> Okay, all of these changes have now been fixed-up into the patches
-> which caused the issues. I have also added Stable to the patch you
-> requested it on.
+>  Philip> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+>  Philip> ---
+>  Philip>  arch/arm/boot/dts/am33xx.dtsi |    8 ++++++++
+>  Philip>  1 file changed, 8 insertions(+)
 > 
-> How would you like to proceed? Do you want a pull-request, or for me
-> to send the patches to the list again?
+>  Philip> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>  Philip> index c2f14e8..eaef5e7 100644
+>  Philip> --- a/arch/arm/boot/dts/am33xx.dtsi
+>  Philip> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>  Philip> @@ -385,5 +385,13 @@
+>  Philip>  				mac-address = [ 00 00 00 00 00 00 ];
+>  Philip>  			};
+>  Philip>  		};
+>  Philip> +
+>  Philip> +		elm: elm at 48080000 {
+>  Philip> +			compatible	= "ti,am33xx-elm";
+> 
+> Please drop the <tab> after compatible.
 
-Either way will work.
+I will replace with space and submit another version
 
-Thanks!
+> 
+> Other than that it looks goood.
+> 
+> Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 
-Anton
+Thanks
+Avinash
 
-p.s. I took another look at the patches, and noticed one issue that is
-constantly there: you place your signed-off-by line on top of everyones',
-but that's wrong. Sign offs are going downwards, not upwards. This is
-quite important since the lines encode how the code "travels" between
-companies and submitters. Currently, one might assume that the origin of
-the code is always Linaro, which is not quite true. (And 'From:' doesn't
-always mean the author, fwiw.)
+> 
+> -- 
+> Bye, Peter Korsgaard
+> 
