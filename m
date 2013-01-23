@@ -1,69 +1,33 @@
-From: avinashphilip@ti.com (Philip Avinash)
-Date: Wed, 23 Jan 2013 14:56:13 +0530
-Subject: [PATCH 1/4] arch: arm: gpmc: gpmc migration support
-In-Reply-To: <1358933176-12409-1-git-send-email-avinashphilip@ti.com>
-References: <1358933176-12409-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1358933176-12409-2-git-send-email-avinashphilip@ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 23 Jan 2013 10:27:45 +0100
+Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
+In-Reply-To: <20130123.080457.171573168772211248.hdoyu@nvidia.com>
+References: <50FE2CA8.20100@ti.com><50FEC503.2080602@wwwdotorg.org><20130123.080457.171573168772211248.hdoyu@nvidia.com>
+Message-ID: <20130123.112745.1104072242042163713.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With recent GPMC driver conversion, usage of gpmc_save/restore_context
-can done from gpmc driver itself. Hence removes the usage from pm34xx.c.
-Also removes the conditional compilation primitives ARCH_OMAP3 for
-gpmc_save/restore_context.
+Hiroshi Doyu <hdoyu@nvidia.com> wrote @ Wed, 23 Jan 2013 08:04:57 +0200 (EET):
 
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
----
- arch/arm/mach-omap2/gpmc.c   |    2 --
- arch/arm/mach-omap2/pm34xx.c |    5 -----
- 2 files changed, 7 deletions(-)
+> Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 22 Jan 2013 17:57:39 +0100:
+> 
+> > Hiroshi, is this series the only dependency you need for your
+> > Tegra114
+> 
+> Basically yes.
+> 
+> > series? So, I could merge your Tegra114 series once this series is applied?
+> 
+> But now "CCF" seems to be in. Then, the HACK(*1) needs to be replaced
+> with "Tegra114 CCF". But "Tegra114 CCF" doesn't seem ready yet. I'll check
+> if this Tegra114 series would work without "Tegra114 CCF".
+> 
+> *1: http://patchwork.ozlabs.org/patch/212010/
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index cbf4e0d..aed958a 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -1426,7 +1426,6 @@ static irqreturn_t gpmc_handle_irq(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
--#ifdef CONFIG_ARCH_OMAP3
- static struct omap3_gpmc_regs gpmc_context;
- 
- void omap3_gpmc_save_context(void)
-@@ -1491,4 +1490,3 @@ void omap3_gpmc_restore_context(void)
- 		}
- 	}
- }
--#endif /* CONFIG_ARCH_OMAP3 */
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 60fbf0a..cab4c5d 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -43,7 +43,6 @@
- #include "common.h"
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
--#include "gpmc.h"
- #include "prm-regbits-34xx.h"
- #include "prm3xxx.h"
- #include "pm.h"
-@@ -84,8 +83,6 @@ static void omap3_core_save_context(void)
- 
- 	/* Save the Interrupt controller context */
- 	omap_intc_save_context();
--	/* Save the GPMC context */
--	omap3_gpmc_save_context();
- 	/* Save the system control module context, padconf already save above*/
- 	omap3_control_save_context();
- 	omap_dma_global_context_save();
-@@ -95,8 +92,6 @@ static void omap3_core_restore_context(void)
- {
- 	/* Restore the control module context, padconf restored by h/w */
- 	omap3_control_restore_context();
--	/* Restore the GPMC context */
--	omap3_gpmc_restore_context();
- 	/* Restore the interrupt controller context */
- 	omap_intc_restore_context();
- 	omap_dma_global_context_restore();
--- 
-1.7.9.5
+Stephen,
+
+Verified "Tegra114 series" worked with "for-3.9/soc" branch(inc CCF)
+with a little tweak.
+
+I can post Tegra114 series again. If you want them rebased onto
+another branch, let me know.
