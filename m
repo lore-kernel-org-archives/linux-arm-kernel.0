@@ -1,30 +1,23 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Jan 2013 15:00:56 +0900
-Subject: [PATCH] ARM: mach-shmobile: mackerel:  enable VFP in defconfig
-Message-ID: <1358920856-32256-1-git-send-email-horms+renesas@verge.net.au>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 23 Jan 2013 07:04:57 +0100
+Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
+In-Reply-To: <50FEC503.2080602@wwwdotorg.org>
+References: <1358833924-24535-2-git-send-email-hdoyu@nvidia.com><50FE2CA8.20100@ti.com><50FEC503.2080602@wwwdotorg.org>
+Message-ID: <20130123.080457.171573168772211248.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_VFP appears to be required to use the
-Debian armhf userspace. Enabling this is consistent
-with many other shmobile boards.
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 22 Jan 2013 17:57:39 +0100:
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/mackerel_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+> Hiroshi, is this series the only dependency you need for your
+> Tegra114
 
-diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
-index e6881ac..7594b3a 100644
---- a/arch/arm/configs/mackerel_defconfig
-+++ b/arch/arm/configs/mackerel_defconfig
-@@ -25,6 +25,7 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_KEXEC=y
-+CONFIG_VFP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_PM=y
- CONFIG_PM_RUNTIME=y
--- 
-1.7.10.4
+Basically yes.
+
+> series? So, I could merge your Tegra114 series once this series is applied?
+
+But now "CCF" seems to be in. Then, the HACK(*1) needs to be replaced
+with "Tegra114 CCF". But "Tegra114 CCF" doesn't seem ready yet. I'll check
+if this Tegra114 series would work without "Tegra114 CCF".
+
+*1: http://patchwork.ozlabs.org/patch/212010/
