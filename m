@@ -1,35 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jan 2013 09:25:10 -0500
-Subject: [PATCH] arm: plat-orion: fix printing of "MPP config
- unavailable on this hardware"
-In-Reply-To: <1358949059-10803-1-git-send-email-gerlando.falauto@keymile.com>
-References: <1358949059-10803-1-git-send-email-gerlando.falauto@keymile.com>
-Message-ID: <20130123142510.GN1758@titan.lakedaemon.net>
+From: kishon@ti.com (kishon)
+Date: Wed, 23 Jan 2013 19:56:37 +0530
+Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA922F5@DBDE01.ent.ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
+ <50FEB3FD.3050001@ti.com> <50FEBB61.9000707@ti.com>
+ <B9531499-0746-44DA-BDBB-999D4CA31E63@dominion.thruhere.net>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA922F5@DBDE01.ent.ti.com>
+Message-ID: <50FFF31D.2070908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 02:50:59PM +0100, Gerlando Falauto wrote:
-> Commit 3cff484d4b264ff467a3b45c544cbbbab69f0bf8
-> ARM: dove: Consolidate mpp code with platform mpp.
-> 
-> refactored printing of the kernel warning
-> "orion_mpp_conf: requested MPP%u config unavailable on this hardware\n"
-> which is not to be printed in case of variant_mask = 0 (unknown variant).
-> This check should be performed using a logical AND (&&) as opposed
-> to a bitwise AND (&).
-> Otherwise, test would fail (and message would be printed) if variant_mask != 1
-> 
-> Signed-off-by: Gerlando Falauto <gerlando.falauto@keymile.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Holger Brunck <holger.brunck@keymile.com>
-> ---
->  arch/arm/plat-orion/mpp.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Afzal,
 
-Applied to mvebu/fixes with some minor cleanup of the commit message
+On Wednesday 23 January 2013 07:28 PM, Mohammed, Afzal wrote:
+> Hi Koen,
+>
+> On Tue, Jan 22, 2013 at 22:32:56, Koen Kooi wrote:
+>
+>> Actually it uses nop-phy as a phy, which is missing from arch/arm/boot/dts/am33xx.dtsi, so mainline is already broken. But adding the nop-phy to the DT is easy enough to patch in locally.
+>
+> USB first instance of am335x works in mainline as of now.
 
-thx,
+Can you check if this series indeed breaks am335x?
 
-Jason.
+Thanks for your help.
+
+Regards
+Kishon
