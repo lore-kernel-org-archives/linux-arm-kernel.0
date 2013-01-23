@@ -1,33 +1,27 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 23 Jan 2013 15:57:59 +0100
-Subject: [PATCH 3.8-rc] arm: mvebu: i2c come back in defconfig
-In-Reply-To: <1358953079-1277-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1358953079-1277-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1358953079-1277-2-git-send-email-gregory.clement@free-electrons.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 23 Jan 2013 07:05:32 -0800
+Subject: [PATCH V5] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <CACRpkdZTwvdmRnDOAcOObj7NhkuUunACpYBvAE1bY65suroQiA@mail.gmail.com>
+References: <1358877374-1279-1-git-send-email-swarren@wwwdotorg.org>
+ <CACRpkdZTwvdmRnDOAcOObj7NhkuUunACpYBvAE1bY65suroQiA@mail.gmail.com>
+Message-ID: <20130123150532.GA2383@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the patch "arm: mvebu: Use dw-apb-uart instead of ns16650 as UART
-driver" was applied to a git tree and became the commit b24212fbfba25
-it wrongly removed the i2c support. This patch reintroduce it.
+On Wed, Jan 23, 2013 at 09:50:36AM +0100, Linus Walleij wrote:
+> OK!
+> 
+> This modified version of the patch is way more beautiful, stupid
+> me for not realizing it could be written like that.
+> 
+> And I can sure live with the removed doc piece ... we can discuss
+> that separately if need be, I have some argument for it but it's
+> a separate issue.
+> 
+> I've dubbed this version the v5 variant and applied it, and included
+> the changelog (so I remember how it came about).
+> 
+> Greg/Mark: are you still confident with your ACK/Reviewed-by
+> tags being added on this version?
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index b5bc96c..cbd91bc 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -33,6 +33,8 @@ CONFIG_MVNETA=y
- CONFIG_MARVELL_PHY=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_I2C=y
-+CONFIG_I2C_MV64XXX=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
--- 
-1.7.9.5
+Yes, that's fine with me.
