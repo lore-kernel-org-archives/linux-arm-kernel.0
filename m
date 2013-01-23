@@ -1,78 +1,49 @@
-From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
-Date: Wed, 23 Jan 2013 12:28:30 +0100
-Subject: [PATCH] [ARM] spitz/pxa: Refactor i2c init code in spitz.c
-In-Reply-To: <CAN1soZy4zXmZKUK0CAi-DndYvZhJqeJTkP1rfpti=v8Ns=HNVg@mail.gmail.com>
-References: <1355257645-27888-1-git-send-email-dromede@gmail.com>
- <CAN1soZy4zXmZKUK0CAi-DndYvZhJqeJTkP1rfpti=v8Ns=HNVg@mail.gmail.com>
-Message-ID: <CAHod+GcZEhRhh+ULHGZjDf6-bqn4UtfeM2oa55Z_4kpoHRqdQQ@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 23 Jan 2013 12:36:36 +0100
+Subject: [PATCH] Implements DMA on mmci driver for LPC3250 plateform
+In-Reply-To: <AB1CB712-43B0-4E47-9752-91447BD749B9@precidata.com>
+References: <AB1CB712-43B0-4E47-9752-91447BD749B9@precidata.com>
+Message-ID: <50FFCB44.4000403@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 10:00 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Wed, Dec 12, 2012 at 4:27 AM,  <dromede@gmail.com> wrote:
->> From: Marko Katic <dromede.gmail.com>
->>
->> This patch changes the way i2c devices are defined
->> and registered.
->>
->> I2c devices that are present in all spitz
->> variants are always defined and registered while the max7310
->> gpio expander specific to the akita variant is defined
->> and registered only when building the kernel for akita variants.
->>
->> spitz_i2c_init() is simplified and is now more readable.
->>
->> Signed-off-by: Marko Katic <dromede@gmail.com>
->> ---
->>  arch/arm/mach-pxa/spitz.c |   38 ++++++++++++++++++--------------------
->>  1 file changed, 18 insertions(+), 20 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
->> index 0cc9dc7..1c7dc2b 100644
->> --- a/arch/arm/mach-pxa/spitz.c
->> +++ b/arch/arm/mach-pxa/spitz.c
->> @@ -865,17 +865,6 @@ static struct pca953x_platform_data akita_pca953x_pdata = {
->>         .gpio_base              = AKITA_IOEXP_GPIO_BASE,
->>  };
->>
->> -static struct i2c_board_info spitz_i2c_devs[] = {
->> -       {
->> -               .type           = "wm8750",
->> -               .addr           = 0x1b,
->> -       }, {
->> -               .type           = "max7310",
->> -               .addr           = 0x18,
->> -               .platform_data  = &akita_pca953x_pdata,
->> -       },
->> -};
->> -
->>  static struct regulator_consumer_supply isl6271a_consumers[] = {
->>         REGULATOR_SUPPLY("vcc_core", NULL),
->>  };
->> @@ -894,26 +883,35 @@ static struct regulator_init_data isl6271a_info[] = {
->>         }
->>  };
->>
->> -static struct i2c_board_info spitz_pi2c_devs[] = {
->> +static struct i2c_board_info spitz_i2c_devs[2] = {
->>         {
->> +               .type           = "wm8750",
->> +               .addr           = 0x1b,
->> +       }, {
->>                 .type           = "isl6271a",
->>                 .addr           = 0x0c,
->>                 .platform_data  = &isl6271a_info,
->>         },
->>  };
->>
-> spitz_i2c_devs[] are in i2c0 bus. spitz_pi2c_devs[] are in i2c1 bus.
-> Why do you move wm8750 from i2c0 bus to i2c1 bus?
+On 01/23/2013 11:11 AM, Gabriele Mondada wrote:
+> Signed-off-by: Gabriele Mondada <gabriele@precidata.com>
+> 
+> UPDATE: Here is the patch cleaned up and validated with scripts/checkpatch.pl. I also add a check to prevent crashing when DMA is disabled.
+> 
+> ORIGINAL POST:
+> Hi,
+> Currently, LPC32xx plateform do not enable DMA on the mmci driver. This makes the driver useless because getting out data from a 64 bytes FIFO by interrupt is not fast enough (at standard SD-card data rate).
+> 
+> DMA is not enabled because LPC32xx has a bug that prevent DMA to work properly with the MMC controller (silicon bug, I guess). NXP did a patch to workaround this, but it has not been commited on the main branch. The patch is for linux 2.6.39.2 and does not use dmaengine.
+> 
+> So, I reworked this patch to make it compatible with the last kernel (3.7). Here it is. Have I any chance to see this patch be commited on the main branch?
+> 
+> Thanks a lot,
+> Gabriele 
+> 
 
-Only the isl6271a is located on the i2c1 bus. WM8750 and MAX7310 are
-on i2c0 bus.
-Please examine my patch again. You will find that WM8750 is correctly
-registered on
-i2c0 bus with this line:
+Please consider that when I got this mail, the source/patch formatting
+was broken, like this:
 
- i2c_register_board_info(0, &spitz_i2c_devs[0], 1);
+drivers/dma/amba-pl08x.c |   20 ++++++
+drivers/mmc/host/mmci.c  |  159 =
++++++++++++++++++++++++++++++++++++++++++-----
+drivers/mmc/host/mmci.h  |   12 +++-
+3 files changed, 174 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index d1cc579..728f65f 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -1758,6 +1758,26 @@ static void pl08x_free_virtual_channels(struct =
+dma_device *dmadev)
+	}
+}
+
+Please use "git send-email" or sth. where code is included unchanged.
+
+Thanks,
+
+Roland
