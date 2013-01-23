@@ -1,97 +1,40 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 23 Jan 2013 10:57:46 +0100
-Subject: [PATCH] clk: Add axi-clkgen driver
-In-Reply-To: <20130122180822.GA2371@kryptos>
-References: <1357755120-32735-1-git-send-email-lars@metafoo.de>
- <20130122180822.GA2371@kryptos>
-Message-ID: <50FFB41A.8090608@metafoo.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 23 Jan 2013 10:58:13 +0100
+Subject: [PATCH REBASE 0/6] i2c: omap: misc changes
+In-Reply-To: <20130114191628.GB9402@arwen.pp.htv.fi>
+References: <1355502849-9289-1-git-send-email-balbi@ti.com>
+ <20130114191628.GB9402@arwen.pp.htv.fi>
+Message-ID: <20130123095813.GG3767@nekote.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2013 07:08 PM, Josh Cartwright wrote:
-> On Wed, Jan 09, 2013 at 07:12:00PM +0100, Lars-Peter Clausen wrote:
->> This driver adds support for the AXI clkgen pcore to the common clock framework.
->> The AXI clkgen pcore is a AXI front-end to the MMCM_ADV frequency synthesizer
->> commonly found in Xilinx FPGAs.
->>
->> The AXI clkgen pcore is used in Analog Devices' reference designs targeting
->> Xilinx FPGAs.
->>
->> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
->> ---
->>  .../devicetree/bindings/clock/axi-clkgen.txt       |  22 ++
->>  drivers/clk/Kconfig                                |   8 +
->>  drivers/clk/Makefile                               |   1 +
->>  drivers/clk/clk-axi-clkgen.c                       | 326 +++++++++++++++++++++
->>  4 files changed, 357 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/axi-clkgen.txt
->>  create mode 100644 drivers/clk/clk-axi-clkgen.c
->>
-> [..]
->> diff --git a/drivers/clk/clk-axi-clkgen.c b/drivers/clk/clk-axi-clkgen.c
->> new file mode 100644
->> index 0000000..e9db225
->> --- /dev/null
->> +++ b/drivers/clk/clk-axi-clkgen.c
->> @@ -0,0 +1,326 @@
->> +/*
->> + * AXI clkgen driver
->> + *
->> + * Copyright 2012-2013 Analog Device Inc.
->> + *  Author: Lars-Peter Clausen <lars@metafoo.de>
->> + *
->> + * Licensed under the GPL-2.
->> + *
->> + */
->> +
->> +#include <linux/platform_device.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/clk.h>
->> +#include <linux/slab.h>
->> +#include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/module.h>
->> +#include <linux/err.h>
->> +
->> +#define AXI_CLKGEN_REG_UPDATE_ENABLE	0x04
->> +#define AXI_CLKGEN_REG_CLK_OUT1		0x08
->> +#define AXI_CLKGEN_REG_CLK_OUT2		0x0c
->> +#define AXI_CLKGEN_REG_CLK_DIV		0x10
->> +#define AXI_CLKGEN_REG_CLK_FB1		0x14
->> +#define AXI_CLKGEN_REG_CLK_FB2		0x18
->> +#define AXI_CLKGEN_REG_LOCK1		0x1c
->> +#define AXI_CLKGEN_REG_LOCK2		0x20
->> +#define AXI_CLKGEN_REG_LOCK3		0x24
->> +#define AXI_CLKGEN_REG_FILTER1		0x28
->> +#define AXI_CLKGEN_REG_FILTER2		0x2c
->> +
->> +struct axi_clkgen {
->> +	void __iomem *base;
->> +	struct clk_hw clk_hw;
->> +};
->> +
->> +static uint32_t axi_clkgen_lookup_filter(unsigned int m)
->> +{
->> +	switch (m) {
->> +	case 0:
->> +		return 0x01001990;
->> +	case 1:
->> +		return 0x01001190;
->> +	case 2:
->> +		return 0x01009890;
->> +	case 3:
->> +		return 0x01001890;
->> +	case 4:
->> +		return 0x01008890;
->> +	case 5 ... 8:
->> +		return 0x01009090;
->> +	case 9 ... 11:
->> +		return 0x0100890;
+On Mon, Jan 14, 2013 at 09:16:28PM +0200, Felipe Balbi wrote:
+> Hi,
 > 
-> Just checking to ensure this ^ entry is correct, since it looks
-> different then the others (it may very well be).
+> On Fri, Dec 14, 2012 at 06:34:03PM +0200, Felipe Balbi wrote:
+> > this is just a rebase of the previous series adding support
+> > for amount of bytes transferred upon NACK.
+> > 
+> > Well, actually the patches implementing transferred bytes
+> > reporting aren't here because we need to discuss how to move
+> > forward.
+> > 
+> > This series is just a preparation for that, but it also
+> > contains a at least one bugfix.
+> > 
+> > Each and every patch has been tested with pandaboard, it
+> > would be nice to get Tested-bys from other folks on other
+> > platforms before pushing this for v3.9 (there's more than
+> > enough time for that).
+> > 
+> > Note that we're also dropping b_hw flag since that becomes
+> > useless since we'll never set STT and STP together anymore.
+> > 
+> > Give it a good round of test, please.
+> 
+> Wolfram, I have these patches rebased on top of v3.8-rc3 if you wish.
+> Let me know if I should resend them (again).
 
-Nice catch, it's wrong indeed.
-
-Thanks
-- Lars
+Yes, please rebase on top of Aaro's patches (probably in v3.8-rc5).
+Patches look mostly good, have to think more about what Patch 5 is
+wanting to achieve at the end of the day.
