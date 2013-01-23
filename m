@@ -1,31 +1,27 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 22 Jan 2013 17:06:37 -0800
-Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
-In-Reply-To: <1358900903-27654-1-git-send-email-swarren@wwwdotorg.org>
-References: <1358900903-27654-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130123010637.GD2024@kroah.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 22 Jan 2013 20:09:31 -0500
+Subject: [PATCH 1/5] mmc: mvsdio: use devm_ API to simplify/correct
+ error paths.
+In-Reply-To: <1358342040-7130-2-git-send-email-andrew@lunn.ch>
+References: <1358342040-7130-1-git-send-email-andrew@lunn.ch>
+ <1358342040-7130-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20130123010931.GB1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 05:28:22PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Wed, Jan 16, 2013 at 02:13:56PM +0100, Andrew Lunn wrote:
+> There are a number of bugs in the error paths of this driver.  Make
+> use of devm_ functions to simplify the cleanup on error.
 > 
-> Clock "emc" is for the External Memory Controller. The USB driver has no
-> business touching this clock directly. Remove the code that does so.
+> Based on a patch by Russell King.
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
-> Greg, Alan, I'd like to take this patch through the Tegra tree to avoid
-> any merge conflicts with the Tegra USB changes that have  recently
-> happened there.
-> 
-> Venu, When creating your patch to convert the Tegra USB PHY driver to a
-> platform driver, can you assume these patches are applied first? Thanks.
-> I assume that these patches make sense to you; could you ack them if so.
-> ---
->  drivers/usb/host/ehci-tegra.c |   17 -----------------
->  1 file changed, 17 deletions(-)
+>  drivers/mmc/host/mvsdio.c |   92 +++++++++++++++------------------------------
+>  1 file changed, 30 insertions(+), 62 deletions(-)
 
-I always love to see code deleted, so feel free to take this through
-your tree:
-	Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Applied to mvebu/fixes
+
+thx,
+
+Jason.
