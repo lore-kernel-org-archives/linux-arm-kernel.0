@@ -1,48 +1,39 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 23 Jan 2013 16:30:36 +1100
-Subject: linux-next: manual merge of the tegra tree with the arm-soc tree
-Message-ID: <20130123163036.4791935db9e9539c4313c97f@canb.auug.org.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 23 Jan 2013 14:49:43 +0900
+Subject: [PATCH] ARM: mach-shmobile: armadillo: defconfig: Enable CEU
+Message-ID: <1358920183-818-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Update the defconfig to enable the CEU camera.
 
-Today's linux-next merge of the tegra tree got a conflict in
-arch/arm/mach-tegra/platsmp.c between commit 520f7bd73354 ("irqchip: Move
-ARM gic.h to include/linux/irqchip/arm-gic.h") from the arm-soc tree and
-commit 4c6e1ff5b5fe ("ARM: tegra: move tegra_cpu_car.h to
-linux/clk/tegra.h") from the tegra tree.
+It appears that it was previously enabled but an
+update is required for Kconfig changes.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/armadillo800eva_defconfig |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+index f9e2701..0b98100 100644
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ b/arch/arm/configs/armadillo800eva_defconfig
+@@ -90,14 +90,11 @@ CONFIG_I2C_SH_MOBILE=y
+ # CONFIG_HWMON is not set
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_VIDEO_DEV=y
+-# CONFIG_RC_CORE is not set
+-# CONFIG_VIDEO_HELPER_CHIPS_AUTO is not set
+-# CONFIG_V4L_USB_DRIVERS is not set
++CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_MT9T112=y
+ CONFIG_VIDEO_SH_MOBILE_CEU=y
+-# CONFIG_RADIO_ADAPTERS is not set
+ CONFIG_FB=y
+ CONFIG_FB_SH_MOBILE_LCDC=y
+ CONFIG_FB_SH_MOBILE_HDMI=y
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-tegra/platsmp.c
-index 18d7290,3ec7fc4..0000000
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@@ -18,11 -18,13 +18,13 @@@
-  #include <linux/jiffies.h>
-  #include <linux/smp.h>
-  #include <linux/io.h>
- +#include <linux/irqchip/arm-gic.h>
-+ #include <linux/clk/tegra.h>
-  
-  #include <asm/cacheflush.h>
- -#include <asm/hardware/gic.h>
-  #include <asm/mach-types.h>
-  #include <asm/smp_scu.h>
-+ #include <asm/smp_plat.h>
-  
-  #include <mach/powergate.h>
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130123/e1eae94b/attachment.sig>
+1.7.10.4
