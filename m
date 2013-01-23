@@ -1,41 +1,45 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Tue, 22 Jan 2013 22:21:11 -0800
-Subject: [PATCH 1/2 net-next] net: fec: add napi support to improve
- proformance
-In-Reply-To: <1358914330-3768-1-git-send-email-Frank.Li@freescale.com>
-References: <1358914330-3768-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1358922071.12374.743.camel@edumazet-glaptop>
+From: anton@enomsg.org (Anton Vorontsov)
+Date: Tue, 22 Jan 2013 22:25:06 -0800
+Subject: [PATCH 23/24] ab8500-bm: Fix minor niggles experienced during
+ testing
+In-Reply-To: <20130122092717.GI6857@gmail.com>
+References: <1358769840-4763-1-git-send-email-lee.jones@linaro.org>
+ <1358769840-4763-24-git-send-email-lee.jones@linaro.org>
+ <20130121191324.GA15037@lizard.mcd01528.sjc.wayport.net>
+ <20130122092717.GI6857@gmail.com>
+Message-ID: <20130123062506.GA20858@lizard.gateway.2wire.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-23 at 12:12 +0800, Frank Li wrote:
-> Add napi support
+On Tue, Jan 22, 2013 at 09:27:17AM +0000, Lee Jones wrote:
+> On Mon, 21 Jan 2013, Anton Vorontsov wrote:
 > 
-> Before this patch
+> > On Mon, Jan 21, 2013 at 12:03:59PM +0000, Lee Jones wrote:
+> > > When compile testing the new AB8500 Battery Management changes
+> > > due for inclusion into upstream, there were a few minor niggles
+> > > which required repairing, or adapting for use against the
+> > > Mainline kernel. This patch is a collection of them all.
+> > 
+> > No. This is the third time I'm saying it: the last time I checked, this is
+> > not how we do development in the mainline.
 > 
->  iperf -s -i 1
->  ------------------------------------------------------------
->  Server listening on TCP port 5001
->  TCP window size: 85.3 KByte (default)
->  ------------------------------------------------------------
->  [  4] local 10.192.242.153 port 5001 connected with 10.192.242.138 port 50004
->  [ ID] Interval       Transfer     Bandwidth
->  [  4]  0.0- 1.0 sec  41.2 MBytes   345 Mbits/sec
->  [  4]  1.0- 2.0 sec  43.7 MBytes   367 Mbits/sec
->  [  4]  2.0- 3.0 sec  42.8 MBytes   359 Mbits/sec
->  [  4]  3.0- 4.0 sec  43.7 MBytes   367 Mbits/sec
->  [  4]  4.0- 5.0 sec  42.7 MBytes   359 Mbits/sec
->  [  4]  5.0- 6.0 sec  43.8 MBytes   367 Mbits/sec
->  [  4]  6.0- 7.0 sec  43.0 MBytes   361 Mbits/sec
+> Okay, all of these changes have now been fixed-up into the patches
+> which caused the issues. I have also added Stable to the patch you
+> requested it on.
 > 
-> After this patch
->  [  4]  2.0- 3.0 sec  51.6 MBytes   433 Mbits/sec
->  [  4]  3.0- 4.0 sec  51.8 MBytes   435 Mbits/sec
->  [  4]  4.0- 5.0 sec  52.2 MBytes   438 Mbits/sec
->  [  4]  5.0- 6.0 sec  52.1 MBytes   437 Mbits/sec
->  [  4]  6.0- 7.0 sec  52.1 MBytes   437 Mbits/sec
->  [  4]  7.0- 8.0 sec  52.3 MBytes   439 Mbits/sec
+> How would you like to proceed? Do you want a pull-request, or for me
+> to send the patches to the list again?
 
-Strange, as you still call netif_rx()
+Either way will work.
 
-NAPI should call netif_receive_skb() instead
+Thanks!
+
+Anton
+
+p.s. I took another look at the patches, and noticed one issue that is
+constantly there: you place your signed-off-by line on top of everyones',
+but that's wrong. Sign offs are going downwards, not upwards. This is
+quite important since the lines encode how the code "travels" between
+companies and submitters. Currently, one might assume that the origin of
+the code is always Linaro, which is not quite true. (And 'From:' doesn't
+always mean the author, fwiw.)
