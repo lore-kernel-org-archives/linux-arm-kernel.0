@@ -1,27 +1,25 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 23 Jan 2013 07:05:32 -0800
-Subject: [PATCH V5] drivers/pinctrl: grab default handles from device core
-In-Reply-To: <CACRpkdZTwvdmRnDOAcOObj7NhkuUunACpYBvAE1bY65suroQiA@mail.gmail.com>
-References: <1358877374-1279-1-git-send-email-swarren@wwwdotorg.org>
- <CACRpkdZTwvdmRnDOAcOObj7NhkuUunACpYBvAE1bY65suroQiA@mail.gmail.com>
-Message-ID: <20130123150532.GA2383@kroah.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Jan 2013 10:06:15 -0500
+Subject: [PATCH 3.8-rc] arm: mvebu: i2c come back in defconfig
+In-Reply-To: <1358953079-1277-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1358953079-1277-1-git-send-email-gregory.clement@free-electrons.com>
+ <1358953079-1277-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130123150615.GT1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 09:50:36AM +0100, Linus Walleij wrote:
-> OK!
+On Wed, Jan 23, 2013 at 03:57:59PM +0100, Gregory CLEMENT wrote:
+> When the patch "arm: mvebu: Use dw-apb-uart instead of ns16650 as UART
+> driver" was applied to a git tree and became the commit b24212fbfba25
+> it wrongly removed the i2c support. This patch reintroduce it.
 > 
-> This modified version of the patch is way more beautiful, stupid
-> me for not realizing it could be written like that.
-> 
-> And I can sure live with the removed doc piece ... we can discuss
-> that separately if need be, I have some argument for it but it's
-> a separate issue.
-> 
-> I've dubbed this version the v5 variant and applied it, and included
-> the changelog (so I remember how it came about).
-> 
-> Greg/Mark: are you still confident with your ACK/Reviewed-by
-> tags being added on this version?
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/configs/mvebu_defconfig |    2 ++
+>  1 file changed, 2 insertions(+)
 
-Yes, that's fine with me.
+Applied to mvebu/fixes
+
+thx,
+
+Jason.
