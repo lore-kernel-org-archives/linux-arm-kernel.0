@@ -1,52 +1,54 @@
-From: liu.y.victor@gmail.com (Liu Ying)
-Date: Wed, 23 Jan 2013 22:08:53 +0800
-Subject: [PATCH 1/2] misc/at24: Add at24c512b eeprom support
-In-Reply-To: <20130123134936.GH16264@pengutronix.de>
-References: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
- <CACRpkdbQcyO82Z7+v61VmJBOHuPVT2ZphQQT7OpZ9edYbho5YQ@mail.gmail.com>
- <20130123125001.GG16264@pengutronix.de>
- <CA+8Hj80=Mk1gMSC9gcRT_XPFrEdRxifaB9FNMtkn3BkUkv9bGA@mail.gmail.com>
- <20130123134936.GH16264@pengutronix.de>
-Message-ID: <CA+8Hj83n+pC+a6bYOOH1b61DTqSjpKsxyKDgDL2pCRKxTq4EXg@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 23 Jan 2013 15:08:49 +0100
+Subject: [PATCH] arm: plat-orion: fix printing of "MPP config unavailable
+ on this hardware"
+In-Reply-To: <1358949059-10803-1-git-send-email-gerlando.falauto@keymile.com>
+References: <1358949059-10803-1-git-send-email-gerlando.falauto@keymile.com>
+Message-ID: <20130123140849.GJ13482@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/23 Wolfram Sang <w.sang@pengutronix.de>:
-> Hi,
->
->> There are some difference between 24c512 and 24c512b about the system
->> reset procedure, according to the two devices' spec:
->> 24c512b:(a) Create a start bit condition, (b)clock 9 cycles, (c)
->> create another start bit followed by stop bit condition.
->> 24c512:(a) Clock up to 9 cycles, (b) look for SDA high in each cycle
->> while SCL is high and then, (c) create a start condition as SDA is
->> high.
->> Could this be a reason to add an entry for 24c512b?
->
-> Since the entries in at24_ids[] are the same, no. If they would differ,
-> that is a reason.
+On Wed, Jan 23, 2013 at 02:50:59PM +0100, Gerlando Falauto wrote:
+> Commit 3cff484d4b264ff467a3b45c544cbbbab69f0bf8
+> ARM: dove: Consolidate mpp code with platform mpp.
+> 
+> refactored printing of the kernel warning
+> "orion_mpp_conf: requested MPP%u config unavailable on this hardware\n"
+> which is not to be printed in case of variant_mask = 0 (unknown variant).
+> This check should be performed using a logical AND (&&) as opposed
+> to a bitwise AND (&).
+> Otherwise, test would fail (and message would be printed) if variant_mask != 1
+> 
+> Signed-off-by: Gerlando Falauto <gerlando.falauto@keymile.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Cc: Holger Brunck <holger.brunck@keymile.com>
+> ---
+>  arch/arm/plat-orion/mpp.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/plat-orion/mpp.c b/arch/arm/plat-orion/mpp.c
+> index 3b1e17b..78ea76c 100644
+> --- a/arch/arm/plat-orion/mpp.c
+> +++ b/arch/arm/plat-orion/mpp.c
+> @@ -48,7 +48,7 @@ void __init orion_mpp_conf(unsigned int *mpp_list, unsigned int variant_mask,
+>  					"number (%u)\n", num);
+>  			continue;
+>  		}
+> -		if (variant_mask & !(*mpp_list & variant_mask)) {
+> +		if (variant_mask && !(*mpp_list & variant_mask)) {
+>  			printk(KERN_WARNING
+>  			       "orion_mpp_conf: requested MPP%u config "
+>  			       "unavailable on this hardware\n", num);
+> -- 
+> 1.7.10.1
+> 
 
-The names of the two entries are not the same, one is "24c512", the
-other is "24c512b".
-My original idea to add the new entry is to count on the name
-difference to do different system reset operations.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
->
->> Now, I think the correct vendor name should be "at" or "atmel".
->
-> "atmel" would be better, but the MX28EVK doesn't even have an I2C eeprom
-> by default IIRC? But that is unrelated to your patch.
-The commit message of the patch which adds 24c32 support for MX28EVK
-tells that "mx28evk has a free slot U50 that can be used to populate
-an I2C EEPROM.".
+Looks like it should only affect dove, but interesting, there are no
+users of dove_mpp_conf(), so we can probably throw away
+mach-dove/mpp.[ch].
 
->
-> --
-> Pengutronix e.K.                           | Wolfram Sang                |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-
-
-
--- 
-Best Regards,
-Liu Ying
+	Andrew
