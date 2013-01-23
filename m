@@ -1,163 +1,197 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jan 2013 23:34:23 +0000
-Subject: [RFC PATCH 5/6] ARM: kirkwood: consolidate DT init of pcie
+Date: Wed, 23 Jan 2013 23:34:22 +0000
+Subject: [RFC PATCH 4/6] ARM: kirkwood: nsa310: convert to pinctrl
 In-Reply-To: <cover.1358983578.git.jason@lakedaemon.net>
 References: <cover.1358983578.git.jason@lakedaemon.net>
-Message-ID: <f8ade42cb164420c6042fe3a6d659cf494074a9e.1358983578.git.jason@lakedaemon.net>
+Message-ID: <f4bb2c92a8d6af9d8f108823d653fe23b51cf45a.1358983578.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/mach-kirkwood/Makefile         |  1 -
- arch/arm/mach-kirkwood/board-dt.c       | 23 +++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-iconnect.c |  9 ---------
- arch/arm/mach-kirkwood/board-mplcec4.c  |  1 -
- arch/arm/mach-kirkwood/board-nsa310.c   | 25 -------------------------
- arch/arm/mach-kirkwood/board-ts219.c    | 13 -------------
- 6 files changed, 23 insertions(+), 49 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/board-nsa310.c
+ arch/arm/boot/dts/kirkwood-nsa310.dts | 99 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c     |  3 --
+ arch/arm/mach-kirkwood/board-nsa310.c | 26 ---------
+ arch/arm/mach-kirkwood/common.h       |  6 ---
+ 4 files changed, 99 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index d665309..ee3aa77 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -36,6 +36,5 @@ obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_MAX_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_LITE_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_MINI_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_NSA310_DT)		+= board-nsa310.o
- obj-$(CONFIG_MACH_OPENBLOCKS_A6_DT)	+= board-openblocks_a6.o
- obj-$(CONFIG_MACH_TOPKICK_DT)		+= board-usi_topkick.o
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+index dbb3551..3a178cf 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+@@ -16,6 +16,105 @@
+ 	};
+ 
+ 	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++			pinctrl-0 = < &pmx_led_esata_green
++				      &pmx_led_esata_red
++				      &pmx_led_usb_green
++				      &pmx_led_usb_red
++				      &pmx_usb_power_off
++				      &pmx_led_sys_green
++				      &pmx_led_sys_red
++				      &pmx_btn_reset
++				      &pmx_btn_copy
++				      &pmx_led_copy_green
++				      &pmx_led_copy_red
++				      &pmx_led_hdd_green
++				      &pmx_led_hdd_red
++				      &pmx_unknown
++				      &pmx_btn_power
++				      &pmx_pwr_off >;
++			pinctrl-names = "default";
++
++			pmx_led_esata_green: pmx-led-esata-green {
++				marvell,pins = "mpp12";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_esata_red: pmx-led-esata-red {
++				marvell,pins = "mpp13";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_usb_green: pmx-led-usb-green {
++				marvell,pins = "mpp15";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_usb_red: pmx-led-usb-red {
++				marvell,pins = "mpp16";
++				marvell,function = "gpio";
++			};
++
++			pmx_usb_power_off: pmx-usb-power-off {
++				marvell,pins = "mpp21";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_sys_green: pmx-led-sys-green {
++				marvell,pins = "mpp28";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_sys_red: pmx-led-sys-red {
++				marvell,pins = "mpp29";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_reset: pmx-btn-reset {
++				marvell,pins = "mpp36";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_copy: pmx-btn-copy {
++				marvell,pins = "mpp37";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_copy_green: pmx-led-copy-green {
++				marvell,pins = "mpp39";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_copy_red: pmx-led-copy-red {
++				marvell,pins = "mpp40";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_hdd_green: pmx-led-hdd-green {
++				marvell,pins = "mpp41";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_hdd_red: pmx-led-hdd-red {
++				marvell,pins = "mpp42";
++				marvell,function = "gpio";
++			};
++
++			pmx_unknown: pmx-unknown {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_power: pmx-btn-power {
++				marvell,pins = "mpp46";
++				marvell,function = "gpio";
++			};
++
++			pmx_pwr_off: pmx-pwr-off {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
++		};
+ 
+ 		serial at 12000 {
+ 			clock-frequency = <200000000>;
 diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 8b35157..73b76e4 100644
+index 8eac548..8b35157 100644
 --- a/arch/arm/mach-kirkwood/board-dt.c
 +++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -70,6 +70,29 @@ static void __init kirkwood_of_clk_init(void)
- 	kirkwood_legacy_clk_init();
- }
+@@ -141,9 +141,6 @@ static void __init kirkwood_dt_init(void)
+ 	if (of_machine_is_compatible("usi,topkick"))
+ 		usi_topkick_init();
  
-+static const char * const kirkwood_dt_pcie0_compat[] = {
-+	"iom,iconnect",
-+	"mpl,cec4",
-+	"qnap,ts219",
-+	"zyxel,nsa310",
-+	NULL
-+};
-+
-+static int __init kirkwood_pcie_dt_init(void)
-+{
-+	int i;
-+
-+	for (i = 0; kirkwood_dt_pcie0_compat[i] != NULL; i++) {
-+		if (of_machine_is_compatible(kirkwood_dt_pcie0_compat[i])) {
-+			kirkwood_pcie_init(KW_PCIE0);
-+			break;
-+		}
-+	}
-+
-+	return 0;
-+}
-+subsys_initcall(kirkwood_pcie_dt_init);
-+
- static void __init kirkwood_dt_init(void)
- {
- 	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
-diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
-index c8ebde4..ff042dc 100644
---- a/arch/arm/mach-kirkwood/board-iconnect.c
-+++ b/arch/arm/mach-kirkwood/board-iconnect.c
-@@ -10,7 +10,6 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/of.h>
- #include <linux/mv643xx_eth.h>
- #include "common.h"
- 
-@@ -22,11 +21,3 @@ void __init iconnect_init(void)
- {
- 	kirkwood_ge00_init(&iconnect_ge00_data);
- }
+-	if (of_machine_is_compatible("zyxel,nsa310"))
+-		nsa310_init();
 -
--static int __init iconnect_pci_init(void)
--{
--	if (of_machine_is_compatible("iom,iconnect"))
--		kirkwood_pcie_init(KW_PCIE0);
--	return 0;
--}
--subsys_initcall(iconnect_pci_init);
-diff --git a/arch/arm/mach-kirkwood/board-mplcec4.c b/arch/arm/mach-kirkwood/board-mplcec4.c
-index 7d6dc66..938712e 100644
---- a/arch/arm/mach-kirkwood/board-mplcec4.c
-+++ b/arch/arm/mach-kirkwood/board-mplcec4.c
-@@ -29,7 +29,6 @@ void __init mplcec4_init(void)
- 	 */
- 	kirkwood_ge00_init(&mplcec4_ge00_data);
- 	kirkwood_ge01_init(&mplcec4_ge01_data);
--	kirkwood_pcie_init(KW_PCIE0);
+ 	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
  }
- 
  
 diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
-deleted file mode 100644
-index 55ade93..0000000
+index 0b99533..55ade93 100644
 --- a/arch/arm/mach-kirkwood/board-nsa310.c
-+++ /dev/null
-@@ -1,25 +0,0 @@
--/*
-- * arch/arm/mach-kirkwood/nsa-310-setup.c
-- *
-- * ZyXEL NSA-310 Setup
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <mach/kirkwood.h>
--#include <linux/of.h>
--#include "common.h"
--
--static int __init nsa310_pci_init(void)
--{
--	if (of_machine_is_compatible("zyxel,nsa310"))
--		kirkwood_pcie_init(KW_PCIE0);
--
--	return 0;
--}
--
--subsys_initcall(nsa310_pci_init);
-diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
-index 10fb397..f00c0a9 100644
---- a/arch/arm/mach-kirkwood/board-ts219.c
-+++ b/arch/arm/mach-kirkwood/board-ts219.c
-@@ -17,10 +17,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
- #include <linux/mv643xx_eth.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
++++ b/arch/arm/mach-kirkwood/board-nsa310.c
+@@ -13,32 +13,6 @@
  #include <mach/kirkwood.h>
+ #include <linux/of.h>
  #include "common.h"
- 
-@@ -38,13 +35,3 @@ void __init qnap_dt_ts219_init(void)
- 
- 	kirkwood_ge00_init(&qnap_ts219_ge00_data);
- }
+-#include "mpp.h"
 -
--/* FIXME: Will not work with DT. Maybe use MPP40_GPIO? */
--static int __init ts219_pci_init(void)
+-static unsigned int nsa310_mpp_config[] __initdata = {
+-	MPP12_GPIO, /* led esata green */
+-	MPP13_GPIO, /* led esata red */
+-	MPP15_GPIO, /* led usb green */
+-	MPP16_GPIO, /* led usb red */
+-	MPP21_GPIO, /* control usb power off */
+-	MPP28_GPIO, /* led sys green */
+-	MPP29_GPIO, /* led sys red */
+-	MPP36_GPIO, /* key reset */
+-	MPP37_GPIO, /* key copy */
+-	MPP39_GPIO, /* led copy green */
+-	MPP40_GPIO, /* led copy red */
+-	MPP41_GPIO, /* led hdd green */
+-	MPP42_GPIO, /* led hdd red */
+-	MPP44_GPIO, /* ?? */
+-	MPP46_GPIO, /* key power */
+-	MPP48_GPIO, /* control power off */
+-	0
+-};
+-
+-void __init nsa310_init(void)
 -{
--	if (machine_is_ts219())
--		kirkwood_pcie_init(KW_PCIE0);
--
--	return 0;
+-	kirkwood_mpp_conf(nsa310_mpp_config);
 -}
--subsys_initcall(ts219_pci_init);
+ 
+ static int __init nsa310_pci_init(void)
+ {
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index e956d02..1c42cb8 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -130,12 +130,6 @@ void ns2_init(void);
+ static inline void ns2_init(void) {};
+ #endif
+ 
+-#ifdef CONFIG_MACH_NSA310_DT
+-void nsa310_init(void);
+-#else
+-static inline void nsa310_init(void) {};
+-#endif
+-
+ #ifdef CONFIG_MACH_OPENBLOCKS_A6_DT
+ void openblocks_a6_init(void);
+ #else
 -- 
 1.8.1.1
