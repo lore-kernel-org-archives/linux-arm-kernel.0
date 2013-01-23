@@ -1,45 +1,26 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 23 Jan 2013 09:38:16 +0100
-Subject: [PATCH v2] Dove: activate GPIO interrupts in DT
-Message-ID: <20130123093816.5cb73df1@armhf>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Jan 2013 09:50:36 +0100
+Subject: [PATCH V5] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <1358877374-1279-1-git-send-email-swarren@wwwdotorg.org>
+References: <1358877374-1279-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CACRpkdZTwvdmRnDOAcOObj7NhkuUunACpYBvAE1bY65suroQiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a DT, the interrupts of an interrupt-controller are not usable when
-#interrupt-cells is missing.
+OK!
 
-This patch activates the interrupts of the GPIOs 0 and 1 for the Marvell
-Dove SoC.
+This modified version of the patch is way more beautiful, stupid
+me for not realizing it could be written like that.
 
-Signed-off-by: Jean-Fran?ois Moine <moinejf@free.fr>
----
-v2
-- gpio-mvebu asks for 2 cells
----
- arch/arm/boot/dts/dove.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
+And I can sure live with the removed doc piece ... we can discuss
+that separately if need be, I have some argument for it but it's
+a separate issue.
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 42eac1f..740630f 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -93,6 +93,7 @@
- 			reg = <0xd0400 0x20>;
- 			ngpios = <32>;
- 			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			interrupts = <12>, <13>, <14>, <60>;
- 		};
- 
-@@ -103,6 +104,7 @@
- 			reg = <0xd0420 0x20>;
- 			ngpios = <32>;
- 			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			interrupts = <61>;
- 		};
- 
- 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+I've dubbed this version the v5 variant and applied it, and included
+the changelog (so I remember how it came about).
+
+Greg/Mark: are you still confident with your ACK/Reviewed-by
+tags being added on this version?
+
+Yours,
+Linus Walleij
