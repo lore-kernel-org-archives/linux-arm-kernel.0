@@ -1,42 +1,43 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 23 Jan 2013 13:40:53 -0800
-Subject: [PATCH v2 1/2] clk: divider: prepare for minimum divider
-In-Reply-To: <6dc1c48cac5b2646a55da3079afb72f88e40c3bc.1358937138.git.afzal@ti.com>
-References: <6dc1c48cac5b2646a55da3079afb72f88e40c3bc.1358937138.git.afzal@ti.com>
-Message-ID: <20130123214053.9205.49804@quantum>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 23 Jan 2013 16:37:36 -0500
+Subject: [PATCH v5 00/14] DMA Engine support for AM33XX
+In-Reply-To: <20130123022133.GA5727@opensource.wolfsonmicro.com>
+References: <1358281974-8411-1-git-send-email-mporter@ti.com>
+ <50FEB6B2.5020303@ti.com>
+ <20130123022133.GA5727@opensource.wolfsonmicro.com>
+Message-ID: <20130123213736.GC5256@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Afzal Mohammed (2013-01-23 03:38:52)
-> Some of clocks can have a limit on minimum divider value that can be
-> programmed, prepare for such a support.
+On Wed, Jan 23, 2013 at 10:21:42AM +0800, Mark Brown wrote:
+> On Tue, Jan 22, 2013 at 09:26:34PM +0530, Sekhar Nori wrote:
+> > On 1/16/2013 2:02 AM, Matt Porter wrote:
 > 
-> Add a new field min_div for the basic divider clock and a new dynamic
-> clock divider registration function where minimum divider value can
-> be specified. Keep behaviour of existing divider clock registration
-> functions, static initialization helpers as was earlier.
+> > > This series adds DMA Engine support for AM33xx, which uses
+> > > an EDMA DMAC. The EDMA DMAC has been previously supported by only
+> > > a private API implementation (much like the situation with OMAP
+> > > DMA) found on the DaVinci family of SoCs.
 > 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> > Will you take this series through the OMAP tree? Only 1/14 touches
+> > mach-davinci and I am mostly okay with it except some changes I just
+> > requested Matt to make in another thread.
+> 
+> Is this series somewhere near actually getting merged then? It seemed
+> like there was lots of stuff going on.
 
-Hi Afzal,
+The issues raised by Sekhar and Santosh were reasonably minor and will
+be addressed. My major concern is that the dependency on some api to
+fetch dmaengine driver SG limitations is not resolved. That's being
+discussed in https://lkml.org/lkml/2013/1/10/432
 
-I'd like to understand this a bit better.  At first the need for a
-minimum divider makes a lot of sense, but I want to make sure it gets
-designed correctly.
+If I don't get confirmation from Vinod soon, I'll just take a stab at
+implementing the callbacks he mentioned in that thread. Static
+per-channel caps don't provide the information needed by a client driver
+the uses the EDMA DMAC.
 
-My first question is whether the minimum divider you plan to use is an
-actual constraint of the hardware (e.g. the clock controller ip only
-lets program two bits which divide by 4, 5, 6 or 7, where 4 is the
-minimum divider) or if this is a functional constraint (e.g. the clock
-hardware can divide by a lower value, but you never want that since it
-results in non-functional video/audio/whatever).  If this is more of a
-functional constraint then perhaps a new api like clk_set_min_rate makes
-more sense.
+Alternatively, we can go back to the hack that looks at the edma
+phandle and hardcodes the mmc SG limits to magic values, but that's just
+plain ugly. I could live with it temporarily if we can't get the
+dmaengine api resolved until 3.10...dunno if others can though. ;)
 
-Secondly, have you looked into using the rate-table option provided by
-the basic divider clock?  Can you explain how this is not a good fit for
-your needs?  Perhaps there are too many divisor values so the table
-would be large?
-
-Thanks,
-Mike
+-Matt
