@@ -1,68 +1,116 @@
-From: smoch@web.de (Soeren Moch)
-Date: Wed, 23 Jan 2013 18:07:00 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <20130123162515.GK13482@lunn.ch>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <201301171049.30415.arnd@arndb.de> <50F800EB.6040104@web.de>
- <201301172026.45514.arnd@arndb.de> <50FABBED.1020905@web.de>
- <20130119185907.GA20719@lunn.ch> <5100022D.9050106@web.de>
- <20130123162515.GK13482@lunn.ch>
-Message-ID: <510018B4.9040903@web.de>
+From: elezegarcia@gmail.com (Ezequiel Garcia)
+Date: Wed, 23 Jan 2013 14:06:12 -0300
+Subject: [PATCH v2 1/3] arm: mvebu: Add support for USB host controllers
+ in Armada 370/XP
+In-Reply-To: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <CALF0-+W8dVLHF66VKni+5ZsQpFd=cGDXE0TD=dRc1B=ptrAMUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.01.2013 17:25, Andrew Lunn wrote:
-> On Wed, Jan 23, 2013 at 04:30:53PM +0100, Soeren Moch wrote:
->> On 19.01.2013 19:59, Andrew Lunn wrote:
->>>> Please find attached a debug log generated with your patch.
->>>>
->>>> I used the sata disk and two em28xx dvb sticks, no other usb devices,
->>>> no ethernet cable connected, tuners on saa716x-based card not used.
->>>>
->>>> What I can see in the log: a lot of coherent mappings from sata_mv
->>>> and orion_ehci, a few from mv643xx_eth, no other coherent mappings.
->>>> All coherent mappings are page aligned, some of them (from orion_ehci)
->>>> are not really small (as claimed in __alloc_from_pool).
->>>>
->>>> I don't believe in a memory leak. When I restart vdr (the application
->>>> utilizing the dvb sticks) then there is enough dma memory available
->>>> again.
->>>
->>> Hi Soeren
->>>
->>> We should be able to rule out a leak. Mount debugfg and then:
->>>
->>> while [ /bin/true ] ; do cat /debug/dma-api/num_free_entries ; sleep 60 ; done
->>>
->>> while you are capturing. See if the number goes down.
->>>
->>>        Andrew
->>
->> Now I built a kernel with debugfs enabled.
->> It is not clear to me what I can see from the
->> dma-api/num_free_entries output. After reboot (vdr running) I see
->> decreasing numbers (3453 3452 3445 3430...), min_free_entries is
->> lower (3390). Sometimes the output is constant for several minutes (
->> 3396 3396 3396 3396 3396,...)
+Jason,
+
+On Wed, Jan 23, 2013 at 12:26 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> The Armada 370 and Armada XP SoC has an Orion EHCI USB controller.
+> This patch adds support for this controller in Armada 370
+> and Armada XP SoC common device tree files.
 >
-> We are interesting in the long term behavior. Does it gradually go
-> down? Or is it stable? If it goes down over time, its clearly a leak
-> somewhere.
+> Cc: Lior Amsalem <alior@marvell.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Tested-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> Tested-by: Florian Fainelli <florian@openwrt.org>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+> Changes from v1:
+>  * Remove uneeded USB_ARCH_HAS_EHCI selection as noted by Florian.
+>
+>  arch/arm/boot/dts/armada-370-xp.dtsi |   15 +++++++++++++++
+>  arch/arm/boot/dts/armada-370.dtsi    |    9 +++++++++
+>  arch/arm/boot/dts/armada-xp.dtsi     |   17 +++++++++++++++++
+>  3 files changed, 41 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index 28276fe..fa025c4 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -145,6 +145,21 @@
+>                         clocks = <&gateclk 17>;
+>                         status = "disabled";
+>                 };
+> +
+> +               usb at d0050000 {
+> +                       compatible = "marvell,orion-ehci";
+> +                       reg = <0xd0050000 0x500>;
+> +                       interrupts = <45>;
+> +                       status = "disabled";
+> +               };
+> +
+> +               usb at d0051000 {
+> +                       compatible = "marvell,orion-ehci";
+> +                       reg = <0xd0051000 0x500>;
+> +                       interrupts = <46>;
+> +                       status = "disabled";
+> +               };
+> +
+>         };
+>  };
+>
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index 88f9bab..8188d13 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -144,5 +144,14 @@
+>                                 dmacap,memset;
+>                         };
+>                 };
+> +
+> +               usb at d0050000 {
+> +                       clocks = <&coreclk 0>;
+> +               };
+> +
+> +               usb at d0051000 {
+> +                       clocks = <&coreclk 0>;
+> +               };
+> +
+>         };
+>  };
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index 2e37ef1..c22a0c8 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -134,5 +134,22 @@
+>                                 dmacap,memset;
+>                         };
+>                 };
+> +
+> +               usb at d0050000 {
+> +                       clocks = <&gateclk 18>;
+> +               };
+> +
+> +               usb at d0051000 {
+> +                       clocks = <&gateclk 19>;
+> +               };
+> +
+> +               usb at d0052000 {
+> +                       compatible = "marvell,orion-ehci";
+> +                       reg = <0xd0052000 0x500>;
+> +                       interrupts = <47>;
+> +                       clocks = <&gateclk 20>;
+> +                       status = "disabled";
+> +               };
+> +
+>         };
+>  };
+> --
+> 1.7.8.6
 >
 
-Now (in the last hour) stable, occasionally lower numbers:
-3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 
-3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 
-3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 
-3396 3396 3396 3396 3396 3396 3396 3396 3396 3365 3396 3394 3396 3396 
-3396 3396 3373 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 
-3396 3353 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 
-3394 3396 3396 3396 3396 3396 3396 3396
+Do you think we're still in time to get this series into v3.9 (given
+we decide soon on the OpenBlocks issue)?
 
-Before the last pool exhaustion going down:
-3395 3395 3389 3379 3379 3374 3367 3360 3352 3343 3343 3343 3342 3336 
-3332 3324 3318 3314 3310 3307 3305 3299 3290 3283 3279 3272 3266 3265 
-3247 3247 3247 3242 3236 3236
+Thanks,
 
-Soeren
+-- 
+    Ezequiel
