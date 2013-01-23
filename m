@@ -1,35 +1,140 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Jan 2013 17:00:55 +0000
-Subject: Kernel API for SGI usage
-In-Reply-To: <CANudz+sMppk5UZK+Vf_hWZYZzPJMunhPJQs0qbu1-dPy9WRikA@mail.gmail.com>
-References: <CANudz+tDzfU1xJgsjeuQBL7r5cwosvSEH6tct5aO8c+LvAm4pA@mail.gmail.com>
- <20130123164620.GR23505@n2100.arm.linux.org.uk>
- <CANudz+sMppk5UZK+Vf_hWZYZzPJMunhPJQs0qbu1-dPy9WRikA@mail.gmail.com>
-Message-ID: <20130123170054.GS23505@n2100.arm.linux.org.uk>
+From: elezegarcia@gmail.com (Ezequiel Garcia)
+Date: Wed, 23 Jan 2013 14:04:42 -0300
+Subject: [PATCH v2 2/3] arm: mvebu: Enable USB controllers on Armada
+ 370/XP boards
+In-Reply-To: <1358954792-16160-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1358954792-16160-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <CALF0-+XJEXJ2B3NLu5DvyxaDuuMNP=zk+z8QUd4GTQULW3BpyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 12:51:50AM +0800, loody wrote:
-> hi Russell:
-> 
-> 2013/1/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Thu, Jan 24, 2013 at 12:39:54AM +0800, loody wrote:
-> >> hi all:
-> >> The other cores on my Soc need SGI to be waken up from reset state.
-> >> Could any one header and functions I need to include and used for?
-> >
-> > That's almost what every platform does.  Plenty of examples in the
-> > platform SMP code for you to look at.
-> Nice to meet you
-> Would you please show me a hint or function name for reference?
-> 
-> Appreciate your help, @_@
+Hi Nobuhiro,
 
-It even comes with comments:
+On Wed, Jan 23, 2013 at 12:26 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> This patch activates every USB port provided by each SoC.
+> Except for Armada XP Openblocks AX3-4 board,
+> where we enable only the first two USB ports
+> until we have more information on the third one usage.
+>
+> Cc: Lior Amsalem <alior@marvell.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Tested-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> Tested-by: Florian Fainelli <florian@openwrt.org>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+> Changes from v1:
+>  * Squashed separate per-board patches into this one,
+>    as suggested by Arnd.
+>  * Remove usb at d0052000 activation in OpenBlocks AX3-4
+>    until we have more information about it.
+>
+>  arch/arm/boot/dts/armada-370-db.dts              |    8 ++++++++
+>  arch/arm/boot/dts/armada-370-mirabox.dts         |    8 ++++++++
+>  arch/arm/boot/dts/armada-xp-db.dts               |   12 ++++++++++++
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    6 ++++++
+>  4 files changed, 34 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+> index 8e66a7c..3d93902 100644
+> --- a/arch/arm/boot/dts/armada-370-db.dts
+> +++ b/arch/arm/boot/dts/armada-370-db.dts
+> @@ -74,5 +74,13 @@
+>                         status = "disabled";
+>                         /* No CD or WP GPIOs */
+>                 };
+> +
+> +               usb at d0050000 {
+> +                       status = "okay";
+> +               };
+> +
+> +               usb at d0051000 {
+> +                       status = "okay";
+> +               };
+>         };
+>  };
+> diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+> index 1864820..dd0c57d 100644
+> --- a/arch/arm/boot/dts/armada-370-mirabox.dts
+> +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+> @@ -62,5 +62,13 @@
+>                          * Wifi/Bluetooth chip
+>                          */
+>                 };
+> +
+> +               usb at d0050000 {
+> +                       status = "okay";
+> +               };
+> +
+> +               usb at d0051000 {
+> +                       status = "okay";
+> +               };
+>         };
+>  };
+> diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+> index c7035c5..c84e1fe 100644
+> --- a/arch/arm/boot/dts/armada-xp-db.dts
+> +++ b/arch/arm/boot/dts/armada-xp-db.dts
+> @@ -97,5 +97,17 @@
+>                         status = "okay";
+>                         /* No CD or WP GPIOs */
+>                 };
+> +
+> +               usb at d0050000 {
+> +                       status = "okay";
+> +               };
+> +
+> +               usb at d0051000 {
+> +                       status = "okay";
+> +               };
+> +
+> +               usb at d0052000 {
+> +                       status = "okay";
+> +               };
+>         };
+>  };
+> diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> index ec36864..3818a82 100644
+> --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> @@ -133,5 +133,11 @@
+>                         nr-ports = <2>;
+>                         status = "okay";
+>                 };
+> +               usb at d0050000 {
+> +                       status = "okay";
+> +               };
+> +               usb at d0051000 {
+> +                       status = "okay";
+> +               };
+>         };
+>  };
+> --
+> 1.7.8.6
+>
 
-        /*
-         * Send the secondary CPU a soft interrupt, thereby causing
-         * the boot monitor to read the system wide flags register,
-         * and branch to the address found there.
-         */
-        gic_raise_softirq(cpumask_of(cpu), 0);
+I'd like to bring this patch to your attention.
+As you can see, I've removed the
+
+               usb at d0052000 {
+                       status = "okay";
+               };
+
+from the OpenBlocks AX3-4 board dts file, since you mentioned this
+board uses that USB
+port for a PCIe connector -- if I understood correctly.
+
+It's interesting to note that Mirabox board doesn't provide direct
+access to its USB ports either,
+but instead they are used to connect a GL827L MMC card reader.
+However, we activate USB ports anyway, since it's needed for that to work fine.
+
+So, IMHO, if OpenBlocks uses third USB port to connect some PCIe controller,
+we should activate it in the dts file.
+
+What do you think?
+
+-- 
+    Ezequiel
