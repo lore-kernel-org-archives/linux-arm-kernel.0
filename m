@@ -1,56 +1,35 @@
-From: liu.y.victor@gmail.com (Liu Ying)
-Date: Wed, 23 Jan 2013 22:23:21 +0800
-Subject: [PATCH 1/2] misc/at24: Add at24c512b eeprom support
-In-Reply-To: <20130123141445.GA2758@pengutronix.de>
-References: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
- <CACRpkdbQcyO82Z7+v61VmJBOHuPVT2ZphQQT7OpZ9edYbho5YQ@mail.gmail.com>
- <20130123125001.GG16264@pengutronix.de>
- <CA+8Hj80=Mk1gMSC9gcRT_XPFrEdRxifaB9FNMtkn3BkUkv9bGA@mail.gmail.com>
- <20130123134936.GH16264@pengutronix.de>
- <CA+8Hj83n+pC+a6bYOOH1b61DTqSjpKsxyKDgDL2pCRKxTq4EXg@mail.gmail.com>
- <20130123141445.GA2758@pengutronix.de>
-Message-ID: <CA+8Hj81NmS5KZp+0NRSgKMHyGueDhQw51DjuA_3s7x50F5GJFg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Jan 2013 09:25:10 -0500
+Subject: [PATCH] arm: plat-orion: fix printing of "MPP config
+ unavailable on this hardware"
+In-Reply-To: <1358949059-10803-1-git-send-email-gerlando.falauto@keymile.com>
+References: <1358949059-10803-1-git-send-email-gerlando.falauto@keymile.com>
+Message-ID: <20130123142510.GN1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/23 Wolfram Sang <w.sang@pengutronix.de>:
->
->> The names of the two entries are not the same, one is "24c512", the
->> other is "24c512b".
->
-> I do understand that. There are TONS of 24c512 variants out there.
->
->> My original idea to add the new entry is to count on the name
->> difference to do different system reset operations.
->
-> Your devicetree may have both names, but at24 doesn't need it since
-> there is no code involved handling the difference.
->
->> The commit message of the patch which adds 24c32 support for MX28EVK
->> tells that "mx28evk has a free slot U50 that can be used to populate
->> an I2C EEPROM.".
->
-> I do know that, too. You can put other things there, too. But well, not
-> worth the hazzle...
+On Wed, Jan 23, 2013 at 02:50:59PM +0100, Gerlando Falauto wrote:
+> Commit 3cff484d4b264ff467a3b45c544cbbbab69f0bf8
+> ARM: dove: Consolidate mpp code with platform mpp.
+> 
+> refactored printing of the kernel warning
+> "orion_mpp_conf: requested MPP%u config unavailable on this hardware\n"
+> which is not to be printed in case of variant_mask = 0 (unknown variant).
+> This check should be performed using a logical AND (&&) as opposed
+> to a bitwise AND (&).
+> Otherwise, test would fail (and message would be printed) if variant_mask != 1
+> 
+> Signed-off-by: Gerlando Falauto <gerlando.falauto@keymile.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Cc: Holger Brunck <holger.brunck@keymile.com>
+> ---
+>  arch/arm/plat-orion/mpp.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-I accept your comments on this patch. Thanks for your review!
+Applied to mvebu/fixes with some minor cleanup of the commit message
 
->
-> --
-> Pengutronix e.K.                           | Wolfram Sang                |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
->
-> -----BEGIN PGP SIGNATURE-----
-> Version: GnuPG v1.4.10 (GNU/Linux)
->
-> iEYEARECAAYFAlD/8FUACgkQD27XaX1/VRsmGgCeJZCaByj0gw37lr753wxW0npY
-> 06oAn0WAmYiUabRNgQ6eAmcO7Ky3f1U4
-> =JSKP
-> -----END PGP SIGNATURE-----
->
+thx,
 
-
-
--- 
-Best Regards,
-Liu Ying
+Jason.
