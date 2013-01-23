@@ -1,27 +1,14 @@
-From: Frank.Li@freescale.com (Frank Li)
-Date: Wed, 23 Jan 2013 12:12:19 +0800
-Subject: [PATCH 2/2 net-next] doc: dt: fsl: fec: add napi optional properties
-Message-ID: <1358914339-3804-1-git-send-email-Frank.Li@freescale.com>
+From: yad.naveen@gmail.com (naveen yadav)
+Date: Wed, 23 Jan 2013 10:35:07 +0530
+Subject: Boot ARM (Cortex A-9) target without device tree support
+Message-ID: <CAJ8eaTxhYqen0g2a2Gjhw-UxD9wnDB1kHPHub-3BKSqAM7MLYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- Documentation/devicetree/bindings/net/fsl-fec.txt |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Dear All,
 
-diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
-index d536392..4a94090 100644
---- a/Documentation/devicetree/bindings/net/fsl-fec.txt
-+++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
-@@ -15,6 +15,8 @@ Optional properties:
-   only if property "phy-reset-gpios" is available.  Missing the property
-   will have the duration be 1 millisecond.  Numbers greater than 1000 are
-   invalid and 1 millisecond will be used instead.
-+- disable_napi : disable napi support
-+- napi_weight : napi weight number, default value is 64
- 
- Example:
- 
--- 
-1.7.1
+We want to run our embedded target on 3.8-rc4 without using device
+tree support. Is it possible.
+If yes then is it controlled by .config or I need to revert some patches.
+
+Thanks
