@@ -1,24 +1,31 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 22 Jan 2013 20:09:31 -0500
-Subject: [PATCH 1/5] mmc: mvsdio: use devm_ API to simplify/correct
- error paths.
-In-Reply-To: <1358342040-7130-2-git-send-email-andrew@lunn.ch>
-References: <1358342040-7130-1-git-send-email-andrew@lunn.ch>
- <1358342040-7130-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20130123010931.GB1758@titan.lakedaemon.net>
+Date: Tue, 22 Jan 2013 20:11:25 -0500
+Subject: [PATCH] ARM: kirkwood: fix missing #interrupt-cells property
+In-Reply-To: <1358883993-17280-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1358883993-17280-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130123011125.GC1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 02:13:56PM +0100, Andrew Lunn wrote:
-> There are a number of bugs in the error paths of this driver.  Make
-> use of devm_ functions to simplify the cleanup on error.
+On Tue, Jan 22, 2013 at 08:46:33PM +0100, Sebastian Hesselbarth wrote:
+> The gpio controller on kirkwood can provide interrupts but is missing
+> the #interrupt-cells property. This patch just adds it to both gpio
+> controllers.
 > 
-> Based on a patch by Russell King.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
->  drivers/mmc/host/mvsdio.c |   92 +++++++++++++++------------------------------
->  1 file changed, 30 insertions(+), 62 deletions(-)
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Jamie Lentin <jm@lentin.co.uk>
+> Cc: Jean-Francois Moine <moinejf@free.fr>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/kirkwood.dtsi |    2 ++
+>  1 file changed, 2 insertions(+)
 
 Applied to mvebu/fixes
 
