@@ -1,20 +1,97 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 23 Jan 2013 10:56:08 +0100
-Subject: [PATCH 1/2] i2c: sirf: register i2c_client from dt child-nodes
- in probe entry
-In-Reply-To: <1356489017-17737-1-git-send-email-Barry.Song@csr.com>
-References: <1356489017-17737-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <20130123095608.GC3767@nekote.pengutronix.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 23 Jan 2013 10:57:46 +0100
+Subject: [PATCH] clk: Add axi-clkgen driver
+In-Reply-To: <20130122180822.GA2371@kryptos>
+References: <1357755120-32735-1-git-send-email-lars@metafoo.de>
+ <20130122180822.GA2371@kryptos>
+Message-ID: <50FFB41A.8090608@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 26, 2012 at 10:30:16AM +0800, Barry Song wrote:
-> From: Barry Song <Baohua.Song@csr.com>
+On 01/22/2013 07:08 PM, Josh Cartwright wrote:
+> On Wed, Jan 09, 2013 at 07:12:00PM +0100, Lars-Peter Clausen wrote:
+>> This driver adds support for the AXI clkgen pcore to the common clock framework.
+>> The AXI clkgen pcore is a AXI front-end to the MMCM_ADV frequency synthesizer
+>> commonly found in Xilinx FPGAs.
+>>
+>> The AXI clkgen pcore is used in Analog Devices' reference designs targeting
+>> Xilinx FPGAs.
+>>
+>> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+>> ---
+>>  .../devicetree/bindings/clock/axi-clkgen.txt       |  22 ++
+>>  drivers/clk/Kconfig                                |   8 +
+>>  drivers/clk/Makefile                               |   1 +
+>>  drivers/clk/clk-axi-clkgen.c                       | 326 +++++++++++++++++++++
+>>  4 files changed, 357 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/axi-clkgen.txt
+>>  create mode 100644 drivers/clk/clk-axi-clkgen.c
+>>
+> [..]
+>> diff --git a/drivers/clk/clk-axi-clkgen.c b/drivers/clk/clk-axi-clkgen.c
+>> new file mode 100644
+>> index 0000000..e9db225
+>> --- /dev/null
+>> +++ b/drivers/clk/clk-axi-clkgen.c
+>> @@ -0,0 +1,326 @@
+>> +/*
+>> + * AXI clkgen driver
+>> + *
+>> + * Copyright 2012-2013 Analog Device Inc.
+>> + *  Author: Lars-Peter Clausen <lars@metafoo.de>
+>> + *
+>> + * Licensed under the GPL-2.
+>> + *
+>> + */
+>> +
+>> +#include <linux/platform_device.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/io.h>
+>> +#include <linux/of.h>
+>> +#include <linux/module.h>
+>> +#include <linux/err.h>
+>> +
+>> +#define AXI_CLKGEN_REG_UPDATE_ENABLE	0x04
+>> +#define AXI_CLKGEN_REG_CLK_OUT1		0x08
+>> +#define AXI_CLKGEN_REG_CLK_OUT2		0x0c
+>> +#define AXI_CLKGEN_REG_CLK_DIV		0x10
+>> +#define AXI_CLKGEN_REG_CLK_FB1		0x14
+>> +#define AXI_CLKGEN_REG_CLK_FB2		0x18
+>> +#define AXI_CLKGEN_REG_LOCK1		0x1c
+>> +#define AXI_CLKGEN_REG_LOCK2		0x20
+>> +#define AXI_CLKGEN_REG_LOCK3		0x24
+>> +#define AXI_CLKGEN_REG_FILTER1		0x28
+>> +#define AXI_CLKGEN_REG_FILTER2		0x2c
+>> +
+>> +struct axi_clkgen {
+>> +	void __iomem *base;
+>> +	struct clk_hw clk_hw;
+>> +};
+>> +
+>> +static uint32_t axi_clkgen_lookup_filter(unsigned int m)
+>> +{
+>> +	switch (m) {
+>> +	case 0:
+>> +		return 0x01001990;
+>> +	case 1:
+>> +		return 0x01001190;
+>> +	case 2:
+>> +		return 0x01009890;
+>> +	case 3:
+>> +		return 0x01001890;
+>> +	case 4:
+>> +		return 0x01008890;
+>> +	case 5 ... 8:
+>> +		return 0x01009090;
+>> +	case 9 ... 11:
+>> +		return 0x0100890;
 > 
-> in probe() entry of i2c_driver, set the of node of adapter and
-> call of_i2c_register_devices to register all i2c_client from
-> dt child-nodes
-> 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Just checking to ensure this ^ entry is correct, since it looks
+> different then the others (it may very well be).
 
-Thanks, applied to for-current.
+Nice catch, it's wrong indeed.
+
+Thanks
+- Lars
