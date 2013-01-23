@@ -1,22 +1,36 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 23 Jan 2013 13:58:47 +0000
-Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
-In-Reply-To: <B9531499-0746-44DA-BDBB-999D4CA31E63@dominion.thruhere.net>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
- <50FEB3FD.3050001@ti.com> <50FEBB61.9000707@ti.com>
- <B9531499-0746-44DA-BDBB-999D4CA31E63@dominion.thruhere.net>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA922F5@DBDE01.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Jan 2013 14:01:50 +0000
+Subject: [GIT PULL] clockevents: decouple broadcast mechanism from drivers
+In-Reply-To: <20130118171545.GB15707@e106331-lin.cambridge.arm.com>
+References: <20130117172910.GA10070@e106331-lin.cambridge.arm.com>
+ <20130118171545.GB15707@e106331-lin.cambridge.arm.com>
+Message-ID: <20130123140150.GA26811@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Koen,
+On Fri, Jan 18, 2013 at 05:15:46PM +0000, Mark Rutland wrote:
+> Hello,
+> 
+> As has been pointed out elsewhere, in my haste to fix this up I made a
+> typo in the first patch, preventing it from building.
+> 
+> Apologies for the confusion. I've created a new branch with a corrected
+> and tested version. Please see the pull request below.
+> 
+> Thanks,
+> Mark.
+> 
+> The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+> 
+>   Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://linux-arm.org/linux-mr.git for-tglx/timer-broadcast-v2
 
-On Tue, Jan 22, 2013 at 22:32:56, Koen Kooi wrote:
- 
-> Actually it uses nop-phy as a phy, which is missing from arch/arm/boot/dts/am33xx.dtsi, so mainline is already broken. But adding the nop-phy to the DT is easy enough to patch in locally.
+Can you pull this please Thomas? I need a stable branch so I can pull in the
+ARM-specific changes, which are in turn required for the KVM patch series.
 
-USB first instance of am335x works in mainline as of now.
+Cheers,
 
-Regards
-Afzal
+Will
