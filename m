@@ -1,42 +1,17 @@
-From: tobetter@gmail.com (Dongjin Kim)
-Date: Thu, 24 Jan 2013 01:40:38 +0900
-Subject: [PATCH] ARM: dts: Fix MSHC property and add RTC node
-Message-ID: <1358959242-1667-1-git-send-email-tobetter@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 23 Jan 2013 09:47:50 -0700
+Subject: [PATCH v2 1/3] ARM: DT: tegra: move serial clock-frequency attr
+ into the SoC dtsi
+In-Reply-To: <1358891169-5939-1-git-send-email-dev@lynxeye.de>
+References: <1358423961-24318-1-git-send-email-dev@lynxeye.de>
+ <1358891169-5939-1-git-send-email-dev@lynxeye.de>
+Message-ID: <51001436.5020506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the property of dw-mshc-sdr-timing and dw-mshc-ddr-timing as per
-its current binding, it only has two cells.
-And also RTC node is added new.
+On 01/22/2013 02:46 PM, Lucas Stach wrote:
+> No Tegra Platform is running PLL_P at another rate than 216MHz, nor is
+> any using an other PLL as UART source clock. Move attribute into SoC
+> level dtsi file to slim down board DT files.
 
-Signed-off-by: Dongjin Kim <tobetter@gmail.com>
----
- arch/arm/boot/dts/exynos4412-odroidx.dts |    8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-index f41a84e..1c1d5ec 100644
---- a/arch/arm/boot/dts/exynos4412-odroidx.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-@@ -49,8 +49,8 @@
- 		fifo-depth = <0x80>;
- 		card-detect-delay = <200>;
- 		samsung,dw-mshc-ciu-div = <3>;
--		samsung,dw-mshc-sdr-timing = <2 3 3>;
--		samsung,dw-mshc-ddr-timing = <1 2 3>;
-+		samsung,dw-mshc-sdr-timing = <2 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2>;
- 
- 		slot at 0 {
- 			reg = <0>;
-@@ -90,4 +90,8 @@
- 	serial at 13830000 {
- 		status = "okay";
- 	};
-+
-+	rtc at 10070000 {
-+		status = "okay";
-+	};
- };
--- 
-1.7.10.4
+I've applied the series to Tegra's for-3.9/dt branch.
