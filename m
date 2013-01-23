@@ -1,44 +1,79 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 23 Jan 2013 09:17:14 -0700
-Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
-In-Reply-To: <1358934326.1540.32.camel@tellur>
-References: <1358900903-27654-1-git-send-email-swarren@wwwdotorg.org>
- <D958900912E20642BCBC71664EFECE3E6E1B13B855@BGMAIL02.nvidia.com>
- <1358934326.1540.32.camel@tellur>
-Message-ID: <51000D0A.4010007@wwwdotorg.org>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 23 Jan 2013 17:19:34 +0100 (CET)
+Subject: [PATCH 5/8] ARM: shmobile: add a GPIO controller DT node for
+ sh7372
+In-Reply-To: <4209290.uCBdrcvT3q@avalon>
+References: <1358356097-26180-1-git-send-email-g.liakhovetski@gmx.de>
+ <1358356097-26180-6-git-send-email-g.liakhovetski@gmx.de>
+ <4209290.uCBdrcvT3q@avalon>
+Message-ID: <Pine.LNX.4.64.1301231714450.26301@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2013 02:45 AM, Lucas Stach wrote:
-> Am Mittwoch, den 23.01.2013, 12:25 +0530 schrieb Venu Byravarasu:
->>> -----Original Message-----
->>> From: linux-tegra-owner at vger.kernel.org [mailto:linux-tegra-
->>> owner at vger.kernel.org] On Behalf Of Stephen Warren
->>> Sent: Wednesday, January 23, 2013 5:58 AM
->>> To: Alan Stern; Greg Kroah-Hartman; Stephen Warren
->>> Cc: Venu Byravarasu; linux-tegra at vger.kernel.org; linux-arm-
->>> kernel at lists.infradead.org; linux-usb at vger.kernel.org; Stephen Warren
->>> Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
->>>
->>> From: Stephen Warren <swarren@nvidia.com>
->>>
->>> Clock "emc" is for the External Memory Controller. The USB driver has no
->>> business touching this clock directly. Remove the code that does so.
->>
->> Stephen,
->> This was primarily done to make sure that EMC is set to a minimum
->> frequency, below which data errors may occur during USB transfers.
->> If we plan to remove this, how should we make sure that the EMC
->> is programmed for the required frequency during USB transfers?
->
-> You could use something like the API I added in "ARM: tegra: add EMC
-> clock scaling API". This needs some rework and I looked into integrating
-> this with the DEVFREQ framework, but I don't think it fits too well.
+Hi Laurent
+
+Thanks for your comments. All will be addressed except for this one:
+
+On Mon, 21 Jan 2013, Laurent Pinchart wrote:
+
+> Hi Guennadi,
 > 
-> Bandwidth requirements should always be communicated to the EMC driver
-> and not described by clock rates.
+> Thanks for the patch.
+> 
+> On Wednesday 16 January 2013 18:08:14 Guennadi Liakhovetski wrote:
+> > Add a missing GPIO controller node to sh7372.
+> > 
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > ---
+> >  arch/arm/boot/dts/sh7372.dtsi |    8 ++++++++
+> >  1 files changed, 8 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/sh7372.dtsi b/arch/arm/boot/dts/sh7372.dtsi
+> > index 582fdec..7ca9322 100644
+> > --- a/arch/arm/boot/dts/sh7372.dtsi
+> > +++ b/arch/arm/boot/dts/sh7372.dtsi
+> > @@ -19,6 +19,14 @@
+> >  		};
+> >  	};
+> > 
+> > +	gpio: pfc at e6050000 {
+> > +		compatible = "renesas,pfc-sh7372";
+> > +		reg = <0xe6050000 0x8000>,
+> > +		      <0xe605800c 0x20>;
+> 
+> Shouldn't the second one be
+> 
+> 		      <0xe605800c 0x1c>;
+> 
+> > +		gpio-controller;
+> > +		#gpio-cells = <2>;
+> > +	};
+> > +
+> 
+> I haven't checked the board files, have you made sure that the PFC device 
+> won't be instantiated twice, once from DT and once from board code ?
 
-I agree.
+Don't think so. board-mackerel.c uses DT in a really dull way - it doesn't 
+call of_platform_populate(). It also initialises interrupts by calling 
+sh7372_init_irq(), which would conflict with intc instances in sh7372.dtsi 
+too, if the latter were used. And board-mackerel-reference.c doesn't 
+register PFC internally.
 
-Besides, on some boards there's an EMC scaling table defined already, so
-the EMC driver is simply overriding the value the USB driver selects anyway.
+Thanks
+Guennadi
+
+> 
+> >  	soc {
+> >  		compatible = "simple-bus";
+> >  		#address-cells = <1>;
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
