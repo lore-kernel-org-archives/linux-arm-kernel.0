@@ -1,37 +1,35 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 23 Jan 2013 10:48:53 +0100
-Subject: [PATCH 6/9] ARM: at91/dts: add macb mii pinctrl config for kizbox
+Date: Wed, 23 Jan 2013 10:48:54 +0100
+Subject: [PATCH 7/9] ARM: at91/at91_dt_defconfig: remove memory specification
+ to cmdline
 In-Reply-To: <cover.1358934163.git.nicolas.ferre@atmel.com>
 References: <cover.1358934163.git.nicolas.ferre@atmel.com>
-Message-ID: <b45c998ea79224b5f8ac718d9be55cacd17fab18.1358934163.git.nicolas.ferre@atmel.com>
+Message-ID: <2e06e92c758b768baaacc061aafa7f710b74ea02.1358934163.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <linux-arm@overkiz.com>
+No need for this cmdline option as we are using DT.
+Moreover this defconfig is targeted to multiple SoC/boards: this option
+was nonsense.
 
-This patch overrides default macb pinctrl config defined in
-at91sam9260.dtsi (pinctrl_macb_rmii) with kizbox board config
-(pinctrl_macb_rmii + pinctrl_macb_rmii_mii_alt).
-
-Signed-off-by: Boris BREZILLON <linux-arm@overkiz.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Reported-by: Josh Wu <josh.wu@atmel.com>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/kizbox.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/at91_dt_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/kizbox.dts b/arch/arm/boot/dts/kizbox.dts
-index e8814fe..b4dc3ed 100644
---- a/arch/arm/boot/dts/kizbox.dts
-+++ b/arch/arm/boot/dts/kizbox.dts
-@@ -48,6 +48,8 @@
- 
- 			macb0: ethernet at fffc4000 {
- 				phy-mode = "mii";
-+				pinctrl-0 = <&pinctrl_macb_rmii
-+				             &pinctrl_macb_rmii_mii_alt>;
- 				status = "okay";
- 			};
- 
+diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+index b175577..a353ff6 100644
+--- a/arch/arm/configs/at91_dt_defconfig
++++ b/arch/arm/configs/at91_dt_defconfig
+@@ -31,7 +31,7 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+-CONFIG_CMDLINE="mem=128M console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
++CONFIG_CMDLINE="console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
+ CONFIG_KEXEC=y
+ CONFIG_AUTO_ZRELADDR=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
 -- 
 1.8.0
