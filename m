@@ -1,25 +1,116 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 23 Jan 2013 16:56:53 +0800
-Subject: [PATCH] [ARM] spitz/pxa: Minor naming fixes in spitz.c
-In-Reply-To: <1355254812-14500-1-git-send-email-dromede@gmail.com>
-References: <1355254812-14500-1-git-send-email-dromede@gmail.com>
-Message-ID: <CAN1soZwRRof8NFdMAd6k4tftLfGwMhh8YHuvuvszemL7pq69Vw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 23 Jan 2013 14:28:08 +0530
+Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex
+ A9
+In-Reply-To: <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
+References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
+ <1358833924-24535-2-git-send-email-hdoyu@nvidia.com> <50FE2CA8.20100@ti.com>
+ <50FEC503.2080602@wwwdotorg.org>
+ <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
+Message-ID: <50FFA620.50008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 3:40 AM,  <dromede@gmail.com> wrote:
-> From: Marko Katic <dromede.gmail.com>
+On Tuesday 22 January 2013 10:34 PM, Olof Johansson wrote:
+> On Tue, Jan 22, 2013 at 8:57 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 01/21/2013 11:07 PM, Santosh Shilimkar wrote:
+>>> On Tuesday 22 January 2013 11:22 AM, Hiroshi Doyu wrote:
+>>>> Skip scu_enable(scu_base) if CPU is not Cortex A9 with SCU.
+>>>>
+>>>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+>>>> ---
+>>> Looks fine. I will also update OMAP code with the new
+>>> interface. Thanks.
+>>
+>> OK, so patch 1/2 at least needs to get into a stable arm-soc branch
+>> then. Unless there are violent objections, I'll forward patch 1/2 to
+>> arm-soc and request it be added into a branch so that Tegra and OMAP can
+>> both merge it into their branches as a dependency. I guess patch 2/2
+>> could also be included; I don't think it has any complex dependencies
+>> that'd prevent that, and would help to show how patch 1/2 gets used.
+>>
+>> Hiroshi, is this series the only dependency you need for your Tegra114
+>> series? So, I could merge your Tegra114 series once this series is applied?
 >
-> The NAND init section was erroneously named "Framebuffer".
-> Gpio expander section should really be called "I2C devices"
-> since it contains all i2c init code.
+> For something like this, it might make more sense for us to just apply
+> the patches for OMAP on top, i.e. we'll pull the short branch from
+> you, and then we can just apply patches (with maintainer acks) on top,
+> instead of doing a bunch of single-patch pulls.
 >
-> Signed-off-by: Marko Katic <dromede@gmail.com>
-> ---
->  arch/arm/mach-pxa/spitz.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-Applied.
+In case you decide to apply patches, you can use patch in the end
+of the email for OMAP. Attached the same in case mailer damages it.
 
-Thanks
-Haojian
+Btw, I noticed the build error with patch 1/1. Since I wasn't using
+the first interface in OMAP code, I just bypassed it for testing.
+I might be missing some dependent patch which added
+read_cpuid_part_number().
+
+---------------
+In file included from arch/arm/kernel/smp_scu.c:15:0:
+linux-2.6/arch/arm/include/asm/smp_scu.h: In function 'scu_a9_has_base':
+linux-2.6/arch/arm/include/asm/smp_scu.h:14:2: error: implicit 
+declaration of function 'read_cpuid_part_number' 
+[-Werror=implicit-function-declaration]
+linux-2.6/arch/arm/include/asm/smp_scu.h:14:37: error: 
+'ARM_CPU_PART_CORTEX_A9' undeclared (first use in this function)
+linux-2.6/arch/arm/include/asm/smp_scu.h:14:37: note: each undeclared 
+identifier is reported only once for each function it appears in
+cc1: some warnings being treated as errors
+make[1]: *** [arch/arm/kernel/smp_scu.o] Error 1
+make: *** [arch/arm/kernel] Error 2
+---------------------------------
+
+Regards
+Santosh
+
+ From 9760cd0ed93b48ec22584e89979cd4a8ec65b938 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Wed, 23 Jan 2013 13:56:19 +0530
+Subject: [PATCH] ARM: OMAP: Make use of available scu_a9_get_base() 
+interface
+
+Drop the define and make use of scu_a9_get_base() which reads
+the physical address of SCU from CP15 register.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+  arch/arm/mach-omap2/omap-smp.c |    2 +-
+  arch/arm/mach-omap2/omap44xx.h |    1 -
+  2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index cd42d92..e683d0d 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -215,7 +215,7 @@ static void __init omap4_smp_init_cpus(void)
+  		 * Currently we can't call ioremap here because
+  		 * SoC detection won't work until after init_early.
+  		 */
+-		scu_base =  OMAP2_L4_IO_ADDRESS(OMAP44XX_SCU_BASE);
++		scu_base =  OMAP2_L4_IO_ADDRESS(scu_a9_get_base());
+  		BUG_ON(!scu_base);
+  		ncores = scu_get_core_count(scu_base);
+  	} else if (cpu_id == CPU_CORTEX_A15) {
+diff --git a/arch/arm/mach-omap2/omap44xx.h b/arch/arm/mach-omap2/omap44xx.h
+index 43b927b..8a515bb 100644
+--- a/arch/arm/mach-omap2/omap44xx.h
++++ b/arch/arm/mach-omap2/omap44xx.h
+@@ -40,7 +40,6 @@
+  #define OMAP44XX_GIC_DIST_BASE		0x48241000
+  #define OMAP44XX_GIC_CPU_BASE		0x48240100
+  #define OMAP44XX_IRQ_GIC_START		32
+-#define OMAP44XX_SCU_BASE		0x48240000
+  #define OMAP44XX_LOCAL_TWD_BASE		0x48240600
+  #define OMAP44XX_L2CACHE_BASE		0x48242000
+  #define OMAP44XX_WKUPGEN_BASE		0x48281000
+-- 
+1.7.9.5
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-OMAP-Make-use-of-available-scu_a9_get_base-inter.patch
+Type: text/x-patch
+Size: 1627 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130123/2bd872f7/attachment.bin>
