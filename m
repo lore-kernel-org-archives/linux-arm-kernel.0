@@ -1,39 +1,42 @@
-From: eric@eukrea.com (Eric =?UTF-8?B?QsOpbmFyZA==?=)
-Date: Wed, 23 Jan 2013 22:14:58 +0100
-Subject: [PATCH v2 2/3] arm: mvebu: Enable USB controllers on Armada
- 370/XP boards
-In-Reply-To: <20130123190352.2d001218@skate>
-References: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1358954792-16160-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <CALF0-+XJEXJ2B3NLu5DvyxaDuuMNP=zk+z8QUd4GTQULW3BpyA@mail.gmail.com>
- <20130123190352.2d001218@skate>
-Message-ID: <20130123221458.6237568b@e6520eb>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 23 Jan 2013 13:40:53 -0800
+Subject: [PATCH v2 1/2] clk: divider: prepare for minimum divider
+In-Reply-To: <6dc1c48cac5b2646a55da3079afb72f88e40c3bc.1358937138.git.afzal@ti.com>
+References: <6dc1c48cac5b2646a55da3079afb72f88e40c3bc.1358937138.git.afzal@ti.com>
+Message-ID: <20130123214053.9205.49804@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-Le Wed, 23 Jan 2013 19:03:52 +0100,
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> a ?crit :
-> On Wed, 23 Jan 2013 14:04:42 -0300, Ezequiel Garcia wrote:
+Quoting Afzal Mohammed (2013-01-23 03:38:52)
+> Some of clocks can have a limit on minimum divider value that can be
+> programmed, prepare for such a support.
 > 
-> > from the OpenBlocks AX3-4 board dts file, since you mentioned this
-> > board uses that USB
-> > port for a PCIe connector -- if I understood correctly.
+> Add a new field min_div for the basic divider clock and a new dynamic
+> clock divider registration function where minimum divider value can
+> be specified. Keep behaviour of existing divider clock registration
+> functions, static initialization helpers as was earlier.
 > 
-> No. The OpenBlocks has a different USB controller that sits on the PCIe
-> bus. There is nothing like a PCIe port that uses a USB port, that
-> doesn't make sense.
-> 
-I don't have a AX3-4 but it seems to have a MiniPCIe socket and
-not a PCIe one.
-MiniPCIe specification includes both PCIe _and_ USB2.0 signals (on pins
-36&38) (and also SMBus, SIM and LEDs drivers check the following table
-for details http://pinoutsguide.com/Slots/mini_pcie_pinout.shtml ) so
-the possibility to have a USB port connected to the MiniPCIe on the
-AX3-4 makes sense.
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
 
-For example most 3G MiniPCIe boards are using the USB2.0 signals and
-not the PCIe ones.
+Hi Afzal,
 
-Eric
+I'd like to understand this a bit better.  At first the need for a
+minimum divider makes a lot of sense, but I want to make sure it gets
+designed correctly.
+
+My first question is whether the minimum divider you plan to use is an
+actual constraint of the hardware (e.g. the clock controller ip only
+lets program two bits which divide by 4, 5, 6 or 7, where 4 is the
+minimum divider) or if this is a functional constraint (e.g. the clock
+hardware can divide by a lower value, but you never want that since it
+results in non-functional video/audio/whatever).  If this is more of a
+functional constraint then perhaps a new api like clk_set_min_rate makes
+more sense.
+
+Secondly, have you looked into using the rate-table option provided by
+the basic divider clock?  Can you explain how this is not a good fit for
+your needs?  Perhaps there are too many divisor values so the table
+would be large?
+
+Thanks,
+Mike
