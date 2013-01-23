@@ -1,44 +1,96 @@
-From: gabriele@precidata.com (Gabriele Mondada)
-Date: Wed, 23 Jan 2013 11:32:10 +0100
-Subject: LPC32xx and MMCI driver
-In-Reply-To: <20121222212457.GJ14363@n2100.arm.linux.org.uk>
-References: <50D2E156.20707@precidata.com> <50D2E317.6000005@precidata.com>
- <20121222212457.GJ14363@n2100.arm.linux.org.uk>
-Message-ID: <4B116C76-1D65-437C-8C38-B08702706FA2@precidata.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 23 Jan 2013 10:36:14 +0000
+Subject: [PATCH] ARM: dts: specify all the per-cpu interrupts of arch
+ timer for exynos5440
+In-Reply-To: <063f01cdf8ec$926cda30$b7468e90$@samsung.com>
+References: <1358818887-16870-1-git-send-email-kgene.kim@samsung.com>
+ <20130122101554.GA18876@e106331-lin.cambridge.arm.com>
+ <063f01cdf8ec$926cda30$b7468e90$@samsung.com>
+Message-ID: <20130123103614.GD32237@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
->> +#ifdef CONFIG_ARCH_LPC32XX
->> +/*
->> + * This exported function is used by mmci driver to workaround a bug in the
->> + * LPC32xx CPU.
->> + */
->> +void pl08x_force_dma_burst(struct dma_chan *chan)
->> +{
->> +    struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
->> +    struct pl08x_driver_data *pl08x = plchan->host;
->> +
->> +    dev_dbg(&pl08x->adev->dev,
->> +        "force burst signal=%d chan=%p plchan=%p\n",
->> +        plchan->signal, chan, plchan);
->> +    if (plchan->signal >= 0)
->> +        writel(1 << plchan->signal, pl08x->base + PL080_SOFT_BREQ);
->> +}
->> +
->> +EXPORT_SYMBOL_GPL(pl08x_force_dma_burst);
-> 
-> Eww.  This is really horrid and totally breaks software layering.
+On Tue, Jan 22, 2013 at 10:05:18PM +0000, Kukjin Kim wrote:
+> Mark Rutland wrote:
+> >
+> + devicetree-discuss, Grant Likely, Rob Herring and Tony Lindgren
+>  
+> > On Tue, Jan 22, 2013 at 01:41:27AM +0000, Kukjin Kim wrote:
+> > > From: Thomas Abraham <thomas.ab@samsung.com>
+> > >
+> > > Need to be changed requirements in the 'cpus' node for exynos5440
+> > > to specify all the per-cpu interrupts of arch timer.
+> > 
+> > The node(s) for the arch timer should not be in the cpus/cpu at N nodes.
+> > Instead, there should be one node (in the root of the tree).
+> > 
+> Well, I don't think so. As per my understanding, the local timers are
+> attached to every ARM cores (cpus) and it generates certain interrupt to the
+> GIC. So the correct representation for this in device tree is to include the
+> interrupts in the cpu nodes in dts file. Your comments  refer to a
+> limitation in the Linux kernel implementation of the arch_timer and it
+> should not result in representing the hardware details incorrectly in the
+> dts file.
 
-Yes, it is.
-There is a silicon bug that prevents the DMA controller to receive the last DMA request. So, I have to generate the last transfer by software.
-How can I do that without breaking software layers? Do I add a new entry point in the dmaengine device?
+I disagree. The "correct representation" is whatever the devicetree binding
+documentation describes. It does not describe placing timer nodes in the cpu
+nodes.
 
-> As for formatting in the patch, that's also horrid.  Extra tab
-> indentations, lines over 80 characters, and a hell of a lot of code
-> to fix this brokenness.
 > 
-> At least the first thing that needs to happen is to clean the patch up
-> so that it passes checkpatch.pl.
+> > If this works currently it's only because the driver picks up one of the
+> nodes,
+> > and luckily it's the same as the others. This is not guaranteed to work in
+> > future, and will likely break.
+> > 
+> It is up to the Linux kernel implementation of arch_timer to handle the
+> hardware details in dts file accordingly.
 
-I cleaned up the patch and posted again on the list. See [PATCH] Implements DMA on mmci driver for LPC3250 plateform
+The binding specification does not specify that there should be multiple timer
+nodes, nor does it specify that they should be under cpu nodes. The timers,
+being a banked resource, can be described with one node.
+
+It is not up to the Linux kernel to handle undocumented variations of bindings.
+
+> 
+> > >
+> > > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > > ---
+> > >  arch/arm/boot/dts/exynos5440.dtsi |   20 ++++++++++++++++----
+> > >  1 file changed, 16 insertions(+), 4 deletions(-)
+> > >
+> > > diff --git a/arch/arm/boot/dts/exynos5440.dtsi
+> > b/arch/arm/boot/dts/exynos5440.dtsi
+> > > index 5406689..c5bd8ed 100644
+> > > --- a/arch/arm/boot/dts/exynos5440.dtsi
+> > > +++ b/arch/arm/boot/dts/exynos5440.dtsi
+> > > @@ -28,7 +28,10 @@
+> > >  			compatible = "arm,cortex-a15";
+> > >  			timer {
+> > >  				compatible = "arm,armv7-timer";
+> > > -				interrupts = <1 13 0xf08>;
+> > > +				interrupts = <1 13 0xf08>,
+> > > +					     <1 14 0xf08>,
+> > > +					     <1 11 0xf08>,
+> > > +					     <1 10 0xf08>;
+> > 
+> > Also, this interrupts list is updated differently to all the other nodes.
+> Typo?
+> > 
+> Hmm, I think this should be fine. If any concerns, please let me know in
+> detail.
+
+Sorry, I misread the diff. Your patch in fact corrects them to be consistent
+where they weren't previously.
+
+> 
+> [...]
+> 
+> Thanks.
+> 
+> - Kukjin
+> 
+> 
+
+Thanks,
+Mark.
