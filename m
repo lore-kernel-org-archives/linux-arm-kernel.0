@@ -1,24 +1,23 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 23 Jan 2013 10:23:13 -0500 (EST)
-Subject: [PATCH 1/2] usb: host: tegra: don't touch EMC clock
-In-Reply-To: <1358900903-27654-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <Pine.LNX.4.44L0.1301231022560.2045-100000@iolanthe.rowland.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 23 Jan 2013 23:24:18 +0800
+Subject: [PATCH V5] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <CACRpkdZTwvdmRnDOAcOObj7NhkuUunACpYBvAE1bY65suroQiA@mail.gmail.com>
+References: <1358877374-1279-1-git-send-email-swarren@wwwdotorg.org>
+ <CACRpkdZTwvdmRnDOAcOObj7NhkuUunACpYBvAE1bY65suroQiA@mail.gmail.com>
+Message-ID: <20130123152410.GA4565@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jan 2013, Stephen Warren wrote:
+On Wed, Jan 23, 2013 at 09:50:36AM +0100, Linus Walleij wrote:
 
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Clock "emc" is for the External Memory Controller. The USB driver has no
-> business touching this clock directly. Remove the code that does so.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Greg, Alan, I'd like to take this patch through the Tegra tree to avoid
-> any merge conflicts with the Tegra USB changes that have  recently
-> happened there.
+> Greg/Mark: are you still confident with your ACK/Reviewed-by
+> tags being added on this version?
 
-It's okay with me.
-
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Yup, this looks great.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130123/be9b4028/attachment-0001.sig>
