@@ -1,37 +1,45 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 23 Jan 2013 12:26:32 -0300
-Subject: [PATCH v2 3/3] arm: mvebu: Update defconfig to select USB support
-In-Reply-To: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1358954792-16160-3-git-send-email-ezequiel.garcia@free-electrons.com>
+From: smoch@web.de (Soeren Moch)
+Date: Wed, 23 Jan 2013 16:30:53 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20130119185907.GA20719@lunn.ch>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <201301171049.30415.arnd@arndb.de> <50F800EB.6040104@web.de>
+ <201301172026.45514.arnd@arndb.de> <50FABBED.1020905@web.de>
+ <20130119185907.GA20719@lunn.ch>
+Message-ID: <5100022D.9050106@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Lior Amsalem <alior@marvell.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-Tested-by: Florian Fainelli <florian@openwrt.org>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+On 19.01.2013 19:59, Andrew Lunn wrote:
+>> Please find attached a debug log generated with your patch.
+>>
+>> I used the sata disk and two em28xx dvb sticks, no other usb devices,
+>> no ethernet cable connected, tuners on saa716x-based card not used.
+>>
+>> What I can see in the log: a lot of coherent mappings from sata_mv
+>> and orion_ehci, a few from mv643xx_eth, no other coherent mappings.
+>> All coherent mappings are page aligned, some of them (from orion_ehci)
+>> are not really small (as claimed in __alloc_from_pool).
+>>
+>> I don't believe in a memory leak. When I restart vdr (the application
+>> utilizing the dvb sticks) then there is enough dma memory available
+>> again.
+>
+> Hi Soeren
+>
+> We should be able to rule out a leak. Mount debugfg and then:
+>
+> while [ /bin/true ] ; do cat /debug/dma-api/num_free_entries ; sleep 60 ; done
+>
+> while you are capturing. See if the number goes down.
+>
+>        Andrew
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index c3c6326..f8d0183 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -42,7 +42,10 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB_SUPPORT=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_ROOT_HUB_TT=y
- CONFIG_MMC=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_RTC_CLASS=y
--- 
-1.7.8.6
+Now I built a kernel with debugfs enabled.
+It is not clear to me what I can see from the dma-api/num_free_entries 
+output. After reboot (vdr running) I see decreasing numbers (3453 3452 
+3445 3430...), min_free_entries is lower (3390). Sometimes the output is 
+constant for several minutes ( 3396 3396 3396 3396 3396,...)
+
+   Soeren
