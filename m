@@ -1,42 +1,27 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jan 2013 12:40:25 -0500
-Subject: [PATCH v2 1/3] arm: mvebu: Add support for USB host
- controllers in Armada 370/XP
-In-Reply-To: <CALF0-+W8dVLHF66VKni+5ZsQpFd=cGDXE0TD=dRc1B=ptrAMUg@mail.gmail.com>
-References: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <CALF0-+W8dVLHF66VKni+5ZsQpFd=cGDXE0TD=dRc1B=ptrAMUg@mail.gmail.com>
-Message-ID: <20130123174025.GV1758@titan.lakedaemon.net>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 23 Jan 2013 18:56:50 +0100
+Subject: [PATCH 0/2] ARM: dts: omap3-overo: Add pwm-leds and audio support
+Message-ID: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 02:06:12PM -0300, Ezequiel Garcia wrote:
-> Jason,
-> 
-> On Wed, Jan 23, 2013 at 12:26 PM, Ezequiel Garcia <ezequiel.garcia@free-electrons.com> wrote:
-> > The Armada 370 and Armada XP SoC has an Orion EHCI USB controller.
-> > This patch adds support for this controller in Armada 370
-> > and Armada XP SoC common device tree files.
-> >
-> > Cc: Lior Amsalem <alior@marvell.com>
-> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Tested-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > Tested-by: Florian Fainelli <florian@openwrt.org>
-> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> > Changes from v1:
-> >  * Remove uneeded USB_ARCH_HAS_EHCI selection as noted by Florian.
-> >
-> >  arch/arm/boot/dts/armada-370-xp.dtsi |   15 +++++++++++++++
-> >  arch/arm/boot/dts/armada-370.dtsi    |    9 +++++++++
-> >  arch/arm/boot/dts/armada-xp.dtsi     |   17 +++++++++++++++++
-> >  3 files changed, 41 insertions(+), 0 deletions(-)
-> 
-> Do you think we're still in time to get this series into v3.9 (given
-> we decide soon on the OpenBlocks issue)?
+Hello Benoit,
 
-That shouldn't be a problem.
+This patchset adds some new DT supports to the Overo products.
+The first patch converts the PMIC LEDB output to use the pwm-leds,
+newly merged in your branch for_3.9/dts. The second patch
+adds the audio support.
 
-thx,
+Best regards,
 
-Jason.
+Florian
+
+Florian Vaussard (2):
+  ARM: dts: omap3-overo: Add support for pwm-leds
+  ARM: dts: omap3-overo: Add audio support
+
+ arch/arm/boot/dts/omap3-overo.dtsi |   23 +++++++++++++++++++----
+ 1 files changed, 19 insertions(+), 4 deletions(-)
+
+-- 
+1.7.5.4
