@@ -1,85 +1,35 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 22 Jan 2013 18:38:59 -0800
-Subject: [PATCH v2] hardlockup: detect hard lockups without NMIs using
- secondary cpus
-In-Reply-To: <CAMbhsRRM+60gUTRuYzT5sAgLPP7Fj=T78Z3E_hZVmajY-wqGeQ@mail.gmail.com>
-References: <1357941108-14138-1-git-send-email-ccross@android.com>
- <20130114154914.6d69eb27.akpm@linux-foundation.org>
- <CAMbhsRR29Zhje9mGtUwHfUsX+eFsggYkVMHPyQ+zgrGUp_rqTQ@mail.gmail.com>
- <20130114162504.e667a4be.akpm@linux-foundation.org>
- <CAMbhsRRM+60gUTRuYzT5sAgLPP7Fj=T78Z3E_hZVmajY-wqGeQ@mail.gmail.com>
-Message-ID: <CAMbhsRTDSJaQd4JKfo8KoaUsBaa5pQkpqh7JpH6jkOP4QFojhA@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Jan 2013 02:48:03 +0000
+Subject: [GIT PULL V2 1/4] ARM: mvebu: cleanup for v3.9
+In-Reply-To: <1358909281.35276e0.21555@triton>
+Message-ID: <1358909283.6D1c74D1.21555@triton>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 14, 2013 at 4:30 PM, Colin Cross <ccross@android.com> wrote:
-> On Mon, Jan 14, 2013 at 4:25 PM, Andrew Morton
-> <akpm@linux-foundation.org> wrote:
->> On Mon, 14 Jan 2013 16:19:23 -0800
->> Colin Cross <ccross@android.com> wrote:
->>
->>> >> +static void watchdog_check_hardlockup_other_cpu(void)
->>> >> +{
->>> >> +     unsigned int next_cpu;
->>> >> +
->>> >> +     /*
->>> >> +      * Test for hardlockups every 3 samples.  The sample period is
->>> >> +      *  watchdog_thresh * 2 / 5, so 3 samples gets us back to slightly over
->>> >> +      *  watchdog_thresh (over by 20%).
->>> >> +      */
->>> >> +     if (__this_cpu_read(hrtimer_interrupts) % 3 != 0)
->>> >> +             return;
->>> >
->>> > The hardwired interval Seems Wrong.  watchdog_thresh is tunable at runtime.
->>> >
->>> > The comment could do with some fleshing out.  *why* do we want to test
->>> > at an interval "slightly over watchdog_thresh"?  What's going on here?
->>>
->>> I'll reword it.  We don't want to be slightly over watchdog_thresh,
->>> ideally we would be exactly at watchdog_thresh.  However, since this
->>> relies on the hrtimer interrupts that are scheduled at watchdog_thresh
->>> * 2 / 5, there is no multiple of hrtimer_interrupts that will result
->>> in watchdog_thresh.  watchdog_thresh * 2 / 5 * 3 (watchdog_thresh *
->>> 1.2) is the closest I can get to testing for a hardlockup once every
->>> watchdog_thresh seconds.
->>
->> It needs more than rewording, doesn't it?  What happens if watchdog_thresh is
->> altered at runtime?
->
-> I'm not sure what you mean.  If watchdog_thresh changes, the next
-> hrtimer interrupt on each cpu will move the following hrtimer
-> interrupt forward by the new watchdog_thresh * 2 / 5.  There may be a
-> single cycle of watchdog checks at an intermediate period, but nothing
-> bad should happen.
->
-> This code doesn't ever deal with watchdog_thresh directly, it is only
-> counting hrtimer interrupts.  3 hrtimer interrupts is always a
-> reasonable approximation of watchdog_thresh.
+The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
 
-I think I see the race you were referring to.  When the hrtimer
-interrupt fires on the first cpu after changing the watchdog thresh,
-it will see the new value and starting firing the timer at the new
-rate.  The other cpus may not see the new value for as long as the old
-sample period.  If the new threshold is more than 3 times lower than
-the old value, one cpu could easily get 3 hrtimer interrupts while
-another cpu doesn't get any, triggering the lockup detector.
+  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
 
-The exact same issue is already present in the existing NMI detector,
-which is conceptually very similar to this one.  It has two
-asynchronous timers, the NMI perf counter and the hrtimer.  If one
-timer sees the new threshold before the other their relative rates
-will be wrong and the lockup detector may fire.  Setting
-watchdog_nmi_touch is not good enough, as one interrupt could fire
-enough to trigger the hardlockup detector twice.  The only fix I can
-think of is to set a timestamp far enough in the future to catch all
-the ordering problems, and ignore lockups until sched_clock() is
-higher than the timestamp.  I think it would need to be a delay of
-twice the larger of the old and new watchdog_thresh values.
+are available in the git repository at:
 
-But its worse than that, the NMI perf counter is never updated when
-watchdog_thresh changes, so raising watchdog_thresh more than 2.5x may
-trigger the NMI detector.
+  git://git.infradead.org/users/jcooper/linux.git tags/cleanup_for_v3.9
 
-I'll send a separate patch for the first problem, but I don't have
-anything to test resetting the NMI counter on so I'll leave that issue
-for someone else.
+for you to fetch changes up to b96e1b1c3c5319294edb0970b6d5bf099c0e85eb:
+
+  ARM: Kirkwood: Cleanup unneeded include files (2013-01-12 21:50:10 +0000)
+
+----------------------------------------------------------------
+mvebu cleanup for v3.9
+ - remove unneeded includes due to DT conversion
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: Cleanup unneeded include files
+
+Thomas Petazzoni (1):
+      arm: kirkwood: dockstar: remove useless include of SDIO header
+
+ arch/arm/mach-kirkwood/board-ib62x0.c   | 1 -
+ arch/arm/mach-kirkwood/board-mplcec4.c  | 1 -
+ arch/arm/mach-kirkwood/dockstar-setup.c | 1 -
+ 3 files changed, 3 deletions(-)
