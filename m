@@ -1,26 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Jan 2013 09:50:36 +0100
-Subject: [PATCH V5] drivers/pinctrl: grab default handles from device core
-In-Reply-To: <1358877374-1279-1-git-send-email-swarren@wwwdotorg.org>
-References: <1358877374-1279-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CACRpkdZTwvdmRnDOAcOObj7NhkuUunACpYBvAE1bY65suroQiA@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 23 Jan 2013 16:51:56 +0800
+Subject: [PATCH] ARM: PXA3xx: program the CSMSADRCFG register
+In-Reply-To: <CAMPhdO8LfzvjoE1Re9G44pAZh+-9U7aj5gUWj2xeUyV1ihyRSg@mail.gmail.com>
+References: <1358077787-31518-1-git-send-email-grinberg@compulab.co.il>
+ <CAMPhdO8LfzvjoE1Re9G44pAZh+-9U7aj5gUWj2xeUyV1ihyRSg@mail.gmail.com>
+Message-ID: <CAN1soZyaUXSNaXNT-bLirh7FDjm9QnYZq_QUUAJt8Tjo=Febeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK!
+On Tue, Jan 15, 2013 at 11:01 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>
+> On Sun, Jan 13, 2013 at 7:49 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> > The Chip Select Configuration Register must be programmed to 0x2 in
+> > order to achieve the correct behavior of the Static Memory Controller.
+> >
+> > Without this patch devices wired to DFI and accessed through SMC cannot
+> > be accessed after resume from S2.
+> >
+> > Do not rely on the boot loader to program the CSMSADRCFG register by
+> > programming it in the kernel smemc module.
+> >
+>
+> Looks good to me. Acked-by: Eric Miao <eric.y.miao@gmail.com>
+>
 
-This modified version of the patch is way more beautiful, stupid
-me for not realizing it could be written like that.
+Appled.
 
-And I can sure live with the removed doc piece ... we can discuss
-that separately if need be, I have some argument for it but it's
-a separate issue.
-
-I've dubbed this version the v5 variant and applied it, and included
-the changelog (so I remember how it came about).
-
-Greg/Mark: are you still confident with your ACK/Reviewed-by
-tags being added on this version?
-
-Yours,
-Linus Walleij
+Thanks.
+Haojian
