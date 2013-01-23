@@ -1,37 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 23 Jan 2013 19:03:52 +0100
-Subject: [PATCH v2 2/3] arm: mvebu: Enable USB controllers on Armada
- 370/XP boards
-In-Reply-To: <CALF0-+XJEXJ2B3NLu5DvyxaDuuMNP=zk+z8QUd4GTQULW3BpyA@mail.gmail.com>
-References: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1358954792-16160-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <CALF0-+XJEXJ2B3NLu5DvyxaDuuMNP=zk+z8QUd4GTQULW3BpyA@mail.gmail.com>
-Message-ID: <20130123190352.2d001218@skate>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Jan 2013 18:05:07 +0000
+Subject: [GIT PULL] psci client-side implementation for 3.9
+Message-ID: <20130123180507.GH26811@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+Hello again guys,
 
-On Wed, 23 Jan 2013 14:04:42 -0300, Ezequiel Garcia wrote:
+Please pull my PSCI client-side implementation for 3.9. This is used by
+the mach-virt platform, for which I'll send another pull request later
+on (since there are some timer dependencies that need resolving first).
 
-> from the OpenBlocks AX3-4 board dts file, since you mentioned this
-> board uses that USB
-> port for a PCIe connector -- if I understood correctly.
+As before, I'll keep this branch stable so others can base against it.
 
-No. The OpenBlocks has a different USB controller that sits on the PCIe
-bus. There is nothing like a PCIe port that uses a USB port, that
-doesn't make sense.
+Thanks,
 
-> So, IMHO, if OpenBlocks uses third USB port to connect some PCIe
-> controller, we should activate it in the dts file.
-> 
-> What do you think?
+Will
 
-No, see above.
+--->8
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+
+  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/virt/psci
+
+for you to fetch changes up to 2bdd424f26be1c98b6e3d9acfffb5559c131c888:
+
+  ARM: psci: add support for PSCI invocations from the kernel (2013-01-10 21:10:20 +0000)
+
+----------------------------------------------------------------
+Will Deacon (4):
+      ARM: opcodes: add missing include of linux/linkage.h
+      ARM: opcodes: add opcodes definitions for ARM security extensions
+      ARM: psci: add devicetree binding for describing PSCI firmware
+      ARM: psci: add support for PSCI invocations from the kernel
+
+ Documentation/devicetree/bindings/arm/psci.txt |  55 ++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/Kconfig                               |  10 +++++++++
+ arch/arm/include/asm/opcodes-sec.h             |  24 +++++++++++++++++++++
+ arch/arm/include/asm/opcodes.h                 |   1 +
+ arch/arm/include/asm/psci.h                    |  36 +++++++++++++++++++++++++++++++
+ arch/arm/kernel/Makefile                       |   1 +
+ arch/arm/kernel/psci.c                         | 211 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 7 files changed, 338 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/psci.txt
+ create mode 100644 arch/arm/include/asm/opcodes-sec.h
+ create mode 100644 arch/arm/include/asm/psci.h
+ create mode 100644 arch/arm/kernel/psci.c
