@@ -1,21 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Jan 2013 22:45:54 +0000
-Subject: [GIT PULL] psci client-side implementation for 3.9
-In-Reply-To: <20130123180507.GH26811@mudshark.cambridge.arm.com>
-References: <20130123180507.GH26811@mudshark.cambridge.arm.com>
-Message-ID: <20130123224554.GT23505@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Jan 2013 23:34:19 +0000
+Subject: [RFC PATCH 1/6] ARM: kirkwood: topkick: init mvsdio via DT
+In-Reply-To: <cover.1358983578.git.jason@lakedaemon.net>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+Message-ID: <7795593940395f036bc46208ccc69dcb6092dd9d.1358983578.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 06:05:07PM +0000, Will Deacon wrote:
-> Hello again guys,
-> 
-> Please pull my PSCI client-side implementation for 3.9. This is used by
-> the mach-virt platform, for which I'll send another pull request later
-> on (since there are some timer dependencies that need resolving first).
-> 
-> As before, I'll keep this branch stable so others can base against it.
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+ arch/arm/boot/dts/kirkwood-topkick.dts     | 7 +++++++
+ arch/arm/mach-kirkwood/board-usi_topkick.c | 6 ------
+ 2 files changed, 7 insertions(+), 6 deletions(-)
 
-Ok, pulled all four, but I'm going to delay a day before pushing the
-tree out - I'd like to let the overnight build system chew on this for
-one night.
+diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
+index cd15452..23c2ddc 100644
+--- a/arch/arm/boot/dts/kirkwood-topkick.dts
++++ b/arch/arm/boot/dts/kirkwood-topkick.dts
+@@ -54,6 +54,13 @@
+ 			status = "okay";
+ 			nr-ports = <1>;
+ 		};
++
++		mvsdio at 90000 {
++			pinctrl-0 = <&pmx_sdio>;
++			pinctrl-names = "default";
++			status = "okay";
++			/* No CD or WP GPIOs */
++		};
+ 	};
+ 
+ 	gpio-leds {
+diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
+index 23d2dd1..95f0711 100644
+--- a/arch/arm/mach-kirkwood/board-usi_topkick.c
++++ b/arch/arm/mach-kirkwood/board-usi_topkick.c
+@@ -14,7 +14,6 @@
+ #include <linux/init.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+-#include <linux/platform_data/mmc-mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+@@ -22,10 +21,6 @@ static struct mv643xx_eth_platform_data topkick_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+ };
+ 
+-static struct mvsdio_platform_data topkick_mvsdio_data = {
+-	/* unfortunately the CD signal has not been connected */
+-};
+-
+ /*
+  * GPIO LED layout
+  *
+@@ -73,5 +68,4 @@ void __init usi_topkick_init(void)
+ 
+ 
+ 	kirkwood_ge00_init(&topkick_ge00_data);
+-	kirkwood_sdio_init(&topkick_mvsdio_data);
+ }
+-- 
+1.8.1.1
