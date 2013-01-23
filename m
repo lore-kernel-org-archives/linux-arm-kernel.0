@@ -1,30 +1,54 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Wed, 23 Jan 2013 15:44:53 +0800
-Subject: [PATCH 1/2 net-next] net: fec: add napi support to improve
- proformance
-In-Reply-To: <20130123072635.GO1906@pengutronix.de>
-References: <1358914330-3768-1-git-send-email-Frank.Li@freescale.com>
- <20130123072635.GO1906@pengutronix.de>
-Message-ID: <CAHrpEqQ3-prqJaCmt1hfOr4GzDVyuRNvko1SCyQZHdALhHkhkw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 23 Jan 2013 08:48:02 +0100
+Subject: [PATCH 0/4] TI LCDC DRM driver
+In-Reply-To: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
+References: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
+Message-ID: <20130123074802.GT1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This comment seems rather unnecessary. Also it should be
->
->         /* space left and right /*
->
-> devicetree bindings should use '-' instead of '_'. The binding
-> Documentation should be in the patch adding the bindings. Also
-> make sure the devicetree parsing is outside of the path for platform
-> based probing.
->
-> With this particular binding I'm unsure it should exist anyway since
-> it's configuration rather than hardware description. The devicetree
-> normally is for hardware description only.
->
+Hi Rob,
 
-What's your opinion?
-Using module parameter, device-tree to config it or the other method?
+On Tue, Jan 22, 2013 at 04:36:21PM -0600, Rob Clark wrote:
+> 
+>  drivers/gpu/drm/Kconfig                |   2 +
+>  drivers/gpu/drm/Makefile               |   1 +
+>  drivers/gpu/drm/i2c/Makefile           |   3 +
+>  drivers/gpu/drm/i2c/tda998x_drv.c      | 908 +++++++++++++++++++++++++++++++++
+>  drivers/gpu/drm/tilcdc/Kconfig         |  25 +
+>  drivers/gpu/drm/tilcdc/Makefile        |  10 +
+>  drivers/gpu/drm/tilcdc/tilcdc_crtc.c   | 597 ++++++++++++++++++++++
+>  drivers/gpu/drm/tilcdc/tilcdc_drv.c    | 611 ++++++++++++++++++++++
+>  drivers/gpu/drm/tilcdc/tilcdc_drv.h    | 159 ++++++
+>  drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 443 ++++++++++++++++
+>  drivers/gpu/drm/tilcdc/tilcdc_panel.h  |  26 +
+>  drivers/gpu/drm/tilcdc/tilcdc_regs.h   | 154 ++++++
+>  drivers/gpu/drm/tilcdc/tilcdc_slave.c  | 380 ++++++++++++++
+>  drivers/gpu/drm/tilcdc/tilcdc_slave.h  |  26 +
+>  drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 423 +++++++++++++++
+>  drivers/gpu/drm/tilcdc/tilcdc_tfp410.h |  26 +
+>  16 files changed, 3794 insertions(+)
+>  create mode 100644 drivers/gpu/drm/i2c/tda998x_drv.c
+>  create mode 100644 drivers/gpu/drm/tilcdc/Kconfig
+>  create mode 100644 drivers/gpu/drm/tilcdc/Makefile
+>  create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+>  create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_drv.c
+>  create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_drv.h
+>  create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_panel.c
+>  create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_panel.h
+>  create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_regs.h
+>  create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_slave.c
+>  create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_slave.h
+>  create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
+>  create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_tfp410.h
 
-best regards
-Frank Li
+I'm missing Documentation/devicetree/bindings/drm/tilcdc/ in the
+diffstat. This is required for adding devicetree bindings.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
