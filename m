@@ -1,38 +1,44 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Wed, 23 Jan 2013 11:27:58 +0100
-Subject: [PATCH] ARM: mach-ux500: enable 128KB way L2 cache on DB8540
-Message-ID: <1358936878-29806-1-git-send-email-fabio.baltieri@linaro.org>
+From: gabriele@precidata.com (Gabriele Mondada)
+Date: Wed, 23 Jan 2013 11:32:10 +0100
+Subject: LPC32xx and MMCI driver
+In-Reply-To: <20121222212457.GJ14363@n2100.arm.linux.org.uk>
+References: <50D2E156.20707@precidata.com> <50D2E317.6000005@precidata.com>
+ <20121222212457.GJ14363@n2100.arm.linux.org.uk>
+Message-ID: <4B116C76-1D65-437C-8C38-B08702706FA2@precidata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Coquelin <maxime.coquelin@stericsson.com>
+> 
+>> +#ifdef CONFIG_ARCH_LPC32XX
+>> +/*
+>> + * This exported function is used by mmci driver to workaround a bug in the
+>> + * LPC32xx CPU.
+>> + */
+>> +void pl08x_force_dma_burst(struct dma_chan *chan)
+>> +{
+>> +    struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
+>> +    struct pl08x_driver_data *pl08x = plchan->host;
+>> +
+>> +    dev_dbg(&pl08x->adev->dev,
+>> +        "force burst signal=%d chan=%p plchan=%p\n",
+>> +        plchan->signal, chan, plchan);
+>> +    if (plchan->signal >= 0)
+>> +        writel(1 << plchan->signal, pl08x->base + PL080_SOFT_BREQ);
+>> +}
+>> +
+>> +EXPORT_SYMBOL_GPL(pl08x_force_dma_burst);
+> 
+> Eww.  This is really horrid and totally breaks software layering.
 
-DB8540 L2 was configured with 64KB way size, but it has 128KB as AP9540.
+Yes, it is.
+There is a silicon bug that prevents the DMA controller to receive the last DMA request. So, I have to generate the last transfer by software.
+How can I do that without breaking software layers? Do I add a new entry point in the dmaengine device?
 
-Fix this by modifying ux500_l2x0_init() to use 128KB way size for all
-cpus in the x540 family.
+> As for formatting in the patch, that's also horrid.  Extra tab
+> indentations, lines over 80 characters, and a hell of a lot of code
+> to fix this brokenness.
+> 
+> At least the first thing that needs to happen is to clean the patch up
+> so that it passes checkpatch.pl.
 
-Signed-off-by: Maxime Coquelin <maxime.coquelin@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
- arch/arm/mach-ux500/cache-l2x0.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index 75d5b51..1682dfe 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -46,8 +46,8 @@ static int __init ux500_l2x0_init(void)
- 	/* Unlock before init */
- 	ux500_l2x0_unlock();
- 
--	/* DB9540's L2 has 128KB way size */
--	if (cpu_is_u9540())
-+	/* DBx540's L2 has 128KB way size */
-+	if (cpu_is_ux540_family())
- 		/* 128KB way size */
- 		aux_val |= (0x4 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
- 	else
--- 
-1.7.12.1
+I cleaned up the patch and posted again on the list. See [PATCH] Implements DMA on mmci driver for LPC3250 plateform
