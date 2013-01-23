@@ -1,12 +1,42 @@
-From: miloody@gmail.com (loody)
-Date: Thu, 24 Jan 2013 00:39:54 +0800
-Subject: Kernel API for SGI usage
-Message-ID: <CANudz+tDzfU1xJgsjeuQBL7r5cwosvSEH6tct5aO8c+LvAm4pA@mail.gmail.com>
+From: tobetter@gmail.com (Dongjin Kim)
+Date: Thu, 24 Jan 2013 01:40:38 +0900
+Subject: [PATCH] ARM: dts: Fix MSHC property and add RTC node
+Message-ID: <1358959242-1667-1-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi all:
-The other cores on my Soc need SGI to be waken up from reset state.
-Could any one header and functions I need to include and used for?
+This fixes the property of dw-mshc-sdr-timing and dw-mshc-ddr-timing as per
+its current binding, it only has two cells.
+And also RTC node is added new.
+
+Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+---
+ arch/arm/boot/dts/exynos4412-odroidx.dts |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+index f41a84e..1c1d5ec 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidx.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+@@ -49,8 +49,8 @@
+ 		fifo-depth = <0x80>;
+ 		card-detect-delay = <200>;
+ 		samsung,dw-mshc-ciu-div = <3>;
+-		samsung,dw-mshc-sdr-timing = <2 3 3>;
+-		samsung,dw-mshc-ddr-timing = <1 2 3>;
++		samsung,dw-mshc-sdr-timing = <2 3>;
++		samsung,dw-mshc-ddr-timing = <1 2>;
+ 
+ 		slot at 0 {
+ 			reg = <0>;
+@@ -90,4 +90,8 @@
+ 	serial at 13830000 {
+ 		status = "okay";
+ 	};
++
++	rtc at 10070000 {
++		status = "okay";
++	};
+ };
 -- 
-Regards,
+1.7.10.4
