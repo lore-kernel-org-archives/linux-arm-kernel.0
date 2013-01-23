@@ -1,50 +1,42 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 23 Jan 2013 20:47:10 +0800
-Subject: [PATCH 3/5] ARM: at91: at91sam9n12: add DT parameters to enable PMECC
-In-Reply-To: <1358945232-2282-1-git-send-email-josh.wu@atmel.com>
-References: <1358945232-2282-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1358945232-2282-4-git-send-email-josh.wu@atmel.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 23 Jan 2013 13:50:01 +0100
+Subject: [PATCH 1/2] misc/at24: Add at24c512b eeprom support
+In-Reply-To: <CACRpkdbQcyO82Z7+v61VmJBOHuPVT2ZphQQT7OpZ9edYbho5YQ@mail.gmail.com>
+References: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
+ <CACRpkdbQcyO82Z7+v61VmJBOHuPVT2ZphQQT7OpZ9edYbho5YQ@mail.gmail.com>
+Message-ID: <20130123125001.GG16264@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Default ecc correctable setting is 2bits in 512 bytes.
+On Wed, Jan 23, 2013 at 01:24:52PM +0100, Linus Walleij wrote:
+> On Wed, Jan 23, 2013 at 7:32 AM, Liu Ying <Ying.Liu@freescale.com> wrote:
+> 
+> > This patch adds at24c512b eeprom support.
+> > The datasheet of at24c512b can be found at:
+> > http://www.alldatasheet.com/datasheet-pdf/pdf/
+> > 256958/ATMEL/AT24C512B-TH-B.html
+> >
+> > Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> 
+> Arnd Bergmann is the misc maintainer, route this by him.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- arch/arm/boot/dts/at91sam9n12.dtsi  |    3 ++-
- arch/arm/boot/dts/at91sam9n12ek.dts |    5 ++++-
- 2 files changed, 6 insertions(+), 2 deletions(-)
+I usually take at24 patches via my I2C tree.
 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 80e29c6..a3a3fdb 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -390,8 +390,9 @@
- 			reg = < 0x40000000 0x10000000
- 				0xffffe000 0x00000600
- 				0xffffe600 0x00000200
--				0x00100000 0x00100000
-+				0x00108000 0x00018000
- 			       >;
-+			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
- 			pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index 0376bf4..d400f8d 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -71,7 +71,10 @@
- 
- 		nand0: nand at 40000000 {
- 			nand-bus-width = <8>;
--			nand-ecc-mode = "soft";
-+			nand-ecc-mode = "hw";
-+			atmel,has-pmecc;
-+			atmel,pmecc-cap = <2>;
-+			atmel,pmecc-sector-size = <512>;
- 			nand-on-flash-bbt;
- 			status = "okay";
- 		};
+But not this one, though. The 512b can equally use the 512 entry. The
+devicetree should contain both entries, the 512 one as a fallback. (And
+the vendor is not "at24"!)
+
+Regards,
+
+   Wolfram
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130123/86f5b0b3/attachment.sig>
