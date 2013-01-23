@@ -1,22 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Jan 2013 13:24:52 +0100
-Subject: [PATCH 1/2] misc/at24: Add at24c512b eeprom support
-In-Reply-To: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
-References: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <CACRpkdbQcyO82Z7+v61VmJBOHuPVT2ZphQQT7OpZ9edYbho5YQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Jan 2013 07:34:16 -0500
+Subject: [PATCH v2] Dove: activate GPIO interrupts in DT
+In-Reply-To: <20130123093816.5cb73df1@armhf>
+References: <20130123093816.5cb73df1@armhf>
+Message-ID: <20130123123416.GG1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 7:32 AM, Liu Ying <Ying.Liu@freescale.com> wrote:
+On Wed, Jan 23, 2013 at 09:38:16AM +0100, Jean-Francois Moine wrote:
+> In a DT, the interrupts of an interrupt-controller are not usable when
+> #interrupt-cells is missing.
+> 
+> This patch activates the interrupts of the GPIOs 0 and 1 for the Marvell
+> Dove SoC.
+> 
+> Signed-off-by: Jean-Fran?ois Moine <moinejf@free.fr>
+> ---
+> v2
+> - gpio-mvebu asks for 2 cells
+> ---
+>  arch/arm/boot/dts/dove.dtsi |    2 ++
+>  1 file changed, 2 insertions(+)
 
-> This patch adds at24c512b eeprom support.
-> The datasheet of at24c512b can be found at:
-> http://www.alldatasheet.com/datasheet-pdf/pdf/
-> 256958/ATMEL/AT24C512B-TH-B.html
->
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+Applied to mvebu/fixes
 
-Arnd Bergmann is the misc maintainer, route this by him.
+thx,
 
-Yours,
-Linus Walleij
+Jason.
