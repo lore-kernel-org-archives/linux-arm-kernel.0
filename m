@@ -1,35 +1,39 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 23 Jan 2013 10:48:51 +0100
-Subject: [PATCH 4/9] ARM: at91: fix gpios on i2c-gpio for RM9200 DT
+Date: Wed, 23 Jan 2013 10:48:52 +0100
+Subject: [PATCH 5/9] ARM: at91: rm9200: remake the BGA as default version
 In-Reply-To: <cover.1358934163.git.nicolas.ferre@atmel.com>
 References: <cover.1358934163.git.nicolas.ferre@atmel.com>
-Message-ID: <334c9e8d6d05be132792a855dcc637773d44cad3.1358934163.git.nicolas.ferre@atmel.com>
+Message-ID: <36224d0fe0f34cdde66a381708853ebadeac799c.1358934163.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joachim Eastwood <manabian@gmail.com>
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Make BGA as the default version as we are supposed to just have
+to specify when we use the PQFP version.
+
+Issue was existing since commit:
+3e90772 (ARM: at91: fix at91rm9200 soc subtype handling).
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: stable <stable@vger.kernel.org> [v3.3]
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/at91rm9200.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-at91/setup.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index e154f24..222047f 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -336,8 +336,8 @@
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 9ee866c..4b67847 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -105,6 +105,8 @@ static void __init soc_detect(u32 dbgu_base)
+ 	switch (socid) {
+ 	case ARCH_ID_AT91RM9200:
+ 		at91_soc_initdata.type = AT91_SOC_RM9200;
++		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_NONE)
++			at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+ 		at91_boot_soc = at91rm9200_soc;
+ 		break;
  
- 	i2c at 0 {
- 		compatible = "i2c-gpio";
--		gpios = <&pioA 23 0 /* sda */
--			 &pioA 24 0 /* scl */
-+		gpios = <&pioA 25 0 /* sda */
-+			 &pioA 26 0 /* scl */
- 			>;
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
 -- 
 1.8.0
