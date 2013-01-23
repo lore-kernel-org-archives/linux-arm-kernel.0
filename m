@@ -1,30 +1,44 @@
-From: kishon@ti.com (kishon)
-Date: Wed, 23 Jan 2013 19:56:37 +0530
-Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA922F5@DBDE01.ent.ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
- <50FEB3FD.3050001@ti.com> <50FEBB61.9000707@ti.com>
- <B9531499-0746-44DA-BDBB-999D4CA31E63@dominion.thruhere.net>
- <C8443D0743D26F4388EA172BF4E2A7A93EA922F5@DBDE01.ent.ti.com>
-Message-ID: <50FFF31D.2070908@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Jan 2013 09:29:33 -0500
+Subject: [PATCH v3] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
+In-Reply-To: <1358174852-19752-1-git-send-email-florian@openwrt.org>
+References: <3816648.2TVsTiMOWx@bender>
+ <1358174852-19752-1-git-send-email-florian@openwrt.org>
+Message-ID: <20130123142933.GO1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+On Mon, Jan 14, 2013 at 03:47:32PM +0100, Florian Fainelli wrote:
+> This patch adds the DTS file to support the Marvell RD-A370-A1
+> (Reference Design board) also known as RD-88F6710 board. It is almost
+> entirely similar to the DB-A370 except on the following points:
+> 
+> - second Ethernet MAC is connected to a switch using RGMII
+> - it only has 512MB of physical RAM
+> - SDIO interface is enabled and working by default (no need for jumpers)
+> 
+> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> ---
+> Jason,
+> 
+> This is rebased against your mvebu/for-next branch, can you please drop v2 of
+> the previous patch and take this one instead? Thanks!
+> 
+> Changes since v2:
+> - rebased against Jason's mvebu/for-next
+> - added SDIO bindings
+> - changed commit message a bit
+> 
+> Changes since v1:
+> - added missing entry in arch/arm/boot/dts/Makefile to actually build the DTB
+> 
+>  arch/arm/boot/dts/Makefile          |    1 +
+>  arch/arm/boot/dts/armada-370-rd.dts |   68 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 69 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-370-rd.dts
 
-On Wednesday 23 January 2013 07:28 PM, Mohammed, Afzal wrote:
-> Hi Koen,
->
-> On Tue, Jan 22, 2013 at 22:32:56, Koen Kooi wrote:
->
->> Actually it uses nop-phy as a phy, which is missing from arch/arm/boot/dts/am33xx.dtsi, so mainline is already broken. But adding the nop-phy to the DT is easy enough to patch in locally.
->
-> USB first instance of am335x works in mainline as of now.
+Applied to mvebu/dt
 
-Can you check if this series indeed breaks am335x?
+thx,
 
-Thanks for your help.
-
-Regards
-Kishon
+Jason.
