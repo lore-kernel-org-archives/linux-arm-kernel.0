@@ -1,37 +1,33 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 23 Jan 2013 17:15:34 +0800
-Subject: [GIT PULL][for 3.9] request from pxa git tree on armsoc/board branch
-Message-ID: <CAN1soZz4kgVii7hufBfgmF=yNK0YE7cOV9TNKPFe4FhRKOMpow@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 23 Jan 2013 16:20:53 +0800
+Subject: [PATCH] mtd: gpmi: fix a dereferencing freed memory error
+Message-ID: <1358929253-29143-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+The patch "490e280 mtd: gpmi-nand: Convert to module_platform_driver()"
+introduced a "dereferencing freed memory" error.
 
-Please help to merge armsoc/board branch from pxa git tree.
+This patch fixes it.
 
-Regards
-Haojian
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
-
-  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
-
-are available in the git repository at:
-
-  git://github.com/hzhuang1/linux.git armsoc/board
-
-for you to fetch changes up to 495b21dc0e488b784ab1d4007d00db1ca2a95c98:
-
-  ARM: pxa: pxa27x.c: add dummy SA1100 rtc clock (2013-01-23 17:05:08 +0800)
-
-----------------------------------------------------------------
-Andrea Adami (1):
-      ARM: pxa: pxa27x.c: add dummy SA1100 rtc clock
-
-Mike Dunn (2):
-      ARM: palmtreo: add docg4 device initialization
-      ARM: palmtreo: replace #if defined with IF_ENABLED
-
- arch/arm/mach-pxa/palmtreo.c |   35 +++++++++++++++++++++++++++++++++--
- arch/arm/mach-pxa/pxa27x.c   |    1 +
- 2 files changed, 34 insertions(+), 2 deletions(-)
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 631564d..38c8b8b 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1657,8 +1657,8 @@ exit_nfc_init:
+ 	release_resources(this);
+ exit_acquire_resources:
+ 	platform_set_drvdata(pdev, NULL);
+-	kfree(this);
+ 	dev_err(this->dev, "driver registration failed: %d\n", ret);
++	kfree(this);
+ 
+ 	return ret;
+ }
+-- 
+1.7.0.4
