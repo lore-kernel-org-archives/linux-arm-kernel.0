@@ -1,19 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 23 Jan 2013 11:28:07 -0700
-Subject: [PATCH 4/4] irqchip: gic: Perform the gic_secondary_init() call
- via CPU notifier
-In-Reply-To: <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
-References: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
- <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
-Message-ID: <51002BB7.2000603@wwwdotorg.org>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 24 Jan 2013 07:28:50 +1300
+Subject: [PATCH v3 1/2] mtd: Add a common JEDEC flash device table
+In-Reply-To: <50FFA692.2060907@parrot.com>
+References: <1358928068-12417-1-git-send-email-linux@prisktech.co.nz>
+ <1358928068-12417-2-git-send-email-linux@prisktech.co.nz>
+ <50FFA692.2060907@parrot.com>
+Message-ID: <1358965730.13715.0.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2013 10:59 AM, Catalin Marinas wrote:
-> All the calls to gic_secondary_init() pass 0 as the first argument.
-> Since this function is called on each CPU when starting, it can be done
-> in a platform-independent way via a CPU notifier registered by the GIC
-> code.
+On Wed, 2013-01-23 at 10:00 +0100, Matthieu CASTET wrote:
+> Tony Prisk a ?crit :
+> > This patch adds a common JEDEC flash device table which can be
+> > expanded on as more features are required.
+> > 
+> > A simple match function is also included to query the table for
+> > a match based on the JEDEC id.
+> 
+> Why don't you use id from include/linux/mtd/cfi.h that is used by flash driver
+> like drivers/mtd/devices/m25p80.c ?
+> 
 
-Tegra part,
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Thanks - have changed for v4.
+
+Regards
+Tony P
