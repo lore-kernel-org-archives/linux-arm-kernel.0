@@ -1,140 +1,68 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Wed, 23 Jan 2013 14:04:42 -0300
-Subject: [PATCH v2 2/3] arm: mvebu: Enable USB controllers on Armada
- 370/XP boards
-In-Reply-To: <1358954792-16160-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1358954792-16160-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <CALF0-+XJEXJ2B3NLu5DvyxaDuuMNP=zk+z8QUd4GTQULW3BpyA@mail.gmail.com>
+From: smoch@web.de (Soeren Moch)
+Date: Wed, 23 Jan 2013 18:07:00 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20130123162515.GK13482@lunn.ch>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <201301171049.30415.arnd@arndb.de> <50F800EB.6040104@web.de>
+ <201301172026.45514.arnd@arndb.de> <50FABBED.1020905@web.de>
+ <20130119185907.GA20719@lunn.ch> <5100022D.9050106@web.de>
+ <20130123162515.GK13482@lunn.ch>
+Message-ID: <510018B4.9040903@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nobuhiro,
-
-On Wed, Jan 23, 2013 at 12:26 PM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> This patch activates every USB port provided by each SoC.
-> Except for Armada XP Openblocks AX3-4 board,
-> where we enable only the first two USB ports
-> until we have more information on the third one usage.
+On 23.01.2013 17:25, Andrew Lunn wrote:
+> On Wed, Jan 23, 2013 at 04:30:53PM +0100, Soeren Moch wrote:
+>> On 19.01.2013 19:59, Andrew Lunn wrote:
+>>>> Please find attached a debug log generated with your patch.
+>>>>
+>>>> I used the sata disk and two em28xx dvb sticks, no other usb devices,
+>>>> no ethernet cable connected, tuners on saa716x-based card not used.
+>>>>
+>>>> What I can see in the log: a lot of coherent mappings from sata_mv
+>>>> and orion_ehci, a few from mv643xx_eth, no other coherent mappings.
+>>>> All coherent mappings are page aligned, some of them (from orion_ehci)
+>>>> are not really small (as claimed in __alloc_from_pool).
+>>>>
+>>>> I don't believe in a memory leak. When I restart vdr (the application
+>>>> utilizing the dvb sticks) then there is enough dma memory available
+>>>> again.
+>>>
+>>> Hi Soeren
+>>>
+>>> We should be able to rule out a leak. Mount debugfg and then:
+>>>
+>>> while [ /bin/true ] ; do cat /debug/dma-api/num_free_entries ; sleep 60 ; done
+>>>
+>>> while you are capturing. See if the number goes down.
+>>>
+>>>        Andrew
+>>
+>> Now I built a kernel with debugfs enabled.
+>> It is not clear to me what I can see from the
+>> dma-api/num_free_entries output. After reboot (vdr running) I see
+>> decreasing numbers (3453 3452 3445 3430...), min_free_entries is
+>> lower (3390). Sometimes the output is constant for several minutes (
+>> 3396 3396 3396 3396 3396,...)
 >
-> Cc: Lior Amsalem <alior@marvell.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Tested-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> Tested-by: Florian Fainelli <florian@openwrt.org>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
-> Changes from v1:
->  * Squashed separate per-board patches into this one,
->    as suggested by Arnd.
->  * Remove usb at d0052000 activation in OpenBlocks AX3-4
->    until we have more information about it.
->
->  arch/arm/boot/dts/armada-370-db.dts              |    8 ++++++++
->  arch/arm/boot/dts/armada-370-mirabox.dts         |    8 ++++++++
->  arch/arm/boot/dts/armada-xp-db.dts               |   12 ++++++++++++
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    6 ++++++
->  4 files changed, 34 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-> index 8e66a7c..3d93902 100644
-> --- a/arch/arm/boot/dts/armada-370-db.dts
-> +++ b/arch/arm/boot/dts/armada-370-db.dts
-> @@ -74,5 +74,13 @@
->                         status = "disabled";
->                         /* No CD or WP GPIOs */
->                 };
-> +
-> +               usb at d0050000 {
-> +                       status = "okay";
-> +               };
-> +
-> +               usb at d0051000 {
-> +                       status = "okay";
-> +               };
->         };
->  };
-> diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-> index 1864820..dd0c57d 100644
-> --- a/arch/arm/boot/dts/armada-370-mirabox.dts
-> +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-> @@ -62,5 +62,13 @@
->                          * Wifi/Bluetooth chip
->                          */
->                 };
-> +
-> +               usb at d0050000 {
-> +                       status = "okay";
-> +               };
-> +
-> +               usb at d0051000 {
-> +                       status = "okay";
-> +               };
->         };
->  };
-> diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-> index c7035c5..c84e1fe 100644
-> --- a/arch/arm/boot/dts/armada-xp-db.dts
-> +++ b/arch/arm/boot/dts/armada-xp-db.dts
-> @@ -97,5 +97,17 @@
->                         status = "okay";
->                         /* No CD or WP GPIOs */
->                 };
-> +
-> +               usb at d0050000 {
-> +                       status = "okay";
-> +               };
-> +
-> +               usb at d0051000 {
-> +                       status = "okay";
-> +               };
-> +
-> +               usb at d0052000 {
-> +                       status = "okay";
-> +               };
->         };
->  };
-> diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-> index ec36864..3818a82 100644
-> --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-> +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-> @@ -133,5 +133,11 @@
->                         nr-ports = <2>;
->                         status = "okay";
->                 };
-> +               usb at d0050000 {
-> +                       status = "okay";
-> +               };
-> +               usb at d0051000 {
-> +                       status = "okay";
-> +               };
->         };
->  };
-> --
-> 1.7.8.6
+> We are interesting in the long term behavior. Does it gradually go
+> down? Or is it stable? If it goes down over time, its clearly a leak
+> somewhere.
 >
 
-I'd like to bring this patch to your attention.
-As you can see, I've removed the
+Now (in the last hour) stable, occasionally lower numbers:
+3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 
+3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 
+3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 
+3396 3396 3396 3396 3396 3396 3396 3396 3396 3365 3396 3394 3396 3396 
+3396 3396 3373 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 
+3396 3353 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 
+3394 3396 3396 3396 3396 3396 3396 3396
 
-               usb at d0052000 {
-                       status = "okay";
-               };
+Before the last pool exhaustion going down:
+3395 3395 3389 3379 3379 3374 3367 3360 3352 3343 3343 3343 3342 3336 
+3332 3324 3318 3314 3310 3307 3305 3299 3290 3283 3279 3272 3266 3265 
+3247 3247 3247 3242 3236 3236
 
-from the OpenBlocks AX3-4 board dts file, since you mentioned this
-board uses that USB
-port for a PCIe connector -- if I understood correctly.
-
-It's interesting to note that Mirabox board doesn't provide direct
-access to its USB ports either,
-but instead they are used to connect a GL827L MMC card reader.
-However, we activate USB ports anyway, since it's needed for that to work fine.
-
-So, IMHO, if OpenBlocks uses third USB port to connect some PCIe controller,
-we should activate it in the dts file.
-
-What do you think?
-
--- 
-    Ezequiel
+Soeren
