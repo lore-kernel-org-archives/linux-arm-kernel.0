@@ -1,29 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Jan 2013 10:46:40 +0100
-Subject: [PATCH 1/1] ARM: ux500: Enable Snowball's GPIO controlled
- Ethernet regulator in DT
-In-Reply-To: <1358775323-8155-1-git-send-email-lee.jones@linaro.org>
-References: <1358775323-8155-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbWVVW98upGcqCsbNXPU9Q2m5VFe71GwngBni4ih+m8_w@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 23 Jan 2013 10:48:47 +0100
+Subject: [PATCH 0/9 v2] at91: some fixes for 3.8-rc5
+Message-ID: <cover.1358934163.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 2:35 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi all,
 
-> The Snowball Board's Ethernet chip is configured in a slightly
-> non-standard way. Its SoC has an address space usually reserved
-> for a NOR-flash device. However, on the Snowball, that external
-> bus is populated by the SMSC9115 Ethernet chip. So, to power on
-> the Ethernet chip, we have to enable the GPIO controlled
-> regulator which usually controls the NOR-flash. In this patch
-> we inform the Snowball's Device Tree which GPIO is used to
-> operate it.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+A v2 of this patch series just to make sure that the patches hit the
+mailing-list once...
+I plan to send a pull-request later today (my time) so if you have something to
+add, well, tell me by now.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks for your help, bye,
 
-I guess you will funnel this to ARM SoC with other DT patches?
+Boris BREZILLON (1):
+  ARM: at91/dts: add macb mii pinctrl config for kizbox
 
-Yours,
-Linus Walleij
+Douglas Gilbert (1):
+  ARM: at91/dts: correct comment in at91sam9x5.dtsi for mii
+
+Jean-Christophe PLAGNIOL-VILLARD (1):
+  ARM: at91: rm9200: remake the BGA as default version
+
+Joachim Eastwood (1):
+  ARM: at91: fix gpios on i2c-gpio for RM9200 DT
+
+Nicolas Ferre (2):
+  ARM: at91/at91_dt_defconfig: remove memory specification to cmdline
+  ARM: at91/at91_dt_defconfig: add at91sam9n12 SoC to DT defconfig
+
+Richard Genoud (3):
+  ARM: at91/at91-pinctrl documentation: fix typo and add some details
+  ARM: at91/at91sam9x5 DTS: correct wrong PIO BANK values on u(s)arts
+  ARM: at91/at91sam9x5 DTS: add SCK USART pins
+
+ .../bindings/pinctrl/atmel,at91-pinctrl.txt        |  5 +-
+ arch/arm/boot/dts/at91rm9200.dtsi                  |  4 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi                  | 60 ++++++++++++++--------
+ arch/arm/boot/dts/kizbox.dts                       |  2 +
+ arch/arm/configs/at91_dt_defconfig                 |  3 +-
+ arch/arm/mach-at91/setup.c                         |  2 +
+ 6 files changed, 51 insertions(+), 25 deletions(-)
+
+-- 
+1.8.0
