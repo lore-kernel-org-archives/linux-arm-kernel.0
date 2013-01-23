@@ -1,39 +1,46 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 23 Jan 2013 16:39:28 +0530
-Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex
- A9
-In-Reply-To: <20130123.125851.1450151123804323961.hdoyu@nvidia.com>
-References: <50FEC503.2080602@wwwdotorg.org><CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com><50FFA620.50008@ti.com>
- <20130123.125851.1450151123804323961.hdoyu@nvidia.com>
-Message-ID: <50FFC4E8.70509@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 23 Jan 2013 11:18:05 +0000
+Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into
+ the driver
+In-Reply-To: <20130123101748.GO23505@n2100.arm.linux.org.uk>
+References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
+ <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
+ <20130122090000.GH6857@gmail.com>
+ <CACRpkdatTagYaMqvpe-a8zj_kO3Twjn1r4SqPty8DosNmcxJcQ@mail.gmail.com>
+ <20130122100607.GH23505@n2100.arm.linux.org.uk>
+ <20130122102010.GL6857@gmail.com>
+ <20130122103723.GI23505@n2100.arm.linux.org.uk>
+ <20130122105608.GP6857@gmail.com>
+ <20130123101349.GH15873@gmail.com>
+ <20130123101748.GO23505@n2100.arm.linux.org.uk>
+Message-ID: <20130123111805.GI15873@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 January 2013 04:28 PM, Hiroshi Doyu wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> wrote @ Wed, 23 Jan 2013 09:58:08 +0100:
->
->> On Tuesday 22 January 2013 10:34 PM, Olof Johansson wrote:
->>> On Tue, Jan 22, 2013 at 8:57 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>> On 01/21/2013 11:07 PM, Santosh Shilimkar wrote:
->>>>> On Tuesday 22 January 2013 11:22 AM, Hiroshi Doyu wrote:
->>>>>> Skip scu_enable(scu_base) if CPU is not Cortex A9 with SCU.
+On Wed, 23 Jan 2013, Russell King - ARM Linux wrote:
 
-[..]
+> On Wed, Jan 23, 2013 at 10:13:49AM +0000, Lee Jones wrote:
+> > On Tue, 22 Jan 2013, Lee Jones wrote:
+> > > Are you saying that you won't do it? :)
+> > > 
+> > > Is there anything I can do to make the process easier?
+> > 
+> > Thinking about this a little more. Is it easier to remove it from your
+> > tree altogether? Only I have a small "ARM: ux500: " patch-set which
+> > directly relies on this patch. I could take it in via ARM-SoC without
+> > any fear of ordering issues.
+> 
+> Thankfully, the patch doesn't conflict with any of the others I have, so
+> we can do that (and it's actually easier to do that.)
+> 
+> Done.
 
->> Btw, I noticed the build error with patch 1/1. Since I wasn't using
->> the first interface in OMAP code, I just bypassed it for testing.
->> I might be missing some dependent patch which added
->> read_cpuid_part_number().
->
-> The following one, which is in "next-20130123", is also necessary.
->
-> commit 59530adc3f1b802c275f0197fc3ac72dc014267a
-> Author: Christoffer Dall <c.dall@virtualopensystems.com>
-> Date:   Tue Dec 18 04:06:37 2012 +0000
->
->      ARM: Define CPU part numbers and implementors
->
-Thanks for the pointer Hiroshi.
+Brilliant, that's 2 birds with one stone. I'll queue it up for ARM-SoC.
 
-Regards,
-Santosh
+Thanks Russell.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
