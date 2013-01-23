@@ -1,22 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Jan 2013 13:27:23 +0100
-Subject: [PATCH 00/10] rework gpio pxa driver for pinctrl
-In-Reply-To: <1358929554-32265-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1358929554-32265-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdZ+COLEbMyHFDEaEVj21UU29q-Qg=3bk3==9QcS+UCJEA@mail.gmail.com>
+Date: Wed, 23 Jan 2013 13:24:52 +0100
+Subject: [PATCH 1/2] misc/at24: Add at24c512b eeprom support
+In-Reply-To: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
+References: <1358922764-31654-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <CACRpkdbQcyO82Z7+v61VmJBOHuPVT2ZphQQT7OpZ9edYbho5YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 9:25 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+On Wed, Jan 23, 2013 at 7:32 AM, Liu Ying <Ying.Liu@freescale.com> wrote:
 
-> Remove all cpu depend macro. Bind gpio pxa driver with pinctrl driver.
+> This patch adds at24c512b eeprom support.
+> The datasheet of at24c512b can be found at:
+> http://www.alldatasheet.com/datasheet-pdf/pdf/
+> 256958/ATMEL/AT24C512B-TH-B.html
+>
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 
-Please route this patch series by Mika so he can test it on his
-funny hardware too.
-
-Can we have this based on top of Mika's patches of these work
-out fine on the PXA?
+Arnd Bergmann is the misc maintainer, route this by him.
 
 Yours,
 Linus Walleij
