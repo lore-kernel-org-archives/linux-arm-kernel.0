@@ -1,57 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 23 Jan 2013 12:42:10 +0100
-Subject: [PATCH 7/9] ARM: at91/at91_dt_defconfig: remove memory
- specification to cmdline
-In-Reply-To: <20130123102057.GJ7360@game.jcrosoft.org>
-References: <cover.1358934163.git.nicolas.ferre@atmel.com>
- <2e06e92c758b768baaacc061aafa7f710b74ea02.1358934163.git.nicolas.ferre@atmel.com>
- <20130123102057.GJ7360@game.jcrosoft.org>
-Message-ID: <50FFCC92.2080906@atmel.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Wed, 23 Jan 2013 17:12:11 +0530
+Subject: [PATCH v2 4/4] ARM: AM33XX: clock: SET_RATE_PARENT in lcd path
+In-Reply-To: <cover.1358937533.git.afzal@ti.com>
+References: <cover.1358937533.git.afzal@ti.com>
+Message-ID: <902fb9aeaf11dab8c94af7645d9270612a5ab77f.1358937533.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2013 11:20 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 10:48 Wed 23 Jan     , Nicolas Ferre wrote:
->> No need for this cmdline option as we are using DT.
->> Moreover this defconfig is targeted to multiple SoC/boards: this option
->> was nonsense.
-> just keep the console the rest is a nonsense too
-> 
-> as on 9g45 the initrd will be at 0x7xxxxxxx
+LCDC clock node is a one that does not have set rate capability. It
+just passes on the rate that is sent downstream by it's parent. While
+lcdc clock parent and it's grand parent - dpll_disp_m2_ck and
+dpll_disp_ck has the capability to configure rate.
 
-BTW, how do you mix 9g45 with other sam9's in this defconfig: it is not
-possible due to this difference in address rage, it not it?
+And the default rates provided by LCDC clock's ancestors are not
+sufficient to obtain pixel clock for current LCDC use cases, hence
+currently display would not work on AM335x SoC's (with driver
+modifications in platfrom independent way).
 
-In this case, should we remove the
-CONFIG_SOC_AT91SAM9G45=y
-from this at91_dt_defconfig?
+Hence inform clock framework to propogate set rate for LCDC clock as
+well as it's parent - dpll_disp_m2_ck. With this change, set rate on
+LCDC clock would get propogated till dpll_disp_ck via dpll_disp_m2_ck,
+hence allowing the driver (same driver is used in DaVinci too) to set
+rates using LCDC clock without worrying about platform dependent clock
+details.
 
-> the console too but as the patch serie to support via DT is not yet mainline
-> we can keep it
-> 
-> Best Regards,
-> J.
->>
->> Reported-by: Josh Wu <josh.wu@atmel.com>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  arch/arm/configs/at91_dt_defconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
->> index b175577..a353ff6 100644
->> --- a/arch/arm/configs/at91_dt_defconfig
->> +++ b/arch/arm/configs/at91_dt_defconfig
->> @@ -31,7 +31,7 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
->>  CONFIG_ZBOOT_ROM_BSS=0x0
->>  CONFIG_ARM_APPENDED_DTB=y
->>  CONFIG_ARM_ATAG_DTB_COMPAT=y
->> -CONFIG_CMDLINE="mem=128M console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
->> +CONFIG_CMDLINE="console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
->>  CONFIG_KEXEC=y
->>  CONFIG_AUTO_ZRELADDR=y
->>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
 
-Bye,
+v2: As DEFINE_CLK_DIVIDER args has no change, make it's usage as reqd.
+
+ arch/arm/mach-omap2/cclock33xx_data.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
+index ea64ad6..476b820 100644
+--- a/arch/arm/mach-omap2/cclock33xx_data.c
++++ b/arch/arm/mach-omap2/cclock33xx_data.c
+@@ -284,9 +284,10 @@ DEFINE_STRUCT_CLK(dpll_disp_ck, dpll_core_ck_parents, dpll_ddr_ck_ops);
+  * TODO: Add clksel here (sys_clkin, CORE_CLKOUTM6, PER_CLKOUTM2
+  * and ALT_CLK1/2)
+  */
+-DEFINE_CLK_DIVIDER(dpll_disp_m2_ck, "dpll_disp_ck", &dpll_disp_ck, 0x0,
+-		   AM33XX_CM_DIV_M2_DPLL_DISP, AM33XX_DPLL_CLKOUT_DIV_SHIFT,
+-		   AM33XX_DPLL_CLKOUT_DIV_WIDTH, CLK_DIVIDER_ONE_BASED, NULL);
++DEFINE_CLK_DIVIDER(dpll_disp_m2_ck, "dpll_disp_ck", &dpll_disp_ck,
++		   CLK_SET_RATE_PARENT, AM33XX_CM_DIV_M2_DPLL_DISP,
++		   AM33XX_DPLL_CLKOUT_DIV_SHIFT, AM33XX_DPLL_CLKOUT_DIV_WIDTH,
++		   CLK_DIVIDER_ONE_BASED, NULL);
+ 
+ /* DPLL_PER */
+ static struct dpll_data dpll_per_dd = {
+@@ -723,7 +724,8 @@ static struct clk_hw_omap lcd_gclk_hw = {
+ 	.clksel_mask	= AM33XX_CLKSEL_0_1_MASK,
+ };
+ 
+-DEFINE_STRUCT_CLK(lcd_gclk, lcd_ck_parents, gpio_fck_ops);
++DEFINE_STRUCT_CLK_FLAGS(lcd_gclk, lcd_ck_parents,
++			gpio_fck_ops, CLK_SET_RATE_PARENT);
+ 
+ DEFINE_CLK_FIXED_FACTOR(mmc_clk, "dpll_per_m2_ck", &dpll_per_m2_ck, 0x0, 1, 2);
+ 
 -- 
-Nicolas Ferre
+1.7.12
