@@ -1,89 +1,91 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 23 Jan 2013 19:50:38 +0100
-Subject: [PATCH] omap2: twl-common: Add default power configuration
-Message-ID: <1358967038-6615-1-git-send-email-matthias.bgg@gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 23 Jan 2013 10:55:22 -0800
+Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
+ Per-CPU Reader-Writer Locks
+In-Reply-To: <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20130123185522.GG2373@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a generic power script configuration.
-When rebooting an OMAP3530 at 125 MHz, the reboot hangs.
-With the generic power script, TWL4030 will be reset
-when a warm reset occures. This way the OMAP3530 does not
-hang on reboot.
+Hello, Srivatsa.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- arch/arm/mach-omap2/twl-common.c | 38 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/twl-common.h |  1 +
- 2 files changed, 39 insertions(+)
+First of all, I'm not sure whether we need to be this step-by-step
+when introducing something new.  It's not like we're transforming an
+existing implementation and it doesn't seem to help understanding the
+series that much either.
 
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index e49b40b..f096beb 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -120,6 +120,41 @@ static struct twl4030_audio_data omap3_audio_pdata = {
- 	.codec = &omap3_codec,
- };
- 
-+static struct twl4030_ins wrst_seq[] __initdata = {
-+	{MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_OFF), 2},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_WRST), 15},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_WRST), 15},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_WRST), 0x60},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2},
-+	{MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_ACTIVE), 2},
-+};
-+
-+static struct twl4030_script wrst_script __initdata = {
-+	.script = wrst_seq,
-+	.size	= ARRAY_SIZE(wrst_seq),
-+	.flags	= TWL4030_WRST_SCRIPT,
-+};
-+
-+static struct twl4030_script *omap3_power_scripts[] __initdata = {
-+	&wrst_script,
-+};
-+
-+static struct twl4030_resconfig omap3_rconfig[] = {
-+	{ .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3, .type = -1,
-+		.type2 = -1 },
-+	{ .resource = RES_VDD1, .devgroup = DEV_GRP_P1, .type = -1,
-+		.type2 = -1 },
-+	{ .resource = RES_VDD2, .devgroup = DEV_GRP_P1, .type = -1,
-+		.type2 = -1 },
-+	{ 0, 0},
-+};
-+
-+static struct twl4030_power_data omap3_power_pdata = {
-+	.scripts	= omap3_power_scripts,
-+	.num		= ARRAY_SIZE(omap3_power_scripts),
-+	.resource_config = omap3_rconfig,
-+};
-+
- static struct regulator_consumer_supply omap3_vdda_dac_supplies[] = {
- 	REGULATOR_SUPPLY("vdda_dac", "omapdss_venc"),
- };
-@@ -224,6 +259,9 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
- 	if (pdata_flags & TWL_COMMON_PDATA_AUDIO && !pmic_data->audio)
- 		pmic_data->audio = &omap3_audio_pdata;
- 
-+	if (pdata_flags & TWL_COMMON_PDATA_POWER && !pmic_data->power)
-+		pmic_data->power = &omap3_power_pdata;
-+
- 	/* Common regulator configurations */
- 	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
- 		pmic_data->vdac = &omap3_vdac_idata;
-diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
-index dcfbad5..dbeb905 100644
---- a/arch/arm/mach-omap2/twl-common.h
-+++ b/arch/arm/mach-omap2/twl-common.h
-@@ -7,6 +7,7 @@
- #define TWL_COMMON_PDATA_BCI		(1 << 1)
- #define TWL_COMMON_PDATA_MADC		(1 << 2)
- #define TWL_COMMON_PDATA_AUDIO		(1 << 3)
-+#define TWL_COMMON_PDATA_POWER		(1 << 4)
- 
- /* Common LDO regulators for TWL4030/TWL6030 */
- #define TWL_COMMON_REGULATOR_VDAC	(1 << 0)
+On Tue, Jan 22, 2013 at 01:03:53PM +0530, Srivatsa S. Bhat wrote:
+> Using global rwlocks as the backend for per-CPU rwlocks helps us avoid many
+> lock-ordering related problems (unlike per-cpu locks). However, global
+
+So, unfortunately, this already seems broken, right?  The problem here
+seems to be that previously, say, read_lock() implied
+preempt_disable() but as this series aims to move away from it, it
+introduces the problem of locking order between such locks and the new
+contruct.
+
+The only two options are either punishing writers or identifying and
+updating all such possible deadlocks.  percpu_rwsem does the former,
+right?  I don't know how feasible the latter would be.  Srivatsa,
+you've been looking at all the places which would require conversion,
+how difficult would doing the latter be?
+
+> +#define reader_uses_percpu_refcnt(pcpu_rwlock, cpu)			\
+> +		(ACCESS_ONCE(per_cpu(*((pcpu_rwlock)->reader_refcnt), cpu)))
+> +
+> +#define reader_nested_percpu(pcpu_rwlock)				\
+> +			(__this_cpu_read(*((pcpu_rwlock)->reader_refcnt)) > 1)
+> +
+> +#define writer_active(pcpu_rwlock)					\
+> +			(__this_cpu_read(*((pcpu_rwlock)->writer_signal)))
+
+Why are these in the public header file?  Are they gonna be used to
+inline something?
+
+> +static inline void raise_writer_signal(struct percpu_rwlock *pcpu_rwlock,
+> +				       unsigned int cpu)
+> +{
+> +	per_cpu(*pcpu_rwlock->writer_signal, cpu) = true;
+> +}
+> +
+> +static inline void drop_writer_signal(struct percpu_rwlock *pcpu_rwlock,
+> +				      unsigned int cpu)
+> +{
+> +	per_cpu(*pcpu_rwlock->writer_signal, cpu) = false;
+> +}
+> +
+> +static void announce_writer_active(struct percpu_rwlock *pcpu_rwlock)
+> +{
+> +	unsigned int cpu;
+> +
+> +	for_each_online_cpu(cpu)
+> +		raise_writer_signal(pcpu_rwlock, cpu);
+> +
+> +	smp_mb(); /* Paired with smp_rmb() in percpu_read_[un]lock() */
+> +}
+> +
+> +static void announce_writer_inactive(struct percpu_rwlock *pcpu_rwlock)
+> +{
+> +	unsigned int cpu;
+> +
+> +	drop_writer_signal(pcpu_rwlock, smp_processor_id());
+> +
+> +	for_each_online_cpu(cpu)
+> +		drop_writer_signal(pcpu_rwlock, cpu);
+> +
+> +	smp_mb(); /* Paired with smp_rmb() in percpu_read_[un]lock() */
+> +}
+
+It could be just personal preference but I find the above one line
+wrappers more obfuscating than anything else.  What's the point of
+wrapping writer_signal = true/false into a separate function?  These
+simple wrappers just add layers that people have to dig through to
+figure out what's going on without adding anything of value.  I'd much
+prefer collapsing these into the percpu_write_[un]lock().
+
+Thanks.
+
 -- 
-1.7.11.7
+tejun
