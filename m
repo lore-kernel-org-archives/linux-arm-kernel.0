@@ -1,18 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 23 Jan 2013 09:57:49 -0700
-Subject: [PATCH] ARM: tegra: move serial clock-frequency attr into the
- Tegra30 dtsi
-In-Reply-To: <1358960222-22705-1-git-send-email-swarren@wwwdotorg.org>
-References: <1358960222-22705-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <5100168D.4090305@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Jan 2013 17:00:55 +0000
+Subject: Kernel API for SGI usage
+In-Reply-To: <CANudz+sMppk5UZK+Vf_hWZYZzPJMunhPJQs0qbu1-dPy9WRikA@mail.gmail.com>
+References: <CANudz+tDzfU1xJgsjeuQBL7r5cwosvSEH6tct5aO8c+LvAm4pA@mail.gmail.com>
+ <20130123164620.GR23505@n2100.arm.linux.org.uk>
+ <CANudz+sMppk5UZK+Vf_hWZYZzPJMunhPJQs0qbu1-dPy9WRikA@mail.gmail.com>
+Message-ID: <20130123170054.GS23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2013 09:57 AM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Thu, Jan 24, 2013 at 12:51:50AM +0800, loody wrote:
+> hi Russell:
 > 
-> No Tegra30 Platform is running PLL_P at another rate than 408MHz, nor is
-> any using any other PLL as UART source clock. Move attribute into SoC
-> level dtsi file to slim down board DT files.
+> 2013/1/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Thu, Jan 24, 2013 at 12:39:54AM +0800, loody wrote:
+> >> hi all:
+> >> The other cores on my Soc need SGI to be waken up from reset state.
+> >> Could any one header and functions I need to include and used for?
+> >
+> > That's almost what every platform does.  Plenty of examples in the
+> > platform SMP code for you to look at.
+> Nice to meet you
+> Would you please show me a hint or function name for reference?
+> 
+> Appreciate your help, @_@
 
-I have applied this to Tegra's for-3.9/dt branch.
+It even comes with comments:
+
+        /*
+         * Send the secondary CPU a soft interrupt, thereby causing
+         * the boot monitor to read the system wide flags register,
+         * and branch to the address found there.
+         */
+        gic_raise_softirq(cpumask_of(cpu), 0);
