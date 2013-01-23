@@ -1,35 +1,30 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 23 Jan 2013 10:48:54 +0100
-Subject: [PATCH 7/9] ARM: at91/at91_dt_defconfig: remove memory specification
- to cmdline
+Date: Wed, 23 Jan 2013 10:48:55 +0100
+Subject: [PATCH 8/9] ARM: at91/at91_dt_defconfig: add at91sam9n12 SoC to DT
+ defconfig
 In-Reply-To: <cover.1358934163.git.nicolas.ferre@atmel.com>
 References: <cover.1358934163.git.nicolas.ferre@atmel.com>
-Message-ID: <2e06e92c758b768baaacc061aafa7f710b74ea02.1358934163.git.nicolas.ferre@atmel.com>
+Message-ID: <581d6299746ed264bcddc48a611343cedd10ba77.1358934163.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-No need for this cmdline option as we are using DT.
-Moreover this defconfig is targeted to multiple SoC/boards: this option
-was nonsense.
 
 Reported-by: Josh Wu <josh.wu@atmel.com>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/configs/at91_dt_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/configs/at91_dt_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index b175577..a353ff6 100644
+index a353ff6..1ea9590 100644
 --- a/arch/arm/configs/at91_dt_defconfig
 +++ b/arch/arm/configs/at91_dt_defconfig
-@@ -31,7 +31,7 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
--CONFIG_CMDLINE="mem=128M console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
-+CONFIG_CMDLINE="console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
- CONFIG_KEXEC=y
- CONFIG_AUTO_ZRELADDR=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+@@ -19,6 +19,7 @@ CONFIG_SOC_AT91SAM9260=y
+ CONFIG_SOC_AT91SAM9263=y
+ CONFIG_SOC_AT91SAM9G45=y
+ CONFIG_SOC_AT91SAM9X5=y
++CONFIG_SOC_AT91SAM9N12=y
+ CONFIG_MACH_AT91SAM_DT=y
+ CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+ CONFIG_AT91_TIMER_HZ=128
 -- 
 1.8.0
