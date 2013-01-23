@@ -1,42 +1,39 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Wed, 23 Jan 2013 15:08:02 -0300
-Subject: [PATCH v2 2/3] arm: mvebu: Enable USB controllers on Armada
- 370/XP boards
-In-Reply-To: <20130123190352.2d001218@skate>
-References: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1358954792-16160-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <CALF0-+XJEXJ2B3NLu5DvyxaDuuMNP=zk+z8QUd4GTQULW3BpyA@mail.gmail.com>
- <20130123190352.2d001218@skate>
-Message-ID: <CALF0-+W+dU5jvTeiX8pLan1hre7+Db3krD3KnW0XoFRvfkkoXQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 23 Jan 2013 19:10:29 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <51001BEE.9020201@web.de>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <201301171049.30415.arnd@arndb.de> <50F800EB.6040104@web.de>
+ <201301172026.45514.arnd@arndb.de> <50FABBED.1020905@web.de>
+ <20130119185907.GA20719@lunn.ch> <5100022D.9050106@web.de>
+ <20130123162515.GK13482@lunn.ch> <510018B4.9040903@web.de>
+ <51001BEE.9020201@web.de>
+Message-ID: <20130123181029.GE20719@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+> >>
+> >
+> >Now (in the last hour) stable, occasionally lower numbers:
+> >3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+> >3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+> >3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+> >3396 3396 3396 3396 3396 3396 3396 3396 3396 3365 3396 3394 3396 3396
+> >3396 3396 3373 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+> >3396 3353 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+> >3394 3396 3396 3396 3396 3396 3396 3396
+> >
+> >Before the last pool exhaustion going down:
+> >3395 3395 3389 3379 3379 3374 3367 3360 3352 3343 3343 3343 3342 3336
+> >3332 3324 3318 3314 3310 3307 3305 3299 3290 3283 3279 3272 3266 3265
+> >3247 3247 3247 3242 3236 3236
+> >
+> Here I stopped vdr (and so closed all dvb_demux devices), the number
+> was remaining the same 3236, even after restart of vdr (and restart
+> of streaming).
 
-On Wed, Jan 23, 2013 at 3:03 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> On Wed, 23 Jan 2013 14:04:42 -0300, Ezequiel Garcia wrote:
->
->> from the OpenBlocks AX3-4 board dts file, since you mentioned this
->> board uses that USB
->> port for a PCIe connector -- if I understood correctly.
->
-> No. The OpenBlocks has a different USB controller that sits on the PCIe
-> bus. There is nothing like a PCIe port that uses a USB port, that
-> doesn't make sense.
->
+So it does suggest a leak. Probably somewhere on an error path,
+e.g. its lost video sync.
 
-Mmm... indeed, I got it completely wrong.
-
->> So, IMHO, if OpenBlocks uses third USB port to connect some PCIe
->> controller, we should activate it in the dts file.
->>
->> What do you think?
->
-> No, see above.
->
-
-So, what do you think about the patch series to be pushed as it is?
-
--- 
-    Ezequiel
+     Andrew
