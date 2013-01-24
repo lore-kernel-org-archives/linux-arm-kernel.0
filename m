@@ -1,38 +1,42 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu, 24 Jan 2013 18:51:43 +0100
-Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
-In-Reply-To: <20130124161349.GC1758@titan.lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <51013933.9020601@openwrt.org> <20130124143736.GZ1758@titan.lakedaemon.net>
- <201301241554.28003.arnd@arndb.de>
- <20130124161349.GC1758@titan.lakedaemon.net>
-Message-ID: <510174AF.4020503@openwrt.org>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Thu, 24 Jan 2013 10:56:53 -0700
+Subject: [PATCH v2 1/1 net-next] net: fec: add napi support to improve
+ proformance
+In-Reply-To: <1359014309-8636-1-git-send-email-Frank.Li@freescale.com>
+References: <1359014309-8636-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <510175E5.4000306@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2013 05:13 PM, Jason Cooper wrote:
-> On Thu, Jan 24, 2013 at 03:54:27PM +0000, Arnd Bergmann wrote:
->> On Thursday 24 January 2013, Jason Cooper wrote:
->>> I agree, however, there is a long history with that patch.  That driver
->>> has been in use by powerpc for many years.  We need to be mindful not to
->>> break existing installations.  I don't think it'll be ready in time for
->>> v3.9.  So, I'd like to do the cleanup now.
->>>
->>>> [1]: http://patchwork.ozlabs.org/patch/175652/
->> I actually think we can take that patch.
-> Woot!
->
->> The result of the discussion back then was after all that we won't try
->> to keep the bindings compatible, and the powerpc version just uses the
->> platform_device part of the driver by fabricating platform_data from
->> the arch code.
->>
->> It should not have any impact on this, as long as you ensure that the
->> platform_data is still supported.
-> Ian's patch appears to do so.  I'll respin this series using it vice my
-> lookup table.
-Sounds good, while at it, I wonder if we could not simplify Ian's patch 
-to be limited to the actual Ethernet MAC driver and use Thomas's mvdio 
-device tree binding for the MDIO bits of mv643xx_eth. What do you think?
---
-Florian
+On 1/24/2013 12:58 AM, Frank Li wrote:
+> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+> index f52ba33..39be2ab 100644
+> --- a/drivers/net/ethernet/freescale/fec.c
+> +++ b/drivers/net/ethernet/freescale/fec.c
+> @@ -67,6 +67,7 @@
+>   #endif
+>   
+>   #define DRIVER_NAME	"fec"
+> +#define FEC_NAPI_WEIGHT	64
+>   
+>   /* Pause frame feild and FIFO threshold */
+>   #define FEC_ENET_FCE	(1 << 5)
+> @@ -565,6 +566,20 @@ fec_timeout(struct net_device *ndev)
+>   }
+>   
+>   static void
+> +fec_enet_rx_int_is_enabled(struct net_device *ndev, bool enabled)
+> +{
+> +	struct fec_enet_private *fep = netdev_priv(ndev);
+> +	uint    int_events;
+> +
+> +	int_events = readl(fep->hwp + FEC_IMASK);
+> +	if (enabled)
+> +		int_events |= FEC_ENET_RXF;
+> +	else
+> +		int_events &= ~FEC_ENET_RXF;
+> +	writel(int_events, fep->hwp + FEC_IMASK);
+> +}
+
+fec_enet_rx_int_is_enabled looks like a question.
+fec_enet_rx_int_enable would be a better name
