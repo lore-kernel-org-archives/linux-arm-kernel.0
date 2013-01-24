@@ -1,136 +1,31 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Thu, 24 Jan 2013 09:54:49 -0600
-Subject: [PATCH] omap2: twl-common: Add default power configuration
-In-Reply-To: <1358967038-6615-1-git-send-email-matthias.bgg@gmail.com>
-References: <1358967038-6615-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <CAOCHtYjufr+MS1=6Cnsn-EgvkPs+Y5oWejAG98aLkVjdQbu1ZA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Jan 2013 15:54:27 +0000
+Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
+In-Reply-To: <20130124143736.GZ1758@titan.lakedaemon.net>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <51013933.9020601@openwrt.org> <20130124143736.GZ1758@titan.lakedaemon.net>
+Message-ID: <201301241554.28003.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 12:50 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> This patch adds a generic power script configuration.
-> When rebooting an OMAP3530 at 125 MHz, the reboot hangs.
-> With the generic power script, TWL4030 will be reset
-> when a warm reset occures. This way the OMAP3530 does not
-> hang on reboot.
->
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->  arch/arm/mach-omap2/twl-common.c | 38 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/twl-common.h |  1 +
->  2 files changed, 39 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-> index e49b40b..f096beb 100644
-> --- a/arch/arm/mach-omap2/twl-common.c
-> +++ b/arch/arm/mach-omap2/twl-common.c
-> @@ -120,6 +120,41 @@ static struct twl4030_audio_data omap3_audio_pdata = {
->         .codec = &omap3_codec,
->  };
->
-> +static struct twl4030_ins wrst_seq[] __initdata = {
-> +       {MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_OFF), 2},
-> +       {MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_WRST), 15},
-> +       {MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_WRST), 15},
-> +       {MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_WRST), 0x60},
-> +       {MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2},
-> +       {MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_ACTIVE), 2},
-> +};
-> +
-> +static struct twl4030_script wrst_script __initdata = {
-> +       .script = wrst_seq,
-> +       .size   = ARRAY_SIZE(wrst_seq),
-> +       .flags  = TWL4030_WRST_SCRIPT,
-> +};
-> +
-> +static struct twl4030_script *omap3_power_scripts[] __initdata = {
-> +       &wrst_script,
-> +};
-> +
-> +static struct twl4030_resconfig omap3_rconfig[] = {
-> +       { .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3, .type = -1,
-> +               .type2 = -1 },
-> +       { .resource = RES_VDD1, .devgroup = DEV_GRP_P1, .type = -1,
-> +               .type2 = -1 },
-> +       { .resource = RES_VDD2, .devgroup = DEV_GRP_P1, .type = -1,
-> +               .type2 = -1 },
-> +       { 0, 0},
-> +};
-> +
-> +static struct twl4030_power_data omap3_power_pdata = {
-> +       .scripts        = omap3_power_scripts,
-> +       .num            = ARRAY_SIZE(omap3_power_scripts),
-> +       .resource_config = omap3_rconfig,
-> +};
-> +
->  static struct regulator_consumer_supply omap3_vdda_dac_supplies[] = {
->         REGULATOR_SUPPLY("vdda_dac", "omapdss_venc"),
->  };
-> @@ -224,6 +259,9 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
->         if (pdata_flags & TWL_COMMON_PDATA_AUDIO && !pmic_data->audio)
->                 pmic_data->audio = &omap3_audio_pdata;
->
-> +       if (pdata_flags & TWL_COMMON_PDATA_POWER && !pmic_data->power)
-> +               pmic_data->power = &omap3_power_pdata;
-> +
->         /* Common regulator configurations */
->         if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
->                 pmic_data->vdac = &omap3_vdac_idata;
-> diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
-> index dcfbad5..dbeb905 100644
-> --- a/arch/arm/mach-omap2/twl-common.h
-> +++ b/arch/arm/mach-omap2/twl-common.h
-> @@ -7,6 +7,7 @@
->  #define TWL_COMMON_PDATA_BCI           (1 << 1)
->  #define TWL_COMMON_PDATA_MADC          (1 << 2)
->  #define TWL_COMMON_PDATA_AUDIO         (1 << 3)
-> +#define TWL_COMMON_PDATA_POWER         (1 << 4)
->
->  /* Common LDO regulators for TWL4030/TWL6030 */
->  #define TWL_COMMON_REGULATOR_VDAC      (1 << 0)
-> --
-> 1.7.11.7
+On Thursday 24 January 2013, Jason Cooper wrote:
+> I agree, however, there is a long history with that patch.  That driver
+> has been in use by powerpc for many years.  We need to be mindful not to
+> break existing installations.  I don't think it'll be ready in time for
+> v3.9.  So, I'd like to do the cleanup now.
+> 
+> thx,
+> 
+> Jason.
+> 
+> > [1]: http://patchwork.ozlabs.org/patch/175652/
 
-Thanks for making this generic Matthias..
+I actually think we can take that patch. The result of the discussion
+back then was after all that we won't try to keep the bindings compatible,
+and the powerpc version just uses the platform_device part of the driver
+by fabricating platform_data from the arch code.
 
-Tested-by: Robert Nelson <robertcnelson@gmail.com>
+It should not have any impact on this, as long as you ensure that the
+platform_data is still supported.
 
-Tested on Beagle C4 (omap3530) and Beagle xM (DM3730, no regressions)
-with this patch to enable it on the Beagle..
-
->From 65004dafc8d37c69dd839803dc8ea5dcefd993df Mon Sep 17 00:00:00 2001
-From: Robert Nelson <robertcnelson@gmail.com>
-Date: Thu, 24 Jan 2013 09:43:51 -0600
-Subject: [PATCH] ARM: OMAP: Beagle: use TWL4030 generic reset script
-
-Enable TWL_COMMON_PDATA_POWER such that OMAP3530 revisions of the
-Beagle (Bx/Cx) will not hang on reboot when running at 125 Mhz.
-
-Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
----
- arch/arm/mach-omap2/board-omap3beagle.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c
-b/arch/arm/mach-omap2/board-omap3beagle.c
-index 22c483d..0974e08 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -353,7 +353,7 @@ static int __init omap3_beagle_i2c_init(void)
- {
- 	omap3_pmic_get_config(&beagle_twldata,
- 			TWL_COMMON_PDATA_USB | TWL_COMMON_PDATA_MADC |
--			TWL_COMMON_PDATA_AUDIO,
-+			TWL_COMMON_PDATA_AUDIO | TWL_COMMON_PDATA_POWER,
- 			TWL_COMMON_REGULATOR_VDAC | TWL_COMMON_REGULATOR_VPLL2);
-
- 	beagle_twldata.vpll2->constraints.name = "VDVI";
--- 
-1.7.10.4
-
-Regards,
-
--- 
-Robert Nelson
-http://www.rcn-ee.com/
+	Arnd
