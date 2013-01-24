@@ -1,80 +1,75 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Thu, 24 Jan 2013 11:08:03 -0600
-Subject: OMAP4 randconfig failure: Zynq
-In-Reply-To: <20130124161211.GX23505@n2100.arm.linux.org.uk>
-References: <20130124111117.GU23505@n2100.arm.linux.org.uk>
- <20130124155704.GJ11970@beefymiracle.amer.corp.natinst.com>
- <20130124160609.GW23505@n2100.arm.linux.org.uk>
- <20130124161211.GX23505@n2100.arm.linux.org.uk>
-Message-ID: <20130124170803.GA1036@beefymiracle.amer.corp.natinst.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 24 Jan 2013 18:08:20 +0100
+Subject: [PATCH 1/2] ARM: dts: omap3-overo: Add support for pwm-leds
+In-Reply-To: <5101663C.7020301@epfl.ch>
+References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
+ <1358963812-19947-2-git-send-email-florian.vaussard@epfl.ch>
+ <5101510C.9050407@ti.com> <51015663.8080109@epfl.ch>
+ <5101570A.1030303@ti.com> <5101663C.7020301@epfl.ch>
+Message-ID: <51016A84.20703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 04:12:11PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 24, 2013 at 04:06:09PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Jan 24, 2013 at 09:57:04AM -0600, Josh Cartwright wrote:
-> > > On Thu, Jan 24, 2013 at 11:11:17AM +0000, Russell King - ARM Linux wrote:
-> > > > The OMAP4 randconfig build last night failed with this error:
-> > > > 
-> > > > arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
-> > > > 
-> > > > Full details at the usual place - 
-> > > > http://www.arm.linux.org.uk/developer/build/
-> > > 
-> > > Curious.  This doesn't look like a valid config to me.
-> > 
-> > I think you're wrong.
+On 01/24/2013 05:50 PM, Florian Vaussard wrote:
+>>> I did it at first, but the led API executes in atomic context, where the
+>>> pwm-twl-led driver uses i2c communication. Setting a trigger will result in a
+>>> kernel panic.
+>>
+>> Now that you mentioned it, this might be true.
+>>
+> 
+> [<c0013204>] (unwind_backtrace+0x0/0xec) from [<c00348ac>]
+> (warn_slowpath_common+0x4c/0x64)
+> [<c00348ac>] (warn_slowpath_common+0x4c/0x64) from [<c00348e0>]
+> (warn_slowpath_null+0x1c/0x24)
+> [<c00348e0>] (warn_slowpath_null+0x1c/0x24) from [<c054d384>]
+> (__mutex_lock_slowpath+0x6c/0x26c)
+> [<c054d384>] (__mutex_lock_slowpath+0x6c/0x26c) from [<c054d590>]
+> (mutex_lock+0xc/0x20)
+> [<c054d590>] (mutex_lock+0xc/0x20) from [<c02d740c>]
+> (regmap_bulk_write+0x48/0x138)
+> [<c02d740c>] (regmap_bulk_write+0x48/0x138) from [<c02de2c0>]
+> (twl_i2c_write+0xa4/0xf0)
+> [<c02de2c0>] (twl_i2c_write+0xa4/0xf0) from [<c0299e34>]
+> (twl4030_pwmled_config+0x70/0x9c)
+> [<c0299e34>] (twl4030_pwmled_config+0x70/0x9c) from [<c029875c>]
+> (pwm_config+0x5c/0x6c)
+> [<c029875c>] (pwm_config+0x5c/0x6c) from [<c039dc04>] (led_pwm_set+0x28/0x64)
+> [<c039dc04>] (led_pwm_set+0x28/0x64) from [<c039e27c>]
+> (led_heartbeat_function+0x10c/0x134)
+> [<c039e27c>] (led_heartbeat_function+0x10c/0x134) from [<c004359c>]
+> (call_timer_fn+0x90/0x178)
+> [<c004359c>] (call_timer_fn+0x90/0x178) from [<c0043994>]
+> (run_timer_softirq+0x250/0x2c8)
+> [<c0043994>] (run_timer_softirq+0x250/0x2c8) from [<c003cf78>]
+> (__do_softirq+0xf8/0x248)
+> [<c003cf78>] (__do_softirq+0xf8/0x248) from [<c003d154>] (irq_exit+0x44/0x98)
+> [<c003d154>] (irq_exit+0x44/0x98) from [<c000e338>] (handle_IRQ+0x68/0x8c)
+> [<c000e338>] (handle_IRQ+0x68/0x8c) from [<c000870c>]
+> (omap3_intc_handle_irq+0x58/0x70)
+> [<c000870c>] (omap3_intc_handle_irq+0x58/0x70) from [<c054f8c0>]
+> (__irq_svc+0x40/0x70)
+> Exception stack(0xc077df60 to 0xc077dfa8)
+> 
+> :-)
+> 
+>>> I am working on a patch for pwm-twl-led to defer using a workqueue right now.
+>>
+>> Great!
+>> The only thing I worry about is the latency we are going to get with the
+>> workqueue.
+>>
+> 
+> If the latency becomes critical, we can create our own workqueue.
 
-Yes, indeed.  I was running my tests using the wrong tree.  I can see
-this issue in today's linux-next.  Sorry for the noise.
+Hrm, when we handled the led via gpio-leds it was also going through the same
+path at the end, via i2c to twl4030.
+I think the fix for this is going to be needed in the pwm core level. Just
+need to look at the gpio code to have similar handling of might_sleep interfaces.
 
-[..]
->
-> And what's missing is _specific_ to Zynq.  Let's look at the error again:
->
-> arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
->
-> What it means is that the "irqchip_init" identifier was not declared by
-> anything before it has been used.  That means arch/arm/mach-zynq/common.c
-> is missing a required #include statement.
->
-> irqchip_init can be found in linux/irqchip.h.  Does arch/arm/mach-zynq/common.c
-> include this required include?  No.  Therefore, the build fails with the
-> above error.
->
-> You need to add this include file...
+> Do we merge anyway this patchset, or do we wait until the trigger has been fixed?
 
-Agreed, thanks.  Looks like this was introduced with "ARM: use common
-irqchip_init for GIC init".  Here's a patch to fix it up, it probably
-makes sense to be pulled into Rob's irqchip/gic-vic-move branch.
+I think it can go and later when we have the fix for the slow path you can add
+the default trigger.
 
--- 8< --
-Subject: [PATCH] ARM: zynq: include irqchip.h to prevent build failure
-
-Commit 0529e315bbda5d502c93df2cfafba9bb337fbdf4 ("ARM: use common irqchip_init
-for GIC init") converts Zynq to make use of irqchip_init, but fails to
-include linux/irqchip.h.  Fixes this build error:
-
-   arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
-
-Reported-by: Russell King <linux@arm.linux.org.uk>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
----
- arch/arm/mach-zynq/common.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 8513b16..8a0b8ab 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -20,6 +20,7 @@
- #include <linux/platform_device.h>
- #include <linux/clk.h>
- #include <linux/clk/zynq.h>
-+#include <linux/irqchip.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
--- 
-1.8.1.1
+Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
