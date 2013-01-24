@@ -1,59 +1,101 @@
-From: highguy@gmail.com (Stijn Devriendt)
-Date: Thu, 24 Jan 2013 13:02:38 +0100
-Subject: [PATCH 6/6 v14] gpio: Add block gpio to several gpio drivers
-In-Reply-To: <1358856404-8975-7-git-send-email-stigge@antcom.de>
-References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
- <1358856404-8975-7-git-send-email-stigge@antcom.de>
-Message-ID: <CAOY=C6H5xETt5UNXUfRkGW9q+bj0y2R3sXNvW87XXvQcYoL_-g@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 24 Jan 2013 07:07:21 -0500
+Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
+In-Reply-To: <20130124062323.GB21297@lunn.ch>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <ecb64cdf824399badaf9d659177811d8cb091156.1358983578.git.jason@lakedaemon.net>
+ <20130124013945.GX1758@titan.lakedaemon.net>
+ <20130124062323.GB21297@lunn.ch>
+Message-ID: <20130124120721.GY1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 1:06 PM, Roland Stigge <stigge@antcom.de> wrote:
-> This patch adds block GPIO support to several gpio drivers.
->
-> This implements block GPIO only for some selected drivers since block GPIO is
-> an optional feature which may not be suitable for every GPIO hardware. (With
-> automatic fallback to the single GPIO functions if not available in a driver.)
->
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
->
-> For pinctrl-at91.c:
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> ---
->
-> +static void lpc32xx_gpio_set_block_p3(struct gpio_chip *chip,
-> +                                     unsigned long mask,
-> +                                     unsigned long values)
-> +{
-> +       struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
-> +       u32 set_bits = values & mask;
-> +       u32 clr_bits = ~values & mask;
-> +
-> +       /* States of GPIO 0-5 start at bit 25 */
-> +       set_bits <<= 25;
-> +       clr_bits <<= 25;
-> +
-> +       /* Note: On LPC32xx, GPOs can only be set at once or cleared at once,
-> +        *       but not set and cleared at once
-> +        */
-> +       if (set_bits)
-> +               __raw_writel(set_bits, group->gpio_grp->outp_set);
-> +       if (clr_bits)
-> +               __raw_writel(clr_bits, group->gpio_grp->outp_clr);
-> +}
-> +
+On Thu, Jan 24, 2013 at 07:23:23AM +0100, Andrew Lunn wrote:
+> > > +static void kirkwood_gige_dt_init(void) {
+> > > +	int i;
+> > > +
+> > > +	for (i = 0; kw_dt_gige[i].compatible != NULL; i++) {
+> > > +		if (of_machine_is_compatible(kw_dt_gige[i].compatible)) {
+> > > +
+> > > +			if (kw_dt_gige[i].phy_addr00 != MV643XX_ETH_PHY_NONE) {
+> > > +				struct mv643xx_eth_platform_data d = {
+> > > +					.phy_addr = kw_dt_gige[i].phy_addr00,
+> > > +				};
+> > > +				kirkwood_ge00_init(&d);
+> > > +			}
+> > > +
+> > > +			if (kw_dt_gige[i].phy_addr01 != MV643XX_ETH_PHY_NONE) {
+> > > +				struct mv643xx_eth_platform_data d = {
+> > > +					.phy_addr = kw_dt_gige[i].phy_addr01,
+> > > +				};
+> > > +				kirkwood_ge01_init(&d);
+> > > +			}
+> > > +
+> > > +			break;
+> > > +		}
+> > 
+> > meh, hindsight is 50/50 :-)  Much more readable this way, I think:
+> > 
+> > 		if (of_machine_is_compatible(kw_dt_gige[i].compatible)) {
+> > 			struct mv643xx_eth_platform_data d;
+> > 
+> > 			if (kw_dt_gige[i].phy_addr00 != MV643XX_ETH_PHY_NONE) {
+> > 				d.phy_addr = kw_dt_gige[i].phy_addr00,
+> > 				kirkwood_ge00_init(&d);
+> > 			}
+> > 
+> > 			if (kw_dt_gige[i].phy_addr01 != MV643XX_ETH_PHY_NONE) {
+> > 				d.phy_addr = kw_dt_gige[i].phy_addr01,
+> > 				kirkwood_ge01_init(&d);
+> > 			}
+> > 
+> > 			break;
+> > 		}
+> > 
+> > thx,
+> > 
+> > Jason.
+> 
+> Hi Jason
+> 
+> Might it be better still to implement something like:
+> 
+> const struct of_device_id *of_match_machine(const struct of_device_id *matches)
+> {
+>         struct device_node *root;
+> 	const struct of_device_id *match;
+> 
+> 	if (!matches)
+> 		return NULL;
+> 
+> 	root = of_find_node_by_path("/");
+> 	if (!root)
+> 		return NULL;	
+> 
+> 	match = of_match_node(matches, root);
+> 	of_node_put(root);
+> 
+> 	return match;
+> }
 
-In my patch, I go out of the way of this kind of thing for a simple reason:
-You may generate incorrect timing by doing this.
+I actually went looking for something like this in linux/of.h and didn't
+find it.  Perhaps it should be added?  Although I'm not sure I see a use
+case after the conversion to DT is complete...
 
-As a fictive example, consider the i2c-bitbang driver, which you could optimize
-by using block-gpio with sda/scl in a single block. By offering the
-block-gpio API
-even when you cannot set all bits at once, you could cause timing issues.
-You might be toggling the clock line before pushing out data, for example.
+> 
+> and then board-dt.c becomes
+> 
+>     match = of_match_machine(ge00_matches);
+>     if (match)
+> 	krikwood_ge00_init(match->data)
+> 
+>     match = of_match_machine(ge01_matches);
+>     if (match)
+> 	krikwood_ge01_init(match->data)
 
-The same holds below, for a driver that has separate hi/lo bits.
+Much nicer, I'll do this for the next revision and see what the
+devicetree guys think.
 
-Regards,
-Stijn
+thx,
+
+Jason.
