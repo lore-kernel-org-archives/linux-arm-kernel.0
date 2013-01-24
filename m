@@ -1,52 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 23 Jan 2013 20:33:34 -0800
-Subject: [GIT PULL][for 3.8] request from armsoc/fix branch in pxa git tree
-In-Reply-To: <CAN1soZzTnVhMwQfOz7=MyHm7b6n=OmNL=wEENJz-SFOPU6Wsjw@mail.gmail.com>
-References: <CAN1soZzTnVhMwQfOz7=MyHm7b6n=OmNL=wEENJz-SFOPU6Wsjw@mail.gmail.com>
-Message-ID: <CAOesGMjfJ6A37Ncek8221dsYNzf6pZNYYD-XOt4hoa9TD_VYAw@mail.gmail.com>
+Date: Wed, 23 Jan 2013 20:34:10 -0800
+Subject: [GIT PULL] ARM: mvebu fixes for v3.8-rc5
+In-Reply-To: <1358904583.07bA7B0.11715@triton>
+References: <1358904583.07bA7B0.11715@triton>
+Message-ID: <CAOesGMiEn9CLSV0Q-pczuSQs8wa16EO+5=KosGD4JVS6X93TQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jan 23, 2013 at 1:15 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> Hi Arnd & Olof,
+On Tue, Jan 22, 2013 at 5:29 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> The following changes since commit 11d5993df2e1f65e3acfeb92a3febe88803b3e7f:
 >
-> Please help to pull armsoc/fix branch in pxa git tree.
->
-> Regards
-> Haojian
->
-> The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
->
->   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+>   arm: mvebu: Fix memory size for Armada 370 DB (2013-01-10 19:16:51 +0000)
 >
 > are available in the git repository at:
 >
->   git://github.com/hzhuang1/linux.git armsoc/fix
->
-> for you to fetch changes up to eea6e39b916dd282c7fa4629be8934b5ad60e62b:
->
->   ARM: pxa: Minor naming fixes in spitz.c (2013-01-23 17:13:07 +0800)
->
-> ----------------------------------------------------------------
-> Igor Grinberg (1):
->       ARM: PXA3xx: program the CSMSADRCFG register
->
-> Marko Katic (1):
->       ARM: pxa: Minor naming fixes in spitz.c
->
-> Mike Dunn (2):
->       ARM: palmtreo: fix lcd initilialization on treo680
->       ARM: palmtreo: fix #ifdefs for leds-gpio device
+>   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.8-rc5
 
-I don't think some of those really are regressions, are they? I.e. the
-palmtreo fixes are for code that never in recent times worked I think?
+Pulled, thanks. A little bigger than ideal at this point in the
+release, but oh well.
 
-If so, I'd prefer to queue this for 3.9 as a fixes-non-critical
-instead, please let me know if that's ok.
-
-Thanks,
 
 -Olof
