@@ -1,30 +1,50 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Thu, 24 Jan 2013 19:14:33 +0200
-Subject: [PATCH v6 00/15] KVM/ARM Implementation
-In-Reply-To: <20130124162627.GE18233@arm.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Thu, 24 Jan 2013 12:25:43 -0500
+Subject: [PATCH v6 01/15] ARM: Add page table and page defines needed by
+ KVM
+In-Reply-To: <20130124171349.GH18233@arm.com>
 References: <20130116175716.29147.15348.stgit@ubuntu>
- <20130124162627.GE18233@arm.com>
-Message-ID: <20130124171432.GC18762@redhat.com>
+ <20130116175726.29147.57548.stgit@ubuntu>
+ <20130124113935.GA1658@localhost.cambridge.arm.com>
+ <CANM98qKYhvb6YVUr_jF0iYrgcmoMqtom+9tsZw1PkWFabRKVNQ@mail.gmail.com>
+ <20130124170220.GF18233@arm.com>
+ <CANM98q+mmU4R1yQ7mnp_QynhX4mbBiViP96FMjSob=fzAHLp6Q@mail.gmail.com>
+ <20130124171349.GH18233@arm.com>
+Message-ID: <CANM98q++PJHzBWnPFRBKX6W0LiAvJmcxbjuu9vr=GHPtmML7aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 04:26:28PM +0000, Catalin Marinas wrote:
-> Hi Christoffer,
-> 
-> On Wed, Jan 16, 2013 at 05:57:19PM +0000, Christoffer Dall wrote:
-> > The following series implements KVM support for ARM processors,
-> > specifically on the Cortex A-15 platform.
-> 
-> I went through the KVM patches (just this series, not the vgic or
-> timers) and apart from a few minor clean-up issues (which can be done
-> later as an additional patch) they look fine to me.
-> 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Same here. Reviewed the patch series from KVM perspective. There are
-improvements that can be done to vcpu run loop, but nothing that should
-prevent this series from going in.
+On Thu, Jan 24, 2013 at 12:13 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, Jan 24, 2013 at 05:04:32PM +0000, Christoffer Dall wrote:
+>> On Thu, Jan 24, 2013 at 12:02 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > On Thu, Jan 24, 2013 at 04:05:33PM +0000, Christoffer Dall wrote:
+>> >> On Thu, Jan 24, 2013 at 6:39 AM, Catalin Marinas
+>> >> <catalin.marinas@arm.com> wrote:
+>> >> > On Wed, Jan 16, 2013 at 05:57:26PM +0000, Christoffer Dall wrote:
+>> >> >> @@ -82,6 +85,10 @@ extern pgprot_t            pgprot_kernel;
+>> >> >>  #define PAGE_READONLY_EXEC   _MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
+>> >> >>  #define PAGE_KERNEL          _MOD_PROT(pgprot_kernel, L_PTE_XN)
+>> >> >>  #define PAGE_KERNEL_EXEC     pgprot_kernel
+>> >> >> +#define PAGE_HYP             _MOD_PROT(pgprot_kernel, L_PTE_HYP)
+>> >> >> +#define PAGE_HYP_DEVICE              _MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+>> >> >> +#define PAGE_S2                      _MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+>> >> >> +#define PAGE_S2_DEVICE               _MOD_PROT(pgprot_s2_device, L_PTE_USER | L_PTE_S2_RDONLY)
+>> >> >
+>> >> > Are these S2 read-only by default?
+>> >>
+>> >> not sure I understand what you're asking here?
+>> >
+>> > Why do you pass L_PTE_S2_RDONLY? Do you need to restrict guest writes
+>> > via the stage 2 attributes?
+>> >
+>> yes, for example when KSM merges two pages, then it must be mapped
+>> read-only to the guest so that we catch writes and perform COW.
+>
+> OK, so you want the default to be read-only unless write access is
+> required and you perform an 'or' with L_PTE_S2_RDWR. Sounds fine.
+>
+exactly, the specific pointer to the code is in line ~562 in arch/arm/kvm/mmu.c.
 
-Reviewed-by: Gleb Natapov <gleb@redhat.com>
- 
---
-			Gleb.
+-Christoffer
