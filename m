@@ -1,40 +1,69 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 24 Jan 2013 22:14:37 +0100
-Subject: [PATCH 1/2] ARM: dts: omap3-overo: Add support for pwm-leds
-In-Reply-To: <51016A84.20703@ti.com>
-References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
- <1358963812-19947-2-git-send-email-florian.vaussard@epfl.ch>
- <5101510C.9050407@ti.com> <51015663.8080109@epfl.ch>
- <5101570A.1030303@ti.com> <5101663C.7020301@epfl.ch> <51016A84.20703@ti.com>
-Message-ID: <5101A43D.7080108@epfl.ch>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 25 Jan 2013 00:24:55 +0200
+Subject: [PATCH] ARM: OMAP1: fix USB host on 1710
+Message-ID: <1359066295-20382-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+There is a long-standing bug that OHCI USB host controller does
+not respond on 1710, because of wrong clock definitions. See e.g.
+http://marc.info/?l=linux-omap&m=119634441229321&w=2. All register reads
+return just zeroes:
 
->>
->>>> I am working on a patch for pwm-twl-led to defer using a workqueue right now.
->>>
->>> Great!
->>> The only thing I worry about is the latency we are going to get with the
->>> workqueue.
->>>
->>
->> If the latency becomes critical, we can create our own workqueue.
->
-> Hrm, when we handled the led via gpio-leds it was also going through the same
-> path at the end, via i2c to twl4030.
-> I think the fix for this is going to be needed in the pwm core level. Just
-> need to look at the gpio code to have similar handling of might_sleep interfaces.
->
+[    1.896606] ohci ohci: OMAP OHCI
+[    1.912597] ohci ohci: new USB bus registered, assigned bus number 1
+[    1.933776] ohci ohci: irq 38, io mem 0xfffba000
+[    2.012573] ohci ohci: init err (00000000 0000)
+[    2.030334] ohci ohci: can't start
+[    2.046661] ohci ohci: startup error -75
+[    2.063201] ohci ohci: USB bus 1 deregistered
 
-You are right. But then the pwm core must provide a way to know if the 
-pwm access function are callable
-from atomic context or not (the gpio framework provides gpio_cansleep()).
-This implies a good amount of changes to the pwm framework, and 
-currently we are the only driver using
-non-atomic access.
+After some experiments, it seems that when changing the usb_dc_ck /
+SOFT_REQ enable bit from USB_REQ_EN_SHIFT to SOFT_USB_OTG_DPLL_REQ_SHIFT
+(like done also on 7XX), the USB appears to work:
 
-I will take a closer look to the complexity of this solution tomorrow.
+[    2.183959] ohci ohci: OMAP OHCI
+[    2.198242] ohci ohci: new USB bus registered, assigned bus number 1
+[    2.215820] ohci ohci: irq 38, io mem 0xfffba000
+[    2.324798] hub 1-0:1.0: USB hub found
+[    2.361267] hub 1-0:1.0: 3 ports detected
 
-Florian
+The patch is tested on Nokia 770.
+
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ arch/arm/mach-omap1/clock_data.c |   12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
+index cb7c6ae..6c4f766 100644
+--- a/arch/arm/mach-omap1/clock_data.c
++++ b/arch/arm/mach-omap1/clock_data.c
+@@ -543,15 +543,6 @@ static struct clk usb_dc_ck = {
+ 	/* Direct from ULPD, no parent */
+ 	.rate		= 48000000,
+ 	.enable_reg	= OMAP1_IO_ADDRESS(SOFT_REQ_REG),
+-	.enable_bit	= USB_REQ_EN_SHIFT,
+-};
+-
+-static struct clk usb_dc_ck7xx = {
+-	.name		= "usb_dc_ck",
+-	.ops		= &clkops_generic,
+-	/* Direct from ULPD, no parent */
+-	.rate		= 48000000,
+-	.enable_reg	= OMAP1_IO_ADDRESS(SOFT_REQ_REG),
+ 	.enable_bit	= SOFT_USB_OTG_DPLL_REQ_SHIFT,
+ };
+ 
+@@ -727,8 +718,7 @@ static struct omap_clk omap_clks[] = {
+ 	CLK(NULL,	"usb_clko",	&usb_clko,	CK_16XX | CK_1510 | CK_310),
+ 	CLK(NULL,	"usb_hhc_ck",	&usb_hhc_ck1510, CK_1510 | CK_310),
+ 	CLK(NULL,	"usb_hhc_ck",	&usb_hhc_ck16xx, CK_16XX),
+-	CLK(NULL,	"usb_dc_ck",	&usb_dc_ck,	CK_16XX),
+-	CLK(NULL,	"usb_dc_ck",	&usb_dc_ck7xx,	CK_7XX),
++	CLK(NULL,	"usb_dc_ck",	&usb_dc_ck,	CK_16XX | CK_7XX),
+ 	CLK(NULL,	"mclk",		&mclk_1510,	CK_1510 | CK_310),
+ 	CLK(NULL,	"mclk",		&mclk_16xx,	CK_16XX),
+ 	CLK(NULL,	"bclk",		&bclk_1510,	CK_1510 | CK_310),
+-- 
+1.7.10.4
