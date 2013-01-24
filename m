@@ -1,54 +1,42 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 24 Jan 2013 13:55:26 +0100
-Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into the
- driver
-In-Reply-To: <20130123111805.GI15873@gmail.com>
-References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
- <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
- <20130122090000.GH6857@gmail.com>
- <CACRpkdatTagYaMqvpe-a8zj_kO3Twjn1r4SqPty8DosNmcxJcQ@mail.gmail.com>
- <20130122100607.GH23505@n2100.arm.linux.org.uk>
- <20130122102010.GL6857@gmail.com>
- <20130122103723.GI23505@n2100.arm.linux.org.uk>
- <20130122105608.GP6857@gmail.com>
- <20130123101349.GH15873@gmail.com>
- <20130123101748.GO23505@n2100.arm.linux.org.uk>
- <20130123111805.GI15873@gmail.com>
-Message-ID: <CAPDyKFpEfids8xdU97US2VNgJKGHQ6Z2vuKo5DgfOjLcCUjN4A@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 24 Jan 2013 14:01:14 +0100
+Subject: [PATCH 3/4] drm/tilcdc: add encoder slave
+In-Reply-To: <1358894185-21617-4-git-send-email-robdclark@gmail.com>
+References: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
+ <1358894185-21617-4-git-send-email-robdclark@gmail.com>
+Message-ID: <20130124130114.GB31306@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 January 2013 12:18, Lee Jones <lee.jones@linaro.org> wrote:
-> On Wed, 23 Jan 2013, Russell King - ARM Linux wrote:
->
->> On Wed, Jan 23, 2013 at 10:13:49AM +0000, Lee Jones wrote:
->> > On Tue, 22 Jan 2013, Lee Jones wrote:
->> > > Are you saying that you won't do it? :)
->> > >
->> > > Is there anything I can do to make the process easier?
->> >
->> > Thinking about this a little more. Is it easier to remove it from your
->> > tree altogether? Only I have a small "ARM: ux500: " patch-set which
->> > directly relies on this patch. I could take it in via ARM-SoC without
->> > any fear of ordering issues.
->>
->> Thankfully, the patch doesn't conflict with any of the others I have, so
->> we can do that (and it's actually easier to do that.)
->>
->> Done.
->
-> Brilliant, that's 2 birds with one stone. I'll queue it up for ARM-SoC.
->
-> Thanks Russell.
->
-> --
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+On Tue, Jan 22, 2013 at 04:36:24PM -0600, Rob Clark wrote:
+> Add output panel driver for i2c encoder slaves.
+> 
+> Signed-off-by: Rob Clark <robdclark@gmail.com>
 
-As long as it goes in for 3.9 I am happy. I am also depending on this
-to add the UHS support for SD-cards for mmci. :-)
+Found some more stuff ...
 
-Kind regards
-Ulf Hansson
+[cut]
+
+> +static const struct drm_encoder_helper_funcs slave_encoder_helper_funcs = {
+> +		.dpms           = drm_i2c_encoder_dpms,
+> +		.mode_fixup     = drm_i2c_encoder_mode_fixup,
+> +		.prepare        = slave_encoder_prepare,
+> +		.commit         = drm_i2c_encoder_commit,
+> +		.mode_set       = drm_i2c_encoder_mode_set,
+> +		.save           = drm_i2c_encoder_save,
+> +		.restore        = drm_i2c_encoder_restore,
+> +};
+
+I couldn't find these wrappers anywhere ...
+
+> +
+> +static const struct i2c_board_info info = {
+> +		I2C_BOARD_INFO("tda998x", 0x70)
+> +};
+
+Shouldn't there be some of/devicetree thing to tell us which one to load?
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
