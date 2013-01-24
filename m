@@ -1,107 +1,81 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 24 Jan 2013 15:49:43 -0500
-Subject: [PATCH v5 00/14] DMA Engine support for AM33XX
-In-Reply-To: <8ea1d227d84648f68e670c56f27c481e@DFLE72.ent.ti.com>
-References: <1358281974-8411-1-git-send-email-mporter@ti.com>
- <50FFC48B.80902@ti.com> <20130123204917.GA5256@beef>
- <8ea1d227d84648f68e670c56f27c481e@DFLE72.ent.ti.com>
-Message-ID: <20130124204943.GE5256@beef>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu, 24 Jan 2013 21:52:50 +0100
+Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
+In-Reply-To: <20130124203824.GG1758@titan.lakedaemon.net>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <3084778.eWbl5o3HSt@bender> <20130124203824.GG1758@titan.lakedaemon.net>
+Message-ID: <33979531.bU6WbEu7BD@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 05:12:05AM +0000, Shilimkar, Santosh wrote:
-> On Thursday 24 January 2013 02:19 AM, Matt Porter wrote:
-> > On Wed, Jan 23, 2013 at 04:37:55PM +0530, Santosh Shilimkar wrote:
-> >> Matt,
-> >>
-> >> On Wednesday 16 January 2013 02:02 AM, Matt Porter wrote:
-> >>
-> >> [..]
-> >>
-> >>> This series adds DMA Engine support for AM33xx, which uses
-> >>> an EDMA DMAC. The EDMA DMAC has been previously supported by only
-> >>> a private API implementation (much like the situation with OMAP
-> >>> DMA) found on the DaVinci family of SoCs.
-> >>>
-> >>> The series applies on top of 3.8-rc3 and the following patches:
-> >>>
-> >>> 	- TPS65910 REGMAP_IRQ build fix:
-> >>> 	  https://patchwork.kernel.org/patch/1857701/
-> >>> 	- dmaengine DT support from Vinod's dmaengine_dt branch in
-> >>> 	  git://git.infradead.org/users/vkoul/slave-dma.git since
-> >>> 	  027478851791df751176398be02a3b1c5f6aa824
-> >>> 	- edma dmaengine driver fix:
-> >>> 	  https://patchwork.kernel.org/patch/1961521/
-> >>> 	- dmaengine dma_get_channel_caps v2:
-> >>> 	  https://patchwork.kernel.org/patch/1961601/
-> >>> 	- dmaengine edma driver channel caps support v2:
-> >>> 	  https://patchwork.kernel.org/patch/1961591/
-> >>>
-> >>> The approach taken is similar to how OMAP DMA is being converted to
-> >>> DMA Engine support. With the functional EDMA private API already
-> >>> existing in mach-davinci/dma.c, we first move that to an ARM common
-> >>> area so it can be shared. Adding DT and runtime PM support to the
-> >>> private EDMA API implementation allows it to run on AM33xx. AM33xx
-> >>> *only* boots using DT so we leverage Jon's generic DT DMA helpers to
-> >>> register EDMA DMAC with the of_dma framework and then add support
-> >>> for calling the dma_request_slave_channel() API to both the mmc
-> >>> and spi drivers.
-> >>>
-> >>> With this series both BeagleBone and the AM335x EVM have working
-> >>> MMC and SPI support.
-> >>>
-> >>> This is tested on BeagleBone with a SPI framebuffer driver and MMC
-> >>> rootfs. A trivial gpio DMA event misc driver was used to test the
-> >>> crossbar DMA event support. It is also tested on the AM335x EVM
-> >>> with the onboard SPI flash and MMC rootfs. The branch at
-> >>> https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-v4
-> >>> has the complete series, dependencies, and some test
-> >>> drivers/defconfigs.
-> >>>
-> >>> Regression testing was done on AM180x-EVM (which also makes use
-> >>> of the EDMA dmaengine driver and the EDMA private API) using SD,
-> >>> SPI flash, and the onboard audio supported by the ASoC Davinci
-> >>> driver. Regression testing was also done on a BeagleBoard xM
-> >>> booting from the legacy board file using MMC rootfs.
-> >>>
-> >>> Matt Porter (14):
-> >>>    ARM: davinci: move private EDMA API to arm/common
-> >>>    ARM: edma: remove unused transfer controller handlers
-> >>>    ARM: edma: add AM33XX support to the private EDMA API
-> >>>    dmaengine: edma: enable build for AM33XX
-> >>>    dmaengine: edma: Add TI EDMA device tree binding
-> >>>    ARM: dts: add AM33XX EDMA support
-> >>>    dmaengine: add dma_request_slave_channel_compat()
-> >>>    mmc: omap_hsmmc: convert to dma_request_slave_channel_compat()
-> >>>    mmc: omap_hsmmc: set max_segs based on dma engine limitations
-> >>>    mmc: omap_hsmmc: add generic DMA request support to the DT binding
-> >>>    ARM: dts: add AM33XX MMC support
-> >>>    spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
-> >>>    spi: omap2-mcspi: add generic DMA request support to the DT binding
-> >>>    ARM: dts: add AM33XX SPI DMA support
-> >>>
-> >> While going through the series and testing it out, I observed an issue
-> >> with MMC driver. You need patch in the end of the email to avoid the
-> >> issue. Same is attached in case mailer damages it. Can you please
-> >> add it with your series if you agree ?
-> >
-> > Yes, by inspection this makes sense. As you noticed, we've been relying
-> > on the fact that DMA resources still don't come from DT, we only use our
-> > DT data in conjunction with the DMA OF helpers to do channel filtering.
-> > I was figuring we would address that separately later, but I see how
-> > even omap4 has this issue with DMA resources named with "tx1", for
-> > example. A good followup once this series is taken will be to only
-> > use hwmod resources on a !populated-dt platform like we do for other
-> > resources now. Baby steps. :)
-> >
-> We are already on it :-)
+On Thursday 24 January 2013 15:38:24 Jason Cooper wrote:
+> On Thu, Jan 24, 2013 at 09:27:24PM +0100, Florian Fainelli wrote:
+> > On Thursday 24 January 2013 13:16:22 Jason Cooper wrote:
+> > > > >Ian's patch appears to do so.  I'll respin this series using it vice my
+> > > > >lookup table.
+> > > > >
+> > > > Sounds good, while at it, I wonder if we could not simplify Ian's
+> > > > patch to be limited to the actual Ethernet MAC driver and use
+> > > > Thomas's mvdio device tree binding for the MDIO bits of mv643xx_eth.
+> > > > What do you think?
+> > > 
+> > > It sounds like you just volunteered ;-)  Do you think you have the time
+> > > to knock it out for v3.9?
+> > 
+> > I do not have any kirkwood board at the moment and I really want to be able to 
+> > test this properly especially with the "clock must be enabled for ethernet not 
+> > be lost". Let me get one and I should be able to do it. Let's adopt your patch 
+> > for the moment, and once I have a kirkwood board I can deal with the ethernet 
+> > driver device tree bindings.
+> > 
+> > Does that sound ok with you?
+> 
+> using Ian's patch as is, I have the following in kirkwood.dtsi:
+> 
+> +
+> +               smi0: mdio at 72000 {
+> +                       compatible = "marvell,mdio-mv643xx";
+> +                       reg = <0x72000 0x4000>;
+> +                       interrupts = <46>;
+> +                       status = "disabled";
+> +               };
+> +
+> +               smi1: mdio at 76000 {
+> +                       compatible = "marvell,mdio-mv643xx";
+> +                       reg = <0x76000 0x4000>;
+> +                       interrupts = <47>;
+> +                       status = "disabled";
+> +               };
+> +
+> +               egiga0 {
+> +                       compatible = "marvell,mv643xx-eth";
+> +                       reg = <0x72000 0x4000>;
+> +                       mdio = <&smi0>;
+> +                       port_number = <0>;
+> +                       phy_addr = <0x80>;
+> +                       interrupts = <11>;
+> +                       clocks = <&gate_clk 0>;
+> +                       status = "disabled";
+> +               };
+> +
+> +               egiga1 {
+> +                       compatible = "marvell,mv643xx-eth";
+> +                       reg = <0x76000 0x4000>;
+> +                       mdio = <&smi1>;
+> +                       port_number = <1>;
+> +                       phy_addr = <0x81>;
+> +                       interrupts = <15>;
+> +                       clocks = <&gate_clk 19>;
+> +                       status = "disabled";
+> +               };
+> 
+> I'll see if I can get it working as is, then we can migrate to Thomas'
+> mdio bindings.
+> 
+> btw - it might be a shared smi, I haven't looked yet, and haven't
+> tested...
 
-Great!
-
-> > Thanks for the catch, I'll add this in with your tested line as well for
-> > the series.
-
-BTW, since I'm dropping mmc support from this series, I'll move your
-patch into a separate series with only the mmc pieces.
-
--Matt
+Ok, the existing mv643xx-eth SMI code also deals with an interrupt-driven SMI
+completion scheme, which is not handled yet with Thomas's mvmdio driver.
+-- 
+Florian
