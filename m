@@ -1,55 +1,54 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 24 Jan 2013 10:12:49 -0800
-Subject: [PATCH 1/4] clk: Introduce optional is_prepared callback
-In-Reply-To: <1359045956-30741-2-git-send-email-ulf.hansson@stericsson.com>
-References: <1359045956-30741-1-git-send-email-ulf.hansson@stericsson.com>
- <1359045956-30741-2-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20130124181249.10623.14484@quantum>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 24 Jan 2013 13:16:22 -0500
+Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
+In-Reply-To: <510174AF.4020503@openwrt.org>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <51013933.9020601@openwrt.org>
+ <20130124143736.GZ1758@titan.lakedaemon.net>
+ <201301241554.28003.arnd@arndb.de>
+ <20130124161349.GC1758@titan.lakedaemon.net>
+ <510174AF.4020503@openwrt.org>
+Message-ID: <20130124181622.GD1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ulf Hansson (2013-01-24 08:45:53)
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> To reflect whether a clk_hw is prepared the clk_hw may implement
-> the optional is_prepared callback. If not implemented we fall back
-> to use the software prepare counter.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/clk/clk.c            |   21 +++++++++++++++++++++
->  include/linux/clk-provider.h |    6 ++++++
->  2 files changed, 27 insertions(+)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 593a2e4..deb259a 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -458,6 +458,27 @@ unsigned long __clk_get_flags(struct clk *clk)
->         return !clk ? 0 : clk->flags;
->  }
->  
-> +bool __clk_is_prepared(struct clk *clk)
-> +{
-> +       int ret;
-> +
-> +       if (!clk)
-> +               return false;
-> +
-> +       /*
-> +        * .is_prepared is optional for clocks that can prepare
-> +        * fall back to software usage counter if it is missing
-> +        */
+On Thu, Jan 24, 2013 at 06:51:43PM +0100, Florian Fainelli wrote:
+> On 01/24/2013 05:13 PM, Jason Cooper wrote:
+> >On Thu, Jan 24, 2013 at 03:54:27PM +0000, Arnd Bergmann wrote:
+> >>On Thursday 24 January 2013, Jason Cooper wrote:
+> >>>I agree, however, there is a long history with that patch.  That driver
+> >>>has been in use by powerpc for many years.  We need to be mindful not to
+> >>>break existing installations.  I don't think it'll be ready in time for
+> >>>v3.9.  So, I'd like to do the cleanup now.
+> >>>
+> >>>>[1]: http://patchwork.ozlabs.org/patch/175652/
+> >>>
+> >>I actually think we can take that patch.
+> >
+> >Woot!
+> >
+> >>The result of the discussion back then was after all that we won't try
+> >>to keep the bindings compatible, and the powerpc version just uses the
+> >>platform_device part of the driver by fabricating platform_data from
+> >>the arch code.
+> >>
+> >>It should not have any impact on this, as long as you ensure that the
+> >>platform_data is still supported.
+> >
+> >Ian's patch appears to do so.  I'll respin this series using it vice my
+> >lookup table.
+> >
+> Sounds good, while at it, I wonder if we could not simplify Ian's
+> patch to be limited to the actual Ethernet MAC driver and use
+> Thomas's mvdio device tree binding for the MDIO bits of mv643xx_eth.
+> What do you think?
 
-Why not make it mandatory?  This could be as simple as saying "it is
-mandatory", or we could even enforce a check in clk_init, though the
-latter suggestion would be noisy until existing clock providers were
-updated.
+It sounds like you just volunteered ;-)  Do you think you have the time
+to knock it out for v3.9?
 
-Note that .is_enabled is technically mandatory for any clock that
-implements .enable/.disable but there is no check for compliance.  It is
-only in Documentation/clk.txt and the kerneldoc.
+I'd like to drop most of these board-*.c files for v3.9.  They've been
+bugging me since I added the first one (board-dreamplug.c).
 
-Regards,
-Mike
+thx,
+
+Jason.
