@@ -1,77 +1,54 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Jan 2013 18:23:21 +0530
-Subject: [PATCH] ARM: dts: specify all the per-cpu interrupts of arch
- timer for exynos5440
-In-Reply-To: <51012C4B.5080300@ti.com>
-References: <1358818887-16870-1-git-send-email-kgene.kim@samsung.com>
- <20130122101554.GA18876@e106331-lin.cambridge.arm.com>
- <063f01cdf8ec$926cda30$b7468e90$@samsung.com>
- <20130123103614.GD32237@e106331-lin.cambridge.arm.com>
- <50FFC1B0.8000601@ti.com> <51012C4B.5080300@ti.com>
-Message-ID: <51012EC1.6010803@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 Jan 2013 13:55:26 +0100
+Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into the
+ driver
+In-Reply-To: <20130123111805.GI15873@gmail.com>
+References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
+ <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
+ <20130122090000.GH6857@gmail.com>
+ <CACRpkdatTagYaMqvpe-a8zj_kO3Twjn1r4SqPty8DosNmcxJcQ@mail.gmail.com>
+ <20130122100607.GH23505@n2100.arm.linux.org.uk>
+ <20130122102010.GL6857@gmail.com>
+ <20130122103723.GI23505@n2100.arm.linux.org.uk>
+ <20130122105608.GP6857@gmail.com>
+ <20130123101349.GH15873@gmail.com>
+ <20130123101748.GO23505@n2100.arm.linux.org.uk>
+ <20130123111805.GI15873@gmail.com>
+Message-ID: <CAPDyKFpEfids8xdU97US2VNgJKGHQ6Z2vuKo5DgfOjLcCUjN4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 January 2013 06:12 PM, Benoit Cousson wrote:
-> Hi Santosh,
+On 23 January 2013 12:18, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 23 Jan 2013, Russell King - ARM Linux wrote:
 >
-> On 01/23/2013 11:55 AM, Santosh Shilimkar wrote:
->> Looping Marc, Benoit
+>> On Wed, Jan 23, 2013 at 10:13:49AM +0000, Lee Jones wrote:
+>> > On Tue, 22 Jan 2013, Lee Jones wrote:
+>> > > Are you saying that you won't do it? :)
+>> > >
+>> > > Is there anything I can do to make the process easier?
+>> >
+>> > Thinking about this a little more. Is it easier to remove it from your
+>> > tree altogether? Only I have a small "ARM: ux500: " patch-set which
+>> > directly relies on this patch. I could take it in via ARM-SoC without
+>> > any fear of ordering issues.
 >>
->> On Wednesday 23 January 2013 04:06 PM, Mark Rutland wrote:
->>> On Tue, Jan 22, 2013 at 10:05:18PM +0000, Kukjin Kim wrote:
->>>> Mark Rutland wrote:
->>>>>
->>>> + devicetree-discuss, Grant Likely, Rob Herring and Tony Lindgren
->>>>
->>>>> On Tue, Jan 22, 2013 at 01:41:27AM +0000, Kukjin Kim wrote:
->>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>>>>
->>>>>> Need to be changed requirements in the 'cpus' node for exynos5440
->>>>>> to specify all the per-cpu interrupts of arch timer.
->>>>>
->>>>> The node(s) for the arch timer should not be in the cpus/cpu at N nodes.
->>>>> Instead, there should be one node (in the root of the tree).
->>>>>
->>>> Well, I don't think so. As per my understanding, the local timers are
->>>> attached to every ARM cores (cpus) and it generates certain interrupt
->>>> to the
->>>> GIC. So the correct representation for this in device tree is to
->>>> include the
->>>> interrupts in the cpu nodes in dts file. Your comments  refer to a
->>>> limitation in the Linux kernel implementation of the arch_timer and it
->>>> should not result in representing the hardware details incorrectly in
->>>> the
->>>> dts file.
->>>
->>> I disagree. The "correct representation" is whatever the devicetree
->>> binding
->>> documentation describes. It does not describe placing timer nodes in
->>> the cpu
->>> nodes.
->>>
->> This seems to be exact same topic what is getting discussed here [1]
->> Technically DT is suppose to represent how the hardware is rather than
->> how the bindings are done.
+>> Thankfully, the patch doesn't conflict with any of the others I have, so
+>> we can do that (and it's actually easier to do that.)
 >>
->> But as Marc pointed out, the approach taken currently is to not
->> duplicate the banked information. The thread [1] isn't concluded
->> yet but looks like we might want to avoid duplicating the information
->> considering, more of such duplication needs to follow. e.g gic i/f
->>
->> Am still waiting on what Benoit has to say ?
+>> Done.
 >
-> I agree with you :-)
+> Brilliant, that's 2 birds with one stone. I'll queue it up for ARM-SoC.
 >
-> I'm not sure the binding was properly done to reflect the HW accurately.
+> Thanks Russell.
 >
-> A local timer for my point of view should be located in the cpu node
-> like a L1 cache. Or at least referenced in each cpu by a phandle.
->
-> What was the rational to put it in the root?
->
- From Marc's answer it seems to avoid the duplication of data but
-I let him elaborate it.
+> --
+> Lee Jones
+> Linaro ST-Ericsson Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
 
-Regards,
-Santosh
+As long as it goes in for 3.9 I am happy. I am also depending on this
+to add the UHS support for SD-cards for mmci. :-)
+
+Kind regards
+Ulf Hansson
