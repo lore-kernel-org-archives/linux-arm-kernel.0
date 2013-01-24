@@ -1,18 +1,17 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 24 Jan 2013 12:14:50 +0530
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Thu, 24 Jan 2013 12:21:45 +0530
 Subject: [PATCH] ARM: DTS: exynos5250-arndale: Add initial board support
  file
 In-Reply-To: <1359008188-23395-1-git-send-email-tushar.behera@linaro.org>
 References: <1359008188-23395-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <CAK9yfHyKK4L_YH5fw=CrcjzeZgfhGKtDMpZQ3GVLnoVt3gkNiQ@mail.gmail.com>
+Message-ID: <CAGOxZ53VsXE_as6aNk85jdxVG2FAg-SqWc8svTHpgrcttE_q0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Tushar,
 
-Just a couple of minor comments.
-
-On 24 January 2013 11:46, Tushar Behera <tushar.behera@linaro.org> wrote:
+On Thu, Jan 24, 2013 at 11:46 AM, Tushar Behera
+<tushar.behera@linaro.org> wrote:
 > From: Girish K S <ks.giri@samsung.com>
 >
 > Arndale is a low cost board based on the Samsung Exynos5250 SoC. This
@@ -35,10 +34,6 @@ On 24 January 2013 11:46, Tushar Behera <tushar.behera@linaro.org> wrote:
 >         exynos4412-smdk4412.dtb \
 >         exynos5250-smdk5250.dtb \
 > +       exynos5250-arndale.dtb \
-
-I think this entry could be moved one step up for maintaining
-alphabetical order.
-
 >         exynos5250-snow.dtb \
 >         exynos5440-ssdk5440.dtb
 >  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
@@ -52,9 +47,6 @@ alphabetical order.
 > + * Samsung's Exynos5250 based Arndale board device tree source
 > + *
 > + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-
-2013?
-
 > + *             http://www.samsung.com
 > + *
 > + * This program is free software; you can redistribute it and/or modify
@@ -75,11 +67,6 @@ alphabetical order.
 > +
 > +       chosen {
 > +               bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
-
-This could be resticted only to console
-                bootargs = "console=ttySAC2,115200";
-
-
 > +       };
 > +
 > +       i2c at 12C60000 {
@@ -118,6 +105,12 @@ This could be resticted only to console
 > +               status = "disabled";
 > +       };
 > +
+
+Why to disable these i2c devices here? Any particular reason?
+You can moves these to exynos5250.dtsi which is suppose to be common
+for all the exynos5250 platforms.
+Please see the exynos4.dtsi for reference.
+
 > +       dwmmc_0: dwmmc0 at 12200000 {
 > +               num-slots = <1>;
 > +               supports-highspeed;
@@ -179,6 +172,8 @@ This could be resticted only to console
 > +       spi_2: spi at 12d40000 {
 > +               status = "disabled";
 > +       };
+
+Same as above.
 > +};
 > --
 > 1.7.4.1
@@ -191,5 +186,5 @@ This could be resticted only to console
 
 
 -- 
-With warm regards,
-Sachin
+Regards,
+Alim
