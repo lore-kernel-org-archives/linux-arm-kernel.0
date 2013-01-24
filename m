@@ -1,95 +1,52 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Thu, 24 Jan 2013 10:00:04 +0530
-Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <20130123195740.GI2373@mtj.dyndns.org>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
- <20130123185522.GG2373@mtj.dyndns.org> <51003B20.2060506@linux.vnet.ibm.com>
- <20130123195740.GI2373@mtj.dyndns.org>
-Message-ID: <5100B8CC.4080406@linux.vnet.ibm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 23 Jan 2013 20:33:34 -0800
+Subject: [GIT PULL][for 3.8] request from armsoc/fix branch in pxa git tree
+In-Reply-To: <CAN1soZzTnVhMwQfOz7=MyHm7b6n=OmNL=wEENJz-SFOPU6Wsjw@mail.gmail.com>
+References: <CAN1soZzTnVhMwQfOz7=MyHm7b6n=OmNL=wEENJz-SFOPU6Wsjw@mail.gmail.com>
+Message-ID: <CAOesGMjfJ6A37Ncek8221dsYNzf6pZNYYD-XOt4hoa9TD_VYAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2013 01:27 AM, Tejun Heo wrote:
-> Hello, Srivatsa.
-> 
-> On Thu, Jan 24, 2013 at 01:03:52AM +0530, Srivatsa S. Bhat wrote:
->> Hmm.. I split it up into steps to help explain the reasoning behind
->> the code sufficiently, rather than spring all of the intricacies at
->> one go (which would make it very hard to write the changelog/comments
->> also). The split made it easier for me to document it well in the
->> changelog, because I could deal with reasonable chunks of code/complexity
->> at a time. IMHO that helps people reading it for the first time to
->> understand the logic easily.
-> 
-> I don't know.  It's a judgement call I guess.  I personally would much
-> prefer having ample documentation as comments in the source itself or
-> as a separate Documentation/ file as that's what most people are gonna
-> be looking at to figure out what's going on.  Maybe just compact it a
-> bit and add more in-line documentation instead?
-> 
+Hi,
 
-OK, I'll think about this.
-
->>> The only two options are either punishing writers or identifying and
->>> updating all such possible deadlocks.  percpu_rwsem does the former,
->>> right?  I don't know how feasible the latter would be.
->>
->> I don't think we can avoid looking into all the possible deadlocks,
->> as long as we use rwlocks inside get/put_online_cpus_atomic() (assuming
->> rwlocks are fair). Even with Oleg's idea of using synchronize_sched()
->> at the writer, we still need to take care of locking rules, because the
->> synchronize_sched() only helps avoid the memory barriers at the reader,
->> and doesn't help get rid of the rwlocks themselves.
-> 
-> Well, percpu_rwlock don't have to use rwlock for the slow path.  It
-> can implement its own writer starving locking scheme.  It's not like
-> implementing slow path global rwlock logic is difficult.
+On Wed, Jan 23, 2013 at 1:15 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> Hi Arnd & Olof,
 >
+> Please help to pull armsoc/fix branch in pxa git tree.
+>
+> Regards
+> Haojian
+>
+> The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
+>
+>   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+>
+> are available in the git repository at:
+>
+>   git://github.com/hzhuang1/linux.git armsoc/fix
+>
+> for you to fetch changes up to eea6e39b916dd282c7fa4629be8934b5ad60e62b:
+>
+>   ARM: pxa: Minor naming fixes in spitz.c (2013-01-23 17:13:07 +0800)
+>
+> ----------------------------------------------------------------
+> Igor Grinberg (1):
+>       ARM: PXA3xx: program the CSMSADRCFG register
+>
+> Marko Katic (1):
+>       ARM: pxa: Minor naming fixes in spitz.c
+>
+> Mike Dunn (2):
+>       ARM: palmtreo: fix lcd initilialization on treo680
+>       ARM: palmtreo: fix #ifdefs for leds-gpio device
 
-Great idea! So probably I could use atomic ops or something similar in the
-slow path to implement the scheme we need...
+I don't think some of those really are regressions, are they? I.e. the
+palmtreo fixes are for code that never in recent times worked I think?
 
->> CPU 0                          CPU 1
->>
->> read_lock(&rwlock)
->>
->>                               write_lock(&rwlock) //spins, because CPU 0
->>                               //has acquired the lock for read
->>
->> read_lock(&rwlock)
->>    ^^^^^
->> What happens here? Does CPU 0 start spinning (and hence deadlock) or will
->> it continue realizing that it already holds the rwlock for read?
-> 
-> I don't think rwlock allows nesting write lock inside read lock.
-> read_lock(); write_lock() will always deadlock.
-> 
+If so, I'd prefer to queue this for 3.9 as a fixes-non-critical
+instead, please let me know if that's ok.
 
-Sure, I understand that :-) My question was, what happens when *two* CPUs
-are involved, as in, the read_lock() is invoked only on CPU 0 whereas the
-write_lock() is invoked on CPU 1.
+Thanks,
 
-For example, the same scenario shown above, but with slightly different
-timing, will NOT result in a deadlock:
-
-Scenario 2:
-  CPU 0                                CPU 1
-
-read_lock(&rwlock)
-
-
-read_lock(&rwlock) //doesn't spin
-
-                                    write_lock(&rwlock) //spins, because CPU 0
-                                    //has acquired the lock for read
-
-
-So I was wondering whether the "fairness" logic of rwlocks would cause
-the second read_lock() to spin (in the first scenario shown above) because
-a writer is already waiting (and hence new readers should spin) and thus
-cause a deadlock.
-
-Regards,
-Srivatsa S. Bhat
+-Olof
