@@ -1,190 +1,59 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Thu, 24 Jan 2013 12:21:45 +0530
-Subject: [PATCH] ARM: DTS: exynos5250-arndale: Add initial board support
- file
-In-Reply-To: <1359008188-23395-1-git-send-email-tushar.behera@linaro.org>
-References: <1359008188-23395-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <CAGOxZ53VsXE_as6aNk85jdxVG2FAg-SqWc8svTHpgrcttE_q0w@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 24 Jan 2013 08:27:14 +0100
+Subject: [PATCH] i2c: at91: add of_device_id entry for at91rm9200
+In-Reply-To: <20121218060232.GL23971@game.jcrosoft.org>
+References: <1354743732-11581-1-git-send-email-manabian@gmail.com>
+ <20121218060232.GL23971@game.jcrosoft.org>
+Message-ID: <20130124072714.GH8364@nekote.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tushar,
+On Tue, Dec 18, 2012 at 07:02:32AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 22:42 Wed 05 Dec     , Joachim Eastwood wrote:
+> > Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> > ---
+> > Hi,
+> > 
+> > AT91RM9200 is gaining DT support now so let's add an id to the i2c driver.
+> > 
+> > Tested on custom RM9200 board. Since the driver doesn't support pinctrl
+> > muxing yet I had to add pinctrl hogs for the i2c pins in my dts for it
+> > to work.
+> 
+> IIRC the i2c IP have quite a lots of issue on rm9200 and until sam9g45
+> 
+> it not recommended to use it instead use i2c-gpio
 
-On Thu, Jan 24, 2013 at 11:46 AM, Tushar Behera
-<tushar.behera@linaro.org> wrote:
-> From: Girish K S <ks.giri@samsung.com>
->
-> Arndale is a low cost board based on the Samsung Exynos5250 SoC. This
-> patch adds initial device tree support for this board.
->
-> Signed-off-by: Girish K S <ks.giri@samsung.com>
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> ---
->  arch/arm/boot/dts/Makefile               |    1 +
->  arch/arm/boot/dts/exynos5250-arndale.dts |  124 ++++++++++++++++++++++++++++++
->  2 files changed, 125 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/exynos5250-arndale.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 5ebb44f..60a9e52 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -44,6 +44,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->         exynos4210-trats.dtb \
->         exynos4412-smdk4412.dtb \
->         exynos5250-smdk5250.dtb \
-> +       exynos5250-arndale.dtb \
->         exynos5250-snow.dtb \
->         exynos5440-ssdk5440.dtb
->  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> new file mode 100644
-> index 0000000..7504cf3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -0,0 +1,124 @@
-> +/*
-> + * Samsung's Exynos5250 based Arndale board device tree source
-> + *
-> + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-> + *             http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +/dts-v1/;
-> +/include/ "exynos5250.dtsi"
-> +
-> +/ {
-> +       model = "Insignal Arndale evaluation board based on EXYNOS5250";
-> +       compatible = "insignal,arndale", "samsung,exynos5250";
-> +
-> +       memory {
-> +               reg = <0x40000000 0x80000000>;
-> +       };
-> +
-> +       chosen {
-> +               bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
-> +       };
-> +
-> +       i2c at 12C60000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 12C70000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 12C80000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 12C90000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 12CA0000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 12CB0000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 12CC0000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 12CD0000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       i2c at 121D0000 {
-> +               status = "disabled";
-> +       };
-> +
+Ludovic, you know the driver best. Does it make sense to add this?
 
-Why to disable these i2c devices here? Any particular reason?
-You can moves these to exynos5250.dtsi which is suppose to be common
-for all the exynos5250 platforms.
-Please see the exynos4.dtsi for reference.
-
-> +       dwmmc_0: dwmmc0 at 12200000 {
-> +               num-slots = <1>;
-> +               supports-highspeed;
-> +               broken-cd;
-> +               fifo-depth = <0x80>;
-> +               card-detect-delay = <200>;
-> +               samsung,dw-mshc-ciu-div = <3>;
-> +               samsung,dw-mshc-sdr-timing = <2 3>;
-> +               samsung,dw-mshc-ddr-timing = <1 2>;
-> +
-> +               slot at 0 {
-> +                       reg = <0>;
-> +                       bus-width = <8>;
-> +                       gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
-> +                               <&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
-> +                               <&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
-> +                               <&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
-> +                               <&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
-> +               };
-> +       };
-> +
-> +       dwmmc_1: dwmmc1 at 12210000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       dwmmc_2: dwmmc2 at 12220000 {
-> +               num-slots = <1>;
-> +               supports-highspeed;
-> +               fifo-depth = <0x80>;
-> +               card-detect-delay = <200>;
-> +               samsung,dw-mshc-ciu-div = <3>;
-> +               samsung,dw-mshc-sdr-timing = <2 3>;
-> +               samsung,dw-mshc-ddr-timing = <1 2>;
-> +
-> +               slot at 0 {
-> +                       reg = <0>;
-> +                       bus-width = <4>;
-> +                       samsung,cd-pinmux-gpio = <&gpc3 2 2 3 3>;
-> +                       gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
-> +                               <&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
-> +                               <&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
-> +                               <&gpc4 3 3 3 3>, <&gpc4 3 3 3 3>,
-> +                               <&gpc4 5 3 3 3>, <&gpc4 6 3 3 3>;
-> +               };
-> +       };
-> +
-> +       dwmmc_3: dwmmc3 at 12230000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       spi_0: spi at 12d20000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       spi_1: spi at 12d30000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       spi_2: spi at 12d40000 {
-> +               status = "disabled";
-> +       };
-
-Same as above.
-> +};
+> 
+> Best Regards,
+> J.
+> > 
+> > regards
+> > Joachim Eastwood
+> > 
+> >  drivers/i2c/busses/i2c-at91.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> > index b4575ee..c504aa8 100644
+> > --- a/drivers/i2c/busses/i2c-at91.c
+> > +++ b/drivers/i2c/busses/i2c-at91.c
+> > @@ -584,6 +584,9 @@ static const struct platform_device_id at91_twi_devtypes[] = {
+> >  #if defined(CONFIG_OF)
+> >  static const struct of_device_id atmel_twi_dt_ids[] = {
+> >  	{
+> > +		.compatible = "atmel,at91rm9200-i2c",
+> > +		.data = &at91rm9200_config,
+> > +	} , {
+> >  		.compatible = "atmel,at91sam9260-i2c",
+> >  		.data = &at91sam9260_config,
+> >  	} , {
+> > -- 
+> > 1.8.0
+> > 
 > --
-> 1.7.4.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Regards,
-Alim
