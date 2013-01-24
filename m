@@ -1,69 +1,77 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 24 Jan 2013 17:50:04 +0100
-Subject: [PATCH 1/2] ARM: dts: omap3-overo: Add support for pwm-leds
-In-Reply-To: <5101570A.1030303@ti.com>
-References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
- <1358963812-19947-2-git-send-email-florian.vaussard@epfl.ch>
- <5101510C.9050407@ti.com> <51015663.8080109@epfl.ch>
- <5101570A.1030303@ti.com>
-Message-ID: <5101663C.7020301@epfl.ch>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Thu, 24 Jan 2013 11:52:29 -0500
+Subject: [PATCH v6 04/15] KVM: ARM: Hypervisor initialization
+In-Reply-To: <20130124154535.GD18233@arm.com>
+References: <20130116175716.29147.15348.stgit@ubuntu>
+ <20130116175748.29147.91246.stgit@ubuntu>
+ <20130124154535.GD18233@arm.com>
+Message-ID: <CANM98qL1gW3z=LoFgDzoJ9Qqp2tsSGiRh9Pk4TdHi0ETmcmzcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> I did it at first, but the led API executes in atomic context, where the
->> pwm-twl-led driver uses i2c communication. Setting a trigger will result in a
->> kernel panic.
+On Thu, Jan 24, 2013 at 10:45 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, Jan 16, 2013 at 05:57:48PM +0000, Christoffer Dall wrote:
+>> --- a/arch/arm/include/asm/pgtable-3level-hwdef.h
+>> +++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+>> @@ -32,6 +32,9 @@
+>>  #define PMD_TYPE_SECT          (_AT(pmdval_t, 1) << 0)
+>>  #define PMD_BIT4               (_AT(pmdval_t, 0))
+>>  #define PMD_DOMAIN(x)          (_AT(pmdval_t, 0))
+>> +#define PMD_APTABLE_SHIFT      (61)
+>> +#define PMD_APTABLE            (_AT(pgdval_t, 3) << PGD_APTABLE_SHIFT)
+>> +#define PMD_PXNTABLE           (_AT(pgdval_t, 1) << 59)
 >
-> Now that you mentioned it, this might be true.
+> Are these used anywhere? I grep'ed but couldn't find. While I'm fine
+> with keeping some hardware definitions for future use, I think here you
+> need to qualify these bits with some suffix to PMD_APTABLE. The APTable
+> are just a group of bits with different meaning (no write access etc.).
+> If you want to keep them as group of bits, you can add a _MASK suffix.
 >
-
-[<c0013204>] (unwind_backtrace+0x0/0xec) from [<c00348ac>] 
-(warn_slowpath_common+0x4c/0x64)
-[<c00348ac>] (warn_slowpath_common+0x4c/0x64) from [<c00348e0>] 
-(warn_slowpath_null+0x1c/0x24)
-[<c00348e0>] (warn_slowpath_null+0x1c/0x24) from [<c054d384>] 
-(__mutex_lock_slowpath+0x6c/0x26c)
-[<c054d384>] (__mutex_lock_slowpath+0x6c/0x26c) from [<c054d590>] 
-(mutex_lock+0xc/0x20)
-[<c054d590>] (mutex_lock+0xc/0x20) from [<c02d740c>] 
-(regmap_bulk_write+0x48/0x138)
-[<c02d740c>] (regmap_bulk_write+0x48/0x138) from [<c02de2c0>] 
-(twl_i2c_write+0xa4/0xf0)
-[<c02de2c0>] (twl_i2c_write+0xa4/0xf0) from [<c0299e34>] 
-(twl4030_pwmled_config+0x70/0x9c)
-[<c0299e34>] (twl4030_pwmled_config+0x70/0x9c) from [<c029875c>] 
-(pwm_config+0x5c/0x6c)
-[<c029875c>] (pwm_config+0x5c/0x6c) from [<c039dc04>] 
-(led_pwm_set+0x28/0x64)
-[<c039dc04>] (led_pwm_set+0x28/0x64) from [<c039e27c>] 
-(led_heartbeat_function+0x10c/0x134)
-[<c039e27c>] (led_heartbeat_function+0x10c/0x134) from [<c004359c>] 
-(call_timer_fn+0x90/0x178)
-[<c004359c>] (call_timer_fn+0x90/0x178) from [<c0043994>] 
-(run_timer_softirq+0x250/0x2c8)
-[<c0043994>] (run_timer_softirq+0x250/0x2c8) from [<c003cf78>] 
-(__do_softirq+0xf8/0x248)
-[<c003cf78>] (__do_softirq+0xf8/0x248) from [<c003d154>] 
-(irq_exit+0x44/0x98)
-[<c003d154>] (irq_exit+0x44/0x98) from [<c000e338>] (handle_IRQ+0x68/0x8c)
-[<c000e338>] (handle_IRQ+0x68/0x8c) from [<c000870c>] 
-(omap3_intc_handle_irq+0x58/0x70)
-[<c000870c>] (omap3_intc_handle_irq+0x58/0x70) from [<c054f8c0>] 
-(__irq_svc+0x40/0x70)
-Exception stack(0xc077df60 to 0xc077dfa8)
-
-:-)
-
->> I am working on a patch for pwm-twl-led to defer using a workqueue right now.
+>> +static int init_hyp_mode(void)
+>> +{
+>> +       phys_addr_t init_phys_addr;
+>> +       int cpu;
+>> +       int err = 0;
+>> +
+>> +       /*
+>> +        * Allocate Hyp PGD and setup Hyp identity mapping
+>> +        */
+>> +       err = kvm_mmu_init();
+>> +       if (err)
+>> +               goto out_err;
 >
-> Great!
-> The only thing I worry about is the latency we are going to get with the
-> workqueue.
+> The comment is a bit misleading since kvm_mmu_init() simply checks
+> whether hyp_pgd has been initialised. The actual initialisation is done
+> by the idmap code.
 >
+This should fix it, thanks:
 
-If the latency becomes critical, we can create our own workqueue.
+diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h
+b/arch/arm/include/asm/pgtable-3level-hwdef.h
+index 432fa12..30fb12a 100644
+--- a/arch/arm/include/asm/pgtable-3level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+@@ -33,7 +33,7 @@
+ #define PMD_BIT4		(_AT(pmdval_t, 0))
+ #define PMD_DOMAIN(x)		(_AT(pmdval_t, 0))
+ #define PMD_APTABLE_SHIFT	(61)
+-#define PMD_APTABLE		(_AT(pgdval_t, 3) << PGD_APTABLE_SHIFT)
++#define PMD_APTABLE_MASK	(_AT(pgdval_t, 3) << PGD_APTABLE_SHIFT)
+ #define PMD_PXNTABLE		(_AT(pgdval_t, 1) << 59)
 
-Do we merge anyway this patchset, or do we wait until the trigger has 
-been fixed?
+ /*
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 2d30e3a..8354a6f 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -871,7 +871,7 @@ static int init_hyp_mode(void)
+ 	int err = 0;
 
-Florian
+ 	/*
+-	 * Allocate Hyp PGD and setup Hyp identity mapping
++	 * Make sure the Hyp identity map is ready for us.
+ 	 */
+ 	err = kvm_mmu_init();
+ 	if (err)
+--
