@@ -1,23 +1,28 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 24 Jan 2013 15:20:49 +0530
-Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
- hwmod data
-In-Reply-To: <20130122183942.GO15361@atomide.com>
-References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
- <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
- <20130118171500.GC15361@atomide.com> <50FCF838.6000105@ti.com>
- <50FD5993.5010008@ti.com> <20130121180113.GA22517@atomide.com>
- <50FE909B.1020001@ti.com> <20130122183942.GO15361@atomide.com>
-Message-ID: <510103F9.4080601@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 24 Jan 2013 18:02:55 +0800
+Subject: [alsa-devel] [PATCH V2 2/2] ASoC: Davinci: machine: Add device
+ tree binding
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EB52FD9@DBDE01.ent.ti.com>
+References: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
+ <1357293277-25543-3-git-send-email-gururaja.hebbar@ti.com>
+ <20130104122612.GM4627@opensource.wolfsonmicro.com>
+ <1BAFE6F6C881BF42822005164F1491C33EB50DCF@DBDE01.ent.ti.com>
+ <20130123154804.GB4565@opensource.wolfsonmicro.com>
+ <1BAFE6F6C881BF42822005164F1491C33EB52FD9@DBDE01.ent.ti.com>
+Message-ID: <20130124100252.GE4955@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 January 2013 12:09 AM, Tony Lindgren wrote:
-> It seems that we should have the iospace available in the driver
-> at that point. And it should be also available to the runtime PM
-> code in hwmod in the device somewhere?
+On Thu, Jan 24, 2013 at 09:33:34AM +0000, Hebbar, Gururaja wrote:
 
-I couldn't find anything as part of the device. Definitely not the
-ioremaped address. There's a device_private->driver_data which the
-drivers can use to populate the ioremaped address but I am sure thats
-not whats its meant for.
+> So, by just using the SND_SOC_DAPM_POST_PMU & SND_SOC_DAPM_PRE_PMD I can mask 
+> & handle one particular voltage. 
+
+What makes you say that?  That is just not true.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130124/2a0abc28/attachment.sig>
