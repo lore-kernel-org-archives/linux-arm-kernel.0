@@ -1,153 +1,205 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 24 Jan 2013 01:27:54 -0500
-Subject: [PATCH v2 11/16] ARM: vexpress/dcscb: add CPU use counts to the power
- up/down API implementation
+Date: Thu, 24 Jan 2013 01:27:56 -0500
+Subject: [PATCH v2 13/16] drivers/bus: add ARM CCI support
 In-Reply-To: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1359008879-9015-12-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1359008879-9015-14-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible for a CPU to be told to power up before it managed
-to power itself down.  Solve this race with a usage count as mandated
-by the API definition.
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Signed-off-by: nicolas Pitre <nico@linaro.org>
+On ARM multi-cluster systems coherency between cores running on
+different clusters is managed by the cache-coherent interconnect (CCI).
+It allows broadcasting of TLB invalidates and memory barriers and it
+guarantees cache coherency at system level.
+
+This patch enables the basic infrastructure required in Linux to
+handle and programme the CCI component. The first implementation is
+based on a platform device, its relative DT compatible property and
+a simple programming interface.
+
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/mach-vexpress/dcscb.c | 77 +++++++++++++++++++++++++++++++++---------
- 1 file changed, 61 insertions(+), 16 deletions(-)
+ drivers/bus/Kconfig     |   4 ++
+ drivers/bus/Makefile    |   2 +
+ drivers/bus/arm-cci.c   | 107 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/arm-cci.h |  30 ++++++++++++++
+ 4 files changed, 143 insertions(+)
+ create mode 100644 drivers/bus/arm-cci.c
+ create mode 100644 include/linux/arm-cci.h
 
-diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 220b990edd..cde9d3a8d2 100644
---- a/arch/arm/mach-vexpress/dcscb.c
-+++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -45,6 +45,7 @@
- static arch_spinlock_t dcscb_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 0f51ed687d..d032f74ff2 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -19,4 +19,8 @@ config OMAP_INTERCONNECT
  
- static void __iomem *dcscb_base;
-+static int dcscb_use_count[4][2];
+ 	help
+ 	  Driver to enable OMAP interconnect error handling driver.
++
++config ARM_CCI
++       bool "ARM CCI driver support"
++
+ endmenu
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index 45d997c854..55aac809e5 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -6,3 +6,5 @@ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
  
- static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- {
-@@ -61,14 +62,27 @@ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- 	local_irq_disable();
- 	arch_spin_lock(&dcscb_lock);
- 
--	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
--	if (rst_hold & (1 << 8)) {
--		/* remove cluster reset and add individual CPU's reset */
--		rst_hold &= ~(1 << 8);
--		rst_hold |= 0xf;
-+	dcscb_use_count[cpu][cluster]++;
-+	if (dcscb_use_count[cpu][cluster] == 1) {
-+		rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-+		if (rst_hold & (1 << 8)) {
-+			/* remove cluster reset and add individual CPU's reset */
-+			rst_hold &= ~(1 << 8);
-+			rst_hold |= 0xf;
-+		}
-+		rst_hold &= ~(cpumask | (cpumask << 4));
-+		writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-+	} else if (dcscb_use_count[cpu][cluster] != 2) {
-+		/*
-+		 * The only possible values are:
-+		 * 0 = CPU down
-+		 * 1 = CPU (still) up
-+		 * 2 = CPU requested to be up before it had a chance
-+		 *     to actually make itself down.
-+		 * Any other value is a bug.
-+		 */
-+		BUG();
- 	}
--	rst_hold &= ~(cpumask | (cpumask << 4));
--	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
- 
- 	arch_spin_unlock(&dcscb_lock);
- 	local_irq_enable();
-@@ -78,7 +92,8 @@ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- 
- static void dcscb_power_down(void)
- {
--	unsigned int mpidr, cpu, cluster, rst_hold, cpumask, last_man;
-+	unsigned int mpidr, cpu, cluster, rst_hold, cpumask;
-+	bool last_man = false, skip_wfi = false;
- 
- 	mpidr = read_cpuid_mpidr();
- 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-@@ -89,13 +104,26 @@ static void dcscb_power_down(void)
- 	BUG_ON(cpu >= 4 || cluster >= 2);
- 
- 	arch_spin_lock(&dcscb_lock);
--	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
--	rst_hold |= cpumask;
--	if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf)
--		rst_hold |= (1 << 8);
--	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-+	dcscb_use_count[cpu][cluster]--;
-+	if (dcscb_use_count[cpu][cluster] == 0) {
-+		rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-+		rst_hold |= cpumask;
-+		if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf) {
-+			rst_hold |= (1 << 8);
-+			last_man = true;
-+		}
-+		writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-+	} else if (dcscb_use_count[cpu][cluster] == 1) {
-+		/*
-+		 * A power_up request went ahead of us.
-+		 * Even if we do not want to shut this CPU down,
-+		 * the caller expects a certain state as if the WFI
-+		 * was aborted.  So let's continue with cache cleaning.
-+		 */
-+		skip_wfi = true;
-+	} else
-+		BUG();
- 	arch_spin_unlock(&dcscb_lock);
--	last_man = (rst_hold & (1 << 8));
- 
- 	/*
- 	 * Now let's clean our L1 cache and shut ourself down.
-@@ -122,8 +150,10 @@ static void dcscb_power_down(void)
- 	set_auxcr(get_auxcr() & ~(1 << 6));
- 
- 	/* Now we are prepared for power-down, do it: */
--	dsb();
--	wfi();
-+	if (!skip_wfi) {
-+		dsb();
-+		wfi();
-+	}
- 
- 	/* Not dead@this point?  Let our caller cope. */
- }
-@@ -133,6 +163,19 @@ static const struct bL_platform_power_ops dcscb_power_ops = {
- 	.power_down	= dcscb_power_down,
- };
- 
-+static void __init dcscb_usage_count_init(void)
+ # Interconnect bus driver for OMAP SoCs.
+ obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
++
++obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+new file mode 100644
+index 0000000000..5de3aa3d1f
+--- /dev/null
++++ b/drivers/bus/arm-cci.c
+@@ -0,0 +1,107 @@
++/*
++ * ARM Cache Coherency Interconnect (CCI400) support
++ *
++ * Copyright (C) 2012-2013 ARM Ltd.
++ * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/arm-cci.h>
++
++#define CCI400_EAG_OFFSET       0x4000
++#define CCI400_KF_OFFSET        0x5000
++
++#define DRIVER_NAME	"CCI"
++struct cci_drvdata {
++	void __iomem *baseaddr;
++	spinlock_t lock;
++};
++
++static struct cci_drvdata *info;
++
++void disable_cci(int cluster)
 +{
-+	unsigned int mpidr, cpu, cluster;
++	u32 cci_reg = cluster ? CCI400_KF_OFFSET : CCI400_EAG_OFFSET;
++	writel_relaxed(0x0, info->baseaddr	+ cci_reg);
 +
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	while (readl_relaxed(info->baseaddr + 0xc) & 0x1)
++			;
++}
++EXPORT_SYMBOL_GPL(disable_cci);
 +
-+	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-+	BUG_ON(cpu >= 4 || cluster >= 2);
-+	dcscb_use_count[cpu][cluster] = 1;
++static int cci_driver_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	int ret = 0;
++
++	info = kzalloc(sizeof(*info), GFP_KERNEL);
++	if (!info) {
++		dev_err(&pdev->dev, "unable to allocate mem\n");
++		return -ENOMEM;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "No memory resource\n");
++		ret = -EINVAL;
++		goto mem_free;
++	}
++
++	if (!request_mem_region(res->start, resource_size(res),
++				dev_name(&pdev->dev))) {
++		dev_err(&pdev->dev, "address 0x%x in use\n", (u32) res->start);
++		ret = -EBUSY;
++		goto mem_free;
++	}
++
++	info->baseaddr = ioremap(res->start, resource_size(res));
++	if (!info->baseaddr) {
++		ret = -ENXIO;
++		goto ioremap_err;
++	}
++
++	platform_set_drvdata(pdev, info);
++
++	pr_info("CCI loaded at %p\n", info->baseaddr);
++	return ret;
++
++ioremap_err:
++	release_region(res->start, resource_size(res));
++mem_free:
++	kfree(info);
++
++	return ret;
 +}
 +
- static int __init dcscb_init(void)
- {
- 	int ret;
-@@ -141,6 +184,8 @@ static int __init dcscb_init(void)
- 	if (!dcscb_base)
- 		return -ENOMEM;
- 
-+	dcscb_usage_count_init();
++static const struct of_device_id arm_cci_matches[] = {
++	{.compatible = "arm,cci"},
++	{},
++};
 +
- 	ret = bL_platform_power_register(&dcscb_power_ops);
- 	if (ret) {
- 		iounmap(dcscb_base);
++static struct platform_driver cci_platform_driver = {
++	.driver = {
++		   .name = DRIVER_NAME,
++		   .of_match_table = arm_cci_matches,
++		  },
++	.probe = cci_driver_probe,
++};
++
++static int __init cci_init(void)
++{
++	return platform_driver_register(&cci_platform_driver);
++}
++
++core_initcall(cci_init);
+diff --git a/include/linux/arm-cci.h b/include/linux/arm-cci.h
+new file mode 100644
+index 0000000000..86ae587817
+--- /dev/null
++++ b/include/linux/arm-cci.h
+@@ -0,0 +1,30 @@
++/*
++ * CCI support
++ *
++ * Copyright (C) 2012-2013 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#ifndef __LINUX_ARM_CCI_H
++#define __LINUX_ARM_CCI_H
++
++#ifdef CONFIG_ARM_CCI
++extern void disable_cci(int cluster);
++#else
++static inline void disable_cci(int cluster) { }
++#endif
++
++#endif
 -- 
 1.8.0
