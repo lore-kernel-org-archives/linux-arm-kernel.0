@@ -1,81 +1,82 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Jan 2013 15:38:24 -0500
-Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
-In-Reply-To: <3084778.eWbl5o3HSt@bender>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <510174AF.4020503@openwrt.org>
- <20130124181622.GD1758@titan.lakedaemon.net>
- <3084778.eWbl5o3HSt@bender>
-Message-ID: <20130124203824.GG1758@titan.lakedaemon.net>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 Jan 2013 21:41:48 +0100
+Subject: [PATCH 0/4] clk: Provide option to unprepare unused clocks at
+ late init
+In-Reply-To: <20130124184944.10623.20870@quantum>
+References: <1359045956-30741-1-git-send-email-ulf.hansson@stericsson.com>
+ <20130124184944.10623.20870@quantum>
+Message-ID: <CAPDyKFqgaw=9rfVQPyGNVMC4F+_dLKBzNqi4vwD9JwM1qDytDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 09:27:24PM +0100, Florian Fainelli wrote:
-> On Thursday 24 January 2013 13:16:22 Jason Cooper wrote:
-> > > >Ian's patch appears to do so.  I'll respin this series using it vice my
-> > > >lookup table.
-> > > >
-> > > Sounds good, while at it, I wonder if we could not simplify Ian's
-> > > patch to be limited to the actual Ethernet MAC driver and use
-> > > Thomas's mvdio device tree binding for the MDIO bits of mv643xx_eth.
-> > > What do you think?
-> > 
-> > It sounds like you just volunteered ;-)  Do you think you have the time
-> > to knock it out for v3.9?
-> 
-> I do not have any kirkwood board at the moment and I really want to be able to 
-> test this properly especially with the "clock must be enabled for ethernet not 
-> be lost". Let me get one and I should be able to do it. Let's adopt your patch 
-> for the moment, and once I have a kirkwood board I can deal with the ethernet 
-> driver device tree bindings.
-> 
-> Does that sound ok with you?
+Hi Mike,
 
-using Ian's patch as is, I have the following in kirkwood.dtsi:
+On 24 January 2013 19:49, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Ulf Hansson (2013-01-24 08:45:52)
+>> From: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> The disable_unused sequence executed at late init, is already handling the
+>> fast unused ungated clocks to be gated. This patchset extends this sequence to
+>> include the slow unused prepared clocks to be unprepared.
+>>
+>> The default behavior will not change in this patchset. To unprepare unused
+>> clocks during the disable_unused sequence, the clk_hw needs to implement
+>> the new optional callback, is_prepared.
+>>
+>> The motivation for this patchset is to save power. Clocks that is from
+>> bootloaders prepared|enabled, but not used should be unprepared|disabled.
+>>
+>> Patch 4 is specific for ux500, which implements the is_prepared callback
+>> for it's PRMCU clocks.
+>>
+>> Note that patch 1-3 has been sent earlier, but since a proof of concept
+>> patch could be useful, as patch 4 is, the hole patchset is resent.
+>>
+>
+> Hi Ulf,
+>
+> I had some minor discussion in patch #1.  Otherwise patches #2 & #3 look
+> good to me.
+>
+> Patch #4 is a bit interesting.  There is nothing wrong with it per se,
+> but the general layering of the prcmu power stuff is the opposite of how
+> I had envisioned things.  Your .prepare callback is making calls to some
+> pm_qos api but a quick grep did not reveal any definitions for those
+> functions, just some stubs in include/linux/mfd/dbx500-prcmu.h.
+>
+> Do these functions scale voltage?  I had figured that some day
+> per-device pm qos apis would call the clk api, not the other way around.
 
-+
-+               smi0: mdio at 72000 {
-+                       compatible = "marvell,mdio-mv643xx";
-+                       reg = <0x72000 0x4000>;
-+                       interrupts = <46>;
-+                       status = "disabled";
-+               };
-+
-+               smi1: mdio at 76000 {
-+                       compatible = "marvell,mdio-mv643xx";
-+                       reg = <0x76000 0x4000>;
-+                       interrupts = <47>;
-+                       status = "disabled";
-+               };
-+
-+               egiga0 {
-+                       compatible = "marvell,mv643xx-eth";
-+                       reg = <0x72000 0x4000>;
-+                       mdio = <&smi0>;
-+                       port_number = <0>;
-+                       phy_addr = <0x80>;
-+                       interrupts = <11>;
-+                       clocks = <&gate_clk 0>;
-+                       status = "disabled";
-+               };
-+
-+               egiga1 {
-+                       compatible = "marvell,mv643xx-eth";
-+                       reg = <0x76000 0x4000>;
-+                       mdio = <&smi1>;
-+                       port_number = <1>;
-+                       phy_addr = <0x81>;
-+                       interrupts = <15>;
-+                       clocks = <&gate_clk 19>;
-+                       status = "disabled";
-+               };
+You are right, these scale voltages. I would like to keep the code as
+is, just as a reminder that some devices using some clocks will
+requires these kind of operations.
+On our internal STE development track this is how it is used but we a
+are moving towards newer APIs.
 
-I'll see if I can get it working as is, then we can migrate to Thomas'
-mdio bindings.
+So I am definitely sharing the same thought as you do and my plan is
+to remove this code along the road, once drivers is adapted properly.
 
-btw - it might be a shared smi, I haven't looked yet, and haven't
-tested...
+>
+> Anyways that is just food for thought and no reason to block patch #4.
+>
+> Regards,
+> Mike
+>
+>> Ulf Hansson (4):
+>>   clk: Introduce optional is_prepared callback
+>>   clk: Unprepare the unused prepared slow clocks at late init
+>>   clk: Introduce optional unprepare_unused callback
+>>   clk: ux500: Support is_prepared callback for clk-prcmu
+>>
+>>  drivers/clk/clk.c             |   53 ++++++++++++++++
+>>  drivers/clk/ux500/clk-prcmu.c |  134 ++++++++++++++++++++++++-----------------
+>>  include/linux/clk-provider.h  |   11 ++++
+>>  3 files changed, 144 insertions(+), 54 deletions(-)
+>>
+>> --
+>> 1.7.10
 
-thx,
+Thanks for the review comments!
 
-Jason.
+Kind regards
+Ulf Hansson
