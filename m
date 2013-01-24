@@ -1,77 +1,100 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 24 Jan 2013 20:00:05 +0100
-Subject: [RFC/PATCH 24/32] usb: gadget: s3c-hsotg: let udc-core manage
- gadget->dev
-In-Reply-To: <1359042370-4358-25-git-send-email-balbi@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 24 Jan 2013 21:09:26 +0200
+Subject: [RFC/PATCH 32/32] usb: gadget: drop now unnecessary flag
+In-Reply-To: <2268214.yJrDJgELNj@flatron>
 References: <1359042370-4358-1-git-send-email-balbi@ti.com>
- <1359042370-4358-25-git-send-email-balbi@ti.com>
-Message-ID: <5963888.Uco7z1jaqo@flatron>
+ <1359042370-4358-33-git-send-email-balbi@ti.com>
+ <2268214.yJrDJgELNj@flatron>
+Message-ID: <20130124190926.GA31254@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Thu, Jan 24, 2013 at 07:52:52PM +0100, Tomasz Figa wrote:
+> Hi Felipe,
+> 
+> On Thursday 24 of January 2013 17:46:10 Felipe Balbi wrote:
+> > We don't need the ->register_my_device flag
+> > anymore because all UDC drivers have been
+> > properly converted.
+> > 
+> > Let's remove every history of it.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >  drivers/usb/chipidea/udc.c             | 1 -
+> >  drivers/usb/dwc3/gadget.c              | 1 -
+> >  drivers/usb/gadget/amd5536udc.c        | 1 -
+> >  drivers/usb/gadget/at91_udc.c          | 1 -
+> >  drivers/usb/gadget/atmel_usba_udc.c    | 1 -
+> >  drivers/usb/gadget/bcm63xx_udc.c       | 1 -
+> >  drivers/usb/gadget/dummy_hcd.c         | 1 -
+> >  drivers/usb/gadget/fsl_qe_udc.c        | 1 -
+> >  drivers/usb/gadget/fsl_udc_core.c      | 1 -
+> >  drivers/usb/gadget/fusb300_udc.c       | 1 -
+> >  drivers/usb/gadget/goku_udc.c          | 1 -
+> >  drivers/usb/gadget/imx_udc.c           | 1 -
+> >  drivers/usb/gadget/lpc32xx_udc.c       | 1 -
+> >  drivers/usb/gadget/m66592-udc.c        | 1 -
+> >  drivers/usb/gadget/mv_u3d_core.c       | 1 -
+> >  drivers/usb/gadget/mv_udc_core.c       | 1 -
+> >  drivers/usb/gadget/net2272.c           | 1 -
+> >  drivers/usb/gadget/net2280.c           | 1 -
+> >  drivers/usb/gadget/omap_udc.c          | 1 -
+> >  drivers/usb/gadget/pch_udc.c           | 1 -
+> >  drivers/usb/gadget/pxa25x_udc.c        | 1 -
+> >  drivers/usb/gadget/pxa27x_udc.c        | 1 -
+> >  drivers/usb/gadget/r8a66597-udc.c      | 1 -
+> >  drivers/usb/gadget/s3c-hsotg.c         | 1 -
+> >  drivers/usb/gadget/s3c-hsudc.c         | 1 -
+> >  drivers/usb/gadget/s3c2410_udc.c       | 1 -
+> >  drivers/usb/gadget/udc-core.c          | 3 ---
+> >  drivers/usb/musb/musb_gadget.c         | 1 -
+> >  drivers/usb/renesas_usbhs/mod_gadget.c | 1 -
+> >  include/linux/usb/gadget.h             | 4 ----
+> >  30 files changed, 35 deletions(-)
+> > 
+> [snip]
+> > diff --git a/drivers/usb/gadget/udc-core.c
+> > b/drivers/usb/gadget/udc-core.c index 9195054..4ee0efc 100644
+> > --- a/drivers/usb/gadget/udc-core.c
+> > +++ b/drivers/usb/gadget/udc-core.c
+> > @@ -173,7 +173,6 @@ int usb_add_gadget_udc(struct device *parent, struct
+> > usb_gadget *gadget) if (!udc)
+> >  		goto err1;
+> > 
+> > -	if (gadget->register_my_device) {
+> >  		dev_set_name(&gadget->dev, "gadget");
+> > 
+> >  		ret = device_register(&gadget->dev);
+> > @@ -211,7 +210,6 @@ err3:
+> >  	put_device(&udc->dev);
+> > 
+> >  err2:
+> > -	if (gadget->register_my_device)
+> >  		put_device(&gadget->dev);
+> >  err1:
+> >  	return ret;
+> > @@ -267,7 +265,6 @@ found:
+> >  	kobject_uevent(&udc->dev.kobj, KOBJ_REMOVE);
+> >  	device_unregister(&udc->dev);
+> > 
+> > -	if (gadget->register_my_device)
+> >  		device_unregister(&gadget->dev);
+> 
+> Correct me if I am wrong, but doesn't this patch leave us with incorrect 
+> indentation?
 
-On Thursday 24 of January 2013 17:46:02 Felipe Balbi wrote:
-> By simply setting a flag, we can drop some
-> boilerplate code.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/usb/gadget/s3c-hsotg.c | 14 +-------------
->  1 file changed, 1 insertion(+), 13 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/s3c-hsotg.c
-> b/drivers/usb/gadget/s3c-hsotg.c index 833d85b..bd8292d 100644
-> --- a/drivers/usb/gadget/s3c-hsotg.c
-> +++ b/drivers/usb/gadget/s3c-hsotg.c
-> @@ -3552,17 +3552,13 @@ static int s3c_hsotg_probe(struct
-> platform_device *pdev)
-> 
->  	dev_info(dev, "regs %p, irq %d\n", hsotg->regs, hsotg->irq);
-> 
-> -	device_initialize(&hsotg->gadget.dev);
-> -
-> -	dev_set_name(&hsotg->gadget.dev, "gadget");
-> -
->  	hsotg->gadget.max_speed = USB_SPEED_HIGH;
->  	hsotg->gadget.ops = &s3c_hsotg_gadget_ops;
->  	hsotg->gadget.name = dev_name(dev);
-> -
->  	hsotg->gadget.dev.parent = dev;
->  	hsotg->gadget.dev.dma_mask = dev->dma_mask;
->  	hsotg->gadget.dev.release = s3c_hsotg_release;
-> +	hsotg->gadget.register_my_device = true;
-> 
->  	/* reset the system */
-> 
-> @@ -3643,12 +3639,6 @@ static int s3c_hsotg_probe(struct platform_device
-> *pdev)
-> 
->  	s3c_hsotg_phy_disable(hsotg);
-> 
-> -	ret = device_add(&hsotg->gadget.dev);
-> -	if (ret) {
-> -		put_device(&hsotg->gadget.dev);
-> -		goto err_ep_mem;
-> -	}
-> -
->  	ret = usb_add_gadget_udc(&pdev->dev, &hsotg->gadget);
->  	if (ret)
->  		goto err_ep_mem;
-> @@ -3687,10 +3677,8 @@ static int s3c_hsotg_remove(struct
-> platform_device *pdev) }
-> 
->  	s3c_hsotg_phy_disable(hsotg);
-> -
->  	clk_disable_unprepare(hsotg->clk);
-> 
-> -	device_unregister(&hsotg->gadget.dev);
->  	return 0;
->  }
+right, I fixed it up on my branch, see [1]. That was me trusting my poor
+sed skills and not verifying the result ;-)
 
-Looks good.
+[1] http://git.kernel.org/?p=linux/kernel/git/balbi/usb.git;a=commitdiff;h=d0bdf2970dd68677c65671be9bd56759593cfaf1
 
-Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
-
-Best regards,
-Tomasz Figa
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130124/16277568/attachment.sig>
