@@ -1,69 +1,77 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Thu, 24 Jan 2013 12:49:53 +0000
-Subject: OMAP baseline test results for v3.8-rc4
-In-Reply-To: <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
- <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
- <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
- <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
- <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECFA0FC@DBDE01.ent.ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 24 Jan 2013 18:23:21 +0530
+Subject: [PATCH] ARM: dts: specify all the per-cpu interrupts of arch
+ timer for exynos5440
+In-Reply-To: <51012C4B.5080300@ti.com>
+References: <1358818887-16870-1-git-send-email-kgene.kim@samsung.com>
+ <20130122101554.GA18876@e106331-lin.cambridge.arm.com>
+ <063f01cdf8ec$926cda30$b7468e90$@samsung.com>
+ <20130123103614.GD32237@e106331-lin.cambridge.arm.com>
+ <50FFC1B0.8000601@ti.com> <51012C4B.5080300@ti.com>
+Message-ID: <51012EC1.6010803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On Tue, Jan 22, 2013 at 07:54:44, Paul Walmsley wrote:
-> 
-> Hi guys,
-> 
-> Regarding the AM33xx test failures with appended DTBs, it would be very 
-> helpful if especially the TI people could try reproducing the problem.
-> Otherwise it's going to cause problems with merging any new AM33xx 
-> patches, since I won't be able to test them without additional work.  
-> Plus, this is something that used to work up until d01e4afd, so something 
-> isn't right.
-> 
-> You'll need to use the bootloader that TI originally shipped with the 
-> BeagleBones:
-> 
-> U-Boot 2011.09-00009-gcf6e04d (Mar 08 2012 - 17:15:43)
-> 
-> This is because many folks don't replace their bootloader.  I do plan to 
-> add a test with a recent version of u-boot, but the kernel should not be 
-> dependent on the bootloader in any way to work correctly.  If it is, then 
-> we need to document what u-boot version the kernel started to work with.
-> 
-> The Kconfig that I use is here:
-> 
-> http://www.pwsan.com/omap/testlogs/test_v3.8-rc4/20130120122039/build/am33xx_only/am33xx_only
-> 
-> It's possible that there's something wrong with the Kconfig.  It's 
-> basically just omap2plus_defconfig, but with all OMAP support for 
-> non-AM33xx turned off, and with the appended DTB and ATAG compatibility 
-> options turned on.
-> 
-> Let's try to do this ASAP.  That way, if it's some bootloader dependency 
-> or bug in the kernel, some fix can be merged during the v3.8-rc series, 
-> which is rapidly drawing to a close.
-> 
-
-I could not track down U-Boot that you were using so I used the v2013.01 tag
-for U-Boot. However, using your build configs for v3.7 and v3.8-rcX I got the same
-observations i.e. v3.7 boots but others don't.
-
-One difference that I found was that post v3.7 the configs that you are using have
-CONFIG_EARLY_PRINTK set. Once I disabled that I was able to bootup v3.8-rc1/4
-(didn't try rc2/3 but I suspect early_printk was the culprit there too).
-
-I checked with Santosh on this and he mentioned that for DT-only boot, which AM335x is,
-that's expected behavior.
-
-Can you update your AM335x-only config to disable CONFIG_EARLY_PRINTK or just skip
-earlyprintk option in the bootargs for now?
-
-If you still have issues booting can you update your U-Boot to v2013.01 since things
-seem to be working fine at this point.
+On Thursday 24 January 2013 06:12 PM, Benoit Cousson wrote:
+> Hi Santosh,
+>
+> On 01/23/2013 11:55 AM, Santosh Shilimkar wrote:
+>> Looping Marc, Benoit
+>>
+>> On Wednesday 23 January 2013 04:06 PM, Mark Rutland wrote:
+>>> On Tue, Jan 22, 2013 at 10:05:18PM +0000, Kukjin Kim wrote:
+>>>> Mark Rutland wrote:
+>>>>>
+>>>> + devicetree-discuss, Grant Likely, Rob Herring and Tony Lindgren
+>>>>
+>>>>> On Tue, Jan 22, 2013 at 01:41:27AM +0000, Kukjin Kim wrote:
+>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>>>>>
+>>>>>> Need to be changed requirements in the 'cpus' node for exynos5440
+>>>>>> to specify all the per-cpu interrupts of arch timer.
+>>>>>
+>>>>> The node(s) for the arch timer should not be in the cpus/cpu at N nodes.
+>>>>> Instead, there should be one node (in the root of the tree).
+>>>>>
+>>>> Well, I don't think so. As per my understanding, the local timers are
+>>>> attached to every ARM cores (cpus) and it generates certain interrupt
+>>>> to the
+>>>> GIC. So the correct representation for this in device tree is to
+>>>> include the
+>>>> interrupts in the cpu nodes in dts file. Your comments  refer to a
+>>>> limitation in the Linux kernel implementation of the arch_timer and it
+>>>> should not result in representing the hardware details incorrectly in
+>>>> the
+>>>> dts file.
+>>>
+>>> I disagree. The "correct representation" is whatever the devicetree
+>>> binding
+>>> documentation describes. It does not describe placing timer nodes in
+>>> the cpu
+>>> nodes.
+>>>
+>> This seems to be exact same topic what is getting discussed here [1]
+>> Technically DT is suppose to represent how the hardware is rather than
+>> how the bindings are done.
+>>
+>> But as Marc pointed out, the approach taken currently is to not
+>> duplicate the banked information. The thread [1] isn't concluded
+>> yet but looks like we might want to avoid duplicating the information
+>> considering, more of such duplication needs to follow. e.g gic i/f
+>>
+>> Am still waiting on what Benoit has to say ?
+>
+> I agree with you :-)
+>
+> I'm not sure the binding was properly done to reflect the HW accurately.
+>
+> A local timer for my point of view should be located in the cpu node
+> like a L1 cache. Or at least referenced in each cpu by a phandle.
+>
+> What was the rational to put it in the root?
+>
+ From Marc's answer it seems to avoid the duplication of data but
+I let him elaborate it.
 
 Regards,
-Vaibhav
+Santosh
