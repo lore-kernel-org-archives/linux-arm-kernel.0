@@ -1,76 +1,87 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Thu, 24 Jan 2013 17:45:54 +0100
-Subject: [PATCH 2/4] clk: Unprepare the unused prepared slow clocks at late
- init
+Date: Thu, 24 Jan 2013 17:45:53 +0100
+Subject: [PATCH 1/4] clk: Introduce optional is_prepared callback
 In-Reply-To: <1359045956-30741-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1359045956-30741-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1359045956-30741-3-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1359045956-30741-2-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-The unused ungated fast clocks are already being disabled from
-clk_disable_unused at late init. This patch extend this sequence
-to the slow unused prepared clocks to be unprepared.
-
-Unless the optional .is_prepared callback is implemented by a
-clk_hw the clk_disable_unused sequence will not unprepare any
-unused clocks, since it will fall back to use the software
-prepare counter.
+To reflect whether a clk_hw is prepared the clk_hw may implement
+the optional is_prepared callback. If not implemented we fall back
+to use the software prepare counter.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/clk/clk.c |   29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ drivers/clk/clk.c            |   21 +++++++++++++++++++++
+ include/linux/clk-provider.h |    6 ++++++
+ 2 files changed, 27 insertions(+)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index deb259a..0944348 100644
+index 593a2e4..deb259a 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -341,6 +341,29 @@ static inline int clk_debug_register(struct clk *clk) { return 0; }
- #endif
+@@ -458,6 +458,27 @@ unsigned long __clk_get_flags(struct clk *clk)
+ 	return !clk ? 0 : clk->flags;
+ }
  
- /* caller must hold prepare_lock */
-+static void clk_unprepare_unused_subtree(struct clk *clk)
++bool __clk_is_prepared(struct clk *clk)
 +{
-+	struct clk *child;
-+	struct hlist_node *tmp;
++	int ret;
 +
 +	if (!clk)
-+		return;
++		return false;
 +
-+	hlist_for_each_entry(child, tmp, &clk->children, child_node)
-+		clk_unprepare_unused_subtree(child);
++	/*
++	 * .is_prepared is optional for clocks that can prepare
++	 * fall back to software usage counter if it is missing
++	 */
++	if (!clk->ops->is_prepared) {
++		ret = clk->prepare_count ? 1 : 0;
++		goto out;
++	}
 +
-+	if (clk->prepare_count)
-+		return;
-+
-+	if (clk->flags & CLK_IGNORE_UNUSED)
-+		return;
-+
-+	if (__clk_is_prepared(clk))
-+		if (clk->ops->unprepare)
-+			clk->ops->unprepare(clk->hw);
++	ret = clk->ops->is_prepared(clk->hw);
++out:
++	return !!ret;
 +}
 +
-+/* caller must hold prepare_lock */
- static void clk_disable_unused_subtree(struct clk *clk)
+ bool __clk_is_enabled(struct clk *clk)
  {
- 	struct clk *child;
-@@ -393,6 +416,12 @@ static int clk_disable_unused(void)
- 	hlist_for_each_entry(clk, tmp, &clk_orphan_list, child_node)
- 		clk_disable_unused_subtree(clk);
+ 	int ret;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 4989b8a..86ff6be 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -45,6 +45,10 @@ struct clk_hw;
+  * 		undo any work done in the @prepare callback. Called with
+  * 		prepare_lock held.
+  *
++ * @is_prepared: Queries the hardware to determine if the clock is prepared.
++ *		This function is allowed to sleep. Optional, if this op is not
++ *		set then the prepare count will be used.
++ *
+  * @enable:	Enable the clock atomically. This must not return until the
+  * 		clock is generating a valid clock signal, usable by consumer
+  * 		devices. Called with enable_lock held. This function must not
+@@ -108,6 +112,7 @@ struct clk_hw;
+ struct clk_ops {
+ 	int		(*prepare)(struct clk_hw *hw);
+ 	void		(*unprepare)(struct clk_hw *hw);
++	int		(*is_prepared)(struct clk_hw *hw);
+ 	int		(*enable)(struct clk_hw *hw);
+ 	void		(*disable)(struct clk_hw *hw);
+ 	int		(*is_enabled)(struct clk_hw *hw);
+@@ -351,6 +356,7 @@ unsigned int __clk_get_enable_count(struct clk *clk);
+ unsigned int __clk_get_prepare_count(struct clk *clk);
+ unsigned long __clk_get_rate(struct clk *clk);
+ unsigned long __clk_get_flags(struct clk *clk);
++bool __clk_is_prepared(struct clk *clk);
+ bool __clk_is_enabled(struct clk *clk);
+ struct clk *__clk_lookup(const char *name);
  
-+	hlist_for_each_entry(clk, tmp, &clk_root_list, child_node)
-+		clk_unprepare_unused_subtree(clk);
-+
-+	hlist_for_each_entry(clk, tmp, &clk_orphan_list, child_node)
-+		clk_unprepare_unused_subtree(clk);
-+
- 	mutex_unlock(&prepare_lock);
- 
- 	return 0;
 -- 
 1.7.10
