@@ -1,28 +1,77 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 24 Jan 2013 08:33:42 -0800
-Subject: [GIT PULL] at91: fixes for 3.8-rc5
-In-Reply-To: <5100FA77.3020405@atmel.com>
-References: <5100FA77.3020405@atmel.com>
-Message-ID: <CAOesGMjvE30TDVGVr8_0cjSTze1ouZFcvu7or4tM1vCuaZfTDg@mail.gmail.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Thu, 24 Jan 2013 11:36:09 -0500
+Subject: [PATCH v6 02/15] ARM: Section based HYP idmap
+In-Reply-To: <20130124143224.GC18233@arm.com>
+References: <20130116175716.29147.15348.stgit@ubuntu>
+ <20130116175734.29147.19552.stgit@ubuntu>
+ <20130124143224.GC18233@arm.com>
+Message-ID: <CANM98qJfxsXtQwjpMw5m8FEM2awtkCg-hZXa_Qrk7=jb3pqFAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 1:10 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Arnd, Olof,
+On Thu, Jan 24, 2013 at 9:32 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, Jan 16, 2013 at 05:57:34PM +0000, Christoffer Dall wrote:
+>> --- a/arch/arm/mm/idmap.c
+>> +++ b/arch/arm/mm/idmap.c
+>> @@ -1,4 +1,6 @@
+>> +#include <linux/module.h>
 >
-> Here is the pull request related to the fixes series that I sent
-> earlier this week. Changes are obvious and are very constrained in
-> AT91-related material.
+> Minor thing - do you need to include linux/module.h here?
 >
-> The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
->
->   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
->
-> are available in the git repository at:
->
->   git://github.com/at91linux/linux-at91.git tags/at91-fixes
 
-Pulled.
+there was once a time when kvm/arm could be compiled as a module; my
+best guess is that it's a leftover from that.
 
+>> +     identity_mapping_add(hyp_pgd, __hyp_idmap_text_start,
+>> +                          __hyp_idmap_text_end, PMD_SECT_AP1);
+>
+> It would be more consistent if you define PMD_SECT_HYP or something like
+> that. I think you have a L_PTE_HYP bit as well.
+>
+Is this along the lines of what you had in mind?
 
--Olof
+diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h
+b/arch/arm/include/asm/pgtable-3level-hwdef.h
+index 18f5cef..432fa12 100644
+--- a/arch/arm/include/asm/pgtable-3level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+@@ -50,6 +50,7 @@
+ #define PMD_SECT_AP_READ	(_AT(pmdval_t, 0))
+ #define PMD_SECT_AP1		(_AT(pmdval_t, 1) << 6)
+ #define PMD_SECT_TEX(x)		(_AT(pmdval_t, 0))
++#define PMD_SECT_HYP		PMD_SECT_AP1
+
+ /*
+  * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
+diff --git a/arch/arm/include/asm/pgtable-3level.h
+b/arch/arm/include/asm/pgtable-3level.h
+index 6ef8afd..a7e6532 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -116,6 +116,7 @@
+ /*
+  * Hyp-mode PL2 PTE definitions for LPAE.
+  */
++#define PMD_HYP			PMD_SECT_AP1
+ #define L_PTE_HYP		L_PTE_USER
+
+ #ifndef __ASSEMBLY__
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 2dffc01..bf1ee20 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -1,4 +1,3 @@
+-#include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/slab.h>
+
+@@ -97,7 +96,7 @@ static int __init init_static_idmap_hyp(void)
+ 	pr_info("Setting up static HYP identity map for 0x%p - 0x%p\n",
+ 		__hyp_idmap_text_start, __hyp_idmap_text_end);
+ 	identity_mapping_add(hyp_pgd, __hyp_idmap_text_start,
+-			     __hyp_idmap_text_end, PMD_SECT_AP1);
++			     __hyp_idmap_text_end, PMD_SECT_HYP);
+
+ 	return 0;
+ }
