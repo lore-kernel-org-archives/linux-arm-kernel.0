@@ -1,75 +1,76 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 24 Jan 2013 01:27:44 -0500
-Subject: [PATCH v2 01/16] ARM: introduce common set_auxcr/get_auxcr functions
-In-Reply-To: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1359008879-9015-2-git-send-email-nicolas.pitre@linaro.org>
+Date: Thu, 24 Jan 2013 01:27:43 -0500
+Subject: [PATCH v2 00/16] low-level CPU and cluster power management
+Message-ID: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+This is version 2 of the patch series required to safely power up
+and down CPUs in a cluster as can be found in b.L systems.
 
-Move the private set_auxcr/get_auxcr functions from
-drivers/cpuidle/cpuidle-calxeda.c so they can be used across platforms.
+Please refer to http://article.gmane.org/gmane.linux.ports.arm.kernel/208625
+for the initial series and particularly the cover page blurb for this work.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
----
- arch/arm/include/asm/cp15.h       | 14 ++++++++++++++
- drivers/cpuidle/cpuidle-calxeda.c | 14 --------------
- 2 files changed, 14 insertions(+), 14 deletions(-)
+Thanks to those who provided review comments.
 
-diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-index 5ef4d8015a..ef0094abf2 100644
---- a/arch/arm/include/asm/cp15.h
-+++ b/arch/arm/include/asm/cp15.h
-@@ -59,6 +59,20 @@ static inline void set_cr(unsigned int val)
- 	isb();
- }
- 
-+static inline unsigned int get_auxcr(void)
-+{
-+	unsigned int val;
-+	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
-+	return val;
-+}
-+
-+static inline void set_auxcr(unsigned int val)
-+{
-+	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
-+	  : : "r" (val) : "cc");
-+	isb();
-+}
-+
- #ifndef CONFIG_SMP
- extern void adjust_cr(unsigned long mask, unsigned long set);
- #endif
-diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-index e1aab38c5a..ece83d6e04 100644
---- a/drivers/cpuidle/cpuidle-calxeda.c
-+++ b/drivers/cpuidle/cpuidle-calxeda.c
-@@ -37,20 +37,6 @@ extern void *scu_base_addr;
- 
- static struct cpuidle_device __percpu *calxeda_idle_cpuidle_devices;
- 
--static inline unsigned int get_auxcr(void)
--{
--	unsigned int val;
--	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
--	return val;
--}
--
--static inline void set_auxcr(unsigned int val)
--{
--	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
--	  : : "r" (val) : "cc");
--	isb();
--}
--
- static noinline void calxeda_idle_restore(void)
- {
- 	set_cr(get_cr() | CR_C);
--- 
-1.8.0
+Changes from v1:
+
+- Pulled in Rob Herring's auxcr accessor patch and converted this series
+  to it.
+- VMajor rework of various barriers (some DSBs demoted to DMBs, etc.)
+- The sync_mem() macro is now split and enhanced to properly process the
+  cache for writers and readers in the cluster critical region helpers.
+- BL_NR_CLUSTERS and BL_CPUS_PER_CLUSTER renamed to BL_MAX_CLUSTERS
+  and BL_MAX_CPUS_PER_CLUSTER.
+- Removed unused C definitions and prototypes for vlocks.
+- Simplified the vlock memory allocation.
+- The vlock code is GPL v2.
+- Replaced MPIDR inline asm by read_cpuid_mpidr().
+- Use of MPIDR_AFFINITY_LEVEL() to replace explicit shifts and masks.
+- Dropped gic_cpu_if_down().
+- Added a DSB before SEV and WFI.
+- Fixed power_up_setup helper prototype.
+- Nuked smp_wmb() in bL_set_entry_vector().
+- Moved the CCI driver to drivers/bus/.
+- Dependency on CONFIG_EXPERIMENTAL removed.
+- Leftover garbage in Makefile removed.
+- Added/clarified various comments in the assembly code.
+- Some documentation typos fixed.
+- Copyright notices updated to 2013
+
+Still not addressed yet in this series:
+
+- The bL_ rename (will be trivial once I settle on an alternative).
+- The CCI and DCSCB device tree binding descriptions.
+
+The new diffstat is:
+
+ .../big.LITTLE/cluster-pm-race-avoidance.txt    | 498 ++++++++++++++++++
+ Documentation/arm/big.LITTLE/vlocks.txt         | 211 ++++++++
+ arch/arm/Kconfig                                |   6 +
+ arch/arm/common/Makefile                        |   1 +
+ arch/arm/common/bL_entry.c                      | 314 +++++++++++
+ arch/arm/common/bL_head.S                       | 214 ++++++++
+ arch/arm/common/bL_platsmp.c                    |  84 +++
+ arch/arm/common/vlock.S                         | 108 ++++
+ arch/arm/common/vlock.h                         |  28 +
+ arch/arm/include/asm/bL_entry.h                 | 190 +++++++
+ arch/arm/include/asm/cp15.h                     |  14 +
+ arch/arm/include/asm/mach/arch.h                |   3 +
+ arch/arm/kernel/setup.c                         |   5 +-
+ arch/arm/mach-vexpress/Kconfig                  |   9 +
+ arch/arm/mach-vexpress/Makefile                 |   1 +
+ arch/arm/mach-vexpress/core.h                   |   2 +
+ arch/arm/mach-vexpress/dcscb.c                  | 249 +++++++++
+ arch/arm/mach-vexpress/dcscb_setup.S            |  80 +++
+ arch/arm/mach-vexpress/platsmp.c                |  12 +
+ arch/arm/mach-vexpress/v2m.c                    |   2 +-
+ drivers/bus/Kconfig                             |   5 +
+ drivers/bus/Makefile                            |   2 +
+ drivers/bus/arm-cci.c                           | 124 +++++
+ drivers/cpuidle/cpuidle-calxeda.c               |  14 -
+ include/linux/arm-cci.h                         |  30 ++
+ 25 files changed, 2190 insertions(+), 16 deletions(-)
+
+
+Nicolas
