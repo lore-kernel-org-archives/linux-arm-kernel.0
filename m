@@ -1,202 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 Jan 2013 11:02:37 +0000
-Subject: [V5 PATCH 25/26] usb: otg: mv_otg: add device tree support
-In-Reply-To: <1359009530-28182-26-git-send-email-chao.xie@marvell.com>
-References: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
- <1359009530-28182-26-git-send-email-chao.xie@marvell.com>
-Message-ID: <20130124110237.GL32237@e106331-lin.cambridge.arm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 24 Jan 2013 13:10:20 +0200
+Subject: [v4 0/6] ARM: Initial support for Tegra114 SoC
+Message-ID: <1359025829-22306-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 06:38:49AM +0000, Chao Xie wrote:
-> All blocks are removed. Add the device tree support for otg.
+Hi,
 
-As with mv_udc, this binding should be documented. Please Cc
-devicetree-discuss when you have one.
+This patchset adds initial support for NVIDIA's new Tegra114 SoC
+(T114) based on the ARM Cortex-A15 MP. This has the minimal support to
+allow the kernel to boot up into shell console. This can be used as a
+basis for adding other device drivers for this SoC. Currently there
+are 2 evaluation boards available, "Dalmore" and "Pluto".
 
-> 
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> ---
->  drivers/usb/otg/mv_otg.c |  128 +++++++++++++++++++++++++++++++++++++--------
->  drivers/usb/otg/mv_otg.h |    6 +-
->  2 files changed, 108 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
-> index 379df92..3aa7fdc 100644
-> --- a/drivers/usb/otg/mv_otg.c
-> +++ b/drivers/usb/otg/mv_otg.c
-> @@ -17,6 +17,7 @@
->  #include <linux/device.h>
->  #include <linux/proc_fs.h>
->  #include <linux/clk.h>
-> +#include <linux/of.h>
->  #include <linux/workqueue.h>
->  #include <linux/platform_device.h>
->  
-> @@ -333,7 +334,7 @@ static void mv_otg_update_inputs(struct mv_otg *mvotg)
->  	else
->  		otg_ctrl->id = !!(otgsc & OTGSC_STS_USB_ID);
->  
-> -	if (mvotg->pdata->otg_force_a_bus_req && !otg_ctrl->id)
-> +	if (mvotg->otg_force_a_bus_req && !otg_ctrl->id)
->  		otg_ctrl->a_bus_req = 1;
->  
->  	otg_ctrl->a_sess_vld = !!(otgsc & OTGSC_STS_A_SESSION_VALID);
-> @@ -690,21 +691,69 @@ int mv_otg_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static int mv_otg_parse_dt(struct platform_device *pdev,
-> +				struct mv_otg *mvotg)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	unsigned int clks_num;
-> +	unsigned int val;
-> +	int i, ret;
-> +	const char *clk_name;
-> +
-> +	if (!np)
-> +		return 1;
-> +
-> +	clks_num = of_property_count_strings(np, "clocks");
-> +	if (clks_num < 0)
-> +		return clks_num;
-> +
-> +	mvotg->clk = devm_kzalloc(&pdev->dev,
-> +		sizeof(struct clk *) * clks_num, GFP_KERNEL);
-> +	if (mvotg->clk == NULL)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < clks_num; i++) {
-> +		ret = of_property_read_string_index(np, "clocks", i,
-> +			&clk_name);
-> +		if (ret)
-> +			return ret;
-> +		mvotg->clk[i] = devm_clk_get(&pdev->dev, clk_name);
-> +		if (IS_ERR(mvotg->clk[i]))
-> +			return PTR_ERR(mvotg->clk[i]);
-> +	}
+For those who want to try:
 
-Again, it seems a shame there's no devm_of_clk_get.
+  $ make ARCH=arm tegra_defconfig
+  $ scripts/config -e ARCH_TEGRA_114_SOC -d SMP -d DRM -d SUSPEND \
+    	-d PM_RUNTIME -d CPU_FREQ -d CPU_IDLE -d HOTPLUG_CPU
+  $ make ARCH=arm menuconfig # if needed to configure more
+  $ make ARCH=arm all -j9
 
-> +
-> +	mvotg->clknum = clks_num;
-> +
-> +	ret = of_property_read_u32(np, "extern_attr", &mvotg->extern_attr);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = of_property_read_u32(np, "mode", &mvotg->mode);
-> +	if (ret)
-> +		return ret;
+You may also want to enable CONFIG_ARM_APPENDED_DTB and
+CONFIG_ARM_ATAG_DTB_COMPAT if the bootloader doesn't support DT yet.
 
-I *really* don't like this, for the same reasons I stated in reply to the
-mv_udc patch.
+Verified that this single image booted up with "Dalmore(T114)",
+"Pluto(T114)" and "Cardhu(T30)". For "Cardhu(T30)" with this single
+image, SPI driver doesn't seem to afford the above configuration , it
+hangs at boot-up. With SPI disabled, it's ok.
 
-> +
-> +	ret = of_property_read_u32(np, "force_a_bus_req", &val);
-> +	if (ret)
-> +		return ret;
-> +	mvotg->otg_force_a_bus_req = !!val;
+The following changes since commit ac8963ed5d41573c724ce6c1e17f5182d476f2e6:
 
-In devicetree, the typical way to handle a boolean case like this would be to
-have a valueless property. If present, the property is true, if not present
-it's considered to default to false:
+  ARM: tegra: Add CPU nodes to Tegra30 device tree (2013-01-23 10:16:18 -0700)
 
-device at 4000 {
-	compatible = "manufacturer,some-device";
-	reg = <0x4000, 0x1000>;
-	manufacturer,boolean-property; /* no value, true if present */
-};
+are available in the git repository at:
 
-Properties which may only have a meaning on one manufacturer's devices are also
-typically prefixed with the manufacturer similarly to compatible strings, e.g.
-"mrvl,force-a-bus-req".
+  git://nv-tegra.nvidia.com/user/hdoyu/linux.git tegra114-base
 
-There may also be a better name for this property.
+for you to fetch changes up to ce08503daaffdffd00e8ebdea8c425d68f287efb:
 
-> +
-> +	ret = of_property_read_u32(np, "disable_clock_gating", &val);
-> +	if (ret)
-> +		return ret;
-> +	mvotg->clock_gating = !val;
+  ARM: tegra: Add initial support for Tegra114 SoC. (2013-01-24 10:10:12 +0200)
 
-You can do the same here, but with the logic inverted.
+----------------------------------------------------------------
+v4:
+Rebased onto Stephen's for-3.9/soc(inc. CCF)
+Removed SCU related pathces.
 
-> +
-> +	return 0;
-> +}
-> +
->  static int mv_otg_probe(struct platform_device *pdev)
->  {
-> -	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
->  	struct mv_otg *mvotg;
->  	struct usb_otg *otg;
->  	struct resource *r;
-> -	int retval = 0, clk_i, i;
-> +	int retval = 0, i;
->  	size_t size;
->  
-> -	if (pdata == NULL) {
-> -		dev_err(&pdev->dev, "failed to get platform data\n");
-> -		return -ENODEV;
-> -	}
-> -
-> -	size = sizeof(*mvotg) + sizeof(struct clk *) * pdata->clknum;
-> +	size = sizeof(*mvotg);
->  	mvotg = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
->  	if (!mvotg) {
->  		dev_err(&pdev->dev, "failed to allocate memory!\n");
-> @@ -718,17 +767,45 @@ static int mv_otg_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, mvotg);
->  
->  	mvotg->pdev = pdev;
-> -	mvotg->extern_attr = pdata->extern_attr;
-> -	mvotg->pdata = pdata;
->  
-> -	mvotg->clknum = pdata->clknum;
-> -	for (clk_i = 0; clk_i < mvotg->clknum; clk_i++) {
-> -		mvotg->clk[clk_i] = devm_clk_get(&pdev->dev,
-> +	retval = mv_otg_parse_dt(pdev, mvotg);
-> +	if (retval > 0) {
-> +		struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
-> +		/* no CONFIG_OF */
-> +		int clk_i = 0;
-> +
-> +		if (pdata == NULL) {
-> +			dev_err(&pdev->dev, "missing platform_data\n");
-> +			return -ENODEV;
-> +		}
-> +		mvotg->extern_attr = pdata->extern_attr;
-> +		mvotg->mode = pdata->mode;
-> +		mvotg->clknum = pdata->clknum;
-> +		mvotg->otg_force_a_bus_req = pdata->otg_force_a_bus_req;
-> +		if (pdata->disable_otg_clock_gating)
-> +			mvotg->clock_gating = 0;
-> +
-> +		size = sizeof(struct clk *) * mvotg->clknum;
-> +		mvotg->clk = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
-> +		if (mvotg->clk == NULL) {
-> +			dev_err(&pdev->dev,
-> +				"failed to allocate memory for clk\n");
-> +			return -ENOMEM;
-> +		}
-> +
-> +		for (clk_i = 0; clk_i < mvotg->clknum; clk_i++) {
-> +			mvotg->clk[clk_i] = devm_clk_get(&pdev->dev,
->  						pdata->clkname[clk_i]);
-> -		if (IS_ERR(mvotg->clk[clk_i])) {
-> -			retval = PTR_ERR(mvotg->clk[clk_i]);
-> -			return retval;
-> +			if (IS_ERR(mvotg->clk[clk_i])) {
-> +				dev_err(&pdev->dev, "failed to get clk %s\n",
-> +					pdata->clkname[clk_i]);
-> +				retval = PTR_ERR(mvotg->clk[clk_i]);
-> +				return retval;
+v3:
+Rebased onto next-20130115.
+Dropped TSC/arch timer patch.
+Use /cpus entry in DT to detect cpu core #.
 
-You don't need to go via retval here.
+v2:
+Rebased against the latest Stephen Warren's linux-next_common
+Add /cpus entry in DT
+Add comment to initialize TSC only in secure mode.
 
-[...]
+Hiroshi Doyu (6):
+      ARM: tegra: Use DT /cpu node to detect number of CPU core
+      ARM: tegra: fuse: Add chip ID Tegra114 0x35
+      ARM: dt: tegra114: Add new SoC base, Tegra114 SoC
+      ARM: dt: tegra114: Add new board, Dalmore
+      ARM: dt: tegra114: Add new board, Pluto
+      ARM: tegra: Add initial support for Tegra114 SoC.
 
-Thanks,
-Mark.
+ arch/arm/boot/dts/Makefile              |    4 +-
+ arch/arm/boot/dts/tegra114-dalmore.dts  |   21 ++++++
+ arch/arm/boot/dts/tegra114-pluto.dts    |   21 ++++++
+ arch/arm/boot/dts/tegra114.dtsi         |  114 +++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/Kconfig             |   10 +++
+ arch/arm/mach-tegra/Makefile            |    1 +
+ arch/arm/mach-tegra/board-dt-tegra114.c |   48 +++++++++++++
+ arch/arm/mach-tegra/common.c            |    1 +
+ arch/arm/mach-tegra/fuse.h              |    1 +
+ arch/arm/mach-tegra/platsmp.c           |   15 ----
+ 10 files changed, 220 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra114-dalmore.dts
+ create mode 100644 arch/arm/boot/dts/tegra114-pluto.dts
+ create mode 100644 arch/arm/boot/dts/tegra114.dtsi
+ create mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
