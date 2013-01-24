@@ -1,54 +1,46 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 24 Jan 2013 17:45:43 +0200
-Subject: [RFC/PATCH 05/32] usb: gadget: amd5536udc: let udc-core manage
- gadget->dev
-In-Reply-To: <1359042370-4358-1-git-send-email-balbi@ti.com>
-References: <1359042370-4358-1-git-send-email-balbi@ti.com>
-Message-ID: <1359042370-4358-6-git-send-email-balbi@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 24 Jan 2013 15:45:35 +0000
+Subject: [PATCH v6 04/15] KVM: ARM: Hypervisor initialization
+In-Reply-To: <20130116175748.29147.91246.stgit@ubuntu>
+References: <20130116175716.29147.15348.stgit@ubuntu>
+ <20130116175748.29147.91246.stgit@ubuntu>
+Message-ID: <20130124154535.GD18233@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By simply setting a flag, we drop some boilerplate
-code.
+On Wed, Jan 16, 2013 at 05:57:48PM +0000, Christoffer Dall wrote:
+> --- a/arch/arm/include/asm/pgtable-3level-hwdef.h
+> +++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+> @@ -32,6 +32,9 @@
+>  #define PMD_TYPE_SECT          (_AT(pmdval_t, 1) << 0)
+>  #define PMD_BIT4               (_AT(pmdval_t, 0))
+>  #define PMD_DOMAIN(x)          (_AT(pmdval_t, 0))
+> +#define PMD_APTABLE_SHIFT      (61)
+> +#define PMD_APTABLE            (_AT(pgdval_t, 3) << PGD_APTABLE_SHIFT)
+> +#define PMD_PXNTABLE           (_AT(pgdval_t, 1) << 59)
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/usb/gadget/amd5536udc.c | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+Are these used anywhere? I grep'ed but couldn't find. While I'm fine
+with keeping some hardware definitions for future use, I think here you
+need to qualify these bits with some suffix to PMD_APTABLE. The APTable
+are just a group of bits with different meaning (no write access etc.).
+If you want to keep them as group of bits, you can add a _MASK suffix.
 
-diff --git a/drivers/usb/gadget/amd5536udc.c b/drivers/usb/gadget/amd5536udc.c
-index 3dac001..1827d4c 100644
---- a/drivers/usb/gadget/amd5536udc.c
-+++ b/drivers/usb/gadget/amd5536udc.c
-@@ -3080,7 +3080,6 @@ static void udc_pci_remove(struct pci_dev *pdev)
- 	if (dev->active)
- 		pci_disable_device(pdev);
- 
--	device_unregister(&dev->gadget.dev);
- 	pci_set_drvdata(pdev, NULL);
- 
- 	udc_remove(dev);
-@@ -3276,6 +3275,7 @@ static int udc_probe(struct udc *dev)
- 	dev->gadget.dev.release = gadget_release;
- 	dev->gadget.name = name;
- 	dev->gadget.max_speed = USB_SPEED_HIGH;
-+	dev->gadget.register_my_device = true;
- 
- 	/* init registers, interrupts, ... */
- 	startup_registers(dev);
-@@ -3301,13 +3301,6 @@ static int udc_probe(struct udc *dev)
- 	if (retval)
- 		goto finished;
- 
--	retval = device_register(&dev->gadget.dev);
--	if (retval) {
--		usb_del_gadget_udc(&dev->gadget);
--		put_device(&dev->gadget.dev);
--		goto finished;
--	}
--
- 	/* timer init */
- 	init_timer(&udc_timer);
- 	udc_timer.function = udc_timer_function;
+> +static int init_hyp_mode(void)
+> +{
+> +       phys_addr_t init_phys_addr;
+> +       int cpu;
+> +       int err = 0;
+> +
+> +       /*
+> +        * Allocate Hyp PGD and setup Hyp identity mapping
+> +        */
+> +       err = kvm_mmu_init();
+> +       if (err)
+> +               goto out_err;
+
+The comment is a bit misleading since kvm_mmu_init() simply checks
+whether hyp_pgd has been initialised. The actual initialisation is done
+by the idmap code.
+
 -- 
-1.8.1.rc1.5.g7e0651a
+Catalin
