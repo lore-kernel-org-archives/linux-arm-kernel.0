@@ -1,100 +1,50 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 24 Jan 2013 11:15:34 -0800
-Subject: [PATCH 5/7] clk: vt8500: Use common of_clk_init() function
-In-Reply-To: <1358543280.8280.2.camel@gitbox>
+Date: Thu, 24 Jan 2013 11:20:43 -0800
+Subject: [PATCH 2/7] clk: tegra: Use common of_clk_init() function
+In-Reply-To: <50E793A0.4020702@nvidia.com>
 References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
- <1357282858-2112-5-git-send-email-pgaikwad@nvidia.com>
- <20130118175621.3982.82838@quantum> <1358543280.8280.2.camel@gitbox>
-Message-ID: <20130124191534.10623.14882@quantum>
+ <1357282858-2112-2-git-send-email-pgaikwad@nvidia.com>
+ <50E703A8.1080808@wwwdotorg.org> <50E793A0.4020702@nvidia.com>
+Message-ID: <20130124192043.10623.60751@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Prisk (2013-01-18 13:08:00)
-> On Fri, 2013-01-18 at 09:56 -0800, Mike Turquette wrote:
-> > Quoting Prashant Gaikwad (2013-01-03 23:00:56)
-> > > Use common of_clk_init() function for clock initialization.
-> > > 
-> > > Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-> > 
-> > Tony,
-> > 
-> > Can I get a Tested-by from you before I take this in?
-> > 
-> Tested-by: Tony Prisk <linux@prisktech.co.nz>
+Quoting Prashant Gaikwad (2013-01-04 18:44:48)
+> On Friday 04 January 2013 10:00 PM, Stephen Warren wrote:
+> > On 01/04/2013 12:00 AM, Prashant Gaikwad wrote:
+> >> Use common of_clk_init() function for clocks initialization.
+> >>   drivers/clk/tegra/clk-tegra20.c |    3 ++-
+> >>   drivers/clk/tegra/clk-tegra30.c |    3 ++-
+> > Oh, so this series is written assuming that the Tegra CCF rework is
+> > already applied then? That makes the dependencies quite painful, since I
+> > think we'll end up with the following order being needed:
+> >
+> > 1) clk: Add composite clock type
+> >     -> This would usually go through the clk tree.
+> > 2) The Tegra CCF rework series
+> >     -> This must go through the Tegra tree due to lots of dependencies
+> >     and merge conflicts with other Tegra patches.
+> > 3) This series
+> >     -> This would usually go through the clk tree.
+> >
+> > Is it possible to re-order the dependencies as (1) (3) (2), so that Mike
+> > can apply (1) and (3) to the clock tree, then I can use the clk tree as
+> > the basis for a branch in the Tegra tree to apply (2) and all the other
+> > Tegra patches that will conflict with (2)?
 > 
-> FYI: This will need another patch to complete as we added another set of
-> clocks to this clk-vt8500.c for 3.9.
-> 
+> If Mike approves the concept and implementation in (1) and (3) then I 
+> will repost (2) and (3) with dependencies re-ordered.
 
-Tony, is the following patch correct?
+Patch (1) still has some unaddressed comments, and is not a real
+dependency for this series.  Since all of the patches have received their
+Tested-by's then I propose to merge all patches from this series into
+clk-next, which exception of patch 2/7 (the Tegra patch).
 
+This reduces your Tegra CCF conversion dependencies and you can role the
+necessary of_clk_init change into your Tegra CCF conversion branch (it
+has my implicit Ack and can be taken through your tree).
 
->From 5b6e0adb69674c684c33503f50010644b049029c Mon Sep 17 00:00:00 2001
-From: Prashant Gaikwad <pgaikwad@nvidia.com>
-Date: Fri, 4 Jan 2013 12:30:56 +0530
-Subject: [PATCH] clk: vt8500: Use common of_clk_init() function
+Let me know if this is OK for you.
 
-Use common of_clk_init() function for clock initialization.
-
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-Tested-by: Tony Prisk <linux@prisktech.co.nz>
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
-[mturquette at linaro.org: added entry for wm8750-pll-clock]
-
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
----
- drivers/clk/clk-vt8500.c |   17 +++++------------
- 1 file changed, 5 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
-index 2515d4f..b5538bb 100644
---- a/drivers/clk/clk-vt8500.c
-+++ b/drivers/clk/clk-vt8500.c
-@@ -291,7 +291,7 @@ static __init void vtwm_device_clk_init(struct device_node *node)
- 	rc = of_clk_add_provider(node, of_clk_src_simple_get, clk);
- 	clk_register_clkdev(clk, clk_name, NULL);
- }
--
-+CLK_OF_DECLARE(vt8500_device, "via,vt8500-device-clock", vtwm_device_clk_init);
- 
- /* PLL clock related functions */
- 
-@@ -612,26 +612,19 @@ static void __init vt8500_pll_init(struct device_node *node)
- {
- 	vtwm_pll_clk_init(node, PLL_TYPE_VT8500);
- }
-+CLK_OF_DECLARE(vt8500_pll, "via,vt8500-pll-clock", vt8500_pll_init);
- 
- static void __init wm8650_pll_init(struct device_node *node)
- {
- 	vtwm_pll_clk_init(node, PLL_TYPE_WM8650);
- }
-+CLK_OF_DECLARE(wm8650_pll, "wm,wm8650-pll-clock", wm8650_pll_init);
- 
- static void __init wm8750_pll_init(struct device_node *node)
- {
- 	vtwm_pll_clk_init(node, PLL_TYPE_WM8750);
- }
--
--static const __initconst struct of_device_id clk_match[] = {
--	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
--	{ .compatible = "via,vt8500-pll-clock", .data = vt8500_pll_init, },
--	{ .compatible = "wm,wm8650-pll-clock", .data = wm8650_pll_init, },
--	{ .compatible = "wm,wm8750-pll-clock", .data = wm8750_pll_init, },
--	{ .compatible = "via,vt8500-device-clock",
--					.data = vtwm_device_clk_init, },
--	{ /* sentinel */ }
--};
-+CLK_OF_DECLARE(wm8750_pll, "wm,wm8750-pll-clock", wm8750_pll_init);
- 
- void __init vtwm_clk_init(void __iomem *base)
- {
-@@ -640,5 +633,5 @@ void __init vtwm_clk_init(void __iomem *base)
- 
- 	pmc_base = base;
- 
--	of_clk_init(clk_match);
-+	of_clk_init(NULL);
- }
--- 
-1.7.10.4
+Thanks,
+Mike
