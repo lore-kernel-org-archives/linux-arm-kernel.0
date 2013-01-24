@@ -1,10 +1,10 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 24 Jan 2013 17:45:47 +0200
-Subject: [RFC/PATCH 09/32] usb: gadget: dummy_hcd: let udc-core manage
+Date: Thu, 24 Jan 2013 17:45:45 +0200
+Subject: [RFC/PATCH 07/32] usb: gadget: atmel_usba_udc: let udc-core manage
  gadget->dev
 In-Reply-To: <1359042370-4358-1-git-send-email-balbi@ti.com>
 References: <1359042370-4358-1-git-send-email-balbi@ti.com>
-Message-ID: <1359042370-4358-10-git-send-email-balbi@ti.com>
+Message-ID: <1359042370-4358-8-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,44 +13,53 @@ boilerplate code.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/usb/gadget/dummy_hcd.c | 10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
+ drivers/usb/gadget/atmel_usba_udc.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/drivers/usb/gadget/dummy_hcd.c b/drivers/usb/gadget/dummy_hcd.c
-index 95d584d..8155d4a 100644
---- a/drivers/usb/gadget/dummy_hcd.c
-+++ b/drivers/usb/gadget/dummy_hcd.c
-@@ -982,16 +982,10 @@ static int dummy_udc_probe(struct platform_device *pdev)
- 	dum->gadget.name = gadget_name;
- 	dum->gadget.ops = &dummy_ops;
- 	dum->gadget.max_speed = USB_SPEED_SUPER;
-+	dum->gadget.register_my_device = true;
+diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+index a7aed84..f0f9423 100644
+--- a/drivers/usb/gadget/atmel_usba_udc.c
++++ b/drivers/usb/gadget/atmel_usba_udc.c
+@@ -1900,9 +1900,9 @@ static int __init usba_udc_probe(struct platform_device *pdev)
+ 	dev_info(&pdev->dev, "FIFO at 0x%08lx mapped at %p\n",
+ 		 (unsigned long)fifo->start, udc->fifo);
  
--	dev_set_name(&dum->gadget.dev, "gadget");
- 	dum->gadget.dev.parent = &pdev->dev;
- 	dum->gadget.dev.release = dummy_gadget_release;
--	rc = device_register(&dum->gadget.dev);
--	if (rc < 0) {
--		put_device(&dum->gadget.dev);
--		return rc;
+-	device_initialize(&udc->gadget.dev);
+ 	udc->gadget.dev.parent = &pdev->dev;
+ 	udc->gadget.dev.dma_mask = pdev->dev.dma_mask;
++	udc->gadget.register_my_device = true;
+ 
+ 	platform_set_drvdata(pdev, udc);
+ 
+@@ -1962,12 +1962,6 @@ static int __init usba_udc_probe(struct platform_device *pdev)
+ 	}
+ 	udc->irq = irq;
+ 
+-	ret = device_add(&udc->gadget.dev);
+-	if (ret) {
+-		dev_dbg(&pdev->dev, "Could not add gadget: %d\n", ret);
+-		goto err_device_add;
 -	}
 -
- 	init_dummy_udc_hw(dum);
+ 	if (gpio_is_valid(pdata->vbus_pin)) {
+ 		if (!gpio_request(pdata->vbus_pin, "atmel_usba_udc")) {
+ 			udc->vbus_pin = pdata->vbus_pin;
+@@ -2007,9 +2001,6 @@ err_add_udc:
+ 		gpio_free(udc->vbus_pin);
+ 	}
  
- 	rc = usb_add_gadget_udc(&pdev->dev, &dum->gadget);
-@@ -1007,7 +1001,6 @@ static int dummy_udc_probe(struct platform_device *pdev)
- err_dev:
- 	usb_del_gadget_udc(&dum->gadget);
- err_udc:
--	device_unregister(&dum->gadget.dev);
- 	return rc;
- }
+-	device_unregister(&udc->gadget.dev);
+-
+-err_device_add:
+ 	free_irq(irq, udc);
+ err_request_irq:
+ 	kfree(usba_ep);
+@@ -2053,8 +2044,6 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
+ 	clk_put(udc->hclk);
+ 	clk_put(udc->pclk);
  
-@@ -1018,7 +1011,6 @@ static int dummy_udc_remove(struct platform_device *pdev)
- 	usb_del_gadget_udc(&dum->gadget);
- 	platform_set_drvdata(pdev, NULL);
- 	device_remove_file(&dum->gadget.dev, &dev_attr_function);
--	device_unregister(&dum->gadget.dev);
+-	device_unregister(&udc->gadget.dev);
+-
  	return 0;
  }
  
