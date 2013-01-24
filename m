@@ -1,58 +1,67 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 24 Jan 2013 15:38:41 +0100
-Subject: [kvmarm] [Qemu-devel] [RFC] Virtio-desktop: Virtio-based virtual
- desktop
-In-Reply-To: <20130124092531.GD18072@stefanha-thinkpad.redhat.com>
-References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
- <20130124092531.GD18072@stefanha-thinkpad.redhat.com>
-Message-ID: <EC4021BD-DDB7-4D28-BD79-4B7A809200AE@suse.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 24 Jan 2013 09:39:34 -0500
+Subject: [RFC PATCH 3/6] ARM: kirkwood: nsa310: cleanup includes and
+ unneeded code
+In-Reply-To: <51013A73.4090400@openwrt.org>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <28ae8033afa32ea4ea298ba63e1d5b2a1f4e18f9.1358983578.git.jason@lakedaemon.net>
+ <20130124055052.GA21297@lunn.ch> <51013A73.4090400@openwrt.org>
+Message-ID: <20130124143934.GA1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 24.01.2013, at 10:25, Stefan Hajnoczi wrote:
-
-> On Thu, Jan 24, 2013 at 11:40:24AM +0530, Anup Patel wrote:
->> IMHO, If we have something like Virtio-desktop specification then all
->> possible guest OSes can have support for it and different hypervisor can
->> emulate it without worrying about guest support.
+On Thu, Jan 24, 2013 at 02:43:15PM +0100, Florian Fainelli wrote:
+> On 01/24/2013 06:50 AM, Andrew Lunn wrote:
+> >On Wed, Jan 23, 2013 at 11:34:21PM +0000, Jason Cooper wrote:
+> >>Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> >>---
+> >>  arch/arm/mach-kirkwood/board-nsa310.c | 9 +--------
+> >>  1 file changed, 1 insertion(+), 8 deletions(-)
+> >>
+> >>diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
+> >>index 1bd328d..0b99533 100644
+> >>--- a/arch/arm/mach-kirkwood/board-nsa310.c
+> >>+++ b/arch/arm/mach-kirkwood/board-nsa310.c
+> >>@@ -10,11 +10,8 @@
+> >>
+> >>  #include <linux/kernel.h>
+> >>  #include <linux/init.h>
+> >>-#include <linux/i2c.h>
+> >>-
+> >>-#include <asm/mach-types.h>
+> >>-#include <asm/mach/arch.h>
+> >>  #include <mach/kirkwood.h>
+> >>+#include <linux/of.h>
+> >>  #include "common.h"
+> >>  #include "mpp.h"
+> >>
+> >>@@ -40,11 +37,7 @@ static unsigned int nsa310_mpp_config[] __initdata = {
+> >>
+> >>  void __init nsa310_init(void)
+> >>  {
+> >>-	u32 dev, rev;
+> >>-
+> >>  	kirkwood_mpp_conf(nsa310_mpp_config);
+> >>-
+> >>-	kirkwood_pcie_id(&dev, &rev);
+> >>  }
+> >>
+> >>  static int __init nsa310_pci_init(void)
+> >>--
+> >>1.8.1.1
+> >>
+> >
+> >Hi Jason, Tero
+> >
+> >This board is rather unusual for a Kirkwood. It has no Ethernet
+> >interfaces. Is this correct?
 > 
-> At this point x86 virtualization is mature and working with a mix of
-> emulated x86 architecture pieces and virtio devices for
-> performance-critical or open-ended functionality that we want to be able
-> to extend.
-> 
-> ARM is getting KVM and virtio-mmio support.  It will be in a similar
-> position soon.
-> 
-> Virtio guest drivers have not been implemented widely.  The Linux and
-> Windows efforts are driven by the folks who were behind virtio from the
-> start, but Solaris, FreeBSD, and others didn't really jump on the virtio
-> bandwagon.
-> 
-> Given this landscape, what is the advantage of doing a virtio-desktop?
-> It will still need to fall back on ARM or x86 which is already being
-> virtualized and emulated.
-> 
-> Depending on how you see it we either have virtio-desktop already or,
-> if not, I think the experience with virtio adoption suggests other
-> hypervisors and guest OSes will not trip over themselves to implement
-> virtio-desktop.
-> 
-> What's the advantage over virtualizating an existing ARM or x86 platform
-> and using virtio devices where appropriate?
+> It seems like it really has an Gigabit Ethernet interface:
+> http://www.clubic.com/disque-dur-memoire/nas/article-465814-1-zyxel-nsa-310.html
 
-You don't get changing hardware for changing CPUs. I don't think it makes sense to do a cross-arch virtio-desktop machine type. Different architectures simply have different needs.
+It's easy enough to add, we just need to know the phy_addr.  Does anyone
+have one to test?
 
-But check out the QEMU e500 machine. We have a fully device tree based machine type in the kernel. QEMU drives it by generating a device tree for devices it actually exposes on the fly.
+thx,
 
-The big advantage we have here is that
-
-  1) We don't have to emulate all hardware real hardware emulates
-  2) We're not restricted to emulate what real hardware emulates. PCI on ARM anyone?
-  3) Different CPU types can live on the same machine. This is something that x86 is doing already. When you get a SoC, guests are usually guaranteed a core <-> device correlation though.
-
-So overall, having a PV machine makes sense. Having the same common PV machine standardized across different architectures does not make sense.
-
-
-Alex
+Jason.
