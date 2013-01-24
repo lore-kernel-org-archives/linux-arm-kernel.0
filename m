@@ -1,56 +1,90 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 24 Jan 2013 16:30:58 -0600
-Subject: [RFC v2 13/18] ARM: OMAP2+: AM33XX: timer: Interchance clkevt
- and clksrc timers
-In-Reply-To: <1356959231-17335-14-git-send-email-vaibhav.bedia@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-14-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <5101B622.7050901@ti.com>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 24 Jan 2013 14:53:38 -0800
+Subject: [PATCH v2 1/3] ARM: stacktrace: harden FP stacktraces against
+ invalid stacks
+In-Reply-To: <5101A2A3.8000608@codeaurora.org>
+References: <1354230027-2204-1-git-send-email-ccross@android.com>
+ <1354230027-2204-2-git-send-email-ccross@android.com>
+ <5101A2A3.8000608@codeaurora.org>
+Message-ID: <CAMbhsRQjK6MndUQbYqYwPk=tx+Xp1B=TzVHM_gSdC_8EGXxgZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
+On Thu, Jan 24, 2013 at 1:07 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> On 11/29/2012 3:00 PM, Colin Cross wrote:
+>
+>> +bool sp_addr_valid(unsigned long sp)
+>> +{
+>> +       unsigned long high;
+>> +       unsigned long offset;
+>> +       unsigned int pfn;
+>> +       unsigned int start_pfn;
+>> +       unsigned int end_pfn;
+>> +
+>> +       if (!IS_ALIGNED(sp, 4))
+>> +               return false;
+>> +
+>> +       offset = sp & (THREAD_SIZE - 1);
+>> +
+>> +       if (offset > THREAD_START_SP)
+>> +               return false;
+>> +
+>> +       if (offset < sizeof(struct thread_info))
+>> +               return false;
+>> +
+>> +       high = STACK_MAX(sp);
+>> +
+>> +       if (!virt_addr_valid(sp) || !virt_addr_valid(high))
+>> +               return false;
+>> +
+>> +       start_pfn = page_to_pfn(virt_to_page(sp));
+>> +       end_pfn = page_to_pfn(virt_to_page(high));
+>> +       for (pfn = start_pfn; pfn <= end_pfn; pfn++)
+>> +               if (!pfn_valid(pfn))
+>> +                       return false;
+>> +
+>> +       return true;
+>> +}
+>
+>
+> I get crashes on bootup with CONFIG_SPARSEMEM enabled if a stacktrace needs
+> to be saved before the sections are setup:
+>
+> <1>[    0.000000] Unable to handle kernel NULL pointer dereference at
+> virtual address 00000000
+> <1>[    0.000000] pgd = c0004000
+> <1>[    0.000000] [00000000] *pgd=00000000
+> <0>[    0.000000] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
+> <4>[    0.000000] Modules linked in:
+> <4>[    0.000000] CPU: 0    Not tainted (3.4.0-ga472ec0-00007-g6479b9e-dirty
+> #10)
+> <4>[    0.000000] PC is at sp_addr_valid+0xb0/0x1bc
+> <4>[    0.000000] LR is at unwind_frame+0x4c/0x5b0
+> ...
+> <1>[    0.000000] Unable to handle kernel NULL pointer dereference at
+> virtual address 00000000
+> <1>[    0.000000] pgd = c0004000
+> <1>[    0.000000] [00000000] *pgd=00000000
+> <0>[    0.000000] BUG: spinlock lockup on CPU#0, swapper/0
+> <0>[    0.000000]  lock: die_lock+0x0/0x10, .magic: dead4ead, .owner:
+> swapper/0, .owner_cpu: 0
+> <1>[    0.000000] Unable to handle kernel NULL pointer dereference at
+> virtual address 00000000
+> <1>[    0.000000] pgd = c0004000
+> <1>[    0.000000] [00000000] *pgd=00000000
+> <0>[    0.000000] BUG: spinlock lockup on CPU#0, swapper/0
+> <0>[    0.000000]  lock: die_lock+0x0/0x10, .magic: dead4ead, .owner:
+> swapper/0, .owner_cpu: 0
+> [repeat several more times]
+>
+> In this case, the stacktrace is being saved via a call to kmemleak_free in
+> free_bootmem. The sections have not yet been initialized so there is a crash
+> in virt_to_page when accessing the section data.
+>
+> I don't see an easy workaround for this right now unless we want to restrict
+> sp_addr_valid until later in bootup.
 
-On 12/31/2012 07:07 AM, Vaibhav Bedia wrote:
-> AM33XX has two timers (DTIMER0/1) in the WKUP domain.
-> On GP devices the source of DMTIMER0 is fixed to an
-> inaccurate internal 32k RC oscillator and this makes
-> the DMTIMER0 practically either as a clocksource or
-> as clockevent.
-> 
-> Currently the timer instance in WKUP domain is used
-> as the clockevent and the timer in non-WKUP domain
-> as the clocksource. DMTIMER1 in WKUP domain can keep
-> running in suspend from a 32K clock fed from external
-> OSC and can serve as the persistent clock for the kernel.
-> To enable this, interchange the timers used as clocksource
-> and clockevent for AM33XX.
-
-I have been thinking about this some more. In the case where we are
-using gptimers for both clock-events and clock-source (on both AM33xx
-and OMAP) and I am wondering if it makes sense to switch the timers so
-that we use the always-on timer for clock-source and a different one
-from clock-events.
-
-For OMAP, if we are not using the 32k-sync for clock-source, then we are
-never going to achieve low power states during idle as we will always
-have one gptimer running. And in this case, to your point below, it
-would be better to use the always-on for clock-source so that in suspend
-we can at least hit low power states and maintain time.
-
-> For now a new DT property has been added to allow the timer code
-> to select the timer with the right property.
-> 
-> It has been pointed out by Santosh Shilimkar and Kevin Hilman
-> that such a change will result in soc-idle never being achieved
-> on AM33XX. There are other reasons why soc-idle does not look
-> feasible on AM33XX so for now we go ahead with the interchange
-> of the the timers. If at a later point of time we do come up
-> with an approach which makes soc-idle possible on AM33XX, this
-> can be revisited.
-
-Right, but this would also be true for OMAP if we don't use the 32k-sync
-as we only have one gptimer in the wake-up domain.
-
-Cheers
-Jon
+Thanks for testing, I was able to reproduce the problem.  It is easily
+fixed by replacing page_to_pfn(virt_to_page(x)) with
+__phys_to_pfn(__virt_to_phys(x)) to avoid touching the page structs at
+all.
