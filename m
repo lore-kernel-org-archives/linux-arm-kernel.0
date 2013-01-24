@@ -1,42 +1,55 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 24 Jan 2013 10:56:53 -0700
-Subject: [PATCH v2 1/1 net-next] net: fec: add napi support to improve
- proformance
-In-Reply-To: <1359014309-8636-1-git-send-email-Frank.Li@freescale.com>
-References: <1359014309-8636-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <510175E5.4000306@boundarydevices.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 24 Jan 2013 10:12:49 -0800
+Subject: [PATCH 1/4] clk: Introduce optional is_prepared callback
+In-Reply-To: <1359045956-30741-2-git-send-email-ulf.hansson@stericsson.com>
+References: <1359045956-30741-1-git-send-email-ulf.hansson@stericsson.com>
+ <1359045956-30741-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20130124181249.10623.14484@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/24/2013 12:58 AM, Frank Li wrote:
-> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> index f52ba33..39be2ab 100644
-> --- a/drivers/net/ethernet/freescale/fec.c
-> +++ b/drivers/net/ethernet/freescale/fec.c
-> @@ -67,6 +67,7 @@
->   #endif
->   
->   #define DRIVER_NAME	"fec"
-> +#define FEC_NAPI_WEIGHT	64
->   
->   /* Pause frame feild and FIFO threshold */
->   #define FEC_ENET_FCE	(1 << 5)
-> @@ -565,6 +566,20 @@ fec_timeout(struct net_device *ndev)
->   }
->   
->   static void
-> +fec_enet_rx_int_is_enabled(struct net_device *ndev, bool enabled)
+Quoting Ulf Hansson (2013-01-24 08:45:53)
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> To reflect whether a clk_hw is prepared the clk_hw may implement
+> the optional is_prepared callback. If not implemented we fall back
+> to use the software prepare counter.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/clk/clk.c            |   21 +++++++++++++++++++++
+>  include/linux/clk-provider.h |    6 ++++++
+>  2 files changed, 27 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 593a2e4..deb259a 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -458,6 +458,27 @@ unsigned long __clk_get_flags(struct clk *clk)
+>         return !clk ? 0 : clk->flags;
+>  }
+>  
+> +bool __clk_is_prepared(struct clk *clk)
 > +{
-> +	struct fec_enet_private *fep = netdev_priv(ndev);
-> +	uint    int_events;
+> +       int ret;
 > +
-> +	int_events = readl(fep->hwp + FEC_IMASK);
-> +	if (enabled)
-> +		int_events |= FEC_ENET_RXF;
-> +	else
-> +		int_events &= ~FEC_ENET_RXF;
-> +	writel(int_events, fep->hwp + FEC_IMASK);
-> +}
+> +       if (!clk)
+> +               return false;
+> +
+> +       /*
+> +        * .is_prepared is optional for clocks that can prepare
+> +        * fall back to software usage counter if it is missing
+> +        */
 
-fec_enet_rx_int_is_enabled looks like a question.
-fec_enet_rx_int_enable would be a better name
+Why not make it mandatory?  This could be as simple as saying "it is
+mandatory", or we could even enforce a check in clk_init, though the
+latter suggestion would be noisy until existing clock providers were
+updated.
+
+Note that .is_enabled is technically mandatory for any clock that
+implements .enable/.disable but there is no check for compliance.  It is
+only in Documentation/clk.txt and the kerneldoc.
+
+Regards,
+Mike
