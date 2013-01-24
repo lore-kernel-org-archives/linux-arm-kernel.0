@@ -1,29 +1,25 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Jan 2013 11:03:14 +0530
-Subject: [PATCH 4/4] irqchip: gic: Perform the gic_secondary_init() call
- via CPU notifier
-In-Reply-To: <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
-References: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
- <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
-Message-ID: <5100C79A.1080305@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 24 Jan 2013 14:07:47 +0800
+Subject: [PATCH] ARM: mxs: dt: Add Crystalfontz CFA-10037 device tree
+ support
+In-Reply-To: <1358872551-14490-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1358872551-14490-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130124060744.GA16959@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 January 2013 11:29 PM, Catalin Marinas wrote:
-> All the calls to gic_secondary_init() pass 0 as the first argument.
-> Since this function is called on each CPU when starting, it can be done
-> in a platform-independent way via a CPU notifier registered by the GIC
-> code.
->
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-
-[..]
-
+On Tue, Jan 22, 2013 at 05:35:51PM +0100, Maxime Ripard wrote:
+> The CFA-10037 is another expansion board for the CFA-10036 module, with
+> only a USB Host, a Ethernet device and a lot of gpios.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->
-Nice to see GIC is converted as well like timers. The trick
-as you mentioned about higher priority of GIC than timer
-is key for correct initialization of secondary CPUs.
+>  arch/arm/boot/dts/imx28-cfa10037.dts |   77 ++++++++++++++++++++++++++++++++++
 
-For OMAP changes and the series,
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Please add the dtb target into arch/arm/boot/dts/Makfile.
+
+Shawn
+
+>  arch/arm/mach-mxs/mach-mxs.c         |    8 ++++
+>  2 files changed, 85 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx28-cfa10037.dts
