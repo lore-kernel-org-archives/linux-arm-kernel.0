@@ -1,81 +1,42 @@
 From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Thu, 24 Jan 2013 16:25:19 +0530
-Subject: [PATCH 5/6] ARM: regulator: add tps6507x device tree data
+Date: Thu, 24 Jan 2013 16:25:15 +0530
+Subject: [PATCH 1/6] ARM: davinci: da850: add OF_DEV_AUXDATA entry for I2C0
 In-Reply-To: <1359024920-32190-1-git-send-email-manishv.b@ti.com>
 References: <1359024920-32190-1-git-send-email-manishv.b@ti.com>
-Message-ID: <1359024920-32190-6-git-send-email-manishv.b@ti.com>
+Message-ID: <1359024920-32190-2-git-send-email-manishv.b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree data for tps6507x regulator by adding
-all tps6507x regulator nodes. Regulators are initialized
-based on compatible name provided in tps6507x DT file.
-
-All tps6507x PMIC regulator device tree nodes are placed
-in a separate device tree include file (tps6507x.dtsi).
-tps6507x.dtsi file is created using datasheet
-http://www.ti.com/lit/ds/symlink/tps65070.pdf
-
-Tested on da850-evm.
+Add OF_DEV_AUXDATA for I2C0 controller driver in da850 board
+dt file to use I2C0 clock.
 
 Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
 ---
- arch/arm/boot/dts/tps6507x.dtsi |   47 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 47 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/tps6507x.dtsi
+ arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tps6507x.dtsi b/arch/arm/boot/dts/tps6507x.dtsi
-new file mode 100644
-index 0000000..4ae483e
---- /dev/null
-+++ b/arch/arm/boot/dts/tps6507x.dtsi
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * Integrated Power Management Chip
-+ * http://www.ti.com/lit/ds/symlink/tps65070.pdf
-+ */
-+
-+&tps {
-+	compatible = "ti,tps6507x";
-+
-+	regulators {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vdcdc1_reg: regulator at 0 {
-+			reg = <0>;
-+			regulator-compatible = "VDCDC1";
-+		};
-+
-+		vdcdc2_reg: regulator at 1 {
-+			reg = <1>;
-+			regulator-compatible = "VDCDC2";
-+		};
-+
-+		vdcdc3_reg: regulator at 2 {
-+			reg = <2>;
-+			regulator-compatible = "VDCDC3";
-+		};
-+
-+		ldo1_reg: regulator at 3 {
-+			reg = <3>;
-+			regulator-compatible = "LDO1";
-+		};
-+
-+		ldo2_reg: regulator at 4 {
-+			reg = <4>;
-+			regulator-compatible = "LDO2";
-+		};
-+
-+	};
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 37c27af..100d644 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
+ 	of_irq_init(da8xx_irq_match);
+ }
+ 
++struct of_dev_auxdata da850_evm_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
++	{}
 +};
++
+ #ifdef CONFIG_ARCH_DAVINCI_DA850
+ 
+ static void __init da850_init_machine(void)
+ {
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table,
++				da850_evm_auxdata_lookup, NULL);
+ 
+ 	da8xx_uart_clk_enable();
+ }
 -- 
 1.7.4.1
