@@ -1,172 +1,63 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Thu, 24 Jan 2013 18:46:48 +0000
-Subject: [PATCH v8 0/3] Cortex-M3 series once more
-In-Reply-To: <1358413196-5609-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1358413196-5609-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <51018198.8000407@arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 24 Jan 2013 10:49:44 -0800
+Subject: [PATCH 0/4] clk: Provide option to unprepare unused clocks at
+ late init
+In-Reply-To: <1359045956-30741-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1359045956-30741-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20130124184944.10623.20870@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Quoting Ulf Hansson (2013-01-24 08:45:52)
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> The disable_unused sequence executed at late init, is already handling the
+> fast unused ungated clocks to be gated. This patchset extends this sequence to
+> include the slow unused prepared clocks to be unprepared.
+> 
+> The default behavior will not change in this patchset. To unprepare unused
+> clocks during the disable_unused sequence, the clk_hw needs to implement
+> the new optional callback, is_prepared.
+> 
+> The motivation for this patchset is to save power. Clocks that is from
+> bootloaders prepared|enabled, but not used should be unprepared|disabled.
+> 
+> Patch 4 is specific for ux500, which implements the is_prepared callback
+> for it's PRMCU clocks.
+> 
+> Note that patch 1-3 has been sent earlier, but since a proof of concept
+> patch could be useful, as patch 4 is, the hole patchset is resent.
+> 
 
-On 17/01/13 08:59, Uwe Kleine-K?nig wrote:
-> Based on Jonny's comments I changed a few more details. The diff to v7
-> can be found below after the diffstat. These are:
->
->   - describe why a #define for cr_alignment is OK in both the
->     commit log and a comment in the header file
->   - a work around for errata 752419 that newer gcc warns about
->   - add a few more comments for better readability
->   - a whitespace fix
->
+Hi Ulf,
 
-Thanks for making these changes.
+I had some minor discussion in patch #1.  Otherwise patches #2 & #3 look
+good to me.
 
-As you will see I've now reviewed the other to patches in the series and 
-there are quite a few smaller things in there...
+Patch #4 is a bit interesting.  There is nothing wrong with it per se,
+but the general layering of the prcmu power stuff is the opposite of how
+I had envisioned things.  Your .prepare callback is making calls to some
+pm_qos api but a quick grep did not reveal any definitions for those
+functions, just some stubs in include/linux/mfd/dbx500-prcmu.h.
 
-> I think the updates are minor enough to still allow the patches to go
-> into v3.9-rc1. Russell, what do you think? You can pull them from
->
+Do these functions scale voltage?  I had figured that some day
+per-device pm qos apis would call the clk api, not the other way around.
 
-I think we should assess this once you've responded to the review of the 
-other two patches.
+Anyways that is just food for thought and no reason to block patch #4.
 
-As far as merging these patches go, as well as the review comments on 
-each patch, I still have the same reservations that I raised around v6 
-of these about the fact that NVIC support and a platform are missing. 
-This means there's no way to actually *use* the V7M code. I understand 
-that you're prepared to commit to getting this in shape and ready to be 
-merged once the base support goes in - is that right?
+Regards,
+Mike
 
-What sort of time-frame do you expect to be able to do this in?
-
-I'm happy to help review/work on NVIC support if you need more eyes (and 
-perhaps even minds!) on the problem, as well as test on the efm32 board.
-
-> 	git://git.pengutronix.de/git/ukl/linux.git for-next
->
-> still based on v3.7-rc1 + your commit "ARM: fix oops on initial entry to
-> userspace with Thumb2 kernels".
-
-Does it trivially re-base to v3.8-rc4?
-
->
-> Catalin Marinas (1):
->    Cortex-M3: Add base support for Cortex-M3
->
-> Uwe Kleine-K?nig (2):
->    ARM: make cr_alignment read-only #ifndef CONFIG_CPU_CP15
->    Cortex-M3: Add support for exception handling
->
->   arch/arm/include/asm/assembler.h   |   13 ++-
->   arch/arm/include/asm/cp15.h        |   16 +++-
->   arch/arm/include/asm/cputype.h     |    3 +
->   arch/arm/include/asm/glue-cache.h  |   25 ++++++
->   arch/arm/include/asm/glue-df.h     |    8 ++
->   arch/arm/include/asm/glue-proc.h   |    9 ++
->   arch/arm/include/asm/irqflags.h    |   22 +++--
->   arch/arm/include/asm/processor.h   |    7 ++
->   arch/arm/include/asm/ptrace.h      |    8 ++
->   arch/arm/include/asm/system_info.h |    1 +
->   arch/arm/include/uapi/asm/ptrace.h |   36 ++++++--
->   arch/arm/kernel/asm-offsets.c      |    3 +
->   arch/arm/kernel/entry-common.S     |    4 +
->   arch/arm/kernel/entry-header.S     |  148 +++++++++++++++++++++++++++++++++
->   arch/arm/kernel/entry-v7m.S        |  134 ++++++++++++++++++++++++++++++
->   arch/arm/kernel/head-common.S      |    9 +-
->   arch/arm/kernel/head-nommu.S       |    9 +-
->   arch/arm/kernel/process.c          |    4 +
->   arch/arm/kernel/ptrace.c           |    3 +
->   arch/arm/kernel/setup.c            |   13 ++-
->   arch/arm/kernel/traps.c            |    2 +
->   arch/arm/mm/alignment.c            |    2 +
->   arch/arm/mm/mmu.c                  |   17 ++++
->   arch/arm/mm/nommu.c                |    2 +
->   arch/arm/mm/proc-v7m.S             |  161 ++++++++++++++++++++++++++++++++++++
->   25 files changed, 637 insertions(+), 22 deletions(-)
->   create mode 100644 arch/arm/kernel/entry-v7m.S
->   create mode 100644 arch/arm/mm/proc-v7m.S
->
-> The incremental changes since v7 are:
->
-> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-> index d814435..1f3262e 100644
-> --- a/arch/arm/include/asm/cp15.h
-> +++ b/arch/arm/include/asm/cp15.h
-> @@ -86,6 +86,11 @@ static inline void set_copro_access(unsigned int val)
->
->   #else /* ifdef CONFIG_CPU_CP15 */
->
-> +/*
-> + * cr_alignment and cr_no_alignment are tightly coupled to cp15 (at least in the
-> + * minds of the developers). Yielding 0 for machines without a cp15 (and making
-> + * it read-only) is fine for most cases and saves quite some #ifdeffery.
-> + */
->   #define cr_no_alignment	UL(0)
->   #define cr_alignment	UL(0)
->
-> diff --git a/arch/arm/include/uapi/asm/ptrace.h b/arch/arm/include/uapi/asm/ptrace.h
-> index 2ae7d1b..d3be66e 100644
-> --- a/arch/arm/include/uapi/asm/ptrace.h
-> +++ b/arch/arm/include/uapi/asm/ptrace.h
-> @@ -144,7 +144,7 @@ struct pt_regs {
->   #define ARM_r1		uregs[1]
->   #define ARM_r0		uregs[0]
->   #define ARM_ORIG_r0	uregs[17]
-> -#define ARM_EXC_RET    uregs[18]
-> +#define ARM_EXC_RET	uregs[18]
->
->   /*
->    * The size of the user-visible VFP state as seen by PTRACE_GET/SETVFPREGS
-> diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-> index a0991dc..842394c 100644
-> --- a/arch/arm/kernel/entry-v7m.S
-> +++ b/arch/arm/kernel/entry-v7m.S
-> @@ -102,8 +102,8 @@ ENTRY(__switch_to)
->   	mov	ip, r4
->   	mov	r0, r5
->   	ldmia	ip!, {r4 - r11}		@ Load all regs saved previously
-> -	ldr	sp, [ip], #4
-> -	ldr	pc, [ip]
-> +	ldr	sp, [ip]
-> +	ldr	pc, [ip, #4]!
->   	.fnend
->   ENDPROC(__switch_to)
->
-> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-> index 2f560c5..5b391a6 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -117,7 +117,7 @@ __mmap_switched_data:
->   #ifdef CONFIG_CPU_CP15
->   	.long	cr_alignment			@ r7
->   #else
-> -	.long	0
-> +	.long	0				@ r7
->   #endif
->   	.long	init_thread_union + THREAD_START_SP @ sp
->   	.size	__mmap_switched_data, . - __mmap_switched_data
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index b675918..92abdb8 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -196,7 +196,7 @@ void adjust_cr(unsigned long mask, unsigned long set)
->   }
->   #endif
->
-> -#else
-> +#else /* ifdef CONFIG_CPU_CP15 */
->
->   static int __init early_cachepolicy(char *p)
->   {
-> @@ -210,7 +210,7 @@ static int __init noalign_setup(char *__unused)
->   }
->   __setup("noalign", noalign_setup);
->
-> -#endif
-> +#endif /* ifdef CONFIG_CPU_CP15 / else */
->
->   #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
->   #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
->
+> Ulf Hansson (4):
+>   clk: Introduce optional is_prepared callback
+>   clk: Unprepare the unused prepared slow clocks at late init
+>   clk: Introduce optional unprepare_unused callback
+>   clk: ux500: Support is_prepared callback for clk-prcmu
+> 
+>  drivers/clk/clk.c             |   53 ++++++++++++++++
+>  drivers/clk/ux500/clk-prcmu.c |  134 ++++++++++++++++++++++++-----------------
+>  include/linux/clk-provider.h  |   11 ++++
+>  3 files changed, 144 insertions(+), 54 deletions(-)
+> 
+> -- 
+> 1.7.10
