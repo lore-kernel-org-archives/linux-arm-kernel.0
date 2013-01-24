@@ -1,42 +1,37 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 24 Jan 2013 10:44:13 +0530
-Subject: [PATCH v5 00/14] DMA Engine support for AM33XX
-In-Reply-To: <20130123213736.GC5256@beef>
-References: <1358281974-8411-1-git-send-email-mporter@ti.com>
- <50FEB6B2.5020303@ti.com> <20130123022133.GA5727@opensource.wolfsonmicro.com>
- <20130123213736.GC5256@beef>
-Message-ID: <5100C325.6020102@ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Thu, 24 Jan 2013 13:27:31 +0800
+Subject: [PATCH] ARM:plat-s3c24xx: for memcpy, reading more things out of
+ boundary
+Message-ID: <5100C643.5010101@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt,
 
-On 1/24/2013 3:07 AM, Matt Porter wrote:
-> On Wed, Jan 23, 2013 at 10:21:42AM +0800, Mark Brown wrote:
->> On Tue, Jan 22, 2013 at 09:26:34PM +0530, Sekhar Nori wrote:
->>> On 1/16/2013 2:02 AM, Matt Porter wrote:
->>
->>>> This series adds DMA Engine support for AM33xx, which uses
->>>> an EDMA DMAC. The EDMA DMAC has been previously supported by only
->>>> a private API implementation (much like the situation with OMAP
->>>> DMA) found on the DaVinci family of SoCs.
->>
->>> Will you take this series through the OMAP tree? Only 1/14 touches
->>> mach-davinci and I am mostly okay with it except some changes I just
->>> requested Matt to make in another thread.
->>
->> Is this series somewhere near actually getting merged then? It seemed
->> like there was lots of stuff going on.
-> 
-> The issues raised by Sekhar and Santosh were reasonably minor and will
-> be addressed. My major concern is that the dependency on some api to
-> fetch dmaengine driver SG limitations is not resolved. That's being
-> discussed in https://lkml.org/lkml/2013/1/10/432
+  the size is made by "plls_no + 1".
+  so when copy from original buffer, need dec 1, or reading out of boundary.
 
-It might be worth posting the patches which don't have dependencies and
-are ready for acceptance as a separate series. That way at least some of
-these patches have a good chance of getting into v3.9 if not the entire
-series.
+additional info:
+  plls_no is ARRARY_SIZE(plls).
 
-Thanks,
-Sekhar
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/plat-s3c24xx/cpu-freq.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/plat-s3c24xx/cpu-freq.c b/arch/arm/plat-s3c24xx/cpu-freq.c
+index 4680799..df093b2 100644
+--- a/arch/arm/plat-s3c24xx/cpu-freq.c
++++ b/arch/arm/plat-s3c24xx/cpu-freq.c
+@@ -700,7 +700,8 @@ int __init s3c_plltab_register(struct cpufreq_frequency_table *plls,
+ 
+ 	vals = kmalloc(size, GFP_KERNEL);
+ 	if (vals) {
+-		memcpy(vals, plls, size);
++		memcpy(vals, plls,
++			size - sizeof(struct cpufreq_frequency_table));
+ 		pll_reg = vals;
+ 
+ 		/* write a terminating entry, we don't store it in the
+-- 
+1.7.10.4
