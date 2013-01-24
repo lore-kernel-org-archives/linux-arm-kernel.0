@@ -1,10 +1,10 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 24 Jan 2013 17:45:53 +0200
-Subject: [RFC/PATCH 15/32] usb: gadget: lpc32xx_udc: let udc-core manage
+Date: Thu, 24 Jan 2013 17:45:51 +0200
+Subject: [RFC/PATCH 13/32] usb: gadget: goku_udc: let udc-core manage
  gadget->dev
 In-Reply-To: <1359042370-4358-1-git-send-email-balbi@ti.com>
 References: <1359042370-4358-1-git-send-email-balbi@ti.com>
-Message-ID: <1359042370-4358-16-git-send-email-balbi@ti.com>
+Message-ID: <1359042370-4358-14-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,51 +13,62 @@ boilerplate code.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/usb/gadget/lpc32xx_udc.c | 11 +----------
- 1 file changed, 1 insertion(+), 10 deletions(-)
+ drivers/usb/gadget/goku_udc.c | 10 +---------
+ drivers/usb/gadget/goku_udc.h |  3 +--
+ 2 files changed, 2 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/usb/gadget/lpc32xx_udc.c b/drivers/usb/gadget/lpc32xx_udc.c
-index dd1c9b1..077e021 100644
---- a/drivers/usb/gadget/lpc32xx_udc.c
-+++ b/drivers/usb/gadget/lpc32xx_udc.c
-@@ -3090,6 +3090,7 @@ static int __init lpc32xx_udc_probe(struct platform_device *pdev)
+diff --git a/drivers/usb/gadget/goku_udc.c b/drivers/usb/gadget/goku_udc.c
+index 85742d4..b4ea2cf 100644
+--- a/drivers/usb/gadget/goku_udc.c
++++ b/drivers/usb/gadget/goku_udc.c
+@@ -1716,8 +1716,6 @@ static void goku_remove(struct pci_dev *pdev)
+ 				pci_resource_len (pdev, 0));
+ 	if (dev->enabled)
+ 		pci_disable_device(pdev);
+-	if (dev->registered)
+-		device_unregister(&dev->gadget.dev);
  
- 	/* init software state */
- 	udc->gadget.dev.parent = dev;
-+	udc->gadget.register_my_device = true;
- 	udc->pdev = pdev;
- 	udc->dev = &pdev->dev;
- 	udc->enabled = 0;
-@@ -3248,12 +3249,6 @@ static int __init lpc32xx_udc_probe(struct platform_device *pdev)
- 	udc_disable(udc);
- 	udc_reinit(udc);
+ 	pci_set_drvdata(pdev, NULL);
+ 	dev->regs = NULL;
+@@ -1756,11 +1754,11 @@ static int goku_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 	dev->gadget.max_speed = USB_SPEED_FULL;
  
--	retval = device_register(&udc->gadget.dev);
--	if (retval < 0) {
--		dev_err(udc->dev, "Device registration failure\n");
--		goto dev_register_fail;
+ 	/* the "gadget" abstracts/virtualizes the controller */
+-	dev_set_name(&dev->gadget.dev, "gadget");
+ 	dev->gadget.dev.parent = &pdev->dev;
+ 	dev->gadget.dev.dma_mask = pdev->dev.dma_mask;
+ 	dev->gadget.dev.release = gadget_release;
+ 	dev->gadget.name = driver_name;
++	dev->gadget.register_my_device = true;
+ 
+ 	/* now all the pci goodies ... */
+ 	retval = pci_enable_device(pdev);
+@@ -1810,12 +1808,6 @@ static int goku_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 	create_proc_read_entry(proc_node_name, 0, NULL, udc_proc_read, dev);
+ #endif
+ 
+-	retval = device_register(&dev->gadget.dev);
+-	if (retval) {
+-		put_device(&dev->gadget.dev);
+-		goto err;
 -	}
--
- 	/* Request IRQs - low and high priority USB device IRQs are routed to
- 	 * the same handler, while the DMA interrupt is routed elsewhere */
- 	retval = request_irq(udc->udp_irq[IRQ_USB_LP], lpc32xx_usb_lp_irq,
-@@ -3320,8 +3315,6 @@ irq_dev_fail:
- irq_hp_fail:
- 	free_irq(udc->udp_irq[IRQ_USB_LP], udc);
- irq_lp_fail:
--	device_unregister(&udc->gadget.dev);
--dev_register_fail:
- 	dma_pool_destroy(udc->dd_cache);
- dma_alloc_fail:
- 	dma_free_coherent(&pdev->dev, UDCA_BUFF_SIZE,
-@@ -3376,8 +3369,6 @@ static int lpc32xx_udc_remove(struct platform_device *pdev)
- 	free_irq(udc->udp_irq[IRQ_USB_HP], udc);
- 	free_irq(udc->udp_irq[IRQ_USB_LP], udc);
+-	dev->registered = 1;
+ 	retval = usb_add_gadget_udc(&pdev->dev, &dev->gadget);
+ 	if (retval)
+ 		goto err;
+diff --git a/drivers/usb/gadget/goku_udc.h b/drivers/usb/gadget/goku_udc.h
+index b4470d2..86d2ada 100644
+--- a/drivers/usb/gadget/goku_udc.h
++++ b/drivers/usb/gadget/goku_udc.h
+@@ -250,8 +250,7 @@ struct goku_udc {
+ 					got_region:1,
+ 					req_config:1,
+ 					configured:1,
+-					enabled:1,
+-					registered:1;
++					enabled:1;
  
--	device_unregister(&udc->gadget.dev);
--
- 	clk_disable(udc->usb_otg_clk);
- 	clk_put(udc->usb_otg_clk);
- 	clk_disable(udc->usb_slv_clk);
+ 	/* pci state used to access those endpoints */
+ 	struct pci_dev			*pdev;
 -- 
 1.8.1.rc1.5.g7e0651a
