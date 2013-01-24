@@ -1,26 +1,69 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 24 Jan 2013 13:21:14 +0100
-Subject: [PATCH 0/2] ARM: dts: omap3-overo: Add pwm-leds and audio support
-In-Reply-To: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <5101273A.9090800@ti.com>
+From: rcsekar@samsung.com (R. Chandrasekar)
+Date: Thu, 24 Jan 2013 18:05:30 +0530
+Subject: [PATCH] Asoc: Samsung: Add support for I2S runtime S2R
+Message-ID: <1359030931-27354-1-git-send-email-rcsekar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Peter who did the original PWM
+From: "R. Chandrasekar" <rcsekar@samsung.com>
 
-Hi Florian,
+This patch adds runtime suspend to resume support for I2S.
 
-On 01/23/2013 06:56 PM, Florian Vaussard wrote:
-> Hello Benoit,
-> 
-> This patchset adds some new DT supports to the Overo products.
-> The first patch converts the PMIC LEDB output to use the pwm-leds,
-> newly merged in your branch for_3.9/dts. The second patch
-> adds the audio support.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Signed-off-by: R. Chandrasekar <rcsekar@samsung.com>
+---
+ sound/soc/samsung/i2s.c |   26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-Excellent, that looks very good to me, but I'd like to get the feedback
-from Peter before merging it.
-
-Thanks,
-Benoit
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index d2d124f..27a5ab1 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -993,6 +993,26 @@ static struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
+ 	return i2s;
+ }
+ 
++#ifdef CONFIG_PM_RUNTIME
++static int i2s_runtime_suspend(struct device *dev)
++{
++	struct i2s_dai *i2s = dev_get_drvdata(dev);
++
++	clk_disable_unprepare(i2s->clk);
++
++	return 0;
++}
++
++static int i2s_runtime_resume(struct device *dev)
++{
++	struct i2s_dai *i2s = dev_get_drvdata(dev);
++
++	clk_prepare_enable(i2s->clk);
++
++	return 0;
++}
++#endif /* CONFIG_PM_RUNTIME */
++
+ static int samsung_i2s_probe(struct platform_device *pdev)
+ {
+ 	u32 dma_pl_chan, dma_cp_chan, dma_pl_sec_chan;
+@@ -1143,12 +1163,18 @@ static int samsung_i2s_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct dev_pm_ops samsung_i2s_pm = {
++	SET_RUNTIME_PM_OPS(i2s_runtime_suspend,
++				i2s_runtime_resume, NULL)
++};
++
+ static struct platform_driver samsung_i2s_driver = {
+ 	.probe  = samsung_i2s_probe,
+ 	.remove = samsung_i2s_remove,
+ 	.driver = {
+ 		.name = "samsung-i2s",
+ 		.owner = THIS_MODULE,
++		.pm = &samsung_i2s_pm,
+ 	},
+ };
+ 
+-- 
+1.7.9.5
