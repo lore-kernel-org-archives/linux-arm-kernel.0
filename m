@@ -1,43 +1,60 @@
-From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Thu, 24 Jan 2013 14:08:15 +0530
-Subject: [PATCH 2/2] ARM: davinci: da850: add wdt OF_DEV_AUXDATA entry
-In-Reply-To: <1359016695-10362-1-git-send-email-anilkumar.v@ti.com>
-References: <1359016695-10362-1-git-send-email-anilkumar.v@ti.com>
-Message-ID: <1359016695-10362-3-git-send-email-anilkumar.v@ti.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 24 Jan 2013 09:43:02 +0100
+Subject: [PATCH] i2c: at91: add of_device_id entry for at91rm9200
+In-Reply-To: <5100E9A4.9020804@atmel.com>
+References: <1354743732-11581-1-git-send-email-manabian@gmail.com>
+ <20121218060232.GL23971@game.jcrosoft.org>
+ <20130124072714.GH8364@nekote.pengutronix.de>
+ <5100E9A4.9020804@atmel.com>
+Message-ID: <CAGhQ9VxRrPOOQKragU=zSW-FPYdsmUEqY7k_fNHZVEM18zXvCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OF_DEV_AUXDATA for wdt driver in da850 board dt
-file to use wdt clock.
+On 24 January 2013 08:58, ludovic.desroches <ludovic.desroches@atmel.com> wrote:
+> Hi,
+>
+>
+> On 01/24/2013 08:27 AM, Wolfram Sang wrote:
+>>
+>> On Tue, Dec 18, 2012 at 07:02:32AM +0100, Jean-Christophe PLAGNIOL-VILLARD
+>> wrote:
+>>>
+>>> On 22:42 Wed 05 Dec     , Joachim Eastwood wrote:
+>>>>
+>>>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>>>> ---
+>>>> Hi,
+>>>>
+>>>> AT91RM9200 is gaining DT support now so let's add an id to the i2c
+>>>> driver.
+>>>>
+>>>> Tested on custom RM9200 board. Since the driver doesn't support pinctrl
+>>>> muxing yet I had to add pinctrl hogs for the i2c pins in my dts for it
+>>>> to work.
+>>>
+>>>
+>>> IIRC the i2c IP have quite a lots of issue on rm9200 and until sam9g45
+>>>
+>>> it not recommended to use it instead use i2c-gpio
+>>
+>>
+>> Ludovic, you know the driver best. Does it make sense to add this?
+>
+>
+> I didn't add this when I did the rework because there was no DT tree support
+> for RM9200. The configuration for RM9200 IP is already in the driver and
+> used for non DT platform so I think it makes sense to add this.
+>
+> But as Jean-Christophe said, it's recommended to use the i2c-gpio driver
+> since we know the first versions of the IP have several issues. However if
+> it fits user usage, it is not forbidden to use it.
 
-Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
----
-:100644 100644 37c27af... 1b295d2... M	arch/arm/mach-davinci/da8xx-dt.c
- arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+I assumed the new driver handles the HW quirks better than the old atmel-twi
+driver(?). So the RM9200 i2c HW is at least usable with this driver.
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 37c27af..1b295d2 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
- 	of_irq_init(da8xx_irq_match);
- }
- 
-+struct of_dev_auxdata da850_evm_auxdata_lookup[] __initdata = {
-+	OF_DEV_AUXDATA("ti,davinci-wdt", 0x1c21000, "watchdog", NULL),
-+	{}
-+};
-+
- #ifdef CONFIG_ARCH_DAVINCI_DA850
- 
- static void __init da850_init_machine(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			da850_evm_auxdata_lookup, NULL);
- 
- 	da8xx_uart_clk_enable();
- }
--- 
-1.7.4.1
+I didn't encounter any problems during my short testing using a couple of
+different i2c devices. As far as I can remember the old driver didn't even
+handle the devices I tested with the new driver.
+
+regards
+Joachim Eastwood
