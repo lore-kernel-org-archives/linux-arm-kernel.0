@@ -1,38 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 24 Jan 2013 15:35:39 +0100
-Subject: [kvmarm] [GIT PULL] KVM/ARM core implementation
-In-Reply-To: <CANM98qLq5wfuUWHmjn_SHG=f1O9kG_cgwpA2VfOy5y4t0m-52Q@mail.gmail.com>
-References: <CANM98qLq5wfuUWHmjn_SHG=f1O9kG_cgwpA2VfOy5y4t0m-52Q@mail.gmail.com>
-Message-ID: <6686cc0110a04573c650fc03a0f42017@localhost>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 24 Jan 2013 09:37:36 -0500
+Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
+In-Reply-To: <51013933.9020601@openwrt.org>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <ecb64cdf824399badaf9d659177811d8cb091156.1358983578.git.jason@lakedaemon.net>
+ <51013933.9020601@openwrt.org>
+Message-ID: <20130124143736.GZ1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Jan 2013 14:22:23 -0500, Christoffer Dall
-<c.dall@virtualopensystems.com> wrote:
-> Hi Will,
+On Thu, Jan 24, 2013 at 02:37:55PM +0100, Florian Fainelli wrote:
+> Hello Jason,
 > 
-> I've prepared a stable branch for you, for-will/kvm/core, based on
-> your stable perf branch.
+> On 01/24/2013 12:34 AM, Jason Cooper wrote:
+> >replace a lot of unneeded code and files with a lookup table.
 > 
-> Since the last patch series, I've addressed the reviewer comments, and
-> rev'ed KVM_CAP_ARM_PSCI to 87, since 86 is already used by PPC in
-> kvm/next.
-> 
-> kvmtool should probably be updated acoordingly.
-> 
-> I rebased the VGIC and the Arch. Timers series on the stable branch
-> and made these available in kvm/vgic and kvm/vgic-timers,
-> respectively. These branches are, however, not yet stable.
+> Would not it be better to keep all of this as-is and merge/improve
+> Ian's mv643xx_eth device tree bindings [1], and then only remove
+> these files? It is just 81 new lines, so it is not a big deal, just
+> wondering here what is best.
 
-FWIW, I've now created a kvm-arm/vgic branch, based on for-will/kvm/core
-and arm-soc's irqchip/gic-vic-move.
+I agree, however, there is a long history with that patch.  That driver
+has been in use by powerpc for many years.  We need to be mindful not to
+break existing installations.  I don't think it'll be ready in time for
+v3.9.  So, I'd like to do the cleanup now.
 
-Not much has changed, apart from the obvious include paths and an
-additional guard in arm-gic.h. This should definitely be stable now.
+thx,
 
-The timer code is currently blocked by the lack of a stable branch for the
-broadcast stuff.
+Jason.
 
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+> [1]: http://patchwork.ozlabs.org/patch/175652/
