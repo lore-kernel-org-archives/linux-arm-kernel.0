@@ -1,37 +1,35 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 24 Jan 2013 13:27:31 +0800
-Subject: [PATCH] ARM:plat-s3c24xx: for memcpy, reading more things out of
- boundary
-Message-ID: <5100C643.5010101@asianux.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 24 Jan 2013 11:02:09 +0530
+Subject: [PATCH 2/4] arm: Move chained_irq_(enter|exit) to a generic file
+In-Reply-To: <1358963974-5496-3-git-send-email-catalin.marinas@arm.com>
+References: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
+ <1358963974-5496-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <5100C759.4070503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 23 January 2013 11:29 PM, Catalin Marinas wrote:
+> These functions have been introduced by commit 10a8c383 (irq: introduce
+> entry and exit functions for chained handlers) in asm/mach/irq.h. This
+> patch moves them to linux/irqchip/chained_irq.h so that generic irqchip
+> drivers do not rely on architecture specific header files.
+>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> ---
 
-  the size is made by "plls_no + 1".
-  so when copy from original buffer, need dec 1, or reading out of boundary.
+[..]
 
-additional info:
-  plls_no is ARRARY_SIZE(plls).
-
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/plat-s3c24xx/cpu-freq.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/plat-s3c24xx/cpu-freq.c b/arch/arm/plat-s3c24xx/cpu-freq.c
-index 4680799..df093b2 100644
---- a/arch/arm/plat-s3c24xx/cpu-freq.c
-+++ b/arch/arm/plat-s3c24xx/cpu-freq.c
-@@ -700,7 +700,8 @@ int __init s3c_plltab_register(struct cpufreq_frequency_table *plls,
- 
- 	vals = kmalloc(size, GFP_KERNEL);
- 	if (vals) {
--		memcpy(vals, plls, size);
-+		memcpy(vals, plls,
-+			size - sizeof(struct cpufreq_frequency_table));
- 		pll_reg = vals;
- 
- 		/* write a terminating entry, we don't store it in the
--- 
-1.7.10.4
+> diff --git a/include/linux/irqchip/chained_irq.h b/include/linux/irqchip/chained_irq.h
+> new file mode 100644
+> index 0000000..adf4c30
+> --- /dev/null
+> +++ b/include/linux/irqchip/chained_irq.h
+> @@ -0,0 +1,52 @@
+> +/*
+> + * Chained IRQ handlers support.
+> + *
+> + * Copyright (C) 2011 ARM Ltd.
+2013 now ;)
