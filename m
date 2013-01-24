@@ -1,23 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 24 Jan 2013 08:32:51 -0800
-Subject: [GIT PULL] vexpress: fixes for v3.8-rc5
-In-Reply-To: <1359031777.26878.49.camel@hornet>
-References: <1359031777.26878.49.camel@hornet>
-Message-ID: <CAOesGMhGUzKoqjQLkiQLR7UNeAhWv0KNeLwtpC9uPWreeQ97hg@mail.gmail.com>
+Date: Thu, 24 Jan 2013 08:33:42 -0800
+Subject: [GIT PULL] at91: fixes for 3.8-rc5
+In-Reply-To: <5100FA77.3020405@atmel.com>
+References: <5100FA77.3020405@atmel.com>
+Message-ID: <CAOesGMjvE30TDVGVr8_0cjSTze1ouZFcvu7or4tM1vCuaZfTDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 4:49 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> Hi Arnd, Olof,
+On Thu, Jan 24, 2013 at 1:10 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Arnd, Olof,
 >
-> Could you, please, pull this small series of VE fixes for v3.8-rc5? It:
->
-> * makes the V2P-CA15_A7 (a.k.a. TC2) work with 3.8 kernels
-> * improves vexpress-sysreg.c behaviour on arm64 platforms
->
-> Thanks!
->
-> Pawel
+> Here is the pull request related to the fixes series that I sent
+> earlier this week. Changes are obvious and are very constrained in
+> AT91-related material.
 >
 > The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
 >
@@ -25,11 +20,9 @@ On Thu, Jan 24, 2013 at 4:49 AM, Pawel Moll <pawel.moll@arm.com> wrote:
 >
 > are available in the git repository at:
 >
->   git://git.linaro.org/people/pawelmoll/linux.git vexpress/fixes
+>   git://github.com/at91linux/linux-at91.git tags/at91-fixes
 
-Pulled. Thanks for giving an overview of the contents. If you have a
-chance, please explore using signed tags to hold that contents too,
-since it makes life even easier for us doing the pulls. :-)
+Pulled.
 
 
 -Olof
