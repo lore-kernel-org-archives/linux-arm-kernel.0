@@ -1,45 +1,40 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 24 Jan 2013 14:52:05 +0530
-Subject: [PATCH] ARM: DTS: exynos5250-arndale: Add initial board support
- file
-In-Reply-To: <CAGOxZ53VsXE_as6aNk85jdxVG2FAg-SqWc8svTHpgrcttE_q0w@mail.gmail.com>
-References: <1359008188-23395-1-git-send-email-tushar.behera@linaro.org>
- <CAGOxZ53VsXE_as6aNk85jdxVG2FAg-SqWc8svTHpgrcttE_q0w@mail.gmail.com>
-Message-ID: <5100FD3D.7080206@linaro.org>
+From: stefanha@gmail.com (Stefan Hajnoczi)
+Date: Thu, 24 Jan 2013 10:25:31 +0100
+Subject: [Qemu-devel] [RFC] Virtio-desktop: Virtio-based virtual desktop
+In-Reply-To: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
+References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
+Message-ID: <20130124092531.GD18072@stefanha-thinkpad.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2013 12:21 PM, Alim Akhtar wrote:
+On Thu, Jan 24, 2013 at 11:40:24AM +0530, Anup Patel wrote:
+> IMHO, If we have something like Virtio-desktop specification then all
+> possible guest OSes can have support for it and different hypervisor can
+> emulate it without worrying about guest support.
 
->> +
->> +       i2c at 12CC0000 {
->> +               status = "disabled";
->> +       };
->> +
->> +       i2c at 12CD0000 {
->> +               status = "disabled";
->> +       };
->> +
->> +       i2c at 121D0000 {
->> +               status = "disabled";
->> +       };
->> +
-> 
-> Why to disable these i2c devices here? Any particular reason?
-> You can moves these to exynos5250.dtsi which is suppose to be common
-> for all the exynos5250 platforms.
-> Please see the exynos4.dtsi for reference.
-> 
+At this point x86 virtualization is mature and working with a mix of
+emulated x86 architecture pieces and virtio devices for
+performance-critical or open-ended functionality that we want to be able
+to extend.
 
-Agreed. There was a discussion going on in [1] related to this. Since
-there was no consensus on that, I preferred to go with the current
-approach that is followed for other EXYNOS5250 based scripts.
+ARM is getting KVM and virtio-mmio support.  It will be in a similar
+position soon.
 
-If it is agreed by Kukjin to move to Exynos4 style, then I can submit
-patches for that.
+Virtio guest drivers have not been implemented widely.  The Linux and
+Windows efforts are driven by the folks who were behind virtio from the
+start, but Solaris, FreeBSD, and others didn't really jump on the virtio
+bandwagon.
 
-[1]
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg15013.html
+Given this landscape, what is the advantage of doing a virtio-desktop?
+It will still need to fall back on ARM or x86 which is already being
+virtualized and emulated.
 
--- 
-Tushar Behera
+Depending on how you see it we either have virtio-desktop already or,
+if not, I think the experience with virtio adoption suggests other
+hypervisors and guest OSes will not trip over themselves to implement
+virtio-desktop.
+
+What's the advantage over virtualizating an existing ARM or x86 platform
+and using virtio devices where appropriate?
+
+Stefan
