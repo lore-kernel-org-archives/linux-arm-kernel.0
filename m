@@ -1,36 +1,34 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Thu, 24 Jan 2013 16:58:40 +0100
-Subject: [PATCH v5 01/45] percpu_rwlock: Introduce the global
- reader-writer lock backend
-In-Reply-To: <CANN689HOmiO-5714UiyuOcjrRYW2DkR4cPLgt96f5YeB9Ws3RQ@mail.gmail.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073315.13822.27093.stgit@srivatsabhat.in.ibm.com>
- <1358883152.21576.55.camel@gandalf.local.home>
- <CANN689HOmiO-5714UiyuOcjrRYW2DkR4cPLgt96f5YeB9Ws3RQ@mail.gmail.com>
-Message-ID: <20130124155840.GA10651@redhat.com>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Thu, 24 Jan 2013 09:57:04 -0600
+Subject: OMAP4 randconfig failure: Zynq
+In-Reply-To: <20130124111117.GU23505@n2100.arm.linux.org.uk>
+References: <20130124111117.GU23505@n2100.arm.linux.org.uk>
+Message-ID: <20130124155704.GJ11970@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23, Michel Lespinasse wrote:
->
-> On Tue, Jan 22, 2013 at 11:32 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
-> >
-> > I thought global locks are now fair. That is, a reader will block if a
-> > writer is waiting. Hence, the above should deadlock on the current
-> > rwlock_t types.
->
-> I believe you are mistaken here. struct rw_semaphore is fair (and
-> blocking), but rwlock_t is unfair. The reason we can't easily make
-> rwlock_t fair is because tasklist_lock currently depends on the
-> rwlock_t unfairness - tasklist_lock readers typically don't disable
-> local interrupts, and tasklist_lock may be acquired again from within
-> an interrupt, which would deadlock if rwlock_t was fair and a writer
-> was queued by the time the interrupt is processed.
+On Thu, Jan 24, 2013 at 11:11:17AM +0000, Russell King - ARM Linux wrote:
+> The OMAP4 randconfig build last night failed with this error:
+> 
+> arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
+> 
+> Full details at the usual place - 
+> http://www.arm.linux.org.uk/developer/build/
 
-Yes.
+Curious.  This doesn't look like a valid config to me.
 
-And, iirc, it was even documented somewhere that while rwlock_t is not
-really nice, it is good to share the locking with interrupts. You do
-not need to disable irqs.
+In particular, both ARCH_MULTIPLATFORM and ARCH_OMAP are selected, even
+though those selections should be mutually exclusive, since they fall
+under the same:
 
-Oleg.
+    choice
+    	prompt "ARM system type"
+    	default ARCH_MULTIPLATFORM
+
+Perhaps it's because CONFIG_ARCH_OMAP=y was setup in the seed?
+
+oldconfig seems to complain, too:
+
+      .config:340:warning: override: ARCH_OMAP changes choice state
+
+  Josh
