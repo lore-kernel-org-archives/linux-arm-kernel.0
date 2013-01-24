@@ -1,77 +1,74 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Thu, 24 Jan 2013 11:52:29 -0500
-Subject: [PATCH v6 04/15] KVM: ARM: Hypervisor initialization
-In-Reply-To: <20130124154535.GD18233@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 24 Jan 2013 17:02:20 +0000
+Subject: [PATCH v6 01/15] ARM: Add page table and page defines needed
+ by KVM
+In-Reply-To: <CANM98qKYhvb6YVUr_jF0iYrgcmoMqtom+9tsZw1PkWFabRKVNQ@mail.gmail.com>
 References: <20130116175716.29147.15348.stgit@ubuntu>
- <20130116175748.29147.91246.stgit@ubuntu>
- <20130124154535.GD18233@arm.com>
-Message-ID: <CANM98qL1gW3z=LoFgDzoJ9Qqp2tsSGiRh9Pk4TdHi0ETmcmzcw@mail.gmail.com>
+ <20130116175726.29147.57548.stgit@ubuntu>
+ <20130124113935.GA1658@localhost.cambridge.arm.com>
+ <CANM98qKYhvb6YVUr_jF0iYrgcmoMqtom+9tsZw1PkWFabRKVNQ@mail.gmail.com>
+Message-ID: <20130124170220.GF18233@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 10:45 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Wed, Jan 16, 2013 at 05:57:48PM +0000, Christoffer Dall wrote:
->> --- a/arch/arm/include/asm/pgtable-3level-hwdef.h
->> +++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
->> @@ -32,6 +32,9 @@
->>  #define PMD_TYPE_SECT          (_AT(pmdval_t, 1) << 0)
->>  #define PMD_BIT4               (_AT(pmdval_t, 0))
->>  #define PMD_DOMAIN(x)          (_AT(pmdval_t, 0))
->> +#define PMD_APTABLE_SHIFT      (61)
->> +#define PMD_APTABLE            (_AT(pgdval_t, 3) << PGD_APTABLE_SHIFT)
->> +#define PMD_PXNTABLE           (_AT(pgdval_t, 1) << 59)
->
-> Are these used anywhere? I grep'ed but couldn't find. While I'm fine
-> with keeping some hardware definitions for future use, I think here you
-> need to qualify these bits with some suffix to PMD_APTABLE. The APTable
-> are just a group of bits with different meaning (no write access etc.).
-> If you want to keep them as group of bits, you can add a _MASK suffix.
->
->> +static int init_hyp_mode(void)
->> +{
->> +       phys_addr_t init_phys_addr;
->> +       int cpu;
->> +       int err = 0;
->> +
->> +       /*
->> +        * Allocate Hyp PGD and setup Hyp identity mapping
->> +        */
->> +       err = kvm_mmu_init();
->> +       if (err)
->> +               goto out_err;
->
-> The comment is a bit misleading since kvm_mmu_init() simply checks
-> whether hyp_pgd has been initialised. The actual initialisation is done
-> by the idmap code.
->
-This should fix it, thanks:
+On Thu, Jan 24, 2013 at 04:05:33PM +0000, Christoffer Dall wrote:
+> On Thu, Jan 24, 2013 at 6:39 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Wed, Jan 16, 2013 at 05:57:26PM +0000, Christoffer Dall wrote:
+> >> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> >> index a3f3792..6ef8afd 100644
+> >> --- a/arch/arm/include/asm/pgtable-3level.h
+> >> +++ b/arch/arm/include/asm/pgtable-3level.h
+> >> @@ -104,11 +104,29 @@
+> >>   */
+> >>  #define L_PGD_SWAPPER                (_AT(pgdval_t, 1) << 55)        /* swapper_pg_dir entry */
+> >>
+> >> +/*
+> >> + * 2nd stage PTE definitions for LPAE.
+> >> + */
+> >> +#define L_PTE_S2_MT_UNCACHED  (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
+> >> +#define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
+> >> +#define L_PTE_S2_MT_WRITEBACK         (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
+> >> +#define L_PTE_S2_RDONLY               (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+> >> +#define L_PTE_S2_RDWR                 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
+> >
+> > Why is this called L_PTE_S2_RDWR? The ARM ARM shows HAP[2:1] as 0b11 for
+> > read/write and 0b10 for WRONLY.
+> 
+> it should be
+> 
+> +#define L_PTE_S2_RDWR                 (_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
 
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h
-b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index 432fa12..30fb12a 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -33,7 +33,7 @@
- #define PMD_BIT4		(_AT(pmdval_t, 0))
- #define PMD_DOMAIN(x)		(_AT(pmdval_t, 0))
- #define PMD_APTABLE_SHIFT	(61)
--#define PMD_APTABLE		(_AT(pgdval_t, 3) << PGD_APTABLE_SHIFT)
-+#define PMD_APTABLE_MASK	(_AT(pgdval_t, 3) << PGD_APTABLE_SHIFT)
- #define PMD_PXNTABLE		(_AT(pgdval_t, 1) << 59)
+OK.
 
- /*
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 2d30e3a..8354a6f 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -871,7 +871,7 @@ static int init_hyp_mode(void)
- 	int err = 0;
+> 
+> >> --- a/arch/arm/include/asm/pgtable.h
+> >> +++ b/arch/arm/include/asm/pgtable.h
+> >> @@ -70,6 +70,9 @@ extern void __pgd_error(const char *file, int line, pgd_t);
+> >>
+> >>  extern pgprot_t              pgprot_user;
+> >>  extern pgprot_t              pgprot_kernel;
+> >> +extern pgprot_t              pgprot_hyp_device;
+> >> +extern pgprot_t              pgprot_s2;
+> >> +extern pgprot_t              pgprot_s2_device;
+> >>
+> >>  #define _MOD_PROT(p, b)      __pgprot(pgprot_val(p) | (b))
+> >>
+> >> @@ -82,6 +85,10 @@ extern pgprot_t            pgprot_kernel;
+> >>  #define PAGE_READONLY_EXEC   _MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
+> >>  #define PAGE_KERNEL          _MOD_PROT(pgprot_kernel, L_PTE_XN)
+> >>  #define PAGE_KERNEL_EXEC     pgprot_kernel
+> >> +#define PAGE_HYP             _MOD_PROT(pgprot_kernel, L_PTE_HYP)
+> >> +#define PAGE_HYP_DEVICE              _MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+> >> +#define PAGE_S2                      _MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+> >> +#define PAGE_S2_DEVICE               _MOD_PROT(pgprot_s2_device, L_PTE_USER | L_PTE_S2_RDONLY)
+> >
+> > Are these S2 read-only by default?
+> 
+> not sure I understand what you're asking here?
 
- 	/*
--	 * Allocate Hyp PGD and setup Hyp identity mapping
-+	 * Make sure the Hyp identity map is ready for us.
- 	 */
- 	err = kvm_mmu_init();
- 	if (err)
---
+Why do you pass L_PTE_S2_RDONLY? Do you need to restrict guest writes
+via the stage 2 attributes?
+
+-- 
+Catalin
