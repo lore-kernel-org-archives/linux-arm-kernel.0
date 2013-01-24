@@ -1,66 +1,59 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Thu, 24 Jan 2013 17:05:24 +0530
-Subject: [PATCH 2/6] ARM: davinci: da850: add DT node for I2C0
-Message-ID: <1359027324-14534-1-git-send-email-manishv.b@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 24 Jan 2013 11:39:35 +0000
+Subject: [PATCH v6 01/15] ARM: Add page table and page defines needed by
+ KVM
+In-Reply-To: <20130116175726.29147.57548.stgit@ubuntu>
+References: <20130116175716.29147.15348.stgit@ubuntu>
+ <20130116175726.29147.57548.stgit@ubuntu>
+Message-ID: <20130124113935.GA1658@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2C0 device tree node information to da850-evm.
-Also, add I2C0 pin muxing information in da850-evm.
+Hi Christoffer,
 
-Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
----
-Depends on patch 
-http://comments.gmane.org/gmane.linux.davinci/25993
+On Wed, Jan 16, 2013 at 05:57:26PM +0000, Christoffer Dall wrote:
+> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> index a3f3792..6ef8afd 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -104,11 +104,29 @@
+>   */
+>  #define L_PGD_SWAPPER		(_AT(pgdval_t, 1) << 55)	/* swapper_pg_dir entry */
+>  
+> +/*
+> + * 2nd stage PTE definitions for LPAE.
+> + */
+> +#define L_PTE_S2_MT_UNCACHED	 (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
+> +#define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
+> +#define L_PTE_S2_MT_WRITEBACK	 (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
+> +#define L_PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+> +#define L_PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
 
- arch/arm/boot/dts/da850-evm.dts |   15 +++++++++++++++
- arch/arm/boot/dts/da850.dtsi    |   10 ++++++++++
- 2 files changed, 25 insertions(+), 0 deletions(-)
+Why is this called L_PTE_S2_RDWR? The ARM ARM shows HAP[2:1] as 0b11 for
+read/write and 0b10 for WRONLY.
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 8cac9d2..3d8290a 100755
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -27,5 +27,20 @@
- 		serial2: serial at 1d0d000 {
- 			status = "okay";
- 		};
-+		i2c0 at 1c22000 {
-+			status = "okay";
-+		};
-+	};
-+};
-+&pmx_core {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+		&i2c0_pins
-+	>;
-+
-+	i2c0_pins: pinmux_i2c0_pins{
-+		pinctrl-single,bits = <
-+			0x10 0x00002200 0x0000ff00	/* I2C0_SDA,I2C0_SCL */
-+		>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 1e6d090..f5ee811 100755
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -66,5 +66,15 @@
- 			interrupt-parent = <&intc>;
- 			status = "disabled";
- 		};
-+		i2c0 at 1c22000 {
-+			compatible = "ti,davinci-i2c";
-+			reg = <0x22000 0x1000>;
-+			clock-frequency = <100000>;
-+			interrupts = <15>;
-+			interrupt-parent = <&intc>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
- 	};
- };
+> --- a/arch/arm/include/asm/pgtable.h
+> +++ b/arch/arm/include/asm/pgtable.h
+> @@ -70,6 +70,9 @@ extern void __pgd_error(const char *file, int line, pgd_t);
+>  
+>  extern pgprot_t		pgprot_user;
+>  extern pgprot_t		pgprot_kernel;
+> +extern pgprot_t		pgprot_hyp_device;
+> +extern pgprot_t		pgprot_s2;
+> +extern pgprot_t		pgprot_s2_device;
+>  
+>  #define _MOD_PROT(p, b)	__pgprot(pgprot_val(p) | (b))
+>  
+> @@ -82,6 +85,10 @@ extern pgprot_t		pgprot_kernel;
+>  #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
+>  #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
+>  #define PAGE_KERNEL_EXEC	pgprot_kernel
+> +#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
+> +#define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+> +#define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+> +#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_USER | L_PTE_S2_RDONLY)
+
+Are these S2 read-only by default?
+
 -- 
-1.7.4.1
+Catalin
