@@ -1,67 +1,69 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Thu, 24 Jan 2013 16:49:33 +0000
-Subject: [PATCH v3 1/1 net-next] net: fec: enable pause frame to improve
- rx prefomance for 1G network
-In-Reply-To: <CAHrpEqSzu97X2PUgUEh30EqkbjLUYyhCN28AEzJ6eLPXx0Qg1Q@mail.gmail.com>
-References: <1358391358-27977-1-git-send-email-Frank.Li@freescale.com>
- <1358973584.2658.14.camel@bwh-desktop.uk.solarflarecom.com>
- <CAHrpEqSzu97X2PUgUEh30EqkbjLUYyhCN28AEzJ6eLPXx0Qg1Q@mail.gmail.com>
-Message-ID: <1359046173.2736.2.camel@bwh-desktop.uk.solarflarecom.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Thu, 24 Jan 2013 17:50:04 +0100
+Subject: [PATCH 1/2] ARM: dts: omap3-overo: Add support for pwm-leds
+In-Reply-To: <5101570A.1030303@ti.com>
+References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
+ <1358963812-19947-2-git-send-email-florian.vaussard@epfl.ch>
+ <5101510C.9050407@ti.com> <51015663.8080109@epfl.ch>
+ <5101570A.1030303@ti.com>
+Message-ID: <5101663C.7020301@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-01-24 at 10:16 +0800, Frank Li wrote:
-> 2013/1/24 Ben Hutchings <bhutchings@solarflare.com>:
-> > On Thu, 2013-01-17 at 10:55 +0800, Frank Li wrote:
-> >> The limition of imx6 internal bus cause fec can't achieve 1G perfomance.
-> >> There will be many packages lost because FIFO over run.
-> >>
-> >> This patch enable pause frame flow control.
-> > [...]
-> >> --- a/drivers/net/ethernet/freescale/fec.c
-> >> +++ b/drivers/net/ethernet/freescale/fec.c
-> > [...]
-> >> +static int fec_enet_set_pauseparam(struct net_device *ndev,
-> >> +                                struct ethtool_pauseparam *pause)
-> >> +{
-> >> +     struct fec_enet_private *fep = netdev_priv(ndev);
-> >> +
-> >> +     if (pause->tx_pause != pause->rx_pause) {
-> >> +             netdev_info(ndev,
-> >> +                     "hardware only support enable/disable both tx and rx");
-> >> +             return -EINVAL;
-> >> +     }
-> >> +
-> >> +     fep->pause_flag = 0;
-> >> +
-> >> +     /* tx pause must be same as rx pause */
-> >> +     fep->pause_flag |= pause->rx_pause ? FEC_PAUSE_FLAG_ENABLE : 0;
-> >> +     fep->pause_flag |= pause->autoneg ? FEC_PAUSE_FLAG_AUTONEG : 0;
-> >> +
-> >> +     if (pause->rx_pause || pause->autoneg) {
-> >> +             fep->phy_dev->supported |= ADVERTISED_Pause;
-> >> +             fep->phy_dev->advertising |= ADVERTISED_Pause;
-> >> +     } else {
-> >> +             fep->phy_dev->supported &= ~ADVERTISED_Pause;
-> >> +             fep->phy_dev->advertising &= ~ADVERTISED_Pause;
-> >> +     }
-> > [...]
-> >
-> > Why is this changing the supported flags, i.e. device capabilities?  You
-> > need to leave those flags alone and reject an attempt to enable pause
-> > frames on a device that doesn't support them.
-> 
-> I go through phylib, I have not found good place set ADVERTISED_Pause
-> capabilities.
-> genphy_config_init never check Pause capabilities.
+>> I did it at first, but the led API executes in atomic context, where the
+>> pwm-twl-led driver uses i2c communication. Setting a trigger will result in a
+>> kernel panic.
+>
+> Now that you mentioned it, this might be true.
+>
 
-I agree that phylib can't initialise pause capabilities because those
-depend on the MAC.  But look at which function I'm quoting: this is the
-ethtool operation, which shouldn't change capabilities.
+[<c0013204>] (unwind_backtrace+0x0/0xec) from [<c00348ac>] 
+(warn_slowpath_common+0x4c/0x64)
+[<c00348ac>] (warn_slowpath_common+0x4c/0x64) from [<c00348e0>] 
+(warn_slowpath_null+0x1c/0x24)
+[<c00348e0>] (warn_slowpath_null+0x1c/0x24) from [<c054d384>] 
+(__mutex_lock_slowpath+0x6c/0x26c)
+[<c054d384>] (__mutex_lock_slowpath+0x6c/0x26c) from [<c054d590>] 
+(mutex_lock+0xc/0x20)
+[<c054d590>] (mutex_lock+0xc/0x20) from [<c02d740c>] 
+(regmap_bulk_write+0x48/0x138)
+[<c02d740c>] (regmap_bulk_write+0x48/0x138) from [<c02de2c0>] 
+(twl_i2c_write+0xa4/0xf0)
+[<c02de2c0>] (twl_i2c_write+0xa4/0xf0) from [<c0299e34>] 
+(twl4030_pwmled_config+0x70/0x9c)
+[<c0299e34>] (twl4030_pwmled_config+0x70/0x9c) from [<c029875c>] 
+(pwm_config+0x5c/0x6c)
+[<c029875c>] (pwm_config+0x5c/0x6c) from [<c039dc04>] 
+(led_pwm_set+0x28/0x64)
+[<c039dc04>] (led_pwm_set+0x28/0x64) from [<c039e27c>] 
+(led_heartbeat_function+0x10c/0x134)
+[<c039e27c>] (led_heartbeat_function+0x10c/0x134) from [<c004359c>] 
+(call_timer_fn+0x90/0x178)
+[<c004359c>] (call_timer_fn+0x90/0x178) from [<c0043994>] 
+(run_timer_softirq+0x250/0x2c8)
+[<c0043994>] (run_timer_softirq+0x250/0x2c8) from [<c003cf78>] 
+(__do_softirq+0xf8/0x248)
+[<c003cf78>] (__do_softirq+0xf8/0x248) from [<c003d154>] 
+(irq_exit+0x44/0x98)
+[<c003d154>] (irq_exit+0x44/0x98) from [<c000e338>] (handle_IRQ+0x68/0x8c)
+[<c000e338>] (handle_IRQ+0x68/0x8c) from [<c000870c>] 
+(omap3_intc_handle_irq+0x58/0x70)
+[<c000870c>] (omap3_intc_handle_irq+0x58/0x70) from [<c054f8c0>] 
+(__irq_svc+0x40/0x70)
+Exception stack(0xc077df60 to 0xc077dfa8)
 
-Ben.
+:-)
 
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+>> I am working on a patch for pwm-twl-led to defer using a workqueue right now.
+>
+> Great!
+> The only thing I worry about is the latency we are going to get with the
+> workqueue.
+>
+
+If the latency becomes critical, we can create our own workqueue.
+
+Do we merge anyway this patchset, or do we wait until the trigger has 
+been fixed?
+
+Florian
