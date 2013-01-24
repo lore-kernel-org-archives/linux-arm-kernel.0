@@ -1,79 +1,65 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 24 Jan 2013 14:42:44 +0530
-Subject: [PATCH] ARM: DTS: exynos5250-arndale: Add initial board support
- file
-In-Reply-To: <CAK9yfHyKK4L_YH5fw=CrcjzeZgfhGKtDMpZQ3GVLnoVt3gkNiQ@mail.gmail.com>
-References: <1359008188-23395-1-git-send-email-tushar.behera@linaro.org>
- <CAK9yfHyKK4L_YH5fw=CrcjzeZgfhGKtDMpZQ3GVLnoVt3gkNiQ@mail.gmail.com>
-Message-ID: <5100FB0C.7040706@linaro.org>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Thu, 24 Jan 2013 10:13:40 +0100
+Subject: [PATCH 3/6 v14] gpio: Add userland device interface to block GPIO
+In-Reply-To: <1358856404-8975-4-git-send-email-stigge@antcom.de>
+References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
+ <1358856404-8975-4-git-send-email-stigge@antcom.de>
+Message-ID: <2755008.6LuYqOq3X4@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2013 12:14 PM, Sachin Kamat wrote:
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 5ebb44f..60a9e52 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -44,6 +44,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->>         exynos4210-trats.dtb \
->>         exynos4412-smdk4412.dtb \
->>         exynos5250-smdk5250.dtb \
->> +       exynos5250-arndale.dtb \
+On Tuesday 22 January 2013 13:06:41, Roland Stigge wrote:
+> This patch adds a character device interface to the block GPIO system.
 > 
-> I think this entry could be moved one step up for maintaining
-> alphabetical order.
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> ---
+>  Documentation/ABI/testing/dev-gpioblock |   34 ++++
+>  drivers/gpio/gpiolib.c                  |  225 +++++++++++++++++++++++++++++++-
+>  include/linux/gpio.h                    |   13 +
+>  3 files changed, 271 insertions(+), 1 deletion(-)
 > 
+> --- /dev/null
+> +++ linux-2.6/Documentation/ABI/testing/dev-gpioblock
+> @@ -0,0 +1,34 @@
+> +What:		/dev/<gpioblock>
+> +Date:		Nov 2012
+> +KernelVersion:	3.7
+> +Contact:	Roland Stigge <stigge@antcom.de>
+> +Description:	The /dev/<gpioblock> character device node provides userspace
+> +		access to GPIO blocks, named exactly as the block, e.g.
+> +		/dev/block0.
+> +
+> +		Reading:
+> +		When reading sizeof(unsigned long) bytes from the device, the
+> +		current state of the block, masked by the current mask (see
+> +		below) can be obtained as a word. When the device is opened
+> +		with O_NONBLOCK, read() always returns with data immediately,
+> +		otherwise it blocks until data is available, see IRQ handling
+> +		below.
+> +
+> +		Writing:
+> +		By writing sizeof(unsigned long) bytes to the device, the
+> +		current state of the block can be set. This operation is
+> +		masked by the current mask (see below).
+> +
+> +		IRQ handling:
+> +		When one or more IRQs in the block are IRQ capable, you can
+                          ^^^^
+I think this should be GPIOs
 
-Ok.
+> +static long gpio_block_fop_ioctl(struct file *f, unsigned int cmd,
+> +				 unsigned long arg)
+> +{
+> +	struct gpio_block *block = (struct gpio_block *)f->private_data;
+> +	unsigned long __user *x = (unsigned long __user *)arg;
+> +
+> +	if (cmd == 0)
+> +		return get_user(block->cur_mask, x);
+> +
+> +	return -EINVAL;
+> +}
 
->>         exynos5250-snow.dtb \
->>         exynos5440-ssdk5440.dtb
->>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
->> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
->> new file mode 100644
->> index 0000000..7504cf3
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
->> @@ -0,0 +1,124 @@
->> +/*
->> + * Samsung's Exynos5250 based Arndale board device tree source
->> + *
->> + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-> 
-> 2013?
-> 
+So there is no way from userspace to create/remove GPIO blocks? I know support in sysfs is problematic due to formatting, but an IOCTL for that would be nice.
 
-Ok.
-
->> + *             http://www.samsung.com
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +/dts-v1/;
->> +/include/ "exynos5250.dtsi"
->> +
->> +/ {
->> +       model = "Insignal Arndale evaluation board based on EXYNOS5250";
->> +       compatible = "insignal,arndale", "samsung,exynos5250";
->> +
->> +       memory {
->> +               reg = <0x40000000 0x80000000>;
->> +       };
->> +
->> +       chosen {
->> +               bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
-> 
-> This could be resticted only to console
->                 bootargs = "console=ttySAC2,115200";
-> 
-> 
-
-Ok.
-
-I will resubmit the patchset.
-
--- 
-Tushar Behera
+Best regards,
+Alexander
