@@ -1,57 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 24 Jan 2013 06:50:52 +0100
-Subject: [RFC PATCH 3/6] ARM: kirkwood: nsa310: cleanup includes and
- unneeded code
-In-Reply-To: <28ae8033afa32ea4ea298ba63e1d5b2a1f4e18f9.1358983578.git.jason@lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <28ae8033afa32ea4ea298ba63e1d5b2a1f4e18f9.1358983578.git.jason@lakedaemon.net>
-Message-ID: <20130124055052.GA21297@lunn.ch>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Thu, 24 Jan 2013 11:22:51 +0530
+Subject: [GIT PULL for v3.8-rc] DaVinci media fixes for v3.8
+Message-ID: <CA+V-a8tndm7LJiCfQqPSa6iSxiJ1UmWL-tbxBWh9HiLvvDPwMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 11:34:21PM +0000, Jason Cooper wrote:
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  arch/arm/mach-kirkwood/board-nsa310.c | 9 +--------
->  1 file changed, 1 insertion(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
-> index 1bd328d..0b99533 100644
-> --- a/arch/arm/mach-kirkwood/board-nsa310.c
-> +++ b/arch/arm/mach-kirkwood/board-nsa310.c
-> @@ -10,11 +10,8 @@
->  
->  #include <linux/kernel.h>
->  #include <linux/init.h>
-> -#include <linux/i2c.h>
-> -
-> -#include <asm/mach-types.h>
-> -#include <asm/mach/arch.h>
->  #include <mach/kirkwood.h>
-> +#include <linux/of.h>
->  #include "common.h"
->  #include "mpp.h"
->  
-> @@ -40,11 +37,7 @@ static unsigned int nsa310_mpp_config[] __initdata = {
->  
->  void __init nsa310_init(void)
->  {
-> -	u32 dev, rev;
-> -
->  	kirkwood_mpp_conf(nsa310_mpp_config);
-> -
-> -	kirkwood_pcie_id(&dev, &rev);
->  }
->  
->  static int __init nsa310_pci_init(void)
-> -- 
-> 1.8.1.1
-> 
+Hi Mauro,
 
-Hi Jason, Tero
+Please pull the following patches which fixes display on DA850 EVM . To
+avoid conflicts I have included a arm patch, which has been Acked by
+its maintainer.
 
-This board is rather unusual for a Kirkwood. It has no Ethernet
-interfaces. Is this correct?
+Fixes :
+     - adv7343 encoder: fix configuring the encoder.
+     - da850: pass data for adv7343 encoder for required configuration.
 
-    Thanks
-	Andrew
+Thank you!
+Prabhakar
+
+The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
+
+  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+
+are available in the git repository at:
+  git://linuxtv.org/mhadli/v4l-dvb-davinci_devices.git davinci_media
+
+Lad, Prabhakar (2):
+      media: adv7343: accept configuration through platform data
+      ARM: davinci: da850 evm: pass platform data for adv7343 encoder
+
+ arch/arm/mach-davinci/board-da850-evm.c |   13 ++++++++
+ drivers/media/i2c/adv7343.c             |   36 ++++++++++++++++++---
+ include/media/adv7343.h                 |   52 +++++++++++++++++++++++++++++++
+ 3 files changed, 96 insertions(+), 5 deletions(-)
