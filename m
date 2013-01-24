@@ -1,62 +1,61 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 24 Jan 2013 16:21:16 +0100
-Subject: [PATCH 2/2] ARM: dts: omap3-overo: Add audio support
-In-Reply-To: <1358963812-19947-3-git-send-email-florian.vaussard@epfl.ch>
-References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
- <1358963812-19947-3-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <5101516C.30602@ti.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Thu, 24 Jan 2013 17:25:17 +0200
+Subject: [RESEND PATCH v5 3/7] usb: chipidea: add otg id switch and vbus
+ connect/disconnect detect
+In-Reply-To: <1358733418-17969-4-git-send-email-peter.chen@freescale.com>
+References: <1358733418-17969-1-git-send-email-peter.chen@freescale.com>
+ <1358733418-17969-4-git-send-email-peter.chen@freescale.com>
+Message-ID: <87y5fimwma.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Peter Chen <peter.chen@freescale.com> writes:
 
-On 01/23/2013 06:56 PM, Florian Vaussard wrote:
-> Add the needed sections to enable audio support on Overo.
+> The main design flow is the same with msm otg driver, that is the id and
+> vbus interrupt are handled at core driver, others are handled by
+> individual drivers.
+>
+> - At former design, when switch usb role from device->host, it will call
+> udc_stop, it will remove the gadget driver, so when switch role
+> from host->device, it can't add gadget driver any more.
+> At new design, when role switch occurs, the gadget just calls
+> usb_gadget_vbus_disconnect/usb_gadget_vbus_connect as well as
+> reset controller, it will not free any device/gadget structure
+>
+> - Add vbus connect and disconnect to core interrupt handler, it can
+> notify udc driver by calling usb_gadget_vbus_disconnect
+> /usb_gadget_vbus_connect.
+>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-Looks fine for me.
+[snip]
 
-Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-> 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  arch/arm/boot/dts/omap3-overo.dtsi |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-> index 800be29..81341fa 100644
-> --- a/arch/arm/boot/dts/omap3-overo.dtsi
-> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
-> @@ -23,6 +23,14 @@
->  			max-brightness = <127>;
->  		};
->  	};
-> +
-> +	sound {
-> +		compatible = "ti,omap-twl4030";
-> +		ti,model = "overo";
-> +
-> +		ti,mcbsp = <&mcbsp2>;
-> +		ti,codec = <&twl_audio>;
-> +	};
->  };
+> @@ -483,6 +614,17 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>  		goto rm_wq;
+>  	}
 >  
->  &i2c1 {
-> @@ -32,6 +40,12 @@
->  		reg = <0x48>;
->  		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
->  		interrupt-parent = <&intc>;
+> +	otgsc = hw_read(ci, OP_OTGSC, ~0);
+> +	/*
+> +	 * if it is device mode:
+> +	 * - Enable vbus detect
+> +	 * - If it has already connected to host, notify udc
+> +	 */
+> +	if (ci->role == CI_ROLE_GADGET) {
+> +		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
+> +		ci_handle_vbus_change(ci);
+> +	}
 > +
-> +		twl_audio: audio {
-> +			compatible = "ti,twl4030-audio";
-> +			codec {
-> +			};
-> +		};
->  	};
->  };
->  
-> 
 
+Actually, this doesn't work, neither here, nor in udc_start(), where the
+next patch moves it. If you start in host role with A plug, unplug it,
+plug B and load a gadget module, it won't start till you replug the
+cable, which is where vbus detection happens. So, when you say that vbus
+detection is "fully tested", what is the test case set that you're
+using?
 
--- 
-P?ter
+One obvious fix is to move ci_handle_vbus_change() call to
+ci13xxx_start(), but I need to think about the whole thing a bit more.
+
+Regards,
+--
+Alex
