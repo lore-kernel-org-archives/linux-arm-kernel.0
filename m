@@ -1,25 +1,26 @@
-From: peter.p.waskiewicz.jr@intel.com (Waskiewicz Jr, Peter P)
-Date: Wed, 23 Jan 2013 22:39:18 -0800
-Subject: [PATCH 1/2 net-next] net: fec: add napi support to improve
- proformance
-In-Reply-To: <CAHrpEqSk8bs8552qQ6j_iP9=QNN98NSd1p+TQN=naRr-NUaxkw@mail.gmail.com>
-References: <1358914330-3768-1-git-send-email-Frank.Li@freescale.com>
- <1358922071.12374.743.camel@edumazet-glaptop>
- <CAHrpEqTqSfBCpoMZ9S81VoXWgVK1iOR+e2OasARgbTD8m_RRvw@mail.gmail.com>
- <1358948954.12374.758.camel@edumazet-glaptop>
- <CAHrpEqSk8bs8552qQ6j_iP9=QNN98NSd1p+TQN=naRr-NUaxkw@mail.gmail.com>
-Message-ID: <20130124063917.GA27481@ppwaskie-mobl2.amr.corp.intel.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 24 Jan 2013 07:42:06 +0100
+Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
+In-Reply-To: <5100C0F7.9080101@wwwdotorg.org>
+References: <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com><50FFA620.50008@ti.com><5100C0F7.9080101@wwwdotorg.org>
+Message-ID: <20130124.084206.122831115046505200.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 10:26:00AM +0800, Frank Li wrote:
-> > A NAPI driver must call netif_receive_skb(), especially if
-> > the RX path does a full copy of the frame : Its hot in cpu cache and
-> > should be processed at once.
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Thu, 24 Jan 2013 06:04:55 +0100:
+
+> Branch scu-base-rework contains just the SCU base address patches. After
+> the few things listed below, I'll rename this branch and send a pull
+> request to arm-soc.
 > 
-> How about napi_gro_receive? is it correct function? I found many driver use it.
+....
+> 2) Lorenzo's last comment on "ARM: tegra: Use DT /cpu node to detect
+> number of CPU core" was:
+> 
+> Please add missing punctuation, reword the commit log to make it clearer.
+> 
+> ... so that patch needs a reworded commit log.
 
-If you want to coalesce your Rx frames to reduce overhead, then yes.  It's
-a good performance improvement overall.
+I fixed. I'll send this[1] as a part of the "Tegra114 series(v4)" today.
 
--PJ
+[1] ARM: tegra: Use DT /cpu node to detect number of CPU core
