@@ -1,82 +1,59 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 24 Jan 2013 01:27:57 -0500
-Subject: [PATCH v2 14/16] ARM: CCI: ensure powerdown-time data is flushed from
- cache
+Date: Thu, 24 Jan 2013 01:27:59 -0500
+Subject: [PATCH v2 16/16] ARM: vexpress/dcscb: probe via device tree
 In-Reply-To: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1359008879-9015-15-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1359008879-9015-17-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Martin <dave.martin@linaro.org>
+This allows for the DCSCB support to be compiled in and selected
+at run time.
 
-Non-local variables used by the CCI management function called after
-disabling the cache must be flushed out to main memory in advance,
-otherwise incoherency of those values may occur if they are sitting
-in the cache of some other CPU when cci_disable() executes.
-
-This patch adds the appropriate flushing to the CCI driver to ensure
-that the relevant data is available in RAM ahead of time.
-
-Because this creates a dependency on arch-specific cacheflushing
-functions, this patch also makes ARM_CCI depend on ARM.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- drivers/bus/Kconfig   |  1 +
- drivers/bus/arm-cci.c | 21 +++++++++++++++++++--
- 2 files changed, 20 insertions(+), 2 deletions(-)
+ arch/arm/mach-vexpress/dcscb.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index d032f74ff2..cd4ac9f001 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -22,5 +22,6 @@ config OMAP_INTERCONNECT
- 
- config ARM_CCI
-        bool "ARM CCI driver support"
-+	depends on ARM
- 
- endmenu
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 5de3aa3d1f..11689f166d 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -21,8 +21,16 @@
- #include <linux/slab.h>
+diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+index 575c489a4c..17e410e4fe 100644
+--- a/arch/arm/mach-vexpress/dcscb.c
++++ b/arch/arm/mach-vexpress/dcscb.c
+@@ -14,6 +14,7 @@
+ #include <linux/io.h>
+ #include <linux/spinlock.h>
+ #include <linux/errno.h>
++#include <linux/of_address.h>
+ #include <linux/vexpress.h>
  #include <linux/arm-cci.h>
  
--#define CCI400_EAG_OFFSET       0x4000
--#define CCI400_KF_OFFSET        0x5000
-+#include <asm/cacheflush.h>
-+#include <asm/memory.h>
-+#include <asm/outercache.h>
-+
-+#include <asm/irq_regs.h>
-+#include <asm/pmu.h>
-+
-+#define CCI400_PMCR                   0x0100
-+#define CCI400_EAG_OFFSET             0x4000
-+#define CCI400_KF_OFFSET              0x5000
+@@ -24,8 +25,6 @@
+ #include <asm/cp15.h>
  
- #define DRIVER_NAME	"CCI"
- struct cci_drvdata {
-@@ -73,6 +81,15 @@ static int cci_driver_probe(struct platform_device *pdev)
- 		goto ioremap_err;
- 	}
  
-+	/*
-+	 * Multi-cluster systems may need this data when non-coherent, during
-+	 * cluster power-up/power-down. Make sure it reaches main memory:
-+	 */
-+	__cpuc_flush_dcache_area(info, sizeof *info);
-+	__cpuc_flush_dcache_area(&info, sizeof info);
-+	outer_clean_range(virt_to_phys(info), virt_to_phys(info + 1));
-+	outer_clean_range(virt_to_phys(&info), virt_to_phys(&info + 1));
-+
- 	platform_set_drvdata(pdev, info);
+-#define DCSCB_PHYS_BASE	0x60000000
+-
+ #define RST_HOLD0	0x0
+ #define RST_HOLD1	0x4
+ #define SYS_SWRESET	0x8
+@@ -215,12 +214,16 @@ extern void dcscb_power_up_setup(unsigned int affinity_level);
  
- 	pr_info("CCI loaded at %p\n", info->baseaddr);
+ static int __init dcscb_init(void)
+ {
++	struct device_node *node;
+ 	unsigned int cfg;
+ 	int ret;
+ 
+-	dcscb_base = ioremap(DCSCB_PHYS_BASE, 0x1000);
++	node = of_find_compatible_node(NULL, NULL, "arm,dcscb");
++	if (!node)
++		return -ENODEV;
++	dcscb_base= of_iomap(node, 0);
+ 	if (!dcscb_base)
+-		return -ENOMEM;
++		return -EINVAL;
+ 	cfg = readl_relaxed(dcscb_base + DCS_CFG_R);
+ 	dcscb_cluster_cpu_mask[0] = (1 << (((cfg >> 16) >> (0 << 2)) & 0xf)) - 1;
+ 	dcscb_cluster_cpu_mask[1] = (1 << (((cfg >> 16) >> (1 << 2)) & 0xf)) - 1;
 -- 
 1.8.0
