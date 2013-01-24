@@ -1,33 +1,34 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 24 Jan 2013 18:13:03 +0800
-Subject: [alsa-devel] [PATCH V2 2/2] ASoC: Davinci: machine: Add device
- tree binding
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EB530BB@DBDE01.ent.ti.com>
-References: <1357293277-25543-1-git-send-email-gururaja.hebbar@ti.com>
- <1357293277-25543-3-git-send-email-gururaja.hebbar@ti.com>
- <20130104122612.GM4627@opensource.wolfsonmicro.com>
- <1BAFE6F6C881BF42822005164F1491C33EB50DCF@DBDE01.ent.ti.com>
- <20130123154804.GB4565@opensource.wolfsonmicro.com>
- <1BAFE6F6C881BF42822005164F1491C33EB52FD9@DBDE01.ent.ti.com>
- <20130124100252.GE4955@opensource.wolfsonmicro.com>
- <1BAFE6F6C881BF42822005164F1491C33EB530BB@DBDE01.ent.ti.com>
-Message-ID: <20130124101301.GG4955@opensource.wolfsonmicro.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 24 Jan 2013 11:13:56 +0100
+Subject: [PATCH] i2c: at91: add of_device_id entry for at91rm9200
+In-Reply-To: <5100E9A4.9020804@atmel.com>
+References: <1354743732-11581-1-git-send-email-manabian@gmail.com>
+ <20121218060232.GL23971@game.jcrosoft.org>
+ <20130124072714.GH8364@nekote.pengutronix.de>
+ <5100E9A4.9020804@atmel.com>
+Message-ID: <20130124101356.GA12933@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 10:06:42AM +0000, Hebbar, Gururaja wrote:
+Hi,
 
-> What I meant was that by using this macro (SND_SOC_DAPM_POST_PMU &
-> SND_SOC_DAPM_PRE_PMD) I can just save and restore existing voltage values inside
-> the event. They will not be user configurable (available to user through some widget).
+> I didn't add this when I did the rework because there was no DT tree
+> support for RM9200. The configuration for RM9200 IP is already in
+> the driver and used for non DT platform so I think it makes sense to
+> add this.
 
-Well, you *could* add separate register control for that but it's not
-really something that should obviously be exposed to users; usually
-that'd be something that is fixed by the platform via platform data.
+I agree. If it is usable for non-dt, it should be usable for dt. If it
+makes sense is left to the user.
+
+Interpreted Ludovic's comment as ack and applied to -next, thanks!
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
+Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130124/a36077fa/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130124/d5e790cb/attachment.sig>
