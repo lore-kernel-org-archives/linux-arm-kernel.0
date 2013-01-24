@@ -1,494 +1,181 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Jan 2013 13:43:23 -0500
-Subject: Fwd: [PATCH v3 6/7] DT: Convert all kirkwood boards with mv643xx
- that use DT
-Message-ID: <20130124184323.GE1758@titan.lakedaemon.net>
+From: tobetter@gmail.com (Dongjin Kim)
+Date: Fri, 25 Jan 2013 03:46:08 +0900
+Subject: [PATCH RESEND] ARM: dts: max77686: Add DTS file for max77686 PMIC
+Message-ID: <1359053177-17725-1-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+This patch adds a dedicated DTS file for max77686 PMIC, supposed to be included
+in a board DTS to control the power for certain consumer devices or AP with 9 BUCKs
+and 26 LDOs
 
-Here's the patch converting all the kirkwood DT boards to Ian's
-mv643xx_eth binding.  Unfortunately, what I don't like is that the call
-to kirkwood_ge00_init() remains, but with a NULL argument.
-
-thx,
-
-Jason.
-
------ Forwarded message from Ian Molton <ian.molton@codethink.co.uk> -----
-
-Date: Tue,  7 Aug 2012 15:34:51 +0100
-From: Ian Molton <ian.molton@codethink.co.uk>
-To: linux-arm-kernel at lists.infradead.org
-Cc: thomas.petazzoni at free-electrons.com, andrew at lunn.ch,
-	ben.dooks at codethink.co.uk, arnd at arndb.de, netdev at vger.kernel.org
-Subject: [PATCH v3 6/7] DT: Convert all kirkwood boards with mv643xx that use DT
-
-This patch converts all present DT capable kirkwood board configurations
-to use DT to configure the mv643xx ethernet controller.
-
-Signed-off-by: Ian Molton <ian.molton@codethink.co.uk>
+Signed-off-by: Dongjin Kim <tobetter@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-dnskw.dtsi     |    9 +++++++++
- arch/arm/boot/dts/kirkwood-dreamplug.dts  |   18 ++++++++++++++++++
- arch/arm/boot/dts/kirkwood-goflexnet.dts  |    8 ++++++++
- arch/arm/boot/dts/kirkwood-ib62x0.dts     |   10 ++++++++++
- arch/arm/boot/dts/kirkwood-iconnect.dts   |   10 ++++++++++
- arch/arm/boot/dts/kirkwood-lsxl.dtsi      |   17 +++++++++++++++++
- arch/arm/boot/dts/kirkwood-ts219-6281.dts |    8 +++++++-
- arch/arm/boot/dts/kirkwood-ts219-6282.dts |    8 +++++++-
- arch/arm/boot/dts/kirkwood-ts219.dtsi     |    3 +++
- arch/arm/mach-kirkwood/board-dnskw.c      |    7 +------
- arch/arm/mach-kirkwood/board-dreamplug.c  |   13 ++-----------
- arch/arm/mach-kirkwood/board-goflexnet.c  |    7 +------
- arch/arm/mach-kirkwood/board-ib62x0.c     |    7 +------
- arch/arm/mach-kirkwood/board-iconnect.c   |    7 +------
- arch/arm/mach-kirkwood/board-lsxl.c       |   13 ++-----------
- arch/arm/mach-kirkwood/board-ts219.c      |   10 +---------
- 16 files changed, 98 insertions(+), 57 deletions(-)
+ arch/arm/boot/dts/max77686.dtsi |  156 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 156 insertions(+)
+ create mode 100644 arch/arm/boot/dts/max77686.dtsi
 
-diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-index 7408655..214fe0b 100644
---- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-@@ -65,5 +65,14 @@
- 				reg = <0x7b00000 0x500000>;
- 			};
- 		};
+diff --git a/arch/arm/boot/dts/max77686.dtsi b/arch/arm/boot/dts/max77686.dtsi
+new file mode 100644
+index 0000000..b80baef
+--- /dev/null
++++ b/arch/arm/boot/dts/max77686.dtsi
+@@ -0,0 +1,156 @@
++/*
++ * Copyright (C) 2013 Dongjin Kim <tobetter@gmail.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ */
 +
-+		smi0: mdio at 72000 {
-+			status = "ok";
++&max77686 {
++	compatible = "maxim,max77686";
++
++	interrupt-controller;
++	#interrupt-cells = <1>;
++
++	voltage-regulators {
++		buck1: buck at 10 {
++			regulator-compatible = "BUCK1";
 +		};
 +
-+		egiga0 {
-+			phy_addr = <8>;
-+			status = "ok";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index 26e281f..c27ed1c 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -53,6 +53,24 @@
- 			status = "okay";
- 			nr-ports = <1>;
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
++		buck2: buck at 12 {
++			regulator-compatible = "BUCK2";
 +		};
 +
-+		smi1: mdio at 76000 {
-+			status = "ok";
++		buck3: buck at 1c {
++			regulator-compatible = "BUCK3";
 +		};
 +
-+		egiga0 {
-+			phy_addr = <0>;
-+			status = "ok";
++		buck4: buck at 26 {
++			regulator-compatible = "BUCK4";
 +		};
 +
-+		egiga1 {
-+			phy_addr = <1>;
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio-leds {
-diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts b/arch/arm/boot/dts/kirkwood-goflexnet.dts
-index 7c8238f..f03dbd0 100644
---- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
-+++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
-@@ -50,6 +50,14 @@
- 			nr-ports = <2>;
- 		};
- 
-+		smi0: mdio at 72000 {
-+			status = "ok";
++		buck5: buck at 30 {
++			regulator-compatible = "BUCK5";
 +		};
 +
-+		egiga0 {
-+			phy_addr = <0>;
-+			status = "ok";
-+		};
- 	};
- 	gpio-leds {
- 		compatible = "gpio-leds";
-diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-index 66794ed..8c462a1 100644
---- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
-+++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-@@ -45,6 +45,16 @@
- 			};
- 
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
++		buck6: buck at 32 {
++			regulator-compatible = "BUCK6";
 +		};
 +
-+		egiga0 {
-+			phy_addr = <8>;
-+			status = "ok";
++		buck7: buck at 34 {
++			regulator-compatible = "BUCK7";
 +		};
 +
- 	};
- 
- 	gpio_keys {
-diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
-index 52d9470..9fc82be 100644
---- a/arch/arm/boot/dts/kirkwood-iconnect.dts
-+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
-@@ -30,6 +30,16 @@
- 			clock-frequency = <200000000>;
- 			status = "ok";
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
++		buck8: buck at 36 {
++			regulator-compatible = "BUCK8";
 +		};
 +
-+		egiga0 {
-+			phy_addr = <b>;
-+			status = "ok";
++		buck9: buck at 38 {
++			regulator-compatible = "BUCK9";
 +		};
 +
- 	};
- 	gpio-leds {
- 		compatible = "gpio-leds";
-diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-index 8ac51c0..2f47661 100644
---- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-@@ -40,6 +40,23 @@
- 				};
- 			};
- 		};
-+		smi0: mdio at 72000 {
-+			status = "ok";
++		ldo1: ldo at 40 {
++			regulator-compatible = "LDO1";
 +		};
 +
-+		smi1: mdio at 76000 {
-+			status = "ok";
++		ldo2: ldo at 41 {
++			regulator-compatible = "LDO2";
 +		};
 +
-+		egiga0 {
-+			phy_addr = <0>;
-+			status = "ok";
++		ldo3: ldo at 42 {
++			regulator-compatible = "LDO3";
 +		};
 +
-+		egiga1 {
-+			phy_addr = <8>;
-+			status = "ok";
++		ldo4: ldo at 43 {
++			regulator-compatible = "LDO4";
 +		};
- 	};
- 
- 	gpio_keys {
-diff --git a/arch/arm/boot/dts/kirkwood-ts219-6281.dts b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-index ccbf327..4ca49b5 100644
---- a/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-@@ -3,6 +3,12 @@
- /include/ "kirkwood-ts219.dtsi"
- 
- / {
-+	ocp at f1000000 {
-+		egiga0 {
-+			phy_addr = <8>;
-+			status = "ok";
++
++		ldo5: ldo at 44 {
++			regulator-compatible = "LDO5";
++		};
++
++		ldo6: ldo at 45 {
++			regulator-compatible = "LDO6";
++		};
++
++		ldo7: ldo at 46 {
++			regulator-compatible = "LDO7";
++		};
++
++		ldo8: ldo at 47 {
++			regulator-compatible = "LDO8";
++		};
++
++		ldo9: ldo at 48 {
++			regulator-compatible = "LDO9";
++		};
++
++		ldo10: ldo at 49 {
++			regulator-compatible = "LDO10";
++		};
++
++		ldo11: ldo at 4a {
++			regulator-compatible = "LDO11";
++		};
++
++		ldo12: ldo at 4b {
++			regulator-compatible = "LDO12";
++		};
++
++		ldo13: ldo at 4c {
++			regulator-compatible = "LDO13";
++		};
++
++		ldo14: ldo at 4d {
++			regulator-compatible = "LDO14";
++		};
++
++		ldo15: ldo at 4e {
++			regulator-compatible = "LDO15";
++		};
++
++		ldo16: ldo at 4f {
++			regulator-compatible = "LDO16";
++		};
++
++		ldo17: ldo at 50 {
++			regulator-compatible = "LDO17";
++		};
++
++		ldo18: ldo at 51 {
++			regulator-compatible = "LDO18";
++		};
++
++		ldo19: ldo at 52 {
++			regulator-compatible = "LDO19";
++		};
++
++		ldo20: ldo at 53 {
++			regulator-compatible = "LDO20";
++		};
++
++		ldo21: ldo at 54 {
++			regulator-compatible = "LDO21";
++		};
++
++		ldo22: ldo at 55 {
++			regulator-compatible = "LDO22";
++		};
++
++		ldo23: ldo at 56 {
++			regulator-compatible = "LDO23";
++		};
++
++		ldo24: ldo at 57 {
++			regulator-compatible = "LDO24";
++		};
++
++		ldo25: ldo at 58 {
++			regulator-compatible = "LDO25";
++		};
++
++		ldo26: ldo at 59 {
++			regulator-compatible = "LDO26";
 +		};
 +	};
- 	gpio_keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
-@@ -18,4 +24,4 @@
- 			gpios = <&gpio0 16 1>;
- 		};
- 	};
--};
-\ No newline at end of file
 +};
-diff --git a/arch/arm/boot/dts/kirkwood-ts219-6282.dts b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-index fbe9932..40f3c61 100644
---- a/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-@@ -3,6 +3,12 @@
- /include/ "kirkwood-ts219.dtsi"
- 
- / {
-+	ocp at f1000000 {
-+		egiga0 {
-+			phy_addr = <0>;
-+			status = "ok";
-+		};
-+	};
- 	gpio_keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
-@@ -18,4 +24,4 @@
- 			gpios = <&gpio1 5 1>;
- 		};
- 	};
--};
-\ No newline at end of file
-+};
-diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-index 64ea27c..06caf41 100644
---- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-@@ -74,5 +74,8 @@
- 			status = "okay";
- 			nr-ports = <2>;
- 		};
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
- 	};
- };
-diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index 4ab3506..4d8216b 100644
---- a/arch/arm/mach-kirkwood/board-dnskw.c
-+++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -15,7 +15,6 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/ata_platform.h>
--#include <linux/mv643xx_eth.h>
- #include <linux/of.h>
- #include <linux/gpio.h>
- #include <linux/input.h>
-@@ -29,10 +28,6 @@
- #include "common.h"
- #include "mpp.h"
- 
--static struct mv643xx_eth_platform_data dnskw_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
- static unsigned int dnskw_mpp_config[] __initdata = {
- 	MPP13_UART1_TXD,	/* Custom ... */
- 	MPP14_UART1_RXD,	/* ... Controller (DNS-320 only) */
-@@ -112,7 +107,7 @@ void __init dnskw_init(void)
- 	kirkwood_mpp_conf(dnskw_mpp_config);
- 
- 	kirkwood_ehci_init();
--	kirkwood_ge00_init(&dnskw_ge00_data);
-+	kirkwood_ge00_init(NULL);
- 
- 	platform_device_register(&dnskw_fan_device);
- 
-diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
-index aeb234d..b97a112 100644
---- a/arch/arm/mach-kirkwood/board-dreamplug.c
-+++ b/arch/arm/mach-kirkwood/board-dreamplug.c
-@@ -15,7 +15,6 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/ata_platform.h>
--#include <linux/mv643xx_eth.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_fdt.h>
-@@ -34,14 +33,6 @@
- #include "common.h"
- #include "mpp.h"
- 
--static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--static struct mv643xx_eth_platform_data dreamplug_ge01_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
--};
--
- static struct mvsdio_platform_data dreamplug_mvsdio_data = {
- 	/* unfortunately the CD signal has not been connected */
- };
-@@ -65,7 +56,7 @@ void __init dreamplug_init(void)
- 	kirkwood_mpp_conf(dreamplug_mpp_config);
- 
- 	kirkwood_ehci_init();
--	kirkwood_ge00_init(&dreamplug_ge00_data);
--	kirkwood_ge01_init(&dreamplug_ge01_data);
-+	kirkwood_ge00_init(NULL);
-+	kirkwood_ge01_init(NULL);
- 	kirkwood_sdio_init(&dreamplug_mvsdio_data);
- }
-diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
-index 413e2c8..be7437d 100644
---- a/arch/arm/mach-kirkwood/board-goflexnet.c
-+++ b/arch/arm/mach-kirkwood/board-goflexnet.c
-@@ -20,7 +20,6 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/ata_platform.h>
--#include <linux/mv643xx_eth.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_fdt.h>
-@@ -36,10 +35,6 @@
- #include "common.h"
- #include "mpp.h"
- 
--static struct mv643xx_eth_platform_data goflexnet_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
- static unsigned int goflexnet_mpp_config[] __initdata = {
- 	MPP29_GPIO,	/* USB Power Enable */
- 	MPP47_GPIO,	/* LED Orange */
-@@ -67,5 +62,5 @@ void __init goflexnet_init(void)
- 		pr_err("can't setup GPIO 29 (USB Power Enable)\n");
- 	kirkwood_ehci_init();
- 
--	kirkwood_ge00_init(&goflexnet_ge00_data);
-+	kirkwood_ge00_init(NULL);
- }
-diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
-index cfc47f8..0a29183 100644
---- a/arch/arm/mach-kirkwood/board-ib62x0.c
-+++ b/arch/arm/mach-kirkwood/board-ib62x0.c
-@@ -16,7 +16,6 @@
- #include <linux/platform_device.h>
- #include <linux/mtd/partitions.h>
- #include <linux/ata_platform.h>
--#include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
- #include <linux/input.h>
- #include <asm/mach-types.h>
-@@ -27,10 +26,6 @@
- 
- #define IB62X0_GPIO_POWER_OFF	24
- 
--static struct mv643xx_eth_platform_data ib62x0_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
- static unsigned int ib62x0_mpp_config[] __initdata = {
- 	MPP0_NF_IO2,
- 	MPP1_NF_IO3,
-@@ -62,7 +57,7 @@ void __init ib62x0_init(void)
- 	kirkwood_mpp_conf(ib62x0_mpp_config);
- 
- 	kirkwood_ehci_init();
--	kirkwood_ge00_init(&ib62x0_ge00_data);
-+	kirkwood_ge00_init(NULL);
- 	if (gpio_request(IB62X0_GPIO_POWER_OFF, "ib62x0:power:off") == 0 &&
- 	    gpio_direction_output(IB62X0_GPIO_POWER_OFF, 0) == 0)
- 		pm_power_off = ib62x0_power_off;
-diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
-index d7a9198..220f0d4 100644
---- a/arch/arm/mach-kirkwood/board-iconnect.c
-+++ b/arch/arm/mach-kirkwood/board-iconnect.c
-@@ -17,7 +17,6 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/mtd/partitions.h>
--#include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-@@ -26,10 +25,6 @@
- #include "common.h"
- #include "mpp.h"
- 
--static struct mv643xx_eth_platform_data iconnect_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(11),
--};
--
- static unsigned int iconnect_mpp_config[] __initdata = {
- 	MPP12_GPIO,
- 	MPP35_GPIO,
-@@ -92,7 +87,7 @@ void __init iconnect_init(void)
- 	kirkwood_nand_init(ARRAY_AND_SIZE(iconnect_nand_parts), 25);
- 
- 	kirkwood_ehci_init();
--	kirkwood_ge00_init(&iconnect_ge00_data);
-+	kirkwood_ge00_init(NULL);
- 
- 	platform_device_register(&iconnect_button_device);
- }
-diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
-index 83d8975..60331d1 100644
---- a/arch/arm/mach-kirkwood/board-lsxl.c
-+++ b/arch/arm/mach-kirkwood/board-lsxl.c
-@@ -18,7 +18,6 @@
- #include <linux/ata_platform.h>
- #include <linux/spi/flash.h>
- #include <linux/spi/spi.h>
--#include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
- #include <linux/gpio-fan.h>
- #include <linux/input.h>
-@@ -28,14 +27,6 @@
- #include "common.h"
- #include "mpp.h"
- 
--static struct mv643xx_eth_platform_data lsxl_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--static struct mv643xx_eth_platform_data lsxl_ge01_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
- static unsigned int lsxl_mpp_config[] __initdata = {
- 	MPP10_GPO,	/* HDD Power Enable */
- 	MPP11_GPIO,	/* USB Vbus Enable */
-@@ -126,8 +117,8 @@ void __init lsxl_init(void)
- 	gpio_set_value(LSXL_GPIO_HDD_POWER, 1);
- 
- 	kirkwood_ehci_init();
--	kirkwood_ge00_init(&lsxl_ge00_data);
--	kirkwood_ge01_init(&lsxl_ge01_data);
-+	kirkwood_ge00_init(NULL);
-+	kirkwood_ge01_init(NULL);
- 	platform_device_register(&lsxl_fan_device);
- 
- 	/* register power-off method */
-diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
-index 1750e68..7e7fe6c 100644
---- a/arch/arm/mach-kirkwood/board-ts219.c
-+++ b/arch/arm/mach-kirkwood/board-ts219.c
-@@ -18,7 +18,6 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
--#include <linux/mv643xx_eth.h>
- #include <linux/ata_platform.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-@@ -29,10 +28,6 @@
- #include "mpp.h"
- #include "tsx1x-common.h"
- 
--static struct mv643xx_eth_platform_data qnap_ts219_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
- static unsigned int qnap_ts219_mpp_config[] __initdata = {
- 	MPP0_SPI_SCn,
- 	MPP1_SPI_MOSI,
-@@ -62,10 +57,7 @@ void __init qnap_dt_ts219_init(void)
- 	kirkwood_mpp_conf(qnap_ts219_mpp_config);
- 
- 	kirkwood_pcie_id(&dev, &rev);
--	if (dev == MV88F6282_DEV_ID)
--		qnap_ts219_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
--
--	kirkwood_ge00_init(&qnap_ts219_ge00_data);
-+	kirkwood_ge00_init(NULL);
- 	kirkwood_ehci_init();
- 
- 	pm_power_off = qnap_tsx1x_power_off;
 -- 
-1.7.9.5
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
------ End forwarded message -----
+1.7.10.4
