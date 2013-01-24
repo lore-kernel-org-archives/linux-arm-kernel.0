@@ -1,140 +1,121 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 24 Jan 2013 13:10:23 +0200
-Subject: [v4 3/6] ARM: dt: tegra114: Add new SoC base, Tegra114 SoC
+Date: Thu, 24 Jan 2013 13:10:26 +0200
+Subject: [v4 6/6] ARM: tegra: Add initial support for Tegra114 SoC.
 In-Reply-To: <1359025829-22306-1-git-send-email-hdoyu@nvidia.com>
 References: <1359025829-22306-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1359025829-22306-4-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1359025829-22306-7-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial support for Tegra 114 SoC. This is expected to be included in
-the board DTS files, Tegra 114 SoC based evaluation board family.
+Add new Tegra 114 SoC support.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- arch/arm/boot/dts/tegra114.dtsi |  114 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 114 insertions(+)
- create mode 100644 arch/arm/boot/dts/tegra114.dtsi
+ arch/arm/mach-tegra/Kconfig             |   10 +++++++
+ arch/arm/mach-tegra/Makefile            |    1 +
+ arch/arm/mach-tegra/board-dt-tegra114.c |   48 +++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/common.c            |    1 +
+ 4 files changed, 60 insertions(+)
+ create mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index abc688f..eada60f 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -45,6 +45,16 @@ config ARCH_TEGRA_3x_SOC
+ 	  Support for NVIDIA Tegra T30 processor family, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+ 
++config ARCH_TEGRA_114_SOC
++	bool "Enable support for Tegra114 family"
++	select ARM_GIC
++	select CPU_V7
++	select ARM_L1_CACHE_SHIFT_6
++	select ARM_ARCH_TIMER
++	help
++	  Support for NVIDIA Tegra T114 processor family, based on the
++	  ARM CortexA15MP CPU
++
+ config TEGRA_PCI
+ 	bool "PCI Express support"
+ 	depends on ARCH_TEGRA_2x_SOC
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 432f2a5..e1eaf30 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -28,6 +28,7 @@ obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
+ 
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-dt-tegra20.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
++obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= board-dt-tegra114.o
+ 
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-harmony-pcie.o
+ 
+diff --git a/arch/arm/mach-tegra/board-dt-tegra114.c b/arch/arm/mach-tegra/board-dt-tegra114.c
 new file mode 100644
-index 0000000..c567916
+index 0000000..3ed17ce
 --- /dev/null
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -0,0 +1,114 @@
-+/include/ "skeleton.dtsi"
++++ b/arch/arm/mach-tegra/board-dt-tegra114.c
+@@ -0,0 +1,48 @@
++/*
++ * NVIDIA Tegra114 device tree board support
++ *
++ * Copyright (C) 2013 NVIDIA Corporation
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
 +
-+/ {
-+	compatible = "nvidia,tegra114";
-+	interrupt-parent = <&gic>;
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/clocksource.h>
 +
-+	gic: interrupt-controller {
-+		compatible = "arm,cortex-a15-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x50041000 0x1000>,
-+		      <0x50042000 0x1000>,
-+		      <0x50044000 0x2000>,
-+		      <0x50046000 0x2000>;
-+		interrupts = <1 9 0xf04>;
-+	};
++#include <asm/mach/arch.h>
++#include <asm/hardware/gic.h>
 +
-+	timer at 60005000 {
-+		compatible = "nvidia,tegra114-timer", "nvidia,tegra20-timer";
-+		reg = <0x60005000 0x400>;
-+		interrupts = <0 0 0x04
-+			      0 1 0x04
-+			      0 41 0x04
-+			      0 42 0x04
-+			      0 121 0x04
-+			      0 122 0x04>;
-+	};
++#include "board.h"
++#include "common.h"
 +
-+	tegra_car: clock {
-+		compatible = "nvidia,tegra114-car, nvidia,tegra30-car";
-+		reg = <0x60006000 0x1000>;
-+		#clock-cells = <1>;
-+	};
++static void __init tegra114_dt_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
 +
-+	serial at 70006000 {
-+		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
-+		reg = <0x70006000 0x40>;
-+		reg-shift = <2>;
-+		interrupts = <0 36 0x04>;
-+		status = "disabled";
-+	};
-+
-+	serial at 70006040 {
-+		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
-+		reg = <0x70006040 0x40>;
-+		reg-shift = <2>;
-+		interrupts = <0 37 0x04>;
-+		status = "disabled";
-+	};
-+
-+	serial at 70006200 {
-+		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
-+		reg = <0x70006200 0x100>;
-+		reg-shift = <2>;
-+		interrupts = <0 46 0x04>;
-+		status = "disabled";
-+	};
-+
-+	serial at 70006300 {
-+		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
-+		reg = <0x70006300 0x100>;
-+		reg-shift = <2>;
-+		interrupts = <0 90 0x04>;
-+		status = "disabled";
-+	};
-+
-+	rtc {
-+		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
-+		reg = <0x7000e000 0x100>;
-+		interrupts = <0 2 0x04>;
-+	};
-+
-+	pmc {
-+		compatible = "nvidia,tegra114-pmc", "nvidia,tegra30-pmc";
-+		reg = <0x7000e400 0x400>;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <2>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <3>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <1 13 0xf08>,
-+			     <1 14 0xf08>,
-+			     <1 11 0xf08>,
-+			     <1 10 0xf08>;
-+	};
++static const char * const tegra114_dt_board_compat[] = {
++	"nvidia,tegra114",
++	NULL,
 +};
++
++DT_MACHINE_START(TEGRA114_DT, "NVIDIA Tegra114 (Flattened Device Tree)")
++	.smp		= smp_ops(tegra_smp_ops),
++	.map_io		= tegra_map_common_io,
++	.init_early	= tegra30_init_early,
++	.init_irq	= tegra_dt_init_irq,
++	.handle_irq	= gic_handle_irq,
++	.init_time	= clocksource_of_init,
++	.init_machine	= tegra114_dt_init,
++	.init_late	= tegra_init_late,
++	.restart	= tegra_assert_system_reset,
++	.dt_compat	= tegra114_dt_board_compat,
++MACHINE_END
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 87dd69c..2f13513 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -59,6 +59,7 @@ u32 tegra_uart_config[4] = {
+ 
+ #ifdef CONFIG_OF
+ static const struct of_device_id tegra_dt_irq_match[] __initconst = {
++	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init },
+ 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
+ 	{ }
+ };
 -- 
 1.7.9.5
