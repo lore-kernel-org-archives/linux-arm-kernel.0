@@ -1,61 +1,87 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 24 Jan 2013 09:46:37 +0100
-Subject: [PATCH 7/9] ARM: at91/at91_dt_defconfig: remove memory
- specification to cmdline
-In-Reply-To: <20130123102057.GJ7360@game.jcrosoft.org>
-References: <cover.1358934163.git.nicolas.ferre@atmel.com>
- <2e06e92c758b768baaacc061aafa7f710b74ea02.1358934163.git.nicolas.ferre@atmel.com>
- <20130123102057.GJ7360@game.jcrosoft.org>
-Message-ID: <5100F4ED.9000004@atmel.com>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Thu, 24 Jan 2013 09:56:30 +0100
+Subject: Sound/ARM/i.MX/SSI: fix SDMA starvation
+Message-ID: <201301240956.30641.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2013 11:20 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 10:48 Wed 23 Jan     , Nicolas Ferre wrote:
->> No need for this cmdline option as we are using DT.
->> Moreover this defconfig is targeted to multiple SoC/boards: this option
->> was nonsense.
-> just keep the console the rest is a nonsense too
-> 
-> as on 9g45 the initrd will be at 0x7xxxxxxx
+In cases when capturing is already running and someone enables also
+playback, the SDMA unit of the i.MX SoC does not see an edge on its TX DMA
+request line. This is due to the TX FIFOs are empty, and this request line is
+active all the time, when the CCSR_SSI_SIER_TDMAE bit is set.
+In this case also the TX FIFO underrun interrupt will flood the system forever.
 
-Understood, but I prefer to keep a "root" option at least, so I keep it
-like this.
+To ensure the first edge happens after enabling the TX side of the SSI unit and
+to trigger the SDMA unit successfully enable the CCSR_SSI_SIER_TDMAE on
+demand only. To be sure, this patch does the same for the CCSR_SSI_SIER_RDMAE
+(RX side) bit.
 
-> the console too but as the patch serie to support via DT is not yet mainline
-> we can keep it
+Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 
-Ok for this.
+---
+ sound/soc/fsl/fsl_ssi.c |   24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
 
-> 
-> Best Regards,
-> J.
->>
->> Reported-by: Josh Wu <josh.wu@atmel.com>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  arch/arm/configs/at91_dt_defconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
->> index b175577..a353ff6 100644
->> --- a/arch/arm/configs/at91_dt_defconfig
->> +++ b/arch/arm/configs/at91_dt_defconfig
->> @@ -31,7 +31,7 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
->>  CONFIG_ZBOOT_ROM_BSS=0x0
->>  CONFIG_ARM_APPENDED_DTB=y
->>  CONFIG_ARM_ATAG_DTB_COMPAT=y
->> -CONFIG_CMDLINE="mem=128M console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
->> +CONFIG_CMDLINE="console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
->>  CONFIG_KEXEC=y
->>  CONFIG_AUTO_ZRELADDR=y
->>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
->> -- 
->> 1.8.0
->>
-> 
-> 
-
+Index: linux.git/sound/soc/fsl/fsl_ssi.c
+===================================================================
+--- linux.git.orig/sound/soc/fsl/fsl_ssi.c
++++ linux.git/sound/soc/fsl/fsl_ssi.c
+@@ -86,10 +86,9 @@ static inline void write_ssi_mask(u32 __
+ #endif
+ 
+ /* SIER bitflag of interrupts to enable */
+-#define SIER_FLAGS (CCSR_SSI_SIER_TFRC_EN | CCSR_SSI_SIER_TDMAE | \
+-		    CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TUE0_EN | \
+-		    CCSR_SSI_SIER_TUE1_EN | CCSR_SSI_SIER_RFRC_EN | \
+-		    CCSR_SSI_SIER_RDMAE | CCSR_SSI_SIER_RIE | \
++#define SIER_FLAGS (CCSR_SSI_SIER_TFRC_EN | CCSR_SSI_SIER_TIE | \
++		    CCSR_SSI_SIER_TUE0_EN | CCSR_SSI_SIER_TUE1_EN | \
++		    CCSR_SSI_SIER_RFRC_EN | CCSR_SSI_SIER_RIE | \
+ 		    CCSR_SSI_SIER_ROE0_EN | CCSR_SSI_SIER_ROE1_EN)
+ 
+ /**
+@@ -489,6 +488,9 @@ static int fsl_ssi_hw_params(struct snd_
+  *
+  * The DMA channel is in external master start and pause mode, which
+  * means the SSI completely controls the flow of data.
++ *
++ * To use the i.MX's SDMA unit it is important to create an edge on the
++ * corresponding request line. Otherwise the request will be ignored!
+  */
+ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+ 			   struct snd_soc_dai *dai)
+@@ -500,20 +502,26 @@ static int fsl_ssi_trigger(struct snd_pc
+ 	switch (cmd) {
+ 	case SNDRV_PCM_TRIGGER_START:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+ 			write_ssi_mask(&ssi->scr, 0,
+ 				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE);
+-		else
++			write_ssi_mask(&ssi->sier, 0, CCSR_SSI_SIER_TDMAE);
++		} else {
+ 			write_ssi_mask(&ssi->scr, 0,
+ 				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_RE);
++			write_ssi_mask(&ssi->sier, 0, CCSR_SSI_SIER_RDMAE);
++		}
+ 		break;
+ 
+ 	case SNDRV_PCM_TRIGGER_STOP:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+ 			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_TE, 0);
+-		else
++			write_ssi_mask(&ssi->sier, CCSR_SSI_SIER_TDMAE, 0);
++		} else {
+ 			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_RE, 0);
++			write_ssi_mask(&ssi->sier, CCSR_SSI_SIER_RDMAE, 0);
++		}
+ 		break;
+ 
+ 	default:
 
 -- 
-Nicolas Ferre
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
