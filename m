@@ -1,82 +1,80 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 24 Jan 2013 17:07:33 +0100
-Subject: [PATCH 3/3] ARM: shmobile: move pin configuration on
- armadillo800eva-reference to DT
-In-Reply-To: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
-References: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <1359043653-11374-4-git-send-email-g.liakhovetski@gmx.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Jan 2013 16:12:11 +0000
+Subject: OMAP4 randconfig failure: Zynq
+In-Reply-To: <20130124160609.GW23505@n2100.arm.linux.org.uk>
+References: <20130124111117.GU23505@n2100.arm.linux.org.uk>
+ <20130124155704.GJ11970@beefymiracle.amer.corp.natinst.com>
+ <20130124160609.GW23505@n2100.arm.linux.org.uk>
+Message-ID: <20130124161211.GX23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pinctrl and sh-eth DT bindings to configure sh-eth MAC pins on
-armadillo800eva in reference implementation.
+On Thu, Jan 24, 2013 at 04:06:09PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 24, 2013 at 09:57:04AM -0600, Josh Cartwright wrote:
+> > On Thu, Jan 24, 2013 at 11:11:17AM +0000, Russell King - ARM Linux wrote:
+> > > The OMAP4 randconfig build last night failed with this error:
+> > > 
+> > > arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
+> > > 
+> > > Full details at the usual place - 
+> > > http://www.arm.linux.org.uk/developer/build/
+> > 
+> > Curious.  This doesn't look like a valid config to me.
+> 
+> I think you're wrong.
+> 
+> > In particular, both ARCH_MULTIPLATFORM and ARCH_OMAP are selected, even
+> > though those selections should be mutually exclusive, since they fall
+> > under the same:
+> > 
+> >     choice
+> >     	prompt "ARM system type"
+> >     	default ARCH_MULTIPLATFORM
+> > 
+> > Perhaps it's because CONFIG_ARCH_OMAP=y was setup in the seed?
+> 
+> ARCH_OMAP2PLUS selects ARCH_OMAP, and ARCH_OMAP2PLUS must be enabled
+> to produce a configuration including any OMAP code.
+> 
+> > oldconfig seems to complain, too:
+> > 
+> >       .config:340:warning: override: ARCH_OMAP changes choice state
+> 
+> Err, nope, don't get that warning.
+> 
+> $ mkdir /tmp/build
+> $ wget -O /tmp/build/.config 'http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=3562'
+> $ emake -j2 O=/tmp/build/ oldconfig
+>   GEN     /tmp/build/Makefile
+>   HOSTCC  scripts/basic/fixdep
+>   HOSTCC  scripts/kconfig/conf.o
+>   SHIPPED scripts/kconfig/zconf.tab.c
+>   SHIPPED scripts/kconfig/zconf.lex.c
+>   SHIPPED scripts/kconfig/zconf.hash.c
+>   HOSTCC  scripts/kconfig/zconf.tab.o
+>   HOSTLD  scripts/kconfig/conf
+> scripts/kconfig/conf --oldconfig Kconfig
+> #
+> # configuration written to .config
+> #
+> 
+> So, the config system produced this configuration, and the config system
+> believes it to be correct.  The problem lies elsewhere.
+> 
+> Clearly from the error, for a configuration for an OMAP platform to be
+> errored out by a Zynq error, that means there's something that Zynq is
+> missing.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
- .../boot/dts/r8a7740-armadillo800eva-reference.dts |    7 +++++
- .../board-armadillo800eva-reference.c              |   24 --------------------
- 2 files changed, 7 insertions(+), 24 deletions(-)
+And what's missing is _specific_ to Zynq.  Let's look at the error again:
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 11cb0f9..b815ffd9 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -26,9 +26,12 @@
- 		reg = <0xe9a00000 0x800>, <0xe9a01800 0x800>;
- 		interrupts = <0x500>;
- 		phy-mode = "mii";
-+		phy-reset-gpios = <&gpio 18 1>;
- 		sh-eth,edmac-endian = "little";
- 		sh-eth,register-type = "gigabit";
- 		sh-eth,phy-id = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&eth_pins>;
- 	};
- 
- 	reg_3p3v: regulator at 0 {
-@@ -137,4 +140,8 @@
- 		renesas,pins = "mmc0_data8_1", "mmc0_ctrl_1";
- 		renesas,function = "mmc0";
- 	};
-+	eth_pins: pfc_eth_pins {
-+		renesas,pins = "eth_base";
-+		renesas,function = "eth";
-+	};
- };
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-index 92d7106..54ec573e 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-@@ -152,30 +152,6 @@ static void __init eva_init(void)
- 	gpio_request(GPIO_FN_SCIFA1_RXD, NULL);
- 	gpio_request(GPIO_FN_SCIFA1_TXD, NULL);
- 
--	/* GETHER */
--	gpio_request(GPIO_FN_ET_CRS,		NULL);
--	gpio_request(GPIO_FN_ET_MDC,		NULL);
--	gpio_request(GPIO_FN_ET_MDIO,		NULL);
--	gpio_request(GPIO_FN_ET_TX_ER,		NULL);
--	gpio_request(GPIO_FN_ET_RX_ER,		NULL);
--	gpio_request(GPIO_FN_ET_ERXD0,		NULL);
--	gpio_request(GPIO_FN_ET_ERXD1,		NULL);
--	gpio_request(GPIO_FN_ET_ERXD2,		NULL);
--	gpio_request(GPIO_FN_ET_ERXD3,		NULL);
--	gpio_request(GPIO_FN_ET_TX_CLK,		NULL);
--	gpio_request(GPIO_FN_ET_TX_EN,		NULL);
--	gpio_request(GPIO_FN_ET_ETXD0,		NULL);
--	gpio_request(GPIO_FN_ET_ETXD1,		NULL);
--	gpio_request(GPIO_FN_ET_ETXD2,		NULL);
--	gpio_request(GPIO_FN_ET_ETXD3,		NULL);
--	gpio_request(GPIO_FN_ET_PHY_INT,	NULL);
--	gpio_request(GPIO_FN_ET_COL,		NULL);
--	gpio_request(GPIO_FN_ET_RX_DV,		NULL);
--	gpio_request(GPIO_FN_ET_RX_CLK,		NULL);
--
--	gpio_request(GPIO_PORT18, NULL); /* PHY_RST */
--	gpio_direction_output(GPIO_PORT18, 1);
--
- #ifdef CONFIG_CACHE_L2X0
- 	/* Early BRESP enable, Shared attribute override enable, 32K*8way */
- 	l2x0_init(IOMEM(0xf0002000), 0x40440000, 0x82000fff);
--- 
-1.7.2.5
+arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
+
+What it means is that the "irqchip_init" identifier was not declared by
+anything before it has been used.  That means arch/arm/mach-zynq/common.c
+is missing a required #include statement.
+
+irqchip_init can be found in linux/irqchip.h.  Does arch/arm/mach-zynq/common.c
+include this required include?  No.  Therefore, the build fails with the
+above error.
+
+You need to add this include file...
