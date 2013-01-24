@@ -1,42 +1,69 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 24 Jan 2013 12:49:37 +0000
-Subject: [GIT PULL] vexpress: fixes for v3.8-rc5
-Message-ID: <1359031777.26878.49.camel@hornet>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Thu, 24 Jan 2013 12:49:53 +0000
+Subject: OMAP baseline test results for v3.8-rc4
+In-Reply-To: <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
+ <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
+ <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
+ <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
+ <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECFA0FC@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Paul,
 
-Could you, please, pull this small series of VE fixes for v3.8-rc5? It:
+On Tue, Jan 22, 2013 at 07:54:44, Paul Walmsley wrote:
+> 
+> Hi guys,
+> 
+> Regarding the AM33xx test failures with appended DTBs, it would be very 
+> helpful if especially the TI people could try reproducing the problem.
+> Otherwise it's going to cause problems with merging any new AM33xx 
+> patches, since I won't be able to test them without additional work.  
+> Plus, this is something that used to work up until d01e4afd, so something 
+> isn't right.
+> 
+> You'll need to use the bootloader that TI originally shipped with the 
+> BeagleBones:
+> 
+> U-Boot 2011.09-00009-gcf6e04d (Mar 08 2012 - 17:15:43)
+> 
+> This is because many folks don't replace their bootloader.  I do plan to 
+> add a test with a recent version of u-boot, but the kernel should not be 
+> dependent on the bootloader in any way to work correctly.  If it is, then 
+> we need to document what u-boot version the kernel started to work with.
+> 
+> The Kconfig that I use is here:
+> 
+> http://www.pwsan.com/omap/testlogs/test_v3.8-rc4/20130120122039/build/am33xx_only/am33xx_only
+> 
+> It's possible that there's something wrong with the Kconfig.  It's 
+> basically just omap2plus_defconfig, but with all OMAP support for 
+> non-AM33xx turned off, and with the appended DTB and ATAG compatibility 
+> options turned on.
+> 
+> Let's try to do this ASAP.  That way, if it's some bootloader dependency 
+> or bug in the kernel, some fix can be merged during the v3.8-rc series, 
+> which is rapidly drawing to a close.
+> 
 
-* makes the V2P-CA15_A7 (a.k.a. TC2) work with 3.8 kernels
-* improves vexpress-sysreg.c behaviour on arm64 platforms
+I could not track down U-Boot that you were using so I used the v2013.01 tag
+for U-Boot. However, using your build configs for v3.7 and v3.8-rcX I got the same
+observations i.e. v3.7 boots but others don't.
 
-Thanks!
+One difference that I found was that post v3.7 the configs that you are using have
+CONFIG_EARLY_PRINTK set. Once I disabled that I was able to bootup v3.8-rc1/4
+(didn't try rc2/3 but I suspect early_printk was the culprit there too).
 
-Pawel
+I checked with Santosh on this and he mentioned that for DT-only boot, which AM335x is,
+that's expected behavior.
 
-The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
+Can you update your AM335x-only config to disable CONFIG_EARLY_PRINTK or just skip
+earlyprintk option in the bootargs for now?
 
-  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+If you still have issues booting can you update your U-Boot to v2013.01 since things
+seem to be working fine at this point.
 
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawelmoll/linux.git vexpress/fixes
-
-for you to fetch changes up to 52666298aebe5e9ab28a773ee61d2ce81fa097bb:
-
-  mfd: vexpress-sysreg: Don't skip initialization on probe (2013-01-24 12:19:23 +0000)
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (1):
-      ARM: vexpress: extend the MPIDR range used for pen release check
-
-Pawel Moll (2):
-      ARM: vexpress: Enable A7 cores in V2P-CA15_A7's Device Tree
-      mfd: vexpress-sysreg: Don't skip initialization on probe
-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |    2 --
- arch/arm/plat-versatile/headsmp.S          |    2 +-
- drivers/mfd/vexpress-sysreg.c              |   32 +++++++++++++++++-----------
- 3 files changed, 21 insertions(+), 15 deletions(-)
+Regards,
+Vaibhav
