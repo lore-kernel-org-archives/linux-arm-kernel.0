@@ -1,58 +1,77 @@
-From: kishon@ti.com (kishon)
-Date: Fri, 25 Jan 2013 00:28:43 +0530
-Subject: [PATCH v1 4/6] drivers: usb: musb: omap: make use of the new
- PHY lib APIs
-In-Reply-To: <50FE9DA6.4030507@ti.com>
-References: <1358848694-20145-1-git-send-email-kishon@ti.com>
- <1358848694-20145-5-git-send-email-kishon@ti.com> <50FE9DA6.4030507@ti.com>
-Message-ID: <51018463.4040908@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 24 Jan 2013 20:00:05 +0100
+Subject: [RFC/PATCH 24/32] usb: gadget: s3c-hsotg: let udc-core manage
+ gadget->dev
+In-Reply-To: <1359042370-4358-25-git-send-email-balbi@ti.com>
+References: <1359042370-4358-1-git-send-email-balbi@ti.com>
+ <1359042370-4358-25-git-send-email-balbi@ti.com>
+Message-ID: <5963888.Uco7z1jaqo@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Felipe,
 
-On Tuesday 22 January 2013 07:39 PM, Roger Quadros wrote:
-> On 01/22/2013 11:58 AM, Kishon Vijay Abraham I wrote:
->> New PHY lib APIs like usb_add_phy_dev() and devm_usb_get_phy_dev() are
->> used in MUSB (OMAP), in order to make use of the binding information
->> provided in the board file (of OMAP platforms).
->> All the platforms should be modified similar to this to add and get the
->> PHY.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>   drivers/usb/musb/omap2430.c   |    2 +-
->>   drivers/usb/otg/twl4030-usb.c |    3 ++-
->>   drivers/usb/phy/omap-usb2.c   |    3 ++-
->>   3 files changed, 5 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
->> index bf6cfe0..1a8cf6d 100644
->> --- a/drivers/usb/musb/omap2430.c
->> +++ b/drivers/usb/musb/omap2430.c
->> @@ -345,7 +345,7 @@ static int omap2430_musb_init(struct musb *musb)
->>   	 * up through ULPI.  TWL4030-family PMICs include one,
->>   	 * which needs a driver, drivers aren't always needed.
->>   	 */
->> -	musb->xceiv = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
->> +	musb->xceiv = devm_usb_get_phy_dev(dev, 0);
->>   	if (IS_ERR_OR_NULL(musb->xceiv)) {
->>   		pr_err("HS USB OTG: no transceiver configured\n");
->>   		return -ENODEV;
->> diff --git a/drivers/usb/otg/twl4030-usb.c b/drivers/usb/otg/twl4030-usb.c
->> index 0a70193..a994715 100644
->> --- a/drivers/usb/otg/twl4030-usb.c
->> +++ b/drivers/usb/otg/twl4030-usb.c
->> @@ -610,6 +610,7 @@ static int twl4030_usb_probe(struct platform_device *pdev)
->>   	twl->phy.dev		= twl->dev;
->>   	twl->phy.label		= "twl4030";
->>   	twl->phy.otg		= otg;
->> +	twl->phy.type		= USB_PHY_TYPE_USB2;
->
-> What is the need to set phy.type? I think this should be deprecated along with the old API.
+On Thursday 24 of January 2013 17:46:02 Felipe Balbi wrote:
+> By simply setting a flag, we can drop some
+> boilerplate code.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/usb/gadget/s3c-hsotg.c | 14 +-------------
+>  1 file changed, 1 insertion(+), 13 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/s3c-hsotg.c
+> b/drivers/usb/gadget/s3c-hsotg.c index 833d85b..bd8292d 100644
+> --- a/drivers/usb/gadget/s3c-hsotg.c
+> +++ b/drivers/usb/gadget/s3c-hsotg.c
+> @@ -3552,17 +3552,13 @@ static int s3c_hsotg_probe(struct
+> platform_device *pdev)
+> 
+>  	dev_info(dev, "regs %p, irq %d\n", hsotg->regs, hsotg->irq);
+> 
+> -	device_initialize(&hsotg->gadget.dev);
+> -
+> -	dev_set_name(&hsotg->gadget.dev, "gadget");
+> -
+>  	hsotg->gadget.max_speed = USB_SPEED_HIGH;
+>  	hsotg->gadget.ops = &s3c_hsotg_gadget_ops;
+>  	hsotg->gadget.name = dev_name(dev);
+> -
+>  	hsotg->gadget.dev.parent = dev;
+>  	hsotg->gadget.dev.dma_mask = dev->dma_mask;
+>  	hsotg->gadget.dev.release = s3c_hsotg_release;
+> +	hsotg->gadget.register_my_device = true;
+> 
+>  	/* reset the system */
+> 
+> @@ -3643,12 +3639,6 @@ static int s3c_hsotg_probe(struct platform_device
+> *pdev)
+> 
+>  	s3c_hsotg_phy_disable(hsotg);
+> 
+> -	ret = device_add(&hsotg->gadget.dev);
+> -	if (ret) {
+> -		put_device(&hsotg->gadget.dev);
+> -		goto err_ep_mem;
+> -	}
+> -
+>  	ret = usb_add_gadget_udc(&pdev->dev, &hsotg->gadget);
+>  	if (ret)
+>  		goto err_ep_mem;
+> @@ -3687,10 +3677,8 @@ static int s3c_hsotg_remove(struct
+> platform_device *pdev) }
+> 
+>  	s3c_hsotg_phy_disable(hsotg);
+> -
+>  	clk_disable_unprepare(hsotg->clk);
+> 
+> -	device_unregister(&hsotg->gadget.dev);
+>  	return 0;
+>  }
 
-The *type* field as such is not deprecated. Adding and getting a PHY 
-using *type* is deprecated.
+Looks good.
 
-Thanks
-Kishon
+Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+
+Best regards,
+Tomasz Figa
