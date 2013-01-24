@@ -1,10 +1,10 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 24 Jan 2013 17:45:45 +0200
-Subject: [RFC/PATCH 07/32] usb: gadget: atmel_usba_udc: let udc-core manage
+Date: Thu, 24 Jan 2013 17:45:48 +0200
+Subject: [RFC/PATCH 10/32] usb: gadget: fsl_qe_udc: let udc-core manage
  gadget->dev
 In-Reply-To: <1359042370-4358-1-git-send-email-balbi@ti.com>
 References: <1359042370-4358-1-git-send-email-balbi@ti.com>
-Message-ID: <1359042370-4358-8-git-send-email-balbi@ti.com>
+Message-ID: <1359042370-4358-11-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,55 +13,59 @@ boilerplate code.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/usb/gadget/atmel_usba_udc.c | 13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
+ drivers/usb/gadget/fsl_qe_udc.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index a7aed84..f0f9423 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -1900,9 +1900,9 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 	dev_info(&pdev->dev, "FIFO at 0x%08lx mapped at %p\n",
- 		 (unsigned long)fifo->start, udc->fifo);
+diff --git a/drivers/usb/gadget/fsl_qe_udc.c b/drivers/usb/gadget/fsl_qe_udc.c
+index ec50f18..08c8432 100644
+--- a/drivers/usb/gadget/fsl_qe_udc.c
++++ b/drivers/usb/gadget/fsl_qe_udc.c
+@@ -2523,13 +2523,9 @@ static int qe_udc_probe(struct platform_device *ofdev)
  
+ 	/* name: Identifies the controller hardware type. */
+ 	udc->gadget.name = driver_name;
+-
 -	device_initialize(&udc->gadget.dev);
- 	udc->gadget.dev.parent = &pdev->dev;
- 	udc->gadget.dev.dma_mask = pdev->dev.dma_mask;
+-
+-	dev_set_name(&udc->gadget.dev, "gadget");
+-
+ 	udc->gadget.dev.release = qe_udc_release;
+ 	udc->gadget.dev.parent = &ofdev->dev;
 +	udc->gadget.register_my_device = true;
  
- 	platform_set_drvdata(pdev, udc);
- 
-@@ -1962,12 +1962,6 @@ static int __init usba_udc_probe(struct platform_device *pdev)
+ 	/* initialize qe_ep struct */
+ 	for (i = 0; i < USB_MAX_ENDPOINTS ; i++) {
+@@ -2592,13 +2588,9 @@ static int qe_udc_probe(struct platform_device *ofdev)
+ 		goto err5;
  	}
- 	udc->irq = irq;
  
 -	ret = device_add(&udc->gadget.dev);
--	if (ret) {
--		dev_dbg(&pdev->dev, "Could not add gadget: %d\n", ret);
--		goto err_device_add;
--	}
+-	if (ret)
+-		goto err6;
 -
- 	if (gpio_is_valid(pdata->vbus_pin)) {
- 		if (!gpio_request(pdata->vbus_pin, "atmel_usba_udc")) {
- 			udc->vbus_pin = pdata->vbus_pin;
-@@ -2007,9 +2001,6 @@ err_add_udc:
- 		gpio_free(udc->vbus_pin);
- 	}
+ 	ret = usb_add_gadget_udc(&ofdev->dev, &udc->gadget);
+ 	if (ret)
+-		goto err7;
++		goto err6;
  
--	device_unregister(&udc->gadget.dev);
--
--err_device_add:
- 	free_irq(irq, udc);
- err_request_irq:
- 	kfree(usba_ep);
-@@ -2053,8 +2044,6 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
- 	clk_put(udc->hclk);
- 	clk_put(udc->pclk);
- 
--	device_unregister(&udc->gadget.dev);
--
+ 	dev_set_drvdata(&ofdev->dev, udc);
+ 	dev_info(udc->dev,
+@@ -2606,8 +2598,6 @@ static int qe_udc_probe(struct platform_device *ofdev)
+ 			(udc->soc_type == PORT_QE) ? "QE" : "CPM");
  	return 0;
- }
+ 
+-err7:
+-	device_unregister(&udc->gadget.dev);
+ err6:
+ 	free_irq(udc->usb_irq, udc);
+ err5:
+@@ -2702,7 +2692,6 @@ static int qe_udc_remove(struct platform_device *ofdev)
+ 
+ 	iounmap(udc->usb_regs);
+ 
+-	device_unregister(&udc->gadget.dev);
+ 	/* wait for release() of gadget.dev to free udc */
+ 	wait_for_completion(&done);
  
 -- 
 1.8.1.rc1.5.g7e0651a
