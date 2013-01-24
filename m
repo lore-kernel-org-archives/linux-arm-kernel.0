@@ -1,66 +1,47 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 24 Jan 2013 11:21:02 +0800
-Subject: [GIT PULL] CSR SiRFmarco SoC infrastructures for 3.9
-Message-ID: <CAGsJ_4z-7z8=3xQwU6iEsqHEcVrRWK+Fm7eoBEbjC-EAewGypA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 23 Jan 2013 19:35:23 -0800
+Subject: [GIT PULL] Renesas ARM-based SoC v3.9
+In-Reply-To: <20130122091924.GB11708@linux-sh.org>
+References: <1357781039-14003-1-git-send-email-horms+renesas@verge.net.au>
+ <20130116063750.GA11765@verge.net.au>
+ <20130116234310.GA411@quad.lixom.net> <2682612.QaV0caZ3tv@avalon>
+ <20130122082123.GA28100@quad.lixom.net>
+ <20130122091924.GB11708@linux-sh.org>
+Message-ID: <CAOesGMgegSh4rmdV3d7zMyN=JJXr9i6hQCNCeH49Z=FwWzotNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+On Tue, Jan 22, 2013 at 1:19 AM, Paul Mundt <lethal@linux-sh.org> wrote:
+> On Tue, Jan 22, 2013 at 12:21:23AM -0800, Olof Johansson wrote:
+>> On Mon, Jan 21, 2013 at 04:31:43PM +0100, Laurent Pinchart wrote:
+>> > Sure, we could push 1-6 through the ARM tree, wait until it reaches mainline,
+>> > then push 7 through the pinctrl tree, wait until it reaches mainline, push 8
+>> > through the SH tree and 9 through the ARM tree, wait until they reach
+>> > mainline, and finally push 10 through the pinctrl tree again. We could even
+>> > push each branch through the tree it belongs to, but I doubt we'll be able to
+>> > push everything during a single merge window.
+>>
+>> Ah, ok -- you're suggesting bringing it _all_ in through arm-soc. We
+>> can do so, I was of the initial impression from Simon's cover letter
+>> that the arch/sh branches would also go through the SH tree.
+>>
+>> This seems to be a particularly hairy conversion, given that it touches two
+>> architectures that need to be updated in lockstep. I guess we might be just as
+>> well off pulling it in as-is (with below exceptions) to get it in.
+>>
+>> If you need the same contents in the SH tree due to dependencies and
+>> later development, let me know and we can agree on a stable branch that
+>> we both pick up in either tree that has all contents.
+>>
+> There isn't anything at the moment pending for the SH tree that cares
+> about or conflicts with any of this work, so it's ok with me if this all
+> goes through arm-soc. If there is any fallout we can take care of it
+> later on in the merge window. This would seem to be a saner option than
+> attempting to merge half a dozen branches with dependencies on each other
+> in precise order, which doesn't leave a lot of time for fixing up
+> any residual merge window damage.
 
-pls pull the following changes for CSR SiRFmarco SoC. it has been
-rebased againest arm-soc timer/cleanup tree.
+Yup, that sounds good. Let's do it that way.
 
-since commit 90cf214d6a549bf482e3c5751ee256cc885b96ea:
 
-  ARM: at91: fix board-rm9200-dt after sys_timer conversion
-(2013-01-14 10:14:04 -0800)
-
-are available in the git repository at:
-  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
-marco-timer-cleanup-rebase
-
-Barry Song (9):
-      ARM: PRIMA2: add CSR SiRFmarco device tree .dts
-      ARM: PRIMA2: enable AUTO_ZRELADDR for SIRF in Kconfig
-      ARM: PRIMA2: initialize l2x0 according to mach from DT
-      ARM: PRIMA2: mv timer to timer-prima2 as we will add timer-marco
-      ARM: PRIMA2: rstc: enable the support for Marco
-      ARM: PRIMA2: rtciobg: it is also compatible with marco
-      ARM: PRIMA2: irq: make prima2 irq can work even we enable GIC for Marco
-      ARM: PRIMA2: add new SiRFmarco SMP SoC infrastructures
-      ARM: PRIMA2: provide two DEBUG_LL ports for prima2 and marco
-
- Documentation/devicetree/bindings/arm/sirf.txt   |   10 +-
- arch/arm/Kconfig                                 |    1 +
- arch/arm/Kconfig.debug                           |   14 +
- arch/arm/boot/dts/Makefile                       |    1 +
- arch/arm/boot/dts/marco-evb.dts                  |   54 ++
- arch/arm/boot/dts/marco.dtsi                     |  756 ++++++++++++++++++++++
- arch/arm/configs/prima2_defconfig                |    3 +
- arch/arm/mach-prima2/Kconfig                     |   10 +
- arch/arm/mach-prima2/Makefile                    |    5 +-
- arch/arm/mach-prima2/common.c                    |   45 ++-
- arch/arm/mach-prima2/common.h                    |   15 +-
- arch/arm/mach-prima2/headsmp.S                   |   79 +++
- arch/arm/mach-prima2/hotplug.c                   |   41 ++
- arch/arm/mach-prima2/include/mach/irqs.h         |    4 +-
- arch/arm/mach-prima2/include/mach/uart.h         |    6 +
- arch/arm/mach-prima2/include/mach/uncompress.h   |    3 +
- arch/arm/mach-prima2/irq.c                       |   16 +-
- arch/arm/mach-prima2/l2x0.c                      |   29 +-
- arch/arm/mach-prima2/platsmp.c                   |  163 +++++
- arch/arm/mach-prima2/rstc.c                      |   45 +-
- arch/arm/mach-prima2/rtciobrg.c                  |    1 +
- arch/arm/mach-prima2/timer-marco.c               |  316 +++++++++
- arch/arm/mach-prima2/{timer.c => timer-prima2.c} |    6 +-
- 23 files changed, 1588 insertions(+), 35 deletions(-)
- create mode 100644 arch/arm/boot/dts/marco-evb.dts
- create mode 100644 arch/arm/boot/dts/marco.dtsi
- create mode 100644 arch/arm/mach-prima2/headsmp.S
- create mode 100644 arch/arm/mach-prima2/hotplug.c
- create mode 100644 arch/arm/mach-prima2/platsmp.c
- create mode 100644 arch/arm/mach-prima2/timer-marco.c
- rename arch/arm/mach-prima2/{timer.c => timer-prima2.c} (98%)
-
-Thanks
-barry
+-Olof
