@@ -1,117 +1,90 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Thu, 24 Jan 2013 01:38:34 -0500
-Subject: [V5 PATCH 10/26] usb: ehci: ehci-mv: use PHY driver for ehci
+Date: Thu, 24 Jan 2013 01:38:39 -0500
+Subject: [V5 PATCH 15/26] arm: ttc_dkb: add usb support
 In-Reply-To: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
 References: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1359009530-28182-11-git-send-email-chao.xie@marvell.com>
+Message-ID: <1359009530-28182-16-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originaly, ehci driver will call the callbacks in platform data
-for PHY initialization and shut down.
-With PHY driver, it will call the APIs provided by PHY driver
-for PHY initialization and shut down. It removes the callbacks
-in platform data, and at same time it removes one block in the
-way of enabling device tree for ehci driver.
+for ttc_dkb board, add udc/otg/ehci support
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/host/ehci-mv.c |   37 +++++++++++++------------------------
- 1 files changed, 13 insertions(+), 24 deletions(-)
+ arch/arm/mach-mmp/ttc_dkb.c |   30 +++++++++++++++++++-----------
+ 1 files changed, 19 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 3065809..be504fd 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -15,17 +15,18 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/usb/otg.h>
-+#include <linux/usb/mv_usb2.h>
- #include <linux/platform_data/mv_usb.h>
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index ce55fd8..0962791 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -27,7 +27,6 @@
+ #include <mach/mfp-pxa910.h>
+ #include <mach/pxa910.h>
+ #include <mach/irqs.h>
+-#include <mach/regs-usb.h>
  
- #define CAPLENGTH_MASK         (0xff)
+ #include "common.h"
  
- struct ehci_hcd_mv {
- 	struct usb_hcd *hcd;
-+	struct mv_usb2_phy *mvphy;
+@@ -158,20 +157,24 @@ static struct i2c_board_info ttc_dkb_i2c_info[] = {
+ };
  
- 	/* Which mode does this ehci running OTG/Host ? */
- 	int mode;
+ #ifdef CONFIG_USB_SUPPORT
+-#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
  
--	void __iomem *phy_regs;
- 	void __iomem *cap_regs;
- 	void __iomem *op_regs;
+ static char *pxa910_usb_clock_name[] = {
+-	[0] = "U2OCLK",
++	[0] = "usb_clk",
++};
++
++static struct mv_usb_phy_platform_data ttc_usb_phy_pdata = {
++	.clknum		= 1,
++	.clkname	= pxa910_usb_clock_name,
+ };
  
-@@ -59,8 +60,8 @@ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
- 	int retval;
++#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
++
+ static struct mv_usb_platform_data ttc_usb_pdata = {
+ 	.clknum		= 1,
+ 	.clkname	= pxa910_usb_clock_name,
+ 	.vbus		= NULL,
+ 	.mode		= MV_USB_MODE_OTG,
+ 	.otg_force_a_bus_req = 1,
+-	.phy_init	= pxa_usb_phy_init,
+-	.phy_deinit	= pxa_usb_phy_deinit,
+ 	.set_vbus	= NULL,
+ };
+ #endif
+@@ -198,19 +201,24 @@ static void __init ttc_dkb_init(void)
+ 	pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
+ 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
  
- 	ehci_clock_enable(ehci_mv);
--	if (ehci_mv->pdata->phy_init) {
--		retval = ehci_mv->pdata->phy_init(ehci_mv->phy_regs);
-+	if (ehci_mv->mvphy->init) {
-+		retval = ehci_mv->mvphy->init(ehci_mv->mvphy);
- 		if (retval)
- 			return retval;
- 	}
-@@ -70,8 +71,8 @@ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
++#ifdef CONFIG_USB_SUPPORT
++	pxa_register_device(&pxa910_device_u2ophy, &ttc_usb_phy_pdata,
++				sizeof(ttc_usb_phy_pdata));
++#endif
++
+ #ifdef CONFIG_USB_MV_UDC
+-	pxa168_device_u2o.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2o);
++	pxa_register_device(&pxa910_device_u2o, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
  
- static void mv_ehci_disable(struct ehci_hcd_mv *ehci_mv)
- {
--	if (ehci_mv->pdata->phy_deinit)
--		ehci_mv->pdata->phy_deinit(ehci_mv->phy_regs);
-+	if (ehci_mv->mvphy->shutdown)
-+		ehci_mv->mvphy->shutdown(ehci_mv->mvphy);
- 	ehci_clock_disable(ehci_mv);
+ #ifdef CONFIG_USB_EHCI_MV_U2O
+-	pxa168_device_u2oehci.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2oehci);
++	pxa_register_device(&pxa910_device_u2oehci, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
+ 
+ #ifdef CONFIG_USB_MV_OTG
+-	pxa168_device_u2ootg.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2ootg);
++	pxa_register_device(&pxa910_device_u2ootg, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
  }
  
-@@ -184,22 +185,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
--		retval = -ENODEV;
--		goto err_clear_drvdata;
--	}
--
--	ehci_mv->phy_regs = devm_ioremap(&pdev->dev, r->start,
--					 resource_size(r));
--	if (ehci_mv->phy_regs == 0) {
--		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		retval = -EFAULT;
--		goto err_clear_drvdata;
--	}
--
--	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!r) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		retval = -ENODEV;
-@@ -214,6 +200,12 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 		goto err_clear_drvdata;
- 	}
- 
-+	ehci_mv->mvphy = mv_usb2_get_phy();
-+	if (ehci_mv->mvphy == NULL) {
-+		retval = -ENODEV;
-+		goto err_clear_drvdata;
-+	}
-+
- 	retval = mv_ehci_enable(ehci_mv);
- 	if (retval) {
- 		dev_err(&pdev->dev, "init phy error %d\n", retval);
-@@ -275,9 +267,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	if (pdata->private_init)
--		pdata->private_init(ehci_mv->op_regs, ehci_mv->phy_regs);
--
- 	dev_info(&pdev->dev,
- 		 "successful find EHCI device with regs 0x%p irq %d"
- 		 " working in %s mode\n", hcd->regs, hcd->irq,
 -- 
 1.7.4.1
