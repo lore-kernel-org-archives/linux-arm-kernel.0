@@ -1,46 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Jan 2013 15:45:35 +0000
-Subject: [PATCH v6 04/15] KVM: ARM: Hypervisor initialization
-In-Reply-To: <20130116175748.29147.91246.stgit@ubuntu>
-References: <20130116175716.29147.15348.stgit@ubuntu>
- <20130116175748.29147.91246.stgit@ubuntu>
-Message-ID: <20130124154535.GD18233@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 24 Jan 2013 17:45:52 +0200
+Subject: [RFC/PATCH 14/32] usb: gadget: imx_udc: let udc-core manage
+ gadget->dev
+In-Reply-To: <1359042370-4358-1-git-send-email-balbi@ti.com>
+References: <1359042370-4358-1-git-send-email-balbi@ti.com>
+Message-ID: <1359042370-4358-15-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 16, 2013 at 05:57:48PM +0000, Christoffer Dall wrote:
-> --- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-> +++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-> @@ -32,6 +32,9 @@
->  #define PMD_TYPE_SECT          (_AT(pmdval_t, 1) << 0)
->  #define PMD_BIT4               (_AT(pmdval_t, 0))
->  #define PMD_DOMAIN(x)          (_AT(pmdval_t, 0))
-> +#define PMD_APTABLE_SHIFT      (61)
-> +#define PMD_APTABLE            (_AT(pgdval_t, 3) << PGD_APTABLE_SHIFT)
-> +#define PMD_PXNTABLE           (_AT(pgdval_t, 1) << 59)
+By simply setting a flag, we can drop some
+boilerplate code.
 
-Are these used anywhere? I grep'ed but couldn't find. While I'm fine
-with keeping some hardware definitions for future use, I think here you
-need to qualify these bits with some suffix to PMD_APTABLE. The APTable
-are just a group of bits with different meaning (no write access etc.).
-If you want to keep them as group of bits, you can add a _MASK suffix.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/usb/gadget/imx_udc.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-> +static int init_hyp_mode(void)
-> +{
-> +       phys_addr_t init_phys_addr;
-> +       int cpu;
-> +       int err = 0;
-> +
-> +       /*
-> +        * Allocate Hyp PGD and setup Hyp identity mapping
-> +        */
-> +       err = kvm_mmu_init();
-> +       if (err)
-> +               goto out_err;
-
-The comment is a bit misleading since kvm_mmu_init() simply checks
-whether hyp_pgd has been initialised. The actual initialisation is done
-by the idmap code.
-
+diff --git a/drivers/usb/gadget/imx_udc.c b/drivers/usb/gadget/imx_udc.c
+index a0eb857..c8b5da3 100644
+--- a/drivers/usb/gadget/imx_udc.c
++++ b/drivers/usb/gadget/imx_udc.c
+@@ -1341,20 +1341,12 @@ static int imx_udc_start(struct usb_gadget *gadget,
+ 	imx_usb->driver = driver;
+ 	imx_usb->gadget.dev.driver = &driver->driver;
+ 
+-	retval = device_add(&imx_usb->gadget.dev);
+-	if (retval)
+-		goto fail;
+-
+ 	D_INI(imx_usb->dev, "<%s> registered gadget driver '%s'\n",
+ 		__func__, driver->driver.name);
+ 
+ 	imx_udc_enable(imx_usb);
+ 
+ 	return 0;
+-fail:
+-	imx_usb->driver = NULL;
+-	imx_usb->gadget.dev.driver = NULL;
+-	return retval;
+ }
+ 
+ static int imx_udc_stop(struct usb_gadget *gadget,
+@@ -1370,8 +1362,6 @@ static int imx_udc_stop(struct usb_gadget *gadget,
+ 	imx_usb->gadget.dev.driver = NULL;
+ 	imx_usb->driver = NULL;
+ 
+-	device_del(&imx_usb->gadget.dev);
+-
+ 	D_INI(imx_usb->dev, "<%s> unregistered gadget driver '%s'\n",
+ 		__func__, driver->driver.name);
+ 
+@@ -1472,8 +1462,7 @@ static int __init imx_udc_probe(struct platform_device *pdev)
+ 	imx_usb->clk = clk;
+ 	imx_usb->dev = &pdev->dev;
+ 
+-	device_initialize(&imx_usb->gadget.dev);
+-
++	imx_usb->gadget.register_my_device = true;
+ 	imx_usb->gadget.dev.parent = &pdev->dev;
+ 	imx_usb->gadget.dev.dma_mask = pdev->dev.dma_mask;
+ 
 -- 
-Catalin
+1.8.1.rc1.5.g7e0651a
