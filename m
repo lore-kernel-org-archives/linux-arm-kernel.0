@@ -1,835 +1,858 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jan 2013 23:34:24 +0000
-Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
-In-Reply-To: <cover.1358983578.git.jason@lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
-Message-ID: <ecb64cdf824399badaf9d659177811d8cb091156.1358983578.git.jason@lakedaemon.net>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Thu, 24 Jan 2013 00:44:15 +0000
+Subject: [v4 PATCH 06/12] spi/atmel_spi: add dmaengine support
+In-Reply-To: <CACQ1gAji8w-H_vPchw5cY8QK0b8+VOBCi=22AvmeCrmZszHSXA@mail.gmail.com>
+References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
+ <1358148877-18679-7-git-send-email-wenyou.yang@atmel.com>
+ <CACQ1gAji8w-H_vPchw5cY8QK0b8+VOBCi=22AvmeCrmZszHSXA@mail.gmail.com>
+Message-ID: <B256D81BAE5131468A838E5D7A2436413A06109A@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-replace a lot of unneeded code and files with a lookup table.
+Thanks a lot for so much comments
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
- arch/arm/mach-kirkwood/Kconfig               | 101 ------------------------
- arch/arm/mach-kirkwood/Makefile              |  14 ----
- arch/arm/mach-kirkwood/board-dnskw.c         |   7 --
- arch/arm/mach-kirkwood/board-dockstar.c      |  32 --------
- arch/arm/mach-kirkwood/board-dreamplug.c     |  35 --------
- arch/arm/mach-kirkwood/board-dt.c            | 114 +++++++++++++++++++--------
- arch/arm/mach-kirkwood/board-goflexnet.c     |  34 --------
- arch/arm/mach-kirkwood/board-ib62x0.c        |  29 -------
- arch/arm/mach-kirkwood/board-iconnect.c      |  23 ------
- arch/arm/mach-kirkwood/board-lsxl.c          |  36 ---------
- arch/arm/mach-kirkwood/board-mplcec4.c       |  35 --------
- arch/arm/mach-kirkwood/board-ns2.c           |  34 --------
- arch/arm/mach-kirkwood/board-openblocks_a6.c |  26 ------
- arch/arm/mach-kirkwood/board-usi_topkick.c   |  29 -------
- arch/arm/mach-kirkwood/common.h              |  63 ---------------
- 15 files changed, 81 insertions(+), 531 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/board-dockstar.c
- delete mode 100644 arch/arm/mach-kirkwood/board-dreamplug.c
- delete mode 100644 arch/arm/mach-kirkwood/board-goflexnet.c
- delete mode 100644 arch/arm/mach-kirkwood/board-ib62x0.c
- delete mode 100644 arch/arm/mach-kirkwood/board-iconnect.c
- delete mode 100644 arch/arm/mach-kirkwood/board-lsxl.c
- delete mode 100644 arch/arm/mach-kirkwood/board-mplcec4.c
- delete mode 100644 arch/arm/mach-kirkwood/board-ns2.c
- delete mode 100644 arch/arm/mach-kirkwood/board-openblocks_a6.c
- delete mode 100644 arch/arm/mach-kirkwood/board-usi_topkick.c
+> -----Original Message-----
+> From: Richard Genoud [mailto:richard.genoud at gmail.com]
+> Sent: 2013?1?24? 0:25
+> To: Yang, Wenyou
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Ferre,
+> Nicolas; plagnioj at jcrosoft.com; Lin, JM; grant.likely at secretlab.ca;
+> spi-devel-general at lists.sourceforge.net
+> Subject: Re: [v4 PATCH 06/12] spi/atmel_spi: add dmaengine support
+> 
+> 2013/1/14 Wenyou Yang <wenyou.yang@atmel.com>:
+> > From: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >
+> > Add dmaengine support.
+> >
+> > For different SoC, the "has_dma_support" is used to select
+> > the transfer mode: dmaengine or PDC.
+> >
+> > For the dmaengine transfer mode, if it fails to config dmaengine,
+> > or if the message len less than 16 bytes, it will use the PIO transfer mode.
+> >
+> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > [wenyou.yang at atmel.com: using "has_dma_support" to select DMA as the
+> spi xfer mode]
+> > [wenyou.yang at atmel.com: add support NPCS1,2,3 chip select other than
+> NPCS0]
+> > [wenyou.yang at atmel.com: fix DMA: OOPS if buffer > 4096 bytes]
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > Cc: grant.likely at secretlab.ca
+> > Cc: spi-devel-general at lists.sourceforge.net
+> > Cc: richard.genoud at gmail.com
+> > ---
+> > This patch is based on the original patch from Nicolas
+> >         [PATCH] spi/atmel_spi: add dmaengine support
+> > and merge the patches from Richard Genoud <richard.genoud@gmail.com>
+> >         [PATCH] spi-atmel: update with dmaengine interface
+> >         [PATCH] spi-atmel: fix __init/__devinit sections mismatch
+> > and Wenyou Yang add the code to support selecting the spi transfer mode,
+> >         add support NPCS1,2,3 chip select other than NPCS0.
+> >         fix DMA: OOPS if buffer > 4096 bytes.
+> >
+> > diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> > index 43c1f63..0d242dc 100644
+> > --- a/drivers/spi/spi-atmel.c
+> > +++ b/drivers/spi/spi-atmel.c
+> > @@ -15,11 +15,13 @@
+> >  #include <linux/platform_device.h>
+> >  #include <linux/delay.h>
+> >  #include <linux/dma-mapping.h>
+> > +#include <linux/dmaengine.h>
+> >  #include <linux/err.h>
+> >  #include <linux/interrupt.h>
+> >  #include <linux/spi/spi.h>
+> >  #include <linux/slab.h>
+> >  #include <linux/platform_data/atmel.h>
+> > +#include <linux/platform_data/dma-atmel.h>
+> >  #include <linux/of.h>
+> >
+> >  #include <asm/io.h>
+> > @@ -182,6 +184,19 @@
+> >  #define spi_writel(port,reg,value) \
+> >         __raw_writel((value), (port)->regs + SPI_##reg)
+> >
+> > +/* use PIO for small transfers, avoiding DMA setup/teardown overhead and
+> > + * cache operations; better heuristics consider wordsize and bitrate.
+> > + */
+> > +#define DMA_MIN_BYTES  16
+> > +
+> > +struct atmel_spi_dma {
+> > +       struct dma_chan                 *chan_rx;
+> > +       struct dma_chan                 *chan_tx;
+> > +       struct scatterlist              sgrx;
+> > +       struct scatterlist              sgtx;
+> > +       struct dma_async_tx_descriptor  *data_desc_rx;
+> > +       struct dma_async_tx_descriptor  *data_desc_tx;
+> > +};
+> >
+> >  /*
+> >   * The core SPI transfer engine just talks to a register bank to set up
+> > @@ -192,6 +207,7 @@ struct atmel_spi_pdata {
+> >         u8      version;
+> >         bool    has_dma_support;
+> >         bool    has_wdrbt;
+> > +       struct at_dma_slave     dma_slave;
+> >  };
+> >
+> >  struct atmel_spi {
+> > @@ -207,6 +223,7 @@ struct atmel_spi {
+> >
+> >         u8                      stopping;
+> >         struct list_head        queue;
+> > +       struct tasklet_struct   tasklet;
+> >         struct spi_transfer     *current_transfer;
+> >         unsigned long           current_remaining_bytes;
+> >         struct spi_transfer     *next_transfer;
+> > @@ -214,8 +231,15 @@ struct atmel_spi {
+> >         int                     done_status;
+> >         struct atmel_spi_pdata  *pdata;
+> >
+> > +       bool                    use_dma;
+> > +       bool                    use_pdc;
+> > +
+> > +       /* scratch buffer */
+> >         void                    *buffer;
+> >         dma_addr_t              buffer_dma;
+> > +
+> > +       /* dmaengine data */
+> > +       struct atmel_spi_dma    dma;
+> >  };
+> >
+> >  /* Controller-specific per-slave state */
+> > @@ -328,9 +352,7 @@ static bool atmel_spi_is_v2(struct atmel_spi *as)
+> >   * and (c) will trigger that first erratum in some cases.
+> >   *
+> >   * TODO: Test if the atmel_spi_is_v2() branch below works on
+> > - * AT91RM9200 if we use some other register than CSR0. However, don't
+> > - * do this unconditionally since AP7000 has an errata where the BITS
+> > - * field in CSR0 overrides all other CSRs.
+> > + * AT91RM9200 if we use some other register than CSR0.
+> >   */
+> >
+> >  static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+> > @@ -340,18 +362,16 @@ static void cs_activate(struct atmel_spi *as,
+> struct spi_device *spi)
+> >         u32 mr;
+> >
+> >         if (atmel_spi_is_v2(as)) {
+> > -               /*
+> > -                * Always use CSR0. This ensures that the clock
+> > -                * switches to the correct idle polarity before we
+> > -                * toggle the CS.
+> > -                */
+> > -               spi_writel(as, CSR0, asd->csr);
+> > +               spi_writel(as, CSR0 + 4 * spi->chip_select, asd->csr);
+> >
+> >                 if (as->pdata->has_wdrbt)
+> > -                       spi_writel(as, MR, SPI_BF(PCS, 0x0e) |
+> SPI_BIT(MSTR)
+> > -                                       | SPI_BIT(MODFDIS) |
+> SPI_BIT(WDRBT));
+> > +                       spi_writel(as, MR,
+> > +                                       SPI_BF(PCS, ~(0x01 <<
+> spi->chip_select))
+> > +                                       | SPI_BIT(MSTR) |
+> SPI_BIT(MODFDIS)
+> > +                                       | SPI_BIT(WDRBT));
+> >                 else
+> > -                       spi_writel(as, MR, SPI_BF(PCS, 0x0e)
+> > +                       spi_writel(as, MR,
+> > +                                       SPI_BF(PCS, ~(0x01 <<
+> spi->chip_select))
+> >                                         | SPI_BIT(MSTR) |
+> SPI_BIT(MODFDIS));
+> >
+> >                 mr = spi_readl(as, MR);
+> > @@ -414,6 +434,12 @@ static void atmel_spi_unlock(struct atmel_spi *as)
+> >                 spin_unlock_irqrestore(&as->lock, as->flags);
+> >  }
+> >
+> > +static inline bool atmel_spi_use_dma(struct atmel_spi *as,
+> > +                               struct spi_transfer *xfer)
+> > +{
+> > +       return as->use_dma && xfer->len >= DMA_MIN_BYTES;
+> > +}
+> > +
+> >  static inline int atmel_spi_xfer_is_last(struct spi_message *msg,
+> >                                         struct spi_transfer *xfer)
+> >  {
+> > @@ -425,6 +451,220 @@ static inline int
+> atmel_spi_xfer_can_be_chained(struct spi_transfer *xfer)
+> >         return xfer->delay_usecs == 0 && !xfer->cs_change;
+> >  }
+> >
+> > +static bool filter(struct dma_chan *chan, void *slave)
+> > +{
+> > +       struct  at_dma_slave *sl = slave;
+> > +
+> > +       if (sl->dma_dev == chan->device->dev) {
+> > +               chan->private = sl;
+> > +               return true;
+> > +       } else {
+> > +               return false;
+> > +       }
+> > +}
+> > +
+> > +static int __devinit atmel_spi_configure_dma(struct atmel_spi *as)
+> > +{
+> > +       struct at_dma_slave *sdata
+> > +                       = (struct at_dma_slave
+> *)&as->pdata->dma_slave;
+> > +
+> > +       if (sdata && sdata->dma_dev) {
+> > +               dma_cap_mask_t mask;
+> > +
+> > +               /* setup DMA addresses */
+> > +               sdata->rx_reg = (dma_addr_t)as->phybase + SPI_RDR;
+> > +               sdata->tx_reg = (dma_addr_t)as->phybase + SPI_TDR;
+> > +
+> > +               /* Try to grab two DMA channels */
+> > +               dma_cap_zero(mask);
+> > +               dma_cap_set(DMA_SLAVE, mask);
+> > +               as->dma.chan_tx = dma_request_channel(mask, filter,
+> sdata);
+> > +               if (as->dma.chan_tx)
+> > +                       as->dma.chan_rx =
+> > +                               dma_request_channel(mask, filter,
+> sdata);
+> > +       }
+> > +       if (!as->dma.chan_rx || !as->dma.chan_tx) {
+> > +               if (as->dma.chan_rx)
+> > +                       dma_release_channel(as->dma.chan_rx);
+> > +               if (as->dma.chan_tx)
+> > +                       dma_release_channel(as->dma.chan_tx);
+> > +               dev_err(&as->pdev->dev,
+> > +                       "DMA channel not available, unable to use
+> SPI\n");
+> > +               return -EBUSY;
+> > +       }
+> > +
+> > +       dev_info(&as->pdev->dev,
+> > +                       "Using %s (tx) and %s (rx) for DMA
+> transfers\n",
+> > +                       dma_chan_name(as->dma.chan_tx),
+> > +                       dma_chan_name(as->dma.chan_rx));
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static void atmel_spi_stop_dma(struct atmel_spi *as)
+> > +{
+> > +       if (as->dma.chan_rx)
+> > +
+> as->dma.chan_rx->device->device_control(as->dma.chan_rx,
+> > +
+> DMA_TERMINATE_ALL, 0);
+> > +       if (as->dma.chan_tx)
+> > +
+> as->dma.chan_tx->device->device_control(as->dma.chan_tx,
+> > +
+> DMA_TERMINATE_ALL, 0);
+> > +}
+> > +
+> > +static void atmel_spi_release_dma(struct atmel_spi *as)
+> > +{
+> > +       if (as->dma.chan_rx)
+> > +               dma_release_channel(as->dma.chan_rx);
+> > +       if (as->dma.chan_tx)
+> > +               dma_release_channel(as->dma.chan_tx);
+> > +}
+> > +
+> > +/* This function is called by the DMA driver from tasklet context */
+> > +static void dma_callback(void *data)
+> > +{
+> > +       struct spi_master       *master = data;
+> > +       struct atmel_spi        *as = spi_master_get_devdata(master);
+> > +
+> > +       /* trigger SPI tasklet */
+> > +       tasklet_schedule(&as->tasklet);
+> > +}
+> > +
+> > +/*
+> > + * Next transfer using PIO.
+> > + * lock is held, spi tasklet is blocked
+> > + */
+> > +static void atmel_spi_next_xfer_pio(struct spi_master *master,
+> > +                               struct spi_transfer *xfer)
+> > +{
+> > +       struct atmel_spi        *as = spi_master_get_devdata(master);
+> > +
+> > +       dev_vdbg(master->dev.parent, "atmel_spi_next_xfer_pio\n");
+> > +
+> > +       as->current_remaining_bytes = xfer->len;
+> > +
+> > +       /* Make sure data is not remaining in RDR */
+> > +       spi_readl(as, RDR);
+> > +       while (spi_readl(as, SR) & SPI_BIT(RDRF)) {
+> > +               spi_readl(as, RDR);
+> > +               cpu_relax();
+> > +       }
+> > +
+> > +       if (xfer->tx_buf)
+> > +               spi_writel(as, TDR, *(u8 *)(xfer->tx_buf));
+> > +       else
+> > +               spi_writel(as, TDR, 0);
+> > +
+> > +       dev_dbg(master->dev.parent,
+> > +               "  start pio xfer %p: len %u tx %p rx %p\n",
+> > +               xfer, xfer->len, xfer->tx_buf, xfer->rx_buf);
+> > +
+> > +       /* Enable relevant interrupts */
+> > +       spi_writel(as, IER, SPI_BIT(RDRF) | SPI_BIT(OVRES));
+> > +}
+> > +
+> > +/*
+> > + * Submit next transfer for DMA.
+> > + * lock is held, spi tasklet is blocked
+> > + */
+> > +static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
+> > +                               struct spi_transfer *xfer,
+> > +                               u32 *plen)
+> > +{
+> > +       struct atmel_spi        *as = spi_master_get_devdata(master);
+> > +       struct dma_chan         *rxchan = as->dma.chan_rx;
+> > +       struct dma_chan         *txchan = as->dma.chan_tx;
+> > +       struct dma_async_tx_descriptor *rxdesc;
+> > +       struct dma_async_tx_descriptor *txdesc;
+> > +       dma_cookie_t            cookie;
+> > +       u32     len = *plen;
+> > +
+> > +       dev_vdbg(master->dev.parent,
+> "atmel_spi_next_xfer_dma_submit\n");
+> > +
+> > +       /* Check that the channels are available */
+> > +       if (!rxchan || !txchan)
+> > +               return -ENODEV;
+> > +
+> > +       /* release lock for DMA operations */
+> > +       atmel_spi_unlock(as);
+> > +
+> > +       /* prepare the RX dma transfer */
+> > +       sg_init_table(&as->dma.sgrx, 1);
+> > +       if (xfer->rx_buf)
+> > +               as->dma.sgrx.dma_address = xfer->rx_dma + xfer->len -
+> *plen;
+> > +       else {
+> > +               as->dma.sgrx.dma_address = as->buffer_dma;
+> > +               if (len > BUFFER_SIZE)
+> > +                       len = BUFFER_SIZE;
+> > +       }
+> You should use brackets before the "else" also.
+> cf Documentation/CodingStyle line 169 :
+> 
+> This does not apply if only one branch of a conditional statement is a single
+> statement; in the latter case use braces in both branches:
+> 
+> if (condition) {
+> 	do_this();
+> 	do_that();
+> } else {
+> 	otherwise();
+> }
+> 
+> 
+> > +
+> > +       /* prepare the TX dma transfer */
+> > +       sg_init_table(&as->dma.sgtx, 1);
+> > +       if (xfer->tx_buf) {
+> > +               as->dma.sgtx.dma_address = xfer->tx_dma + xfer->len -
+> *plen;
+> > +       } else {
+> > +               as->dma.sgtx.dma_address = as->buffer_dma;
+> > +               if (len > BUFFER_SIZE)
+> > +                       len = BUFFER_SIZE;
+> > +               memset(as->buffer, 0, len);
+> > +       }
+> > +
+> > +       sg_dma_len(&as->dma.sgtx) = len;
+> > +       sg_dma_len(&as->dma.sgrx) = len;
+> > +
+> > +       *plen = len;
+> > +
+> > +       /* Send both scatterlists */
+> > +       rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
+> > +                                       &as->dma.sgrx,
+> > +                                       1,
+> > +                                       DMA_FROM_DEVICE,
+> > +                                       DMA_PREP_INTERRUPT |
+> DMA_CTRL_ACK,
+> > +                                       NULL);
+> > +       if (!rxdesc)
+> > +               goto err_dma;
+> > +
+> > +       txdesc = txchan->device->device_prep_slave_sg(txchan,
+> > +                                       &as->dma.sgtx,
+> > +                                       1,
+> > +                                       DMA_TO_DEVICE,
+> > +                                       DMA_PREP_INTERRUPT |
+> DMA_CTRL_ACK,
+> > +                                       NULL);
+> > +       if (!txdesc)
+> > +               goto err_dma;
+> > +
+> > +       dev_dbg(master->dev.parent,
+> > +               "  start dma xfer %p: len %u tx %p/%08x rx %p/%08x\n",
+> > +               xfer, xfer->len, xfer->tx_buf, xfer->tx_dma,
+> > +               xfer->rx_buf, xfer->rx_dma);
+> > +
+> > +       /* Enable relevant interrupts */
+> > +       spi_writel(as, IER, SPI_BIT(OVRES));
+> > +
+> > +       /* Put the callback on the RX transfer only, that should finish last */
+> > +       rxdesc->callback = dma_callback;
+> > +       rxdesc->callback_param = master;
+> > +
+> > +       /* Submit and fire RX and TX with TX last so we're ready to read! */
+> > +       cookie = rxdesc->tx_submit(rxdesc);
+> > +       if (dma_submit_error(cookie))
+> > +               goto err_dma;
+> > +       cookie = txdesc->tx_submit(txdesc);
+> > +       if (dma_submit_error(cookie))
+> > +               goto err_dma;
+> > +       rxchan->device->device_issue_pending(rxchan);
+> > +       txchan->device->device_issue_pending(txchan);
+> > +
+> > +       /* take back lock */
+> > +       atmel_spi_lock(as);
+> > +       return 0;
+> > +
+> > +err_dma:
+> > +       spi_writel(as, IDR, SPI_BIT(OVRES));
+> > +       atmel_spi_stop_dma(as);
+> > +       atmel_spi_lock(as);
+> > +       return -ENOMEM;
+> > +}
+> > +
+> >  static void atmel_spi_next_xfer_data(struct spi_master *master,
+> >                                 struct spi_transfer *xfer,
+> >                                 dma_addr_t *tx_dma,
+> > @@ -457,10 +697,10 @@ static void atmel_spi_next_xfer_data(struct
+> spi_master *master,
+> >  }
+> >
+> >  /*
+> > - * Submit next transfer for DMA.
+> > + * Submit next transfer for PDC.
+> >   * lock is held, spi irq is blocked
+> >   */
+> > -static void atmel_spi_next_xfer(struct spi_master *master,
+> > +static void atmel_spi_next_xfer_pdc(struct spi_master *master,
+> >                                 struct spi_message *msg)
+> >  {
+> >         struct atmel_spi        *as = spi_master_get_devdata(master);
+> > @@ -557,6 +797,49 @@ static void atmel_spi_next_xfer(struct spi_master
+> *master,
+> >         spi_writel(as, PTCR, SPI_BIT(TXTEN) | SPI_BIT(RXTEN));
+> >  }
+> >
+> > +/*
+> > + * Choose way to submit next transfer and start it.
+> > + * lock is held, spi tasklet is blocked
+> > + */
+> > +static void atmel_spi_next_xfer_dma(struct spi_master *master,
+> > +                               struct spi_message *msg)
+> > +{
+> > +       struct atmel_spi        *as = spi_master_get_devdata(master);
+> > +       struct spi_transfer     *xfer;
+> > +       u32     remaining, len;
+> > +
+> > +       dev_vdbg(&msg->spi->dev, "atmel_spi_next_xfer\n");
+> > +
+> > +       remaining = as->current_remaining_bytes;
+> > +       if (remaining) {
+> > +               xfer = as->current_transfer;
+> > +               len = remaining;
+> > +       } else {
+> > +               if (!as->current_transfer)
+> > +                       xfer = list_entry(msg->transfers.next,
+> > +                               struct spi_transfer, transfer_list);
+> > +               else
+> > +                       xfer = list_entry(
+> > +
+> as->current_transfer->transfer_list.next,
+> > +                                       struct spi_transfer,
+> transfer_list);
+> > +
+> > +               as->current_transfer = xfer;
+> > +               len = xfer->len;
+> > +       }
+> > +
+> > +       if (atmel_spi_use_dma(as, xfer)) {
+> > +               u32 total = len;
+> > +               if (!atmel_spi_next_xfer_dma_submit(master, xfer, &len))
+> {
+> > +                       as->current_remaining_bytes = total - len;
+> > +                       return;
+> > +               } else
+> > +                       dev_err(&msg->spi->dev, "unable to use DMA,
+> fallback to PIO\n");
+> same here.
+> > +       }
+> > +
+> > +       /* use PIO if error appened using DMA */
+> > +       atmel_spi_next_xfer_pio(master, xfer);
+> > +}
+> > +
+> >  static void atmel_spi_next_message(struct spi_master *master)
+> >  {
+> >         struct atmel_spi        *as = spi_master_get_devdata(master);
+> > @@ -581,7 +864,10 @@ static void atmel_spi_next_message(struct
+> spi_master *master)
+> >         } else
+> >                 cs_activate(as, spi);
+> >
+> > -       atmel_spi_next_xfer(master, msg);
+> > +       if (as->use_pdc)
+> > +               atmel_spi_next_xfer_pdc(master, msg);
+> > +       else
+> > +               atmel_spi_next_xfer_dma(master, msg);
+> >  }
+> >
+> >  /*
+> > @@ -634,6 +920,11 @@ static void atmel_spi_dma_unmap_xfer(struct
+> spi_master *master,
+> >                                  xfer->len, DMA_FROM_DEVICE);
+> >  }
+> >
+> > +static void atmel_spi_disable_pdc_transfer(struct atmel_spi *as)
+> > +{
+> > +       spi_writel(as, PTCR, SPI_BIT(RXTDIS) | SPI_BIT(TXTDIS));
+> > +}
+> > +
+> >  static void
+> >  atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
+> >                 struct spi_message *msg, int stay)
+> > @@ -659,19 +950,175 @@ atmel_spi_msg_done(struct spi_master *master,
+> struct atmel_spi *as,
+> >         as->done_status = 0;
+> >
+> >         /* continue if needed */
+> > -       if (list_empty(&as->queue) || as->stopping)
+> > -               spi_writel(as, PTCR, SPI_BIT(RXTDIS) | SPI_BIT(TXTDIS));
+> > -       else
+> > +       if (list_empty(&as->queue) || as->stopping) {
+> > +               if (as->use_pdc)
+> > +                       atmel_spi_disable_pdc_transfer(as);
+> > +       } else
+> >                 atmel_spi_next_message(master);
+> same.
+> >  }
+> >
+> > -static irqreturn_t
+> > -atmel_spi_interrupt(int irq, void *dev_id)
+> > +/* Called from IRQ
+> > + * lock is held
+> > + *
+> > + * Must update "current_remaining_bytes" to keep track of data
+> > + * to transfer.
+> > + */
+> > +static void
+> > +atmel_spi_pump_pio_data(struct atmel_spi *as, struct spi_transfer *xfer)
+> >  {
+> > -       struct spi_master       *master = dev_id;
+> > +       u8              *txp;
+> > +       u8              *rxp;
+> > +       unsigned long   xfer_pos = xfer->len -
+> as->current_remaining_bytes;
+> > +
+> > +       if (xfer->rx_buf) {
+> > +               rxp = ((u8 *)xfer->rx_buf) + xfer_pos;
+> > +               *rxp = spi_readl(as, RDR);
+> > +       } else {
+> > +               spi_readl(as, RDR);
+> > +       }
+> > +
+> > +       as->current_remaining_bytes--;
+> > +
+> > +       if (as->current_remaining_bytes) {
+> > +               if (xfer->tx_buf) {
+> > +                       txp = ((u8 *)xfer->tx_buf) + xfer_pos + 1;
+> > +                       spi_writel(as, TDR, *txp);
+> > +               } else {
+> > +                       spi_writel(as, TDR, 0);
+> > +               }
+> > +       }
+> > +}
+> > +
+> > +/* Tasklet
+> > + * Called from DMA callback + pio transfer and overrun IRQ.
+> > + */
+> > +static void atmel_spi_tasklet_func(unsigned long data)
+> > +{
+> > +       struct spi_master       *master = (struct spi_master *)data;
+> >         struct atmel_spi        *as = spi_master_get_devdata(master);
+> >         struct spi_message      *msg;
+> >         struct spi_transfer     *xfer;
+> > +
+> > +       dev_vdbg(master->dev.parent, "atmel_spi_tasklet_func\n");
+> > +
+> > +       atmel_spi_lock(as);
+> > +
+> > +       xfer = as->current_transfer;
+> > +
+> > +       if (xfer == NULL)
+> > +               /* already been there */
+> > +               goto tasklet_out;
+> > +
+> > +       msg = list_entry(as->queue.next, struct spi_message, queue);
+> > +
+> > +       if (as->current_remaining_bytes == 0) {
+> > +               if (as->done_status < 0) {
+> > +                       /* error happened (overrun) */
+> > +                       if (atmel_spi_use_dma(as, xfer))
+> > +                               atmel_spi_stop_dma(as);
+> > +               } else
+> > +                       /* only update length if no error */
+> > +                       msg->actual_length += xfer->len;
+> same
+> > +
+> > +               if (atmel_spi_use_dma(as, xfer))
+> > +                       if (!msg->is_dma_mapped)
+> > +                               atmel_spi_dma_unmap_xfer(master,
+> xfer);
+> > +
+> > +               if (xfer->delay_usecs)
+> > +                       udelay(xfer->delay_usecs);
+> > +
+> > +               if (atmel_spi_xfer_is_last(msg, xfer) || as->done_status <
+> 0)
+> > +                       /* report completed (or erroneous) message */
+> > +                       atmel_spi_msg_done(master, as, msg,
+> xfer->cs_change);
+> > +               else {
+> same
+> > +                       if (xfer->cs_change) {
+> > +                               cs_deactivate(as, msg->spi);
+> > +                               udelay(1);
+> > +                               cs_activate(as, msg->spi);
+> > +                       }
+> > +
+> > +                       /*
+> > +                        * Not done yet. Submit the next transfer.
+> > +                        *
+> > +                        * FIXME handle protocol options for xfer
+> > +                        */
+> > +                       atmel_spi_next_xfer_dma(master, msg);
+> > +               }
+> > +       } else
+> same
+> > +               /*
+> > +                * Keep going, we still have data to send in
+> > +                * the current transfer.
+> > +                */
+> > +               atmel_spi_next_xfer_dma(master, msg);
+> > +
+> > +tasklet_out:
+> > +       atmel_spi_unlock(as);
+> > +}
+> > +
+> > +static int atmel_spi_interrupt_dma(struct atmel_spi *as,
+> > +                               struct spi_master *master)
+> > +{
+> > +       u32                     status, pending, imr;
+> > +       struct spi_transfer     *xfer;
+> > +       int                     ret = IRQ_NONE;
+> > +
+> > +       imr = spi_readl(as, IMR);
+> > +       status = spi_readl(as, SR);
+> > +       pending = status & imr;
+> > +
+> > +       if (pending & SPI_BIT(OVRES)) {
+> > +               ret = IRQ_HANDLED;
+> > +               spi_writel(as, IDR, SPI_BIT(OVRES));
+> > +               dev_warn(master->dev.parent, "overrun\n");
+> > +
+> > +               /*
+> > +                * When we get an overrun, we disregard the current
+> > +                * transfer. Data will not be copied back from any
+> > +                * bounce buffer and msg->actual_len will not be
+> > +                * updated with the last xfer.
+> > +                *
+> > +                * We will also not process any remaning transfers in
+> > +                * the message.
+> > +                *
+> > +                * All actions are done in tasklet with done_status
+> indication
+> > +                */
+> > +               as->done_status = -EIO;
+> > +               smp_wmb();
+> > +
+> > +               /* Clear any overrun happening while cleaning up */
+> > +               spi_readl(as, SR);
+> > +
+> > +               tasklet_schedule(&as->tasklet);
+> > +
+> > +       } else if (pending & SPI_BIT(RDRF)) {
+> > +               atmel_spi_lock(as);
+> > +
+> > +               if (as->current_remaining_bytes) {
+> > +                       ret = IRQ_HANDLED;
+> > +                       xfer = as->current_transfer;
+> > +                       atmel_spi_pump_pio_data(as, xfer);
+> > +                       if (!as->current_remaining_bytes) {
+> > +                               /* no more data to xfer, kick tasklet */
+> > +                               spi_writel(as, IDR, pending);
+> > +                               tasklet_schedule(&as->tasklet);
+> > +                       }
+> > +               }
+> > +
+> > +               atmel_spi_unlock(as);
+> > +       } else {
+> > +               WARN_ONCE(pending, "IRQ not handled, pending
+> = %x\n", pending);
+> > +               ret = IRQ_HANDLED;
+> > +               spi_writel(as, IDR, pending);
+> > +       }
+> > +
+> > +       return ret;
+> > +}
+> > +
+> > +static int atmel_spi_interrupt_pdc(struct atmel_spi *as,
+> > +                               struct spi_master *master)
+> > +{
+> > +       struct spi_message      *msg;
+> > +       struct spi_transfer     *xfer;
+> >         u32                     status, pending, imr;
+> >         int                     ret = IRQ_NONE;
+> >
+> > @@ -767,14 +1214,14 @@ atmel_spi_interrupt(int irq, void *dev_id)
+> >                                  *
+> >                                  * FIXME handle protocol options for
+> xfer
+> >                                  */
+> > -                               atmel_spi_next_xfer(master, msg);
+> > +                               atmel_spi_next_xfer_pdc(master,
+> msg);
+> >                         }
+> >                 } else {
+> >                         /*
+> >                          * Keep going, we still have data to send in
+> >                          * the current transfer.
+> >                          */
+> > -                       atmel_spi_next_xfer(master, msg);
+> > +                       atmel_spi_next_xfer_pdc(master, msg);
+> >                 }
+> >         }
+> >
+> > @@ -783,6 +1230,27 @@ atmel_spi_interrupt(int irq, void *dev_id)
+> >         return ret;
+> >  }
+> >
+> > +/* Interrupt
+> > + *
+> > + * No need for locking in this Interrupt handler: done_status is the
+> > + * only information modified. What we need is the update of this field
+> > + * before tasklet runs. This is ensured by using barrier.
+> > + */
+> > +static irqreturn_t
+> > +atmel_spi_interrupt(int irq, void *dev_id)
+> > +{
+> > +       struct spi_master       *master = dev_id;
+> > +       struct atmel_spi        *as = spi_master_get_devdata(master);
+> > +       int ret;
+> > +
+> > +       if (as->use_pdc)
+> > +               ret = atmel_spi_interrupt_pdc(as, master);
+> > +       else
+> > +               ret = atmel_spi_interrupt_dma(as, master);
+> > +
+> > +       return ret;
+> > +}
+> > +
+> >  static int atmel_spi_setup(struct spi_device *spi)
+> >  {
+> >         struct atmel_spi        *as;
+> > @@ -945,13 +1413,10 @@ static int atmel_spi_transfer(struct spi_device
+> *spi, struct spi_message *msg)
+> >
+> >                 /*
+> >                  * DMA map early, for performance (empties dcache
+> ASAP) and
+> > -                * better fault reporting.  This is a DMA-only driver.
+> > -                *
+> > -                * NOTE that if dma_unmap_single() ever starts to do
+> work on
+> > -                * platforms supported by this driver, we would need to
+> clean
+> > -                * up mappings for previously-mapped transfers.
+> > +                * better fault reporting.
+> >                  */
+> > -               if (!msg->is_dma_mapped) {
+> > +               if ((!msg->is_dma_mapped) && (atmel_spi_use_dma(as,
+> xfer)
+> > +                       || as->use_pdc)) {
+> >                         if (atmel_spi_dma_map_xfer(as, xfer) < 0)
+> >                                 return -ENOMEM;
+> >                 }
+> > @@ -1068,6 +1533,8 @@ static int atmel_spi_probe(struct platform_device
+> *pdev)
+> >
+> >         spin_lock_init(&as->lock);
+> >         INIT_LIST_HEAD(&as->queue);
+> > +       tasklet_init(&as->tasklet, atmel_spi_tasklet_func,
+> > +                                       (unsigned long)master);
+> >         as->pdev = pdev;
+> >         as->regs = ioremap(regs->start, resource_size(regs));
+> >         if (!as->regs)
+> > @@ -1096,7 +1563,15 @@ static int atmel_spi_probe(struct
+> platform_device *pdev)
+> >         else
+> >                 spi_writel(as, MR, SPI_BIT(MSTR) | SPI_BIT(MODFDIS));
+> >
+> > -       spi_writel(as, PTCR, SPI_BIT(RXTDIS) | SPI_BIT(TXTDIS));
+> > +       as->use_dma = false;
+> > +       as->use_pdc = false;
+> > +
+> > +       if (as->pdata->has_dma_support) {
+> > +               if (atmel_spi_configure_dma(as) == 0)
+> > +                       as->use_dma = true;
+> > +       } else
+> > +               as->use_pdc = true;
+> same.
+> 
+> Maybe you should add a little dev_info in case both use_dma and
+> use_pcd are null:
+> if (!as->use_dma && !as->use_pdc)
+> dev_info(&pdev->dev, "Atmel SPI Controller: Using PIO only for transferts");
+> 
+> I tested it on sam9g35.
+> It's working *almost* all right.
+> I've got a problem with the ioctl SPI_IOC_MESSAGE().
+> (cf Documentation/spi/spidev_fdx.c)
+> I'm reading on spidev something like that :
+> struct spi_ioc_transfer xfer[3];
+> memset(xfer, 0, sizeof(xfer));
+> xfer[0].tx_buf = (unsigned long)&tx_header;
+> xer[0].rx_buf = (unsigned long)&rx_header;
+> xfer[0].len = 2;
+> xfer[1].rx_buf = (unsigned long)rx_buf;
+> xfer[1].len = 124;
+> xfer[2].tx_buf = (unsigned long)&tx_footer;
+> xfer[2].rx_buf = (unsigned long)&rx_footer;
+> xfer[2].len = 2;
+> 
+> nb = ioctl(spi_data->fd, SPI_IOC_MESSAGE(3), xfer);
+> 
+> If I force DMA all the time with
+> #define DMA_MIN_BYTES   1
+> I haven't got any problem, all works ok.
+> If I for PIO all the time with
+> #define DMA_MIN_BYTES   1000
+> I'ts woking also without any problem.
+> 
+> BUT
+> When the DMA_MIN_BYTES are at 16 (so, xfer[0] is transfered by PIO,
+> xfer[1] by DMA and xfer[2] by PIO), I've got a lot of errors in my
+> rx_buffer.
+> ie, I'm not receiving what I should.
+> 
+> Did you experience anything like that ?
+No, I didn't try it. I will do next week.
+> 
+> Regards,
+> Richard
 
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 432bee0..188651b 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -58,19 +58,6 @@ config ARCH_KIRKWOOD_DT
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell Kirkwood using flattened device tree.
- 
--config MACH_DREAMPLUG_DT
--	bool "Marvell DreamPlug (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Marvell DreamPlug (Flattened Device Tree).
--
--config MACH_ICONNECT_DT
--	bool "Iomega Iconnect (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here to enable Iomega Iconnect support.
--
- config MACH_DLINK_KIRKWOOD_DT
- 	bool "D-Link Kirkwood-based NAS (Flattened Device Tree)"
- 	select ARCH_KIRKWOOD_DT
-@@ -79,14 +66,6 @@ config MACH_DLINK_KIRKWOOD_DT
- 	  Kirkwood-based D-Link NASes such as DNS-320 & DNS-325,
- 	  using Flattened Device Tree.
- 
--config MACH_IB62X0_DT
--	bool "RaidSonic IB-NAS6210, IB-NAS6220 (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  RaidSonic IB-NAS6210 & IB-NAS6220 devices, using
--	  Flattened Device Tree.
--
- config MACH_TS219_DT
- 	bool "Device Tree for QNAP TS-11X, TS-21X NAS"
- 	select ARCH_KIRKWOOD_DT
-@@ -102,29 +81,6 @@ config MACH_TS219_DT
- 	  or MV6282. If you have the wrong one, the buttons will not
- 	  work.
- 
--config MACH_DOCKSTAR_DT
--	bool "Seagate FreeAgent Dockstar (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Seagate FreeAgent Dockstar (Flattened Device Tree).
--
--config MACH_GOFLEXNET_DT
--	bool "Seagate GoFlex Net (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Seagate GoFlex Net (Flattened Device Tree).
--
--config MACH_LSXL_DT
--	bool "Buffalo Linkstation LS-XHL, LS-CHLv2 (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	select POWER_RESET_RESTART
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Buffalo Linkstation LS-XHL & LS-CHLv2 devices, using
--	  Flattened Device Tree.
--
- config MACH_IOMEGA_IX2_200_DT
- 	bool "Iomega StorCenter ix2-200 (Flattened Device Tree)"
- 	select ARCH_KIRKWOOD_DT
-@@ -139,63 +95,6 @@ config MACH_KM_KIRKWOOD_DT
- 	  Say 'Y' here if you want your kernel to support the
- 	  Keymile Kirkwood Reference Desgin, using Flattened Device Tree.
- 
--config MACH_INETSPACE_V2_DT
--	bool "LaCie Internet Space v2 NAS (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the LaCie
--	  Internet Space v2 NAS, using Flattened Device Tree.
--
--config MACH_MPLCEC4_DT
--	bool "MPL CEC4 (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  MPL CEC4 (Flattened Device Tree).
--
--config MACH_NETSPACE_V2_DT
--	bool "LaCie Network Space v2 NAS (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the LaCie
--	  Network Space v2 NAS, using Flattened Device Tree.
--
--config MACH_NETSPACE_MAX_V2_DT
--	bool "LaCie Network Space Max v2 NAS (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the LaCie
--	  Network Space Max v2 NAS, using Flattened Device Tree.
--
--config MACH_NETSPACE_LITE_V2_DT
--	bool "LaCie Network Space Lite v2 NAS (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the LaCie
--	  Network Space Lite v2 NAS, using Flattened Device Tree.
--
--config MACH_NETSPACE_MINI_V2_DT
--	bool "LaCie Network Space Mini v2 NAS (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the LaCie
--	  Network Space Mini v2 NAS (aka SafeBox), using Flattened
--	  Device Tree.
--
--config MACH_OPENBLOCKS_A6_DT
--	bool "Plat'Home OpenBlocks A6 (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Plat'Home OpenBlocks A6 (Flattened Device Tree).
--
--config MACH_TOPKICK_DT
--	bool "USI Topkick (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  USI Topkick, using Flattened Device Tree
--
- config MACH_TS219
- 	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
- 	help
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index ee3aa77..ab739b0 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -20,21 +20,7 @@ obj-$(CONFIG_MACH_NET5BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
- obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
- 
- obj-$(CONFIG_ARCH_KIRKWOOD_DT)		+= board-dt.o
--obj-$(CONFIG_MACH_DREAMPLUG_DT)		+= board-dreamplug.o
--obj-$(CONFIG_MACH_ICONNECT_DT)		+= board-iconnect.o
- obj-$(CONFIG_MACH_DLINK_KIRKWOOD_DT)	+= board-dnskw.o
--obj-$(CONFIG_MACH_IB62X0_DT)		+= board-ib62x0.o
- obj-$(CONFIG_MACH_TS219_DT)		+= board-ts219.o tsx1x-common.o
--obj-$(CONFIG_MACH_DOCKSTAR_DT)		+= board-dockstar.o
--obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
--obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
- obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
- obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
--obj-$(CONFIG_MACH_INETSPACE_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_MPLCEC4_DT)		+= board-mplcec4.o
--obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_NETSPACE_MAX_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_NETSPACE_LITE_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_NETSPACE_MINI_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_OPENBLOCKS_A6_DT)	+= board-openblocks_a6.o
--obj-$(CONFIG_MACH_TOPKICK_DT)		+= board-usi_topkick.o
-diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index a1aa87f..2af7a95 100644
---- a/arch/arm/mach-kirkwood/board-dnskw.c
-+++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -14,14 +14,9 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
--#include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
- #include "common.h"
- 
--static struct mv643xx_eth_platform_data dnskw_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
- /* Register any GPIO for output and set the value */
- static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
- {
-@@ -36,8 +31,6 @@ static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
- 
- void __init dnskw_init(void)
- {
--	kirkwood_ge00_init(&dnskw_ge00_data);
--
- 	/* Set NAS to turn back on after a power failure */
- 	dnskw_gpio_register(37, "dnskw:power:recover", 1);
- }
-diff --git a/arch/arm/mach-kirkwood/board-dockstar.c b/arch/arm/mach-kirkwood/board-dockstar.c
-deleted file mode 100644
-index d7196db..0000000
---- a/arch/arm/mach-kirkwood/board-dockstar.c
-+++ /dev/null
-@@ -1,32 +0,0 @@
--/*
-- * arch/arm/mach-kirkwood/board-dockstar.c
-- *
-- * Seagate FreeAgent Dockstar Board Init for drivers not converted to
-- * flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- *
-- * Copied and modified for Seagate GoFlex Net support by
-- * Joshua Coombs <josh.coombs@gmail.com> based on ArchLinux ARM's
-- * GoFlex kernel patches.
-- *
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data dockstar_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--void __init dockstar_dt_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&dockstar_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
-deleted file mode 100644
-index 0903242..0000000
---- a/arch/arm/mach-kirkwood/board-dreamplug.c
-+++ /dev/null
-@@ -1,35 +0,0 @@
--/*
-- * Copyright 2012 (C), Jason Cooper <jason@lakedaemon.net>
-- *
-- * arch/arm/mach-kirkwood/board-dreamplug.c
-- *
-- * Marvell DreamPlug Reference Board Init for drivers not converted to
-- * flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include <linux/gpio.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--static struct mv643xx_eth_platform_data dreamplug_ge01_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
--};
--
--void __init dreamplug_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&dreamplug_ge00_data);
--	kirkwood_ge01_init(&dreamplug_ge01_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 73b76e4..f5bd640 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -93,6 +93,86 @@ static int __init kirkwood_pcie_dt_init(void)
- }
- subsys_initcall(kirkwood_pcie_dt_init);
- 
-+struct kirkwood_dt_gige {
-+	const char *compatible;
-+	int phy_addr00;
-+	int phy_addr01;
-+};
-+
-+static struct kirkwood_dt_gige kw_dt_gige[] = {
-+	{ .compatible = "buffalo,lsxl",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(0),
-+	  .phy_addr01 = MV643XX_ETH_PHY_ADDR(8) },
-+	{ .compatible = "dlink,dns-kirkwood",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(8),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "globalscale,dreamplug",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(0),
-+	  .phy_addr01 = MV643XX_ETH_PHY_ADDR(1) },
-+	{ .compatible = "iom,iconnect",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(11),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "lacie,inetspace_v2",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(8),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "lacie,netspace_v2",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(8),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "lacie,netspace_max_v2",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(8),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "lacie,netspace_lite_v2",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(0),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "lacie,netspace_mini_v2",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(0),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "mpl,cec4",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(1),
-+	  .phy_addr01 = MV643XX_ETH_PHY_ADDR(2) },
-+	{ .compatible = "plathome,openblocks-a6",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(0),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "raidsonic,ib-nas62x0",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(8),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "seagate,dockstar",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(0),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "seagate,goflexnet",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(0),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ .compatible = "usi,topkick",
-+	  .phy_addr00 = MV643XX_ETH_PHY_ADDR(0),
-+	  .phy_addr01 = MV643XX_ETH_PHY_NONE },
-+	{ NULL, MV643XX_ETH_PHY_NONE, MV643XX_ETH_PHY_NONE },
-+};
-+
-+static void kirkwood_gige_dt_init(void) {
-+	int i;
-+
-+	for (i = 0; kw_dt_gige[i].compatible != NULL; i++) {
-+		if (of_machine_is_compatible(kw_dt_gige[i].compatible)) {
-+
-+			if (kw_dt_gige[i].phy_addr00 != MV643XX_ETH_PHY_NONE) {
-+				struct mv643xx_eth_platform_data d = {
-+					.phy_addr = kw_dt_gige[i].phy_addr00,
-+				};
-+				kirkwood_ge00_init(&d);
-+			}
-+
-+			if (kw_dt_gige[i].phy_addr01 != MV643XX_ETH_PHY_NONE) {
-+				struct mv643xx_eth_platform_data d = {
-+					.phy_addr = kw_dt_gige[i].phy_addr01,
-+				};
-+				kirkwood_ge01_init(&d);
-+			}
-+
-+			break;
-+		}
-+	}
-+}
-+
- static void __init kirkwood_dt_init(void)
- {
- 	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
-@@ -118,52 +198,20 @@ static void __init kirkwood_dt_init(void)
- 	kexec_reinit = kirkwood_enable_pcie;
- #endif
- 
--	if (of_machine_is_compatible("globalscale,dreamplug"))
--		dreamplug_init();
-+	kirkwood_gige_dt_init();
- 
- 	if (of_machine_is_compatible("dlink,dns-kirkwood"))
- 		dnskw_init();
- 
--	if (of_machine_is_compatible("iom,iconnect"))
--		iconnect_init();
--
--	if (of_machine_is_compatible("raidsonic,ib-nas62x0"))
--		ib62x0_init();
--
- 	if (of_machine_is_compatible("qnap,ts219"))
- 		qnap_dt_ts219_init();
- 
--	if (of_machine_is_compatible("seagate,dockstar"))
--		dockstar_dt_init();
--
--	if (of_machine_is_compatible("seagate,goflexnet"))
--		goflexnet_init();
--
--	if (of_machine_is_compatible("buffalo,lsxl"))
--		lsxl_init();
--
- 	if (of_machine_is_compatible("iom,ix2-200"))
- 		iomega_ix2_200_init();
- 
- 	if (of_machine_is_compatible("keymile,km_kirkwood"))
- 		km_kirkwood_init();
- 
--	if (of_machine_is_compatible("lacie,inetspace_v2") ||
--	    of_machine_is_compatible("lacie,netspace_v2") ||
--	    of_machine_is_compatible("lacie,netspace_max_v2") ||
--	    of_machine_is_compatible("lacie,netspace_lite_v2") ||
--	    of_machine_is_compatible("lacie,netspace_mini_v2"))
--		ns2_init();
--
--	if (of_machine_is_compatible("mpl,cec4"))
--		mplcec4_init();
--
--	if (of_machine_is_compatible("plathome,openblocks-a6"))
--		openblocks_a6_init();
--
--	if (of_machine_is_compatible("usi,topkick"))
--		usi_topkick_init();
--
- 	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
- }
- 
-diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
-deleted file mode 100644
-index 9db979a..0000000
---- a/arch/arm/mach-kirkwood/board-goflexnet.c
-+++ /dev/null
-@@ -1,34 +0,0 @@
--/*
-- * Copyright 2012 (C), Jason Cooper <jason@lakedaemon.net>
-- *
-- * arch/arm/mach-kirkwood/board-goflexnet.c
-- *
-- * Seagate GoFlext Net Board Init for drivers not converted to
-- * flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- *
-- * Copied and modified for Seagate GoFlex Net support by
-- * Joshua Coombs <josh.coombs@gmail.com> based on ArchLinux ARM's
-- * GoFlex kernel patches.
-- *
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data goflexnet_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--void __init goflexnet_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&goflexnet_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
-deleted file mode 100644
-index 9a857ae..0000000
---- a/arch/arm/mach-kirkwood/board-ib62x0.c
-+++ /dev/null
-@@ -1,29 +0,0 @@
--/*
-- * Copyright 2012 (C), Simon Baatz <gmbnomis@gmail.com>
-- *
-- * arch/arm/mach-kirkwood/board-ib62x0.c
-- *
-- * RaidSonic ICY BOX IB-NAS6210 & IB-NAS6220 init for drivers not
-- * converted to flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data ib62x0_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
--void __init ib62x0_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&ib62x0_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
-deleted file mode 100644
-index ff042dc..0000000
---- a/arch/arm/mach-kirkwood/board-iconnect.c
-+++ /dev/null
-@@ -1,23 +0,0 @@
--/*
-- * arch/arm/mach-kirkwood/board-iconnect.c
-- *
-- * Iomega i-connect Board Setup
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data iconnect_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(11),
--};
--
--void __init iconnect_init(void)
--{
--	kirkwood_ge00_init(&iconnect_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
-deleted file mode 100644
-index 3483952..0000000
---- a/arch/arm/mach-kirkwood/board-lsxl.c
-+++ /dev/null
-@@ -1,36 +0,0 @@
--/*
-- * Copyright 2012 (C), Michael Walle <michael@walle.cc>
-- *
-- * arch/arm/mach-kirkwood/board-lsxl.c
-- *
-- * Buffalo Linkstation LS-XHL and LS-CHLv2 init for drivers not
-- * converted to flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data lsxl_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--static struct mv643xx_eth_platform_data lsxl_ge01_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
--void __init lsxl_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--
--	kirkwood_ge00_init(&lsxl_ge00_data);
--	kirkwood_ge01_init(&lsxl_ge01_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-mplcec4.c b/arch/arm/mach-kirkwood/board-mplcec4.c
-deleted file mode 100644
-index 938712e..0000000
---- a/arch/arm/mach-kirkwood/board-mplcec4.c
-+++ /dev/null
-@@ -1,35 +0,0 @@
--/*
-- * Copyright (C) 2012 MPL AG, Switzerland
-- * Stefan Peter <s.peter@mpl.ch>
-- *
-- * arch/arm/mach-kirkwood/board-mplcec4.c
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data mplcec4_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
--};
--
--static struct mv643xx_eth_platform_data mplcec4_ge01_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(2),
--};
--
--void __init mplcec4_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&mplcec4_ge00_data);
--	kirkwood_ge01_init(&mplcec4_ge01_data);
--}
--
--
--
-diff --git a/arch/arm/mach-kirkwood/board-ns2.c b/arch/arm/mach-kirkwood/board-ns2.c
-deleted file mode 100644
-index f2ea3b7..0000000
---- a/arch/arm/mach-kirkwood/board-ns2.c
-+++ /dev/null
-@@ -1,34 +0,0 @@
--/*
-- * Copyright 2012 (C), Simon Guinot <simon.guinot@sequanux.org>
-- *
-- * arch/arm/mach-kirkwood/board-ns2.c
-- *
-- * LaCie Network Space v2 board (and parents) initialization for drivers
-- * not converted to flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/mv643xx_eth.h>
--#include <linux/of.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data ns2_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
--void __init ns2_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	if (of_machine_is_compatible("lacie,netspace_lite_v2") ||
--	    of_machine_is_compatible("lacie,netspace_mini_v2"))
--		ns2_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
--	kirkwood_ge00_init(&ns2_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-openblocks_a6.c b/arch/arm/mach-kirkwood/board-openblocks_a6.c
-deleted file mode 100644
-index b11d8fd..0000000
---- a/arch/arm/mach-kirkwood/board-openblocks_a6.c
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/*
-- * Copyright 2012 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-- *
-- * arch/arm/mach-kirkwood/board-openblocks_a6.c
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data openblocks_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--void __init openblocks_a6_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&openblocks_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
-deleted file mode 100644
-index 1cc04ec..0000000
---- a/arch/arm/mach-kirkwood/board-usi_topkick.c
-+++ /dev/null
-@@ -1,29 +0,0 @@
--/*
-- * Copyright 2012 (C), Jason Cooper <jason@lakedaemon.net>
-- *
-- * arch/arm/mach-kirkwood/board-usi_topkick.c
-- *
-- * USI Topkick Init for drivers not converted to flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include <linux/gpio.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data topkick_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--void __init usi_topkick_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&topkick_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 1c42cb8..ba6eb9c 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -55,11 +55,6 @@ void kirkwood_restart(char, const char *);
- void kirkwood_clk_init(void);
- 
- /* board init functions for boards not fully converted to fdt */
--#ifdef CONFIG_MACH_DREAMPLUG_DT
--void dreamplug_init(void);
--#else
--static inline void dreamplug_init(void) {};
--#endif
- #ifdef CONFIG_MACH_TS219_DT
- void qnap_dt_ts219_init(void);
- #else
-@@ -72,36 +67,6 @@ void dnskw_init(void);
- static inline void dnskw_init(void) {};
- #endif
- 
--#ifdef CONFIG_MACH_ICONNECT_DT
--void iconnect_init(void);
--#else
--static inline void iconnect_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_IB62X0_DT
--void ib62x0_init(void);
--#else
--static inline void ib62x0_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_DOCKSTAR_DT
--void dockstar_dt_init(void);
--#else
--static inline void dockstar_dt_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_GOFLEXNET_DT
--void goflexnet_init(void);
--#else
--static inline void goflexnet_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_LSXL_DT
--void lsxl_init(void);
--#else
--static inline void lsxl_init(void) {};
--#endif
--
- #ifdef CONFIG_MACH_IOMEGA_IX2_200_DT
- void iomega_ix2_200_init(void);
- #else
-@@ -114,34 +79,6 @@ void km_kirkwood_init(void);
- static inline void km_kirkwood_init(void) {};
- #endif
- 
--#ifdef CONFIG_MACH_MPLCEC4_DT
--void mplcec4_init(void);
--#else
--static inline void mplcec4_init(void) {};
--#endif
--
--#if defined(CONFIG_MACH_INETSPACE_V2_DT) || \
--	defined(CONFIG_MACH_NETSPACE_V2_DT) || \
--	defined(CONFIG_MACH_NETSPACE_MAX_V2_DT) || \
--	defined(CONFIG_MACH_NETSPACE_LITE_V2_DT) || \
--	defined(CONFIG_MACH_NETSPACE_MINI_V2_DT)
--void ns2_init(void);
--#else
--static inline void ns2_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_OPENBLOCKS_A6_DT
--void openblocks_a6_init(void);
--#else
--static inline void openblocks_a6_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_TOPKICK_DT
--void usi_topkick_init(void);
--#else
--static inline void usi_topkick_init(void) {};
--#endif
--
- /* early init functions not converted to fdt yet */
- char *kirkwood_id(void);
- void kirkwood_l2_init(void);
--- 
-1.8.1.1
+Best Regards,
+Wenyou Yang
