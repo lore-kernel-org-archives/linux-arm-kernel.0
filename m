@@ -1,369 +1,585 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Thu, 24 Jan 2013 01:38:26 -0500
-Subject: [V5 PATCH 02/26] usb: gadget: mv_udc: use devm_xxx for probe
+Date: Thu, 24 Jan 2013 01:38:32 -0500
+Subject: [V5 PATCH 08/26] usb: phy: mv_usb2: add PHY driver for marvell usb2
+ controller
 In-Reply-To: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
 References: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1359009530-28182-3-git-send-email-chao.xie@marvell.com>
+Message-ID: <1359009530-28182-9-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use devm_xxx for udc driver probe. So we do need care about
-the resources release in driver remove or failure handling
-in driver probe.
+The PHY is seperated from usb controller.
+The usb controller used in marvell pxa168/pxa910/mmp2 are same,
+but PHY initialization may be different.
+the usb controller can support udc/otg/ehci, and for each of
+the mode, it need PHY to initialized before use the controller.
+Direclty writing the phy driver will make the usb controller
+driver to be simple and portable.
+The PHY driver will be used by marvell udc/otg/ehci.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/gadget/mv_udc_core.c |  156 ++++++++++++++------------------------
- 1 files changed, 56 insertions(+), 100 deletions(-)
+ drivers/usb/phy/Kconfig              |    7 +
+ drivers/usb/phy/Makefile             |    1 +
+ drivers/usb/phy/mv_usb2_phy.c        |  454 ++++++++++++++++++++++++++++++++++
+ include/linux/platform_data/mv_usb.h |    9 +-
+ include/linux/usb/mv_usb2.h          |   43 ++++
+ 5 files changed, 511 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/usb/phy/mv_usb2_phy.c
+ create mode 100644 include/linux/usb/mv_usb2.h
 
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index 32a9972..e2fdc8e 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -2115,12 +2115,11 @@ static void gadget_release(struct device *_dev)
- 	complete(udc->done);
- }
+diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+index 5de6e7f..7bfce04 100644
+--- a/drivers/usb/phy/Kconfig
++++ b/drivers/usb/phy/Kconfig
+@@ -45,3 +45,10 @@ config USB_RCAR_PHY
  
--static int mv_udc_remove(struct platform_device *dev)
-+static int mv_udc_remove(struct platform_device *pdev)
- {
- 	struct mv_udc *udc;
--	int clk_i;
- 
--	udc = platform_get_drvdata(dev);
-+	udc = platform_get_drvdata(pdev);
- 
- 	usb_del_gadget_udc(&udc->gadget);
- 
-@@ -2129,55 +2128,27 @@ static int mv_udc_remove(struct platform_device *dev)
- 		destroy_workqueue(udc->qwork);
- 	}
- 
--	/*
--	 * If we have transceiver inited,
--	 * then vbus irq will not be requested in udc driver.
--	 */
--	if (udc->pdata && udc->pdata->vbus
--		&& udc->clock_gating && IS_ERR_OR_NULL(udc->transceiver))
--		free_irq(udc->pdata->vbus->irq, &dev->dev);
--
- 	/* free memory allocated in probe */
- 	if (udc->dtd_pool)
- 		dma_pool_destroy(udc->dtd_pool);
- 
- 	if (udc->ep_dqh)
--		dma_free_coherent(&dev->dev, udc->ep_dqh_size,
-+		dma_free_coherent(&pdev->dev, udc->ep_dqh_size,
- 			udc->ep_dqh, udc->ep_dqh_dma);
- 
--	kfree(udc->eps);
--
--	if (udc->irq)
--		free_irq(udc->irq, &dev->dev);
--
- 	mv_udc_disable(udc);
- 
--	if (udc->cap_regs)
--		iounmap(udc->cap_regs);
--
--	if (udc->phy_regs)
--		iounmap(udc->phy_regs);
--
--	if (udc->status_req) {
--		kfree(udc->status_req->req.buf);
--		kfree(udc->status_req);
--	}
--
--	for (clk_i = 0; clk_i <= udc->clknum; clk_i++)
--		clk_put(udc->clk[clk_i]);
--
- 	device_unregister(&udc->gadget.dev);
- 
- 	/* free dev, wait for the release() finished */
- 	wait_for_completion(udc->done);
--	kfree(udc);
- 
- 	return 0;
- }
- 
--static int mv_udc_probe(struct platform_device *dev)
-+static int mv_udc_probe(struct platform_device *pdev)
- {
--	struct mv_usb_platform_data *pdata = dev->dev.platform_data;
-+	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
- 	struct mv_udc *udc;
- 	int retval = 0;
- 	int clk_i = 0;
-@@ -2185,70 +2156,68 @@ static int mv_udc_probe(struct platform_device *dev)
- 	size_t size;
- 
- 	if (pdata == NULL) {
--		dev_err(&dev->dev, "missing platform_data\n");
-+		dev_err(&pdev->dev, "missing platform_data\n");
- 		return -ENODEV;
- 	}
- 
- 	size = sizeof(*udc) + sizeof(struct clk *) * pdata->clknum;
--	udc = kzalloc(size, GFP_KERNEL);
-+	udc = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
- 	if (udc == NULL) {
--		dev_err(&dev->dev, "failed to allocate memory for udc\n");
-+		dev_err(&pdev->dev, "failed to allocate memory for udc\n");
- 		return -ENOMEM;
- 	}
- 
- 	udc->done = &release_done;
--	udc->pdata = dev->dev.platform_data;
-+	udc->pdata = pdev->dev.platform_data;
- 	spin_lock_init(&udc->lock);
- 
--	udc->dev = dev;
-+	udc->dev = pdev;
- 
- #ifdef CONFIG_USB_OTG_UTILS
- 	if (pdata->mode == MV_USB_MODE_OTG)
--		udc->transceiver = usb_get_phy(USB_PHY_TYPE_USB2);
-+		udc->transceiver = devm_usb_get_phy(&pdev->dev,
-+					USB_PHY_TYPE_USB2);
- #endif
- 
- 	udc->clknum = pdata->clknum;
- 	for (clk_i = 0; clk_i < udc->clknum; clk_i++) {
--		udc->clk[clk_i] = clk_get(&dev->dev, pdata->clkname[clk_i]);
-+		udc->clk[clk_i] = devm_clk_get(&pdev->dev,
-+					pdata->clkname[clk_i]);
- 		if (IS_ERR(udc->clk[clk_i])) {
- 			retval = PTR_ERR(udc->clk[clk_i]);
--			goto err_put_clk;
-+			return retval;
- 		}
- 	}
- 
- 	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
- 	if (r == NULL) {
--		dev_err(&dev->dev, "no I/O memory resource defined\n");
--		retval = -ENODEV;
--		goto err_put_clk;
-+		dev_err(&pdev->dev, "no I/O memory resource defined\n");
-+		return -ENODEV;
- 	}
- 
- 	udc->cap_regs = (struct mv_cap_regs __iomem *)
--		ioremap(r->start, resource_size(r));
-+		devm_ioremap(&pdev->dev, r->start, resource_size(r));
- 	if (udc->cap_regs == NULL) {
--		dev_err(&dev->dev, "failed to map I/O memory\n");
--		retval = -EBUSY;
--		goto err_put_clk;
-+		dev_err(&pdev->dev, "failed to map I/O memory\n");
-+		return -EBUSY;
- 	}
- 
- 	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
- 	if (r == NULL) {
--		dev_err(&dev->dev, "no phy I/O memory resource defined\n");
--		retval = -ENODEV;
--		goto err_iounmap_capreg;
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called rcar-phy.
++
++config MV_USB2_PHY
++	tristate "Marvell USB 2.0 PHY Driver"
++	depends on ARCH_PXA || ARCH_MMP
++	help
++	  Enable this to support Marvell USB 2.0 phy driver for Marvell
++	  SoC.
+diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
+index 1a579a8..e33e09c 100644
+--- a/drivers/usb/phy/Makefile
++++ b/drivers/usb/phy/Makefile
+@@ -9,3 +9,4 @@ obj-$(CONFIG_USB_ISP1301)		+= isp1301.o
+ obj-$(CONFIG_MV_U3D_PHY)		+= mv_u3d_phy.o
+ obj-$(CONFIG_USB_EHCI_TEGRA)	+= tegra_usb_phy.o
+ obj-$(CONFIG_USB_RCAR_PHY)		+= rcar-phy.o
++obj-$(CONFIG_MV_USB2_PHY)		+= mv_usb2_phy.o
+diff --git a/drivers/usb/phy/mv_usb2_phy.c b/drivers/usb/phy/mv_usb2_phy.c
+new file mode 100644
+index 0000000..c2bccae
+--- /dev/null
++++ b/drivers/usb/phy/mv_usb2_phy.c
+@@ -0,0 +1,454 @@
++/*
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Chao Xie <xiechao.mail@gmail.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/resource.h>
++#include <linux/delay.h>
++#include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/io.h>
++#include <linux/err.h>
++#include <linux/clk.h>
++#include <linux/export.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/platform_data/mv_usb.h>
++#include <linux/usb/mv_usb2.h>
++
++/* phy regs */
++#define UTMI_REVISION		0x0
++#define UTMI_CTRL		0x4
++#define UTMI_PLL		0x8
++#define UTMI_TX			0xc
++#define UTMI_RX			0x10
++#define UTMI_IVREF		0x14
++#define UTMI_T0			0x18
++#define UTMI_T1			0x1c
++#define UTMI_T2			0x20
++#define UTMI_T3			0x24
++#define UTMI_T4			0x28
++#define UTMI_T5			0x2c
++#define UTMI_RESERVE		0x30
++#define UTMI_USB_INT		0x34
++#define UTMI_DBG_CTL		0x38
++#define UTMI_OTG_ADDON		0x3c
++
++/* For UTMICTRL Register */
++#define UTMI_CTRL_USB_CLK_EN                    (1 << 31)
++/* pxa168 */
++#define UTMI_CTRL_SUSPEND_SET1                  (1 << 30)
++#define UTMI_CTRL_SUSPEND_SET2                  (1 << 29)
++#define UTMI_CTRL_RXBUF_PDWN                    (1 << 24)
++#define UTMI_CTRL_TXBUF_PDWN                    (1 << 11)
++
++#define UTMI_CTRL_INPKT_DELAY_SHIFT             30
++#define UTMI_CTRL_INPKT_DELAY_SOF_SHIFT		28
++#define UTMI_CTRL_PU_REF_SHIFT			20
++#define UTMI_CTRL_ARC_PULLDN_SHIFT              12
++#define UTMI_CTRL_PLL_PWR_UP_SHIFT              1
++#define UTMI_CTRL_PWR_UP_SHIFT                  0
++
++/* For UTMI_PLL Register */
++#define UTMI_PLL_PLLCALI12_SHIFT		29
++#define UTMI_PLL_PLLCALI12_MASK			(0x3 << 29)
++
++#define UTMI_PLL_PLLVDD18_SHIFT			27
++#define UTMI_PLL_PLLVDD18_MASK			(0x3 << 27)
++
++#define UTMI_PLL_PLLVDD12_SHIFT			25
++#define UTMI_PLL_PLLVDD12_MASK			(0x3 << 25)
++
++#define UTMI_PLL_CLK_BLK_EN_SHIFT               24
++#define CLK_BLK_EN                              (0x1 << 24)
++#define PLL_READY                               (0x1 << 23)
++#define KVCO_EXT                                (0x1 << 22)
++#define VCOCAL_START                            (0x1 << 21)
++
++#define UTMI_PLL_KVCO_SHIFT			15
++#define UTMI_PLL_KVCO_MASK                      (0x7 << 15)
++
++#define UTMI_PLL_ICP_SHIFT			12
++#define UTMI_PLL_ICP_MASK                       (0x7 << 12)
++
++#define UTMI_PLL_FBDIV_SHIFT                    4
++#define UTMI_PLL_FBDIV_MASK                     (0xFF << 4)
++
++#define UTMI_PLL_REFDIV_SHIFT                   0
++#define UTMI_PLL_REFDIV_MASK                    (0xF << 0)
++
++/* For UTMI_TX Register */
++#define UTMI_TX_REG_EXT_FS_RCAL_SHIFT		27
++#define UTMI_TX_REG_EXT_FS_RCAL_MASK		(0xf << 27)
++
++#define UTMI_TX_REG_EXT_FS_RCAL_EN_SHIFT	26
++#define UTMI_TX_REG_EXT_FS_RCAL_EN_MASK		(0x1 << 26)
++
++#define UTMI_TX_TXVDD12_SHIFT                   22
++#define UTMI_TX_TXVDD12_MASK                    (0x3 << 22)
++
++#define UTMI_TX_CK60_PHSEL_SHIFT                17
++#define UTMI_TX_CK60_PHSEL_MASK                 (0xf << 17)
++
++#define UTMI_TX_IMPCAL_VTH_SHIFT                14
++#define UTMI_TX_IMPCAL_VTH_MASK                 (0x7 << 14)
++
++#define REG_RCAL_START                          (0x1 << 12)
++
++#define UTMI_TX_LOW_VDD_EN_SHIFT                11
++
++#define UTMI_TX_AMP_SHIFT			0
++#define UTMI_TX_AMP_MASK			(0x7 << 0)
++
++/* For UTMI_RX Register */
++#define UTMI_REG_SQ_LENGTH_SHIFT                15
++#define UTMI_REG_SQ_LENGTH_MASK                 (0x3 << 15)
++
++#define UTMI_RX_SQ_THRESH_SHIFT                 4
++#define UTMI_RX_SQ_THRESH_MASK                  (0xf << 4)
++
++#define UTMI_OTG_ADDON_OTG_ON			(1 << 0)
++
++enum mv_usb2_phy_type {
++	PXA168_USB,
++	PXA910_USB,
++	MMP2_USB,
++};
++
++static struct mv_usb2_phy *the_phy;
++
++struct mv_usb2_phy *mv_usb2_get_phy(void)
++{
++	return the_phy;
++}
++EXPORT_SYMBOL(mv_usb2_get_phy);
++
++static unsigned int u2o_get(void __iomem *base, unsigned int offset)
++{
++	return readl(base + offset);
++}
++
++static void u2o_set(void __iomem *base, unsigned int offset,
++		unsigned int value)
++{
++	u32 reg;
++
++	reg = readl(base + offset);
++	reg |= value;
++	writel(reg, base + offset);
++	readl(base + offset);
++}
++
++static void u2o_clear(void __iomem *base, unsigned int offset,
++		unsigned int value)
++{
++	u32 reg;
++
++	reg = readl(base + offset);
++	reg &= ~value;
++	writel(reg, base + offset);
++	readl(base + offset);
++}
++
++static void u2o_write(void __iomem *base, unsigned int offset,
++		unsigned int value)
++{
++	writel(value, base + offset);
++	readl(base + offset);
++}
++
++static int _usb_phy_init(struct mv_usb2_phy *mv_phy)
++{
++	struct platform_device *pdev = mv_phy->pdev;
++	unsigned int loops = 0;
++	void __iomem *base = mv_phy->base;
++
++	dev_dbg(&pdev->dev, "phy init\n");
++
++	/* Initialize the USB PHY power */
++	if (mv_phy->type == PXA910_USB) {
++		u2o_set(base, UTMI_CTRL, (1<<UTMI_CTRL_INPKT_DELAY_SOF_SHIFT)
++			| (1<<UTMI_CTRL_PU_REF_SHIFT));
++	}
++
++	u2o_set(base, UTMI_CTRL, 1<<UTMI_CTRL_PLL_PWR_UP_SHIFT);
++	u2o_set(base, UTMI_CTRL, 1<<UTMI_CTRL_PWR_UP_SHIFT);
++
++	/* UTMI_PLL settings */
++	u2o_clear(base, UTMI_PLL, UTMI_PLL_PLLVDD18_MASK
++		| UTMI_PLL_PLLVDD12_MASK | UTMI_PLL_PLLCALI12_MASK
++		| UTMI_PLL_FBDIV_MASK | UTMI_PLL_REFDIV_MASK
++		| UTMI_PLL_ICP_MASK | UTMI_PLL_KVCO_MASK);
++
++	u2o_set(base, UTMI_PLL, 0xee<<UTMI_PLL_FBDIV_SHIFT
++		| 0xb<<UTMI_PLL_REFDIV_SHIFT | 3<<UTMI_PLL_PLLVDD18_SHIFT
++		| 3<<UTMI_PLL_PLLVDD12_SHIFT | 3<<UTMI_PLL_PLLCALI12_SHIFT
++		| 1<<UTMI_PLL_ICP_SHIFT | 3<<UTMI_PLL_KVCO_SHIFT);
++
++	/* UTMI_TX */
++	u2o_clear(base, UTMI_TX, UTMI_TX_REG_EXT_FS_RCAL_EN_MASK
++		| UTMI_TX_TXVDD12_MASK | UTMI_TX_CK60_PHSEL_MASK
++		| UTMI_TX_IMPCAL_VTH_MASK | UTMI_TX_REG_EXT_FS_RCAL_MASK
++		| UTMI_TX_AMP_MASK);
++	u2o_set(base, UTMI_TX, 3<<UTMI_TX_TXVDD12_SHIFT
++		| 4<<UTMI_TX_CK60_PHSEL_SHIFT | 4<<UTMI_TX_IMPCAL_VTH_SHIFT
++		| 8<<UTMI_TX_REG_EXT_FS_RCAL_SHIFT | 3<<UTMI_TX_AMP_SHIFT);
++
++	/* UTMI_RX */
++	u2o_clear(base, UTMI_RX, UTMI_RX_SQ_THRESH_MASK
++		| UTMI_REG_SQ_LENGTH_MASK);
++	u2o_set(base, UTMI_RX, 7<<UTMI_RX_SQ_THRESH_SHIFT
++		| 2<<UTMI_REG_SQ_LENGTH_SHIFT);
++
++	/* UTMI_IVREF */
++	if (mv_phy->type == PXA168_USB)
++		/* fixing Microsoft Altair board interface with NEC hub issue -
++		 * Set UTMI_IVREF from 0x4a3 to 0x4bf */
++		u2o_write(base, UTMI_IVREF, 0x4bf);
++
++	/* toggle VCOCAL_START bit of UTMI_PLL */
++	udelay(200);
++	u2o_set(base, UTMI_PLL, VCOCAL_START);
++	udelay(40);
++	u2o_clear(base, UTMI_PLL, VCOCAL_START);
++
++	/* toggle REG_RCAL_START bit of UTMI_TX */
++	udelay(400);
++	u2o_set(base, UTMI_TX, REG_RCAL_START);
++	udelay(40);
++	u2o_clear(base, UTMI_TX, REG_RCAL_START);
++	udelay(400);
++
++	/* Make sure PHY PLL is ready */
++	loops = 0;
++	while ((u2o_get(base, UTMI_PLL) & PLL_READY) == 0) {
++		mdelay(1);
++		loops++;
++		if (loops > 100) {
++			dev_warn(&pdev->dev, "calibrate timeout, UTMI_PLL %x\n",
++				u2o_get(base, UTMI_PLL));
++			break;
++		}
++	}
++
++	if (mv_phy->type == PXA168_USB) {
++		u2o_set(base, UTMI_RESERVE, 1 << 5);
++		/* Turn on UTMI PHY OTG extension */
++		u2o_write(base, UTMI_OTG_ADDON, 1);
++	}
++
++	return 0;
++}
++
++static int _usb_phy_shutdown(struct mv_usb2_phy *mv_phy)
++{
++	void __iomem *base = mv_phy->base;
++
++	if (mv_phy->type == PXA168_USB)
++		u2o_clear(base, UTMI_OTG_ADDON, UTMI_OTG_ADDON_OTG_ON);
++
++	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_RXBUF_PDWN);
++	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_TXBUF_PDWN);
++	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_USB_CLK_EN);
++	u2o_clear(base, UTMI_CTRL, 1<<UTMI_CTRL_PWR_UP_SHIFT);
++	u2o_clear(base, UTMI_CTRL, 1<<UTMI_CTRL_PLL_PWR_UP_SHIFT);
++
++	return 0;
++}
++
++static int usb_phy_init(struct mv_usb2_phy *mv_phy)
++{
++	int i = 0;
++
++	mutex_lock(&mv_phy->phy_lock);
++	if (mv_phy->refcount++ == 0) {
++		for (i = 0; i < mv_phy->clks_num; i++)
++			clk_prepare_enable(mv_phy->clks[i]);
++		_usb_phy_init(mv_phy);
++	}
++	mutex_unlock(&mv_phy->phy_lock);
++	return 0;
++}
++
++static void usb_phy_shutdown(struct mv_usb2_phy *mv_phy)
++{
++	int i = 0;
++
++	mutex_lock(&mv_phy->phy_lock);
++	if (mv_phy->refcount++ == 0) {
++		_usb_phy_shutdown(mv_phy);
++		for (i = 0; i < mv_phy->clks_num; i++)
++			clk_disable_unprepare(mv_phy->clks[i]);
++	}
++	mutex_unlock(&mv_phy->phy_lock);
++}
++
++static struct of_device_id usb_phy_dt_ids[] = {
++	{ .compatible = "mrvl,pxa168-usb-phy",	.data = (void *)PXA168_USB},
++	{ .compatible = "mrvl,pxa910-usb-phy",	.data = (void *)PXA910_USB},
++	{ .compatible = "mrvl,mmp2-usb-phy",	.data = (void *)MMP2_USB},
++	{}
++};
++MODULE_DEVICE_TABLE(of, usb_phy_dt_ids);
++
++static int usb_phy_parse_dt(struct platform_device *pdev,
++				struct mv_usb2_phy *mv_phy)
++{
++	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *of_id =
++			of_match_device(usb_phy_dt_ids, &pdev->dev);
++	unsigned int clks_num;
++	int i, ret;
++	const char *clk_name;
++
++	if (!np)
++		return 1;
++
++	clks_num = of_property_count_strings(np, "clocks");
++	if (clks_num < 0) {
++		dev_err(&pdev->dev, "failed to get clock number\n");
++		return clks_num;
++	}
++
++	mv_phy->clks = devm_kzalloc(&pdev->dev,
++		sizeof(struct clk *) * clks_num, GFP_KERNEL);
++	if (mv_phy->clks == NULL) {
++		dev_err(&pdev->dev,
++			"failed to allocate mempory for clocks");
++		return -ENOMEM;
++	}
++
++	for (i = 0; i < clks_num; i++) {
++		ret = of_property_read_string_index(np, "clocks", i,
++			&clk_name);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to read clocks\n");
++			return ret;
++		}
++		mv_phy->clks[i] = devm_clk_get(&pdev->dev, clk_name);
++		if (IS_ERR(mv_phy->clks[i])) {
++			dev_err(&pdev->dev, "failed to get clock %s\n",
++				clk_name);
++			return PTR_ERR(mv_phy->clks[i]);
++		}
++	}
++
++	mv_phy->clks_num = clks_num;
++	mv_phy->type = (enum mv_usb2_phy_type)(of_id->data);
++
++	return 0;
++}
++
++static int usb_phy_probe(struct platform_device *pdev)
++{
++	struct mv_usb2_phy *mv_phy;
++	struct resource *r;
++	int ret, i;
++
++	mv_phy = devm_kzalloc(&pdev->dev, sizeof(*mv_phy), GFP_KERNEL);
++	if (mv_phy == NULL) {
++		dev_err(&pdev->dev, "failed to allocate memory\n");
++		return -ENOMEM;
++	}
++	mutex_init(&mv_phy->phy_lock);
++
++	ret = usb_phy_parse_dt(pdev, mv_phy);
++	/* no CONFIG_OF */
++	if (ret > 0) {
++		struct mv_usb_phy_platform_data *pdata
++				= pdev->dev.platform_data;
++		const struct platform_device_id *id
++				= platform_get_device_id(pdev);
++
++		if (pdata == NULL || id == NULL) {
++			dev_err(&pdev->dev,
++				"missing platform_data or id_entry\n");
++			return -ENODEV;
++		}
++		mv_phy->type = (unsigned int)(id->driver_data);
++		mv_phy->clks_num = pdata->clknum;
++		mv_phy->clks = devm_kzalloc(&pdev->dev,
++			sizeof(struct clk *) * mv_phy->clks_num, GFP_KERNEL);
++		if (mv_phy->clks == NULL) {
++			dev_err(&pdev->dev,
++				"failed to allocate mempory for clocks");
++			return -ENOMEM;
++		}
++		for (i = 0; i < mv_phy->clks_num; i++)
++			mv_phy->clks[i] = devm_clk_get(&pdev->dev,
++							pdata->clkname[i]);
++			if (IS_ERR(mv_phy->clks[i])) {
++				dev_err(&pdev->dev, "failed to get clock %s\n",
++					pdata->clkname[i]);
++				return PTR_ERR(mv_phy->clks[i]);
++			}
++	} else if (ret < 0) {
++		dev_err(&pdev->dev, "error parse dt\n");
++		return ret;
++	}
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (r == NULL) {
 +		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
 +		return -ENODEV;
- 	}
- 
- 	udc->phy_regs = ioremap(r->start, resource_size(r));
- 	if (udc->phy_regs == NULL) {
--		dev_err(&dev->dev, "failed to map phy I/O memory\n");
--		retval = -EBUSY;
--		goto err_iounmap_capreg;
-+		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
++	}
++	mv_phy->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
++	if (mv_phy->base == NULL) {
++		dev_err(&pdev->dev, "error map register base\n");
 +		return -EBUSY;
- 	}
- 
- 	/* we will acces controller register, so enable the clk */
- 	retval = mv_udc_enable_internal(udc);
- 	if (retval)
--		goto err_iounmap_phyreg;
-+		return retval;
- 
- 	udc->op_regs =
- 		(struct mv_op_regs __iomem *)((unsigned long)udc->cap_regs
-@@ -2265,11 +2234,11 @@ static int mv_udc_probe(struct platform_device *dev)
- 
- 	size = udc->max_eps * sizeof(struct mv_dqh) *2;
- 	size = (size + DQH_ALIGNMENT - 1) & ~(DQH_ALIGNMENT - 1);
--	udc->ep_dqh = dma_alloc_coherent(&dev->dev, size,
-+	udc->ep_dqh = dma_alloc_coherent(&pdev->dev, size,
- 					&udc->ep_dqh_dma, GFP_KERNEL);
- 
- 	if (udc->ep_dqh == NULL) {
--		dev_err(&dev->dev, "allocate dQH memory failed\n");
-+		dev_err(&pdev->dev, "allocate dQH memory failed\n");
- 		retval = -ENOMEM;
- 		goto err_disable_clock;
- 	}
-@@ -2277,7 +2246,7 @@ static int mv_udc_probe(struct platform_device *dev)
- 
- 	/* create dTD dma_pool resource */
- 	udc->dtd_pool = dma_pool_create("mv_dtd",
--			&dev->dev,
-+			&pdev->dev,
- 			sizeof(struct mv_dtd),
- 			DTD_ALIGNMENT,
- 			DMA_BOUNDARY);
-@@ -2288,19 +2257,20 @@ static int mv_udc_probe(struct platform_device *dev)
- 	}
- 
- 	size = udc->max_eps * sizeof(struct mv_ep) *2;
--	udc->eps = kzalloc(size, GFP_KERNEL);
-+	udc->eps = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
- 	if (udc->eps == NULL) {
--		dev_err(&dev->dev, "allocate ep memory failed\n");
-+		dev_err(&pdev->dev, "allocate ep memory failed\n");
- 		retval = -ENOMEM;
- 		goto err_destroy_dma;
- 	}
- 
- 	/* initialize ep0 status request structure */
--	udc->status_req = kzalloc(sizeof(struct mv_req), GFP_KERNEL);
-+	udc->status_req = devm_kzalloc(&pdev->dev, sizeof(struct mv_req),
-+					GFP_KERNEL);
- 	if (!udc->status_req) {
--		dev_err(&dev->dev, "allocate status_req memory failed\n");
-+		dev_err(&pdev->dev, "allocate status_req memory failed\n");
- 		retval = -ENOMEM;
--		goto err_free_eps;
-+		goto err_destroy_dma;
- 	}
- 	INIT_LIST_HEAD(&udc->status_req->queue);
- 
-@@ -2315,17 +2285,17 @@ static int mv_udc_probe(struct platform_device *dev)
- 
- 	r = platform_get_resource(udc->dev, IORESOURCE_IRQ, 0);
- 	if (r == NULL) {
--		dev_err(&dev->dev, "no IRQ resource defined\n");
-+		dev_err(&pdev->dev, "no IRQ resource defined\n");
- 		retval = -ENODEV;
--		goto err_free_status_req;
-+		goto err_destroy_dma;
- 	}
- 	udc->irq = r->start;
--	if (request_irq(udc->irq, mv_udc_irq,
-+	if (devm_request_irq(&pdev->dev, udc->irq, mv_udc_irq,
- 		IRQF_SHARED, driver_name, udc)) {
--		dev_err(&dev->dev, "Request irq %d for UDC failed\n",
-+		dev_err(&pdev->dev, "Request irq %d for UDC failed\n",
- 			udc->irq);
- 		retval = -ENODEV;
--		goto err_free_status_req;
-+		goto err_destroy_dma;
- 	}
- 
- 	/* initialize gadget structure */
-@@ -2337,14 +2307,14 @@ static int mv_udc_probe(struct platform_device *dev)
- 
- 	/* the "gadget" abstracts/virtualizes the controller */
- 	dev_set_name(&udc->gadget.dev, "gadget");
--	udc->gadget.dev.parent = &dev->dev;
--	udc->gadget.dev.dma_mask = dev->dev.dma_mask;
-+	udc->gadget.dev.parent = &pdev->dev;
-+	udc->gadget.dev.dma_mask = pdev->dev.dma_mask;
- 	udc->gadget.dev.release = gadget_release;
- 	udc->gadget.name = driver_name;		/* gadget name */
- 
- 	retval = device_register(&udc->gadget.dev);
- 	if (retval)
--		goto err_free_irq;
-+		goto err_destroy_dma;
- 
- 	eps_init(udc);
- 
-@@ -2353,10 +2323,11 @@ static int mv_udc_probe(struct platform_device *dev)
- 		udc->clock_gating = 1;
- 	else if (pdata->vbus) {
- 		udc->clock_gating = 1;
--		retval = request_threaded_irq(pdata->vbus->irq, NULL,
-+		retval = devm_request_threaded_irq(&pdev->dev,
-+				pdata->vbus->irq, NULL,
- 				mv_udc_vbus_irq, IRQF_ONESHOT, "vbus", udc);
- 		if (retval) {
--			dev_info(&dev->dev,
-+			dev_info(&pdev->dev,
- 				"Can not request irq for VBUS, "
- 				"disable clock gating\n");
- 			udc->clock_gating = 0;
-@@ -2364,7 +2335,7 @@ static int mv_udc_probe(struct platform_device *dev)
- 
- 		udc->qwork = create_singlethread_workqueue("mv_udc_queue");
- 		if (!udc->qwork) {
--			dev_err(&dev->dev, "cannot create workqueue\n");
-+			dev_err(&pdev->dev, "cannot create workqueue\n");
- 			retval = -ENOMEM;
- 			goto err_unregister;
- 		}
-@@ -2382,43 +2353,28 @@ static int mv_udc_probe(struct platform_device *dev)
- 	else
- 		udc->vbus_active = 1;
- 
--	retval = usb_add_gadget_udc(&dev->dev, &udc->gadget);
-+	retval = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
- 	if (retval)
--		goto err_unregister;
-+		goto err_create_workqueue;
- 
--	platform_set_drvdata(dev, udc);
--	dev_info(&dev->dev, "successful probe UDC device %s clock gating.\n",
-+	platform_set_drvdata(pdev, udc);
-+	dev_info(&pdev->dev, "successful probe UDC device %s clock gating.\n",
- 		udc->clock_gating ? "with" : "without");
- 
- 	return 0;
- 
-+err_create_workqueue:
-+	destroy_workqueue(udc->qwork);
- err_unregister:
--	if (udc->pdata && udc->pdata->vbus
--		&& udc->clock_gating && IS_ERR_OR_NULL(udc->transceiver))
--		free_irq(pdata->vbus->irq, &dev->dev);
- 	device_unregister(&udc->gadget.dev);
--err_free_irq:
--	free_irq(udc->irq, &dev->dev);
--err_free_status_req:
--	kfree(udc->status_req->req.buf);
--	kfree(udc->status_req);
--err_free_eps:
--	kfree(udc->eps);
- err_destroy_dma:
- 	dma_pool_destroy(udc->dtd_pool);
- err_free_dma:
--	dma_free_coherent(&dev->dev, udc->ep_dqh_size,
-+	dma_free_coherent(&pdev->dev, udc->ep_dqh_size,
- 			udc->ep_dqh, udc->ep_dqh_dma);
- err_disable_clock:
- 	mv_udc_disable_internal(udc);
--err_iounmap_phyreg:
--	iounmap(udc->phy_regs);
--err_iounmap_capreg:
--	iounmap(udc->cap_regs);
--err_put_clk:
--	for (clk_i--; clk_i >= 0; clk_i--)
--		clk_put(udc->clk[clk_i]);
--	kfree(udc);
++	}
++	platform_set_drvdata(pdev, mv_phy);
++	mv_phy->pdev = pdev;
++	mv_phy->init = usb_phy_init;
++	mv_phy->shutdown = usb_phy_shutdown;
 +
- 	return retval;
- }
++	platform_set_drvdata(pdev, mv_phy);
++
++	the_phy = mv_phy;
++
++	dev_info(&pdev->dev, "mv usb2 phy initialized\n");
++
++	return 0;
++}
++
++static int usb_phy_remove(struct platform_device *pdev)
++{
++	the_phy = NULL;
++
++	return 0;
++}
++
++static struct platform_device_id usb_phy_ids[] = {
++	{ .name = "pxa168-usb-phy",	.driver_data = PXA168_USB },
++	{ .name = "pxa910-usb-phy",	.driver_data = PXA910_USB },
++	{ .name = "mmp2-usb-phy",	.driver_data = MMP2_USB },
++	{}
++};
++
++static struct platform_driver usb_phy_driver = {
++	.probe	= usb_phy_probe,
++	.remove = usb_phy_remove,
++	.driver = {
++		.name   = "pxa168-usb-phy",
++		.of_match_table = usb_phy_dt_ids,
++	},
++	.id_table = usb_phy_ids,
++};
++
++static int __init mv_usb2_phy_init(void)
++{
++	return platform_driver_register(&usb_phy_driver);
++}
++arch_initcall(mv_usb2_phy_init);
+diff --git a/include/linux/platform_data/mv_usb.h b/include/linux/platform_data/mv_usb.h
+index 944b01d..fd3d1b4 100644
+--- a/include/linux/platform_data/mv_usb.h
++++ b/include/linux/platform_data/mv_usb.h
+@@ -47,9 +47,12 @@ struct mv_usb_platform_data {
+ 	/* Force a_bus_req to be asserted */
+ 	 unsigned int    otg_force_a_bus_req:1;
  
-@@ -2489,12 +2445,12 @@ static const struct dev_pm_ops mv_udc_pm_ops = {
+-	int	(*phy_init)(void __iomem *regbase);
+-	void	(*phy_deinit)(void __iomem *regbase);
+ 	int	(*set_vbus)(unsigned int vbus);
+-	int     (*private_init)(void __iomem *opregs, void __iomem *phyregs);
  };
++
++struct mv_usb_phy_platform_data {
++	unsigned int	clknum;
++	char		**clkname;
++};
++
  #endif
- 
--static void mv_udc_shutdown(struct platform_device *dev)
-+static void mv_udc_shutdown(struct platform_device *pdev)
- {
- 	struct mv_udc *udc;
- 	u32 mode;
- 
--	udc = platform_get_drvdata(dev);
-+	udc = platform_get_drvdata(pdev);
- 	/* reset controller mode to IDLE */
- 	mv_udc_enable(udc);
- 	mode = readl(&udc->op_regs->usbmode);
+diff --git a/include/linux/usb/mv_usb2.h b/include/linux/usb/mv_usb2.h
+new file mode 100644
+index 0000000..9744a97
+--- /dev/null
++++ b/include/linux/usb/mv_usb2.h
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (C) 2012 Marvell Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __MV_USB2_H
++#define __MV_USB2_H
++
++#include <linux/clk.h>
++
++struct mv_usb2_phy {
++	struct platform_device	*pdev;
++	struct mutex		phy_lock;
++	unsigned int		refcount;
++	unsigned int		type;
++	void __iomem		*base;
++	struct clk		**clks;
++	unsigned int		clks_num;
++
++	int	(*init)(struct mv_usb2_phy *mv_phy);
++	void	(*shutdown)(struct mv_usb2_phy *mv_phy);
++};
++
++#if defined(CONFIG_MV_USB2_PHY) || defined(CONFIG_MV_USB2_PHY_MODULE)
++
++extern struct mv_usb2_phy *mv_usb2_get_phy(void);
++
++#else
++
++struct mv_usb2_phy *mv_usb2_get_phy(void) { return NULL; }
++
++#endif
++
++#endif
 -- 
 1.7.4.1
