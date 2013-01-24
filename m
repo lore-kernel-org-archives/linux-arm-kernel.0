@@ -1,69 +1,38 @@
 From: rcsekar@samsung.com (R. Chandrasekar)
-Date: Thu, 24 Jan 2013 18:05:30 +0530
-Subject: [PATCH] Asoc: Samsung: Add support for I2S runtime S2R
-Message-ID: <1359030931-27354-1-git-send-email-rcsekar@samsung.com>
+Date: Thu, 24 Jan 2013 18:05:31 +0530
+Subject: [PATCH] Asoc: Samsung: Add I2S S/W RST in startup function
+In-Reply-To: <1359030931-27354-1-git-send-email-rcsekar@samsung.com>
+References: <1359030931-27354-1-git-send-email-rcsekar@samsung.com>
+Message-ID: <1359030931-27354-2-git-send-email-rcsekar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "R. Chandrasekar" <rcsekar@samsung.com>
+From: Padmavathi Venna <padma.v@samsung.com>
 
-This patch adds runtime suspend to resume support for I2S.
+I2S module need to be reset after S2R. Keeping the S/W rst
+control part in resume didn't help in playing audio after resume.
+So this patch adds S/W RST control part in startup function which
+gets triggered for every new audio stream playback.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 Signed-off-by: R. Chandrasekar <rcsekar@samsung.com>
 ---
- sound/soc/samsung/i2s.c |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ sound/soc/samsung/i2s.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index d2d124f..27a5ab1 100644
+index 27a5ab1..9f098cd 100644
 --- a/sound/soc/samsung/i2s.c
 +++ b/sound/soc/samsung/i2s.c
-@@ -993,6 +993,26 @@ static struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
- 	return i2s;
- }
+@@ -651,6 +651,9 @@ static int i2s_startup(struct snd_pcm_substream *substream,
+ 	/* Enforce set_sysclk in Master mode */
+ 	i2s->rclk_srcrate = 0;
  
-+#ifdef CONFIG_PM_RUNTIME
-+static int i2s_runtime_suspend(struct device *dev)
-+{
-+	struct i2s_dai *i2s = dev_get_drvdata(dev);
++	if (!any_active(i2s) && (i2s->quirks & QUIRK_NEED_RSTCLR))
++		writel(CON_RSTCLR, i2s->addr + I2SCON);
 +
-+	clk_disable_unprepare(i2s->clk);
-+
-+	return 0;
-+}
-+
-+static int i2s_runtime_resume(struct device *dev)
-+{
-+	struct i2s_dai *i2s = dev_get_drvdata(dev);
-+
-+	clk_prepare_enable(i2s->clk);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_PM_RUNTIME */
-+
- static int samsung_i2s_probe(struct platform_device *pdev)
- {
- 	u32 dma_pl_chan, dma_cp_chan, dma_pl_sec_chan;
-@@ -1143,12 +1163,18 @@ static int samsung_i2s_remove(struct platform_device *pdev)
+ 	spin_unlock_irqrestore(&lock, flags);
+ 
  	return 0;
- }
- 
-+static const struct dev_pm_ops samsung_i2s_pm = {
-+	SET_RUNTIME_PM_OPS(i2s_runtime_suspend,
-+				i2s_runtime_resume, NULL)
-+};
-+
- static struct platform_driver samsung_i2s_driver = {
- 	.probe  = samsung_i2s_probe,
- 	.remove = samsung_i2s_remove,
- 	.driver = {
- 		.name = "samsung-i2s",
- 		.owner = THIS_MODULE,
-+		.pm = &samsung_i2s_pm,
- 	},
- };
- 
 -- 
 1.7.9.5
