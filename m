@@ -1,59 +1,40 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 24 Jan 2013 08:27:14 +0100
-Subject: [PATCH] i2c: at91: add of_device_id entry for at91rm9200
-In-Reply-To: <20121218060232.GL23971@game.jcrosoft.org>
-References: <1354743732-11581-1-git-send-email-manabian@gmail.com>
- <20121218060232.GL23971@game.jcrosoft.org>
-Message-ID: <20130124072714.GH8364@nekote.pengutronix.de>
+Date: Thu, 24 Jan 2013 08:27:36 +0100
+Subject: [PATCH 2/2] i2c: sirf: add support for new SiRFmarco SMP SoC
+In-Reply-To: <1356489017-17737-2-git-send-email-Barry.Song@csr.com>
+References: <1356489017-17737-1-git-send-email-Barry.Song@csr.com>
+ <1356489017-17737-2-git-send-email-Barry.Song@csr.com>
+Message-ID: <20130124072736.GJ8364@nekote.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 18, 2012 at 07:02:32AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 22:42 Wed 05 Dec     , Joachim Eastwood wrote:
-> > Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> > ---
-> > Hi,
-> > 
-> > AT91RM9200 is gaining DT support now so let's add an id to the i2c driver.
-> > 
-> > Tested on custom RM9200 board. Since the driver doesn't support pinctrl
-> > muxing yet I had to add pinctrl hogs for the i2c pins in my dts for it
-> > to work.
+On Wed, Dec 26, 2012 at 10:30:17AM +0800, Barry Song wrote:
+> From: Barry Song <Baohua.Song@csr.com>
 > 
-> IIRC the i2c IP have quite a lots of issue on rm9200 and until sam9g45
+> the driver is also compatible with SiRFmarco except SiRFprimaII,
+> so simply add "sirf,marco-i2c" to OF match table.
 > 
-> it not recommended to use it instead use i2c-gpio
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Ludovic, you know the driver best. Does it make sense to add this?
+Why can't you use the existing compatible entry as a fallback like in:
 
+	compatible = "sirf,marco-i2c", "sirf,prima2-i2c";
+?
+
+> ---
+>  drivers/i2c/busses/i2c-sirf.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> Best Regards,
-> J.
-> > 
-> > regards
-> > Joachim Eastwood
-> > 
-> >  drivers/i2c/busses/i2c-at91.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> > index b4575ee..c504aa8 100644
-> > --- a/drivers/i2c/busses/i2c-at91.c
-> > +++ b/drivers/i2c/busses/i2c-at91.c
-> > @@ -584,6 +584,9 @@ static const struct platform_device_id at91_twi_devtypes[] = {
-> >  #if defined(CONFIG_OF)
-> >  static const struct of_device_id atmel_twi_dt_ids[] = {
-> >  	{
-> > +		.compatible = "atmel,at91rm9200-i2c",
-> > +		.data = &at91rm9200_config,
-> > +	} , {
-> >  		.compatible = "atmel,at91sam9260-i2c",
-> >  		.data = &at91sam9260_config,
-> >  	} , {
-> > -- 
-> > 1.8.0
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
+> index 181d7c2..ed38b16 100644
+> --- a/drivers/i2c/busses/i2c-sirf.c
+> +++ b/drivers/i2c/busses/i2c-sirf.c
+> @@ -439,6 +439,7 @@ static const struct dev_pm_ops i2c_sirfsoc_pm_ops = {
+>  
+>  static const struct of_device_id sirfsoc_i2c_of_match[] __devinitconst = {
+>  	{ .compatible = "sirf,prima2-i2c", },
+> +	{ .compatible = "sirf,marco-i2c", },
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(of, sirfsoc_i2c_of_match);
+> -- 
