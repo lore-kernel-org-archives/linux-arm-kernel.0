@@ -1,87 +1,32 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 24 Jan 2013 17:07:32 +0100
-Subject: [PATCH/RFC 2/3] ethernet: add a PHY reset GPIO DT binding to sh_eth
-In-Reply-To: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
-References: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <1359043653-11374-3-git-send-email-g.liakhovetski@gmx.de>
+Date: Thu, 24 Jan 2013 17:07:30 +0100
+Subject: [PATCH 0/3] ARM: shmobile: sh-eth pins in DT for armadillo800eva
+Message-ID: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If an ethernet PHY can be reset by a GPIO, it can be specified in DT. Add
-a binding and code to parse it, request the GPIO and take the PHY out of
-reset.
+This patch series gets rid of gpio_request()-style ethernet pin 
+configuration on armadillo800eva in reference implementation.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: netdev at vger.kernel.org
----
- Documentation/devicetree/bindings/net/sh_ether.txt |    2 ++
- drivers/net/ethernet/renesas/sh_eth.c              |    9 ++++++++-
- 2 files changed, 10 insertions(+), 1 deletions(-)
+Guennadi Liakhovetski (3):
+  pinctrl: add ethernet pin groups to r8a7740
+  ethernet: add a PHY reset GPIO DT binding to sh_eth
+  ARM: shmobile: move pin configuration on armadillo800eva-reference to
+    DT
 
-diff --git a/Documentation/devicetree/bindings/net/sh_ether.txt b/Documentation/devicetree/bindings/net/sh_ether.txt
-index c11e45d..edaf683 100644
---- a/Documentation/devicetree/bindings/net/sh_ether.txt
-+++ b/Documentation/devicetree/bindings/net/sh_ether.txt
-@@ -12,6 +12,7 @@ Required properties:
- - interrupts:                   Interrupt mapping for the sh_eth interrupt
-                                 sources (vector id).
- - phy-mode:              String, operation mode of the PHY interface.
-+- phy-reset-gpios:              PHY reset GPIO tuple
- - sh-eth,edmac-endian:          String, endian of sh_eth dmac.
- - sh-eth,register-type:         String, register type of sh_eth.
-                                 Please select "gigabit", "fast-sh4" or
-@@ -37,6 +38,7 @@ Example (armadillo800eva):
- 		reg = <0xe9a00000 0x800>, <0xe9a01800 0x800>;
- 		interrupts = <0x500>;
- 		phy-mode = "mii";
-+		phy-reset-gpios = <&gpio 18 0>;
- 		sh-eth,edmac-endian = "little";
- 		sh-eth,register-type = "gigabit";
- 		sh-eth,phy-id = <0>;
-diff --git a/drivers/net/ethernet/renesas/sh_eth.c b/drivers/net/ethernet/renesas/sh_eth.c
-index 1f64848..06035a2 100644
---- a/drivers/net/ethernet/renesas/sh_eth.c
-+++ b/drivers/net/ethernet/renesas/sh_eth.c
-@@ -20,6 +20,7 @@
-  *  the file called "COPYING".
-  */
- 
-+#include <linux/gpio.h>
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/kernel.h>
-@@ -33,6 +34,7 @@
- #include <linux/netdevice.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_gpio.h>
- #include <linux/of_platform.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -2376,10 +2378,11 @@ sh_eth_of_get_register_type(struct device_node *np)
- static struct sh_eth_plat_data *
- sh_eth_parse_dt(struct device *dev, struct net_device *ndev)
- {
--	int ret;
-+	int ret, gpio;
- 	const char *of_str;
- 	struct device_node *np = dev->of_node;
- 	struct sh_eth_plat_data *pdata;
-+	enum of_gpio_flags flags;
- 
- 	pdata = devm_kzalloc(dev, sizeof(struct sh_eth_plat_data),
- 					GFP_KERNEL);
-@@ -2420,6 +2423,10 @@ sh_eth_parse_dt(struct device *dev, struct net_device *ndev)
- 	else
- 		pdata->needs_init = 0;
- 
-+	gpio = of_get_named_gpio_flags(np, "phy-reset-gpios", 0, &flags);
-+	if (gpio_is_valid(gpio) && !devm_gpio_request(dev, gpio, NULL))
-+		gpio_direction_output(gpio, !!(flags & OF_GPIO_ACTIVE_LOW));
-+
- #ifdef CONFIG_OF_NET
- 	if (!is_valid_ether_addr(ndev->dev_addr)) {
- 		const char *macaddr = of_get_mac_address(np);
+ Documentation/devicetree/bindings/net/sh_ether.txt |    2 +
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts |    7 ++++
+ .../board-armadillo800eva-reference.c              |   24 ---------------
+ drivers/net/ethernet/renesas/sh_eth.c              |    9 +++++-
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c               |   31 ++++++++++++++++++++
+ 5 files changed, 48 insertions(+), 25 deletions(-)
+
 -- 
 1.7.2.5
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
