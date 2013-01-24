@@ -1,65 +1,38 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 24 Jan 2013 15:16:57 +0200
-Subject: [PATCH 2/2] ARM: dma-mapping: Add arm_iommu_detach_device()
-In-Reply-To: <1359033425-6674-1-git-send-email-hdoyu@nvidia.com>
-References: <1359033425-6674-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1359033425-6674-2-git-send-email-hdoyu@nvidia.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 24 Jan 2013 14:27:59 +0100
+Subject: [PATCH] i2c: samsung: resume race fix
+In-Reply-To: <20121107114437.0a563c7e@endymion.delvare>
+References: <1352284106-24988-1-git-send-email-ch.naveen@samsung.com>
+ <20121107114437.0a563c7e@endymion.delvare>
+Message-ID: <20130124132759.GH12933@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A counter part of arm_iommu_attach_device().
+On Wed, Nov 07, 2012 at 11:44:37AM +0100, Jean Delvare wrote:
+> On Wed, 07 Nov 2012 15:58:26 +0530, Naveen Krishna Chatradhi wrote:
+> > Don't unmark the device as suspended until after it's been re-setup.
+> > 
+> > The main race would be w.r.t. an i2c driver that gets resumed at the same
+> > time (asyncronously), that is allowed to do a transfer since suspended
+> > is set to 0 before reinit, but really should have seen the -EIO return
+> > instead.
+> 
+> I thought that the suspend order was children first and the resume
+> order was parent first?
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/include/asm/dma-iommu.h |    1 +
- arch/arm/mm/dma-mapping.c        |   25 +++++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
+Same here, why does it not work this way?
 
-diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
-index 799b094..af1ac4ed 100644
---- a/arch/arm/include/asm/dma-iommu.h
-+++ b/arch/arm/include/asm/dma-iommu.h
-@@ -29,6 +29,7 @@ void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
- 
- int arm_iommu_attach_device(struct device *dev,
- 					struct dma_iommu_mapping *mapping);
-+void arm_iommu_detach_device(struct device *dev);
- 
- #endif /* __KERNEL__ */
- #endif
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 6b2fb87..b075a1f 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1842,4 +1842,29 @@ int arm_iommu_attach_device(struct device *dev,
- 	return 0;
- }
- 
-+/**
-+ * arm_iommu_detach_device
-+ * @dev: valid struct device pointer
-+ *
-+ * Detaches the provided device from a previously attached map.
-+ * This voids the dma operations (dma_map_ops pointer)
-+ */
-+void arm_iommu_detach_device(struct device *dev)
-+{
-+	struct dma_iommu_mapping *mapping;
-+
-+	mapping = to_dma_iommu_mapping(dev);
-+	if (!mapping) {
-+		dev_warn(dev, "Not attached\n");
-+		return;
-+	}
-+
-+	iommu_detach_device(mapping->domain, dev);
-+	kref_put(&mapping->kref, release_iommu_mapping);
-+	mapping = NULL;
-+	set_dma_ops(dev, NULL);
-+
-+	pr_debug("Detached IOMMU controller from %s device.\n", dev_name(dev));
-+}
-+
- #endif
+Regards,
+
+   Wolfram
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130124/818565c5/attachment-0001.sig>
