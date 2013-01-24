@@ -1,86 +1,89 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Jan 2013 11:26:27 +0530
-Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex
- A9
-In-Reply-To: <5100C0F7.9080101@wwwdotorg.org>
-References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
- <1358833924-24535-2-git-send-email-hdoyu@nvidia.com> <50FE2CA8.20100@ti.com>
- <50FEC503.2080602@wwwdotorg.org>
- <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
- <50FFA620.50008@ti.com> <5100C0F7.9080101@wwwdotorg.org>
-Message-ID: <5100CD0B.4080504@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 24 Jan 2013 07:23:23 +0100
+Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
+In-Reply-To: <20130124013945.GX1758@titan.lakedaemon.net>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <ecb64cdf824399badaf9d659177811d8cb091156.1358983578.git.jason@lakedaemon.net>
+ <20130124013945.GX1758@titan.lakedaemon.net>
+Message-ID: <20130124062323.GB21297@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
+> > +static void kirkwood_gige_dt_init(void) {
+> > +	int i;
+> > +
+> > +	for (i = 0; kw_dt_gige[i].compatible != NULL; i++) {
+> > +		if (of_machine_is_compatible(kw_dt_gige[i].compatible)) {
+> > +
+> > +			if (kw_dt_gige[i].phy_addr00 != MV643XX_ETH_PHY_NONE) {
+> > +				struct mv643xx_eth_platform_data d = {
+> > +					.phy_addr = kw_dt_gige[i].phy_addr00,
+> > +				};
+> > +				kirkwood_ge00_init(&d);
+> > +			}
+> > +
+> > +			if (kw_dt_gige[i].phy_addr01 != MV643XX_ETH_PHY_NONE) {
+> > +				struct mv643xx_eth_platform_data d = {
+> > +					.phy_addr = kw_dt_gige[i].phy_addr01,
+> > +				};
+> > +				kirkwood_ge01_init(&d);
+> > +			}
+> > +
+> > +			break;
+> > +		}
+> 
+> meh, hindsight is 50/50 :-)  Much more readable this way, I think:
+> 
+> 		if (of_machine_is_compatible(kw_dt_gige[i].compatible)) {
+> 			struct mv643xx_eth_platform_data d;
+> 
+> 			if (kw_dt_gige[i].phy_addr00 != MV643XX_ETH_PHY_NONE) {
+> 				d.phy_addr = kw_dt_gige[i].phy_addr00,
+> 				kirkwood_ge00_init(&d);
+> 			}
+> 
+> 			if (kw_dt_gige[i].phy_addr01 != MV643XX_ETH_PHY_NONE) {
+> 				d.phy_addr = kw_dt_gige[i].phy_addr01,
+> 				kirkwood_ge01_init(&d);
+> 			}
+> 
+> 			break;
+> 		}
+> 
+> thx,
+> 
+> Jason.
 
-On Thursday 24 January 2013 10:34 AM, Stephen Warren wrote:
-> On 01/23/2013 01:58 AM, Santosh Shilimkar wrote:
->> On Tuesday 22 January 2013 10:34 PM, Olof Johansson wrote:
->>> On Tue, Jan 22, 2013 at 8:57 AM, Stephen Warren
->>> <swarren@wwwdotorg.org> wrote:
->>>> On 01/21/2013 11:07 PM, Santosh Shilimkar wrote:
->>>>> On Tuesday 22 January 2013 11:22 AM, Hiroshi Doyu wrote:
->>>>>> Skip scu_enable(scu_base) if CPU is not Cortex A9 with SCU.
->>>>>>
->>>>>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->>>>>> ---
->>>>> Looks fine. I will also update OMAP code with the new
->>>>> interface. Thanks.
->>>>
->>>> OK, so patch 1/2 at least needs to get into a stable arm-soc branch
->>>> then. Unless there are violent objections, I'll forward patch 1/2 to
->>>> arm-soc and request it be added into a branch so that Tegra and OMAP can
->>>> both merge it into their branches as a dependency. I guess patch 2/2
->>>> could also be included; I don't think it has any complex dependencies
->>>> that'd prevent that, and would help to show how patch 1/2 gets used.
->>>>
->>>> Hiroshi, is this series the only dependency you need for your Tegra114
->>>> series? So, I could merge your Tegra114 series once this series is
->>>> applied?
->>>
->>> For something like this, it might make more sense for us to just apply
->>> the patches for OMAP on top, i.e. we'll pull the short branch from
->>> you, and then we can just apply patches (with maintainer acks) on top,
->>> instead of doing a bunch of single-patch pulls.
->>
->> In case you decide to apply patches, you can use patch in the end
->> of the email for OMAP. Attached the same in case mailer damages it.
->>
->> Btw, I noticed the build error with patch 1/1. Since I wasn't using
->> the first interface in OMAP code, I just bypassed it for testing.
->> I might be missing some dependent patch which added
->> read_cpuid_part_number().
->
-> Thanks for the OMAP patch. I have pushed a couple of temporary and
-> non-stable branches to:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
->
-> Branch scu-base-rework contains just the SCU base address patches. After
-> the few things listed below, I'll rename this branch and send a pull
-> request to arm-soc.
->
-> 1) Olof asked that Russell Ack or otherwise OK Hiroshi's latest versions
-> of the following two patches since he commented on previous versions:
->
-> ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
-> ARM: Add API to detect SCU base address from CP15
->
-> 2) Lorenzo's last comment on "ARM: tegra: Use DT /cpu node to detect
-> number of CPU core" was:
->
-> Please add missing punctuation, reword the commit log to make it clearer.
->
-> ... so that patch needs a reworded commit log.
->
-> 3) This branch needs testing on both Tegra30 and OMAP (I'm away from the
-> office at the moment and can only test on Tegra20 here),
->
-Tested 'scu-base-rework' branch on OMAP and it works just fine. I
-noticed that the OMAP patch subject got line wrapped. Can you
-please fix that before sending pull request ?
-Thanks for picking up the patch.
+Hi Jason
 
-Regards,
-Santosh
+Might it be better still to implement something like:
+
+const struct of_device_id *of_match_machine(const struct of_device_id *matches)
+{
+        struct device_node *root;
+	const struct of_device_id *match;
+
+	if (!matches)
+		return NULL;
+
+	root = of_find_node_by_path("/");
+	if (!root)
+		return NULL;	
+
+	match = of_match_node(matches, root);
+	of_node_put(root);
+
+	return match;
+}
+
+and then board-dt.c becomes
+
+    match = of_match_machine(ge00_matches);
+    if (match)
+	krikwood_ge00_init(match->data)
+
+    match = of_match_machine(ge01_matches);
+    if (match)
+	krikwood_ge01_init(match->data)
+
+	Andrew
