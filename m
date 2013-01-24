@@ -1,71 +1,80 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 24 Jan 2013 09:06:30 -0800
-Subject: [PATCH v2 1/2] clk: divider: prepare for minimum divider
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA92ABC@DBDE01.ent.ti.com>
-References: <6dc1c48cac5b2646a55da3079afb72f88e40c3bc.1358937138.git.afzal@ti.com>
- <20130123214053.9205.49804@quantum>
- <C8443D0743D26F4388EA172BF4E2A7A93EA92ABC@DBDE01.ent.ti.com>
-Message-ID: <20130124170630.10623.78749@quantum>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Thu, 24 Jan 2013 11:08:03 -0600
+Subject: OMAP4 randconfig failure: Zynq
+In-Reply-To: <20130124161211.GX23505@n2100.arm.linux.org.uk>
+References: <20130124111117.GU23505@n2100.arm.linux.org.uk>
+ <20130124155704.GJ11970@beefymiracle.amer.corp.natinst.com>
+ <20130124160609.GW23505@n2100.arm.linux.org.uk>
+ <20130124161211.GX23505@n2100.arm.linux.org.uk>
+Message-ID: <20130124170803.GA1036@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mohammed, Afzal (2013-01-24 03:29:15)
-> Hi Mike,
-> 
-> On Thu, Jan 24, 2013 at 03:10:53, Mike Turquette wrote:
-> > Quoting Afzal Mohammed (2013-01-23 03:38:52)
-> 
-> > > Some of clocks can have a limit on minimum divider value that can be
-> > > programmed, prepare for such a support.
-> 
-> > > Add a new field min_div for the basic divider clock and a new dynamic
-> > > clock divider registration function where minimum divider value can
-> > > be specified. Keep behaviour of existing divider clock registration
-> > > functions, static initialization helpers as was earlier.
-> 
-> > My first question is whether the minimum divider you plan to use is an
-> > actual constraint of the hardware (e.g. the clock controller ip only
-> > lets program two bits which divide by 4, 5, 6 or 7, where 4 is the
-> > minimum divider) or if this is a functional constraint (e.g. the clock
-> > hardware can divide by a lower value, but you never want that since it
-> > results in non-functional video/audio/whatever).  If this is more of a
-> > functional constraint then perhaps a new api like clk_set_min_rate makes
-> > more sense.
-> 
-> It is a functional constraint: divider has 8 bits and it can have
-> all possible values (0 to 255) and divider value corresponds to
-> value set in the 8 bits. But depending on the modes the minimum
-> value that can be configured (to get display working) varies.
-> Eg. For raster mode (which the driver is presently supporting), it
-> can take a minimum value of 2, while in LIDD (LCD interface display
-> driver) mode it can take a min value of 1.
-> 
-> Here min rate is not a constraint w.r.t divider in LCDC IP, but
-> rather min divider.
-> 
-
-Just so I understand correctly... you are saying that the functional
-constraint is not caused by the clock rate, but instead by the divider
-value?  For the different modes (raster vs LIDD) is the clock rate the
-same, or is the clock rate different?
-
-What is the clock output rate of the divider in raster mode?  What is
-the clock output rate of the divider in LIDD mode?
-
-Thanks,
-Mike
-
-> As it is the case, you prefer a clk_divider_set_min_div()?
-> 
+On Thu, Jan 24, 2013 at 04:12:11PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 24, 2013 at 04:06:09PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Jan 24, 2013 at 09:57:04AM -0600, Josh Cartwright wrote:
+> > > On Thu, Jan 24, 2013 at 11:11:17AM +0000, Russell King - ARM Linux wrote:
+> > > > The OMAP4 randconfig build last night failed with this error:
+> > > > 
+> > > > arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
+> > > > 
+> > > > Full details at the usual place - 
+> > > > http://www.arm.linux.org.uk/developer/build/
+> > > 
+> > > Curious.  This doesn't look like a valid config to me.
 > > 
-> > Secondly, have you looked into using the rate-table option provided by
-> > the basic divider clock?  Can you explain how this is not a good fit for
-> > your needs?  Perhaps there are too many divisor values so the table
-> > would be large?
-> 
-> Divider values can range from 2-255 (254 possible values), so I believe
-> it is not a suitable candidate here (also divider to values have 1-to-1
-> mapping)
-> 
-> Regards
-> Afzal
+> > I think you're wrong.
+
+Yes, indeed.  I was running my tests using the wrong tree.  I can see
+this issue in today's linux-next.  Sorry for the noise.
+
+[..]
+>
+> And what's missing is _specific_ to Zynq.  Let's look at the error again:
+>
+> arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
+>
+> What it means is that the "irqchip_init" identifier was not declared by
+> anything before it has been used.  That means arch/arm/mach-zynq/common.c
+> is missing a required #include statement.
+>
+> irqchip_init can be found in linux/irqchip.h.  Does arch/arm/mach-zynq/common.c
+> include this required include?  No.  Therefore, the build fails with the
+> above error.
+>
+> You need to add this include file...
+
+Agreed, thanks.  Looks like this was introduced with "ARM: use common
+irqchip_init for GIC init".  Here's a patch to fix it up, it probably
+makes sense to be pulled into Rob's irqchip/gic-vic-move branch.
+
+-- 8< --
+Subject: [PATCH] ARM: zynq: include irqchip.h to prevent build failure
+
+Commit 0529e315bbda5d502c93df2cfafba9bb337fbdf4 ("ARM: use common irqchip_init
+for GIC init") converts Zynq to make use of irqchip_init, but fails to
+include linux/irqchip.h.  Fixes this build error:
+
+   arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
+
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+---
+ arch/arm/mach-zynq/common.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 8513b16..8a0b8ab 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -20,6 +20,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
+ #include <linux/clk/zynq.h>
++#include <linux/irqchip.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+-- 
+1.8.1.1
