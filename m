@@ -1,28 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jan 2013 20:33:12 -0500
-Subject: [RFC PATCH 0/6] ARM: kirkwood: cleanup DT conversion
-In-Reply-To: <cover.1358983578.git.jason@lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
-Message-ID: <20130124013312.GW1758@titan.lakedaemon.net>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Thu, 24 Jan 2013 09:33:12 +0800
+Subject: [V4 PATCH 18/26] usb: phy: mv_usb2_phy: add externel chip support
+In-Reply-To: <20130123114725.GH29258@arwen.pp.htv.fi>
+References: <xiechao.mail@gmail.com>
+ <1358762864-9249-1-git-send-email-chao.xie@marvell.com>
+ <1358762864-9249-19-git-send-email-chao.xie@marvell.com>
+ <20130121155156.GM23505@n2100.arm.linux.org.uk>
+ <CADApbeghH7EdQaz7PP-pPK4huhxJ0OrLDEGTHBg4s0+3SQbRoA@mail.gmail.com>
+ <20130123114725.GH29258@arwen.pp.htv.fi>
+Message-ID: <CADApbegpYhG=imC=XtWATNF48ZWZ1VmWtedyU108C4qQkBeyNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 11:34:18PM +0000, Jason Cooper wrote:
-> All,
-> 
-> This is a first cut at cleaning up mach-kirkwood/.  There are a few DT
-> conversions (topkick -> mvsdio, pinctrl) which, once reviewed, I'll put in the
-> normal pull request cycle.
-> 
-> The others which remove board-*.c files, I'll keep updating against
-> mvebu/for-next, and then apply at the end of the merge window.
-> 
-> Please test as you are able.
-
-I should also mention, this was built against mvebu/for-next (not
-stable) which is just the merging of all the mvebu/* branches and
-arm-soc/for-next into one branch.
-
-thx,
-
-Jason.
+On Wed, Jan 23, 2013 at 7:47 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Tue, Jan 22, 2013 at 10:51:32AM +0800, Chao Xie wrote:
+>> On Mon, Jan 21, 2013 at 11:51 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Mon, Jan 21, 2013 at 05:07:36AM -0500, Chao Xie wrote:
+>> >> +     mv_phy->extern_chip.head = devm_kzalloc(&pdev->dev,
+>> >> +                                     sizeof(*mv_phy->extern_chip.head),
+>> >> +                                     GFP_KERNEL);
+>> >> +     if (mv_phy->extern_chip.head == NULL)
+>> >> +             return -ENOMEM;
+>> >> +     ATOMIC_INIT_NOTIFIER_HEAD(mv_phy->extern_chip.head);
+>> >
+>> > Why do you need to allocate an atomic notifier list head as an entirely
+>> > separate data structure?
+>> > --
+>> > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+>> > the body of a message to majordomo at vger.kernel.org
+>> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>> Th reason is that the original code seperate the extern_chip and phy
+>> support. So it depends
+>> on the ->head to detect whether extern_chip is initialized or not.
+>> Now it is combined with phy, the ->phy pointer can do the job.
+>
+> does that need to be dynamically allocated ?
+>
+> --
+> balbi
+hi
+It does not need to be dynamically allocated. I will modify it, and
+send out V5 today. Thanks for Russell's review.
