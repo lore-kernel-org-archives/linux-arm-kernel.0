@@ -1,31 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Jan 2013 15:54:27 +0000
-Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
-In-Reply-To: <20130124143736.GZ1758@titan.lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <51013933.9020601@openwrt.org> <20130124143736.GZ1758@titan.lakedaemon.net>
-Message-ID: <201301241554.28003.arnd@arndb.de>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 24 Jan 2013 16:58:40 +0100
+Subject: [PATCH v5 01/45] percpu_rwlock: Introduce the global
+ reader-writer lock backend
+In-Reply-To: <CANN689HOmiO-5714UiyuOcjrRYW2DkR4cPLgt96f5YeB9Ws3RQ@mail.gmail.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122073315.13822.27093.stgit@srivatsabhat.in.ibm.com>
+ <1358883152.21576.55.camel@gandalf.local.home>
+ <CANN689HOmiO-5714UiyuOcjrRYW2DkR4cPLgt96f5YeB9Ws3RQ@mail.gmail.com>
+Message-ID: <20130124155840.GA10651@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 January 2013, Jason Cooper wrote:
-> I agree, however, there is a long history with that patch.  That driver
-> has been in use by powerpc for many years.  We need to be mindful not to
-> break existing installations.  I don't think it'll be ready in time for
-> v3.9.  So, I'd like to do the cleanup now.
-> 
-> thx,
-> 
-> Jason.
-> 
-> > [1]: http://patchwork.ozlabs.org/patch/175652/
+On 01/23, Michel Lespinasse wrote:
+>
+> On Tue, Jan 22, 2013 at 11:32 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
+> >
+> > I thought global locks are now fair. That is, a reader will block if a
+> > writer is waiting. Hence, the above should deadlock on the current
+> > rwlock_t types.
+>
+> I believe you are mistaken here. struct rw_semaphore is fair (and
+> blocking), but rwlock_t is unfair. The reason we can't easily make
+> rwlock_t fair is because tasklist_lock currently depends on the
+> rwlock_t unfairness - tasklist_lock readers typically don't disable
+> local interrupts, and tasklist_lock may be acquired again from within
+> an interrupt, which would deadlock if rwlock_t was fair and a writer
+> was queued by the time the interrupt is processed.
 
-I actually think we can take that patch. The result of the discussion
-back then was after all that we won't try to keep the bindings compatible,
-and the powerpc version just uses the platform_device part of the driver
-by fabricating platform_data from the arch code.
+Yes.
 
-It should not have any impact on this, as long as you ensure that the
-platform_data is still supported.
+And, iirc, it was even documented somewhere that while rwlock_t is not
+really nice, it is good to share the locking with interrupts. You do
+not need to disable irqs.
 
-	Arnd
+Oleg.
