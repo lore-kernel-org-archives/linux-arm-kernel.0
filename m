@@ -1,151 +1,90 @@
 From: rachna@ti.com (Patil, Rachna)
-Date: Thu, 24 Jan 2013 09:15:10 +0530
-Subject: [PATCH v4 6/8] input: ti_am335x_tsc: Add DT support
+Date: Thu, 24 Jan 2013 09:15:09 +0530
+Subject: [PATCH v4 5/8] MFD: ti_am335x_tscadc: Add DT support
 In-Reply-To: <1358999112-31192-1-git-send-email-rachna@ti.com>
 References: <1358999112-31192-1-git-send-email-rachna@ti.com>
-Message-ID: <1358999112-31192-7-git-send-email-rachna@ti.com>
+Message-ID: <1358999112-31192-6-git-send-email-rachna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Patil, Rachna" <rachna@ti.com>
 
-Add DT support for client touchscreen driver
+Make changes to add DT support in the MFD core driver.
 
 Signed-off-by: Patil, Rachna <rachna@ti.com>
 ---
 Changes in v4:
 	Non-standard properties prefixed with vendor name.
 
- drivers/input/touchscreen/ti_am335x_tsc.c |   94 +++++++++++++++++++++++++----
- 1 file changed, 81 insertions(+), 13 deletions(-)
+ drivers/mfd/ti_am335x_tscadc.c |   28 +++++++++++++++++++++++-----
+ 1 file changed, 23 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
-index 064d2b2..6ff5a76 100644
---- a/drivers/input/touchscreen/ti_am335x_tsc.c
-+++ b/drivers/input/touchscreen/ti_am335x_tsc.c
-@@ -26,6 +26,8 @@
- #include <linux/io.h>
- #include <linux/input/ti_am335x_tsc.h>
- #include <linux/delay.h>
+diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+index e9f3fb5..87b446b 100644
+--- a/drivers/mfd/ti_am335x_tscadc.c
++++ b/drivers/mfd/ti_am335x_tscadc.c
+@@ -22,6 +22,8 @@
+ #include <linux/regmap.h>
+ #include <linux/mfd/core.h>
+ #include <linux/pm_runtime.h>
 +#include <linux/of.h>
 +#include <linux/of_device.h>
  
  #include <linux/mfd/ti_am335x_tscadc.h>
+ #include <linux/input/ti_am335x_tsc.h>
+@@ -64,20 +66,31 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
+ 	struct resource		*res;
+ 	struct clk		*clk;
+ 	struct mfd_tscadc_board	*pdata = pdev->dev.platform_data;
++	struct device_node	*node = pdev->dev.of_node;
+ 	struct mfd_cell		*cell;
+ 	int			err, ctrl;
+ 	int			clk_value, clock_rate;
+-	int			tsc_wires, adc_channels = 0, total_channels;
++	int			tsc_wires = 0, adc_channels = 0, total_channels;
  
-@@ -366,6 +368,74 @@ static irqreturn_t titsc_irq(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
-+static int titsc_parse_dt(struct ti_tscadc_dev *tscadc_dev,
-+					struct titsc *ts_dev)
-+{
-+	struct device_node *node = tscadc_dev->dev->of_node;
-+	int err, i;
-+	u32 val32, wires_conf[4];
-+
-+	if (!node)
-+		return -EINVAL;
-+	else {
-+		node = of_find_node_by_name(node, "tsc");
-+		if (!node)
-+			return -EINVAL;
-+		else {
-+			err = of_property_read_u32(node, "ti,wires", &val32);
-+			if (err < 0)
-+				goto error_ret;
-+			else
-+				ts_dev->wires = val32;
-+
-+			err = of_property_read_u32(node,
-+					"ti,x-plate-resistance", &val32);
-+			if (err < 0)
-+				goto error_ret;
-+			else
-+				ts_dev->x_plate_resistance = val32;
-+
-+			err = of_property_read_u32(node,
-+					"ti,steps-to-configure", &val32);
-+			if (err < 0)
-+				goto error_ret;
-+			else
-+				ts_dev->steps_to_configure = val32;
-+
-+			err = of_property_read_u32_array(node, "ti,wire-config",
-+					wires_conf, ARRAY_SIZE(wires_conf));
-+			if (err < 0)
-+				goto error_ret;
-+			else {
-+				for (i = 0; i < ARRAY_SIZE(wires_conf); i++)
-+					ts_dev->config_inp[i] = wires_conf[i];
-+			}
-+		}
-+	}
-+	return 0;
-+
-+error_ret:
-+	return err;
-+}
-+
-+static int titsc_parse_pdata(struct ti_tscadc_dev *tscadc_dev,
-+					struct titsc *ts_dev)
-+{
-+	struct mfd_tscadc_board	*pdata = tscadc_dev->dev->platform_data;
-+
-+	if (!pdata)
-+		return -EINVAL;
-+
-+	ts_dev->wires = pdata->tsc_init->wires;
-+	ts_dev->x_plate_resistance =
-+		pdata->tsc_init->x_plate_resistance;
-+	ts_dev->steps_to_configure =
-+		pdata->tsc_init->steps_to_configure;
-+	memcpy(ts_dev->config_inp, pdata->tsc_init->wire_config,
-+		sizeof(pdata->tsc_init->wire_config));
-+	return 0;
-+}
-+
- /*
-  * The functions for inserting/removing driver as a module.
-  */
-@@ -375,16 +445,8 @@ static int titsc_probe(struct platform_device *pdev)
- 	struct titsc *ts_dev;
- 	struct input_dev *input_dev;
- 	struct ti_tscadc_dev *tscadc_dev = pdev->dev.platform_data;
--	struct mfd_tscadc_board	*pdata;
- 	int err;
- 
--	pdata = tscadc_dev->dev->platform_data;
--
 -	if (!pdata) {
--		dev_err(&pdev->dev, "Could not find platform data\n");
--		return -EINVAL;
--	}
--
- 	/* Allocate memory for device */
- 	ts_dev = kzalloc(sizeof(struct titsc), GFP_KERNEL);
- 	input_dev = input_allocate_device();
-@@ -398,11 +460,17 @@ static int titsc_probe(struct platform_device *pdev)
- 	ts_dev->mfd_tscadc = tscadc_dev;
- 	ts_dev->input = input_dev;
- 	ts_dev->irq = tscadc_dev->irq;
--	ts_dev->wires = pdata->tsc_init->wires;
--	ts_dev->x_plate_resistance = pdata->tsc_init->x_plate_resistance;
--	ts_dev->steps_to_configure = pdata->tsc_init->steps_to_configure;
--	memcpy(ts_dev->config_inp, pdata->tsc_init->wire_config,
--			sizeof(pdata->tsc_init->wire_config));
++	if (!pdata && !pdev->dev.of_node) {
+ 		dev_err(&pdev->dev, "Could not find platform data\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	if (pdata->adc_init)
+-		adc_channels = pdata->adc_init->adc_channels;
++	if (pdev->dev.platform_data) {
++		if (pdata->tsc_init)
++			tsc_wires = pdata->tsc_init->wires;
 +
-+	if (tscadc_dev->dev->platform_data)
-+		err = titsc_parse_pdata(tscadc_dev, ts_dev);
-+	else
-+		err = titsc_parse_dt(tscadc_dev, ts_dev);
++		if (pdata->adc_init)
++			adc_channels = pdata->adc_init->adc_channels;
++	} else {
++		node = of_find_node_by_name(pdev->dev.of_node, "tsc");
++		of_property_read_u32(node, "ti,wires", &tsc_wires);
 +
-+	if (err) {
-+		dev_err(&pdev->dev, "Could not find platform data\n");
-+		err = -EINVAL;
-+		goto err_free_mem;
++		node = of_find_node_by_name(pdev->dev.of_node, "adc");
++		of_property_read_u32(node, "ti,adc-channels", &adc_channels);
 +	}
  
- 	err = request_irq(ts_dev->irq, titsc_irq,
- 			  0, pdev->dev.driver->name, ts_dev);
+-	tsc_wires = pdata->tsc_init->wires;
+ 	total_channels = tsc_wires + adc_channels;
+ 
+ 	if (total_channels > 8) {
+@@ -256,11 +269,16 @@ static const struct dev_pm_ops tscadc_pm_ops = {
+ #define TSCADC_PM_OPS NULL
+ #endif
+ 
++static const struct of_device_id ti_tscadc_dt_ids[] = {
++	{ .compatible = "ti,ti-tscadc", },
++};
++
+ static struct platform_driver ti_tscadc_driver = {
+ 	.driver = {
+ 		.name   = "ti_tscadc",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= TSCADC_PM_OPS,
++		.of_match_table = of_match_ptr(ti_tscadc_dt_ids),
+ 	},
+ 	.probe	= ti_tscadc_probe,
+ 	.remove	= ti_tscadc_remove,
 -- 
 1.7.9.5
