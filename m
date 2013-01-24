@@ -1,89 +1,164 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 24 Jan 2013 07:23:23 +0100
-Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
-In-Reply-To: <20130124013945.GX1758@titan.lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <ecb64cdf824399badaf9d659177811d8cb091156.1358983578.git.jason@lakedaemon.net>
- <20130124013945.GX1758@titan.lakedaemon.net>
-Message-ID: <20130124062323.GB21297@lunn.ch>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 24 Jan 2013 11:46:28 +0530
+Subject: [PATCH] ARM: DTS: exynos5250-arndale: Add initial board support file
+Message-ID: <1359008188-23395-1-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +static void kirkwood_gige_dt_init(void) {
-> > +	int i;
-> > +
-> > +	for (i = 0; kw_dt_gige[i].compatible != NULL; i++) {
-> > +		if (of_machine_is_compatible(kw_dt_gige[i].compatible)) {
-> > +
-> > +			if (kw_dt_gige[i].phy_addr00 != MV643XX_ETH_PHY_NONE) {
-> > +				struct mv643xx_eth_platform_data d = {
-> > +					.phy_addr = kw_dt_gige[i].phy_addr00,
-> > +				};
-> > +				kirkwood_ge00_init(&d);
-> > +			}
-> > +
-> > +			if (kw_dt_gige[i].phy_addr01 != MV643XX_ETH_PHY_NONE) {
-> > +				struct mv643xx_eth_platform_data d = {
-> > +					.phy_addr = kw_dt_gige[i].phy_addr01,
-> > +				};
-> > +				kirkwood_ge01_init(&d);
-> > +			}
-> > +
-> > +			break;
-> > +		}
-> 
-> meh, hindsight is 50/50 :-)  Much more readable this way, I think:
-> 
-> 		if (of_machine_is_compatible(kw_dt_gige[i].compatible)) {
-> 			struct mv643xx_eth_platform_data d;
-> 
-> 			if (kw_dt_gige[i].phy_addr00 != MV643XX_ETH_PHY_NONE) {
-> 				d.phy_addr = kw_dt_gige[i].phy_addr00,
-> 				kirkwood_ge00_init(&d);
-> 			}
-> 
-> 			if (kw_dt_gige[i].phy_addr01 != MV643XX_ETH_PHY_NONE) {
-> 				d.phy_addr = kw_dt_gige[i].phy_addr01,
-> 				kirkwood_ge01_init(&d);
-> 			}
-> 
-> 			break;
-> 		}
-> 
-> thx,
-> 
-> Jason.
+From: Girish K S <ks.giri@samsung.com>
 
-Hi Jason
+Arndale is a low cost board based on the Samsung Exynos5250 SoC. This
+patch adds initial device tree support for this board.
 
-Might it be better still to implement something like:
+Signed-off-by: Girish K S <ks.giri@samsung.com>
+Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+---
+ arch/arm/boot/dts/Makefile               |    1 +
+ arch/arm/boot/dts/exynos5250-arndale.dts |  124 ++++++++++++++++++++++++++++++
+ 2 files changed, 125 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos5250-arndale.dts
 
-const struct of_device_id *of_match_machine(const struct of_device_id *matches)
-{
-        struct device_node *root;
-	const struct of_device_id *match;
-
-	if (!matches)
-		return NULL;
-
-	root = of_find_node_by_path("/");
-	if (!root)
-		return NULL;	
-
-	match = of_match_node(matches, root);
-	of_node_put(root);
-
-	return match;
-}
-
-and then board-dt.c becomes
-
-    match = of_match_machine(ge00_matches);
-    if (match)
-	krikwood_ge00_init(match->data)
-
-    match = of_match_machine(ge01_matches);
-    if (match)
-	krikwood_ge01_init(match->data)
-
-	Andrew
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 5ebb44f..60a9e52 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -44,6 +44,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+ 	exynos4210-trats.dtb \
+ 	exynos4412-smdk4412.dtb \
+ 	exynos5250-smdk5250.dtb \
++	exynos5250-arndale.dtb \
+ 	exynos5250-snow.dtb \
+ 	exynos5440-ssdk5440.dtb
+ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+new file mode 100644
+index 0000000..7504cf3
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -0,0 +1,124 @@
++/*
++ * Samsung's Exynos5250 based Arndale board device tree source
++ *
++ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/dts-v1/;
++/include/ "exynos5250.dtsi"
++
++/ {
++	model = "Insignal Arndale evaluation board based on EXYNOS5250";
++	compatible = "insignal,arndale", "samsung,exynos5250";
++
++	memory {
++		reg = <0x40000000 0x80000000>;
++	};
++
++	chosen {
++		bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
++	};
++
++	i2c at 12C60000 {
++		status = "disabled";
++	};
++
++	i2c at 12C70000 {
++		status = "disabled";
++	};
++
++	i2c at 12C80000 {
++		status = "disabled";
++	};
++
++	i2c at 12C90000 {
++		status = "disabled";
++	};
++
++	i2c at 12CA0000 {
++		status = "disabled";
++	};
++
++	i2c at 12CB0000 {
++		status = "disabled";
++	};
++
++	i2c at 12CC0000 {
++		status = "disabled";
++	};
++
++	i2c at 12CD0000 {
++		status = "disabled";
++	};
++
++	i2c at 121D0000 {
++		status = "disabled";
++	};
++
++	dwmmc_0: dwmmc0 at 12200000 {
++		num-slots = <1>;
++		supports-highspeed;
++		broken-cd;
++		fifo-depth = <0x80>;
++		card-detect-delay = <200>;
++		samsung,dw-mshc-ciu-div = <3>;
++		samsung,dw-mshc-sdr-timing = <2 3>;
++		samsung,dw-mshc-ddr-timing = <1 2>;
++
++		slot at 0 {
++			reg = <0>;
++			bus-width = <8>;
++			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
++				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
++				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
++				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
++				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
++		};
++	};
++
++	dwmmc_1: dwmmc1 at 12210000 {
++		status = "disabled";
++	};
++
++	dwmmc_2: dwmmc2 at 12220000 {
++		num-slots = <1>;
++		supports-highspeed;
++		fifo-depth = <0x80>;
++		card-detect-delay = <200>;
++		samsung,dw-mshc-ciu-div = <3>;
++		samsung,dw-mshc-sdr-timing = <2 3>;
++		samsung,dw-mshc-ddr-timing = <1 2>;
++
++		slot at 0 {
++			reg = <0>;
++			bus-width = <4>;
++			samsung,cd-pinmux-gpio = <&gpc3 2 2 3 3>;
++			gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
++				<&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
++				<&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
++				<&gpc4 3 3 3 3>, <&gpc4 3 3 3 3>,
++				<&gpc4 5 3 3 3>, <&gpc4 6 3 3 3>;
++		};
++	};
++
++	dwmmc_3: dwmmc3 at 12230000 {
++		status = "disabled";
++	};
++
++	spi_0: spi at 12d20000 {
++		status = "disabled";
++	};
++
++	spi_1: spi at 12d30000 {
++		status = "disabled";
++	};
++
++	spi_2: spi at 12d40000 {
++		status = "disabled";
++	};
++};
+-- 
+1.7.4.1
