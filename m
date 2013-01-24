@@ -1,73 +1,42 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 24 Jan 2013 13:42:51 +0100
-Subject: [PATCH] ARM: dts: specify all the per-cpu interrupts of arch
- timer for exynos5440
-In-Reply-To: <50FFC1B0.8000601@ti.com>
-References: <1358818887-16870-1-git-send-email-kgene.kim@samsung.com>
- <20130122101554.GA18876@e106331-lin.cambridge.arm.com>
- <063f01cdf8ec$926cda30$b7468e90$@samsung.com>
- <20130123103614.GD32237@e106331-lin.cambridge.arm.com>
- <50FFC1B0.8000601@ti.com>
-Message-ID: <51012C4B.5080300@ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 24 Jan 2013 12:49:37 +0000
+Subject: [GIT PULL] vexpress: fixes for v3.8-rc5
+Message-ID: <1359031777.26878.49.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+Hi Arnd, Olof,
 
-On 01/23/2013 11:55 AM, Santosh Shilimkar wrote:
-> Looping Marc, Benoit
-> 
-> On Wednesday 23 January 2013 04:06 PM, Mark Rutland wrote:
->> On Tue, Jan 22, 2013 at 10:05:18PM +0000, Kukjin Kim wrote:
->>> Mark Rutland wrote:
->>>>
->>> + devicetree-discuss, Grant Likely, Rob Herring and Tony Lindgren
->>>
->>>> On Tue, Jan 22, 2013 at 01:41:27AM +0000, Kukjin Kim wrote:
->>>>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>>>
->>>>> Need to be changed requirements in the 'cpus' node for exynos5440
->>>>> to specify all the per-cpu interrupts of arch timer.
->>>>
->>>> The node(s) for the arch timer should not be in the cpus/cpu at N nodes.
->>>> Instead, there should be one node (in the root of the tree).
->>>>
->>> Well, I don't think so. As per my understanding, the local timers are
->>> attached to every ARM cores (cpus) and it generates certain interrupt
->>> to the
->>> GIC. So the correct representation for this in device tree is to
->>> include the
->>> interrupts in the cpu nodes in dts file. Your comments  refer to a
->>> limitation in the Linux kernel implementation of the arch_timer and it
->>> should not result in representing the hardware details incorrectly in
->>> the
->>> dts file.
->>
->> I disagree. The "correct representation" is whatever the devicetree
->> binding
->> documentation describes. It does not describe placing timer nodes in
->> the cpu
->> nodes.
->>
-> This seems to be exact same topic what is getting discussed here [1]
-> Technically DT is suppose to represent how the hardware is rather than
-> how the bindings are done.
-> 
-> But as Marc pointed out, the approach taken currently is to not
-> duplicate the banked information. The thread [1] isn't concluded
-> yet but looks like we might want to avoid duplicating the information
-> considering, more of such duplication needs to follow. e.g gic i/f
-> 
-> Am still waiting on what Benoit has to say ?
+Could you, please, pull this small series of VE fixes for v3.8-rc5? It:
 
-I agree with you :-)
+* makes the V2P-CA15_A7 (a.k.a. TC2) work with 3.8 kernels
+* improves vexpress-sysreg.c behaviour on arm64 platforms
 
-I'm not sure the binding was properly done to reflect the HW accurately.
+Thanks!
 
-A local timer for my point of view should be located in the cpu node
-like a L1 cache. Or at least referenced in each cpu by a phandle.
+Pawel
 
-What was the rational to put it in the root?
+The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
 
-Regards,
-Benoit
+  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/pawelmoll/linux.git vexpress/fixes
+
+for you to fetch changes up to 52666298aebe5e9ab28a773ee61d2ce81fa097bb:
+
+  mfd: vexpress-sysreg: Don't skip initialization on probe (2013-01-24 12:19:23 +0000)
+
+----------------------------------------------------------------
+Lorenzo Pieralisi (1):
+      ARM: vexpress: extend the MPIDR range used for pen release check
+
+Pawel Moll (2):
+      ARM: vexpress: Enable A7 cores in V2P-CA15_A7's Device Tree
+      mfd: vexpress-sysreg: Don't skip initialization on probe
+
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |    2 --
+ arch/arm/plat-versatile/headsmp.S          |    2 +-
+ drivers/mfd/vexpress-sysreg.c              |   32 +++++++++++++++++-----------
+ 3 files changed, 21 insertions(+), 15 deletions(-)
