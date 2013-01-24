@@ -1,38 +1,53 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 24 Jan 2013 15:52:51 +0100
-Subject: [kvmarm] [Qemu-devel] [RFC] Virtio-desktop: Virtio-based virtual
- desktop
-In-Reply-To: <CAFEAcA-EM-aj-tMZbfhbLg20OB0iBk7qnTRuYav0PBaRNTsXXw@mail.gmail.com>
-References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
- <20130124092531.GD18072@stefanha-thinkpad.redhat.com>
- <EC4021BD-DDB7-4D28-BD79-4B7A809200AE@suse.de>
- <CAFEAcA-EM-aj-tMZbfhbLg20OB0iBk7qnTRuYav0PBaRNTsXXw@mail.gmail.com>
-Message-ID: <8506AC59-2158-4DB3-BCF3-22C61B94DE89@suse.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 24 Jan 2013 16:19:40 +0100
+Subject: [PATCH 1/2] ARM: dts: omap3-overo: Add support for pwm-leds
+In-Reply-To: <1358963812-19947-2-git-send-email-florian.vaussard@epfl.ch>
+References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
+ <1358963812-19947-2-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <5101510C.9050407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 24.01.2013, at 15:42, Peter Maydell wrote:
-
-> On 24 January 2013 14:38, Alexander Graf <agraf@suse.de> wrote:
->> But check out the QEMU e500 machine. We have a fully device tree
->> based machine type in the kernel. QEMU drives it by generating a
->> device tree for devices it actually exposes on the fly.
+On 01/23/2013 06:56 PM, Florian Vaussard wrote:
+> Convert the on-board LED connected to the TWL4030 (LEDB) to use
+> pwm-leds.
 > 
-> The ARM equivalent for that would be mach-virt, I think
-> (I forget what the status is but no doubt somebody will
-> remind me :-))
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> ---
+>  arch/arm/boot/dts/omap3-overo.dtsi |    9 +++++----
+>  1 files changed, 5 insertions(+), 4 deletions(-)
 > 
->> The big advantage we have here is that
->> 
->>  1) We don't have to emulate all hardware real hardware emulates
->>  2) We're not restricted to emulate what real hardware emulates. PCI on ARM anyone?
+> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+> index 89808ce..800be29 100644
+> --- a/arch/arm/boot/dts/omap3-overo.dtsi
+> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
+> @@ -14,12 +14,13 @@
+>  /include/ "omap3.dtsi"
+>  
+>  / {
+> -	leds {
+> -		compatible = "gpio-leds";
+> +	pwmleds {
+> +		compatible = "pwm-leds";
+> +
+>  		overo {
+>  			label = "overo:blue:COM";
+> -			gpios = <&twl_gpio 19 0>;
+> -			linux,default-trigger = "mmc0";
+
+You can keep the default trigger for the pwm-leds as well.
+The best way to test this is on top of linux-next which already have the
+leds-pwm DT bindings.
+
+> +			pwms = <&twl_pwmled 1 7812500>;
+> +			max-brightness = <127>;
+>  		};
+>  	};
+>  };
 > 
-> ...do we have an ARM PCI controller of any working kind in
-> the kernel? versatilepb's PCI controller doesn't count as
-> it is utterly broken :-)
-
-Don't the Marvell chips have PCI? And Tegra? I'm sure there have to be some SoCs with PCI :).
 
 
-Alex
+-- 
+P?ter
