@@ -1,65 +1,79 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 24 Jan 2013 10:10:15 +0100
-Subject: [GIT PULL] at91: fixes for 3.8-rc5
-Message-ID: <5100FA77.3020405@atmel.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 24 Jan 2013 14:42:44 +0530
+Subject: [PATCH] ARM: DTS: exynos5250-arndale: Add initial board support
+ file
+In-Reply-To: <CAK9yfHyKK4L_YH5fw=CrcjzeZgfhGKtDMpZQ3GVLnoVt3gkNiQ@mail.gmail.com>
+References: <1359008188-23395-1-git-send-email-tushar.behera@linaro.org>
+ <CAK9yfHyKK4L_YH5fw=CrcjzeZgfhGKtDMpZQ3GVLnoVt3gkNiQ@mail.gmail.com>
+Message-ID: <5100FB0C.7040706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On 01/24/2013 12:14 PM, Sachin Kamat wrote:
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 5ebb44f..60a9e52 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -44,6 +44,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+>>         exynos4210-trats.dtb \
+>>         exynos4412-smdk4412.dtb \
+>>         exynos5250-smdk5250.dtb \
+>> +       exynos5250-arndale.dtb \
+> 
+> I think this entry could be moved one step up for maintaining
+> alphabetical order.
+> 
 
-Here is the pull request related to the fixes series that I sent
-earlier this week. Changes are obvious and are very constrained in
-AT91-related material.
+Ok.
 
-The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
+>>         exynos5250-snow.dtb \
+>>         exynos5440-ssdk5440.dtb
+>>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+>> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+>> new file mode 100644
+>> index 0000000..7504cf3
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+>> @@ -0,0 +1,124 @@
+>> +/*
+>> + * Samsung's Exynos5250 based Arndale board device tree source
+>> + *
+>> + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+> 
+> 2013?
+> 
 
-  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+Ok.
 
-are available in the git repository at:
+>> + *             http://www.samsung.com
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +/dts-v1/;
+>> +/include/ "exynos5250.dtsi"
+>> +
+>> +/ {
+>> +       model = "Insignal Arndale evaluation board based on EXYNOS5250";
+>> +       compatible = "insignal,arndale", "samsung,exynos5250";
+>> +
+>> +       memory {
+>> +               reg = <0x40000000 0x80000000>;
+>> +       };
+>> +
+>> +       chosen {
+>> +               bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
+> 
+> This could be resticted only to console
+>                 bootargs = "console=ttySAC2,115200";
+> 
+> 
 
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+Ok.
 
-for you to fetch changes up to 8461c2f6fdd3ef0b26f931d561435df8cae2a9a5:
+I will resubmit the patchset.
 
-  ARM: at91/dts: correct comment in at91sam9x5.dtsi for mii (2013-01-23 10:40:51 +0100)
-
-----------------------------------------------------------------
-Here are fixes for AT91 that are mainly related to device tree.
-One RM9200 setup option is the only C code change.
-Some documentation changes can clarify the pinctrl use.
-Then, some defconfig modifications are allowing the affected platforms
-to boot.
-
-----------------------------------------------------------------
-Boris BREZILLON (1):
-      ARM: at91/dts: add macb mii pinctrl config for kizbox
-
-Douglas Gilbert (1):
-      ARM: at91/dts: correct comment in at91sam9x5.dtsi for mii
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      ARM: at91: rm9200: remake the BGA as default version
-
-Joachim Eastwood (1):
-      ARM: at91: fix gpios on i2c-gpio for RM9200 DT
-
-Nicolas Ferre (2):
-      ARM: at91/at91_dt_defconfig: remove memory specification to cmdline
-      ARM: at91/at91_dt_defconfig: add at91sam9n12 SoC to DT defconfig
-
-Richard Genoud (3):
-      ARM: at91/at91-pinctrl documentation: fix typo and add some details
-      ARM: at91/at91sam9x5 DTS: correct wrong PIO BANK values on u(s)arts
-      ARM: at91/at91sam9x5 DTS: add SCK USART pins
-
- Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt |  5 +--
- arch/arm/boot/dts/at91rm9200.dtsi                                |  4 +--
- arch/arm/boot/dts/at91sam9x5.dtsi                                | 60 +++++++++++++++++++++++------------
- arch/arm/boot/dts/kizbox.dts                                     |  2 ++
- arch/arm/configs/at91_dt_defconfig                               |  3 +-
- arch/arm/mach-at91/setup.c                                       |  2 ++
- 6 files changed, 51 insertions(+), 25 deletions(-)
-
-Thanks, best regards,
 -- 
-Nicolas Ferre
+Tushar Behera
