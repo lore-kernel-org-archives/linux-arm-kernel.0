@@ -1,121 +1,61 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 24 Jan 2013 13:10:26 +0200
-Subject: [v4 6/6] ARM: tegra: Add initial support for Tegra114 SoC.
+Date: Thu, 24 Jan 2013 13:10:24 +0200
+Subject: [v4 4/6] ARM: dt: tegra114: Add new board, Dalmore
 In-Reply-To: <1359025829-22306-1-git-send-email-hdoyu@nvidia.com>
 References: <1359025829-22306-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1359025829-22306-7-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1359025829-22306-5-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new Tegra 114 SoC support.
+Add a new evaluation board, Dalmore for Tegra 114 family.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- arch/arm/mach-tegra/Kconfig             |   10 +++++++
- arch/arm/mach-tegra/Makefile            |    1 +
- arch/arm/mach-tegra/board-dt-tegra114.c |   48 +++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/common.c            |    1 +
- 4 files changed, 60 insertions(+)
- create mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
+ arch/arm/boot/dts/Makefile             |    3 ++-
+ arch/arm/boot/dts/tegra114-dalmore.dts |   21 +++++++++++++++++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/tegra114-dalmore.dts
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index abc688f..eada60f 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -45,6 +45,16 @@ config ARCH_TEGRA_3x_SOC
- 	  Support for NVIDIA Tegra T30 processor family, based on the
- 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
- 
-+config ARCH_TEGRA_114_SOC
-+	bool "Enable support for Tegra114 family"
-+	select ARM_GIC
-+	select CPU_V7
-+	select ARM_L1_CACHE_SHIFT_6
-+	select ARM_ARCH_TIMER
-+	help
-+	  Support for NVIDIA Tegra T114 processor family, based on the
-+	  ARM CortexA15MP CPU
-+
- config TEGRA_PCI
- 	bool "PCI Express support"
- 	depends on ARCH_TEGRA_2x_SOC
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 432f2a5..e1eaf30 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -28,6 +28,7 @@ obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
- 
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-dt-tegra20.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
-+obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= board-dt-tegra114.o
- 
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-harmony-pcie.o
- 
-diff --git a/arch/arm/mach-tegra/board-dt-tegra114.c b/arch/arm/mach-tegra/board-dt-tegra114.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e44da40..88ea9fc 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -143,7 +143,8 @@ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ 	tegra20-ventana.dtb \
+ 	tegra20-whistler.dtb \
+ 	tegra30-cardhu-a02.dtb \
+-	tegra30-cardhu-a04.dtb
++	tegra30-cardhu-a04.dtb \
++	tegra114-dalmore.dtb
+ dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
+ 	vexpress-v2p-ca9.dtb \
+ 	vexpress-v2p-ca15-tc1.dtb \
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
 new file mode 100644
-index 0000000..3ed17ce
+index 0000000..a30aca6
 --- /dev/null
-+++ b/arch/arm/mach-tegra/board-dt-tegra114.c
-@@ -0,0 +1,48 @@
-+/*
-+ * NVIDIA Tegra114 device tree board support
-+ *
-+ * Copyright (C) 2013 NVIDIA Corporation
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -0,0 +1,21 @@
++/dts-v1/;
 +
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/clocksource.h>
++/include/ "tegra114.dtsi"
 +
-+#include <asm/mach/arch.h>
-+#include <asm/hardware/gic.h>
++/ {
++	model = "NVIDIA Tegra114 Dalmore evaluation board";
++	compatible = "nvidia,dalmore", "nvidia,tegra114";
 +
-+#include "board.h"
-+#include "common.h"
++	memory {
++		reg = <0x80000000 0x40000000>;
++	};
 +
-+static void __init tegra114_dt_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
++	serial at 70006300 {
++		status = "okay";
++		clock-frequency = <408000000>;
++	};
 +
-+static const char * const tegra114_dt_board_compat[] = {
-+	"nvidia,tegra114",
-+	NULL,
++	pmc {
++		nvidia,invert-interrupt;
++	};
 +};
-+
-+DT_MACHINE_START(TEGRA114_DT, "NVIDIA Tegra114 (Flattened Device Tree)")
-+	.smp		= smp_ops(tegra_smp_ops),
-+	.map_io		= tegra_map_common_io,
-+	.init_early	= tegra30_init_early,
-+	.init_irq	= tegra_dt_init_irq,
-+	.handle_irq	= gic_handle_irq,
-+	.init_time	= clocksource_of_init,
-+	.init_machine	= tegra114_dt_init,
-+	.init_late	= tegra_init_late,
-+	.restart	= tegra_assert_system_reset,
-+	.dt_compat	= tegra114_dt_board_compat,
-+MACHINE_END
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 87dd69c..2f13513 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -59,6 +59,7 @@ u32 tegra_uart_config[4] = {
- 
- #ifdef CONFIG_OF
- static const struct of_device_id tegra_dt_irq_match[] __initconst = {
-+	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init },
- 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
- 	{ }
- };
 -- 
 1.7.9.5
