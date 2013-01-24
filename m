@@ -1,63 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Jan 2013 17:05:20 +0000
-Subject: [PATCH v6 02/15] ARM: Section based HYP idmap
-In-Reply-To: <CANM98qJfxsXtQwjpMw5m8FEM2awtkCg-hZXa_Qrk7=jb3pqFAQ@mail.gmail.com>
-References: <20130116175716.29147.15348.stgit@ubuntu>
- <20130116175734.29147.19552.stgit@ubuntu>
- <20130124143224.GC18233@arm.com>
- <CANM98qJfxsXtQwjpMw5m8FEM2awtkCg-hZXa_Qrk7=jb3pqFAQ@mail.gmail.com>
-Message-ID: <20130124170520.GG18233@arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 24 Jan 2013 09:06:30 -0800
+Subject: [PATCH v2 1/2] clk: divider: prepare for minimum divider
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA92ABC@DBDE01.ent.ti.com>
+References: <6dc1c48cac5b2646a55da3079afb72f88e40c3bc.1358937138.git.afzal@ti.com>
+ <20130123214053.9205.49804@quantum>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA92ABC@DBDE01.ent.ti.com>
+Message-ID: <20130124170630.10623.78749@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 04:36:09PM +0000, Christoffer Dall wrote:
-> On Thu, Jan 24, 2013 at 9:32 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Wed, Jan 16, 2013 at 05:57:34PM +0000, Christoffer Dall wrote:
-> >> --- a/arch/arm/mm/idmap.c
-> >> +++ b/arch/arm/mm/idmap.c
-> >> @@ -1,4 +1,6 @@
-> >> +#include <linux/module.h>
-> >
-> > Minor thing - do you need to include linux/module.h here?
-> >
+Quoting Mohammed, Afzal (2013-01-24 03:29:15)
+> Hi Mike,
 > 
-> there was once a time when kvm/arm could be compiled as a module; my
-> best guess is that it's a leftover from that.
+> On Thu, Jan 24, 2013 at 03:10:53, Mike Turquette wrote:
+> > Quoting Afzal Mohammed (2013-01-23 03:38:52)
 > 
-> >> +     identity_mapping_add(hyp_pgd, __hyp_idmap_text_start,
-> >> +                          __hyp_idmap_text_end, PMD_SECT_AP1);
-> >
-> > It would be more consistent if you define PMD_SECT_HYP or something like
-> > that. I think you have a L_PTE_HYP bit as well.
-> >
-> Is this along the lines of what you had in mind?
+> > > Some of clocks can have a limit on minimum divider value that can be
+> > > programmed, prepare for such a support.
 > 
-> diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h
-> b/arch/arm/include/asm/pgtable-3level-hwdef.h
-> index 18f5cef..432fa12 100644
-> --- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-> +++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-> @@ -50,6 +50,7 @@
->  #define PMD_SECT_AP_READ	(_AT(pmdval_t, 0))
->  #define PMD_SECT_AP1		(_AT(pmdval_t, 1) << 6)
->  #define PMD_SECT_TEX(x)		(_AT(pmdval_t, 0))
-> +#define PMD_SECT_HYP		PMD_SECT_AP1
+> > > Add a new field min_div for the basic divider clock and a new dynamic
+> > > clock divider registration function where minimum divider value can
+> > > be specified. Keep behaviour of existing divider clock registration
+> > > functions, static initialization helpers as was earlier.
 > 
->  /*
->   * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
-> diff --git a/arch/arm/include/asm/pgtable-3level.h
-> b/arch/arm/include/asm/pgtable-3level.h
-> index 6ef8afd..a7e6532 100644
-> --- a/arch/arm/include/asm/pgtable-3level.h
-> +++ b/arch/arm/include/asm/pgtable-3level.h
-> @@ -116,6 +116,7 @@
->  /*
->   * Hyp-mode PL2 PTE definitions for LPAE.
->   */
-> +#define PMD_HYP			PMD_SECT_AP1
+> > My first question is whether the minimum divider you plan to use is an
+> > actual constraint of the hardware (e.g. the clock controller ip only
+> > lets program two bits which divide by 4, 5, 6 or 7, where 4 is the
+> > minimum divider) or if this is a functional constraint (e.g. the clock
+> > hardware can divide by a lower value, but you never want that since it
+> > results in non-functional video/audio/whatever).  If this is more of a
+> > functional constraint then perhaps a new api like clk_set_min_rate makes
+> > more sense.
+> 
+> It is a functional constraint: divider has 8 bits and it can have
+> all possible values (0 to 255) and divider value corresponds to
+> value set in the 8 bits. But depending on the modes the minimum
+> value that can be configured (to get display working) varies.
+> Eg. For raster mode (which the driver is presently supporting), it
+> can take a minimum value of 2, while in LIDD (LCD interface display
+> driver) mode it can take a min value of 1.
+> 
+> Here min rate is not a constraint w.r.t divider in LCDC IP, but
+> rather min divider.
+> 
 
-Yes, but only one definition in is probably enough (PMD_SECT_HYP?).
+Just so I understand correctly... you are saying that the functional
+constraint is not caused by the clock rate, but instead by the divider
+value?  For the different modes (raster vs LIDD) is the clock rate the
+same, or is the clock rate different?
 
--- 
-Catalin
+What is the clock output rate of the divider in raster mode?  What is
+the clock output rate of the divider in LIDD mode?
+
+Thanks,
+Mike
+
+> As it is the case, you prefer a clk_divider_set_min_div()?
+> 
+> > 
+> > Secondly, have you looked into using the rate-table option provided by
+> > the basic divider clock?  Can you explain how this is not a good fit for
+> > your needs?  Perhaps there are too many divisor values so the table
+> > would be large?
+> 
+> Divider values can range from 2-255 (254 possible values), so I believe
+> it is not a suitable candidate here (also divider to values have 1-to-1
+> mapping)
+> 
+> Regards
+> Afzal
