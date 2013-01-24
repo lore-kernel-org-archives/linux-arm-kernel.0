@@ -1,34 +1,67 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Thu, 24 Jan 2013 09:57:04 -0600
-Subject: OMAP4 randconfig failure: Zynq
-In-Reply-To: <20130124111117.GU23505@n2100.arm.linux.org.uk>
-References: <20130124111117.GU23505@n2100.arm.linux.org.uk>
-Message-ID: <20130124155704.GJ11970@beefymiracle.amer.corp.natinst.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Thu, 24 Jan 2013 11:05:33 -0500
+Subject: [PATCH v6 01/15] ARM: Add page table and page defines needed by
+ KVM
+In-Reply-To: <20130124113935.GA1658@localhost.cambridge.arm.com>
+References: <20130116175716.29147.15348.stgit@ubuntu>
+ <20130116175726.29147.57548.stgit@ubuntu>
+ <20130124113935.GA1658@localhost.cambridge.arm.com>
+Message-ID: <CANM98qKYhvb6YVUr_jF0iYrgcmoMqtom+9tsZw1PkWFabRKVNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 11:11:17AM +0000, Russell King - ARM Linux wrote:
-> The OMAP4 randconfig build last night failed with this error:
-> 
-> arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
-> 
-> Full details at the usual place - 
-> http://www.arm.linux.org.uk/developer/build/
+On Thu, Jan 24, 2013 at 6:39 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> Hi Christoffer,
+>
+> On Wed, Jan 16, 2013 at 05:57:26PM +0000, Christoffer Dall wrote:
+>> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+>> index a3f3792..6ef8afd 100644
+>> --- a/arch/arm/include/asm/pgtable-3level.h
+>> +++ b/arch/arm/include/asm/pgtable-3level.h
+>> @@ -104,11 +104,29 @@
+>>   */
+>>  #define L_PGD_SWAPPER                (_AT(pgdval_t, 1) << 55)        /* swapper_pg_dir entry */
+>>
+>> +/*
+>> + * 2nd stage PTE definitions for LPAE.
+>> + */
+>> +#define L_PTE_S2_MT_UNCACHED  (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
+>> +#define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
+>> +#define L_PTE_S2_MT_WRITEBACK         (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
+>> +#define L_PTE_S2_RDONLY               (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>> +#define L_PTE_S2_RDWR                 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
+>
+> Why is this called L_PTE_S2_RDWR? The ARM ARM shows HAP[2:1] as 0b11 for
+> read/write and 0b10 for WRONLY.
+>
 
-Curious.  This doesn't look like a valid config to me.
+it should be
 
-In particular, both ARCH_MULTIPLATFORM and ARCH_OMAP are selected, even
-though those selections should be mutually exclusive, since they fall
-under the same:
++#define L_PTE_S2_RDWR                 (_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
 
-    choice
-    	prompt "ARM system type"
-    	default ARCH_MULTIPLATFORM
+>> --- a/arch/arm/include/asm/pgtable.h
+>> +++ b/arch/arm/include/asm/pgtable.h
+>> @@ -70,6 +70,9 @@ extern void __pgd_error(const char *file, int line, pgd_t);
+>>
+>>  extern pgprot_t              pgprot_user;
+>>  extern pgprot_t              pgprot_kernel;
+>> +extern pgprot_t              pgprot_hyp_device;
+>> +extern pgprot_t              pgprot_s2;
+>> +extern pgprot_t              pgprot_s2_device;
+>>
+>>  #define _MOD_PROT(p, b)      __pgprot(pgprot_val(p) | (b))
+>>
+>> @@ -82,6 +85,10 @@ extern pgprot_t            pgprot_kernel;
+>>  #define PAGE_READONLY_EXEC   _MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
+>>  #define PAGE_KERNEL          _MOD_PROT(pgprot_kernel, L_PTE_XN)
+>>  #define PAGE_KERNEL_EXEC     pgprot_kernel
+>> +#define PAGE_HYP             _MOD_PROT(pgprot_kernel, L_PTE_HYP)
+>> +#define PAGE_HYP_DEVICE              _MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+>> +#define PAGE_S2                      _MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+>> +#define PAGE_S2_DEVICE               _MOD_PROT(pgprot_s2_device, L_PTE_USER | L_PTE_S2_RDONLY)
+>
+> Are these S2 read-only by default?
+>
 
-Perhaps it's because CONFIG_ARCH_OMAP=y was setup in the seed?
-
-oldconfig seems to complain, too:
-
-      .config:340:warning: override: ARCH_OMAP changes choice state
-
-  Josh
+not sure I understand what you're asking here?
