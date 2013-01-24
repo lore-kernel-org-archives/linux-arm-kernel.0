@@ -1,100 +1,100 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 24 Jan 2013 21:09:26 +0200
-Subject: [RFC/PATCH 32/32] usb: gadget: drop now unnecessary flag
-In-Reply-To: <2268214.yJrDJgELNj@flatron>
-References: <1359042370-4358-1-git-send-email-balbi@ti.com>
- <1359042370-4358-33-git-send-email-balbi@ti.com>
- <2268214.yJrDJgELNj@flatron>
-Message-ID: <20130124190926.GA31254@arwen.pp.htv.fi>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 24 Jan 2013 11:15:34 -0800
+Subject: [PATCH 5/7] clk: vt8500: Use common of_clk_init() function
+In-Reply-To: <1358543280.8280.2.camel@gitbox>
+References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
+ <1357282858-2112-5-git-send-email-pgaikwad@nvidia.com>
+ <20130118175621.3982.82838@quantum> <1358543280.8280.2.camel@gitbox>
+Message-ID: <20130124191534.10623.14882@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 07:52:52PM +0100, Tomasz Figa wrote:
-> Hi Felipe,
+Quoting Tony Prisk (2013-01-18 13:08:00)
+> On Fri, 2013-01-18 at 09:56 -0800, Mike Turquette wrote:
+> > Quoting Prashant Gaikwad (2013-01-03 23:00:56)
+> > > Use common of_clk_init() function for clock initialization.
+> > > 
+> > > Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> > 
+> > Tony,
+> > 
+> > Can I get a Tested-by from you before I take this in?
+> > 
+> Tested-by: Tony Prisk <linux@prisktech.co.nz>
 > 
-> On Thursday 24 of January 2013 17:46:10 Felipe Balbi wrote:
-> > We don't need the ->register_my_device flag
-> > anymore because all UDC drivers have been
-> > properly converted.
-> > 
-> > Let's remove every history of it.
-> > 
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> >  drivers/usb/chipidea/udc.c             | 1 -
-> >  drivers/usb/dwc3/gadget.c              | 1 -
-> >  drivers/usb/gadget/amd5536udc.c        | 1 -
-> >  drivers/usb/gadget/at91_udc.c          | 1 -
-> >  drivers/usb/gadget/atmel_usba_udc.c    | 1 -
-> >  drivers/usb/gadget/bcm63xx_udc.c       | 1 -
-> >  drivers/usb/gadget/dummy_hcd.c         | 1 -
-> >  drivers/usb/gadget/fsl_qe_udc.c        | 1 -
-> >  drivers/usb/gadget/fsl_udc_core.c      | 1 -
-> >  drivers/usb/gadget/fusb300_udc.c       | 1 -
-> >  drivers/usb/gadget/goku_udc.c          | 1 -
-> >  drivers/usb/gadget/imx_udc.c           | 1 -
-> >  drivers/usb/gadget/lpc32xx_udc.c       | 1 -
-> >  drivers/usb/gadget/m66592-udc.c        | 1 -
-> >  drivers/usb/gadget/mv_u3d_core.c       | 1 -
-> >  drivers/usb/gadget/mv_udc_core.c       | 1 -
-> >  drivers/usb/gadget/net2272.c           | 1 -
-> >  drivers/usb/gadget/net2280.c           | 1 -
-> >  drivers/usb/gadget/omap_udc.c          | 1 -
-> >  drivers/usb/gadget/pch_udc.c           | 1 -
-> >  drivers/usb/gadget/pxa25x_udc.c        | 1 -
-> >  drivers/usb/gadget/pxa27x_udc.c        | 1 -
-> >  drivers/usb/gadget/r8a66597-udc.c      | 1 -
-> >  drivers/usb/gadget/s3c-hsotg.c         | 1 -
-> >  drivers/usb/gadget/s3c-hsudc.c         | 1 -
-> >  drivers/usb/gadget/s3c2410_udc.c       | 1 -
-> >  drivers/usb/gadget/udc-core.c          | 3 ---
-> >  drivers/usb/musb/musb_gadget.c         | 1 -
-> >  drivers/usb/renesas_usbhs/mod_gadget.c | 1 -
-> >  include/linux/usb/gadget.h             | 4 ----
-> >  30 files changed, 35 deletions(-)
-> > 
-> [snip]
-> > diff --git a/drivers/usb/gadget/udc-core.c
-> > b/drivers/usb/gadget/udc-core.c index 9195054..4ee0efc 100644
-> > --- a/drivers/usb/gadget/udc-core.c
-> > +++ b/drivers/usb/gadget/udc-core.c
-> > @@ -173,7 +173,6 @@ int usb_add_gadget_udc(struct device *parent, struct
-> > usb_gadget *gadget) if (!udc)
-> >  		goto err1;
-> > 
-> > -	if (gadget->register_my_device) {
-> >  		dev_set_name(&gadget->dev, "gadget");
-> > 
-> >  		ret = device_register(&gadget->dev);
-> > @@ -211,7 +210,6 @@ err3:
-> >  	put_device(&udc->dev);
-> > 
-> >  err2:
-> > -	if (gadget->register_my_device)
-> >  		put_device(&gadget->dev);
-> >  err1:
-> >  	return ret;
-> > @@ -267,7 +265,6 @@ found:
-> >  	kobject_uevent(&udc->dev.kobj, KOBJ_REMOVE);
-> >  	device_unregister(&udc->dev);
-> > 
-> > -	if (gadget->register_my_device)
-> >  		device_unregister(&gadget->dev);
+> FYI: This will need another patch to complete as we added another set of
+> clocks to this clk-vt8500.c for 3.9.
 > 
-> Correct me if I am wrong, but doesn't this patch leave us with incorrect 
-> indentation?
 
-right, I fixed it up on my branch, see [1]. That was me trusting my poor
-sed skills and not verifying the result ;-)
+Tony, is the following patch correct?
 
-[1] http://git.kernel.org/?p=linux/kernel/git/balbi/usb.git;a=commitdiff;h=d0bdf2970dd68677c65671be9bd56759593cfaf1
 
+>From 5b6e0adb69674c684c33503f50010644b049029c Mon Sep 17 00:00:00 2001
+From: Prashant Gaikwad <pgaikwad@nvidia.com>
+Date: Fri, 4 Jan 2013 12:30:56 +0530
+Subject: [PATCH] clk: vt8500: Use common of_clk_init() function
+
+Use common of_clk_init() function for clock initialization.
+
+Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+Tested-by: Tony Prisk <linux@prisktech.co.nz>
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+[mturquette at linaro.org: added entry for wm8750-pll-clock]
+
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+---
+ drivers/clk/clk-vt8500.c |   17 +++++------------
+ 1 file changed, 5 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+index 2515d4f..b5538bb 100644
+--- a/drivers/clk/clk-vt8500.c
++++ b/drivers/clk/clk-vt8500.c
+@@ -291,7 +291,7 @@ static __init void vtwm_device_clk_init(struct device_node *node)
+ 	rc = of_clk_add_provider(node, of_clk_src_simple_get, clk);
+ 	clk_register_clkdev(clk, clk_name, NULL);
+ }
+-
++CLK_OF_DECLARE(vt8500_device, "via,vt8500-device-clock", vtwm_device_clk_init);
+ 
+ /* PLL clock related functions */
+ 
+@@ -612,26 +612,19 @@ static void __init vt8500_pll_init(struct device_node *node)
+ {
+ 	vtwm_pll_clk_init(node, PLL_TYPE_VT8500);
+ }
++CLK_OF_DECLARE(vt8500_pll, "via,vt8500-pll-clock", vt8500_pll_init);
+ 
+ static void __init wm8650_pll_init(struct device_node *node)
+ {
+ 	vtwm_pll_clk_init(node, PLL_TYPE_WM8650);
+ }
++CLK_OF_DECLARE(wm8650_pll, "wm,wm8650-pll-clock", wm8650_pll_init);
+ 
+ static void __init wm8750_pll_init(struct device_node *node)
+ {
+ 	vtwm_pll_clk_init(node, PLL_TYPE_WM8750);
+ }
+-
+-static const __initconst struct of_device_id clk_match[] = {
+-	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+-	{ .compatible = "via,vt8500-pll-clock", .data = vt8500_pll_init, },
+-	{ .compatible = "wm,wm8650-pll-clock", .data = wm8650_pll_init, },
+-	{ .compatible = "wm,wm8750-pll-clock", .data = wm8750_pll_init, },
+-	{ .compatible = "via,vt8500-device-clock",
+-					.data = vtwm_device_clk_init, },
+-	{ /* sentinel */ }
+-};
++CLK_OF_DECLARE(wm8750_pll, "wm,wm8750-pll-clock", wm8750_pll_init);
+ 
+ void __init vtwm_clk_init(void __iomem *base)
+ {
+@@ -640,5 +633,5 @@ void __init vtwm_clk_init(void __iomem *base)
+ 
+ 	pmc_base = base;
+ 
+-	of_clk_init(clk_match);
++	of_clk_init(NULL);
+ }
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130124/16277568/attachment.sig>
+1.7.10.4
