@@ -1,181 +1,172 @@
-From: tobetter@gmail.com (Dongjin Kim)
-Date: Fri, 25 Jan 2013 03:46:08 +0900
-Subject: [PATCH RESEND] ARM: dts: max77686: Add DTS file for max77686 PMIC
-Message-ID: <1359053177-17725-1-git-send-email-tobetter@gmail.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Thu, 24 Jan 2013 18:46:48 +0000
+Subject: [PATCH v8 0/3] Cortex-M3 series once more
+In-Reply-To: <1358413196-5609-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1358413196-5609-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <51018198.8000407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a dedicated DTS file for max77686 PMIC, supposed to be included
-in a board DTS to control the power for certain consumer devices or AP with 9 BUCKs
-and 26 LDOs
+Hi Uwe,
 
-Signed-off-by: Dongjin Kim <tobetter@gmail.com>
----
- arch/arm/boot/dts/max77686.dtsi |  156 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 156 insertions(+)
- create mode 100644 arch/arm/boot/dts/max77686.dtsi
+On 17/01/13 08:59, Uwe Kleine-K?nig wrote:
+> Based on Jonny's comments I changed a few more details. The diff to v7
+> can be found below after the diffstat. These are:
+>
+>   - describe why a #define for cr_alignment is OK in both the
+>     commit log and a comment in the header file
+>   - a work around for errata 752419 that newer gcc warns about
+>   - add a few more comments for better readability
+>   - a whitespace fix
+>
 
-diff --git a/arch/arm/boot/dts/max77686.dtsi b/arch/arm/boot/dts/max77686.dtsi
-new file mode 100644
-index 0000000..b80baef
---- /dev/null
-+++ b/arch/arm/boot/dts/max77686.dtsi
-@@ -0,0 +1,156 @@
-+/*
-+ * Copyright (C) 2013 Dongjin Kim <tobetter@gmail.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ */
-+
-+&max77686 {
-+	compatible = "maxim,max77686";
-+
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+
-+	voltage-regulators {
-+		buck1: buck at 10 {
-+			regulator-compatible = "BUCK1";
-+		};
-+
-+		buck2: buck at 12 {
-+			regulator-compatible = "BUCK2";
-+		};
-+
-+		buck3: buck at 1c {
-+			regulator-compatible = "BUCK3";
-+		};
-+
-+		buck4: buck at 26 {
-+			regulator-compatible = "BUCK4";
-+		};
-+
-+		buck5: buck at 30 {
-+			regulator-compatible = "BUCK5";
-+		};
-+
-+		buck6: buck at 32 {
-+			regulator-compatible = "BUCK6";
-+		};
-+
-+		buck7: buck at 34 {
-+			regulator-compatible = "BUCK7";
-+		};
-+
-+		buck8: buck at 36 {
-+			regulator-compatible = "BUCK8";
-+		};
-+
-+		buck9: buck at 38 {
-+			regulator-compatible = "BUCK9";
-+		};
-+
-+		ldo1: ldo at 40 {
-+			regulator-compatible = "LDO1";
-+		};
-+
-+		ldo2: ldo at 41 {
-+			regulator-compatible = "LDO2";
-+		};
-+
-+		ldo3: ldo at 42 {
-+			regulator-compatible = "LDO3";
-+		};
-+
-+		ldo4: ldo at 43 {
-+			regulator-compatible = "LDO4";
-+		};
-+
-+		ldo5: ldo at 44 {
-+			regulator-compatible = "LDO5";
-+		};
-+
-+		ldo6: ldo at 45 {
-+			regulator-compatible = "LDO6";
-+		};
-+
-+		ldo7: ldo at 46 {
-+			regulator-compatible = "LDO7";
-+		};
-+
-+		ldo8: ldo at 47 {
-+			regulator-compatible = "LDO8";
-+		};
-+
-+		ldo9: ldo at 48 {
-+			regulator-compatible = "LDO9";
-+		};
-+
-+		ldo10: ldo at 49 {
-+			regulator-compatible = "LDO10";
-+		};
-+
-+		ldo11: ldo at 4a {
-+			regulator-compatible = "LDO11";
-+		};
-+
-+		ldo12: ldo at 4b {
-+			regulator-compatible = "LDO12";
-+		};
-+
-+		ldo13: ldo at 4c {
-+			regulator-compatible = "LDO13";
-+		};
-+
-+		ldo14: ldo at 4d {
-+			regulator-compatible = "LDO14";
-+		};
-+
-+		ldo15: ldo at 4e {
-+			regulator-compatible = "LDO15";
-+		};
-+
-+		ldo16: ldo at 4f {
-+			regulator-compatible = "LDO16";
-+		};
-+
-+		ldo17: ldo at 50 {
-+			regulator-compatible = "LDO17";
-+		};
-+
-+		ldo18: ldo at 51 {
-+			regulator-compatible = "LDO18";
-+		};
-+
-+		ldo19: ldo at 52 {
-+			regulator-compatible = "LDO19";
-+		};
-+
-+		ldo20: ldo at 53 {
-+			regulator-compatible = "LDO20";
-+		};
-+
-+		ldo21: ldo at 54 {
-+			regulator-compatible = "LDO21";
-+		};
-+
-+		ldo22: ldo at 55 {
-+			regulator-compatible = "LDO22";
-+		};
-+
-+		ldo23: ldo at 56 {
-+			regulator-compatible = "LDO23";
-+		};
-+
-+		ldo24: ldo at 57 {
-+			regulator-compatible = "LDO24";
-+		};
-+
-+		ldo25: ldo at 58 {
-+			regulator-compatible = "LDO25";
-+		};
-+
-+		ldo26: ldo at 59 {
-+			regulator-compatible = "LDO26";
-+		};
-+	};
-+};
--- 
-1.7.10.4
+Thanks for making these changes.
+
+As you will see I've now reviewed the other to patches in the series and 
+there are quite a few smaller things in there...
+
+> I think the updates are minor enough to still allow the patches to go
+> into v3.9-rc1. Russell, what do you think? You can pull them from
+>
+
+I think we should assess this once you've responded to the review of the 
+other two patches.
+
+As far as merging these patches go, as well as the review comments on 
+each patch, I still have the same reservations that I raised around v6 
+of these about the fact that NVIC support and a platform are missing. 
+This means there's no way to actually *use* the V7M code. I understand 
+that you're prepared to commit to getting this in shape and ready to be 
+merged once the base support goes in - is that right?
+
+What sort of time-frame do you expect to be able to do this in?
+
+I'm happy to help review/work on NVIC support if you need more eyes (and 
+perhaps even minds!) on the problem, as well as test on the efm32 board.
+
+> 	git://git.pengutronix.de/git/ukl/linux.git for-next
+>
+> still based on v3.7-rc1 + your commit "ARM: fix oops on initial entry to
+> userspace with Thumb2 kernels".
+
+Does it trivially re-base to v3.8-rc4?
+
+>
+> Catalin Marinas (1):
+>    Cortex-M3: Add base support for Cortex-M3
+>
+> Uwe Kleine-K?nig (2):
+>    ARM: make cr_alignment read-only #ifndef CONFIG_CPU_CP15
+>    Cortex-M3: Add support for exception handling
+>
+>   arch/arm/include/asm/assembler.h   |   13 ++-
+>   arch/arm/include/asm/cp15.h        |   16 +++-
+>   arch/arm/include/asm/cputype.h     |    3 +
+>   arch/arm/include/asm/glue-cache.h  |   25 ++++++
+>   arch/arm/include/asm/glue-df.h     |    8 ++
+>   arch/arm/include/asm/glue-proc.h   |    9 ++
+>   arch/arm/include/asm/irqflags.h    |   22 +++--
+>   arch/arm/include/asm/processor.h   |    7 ++
+>   arch/arm/include/asm/ptrace.h      |    8 ++
+>   arch/arm/include/asm/system_info.h |    1 +
+>   arch/arm/include/uapi/asm/ptrace.h |   36 ++++++--
+>   arch/arm/kernel/asm-offsets.c      |    3 +
+>   arch/arm/kernel/entry-common.S     |    4 +
+>   arch/arm/kernel/entry-header.S     |  148 +++++++++++++++++++++++++++++++++
+>   arch/arm/kernel/entry-v7m.S        |  134 ++++++++++++++++++++++++++++++
+>   arch/arm/kernel/head-common.S      |    9 +-
+>   arch/arm/kernel/head-nommu.S       |    9 +-
+>   arch/arm/kernel/process.c          |    4 +
+>   arch/arm/kernel/ptrace.c           |    3 +
+>   arch/arm/kernel/setup.c            |   13 ++-
+>   arch/arm/kernel/traps.c            |    2 +
+>   arch/arm/mm/alignment.c            |    2 +
+>   arch/arm/mm/mmu.c                  |   17 ++++
+>   arch/arm/mm/nommu.c                |    2 +
+>   arch/arm/mm/proc-v7m.S             |  161 ++++++++++++++++++++++++++++++++++++
+>   25 files changed, 637 insertions(+), 22 deletions(-)
+>   create mode 100644 arch/arm/kernel/entry-v7m.S
+>   create mode 100644 arch/arm/mm/proc-v7m.S
+>
+> The incremental changes since v7 are:
+>
+> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+> index d814435..1f3262e 100644
+> --- a/arch/arm/include/asm/cp15.h
+> +++ b/arch/arm/include/asm/cp15.h
+> @@ -86,6 +86,11 @@ static inline void set_copro_access(unsigned int val)
+>
+>   #else /* ifdef CONFIG_CPU_CP15 */
+>
+> +/*
+> + * cr_alignment and cr_no_alignment are tightly coupled to cp15 (at least in the
+> + * minds of the developers). Yielding 0 for machines without a cp15 (and making
+> + * it read-only) is fine for most cases and saves quite some #ifdeffery.
+> + */
+>   #define cr_no_alignment	UL(0)
+>   #define cr_alignment	UL(0)
+>
+> diff --git a/arch/arm/include/uapi/asm/ptrace.h b/arch/arm/include/uapi/asm/ptrace.h
+> index 2ae7d1b..d3be66e 100644
+> --- a/arch/arm/include/uapi/asm/ptrace.h
+> +++ b/arch/arm/include/uapi/asm/ptrace.h
+> @@ -144,7 +144,7 @@ struct pt_regs {
+>   #define ARM_r1		uregs[1]
+>   #define ARM_r0		uregs[0]
+>   #define ARM_ORIG_r0	uregs[17]
+> -#define ARM_EXC_RET    uregs[18]
+> +#define ARM_EXC_RET	uregs[18]
+>
+>   /*
+>    * The size of the user-visible VFP state as seen by PTRACE_GET/SETVFPREGS
+> diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+> index a0991dc..842394c 100644
+> --- a/arch/arm/kernel/entry-v7m.S
+> +++ b/arch/arm/kernel/entry-v7m.S
+> @@ -102,8 +102,8 @@ ENTRY(__switch_to)
+>   	mov	ip, r4
+>   	mov	r0, r5
+>   	ldmia	ip!, {r4 - r11}		@ Load all regs saved previously
+> -	ldr	sp, [ip], #4
+> -	ldr	pc, [ip]
+> +	ldr	sp, [ip]
+> +	ldr	pc, [ip, #4]!
+>   	.fnend
+>   ENDPROC(__switch_to)
+>
+> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+> index 2f560c5..5b391a6 100644
+> --- a/arch/arm/kernel/head-common.S
+> +++ b/arch/arm/kernel/head-common.S
+> @@ -117,7 +117,7 @@ __mmap_switched_data:
+>   #ifdef CONFIG_CPU_CP15
+>   	.long	cr_alignment			@ r7
+>   #else
+> -	.long	0
+> +	.long	0				@ r7
+>   #endif
+>   	.long	init_thread_union + THREAD_START_SP @ sp
+>   	.size	__mmap_switched_data, . - __mmap_switched_data
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index b675918..92abdb8 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -196,7 +196,7 @@ void adjust_cr(unsigned long mask, unsigned long set)
+>   }
+>   #endif
+>
+> -#else
+> +#else /* ifdef CONFIG_CPU_CP15 */
+>
+>   static int __init early_cachepolicy(char *p)
+>   {
+> @@ -210,7 +210,7 @@ static int __init noalign_setup(char *__unused)
+>   }
+>   __setup("noalign", noalign_setup);
+>
+> -#endif
+> +#endif /* ifdef CONFIG_CPU_CP15 / else */
+>
+>   #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
+>   #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+>
