@@ -1,59 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Jan 2013 11:39:35 +0000
-Subject: [PATCH v6 01/15] ARM: Add page table and page defines needed by
- KVM
-In-Reply-To: <20130116175726.29147.57548.stgit@ubuntu>
-References: <20130116175716.29147.15348.stgit@ubuntu>
- <20130116175726.29147.57548.stgit@ubuntu>
-Message-ID: <20130124113935.GA1658@localhost.cambridge.arm.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 24 Jan 2013 11:51:45 +0000
+Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
+In-Reply-To: <50FFF31D.2070908@ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
+ <50FEB3FD.3050001@ti.com> <50FEBB61.9000707@ti.com>
+ <B9531499-0746-44DA-BDBB-999D4CA31E63@dominion.thruhere.net>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA922F5@DBDE01.ent.ti.com>
+ <50FFF31D.2070908@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA92B0B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Kishon,
 
-On Wed, Jan 16, 2013 at 05:57:26PM +0000, Christoffer Dall wrote:
-> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-> index a3f3792..6ef8afd 100644
-> --- a/arch/arm/include/asm/pgtable-3level.h
-> +++ b/arch/arm/include/asm/pgtable-3level.h
-> @@ -104,11 +104,29 @@
->   */
->  #define L_PGD_SWAPPER		(_AT(pgdval_t, 1) << 55)	/* swapper_pg_dir entry */
->  
-> +/*
-> + * 2nd stage PTE definitions for LPAE.
-> + */
-> +#define L_PTE_S2_MT_UNCACHED	 (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
-> +#define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
-> +#define L_PTE_S2_MT_WRITEBACK	 (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
-> +#define L_PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
-> +#define L_PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
+On Wed, Jan 23, 2013 at 19:56:37, ABRAHAM, KISHON VIJAY wrote:
+> On Wednesday 23 January 2013 07:28 PM, Mohammed, Afzal wrote:
 
-Why is this called L_PTE_S2_RDWR? The ARM ARM shows HAP[2:1] as 0b11 for
-read/write and 0b10 for WRONLY.
+> > USB first instance of am335x works in mainline as of now.
 
-> --- a/arch/arm/include/asm/pgtable.h
-> +++ b/arch/arm/include/asm/pgtable.h
-> @@ -70,6 +70,9 @@ extern void __pgd_error(const char *file, int line, pgd_t);
->  
->  extern pgprot_t		pgprot_user;
->  extern pgprot_t		pgprot_kernel;
-> +extern pgprot_t		pgprot_hyp_device;
-> +extern pgprot_t		pgprot_s2;
-> +extern pgprot_t		pgprot_s2_device;
->  
->  #define _MOD_PROT(p, b)	__pgprot(pgprot_val(p) | (b))
->  
-> @@ -82,6 +85,10 @@ extern pgprot_t		pgprot_kernel;
->  #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
->  #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
->  #define PAGE_KERNEL_EXEC	pgprot_kernel
-> +#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
-> +#define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
-> +#define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
-> +#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_USER | L_PTE_S2_RDONLY)
+> Can you check if this series indeed breaks am335x?
+> 
+> Thanks for your help.
 
-Are these S2 read-only by default?
+Do you have a tree having these changes, it would be easier for me.
 
--- 
-Catalin
+Regards
+Afzal
