@@ -1,81 +1,37 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu, 24 Jan 2013 21:52:50 +0100
-Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
-In-Reply-To: <20130124203824.GG1758@titan.lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <3084778.eWbl5o3HSt@bender> <20130124203824.GG1758@titan.lakedaemon.net>
-Message-ID: <33979531.bU6WbEu7BD@bender>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Thu, 24 Jan 2013 23:05:12 +0200
+Subject: [PATCH v2 13/16] drivers/bus: add ARM CCI support
+In-Reply-To: <1359008879-9015-14-git-send-email-nicolas.pitre@linaro.org>
+References: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359008879-9015-14-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <CAMAG_ecxWK-NqxwFys0tpxXssub+55-gAExuqyGM_EchOQPAVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 January 2013 15:38:24 Jason Cooper wrote:
-> On Thu, Jan 24, 2013 at 09:27:24PM +0100, Florian Fainelli wrote:
-> > On Thursday 24 January 2013 13:16:22 Jason Cooper wrote:
-> > > > >Ian's patch appears to do so.  I'll respin this series using it vice my
-> > > > >lookup table.
-> > > > >
-> > > > Sounds good, while at it, I wonder if we could not simplify Ian's
-> > > > patch to be limited to the actual Ethernet MAC driver and use
-> > > > Thomas's mvdio device tree binding for the MDIO bits of mv643xx_eth.
-> > > > What do you think?
-> > > 
-> > > It sounds like you just volunteered ;-)  Do you think you have the time
-> > > to knock it out for v3.9?
-> > 
-> > I do not have any kirkwood board at the moment and I really want to be able to 
-> > test this properly especially with the "clock must be enabled for ethernet not 
-> > be lost". Let me get one and I should be able to do it. Let's adopt your patch 
-> > for the moment, and once I have a kirkwood board I can deal with the ethernet 
-> > driver device tree bindings.
-> > 
-> > Does that sound ok with you?
-> 
-> using Ian's patch as is, I have the following in kirkwood.dtsi:
-> 
+On Thu, Jan 24, 2013 at 8:27 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> +static int cci_driver_probe(struct platform_device *pdev)
+> +{
+> +       struct resource *res;
+> +       int ret = 0;
 > +
-> +               smi0: mdio at 72000 {
-> +                       compatible = "marvell,mdio-mv643xx";
-> +                       reg = <0x72000 0x4000>;
-> +                       interrupts = <46>;
-> +                       status = "disabled";
-> +               };
+> +       info = kzalloc(sizeof(*info), GFP_KERNEL);
+devm_kzalloc and managed resources allocation can save you few code lines.
+> +       if (!info) {
+> +               dev_err(&pdev->dev, "unable to allocate mem\n");
+> +               return -ENOMEM;
+> +       }
 > +
-> +               smi1: mdio at 76000 {
-> +                       compatible = "marvell,mdio-mv643xx";
-> +                       reg = <0x76000 0x4000>;
-> +                       interrupts = <47>;
-> +                       status = "disabled";
-> +               };
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       if (!res) {
+> +               dev_err(&pdev->dev, "No memory resource\n");
+> +               ret = -EINVAL;
+> +               goto mem_free;
+> +       }
 > +
-> +               egiga0 {
-> +                       compatible = "marvell,mv643xx-eth";
-> +                       reg = <0x72000 0x4000>;
-> +                       mdio = <&smi0>;
-> +                       port_number = <0>;
-> +                       phy_addr = <0x80>;
-> +                       interrupts = <11>;
-> +                       clocks = <&gate_clk 0>;
-> +                       status = "disabled";
-> +               };
-> +
-> +               egiga1 {
-> +                       compatible = "marvell,mv643xx-eth";
-> +                       reg = <0x76000 0x4000>;
-> +                       mdio = <&smi1>;
-> +                       port_number = <1>;
-> +                       phy_addr = <0x81>;
-> +                       interrupts = <15>;
-> +                       clocks = <&gate_clk 19>;
-> +                       status = "disabled";
-> +               };
-> 
-> I'll see if I can get it working as is, then we can migrate to Thomas'
-> mdio bindings.
-> 
-> btw - it might be a shared smi, I haven't looked yet, and haven't
-> tested...
-
-Ok, the existing mv643xx-eth SMI code also deals with an interrupt-driven SMI
-completion scheme, which is not handled yet with Thomas's mvmdio driver.
--- 
-Florian
+> +       if (!request_mem_region(res->start, resource_size(res),
+> +                               dev_name(&pdev->dev))) {
+> +               dev_err(&pdev->dev, "address 0x%x in use\n", (u32) res->start);
+I suggest that you use %pR or %pr (more info at Documentation/prink-formats.txt
+also, request_mem_region can fail due to other reasons
+> +               ret = -EBUSY;
+> +               goto mem_free;
