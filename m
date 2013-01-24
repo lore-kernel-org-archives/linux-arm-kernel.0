@@ -1,164 +1,75 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 24 Jan 2013 11:46:28 +0530
-Subject: [PATCH] ARM: DTS: exynos5250-arndale: Add initial board support file
-Message-ID: <1359008188-23395-1-git-send-email-tushar.behera@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 24 Jan 2013 01:27:44 -0500
+Subject: [PATCH v2 01/16] ARM: introduce common set_auxcr/get_auxcr functions
+In-Reply-To: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1359008879-9015-2-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Girish K S <ks.giri@samsung.com>
+From: Rob Herring <rob.herring@calxeda.com>
 
-Arndale is a low cost board based on the Samsung Exynos5250 SoC. This
-patch adds initial device tree support for this board.
+Move the private set_auxcr/get_auxcr functions from
+drivers/cpuidle/cpuidle-calxeda.c so they can be used across platforms.
 
-Signed-off-by: Girish K S <ks.giri@samsung.com>
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/boot/dts/Makefile               |    1 +
- arch/arm/boot/dts/exynos5250-arndale.dts |  124 ++++++++++++++++++++++++++++++
- 2 files changed, 125 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos5250-arndale.dts
+ arch/arm/include/asm/cp15.h       | 14 ++++++++++++++
+ drivers/cpuidle/cpuidle-calxeda.c | 14 --------------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5ebb44f..60a9e52 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -44,6 +44,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos4210-trats.dtb \
- 	exynos4412-smdk4412.dtb \
- 	exynos5250-smdk5250.dtb \
-+	exynos5250-arndale.dtb \
- 	exynos5250-snow.dtb \
- 	exynos5440-ssdk5440.dtb
- dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-new file mode 100644
-index 0000000..7504cf3
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -0,0 +1,124 @@
-+/*
-+ * Samsung's Exynos5250 based Arndale board device tree source
-+ *
-+ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
+diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+index 5ef4d8015a..ef0094abf2 100644
+--- a/arch/arm/include/asm/cp15.h
++++ b/arch/arm/include/asm/cp15.h
+@@ -59,6 +59,20 @@ static inline void set_cr(unsigned int val)
+ 	isb();
+ }
+ 
++static inline unsigned int get_auxcr(void)
++{
++	unsigned int val;
++	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
++	return val;
++}
 +
-+/dts-v1/;
-+/include/ "exynos5250.dtsi"
++static inline void set_auxcr(unsigned int val)
++{
++	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
++	  : : "r" (val) : "cc");
++	isb();
++}
 +
-+/ {
-+	model = "Insignal Arndale evaluation board based on EXYNOS5250";
-+	compatible = "insignal,arndale", "samsung,exynos5250";
-+
-+	memory {
-+		reg = <0x40000000 0x80000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
-+	};
-+
-+	i2c at 12C60000 {
-+		status = "disabled";
-+	};
-+
-+	i2c at 12C70000 {
-+		status = "disabled";
-+	};
-+
-+	i2c at 12C80000 {
-+		status = "disabled";
-+	};
-+
-+	i2c at 12C90000 {
-+		status = "disabled";
-+	};
-+
-+	i2c at 12CA0000 {
-+		status = "disabled";
-+	};
-+
-+	i2c at 12CB0000 {
-+		status = "disabled";
-+	};
-+
-+	i2c at 12CC0000 {
-+		status = "disabled";
-+	};
-+
-+	i2c at 12CD0000 {
-+		status = "disabled";
-+	};
-+
-+	i2c at 121D0000 {
-+		status = "disabled";
-+	};
-+
-+	dwmmc_0: dwmmc0 at 12200000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		broken-cd;
-+		fifo-depth = <0x80>;
-+		card-detect-delay = <200>;
-+		samsung,dw-mshc-ciu-div = <3>;
-+		samsung,dw-mshc-sdr-timing = <2 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <8>;
-+			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
-+				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
-+				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
-+				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
-+				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
-+		};
-+	};
-+
-+	dwmmc_1: dwmmc1 at 12210000 {
-+		status = "disabled";
-+	};
-+
-+	dwmmc_2: dwmmc2 at 12220000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		fifo-depth = <0x80>;
-+		card-detect-delay = <200>;
-+		samsung,dw-mshc-ciu-div = <3>;
-+		samsung,dw-mshc-sdr-timing = <2 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <4>;
-+			samsung,cd-pinmux-gpio = <&gpc3 2 2 3 3>;
-+			gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
-+				<&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
-+				<&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
-+				<&gpc4 3 3 3 3>, <&gpc4 3 3 3 3>,
-+				<&gpc4 5 3 3 3>, <&gpc4 6 3 3 3>;
-+		};
-+	};
-+
-+	dwmmc_3: dwmmc3 at 12230000 {
-+		status = "disabled";
-+	};
-+
-+	spi_0: spi at 12d20000 {
-+		status = "disabled";
-+	};
-+
-+	spi_1: spi at 12d30000 {
-+		status = "disabled";
-+	};
-+
-+	spi_2: spi at 12d40000 {
-+		status = "disabled";
-+	};
-+};
+ #ifndef CONFIG_SMP
+ extern void adjust_cr(unsigned long mask, unsigned long set);
+ #endif
+diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+index e1aab38c5a..ece83d6e04 100644
+--- a/drivers/cpuidle/cpuidle-calxeda.c
++++ b/drivers/cpuidle/cpuidle-calxeda.c
+@@ -37,20 +37,6 @@ extern void *scu_base_addr;
+ 
+ static struct cpuidle_device __percpu *calxeda_idle_cpuidle_devices;
+ 
+-static inline unsigned int get_auxcr(void)
+-{
+-	unsigned int val;
+-	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
+-	return val;
+-}
+-
+-static inline void set_auxcr(unsigned int val)
+-{
+-	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
+-	  : : "r" (val) : "cc");
+-	isb();
+-}
+-
+ static noinline void calxeda_idle_restore(void)
+ {
+ 	set_cr(get_cr() | CR_C);
 -- 
-1.7.4.1
+1.8.0
