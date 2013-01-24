@@ -1,52 +1,132 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 24 Jan 2013 12:57:20 +0100
-Subject: [PATCH 2/4] drm/i2c: nxp-tda998x (v2)
-In-Reply-To: <1358894185-21617-3-git-send-email-robdclark@gmail.com>
-References: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
- <1358894185-21617-3-git-send-email-robdclark@gmail.com>
-Message-ID: <20130124115720.GV31870@phenom.ffwll.local>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 24 Jan 2013 11:56:39 +0000
+Subject: [PATCH v2 09/16] ARM: vexpress: Select the correct SMP
+ operations at run-time
+In-Reply-To: <1359008879-9015-10-git-send-email-nicolas.pitre@linaro.org>
+References: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359008879-9015-10-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1359028599.4929.21.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 04:36:23PM -0600, Rob Clark wrote:
-> Driver for the NXP TDA998X i2c hdmi encoder slave.
+On Thu, 2013-01-24 at 01:27 -0500, Nicolas Pitre wrote:
+> From: Jon Medhurst <tixy@linaro.org>
 > 
-> v1: original
-> v2: fix npix/nline programming
-> 
-> Signed-off-by: Rob Clark <robdclark@gmail.com>
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> ---
 
-Just one bikeshed, otherwise
+Should this patch be split into two. One to introduce the new smp_init
+hook, and one to make vexpress use it? With descriptions like:
 
-Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+-----------------------------------------------------------------------
+ARM: kernel: Enable selection of SMP operations at boot time
 
-[cut]
+Add a new 'smp_init' hook to machine_desc so platforms can specify a
+function to be used to setup smp ops instead of having a statically
+defined value.
+-----------------------------------------------------------------------
+ARM: vexpress: Select multi-cluster SMP operation if required
+-----------------------------------------------------------------------
 
-> +static void
-> +reg_set(struct drm_encoder *encoder, uint16_t reg, uint8_t val)
-> +{
-> +	reg_write(encoder, reg, reg_read(encoder, reg) | val);
-> +}
-> +
-> +static void
-> +reg_clear(struct drm_encoder *encoder, uint16_t reg, uint8_t val)
-> +{
-> +	reg_write(encoder, reg, reg_read(encoder, reg) & ~val);
-> +}
-
-What about drivers/base/regmap? I haven't looked to closely yet and never
-used it in code, but there's a presentation [1] and it sounds like it
-provides some nice (and more important standardized) helper stuff for
-debug, tracing, ...
-
-Since encoder slave drivers tend to be utterly boring register bashing and
-we expect tons of time, I think high levels of standardization would be
-really useful. Care to look into this a bit?
-
-Cheers, Daniel
-
-1: http://free-electrons.com/blog/fosdem2012-videos/
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Tixy
+
+>  arch/arm/include/asm/mach/arch.h |  3 +++
+>  arch/arm/kernel/setup.c          |  5 ++++-
+>  arch/arm/mach-vexpress/core.h    |  2 ++
+>  arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
+>  arch/arm/mach-vexpress/v2m.c     |  2 +-
+>  5 files changed, 22 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 917d4fcfd9..3d01c6d6c3 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -17,8 +17,10 @@ struct pt_regs;
+>  struct smp_operations;
+>  #ifdef CONFIG_SMP
+>  #define smp_ops(ops) (&(ops))
+> +#define smp_init_ops(ops) (&(ops))
+>  #else
+>  #define smp_ops(ops) (struct smp_operations *)NULL
+> +#define smp_init_ops(ops) (void (*)(void))NULL
+>  #endif
+>  
+>  struct machine_desc {
+> @@ -42,6 +44,7 @@ struct machine_desc {
+>  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+>  	char			restart_mode;	/* default restart mode	*/
+>  	struct smp_operations	*smp;		/* SMP operations	*/
+> +	void			(*smp_init)(void);
+>  	void			(*fixup)(struct tag *, char **,
+>  					 struct meminfo *);
+>  	void			(*reserve)(void);/* reserve mem blocks	*/
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 3f6cbb2e3e..41edca8582 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
+>  	arm_dt_init_cpu_maps();
+>  #ifdef CONFIG_SMP
+>  	if (is_smp()) {
+> -		smp_set_ops(mdesc->smp);
+> +		if(mdesc->smp_init)
+> +			(*mdesc->smp_init)();
+> +		else
+> +			smp_set_ops(mdesc->smp);
+>  		smp_init_cpus();
+>  	}
+>  #endif
+> diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
+> index f134cd4a85..3a761fd76c 100644
+> --- a/arch/arm/mach-vexpress/core.h
+> +++ b/arch/arm/mach-vexpress/core.h
+> @@ -6,6 +6,8 @@
+>  
+>  void vexpress_dt_smp_map_io(void);
+>  
+> +void vexpress_smp_init_ops(void);
+> +
+>  extern struct smp_operations	vexpress_smp_ops;
+>  
+>  extern void vexpress_cpu_die(unsigned int cpu);
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index c5d70de9bb..e62a08b561 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/smp.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/vexpress.h>
+>  
+> @@ -206,3 +207,14 @@ struct smp_operations __initdata vexpress_smp_ops = {
+>  	.cpu_die		= vexpress_cpu_die,
+>  #endif
+>  };
+> +
+> +void __init vexpress_smp_init_ops(void)
+> +{
+> +	struct smp_operations *ops = &vexpress_smp_ops;
+> +#ifdef CONFIG_BIG_LITTLE
+> +	extern struct smp_operations bL_smp_ops;
+> +	if(of_find_compatible_node(NULL, NULL, "arm,cci"))
+> +		ops = &bL_smp_ops;
+> +#endif
+> +	smp_set_ops(ops);
+> +}
+> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> index 011661a6c5..34172bd504 100644
+> --- a/arch/arm/mach-vexpress/v2m.c
+> +++ b/arch/arm/mach-vexpress/v2m.c
+> @@ -494,7 +494,7 @@ static const char * const v2m_dt_match[] __initconst = {
+>  
+>  DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
+>  	.dt_compat	= v2m_dt_match,
+> -	.smp		= smp_ops(vexpress_smp_ops),
+> +	.smp_init	= smp_init_ops(vexpress_smp_init_ops),
+>  	.map_io		= v2m_dt_map_io,
+>  	.init_early	= v2m_dt_init_early,
+>  	.init_irq	= v2m_dt_init_irq,
