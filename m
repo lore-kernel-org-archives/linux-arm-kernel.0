@@ -1,80 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Jan 2013 16:12:11 +0000
-Subject: OMAP4 randconfig failure: Zynq
-In-Reply-To: <20130124160609.GW23505@n2100.arm.linux.org.uk>
-References: <20130124111117.GU23505@n2100.arm.linux.org.uk>
- <20130124155704.GJ11970@beefymiracle.amer.corp.natinst.com>
- <20130124160609.GW23505@n2100.arm.linux.org.uk>
-Message-ID: <20130124161211.GX23505@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 24 Jan 2013 11:13:49 -0500
+Subject: [RFC PATCH 6/6] ARM: kirkwood: consolidate mv643xx_eth init for DT
+In-Reply-To: <201301241554.28003.arnd@arndb.de>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <51013933.9020601@openwrt.org>
+ <20130124143736.GZ1758@titan.lakedaemon.net>
+ <201301241554.28003.arnd@arndb.de>
+Message-ID: <20130124161349.GC1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 04:06:09PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 24, 2013 at 09:57:04AM -0600, Josh Cartwright wrote:
-> > On Thu, Jan 24, 2013 at 11:11:17AM +0000, Russell King - ARM Linux wrote:
-> > > The OMAP4 randconfig build last night failed with this error:
-> > > 
-> > > arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
-> > > 
-> > > Full details at the usual place - 
-> > > http://www.arm.linux.org.uk/developer/build/
+On Thu, Jan 24, 2013 at 03:54:27PM +0000, Arnd Bergmann wrote:
+> On Thursday 24 January 2013, Jason Cooper wrote:
+> > I agree, however, there is a long history with that patch.  That driver
+> > has been in use by powerpc for many years.  We need to be mindful not to
+> > break existing installations.  I don't think it'll be ready in time for
+> > v3.9.  So, I'd like to do the cleanup now.
 > > 
-> > Curious.  This doesn't look like a valid config to me.
+> > > [1]: http://patchwork.ozlabs.org/patch/175652/
 > 
-> I think you're wrong.
-> 
-> > In particular, both ARCH_MULTIPLATFORM and ARCH_OMAP are selected, even
-> > though those selections should be mutually exclusive, since they fall
-> > under the same:
-> > 
-> >     choice
-> >     	prompt "ARM system type"
-> >     	default ARCH_MULTIPLATFORM
-> > 
-> > Perhaps it's because CONFIG_ARCH_OMAP=y was setup in the seed?
-> 
-> ARCH_OMAP2PLUS selects ARCH_OMAP, and ARCH_OMAP2PLUS must be enabled
-> to produce a configuration including any OMAP code.
-> 
-> > oldconfig seems to complain, too:
-> > 
-> >       .config:340:warning: override: ARCH_OMAP changes choice state
-> 
-> Err, nope, don't get that warning.
-> 
-> $ mkdir /tmp/build
-> $ wget -O /tmp/build/.config 'http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=3562'
-> $ emake -j2 O=/tmp/build/ oldconfig
->   GEN     /tmp/build/Makefile
->   HOSTCC  scripts/basic/fixdep
->   HOSTCC  scripts/kconfig/conf.o
->   SHIPPED scripts/kconfig/zconf.tab.c
->   SHIPPED scripts/kconfig/zconf.lex.c
->   SHIPPED scripts/kconfig/zconf.hash.c
->   HOSTCC  scripts/kconfig/zconf.tab.o
->   HOSTLD  scripts/kconfig/conf
-> scripts/kconfig/conf --oldconfig Kconfig
-> #
-> # configuration written to .config
-> #
-> 
-> So, the config system produced this configuration, and the config system
-> believes it to be correct.  The problem lies elsewhere.
-> 
-> Clearly from the error, for a configuration for an OMAP platform to be
-> errored out by a Zynq error, that means there's something that Zynq is
-> missing.
+> I actually think we can take that patch.
 
-And what's missing is _specific_ to Zynq.  Let's look at the error again:
+Woot!
 
-arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init' undeclared here (not in a function)
+> The result of the discussion back then was after all that we won't try
+> to keep the bindings compatible, and the powerpc version just uses the
+> platform_device part of the driver by fabricating platform_data from
+> the arch code.
+> 
+> It should not have any impact on this, as long as you ensure that the
+> platform_data is still supported.
 
-What it means is that the "irqchip_init" identifier was not declared by
-anything before it has been used.  That means arch/arm/mach-zynq/common.c
-is missing a required #include statement.
+Ian's patch appears to do so.  I'll respin this series using it vice my
+lookup table.
 
-irqchip_init can be found in linux/irqchip.h.  Does arch/arm/mach-zynq/common.c
-include this required include?  No.  Therefore, the build fails with the
-above error.
+thx,
 
-You need to add this include file...
+Jason.
