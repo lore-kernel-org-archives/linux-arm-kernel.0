@@ -1,57 +1,66 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 24 Jan 2013 11:29:15 +0000
-Subject: [PATCH v2 1/2] clk: divider: prepare for minimum divider
-In-Reply-To: <20130123214053.9205.49804@quantum>
-References: <6dc1c48cac5b2646a55da3079afb72f88e40c3bc.1358937138.git.afzal@ti.com>
- <20130123214053.9205.49804@quantum>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA92ABC@DBDE01.ent.ti.com>
+From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
+Date: Thu, 24 Jan 2013 17:05:24 +0530
+Subject: [PATCH 2/6] ARM: davinci: da850: add DT node for I2C0
+Message-ID: <1359027324-14534-1-git-send-email-manishv.b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Add I2C0 device tree node information to da850-evm.
+Also, add I2C0 pin muxing information in da850-evm.
 
-On Thu, Jan 24, 2013 at 03:10:53, Mike Turquette wrote:
-> Quoting Afzal Mohammed (2013-01-23 03:38:52)
+Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+---
+Depends on patch 
+http://comments.gmane.org/gmane.linux.davinci/25993
 
-> > Some of clocks can have a limit on minimum divider value that can be
-> > programmed, prepare for such a support.
+ arch/arm/boot/dts/da850-evm.dts |   15 +++++++++++++++
+ arch/arm/boot/dts/da850.dtsi    |   10 ++++++++++
+ 2 files changed, 25 insertions(+), 0 deletions(-)
 
-> > Add a new field min_div for the basic divider clock and a new dynamic
-> > clock divider registration function where minimum divider value can
-> > be specified. Keep behaviour of existing divider clock registration
-> > functions, static initialization helpers as was earlier.
-
-> My first question is whether the minimum divider you plan to use is an
-> actual constraint of the hardware (e.g. the clock controller ip only
-> lets program two bits which divide by 4, 5, 6 or 7, where 4 is the
-> minimum divider) or if this is a functional constraint (e.g. the clock
-> hardware can divide by a lower value, but you never want that since it
-> results in non-functional video/audio/whatever).  If this is more of a
-> functional constraint then perhaps a new api like clk_set_min_rate makes
-> more sense.
-
-It is a functional constraint: divider has 8 bits and it can have
-all possible values (0 to 255) and divider value corresponds to
-value set in the 8 bits. But depending on the modes the minimum
-value that can be configured (to get display working) varies.
-Eg. For raster mode (which the driver is presently supporting), it
-can take a minimum value of 2, while in LIDD (LCD interface display
-driver) mode it can take a min value of 1.
-
-Here min rate is not a constraint w.r.t divider in LCDC IP, but
-rather min divider.
-
-As it is the case, you prefer a clk_divider_set_min_div()?
-
-> 
-> Secondly, have you looked into using the rate-table option provided by
-> the basic divider clock?  Can you explain how this is not a good fit for
-> your needs?  Perhaps there are too many divisor values so the table
-> would be large?
-
-Divider values can range from 2-255 (254 possible values), so I believe
-it is not a suitable candidate here (also divider to values have 1-to-1
-mapping)
-
-Regards
-Afzal
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 8cac9d2..3d8290a 100755
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -27,5 +27,20 @@
+ 		serial2: serial at 1d0d000 {
+ 			status = "okay";
+ 		};
++		i2c0 at 1c22000 {
++			status = "okay";
++		};
++	};
++};
++&pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&i2c0_pins
++	>;
++
++	i2c0_pins: pinmux_i2c0_pins{
++		pinctrl-single,bits = <
++			0x10 0x00002200 0x0000ff00	/* I2C0_SDA,I2C0_SCL */
++		>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 1e6d090..f5ee811 100755
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -66,5 +66,15 @@
+ 			interrupt-parent = <&intc>;
+ 			status = "disabled";
+ 		};
++		i2c0 at 1c22000 {
++			compatible = "ti,davinci-i2c";
++			reg = <0x22000 0x1000>;
++			clock-frequency = <100000>;
++			interrupts = <15>;
++			interrupt-parent = <&intc>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
+ 	};
+ };
+-- 
+1.7.4.1
