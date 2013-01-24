@@ -1,85 +1,103 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 23 Jan 2013 22:04:55 -0700
-Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex
- A9
-In-Reply-To: <50FFA620.50008@ti.com>
-References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
- <1358833924-24535-2-git-send-email-hdoyu@nvidia.com> <50FE2CA8.20100@ti.com>
- <50FEC503.2080602@wwwdotorg.org>
- <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
- <50FFA620.50008@ti.com>
-Message-ID: <5100C0F7.9080101@wwwdotorg.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 24 Jan 2013 10:42:05 +0530
+Subject: [PATCH v5 00/14] DMA Engine support for AM33XX
+In-Reply-To: <20130123204917.GA5256@beef>
+References: <1358281974-8411-1-git-send-email-mporter@ti.com>
+ <50FFC48B.80902@ti.com> <20130123204917.GA5256@beef>
+Message-ID: <5100C2A5.7040702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2013 01:58 AM, Santosh Shilimkar wrote:
-> On Tuesday 22 January 2013 10:34 PM, Olof Johansson wrote:
->> On Tue, Jan 22, 2013 at 8:57 AM, Stephen Warren
->> <swarren@wwwdotorg.org> wrote:
->>> On 01/21/2013 11:07 PM, Santosh Shilimkar wrote:
->>>> On Tuesday 22 January 2013 11:22 AM, Hiroshi Doyu wrote:
->>>>> Skip scu_enable(scu_base) if CPU is not Cortex A9 with SCU.
->>>>>
->>>>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->>>>> ---
->>>> Looks fine. I will also update OMAP code with the new
->>>> interface. Thanks.
->>>
->>> OK, so patch 1/2 at least needs to get into a stable arm-soc branch
->>> then. Unless there are violent objections, I'll forward patch 1/2 to
->>> arm-soc and request it be added into a branch so that Tegra and OMAP can
->>> both merge it into their branches as a dependency. I guess patch 2/2
->>> could also be included; I don't think it has any complex dependencies
->>> that'd prevent that, and would help to show how patch 1/2 gets used.
->>>
->>> Hiroshi, is this series the only dependency you need for your Tegra114
->>> series? So, I could merge your Tegra114 series once this series is
->>> applied?
+On Thursday 24 January 2013 02:19 AM, Matt Porter wrote:
+> On Wed, Jan 23, 2013 at 04:37:55PM +0530, Santosh Shilimkar wrote:
+>> Matt,
 >>
->> For something like this, it might make more sense for us to just apply
->> the patches for OMAP on top, i.e. we'll pull the short branch from
->> you, and then we can just apply patches (with maintainer acks) on top,
->> instead of doing a bunch of single-patch pulls.
+>> On Wednesday 16 January 2013 02:02 AM, Matt Porter wrote:
+>>
+>> [..]
+>>
+>>> This series adds DMA Engine support for AM33xx, which uses
+>>> an EDMA DMAC. The EDMA DMAC has been previously supported by only
+>>> a private API implementation (much like the situation with OMAP
+>>> DMA) found on the DaVinci family of SoCs.
+>>>
+>>> The series applies on top of 3.8-rc3 and the following patches:
+>>>
+>>> 	- TPS65910 REGMAP_IRQ build fix:
+>>> 	  https://patchwork.kernel.org/patch/1857701/
+>>> 	- dmaengine DT support from Vinod's dmaengine_dt branch in
+>>> 	  git://git.infradead.org/users/vkoul/slave-dma.git since
+>>> 	  027478851791df751176398be02a3b1c5f6aa824
+>>> 	- edma dmaengine driver fix:
+>>> 	  https://patchwork.kernel.org/patch/1961521/
+>>> 	- dmaengine dma_get_channel_caps v2:
+>>> 	  https://patchwork.kernel.org/patch/1961601/
+>>> 	- dmaengine edma driver channel caps support v2:
+>>> 	  https://patchwork.kernel.org/patch/1961591/
+>>>
+>>> The approach taken is similar to how OMAP DMA is being converted to
+>>> DMA Engine support. With the functional EDMA private API already
+>>> existing in mach-davinci/dma.c, we first move that to an ARM common
+>>> area so it can be shared. Adding DT and runtime PM support to the
+>>> private EDMA API implementation allows it to run on AM33xx. AM33xx
+>>> *only* boots using DT so we leverage Jon's generic DT DMA helpers to
+>>> register EDMA DMAC with the of_dma framework and then add support
+>>> for calling the dma_request_slave_channel() API to both the mmc
+>>> and spi drivers.
+>>>
+>>> With this series both BeagleBone and the AM335x EVM have working
+>>> MMC and SPI support.
+>>>
+>>> This is tested on BeagleBone with a SPI framebuffer driver and MMC
+>>> rootfs. A trivial gpio DMA event misc driver was used to test the
+>>> crossbar DMA event support. It is also tested on the AM335x EVM
+>>> with the onboard SPI flash and MMC rootfs. The branch at
+>>> https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-v4
+>>> has the complete series, dependencies, and some test
+>>> drivers/defconfigs.
+>>>
+>>> Regression testing was done on AM180x-EVM (which also makes use
+>>> of the EDMA dmaengine driver and the EDMA private API) using SD,
+>>> SPI flash, and the onboard audio supported by the ASoC Davinci
+>>> driver. Regression testing was also done on a BeagleBoard xM
+>>> booting from the legacy board file using MMC rootfs.
+>>>
+>>> Matt Porter (14):
+>>>    ARM: davinci: move private EDMA API to arm/common
+>>>    ARM: edma: remove unused transfer controller handlers
+>>>    ARM: edma: add AM33XX support to the private EDMA API
+>>>    dmaengine: edma: enable build for AM33XX
+>>>    dmaengine: edma: Add TI EDMA device tree binding
+>>>    ARM: dts: add AM33XX EDMA support
+>>>    dmaengine: add dma_request_slave_channel_compat()
+>>>    mmc: omap_hsmmc: convert to dma_request_slave_channel_compat()
+>>>    mmc: omap_hsmmc: set max_segs based on dma engine limitations
+>>>    mmc: omap_hsmmc: add generic DMA request support to the DT binding
+>>>    ARM: dts: add AM33XX MMC support
+>>>    spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
+>>>    spi: omap2-mcspi: add generic DMA request support to the DT binding
+>>>    ARM: dts: add AM33XX SPI DMA support
+>>>
+>> While going through the series and testing it out, I observed an issue
+>> with MMC driver. You need patch in the end of the email to avoid the
+>> issue. Same is attached in case mailer damages it. Can you please
+>> add it with your series if you agree ?
 >
-> In case you decide to apply patches, you can use patch in the end
-> of the email for OMAP. Attached the same in case mailer damages it.
-> 
-> Btw, I noticed the build error with patch 1/1. Since I wasn't using
-> the first interface in OMAP code, I just bypassed it for testing.
-> I might be missing some dependent patch which added
-> read_cpuid_part_number().
+> Yes, by inspection this makes sense. As you noticed, we've been relying
+> on the fact that DMA resources still don't come from DT, we only use our
+> DT data in conjunction with the DMA OF helpers to do channel filtering.
+> I was figuring we would address that separately later, but I see how
+> even omap4 has this issue with DMA resources named with "tx1", for
+> example. A good followup once this series is taken will be to only
+> use hwmod resources on a !populated-dt platform like we do for other
+> resources now. Baby steps. :)
+>
+We are already on it :-)
 
-Thanks for the OMAP patch. I have pushed a couple of temporary and
-non-stable branches to:
+> Thanks for the catch, I'll add this in with your tested line as well for
+> the series.
+>
+Thanks.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
-
-Branch scu-base-rework contains just the SCU base address patches. After
-the few things listed below, I'll rename this branch and send a pull
-request to arm-soc.
-
-1) Olof asked that Russell Ack or otherwise OK Hiroshi's latest versions
-of the following two patches since he commented on previous versions:
-
-ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
-ARM: Add API to detect SCU base address from CP15
-
-2) Lorenzo's last comment on "ARM: tegra: Use DT /cpu node to detect
-number of CPU core" was:
-
-Please add missing punctuation, reword the commit log to make it clearer.
-
-... so that patch needs a reworded commit log.
-
-3) This branch needs testing on both Tegra30 and OMAP (I'm away from the
-office at the moment and can only test on Tegra20 here),
-
-Branch test-test-hdoyu-t114 contains the most recent version of the
-Tegra114 series from Hiroshi, mainly for my local testing etc. Hiroshi
-said he will repost an updated version based on the latest Tegra common
-clock framework changes. For the record, what I plan to do when applying
-this is:
-
-1) Merge the renamed tmp/scu-base-rework into Tegra's for-3.9/soc.
-
-2) Apply the new posting of the Tegra114 patch series.
+Regards,
+Santosh
