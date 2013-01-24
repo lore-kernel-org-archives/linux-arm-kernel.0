@@ -1,54 +1,210 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Thu, 24 Jan 2013 09:12:19 +0100
-Subject: OHCI on Samsung S3C6410 SoC, how to get it work?
-Message-ID: <201301240912.19490.jbe@pengutronix.de>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Thu, 24 Jan 2013 15:58:29 +0800
+Subject: [PATCH v2 1/1 net-next] net: fec: add napi support to improve
+ proformance
+Message-ID: <1359014309-8636-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi list,
+Add napi support
 
-I'm trying to get the OHCI unit work on my S3C6410 SoC based Mini6410 but
-without luck yet.
+Before this patch
 
-The driver in my Linux-3.7.4 always reports:
+ iperf -s -i 1
+ ------------------------------------------------------------
+ Server listening on TCP port 5001
+ TCP window size: 85.3 KByte (default)
+ ------------------------------------------------------------
+ [  4] local 10.192.242.153 port 5001 connected with 10.192.242.138 port 50004
+ [ ID] Interval       Transfer     Bandwidth
+ [  4]  0.0- 1.0 sec  41.2 MBytes   345 Mbits/sec
+ [  4]  1.0- 2.0 sec  43.7 MBytes   367 Mbits/sec
+ [  4]  2.0- 3.0 sec  42.8 MBytes   359 Mbits/sec
+ [  4]  3.0- 4.0 sec  43.7 MBytes   367 Mbits/sec
+ [  4]  4.0- 5.0 sec  42.7 MBytes   359 Mbits/sec
+ [  4]  5.0- 6.0 sec  43.8 MBytes   367 Mbits/sec
+ [  4]  6.0- 7.0 sec  43.0 MBytes   361 Mbits/sec
 
-[...]
-ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-ohci_hcd: block sizes: ed 64 td 64
-s3c2410-ohci s3c2410-ohci: s3c2410_start_hc:
-s3c2410-ohci s3c2410-ohci: S3C24XX OHCI
-s3c2410-ohci s3c2410-ohci: new USB bus registered, assigned bus number 1
-s3c2410-ohci s3c2410-ohci: irq 79, io mem 0x74300000
-s3c2410-ohci s3c2410-ohci: created debug files
-s3c2410-ohci s3c2410-ohci: fminterval delta -11999
-s3c2410-ohci s3c2410-ohci: enabling initreset quirk
-s3c2410-ohci s3c2410-ohci: init err (00000000 0000)
-s3c2410-ohci s3c2410-ohci: can't start s3c24xx
-s3c2410-ohci s3c2410-ohci: OHCI controller state
-s3c2410-ohci s3c2410-ohci: OHCI 0.0, NO legacy support registers, rh state halted
-s3c2410-ohci s3c2410-ohci: control 0x000 HCFS=reset CBSR=0
-s3c2410-ohci s3c2410-ohci: cmdstatus 0x00000 SOC=0
-s3c2410-ohci s3c2410-ohci: intrstatus 0x00000000
-s3c2410-ohci s3c2410-ohci: intrenable 0x00000000
-s3c2410-ohci s3c2410-ohci: hcca frame #0000
-s3c2410-ohci s3c2410-ohci: roothub.a 00000000 POTPGT=0 NDP=0(0)
-s3c2410-ohci s3c2410-ohci: roothub.b 00000000 PPCM=0000 DR=0000
-s3c2410-ohci s3c2410-ohci: roothub.status 00000000
-s3c2410-ohci s3c2410-ohci: startup error -75
-s3c2410-ohci s3c2410-ohci: USB bus 1 deregistered
-s3c2410-ohci s3c2410-ohci: s3c2410_stop_hc:
-s3c2410-ohci: probe of s3c2410-ohci failed with error -75
-[...]
+After this patch
+ [  4]  2.0- 3.0 sec  51.6 MBytes   433 Mbits/sec
+ [  4]  3.0- 4.0 sec  51.8 MBytes   435 Mbits/sec
+ [  4]  4.0- 5.0 sec  52.2 MBytes   438 Mbits/sec
+ [  4]  5.0- 6.0 sec  52.1 MBytes   437 Mbits/sec
+ [  4]  6.0- 7.0 sec  52.1 MBytes   437 Mbits/sec
+ [  4]  7.0- 8.0 sec  52.3 MBytes   439 Mbits/sec
 
->From the error messages I guess the unit does not receive a clock. But as far
-I can follow the code, the driver enables the correct clocks. From the data
-sheet I know the OHCI unit shares the clock with the OTG unit. Has someone a
-working OHCI on an S3C6410 SoC based system and can give me some hints how to
-get it work on my Mini6410?
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Fugang Duan <B38611@freescale.com>
+---
+Change from v1 to v2
+ * Remove use_napi and napi_weight config. Support NAPI only.
+ * using napi_gro_receive replace netif_rx
 
-Regards,
-Juergen
+ drivers/net/ethernet/freescale/fec.c |   56 +++++++++++++++++++++++++++++-----
+ drivers/net/ethernet/freescale/fec.h |    2 +
+ 2 files changed, 50 insertions(+), 8 deletions(-)
 
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index f52ba33..39be2ab 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -67,6 +67,7 @@
+ #endif
+ 
+ #define DRIVER_NAME	"fec"
++#define FEC_NAPI_WEIGHT	64
+ 
+ /* Pause frame feild and FIFO threshold */
+ #define FEC_ENET_FCE	(1 << 5)
+@@ -565,6 +566,20 @@ fec_timeout(struct net_device *ndev)
+ }
+ 
+ static void
++fec_enet_rx_int_is_enabled(struct net_device *ndev, bool enabled)
++{
++	struct fec_enet_private *fep = netdev_priv(ndev);
++	uint    int_events;
++
++	int_events = readl(fep->hwp + FEC_IMASK);
++	if (enabled)
++		int_events |= FEC_ENET_RXF;
++	else
++		int_events &= ~FEC_ENET_RXF;
++	writel(int_events, fep->hwp + FEC_IMASK);
++}
++
++static void
+ fec_enet_tx(struct net_device *ndev)
+ {
+ 	struct	fec_enet_private *fep;
+@@ -656,8 +671,8 @@ fec_enet_tx(struct net_device *ndev)
+  * not been given to the system, we just set the empty indicator,
+  * effectively tossing the packet.
+  */
+-static void
+-fec_enet_rx(struct net_device *ndev)
++static int
++fec_enet_rx(struct net_device *ndev, int budget)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+ 	const struct platform_device_id *id_entry =
+@@ -667,13 +682,12 @@ fec_enet_rx(struct net_device *ndev)
+ 	struct	sk_buff	*skb;
+ 	ushort	pkt_len;
+ 	__u8 *data;
++	int	pkt_received = 0;
+ 
+ #ifdef CONFIG_M532x
+ 	flush_cache_all();
+ #endif
+ 
+-	spin_lock(&fep->hw_lock);
+-
+ 	/* First, grab all of the stats for the incoming packet.
+ 	 * These get messed up if we get called due to a busy condition.
+ 	 */
+@@ -681,6 +695,10 @@ fec_enet_rx(struct net_device *ndev)
+ 
+ 	while (!((status = bdp->cbd_sc) & BD_ENET_RX_EMPTY)) {
+ 
++		if (pkt_received >= budget)
++			break;
++		pkt_received++;
++
+ 		/* Since we have allocated space to hold a complete frame,
+ 		 * the last indicator should be set.
+ 		 */
+@@ -762,7 +780,7 @@ fec_enet_rx(struct net_device *ndev)
+ 			}
+ 
+ 			if (!skb_defer_rx_timestamp(skb))
+-				netif_rx(skb);
++				napi_gro_receive(&fep->napi, skb);
+ 		}
+ 
+ 		bdp->cbd_bufaddr = dma_map_single(&fep->pdev->dev, data,
+@@ -796,7 +814,7 @@ rx_processing_done:
+ 	}
+ 	fep->cur_rx = bdp;
+ 
+-	spin_unlock(&fep->hw_lock);
++	return pkt_received;
+ }
+ 
+ static irqreturn_t
+@@ -805,6 +823,7 @@ fec_enet_interrupt(int irq, void *dev_id)
+ 	struct net_device *ndev = dev_id;
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+ 	uint int_events;
++	ulong flags;
+ 	irqreturn_t ret = IRQ_NONE;
+ 
+ 	do {
+@@ -813,7 +832,14 @@ fec_enet_interrupt(int irq, void *dev_id)
+ 
+ 		if (int_events & FEC_ENET_RXF) {
+ 			ret = IRQ_HANDLED;
+-			fec_enet_rx(ndev);
++
++			spin_lock_irqsave(&fep->hw_lock, flags);
++			/* Disable the RX interrupt */
++			if (napi_schedule_prep(&fep->napi)) {
++				fec_enet_rx_int_is_enabled(ndev, false);
++				__napi_schedule(&fep->napi);
++			}
++			spin_unlock_irqrestore(&fep->hw_lock, flags);
+ 		}
+ 
+ 		/* Transmit OK, or non-fatal error. Update the buffer
+@@ -834,7 +860,16 @@ fec_enet_interrupt(int irq, void *dev_id)
+ 	return ret;
+ }
+ 
+-
++static int fec_enet_rx_napi(struct napi_struct *napi, int budget)
++{
++	struct net_device *ndev = napi->dev;
++	int pkgs = fec_enet_rx(ndev, budget);
++	if (pkgs < budget) {
++		napi_complete(napi);
++		fec_enet_rx_int_is_enabled(ndev, true);
++	}
++	return pkgs;
++}
+ 
+ /* ------------------------------------------------------------------------- */
+ static void fec_get_mac(struct net_device *ndev)
+@@ -1392,6 +1427,8 @@ fec_enet_open(struct net_device *ndev)
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+ 	int ret;
+ 
++	napi_enable(&fep->napi);
++
+ 	/* I should reset the ring buffers here, but I don't yet know
+ 	 * a simple way to do that.
+ 	 */
+@@ -1604,6 +1641,9 @@ static int fec_enet_init(struct net_device *ndev)
+ 	ndev->netdev_ops = &fec_netdev_ops;
+ 	ndev->ethtool_ops = &fec_enet_ethtool_ops;
+ 
++	fec_enet_rx_int_is_enabled(ndev, false);
++	netif_napi_add(ndev, &fep->napi, fec_enet_rx_napi, FEC_NAPI_WEIGHT);
++
+ 	/* Initialize the receive buffer descriptors. */
+ 	bdp = fep->rx_bd_base;
+ 	for (i = 0; i < RX_RING_SIZE; i++) {
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index 2ebedaf..01579b8 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -249,6 +249,8 @@ struct fec_enet_private {
+ 	int	bufdesc_ex;
+ 	int	pause_flag;
+ 
++	struct	napi_struct napi;
++
+ 	struct ptp_clock *ptp_clock;
+ 	struct ptp_clock_info ptp_caps;
+ 	unsigned long last_overflow_check;
 -- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
+1.7.1
