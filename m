@@ -1,90 +1,117 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Thu, 24 Jan 2013 01:38:38 -0500
-Subject: [V5 PATCH 14/26] arm: brownstone: add usb support for the board
+Date: Thu, 24 Jan 2013 01:38:34 -0500
+Subject: [V5 PATCH 10/26] usb: ehci: ehci-mv: use PHY driver for ehci
 In-Reply-To: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
 References: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1359009530-28182-15-git-send-email-chao.xie@marvell.com>
+Message-ID: <1359009530-28182-11-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for brownstone board, add the udc/otg/ehci support
+Originaly, ehci driver will call the callbacks in platform data
+for PHY initialization and shut down.
+With PHY driver, it will call the APIs provided by PHY driver
+for PHY initialization and shut down. It removes the callbacks
+in platform data, and at same time it removes one block in the
+way of enabling device tree for ehci driver.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- arch/arm/mach-mmp/brownstone.c |   47 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 47 insertions(+), 0 deletions(-)
+ drivers/usb/host/ehci-mv.c |   37 +++++++++++++------------------------
+ 1 files changed, 13 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-index 5cb769c..90c0340 100644
---- a/arch/arm/mach-mmp/brownstone.c
-+++ b/arch/arm/mach-mmp/brownstone.c
-@@ -18,6 +18,7 @@
- #include <linux/regulator/max8649.h>
- #include <linux/regulator/fixed.h>
- #include <linux/mfd/max8925.h>
-+#include <linux/platform_data/mv_usb.h>
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index 3065809..be504fd 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -15,17 +15,18 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/usb/otg.h>
++#include <linux/usb/mv_usb2.h>
+ #include <linux/platform_data/mv_usb.h>
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -195,6 +196,31 @@ static struct sram_platdata mmp2_isram_platdata = {
- 	.granularity	= SRAM_GRANULARITY,
- };
+ #define CAPLENGTH_MASK         (0xff)
  
-+#ifdef CONFIG_USB_SUPPORT
-+
-+static char *mmp2_usb_clock_name[] = {
-+	[0] = "usb_clk",
-+};
-+
-+static struct mv_usb_phy_platform_data brownstone_usb_phy_pdata = {
-+	.clknum		= 1,
-+	.clkname	= mmp2_usb_clock_name,
-+};
-+
-+#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
-+
-+static struct mv_usb_platform_data brownstone_usb_pdata = {
-+	.clknum		= 1,
-+	.clkname	= mmp2_usb_clock_name,
-+	.vbus		= NULL,
-+	.mode		= MV_USB_MODE_OTG,
-+	.otg_force_a_bus_req = 1,
-+	.set_vbus	= NULL,
-+};
-+#endif
-+#endif
-+
-+
- static void __init brownstone_init(void)
+ struct ehci_hcd_mv {
+ 	struct usb_hcd *hcd;
++	struct mv_usb2_phy *mvphy;
+ 
+ 	/* Which mode does this ehci running OTG/Host ? */
+ 	int mode;
+ 
+-	void __iomem *phy_regs;
+ 	void __iomem *cap_regs;
+ 	void __iomem *op_regs;
+ 
+@@ -59,8 +60,8 @@ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
+ 	int retval;
+ 
+ 	ehci_clock_enable(ehci_mv);
+-	if (ehci_mv->pdata->phy_init) {
+-		retval = ehci_mv->pdata->phy_init(ehci_mv->phy_regs);
++	if (ehci_mv->mvphy->init) {
++		retval = ehci_mv->mvphy->init(ehci_mv->mvphy);
+ 		if (retval)
+ 			return retval;
+ 	}
+@@ -70,8 +71,8 @@ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
+ 
+ static void mv_ehci_disable(struct ehci_hcd_mv *ehci_mv)
  {
- 	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
-@@ -211,6 +237,27 @@ static void __init brownstone_init(void)
- 
- 	/* enable 5v regulator */
- 	platform_device_register(&brownstone_v_5vp_device);
-+
-+#ifdef CONFIG_USB_SUPPORT
-+	pxa_register_device(&mmp2_device_u2ophy, &brownstone_usb_phy_pdata,
-+				sizeof(brownstone_usb_phy_pdata));
-+#endif
-+
-+#ifdef CONFIG_USB_MV_UDC
-+	pxa_register_device(&mmp2_device_u2o, &brownstone_usb_pdata,
-+				sizeof(brownstone_usb_pdata));
-+#endif
-+
-+#ifdef CONFIG_USB_EHCI_MV_U2O
-+	pxa_register_device(&mmp2_device_u2oehci, &brownstone_usb_pdata,
-+				sizeof(brownstone_usb_pdata));
-+#endif
-+
-+#ifdef CONFIG_USB_MV_OTG
-+	pxa_register_device(&mmp2_device_u2ootg, &brownstone_usb_pdata,
-+				sizeof(brownstone_usb_pdata));
-+#endif
-+
+-	if (ehci_mv->pdata->phy_deinit)
+-		ehci_mv->pdata->phy_deinit(ehci_mv->phy_regs);
++	if (ehci_mv->mvphy->shutdown)
++		ehci_mv->mvphy->shutdown(ehci_mv->mvphy);
+ 	ehci_clock_disable(ehci_mv);
  }
  
- MACHINE_START(BROWNSTONE, "Brownstone Development Platform")
+@@ -184,22 +185,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
+-		retval = -ENODEV;
+-		goto err_clear_drvdata;
+-	}
+-
+-	ehci_mv->phy_regs = devm_ioremap(&pdev->dev, r->start,
+-					 resource_size(r));
+-	if (ehci_mv->phy_regs == 0) {
+-		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
+-		retval = -EFAULT;
+-		goto err_clear_drvdata;
+-	}
+-
+-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "capregs");
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!r) {
+ 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+ 		retval = -ENODEV;
+@@ -214,6 +200,12 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		goto err_clear_drvdata;
+ 	}
+ 
++	ehci_mv->mvphy = mv_usb2_get_phy();
++	if (ehci_mv->mvphy == NULL) {
++		retval = -ENODEV;
++		goto err_clear_drvdata;
++	}
++
+ 	retval = mv_ehci_enable(ehci_mv);
+ 	if (retval) {
+ 		dev_err(&pdev->dev, "init phy error %d\n", retval);
+@@ -275,9 +267,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	if (pdata->private_init)
+-		pdata->private_init(ehci_mv->op_regs, ehci_mv->phy_regs);
+-
+ 	dev_info(&pdev->dev,
+ 		 "successful find EHCI device with regs 0x%p irq %d"
+ 		 " working in %s mode\n", hcd->regs, hcd->irq,
 -- 
 1.7.4.1
