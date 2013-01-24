@@ -1,35 +1,86 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 24 Jan 2013 11:22:51 +0530
-Subject: [GIT PULL for v3.8-rc] DaVinci media fixes for v3.8
-Message-ID: <CA+V-a8tndm7LJiCfQqPSa6iSxiJ1UmWL-tbxBWh9HiLvvDPwMA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 24 Jan 2013 11:26:27 +0530
+Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex
+ A9
+In-Reply-To: <5100C0F7.9080101@wwwdotorg.org>
+References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
+ <1358833924-24535-2-git-send-email-hdoyu@nvidia.com> <50FE2CA8.20100@ti.com>
+ <50FEC503.2080602@wwwdotorg.org>
+ <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
+ <50FFA620.50008@ti.com> <5100C0F7.9080101@wwwdotorg.org>
+Message-ID: <5100CD0B.4080504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+Stephen,
 
-Please pull the following patches which fixes display on DA850 EVM . To
-avoid conflicts I have included a arm patch, which has been Acked by
-its maintainer.
+On Thursday 24 January 2013 10:34 AM, Stephen Warren wrote:
+> On 01/23/2013 01:58 AM, Santosh Shilimkar wrote:
+>> On Tuesday 22 January 2013 10:34 PM, Olof Johansson wrote:
+>>> On Tue, Jan 22, 2013 at 8:57 AM, Stephen Warren
+>>> <swarren@wwwdotorg.org> wrote:
+>>>> On 01/21/2013 11:07 PM, Santosh Shilimkar wrote:
+>>>>> On Tuesday 22 January 2013 11:22 AM, Hiroshi Doyu wrote:
+>>>>>> Skip scu_enable(scu_base) if CPU is not Cortex A9 with SCU.
+>>>>>>
+>>>>>> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+>>>>>> ---
+>>>>> Looks fine. I will also update OMAP code with the new
+>>>>> interface. Thanks.
+>>>>
+>>>> OK, so patch 1/2 at least needs to get into a stable arm-soc branch
+>>>> then. Unless there are violent objections, I'll forward patch 1/2 to
+>>>> arm-soc and request it be added into a branch so that Tegra and OMAP can
+>>>> both merge it into their branches as a dependency. I guess patch 2/2
+>>>> could also be included; I don't think it has any complex dependencies
+>>>> that'd prevent that, and would help to show how patch 1/2 gets used.
+>>>>
+>>>> Hiroshi, is this series the only dependency you need for your Tegra114
+>>>> series? So, I could merge your Tegra114 series once this series is
+>>>> applied?
+>>>
+>>> For something like this, it might make more sense for us to just apply
+>>> the patches for OMAP on top, i.e. we'll pull the short branch from
+>>> you, and then we can just apply patches (with maintainer acks) on top,
+>>> instead of doing a bunch of single-patch pulls.
+>>
+>> In case you decide to apply patches, you can use patch in the end
+>> of the email for OMAP. Attached the same in case mailer damages it.
+>>
+>> Btw, I noticed the build error with patch 1/1. Since I wasn't using
+>> the first interface in OMAP code, I just bypassed it for testing.
+>> I might be missing some dependent patch which added
+>> read_cpuid_part_number().
+>
+> Thanks for the OMAP patch. I have pushed a couple of temporary and
+> non-stable branches to:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+>
+> Branch scu-base-rework contains just the SCU base address patches. After
+> the few things listed below, I'll rename this branch and send a pull
+> request to arm-soc.
+>
+> 1) Olof asked that Russell Ack or otherwise OK Hiroshi's latest versions
+> of the following two patches since he commented on previous versions:
+>
+> ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
+> ARM: Add API to detect SCU base address from CP15
+>
+> 2) Lorenzo's last comment on "ARM: tegra: Use DT /cpu node to detect
+> number of CPU core" was:
+>
+> Please add missing punctuation, reword the commit log to make it clearer.
+>
+> ... so that patch needs a reworded commit log.
+>
+> 3) This branch needs testing on both Tegra30 and OMAP (I'm away from the
+> office at the moment and can only test on Tegra20 here),
+>
+Tested 'scu-base-rework' branch on OMAP and it works just fine. I
+noticed that the OMAP patch subject got line wrapped. Can you
+please fix that before sending pull request ?
+Thanks for picking up the patch.
 
-Fixes :
-     - adv7343 encoder: fix configuring the encoder.
-     - da850: pass data for adv7343 encoder for required configuration.
-
-Thank you!
-Prabhakar
-
-The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
-
-  Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
-
-are available in the git repository at:
-  git://linuxtv.org/mhadli/v4l-dvb-davinci_devices.git davinci_media
-
-Lad, Prabhakar (2):
-      media: adv7343: accept configuration through platform data
-      ARM: davinci: da850 evm: pass platform data for adv7343 encoder
-
- arch/arm/mach-davinci/board-da850-evm.c |   13 ++++++++
- drivers/media/i2c/adv7343.c             |   36 ++++++++++++++++++---
- include/media/adv7343.h                 |   52 +++++++++++++++++++++++++++++++
- 3 files changed, 96 insertions(+), 5 deletions(-)
+Regards,
+Santosh
