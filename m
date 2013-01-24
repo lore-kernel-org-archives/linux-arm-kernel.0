@@ -1,242 +1,233 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Thu, 24 Jan 2013 01:38:42 -0500
-Subject: [V5 PATCH 18/26] usb: phy: mv_usb2_phy: add externel chip support
+Date: Thu, 24 Jan 2013 01:38:49 -0500
+Subject: [V5 PATCH 25/26] usb: otg: mv_otg: add device tree support
 In-Reply-To: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
 References: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1359009530-28182-19-git-send-email-chao.xie@marvell.com>
+Message-ID: <1359009530-28182-26-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the vbus and idpin detection. It may be completed by some
-external chip, for example the pmic chip 88pm860x in driver/mfd
-can do it.
-Although the usb controller can detect the vbus and id pin, but
-it need clock on and PHY enabled to detect the
-vbus/idpin. It will increase the power.
-Using the external chip to detect vbus/idpin can save the power.
+All blocks are removed. Add the device tree support for otg.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/phy/mv_usb2_phy.c        |   49 +++++++++++++++++++
- include/linux/platform_data/mv_usb.h |   15 ++----
- include/linux/usb/mv_usb2.h          |   85 ++++++++++++++++++++++++++++++++++
- 3 files changed, 139 insertions(+), 10 deletions(-)
+ drivers/usb/otg/mv_otg.c |  128 +++++++++++++++++++++++++++++++++++++--------
+ drivers/usb/otg/mv_otg.h |    6 +-
+ 2 files changed, 108 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/usb/phy/mv_usb2_phy.c b/drivers/usb/phy/mv_usb2_phy.c
-index c2bccae..78ddeff 100644
---- a/drivers/usb/phy/mv_usb2_phy.c
-+++ b/drivers/usb/phy/mv_usb2_phy.c
-@@ -136,6 +136,53 @@ struct mv_usb2_phy *mv_usb2_get_phy(void)
- }
- EXPORT_SYMBOL(mv_usb2_get_phy);
- 
-+int mv_usb2_register_notifier(struct mv_usb2_phy *phy,
-+		struct notifier_block *nb)
-+{
-+	int ret;
-+
-+	if (!phy)
-+		return -ENODEV;
-+
-+	ret = atomic_notifier_chain_register(&phy->extern_chip.head, nb);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(mv_usb2_register_notifier);
-+
-+int mv_usb2_unregister_notifier(struct mv_usb2_phy *phy,
-+		struct notifier_block *nb)
-+{
-+	int ret;
-+
-+	if (!phy)
-+		return -ENODEV;
-+
-+	ret = atomic_notifier_chain_unregister(&phy->extern_chip.head, nb);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(mv_usb2_unregister_notifier);
-+
-+int mv_usb2_notify(struct mv_usb2_phy *phy, unsigned long val, void *v)
-+{
-+	int ret;
-+
-+	if (!phy)
-+		return -ENODEV;
-+
-+	ret = atomic_notifier_call_chain(&phy->extern_chip.head, val, v);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(mv_usb2_notify);
-+
- static unsigned int u2o_get(void __iomem *base, unsigned int offset)
- {
- 	return readl(base + offset);
-@@ -414,6 +461,8 @@ static int usb_phy_probe(struct platform_device *pdev)
- 	mv_phy->init = usb_phy_init;
- 	mv_phy->shutdown = usb_phy_shutdown;
- 
-+	ATOMIC_INIT_NOTIFIER_HEAD(&mv_phy->extern_chip.head);
-+
- 	platform_set_drvdata(pdev, mv_phy);
- 
- 	the_phy = mv_phy;
-diff --git a/include/linux/platform_data/mv_usb.h b/include/linux/platform_data/mv_usb.h
-index fd3d1b4..dc25d60 100644
---- a/include/linux/platform_data/mv_usb.h
-+++ b/include/linux/platform_data/mv_usb.h
-@@ -28,16 +28,13 @@ enum {
- 	VBUS_HIGH	= 1 << 0,
- };
- 
--struct mv_usb_addon_irq {
--	unsigned int	irq;
--	int		(*poll)(void);
--};
--
-+#define MV_USB_HAS_VBUS_DETECTION	(1 << 0)
-+#define MV_USB_HAS_IDPIN_DETECTION	(1 << 1)
- struct mv_usb_platform_data {
- 	unsigned int		clknum;
- 	char			**clkname;
--	struct mv_usb_addon_irq	*id;	/* Only valid for OTG. ID pin change*/
--	struct mv_usb_addon_irq	*vbus;	/* valid for OTG/UDC. VBUS change*/
-+
-+	unsigned int		extern_attr;
- 
- 	/* only valid for HCD. OTG or Host only*/
- 	unsigned int		mode;
-@@ -45,9 +42,7 @@ struct mv_usb_platform_data {
- 	/* This flag is used for that needs id pin checked by otg */
- 	unsigned int    disable_otg_clock_gating:1;
- 	/* Force a_bus_req to be asserted */
--	 unsigned int    otg_force_a_bus_req:1;
--
--	int	(*set_vbus)(unsigned int vbus);
-+	unsigned int    otg_force_a_bus_req:1;
- };
- 
- struct mv_usb_phy_platform_data {
-diff --git a/include/linux/usb/mv_usb2.h b/include/linux/usb/mv_usb2.h
-index 9744a97..f76fa06 100644
---- a/include/linux/usb/mv_usb2.h
-+++ b/include/linux/usb/mv_usb2.h
-@@ -17,6 +17,33 @@
- 
+diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
+index 379df92..3aa7fdc 100644
+--- a/drivers/usb/otg/mv_otg.c
++++ b/drivers/usb/otg/mv_otg.c
+@@ -17,6 +17,7 @@
+ #include <linux/device.h>
+ #include <linux/proc_fs.h>
  #include <linux/clk.h>
++#include <linux/of.h>
+ #include <linux/workqueue.h>
+ #include <linux/platform_device.h>
  
-+enum {
-+	EVENT_VBUS,
-+	EVENT_ID,
-+};
-+
-+struct pxa_usb_vbus_ops {
-+	int (*get_vbus)(unsigned int *level);
-+	int (*set_vbus)(unsigned int level);
-+	int (*init)(void);
-+};
-+
-+struct pxa_usb_idpin_ops {
-+	int (*get_idpin)(unsigned int *level);
-+	int (*init)(void);
-+};
-+
-+struct pxa_usb_extern_ops {
-+	struct pxa_usb_vbus_ops		vbus;
-+	struct pxa_usb_idpin_ops	idpin;
-+};
-+
-+struct mv_usb2_extern_chip {
-+	unsigned int id;
-+	struct pxa_usb_extern_ops ops;
-+	struct atomic_notifier_head head;
-+};
-+
- struct mv_usb2_phy {
- 	struct platform_device	*pdev;
- 	struct mutex		phy_lock;
-@@ -26,6 +53,8 @@ struct mv_usb2_phy {
- 	struct clk		**clks;
- 	unsigned int		clks_num;
+@@ -333,7 +334,7 @@ static void mv_otg_update_inputs(struct mv_otg *mvotg)
+ 	else
+ 		otg_ctrl->id = !!(otgsc & OTGSC_STS_USB_ID);
  
-+	struct mv_usb2_extern_chip extern_chip;
-+
- 	int	(*init)(struct mv_usb2_phy *mv_phy);
- 	void	(*shutdown)(struct mv_usb2_phy *mv_phy);
- };
-@@ -34,10 +63,66 @@ struct mv_usb2_phy {
+-	if (mvotg->pdata->otg_force_a_bus_req && !otg_ctrl->id)
++	if (mvotg->otg_force_a_bus_req && !otg_ctrl->id)
+ 		otg_ctrl->a_bus_req = 1;
  
- extern struct mv_usb2_phy *mv_usb2_get_phy(void);
+ 	otg_ctrl->a_sess_vld = !!(otgsc & OTGSC_STS_A_SESSION_VALID);
+@@ -690,21 +691,69 @@ int mv_otg_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
-+#define mv_usb2_has_extern_call(phy, o, f, arg...)( \
-+{ \
-+	int ret;					\
-+	ret = (!phy ? 0 : ((phy->extern_chip.ops.o.f) ?	\
-+		1 : 0));				\
-+	ret;						\
-+} \
-+)
-+
-+#define mv_usb2_extern_call(phy, o, f, args...)( \
-+{ \
-+	int ret;						\
-+	ret = (!phy ? -ENODEV : ((phy->extern_chip.ops.o.f) ?	\
-+		phy->extern_chip.ops.o.f(args) : -ENOIOCTLCMD));\
-+	ret;							\
-+} \
-+)
-+
-+#define mv_usb2_set_extern_call(phy, o, f, p)( \
-+{ \
-+	int ret;							\
-+	ret = !phy ? -ENODEV : ((phy->extern_chip.ops.o.f) ?		\
-+		-EINVAL : ({phy->extern_chip.ops.o.f = p; 0; }));	\
-+	ret;								\
-+} \
-+)
-+
-+extern int mv_usb2_register_notifier(struct mv_usb2_phy *phy,
-+					struct notifier_block *nb);
-+extern int mv_usb2_unregister_notifier(struct mv_usb2_phy *phy,
-+					struct notifier_block *nb);
-+extern int mv_usb2_notify(struct mv_usb2_phy *phy, unsigned long val, void *v);
-+
- #else
- 
- struct mv_usb2_phy *mv_usb2_get_phy(void) { return NULL; }
- 
-+#define mv_usb2_has_extern_call(phy, o, f, arg...)(0)
-+
-+#define mv_usb2_extern_call(phy, o, f, args...)(0)
-+
-+#define mv_usb2_set_extern_call(phy, o, f, p)(0)
-+
-+int mv_usb2_register_notifier(struct mv_usb2_phy *phy,
-+					struct notifier_block *nb)
++static int mv_otg_parse_dt(struct platform_device *pdev,
++				struct mv_otg *mvotg)
 +{
-+	return -EINVAL;
-+}
++	struct device_node *np = pdev->dev.of_node;
++	unsigned int clks_num;
++	unsigned int val;
++	int i, ret;
++	const char *clk_name;
 +
-+int mv_usb2_unregister_notifier(struct mv_usb2_phy *phy,
-+					struct notifier_block *nb)
-+{
-+	return -EINVAL;
-+}
++	if (!np)
++		return 1;
 +
-+int mv_usb2_notify(struct mv_usb2_phy *phy, unsigned long val, void *v)
-+{
++	clks_num = of_property_count_strings(np, "clocks");
++	if (clks_num < 0)
++		return clks_num;
++
++	mvotg->clk = devm_kzalloc(&pdev->dev,
++		sizeof(struct clk *) * clks_num, GFP_KERNEL);
++	if (mvotg->clk == NULL)
++		return -ENOMEM;
++
++	for (i = 0; i < clks_num; i++) {
++		ret = of_property_read_string_index(np, "clocks", i,
++			&clk_name);
++		if (ret)
++			return ret;
++		mvotg->clk[i] = devm_clk_get(&pdev->dev, clk_name);
++		if (IS_ERR(mvotg->clk[i]))
++			return PTR_ERR(mvotg->clk[i]);
++	}
++
++	mvotg->clknum = clks_num;
++
++	ret = of_property_read_u32(np, "extern_attr", &mvotg->extern_attr);
++	if (ret)
++		return ret;
++
++	ret = of_property_read_u32(np, "mode", &mvotg->mode);
++	if (ret)
++		return ret;
++
++	ret = of_property_read_u32(np, "force_a_bus_req", &val);
++	if (ret)
++		return ret;
++	mvotg->otg_force_a_bus_req = !!val;
++
++	ret = of_property_read_u32(np, "disable_clock_gating", &val);
++	if (ret)
++		return ret;
++	mvotg->clock_gating = !val;
++
 +	return 0;
 +}
 +
+ static int mv_otg_probe(struct platform_device *pdev)
+ {
+-	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
+ 	struct mv_otg *mvotg;
+ 	struct usb_otg *otg;
+ 	struct resource *r;
+-	int retval = 0, clk_i, i;
++	int retval = 0, i;
+ 	size_t size;
+ 
+-	if (pdata == NULL) {
+-		dev_err(&pdev->dev, "failed to get platform data\n");
+-		return -ENODEV;
+-	}
+-
+-	size = sizeof(*mvotg) + sizeof(struct clk *) * pdata->clknum;
++	size = sizeof(*mvotg);
+ 	mvotg = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+ 	if (!mvotg) {
+ 		dev_err(&pdev->dev, "failed to allocate memory!\n");
+@@ -718,17 +767,45 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, mvotg);
+ 
+ 	mvotg->pdev = pdev;
+-	mvotg->extern_attr = pdata->extern_attr;
+-	mvotg->pdata = pdata;
+ 
+-	mvotg->clknum = pdata->clknum;
+-	for (clk_i = 0; clk_i < mvotg->clknum; clk_i++) {
+-		mvotg->clk[clk_i] = devm_clk_get(&pdev->dev,
++	retval = mv_otg_parse_dt(pdev, mvotg);
++	if (retval > 0) {
++		struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
++		/* no CONFIG_OF */
++		int clk_i = 0;
++
++		if (pdata == NULL) {
++			dev_err(&pdev->dev, "missing platform_data\n");
++			return -ENODEV;
++		}
++		mvotg->extern_attr = pdata->extern_attr;
++		mvotg->mode = pdata->mode;
++		mvotg->clknum = pdata->clknum;
++		mvotg->otg_force_a_bus_req = pdata->otg_force_a_bus_req;
++		if (pdata->disable_otg_clock_gating)
++			mvotg->clock_gating = 0;
++
++		size = sizeof(struct clk *) * mvotg->clknum;
++		mvotg->clk = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
++		if (mvotg->clk == NULL) {
++			dev_err(&pdev->dev,
++				"failed to allocate memory for clk\n");
++			return -ENOMEM;
++		}
++
++		for (clk_i = 0; clk_i < mvotg->clknum; clk_i++) {
++			mvotg->clk[clk_i] = devm_clk_get(&pdev->dev,
+ 						pdata->clkname[clk_i]);
+-		if (IS_ERR(mvotg->clk[clk_i])) {
+-			retval = PTR_ERR(mvotg->clk[clk_i]);
+-			return retval;
++			if (IS_ERR(mvotg->clk[clk_i])) {
++				dev_err(&pdev->dev, "failed to get clk %s\n",
++					pdata->clkname[clk_i]);
++				retval = PTR_ERR(mvotg->clk[clk_i]);
++				return retval;
++			}
+ 		}
++	} else if (retval < 0) {
++		dev_err(&pdev->dev, "error parse dt\n");
++		return retval;
+ 	}
+ 
+ 	mvotg->qwork = create_singlethread_workqueue("mv_otg_queue");
+@@ -770,6 +847,7 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	}
+ 	mvotg->mvphy = mv_usb2_get_phy();
+ 	if (mvotg->mvphy == NULL) {
++		dev_err(&pdev->dev, "failed to get usb phy\n");
+ 		retval = -ENODEV;
+ 		goto err_destroy_workqueue;
+ 	}
+@@ -791,9 +869,6 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 		mv_usb2_register_notifier(mvotg->mvphy, &mvotg->notifier);
+ 	}
+ 
+-	if (pdata->disable_otg_clock_gating)
+-		mvotg->clock_gating = 0;
+-
+ 	mv_otg_reset(mvotg);
+ 	mv_otg_init_irq(mvotg);
+ 
+@@ -892,13 +967,20 @@ static int mv_otg_resume(struct platform_device *pdev)
+ }
  #endif
+ 
++static struct of_device_id mv_otg_dt_ids[] = {
++	{ .compatible = "mrvl,mv-otg" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, mv_otg_dt_ids);
++
+ static struct platform_driver mv_otg_driver = {
+ 	.probe = mv_otg_probe,
+ 	.remove = __exit_p(mv_otg_remove),
+ 	.driver = {
+-		   .owner = THIS_MODULE,
+-		   .name = driver_name,
+-		   },
++		.owner = THIS_MODULE,
++		.name = driver_name,
++		.of_match_table = mv_otg_dt_ids,
++	},
+ #ifdef CONFIG_PM
+ 	.suspend = mv_otg_suspend,
+ 	.resume = mv_otg_resume,
+diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
+index f5bc7dd..3b9356d 100644
+--- a/drivers/usb/otg/mv_otg.h
++++ b/drivers/usb/otg/mv_otg.h
+@@ -157,12 +157,12 @@ struct mv_otg {
+ 
+ 	spinlock_t wq_lock;
+ 
+-	struct mv_usb_platform_data *pdata;
+-
+ 	unsigned int active;
+ 	unsigned int clock_gating;
++	unsigned int mode;
++	unsigned int otg_force_a_bus_req;
+ 	unsigned int clknum;
+-	struct clk *clk[0];
++	struct clk **clk;
+ };
  
  #endif
 -- 
