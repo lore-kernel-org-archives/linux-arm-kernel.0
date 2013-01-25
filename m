@@ -1,53 +1,140 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 25 Jan 2013 16:49:55 +0100
-Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <1359075633-13502-5-git-send-email-dinguyen@altera.com>
-References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-5-git-send-email-dinguyen@altera.com>
-Message-ID: <20130125154955.GD10055@amd.pavel.ucw.cz>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 25 Jan 2013 15:56:33 +0000
+Subject: [PATCH v3 3/3] arm: omap2: gpmc: add DT bindings for OneNAND
+In-Reply-To: <1359116591-32730-3-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1359116591-32730-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1359116591-32730-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130125155633.GC16795@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-> mach-socfpga is another platform that needs to use
-> v7_invalidate_l1 to bringup additional cores. There was a comment that
-> the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
+I have a couple more comments after looking though this a bit more thoroughly.
 
-If there are three copies of code, with fourth one needed for next
-platform, moving it into common code makes sense.
+On Fri, Jan 25, 2013 at 12:23:11PM +0000, Ezequiel Garcia wrote:
+> This patch adds device tree bindings for OMAP OneNAND devices.
+> Tested on an OMAP3 3430 IGEPv2 board.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+> Changes from v2:
+>  * Remove unneeded of_node_put() as reported by Mark Rutland
+> 
+> Changes from v1:
+>  * Fix typo in Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
+> 
+>  .../devicetree/bindings/mtd/gpmc-onenand.txt       |   43 +++++++++++++++++++
+>  arch/arm/mach-omap2/gpmc.c                         |   45 ++++++++++++++++++++
+>  2 files changed, 88 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt b/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
+> new file mode 100644
+> index 0000000..deec9da
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
+> @@ -0,0 +1,43 @@
+> +Device tree bindings for GPMC connected OneNANDs
+> +
+> +GPMC connected OneNAND (found on OMAP boards) are represented as child nodes of
+> +the GPMC controller with a name of "onenand".
+> +
+> +All timing relevant properties as well as generic gpmc child properties are
+> +explained in a separate documents - please refer to
+> +Documentation/devicetree/bindings/bus/ti-gpmc.txt
 
-But... The code was not identical before the merge. Are you sure that
-the differences do not hurt? At the very least, it should be mentioned
-in the changelog.
+Which tree can I find this in?
+
+> +
+> +Required properties:
+> +
+> + - reg:			The CS line the peripheral is connected to
+> +
+> +Optional properties:
+> +
+> + - dma-channel:		DMA Channel index
+> +
+> +For inline partiton table parsing (optional):
+> +
+> + - #address-cells: should be set to 1
+> + - #size-cells: should be set to 1
+> +
+> +Example for an OMAP3430 board:
+> +
+> +	gpmc: gpmc at 6e000000 {
+> +		compatible = "ti,omap3430-gpmc";
+> +		ti,hwmods = "gpmc";
+> +		reg = <0x6e000000 0x1000000>;
+> +		interrupts = <20>;
+> +		gpmc,num-cs = <8>;
+> +		gpmc,num-waitpins = <4>;
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +
+> +		onenand at 0 {
+> +			reg = <0 0 0>; /* CS0, offset 0 */
+> +
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +
+> +			/* partitions go here */
+> +		};
+> +	};
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index c6255f7..0636d0a 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -39,6 +39,7 @@
+>  #include "omap_device.h"
+>  #include "gpmc.h"
+>  #include "gpmc-nand.h"
+> +#include "gpmc-onenand.h"
+>  
+>  #define	DEVICE_NAME		"omap-gpmc"
+>  
+> @@ -1259,6 +1260,43 @@ static int gpmc_probe_nand_child(struct platform_device *pdev,
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_MTD_ONENAND
+> +static int gpmc_probe_onenand_child(struct platform_device *pdev,
+> +				 struct device_node *child)
+> +{
+> +	u32 val;
+> +	struct omap_onenand_platform_data *gpmc_onenand_data;
+> +
+> +	if (of_property_read_u32(child, "reg", &val) < 0) {
+> +		dev_err(&pdev->dev, "%s has no 'reg' property\n",
+> +			child->full_name);
+> +		return -ENODEV;
+> +	}
+
+I don't understand the format of the reg property, but it seems odd that you
+only need to read one cell from it. Are the remaining address cell and size
+cell used anywhere?
+
+> +
+> +	gpmc_onenand_data = devm_kzalloc(&pdev->dev, sizeof(*gpmc_onenand_data),
+> +					 GFP_KERNEL);
+> +	if (!gpmc_onenand_data)
+> +		return -ENOMEM;
+> +
+> +	gpmc_onenand_data->cs = val;
+> +	gpmc_onenand_data->of_node = child;
+> +	gpmc_onenand_data->dma_channel = -1;
+> +
+> +	if (!of_property_read_u32(child, "dma-channel", &val))
+> +		gpmc_onenand_data->dma_channel = val;
+> +
+> +	gpmc_onenand_init(gpmc_onenand_data);
+> +
+> +	return 0;
+> +}
+
+[...]
+
+Otherwise looks good.
 
 Thanks,
-								Pavel
-
-> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-> index 7e49deb..921fc15 100644
-> --- a/arch/arm/mach-imx/headsmp.S
-> +++ b/arch/arm/mach-imx/headsmp.S
-> @@ -17,53 +17,6 @@
-> -ENTRY(v7_invalidate_l1)
-> -	mov	r0, #0
-> -	mcr	p15, 0, r0, c7, c5, 0	@ invalidate I cache
-> -	mcr	p15, 2, r0, c0, c0, 0
-> -	mrc	p15, 1, r0, c0, c0, 0
-...
-> diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-> index 4a317fa..fb082c4 100644
-> --- a/arch/arm/mach-tegra/headsmp.S
-> +++ b/arch/arm/mach-tegra/headsmp.S
-> @@ -18,49 +18,6 @@
-> -ENTRY(v7_invalidate_l1)
-> -        mov     r0, #0
-> -        mcr     p15, 2, r0, c0, c0, 0
-> -        mrc     p15, 1, r0, c0, c0, 0
-
-[Note missing mcr p15, 0, .. line.]
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Mark.
