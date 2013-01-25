@@ -1,50 +1,37 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 25 Jan 2013 09:48:18 +0200
-Subject: [PATCH v3 1/4] drivers: usb: phy: add a new driver for usb part
- of control module
-In-Reply-To: <510218FE.8080606@wwwdotorg.org>
-References: <1359080391-5120-1-git-send-email-kishon@ti.com>
- <1359080391-5120-2-git-send-email-kishon@ti.com>
- <510218FE.8080606@wwwdotorg.org>
-Message-ID: <20130125074818.GF15886@arwen.pp.htv.fi>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 25 Jan 2013 13:21:49 +0530
+Subject: [PATCH] arm: omap: make wakeupgen_lock raw
+In-Reply-To: <20130124182159.GL4424@arwen.pp.htv.fi>
+References: <1354891787-24119-1-git-send-email-balbi@ti.com>
+ <20130124182159.GL4424@arwen.pp.htv.fi>
+Message-ID: <51023995.1050703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 09:32:46PM -0800, Stephen Warren wrote:
-> On 01/24/2013 06:19 PM, Kishon Vijay Abraham I wrote:
-> > Added a new driver for the usb part of control module. This has an API
-> > to power on the USB2 phy and an API to write to the mailbox depending on
-> > whether MUSB has to act in host mode or in device mode.
-> > 
-> > Writing to control module registers for doing the above task which was
-> > previously done in omap glue and in omap-usb2 phy will be removed.
-> 
-> > diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
-> 
-> This file seems to be specific to the TI USB PHYs, not all USB PHYs;
-> shouldn't it be renamed ti-usb-phy.txt, or even better renamed to match
-> the compatible value it documents, giving ti,omap-usb2.txt?
+On Thursday 24 January 2013 11:52 PM, Felipe Balbi wrote:
+> Hi,
+>
+> On Fri, Dec 07, 2012 at 04:49:47PM +0200, Felipe Balbi wrote:
+>> From: Thomas Gleixner <tglx@linutronix.de>
+>>
+>> When applying RT patch on top of Linux, spinlocks are
+>> implemented as RT-mutexes, which means they are preemptable.
+>>
+>> Current GIC implementation on OMAP is using a spinlock
+>> to protect against preemption. As it turns out, we need
+>> to convert that lock into a raw_spinlock so that OMAP's
+>> interrupt controller works as expected after RT-patch
+>> is applied.
+>>
+>> This patch is simply to decrease the amount of changes
+>> RT-team needs to carry out of tree. It doesn't cause any
+>> changes in behavior.
+>>
+>> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>
+Sorry i missed this patch. Tony can you please
+pick it up?
 
-could be, but that can be done as a separate patch. It's not part of
-$SUBJECT.
-
-> >  add the address of control module dev conf register until a driver for
-> >  control module is added
-> >  
-> > +Optional properties:
-> > + - ctrl_module : phandle of the control module used by PHY driver to power on
-> > +   the PHY.
-> 
-> DT property names generally use - not _ as the word separator.
-
-fair enough, Kishon, can you fix this up ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130125/ec99a099/attachment.sig>
+For the patch,
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
