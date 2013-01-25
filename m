@@ -1,25 +1,86 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 25 Jan 2013 12:08:23 -0500
-Subject: [PATCH 19/19] [INCOMPLETE] ARM: make return_address available
- for ARM_UNWIND
-In-Reply-To: <20130125165934.GE2069@linaro.org>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <1359123276-15833-20-git-send-email-arnd@arndb.de>
- <20130125162608.GD2069@linaro.org>
- <1359132254.21576.230.camel@gandalf.local.home>
- <20130125165934.GE2069@linaro.org>
-Message-ID: <1359133703.21576.233.camel@gandalf.local.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 25 Jan 2013 17:08:45 +0000
+Subject: [PATCH v4 1/4] drivers: usb: phy: add a new driver for usb
+ part of control module
+In-Reply-To: <20130125162346.GM28379@arwen.pp.htv.fi>
+References: <1359109440-2195-1-git-send-email-kishon@ti.com>
+ <1359109440-2195-2-git-send-email-kishon@ti.com>
+ <20130125110141.GK3075@e106331-lin.cambridge.arm.com>
+ <20130125111120.GP15886@arwen.pp.htv.fi>
+ <20130125122943.GB16795@e106331-lin.cambridge.arm.com>
+ <20130125145928.GC28379@arwen.pp.htv.fi>
+ <20130125161401.GD16795@e106331-lin.cambridge.arm.com>
+ <20130125162346.GM28379@arwen.pp.htv.fi>
+Message-ID: <20130125170845.GE16795@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-01-25 at 16:59 +0000, Dave Martin wrote:
+On Fri, Jan 25, 2013 at 04:23:46PM +0000, Felipe Balbi wrote:
+> Hi,
+> 
+> On Fri, Jan 25, 2013 at 04:14:02PM +0000, Mark Rutland wrote:
+> > On Fri, Jan 25, 2013 at 02:59:28PM +0000, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Fri, Jan 25, 2013 at 12:29:43PM +0000, Mark Rutland wrote:
+> > > > > > > +   depending upon omap4 or omap5.
+> > > > > > > + - reg-names: The names of the register addresses corresponding to the registers
+> > > > > > > +   filled in "reg".
+> > > > > > > + - ti,type: This is used to differentiate whether the control module has
+> > > > > > > +   usb mailbox or usb3 phy power. omap4 has usb mailbox in control module to
+> > > > > > > +   notify events to the musb core and omap5 has usb3 phy power register to
+> > > > > > > +   power on usb3 phy. Should be "1" if it has mailbox and "2" if it has usb3
+> > > > > > > +   phy power.
+> > > > > > 
+> > > > > > Why not make this a string property, perhaps values "mailbox" or "register"?
+> > > > > 
+> > > > > NAK.
+> > > > 
+> > > > Can I ask what your objection to using a string property is?
+> > > > 
+> > > > As far as I can see, "ti,type" is only used by this driver, so there's no
+> > > > common convention to stick to. Using a string makes the binding easier for
+> > > > humans to read, and thus harder to mess up in a dts, and it decouples the
+> > > > binding from kernel-side constants.
+> > > 
+> > > IIRC there is some work going on to add #define-like support for DT,
+> > > which would allow us to match against integers while still having
+> > > meaningful symbolic representations.
+> > 
+> > I was under the impression that the motivation for using the preprocessor on
+> > the DT was to allow symbolic names for device/soc-specific values like
+> > addresses, rather than what amounts to ABI values for the binding.
+> > 
+> > I don't see the point in building a binding that depends on future
+> > functionality to be legible, especially as we can make it more readable,
+> > robust, and just as extensible today, with a simple change to the proposed
+> > binding.
+> > 
+> > Even ignoring the above, the driver isn't doing appropriate sanity checking.
+> > If you use a string property, this sanity check is implicit in the parsing --
+> > you've either matched a value you can handle or you haven't.
+> 
+> Even IRQs use numbers (not talking about the IRQ number, but the IRQ
+> flags), why would we depend on string comparisson ? It doesn't make
+> sense.
 
-> Cool.  Are you aware of return_address being used elsewhere?  Currently
-> I'm not aware of anything else which uses it, and grep is not finding
-> any calls outside ftrace.h that I can see.
+When describing interrupts, the flags are associated with the interrupt number,
+and don't really make sense on their own. devicetree does not allow you to mix
+strings and integers in a value, so you'd never be able to encode irq flags
+with strings without completely breaking away from the way ePAPR describes how
+to encode interrupts.
 
-softirq.c has a trace_preempt_off() use of CALLER_ADDR1.
+By using a string property, the binding is self-describing and easy for humans
+to read and verify. It doesn't add a large overhead to either the driver or the
+dts, and is no worse (possibly better) for future extension of bindings to
+support new device variants while retaining backwards compatibility.
 
-kernel/sched/core.c has CALLER_ADDR1, 2 an 3.
+See the standard "status" property, which is string encoded. This would still
+work were it an integer-encoded enumeration. Having it as a string makes the
+meaning clear to a reader of the dts, and it's trivial for code to deal with.
 
--- Steve
+I don't understand why you think encoding a more legible value in the dt does
+not make sense.
+
+Thanks,
+Mark.
