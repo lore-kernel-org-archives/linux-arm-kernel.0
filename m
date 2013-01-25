@@ -1,25 +1,54 @@
-From: romieu@fr.zoreil.com (Francois Romieu)
-Date: Fri, 25 Jan 2013 23:23:06 +0100
-Subject: [PATCH v3 1/1 net-next] net: fec: add napi support to improve
- proformance
-In-Reply-To: <20130125043311.GA4141@ppwaskie-mobl2.amr.corp.intel.com>
-References: <1359077343-8271-1-git-send-email-Frank.Li@freescale.com>
- <20130125043311.GA4141@ppwaskie-mobl2.amr.corp.intel.com>
-Message-ID: <20130125222306.GA2523@electric-eye.fr.zoreil.com>
+From: Trond.Myklebust@netapp.com (Myklebust, Trond)
+Date: Fri, 25 Jan 2013 23:04:28 +0000
+Subject: [PATCH 15/19] sunrpc: don't warn for unused variable 'buf'
+In-Reply-To: <1359153858-31992-16-git-send-email-arnd@arndb.de>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <1359153858-31992-1-git-send-email-arnd@arndb.de>
+ <1359153858-31992-16-git-send-email-arnd@arndb.de>
+Message-ID: <4FA345DA4F4AE44899BD2B03EEEC2FA91833C205@sacexcmbx05-prd.hq.netapp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Waskiewicz Jr, Peter P <peter.p.waskiewicz.jr@intel.com> :
-[...]
-> Also, when you're disabling interrupts above, you're doing that in your
-> HW interrupt handler, you should be using spin_lock_irqsave()/irq_restore().
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Friday, January 25, 2013 5:44 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org; Arnd Bergmann; J. Bruce Fields;
+> Myklebust, Trond; linux-nfs at vger.kernel.org; netdev at vger.kernel.org
+> Subject: [PATCH 15/19] sunrpc: don't warn for unused variable 'buf'
+> 
+> When RPC_DEBUG is unset, the dprintk() macro does nothing, causing the
+> 'buf' variable in svc_printk to become unused.
+> Marking it as __maybe_unused avoids a harmless gcc warning.
+> 
+> Without this patch, building at91_dt_defconfig results in:
+> 
+> net/sunrpc/svc.c: In function 'svc_printk':
+> net/sunrpc/svc.c:1051:7: warning: unused variable 'buf' [-Wunused-variable]
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: "J. Bruce Fields" <bfields@redhat.com>
+> Cc: Trond Myklebust <Trond.Myklebust@netapp.com>
+> Cc: linux-nfs at vger.kernel.org
+> Cc: netdev at vger.kernel.org
+> ---
+>  net/sunrpc/svc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/net/sunrpc/svc.c b/net/sunrpc/svc.c index dbf12ac..b1f5223
+> 100644
+> --- a/net/sunrpc/svc.c
+> +++ b/net/sunrpc/svc.c
+> @@ -1047,7 +1047,7 @@ void svc_printk(struct svc_rqst *rqstp, const char
+> *fmt, ...)  {
+>  	struct va_format vaf;
+>  	va_list args;
+> -	char 	buf[RPC_MAX_ADDRBUFLEN];
+> +	char buf[RPC_MAX_ADDRBUFLEN] __maybe_unused;
+> 
+>  	va_start(args, fmt);
 
-Does the platform forbid to defer FEC_EIR / FEC_IEVENT write to the napi
-poll handler and only disable the irq through FEC_EIMR / FEC_IMASK in
-fec_enet_interrupt so as to remove the spinlock ?
+Alternatively, just declare it using the RPC_IFDEBUG() macro.
 
-(Frank, please keep an empty line between variables declarations and
-function body).
-
--- 
-Ueimor
+Cheers
+  Trond
