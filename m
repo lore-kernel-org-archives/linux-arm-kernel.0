@@ -1,101 +1,198 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 25 Jan 2013 20:53:52 +0000
-Subject: [PATCH V3 0/8] ARM: kirkwood: cleanup DT conversion
-In-Reply-To: <cover.1358983578.git.jason@lakedaemon.net>
+Date: Fri, 25 Jan 2013 20:53:56 +0000
+Subject: [PATCH V3 4/8] ARM: kirkwood: nsa310: convert to pinctrl
+In-Reply-To: <cover.1359146831.git.jason@lakedaemon.net>
 References: <cover.1358983578.git.jason@lakedaemon.net>
-Message-ID: <cover.1359146831.git.jason@lakedaemon.net>
+ <cover.1359146831.git.jason@lakedaemon.net>
+Message-ID: <9369c78737e0ba4d43f1cab8a34efb48a24921ea.1359146831.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+ arch/arm/boot/dts/kirkwood-nsa310.dts | 99 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c     |  3 --
+ arch/arm/mach-kirkwood/board-nsa310.c | 26 ---------
+ arch/arm/mach-kirkwood/common.h       |  6 ---
+ 4 files changed, 99 insertions(+), 35 deletions(-)
 
-This is a third cut at cleaning up mach-kirkwood/.  There are a few DT
-conversions (topkick -> mvsdio, pinctrl) which, once reviewed, I'll put in the
-normal pull request cycle.
-
-The others which remove board-*.c files, I'll keep updating against
-mvebu/for-next, and then apply at the end of the merge window.
-
-Please test as you are able.
-
-Changes since V1:
- - Included Ian Molton's patch to add DT bindings to mv643xx_eth
- - little doc cleanup
- - tested on dreamplug
-   - good: boots fine to bash prompt
-   - bad: hangs within one minute of booting (even with init=/bin/sh)
-     - no output, just frozen hard
-     - will debug more tomorrow
-
-Changes since V2:
- - discovered source of hang.  ge0/1 clocks getting gated
-   - changed alias for clocks
-   - able to pull ip address and ping though the interface
-
-thx,
-
-Jason.
-
-Ian Molton (1):
-  mv643xx.c: Add basic device tree support.
-
-Jason Cooper (7):
-  ARM: kirkwood: topkick: init mvsdio via DT
-  ARM: kirkwood: topkick: convert to pinctrl
-  ARM: kirkwood: nsa310: cleanup includes and unneeded code
-  ARM: kirkwood: nsa310: convert to pinctrl
-  ARM: kirkwood: consolidate DT init of pcie
-  ARM: mvebu: correct gated clock documentation
-  ARM: kirkwood: mv643xx_eth dt conversion
-
- .../bindings/clock/mvebu-gated-clock.txt           |   2 +-
- Documentation/devicetree/bindings/net/mv643xx.txt  |  75 +++++++++++++++
- arch/arm/boot/dts/kirkwood-dnskw.dtsi              |   9 ++
- arch/arm/boot/dts/kirkwood-dockstar.dts            |   8 ++
- arch/arm/boot/dts/kirkwood-dreamplug.dts           |  16 ++++
- arch/arm/boot/dts/kirkwood-goflexnet.dts           |   7 ++
- arch/arm/boot/dts/kirkwood-ib62x0.dts              |   9 ++
- arch/arm/boot/dts/kirkwood-iconnect.dts            |   9 ++
- arch/arm/boot/dts/kirkwood-lsxl.dtsi               |  18 ++++
- arch/arm/boot/dts/kirkwood-mplcec4.dts             |  18 ++++
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |   9 ++
- arch/arm/boot/dts/kirkwood-ns2lite.dts             |   5 +
- arch/arm/boot/dts/kirkwood-ns2mini.dts             |   5 +
- arch/arm/boot/dts/kirkwood-nsa310.dts              |  99 ++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |   8 ++
- arch/arm/boot/dts/kirkwood-topkick.dts             | 103 +++++++++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi                    |  38 ++++++++
- arch/arm/mach-kirkwood/Kconfig                     | 101 --------------------
- arch/arm/mach-kirkwood/Makefile                    |  15 ---
- arch/arm/mach-kirkwood/board-dnskw.c               |   7 --
- arch/arm/mach-kirkwood/board-dockstar.c            |  32 -------
- arch/arm/mach-kirkwood/board-dreamplug.c           |  35 -------
- arch/arm/mach-kirkwood/board-dt.c                  |  64 +++++--------
- arch/arm/mach-kirkwood/board-goflexnet.c           |  34 -------
- arch/arm/mach-kirkwood/board-ib62x0.c              |  29 ------
- arch/arm/mach-kirkwood/board-iconnect.c            |  32 -------
- arch/arm/mach-kirkwood/board-lsxl.c                |  36 -------
- arch/arm/mach-kirkwood/board-mplcec4.c             |  36 -------
- arch/arm/mach-kirkwood/board-ns2.c                 |  34 -------
- arch/arm/mach-kirkwood/board-nsa310.c              |  58 ------------
- arch/arm/mach-kirkwood/board-openblocks_a6.c       |  26 ------
- arch/arm/mach-kirkwood/board-ts219.c               |  13 ---
- arch/arm/mach-kirkwood/board-usi_topkick.c         |  77 ---------------
- arch/arm/mach-kirkwood/common.h                    |  69 --------------
- drivers/net/ethernet/marvell/mv643xx_eth.c         |  93 +++++++++++++++++--
- 35 files changed, 548 insertions(+), 681 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/mv643xx.txt
- delete mode 100644 arch/arm/mach-kirkwood/board-dockstar.c
- delete mode 100644 arch/arm/mach-kirkwood/board-dreamplug.c
- delete mode 100644 arch/arm/mach-kirkwood/board-goflexnet.c
- delete mode 100644 arch/arm/mach-kirkwood/board-ib62x0.c
- delete mode 100644 arch/arm/mach-kirkwood/board-iconnect.c
- delete mode 100644 arch/arm/mach-kirkwood/board-lsxl.c
- delete mode 100644 arch/arm/mach-kirkwood/board-mplcec4.c
- delete mode 100644 arch/arm/mach-kirkwood/board-ns2.c
- delete mode 100644 arch/arm/mach-kirkwood/board-nsa310.c
- delete mode 100644 arch/arm/mach-kirkwood/board-openblocks_a6.c
- delete mode 100644 arch/arm/mach-kirkwood/board-usi_topkick.c
-
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+index dbb3551..3a178cf 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+@@ -16,6 +16,105 @@
+ 	};
+ 
+ 	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++			pinctrl-0 = < &pmx_led_esata_green
++				      &pmx_led_esata_red
++				      &pmx_led_usb_green
++				      &pmx_led_usb_red
++				      &pmx_usb_power_off
++				      &pmx_led_sys_green
++				      &pmx_led_sys_red
++				      &pmx_btn_reset
++				      &pmx_btn_copy
++				      &pmx_led_copy_green
++				      &pmx_led_copy_red
++				      &pmx_led_hdd_green
++				      &pmx_led_hdd_red
++				      &pmx_unknown
++				      &pmx_btn_power
++				      &pmx_pwr_off >;
++			pinctrl-names = "default";
++
++			pmx_led_esata_green: pmx-led-esata-green {
++				marvell,pins = "mpp12";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_esata_red: pmx-led-esata-red {
++				marvell,pins = "mpp13";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_usb_green: pmx-led-usb-green {
++				marvell,pins = "mpp15";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_usb_red: pmx-led-usb-red {
++				marvell,pins = "mpp16";
++				marvell,function = "gpio";
++			};
++
++			pmx_usb_power_off: pmx-usb-power-off {
++				marvell,pins = "mpp21";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_sys_green: pmx-led-sys-green {
++				marvell,pins = "mpp28";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_sys_red: pmx-led-sys-red {
++				marvell,pins = "mpp29";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_reset: pmx-btn-reset {
++				marvell,pins = "mpp36";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_copy: pmx-btn-copy {
++				marvell,pins = "mpp37";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_copy_green: pmx-led-copy-green {
++				marvell,pins = "mpp39";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_copy_red: pmx-led-copy-red {
++				marvell,pins = "mpp40";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_hdd_green: pmx-led-hdd-green {
++				marvell,pins = "mpp41";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_hdd_red: pmx-led-hdd-red {
++				marvell,pins = "mpp42";
++				marvell,function = "gpio";
++			};
++
++			pmx_unknown: pmx-unknown {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_power: pmx-btn-power {
++				marvell,pins = "mpp46";
++				marvell,function = "gpio";
++			};
++
++			pmx_pwr_off: pmx-pwr-off {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
++		};
+ 
+ 		serial at 12000 {
+ 			clock-frequency = <200000000>;
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 8eac548..8b35157 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -141,9 +141,6 @@ static void __init kirkwood_dt_init(void)
+ 	if (of_machine_is_compatible("usi,topkick"))
+ 		usi_topkick_init();
+ 
+-	if (of_machine_is_compatible("zyxel,nsa310"))
+-		nsa310_init();
+-
+ 	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
+ }
+ 
+diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
+index 0b99533..55ade93 100644
+--- a/arch/arm/mach-kirkwood/board-nsa310.c
++++ b/arch/arm/mach-kirkwood/board-nsa310.c
+@@ -13,32 +13,6 @@
+ #include <mach/kirkwood.h>
+ #include <linux/of.h>
+ #include "common.h"
+-#include "mpp.h"
+-
+-static unsigned int nsa310_mpp_config[] __initdata = {
+-	MPP12_GPIO, /* led esata green */
+-	MPP13_GPIO, /* led esata red */
+-	MPP15_GPIO, /* led usb green */
+-	MPP16_GPIO, /* led usb red */
+-	MPP21_GPIO, /* control usb power off */
+-	MPP28_GPIO, /* led sys green */
+-	MPP29_GPIO, /* led sys red */
+-	MPP36_GPIO, /* key reset */
+-	MPP37_GPIO, /* key copy */
+-	MPP39_GPIO, /* led copy green */
+-	MPP40_GPIO, /* led copy red */
+-	MPP41_GPIO, /* led hdd green */
+-	MPP42_GPIO, /* led hdd red */
+-	MPP44_GPIO, /* ?? */
+-	MPP46_GPIO, /* key power */
+-	MPP48_GPIO, /* control power off */
+-	0
+-};
+-
+-void __init nsa310_init(void)
+-{
+-	kirkwood_mpp_conf(nsa310_mpp_config);
+-}
+ 
+ static int __init nsa310_pci_init(void)
+ {
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index e956d02..1c42cb8 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -130,12 +130,6 @@ void ns2_init(void);
+ static inline void ns2_init(void) {};
+ #endif
+ 
+-#ifdef CONFIG_MACH_NSA310_DT
+-void nsa310_init(void);
+-#else
+-static inline void nsa310_init(void) {};
+-#endif
+-
+ #ifdef CONFIG_MACH_OPENBLOCKS_A6_DT
+ void openblocks_a6_init(void);
+ #else
 -- 
 1.8.1.1
