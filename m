@@ -1,136 +1,206 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 25 Jan 2013 11:34:55 +0100 (CET)
-Subject: [PATCH/RFC 2/3] ethernet: add a PHY reset GPIO DT binding to
- sh_eth
-In-Reply-To: <7921225.sfO3PIeLVS@avalon>
-References: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
- <1359043653-11374-3-git-send-email-g.liakhovetski@gmx.de>
- <7921225.sfO3PIeLVS@avalon>
-Message-ID: <Pine.LNX.4.64.1301251127460.17518@axis700.grange>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 25 Jan 2013 11:36:50 +0100
+Subject: arm: Kernel failures when several memory banks are used with
+ starting address above 128MB
+In-Reply-To: <alpine.LFD.2.02.1301221528050.6300@xanadu.home>
+References: <CAHTX3dJZxuoz_0Eaa7QcoK9bF4LdLuWcDcwK3OUKc6qY_0PeuQ@mail.gmail.com>
+ <alpine.LFD.2.02.1301221528050.6300@xanadu.home>
+Message-ID: <CAHTX3dJSiD7-Qw5Goc1ROWym=eyxto+ORiz8tQ9R+irMVpSvXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent
+Hi Nicolas,
 
-On Fri, 25 Jan 2013, Laurent Pinchart wrote:
+2013/1/22 Nicolas Pitre <nicolas.pitre@linaro.org>:
+> On Tue, 22 Jan 2013, Michal Simek wrote:
+>
+>> Hi,
+>>
+>> I have a question regarding to the case where DTS specify one memory bank
+>> for example <0x0 0x40000000> with CONFIG_ARM_PATCH_PHYS_VIRT=y
+>> where the kernel can be loaded at a 16MB boundary.
+>> I was testing it on the 3.8-rc4 on arm zynq.
+>>
+>> 1. If the kernel is loaded within 0 - 127MB memory then the kernel can
+>> work with the whole
+>> 1GB memory. It shows that the memory in front of the kernel is also
+>> available for the kernel.
+>>
+>> 2. If the kernel is loaded on the higher addresses then it fails by
+>> these error messages.
+>> "Ignoring RAM at 00000000-3fffffff (vmalloc region overlap).
+>> Memory policy: ECC disabled, Data cache writeback
+>> Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0."
+>>
+>> 3. If I use several memory banks solution
+>> for example
+>> reg = <0 0x10000000 0x10000000 0x30000000>;
+>> and the kernel is loaded to 0x10008000 then the first memory bank is
+>> ignored and kernel will boot.
+>> "Ignoring RAM at 00000000-0fffffff (vmalloc region overlap)." with
+>> 768MB of memory.
+>>
+>> 4. The next interesting example is description with 3 memory banks.
+>> reg = <0 0x10000000 0x10000000 0x20000000 0x30000000 0x10000000>;
+>> which behaves as point 3. It means the first 128MB is ignored and only
+>> 768MB of ram is available.
+>>
+>>
+>> The real question is how the kernel should behave for these situations.
+>> I would expect that if the kernel is within one memory bank
+>> then it will use this whole bank
+>> Or
+>> I would expect that the memory which is in front of the kernel start address
+>> will be simple ignored and the kernel will find out which memory bank
+>> is used and will use it.
+>> Not just caused kernel panic.
+>> Or
+>> Is there any expectation that you have to run the relocatable kernel
+>> in the first 128MB of the memory
+>> or changing DTS depending on the kernel position where it is loaded?
+>
+> There are two kernel config symbols influencing this:
+>
+> config AUTO_ZRELADDR
+>         bool "Auto calculation of the decompressed kernel image address"
+>         depends on !ZBOOT_ROM && !ARCH_U300
+>         help
+>           ZRELADDR is the physical address where the decompressed kernel
+>           image will be placed. If AUTO_ZRELADDR is selected, the address
+>           will be determined at run-time by masking the current IP with
+>           0xf8000000. This assumes the zImage being placed in the first 128MB
+>           from start of memory.
+>
+> config ARM_PATCH_PHYS_VIRT
+>         bool "Patch physical to virtual translations at runtime" if EMBEDDED
+>         default y
+>         depends on !XIP_KERNEL && MMU
+>         depends on !ARCH_REALVIEW || !SPARSEMEM
+>         help
+>           Patch phys-to-virt and virt-to-phys translation functions at
+>           boot and module load time according to the position of the
+>           kernel in system memory.
+>
+>           This can only be used with non-XIP MMU kernels where the base
+>           of physical memory is at a 16MB boundary.
+>
+>           Only disable this option if you know that you do not require
+>           this feature (eg, building a kernel for a single machine) and
+>           you need to shrink the kernel to the minimal size.
 
-> Hi Guennadi,
-> 
-> On Thursday 24 January 2013 17:07:32 Guennadi Liakhovetski wrote:
-> > If an ethernet PHY can be reset by a GPIO, it can be specified in DT. Add
-> > a binding and code to parse it, request the GPIO and take the PHY out of
-> > reset.
-> > 
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> > Cc: netdev at vger.kernel.org
-> > ---
-> >  Documentation/devicetree/bindings/net/sh_ether.txt |    2 ++
-> >  drivers/net/ethernet/renesas/sh_eth.c              |    9 ++++++++-
-> >  2 files changed, 10 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/sh_ether.txt
-> > b/Documentation/devicetree/bindings/net/sh_ether.txt index c11e45d..edaf683
-> > 100644
-> > --- a/Documentation/devicetree/bindings/net/sh_ether.txt
-> > +++ b/Documentation/devicetree/bindings/net/sh_ether.txt
-> > @@ -12,6 +12,7 @@ Required properties:
-> >  - interrupts:                   Interrupt mapping for the sh_eth interrupt
-> >                                  sources (vector id).
-> >  - phy-mode:              String, operation mode of the PHY interface.
-> > +- phy-reset-gpios:              PHY reset GPIO tuple
-> 
-> If you can't have more than one GPIO here, what about calling it phy-reset-
-> gpio ?
+ok. This is on zynq platform which enables ARCH_MULTIPLATFORM.
+It means that both these options are enabled by default and
 
->From Documentation/devicetree/bindings/gpio/gpio.txt:
 
-<quote>
-GPIO properties should be named "[<name>-]gpios".
-</quote>
+> Of course, the kernel must be loaded at some address within the provided
+> RAM information in DT as well.  If you cannot meet those restrictions
+> then the corresponding features have to be disabled in your build.
 
-> >  - sh-eth,edmac-endian:          String, endian of sh_eth dmac.
-> >  - sh-eth,register-type:         String, register type of sh_eth.
-> >                                  Please select "gigabit", "fast-sh4" or
-> > @@ -37,6 +38,7 @@ Example (armadillo800eva):
-> >  		reg = <0xe9a00000 0x800>, <0xe9a01800 0x800>;
-> >  		interrupts = <0x500>;
-> >  		phy-mode = "mii";
-> > +		phy-reset-gpios = <&gpio 18 0>;
-> >  		sh-eth,edmac-endian = "little";
-> >  		sh-eth,register-type = "gigabit";
-> >  		sh-eth,phy-id = <0>;
-> > diff --git a/drivers/net/ethernet/renesas/sh_eth.c
-> > b/drivers/net/ethernet/renesas/sh_eth.c index 1f64848..06035a2 100644
-> > --- a/drivers/net/ethernet/renesas/sh_eth.c
-> > +++ b/drivers/net/ethernet/renesas/sh_eth.c
-> > @@ -20,6 +20,7 @@
-> >   *  the file called "COPYING".
-> >   */
-> > 
-> > +#include <linux/gpio.h>
-> >  #include <linux/init.h>
-> >  #include <linux/module.h>
-> >  #include <linux/kernel.h>
-> > @@ -33,6 +34,7 @@
-> >  #include <linux/netdevice.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_device.h>
-> > +#include <linux/of_gpio.h>
-> >  #include <linux/of_platform.h>
-> >  #include <linux/of_address.h>
-> >  #include <linux/of_irq.h>
-> > @@ -2376,10 +2378,11 @@ sh_eth_of_get_register_type(struct device_node *np)
-> >  static struct sh_eth_plat_data *
-> >  sh_eth_parse_dt(struct device *dev, struct net_device *ndev)
-> >  {
-> > -	int ret;
-> > +	int ret, gpio;
-> >  	const char *of_str;
-> >  	struct device_node *np = dev->of_node;
-> >  	struct sh_eth_plat_data *pdata;
-> > +	enum of_gpio_flags flags;
-> > 
-> >  	pdata = devm_kzalloc(dev, sizeof(struct sh_eth_plat_data),
-> >  					GFP_KERNEL);
-> > @@ -2420,6 +2423,10 @@ sh_eth_parse_dt(struct device *dev, struct net_device
-> > *ndev) else
-> >  		pdata->needs_init = 0;
-> > 
-> > +	gpio = of_get_named_gpio_flags(np, "phy-reset-gpios", 0, &flags);
-> > +	if (gpio_is_valid(gpio) && !devm_gpio_request(dev, gpio, NULL))
-> > +		gpio_direction_output(gpio, !!(flags & OF_GPIO_ACTIVE_LOW));
-> 
-> You could use devm_gpio_request_one() here.
+Does it mean what Russel mention that within means from ram start address
++ 16MB (from my test that limit is 128MB - but maybe memory tests can
+find some bugs
+but the kernel boots)
 
-Yes, but then the flag would look uglier, something like
+The fact is that I can't disabled these options because of
+ARCH_MULTIPLATFORM option.
+I am running AMP which means on the second ARM runs rtos.
+Rtos on the second cpu needs to access vectors started at 0x0 that's
+why I need to move
+the kernel to higher addresses.
 
-		devm_gpio_request_one(dev, gpio, flags & 
-			OF_GPIO_ACTIVE_LOW ? GPIOF_OUT_INIT_HIGH : 
-			GPIOF_OUT_INIT_LOW);
+As I see from the exynos4210-origen.dts they use 4 memory banks
+        memory {
+                reg = <0x40000000 0x10000000
+                       0x50000000 0x10000000
+                       0x60000000 0x10000000
+                       0x70000000 0x10000000>;
+        };
 
-Does it really look like an improvement? :)
+I expect that kernel starting address is 0x40000000 (+0x8000) and
+everything works as expected
+but if they will try to use( without changing dts which describe exact
+and real hardware configuration)
+0x50000000 starting address than kernel won't boot.
+What it is interesting on this is that Linux can work with all memory
+banks which are in DTS
+on higher addresses than starting address but can't work with memory
+banks which are on lower addresses.
 
-> Is there no need to reset the phy at runtime ?
+That's why I have created these patches (it is just c&p just to see
+what I am talking about)
+which ensure that kernel will boot not failed in these two cases.
 
-No idea, I'm not developing the driver, I'm just porting one specific 
-feature from one API to another with no functional changes (apart from 
-postponing setting the GPIO).
+Case 1:
+The kernel starting address is at 0x10008000
+dts memory reg = <0x0 0x40000000>;
+which ensure that kernel will work only with 0x10000000 - 0x40000000
+address space
+Kernel bootlog will contain: "Change memory bank to 10000000-3fffffff"
 
-Thanks
-Guennadi
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 9f06102..377d600 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -936,7 +936,26 @@ void __init sanity_check_meminfo(void)
+                if (bank->start > ULONG_MAX)
+                        highmem = 1;
 
-> > +
-> >  #ifdef CONFIG_OF_NET
-> >  	if (!is_valid_ether_addr(ndev->dev_addr)) {
-> >  		const char *macaddr = of_get_mac_address(np);
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
++               if (bank->start < __pa(PAGE_OFFSET) &&
++                       __pa(PAGE_OFFSET) <= (bank->start + bank->size - 1)) {
++                               int offset = __pa(PAGE_OFFSET) - bank->start;
++                               bank->start += offset;
++                               bank->size -= offset;
++                               pr_crit("Change memory bank to %.8llx-%.8llx\n",
++                                       (unsigned long long)bank->start,
++                                       (unsigned long long)bank->start +
++                                                               bank->size - 1);
++               }
++
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+
+Case 2:
+In two bank solution with the kernel starting address at 0x10008000
+will be the first bank ignored
+which ensure that HIGHMEM will work and kernel will boot
+reg = <0x0 0x10000000 0x10000000 0x30000000>;
+Kernel bootlog will contain: "Ignoring RAM at 00000000-0fffffff
+(CONFIG_HIGHMEM)."
+
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 048a199..377d600 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -948,6 +948,14 @@ void __init sanity_check_meminfo(void)
+                }
+
+ #ifdef CONFIG_HIGHMEM
++               if (__va(bank->start + bank->size - 1) < (void *)PAGE_OFFSET) {
++                       pr_notice("Ignoring RAM@%.8llx-%.8llx "
++                               "(CONFIG_HIGHMEM).\n",
++                               (unsigned long long)bank->start,
++                               (unsigned long long)bank->start +
+bank->size - 1);
++                       continue;
++               }
++
+                if (__va(bank->start) >= vmalloc_min ||
+                    __va(bank->start) < (void *)PAGE_OFFSET)
+                        highmem = 1;
+
+
+Also these two patches ensure that kernel can be placed to any memory location
+and will work with the rest of memory which is defined in the dts
+without changing
+dts to reflect different loading address.
+
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian
