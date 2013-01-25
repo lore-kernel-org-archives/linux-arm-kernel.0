@@ -1,53 +1,105 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jan 2013 22:44:03 +0000
-Subject: [PATCH 04/19] oss/dmabuf: use dma_map_single
+Date: Fri, 25 Jan 2013 22:44:17 +0000
+Subject: [PATCH 18/19] ARM: at91: suspend both memory controllers on
+ at91sam9263
 In-Reply-To: <1359153858-31992-1-git-send-email-arnd@arndb.de>
 References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
  <1359153858-31992-1-git-send-email-arnd@arndb.de>
-Message-ID: <1359153858-31992-5-git-send-email-arnd@arndb.de>
+Message-ID: <1359153858-31992-19-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The virt_to_bus/bus_to_virt functions have been deprecated
-for as long as I can remember, and they are used in very
-few remaining instances, usually in obscure ISA device
-drivers. The OSS sound drivers are the only ones that are
-still used on the ARM architecture, and only on some of
-the earliest StrongARM machines.
+For the past three years, we have had a #warning in
+mach-at91 about the sdram_selfrefresh_enable or
+at91sam9_standby functions possibly not working on
+at91sam9263. In the meantime a function was added
+to do the right thing on at91sam9g45, which looks like
+it should also work on '9263.
 
-The problem for converting the OSS subsystem to use
-dma_map_single instead is that the caller of virt_to_bus
-does not have a device pointer, since the subsystem has
-never been ported to use the common device infrastructure.
+This patch blindly removes the warning and changes the
+at91sam9263 to use the same code at at91sam9g45, which
+may or may not be the right solution. If it is not,
+maybe someone could provide a better fix.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jaroslav Kysela <perex@perex.cz>
-Cc: Takashi Iwai <tiwai@suse.de>
-Cc: alsa-devel at alsa-project.org
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Albin Tonnerre <albin.tonnerre@free-electrons.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- sound/oss/dmabuf.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-at91/cpuidle.c |  2 ++
+ arch/arm/mach-at91/pm.c      |  2 ++
+ arch/arm/mach-at91/pm.h      | 30 ++++++++++++++++++++++++------
+ 3 files changed, 28 insertions(+), 6 deletions(-)
 
-diff --git a/sound/oss/dmabuf.c b/sound/oss/dmabuf.c
-index bcc3e8e..a59c888 100644
---- a/sound/oss/dmabuf.c
-+++ b/sound/oss/dmabuf.c
-@@ -114,7 +114,7 @@ static int sound_alloc_dmap(struct dma_buffparms *dmap)
- 		}
- 	}
- 	dmap->raw_buf = start_addr;
--	dmap->raw_buf_phys = virt_to_bus(start_addr);
-+	dmap->raw_buf_phys = dma_map_single(NULL, start_addr, dmap->buffsize, DMA_BIDIRECTIONAL);
+diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+index 0c63815..4c67946 100644
+--- a/arch/arm/mach-at91/cpuidle.c
++++ b/arch/arm/mach-at91/cpuidle.c
+@@ -38,6 +38,8 @@ static int at91_enter_idle(struct cpuidle_device *dev,
+ 		at91rm9200_standby();
+ 	else if (cpu_is_at91sam9g45())
+ 		at91sam9g45_standby();
++	else if (cpu_is_at91sam9263())
++		at91sam9263_standby();
+ 	else
+ 		at91sam9_standby();
  
- 	for (page = virt_to_page(start_addr); page <= virt_to_page(end_addr); page++)
- 		SetPageReserved(page);
-@@ -139,6 +139,7 @@ static void sound_free_dmap(struct dma_buffparms *dmap)
- 	for (page = virt_to_page(start_addr); page <= virt_to_page(end_addr); page++)
- 		ClearPageReserved(page);
- 
-+	dma_unmap_single(NULL, dmap->raw_buf_phys, dmap->buffsize, DMA_BIDIRECTIONAL);
- 	free_pages((unsigned long) dmap->raw_buf, sz);
- 	dmap->raw_buf = NULL;
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index adb6db8..b8017c1 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -267,6 +267,8 @@ static int at91_pm_enter(suspend_state_t state)
+ 				at91rm9200_standby();
+ 			else if (cpu_is_at91sam9g45())
+ 				at91sam9g45_standby();
++			else if (cpu_is_at91sam9263())
++				at91sam9263_standby();
+ 			else
+ 				at91sam9_standby();
+ 			break;
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index 38f467c..2f5908f 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -70,13 +70,31 @@ static inline void at91sam9g45_standby(void)
+ 	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
  }
+ 
+-#ifdef CONFIG_SOC_AT91SAM9263
+-/*
+- * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
+- * handle those cases both here and in the Suspend-To-RAM support.
++/* We manage both DDRAM/SDRAM controllers, we need more than one value to
++ * remember.
+  */
+-#warning Assuming EB1 SDRAM controller is *NOT* used
+-#endif
++static inline void at91sam9263_standby(void)
++{
++	u32 lpr0, lpr1;
++	u32 saved_lpr0, saved_lpr1;
++
++	saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
++	lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
++	lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
++
++	saved_lpr0 = at91_ramc_read(0, AT91_SDRAMC_LPR);
++	lpr0 = saved_lpr0 & ~AT91_SDRAMC_LPCB;
++	lpr0 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
++
++	/* self-refresh mode now */
++	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
++	at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
++
++	cpu_do_idle();
++
++	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
++	at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
++}
+ 
+ static inline void at91sam9_standby(void)
+ {
 -- 
 1.8.0
