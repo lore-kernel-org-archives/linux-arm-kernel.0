@@ -1,25 +1,29 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 25 Jan 2013 16:03:29 +0100
-Subject: [RFC V2 PATCH 0/8] ARM: kirkwood: cleanup DT conversion
-In-Reply-To: <20130125125214.GI1758@titan.lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <cover.1359091286.git.jason@lakedaemon.net>
- <201301251115.47480.arnd@arndb.de>
- <20130125125214.GI1758@titan.lakedaemon.net>
-Message-ID: <CABJ1b_QaTBLgGASTs2yi435jR=LepN-iY97xTLXAu1hZw69Wuw@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 25 Jan 2013 15:08:06 +0000
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: add ARCH_ZYNQ
+In-Reply-To: <20130124201709.GB1036@beefymiracle.amer.corp.natinst.com>
+References: <bb37ce3392153c4cae3a2bc642f831683620473a.1359057921.git.josh.cartwright@ni.com>
+ <621fb4946273492b88fe9a903118047f497e00ee.1359057921.git.josh.cartwright@ni.com>
+ <20130124201709.GB1036@beefymiracle.amer.corp.natinst.com>
+Message-ID: <7b635cbd-4c77-41c7-9b69-c1b9ef92353c@CH1EHSMHS019.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 1:52 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> Once I have the mv643xx_eth binding working reliably, preferably with
-> mvmdio, I'll take a look at removing the last board-*.c files.  If the
-> stars align, we'll get it all done for v3.9.
->
-> The only big thing left will be pcie.
 
-Jason,
 
-there is also addr_map that we haven't thought about yet. Is it supposed
-to be configurable through DT or do we leave it as "linux wants it that way"?
+> -----Original Message-----
+> From: Josh Cartwright [mailto:josh.cartwright at ni.com]
+> Sent: Thursday, January 24, 2013 9:17 PM
+> To: arm at kernel.org; Rob Herring
+> Cc: linux-arm-kernel at lists.infradead.org; Michal Simek
+> Subject: Re: [PATCH 2/2] ARM: multi_v7_defconfig: add ARCH_ZYNQ
+> 
+> On Thu, Jan 24, 2013 at 01:33:25PM -0600, Josh Cartwright wrote:
+> > Cc: Michal Simek <michal.simek@ni.com>
+> 
+> Ugh, my fingers typed '@ni.com' out of habit.  Corrected patch below (and
+> correct Cc added).
 
-Sebastian
+Acked-by: Michal Simek <michal.simek@xilinx.com>
+
+M
