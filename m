@@ -1,58 +1,41 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Fri, 25 Jan 2013 10:02:09 +0800
-Subject: [PATCH v2 1/1 net-next] net: fec: add napi support to improve
- proformance
-In-Reply-To: <1359035768.12374.2083.camel@edumazet-glaptop>
-References: <1359014309-8636-1-git-send-email-Frank.Li@freescale.com>
- <1359035768.12374.2083.camel@edumazet-glaptop>
-Message-ID: <CAHrpEqQKSs801pAb-Hdh1G2uGS9oYqxsV-uwUMevyzHTry729w@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 25 Jan 2013 11:02:53 +0900
+Subject: [PATCH 1/2] ARM: mach-shmobile: armadillo: defconfig: Enable CEU
+In-Reply-To: <1359079374-25032-1-git-send-email-horms+renesas@verge.net.au>
+References: <1359079374-25032-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359079374-25032-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/24 Eric Dumazet <eric.dumazet@gmail.com>:
-> On Thu, 2013-01-24 at 15:58 +0800, Frank Li wrote:
->>
->>  static irqreturn_t
->> @@ -805,6 +823,7 @@ fec_enet_interrupt(int irq, void *dev_id)
->>       struct net_device *ndev = dev_id;
->>       struct fec_enet_private *fep = netdev_priv(ndev);
->>       uint int_events;
->> +     ulong flags;
->>       irqreturn_t ret = IRQ_NONE;
->>
->>       do {
->> @@ -813,7 +832,14 @@ fec_enet_interrupt(int irq, void *dev_id)
->>
->>               if (int_events & FEC_ENET_RXF) {
->>                       ret = IRQ_HANDLED;
->> -                     fec_enet_rx(ndev);
->> +
->> +                     spin_lock_irqsave(&fep->hw_lock, flags);
->
-> You already are in a irq safe context, spin_lock() should be ok
+Update the defconfig to enable the CEU camera.
 
-Okay, I will fix it.
+It appears that it was previously enabled but an
+update is required for Kconfig changes.
 
->
->> +                     /* Disable the RX interrupt */
->> +                     if (napi_schedule_prep(&fep->napi)) {
->> +                             fec_enet_rx_int_is_enabled(ndev, false);
->> +                             __napi_schedule(&fep->napi);
->> +                     }
->> +                     spin_unlock_irqrestore(&fep->hw_lock, flags);
->
->        spin_unlock();
->
->>               }
->>
->
->
-> Same remark for the spin_lock_irqsave(&fep->tmreg_lock, flags) in
-> fec_enet_tx()
->
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/armadillo800eva_defconfig |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-Okay, but it is not related with NAPI support.
-Need new patch for that.
-
->
->
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+index f9e2701..0b98100 100644
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ b/arch/arm/configs/armadillo800eva_defconfig
+@@ -90,14 +90,11 @@ CONFIG_I2C_SH_MOBILE=y
+ # CONFIG_HWMON is not set
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_VIDEO_DEV=y
+-# CONFIG_RC_CORE is not set
+-# CONFIG_VIDEO_HELPER_CHIPS_AUTO is not set
+-# CONFIG_V4L_USB_DRIVERS is not set
++CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_MT9T112=y
+ CONFIG_VIDEO_SH_MOBILE_CEU=y
+-# CONFIG_RADIO_ADAPTERS is not set
+ CONFIG_FB=y
+ CONFIG_FB_SH_MOBILE_LCDC=y
+ CONFIG_FB_SH_MOBILE_HDMI=y
+-- 
+1.7.10.4
