@@ -1,69 +1,104 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 12:55:23 +0900
-Subject: [PATCH 05/15] ARM: sh7372: add clock lookup entries for DT-based
- devices
+Date: Fri, 25 Jan 2013 12:55:26 +0900
+Subject: [PATCH 08/15] ARM: shmobile: sh73a0: Add CPU sleep suspend
 In-Reply-To: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359086133-23357-6-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359086133-23357-9-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Bastian Hecht <hechtb@gmail.com>
 
-When booting with DT, devices are named differently. To get their clocks
-additional entries have to be added to the lookup table.
+Add the lighest possible sleep mode on Cortex-A9 cores: CPU sleep. It is
+entered by a simple dsb and wfi instruction via cpu_do_idle(). As just
+clocks are stopped there is no need to save or restore any state of the
+system.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Signed-off-by: Simon Horman <horms@verge.net.au>
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-sh7372.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/mach-shmobile/Makefile              |    1 +
+ arch/arm/mach-shmobile/board-kzm9g.c         |    2 ++
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/pm-sh73a0.c           |   32 ++++++++++++++++++++++++++
+ 4 files changed, 36 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/pm-sh73a0.c
 
-diff --git a/arch/arm/mach-shmobile/clock-sh7372.c b/arch/arm/mach-shmobile/clock-sh7372.c
-index 3ca6757b..45d21fe 100644
---- a/arch/arm/mach-shmobile/clock-sh7372.c
-+++ b/arch/arm/mach-shmobile/clock-sh7372.c
-@@ -544,6 +544,7 @@ static struct clk_lookup lookups[] = {
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 0b71479..f6aba6d 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -37,6 +37,7 @@ obj-$(CONFIG_ARCH_SHMOBILE)	+= pm-rmobile.o
+ obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o
+ obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
++obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
  
- 	/* MSTP32 clocks */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.2", &mstp_clks[MSTP001]), /* IIC2 */
-+	CLKDEV_DEV_ID("fff30000.i2c", &mstp_clks[MSTP001]), /* IIC2 */
- 	CLKDEV_DEV_ID("spi_sh_msiof.0", &mstp_clks[MSTP000]), /* MSIOF0 */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.4", &mstp_clks[MSTP131]), /* VEU3 */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.3", &mstp_clks[MSTP130]), /* VEU2 */
-@@ -556,6 +557,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-mipi-dsi.0", &mstp_clks[MSTP118]), /* DSITX0 */
- 	CLKDEV_DEV_ID("sh_mobile_lcdc_fb.1", &mstp_clks[MSTP117]), /* LCDC1 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.0", &mstp_clks[MSTP116]), /* IIC0 */
-+	CLKDEV_DEV_ID("fff20000.i2c", &mstp_clks[MSTP116]), /* IIC0 */
- 	CLKDEV_DEV_ID("sh_mobile_meram.0", &mstp_clks[MSTP113]), /* MERAM */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.5", &mstp_clks[MSTP106]), /* JPU */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.0", &mstp_clks[MSTP101]), /* VPU */
-@@ -577,18 +579,25 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP200]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI2 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.1", &mstp_clks[MSTP323]), /* IIC1 */
-+	CLKDEV_DEV_ID("e6c20000.i2c", &mstp_clks[MSTP323]), /* IIC1 */
- 	CLKDEV_DEV_ID("r8a66597_hcd.0", &mstp_clks[MSTP322]), /* USB0 */
- 	CLKDEV_DEV_ID("r8a66597_udc.0", &mstp_clks[MSTP322]), /* USB0 */
- 	CLKDEV_DEV_ID("renesas_usbhs.0", &mstp_clks[MSTP322]), /* USB0 */
- 	CLKDEV_DEV_ID("sh_flctl.0", &mstp_clks[MSTP315]), /* FLCTL */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
-+	CLKDEV_DEV_ID("e6850000.sdhi", &mstp_clks[MSTP314]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
-+	CLKDEV_DEV_ID("e6860000.sdhi", &mstp_clks[MSTP313]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMC */
-+	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMC */
- 	CLKDEV_DEV_ID("sh-mipi-dsi.1", &mstp_clks[MSTP423]), /* DSITX1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP415]), /* SDHI2 */
-+	CLKDEV_DEV_ID("e6870000.sdhi", &mstp_clks[MSTP415]), /* SDHI2 */
- 	CLKDEV_DEV_ID("sh-mobile-hdmi", &mstp_clks[MSTP413]), /* HDMI */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.3", &mstp_clks[MSTP411]), /* IIC3 */
-+	CLKDEV_DEV_ID("e6d20000.i2c", &mstp_clks[MSTP411]), /* IIC3 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.4", &mstp_clks[MSTP410]), /* IIC4 */
-+	CLKDEV_DEV_ID("e6d30000.i2c", &mstp_clks[MSTP410]), /* IIC4 */
- 	CLKDEV_DEV_ID("sh-dma-engine.4", &mstp_clks[MSTP407]), /* USB-DMAC1 */
- 	CLKDEV_DEV_ID("r8a66597_hcd.1", &mstp_clks[MSTP406]), /* USB1 */
- 	CLKDEV_DEV_ID("r8a66597_udc.1", &mstp_clks[MSTP406]), /* USB1 */
+ # Board objects
+ obj-$(CONFIG_MACH_AP4EVB)	+= board-ap4evb.o
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index ac94285..363c6ed 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -772,6 +772,8 @@ static void __init kzm_init(void)
+ 
+ 	sh73a0_add_standard_devices();
+ 	platform_add_devices(kzm_devices, ARRAY_SIZE(kzm_devices));
++
++	sh73a0_pm_init();
+ }
+ 
+ static void kzm9g_restart(char mode, const char *cmd)
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 2d1686b..f221c11 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -40,6 +40,7 @@ extern void sh73a0_add_early_devices(void);
+ extern void sh73a0_add_standard_devices(void);
+ extern void sh73a0_clock_init(void);
+ extern void sh73a0_pinmux_init(void);
++extern void sh73a0_pm_init(void);
+ extern struct clk sh73a0_extal1_clk;
+ extern struct clk sh73a0_extal2_clk;
+ extern struct clk sh73a0_extcki_clk;
+diff --git a/arch/arm/mach-shmobile/pm-sh73a0.c b/arch/arm/mach-shmobile/pm-sh73a0.c
+new file mode 100644
+index 0000000..99086e9
+--- /dev/null
++++ b/arch/arm/mach-shmobile/pm-sh73a0.c
+@@ -0,0 +1,32 @@
++/*
++ * sh73a0 Power management support
++ *
++ *  Copyright (C) 2012 Bastian Hecht <hechtb+renesas@gmail.com>
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++#include <linux/suspend.h>
++#include <mach/common.h>
++
++#ifdef CONFIG_SUSPEND
++static int sh73a0_enter_suspend(suspend_state_t suspend_state)
++{
++	cpu_do_idle();
++	return 0;
++}
++
++static void sh73a0_suspend_init(void)
++{
++	shmobile_suspend_ops.enter = sh73a0_enter_suspend;
++}
++#else
++static void sh73a0_suspend_init(void) {}
++#endif
++
++void __init sh73a0_pm_init(void)
++{
++	sh73a0_suspend_init();
++}
 -- 
 1.7.10.4
