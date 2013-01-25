@@ -1,41 +1,58 @@
-From: xiechao.linux@gmail.com (chao xie)
-Date: Fri, 25 Jan 2013 09:57:52 +0800
-Subject: [V5 PATCH 07/26] usb: gadget: mv_udc: make mv_udc depends on
- ARCH_MMP or ARCH_PXA
-In-Reply-To: <20130124090849.GE27304@arwen.pp.htv.fi>
-References: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
- <1359009530-28182-8-git-send-email-chao.xie@marvell.com>
- <20130124090849.GE27304@arwen.pp.htv.fi>
-Message-ID: <CAK9wHMR4OH9hxfE31XHZvPVh+wfK7eDTqS-mL7Gmye1hzo5ScQ@mail.gmail.com>
+From: lznuaa@gmail.com (Frank Li)
+Date: Fri, 25 Jan 2013 10:02:09 +0800
+Subject: [PATCH v2 1/1 net-next] net: fec: add napi support to improve
+ proformance
+In-Reply-To: <1359035768.12374.2083.camel@edumazet-glaptop>
+References: <1359014309-8636-1-git-send-email-Frank.Li@freescale.com>
+ <1359035768.12374.2083.camel@edumazet-glaptop>
+Message-ID: <CAHrpEqQKSs801pAb-Hdh1G2uGS9oYqxsV-uwUMevyzHTry729w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/24 Felipe Balbi <balbi@ti.com>:
-> Hi,
->
-> On Thu, Jan 24, 2013 at 01:38:31AM -0500, Chao Xie wrote:
->> Only ARCH_PXA and ARCH_MMP will use mv_udc.
+2013/1/24 Eric Dumazet <eric.dumazet@gmail.com>:
+> On Thu, 2013-01-24 at 15:58 +0800, Frank Li wrote:
 >>
->> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>>  static irqreturn_t
+>> @@ -805,6 +823,7 @@ fec_enet_interrupt(int irq, void *dev_id)
+>>       struct net_device *ndev = dev_id;
+>>       struct fec_enet_private *fep = netdev_priv(ndev);
+>>       uint int_events;
+>> +     ulong flags;
+>>       irqreturn_t ret = IRQ_NONE;
+>>
+>>       do {
+>> @@ -813,7 +832,14 @@ fec_enet_interrupt(int irq, void *dev_id)
+>>
+>>               if (int_events & FEC_ENET_RXF) {
+>>                       ret = IRQ_HANDLED;
+>> -                     fec_enet_rx(ndev);
+>> +
+>> +                     spin_lock_irqsave(&fep->hw_lock, flags);
 >
-> NAK, you should fix your transceiver dependency. I want these gadget
-> drivers to compile cleanly on all arches so we make proper use of
-> linux-next. I have applied up to previous patch in this series and I
-> won't go any further. The rest will be delayed for v3.10
+> You already are in a irq safe context, spin_lock() should be ok
+
+Okay, I will fix it.
+
 >
-> sorry
+>> +                     /* Disable the RX interrupt */
+>> +                     if (napi_schedule_prep(&fep->napi)) {
+>> +                             fec_enet_rx_int_is_enabled(ndev, false);
+>> +                             __napi_schedule(&fep->napi);
+>> +                     }
+>> +                     spin_unlock_irqrestore(&fep->hw_lock, flags);
 >
-> --
-> balbi
+>        spin_unlock();
+>
+>>               }
+>>
+>
+>
+> Same remark for the spin_lock_irqsave(&fep->tmreg_lock, flags) in
+> fec_enet_tx()
+>
 
-I see. I will remove this patch. In fact, I have modified the dependency, so
-without this patch, the reset of patches can still be compiled successully.
-So when is the next merge? Need i re-send the rest of patches?
-There are some feedbacks about device tree, and I will seperate the
-device tree part from the
-patche series. i do not want to post a big set of patches only with
-modification to device tree part.
+Okay, but it is not related with NAPI support.
+Need new patch for that.
 
-Thanks.
-
-Chao
+>
+>
