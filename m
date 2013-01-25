@@ -1,41 +1,175 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 25 Jan 2013 07:52:14 -0500
-Subject: [RFC V2 PATCH 0/8] ARM: kirkwood: cleanup DT conversion
-In-Reply-To: <201301251115.47480.arnd@arndb.de>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <cover.1359091286.git.jason@lakedaemon.net>
- <201301251115.47480.arnd@arndb.de>
-Message-ID: <20130125125214.GI1758@titan.lakedaemon.net>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 25 Jan 2013 13:53:21 +0100
+Subject: [PATCH 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can sleep
+In-Reply-To: <1359108114-16998-4-git-send-email-florian.vaussard@epfl.ch>
+References: <1359108114-16998-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359108114-16998-4-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <51028041.2060504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 11:15:47AM +0000, Arnd Bergmann wrote:
-> On Friday 25 January 2013, Jason Cooper wrote:
-> > This is a second cut at cleaning up mach-kirkwood/.  There are a few DT
-> > conversions (topkick -> mvsdio, pinctrl) which, once reviewed, I'll put in the
-> > normal pull request cycle.
-> > 
-> > The others which remove board-*.c files, I'll keep updating against
-> > mvebu/for-next, and then apply at the end of the merge window.
-> > 
-> > Please test as you are able.
+On 01/25/2013 11:01 AM, Florian Vaussard wrote:
+> Call to led_pwm_set() can happen inside atomic context, like triggers.
+> If the PWM call can sleep, defer using a worker.
 > 
-> Great work, it's really nice to see where things are going now!
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> ---
+>  drivers/leds/leds-pwm.c |   45 +++++++++++++++++++++++++++++++++++++++------
+>  1 files changed, 39 insertions(+), 6 deletions(-)
 > 
-> In patch 7, the changeset text seems to be indented wrong, but the
-> patch is still good.
+> diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+> index a1ea5f6..1ffb6ba 100644
+> --- a/drivers/leds/leds-pwm.c
+> +++ b/drivers/leds/leds-pwm.c
+> @@ -23,12 +23,15 @@
+>  #include <linux/pwm.h>
+>  #include <linux/leds_pwm.h>
+>  #include <linux/slab.h>
+> +#include <linux/workqueue.h>
+>  
+>  struct led_pwm_data {
+>  	struct led_classdev	cdev;
+>  	struct pwm_device	*pwm;
+> +	struct work_struct	work;
+>  	unsigned int		active_low;
+>  	unsigned int		period;
+> +	int			duty;
+
+Would it be better if we also store the can_sleep in led_pwm_data struct and
+initialize it when we probe the LEDs? It is not going to change runtime and we
+will save one API call every time the LED has been changed.
+
+>  };
+>  
+>  struct led_pwm_priv {
+> @@ -36,6 +39,20 @@ struct led_pwm_priv {
+>  	struct led_pwm_data leds[0];
+>  };
+>  
+> +static void led_pwm_work(struct work_struct *work)
+> +{
+> +	struct led_pwm_data *led_dat =
+> +		container_of(work, struct led_pwm_data, work);
+> +	int new_duty = led_dat->duty;
+> +
+> +	pwm_config(led_dat->pwm, new_duty, led_dat->period);
+> +
+> +	if (new_duty == 0)
+> +		pwm_disable(led_dat->pwm);
+> +	else
+> +		pwm_enable(led_dat->pwm);
+> +}
+
+I think we can remove the duplicated code by doing something like this:
+
+static void __led_pwm_set(struct led_pwm_data *led_dat)
+{
+	int new_duty = led_dat->duty;
+
+	pwm_config(led_dat->pwm, new_duty, led_dat->period);
+
+	if (new_duty == 0)
+		pwm_disable(led_dat->pwm);
+	else
+		pwm_enable(led_dat->pwm);
+}
+
+static void led_pwm_work(struct work_struct *work)
+{
+	struct led_pwm_data *led_dat =
+		container_of(work, struct led_pwm_data, work);
+
+	__led_pwm_set(led_dat);
+}
+
+static void led_pwm_set(struct led_classdev *led_cdev,
+	enum led_brightness brightness)
+{
+	struct led_pwm_data *led_dat =
+		container_of(led_cdev, struct led_pwm_data, cdev);
+ 	unsigned int max = led_dat->cdev.max_brightness;
+
+	led_dat->duty = brightness * led_dat->period / max;
+
+	if (led_dat->can_sleep)
+		schedule_work(&led_dat->work);
+	else
+		__led_pwm_set(led_dat);
+}
+
+What do you think?
+
+> +
+>  static void led_pwm_set(struct led_classdev *led_cdev,
+>  	enum led_brightness brightness)
+>  {
+> @@ -43,13 +60,23 @@ static void led_pwm_set(struct led_classdev *led_cdev,
+>  		container_of(led_cdev, struct led_pwm_data, cdev);
+>  	unsigned int max = led_dat->cdev.max_brightness;
+>  	unsigned int period =  led_dat->period;
+> +	int duty;
+>  
+> -	if (brightness == 0) {
+> -		pwm_config(led_dat->pwm, 0, period);
+> -		pwm_disable(led_dat->pwm);
+> +	if (brightness == 0)
+> +		duty = 0;
+> +	else
+> +		duty = brightness * period / max;
+> +
+> +	if (pwm_can_sleep(led_dat->pwm)) {
+> +		led_dat->duty = duty;
+> +		schedule_work(&led_dat->work);
+>  	} else {
+> -		pwm_config(led_dat->pwm, brightness * period / max, period);
+> -		pwm_enable(led_dat->pwm);
+> +		pwm_config(led_dat->pwm, duty, period);
+> +
+> +		if (duty == 0)
+> +			pwm_disable(led_dat->pwm);
+> +		else
+> +			pwm_enable(led_dat->pwm);
+>  	}
+>  }
+
+
+
+>  
+> @@ -100,6 +127,8 @@ static struct led_pwm_priv *led_pwm_create_of(struct platform_device *pdev)
+>  		led_dat->cdev.brightness = LED_OFF;
+>  		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+>  
+> +		INIT_WORK(&led_dat->work, led_pwm_work);
+> +
+>  		ret = led_classdev_register(&pdev->dev, &led_dat->cdev);
+>  		if (ret < 0) {
+>  			dev_err(&pdev->dev, "failed to register for %s\n",
+> @@ -153,6 +182,8 @@ static int led_pwm_probe(struct platform_device *pdev)
+>  			led_dat->cdev.max_brightness = cur_led->max_brightness;
+>  			led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+>  
+> +			INIT_WORK(&led_dat->work, led_pwm_work);
+
+If we query the can_sleep before we can skip the INIT_WORK() when it is not set.
+
+> +
+>  			ret = led_classdev_register(&pdev->dev, &led_dat->cdev);
+>  			if (ret < 0)
+>  				goto err;
+> @@ -180,8 +211,10 @@ static int led_pwm_remove(struct platform_device *pdev)
+>  	struct led_pwm_priv *priv = platform_get_drvdata(pdev);
+>  	int i;
+>  
+> -	for (i = 0; i < priv->num_leds; i++)
+> +	for (i = 0; i < priv->num_leds; i++) {
+>  		led_classdev_unregister(&priv->leds[i].cdev);
+> +		cancel_work_sync(&priv->leds[i].work);
+> +	}
+>  
+>  	return 0;
+>  }
 > 
-> I wonder if it makes sense to collapse the few remaining DT based
-> board files now and move their entire contents back into board-dt.c.
-> Of course, if you think they will all be gone soon anyway, there
-> is no point.
 
-Once I have the mv643xx_eth binding working reliably, preferably with
-mvmdio, I'll take a look at removing the last board-*.c files.  If the
-stars align, we'll get it all done for v3.9.
 
-The only big thing left will be pcie.
-
-thx,
-
-Jason.
+-- 
+P?ter
