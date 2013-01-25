@@ -1,140 +1,26 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Jan 2013 09:36:50 +0100
-Subject: [PATCH v3 2/3] gpio: pca953x: add support for pca9505
-In-Reply-To: <CACRpkda-N0GrKOeaz4Hji0ef9pSRNPCxW_jLGR28iX-sk0-=tg@mail.gmail.com>
-References: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
- <1358889025-8530-3-git-send-email-gregory.clement@free-electrons.com>
- <CACRpkda-N0GrKOeaz4Hji0ef9pSRNPCxW_jLGR28iX-sk0-=tg@mail.gmail.com>
-Message-ID: <51024422.2060503@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 25 Jan 2013 09:39:33 +0100
+Subject: [PATCH RESEND 0/2] CFA10036: Switch to SPI Bitbanging
+Message-ID: <1359103175-26304-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2013 09:16 AM, Linus Walleij wrote:
-> On Tue, Jan 22, 2013 at 10:10 PM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
-> 
->> Now that pca953x driver can handle GPIO expanders with more than 32
->> bits this patch adds the support for the pca9505 which cam with 40
->> GPIOs.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> 
-> Patch applied, thanks.
-> 
-> But guys, this driver contains some horrific stuff, look at this:
-> 
-> static int pxa_gpio_nums(void)
-> {
->         int count = 0;
-> 
-> #ifdef CONFIG_ARCH_PXA
->         if (cpu_is_pxa25x()) {
-> #ifdef CONFIG_CPU_PXA26x
->                 count = 89;
->                 gpio_type = PXA26X_GPIO;
-> #elif defined(CONFIG_PXA25x)
->                 count = 84;
->                 gpio_type = PXA26X_GPIO;
-> #endif /* CONFIG_CPU_PXA26x */
->         } else if (cpu_is_pxa27x()) {
->                 count = 120;
->                 gpio_type = PXA27X_GPIO;
->         } else if (cpu_is_pxa93x()) {
->                 count = 191;
->                 gpio_type = PXA93X_GPIO;
->         } else if (cpu_is_pxa3xx()) {
->                 count = 127;
->                 gpio_type = PXA3XX_GPIO;
->         }
-> #endif /* CONFIG_ARCH_PXA */
-> 
-> #ifdef CONFIG_ARCH_MMP
->         if (cpu_is_pxa168() || cpu_is_pxa910()) {
->                 count = 127;
->                 gpio_type = MMP_GPIO;
->         } else if (cpu_is_mmp2()) {
->                 count = 191;
->                 gpio_type = MMP_GPIO;
->         }
-> #endif /* CONFIG_ARCH_MMP */
->         return count;
-> }
-> 
-> This is totally killing all attempts at a single kernel for multiple
-> machines in this family. The above should not be #ifdef's but instead
-> use either platform data or the compatible property to figure out which
-> one to use.
-> 
-> It's fine to introduce new compatible= strings or device names to
-> distinguish between these.
-> 
-> As an example, in pinctrl-nomadik.c we have this:
-> 
-> static const struct of_device_id nmk_pinctrl_match[] = {
->         {
->                 .compatible = "stericsson,nmk_pinctrl",
->                 .data = (void *)PINCTRL_NMK_DB8500,
->         },
->         {},
-> };
-> 
-> static const struct platform_device_id nmk_pinctrl_id[] = {
->         { "pinctrl-stn8815", PINCTRL_NMK_STN8815 },
->         { "pinctrl-db8500", PINCTRL_NMK_DB8500 },
->         { "pinctrl-db8540", PINCTRL_NMK_DB8540 },
->         { }
-> };
-> 
-> static struct platform_driver nmk_pinctrl_driver = {
->         .driver = {
->                 .owner = THIS_MODULE,
->                 .name = "pinctrl-nomadik",
->                 .of_match_table = nmk_pinctrl_match,
->         },
->         .probe = nmk_pinctrl_probe,
->         .id_table = nmk_pinctrl_id,
-> };
-> 
-> 
-> The first match is for DT boot the latter for using the platform
-> device name directly.
-> 
-> Then in the probefunction we do:
-> 
-> static int nmk_pinctrl_probe(struct platform_device *pdev)
-> {
->         const struct platform_device_id *platid = platform_get_device_id(pdev);
-> (...)
->         if (platid)
->                 version = platid->driver_data;
->         else if (np) {
->                 const struct of_device_id *match;
-> 
->                 match = of_match_device(nmk_pinctrl_match, &pdev->dev);
->                 if (!match)
->                         return -ENODEV;
->                 version = (unsigned int) match->data;
->         }
-> (...)
->         if (version == PINCTRL_NMK_STN8815)
->                 nmk_pinctrl_stn8815_init(&npct->soc);
->         if (version == PINCTRL_NMK_DB8500)
->                 nmk_pinctrl_db8500_init(&npct->soc);
->         if (version == PINCTRL_NMK_DB8540)
->                 nmk_pinctrl_db8540_init(&npct->soc);
-> }
-> 
-> Surely a scheme like this must be possible to use to distinguish between
-> the different versions at runtime rather than using these #ifdefs?
-> 
+Hi,
 
-Well, at the beginning I thought adding support for pca9505 was just a matter
-of a couple of lines to add. Then I realized that I need to handle the 40 bits
-case, and I ended up refactoring all access to the registers. So now I am on it,
-it seems I am volunteer to continue to improve this driver.
+Here is a patchset that moves the spi bus we use to bitbanging. This is needed
+because the DAC found on this bus is actually using a 12 bits wordlength, while
+the imx28 spi controler can only handle 4, 8 or 16 bits per words.
 
-However I won't be able to test it, the only PXA based platform I have is a
-Zaurus SL-C3100 which embeds a PXA270 if I remember well, but I doubt it come
-with gpio expander on i2c.
+Thanks,
+Maxime
 
-Gregory
+Maxime Ripard (2):
+  spi: spi-gpio: Add checks for the dt properties
+  ARM: dts: cfa10049: Change the SPI3 bus to spi-gpio
+
+ arch/arm/boot/dts/imx28-cfa10049.dts |   78 ++++++++++++++++++----------------
+ drivers/spi/spi-gpio.c               |   23 ++++++++--
+ 2 files changed, 62 insertions(+), 39 deletions(-)
+
+-- 
+1.7.10.4
