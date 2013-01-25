@@ -1,18 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Jan 2013 08:52:34 +0000
-Subject: [BUG] panda board locks up on boot
-In-Reply-To: <1359082886.21576.199.camel@gandalf.local.home>
-References: <1359082886.21576.199.camel@gandalf.local.home>
-Message-ID: <20130125085234.GY23505@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 25 Jan 2013 09:54:04 +0100
+Subject: [PATCHv2 0/3] Add framebuffer support to the CFA-10049
+Message-ID: <1359104048-26823-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 10:01:26PM -0500, Steven Rostedt wrote:
-> I've recently started testing my work on arm boards and have found that
-> they both don't boot under the latest kernel anymore. I already posted
-> about my snowball board, but my panda board also locks up.
+Hi,
 
-You need to enable DMA engine and the OMAP DMA engine driver.  I believe
-someone was going to work on adding PIO-mode support to the driver but
-I suspect as TI's OMAP division is being reorganized, all that is now
-uncertain.
+The CFA-10049 embeds a LCD screen that is using a Himax HX-8357B
+that needs to be initialized through SPI before being able to use
+its RGB interface.
+
+This patchset adds a driver for this controller, and the needed
+pieces in the 10049 device tree to enable it.
+
+Maxime
+
+Changes from v1:
+  - Fixed typos and minor changes
+  - Removed the __devinit/__devexit
+
+Maxime Ripard (3):
+  fb: backlight: Add the Himax HX-8357B LCD controller
+  ARM: dts: mxs: Add muxing options for the third PWM
+  ARM: dts: mxs: Add the LCD to the 10049 board
+
+ arch/arm/boot/dts/imx28-cfa10049.dts |   99 +++++++
+ arch/arm/boot/dts/imx28.dtsi         |   10 +
+ arch/arm/mach-mxs/mach-mxs.c         |   22 ++
+ drivers/video/backlight/Kconfig      |    7 +
+ drivers/video/backlight/Makefile     |    1 +
+ drivers/video/backlight/hx8357.c     |  482 ++++++++++++++++++++++++++++++++++
+ 6 files changed, 621 insertions(+)
+ create mode 100644 drivers/video/backlight/hx8357.c
+
+-- 
+1.7.10.4
