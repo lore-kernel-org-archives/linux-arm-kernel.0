@@ -1,39 +1,34 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 25 Jan 2013 12:06:35 +0530
-Subject: [PATCH] ARM: omap4: clock data: Add missing clkdm association for
- dpll_usb
-Message-ID: <1359095795-9538-1-git-send-email-rnayak@ti.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 25 Jan 2013 14:38:32 +0800
+Subject: [PATCH] ARM: tegra: fix compile error when disable CPU_IDLE
+Message-ID: <1359095912-32455-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dpll_usb needs the clkdm association so the clkdm can be
-turned on before a relock. All other dplls for omap4 belong
-to the ALWON (always on) domain.
+The "sleep.S" file has many functions that be shared by different module
+currently. Not just for CPU idle driver. Make it build as default now.
 
-The association was present as part of the older data file
-(clock44xx_data.c) but looks like was accidently dropped with
-the common clk convertion.
-
-More details of the patch which fixed this up in the older
-data file can be dound here..
-http://www.spinics.net/lists/linux-omap/msg63076.html
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Reported-by: Rhyland Klein <rklein@nvidia.com>
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-omap2/cclock44xx_data.c |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-tegra/Makefile | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-index 5789a5e..fdea8da 100644
---- a/arch/arm/mach-omap2/cclock44xx_data.c
-+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -601,6 +601,7 @@ static struct clk_hw_omap dpll_usb_ck_hw = {
- 	},
- 	.dpll_data	= &dpll_usb_dd,
- 	.ops		= &clkhwops_omap3_dpll,
-+	.clkdm_name	= "l3_init_clkdm",
- };
- 
- DEFINE_STRUCT_CLK(dpll_usb_ck, dpll_usb_ck_parents, dpll_ck_ops);
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 432f2a5..200faf2 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -6,10 +6,9 @@ obj-y					+= pmc.o
+ obj-y					+= flowctrl.o
+ obj-y					+= powergate.o
+ obj-y					+= apbio.o
+-obj-y					+= pm.o
++obj-y					+= pm.o sleep.o
+ obj-y					+= reset.o reset-handler.o
+ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+-obj-$(CONFIG_CPU_IDLE)			+= sleep.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra20_speedo.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= sleep-tegra20.o
 -- 
-1.7.9.5
+1.8.0.3
