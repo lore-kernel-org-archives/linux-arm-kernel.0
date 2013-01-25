@@ -1,40 +1,43 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 25 Jan 2013 23:15:39 +0100
-Subject: [PATCH 1/4 v11] arm: use device tree to get smp_twd clock
-In-Reply-To: <20130125214000.GA23505@n2100.arm.linux.org.uk>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <3041510.xugDHtFsGr@vostro.rjw.lan>
- <20130125214000.GA23505@n2100.arm.linux.org.uk>
-Message-ID: <2022065.fFzVbP4vta@vostro.rjw.lan>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 25 Jan 2013 14:20:32 -0800
+Subject: [PATCH v2 1/4] ARM: OMAP2+: dpll: round rate to closest value
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA9388C@DBDE01.ent.ti.com>
+References: <cover.1358937533.git.afzal@ti.com>
+ <871e6890897534b6c3669e252f23bef5ff1247b6.1358937533.git.afzal@ti.com>
+ <alpine.DEB.2.00.1301250816010.471@utopia.booyaka.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9388C@DBDE01.ent.ti.com>
+Message-ID: <20130125222032.10623.47200@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 25, 2013 09:40:00 PM Russell King - ARM Linux wrote:
-> On Fri, Jan 25, 2013 at 10:03:05PM +0100, Rafael J. Wysocki wrote:
-> > On Friday, January 25, 2013 01:46:42 PM Mark Langsdorf wrote:
-> > > From: Rob Herring <rob.herring@calxeda.com>
+Quoting Mohammed, Afzal (2013-01-25 04:18:22)
+> Hi Paul,
+> 
+> On Fri, Jan 25, 2013 at 13:48:11, Paul Walmsley wrote:
+> > On Wed, 23 Jan 2013, Afzal Mohammed wrote:
+> 
+> > > Currently round rate function would return proper rate iff requested
+> > > rate exactly matches the PLL lockable rate. This causes set_rate to
+> > > fail if exact rate could not be set. Instead round rate may return
+> > > closest rate possible (less than the requested). And if any user is
+> > > badly in need of exact rate, then return value of round rate could
+> > > be used to decide whether to invoke set rate or not.
 > > > 
-> > > Move clk setup to twd_local_timer_common_register and rely on
-> > > twd_timer_rate being 0 to force calibration if there is no clock.
-> > > Remove common_setup_called as it is no longer needed.
-> > > 
-> > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > > Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
+> > > Modify round rate so that it return closest possible rate.
 > > 
-> > Russell, is this fine with you?
+> > This doesn't look like the right approach to me.  For some PLLs, an exact 
+> > rate is desired.
 > 
-> Looks fine to me, though I had to check twd_calibrate_rate() to make
-> sure it wouldn't run if the twd_timer_rate was non-zero.
+> If exact rate is required, there is a way to achieve it as mentioned
+> in the commit message, i.e. by first invoking round rate over reqd. rate
+> and if it doesn't match, bail out w/o invoking set_rate.
 > 
-> If you want an acked-by:
-> 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> And it seems requirement of CCF w.r.t to round rate is to return closest
+> possible rate.
 
-I will, thanks a lot!
+Is MULT_ROUND_UP doing the right thing for you in the clk_divider code?
+What is the clock rate requested of the parent PLL?  I just want to make
+sure that we're doing the right thing in the basic divider code.
 
-Rafael
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Thanks,
+Mike
