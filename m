@@ -1,58 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:24:09 +0900
-Subject: [PATCH 33/80] sh: sh7720: Register PFC platform device
+Date: Fri, 25 Jan 2013 11:24:54 +0900
+Subject: [PATCH 78/80] sh: Remove unused sh_pfc_register_info() function
 In-Reply-To: <1359080696-31489-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359080696-31489-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080696-31489-34-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359080696-31489-79-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Add arch code to register the PFC platform device instead of calling the
-driver directly. Platform device registration in the sh-pfc driver will
-be removed.
+All boards use sh_pfc_register() directly, remove the unused
+sh_pfc_register_info() function.
+
+Make the name argument to sh_pfc_register() mandatory as it's now
+supplied by all callers.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/sh/Kconfig                        |    1 +
- arch/sh/kernel/cpu/sh3/pinmux-sh7720.c |    3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/sh/include/asm/gpio.h           |    2 +-
+ arch/sh/include/cpu-common/cpu/pfc.h |    4 ----
+ arch/sh/kernel/cpu/pfc.c             |   13 +------------
+ 3 files changed, 2 insertions(+), 17 deletions(-)
 
-diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index b934d7d..bfb8b3e 100644
---- a/arch/sh/Kconfig
-+++ b/arch/sh/Kconfig
-@@ -367,6 +367,7 @@ config CPU_SUBTYPE_SH7720
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select USB_ARCH_HAS_OHCI
- 	select USB_OHCI_SH if USB_OHCI_HCD
-+	select PINCTRL
- 	help
- 	  Select SH7720 if you have a SH3-DSP SH7720 CPU.
+diff --git a/arch/sh/include/asm/gpio.h b/arch/sh/include/asm/gpio.h
+index 04f53d3..7dfe15e 100644
+--- a/arch/sh/include/asm/gpio.h
++++ b/arch/sh/include/asm/gpio.h
+@@ -20,7 +20,7 @@
+ #endif
  
-diff --git a/arch/sh/kernel/cpu/sh3/pinmux-sh7720.c b/arch/sh/kernel/cpu/sh3/pinmux-sh7720.c
-index 9ca1546..df0648f 100644
---- a/arch/sh/kernel/cpu/sh3/pinmux-sh7720.c
-+++ b/arch/sh/kernel/cpu/sh3/pinmux-sh7720.c
-@@ -11,6 +11,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/gpio.h>
-+#include <cpu/pfc.h>
- #include <cpu/sh7720.h>
+ #define ARCH_NR_GPIOS 512
+-#include <linux/sh_pfc.h>
++#include <asm-generic/gpio.h>
  
- enum {
-@@ -1236,7 +1237,7 @@ static struct pinmux_info sh7720_pinmux_info = {
+ #ifdef CONFIG_GPIOLIB
  
- static int __init plat_pinmux_setup(void)
+diff --git a/arch/sh/include/cpu-common/cpu/pfc.h b/arch/sh/include/cpu-common/cpu/pfc.h
+index 40e8643..e538813 100644
+--- a/arch/sh/include/cpu-common/cpu/pfc.h
++++ b/arch/sh/include/cpu-common/cpu/pfc.h
+@@ -18,13 +18,9 @@
+ 
+ #include <linux/types.h>
+ 
+-struct pinmux_info;
+ struct resource;
+ 
+ int sh_pfc_register(const char *name,
+ 		    struct resource *resource, u32 num_resources);
+-int sh_pfc_register_info(const char *name,
+-			 struct resource *resource, u32 num_resources,
+-			 struct pinmux_info *pdata);
+ 
+ #endif /* __ARCH_SH_CPU_PFC_H__ */
+diff --git a/arch/sh/kernel/cpu/pfc.c b/arch/sh/kernel/cpu/pfc.c
+index d045d75..d766564 100644
+--- a/arch/sh/kernel/cpu/pfc.c
++++ b/arch/sh/kernel/cpu/pfc.c
+@@ -19,26 +19,15 @@
+ #include <cpu/pfc.h>
+ 
+ static struct platform_device sh_pfc_device = {
+-	.name		= "sh-pfc",
+ 	.id		= -1,
+ };
+ 
+ int __init sh_pfc_register(const char *name,
+ 			   struct resource *resource, u32 num_resources)
  {
--	return register_pinmux(&sh7720_pinmux_info);
-+	return sh_pfc_register_info(NULL, NULL, 0, &sh7720_pinmux_info);
- }
+-	if (name)
+-		sh_pfc_device.name = name;
++	sh_pfc_device.name = name;
+ 	sh_pfc_device.num_resources = num_resources;
+ 	sh_pfc_device.resource = resource;
  
- arch_initcall(plat_pinmux_setup);
+ 	return platform_device_register(&sh_pfc_device);
+ }
+-
+-int __init sh_pfc_register_info(const char *name,
+-				struct resource *resource, u32 num_resources,
+-				struct pinmux_info *pdata)
+-{
+-	sh_pfc_device.dev.platform_data = pdata;
+-
+-	return sh_pfc_register(name, resource, num_resources);
+-}
 -- 
 1.7.10.4
