@@ -1,36 +1,38 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 24 Jan 2013 22:01:26 -0500
-Subject: [BUG] panda board locks up on boot
-Message-ID: <1359082886.21576.199.camel@gandalf.local.home>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 25 Jan 2013 08:48:34 +0530
+Subject: [PATCH 5/6] ARM: dts: omap5: add dwc3 core dt data
+In-Reply-To: <1359083915-8690-1-git-send-email-kishon@ti.com>
+References: <1359083915-8690-1-git-send-email-kishon@ti.com>
+Message-ID: <1359083915-8690-6-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've recently started testing my work on arm boards and have found that
-they both don't boot under the latest kernel anymore. I already posted
-about my snowball board, but my panda board also locks up.
+Add dwc3 core dt data as a subnode to dwc3 omap glue data in omap5 dt
+data file. The information for the entered data node is available @
+Documentation/devicetree/bindings/usb/dwc3.txt
 
-I've bisected it down to this commit:
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap5.dtsi |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-commit 26b88520b80695a6fa5fd95b5d97c03f4daf87e0
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Fri Apr 13 12:27:37 2012 +0100
-
-    mmc: omap_hsmmc: remove private DMA API implementation
-    
-    Remove the private DMA API implementation from omap_hsmmc, making it
-    use entirely the DMA engine API.
-    
-    Tested-by: Tony Lindgren <tony@atomide.com>
-    Tested-by: Venkatraman S <svenkatr@ti.com>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-
-The commit before boots fine, when adding this commit, it locks up.
-
-I reverted the commit (with tweaks) against 3.8-rc4 and was able to get
-my board booting again. Not sure what to do, but I wanted to let people
-know.
-
-Thanks,
-
--- Steve
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 1703a72..58118c4 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -522,6 +522,13 @@
+ 			#size-cells = <1>;
+ 			utmi-mode = <2>;
+ 			ranges;
++			dwc3 at 4a030000 {
++				compatible = "synopsys,dwc3";
++				reg = <0x4a030000 0xcfff>;
++				interrupts = <0 92 4>;
++				usb_phy = <&usb2_phy>, <&usb3_phy>;
++				tx-fifo-resize;
++			};
+ 		};
+ 
+ 		ocp2scp {
+-- 
+1.7.9.5
