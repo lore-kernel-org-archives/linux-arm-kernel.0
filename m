@@ -1,61 +1,50 @@
-From: stefanha@gmail.com (Stefan Hajnoczi)
-Date: Fri, 25 Jan 2013 08:46:23 +0100
-Subject: [Qemu-devel] [RFC] Virtio-desktop: Virtio-based virtual desktop
-In-Reply-To: <CALrVBksLFyq5Vb+oLtASrdgU6x=GxXCEFy_ZWmvSosDOU6CsiQ@mail.gmail.com>
-References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
- <20130124092531.GD18072@stefanha-thinkpad.redhat.com>
- <CALrVBksLFyq5Vb+oLtASrdgU6x=GxXCEFy_ZWmvSosDOU6CsiQ@mail.gmail.com>
-Message-ID: <CAJSP0QUvhvSwv1M8ciakqJTkfn4dNeDLbPK5N4oM4WDBRz498g@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 25 Jan 2013 09:48:18 +0200
+Subject: [PATCH v3 1/4] drivers: usb: phy: add a new driver for usb part
+ of control module
+In-Reply-To: <510218FE.8080606@wwwdotorg.org>
+References: <1359080391-5120-1-git-send-email-kishon@ti.com>
+ <1359080391-5120-2-git-send-email-kishon@ti.com>
+ <510218FE.8080606@wwwdotorg.org>
+Message-ID: <20130125074818.GF15886@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 2:08 PM, Anup Patel <anup.patel@linaro.org> wrote:
-> On 24 January 2013 14:55, Stefan Hajnoczi <stefanha@gmail.com> wrote:
->>
->> On Thu, Jan 24, 2013 at 11:40:24AM +0530, Anup Patel wrote:
->> > IMHO, If we have something like Virtio-desktop specification then all
->> > possible guest OSes can have support for it and different hypervisor can
->> > emulate it without worrying about guest support.
->>
->> At this point x86 virtualization is mature and working with a mix of
->> emulated x86 architecture pieces and virtio devices for
->> performance-critical or open-ended functionality that we want to be able
->> to extend.
->>
->> ARM is getting KVM and virtio-mmio support.  It will be in a similar
->> position soon.
->>
->> Virtio guest drivers have not been implemented widely.  The Linux and
->> Windows efforts are driven by the folks who were behind virtio from the
->> start, but Solaris, FreeBSD, and others didn't really jump on the virtio
->> bandwagon.
->
-> [Anup] I think other OSes will be motivated to added Virtio drivers if there
-> exists some think like Virtio-desktop specification that is being emulated
-> by
-> many hypervisors.
+On Thu, Jan 24, 2013 at 09:32:46PM -0800, Stephen Warren wrote:
+> On 01/24/2013 06:19 PM, Kishon Vijay Abraham I wrote:
+> > Added a new driver for the usb part of control module. This has an API
+> > to power on the USB2 phy and an API to write to the mailbox depending on
+> > whether MUSB has to act in host mode or in device mode.
+> > 
+> > Writing to control module registers for doing the above task which was
+> > previously done in omap glue and in omap-usb2 phy will be removed.
+> 
+> > diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
+> 
+> This file seems to be specific to the TI USB PHYs, not all USB PHYs;
+> shouldn't it be renamed ti-usb-phy.txt, or even better renamed to match
+> the compatible value it documents, giving ti,omap-usb2.txt?
 
-Absolutely, if most hypervisors implement it then guests will also
-implement it.  But this is exactly what I tried to describe in the
-previous email:
+could be, but that can be done as a separate patch. It's not part of
+$SUBJECT.
 
-Yes, virtio has the potential to be implemented by many hypervisors.
-The specification is out there and existing open source
-implementations are out there.
+> >  add the address of control module dev conf register until a driver for
+> >  control module is added
+> >  
+> > +Optional properties:
+> > + - ctrl_module : phandle of the control module used by PHY driver to power on
+> > +   the PHY.
+> 
+> DT property names generally use - not _ as the word separator.
 
-But the leading x86 hypervisors (kvm, xen, vmware, hyperv) implement
-their own paravirt I/O approaches.  This may be due to historical
-reasons but virtio has been around long enough for any of the other
-big hypervisors to implement it if they wanted to.
+fair enough, Kishon, can you fix this up ?
 
-Code sharing or a unified standard isn't sufficient motivation when
-there are other factors like ability to change device spec to achieve
-better performance, compatibility with existing guests, ability to add
-new features, certified device drivers, etc.
-
-The incentives need to be favorable for hypervisors to wed themselves
-to a standardized paravirt device - simply adding more virtio devices
-doesn't change today's incentives, so you cannot expect hypervisor
-vendors to act differently from how they have in the past.
-
-Stefan
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130125/ec99a099/attachment.sig>
