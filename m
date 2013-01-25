@@ -1,66 +1,73 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Fri, 25 Jan 2013 10:24:17 -0600
-Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <20130125154955.GD10055@amd.pavel.ucw.cz>
-References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-5-git-send-email-dinguyen@altera.com>
- <20130125154955.GD10055@amd.pavel.ucw.cz>
-Message-ID: <1359131057.32148.9.camel@linux-builds1>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 25 Jan 2013 18:23:46 +0200
+Subject: [PATCH v4 1/4] drivers: usb: phy: add a new driver for usb part
+ of control module
+In-Reply-To: <20130125161401.GD16795@e106331-lin.cambridge.arm.com>
+References: <1359109440-2195-1-git-send-email-kishon@ti.com>
+ <1359109440-2195-2-git-send-email-kishon@ti.com>
+ <20130125110141.GK3075@e106331-lin.cambridge.arm.com>
+ <20130125111120.GP15886@arwen.pp.htv.fi>
+ <20130125122943.GB16795@e106331-lin.cambridge.arm.com>
+ <20130125145928.GC28379@arwen.pp.htv.fi>
+ <20130125161401.GD16795@e106331-lin.cambridge.arm.com>
+Message-ID: <20130125162346.GM28379@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-On Fri, 2013-01-25 at 16:49 +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > mach-socfpga is another platform that needs to use
-> > v7_invalidate_l1 to bringup additional cores. There was a comment that
-> > the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
-> 
-> If there are three copies of code, with fourth one needed for next
-> platform, moving it into common code makes sense.
-> 
-> But... The code was not identical before the merge. Are you sure that
-> the differences do not hurt? At the very least, it should be mentioned
-> in the changelog.
+Hi,
 
-Indeed, the addition of 
-
-mcr     p15, 0, r0, c7, c5, 0   @ invalidate I cache
-
-was done by commit # 5b2acf384c8a8707d32a98106192ee7187e4446d
-
-This adds invalidate I-Cache as well as D-Cache, which I think should be
-ok for most platforms. 
-
-Hopefully, Stephen can test and verify.
-
-Dinh
+On Fri, Jan 25, 2013 at 04:14:02PM +0000, Mark Rutland wrote:
+> On Fri, Jan 25, 2013 at 02:59:28PM +0000, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Fri, Jan 25, 2013 at 12:29:43PM +0000, Mark Rutland wrote:
+> > > > > > +   depending upon omap4 or omap5.
+> > > > > > + - reg-names: The names of the register addresses corresponding to the registers
+> > > > > > +   filled in "reg".
+> > > > > > + - ti,type: This is used to differentiate whether the control module has
+> > > > > > +   usb mailbox or usb3 phy power. omap4 has usb mailbox in control module to
+> > > > > > +   notify events to the musb core and omap5 has usb3 phy power register to
+> > > > > > +   power on usb3 phy. Should be "1" if it has mailbox and "2" if it has usb3
+> > > > > > +   phy power.
+> > > > > 
+> > > > > Why not make this a string property, perhaps values "mailbox" or "register"?
+> > > > 
+> > > > NAK.
+> > > 
+> > > Can I ask what your objection to using a string property is?
+> > > 
+> > > As far as I can see, "ti,type" is only used by this driver, so there's no
+> > > common convention to stick to. Using a string makes the binding easier for
+> > > humans to read, and thus harder to mess up in a dts, and it decouples the
+> > > binding from kernel-side constants.
+> > 
+> > IIRC there is some work going on to add #define-like support for DT,
+> > which would allow us to match against integers while still having
+> > meaningful symbolic representations.
 > 
-> Thanks,
-> 								Pavel
+> I was under the impression that the motivation for using the preprocessor on
+> the DT was to allow symbolic names for device/soc-specific values like
+> addresses, rather than what amounts to ABI values for the binding.
 > 
-> > diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-> > index 7e49deb..921fc15 100644
-> > --- a/arch/arm/mach-imx/headsmp.S
-> > +++ b/arch/arm/mach-imx/headsmp.S
-> > @@ -17,53 +17,6 @@
-> > -ENTRY(v7_invalidate_l1)
-> > -	mov	r0, #0
-> > -	mcr	p15, 0, r0, c7, c5, 0	@ invalidate I cache
-> > -	mcr	p15, 2, r0, c0, c0, 0
-> > -	mrc	p15, 1, r0, c0, c0, 0
-> ...
-> > diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-> > index 4a317fa..fb082c4 100644
-> > --- a/arch/arm/mach-tegra/headsmp.S
-> > +++ b/arch/arm/mach-tegra/headsmp.S
-> > @@ -18,49 +18,6 @@
-> > -ENTRY(v7_invalidate_l1)
-> > -        mov     r0, #0
-> > -        mcr     p15, 2, r0, c0, c0, 0
-> > -        mrc     p15, 1, r0, c0, c0, 0
+> I don't see the point in building a binding that depends on future
+> functionality to be legible, especially as we can make it more readable,
+> robust, and just as extensible today, with a simple change to the proposed
+> binding.
 > 
-> [Note missing mcr p15, 0, .. line.]
-> 
-> 
+> Even ignoring the above, the driver isn't doing appropriate sanity checking.
+> If you use a string property, this sanity check is implicit in the parsing --
+> you've either matched a value you can handle or you haven't.
+
+Even IRQs use numbers (not talking about the IRQ number, but the IRQ
+flags), why would we depend on string comparisson ? It doesn't make
+sense.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130125/1d9f17bb/attachment-0001.sig>
