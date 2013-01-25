@@ -1,43 +1,38 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 25 Jan 2013 08:18:11 -0600
-Subject: [PATCH] ARM: omap2: gpmc: Remove unneeded of_node_put()
-In-Reply-To: <1359116387-32613-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1359116387-32613-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <51029423.2040106@ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 25 Jan 2013 15:22:40 +0100
+Subject: [PATCHv1 for soc 1/5] arm: socfpga: Add new device tree source
+ for actual socfpga HW
+In-Reply-To: <1359075633-13502-2-git-send-email-dinguyen@altera.com>
+References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
+ <1359075633-13502-2-git-send-email-dinguyen@altera.com>
+Message-ID: <20130125142240.GB10055@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-On 01/25/2013 06:19 AM, Ezequiel Garcia wrote:
-> for_each_node_by_name() automatically calls of_node_put() on each
-> node passed; so don't do it explicitly unless there's an error.
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index 01ce462..c6255f7 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -1271,9 +1271,10 @@ static int gpmc_probe_dt(struct platform_device *pdev)
->  
->  	for_each_node_by_name(child, "nand") {
->  		ret = gpmc_probe_nand_child(pdev, child);
-> -		of_node_put(child);
-> -		if (ret < 0)
-> +		if (ret < 0) {
-> +			of_node_put(child);
->  			return ret;
-> +		}
->  	}
->  
->  	return 0;
-> 
+> Up to this point, support for socfpga has only been on a virtual
+> platform. Now that actual hardware is available, we add the appropriate
+> device tree source files.
 
-Acked-by: Jon Hunter <jon-hunter@ti.com>
+Wow, actual hardware :-). Can I get one?
 
-Thanks!
-Jon
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Pavel Machek <pavel@denx.de>
+
+I tested it on 3.7-rc2-based tree, as it is newest I have around. It
+seems to work ok. [Do you have newer git tree somewhere?]
+
+Tested-by: Pavel Machek <pavel@denx.de>
+Reviewed-by: Pavel Machek <pavel@denx.de>
+
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
