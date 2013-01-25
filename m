@@ -1,104 +1,105 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 12:55:26 +0900
-Subject: [PATCH 08/15] ARM: shmobile: sh73a0: Add CPU sleep suspend
+Date: Fri, 25 Jan 2013 12:55:29 +0900
+Subject: [PATCH 11/15] ARM: SH-Mobile: sh73a0: Add CPU Hotplug
 In-Reply-To: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359086133-23357-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359086133-23357-12-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bastian Hecht <hechtb@gmail.com>
 
-Add the lighest possible sleep mode on Cortex-A9 cores: CPU sleep. It is
-entered by a simple dsb and wfi instruction via cpu_do_idle(). As just
-clocks are stopped there is no need to save or restore any state of the
-system.
+Add the capability to add and remove CPUs on the fly.
+The Cortex-A9 offers the possibility to take single cores out of the
+MP Core. We add this capabilty taking care that caches are kept
+coherent. For verifying the shutdown we rely on the internal SH73A0
+Power Status Register PSTR.
 
 Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile              |    1 +
- arch/arm/mach-shmobile/board-kzm9g.c         |    2 ++
- arch/arm/mach-shmobile/include/mach/common.h |    1 +
- arch/arm/mach-shmobile/pm-sh73a0.c           |   32 ++++++++++++++++++++++++++
- 4 files changed, 36 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/pm-sh73a0.c
+ arch/arm/mach-shmobile/smp-sh73a0.c |   36 +++++++++++++++++++++++++++++------
+ 1 file changed, 30 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 0b71479..f6aba6d 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -37,6 +37,7 @@ obj-$(CONFIG_ARCH_SHMOBILE)	+= pm-rmobile.o
- obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o
- obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
-+obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 430b44e..9812ea3 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -25,6 +25,7 @@
+ #include <linux/delay.h>
+ #include <linux/irqchip/arm-gic.h>
+ #include <mach/common.h>
++#include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <mach/sh73a0.h>
+ #include <asm/smp_scu.h>
+@@ -36,6 +37,8 @@
+ #define SBAR		IOMEM(0xe6180020)
+ #define APARMBAREA	IOMEM(0xe6f10020)
  
- # Board objects
- obj-$(CONFIG_MACH_AP4EVB)	+= board-ap4evb.o
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index ac94285..363c6ed 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -772,6 +772,8 @@ static void __init kzm_init(void)
- 
- 	sh73a0_add_standard_devices();
- 	platform_add_devices(kzm_devices, ARRAY_SIZE(kzm_devices));
++#define PSTR_SHUTDOWN_MODE	3
 +
-+	sh73a0_pm_init();
+ static void __iomem *scu_base_addr(void)
+ {
+ 	return (void __iomem *)0xf0000000;
+@@ -92,16 +95,20 @@ static void __init sh73a0_smp_init_cpus(void)
+ 	shmobile_smp_init_cpus(ncores);
  }
  
- static void kzm9g_restart(char mode, const char *cmd)
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 2d1686b..f221c11 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -40,6 +40,7 @@ extern void sh73a0_add_early_devices(void);
- extern void sh73a0_add_standard_devices(void);
- extern void sh73a0_clock_init(void);
- extern void sh73a0_pinmux_init(void);
-+extern void sh73a0_pm_init(void);
- extern struct clk sh73a0_extal1_clk;
- extern struct clk sh73a0_extal2_clk;
- extern struct clk sh73a0_extcki_clk;
-diff --git a/arch/arm/mach-shmobile/pm-sh73a0.c b/arch/arm/mach-shmobile/pm-sh73a0.c
-new file mode 100644
-index 0000000..99086e9
---- /dev/null
-+++ b/arch/arm/mach-shmobile/pm-sh73a0.c
-@@ -0,0 +1,32 @@
-+/*
-+ * sh73a0 Power management support
-+ *
-+ *  Copyright (C) 2012 Bastian Hecht <hechtb+renesas@gmail.com>
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
+-static int __maybe_unused sh73a0_cpu_kill(unsigned int cpu)
++#ifdef CONFIG_HOTPLUG_CPU
++static int sh73a0_cpu_kill(unsigned int cpu)
+ {
 +
-+#include <linux/suspend.h>
-+#include <mach/common.h>
-+
-+#ifdef CONFIG_SUSPEND
-+static int sh73a0_enter_suspend(suspend_state_t suspend_state)
+ 	int k;
++	u32 pstr;
+ 
+-	/* this function is running on another CPU than the offline target,
+-	 * here we need wait for shutdown code in platform_cpu_die() to
+-	 * finish before asking SoC-specific code to power off the CPU core.
++	/*
++	 * wait until the power status register confirms the shutdown of the
++	 * offline target
+ 	 */
+ 	for (k = 0; k < 1000; k++) {
+-		if (shmobile_cpu_is_dead(cpu))
++		pstr = (__raw_readl(PSTR) >> (4 * cpu)) & 3;
++		if (pstr == PSTR_SHUTDOWN_MODE)
+ 			return 1;
+ 
+ 		mdelay(1);
+@@ -110,6 +117,23 @@ static int __maybe_unused sh73a0_cpu_kill(unsigned int cpu)
+ 	return 0;
+ }
+ 
++static void sh73a0_cpu_die(unsigned int cpu)
 +{
++	/*
++	 * The ARM MPcore does not issue a cache coherency request for the L1
++	 * cache when powering off single CPUs. We must take care of this and
++	 * further caches.
++	 */
++	dsb();
++	flush_cache_all();
++
++	/* Set power off mode. This takes the CPU out of the MP cluster */
++	scu_power_mode(scu_base_addr(), SCU_PM_POWEROFF);
++
++	/* Enter shutdown mode */
 +	cpu_do_idle();
-+	return 0;
 +}
-+
-+static void sh73a0_suspend_init(void)
-+{
-+	shmobile_suspend_ops.enter = sh73a0_enter_suspend;
-+}
-+#else
-+static void sh73a0_suspend_init(void) {}
-+#endif
-+
-+void __init sh73a0_pm_init(void)
-+{
-+	sh73a0_suspend_init();
-+}
++#endif /* CONFIG_HOTPLUG_CPU */
+ 
+ struct smp_operations sh73a0_smp_ops __initdata = {
+ 	.smp_init_cpus		= sh73a0_smp_init_cpus,
+@@ -118,7 +142,7 @@ struct smp_operations sh73a0_smp_ops __initdata = {
+ 	.smp_boot_secondary	= sh73a0_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= sh73a0_cpu_kill,
+-	.cpu_die		= shmobile_cpu_die,
++	.cpu_die		= sh73a0_cpu_die,
+ 	.cpu_disable		= shmobile_cpu_disable,
+ #endif
+ };
 -- 
 1.7.10.4
