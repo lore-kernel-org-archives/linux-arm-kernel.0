@@ -1,276 +1,306 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:13:31 +0900
-Subject: [PATCH 13/15] ARM: mach-shmobile: sh73a0: Minimal setup using DT
-In-Reply-To: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
-References: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080013-29189-14-git-send-email-horms+renesas@verge.net.au>
+From: xiechao.linux@gmail.com (chao xie)
+Date: Fri, 25 Jan 2013 10:13:54 +0800
+Subject: [V5 PATCH 24/26] usb: gadget: mv_udc: add device tree support
+In-Reply-To: <20130124104904.GK32237@e106331-lin.cambridge.arm.com>
+References: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
+ <1359009530-28182-25-git-send-email-chao.xie@marvell.com>
+ <20130124104904.GK32237@e106331-lin.cambridge.arm.com>
+Message-ID: <CAK9wHMTVBRGf-mhnmzSKKGyuHKeXU7N8k2vTh9omkD4A0yhPsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow a minimal setup of the sh73a0 SoC using a flattened device tree.
-In particular, Configure the i2c controllers using a flattened device tree.
+2013/1/24 Mark Rutland <mark.rutland@arm.com>:
+> Hello,
+>
+> On Thu, Jan 24, 2013 at 06:38:48AM +0000, Chao Xie wrote:
+>> In original driver, we have callbacks in platform data, and some
+>> dynamically allocations variables in platform data.
+>> Now, these blocks are removed, the device tree support is easier
+>> now.
+>
+> Please could you also add a binding document? See
+> Documentation/devicetree/bindings/usb for examples of existing bindings.
+>
+> Also, please Cc devicetree-discuss when introducing a new binding as you are
+> doing here.
+>
+>>
+>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>> ---
+>>  drivers/usb/gadget/mv_udc.h      |    5 +-
+>>  drivers/usb/gadget/mv_udc_core.c |  106 ++++++++++++++++++++++++++++++--------
+>>  2 files changed, 86 insertions(+), 25 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
+>> index 50ae7c7..de84722 100644
+>> --- a/drivers/usb/gadget/mv_udc.h
+>> +++ b/drivers/usb/gadget/mv_udc.h
+>> @@ -179,6 +179,7 @@ struct mv_udc {
+>>       int                             irq;
+>>
+>>       unsigned int                    extern_attr;
+>> +     unsigned int                    mode;
+>>       struct notifier_block           notifier;
+>>
+>>       struct mv_cap_regs __iomem      *cap_regs;
+>> @@ -222,11 +223,9 @@ struct mv_udc {
+>>       struct mv_usb2_phy      *phy;
+>>       struct usb_phy          *transceiver;
+>>
+>> -     struct mv_usb_platform_data     *pdata;
+>> -
+>>       /* some SOC has mutiple clock sources for USB*/
+>>       unsigned int    clknum;
+>> -     struct clk      *clk[0];
+>> +     struct clk      **clk;
+>>  };
+>>
+>>  /* endpoint data structure */
+>> diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
+>> index 2e5907f..a4ee9a1 100644
+>> --- a/drivers/usb/gadget/mv_udc_core.c
+>> +++ b/drivers/usb/gadget/mv_udc_core.c
+>> @@ -34,6 +34,7 @@
+>>  #include <linux/irq.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/clk.h>
+>> +#include <linux/of.h>
+>>  #include <linux/platform_data/mv_usb.h>
+>>  #include <linux/usb/mv_usb2.h>
+>>  #include <asm/unaligned.h>
+>> @@ -2153,21 +2154,57 @@ static int mv_udc_remove(struct platform_device *pdev)
+>>       return 0;
+>>  }
+>>
+>> +static int mv_udc_parse_dt(struct platform_device *pdev,
+>> +                             struct mv_udc *udc)
+>> +{
+>> +     struct device_node *np = pdev->dev.of_node;
+>> +     unsigned int clks_num;
+>> +     int i, ret;
+>> +     const char *clk_name;
+>> +
+>> +     if (!np)
+>> +             return 1;
+>> +
+>> +     clks_num = of_property_count_strings(np, "clocks");
+>> +     if (clks_num < 0)
+>> +             return clks_num;
+>> +
+>> +     udc->clk = devm_kzalloc(&pdev->dev,
+>> +             sizeof(struct clk *) * clks_num, GFP_KERNEL);
+>> +     if (udc->clk == NULL)
+>> +             return -ENOMEM;
+>> +
+>> +     for (i = 0; i < clks_num; i++) {
+>> +             ret = of_property_read_string_index(np, "clocks", i,
+>> +                     &clk_name);
+>> +             if (ret)
+>> +                     return ret;
+>> +             udc->clk[i] = devm_clk_get(&pdev->dev, clk_name);
+>> +             if (IS_ERR(udc->clk[i]))
+>> +                     return PTR_ERR(udc->clk[i]);
+>
+> I was going to ask if you couldn't use of_clk_get, but I see you want to use
+> the devm_* functions to handle cleanup. It seems a shame there's not a standard
+> devm_of_clk_get.
+>
+It is nice to have someone to review the device tree part patches.
+In fact main target of the modification is to remove the
+pointers/callbacks in the platform_data, so
+i can easly to add device tree support.
 
-SCI serial controller and CMT clock source, whose drivers do not yet
-support configuration using a flattened device tree, are still configured
-using C code in order to allow booting of a board with this SoC.
+of_clk_get is is based on CONFIG_COMMON_CLK. of_clk_get is not simple.
+The orginal way we use to
+get a clock used two arguments: dev_id and con_id. The dev_id is the
+name of the device.
+of_clk_get need clock framework changes. It means that clock driver
+need add device tree support. Now
+we are doing the clock tree support for Marvell MMP SOCes, but it will
+not be done in a short time.
+As i think, of_clk_get still have some problems. It parses the
+property's name as "clocks", but it does not support
+mutipile clocks. If the device driver original has two clocks, the old
+way can do it as
+clk_get(dev, "clock 1");
+clk_get(dev, "clock 2");
+of_clk_get can not do it. I have not asked this question in the
+mailist, and i will do it soon.
 
-*** Please note that the clock initialisation scheme used in
-    this patch does not currently work with SMP as there
-    is a yet to be resolved lock-up in workqueue initialisation.
+>> +     }
+>> +
+>> +     udc->clknum = clks_num;
+>> +
+>> +     ret = of_property_read_u32(np, "extern_attr", &udc->extern_attr);
+>> +     if (ret)
+>> +             return ret;
+>
+> This looks like a *very* bad idea. The udc::extern_attr field seems to be a set
+> of flags, which this could reads in directly (without any sanity checking),
+> effectively making it an undocumented ABI. This might be better as a set of
+> valueless properties.
+>
+> Will unsigned int be the same as u32 on all platforms this could be used on?
+> If not, you're passing the wrong type into of_property_read_u32.
+>
+> Additionally, in devicetree, '-' is used in preference of '_' in compatible
+> and property names.
+>
+I see. So what you mean is if the extern_attr has two flags, FLAG_A and FLAG_B,
+i need add two boolean properties Property_FLAG_A and Property_FLAG_B?
 
-    CONFIG_SMP must be disabled when using this code. ***
+>> +
+>> +     ret = of_property_read_u32(np, "mode", &udc->mode);
+>> +     if (ret)
+>> +             return ret;
+>
+> If I've understood correctly, this property will either be MV_USB_MODE_OTG (0)
+> or MV_USB_MODE_OTG (1). Again, I don't think this is good to be exported as an
+> ABI, especially as nothing in the enum definition points out that this affects
+> anything outside the kernel.
+>
+> If this isn't something that wants to be changed at runtime, this should
+> probably be a string property, with "host" and "otg" as valid values. Looking
+> in Documentation/devicetree, the nvidia,tegra20-ehci binding uses similar
+> strings in its dr_mode property. There may be other (undocumented) precedents.
+>
+Thanks. I will check the examples, and change it.
 
-Includes update from Thierry Reding to no longer use gic_handle_irq()
+>> +
+>> +     return 0;
+>> +}
+>> +
+>>  static int mv_udc_probe(struct platform_device *pdev)
+>>  {
+>> -     struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
+>>       struct mv_udc *udc;
+>>       int retval = 0;
+>> -     int clk_i = 0;
+>>       struct resource *r;
+>>       size_t size;
+>>
+>> -     if (pdata == NULL) {
+>> -             dev_err(&pdev->dev, "missing platform_data\n");
+>> -             return -ENODEV;
+>> -     }
+>> -
+>> -     size = sizeof(*udc) + sizeof(struct clk *) * pdata->clknum;
+>> +     size = sizeof(*udc);
+>>       udc = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+>>       if (udc == NULL) {
+>>               dev_err(&pdev->dev, "failed to allocate memory for udc\n");
+>> @@ -2175,14 +2212,43 @@ static int mv_udc_probe(struct platform_device *pdev)
+>>       }
+>>
+>>       udc->done = &release_done;
+>> -     udc->extern_attr = pdata->extern_attr;
+>> -     udc->pdata = pdev->dev.platform_data;
+>>       spin_lock_init(&udc->lock);
+>>
+>>       udc->dev = pdev;
+>>
+>> +     retval = mv_udc_parse_dt(pdev, udc);
+>> +     if (retval > 0) {
+>> +             /* no CONFIG_OF */
+>> +             struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
+>> +             int clk_i = 0;
+>> +
+>> +             if (pdata == NULL) {
+>> +                     dev_err(&pdev->dev, "missing platform_data\n");
+>> +                     return -ENODEV;
+>> +             }
+>> +             udc->extern_attr = pdata->extern_attr;
+>> +             udc->mode = pdata->mode;
+>> +             udc->clknum = pdata->clknum;
+>> +
+>> +             size = sizeof(struct clk *) * udc->clknum;
+>> +             udc->clk = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+>> +             if (udc->clk == NULL)
+>> +                     return -ENOMEM;
+>> +             for (clk_i = 0; clk_i < udc->clknum; clk_i++) {
+>> +                     udc->clk[clk_i] = devm_clk_get(&pdev->dev,
+>> +                                             pdata->clkname[clk_i]);
+>> +                     if (IS_ERR(udc->clk[clk_i])) {
+>> +                             retval = PTR_ERR(udc->clk[clk_i]);
+>> +                             return retval;
+>
+> Why not just return PTR_ERR(udc->clk[clk_i]); ?
+>
+sure. i will change it.
 
-Cc: Thierry Reding <thierry.reding@avionic-design.de>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> +                     }
+>> +             }
+>> +     } else if (retval < 0) {
+>> +             dev_err(&pdev->dev, "error parse dt\n");
+>> +             return retval;
+>> +     }
+>> +
+>>  #ifdef CONFIG_USB_OTG_UTILS
+>> -     if (pdata->mode == MV_USB_MODE_OTG) {
+>> +     if (udc->mode == MV_USB_MODE_OTG) {
+>>               udc->transceiver = devm_usb_get_phy(&pdev->dev,
+>>                                       USB_PHY_TYPE_USB2);
+>>               if (IS_ERR_OR_NULL(udc->transceiver)) {
+>> @@ -2191,17 +2257,6 @@ static int mv_udc_probe(struct platform_device *pdev)
+>>               }
+>>       }
+>>  #endif
+>> -
+>> -     udc->clknum = pdata->clknum;
+>> -     for (clk_i = 0; clk_i < udc->clknum; clk_i++) {
+>> -             udc->clk[clk_i] = devm_clk_get(&pdev->dev,
+>> -                                     pdata->clkname[clk_i]);
+>> -             if (IS_ERR(udc->clk[clk_i])) {
+>> -                     retval = PTR_ERR(udc->clk[clk_i]);
+>> -                     return retval;
+>> -             }
+>> -     }
+>> -
+>>       r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
+>>       if (r == NULL) {
+>>               dev_err(&pdev->dev, "no I/O memory resource defined\n");
+>> @@ -2466,6 +2521,12 @@ static void mv_udc_shutdown(struct platform_device *pdev)
+>>       mv_udc_disable(udc);
+>>  }
+>>
+>> +static struct of_device_id mv_udc_dt_ids[] = {
+>> +     { .compatible = "mrvl,mv-udc" },
+>
+> This compatible string should be listed in the binding document you generate to
+> accompany this.
+>
+I see. i will add the documents at the device tree directory.
+I will seperate the device tree part patches from the other patches. Thanks.
 
-fix
----
- arch/arm/boot/dts/sh73a0.dtsi                |   60 +++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-sh73a0.c        |   12 +++++
- arch/arm/mach-shmobile/include/mach/common.h |    2 +
- arch/arm/mach-shmobile/setup-sh73a0.c        |   62 +++++++++++++++++++++++++-
- 4 files changed, 135 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 7dae1f4..721f486 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -30,4 +30,64 @@
- 		reg = <0xf0001000 0x1000>,
- 		      <0xf0000100 0x100>;
- 	};
-+
-+	i2c0: i2c at 0xe6820000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xe6820000 0x425>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 167 0x4
-+			      0 168 0x4
-+			      0 169 0x4
-+			      0 170 0x4>;
-+	};
-+
-+	i2c1: i2c at 0xe6822000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xe6822000 0x425>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 51 0x4
-+			      0 52 0x4
-+			      0 53 0x4
-+			      0 54 0x4>;
-+	};
-+
-+	i2c2: i2c at 0xe6824000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xe6824000 0x425>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 171 0x4
-+			      0 172 0x4
-+			      0 173 0x4
-+			      0 174 0x4>;
-+	};
-+
-+	i2c3: i2c at 0xe6826000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xe6826000 0x425>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 183 0x4
-+			      0 184 0x4
-+			      0 185 0x4
-+			      0 186 0x4>;
-+	};
-+
-+	i2c4: i2c at 0xe6828000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xe6828000 0x425>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 187 0x4
-+			      0 188 0x4
-+			      0 189 0x4
-+			      0 190 0x4>;
-+	};
- };
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 5f57701..eab2667 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -525,6 +525,13 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP403] = MSTP(&r_clk, SMSTPCR4, 3, 0), /* KEYSC */
- };
- 
-+/* The lookups structure below includes duplicate entries for some clocks
-+ * with alternate names.
-+ * - The traditional name used when a device is initialised with platform data
-+ * - The name used when a device is initialised using device tree
-+ * The longer-term aim is to remove these duplicates, and indeed the
-+ * lookups table entirely, by describing clocks using device tree.
-+ */
- static struct clk_lookup lookups[] = {
- 	/* main clocks */
- 	CLKDEV_CON_ID("r_clk", &r_clk),
-@@ -545,6 +552,7 @@ static struct clk_lookup lookups[] = {
- 
- 	/* MSTP32 clocks */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.2", &mstp_clks[MSTP001]), /* I2C2 */
-+	CLKDEV_DEV_ID("e6824000.i2c", &mstp_clks[MSTP001]), /* I2C2 */
- 	CLKDEV_DEV_ID("sh_mobile_ceu.1", &mstp_clks[MSTP129]), /* CEU1 */
- 	CLKDEV_DEV_ID("sh-mobile-csi2.1", &mstp_clks[MSTP128]), /* CSI2-RX1 */
- 	CLKDEV_DEV_ID("sh_mobile_ceu.0", &mstp_clks[MSTP127]), /* CEU0 */
-@@ -553,6 +561,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP125]), /* TMU01 */
- 	CLKDEV_DEV_ID("sh-mipi-dsi.0", &mstp_clks[MSTP118]), /* DSITX */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.0", &mstp_clks[MSTP116]), /* I2C0 */
-+	CLKDEV_DEV_ID("e6820000.i2c", &mstp_clks[MSTP116]), /* I2C0 */
- 	CLKDEV_DEV_ID("sh_mobile_lcdc_fb.0", &mstp_clks[MSTP100]), /* LCDC0 */
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP219]), /* SCIFA7 */
- 	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP218]), /* SY-DMAC */
-@@ -569,6 +578,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI */
- 	CLKDEV_DEV_ID("sh_irda.0", &mstp_clks[MSTP325]), /* IrDA */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.1", &mstp_clks[MSTP323]), /* I2C1 */
-+	CLKDEV_DEV_ID("e6822000.i2c", &mstp_clks[MSTP323]), /* I2C1 */
- 	CLKDEV_DEV_ID("renesas_usbhs", &mstp_clks[MSTP322]), /* USB */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
-@@ -579,7 +589,9 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("leds-renesas-tpu.30", &mstp_clks[MSTP301]), /* TPU3 */
- 	CLKDEV_DEV_ID("leds-renesas-tpu.41", &mstp_clks[MSTP300]), /* TPU4 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.3", &mstp_clks[MSTP411]), /* I2C3 */
-+	CLKDEV_DEV_ID("e6826000.i2c", &mstp_clks[MSTP411]), /* I2C3 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.4", &mstp_clks[MSTP410]), /* I2C4 */
-+	CLKDEV_DEV_ID("e6828000.i2c", &mstp_clks[MSTP410]), /* I2C4 */
- 	CLKDEV_DEV_ID("sh_keysc.0", &mstp_clks[MSTP403]), /* KEYSC */
- };
- 
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index e2ba16b..64c0622 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -38,7 +38,9 @@ extern void sh73a0_init_irq_dt(void);
- extern void sh73a0_map_io(void);
- extern void sh73a0_earlytimer_init(void);
- extern void sh73a0_add_early_devices(void);
-+extern void sh73a0_add_early_devices_dt(void);
- extern void sh73a0_add_standard_devices(void);
-+extern void sh73a0_add_standard_devices_dt(void);
- extern void sh73a0_clock_init(void);
- extern void sh73a0_pinmux_init(void);
- extern void sh73a0_pm_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index 8c2d642..f7ecb0b 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -23,6 +23,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/platform_device.h>
-+#include <linux/of_platform.h>
- #include <linux/delay.h>
- #include <linux/input.h>
- #include <linux/io.h>
-@@ -754,7 +755,7 @@ static struct platform_device pmu_device = {
- 	.resource	= pmu_resources,
- };
- 
--static struct platform_device *sh73a0_early_devices[] __initdata = {
-+static struct platform_device *sh73a0_early_devices_dt[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
- 	&scif2_device,
-@@ -765,6 +766,9 @@ static struct platform_device *sh73a0_early_devices[] __initdata = {
- 	&scif7_device,
- 	&scif8_device,
- 	&cmt10_device,
-+};
-+
-+static struct platform_device *sh73a0_early_devices[] __initdata = {
- 	&tmu00_device,
- 	&tmu01_device,
- };
-@@ -787,6 +791,8 @@ void __init sh73a0_add_standard_devices(void)
- 	/* Clear software reset bit on SY-DMAC module */
- 	__raw_writel(__raw_readl(SRCR2) & ~(1 << 18), SRCR2);
- 
-+	platform_add_devices(sh73a0_early_devices_dt,
-+			    ARRAY_SIZE(sh73a0_early_devices_dt));
- 	platform_add_devices(sh73a0_early_devices,
- 			    ARRAY_SIZE(sh73a0_early_devices));
- 	platform_add_devices(sh73a0_late_devices,
-@@ -805,9 +811,63 @@ void __init sh73a0_earlytimer_init(void)
- 
- void __init sh73a0_add_early_devices(void)
- {
-+	early_platform_add_devices(sh73a0_early_devices_dt,
-+				   ARRAY_SIZE(sh73a0_early_devices_dt));
- 	early_platform_add_devices(sh73a0_early_devices,
- 				   ARRAY_SIZE(sh73a0_early_devices));
- 
- 	/* setup early console here as well */
- 	shmobile_setup_console();
- }
-+
-+#ifdef CONFIG_USE_OF
-+
-+/* Please note that the clock initialisation shcheme used in
-+ * sh73a0_add_early_devices_dt() and sh73a0_add_standard_devices_dt()
-+ * does not work with SMP as there is a yet to be resolved lock-up in
-+ * workqueue initialisation.
-+ *
-+ * CONFIG_SMP should be disabled when using this code.
-+ */
-+
-+void __init sh73a0_add_early_devices_dt(void)
-+{
-+	shmobile_setup_delay(1196, 44, 46); /* Cortex-A9 @ 1196MHz */
-+
-+	early_platform_add_devices(sh73a0_early_devices_dt,
-+				   ARRAY_SIZE(sh73a0_early_devices_dt));
-+
-+	/* setup early console here as well */
-+	shmobile_setup_console();
-+}
-+
-+static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
-+	{},
-+};
-+
-+void __init sh73a0_add_standard_devices_dt(void)
-+{
-+	/* clocks are setup late during boot in the case of DT */
-+	sh73a0_clock_init();
-+
-+	platform_add_devices(sh73a0_early_devices_dt,
-+			     ARRAY_SIZE(sh73a0_early_devices_dt));
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     sh73a0_auxdata_lookup, NULL);
-+}
-+
-+static const char *sh73a0_boards_compat_dt[] __initdata = {
-+	"renesas,sh73a0",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
-+	.map_io		= sh73a0_map_io,
-+	.init_early	= sh73a0_add_early_devices_dt,
-+	.nr_irqs	= NR_IRQS_LEGACY,
-+	.init_irq	= sh73a0_init_irq_dt,
-+	.init_machine	= sh73a0_add_standard_devices_dt,
-+	.init_time	= shmobile_timer_init,
-+	.dt_compat	= sh73a0_boards_compat_dt,
-+MACHINE_END
-+#endif /* CONFIG_USE_OF */
--- 
-1.7.10.4
+>> +     { /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, mv_udc_dt_ids);
+>> +
+>>  static struct platform_driver udc_driver = {
+>>       .probe          = mv_udc_probe,
+>>       .remove         = mv_udc_remove,
+>> @@ -2476,6 +2537,7 @@ static struct platform_driver udc_driver = {
+>>  #ifdef CONFIG_PM
+>>               .pm     = &mv_udc_pm_ops,
+>>  #endif
+>> +             .of_match_table = mv_udc_dt_ids,
+>>       },
+>>  };
+>>
+>> --
+>> 1.7.4.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> Thanks,
+> Mark.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
