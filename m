@@ -1,55 +1,97 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 25 Jan 2013 11:15:10 +0100
-Subject: [GIT PULL] i.MX SoC updates for v3.9
-Message-ID: <20130125101510.GK1906@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 25 Jan 2013 11:15:48 +0100
+Subject: [PATCH 1/3] pinctrl: add ethernet pin groups to r8a7740
+In-Reply-To: <1359043653-11374-2-git-send-email-g.liakhovetski@gmx.de>
+References: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
+ <1359043653-11374-2-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <2776240.reRXLDdyXo@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Guennadi,
 
-Please pull the following (mostly clock relates) updates for v3.9.
+Thanks for the patch.
 
-Sascha
+On Thursday 24 January 2013 17:07:31 Guennadi Liakhovetski wrote:
+> r8a7740 SoCs have an integrated gigabit ethernet MAC. This patch adds two
+> pin groups: base for 100mbps and additional pins for the gigabit mode.
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+>  drivers/pinctrl/sh-pfc/pfc-r8a7740.c |   31 +++++++++++++++++++++++++++++++
+> 1 files changed, 31 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+> b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c index 4c92af8..d7f69dd 100644
+> --- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+> @@ -2052,6 +2052,29 @@ static const unsigned int mmc0_ctrl_1_mux[] = {
+>  	MMC1_CMD_PORT104_MARK, MMC1_CLK_PORT103_MARK,
+>  };
+> 
+> +static const unsigned int eth_base_pins[] = {
+> +	203, 204, 205, 206, 207,
+> +	183, 184,
+> +	185, 186, 187, 188,
+> +	171, 170, 169, 168,
+> +	161, 163, 164, 174,
+> +};
+> +static const unsigned int eth_base_mux[] = {
+> +	ET_TX_ER_MARK, ET_RX_ER_MARK, ET_CRS_MARK, ET_MDC_MARK, ET_MDIO_MARK,
+> +	ET_TX_EN_MARK, ET_TX_CLK_MARK,
+> +	ET_ERXD0_MARK, ET_ERXD1_MARK, ET_ERXD2_MARK, ET_ERXD3_MARK,
+> +	ET_ETXD0_MARK, ET_ETXD1_MARK, ET_ETXD2_MARK, ET_ETXD3_MARK,
+> +	ET_RX_DV_MARK, ET_COL_MARK, ET_PHY_INT_MARK, ET_RX_CLK_MARK,
+> +};
+> +static const unsigned int eth_gbit_pins[] = {
+> +	189, 190, 191, 192,
+> +	167, 166, 173, 172,
+> +};
+> +static const unsigned int eth_gbit_mux[] = {
+> +	ET_ERXD4_MARK, ET_ERXD5_MARK, ET_ERXD6_MARK, ET_ERXD7_MARK,
+> +	ET_ETXD4_MARK, ET_ETXD5_MARK, ET_ETXD6_MARK, ET_ETXD7_MARK,
+> +};
+> +
+>  static const struct sh_pfc_pin_group pinmux_groups[] = {
+>  	SH_PFC_PIN_GROUP(lcd0_data8),
+>  	SH_PFC_PIN_GROUP(lcd0_data9),
+> @@ -2100,6 +2123,8 @@ static const struct sh_pfc_pin_group pinmux_groups[] =
+> { SH_PFC_PIN_GROUP(mmc0_data4_1),
+>  	SH_PFC_PIN_GROUP(mmc0_data8_1),
+>  	SH_PFC_PIN_GROUP(mmc0_ctrl_1),
+> +	SH_PFC_PIN_GROUP(eth_base),
+> +	SH_PFC_PIN_GROUP(eth_gbit),
+>  };
+> 
+>  static const char * const lcd0_groups[] = {
+> @@ -2167,6 +2192,11 @@ static const char * const mmc0_groups[] = {
+>  	"mmc0_ctrl_1",
+>  };
+> 
+> +static const char * const eth_groups[] = {
+> +	"eth_base",
+> +	"eth_gbit",
+> +};
+> +
 
-The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+What about calling the groups mdio (for management), mii, gmii and rmii ? You 
+can duplicate common pins in mii and gmii.
 
-  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+The WOL, GTK_CLK and LINK pins are missing BTW.
 
-are available in the git repository at:
+>  static const struct sh_pfc_function pinmux_functions[] = {
+>  	SH_PFC_FUNCTION(lcd0),
+>  	SH_PFC_FUNCTION(lcd1),
+> @@ -2174,6 +2204,7 @@ static const struct sh_pfc_function pinmux_functions[]
+> = { SH_PFC_FUNCTION(sdhi1),
+>  	SH_PFC_FUNCTION(sdhi2),
+>  	SH_PFC_FUNCTION(mmc0),
+> +	SH_PFC_FUNCTION(eth),
+>  };
+> 
+>  #define PINMUX_FN_BASE	ARRAY_SIZE(pinmux_pins)
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-soc
-
-for you to fetch changes up to 3ea8098572280d16163a429e0f8dfd90492a5934:
-
-  ARM: clk-imx35: Fix build warnings with W=1 (2013-01-25 11:12:38 +0100)
-
-----------------------------------------------------------------
-ARM i.MX SoC updates for next
-
-Mostly clock related updates, most notably the conversion of
-i.MX31 to a DT based lookup.
-
-----------------------------------------------------------------
-Fabio Estevam (4):
-      ARM: Let CONFIG_MACH_IMX31_DT be built by default
-      ARM: clk-imx31: Add dummy clock
-      ARM: mx31: Replace clk_register_clkdev with clock DT lookup
-      ARM: clk-imx35: Fix build warnings with W=1
-
-Gwenhael Goavec-Merou (1):
-      ARM: imx27: add a clock gate to activate SPLL clock
-
- .../devicetree/bindings/clock/imx31-clock.txt      |   91 ++++++++++++++++++++
- arch/arm/boot/dts/imx31.dtsi                       |   17 ++++
- arch/arm/configs/imx_v6_v7_defconfig               |    1 +
- arch/arm/mach-imx/clk-imx27.c                      |    7 +-
- arch/arm/mach-imx/clk-imx31.c                      |   15 +++-
- arch/arm/mach-imx/clk-imx35.c                      |    4 +-
- arch/arm/mach-imx/imx31-dt.c                       |   17 +---
- 7 files changed, 129 insertions(+), 23 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/imx31-clock.txt
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+
+Laurent Pinchart
