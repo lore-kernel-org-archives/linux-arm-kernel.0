@@ -1,36 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:17:28 +0900
-Subject: [PATCH 2/7] ARM: shmobile: fix sample amixer settings for mackerel
+Date: Fri, 25 Jan 2013 11:17:30 +0900
+Subject: [PATCH 4/7] ARM: shmobile: add sample amixer settings for
+ armadillo800eva
 In-Reply-To: <1359080253-30995-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359080253-30995-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080253-30995-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359080253-30995-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch updates FSI-AK4643 amixer setting
+wm8978 codec requires amixer settings for capture.
+This patch adds sample amixer settings on comment area.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-mackerel.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index 2fed62f..002eaf6 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -202,9 +202,7 @@
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 5353adf..5f179e1 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -124,6 +124,14 @@
+  * this command is required when playback.
   *
-  * it needs amixer settings for playing
-  *
-- * amixer set "Headphone" on
-- * amixer set "HPOUTL Mixer DACH" on
-- * amixer set "HPOUTR Mixer DACH" on
-+ * amixer set "Headphone Enable" on
+  * # amixer set "Headphone" 50
++ *
++ * this command is required when capture.
++ *
++ * # amixer set "Input PGA" 15
++ * # amixer set "Left Input Mixer MicP" on
++ * # amixer set "Left Input Mixer MicN" on
++ * # amixer set "Right Input Mixer MicN" on
++ * # amixer set "Right Input Mixer MicP" on
   */
  
- /* Fixed 3.3V and 1.8V regulators to be used by multiple devices */
+ /*
 -- 
 1.7.10.4
