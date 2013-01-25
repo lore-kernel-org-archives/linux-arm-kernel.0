@@ -1,72 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 25 Jan 2013 10:08:10 +0000
-Subject: [PATCH 12/15] ARM: mach-shmobile: sh73a0: Allow initialisation
- of GIC by DT
-In-Reply-To: <1359080013-29189-13-git-send-email-horms+renesas@verge.net.au>
-References: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
- <1359080013-29189-13-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130125100810.GI3075@e106331-lin.cambridge.arm.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Fri, 25 Jan 2013 11:06:45 +0100
+Subject: [RFC PATCH 0/4] net: mvmdio: close the gaps between mv643xx_eth and
+ mvmdio
+Message-ID: <1359108409-4378-1-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 02:13:30AM +0000, Simon Horman wrote:
-> This allows the GIC interrupt controller of the sh73a0 SoC to be
-> initialised using a flattened device tree blob.
-> 
-> It does not allow the INTC interrupt controller which is also present on
-> the sh73a0 SoC to be enabled via device tree.  Nor does it handle sharing
-> of interrupts between the GIC and INTC interrupt controllers.
-> 
-> This limits the usefulness of this code to applications which only wish to
-> access devices which use interrupts that can be handled by the GIC
-> interrupt controller. Other applications should, for now, continue using
-> non-device tree initialisation of the sh72a0 interrupt controllers.
-> 
-> Includes update to use irqchip_init() by Thierry Reding
-> 
-> Cc: Thierry Reding <thierry.reding@avionic-design.de>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/boot/dts/sh73a0.dtsi                |   33 ++++++++++++++++++++++++++
->  arch/arm/mach-shmobile/include/mach/common.h |    1 +
->  arch/arm/mach-shmobile/intc-sh73a0.c         |    9 +++++++
->  3 files changed, 43 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-> new file mode 100644
-> index 0000000..7dae1f4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sh73a0.dtsi
-> @@ -0,0 +1,33 @@
-> +/*
-> + * Device Tree Source for the SH73A0 SoC
-> + *
-> + * Copyright (C) 2012 Renesas Solutions Corp.
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	compatible = "renesas,sh73a0";
-> +
-> +	cpus {
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a9";
-> +		};
-> +		cpu at 1 {
-> +			compatible = "arm,cortex-a9";
-> +		};
-> +	};
+Hi all,
 
-It would be good the have reg and device_type properties set for the cpu nodes,
-so they're guaranteed to work with the logical map.
+This patch series attempts to close the gaps between the SMI/MDIO driver
+implemented and use by the Marvell MV643XX ethernet driver and Thomas' MVMDIO
+driver. I did not convert yet mv643xx_eth to use it as it would require proper
+Device Tree bindings (which is being worked on) to easily hook into it.
 
-[...]
+Note that I could not test this properly yet, thus the RFC, and I would like to
+find a better way of setting/getting the PHY address than using two exports,
+although I have tried to make them easy enough to use so the following logic in
+Ethernet drivers can be used:
 
-Thanks,
-Mark.
+- lookup device tree handle from MDIO device tree node
+- lookup corresponding struct platform_device from the device tree handle
+- call the helpers
+
+Comment welcome!
+
+Florian Fainelli (4):
+  net: mvmdio: rename base register cookie from smireg to regs
+  net: mvmdio: do not assume SMI reg is at offset 0 of the resource
+  net: mvmdio: enhance driver to support SMI error/done interrupts
+  net: mvmdio: add getter and setter for PHY addresses
+
+ .../devicetree/bindings/net/marvell-orion-mdio.txt |    5 +-
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    2 +-
+ drivers/net/ethernet/marvell/mvmdio.c              |  125 +++++++++++++++++---
+ include/linux/marvell_mvmdio.h                     |   10 ++
+ 4 files changed, 122 insertions(+), 20 deletions(-)
+ create mode 100644 include/linux/marvell_mvmdio.h
+
+-- 
+1.7.10.4
