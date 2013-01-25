@@ -1,101 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jan 2013 22:44:01 +0000
-Subject: [PATCH 02/19] ARM: disable virt_to_bus/virt_to_bus almost everywhere
+Date: Fri, 25 Jan 2013 22:44:05 +0000
+Subject: [PATCH 06/19] sched/debug: fix format string for 32 bit platforms
 In-Reply-To: <1359153858-31992-1-git-send-email-arnd@arndb.de>
 References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
  <1359153858-31992-1-git-send-email-arnd@arndb.de>
-Message-ID: <1359153858-31992-3-git-send-email-arnd@arndb.de>
+Message-ID: <1359153858-31992-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are getting a number of warnings about the use of the deprecated
-bus_to_virt function in drivers using the ARM ISA DMA API:
+The type returned from atomic64_t can be either unsigned
+long or unsigned long long, depending on the architecture.
+Using a cast to unsigned long long lets us use the same
+format string for all architectures.
 
-drivers/parport/parport_pc.c: In function 'parport_pc_fifo_write_block_dma':
-drivers/parport/parport_pc.c:622:3: warning: 'bus_to_virt' is deprecated
-(declared at arch/arm/include/asm/memory.h:253) [-Wdeprecated-declarations]
+Without this patch, building with scheduler debugging
+enabled results in:
 
-This is only because that function gets used by the inline
-set_dma_addr() helper. We know that any driver for the ISA DMA API
-is correctly using the DMA addresses, so we can change this
-to use the __bus_to_virt() function instead, which does not warn.
-
-After this, there are no remaining drivers that are used on
-any defconfigs on ARM using virt_to_bus or bus_to_virt, with
-the exception of the OSS sound driver. That driver is only used
-on RiscPC, NetWinder and Shark, so we can set ARCH_NO_VIRT_TO_BUS
-on all other platforms and hide the deprecated functions, which
-is far more effective than marking them as deprecated, in order
-to avoid any new users of that code.
+kernel/sched/debug.c: In function 'print_cfs_rq':
+kernel/sched/debug.c:225:2: warning: format '%ld' expects argument of type 'long int', but argument 4 has type 'long long int' [-Wformat]
+kernel/sched/debug.c:225:2: warning: format '%ld' expects argument of type 'long int', but argument 3 has type 'long long int' [-Wformat]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Paul Turner <pjt@google.com>
 ---
- arch/arm/Kconfig                 | 4 ++++
- arch/arm/configs/shark_defconfig | 1 -
- arch/arm/include/asm/dma.h       | 2 +-
- arch/arm/include/asm/memory.h    | 2 ++
- 4 files changed, 7 insertions(+), 2 deletions(-)
+ kernel/sched/debug.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 67874b8..91d4aea 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1450,6 +1450,10 @@ config ISA_DMA
- 	bool
- 	select ISA_DMA_API
- 
-+config ARCH_NO_VIRT_TO_BUS
-+	def_bool y
-+	depends on !ARCH_RPC && !ARCH_NETWINDER && !ARCH_SHARK
-+
- # Select ISA DMA interface
- config ISA_DMA_API
- 	bool
-diff --git a/arch/arm/configs/shark_defconfig b/arch/arm/configs/shark_defconfig
-index caa07db..e319b2c 100644
---- a/arch/arm/configs/shark_defconfig
-+++ b/arch/arm/configs/shark_defconfig
-@@ -73,7 +73,6 @@ CONFIG_PARTITION_ADVANCED=y
- CONFIG_NLS_CODEPAGE_437=m
- CONFIG_NLS_CODEPAGE_850=m
- CONFIG_NLS_ISO8859_1=m
--# CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
- CONFIG_DEBUG_KERNEL=y
- # CONFIG_SCHED_DEBUG is not set
-diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
-index 5694a0d..58b8c6a 100644
---- a/arch/arm/include/asm/dma.h
-+++ b/arch/arm/include/asm/dma.h
-@@ -105,7 +105,7 @@ extern void set_dma_sg(unsigned int chan, struct scatterlist *sg, int nr_sg);
-  */
- extern void __set_dma_addr(unsigned int chan, void *addr);
- #define set_dma_addr(chan, addr)				\
--	__set_dma_addr(chan, bus_to_virt(addr))
-+	__set_dma_addr(chan, (void *)__bus_to_virt(addr))
- 
- /* Set the DMA byte count for this channel
-  *
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 73cf03a..b11105c 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -245,6 +245,7 @@ static inline void *phys_to_virt(phys_addr_t x)
- #define __bus_to_pfn(x)	__phys_to_pfn(x)
- #endif
- 
-+#ifdef CONFIG_VIRT_TO_BUS
- static inline __deprecated unsigned long virt_to_bus(void *x)
- {
- 	return __virt_to_bus((unsigned long)x);
-@@ -254,6 +255,7 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
- {
- 	return (void *)__bus_to_virt(x);
- }
-+#endif
- 
- /*
-  * Conversion between a struct page and a physical address.
+diff --git a/kernel/sched/debug.c b/kernel/sched/debug.c
+index 2cd3c1b..7ae4c4c 100644
+--- a/kernel/sched/debug.c
++++ b/kernel/sched/debug.c
+@@ -222,8 +222,8 @@ void print_cfs_rq(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
+ 			cfs_rq->runnable_load_avg);
+ 	SEQ_printf(m, "  .%-30s: %lld\n", "blocked_load_avg",
+ 			cfs_rq->blocked_load_avg);
+-	SEQ_printf(m, "  .%-30s: %ld\n", "tg_load_avg",
+-			atomic64_read(&cfs_rq->tg->load_avg));
++	SEQ_printf(m, "  .%-30s: %lld\n", "tg_load_avg",
++			(unsigned long long)atomic64_read(&cfs_rq->tg->load_avg));
+ 	SEQ_printf(m, "  .%-30s: %lld\n", "tg_load_contrib",
+ 			cfs_rq->tg_load_contrib);
+ 	SEQ_printf(m, "  .%-30s: %d\n", "tg_runnable_contrib",
 -- 
 1.8.0
