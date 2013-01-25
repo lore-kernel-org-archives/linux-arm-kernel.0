@@ -1,36 +1,44 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 25 Jan 2013 16:13:58 +0100
-Subject: [PATCHv1 for soc 3/5] arm: socfpga: Add entries to enable make
- dtbs socfpga
-In-Reply-To: <1359075633-13502-4-git-send-email-dinguyen@altera.com>
-References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-4-git-send-email-dinguyen@altera.com>
-Message-ID: <20130125151357.GC10055@amd.pavel.ucw.cz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Jan 2013 15:28:31 +0000
+Subject: [PATCH 5/5] drm/exynos: don't include plat/gpio-cfg.h
+In-Reply-To: <1359127711-19070-1-git-send-email-arnd@arndb.de>
+References: <1359127711-19070-1-git-send-email-arnd@arndb.de>
+Message-ID: <1359127711-19070-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Patch  9eb3e9e6f3 "drm/exynos: add support for ARCH_MULTIPLATFORM"
+allowed building the exynos hdmi driver on non-samsung platforms,
+which unfortunately broke compilation in combination with 22c4f42897
+"drm: exynos: hdmi: add support for exynos5 hdmi", which added
+an inclusion of the samsung-specific plat/gpio-cfg.h header file.
 
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -124,6 +124,8 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
->  	r8a7740-armadillo800eva.dtb \
->  	sh73a0-kzm9g.dtb \
->  	sh7372-mackerel.dtb
-> +dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
-> +	socfpga_vt.dtb
->  dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
->  	spear1340-evb.dtb
->  dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+Fortunately, that header file is not required any more here, so
+we can simply revert the inclusion in order to build the ARM
+allyesconfig again without getting this error:
 
-This allows me to remove manual dtb invocation from the build
-scripts. Good.
+drivers/gpu/drm/exynos/exynos_hdmi.c:37:27: fatal error: plat/gpio-cfg.h: No such file or directory
 
-For 2,3/5:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Rob Clark <rob@ti.com>
+Cc: Inki Dae <inki.dae@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Rahul Sharma <rahul.sharma@samsung.com>
+---
+ drivers/gpu/drm/exynos/exynos_hdmi.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Tested-by: Pavel Machek <pavel@denx.de>
-Reviewed-by: Pavel Machek <pavel@denx.de>
-
-									Pavel
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index 41ff79d..b5f5119 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -34,7 +34,6 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/io.h>
+ #include <linux/of_gpio.h>
+-#include <plat/gpio-cfg.h>
+ 
+ #include <drm/exynos_drm.h>
+ 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.8.0
