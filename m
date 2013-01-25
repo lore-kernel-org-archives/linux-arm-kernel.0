@@ -1,69 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:13:23 +0900
-Subject: [PATCH 05/15] ARM: sh7372: add clock lookup entries for DT-based
- devices
+Date: Fri, 25 Jan 2013 11:13:27 +0900
+Subject: [PATCH 09/15] ARM: shmobile: r8a7740: Add CPU sleep suspend
 In-Reply-To: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080013-29189-6-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359080013-29189-10-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Bastian Hecht <hechtb@gmail.com>
 
-When booting with DT, devices are named differently. To get their clocks
-additional entries have to be added to the lookup table.
+Add the lighest possible sleep mode on Cortex-A9 cores: CPU sleep.
+It is entered by a simple dsb and wfi instruction via cpu_do_idle(). As
+just clocks are stopped there is no need to save or restore any state of
+the system.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Signed-off-by: Simon Horman <horms@verge.net.au>
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+Acked-by: Magnus Damm <damm@opensource.se>
+[ horms at verge.net.au: Added missing includes ]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-sh7372.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    2 ++
+ arch/arm/mach-shmobile/include/mach/common.h   |    1 +
+ arch/arm/mach-shmobile/pm-r8a7740.c            |   22 ++++++++++++++++++++++
+ 3 files changed, 25 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-sh7372.c b/arch/arm/mach-shmobile/clock-sh7372.c
-index 3ca6757b..45d21fe 100644
---- a/arch/arm/mach-shmobile/clock-sh7372.c
-+++ b/arch/arm/mach-shmobile/clock-sh7372.c
-@@ -544,6 +544,7 @@ static struct clk_lookup lookups[] = {
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index e791244..6573137 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -1181,6 +1181,8 @@ static void __init eva_init(void)
+ 	rmobile_add_device_to_domain("A4LC", &hdmi_lcdc_device);
+ 	if (usb)
+ 		rmobile_add_device_to_domain("A3SP", usb);
++
++	r8a7740_pm_init();
+ }
  
- 	/* MSTP32 clocks */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.2", &mstp_clks[MSTP001]), /* IIC2 */
-+	CLKDEV_DEV_ID("fff30000.i2c", &mstp_clks[MSTP001]), /* IIC2 */
- 	CLKDEV_DEV_ID("spi_sh_msiof.0", &mstp_clks[MSTP000]), /* MSIOF0 */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.4", &mstp_clks[MSTP131]), /* VEU3 */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.3", &mstp_clks[MSTP130]), /* VEU2 */
-@@ -556,6 +557,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-mipi-dsi.0", &mstp_clks[MSTP118]), /* DSITX0 */
- 	CLKDEV_DEV_ID("sh_mobile_lcdc_fb.1", &mstp_clks[MSTP117]), /* LCDC1 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.0", &mstp_clks[MSTP116]), /* IIC0 */
-+	CLKDEV_DEV_ID("fff20000.i2c", &mstp_clks[MSTP116]), /* IIC0 */
- 	CLKDEV_DEV_ID("sh_mobile_meram.0", &mstp_clks[MSTP113]), /* MERAM */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.5", &mstp_clks[MSTP106]), /* JPU */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.0", &mstp_clks[MSTP101]), /* VPU */
-@@ -577,18 +579,25 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP200]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI2 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.1", &mstp_clks[MSTP323]), /* IIC1 */
-+	CLKDEV_DEV_ID("e6c20000.i2c", &mstp_clks[MSTP323]), /* IIC1 */
- 	CLKDEV_DEV_ID("r8a66597_hcd.0", &mstp_clks[MSTP322]), /* USB0 */
- 	CLKDEV_DEV_ID("r8a66597_udc.0", &mstp_clks[MSTP322]), /* USB0 */
- 	CLKDEV_DEV_ID("renesas_usbhs.0", &mstp_clks[MSTP322]), /* USB0 */
- 	CLKDEV_DEV_ID("sh_flctl.0", &mstp_clks[MSTP315]), /* FLCTL */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
-+	CLKDEV_DEV_ID("e6850000.sdhi", &mstp_clks[MSTP314]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
-+	CLKDEV_DEV_ID("e6860000.sdhi", &mstp_clks[MSTP313]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMC */
-+	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMC */
- 	CLKDEV_DEV_ID("sh-mipi-dsi.1", &mstp_clks[MSTP423]), /* DSITX1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP415]), /* SDHI2 */
-+	CLKDEV_DEV_ID("e6870000.sdhi", &mstp_clks[MSTP415]), /* SDHI2 */
- 	CLKDEV_DEV_ID("sh-mobile-hdmi", &mstp_clks[MSTP413]), /* HDMI */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.3", &mstp_clks[MSTP411]), /* IIC3 */
-+	CLKDEV_DEV_ID("e6d20000.i2c", &mstp_clks[MSTP411]), /* IIC3 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.4", &mstp_clks[MSTP410]), /* IIC4 */
-+	CLKDEV_DEV_ID("e6d30000.i2c", &mstp_clks[MSTP410]), /* IIC4 */
- 	CLKDEV_DEV_ID("sh-dma-engine.4", &mstp_clks[MSTP407]), /* USB-DMAC1 */
- 	CLKDEV_DEV_ID("r8a66597_hcd.1", &mstp_clks[MSTP406]), /* USB1 */
- 	CLKDEV_DEV_ID("r8a66597_udc.1", &mstp_clks[MSTP406]), /* USB1 */
+ static void __init eva_earlytimer_init(void)
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index f221c11..c0ab595 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -52,6 +52,7 @@ extern void r8a7740_add_early_devices(void);
+ extern void r8a7740_add_standard_devices(void);
+ extern void r8a7740_clock_init(u8 md_ck);
+ extern void r8a7740_pinmux_init(void);
++extern void r8a7740_pm_init(void);
+ 
+ extern void r8a7779_init_irq(void);
+ extern void r8a7779_map_io(void);
+diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
+index 21e5316d..40b87aa 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7740.c
++++ b/arch/arm/mach-shmobile/pm-r8a7740.c
+@@ -9,7 +9,9 @@
+  * for more details.
+  */
+ #include <linux/console.h>
++#include <linux/suspend.h>
+ #include <mach/pm-rmobile.h>
++#include <mach/common.h>
+ 
+ #ifdef CONFIG_PM
+ static int r8a7740_pd_a4s_suspend(void)
+@@ -58,3 +60,23 @@ void __init r8a7740_init_pm_domains(void)
+ }
+ 
+ #endif /* CONFIG_PM */
++
++#ifdef CONFIG_SUSPEND
++static int r8a7740_enter_suspend(suspend_state_t suspend_state)
++{
++	cpu_do_idle();
++	return 0;
++}
++
++static void r8a7740_suspend_init(void)
++{
++	shmobile_suspend_ops.enter = r8a7740_enter_suspend;
++}
++#else
++static void r8a7740_suspend_init(void) {}
++#endif
++
++void __init r8a7740_pm_init(void)
++{
++	r8a7740_suspend_init();
++}
 -- 
 1.7.10.4
