@@ -1,62 +1,62 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 25 Jan 2013 11:25:12 -0800
-Subject: [PATCH 0/6] Initial Device Tree support for S3C64xx
-In-Reply-To: <1689405.9Ne2g34LZt@flatron>
-References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
- <1689405.9Ne2g34LZt@flatron>
-Message-ID: <017001cdfb31$b44bd3d0$1ce37b70$@samsung.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Fri, 25 Jan 2013 20:31:54 +0100
+Subject: [kvmarm] [Qemu-devel] [RFC] Virtio-desktop: Virtio-based virtual
+ desktop
+In-Reply-To: <CAAu8pHve_E-jtQAXidxroWHRVi_QKaYs6YeQhHqEap2bd7RMEQ@mail.gmail.com>
+References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
+ <CAAu8pHve_E-jtQAXidxroWHRVi_QKaYs6YeQhHqEap2bd7RMEQ@mail.gmail.com>
+Message-ID: <C549A8FA-7BD7-4C9C-B2B7-AE960F402645@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> On Sunday 13 of January 2013 02:10:52 Tomasz Figa wrote:
-> > This series is adds Device Tree support for Samsung S3C64xx SoC series.
-> >
-> > It fixes several problems preventing from booting an S3C64xx-based
-> > system using Device Tree, adds all the infrastructure for Device
-> > Tree-based board support, including mach-s3c64xx-dt and dts include
-> > files for S3C64xx SoCs, and (very) basic device tree source for
-> > FriendlyARM Mini6410 board.
-> >
-> > Current support is very limited and allows only basic bootup with UART
-> > and SDHCI, but should be fine as a start and will be extended in
-> > future, hopefully with help of S3C64xx board maintainers.
-> >
-> > Tomasz Figa (6):
-> >   ARM: common: vic: Parse interrupt and resume masks from device tree
-> >   ARM: common: vic: Fix invalid first IRQ number in OF-based
-> >     registration
-> >   ARM: s3c64xx: Add support for OF-based VIC initialization
-> >   ARM: s3c64xx: Add board file for boot using Device Tree
-> >   ARM: dts: Add basic dts include files for Samsung S3C64xx SoCs
-> >   ARM: dts: Add dts file for S3C6410-based Mini6410 board
-> >
-> >  Documentation/devicetree/bindings/arm/vic.txt |  6 ++
-> >  arch/arm/boot/dts/Makefile                    |  1 +
-> >  arch/arm/boot/dts/s3c6400.dtsi                | 33 +++++++++
-> >  arch/arm/boot/dts/s3c6410-mini6410.dts        | 50 ++++++++++++++
-> >  arch/arm/boot/dts/s3c6410.dtsi                | 33 +++++++++
-> >  arch/arm/boot/dts/s3c64xx.dtsi                | 97
-> > +++++++++++++++++++++++++++ arch/arm/common/vic.c
-> >   |  9 ++-
-> >  arch/arm/mach-s3c64xx/Kconfig                 | 13 ++++
-> >  arch/arm/mach-s3c64xx/Makefile                |  1 +
-> >  arch/arm/mach-s3c64xx/common.c                | 16 +++++
-> >  arch/arm/mach-s3c64xx/common.h                |  4 ++
-> >  arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c       | 84
-> > +++++++++++++++++++++++ 12 files changed, 345 insertions(+), 2
-> > deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/s3c6400.dtsi
-> >  create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
-> >  create mode 100644 arch/arm/boot/dts/s3c6410.dtsi
-> >  create mode 100644 arch/arm/boot/dts/s3c64xx.dtsi
-> >  create mode 100644 arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
-> 
-> Any other comments on this series?
-> 
-Looks good to me. But would be better if the vic changes could get ack ;-)
 
-Thanks.
+On 25.01.2013, at 20:04, Blue Swirl wrote:
 
-- Kukjin
+> On Thu, Jan 24, 2013 at 6:10 AM, Anup Patel <anup.patel@linaro.org> wrote:
+>> Hi All,
+>> 
+>> How about having a generic Virtio-based machine for emulating a virtual
+>> desktop ?
+> 
+> I have also thought about this, current virtio design is not very
+> clean. On the downside, pure no-legacy approach might not work well if
+> you want the host to give control of a host device to guest (VFIO like
+> pass through using IOMMUs).
+> 
+>> I know folks have already thought about this and probably also tried
+>> something or other on this front but, it will be good to know the downsides.
+>> 
+>> Virtio-desktop can be a separate specification describing a virtual desktop.
+>> Of-course we cannot avoid few architecture dependent virtual devices in but
+>> the Virtio-desktop specification will try to keep minimum possible
+>> architecture dependent devices.
+>> 
+>> As per our thoughts, a Virtio-desktop will have two kinds of devices:
+>> 1. Architecture dependent devices: This devices will be emulated in-kernel
+>> by architecture specific code of KVM or Xen or Some other hypervisor.
+>>   a) Virtualized CPU
+>>   b) Virtualized PIC (i.e. in-kernel architecture specific emulation of
+>> irqchip)
+>>   c) Virtualized Timer (i.e. in-kernel architecture specific emulation of
+>> timer chip)
+> 
+> I think reusing PIC and timer design is not the most optimal. What a
+> PV aware OS really wants is to wake up because of an external event or
+> at some specific point of time (or after a specific delay) and easy
+> way to manage the VM clock without timer tick counting. With a
+> tickless approach, it would need the timer events as rarely as
+> possible.
+> 
+> Perhaps a better approach would be to introduce a way for the guest to
+> subscribe to a list of external events (including time), which would
+> be fed to it via something like reverse hypercall (or just use legacy
+> interrupts). Preferably it should be possible to pass any events
+> through a stack of guests to the end consumer guest and even
+> applications in a guest.
+
+This approach falls apart once hardware vendors implement timer interrupts inside a guest context (which Intel and IIUC ARM are doing). At that point, it's actually more efficient to do real timer calls to real hardware.
+
+PV is bad. We only do it when we have to. Not doing PV where we don't have to is exactly the reason KVM is superior to Xen.
+
+
+Alex
