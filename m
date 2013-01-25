@@ -1,70 +1,30 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 25 Jan 2013 14:28:28 +0800
-Subject: [RESEND PATCH v5 3/7] usb: chipidea: add otg id switch and
- vbus connect/disconnect detect
-In-Reply-To: <87y5fimwma.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1358733418-17969-1-git-send-email-peter.chen@freescale.com>
- <1358733418-17969-4-git-send-email-peter.chen@freescale.com>
- <87y5fimwma.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20130125062827.GD29795@nchen-desktop>
+From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
+Date: Fri, 25 Jan 2013 06:29:49 +0000
+Subject: [PATCH 5/6] ARM: regulator: add tps6507x device tree data
+In-Reply-To: <20130124120050.GP4955@opensource.wolfsonmicro.com>
+References: <1359024920-32190-1-git-send-email-manishv.b@ti.com>
+ <1359024920-32190-6-git-send-email-manishv.b@ti.com>
+ <20130124120050.GP4955@opensource.wolfsonmicro.com>
+Message-ID: <A4887BF146CD57468F700B415D2F4701581621@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 05:25:17PM +0200, Alexander Shishkin wrote:
-> Peter Chen <peter.chen@freescale.com> writes:
+Hi Mark,
+
+On Thu, Jan 24, 2013 at 17:30:51, Mark Brown wrote:
+> On Thu, Jan 24, 2013 at 04:25:19PM +0530, Vishwanathrao Badarkhe, Manish wrote:
 > 
-> > The main design flow is the same with msm otg driver, that is the id and
-> > vbus interrupt are handled at core driver, others are handled by
-> > individual drivers.
-> >
-> > - At former design, when switch usb role from device->host, it will call
-> > udc_stop, it will remove the gadget driver, so when switch role
-> > from host->device, it can't add gadget driver any more.
-> > At new design, when role switch occurs, the gadget just calls
-> > usb_gadget_vbus_disconnect/usb_gadget_vbus_connect as well as
-> > reset controller, it will not free any device/gadget structure
-> >
-> > - Add vbus connect and disconnect to core interrupt handler, it can
-> > notify udc driver by calling usb_gadget_vbus_disconnect
-> > /usb_gadget_vbus_connect.
-> >
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/tps6507x.dtsi |   47 +++++++++++++++++++++++++++++++++++++++
 > 
-> [snip]
+> Why are you putting this in arch/arm?
 > 
-> > @@ -483,6 +614,17 @@ static int ci_hdrc_probe(struct platform_device *pdev)
-> >  		goto rm_wq;
-> >  	}
-> >  
-> > +	otgsc = hw_read(ci, OP_OTGSC, ~0);
-> > +	/*
-> > +	 * if it is device mode:
-> > +	 * - Enable vbus detect
-> > +	 * - If it has already connected to host, notify udc
-> > +	 */
-> > +	if (ci->role == CI_ROLE_GADGET) {
-> > +		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
-> > +		ci_handle_vbus_change(ci);
-> > +	}
-> > +
-> 
-> Actually, this doesn't work, neither here, nor in udc_start(), where the
-> next patch moves it. If you start in host role with A plug, unplug it,
-> plug B and load a gadget module,
 
-When we unplug A, device's role start will be called, that is
-udc_id_switch_for_device in my patch, it will enable vbus interrupt.
-Then, when we plug B, there will be an vbus interrupt, then the
-ci->vbus_active will be set, then when we load a gadget module, 
-the enumeration will begin like I said at last email.
+I too doubt that whether it should be in architecture specific folder,
+My code is in reference to below patch:
+arm/dts: regulator: Add tps65910 device tree data(d5d08e2e1672da627d7c9d34a9dc1089c653e23a)
 
-Ok, I say "fully tested" means I tested cases for my development, which
-includes: host/device is plugged during boots up, device/host switch,
-host only controller, load gadget before/next cable plugs in. If you
-think it is not enough, I will skip "fully" when sends next version patch.
+Could you please suggest me if it can be moved somewhere else?
 
-
--- 
-
-Best Regards,
-Peter Chen
+Regards, 
+Manish
