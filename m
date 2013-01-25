@@ -1,28 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 25 Jan 2013 10:54:17 +0100
-Subject: [PATCH 02/10] gpio: pxa: identify ed mask reg with platform data
-In-Reply-To: <1358929554-32265-3-git-send-email-haojian.zhuang@linaro.org>
-References: <1358929554-32265-1-git-send-email-haojian.zhuang@linaro.org>
- <1358929554-32265-3-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdYnMhWYy_FGrJs+=DN7od08nk5eeansPNaq9nxhm61-=A@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 25 Jan 2013 09:55:29 +0000
+Subject: [V5 PATCH 26/26] usb: ehci: ehci-mv: add device tree support
+In-Reply-To: <CAK9wHMQF6UYpc-TVxh1ot9hgmErFfvhFGuPLNQn1CfaMcsnD-A@mail.gmail.com>
+References: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
+ <1359009530-28182-27-git-send-email-chao.xie@marvell.com>
+ <20130124111603.GM32237@e106331-lin.cambridge.arm.com>
+ <CAK9wHMQF6UYpc-TVxh1ot9hgmErFfvhFGuPLNQn1CfaMcsnD-A@mail.gmail.com>
+Message-ID: <20130125095528.GH3075@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 9:25 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+[...]
 
-> Avoid to judge whether edge mask register exists by CPU. Use platform
-> data to identify it instead. The gpio edge mask register exists in MMP
-> series SoC.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> >> @@ -170,19 +202,36 @@ static int mv_ehci_probe(struct platform_device *pdev)
+> >>       }
+> >>
+> >>       platform_set_drvdata(pdev, ehci_mv);
+> >> -     ehci_mv->pdata = pdata;
+> >>       ehci_mv->hcd = hcd;
+> >>
+> >> -     ehci_mv->clknum = pdata->clknum;
+> >> -     for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
+> >> -             ehci_mv->clk[clk_i] =
+> >> -                 devm_clk_get(&pdev->dev, pdata->clkname[clk_i]);
+> >> -             if (IS_ERR(ehci_mv->clk[clk_i])) {
+> >> -                     dev_err(&pdev->dev, "error get clck \"%s\"\n",
+> >> -                             pdata->clkname[clk_i]);
+> >> -                     retval = PTR_ERR(ehci_mv->clk[clk_i]);
+> >> -                     goto err_clear_drvdata;
+> >> +     retval = mv_ehci_parse_dt(pdev, ehci_mv);
+> >> +     if (retval > 0) {
+> >
+> > Is this why you returned 1 from mv_ehci_parse_dt? So you only do this if you
+> > don't have a dt node?
+> >
+> > If so, why not rip the check (and positive error code) out of mv_ehci_parse_dt,
+> > and then here:
+> >
+> > if (pdev->dev.of_node) {
+> >         retval = mv_ehci_parse_dt(pdev, ehci_mv);
+> > } else
+> >         fall back to mv_usb_platform_data ...
+> > }
+> >
+> > That makes it obvious that one side depends on dt and the other's a fallback,
+> > and doesn't rely on nonstandard return code behaviour.
+> >
+> 
+> I will change it.
+> 
+> > Also, why not return immediately if mv_ehci_parse_dt fails?
+> >
+> I do not understand. if mv_ehci_parse_dt returns negative value, the
+> probe will be finished immediately.
 
-ARM SoC folks: do you approve (ACK) this patch so I
-can apply it to my GPIO tree?
+Yes, you're right. I got myself confused about the logic.
 
-It looks allright to me, I just want to know so that there are no
-huge changes around this code in the ARM SoC tree that will
-cause trouble.
-
-Yours,
-Linus Walleij
+Thanks,
+Mark.
