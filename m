@@ -1,53 +1,30 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Jan 2013 18:32:41 +0100
-Subject: [PATCH v2 1/5] arm: mvebu: Add support for local interrupt
+Date: Fri, 25 Jan 2013 18:32:43 +0100
+Subject: [PATCH v2 3/5] arm: mvebu: update defconfig with local timer support
 In-Reply-To: <1359135165-32108-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1359135165-32108-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1359135165-32108-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1359135165-32108-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MPIC allows the use of private interrupt for each CPUs. The 28th first
-interrupts are per-cpu. This patch adds support to use them.
+Now that we have support for local timers, enable it by default
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/irq-armada-370-xp.c |   15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+ arch/arm/configs/mvebu_defconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-index f99a4a2..274ff58 100644
---- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-@@ -145,10 +145,17 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
- {
- 	armada_370_xp_irq_mask(irq_get_irq_data(virq));
- 	writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
--
--	irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
--				 handle_level_irq);
- 	irq_set_status_flags(virq, IRQ_LEVEL);
-+
-+	if (hw < ARMADA_370_XP_MAX_PER_CPU_IRQS) {
-+		irq_set_percpu_devid(virq);
-+		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
-+					handle_percpu_devid_irq);
-+
-+	} else {
-+		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
-+					handle_level_irq);
-+	}
- 	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
- 
- 	return 0;
-@@ -245,7 +252,7 @@ asmlinkage void __exception_irq_entry armada_370_xp_handle_irq(struct pt_regs
- 		if (irqnr > 1022)
- 			break;
- 
--		if (irqnr >= 8) {
-+		if (irqnr > 0) {
- 			irqnr =	irq_find_mapping(armada_370_xp_mpic_domain,
- 					irqnr);
- 			handle_IRQ(irqnr, regs);
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index b5bc96c..28c1e38 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -14,7 +14,6 @@ CONFIG_MACH_ARMADA_XP=y
+ # CONFIG_CACHE_L2X0 is not set
+ # CONFIG_SWP_EMULATE is not set
+ CONFIG_SMP=y
+-# CONFIG_LOCAL_TIMERS is not set
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ # CONFIG_COMPACTION is not set
 -- 
 1.7.9.5
